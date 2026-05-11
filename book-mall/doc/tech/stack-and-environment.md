@@ -16,6 +16,17 @@
 4. **本地验证**：在项目目录执行 `pnpm run db:deploy` 或 `dotenv -e .env.local -- npx prisma db execute --stdin <<< "select 1"`；若 CLI 也超时，问题在 **网络或 Neon 状态**，而非页面代码。  
 5. **开发体验**：若冷启动仍烦人，可在 Neon **升级套餐**或启用 **Always-on**（以控制台当前套餐为准），减少睡眠次数。
 
+### 1.2 连接池耗尽或 「Timed out fetching a new connection」
+
+- 确认 **`DATABASE_URL` 为 Pooled**（主机含 `-pooler`，query 含 **`pgbouncer=true`**）；同一数据库勿并行多个 **`pnpm dev`**、长时间 **Prisma Studio**、CLI migrate 等占满连接。
+- 可选在 URL 追加 **`pool_timeout=30`**（仅放宽等待空闲连接的时间，不能替代扩容或降并发）。
+- 工具站每个页面请求都会调用主站 **`GET /api/sso/tools/introspect`**；实现上已合并 User 查询、并将黄金会员校验改为单次事务内顺序读，以降低单次请求的连接峰值。若仍慢，优先排查 **Neon 睡眠冷启动**（见上文 `connect_timeout`）与 **跨区域延迟**。
+
+### 1.3 Neon：迁移与运行时连接串（进阶）
+
+- Prisma Migrate 对 **PgBouncer 事务模式** 有限制时，可在 Neon 控制台复制 **Direct（非 pooler）** 连接串，仅在本地执行 `prisma migrate dev` / `db push` 时使用；应用运行时仍应用 **Pooled** `DATABASE_URL`。若暂不拆分两串，迁移偶发失败时再按控制台文档切换即可。
+- 大规模 Serverless 可考虑 **Prisma Accelerate** 或 Neon **Scale** 套餐自带的连接策略（按官方文档配置），本仓库默认不强制。
+
 ## 2. 部署
 
 - **平台**：Vercel 自动部署（与仓库绑定后的流水线）。  

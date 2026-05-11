@@ -38,6 +38,9 @@ export default async function AccountPage() {
   ]);
 
   const toolsSsoReady = isToolsSsoConfigured();
+  const isAdminUser = session.user.role === "ADMIN";
+  const canLaunchTools =
+    toolsSsoReady && (goldAccess.isGoldMember || isAdminUser);
 
   const hasPendingWalletRefund = walletRefunds.some((r) => r.status === "PENDING");
 
@@ -108,15 +111,17 @@ export default async function AccountPage() {
                   {formatMinorAsYuan(goldAccess.minBalanceLineMinor)}）
                 </p>
                 <LaunchToolsAppButton
-                  enabled={goldAccess.isGoldMember && toolsSsoReady}
+                  enabled={canLaunchTools}
                   helperText={
                     !toolsSsoReady
                       ? "工具站跳转未启用：请在服务端配置 TOOLS_PUBLIC_ORIGIN、TOOLS_SSO_SERVER_SECRET、TOOLS_SSO_JWT_SECRET（见 doc/tech/tools-sso-environment.md）。"
-                      : !goldAccess.isGoldMember
+                      : !goldAccess.isGoldMember && !isAdminUser
                         ? !goldAccess.hasRechargeHistory
-                          ? "请先完成至少一笔钱包充值入账。"
-                          : `余额需不低于 ¥${formatMinorAsYuan(goldAccess.minBalanceLineMinor)}（当前 ¥${formatMinorAsYuan(goldAccess.balanceMinor)}）。`
-                        : "将跳转至独立部署的工具站（默认路径 /fitting-room）；需在工具项目实现回调与换票。"
+                          ? "请先完成至少一笔钱包充值入账（或通过管理员账号从后台进入工具站调试）。"
+                          : `余额需不低于 ¥${formatMinorAsYuan(goldAccess.minBalanceLineMinor)}（当前 ¥${formatMinorAsYuan(goldAccess.balanceMinor)}）；或通过管理员账号从后台进入工具站调试。`
+                        : isAdminUser && !goldAccess.isGoldMember
+                          ? "当前以管理员身份直通工具站（不要求黄金会员）；普通用户仍需黄金会员。"
+                          : "将跳转至独立部署的工具站（默认路径 /fitting-room）；需在工具项目实现回调与换票。"
                   }
                 />
               </div>

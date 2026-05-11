@@ -18,15 +18,19 @@
 |------|------|
 | `MAIN_SITE_ORIGIN` | 主站 origin，无末尾 `/`。例：`https://www.ai-code8.com` |
 | `TOOLS_SSO_SERVER_SECRET` | 与主站 **完全一致** |
-| `TOOLS_SSO_JWT_SECRET` | 若工具站本地验 JWT，与主站一致；否则可仅凭 introspect |
+| `TOOLS_SSO_JWT_SECRET` | **强烈建议与主站一致**：服务端 **`resolveToolsShellSession`** 优先本地验签 JWT（内含 `email`/`name`/`image` 裁剪字段）；未配置或验签失败时壳层降级为 **`GET introspect`** |
+| `TOOL_WEB_*` | **可选**：大模型 / 兼容接口 Key、Base URL、模型名等；仅写在工具站 `.env.local`，模板见 **`tool-web/config/tool-web.env.example`**，读取 **`tool-web/lib/tool-config.ts`** |
 
 ## 主站 HTTP API
 
 | 方法 | 路径 | 调用方 | 说明 |
 |------|------|--------|------|
-| `POST` | `/api/sso/tools/issue` | 主站浏览器（已登录） | Body 可选 `{ redirectPath?: string }`，默认 `/fitting-room`；返回 `{ redirectUrl, codeTtlSeconds }` |
-| `POST` | `/api/sso/tools/exchange` | 工具站 **服务端** | Header `Authorization: Bearer TOOLS_SSO_SERVER_SECRET`；Body `{ code }`；返回 OAuth 式 `{ access_token, expires_in, token_type, token_subtype }` |
-| `GET` | `/api/sso/tools/introspect` | 工具站 **服务端** | Header `Authorization: Bearer <access_token>`；返回 `active`、`balance_minor` 等；权限丢失时 `active: false` |
+| `POST` | `/api/sso/tools/issue` | 主站浏览器（已登录） | Body 可选 `{ redirectPath?: string }`，默认 `/fitting-room`；**黄金会员或管理员**可换取跳转；返回 `{ redirectUrl, codeTtlSeconds }` |
+| `GET` | `/api/sso/tools/re-enter` | 浏览器（工具站过期引导） | Query：`redirect`（工具站内路径，默认 `/fitting-room`，须以 `/` 开头）。已登录则直接 302 至工具站 callback；未登录则 302 至 `/login?callbackUrl=…` 登录后再回到本接口签发跳转。**新标签直达本接口时浏览器会先显示 `about:blank`**，可从主站页面改为先打开 **`/tools-open?redirect=/路径`**（加载动画后再跳转本接口）。 |
+| `POST` | `/api/sso/tools/exchange` | 工具站 **服务端** | Header `Authorization: Bearer TOOLS_SSO_SERVER_SECRET`；Body `{ code }`；返回 OAuth 式 `{ access_token, expires_in, token_type, token_subtype }`。JWT Payload 除 `sub`、`tier`、`exp` 外写入裁剪后的 **`email` / `name` / `image`**（供工具站壳层本地验签展示）。 |
+| `GET` | `/api/sso/tools/introspect` | 工具站 **服务端** | Header `Authorization: Bearer <access_token>`；返回 `active`、`tools_role`（`admin` / `member`）、`balance_minor`、`email`、`name`、`image`（头像 URL，OAuth 常见；可为 `null`）等；权限丢失时 `active: false` |
+
+**吊销黄金会员、余额线变更等「实时权威」仍以 `GET /api/sso/tools/introspect` 为准**；JWT 仅在 TTL 内视为壳层展示与路由占位可信源，缩短 TTL（`TOOLS_SSO_JWT_TTL_SECONDS`）可收窄滞后窗口。
 
 ## 数据库
 
@@ -36,7 +40,7 @@
 
 最小可运行 Next 应用：[**`../../../tool-web/README.md`**](../../../tool-web/README.md)。本地典型配置：`TOOLS_PUBLIC_ORIGIN=http://127.0.0.1:3001`（主站）、`MAIN_SITE_ORIGIN=http://localhost:3000`（工具站）。
 
-若 Git 根目录仅在 `book-mall`，上级 **`tool-web`** 不会随远端 clone；请把仓库根上移至共同父目录，或将工具站单独维护——见 **[`README.md`](../../../README.md)**（`private_website` 根目录说明）。
+**Git 根目录**为本仓库 **`private_website/`**，clone / push 会同时包含 `book-mall` 与 `tool-web`。仓库约定说明见 **[`README.md`](../../../README.md)**。
 
 ## 相关文档
 

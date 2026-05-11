@@ -69,9 +69,27 @@ model User {
   walletRefundRequests         WalletRefundRequest[]
   subscriptionRefundRequests   SubscriptionRefundRequest[]
   ssoAuthorizationCodes        SsoAuthorizationCode[]
+  toolUsageEvents              ToolUsageEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// 工具站访问 / 调用打点（审计与后续扣费扩展）；写入方为主站 API，身份以工具 JWT 的 sub 为准。
+model ToolUsageEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  /// 业务约定的工具键，如 fitting-room、home
+  toolKey   String
+  /// page_view、invoke 等
+  action    String   @default("page_view")
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, toolKey, createdAt])
+  @@index([toolKey, createdAt])
 }
 
 // —— 平台配置（单行 default）——

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getGoldMemberAccess } from "@/lib/gold-member";
+import { getToolsSsoEligibility } from "@/lib/tools-sso-access";
 import {
   getToolsJwtTtlSec,
   requireToolsJwtSecret,
@@ -10,6 +10,7 @@ import { signToolsAccessToken } from "@/lib/tools-sso-token";
 
 /**
  * 工具站服务端调用：用一次性 code 换短时 access token（JWT）。
+ * 准入：黄金会员或主站管理员；JWT `tier` 分别为 `gold` / `admin`。
  * 须在服务端发起；Bearer 为 TOOLS_SSO_SERVER_SECRET。
  */
 export async function POST(req: Request) {
@@ -36,14 +37,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "无效或已过期的授权码" }, { status: 400 });
   }
 
-  const gold = await getGoldMemberAccess(row.userId);
-  if (!gold.isGoldMember) {
+  const elig = await getToolsSsoEligibility(row.userId);
+  if (!elig.ok) {
     await prisma.ssoAuthorizationCode.update({
       where: { id: row.id },
       data: { consumedAt: now },
     });
     return NextResponse.json(
-      { error: "当前不满足黄金会员条件，授权码已作废" },
+      { error: "当前不满足工具站准入条件（黄金会员或管理员），授权码已作废" },
       { status: 403 },
     );
   }
@@ -65,12 +66,18 @@ export async function POST(req: Request) {
     userId: row.userId,
     secret: jwtSecret,
     expiresInSec: expiresIn,
+    tier: elig.isAdmin ? "admin" : "gold",
+    profile: {
+      email: elig.email,
+      name: elig.name,
+      image: elig.image,
+    },
   });
 
   return NextResponse.json({
     access_token: accessToken,
     expires_in: expiresIn,
     token_type: "Bearer",
-    token_subtype: "tools_sso_gold",
+    token_subtype: elig.isAdmin ? "tools_sso_admin" : "tools_sso_gold",
   });
 }
