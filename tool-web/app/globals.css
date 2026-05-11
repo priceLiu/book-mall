@@ -8,6 +8,7 @@
   --tool-accent: #18181b;
   --tool-accent-contrast: #fafafa;
   --tool-sidebar-w: 260px;
+  --tool-sidebar-w-collapsed: 52px;
   --tool-topbar-h: 56px;
 }
 
@@ -62,13 +63,39 @@ a {
   box-sizing: border-box;
   display: flex;
   align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
 }
 
 .tool-brand {
+  flex: 1;
+  min-width: 0;
   font-weight: 700;
   font-size: 1.05rem;
   letter-spacing: -0.02em;
   text-decoration: none;
+}
+
+.tool-sidebar-pin-btn {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--tool-border);
+  border-radius: 8px;
+  background: var(--tool-surface);
+  color: var(--tool-text);
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tool-sidebar-pin-btn:hover {
+  background: var(--tool-bg);
 }
 
 .tool-brand:hover {
@@ -363,6 +390,10 @@ button.tool-renew {
   box-sizing: border-box;
 }
 
+.tool-main-scroll .tw-main.fitting-room-main {
+  max-width: min(96rem, 100%);
+}
+
 /* ----- 通用内容块（页面内） ----- */
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -467,6 +498,41 @@ code {
   .tool-sidebar {
     position: relative;
     transform: none !important;
+    transition: width 0.22s ease;
+  }
+
+  .tool-sidebar-pin-btn {
+    display: inline-flex;
+  }
+
+  .tool-root.tool-sidebar-collapsed-desktop .tool-sidebar {
+    width: var(--tool-sidebar-w-collapsed);
+  }
+
+  .tool-root.tool-sidebar-collapsed-desktop .tool-brand {
+    display: none;
+  }
+
+  .tool-root.tool-sidebar-collapsed-desktop .tool-sidebar-body {
+    display: none;
+  }
+
+  .tool-root.tool-sidebar-collapsed-desktop .tool-sidebar-head {
+    justify-content: center;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+    border-bottom-color: transparent;
+  }
+
+  .tool-root.tool-sidebar-collapsed-desktop .tool-sidebar-pin-btn {
+    background: var(--tool-text);
+    color: var(--tool-accent-contrast);
+    border-color: var(--tool-text);
+  }
+
+  .tool-root.tool-sidebar-collapsed-desktop .tool-sidebar-pin-btn:hover {
+    background: var(--tool-text);
+    opacity: 0.92;
   }
 }
 

@@ -58,8 +58,36 @@ export async function POST(req: Request) {
 
   const meta = parseMeta(body.meta);
 
+  const toolUsageDelegate = (
+    prisma as unknown as {
+      toolUsageEvent?: {
+        create: (args: {
+          data: {
+            userId: string;
+            toolKey: string;
+            action: string;
+            meta?: Prisma.InputJsonValue;
+          };
+        }) => Promise<unknown>;
+      };
+    }
+  ).toolUsageEvent;
+
+  if (!toolUsageDelegate?.create) {
+    console.error(
+      "[tools/usage] Prisma 客户端不含 toolUsageEvent（请在 book-mall 执行 `pnpm prisma generate` 并重启 dev）",
+    );
+    return NextResponse.json(
+      {
+        error:
+          "打点存储未就绪：数据库客户端未生成 ToolUsageEvent，请在 book-mall 目录执行 prisma generate 后重启服务",
+      },
+      { status: 503 },
+    );
+  }
+
   try {
-    await prisma.toolUsageEvent.create({
+    await toolUsageDelegate.create({
       data: {
         userId: verified.sub,
         toolKey,

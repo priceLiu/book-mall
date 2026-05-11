@@ -1,0 +1,78 @@
+[
+    {
+        "id": "sophia",
+        "name": "Sophia",
+        "style": "Elegant",
+        "gender": "Female",
+        "height": "170",
+        "weight": "50kg",
+        "body": "Pear Shape",
+        "bust": "86cm",
+        "waist": "60cm",
+        "hips": "90cm",
+        "image": "https://static-main.aiyeshi.cn/ai-fitroom/model_01.webp",
+        "selected": true,
+        "isCustom": false
+    },
+    {
+        "id": "mike",
+        "name": "Mike",
+        "style": "Casual",
+        "gender": "Male",
+        "height": "183",
+        "weight": "75kg",
+        "body": "Athletic",
+        "bust": "98cm",
+        "waist": "78cm",
+        "hips": "92cm",
+        "image": "https://static-main.aiyeshi.cn/ai-fitroom/model_02.webp",
+        "selected": false,
+        "isCustom": false
+    },
+    {
+        "id": "lina",
+        "name": "Lina",
+        "style": "Streetwear",
+        "gender": "Female",
+        "height": "165",
+        "weight": "48kg",
+        "body": "Hourglass",
+        "bust": "88cm",
+        "waist": "58cm",
+       
+        "hips": "88cm",
+        "image": "https://static-main.aiyeshi.cn/ai-fitroom/model_03.png",
+        "selected": false,
+        "isCustom": false
+    },
+    {
+        "id": "david",
+        "name": "David",
+        "style": "Formal",
+        "gender": "Male",
+        "height": "188",
+        "weight": "82kg",
+        "body": "Rectangle",
+        "bust": "102cm",
+        "waist": "84cm",
+        "hips": "96cm",
+        "image": "https://static-main.aiyeshi.cn/ai-fitroom/model_04.png",
+        "selected": false,
+        "isCustom": false
+    },
+    {
+        "id": "emma",
+        "name": "Emma",
+        "style": "Minimalist",
+        "gender": "Female",
+        "height": "175",
+        "weight": "54kg",
+        "body": "Straight",
+        "bust": "84cm",
+        "waist": "62cm",
+        "hips": "86cm",
+        "image": "https://static-main.aiyeshi.cn/ai-fitroom/model_05.webp",
+        "selected": false,
+        "isCustom": false
+    }
+]
