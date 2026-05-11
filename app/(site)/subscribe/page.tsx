@@ -97,7 +97,7 @@ export default async function SubscribePage() {
         <h2 className="text-xl font-semibold md:text-2xl">AI 应用</h2>
         <AiAppsRechargeNotice />
         <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
-          工具型产品提供在线推理、模板生成与工作流编排等能力。除订阅会员身份外，按量与工具调用依赖钱包余额；不满足条件时应用将无法正常使用，请以下方「选择订阅」开通会员，并在个人中心充值。
+          工具型产品提供在线推理、结构化内容生成与工作流编排等能力。除订阅会员身份外，按量与工具调用依赖钱包余额；不满足条件时应用将无法正常使用，请以下方「选择订阅」开通会员，并在个人中心充值。
         </p>
         <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
           <Link href="/products/ai-apps" className="text-primary underline-offset-4 hover:underline">

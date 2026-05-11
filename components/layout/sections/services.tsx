@@ -19,7 +19,7 @@ const serviceList: ServiceProps[] = [
   {
     title: "自定义域名接入",
     description:
-      "将落地页绑定到你的品牌域名，统一访问入口与搜索引擎展示。",
+      "将官网或业务站点绑定到你的品牌域名，统一访问入口与搜索引擎展示。",
     pro: 0,
   },
   {
