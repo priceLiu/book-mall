@@ -21,7 +21,7 @@ export function TextToImagePanel({
   const originConfigured =
     typeof mainOrigin === "string" && mainOrigin.trim().length > 0;
 
-  if (loading && hasTokenCookie) {
+  if (loading) {
     return (
       <p className="tw-muted" role="status">
         正在同步会话…

@@ -20,10 +20,10 @@ import { GUEST_TOOL_SHELL_SESSION } from "@/lib/tool-shell-session-types";
 export type { ToolShellSession } from "@/lib/tool-shell-session-types";
 
 export type ToolsSessionContextValue = {
-  /** 正在请求 `/api/tools-session`（仅有 Cookie 时为 true） */
+  /** 正在请求 `/api/tools-session` */
   loading: boolean;
   session: ToolShellSession;
-  /** 请求开始时浏览器是否带有 tools_token */
+  /** 最近一次 `/api/tools-session` 返回的 `hasCookie`（与服务端 Cookie 一致） */
   hasTokenCookie: boolean;
   refetch: () => Promise<void>;
 };
@@ -44,42 +44,52 @@ function avatarLooksAbsolute(url: string) {
   return /^https?:\/\//i.test(url.trim());
 }
 
+function parseToolsSessionPayload(raw: unknown): FetchToolsSessionResult {
+  if (!raw || typeof raw !== "object") {
+    return {
+      hasCookie: false,
+      originConfigured: false,
+      introspectStatus: null,
+      introspect: null,
+      active: false,
+    };
+  }
+  const o = raw as Record<string, unknown>;
+  const { _diag: _ignored, ...rest } = o;
+  return rest as FetchToolsSessionResult;
+}
+
 export function ToolShellClient({
   children,
   mainOrigin,
-  hasTokenCookie,
 }: {
   children: React.ReactNode;
   mainOrigin: string | null;
-  hasTokenCookie: boolean;
 }) {
   const pathname = usePathname() || "/";
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [loading, setLoading] = useState(Boolean(hasTokenCookie));
-  const [session, setSession] = useState<ToolShellSession>(
-    hasTokenCookie ? GUEST_TOOL_SHELL_SESSION : GUEST_TOOL_SHELL_SESSION,
-  );
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<ToolShellSession>(GUEST_TOOL_SHELL_SESSION);
+  const [hasTokenCookie, setHasTokenCookie] = useState(false);
 
   const loadSession = useCallback(async () => {
-    if (!hasTokenCookie) {
-      setLoading(false);
-      setSession(GUEST_TOOL_SHELL_SESSION);
-      return;
-    }
     setLoading(true);
     try {
       const r = await fetch("/api/tools-session", {
         cache: "no-store",
         credentials: "same-origin",
       });
-      const data = (await r.json()) as FetchToolsSessionResult;
+      const raw = await r.json().catch(() => null);
+      const data = parseToolsSessionPayload(raw);
+      setHasTokenCookie(Boolean(data.hasCookie));
       setSession(mapFetchToolsSessionResultToShell(data));
     } catch {
+      setHasTokenCookie(false);
       setSession(GUEST_TOOL_SHELL_SESSION);
     } finally {
       setLoading(false);
     }
-  }, [hasTokenCookie]);
+  }, []);
 
   useEffect(() => {
     void loadSession();
@@ -106,25 +116,36 @@ export function ToolShellClient({
 
   const mainHref = mainOrigin != null ? `${mainOrigin.replace(/\/$/, "")}/` : null;
 
-  const displayName =
-    session.name?.trim() ||
-    session.email?.trim() ||
-    (session.sub
-      ? session.sub.length <= 14
+  const emailRaw = session.email?.trim() ?? "";
+  const nameRaw = session.name?.trim() ?? "";
+  const subCompact =
+    session.sub == null || session.sub === ""
+      ? ""
+      : session.sub.length <= 14
         ? session.sub
-        : `${session.sub.slice(0, 12)}…`
-      : null) ||
+        : `${session.sub.slice(0, 12)}…`;
+
+  const primaryLabel =
+    nameRaw ||
+    emailRaw ||
+    subCompact ||
     (session.active ? "已登录用户" : null);
+
+  /** 主行已等于邮箱时不重复第二行；有昵称时再单独显示邮箱 */
+  const emailSubline =
+    emailRaw.length > 0 && primaryLabel != null && emailRaw !== primaryLabel
+      ? emailRaw
+      : null;
 
   const avatarUrl = session.image?.trim() ?? "";
   const safeAvatar = avatarUrl && avatarLooksAbsolute(avatarUrl) ? avatarUrl : "";
   const fallbackInitial =
-    displayName && displayName.length > 0
-      ? displayName.charAt(0).toUpperCase()
+    (nameRaw || emailRaw || subCompact || "").length > 0
+      ? (nameRaw || emailRaw || subCompact).charAt(0).toUpperCase()
       : "?";
 
   const userSlot = (() => {
-    if (loading && hasTokenCookie) {
+    if (loading) {
       return (
         <span className="tool-user-loading" title="正在校验工具站令牌">
           校验会话…
@@ -142,42 +163,38 @@ export function ToolShellClient({
       );
     }
     const title =
-      session.email ?? session.name ?? session.sub ?? undefined;
+      [nameRaw, emailRaw].filter((s) => s.length > 0).join(" · ") ||
+      session.sub ||
+      undefined;
     return (
-      <div className="tool-user-meta">
-        <div className="tool-user-row">
-          {safeAvatar ? (
-            <img
-              src={safeAvatar}
-              alt=""
-              width={32}
-              height={32}
-              className="tool-user-avatar tool-user-avatar--img"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <span className="tool-user-avatar tool-user-avatar--fallback" aria-hidden>
-              {fallbackInitial}
-            </span>
-          )}
-          <span className="tool-user-name" title={title}>
-            {displayName ?? "已登录用户"}
+      <div className="tool-user-profile">
+        {safeAvatar ? (
+          <img
+            src={safeAvatar}
+            alt=""
+            width={32}
+            height={32}
+            className="tool-user-avatar tool-user-avatar--img"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <span className="tool-user-avatar tool-user-avatar--fallback" aria-hidden>
+            {fallbackInitial}
           </span>
-          {session.toolsRole ? (
-            <span className="tool-user-badge">
-              {session.toolsRole === "admin" ? "管理员" : "会员"}
+        )}
+        <div className="tool-user-text-stack">
+          <span className="tool-user-name" title={title}>
+            {primaryLabel ?? "已登录用户"}
+          </span>
+          {emailSubline ? (
+            <span className="tool-user-email-line" title={emailSubline}>
+              {emailSubline}
             </span>
           ) : null}
         </div>
-        {session.sub ? (
-          <span
-            className="tool-user-id"
-            title={`主站用户 ID（审计 / 计费关联）：${session.sub}`}
-          >
-            ID{" "}
-            {session.sub.length > 22
-              ? `${session.sub.slice(0, 20)}…`
-              : session.sub}
+        {session.toolsRole ? (
+          <span className="tool-user-badge">
+            {session.toolsRole === "admin" ? "管理员" : "会员"}
           </span>
         ) : null}
       </div>
@@ -276,6 +293,11 @@ export function ToolShellClient({
 
             <div className="tool-user">
               {userSlot}
+              {hasTokenCookie ? (
+                <a href="/api/tools-logout" className="tool-logout">
+                  退出
+                </a>
+              ) : null}
               {renewHref ? (
                 <Link href={renewHref} className="tool-renew">
                   重新连接

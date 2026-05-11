@@ -31,6 +31,7 @@ export async function issueToolsSsoRedirect(opts: {
       ok: false,
       status: 503,
       error: "SSO 环境变量未正确配置（TOOLS_PUBLIC_ORIGIN / TOOLS_SSO_*）",
+      code: "TOOLS_SSO_SECRETS_MISSING",
     };
   }
 
@@ -40,6 +41,7 @@ export async function issueToolsSsoRedirect(opts: {
       ok: false,
       status: 503,
       error: "TOOLS_PUBLIC_ORIGIN 无效或未配置",
+      code: "TOOLS_PUBLIC_ORIGIN_INVALID",
     };
   }
 

@@ -21,7 +21,21 @@ export async function getToolsSsoEligibility(userId: string): Promise<ToolsSsoEl
     getGoldMemberAccess(userId),
   ]);
   const isAdmin = user?.role === "ADMIN";
-  const ok = isAdmin || gold.isGoldMember;
+  let ok = isAdmin || gold.isGoldMember;
+
+  const relaxDev =
+    process.env.NODE_ENV === "development" &&
+    process.env.TOOLS_SSO_RELAX_MEMBERSHIP?.trim() === "1";
+
+  if (relaxDev && user) {
+    if (!ok) {
+      console.warn(
+        "[tools-sso] TOOLS_SSO_RELAX_MEMBERSHIP=1：开发模式下放行工具站 SSO（非管理员且非黄金会员）",
+      );
+    }
+    ok = true;
+  }
+
   return {
     ok,
     isAdmin,
