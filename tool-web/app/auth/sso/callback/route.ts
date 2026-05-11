@@ -1,16 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-
-function mainOrigin(): string | null {
-  const raw = process.env.MAIN_SITE_ORIGIN?.trim();
-  if (!raw) return null;
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    return raw.replace(/\/$/, "");
-  } catch {
-    return null;
-  }
-}
+import { getMainSiteOrigin } from "@/lib/site-origin";
 
 function exchangeSecret(): string | null {
   const s = process.env.TOOLS_SSO_SERVER_SECRET?.trim();
@@ -25,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   const base = request.nextUrl.origin;
-  const origin = mainOrigin();
+  const origin = getMainSiteOrigin();
   const secret = exchangeSecret();
 
   if (!code || !origin || !secret) {

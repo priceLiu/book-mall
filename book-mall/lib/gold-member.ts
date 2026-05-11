@@ -13,7 +13,8 @@ export async function getGoldMemberAccess(userId: string): Promise<{
   minBalanceLineMinor: number;
   hasRechargeHistory: boolean;
 }> {
-  const [config, wallet, rechargeCount] = await Promise.all([
+  /** 单连接顺序执行，降低与 introspect 等路由叠加时的连接池峰值（wall-clock 略增通常可接受） */
+  const [config, wallet, rechargeCount] = await prisma.$transaction([
     prisma.platformConfig.findUnique({ where: { id: "default" } }),
     prisma.wallet.findUnique({ where: { userId } }),
     prisma.walletEntry.count({

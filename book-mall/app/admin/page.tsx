@@ -10,7 +10,7 @@ import {
 
 export default async function AdminDashboardPage() {
   const now = new Date();
-  const [userCount, activeSubscriptions, balanceSum] = await Promise.all([
+  const [userCount, activeSubscriptions, balanceSum] = await prisma.$transaction([
     prisma.user.count(),
     prisma.subscription.count({
       where: { status: "ACTIVE", currentPeriodEnd: { gt: now } },

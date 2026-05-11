@@ -1,27 +1,30 @@
 import Link from "next/link";
+import { mainSiteToolsReEnterHref } from "@/lib/main-site-tools-links";
+import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export default function Home() {
+  const origin = getMainSiteOrigin();
+  const renewFitting = mainSiteToolsReEnterHref(origin, "/fitting-room");
+
   return (
-    <main>
-      <h1>AI 工具站</h1>
-      <p>
-        本目录为仓库内<strong>独立 Next 应用</strong>，默认端口 <code>3001</code>
-        ，与主站分离进程运行。
+    <main className="tw-main">
+      <h1 style={{ marginTop: 0 }}>工作台</h1>
+      <p className="tw-muted">
+        请从左侧 <strong>工具列表</strong> 进入具体应用。大屏侧栏常驻；小屏使用左上角「菜单」展开导航。
       </p>
-      <p>
-        请从主站个人中心点击「打开试衣间」跳转至此（带 SSO <code>code</code>
-        ）；或先登录主站并完成黄金会员条件后使用入口。
+      <p className="tw-muted">
+        若顶部显示「未建立工具站会话」，请先完成主站 SSO（个人中心 / 管理后台入口，或使用「重新连接」）。说明见{" "}
+        <code>tool-web/doc/tech/sso-session-troubleshooting.md</code>。
       </p>
-      <ul>
-        <li>
-          <Link href="/fitting-room">试衣间占位页</Link>（需已通过 SSO 写入 Cookie）
-        </li>
-      </ul>
-      <p style={{ fontSize: "0.9rem", color: "#555" }}>
-        配置说明见本目录 <code>README.md</code> 与主站文档{" "}
-        <code>book-mall/doc/tech/tools-sso-environment.md</code>
-        。
-      </p>
+      {renewFitting ? (
+        <div
+          className="tw-note"
+          style={{ marginTop: "1rem", background: "var(--tool-surface)", borderColor: "var(--tool-border)" }}
+        >
+          <strong>快捷：</strong>
+          <Link href={renewFitting}>从主站签发会话并进入试衣间</Link>
+        </div>
+      ) : null}
     </main>
   );
 }

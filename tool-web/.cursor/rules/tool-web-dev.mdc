@@ -1,0 +1,32 @@
+---
+description: AI 工具站 (tool-web) 开发约定 — SSO、导航、布局与文档
+globs: tool-web/**/*
+alwaysApply: false
+---
+
+# tool-web 开发规则
+
+## 架构
+
+- 独立 Next 应用；认证依赖主站 SSO，服务端换票后 Cookie 名 **`tools_token`**。壳层会话优先 **`TOOLS_SSO_JWT_SECRET` 本地验签 JWT**（快路径）；失败或未配置时再 **`fetchToolsSession` / introspect**。计费与高危操作建议 Route 内单独复核。
+- 不要把 **`TOOLS_SSO_*`**、上游模型 Key 暴露给客户端组件；推理走 **`app/api/**` Route Handler**，配置读 **`lib/tool-config.ts`**。
+
+## UI 壳层
+
+- 全站布局由 **`ToolShell` / `ToolShellClient`** 提供：**左侧导航**依次为 **回到主站**（与工具同款 `tool-nav-link`，顶部）、横线分隔、可折叠 **工具列表**；顶栏展示 **`introspect` 头像 / 昵称 / 角色** 与 **重新连接**；**回到主站** 新开主站 origin。
+- 新增工具菜单项：只改 **`config/nav-tools.ts`** 的 **`TOOL_NAV_ITEMS`**。
+- 若某工具 **`showOnMobile: false`**：必须在 **`tool-web/doc/tech/layout-and-responsive.md`**（或 `doc/product/overview.md`）写明桌面独占原因。
+
+## 样式与布局
+
+- 使用 **`app/globals.css`** 中的 `--tool-*` / `.tool-root` / `.tw-main`；主内容区应 **`fill` 视口**（侧栏 + 顶栏 + 可滚动主区），避免「小号居中卡片」破坏一致性。
+- 移动端行为以 **`tool-shell-client.tsx`** 抽屉为准；不要用第二个并列全局导航替代侧栏。
+
+## 文档
+
+- 产品 / SSO / 部署变更时同步 **`tool-web/doc/`**（索引 **`doc/README.md`**），并视情况更新 **`book-mall/doc/tech/tools-sso-environment.md`**。
+- **`tool-web/README.md`** 保持指向上述文档与主站 SSO 文档。
+
+## 排障提示（给用户 / 支持）
+
+- 「从主站过来仍无会话」常见为 **`TOOLS_PUBLIC_ORIGIN` 与浏览器地址栏 host 不一致**（`localhost` vs `127.0.0.1`）；详见 **`doc/tech/sso-session-troubleshooting.md`**。

@@ -2,7 +2,7 @@
 
 面向 **知识型 + 工具型** 产品的订阅与充值余额站点：**营销首页**、**产品与订阅**、**邮箱密码登录（NextAuth）**、**用户中心（账户 / 钱包 / 订阅）**、**管理后台 `/admin`**（分类、商品、计费公示、退款与用户管理）。业务规则详见仓库内 [`doc/product/`](./doc/product/) 与 [`doc/README.md`](./doc/README.md)。
 
-**独立工具站**：与 **`book-mall` 同级目录 `tool-web/`**（不在 `book-mall/` 内部）。默认端口 **`3001`**，单独进程运行；SSO 说明见 **[`../tool-web/README.md`](../tool-web/README.md)**。目录布局见仓库上一级 **[`README.md`](../README.md)**（若在桌面打开的是 `private_website` 工作区）。
+**独立工具站**：与 **`book-mall` 同级目录 `tool-web/`**（不在 `book-mall/` 内部）。默认端口 **`3001`**，单独进程运行；SSO 说明见 **[`../tool-web/README.md`](../tool-web/README.md)**。Git 仓库根目录为 **`private_website/`**，布局与双进程启动方式见 **[`../README.md`](../README.md)**。
 
 技术栈：[Next.js 14](https://nextjs.org/) · [TypeScript](https://www.typescriptlang.org/) · [Tailwind CSS](https://tailwindcss.com/) · [shadcn/ui](https://ui.shadcn.com/) · [Prisma](https://www.prisma.io/) · [Neon PostgreSQL](https://neon.tech/) · [NextAuth.js](https://next-auth.js.org/)
 

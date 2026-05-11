@@ -53,12 +53,41 @@ export function getToolsJwtTtlSec(): number {
   return 600;
 }
 
-export function isToolsSsoConfigured(): boolean {
-  try {
-    requireToolsSsoServerSecret();
-    requireToolsJwtSecret();
-    return Boolean(getToolsPublicOrigin());
-  } catch {
-    return false;
+/** 用于后台 UI：逐项说明为何 SSO 未就绪（不涉及密钥明文）。 */
+export function getToolsSsoSetupDiagnostics(): { ready: boolean; issues: string[] } {
+  const issues: string[] = [];
+
+  const rawOrigin = process.env.TOOLS_PUBLIC_ORIGIN?.trim();
+  const origin = getToolsPublicOrigin();
+  if (!rawOrigin) {
+    issues.push(
+      "未设置 TOOLS_PUBLIC_ORIGIN（本地示例：http://127.0.0.1:3001 ，须含协议、无末尾 /）",
+    );
+  } else if (!origin) {
+    issues.push(
+      "TOOLS_PUBLIC_ORIGIN 无法解析为有效 http(s) URL（请检查是否漏写 http:// 或拼写错误）",
+    );
   }
+
+  const server = process.env.TOOLS_SSO_SERVER_SECRET?.trim();
+  if (!server) {
+    issues.push(
+      "未设置 TOOLS_SSO_SERVER_SECRET（≥16 字符；须与 tool-web/.env.local 内完全一致）",
+    );
+  } else if (server.length < 16) {
+    issues.push("TOOLS_SSO_SERVER_SECRET 长度不足 16 字符");
+  }
+
+  const jwt = process.env.TOOLS_SSO_JWT_SECRET?.trim();
+  if (!jwt) {
+    issues.push("未设置 TOOLS_SSO_JWT_SECRET（≥16 字符随机串）");
+  } else if (jwt.length < 16) {
+    issues.push("TOOLS_SSO_JWT_SECRET 长度不足 16 字符");
+  }
+
+  return { ready: issues.length === 0, issues };
+}
+
+export function isToolsSsoConfigured(): boolean {
+  return getToolsSsoSetupDiagnostics().ready;
 }
