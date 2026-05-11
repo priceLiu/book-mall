@@ -4,7 +4,7 @@
 
 技术栈：[Next.js 14](https://nextjs.org/) · [TypeScript](https://www.typescriptlang.org/) · [Tailwind CSS](https://tailwindcss.com/) · [shadcn/ui](https://ui.shadcn.com/) · [Prisma](https://www.prisma.io/) · [Neon PostgreSQL](https://neon.tech/) · [NextAuth.js](https://next-auth.js.org/)
 
-![站点示意](./public/demo-img.jpg)
+![站点首页示意](./public/main-hero.jpg)
 
 ---
 
@@ -48,7 +48,7 @@
 ## 本地开发（从零到可访问）
 
 ```bash
-cd shadcn-landing-page
+cd book-mall
 pnpm install          # 或 npm install
 ```
 
@@ -85,7 +85,7 @@ pnpm run start        # next start
 
 ## 部署到 Vercel（对接 GitHub）
 
-1. 将本仓库推送到 GitHub，在 [Vercel](https://vercel.com/) 中 **Import** 该仓库，Framework Preset 选 **Next.js**，**Root Directory** 若 monorepo 则指向 `shadcn-landing-page`。
+1. 将本仓库推送到 GitHub，在 [Vercel](https://vercel.com/) 中 **Import** 该仓库，Framework Preset 选 **Next.js**，**Root Directory** 若 monorepo 则指向 `book-mall`。
 2. 在 Vercel **Environment Variables**（Production / Preview 按需）中添加：
    - `DATABASE_URL`
    - `NEXTAUTH_URL`（生产域名，如 `https://www.example.com`）
