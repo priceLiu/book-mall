@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { ChevronDown } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,10 +15,64 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
 
+export type AdminNavUserProps = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  image: string | null;
+};
+
+function avatarLooksAbsolute(url: string) {
+  return /^https?:\/\//i.test(url.trim());
+}
+
+function AdminHeaderUser({ user }: { user: AdminNavUserProps }) {
+  const img =
+    user.image?.trim() && avatarLooksAbsolute(user.image)
+      ? user.image.trim()
+      : null;
+  const hasProfile = Boolean(user.name?.trim() || user.email?.trim());
+  const primary =
+    user.name?.trim() ||
+    user.email?.trim() ||
+    (user.id.length > 14 ? `${user.id.slice(0, 12)}…` : user.id);
+  let secondary: string | null = null;
+  if (user.name?.trim() && user.email?.trim()) {
+    secondary = user.email.trim();
+  } else if (hasProfile) {
+    secondary = `ID ${user.id.length > 22 ? `${user.id.slice(0, 20)}…` : user.id}`;
+  }
+  const initial =
+    primary.length > 0 ? primary.charAt(0).toUpperCase() : "?";
+
+  return (
+    <div
+      className="flex max-w-[min(14rem,40vw)] shrink items-center gap-2 rounded-md border border-transparent px-1 py-0.5"
+      title={`${user.email ?? ""}${user.email ? " · " : ""}${user.id}`}
+    >
+      <Avatar className="h-8 w-8 shrink-0">
+        {img ? <AvatarImage src={img} alt="" referrerPolicy="no-referrer" /> : null}
+        <AvatarFallback className="text-xs font-semibold">{initial}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-col leading-tight hidden sm:flex">
+        <span className="truncate text-sm font-medium text-foreground">{primary}</span>
+        {secondary ? (
+          <span className="truncate text-xs text-muted-foreground">{secondary}</span>
+        ) : null}
+      </div>
+      <span className="hidden shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-primary sm:inline-flex">
+        管理员
+      </span>
+    </div>
+  );
+}
+
 export function AdminNav({
+  user,
   toolsSsoReady,
   toolsSsoIssues,
 }: {
+  user: AdminNavUserProps;
   toolsSsoReady: boolean;
   toolsSsoIssues: string[];
 }) {
@@ -71,8 +126,10 @@ export function AdminNav({
         </Button>
       </div>
 
-      <div className="ml-auto flex flex-wrap items-center gap-1">
-        <span className="mx-1 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        <AdminHeaderUser user={user} />
+
+        <span className="mx-0.5 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
 
         <AdminToolsStationEntry
           toolsSsoReady={toolsSsoReady}

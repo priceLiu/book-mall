@@ -29,6 +29,12 @@ export default async function AdminLayout({
             管理后台
           </Link>
           <AdminNav
+            user={{
+              id: session.user.id,
+              email: session.user.email ?? null,
+              name: session.user.name ?? null,
+              image: session.user.image ?? null,
+            }}
             toolsSsoReady={toolsSsoDiag.ready}
             toolsSsoIssues={toolsSsoDiag.issues}
           />

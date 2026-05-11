@@ -8,7 +8,7 @@
   --tool-accent: #18181b;
   --tool-accent-contrast: #fafafa;
   --tool-sidebar-w: 260px;
-  --tool-topbar-h: 52px;
+  --tool-topbar-h: 56px;
 }
 
 html,
@@ -55,9 +55,10 @@ a {
 }
 
 .tool-sidebar-head {
-  padding: 1rem 1.25rem;
+  flex-shrink: 0;
+  height: var(--tool-topbar-h);
+  padding: 0 1.25rem;
   border-bottom: 1px solid var(--tool-border);
-  min-height: var(--tool-topbar-h);
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -176,6 +177,7 @@ a {
   flex-shrink: 0;
   height: var(--tool-topbar-h);
   padding: 0 1rem;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -199,35 +201,40 @@ a {
 
 .tool-topbar-fill {
   flex: 1;
+  min-width: 0.5rem;
 }
 
 .tool-user {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.875rem;
+  flex-shrink: 0;
+  min-width: 0;
   justify-content: flex-end;
 }
 
-.tool-user-meta {
+.tool-user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.tool-user-text-stack {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.125rem;
-  max-width: 16rem;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  line-height: 1.2;
 }
 
-.tool-user-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.tool-user-id {
-  font-size: 0.625rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+.tool-user-email-line {
+  font-size: 0.6875rem;
+  font-weight: 400;
   color: var(--tool-muted);
-  max-width: 100%;
+  max-width: 15rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -264,6 +271,7 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.25;
 }
 
 .tool-user-badge {
@@ -289,10 +297,57 @@ a {
 }
 
 .tool-renew {
+  flex-shrink: 0;
+  box-sizing: border-box;
   font-size: 0.8125rem;
   font-weight: 500;
+  text-decoration: none;
+  padding: 0.38rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--tool-border);
+  color: var(--tool-text);
+  white-space: nowrap;
+}
+
+.tool-renew:hover {
+  background: var(--tool-bg);
+}
+
+.tool-logout {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 0.38rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--tool-border);
+  color: var(--tool-muted);
+  white-space: nowrap;
+}
+
+.tool-logout:hover {
+  background: rgba(244, 244, 245, 0.85);
+  border-color: var(--tool-muted);
+  color: var(--tool-text);
+}
+
+button.tool-renew {
+  cursor: pointer;
+  font: inherit;
+}
+
+.tool-renew--link {
+  border: none;
+  background: none;
+  padding: 0;
   text-decoration: underline;
   text-underline-offset: 2px;
+  white-space: normal;
+}
+
+.tool-renew--link:hover {
+  background: transparent;
 }
 
 .tool-main-scroll {
@@ -392,7 +447,15 @@ code {
   }
 
   .tool-user-name {
-    max-width: 8rem;
+    max-width: 7rem;
+  }
+
+  .tool-user-email-line {
+    max-width: 9rem;
+  }
+
+  .tool-user {
+    gap: 0.5rem;
   }
 
   .tool-nav-li--desktop-only {

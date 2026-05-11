@@ -12,17 +12,10 @@ export function FittingRoomPanel({
 }) {
   const { loading, session, hasTokenCookie, refetch } = useToolsSession();
 
-  const toolsRole =
-    session.active &&
-    typeof session.toolsRole === "string" &&
-    session.toolsRole.trim().length > 0
-      ? session.toolsRole
-      : null;
-
   const originConfigured =
     typeof mainOrigin === "string" && mainOrigin.trim().length > 0;
 
-  if (loading && hasTokenCookie) {
+  if (loading) {
     return (
       <p className="tw-muted" role="status">
         正在同步会话…
@@ -76,15 +69,7 @@ export function FittingRoomPanel({
         <p style={{ margin: "0 0 0.5rem" }}>
           <button
             type="button"
-            className="tool-renew"
-            style={{
-              cursor: "pointer",
-              border: "none",
-              background: "none",
-              padding: 0,
-              font: "inherit",
-              textDecoration: "underline",
-            }}
+            className="tool-renew tool-renew--link"
             onClick={() => void refetch()}
           >
             再试一次同步
@@ -106,28 +91,11 @@ export function FittingRoomPanel({
   }
 
   return (
-    <section className="tw-card">
-      <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>会话状态</h2>
+    <section className="tw-card" style={{ marginTop: "1.25rem" }}>
+      <h2 style={{ marginTop: 0, fontSize: "1.05rem" }}>接入说明</h2>
       <p className="tw-muted" style={{ marginBottom: 0 }}>
-        已由壳层同步 ·{" "}
-        <span style={{ fontWeight: 600 }}>准入有效</span>
-        {toolsRole ? ` · 角色 ${toolsRole}` : null}
-      </p>
-      <pre className="tw-pre" style={{ marginTop: "0.75rem" }}>
-        {JSON.stringify(
-          {
-            sub: session.sub,
-            email: session.email,
-            name: session.name,
-            tools_role: session.toolsRole,
-          },
-          null,
-          2,
-        )}
-      </pre>
-      <p style={{ marginBottom: 0, fontSize: "0.9rem", marginTop: "0.75rem" }}>
-        可在此目录新增客户端组件、调用自建 API Route（服务端读取 <code>lib/tool-config.ts</code>
-        ）扩展试衣业务。
+        身份与权限见顶栏；可在此接入试衣业务逻辑与计费，服务端 Route 建议校验令牌或调用主站{" "}
+        <code>introspect</code>。
       </p>
     </section>
   );

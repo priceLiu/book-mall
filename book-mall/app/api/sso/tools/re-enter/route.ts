@@ -33,7 +33,16 @@ export async function GET(req: NextRequest) {
   });
 
   if (!result.ok) {
-    return NextResponse.redirect(new URL("/account", req.nextUrl.origin));
+    const url = new URL("/account", req.nextUrl.origin);
+    const code =
+      result.code ??
+      (result.status === 503
+        ? "TOOLS_SSO_UNAVAILABLE"
+        : result.status === 403
+          ? "TOOLS_ACCESS_DENIED"
+          : "TOOLS_SSO_UNKNOWN");
+    url.searchParams.set("tools_sso_err", code);
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.redirect(result.redirectUrl);

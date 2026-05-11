@@ -1,4 +1,4 @@
-// AI Mall — Neon PostgreSQL（逻辑库 ai_mall）
+// AI Mall — PostgreSQL（生产：腾讯云 RDS `tool_mall`；本地详见 DATABASE_URL）
 // 产品规则见 doc/product/
 
 generator client {
