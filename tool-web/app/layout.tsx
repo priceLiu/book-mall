@@ -16,8 +16,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
-      <body>
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <ToolShell>{children}</ToolShell>
       </body>
     </html>

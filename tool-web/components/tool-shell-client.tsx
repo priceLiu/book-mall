@@ -7,7 +7,9 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { TOOL_NAV_ITEMS } from "@/config/nav-tools";
@@ -44,6 +46,16 @@ function avatarLooksAbsolute(url: string) {
   return /^https?:\/\//i.test(url.trim());
 }
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "tool-sidebar-collapsed-desktop";
+
+function persistSidebarCollapsed(collapsed: boolean) {
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 function parseToolsSessionPayload(raw: unknown): FetchToolsSessionResult {
   if (!raw || typeof raw !== "object") {
     return {
@@ -67,7 +79,17 @@ export function ToolShellClient({
   mainOrigin: string | null;
 }) {
   const pathname = usePathname() || "/";
+
+  const activeNavHref = useMemo(() => {
+    const sorted = [...TOOL_NAV_ITEMS].sort((a, b) => b.href.length - a.href.length);
+    const hit = sorted.find(
+      (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+    );
+    return hit?.href ?? null;
+  }, [pathname]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsedDesktop, setSidebarCollapsedDesktop] = useState(false);
+  const prevPathnameRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<ToolShellSession>(GUEST_TOOL_SHELL_SESSION);
   const [hasTokenCookie, setHasTokenCookie] = useState(false);
@@ -95,8 +117,36 @@ export function ToolShellClient({
     void loadSession();
   }, [loadSession]);
 
+  useLayoutEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1") {
+        setSidebarCollapsedDesktop(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleSidebarCollapsedDesktop = useCallback(() => {
+    setSidebarCollapsedDesktop((c) => {
+      const next = !c;
+      persistSidebarCollapsed(next);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     setSidebarOpen(false);
+    if (prevPathnameRef.current === null) {
+      prevPathnameRef.current = pathname;
+      return;
+    }
+    if (prevPathnameRef.current === pathname) return;
+    prevPathnameRef.current = pathname;
+    if (typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) {
+      setSidebarCollapsedDesktop(true);
+      persistSidebarCollapsed(true);
+    }
   }, [pathname]);
 
   const ctxValue = useMemo<ToolsSessionContextValue>(
@@ -201,9 +251,16 @@ export function ToolShellClient({
     );
   })();
 
+  const rootClassName = [
+    "tool-root",
+    sidebarCollapsedDesktop ? "tool-sidebar-collapsed-desktop" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <ToolsSessionContext.Provider value={ctxValue}>
-      <div className="tool-root">
+      <div className={rootClassName}>
         {sidebarOpen ? (
           <button
             type="button"
@@ -222,6 +279,16 @@ export function ToolShellClient({
             <Link href="/" className="tool-brand" onClick={() => setSidebarOpen(false)}>
               AI 工具站
             </Link>
+            <button
+              type="button"
+              className="tool-sidebar-pin-btn"
+              aria-label={sidebarCollapsedDesktop ? "展开侧栏" : "收起侧栏"}
+              aria-expanded={!sidebarCollapsedDesktop}
+              title={sidebarCollapsedDesktop ? "展开侧栏" : "收起侧栏"}
+              onClick={toggleSidebarCollapsedDesktop}
+            >
+              <span aria-hidden>{sidebarCollapsedDesktop ? "›" : "‹"}</span>
+            </button>
           </div>
 
           <nav className="tool-sidebar-body">
@@ -262,7 +329,7 @@ export function ToolShellClient({
                     <Link
                       href={item.href}
                       className={
-                        pathname === item.href || pathname.startsWith(`${item.href}/`)
+                        activeNavHref === item.href
                           ? "tool-nav-link tool-nav-link--active"
                           : "tool-nav-link"
                       }
