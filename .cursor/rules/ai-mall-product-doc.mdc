@@ -1,0 +1,13 @@
+---
+description: 需求与功能开发前须查阅产品文档体系并维护归类文档
+alwaysApply: true
+---
+
+# AI Mall（shadcn-landing-page）产品文档与开发纪律
+
+1. **开工前**：阅读 `shadcn-landing-page/doc/README.md`，并对照 `doc/product/` 下与需求相关的专题；不得仅凭记忆改业务规则。
+2. **计划**：在 `doc/templates/feature-plan-template.md` 复制一份到 `doc/plans/`（或 Issue）填写任务与勾选进度；复杂需求拆分为可验收条目。
+3. **归档**：
+   - 数据库表结构、迁移、字段含义 → 在 `doc/database/schema-changelog.md` **追加一条**（或按日期新建 `doc/database/YYYY-MM-DD-摘要.md`），禁止只改代码不记。
+   - 功能逻辑、状态机、边界规则 → 在 `doc/logic/` 下 **独立成文**（如 `wallet-balance-rules.md`），勿堆进单一大文档。
+4. **技术栈与部署** 以 `doc/tech/stack-and-environment.md` 为准；环境变量 secrets 不入文档正文。

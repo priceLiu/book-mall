@@ -27,51 +27,51 @@ interface ReviewProps {
 const reviewList: ReviewProps[] = [
   {
     image: "https://github.com/shadcn.png",
-    name: "John Doe",
-    userName: "Product Manager",
+    name: "苏总",
+    userName: "企业负责人",
     comment:
-      "Wow NextJs + Shadcn is awesome!. This template lets me change colors, fonts and images to match my brand identity. ",
+      "可以快速找到我要学习的工具，上手非常快。",
     rating: 5.0,
   },
   {
     image: "https://github.com/shadcn.png",
-    name: "Sophia Collins",
-    userName: "Cybersecurity Analyst",
+    name: "何总",
+    userName: "创业老板",
     comment:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna. ",
+      "非常有帮助, 可以让我快速了解应用, 让公司的运营学习了解并实施应用",
     rating: 4.8,
   },
 
   {
     image: "https://github.com/shadcn.png",
-    name: "Adam Johnson",
-    userName: "Chief Technology Officer",
+    name: "王浩",
+    userName: "技术负责人",
     comment:
-      "Lorem ipsum dolor sit amet,exercitation. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+      "代码组织合理，主题与无障碍细节到位，适合作为对内对外站点的起点继续演进。",
     rating: 4.9,
   },
   {
     image: "https://github.com/shadcn.png",
-    name: "Ethan Parker",
-    userName: "Data Scientist",
+    name: "陈晨",
+    userName: "数据科学家",
     comment:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod labore et dolore magna aliqua. Ut enim ad minim veniam.",
+      "排版与动效克制不浮夸，把注意力留给内容和数据展示，是我喜欢的风格。",
     rating: 5.0,
   },
   {
     image: "https://github.com/shadcn.png",
-    name: "Ava Mitchell",
-    userName: "IT Project Manager",
+    name: "赵雪",
+    userName: "IT 项目经理",
     comment:
-      "Lorem ipsum dolor sit amet, tempor incididunt  aliqua. Ut enim ad minim veniam, quis nostrud incididunt consectetur adipiscing elit.",
+      "和团队对接需求时，直接用模板分区讲解非常高效，改版迭代也不痛苦。",
     rating: 5.0,
   },
   {
     image: "https://github.com/shadcn.png",
-    name: "Isabella Reed",
-    userName: "DevOps Engineer",
+    name: "孙悦",
+    userName: "运维工程师",
     comment:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+      "依赖主流栈，部署流程顺畅；样式 token 化了以后换肤维护会轻松很多。",
     rating: 4.9,
   },
 ];
@@ -81,11 +81,11 @@ export const TestimonialSection = () => {
     <section id="testimonials" className="container py-24 sm:py-32">
       <div className="text-center mb-8">
         <h2 className="text-lg text-primary text-center mb-2 tracking-wider">
-          Testimonials
+          客户评价
         </h2>
 
         <h2 className="text-3xl md:text-4xl text-center font-bold mb-4">
-          Hear What Our 1000+ Clients Say
+          听听他们的真实反馈
         </h2>
       </div>
 
@@ -118,7 +118,7 @@ export const TestimonialSection = () => {
                     <Avatar>
                       <AvatarImage
                         src="https://avatars.githubusercontent.com/u/75042455?v=4"
-                        alt="radix"
+                        alt="用户头像"
                       />
                       <AvatarFallback>SV</AvatarFallback>
                     </Avatar>

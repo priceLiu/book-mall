@@ -11,39 +11,39 @@ interface FeaturesProps {
 const featureList: FeaturesProps[] = [
   {
     icon: "TabletSmartphone",
-    title: "Mobile Friendly",
+    title: "精准角色导航",
     description:
-      "Lorem ipsum dolor sit amet consectetur adipisicing elit. A odio velit cum aliquam, consectetur.",
+      "不是简单堆砌工具链接，而是按“打工人、创业老板、自由职业、转型者”四大角色 + 场景分类（办公/写作/视频/编程等）。用户3步内就能找到最适合自己当前任务的AI工具，告别大海捞针。",
   },
   {
     icon: "BadgeCheck",
-    title: "Social Proof",
+    title: "课程+工具闭环",
     description:
-      "Lorem ipsum dolor sit amet consectetur. Natus consectetur, odio ea accusamus aperiam.",
+      "每个核心工具都配套实战课程：从“这是什么”到“怎么用”到“用在哪儿”。不只是教操作，而是教会用户把AI嵌入真实工作流。学完就能用，用完就提效。",
   },
   {
     icon: "Goal",
-    title: "Targeted Content",
+    title: "真实案例与社区验证",
     description:
-      "Lorem ipsum dolor sit amet consectetur adipisicing elit. odio ea accusamus aperiam.",
+      "展示一人公司、创业者、转型者使用AI前后的真实数据与案例（如“用AI把文案产出提升3倍”）。配合用户评价与案例库，用社会认同降低决策顾虑，增强下单信心。",
   },
   {
     icon: "PictureInPicture",
-    title: "Strong Visuals",
+    title: "零基础友好+持续陪伴",
     description:
-      "Lorem elit. A odio velit cum aliquam. Natus consectetur dolores, odio ea accusamus aperiam.",
+      "设有“AI新手村”：入门指南、工具对比、每周技巧、常见问题FAQ。解决“不知道从哪开始”、“怕学不会”、“没人问”的痛点。课程阶梯式设计，从零到一，再到精通，长期陪跑。",
   },
   {
     icon: "MousePointerClick",
-    title: "Clear CTA",
+    title: "移动优先+快速上手",
     description:
-      "Lorem ipsum dolor sit amet consectetur adipisicing. odio ea accusamus consectetur.",
+      "自适应布局与触控优化，手机/平板同样清晰可操作。课程支持碎片化学习，工具即开即用。主按钮与行动路径一目了然，减少找教程、找入口的时间浪费。",
   },
   {
     icon: "Newspaper",
-    title: "Clear Headline",
+    title: "清晰的价值主张",
     description:
-      "Lorem ipsum dolor sit amet consectetur adipisicing elit. A odio velit cum aliquam. Natus consectetur.",
+      "一句“找AI，上智选”点明核心，副标题“一人公司、创业老板、自由职业的专属AI加油站”。扫一眼就懂你是做什么的、为谁服务、能解决什么问题。",
   },
 ];
 
@@ -51,17 +51,15 @@ export const FeaturesSection = () => {
   return (
     <section id="features" className="container py-24 sm:py-32">
       <h2 className="text-lg text-primary text-center mb-2 tracking-wider">
-        Features
+        功能
       </h2>
 
       <h2 className="text-3xl md:text-4xl text-center font-bold mb-4">
-        What Makes Us Different
+        我们的不同之处
       </h2>
 
       <h3 className="md:w-1/2 mx-auto text-xl text-center text-muted-foreground mb-8">
-        Lorem ipsum dolor, sit amet consectetur adipisicing elit. Voluptatem
-        fugiat, odit similique quasi sint reiciendis quidem iure veritatis optio
-        facere tenetur.
+      从找到工具到学会用工具，按角色陪跑、课程闭环，让AI真正为你所用
       </h3>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

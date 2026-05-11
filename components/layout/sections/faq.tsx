@@ -13,32 +13,32 @@ interface FAQProps {
 
 const FAQList: FAQProps[] = [
   {
-    question: "Is this template free?",
-    answer: "Yes. It is a free NextJS Shadcn template.",
+    question: "这个模板是免费的吗？",
+    answer: "是的。这是一套免费的 Next.js + Shadcn 模板。",
     value: "item-1",
   },
   {
-    question: "Duis aute irure dolor in reprehenderit in voluptate velit?",
+    question: "支持哪些浏览器与设备尺寸？",
     answer:
-      "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Sint labore quidem quam consectetur sapiente, iste rerum reiciendis animi nihil nostrum sit quo, modi quod.",
+      "模板采用响应式布局与现代 CSS，主流桌面与移动浏览器均可良好展示；也支持你按需扩展深色模式与无障碍优化。",
     value: "item-2",
   },
   {
-    question:
-      "Lorem ipsum dolor sit amet Consectetur natus dolor minus quibusdam?",
+    question: "我可以修改品牌色、字体和图片吗？",
     answer:
-      "Lorem ipsum dolor sit amet consectetur, adipisicing elit. Labore qui nostrum reiciendis veritatis.",
+      "可以。主题变量与组件结构便于替换，你可以快速对齐自有设计规范而无需大改底层代码。",
     value: "item-3",
   },
   {
-    question: "Excepteur sint occaecat cupidata non proident sunt?",
-    answer: "Lorem ipsum dolor sit amet consectetur, adipisicing elit.",
+    question: "是否可用于商业项目？",
+    answer:
+      "请留意所使用依赖与素材各自的许可协议；模板代码可按你的场景评估后用于对内或对外站点。",
     value: "item-4",
   },
   {
-    question:
-      "Enim ad minim veniam, quis nostrud exercitation ullamco laboris?",
-    answer: "consectetur adipisicing elit. Sint labore.",
+    question: "遇到问题如何获取帮助？",
+    answer:
+      "可通过仓库 Issue、社区频道或邮件联系维护者，并附上复现步骤与环境信息以便排查。",
     value: "item-5",
   },
 ];
@@ -48,11 +48,11 @@ export const FAQSection = () => {
     <section id="faq" className="container md:w-[700px] py-24 sm:py-32">
       <div className="text-center mb-8">
         <h2 className="text-lg text-primary text-center mb-2 tracking-wider">
-          FAQS
+          常见问题
         </h2>
 
         <h2 className="text-3xl md:text-4xl text-center font-bold">
-          Common Questions
+          您可能想了解
         </h2>
       </div>
 
