@@ -11,27 +11,27 @@ interface BenefitsProps {
 const benefitList: BenefitsProps[] = [
   {
     icon: "Blocks",
-    title: "Build Brand Trust",
+    title: "一站式AI能力中枢",
     description:
-      "Lorem ipsum dolor sit amet consectetur adipisicing elit. A odio velit cum aliquam. Natus consectetur dolores.",
+      "从导航站发现工具，到应用直接落地，再到课程系统学习。打通“找、用、学”闭环，让一人公司、创业老板不再碎片化摸索，一个平台配齐你的AI基建。",
   },
   {
     icon: "LineChart",
-    title: "More Leads",
+    title: "加速个人与业务增长",
     description:
-      "Lorem ipsum dolor sit amet consectetur adipisicing elit. A odio velit cum aliquam, natus consectetur.",
+      "精选垂直场景AI工具（写作/视频/编程/办公），搭配实战课程，帮你把AI转化为内容产出、营销转化、效率提升的实际结果。从“忙不过来”到“一个人撑起一条龙”",
   },
   {
     icon: "Wallet",
-    title: "Higher Conversions",
+    title: "降低试错与决策成本",
     description:
-      "Lorem ipsum dolor sit amet consectetur adipisicing elit. Natus consectetur. A odio velit cum aliquam",
+      "导航站帮你筛掉90%不合适的工具，课程教你怎么用对、用好。不用再花几个月踩坑，用最少的时间和金钱找到最适合你业务的AI方案。",
   },
   {
     icon: "Sparkle",
-    title: "Test Marketing Ideas",
+    title: "持续进化与生态协同",
     description:
-      "Lorem ipsum dolor sit amet consectetur adipisicing elit. A odio velit cum aliquam. Natus consectetur dolores.",
+      "模块化内容快速迭代，紧跟AI前沿。导航站、工具、课程三者互相引流，形成用户粘性。一人公司可长期依赖这个生态保持竞争力，AI能力随你一起成长。",
   },
 ];
 
@@ -40,15 +40,13 @@ export const BenefitsSection = () => {
     <section id="benefits" className="container py-24 sm:py-32">
       <div className="grid lg:grid-cols-2 place-items-center lg:gap-24">
         <div>
-          <h2 className="text-lg text-primary mb-2 tracking-wider">Benefits</h2>
+          <h2 className="text-lg text-primary mb-2 tracking-wider">优势</h2>
 
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Your Shortcut to Success
+            AI 成为您的智手
           </h2>
           <p className="text-xl text-muted-foreground mb-8">
-            Lorem ipsum dolor sit amet consectetur, adipisicing elit. Non
-            ducimus reprehenderit architecto rerum similique facere odit
-            deleniti necessitatibus quo quae.
+            让 AI 成为您的助手, 帮助您实现一切的不可能. 一个人就可以。
           </p>
         </div>
 

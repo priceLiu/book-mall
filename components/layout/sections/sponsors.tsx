@@ -12,31 +12,31 @@ interface sponsorsProps {
 const sponsors: sponsorsProps[] = [
   {
     icon: "Crown",
-    name: "Acmebrand",
+    name: "艾克美品牌",
   },
   {
     icon: "Vegan",
-    name: "Acmelogo",
+    name: "艾克美标志",
   },
   {
     icon: "Ghost",
-    name: "Acmesponsor",
+    name: "艾克美赞助",
   },
   {
     icon: "Puzzle",
-    name: "Acmeipsum",
+    name: "艾克美文案",
   },
   {
     icon: "Squirrel",
-    name: "Acme",
+    name: "艾克美",
   },
   {
     icon: "Cookie",
-    name: "Accmee",
+    name: "阿克米",
   },
   {
     icon: "Drama",
-    name: "Acmetech",
+    name: "艾克美科技",
   },
 ];
 
@@ -44,7 +44,7 @@ export const SponsorsSection = () => {
   return (
     <section id="sponsors" className="max-w-[75%] mx-auto pb-24 sm:pb-32">
       <h2 className="text-lg md:text-xl text-center mb-6">
-        Our Platinum Sponsors
+        我们的白金赞助商
       </h2>
 
       <div className="mx-auto">

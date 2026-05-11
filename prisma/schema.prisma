@@ -1,0 +1,322 @@
+// AI Mall — Neon PostgreSQL（逻辑库 ai_mall）
+// 产品规则见 doc/product/
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// —— NextAuth 适配模型 ——
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  /// 邮箱密码注册时使用；OAuth 用户可为空
+  passwordHash   String?
+  role           UserRole  @default(USER)
+
+  accounts                     Account[]
+  sessions                     Session[]
+  wallet                       Wallet?
+  subscriptions                Subscription[]
+  orders                       Order[]
+  walletRefundRequests         WalletRefundRequest[]
+  subscriptionRefundRequests   SubscriptionRefundRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// —— 平台配置（单行 default）——
+model PlatformConfig {
+  id                   String   @id @default("default")
+  /// 高级/按量服务最低可用余额，默认 2000=20 元（分）
+  minBalanceLineMinor  Int      @default(2000)
+  balanceWarnHighMinor Int      @default(5000)
+  balanceWarnMidMinor  Int      @default(3000)
+  /// LLM：每千 token 计价（分），0 表示未启用/占位
+  llmInputPer1kTokensMinor  Int @default(0)
+  llmOutputPer1kTokensMinor Int @default(0)
+  /// 高阶工具：单次调用默认扣费（分）
+  toolInvokePerCallMinor    Int @default(0)
+  /// 异常消耗：超过近均值的百分比即告警，如 300=3 倍
+  usageAnomalyRatioPercent  Int @default(300)
+  updatedAt            DateTime @updatedAt
+}
+
+// —— 钱包 ——
+model Wallet {
+  id            String @id @default(cuid())
+  userId        String @unique
+  balanceMinor  Int    @default(0)
+  frozenMinor   Int    @default(0)
+  currency      String @default("CNY")
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries WalletEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum WalletEntryType {
+  RECHARGE
+  CONSUME
+  REFUND
+  ADJUST
+}
+
+model WalletEntry {
+  id               String          @id @default(cuid())
+  walletId         String
+  type             WalletEntryType
+  /// 入为正、出为负（分）
+  amountMinor      Int
+  balanceAfterMinor Int
+  idempotencyKey   String?         @unique
+  description      String?
+  orderId          String?
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([walletId, createdAt])
+}
+
+// —— 订阅 ——
+enum SubscriptionInterval {
+  MONTH
+  YEAR
+}
+
+model SubscriptionPlan {
+  id         String               @id @default(cuid())
+  slug       String               @unique
+  name       String
+  interval   SubscriptionInterval
+  priceMinor Int
+  active     Boolean              @default(true)
+
+  subscriptions Subscription[]
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String
+  planId             String
+  status             SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean            @default(false)
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, status])
+}
+
+// —— 订单（含模拟支付）——
+enum OrderType {
+  SUBSCRIPTION
+  WALLET_TOPUP
+}
+
+enum OrderStatus {
+  PENDING
+  AWAITING_MOCK_CONFIRM
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  userId      String
+  type        OrderType
+  status      OrderStatus @default(PENDING)
+  amountMinor Int
+  currency    String      @default("CNY")
+  /// 订阅目标 planSlug、充值档位等
+  meta        Json?
+  /// 订阅类订单完成退款处理后标记
+  refundedAt  DateTime?
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paidAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+// —— 退款审核（产品 6.3 / 5.3）——
+enum RefundRequestStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+/// 余额退款：用户申请 → 后台核算应扣未扣 → 扣减后退还（流水入账）
+model WalletRefundRequest {
+  id        String @id @default(cuid())
+  userId    String
+  status    RefundRequestStatus @default(PENDING)
+  /// 申请退还金额（分），null 表示按「可退余额」由后台核算
+  requestedAmountMinor Int?
+  /// 应扣未扣（分），管理员核准
+  pendingSettlementMinor Int @default(0)
+  /// 实际从钱包扣减并记为退款的金额（分）
+  refundAmountMinor      Int?
+  userNote               String?
+  adminNote              String?
+  decidedAt              DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+/// 订阅订单退款审核（政策独立于余额退款）
+model SubscriptionRefundRequest {
+  id         String @id @default(cuid())
+  userId     String
+  orderId    String?
+  subscriptionId String?
+  status     RefundRequestStatus @default(PENDING)
+  userReason String?
+  adminNote  String?
+  decidedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+// —— 产品（5.1 知识型 / 工具型）——
+enum ProductKind {
+  KNOWLEDGE
+  TOOL
+}
+
+enum ProductTier {
+  BASIC
+  ADVANCED
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// 分类：两大品类下支持子分类（parentId 为空为顶级）
+model ProductCategory {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  kind      ProductKind
+  parentId  String?
+  parent    ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  ProductCategory[] @relation("CategoryHierarchy")
+  products  Product[]
+  sortOrder Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId, kind])
+}
+
+model Product {
+  id              String        @id @default(cuid())
+  title           String
+  slug            String        @unique
+  /// 一句话概述（首页推荐/列表）
+  summary         String
+  /// 详情
+  description     String        @db.Text
+  /// 知识型：课程内容等（富文本简化存文本）
+  courseContent   String?       @db.Text
+  kind            ProductKind
+  tier            ProductTier
+  /// 标价（分）
+  priceMinor      Int           @default(0)
+  coverImageUrl   String
+  status          ProductStatus @default(DRAFT)
+  /// 首页推荐
+  featuredHome    Boolean       @default(false)
+  featuredSort    Int           @default(0)
+  /// 工具型：权限说明、大模型计费说明
+  toolPermissions String?       @db.Text
+  meteringNote    String?       @db.Text
+
+  categoryId String?
+  category   ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind, status])
+  @@index([featuredHome, status, featuredSort])
+}
