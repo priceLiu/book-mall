@@ -1,0 +1,65 @@
+# v1.1 独立 AI 工具（试衣间等）与主站集成 — 需求与约定
+
+> **状态**：已落地主站侧 SSO 换票 API、黄金会员判定与个人中心入口；**独立工具仓库**需实现 `/auth/sso/callback` 与服务端换票，详见 [`tools-sso-environment.md`](./tech/tools-sso-environment.md) 与 [`tools-sso-session.md`](./logic/tools-sso-session.md)。
+
+## 1. 背景
+
+主站（AI Mall）负责账号、计费与充值；AI 能力重的工具（如试衣间）独立部署，避免主仓臃肿、便于按性能单独扩容或拆分。
+
+## 2. 名词：黄金会员（工具站准入）
+
+**黄金会员**统一定义为同时满足：
+
+1. **历史上至少完成过一次钱包充值入账**（存在 `WalletEntry`，`type = RECHARGE`）；  
+2. **当前可用余额 ≥ 平台最低余额线**（`PlatformConfig.minBalanceLineMinor`，默认 **2000 分 = ¥20**）。
+
+实现见 `lib/gold-member.ts`。**注意**：这与站内「订阅 + 余额」的 **高级计量会员**（`getMembershipFlags().canUsePremiumMetered`）是 **不同概念**；工具站准入只用黄金会员规则。
+
+## 3. 域名与部署（约定占位）
+
+| 角色 | 占位域名（可替换） | 说明 |
+|------|-------------------|------|
+| 主站 | `https://www.ai-code8.com` | Next.js 本站 |
+| 工具站 | `https://tools.ai-code8.com` | 独立项目；环境变量 **`TOOLS_PUBLIC_ORIGIN`** 指向其 **Origin**（无末尾 `/`） |
+
+生产环境须使用 **HTTPS**。Preview / Staging 可使用各自子域，**密钥与 AppId 隔离**。
+
+## 4. 令牌与安全策略（低风险预设）
+
+采用 **一次性授权码 + 短时 JWT**，避免在主站会话 Cookie 与工具站之间共享浏览器 Cookie。
+
+| artifact | 说明 |
+|-----------|------|
+| **授权码 `code`** | 随机串，存 DB，默认 **90s** 有效，**单次使用**；仅出现在跳转 URL query。 |
+| **`TOOLS_SSO_SERVER_SECRET`** | 工具站 **服务端** 调用 `POST /api/sso/tools/exchange` 时 `Authorization: Bearer …`，**禁止暴露给浏览器**。 |
+| **JWT** | HS256，`aud = book-mall-tools`，默认 **600s**；载荷含 `sub`（用户 id）、`tier: gold`。密钥 **`TOOLS_SSO_JWT_SECRET`**。 |
+
+工具站在执行敏感操作前应 **`GET /api/sso/tools/introspect`**（Bearer JWT）复核用户仍满足黄金会员（余额可能被消耗）。
+
+## 5. 跳转与时序（摘要）
+
+1. 用户在主站已登录 → 个人中心点击「打开试衣间」→ `POST /api/sso/tools/issue` → 前端跳转到  
+   `{TOOLS_PUBLIC_ORIGIN}/auth/sso/callback?code=…&redirect=/fitting-room`
+2. **工具站服务端**读取 `code`，向主站发起 `POST /api/sso/tools/exchange`，Body `{ code }`，Header `Authorization: Bearer TOOLS_SSO_SERVER_SECRET`
+3. 得到 `access_token` 后建立工具站自有会话（Session / Cookie）；再 `redirect` 到业务路径（默认 `/fitting-room`）。
+
+完整步骤与失败分支见 [`tools-sso-session.md`](./logic/tools-sso-session.md)。
+
+## 6. 扩展与性能（部署拆分）
+
+- **工具 API** 与 **主站** 通过 HTTP 解耦：后续若试衣间 GPU/推理压力大，可将 **仅推理服务** 再拆一层（队列 + Worker），工具站 BFF 仍负责会话与鉴权。  
+- **主站** 仅暴露 issue / exchange / introspect；不宜让工具直连主库。  
+- 多工具共用同一 **`TOOLS_PUBLIC_ORIGIN`** 下路径区分（如 `/fitting-room`、`/future-tool`）；issue 请求体可带 `redirectPath`（必须以 `/` 开头）。
+
+## 7. 产品与权限文档
+
+- 产品分册索引：[`08-independent-tools-sso.md`](./product/08-independent-tools-sso.md)  
+- 实施计划与勾选：[`2026-05-11-tools-sso-gold-member.md`](./plans/2026-05-11-tools-sso-gold-member.md)
+
+## 7.1 工具站代码路径（与 `book-mall/` 同级）
+
+独立工具前端目录名为 **`tool-web`**，与 **`book-mall`** 在同一父目录下（例如 `private_website/book-mall` 与 `private_website/tool-web`），**不在 `book-mall/` 子路径内**。说明见 [**`../../tool-web/README.md`**](../../tool-web/README.md)。
+
+## 8. 无权限行为
+
+直接访问工具 URL 且无有效工具站会话 → **403 或重定向主站** `/subscribe` / `/pay/mock-topup`（视工具站实现）。
