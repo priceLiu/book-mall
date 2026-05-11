@@ -11,7 +11,7 @@ export const FooterSection = () => {
             <Link href="#" className="flex font-bold items-center">
               <ChevronsDownIcon className="w-9 h-9 mr-2 bg-gradient-to-tr from-primary via-primary/70 to-primary rounded-lg border border-secondary" />
 
-              <h3 className="text-2xl">Shadcn</h3>
+              <h3 className="text-2xl">智选 AI</h3>
             </Link>
           </div>
 
@@ -108,16 +108,7 @@ export const FooterSection = () => {
 
         <Separator className="my-6" />
         <section className="">
-          <h3 className="">
-            © 2024 设计与开发：
-            <Link
-              target="_blank"
-              href="https://github.com/leoMirandaa"
-              className="text-primary transition-all border-primary hover:border-b-2 ml-1"
-            >
-              Leo Miranda
-            </Link>
-          </h3>
+          <h3 className="">© {new Date().getFullYear()} 智选 AI Mall · ai-code8.com</h3>
         </section>
       </div>
     </footer>

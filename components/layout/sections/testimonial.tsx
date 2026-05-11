@@ -47,7 +47,7 @@ const reviewList: ReviewProps[] = [
     name: "王浩",
     userName: "技术负责人",
     comment:
-      "代码组织合理，主题与无障碍细节到位，适合作为对内对外站点的起点继续演进。",
+      "界面层级清晰，学习与演示路径一目了然，对内培训和对外讲解都很省心。",
     rating: 4.9,
   },
   {
@@ -63,7 +63,7 @@ const reviewList: ReviewProps[] = [
     name: "赵雪",
     userName: "IT 项目经理",
     comment:
-      "和团队对接需求时，直接用模板分区讲解非常高效，改版迭代也不痛苦。",
+      "和团队对齐方案时，按栏目分区演示非常高效，改版迭代节奏也好把控。",
     rating: 5.0,
   },
   {
@@ -71,7 +71,7 @@ const reviewList: ReviewProps[] = [
     name: "孙悦",
     userName: "运维工程师",
     comment:
-      "依赖主流栈，部署流程顺畅；样式 token 化了以后换肤维护会轻松很多。",
+      "多端访问稳定，上手成本低；常用入口聚合得好，日常推广与公司内部分发都省事。",
     rating: 4.9,
   },
 ];

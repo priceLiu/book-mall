@@ -7,8 +7,8 @@ import { AuthSessionProvider } from "@/components/providers/session-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Shadcn - 落地页模板",
-  description: "基于 Shadcn 的落地页模板",
+  title: "AI-code8.com - 智选AI, 一人公司, 创业老板必备",
+  description: "AI为您打工, 你是一人公司的老板",
 };
 
 export default function RootLayout({
