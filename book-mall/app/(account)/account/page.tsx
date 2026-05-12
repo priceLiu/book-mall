@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { AccountDevActions } from "@/components/account/account-dev-actions";
 import { LaunchToolsAppButton } from "@/components/account/launch-tools-app";
 import { WalletRefundRequestForm } from "@/components/account/wallet-refund-request-form";
+import { ChangePasswordForm } from "@/components/account/change-password-form";
 
 export const metadata = {
   title: "个人中心 — AI Mall",
@@ -74,7 +75,7 @@ export default async function AccountPage({
   const toolsBanner =
     toolsSsoErr.length > 0 ? toolsSsoErrBanner(toolsSsoErr) : null;
 
-  const [flags, walletRefunds, goldAccess] = await Promise.all([
+  const [flags, walletRefunds, goldAccess, accountSecrets] = await Promise.all([
     getMembershipFlags(session.user.id),
     prisma.walletRefundRequest.findMany({
       where: { userId: session.user.id },
@@ -82,7 +83,13 @@ export default async function AccountPage({
       take: 15,
     }),
     getGoldMemberAccess(session.user.id),
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { passwordHash: true },
+    }),
   ]);
+
+  const hasPassword = Boolean(accountSecrets?.passwordHash);
 
   const toolsSsoReady = isToolsSsoConfigured();
   const isAdminUser = session.user.role === "ADMIN";
@@ -135,6 +142,16 @@ export default async function AccountPage({
             </CardHeader>
             <CardContent className="text-sm space-y-2">
               {session.user.name ? <p>昵称：{session.user.name}</p> : null}
+            </CardContent>
+          </Card>
+
+          <Card className="sm:col-span-2 xl:col-span-1">
+            <CardHeader>
+              <CardTitle>登录密码</CardTitle>
+              <CardDescription>验证当前密码后更新；适用于邮箱密码登录的账号</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChangePasswordForm enabled={hasPassword} />
             </CardContent>
           </Card>
 
