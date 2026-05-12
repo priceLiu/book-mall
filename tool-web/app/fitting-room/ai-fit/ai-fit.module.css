@@ -435,8 +435,20 @@
 
 .modelGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+@media (max-width: 960px) {
+  .modelGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .modelGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .modelCard {
@@ -499,54 +511,65 @@
 
 .cardInner {
   display: flex;
-  gap: 0.65rem;
-  align-items: stretch;
-  padding: 0.75rem 0.85rem 0.85rem;
-  padding-right: 2rem;
+  gap: 0.45rem;
+  align-items: flex-start;
+  padding: 0.4rem 0.45rem 0.45rem;
+  padding-right: 1.65rem;
 }
 
 .cardMeta {
-  flex: 1;
+  flex: 0 0 30%;
+  max-width: 32%;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.2rem;
+  padding-top: 0.15rem;
 }
 
 .cardName {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.875rem;
+  line-height: 1.25;
 }
 
 .cardStyle {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--ai-accent);
   font-weight: 600;
+  line-height: 1.25;
 }
 
-.cardStat {
-  font-size: 0.72rem;
+.cardStatStack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  margin-top: 0.1rem;
+}
+
+.cardStatLine {
+  font-size: 0.65rem;
   color: var(--tool-muted, #71717a);
   line-height: 1.35;
 }
 
 .cardImgWrap {
-  width: 38%;
-  flex-shrink: 0;
+  flex: 1 1 0;
+  min-width: 0;
   border-radius: 8px;
   overflow: hidden;
   background: var(--tool-bg, #f4f4f5);
-  aspect-ratio: 3 / 5;
+  aspect-ratio: 9 / 16;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .cardImg {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
-  width: auto;
-  height: auto;
   object-fit: contain;
   display: block;
 }
@@ -669,31 +692,37 @@
 }
 
 .modalPanel {
-  width: min(100%, 480px);
-  max-height: min(90vh, 720px);
+  box-sizing: border-box;
+  width: min(100%, 400px);
+  max-height: min(86vh, 560px);
+  overflow-x: hidden;
   overflow-y: auto;
   border-radius: 12px;
   background: var(--tool-surface, #fff);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.14);
-  padding: 1.25rem 1.25rem 1.15rem;
+  padding: 1rem 1rem 0.9rem;
 }
 
 .modalTitle {
-  margin: 0 0 1rem;
-  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
   font-weight: 700;
 }
 
 .modalGrid {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.7rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .modalField {
   display: flex;
   flex-direction: column;
   gap: 0.28rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .modalLabel {
@@ -708,33 +737,56 @@
 }
 
 .modalInput {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.45rem 0.55rem;
   border-radius: 8px;
   border: 1px solid var(--tool-border, #e4e4e7);
   font-size: 0.875rem;
 }
 
+.modalFileWrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .modalFileInput {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   font-size: 0.8125rem;
 }
 
 .modalPreviewImg {
   margin-top: 0.45rem;
-  max-height: 160px;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: 200px;
+  height: auto;
   border-radius: 8px;
   object-fit: contain;
 }
 
 .modalRow2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .modalRow3 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  min-width: 0;
+  width: 100%;
 }
 
 .modalErr {
@@ -745,10 +797,11 @@
 
 .modalActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-end;
-  margin-top: 1.1rem;
-  padding-top: 0.85rem;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
   border-top: 1px solid var(--tool-border, #e4e4e7);
 }
 

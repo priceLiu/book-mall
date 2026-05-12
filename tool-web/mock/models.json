@@ -71,7 +71,22 @@
         "bust": "84cm",
         "waist": "62cm",
         "hips": "86cm",
-        "image": "https://static-main.aiyeshi.cn/ai-fitroom/model_05.webp",
+        "image": "https://bailian-bmp-prod.oss-cn-beijing.aliyuncs.com/public/img_to_img/ai_tryon/tryon_models/04.png",
+        "selected": false,
+        "isCustom": false
+    },
+    {
+        "id": "Eva",
+        "name": "Eva",
+        "style": "Western",
+        "gender": "Female",
+        "height": "174",
+        "weight": "52kg",
+        "body": "rectangular",
+        "bust": "84cm",
+        "waist": "62cm",
+        "hips": "86cm",
+        "image": "https://bailian-bmp-prod.oss-cn-beijing.aliyuncs.com/public/img_to_img/ai_tryon/tryon_models/03.png",
         "selected": false,
         "isCustom": false
     }
