@@ -12,7 +12,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { TOOL_NAV_ITEMS } from "@/config/nav-tools";
+import {
+  TOOL_NAV_ENTRIES,
+  TOOL_NAV_ITEMS,
+  isToolNavGroup,
+  type ToolNavEntry,
+} from "@/config/nav-tools";
 import { ToolUsageBeacon } from "@/components/tool-usage-beacon";
 import { mapFetchToolsSessionResultToShell } from "@/lib/map-fetch-tools-session";
 import type { FetchToolsSessionResult } from "@/lib/tools-introspect";
@@ -44,6 +49,154 @@ export function useToolsSession(): ToolsSessionContextValue {
 
 function avatarLooksAbsolute(url: string) {
   return /^https?:\/\//i.test(url.trim());
+}
+
+function activeHrefMatchesItem(href: string, item: { href: string }) {
+  return href === item.href;
+}
+
+function groupContainsActive(
+  entry: ToolNavEntry,
+  activeHref: string | null,
+): boolean {
+  if (!isToolNavGroup(entry)) return false;
+  if (!activeHref) return false;
+  return entry.children.some((c) => activeHrefMatchesItem(activeHref, c));
+}
+
+function ToolNavTree({
+  entries,
+  activeHref,
+  onNavigate,
+}: {
+  entries: ToolNavEntry[];
+  activeHref: string | null;
+  onNavigate: () => void;
+}) {
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const e of entries) {
+      if (isToolNavGroup(e)) {
+        const hasActive = e.children.some(
+          (c) => c.href === activeHref,
+        );
+        init[e.label] = hasActive || Boolean(e.defaultOpen);
+      }
+    }
+    return init;
+  });
+
+  /** 进入组内子项时自动展开该组（不强制收起其它） */
+  useEffect(() => {
+    if (!activeHref) return;
+    setOpenMap((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const e of entries) {
+        if (isToolNavGroup(e) && e.children.some((c) => c.href === activeHref)) {
+          if (!next[e.label]) {
+            next[e.label] = true;
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [entries, activeHref]);
+
+  const toggle = useCallback((label: string) => {
+    setOpenMap((prev) => ({ ...prev, [label]: !prev[label] }));
+  }, []);
+
+  return (
+    <ul className="tool-nav-sub">
+      {entries.map((entry) => {
+        if (!isToolNavGroup(entry)) {
+          const item = entry;
+          return (
+            <li
+              key={item.href}
+              className={
+                item.showOnMobile === false
+                  ? "tool-nav-li tool-nav-li--desktop-only"
+                  : "tool-nav-li"
+              }
+            >
+              <Link
+                href={item.href}
+                className={
+                  activeHrefMatchesItem(activeHref ?? "", item)
+                    ? "tool-nav-link tool-nav-link--active"
+                    : "tool-nav-link"
+                }
+                onClick={onNavigate}
+              >
+                {item.label}
+              </Link>
+            </li>
+          );
+        }
+
+        const open = Boolean(openMap[entry.label]);
+        const hasActive = groupContainsActive(entry, activeHref);
+        const triggerCls = [
+          "tool-nav-group-trigger",
+          hasActive ? "tool-nav-group-trigger--has-active" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        return (
+          <li key={entry.label} className="tool-nav-li tool-nav-group">
+            <button
+              type="button"
+              className={triggerCls}
+              aria-expanded={open}
+              onClick={() => toggle(entry.label)}
+            >
+              <span className="tool-nav-group-label">{entry.label}</span>
+              <span
+                className={`tool-nav-chevron ${open ? "tool-nav-chevron--open" : ""}`}
+                aria-hidden
+              >
+                ›
+              </span>
+            </button>
+            <div
+              className={`tool-nav-group-panel ${open ? "tool-nav-group-panel--open" : ""}`}
+              data-open={open ? "1" : "0"}
+            >
+              <ul className="tool-nav-sublist">
+                {entry.children.map((child) => (
+                  <li
+                    key={child.href}
+                    className={
+                      child.showOnMobile === false
+                        ? "tool-nav-li tool-nav-li--desktop-only"
+                        : "tool-nav-li"
+                    }
+                  >
+                    <Link
+                      href={child.href}
+                      className={
+                        activeHrefMatchesItem(activeHref ?? "", child)
+                          ? "tool-nav-sublink tool-nav-sublink--active"
+                          : "tool-nav-sublink"
+                      }
+                      onClick={onNavigate}
+                    >
+                      <span className="tool-nav-sublink-dot" aria-hidden />
+                      <span className="tool-nav-sublink-text">{child.label}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "tool-sidebar-collapsed-desktop";
@@ -314,33 +467,11 @@ export function ToolShellClient({
 
             <hr className="tool-sidebar-divider" />
 
-            <details className="tool-nav-details" open>
-              <summary className="tool-nav-summary">工具列表</summary>
-              <ul className="tool-nav-sub">
-                {TOOL_NAV_ITEMS.map((item) => (
-                  <li
-                    key={item.href}
-                    className={
-                      item.showOnMobile === false
-                        ? "tool-nav-li tool-nav-li--desktop-only"
-                        : "tool-nav-li"
-                    }
-                  >
-                    <Link
-                      href={item.href}
-                      className={
-                        activeNavHref === item.href
-                          ? "tool-nav-link tool-nav-link--active"
-                          : "tool-nav-link"
-                      }
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </details>
+            <ToolNavTree
+              entries={TOOL_NAV_ENTRIES}
+              activeHref={activeNavHref}
+              onNavigate={() => setSidebarOpen(false)}
+            />
           </nav>
         </aside>
 
