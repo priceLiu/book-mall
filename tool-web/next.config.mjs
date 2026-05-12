@@ -8,6 +8,11 @@ const nextConfig = {
         hostname: "static-main.aiyeshi.cn",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "tool-mall.oss-cn-guangzhou.aliyuncs.com",
+        pathname: "/**",
+      },
     ],
   },
 };

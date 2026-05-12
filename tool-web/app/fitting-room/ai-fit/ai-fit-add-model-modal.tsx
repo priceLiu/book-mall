@@ -24,7 +24,7 @@ export function AiFitAddModelModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onConfirm: (payload: AddModelPayload) => void;
+  onConfirm: (payload: AddModelPayload) => Promise<void>;
   t: (key: AiFitMsgKey) => string;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -83,7 +83,7 @@ export function AiFitAddModelModal({
     reader.readAsDataURL(file);
   };
 
-  const submit = () => {
+  const submit = async () => {
     const n = name.trim();
     if (!n) {
       setErr(t("validationNeedName"));
@@ -94,18 +94,22 @@ export function AiFitAddModelModal({
       return;
     }
     setErr(null);
-    onConfirm({
-      name: n,
-      style: style.trim(),
-      height: height.trim(),
-      weight: weight.trim(),
-      body: body.trim(),
-      bust: bust.trim(),
-      waist: waist.trim(),
-      hips: hips.trim(),
-      imageDataUrl,
-    });
-    onClose();
+    try {
+      await onConfirm({
+        name: n,
+        style: style.trim(),
+        height: height.trim(),
+        weight: weight.trim(),
+        body: body.trim(),
+        bust: bust.trim(),
+        waist: waist.trim(),
+        hips: hips.trim(),
+        imageDataUrl,
+      });
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t("saveModelFailed"));
+    }
   };
 
   if (!open) return null;
@@ -148,26 +152,27 @@ export function AiFitAddModelModal({
             ) : null}
           </label>
 
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>{t("modelName")}</span>
-            <input
-              name="model-name"
-              className={styles.modalInput}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
-
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>{t("style")}</span>
-            <input
-              className={styles.modalInput}
-              value={style}
-              onChange={(e) => setStyle(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
+          <div className={styles.modalRow2}>
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>{t("modelName")}</span>
+              <input
+                name="model-name"
+                className={styles.modalInput}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="off"
+              />
+            </label>
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>{t("style")}</span>
+              <input
+                className={styles.modalInput}
+                value={style}
+                onChange={(e) => setStyle(e.target.value)}
+                autoComplete="off"
+              />
+            </label>
+          </div>
 
           <div className={styles.modalRow2}>
             <label className={styles.modalField}>

@@ -9,5 +9,6 @@ export type ToolNavItem = {
 export const TOOL_NAV_ITEMS: ToolNavItem[] = [
   { href: "/fitting-room", label: "试衣间" },
   { href: "/fitting-room/ai-fit", label: "AI试衣" },
+  { href: "/fitting-room/ai-fit/closet", label: "我的衣柜" },
   { href: "/text-to-image", label: "文生图" },
 ];

@@ -70,9 +70,90 @@ model User {
   subscriptionRefundRequests   SubscriptionRefundRequest[]
   ssoAuthorizationCodes        SsoAuthorizationCode[]
   toolUsageEvents              ToolUsageEvent[]
+  aiFitCustomModels            AiFitCustomModel[]
+  aiFitGarmentUploads          AiFitGarmentUpload[]
+  aiFitClosetItems             AiFitClosetItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// AI 试衣：用户自定义模特（全身照等为 Data URL / base64 文本存库）
+model AiFitCustomModel {
+  id    String @id @default(cuid())
+  userId String
+  name  String
+  style String @default("")
+  height String @default("")
+  weight String @default("")
+  body  String @default("")
+  bust  String?
+  waist String?
+  hips  String?
+  /// data:image/jpeg|png|webp;base64,...
+  imageDataUrl String @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+enum AiFitGarmentSlot {
+  TOP
+  BOTTOM
+  ONE_PIECE
+}
+
+/// AI 试衣：用户上传的服装图（base64 Data URL）
+model AiFitGarmentUpload {
+  id     String           @id @default(cuid())
+  userId String
+  slot   AiFitGarmentSlot
+  /// data:image/...;base64,...
+  imageDataUrl String @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum AiFitClosetGarmentMode {
+  TWO_PIECE
+  ONE_PIECE
+}
+
+/// AI 试衣：用户「我的衣柜」收藏的成片（OSS 公网 URL）
+model AiFitClosetItem {
+  id     String @id @default(cuid())
+  userId String
+
+  /// 试衣成片 https URL（百炼/OSS）
+  imageUrl String @db.Text
+
+  /// 生成时所选搭配模式
+  garmentMode AiFitClosetGarmentMode
+
+  /// 生成上下文（用于「再试一次」/审计），均为 https URL
+  personImageUrl   String? @db.Text
+  topGarmentUrl    String? @db.Text
+  bottomGarmentUrl String? @db.Text
+
+  /// 用户备注（可选，<=120 字）
+  note String?
+
+  /// 关联百炼 task_id（可选，便于回溯）
+  taskId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 /// 工具站访问 / 调用打点（审计与后续扣费扩展）；写入方为主站 API，身份以工具 JWT 的 sub 为准。

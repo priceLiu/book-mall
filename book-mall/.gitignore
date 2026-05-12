@@ -27,6 +27,8 @@ yarn-error.log*
 
 # local env files
 .env*.local
+# Prisma CLI 默认读取 .env；本地可由 .env.local 复制生成，勿提交密钥
+.env
 
 # vercel
 .vercel

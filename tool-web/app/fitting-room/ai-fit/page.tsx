@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { AiFitModelRecord } from "@/lib/ai-fit-types";
 import modelsJson from "@/mock/models.json";
 import { AiFitClient } from "./ai-fit-client";
@@ -11,7 +12,9 @@ export default function AiFitPage() {
 
   return (
     <main className="tw-main fitting-room-main">
-      <AiFitClient initialModels={initialModels} />
+      <Suspense fallback={null}>
+        <AiFitClient initialModels={initialModels} />
+      </Suspense>
     </main>
   );
 }
