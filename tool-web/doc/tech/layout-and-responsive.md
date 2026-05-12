@@ -14,7 +14,7 @@
 
 ### 多工具入口与未来扩展
 
-- **导航**：继续用 `config/nav-tools.ts` 注册路径；主站 `issue`/`re-enter` 的 `redirect` 指向对应工具路径即可。  
+- **导航**：继续用 `config/nav-tools.ts` 注册路径；菜单结构与扩展规则（**分组 / 叶子 / 自动展开 / 命名约定**）以 **[tech/navigation.md](./navigation.md)** 为准。主站 `issue`/`re-enter` 的 `redirect` 指向对应工具路径即可。  
 - **域名**：每个浏览器访问的工具站 origin 须与主站 **`TOOLS_PUBLIC_ORIGIN`** 逐项对齐（含 `localhost`/`127.0.0.1`）。  
 - **量级**：入口再多也只多一份 JWT；若日后需要在敏感工具「秒级」对齐主站状态，可在该路由 **`fetchToolsSession`** 或专用校验 API，而不必回到「全局每页 introspect」。  
 
