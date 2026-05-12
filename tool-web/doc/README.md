@@ -5,6 +5,7 @@
 | 文档 | 说明 |
 |------|------|
 | [product/overview.md](./product/overview.md) | 定位、功能范围、与主站关系 |
+| [product/fitting-room-and-ai-fit.md](./product/fitting-room-and-ai-fit.md) | 试衣间与 AI 试衣：需求、问题、实现与数据约定 |
 | [tech/sso-session-troubleshooting.md](./tech/sso-session-troubleshooting.md) | SSO、`tools_token`、`TOOLS_PUBLIC_ORIGIN` 与常见问题（含「从主站过来仍提示未登录」） |
 | [tech/layout-and-responsive.md](./tech/layout-and-responsive.md) | 壳层布局、左侧导航、移动端与桌面独占工具 |
 | [process/deployment.md](./process/deployment.md) | 环境变量、构建发布、与主站联调 |
