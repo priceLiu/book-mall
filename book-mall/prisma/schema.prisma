@@ -73,6 +73,7 @@ model User {
   aiFitCustomModels            AiFitCustomModel[]
   aiFitGarmentUploads          AiFitGarmentUpload[]
   aiFitClosetItems             AiFitClosetItem[]
+  textToImageLibraryItems      TextToImageLibraryItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -148,6 +149,22 @@ model AiFitClosetItem {
 
   /// 关联百炼 task_id（可选，便于回溯）
   taskId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// 文生图：用户「我的图片库」收藏的成片（https 公网 URL）
+model TextToImageLibraryItem {
+  id       String @id @default(cuid())
+  userId   String
+
+  imageUrl String @db.Text
+  /// 生成时的提示词摘要（可选）
+  prompt   String? @db.VarChar(2000)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

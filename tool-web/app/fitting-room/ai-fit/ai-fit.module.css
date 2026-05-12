@@ -401,6 +401,13 @@
   background: var(--tool-bg, #f4f4f5);
 }
 
+a.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+}
+
 .btnAccent {
   padding: 0.38rem 0.75rem;
   border-radius: 8px;
