@@ -77,5 +77,12 @@ export const en = {
     closetCardDelete: "Delete",
     closetDeleteConfirm: "Remove this look from your closet?",
     closetDeleteFailed: "Delete failed. Please try again.",
+    imageLibraryPageTitle: "My image library",
+    imageLibraryEmptyTitle: "No saved images yet",
+    imageLibraryEmptyHint:
+      'Generate on “Text-to-image”, then save results to your library to see them here.',
+    imageLibraryGoGenerate: "Open text-to-image",
+    imageLibraryLoading: "Loading your library…",
+    imageLibraryPromptNone: "(No prompt)",
   },
 } as const;

@@ -75,5 +75,12 @@ export const zh = {
     closetCardDelete: "删除",
     closetDeleteConfirm: "确定要从衣柜删除这张图吗？",
     closetDeleteFailed: "删除失败，请稍后重试",
+    imageLibraryPageTitle: "我的图片库",
+    imageLibraryEmptyTitle: "图片库还是空的",
+    imageLibraryEmptyHint:
+      "在「文生图」生成图片并保存到图片库后，将在此处展示。生成接口就绪后可在结果旁一键入库。",
+    imageLibraryGoGenerate: "去文生图",
+    imageLibraryLoading: "正在加载图片库…",
+    imageLibraryPromptNone: "（无提示词）",
   },
 } as const;

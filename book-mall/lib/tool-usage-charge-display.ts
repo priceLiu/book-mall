@@ -17,6 +17,7 @@ export function resolveToolUsageChargeVariant(
   if (
     toolKey === "fitting-room" ||
     toolKey.startsWith("fitting-room__ai-fit__closet") ||
+    toolKey.startsWith("text-to-image__library") ||
     toolKey === "app-history"
   ) {
     return "nonbill";

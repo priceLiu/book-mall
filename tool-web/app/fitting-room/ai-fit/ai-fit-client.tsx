@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
@@ -766,6 +767,9 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
                   </>
                 ) : rightPanel === "idle" && tryOnResultUrl ? (
                   <>
+                    <Link href="/fitting-room/ai-fit/closet" className={styles.btnGhost}>
+                      {t("closetPageTitle")}
+                    </Link>
                     <button
                       type="button"
                       className={styles.btnAccent}

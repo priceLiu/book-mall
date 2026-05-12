@@ -38,7 +38,15 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
       { href: "/fitting-room/ai-fit/closet", label: "我的衣柜" },
     ],
   },
-  { href: "/text-to-image", label: "文生图", navKey: "text-to-image" },
+  {
+    label: "文生图",
+    navKey: "text-to-image",
+    defaultOpen: true,
+    children: [
+      { href: "/text-to-image", label: "生成" },
+      { href: "/text-to-image/library", label: "我的图片库" },
+    ],
+  },
   { href: "/app-history", label: "费用使用明细", navKey: "app-history" },
 ];
 
