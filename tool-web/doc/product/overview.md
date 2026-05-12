@@ -14,7 +14,8 @@
 ## 功能需求（当前与扩展）
 
 - **工作台**：默认首页，说明导航与重连方式。
-- **试衣间** (`/fitting-room`)：业务占位 + introspect 调试信息（开发期）。
+- **试衣间** (`/fitting-room`)：套装列表与详情弹层；**试穿**跳转 **AI 试衣**并预填服装（详见 [fitting-room-and-ai-fit.md](./fitting-room-and-ai-fit.md)）。
+- **AI 试衣** (`/fitting-room/ai-fit`)：模特与服装配置、异步试衣与结果展示；支持从试衣间带 `id` 预填。
 - **文生图** (`/text-to-image`)：占位；推理 Key 仅服务端 `lib/tool-config.ts` 读取。
 - **新增工具**：在 `config/nav-tools.ts` 的 `TOOL_NAV_ITEMS` 注册 href 与文案；复杂交互优先服务端 Route Handler。
 
