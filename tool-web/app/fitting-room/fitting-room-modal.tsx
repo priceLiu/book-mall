@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFittingRoomLocale } from "@/components/fitting-room-locale-context";
 import type { Outfit } from "@/lib/fitting-room-types";
@@ -57,10 +58,12 @@ export function FittingRoomModal({
     return typeof slide?.amazon_url === "string" ? slide.amazon_url.trim() : "";
   }, [slides, safeIndex]);
 
+  const router = useRouter();
+
   const tryOn = useCallback(() => {
-    const urls = slides.map((s) => s.url).filter(Boolean);
-    console.log("[fitting-room try-on] split image urls:", urls);
-  }, [slides]);
+    onClose();
+    router.push(`/fitting-room/ai-fit?id=${encodeURIComponent(outfit.id)}`);
+  }, [onClose, outfit.id, router]);
 
   const buy = useCallback(() => {
     if (!purchaseUrl) return;
