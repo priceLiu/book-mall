@@ -1,11 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  APP_HISTORY_TAB_DEFS,
-  type AppHistoryTabId,
-  usageEventMatchesTab,
-} from "@/lib/app-history-tabs";
+import { toolKeyToLabel } from "@/lib/tool-key-label";
 
 export type UsageEventRow = {
   id: string;
@@ -16,26 +12,52 @@ export type UsageEventRow = {
   createdAt: string;
 };
 
-function formatMeta(meta: unknown): string {
-  if (meta == null) return "—";
-  try {
-    const s = JSON.stringify(meta);
-    return s.length > 220 ? `${s.slice(0, 220)}…` : s;
-  } catch {
-    return String(meta);
-  }
+type GroupedRow = {
+  toolKey: string;
+  label: string;
+  count: number;
+  sumCostMinor: number;
+  lastAt: string;
+  lastAction: string;
+};
+
+function formatYuan(minor: number): string {
+  if (!minor || minor <= 0) return "—";
+  return `${(minor / 100).toFixed(2)} 元`;
 }
 
-function formatCost(costMinor: number | null): string {
-  if (costMinor == null || costMinor <= 0) return "—";
-  return `${(costMinor / 100).toFixed(2)} 元`;
+function aggregate(events: UsageEventRow[]): GroupedRow[] {
+  const map = new Map<string, GroupedRow>();
+  for (const e of events) {
+    const key = e.toolKey;
+    const row =
+      map.get(key) ??
+      ({
+        toolKey: key,
+        label: toolKeyToLabel(key),
+        count: 0,
+        sumCostMinor: 0,
+        lastAt: e.createdAt,
+        lastAction: e.action,
+      } as GroupedRow);
+    row.count += 1;
+    row.sumCostMinor += typeof e.costMinor === "number" ? e.costMinor : 0;
+    if (new Date(e.createdAt).getTime() > new Date(row.lastAt).getTime()) {
+      row.lastAt = e.createdAt;
+      row.lastAction = e.action;
+    }
+    map.set(key, row);
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime(),
+  );
 }
 
 export function AppHistoryClient() {
-  const [tab, setTab] = useState<AppHistoryTabId>("all");
   const [events, setEvents] = useState<UsageEventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,9 +73,7 @@ export function AppHistoryClient() {
       };
       if (!r.ok) {
         setEvents([]);
-        setError(
-          typeof data.error === "string" ? data.error : `HTTP ${r.status}`,
-        );
+        setError(typeof data.error === "string" ? data.error : `HTTP ${r.status}`);
         return;
       }
       setEvents(Array.isArray(data.events) ? data.events : []);
@@ -69,50 +89,26 @@ export function AppHistoryClient() {
     void load();
   }, [load]);
 
-  const filtered = useMemo(
-    () => events.filter((e) => usageEventMatchesTab(tab, e.toolKey)),
-    [events, tab],
-  );
+  const grouped = useMemo(() => aggregate(events), [events]);
 
-  const sumCost = useMemo(
-    () =>
-      filtered.reduce((acc, e) => acc + (typeof e.costMinor === "number" ? e.costMinor : 0), 0),
-    [filtered],
-  );
+  const eventsForExpanded = useMemo(() => {
+    if (!expanded) return [];
+    return events.filter((e) => e.toolKey === expanded).slice(0, 20);
+  }, [events, expanded]);
 
   return (
     <div>
       <div
         style={{
           display: "flex",
-          flexWrap: "wrap",
-          gap: "0.5rem",
-          marginBottom: "1rem",
+          gap: "0.75rem",
           alignItems: "center",
+          marginBottom: "1rem",
         }}
       >
-        {APP_HISTORY_TAB_DEFS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            style={{
-              padding: "0.35rem 0.75rem",
-              borderRadius: "999px",
-              border:
-                tab === t.id
-                  ? "1px solid var(--tool-accent, #111)"
-                  : "1px solid var(--tool-border, #ddd)",
-              background:
-                tab === t.id ? "var(--tool-accent-contrast, #111)" : "transparent",
-              color: tab === t.id ? "#fff" : "inherit",
-              cursor: "pointer",
-              fontSize: "0.875rem",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+        <span className="tw-muted" style={{ fontSize: "0.875rem" }}>
+          按 <strong>工具</strong> 汇总（最近 100 条）
+        </span>
         <button
           type="button"
           onClick={() => void load()}
@@ -138,58 +134,120 @@ export function AppHistoryClient() {
           </button>
           {"（未登录工具站会话时会提示 no_session）"}
         </p>
-      ) : filtered.length === 0 ? (
-        <p className="tw-muted">当前 Tab 下暂无记录。浏览工具页或完成 AI 试衣后会出现打点。</p>
+      ) : grouped.length === 0 ? (
+        <p className="tw-muted">
+          暂无记录。访问任一工具页或完成一次 AI 试衣后会在此出现。
+        </p>
       ) : (
-        <>
-          <p className="tw-muted" style={{ marginBottom: "0.75rem", fontSize: "0.875rem" }}>
-            共 {filtered.length} 条
-            {sumCost > 0 ? ` · 本页展示合计消耗约 ${(sumCost / 100).toFixed(2)} 元（分栏汇总）` : null}
-          </p>
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                minWidth: "720px",
-                borderCollapse: "collapse",
-                fontSize: "0.875rem",
-              }}
-            >
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--tool-border, #ddd)" }}>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>时间</th>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>工具</th>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>动作</th>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>消耗</th>
-                  <th style={{ textAlign: "left", padding: "0.5rem" }}>详情</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row) => (
-                  <tr
-                    key={row.id}
-                    style={{
-                      borderBottom: "1px solid var(--tool-border, #eee)",
-                      verticalAlign: "top",
-                    }}
-                  >
-                    <td style={{ padding: "0.5rem", whiteSpace: "nowrap" }}>
-                      {new Date(row.createdAt).toLocaleString("zh-CN")}
-                    </td>
-                    <td style={{ padding: "0.5rem", wordBreak: "break-all" }}>
-                      <code>{row.toolKey}</code>
-                    </td>
-                    <td style={{ padding: "0.5rem" }}>{row.action}</td>
-                    <td style={{ padding: "0.5rem" }}>{formatCost(row.costMinor)}</td>
-                    <td style={{ padding: "0.5rem", wordBreak: "break-word" }}>
-                      {formatMeta(row.meta)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              minWidth: "640px",
+              borderCollapse: "collapse",
+              fontSize: "0.9rem",
+            }}
+          >
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--tool-border, #ddd)" }}>
+                <th style={{ textAlign: "left", padding: "0.5rem" }}>工具</th>
+                <th style={{ textAlign: "right", padding: "0.5rem" }}>使用次数</th>
+                <th style={{ textAlign: "right", padding: "0.5rem" }}>合计消耗</th>
+                <th style={{ textAlign: "left", padding: "0.5rem" }}>最近使用</th>
+                <th style={{ textAlign: "left", padding: "0.5rem" }}>动作</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {grouped.map((g) => {
+                const isOpen = expanded === g.toolKey;
+                return (
+                  <>
+                    <tr
+                      key={g.toolKey}
+                      style={{ borderBottom: "1px solid var(--tool-border, #eee)" }}
+                    >
+                      <td style={{ padding: "0.5rem" }}>
+                        <div style={{ fontWeight: 600 }}>{g.label}</div>
+                        <div className="tw-muted" style={{ fontSize: "0.75rem" }}>
+                          <code>{g.toolKey}</code>
+                        </div>
+                      </td>
+                      <td style={{ padding: "0.5rem", textAlign: "right" }}>
+                        {g.count}
+                      </td>
+                      <td style={{ padding: "0.5rem", textAlign: "right" }}>
+                        {formatYuan(g.sumCostMinor)}
+                      </td>
+                      <td style={{ padding: "0.5rem", whiteSpace: "nowrap" }}>
+                        {new Date(g.lastAt).toLocaleString("zh-CN")}
+                      </td>
+                      <td style={{ padding: "0.5rem" }}>{g.lastAction}</td>
+                      <td style={{ padding: "0.5rem", textAlign: "right" }}>
+                        <button
+                          type="button"
+                          onClick={() => setExpanded(isOpen ? null : g.toolKey)}
+                          style={{ cursor: "pointer", fontSize: "0.8rem" }}
+                        >
+                          {isOpen ? "收起" : "明细"}
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen ? (
+                      <tr key={`${g.toolKey}__detail`}>
+                        <td colSpan={6} style={{ padding: "0 0.5rem 0.75rem" }}>
+                          <div
+                            style={{
+                              background: "var(--tool-surface, #f8f8f8)",
+                              border: "1px solid var(--tool-border, #eee)",
+                              borderRadius: "6px",
+                              padding: "0.5rem 0.75rem",
+                            }}
+                          >
+                            <div
+                              className="tw-muted"
+                              style={{ fontSize: "0.75rem", marginBottom: "0.25rem" }}
+                            >
+                              最近 {eventsForExpanded.length} 条
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
+                              {eventsForExpanded.map((row) => (
+                                <li
+                                  key={row.id}
+                                  style={{ fontSize: "0.8rem", marginBottom: "0.25rem" }}
+                                >
+                                  <span style={{ color: "var(--tool-muted, #666)" }}>
+                                    {new Date(row.createdAt).toLocaleString("zh-CN")}
+                                  </span>
+                                  {" · "}
+                                  {row.action}
+                                  {typeof row.costMinor === "number" && row.costMinor > 0 ? (
+                                    <>
+                                      {" · "}
+                                      <strong>{formatYuan(row.costMinor)}</strong>
+                                    </>
+                                  ) : null}
+                                  {row.meta != null ? (
+                                    <>
+                                      {" · "}
+                                      <code style={{ fontSize: "0.72rem" }}>
+                                        {JSON.stringify(row.meta).slice(0, 160)}
+                                      </code>
+                                    </>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
