@@ -69,6 +69,12 @@ git rm -r --cached .pnpm-store
 
 若仓库曾在「仅有 `book-mall` 为根」的时期有过提交，旧提交里的路径树与当前「一切在 `book-mall/` 下」的布局不一致；日常开发不影响。若需要整条历史都改成 monorepo 布局，需另行使用 `git filter-repo` 等重写历史（可选）。
 
+## 腾讯云部署（Docker / 云托管）
+
+主站与工具站已含 Dockerfile。**云托管 CloudBase Run**：同一仓库建两个服务，**目标目录**分别填 `book-mall`、`tool-web`，端口 **3000** / **3001**，环境变量在控制台填写（勿提交密钥）。详见 **`deploy/tencent/README.md`** 中的「云托管 CloudBase Run」小节。
+
+若在本机或自建机编排，可用根目录 **`docker-compose.yml`**。
+
 ## 仓库根上移（仅需做一次）
 
 若你的 `.git` 仍在 `book-mall/` 内，可在 **`private_website/`** 执行：

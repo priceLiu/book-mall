@@ -1,0 +1,23 @@
+# 单仓库双应用：主站 + 工具站
+# 使用方法：deploy/tencent/README.md
+
+services:
+  book-mall:
+    build:
+      context: ./book-mall
+      dockerfile: Dockerfile
+    ports:
+      - "${BOOK_MALL_PORT:-3000}:3000"
+    env_file:
+      - ./deploy/tencent/book-mall.env
+    restart: unless-stopped
+
+  tool-web:
+    build:
+      context: ./tool-web
+      dockerfile: Dockerfile
+    ports:
+      - "${TOOL_WEB_PORT:-3001}:3001"
+    env_file:
+      - ./deploy/tencent/tool-web.env
+    restart: unless-stopped

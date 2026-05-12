@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.gitignore
+*.md
+.env
+.env.*
+!.env.example
+coverage
+.husky
+.vscode
+.idea
+pnpm-debug.log*
+npm-debug.log*

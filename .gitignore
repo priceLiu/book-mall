@@ -10,3 +10,7 @@
 
 # 含腾讯云数据库凭证的迁移/issue 笔记（勿提交）
 /issue.md
+
+# 腾讯云部署本地密钥（从 *.example 复制，勿提交）
+/deploy/tencent/book-mall.env
+/deploy/tencent/tool-web.env
