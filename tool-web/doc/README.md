@@ -10,6 +10,7 @@
 | [tech/sso-session-troubleshooting.md](./tech/sso-session-troubleshooting.md) | SSO、`tools_token`、`TOOLS_PUBLIC_ORIGIN` 与常见问题（含「从主站过来仍提示未登录」） |
 | [tech/layout-and-responsive.md](./tech/layout-and-responsive.md) | 壳层布局、左侧导航、移动端与桌面独占工具 |
 | [tech/navigation.md](./tech/navigation.md) | **左侧菜单结构与扩展规范**：分组/叶子、命名、默认展开、可访问性、验证清单 |
+| [tech/components-ui-tailwind.md](./tech/components-ui-tailwind.md) | **`components/ui` + Tailwind utilities**：与工作站样式的共存方式、文生图 Hero |
 | [process/deployment.md](./process/deployment.md) | 环境变量、构建发布、与主站联调 |
 
 主站侧 SSO 环境变量与 HTTP API 总表：[`../../book-mall/doc/tech/tools-sso-environment.md`](../../book-mall/doc/tech/tools-sso-environment.md)。

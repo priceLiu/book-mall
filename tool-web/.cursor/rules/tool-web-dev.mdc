@@ -26,6 +26,7 @@ alwaysApply: false
 
 - 产品 / SSO / 部署变更时同步 **`tool-web/doc/`**（索引 **`doc/README.md`**），并视情况更新 **`book-mall/doc/tech/tools-sso-environment.md`**。
 - **`tool-web/README.md`** 保持指向上述文档与主站 SSO 文档。
+- **`components/ui`**（Tailwind utilities / shadcn 风格）详见 **`tool-web/doc/tech/components-ui-tailwind.md`**。
 
 ## 排障提示（给用户 / 支持）
 

@@ -10,7 +10,7 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "tool-mall.oss-cn-guangzhou.aliyuncs.com",
+        hostname: "images.unsplash.com",
         pathname: "/**",
       },
     ],
