@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { TextToImageLibraryItem } from "@/lib/text-to-image-library-types";
 import styles from "@/app/fitting-room/ai-fit/closet/closet.module.css";
@@ -129,14 +130,11 @@ function LibraryView() {
           className={styles.lightboxInner}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            className={styles.lightboxClose}
+          <ToolShellCloseButton
+            floating
+            label={t("closetLightboxClose")}
             onClick={() => setPreviewUrl(null)}
-            aria-label={t("closetLightboxClose")}
-          >
-            ×
-          </button>
+          />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={previewUrl}
@@ -193,16 +191,19 @@ function LibraryView() {
                     />
                   </div>
                 </button>
-                <div className={styles.cardBody}>
-                  <div className={styles.cardMeta}>
-                    <span className={styles.cardMode} title={item.prompt ?? undefined}>
+                <div className={styles.cardBodyLibrary}>
+                  <div className={styles.cardMetaLibrary}>
+                    <span
+                      className={styles.cardPromptLibrary}
+                      title={item.prompt ?? undefined}
+                    >
                       {item.prompt?.trim()
                         ? promptEllipsis(item.prompt)
                         : t("imageLibraryPromptNone")}
                     </span>
                     <span className={styles.cardTime}>{formatDate(item.createdAt)}</span>
                   </div>
-                  <div className={styles.cardActions}>
+                  <div className={styles.cardActionsLibrary}>
                     <button
                       type="button"
                       className={styles.btnPreview}

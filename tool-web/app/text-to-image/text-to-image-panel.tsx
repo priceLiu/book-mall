@@ -47,7 +47,7 @@ export function TextToImagePanel({
 
   return (
     <p className="tw-muted" style={{ margin: "0.75rem 0 0", maxWidth: "36rem" }}>
-      生成入口建设中。已保存的成片请在侧边栏「
+      点击上方「填写提示词」或「直接生成」打开生成窗口。已保存的图片可在侧边栏「
       <Link href="/text-to-image/library">我的图片库</Link>
       」查看。
     </p>

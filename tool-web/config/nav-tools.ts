@@ -47,7 +47,19 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
       { href: "/text-to-image/library", label: "我的图片库" },
     ],
   },
-  { href: "/app-history", label: "费用使用明细", navKey: "app-history" },
+  {
+    label: "费用",
+    navKey: "app-history",
+    defaultOpen: true,
+    children: [
+      { href: "/app-history", label: "费用使用明细", navKey: "app-history" },
+      {
+        href: "/app-history/plan-rules",
+        label: "计划规则说明",
+        navKey: "app-history",
+      },
+    ],
+  },
 ];
 
 /** 仅供 activeNavHref 等扁平场景使用 */

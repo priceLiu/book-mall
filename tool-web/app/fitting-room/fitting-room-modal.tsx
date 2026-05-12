@@ -7,6 +7,7 @@ import type { Outfit } from "@/lib/fitting-room-types";
 import { fittingRoomImageSrc } from "@/lib/fitting-room-image-url";
 import { FITTING_ROOM_IMG_FALLBACK } from "@/lib/fitting-room-fallback-image";
 import { fittingRoomRemotePlaceholderSrc } from "@/lib/fitting-room-remote-placeholder";
+import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import styles from "./fitting-room.module.css";
 
 function pieceLabel(type: string, t: (k: "pieceTop" | "pieceBottom" | "pieceOther") => string) {
@@ -84,14 +85,7 @@ export function FittingRoomModal({
         aria-modal="true"
         aria-labelledby="fitting-room-modal-title"
       >
-        <button
-          type="button"
-          className={styles.modalClose}
-          aria-label={t("modalCloseAria")}
-          onClick={onClose}
-        >
-          ×
-        </button>
+        <ToolShellCloseButton floating label={t("modalCloseAria")} onClick={onClose} />
         <h2 id="fitting-room-modal-title" className={styles.visuallyHidden}>
           {t("galleryTitle")}
         </h2>

@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import { MoveRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,9 +15,19 @@ const HERO_IMAGES = [
 export type TextToImageHeroProps = {
   /** 「跳转生成」滚动到的锚点 id，默认落到面板区域 */
   panelAnchorId?: string;
+  /** 点击「填写提示词」打开弹层（与锚点跳转二选一） */
+  onFillPrompt?: () => void;
+  /** 点击「直接生成」：可先滚动再打开弹层 */
+  onDirectGenerate?: () => void;
 };
 
-function TextToImageHero({ panelAnchorId = "text-to-image-panel" }: TextToImageHeroProps) {
+function TextToImageHero({
+  panelAnchorId = "text-to-image-panel",
+  onFillPrompt,
+  onDirectGenerate,
+}: TextToImageHeroProps) {
+  const anchor = `#${panelAnchorId}`;
+
   return (
     <div className="w-full py-12 lg:py-16">
       <div className="mx-auto max-w-[1100px] px-4 sm:px-6">
@@ -34,16 +46,34 @@ function TextToImageHero({ panelAnchorId = "text-to-image-panel" }: TextToImageH
               </p>
             </div>
             <div className="flex flex-row flex-wrap gap-4">
-              <Button size="lg" className="gap-2" variant="outline" asChild>
-                <a href={`#${panelAnchorId}`}>
+              {onDirectGenerate ? (
+                <Button
+                  size="lg"
+                  className="gap-2"
+                  variant="outline"
+                  type="button"
+                  onClick={onDirectGenerate}
+                >
                   直接生成 <Sparkles className="h-4 w-4" />
-                </a>
-              </Button>
-              <Button size="lg" className="gap-2" asChild>
-                <a href={`#${panelAnchorId}`}>
+                </Button>
+              ) : (
+                <Button size="lg" className="gap-2" variant="outline" asChild>
+                  <a href={anchor}>
+                    直接生成 <Sparkles className="h-4 w-4" />
+                  </a>
+                </Button>
+              )}
+              {onFillPrompt ? (
+                <Button size="lg" className="gap-2" type="button" onClick={onFillPrompt}>
                   填写提示词 <MoveRight className="h-4 w-4" />
-                </a>
-              </Button>
+                </Button>
+              ) : (
+                <Button size="lg" className="gap-2" asChild>
+                  <a href={anchor}>
+                    填写提示词 <MoveRight className="h-4 w-4" />
+                  </a>
+                </Button>
+              )}
             </div>
           </div>
 
