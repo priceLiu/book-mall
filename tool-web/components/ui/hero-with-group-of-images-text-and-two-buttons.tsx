@@ -3,20 +3,11 @@ import { MoveRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-/** Unsplash：抽象渐变 / 创意图形（长期可用的公开素材链接） */
+/** 本地 Hero 配图：`[0]` 左上、`[1]` 右侧竖图、`[2]` 左下（与栅格 `row-span-2` 一致）。 */
 const HERO_IMAGES = [
-  {
-    src: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80",
-    alt: "abstract gradient art",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?auto=format&fit=crop&w=600&q=80",
-    alt: "fluid shapes",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=600&q=80",
-    alt: "color burst",
-  },
+  { src: "/images/2.jpeg", alt: "文生图示例 1" },
+  { src: "/images/1.jpeg", alt: "文生图示例 2" },
+  { src: "/images/3.jpeg", alt: "文生图示例 3" },
 ] as const;
 
 export type TextToImageHeroProps = {

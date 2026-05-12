@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolveBillablePriceMinor } from "@/lib/tool-billable-price";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
+import { toolKeyToLabel } from "@/lib/tool-key-label";
+import { recordToolUsageAndConsumeWallet } from "@/lib/wallet-record-tool-usage-consume";
 
 const MAX_TOOL_KEY = 64;
 const MAX_ACTION = 64;
-const MAX_USAGE_QUERY = 100;
+/** 工具站费用明细分页：每页最多条数（产品约定 50） */
+const DEFAULT_USAGE_LIMIT = 50;
+const MAX_USAGE_LIMIT = 50;
 
 function parseMeta(v: unknown): Prisma.InputJsonValue | undefined {
   if (v == null || typeof v !== "object" || Array.isArray(v)) return undefined;
@@ -53,10 +58,13 @@ async function resolveCostMinorForEvent(
   if (typeof raw === "number" && Number.isFinite(raw)) {
     return Math.max(0, Math.floor(raw));
   }
-  if (
-    action === "try_on" &&
-    (toolKey.includes("ai-fit") || toolKey.endsWith("__ai-fit"))
-  ) {
+  const fromTable = await resolveBillablePriceMinor(toolKey, action);
+  if (fromTable != null) return fromTable;
+  /**
+   * AI试衣：仅成片成功后的 try_on 自动标价（见 tool-web/doc/payment.md）；page_view 不写单价。
+   * 套装 / 试衣间父路由 / 衣柜等不设自动单价。
+   */
+  if (action === "try_on" && toolKey === "fitting-room__ai-fit") {
     const cfg = await prisma.platformConfig.findUnique({
       where: { id: "default" },
       select: { toolInvokePerCallMinor: true },
@@ -67,44 +75,83 @@ async function resolveCostMinorForEvent(
   return undefined;
 }
 
-/** 当前用户在工具站产生的使用明细（分页由 limit 控制）。 */
+/** 当前用户在工具站产生的使用明细（分页：`page` + `limit`，默认每页 50 条）。 */
 export async function GET(req: Request) {
   const v = verifyBearer(req);
   if (!v.ok) return v.res;
 
   const url = new URL(req.url);
-  const limitRaw = parseInt(url.searchParams.get("limit") ?? "50", 10);
+  const limitRaw = parseInt(url.searchParams.get("limit") ?? `${DEFAULT_USAGE_LIMIT}`, 10);
   const limit = Math.min(
-    MAX_USAGE_QUERY,
-    Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 50),
+    MAX_USAGE_LIMIT,
+    Math.max(1, Number.isFinite(limitRaw) ? limitRaw : DEFAULT_USAGE_LIMIT),
   );
+  const pageRaw = parseInt(url.searchParams.get("page") ?? "1", 10);
+  const page = Math.max(1, Number.isFinite(pageRaw) ? pageRaw : 1);
+  const skip = (page - 1) * limit;
   const toolKeyPrefix = url.searchParams.get("toolKeyPrefix")?.trim() ?? "";
 
-  const events = await prisma.toolUsageEvent.findMany({
-    where: {
-      userId: v.userId,
-      ...(toolKeyPrefix.length > 0
-        ? { toolKey: { startsWith: toolKeyPrefix } }
-        : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    select: {
-      id: true,
-      toolKey: true,
-      action: true,
-      meta: true,
-      costMinor: true,
-      createdAt: true,
-    },
-  });
+  const baseWhere: Prisma.ToolUsageEventWhereInput = {
+    userId: v.userId,
+    ...(toolKeyPrefix.length > 0
+      ? { toolKey: { startsWith: toolKeyPrefix } }
+      : {}),
+  };
 
-  return NextResponse.json({ events });
+  const [total, events, summaryGroups] = await prisma.$transaction([
+    prisma.toolUsageEvent.count({ where: baseWhere }),
+    prisma.toolUsageEvent.findMany({
+      where: baseWhere,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        toolKey: true,
+        action: true,
+        meta: true,
+        costMinor: true,
+        createdAt: true,
+      },
+    }),
+    prisma.toolUsageEvent.groupBy({
+      by: ["toolKey"],
+      where: baseWhere,
+      _count: { id: true },
+      _sum: { costMinor: true },
+    }),
+  ]);
+
+  const totalPages =
+    total === 0 ? 0 : Math.ceil(total / limit);
+
+  const summaryByTool = [...summaryGroups]
+    .map((r) => ({
+      toolKey: r.toolKey,
+      label: toolKeyToLabel(r.toolKey),
+      billCount: r._count.id,
+      sumMinor: r._sum.costMinor ?? 0,
+    }))
+    .sort(
+      (a, b) =>
+        b.sumMinor - a.sumMinor ||
+        b.billCount - a.billCount ||
+        a.label.localeCompare(b.label, "zh-CN"),
+    );
+
+  return NextResponse.json({
+    events,
+    page,
+    limit,
+    total,
+    totalPages,
+    summaryByTool,
+  });
 }
 
 /**
- * 记录工具站使用事件（需在请求头携带工具 JWT）。
- * 身份以验签后的 `sub` 为准，对应主站 User.id；不写 introspect，避免拖慢打点。
+ * 工具站上报入口（需在请求头携带工具 JWT）。
+ * 仅当解析出的 costMinor 为正整数时写入 ToolUsageEvent；否则返回 { ok: true, recorded: false }，不落库。
  */
 export async function POST(req: Request) {
   let jwtSecret: string;
@@ -134,9 +181,9 @@ export async function POST(req: Request) {
   }
 
   const toolKeyRaw = typeof body.toolKey === "string" ? body.toolKey.trim() : "";
-  const toolKey =
+  const rawToolKey =
     toolKeyRaw.length > 0 ? toolKeyRaw.slice(0, MAX_TOOL_KEY) : "";
-  if (!toolKey) {
+  if (!rawToolKey) {
     return NextResponse.json({ error: "toolKey 必填" }, { status: 400 });
   }
 
@@ -146,17 +193,44 @@ export async function POST(req: Request) {
       : "page_view";
 
   const meta = parseMeta(body.meta);
-  const costMinor = await resolveCostMinorForEvent(body, toolKey, actionRaw);
+  const costMinor = await resolveCostMinorForEvent(body, rawToolKey, actionRaw);
+
+  /** 仅入库「已标价且金额 > 0」的流水；浏览与非计费动作不入库（见 tool-web/doc/payment.md）。 */
+  if (costMinor === undefined || costMinor <= 0) {
+    return NextResponse.json({ ok: true, recorded: false });
+  }
 
   try {
-    await prisma.toolUsageEvent.create({
-      data: {
-        userId: verified.sub,
-        toolKey,
-        action: actionRaw,
-        ...(costMinor !== undefined ? { costMinor } : {}),
-        ...(meta !== undefined ? { meta } : {}),
-      },
+    const outcome = await recordToolUsageAndConsumeWallet({
+      userId: verified.sub,
+      toolKey: rawToolKey,
+      action: actionRaw,
+      costMinor,
+      meta,
+    });
+
+    if (!outcome.ok) {
+      if (outcome.reason === "duplicate") {
+        return NextResponse.json({
+          ok: true,
+          recorded: false,
+          duplicate: true,
+        });
+      }
+      return NextResponse.json(
+        {
+          error: "insufficient_balance",
+          balanceMinor: outcome.balanceMinor,
+          requiredMinor: costMinor,
+        },
+        { status: 402 },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      recorded: true,
+      balanceMinor: outcome.balanceAfterMinor,
     });
   } catch (e) {
     const code =
@@ -171,6 +245,4 @@ export async function POST(req: Request) {
     }
     throw e;
   }
-
-  return NextResponse.json({ ok: true });
 }

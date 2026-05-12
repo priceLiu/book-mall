@@ -14,11 +14,10 @@ import {
 } from "react";
 import {
   TOOL_NAV_ENTRIES,
-  TOOL_NAV_ITEMS,
   isToolNavGroup,
   type ToolNavEntry,
 } from "@/config/nav-tools";
-import { ToolUsageBeacon } from "@/components/tool-usage-beacon";
+import { flattenToolNavEntries } from "@/lib/apply-tool-nav-visibility";
 import { mapFetchToolsSessionResultToShell } from "@/lib/map-fetch-tools-session";
 import type { FetchToolsSessionResult } from "@/lib/tools-introspect";
 import type { ToolShellSession } from "@/lib/tool-shell-session-types";
@@ -227,19 +226,27 @@ function parseToolsSessionPayload(raw: unknown): FetchToolsSessionResult {
 export function ToolShellClient({
   children,
   mainOrigin,
+  navEntries = TOOL_NAV_ENTRIES,
 }: {
   children: React.ReactNode;
   mainOrigin: string | null;
+  /** 经主站菜单可见性过滤后的条目 */
+  navEntries?: ToolNavEntry[];
 }) {
   const pathname = usePathname() || "/";
 
+  const flatNavItems = useMemo(
+    () => flattenToolNavEntries(navEntries),
+    [navEntries],
+  );
+
   const activeNavHref = useMemo(() => {
-    const sorted = [...TOOL_NAV_ITEMS].sort((a, b) => b.href.length - a.href.length);
+    const sorted = [...flatNavItems].sort((a, b) => b.href.length - a.href.length);
     const hit = sorted.find(
       (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
     );
     return hit?.href ?? null;
-  }, [pathname]);
+  }, [pathname, flatNavItems]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsedDesktop, setSidebarCollapsedDesktop] = useState(false);
   const prevPathnameRef = useRef<string | null>(null);
@@ -468,7 +475,7 @@ export function ToolShellClient({
             <hr className="tool-sidebar-divider" />
 
             <ToolNavTree
-              entries={TOOL_NAV_ENTRIES}
+              entries={navEntries}
               activeHref={activeNavHref}
               onNavigate={() => setSidebarOpen(false)}
             />
@@ -496,18 +503,25 @@ export function ToolShellClient({
                   退出
                 </a>
               ) : null}
-              {renewHref ? (
-                <Link href={renewHref} className="tool-renew">
-                  重新连接
-                </Link>
+              {renewHref && !loading ? (
+                hasTokenCookie && session.active ? (
+                  <span
+                    className="tool-connected"
+                    title="已与主站建立有效工具会话，可直接使用各工具"
+                  >
+                    已连接
+                  </span>
+                ) : (
+                  <Link href={renewHref} className="tool-renew">
+                    重新连接
+                  </Link>
+                )
               ) : null}
             </div>
           </header>
 
           <main className="tool-main-scroll">{children}</main>
         </div>
-
-        <ToolUsageBeacon enabled={!loading && session.active} />
       </div>
     </ToolsSessionContext.Provider>
   );

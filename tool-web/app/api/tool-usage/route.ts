@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 }
 
 /**
- * 浏览器异步打点：透传 Cookie 中的工具 JWT 到主站写入 ToolUsageEvent。
+ * 代理主站写入 `ToolUsageEvent`：**仅当主站解析出正金额 costMinor 时才会入库**；否则 `{ recorded: false }`。
  */
 export async function POST(req: Request) {
   const jar = cookies();

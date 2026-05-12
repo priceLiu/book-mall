@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
+import {
+  formatToolUsageChargeDisplay,
+  formatToolUsageUnitPriceDisplay,
+  isAiFitBillableTryOn,
+} from "@/lib/tool-usage-charge-display";
+import styles from "./expense-detail.module.css";
 
 export type UsageEventRow = {
   id: string;
@@ -12,243 +18,382 @@ export type UsageEventRow = {
   createdAt: string;
 };
 
-type GroupedRow = {
+export type ToolSummaryRow = {
   toolKey: string;
   label: string;
-  count: number;
-  sumCostMinor: number;
-  lastAt: string;
-  lastAction: string;
+  billCount: number;
+  sumMinor: number;
 };
 
-function formatYuan(minor: number): string {
-  if (!minor || minor <= 0) return "—";
-  return `${(minor / 100).toFixed(2)} 元`;
+type WalletPayload = {
+  active: boolean;
+  balanceMinor: number | null;
+  minBalanceLineMinor: number | null;
+  reason?: string;
+};
+
+const PAGE_SIZE = 50;
+
+function formatYuanFromMinor(minor: number | null | undefined): string {
+  if (minor == null || !Number.isFinite(minor)) return "—";
+  return `${(minor / 100).toFixed(2)}`;
 }
 
-function aggregate(events: UsageEventRow[]): GroupedRow[] {
-  const map = new Map<string, GroupedRow>();
-  for (const e of events) {
-    const key = e.toolKey;
-    const row =
-      map.get(key) ??
-      ({
-        toolKey: key,
-        label: toolKeyToLabel(key),
-        count: 0,
-        sumCostMinor: 0,
-        lastAt: e.createdAt,
-        lastAction: e.action,
-      } as GroupedRow);
-    row.count += 1;
-    row.sumCostMinor += typeof e.costMinor === "number" ? e.costMinor : 0;
-    if (new Date(e.createdAt).getTime() > new Date(row.lastAt).getTime()) {
-      row.lastAt = e.createdAt;
-      row.lastAction = e.action;
+function BalanceFooterStrip({
+  loading,
+  errorText,
+  wallet,
+}: {
+  loading: boolean;
+  errorText: string | null;
+  wallet: WalletPayload | null;
+}) {
+  const amountDisplay = (() => {
+    if (loading) return <span className={styles.balanceMuted}>读取中…</span>;
+    if (errorText) return <span className={styles.balanceMuted}>{errorText}</span>;
+    if (!wallet?.active && wallet?.reason === "tools_access_denied") {
+      return <span className={styles.balanceMuted}>暂无准入 · 请充值或联系管理员</span>;
     }
-    map.set(key, row);
-  }
-  return Array.from(map.values()).sort(
-    (a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime(),
+    if (wallet?.balanceMinor == null) {
+      return <span className={styles.balanceMuted}>—</span>;
+    }
+    return (
+      <>
+        <span className={styles.balanceAmount}>¥{formatYuanFromMinor(wallet.balanceMinor)}</span>
+        <span className={styles.balanceMuted}> CNY</span>
+      </>
+    );
+  })();
+
+  const hint =
+    !loading &&
+    !errorText &&
+    wallet?.active &&
+    wallet.minBalanceLineMinor != null &&
+    wallet.minBalanceLineMinor > 0 ? (
+      <p className={styles.balanceHint}>
+        最低可用余额线（工具准入）：¥{formatYuanFromMinor(wallet.minBalanceLineMinor)}
+      </p>
+    ) : null;
+
+  return (
+    <section
+      className={`${styles.balanceStrip} ${styles.balanceStripFooter}`}
+      aria-label="当前余额（页尾）"
+    >
+      <div className={styles.balanceStripInner}>
+        <span className={styles.balanceLabel}>钱包余额</span>
+        {amountDisplay}
+      </div>
+      {hint}
+    </section>
   );
 }
 
 export function AppHistoryClient() {
+  const [page, setPage] = useState(1);
   const [events, setEvents] = useState<UsageEventRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [summaryByTool, setSummaryByTool] = useState<ToolSummaryRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [wallet, setWallet] = useState<WalletPayload | null>(null);
+  const [walletPending, setWalletPending] = useState(true);
+  const [usageLoading, setUsageLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [walletError, setWalletError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const loadWallet = useCallback(async () => {
+    setWalletPending(true);
     try {
-      const r = await fetch("/api/tool-usage?limit=100", {
+      const walletRes = await fetch("/api/tool-wallet", {
         cache: "no-store",
         credentials: "same-origin",
       });
-      const data = (await r.json()) as {
+      const walletData = (await walletRes.json()) as WalletPayload & { error?: string };
+      if (!walletRes.ok) {
+        setWallet(null);
+        setWalletError(
+          typeof walletData.error === "string" ? walletData.error : `钱包 ${walletRes.status}`,
+        );
+      } else {
+        setWallet({
+          active: Boolean(walletData.active),
+          balanceMinor: walletData.balanceMinor ?? null,
+          minBalanceLineMinor: walletData.minBalanceLineMinor ?? null,
+          reason: walletData.reason,
+        });
+        setWalletError(null);
+      }
+    } catch {
+      setWallet(null);
+      setWalletError("余额读取失败");
+    } finally {
+      setWalletPending(false);
+    }
+  }, []);
+
+  const loadUsage = useCallback(async (pageNum: number) => {
+    setUsageLoading(true);
+    setError(null);
+    try {
+      const usageRes = await fetch(
+        `/api/tool-usage?page=${pageNum}&limit=${PAGE_SIZE}`,
+        { cache: "no-store", credentials: "same-origin" },
+      );
+      const usageData = (await usageRes.json()) as {
         events?: UsageEventRow[];
+        summaryByTool?: ToolSummaryRow[];
+        page?: number;
+        limit?: number;
+        total?: number;
+        totalPages?: number;
         error?: string;
       };
-      if (!r.ok) {
+      if (!usageRes.ok) {
         setEvents([]);
-        setError(typeof data.error === "string" ? data.error : `HTTP ${r.status}`);
+        setSummaryByTool([]);
+        setTotal(0);
+        setTotalPages(0);
+        setError(typeof usageData.error === "string" ? usageData.error : `HTTP ${usageRes.status}`);
         return;
       }
-      setEvents(Array.isArray(data.events) ? data.events : []);
+      setEvents(Array.isArray(usageData.events) ? usageData.events : []);
+      setSummaryByTool(
+        Array.isArray(usageData.summaryByTool) ? usageData.summaryByTool : [],
+      );
+      setTotal(typeof usageData.total === "number" ? usageData.total : 0);
+      setTotalPages(typeof usageData.totalPages === "number" ? usageData.totalPages : 0);
     } catch {
       setEvents([]);
+      setSummaryByTool([]);
+      setTotal(0);
+      setTotalPages(0);
       setError("加载失败，请检查网络与主站连接");
     } finally {
-      setLoading(false);
+      setUsageLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void loadWallet();
+  }, [loadWallet]);
 
-  const grouped = useMemo(() => aggregate(events), [events]);
+  useEffect(() => {
+    void loadUsage(page);
+  }, [page, loadUsage]);
 
-  const eventsForExpanded = useMemo(() => {
-    if (!expanded) return [];
-    return events.filter((e) => e.toolKey === expanded).slice(0, 20);
-  }, [events, expanded]);
+  const refreshAll = useCallback(async () => {
+    await loadWallet();
+    await loadUsage(page);
+  }, [loadWallet, loadUsage, page]);
+
+  const pageSumMinor = useMemo(() => {
+    return events.reduce((acc, e) => {
+      const c = e.costMinor;
+      return acc + (typeof c === "number" && c > 0 ? c : 0);
+    }, 0);
+  }, [events]);
+
+  const summarizedKeys = useMemo(
+    () => new Set(summaryByTool.map((s) => s.toolKey)),
+    [summaryByTool],
+  );
+
+  const orphanRows = useMemo(
+    () => events.filter((e) => !summarizedKeys.has(e.toolKey)),
+    [events, summarizedKeys],
+  );
+
+  const walletHintForStrip =
+    walletError != null
+      ? walletError === "no_session"
+        ? "未登录工具站会话"
+        : walletError
+      : null;
+
+  const showPager = total > 0 && totalPages > 0;
+
+  const inlineBalance = (() => {
+    if (walletPending) return <span className={styles.balanceMuted}>余额读取中…</span>;
+    if (walletHintForStrip) {
+      return <span className={styles.balanceMuted}>{walletHintForStrip}</span>;
+    }
+    if (!wallet?.active && wallet?.reason === "tools_access_denied") {
+      return <span className={styles.balanceMuted}>暂无准入</span>;
+    }
+    if (wallet?.balanceMinor == null) {
+      return <span className={styles.balanceMuted}>—</span>;
+    }
+    return (
+      <span className={styles.inlineBalanceAmt}>
+        ¥{formatYuanFromMinor(wallet.balanceMinor)}
+      </span>
+    );
+  })();
+
+  function renderRow(row: UsageEventRow) {
+    const charge = formatToolUsageChargeDisplay(row.toolKey, row.action, row.costMinor);
+    const unit = formatToolUsageUnitPriceDisplay(
+      row.toolKey,
+      row.action,
+      row.costMinor,
+      row.meta,
+    );
+    const chargeCls =
+      charge.variant === "money"
+        ? styles.costCharge
+        : charge.variant === "nonbill"
+          ? styles.costNonBillable
+          : isAiFitBillableTryOn(row.toolKey, row.action)
+            ? `${styles.costNone} ${styles.costMissingPrice}`
+            : styles.costNone;
+    const unitCls =
+      unit.variant === "money"
+        ? styles.unitPrice
+        : unit.variant === "nonbill"
+          ? styles.costNonBillable
+          : isAiFitBillableTryOn(row.toolKey, row.action)
+            ? `${styles.costNone} ${styles.costMissingPrice}`
+            : styles.costNone;
+    return (
+      <div key={row.id} className={styles.detailRow}>
+        <div className={styles.detailTime}>
+          {new Date(row.createdAt).toLocaleString("zh-CN")}
+        </div>
+        <div className={styles.detailTool}>
+          {toolKeyToLabel(row.toolKey)}
+          <code>{row.toolKey}</code>
+        </div>
+        <div className={styles.detailAction}>{row.action}</div>
+        <div className={`${unitCls} ${styles.cellNumeric}`}>{unit.text}</div>
+        <div className={chargeCls}>{charge.text}</div>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          gap: "0.75rem",
-          alignItems: "center",
-          marginBottom: "1rem",
-        }}
-      >
-        <span className="tw-muted" style={{ fontSize: "0.875rem" }}>
-          按 <strong>工具</strong> 汇总（最近 100 条）
-        </span>
-        <button
-          type="button"
-          onClick={() => void load()}
-          style={{
-            marginLeft: "auto",
-            padding: "0.35rem 0.75rem",
-            fontSize: "0.875rem",
-            cursor: "pointer",
-          }}
-        >
-          刷新
-        </button>
+      <div className={styles.detailToolbarRow}>
+        <div className={styles.detailToolbarMain}>
+          <p className={styles.detailSectionTitle}>使用明细（扣费）</p>
+          <button type="button" className={styles.refreshBtn} onClick={() => void refreshAll()}>
+            刷新余额与明细
+          </button>
+        </div>
+        <div className={styles.detailToolbarRight}>
+          <div className={styles.inlineBalance}>
+            <span className={styles.inlineBalanceLabel}>当前余额</span>
+            {inlineBalance}
+          </div>
+          <div className={styles.toolNotes} aria-label="各工具扣费笔记">
+            <div className={styles.toolNotesTitle}>扣费工具摘要（全部分页合计）</div>
+            {summaryByTool.length === 0 ? (
+              <p className={styles.toolNotesEmpty}>暂无汇总</p>
+            ) : (
+              <ul className={styles.toolNotesList}>
+                {summaryByTool.map((s) => (
+                  <li key={s.toolKey} className={styles.toolNotesLi}>
+                    {s.label} · {s.billCount} 笔 · ¥{(s.sumMinor / 100).toFixed(2)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
 
-      {loading ? (
+      {usageLoading && events.length === 0 ? (
         <p className="tw-muted">加载中…</p>
       ) : error ? (
         <p className="tw-muted" style={{ color: "crimson" }}>
           {error}
           {" · "}
-          <button type="button" onClick={() => void load()}>
+          <button type="button" onClick={() => void refreshAll()}>
             重试
           </button>
           {"（未登录工具站会话时会提示 no_session）"}
         </p>
-      ) : grouped.length === 0 ? (
+      ) : total === 0 ? (
         <p className="tw-muted">
-          暂无记录。访问任一工具页或完成一次 AI 试衣后会在此出现。
+          暂无扣费记录。产生试衣成功等事件后将在此列出。
         </p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              minWidth: "640px",
-              borderCollapse: "collapse",
-              fontSize: "0.9rem",
-            }}
-          >
-            <thead>
-              <tr style={{ borderBottom: "1px solid var(--tool-border, #ddd)" }}>
-                <th style={{ textAlign: "left", padding: "0.5rem" }}>工具</th>
-                <th style={{ textAlign: "right", padding: "0.5rem" }}>使用次数</th>
-                <th style={{ textAlign: "right", padding: "0.5rem" }}>合计消耗</th>
-                <th style={{ textAlign: "left", padding: "0.5rem" }}>最近使用</th>
-                <th style={{ textAlign: "left", padding: "0.5rem" }}>动作</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {grouped.map((g) => {
-                const isOpen = expanded === g.toolKey;
-                return (
-                  <>
-                    <tr
-                      key={g.toolKey}
-                      style={{ borderBottom: "1px solid var(--tool-border, #eee)" }}
-                    >
-                      <td style={{ padding: "0.5rem" }}>
-                        <div style={{ fontWeight: 600 }}>{g.label}</div>
-                        <div className="tw-muted" style={{ fontSize: "0.75rem" }}>
-                          <code>{g.toolKey}</code>
-                        </div>
-                      </td>
-                      <td style={{ padding: "0.5rem", textAlign: "right" }}>
-                        {g.count}
-                      </td>
-                      <td style={{ padding: "0.5rem", textAlign: "right" }}>
-                        {formatYuan(g.sumCostMinor)}
-                      </td>
-                      <td style={{ padding: "0.5rem", whiteSpace: "nowrap" }}>
-                        {new Date(g.lastAt).toLocaleString("zh-CN")}
-                      </td>
-                      <td style={{ padding: "0.5rem" }}>{g.lastAction}</td>
-                      <td style={{ padding: "0.5rem", textAlign: "right" }}>
-                        <button
-                          type="button"
-                          onClick={() => setExpanded(isOpen ? null : g.toolKey)}
-                          style={{ cursor: "pointer", fontSize: "0.8rem" }}
-                        >
-                          {isOpen ? "收起" : "明细"}
-                        </button>
-                      </td>
-                    </tr>
-                    {isOpen ? (
-                      <tr key={`${g.toolKey}__detail`}>
-                        <td colSpan={6} style={{ padding: "0 0.5rem 0.75rem" }}>
-                          <div
-                            style={{
-                              background: "var(--tool-surface, #f8f8f8)",
-                              border: "1px solid var(--tool-border, #eee)",
-                              borderRadius: "6px",
-                              padding: "0.5rem 0.75rem",
-                            }}
-                          >
-                            <div
-                              className="tw-muted"
-                              style={{ fontSize: "0.75rem", marginBottom: "0.25rem" }}
-                            >
-                              最近 {eventsForExpanded.length} 条
-                            </div>
-                            <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-                              {eventsForExpanded.map((row) => (
-                                <li
-                                  key={row.id}
-                                  style={{ fontSize: "0.8rem", marginBottom: "0.25rem" }}
-                                >
-                                  <span style={{ color: "var(--tool-muted, #666)" }}>
-                                    {new Date(row.createdAt).toLocaleString("zh-CN")}
-                                  </span>
-                                  {" · "}
-                                  {row.action}
-                                  {typeof row.costMinor === "number" && row.costMinor > 0 ? (
-                                    <>
-                                      {" · "}
-                                      <strong>{formatYuan(row.costMinor)}</strong>
-                                    </>
-                                  ) : null}
-                                  {row.meta != null ? (
-                                    <>
-                                      {" · "}
-                                      <code style={{ fontSize: "0.72rem" }}>
-                                        {JSON.stringify(row.meta).slice(0, 160)}
-                                      </code>
-                                    </>
-                                  ) : null}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className={styles.detailCard}>
+          <div className={styles.detailHead}>
+            <span>时间</span>
+            <span>工具</span>
+            <span>动作</span>
+            <span style={{ textAlign: "right" }}>单价</span>
+            <span style={{ textAlign: "right" }}>AI扣费</span>
+          </div>
+
+          {summaryByTool.map((s) => {
+            const rows = events.filter((e) => e.toolKey === s.toolKey);
+            if (rows.length === 0) return null;
+            return (
+              <div key={s.toolKey} className={styles.toolGroup}>
+                <div className={styles.toolGroupHead}>
+                  <span>{s.label}</span>
+                  <span className={styles.toolGroupMeta}>
+                    累计 {s.billCount} 笔 · 合计 ¥{(s.sumMinor / 100).toFixed(2)}
+                  </span>
+                </div>
+                <div className={styles.toolGroupRows}>{rows.map(renderRow)}</div>
+              </div>
+            );
+          })}
+
+          {orphanRows.length > 0 ? (
+            <div className={styles.toolGroup}>
+              <div className={styles.toolGroupHead}>
+                <span>其他</span>
+                <span className={styles.toolGroupMeta}>本页 {orphanRows.length} 条</span>
+              </div>
+              <div className={styles.toolGroupRows}>{orphanRows.map(renderRow)}</div>
+            </div>
+          ) : null}
+
+          <div className={styles.summaryLine}>
+            <span>本页合计扣费（仅已标价）</span>
+            <span className={styles.summaryStrong}>
+              {pageSumMinor > 0 ? `¥${(pageSumMinor / 100).toFixed(2)}` : "—"}
+            </span>
+          </div>
+          {showPager ? (
+            <div className={styles.pager}>
+              <span>
+                共 <strong className={styles.summaryStrong}>{total}</strong> 条 · 第{" "}
+                <strong className={styles.summaryStrong}>{page}</strong> /{" "}
+                <strong className={styles.summaryStrong}>{totalPages}</strong> 页
+              </span>
+              <div className={styles.pagerBtns}>
+                <button
+                  type="button"
+                  className={styles.pagerBtn}
+                  disabled={page <= 1 || usageLoading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  上一页
+                </button>
+                <button
+                  type="button"
+                  className={styles.pagerBtn}
+                  disabled={page >= totalPages || usageLoading}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
+
+      <BalanceFooterStrip
+        loading={walletPending}
+        errorText={walletHintForStrip}
+        wallet={wallet}
+      />
     </div>
   );
 }
