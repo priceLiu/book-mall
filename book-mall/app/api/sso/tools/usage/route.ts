@@ -215,6 +215,7 @@ export async function POST(req: Request) {
           ok: true,
           recorded: false,
           duplicate: true,
+          costMinor,
         });
       }
       return NextResponse.json(
@@ -231,6 +232,7 @@ export async function POST(req: Request) {
       ok: true,
       recorded: true,
       balanceMinor: outcome.balanceAfterMinor,
+      costMinor,
     });
   } catch (e) {
     const code =

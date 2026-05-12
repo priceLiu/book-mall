@@ -177,6 +177,36 @@
   flex-shrink: 0;
 }
 
+/* 文生图「我的图片库」：提示词 + 时间纵向排列，操作按钮在下方 */
+.cardBodyLibrary {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem 0.75rem;
+}
+
+.cardMetaLibrary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.cardPromptLibrary {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  font-weight: 500;
+  color: #404040;
+}
+
+.cardActionsLibrary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .btnPreview,
 .btnDownload,
 .btnDelete {
@@ -245,30 +275,6 @@
   border: 0;
   outline: none;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
-}
-
-.lightboxClose {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
-  z-index: 2;
-  width: 2.25rem;
-  height: 2.25rem;
-  border: none;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 1.35rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-.lightboxClose:hover {
-  background: rgba(0, 0, 0, 0.72);
 }
 
 .banner {

@@ -1,0 +1,116 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pageInner {
+  width: 100%;
+  max-width: 52rem;
+}
+
+.pageTitle {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  text-align: center;
+  width: 100%;
+}
+
+.doc {
+  max-width: 52rem;
+  width: 100%;
+}
+
+.intro {
+  margin: 0 0 1.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--tool-muted, #52525b);
+}
+
+.section {
+  margin-bottom: 1.15rem;
+}
+
+.sectionHead {
+  margin: 0 0 0.55rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--tool-text, #18181b);
+  letter-spacing: -0.01em;
+}
+
+.sectionInner:global(.tool-reminder-banner--block) .sectionHead,
+.sectionInner:global(.tool-reminder-warn) .sectionHead,
+.sectionInner:global(.tool-reminder-danger) .sectionHead {
+  color: inherit;
+}
+
+.sectionInner:global(.tool-reminder-banner--block) .bodyProse,
+.sectionInner:global(.tool-reminder-warn) .bodyProse,
+.sectionInner:global(.tool-reminder-danger) .bodyProse {
+  color: inherit;
+}
+
+.sectionInner {
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.sectionNeutralPanel {
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--tool-border, #e4e4e7);
+  background: var(--tool-bg, #fafafa);
+  box-sizing: border-box;
+}
+
+.bodyProse {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--tool-text, #27272a);
+}
+
+.bodyProse p {
+  margin: 0 0 0.55rem;
+}
+
+.bodyProse p:last-child {
+  margin-bottom: 0;
+}
+
+.ul {
+  margin: 0 0 0.45rem;
+  padding-left: 1.15rem;
+}
+
+.ul li {
+  margin-bottom: 0.35rem;
+}
+
+.ul li:last-child {
+  margin-bottom: 0;
+}
+
+.quote {
+  margin: 0 0 0.55rem;
+  padding: 0.45rem 0.65rem;
+  border-left: 3px solid var(--tool-border, #e4e4e7);
+  background: var(--tool-bg, #f4f4f5);
+  font-size: 0.8125rem;
+  color: var(--tool-muted, #52525b);
+}
+
+.hr {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 1px solid var(--tool-border, #e4e4e7);
+}
+
+.footerNote {
+  margin: 1rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--tool-muted, #71717a);
+  font-style: italic;
+}

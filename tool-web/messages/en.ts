@@ -31,6 +31,8 @@ export const en = {
     tryOnResultDismiss: "Dismiss",
     tryOnTimeout: "Try-on timed out. Please try again.",
     tryOnFailed: "Try-on failed. Check images and network.",
+    tryOnUsageRecordPending:
+      "Usage billing was not recorded yet. Check Usage & billing later; the server retries automatically.",
     height: "Height",
     weight: "Weight",
     bodyType: "Body type",
@@ -77,6 +79,12 @@ export const en = {
     closetCardDelete: "Delete",
     closetDeleteConfirm: "Remove this look from your closet?",
     closetDeleteFailed: "Delete failed. Please try again.",
+    billingReminderAfterTryOn:
+      "Try-on image is ready. If charges apply, billing follows the main site per-call price — see Usage & billing.",
+    tryOnBillingCharged:
+      "This try-on was billed {{amount}} CNY (per-call rate). See Usage & billing for details.",
+    tryOnBillingDuplicate:
+      "Billing record already exists (idempotent). Per-call rate {{amount}} CNY; no duplicate charge. See Usage & billing.",
     imageLibraryPageTitle: "My image library",
     imageLibraryEmptyTitle: "No saved images yet",
     imageLibraryEmptyHint:

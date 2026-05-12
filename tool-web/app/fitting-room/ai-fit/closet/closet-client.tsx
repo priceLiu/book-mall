@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { AiFitClosetItem } from "@/lib/ai-fit-closet-types";
 import styles from "./closet.module.css";
@@ -123,14 +124,11 @@ function ClosetView() {
           className={styles.lightboxInner}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            className={styles.lightboxClose}
+          <ToolShellCloseButton
+            floating
+            label={t("closetLightboxClose")}
             onClick={() => setPreviewUrl(null)}
-            aria-label={t("closetLightboxClose")}
-          >
-            ×
-          </button>
+          />
           {/* eslint-disable-next-line @next/next/no-img-element -- 外链 OSS */}
           <img
             src={previewUrl}

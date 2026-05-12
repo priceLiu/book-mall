@@ -43,14 +43,19 @@ function virtualHostedPublicUrl(cfg: OssEnvConfig, key: string): string {
 export async function uploadAiFitImageToOss(
   buffer: Buffer,
   contentType: string,
-  folder: "tryon" | "result" = "tryon",
+  folder: "tryon" | "result" | "text2image" = "tryon",
 ): Promise<string> {
   const cfg = readOssEnv();
   if ("error" in cfg) throw new Error(cfg.error);
 
   const client = createOssClientFrom(cfg);
   const ext = extForMime(contentType);
-  const prefix = folder === "result" ? "ai-fit/result" : "ai-fit/tryon";
+  const prefix =
+    folder === "result"
+      ? "ai-fit/result"
+      : folder === "text2image"
+        ? "text-to-image/generated"
+        : "ai-fit/tryon";
   const key = `${prefix}/${randomUUID()}.${ext}`;
   const ct = cleanContentType(contentType);
 
@@ -161,4 +166,12 @@ export async function persistTryOnResultImageToOss(
 ): Promise<string> {
   const { buf, contentType } = await downloadRemoteImageBuffer(ephemeralImageUrl);
   return uploadAiFitImageToOss(buf, contentType, "result");
+}
+
+/** 文生图：DashScope 结果 URL 多为短期有效 → 下载写入自有 OSS（text-to-image/generated/） */
+export async function persistTextToImageResultToOss(
+  ephemeralImageUrl: string,
+): Promise<string> {
+  const { buf, contentType } = await downloadRemoteImageBuffer(ephemeralImageUrl);
+  return uploadAiFitImageToOss(buf, contentType, "text2image");
 }

@@ -63,7 +63,7 @@ function takeHttpsUrl(raw: unknown): string | null {
   return t;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const v = verifyBearer(req);
   if (!v.ok) return v.res;
 

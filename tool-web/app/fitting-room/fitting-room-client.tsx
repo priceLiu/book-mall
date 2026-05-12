@@ -102,7 +102,9 @@ function FittingRoomPageBody({
             {renewHref ? (
               <>
                 {" · "}
-                <Link href={renewHref}>{t("reconnectShort")}</Link>
+                <Link href={renewHref} className="tool-renew tool-renew--compact">
+                  {t("reconnectShort")}
+                </Link>
               </>
             ) : null}
           </p>

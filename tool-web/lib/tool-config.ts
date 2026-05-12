@@ -1,3 +1,5 @@
+import { getQwenApiKey } from "@/lib/qwen-env";
+
 /**
  * 工具站自有配置（大模型 Key、兼容网关等）。
  *
@@ -23,7 +25,7 @@ export function getTextToImageModel(): string {
   return process.env.TOOL_WEB_IMAGE_MODEL?.trim() || "gpt-image-1";
 }
 
-/** 文生图等能力是否具备最小配置（有 Key 即可在后端继续接线）。 */
+/** 文生图等能力是否具备最小配置（OpenAI 兼容或通义 wanx 任一即可）。 */
 export function isTextToImageBackendConfigured(): boolean {
-  return Boolean(getOpenAiCompatApiKey());
+  return Boolean(getOpenAiCompatApiKey() || getQwenApiKey());
 }

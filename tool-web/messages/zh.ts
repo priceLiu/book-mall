@@ -30,6 +30,8 @@ export const zh = {
     tryOnResultDismiss: "清除结果",
     tryOnTimeout: "试衣超时，请稍后重试",
     tryOnFailed: "试衣失败，请检查图片与网络后重试",
+    tryOnUsageRecordPending:
+      "计费暂未记入账户，请稍后在费用明细核对；服务端仍在自动重试上报。",
     height: "身高",
     weight: "体重",
     bodyType: "身材",
@@ -75,6 +77,12 @@ export const zh = {
     closetCardDelete: "删除",
     closetDeleteConfirm: "确定要从衣柜删除这张图吗？",
     closetDeleteFailed: "删除失败，请稍后重试",
+    billingReminderAfterTryOn:
+      "试衣成片已生成。如涉及扣费，按主站单次标价计费，可在费用明细中查看。",
+    tryOnBillingCharged:
+      "本次试衣已扣费 {{amount}} 元（单次标价），可在费用明细中查看。",
+    tryOnBillingDuplicate:
+      "计费记录已存在（幂等），单次标价 {{amount}} 元，本次未重复扣款。可在费用明细中查看。",
     imageLibraryPageTitle: "我的图片库",
     imageLibraryEmptyTitle: "图片库还是空的",
     imageLibraryEmptyHint:

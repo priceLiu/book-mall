@@ -13,7 +13,7 @@ import {
   dashscopeGetTask,
 } from "@/lib/ai-fit-dashscope";
 import { readOssEnv } from "@/lib/oss-client";
-import { recordToolUsageFromServer } from "@/lib/forward-tools-usage-server";
+import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 
 export const runtime = "nodejs";
 
@@ -24,6 +24,94 @@ const persistedTryOnResultUrlByTask = new Map<
 >();
 const PERSISTED_TRY_ON_TTL_MS = 20 * 60 * 1000;
 const recordedTryOnUsageTasks = new Set<string>();
+const recordedTryOnUsageInsufficientTasks = new Set<string>();
+
+/** 成片计费展示：幂等 / 金额（与 taskId 绑定，TTL 与 OSS 缓存一致时清理） */
+type TryOnBillingSnap = { chargedMinor?: number; billingDuplicate?: boolean };
+const tryOnBillingSnapByTaskId = new Map<string, TryOnBillingSnap>();
+
+/**
+ * 计费锚定：仅在任务成功且写出结果图 URL 后打点一次 try_on（等价于用户一次「试衣」成功成片），
+ * 与台帐单价一致；toolKey 须为 AI试衣页 `fitting-room__ai-fit`（与 Beacon 路径规则一致）。
+ */
+export const AI_FIT_USAGE_TOOL_KEY = "fitting-room__ai-fit";
+
+type AiFitTryOnUsagePayload = {
+  recorded: boolean;
+  insufficientBalance?: boolean;
+  error?: string | null;
+  chargedMinor?: number;
+  billingDuplicate?: boolean;
+};
+
+async function reportAiFitTryOnUsage(opts: {
+  taskId: string;
+  imageUrl: string;
+  persistedToOwnOss: boolean;
+}): Promise<AiFitTryOnUsagePayload> {
+  try {
+    const usage = await postToolUsageFromServerWithRetries({
+      toolKey: AI_FIT_USAGE_TOOL_KEY,
+      action: "try_on",
+      meta: {
+        taskId: opts.taskId,
+        resultImageUrl: opts.imageUrl,
+        persistedToOwnOss: opts.persistedToOwnOss,
+      },
+    });
+    if (!usage.ok) {
+      const msg =
+        usage.reason === "no_session"
+          ? "未检测到工具站令牌，无法上报计费"
+          : "工具站未配置 MAIN_SITE_ORIGIN，无法上报计费";
+      return { recorded: false, error: msg };
+    }
+    if (usage.status === 402) {
+      const req = usage.data.requiredMinor;
+      return {
+        recorded: false,
+        insufficientBalance: true,
+        error:
+          typeof req === "number"
+            ? `账户余额不足（约需 ${req / 100} 元）`
+            : "账户余额不足，无法完成本次计费",
+      };
+    }
+    if (usage.status !== 200) {
+      const err =
+        typeof usage.data.error === "string"
+          ? usage.data.error
+          : `计费上报失败（HTTP ${usage.status}）`;
+      return { recorded: false, error: err };
+    }
+    const d = usage.data;
+    const costMinor =
+      typeof d.costMinor === "number" && Number.isFinite(d.costMinor)
+        ? Math.max(0, Math.floor(d.costMinor))
+        : undefined;
+
+    if (d.duplicate === true) {
+      return {
+        recorded: true,
+        billingDuplicate: true,
+        chargedMinor: costMinor,
+      };
+    }
+    if (d.recorded === true) {
+      return {
+        recorded: true,
+        chargedMinor: costMinor,
+      };
+    }
+    return { recorded: true };
+  } catch (e) {
+    console.error("[ai-fit try-on] usage reporting failed after retries", e);
+    return {
+      recorded: false,
+      error: "计费上报失败（网络异常），将自动重试",
+    };
+  }
+}
 
 function cachedPersistedUrl(taskId: string): string | undefined {
   const row = persistedTryOnResultUrlByTask.get(taskId);
@@ -31,6 +119,8 @@ function cachedPersistedUrl(taskId: string): string | undefined {
   if (Date.now() - row.at > PERSISTED_TRY_ON_TTL_MS) {
     persistedTryOnResultUrlByTask.delete(taskId);
     recordedTryOnUsageTasks.delete(taskId);
+    recordedTryOnUsageInsufficientTasks.delete(taskId);
+    tryOnBillingSnapByTaskId.delete(taskId);
     return undefined;
   }
   return row.url;
@@ -39,12 +129,6 @@ function cachedPersistedUrl(taskId: string): string | undefined {
 function rememberPersistedUrl(taskId: string, url: string) {
   persistedTryOnResultUrlByTask.set(taskId, { url, at: Date.now() });
 }
-
-/**
- * 计费锚定：仅在任务成功且写出结果图 URL 后打点一次 try_on（等价于用户一次「试衣」成功成片），
- * 与台帐单价一致；toolKey 须为 AI试衣页 `fitting-room__ai-fit`（与 Beacon 路径规则一致）。
- */
-export const AI_FIT_USAGE_TOOL_KEY = "fitting-room__ai-fit";
 
 function urlBlockedForDashscope(u: string): boolean {
   try {
@@ -286,22 +370,48 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    if (
-      imageUrl &&
-      taskId &&
-      succeeded &&
-      !recordedTryOnUsageTasks.has(taskId)
-    ) {
-      recordedTryOnUsageTasks.add(taskId);
-      await recordToolUsageFromServer({
-        toolKey: AI_FIT_USAGE_TOOL_KEY,
-        action: "try_on",
-        meta: {
-          taskId,
-          resultImageUrl: imageUrl,
-          persistedToOwnOss,
-        },
+  }
+
+  let usage:
+    | {
+        recorded: boolean;
+        insufficientBalance?: boolean;
+        error?: string | null;
+        chargedMinor?: number;
+        billingDuplicate?: boolean;
+      }
+    | undefined;
+
+  if (succeeded && imageUrl && taskId) {
+    if (recordedTryOnUsageTasks.has(taskId)) {
+      const snap = tryOnBillingSnapByTaskId.get(taskId);
+      usage = {
+        recorded: true,
+        chargedMinor: snap?.chargedMinor,
+        billingDuplicate: snap?.billingDuplicate,
+      };
+    } else if (recordedTryOnUsageInsufficientTasks.has(taskId)) {
+      usage = {
+        recorded: false,
+        insufficientBalance: true,
+        error: "账户余额不足，无法记入本次试衣扣费；成片仍可预览。",
+      };
+    } else {
+      const reported = await reportAiFitTryOnUsage({
+        taskId,
+        imageUrl,
+        persistedToOwnOss,
       });
+      usage = reported;
+      if (reported.recorded) {
+        recordedTryOnUsageTasks.add(taskId);
+        tryOnBillingSnapByTaskId.set(taskId, {
+          chargedMinor: reported.chargedMinor,
+          billingDuplicate: reported.billingDuplicate,
+        });
+      } else if (reported.insufficientBalance) {
+        recordedTryOnUsageInsufficientTasks.add(taskId);
+      }
     }
   }
 
@@ -310,5 +420,6 @@ export async function GET(req: NextRequest) {
     imageUrl,
     message: message ?? null,
     code: code ?? null,
+    ...(usage ? { usage } : {}),
   });
 }

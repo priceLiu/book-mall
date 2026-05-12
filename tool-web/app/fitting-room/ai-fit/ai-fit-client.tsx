@@ -87,6 +87,30 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+type TryOnPollUsage = {
+  recorded: boolean;
+  insufficientBalance?: boolean;
+  error?: string | null;
+  chargedMinor?: number;
+  billingDuplicate?: boolean;
+};
+
+function formatTryOnBillingLine(
+  u: TryOnPollUsage | undefined,
+  t: (key: string) => string,
+): string {
+  if (!u?.recorded) return t("billingReminderAfterTryOn");
+  const amount =
+    u.chargedMinor != null ? (u.chargedMinor / 100).toFixed(2) : null;
+  if (amount != null && u.billingDuplicate) {
+    return t("tryOnBillingDuplicate").replace(/\{\{amount\}\}/g, amount);
+  }
+  if (amount != null) {
+    return t("tryOnBillingCharged").replace(/\{\{amount\}\}/g, amount);
+  }
+  return t("billingReminderAfterTryOn");
+}
+
 function imgSrc(url: string): string {
   if (url.startsWith("data:")) return url;
   return fittingRoomImageSrc(url);
@@ -127,6 +151,8 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [closetSaveError, setClosetSaveError] = useState<string | null>(null);
+  const [tryOnUsageWarn, setTryOnUsageWarn] = useState<string | null>(null);
+  const [tryOnBillingLine, setTryOnBillingLine] = useState<string>("");
 
   const restoreRightRef = useRef<Exclude<RightPanel, "loading">>("idle");
 
@@ -396,6 +422,9 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
     setFormError(null);
     setTryOnResultUrl(null);
     setTryOnResultMeta(null);
+                        setTryOnUsageWarn(null);
+                        setTryOnBillingLine("");
+    setTryOnBillingLine("");
     setClosetSaveState("idle");
     restoreRightRef.current = rightPanel === "models" ? "models" : "idle";
     setRightPanel("loading");
@@ -443,6 +472,7 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
 
       const deadline = Date.now() + 180_000;
       let imageUrl: string | null = null;
+      let lastUsage: TryOnPollUsage | undefined;
       while (Date.now() < deadline) {
         await delay(2800);
         const pr = await fetch(
@@ -454,6 +484,7 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
           imageUrl?: string | null;
           message?: string | null;
           error?: string;
+          usage?: TryOnPollUsage;
         };
         if (!pr.ok) {
           throw new Error(pj.error ?? pj.message ?? t("tryOnFailed"));
@@ -463,7 +494,15 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
           (st === "SUCCEEDED" || st === "SUCCESS") && pj.imageUrl;
         if (done) {
           imageUrl = pj.imageUrl!;
-          break;
+          lastUsage = pj.usage;
+          const billingDone =
+            lastUsage == null ||
+            lastUsage.recorded === true ||
+            lastUsage.insufficientBalance === true;
+          if (billingDone) break;
+          /** 成片已返回但计费未落库：继续轮询以便服务端重试上报（幂等 taskId） */
+          await delay(2800);
+          continue;
         }
         if (st === "FAILED" || st === "CANCELED") {
           throw new Error(
@@ -475,6 +514,13 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
       if (!imageUrl) {
         throw new Error(t("tryOnTimeout"));
       }
+
+      const usageWarn =
+        lastUsage && !lastUsage.recorded
+          ? (lastUsage.error?.trim() || t("tryOnUsageRecordPending"))
+          : null;
+      setTryOnUsageWarn(usageWarn);
+      setTryOnBillingLine(formatTryOnBillingLine(lastUsage, t));
 
       setTryOnResultUrl(normalizeTryOnImageUrl(imageUrl));
       setTryOnResultMeta({
@@ -791,6 +837,8 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
                       onClick={() => {
                         setTryOnResultUrl(null);
                         setTryOnResultMeta(null);
+                        setTryOnUsageWarn(null);
+                        setTryOnBillingLine("");
                         setClosetSaveState("idle");
                         setClosetSaveError(null);
                       }}
@@ -807,6 +855,20 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
             <div className={styles.rightBody}>
               {tryOnResultUrl ? (
                 <div className={styles.resultWrap}>
+                  <p
+                    className="tool-reminder-banner tool-reminder-banner--block"
+                    style={{ marginBottom: "0.75rem" }}
+                  >
+                    {tryOnBillingLine || t("billingReminderAfterTryOn")}
+                  </p>
+                  {tryOnUsageWarn ? (
+                    <p
+                      className="tool-reminder-warn"
+                      style={{ marginBottom: "0.75rem" }}
+                    >
+                      {tryOnUsageWarn}
+                    </p>
+                  ) : null}
                   <div className={styles.resultStack}>
                     <div className={styles.resultCard}>
                       {/* eslint-disable-next-line @next/next/no-img-element -- remote OSS result */}

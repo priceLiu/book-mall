@@ -1,0 +1,20 @@
+---
+description: tool-web 统一关闭按钮、提醒色、计费成功提示与「重新连接」样式
+globs: tool-web/**/*
+alwaysApply: false
+---
+
+# UI 壳层：关闭 ×、提醒色、计费提示
+
+完整说明见 **`tool-web/doc/tech/ui-shell-conventions.md`**。编辑弹层 / 灯箱 / 计费提示时优先打开该文档。
+
+## 必须遵守
+
+1. **右上角关闭**：使用 **`ToolShellCloseButton`**（`components/ui/tool-shell-close-button.tsx`）。灯箱 / 大图预览加 **`floating`**；禁止新建 `.modalClose` / `.lightboxClose` / `.closeBtn` 等同角色样式。
+2. **正向计费 / 成功说明**：使用 **`app/globals.css`** 中的 **`.tool-reminder-banner`**（必要时 **`--block`**），配色对应 **`--tool-reminder-success-*`**。文生图与 AI 试衣 **成片展示后** 必须有一条同类提醒（扣费口径 + 费用明细入口）。
+3. **「重新连接」**：使用 **`.tool-renew`**（或 **`tool-renew--compact`**），与薄荷绿提醒色一致；不要用红色主按钮表达「重新登录」。
+4. **会话状态 UI**：若存在 **`tools_token` Cookie** 但 introspect 暂不可用，避免只显示「请先登录」；区分 **无 Cookie** / **有 Cookie 未激活**（可用 **`tool-reminder-warn`**），并与 API 实际可调用行为对齐。
+
+## 例外
+
+- **`.tool-reminder-danger`**：仅用于错误 / 阻断；成功生成路径不要用红色信息条代替计费说明。

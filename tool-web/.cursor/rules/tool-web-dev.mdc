@@ -14,6 +14,7 @@ alwaysApply: false
 ## UI 壳层
 
 - 全站布局由 **`ToolShell` / `ToolShellClient`** 提供：**左侧导航** = **回到主站** + 横线分隔 + **分组化工具树**；顶栏展示 **`introspect` 头像 / 昵称 / 角色** 与 **重新连接**；**回到主站** 新开主站 origin。
+- **关闭按钮、薄荷绿提醒条、重新连接药丸、生成后计费文案**：统一约定见 **`doc/tech/ui-shell-conventions.md`**，Cursor 规则 **`tool-web-ui-shell.mdc`**。
 - 新增工具菜单：只改 **`config/nav-tools.ts`** 的 **`TOOL_NAV_ENTRIES`**（支持 **`ToolNavGroup`** 分组与 **`ToolNavItem`** 叶子）。**叶子 vs 分组** 的取舍、命名、默认展开规则、可访问性约定，**统一以 `tool-web/doc/tech/navigation.md` 为准**，请勿在此处重复实现协议。
 - 若某工具 **`showOnMobile: false`**：必须在 **`tool-web/doc/tech/layout-and-responsive.md`**（或 `doc/product/overview.md`）写明桌面独占原因。
 
