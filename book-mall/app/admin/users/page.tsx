@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { AdminUserResetPasswordButton } from "@/components/admin/admin-user-reset-password-button";
 
 export default async function AdminUsersPage() {
   const users = await prisma.user.findMany({
@@ -26,13 +27,14 @@ export default async function AdminUsersPage() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-secondary">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table className="w-full min-w-[780px] text-left text-sm">
           <thead className="border-b border-secondary bg-muted/50">
             <tr>
               <th className="p-3 font-medium">邮箱</th>
               <th className="p-3 font-medium">昵称</th>
               <th className="p-3 font-medium">角色</th>
               <th className="p-3 font-medium">注册时间</th>
+              <th className="p-3 font-medium w-[10rem]">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -53,6 +55,9 @@ export default async function AdminUsersPage() {
                 </td>
                 <td className="p-3 text-muted-foreground">
                   {u.createdAt.toLocaleString("zh-CN")}
+                </td>
+                <td className="p-3 align-top">
+                  <AdminUserResetPasswordButton userId={u.id} email={u.email} />
                 </td>
               </tr>
             ))}

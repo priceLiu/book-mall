@@ -124,6 +124,10 @@ export function AdminNav({
         <Button variant="ghost" size="sm" className="h-9 px-2 text-sm font-normal" asChild>
           <Link href="/admin/users">用户</Link>
         </Button>
+
+        <Button variant="ghost" size="sm" className="h-9 px-2 text-sm font-normal" asChild>
+          <Link href="/admin/security">账号安全</Link>
+        </Button>
       </div>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
