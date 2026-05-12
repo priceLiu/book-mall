@@ -57,6 +57,10 @@ pnpm install
 
 在 **`private_website/`** 根目录执行 `git add` / `git commit` / `git push` 即可同时包含 `book-mall` 与 `tool-web`。
 
+只改主站时可：`git add book-mall/`、`git status` 核对后在根目录提交并推送。**不要在 `cd book-mall` 后再执行 `git commit`**（该目录下没有 `.git`，会继续用到上一级仓库或报错）。
+
+若 **`git push` 被 GitHub 拒绝并提示 secret / push protection**：说明某次提交里带了密钥文件。切勿提交 `book-mall/.env`、`book-mall/.env.local`（已由 `book-mall/.gitignore` 忽略）；若已误提交，需从历史中移除后再推送。工具站侧同类说明见 **`tool-web/doc/product/fitting-room-and-ai-fit.md`** 第 3.1 节。
+
 **请勿提交 `.pnpm-store/`**（已在根 `.gitignore` 忽略）。若曾经误执行过 `git add -A` 把 store 加进索引，请执行：
 
 ```bash
