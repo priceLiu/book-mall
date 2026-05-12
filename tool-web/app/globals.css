@@ -921,3 +921,6 @@ code {
     transform: scale(0.78);
   }
 }
+
+/* Tailwind：仅为 components/ui 生成 utilities（禁用 preflight，见 tailwind.config.ts） */
+@tailwind utilities;
