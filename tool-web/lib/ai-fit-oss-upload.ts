@@ -43,13 +43,15 @@ function virtualHostedPublicUrl(cfg: OssEnvConfig, key: string): string {
 export async function uploadAiFitImageToOss(
   buffer: Buffer,
   contentType: string,
+  folder: "tryon" | "result" = "tryon",
 ): Promise<string> {
   const cfg = readOssEnv();
   if ("error" in cfg) throw new Error(cfg.error);
 
   const client = createOssClientFrom(cfg);
   const ext = extForMime(contentType);
-  const key = `ai-fit/tryon/${randomUUID()}.${ext}`;
+  const prefix = folder === "result" ? "ai-fit/result" : "ai-fit/tryon";
+  const key = `${prefix}/${randomUUID()}.${ext}`;
   const ct = cleanContentType(contentType);
 
   let result: Awaited<ReturnType<typeof client.put>>;
@@ -85,13 +87,22 @@ export function shouldRehostRemoteUrl(remoteUrl: string): boolean {
   }
 }
 
-/** 由服务端下载远端图并上传 OSS，返回 OSS 公网 HTTPS URL（用于交给百炼）。 */
-export async function rehostRemoteImageToOss(remoteUrl: string): Promise<string> {
+async function downloadRemoteImageBuffer(remoteUrl: string): Promise<{
+  buf: Buffer;
+  contentType: string;
+  href: string;
+}> {
   let parsed: URL;
   try {
-    parsed = new URL(remoteUrl);
+    parsed = new URL(remoteUrl.trim());
   } catch {
     throw new Error(`无效的图片 URL：${remoteUrl}`);
+  }
+
+  let href = parsed.href;
+  if (parsed.protocol === "http:" && /\.aliyuncs\.com$/i.test(parsed.hostname)) {
+    href = href.replace(/^http:/i, "https:");
+    parsed = new URL(href);
   }
 
   /** 对已知证书过期的 CDN 放宽 TLS 校验，其余主机仍按默认校验 */
@@ -100,7 +111,7 @@ export async function rehostRemoteImageToOss(remoteUrl: string): Promise<string>
     ? new Agent({ connect: { rejectUnauthorized: false } })
     : undefined;
 
-  const res = await undiciFetch(parsed.href, {
+  const res = await undiciFetch(href, {
     dispatcher,
     redirect: "follow",
     headers: {
@@ -110,13 +121,13 @@ export async function rehostRemoteImageToOss(remoteUrl: string): Promise<string>
   });
 
   if (!res.ok) {
-    throw new Error(`下载图片失败：HTTP ${res.status} ← ${parsed.href}`);
+    throw new Error(`下载图片失败：HTTP ${res.status} ← ${href}`);
   }
 
   const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length === 0) throw new Error(`图片为空：${parsed.href}`);
+  if (buf.length === 0) throw new Error(`图片为空：${href}`);
   if (buf.length > MAX_REHOST_BYTES) {
-    throw new Error(`图片过大（>${Math.round(MAX_REHOST_BYTES / 1024 / 1024)}MB）：${parsed.href}`);
+    throw new Error(`图片过大（>${Math.round(MAX_REHOST_BYTES / 1024 / 1024)}MB）：${href}`);
   }
 
   const rawCt = res.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
@@ -133,5 +144,21 @@ export async function rehostRemoteImageToOss(remoteUrl: string): Promise<string>
             : "image/png";
   }
 
-  return uploadAiFitImageToOss(buf, contentType);
+  return { buf, contentType, href };
+}
+
+/** 由服务端下载远端图并上传 OSS，返回 OSS 公网 HTTPS URL（用于交给百炼）。 */
+export async function rehostRemoteImageToOss(remoteUrl: string): Promise<string> {
+  const { buf, contentType } = await downloadRemoteImageBuffer(remoteUrl);
+  return uploadAiFitImageToOss(buf, contentType, "tryon");
+}
+
+/**
+ * 百炼/Dashscope 返回的成片 URL 多为短期有效；下载后写入自有 OSS（ai-fit/result/），返回稳定公网 HTTPS。
+ */
+export async function persistTryOnResultImageToOss(
+  ephemeralImageUrl: string,
+): Promise<string> {
+  const { buf, contentType } = await downloadRemoteImageBuffer(ephemeralImageUrl);
+  return uploadAiFitImageToOss(buf, contentType, "result");
 }

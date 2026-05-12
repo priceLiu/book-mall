@@ -11,4 +11,5 @@ export const TOOL_NAV_ITEMS: ToolNavItem[] = [
   { href: "/fitting-room/ai-fit", label: "AI试衣" },
   { href: "/fitting-room/ai-fit/closet", label: "我的衣柜" },
   { href: "/text-to-image", label: "文生图" },
+  { href: "/app-history", label: "应用历史" },
 ];

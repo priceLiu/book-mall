@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
+  persistTryOnResultImageToOss,
   rehostRemoteImageToOss,
   shouldRehostRemoteUrl,
   uploadAiFitImageToOss,
@@ -12,8 +13,35 @@ import {
   dashscopeGetTask,
 } from "@/lib/ai-fit-dashscope";
 import { readOssEnv } from "@/lib/oss-client";
+import { recordToolUsageFromServer } from "@/lib/forward-tools-usage-server";
 
 export const runtime = "nodejs";
+
+/** 同一 task 轮询多次时复用已持久化的成片 URL，避免重复上传 OSS */
+const persistedTryOnResultUrlByTask = new Map<
+  string,
+  { url: string; at: number }
+>();
+const PERSISTED_TRY_ON_TTL_MS = 20 * 60 * 1000;
+const recordedTryOnUsageTasks = new Set<string>();
+
+function cachedPersistedUrl(taskId: string): string | undefined {
+  const row = persistedTryOnResultUrlByTask.get(taskId);
+  if (!row) return undefined;
+  if (Date.now() - row.at > PERSISTED_TRY_ON_TTL_MS) {
+    persistedTryOnResultUrlByTask.delete(taskId);
+    recordedTryOnUsageTasks.delete(taskId);
+    return undefined;
+  }
+  return row.url;
+}
+
+function rememberPersistedUrl(taskId: string, url: string) {
+  persistedTryOnResultUrlByTask.set(taskId, { url, at: Date.now() });
+}
+
+/** 与 `tool-usage-beacon` pathname → toolKey 规则一致：/fitting-room/ai-fit → fitting-room__ai-fit */
+const AI_FIT_USAGE_TOOL_KEY = "fitting-room__ai-fit";
 
 function urlBlockedForDashscope(u: string): boolean {
   try {
@@ -222,14 +250,61 @@ export async function GET(req: NextRequest) {
 
   const status =
     typeof output.task_status === "string" ? output.task_status : "UNKNOWN";
-  const imageUrl = dashscopeExtractTaskImageUrl(output);
+  const rawEphemeralUrl = dashscopeExtractTaskImageUrl(output);
   const message =
     typeof output.message === "string" ? output.message : undefined;
   const code = typeof output.code === "string" ? output.code : undefined;
 
+  const stUpper = status.toUpperCase();
+  const succeeded =
+    (stUpper === "SUCCEEDED" || stUpper === "SUCCESS") &&
+    Boolean(rawEphemeralUrl?.trim());
+
+  let imageUrl = rawEphemeralUrl ?? null;
+  let persistedToOwnOss = false;
+
+  if (succeeded && rawEphemeralUrl && taskId) {
+    const cached = cachedPersistedUrl(taskId);
+    if (cached) {
+      imageUrl = cached;
+      persistedToOwnOss = true;
+    } else {
+      const ossCfg = readOssEnv();
+      if (!("error" in ossCfg)) {
+        try {
+          const stable = await persistTryOnResultImageToOss(rawEphemeralUrl);
+          imageUrl = stable;
+          persistedToOwnOss = true;
+          rememberPersistedUrl(taskId, stable);
+        } catch (e) {
+          console.error("[ai-fit try-on] persist result to OSS failed:", e);
+          /** 退回百炼短期 URL，客户端仍可短暂预览 */
+        }
+      }
+    }
+
+    if (
+      imageUrl &&
+      taskId &&
+      succeeded &&
+      !recordedTryOnUsageTasks.has(taskId)
+    ) {
+      recordedTryOnUsageTasks.add(taskId);
+      await recordToolUsageFromServer({
+        toolKey: AI_FIT_USAGE_TOOL_KEY,
+        action: "try_on",
+        meta: {
+          taskId,
+          resultImageUrl: imageUrl,
+          persistedToOwnOss,
+        },
+      });
+    }
+  }
+
   return NextResponse.json({
     status,
-    imageUrl: imageUrl ?? null,
+    imageUrl,
     message: message ?? null,
     code: code ?? null,
   });

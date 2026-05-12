@@ -29,12 +29,16 @@
 | `GET` | `/api/sso/tools/re-enter` | 浏览器（工具站过期引导） | Query：`redirect`（工具站内路径，默认 `/fitting-room`，须以 `/` 开头）。已登录则直接 302 至工具站 callback；未登录则 302 至 `/login?callbackUrl=…` 登录后再回到本接口签发跳转。**新标签直达本接口时浏览器会先显示 `about:blank`**，可从主站页面改为先打开 **`/tools-open?redirect=/路径`**（加载动画后再跳转本接口）。 |
 | `POST` | `/api/sso/tools/exchange` | 工具站 **服务端** | Header `Authorization: Bearer TOOLS_SSO_SERVER_SECRET`；Body `{ code }`；返回 OAuth 式 `{ access_token, expires_in, token_type, token_subtype }`。JWT Payload 除 `sub`、`tier`、`exp` 外写入裁剪后的 **`email` / `name` / `image`**（供工具站壳层本地验签展示）。 |
 | `GET` | `/api/sso/tools/introspect` | 工具站 **服务端** | Header `Authorization: Bearer <access_token>`；返回 `active`、`tools_role`（`admin` / `member`）、`balance_minor`、`email`、`name`、`image`（头像 URL，OAuth 常见；可为 `null`）等；权限丢失时 `active: false` |
+| `POST` | `/api/sso/tools/usage` | 工具站 **服务端或浏览器（经 `/api/tool-usage` 代理）** | Header `Authorization: Bearer <access_token>`；Body：`toolKey`、`action`（默认 `page_view`）、可选 `meta`（JSON 对象）、可选 `costMinor`（分）。AI 试衣 `try_on` 可按平台 **`PlatformConfig.toolInvokePerCallMinor`** 自动写入 `costMinor`。 |
+| `GET` | `/api/sso/tools/usage` | 工具站 **服务端（经 `/api/tool-usage`）** | 同上 Bearer；Query：`limit`（默认 50，最大 100）、可选 `toolKeyPrefix`。返回 `{ events: [...] }`，供「应用历史」页。 |
 
 **吊销黄金会员、余额线变更等「实时权威」仍以 `GET /api/sso/tools/introspect` 为准**；JWT 仅在 TTL 内视为壳层展示与路由占位可信源，缩短 TTL（`TOOLS_SSO_JWT_TTL_SECONDS`）可收窄滞后窗口。
 
 ## 数据库
 
 表 **`SsoAuthorizationCode`**：一次性 code，含 `expiresAt`、`consumedAt`。迁移见 `prisma/migrations/20260511180000_sso_tools_authorization_code/`。
+
+表 **`ToolUsageEvent`**：工具站打点（`toolKey` / `action` / `meta` / `costMinor`）。迁移见 `prisma/migrations/20260511210000_tool_usage_event/` 及 **`20260513180000_tool_usage_cost_minor`**（`costMinor` 列）。
 
 ## 本仓库配套工具站（与 `book-mall/` 同级：`tool-web/`）
 

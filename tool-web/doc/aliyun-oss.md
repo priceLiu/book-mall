@@ -25,7 +25,8 @@ Bucket 名变更时，请同步修改 `OSS_BUCKET` 与 `remotePatterns` 中的 `
 
 ## 上传路径
 
-对象前缀：`ai-fit/tryon/<uuid>.<jpg|png|webp>`。
+- 输入侧（交给百炼前）：`ai-fit/tryon/<uuid>.<jpg|png|webp>`
+- **成片持久化**（百炼返回的短期 URL 拉回后写入自有 Bucket）：`ai-fit/result/<uuid>.<jpg|png|webp>` —— 衣柜保存与历史打点中的 `resultImageUrl` 应优先使用该稳定 HTTPS。
 
 ## 自动中转（解决 TLS 过期 / 私网图等百炼无法直拉的情况）
 

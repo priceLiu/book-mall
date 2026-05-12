@@ -6,16 +6,105 @@ import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 
 const MAX_TOOL_KEY = 64;
 const MAX_ACTION = 64;
+const MAX_USAGE_QUERY = 100;
 
 function parseMeta(v: unknown): Prisma.InputJsonValue | undefined {
   if (v == null || typeof v !== "object" || Array.isArray(v)) return undefined;
   return v as Prisma.InputJsonValue;
 }
 
+function verifyBearer(req: Request):
+  | { ok: true; userId: string }
+  | { ok: false; res: NextResponse } {
+  let jwtSecret: string;
+  try {
+    jwtSecret = requireToolsJwtSecret();
+  } catch {
+    return {
+      ok: false,
+      res: NextResponse.json({ error: "JWT 密钥未配置" }, { status: 503 }),
+    };
+  }
+  const auth = req.headers.get("authorization");
+  const raw =
+    auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
+  if (!raw) {
+    return {
+      ok: false,
+      res: NextResponse.json({ error: "缺少 Bearer Token" }, { status: 401 }),
+    };
+  }
+  const verified = verifyToolsAccessToken(raw, jwtSecret);
+  if (!verified) {
+    return {
+      ok: false,
+      res: NextResponse.json({ error: "无效或过期的工具令牌" }, { status: 401 }),
+    };
+  }
+  return { ok: true, userId: verified.sub };
+}
+
+async function resolveCostMinorForEvent(
+  body: Record<string, unknown>,
+  toolKey: string,
+  action: string,
+): Promise<number | undefined> {
+  const raw = body.costMinor;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return Math.max(0, Math.floor(raw));
+  }
+  if (
+    action === "try_on" &&
+    (toolKey.includes("ai-fit") || toolKey.endsWith("__ai-fit"))
+  ) {
+    const cfg = await prisma.platformConfig.findUnique({
+      where: { id: "default" },
+      select: { toolInvokePerCallMinor: true },
+    });
+    const v = cfg?.toolInvokePerCallMinor;
+    if (typeof v === "number" && v > 0) return v;
+  }
+  return undefined;
+}
+
+/** 当前用户在工具站产生的使用明细（分页由 limit 控制）。 */
+export async function GET(req: Request) {
+  const v = verifyBearer(req);
+  if (!v.ok) return v.res;
+
+  const url = new URL(req.url);
+  const limitRaw = parseInt(url.searchParams.get("limit") ?? "50", 10);
+  const limit = Math.min(
+    MAX_USAGE_QUERY,
+    Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 50),
+  );
+  const toolKeyPrefix = url.searchParams.get("toolKeyPrefix")?.trim() ?? "";
+
+  const events = await prisma.toolUsageEvent.findMany({
+    where: {
+      userId: v.userId,
+      ...(toolKeyPrefix.length > 0
+        ? { toolKey: { startsWith: toolKeyPrefix } }
+        : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      toolKey: true,
+      action: true,
+      meta: true,
+      costMinor: true,
+      createdAt: true,
+    },
+  });
+
+  return NextResponse.json({ events });
+}
+
 /**
  * 记录工具站使用事件（需在请求头携带工具 JWT）。
  * 身份以验签后的 `sub` 为准，对应主站 User.id；不写 introspect，避免拖慢打点。
- * 后续「扣减余额」等应在独立接口中复核准入并走钱包事务。
  */
 export async function POST(req: Request) {
   let jwtSecret: string;
@@ -57,41 +146,15 @@ export async function POST(req: Request) {
       : "page_view";
 
   const meta = parseMeta(body.meta);
-
-  const toolUsageDelegate = (
-    prisma as unknown as {
-      toolUsageEvent?: {
-        create: (args: {
-          data: {
-            userId: string;
-            toolKey: string;
-            action: string;
-            meta?: Prisma.InputJsonValue;
-          };
-        }) => Promise<unknown>;
-      };
-    }
-  ).toolUsageEvent;
-
-  if (!toolUsageDelegate?.create) {
-    console.error(
-      "[tools/usage] Prisma 客户端不含 toolUsageEvent（请在 book-mall 执行 `pnpm prisma generate` 并重启 dev）",
-    );
-    return NextResponse.json(
-      {
-        error:
-          "打点存储未就绪：数据库客户端未生成 ToolUsageEvent，请在 book-mall 目录执行 prisma generate 后重启服务",
-      },
-      { status: 503 },
-    );
-  }
+  const costMinor = await resolveCostMinorForEvent(body, toolKey, actionRaw);
 
   try {
-    await toolUsageDelegate.create({
+    await prisma.toolUsageEvent.create({
       data: {
         userId: verified.sub,
         toolKey,
         action: actionRaw,
+        ...(costMinor !== undefined ? { costMinor } : {}),
         ...(meta !== undefined ? { meta } : {}),
       },
     });
