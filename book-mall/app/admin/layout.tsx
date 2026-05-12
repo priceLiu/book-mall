@@ -23,9 +23,9 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 border-b border-secondary bg-card/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-card/90">
+      <header className="sticky top-0 z-40 border-b border-border bg-card text-card-foreground shadow-sm">
         <div className="container flex min-h-14 max-w-screen-xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 mx-auto">
-          <Link href="/admin" className="font-semibold text-foreground shrink-0">
+          <Link href="/admin" className="font-semibold text-card-foreground shrink-0 hover:text-primary">
             管理后台
           </Link>
           <AdminNav

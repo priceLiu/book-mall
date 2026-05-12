@@ -53,9 +53,10 @@ export type ToolNavEntry = ToolNavItem | ToolNavGroup;
 - 若当前页面 `pathname` 命中分组内任一子项，该组会被**自动展开**（无视 `defaultOpen`），由 `ToolNavTree` 中的 `useEffect` 强制 open。
 - 建议：**与首页直接相关的第一个分组**设 `defaultOpen: true`，其余保持折叠（避免列表过长）。
 
-## 5. 路由与 `toolKey`（打点）
+## 5. 路由与 `toolKey`（费用流水 / 业务打点）
 
-- 打点 `toolKey` 由 `ToolUsageBeacon` 根据 `pathname` 自动转换（`/` → `home`，`/a/b` → `a__b`），与菜单**解耦**——分组重命名不会影响埋点。
+- **不再入库页面浏览**：壳层已移除自动 `page_view` 上报；主站 **`ToolUsageEvent` 仅写入「已标价且扣费金额 > 0」的事件**（试衣成片成功、文生图成功调用等由各工具在服务端调用 **`POST /api/tool-usage`** 代理写入）。
+- **`toolKey` 与路径对齐约定**（业务上报时自行换算，与菜单解耦）：`/` → `home`，`/a/b` → `a__b`。
 - **不要为分组本身配 `href`**：用户点击分组时只展开，不跳转。
 - 子项 `href` 必须是 **绝对路径**，且与 `app/` 路由一致。
 

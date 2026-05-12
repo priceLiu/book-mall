@@ -175,6 +175,33 @@ model ToolUsageEvent {
   @@index([toolKey, createdAt])
 }
 
+/// 工具应用按次计费单价（分）；生效区间内匹配 toolKey + action，优先精确 action，其次 action 为空表示该工具通配。
+model ToolBillablePrice {
+  id            String    @id @default(cuid())
+  toolKey       String
+  /// 例如 try_on、invoke；null 表示未限定 action（慎用）
+  action        String?
+  priceMinor    Int
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  active        Boolean   @default(true)
+  note          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([toolKey, effectiveFrom])
+}
+
+/// 工具站左侧菜单项是否在导航中展示（由主站后台维护）；navKey 与 tool-web `config/nav-tools` 约定一致。
+model ToolNavVisibility {
+  navKey    String   @id
+  label     String
+  visible   Boolean  @default(true)
+  sortOrder Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
 // —— 平台配置（单行 default）——
 model PlatformConfig {
   id                   String   @id @default("default")

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
-/** 试衣成功成片落 OSS 后上报主站「工具使用」事件（与 ToolUsageBeacon 路径 toolKey 约定一致）。 */
+/** AI试衣：成片成功且写出计费点后上报主站 try_on（与 Beacon page_view 分离）；详见 doc/payment.md。 */
 export async function recordToolUsageFromServer(opts: {
   toolKey: string;
   action: string;
@@ -14,7 +14,7 @@ export async function recordToolUsageFromServer(opts: {
   if (!origin?.length) return;
 
   try {
-    await fetch(`${origin}/api/sso/tools/usage`, {
+    const r = await fetch(`${origin}/api/sso/tools/usage`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -27,7 +27,14 @@ export async function recordToolUsageFromServer(opts: {
       }),
       cache: "no-store",
     });
-  } catch {
-    /* 不打断试衣主流程 */
+    if (!r.ok) {
+      const detail = (await r.json().catch(() => null)) as Record<
+        string,
+        unknown
+      > | null;
+      console.error("[recordToolUsageFromServer]", r.status, detail);
+    }
+  } catch (e) {
+    console.error("[recordToolUsageFromServer]", e);
   }
 }

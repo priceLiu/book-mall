@@ -14,6 +14,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
+import { ToggleTheme } from "@/components/layout/toogle-theme";
+
+/** Ghost 顶栏按钮默认不显式前景色时，在深色/磨砂背景下可能被「吃掉」；与 `bg-card` 顶栏对齐为 card 前景色 */
+const ADMIN_NAV_GHOST =
+  "h-9 px-2 text-sm font-normal text-card-foreground hover:bg-accent hover:text-accent-foreground";
 
 export type AdminNavUserProps = {
   id: string;
@@ -52,10 +57,10 @@ function AdminHeaderUser({ user }: { user: AdminNavUserProps }) {
     >
       <Avatar className="h-8 w-8 shrink-0">
         {img ? <AvatarImage src={img} alt="" referrerPolicy="no-referrer" /> : null}
-        <AvatarFallback className="text-xs font-semibold">{initial}</AvatarFallback>
+        <AvatarFallback className="text-xs font-semibold text-card-foreground">{initial}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-col leading-tight hidden sm:flex">
-        <span className="truncate text-sm font-medium text-foreground">{primary}</span>
+        <span className="truncate text-sm font-medium text-card-foreground">{primary}</span>
         {secondary ? (
           <span className="truncate text-xs text-muted-foreground">{secondary}</span>
         ) : null}
@@ -77,15 +82,15 @@ export function AdminNav({
   toolsSsoIssues: string[];
 }) {
   return (
-    <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-2">
+    <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-2 text-card-foreground">
       <div className="flex flex-wrap items-center gap-1">
-        <Button variant="ghost" size="sm" className="h-9 px-2 text-sm font-normal" asChild>
+        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
           <Link href="/admin">概览</Link>
         </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-9 gap-1 px-2 text-sm font-normal">
+            <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} gap-1`}>
               计费与资金
               <ChevronDown className="h-4 w-4 opacity-70" />
             </Button>
@@ -97,6 +102,9 @@ export function AdminNav({
               <Link href="/admin/billing">订阅与充值</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
+              <Link href="/admin/finance/recharges">充值明细</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link href="/admin/refunds">退款审核</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -104,7 +112,7 @@ export function AdminNav({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-9 gap-1 px-2 text-sm font-normal">
+            <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} gap-1`}>
               产品与内容
               <ChevronDown className="h-4 w-4 opacity-70" />
             </Button>
@@ -121,15 +129,30 @@ export function AdminNav({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button variant="ghost" size="sm" className="h-9 px-2 text-sm font-normal" asChild>
+        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
           <Link href="/admin/users">用户</Link>
         </Button>
 
-        <Button variant="ghost" size="sm" className="h-9 px-2 text-sm font-normal" asChild>
-          <Link href="/admin/tool-usage">工具使用</Link>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} gap-1`}>
+              工具应用管理
+              <ChevronDown className="h-4 w-4 opacity-70" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuLabel>工具应用管理</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/admin/tool-apps/manage">工具管理</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/tool-usage">工具使用明细与费用</Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <Button variant="ghost" size="sm" className="h-9 px-2 text-sm font-normal" asChild>
+        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
           <Link href="/admin/security">账号安全</Link>
         </Button>
       </div>
@@ -146,7 +169,11 @@ export function AdminNav({
 
         <span className="mx-1 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
 
-        <Button variant="ghost" size="sm" className="h-9 px-2 text-sm font-normal" asChild>
+        <ToggleTheme iconOnly />
+
+        <span className="mx-1 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
+
+        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
           <Link href="/">回前台</Link>
         </Button>
 
@@ -154,7 +181,7 @@ export function AdminNav({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-9 px-2 text-sm font-normal"
+          className={ADMIN_NAV_GHOST}
           onClick={() => signOut({ callbackUrl: "/" })}
         >
           退出

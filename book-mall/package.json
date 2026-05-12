@@ -18,7 +18,8 @@
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
     "db:seed": "dotenv -e .env.local -- prisma db seed",
     "db:studio": "dotenv -e .env.local -- prisma studio",
-    "db:deploy": "dotenv -e .env.local -- prisma migrate deploy"
+    "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",
+    "db:calibrate-pilot": "dotenv -e .env.local -- tsx scripts/calibrate-pilot-tool-billing.ts"
   },
   "dependencies": {
     "@devnomic/marquee": "^1.0.2",
@@ -39,6 +40,7 @@
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "echarts": "^6.0.0",
     "embla-carousel-react": "^8.1.3",
     "lucide-react": "^0.383.0",
     "next": "14.2.3",

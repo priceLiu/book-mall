@@ -8,14 +8,14 @@
 - 应在工具站服务端将二进制拉回并写入 **自有 OSS**（或等价持久存储），对外暴露 **稳定 HTTPS**（见 `tool-web/doc/aliyun-oss.md` 中 **`ai-fit/result/`** 前缀）。
 - 「保存到我的衣柜」等后续流程仅保存上述稳定 URL。
 
-## 2. 应用历史打点（主站统一存储）
+## 2. 应用历史 / 费用流水（主站统一存储）
 
-- **页面浏览**：壳层已通过 **`ToolUsageBeacon`** + **`POST /api/tool-usage`** 按路径生成 `toolKey`（`/a/b` → `a__b`）。
-- **关键业务动作**（如一次试衣成功）：须在服务端或客户端调用 **`POST /api/sso/tools/usage`**（工具站推荐走 **`POST /api/tool-usage`** 代理），至少包含：
-  - **`toolKey`**：与 Beacon 规则一致或业务约定键（AI 试衣成片成功使用 `fitting-room__ai-fit`）。
-  - **`action`**：如 `page_view`、`try_on`、`invoke`。
+- **不入库页面浏览**：壳层**不再**自动上报 `page_view`；主站 **`POST /api/sso/tools/usage`** 仅在解析出 **`costMinor > 0`** 时写入 **`ToolUsageEvent`**（未标价或非计费请求返回 `recorded: false`，不落库）。
+- **关键业务动作**（如一次试衣成片成功、文生图一次成功调用）：须在**服务端**调用 **`POST /api/sso/tools/usage`**（工具站推荐走 **`POST /api/tool-usage`** 代理），至少包含：
+  - **`toolKey`**：与路径换算约定一致或业务键（AI 试衣成片成功使用 `fitting-room__ai-fit`；文生图使用 `text-to-image`）。
+  - **`action`**：如 **`try_on`**、**`invoke`**（按定价表匹配）；勿依赖 `page_view` 作为计费依据。
   - **`meta`**（可选 JSON）：`taskId`、稳定 **`resultImageUrl`**、模式等业务字段。
-- **`costMinor`**（可选）：单次消耗「分」；未传时 AI 试衣 **`try_on`** 可由主站按 **`PlatformConfig.toolInvokePerCallMinor`** 自动写入。
+- **`costMinor`**（可选）：单次消耗「分」；未传时由主站按 **`ToolBillablePrice`** / **`PlatformConfig.toolInvokePerCallMinor`**（AI 试衣 try_on 兜底）解析；**解析出正金额后**在同一事务内写入 **`ToolUsageEvent`**、**`WalletEntry(CONSUME)`** 并扣 **`Wallet`**；仍无法标价或余额不足则**不入账 / 402**。
 
 ## 3. 用户可见「应用历史」
 
