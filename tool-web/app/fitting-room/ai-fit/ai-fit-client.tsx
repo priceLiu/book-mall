@@ -161,13 +161,6 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
     e.stopPropagation();
   };
 
-  const statLine = (model: AiFitModelRecord) =>
-    [
-      `${t("height")} ${model.height}`,
-      `${t("weight")} ${model.weight}`,
-      `${t("bodyType")} ${model.body}`,
-    ].join(" · ");
-
   return (
     <div className={styles.workspace}>
       <header className={styles.pageHead}>
@@ -453,7 +446,17 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
                       <div className={styles.cardMeta}>
                         <span className={styles.cardName}>{m.name}</span>
                         <span className={styles.cardStyle}>{m.style}</span>
-                        <span className={styles.cardStat}>{statLine(m)}</span>
+                        <div className={styles.cardStatStack}>
+                          <span className={styles.cardStatLine}>
+                            {t("height")} {m.height}
+                          </span>
+                          <span className={styles.cardStatLine}>
+                            {t("weight")} {m.weight}
+                          </span>
+                          <span className={styles.cardStatLine}>
+                            {t("bodyType")} {m.body}
+                          </span>
+                        </div>
                       </div>
                       <div className={styles.cardImgWrap}>
                         {/* eslint-disable-next-line @next/next/no-img-element -- CDN/blob/data */}

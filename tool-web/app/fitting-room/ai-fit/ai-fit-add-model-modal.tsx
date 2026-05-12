@@ -133,13 +133,15 @@ export function AiFitAddModelModal({
           <label className={styles.modalField}>
             <span className={styles.modalLabel}>{t("modalImageLabel")}</span>
             <span className={styles.modalHint}>{t("modalImageHint")}</span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className={styles.modalFileInput}
-              onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-            />
+            <div className={styles.modalFileWrap}>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className={styles.modalFileInput}
+                onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
             {imageDataUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- user-upload data URL
               <img src={imageDataUrl} alt="" className={styles.modalPreviewImg} />
