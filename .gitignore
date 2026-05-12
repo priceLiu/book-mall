@@ -5,6 +5,9 @@
 /tool-web/node_modules/
 /tool-web/.next/
 
+# 工具站本地密钥与环境（勿提交）
+tool-web/.env.local
+
 # 根目录杂项
 .DS_Store
 
