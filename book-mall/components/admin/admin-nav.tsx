@@ -126,6 +126,10 @@ export function AdminNav({
         </Button>
 
         <Button variant="ghost" size="sm" className="h-9 px-2 text-sm font-normal" asChild>
+          <Link href="/admin/tool-usage">工具使用</Link>
+        </Button>
+
+        <Button variant="ghost" size="sm" className="h-9 px-2 text-sm font-normal" asChild>
           <Link href="/admin/security">账号安全</Link>
         </Button>
       </div>

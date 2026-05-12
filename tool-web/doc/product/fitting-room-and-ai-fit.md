@@ -105,6 +105,7 @@ AI 试衣结果区使用了 **`saveClosetFailed`**，曾一度未写入 `message
 - 将 **`OUTFITS`** 从 Mock 换为服务端接口，预填逻辑改为 `fetch` + 缓存；查询参数可扩展为 `outfitId` 等与后端一致命名。
 - 修复试衣间 **背景黑线**。
 - 若产品需要保留可分享的深链，可取消预填后的 **`replace`**，或改为仅用 `history.replaceState` 更新地址栏（需评估与 SEO、刷新行为的一致性）。
+- 工具通用约定（成片 OSS、打点、应用历史 Tab）见 **[tools-delivery-checklist.md](./tools-delivery-checklist.md)**。
 
 ---
 
