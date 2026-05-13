@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import {
   persistTryOnResultImageToOss,
   rehostRemoteImageToOss,
@@ -32,7 +33,7 @@ const tryOnBillingSnapByTaskId = new Map<string, TryOnBillingSnap>();
 
 /**
  * 计费锚定：仅在任务成功且写出结果图 URL 后打点一次 try_on（等价于用户一次「试衣」成功成片），
- * 与台帐单价一致；toolKey 须为 AI试衣页 `fitting-room__ai-fit`（与 Beacon 路径规则一致）。
+ * 与台帐单价一致；toolKey 须为 AI智能试衣页 `fitting-room__ai-fit`（与 Beacon 路径规则一致）。
  */
 const AI_FIT_USAGE_TOOL_KEY = "fitting-room__ai-fit";
 
@@ -186,6 +187,9 @@ async function resolveImageRef(
 
 /** 创建百炼 AI 试衣异步任务（aitryon）。 */
 export async function POST(req: NextRequest) {
+  const suite = await requireToolSuiteNavAccess("fitting-room");
+  if (!suite.ok) return suite.response;
+
   const apiKey = process.env.DASHSCOPE_API_KEY?.trim();
   if (!apiKey) {
     return NextResponse.json(
@@ -311,6 +315,9 @@ export async function POST(req: NextRequest) {
 
 /** 查询百炼试衣任务状态。 */
 export async function GET(req: NextRequest) {
+  const suite = await requireToolSuiteNavAccess("fitting-room");
+  if (!suite.ok) return suite.response;
+
   const apiKey = process.env.DASHSCOPE_API_KEY?.trim();
   if (!apiKey) {
     return NextResponse.json(

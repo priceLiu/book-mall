@@ -22,7 +22,7 @@ export function SmartSupportHomeClient({
 
       <section id="smart-support-panel" aria-labelledby="smart-support-heading">
         <h1 id="smart-support-heading" style={{ marginTop: 0 }}>
-          智能客服
+          AI智能客服
         </h1>
         <ToolImplementationCrossLink href="/smart-support/implementation" />
 
@@ -33,7 +33,7 @@ export function SmartSupportHomeClient({
         ) : !session.active ? (
           <div className="tw-note" style={{ marginTop: "0.75rem" }}>
             <p style={{ margin: "0 0 0.5rem" }}>
-              使用智能客服前请先通过主站登录并进入工具站（令牌过期时需重新连接）。
+              使用 AI智能客服前请先通过主站登录并进入工具站（令牌过期时需重新连接）。
             </p>
             {renewHref ? (
               <p style={{ margin: "0 0 0.5rem" }}>

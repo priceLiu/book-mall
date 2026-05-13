@@ -1,5 +1,5 @@
 /**
- * 试点校准：为指定用户入账 ¥1000，并将其「AI试衣 try_on」流水补齐 costMinor（按当前生效单价）。
+ * 试点校准：为指定用户入账 ¥1000，并将其「AI智能试衣 try_on」流水补齐 costMinor（按当前生效单价）。
  *
  * 执行（book-mall 目录）：
  *   pnpm exec dotenv -e .env.local -- tsx scripts/calibrate-pilot-tool-billing.ts

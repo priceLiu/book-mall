@@ -5,7 +5,7 @@ export function toolKeyToLabel(toolKey: string): string {
   const exact: Record<string, string> = {
     home: "工作台",
     "fitting-room": "试衣间",
-    "fitting-room__ai-fit": "AI试衣",
+    "fitting-room__ai-fit": "AI智能试衣",
     "fitting-room__ai-fit__closet": "我的衣柜",
     "text-to-image": "文生图",
     "text-to-image__library": "我的图片库",
@@ -13,7 +13,7 @@ export function toolKeyToLabel(toolKey: string): string {
   };
   if (exact[key]) return exact[key];
   if (key.startsWith("fitting-room__ai-fit__closet")) return "我的衣柜";
-  if (key.startsWith("fitting-room__ai-fit")) return "AI试衣";
+  if (key.startsWith("fitting-room__ai-fit")) return "AI智能试衣";
   if (key.startsWith("fitting-room")) return "试衣间";
   if (key.startsWith("text-to-image__library")) return "我的图片库";
   if (key.startsWith("text-to-image")) return "文生图";

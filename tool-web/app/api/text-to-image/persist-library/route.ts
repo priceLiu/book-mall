@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { persistTextToImageResultToOss } from "@/lib/ai-fit-oss-upload";
+import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const runtime = "nodejs";
@@ -42,6 +43,9 @@ function normalizeSourceUrl(raw: string): string | null {
  * 将 DashScope 短期 URL 拉到自有 OSS，再写入「我的图片库」（主站 SSO）。
  */
 export async function POST(req: Request) {
+  const suite = await requireToolSuiteNavAccess("text-to-image");
+  if (!suite.ok) return suite.response;
+
   const origin = originOrError();
   if (origin instanceof NextResponse) return origin;
   const token = tokenOrError();

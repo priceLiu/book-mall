@@ -20,7 +20,7 @@ export async function FeaturedProductsSection() {
   let items: ProductWithCategory[] = [];
   try {
     items = await prisma.product.findMany({
-      where: { featuredHome: true, status: "PUBLISHED" },
+      where: { featuredHome: true, status: "PUBLISHED", catalogUnavailable: false },
       orderBy: [{ featuredSort: "asc" }, { updatedAt: "desc" }],
       take: 12,
       include: { category: true },
@@ -36,8 +36,8 @@ export async function FeaturedProductsSection() {
   return (
     <section id="featured-products" className="max-w-[75%] mx-auto py-16 sm:py-20">
       <h2 className="text-lg md:text-xl text-center mb-2">推荐产品</h2>
-      <p className="text-sm text-muted-foreground text-center mb-10">
-        管理员在后台勾选「推荐首页」后展示于此
+      <p className="text-sm text-muted-foreground text-center mb-10 max-w-xl mx-auto leading-relaxed">
+        管理员在后台勾选「推荐首页」并上传封面图 URL 后展示于此；展示内容与「产品管理」上架条目一致。
       </p>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((p) => (
@@ -49,7 +49,7 @@ export async function FeaturedProductsSection() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={p.coverImageUrl}
-                alt=""
+                alt={p.title}
                 className="mb-4 aspect-square w-full rounded-lg object-cover bg-muted"
               />
               <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
@@ -61,7 +61,9 @@ export async function FeaturedProductsSection() {
               <p className="text-sm text-muted-foreground line-clamp-2">{p.summary}</p>
             </Link>
             <Button asChild className="mt-4 w-full shrink-0">
-              <Link href="/subscribe">订阅</Link>
+              <Link href={p.kind === "KNOWLEDGE" ? `/courses/${p.slug}` : `/products/${p.slug}`}>
+                {p.kind === "KNOWLEDGE" ? "进入 AI 学堂" : "查看应用"}
+              </Link>
             </Button>
           </div>
         ))}

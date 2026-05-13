@@ -3,6 +3,7 @@ import { formatMinorAsYuan } from "@/lib/currency";
 import {
   updatePlatformBillingConfig,
   updateSubscriptionPlanPrice,
+  updateSubscriptionPlanToolsAllowlist,
   extendActiveSubscription,
 } from "@/app/actions/billing";
 import { createSubscriptionRefundRequest } from "@/app/actions/refunds";
@@ -16,9 +17,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 
 export const metadata = {
   title: "订阅与计费 — 管理后台",
+};
+
+const SUITE_LABEL: Record<string, string> = {
+  "fitting-room": "试衣间",
+  "text-to-image": "文生图",
+  "smart-support": "AI智能客服",
+  "app-history": "费用明细",
 };
 
 export default async function AdminBillingPage() {
@@ -84,33 +93,79 @@ export default async function AdminBillingPage() {
           <CardTitle>订阅套餐价格</CardTitle>
           <CardDescription>月度/年度标价（分）；真实支付接入后可与订单联动</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-8">
           {plans.map((plan) => (
-            <form
-              key={plan.id}
-              action={updateSubscriptionPlanPrice}
-              className="flex flex-wrap items-end gap-4 border-b border-secondary/80 pb-4 last:border-0 last:pb-0"
-            >
-              <input type="hidden" name="planId" value={plan.id} />
-              <div>
-                <p className="text-sm font-medium">
-                  {plan.name}{" "}
-                  <span className="text-muted-foreground">({plan.slug})</span>
+            <div key={plan.id} className="space-y-5 border-b border-secondary/80 pb-8 last:border-0 last:pb-0">
+              <form
+                action={updateSubscriptionPlanPrice}
+                className="flex flex-wrap items-end gap-4"
+              >
+                <input type="hidden" name="planId" value={plan.id} />
+                <div>
+                  <p className="text-sm font-medium">
+                    {plan.name}{" "}
+                    <span className="text-muted-foreground">({plan.slug})</span>
+                  </p>
+                  <Label className="text-xs text-muted-foreground">价格（分）</Label>
+                  <Input
+                    name="priceMinor"
+                    type="number"
+                    className="mt-1 w-40"
+                    defaultValue={plan.priceMinor}
+                    required
+                    min={0}
+                  />
+                </div>
+                <Button type="submit" size="sm" variant="secondary">
+                  保存价格
+                </Button>
+              </form>
+
+              <form action={updateSubscriptionPlanToolsAllowlist} className="space-y-3">
+                <input type="hidden" name="planId" value={plan.id} />
+                <p className="text-xs font-medium text-muted-foreground">
+                  工具站套件（JWT / introspect <code className="font-mono">tools_nav_keys</code>）
                 </p>
-                <Label className="text-xs text-muted-foreground">价格（分）</Label>
-                <Input
-                  name="priceMinor"
-                  type="number"
-                  className="mt-1 w-40"
-                  defaultValue={plan.priceMinor}
-                  required
-                  min={0}
-                />
-              </div>
-              <Button type="submit" size="sm" variant="secondary">
-                保存
-              </Button>
-            </form>
+                <div className="flex flex-col gap-2 text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="toolsAllowMode"
+                      value="all"
+                      defaultChecked={plan.toolsNavAllowlist.length === 0}
+                    />
+                    <span>
+                      订阅享有<strong>全部</strong>套件分组（白名单留空）
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="toolsAllowMode"
+                      value="pick"
+                      defaultChecked={plan.toolsNavAllowlist.length > 0}
+                    />
+                    <span>仅勾选的分组（自定义）</span>
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                  {TOOL_SUITE_NAV_KEYS.map((key) => (
+                    <label key={key} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="toolsNavKey"
+                        value={key}
+                        defaultChecked={plan.toolsNavAllowlist.includes(key)}
+                      />
+                      <span>{SUITE_LABEL[key] ?? key}</span>
+                    </label>
+                  ))}
+                </div>
+                <Button type="submit" size="sm" variant="outline">
+                  保存套件范围
+                </Button>
+              </form>
+            </div>
           ))}
         </CardContent>
       </Card>

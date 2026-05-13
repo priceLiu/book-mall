@@ -1,6 +1,6 @@
 import { formatMinorAsYuan } from "@/lib/currency";
 
-/** 管理后台 / 文案：仅 AI试衣成片成功上报的 try_on 计入标价扣费。 */
+/** 管理后台 / 文案：仅 AI智能试衣成片成功上报的 try_on 计入标价扣费。 */
 export function isAiFitBillableTryOn(toolKey: string, action: string): boolean {
   return toolKey === "fitting-room__ai-fit" && action === "try_on";
 }

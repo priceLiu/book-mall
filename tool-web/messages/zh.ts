@@ -1,9 +1,9 @@
 /** AI 试衣工作台 — 中文文案（键需与 en.ts 一致） */
 export const zh = {
   aiFit: {
-    pageTitle: "AI试衣",
+    pageTitle: "AI智能试衣",
     configTitle: "配置",
-    aiModelSection: "AI试衣模特",
+    aiModelSection: "AI智能试衣模特",
     switchModelAria: "打开模特选择",
     garmentSection: "试穿服装",
     garmentTwoPiece: "上下装",
@@ -19,7 +19,8 @@ export const zh = {
     disclaimer:
       "试用页面生成结果仅供参考；请勿将生成内容用于违法违规用途。输出内容由 AI 生成。",
     emptyRightTitle: "工作台",
-    emptyRightHint: "点击左侧「AI试衣模特」在此选择模特，或开始试衣查看进度。",
+    emptyRightHint:
+      "点击左侧「AI智能试衣模特」在此选择模特，或开始试衣查看进度。",
     modelPickerTitle: "选择模特",
     addModel: "新增模特",
     back: "返回",
@@ -65,8 +66,9 @@ export const zh = {
     fittingRoomOutfitNotFound: "未找到该套装，请从试衣间重新点击「试穿」",
     closetPageTitle: "我的衣柜",
     closetEmptyTitle: "衣柜还是空的",
-    closetEmptyHint: "去「AI 试衣」生成效果图后，点击「保存到我的衣柜」即可收藏到此。",
-    closetGoTryOn: "去 AI 试衣",
+    closetEmptyHint:
+      "去「AI智能试衣」生成效果图后，点击「保存到我的衣柜」即可收藏到此。",
+    closetGoTryOn: "去 AI智能试衣",
     closetLoading: "正在加载衣柜…",
     closetCardModeTwo: "上下装",
     closetCardModeOne: "连体单件",

@@ -21,6 +21,8 @@ export function LaunchToolsAppButton({
    * `default`：个人中心等块状区域。
    */
   layout = "default",
+  /** 为 true 时在拿到 redirectUrl 后 `window.open`，否则当前页跳转 */
+  openInNewTab = false,
 }: {
   enabled: boolean;
   /** 未启用时在按钮下方展示 */
@@ -34,6 +36,7 @@ export function LaunchToolsAppButton({
   className?: string;
   title?: string;
   layout?: "default" | "inlineNav";
+  openInNewTab?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -83,7 +86,11 @@ export function LaunchToolsAppButton({
         return;
       }
       if (typeof data.redirectUrl === "string") {
-        window.location.assign(data.redirectUrl);
+        if (openInNewTab) {
+          window.open(data.redirectUrl, "_blank", "noopener,noreferrer");
+        } else {
+          window.location.assign(data.redirectUrl);
+        }
         return;
       }
       setMsg("响应缺少 redirectUrl");
@@ -96,7 +103,7 @@ export function LaunchToolsAppButton({
     <div
       className={cn(
         isInlineNav
-          ? "inline-flex shrink-0 flex-col items-start gap-0"
+          ? "inline-flex shrink-0 flex-col items-start gap-0 self-center"
           : "space-y-2",
       )}
     >
@@ -105,7 +112,11 @@ export function LaunchToolsAppButton({
         variant={variant}
         size="sm"
         title={title}
-        className={cn(!isInlineNav && "w-full sm:w-auto", className)}
+        className={cn(
+          !isInlineNav && "w-full sm:w-auto",
+          isInlineNav && "h-9 shrink-0",
+          className,
+        )}
         disabled={!enabled || busy}
         onClick={() => void handleLaunch()}
       >

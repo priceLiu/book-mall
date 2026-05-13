@@ -63,7 +63,7 @@ async function resolveCostMinorForEvent(
   const fromTable = await resolveBillablePriceMinor(toolKey, action);
   if (fromTable != null) return fromTable;
   /**
-   * AI试衣：仅成片成功后的 try_on 自动标价（见 tool-web/doc/payment.md）；page_view 不写单价。
+ * AI智能试衣：仅成片成功后的 try_on 自动标价（见 tool-web/doc/payment.md）；page_view 不写单价。
    * 套装 / 试衣间父路由 / 衣柜等不设自动单价。
    */
   if (action === "try_on" && toolKey === "fitting-room__ai-fit") {

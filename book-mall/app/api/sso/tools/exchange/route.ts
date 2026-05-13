@@ -7,12 +7,14 @@ import {
   toolsExchangeAuthorized,
 } from "@/lib/sso-tools-env";
 import { signToolsAccessToken } from "@/lib/tools-sso-token";
+import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
+import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 
 export const dynamic = "force-dynamic";
 
 /**
  * 工具站服务端调用：用一次性 code 换短时 access token（JWT）。
- * 准入：黄金会员或主站管理员；JWT `tier` 分别为 `gold` / `admin`。
+ * 准入：管理员直通；普通用户须为黄金会员且具备有效订阅。JWT `tier` 分别为 `gold` / `admin`，载荷含 `tools_nav_keys`。
  * 须在服务端发起；Bearer 为 TOOLS_SSO_SERVER_SECRET。
  */
 export async function POST(req: Request) {
@@ -46,7 +48,28 @@ export async function POST(req: Request) {
       data: { consumedAt: now },
     });
     return NextResponse.json(
-      { error: "当前不满足工具站准入条件（黄金会员或管理员），授权码已作废" },
+      {
+        error:
+          "当前不满足工具站准入条件（须管理员，或黄金会员且具备会员计划或单品工具订阅），授权码已作废",
+      },
+      { status: 403 },
+    );
+  }
+
+  const resolvedNav = await resolveToolsNavKeysForUser(row.userId);
+  const toolsNavKeys = elig.isAdmin
+    ? [...TOOL_SUITE_NAV_KEYS]
+    : resolvedNav.keys;
+  if (!elig.isAdmin && toolsNavKeys.length === 0) {
+    await prisma.ssoAuthorizationCode.update({
+      where: { id: row.id },
+      data: { consumedAt: now },
+    });
+    return NextResponse.json(
+      {
+        error:
+          "当前订阅未包含任何可用工具分组，请先在个人中心核对套件权益后再试",
+      },
       { status: 403 },
     );
   }
@@ -69,6 +92,7 @@ export async function POST(req: Request) {
     secret: jwtSecret,
     expiresInSec: expiresIn,
     tier: elig.isAdmin ? "admin" : "gold",
+    toolsNavKeys,
     profile: {
       email: elig.email,
       name: elig.name,

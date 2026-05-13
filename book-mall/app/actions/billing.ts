@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 
 async function assertAdmin() {
   const session = await getServerSession(authOptions);
@@ -49,6 +50,33 @@ export async function updateSubscriptionPlanPrice(formData: FormData) {
   await prisma.subscriptionPlan.update({
     where: { id: planId },
     data: { priceMinor },
+  });
+  revalidatePath("/admin/billing");
+}
+
+export async function updateSubscriptionPlanToolsAllowlist(formData: FormData) {
+  await assertAdmin();
+  const planId = String(formData.get("planId") ?? "").trim();
+  if (!planId) throw new Error("无效的套餐");
+
+  const mode = String(formData.get("toolsAllowMode") ?? "all");
+  const allowed = new Set<string>(TOOL_SUITE_NAV_KEYS);
+
+  let keys: string[] = [];
+  if (mode === "pick") {
+    for (const x of formData.getAll("toolsNavKey")) {
+      if (typeof x !== "string") continue;
+      const k = x.trim();
+      if (allowed.has(k)) keys.push(k);
+    }
+    if (keys.length === 0) {
+      throw new Error("自定义模式下请至少选择一个工具套件分组");
+    }
+  }
+
+  await prisma.subscriptionPlan.update({
+    where: { id: planId },
+    data: { toolsNavAllowlist: keys },
   });
   revalidatePath("/admin/billing");
 }

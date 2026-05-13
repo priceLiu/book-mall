@@ -142,7 +142,7 @@ export function SmartSupportChatClient({
         <h1 style={{ margin: 0 }}>我的智能客服</h1>
         <ToolImplementationCrossLink href="/smart-support/implementation" />
         <p className="tw-muted" style={{ margin: "0.35rem 0 0" }}>
-          <Link href="/smart-support">返回智能客服首页</Link>
+          <Link href="/smart-support">返回 AI智能客服首页</Link>
         </p>
       </header>
 
@@ -152,7 +152,9 @@ export function SmartSupportChatClient({
         </p>
       ) : !session.active ? (
         <div className="tw-note">
-          <p style={{ margin: "0 0 0.5rem" }}>请先登录工具站后再使用智能客服。</p>
+          <p style={{ margin: "0 0 0.5rem" }}>
+            请先登录工具站后再使用 AI智能客服。
+          </p>
           {renewHref ? (
             <p style={{ margin: 0 }}>
               <Link href={renewHref}>从主站重新连接</Link>
@@ -173,7 +175,7 @@ export function SmartSupportChatClient({
               </div>
               <div>
                 <h2 id="deepseek-panel-title" className={styles.panelTitle}>
-                  DeepSeek 智能客服
+                  DeepSeek · AI智能客服
                 </h2>
                 <p className={styles.panelSubtitle}>
                   流式输出 · 多轮上下文 · 模型 deepseek-chat
@@ -196,7 +198,7 @@ export function SmartSupportChatClient({
               >
                 {messages.length === 0 ? (
                   <p className={styles.emptyHint}>
-                    您好，我是基于 DeepSeek 的智能客服。可直接询问订阅、余额、试衣间、文生图等问题；支持多轮追问。
+                    您好，我是基于 DeepSeek 的 AI智能客服。可直接询问订阅、余额、试衣间、文生图等问题；支持多轮追问。
                   </p>
                 ) : (
                   messages.map((m) => (
@@ -250,7 +252,7 @@ export function SmartSupportChatClient({
               </div>
               <div>
                 <h2 id="dify-panel-title" className={styles.panelTitle}>
-                  Dify 智能客服
+                  Dify · AI智能客服
                 </h2>
                 <p className={styles.panelSubtitle}>
                   Udify 嵌入 · 工作流 / 知识库由 Dify 控制台配置
@@ -269,7 +271,7 @@ export function SmartSupportChatClient({
                 </div>
               ) : (
                 <iframe
-                  title="Dify 智能客服"
+                  title="Dify · AI智能客服"
                   className={styles.difyIframe}
                   src={getUdifyChatbotEmbedUrl(difyToken)}
                   allow="clipboard-write; microphone *"

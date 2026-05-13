@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
 import OpenAI from "openai";
+import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getDeepseekApiKey } from "@/lib/deepseek-env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** 与界面一致的客服人设（服务端强制，防止客户端篡改 system）。 */
-const SMART_SUPPORT_SYSTEM_PROMPT = `你是「智选 AI Mall」工具站的智能客服助手。语气专业、简洁、友好。
+const SMART_SUPPORT_SYSTEM_PROMPT = `你是「智选 AI Mall」工具站的 AI智能客服助手。语气专业、简洁、友好。
 帮助用户理解订阅与余额、试衣间与 AI 试衣、文生图与图片库、费用明细与 SSO 登录等说明。
 若涉及具体订单退款、账号风控或需核实身份的操作，请引导用户前往主站「个人中心」或联系人工客服。
 回答尽量使用简体中文，除非用户明确要求其他语言。`;
@@ -38,6 +39,9 @@ function sanitizeChatMessages(raw: unknown): OpenAI.Chat.ChatCompletionMessagePa
 }
 
 export async function POST(req: Request) {
+  const suite = await requireToolSuiteNavAccess("smart-support");
+  if (!suite.ok) return suite.response;
+
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
     return new Response(JSON.stringify({ error: "请先登录工具站" }), {

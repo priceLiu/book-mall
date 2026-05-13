@@ -6,17 +6,17 @@ import {
 } from "@/components/tool-implementation-doc";
 
 export const metadata = {
-  title: "AI试衣 · 实现逻辑 — AI 工具站",
+  title: "AI智能试衣 · 实现逻辑 — AI 工具站",
 };
 
 export default function AiFitImplementationPage() {
   return (
     <main className="tw-main fitting-room-main">
       <ToolImplementationDoc
-        title="AI试衣 · 实现逻辑"
+        title="AI智能试衣 · 实现逻辑"
         lead="异步试衣任务、DashScope 调用、成片落自有 OSS 与主站计费上报的串联说明。"
         useToolHref="/fitting-room/ai-fit"
-        useToolLabel="回到 AI试衣页"
+        useToolLabel="回到 AI智能试衣页"
       >
         <ToolImplementationSection heading="1. 流程摘要">
           <p>

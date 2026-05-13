@@ -174,6 +174,10 @@ export function AdminNav({
         <span className="mx-1 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
 
         <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
+          <Link href="/account">个人中心</Link>
+        </Button>
+
+        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
           <Link href="/">回前台</Link>
         </Button>
 

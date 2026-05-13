@@ -29,6 +29,8 @@ export function signToolsAccessToken(opts: {
   expiresInSec: number;
   /** 主站签发：`gold` 会员工具准入，`admin` 为管理员直通（仍须 introspect 复核敏感路径）。 */
   tier?: "gold" | "admin";
+  /** 工具站分组 navKey，不含套件外的自定义字符串（长度裁剪）。 */
+  toolsNavKeys?: readonly string[];
   /** 写入 JWT，供工具站壳层本地验签展示（字段受限以防 Cookie 过大） */
   profile?: {
     email?: string | null;
@@ -39,7 +41,7 @@ export function signToolsAccessToken(opts: {
   const header = base64UrlEncodeJson({ alg: "HS256", typ: "JWT" });
   const now = Math.floor(Date.now() / 1000);
   const tier = opts.tier ?? "gold";
-  const payloadObj: Record<string, string | number> = {
+  const payloadObj: Record<string, unknown> = {
     sub: opts.userId,
     aud: TOOLS_JWT_AUDIENCE,
     tier,
@@ -47,6 +49,15 @@ export function signToolsAccessToken(opts: {
     exp: now + opts.expiresInSec,
   };
 
+  const keys =
+    opts.toolsNavKeys?.flatMap((k) => {
+      const t = String(k).trim();
+      if (!t || t.length > 64) return [];
+      return [t];
+    }) ?? [];
+  if (keys.length > 0) {
+    payloadObj.tools_nav_keys = keys.slice(0, 24);
+  }
   const email = trimClaim(opts.profile?.email, 320);
   const name = trimClaim(opts.profile?.name, 120);
   let image = trimClaim(opts.profile?.image, 768);
@@ -76,11 +87,25 @@ export type VerifiedToolsToken = {
   email?: string;
   name?: string;
   image?: string;
+  /** 可能为空数组或省略（旧 JWT）；工具站应回落 introspect。 */
+  tools_nav_keys?: string[];
 };
 
 function pickTier(raw: unknown): "gold" | "admin" | null {
   if (raw === "gold" || raw === "admin") return raw;
   return null;
+}
+
+function pickToolsNavKeys(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  for (const x of raw) {
+    if (typeof x !== "string") continue;
+    const t = x.trim();
+    if (!t || t.length > 64 || out.length >= 24) continue;
+    out.push(t);
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 function pickClaim(raw: unknown, maxLen: number): string | undefined {
@@ -143,6 +168,9 @@ export function verifyToolsAccessToken(
   if (email) out.email = email;
   if (name) out.name = name;
   if (image) out.image = image;
+
+  const tnk = pickToolsNavKeys(payloadRaw.tools_nav_keys);
+  if (tnk) out.tools_nav_keys = tnk;
 
   return out;
 }

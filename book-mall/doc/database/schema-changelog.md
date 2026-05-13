@@ -48,6 +48,19 @@
 - **首页推荐**：`Product.featuredHome`、`featuredSort`（仅 `PUBLISHED` 且勾选后在首页展示）。  
 - **应用**：`pnpm run db:deploy`，再 `pnpm db:seed`（会写入默认「AI 课程」「AI 应用」分类）。
 
+## 2026-05-12 — 课程课时进度 `CourseLessonProgress`
+
+- **迁移目录**：`prisma/migrations/20260512140000_course_lesson_progress/`  
+- **新表**：`CourseLessonProgress`（用户 × `courseSlug` × `lessonIndex` 唯一；记录完成时间）。  
+- **应用**：`pnpm run db:deploy`。
+
+## 2026-05-12 — 订阅计划工具套件分组白名单
+
+- **迁移目录**：`prisma/migrations/20260512120000_subscription_plan_tools_nav_allowlist/`  
+- **SubscriptionPlan**：`toolsNavAllowlist`（`TEXT[]`，默认空数组；**空表示订阅期内可使用套件内全部分组**）。  
+- **逻辑**：工具站 JWT / introspect 下发 `tools_nav_keys`；详见 `doc/releases/v2.0-tools-subscription-courses.md`。  
+- **应用**：`pnpm run db:deploy`。
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

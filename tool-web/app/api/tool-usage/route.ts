@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { requireActiveToolsSession } from "@/lib/require-tools-api-access";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 const UPSTREAM = "/api/sso/tools/usage";
@@ -17,6 +18,9 @@ function originOrError(): string | NextResponse {
 
 /** 拉取当前登录用户在主站的工具使用明细（Bearer tools_token）。 */
 export async function GET(req: Request) {
+  const gate = await requireActiveToolsSession();
+  if (!gate.ok) return gate.response;
+
   const jar = cookies();
   const token = jar.get("tools_token")?.value?.trim();
   if (!token) {
@@ -45,6 +49,9 @@ export async function GET(req: Request) {
  * 代理主站写入 `ToolUsageEvent`：**仅当主站解析出正金额 costMinor 时才会入库**；否则 `{ recorded: false }`。
  */
 export async function POST(req: Request) {
+  const gate = await requireActiveToolsSession();
+  if (!gate.ok) return gate.response;
+
   const jar = cookies();
   const token = jar.get("tools_token")?.value?.trim();
   if (!token) {

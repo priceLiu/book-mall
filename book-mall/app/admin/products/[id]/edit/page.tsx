@@ -22,10 +22,10 @@ export default async function AdminProductEditPage({
   if (!product) notFound();
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 px-1 sm:px-0">
       <div>
         <Link
-          href="/admin/products"
+          href={`/admin/products?kind=${product.kind}`}
           className="text-sm text-muted-foreground hover:text-foreground"
         >
           ← 产品列表
