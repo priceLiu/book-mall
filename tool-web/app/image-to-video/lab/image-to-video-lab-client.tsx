@@ -10,7 +10,6 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ArrowRightLeft,
@@ -46,7 +45,6 @@ import {
   type T2vAspectRatio,
 } from "@/lib/image-to-video-models";
 import { cn } from "@/lib/utils";
-import closetStyles from "@/app/fitting-room/ai-fit/closet/closet.module.css";
 import ttiStyles from "../../text-to-image/text-to-image-modal.module.css";
 import { TextToVideoWorkbench } from "./text-to-video-workbench";
 
@@ -58,32 +56,27 @@ function promptEllipsisLab(text: string, max = 72): string {
   return `${t.slice(0, max)}…`;
 }
 
-type JobPromptTipState = {
+/** 将 persist-library / 主站代理返回的 error 字段转成用户可读中文 */
+function normalizePersistLibraryClientMessage(
+  err: string | undefined,
+  status: number,
+): string {
+  const e = (err ?? "").trim();
+  if (e === "main_origin_not_configured") {
+    return "工具站未配置 MAIN_SITE_ORIGIN，无法写入视频库。请在 tool-web/.env.local 设置主站地址（例如 http://localhost:3000），并重启服务。";
+  }
+  if (e === "no_session") return "请先登录工具站";
+  if (e.length > 0) return e;
+  if (status === 401) return "请先登录工具站";
+  if (status === 409) return "视频库已满";
+  if (status === 503) return "服务暂不可用（请确认主站已启动且数据库已迁移）";
+  return "保存失败";
+}
+
+type JobPromptModalState = {
   jobId: string;
   text: string;
-  left: number;
-  top: number;
-  maxWidth: number;
 };
-
-function computeJobPromptTooltipPlacement(rect: DOMRect): Pick<
-  JobPromptTipState,
-  "left" | "top" | "maxWidth"
-> {
-  const margin = 8;
-  const maxWidth = Math.min(480, window.innerWidth - margin * 2);
-  const left = Math.min(
-    Math.max(margin, rect.left),
-    window.innerWidth - margin - maxWidth,
-  );
-  const below = rect.bottom + 6;
-  const estimatedMaxH = Math.min(window.innerHeight * 0.42, 320);
-  let top = below;
-  if (below + estimatedMaxH > window.innerHeight - margin) {
-    top = Math.max(margin, rect.top - estimatedMaxH - 6);
-  }
-  return { left, top, maxWidth };
-}
 
 function randomSeedString(): string {
   return String(Math.floor(Math.random() * 1_000_000_000));
@@ -412,8 +405,9 @@ export function ImageToVideoLabClient() {
   const [librarySavedByJobId, setLibrarySavedByJobId] = useState<Record<string, boolean>>(
     {},
   );
-  const [jobPromptTip, setJobPromptTip] = useState<JobPromptTipState | null>(null);
-  const [mountedLab, setMountedLab] = useState(false);
+  const [librarySaveConfirmJob, setLibrarySaveConfirmJob] = useState<LabJob | null>(null);
+  const [saveLibraryModalError, setSaveLibraryModalError] = useState<string | null>(null);
+  const [jobPromptModal, setJobPromptModal] = useState<JobPromptModalState | null>(null);
 
   const { chargeLine, chargeTitle } = useMemo(() => {
     if (billableYuan != null) {
@@ -429,10 +423,6 @@ export function ImageToVideoLabClient() {
         "单次生成按主站「工具管理」配置的按次单价扣费；标价加载失败时请刷新页面或查看管理后台。",
     };
   }, [billableYuan]);
-
-  useEffect(() => {
-    setMountedLab(true);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -455,15 +445,20 @@ export function ImageToVideoLabClient() {
   }, []);
 
   useEffect(() => {
-    if (!jobPromptTip) return;
-    const hide = () => setJobPromptTip(null);
-    window.addEventListener("scroll", hide, true);
-    window.addEventListener("resize", hide);
-    return () => {
-      window.removeEventListener("scroll", hide, true);
-      window.removeEventListener("resize", hide);
+    if (!librarySaveConfirmJob && !jobPromptModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const saving =
+        librarySaveConfirmJob != null &&
+        librarySaveBusyId === librarySaveConfirmJob.id;
+      if (saving) return;
+      setLibrarySaveConfirmJob(null);
+      setSaveLibraryModalError(null);
+      setJobPromptModal(null);
     };
-  }, [jobPromptTip]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [librarySaveConfirmJob, jobPromptModal, librarySaveBusyId]);
 
   const selectedModel = useMemo(() => {
     if (modeTab === "t2v") {
@@ -853,58 +848,73 @@ export function ImageToVideoLabClient() {
     setJobs((prev) => prev.filter((j) => j.id !== id));
   };
 
-  const saveJobToLibrary = useCallback(async (job: LabJob) => {
-    const lines = [
-      "将本条成片保存到「我的视频库」？",
-      "",
-      "· 我们会把视频转存到自有 OSS（模型返回的链接约 24 小时有效）。",
-      "· 默认每人最多 10 条；已满时请删除旧条目或使用下方「申请扩容」入口（付费功能即将开放）。",
-      "· 为控制存储成本，建议每条保留约 7 天；到期后管理员可按策略删除，重要成片请下载备份。",
-      "",
-      "确认保存？",
-    ];
-    if (!window.confirm(lines.join("\n"))) return;
-    setLibrarySaveBusyId(job.id);
-    setFlowError(null);
-    try {
-      const r = await fetch("/api/image-to-video/persist-library", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourceUrl: job.videoUrl,
-          prompt: job.prompt,
-          mode: job.mode,
-          resolution: job.resolution,
-          durationSec: job.durationSec,
-          seed: job.seed || undefined,
-          modelLabel: job.modelLabel,
-        }),
-      });
-      const data = (await r.json().catch(() => ({}))) as {
-        error?: string;
-        message?: string;
-      };
-      if (!r.ok) {
+  const persistJobToLibrary = useCallback(
+    async (job: LabJob): Promise<{ ok: true } | { ok: false; message: string }> => {
+      setLibrarySaveBusyId(job.id);
+      setFlowError(null);
+      try {
+        const r = await fetch("/api/image-to-video/persist-library", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceUrl: job.videoUrl,
+            prompt: job.prompt,
+            mode: job.mode,
+            resolution: job.resolution,
+            durationSec: job.durationSec,
+            seed: job.seed || undefined,
+            modelLabel: job.modelLabel,
+          }),
+        });
+        const data = (await r.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+        };
+        if (!r.ok) {
+          const raw =
+            typeof data.message === "string" && data.message.trim()
+              ? data.message.trim()
+              : typeof data.error === "string"
+                ? data.error.trim()
+                : "";
+          const msg = normalizePersistLibraryClientMessage(
+            raw || undefined,
+            r.status,
+          );
+          setFlowError(msg);
+          return { ok: false, message: msg };
+        }
+        setLibrarySavedByJobId((p) => ({ ...p, [job.id]: true }));
+        return { ok: true };
+      } catch (e) {
         const msg =
-          typeof data.message === "string"
-            ? data.message
-            : typeof data.error === "string"
-              ? data.error
-              : r.status === 409
-                ? "视频库已满"
-                : r.status === 401
-                  ? "请先登录工具站"
-                  : "保存失败";
-        throw new Error(msg);
+          e instanceof Error ? e.message : "保存到视频库失败（网络或响应异常）";
+        setFlowError(msg);
+        return { ok: false, message: msg };
+      } finally {
+        setLibrarySaveBusyId(null);
       }
-      setLibrarySavedByJobId((p) => ({ ...p, [job.id]: true }));
-    } catch (e) {
-      setFlowError(e instanceof Error ? e.message : "保存到视频库失败");
-    } finally {
-      setLibrarySaveBusyId(null);
-    }
+    },
+    [],
+  );
+
+  const openSaveLibraryConfirm = useCallback((job: LabJob) => {
+    setSaveLibraryModalError(null);
+    setLibrarySaveConfirmJob(job);
   }, []);
+
+  const confirmSaveLibrary = useCallback(async () => {
+    const job = librarySaveConfirmJob;
+    if (!job) return;
+    setSaveLibraryModalError(null);
+    const result = await persistJobToLibrary(job);
+    if (result.ok) {
+      setLibrarySaveConfirmJob(null);
+    } else {
+      setSaveLibraryModalError(result.message);
+    }
+  }, [librarySaveConfirmJob, persistJobToLibrary]);
 
   const exampleThumbnailsEl = useMemo(
     () => (
@@ -1688,7 +1698,7 @@ export function ImageToVideoLabClient() {
                     disabled={
                       librarySaveBusyId === job.id || Boolean(librarySavedByJobId[job.id])
                     }
-                    onClick={() => void saveJobToLibrary(job)}
+                    onClick={() => openSaveLibraryConfirm(job)}
                   >
                     <Library className="h-4 w-4 shrink-0" />
                     <span className="hidden text-xs font-medium sm:inline">
@@ -1721,23 +1731,16 @@ export function ImageToVideoLabClient() {
                     <Clapperboard className="h-3 w-3 shrink-0" aria-hidden />
                     {modeLabelVideo(job.mode)}
                   </span>
-                  <span
-                    className="min-w-0 cursor-default break-words text-sm leading-snug text-foreground/90"
-                    onMouseEnter={(e) => {
-                      if (job.prompt.trim().length <= 72) return;
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setJobPromptTip({
-                        jobId: job.id,
-                        text: job.prompt,
-                        ...computeJobPromptTooltipPlacement(rect),
-                      });
-                    }}
-                    onMouseLeave={() =>
-                      setJobPromptTip((t) => (t?.jobId === job.id ? null : t))
+                  <button
+                    type="button"
+                    className="min-w-0 cursor-pointer break-words rounded px-0.5 text-left text-sm leading-snug text-foreground/90 underline-offset-2 hover:bg-muted/60 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+                    title="点击查看完整提示词"
+                    onClick={() =>
+                      setJobPromptModal({ jobId: job.id, text: job.prompt })
                     }
                   >
                     {promptEllipsisLab(job.prompt)}
-                  </span>
+                  </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
@@ -1777,24 +1780,148 @@ export function ImageToVideoLabClient() {
         </section>
       </div>
 
-      {mountedLab && jobPromptTip
-        ? createPortal(
-            <div
-              role="tooltip"
-              className={closetStyles.promptFullTooltip}
-              style={{
-                position: "fixed",
-                left: jobPromptTip.left,
-                top: jobPromptTip.top,
-                maxWidth: jobPromptTip.maxWidth,
-                zIndex: 10050,
-              }}
-            >
-              {jobPromptTip.text}
-            </div>,
-            document.body,
-          )
-        : null}
+      {jobPromptModal ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lab-prompt-modal-title"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setJobPromptModal(null)}
+        >
+          <div
+            className="flex max-h-[min(85dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <h2
+                id="lab-prompt-modal-title"
+                className="text-sm font-semibold text-foreground"
+              >
+                提示词全文
+              </h2>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9 w-9 shrink-0 p-0"
+                aria-label="关闭"
+                onClick={() => setJobPromptModal(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="min-h-0 overflow-y-auto px-4 py-3">
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                {jobPromptModal.text}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {librarySaveConfirmJob ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lab-save-library-title"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => {
+            if (
+              librarySaveConfirmJob != null &&
+              librarySaveBusyId === librarySaveConfirmJob.id
+            ) {
+              return;
+            }
+            setLibrarySaveConfirmJob(null);
+            setSaveLibraryModalError(null);
+          }}
+        >
+          <div
+            className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+              <h2
+                id="lab-save-library-title"
+                className="text-sm font-semibold leading-snug text-foreground"
+              >
+                保存到「我的视频库」？
+              </h2>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9 w-9 shrink-0 p-0"
+                aria-label="关闭"
+                onClick={() => {
+                  if (
+                    librarySaveConfirmJob != null &&
+                    librarySaveBusyId === librarySaveConfirmJob.id
+                  ) {
+                    return;
+                  }
+                  setLibrarySaveConfirmJob(null);
+                  setSaveLibraryModalError(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-3 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+              <p className="my-0 text-foreground/90">
+                我们会把视频转存到自有 OSS（模型返回的链接约 24 小时有效）。
+              </p>
+              <ul className="my-0 list-disc space-y-2 pl-5">
+                <li>
+                  默认每人最多 10 条；已满时请删除旧条目或使用下方「申请扩容」入口（付费功能即将开放）。
+                </li>
+                <li>
+                  为控制存储成本，建议每条保留约 7 天；到期后管理员可按策略删除，重要成片请下载备份。
+                </li>
+              </ul>
+            </div>
+            {saveLibraryModalError ? (
+              <p className="mx-4 mb-0 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {saveLibraryModalError}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-3">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={
+                  librarySaveConfirmJob != null &&
+                  librarySaveBusyId === librarySaveConfirmJob.id
+                }
+                onClick={() => {
+                  if (
+                    librarySaveConfirmJob != null &&
+                    librarySaveBusyId === librarySaveConfirmJob.id
+                  ) {
+                    return;
+                  }
+                  setLibrarySaveConfirmJob(null);
+                  setSaveLibraryModalError(null);
+                }}
+              >
+                取消
+              </Button>
+              <Button
+                type="button"
+                className="bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500"
+                disabled={
+                  librarySaveConfirmJob != null &&
+                  librarySaveBusyId === librarySaveConfirmJob.id
+                }
+                onClick={() => void confirmSaveLibrary()}
+              >
+                {librarySaveConfirmJob != null &&
+                librarySaveBusyId === librarySaveConfirmJob.id
+                  ? "保存中…"
+                  : "确认保存"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {refPreviewSrc ? (
         <div
