@@ -4,7 +4,7 @@
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `TOOLS_PUBLIC_ORIGIN` | 接入工具站时 **必填** | 工具站站点根 URL，无末尾 `/`。例：`https://tools.ai-code8.com`；本地可为 `http://127.0.0.1:3001` |
+| `TOOLS_PUBLIC_ORIGIN` | 接入工具站时 **必填** | 工具站站点根 URL，无末尾 `/`。例：`https://tools.ai-code8.com`；本地常见 `http://localhost:3001`（须与浏览器地址栏 **同源**，勿混用 `localhost` 与 `127.0.0.1`） |
 | `TOOLS_SSO_SERVER_SECRET` | **必填** | 随机长字符串（≥16）；工具站 **服务端** 调用 `exchange` 时 `Authorization: Bearer <值>` |
 | `TOOLS_SSO_JWT_SECRET` | **必填** | JWT HS256 密钥（≥16）；主站签名，工具站 **若自行验签** 须配置同一值（建议只在服务端） |
 | `TOOLS_SSO_CODE_TTL_SECONDS` | 否 | 授权码 TTL，30–300，默认 **90** |
@@ -42,7 +42,7 @@
 
 ## 本仓库配套工具站（与 `book-mall/` 同级：`tool-web/`）
 
-最小可运行 Next 应用：[**`../../../tool-web/README.md`**](../../../tool-web/README.md)。本地典型配置：`TOOLS_PUBLIC_ORIGIN=http://127.0.0.1:3001`（主站）、`MAIN_SITE_ORIGIN=http://localhost:3000`（工具站）。
+最小可运行 Next 应用：[**`../../../tool-web/README.md`**](../../../tool-web/README.md)。本地典型配置：`TOOLS_PUBLIC_ORIGIN=http://localhost:3001`（主站）、`MAIN_SITE_ORIGIN=http://localhost:3000`（工具站）。
 
 **Git 根目录**为本仓库 **`private_website/`**，clone / push 会同时包含 `book-mall` 与 `tool-web`。仓库约定说明见 **[`README.md`](../../../README.md)**。
 

@@ -20,7 +20,7 @@
 
 ## 本地联调（最短）
 
-1. 主站 `book-mall`：`TOOLS_PUBLIC_ORIGIN` 指向工具站 dev URL（如 `http://127.0.0.1:3001`），配置两个 Secret，`pnpm dev`（常见 `:3000`）。
+1. 主站 `book-mall`：`TOOLS_PUBLIC_ORIGIN` 指向工具站 dev URL（如 `http://localhost:3001`，与浏览器访问工具站的 host 一致），配置两个 Secret，`pnpm dev`（常见 `:3000`）。
 2. 工具站 `tool-web`：复制 `.env.example` → `.env.local`，`MAIN_SITE_ORIGIN` 指向主站，`pnpm install && pnpm dev`。
 
 从主站 **个人中心 / 管理后台** 打开工具入口，完成 callback 后再访问各工具页。
