@@ -55,7 +55,7 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
       { href: "/app-history", label: "费用使用明细", navKey: "app-history" },
       {
         href: "/app-history/plan-rules",
-        label: "计划规则说明",
+        label: "计费规则说明",
         navKey: "app-history",
       },
     ],
