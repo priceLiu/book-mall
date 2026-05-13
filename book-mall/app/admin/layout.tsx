@@ -6,6 +6,9 @@ import { getToolsSsoSetupDiagnostics } from "@/lib/sso-tools-env";
 
 import { AdminNav } from "@/components/admin/admin-nav";
 
+/** 构建阶段 CI 往往无 DATABASE_URL；避免对 Prisma 做静态预渲染 */
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "管理后台",
 };

@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AccountShell } from "@/components/account/account-shell";
 
+/** Layout 内查询 Prisma；构建阶段 CI 往往无 DATABASE_URL */
+export const dynamic = "force-dynamic";
+
 export default async function AccountGroupLayout({
   children,
 }: {
