@@ -520,7 +520,9 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
           ? (lastUsage.error?.trim() || t("tryOnUsageRecordPending"))
           : null;
       setTryOnUsageWarn(usageWarn);
-      setTryOnBillingLine(formatTryOnBillingLine(lastUsage, t));
+      setTryOnBillingLine(
+        formatTryOnBillingLine(lastUsage, t as (key: string) => string),
+      );
 
       setTryOnResultUrl(normalizeTryOnImageUrl(imageUrl));
       setTryOnResultMeta({

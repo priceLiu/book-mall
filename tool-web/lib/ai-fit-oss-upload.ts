@@ -48,7 +48,7 @@ export async function uploadAiFitImageToOss(
   const cfg = readOssEnv();
   if ("error" in cfg) throw new Error(cfg.error);
 
-  const client = createOssClientFrom(cfg);
+  const client = await createOssClientFrom(cfg);
   const ext = extForMime(contentType);
   const prefix =
     folder === "result"
