@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { TOOL_IMAGE_LIBRARY_DEFAULT_MAX } from "@/lib/tool-library-quota";
+import {
+  TOOL_LIBRARY_RETENTION_DAYS,
+  TOOL_VIDEO_LIBRARY_DEFAULT_MAX,
+} from "@/lib/tool-library-quota";
 import { prismaErrorCode } from "@/lib/ai-fit-db-error";
 import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +13,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MAX_URL_LEN = 8192;
-const MAX_PROMPT_LEN = 2000;
+const MAX_PROMPT_LEN = 8000;
+const LAB_MODES = new Set(["i2v", "t2v", "ref"]);
 
 function verifyBearer(req: Request):
   | { ok: true; userId: string }
@@ -66,29 +70,27 @@ function takeHttpsUrl(raw: unknown): string | null {
   return t;
 }
 
+function retainUntilFromNow(): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + TOOL_LIBRARY_RETENTION_DAYS);
+  return d;
+}
+
 export async function GET(req: Request) {
   const v = verifyBearer(req);
   if (!v.ok) return v.res;
 
+  let rows: Awaited<ReturnType<typeof prisma.imageToVideoLibraryItem.findMany>>;
+  let countAll: number;
   try {
-    const [rows, countAll] = await Promise.all([
-      prisma.textToImageLibraryItem.findMany({
+    [rows, countAll] = await Promise.all([
+      prisma.imageToVideoLibraryItem.findMany({
         where: { userId: v.userId },
         orderBy: { createdAt: "desc" },
-        take: 200,
+        take: Math.max(TOOL_VIDEO_LIBRARY_DEFAULT_MAX * 4, 50),
       }),
-      prisma.textToImageLibraryItem.count({ where: { userId: v.userId } }),
+      prisma.imageToVideoLibraryItem.count({ where: { userId: v.userId } }),
     ]);
-
-    return NextResponse.json({
-      items: rows.map((r) => ({
-        id: r.id,
-        imageUrl: r.imageUrl,
-        prompt: r.prompt ?? null,
-        createdAt: r.createdAt.toISOString(),
-      })),
-      quota: { max: TOOL_IMAGE_LIBRARY_DEFAULT_MAX, used: countAll },
-    });
   } catch (e) {
     const code = prismaErrorCode(e);
     if (code === "P2021") {
@@ -97,16 +99,31 @@ export async function GET(req: Request) {
         { status: 503 },
       );
     }
-    console.error("[text-to-image/library] GET list failed", e);
+    console.error("[image-to-video/library] GET list failed", e);
     const msg =
       e && typeof e === "object" && "message" in e && typeof (e as Error).message === "string"
         ? (e as Error).message
-        : "读取图片库失败";
+        : "读取视频库失败";
     return NextResponse.json({ items: [], error: msg }, { status: 500 });
   }
+
+  return NextResponse.json({
+    items: rows.map((r) => ({
+      id: r.id,
+      videoUrl: r.videoUrl,
+      prompt: r.prompt ?? null,
+      mode: r.mode,
+      resolution: r.resolution,
+      durationSec: r.durationSec,
+      seed: r.seed ?? null,
+      modelLabel: r.modelLabel ?? null,
+      retainUntil: r.retainUntil.toISOString(),
+      createdAt: r.createdAt.toISOString(),
+    })),
+    quota: { max: TOOL_VIDEO_LIBRARY_DEFAULT_MAX, used: countAll },
+  });
 }
 
-/** 保存一张文生图成片到图片库 */
 export async function POST(req: Request) {
   const v = verifyBearer(req);
   if (!v.ok) return v.res;
@@ -118,52 +135,99 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "请求体须为 JSON" }, { status: 400 });
   }
 
-  const imageUrl = takeHttpsUrl(body.imageUrl);
-  if (!imageUrl) {
+  const videoUrl = takeHttpsUrl(body.videoUrl);
+  if (!videoUrl) {
     return NextResponse.json(
       {
         error:
-          "imageUrl 须为 https 公网 URL（单条最长 8192 字符）；阿里云 OSS 的 http 链会自动升为 https",
+          "videoUrl 须为 https 公网 URL（单条最长 8192 字符）；阿里云 OSS 的 http 链会自动升为 https",
       },
       { status: 400 },
     );
+  }
+
+  const modeRaw = typeof body.mode === "string" ? body.mode.trim() : "";
+  if (!LAB_MODES.has(modeRaw)) {
+    return NextResponse.json(
+      { error: "mode 须为 i2v、t2v 或 ref" },
+      { status: 400 },
+    );
+  }
+
+  const resolution =
+    typeof body.resolution === "string" && /^(720P|1080P)$/.test(body.resolution.trim())
+      ? body.resolution.trim()
+      : null;
+  if (!resolution) {
+    return NextResponse.json({ error: "resolution 须为 720P 或 1080P" }, { status: 400 });
+  }
+
+  const durationRaw = body.durationSec;
+  const durationSec =
+    typeof durationRaw === "number" && Number.isFinite(durationRaw)
+      ? Math.round(durationRaw)
+      : typeof durationRaw === "string" && /^\d+$/.test(durationRaw.trim())
+        ? Number.parseInt(durationRaw.trim(), 10)
+        : NaN;
+  if (!Number.isFinite(durationSec) || durationSec < 1 || durationSec > 600) {
+    return NextResponse.json({ error: "durationSec 无效" }, { status: 400 });
   }
 
   const promptRaw =
     typeof body.prompt === "string" ? body.prompt.trim().slice(0, MAX_PROMPT_LEN) : "";
   const prompt = promptRaw.length > 0 ? promptRaw : null;
 
+  const seedRaw = typeof body.seed === "string" ? body.seed.trim().slice(0, 64) : "";
+  const seed = seedRaw.length > 0 ? seedRaw : null;
+
+  const modelLabelRaw =
+    typeof body.modelLabel === "string" ? body.modelLabel.trim().slice(0, 200) : "";
+  const modelLabel = modelLabelRaw.length > 0 ? modelLabelRaw : null;
+
   try {
-    const used = await prisma.textToImageLibraryItem.count({
+    const used = await prisma.imageToVideoLibraryItem.count({
       where: { userId: v.userId },
     });
-    if (used >= TOOL_IMAGE_LIBRARY_DEFAULT_MAX) {
+    if (used >= TOOL_VIDEO_LIBRARY_DEFAULT_MAX) {
       return NextResponse.json(
         {
-          error: "image_library_full",
-          message: `我的图片库已满（上限 ${TOOL_IMAGE_LIBRARY_DEFAULT_MAX} 张）。可删除旧条目或申请扩容（即将支持）。`,
-          max: TOOL_IMAGE_LIBRARY_DEFAULT_MAX,
+          error: "video_library_full",
+          message: `我的视频库已满（上限 ${TOOL_VIDEO_LIBRARY_DEFAULT_MAX} 条）。可删除旧条目或申请扩容（即将支持）。`,
+          max: TOOL_VIDEO_LIBRARY_DEFAULT_MAX,
           used,
         },
         { status: 409 },
       );
     }
 
-    const row = await prisma.textToImageLibraryItem.create({
+    const row = await prisma.imageToVideoLibraryItem.create({
       data: {
         userId: v.userId,
-        imageUrl,
+        videoUrl,
         prompt,
+        mode: modeRaw,
+        resolution,
+        durationSec,
+        seed,
+        modelLabel,
+        retainUntil: retainUntilFromNow(),
       },
     });
+
     return NextResponse.json({
       item: {
         id: row.id,
-        imageUrl: row.imageUrl,
+        videoUrl: row.videoUrl,
         prompt: row.prompt ?? null,
+        mode: row.mode,
+        resolution: row.resolution,
+        durationSec: row.durationSec,
+        seed: row.seed ?? null,
+        modelLabel: row.modelLabel ?? null,
+        retainUntil: row.retainUntil.toISOString(),
         createdAt: row.createdAt.toISOString(),
       },
-      quota: { max: TOOL_IMAGE_LIBRARY_DEFAULT_MAX, used: used + 1 },
+      quota: { max: TOOL_VIDEO_LIBRARY_DEFAULT_MAX, used: used + 1 },
     });
   } catch (e) {
     const code = prismaErrorCode(e);
@@ -176,7 +240,7 @@ export async function POST(req: Request) {
     if (code === "P2003") {
       return NextResponse.json({ error: "用户不存在" }, { status: 404 });
     }
-    console.error("[text-to-image/library] POST create failed", e);
+    console.error("[image-to-video/library] POST create failed", e);
     const msg =
       e && typeof e === "object" && "message" in e && typeof (e as Error).message === "string"
         ? (e as Error).message
@@ -185,7 +249,6 @@ export async function POST(req: Request) {
   }
 }
 
-/** 删除一条记录（仅限本人） */
 export async function DELETE(req: Request) {
   const v = verifyBearer(req);
   if (!v.ok) return v.res;
@@ -197,20 +260,20 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    const row = await prisma.textToImageLibraryItem.findFirst({
+    const row = await prisma.imageToVideoLibraryItem.findFirst({
       where: { id, userId: v.userId },
-      select: { id: true, imageUrl: true },
+      select: { id: true, videoUrl: true },
     });
     if (!row) {
       return NextResponse.json({ error: "不存在或无权删除" }, { status: 404 });
     }
 
-    const oss = await deleteManagedOssObjectByUrl(row.imageUrl);
+    const oss = await deleteManagedOssObjectByUrl(row.videoUrl);
     if (!oss.ok) {
       return NextResponse.json({ error: oss.error }, { status: 502 });
     }
 
-    await prisma.textToImageLibraryItem.delete({ where: { id: row.id } });
+    await prisma.imageToVideoLibraryItem.delete({ where: { id: row.id } });
     return NextResponse.json({ ok: true, ossDeleted: oss.deleted });
   } catch (e) {
     const code = prismaErrorCode(e);
@@ -220,7 +283,7 @@ export async function DELETE(req: Request) {
         { status: 503 },
       );
     }
-    console.error("[text-to-image/library] DELETE failed", e);
+    console.error("[image-to-video/library] DELETE failed", e);
     const msg =
       e && typeof e === "object" && "message" in e && typeof (e as Error).message === "string"
         ? (e as Error).message

@@ -82,6 +82,12 @@ export const zh = {
     closetLightboxAria: "查看大图",
     closetCardDelete: "删除",
     closetDeleteConfirm: "确定要从衣柜删除这张图吗？",
+    destructiveDeleteSecondGeneric:
+      "【再次确认】删除后无法恢复，确定继续？",
+    destructiveDeleteSecondOss:
+      "【再次确认】删除后无法恢复。将同时尝试删除云端存储（OSS）中的对应文件，确定继续？",
+    imageLibraryDeleteConfirm:
+      "从「我的图片库」删除本条？将从列表移除并尝试删除云端 OSS 中的对应图片文件。",
     closetDeleteFailed: "删除失败，请稍后重试",
     billingReminderAfterTryOn:
       "试衣成片已生成。如涉及扣费，按主站单次标价计费，可在费用明细中查看。",

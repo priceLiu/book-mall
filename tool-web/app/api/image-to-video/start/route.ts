@@ -9,10 +9,13 @@ import {
 } from "@/lib/image-to-video-dashscope";
 import {
   getImageToVideoModelByApiModel,
+  getReferenceToVideoModelByApiModel,
   getTextToVideoModelByApiModel,
   IMAGE_TO_VIDEO_MODELS,
-  resolutionToT2vSize,
+  REFERENCE_TO_VIDEO_MODELS,
   TEXT_TO_VIDEO_MODELS,
+  T2V_ASPECT_RATIO_OPTIONS,
+  t2vAspectRatioToSize,
 } from "@/lib/image-to-video-models";
 
 export const runtime = "nodejs";
@@ -111,12 +114,19 @@ export async function POST(req: Request) {
       );
     }
     const t2vDur: 5 | 10 = duration <= 7 ? 5 : 10;
+    const aspectRaw =
+      typeof body.aspectRatio === "string" ? body.aspectRatio.trim() : "";
+    const aspectAllowed = new Set<string>(
+      T2V_ASPECT_RATIO_OPTIONS as unknown as string[],
+    );
+    const aspectForSize = aspectAllowed.has(aspectRaw) ? aspectRaw : "16:9";
+    const size = t2vAspectRatioToSize(aspectForSize, resolution);
     const created = await t2vCreateVideoTask({
       apiKey,
       model: modelEntry.apiModel,
       parameterExtras: modelEntry.defaultParameters,
       prompt,
-      size: resolutionToT2vSize(resolution),
+      size,
       duration: t2vDur,
     });
     if (!created.ok) {
@@ -153,8 +163,21 @@ export async function POST(req: Request) {
     }
 
     const normalizedPrompt = normalizeReferenceVideoPrompt(prompt, urls.length);
+    const refModelRaw =
+      typeof body.model === "string" && body.model.trim()
+        ? body.model.trim()
+        : REFERENCE_TO_VIDEO_MODELS[0]!.apiModel;
+    const refModelEntry = getReferenceToVideoModelByApiModel(refModelRaw);
+    if (!refModelEntry) {
+      return NextResponse.json(
+        { error: "不支持的参考生视频模型，请刷新页面后重试" },
+        { status: 400 },
+      );
+    }
     const created = await r2vCreateReferenceVideoTask({
       apiKey,
+      model: refModelEntry.apiModel,
+      parameterExtras: refModelEntry.defaultParameters,
       prompt: normalizedPrompt,
       referenceImageUrls: urls,
       resolution,

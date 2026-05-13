@@ -82,6 +82,12 @@ export const en = {
     closetLightboxAria: "Full-size image preview",
     closetCardDelete: "Delete",
     closetDeleteConfirm: "Remove this look from your closet?",
+    destructiveDeleteSecondGeneric:
+      "Second confirmation: this cannot be undone. Continue?",
+    destructiveDeleteSecondOss:
+      "Second confirmation: this cannot be undone. We will also try to delete the matching file from cloud storage (OSS). Continue?",
+    imageLibraryDeleteConfirm:
+      "Remove this image from your library? We'll remove the list entry and try to delete the matching file from cloud storage (OSS).",
     closetDeleteFailed: "Delete failed. Please try again.",
     billingReminderAfterTryOn:
       "Try-on image is ready. If charges apply, billing follows the main site per-call price — see Usage & billing.",
