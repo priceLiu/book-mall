@@ -660,8 +660,18 @@ export function ImageToVideoLabClient() {
     let settleHintForJob: string | null = null;
     const snapPrompt = promptCurrent.trim();
     const snapRes = resolution;
+    const t2vTeForDuration =
+      modeTab === "t2v"
+        ? getTextToVideoModelById(selectedModelId) ?? TEXT_TO_VIDEO_MODELS[0]!
+        : null;
     const effectiveDurationSec =
-      modeTab === "t2v" ? (durationSec <= 7 ? 5 : 10) : durationSec;
+      modeTab === "t2v"
+        ? t2vTeForDuration!.apiModel.startsWith("happyhorse-")
+          ? Math.min(15, Math.max(3, Math.round(durationSec)))
+          : durationSec <= 7
+            ? 5
+            : 10
+        : durationSec;
     const snapDur = effectiveDurationSec;
     const snapSeed = seed.trim() || "";
     const snapMode: LabModeTab = modeTab;
@@ -679,6 +689,8 @@ export function ImageToVideoLabClient() {
           duration: effectiveDurationSec,
           model: te.apiModel,
           aspectRatio: t2vAspectRatio,
+          seed: snapSeed || undefined,
+          watermark: false,
         };
       } else if (modeTab === "ref") {
         const re =
@@ -1513,7 +1525,9 @@ export function ImageToVideoLabClient() {
             </div>
             {modeTab === "t2v" ? (
               <p className="my-0 text-[0.65rem] leading-snug text-muted-foreground">
-                Wan2.5 文生：接口仅接受 5 秒或 10 秒，已按滑块自动对齐。
+                {selectedModel.apiModel.startsWith("happyhorse-")
+                  ? "HappyHorse 文生：时长支持 3～15 秒（与接口一致）。"
+                  : "万相文生：接口仅接受 5 秒或 10 秒，已按滑块自动对齐。"}
               </p>
             ) : null}
           </div>

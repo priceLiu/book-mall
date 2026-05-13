@@ -201,13 +201,15 @@ export function resolutionToT2vSize(
   return resolution === "720P" ? "1280*720" : "1920*1080";
 }
 
-/** 文生视频实验室：宽高比选项（与主站 R2V 常见比例对齐，不含 4:5 等） */
+/** 文生视频实验室：宽高比（HappyHorse 文档含 4:5、5:4，万相 size 同步映射） */
 export const T2V_ASPECT_RATIO_OPTIONS = [
   "16:9",
   "9:16",
   "1:1",
   "4:3",
   "3:4",
+  "4:5",
+  "5:4",
 ] as const;
 
 export type T2vAspectRatio = (typeof T2V_ASPECT_RATIO_OPTIONS)[number];
@@ -221,6 +223,8 @@ const T2V_ASPECT_TO_SIZE: Record<
   "1:1": ["720*720", "1080*1080"],
   "4:3": ["960*720", "1440*1080"],
   "3:4": ["720*960", "1080*1440"],
+  "4:5": ["720*900", "1080*1350"],
+  "5:4": ["900*720", "1350*1080"],
 };
 
 export function t2vAspectRatioToSize(
