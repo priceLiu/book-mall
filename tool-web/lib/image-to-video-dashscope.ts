@@ -145,6 +145,8 @@ function validateImageRef(
 /** HappyHorse 参考生视频（1～9 张 reference_image），异步任务创建 */
 export async function r2vCreateReferenceVideoTask(opts: {
   apiKey: string;
+  /** DashScope `model`；缺省为 HappyHorse R2V */
+  model?: string;
   prompt: string;
   /** 与 media 顺序一致；每项为 HTTPS/HTTP URL 或 data:image/… */
   referenceImageUrls: string[];
@@ -154,6 +156,7 @@ export async function r2vCreateReferenceVideoTask(opts: {
   duration: number;
   seedStr?: string;
   watermark?: boolean;
+  parameterExtras?: Record<string, unknown>;
 }): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
   const prompt = opts.prompt.trim();
   if (!prompt) return { ok: false, error: "提示词不能为空" };
@@ -171,7 +174,13 @@ export async function r2vCreateReferenceVideoTask(opts: {
   const seed = parseSeed(opts.seedStr);
   const ratio = opts.ratio.trim() || "16:9";
 
+  const model =
+    typeof opts.model === "string" && opts.model.trim()
+      ? opts.model.trim()
+      : HAPPYHORSE_R2V_MODEL;
+
   const parameters: Record<string, unknown> = {
+    ...(opts.parameterExtras ?? {}),
     resolution: opts.resolution,
     ratio,
     duration,
@@ -180,7 +189,7 @@ export async function r2vCreateReferenceVideoTask(opts: {
   if (seed != null) parameters.seed = seed;
 
   const body = {
-    model: HAPPYHORSE_R2V_MODEL,
+    model,
     input: {
       prompt,
       media: urls.map((url) => ({ type: "reference_image", url })),

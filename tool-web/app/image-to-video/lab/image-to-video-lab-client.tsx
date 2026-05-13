@@ -10,11 +10,11 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ArrowRightLeft,
   Check,
-  ChevronsUpDown,
   Clapperboard,
   Dices,
   Download,
@@ -23,6 +23,7 @@ import {
   ImagePlus,
   Images,
   Info,
+  Library,
   RefreshCw,
   Upload,
   Wand2,
@@ -34,16 +35,55 @@ import { ToolChargeSubmitButton } from "@/components/ui/tool-charge-submit-butto
 import { formatDashScopeI2vFailureForUser } from "@/lib/image-to-video-task-errors";
 import {
   DEFAULT_IMAGE_TO_VIDEO_MODEL_ID,
+  DEFAULT_REFERENCE_TO_VIDEO_MODEL_ID,
   DEFAULT_TEXT_TO_VIDEO_MODEL_ID,
   getImageToVideoModelById,
+  getReferenceToVideoModelById,
   getTextToVideoModelById,
   IMAGE_TO_VIDEO_MODELS,
+  REFERENCE_TO_VIDEO_MODELS,
   TEXT_TO_VIDEO_MODELS,
+  type T2vAspectRatio,
 } from "@/lib/image-to-video-models";
 import { cn } from "@/lib/utils";
+import closetStyles from "@/app/fitting-room/ai-fit/closet/closet.module.css";
 import ttiStyles from "../../text-to-image/text-to-image-modal.module.css";
+import { TextToVideoWorkbench } from "./text-to-video-workbench";
 
 const SEED_TOOLTIP = "随机数种子，用于控制模型生成内容的随机性";
+
+function promptEllipsisLab(text: string, max = 72): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max)}…`;
+}
+
+type JobPromptTipState = {
+  jobId: string;
+  text: string;
+  left: number;
+  top: number;
+  maxWidth: number;
+};
+
+function computeJobPromptTooltipPlacement(rect: DOMRect): Pick<
+  JobPromptTipState,
+  "left" | "top" | "maxWidth"
+> {
+  const margin = 8;
+  const maxWidth = Math.min(480, window.innerWidth - margin * 2);
+  const left = Math.min(
+    Math.max(margin, rect.left),
+    window.innerWidth - margin - maxWidth,
+  );
+  const below = rect.bottom + 6;
+  const estimatedMaxH = Math.min(window.innerHeight * 0.42, 320);
+  let top = below;
+  if (below + estimatedMaxH > window.innerHeight - margin) {
+    top = Math.max(margin, rect.top - estimatedMaxH - 6);
+  }
+  return { left, top, maxWidth };
+}
 
 function randomSeedString(): string {
   return String(Math.floor(Math.random() * 1_000_000_000));
@@ -200,8 +240,17 @@ const EXAMPLE_ROW_SLICE = 5;
 type LabModeTab = "i2v" | "t2v" | "ref";
 type ResultFilter = "all" | "i2v" | "t2v" | "ref";
 
+function modeLabelVideo(m: LabModeTab): string {
+  if (m === "i2v") return "图生视频";
+  if (m === "ref") return "参考生视频";
+  return "文生视频";
+}
+
 /** 参考生视频网格：最多 9 张图（与官方 API 一致）+ 1 个上传格 */
 const REF_GRID_MAX_IMAGES = 9;
+
+/** 图生 / 参考生 空态上传区统一高度（与有首帧时 aspect-[4:3] 预览区视觉大致对齐） */
+const LAB_UPLOAD_EMPTY_MIN_H = "min-h-[220px]";
 
 const REF_RATIO_OPTIONS = [
   "16:9",
@@ -353,11 +402,18 @@ export function ImageToVideoLabClient() {
   const [dragOverI2v, setDragOverI2v] = useState(false);
   const [dragOverRefPanel, setDragOverRefPanel] = useState(false);
   const [refRatio, setRefRatio] = useState<string>("16:9");
+  const [t2vAspectRatio, setT2vAspectRatio] = useState<T2vAspectRatio>("16:9");
   const [selectedModelId, setSelectedModelId] = useState(DEFAULT_IMAGE_TO_VIDEO_MODEL_ID);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const [generatingModelLabel, setGeneratingModelLabel] = useState("");
   const [billableYuan, setBillableYuan] = useState<number | null>(null);
+  const [librarySaveBusyId, setLibrarySaveBusyId] = useState<string | null>(null);
+  const [librarySavedByJobId, setLibrarySavedByJobId] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [jobPromptTip, setJobPromptTip] = useState<JobPromptTipState | null>(null);
+  const [mountedLab, setMountedLab] = useState(false);
 
   const { chargeLine, chargeTitle } = useMemo(() => {
     if (billableYuan != null) {
@@ -373,6 +429,10 @@ export function ImageToVideoLabClient() {
         "单次生成按主站「工具管理」配置的按次单价扣费；标价加载失败时请刷新页面或查看管理后台。",
     };
   }, [billableYuan]);
+
+  useEffect(() => {
+    setMountedLab(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -394,12 +454,34 @@ export function ImageToVideoLabClient() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!jobPromptTip) return;
+    const hide = () => setJobPromptTip(null);
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+    return () => {
+      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+    };
+  }, [jobPromptTip]);
+
   const selectedModel = useMemo(() => {
     if (modeTab === "t2v") {
       return getTextToVideoModelById(selectedModelId) ?? TEXT_TO_VIDEO_MODELS[0]!;
     }
+    if (modeTab === "ref") {
+      return (
+        getReferenceToVideoModelById(selectedModelId) ?? REFERENCE_TO_VIDEO_MODELS[0]!
+      );
+    }
     return getImageToVideoModelById(selectedModelId) ?? IMAGE_TO_VIDEO_MODELS[0]!;
   }, [modeTab, selectedModelId]);
+
+  const labModelPickerList = useMemo(() => {
+    if (modeTab === "t2v") return TEXT_TO_VIDEO_MODELS;
+    if (modeTab === "ref") return REFERENCE_TO_VIDEO_MODELS;
+    return IMAGE_TO_VIDEO_MODELS;
+  }, [modeTab]);
 
   const visibleJobs = useMemo(() => {
     return jobs.filter(
@@ -573,17 +655,7 @@ export function ImageToVideoLabClient() {
     setGeneratingRemoteStatus("");
     setGeneratingBusy(true);
 
-    let snapModelTitle: string;
-    if (modeTab === "ref") {
-      snapModelTitle = "HappyHorse 参考生视频";
-    } else if (modeTab === "t2v") {
-      snapModelTitle =
-        (getTextToVideoModelById(selectedModelId) ?? TEXT_TO_VIDEO_MODELS[0]!).title;
-    } else {
-      snapModelTitle =
-        (getImageToVideoModelById(selectedModelId) ?? IMAGE_TO_VIDEO_MODELS[0]!).title;
-    }
-    setGeneratingModelLabel(snapModelTitle);
+    setGeneratingModelLabel(selectedModel.title);
 
     let settleHintForJob: string | null = null;
     const snapPrompt = promptCurrent.trim();
@@ -593,6 +665,7 @@ export function ImageToVideoLabClient() {
     const snapDur = effectiveDurationSec;
     const snapSeed = seed.trim() || "";
     const snapMode: LabModeTab = modeTab;
+    const snapModelTitle = selectedModel.title;
 
     try {
       let startBody: Record<string, unknown>;
@@ -605,8 +678,12 @@ export function ImageToVideoLabClient() {
           resolution,
           duration: effectiveDurationSec,
           model: te.apiModel,
+          aspectRatio: t2vAspectRatio,
         };
       } else if (modeTab === "ref") {
+        const re =
+          getReferenceToVideoModelById(selectedModelId) ??
+          REFERENCE_TO_VIDEO_MODELS[0]!;
         const referenceFrames = await Promise.all(
           refImages.slice(0, 9).map((s) => loadImageAsDataUrl(s)),
         );
@@ -619,6 +696,7 @@ export function ImageToVideoLabClient() {
           seed: seed.trim() || undefined,
           watermark: false,
           ratio: refRatio,
+          model: re.apiModel,
         };
       } else {
         const ie =
@@ -763,6 +841,59 @@ export function ImageToVideoLabClient() {
     setJobs((prev) => prev.filter((j) => j.id !== id));
   };
 
+  const saveJobToLibrary = useCallback(async (job: LabJob) => {
+    const lines = [
+      "将本条成片保存到「我的视频库」？",
+      "",
+      "· 我们会把视频转存到自有 OSS（模型返回的链接约 24 小时有效）。",
+      "· 默认每人最多 10 条；已满时请删除旧条目或使用下方「申请扩容」入口（付费功能即将开放）。",
+      "· 为控制存储成本，建议每条保留约 7 天；到期后管理员可按策略删除，重要成片请下载备份。",
+      "",
+      "确认保存？",
+    ];
+    if (!window.confirm(lines.join("\n"))) return;
+    setLibrarySaveBusyId(job.id);
+    setFlowError(null);
+    try {
+      const r = await fetch("/api/image-to-video/persist-library", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceUrl: job.videoUrl,
+          prompt: job.prompt,
+          mode: job.mode,
+          resolution: job.resolution,
+          durationSec: job.durationSec,
+          seed: job.seed || undefined,
+          modelLabel: job.modelLabel,
+        }),
+      });
+      const data = (await r.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
+      if (!r.ok) {
+        const msg =
+          typeof data.message === "string"
+            ? data.message
+            : typeof data.error === "string"
+              ? data.error
+              : r.status === 409
+                ? "视频库已满"
+                : r.status === 401
+                  ? "请先登录工具站"
+                  : "保存失败";
+        throw new Error(msg);
+      }
+      setLibrarySavedByJobId((p) => ({ ...p, [job.id]: true }));
+    } catch (e) {
+      setFlowError(e instanceof Error ? e.message : "保存到视频库失败");
+    } finally {
+      setLibrarySaveBusyId(null);
+    }
+  }, []);
+
   const exampleThumbnailsEl = useMemo(
     () => (
       <>
@@ -877,6 +1008,12 @@ export function ImageToVideoLabClient() {
                       ? id
                       : DEFAULT_IMAGE_TO_VIDEO_MODEL_ID,
                   );
+                } else if (key === "ref") {
+                  setSelectedModelId((id) =>
+                    REFERENCE_TO_VIDEO_MODELS.some((m) => m.id === id)
+                      ? id
+                      : DEFAULT_REFERENCE_TO_VIDEO_MODEL_ID,
+                  );
                 }
               }}
               className={chipVariants({
@@ -915,30 +1052,42 @@ export function ImageToVideoLabClient() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-6">
         <aside className="relative flex w-full min-h-0 max-h-[calc(100dvh-5.25rem)] flex-col lg:sticky lg:top-3 lg:max-h-[calc(100dvh-4.75rem)] lg:w-[400px] xl:w-[420px]">
           <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-hidden pr-0.5 pb-36 [scrollbar-gutter:stable]">
-            {modeTab === "t2v" ? (
-              <>
-                <div className="relative" ref={modelPickerRef}>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-border/90 bg-card px-3 py-2 text-left shadow-sm transition hover:bg-muted/50"
-                    aria-expanded={modelPickerOpen}
-                    aria-haspopup="listbox"
-                    onClick={() => setModelPickerOpen((o) => !o)}
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
+            <>
+              <div
+                ref={modelPickerRef}
+                className="overflow-hidden rounded-2xl border border-border/90 bg-card shadow-sm ring-1 ring-violet-500/10"
+              >
+                <div className="relative border-b border-border/80 bg-muted/30">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
                       <span className="shrink-0 text-lg" aria-hidden>
                         {selectedModel.icon}
                       </span>
-                      <span className="truncate text-sm font-medium">{selectedModel.title}</span>
-                    </span>
-                    <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  </button>
+                      <button
+                        type="button"
+                        className="min-w-0 truncate text-left text-sm font-semibold"
+                        onClick={() => setModelPickerOpen((o) => !o)}
+                        aria-expanded={modelPickerOpen}
+                        aria-haspopup="listbox"
+                      >
+                        {selectedModel.title}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      aria-label="选择或切换模型"
+                      onClick={() => setModelPickerOpen((o) => !o)}
+                    >
+                      <ArrowRightLeft className="h-4 w-4" />
+                    </button>
+                  </div>
                   {modelPickerOpen ? (
                     <div
-                      className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-border/90 bg-background shadow-lg"
+                      className="absolute left-0 right-0 top-full z-30 max-h-72 overflow-y-auto border-b border-border/80 bg-background shadow-md"
                       role="listbox"
                     >
-                      {TEXT_TO_VIDEO_MODELS.map((m) => {
+                      {labModelPickerList.map((m) => {
                         const isSel = m.id === selectedModel.id;
                         return (
                           <button
@@ -975,109 +1124,18 @@ export function ImageToVideoLabClient() {
                     </div>
                   ) : null}
                 </div>
-                <div className="rounded-xl border border-border/90 bg-muted/40 p-4 shadow-sm ring-1 ring-violet-500/10">
-                  <p className="my-0 text-sm leading-relaxed text-muted-foreground">
-                    文生视频仅需提示词与下方参数，无需上传图片。当前 Wan2.5 文生接口多仅支持{" "}
-                    <span className="font-medium text-foreground">5 秒</span> 或{" "}
-                    <span className="font-medium text-foreground">10 秒</span>{" "}
-                    成片；提交时按时长滑块自动取整（≤7 秒按 5 秒，否则按 10 秒）。
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/80 bg-muted/40 px-2 py-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="shrink-0 text-xs font-medium text-muted-foreground">示例</span>
-                    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-gutter:stable]">
-                      {exampleThumbnailsEl}
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div
-                  ref={modeTab === "i2v" ? modelPickerRef : undefined}
-                  className="overflow-hidden rounded-2xl border border-border/90 bg-card shadow-sm ring-1 ring-violet-500/10"
-                >
-                  <div className="relative border-b border-border/80 bg-muted/30">
-                    <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-                      <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <span className="shrink-0 text-lg" aria-hidden>
-                          {modeTab === "ref" ? "🎠" : selectedModel.icon}
-                        </span>
-                        {modeTab === "ref" ? (
-                          <span className="truncate text-sm font-semibold tracking-tight">
-                            HappyHorse-1.0-R2V
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="min-w-0 truncate text-left text-sm font-semibold"
-                            onClick={() => setModelPickerOpen((o) => !o)}
-                          >
-                            {selectedModel.title}
-                          </button>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                        aria-label={modeTab === "ref" ? "上传参考图" : "选择或切换模型"}
-                        onClick={() => {
-                          if (modeTab === "ref") {
-                            openRefAppendPicker();
-                          } else {
-                            setModelPickerOpen((o) => !o);
-                          }
-                        }}
-                      >
-                        <ArrowRightLeft className="h-4 w-4" />
-                      </button>
-                    </div>
-                    {modelPickerOpen && modeTab === "i2v" ? (
-                      <div
-                        className="absolute left-0 right-0 top-full z-30 max-h-72 overflow-y-auto border-b border-border/80 bg-background shadow-md"
-                        role="listbox"
-                      >
-                        {IMAGE_TO_VIDEO_MODELS.map((m) => {
-                          const isSel = m.id === selectedModel.id;
-                          return (
-                            <button
-                              key={m.id}
-                              type="button"
-                              role="option"
-                              aria-selected={isSel}
-                              className={cn(
-                                "flex w-full items-start gap-3 border-b border-border/60 px-3 py-2.5 text-left transition last:border-b-0 hover:bg-muted/80",
-                                isSel && "bg-violet-50/80 dark:bg-violet-950/40",
-                              )}
-                              onClick={() => {
-                                setSelectedModelId(m.id);
-                                setModelPickerOpen(false);
-                              }}
-                            >
-                              <span className="text-lg leading-none" aria-hidden>
-                                {m.icon}
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block text-sm font-semibold text-foreground">
-                                  {m.title}
-                                </span>
-                                <span className="mt-0.5 block text-xs text-muted-foreground">
-                                  {m.description}
-                                </span>
-                              </span>
-                              {isSel ? (
-                                <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
-                              ) : null}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
 
-                  <div className="p-3">
-                    {modeTab === "i2v" ? (
+                <div className="p-3">
+                  {modeTab === "t2v" ? (
+                    <TextToVideoWorkbench
+                      prompt={promptT2v}
+                      onPromptChange={setPromptT2v}
+                      resolution={resolution}
+                      onResolutionChange={setResolution}
+                      aspectRatio={t2vAspectRatio}
+                      onAspectRatioChange={setT2vAspectRatio}
+                    />
+                  ) : modeTab === "i2v" ? (
                       <>
                         <input
                           ref={fileInputRef}
@@ -1090,7 +1148,8 @@ export function ImageToVideoLabClient() {
                         {!i2vFirstFrameSrc ? (
                           <div
                             className={cn(
-                              "flex min-h-[220px] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center transition-colors dark:border-zinc-600",
+                              "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center transition-colors dark:border-zinc-600",
+                              LAB_UPLOAD_EMPTY_MIN_H,
                               dragOverI2v &&
                                 "border-violet-500 bg-violet-50/40 dark:border-violet-400 dark:bg-violet-950/25",
                             )}
@@ -1209,7 +1268,8 @@ export function ImageToVideoLabClient() {
                         {refImages.length === 0 ? (
                           <div
                             className={cn(
-                              "flex min-h-[220px] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center transition-colors dark:border-zinc-600",
+                              "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center transition-colors dark:border-zinc-600",
+                              LAB_UPLOAD_EMPTY_MIN_H,
                               dragOverRefPanel &&
                                 "border-violet-500 bg-violet-50/40 dark:border-violet-400 dark:bg-violet-950/25",
                             )}
@@ -1257,10 +1317,24 @@ export function ImageToVideoLabClient() {
                           </div>
                         ) : (
                           <div
-                            className="rounded-xl border border-border/80 bg-muted/30 p-2"
+                            className={cn(
+                              "relative rounded-xl border-2 border-dashed border-zinc-300 bg-muted/50 p-2 transition-colors dark:border-zinc-600",
+                              dragOverRefPanel &&
+                                "border-violet-500 bg-violet-50/50 dark:border-violet-400 dark:bg-violet-950/20",
+                            )}
+                            onDragEnter={(e) => {
+                              e.preventDefault();
+                              setDragOverRefPanel(true);
+                            }}
                             onDragOver={(e) => e.preventDefault()}
+                            onDragLeave={(e) => {
+                              const rel = e.relatedTarget as Node | null;
+                              if (rel && e.currentTarget.contains(rel)) return;
+                              setDragOverRefPanel(false);
+                            }}
                             onDrop={(e) => {
                               e.preventDefault();
+                              setDragOverRefPanel(false);
                               void ingestRefFilesAppend(e.dataTransfer.files);
                             }}
                           >
@@ -1322,6 +1396,7 @@ export function ImageToVideoLabClient() {
                     )}
                   </div>
 
+                  {modeTab !== "t2v" ? (
                   <div className="border-t border-border/80 bg-muted/20 px-2 py-2">
                     <div className="flex items-center gap-1.5">
                       <span className="shrink-0 text-xs font-medium text-muted-foreground">示例</span>
@@ -1330,6 +1405,7 @@ export function ImageToVideoLabClient() {
                       </div>
                     </div>
                   </div>
+                  ) : null}
                 </div>
 
                 {modeTab === "ref" ? (
@@ -1354,26 +1430,20 @@ export function ImageToVideoLabClient() {
                     </div>
                   </div>
                 ) : null}
-              </>
-            )}
+            </>
+          {modeTab !== "t2v" ? (
+            <>
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="i2v-prompt">
               提示词 <span className="text-destructive">*</span>
             </label>
             <textarea
               id="i2v-prompt"
-              value={
-                modeTab === "i2v"
-                  ? promptI2v
-                  : modeTab === "ref"
-                    ? promptRef
-                    : promptT2v
-              }
+              value={modeTab === "i2v" ? promptI2v : promptRef}
               onChange={(e) => {
                 const v = e.target.value;
                 if (modeTab === "i2v") setPromptI2v(v);
-                else if (modeTab === "ref") setPromptRef(v);
-                else setPromptT2v(v);
+                else setPromptRef(v);
               }}
               rows={5}
               className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
@@ -1401,6 +1471,8 @@ export function ImageToVideoLabClient() {
               ))}
             </div>
           </div>
+            </>
+          ) : null}
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-3">
@@ -1489,7 +1561,7 @@ export function ImageToVideoLabClient() {
           </div>
 
           <p className="text-[0.65rem] leading-snug text-muted-foreground">
-            生成结果链接约 24 小时有效，请及时下载或在「我的视频库」中保存。
+            生成结果临时链接约 24 小时有效，请下载或使用右侧「保存」写入「我的视频库」（转存 OSS，默认最多 10 条，建议保留约 7 天）。
           </p>
 
           <div className="flex flex-wrap gap-2 border-t border-border/80 pt-2">
@@ -1588,7 +1660,27 @@ export function ImageToVideoLabClient() {
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 gap-1 px-2 text-violet-700 dark:text-violet-300"
+                    title={
+                      librarySavedByJobId[job.id]
+                        ? "已保存到视频库"
+                        : "保存到「我的视频库」（转存 OSS）"
+                    }
+                    aria-label="保存到我的视频库"
+                    disabled={
+                      librarySaveBusyId === job.id || Boolean(librarySavedByJobId[job.id])
+                    }
+                    onClick={() => void saveJobToLibrary(job)}
+                  >
+                    <Library className="h-4 w-4 shrink-0" />
+                    <span className="hidden text-xs font-medium sm:inline">
+                      {librarySavedByJobId[job.id] ? "已保存" : "保存"}
+                    </span>
+                  </Button>
                   <Button variant="ghost" className="h-9 w-9 p-0" asChild aria-label="下载视频">
                     <a href={job.videoUrl} target="_blank" rel="noopener noreferrer" download>
                       <Download className="h-4 w-4" />
@@ -1610,12 +1702,28 @@ export function ImageToVideoLabClient() {
                     {job.settleHint}
                   </p>
                 ) : null}
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-medium text-foreground">
-                    <Clapperboard className="h-3 w-3" />
-                    首帧
+                <div className="flex flex-wrap items-start gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-medium text-foreground">
+                    <Clapperboard className="h-3 w-3 shrink-0" aria-hidden />
+                    {modeLabelVideo(job.mode)}
                   </span>
-                  <span className="line-clamp-2 text-sm text-foreground/90">{job.prompt}</span>
+                  <span
+                    className="min-w-0 cursor-default break-words text-sm leading-snug text-foreground/90"
+                    onMouseEnter={(e) => {
+                      if (job.prompt.trim().length <= 72) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setJobPromptTip({
+                        jobId: job.id,
+                        text: job.prompt,
+                        ...computeJobPromptTooltipPlacement(rect),
+                      });
+                    }}
+                    onMouseLeave={() =>
+                      setJobPromptTip((t) => (t?.jobId === job.id ? null : t))
+                    }
+                  >
+                    {promptEllipsisLab(job.prompt)}
+                  </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs">
@@ -1640,7 +1748,7 @@ export function ImageToVideoLabClient() {
                 />
               </div>
               <p className="border-t border-border/80 px-4 py-2 text-[0.7rem] text-muted-foreground">
-                成片链接约 24 小时有效，请及时下载或转存。
+                成片临时链接约 24 小时有效；可下载备份或使用「保存」转存至「我的视频库」（自有 OSS，建议保留约 7 天，详见保存时的说明）。
                 <a
                   href={job.videoUrl}
                   target="_blank"
@@ -1654,6 +1762,25 @@ export function ImageToVideoLabClient() {
           ))}
         </section>
       </div>
+
+      {mountedLab && jobPromptTip
+        ? createPortal(
+            <div
+              role="tooltip"
+              className={closetStyles.promptFullTooltip}
+              style={{
+                position: "fixed",
+                left: jobPromptTip.left,
+                top: jobPromptTip.top,
+                maxWidth: jobPromptTip.maxWidth,
+                zIndex: 10050,
+              }}
+            >
+              {jobPromptTip.text}
+            </div>,
+            document.body,
+          )
+        : null}
 
       {refPreviewSrc ? (
         <div

@@ -8,6 +8,7 @@ import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { AiFitClosetItem } from "@/lib/ai-fit-closet-types";
 import styles from "./closet.module.css";
+import { confirmDestructiveTwice } from "@/lib/confirm-destructive-twice";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -89,7 +90,7 @@ function ClosetView() {
 
   const handleDelete = useCallback(
     async (id: string) => {
-      if (!window.confirm(t("closetDeleteConfirm"))) return;
+      if (!confirmDestructiveTwice(t("closetDeleteConfirm"), t("destructiveDeleteSecondGeneric"))) return;
       setBusyId(id);
       try {
         const r = await fetch(

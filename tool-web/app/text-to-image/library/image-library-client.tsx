@@ -8,6 +8,9 @@ import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { TextToImageLibraryItem } from "@/lib/text-to-image-library-types";
 import styles from "@/app/fitting-room/ai-fit/closet/closet.module.css";
+import { confirmDestructiveTwice } from "@/lib/confirm-destructive-twice";
+
+type ImageLibraryQuota = { max: number; used: number };
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -66,6 +69,7 @@ type PromptTooltipState = {
 function LibraryView() {
   const { t } = useMessagesLocale();
   const [items, setItems] = useState<TextToImageLibraryItem[]>([]);
+  const [quota, setQuota] = useState<ImageLibraryQuota | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -84,14 +88,23 @@ function LibraryView() {
         const r = await fetch("/api/text-to-image/library", { cache: "no-store" });
         const data = (await r.json()) as {
           items?: TextToImageLibraryItem[];
+          quota?: ImageLibraryQuota;
           error?: string;
         };
         if (cancelled) return;
         if (!r.ok) {
           setError(data.error ?? null);
           setItems([]);
+          setQuota(null);
         } else {
           setItems(Array.isArray(data.items) ? data.items : []);
+          setQuota(
+            data.quota &&
+              typeof data.quota.used === "number" &&
+              typeof data.quota.max === "number"
+              ? data.quota
+              : null,
+          );
         }
       } catch {
         if (!cancelled) {
@@ -134,7 +147,10 @@ function LibraryView() {
 
   const handleDelete = useCallback(
     async (id: string) => {
-      if (!window.confirm(t("closetDeleteConfirm"))) return;
+      if (
+        !confirmDestructiveTwice(t("imageLibraryDeleteConfirm"), t("destructiveDeleteSecondOss"))
+      )
+        return;
       setBusyId(id);
       try {
         const r = await fetch(
@@ -146,6 +162,7 @@ function LibraryView() {
           return;
         }
         setItems((prev) => prev.filter((x) => x.id !== id));
+        setQuota((q) => (q ? { ...q, used: Math.max(0, q.used - 1) } : q));
       } catch {
         setError(t("closetDeleteFailed"));
       } finally {
@@ -223,6 +240,26 @@ function LibraryView() {
       </header>
 
       <section className={styles.container}>
+        {quota ? (
+          <p className="mb-3 rounded-lg border border-border/80 bg-muted/40 px-3 py-2 text-[0.8rem] leading-relaxed text-muted-foreground">
+            <span className="font-medium text-foreground">
+              已用 {quota.used} / {quota.max} 张
+            </span>
+            。默认每人最多 {quota.max}{" "}
+            张；超出请删除旧图或使用「申请扩容」（付费功能即将开放）。
+            <button
+              type="button"
+              className="ml-1 font-medium text-violet-700 underline decoration-violet-600/40 underline-offset-2 dark:text-violet-300"
+              onClick={() =>
+                alert(
+                  "图片库扩容为付费增值服务，即将开放自助申请。如需洽谈企业套餐，请通过网站联系方式联络。",
+                )
+              }
+            >
+              申请扩容（即将支持）
+            </button>
+          </p>
+        ) : null}
         {error ? <p className={styles.banner}>{error}</p> : null}
 
         {loading ? (

@@ -1,0 +1,151 @@
+{
+  "defaults": {
+    "imageToVideo": "happyhorse-1-0-i2v",
+    "textToVideo": "happyhorse-1-0-t2v",
+    "referenceToVideo": "happyhorse-1-0-r2v"
+  },
+  "imageToVideo": [
+    {
+      "id": "happyhorse-1-0-i2v",
+      "apiModel": "happyhorse-1.0-i2v",
+      "title": "HappyHorse-1.0-I2V",
+      "description": "HappyHorse-1.0-I2V 支持图生视频，具备高度可控的画面与运动表现（以控制台为准）。",
+      "icon": "🎠"
+    },
+    {
+      "id": "wan27-i2v-2026-04-25",
+      "apiModel": "wan2.7-i2v-2026-04-25",
+      "title": "万相2.7-图生视频-2026-04-25",
+      "description": "万相 2.7 图生视频，演绎能力全面升级，文戏情绪与镜头衔接更稳。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "wan27-i2v",
+      "apiModel": "wan2.7-i2v",
+      "title": "万相2.7-图生视频",
+      "description": "万相 2.7 图生视频，演绎能力全面升级，文戏情绪与镜头衔接更稳。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "wan26-i2v-flash",
+      "apiModel": "wan2.6-i2v-flash",
+      "title": "wan2.6-I2V-flash",
+      "description": "万相 2.6 图生视频 Flash，生成更快、更高性价比，适合试镜与迭代。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "wan26-i2v",
+      "apiModel": "wan2.6-i2v",
+      "title": "Wan2.6-I2V",
+      "description": "万相 2.6 图生视频，智能分镜调度支持多镜头叙事与节奏控制。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "wan25-i2v-preview",
+      "apiModel": "wan2.5-i2v-preview",
+      "title": "Wan2.5-I2V-Preview",
+      "description": "万相 2.5 图生视频 Preview，全新升级技术架构与生成管线。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "pixverse-c1-it2v",
+      "apiModel": "pixverse-c1-it2v",
+      "title": "PixVerse-C1-it2v",
+      "description": "C1 是 PixVerse 面向影视行业的图生模型；apiModel 以百炼控制台为准。",
+      "icon": "P"
+    }
+  ],
+  "textToVideo": [
+    {
+      "id": "happyhorse-1-0-t2v",
+      "apiModel": "happyhorse-1.0-t2v",
+      "title": "HappyHorse-1.0-T2V",
+      "description": "HappyHorse-1.0-T2V 支持文生视频，具备高度可控的镜头与氛围（以控制台为准）。",
+      "icon": "🎠"
+    },
+    {
+      "id": "wan27-t2v-2026-04-25",
+      "apiModel": "wan2.7-t2v-2026-04-25",
+      "title": "万相2.7-文生视频-2026-04-25",
+      "description": "万相 2.7 文生视频，演绎能力全面升级，文戏情绪与节奏更稳。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "wan27-t2v",
+      "apiModel": "wan2.7-t2v",
+      "title": "万相2.7-文生视频",
+      "description": "万相 2.7 文生视频，演绎能力全面升级，文戏情绪与节奏更稳。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "wan26-t2v",
+      "apiModel": "wan2.6-t2v",
+      "title": "Wan2.6-T2V",
+      "description": "万相 2.6 文生视频，智能分镜调度支持多镜头叙事。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "wan25-t2v-preview",
+      "apiModel": "wan2.5-t2v-preview",
+      "title": "Wan2.5-T2V-Preview",
+      "description": "万相 2.5 文生视频 Preview，全新升级模型架构与生成管线。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "pixverse-c1-t2v",
+      "apiModel": "pixverse-c1-t2v",
+      "title": "PixVerse-C1-t2v",
+      "description": "C1 是 PixVerse 面向影视行业的文生模型；apiModel 以百炼控制台为准。",
+      "icon": "P"
+    },
+    {
+      "id": "pixverse-v6-t2v",
+      "apiModel": "pixverse-v6-t2v",
+      "title": "PixVerse-V6-t2v",
+      "description": "V6 是 PixVerse 新一代文生视频模型；apiModel 以百炼控制台为准。",
+      "icon": "P"
+    }
+  ],
+  "referenceToVideo": [
+    {
+      "id": "happyhorse-1-0-r2v",
+      "apiModel": "happyhorse-1.0-r2v",
+      "title": "HappyHorse-1.0-R2V",
+      "description": "HappyHorse-1.0-R2V 支持参考生视频，更加稳定的角色、道具与场景一致性（以控制台为准）。",
+      "icon": "🎠"
+    },
+    {
+      "id": "wan27-r2v",
+      "apiModel": "wan2.7-r2v",
+      "title": "万相2.7-参考生视频",
+      "description": "万相 2.7 参考生视频，更加稳定的角色、道具与场景一致性。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "wan26-r2v",
+      "apiModel": "wan2.6-r2v",
+      "title": "Wan2.6-R2V",
+      "description": "万相 2.6 参考生视频，支持指定人物或任意物品进入镜头叙事。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    },
+    {
+      "id": "wan26-r2v-flash",
+      "apiModel": "wan2.6-r2v-flash",
+      "title": "Wan2.6-R2V-Flash",
+      "description": "万相 2.6 参考生视频 Flash，生成更快、性价比更高。",
+      "icon": "✦",
+      "defaultParameters": { "prompt_extend": true }
+    }
+  ]
+}

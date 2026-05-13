@@ -1,0 +1,196 @@
+/* 文生视频工作台 — 样式隔离，仅作用于本模块 className */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.promptLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 7.5rem;
+  resize: vertical;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--input));
+  background: hsl(var(--background));
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+
+.textarea::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+.textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px rgb(139 92 246 / 0.35);
+}
+
+.exampleBox {
+  border-radius: 0.75rem;
+  border: 1px solid hsl(var(--border) / 0.85);
+  background: hsl(var(--muted) / 0.35);
+  padding: 0.75rem 0.875rem;
+}
+
+.exampleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+}
+
+.exampleTitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.refreshBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border) / 0.9);
+  background: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.refreshBtn:hover {
+  background: hsl(var(--muted) / 0.5);
+  color: var(--foreground);
+  border-color: rgb(124 117 232 / 0.45);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border) / 0.95);
+  background: hsl(var(--background));
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--foreground);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.chip:hover {
+  border-color: rgb(124 117 232 / 0.55);
+  background: rgb(124 117 232 / 0.08);
+  color: rgb(91 78 216);
+}
+
+:root[class~="dark"] .chip:hover {
+  color: rgb(196 181 253);
+}
+
+.sectionLabel {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.toggleRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.toggleBtn {
+  flex: 1;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(212 212 216);
+  background: hsl(var(--background));
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(24 24 27);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+:root[class~="dark"] .toggleBtn {
+  border-color: rgb(63 63 70);
+  color: rgb(244 244 245);
+}
+
+.toggleBtnActive {
+  border-color: rgb(109 40 217);
+  background: rgb(124 117 232);
+  color: white;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+:root[class~="dark"] .toggleBtnActive {
+  border-color: rgb(167 139 250);
+  background: rgb(109 40 217);
+  color: white;
+}
+
+.aspectGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.aspectBtn {
+  border-radius: 0.375rem;
+  border: 1px solid rgb(212 212 216);
+  background: hsl(var(--background));
+  padding: 0.375rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgb(39 39 42);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+:root[class~="dark"] .aspectBtn {
+  border-color: rgb(63 63 70);
+  color: rgb(244 244 245);
+}
+
+.aspectBtnActive {
+  border-color: rgb(109 40 217);
+  background: rgb(124 117 232);
+  color: white;
+}
+
+:root[class~="dark"] .aspectBtnActive {
+  border-color: rgb(167 139 250);
+  background: rgb(109 40 217);
+  color: white;
+}

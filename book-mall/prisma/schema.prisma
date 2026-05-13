@@ -74,6 +74,7 @@ model User {
   aiFitGarmentUploads          AiFitGarmentUpload[]
   aiFitClosetItems             AiFitClosetItem[]
   textToImageLibraryItems      TextToImageLibraryItem[]
+  imageToVideoLibraryItems     ImageToVideoLibraryItem[]
   courseLessonProgress         CourseLessonProgress[]
   userProductSubscriptions     UserProductSubscription[]
 
@@ -190,6 +191,31 @@ model TextToImageLibraryItem {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+/// 图生/参考/文生视频：用户「我的视频库」收藏的成片（OSS 长期链 + 建议保留期限）
+model ImageToVideoLibraryItem {
+  id     String @id @default(cuid())
+  userId String
+
+  videoUrl   String  @db.Text
+  prompt     String? @db.Text
+  /// i2v | t2v | ref
+  mode       String
+  resolution String
+  durationSec Int
+  seed      String?
+  modelLabel String?
+
+  /// 建议清理时间不早于该时刻（默认创建 +7 天）；管理员可提前删除
+  retainUntil DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([retainUntil])
 }
 
 /// 工具站访问 / 调用打点（审计与后续扣费扩展）；写入方为主站 API，身份以工具 JWT 的 sub 为准。
