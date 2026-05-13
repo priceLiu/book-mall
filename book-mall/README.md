@@ -37,7 +37,7 @@
 
 ## 环境变量
 
-复制 [`.env.example`](./.env.example) 为 **`.env.local`**（供 Next.js 与本地脚本），并建议 **再复制一份为 `.env`**（供 Prisma CLI 在 `pnpm build` / `prisma migrate` 等命令下默认读取；二者内容保持一致即可）。
+复制 [`.env.example`](./.env.example) 为 **`.env.local`**（勿提交）。Next.js 与 **`pnpm dev`** 会读取它；`pnpm build`、`pnpm db:*` 等脚本通过 **dotenv-cli** 同样指向 `.env.local`，无需再维护单独的 `.env`。
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
@@ -57,7 +57,7 @@ cd book-mall
 pnpm install          # 或 npm install
 ```
 
-1. 按上文创建 `.env.local` 与 `.env`，填入 `DATABASE_URL`、`NEXTAUTH_URL`、`NEXTAUTH_SECRET`。
+1. 按上文创建 `.env.local`，填入 `DATABASE_URL`、`NEXTAUTH_URL`、`NEXTAUTH_SECRET`。
 2. 初始化数据库结构并写入种子数据：
 
 ```bash
@@ -71,7 +71,7 @@ pnpm run db:seed      # 默认订阅档位、分类、平台配置；并按 ADMI
 pnpm dev              # 默认 http://localhost:3000
 ```
 
-4. 首次管理员：用 `/register` 注册账号 → 将邮箱写入 `.env.local` / `.env` 的 `ADMIN_EMAILS` → 再执行 `pnpm run db:seed` → 重新登录 → 访问 `/admin`。
+4. 首次管理员：用 `/register` 注册账号 → 将邮箱写入 `.env.local` 的 `ADMIN_EMAILS` → 再执行 `pnpm run db:seed` → 重新登录 → 访问 `/admin`。
 
 可选：`pnpm run db:studio` 打开 Prisma Studio（通过仓库脚本读取 `.env.local`）。
 
@@ -83,10 +83,10 @@ pnpm dev              # 默认 http://localhost:3000
 cd ../tool-web             # 与 book-mall 同级（勿在 book-mall 内找 tool-web）
 pnpm install
 cp .env.example .env.local   # 填入 MAIN_SITE_ORIGIN 与 TOOLS_SSO_*（与主站一致）
-pnpm dev                     # 默认 http://127.0.0.1:3001
+pnpm dev                     # 默认 http://localhost:3001
 ```
 
-主站 `.env.local` 须设置 `TOOLS_PUBLIC_ORIGIN=http://127.0.0.1:3001`。详见 [**`../tool-web/README.md`**](../tool-web/README.md)。
+主站 `.env.local` 须设置 `TOOLS_PUBLIC_ORIGIN=http://localhost:3001`（与工具站实际访问 Origin **主机名一致**，勿混用 `127.0.0.1` 与 `localhost`）。详见 [**`../tool-web/README.md`**](../tool-web/README.md)。
 
 ---
 

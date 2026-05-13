@@ -10,14 +10,14 @@
 ## 本地联调（最短路径）
 
 1. **主站**（目录 `book-mall/`）：  
-   - `.env.local` 中配置 `TOOLS_PUBLIC_ORIGIN=http://127.0.0.1:3001`  
+   - `.env.local` 中配置 `TOOLS_PUBLIC_ORIGIN=http://localhost:3001`（与浏览器访问工具站的 host **一致**，勿与 `127.0.0.1` 混用）  
    - 以及与下文一致的 `TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`  
    - `pnpm dev` → 默认 `http://localhost:3000`
 
 2. **工具站**（本目录）：  
    - 复制 `.env.example` 为 `.env.local`，填入与主站相同的 **`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`**（后者强烈建议配置）、`MAIN_SITE_ORIGIN=http://localhost:3000`  
    - `pnpm install`  
-   - `pnpm dev` → 默认 `http://127.0.0.1:3001`
+   - `pnpm dev` → 默认 `http://localhost:3001`
 
 3. 浏览器登录主站 → 个人中心 → **打开试衣间**，或 **管理后台** → **工具站** → 默认落在本站 `/fitting-room`。
 
