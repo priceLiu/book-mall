@@ -112,23 +112,35 @@ export async function POST(req: Request) {
     typeof body.modelLabel === "string" ? body.modelLabel.trim().slice(0, 200) : "";
   const modelLabel = modelLabelRaw.length > 0 ? modelLabelRaw : null;
 
-  const r = await fetch(`${origin}${UPSTREAM}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      videoUrl: ossUrl,
-      prompt,
-      mode: modeRaw,
-      resolution,
-      durationSec,
-      seed,
-      modelLabel,
-    }),
-    cache: "no-store",
-  });
+  let r: Response;
+  try {
+    r = await fetch(`${origin}${UPSTREAM}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        videoUrl: ossUrl,
+        prompt,
+        mode: modeRaw,
+        resolution,
+        durationSec,
+        seed,
+        modelLabel,
+      }),
+      cache: "no-store",
+    });
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      {
+        error: "main_site_unreachable",
+        message: `无法请求主站（请确认 MAIN_SITE_ORIGIN 指向已启动的主站，且本机网络可达）：${detail}`,
+      },
+      { status: 502 },
+    );
+  }
 
   const text = await r.text();
   return new NextResponse(text, {
