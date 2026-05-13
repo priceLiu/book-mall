@@ -51,6 +51,7 @@ export default async function AdminDashboardPage() {
     }),
     prisma.toolUsageEvent.groupBy({
       by: ["toolKey"],
+      orderBy: { toolKey: "asc" },
       _count: { id: true },
     }),
   ]);
@@ -59,10 +60,14 @@ export default async function AdminDashboardPage() {
   const totalRecharge = rechargeSum._sum.amountMinor ?? 0;
 
   const toolUsageChartData = [...toolUsageGroups]
-    .sort((a, b) => b._count.id - a._count.id)
+    .sort(
+      (a, b) =>
+        ((b._count as { id: number } | undefined)?.id ?? 0) -
+        ((a._count as { id: number } | undefined)?.id ?? 0),
+    )
     .map((g) => ({
       label: toolKeyToLabel(g.toolKey),
-      count: g._count.id,
+      count: (g._count as { id: number } | undefined)?.id ?? 0,
     }));
 
   return (
