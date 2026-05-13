@@ -1,0 +1,78 @@
+.root {
+  max-width: 48rem;
+  width: 100%;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+.header {
+  margin-bottom: 1.25rem;
+}
+
+.crumb {
+  font-size: 0.85rem;
+  color: var(--tool-muted);
+  margin: 0 0 0.5rem;
+}
+
+.crumb a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.3;
+}
+
+.lead {
+  color: var(--tool-muted);
+  font-size: 0.95rem;
+  margin: 0.75rem 0 0;
+  line-height: 1.55;
+}
+
+.section {
+  margin-top: 1.75rem;
+}
+
+.section h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.65rem;
+  font-weight: 600;
+}
+
+.section :global(p),
+.section :global(ul) {
+  margin: 0.45rem 0;
+  line-height: 1.6;
+  font-size: 0.9rem;
+}
+
+.section :global(ul) {
+  padding-left: 1.25rem;
+}
+
+.section :global(li) {
+  margin: 0.25rem 0;
+}
+
+.codeCaption {
+  font-size: 0.8rem;
+  color: var(--tool-muted);
+  margin: 0.65rem 0 0.25rem;
+}
+
+.footer {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--tool-border);
+  font-size: 0.82rem;
+  color: var(--tool-muted);
+  line-height: 1.6;
+}
+
+.footer p {
+  margin: 0.4rem 0;
+}

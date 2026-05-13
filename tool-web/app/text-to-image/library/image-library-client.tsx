@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { TextToImageLibraryItem } from "@/lib/text-to-image-library-types";
@@ -35,6 +36,33 @@ function promptEllipsis(text: string, max = 42): string {
   return `${t.slice(0, max)}…`;
 }
 
+function computePromptTooltipPlacement(rect: DOMRect): Pick<
+  PromptTooltipState,
+  "left" | "top" | "maxWidth"
+> {
+  const margin = 8;
+  const maxWidth = Math.min(400, window.innerWidth - margin * 2);
+  const left = Math.min(
+    Math.max(margin, rect.left),
+    window.innerWidth - margin - maxWidth,
+  );
+  const below = rect.bottom + 6;
+  const estimatedMaxH = Math.min(window.innerHeight * 0.42, 300);
+  let top = below;
+  if (below + estimatedMaxH > window.innerHeight - margin) {
+    top = Math.max(margin, rect.top - estimatedMaxH - 6);
+  }
+  return { left, top, maxWidth };
+}
+
+type PromptTooltipState = {
+  itemId: string;
+  text: string;
+  left: number;
+  top: number;
+  maxWidth: number;
+};
+
 function LibraryView() {
   const { t } = useMessagesLocale();
   const [items, setItems] = useState<TextToImageLibraryItem[]>([]);
@@ -43,6 +71,7 @@ function LibraryView() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [promptTip, setPromptTip] = useState<PromptTooltipState | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -92,6 +121,17 @@ function LibraryView() {
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    if (!promptTip) return;
+    const hide = () => setPromptTip(null);
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+    return () => {
+      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+    };
+  }, [promptTip]);
+
   const handleDelete = useCallback(
     async (id: string) => {
       if (!window.confirm(t("closetDeleteConfirm"))) return;
@@ -114,6 +154,27 @@ function LibraryView() {
     },
     [t],
   );
+
+  const promptTooltipPortal =
+    mounted &&
+    promptTip &&
+    createPortal(
+      <div
+        id="image-library-prompt-tooltip"
+        role="tooltip"
+        className={styles.promptFullTooltip}
+        style={{
+          position: "fixed",
+          left: promptTip.left,
+          top: promptTip.top,
+          maxWidth: promptTip.maxWidth,
+          zIndex: 10050,
+        }}
+      >
+        {promptTip.text}
+      </div>,
+      document.body,
+    );
 
   const lightbox =
     mounted &&
@@ -153,6 +214,7 @@ function LibraryView() {
         <div>
           <h1 className={styles.title}>{t("imageLibraryPageTitle")}</h1>
           <p className={styles.subtitle}>{t("disclaimer")}</p>
+          <ToolImplementationCrossLink href="/text-to-image/implementation" />
         </div>
         <Link href="/text-to-image" className={styles.cta}>
           <span aria-hidden>✨</span>
@@ -195,7 +257,34 @@ function LibraryView() {
                   <div className={styles.cardMetaLibrary}>
                     <span
                       className={styles.cardPromptLibrary}
-                      title={item.prompt ?? undefined}
+                      tabIndex={item.prompt?.trim() ? 0 : undefined}
+                      aria-describedby={
+                        promptTip?.itemId === item.id
+                          ? "image-library-prompt-tooltip"
+                          : undefined
+                      }
+                      onMouseEnter={(e) => {
+                        const full = item.prompt?.trim();
+                        if (!full) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setPromptTip({
+                          itemId: item.id,
+                          text: full,
+                          ...computePromptTooltipPlacement(rect),
+                        });
+                      }}
+                      onMouseLeave={() => setPromptTip(null)}
+                      onBlur={() => setPromptTip(null)}
+                      onFocus={(e) => {
+                        const full = item.prompt?.trim();
+                        if (!full) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setPromptTip({
+                          itemId: item.id,
+                          text: full,
+                          ...computePromptTooltipPlacement(rect),
+                        });
+                      }}
                     >
                       {item.prompt?.trim()
                         ? promptEllipsis(item.prompt)
@@ -235,6 +324,7 @@ function LibraryView() {
           </div>
         )}
       </section>
+      {promptTooltipPortal}
       {lightbox}
     </div>
   );

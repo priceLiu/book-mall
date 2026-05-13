@@ -36,6 +36,8 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
       { href: "/fitting-room", label: "套装" },
       { href: "/fitting-room/ai-fit", label: "AI试衣" },
       { href: "/fitting-room/ai-fit/closet", label: "我的衣柜" },
+      { href: "/fitting-room/implementation", label: "实现逻辑 · 套装" },
+      { href: "/fitting-room/ai-fit/implementation", label: "实现逻辑 · AI试衣" },
     ],
   },
   {
@@ -45,6 +47,17 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
     children: [
       { href: "/text-to-image", label: "生成" },
       { href: "/text-to-image/library", label: "我的图片库" },
+      { href: "/text-to-image/implementation", label: "实现逻辑" },
+    ],
+  },
+  {
+    label: "智能客服",
+    navKey: "smart-support",
+    defaultOpen: true,
+    children: [
+      { href: "/smart-support", label: "首页" },
+      { href: "/smart-support/chat", label: "我的智能客服" },
+      { href: "/smart-support/implementation", label: "实现逻辑" },
     ],
   },
   {

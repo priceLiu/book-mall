@@ -7,6 +7,7 @@ import {
   useFittingRoomLocale,
 } from "@/components/fitting-room-locale-context";
 import { useToolsSession } from "@/components/tool-shell-client";
+import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { FittingRoomGallery } from "./fitting-room-gallery";
 import {
   LocaleSwitcher,
@@ -56,6 +57,7 @@ function FittingRoomPageBody({
       </div>
 
       <p className="tw-muted">{t("pageSubtitle")}</p>
+      <ToolImplementationCrossLink href="/fitting-room/implementation" />
 
       {loading ? (
         <p className="tw-muted" role="status">

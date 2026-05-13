@@ -9,6 +9,7 @@ import { prefillGarmentsFromOutfit } from "@/lib/ai-fit-prefill-from-outfit";
 import { OUTFITS } from "@/lib/fitting-room-data";
 import { FITTING_ROOM_IMG_FALLBACK } from "@/lib/fitting-room-fallback-image";
 import { fittingRoomImageSrc } from "@/lib/fitting-room-image-url";
+import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { AiFitAddModelModal, type AddModelPayload } from "./ai-fit-add-model-modal";
 import styles from "./ai-fit.module.css";
 
@@ -575,6 +576,7 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
           </button>
         </div>
       </header>
+      <ToolImplementationCrossLink href="/fitting-room/ai-fit/implementation" />
 
       <div className={styles.layout}>
         <aside className={styles.leftPanel}>

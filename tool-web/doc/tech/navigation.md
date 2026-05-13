@@ -82,7 +82,7 @@ export type ToolNavEntry = ToolNavItem | ToolNavGroup;
 - [ ] 子项 `href` 与 `app/` 实际路由一致，刷新不会 404。
 - [ ] 命中子项时该分组能被自动展开。
 - [ ] 桌面 / 移动端均可点击（除非 `showOnMobile: false` 并已写文档）。
-- [ ] 打点 `toolKey` 命名与 **`product/tools-delivery-checklist.md`** 中的约定一致（如需为该工具显示中文名，更新 **`lib/tool-key-label.ts`** 与主站 **`book-mall/lib/tool-key-label.ts`** 两份映射）。
+- [ ] **「实现逻辑」页**已按 **`product/tools-delivery-checklist.md`** §5 交付（路由、导航、`ToolImplementationCrossLink`、摘录与页脚文案）。
 
 ## 9. 范例：本期改造
 
@@ -90,14 +90,50 @@ export type ToolNavEntry = ToolNavItem | ToolNavGroup;
 export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
   {
     label: "试衣间",
+    navKey: "fitting-room",
     defaultOpen: true,
     children: [
       { href: "/fitting-room", label: "套装" },
       { href: "/fitting-room/ai-fit", label: "AI试衣" },
       { href: "/fitting-room/ai-fit/closet", label: "我的衣柜" },
+      { href: "/fitting-room/implementation", label: "实现逻辑 · 套装" },
+      { href: "/fitting-room/ai-fit/implementation", label: "实现逻辑 · AI试衣" },
     ],
   },
-  { href: "/text-to-image", label: "文生图" },
-  { href: "/app-history", label: "应用历史" },
+  {
+    label: "文生图",
+    navKey: "text-to-image",
+    defaultOpen: true,
+    children: [
+      { href: "/text-to-image", label: "生成" },
+      { href: "/text-to-image/library", label: "我的图片库" },
+      { href: "/text-to-image/implementation", label: "实现逻辑" },
+    ],
+  },
+  {
+    label: "智能客服",
+    navKey: "smart-support",
+    defaultOpen: true,
+    children: [
+      { href: "/smart-support", label: "首页" },
+      { href: "/smart-support/chat", label: "我的智能客服" },
+      { href: "/smart-support/implementation", label: "实现逻辑" },
+    ],
+  },
+  {
+    label: "费用",
+    navKey: "app-history",
+    defaultOpen: true,
+    children: [
+      { href: "/app-history", label: "费用使用明细", navKey: "app-history" },
+      {
+        href: "/app-history/plan-rules",
+        label: "计费规则说明",
+        navKey: "app-history",
+      },
+    ],
+  },
 ];
 ```
+
+实现逻辑页须满足 **`product/tools-delivery-checklist.md`** §5。
