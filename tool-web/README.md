@@ -31,7 +31,14 @@
 |------|------|
 | `/auth/sso/callback` | 接收主站跳转的 `code`，服务端换票并写入 HttpOnly Cookie |
 | `/fitting-room` | 试衣间（页面级仍可 introspect；壳层优先 JWT） |
-| `/text-to-image` | 文生图（占位 + `lib/tool-config` 说明） |
+| `/text-to-image` | 文生图 |
+| `/text-to-image/implementation` | 文生图 · 实现逻辑（摘录） |
+| `/fitting-room/implementation` | 试衣间套装 · 实现逻辑 |
+| `/fitting-room/ai-fit/implementation` | AI试衣 · 实现逻辑 |
+| `/smart-support` | 智能客服首页（Hero + 入口） |
+| `/smart-support/chat` | 我的智能客服（DeepSeek + Dify） |
+| `/smart-support/sessions` | 会话归档占位（侧栏无入口，保留路由） |
+| `/smart-support/implementation` | 智能客服 · 实现逻辑 |
 | `/sso-error` | 换票失败提示 |
 
 完整协议见 [`../book-mall/doc/tech/tools-sso-environment.md`](../book-mall/doc/tech/tools-sso-environment.md)。

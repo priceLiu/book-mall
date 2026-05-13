@@ -29,6 +29,13 @@ alwaysApply: false
 - **`tool-web/README.md`** 保持指向上述文档与主站 SSO 文档。
 - **`components/ui`**（Tailwind utilities / shadcn 风格）详见 **`tool-web/doc/tech/components-ui-tailwind.md`**。
 
+## 实现逻辑页（必交付）
+
+- **每个面向用户的工具**（独立路由、侧栏有入口）在上线或重大改版合并前，须同步新增或更新对应的 **「实现逻辑」** 页面（独立路由，路径约定见下），并与具体使用页 **双向链接**（使用页放 **`ToolImplementationCrossLink`**，实现页用 **`ToolImplementationDoc`** 回到使用页）。
+- 页面结构固定为四段：**流程摘要** → **关键事项（安全 / 计费 / 幂等）** → **核心代码摘录**（仓库真实路径 + 少量节选；**禁止**贴密钥与完整未审源码）→ 页脚 **`lib/tool-implementation-meta.ts`** 中的「联系站长」「AI 辅助说明」。
+- 导航：在 **`config/nav-tools.ts`** 对应分组下增加实现逻辑子项（与其它工具页同级）。
+- 详细清单与 PR 勾选：**`doc/product/tools-delivery-checklist.md`**。
+
 ## 排障提示（给用户 / 支持）
 
 - 「从主站过来仍无会话」常见为 **`TOOLS_PUBLIC_ORIGIN` 与浏览器地址栏 host 不一致**（`localhost` vs `127.0.0.1`）；详见 **`doc/tech/sso-session-troubleshooting.md`**。

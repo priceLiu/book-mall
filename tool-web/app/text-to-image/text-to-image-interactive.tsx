@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Hero } from "@/components/ui/hero-with-group-of-images-text-and-two-buttons";
+import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import {
   TextToImageGenerateModal,
   type TextToImagePromptPreset,
@@ -44,6 +45,7 @@ export function TextToImageInteractive({
         <h1 id="text-to-image-heading" style={{ marginTop: 0 }}>
           文生图
         </h1>
+        <ToolImplementationCrossLink href="/text-to-image/implementation" />
 
         <TextToImagePanel renewHref={renewHref} mainOrigin={mainOrigin} />
       </section>

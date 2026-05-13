@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { AiFitClosetItem } from "@/lib/ai-fit-closet-types";
@@ -147,6 +148,7 @@ function ClosetView() {
         <div>
           <h1 className={styles.title}>{t("closetPageTitle")}</h1>
           <p className={styles.subtitle}>{t("disclaimer")}</p>
+          <ToolImplementationCrossLink href="/fitting-room/ai-fit/implementation" />
         </div>
         <Link href="/fitting-room/ai-fit" className={styles.cta}>
           <span aria-hidden>✨</span>

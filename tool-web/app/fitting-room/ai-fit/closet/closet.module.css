@@ -198,6 +198,27 @@
   line-height: 1.45;
   font-weight: 500;
   color: #404040;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
+
+/* 我的图片库：悬停展示完整提示词（portal，见 image-library-client） */
+.promptFullTooltip {
+  pointer-events: none;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #fafafa;
+  background: rgba(24, 24, 27, 0.94);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+  max-height: min(42vh, 300px);
+  overflow-y: auto;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .cardActionsLibrary {
