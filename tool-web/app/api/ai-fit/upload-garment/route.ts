@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,9 @@ export const dynamic = "force-dynamic";
 const UPSTREAM = "/api/sso/tools/ai-fit/upload-garment";
 
 export async function POST(req: Request) {
+  const suite = await requireToolSuiteNavAccess("fitting-room");
+  if (!suite.ok) return suite.response;
+
   const origin = getMainSiteOrigin();
   if (!origin) {
     return NextResponse.json(

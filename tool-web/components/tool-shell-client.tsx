@@ -18,6 +18,12 @@ import {
   type ToolNavEntry,
 } from "@/config/nav-tools";
 import { flattenToolNavEntries } from "@/lib/apply-tool-nav-visibility";
+import { applyToolNavEntitlements } from "@/lib/apply-tool-nav-entitlements";
+import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
+import {
+  pathnameToToolSuiteNavKey,
+  isToolPublicPath,
+} from "@/lib/tool-route-suite-key";
 import { mapFetchToolsSessionResultToShell } from "@/lib/map-fetch-tools-session";
 import type { FetchToolsSessionResult } from "@/lib/tools-introspect";
 import type { ToolShellSession } from "@/lib/tool-shell-session-types";
@@ -208,6 +214,54 @@ function persistSidebarCollapsed(collapsed: boolean) {
   }
 }
 
+function ToolRouteEntitlementGate({
+  children,
+  pathname,
+  loading,
+  session,
+  subscriptionCenterHref,
+}: {
+  children: React.ReactNode;
+  pathname: string;
+  loading: boolean;
+  session: ToolShellSession;
+  subscriptionCenterHref: string | null;
+}) {
+  if (isToolPublicPath(pathname)) return children;
+  const routeKey = pathnameToToolSuiteNavKey(pathname);
+  if (!routeKey) return children;
+  if (loading) return children;
+  if (!session.active) return children;
+
+  const keys =
+    session.toolsRole === "admin"
+      ? [...TOOL_SUITE_NAV_KEYS]
+      : session.toolsNavKeys ?? [];
+  if (keys.includes(routeKey)) return children;
+
+  return (
+    <div className="tw-note" style={{ margin: "1rem auto", maxWidth: "32rem" }}>
+      <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>
+        当前订阅不包含该工具套件
+      </h1>
+      <p className="tw-muted">
+        请在主站打开订阅中心，确认套餐所含工具分组；更新订阅后在工具站点击「重新连接」刷新令牌。
+      </p>
+      {subscriptionCenterHref ? (
+        <p style={{ marginTop: "0.75rem" }}>
+          <a href={subscriptionCenterHref} target="_blank" rel="noopener noreferrer">
+            订阅中心
+          </a>
+        </p>
+      ) : (
+        <p className="tw-muted" style={{ marginTop: "0.75rem" }}>
+          未配置主站地址；请在部署环境中设置 MAIN_SITE_ORIGIN。
+        </p>
+      )}
+    </div>
+  );
+}
+
 function parseToolsSessionPayload(raw: unknown): FetchToolsSessionResult {
   if (!raw || typeof raw !== "object") {
     return {
@@ -253,6 +307,18 @@ export function ToolShellClient({
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<ToolShellSession>(GUEST_TOOL_SHELL_SESSION);
   const [hasTokenCookie, setHasTokenCookie] = useState(false);
+
+  const entitledNavEntries = useMemo(
+    () =>
+      applyToolNavEntitlements(navEntries, {
+        toolsRole: session.toolsRole,
+        toolsNavKeys:
+          session.toolsRole === "admin"
+            ? [...TOOL_SUITE_NAV_KEYS]
+            : session.toolsNavKeys,
+      }),
+    [navEntries, session.toolsRole, session.toolsNavKeys],
+  );
 
   const loadSession = useCallback(async () => {
     setLoading(true);
@@ -322,6 +388,11 @@ export function ToolShellClient({
   const renewHref =
     mainOrigin != null && mainOrigin.length > 0
       ? `${mainOrigin.replace(/\/$/, "")}/api/sso/tools/re-enter?redirect=${encodeURIComponent(pathname)}`
+      : null;
+
+  const subscriptionCenterHref =
+    mainOrigin != null && mainOrigin.length > 0
+      ? `${mainOrigin.replace(/\/$/, "")}/account/subscription`
       : null;
 
   const mainHref = mainOrigin != null ? `${mainOrigin.replace(/\/$/, "")}/` : null;
@@ -475,7 +546,7 @@ export function ToolShellClient({
             <hr className="tool-sidebar-divider" />
 
             <ToolNavTree
-              entries={navEntries}
+              entries={entitledNavEntries}
               activeHref={activeNavHref}
               onNavigate={() => setSidebarOpen(false)}
             />
@@ -520,7 +591,16 @@ export function ToolShellClient({
             </div>
           </header>
 
-          <main className="tool-main-scroll">{children}</main>
+          <main className="tool-main-scroll">
+            <ToolRouteEntitlementGate
+              pathname={pathname}
+              loading={loading}
+              session={session}
+              subscriptionCenterHref={subscriptionCenterHref}
+            >
+              {children}
+            </ToolRouteEntitlementGate>
+          </main>
         </div>
       </div>
     </ToolsSessionContext.Provider>

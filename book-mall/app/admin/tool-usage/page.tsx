@@ -198,7 +198,7 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
         <h1 className="text-2xl font-bold">工具使用明细与费用</h1>
         <p className="text-sm text-muted-foreground">
           逐条展示打点与标价扣费（<code className="rounded bg-muted px-1 text-xs">costMinor</code>
-          ）。<strong className="font-medium text-foreground">AI试衣</strong>仅在成片成功后的{" "}
+          ）。<strong className="font-medium text-foreground">AI智能试衣</strong>仅在成片成功后的{" "}
           <code className="rounded bg-muted px-1 text-xs">try_on</code>{" "}
           事件计价（详见工具站 <code className="rounded bg-muted px-1 text-xs">doc/payment.md</code>
           ）；浏览与非计费入口在「AI扣费」列显示「不计费」。默认每页 {PAGE_SIZE} 条。
@@ -206,7 +206,7 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
       </div>
 
       <div className="rounded-lg border border-secondary bg-muted/30 px-4 py-3 text-sm">
-        <strong className="text-foreground">AI试衣计费汇总（当前筛选）</strong>
+        <strong className="text-foreground">AI智能试衣计费汇总（当前筛选）</strong>
         <span className="mx-2 text-muted-foreground">·</span>
         <span className="text-muted-foreground">
           成功试衣事件（try_on）共{" "}

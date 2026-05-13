@@ -4,7 +4,7 @@ import modelsJson from "@/mock/models.json";
 import { AiFitClient } from "./ai-fit-client";
 
 export const metadata = {
-  title: "AI试衣 — AI 工具站",
+  title: "AI智能试衣 — AI 工具站",
 };
 
 export default function AiFitPage() {

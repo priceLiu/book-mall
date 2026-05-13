@@ -18,11 +18,24 @@ export type VerifiedToolsJwt = {
   email?: string;
   name?: string;
   image?: string;
+  toolsNavKeys?: string[];
 };
 
 function pickTier(raw: unknown): "gold" | "admin" | null {
   if (raw === "gold" || raw === "admin") return raw;
   return null;
+}
+
+function pickToolsNavKeys(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  for (const x of raw) {
+    if (typeof x !== "string") continue;
+    const t = x.trim();
+    if (!t || t.length > 64 || out.length >= 24) continue;
+    out.push(t);
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 function pickClaim(raw: unknown, maxLen: number): string | undefined {
@@ -81,6 +94,9 @@ export function verifyToolsJwt(token: string, secret: string): VerifiedToolsJwt 
   if (email) out.email = email;
   if (name) out.name = name;
   if (image) out.image = image;
+
+  const tnk = pickToolsNavKeys(payloadRaw.tools_nav_keys);
+  if (tnk) out.toolsNavKeys = tnk;
 
   return out;
 }

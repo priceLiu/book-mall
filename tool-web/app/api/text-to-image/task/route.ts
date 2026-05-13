@@ -1,11 +1,15 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getQwenApiKey } from "@/lib/qwen-env";
 import { wanxGetTextImageTask } from "@/lib/text-to-image-dashscope";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
+  const suite = await requireToolSuiteNavAccess("text-to-image");
+  if (!suite.ok) return suite.response;
+
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });

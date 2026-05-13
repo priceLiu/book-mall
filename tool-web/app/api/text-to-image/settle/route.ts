@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
+import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getQwenApiKey } from "@/lib/qwen-env";
 import { wanxGetTextImageTask } from "@/lib/text-to-image-dashscope";
 
@@ -8,6 +9,9 @@ export const runtime = "nodejs";
 
 /** 文生图单次生成扣费（与 ToolBillablePrice text-to-image / invoke 对齐，默认 0.5 元）。幂等键 meta.taskId = DashScope task_id */
 export async function POST(req: Request) {
+  const suite = await requireToolSuiteNavAccess("text-to-image");
+  if (!suite.ok) return suite.response;
+
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });

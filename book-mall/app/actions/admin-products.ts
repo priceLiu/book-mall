@@ -7,19 +7,15 @@ import { prisma } from "@/lib/prisma";
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-function parsePriceMinor(formData: FormData): number {
-  const raw = (formData.get("priceYuan") as string)?.trim() ?? "0";
-  const n = Number.parseFloat(raw);
-  if (Number.isNaN(n) || n < 0) return 0;
-  return Math.round(n * 100);
-}
-
 export async function createProduct(formData: FormData) {
   await requireAdminSession();
   const title = (formData.get("title") as string)?.trim() ?? "";
   const slug = (formData.get("slug") as string)?.trim().toLowerCase() ?? "";
   const summary = (formData.get("summary") as string)?.trim() ?? "";
   const description = (formData.get("description") as string)?.trim() ?? "";
+  const descriptionFormatRaw = (formData.get("descriptionFormat") as string)?.trim();
+  const descriptionFormat =
+    descriptionFormatRaw === "MARKDOWN" ? "MARKDOWN" : "PLAIN";
   const kind = formData.get("kind") as "KNOWLEDGE" | "TOOL";
   const tier = formData.get("tier") as "BASIC" | "ADVANCED";
   const status = formData.get("status") as "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -30,7 +26,10 @@ export async function createProduct(formData: FormData) {
   const meteringNote = (formData.get("meteringNote") as string)?.trim() || null;
   const featuredHome = formData.get("featuredHome") === "on";
   const featuredSort = Number(formData.get("featuredSort") || 0) || 0;
-  const priceMinor = parsePriceMinor(formData);
+  const catalogUnavailable = formData.get("catalogUnavailable") === "on";
+  const toolNavKeyRaw = (formData.get("toolNavKey") as string)?.trim() ?? "";
+  const toolNavKey =
+    kind === "TOOL" && toolNavKeyRaw.length > 0 ? toolNavKeyRaw : null;
 
   if (!title || !slug || !SLUG_RE.test(slug) || !summary || !coverImageUrl) {
     throw new Error("请填写标题、slug、概述与封面 URL");
@@ -47,10 +46,10 @@ export async function createProduct(formData: FormData) {
       slug,
       summary,
       description,
+      descriptionFormat,
       kind,
       tier,
       status,
-      priceMinor,
       coverImageUrl,
       categoryId,
       courseContent: courseContent || null,
@@ -58,13 +57,16 @@ export async function createProduct(formData: FormData) {
       meteringNote: meteringNote || null,
       featuredHome,
       featuredSort,
+      catalogUnavailable,
+      toolNavKey,
     },
   });
 
   revalidatePath("/");
   revalidatePath("/admin/products");
   revalidatePath("/products");
-  redirect("/admin/products");
+  revalidatePath("/courses");
+  redirect(`/admin/products?kind=${kind}`);
 }
 
 export async function updateProduct(formData: FormData) {
@@ -76,6 +78,9 @@ export async function updateProduct(formData: FormData) {
   const slug = (formData.get("slug") as string)?.trim().toLowerCase() ?? "";
   const summary = (formData.get("summary") as string)?.trim() ?? "";
   const description = (formData.get("description") as string)?.trim() ?? "";
+  const descriptionFormatRaw = (formData.get("descriptionFormat") as string)?.trim();
+  const descriptionFormat =
+    descriptionFormatRaw === "MARKDOWN" ? "MARKDOWN" : "PLAIN";
   const kind = formData.get("kind") as "KNOWLEDGE" | "TOOL";
   const tier = formData.get("tier") as "BASIC" | "ADVANCED";
   const status = formData.get("status") as "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -86,7 +91,10 @@ export async function updateProduct(formData: FormData) {
   const meteringNote = (formData.get("meteringNote") as string)?.trim() || null;
   const featuredHome = formData.get("featuredHome") === "on";
   const featuredSort = Number(formData.get("featuredSort") || 0) || 0;
-  const priceMinor = parsePriceMinor(formData);
+  const catalogUnavailable = formData.get("catalogUnavailable") === "on";
+  const toolNavKeyRaw = (formData.get("toolNavKey") as string)?.trim() ?? "";
+  const toolNavKey =
+    kind === "TOOL" && toolNavKeyRaw.length > 0 ? toolNavKeyRaw : null;
 
   if (!title || !slug || !SLUG_RE.test(slug) || !summary || !coverImageUrl) {
     throw new Error("请填写标题、slug、概述与封面 URL");
@@ -104,10 +112,10 @@ export async function updateProduct(formData: FormData) {
       slug,
       summary,
       description,
+      descriptionFormat,
       kind,
       tier,
       status,
-      priceMinor,
       coverImageUrl,
       categoryId,
       courseContent: courseContent || null,
@@ -115,24 +123,23 @@ export async function updateProduct(formData: FormData) {
       meteringNote: meteringNote || null,
       featuredHome,
       featuredSort,
+      catalogUnavailable,
+      toolNavKey,
     },
   });
 
   revalidatePath("/");
   revalidatePath("/admin/products");
   revalidatePath("/products");
-  redirect("/admin/products");
+  revalidatePath("/courses");
+  redirect(`/admin/products?kind=${kind}`);
 }
 
-export async function deleteProductForm(formData: FormData) {
+export async function deleteProductForm(_formData: FormData) {
   await requireAdminSession();
-  const productId = (formData.get("id") as string)?.trim();
-  if (!productId) throw new Error("缺少产品 id");
-
-  await prisma.product.delete({ where: { id: productId } });
-  revalidatePath("/");
-  revalidatePath("/admin/products");
-  revalidatePath("/products");
+  throw new Error(
+    "为保护历史订单与用户订阅数据，产品不允许删除。请使用「前台暂停新订」或下架归档。",
+  );
 }
 
 export async function setProductFeaturedHome(formData: FormData) {
@@ -149,4 +156,5 @@ export async function setProductFeaturedHome(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/admin/products");
   revalidatePath("/products");
+  revalidatePath("/courses");
 }

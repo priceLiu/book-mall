@@ -8,6 +8,8 @@ export type ToolShellSession = {
   /** introspect / JWT 的 subject（邮箱缺失时为稳定标识） */
   sub: string | null;
   toolsRole: string | null;
+  /** 主站下发的可用工具套件 navKey；管理员侧栏仍展示全集（由壳层处理） */
+  toolsNavKeys: string[] | null;
 };
 
 export const GUEST_TOOL_SHELL_SESSION: ToolShellSession = {
@@ -17,4 +19,5 @@ export const GUEST_TOOL_SHELL_SESSION: ToolShellSession = {
   image: null,
   sub: null,
   toolsRole: null,
+  toolsNavKeys: null,
 };

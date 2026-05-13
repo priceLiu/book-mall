@@ -14,7 +14,7 @@ export default function FittingRoomImplementationPage() {
     <main className="tw-main fitting-room-main">
       <ToolImplementationDoc
         title="试衣间（套装）· 实现逻辑"
-        lead="套装列表、筛选与详情弹层的数据流与跳转约定；试穿动作会进入 AI 试衣并预填服装。"
+        lead="套装列表、筛选与详情弹层的数据流与跳转约定；试穿动作会进入 AI智能试衣并预填服装。"
         useToolHref="/fitting-room"
         useToolLabel="回到试衣间套装页"
       >
@@ -25,7 +25,7 @@ export default function FittingRoomImplementationPage() {
           </p>
           <p>
             弹层内「试穿」使用 <code>router.push(&apos;/fitting-room/ai-fit?id=&apos; + …)</code>
-            ，AI 试衣页根据 URL 查询参数预填对应套装。
+            ，AI智能试衣页根据 URL 查询参数预填对应套装。
           </p>
         </ToolImplementationSection>
 
@@ -36,18 +36,18 @@ export default function FittingRoomImplementationPage() {
               <code>lib/fitting-room-image-url.ts</code>。
             </li>
             <li>
-              试衣间<strong>浏览</strong>本身不计入应用历史扣费；计费发生在 AI 试衣成片成功后。
+              试衣间<strong>浏览</strong>本身不计入应用历史扣费；计费发生在 AI智能试衣成片成功后。
             </li>
             <li>
-              AI 试衣与衣柜的实现逻辑见{" "}
-              <Link href="/fitting-room/ai-fit/implementation">实现逻辑 · AI试衣</Link>。
+              AI智能试衣与衣柜的实现逻辑见{" "}
+              <Link href="/fitting-room/ai-fit/implementation">实现逻辑 · AI智能试衣</Link>。
             </li>
           </ul>
         </ToolImplementationSection>
 
         <ToolImplementationSection heading="3. 核心代码摘录">
           <ToolImplementationCode
-            caption="试穿跳转：带套装 id 进入 AI 试衣（app/fitting-room/fitting-room-modal.tsx）"
+            caption="试穿跳转：带套装 id 进入 AI智能试衣（app/fitting-room/fitting-room-modal.tsx）"
             code={`router.push(\`/fitting-room/ai-fit?id=\${encodeURIComponent(outfit.id)}\`);`}
           />
         </ToolImplementationSection>

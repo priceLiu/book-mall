@@ -53,7 +53,7 @@ export async function issueToolsSsoRedirect(opts: {
       ok: false,
       status: 403,
       error:
-        "需要黄金会员（充值记录 + 余额不低于最低线）或管理员账号；当前不满足工具站准入条件",
+        "需要黄金会员（充值记录 + 余额不低于最低线）以及有效的会员计划或单品工具订阅；当前不满足工具站准入条件",
       code: "TOOLS_ACCESS_DENIED",
     };
   }

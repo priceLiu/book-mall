@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { requireActiveToolsSession } from "@/lib/require-tools-api-access";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 const UPSTREAM = "/api/sso/tools/introspect";
@@ -17,6 +18,9 @@ function originOrError(): string | NextResponse {
 
 /** 透传工具 JWT 查询主站 introspect，返回钱包余额与最低线（分）。 */
 export async function GET() {
+  const gate = await requireActiveToolsSession();
+  if (!gate.ok) return gate.response;
+
   const jar = cookies();
   const token = jar.get("tools_token")?.value?.trim();
   if (!token) {

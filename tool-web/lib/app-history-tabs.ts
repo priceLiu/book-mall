@@ -14,7 +14,7 @@ export type AppHistoryTabDef = {
 export const APP_HISTORY_TAB_DEFS: AppHistoryTabDef[] = [
   { id: "all", label: "全部" },
   { id: "fitting", label: "试衣间" },
-  { id: "ai_fit", label: "AI试衣" },
+  { id: "ai_fit", label: "AI智能试衣" },
   { id: "closet", label: "我的衣柜" },
   { id: "text_to_image", label: "文生图" },
 ];

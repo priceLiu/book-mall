@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,9 @@ export async function GET() {
     return NextResponse.json({ items: [] });
   }
 
+  const gate = await requireToolSuiteNavAccess("fitting-room");
+  if (!gate.ok) return gate.response;
+
   const r = await fetch(`${origin}${UPSTREAM}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
@@ -50,6 +54,8 @@ export async function GET() {
 export async function POST(req: Request) {
   const origin = originOrError();
   if (origin instanceof NextResponse) return origin;
+  const suite = await requireToolSuiteNavAccess("fitting-room");
+  if (!suite.ok) return suite.response;
   const token = tokenOrError();
   if (token instanceof NextResponse) return token;
 
@@ -73,6 +79,8 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const origin = originOrError();
   if (origin instanceof NextResponse) return origin;
+  const suite = await requireToolSuiteNavAccess("fitting-room");
+  if (!suite.ok) return suite.response;
   const token = tokenOrError();
   if (token instanceof NextResponse) return token;
 

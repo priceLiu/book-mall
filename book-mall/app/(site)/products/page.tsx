@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { isPrismaConnectionUnavailable, logDbUnavailable } from "@/lib/db-unavailable";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { productPricingFootnote } from "@/lib/product-pricing-footnote";
 import type { Prisma } from "@prisma/client";
 
 type ProductWithCategory = Prisma.ProductGetPayload<{
@@ -31,7 +31,7 @@ export default async function ProductsPage({
   let dbUnavailable = false;
   try {
     products = await prisma.product.findMany({
-      where: { status: "PUBLISHED" },
+      where: { status: "PUBLISHED", catalogUnavailable: false },
       orderBy: [{ featuredSort: "asc" }, { updatedAt: "desc" }],
       include: { category: true },
     });
@@ -105,7 +105,7 @@ export default async function ProductsPage({
                 {p.title}
               </h2>
               <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-1">{p.summary}</p>
-              <p className="text-sm tabular-nums font-semibold">¥{formatMinorAsYuan(p.priceMinor)}</p>
+              <p className="text-xs text-muted-foreground leading-snug">{productPricingFootnote(p.kind)}</p>
             </Link>
           ))}
         </div>

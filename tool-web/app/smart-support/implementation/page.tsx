@@ -7,12 +7,12 @@ import {
 import { SMART_SUPPORT_MULTI_ROUND_NODE_SAMPLE } from "@/lib/smart-support-node-sample";
 
 export const metadata = {
-  title: "智能客服 · 实现逻辑 — AI 工具站",
+  title: "AI智能客服 · 实现逻辑 — AI 工具站",
 };
 
 const DIFY_IFRAME_SAMPLE = `<iframe
   src="https://udify.app/chatbot/<YOUR_EMBED_TOKEN>"
-  title="Dify 智能客服"
+  title="Dify · AI智能客服"
   width="100%"
   height="520"
   allow="clipboard-write; microphone *"
@@ -50,10 +50,10 @@ export default function SmartSupportImplementationPage() {
   return (
     <main className="tw-main fitting-room-main">
       <ToolImplementationDoc
-        title="智能客服 · 实现逻辑"
+        title="AI智能客服 · 实现逻辑"
         lead="「我的智能客服」页（`/smart-support/chat`）双栏：左侧 DeepSeek（服务端流式 API）；右侧 Dify 使用 Udify Chatbot **iframe**（`https://udify.app/chatbot/<token>`）。"
         useToolHref="/smart-support"
-        useToolLabel="回到智能客服首页"
+        useToolLabel="回到 AI智能客服首页"
       >
         <ToolImplementationSection heading="1. 流程摘要">
           <p>
@@ -91,7 +91,7 @@ export default function SmartSupportImplementationPage() {
             <li>计费若按 token / 会话计费，须与 <code>POST /api/tool-usage</code> 约定对齐后再打点。</li>
             <li>
               页面入口：<Link href="/smart-support/chat">我的智能客服</Link>、
-              <Link href="/smart-support">智能客服首页</Link>。
+              <Link href="/smart-support">AI智能客服首页</Link>。
             </li>
           </ul>
         </ToolImplementationSection>

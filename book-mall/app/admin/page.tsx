@@ -79,65 +79,65 @@ export default async function AdminDashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Card>
+      <div className="grid gap-4 items-stretch sm:grid-cols-2 xl:grid-cols-5">
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-2">
             <CardDescription>注册用户</CardDescription>
             <CardTitle className="text-3xl tabular-nums">{userCount}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
+        <Card className="flex h-full flex-col">
           <CardHeader className="pb-2">
             <CardDescription>有效订阅</CardDescription>
             <CardTitle className="text-3xl tabular-nums">{activeSubscriptions}</CardTitle>
           </CardHeader>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="flex h-full flex-col">
+          <CardHeader className="shrink-0 pb-2">
             <CardDescription>总充值金额（CNY）</CardDescription>
             <CardTitle className="text-3xl tabular-nums">
               ¥{formatMinorAsYuan(totalRecharge)}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 pt-0 text-xs text-muted-foreground">
-            <p>历史累计入账「充值」类型之和</p>
+          <CardContent className="flex flex-1 flex-col pt-0 text-xs text-muted-foreground">
+            <p className="min-h-[3rem] leading-snug">历史累计入账「充值」类型之和</p>
             <Link
               href="/admin/finance/recharges"
-              className="inline-block font-medium text-primary underline-offset-4 hover:underline"
+              className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
             >
               查看充值明细 →
             </Link>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="flex h-full flex-col">
+          <CardHeader className="shrink-0 pb-2">
             <CardDescription>充值笔数</CardDescription>
             <CardTitle className="text-3xl tabular-nums">{rechargeTxCount}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 pt-0 text-xs text-muted-foreground">
-            <p>
+          <CardContent className="flex flex-1 flex-col pt-0 text-xs text-muted-foreground">
+            <p className="min-h-[3rem] leading-snug">
               钱包流水类型为「充值」的分录条数（入账次数口径）
             </p>
             <Link
               href="/admin/finance/recharges"
-              className="inline-block font-medium text-primary underline-offset-4 hover:underline"
+              className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
             >
               充值明细 →
             </Link>
           </CardContent>
         </Card>
-        <Card className="sm:col-span-2 xl:col-span-1">
-          <CardHeader className="pb-2">
+        <Card className="flex h-full flex-col sm:col-span-2 xl:col-span-1">
+          <CardHeader className="shrink-0 pb-2">
             <CardDescription>全站剩余金额（CNY）</CardDescription>
             <CardTitle className="text-3xl tabular-nums">
               ¥{formatMinorAsYuan(totalBalance)}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 pt-0 text-xs text-muted-foreground">
-            <p>各用户钱包可用余额之和</p>
+          <CardContent className="flex flex-1 flex-col pt-0 text-xs text-muted-foreground">
+            <p className="min-h-[3rem] leading-snug">各用户钱包可用余额之和</p>
             <Link
               href="/admin/tool-usage"
-              className="inline-block font-medium text-primary underline-offset-4 hover:underline"
+              className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
             >
               查看工具使用明细与费用 →
             </Link>

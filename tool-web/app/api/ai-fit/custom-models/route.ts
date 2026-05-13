@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ export async function GET() {
   if (!token) {
     return NextResponse.json({ models: [] });
   }
+
+  const gate = await requireToolSuiteNavAccess("fitting-room");
+  if (!gate.ok) return gate.response;
 
   const r = await fetch(`${origin.replace(/\/$/, "")}${UPSTREAM}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -41,6 +45,8 @@ export async function POST(req: Request) {
       { status: 503 },
     );
   }
+  const suite = await requireToolSuiteNavAccess("fitting-room");
+  if (!suite.ok) return suite.response;
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
     return NextResponse.json({ error: "no_session" }, { status: 401 });

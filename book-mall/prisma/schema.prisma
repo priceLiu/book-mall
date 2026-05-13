@@ -74,9 +74,28 @@ model User {
   aiFitGarmentUploads          AiFitGarmentUpload[]
   aiFitClosetItems             AiFitClosetItem[]
   textToImageLibraryItems      TextToImageLibraryItem[]
+  courseLessonProgress         CourseLessonProgress[]
+  userProductSubscriptions     UserProductSubscription[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// 课程课时学习进度（与 Product.slug 知识型课程关联）
+model CourseLessonProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  courseSlug  String
+  lessonIndex Int
+  watchedSec  Int       @default(0)
+  completedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, courseSlug, lessonIndex])
+  @@index([userId, courseSlug])
 }
 
 /// AI 试衣：用户自定义模特（全身照等为 Data URL / base64 文本存库）
@@ -289,6 +308,8 @@ model SubscriptionPlan {
   interval   SubscriptionInterval
   priceMinor Int
   active     Boolean              @default(true)
+  /// 工具站侧栏分组 navKey 白名单；空数组表示订阅期内可使用「当前套件」内全部工具分组。
+  toolsNavAllowlist String[] @default([])
 
   subscriptions Subscription[]
 }
@@ -320,6 +341,7 @@ model Subscription {
 enum OrderType {
   SUBSCRIPTION
   WALLET_TOPUP
+  PRODUCT_SUBSCRIPTION
 }
 
 enum OrderStatus {
@@ -416,6 +438,36 @@ enum ProductStatus {
   ARCHIVED
 }
 
+enum ProductDescriptionFormat {
+  PLAIN
+  MARKDOWN
+}
+
+enum UserProductSubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+/// 用户按「单品」订阅的课程或工具（与会员计划订阅并行）
+model UserProductSubscription {
+  id                 String                        @id @default(cuid())
+  userId             String
+  productId          String
+  status             UserProductSubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime                      @default(now())
+  currentPeriodEnd   DateTime
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId])
+  @@index([userId, status])
+}
+
 /// 分类：两大品类下支持子分类（parentId 为空为顶级）
 model ProductCategory {
   id        String   @id @default(cuid())
@@ -442,14 +494,18 @@ model Product {
   summary         String
   /// 详情
   description     String        @db.Text
+  /// 详情展示：纯文本（保留换行）或 Markdown
+  descriptionFormat ProductDescriptionFormat @default(PLAIN)
   /// 知识型：课程内容等（富文本简化存文本）
   courseContent   String?       @db.Text
   kind            ProductKind
   tier            ProductTier
-  /// 标价（分）
-  priceMinor      Int           @default(0)
   coverImageUrl   String
   status          ProductStatus @default(DRAFT)
+  /// 仍上架展示，但前台不可新订（已订用户保留权益）；不等同于归档下架
+  catalogUnavailable Boolean    @default(false)
+  /// 工具型：对应工具站套件 navKey（如 fitting-room）；用于单品工具订阅授权
+  toolNavKey      String?
   /// 首页推荐
   featuredHome    Boolean       @default(false)
   featuredSort    Int           @default(0)
@@ -459,6 +515,8 @@ model Product {
 
   categoryId String?
   category   ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  userProductSubscriptions UserProductSubscription[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

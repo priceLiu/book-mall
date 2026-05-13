@@ -3,7 +3,7 @@ import { mainSiteToolsReEnterHref } from "@/lib/main-site-tools-links";
 import { SmartSupportHomeClient } from "./smart-support-home-client";
 
 export const metadata = {
-  title: "智能客服 — AI 工具站",
+  title: "AI智能客服 — AI 工具站",
 };
 
 export default function SmartSupportHomePage() {

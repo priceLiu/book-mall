@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "与主站 book-mall 通过 SSO 联通的独立工具前端",
 };
 
-/** 布局内仅请求主站公开 `/api/tools/nav-visibility`（轻量）；会话仍以客户端 `/api/tools-session` 为准，勿在此 await introspect。 */
+/** 布局内请求主站 `/api/tools/nav-visibility`；会话由客户端 `/api/tools-session` 拉取（含 `tools_nav_keys` 套件门禁）。 */
 export const dynamic = "force-dynamic";
 
 export default function RootLayout({

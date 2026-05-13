@@ -37,7 +37,7 @@ export function SmartSupportHero({
         <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-12">
           <div className="flex flex-col gap-5">
             <div>
-              <Badge variant="outline">智能客服已就绪</Badge>
+              <Badge variant="outline">AI智能客服已就绪</Badge>
             </div>
             <div className="flex flex-col gap-4">
               <h2 className="max-w-lg text-left text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl">

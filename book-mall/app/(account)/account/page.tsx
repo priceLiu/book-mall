@@ -6,7 +6,6 @@ import { getMembershipFlags } from "@/lib/membership";
 import { formatMinorAsYuan } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 import { getGoldMemberAccess } from "@/lib/gold-member";
-import { isToolsSsoConfigured } from "@/lib/sso-tools-env";
 import {
   Card,
   CardContent,
@@ -16,9 +15,9 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AccountDevActions } from "@/components/account/account-dev-actions";
-import { LaunchToolsAppButton } from "@/components/account/launch-tools-app";
 import { WalletRefundRequestForm } from "@/components/account/wallet-refund-request-form";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
+import { Separator } from "@/components/ui/separator";
 
 export const metadata = {
   title: "个人中心 — AI Mall",
@@ -30,7 +29,7 @@ function toolsSsoErrBanner(code: string): { title: string; body: string } | null
       return {
         title: "未能打开 AI 工具站",
         body:
-          "当前账号不满足工具站准入：须为管理员，或「黄金会员」（历史上至少有一笔钱包充值入账，且可用余额不低于平台最低线）。请在下方钱包卡片查看状态并完成充值后重试。",
+          "当前账号不满足工具站准入：须为主站管理员，或同时具备「黄金会员」（钱包充值记录且不低于最低线）与「有效会员计划 **或** 单品工具订阅」。请在钱包卡片查看充值状态，在订阅中心办理会员或工具单品后再试。",
       };
     case "SSO_CODE_PERSIST_FAILED":
       return {
@@ -91,11 +90,6 @@ export default async function AccountPage({
 
   const hasPassword = Boolean(accountSecrets?.passwordHash);
 
-  const toolsSsoReady = isToolsSsoConfigured();
-  const isAdminUser = session.user.role === "ADMIN";
-  const canLaunchTools =
-    toolsSsoReady && (goldAccess.isGoldMember || isAdminUser);
-
   const hasPendingWalletRefund = walletRefunds.some((r) => r.status === "PENDING");
 
   return (
@@ -134,97 +128,137 @@ export default async function AccountPage({
           </CardHeader>
         </Card>
 
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3 items-start">
-          <Card className="sm:col-span-2 xl:col-span-1">
-            <CardHeader>
-              <CardTitle>账号</CardTitle>
-              <CardDescription>{session.user.email}</CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              {session.user.name ? <p>昵称：{session.user.name}</p> : null}
-            </CardContent>
-          </Card>
+        <section className="space-y-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold tracking-tight">账户与安全</h2>
+            <Separator className="flex-1" />
+          </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>账号</CardTitle>
+                <CardDescription>{session.user.email}</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm space-y-2">
+                {session.user.name ? <p>昵称：{session.user.name}</p> : null}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>登录密码</CardTitle>
+                <CardDescription>验证当前密码后更新；适用于邮箱密码登录的账号</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChangePasswordForm enabled={hasPassword} />
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
-          <Card className="sm:col-span-2 xl:col-span-1">
-            <CardHeader>
-              <CardTitle>登录密码</CardTitle>
-              <CardDescription>验证当前密码后更新；适用于邮箱密码登录的账号</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChangePasswordForm enabled={hasPassword} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>钱包</CardTitle>
-              <CardDescription>
-                可用余额（CNY） · 最低可用线 {formatMinorAsYuan(flags.minBalanceLineMinor)}{" "}
-                元，可用于高阶/按量服务前置校验
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p className="text-2xl font-semibold tabular-nums">
-                ¥{formatMinorAsYuan(flags.balanceMinor)}
-              </p>
-              <p className="text-muted-foreground">
-                高级会员状态（可享用高阶/按量）：{" "}
-                <span className="font-medium text-foreground">
-                  {flags.canUsePremiumMetered ? "是" : "否"}
-                </span>
-                （需订阅有效且余额不低于最低线）
-              </p>
-              <div className="pt-3 mt-3 border-t border-secondary space-y-2">
+        <section className="space-y-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold tracking-tight">钱包与订阅</h2>
+            <Separator className="flex-1" />
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="h-full flex flex-col">
+              <CardHeader>
+                <CardTitle>钱包</CardTitle>
+                <CardDescription>
+                  可用余额（CNY） · 最低可用线 {formatMinorAsYuan(flags.minBalanceLineMinor)}{" "}
+                  元；独立 AI 工具站须黄金会员 +（会员计划或单品工具订阅），请从顶部菜单进入工具站。
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm flex-1 flex flex-col">
+                <p className="text-2xl font-semibold tabular-nums">
+                  ¥{formatMinorAsYuan(flags.balanceMinor)}
+                </p>
                 <p className="text-muted-foreground">
-                  黄金会员（独立 AI 工具站准入）：{" "}
+                  高级会员状态（可享用高阶/按量）：{" "}
                   <span className="font-medium text-foreground">
-                    {goldAccess.isGoldMember ? "是" : "否"}
+                    {flags.canUsePremiumMetered ? "是" : "否"}
                   </span>
-                  （须历史有过充值记录，且余额 ≥ ¥
-                  {formatMinorAsYuan(goldAccess.minBalanceLineMinor)}）
+                  （需会员计划有效且余额不低于最低线）
                 </p>
-                <LaunchToolsAppButton
-                  enabled={canLaunchTools}
-                  helperText={
-                    !toolsSsoReady
-                      ? "工具站跳转未启用：请在服务端配置 TOOLS_PUBLIC_ORIGIN、TOOLS_SSO_SERVER_SECRET、TOOLS_SSO_JWT_SECRET（见 doc/tech/tools-sso-environment.md）。"
-                      : !goldAccess.isGoldMember && !isAdminUser
-                        ? !goldAccess.hasRechargeHistory
-                          ? "请先完成至少一笔钱包充值入账（或通过管理员账号从后台进入工具站调试）。"
-                          : `余额需不低于 ¥${formatMinorAsYuan(goldAccess.minBalanceLineMinor)}（当前 ¥${formatMinorAsYuan(goldAccess.balanceMinor)}）；或通过管理员账号从后台进入工具站调试。`
-                        : isAdminUser && !goldAccess.isGoldMember
-                          ? "当前以管理员身份直通工具站（不要求黄金会员）；普通用户仍需黄金会员。"
-                          : "将跳转至独立部署的工具站（默认路径 /fitting-room）；需在工具项目实现回调与换票。"
-                  }
-                />
-              </div>
-              <Button asChild variant="secondary" size="sm" className="mt-2 w-full sm:w-auto">
-                <Link href="/pay/mock-topup">钱包充值（模拟收银）</Link>
-              </Button>
-            </CardContent>
-          </Card>
+                <div className="pt-3 mt-auto border-t border-secondary space-y-2">
+                  <p className="text-muted-foreground">
+                    黄金会员（独立 AI 工具站准入）：{" "}
+                    <span className="font-medium text-foreground">
+                      {goldAccess.isGoldMember ? "是" : "否"}
+                    </span>
+                    （须历史有过充值记录，且余额 ≥ ¥
+                    {formatMinorAsYuan(goldAccess.minBalanceLineMinor)}）
+                  </p>
+                </div>
+                <Button asChild variant="secondary" size="sm" className="mt-2 w-full sm:w-auto">
+                  <Link href="/pay/mock-topup">钱包充值（模拟收银）</Link>
+                </Button>
+              </CardContent>
+            </Card>
 
+            <Card className="h-full flex flex-col">
+              <CardHeader className="space-y-1 pb-2">
+                <CardTitle>订阅中心</CardTitle>
+                <CardDescription>
+                  会员订阅、AI 课程订阅、AI 工具订阅、订单记录均在此管理
+                </CardDescription>
+              </CardHeader>
+            <CardContent className="flex flex-1 flex-col gap-0 px-6 pb-6 pt-0 text-sm">
+                <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b border-border/60 pb-5">
+                  <p className="min-w-[7rem]">
+                    状态：{" "}
+                    <span className="font-medium text-foreground">
+                      {flags.hasActiveSubscription ? "有效" : "未开通 / 已过期"}
+                    </span>
+                  </p>
+                  <p className="min-w-[7rem]">
+                    套餐：{" "}
+                    <span className="font-medium text-foreground">
+                      {flags.membershipPlanName ?? "—"}
+                    </span>
+                  </p>
+                  <p className="min-w-[7rem]">
+                    有效期：{" "}
+                    <span className="font-medium text-foreground tabular-nums">
+                      {flags.subscriptionEndsAt
+                        ? flags.subscriptionEndsAt.toLocaleString("zh-CN")
+                        : "—"}
+                    </span>
+                  </p>
+                  <p className="min-w-[7rem]">
+                    单品工具：{" "}
+                    <span className="font-medium text-foreground">
+                      {flags.hasActiveToolProductSubscription ? "有" : "无"}
+                    </span>
+                  </p>
+                </div>
+                <div className="mt-auto flex flex-row flex-wrap items-center justify-center gap-3 pt-8">
+                  <Button
+                    asChild
+                    variant="subscription"
+                    className="h-10 min-h-10 min-w-[12rem] max-w-[16rem] shrink-0"
+                  >
+                    <Link href="/account/subscription">打开订阅中心</Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="subscription"
+                    className="h-10 min-h-10 min-w-[12rem] max-w-[16rem] shrink-0"
+                  >
+                    <Link href="/courses">进入 AI 学堂</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold tracking-tight">退款与服务</h2>
+            <Separator className="flex-1" />
+          </div>
           <Card>
-            <CardHeader>
-              <CardTitle>订阅</CardTitle>
-              <CardDescription>周期性订阅与普通型权益</CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <p>
-                状态：{" "}
-                <span className="font-medium">
-                  {flags.hasActiveSubscription ? "订阅有效" : "未订阅 / 已过期"}
-                </span>
-              </p>
-              {flags.subscriptionEndsAt ? (
-                <p className="text-muted-foreground">
-                  当前周期至：{flags.subscriptionEndsAt.toLocaleString("zh-CN")}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="sm:col-span-2 xl:col-span-3">
             <CardHeader>
               <CardTitle>余额退款申请（6.3）</CardTitle>
               <CardDescription>
@@ -259,13 +293,13 @@ export default async function AccountPage({
               ) : null}
             </CardContent>
           </Card>
+        </section>
 
-          {process.env.NODE_ENV === "development" ? (
-            <div className="sm:col-span-2 xl:col-span-3 w-full">
-              <AccountDevActions />
-            </div>
-          ) : null}
-        </div>
+        {process.env.NODE_ENV === "development" ? (
+          <section className="pt-2">
+            <AccountDevActions />
+          </section>
+        ) : null}
       </div>
     </main>
   );

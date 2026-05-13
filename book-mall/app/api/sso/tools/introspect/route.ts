@@ -4,6 +4,8 @@ import { logToolsIntrospectToConsole } from "@/lib/tools-introspect-console-log"
 import { toolsRouteDiagnosticsEnabled } from "@/lib/tools-route-diagnostics";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
+import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
+import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +119,11 @@ export async function GET(req: Request) {
     msTotal: performance.now() - tRoute,
   });
 
+  const resolvedNav = await resolveToolsNavKeysForUser(verified.sub);
+  const tools_nav_keys = elig.isAdmin
+    ? [...TOOL_SUITE_NAV_KEYS]
+    : resolvedNav.keys;
+
   const payload = {
     active: true,
     sub: verified.sub,
@@ -126,6 +133,8 @@ export async function GET(req: Request) {
     balance_minor: elig.gold.balanceMinor,
     min_balance_line_minor: elig.gold.minBalanceLineMinor,
     has_recharge_history: elig.gold.hasRechargeHistory,
+    has_active_subscription: elig.hasActiveSubscription,
+    tools_nav_keys,
     email: elig.email,
     name: elig.name,
     image: elig.image,

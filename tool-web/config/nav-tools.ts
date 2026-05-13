@@ -34,10 +34,13 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
     defaultOpen: true,
     children: [
       { href: "/fitting-room", label: "套装" },
-      { href: "/fitting-room/ai-fit", label: "AI试衣" },
+      { href: "/fitting-room/ai-fit", label: "AI智能试衣" },
       { href: "/fitting-room/ai-fit/closet", label: "我的衣柜" },
       { href: "/fitting-room/implementation", label: "实现逻辑 · 套装" },
-      { href: "/fitting-room/ai-fit/implementation", label: "实现逻辑 · AI试衣" },
+      {
+        href: "/fitting-room/ai-fit/implementation",
+        label: "实现逻辑 · AI智能试衣",
+      },
     ],
   },
   {
@@ -51,7 +54,7 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
     ],
   },
   {
-    label: "智能客服",
+    label: "AI智能客服",
     navKey: "smart-support",
     defaultOpen: true,
     children: [

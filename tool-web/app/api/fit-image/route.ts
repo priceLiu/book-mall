@@ -1,5 +1,6 @@
 import { Agent, fetch as undiciFetch } from "undici";
 import { NextRequest, NextResponse } from "next/server";
+import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 
 const ALLOWED_HOST = "static-main.aiyeshi.cn";
 const ALLOWED_PATH_PREFIX = "/ai-fitroom/";
@@ -25,6 +26,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const suite = await requireToolSuiteNavAccess("fitting-room");
+  if (!suite.ok) return suite.response;
+
   const raw = req.nextUrl.searchParams.get("url");
   if (!raw) {
     return new NextResponse("missing url", { status: 400 });
