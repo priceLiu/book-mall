@@ -7,6 +7,8 @@ import {
   type MockSubscribePlanSlug,
 } from "@/lib/apply-mock-subscription";
 
+export const dynamic = "force-dynamic";
+
 /** 模拟订阅开通（月度 30 天 / 年度 365 天）；详见 doc/process/mock-payment-checkout.md */
 export async function POST(req: Request) {
   if (!allowDevMockPaymentApis()) {

@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 const bodySchema = z.object({
   requestedAmountMinor: z.number().int().positive().nullable().optional(),
   userNote: z.string().max(2000).optional(),

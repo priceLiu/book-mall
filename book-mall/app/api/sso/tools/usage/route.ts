@@ -7,6 +7,8 @@ import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
 import { recordToolUsageAndConsumeWallet } from "@/lib/wallet-record-tool-usage-consume";
 
+export const dynamic = "force-dynamic";
+
 const MAX_TOOL_KEY = 64;
 const MAX_ACTION = 64;
 /** 工具站费用明细分页：每页最多条数（产品约定 50） */

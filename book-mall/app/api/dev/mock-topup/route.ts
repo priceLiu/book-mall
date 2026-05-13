@@ -8,6 +8,8 @@ import {
   type MockTopupAmountMinor,
 } from "@/lib/apply-mock-topup";
 
+export const dynamic = "force-dynamic";
+
 /** 模拟钱包充值；档位见 lib/apply-mock-topup.ts；开启条件见 doc/process/mock-payment-checkout.md */
 export async function POST(req: Request) {
   if (!allowDevMockPaymentApis()) {

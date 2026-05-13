@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { generateTempLoginPassword } from "@/lib/generate-temp-password";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 type RouteCtx = { params: { userId: string } };
 
 /** 管理员为用户一键重置登录密码（返回明文一次） */
