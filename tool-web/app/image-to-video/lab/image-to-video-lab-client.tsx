@@ -12,6 +12,7 @@ import {
 } from "react";
 import Link from "next/link";
 import {
+  ArrowRightLeft,
   Check,
   ChevronsUpDown,
   Clapperboard,
@@ -19,10 +20,10 @@ import {
   Download,
   Eye,
   Film,
+  ImagePlus,
   Images,
   Info,
   RefreshCw,
-  Trash2,
   Upload,
   Wand2,
   X,
@@ -212,6 +213,17 @@ const REF_RATIO_OPTIONS = [
   "1:1",
 ] as const;
 
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+
+function readFileAsDataUrl(f: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(new Error("读取图片失败"));
+    r.readAsDataURL(f);
+  });
+}
+
 function presetRefSources(p: ExamplePreset): string[] {
   const raw = p.refSrcs?.length ? p.refSrcs : [p.src];
   return raw.slice(0, REF_GRID_MAX_IMAGES);
@@ -308,50 +320,23 @@ export function ImageToVideoLabClient() {
   const [i2vExamplePresets, setI2vExamplePresets] = useState<ExamplePreset[]>(() =>
     I2V_EXAMPLE_PRESETS.slice(0, EXAMPLE_ROW_SLICE),
   );
-  const [i2vExampleSelectedId, setI2vExampleSelectedId] = useState<string>(
-    I2V_EXAMPLE_PRESETS[0]!.id,
-  );
+  const [i2vExampleSelectedId, setI2vExampleSelectedId] = useState<string | null>(null);
   const [refExamplePresets, setRefExamplePresets] = useState<ExamplePreset[]>(() =>
     REF_EXAMPLE_PRESETS.slice(0, EXAMPLE_ROW_SLICE),
   );
   const [refExampleSelectedId, setRefExampleSelectedId] = useState<string>(
     REF_EXAMPLE_PRESETS[0]!.id,
   );
+  const [t2vExampleSelectedId, setT2vExampleSelectedId] = useState<string | null>(null);
   const examplePresets =
     modeTab === "ref" ? refExamplePresets : i2vExamplePresets;
 
-  const selectedForPrompt = useMemo(() => {
-    if (modeTab === "ref") {
-      const list = refExamplePresets;
-      const id = refExampleSelectedId;
-      return list.find((p) => p.id === id) ?? list[0]!;
-    }
-    const list = i2vExamplePresets;
-    const id = i2vExampleSelectedId;
-    return list.find((p) => p.id === id) ?? list[0]!;
-  }, [
-    modeTab,
-    refExamplePresets,
-    refExampleSelectedId,
-    i2vExamplePresets,
-    i2vExampleSelectedId,
-  ]);
+  /** 首帧：仅图生；null = 空态（与参考生一致，不默认套用示例图） */
+  const [i2vFirstFrameSrc, setI2vFirstFrameSrc] = useState<string | null>(null);
 
-  const [customFirstFrameDataUrl, setCustomFirstFrameDataUrl] = useState<string | null>(
-    null,
-  );
-  const i2vExampleSelected = useMemo(
-    () =>
-      i2vExamplePresets.find((p) => p.id === i2vExampleSelectedId) ??
-      i2vExamplePresets[0]!,
-    [i2vExamplePresets, i2vExampleSelectedId],
-  );
-  const previewSrc = customFirstFrameDataUrl ?? i2vExampleSelected.src;
-  const [prompt, setPrompt] = useState(I2V_EXAMPLE_PRESETS[0]!.prompt);
-
-  useEffect(() => {
-    setPrompt(selectedForPrompt.prompt);
-  }, [selectedForPrompt]);
+  const [promptI2v, setPromptI2v] = useState("");
+  const [promptRef, setPromptRef] = useState("");
+  const [promptT2v, setPromptT2v] = useState("");
 
   const [resolution, setResolution] = useState<"720P" | "1080P">("1080P");
   const [durationSec, setDurationSec] = useState(5);
@@ -365,6 +350,8 @@ export function ImageToVideoLabClient() {
   const refGridUploadTargetRef = useRef<"append" | number>("append");
   const [refImages, setRefImages] = useState<string[]>([]);
   const [refPreviewSrc, setRefPreviewSrc] = useState<string | null>(null);
+  const [dragOverI2v, setDragOverI2v] = useState(false);
+  const [dragOverRefPanel, setDragOverRefPanel] = useState(false);
   const [refRatio, setRefRatio] = useState<string>("16:9");
   const [selectedModelId, setSelectedModelId] = useState(DEFAULT_IMAGE_TO_VIDEO_MODEL_ID);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
@@ -421,8 +408,9 @@ export function ImageToVideoLabClient() {
   }, [jobs, resultFilter]);
 
   useEffect(() => {
+    if (!i2vExampleSelectedId) return;
     if (i2vExamplePresets.some((p) => p.id === i2vExampleSelectedId)) return;
-    setI2vExampleSelectedId(i2vExamplePresets[0]!.id);
+    setI2vExampleSelectedId(null);
   }, [i2vExamplePresets, i2vExampleSelectedId]);
 
   useEffect(() => {
@@ -440,77 +428,122 @@ export function ImageToVideoLabClient() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [modelPickerOpen]);
 
+  const ingestI2vFile = useCallback((f: File) => {
+    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(f.type)) {
+      setFlowError("请上传 JPEG、PNG 或 WebP 图片");
+      return;
+    }
+    if (f.size > MAX_IMAGE_BYTES) {
+      setFlowError("首帧图片需不超过 20MB（见官方文档限制）");
+      return;
+    }
+    void readFileAsDataUrl(f)
+      .then((url) => {
+        setFlowError(null);
+        setI2vFirstFrameSrc(url);
+        setI2vExampleSelectedId(null);
+      })
+      .catch(() => setFlowError("读取图片失败"));
+  }, []);
+
+  const ingestRefFilesAppend = useCallback(async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList).filter((f) =>
+      /^image\/(jpeg|jpg|png|webp)$/i.test(f.type),
+    );
+    if (files.length === 0) {
+      setFlowError("请使用 JPEG、PNG 或 WebP 图片");
+      return;
+    }
+    const urls: string[] = [];
+    for (const f of files) {
+      if (f.size > MAX_IMAGE_BYTES) {
+        setFlowError("单张图片需不超过 20MB（见官方文档限制）");
+        return;
+      }
+      try {
+        urls.push(await readFileAsDataUrl(f));
+      } catch {
+        setFlowError("读取图片失败");
+        return;
+      }
+    }
+    setFlowError(null);
+    setRefImages((prev) => {
+      const next = [...prev];
+      for (const url of urls) {
+        if (next.length >= REF_GRID_MAX_IMAGES) break;
+        next.push(url);
+      }
+      return next;
+    });
+  }, []);
+
   const refreshExamples = useCallback(() => {
     if (modeTab === "ref") {
       const next = shuffle([...REF_EXAMPLE_PRESETS]).slice(0, EXAMPLE_ROW_SLICE);
       setRefExamplePresets(next);
       const first = next[0]!;
       setRefExampleSelectedId(first.id);
-      setRefImages(presetRefSources(first));
+      setRefImages([]);
+    } else if (modeTab === "i2v") {
+      const next = shuffle([...I2V_EXAMPLE_PRESETS]).slice(0, EXAMPLE_ROW_SLICE);
+      setI2vExamplePresets(next);
+      setI2vExampleSelectedId(null);
+      setI2vFirstFrameSrc(null);
     } else {
       const next = shuffle([...I2V_EXAMPLE_PRESETS]).slice(0, EXAMPLE_ROW_SLICE);
       setI2vExamplePresets(next);
-      setI2vExampleSelectedId(next[0]!.id);
-      setCustomFirstFrameDataUrl(null);
+      setT2vExampleSelectedId(null);
     }
   }, [modeTab]);
 
-  const onRefGridFile = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
-    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(f.type)) {
-      setFlowError("请上传 JPEG、PNG 或 WebP 图片");
-      return;
-    }
-    if (f.size > 20 * 1024 * 1024) {
-      setFlowError("参考图需不超过 20MB（见官方文档限制）");
-      return;
-    }
-    const target = refGridUploadTargetRef.current;
-    const r = new FileReader();
-    r.onload = () => {
-      setFlowError(null);
-      const url = r.result as string;
+  const onRefGridFile = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      e.target.value = "";
+      if (!files?.length) return;
+      const target = refGridUploadTargetRef.current;
       if (target === "append") {
-        setRefImages((prev) =>
-          prev.length >= REF_GRID_MAX_IMAGES ? prev : [...prev, url],
-        );
-      } else {
+        await ingestRefFilesAppend(files);
+        return;
+      }
+      const f = files[0]!;
+      if (!/^image\/(jpeg|jpg|png|webp)$/i.test(f.type)) {
+        setFlowError("请上传 JPEG、PNG 或 WebP 图片");
+        return;
+      }
+      if (f.size > MAX_IMAGE_BYTES) {
+        setFlowError("参考图需不超过 20MB（见官方文档限制）");
+        return;
+      }
+      try {
+        const url = await readFileAsDataUrl(f);
+        setFlowError(null);
         setRefImages((prev) => {
           const n = [...prev];
           n[target] = url;
           return n;
         });
+      } catch {
+        setFlowError("读取图片失败");
       }
-    };
-    r.onerror = () => setFlowError("读取图片失败");
-    r.readAsDataURL(f);
-  }, []);
+    },
+    [ingestRefFilesAppend],
+  );
 
-  const onFirstFrameFile = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
-    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(f.type)) {
-      setFlowError("请上传 JPEG、PNG 或 WebP 图片");
-      return;
-    }
-    if (f.size > 20 * 1024 * 1024) {
-      setFlowError("首帧图片需不超过 20MB（见官方文档限制）");
-      return;
-    }
-    const r = new FileReader();
-    r.onload = () => {
-      setFlowError(null);
-      setCustomFirstFrameDataUrl(r.result as string);
-    };
-    r.onerror = () => setFlowError("读取图片失败");
-    r.readAsDataURL(f);
-  }, []);
+  const onFirstFrameFile = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      e.target.value = "";
+      if (!f) return;
+      ingestI2vFile(f);
+    },
+    [ingestI2vFile],
+  );
 
-  const clearCustomFirstFrame = useCallback(() => {
-    setCustomFirstFrameDataUrl(null);
+  const openRefAppendPicker = useCallback(() => {
+    refGridUploadTargetRef.current = "append";
+    refGridFileRef.current?.click();
   }, []);
 
   const handleGenerate = () => {
@@ -519,8 +552,15 @@ export function ImageToVideoLabClient() {
 
   async function runGeneration() {
     if (generatingBusy) return;
-    if (!prompt.trim()) {
+    const promptCurrent =
+      modeTab === "i2v" ? promptI2v : modeTab === "ref" ? promptRef : promptT2v;
+    if (!promptCurrent.trim()) {
       setFlowError("请填写提示词");
+      return;
+    }
+
+    if (modeTab === "i2v" && !i2vFirstFrameSrc) {
+      setFlowError("请上传或从下方示例选择首帧图后再生成");
       return;
     }
 
@@ -546,7 +586,7 @@ export function ImageToVideoLabClient() {
     setGeneratingModelLabel(snapModelTitle);
 
     let settleHintForJob: string | null = null;
-    const snapPrompt = prompt.trim();
+    const snapPrompt = promptCurrent.trim();
     const snapRes = resolution;
     const effectiveDurationSec =
       modeTab === "t2v" ? (durationSec <= 7 ? 5 : 10) : durationSec;
@@ -583,7 +623,7 @@ export function ImageToVideoLabClient() {
       } else {
         const ie =
           getImageToVideoModelById(selectedModelId) ?? IMAGE_TO_VIDEO_MODELS[0]!;
-        const firstFrame = await loadImageAsDataUrl(previewSrc);
+        const firstFrame = await loadImageAsDataUrl(i2vFirstFrameSrc!);
         startBody = {
           kind: "i2v",
           prompt: snapPrompt,
@@ -715,13 +755,91 @@ export function ImageToVideoLabClient() {
   }
 
   const canSubmitGenerate =
-    modeTab === "i2v" ||
+    (modeTab === "i2v" && i2vFirstFrameSrc !== null) ||
     modeTab === "t2v" ||
     (modeTab === "ref" && refImages.length > 0);
 
   const dismissJob = (id: string) => {
     setJobs((prev) => prev.filter((j) => j.id !== id));
   };
+
+  const exampleThumbnailsEl = useMemo(
+    () => (
+      <>
+        {examplePresets.map((p) => {
+          const expectedRefs = presetRefSources(p);
+          const isExampleActive =
+            modeTab === "ref"
+              ? p.id === refExampleSelectedId &&
+                refImages.length === expectedRefs.length &&
+                refImages.every((src, i) => src === expectedRefs[i])
+              : modeTab === "i2v"
+                ? Boolean(
+                    i2vExampleSelectedId &&
+                      i2vFirstFrameSrc &&
+                      p.id === i2vExampleSelectedId &&
+                      i2vFirstFrameSrc === p.src,
+                  )
+                : p.id === t2vExampleSelectedId;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              aria-pressed={isExampleActive}
+              onClick={() => {
+                if (modeTab === "ref") {
+                  setRefImages(presetRefSources(p));
+                  setRefExampleSelectedId(p.id);
+                  setPromptRef(p.prompt);
+                } else if (modeTab === "i2v") {
+                  setI2vFirstFrameSrc(p.src);
+                  setI2vExampleSelectedId(p.id);
+                  setPromptI2v(p.prompt);
+                } else {
+                  setT2vExampleSelectedId(p.id);
+                  setPromptT2v(p.prompt);
+                }
+              }}
+              title={p.label}
+              className={cn(
+                "relative aspect-square h-14 w-14 shrink-0 overflow-hidden rounded-md outline-none transition-[box-shadow,border-color] duration-150 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:h-16 sm:w-16",
+                isExampleActive
+                  ? "border-2 border-zinc-950 shadow-sm dark:border-zinc-100"
+                  : "border-2 border-transparent hover:opacity-90",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.src} alt="" className="h-full w-full object-cover" />
+              {modeTab === "ref" ? (
+                <span className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-5 min-w-[1.15rem] items-center justify-center rounded-full bg-black/72 px-1 text-[0.65rem] font-semibold tabular-nums text-white shadow-sm">
+                  {presetRefBadgeCount(p)}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-14 w-14 shrink-0 rounded-md border-zinc-300 p-0 sm:h-16 sm:w-16 dark:border-zinc-600"
+          onClick={refreshExamples}
+          aria-label="换一组示例"
+        >
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      </>
+    ),
+    [
+      modeTab,
+      examplePresets,
+      refExampleSelectedId,
+      refImages,
+      i2vExampleSelectedId,
+      i2vFirstFrameSrc,
+      t2vExampleSelectedId,
+      refreshExamples,
+    ],
+  );
 
   return (
     <div className="mx-auto max-w-[1400px] px-2 pb-2 pt-0 sm:px-3 lg:px-4">
@@ -744,6 +862,7 @@ export function ImageToVideoLabClient() {
               role="tab"
               aria-selected={modeTab === key}
               onClick={() => {
+                setModelPickerOpen(false);
                 setModeTab(key);
                 setResultFilter(key);
                 if (key === "t2v") {
@@ -758,15 +877,6 @@ export function ImageToVideoLabClient() {
                       ? id
                       : DEFAULT_IMAGE_TO_VIDEO_MODEL_ID,
                   );
-                }
-                if (key === "ref") {
-                  setRefImages((prev) => {
-                    if (prev.length > 0) return prev;
-                    const cur =
-                      refExamplePresets.find((p) => p.id === refExampleSelectedId) ??
-                      refExamplePresets[0];
-                    return cur ? presetRefSources(cur) : [];
-                  });
                 }
               }}
               className={chipVariants({
@@ -805,42 +915,30 @@ export function ImageToVideoLabClient() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-6">
         <aside className="relative flex w-full min-h-0 max-h-[calc(100dvh-5.25rem)] flex-col lg:sticky lg:top-3 lg:max-h-[calc(100dvh-4.75rem)] lg:w-[400px] xl:w-[420px]">
           <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-hidden pr-0.5 pb-36 [scrollbar-gutter:stable]">
-            {modeTab === "ref" ? (
-              <div className="flex w-full items-start gap-3 rounded-xl border border-border/90 bg-card px-3 py-2.5 text-left shadow-sm ring-1 ring-violet-500/10">
-                <span className="shrink-0 text-lg" aria-hidden>
-                  🎞
-                </span>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold">HappyHorse 参考生视频</div>
-                  <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-                    官方模型 happyhorse-1.0-r2v；提示词请用 [Image 1]… 指代参考图顺序（示例里的 character1 会在服务端自动替换）。
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="relative" ref={modelPickerRef}>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 rounded-xl border border-border/90 bg-card px-3 py-2 text-left shadow-sm transition hover:bg-muted/50"
-                  aria-expanded={modelPickerOpen}
-                  aria-haspopup="listbox"
-                  onClick={() => setModelPickerOpen((o) => !o)}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="shrink-0 text-lg" aria-hidden>
-                      {selectedModel.icon}
-                    </span>
-                    <span className="truncate text-sm font-medium">{selectedModel.title}</span>
-                  </span>
-                  <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                </button>
-                {modelPickerOpen ? (
-                  <div
-                    className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-border/90 bg-background shadow-lg"
-                    role="listbox"
+            {modeTab === "t2v" ? (
+              <>
+                <div className="relative" ref={modelPickerRef}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-border/90 bg-card px-3 py-2 text-left shadow-sm transition hover:bg-muted/50"
+                    aria-expanded={modelPickerOpen}
+                    aria-haspopup="listbox"
+                    onClick={() => setModelPickerOpen((o) => !o)}
                   >
-                    {(modeTab === "t2v" ? TEXT_TO_VIDEO_MODELS : IMAGE_TO_VIDEO_MODELS).map(
-                      (m) => {
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 text-lg" aria-hidden>
+                        {selectedModel.icon}
+                      </span>
+                      <span className="truncate text-sm font-medium">{selectedModel.title}</span>
+                    </span>
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  </button>
+                  {modelPickerOpen ? (
+                    <div
+                      className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-border/90 bg-background shadow-lg"
+                      role="listbox"
+                    >
+                      {TEXT_TO_VIDEO_MODELS.map((m) => {
                         const isSel = m.id === selectedModel.id;
                         return (
                           <button
@@ -873,232 +971,410 @@ export function ImageToVideoLabClient() {
                             ) : null}
                           </button>
                         );
-                      },
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {modeTab === "i2v" ? (
-              <>
-                <div className="relative overflow-hidden rounded-xl border border-border/90 bg-muted shadow-sm ring-1 ring-violet-500/10">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    className="sr-only"
-                    aria-hidden
-                    onChange={onFirstFrameFile}
-                  />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={previewSrc} alt="" className="aspect-[4/3] w-full object-cover" />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/55 to-transparent" />
-                  <div className="absolute inset-0 flex items-center justify-center gap-3">
-                    <button
-                      type="button"
-                      className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/92 text-zinc-900 shadow-lg backdrop-blur-sm transition hover:bg-white dark:border-white/20 dark:bg-zinc-900/90 dark:text-zinc-50"
-                      aria-label="上传首帧图片"
-                      title="上传首帧（JPEG / PNG / WebP，≤20MB）"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Upload className="h-5 w-5" strokeWidth={2.25} />
-                    </button>
-                    {customFirstFrameDataUrl ? (
-                      <button
-                        type="button"
-                        className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/30 bg-white/92 text-red-700 shadow-lg backdrop-blur-sm transition hover:bg-white dark:border-white/20 dark:bg-zinc-900/90 dark:text-red-400"
-                        aria-label="清除自定义首帧，恢复示例图"
-                        title="清除自定义首帧"
-                        onClick={clearCustomFirstFrame}
-                      >
-                        <Trash2 className="h-5 w-5" strokeWidth={2.25} />
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                <p className="my-0 text-center text-[0.65rem] leading-tight text-zinc-600 dark:text-zinc-400">
-                  可上传自己的首帧图；未上传时使用下方「示例」缩略图。
-                  {customFirstFrameDataUrl ? (
-                    <span className="font-medium text-violet-700 dark:text-violet-300">
-                      {" "}
-                      当前为自定义首帧
-                    </span>
+                      })}
+                    </div>
                   ) : null}
-                </p>
-              </>
-            ) : modeTab === "ref" ? (
-              <>
-                <input
-                  ref={refGridFileRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
-                  className="sr-only"
-                  aria-hidden
-                  onChange={onRefGridFile}
-                />
-                <div className="rounded-xl border border-border/90 bg-muted/50 p-2 shadow-sm ring-1 ring-violet-500/10">
-                  <div className="grid grid-cols-3 gap-2">
-                    {refImages.map((src, index) => (
-                      <div
-                        key={index}
-                        className="group relative aspect-square w-full overflow-hidden rounded-lg border border-border/80 bg-background shadow-sm"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt="" className="h-full w-full object-cover" />
-                        <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-150 group-hover:bg-black/45" />
-                        <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
-                          <button
-                            type="button"
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-zinc-900 shadow-md transition hover:bg-white"
-                            aria-label="放大预览"
-                            title="放大预览"
-                            onClick={() => setRefPreviewSrc(src)}
-                          >
-                            <Eye className="h-4 w-4" strokeWidth={2.25} />
-                          </button>
-                          <button
-                            type="button"
-                            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-zinc-900 shadow-md transition hover:bg-white"
-                            aria-label="上传替换此参考图"
-                            title="上传替换"
-                            onClick={() => {
-                              refGridUploadTargetRef.current = index;
-                              refGridFileRef.current?.click();
-                            }}
-                          >
-                            <Upload className="h-4 w-4" strokeWidth={2.25} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {refImages.length < REF_GRID_MAX_IMAGES ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          refGridUploadTargetRef.current = "append";
-                          refGridFileRef.current?.click();
-                        }}
-                        className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-zinc-300 bg-background/80 text-muted-foreground transition hover:border-violet-400 hover:bg-violet-50/50 hover:text-violet-800 dark:border-zinc-600 dark:hover:border-violet-500 dark:hover:bg-violet-950/30 dark:hover:text-violet-200"
-                        aria-label="上传参考图"
-                        title={`上传参考图（还可添加 ${REF_GRID_MAX_IMAGES - refImages.length} 张）`}
-                      >
-                        <Upload className="h-6 w-6 opacity-70" strokeWidth={2} />
-                        <span className="px-1 text-center text-[0.65rem] font-medium leading-tight">
-                          上传
-                        </span>
-                        <span className="text-[0.6rem] tabular-nums opacity-80">
-                          {refImages.length}/{REF_GRID_MAX_IMAGES}
-                        </span>
-                      </button>
-                    ) : null}
-                  </div>
                 </div>
-                <p className="my-0 text-center text-[0.65rem] leading-tight text-zinc-600 dark:text-zinc-400">
-                  参考图最多 {REF_GRID_MAX_IMAGES} 张正方形缩略图；末格为上传。悬停在图上可预览或替换上传。
-                </p>
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-sm font-medium">画幅比例</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {REF_RATIO_OPTIONS.map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRefRatio(r)}
-                        className={cn(
-                          "rounded-md border px-2 py-1 text-xs font-semibold tabular-nums transition-colors",
-                          refRatio === r
-                            ? "border-violet-700 bg-violet-600 text-white dark:border-violet-500"
-                            : "border-zinc-300 bg-white text-zinc-800 hover:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100",
-                        )}
-                      >
-                        {r}
-                      </button>
-                    ))}
+                <div className="rounded-xl border border-border/90 bg-muted/40 p-4 shadow-sm ring-1 ring-violet-500/10">
+                  <p className="my-0 text-sm leading-relaxed text-muted-foreground">
+                    文生视频仅需提示词与下方参数，无需上传图片。当前 Wan2.5 文生接口多仅支持{" "}
+                    <span className="font-medium text-foreground">5 秒</span> 或{" "}
+                    <span className="font-medium text-foreground">10 秒</span>{" "}
+                    成片；提交时按时长滑块自动取整（≤7 秒按 5 秒，否则按 10 秒）。
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/80 bg-muted/40 px-2 py-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="shrink-0 text-xs font-medium text-muted-foreground">示例</span>
+                    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-gutter:stable]">
+                      {exampleThumbnailsEl}
+                    </div>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="rounded-xl border border-border/90 bg-muted/40 p-4 shadow-sm ring-1 ring-violet-500/10">
-                <p className="my-0 text-sm leading-relaxed text-muted-foreground">
-                  文生视频仅需提示词与下方参数，无需上传图片。当前 Wan2.5 文生接口多仅支持{" "}
-                  <span className="font-medium text-foreground">5 秒</span> 或{" "}
-                  <span className="font-medium text-foreground">10 秒</span>{" "}
-                  成片；提交时按时长滑块自动取整（≤7 秒按 5 秒，否则按 10 秒）。
-                </p>
-              </div>
-            )}
-
-            {/* 示例：标题 + 缩略图与刷新同一行（与图生视频、参考生视频共用） */}
-            <div className="rounded-lg border border-border/80 bg-muted/40 px-2 py-1">
-              <div className="flex items-center gap-1.5">
-                <span className="shrink-0 text-xs font-medium text-muted-foreground">示例</span>
-                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-gutter:stable]">
-                  {examplePresets.map((p) => {
-                    const expectedRefs = presetRefSources(p);
-                    const isExampleActive =
-                      modeTab === "ref"
-                        ? p.id === refExampleSelectedId &&
-                          refImages.length === expectedRefs.length &&
-                          refImages.every((src, i) => src === expectedRefs[i])
-                        : modeTab === "i2v"
-                          ? !customFirstFrameDataUrl && p.id === i2vExampleSelectedId
-                          : p.id === i2vExampleSelectedId;
-                    return (
+              <>
+                <div
+                  ref={modeTab === "i2v" ? modelPickerRef : undefined}
+                  className="overflow-hidden rounded-2xl border border-border/90 bg-card shadow-sm ring-1 ring-violet-500/10"
+                >
+                  <div className="relative border-b border-border/80 bg-muted/30">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className="shrink-0 text-lg" aria-hidden>
+                          {modeTab === "ref" ? "🎠" : selectedModel.icon}
+                        </span>
+                        {modeTab === "ref" ? (
+                          <span className="truncate text-sm font-semibold tracking-tight">
+                            HappyHorse-1.0-R2V
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="min-w-0 truncate text-left text-sm font-semibold"
+                            onClick={() => setModelPickerOpen((o) => !o)}
+                          >
+                            {selectedModel.title}
+                          </button>
+                        )}
+                      </div>
                       <button
-                        key={p.id}
                         type="button"
-                        aria-pressed={isExampleActive}
+                        className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                        aria-label={modeTab === "ref" ? "上传参考图" : "选择或切换模型"}
                         onClick={() => {
                           if (modeTab === "ref") {
-                            setRefImages(presetRefSources(p));
-                            setRefExampleSelectedId(p.id);
+                            openRefAppendPicker();
                           } else {
-                            if (modeTab === "i2v") {
-                              setCustomFirstFrameDataUrl(null);
-                            }
-                            setI2vExampleSelectedId(p.id);
+                            setModelPickerOpen((o) => !o);
                           }
                         }}
-                        title={p.label}
-                        className={cn(
-                          "relative aspect-square h-14 w-14 shrink-0 overflow-hidden rounded-md outline-none transition-[box-shadow,border-color] duration-150 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:h-16 sm:w-16",
-                          isExampleActive
-                            ? "border-2 border-zinc-950 shadow-sm dark:border-zinc-100"
-                            : "border-2 border-transparent hover:opacity-90",
-                        )}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={p.src} alt="" className="h-full w-full object-cover" />
-                        {modeTab === "ref" ? (
-                          <span className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-5 min-w-[1.15rem] items-center justify-center rounded-full bg-black/72 px-1 text-[0.65rem] font-semibold tabular-nums text-white shadow-sm">
-                            {presetRefBadgeCount(p)}
-                          </span>
-                        ) : null}
+                        <ArrowRightLeft className="h-4 w-4" />
                       </button>
-                    );
-                  })}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-14 w-14 shrink-0 rounded-md border-zinc-300 p-0 sm:h-16 sm:w-16 dark:border-zinc-600"
-                    onClick={refreshExamples}
-                    aria-label="换一组示例"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
+                    </div>
+                    {modelPickerOpen && modeTab === "i2v" ? (
+                      <div
+                        className="absolute left-0 right-0 top-full z-30 max-h-72 overflow-y-auto border-b border-border/80 bg-background shadow-md"
+                        role="listbox"
+                      >
+                        {IMAGE_TO_VIDEO_MODELS.map((m) => {
+                          const isSel = m.id === selectedModel.id;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              role="option"
+                              aria-selected={isSel}
+                              className={cn(
+                                "flex w-full items-start gap-3 border-b border-border/60 px-3 py-2.5 text-left transition last:border-b-0 hover:bg-muted/80",
+                                isSel && "bg-violet-50/80 dark:bg-violet-950/40",
+                              )}
+                              onClick={() => {
+                                setSelectedModelId(m.id);
+                                setModelPickerOpen(false);
+                              }}
+                            >
+                              <span className="text-lg leading-none" aria-hidden>
+                                {m.icon}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-semibold text-foreground">
+                                  {m.title}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-muted-foreground">
+                                  {m.description}
+                                </span>
+                              </span>
+                              {isSel ? (
+                                <Check className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
 
+                  <div className="p-3">
+                    {modeTab === "i2v" ? (
+                      <>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          className="sr-only"
+                          aria-hidden
+                          onChange={onFirstFrameFile}
+                        />
+                        {!i2vFirstFrameSrc ? (
+                          <div
+                            className={cn(
+                              "flex min-h-[220px] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center transition-colors dark:border-zinc-600",
+                              dragOverI2v &&
+                                "border-violet-500 bg-violet-50/40 dark:border-violet-400 dark:bg-violet-950/25",
+                            )}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="点击或拖拽上传首帧图，也可在下方选择示例"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                fileInputRef.current?.click();
+                              }
+                            }}
+                            onClick={() => fileInputRef.current?.click()}
+                            onDragEnter={(e) => {
+                              e.preventDefault();
+                              setDragOverI2v(true);
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDragLeave={(e) => {
+                              const rel = e.relatedTarget as Node | null;
+                              if (rel && e.currentTarget.contains(rel)) return;
+                              setDragOverI2v(false);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setDragOverI2v(false);
+                              const f = e.dataTransfer.files[0];
+                              if (f) ingestI2vFile(f);
+                            }}
+                          >
+                            <ImagePlus
+                              className="h-12 w-12 text-muted-foreground/90"
+                              strokeWidth={1.25}
+                              aria-hidden
+                            />
+                            <p className="text-sm font-semibold text-foreground">点击 / 拖拽 上传图片</p>
+                            <ul className="max-w-[300px] space-y-1 text-[0.7rem] leading-relaxed text-muted-foreground">
+                              <li>图生视频仅使用 1 张首帧图</li>
+                              <li>图像格式：JPEG、JPG、PNG、WEBP；单张不超过 20MB</li>
+                              <li>分辨率：推荐 720P 以上，图像短边大于 400 像素</li>
+                              <li className="text-violet-700/90 dark:text-violet-300/90">
+                                点击下方示例可一键套用首帧，与上传相同
+                              </li>
+                            </ul>
+                          </div>
+                        ) : (
+                          <div
+                            className={cn(
+                              "group relative aspect-[4/3] w-full overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-muted/50 transition-colors dark:border-zinc-600",
+                              dragOverI2v &&
+                                "border-violet-500 bg-violet-50/50 dark:border-violet-400 dark:bg-violet-950/20",
+                            )}
+                            onDragEnter={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDragOverI2v(true);
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onDragLeave={(e) => {
+                              const rel = e.relatedTarget as Node | null;
+                              if (rel && e.currentTarget.contains(rel)) return;
+                              setDragOverI2v(false);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDragOverI2v(false);
+                              const f = e.dataTransfer.files[0];
+                              if (f) ingestI2vFile(f);
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={i2vFirstFrameSrc}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-150 group-hover:bg-black/45" />
+                            <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+                              <button
+                                type="button"
+                                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-zinc-900 shadow-md transition hover:bg-white"
+                                aria-label="放大预览首帧"
+                                title="放大预览"
+                                onClick={() => setRefPreviewSrc(i2vFirstFrameSrc)}
+                              >
+                                <Eye className="h-4 w-4" strokeWidth={2.25} />
+                              </button>
+                              <button
+                                type="button"
+                                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-zinc-900 shadow-md transition hover:bg-white"
+                                aria-label="上传替换首帧图"
+                                title="上传替换"
+                                onClick={() => fileInputRef.current?.click()}
+                              >
+                                <Upload className="h-4 w-4" strokeWidth={2.25} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          ref={refGridFileRef}
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          multiple
+                          className="sr-only"
+                          aria-hidden
+                          onChange={onRefGridFile}
+                        />
+                        {refImages.length === 0 ? (
+                          <div
+                            className={cn(
+                              "flex min-h-[220px] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-zinc-300 bg-muted/40 px-4 py-8 text-center transition-colors dark:border-zinc-600",
+                              dragOverRefPanel &&
+                                "border-violet-500 bg-violet-50/40 dark:border-violet-400 dark:bg-violet-950/25",
+                            )}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="点击或拖拽上传参考图，也可在下方选择示例"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                openRefAppendPicker();
+                              }
+                            }}
+                            onClick={openRefAppendPicker}
+                            onDragEnter={(e) => {
+                              e.preventDefault();
+                              setDragOverRefPanel(true);
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDragLeave={(e) => {
+                              const rel = e.relatedTarget as Node | null;
+                              if (rel && e.currentTarget.contains(rel)) return;
+                              setDragOverRefPanel(false);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setDragOverRefPanel(false);
+                              void ingestRefFilesAppend(e.dataTransfer.files);
+                            }}
+                          >
+                            <ImagePlus
+                              className="h-12 w-12 text-muted-foreground/90"
+                              strokeWidth={1.25}
+                              aria-hidden
+                            />
+                            <p className="text-sm font-semibold text-foreground">点击 / 拖拽 上传图片</p>
+                            <ul className="max-w-[300px] space-y-1 text-[0.7rem] leading-relaxed text-muted-foreground">
+                              <li>最多可上传 {REF_GRID_MAX_IMAGES} 张参考图片</li>
+                              <li>图像格式：JPEG、JPG、PNG、WEBP；单张不超过 20MB</li>
+                              <li>分辨率：推荐 720P 以上，图像短边大于 400 像素</li>
+                              <li>宽高比：建议多张图比例一致，与目标视频比例接近</li>
+                              <li className="text-violet-700/90 dark:text-violet-300/90">
+                                点击下方示例可一键填入参考图，与上传相同
+                              </li>
+                            </ul>
+                          </div>
+                        ) : (
+                          <div
+                            className="rounded-xl border border-border/80 bg-muted/30 p-2"
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              void ingestRefFilesAppend(e.dataTransfer.files);
+                            }}
+                          >
+                            <div className="grid grid-cols-3 gap-2">
+                              {refImages.map((src, index) => (
+                                <div
+                                  key={index}
+                                  className="group relative aspect-square w-full overflow-hidden rounded-lg border border-border/80 bg-background shadow-sm"
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={src} alt="" className="h-full w-full object-cover" />
+                                  <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-150 group-hover:bg-black/45" />
+                                  <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
+                                    <button
+                                      type="button"
+                                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-zinc-900 shadow-md transition hover:bg-white"
+                                      aria-label="放大预览"
+                                      title="放大预览"
+                                      onClick={() => setRefPreviewSrc(src)}
+                                    >
+                                      <Eye className="h-4 w-4" strokeWidth={2.25} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-zinc-900 shadow-md transition hover:bg-white"
+                                      aria-label="上传替换此参考图"
+                                      title="上传替换"
+                                      onClick={() => {
+                                        refGridUploadTargetRef.current = index;
+                                        refGridFileRef.current?.click();
+                                      }}
+                                    >
+                                      <Upload className="h-4 w-4" strokeWidth={2.25} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                              {refImages.length < REF_GRID_MAX_IMAGES ? (
+                                <button
+                                  type="button"
+                                  onClick={openRefAppendPicker}
+                                  className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-zinc-300 bg-background/80 text-muted-foreground transition hover:border-violet-400 hover:bg-violet-50/50 hover:text-violet-800 dark:border-zinc-600 dark:hover:border-violet-500 dark:hover:bg-violet-950/30 dark:hover:text-violet-200"
+                                  aria-label="上传参考图"
+                                  title={`上传参考图（还可添加 ${REF_GRID_MAX_IMAGES - refImages.length} 张）`}
+                                >
+                                  <Upload className="h-6 w-6 opacity-70" strokeWidth={2} />
+                                  <span className="px-1 text-center text-[0.65rem] font-medium leading-tight">
+                                    上传
+                                  </span>
+                                  <span className="text-[0.6rem] tabular-nums opacity-80">
+                                    {refImages.length}/{REF_GRID_MAX_IMAGES}
+                                  </span>
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="border-t border-border/80 bg-muted/20 px-2 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0 text-xs font-medium text-muted-foreground">示例</span>
+                      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-gutter:stable]">
+                        {exampleThumbnailsEl}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {modeTab === "ref" ? (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-sm font-medium">画幅比例</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {REF_RATIO_OPTIONS.map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setRefRatio(r)}
+                          className={cn(
+                            "rounded-md border px-2 py-1 text-xs font-semibold tabular-nums transition-colors",
+                            refRatio === r
+                              ? "border-violet-700 bg-violet-600 text-white dark:border-violet-500"
+                              : "border-zinc-300 bg-white text-zinc-800 hover:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100",
+                          )}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="i2v-prompt">
               提示词 <span className="text-destructive">*</span>
             </label>
             <textarea
               id="i2v-prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              value={
+                modeTab === "i2v"
+                  ? promptI2v
+                  : modeTab === "ref"
+                    ? promptRef
+                    : promptT2v
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (modeTab === "i2v") setPromptI2v(v);
+                else if (modeTab === "ref") setPromptRef(v);
+                else setPromptT2v(v);
+              }}
               rows={5}
               className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
               placeholder="描述镜头运动、氛围与风格…"
@@ -1383,7 +1659,7 @@ export function ImageToVideoLabClient() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="参考图预览"
+          aria-label="图片预览"
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-6 backdrop-blur-sm"
           onClick={() => setRefPreviewSrc(null)}
         >
