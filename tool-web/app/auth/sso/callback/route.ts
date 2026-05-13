@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMainSiteOrigin } from "@/lib/site-origin";
+import { getMainSiteOrigin, getToolsSitePublicOrigin } from "@/lib/site-origin";
 
 function exchangeSecret(): string | null {
   const s = process.env.TOOLS_SSO_SERVER_SECRET?.trim();
@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
     redirectPath = "/fitting-room";
   }
 
-  const base = request.nextUrl.origin;
+  const base =
+    getToolsSitePublicOrigin() ??
+    request.nextUrl.origin;
   const origin = getMainSiteOrigin();
   const secret = exchangeSecret();
 

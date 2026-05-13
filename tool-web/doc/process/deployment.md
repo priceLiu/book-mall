@@ -10,12 +10,13 @@
 | 变量 | 说明 |
 |------|------|
 | `MAIN_SITE_ORIGIN` | 主站根 URL，无末尾 `/` |
+| `TOOLS_PUBLIC_ORIGIN` | 与主站 `TOOLS_PUBLIC_ORIGIN` **完全相同**；生产必填，用于 `/auth/sso/callback` 重定向（Docker 内勿依赖 `request.nextUrl.origin`，常为 `http://0.0.0.0:3001`） |
 | `TOOLS_SSO_SERVER_SECRET` | 与主站一致；服务端 `exchange` 使用 |
 | `TOOLS_SSO_JWT_SECRET` | 若本地验 JWT，与主站一致 |
 
 可选：`TOOL_WEB_*`，模板见 `config/tool-web.env.example`，读取 `lib/tool-config.ts`。
 
-主站侧 **`TOOLS_PUBLIC_ORIGIN`** 必须与浏览器访问的工具站 origin **完全一致**（含协议与 host）。
+主站侧 **`TOOLS_PUBLIC_ORIGIN`** 与工具站侧 **`TOOLS_PUBLIC_ORIGIN`** 须 **完全一致**，且与浏览器访问的工具站 origin **一致**（含协议与 host）。
 
 ## 本地联调（最短）
 
