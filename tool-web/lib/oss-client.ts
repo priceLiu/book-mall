@@ -1,5 +1,3 @@
-import OSS from "ali-oss";
-
 export type OssEnvConfig = {
   accessKeyId: string;
   accessKeySecret: string;
@@ -31,7 +29,9 @@ export function readOssEnv(): OssEnvConfig | { error: string } {
   };
 }
 
-export function createOssClientFrom(cfg: OssEnvConfig): OSS {
+/** 运行时动态加载 ali-oss，避免 next build 收集路由时加载 SDK（部分环境会触发 os.networkInterfaces 报错）。 */
+export async function createOssClientFrom(cfg: OssEnvConfig) {
+  const OSS = (await import("ali-oss")).default;
   return new OSS({
     accessKeyId: cfg.accessKeyId,
     accessKeySecret: cfg.accessKeySecret,
@@ -44,7 +44,7 @@ export function createOssClientFrom(cfg: OssEnvConfig): OSS {
   });
 }
 
-export function createOssClient(): OSS {
+export async function createOssClient() {
   const cfg = readOssEnv();
   if ("error" in cfg) throw new Error(cfg.error);
   return createOssClientFrom(cfg);

@@ -34,7 +34,7 @@ const tryOnBillingSnapByTaskId = new Map<string, TryOnBillingSnap>();
  * 计费锚定：仅在任务成功且写出结果图 URL 后打点一次 try_on（等价于用户一次「试衣」成功成片），
  * 与台帐单价一致；toolKey 须为 AI试衣页 `fitting-room__ai-fit`（与 Beacon 路径规则一致）。
  */
-export const AI_FIT_USAGE_TOOL_KEY = "fitting-room__ai-fit";
+const AI_FIT_USAGE_TOOL_KEY = "fitting-room__ai-fit";
 
 type AiFitTryOnUsagePayload = {
   recorded: boolean;

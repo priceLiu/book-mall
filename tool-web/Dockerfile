@@ -12,7 +12,7 @@ COPY . .
 RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable && corepack prepare pnpm@9.15.5 --activate \
-  && pnpm exec next build
+  && pnpm run build:docker
 
 FROM base AS runner
 ENV NODE_ENV=production
