@@ -68,10 +68,36 @@
     0 0 0 1px rgba(228, 228, 231, 0.95),
     0 1px 3px rgba(0, 0, 0, 0.04);
   background: var(--tool-surface, #fff);
-  padding: 1rem 1rem 1.15rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: min(920px, calc(100dvh - 8.5rem));
+  min-height: 320px;
+  overflow: hidden;
+}
+
+.leftPanelScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem 1rem 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.leftPanelFooter {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem 1.1rem;
+  border-top: 1px solid var(--tool-border, #e4e4e7);
+  background: color-mix(in srgb, var(--tool-surface, #fff) 92%, transparent);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .rightPanel {

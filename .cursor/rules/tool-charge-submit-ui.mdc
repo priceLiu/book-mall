@@ -1,0 +1,34 @@
+---
+description: 工具站内「涉及扣费」的主提交按钮样式与文案（双行胶囊、扣费说明无「约」）
+globs: tool-web/**/*.tsx
+alwaysApply: false
+---
+
+# 计费主按钮（ToolChargeSubmitButton）
+
+凡工具站内 **会产生主站工具账户扣费** 的主操作（提交生成、试衣成片等），应统一使用 `tool-web/components/ui/tool-charge-submit-button.tsx` 的 **`ToolChargeSubmitButton`**，除非产品明确要求其它形态。
+
+## 视觉
+
+- **形状**：`rounded-full` 胶囊大圆角，通栏宽度，深色底 `hsl(222 40% 18%)`，白字，轻阴影。
+- **结构**：**两行**
+  1. 主行：图标（可选）+ 主文案；进行中为 **转圈 Loader** + 进行中文案。
+  2. 次行：扣费说明 + **`ⓘ`**，`text-white/80`，`ⓘ` 与整段带相同 `title`（详述以主站定价为准）。
+
+## 文案
+
+- **扣费行**：写清 **数量/次数** 与 **标价**，与主站 `ToolBillablePrice` 一致；**不要写「约」**（如「扣费 5 元」「扣费 0.5 元」）。
+- `chargeTitle`（tooltip）：说明按主站「工具管理」定价、实际以账户与后台为准。
+
+## 状态
+
+- `busy` 为真时：`disabled` 但保持 **不透明**（`disabled:opacity-100`），避免整颗按钮发灰看不清。
+- 仅因未就绪禁用时：`disabled` 且 **`disabled:opacity-50`**。
+
+## 长表单与侧栏
+
+参数区过长时，侧栏/左栏可用 **`flex` + `min-h-0` + 内层 `overflow-y-auto`**。需要 **始终可见** 的计费主按钮时，可用 **`position: fixed; bottom: 0`**（与侧栏同宽的居左内层容器 + `z-index`），主内容区预留 **`padding-bottom`**，避免最后一屏内容被条带遮挡。
+
+## 新增计费工具时
+
+在对应页面接入 `ToolChargeSubmitButton`，并在此规则意义上自检：**主按钮是否双行、扣费行无「约」、ⓘ 提示是否完整**。

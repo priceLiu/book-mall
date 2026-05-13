@@ -26,6 +26,7 @@ export const metadata = {
 const SUITE_LABEL: Record<string, string> = {
   "fitting-room": "试衣间",
   "text-to-image": "文生图",
+  "image-to-video": "图生视频",
   "smart-support": "AI智能客服",
   "app-history": "费用明细",
 };

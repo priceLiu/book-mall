@@ -5,6 +5,7 @@
 export const TOOL_SUITE_NAV_KEYS = [
   "fitting-room",
   "text-to-image",
+  "image-to-video",
   "smart-support",
   "app-history",
 ] as const;

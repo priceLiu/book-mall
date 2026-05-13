@@ -18,7 +18,7 @@ export async function resolveBillablePriceMinor(
       effectiveFrom: { lte: now },
       OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
     },
-    orderBy: { effectiveFrom: "desc" },
+    orderBy: [{ effectiveFrom: "desc" }, { updatedAt: "desc" }],
   });
 
   const applicable = rows.filter(

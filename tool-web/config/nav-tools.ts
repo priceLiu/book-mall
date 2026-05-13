@@ -54,6 +54,16 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
     ],
   },
   {
+    label: "图生视频",
+    navKey: "image-to-video",
+    defaultOpen: true,
+    children: [
+      { href: "/image-to-video", label: "首页" },
+      { href: "/image-to-video/lab", label: "实验室" },
+      { href: "/image-to-video/library", label: "我的视频库" },
+    ],
+  },
+  {
     label: "AI智能客服",
     navKey: "smart-support",
     defaultOpen: true,

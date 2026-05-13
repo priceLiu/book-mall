@@ -38,7 +38,11 @@ export default async function AdminToolAppsManagePage() {
   const [navRows, prices] = await Promise.all([
     prisma.toolNavVisibility.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.toolBillablePrice.findMany({
-      orderBy: [{ toolKey: "asc" }, { effectiveFrom: "desc" }],
+      orderBy: [
+        { toolKey: "asc" },
+        { effectiveFrom: "desc" },
+        { updatedAt: "desc" },
+      ],
     }),
   ]);
 
