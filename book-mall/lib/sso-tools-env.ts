@@ -1,15 +1,30 @@
 /** 独立工具站 SSO 环境变量（主站与工具站服务端共用密钥时需同步部署配置） */
 
-export function getToolsPublicOrigin(): string | null {
-  const raw = process.env.TOOLS_PUBLIC_ORIGIN?.trim();
-  if (!raw) return null;
+/**
+ * 纠正控制台常见误填：`https://host/:3001`（端口写在 path）→ `https://host:3001`。
+ * 云上网关通常只需 `https://host`，勿带路径形式的端口。
+ */
+function normalizeHttpOriginUrl(raw: string): URL | null {
   try {
-    const u = new URL(raw);
+    const u = new URL(raw.trim());
     if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    return raw.replace(/\/$/, "");
+    const m = u.pathname.match(/^\/:(\d+)\/?$/);
+    if (m && !u.port) {
+      u.port = m[1];
+      u.pathname = "/";
+    }
+    return u;
   } catch {
     return null;
   }
+}
+
+export function getToolsPublicOrigin(): string | null {
+  const raw = process.env.TOOLS_PUBLIC_ORIGIN?.trim();
+  if (!raw) return null;
+  const u = normalizeHttpOriginUrl(raw);
+  if (!u) return null;
+  return u.origin;
 }
 
 export function requireToolsSsoServerSecret(): string {

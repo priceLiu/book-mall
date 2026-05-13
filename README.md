@@ -75,7 +75,7 @@ git rm -r --cached .pnpm-store
 
 ## 腾讯云部署（Docker / 云托管）
 
-主站与工具站已含 Dockerfile。**云托管 CloudBase Run**：同一仓库建两个服务，**目标目录**分别填 `book-mall`、`tool-web`，端口 **3000** / **3001**，环境变量在控制台填写（勿提交密钥）。详见 **`deploy/tencent/README.md`** 中的「云托管 CloudBase Run」小节。
+主站与工具站已含 Dockerfile。**云托管 CloudBase Run**：同一仓库建两个服务，**目标目录**分别填 `book-mall`、`tool-web`，端口 **3000** / **3001**，环境变量在控制台填写（勿提交密钥）。详见 **`deploy/tencent/README.md`** 中的「云托管 CloudBase Run」小节；构建失败与 SSO 排障见根目录 **`deploy.md`**。
 
 若在本机或自建机编排，可用根目录 **`docker-compose.yml`**。
 

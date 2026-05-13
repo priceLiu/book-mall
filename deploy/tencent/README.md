@@ -51,6 +51,7 @@
 在 **工具站服务** 里填写：
 
 - `MAIN_SITE_ORIGIN` — 与主站公网 origin 一致（无末尾 `/`），如 `https://mall.example.com`
+- `TOOLS_PUBLIC_ORIGIN` — **须与主站 `TOOLS_PUBLIC_ORIGIN` 完全一致**（浏览器访问工具站的 Origin）；生产必填，否则换票重定向可能变成 `http://0.0.0.0:3001/...`
 - `TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET` — 与主站相同  
 
 更全的可选项见：`book-mall/.env.example`、`tool-web/.env.example`。
@@ -61,6 +62,7 @@
 
 - `NEXTAUTH_URL`、`TOOLS_PUBLIC_ORIGIN`、`MAIN_SITE_ORIGIN` 必须与用户浏览器地址栏的 **协议 + 域名 + 端口** 一致。  
 - **不要**填 Docker 内部主机名（如 `http://book-mall:3000`）。
+- **勿**写成 `https://域名/:3001`（端口写在路径里）；应为 **`https://域名`**（云托管常见）或 **`https://域名:3001`**（端口在冒号后）。写错会导致跳转 URL 变为 `...com/:3001/auth/...` 进而 **404**。
 
 配置保存并触发一次发布后，以后你只要 **`git push`**，平台会按各自服务的构建目录重新构建并滚动发布。
 
