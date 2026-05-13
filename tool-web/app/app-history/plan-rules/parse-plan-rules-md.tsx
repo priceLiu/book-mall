@@ -95,7 +95,7 @@ export type ParsedPlanRules = {
 export function parsePlanRulesMarkdown(source: string): ParsedPlanRules {
   const lines = source.split("\n");
   let i = 0;
-  let pageTitle = "计划规则说明";
+  let pageTitle = "计费规则说明";
   if (lines[0]?.startsWith("# ")) {
     pageTitle = lines[0].slice(2).trim();
     i = 1;

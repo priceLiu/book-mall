@@ -5,7 +5,7 @@
 | 文档 | 说明 |
 |------|------|
 | [product/overview.md](./product/overview.md) | 定位、功能范围、与主站关系 |
-| [product/billing-plan-rules.md](./product/billing-plan-rules.md) | **计费计划规则说明**：免责、充值与明细、AI 试衣 / 文生图口径、超时与云账单（站内路由 `/app-history/plan-rules`） |
+| [product/billing-plan-rules.md](./product/billing-plan-rules.md) | **计费计费规则说明**：免责、充值与明细、AI 试衣 / 文生图口径、超时与云账单（站内路由 `/app-history/plan-rules`） |
 | [product/fitting-room-and-ai-fit.md](./product/fitting-room-and-ai-fit.md) | 试衣间与 AI 试衣：需求、问题、实现与数据约定 |
 | [product/tools-delivery-checklist.md](./product/tools-delivery-checklist.md) | 工具交付清单：成片 OSS、打点、应用历史与管理后台 |
 | [tech/sso-session-troubleshooting.md](./tech/sso-session-troubleshooting.md) | SSO、`tools_token`、`TOOLS_PUBLIC_ORIGIN` 与常见问题（含「从主站过来仍提示未登录」） |
