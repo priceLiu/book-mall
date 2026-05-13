@@ -16,6 +16,10 @@ export const en = {
     freeQuota: "Free quota",
     quotaValueDemo: "385 / 400",
     startFitting: "Start try-on",
+    tryOnChargeLineSub: "¥1 charged on successful try-on",
+    tryOnChargeLineTitle:
+      "Billed per main-site tools pricing from your tools wallet; charged only after a successful render.",
+    tryOnBusy: "Trying on…",
     disclaimer:
       "Demo output is for reference only. Do not use AI-generated content for unlawful purposes.",
     emptyRightTitle: "Workspace",

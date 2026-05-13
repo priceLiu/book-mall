@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
 import { createPortal } from "react-dom";
+import { ToolChargeSubmitButton } from "@/components/ui/tool-charge-submit-button";
 import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import { useToolsSession } from "@/components/tool-shell-client";
 import styles from "./text-to-image-modal.module.css";
@@ -16,6 +18,9 @@ const POLL_INTERVAL_MS = 2000;
 const MAX_POLLS = 90;
 const SETTLE_ATTEMPTS = 4;
 const SETTLE_BASE_DELAY_MS = 350;
+
+const TTI_CHARGE_TITLE =
+  "单次任务按 0.5 元从工具账户扣费（以主站「工具管理」定价为准）。";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -177,7 +182,7 @@ export function TextToImageGenerateModal({
       if (settleR.status === 402) {
         const req = settleJson.requiredMinor;
         setSettleBanner(
-          `账户余额不足，无法完成本次计费（${typeof req === "number" ? `需 ${(req as number) / 100} 元` : "需约 0.5 元"}）。图片仍可依链接临时查看，建议充值后再次生成。`,
+          `账户余额不足，无法完成本次计费（${typeof req === "number" ? `需 ${(req as number) / 100} 元` : "需 0.5 元"}）。图片仍可依链接临时查看，建议充值后再次生成。`,
         );
         setSuccessBanner(null);
         return;
@@ -195,7 +200,7 @@ export function TextToImageGenerateModal({
       if (settleJson.duplicate === true) {
         setSuccessBanner("计费记录已存在（幂等），无需重复扣款。");
       } else if (settleJson.recorded === true) {
-        setSuccessBanner("已按单次生成计费（约 0.5 元），可在费用明细中查看。");
+        setSuccessBanner("已按单次生成计费（0.5 元），可在费用明细中查看。");
       } else {
         setSuccessBanner(null);
       }
@@ -397,6 +402,7 @@ export function TextToImageGenerateModal({
 
         <div className={bodyClass}>
           <div className={styles.leftPane}>
+            <div className={styles.leftPaneScroll}>
             <label className={styles.label} htmlFor="tti-prompt">
               正向提示词
             </label>
@@ -439,16 +445,19 @@ export function TextToImageGenerateModal({
                 令牌已写入，但主站校验未完成（常见于数据库冷启动）。仍可尝试生成；异常时请点顶部右侧「重新连接」刷新会话。
               </p>
             ) : null}
+            </div>
 
-            <div className={styles.actions}>
-              <button
-                type="button"
-                className={styles.btnPrimary}
+            <div className={styles.leftPaneFooter}>
+              <ToolChargeSubmitButton
+                busy={polling || settlingBilling}
+                disabled={sessLoading || !hasTokenCookie}
                 onClick={() => void handleGenerate()}
-                disabled={polling || settlingBilling || sessLoading || !hasTokenCookie}
-              >
-                {polling ? "生成中…" : "生成 4 张图片"}
-              </button>
+                primaryLabel="生成 4 张图片"
+                busyLabel="生成中…"
+                chargeLine="一次生成 4 张图，扣费 0.5 元"
+                chargeTitle={TTI_CHARGE_TITLE}
+                idleIcon={<Sparkles className="h-4 w-4" aria-hidden />}
+              />
             </div>
           </div>
 

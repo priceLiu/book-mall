@@ -16,6 +16,10 @@ export const zh = {
     freeQuota: "免费额度",
     quotaValueDemo: "385 / 400",
     startFitting: "开始试衣",
+    tryOnChargeLineSub: "单次成片成功，扣费 1 元",
+    tryOnChargeLineTitle:
+      "按主站「工具管理」定价从工具账户扣费；仅在试衣成片成功时结算。",
+    tryOnBusy: "试衣中…",
     disclaimer:
       "试用页面生成结果仅供参考；请勿将生成内容用于违法违规用途。输出内容由 AI 生成。",
     emptyRightTitle: "工作台",

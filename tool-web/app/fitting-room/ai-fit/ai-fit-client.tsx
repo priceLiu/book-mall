@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { ToolChargeSubmitButton } from "@/components/ui/tool-charge-submit-button";
 import { MessagesLocaleProvider, useMessagesLocale } from "@/components/messages-locale-context";
 import type { AiFitModelRecord } from "@/lib/ai-fit-types";
 import { prefillGarmentsFromOutfit } from "@/lib/ai-fit-prefill-from-outfit";
@@ -405,8 +407,6 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
       ? Boolean(topPreview && bottomPreview)
       : Boolean(onePreview);
 
-  const canStart = Boolean(selectedModel && garmentsReady && !tryOnBusy);
-
   const handleStart = async () => {
     if (!selectedModel) {
       setFormError(t("validationNeedModel"));
@@ -423,8 +423,7 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
     setFormError(null);
     setTryOnResultUrl(null);
     setTryOnResultMeta(null);
-                        setTryOnUsageWarn(null);
-                        setTryOnBillingLine("");
+    setTryOnUsageWarn(null);
     setTryOnBillingLine("");
     setClosetSaveState("idle");
     restoreRightRef.current = rightPanel === "models" ? "models" : "idle";
@@ -580,6 +579,7 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
 
       <div className={styles.layout}>
         <aside className={styles.leftPanel}>
+          <div className={styles.leftPanelScroll}>
           <section className={styles.configBlock}>
             <h2 className={styles.sectionTitle}>
               <span className={styles.sectionIcon} aria-hidden>
@@ -776,18 +776,22 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
           </div>
 
           {formError ? <p className={styles.validationBanner}>{formError}</p> : null}
+          </div>
 
-          <button
-            type="button"
-            className={styles.btnStart}
-            disabled={!canStart}
-            onClick={handleStart}
-          >
-            <span aria-hidden>✨</span>
-            {t("startFitting")}
-          </button>
+          <div className={styles.leftPanelFooter}>
+            <ToolChargeSubmitButton
+              busy={tryOnBusy}
+              disabled={!selectedModel || !garmentsReady}
+              onClick={handleStart}
+              primaryLabel={t("startFitting")}
+              busyLabel={t("tryOnBusy")}
+              chargeLine={t("tryOnChargeLineSub")}
+              chargeTitle={t("tryOnChargeLineTitle")}
+              idleIcon={<Sparkles className="h-4 w-4" aria-hidden />}
+            />
 
-          <p className={styles.disclaimer}>{t("disclaimer")}</p>
+            <p className={styles.disclaimer}>{t("disclaimer")}</p>
+          </div>
         </aside>
 
         <section className={styles.rightPanel} aria-live="polite">

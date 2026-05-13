@@ -64,6 +64,7 @@ async function resolveCostMinorForEvent(
   if (fromTable != null) return fromTable;
   /**
  * AI智能试衣：仅成片成功后的 try_on 自动标价（见 tool-web/doc/payment.md）；page_view 不写单价。
+   * 图生视频：仅任务 SUCCEEDED 后 settle 上报的 invoke 自动标价（toolKey image-to-video）；
    * 套装 / 试衣间父路由 / 衣柜等不设自动单价。
    */
   if (action === "try_on" && toolKey === "fitting-room__ai-fit") {

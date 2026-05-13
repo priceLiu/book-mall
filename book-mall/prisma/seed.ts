@@ -378,6 +378,11 @@ async function main() {
     data: { label: "AI智能客服" },
   });
 
+  await prisma.toolNavVisibility.updateMany({
+    where: { navKey: "image-to-video" },
+    data: { label: "图生视频" },
+  });
+
   await syncPilotSubscriptions(PILOT_SYNC_EMAIL);
 }
 
