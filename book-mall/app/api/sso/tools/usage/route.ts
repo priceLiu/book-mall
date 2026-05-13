@@ -117,6 +117,7 @@ export async function GET(req: Request) {
     prisma.toolUsageEvent.groupBy({
       by: ["toolKey"],
       where: baseWhere,
+      orderBy: { toolKey: "asc" },
       _count: { id: true },
       _sum: { costMinor: true },
     }),
@@ -129,8 +130,8 @@ export async function GET(req: Request) {
     .map((r) => ({
       toolKey: r.toolKey,
       label: toolKeyToLabel(r.toolKey),
-      billCount: r._count.id,
-      sumMinor: r._sum.costMinor ?? 0,
+      billCount: (r._count as { id: number } | undefined)?.id ?? 0,
+      sumMinor: (r._sum as { costMinor: number | null } | undefined)?.costMinor ?? 0,
     }))
     .sort(
       (a, b) =>
