@@ -8,6 +8,8 @@ import {
 } from "@/lib/sso-tools-env";
 import { signToolsAccessToken } from "@/lib/tools-sso-token";
 
+export const dynamic = "force-dynamic";
+
 /**
  * 工具站服务端调用：用一次性 code 换短时 access token（JWT）。
  * 准入：黄金会员或主站管理员；JWT `tier` 分别为 `gold` / `admin`。

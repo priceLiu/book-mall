@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { issueToolsSsoRedirect } from "@/lib/issue-tools-sso-redirect";
 
+export const dynamic = "force-dynamic";
+
 /**
  * 主站侧：黄金会员或管理员换取跳转 URL（query 带一次性 code）。
  * 工具站 `/auth/sso/callback` 应用服务端 POST `/api/sso/tools/exchange` 换 token。

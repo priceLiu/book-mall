@@ -5,6 +5,8 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 const bodySchema = z.object({
   currentPassword: z.string().min(1, "请输入当前密码"),
   newPassword: z.string().min(8, "新密码至少 8 位"),

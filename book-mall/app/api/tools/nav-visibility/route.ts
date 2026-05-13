@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 /** 工具站服务端拉取左侧菜单可见性；无需登录。 */
 export async function GET() {
   try {

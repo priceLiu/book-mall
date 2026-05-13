@@ -5,6 +5,8 @@ import { toolsRouteDiagnosticsEnabled } from "@/lib/tools-route-diagnostics";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 
+export const dynamic = "force-dynamic";
+
 function mergeDiag<T extends Record<string, unknown>>(
   body: T,
   diag: Record<string, unknown>,

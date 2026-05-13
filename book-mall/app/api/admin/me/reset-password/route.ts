@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { generateTempLoginPassword } from "@/lib/generate-temp-password";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 /** 管理员一键重置自己的登录密码（返回明文一次，请妥善保存） */
 export async function POST() {
   const session = await getServerSession(authOptions);

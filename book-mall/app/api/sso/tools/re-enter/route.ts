@@ -7,6 +7,8 @@ import { sanitizeToolsRedirectPath } from "@/lib/sanitize-tools-redirect-path";
 
 const RE_ENTER_PATH = "/api/sso/tools/re-enter";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET：会话失效后从工具站打开此链接；未登录则跳转登录（callbackUrl 带回本接口），
  * 已登录则直接签发 code 并 302 至工具站 `/auth/sso/callback`。
