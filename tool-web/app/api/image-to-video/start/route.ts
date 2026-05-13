@@ -113,22 +113,35 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const t2vDur: 5 | 10 = duration <= 7 ? 5 : 10;
     const aspectRaw =
       typeof body.aspectRatio === "string" ? body.aspectRatio.trim() : "";
     const aspectAllowed = new Set<string>(
       T2V_ASPECT_RATIO_OPTIONS as unknown as string[],
     );
     const aspectForSize = aspectAllowed.has(aspectRaw) ? aspectRaw : "16:9";
-    const size = t2vAspectRatioToSize(aspectForSize, resolution);
-    const created = await t2vCreateVideoTask({
-      apiKey,
-      model: modelEntry.apiModel,
-      parameterExtras: modelEntry.defaultParameters,
-      prompt,
-      size,
-      duration: t2vDur,
-    });
+    const isHappyHorseT2v = modelEntry.apiModel.startsWith("happyhorse-");
+    const created = isHappyHorseT2v
+      ? await t2vCreateVideoTask({
+          apiKey,
+          model: modelEntry.apiModel,
+          parameterExtras: modelEntry.defaultParameters,
+          prompt,
+          parameterStyle: "resolutionRatio",
+          resolution,
+          ratio: aspectForSize,
+          duration: Math.min(15, Math.max(3, duration)),
+          seedStr,
+          watermark,
+        })
+      : await t2vCreateVideoTask({
+          apiKey,
+          model: modelEntry.apiModel,
+          parameterExtras: modelEntry.defaultParameters,
+          prompt,
+          parameterStyle: "wanSize",
+          size: t2vAspectRatioToSize(aspectForSize, resolution),
+          duration: duration <= 7 ? 5 : 10,
+        });
     if (!created.ok) {
       return NextResponse.json({ error: created.error }, { status: 502 });
     }

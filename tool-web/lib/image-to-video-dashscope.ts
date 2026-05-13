@@ -1,6 +1,6 @@
 /**
  * 阿里云 DashScope · 视频合成（华北2 北京）：图生 i2v、参考生 r2v、文生 t2v
- * 文档：doc/pic-video.md、doc/chanaosheng.md
+ * 文档：doc/pic-video.md、doc/chanaosheng.md、doc/wen-video.md（HappyHorse 文生 parameters）
  */
 
 const CREATE_URL =
@@ -226,30 +226,61 @@ export async function r2vCreateReferenceVideoTask(opts: {
   return { ok: true, taskId };
 }
 
-/** Wan 文生视频（无首帧）；duration 仅部分模型支持 5 / 10 */
-export async function t2vCreateVideoTask(opts: {
+export type T2vCreateVideoTaskOpts = {
   apiKey: string;
   model: string;
   prompt: string;
-  /** 如 1280*720、1920*1080 */
-  size: string;
-  duration: 5 | 10;
   parameterExtras?: Record<string, unknown>;
-}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+} & (
+  | {
+      /** 万相等：parameters 使用 size + duration（5 或 10） */
+      parameterStyle: "wanSize";
+      size: string;
+      duration: 5 | 10;
+    }
+  | {
+      /** HappyHorse 等：parameters 使用 resolution、ratio、duration（3～15） */
+      parameterStyle: "resolutionRatio";
+      resolution: "720P" | "1080P";
+      ratio: string;
+      duration: number;
+      seedStr?: string;
+      watermark?: boolean;
+    }
+);
+
+/** 文生视频（无首帧）：万相走 size，HappyHorse 走 resolution/ratio（见 doc/wen-video.md） */
+export async function t2vCreateVideoTask(
+  opts: T2vCreateVideoTaskOpts,
+): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
   const prompt = opts.prompt.trim();
   if (!prompt) return { ok: false, error: "提示词不能为空" };
 
   const model = opts.model.trim();
   if (!model) return { ok: false, error: "缺少模型名称" };
 
-  const size = opts.size.trim();
-  if (!size) return { ok: false, error: "缺少画面尺寸（size）" };
-
-  const parameters: Record<string, unknown> = {
-    ...(opts.parameterExtras ?? {}),
-    size,
-    duration: opts.duration,
-  };
+  let parameters: Record<string, unknown>;
+  if (opts.parameterStyle === "wanSize") {
+    const size = opts.size.trim();
+    if (!size) return { ok: false, error: "缺少画面尺寸（size）" };
+    parameters = {
+      ...(opts.parameterExtras ?? {}),
+      size,
+      duration: opts.duration,
+    };
+  } else {
+    const duration = Math.min(15, Math.max(3, Math.floor(opts.duration)));
+    const ratio = opts.ratio.trim() || "16:9";
+    const seed = parseSeed(opts.seedStr);
+    parameters = {
+      ...(opts.parameterExtras ?? {}),
+      resolution: opts.resolution,
+      ratio,
+      duration,
+      watermark: opts.watermark ?? false,
+    };
+    if (seed != null) parameters.seed = seed;
+  }
 
   const body = {
     model,
