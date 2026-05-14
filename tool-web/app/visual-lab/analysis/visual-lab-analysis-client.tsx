@@ -424,6 +424,11 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
   const deepAnchorRef = useRef<HTMLDivElement>(null);
   const welcomeRef = useRef<HTMLDivElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  /** 流式输出时是否保持回复区贴在底部；用户上滑阅读后暂停自动滚动 */
+  const streamStickBottomRef = useRef(true);
+  /** 思考过程 pre 内滚动：流式时贴底；用户上滑后暂停 */
+  const reasoningStickBottomRef = useRef(true);
+  const reasoningPreRef = useRef<HTMLPreElement>(null);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const analysisAbortRef = useRef<AbortController | null>(null);
 
@@ -459,6 +464,42 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
     setUploadFailText(msg);
     window.setTimeout(() => setUploadFailText(null), 6000);
   }, []);
+
+  const onComposeResultScroll = useCallback(() => {
+    const el = resultRef.current;
+    if (!el) return;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    streamStickBottomRef.current = dist < 72;
+  }, []);
+
+  const onReasoningPreScroll = useCallback(() => {
+    const el = reasoningPreRef.current;
+    if (!el) return;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    reasoningStickBottomRef.current = dist < 48;
+  }, []);
+
+  useEffect(() => {
+    if (!submitted) return;
+    if (!streamStickBottomRef.current) return;
+    const id = requestAnimationFrame(() => {
+      const r = resultRef.current;
+      if (!r || !streamStickBottomRef.current) return;
+      r.scrollTop = r.scrollHeight;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [analysisReply, analysisReasoning, submitted, analyzing]);
+
+  useEffect(() => {
+    if (!analysisReasoning) return;
+    if (!reasoningStickBottomRef.current) return;
+    const id = requestAnimationFrame(() => {
+      const r = reasoningPreRef.current;
+      if (!r || !reasoningStickBottomRef.current) return;
+      r.scrollTop = r.scrollHeight;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [analysisReasoning]);
 
   useEffect(() => {
     if (!mediaLightbox) return;
@@ -732,6 +773,8 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
       setAnalysisReply("");
       setAnalysisReasoning("");
       setAnalysisStopped(false);
+      streamStickBottomRef.current = true;
+      reasoningStickBottomRef.current = true;
       setAnalyzing(true);
       setSubmitted(true);
 
@@ -948,7 +991,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
 
       <div className="vl-compose-stack" data-session={submitted ? "true" : undefined}>
         {submitted ? (
-          <div ref={resultRef} className="vl-compose-result">
+          <div ref={resultRef} className="vl-compose-result" onScroll={onComposeResultScroll}>
             {userTurnDisplay ? (
               <div className="vl-analysis-user-turn" aria-label="本次发送内容">
                 <div className="vl-analysis-user-bubble">
@@ -1027,7 +1070,13 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
             {analysisReasoning ? (
               <details className="vl-analysis-reasoning" open={analyzing}>
                 <summary>思考过程</summary>
-                <pre className="vl-analysis-reasoning-pre">{analysisReasoning}</pre>
+                <pre
+                  ref={reasoningPreRef}
+                  className="vl-analysis-reasoning-pre"
+                  onScroll={onReasoningPreScroll}
+                >
+                  {analysisReasoning}
+                </pre>
               </details>
             ) : null}
             {!analysisError && analysisReply ? (

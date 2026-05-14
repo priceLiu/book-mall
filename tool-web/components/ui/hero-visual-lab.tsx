@@ -33,7 +33,7 @@ export function VisualLabHero({ analysisHref = "/visual-lab/analysis" }: VisualL
               <Link href="/visual-lab/gallery" className="vl-btn vl-btn-outline">
                 成果展 <Images className="h-4 w-4" strokeWidth={2} />
               </Link>
-              <Link href="#visual-lab-intro" className="vl-btn vl-btn-outline">
+              <Link href="/visual-lab/implementation" className="vl-btn vl-btn-outline">
                 能力说明 <Sparkles className="h-4 w-4" strokeWidth={2} />
               </Link>
             </div>

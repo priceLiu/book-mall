@@ -1,5 +1,3 @@
-import { getMainSiteOrigin } from "@/lib/site-origin";
-import { mainSiteToolsReEnterHref } from "@/lib/main-site-tools-links";
 import { VisualLabHomeClient } from "./visual-lab-home-client";
 
 export const metadata = {
@@ -7,12 +5,9 @@ export const metadata = {
 };
 
 export default function VisualLabHomePage() {
-  const origin = getMainSiteOrigin();
-  const renewHref = mainSiteToolsReEnterHref(origin, "/visual-lab");
-
   return (
     <main className="tw-main fitting-room-main visual-lab-main">
-      <VisualLabHomeClient renewHref={renewHref} mainOrigin={origin} />
+      <VisualLabHomeClient />
     </main>
   );
 }

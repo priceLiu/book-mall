@@ -21,7 +21,7 @@ export function LaunchToolsAppButton({
    * `default`：个人中心等块状区域。
    */
   layout = "default",
-  /** 为 true 时在拿到 redirectUrl 后 `window.open`，否则当前页跳转 */
+  /** 为 true 时在通过校验后 `window.open` 过渡页，否则当前页跳转 */
   openInNewTab = false,
 }: {
   enabled: boolean;
@@ -86,10 +86,14 @@ export function LaunchToolsAppButton({
         return;
       }
       if (typeof data.redirectUrl === "string") {
+        const toolsOpen = new URL(
+          `/tools-open?redirect=${encodeURIComponent(redirectPath)}`,
+          window.location.origin,
+        );
         if (openInNewTab) {
-          window.open(data.redirectUrl, "_blank", "noopener,noreferrer");
+          window.open(toolsOpen.href, "_blank", "noopener,noreferrer");
         } else {
-          window.location.assign(data.redirectUrl);
+          window.location.assign(toolsOpen.href);
         }
         return;
       }
