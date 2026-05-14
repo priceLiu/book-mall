@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import {
   completeWalletRefund,
   rejectWalletRefund,
@@ -68,9 +68,9 @@ export default async function AdminRefundsPage() {
                   </span>
                   <span>
                     <span className="text-muted-foreground">申请额</span>：
-                    {r.requestedAmountMinor == null
+                    {r.requestedAmountPoints == null
                       ? "全额（由后台核算）"
-                      : `¥${formatMinorAsYuan(r.requestedAmountMinor)}`}
+                      : `¥${formatPointsAsYuan(r.requestedAmountPoints)}`}
                   </span>
                   <span className="text-muted-foreground">
                     {r.createdAt.toLocaleString("zh-CN")}
@@ -90,7 +90,7 @@ export default async function AdminRefundsPage() {
                         <Label htmlFor={`ps-${r.id}`}>应扣未扣（分）</Label>
                         <Input
                           id={`ps-${r.id}`}
-                          name="pendingSettlementMinor"
+                          name="pendingSettlementPoints"
                           type="number"
                           min={0}
                           defaultValue={0}
@@ -102,7 +102,7 @@ export default async function AdminRefundsPage() {
                         <Label htmlFor={`ov-${r.id}`}>提现额覆盖（分，可选）</Label>
                         <Input
                           id={`ov-${r.id}`}
-                          name="refundAmountMinorOverride"
+                          name="refundAmountPointsOverride"
                           type="number"
                           min={0}
                           className="mt-1"
@@ -128,8 +128,8 @@ export default async function AdminRefundsPage() {
                 ) : (
                   <p className="text-sm text-muted-foreground">
                     处理结果：实提{" "}
-                    {r.refundAmountMinor != null
-                      ? `¥${formatMinorAsYuan(r.refundAmountMinor)}`
+                    {r.refundAmountPoints != null
+                      ? `¥${formatPointsAsYuan(r.refundAmountPoints)}`
                       : "—"}
                     {r.adminNote ? ` · ${r.adminNote}` : ""}
                   </p>

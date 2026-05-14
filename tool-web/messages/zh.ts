@@ -16,7 +16,7 @@ export const zh = {
     freeQuota: "免费额度",
     quotaValueDemo: "385 / 400",
     startFitting: "开始试衣",
-    tryOnChargeLineSub: "单次成片成功，扣费 1 元",
+    tryOnChargeLineSub: "单次成片成功，扣费 100 点（¥1.00）",
     tryOnChargeLineTitle:
       "按主站「工具管理」定价从工具账户扣费；仅在试衣成片成功时结算。",
     tryOnBusy: "试衣中…",
@@ -92,9 +92,9 @@ export const zh = {
     billingReminderAfterTryOn:
       "试衣成片已生成。如涉及扣费，按主站单次标价计费，可在费用明细中查看。",
     tryOnBillingCharged:
-      "本次试衣已扣费 {{amount}} 元（单次标价），可在费用明细中查看。",
+      "本次试衣已扣费 {{amount}}（单次标价），可在费用明细中查看。",
     tryOnBillingDuplicate:
-      "计费记录已存在（幂等），单次标价 {{amount}} 元，本次未重复扣款。可在费用明细中查看。",
+      "计费记录已存在（幂等），单次标价 {{amount}}，本次未重复扣款。可在费用明细中查看。",
     imageLibraryPageTitle: "我的图片库",
     imageLibraryEmptyTitle: "图片库还是空的",
     imageLibraryEmptyHint:

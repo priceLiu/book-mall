@@ -51,20 +51,20 @@ export async function GET() {
   }
 
   const active = raw.active === true;
-  const balanceMinor =
-    typeof raw.balance_minor === "number" && Number.isFinite(raw.balance_minor)
-      ? Math.max(0, Math.floor(raw.balance_minor))
+  const balancePoints =
+    typeof raw.balance_points === "number" && Number.isFinite(raw.balance_points)
+      ? Math.max(0, Math.floor(raw.balance_points))
       : null;
-  const minBalanceLineMinor =
-    typeof raw.min_balance_line_minor === "number" &&
-    Number.isFinite(raw.min_balance_line_minor)
-      ? Math.max(0, Math.floor(raw.min_balance_line_minor))
+  const minBalanceLinePoints =
+    typeof raw.min_balance_line_points === "number" &&
+    Number.isFinite(raw.min_balance_line_points)
+      ? Math.max(0, Math.floor(raw.min_balance_line_points))
       : null;
 
   return NextResponse.json({
     active,
-    balanceMinor,
-    minBalanceLineMinor,
+    balancePoints,
+    minBalanceLinePoints,
     reason: typeof raw.reason === "string" ? raw.reason : undefined,
   });
 }

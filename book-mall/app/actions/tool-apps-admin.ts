@@ -40,7 +40,7 @@ export async function updateToolNavVisibility(formData: FormData) {
   revalidatePath("/admin/tool-apps/manage");
 }
 
-/** 新增一条按次单价（分） */
+/** 新增一条按次单价（priceYuan → 点 / pricePoints） */
 export async function createToolBillablePrice(formData: FormData) {
   await assertAdmin();
   const toolKey = String(formData.get("toolKey") ?? "").trim();
@@ -53,8 +53,8 @@ export async function createToolBillablePrice(formData: FormData) {
 
   if (!toolKey) throw new Error("toolKey 必填");
   if (!Number.isFinite(yuan) || yuan < 0) throw new Error("单价（元）无效");
-  const priceMinor = Math.round(yuan * 100);
-  if (priceMinor < 0 || !Number.isInteger(priceMinor)) throw new Error("单价换算分无效");
+  const pricePoints = Math.round(yuan * 100);
+  if (pricePoints < 0 || !Number.isInteger(pricePoints)) throw new Error("单价换算点无效");
 
   const effectiveFrom = parseCnWallDatetimeLocal(effectiveFromRaw);
   const effectiveTo = optionalCnWallEnd(effectiveToRaw);
@@ -63,7 +63,7 @@ export async function createToolBillablePrice(formData: FormData) {
     data: {
       toolKey,
       action: actionRaw.length > 0 ? actionRaw : null,
-      priceMinor,
+      pricePoints,
       effectiveFrom,
       effectiveTo,
       active,
@@ -86,8 +86,8 @@ export async function updateToolBillablePrice(formData: FormData) {
   const active = formData.get("active") === "on";
 
   if (!Number.isFinite(yuan) || yuan < 0) throw new Error("单价（元）无效");
-  const priceMinor = Math.round(yuan * 100);
-  if (priceMinor < 0 || !Number.isInteger(priceMinor)) throw new Error("单价换算分无效");
+  const pricePoints = Math.round(yuan * 100);
+  if (pricePoints < 0 || !Number.isInteger(pricePoints)) throw new Error("单价换算点无效");
 
   const effectiveFrom = parseCnWallDatetimeLocal(effectiveFromRaw);
   const effectiveTo = optionalCnWallEnd(effectiveToRaw);
@@ -95,7 +95,7 @@ export async function updateToolBillablePrice(formData: FormData) {
   await prisma.toolBillablePrice.update({
     where: { id },
     data: {
-      priceMinor,
+      pricePoints,
       effectiveFrom,
       effectiveTo,
       active,

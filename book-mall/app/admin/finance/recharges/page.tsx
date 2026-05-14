@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { WalletEntryType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
@@ -35,8 +35,8 @@ export default async function AdminRechargesPage({ searchParams }: Props) {
       take: PAGE_SIZE,
       select: {
         id: true,
-        amountMinor: true,
-        balanceAfterMinor: true,
+        amountPoints: true,
+        balanceAfterPoints: true,
         description: true,
         orderId: true,
         createdAt: true,
@@ -51,12 +51,12 @@ export default async function AdminRechargesPage({ searchParams }: Props) {
     }),
     prisma.walletEntry.aggregate({
       where,
-      _sum: { amountMinor: true },
+      _sum: { amountPoints: true },
     }),
   ]);
 
   const totalPages = total === 0 ? 0 : Math.ceil(total / PAGE_SIZE);
-  const sumMinor = sumAgg._sum.amountMinor ?? 0;
+  const sumPoints = sumAgg._sum.amountPoints ?? 0;
 
   const buildHref = (p: number) =>
     p <= 1 ? "/admin/finance/recharges" : `/admin/finance/recharges?page=${p}`;
@@ -67,11 +67,11 @@ export default async function AdminRechargesPage({ searchParams }: Props) {
         <div>
           <h1 className="text-2xl font-bold">充值明细</h1>
           <p className="text-sm text-muted-foreground">
-            历史「钱包入账 · 充值」流水；累计充值总额{" "}
-            <strong className="text-foreground tabular-nums">
-              ¥{formatMinorAsYuan(sumMinor)}
-            </strong>
-            。
+          历史「钱包入账 · 充值」流水；累计充值入账{" "}
+          <strong className="text-foreground tabular-nums">
+            {sumPoints.toLocaleString("zh-CN")} 点
+          </strong>
+          （¥{formatPointsAsYuan(sumPoints)}）。
           </p>
         </div>
         <Button variant="outline" size="sm" asChild>
@@ -119,8 +119,8 @@ export default async function AdminRechargesPage({ searchParams }: Props) {
             <tr>
               <th className="p-3 font-medium">时间</th>
               <th className="p-3 font-medium">用户</th>
-              <th className="p-3 font-medium text-right">充值金额(元)</th>
-              <th className="p-3 font-medium text-right">入账后余额(元)</th>
+              <th className="p-3 font-medium text-right">入账（点）</th>
+              <th className="p-3 font-medium text-right">入账后余额（点）</th>
               <th className="p-3 font-medium">备注 / 订单</th>
             </tr>
           </thead>
@@ -154,10 +154,16 @@ export default async function AdminRechargesPage({ searchParams }: Props) {
                       <div className="text-xs text-muted-foreground">{secondary}</div>
                     </td>
                     <td className="p-3 tabular-nums text-right font-medium text-emerald-700 dark:text-emerald-400">
-                      +¥{formatMinorAsYuan(r.amountMinor)}
+                      +{r.amountPoints.toLocaleString("zh-CN")} 点
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        ¥{formatPointsAsYuan(r.amountPoints)}
+                      </span>
                     </td>
                     <td className="p-3 tabular-nums text-right">
-                      ¥{formatMinorAsYuan(r.balanceAfterMinor)}
+                      {r.balanceAfterPoints.toLocaleString("zh-CN")} 点
+                      <span className="block text-xs text-muted-foreground">
+                        ¥{formatPointsAsYuan(r.balanceAfterPoints)}
+                      </span>
                     </td>
                     <td className="p-3 max-w-[20rem] truncate text-muted-foreground" title={desc}>
                       {desc || "—"}

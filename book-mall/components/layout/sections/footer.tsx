@@ -72,6 +72,12 @@ export const FooterSection = () => {
             </div>
 
             <div>
+              <Link href="/pricing-disclosure" className="opacity-60 hover:opacity-100">
+                价格公示
+              </Link>
+            </div>
+
+            <div>
               <Link href="/#faq" className="opacity-60 hover:opacity-100">
                 常见问题
               </Link>

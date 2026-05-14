@@ -6,6 +6,9 @@
 |------|------|
 | [product/overview.md](./product/overview.md) | 定位、功能范围、与主站关系 |
 | [product/billing-plan-rules.md](./product/billing-plan-rules.md) | **计费计费规则说明**：免责、充值与明细、AI 试衣 / 文生图口径、超时与云账单（站内路由 `/app-history/plan-rules`） |
+| [product/learning-pricing-requirements.md](./product/learning-pricing-requirements.md) | **学习端轻量报价 · 需求**：国内 only、无免费额度对客、×2.0 系数、范围与非目标、修订跟踪 |
+| [product/learning-pricing-solution.md](./product/learning-pricing-solution.md) | **学习端轻量报价 · 方案**：公式、catalog 落地、主站衔接、分期实施、平台复制清单 |
+| [product/learning-pricing-wallet-points.md](./product/learning-pricing-wallet-points.md) | **点数与钱包**：点=分 1:1、充值/扣费/introspect 一致、禁止双轨余额（配合主站 `Wallet`） |
 | [product/fitting-room-and-ai-fit.md](./product/fitting-room-and-ai-fit.md) | 试衣间与 AI 试衣：需求、问题、实现与数据约定 |
 | [product/tools-delivery-checklist.md](./product/tools-delivery-checklist.md) | 工具交付清单：成片 OSS、打点、应用历史与管理后台 |
 | [tech/sso-session-troubleshooting.md](./tech/sso-session-troubleshooting.md) | SSO、`tools_token`、`TOOLS_PUBLIC_ORIGIN` 与常见问题（含「从主站过来仍提示未登录」） |

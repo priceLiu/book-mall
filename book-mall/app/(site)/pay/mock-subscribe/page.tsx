@@ -41,7 +41,7 @@ export default async function MockSubscribePayPage({
     <MockSubscribeCheckout
       planSlug={planSlug}
       planName={plan.name}
-      amountMinor={plan.priceMinor}
+      amountPoints={plan.pricePoints}
       intervalLabel={intervalLabel}
     />
   );

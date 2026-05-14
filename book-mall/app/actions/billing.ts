@@ -27,12 +27,12 @@ export async function updatePlatformBillingConfig(formData: FormData) {
   await prisma.platformConfig.update({
     where: { id: "default" },
     data: {
-      minBalanceLineMinor: num("minBalanceLineMinor"),
-      balanceWarnHighMinor: num("balanceWarnHighMinor"),
-      balanceWarnMidMinor: num("balanceWarnMidMinor"),
-      llmInputPer1kTokensMinor: num("llmInputPer1kTokensMinor"),
-      llmOutputPer1kTokensMinor: num("llmOutputPer1kTokensMinor"),
-      toolInvokePerCallMinor: num("toolInvokePerCallMinor"),
+      minBalanceLinePoints: num("minBalanceLinePoints"),
+      balanceWarnHighPoints: num("balanceWarnHighPoints"),
+      balanceWarnMidPoints: num("balanceWarnMidPoints"),
+      llmInputPer1kTokensPoints: num("llmInputPer1kTokensPoints"),
+      llmOutputPer1kTokensPoints: num("llmOutputPer1kTokensPoints"),
+      toolInvokePerCallPoints: num("toolInvokePerCallPoints"),
       usageAnomalyRatioPercent: num("usageAnomalyRatioPercent"),
     },
   });
@@ -43,13 +43,13 @@ export async function updatePlatformBillingConfig(formData: FormData) {
 export async function updateSubscriptionPlanPrice(formData: FormData) {
   await assertAdmin();
   const planId = String(formData.get("planId") ?? "");
-  const priceMinor = Number(formData.get("priceMinor"));
-  if (!planId || !Number.isInteger(priceMinor) || priceMinor < 0) {
+  const pricePoints = Number(formData.get("pricePoints"));
+  if (!planId || !Number.isInteger(pricePoints) || pricePoints < 0) {
     throw new Error("无效的套餐或价格");
   }
   await prisma.subscriptionPlan.update({
     where: { id: planId },
-    data: { priceMinor },
+    data: { pricePoints },
   });
   revalidatePath("/admin/billing");
 }

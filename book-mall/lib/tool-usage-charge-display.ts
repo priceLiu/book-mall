@@ -1,4 +1,4 @@
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan, formatPointsIntegerCn } from "@/lib/currency";
 
 /** 管理后台 / 文案：仅 AI智能试衣成片成功上报的 try_on 计入标价扣费。 */
 export function isAiFitBillableTryOn(toolKey: string, action: string): boolean {
@@ -10,9 +10,9 @@ export type ToolUsageChargeVariant = "priced" | "nonbill" | "dash";
 export function resolveToolUsageChargeVariant(
   toolKey: string,
   action: string,
-  costMinor: number | null,
+  costPoints: number | null,
 ): ToolUsageChargeVariant {
-  if (typeof costMinor === "number" && costMinor > 0) return "priced";
+  if (typeof costPoints === "number" && costPoints > 0) return "priced";
   if (action === "page_view") return "nonbill";
   if (
     toolKey === "fitting-room" ||
@@ -26,7 +26,7 @@ export function resolveToolUsageChargeVariant(
 }
 
 /**
- * 单行计费数量（默认 1）。若上报 `meta.quantity`（正整数），单价 = costMinor / quantity。
+ * 单行计费数量（默认 1）。若上报 `meta.quantity`（正整数），单价 = costPoints / quantity。
  */
 export function billingQuantityFromMeta(meta: unknown): number {
   if (meta == null || typeof meta !== "object" || Array.isArray(meta)) return 1;
@@ -41,37 +41,55 @@ export function billingQuantityFromMeta(meta: unknown): number {
   return 1;
 }
 
+export type ToolUsageMoneyCell = {
+  variant: ToolUsageChargeVariant;
+  /** 主行：点数口径（与 DB `costPoints` 一致） */
+  primary: string;
+  /** 副行：约合人民币，仅 priced 时有 */
+  secondary?: string;
+};
+
 /**
- * 明细「AI扣费」列：有金额优先展示；浏览与非计费入口展示「不计费」；其余未标价展示「—」。
+ * 明细「扣费」列：库字段为点；展示「点」为主、「元」为辅（与工具管理按次单价同一口径）。
  */
 export function formatToolUsageChargeDisplay(
   toolKey: string,
   action: string,
-  costMinor: number | null,
-): { variant: "money" | "dash" | "nonbill"; text: string } {
-  const v = resolveToolUsageChargeVariant(toolKey, action, costMinor);
+  costPoints: number | null,
+): ToolUsageMoneyCell {
+  const v = resolveToolUsageChargeVariant(toolKey, action, costPoints);
   if (v === "priced") {
-    return { variant: "money", text: `¥${formatMinorAsYuan(costMinor!)}` };
+    const pts = costPoints!;
+    return {
+      variant: "priced",
+      primary: `${formatPointsIntegerCn(pts)} 点`,
+      secondary: `约合 ¥${formatPointsAsYuan(pts)}`,
+    };
   }
-  if (v === "nonbill") return { variant: "nonbill", text: "不计费" };
-  return { variant: "dash", text: "—" };
+  if (v === "nonbill") return { variant: "nonbill", primary: "不计费" };
+  return { variant: "dash", primary: "—" };
 }
 
 /**
- * 「单价」列：已标价时为单价（元）；口径与扣费列的非计费展示一致。
+ * 「按次扣点 / 单价」列：已标价时为「每份点数」；quantity>1 时为单价 = costPoints/qty。
  */
 export function formatToolUsageUnitPriceDisplay(
   toolKey: string,
   action: string,
-  costMinor: number | null,
+  costPoints: number | null,
   meta: unknown,
-): { variant: "money" | "dash" | "nonbill"; text: string } {
-  const v = resolveToolUsageChargeVariant(toolKey, action, costMinor);
+): ToolUsageMoneyCell {
+  const v = resolveToolUsageChargeVariant(toolKey, action, costPoints);
   if (v !== "priced") {
-    if (v === "nonbill") return { variant: "nonbill", text: "不计费" };
-    return { variant: "dash", text: "—" };
+    if (v === "nonbill") return { variant: "nonbill", primary: "不计费" };
+    return { variant: "dash", primary: "—" };
   }
   const qty = billingQuantityFromMeta(meta);
-  const unitMinor = Math.floor(costMinor! / qty);
-  return { variant: "money", text: `¥${formatMinorAsYuan(unitMinor)}` };
+  const unitPoints = Math.floor(costPoints! / qty);
+  const label = qty > 1 ? `${formatPointsIntegerCn(unitPoints)} 点/份` : `${formatPointsIntegerCn(unitPoints)} 点/次`;
+  return {
+    variant: "priced",
+    primary: label,
+    secondary: `约合 ¥${formatPointsAsYuan(unitPoints)}`,
+  };
 }

@@ -12,6 +12,7 @@ export function toolKeyToLabel(toolKey: string): string {
     "image-to-video": "图生视频",
     "image-to-video__library": "我的视频库",
     "visual-lab": "视觉实验室",
+    "visual-lab__analysis": "视觉实验室 · 分析室",
     "app-history": "费用使用明细",
   };
   if (exact[key]) return exact[key];

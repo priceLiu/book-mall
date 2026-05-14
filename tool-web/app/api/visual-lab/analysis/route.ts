@@ -2,6 +2,11 @@ import OpenAI from "openai";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getDashscopeOpenAiCompatBaseUrl } from "@/lib/dashscope-openai-env";
 import { getQwenApiKey } from "@/lib/qwen-env";
+import { postToolUsageFromServer } from "@/lib/forward-tools-usage-server";
+import {
+  VISUAL_LAB_ANALYSIS_ACTION,
+  VISUAL_LAB_ANALYSIS_TOOL_KEY,
+} from "@/lib/visual-lab-analysis-billing";
 import {
   getVisualLabAnalysisModelById,
   VISUAL_LAB_ANALYSIS_MODELS,
@@ -30,6 +35,8 @@ type Body = {
   enableThinking?: unknown;
   thinkingBudget?: unknown;
   attachments?: unknown;
+  /** 客户端为每次点击生成的 UUID，与主站扣费幂等键 meta.taskId 对齐 */
+  billingRequestId?: unknown;
 };
 
 function isAttKind(k: unknown): k is AttKind {
@@ -204,6 +211,60 @@ export async function POST(req: Request) {
       );
     }
     throw e;
+  }
+
+  const billingRaw =
+    typeof body.billingRequestId === "string" ? body.billingRequestId.trim() : "";
+  if (billingRaw.length < 16) {
+    return Response.json(
+      {
+        error: "missing_billing_request_id",
+        message: "缺少 billingRequestId，请刷新页面后重试",
+      },
+      { status: 400 },
+    );
+  }
+
+  const usage = await postToolUsageFromServer({
+    toolKey: VISUAL_LAB_ANALYSIS_TOOL_KEY,
+    action: VISUAL_LAB_ANALYSIS_ACTION,
+    meta: { taskId: billingRaw },
+  });
+  if (!usage.ok) {
+    const msg =
+      usage.reason === "no_session" ? "请先登录工具站" : "工具站未配置主站地址，无法计费";
+    return Response.json({ error: "billing_unavailable", message: msg }, { status: 503 });
+  }
+  if (usage.status === 402) {
+    return Response.json(usage.data, { status: 402 });
+  }
+  if (usage.status !== 200) {
+    const d = usage.data;
+    return Response.json(
+      {
+        error: "billing_failed",
+        message: typeof d.error === "string" ? d.error : "计费失败",
+        ...d,
+      },
+      { status: usage.status >= 400 && usage.status < 600 ? usage.status : 502 },
+    );
+  }
+  const billed = usage.data as Record<string, unknown>;
+  if (billed.recorded !== true) {
+    if (billed.duplicate === true) {
+      return Response.json(
+        { error: "duplicate_billing", message: "该次分析已扣费，请勿重复提交同一请求" },
+        { status: 409 },
+      );
+    }
+    return Response.json(
+      {
+        error: "billing_unconfigured",
+        message:
+          "主站未配置分析室标价：请在「工具管理 → 按次单价」添加 visual-lab__analysis / invoke",
+      },
+      { status: 503 },
+    );
   }
 
   const client = new OpenAI({

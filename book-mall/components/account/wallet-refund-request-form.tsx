@@ -19,7 +19,7 @@ export function WalletRefundRequestForm() {
     const fd = new FormData(e.currentTarget);
     const yuan = String(fd.get("amountYuan") ?? "").trim();
     const userNote = String(fd.get("userNote") ?? "").trim();
-    let requestedAmountMinor: number | null = null;
+    let requestedAmountPoints: number | null = null;
     if (yuan) {
       const n = Math.round(parseFloat(yuan) * 100);
       if (!Number.isFinite(n) || n <= 0) {
@@ -27,13 +27,13 @@ export function WalletRefundRequestForm() {
         setLoading(false);
         return;
       }
-      requestedAmountMinor = n;
+      requestedAmountPoints = n;
     }
     try {
       const res = await fetch("/api/account/wallet-refund", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestedAmountMinor, userNote: userNote || undefined }),
+        body: JSON.stringify({ requestedAmountPoints, userNote: userNote || undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

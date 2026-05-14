@@ -38,7 +38,7 @@ export async function applyMockSubscriptionPayment(
         userId,
         type: "SUBSCRIPTION",
         status: "PAID",
-        amountMinor: plan.priceMinor,
+        amountPoints: plan.pricePoints,
         paidAt: new Date(),
         meta: {
           mock: true,

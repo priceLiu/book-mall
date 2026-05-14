@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,19 +12,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import {
-  MOCK_TOPUP_CUSTOM_MAX_MINOR,
-  MOCK_TOPUP_CUSTOM_MIN_MINOR,
+  MOCK_TOPUP_CUSTOM_MAX_POINTS,
+  MOCK_TOPUP_CUSTOM_MIN_POINTS,
   MOCK_TOPUP_PRESETS,
-  isAllowedMockTopupAmountMinor,
+  isAllowedMockTopupAmountPoints,
 } from "@/lib/apply-mock-topup";
 import { FakeQrPlaceholder } from "@/components/pay/fake-qr-placeholder";
 
 const PRESETS = MOCK_TOPUP_PRESETS as readonly number[];
 
-const CUSTOM_MIN_YUAN = MOCK_TOPUP_CUSTOM_MIN_MINOR / 100;
-const CUSTOM_MAX_YUAN = MOCK_TOPUP_CUSTOM_MAX_MINOR / 100;
+const CUSTOM_MIN_YUAN = MOCK_TOPUP_CUSTOM_MIN_POINTS / 100;
+const CUSTOM_MAX_YUAN = MOCK_TOPUP_CUSTOM_MAX_POINTS / 100;
+
+export type MockTopupUnusedCoupon = {
+  id: string;
+  titleSnap: string;
+  paidAmountPointsSnap: number;
+  bonusPointsSnap: number;
+  expiresAt: string;
+};
 
 function parseIntegerYuan(raw: string): number | null {
   const t = raw.trim();
@@ -33,21 +41,28 @@ function parseIntegerYuan(raw: string): number | null {
   return Number.isNaN(y) ? null : y;
 }
 
-function initialCustomYuanField(amountMinor: number): string {
-  if (PRESETS.includes(amountMinor)) return "";
+function initialCustomYuanField(amountPoints: number): string {
+  if (PRESETS.includes(amountPoints)) return "";
   if (
-    amountMinor >= MOCK_TOPUP_CUSTOM_MIN_MINOR &&
-    amountMinor <= MOCK_TOPUP_CUSTOM_MAX_MINOR &&
-    amountMinor % 100 === 0
+    amountPoints >= MOCK_TOPUP_CUSTOM_MIN_POINTS &&
+    amountPoints <= MOCK_TOPUP_CUSTOM_MAX_POINTS &&
+    amountPoints % 100 === 0
   ) {
-    return String(amountMinor / 100);
+    return String(amountPoints / 100);
   }
   return "";
 }
 
-export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: number }) {
-  const [amountMinor, setAmountMinor] = useState(initialAmountMinor);
-  const [customYuan, setCustomYuan] = useState(() => initialCustomYuanField(initialAmountMinor));
+export function MockTopupCheckout({
+  initialAmountPoints,
+  unusedCoupons,
+}: {
+  initialAmountPoints: number;
+  unusedCoupons: MockTopupUnusedCoupon[];
+}) {
+  const [amountPoints, setAmountPoints] = useState(initialAmountPoints);
+  const [customYuan, setCustomYuan] = useState(() => initialCustomYuanField(initialAmountPoints));
+  const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -57,11 +72,22 @@ export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: 
     customYuan.trim() !== "" &&
     (customYuanNum === null || customYuanNum < CUSTOM_MIN_YUAN || customYuanNum > CUSTOM_MAX_YUAN);
 
+  const matchingCoupons = useMemo(
+    () => unusedCoupons.filter((c) => c.paidAmountPointsSnap === amountPoints),
+    [unusedCoupons, amountPoints],
+  );
+
+  const selectedBonus =
+    selectedCouponId &&
+    matchingCoupons.some((c) => c.id === selectedCouponId)
+      ? (matchingCoupons.find((c) => c.id === selectedCouponId)?.bonusPointsSnap ?? 0)
+      : 0;
+
   const applyCustomYuan = useCallback((raw: string) => {
     setCustomYuan(raw);
     const y = parseIntegerYuan(raw);
     if (y !== null && y >= CUSTOM_MIN_YUAN && y <= CUSTOM_MAX_YUAN) {
-      setAmountMinor(y * 100);
+      setAmountPoints(y * 100);
     }
   }, []);
 
@@ -71,16 +97,22 @@ export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: 
       setMsg(`请输入 ${CUSTOM_MIN_YUAN}～${CUSTOM_MAX_YUAN} 之间的整数金额（元）`);
       return;
     }
-    if (!isAllowedMockTopupAmountMinor(amountMinor)) {
+    if (!isAllowedMockTopupAmountPoints(amountPoints)) {
       setMsg(`金额须为快捷档位，或 ${CUSTOM_MIN_YUAN}～${CUSTOM_MAX_YUAN} 元整数`);
       return;
     }
     setBusy(true);
     try {
+      const body: { amountPoints: number; rechargeCouponId?: string } = {
+        amountPoints,
+      };
+      if (selectedCouponId && matchingCoupons.some((c) => c.id === selectedCouponId)) {
+        body.rechargeCouponId = selectedCouponId;
+      }
       const res = await fetch("/api/dev/mock-topup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amountMinor }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -92,7 +124,9 @@ export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: 
     } finally {
       setBusy(false);
     }
-  }, [amountMinor, customInvalid]);
+  }, [amountPoints, customInvalid, matchingCoupons, selectedCouponId, router]);
+
+  const totalCredit = amountPoints + selectedBonus;
 
   return (
     <main className="container max-w-lg mx-auto px-4 py-16 md:py-24">
@@ -101,22 +135,27 @@ export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: 
           <CardTitle>模拟收银（钱包充值）</CardTitle>
           <CardDescription>
             高级能力需「订阅有效 + 余额不低于最低线」。以下为过渡演示：占位二维码 +「支付成功」等同到账。
+            充送须先在{" "}
+            <Link href="/account/recharge-promos" className="text-primary underline">
+              充值优惠
+            </Link>{" "}
+            领取优惠券，支付时核销。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8 flex flex-col items-center">
           <div className="flex flex-wrap justify-center gap-2 w-full">
-            {PRESETS.map((minor) => (
+            {PRESETS.map((pts) => (
               <Button
-                key={minor}
+                key={pts}
                 type="button"
-                variant={amountMinor === minor ? "default" : "outline"}
+                variant={amountPoints === pts ? "default" : "outline"}
                 size="sm"
                 onClick={() => {
-                  setAmountMinor(minor);
+                  setAmountPoints(pts);
                   setCustomYuan("");
                 }}
               >
-                ¥{minor / 100}
+                ¥{pts / 100}
               </Button>
             ))}
           </div>
@@ -148,9 +187,65 @@ export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: 
           </div>
 
           <div className="text-center space-y-1 w-full">
-            <p className="font-semibold text-lg">充值到账金额</p>
+            <p className="font-semibold text-lg">实付金额</p>
             <p className="text-3xl font-bold tabular-nums pt-2">
-              ¥{formatMinorAsYuan(amountMinor)}
+              ¥{formatPointsAsYuan(amountPoints)}
+            </p>
+            {matchingCoupons.length > 0 ? (
+              <div className="pt-4 w-full max-w-md mx-auto text-left space-y-3 border-t border-border/60 mt-4">
+                <p className="text-sm font-medium text-center">
+                  本档位可用优惠券（{matchingCoupons.length}）
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li>
+                    <label className="flex items-start gap-2 cursor-pointer rounded-md border border-border/80 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                      <input
+                        type="radio"
+                        name="rechargeCoupon"
+                        className="mt-1"
+                        checked={selectedCouponId == null}
+                        onChange={() => setSelectedCouponId(null)}
+                      />
+                      <span className="flex-1 leading-snug">
+                        <span className="font-medium">不使用优惠券</span>
+                        <span className="block text-muted-foreground text-xs mt-1">
+                          仅实付金额到账，已领的券可留待下次（注意券面有效期）。
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                  {matchingCoupons.map((c) => (
+                    <li key={c.id}>
+                      <label className="flex items-start gap-2 cursor-pointer rounded-md border border-border/80 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                        <input
+                          type="radio"
+                          name="rechargeCoupon"
+                          className="mt-1"
+                          checked={selectedCouponId === c.id}
+                          onChange={() => setSelectedCouponId(c.id)}
+                        />
+                        <span className="flex-1 leading-snug">
+                          <span className="font-medium">{c.titleSnap}</span>
+                          <span className="block text-muted-foreground text-xs mt-1 tabular-nums">
+                            另送 {c.bonusPointsSnap.toLocaleString("zh-CN")} 点（¥
+                            {formatPointsAsYuan(c.bonusPointsSnap)}）· 有效期至{" "}
+                            {new Date(c.expiresAt).toLocaleString("zh-CN")}
+                          </span>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground text-center">
+                  有多张券时仅能核销一张；对账以订单关联的券 ID 为准。
+                </p>
+              </div>
+            ) : null}
+            <p className="text-sm text-muted-foreground pt-2">
+              预计到账合计（含赠送）:{" "}
+              <span className="font-semibold text-foreground tabular-nums">
+                ¥{formatPointsAsYuan(totalCredit)}
+              </span>
             </p>
           </div>
 

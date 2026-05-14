@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import {
   updatePlatformBillingConfig,
   updateSubscriptionPlanPrice,
@@ -43,7 +43,7 @@ export default async function AdminBillingPage() {
     }),
     prisma.walletEntry.aggregate({
       where: { type: "RECHARGE" },
-      _sum: { amountMinor: true },
+      _sum: { amountPoints: true },
     }),
   ]);
 
@@ -51,19 +51,22 @@ export default async function AdminBillingPage() {
     return <p className="text-destructive text-sm">请先执行 pnpm db:seed</p>;
   }
 
-  const totalRecharge = rechargeAgg._sum.amountMinor ?? 0;
+  const totalRecharge = rechargeAgg._sum.amountPoints ?? 0;
 
   return (
     <div className="space-y-10">
       <div>
         <h1 className="text-2xl font-bold">订阅与充值管理（5.3）</h1>
         <p className="text-sm text-muted-foreground">
-          计费配置、订阅套餐价格、订单查阅、手动续期与订阅提现审核入口；可配置项同步满足{" "}
-          <strong>第七章·运营公示</strong> 的前台文案数据来源。
+          计费配置、订阅套餐价格、订单查阅、手动续期与订阅提现审核入口；前台「第七章」细则见{" "}
+          <a href="/pricing-disclosure" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+            价格公示与使用说明
+          </a>
+          与首页计费摘要。
         </p>
         <p className="mt-2 text-sm tabular-nums">
           历史充值入账合计（流水 RECHARGE）：{" "}
-          <span className="font-semibold">¥{formatMinorAsYuan(totalRecharge)}</span>
+          <span className="font-semibold">¥{formatPointsAsYuan(totalRecharge)}</span>
         </p>
       </div>
 
@@ -71,17 +74,17 @@ export default async function AdminBillingPage() {
         <CardHeader>
           <CardTitle>计费配置</CardTitle>
           <CardDescription>
-            最低余额线、预警线、LLM/工具参考单价（分）、异常消耗倍数（%）
+            最低余额线、预警线、LLM/工具参考单价（点，1 点 = ¥0.01）、异常消耗倍数（%）
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form action={updatePlatformBillingConfig} className="grid gap-4 sm:grid-cols-2">
-            <Field label="最低余额线（分）" name="minBalanceLineMinor" defaultValue={config.minBalanceLineMinor} />
-            <Field label="较高预警线（分）" name="balanceWarnHighMinor" defaultValue={config.balanceWarnHighMinor} />
-            <Field label="中等预警线（分）" name="balanceWarnMidMinor" defaultValue={config.balanceWarnMidMinor} />
-            <Field label="LLM 输入 / 千 token（分）" name="llmInputPer1kTokensMinor" defaultValue={config.llmInputPer1kTokensMinor} />
-            <Field label="LLM 输出 / 千 token（分）" name="llmOutputPer1kTokensMinor" defaultValue={config.llmOutputPer1kTokensMinor} />
-            <Field label="工具单次调用（分）" name="toolInvokePerCallMinor" defaultValue={config.toolInvokePerCallMinor} />
+            <Field label="最低余额线（点）" name="minBalanceLinePoints" defaultValue={config.minBalanceLinePoints} />
+            <Field label="较高预警线（点）" name="balanceWarnHighPoints" defaultValue={config.balanceWarnHighPoints} />
+            <Field label="中等预警线（点）" name="balanceWarnMidPoints" defaultValue={config.balanceWarnMidPoints} />
+            <Field label="LLM 输入 / 千 token（点）" name="llmInputPer1kTokensPoints" defaultValue={config.llmInputPer1kTokensPoints} />
+            <Field label="LLM 输出 / 千 token（点）" name="llmOutputPer1kTokensPoints" defaultValue={config.llmOutputPer1kTokensPoints} />
+            <Field label="工具单次调用（点）" name="toolInvokePerCallPoints" defaultValue={config.toolInvokePerCallPoints} />
             <Field label="异常消耗倍数（%）" name="usageAnomalyRatioPercent" defaultValue={config.usageAnomalyRatioPercent} />
             <div className="sm:col-span-2">
               <Button type="submit">保存配置</Button>
@@ -93,7 +96,7 @@ export default async function AdminBillingPage() {
       <Card>
         <CardHeader>
           <CardTitle>订阅套餐价格</CardTitle>
-          <CardDescription>月度/年度标价（分）；真实支付接入后可与订单联动</CardDescription>
+          <CardDescription>月度/年度标价（点）；真实支付接入后可与订单联动</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
           {plans.map((plan) => (
@@ -108,12 +111,12 @@ export default async function AdminBillingPage() {
                     {plan.name}{" "}
                     <span className="text-muted-foreground">({plan.slug})</span>
                   </p>
-                  <Label className="text-xs text-muted-foreground">价格（分）</Label>
+                  <Label className="text-xs text-muted-foreground">价格（点）</Label>
                   <Input
-                    name="priceMinor"
+                    name="pricePoints"
                     type="number"
                     className="mt-1 w-40"
-                    defaultValue={plan.priceMinor}
+                    defaultValue={plan.pricePoints}
                     required
                     min={0}
                   />
@@ -225,7 +228,7 @@ export default async function AdminBillingPage() {
                   <td className="p-2">{o.user.email}</td>
                   <td className="p-2">{o.type}</td>
                   <td className="p-2">{o.status}</td>
-                  <td className="p-2 tabular-nums">¥{formatMinorAsYuan(o.amountMinor)}</td>
+                  <td className="p-2 tabular-nums">¥{formatPointsAsYuan(o.amountPoints)}</td>
                   <td className="p-2">{o.refundedAt ? "已提" : "—"}</td>
                   <td className="p-2">
                     {o.type === "SUBSCRIPTION" &&

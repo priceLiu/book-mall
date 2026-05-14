@@ -13,10 +13,11 @@
 ## 交互约定（钱包充值）
 
 1. **同样**：占位二维码 + **「支付成功」** 后入账。
-2. **档位**：页面上可选 **¥50 / ¥100 / ¥200**（服务端白名单，见 `lib/apply-mock-topup.ts`），写入：
-   - `Order`（`type: WALLET_TOPUP`，`PAID`）
-   - `Wallet.balanceMinor` 增加、`WalletEntry`（`RECHARGE`）
-3. **路由**：已登录 → **`/pay/mock-topup`**（可选 query **`amount`** = 分，如 `10000`；非法或未传则默认 ¥100）。
+2. **档位**：页面上可选 **¥50 / ¥100 / ¥200 / ¥500**（服务端白名单，见 `lib/apply-mock-topup.ts`），经 `fulfillWalletTopupCredits` 写入：
+   - `Order`（`type: WALLET_TOPUP`，`PAID`，`amountPoints` = 到账点数合计）
+   - `Wallet.balancePoints` 增加、`WalletEntry`（`RECHARGE`；若有「充送」则为同一订单下 **两条** RECHARGE）
+3. **充送（演示）**：须在 **`/account/recharge-promos`** 先 **领取优惠券**，再在收银台 **勾选核销**（仅与当前实付档位一致的未过期 `UNUSED` 券）。`POST /api/dev/mock-topup` 可选 JSON **`rechargeCouponId`**（字符串）；不传则仅实付到账。约定见 `doc/product/points-wallet-topup-spec.md`。
+4. **路由**：已登录 → **`/pay/mock-topup`**（可选 query **`amount`** = 点，如 `10000`；非法或未传则默认 ¥100）。
 
 高级能力（高阶/按量工具）产品规则侧重：**订阅有效** 且 **余额不低于最低线**；演示路径建议先走订阅收银再走充值收银。
 
@@ -37,7 +38,7 @@
 ## 相关代码入口
 
 - 订阅：`components/subscribe/subscribe-client.tsx` → `/pay/mock-subscribe`
-- 充值：`app/(account)/account/page.tsx`、`app/(site)/subscribe/page.tsx` → `/pay/mock-topup`
+- 充值：`app/(account)/account/page.tsx`、`app/(site)/subscribe/page.tsx` → `/pay/mock-topup`；充送领取 → **`/account/recharge-promos`**
 - 订阅收银 UI：`app/(site)/pay/mock-subscribe/page.tsx`、`components/pay/mock-subscribe-checkout.tsx`
 - 充值收银 UI：`app/(site)/pay/mock-topup/page.tsx`、`components/pay/mock-topup-checkout.tsx`
 - 占位二维码：`components/pay/fake-qr-placeholder.tsx`

@@ -4,8 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { allowDevMockPaymentApis } from "@/lib/dev-mock-payment";
 import {
   applyMockWalletTopup,
-  normalizeMockTopupAmountMinor,
-  type MockTopupAmountMinor,
+  normalizeMockTopupAmountPoints,
+  type MockTopupAmountPoints,
 } from "@/lib/apply-mock-topup";
 
 export const dynamic = "force-dynamic";
@@ -24,23 +24,39 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  let amountMinor: MockTopupAmountMinor = normalizeMockTopupAmountMinor(undefined);
+  let amountPoints: MockTopupAmountPoints = normalizeMockTopupAmountPoints(undefined);
+  let rechargeCouponId: string | undefined;
   try {
     const body = await req.json();
-    amountMinor = normalizeMockTopupAmountMinor(body?.amountMinor);
+    amountPoints = normalizeMockTopupAmountPoints(body?.amountPoints);
+    const cid = body?.rechargeCouponId;
+    if (typeof cid === "string" && cid.trim()) {
+      rechargeCouponId = cid.trim();
+    }
   } catch {
     /* empty / invalid JSON — default amount */
   }
 
   try {
-    const { orderId, balanceAfterMinor } = await applyMockWalletTopup(
-      session.user.id,
-      amountMinor,
-    );
-    return NextResponse.json({ ok: true, orderId, balanceAfterMinor });
+    const { orderId, balanceAfterPoints, creditedTotalPoints } =
+      await applyMockWalletTopup(session.user.id, amountPoints, {
+        rechargeCouponId,
+      });
+    return NextResponse.json({
+      ok: true,
+      orderId,
+      balanceAfterPoints,
+      creditedTotalPoints,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "充值失败";
-    const status = message.includes("不在允许范围") ? 400 : 500;
+    const status =
+      message.includes("不在允许范围") ||
+      message.includes("优惠券") ||
+      message.includes("档位") ||
+      message.includes("不可同时")
+        ? 400
+        : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

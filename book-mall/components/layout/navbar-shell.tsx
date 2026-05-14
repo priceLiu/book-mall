@@ -32,6 +32,7 @@ interface RouteProps {
 const routeList: RouteProps[] = [
   { href: "#testimonials", label: "客户评价" },
   { href: "#pricing", label: "价格" },
+  { href: "/pricing-disclosure", label: "价格公示" },
   { href: "#contact", label: "联系" },
   { href: "#faq", label: "常见问题" },
 ];

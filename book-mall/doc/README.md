@@ -9,6 +9,7 @@
 | [00-overview.md](./product/00-overview.md) | 文档目的、定位、名词、文档关系 |
 | [01-catalog-and-permissions.md](./product/01-catalog-and-permissions.md) | 产品分类、权限矩阵 |
 | [02-users-billing-and-balance.md](./product/02-users-billing-and-balance.md) | 用户层级、订阅与余额、最低余额线、提现结算 |
+| [**points-wallet-topup-spec.md**](./product/points-wallet-topup-spec.md) | **点数口径、充值入账、充送优惠券（模板/领取/核销）、meta 与对账** |
 | [03-metering-llm-and-tools.md](./product/03-metering-llm-and-tools.md) | 大模型/高阶工具计量方案、水位预警（含后台） |
 | [04-user-center.md](./product/04-user-center.md) | 前台用户中心 |
 | [05-admin.md](./product/05-admin.md) | 后台管理（含预警与对账） |
