@@ -1133,6 +1133,155 @@
   margin: 0.2rem 0;
 }
 
+.visual-lab-theme-root .vl-analysis-reply-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.65rem;
+}
+
+.visual-lab-theme-root .vl-analysis-code-fence {
+  margin: 0.65rem 0;
+  border-radius: 10px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface-2);
+  overflow: hidden;
+}
+
+.visual-lab-theme-root .vl-analysis-code-fence-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--vl-border-strong);
+  background: color-mix(in srgb, var(--vl-surface) 70%, var(--vl-surface-2));
+}
+
+.visual-lab-theme-root .vl-analysis-code-fence-lang {
+  margin-right: auto;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-analysis-code-fence-btn {
+  flex-shrink: 0;
+  padding: 0.22rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  color: var(--vl-fg);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.visual-lab-theme-root .vl-analysis-code-fence-btn:hover {
+  border-color: var(--vl-accent);
+  background: color-mix(in srgb, var(--vl-accent) 8%, var(--vl-surface));
+  color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-analysis-code-fence-btn--accent {
+  border-color: color-mix(in srgb, var(--vl-accent) 45%, var(--vl-border-strong));
+  color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-analysis-code-fence-pre {
+  margin: 0;
+  max-height: none;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0;
+  overflow-x: auto;
+  background: var(--vl-surface);
+  border: none;
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-analysis-code-fence-pre code {
+  font-size: 0.8125rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-analysis-code-fence-pre--raw {
+  border-radius: 8px;
+  border: 1px solid var(--vl-border-strong);
+}
+
+.visual-lab-theme-root .vl-analysis-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-analysis-preview-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(96vw, 920px);
+  max-height: min(92vh, 900px);
+  border-radius: 12px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-analysis-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface-2);
+}
+
+.visual-lab-theme-root .vl-analysis-preview-title {
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-analysis-preview-hint {
+  margin: 0;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--vl-muted);
+  background: color-mix(in srgb, var(--vl-accent) 6%, var(--vl-surface));
+  border-bottom: 1px solid var(--vl-border);
+}
+
+.visual-lab-theme-root .vl-analysis-preview-iframe {
+  flex: 1 1 0%;
+  min-height: min(70vh, 560px);
+  width: 100%;
+  border: none;
+  background: #fff;
+  color-scheme: light;
+}
+
+.visual-lab-theme-root[data-theme="light"] .vl-analysis-preview-iframe {
+  background: #fff;
+}
+
 .visual-lab-theme-root .vl-analysis-md hr {
   margin: 0.75rem 0;
   border: none;
@@ -1147,7 +1296,7 @@
   border: 1px solid var(--vl-border);
 }
 
-.visual-lab-theme-root .vl-analysis-md pre {
+.visual-lab-theme-root .vl-analysis-md pre:not(.vl-analysis-code-fence-pre):not(.vl-analysis-code-fence-pre--raw) {
   margin: 0.5rem 0;
   padding: 0.65rem 0.75rem;
   border-radius: 8px;
@@ -1156,7 +1305,7 @@
   border: 1px solid var(--vl-border-strong);
 }
 
-.visual-lab-theme-root .vl-analysis-md pre code {
+.visual-lab-theme-root .vl-analysis-md pre:not(.vl-analysis-code-fence-pre):not(.vl-analysis-code-fence-pre--raw) code {
   padding: 0;
   border: none;
   background: none;
