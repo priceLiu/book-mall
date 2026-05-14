@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 export type EffectiveBillableRow = {
   toolKey: string;
   action: string | null;
+  schemeARefModelKey: string | null;
   pricePoints: number;
   effectiveFrom: Date;
   effectiveTo: Date | null;
@@ -10,7 +11,8 @@ export type EffectiveBillableRow = {
 };
 
 /**
- * 前台公示：当前仍处于生效区间内的按次标价；每个 (toolKey, action) 仅保留最近生效的一条。
+ * 前台公示：当前仍处于生效区间内的按次标价。
+ * 同一 (toolKey, action) 若有多行（如分析室按参考模型分行），按 schemeARefModelKey 区分各保留一条最新生效的。
  */
 export async function getEffectiveBillablePricesForDisclosure(
   now = new Date(),
@@ -23,6 +25,8 @@ export async function getEffectiveBillablePricesForDisclosure(
     },
     orderBy: [
       { toolKey: "asc" },
+      { action: "asc" },
+      { schemeARefModelKey: "asc" },
       { effectiveFrom: "desc" },
       { updatedAt: "desc" },
     ],
@@ -31,12 +35,14 @@ export async function getEffectiveBillablePricesForDisclosure(
   const seen = new Set<string>();
   const out: EffectiveBillableRow[] = [];
   for (const r of rows) {
-    const k = `${r.toolKey}\0${r.action ?? ""}`;
+    const ref = r.schemeARefModelKey ?? "";
+    const k = `${r.toolKey}\0${r.action ?? ""}\0${ref}`;
     if (seen.has(k)) continue;
     seen.add(k);
     out.push({
       toolKey: r.toolKey,
       action: r.action,
+      schemeARefModelKey: r.schemeARefModelKey ?? null,
       pricePoints: r.pricePoints,
       effectiveFrom: r.effectiveFrom,
       effectiveTo: r.effectiveTo,
@@ -49,8 +55,18 @@ export async function getEffectiveBillablePricesForDisclosure(
     if (tk !== 0) return tk;
     if (a.action == null && b.action != null) return 1;
     if (a.action != null && b.action == null) return -1;
-    if (a.action == null && b.action == null) return 0;
-    return (a.action ?? "").localeCompare(b.action ?? "", "zh-CN");
+    if (a.action == null && b.action == null) {
+      return (a.schemeARefModelKey ?? "").localeCompare(
+        b.schemeARefModelKey ?? "",
+        "zh-CN",
+      );
+    }
+    const ac = (a.action ?? "").localeCompare(b.action ?? "", "zh-CN");
+    if (ac !== 0) return ac;
+    return (a.schemeARefModelKey ?? "").localeCompare(
+      b.schemeARefModelKey ?? "",
+      "zh-CN",
+    );
   });
 
   return out;

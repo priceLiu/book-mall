@@ -13,12 +13,13 @@ export const zh = {
     uploadOnePiece: "上传连体装",
     uploadHint: "点击或拖拽图片到这里",
     uploadOfficialSample: "没有合适的图片？使用官方示例",
-    freeQuota: "免费额度",
-    quotaValueDemo: "385 / 400",
     startFitting: "开始试衣",
-    tryOnChargeLineSub: "单次成片成功，扣费 100 点（¥1.00）",
+    tryOnChargeLineSub: "成片 1 次，扣费以「费用 → 价格表」为准",
+    tryOnChargeLineLoading: "成片 1 次，扣费计算中…",
     tryOnChargeLineTitle:
-      "按主站「工具管理」定价从工具账户扣费；仅在试衣成片成功时结算。",
+      "从工具账户扣费；仅在试衣成片成功后结算；具体点数与价格表「方案 A · AI 试衣」一致。",
+    tryOnChargeLineTitleFallback:
+      "单次成片扣费以主站配置与「费用 → 价格表」为准；标价加载失败时请刷新页面或联系管理员。",
     tryOnBusy: "试衣中…",
     disclaimer:
       "试用页面生成结果仅供参考；请勿将生成内容用于违法违规用途。输出内容由 AI 生成。",

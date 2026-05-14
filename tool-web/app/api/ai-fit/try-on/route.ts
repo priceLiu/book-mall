@@ -15,6 +15,11 @@ import {
 } from "@/lib/ai-fit-dashscope";
 import { readOssEnv } from "@/lib/oss-client";
 import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
+import {
+  computeAiTryOnChargePoints,
+  resolveAiTryOnBillingModelId,
+} from "@/lib/tools-scheme-a-pricing";
+import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
 
 export const runtime = "nodejs";
 
@@ -51,13 +56,26 @@ async function reportAiFitTryOnUsage(opts: {
   persistedToOwnOss: boolean;
 }): Promise<AiFitTryOnUsagePayload> {
   try {
+    const tryOnModelId = resolveAiTryOnBillingModelId();
+    const { multiplier: retailMult } = await getSchemeARetailMultiplierServer({
+      toolKey: AI_FIT_USAGE_TOOL_KEY,
+      modelKey: tryOnModelId,
+    });
+    const billingPoints = computeAiTryOnChargePoints(tryOnModelId, retailMult);
+    if (billingPoints <= 0) {
+      return { recorded: false, error: "试衣方案 A 标价未配置或无效" };
+    }
     const usage = await postToolUsageFromServerWithRetries({
       toolKey: AI_FIT_USAGE_TOOL_KEY,
       action: "try_on",
+      costPoints: billingPoints,
       meta: {
         taskId: opts.taskId,
         resultImageUrl: opts.imageUrl,
         persistedToOwnOss: opts.persistedToOwnOss,
+        pricingScheme: "tools_scheme_a",
+        tryOnModel: tryOnModelId,
+        retailMultiplier: retailMult,
       },
     });
     if (!usage.ok) {

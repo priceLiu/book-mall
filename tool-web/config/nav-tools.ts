@@ -92,6 +92,11 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
     children: [
       { href: "/app-history", label: "费用使用明细", navKey: "app-history" },
       {
+        href: "/app-history/price-list",
+        label: "价格表",
+        navKey: "app-history",
+      },
+      {
         href: "/app-history/plan-rules",
         label: "计费规则说明",
         navKey: "app-history",

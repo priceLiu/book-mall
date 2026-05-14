@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUp,
@@ -487,6 +487,39 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
     null,
   );
 
+  const [billablePricePoints, setBillablePricePoints] = useState<number | null>(null);
+  const [billablePriceLoading, setBillablePriceLoading] = useState(true);
+
+  const refetchBillablePrice = useCallback(async () => {
+    setBillablePriceLoading(true);
+    try {
+      const qs = new URLSearchParams({ modelId });
+      const r = await fetch(`/api/visual-lab/billable-hint?${qs}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      const d = (await r.json().catch(() => null)) as { pricePoints?: unknown } | null;
+      if (r.ok && d && typeof d.pricePoints === "number" && Number.isFinite(d.pricePoints)) {
+        setBillablePricePoints(Math.max(0, Math.floor(d.pricePoints)));
+      } else {
+        setBillablePricePoints(null);
+      }
+    } catch {
+      setBillablePricePoints(null);
+    } finally {
+      setBillablePriceLoading(false);
+    }
+  }, [modelId]);
+
+  useEffect(() => {
+    void refetchBillablePrice();
+  }, [refetchBillablePrice]);
+
+  const displayPricePoints = useMemo(
+    () => billablePricePoints ?? VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS,
+    [billablePricePoints],
+  );
+
   const showUploadFail = useCallback((msg: string) => {
     setUploadFailText(msg);
     window.setTimeout(() => setUploadFailText(null), 6000);
@@ -892,7 +925,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
           const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
           if (res.status === 402) {
             const req = data ? readRequiredPointsFromSettleJson(data) : undefined;
-            const suffix = formatRequiredPointsShortfall(req ?? VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS);
+            const suffix = formatRequiredPointsShortfall(req ?? displayPricePoints);
             throw new Error(`余额不足：${suffix}`);
           }
           const msg =
@@ -956,7 +989,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
         setAnalyzing(false);
       }
     },
-    [analyzing, modelId, thinkingTokens, showUploadFail, refetchWallet],
+    [analyzing, modelId, thinkingTokens, showUploadFail, refetchWallet, displayPricePoints],
   );
 
   const handleSend = useCallback(async () => {
@@ -1210,6 +1243,31 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                 <ChevronDown className="h-4 w-4" />
               </button>
             </div>
+            <p className="vl-muted mt-2 text-center text-xs leading-relaxed">
+              单次分析按主站标价扣费一次（与{" "}
+              <Link href="/app-history/price-list" className="underline decoration-dotted underline-offset-2">
+                价格表
+              </Link>{" "}
+              中「视觉实验室 · 分析室」一致）。
+              {billablePriceLoading && billablePricePoints == null ? (
+                <>
+                  {" "}
+                  单价<strong className="tabular-nums text-[var(--vl-fg)]">读取中…</strong>
+                </>
+              ) : (
+                <>
+                  {" "}
+                  当前为{" "}
+                  <strong className="tabular-nums text-[var(--vl-fg)]">
+                    {displayPricePoints.toLocaleString("zh-CN")} 点
+                  </strong>
+                  <span className="opacity-90">（¥{(displayPricePoints / 100).toFixed(2)}）</span>
+                  {billablePricePoints == null ? (
+                    <span className="opacity-80">（以下为主站未返回时的参考值）</span>
+                  ) : null}
+                </>
+              )}
+            </p>
             {modelMenuOpen ? (
               <div className="vl-model-menu" role="listbox">
                 {VISUAL_LAB_ANALYSIS_MODELS.map((m) => (
@@ -1379,15 +1437,17 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
 
                 <span
                   className="vl-compose-per-call"
-                  title="每次点击发送或模板即扣费一次，与模型输出长度无关（以主站标价为准）"
+                  title="每次点击发送或模板即扣费一次，金额与主站「按次单价」及价格表一致"
                 >
                   每次{" "}
                   <strong className="tabular-nums">
-                    {VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS.toLocaleString("zh-CN")} 点
+                    {billablePriceLoading && billablePricePoints == null
+                      ? "…"
+                      : displayPricePoints.toLocaleString("zh-CN")}
                   </strong>
-                  <span className="opacity-80">
-                    （¥{(VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS / 100).toFixed(2)}）
-                  </span>
+                  {billablePriceLoading && billablePricePoints == null ? null : (
+                    <span className="opacity-80">（¥{(displayPricePoints / 100).toFixed(2)}）</span>
+                  )}
                 </span>
 
                 <input
@@ -1442,8 +1502,8 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                     className="vl-compose-send"
                     data-ready={sendReady}
                     disabled={!sendReady}
-                    aria-label={`发送并扣费 ${VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS} 点`}
-                    title={`发送后先扣 ${VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS.toLocaleString("zh-CN")} 点（¥${(VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS / 100).toFixed(2)}），再拉流模型回复`}
+                    aria-label={`发送并扣费（${displayPricePoints} 点，与主站标价一致）`}
+                    title={`发送后先扣 ${displayPricePoints.toLocaleString("zh-CN")} 点（¥${(displayPricePoints / 100).toFixed(2)}），再拉流模型回复`}
                     onClick={() => void handleSend()}
                   >
                     <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
@@ -1468,7 +1528,10 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                     <span className="vl-analysis-template-card-kicker">{t.title}</span>
                     <p className="vl-analysis-template-card-desc">{t.description}</p>
                     <span className="vl-analysis-template-card-charge" aria-hidden>
-                      每次 {VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS.toLocaleString("zh-CN")} 点
+                      每次{" "}
+                      {billablePriceLoading && billablePricePoints == null
+                        ? "…"
+                        : `${displayPricePoints.toLocaleString("zh-CN")} 点`}
                     </span>
                     <div className="vl-analysis-template-card-media">
                       {t.mode === "video" ? (

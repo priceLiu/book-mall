@@ -7,7 +7,8 @@
     "build": "next build",
     "build:docker": "next build",
     "start": "next start -p 3001",
-    "lint": "next lint"
+    "lint": "next lint",
+    "pricing:extract-price-md": "npx --yes tsx scripts/pricing-extract-price-md.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.2",

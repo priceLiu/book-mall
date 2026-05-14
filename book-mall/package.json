@@ -19,7 +19,12 @@
     "db:seed": "dotenv -e .env.local -- prisma db seed",
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",
-    "db:calibrate-pilot": "dotenv -e .env.local -- tsx scripts/calibrate-pilot-tool-billing.ts"
+    "db:calibrate-pilot": "dotenv -e .env.local -- tsx scripts/calibrate-pilot-tool-billing.ts",
+    "pricing:bootstrap": "dotenv -e .env.local -- tsx scripts/pricing-bootstrap.ts",
+    "pricing:import-markdown": "dotenv -e .env.local -- tsx scripts/pricing-import-markdown.ts",
+    "pricing:import-csv": "dotenv -e .env.local -- tsx scripts/pricing-import-csv.ts",
+    "pricing:emit-catalogs": "dotenv -e .env.local -- tsx scripts/pricing-emit-catalogs.ts",
+    "pricing:normalize-upload-csv": "tsx scripts/pricing-normalize-upload-csv.ts"
   },
   "dependencies": {
     "@devnomic/marquee": "^1.0.2",

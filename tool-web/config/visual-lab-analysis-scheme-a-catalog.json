@@ -1,0 +1,56 @@
+{
+  "retailMultiplier": 2,
+  "defaultEquivalentInputMillion": 0.35,
+  "defaultEquivalentOutputMillion": 0.57,
+  "schemeNote": "成本字段由主站 PricingSourceLine 经 pnpm pricing:emit-catalogs 同步； retailMultiplier 与等价用量仍以本文件为准；人工请勿手改 input/output 元价。",
+  "models": [
+    {
+      "id": "qwen3.6-plus",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 12,
+      "tierNote": "0<输入Token≤256K · 中国内地"
+    },
+    {
+      "id": "qwen3.6-flash",
+      "inputYuanPerMillion": 1.2,
+      "outputYuanPerMillion": 7.2,
+      "tierNote": "0<输入Token≤256K · 中国内地"
+    },
+    {
+      "id": "qwen3.5-plus",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 4.8,
+      "tierNote": "0<输入Token≤128K · 中国内地"
+    },
+    {
+      "id": "qwen3.5-flash",
+      "inputYuanPerMillion": 0.2,
+      "outputYuanPerMillion": 2,
+      "tierNote": "0<输入Token≤128K · 中国内地"
+    },
+    {
+      "id": "qwen3-vl-plus",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 10,
+      "tierNote": "0<输入Token≤32K · 中国内地"
+    },
+    {
+      "id": "qwen3-vl-flash",
+      "inputYuanPerMillion": 0.15,
+      "outputYuanPerMillion": 1.5,
+      "tierNote": "0<输入Token≤32K · 中国内地"
+    },
+    {
+      "id": "qwen-vl-max",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 4,
+      "tierNote": "无阶梯 · 中国内地"
+    },
+    {
+      "id": "qwen-vl-plus",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "tierNote": "无阶梯 · 中国内地"
+    }
+  ]
+}
