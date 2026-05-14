@@ -387,7 +387,7 @@ model Order {
   currency    String      @default("CNY")
   /// 订阅目标 planSlug、充值档位等
   meta        Json?
-  /// 订阅类订单完成退款处理后标记
+  /// 订阅类订单完成提现处理后标记
   refundedAt  DateTime?
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -399,23 +399,23 @@ model Order {
   @@index([userId, createdAt])
 }
 
-// —— 退款审核（产品 6.3 / 5.3）——
+// —— 提现审核（产品 6.3 / 5.3）——
 enum RefundRequestStatus {
   PENDING
   COMPLETED
   REJECTED
 }
 
-/// 余额退款：用户申请 → 后台核算应扣未扣 → 扣减后退还（流水入账）
+/// 余额提现：用户申请 → 后台核算应扣未扣 → 扣减后入账（流水记提现）
 model WalletRefundRequest {
   id        String @id @default(cuid())
   userId    String
   status    RefundRequestStatus @default(PENDING)
-  /// 申请退还金额（分），null 表示按「可退余额」由后台核算
+  /// 申请提现金额（分），null 表示按「可提现余额」由后台核算
   requestedAmountMinor Int?
   /// 应扣未扣（分），管理员核准
   pendingSettlementMinor Int @default(0)
-  /// 实际从钱包扣减并记为退款的金额（分）
+  /// 实际从钱包扣减并记为提现的金额（分）
   refundAmountMinor      Int?
   userNote               String?
   adminNote              String?
@@ -429,7 +429,7 @@ model WalletRefundRequest {
   @@index([status, createdAt])
 }
 
-/// 订阅订单退款审核（政策独立于余额退款）
+/// 订阅订单提现审核（政策独立于余额提现）
 model SubscriptionRefundRequest {
   id         String @id @default(cuid())
   userId     String

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { ImageToVideoHero } from "@/components/ui/hero-image-to-video";
 import { useToolsSession } from "@/components/tool-shell-client";
 
@@ -30,9 +31,6 @@ export function ImageToVideoHomeClient({
         <p className="mt-1 text-sm text-muted-foreground">
           首页导航与文生图一致：生成入口在 <strong>实验室</strong>，资产管理在{" "}
           <strong>我的视频库</strong>。
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          对接推理接口后，将在此补充实现逻辑与计费说明链接。
         </p>
 
         {loading ? (
@@ -82,7 +80,10 @@ export function ImageToVideoHomeClient({
         className="border-t border-border/80 bg-muted/30 py-12"
       >
         <div className="mx-auto max-w-[1100px] px-4 sm:px-6">
-          <h2 className="text-lg font-semibold">能力说明（预览版）</h2>
+          <h2 className="text-lg font-semibold">能力说明</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            <ToolImplementationCrossLink href="/image-to-video/implementation" />
+          </p>
           <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground leading-relaxed">
             <li>
               <strong className="text-foreground">实验室</strong>
@@ -94,7 +95,7 @@ export function ImageToVideoHomeClient({
             </li>
             <li>
               <strong className="text-foreground">我的视频库</strong>
-              ：列表、预览、下载入口对齐「我的图片库」交互；当前为静态示例数据。
+              ：实验室保存后写入主站库存与自有 OSS；列表与配额与主站 SSO 一致。
             </li>
           </ul>
         </div>

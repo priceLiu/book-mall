@@ -1,16 +1,29 @@
 import { prisma } from "@/lib/prisma";
 
-/** 允许的模拟充值档位（分） */
-export const MOCK_TOPUP_PRESETS = [50_00, 100_00, 200_00] as const;
+/** 快捷档位（分） */
+export const MOCK_TOPUP_PRESETS = [50_00, 100_00, 200_00, 500_00] as const;
 
-export type MockTopupAmountMinor = (typeof MOCK_TOPUP_PRESETS)[number];
+export type MockTopupPresetMinor = (typeof MOCK_TOPUP_PRESETS)[number];
 
-export const MOCK_TOPUP_AMOUNT_MINOR_WHITELIST = new Set<number>(MOCK_TOPUP_PRESETS);
+/** 允许提交的模拟充值金额（分）：快捷档位，或 30～1000 元整数 */
+export type MockTopupAmountMinor = number;
 
-/** 默认模拟充值 ¥100（分） */
-export const DEFAULT_MOCK_TOPUP_AMOUNT_MINOR: MockTopupAmountMinor = 100_00;
+export const MOCK_TOPUP_PRESET_WHITELIST = new Set<number>(MOCK_TOPUP_PRESETS);
 
-export function normalizeMockTopupAmountMinor(raw: unknown): MockTopupAmountMinor {
+/** 自定金额下限 / 上限（分），对应 30～1000 元整 */
+export const MOCK_TOPUP_CUSTOM_MIN_MINOR = 30 * 100;
+export const MOCK_TOPUP_CUSTOM_MAX_MINOR = 1000 * 100;
+
+export const DEFAULT_MOCK_TOPUP_AMOUNT_MINOR = 100_00;
+
+export function isAllowedMockTopupAmountMinor(n: number): boolean {
+  if (!Number.isInteger(n) || n <= 0) return false;
+  if (MOCK_TOPUP_PRESET_WHITELIST.has(n)) return true;
+  if (n % 100 !== 0) return false;
+  return n >= MOCK_TOPUP_CUSTOM_MIN_MINOR && n <= MOCK_TOPUP_CUSTOM_MAX_MINOR;
+}
+
+export function normalizeMockTopupAmountMinor(raw: unknown): number {
   const n =
     typeof raw === "number"
       ? raw
@@ -20,18 +33,19 @@ export function normalizeMockTopupAmountMinor(raw: unknown): MockTopupAmountMino
   if (!Number.isFinite(n) || !Number.isInteger(n)) {
     return DEFAULT_MOCK_TOPUP_AMOUNT_MINOR;
   }
-  return MOCK_TOPUP_AMOUNT_MINOR_WHITELIST.has(n)
-    ? (n as MockTopupAmountMinor)
-    : DEFAULT_MOCK_TOPUP_AMOUNT_MINOR;
+  if (isAllowedMockTopupAmountMinor(n)) {
+    return n;
+  }
+  return DEFAULT_MOCK_TOPUP_AMOUNT_MINOR;
 }
 
 /** 模拟充值到账：订单 + 钱包流水 */
 export async function applyMockWalletTopup(
   userId: string,
-  amountMinor: MockTopupAmountMinor,
+  amountMinor: number,
 ): Promise<{ orderId: string; balanceAfterMinor: number }> {
-  if (!MOCK_TOPUP_AMOUNT_MINOR_WHITELIST.has(amountMinor)) {
-    throw new Error("充值金额不在允许的模拟档位内");
+  if (!isAllowedMockTopupAmountMinor(amountMinor)) {
+    throw new Error("充值金额不在允许范围内（快捷档位或 30～1000 元整数）");
   }
 
   return prisma.$transaction(async (tx) => {

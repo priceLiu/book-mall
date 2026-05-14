@@ -107,7 +107,7 @@ export default async function AccountPage({
         <div className="space-y-2">
           <h1 className="text-2xl md:text-3xl font-bold">个人中心</h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            免费注册用户与游客内容权限一致；此处为账户、钱包与订阅入口。计费与退款详见{" "}
+            免费注册用户与游客内容权限一致；此处为账户、钱包与订阅入口。计费与提现详见{" "}
             <Link href="/#billing-policy" className="text-primary underline">
               前台公示
             </Link>
@@ -117,9 +117,9 @@ export default async function AccountPage({
 
         <Card className="border-dashed">
           <CardHeader>
-            <CardTitle className="text-base">计费与退款（摘要）</CardTitle>
+            <CardTitle className="text-base">计费与提现（摘要）</CardTitle>
             <CardDescription>
-              订阅费不可用余额抵扣；高阶/按量依赖余额且须不低于最低线；余额退款须先结清应扣未扣。完整说明见{" "}
+              订阅费不可用余额抵扣；高阶/按量依赖余额且须不低于最低线；余额提现须先结清应扣未扣。完整说明见{" "}
               <Link href="/#billing-policy" className="underline">
                 本站公示
               </Link>
@@ -190,7 +190,7 @@ export default async function AccountPage({
                     {formatMinorAsYuan(goldAccess.minBalanceLineMinor)}）
                   </p>
                 </div>
-                <Button asChild variant="secondary" size="sm" className="mt-2 w-full sm:w-auto">
+                <Button asChild variant="subscription" size="sm" className="mt-2 w-full sm:w-auto">
                   <Link href="/pay/mock-topup">钱包充值（模拟收银）</Link>
                 </Button>
               </CardContent>
@@ -255,12 +255,12 @@ export default async function AccountPage({
 
         <section className="space-y-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold tracking-tight">退款与服务</h2>
+            <h2 className="text-lg font-semibold tracking-tight">提现与服务</h2>
             <Separator className="flex-1" />
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>余额退款申请（6.3）</CardTitle>
+              <CardTitle>余额提现申请（6.3）</CardTitle>
               <CardDescription>
                 提交后由后台核算应扣未扣；处理中金额仍留在钱包，核准后从余额扣减并记流水。
                 {hasPendingWalletRefund ? (
@@ -285,7 +285,7 @@ export default async function AccountPage({
                       <span>{r.createdAt.toLocaleString("zh-CN")}</span>
                       <span className="font-medium text-foreground">{r.status}</span>
                       {r.refundAmountMinor != null ? (
-                        <span>实退 ¥{formatMinorAsYuan(r.refundAmountMinor)}</span>
+                        <span>实提 ¥{formatMinorAsYuan(r.refundAmountMinor)}</span>
                       ) : null}
                     </li>
                   ))}

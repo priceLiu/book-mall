@@ -12,7 +12,7 @@ async function assertAdmin() {
   }
 }
 
-/** 完成余额退款：从钱包扣减 refundAmount，记流水；应扣未扣从额度中扣除 */
+/** 完成余额提现：从钱包扣减 refundAmount，记流水；应扣未扣从额度中扣除 */
 export async function completeWalletRefund(formData: FormData) {
   await assertAdmin();
   const id = String(formData.get("id") ?? "");
@@ -46,12 +46,12 @@ export async function completeWalletRefund(formData: FormData) {
     let refundAmount = cap - pendingSettlementMinor;
     if (overrideRaw != null && String(overrideRaw) !== "") {
       const o = Number(overrideRaw);
-      if (!Number.isInteger(o) || o < 0) throw new Error("退款金额覆盖值无效");
+      if (!Number.isInteger(o) || o < 0) throw new Error("提现金额覆盖值无效");
       refundAmount = o;
     }
-    if (refundAmount <= 0) throw new Error("核算后无可退金额");
+    if (refundAmount <= 0) throw new Error("核算后无可提现金额");
     if (refundAmount > wallet.balanceMinor) {
-      throw new Error("退款额超过可用余额");
+      throw new Error("提现额超过可用余额");
     }
 
     const newBal = wallet.balanceMinor - refundAmount;
@@ -65,7 +65,7 @@ export async function completeWalletRefund(formData: FormData) {
         type: "REFUND",
         amountMinor: -refundAmount,
         balanceAfterMinor: newBal,
-        description: `余额退款核准（应扣未扣 ${pendingSettlementMinor} 分）${adminNote ? ` — ${adminNote}` : ""}`,
+        description: `余额提现核准（应扣未扣 ${pendingSettlementMinor} 分）${adminNote ? ` — ${adminNote}` : ""}`,
       },
     });
     await tx.walletRefundRequest.update({
@@ -113,12 +113,12 @@ export async function createSubscriptionRefundRequest(formData: FormData) {
   });
   if (!order || order.type !== "SUBSCRIPTION") throw new Error("仅支持订阅类订单");
   if (order.status !== "PAID") throw new Error("订单未支付");
-  if (order.refundedAt) throw new Error("该订单已退款");
+  if (order.refundedAt) throw new Error("该订单已完成提现标记");
 
   const existing = await prisma.subscriptionRefundRequest.findFirst({
     where: { orderId, status: "PENDING" },
   });
-  if (existing) throw new Error("已存在待审核的订阅退款");
+  if (existing) throw new Error("已存在待审核的订阅提现");
 
   const meta = order.meta as { subscriptionId?: string } | null;
   const subscriptionId =

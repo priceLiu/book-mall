@@ -12,11 +12,11 @@
 - **应用**：`pnpm run db:deploy`。  
 - **逻辑**：详见 `doc/logic/tools-sso-session.md`、`doc/tech/tools-sso-environment.md`。
 
-## 2026-05-12 — 计费配置扩展与退款审核
+## 2026-05-12 — 计费配置扩展与提现审核
 
 - **迁移目录**：`prisma/migrations/20250512120000_billing_refunds/`  
 - **PlatformConfig**：`llmInputPer1kTokensMinor`、`llmOutputPer1kTokensMinor`、`toolInvokePerCallMinor`、`usageAnomalyRatioPercent`。  
-- **Order**：`refundedAt`（订阅退款完成后标记，避免重复退）。  
+- **Order**：`refundedAt`（订阅提现完成后标记，避免重复办理）。  
 - **新表**：`WalletRefundRequest`、`SubscriptionRefundRequest`，枚举 `RefundRequestStatus`。  
 - **应用**：`pnpm run db:deploy`。
 
@@ -60,6 +60,12 @@
 - **SubscriptionPlan**：`toolsNavAllowlist`（`TEXT[]`，默认空数组；**空表示订阅期内可使用套件内全部分组**）。  
 - **逻辑**：工具站 JWT / introspect 下发 `tools_nav_keys`；详见 `doc/releases/v2.0-tools-subscription-courses.md`。  
 - **应用**：`pnpm run db:deploy`。
+
+## 2026-06-15 — 工具站「视觉实验室」侧栏分组
+
+- **迁移目录**：`prisma/migrations/20260615120000_tool_nav_visual_lab/`  
+- **ToolNavVisibility**：新增 `navKey = visual-lab`，`label = 视觉实验室`；`sortOrder >= 4` 的既有行顺延。  
+- **应用**：`pnpm run db:deploy`（工具站 `config/nav-tools.ts` 已同步四项子菜单）。
 
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题

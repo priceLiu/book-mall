@@ -11,7 +11,7 @@ const bodySchema = z.object({
   userNote: z.string().max(2000).optional(),
 });
 
-/** 用户发起余额退款申请（6.3） */
+/** 用户发起余额提现申请（6.3） */
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -33,14 +33,14 @@ export async function POST(request: Request) {
     where: { userId: session.user.id, status: "PENDING" },
   });
   if (pending) {
-    return NextResponse.json({ error: "您已有待审核的余额退款申请" }, { status: 409 });
+    return NextResponse.json({ error: "您已有待审核的余额提现申请" }, { status: 409 });
   }
 
   const wallet = await prisma.wallet.findUnique({
     where: { userId: session.user.id },
   });
   if (!wallet || wallet.balanceMinor <= 0) {
-    return NextResponse.json({ error: "无可退余额" }, { status: 400 });
+    return NextResponse.json({ error: "无可提现余额" }, { status: 400 });
   }
 
   const reqMinor = parsed.data.requestedAmountMinor;

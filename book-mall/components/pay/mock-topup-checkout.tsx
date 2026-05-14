@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,27 +11,70 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { formatMinorAsYuan } from "@/lib/currency";
 import {
+  MOCK_TOPUP_CUSTOM_MAX_MINOR,
+  MOCK_TOPUP_CUSTOM_MIN_MINOR,
   MOCK_TOPUP_PRESETS,
-  type MockTopupAmountMinor,
+  isAllowedMockTopupAmountMinor,
 } from "@/lib/apply-mock-topup";
 import { FakeQrPlaceholder } from "@/components/pay/fake-qr-placeholder";
 
-const LABELS: Record<MockTopupAmountMinor, string> = {
-  [50_00]: "¥50",
-  [100_00]: "¥100",
-  [200_00]: "¥200",
-};
+const PRESETS = MOCK_TOPUP_PRESETS as readonly number[];
 
-export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: MockTopupAmountMinor }) {
-  const [amountMinor, setAmountMinor] = useState<MockTopupAmountMinor>(initialAmountMinor);
+const CUSTOM_MIN_YUAN = MOCK_TOPUP_CUSTOM_MIN_MINOR / 100;
+const CUSTOM_MAX_YUAN = MOCK_TOPUP_CUSTOM_MAX_MINOR / 100;
+
+function parseIntegerYuan(raw: string): number | null {
+  const t = raw.trim();
+  if (t === "" || !/^\d+$/.test(t)) return null;
+  const y = Number.parseInt(t, 10);
+  return Number.isNaN(y) ? null : y;
+}
+
+function initialCustomYuanField(amountMinor: number): string {
+  if (PRESETS.includes(amountMinor)) return "";
+  if (
+    amountMinor >= MOCK_TOPUP_CUSTOM_MIN_MINOR &&
+    amountMinor <= MOCK_TOPUP_CUSTOM_MAX_MINOR &&
+    amountMinor % 100 === 0
+  ) {
+    return String(amountMinor / 100);
+  }
+  return "";
+}
+
+export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: number }) {
+  const [amountMinor, setAmountMinor] = useState(initialAmountMinor);
+  const [customYuan, setCustomYuan] = useState(() => initialCustomYuanField(initialAmountMinor));
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  async function onPaidClick() {
+  const customYuanNum = parseIntegerYuan(customYuan);
+  const customInvalid =
+    customYuan.trim() !== "" &&
+    (customYuanNum === null || customYuanNum < CUSTOM_MIN_YUAN || customYuanNum > CUSTOM_MAX_YUAN);
+
+  const applyCustomYuan = useCallback((raw: string) => {
+    setCustomYuan(raw);
+    const y = parseIntegerYuan(raw);
+    if (y !== null && y >= CUSTOM_MIN_YUAN && y <= CUSTOM_MAX_YUAN) {
+      setAmountMinor(y * 100);
+    }
+  }, []);
+
+  const onPaidClick = useCallback(async () => {
     setMsg(null);
+    if (customInvalid) {
+      setMsg(`请输入 ${CUSTOM_MIN_YUAN}～${CUSTOM_MAX_YUAN} 之间的整数金额（元）`);
+      return;
+    }
+    if (!isAllowedMockTopupAmountMinor(amountMinor)) {
+      setMsg(`金额须为快捷档位，或 ${CUSTOM_MIN_YUAN}～${CUSTOM_MAX_YUAN} 元整数`);
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch("/api/dev/mock-topup", {
@@ -49,7 +92,7 @@ export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: 
     } finally {
       setBusy(false);
     }
-  }
+  }, [amountMinor, customInvalid]);
 
   return (
     <main className="container max-w-lg mx-auto px-4 py-16 md:py-24">
@@ -62,17 +105,46 @@ export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: 
         </CardHeader>
         <CardContent className="space-y-8 flex flex-col items-center">
           <div className="flex flex-wrap justify-center gap-2 w-full">
-            {MOCK_TOPUP_PRESETS.map((minor) => (
+            {PRESETS.map((minor) => (
               <Button
                 key={minor}
                 type="button"
                 variant={amountMinor === minor ? "default" : "outline"}
                 size="sm"
-                onClick={() => setAmountMinor(minor)}
+                onClick={() => {
+                  setAmountMinor(minor);
+                  setCustomYuan("");
+                }}
               >
-                {LABELS[minor]}
+                ¥{minor / 100}
               </Button>
             ))}
+          </div>
+
+          <div className="w-full space-y-2 max-w-sm">
+            <label htmlFor="mock-topup-custom-yuan" className="text-sm font-medium">
+              自定金额（元）
+            </label>
+            <Input
+              id="mock-topup-custom-yuan"
+              type="number"
+              inputMode="numeric"
+              min={CUSTOM_MIN_YUAN}
+              max={CUSTOM_MAX_YUAN}
+              step={1}
+              placeholder={`${CUSTOM_MIN_YUAN}～${CUSTOM_MAX_YUAN} 整数`}
+              value={customYuan}
+              onChange={(e) => applyCustomYuan(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              与快捷档位互斥显示：点击档位会清空此处；在此输入有效整数后，下方到账金额会同步（{CUSTOM_MIN_YUAN}～
+              {CUSTOM_MAX_YUAN} 元）。
+            </p>
+            {customInvalid ? (
+              <p className="text-xs text-destructive">
+                请输入 {CUSTOM_MIN_YUAN}～{CUSTOM_MAX_YUAN} 之间的整数（元）。
+              </p>
+            ) : null}
           </div>
 
           <div className="text-center space-y-1 w-full">
@@ -94,8 +166,8 @@ export function MockTopupCheckout({ initialAmountMinor }: { initialAmountMinor: 
               type="button"
               size="lg"
               className="min-w-[160px]"
-              disabled={busy}
-              onClick={onPaidClick}
+              disabled={busy || customInvalid}
+              onClick={() => void onPaidClick()}
             >
               {busy ? "处理中…" : "支付成功"}
             </Button>

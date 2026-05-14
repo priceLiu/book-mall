@@ -1,0 +1,1866 @@
+/**
+ * 视觉实验室：黑白橙 + 开灯/关灯（data-theme 由 visual-lab-theme-client 设置）
+ * 仅在有 .visual-lab-theme-root 祖先时生效；主内容区请带 .visual-lab-main。
+ */
+
+/* ----  tokens ---- */
+.visual-lab-theme-root[data-theme="dark"] {
+  --vl-bg: #050505;
+  --vl-fg: #f5f5f5;
+  --vl-muted: #a3a3a3;
+  --vl-accent: #f97316;
+  --vl-accent-press: #ea580c;
+  --vl-on-accent: #ffffff;
+  --vl-surface: #0f0f0f;
+  --vl-surface-2: #171717;
+  --vl-border: #2a2a2a;
+  --vl-border-strong: #404040;
+  --vl-intro-band: #080808;
+  --vl-ring-image: rgba(249, 115, 22, 0.22);
+  --vl-danger: #fb7185;
+  --vl-success-hint: #fdba74;
+  --vl-scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --vl-scrollbar-thumb-hover: rgba(249, 115, 22, 0.65);
+}
+
+.visual-lab-theme-root[data-theme="light"] {
+  --vl-bg: #fafafa;
+  --vl-fg: #0a0a0a;
+  --vl-muted: #525252;
+  --vl-accent: #ea580c;
+  --vl-accent-press: #c2410c;
+  --vl-on-accent: #ffffff;
+  --vl-surface: #ffffff;
+  --vl-surface-2: #f5f5f5;
+  --vl-border: #e5e5e5;
+  --vl-border-strong: #d4d4d4;
+  --vl-intro-band: #f0f0f0;
+  --vl-ring-image: rgba(234, 88, 12, 0.2);
+  --vl-danger: #e11d48;
+  --vl-success-hint: #c2410c;
+  --vl-scrollbar-thumb: rgba(0, 0, 0, 0.22);
+  --vl-scrollbar-thumb-hover: rgba(234, 88, 12, 0.55);
+}
+
+/* ---- 细滚动条（分析结果、思考过程等可滚动区）---- */
+.visual-lab-theme-root .vl-compose-result,
+.visual-lab-theme-root .vl-analysis-reasoning-pre {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vl-scrollbar-thumb) transparent;
+}
+
+.visual-lab-theme-root .vl-compose-result::-webkit-scrollbar,
+.visual-lab-theme-root .vl-analysis-reasoning-pre::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.visual-lab-theme-root .vl-compose-result::-webkit-scrollbar-track,
+.visual-lab-theme-root .vl-analysis-reasoning-pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.visual-lab-theme-root .vl-compose-result::-webkit-scrollbar-thumb,
+.visual-lab-theme-root .vl-analysis-reasoning-pre::-webkit-scrollbar-thumb {
+  background-color: var(--vl-scrollbar-thumb);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.visual-lab-theme-root .vl-compose-result::-webkit-scrollbar-thumb:hover,
+.visual-lab-theme-root .vl-analysis-reasoning-pre::-webkit-scrollbar-thumb:hover {
+  background-color: var(--vl-scrollbar-thumb-hover);
+}
+
+/* ---- 主滚动区：铺满工具壳内背景 ---- */
+.visual-lab-theme-root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vl-bg);
+  color: var(--vl-fg);
+  transition: background-color 0.22s ease, color 0.22s ease;
+}
+
+.visual-lab-theme-root .visual-lab-main {
+  background: var(--vl-bg) !important;
+  color: var(--vl-fg);
+  transition: background-color 0.22s ease, color 0.22s ease;
+}
+
+/* 分析室：主列参与高度链；仅在进入会话态后撑满视窗（避免首屏底部空白一条） */
+.visual-lab-theme-root .visual-lab-main--analysis {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.visual-lab-theme-root:has(.vl-analysis-page--session) > .visual-lab-main--analysis {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 视觉实验室 · 分析室：右上角「全屏 | 开关灯」工具条 */
+.visual-lab-theme-root .vl-floating-toolbar {
+  position: fixed;
+  top: calc(0.65rem + 48px);
+  right: 1rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.visual-lab-theme-root.visual-lab-immersive-active .vl-floating-toolbar {
+  top: calc(0.55rem + env(safe-area-inset-top, 0px));
+}
+
+/* 顶栏「开关灯」：与主站 ToggleTheme iconOnly 同款 Sun/Moon */
+.visual-lab-theme-root .vl-theme-toggle {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.12s ease;
+}
+
+.visual-lab-theme-root .vl-theme-toggle:hover {
+  transform: translateY(-1px);
+}
+
+/* 关灯（深色页面）：深灰圆底 + 白月牙 */
+.visual-lab-theme-root[data-theme="dark"] .vl-theme-toggle {
+  background: #1a1a1a;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+/* 开灯（浅色页面）：白圆底 + 黑太阳 */
+.visual-lab-theme-root[data-theme="light"] .vl-theme-toggle {
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.12),
+    0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.visual-lab-theme-root .vl-theme-toggle:focus-visible {
+  outline: 2px solid var(--vl-accent);
+  outline-offset: 2px;
+}
+
+.visual-lab-theme-root .vl-theme-toggle-icons {
+  position: relative;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.visual-lab-theme-root .vl-theme-toggle-icon {
+  position: absolute;
+  inset: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  transition:
+    transform 0.25s ease,
+    opacity 0.2s ease;
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-theme-toggle-icon--sun {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0);
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-theme-toggle-icon--moon {
+  opacity: 1;
+  transform: rotate(0) scale(1);
+  color: #f5f5f5;
+}
+
+.visual-lab-theme-root[data-theme="light"] .vl-theme-toggle-icon--sun {
+  opacity: 1;
+  transform: rotate(0) scale(1);
+  color: #0a0a0a;
+}
+
+.visual-lab-theme-root[data-theme="light"] .vl-theme-toggle-icon--moon {
+  opacity: 0;
+  transform: rotate(90deg) scale(0);
+}
+
+/* 分析室 · 沉浸式全屏（图标按钮，与开关灯同形） */
+.visual-lab-theme-root .vl-immersive-toggle {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.12s ease;
+}
+
+.visual-lab-theme-root .vl-immersive-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-immersive-toggle {
+  background: #1a1a1a;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+  color: #f5f5f5;
+}
+
+.visual-lab-theme-root[data-theme="light"] .vl-immersive-toggle {
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.12),
+    0 4px 14px rgba(0, 0, 0, 0.08);
+  color: #0a0a0a;
+}
+
+.visual-lab-theme-root .vl-immersive-toggle:focus-visible {
+  outline: 2px solid var(--vl-accent);
+  outline-offset: 2px;
+}
+
+.visual-lab-theme-root .vl-immersive-toggle-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .visual-lab-theme-root .vl-floating-toolbar {
+    top: calc(0.5rem + 44px);
+    right: 0.6rem;
+    gap: 0.35rem;
+  }
+
+  .visual-lab-theme-root.visual-lab-immersive-active .vl-floating-toolbar {
+    top: calc(0.45rem + env(safe-area-inset-top, 0px));
+  }
+
+  .visual-lab-theme-root .vl-theme-toggle,
+  .visual-lab-theme-root .vl-immersive-toggle {
+    width: 2.125rem;
+    height: 2.125rem;
+  }
+
+  .visual-lab-theme-root .vl-theme-toggle-icons,
+  .visual-lab-theme-root .vl-theme-toggle-icon,
+  .visual-lab-theme-root .vl-immersive-toggle-icon {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+}
+
+/* 分析室 · 费用说明横幅（浅蓝底，与主站提示条一致） */
+.visual-lab-theme-root .vl-analysis-info-banner {
+  margin-top: 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid #91caff;
+  background: #e6f7ff;
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-analysis-info-banner-icon {
+  flex-shrink: 0;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 999px;
+  background: #1677ff;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.visual-lab-theme-root .vl-analysis-info-banner-text {
+  flex: 1;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.visual-lab-theme-root .vl-analysis-info-banner-dismiss {
+  flex-shrink: 0;
+  margin: -0.15rem -0.15rem 0 0;
+  padding: 0.2rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(9, 88, 217, 0.75);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.visual-lab-theme-root .vl-analysis-info-banner-dismiss:hover {
+  color: #0958d9;
+  background: rgba(22, 119, 255, 0.12);
+}
+
+.visual-lab-theme-root .vl-analysis-info-banner-dismiss:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
+}
+
+/* 分析室：为右上角「全屏 | 主题」预留空间，避免标题与按钮叠压 */
+.visual-lab-theme-root .vl-analysis-toolbar-pad {
+  padding-right: max(1rem, calc(5.25rem + env(safe-area-inset-right, 0px)));
+}
+
+.visual-lab-theme-root .vl-analysis-header-block {
+  flex-shrink: 0;
+}
+
+/* 已发送后：整页进入会话布局；限制在视口内，仅中间结果区滚动，底部输入始终在可视区域底部 */
+.visual-lab-theme-root .vl-analysis-toolbar-pad.vl-analysis-page--session {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 1rem;
+  overflow: hidden;
+}
+
+@media (min-width: 900px) {
+  .visual-lab-theme-root .vl-analysis-toolbar-pad {
+    padding-right: 1.5rem;
+  }
+}
+
+.visual-lab-theme-root .vl-muted {
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-h2-lg {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.75rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-lead {
+  margin: 0;
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  line-height: 1.65;
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-section-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--vl-fg);
+}
+
+/* ---- 按钮 / 链接 ---- */
+.visual-lab-theme-root .visual-lab-main article section strong {
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-btn {
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.visual-lab-theme-root .vl-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.visual-lab-theme-root .vl-btn-primary {
+  background: var(--vl-accent);
+  color: var(--vl-on-accent);
+  box-shadow: 0 2px 10px rgba(249, 115, 22, 0.35);
+}
+
+.visual-lab-theme-root .vl-btn-primary:hover:not(:disabled) {
+  background: var(--vl-accent-press);
+  color: var(--vl-on-accent);
+}
+
+.visual-lab-theme-root .vl-btn-outline {
+  background: transparent;
+  color: var(--vl-fg);
+  border: 2px solid var(--vl-border-strong);
+}
+
+.visual-lab-theme-root .vl-btn-outline:hover:not(:disabled) {
+  border-color: var(--vl-accent);
+  color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-btn-ghost {
+  background: transparent;
+  color: var(--vl-muted);
+  border: 2px solid transparent;
+}
+
+.visual-lab-theme-root .vl-btn-ghost:hover:not(:disabled) {
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-btn-ghost.vl-text-danger {
+  color: var(--vl-danger);
+}
+
+.visual-lab-theme-root .vl-btn-ghost.vl-text-danger:hover:not(:disabled) {
+  color: var(--vl-danger);
+  opacity: 0.85;
+}
+
+.visual-lab-theme-root .vl-btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.visual-lab-theme-root .vl-inline-link {
+  color: var(--vl-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.visual-lab-theme-root .vl-inline-link:hover {
+  color: var(--vl-accent-press);
+}
+
+.visual-lab-theme-root .visual-lab-main .tw-muted a,
+.visual-lab-theme-root .visual-lab-main a.vl-inline-link {
+  color: var(--vl-accent);
+}
+
+/* ---- Hero 拼图上的图框 ---- */
+.visual-lab-theme-root .vl-hero-media {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--vl-surface-2);
+  box-shadow: 0 0 0 1px var(--vl-ring-image);
+}
+
+/* ---- 介绍条带 ---- */
+.visual-lab-theme-root .vl-intro-band {
+  border-top: 1px solid var(--vl-border);
+  background: var(--vl-intro-band);
+  padding: 3rem 0;
+}
+
+.visual-lab-theme-root .vl-intro-band ul {
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-intro-band strong {
+  color: var(--vl-fg);
+}
+
+/* ---- 提示框 ---- */
+.visual-lab-theme-root .vl-note {
+  border: 1px solid var(--vl-border-strong);
+  border-radius: 10px;
+  padding: 1rem 1.15rem;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+  background: var(--vl-surface);
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-note {
+  border-color: rgba(249, 115, 22, 0.35);
+  background: var(--vl-surface-2);
+}
+
+/* ---- 分析室 ---- */
+.visual-lab-theme-root .vl-dropzone {
+  display: flex;
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 2px dashed var(--vl-border-strong);
+  background: var(--vl-surface);
+  padding: 3.5rem 1.5rem;
+  text-align: center;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.visual-lab-theme-root .vl-dropzone:hover {
+  border-color: var(--vl-accent);
+  background: var(--vl-surface-2);
+}
+
+.visual-lab-theme-root .vl-dropzone-icon {
+  color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-card {
+  border-radius: 0.75rem;
+  border: 1px solid var(--vl-border);
+  background: var(--vl-surface);
+  padding: 1.25rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-card {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.visual-lab-theme-root .vl-preview-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--vl-surface-2);
+  box-shadow: 0 0 0 1px var(--vl-border);
+}
+
+.visual-lab-theme-root .vl-textarea {
+  margin-top: 0.5rem;
+  display: flex;
+  min-height: 88px;
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  color: var(--vl-fg);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-textarea::placeholder {
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-textarea:focus {
+  outline: none;
+  border-color: var(--vl-accent);
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+}
+
+.visual-lab-theme-root .vl-dt {
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-dd-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-err {
+  font-size: 0.875rem;
+  color: var(--vl-danger);
+}
+
+.visual-lab-theme-root .vl-text-danger {
+  color: var(--vl-danger);
+}
+
+/* ---- 成果展卡片 ---- */
+.visual-lab-theme-root .vl-gallery-card {
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--vl-border);
+  background: var(--vl-surface);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-gallery-card {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+.visual-lab-theme-root .vl-gallery-thumb-bg {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--vl-surface-2);
+}
+
+.visual-lab-theme-root .vl-gallery-video-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #0a0a0f;
+}
+
+/* ---- 实现逻辑页 ---- */
+.visual-lab-theme-root .visual-lab-main article a {
+  color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .visual-lab-main article header h1 {
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .visual-lab-main article .tw-pre,
+.visual-lab-theme-root .visual-lab-main .tw-pre {
+  background: var(--vl-surface-2);
+  border-color: var(--vl-border);
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .visual-lab-main code {
+  background: var(--vl-surface-2);
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root[data-theme="light"] .visual-lab-main code {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.visual-lab-theme-root .visual-lab-main article header p {
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .visual-lab-main article section h2 {
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .visual-lab-main article section p,
+.visual-lab-theme-root .visual-lab-main article section li {
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .visual-lab-main article footer {
+  border-top-color: var(--vl-border);
+  color: var(--vl-muted);
+}
+
+/* ---- 分析室 · 上传失败提示（图 5，位于浅蓝条下方居中）---- */
+.visual-lab-theme-root .vl-upload-fail-banner {
+  margin: 0.75rem auto 0;
+  max-width: 42rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-upload-fail-banner {
+  background: var(--vl-surface);
+  border-color: var(--vl-border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.visual-lab-theme-root .vl-upload-fail-banner-icon {
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.visual-lab-theme-root .vl-upload-fail-banner-text {
+  flex: 1;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-upload-fail-banner-dismiss {
+  flex-shrink: 0;
+  padding: 0.2rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vl-muted);
+  cursor: pointer;
+}
+
+/* 分析室会话态：禁止主列外层再纵向滚动，避免长回复把输入框顶到屏幕外 */
+.tool-main-scroll:has(.vl-analysis-page--session) {
+  overflow: hidden;
+}
+
+.visual-lab-theme-root:has(.vl-analysis-page--session) {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- 分析室 · 居中输入区（图 1 / 图 7）---- */
+.visual-lab-theme-root .vl-compose-stack {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.visual-lab-theme-root .vl-compose-stack[data-session="true"] {
+  flex: 1 1 0%;
+  min-height: 0;
+  margin-top: 0.75rem;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.visual-lab-theme-root .vl-compose-result {
+  width: 100%;
+  max-width: 42rem;
+  min-height: 12rem;
+  margin-bottom: 1.25rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px dashed var(--vl-border-strong);
+  background: var(--vl-surface);
+  box-sizing: border-box;
+  color: var(--vl-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.visual-lab-theme-root .vl-analysis-user-turn {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin: 0 0 1rem;
+}
+
+.visual-lab-theme-root .vl-analysis-user-bubble {
+  max-width: 28rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+  clear: both;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, #f3f0ff 55%, var(--vl-surface)),
+    color-mix(in srgb, var(--vl-accent) 8%, var(--vl-surface))
+  );
+  box-sizing: border-box;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-analysis-user-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-analysis-user-media {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.visual-lab-theme-root .vl-analysis-user-thumb-hit {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface-2);
+  line-height: 0;
+}
+
+.visual-lab-theme-root .vl-analysis-user-thumb-zoom {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.visual-lab-theme-root .vl-analysis-user-thumb-hit:hover .vl-analysis-user-thumb-zoom,
+.visual-lab-theme-root .vl-analysis-user-thumb-hit:focus-within .vl-analysis-user-thumb-zoom {
+  opacity: 1;
+}
+
+.visual-lab-theme-root .vl-analysis-user-thumb {
+  display: block;
+  width: 10rem;
+  max-width: min(10rem, 100%);
+  height: auto;
+  max-height: 10rem;
+  object-fit: cover;
+}
+
+.visual-lab-theme-root .vl-analysis-user-video-shell {
+  position: relative;
+  display: inline-block;
+  max-width: min(18rem, 100%);
+  align-self: flex-end;
+  border-radius: 8px;
+  border: 1px solid var(--vl-border-strong);
+  background: #000;
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-analysis-user-video-shell .vl-analysis-user-video {
+  display: block;
+  width: 100%;
+  max-width: 18rem;
+  vertical-align: bottom;
+  border-radius: 8px;
+  max-height: none;
+}
+
+.visual-lab-theme-root .vl-analysis-user-video-expand {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--vl-fg);
+  background: color-mix(in srgb, var(--vl-surface) 90%, transparent);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.28);
+}
+
+.visual-lab-theme-root .vl-analysis-user-video-expand:hover {
+  background: var(--vl-surface);
+}
+
+.visual-lab-theme-root .vl-media-lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-media-lightbox-panel {
+  position: relative;
+  max-width: min(96vw, 72rem);
+  max-height: 92vh;
+  margin: auto;
+}
+
+.visual-lab-theme-root .vl-media-lightbox-close {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--vl-surface);
+  color: var(--vl-fg);
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
+}
+
+.visual-lab-theme-root .vl-media-lightbox-img {
+  display: block;
+  max-width: 100%;
+  max-height: 88vh;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.visual-lab-theme-root .vl-media-lightbox-video {
+  display: block;
+  max-width: 100%;
+  max-height: 88vh;
+  width: auto;
+  margin: 0 auto;
+  border-radius: 8px;
+  background: #000;
+}
+
+.visual-lab-theme-root .vl-analysis-user-docs {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--vl-muted);
+  text-align: left;
+}
+
+.visual-lab-theme-root .vl-analysis-result-error {
+  margin: 0 0 0.75rem;
+  color: var(--vl-danger);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.visual-lab-theme-root .vl-analysis-result-loading {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--vl-muted);
+  font-size: 0.875rem;
+}
+
+.visual-lab-theme-root .vl-analysis-result-stopped {
+  margin: 0 0 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface-2);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-analysis-result-placeholder {
+  margin: 0;
+  color: var(--vl-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.visual-lab-theme-root .vl-analysis-result-body {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  max-height: min(70vh, 36rem);
+  overflow: auto;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  color: var(--vl-fg);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  border-radius: 10px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface-2);
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-analysis-md {
+  margin: 0;
+}
+
+.visual-lab-theme-root .vl-analysis-md :first-child {
+  margin-top: 0;
+}
+
+.visual-lab-theme-root .vl-analysis-md :last-child {
+  margin-bottom: 0;
+}
+
+.visual-lab-theme-root .vl-analysis-md h1,
+.visual-lab-theme-root .vl-analysis-md h2,
+.visual-lab-theme-root .vl-analysis-md h3 {
+  margin: 1rem 0 0.5rem;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-analysis-md h1 {
+  font-size: 1.125rem;
+}
+
+.visual-lab-theme-root .vl-analysis-md h2 {
+  font-size: 1.05rem;
+}
+
+.visual-lab-theme-root .vl-analysis-md h3 {
+  font-size: 0.98rem;
+}
+
+.visual-lab-theme-root .vl-analysis-md p {
+  margin: 0.45rem 0;
+}
+
+.visual-lab-theme-root .vl-analysis-md ul,
+.visual-lab-theme-root .vl-analysis-md ol {
+  margin: 0.45rem 0;
+  padding-left: 1.25rem;
+}
+
+.visual-lab-theme-root .vl-analysis-md li {
+  margin: 0.2rem 0;
+}
+
+.visual-lab-theme-root .vl-analysis-md hr {
+  margin: 0.75rem 0;
+  border: none;
+  border-top: 1px solid var(--vl-border-strong);
+}
+
+.visual-lab-theme-root .vl-analysis-md code {
+  font-size: 0.8125em;
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+  background: var(--vl-surface);
+  border: 1px solid var(--vl-border);
+}
+
+.visual-lab-theme-root .vl-analysis-md pre {
+  margin: 0.5rem 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  background: var(--vl-surface);
+  border: 1px solid var(--vl-border-strong);
+}
+
+.visual-lab-theme-root .vl-analysis-md pre code {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.8125rem;
+}
+
+.visual-lab-theme-root .vl-analysis-md blockquote {
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--vl-border-strong);
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-analysis-md table {
+  margin: 0.5rem 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.visual-lab-theme-root .vl-analysis-md th,
+.visual-lab-theme-root .vl-analysis-md td {
+  border: 1px solid var(--vl-border-strong);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+}
+
+.visual-lab-theme-root .vl-analysis-md th {
+  background: var(--vl-surface);
+  font-weight: 600;
+}
+
+.visual-lab-theme-root .vl-analysis-md strong {
+  font-weight: 650;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-analysis-md-a {
+  color: var(--vl-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.visual-lab-theme-root .vl-analysis-md-a:hover {
+  opacity: 0.9;
+}
+
+.visual-lab-theme-root .vl-analysis-md-inline-link {
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-analysis-md-figure {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+  max-width: 100%;
+}
+
+.visual-lab-theme-root .vl-analysis-md-figure--video {
+  width: 100%;
+}
+
+.visual-lab-theme-root .vl-analysis-md-img {
+  display: block;
+  max-width: min(100%, 28rem);
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--vl-border-strong);
+}
+
+.visual-lab-theme-root .vl-analysis-md-video {
+  display: block;
+  width: 100%;
+  max-width: min(100%, 32rem);
+  max-height: 20rem;
+  border-radius: 8px;
+  border: 1px solid var(--vl-border-strong);
+  background: #000;
+}
+
+.visual-lab-theme-root .vl-analysis-md-save {
+  flex-shrink: 0;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  color: var(--vl-accent);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.visual-lab-theme-root .vl-analysis-md-save:hover:not(:disabled) {
+  border-color: var(--vl-accent);
+  background: color-mix(in srgb, var(--vl-accent) 8%, var(--vl-surface));
+}
+
+.visual-lab-theme-root .vl-analysis-md-save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.visual-lab-theme-root .vl-outcome-quota-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-outcome-quota-panel {
+  width: 100%;
+  max-width: 22rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  color: var(--vl-fg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+.visual-lab-theme-root .vl-outcome-quota-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.visual-lab-theme-root .vl-outcome-quota-text {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-outcome-quota-packs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.visual-lab-theme-root .vl-outcome-quota-muted {
+  margin: 0 0 0.65rem;
+  font-size: 0.75rem;
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-outcome-quota-close {
+  margin-top: 0.25rem;
+}
+
+.visual-lab-theme-root .vl-analysis-reasoning {
+  margin: 0 0 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface-2);
+  padding: 0.5rem 0.65rem;
+}
+
+.visual-lab-theme-root .vl-analysis-reasoning summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--vl-fg);
+  list-style-position: outside;
+}
+
+.visual-lab-theme-root .vl-analysis-reasoning-pre {
+  margin: 0.5rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--vl-muted);
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.visual-lab-theme-root .vl-compose-stack[data-session="true"] .vl-compose-result {
+  flex: 1 1 0%;
+  min-height: 0;
+  margin-bottom: 0.75rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.visual-lab-theme-root .vl-compose-wrap {
+  width: 100%;
+  max-width: 42rem;
+  flex-shrink: 0;
+}
+
+.visual-lab-theme-root .vl-compose-stack[data-session="true"] .vl-compose-wrap {
+  margin-left: auto;
+  margin-right: auto;
+  flex-shrink: 0;
+}
+
+/* ---- 分析室 · 初始态模板（选择模板，一键体验）---- */
+.visual-lab-theme-root .vl-analysis-templates {
+  width: 100%;
+  max-width: 42rem;
+  margin: 1.5rem auto 0;
+  padding: 0 0.125rem;
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-analysis-templates-title {
+  margin: 0 0 1rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--vl-fg);
+  letter-spacing: 0.02em;
+}
+
+.visual-lab-theme-root .vl-analysis-templates-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .visual-lab-theme-root .vl-analysis-templates-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .visual-lab-theme-root .vl-analysis-templates-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.visual-lab-theme-root .vl-analysis-template-card-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.visual-lab-theme-root .vl-analysis-template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 0;
+  padding: 0.65rem 0.7rem 0.55rem;
+  border-radius: 12px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.visual-lab-theme-root .vl-analysis-template-card:hover:not(:disabled) {
+  border-color: var(--vl-accent);
+  box-shadow: 0 4px 18px rgba(249, 115, 22, 0.15);
+  transform: translateY(-1px);
+}
+
+.visual-lab-theme-root .vl-analysis-template-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.visual-lab-theme-root .vl-analysis-template-card-kicker {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--vl-fg);
+  margin-bottom: 0.35rem;
+}
+
+.visual-lab-theme-root .vl-analysis-template-card-desc {
+  margin: 0 0 0.5rem;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--vl-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 0 0 auto;
+  min-height: 3.1em;
+}
+
+.visual-lab-theme-root .vl-analysis-template-card-media {
+  position: relative;
+  margin-top: auto;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--vl-surface-2);
+  flex-shrink: 0;
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-analysis-template-card {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* 会话态：底部输入区变矮，与参考图 2 / 3 一致 */
+.visual-lab-theme-root .vl-compose-stack[data-session="true"] .vl-compose-input {
+  min-height: 2.75rem;
+  max-height: 7rem;
+  padding: 0.5rem 0.85rem;
+  resize: none;
+  line-height: 1.45;
+}
+
+.visual-lab-theme-root .vl-compose-stack[data-session="true"] .vl-compose-thumbs {
+  padding: 0.5rem 0.65rem 0;
+}
+
+.visual-lab-theme-root .vl-compose-welcome {
+  text-align: center;
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+.visual-lab-theme-root .vl-compose-welcome-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-model-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface-2);
+  color: var(--vl-accent);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.visual-lab-theme-root .vl-model-select:hover {
+  background: rgba(249, 115, 22, 0.12);
+}
+
+.visual-lab-theme-root .vl-compose-card {
+  border-radius: 12px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 2px 12px rgba(0, 0, 0, 0.04);
+  overflow: visible;
+}
+
+.visual-lab-theme-root[data-theme="light"] .vl-compose-card {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-compose-card {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.visual-lab-theme-root .vl-compose-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 0.75rem 0;
+}
+
+.visual-lab-theme-root .vl-compose-thumb {
+  position: relative;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface-2);
+}
+
+.visual-lab-theme-root .vl-compose-thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.visual-lab-theme-root .vl-compose-input {
+  display: block;
+  width: 100%;
+  min-height: 7.5rem;
+  padding: 0.75rem 0.85rem;
+  border: none;
+  background: transparent;
+  color: var(--vl-fg);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-compose-input::placeholder {
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-compose-input:focus {
+  outline: none;
+}
+
+.visual-lab-theme-root .vl-compose-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-top: 1px solid var(--vl-border-strong);
+}
+
+.visual-lab-theme-root .vl-compose-toolbar-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.visual-lab-theme-root .vl-compose-icon-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  color: var(--vl-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.visual-lab-theme-root .vl-compose-icon-btn:hover {
+  border-color: var(--vl-accent);
+  color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-compose-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: rgba(249, 115, 22, 0.12);
+  color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-compose-chip[data-active="false"] {
+  background: var(--vl-surface);
+  border-color: var(--vl-border-strong);
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-compose-chip-neutral {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  color: var(--vl-muted);
+  cursor: pointer;
+}
+
+.visual-lab-theme-root .vl-compose-chip-neutral[data-on="true"] {
+  border-color: var(--vl-accent);
+  color: var(--vl-accent);
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.visual-lab-theme-root .vl-compose-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.visual-lab-theme-root .vl-compose-balance {
+  font-size: 0.75rem;
+  color: var(--vl-muted);
+  white-space: nowrap;
+}
+
+.visual-lab-theme-root .vl-compose-balance strong {
+  color: var(--vl-fg);
+  font-weight: 600;
+}
+
+.visual-lab-theme-root .vl-compose-send {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+  border: none;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vl-surface-2);
+  color: var(--vl-muted);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.visual-lab-theme-root .vl-compose-send[data-ready="true"] {
+  cursor: pointer;
+  background: var(--vl-accent);
+  color: #ffffff;
+}
+
+.visual-lab-theme-root .vl-compose-send[data-ready="true"]:hover {
+  background: var(--vl-accent-press);
+}
+
+.visual-lab-theme-root .vl-compose-send--stop {
+  cursor: pointer;
+  background: var(--vl-accent);
+  color: #ffffff;
+}
+
+.visual-lab-theme-root .vl-compose-send--stop .vl-compose-stop-glyph {
+  display: block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.visual-lab-theme-root .vl-compose-send--stop:hover {
+  background: var(--vl-accent-press);
+}
+
+.visual-lab-theme-root .vl-compose-popover {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 0.35rem;
+  min-width: 17rem;
+  padding: 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 10px 28px rgba(0, 0, 0, 0.15);
+  z-index: 60;
+}
+
+.visual-lab-theme-root[data-theme="dark"] .vl-compose-popover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.visual-lab-theme-root .vl-compose-popover-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.visual-lab-theme-root .vl-compose-popover-title span:first-child {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-compose-popover-metric {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-compose-popover-desc {
+  font-size: 0.75rem;
+  color: var(--vl-muted);
+  margin: 0 0 0.75rem;
+}
+
+.visual-lab-theme-root .vl-compose-slider {
+  width: 100%;
+  accent-color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-compose-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: var(--vl-muted);
+  margin-top: 0.25rem;
+}
+
+.visual-lab-theme-root .vl-compose-attach-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 0.35rem;
+  min-width: 15.5rem;
+  padding: 0.35rem 0;
+  border-radius: 10px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 10px 28px rgba(0, 0, 0, 0.15);
+  z-index: 60;
+}
+
+.visual-lab-theme-root[data-theme="light"] .vl-compose-popover,
+.visual-lab-theme-root[data-theme="light"] .vl-compose-attach-menu {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 10px 28px rgba(0, 0, 0, 0.1);
+}
+
+.visual-lab-theme-root .vl-compose-attach-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  background: transparent;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+  color: var(--vl-fg);
+}
+
+.visual-lab-theme-root .vl-compose-attach-item:hover {
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.visual-lab-theme-root .vl-model-menu {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0.35rem;
+  width: min(30rem, calc(100vw - 2rem));
+  min-width: 20rem;
+  padding: 0.35rem 0;
+  border-radius: 10px;
+  border: 1px solid var(--vl-border-strong);
+  background: var(--vl-surface);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 10px 28px rgba(0, 0, 0, 0.18);
+  z-index: 55;
+}
+
+.visual-lab-theme-root[data-theme="light"] .vl-model-menu {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 10px 28px rgba(0, 0, 0, 0.1);
+}
+
+.visual-lab-theme-root .vl-model-menu button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.55rem 0.9rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--vl-fg);
+  box-sizing: border-box;
+}
+
+.visual-lab-theme-root .vl-model-menu-option-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.visual-lab-theme-root .vl-model-menu-option-icon {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  line-height: 1;
+  opacity: 0.85;
+  color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-model-menu-option-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.visual-lab-theme-root .vl-model-menu-option-desc {
+  display: block;
+  margin-left: calc(0.75rem + 0.35rem);
+  padding-right: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--vl-muted);
+}
+
+.visual-lab-theme-root .vl-model-menu button:hover {
+  background: rgba(249, 115, 22, 0.1);
+}
+
+.visual-lab-theme-root .vl-model-menu button:focus-visible {
+  outline: 2px solid var(--vl-accent);
+  outline-offset: -2px;
+}

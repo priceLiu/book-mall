@@ -3,6 +3,7 @@ export const TOOL_NAV_LABEL: Record<string, string> = {
   "fitting-room": "试衣间",
   "text-to-image": "文生图",
   "image-to-video": "图生视频",
+  "visual-lab": "视觉实验室",
   "smart-support": "AI智能客服",
   "app-history": "费用与计费说明",
 };

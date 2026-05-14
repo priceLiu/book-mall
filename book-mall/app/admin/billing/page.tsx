@@ -27,6 +27,7 @@ const SUITE_LABEL: Record<string, string> = {
   "fitting-room": "试衣间",
   "text-to-image": "文生图",
   "image-to-video": "图生视频",
+  "visual-lab": "视觉实验室",
   "smart-support": "AI智能客服",
   "app-history": "费用明细",
 };
@@ -57,7 +58,7 @@ export default async function AdminBillingPage() {
       <div>
         <h1 className="text-2xl font-bold">订阅与充值管理（5.3）</h1>
         <p className="text-sm text-muted-foreground">
-          计费配置、订阅套餐价格、订单查阅、手动续期与订阅退款审核入口；可配置项同步满足{" "}
+          计费配置、订阅套餐价格、订单查阅、手动续期与订阅提现审核入口；可配置项同步满足{" "}
           <strong>第七章·运营公示</strong> 的前台文案数据来源。
         </p>
         <p className="mt-2 text-sm tabular-nums">
@@ -195,9 +196,9 @@ export default async function AdminBillingPage() {
         <CardHeader>
           <CardTitle>订单（最近 80 条）</CardTitle>
           <CardDescription>
-            订阅退款：对「已支付且未标记退款」的订阅订单可创建审核单，在{" "}
+            订阅提现：对「已支付且未标记提现完成」的订阅订单可创建审核单，在{" "}
             <a href="/admin/refunds" className="text-primary underline">
-              退款审核
+              提现审核
             </a>{" "}
             中处理。
           </CardDescription>
@@ -211,7 +212,7 @@ export default async function AdminBillingPage() {
                 <th className="p-2">类型</th>
                 <th className="p-2">状态</th>
                 <th className="p-2">金额</th>
-                <th className="p-2">退款</th>
+                <th className="p-2">提现</th>
                 <th className="p-2">操作</th>
               </tr>
             </thead>
@@ -225,7 +226,7 @@ export default async function AdminBillingPage() {
                   <td className="p-2">{o.type}</td>
                   <td className="p-2">{o.status}</td>
                   <td className="p-2 tabular-nums">¥{formatMinorAsYuan(o.amountMinor)}</td>
-                  <td className="p-2">{o.refundedAt ? "已退" : "—"}</td>
+                  <td className="p-2">{o.refundedAt ? "已提" : "—"}</td>
                   <td className="p-2">
                     {o.type === "SUBSCRIPTION" &&
                     o.status === "PAID" &&
@@ -233,7 +234,7 @@ export default async function AdminBillingPage() {
                       <form action={createSubscriptionRefundRequest}>
                         <input type="hidden" name="orderId" value={o.id} />
                         <Button type="submit" size="sm" variant="outline">
-                          发起退款审核
+                          发起提现审核
                         </Button>
                       </form>
                     ) : (

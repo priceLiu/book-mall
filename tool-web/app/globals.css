@@ -630,6 +630,49 @@ button.tool-renew {
   min-height: 0;
 }
 
+/* 视觉实验室：主列滚区撑满高度，便于黑/白底铺满视窗 */
+.tool-main-scroll:has(.visual-lab-theme-root) {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 视觉实验室 · 分析室沉浸式：隐藏侧栏与工具顶栏，主列铺满 */
+.tool-root.visual-lab-immersive .tool-sidebar,
+.tool-root.visual-lab-immersive .tool-sidebar-backdrop {
+  display: none !important;
+}
+
+.tool-root.visual-lab-immersive .tool-topbar {
+  display: none !important;
+}
+
+.tool-root.visual-lab-immersive .tool-column {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.tool-root.visual-lab-immersive .tool-main-scroll {
+  min-height: 100dvh;
+}
+
+/* 分析室已进入会话：整站壳层锁死在视口高度（否则 .tool-root 会随内容无限变高，中间 flex 无法限制高度，输入区被顶出屏外） */
+.tool-root:has(.vl-analysis-page--session) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.tool-root:has(.vl-analysis-page--session) .tool-main-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 全屏沉浸 + 会话：避免 min-height:100dvh 在长内容上再次撑开主滚区 */
+.tool-root.visual-lab-immersive:has(.vl-analysis-page--session) .tool-main-scroll {
+  min-height: 0;
+}
+
 .tool-main-scroll .tw-main {
   max-width: 72rem;
   margin: 0 auto;
