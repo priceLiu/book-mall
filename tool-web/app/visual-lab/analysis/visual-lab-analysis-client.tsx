@@ -320,6 +320,102 @@ async function attachmentToPayload(a: Attachment): Promise<{
   return { kind: a.kind, name: a.file.name, mimeType, base64 };
 }
 
+type AnalysisStreamEv =
+  | { type: "reasoning"; text: string }
+  | { type: "content"; text: string }
+  | { type: "done" }
+  | { type: "error"; message?: string };
+
+/** 解析 /api/visual-lab/analysis 返回的 NDJSON 流（与智能客服流式不同，含 reasoning + content） */
+async function readVisualLabAnalysisStream(
+  res: Response,
+  signal: AbortSignal,
+  onReasoning: (full: string) => void,
+  onContent: (full: string) => void,
+): Promise<void> {
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("无法读取响应流");
+
+  const decoder = new TextDecoder();
+  let carry = "";
+  let reasoning = "";
+  let content = "";
+
+  const onAbort = () => {
+    void reader.cancel();
+  };
+  signal.addEventListener("abort", onAbort);
+
+    try {
+      while (!signal.aborted) {
+        let readResult: ReadableStreamReadResult<Uint8Array>;
+        try {
+          readResult = await reader.read();
+        } catch (e) {
+          const isAbort =
+            (e instanceof DOMException && e.name === "AbortError") ||
+            (e instanceof Error && e.name === "AbortError");
+          if (isAbort) return;
+          throw e;
+        }
+        const { done, value } = readResult;
+        if (done) break;
+      carry += decoder.decode(value, { stream: true });
+      for (;;) {
+        const ix = carry.indexOf("\n");
+        if (ix < 0) break;
+        const line = carry.slice(0, ix).trim();
+        carry = carry.slice(ix + 1);
+        if (!line) continue;
+        let ev: AnalysisStreamEv;
+        try {
+          ev = JSON.parse(line) as AnalysisStreamEv;
+        } catch {
+          continue;
+        }
+        if (ev.type === "done") {
+          continue;
+        }
+        if (ev.type === "reasoning" && typeof ev.text === "string") {
+          reasoning += ev.text;
+          onReasoning(reasoning);
+        } else if (ev.type === "content" && typeof ev.text === "string") {
+          content += ev.text;
+          onContent(content);
+        } else if (ev.type === "error") {
+          throw new Error(
+            typeof ev.message === "string" && ev.message.trim()
+              ? ev.message.trim()
+              : "模型流式输出失败",
+          );
+        }
+      }
+    }
+    carry += decoder.decode();
+    const tail = carry.trim();
+    if (tail) {
+      try {
+        const ev = JSON.parse(tail) as AnalysisStreamEv;
+        if (ev.type === "error") {
+          throw new Error(
+            typeof ev.message === "string" && ev.message.trim()
+              ? ev.message.trim()
+              : "模型流式输出失败",
+          );
+        }
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          /* 尾帧可能截断在未换行处，忽略 */
+        } else {
+          throw e;
+        }
+      }
+    }
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}
+
 export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: string | null }) {
   const docInputRef = useRef<HTMLInputElement>(null);
   const imgInputRef = useRef<HTMLInputElement>(null);
@@ -669,15 +765,11 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
           }),
         });
 
-        const data = (await res.json().catch(() => null)) as {
-          ok?: boolean;
-          content?: unknown;
-          reasoning?: unknown;
-          message?: unknown;
-          error?: unknown;
-        } | null;
-
         if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as {
+            message?: unknown;
+            error?: unknown;
+          } | null;
           const msg =
             (typeof data?.message === "string" && data.message) ||
             (typeof data?.error === "string" && data.error) ||
@@ -685,10 +777,22 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
           throw new Error(msg);
         }
 
-        const reply = typeof data?.content === "string" ? data.content : "";
-        const reasoning = typeof data?.reasoning === "string" ? data.reasoning : "";
-        setAnalysisReply(reply);
-        setAnalysisReasoning(reasoning);
+        const ct = res.headers.get("content-type") ?? "";
+        if (ct.includes("ndjson")) {
+          await readVisualLabAnalysisStream(
+            res,
+            ac.signal,
+            (full) => setAnalysisReasoning(full),
+            (full) => setAnalysisReply(full),
+          );
+        } else {
+          const data = (await res.json().catch(() => null)) as {
+            content?: unknown;
+            reasoning?: unknown;
+          } | null;
+          setAnalysisReply(typeof data?.content === "string" ? data.content : "");
+          setAnalysisReasoning(typeof data?.reasoning === "string" ? data.reasoning : "");
+        }
       } catch (e) {
         const isAbort =
           (e instanceof DOMException && e.name === "AbortError") ||
@@ -703,6 +807,10 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
         }
       } finally {
         if (analysisAbortRef.current === ac) analysisAbortRef.current = null;
+        if (ac.signal.aborted) {
+          setAnalysisStopped(true);
+          setAnalysisError(null);
+        }
         setAnalyzing(false);
       }
     },
@@ -905,7 +1013,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                 {analysisError}
               </p>
             ) : null}
-            {analyzing ? (
+            {analyzing && !analysisReasoning && !analysisReply ? (
               <p className="vl-analysis-result-loading">
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
                 <span>正在调用通义视觉模型（OpenAI 兼容模式）…</span>
@@ -916,13 +1024,13 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                 回答已停止
               </p>
             ) : null}
-            {!analyzing && analysisReasoning ? (
-              <details className="vl-analysis-reasoning">
+            {analysisReasoning ? (
+              <details className="vl-analysis-reasoning" open={analyzing}>
                 <summary>思考过程</summary>
                 <pre className="vl-analysis-reasoning-pre">{analysisReasoning}</pre>
               </details>
             ) : null}
-            {!analyzing && !analysisError && analysisReply ? (
+            {!analysisError && analysisReply ? (
               <div className="vl-analysis-result-body">
                 <AnalysisReplyMarkdown
                   markdown={analysisReply}

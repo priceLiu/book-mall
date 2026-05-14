@@ -211,53 +211,21 @@ export async function POST(req: Request) {
     baseURL: getDashscopeOpenAiCompatBaseUrl(),
   });
 
-  type CreateBody = OpenAI.Chat.ChatCompletionCreateParamsNonStreaming & {
+  type ThinkingCreateParams = OpenAI.Chat.ChatCompletionCreateParamsStreaming & {
     enable_thinking?: boolean;
     thinking_budget?: number;
   };
 
-  const createParams: CreateBody = {
+  const streamParams: ThinkingCreateParams = {
     model: meta.apiModel,
     messages: [{ role: "user", content: userContent }],
-    ...(enableThinking
-      ? { enable_thinking: true, thinking_budget: thinkingBudget }
-      : {}),
+    stream: true,
+    ...(enableThinking ? { enable_thinking: true, thinking_budget: thinkingBudget } : {}),
   };
 
+  let upstream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
   try {
-    const completion = await client.chat.completions.create(createParams);
-
-    const choice = completion.choices[0];
-    const msg = choice?.message as
-      | (OpenAI.Chat.ChatCompletionMessage & {
-          reasoning_content?: string | null;
-        })
-      | undefined;
-
-    const contentRaw = msg?.content as unknown;
-    let content = "";
-    if (typeof contentRaw === "string") {
-      content = contentRaw;
-    } else if (Array.isArray(contentRaw)) {
-      const chunks: string[] = [];
-      for (const p of contentRaw) {
-        if (p && typeof p === "object" && "text" in p && typeof (p as { text?: unknown }).text === "string") {
-          chunks.push((p as { text: string }).text);
-        }
-      }
-      content = chunks.join("");
-    }
-
-    const reasoning =
-      typeof msg?.reasoning_content === "string" ? msg.reasoning_content.trim() : "";
-
-    return Response.json({
-      ok: true,
-      model: meta.apiModel,
-      content: content || "",
-      reasoning: reasoning || undefined,
-      usage: completion.usage,
-    });
+    upstream = await client.chat.completions.create(streamParams);
   } catch (e: unknown) {
     const status =
       e && typeof e === "object" && "status" in e && typeof (e as { status: unknown }).status === "number"
@@ -272,4 +240,52 @@ export async function POST(req: Request) {
       { status: status >= 400 && status < 600 ? status : 502 },
     );
   }
+
+  const encoder = new TextEncoder();
+
+  type StreamEv =
+    | { type: "reasoning"; text: string }
+    | { type: "content"; text: string }
+    | { type: "done" }
+    | { type: "error"; message: string };
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      const send = (ev: StreamEv) => {
+        controller.enqueue(encoder.encode(`${JSON.stringify(ev)}\n`));
+      };
+      try {
+        for await (const chunk of upstream) {
+          const delta = chunk.choices[0]?.delta as
+            | {
+                content?: string | null;
+                reasoning_content?: string | null;
+              }
+            | undefined;
+          const r = delta?.reasoning_content;
+          if (typeof r === "string" && r.length > 0) {
+            send({ type: "reasoning", text: r });
+          }
+          const c = delta?.content;
+          if (typeof c === "string" && c.length > 0) {
+            send({ type: "content", text: c });
+          }
+        }
+        send({ type: "done" });
+        controller.close();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "stream_error";
+        send({ type: "error", message });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+      Connection: "keep-alive",
+    },
+  });
 }
