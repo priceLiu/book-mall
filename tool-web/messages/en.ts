@@ -16,7 +16,7 @@ export const en = {
     freeQuota: "Free quota",
     quotaValueDemo: "385 / 400",
     startFitting: "Start try-on",
-    tryOnChargeLineSub: "¥1 charged on successful try-on",
+    tryOnChargeLineSub: "100 pts (¥1.00) per successful try-on",
     tryOnChargeLineTitle:
       "Billed per main-site tools pricing from your tools wallet; charged only after a successful render.",
     tryOnBusy: "Trying on…",
@@ -92,9 +92,9 @@ export const en = {
     billingReminderAfterTryOn:
       "Try-on image is ready. If charges apply, billing follows the main site per-call price — see Usage & billing.",
     tryOnBillingCharged:
-      "This try-on was billed {{amount}} CNY (per-call rate). See Usage & billing for details.",
+      "This try-on was billed {{amount}} (per-call rate). See Usage & billing for details.",
     tryOnBillingDuplicate:
-      "Billing record already exists (idempotent). Per-call rate {{amount}} CNY; no duplicate charge. See Usage & billing.",
+      "Billing record already exists (idempotent). Per-call rate {{amount}}; no duplicate charge. See Usage & billing.",
     imageLibraryPageTitle: "My image library",
     imageLibraryEmptyTitle: "No saved images yet",
     imageLibraryEmptyHint:

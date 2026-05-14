@@ -54,7 +54,7 @@ export async function subscribeProductMock(formData: FormData) {
         userId,
         type: "PRODUCT_SUBSCRIPTION",
         status: "PAID",
-        amountMinor: 0,
+        amountPoints: 0,
         paidAt: new Date(),
         meta: {
           mock: true,

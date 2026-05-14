@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { authOptions } from "@/lib/auth";
 import { getMembershipFlags } from "@/lib/membership";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 import { getGoldMemberAccess } from "@/lib/gold-member";
 import {
@@ -165,14 +165,21 @@ export default async function AccountPage({
               <CardHeader>
                 <CardTitle>钱包</CardTitle>
                 <CardDescription>
-                  可用余额（CNY） · 最低可用线 {formatMinorAsYuan(flags.minBalanceLineMinor)}{" "}
-                  元；独立 AI 工具站须黄金会员 +（会员计划或单品工具订阅），请从顶部菜单进入工具站。
+                  账本以<strong className="font-medium text-foreground">点</strong>记账（100 点 = 1 元）；以下为可用余额与折合人民币。
+                  最低可用线 {flags.minBalanceLinePoints.toLocaleString("zh-CN")} 点（¥
+                  {formatPointsAsYuan(flags.minBalanceLinePoints)}）。独立 AI 工具站须黄金会员 +（会员计划或单品工具订阅），请从顶部菜单进入工具站。
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm flex-1 flex flex-col">
-                <p className="text-2xl font-semibold tabular-nums">
-                  ¥{formatMinorAsYuan(flags.balanceMinor)}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-2xl font-semibold tabular-nums tracking-tight">
+                    {flags.balancePoints.toLocaleString("zh-CN")}{" "}
+                    <span className="text-lg font-semibold text-muted-foreground">点</span>
+                  </p>
+                  <p className="text-sm text-muted-foreground tabular-nums">
+                    约合 ¥{formatPointsAsYuan(flags.balancePoints)}
+                  </p>
+                </div>
                 <p className="text-muted-foreground">
                   高级会员状态（可享用高阶/按量）：{" "}
                   <span className="font-medium text-foreground">
@@ -186,13 +193,19 @@ export default async function AccountPage({
                     <span className="font-medium text-foreground">
                       {goldAccess.isGoldMember ? "是" : "否"}
                     </span>
-                    （须历史有过充值记录，且余额 ≥ ¥
-                    {formatMinorAsYuan(goldAccess.minBalanceLineMinor)}）
+                    （须历史有过充值记录，且余额 ≥{" "}
+                    {goldAccess.minBalanceLinePoints.toLocaleString("zh-CN")} 点 / ¥
+                    {formatPointsAsYuan(goldAccess.minBalanceLinePoints)}）
                   </p>
                 </div>
-                <Button asChild variant="subscription" size="sm" className="mt-2 w-full sm:w-auto">
-                  <Link href="/pay/mock-topup">钱包充值（模拟收银）</Link>
-                </Button>
+                <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                  <Button asChild variant="subscription" size="sm" className="w-full sm:w-auto">
+                    <Link href="/pay/mock-topup">钱包充值（模拟收银）</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Link href="/account/recharge-promos">充值优惠券</Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -284,8 +297,8 @@ export default async function AccountPage({
                     <li key={r.id} className="flex flex-wrap gap-2 text-muted-foreground">
                       <span>{r.createdAt.toLocaleString("zh-CN")}</span>
                       <span className="font-medium text-foreground">{r.status}</span>
-                      {r.refundAmountMinor != null ? (
-                        <span>实提 ¥{formatMinorAsYuan(r.refundAmountMinor)}</span>
+                      {r.refundAmountPoints != null ? (
+                        <span>实提 ¥{formatPointsAsYuan(r.refundAmountPoints)}</span>
                       ) : null}
                     </li>
                   ))}

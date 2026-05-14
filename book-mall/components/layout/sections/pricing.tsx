@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { isPrismaConnectionUnavailable, logDbUnavailable } from "@/lib/db-unavailable";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import { Button } from "@/components/ui/button";
 import type { SubscriptionPlan } from "@prisma/client";
 import {
@@ -52,7 +52,7 @@ export async function PricingSection() {
       title: "月度订阅",
       popular: false,
       priceLine: monthly
-        ? `¥${formatMinorAsYuan(monthly.priceMinor)} / 月`
+        ? `¥${formatPointsAsYuan(monthly.pricePoints)} / 月`
         : "价格待定",
       description: "按月开通会员，灵活续费；配合钱包充值使用 AI 应用按量能力。",
       buttonText: "月度订阅",
@@ -69,7 +69,7 @@ export async function PricingSection() {
       title: "年度订阅",
       popular: true,
       priceLine: yearly
-        ? `¥${formatMinorAsYuan(yearly.priceMinor)} / 年`
+        ? `¥${formatPointsAsYuan(yearly.pricePoints)} / 年`
         : "价格待定",
       description: "年度付费更省，适合持续学习与长期使用 AI 应用。",
       buttonText: "年度订阅",
@@ -104,9 +104,15 @@ export async function PricingSection() {
 
       <h2 className="text-3xl md:text-4xl text-center font-bold mb-4">会员与订阅</h2>
 
-      <h3 className="md:w-1/2 mx-auto text-xl text-center text-muted-foreground pb-14">
+      <h3 className="md:w-1/2 mx-auto text-xl text-center text-muted-foreground pb-4">
         先成为订阅会员，再在个人中心充值；工具型按量能力以站内公示为准。
       </h3>
+
+      <p className="text-center text-sm text-muted-foreground pb-14">
+        <Link href="/pricing-disclosure" className="text-primary underline font-medium">
+          查看完整价格公示与使用案例
+        </Link>
+      </p>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-4">
         {tiers.map(

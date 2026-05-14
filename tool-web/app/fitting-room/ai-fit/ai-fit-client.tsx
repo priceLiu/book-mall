@@ -94,7 +94,7 @@ type TryOnPollUsage = {
   recorded: boolean;
   insufficientBalance?: boolean;
   error?: string | null;
-  chargedMinor?: number;
+  chargedPoints?: number;
   billingDuplicate?: boolean;
 };
 
@@ -104,7 +104,9 @@ function formatTryOnBillingLine(
 ): string {
   if (!u?.recorded) return t("billingReminderAfterTryOn");
   const amount =
-    u.chargedMinor != null ? (u.chargedMinor / 100).toFixed(2) : null;
+    u.chargedPoints != null
+      ? `${u.chargedPoints.toLocaleString("zh-CN")} 点（¥${(u.chargedPoints / 100).toFixed(2)}）`
+      : null;
   if (amount != null && u.billingDuplicate) {
     return t("tryOnBillingDuplicate").replace(/\{\{amount\}\}/g, amount);
   }

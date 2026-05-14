@@ -105,6 +105,12 @@ export function AdminNav({
               <Link href="/admin/finance/recharges">充值明细</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
+              <Link href="/admin/finance/reconciliation">财务核对</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/promo-templates">充值优惠模板</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link href="/admin/refunds">提现审核</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>

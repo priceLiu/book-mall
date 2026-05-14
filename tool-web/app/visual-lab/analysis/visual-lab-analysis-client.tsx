@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 import { AnalysisReplyMarkdown } from "@/components/visual-lab/analysis-reply-markdown";
 import {
+  formatPointsPrimaryYuanSecondary,
+  formatRequiredPointsShortfall,
+  readRequiredPointsFromSettleJson,
+} from "@/lib/format-points-ui";
+import {
   type VisualLabGalleryItem,
   type VisualLabSnapshotStats,
   type AppendVisualLabNotebookGalleryResult,
@@ -39,6 +44,8 @@ import {
   VISUAL_LAB_ANALYSIS_MODELS,
   getVisualLabAnalysisModelById,
 } from "@/lib/visual-lab-analysis-models";
+import { VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS } from "@/lib/visual-lab-analysis-billing";
+import { formatReferencePricingLine } from "@/lib/visual-lab-analysis-reference-pricing";
 
 const MAX_DOC = 1;
 const MAX_IMG = 5;
@@ -303,11 +310,6 @@ function suggestedNameFromImageDataUrl(dataUrl: string): string {
   return `分析附图-${Date.now()}.${ext}`;
 }
 
-function formatYuan(minor: number | null | undefined): string {
-  if (minor == null || !Number.isFinite(minor)) return "—";
-  return (minor / 100).toFixed(2);
-}
-
 async function buildUserTurnDisplay(attSnap: Attachment[], promptSnap: string): Promise<UserTurnDisplay> {
   const images: string[] = [];
   const videos: string[] = [];
@@ -467,8 +469,8 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
   const [modelId, setModelId] = useState<string>(DEFAULT_VISUAL_LAB_ANALYSIS_MODEL_ID);
 
   const [walletLoading, setWalletLoading] = useState(true);
-  const [balanceMinor, setBalanceMinor] = useState<number | null>(null);
-  const [usedMinor, setUsedMinor] = useState<number | null>(null);
+  const [balancePoints, setBalancePoints] = useState<number | null>(null);
+  const [usedPoints, setUsedPoints] = useState<number | null>(null);
 
   const [uploadFailText, setUploadFailText] = useState<string | null>(null);
   const [infoBannerDismissed, setInfoBannerDismissed] = useState(false);
@@ -548,31 +550,31 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
           }),
         ]);
         const wj = (await wr.json().catch(() => null)) as {
-          balanceMinor?: number | null;
+          balancePoints?: number | null;
           active?: boolean;
         } | null;
         const uj = (await ur.json().catch(() => null)) as {
-          summaryByTool?: { sumMinor?: number | null }[];
+          summaryByTool?: { sumPoints?: number | null }[];
         } | null;
         if (cancelled) return;
-        if (wr.ok && wj && typeof wj.balanceMinor === "number") {
-          setBalanceMinor(Math.max(0, Math.floor(wj.balanceMinor)));
+        if (wr.ok && wj && typeof wj.balancePoints === "number") {
+          setBalancePoints(Math.max(0, Math.floor(wj.balancePoints)));
         } else {
-          setBalanceMinor(null);
+          setBalancePoints(null);
         }
         if (ur.ok && uj?.summaryByTool && Array.isArray(uj.summaryByTool)) {
           const sum = uj.summaryByTool.reduce(
-            (s, r) => s + (typeof r.sumMinor === "number" ? r.sumMinor : 0),
+            (s, r) => s + (typeof r.sumPoints === "number" ? r.sumPoints : 0),
             0,
           );
-          setUsedMinor(sum);
+          setUsedPoints(sum);
         } else {
-          setUsedMinor(null);
+          setUsedPoints(null);
         }
       } catch {
         if (!cancelled) {
-          setBalanceMinor(null);
-          setUsedMinor(null);
+          setBalancePoints(null);
+          setUsedPoints(null);
         }
       } finally {
         if (!cancelled) setWalletLoading(false);
@@ -581,6 +583,20 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const refetchWallet = useCallback(async () => {
+    try {
+      const wr = await fetch("/api/tool-wallet", { cache: "no-store", credentials: "same-origin" });
+      const wj = (await wr.json().catch(() => null)) as {
+        balancePoints?: number | null;
+      } | null;
+      if (wr.ok && wj && typeof wj.balancePoints === "number") {
+        setBalancePoints(Math.max(0, Math.floor(wj.balancePoints)));
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -837,9 +853,6 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
       const ac = new AbortController();
       analysisAbortRef.current = ac;
 
-      const turnDisplay = await buildUserTurnDisplay(attSnap, promptSnap);
-      setUserTurnDisplay(turnDisplay);
-
       const modelIdSnap = modelId;
       const budgetSnap = thinkingTokens;
 
@@ -853,23 +866,12 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
       streamStickBottomRef.current = true;
       reasoningStickBottomRef.current = true;
       setAnalyzing(true);
-      setSubmitted(true);
-
-      setAttachments((prev) => {
-        prev.forEach((a) => {
-          if (a.url) URL.revokeObjectURL(a.url);
-        });
-        return [];
-      });
-      setPrompt("");
-
-      requestAnimationFrame(() => {
-        resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
 
       try {
         const attachmentPayload =
           attSnap.length > 0 ? await Promise.all(attSnap.map((a) => attachmentToPayload(a))) : [];
+
+        const billingRequestId = crypto.randomUUID();
 
         const res = await fetch("/api/visual-lab/analysis", {
           method: "POST",
@@ -882,20 +884,38 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
             enableThinking: true,
             thinkingBudget: budgetSnap,
             attachments: attachmentPayload,
+            billingRequestId,
           }),
         });
 
         if (!res.ok) {
-          const data = (await res.json().catch(() => null)) as {
-            message?: unknown;
-            error?: unknown;
-          } | null;
+          const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+          if (res.status === 402) {
+            const req = data ? readRequiredPointsFromSettleJson(data) : undefined;
+            const suffix = formatRequiredPointsShortfall(req ?? VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS);
+            throw new Error(`余额不足：${suffix}`);
+          }
           const msg =
             (typeof data?.message === "string" && data.message) ||
             (typeof data?.error === "string" && data.error) ||
             `请求失败（${res.status}）`;
           throw new Error(msg);
         }
+
+        const turnDisplay = await buildUserTurnDisplay(attSnap, promptSnap);
+        setUserTurnDisplay(turnDisplay);
+        setAttachments((prev) => {
+          prev.forEach((a) => {
+            if (a.url) URL.revokeObjectURL(a.url);
+          });
+          return [];
+        });
+        setPrompt("");
+        setSubmitted(true);
+
+        requestAnimationFrame(() => {
+          resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
 
         const ct = res.headers.get("content-type") ?? "";
         if (ct.includes("ndjson")) {
@@ -913,6 +933,8 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
           setAnalysisReply(typeof data?.content === "string" ? data.content : "");
           setAnalysisReasoning(typeof data?.reasoning === "string" ? data.reasoning : "");
         }
+
+        void refetchWallet();
       } catch (e) {
         const isAbort =
           (e instanceof DOMException && e.name === "AbortError") ||
@@ -934,7 +956,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
         setAnalyzing(false);
       }
     },
-    [analyzing, modelId, thinkingTokens, showUploadFail],
+    [analyzing, modelId, thinkingTokens, showUploadFail, refetchWallet],
   );
 
   const handleSend = useCallback(async () => {
@@ -1005,7 +1027,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
   return (
     <div
       className={
-        "vl-analysis-toolbar-pad mx-auto max-w-[1100px] px-4 pt-8 sm:px-6" +
+        "vl-analysis-toolbar-pad mx-auto max-w-[1280px] px-4 pt-8 sm:px-6" +
         (submitted ? " vl-analysis-page--session pb-4" : " pb-12")
       }
     >
@@ -1028,12 +1050,6 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
         <p className="vl-muted mt-1 text-sm">
           视觉理解模型可以根据您传入的图片或视频进行回答，支持单图或多图的输入，适用于图像描述、视觉问答、物体定位等多种任务。
         </p>
-        <p className="vl-muted mt-2 text-sm">
-          「保存到成果展」中，<strong className="font-medium text-zinc-200">分析快照</strong>与
-          <strong className="font-medium text-zinc-200">仅保存的模型回复（Markdown）</strong>在本机合计最多保留{" "}
-          {VISUAL_LAB_GALLERY_SNAPSHOT_MAX} 条；超出时<strong className="font-medium text-zinc-200">最早的一条会被新保存覆盖</strong>
-          （回复里单独「存入成果」的图片 / 视频另有条数上限，不受此轮替影响）。
-        </p>
 
         {!infoBannerDismissed ? (
           <div className="vl-analysis-info-banner" role="status">
@@ -1041,7 +1057,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
               <Info className="h-3 w-3" strokeWidth={2.5} />
             </span>
             <p className="vl-analysis-info-banner-text">
-              模型体验将会消耗免费额度或产生按量付费账单，费用以实际发生为主（模型部署-算力时长计费模型除外）
+              点击「发送」或下方体验模板并成功发起请求时，将按次从钱包扣点；余额不足将无法继续。模型失败或中断通常不退款。上游阿里云 Token 用量费用另见百炼账单。
             </p>
             <button
               type="button"
@@ -1214,6 +1230,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                       <span className="vl-model-menu-option-title">{m.title}</span>
                     </span>
                     <span className="vl-model-menu-option-desc">{m.description}</span>
+                    <span className="vl-model-menu-option-ref">{formatReferencePricingLine(m)}</span>
                   </button>
                 ))}
               </div>
@@ -1360,6 +1377,19 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                   搜索
                 </button>
 
+                <span
+                  className="vl-compose-per-call"
+                  title="每次点击发送或模板即扣费一次，与模型输出长度无关（以主站标价为准）"
+                >
+                  每次{" "}
+                  <strong className="tabular-nums">
+                    {VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS.toLocaleString("zh-CN")} 点
+                  </strong>
+                  <span className="opacity-80">
+                    （¥{(VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS / 100).toFixed(2)}）
+                  </span>
+                </span>
+
                 <input
                   ref={docInputRef}
                   type="file"
@@ -1385,17 +1415,16 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
               </div>
 
               <div className="vl-compose-toolbar-right">
-                <span className="vl-compose-balance">
-                  可用余额
+                <span className="vl-compose-balance" aria-label="已用点数与当前余额">
                   {walletLoading ? (
-                    <strong> …</strong>
+                    <strong>…</strong>
                   ) : (
-                    <>
-                      {" "}
-                      <strong>
-                        已用 ¥{formatYuan(usedMinor ?? 0)} / 余额 ¥{formatYuan(balanceMinor)}
-                      </strong>
-                    </>
+                    <strong>
+                      已用 {formatPointsPrimaryYuanSecondary(usedPoints ?? 0)} / 余额{" "}
+                      {balancePoints != null && Number.isFinite(balancePoints)
+                        ? formatPointsPrimaryYuanSecondary(balancePoints)
+                        : "—"}
+                    </strong>
                   )}
                 </span>
                 {analyzing ? (
@@ -1413,7 +1442,8 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                     className="vl-compose-send"
                     data-ready={sendReady}
                     disabled={!sendReady}
-                    aria-label="发送"
+                    aria-label={`发送并扣费 ${VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS} 点`}
+                    title={`发送后先扣 ${VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS.toLocaleString("zh-CN")} 点（¥${(VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS / 100).toFixed(2)}），再拉流模型回复`}
                     onClick={() => void handleSend()}
                   >
                     <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
@@ -1437,6 +1467,9 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                   >
                     <span className="vl-analysis-template-card-kicker">{t.title}</span>
                     <p className="vl-analysis-template-card-desc">{t.description}</p>
+                    <span className="vl-analysis-template-card-charge" aria-hidden>
+                      每次 {VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS.toLocaleString("zh-CN")} 点
+                    </span>
                     <div className="vl-analysis-template-card-media">
                       {t.mode === "video" ? (
                         <video
@@ -1453,7 +1486,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                           alt=""
                           fill
                           className="object-cover"
-                          sizes="(max-width: 640px) 100vw, (max-width: 1100px) 34vw, 260px"
+                          sizes="(max-width: 640px) 100vw, (max-width: 1280px) 34vw, 260px"
                         />
                       )}
                     </div>
@@ -1491,7 +1524,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  ¥50 充值套餐
+                  5000 点档（¥50）
                 </a>
                 <a
                   className="vl-btn vl-btn-outline vl-btn-sm"
@@ -1499,7 +1532,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  ¥100 充值套餐
+                  10000 点档（¥100）
                 </a>
               </div>
             ) : (

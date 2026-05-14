@@ -14,7 +14,7 @@ export type UsageEventRow = {
   toolKey: string;
   action: string;
   meta: unknown;
-  costMinor: number | null;
+  costPoints: number | null;
   createdAt: string;
 };
 
@@ -22,21 +22,21 @@ export type ToolSummaryRow = {
   toolKey: string;
   label: string;
   billCount: number;
-  sumMinor: number;
+  sumPoints: number;
 };
 
 type WalletPayload = {
   active: boolean;
-  balanceMinor: number | null;
-  minBalanceLineMinor: number | null;
+  balancePoints: number | null;
+  minBalanceLinePoints: number | null;
   reason?: string;
 };
 
 const PAGE_SIZE = 50;
 
-function formatYuanFromMinor(minor: number | null | undefined): string {
-  if (minor == null || !Number.isFinite(minor)) return "—";
-  return `${(minor / 100).toFixed(2)}`;
+function formatYuanFromPoints(points: number | null | undefined): string {
+  if (points == null || !Number.isFinite(points)) return "—";
+  return `${(points / 100).toFixed(2)}`;
 }
 
 function BalanceFooterStrip({
@@ -54,13 +54,16 @@ function BalanceFooterStrip({
     if (!wallet?.active && wallet?.reason === "tools_access_denied") {
       return <span className={styles.balanceMuted}>暂无准入 · 请充值或联系管理员</span>;
     }
-    if (wallet?.balanceMinor == null) {
+    if (wallet?.balancePoints == null) {
       return <span className={styles.balanceMuted}>—</span>;
     }
+    const pts = wallet.balancePoints;
     return (
       <>
-        <span className={styles.balanceAmount}>¥{formatYuanFromMinor(wallet.balanceMinor)}</span>
-        <span className={styles.balanceMuted}> CNY</span>
+        <span className={styles.balanceAmount}>
+          {pts.toLocaleString("zh-CN")} 点
+        </span>
+        <span className={styles.balanceMuted}>（¥{formatYuanFromPoints(pts)}）</span>
       </>
     );
   })();
@@ -69,10 +72,12 @@ function BalanceFooterStrip({
     !loading &&
     !errorText &&
     wallet?.active &&
-    wallet.minBalanceLineMinor != null &&
-    wallet.minBalanceLineMinor > 0 ? (
+    wallet.minBalanceLinePoints != null &&
+    wallet.minBalanceLinePoints > 0 ? (
       <p className={styles.balanceHint}>
-        最低可用余额线（工具准入）：¥{formatYuanFromMinor(wallet.minBalanceLineMinor)}
+        最低可用余额线（工具准入）：
+        {wallet.minBalanceLinePoints.toLocaleString("zh-CN")} 点（¥
+        {formatYuanFromPoints(wallet.minBalanceLinePoints)}）
       </p>
     ) : null;
 
@@ -118,8 +123,8 @@ export function AppHistoryClient() {
       } else {
         setWallet({
           active: Boolean(walletData.active),
-          balanceMinor: walletData.balanceMinor ?? null,
-          minBalanceLineMinor: walletData.minBalanceLineMinor ?? null,
+          balancePoints: walletData.balancePoints ?? null,
+          minBalanceLinePoints: walletData.minBalanceLinePoints ?? null,
           reason: walletData.reason,
         });
         setWalletError(null);
@@ -187,9 +192,9 @@ export function AppHistoryClient() {
     await loadUsage(page);
   }, [loadWallet, loadUsage, page]);
 
-  const pageSumMinor = useMemo(() => {
+  const pageSumPoints = useMemo(() => {
     return events.reduce((acc, e) => {
-      const c = e.costMinor;
+      const c = e.costPoints;
       return acc + (typeof c === "number" && c > 0 ? c : 0);
     }, 0);
   }, [events]);
@@ -221,22 +226,23 @@ export function AppHistoryClient() {
     if (!wallet?.active && wallet?.reason === "tools_access_denied") {
       return <span className={styles.balanceMuted}>暂无准入</span>;
     }
-    if (wallet?.balanceMinor == null) {
+    if (wallet?.balancePoints == null) {
       return <span className={styles.balanceMuted}>—</span>;
     }
     return (
       <span className={styles.inlineBalanceAmt}>
-        ¥{formatYuanFromMinor(wallet.balanceMinor)}
+        {wallet.balancePoints.toLocaleString("zh-CN")} 点（¥
+        {formatYuanFromPoints(wallet.balancePoints)}）
       </span>
     );
   })();
 
   function renderRow(row: UsageEventRow) {
-    const charge = formatToolUsageChargeDisplay(row.toolKey, row.action, row.costMinor);
+    const charge = formatToolUsageChargeDisplay(row.toolKey, row.action, row.costPoints);
     const unit = formatToolUsageUnitPriceDisplay(
       row.toolKey,
       row.action,
-      row.costMinor,
+      row.costPoints,
       row.meta,
     );
     const chargeCls =
@@ -293,7 +299,9 @@ export function AppHistoryClient() {
               <ul className={styles.toolNotesList}>
                 {summaryByTool.map((s) => (
                   <li key={s.toolKey} className={styles.toolNotesLi}>
-                    {s.label} · {s.billCount} 笔 · ¥{(s.sumMinor / 100).toFixed(2)}
+                    {s.label} · {s.billCount} 笔 ·{" "}
+                    {s.sumPoints.toLocaleString("zh-CN")} 点（¥
+                    {(s.sumPoints / 100).toFixed(2)}）
                   </li>
                 ))}
               </ul>
@@ -335,7 +343,8 @@ export function AppHistoryClient() {
                 <div className={styles.toolGroupHead}>
                   <span>{s.label}</span>
                   <span className={styles.toolGroupMeta}>
-                    累计 {s.billCount} 笔 · 合计 ¥{(s.sumMinor / 100).toFixed(2)}
+                    累计 {s.billCount} 笔 · 合计 {s.sumPoints.toLocaleString("zh-CN")}{" "}
+                    点（¥{(s.sumPoints / 100).toFixed(2)}）
                   </span>
                 </div>
                 <div className={styles.toolGroupRows}>{rows.map(renderRow)}</div>
@@ -356,7 +365,9 @@ export function AppHistoryClient() {
           <div className={styles.summaryLine}>
             <span>本页合计扣费（仅已标价）</span>
             <span className={styles.summaryStrong}>
-              {pageSumMinor > 0 ? `¥${(pageSumMinor / 100).toFixed(2)}` : "—"}
+              {pageSumPoints > 0
+                ? `${pageSumPoints.toLocaleString("zh-CN")} 点（¥${(pageSumPoints / 100).toFixed(2)}）`
+                : "—"}
             </span>
           </div>
           {showPager ? (

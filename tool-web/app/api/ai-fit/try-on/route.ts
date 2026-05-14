@@ -28,7 +28,7 @@ const recordedTryOnUsageTasks = new Set<string>();
 const recordedTryOnUsageInsufficientTasks = new Set<string>();
 
 /** 成片计费展示：幂等 / 金额（与 taskId 绑定，TTL 与 OSS 缓存一致时清理） */
-type TryOnBillingSnap = { chargedMinor?: number; billingDuplicate?: boolean };
+type TryOnBillingSnap = { chargedPoints?: number; billingDuplicate?: boolean };
 const tryOnBillingSnapByTaskId = new Map<string, TryOnBillingSnap>();
 
 /**
@@ -41,7 +41,7 @@ type AiFitTryOnUsagePayload = {
   recorded: boolean;
   insufficientBalance?: boolean;
   error?: string | null;
-  chargedMinor?: number;
+  chargedPoints?: number;
   billingDuplicate?: boolean;
 };
 
@@ -68,7 +68,7 @@ async function reportAiFitTryOnUsage(opts: {
       return { recorded: false, error: msg };
     }
     if (usage.status === 402) {
-      const req = usage.data.requiredMinor;
+      const req = usage.data.requiredPoints;
       return {
         recorded: false,
         insufficientBalance: true,
@@ -86,22 +86,22 @@ async function reportAiFitTryOnUsage(opts: {
       return { recorded: false, error: err };
     }
     const d = usage.data;
-    const costMinor =
-      typeof d.costMinor === "number" && Number.isFinite(d.costMinor)
-        ? Math.max(0, Math.floor(d.costMinor))
+    const costPoints =
+      typeof d.costPoints === "number" && Number.isFinite(d.costPoints)
+        ? Math.max(0, Math.floor(d.costPoints))
         : undefined;
 
     if (d.duplicate === true) {
       return {
         recorded: true,
         billingDuplicate: true,
-        chargedMinor: costMinor,
+        chargedPoints: costPoints,
       };
     }
     if (d.recorded === true) {
       return {
         recorded: true,
-        chargedMinor: costMinor,
+        chargedPoints: costPoints,
       };
     }
     return { recorded: true };
@@ -384,7 +384,7 @@ export async function GET(req: NextRequest) {
         recorded: boolean;
         insufficientBalance?: boolean;
         error?: string | null;
-        chargedMinor?: number;
+        chargedPoints?: number;
         billingDuplicate?: boolean;
       }
     | undefined;
@@ -394,7 +394,7 @@ export async function GET(req: NextRequest) {
       const snap = tryOnBillingSnapByTaskId.get(taskId);
       usage = {
         recorded: true,
-        chargedMinor: snap?.chargedMinor,
+        chargedPoints: snap?.chargedPoints,
         billingDuplicate: snap?.billingDuplicate,
       };
     } else if (recordedTryOnUsageInsufficientTasks.has(taskId)) {
@@ -413,7 +413,7 @@ export async function GET(req: NextRequest) {
       if (reported.recorded) {
         recordedTryOnUsageTasks.add(taskId);
         tryOnBillingSnapByTaskId.set(taskId, {
-          chargedMinor: reported.chargedMinor,
+          chargedPoints: reported.chargedPoints,
           billingDuplicate: reported.billingDuplicate,
         });
       } else if (reported.insufficientBalance) {

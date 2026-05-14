@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
 import {
   balanceRiskLevel,
-  balanceRiskThresholdMinor,
+  balanceRiskThresholdPoints,
 } from "@/lib/balance-risk";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,12 +99,12 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
   }
 
   if (platform && balanceRisk !== "all") {
-    const thr = balanceRiskThresholdMinor(balanceRisk, platform);
+    const thr = balanceRiskThresholdPoints(balanceRisk, platform);
     if (thr != null) {
       userAnd.push({
         OR: [
           { wallet: { is: null } },
-          { wallet: { balanceMinor: { lt: thr } } },
+          { wallet: { balancePoints: { lt: thr } } },
         ],
       });
     }
@@ -126,7 +126,7 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
         id: true,
         toolKey: true,
         action: true,
-        costMinor: true,
+        costPoints: true,
         meta: true,
         createdAt: true,
         user: {
@@ -134,7 +134,7 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
             id: true,
             email: true,
             name: true,
-            wallet: { select: { balanceMinor: true } },
+            wallet: { select: { balancePoints: true } },
           },
         },
       },
@@ -149,7 +149,7 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
               { wallet: { is: null } },
               {
                 wallet: {
-                  balanceMinor: { lt: platform.minBalanceLineMinor },
+                  balancePoints: { lt: platform.minBalanceLinePoints },
                 },
               },
             ],
@@ -166,29 +166,29 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
   const [aiFitAgg, aiFitMissingCostCount] = await Promise.all([
     prisma.toolUsageEvent.aggregate({
       where: aiFitBillWhere,
-      _sum: { costMinor: true },
+      _sum: { costPoints: true },
       _count: true,
     }),
     prisma.toolUsageEvent.count({
       where: {
         ...aiFitBillWhere,
-        costMinor: null,
+        costPoints: null,
       },
     }),
   ]);
 
-  const aiFitSumMinor = aiFitAgg._sum.costMinor ?? 0;
+  const aiFitSumPoints = aiFitAgg._sum.costPoints ?? 0;
   const aiFitTryOnCount = aiFitAgg._count;
 
   const totalPages = total === 0 ? 0 : Math.ceil(total / PAGE_SIZE);
-  const pageSumMinor = events.reduce((acc: number, e) => {
-    const c = e.costMinor;
+  const pageSumPoints = events.reduce((acc: number, e) => {
+    const c = e.costPoints;
     return acc + (typeof c === "number" && c > 0 ? c : 0);
   }, 0);
 
   const warnRowsOnPage = events.filter((e) => {
     if (!platform) return false;
-    const bal = e.user.wallet?.balanceMinor ?? 0;
+    const bal = e.user.wallet?.balancePoints ?? 0;
     return balanceRiskLevel(bal, platform) === "critical";
   }).length;
 
@@ -197,11 +197,12 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
       <div>
         <h1 className="text-2xl font-bold">工具使用明细与费用</h1>
         <p className="text-sm text-muted-foreground">
-          逐条展示打点与标价扣费（<code className="rounded bg-muted px-1 text-xs">costMinor</code>
-          ）。<strong className="font-medium text-foreground">AI智能试衣</strong>仅在成片成功后的{" "}
+          逐条展示打点与扣费。库里为{" "}
+          <code className="rounded bg-muted px-1 text-xs">costPoints（点）</code>，100 点 = 1 元，与「工具管理 →
+          按次单价」同一记账口径。
+          <strong className="font-medium text-foreground"> AI智能试衣</strong>仅在成片成功后的{" "}
           <code className="rounded bg-muted px-1 text-xs">try_on</code>{" "}
-          事件计价（详见工具站 <code className="rounded bg-muted px-1 text-xs">doc/payment.md</code>
-          ）；浏览与非计费入口在「AI扣费」列显示「不计费」。默认每页 {PAGE_SIZE} 条。
+          事件计价；浏览与非计费入口扣费列显示「不计费」。默认每页 {PAGE_SIZE} 条。
         </p>
       </div>
 
@@ -211,15 +212,17 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
         <span className="text-muted-foreground">
           成功试衣事件（try_on）共{" "}
           <strong className="tabular-nums text-foreground">{aiFitTryOnCount}</strong> 条
-          ，合计{" "}
+          ，合计扣点{" "}
           <strong className="tabular-nums text-foreground">
-            {aiFitSumMinor > 0 ? `¥${formatMinorAsYuan(aiFitSumMinor)}` : "—"}
+            {aiFitSumPoints > 0
+              ? `${aiFitSumPoints.toLocaleString("zh-CN")} 点（约合 ¥${formatPointsAsYuan(aiFitSumPoints)}）`
+              : "—"}
           </strong>
           {aiFitMissingCostCount > 0 ? (
             <>
               <span className="mx-2 text-muted-foreground">·</span>
               <span className="text-amber-800 dark:text-amber-200">
-                其中 <strong>{aiFitMissingCostCount}</strong> 条未写 costMinor（异常）
+                其中 <strong>{aiFitMissingCostCount}</strong> 条未写 costPoints（异常）
               </span>
             </>
           ) : null}
@@ -233,8 +236,9 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
         >
           <strong className="text-destructive">余额预警：</strong>
           全站共有 <strong>{usersBelowMinCount}</strong>{" "}
-          名用户钱包余额<strong>低于最低可用线</strong>（¥
-          {formatMinorAsYuan(platform.minBalanceLineMinor)}，工具黄金会员准入参考）。可在下方筛选「低于最低可用线」聚焦相关流水。
+          名用户钱包余额<strong>低于最低可用线</strong>（
+          {platform.minBalanceLinePoints.toLocaleString("zh-CN")} 点 / ¥
+          {formatPointsAsYuan(platform.minBalanceLinePoints)}，工具黄金会员准入参考）。可在下方筛选「低于最低可用线」聚焦相关流水。
         </div>
       ) : null}
 
@@ -292,9 +296,11 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
               <strong className="text-foreground">{totalPages}</strong> 页
             </>
           )}{" "}
-          · 本页合计扣费{" "}
+          · 本页合计扣点{" "}
           <strong className="text-foreground tabular-nums">
-            {pageSumMinor > 0 ? `¥${formatMinorAsYuan(pageSumMinor)}` : "—"}
+            {pageSumPoints > 0
+              ? `${pageSumPoints.toLocaleString("zh-CN")} 点（¥${formatPointsAsYuan(pageSumPoints)}）`
+              : "—"}
           </strong>
         </span>
         <div className="flex gap-2">
@@ -341,11 +347,11 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
             <tr>
               <th className="p-3 font-medium">预警</th>
               <th className="p-3 font-medium">用户</th>
-              <th className="p-3 font-medium text-right">当前余额(元)</th>
+              <th className="p-3 font-medium text-right">余额（点）</th>
               <th className="p-3 font-medium">工具</th>
               <th className="p-3 font-medium">动作</th>
-              <th className="p-3 font-medium text-right">单价(元)</th>
-              <th className="p-3 font-medium text-right">AI扣费(元)</th>
+              <th className="p-3 font-medium text-right">按次扣点</th>
+              <th className="p-3 font-medium text-right">本笔扣点</th>
               <th className="p-3 font-medium">时间</th>
             </tr>
           </thead>
@@ -361,18 +367,18 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
                 const u = row.user;
                 const primary = u.email ?? u.id;
                 const secondary = u.name?.trim() ? u.name : "—";
-                const bal = u.wallet?.balanceMinor ?? 0;
+                const bal = u.wallet?.balancePoints ?? 0;
                 const level =
                   platform != null ? balanceRiskLevel(bal, platform) : "ok";
                 const charge = formatToolUsageChargeDisplay(
                   row.toolKey,
                   row.action,
-                  row.costMinor,
+                  row.costPoints,
                 );
                 const unit = formatToolUsageUnitPriceDisplay(
                   row.toolKey,
                   row.action,
-                  row.costMinor,
+                  row.costPoints,
                   row.meta,
                 );
 
@@ -390,8 +396,13 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
                       </div>
                       <div className="text-xs text-muted-foreground">{secondary}</div>
                     </td>
-                    <td className="p-3 tabular-nums text-right">
-                      ¥{formatMinorAsYuan(bal)}
+                    <td className="p-3 text-right align-top">
+                      <div className="tabular-nums font-medium text-foreground">
+                        {bal.toLocaleString("zh-CN")} 点
+                      </div>
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        约合 ¥{formatPointsAsYuan(bal)}
+                      </div>
                     </td>
                     <td className="p-3">
                       <div className="font-medium">{toolKeyToLabel(row.toolKey)}</div>
@@ -402,27 +413,33 @@ export default async function AdminToolUsagePage({ searchParams }: Props) {
                     <td className="p-3">{row.action}</td>
                     <td
                       className={cn(
-                        "p-3 text-right tabular-nums",
-                        unit.variant === "money" && "font-medium text-foreground",
+                        "p-3 text-right align-top tabular-nums",
+                        unit.variant === "priced" && "font-medium text-foreground",
                         unit.variant === "nonbill" && "text-muted-foreground",
                         unit.variant === "dash" &&
                           isAiFitBillableTryOn(row.toolKey, row.action) &&
                           "text-amber-800 dark:text-amber-200",
                       )}
                     >
-                      {unit.text}
+                      <div>{unit.primary}</div>
+                      {unit.secondary ? (
+                        <div className="text-xs text-muted-foreground font-normal">{unit.secondary}</div>
+                      ) : null}
                     </td>
                     <td
                       className={cn(
-                        "p-3 text-right tabular-nums",
-                        charge.variant === "money" && "font-medium text-foreground",
+                        "p-3 text-right align-top tabular-nums",
+                        charge.variant === "priced" && "font-medium text-foreground",
                         charge.variant === "nonbill" && "text-muted-foreground",
                         charge.variant === "dash" &&
                           isAiFitBillableTryOn(row.toolKey, row.action) &&
                           "text-amber-800 dark:text-amber-200",
                       )}
                     >
-                      {charge.text}
+                      <div>{charge.primary}</div>
+                      {charge.secondary ? (
+                        <div className="text-xs text-muted-foreground font-normal">{charge.secondary}</div>
+                      ) : null}
                     </td>
                     <td className="p-3 whitespace-nowrap text-muted-foreground">
                       {row.createdAt.toLocaleString("zh-CN")}

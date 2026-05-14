@@ -11,19 +11,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import type { MockSubscribePlanSlug } from "@/lib/apply-mock-subscription";
 import { FakeQrPlaceholder } from "@/components/pay/fake-qr-placeholder";
 
 export function MockSubscribeCheckout({
   planSlug,
   planName,
-  amountMinor,
+  amountPoints,
   intervalLabel,
 }: {
   planSlug: MockSubscribePlanSlug;
   planName: string;
-  amountMinor: number;
+  amountPoints: number;
   intervalLabel: string;
 }) {
   const router = useRouter();
@@ -65,7 +65,7 @@ export function MockSubscribeCheckout({
             <p className="font-semibold text-lg">{planName}</p>
             <p className="text-muted-foreground text-sm">{intervalLabel}套餐</p>
             <p className="text-3xl font-bold tabular-nums pt-2">
-              ¥{formatMinorAsYuan(amountMinor)}
+              ¥{formatPointsAsYuan(amountPoints)}
             </p>
           </div>
 

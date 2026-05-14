@@ -1,21 +1,22 @@
 # 后台：订阅/充值配置与提现审核
 
 > 产品：`doc/product/05-admin.md` §5.3、`06-flows.md` §6.3、`07-operations.md`  
-> 路由：`/admin/billing`、`/admin/refunds`  
-> 动作：`app/actions/billing.ts`、`app/actions/refunds.ts`
+> 路由：`/admin/billing`、`/admin/refunds`、`/admin/finance/promo-templates`  
+> 动作：`app/actions/billing.ts`、`app/actions/refunds.ts`、`app/actions/recharge-promo-admin.ts`
 
 ## 5.3 已实现能力（首期）
 
 - **计费配置**：写入 `PlatformConfig` 单行（含 LLM/工具参考单价、异常倍数）。  
-- **订阅价**：更新 `SubscriptionPlan.priceMinor`。  
+- **订阅价**：更新 `SubscriptionPlan.pricePoints`。  
 - **手动续期**：按邮箱找到当前有效 `Subscription`，延长 `currentPeriodEnd`。  
 - **订单列表**：`Order` + 对订阅已支付未 `refundedAt` 的订单 **发起订阅提现审核**。  
-- **充值统计**：`WalletEntry` 类型 `RECHARGE` 的 `amountMinor` 汇总（到账口径，非支付渠道流水）。
+- **充值统计**：`WalletEntry` 类型 `RECHARGE` 的 `amountPoints` 汇总（到账口径，非支付渠道流水）。
+- **充值优惠模板**：`/admin/finance/promo-templates` 维护 `RechargePromoTemplate`；用户侧领取与核销约定见 `doc/product/points-wallet-topup-spec.md`。
 
 ## 6.3 余额提现
 
 1. 用户：`POST /api/account/wallet-refund`，写 `WalletRefundRequest`（`PENDING`），同一用户仅允许一条 `PENDING`。  
-2. 管理员：`completeWalletRefund`：填 **应扣未扣**（分），可选 **提现额覆盖**；默认实提 = `min(申请额或余额, 余额) - 应扣未扣`，并从钱包扣减、记 `WalletEntry` 类型 `REFUND`。  
+2. 管理员：`completeWalletRefund`：填 **应扣未扣**（点），可选 **提现额覆盖**；默认实提 = `min(申请额或余额, 余额) - 应扣未扣`，并从钱包扣减、记 `WalletEntry` 类型 `REFUND`。
 3. `rejectWalletRefund`：`REJECTED`。
 
 ## 订阅提现审核

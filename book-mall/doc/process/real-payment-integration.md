@@ -6,7 +6,7 @@
 
 - **生产环境**不得设置 **`ALLOW_MOCK_PAYMENT=true`**，并确保 **`/api/dev/mock-*`** 在非 development 下不可用（当前实现已依赖环境与该开关）。
 - 前端入口应从 **`/pay/mock-*`** 切换为 **渠道收银页 / 真实二维码页**，避免用户误以为仍为演示。
-- 模拟落库逻辑（`lib/apply-mock-subscription.ts`、`lib/apply-mock-topup.ts`）仅作过渡参考；真实支付应在 **独立适配层** 中完成后调用「业务入账」函数，避免复制粘贴散落多处。
+- 模拟落库逻辑（`lib/apply-mock-subscription.ts`、`lib/apply-mock-topup.ts`）仅作过渡参考；真实支付应在 **独立适配层** 中完成后调用 **`fulfillWalletTopupCredits`**（`lib/wallet-topup-fulfill.ts`），避免复制粘贴散落多处。详见 `doc/product/points-wallet-topup-spec.md`。
 
 ## 2. 可信来源：异步通知优先于前端提示
 
@@ -38,7 +38,7 @@
 | 类型 | 要点 |
 |------|------|
 | **订阅** | 支付成功后：激活/续期 `Subscription`，写 `Order(type: SUBSCRIPTION)`；周期起止与套餐一致；注意 **续费** 与 **新订**、并发支付同一用户的策略。 |
-| **钱包充值** | 支付成功后：`Wallet` 增加余额、`WalletEntry(RECHARGE)`、`Order(type: WALLET_TOPUP)`；与产品规则「订阅与余额互不抵扣」一致（见 `doc/product/02-users-billing-and-balance.md` 等）。 |
+| **钱包充值** | 支付成功后调用 **`fulfillWalletTopupCredits`**：`Wallet` 增加余额、`WalletEntry(RECHARGE)`（可多条）、`Order(type: WALLET_TOPUP)`；`Order.meta.topup` 区分本金与赠送；若用户在该笔支付中选择了 **充值优惠券**，须传入与渠道订单一致的 **`paidAmountPoints`** 及 **`rechargeCouponId`**（验券逻辑见 `lib/wallet-topup-fulfill.ts`）。与「订阅与余额互不抵扣」等产品规则见 `doc/product/points-wallet-topup-spec.md`、`doc/product/02-users-billing-and-balance.md`。 |
 
 同一套 notify 入口可按 **`out_trade_no` 前缀或订单类型字段** 分发到不同入账逻辑。
 
@@ -73,7 +73,7 @@
 ## 11. 与当前代码的衔接建议
 
 1. 新增 **`lib/payments/`**（或等价目录）：`createPayment`、`handleAlipayNotify`、`fulfillOrder`（内部再调用订阅入账 / 充值入账）。
-2. 将现有 **`applyMock*`** 中的 **事务块** 提炼为 **`fulfillSubscriptionPaid`** / **`fulfillWalletTopupPaid`**，供 notify 与人工补单（极少）复用。
+2. 将现有 **`applyMock*`** 中的 **事务块** 与 **`fulfillWalletTopupCredits`**（`lib/wallet-topup-fulfill.ts`）对齐，供 notify 与人工补单（极少）复用；订阅侧仍可提炼 **`fulfillSubscriptionPaid`**。
 3. 过渡期内可保留 mock 路由仅用于 development，与真实路由 **路径、权限完全分离**。
 
 ---

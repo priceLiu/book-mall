@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { resolveBillablePriceMinor } from "@/lib/tool-billable-price";
+import { resolveBillablePricePoints } from "@/lib/tool-billable-price";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
@@ -51,16 +51,16 @@ function verifyBearer(req: Request):
   return { ok: true, userId: verified.sub };
 }
 
-async function resolveCostMinorForEvent(
+async function resolveCostPointsForEvent(
   body: Record<string, unknown>,
   toolKey: string,
   action: string,
 ): Promise<number | undefined> {
-  const raw = body.costMinor;
+  const raw = body.costPoints ?? (body as { costMinor?: unknown }).costMinor;
   if (typeof raw === "number" && Number.isFinite(raw)) {
     return Math.max(0, Math.floor(raw));
   }
-  const fromTable = await resolveBillablePriceMinor(toolKey, action);
+  const fromTable = await resolveBillablePricePoints(toolKey, action);
   if (fromTable != null) return fromTable;
   /**
  * AI智能试衣：仅成片成功后的 try_on 自动标价（见 tool-web/doc/payment.md）；page_view 不写单价。
@@ -70,9 +70,9 @@ async function resolveCostMinorForEvent(
   if (action === "try_on" && toolKey === "fitting-room__ai-fit") {
     const cfg = await prisma.platformConfig.findUnique({
       where: { id: "default" },
-      select: { toolInvokePerCallMinor: true },
+      select: { toolInvokePerCallPoints: true },
     });
-    const v = cfg?.toolInvokePerCallMinor;
+    const v = cfg?.toolInvokePerCallPoints;
     if (typeof v === "number" && v > 0) return v;
   }
   return undefined;
@@ -113,7 +113,7 @@ export async function GET(req: Request) {
         toolKey: true,
         action: true,
         meta: true,
-        costMinor: true,
+        costPoints: true,
         createdAt: true,
       },
     }),
@@ -122,7 +122,7 @@ export async function GET(req: Request) {
       where: baseWhere,
       orderBy: { toolKey: "asc" },
       _count: { id: true },
-      _sum: { costMinor: true },
+      _sum: { costPoints: true },
     }),
   ]);
 
@@ -134,11 +134,11 @@ export async function GET(req: Request) {
       toolKey: r.toolKey,
       label: toolKeyToLabel(r.toolKey),
       billCount: (r._count as { id: number } | undefined)?.id ?? 0,
-      sumMinor: (r._sum as { costMinor: number | null } | undefined)?.costMinor ?? 0,
+      sumPoints: (r._sum as { costPoints: number | null } | undefined)?.costPoints ?? 0,
     }))
     .sort(
       (a, b) =>
-        b.sumMinor - a.sumMinor ||
+        b.sumPoints - a.sumPoints ||
         b.billCount - a.billCount ||
         a.label.localeCompare(b.label, "zh-CN"),
     );
@@ -155,7 +155,7 @@ export async function GET(req: Request) {
 
 /**
  * 工具站上报入口（需在请求头携带工具 JWT）。
- * 仅当解析出的 costMinor 为正整数时写入 ToolUsageEvent；否则返回 { ok: true, recorded: false }，不落库。
+ * 仅当解析出的 costPoints 为正整数时写入 ToolUsageEvent；否则返回 { ok: true, recorded: false }，不落库。
  */
 export async function POST(req: Request) {
   let jwtSecret: string;
@@ -197,10 +197,10 @@ export async function POST(req: Request) {
       : "page_view";
 
   const meta = parseMeta(body.meta);
-  const costMinor = await resolveCostMinorForEvent(body, rawToolKey, actionRaw);
+  const costPoints = await resolveCostPointsForEvent(body, rawToolKey, actionRaw);
 
   /** 仅入库「已标价且金额 > 0」的流水；浏览与非计费动作不入库（见 tool-web/doc/payment.md）。 */
-  if (costMinor === undefined || costMinor <= 0) {
+  if (costPoints === undefined || costPoints <= 0) {
     return NextResponse.json({ ok: true, recorded: false });
   }
 
@@ -209,7 +209,7 @@ export async function POST(req: Request) {
       userId: verified.sub,
       toolKey: rawToolKey,
       action: actionRaw,
-      costMinor,
+      costPoints,
       meta,
     });
 
@@ -219,14 +219,14 @@ export async function POST(req: Request) {
           ok: true,
           recorded: false,
           duplicate: true,
-          costMinor,
+          costPoints,
         });
       }
       return NextResponse.json(
         {
           error: "insufficient_balance",
-          balanceMinor: outcome.balanceMinor,
-          requiredMinor: costMinor,
+          balancePoints: outcome.balancePoints,
+          requiredPoints: costPoints,
         },
         { status: 402 },
       );
@@ -235,8 +235,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       recorded: true,
-      balanceMinor: outcome.balanceAfterMinor,
-      costMinor,
+      balancePoints: outcome.balanceAfterPoints,
+      costPoints,
     });
   } catch (e) {
     const code =

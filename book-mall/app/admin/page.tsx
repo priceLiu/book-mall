@@ -2,7 +2,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { WalletEntryType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
 import {
   Card,
@@ -41,10 +41,10 @@ export default async function AdminDashboardPage() {
     prisma.subscription.count({
       where: { status: "ACTIVE", currentPeriodEnd: { gt: now } },
     }),
-    prisma.wallet.aggregate({ _sum: { balanceMinor: true } }),
+    prisma.wallet.aggregate({ _sum: { balancePoints: true } }),
     prisma.walletEntry.aggregate({
       where: { type: WalletEntryType.RECHARGE },
-      _sum: { amountMinor: true },
+      _sum: { amountPoints: true },
     }),
     prisma.walletEntry.count({
       where: { type: WalletEntryType.RECHARGE },
@@ -56,8 +56,8 @@ export default async function AdminDashboardPage() {
     }),
   ]);
 
-  const totalBalance = balanceSum._sum.balanceMinor ?? 0;
-  const totalRecharge = rechargeSum._sum.amountMinor ?? 0;
+  const totalBalance = balanceSum._sum.balancePoints ?? 0;
+  const totalRecharge = rechargeSum._sum.amountPoints ?? 0;
 
   const toolUsageChartData = [...toolUsageGroups]
     .sort(
@@ -75,7 +75,22 @@ export default async function AdminDashboardPage() {
       <div>
         <h1 className="text-2xl font-bold">概览</h1>
         <p className="text-sm text-muted-foreground">
-          用户、订阅与资金汇总；充值与工具消耗明细见对应入口。
+          用户、订阅与资金汇总（账本为<strong className="font-medium text-foreground">点</strong>，100 点 = 1
+          元）；充值与工具消耗明细见对应入口。
+        </p>
+        <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+          <Link href="/admin/finance/reconciliation" className="font-medium text-primary underline-offset-4 hover:underline">
+            财务核对
+          </Link>
+          <span className="text-muted-foreground">·</span>
+          <Link
+            href="/pricing-disclosure"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            前台价格公示
+          </Link>
         </p>
       </div>
 
@@ -94,13 +109,17 @@ export default async function AdminDashboardPage() {
         </Card>
         <Card className="flex h-full flex-col">
           <CardHeader className="shrink-0 pb-2">
-            <CardDescription>总充值金额（CNY）</CardDescription>
-            <CardTitle className="text-3xl tabular-nums">
-              ¥{formatMinorAsYuan(totalRecharge)}
+            <CardDescription>累计充值入账（点）</CardDescription>
+            <CardTitle className="text-3xl tabular-nums tracking-tight">
+              {totalRecharge.toLocaleString("zh-CN")}
+              <span className="text-lg font-semibold text-muted-foreground"> 点</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0 text-xs text-muted-foreground">
-            <p className="min-h-[3rem] leading-snug">历史累计入账「充值」类型之和</p>
+            <p className="min-h-[3rem] leading-snug">
+              钱包流水类型「充值」的 <code className="rounded bg-muted px-1">amountPoints</code> 之和（含营销赠送点数）
+              · 约合 <span className="tabular-nums">¥{formatPointsAsYuan(totalRecharge)}</span>
+            </p>
             <Link
               href="/admin/finance/recharges"
               className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
@@ -128,13 +147,17 @@ export default async function AdminDashboardPage() {
         </Card>
         <Card className="flex h-full flex-col sm:col-span-2 xl:col-span-1">
           <CardHeader className="shrink-0 pb-2">
-            <CardDescription>全站剩余金额（CNY）</CardDescription>
-            <CardTitle className="text-3xl tabular-nums">
-              ¥{formatMinorAsYuan(totalBalance)}
+            <CardDescription>全站可用余额合计（点）</CardDescription>
+            <CardTitle className="text-3xl tabular-nums tracking-tight">
+              {totalBalance.toLocaleString("zh-CN")}
+              <span className="text-lg font-semibold text-muted-foreground"> 点</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0 text-xs text-muted-foreground">
-            <p className="min-h-[3rem] leading-snug">各用户钱包可用余额之和</p>
+            <p className="min-h-[3rem] leading-snug">
+              各用户 <code className="rounded bg-muted px-1">Wallet.balancePoints</code> 之和 · 约合{" "}
+              <span className="tabular-nums">¥{formatPointsAsYuan(totalBalance)}</span>
+            </p>
             <Link
               href="/admin/tool-usage"
               className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"

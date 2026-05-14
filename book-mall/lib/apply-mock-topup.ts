@@ -1,29 +1,29 @@
-import { prisma } from "@/lib/prisma";
+import { fulfillWalletTopupCredits } from "@/lib/wallet-topup-fulfill";
 
-/** 快捷档位（分） */
+/** 快捷档位（点，1 点 = ¥0.01） */
 export const MOCK_TOPUP_PRESETS = [50_00, 100_00, 200_00, 500_00] as const;
 
-export type MockTopupPresetMinor = (typeof MOCK_TOPUP_PRESETS)[number];
+export type MockTopupPresetPoints = (typeof MOCK_TOPUP_PRESETS)[number];
 
-/** 允许提交的模拟充值金额（分）：快捷档位，或 30～1000 元整数 */
-export type MockTopupAmountMinor = number;
+/** 允许提交的模拟充值点数：快捷档位，或 30～1000 元整对应点数 */
+export type MockTopupAmountPoints = number;
 
 export const MOCK_TOPUP_PRESET_WHITELIST = new Set<number>(MOCK_TOPUP_PRESETS);
 
-/** 自定金额下限 / 上限（分），对应 30～1000 元整 */
-export const MOCK_TOPUP_CUSTOM_MIN_MINOR = 30 * 100;
-export const MOCK_TOPUP_CUSTOM_MAX_MINOR = 1000 * 100;
+/** 自定金额下限 / 上限（点），对应 30～1000 元整 */
+export const MOCK_TOPUP_CUSTOM_MIN_POINTS = 30 * 100;
+export const MOCK_TOPUP_CUSTOM_MAX_POINTS = 1000 * 100;
 
-export const DEFAULT_MOCK_TOPUP_AMOUNT_MINOR = 100_00;
+export const DEFAULT_MOCK_TOPUP_AMOUNT_POINTS = 100_00;
 
-export function isAllowedMockTopupAmountMinor(n: number): boolean {
+export function isAllowedMockTopupAmountPoints(n: number): boolean {
   if (!Number.isInteger(n) || n <= 0) return false;
   if (MOCK_TOPUP_PRESET_WHITELIST.has(n)) return true;
   if (n % 100 !== 0) return false;
-  return n >= MOCK_TOPUP_CUSTOM_MIN_MINOR && n <= MOCK_TOPUP_CUSTOM_MAX_MINOR;
+  return n >= MOCK_TOPUP_CUSTOM_MIN_POINTS && n <= MOCK_TOPUP_CUSTOM_MAX_POINTS;
 }
 
-export function normalizeMockTopupAmountMinor(raw: unknown): number {
+export function normalizeMockTopupAmountPoints(raw: unknown): number {
   const n =
     typeof raw === "number"
       ? raw
@@ -31,52 +31,40 @@ export function normalizeMockTopupAmountMinor(raw: unknown): number {
         ? Number.parseInt(raw, 10)
         : NaN;
   if (!Number.isFinite(n) || !Number.isInteger(n)) {
-    return DEFAULT_MOCK_TOPUP_AMOUNT_MINOR;
+    return DEFAULT_MOCK_TOPUP_AMOUNT_POINTS;
   }
-  if (isAllowedMockTopupAmountMinor(n)) {
+  if (isAllowedMockTopupAmountPoints(n)) {
     return n;
   }
-  return DEFAULT_MOCK_TOPUP_AMOUNT_MINOR;
+  return DEFAULT_MOCK_TOPUP_AMOUNT_POINTS;
 }
 
-/** 模拟充值到账：订单 + 钱包流水 */
+export type ApplyMockWalletTopupOptions = {
+  /** 须先在个人中心领取；与实付档位一致时在入账事务内核销 */
+  rechargeCouponId?: string;
+};
+
+/**
+ * 模拟充值到账。内部统一走 `fulfillWalletTopupCredits`（与真实支付入账路径对齐）。
+ * 充送仅通过「已领取的充值优惠券」核销生效。
+ */
 export async function applyMockWalletTopup(
   userId: string,
-  amountMinor: number,
-): Promise<{ orderId: string; balanceAfterMinor: number }> {
-  if (!isAllowedMockTopupAmountMinor(amountMinor)) {
+  paidAmountPoints: number,
+  options?: ApplyMockWalletTopupOptions,
+): Promise<{
+  orderId: string;
+  balanceAfterPoints: number;
+  creditedTotalPoints: number;
+}> {
+  if (!isAllowedMockTopupAmountPoints(paidAmountPoints)) {
     throw new Error("充值金额不在允许范围内（快捷档位或 30～1000 元整数）");
   }
 
-  return prisma.$transaction(async (tx) => {
-    const wallet = await tx.wallet.findUniqueOrThrow({
-      where: { userId },
-    });
-    const next = wallet.balanceMinor + amountMinor;
-    await tx.wallet.update({
-      where: { id: wallet.id },
-      data: { balanceMinor: next },
-    });
-    const order = await tx.order.create({
-      data: {
-        userId,
-        type: "WALLET_TOPUP",
-        status: "PAID",
-        amountMinor,
-        paidAt: new Date(),
-        meta: { mock: true },
-      },
-    });
-    await tx.walletEntry.create({
-      data: {
-        walletId: wallet.id,
-        type: "RECHARGE",
-        amountMinor,
-        balanceAfterMinor: next,
-        description: `模拟充值 ¥${(amountMinor / 100).toFixed(2)}`,
-        orderId: order.id,
-      },
-    });
-    return { orderId: order.id, balanceAfterMinor: next };
+  return fulfillWalletTopupCredits({
+    userId,
+    paidAmountPoints,
+    rechargeCouponId: options?.rechargeCouponId?.trim() || undefined,
+    meta: { mock: true },
   });
 }

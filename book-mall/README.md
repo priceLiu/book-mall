@@ -17,7 +17,7 @@
 | 首页 | `/` — Hero、权益、功能、评价、定价、FAQ、计费公示等 |
 | 登录 / 注册 | `/login`、`/register` |
 | 订阅说明与收银 | `/subscribe` → 已登录选套餐进入 **`/pay/mock-subscribe?plan=…`**（占位码 +「支付成功」） |
-| 钱包充值（模拟） | **`/pay/mock-topup`** — ¥50 / ¥100 / ¥200 / ¥500 或 30～1000 元整数；个人中心与订阅页均有入口 |
+| 钱包充值（模拟） | **`/pay/mock-topup`** — ¥50 / ¥100 / ¥200 / ¥500 或 30～1000 元整数；充送先在 **`/account/recharge-promos`** 领券再在收银台勾选核销；个人中心与订阅页均有入口 |
 | 产品列表与详情 | `/products`、`/products/[slug]`，`/products/ai-courses`、`/products/ai-apps` |
 | 用户中心（需登录） | `/account` — 资料、钱包、订阅与模拟支付相关入口 |
 | 管理后台（需管理员） | `/admin/*` — 分类、商品、平台配置、账单公示、提现审批、用户列表 |

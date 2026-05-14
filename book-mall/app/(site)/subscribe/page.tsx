@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { isPrismaConnectionUnavailable, logDbUnavailable } from "@/lib/db-unavailable";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import {
   Card,
   CardContent,
@@ -45,7 +45,7 @@ function AiAppsRechargeNotice() {
           <Link href="/pay/mock-topup">模拟收银充值</Link>
         </Button>
         <span className="text-amber-900/90 dark:text-amber-200/90">
-          （¥50 / ¥100 / ¥200，到账后在个人中心与后台订单可见）
+          （例如 5000 / 10000 / 20000 点，对应 ¥50 / ¥100 / ¥200，到账后在个人中心与后台订单可见）
         </span>
       </p>
     </div>
@@ -105,6 +105,13 @@ export default async function SubscribePage() {
       >
         <h2 className="text-xl font-semibold md:text-2xl">AI 应用</h2>
         <AiAppsRechargeNotice />
+        <p className="text-sm text-muted-foreground">
+          工具按次单价、订阅标价与最低余额线等以{" "}
+          <Link href="/pricing-disclosure" className="font-medium text-primary underline-offset-4 hover:underline">
+            价格公示与使用说明
+          </Link>{" "}
+          为准。
+        </p>
         <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
           工具型产品提供在线推理、结构化内容生成与工作流编排等能力。除订阅会员身份外，按量与工具调用依赖钱包余额；不满足条件时应用将无法正常使用，请以下方「选择订阅」开通会员，并在个人中心充值。
         </p>
@@ -124,7 +131,7 @@ export default async function SubscribePage() {
             <CardDescription>按月灵活续费</CardDescription>
             {monthly ? (
               <p className="pt-2 text-2xl font-bold tabular-nums">
-                ¥{formatMinorAsYuan(monthly.priceMinor)}
+                ¥{formatPointsAsYuan(monthly.pricePoints)}
                 <span className="text-base font-normal text-muted-foreground"> / 月</span>
               </p>
             ) : (
@@ -149,7 +156,7 @@ export default async function SubscribePage() {
             <CardDescription>更优单价，适合长期学习</CardDescription>
             {yearly ? (
               <p className="pt-2 text-2xl font-bold tabular-nums">
-                ¥{formatMinorAsYuan(yearly.priceMinor)}
+                ¥{formatPointsAsYuan(yearly.pricePoints)}
                 <span className="text-base font-normal text-muted-foreground"> / 年</span>
               </p>
             ) : (

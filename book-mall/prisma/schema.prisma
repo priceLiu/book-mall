@@ -77,6 +77,7 @@ model User {
   imageToVideoLibraryItems     ImageToVideoLibraryItem[]
   courseLessonProgress         CourseLessonProgress[]
   userProductSubscriptions     UserProductSubscription[]
+  userRechargeCoupons          UserRechargeCoupon[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -227,8 +228,8 @@ model ToolUsageEvent {
   /// page_view、invoke 等
   action    String   @default("page_view")
   meta      Json?
-  /// 单次消耗（分）；可与 PlatformConfig.toolInvokePerCallMinor 对齐，或由调用方传入
-  costMinor Int?
+  /// 单次消耗点数（1 点 = ¥0.01）；可与 PlatformConfig.toolInvokePerCallPoints 对齐，或由调用方传入
+  costPoints Int?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -237,13 +238,13 @@ model ToolUsageEvent {
   @@index([toolKey, createdAt])
 }
 
-/// 工具应用按次计费单价（分）；生效区间内匹配 toolKey + action，优先精确 action，其次 action 为空表示该工具通配。
+/// 工具应用按次计费单价（点，1 点 = ¥0.01）；生效区间内匹配 toolKey + action，优先精确 action，其次 action 为空表示该工具通配。
 model ToolBillablePrice {
   id            String    @id @default(cuid())
   toolKey       String
   /// 例如 try_on、invoke；null 表示未限定 action（慎用）
   action        String?
-  priceMinor    Int
+  pricePoints   Int
   effectiveFrom DateTime
   effectiveTo   DateTime?
   active        Boolean   @default(true)
@@ -267,15 +268,15 @@ model ToolNavVisibility {
 // —— 平台配置（单行 default）——
 model PlatformConfig {
   id                   String   @id @default("default")
-  /// 高级/按量服务最低可用余额，默认 2000=20 元（分）
-  minBalanceLineMinor  Int      @default(2000)
-  balanceWarnHighMinor Int      @default(5000)
-  balanceWarnMidMinor  Int      @default(3000)
-  /// LLM：每千 token 计价（分），0 表示未启用/占位
-  llmInputPer1kTokensMinor  Int @default(0)
-  llmOutputPer1kTokensMinor Int @default(0)
-  /// 高阶工具：单次调用默认扣费（分）
-  toolInvokePerCallMinor    Int @default(0)
+  /// 高级/按量服务最低可用余额（点），默认 2000 = ¥20
+  minBalanceLinePoints  Int      @default(2000)
+  balanceWarnHighPoints Int      @default(5000)
+  balanceWarnMidPoints  Int      @default(3000)
+  /// LLM：每千 token 计价（点），0 表示未启用/占位
+  llmInputPer1kTokensPoints  Int @default(0)
+  llmOutputPer1kTokensPoints Int @default(0)
+  /// 高阶工具：单次调用默认扣费（点）
+  toolInvokePerCallPoints    Int @default(0)
   /// 异常消耗：超过近均值的百分比即告警，如 300=3 倍
   usageAnomalyRatioPercent  Int @default(300)
   updatedAt            DateTime @updatedAt
@@ -285,8 +286,8 @@ model PlatformConfig {
 model Wallet {
   id            String @id @default(cuid())
   userId        String @unique
-  balanceMinor  Int    @default(0)
-  frozenMinor   Int    @default(0)
+  balancePoints  Int    @default(0)
+  frozenPoints   Int    @default(0)
   currency      String @default("CNY")
 
   user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -307,9 +308,9 @@ model WalletEntry {
   id               String          @id @default(cuid())
   walletId         String
   type             WalletEntryType
-  /// 入为正、出为负（分）
-  amountMinor      Int
-  balanceAfterMinor Int
+  /// 入为正、出为负（点）
+  amountPoints      Int
+  balanceAfterPoints Int
   idempotencyKey   String?         @unique
   description      String?
   orderId          String?
@@ -332,7 +333,7 @@ model SubscriptionPlan {
   slug       String               @unique
   name       String
   interval   SubscriptionInterval
-  priceMinor Int
+  pricePoints Int
   active     Boolean              @default(true)
   /// 工具站侧栏分组 navKey 白名单；空数组表示订阅期内可使用「当前套件」内全部工具分组。
   toolsNavAllowlist String[] @default([])
@@ -383,7 +384,7 @@ model Order {
   userId      String
   type        OrderType
   status      OrderStatus @default(PENDING)
-  amountMinor Int
+  amountPoints Int
   currency    String      @default("CNY")
   /// 订阅目标 planSlug、充值档位等
   meta        Json?
@@ -393,10 +394,65 @@ model Order {
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   paidAt DateTime?
 
+  rechargeCouponRedemption UserRechargeCoupon?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, createdAt])
+}
+
+// —— 充值优惠：模板（平台配置）+ 用户领取的优惠券（核销后绑定 Order）——
+enum RechargeCouponStatus {
+  UNUSED
+  REDEEMED
+  EXPIRED
+}
+
+model RechargePromoTemplate {
+  id    String @id @default(cuid())
+  slug  String @unique
+  title String
+  /// 核销时要求实付点与此完全一致（如 10000 = ¥100 档）
+  paidAmountPoints Int
+  bonusPoints      Int
+  active           Boolean  @default(true)
+  claimableFrom    DateTime
+  claimableTo      DateTime
+  /// 领取后多少天内有效，逾期 UNUSED → EXPIRED
+  validDaysAfterClaim Int @default(7)
+  maxClaimsPerUser    Int @default(1)
+  sortOrder           Int @default(0)
+  note                String? @db.Text
+
+  coupons UserRechargeCoupon[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserRechargeCoupon {
+  id         String               @id @default(cuid())
+  userId     String
+  templateId String
+  status     RechargeCouponStatus @default(UNUSED)
+  /// 领取时快照，避免改模板影响已发票
+  paidAmountPointsSnap Int
+  bonusPointsSnap      Int
+  titleSnap            String
+  templateSlugSnap     String
+  claimedAt            DateTime
+  expiresAt            DateTime
+  redeemedAt           DateTime?
+  orderId              String? @unique
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template RechargePromoTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  order    Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([userId, templateId])
+  @@index([expiresAt])
 }
 
 // —— 提现审核（产品 6.3 / 5.3）——
@@ -411,12 +467,12 @@ model WalletRefundRequest {
   id        String @id @default(cuid())
   userId    String
   status    RefundRequestStatus @default(PENDING)
-  /// 申请提现金额（分），null 表示按「可提现余额」由后台核算
-  requestedAmountMinor Int?
-  /// 应扣未扣（分），管理员核准
-  pendingSettlementMinor Int @default(0)
-  /// 实际从钱包扣减并记为提现的金额（分）
-  refundAmountMinor      Int?
+  /// 申请提现金额（点），null 表示按「可提现余额」由后台核算
+  requestedAmountPoints Int?
+  /// 应扣未扣（点），管理员核准
+  pendingSettlementPoints Int @default(0)
+  /// 实际从钱包扣减并记为提现的金额（点）
+  refundAmountPoints      Int?
   userNote               String?
   adminNote              String?
   decidedAt              DateTime?

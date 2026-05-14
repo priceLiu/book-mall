@@ -35,7 +35,12 @@ export function BillingPolicySection() {
             <h3 className="text-lg font-semibold text-foreground mb-2">按量计费（概要）</h3>
             <p>
               大模型等能力一般按 <strong>Token、调用次数或时长</strong>{" "}
-              等维度计费；具体单价以产品页、下单页及个人中心说明为准，并可在运营需要时通过后台配置调整。
+              等维度计费；具体单价以{" "}
+              <a href="/pricing-disclosure" className="text-primary underline font-medium">
+                价格公示与使用说明
+              </a>{" "}
+              、产品页、下单页及个人中心说明为准，并可在运营需要时通过后台配置调整。账户以{" "}
+              <strong className="text-foreground">点</strong> 记账（1 点 = ¥0.01）。
             </p>
           </div>
           <div>

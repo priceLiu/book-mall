@@ -1,11 +1,11 @@
 /**
- * 试点校准：为指定用户入账 ¥1000，并将其「AI智能试衣 try_on」流水补齐 costMinor（按当前生效单价）。
+ * 试点校准：为指定用户入账 ¥1000，并将其「AI智能试衣 try_on」流水补齐 costPoints（按当前生效单价）。
  *
  * 执行（book-mall 目录）：
  *   pnpm exec dotenv -e .env.local -- tsx scripts/calibrate-pilot-tool-billing.ts
  */
 import { prisma } from "../lib/prisma";
-import { resolveBillablePriceMinor } from "../lib/tool-billable-price";
+import { resolveBillablePricePoints } from "../lib/tool-billable-price";
 
 const PILOT_EMAIL = "13808816802@126.com";
 const RECHARGE_MINOR = 100_000; // ¥1000
@@ -43,8 +43,8 @@ async function main() {
     process.exit(2);
   }
 
-  const unitMinor =
-    (await resolveBillablePriceMinor("fitting-room__ai-fit", "try_on")) ?? 100;
+  const unitPoints =
+    (await resolveBillablePricePoints("fitting-room__ai-fit", "try_on")) ?? 100;
 
   const result = await prisma.$transaction(async (tx) => {
     const wallet = await tx.wallet.upsert({
@@ -52,17 +52,17 @@ async function main() {
       create: { userId: user.id },
       update: {},
     });
-    const nextBalance = wallet.balanceMinor + RECHARGE_MINOR;
+    const nextBalance = wallet.balancePoints + RECHARGE_MINOR;
     await tx.wallet.update({
       where: { id: wallet.id },
-      data: { balanceMinor: nextBalance },
+      data: { balancePoints: nextBalance },
     });
     const order = await tx.order.create({
       data: {
         userId: user.id,
         type: "WALLET_TOPUP",
         status: "PAID",
-        amountMinor: RECHARGE_MINOR,
+        amountPoints: RECHARGE_MINOR,
         paidAt: new Date(),
         meta: {
           pilot_calibration: true,
@@ -74,8 +74,8 @@ async function main() {
       data: {
         walletId: wallet.id,
         type: "RECHARGE",
-        amountMinor: RECHARGE_MINOR,
-        balanceAfterMinor: nextBalance,
+        amountPoints: RECHARGE_MINOR,
+        balanceAfterPoints: nextBalance,
         description: `校准入账 · 试点充值 ¥${(RECHARGE_MINOR / 100).toFixed(2)}`,
         orderId: order.id,
       },
@@ -86,16 +86,16 @@ async function main() {
         userId: user.id,
         action: "try_on",
         toolKey: "fitting-room__ai-fit",
-        costMinor: null,
+        costPoints: null,
       },
-      data: { costMinor: unitMinor },
+      data: { costPoints: unitPoints },
     });
 
     return {
       nextBalance,
       backfilled: backfilled.count,
       orderId: order.id,
-      unitMinor,
+      unitPoints,
     };
   });
 
@@ -104,10 +104,10 @@ async function main() {
       {
         userId: user.id,
         email: user.email,
-        rechargeMinor: RECHARGE_MINOR,
-        balanceAfterMinor: result.nextBalance,
+        rechargePoints: RECHARGE_MINOR,
+        balanceAfterPoints: result.nextBalance,
         backfilledTryOnRows: result.backfilled,
-        unitMinorApplied: result.unitMinor,
+        unitPointsApplied: result.unitPoints,
         orderId: result.orderId,
       },
       null,

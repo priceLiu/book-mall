@@ -46,7 +46,7 @@ export async function GET(req: Request) {
 }
 
 /**
- * 代理主站写入 `ToolUsageEvent`：**仅当主站解析出正金额 costMinor 时才会入库**；否则 `{ recorded: false }`。
+ * 代理主站写入 `ToolUsageEvent`：**仅当主站解析出正金额 costPoints 时才会入库**；否则 `{ recorded: false }`。
  */
 export async function POST(req: Request) {
   const gate = await requireActiveToolsSession();

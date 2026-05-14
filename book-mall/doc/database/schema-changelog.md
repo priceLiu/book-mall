@@ -61,6 +61,24 @@
 - **逻辑**：工具站 JWT / introspect 下发 `tools_nav_keys`；详见 `doc/releases/v2.0-tools-subscription-courses.md`。  
 - **应用**：`pnpm run db:deploy`。
 
+## 2026-05-13 — 钱包充值入账统一与「充送」meta（无新迁移）
+
+- **迁移**：无新增 SQL；依赖既有 `Order.meta`（JSON）、`WalletEntry`。
+- **逻辑**：`lib/wallet-topup-fulfill.ts` 统一「加余额 + 订单 + 流水」；支持本金 + 赠送拆分，`Order.meta.topup` 记 `{ paidAmountPoints, bonusPoints, creditedTotalPoints }`；有赠送时同一 `orderId` 可对应 **两条** `RECHARGE`。
+- **文档**：`doc/product/points-wallet-topup-spec.md`（影响面、遗留、财务注意点）。
+- **应用**：拉代码即可；真实支付接入时在 notify 内调用 `fulfillWalletTopupCredits`。
+- **后续**：**2026-05-14** 起充送产品路径以 **优惠券模板 + 领取 + `rechargeCouponId` 核销** 为主（见上条与本 spec 最新版）。
+
+## 2026-05-14 — 充值优惠模板与用户优惠券（充送对账）
+
+- **迁移目录**：`prisma/migrations/20260514143000_recharge_promo_coupons/`  
+- **新枚举**：`RechargeCouponStatus`（`UNUSED` | `REDEEMED` | `EXPIRED`）。  
+- **新表**：`RechargePromoTemplate`（可调「充 N 送 M」、领取时间窗、每用户领取上限、领取后有效天数等）；`UserRechargeCoupon`（领取快照、`expiresAt`、核销后 `orderId` 唯一关联 `Order`）。  
+- **逻辑**：`lib/recharge-coupon.ts`（领取、过期、列表）；`fulfillWalletTopupCredits` 支持 `rechargeCouponId`；`Order.meta.topup.rechargeCouponId` 对账。  
+- **前台**：`/account/recharge-promos`；收银台 `/pay/mock-topup` 传 `rechargeCouponId`。  
+- **后台**：`/admin/finance/promo-templates`。  
+- **应用**：`pnpm run db:deploy`。
+
 ## 2026-06-15 — 工具站「视觉实验室」侧栏分组
 
 - **迁移目录**：`prisma/migrations/20260615120000_tool_nav_visual_lab/`  

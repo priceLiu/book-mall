@@ -35,11 +35,11 @@ export async function GET() {
     return NextResponse.json({ error: msg }, { status: r.status >= 400 ? r.status : 502 });
   }
 
-  const priceMinor = data.priceMinor;
+  const pricePoints = data.pricePoints;
   const yuan = data.yuan;
-  if (typeof priceMinor !== "number" || typeof yuan !== "number") {
+  if (typeof pricePoints !== "number" || typeof yuan !== "number") {
     return NextResponse.json({ error: "主站响应格式异常" }, { status: 502 });
   }
 
-  return NextResponse.json({ priceMinor, yuan });
+  return NextResponse.json({ pricePoints, yuan });
 }

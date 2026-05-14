@@ -20,9 +20,9 @@ export function toolUsageWalletIdempotencyKey(
 }
 
 export type RecordToolUsageConsumeResult =
-  | { ok: true; balanceAfterMinor: number; usageEventId: string }
+  | { ok: true; balanceAfterPoints: number; usageEventId: string }
   | { ok: false; reason: "duplicate" }
-  | { ok: false; reason: "insufficient_balance"; balanceMinor: number };
+  | { ok: false; reason: "insufficient_balance"; balancePoints: number };
 
 /**
  * 记工具扣费流水并同步扣减钱包（同一事务）。
@@ -31,7 +31,7 @@ export async function recordToolUsageAndConsumeWallet(opts: {
   userId: string;
   toolKey: string;
   action: string;
-  costMinor: number;
+  costPoints: number;
   meta: Prisma.InputJsonValue | undefined;
 }): Promise<RecordToolUsageConsumeResult> {
   const key = toolUsageWalletIdempotencyKey(
@@ -59,20 +59,20 @@ export async function recordToolUsageAndConsumeWallet(opts: {
       const dec = await tx.wallet.updateMany({
         where: {
           userId: opts.userId,
-          balanceMinor: { gte: opts.costMinor },
+          balancePoints: { gte: opts.costPoints },
         },
-        data: { balanceMinor: { decrement: opts.costMinor } },
+        data: { balancePoints: { decrement: opts.costPoints } },
       });
 
       if (dec.count !== 1) {
         const w = await tx.wallet.findUniqueOrThrow({
           where: { userId: opts.userId },
-          select: { balanceMinor: true },
+          select: { balancePoints: true },
         });
         return {
           ok: false,
           reason: "insufficient_balance",
-          balanceMinor: w.balanceMinor,
+          balancePoints: w.balancePoints,
         };
       }
 
@@ -85,7 +85,7 @@ export async function recordToolUsageAndConsumeWallet(opts: {
           userId: opts.userId,
           toolKey: opts.toolKey,
           action: opts.action,
-          costMinor: opts.costMinor,
+          costPoints: opts.costPoints,
           ...(opts.meta !== undefined ? { meta: opts.meta } : {}),
         },
       });
@@ -94,16 +94,16 @@ export async function recordToolUsageAndConsumeWallet(opts: {
         data: {
           walletId: wallet.id,
           type: "CONSUME",
-          amountMinor: -opts.costMinor,
-          balanceAfterMinor: wallet.balanceMinor,
+          amountPoints: -opts.costPoints,
+          balanceAfterPoints: wallet.balancePoints,
           idempotencyKey: key ?? undefined,
-          description: `工具消耗 · ${opts.toolKey} · ${opts.action} · ¥${(opts.costMinor / 100).toFixed(2)}`,
+          description: `工具消耗 · ${opts.toolKey} · ${opts.action} · ¥${(opts.costPoints / 100).toFixed(2)}`,
         },
       });
 
       return {
         ok: true,
-        balanceAfterMinor: wallet.balanceMinor,
+        balanceAfterPoints: wallet.balancePoints,
         usageEventId: ev.id,
       };
     });

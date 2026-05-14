@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { formatMinorAsYuan } from "@/lib/currency";
+import { formatPointsAsYuan } from "@/lib/currency";
 import { TOOL_NAV_LABEL } from "@/lib/tool-nav-labels";
 import {
   Card,
@@ -354,7 +354,7 @@ export default async function AccountSubscriptionPage() {
                       </td>
                       <td className="py-2">{orderTypeLabel(o.type)}</td>
                       <td className="py-2">{o.status}</td>
-                      <td className="py-2 tabular-nums">¥{formatMinorAsYuan(o.amountMinor)}</td>
+                      <td className="py-2 tabular-nums">¥{formatPointsAsYuan(o.amountPoints)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
-  requestedAmountMinor: z.number().int().positive().nullable().optional(),
+  requestedAmountPoints: z.number().int().positive().nullable().optional(),
   userNote: z.string().max(2000).optional(),
 });
 
@@ -39,19 +39,19 @@ export async function POST(request: Request) {
   const wallet = await prisma.wallet.findUnique({
     where: { userId: session.user.id },
   });
-  if (!wallet || wallet.balanceMinor <= 0) {
+  if (!wallet || wallet.balancePoints <= 0) {
     return NextResponse.json({ error: "无可提现余额" }, { status: 400 });
   }
 
-  const reqMinor = parsed.data.requestedAmountMinor;
-  if (reqMinor != null && reqMinor > wallet.balanceMinor) {
+  const reqMinor = parsed.data.requestedAmountPoints;
+  if (reqMinor != null && reqMinor > wallet.balancePoints) {
     return NextResponse.json({ error: "申请金额超过可用余额" }, { status: 400 });
   }
 
   await prisma.walletRefundRequest.create({
     data: {
       userId: session.user.id,
-      requestedAmountMinor: reqMinor ?? null,
+      requestedAmountPoints: reqMinor ?? null,
       userNote: parsed.data.userNote?.trim() || null,
     },
   });

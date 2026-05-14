@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/prisma";
 
 /**
- * 解析当前生效的按次单价（分）。
+ * 解析当前生效的按次单价（点，1 点 = ¥0.01）。
  * 匹配同一 toolKey 下 effectiveFrom ≤ now ≤ effectiveTo（或 effectiveTo 为空），
  * 且 action 等于给定 action，或定价行为 null（通配该工具下 action）。
  * 优先采用「action 精确匹配」的行；否则采用 action 为 null 的行。
  */
-export async function resolveBillablePriceMinor(
+export async function resolveBillablePricePoints(
   toolKey: string,
   action: string,
 ): Promise<number | undefined> {
@@ -28,6 +28,6 @@ export async function resolveBillablePriceMinor(
 
   const exact = applicable.find((r) => r.action === action);
   const row = exact ?? applicable.find((r) => r.action == null);
-  const v = row?.priceMinor;
+  const v = row?.pricePoints;
   return typeof v === "number" && v > 0 ? v : undefined;
 }

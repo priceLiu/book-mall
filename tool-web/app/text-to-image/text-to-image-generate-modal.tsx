@@ -6,6 +6,10 @@ import { createPortal } from "react-dom";
 import { ToolChargeSubmitButton } from "@/components/ui/tool-charge-submit-button";
 import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import { useToolsSession } from "@/components/tool-shell-client";
+import {
+  formatRequiredPointsShortfall,
+  readRequiredPointsFromSettleJson,
+} from "@/lib/format-points-ui";
 import styles from "./text-to-image-modal.module.css";
 
 type TaskOutput = {
@@ -20,7 +24,7 @@ const SETTLE_ATTEMPTS = 4;
 const SETTLE_BASE_DELAY_MS = 350;
 
 const TTI_CHARGE_TITLE =
-  "单次任务按 0.5 元从工具账户扣费（以主站「工具管理」定价为准）。";
+  "单次任务按 50 点（¥0.50，100 点=1 元）从工具账户扣费，以主站「工具管理」定价为准。";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -180,9 +184,11 @@ export function TextToImageGenerateModal({
 
     const apply = (settleR: Response, settleJson: Record<string, unknown>) => {
       if (settleR.status === 402) {
-        const req = settleJson.requiredMinor;
+        const req = readRequiredPointsFromSettleJson(settleJson);
         setSettleBanner(
-          `账户余额不足，无法完成本次计费（${typeof req === "number" ? `需 ${(req as number) / 100} 元` : "需 0.5 元"}）。图片仍可依链接临时查看，建议充值后再次生成。`,
+          `账户余额不足，无法完成本次计费（${
+            req != null ? formatRequiredPointsShortfall(req) : formatRequiredPointsShortfall(50)
+          }）。图片仍可依链接临时查看，建议充值后再次生成。`,
         );
         setSuccessBanner(null);
         return;
@@ -200,7 +206,7 @@ export function TextToImageGenerateModal({
       if (settleJson.duplicate === true) {
         setSuccessBanner("计费记录已存在（幂等），无需重复扣款。");
       } else if (settleJson.recorded === true) {
-        setSuccessBanner("已按单次生成计费（0.5 元），可在费用明细中查看。");
+        setSuccessBanner("已按单次生成计费（50 点），可在费用明细中查看。");
       } else {
         setSuccessBanner(null);
       }
@@ -454,7 +460,7 @@ export function TextToImageGenerateModal({
                 onClick={() => void handleGenerate()}
                 primaryLabel="生成 4 张图片"
                 busyLabel="生成中…"
-                chargeLine="一次生成 4 张图，扣费 0.5 元"
+                chargeLine="一次生成 4 张图，扣费 50 点（¥0.50）"
                 chargeTitle={TTI_CHARGE_TITLE}
                 idleIcon={<Sparkles className="h-4 w-4" aria-hidden />}
               />

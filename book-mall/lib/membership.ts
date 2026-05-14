@@ -10,8 +10,8 @@ export async function getMembershipFlags(userId: string): Promise<{
   /** 当前有效会员计划的展示名称（无则 null） */
   membershipPlanName: string | null;
   subscriptionEndsAt: Date | null;
-  balanceMinor: number;
-  minBalanceLineMinor: number;
+  balancePoints: number;
+  minBalanceLinePoints: number;
   canUsePremiumMetered: boolean;
 }> {
   const now = new Date();
@@ -46,13 +46,13 @@ export async function getMembershipFlags(userId: string): Promise<{
     }),
   ]);
 
-  const minLine = config?.minBalanceLineMinor ?? 2000;
-  const balanceMinor = wallet?.balanceMinor ?? 0;
+  const minLine = config?.minBalanceLinePoints ?? 2000;
+  const balancePoints = wallet?.balancePoints ?? 0;
   const hasActiveSubscription = Boolean(sub);
   const hasActiveToolProductSubscription = toolProdCount > 0;
   const hasActiveCourseProductSubscription = courseProdCount > 0;
   const canUsePremiumMetered =
-    hasActiveSubscription && balanceMinor >= minLine;
+    hasActiveSubscription && balancePoints >= minLine;
 
   return {
     hasActiveSubscription,
@@ -60,8 +60,8 @@ export async function getMembershipFlags(userId: string): Promise<{
     hasActiveCourseProductSubscription,
     membershipPlanName: sub?.plan.name ?? null,
     subscriptionEndsAt: sub?.currentPeriodEnd ?? null,
-    balanceMinor,
-    minBalanceLineMinor: minLine,
+    balancePoints,
+    minBalanceLinePoints: minLine,
     canUsePremiumMetered,
   };
 }

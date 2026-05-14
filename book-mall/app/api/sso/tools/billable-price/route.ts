@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveBillablePriceMinor } from "@/lib/tool-billable-price";
+import { resolveBillablePricePoints } from "@/lib/tool-billable-price";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 
@@ -39,7 +39,7 @@ function verifyBearer(req: Request):
   return { ok: true, userId: verified.sub };
 }
 
-/** 工具站展示用：当前生效的按次单价（分 / 元），与计费结算同源 `resolveBillablePriceMinor`。 */
+/** 工具站展示用：当前生效的按次单价（点 / 元），与计费结算同源 `resolveBillablePricePoints`。 */
 export async function GET(req: Request) {
   const v = verifyBearer(req);
   if (!v.ok) return v.res;
@@ -55,19 +55,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "action 无效" }, { status: 400 });
   }
 
-  const priceMinor = await resolveBillablePriceMinor(toolKey, action);
-  if (priceMinor == null) {
+  const pricePoints = await resolveBillablePricePoints(toolKey, action);
+  if (pricePoints == null) {
     return NextResponse.json(
       { error: "未找到当前生效单价，请在管理后台「工具管理」配置" },
       { status: 404 },
     );
   }
 
-  const yuan = Math.round(priceMinor) / 100;
+  const yuan = Math.round(pricePoints) / 100;
   return NextResponse.json({
     toolKey,
     action,
-    priceMinor,
+    pricePoints,
     yuan,
   });
 }

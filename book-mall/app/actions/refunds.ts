@@ -16,19 +16,19 @@ async function assertAdmin() {
 export async function completeWalletRefund(formData: FormData) {
   await assertAdmin();
   const id = String(formData.get("id") ?? "");
-  const pendingRaw = formData.get("pendingSettlementMinor");
-  const pendingSettlementMinor =
+  const pendingRaw = formData.get("pendingSettlementPoints");
+  const pendingSettlementPoints =
     pendingRaw == null || pendingRaw === ""
       ? 0
       : Number(pendingRaw);
-  const overrideRaw = formData.get("refundAmountMinorOverride");
+  const overrideRaw = formData.get("refundAmountPointsOverride");
   const adminNote = String(formData.get("adminNote") ?? "").trim() || null;
 
-  if (!id || !Number.isFinite(pendingSettlementMinor) || pendingSettlementMinor < 0) {
+  if (!id || !Number.isFinite(pendingSettlementPoints) || pendingSettlementPoints < 0) {
     throw new Error("无效的应扣未扣");
   }
-  if (!Number.isInteger(pendingSettlementMinor)) {
-    throw new Error("应扣未扣须为整数（分）");
+  if (!Number.isInteger(pendingSettlementPoints)) {
+    throw new Error("应扣未扣须为整数（点）");
   }
 
   await prisma.$transaction(async (tx) => {
@@ -41,39 +41,39 @@ export async function completeWalletRefund(formData: FormData) {
     if (!wallet) throw new Error("用户无钱包");
 
     const requested =
-      req.requestedAmountMinor ?? wallet.balanceMinor;
-    const cap = Math.min(requested, wallet.balanceMinor);
-    let refundAmount = cap - pendingSettlementMinor;
+      req.requestedAmountPoints ?? wallet.balancePoints;
+    const cap = Math.min(requested, wallet.balancePoints);
+    let refundAmount = cap - pendingSettlementPoints;
     if (overrideRaw != null && String(overrideRaw) !== "") {
       const o = Number(overrideRaw);
       if (!Number.isInteger(o) || o < 0) throw new Error("提现金额覆盖值无效");
       refundAmount = o;
     }
     if (refundAmount <= 0) throw new Error("核算后无可提现金额");
-    if (refundAmount > wallet.balanceMinor) {
+    if (refundAmount > wallet.balancePoints) {
       throw new Error("提现额超过可用余额");
     }
 
-    const newBal = wallet.balanceMinor - refundAmount;
+    const newBal = wallet.balancePoints - refundAmount;
     await tx.wallet.update({
       where: { id: wallet.id },
-      data: { balanceMinor: newBal },
+      data: { balancePoints: newBal },
     });
     await tx.walletEntry.create({
       data: {
         walletId: wallet.id,
         type: "REFUND",
-        amountMinor: -refundAmount,
-        balanceAfterMinor: newBal,
-        description: `余额提现核准（应扣未扣 ${pendingSettlementMinor} 分）${adminNote ? ` — ${adminNote}` : ""}`,
+        amountPoints: -refundAmount,
+        balanceAfterPoints: newBal,
+        description: `余额提现核准（应扣未扣 ${pendingSettlementPoints} 点）${adminNote ? ` — ${adminNote}` : ""}`,
       },
     });
     await tx.walletRefundRequest.update({
       where: { id },
       data: {
         status: "COMPLETED",
-        pendingSettlementMinor,
-        refundAmountMinor: refundAmount,
+        pendingSettlementPoints,
+        refundAmountPoints: refundAmount,
         adminNote,
         decidedAt: new Date(),
       },

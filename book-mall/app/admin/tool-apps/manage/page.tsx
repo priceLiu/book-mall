@@ -99,10 +99,12 @@ export default async function AdminToolAppsManagePage() {
         <CardHeader>
           <CardTitle>按次单价</CardTitle>
           <CardDescription>
-            单位为元（保存时换算为分）；约定示例 — 试衣间大模型扣费挂在{" "}
+            表内填写<strong className="text-foreground">人民币（元）</strong>，保存时换算为<strong className="text-foreground">点</strong>写入{" "}
+            <code className="text-xs">ToolBillablePrice</code>（100 点 = 1 元，与钱包、工具流水{" "}
+            <code className="text-xs">costPoints</code> 一致）。试衣间大模型扣费挂在{" "}
             <code className="text-xs">fitting-room__ai-fit</code> +{" "}
-            <code className="text-xs">try_on</code>。空 <code className="text-xs">action</code>{" "}
-            表示该工具下通配。时间按 <strong>北京时间</strong> 填写。
+            <code className="text-xs">try_on</code>；空 <code className="text-xs">action</code> 表示该工具下通配。时间按{" "}
+            <strong>北京时间</strong> 填写。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
@@ -165,7 +167,7 @@ export default async function AdminToolAppsManagePage() {
                             step="0.01"
                             min={0}
                             required
-                            defaultValue={(p.priceMinor / 100).toFixed(2)}
+                            defaultValue={(p.pricePoints / 100).toFixed(2)}
                             className="h-9 font-mono text-xs"
                           />
                         </td>

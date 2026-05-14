@@ -48,6 +48,10 @@ import {
   type T2vAspectRatio,
 } from "@/lib/image-to-video-models";
 import { cn } from "@/lib/utils";
+import {
+  formatRequiredPointsShortfall,
+  readRequiredPointsFromSettleJson,
+} from "@/lib/format-points-ui";
 import ttiStyles from "../../text-to-image/text-to-image-modal.module.css";
 import { TextToVideoWorkbench } from "./text-to-video-workbench";
 
@@ -342,13 +346,6 @@ async function readJsonBody<T>(res: Response): Promise<
   }
 }
 
-function formatYuanForUi(yuan: number): string {
-  const cents = Math.round(yuan * 100);
-  if (!Number.isFinite(cents)) return "—";
-  if (cents % 100 === 0) return String(cents / 100);
-  return (cents / 100).toFixed(2).replace(/\.?0+$/, "");
-}
-
 type LabJob = {
   id: string;
   mode: LabModeTab;
@@ -406,7 +403,7 @@ export function ImageToVideoLabClient() {
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const [generatingModelLabel, setGeneratingModelLabel] = useState("");
-  const [billableYuan, setBillableYuan] = useState<number | null>(null);
+  const [billablePricePoints, setBillablePricePoints] = useState<number | null>(null);
   const [librarySaveBusyId, setLibrarySaveBusyId] = useState<string | null>(null);
   const [librarySavedByJobId, setLibrarySavedByJobId] = useState<Record<string, boolean>>(
     {},
@@ -417,19 +414,20 @@ export function ImageToVideoLabClient() {
   const [overlayMounted, setOverlayMounted] = useState(false);
 
   const { chargeLine, chargeTitle } = useMemo(() => {
-    if (billableYuan != null) {
-      const y = formatYuanForUi(billableYuan);
+    if (billablePricePoints != null && billablePricePoints > 0) {
+      const pts = billablePricePoints;
+      const y = (pts / 100).toFixed(2);
       return {
-        chargeLine: `生成 1 个视频，扣费 ${y} 元`,
-        chargeTitle: `单次生成按 ${y} 元/次从工具账户扣费（与主站「工具管理」标价一致）。`,
+        chargeLine: `生成 1 个视频，扣费 ${pts.toLocaleString("zh-CN")} 点（¥${y}）`,
+        chargeTitle: `单次生成按 ${pts.toLocaleString("zh-CN")} 点/次（¥${y}，100 点=1 元）从工具账户扣费，与主站「工具管理」标价一致。`,
       };
     }
     return {
       chargeLine: "生成 1 个视频，扣费以主站「工具管理」标价为准",
       chargeTitle:
-        "单次生成按主站「工具管理」配置的按次单价扣费；标价加载失败时请刷新页面或查看管理后台。",
+        "单次生成按主站「工具管理」配置的按次单价（点）扣费；标价加载失败时请刷新页面或查看管理后台。",
     };
-  }, [billableYuan]);
+  }, [billablePricePoints]);
 
   useEffect(() => {
     setOverlayMounted(true);
@@ -442,9 +440,9 @@ export function ImageToVideoLabClient() {
         const r = await fetch("/api/image-to-video/billable-hint", {
           credentials: "same-origin",
         });
-        const j = (await r.json().catch(() => ({}))) as { yuan?: number };
-        if (!cancelled && r.ok && typeof j.yuan === "number") {
-          setBillableYuan(j.yuan);
+        const j = (await r.json().catch(() => ({}))) as { pricePoints?: number };
+        if (!cancelled && r.ok && typeof j.pricePoints === "number") {
+          setBillablePricePoints(Math.max(0, Math.floor(j.pricePoints)));
         }
       } catch {
         /* 标价仅影响展示，计费以主站结算为准 */
@@ -795,9 +793,9 @@ export function ImageToVideoLabClient() {
           const settleJson = settleParsed.data;
 
           if (settleR.status === 402) {
-            const req = settleJson.requiredMinor;
+            const req = readRequiredPointsFromSettleJson(settleJson);
             settleHintForJob = `账户余额不足，无法完成本次计费（${
-              typeof req === "number" ? `需 ${(req as number) / 100} 元` : "请充值"
+              req != null ? formatRequiredPointsShortfall(req) : "请充值"
             }）。视频仍可播放，链接约 24 小时有效。`;
           } else if (!settleR.ok) {
             settleHintForJob =
