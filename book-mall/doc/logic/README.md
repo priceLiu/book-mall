@@ -7,9 +7,9 @@
 
 | 文件 | 说明 |
 |------|------|
-| [wallet-balance-and-refund.md](./wallet-balance-and-refund.md) | 余额、最低线、应扣未扣、退款结算顺序（对齐产品二册） |
+| [wallet-balance-and-refund.md](./wallet-balance-and-refund.md) | 余额、最低线、应扣未扣、提现结算顺序（对齐产品二册） |
 | [membership-flags.md](./membership-flags.md) | `getMembershipFlags` 与前台「高级会员状态」 |
 | [admin-access.md](./admin-access.md) | 管理后台路径、角色、`ADMIN_EMAILS` |
-| [admin-billing-and-refunds.md](./admin-billing-and-refunds.md) | 5.3 / 6.3 计费配置、订单与退款审核 |
+| [admin-billing-and-refunds.md](./admin-billing-and-refunds.md) | 5.3 / 6.3 计费配置、订单与提现审核 |
 
 新增逻辑文档时：**文件名小写 + 短横线**；在本文 README 表格中增一行。

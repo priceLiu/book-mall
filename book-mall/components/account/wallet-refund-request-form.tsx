@@ -23,7 +23,7 @@ export function WalletRefundRequestForm() {
     if (yuan) {
       const n = Math.round(parseFloat(yuan) * 100);
       if (!Number.isFinite(n) || n <= 0) {
-        setError("退款金额无效");
+        setError("提现金额无效");
         setLoading(false);
         return;
       }
@@ -50,7 +50,7 @@ export function WalletRefundRequestForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-3 text-sm">
       <div className="space-y-1">
-        <Label htmlFor="amountYuan">申请退还金额（元，留空表示按可退余额由后台核算）</Label>
+        <Label htmlFor="amountYuan">申请提现金额（元，留空表示按可提现余额由后台核算）</Label>
         <Input id="amountYuan" name="amountYuan" type="number" step={0.01} placeholder="例如 50.00" />
       </div>
       <div className="space-y-1">
@@ -59,7 +59,7 @@ export function WalletRefundRequestForm() {
       </div>
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
       <Button type="submit" size="sm" disabled={loading}>
-        {loading ? "提交中…" : "提交余额退款申请"}
+        {loading ? "提交中…" : "提交余额提现申请"}
       </Button>
     </form>
   );

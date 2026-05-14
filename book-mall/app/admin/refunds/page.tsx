@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export const metadata = {
-  title: "退款审核 — 管理后台",
+  title: "提现审核 — 管理后台",
 };
 
 export default async function AdminRefundsPage() {
@@ -38,16 +38,16 @@ export default async function AdminRefundsPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-bold">退款审核（6.3 / 5.3）</h1>
+        <h1 className="text-2xl font-bold">提现审核（6.3 / 5.3）</h1>
         <p className="text-sm text-muted-foreground">
-          余额退款：核算应扣未扣后从钱包扣减并记流水；订阅退款：核准后结束订阅并标记订单
-          <code className="mx-1 rounded bg-muted px-1 text-xs">refundedAt</code>。
+          余额提现：核算应扣未扣后从钱包扣减并记流水；订阅提现：核准后结束订阅并标记订单{" "}
+          <code className="mx-1 rounded bg-muted px-1 text-xs">refundedAt</code>（数据字段名）。
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>余额退款申请</CardTitle>
+          <CardTitle>余额提现申请</CardTitle>
           <CardDescription>待处理优先关注 PENDING</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
@@ -99,7 +99,7 @@ export default async function AdminRefundsPage() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`ov-${r.id}`}>退款额覆盖（分，可选）</Label>
+                        <Label htmlFor={`ov-${r.id}`}>提现额覆盖（分，可选）</Label>
                         <Input
                           id={`ov-${r.id}`}
                           name="refundAmountMinorOverride"
@@ -127,7 +127,7 @@ export default async function AdminRefundsPage() {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    处理结果：实退{" "}
+                    处理结果：实提{" "}
                     {r.refundAmountMinor != null
                       ? `¥${formatMinorAsYuan(r.refundAmountMinor)}`
                       : "—"}
@@ -142,8 +142,8 @@ export default async function AdminRefundsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>订阅退款审核</CardTitle>
-          <CardDescription>来自「订阅与充值 → 发起退款审核」</CardDescription>
+          <CardTitle>订阅提现审核</CardTitle>
+          <CardDescription>来自「订阅与充值 → 发起提现审核」</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
           {subReqs.length === 0 ? (

@@ -1,0 +1,63 @@
+{
+  "defaults": {
+    "analysisModel": "qwen3.6-plus"
+  },
+  "models": [
+    {
+      "id": "qwen3.6-plus",
+      "apiModel": "qwen3.6-plus",
+      "title": "Qwen3.6-Plus",
+      "description": "性能最强，推荐优先使用。",
+      "icon": "✦"
+    },
+    {
+      "id": "qwen3.6-flash",
+      "apiModel": "qwen3.6-flash",
+      "title": "Qwen3.6-Flash",
+      "description": "速度更快，成本更低。",
+      "icon": "✦"
+    },
+    {
+      "id": "qwen3.5-plus",
+      "apiModel": "qwen3.5-plus",
+      "title": "Qwen3.5-Plus",
+      "description": "千问性能最强的视觉理解模型，推荐优先使用。",
+      "icon": "✦"
+    },
+    {
+      "id": "qwen3.5-flash",
+      "apiModel": "qwen3.5-flash",
+      "title": "Qwen3.5-Flash",
+      "description": "速度更快，成本更低，是兼顾性能与成本的高性价比选择。",
+      "icon": "✦"
+    },
+    {
+      "id": "qwen3-vl-plus",
+      "apiModel": "qwen3-vl-plus",
+      "title": "Qwen3-VL-Plus",
+      "description": "Qwen3-VL 系列中性能最强的模型。",
+      "icon": "✦"
+    },
+    {
+      "id": "qwen3-vl-flash",
+      "apiModel": "qwen3-vl-flash",
+      "title": "Qwen3-VL-Flash",
+      "description": "速度更快，成本更低，是兼顾性能与成本的高性价比选择。",
+      "icon": "✦"
+    },
+    {
+      "id": "qwen-vl-max",
+      "apiModel": "qwen-vl-max",
+      "title": "Qwen-VL-Max（Qwen2.5-VL）",
+      "description": "Qwen2.5-VL 系列中效果最佳的模型。",
+      "icon": "✦"
+    },
+    {
+      "id": "qwen-vl-plus",
+      "apiModel": "qwen-vl-plus",
+      "title": "Qwen-VL-Plus（Qwen2.5-VL）",
+      "description": "速度更快，在效果与成本之间实现良好平衡。",
+      "icon": "✦"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-/** 第七章：用户知情权·计费与退款公示（落地页可锚点 #billing-policy） */
+/** 第七章：用户知情权·计费与提现公示（落地页可锚点 #billing-policy） */
 export function BillingPolicySection() {
   return (
     <section
@@ -6,9 +6,9 @@ export function BillingPolicySection() {
       className="container w-full py-16 sm:py-24 scroll-mt-24"
     >
       <div className="mx-auto max-w-screen-xl rounded-2xl border border-secondary bg-card p-8 md:p-12">
-        <h2 className="text-2xl md:text-3xl font-bold mb-2">计费、余额与退款说明</h2>
+        <h2 className="text-2xl md:text-3xl font-bold mb-2">计费、余额与提现说明</h2>
         <p className="text-sm text-muted-foreground mb-8">
-          以下为产品规则摘要，具体以订单协议及后台公示为准；订阅退款与余额退款政策<strong>相互独立</strong>。
+          以下为产品规则摘要，具体以订单协议及后台公示为准；订阅相关提现与余额提现规则<strong>相互独立</strong>。
         </p>
         <div className="max-w-none space-y-6 text-muted-foreground text-sm leading-relaxed">
           <div>
@@ -39,16 +39,16 @@ export function BillingPolicySection() {
             </p>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">余额退款</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-2">余额提现</h3>
             <p>
-              用户可申请<strong>余额退款</strong>。平台在<strong>结清应扣未扣</strong>
-              （已发生尚未入账的用量费用等）后，对<strong>剩余可退金额</strong>办理退款；实际到账路径、时效与手续费（若有）以会员中心/帮助中心为准。
+              用户不再继续使用时，可申请将账户<strong>余额提现</strong>。平台在<strong>结清应扣未扣</strong>
+              （已发生尚未入账的用量费用等）后，对<strong>剩余可提现金额</strong>办理提现；实际到账路径、时效与手续费（若有）以会员中心/帮助中心为准。
             </p>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">订阅退款</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-2">订阅与订单提现</h3>
             <p>
-              <strong>订阅订单退款</strong>是否允许、条件与时限与余额退款<strong>分别约定</strong>
+              <strong>订阅类订单</strong>是否允许提现结束时结算结余、条件与时限与余额提现<strong>分别约定</strong>
               ，请以订阅时展示的条款及客服指引为准。
             </p>
           </div>

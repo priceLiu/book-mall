@@ -33,9 +33,6 @@ function TextToImageHero({
       <div className="mx-auto max-w-[1100px] px-4 sm:px-6">
         <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-12">
           <div className="flex flex-col gap-5">
-            <div>
-              <Badge variant="outline">文生图已就绪</Badge>
-            </div>
             <div className="flex flex-col gap-4">
               <h2 className="max-w-lg text-left text-4xl font-semibold tracking-tight md:text-6xl lg:text-7xl">
                 用文字，画出下一帧灵感

@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, orderId, balanceAfterMinor });
   } catch (e) {
     const message = e instanceof Error ? e.message : "充值失败";
-    const status = message.includes("档位") ? 400 : 500;
+    const status = message.includes("不在允许范围") ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

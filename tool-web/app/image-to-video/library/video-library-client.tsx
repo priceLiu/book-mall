@@ -14,6 +14,7 @@ import {
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
 } from "@/lib/confirm-destructive-twice";
 import { cn } from "@/lib/utils";
+import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 
 const RETENTION_DAYS = 7;
 
@@ -276,6 +277,7 @@ export function ImageToVideoLibraryClient() {
             所有内容均由人工智能模型生成。保存入库的视频会转存到自有 OSS；模型原始链接约 24 小时有效。
             建议保留约 {RETENTION_DAYS} 天，管理员可按存储策略删除库中文件。
           </p>
+          <ToolImplementationCrossLink href="/image-to-video/implementation" />
         </div>
         <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
           <Link href="/image-to-video/lab" className={styles.cta}>

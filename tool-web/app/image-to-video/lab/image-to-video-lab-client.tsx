@@ -10,10 +10,12 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ArrowRightLeft,
   Check,
+  CheckCircle2,
   Clapperboard,
   Dices,
   Download,
@@ -31,6 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { chipVariants } from "@/components/ui/chip";
 import { ToolChargeSubmitButton } from "@/components/ui/tool-charge-submit-button";
+import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { formatDashScopeI2vFailureForUser } from "@/lib/image-to-video-task-errors";
 import {
   DEFAULT_IMAGE_TO_VIDEO_MODEL_ID,
@@ -49,6 +52,9 @@ import ttiStyles from "../../text-to-image/text-to-image-modal.module.css";
 import { TextToVideoWorkbench } from "./text-to-video-workbench";
 
 const SEED_TOOLTIP = "随机数种子，用于控制模型生成内容的随机性";
+
+/** 挂到 document.body，避免主滚动区内 <video> 合成层盖住 fixed 弹层 */
+const LAB_OVERLAY_Z = "z-[100000]";
 
 function promptEllipsisLab(text: string, max = 72): string {
   const t = text.trim();
@@ -408,6 +414,7 @@ export function ImageToVideoLabClient() {
   const [librarySaveConfirmJob, setLibrarySaveConfirmJob] = useState<LabJob | null>(null);
   const [saveLibraryModalError, setSaveLibraryModalError] = useState<string | null>(null);
   const [jobPromptModal, setJobPromptModal] = useState<JobPromptModalState | null>(null);
+  const [overlayMounted, setOverlayMounted] = useState(false);
 
   const { chargeLine, chargeTitle } = useMemo(() => {
     if (billableYuan != null) {
@@ -423,6 +430,10 @@ export function ImageToVideoLabClient() {
         "单次生成按主站「工具管理」配置的按次单价扣费；标价加载失败时请刷新页面或查看管理后台。",
     };
   }, [billableYuan]);
+
+  useEffect(() => {
+    setOverlayMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -445,7 +456,7 @@ export function ImageToVideoLabClient() {
   }, []);
 
   useEffect(() => {
-    if (!librarySaveConfirmJob && !jobPromptModal) return;
+    if (!librarySaveConfirmJob && !jobPromptModal && !refPreviewSrc) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       const saving =
@@ -455,10 +466,20 @@ export function ImageToVideoLabClient() {
       setLibrarySaveConfirmJob(null);
       setSaveLibraryModalError(null);
       setJobPromptModal(null);
+      setRefPreviewSrc(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [librarySaveConfirmJob, jobPromptModal, librarySaveBusyId]);
+  }, [librarySaveConfirmJob, jobPromptModal, librarySaveBusyId, refPreviewSrc]);
+
+  useEffect(() => {
+    if (!jobPromptModal && !librarySaveConfirmJob && !refPreviewSrc) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [jobPromptModal, librarySaveConfirmJob, refPreviewSrc]);
 
   const selectedModel = useMemo(() => {
     if (modeTab === "t2v") {
@@ -1595,6 +1616,7 @@ export function ImageToVideoLabClient() {
             <Button variant="outline" size="sm" asChild>
               <Link href="/image-to-video/library">我的视频库</Link>
             </Button>
+            <ToolImplementationCrossLink href="/image-to-video/implementation" />
           </div>
         </div>
 
@@ -1688,10 +1710,15 @@ export function ImageToVideoLabClient() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-9 gap-1 px-2 text-violet-700 dark:text-violet-300"
+                    className={cn(
+                      "h-9 gap-1 px-2",
+                      librarySavedByJobId[job.id]
+                        ? "text-emerald-700 dark:text-emerald-400"
+                        : "text-violet-700 dark:text-violet-300",
+                    )}
                     title={
                       librarySavedByJobId[job.id]
-                        ? "已保存到视频库"
+                        ? "已写入「我的视频库」，可从侧栏「我的视频库」进入查看"
                         : "保存到「我的视频库」（转存 OSS）"
                     }
                     aria-label="保存到我的视频库"
@@ -1700,9 +1727,13 @@ export function ImageToVideoLabClient() {
                     }
                     onClick={() => openSaveLibraryConfirm(job)}
                   >
-                    <Library className="h-4 w-4 shrink-0" />
+                    {librarySavedByJobId[job.id] ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+                    ) : (
+                      <Library className="h-4 w-4 shrink-0" aria-hidden />
+                    )}
                     <span className="hidden text-xs font-medium sm:inline">
-                      {librarySavedByJobId[job.id] ? "已保存" : "保存"}
+                      {librarySavedByJobId[job.id] ? "已入库" : "保存"}
                     </span>
                   </Button>
                   <Button variant="ghost" className="h-9 w-9 p-0" asChild aria-label="下载视频">
@@ -1780,174 +1811,192 @@ export function ImageToVideoLabClient() {
         </section>
       </div>
 
-      {jobPromptModal ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="lab-prompt-modal-title"
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          onClick={() => setJobPromptModal(null)}
-        >
-          <div
-            className="flex max-h-[min(85dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-              <h2
-                id="lab-prompt-modal-title"
-                className="text-sm font-semibold text-foreground"
+      {overlayMounted && jobPromptModal
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="lab-prompt-modal-title"
+              className={cn(
+                LAB_OVERLAY_Z,
+                "fixed inset-0 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md",
+              )}
+              onClick={() => setJobPromptModal(null)}
+            >
+              <div
+                className="flex max-h-[min(85dvh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white text-zinc-900 shadow-2xl dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                onClick={(e) => e.stopPropagation()}
               >
-                提示词全文
-              </h2>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-9 w-9 shrink-0 p-0"
-                aria-label="关闭"
-                onClick={() => setJobPromptModal(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="min-h-0 overflow-y-auto px-4 py-3">
-              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
-                {jobPromptModal.text}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
+                <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                  <h2
+                    id="lab-prompt-modal-title"
+                    className="text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+                  >
+                    提示词全文
+                  </h2>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 w-9 shrink-0 p-0"
+                    aria-label="关闭"
+                    onClick={() => setJobPromptModal(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="min-h-0 overflow-y-auto bg-white px-4 py-3 dark:bg-zinc-950">
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+                    {jobPromptModal.text}
+                  </p>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {librarySaveConfirmJob ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="lab-save-library-title"
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          onClick={() => {
-            if (
-              librarySaveConfirmJob != null &&
-              librarySaveBusyId === librarySaveConfirmJob.id
-            ) {
-              return;
-            }
-            setLibrarySaveConfirmJob(null);
-            setSaveLibraryModalError(null);
-          }}
-        >
-          <div
-            className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-              <h2
-                id="lab-save-library-title"
-                className="text-sm font-semibold leading-snug text-foreground"
-              >
-                保存到「我的视频库」？
-              </h2>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-9 w-9 shrink-0 p-0"
-                aria-label="关闭"
-                onClick={() => {
-                  if (
-                    librarySaveConfirmJob != null &&
-                    librarySaveBusyId === librarySaveConfirmJob.id
-                  ) {
-                    return;
-                  }
-                  setLibrarySaveConfirmJob(null);
-                  setSaveLibraryModalError(null);
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="space-y-3 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-              <p className="my-0 text-foreground/90">
-                我们会把视频转存到自有 OSS（模型返回的链接约 24 小时有效）。
-              </p>
-              <ul className="my-0 list-disc space-y-2 pl-5">
-                <li>
-                  默认每人最多 10 条；已满时请删除旧条目或使用下方「申请扩容」入口（付费功能即将开放）。
-                </li>
-                <li>
-                  为控制存储成本，建议每条保留约 7 天；到期后管理员可按策略删除，重要成片请下载备份。
-                </li>
-              </ul>
-            </div>
-            {saveLibraryModalError ? (
-              <p className="mx-4 mb-0 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {saveLibraryModalError}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-3">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={
+      {overlayMounted && librarySaveConfirmJob
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="lab-save-library-title"
+              className={cn(
+                LAB_OVERLAY_Z,
+                "fixed inset-0 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md",
+              )}
+              onClick={() => {
+                if (
                   librarySaveConfirmJob != null &&
                   librarySaveBusyId === librarySaveConfirmJob.id
+                ) {
+                  return;
                 }
-                onClick={() => {
-                  if (
-                    librarySaveConfirmJob != null &&
+                setLibrarySaveConfirmJob(null);
+                setSaveLibraryModalError(null);
+              }}
+            >
+              <div
+                className="flex w-full max-w-md flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white text-zinc-900 shadow-2xl dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                  <h2
+                    id="lab-save-library-title"
+                    className="text-sm font-semibold leading-snug text-zinc-900 dark:text-zinc-100"
+                  >
+                    保存到「我的视频库」？
+                  </h2>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 w-9 shrink-0 p-0"
+                    aria-label="关闭"
+                    onClick={() => {
+                      if (
+                        librarySaveConfirmJob != null &&
+                        librarySaveBusyId === librarySaveConfirmJob.id
+                      ) {
+                        return;
+                      }
+                      setLibrarySaveConfirmJob(null);
+                      setSaveLibraryModalError(null);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="space-y-3 bg-white px-4 py-3 text-sm leading-relaxed text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+                  <p className="my-0 text-zinc-800 dark:text-zinc-200">
+                    我们会把视频转存到自有 OSS（模型返回的链接约 24 小时有效）。
+                  </p>
+                  <ul className="my-0 list-disc space-y-2 pl-5">
+                    <li>
+                      默认每人最多 10 条；已满时请删除旧条目或使用下方「申请扩容」入口（付费功能即将开放）。
+                    </li>
+                    <li>
+                      为控制存储成本，建议每条保留约 7 天；到期后管理员可按策略删除，重要成片请下载备份。
+                    </li>
+                  </ul>
+                </div>
+                {saveLibraryModalError ? (
+                  <p className="mx-4 mb-0 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
+                    {saveLibraryModalError}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/80">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={
+                      librarySaveConfirmJob != null &&
+                      librarySaveBusyId === librarySaveConfirmJob.id
+                    }
+                    onClick={() => {
+                      if (
+                        librarySaveConfirmJob != null &&
+                        librarySaveBusyId === librarySaveConfirmJob.id
+                      ) {
+                        return;
+                      }
+                      setLibrarySaveConfirmJob(null);
+                      setSaveLibraryModalError(null);
+                    }}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    type="button"
+                    className="bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500"
+                    disabled={
+                      librarySaveConfirmJob != null &&
+                      librarySaveBusyId === librarySaveConfirmJob.id
+                    }
+                    onClick={() => void confirmSaveLibrary()}
+                  >
+                    {librarySaveConfirmJob != null &&
                     librarySaveBusyId === librarySaveConfirmJob.id
-                  ) {
-                    return;
-                  }
-                  setLibrarySaveConfirmJob(null);
-                  setSaveLibraryModalError(null);
-                }}
-              >
-                取消
-              </Button>
-              <Button
-                type="button"
-                className="bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500"
-                disabled={
-                  librarySaveConfirmJob != null &&
-                  librarySaveBusyId === librarySaveConfirmJob.id
-                }
-                onClick={() => void confirmSaveLibrary()}
-              >
-                {librarySaveConfirmJob != null &&
-                librarySaveBusyId === librarySaveConfirmJob.id
-                  ? "保存中…"
-                  : "确认保存"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+                      ? "保存中…"
+                      : "确认保存"}
+                  </Button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
-      {refPreviewSrc ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="图片预览"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-6 backdrop-blur-sm"
-          onClick={() => setRefPreviewSrc(null)}
-        >
-          <button
-            type="button"
-            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
-            aria-label="关闭预览"
-            onClick={() => setRefPreviewSrc(null)}
-          >
-            <X className="h-5 w-5" />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={refPreviewSrc}
-            alt=""
-            className="max-h-[min(88dvh,920px)] max-w-[min(96vw,1200px)] object-contain shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      ) : null}
+      {overlayMounted && refPreviewSrc
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="图片预览"
+              className={cn(
+                LAB_OVERLAY_Z,
+                "fixed inset-0 flex items-center justify-center bg-black/80 p-6 backdrop-blur-md",
+              )}
+              onClick={() => setRefPreviewSrc(null)}
+            >
+              <button
+                type="button"
+                className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25"
+                aria-label="关闭预览"
+                onClick={() => setRefPreviewSrc(null)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={refPreviewSrc}
+                alt=""
+                className="max-h-[min(88dvh,920px)] max-w-[min(96vw,1200px)] object-contain shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

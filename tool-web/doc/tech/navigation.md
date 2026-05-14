@@ -118,6 +118,18 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
       { href: "/image-to-video", label: "首页" },
       { href: "/image-to-video/lab", label: "实验室" },
       { href: "/image-to-video/library", label: "我的视频库" },
+      { href: "/image-to-video/implementation", label: "实现逻辑" },
+    ],
+  },
+  {
+    label: "视觉实验室",
+    navKey: "visual-lab",
+    defaultOpen: true,
+    children: [
+      { href: "/visual-lab", label: "首页" },
+      { href: "/visual-lab/analysis", label: "分析室" },
+      { href: "/visual-lab/gallery", label: "成果展" },
+      { href: "/visual-lab/implementation", label: "实现逻辑" },
     ],
   },
   {

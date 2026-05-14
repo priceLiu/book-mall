@@ -33,6 +33,12 @@
 | `/fitting-room` | 试衣间（页面级仍可 introspect；壳层优先 JWT） |
 | `/text-to-image` | 文生图 |
 | `/text-to-image/implementation` | 文生图 · 实现逻辑（摘录） |
+| `/image-to-video` | 图生视频 |
+| `/image-to-video/implementation` | 图生视频 · 实现逻辑（摘录） |
+| `/visual-lab` | 视觉实验室 · 首页 |
+| `/visual-lab/analysis` | 视觉实验室 · 分析室 |
+| `/visual-lab/gallery` | 视觉实验室 · 成果展 |
+| `/visual-lab/implementation` | 视觉实验室 · 实现逻辑（摘录） |
 | `/fitting-room/implementation` | 试衣间套装 · 实现逻辑 |
 | `/fitting-room/ai-fit/implementation` | AI试衣 · 实现逻辑 |
 | `/smart-support` | 智能客服首页（Hero + 入口） |

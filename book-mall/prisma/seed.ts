@@ -383,6 +383,11 @@ async function main() {
     data: { label: "图生视频" },
   });
 
+  await prisma.toolNavVisibility.updateMany({
+    where: { navKey: "visual-lab" },
+    data: { label: "视觉实验室" },
+  });
+
   await syncPilotSubscriptions(PILOT_SYNC_EMAIL);
 }
 

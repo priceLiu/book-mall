@@ -28,7 +28,7 @@
 ## 5. 「实现逻辑」读者页（面向开发者 / 透明度）
 
 - **何时必须做**：新工具首版合并前，或某工具 **计费方式、上游对接、安全边界** 发生重大变更时，须同步更新对应实现逻辑页。
-- **路由**：与工具同属一份业务时挂在该业务路径下，例如 `…/implementation`（本期：`/text-to-image/implementation`、`/fitting-room/implementation`、`/fitting-room/ai-fit/implementation`、`/smart-support/implementation`）；若未来工具无单一「首页」，可与架构负责人约定同级路由。
+- **路由**：与工具同属一份业务时挂在该业务路径下，例如 `…/implementation`（本期：`/text-to-image/implementation`、`/image-to-video/implementation`、`/visual-lab/implementation`、`/fitting-room/implementation`、`/fitting-room/ai-fit/implementation`、`/smart-support/implementation`）；若未来工具无单一「首页」，可与架构负责人约定同级路由。
 - **必备内容**：
   1. **流程摘要**（浏览器 → Route Handler → 上游 → 持久化 / 计费）。
   2. **关键事项**（密钥不落客户端、`toolKey`/`action`、幂等、402、OSS 与临时 URL 等）。

@@ -67,7 +67,7 @@ export const FooterSection = () => {
 
             <div>
               <Link href="/#billing-policy" className="opacity-60 hover:opacity-100">
-                计费与退款
+                计费与提现
               </Link>
             </div>
 

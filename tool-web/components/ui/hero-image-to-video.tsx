@@ -22,14 +22,7 @@ export function ImageToVideoHero({ labHref = "/image-to-video/lab" }: ImageToVid
       <div className="mx-auto max-w-[1100px] px-4 sm:px-6">
         <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-12">
           <div className="flex flex-col gap-5">
-            <div>
-              <Badge
-                variant="outline"
-                className="border-violet-500/50 text-violet-700 dark:text-violet-300"
-              >
-                图生视频 · 实验室预览
-              </Badge>
-            </div>
+
             <div className="flex flex-col gap-4">
               <h2 className="max-w-lg text-left text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl">
                 静帧起势，让画面动起来
