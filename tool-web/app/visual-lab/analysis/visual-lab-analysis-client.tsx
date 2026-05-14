@@ -24,10 +24,13 @@ import { AnalysisReplyMarkdown } from "@/components/visual-lab/analysis-reply-ma
 import {
   type VisualLabGalleryItem,
   type VisualLabSnapshotStats,
+  type AppendVisualLabNotebookGalleryResult,
   VISUAL_LAB_REPLY_GALLERY_MAX_IMAGES,
   VISUAL_LAB_REPLY_GALLERY_MAX_VIDEOS,
+  VISUAL_LAB_REPLY_MARKDOWN_THUMB_DATA_URL,
   VISUAL_LAB_VIDEO_PLACEHOLDER_STATS,
   VISUAL_LAB_VIDEO_THUMB_DATA_URL,
+  VISUAL_LAB_GALLERY_SNAPSHOT_MAX,
   appendVisualLabGalleryItem,
   appendVisualLabReplyMediaItem,
 } from "@/lib/visual-lab-gallery";
@@ -276,6 +279,28 @@ function readFileAsDataUrl(file: File): Promise<string> {
     r.onerror = () => reject(r.error ?? new Error("read_failed"));
     r.readAsDataURL(file);
   });
+}
+
+/** 将本轮用户图 data URL 转回 File，供发送后附件已清空时仍能把快照写入成果展 */
+async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
+  const r = await fetch(dataUrl);
+  const blob = await r.blob();
+  const type =
+    blob.type && blob.type.startsWith("image/") ? blob.type : "image/png";
+  return new File([blob], fileName, { type });
+}
+
+function suggestedNameFromImageDataUrl(dataUrl: string): string {
+  const m = /^data:([^;,]+);/i.exec(dataUrl);
+  const mime = (m?.[1] ?? "image/png").toLowerCase();
+  const ext = mime.includes("png")
+    ? "png"
+    : mime.includes("webp")
+      ? "webp"
+      : mime.includes("gif")
+        ? "gif"
+        : "jpg";
+  return `分析附图-${Date.now()}.${ext}`;
 }
 
 function formatYuan(minor: number | null | undefined): string {
@@ -668,28 +693,76 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
 
   const saveToGallery = useCallback(async () => {
     const img = attachments.find((a) => a.kind === "image");
-    if (!img) {
-      showUploadFail("请先上传至少一张图片后再保存到成果展。");
+    const reply = analysisReply.trim();
+    const turnImageDataUrl = userTurnDisplay?.images[0];
+
+    const notifyNotebookSaved = (prefix: string, r: AppendVisualLabNotebookGalleryResult) => {
+      setSaveHint(
+        `${prefix}（分析快照与纯回复 ${r.notebookSlotCount}/${VISUAL_LAB_GALLERY_SNAPSHOT_MAX} 条）` +
+          (r.replacedOldestNotebook ? "；最早的一条已被本轮替换" : ""),
+      );
+      window.setTimeout(() => setSaveHint(null), 5000);
+    };
+
+    if (img) {
+      try {
+        const { stats, thumbDataUrl } = await analyzeImageFile(img.file);
+        const item: VisualLabGalleryItem = {
+          id: newId(),
+          createdAt: new Date().toISOString(),
+          kind: "snapshot",
+          imageName: img.file.name,
+          note: prompt.trim(),
+          thumbDataUrl,
+          stats,
+          replyMarkdown: reply || undefined,
+        };
+        notifyNotebookSaved("已保存到成果展", appendVisualLabGalleryItem(item));
+      } catch {
+        showUploadFail("保存失败：无法生成缩略图，请换一张图片重试。");
+      }
       return;
     }
-    try {
-      const { stats, thumbDataUrl } = await analyzeImageFile(img.file);
+
+    if (turnImageDataUrl) {
+      try {
+        const name = suggestedNameFromImageDataUrl(turnImageDataUrl);
+        const file = await dataUrlToFile(turnImageDataUrl, name);
+        const { stats, thumbDataUrl } = await analyzeImageFile(file);
+        const item: VisualLabGalleryItem = {
+          id: newId(),
+          createdAt: new Date().toISOString(),
+          kind: "snapshot",
+          imageName: file.name,
+          note: userTurnDisplay?.text?.trim() || prompt.trim() || "分析室快照",
+          thumbDataUrl,
+          stats,
+          replyMarkdown: reply || undefined,
+        };
+        notifyNotebookSaved("已保存到成果展", appendVisualLabGalleryItem(item));
+      } catch {
+        showUploadFail("保存失败：无法从本轮上传图生成缩略图。");
+      }
+      return;
+    }
+
+    if (reply) {
       const item: VisualLabGalleryItem = {
         id: newId(),
         createdAt: new Date().toISOString(),
-        kind: "snapshot",
-        imageName: img.file.name,
-        note: prompt.trim(),
-        thumbDataUrl,
-        stats,
+        kind: "reply-markdown",
+        imageName: `模型回复-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.md`,
+        note: prompt.trim() || "分析室 · 保存的模型回复（可含代码）",
+        thumbDataUrl: VISUAL_LAB_REPLY_MARKDOWN_THUMB_DATA_URL,
+        stats: VISUAL_LAB_VIDEO_PLACEHOLDER_STATS,
+        replyMarkdown: reply,
       };
-      const all = appendVisualLabGalleryItem(item);
-      setSaveHint(`已保存到成果展（本机共 ${all.length} 条）`);
-      window.setTimeout(() => setSaveHint(null), 4000);
-    } catch {
-      showUploadFail("保存失败：无法生成缩略图，请换一张图片重试。");
+      notifyNotebookSaved("已保存文本/代码回复到成果展", appendVisualLabGalleryItem(item));
+      return;
     }
-  }, [attachments, prompt, showUploadFail]);
+
+    showUploadFail("请上传至少一张图片，或在收到模型回复后再保存到成果展。");
+  }, [attachments, prompt, showUploadFail, analysisReply, userTurnDisplay]);
 
   const saveReplyMediaFromAnalysis = useCallback(
     async (url: string, kind: "reply-image" | "reply-video") => {
@@ -709,6 +782,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
             return;
           }
           const { stats, thumbDataUrl } = await analyzeImageFile(file);
+          const replySnap = analysisReply.trim() || undefined;
           const appended = appendVisualLabReplyMediaItem({
             id: newId(),
             createdAt: new Date().toISOString(),
@@ -718,6 +792,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
             thumbDataUrl,
             stats,
             sourceUrl: url,
+            replyMarkdown: replySnap,
           });
           if (!appended.ok) {
             setOutcomeQuotaModalKind(appended.reason === "quota-image" ? "image" : "video");
@@ -725,6 +800,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
           }
           setSaveHint(`已保存回复中的图片到成果展（回复图最多 ${VISUAL_LAB_REPLY_GALLERY_MAX_IMAGES} 条）`);
         } else {
+          const replySnap = analysisReply.trim() || undefined;
           const appended = appendVisualLabReplyMediaItem({
             id: newId(),
             createdAt: new Date().toISOString(),
@@ -734,6 +810,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
             thumbDataUrl: VISUAL_LAB_VIDEO_THUMB_DATA_URL,
             stats: VISUAL_LAB_VIDEO_PLACEHOLDER_STATS,
             sourceUrl: url,
+            replyMarkdown: replySnap,
           });
           if (!appended.ok) {
             setOutcomeQuotaModalKind(appended.reason === "quota-video" ? "video" : "image");
@@ -746,7 +823,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
         showUploadFail(e instanceof Error ? e.message : "保存失败");
       }
     },
-    [showUploadFail],
+    [showUploadFail, analysisReply],
   );
 
   const sendReady = prompt.trim().length > 0;
@@ -951,6 +1028,12 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
         <p className="vl-muted mt-1 text-sm">
           视觉理解模型可以根据您传入的图片或视频进行回答，支持单图或多图的输入，适用于图像描述、视觉问答、物体定位等多种任务。
         </p>
+        <p className="vl-muted mt-2 text-sm">
+          「保存到成果展」中，<strong className="font-medium text-zinc-200">分析快照</strong>与
+          <strong className="font-medium text-zinc-200">仅保存的模型回复（Markdown）</strong>在本机合计最多保留{" "}
+          {VISUAL_LAB_GALLERY_SNAPSHOT_MAX} 条；超出时<strong className="font-medium text-zinc-200">最早的一条会被新保存覆盖</strong>
+          （回复里单独「存入成果」的图片 / 视频另有条数上限，不受此轮替影响）。
+        </p>
 
         {!infoBannerDismissed ? (
           <div className="vl-analysis-info-banner" role="status">
@@ -1084,6 +1167,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
                 <AnalysisReplyMarkdown
                   markdown={analysisReply}
                   onSaveReplyMedia={saveReplyMediaFromAnalysis}
+                  replyStreaming={analyzing}
                 />
               </div>
             ) : null}

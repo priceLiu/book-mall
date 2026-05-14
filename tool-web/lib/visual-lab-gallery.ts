@@ -2,8 +2,8 @@
 
 export const VISUAL_LAB_GALLERY_STORAGE_KEY = "visual-lab-gallery-v1";
 
-/** 「保存到成果展」快照（分析室顶栏）每人上限 */
-export const VISUAL_LAB_GALLERY_SNAPSHOT_MAX = 24;
+/** 分析室「快照」+「仅保存模型回复正文」共用上限；超出后循环覆盖最旧一条 */
+export const VISUAL_LAB_GALLERY_SNAPSHOT_MAX = 10;
 
 /** 从模型回复保存的图片 / 视频上限（与图生视频库数量级规则对齐） */
 export const VISUAL_LAB_REPLY_GALLERY_MAX_IMAGES = 20;
@@ -11,7 +11,7 @@ export const VISUAL_LAB_REPLY_GALLERY_MAX_VIDEOS = 10;
 
 const STORAGE_HARD_CAP = 200;
 
-export type VisualLabGalleryKind = "snapshot" | "reply-image" | "reply-video";
+export type VisualLabGalleryKind = "snapshot" | "reply-image" | "reply-video" | "reply-markdown";
 
 export type VisualLabSnapshotStats = {
   width: number;
@@ -31,6 +31,8 @@ export type VisualLabGalleryItem = {
   stats: VisualLabSnapshotStats;
   /** 来自模型回复的原始 URL（外链可能有时效） */
   sourceUrl?: string;
+  /** 当时的模型正文（Markdown，不含思考过程）；新写入条目才有 */
+  replyMarkdown?: string;
 };
 
 export function looksLikeVideoUrl(url: string): boolean {
@@ -47,8 +49,11 @@ function galleryKindOf(x: VisualLabGalleryItem): VisualLabGalleryKind {
   return x.kind ?? "snapshot";
 }
 
-function countSnapshots(items: VisualLabGalleryItem[]): number {
-  return items.filter((x) => galleryKindOf(x) === "snapshot").length;
+function countNotebookSlots(items: VisualLabGalleryItem[]): number {
+  return items.filter((x) => {
+    const k = galleryKindOf(x);
+    return k === "snapshot" || k === "reply-markdown";
+  }).length;
 }
 
 function countReplyImages(items: VisualLabGalleryItem[]): number {
@@ -64,6 +69,13 @@ export const VISUAL_LAB_VIDEO_THUMB_DATA_URL =
   "data:image/svg+xml," +
   encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80"><rect width="120" height="80" rx="8" fill="#1e1b4b"/><path d="M48 28v24l20-12-20-12z" fill="#e9d5ff"/></svg>`,
+  );
+
+/** 纯文本/代码回复卡片占位缩略 */
+export const VISUAL_LAB_REPLY_MARKDOWN_THUMB_DATA_URL =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80"><rect width="120" height="80" rx="8" fill="#171717"/><text x="60" y="46" text-anchor="middle" fill="#f97316" font-family="ui-monospace,monospace" font-size="15" font-weight="700">&lt;/&gt;</text></svg>`,
   );
 
 export const VISUAL_LAB_VIDEO_PLACEHOLDER_STATS: VisualLabSnapshotStats = {
@@ -111,18 +123,29 @@ export function persistVisualLabGallery(items: VisualLabGalleryItem[]): void {
   );
 }
 
+export type AppendVisualLabNotebookGalleryResult = {
+  items: VisualLabGalleryItem[];
+  /** 为不超过上限而删除了一条更早的「快照」或「纯回复」时 */
+  replacedOldestNotebook: boolean;
+  /** 当前「快照 + 纯回复」条数 */
+  notebookSlotCount: number;
+};
+
 export function appendVisualLabGalleryItem(
   item: Omit<VisualLabGalleryItem, "kind"> & { kind?: VisualLabGalleryKind },
-): VisualLabGalleryItem[] {
+): AppendVisualLabNotebookGalleryResult {
   const withKind: VisualLabGalleryItem = {
     ...item,
     kind: item.kind ?? "snapshot",
   };
   let next: VisualLabGalleryItem[] = [withKind, ...loadVisualLabGallery()];
-  while (countSnapshots(next) > VISUAL_LAB_GALLERY_SNAPSHOT_MAX) {
+  let replacedOldestNotebook = false;
+  while (countNotebookSlots(next) > VISUAL_LAB_GALLERY_SNAPSHOT_MAX) {
+    replacedOldestNotebook = true;
     let drop: number | undefined;
     for (let i = next.length - 1; i >= 0; i--) {
-      if (galleryKindOf(next[i]!) === "snapshot") {
+      const k = galleryKindOf(next[i]!);
+      if (k === "snapshot" || k === "reply-markdown") {
         drop = i;
         break;
       }
@@ -132,7 +155,8 @@ export function appendVisualLabGalleryItem(
   }
   next = next.slice(0, STORAGE_HARD_CAP);
   persistVisualLabGallery(next);
-  return next;
+  const notebookSlotCount = countNotebookSlots(next);
+  return { items: next, replacedOldestNotebook, notebookSlotCount };
 }
 
 export type AppendReplyResult =
