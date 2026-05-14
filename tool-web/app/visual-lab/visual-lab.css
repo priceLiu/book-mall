@@ -116,8 +116,65 @@
   gap: 0.5rem;
 }
 
+.visual-lab-theme-root .vl-floating-toolbar-trailing {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* 沉浸式：顶条横跨视口，左侧子页互通，右侧全屏/主题 */
 .visual-lab-theme-root.visual-lab-immersive-active .vl-floating-toolbar {
+  left: 1rem;
+  right: 1rem;
+  width: auto;
+  max-width: none;
+  justify-content: flex-start;
   top: calc(0.55rem + env(safe-area-inset-top, 0px));
+}
+
+.visual-lab-theme-root .vl-immersive-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.visual-lab-theme-root .vl-immersive-subnav-link {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.38rem 0.7rem;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--vl-muted);
+  border: 1px solid var(--vl-border);
+  background: var(--vl-surface);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+  white-space: nowrap;
+}
+
+.visual-lab-theme-root .vl-immersive-subnav-link:hover {
+  color: var(--vl-fg);
+  border-color: var(--vl-border-strong);
+  background: var(--vl-surface-2);
+}
+
+.visual-lab-theme-root .vl-immersive-subnav-link--active {
+  color: var(--vl-on-accent);
+  background: var(--vl-accent);
+  border-color: var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-immersive-subnav-link--active:hover {
+  color: var(--vl-on-accent);
+  background: var(--vl-accent-press);
+  border-color: var(--vl-accent-press);
 }
 
 /* 顶栏「开关灯」：与主站 ToggleTheme iconOnly 同款 Sun/Moon */
@@ -260,6 +317,8 @@
 
   .visual-lab-theme-root.visual-lab-immersive-active .vl-floating-toolbar {
     top: calc(0.45rem + env(safe-area-inset-top, 0px));
+    left: 0.6rem;
+    right: 0.6rem;
   }
 
   .visual-lab-theme-root .vl-theme-toggle,
@@ -1015,8 +1074,7 @@
 .visual-lab-theme-root .vl-analysis-result-body {
   margin: 0;
   padding: 0.85rem 1rem;
-  max-height: min(70vh, 36rem);
-  overflow: auto;
+  overflow: visible;
   overflow-wrap: break-word;
   word-break: break-word;
   color: var(--vl-fg);

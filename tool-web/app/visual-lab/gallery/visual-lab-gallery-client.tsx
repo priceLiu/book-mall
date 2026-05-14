@@ -54,27 +54,17 @@ export function VisualLabGalleryClient() {
 
   return (
     <div className="mx-auto max-w-[1100px] px-4 pb-12 pt-8 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="vl-h1">成果展</h1>
-          <p className="vl-muted mt-1 text-sm">
-            与分析室保存的内容同步（仅当前浏览器、本站点）。快照最多{" "}
-            <span className="tabular-nums">24</span> 条；从模型回复保存的图片 / 视频分别最多{" "}
-            <span className="tabular-nums">20</span> / <span className="tabular-nums">10</span>{" "}
-            条。删除或清空后立即生效。
-          </p>
-          <p className="tw-muted mt-2 text-sm">
-            <ToolImplementationCrossLink href="/visual-lab/implementation" />
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/visual-lab/analysis" className="vl-btn vl-btn-outline vl-btn-sm">
-            去分析室
-          </Link>
-          <Link href="/visual-lab" className="vl-btn vl-btn-outline vl-btn-sm">
-            首页
-          </Link>
-        </div>
+      <div>
+        <h1 className="vl-h1">成果展</h1>
+        <p className="vl-muted mt-1 text-sm">
+          与分析室保存的内容同步（仅当前浏览器、本站点）。快照最多{" "}
+          <span className="tabular-nums">24</span> 条；从模型回复保存的图片 / 视频分别最多{" "}
+          <span className="tabular-nums">20</span> / <span className="tabular-nums">10</span>{" "}
+          条。删除或清空后立即生效。
+        </p>
+        <p className="tw-muted mt-2 text-sm">
+          <ToolImplementationCrossLink href="/visual-lab/implementation" />
+        </p>
       </div>
 
       {items.length > 0 ? (
