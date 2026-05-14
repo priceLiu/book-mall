@@ -1,0 +1,3064 @@
+{
+  "meta": {
+    "generatedAt": "2026-05-14T17:21:40.181Z",
+    "sourceRelativePath": "doc/price.md",
+    "sourceSha256": "ed95fa8b3d02e5a5a9565c945be4d6156cd43d28e2ce3051c2ea47cd4ce94d0f",
+    "rowCount": 251,
+    "warnings": [
+      "L3593: 表头无法映射列，跳过该表",
+      "L3642: 表头无法映射列，跳过该表"
+    ]
+  },
+  "rows": [
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3.6-max-preview > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3.6-max-preview"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 9,
+      "outputYuanPerMillion": 54,
+      "sourceLine": 21
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3.6-max-preview > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3.6-max-preview"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 15,
+      "outputYuanPerMillion": 90,
+      "sourceLine": 22
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max > 当前能力等同于qwen3-max-2026-01-23 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-max",
+        "qwen3-max-2026-01-23"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 2.5,
+      "outputYuanPerMillion": 10,
+      "sourceLine": 23
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max > 当前能力等同于qwen3-max-2026-01-23 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-max",
+        "qwen3-max-2026-01-23"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 24
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max > 当前能力等同于qwen3-max-2026-01-23 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-max",
+        "qwen3-max-2026-01-23"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 7,
+      "outputYuanPerMillion": 28,
+      "sourceLine": 25
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max-2026-01-23",
+      "modelKeys": [
+        "qwen3-max-2026-01-23"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 2.5,
+      "outputYuanPerMillion": 10,
+      "sourceLine": 26
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max-2026-01-23",
+      "modelKeys": [
+        "qwen3-max-2026-01-23"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 27
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max-2026-01-23",
+      "modelKeys": [
+        "qwen3-max-2026-01-23"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 7,
+      "outputYuanPerMillion": 28,
+      "sourceLine": 28
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max-2025-09-23",
+      "modelKeys": [
+        "qwen3-max-2025-09-23"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 6,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 29
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max-2025-09-23",
+      "modelKeys": [
+        "qwen3-max-2025-09-23"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 10,
+      "outputYuanPerMillion": 40,
+      "sourceLine": 30
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max-2025-09-23",
+      "modelKeys": [
+        "qwen3-max-2025-09-23"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 15,
+      "outputYuanPerMillion": 60,
+      "sourceLine": 31
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max-preview > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-max-preview"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 6,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 32
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max-preview > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-max-preview"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 10,
+      "outputYuanPerMillion": 40,
+      "sourceLine": 33
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen3-max-preview > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-max-preview"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 15,
+      "outputYuanPerMillion": 60,
+      "sourceLine": 34
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen-max > 当前能力等同于qwen-max-2024-09-19 > Batch调用半价",
+      "modelKeys": [
+        "qwen-max",
+        "qwen-max-2024-09-19"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 2.4,
+      "outputYuanPerMillion": 9.6,
+      "sourceLine": 40
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen-max-latest > Batch调用半价",
+      "modelKeys": [
+        "qwen-max-latest"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 2.4,
+      "outputYuanPerMillion": 9.6,
+      "sourceLine": 41
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen-max-2025-01-25",
+      "modelKeys": [
+        "qwen-max-2025-01-25"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 2.4,
+      "outputYuanPerMillion": 9.6,
+      "sourceLine": 42
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen-max-2024-09-19",
+      "modelKeys": [
+        "qwen-max-2024-09-19"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 20,
+      "outputYuanPerMillion": 60,
+      "sourceLine": 43
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Max",
+      "modelRaw": "qwen-max-2024-04-28",
+      "modelKeys": [
+        "qwen-max-2024-04-28"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 40,
+      "outputYuanPerMillion": 120,
+      "sourceLine": 44
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen3.6-plus > 当前能力等同于qwen3.6-plus-2026-04-02",
+      "modelKeys": [
+        "qwen3.6-plus",
+        "qwen3.6-plus-2026-04-02"
+      ],
+      "tierRaw": "0<Token≤256K",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 129
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "8元",
+      "inputYuanPerMillion": 48,
+      "outputYuanPerMillion": 48,
+      "sourceLine": 130
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen3.6-plus-2026-04-02",
+      "modelKeys": [
+        "qwen3.6-plus-2026-04-02"
+      ],
+      "tierRaw": "0<Token≤256K",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 131
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "8元",
+      "inputYuanPerMillion": 48,
+      "outputYuanPerMillion": 48,
+      "sourceLine": 132
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen3.5-plus > 当前能力等同于qwen3.5-plus-2026-02-15",
+      "modelKeys": [
+        "qwen3.5-plus",
+        "qwen3.5-plus-2026-02-15"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 4.8,
+      "sourceLine": 133
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 12,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 134
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "4元",
+      "inputYuanPerMillion": 24,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 135
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen3.5-plus-2026-04-20",
+      "modelKeys": [
+        "qwen3.5-plus-2026-04-20"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 4.8,
+      "sourceLine": 136
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 12,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 137
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "4元",
+      "inputYuanPerMillion": 24,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 138
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen3.5-plus-2026-02-15",
+      "modelKeys": [
+        "qwen3.5-plus-2026-02-15"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 4.8,
+      "sourceLine": 139
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 12,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 140
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "4元",
+      "inputYuanPerMillion": 24,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 141
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus > 当前能力等同于qwen-plus-2025-12-01 > Batch调用半价",
+      "modelKeys": [
+        "qwen-plus",
+        "qwen-plus-2025-12-01"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 142
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "2.4元",
+      "inputYuanPerMillion": 20,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 143
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "4.8元",
+      "inputYuanPerMillion": 48,
+      "outputYuanPerMillion": 64,
+      "sourceLine": 144
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus-latest > Batch调用半价",
+      "modelKeys": [
+        "qwen-plus-latest"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 145
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "2.4元",
+      "inputYuanPerMillion": 20,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 146
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "4.8元",
+      "inputYuanPerMillion": 48,
+      "outputYuanPerMillion": 64,
+      "sourceLine": 147
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus-2025-12-01",
+      "modelKeys": [
+        "qwen-plus-2025-12-01"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 148
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "2.4元",
+      "inputYuanPerMillion": 20,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 149
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "4.8元",
+      "inputYuanPerMillion": 48,
+      "outputYuanPerMillion": 64,
+      "sourceLine": 150
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus-2025-09-11",
+      "modelKeys": [
+        "qwen-plus-2025-09-11"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 151
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "2.4元",
+      "inputYuanPerMillion": 20,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 152
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "4.8元",
+      "inputYuanPerMillion": 48,
+      "outputYuanPerMillion": 64,
+      "sourceLine": 153
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus-2025-07-28",
+      "modelKeys": [
+        "qwen-plus-2025-07-28"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 154
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "2.4元",
+      "inputYuanPerMillion": 20,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 155
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "256K<Token≤1M",
+      "modelKeys": [
+        "256k<token≤1m"
+      ],
+      "tierRaw": "4.8元",
+      "inputYuanPerMillion": 48,
+      "outputYuanPerMillion": 64,
+      "sourceLine": 156
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus-2025-07-14",
+      "modelKeys": [
+        "qwen-plus-2025-07-14"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 157
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus-2025-04-28",
+      "modelKeys": [
+        "qwen-plus-2025-04-28"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 158
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus-2025-01-25",
+      "modelKeys": [
+        "qwen-plus-2025-01-25"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 164
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus-2025-01-12",
+      "modelKeys": [
+        "qwen-plus-2025-01-12"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 165
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Plus",
+      "modelRaw": "qwen-plus-2024-12-20",
+      "modelKeys": [
+        "qwen-plus-2024-12-20"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 166
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.6-flash > 当前能力等同于qwen3.6-flash-2026-04-16 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3.6-flash",
+        "qwen3.6-flash-2026-04-16"
+      ],
+      "tierRaw": "0<Token≤256K",
+      "inputYuanPerMillion": 1.2,
+      "outputYuanPerMillion": 7.2,
+      "sourceLine": 286
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.6-flash > 当前能力等同于qwen3.6-flash-2026-04-16 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3.6-flash",
+        "qwen3.6-flash-2026-04-16"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 4.8,
+      "outputYuanPerMillion": 28.8,
+      "sourceLine": 287
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.6-flash-2026-04-16",
+      "modelKeys": [
+        "qwen3.6-flash-2026-04-16"
+      ],
+      "tierRaw": "0<Token≤256K",
+      "inputYuanPerMillion": 1.2,
+      "outputYuanPerMillion": 7.2,
+      "sourceLine": 288
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.6-flash-2026-04-16",
+      "modelKeys": [
+        "qwen3.6-flash-2026-04-16"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 4.8,
+      "outputYuanPerMillion": 28.8,
+      "sourceLine": 289
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.5-flash > 当前能力等同于qwen3.5-flash-2026-02-23 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3.5-flash",
+        "qwen3.5-flash-2026-02-23"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.2,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 290
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.5-flash > 当前能力等同于qwen3.5-flash-2026-02-23 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3.5-flash",
+        "qwen3.5-flash-2026-02-23"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 8,
+      "sourceLine": 291
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.5-flash > 当前能力等同于qwen3.5-flash-2026-02-23 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3.5-flash",
+        "qwen3.5-flash-2026-02-23"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 1.2,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 292
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.5-flash-2026-02-23",
+      "modelKeys": [
+        "qwen3.5-flash-2026-02-23"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.2,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 293
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.5-flash-2026-02-23",
+      "modelKeys": [
+        "qwen3.5-flash-2026-02-23"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 8,
+      "sourceLine": 294
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen3.5-flash-2026-02-23",
+      "modelKeys": [
+        "qwen3.5-flash-2026-02-23"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 1.2,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 295
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen-flash > 当前能力等同于qwen-flash-2025-07-28 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen-flash",
+        "qwen-flash-2025-07-28"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.15,
+      "outputYuanPerMillion": 1.5,
+      "sourceLine": 296
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen-flash > 当前能力等同于qwen-flash-2025-07-28 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen-flash",
+        "qwen-flash-2025-07-28"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 0.6,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 297
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen-flash > 当前能力等同于qwen-flash-2025-07-28 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen-flash",
+        "qwen-flash-2025-07-28"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 1.2,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 298
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen-flash-2025-07-28",
+      "modelKeys": [
+        "qwen-flash-2025-07-28"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.15,
+      "outputYuanPerMillion": 1.5,
+      "sourceLine": 299
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen-flash-2025-07-28",
+      "modelKeys": [
+        "qwen-flash-2025-07-28"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 0.6,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 300
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Flash",
+      "modelRaw": "qwen-flash-2025-07-28",
+      "modelKeys": [
+        "qwen-flash-2025-07-28"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 1.2,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 301
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Turbo",
+      "modelRaw": "qwen-turbo > 当前能力等同于qwen-turbo-2025-04-28 > Batch调用半价",
+      "modelKeys": [
+        "qwen-turbo",
+        "qwen-turbo-2025-04-28"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.6,
+      "sourceLine": 392
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Turbo",
+      "modelRaw": "qwen-turbo-latest > Batch调用半价",
+      "modelKeys": [
+        "qwen-turbo-latest"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.6,
+      "sourceLine": 393
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Turbo",
+      "modelRaw": "qwen-turbo-2025-07-15",
+      "modelKeys": [
+        "qwen-turbo-2025-07-15"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.6,
+      "sourceLine": 394
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Turbo",
+      "modelRaw": "qwen-turbo-2025-04-28",
+      "modelKeys": [
+        "qwen-turbo-2025-04-28"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.6,
+      "sourceLine": 395
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Turbo",
+      "modelRaw": "qwen-turbo-2025-02-11",
+      "modelKeys": [
+        "qwen-turbo-2025-02-11"
+      ],
+      "tierRaw": "0.3元",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.6,
+      "sourceLine": 401
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Turbo",
+      "modelRaw": "qwen-turbo-2024-11-01",
+      "modelKeys": [
+        "qwen-turbo-2024-11-01"
+      ],
+      "tierRaw": "0.3元",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.6,
+      "sourceLine": 402
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QwQ",
+      "modelRaw": "qwq-plus > 当前能力等同于qwq-plus-2025-03-05 > Batch调用半价",
+      "modelKeys": [
+        "qwq-plus"
+      ],
+      "tierRaw": "仅思考模式",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 437
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QwQ",
+      "modelRaw": "qwq-plus-latest",
+      "modelKeys": [
+        "qwq-plus-latest"
+      ],
+      "tierRaw": "仅思考模式",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 438
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QwQ",
+      "modelRaw": "qwq-plus-2025-03-05",
+      "modelKeys": [
+        "qwq-plus-2025-03-05"
+      ],
+      "tierRaw": "仅思考模式",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 439
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Long",
+      "modelRaw": "qwen-long > Batch调用半价",
+      "modelKeys": [
+        "qwen-long"
+      ],
+      "tierRaw": "0.5元",
+      "inputYuanPerMillion": 0.5,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 465
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Long",
+      "modelRaw": "qwen-long-latest",
+      "modelKeys": [
+        "qwen-long-latest"
+      ],
+      "tierRaw": "0.5元",
+      "inputYuanPerMillion": 0.5,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 466
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Long",
+      "modelRaw": "qwen-long-2025-01-25",
+      "modelKeys": [
+        "qwen-long-2025-01-25"
+      ],
+      "tierRaw": "0.5元",
+      "inputYuanPerMillion": 0.5,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 467
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen3.5-omni-plus > 当前能力等同于qwen3.5-omni-plus-2026-03-15",
+      "modelKeys": [
+        "qwen3.5-omni-plus",
+        "qwen3.5-omni-plus-2026-03-15"
+      ],
+      "tierRaw": "7元",
+      "inputYuanPerMillion": 7,
+      "outputYuanPerMillion": 40,
+      "sourceLine": 480
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen3.5-omni-plus-2026-03-15",
+      "modelKeys": [
+        "qwen3.5-omni-plus-2026-03-15"
+      ],
+      "tierRaw": "7元",
+      "inputYuanPerMillion": 7,
+      "outputYuanPerMillion": 40,
+      "sourceLine": 481
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen3.5-omni-flash > 当前能力等同于qwen3.5-omni-flash-2026-03-15",
+      "modelKeys": [
+        "qwen3.5-omni-flash",
+        "qwen3.5-omni-flash-2026-03-15"
+      ],
+      "tierRaw": "2.2元",
+      "inputYuanPerMillion": 2.2,
+      "outputYuanPerMillion": 13.3,
+      "sourceLine": 482
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen3.5-omni-flash-2026-03-15",
+      "modelKeys": [
+        "qwen3.5-omni-flash-2026-03-15"
+      ],
+      "tierRaw": "2.2元",
+      "inputYuanPerMillion": 2.2,
+      "outputYuanPerMillion": 13.3,
+      "sourceLine": 483
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen3-omni-flash > 当前能力等同于qwen3-omni-flash-2025-12-01",
+      "modelKeys": [
+        "qwen3-omni-flash",
+        "qwen3-omni-flash-2025-12-01"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 1.8,
+      "outputYuanPerMillion": 6.9,
+      "sourceLine": 490
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen3-omni-flash-2025-12-01",
+      "modelKeys": [
+        "qwen3-omni-flash-2025-12-01"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 1.8,
+      "outputYuanPerMillion": 6.9,
+      "sourceLine": 491
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen3-omni-flash-2025-09-15",
+      "modelKeys": [
+        "qwen3-omni-flash-2025-09-15"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 1.8,
+      "outputYuanPerMillion": 6.9,
+      "sourceLine": 492
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen-omni-turbo > 当前能力等同于qwen-omni-turbo-2025-03-26",
+      "modelKeys": [
+        "qwen-omni-turbo",
+        "qwen-omni-turbo-2025-03-26"
+      ],
+      "tierRaw": "非思考模式",
+      "inputYuanPerMillion": 0.4,
+      "outputYuanPerMillion": 1.6,
+      "sourceLine": 493
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen-omni-turbo-latest",
+      "modelKeys": [
+        "qwen-omni-turbo-latest"
+      ],
+      "tierRaw": "非思考模式",
+      "inputYuanPerMillion": 0.4,
+      "outputYuanPerMillion": 1.6,
+      "sourceLine": 494
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen-omni-turbo-2025-03-26",
+      "modelKeys": [
+        "qwen-omni-turbo-2025-03-26"
+      ],
+      "tierRaw": "非思考模式",
+      "inputYuanPerMillion": 0.4,
+      "outputYuanPerMillion": 1.6,
+      "sourceLine": 495
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni",
+      "modelRaw": "qwen-omni-turbo-2025-01-19",
+      "modelKeys": [
+        "qwen-omni-turbo-2025-01-19"
+      ],
+      "tierRaw": "非思考模式",
+      "inputYuanPerMillion": 0.4,
+      "outputYuanPerMillion": 1.6,
+      "sourceLine": 496
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen3.5-omni-plus-realtime",
+      "modelKeys": [
+        "qwen3.5-omni-plus-realtime"
+      ],
+      "tierRaw": "10元",
+      "inputYuanPerMillion": 10,
+      "outputYuanPerMillion": 60,
+      "sourceLine": 537
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen3.5-omni-plus-realtime-2026-03-15",
+      "modelKeys": [
+        "qwen3.5-omni-plus-realtime-2026-03-15"
+      ],
+      "tierRaw": "10元",
+      "inputYuanPerMillion": 10,
+      "outputYuanPerMillion": 60,
+      "sourceLine": 538
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen3.5-omni-flash-realtime",
+      "modelKeys": [
+        "qwen3.5-omni-flash-realtime"
+      ],
+      "tierRaw": "3.3元",
+      "inputYuanPerMillion": 3.3,
+      "outputYuanPerMillion": 20,
+      "sourceLine": 539
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen3.5-omni-flash-realtime-2026-03-15",
+      "modelKeys": [
+        "qwen3.5-omni-flash-realtime-2026-03-15"
+      ],
+      "tierRaw": "3.3元",
+      "inputYuanPerMillion": 3.3,
+      "outputYuanPerMillion": 20,
+      "sourceLine": 540
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen3-omni-flash-realtime",
+      "modelKeys": [
+        "qwen3-omni-flash-realtime"
+      ],
+      "tierRaw": "2.2元",
+      "inputYuanPerMillion": 2.2,
+      "outputYuanPerMillion": 8.3,
+      "sourceLine": 547
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen3-omni-flash-realtime-2025-12-01",
+      "modelKeys": [
+        "qwen3-omni-flash-realtime-2025-12-01"
+      ],
+      "tierRaw": "2.2元",
+      "inputYuanPerMillion": 2.2,
+      "outputYuanPerMillion": 8.3,
+      "sourceLine": 548
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen3-omni-flash-realtime-2025-09-15",
+      "modelKeys": [
+        "qwen3-omni-flash-realtime-2025-09-15"
+      ],
+      "tierRaw": "2.2元",
+      "inputYuanPerMillion": 2.2,
+      "outputYuanPerMillion": 8.3,
+      "sourceLine": 549
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen-omni-turbo-realtime",
+      "modelKeys": [
+        "qwen-omni-turbo-realtime"
+      ],
+      "tierRaw": "1.6元",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 6.4,
+      "sourceLine": 550
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen-omni-turbo-realtime-latest",
+      "modelKeys": [
+        "qwen-omni-turbo-realtime-latest"
+      ],
+      "tierRaw": "1.6元",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 6.4,
+      "sourceLine": 551
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Omni-Realtime",
+      "modelRaw": "qwen-omni-turbo-realtime-2025-05-08",
+      "modelKeys": [
+        "qwen-omni-turbo-realtime-2025-05-08"
+      ],
+      "tierRaw": "1.6元",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 6.4,
+      "sourceLine": 552
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QVQ",
+      "modelRaw": "qvq-max > 当前能力等同于qvq-max-2025-03-25",
+      "modelKeys": [
+        "qvq-max"
+      ],
+      "tierRaw": "8元",
+      "inputYuanPerMillion": 8,
+      "outputYuanPerMillion": 32,
+      "sourceLine": 592
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QVQ",
+      "modelRaw": "qvq-max-latest",
+      "modelKeys": [
+        "qvq-max-latest"
+      ],
+      "tierRaw": "8元",
+      "inputYuanPerMillion": 8,
+      "outputYuanPerMillion": 32,
+      "sourceLine": 593
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QVQ",
+      "modelRaw": "qvq-max-2025-05-15",
+      "modelKeys": [
+        "qvq-max-2025-05-15"
+      ],
+      "tierRaw": "8元",
+      "inputYuanPerMillion": 8,
+      "outputYuanPerMillion": 32,
+      "sourceLine": 594
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QVQ",
+      "modelRaw": "qvq-max-2025-03-25",
+      "modelKeys": [
+        "qvq-max-2025-03-25"
+      ],
+      "tierRaw": "8元",
+      "inputYuanPerMillion": 8,
+      "outputYuanPerMillion": 32,
+      "sourceLine": 595
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QVQ",
+      "modelRaw": "qvq-plus > 当前能力等同于qvq-plus-2025-05-15",
+      "modelKeys": [
+        "qvq-plus"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 5,
+      "sourceLine": 596
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QVQ",
+      "modelRaw": "qvq-plus-latest",
+      "modelKeys": [
+        "qvq-plus-latest"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 5,
+      "sourceLine": 597
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "QVQ",
+      "modelRaw": "qvq-plus-2025-05-15",
+      "modelKeys": [
+        "qvq-plus-2025-05-15"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 5,
+      "sourceLine": 598
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-plus > 当前能力等同于qwen3-vl-plus-2025-12-19 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-vl-plus",
+        "qwen3-vl-plus-2025-12-19"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 10,
+      "sourceLine": 626
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-plus > 当前能力等同于qwen3-vl-plus-2025-12-19 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-vl-plus",
+        "qwen3-vl-plus-2025-12-19"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 15,
+      "sourceLine": 627
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-plus > 当前能力等同于qwen3-vl-plus-2025-12-19 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-vl-plus",
+        "qwen3-vl-plus-2025-12-19"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 3,
+      "outputYuanPerMillion": 30,
+      "sourceLine": 628
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-plus-2025-12-19",
+      "modelKeys": [
+        "qwen3-vl-plus-2025-12-19"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 10,
+      "sourceLine": 629
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-plus-2025-12-19",
+      "modelKeys": [
+        "qwen3-vl-plus-2025-12-19"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 15,
+      "sourceLine": 630
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-plus-2025-12-19",
+      "modelKeys": [
+        "qwen3-vl-plus-2025-12-19"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 3,
+      "outputYuanPerMillion": 30,
+      "sourceLine": 631
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-plus-2025-09-23",
+      "modelKeys": [
+        "qwen3-vl-plus-2025-09-23"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 10,
+      "sourceLine": 632
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-plus-2025-09-23",
+      "modelKeys": [
+        "qwen3-vl-plus-2025-09-23"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 15,
+      "sourceLine": 633
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-plus-2025-09-23",
+      "modelKeys": [
+        "qwen3-vl-plus-2025-09-23"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 3,
+      "outputYuanPerMillion": 30,
+      "sourceLine": 634
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-flash > 当前能力等同于qwen3-vl-flash-2026-01-22 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-vl-flash",
+        "qwen3-vl-flash-2026-01-22"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 0.15,
+      "outputYuanPerMillion": 1.5,
+      "sourceLine": 635
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-flash > 当前能力等同于qwen3-vl-flash-2026-01-22 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-vl-flash",
+        "qwen3-vl-flash-2026-01-22"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 636
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-flash > 当前能力等同于qwen3-vl-flash-2026-01-22 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-vl-flash",
+        "qwen3-vl-flash-2026-01-22"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 0.6,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 637
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-flash-2026-01-22",
+      "modelKeys": [
+        "qwen3-vl-flash-2026-01-22"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 0.15,
+      "outputYuanPerMillion": 1.5,
+      "sourceLine": 638
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-flash-2026-01-22",
+      "modelKeys": [
+        "qwen3-vl-flash-2026-01-22"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 639
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-flash-2026-01-22",
+      "modelKeys": [
+        "qwen3-vl-flash-2026-01-22"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 0.6,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 640
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-flash-2025-10-15",
+      "modelKeys": [
+        "qwen3-vl-flash-2025-10-15"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 0.15,
+      "outputYuanPerMillion": 1.5,
+      "sourceLine": 641
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-flash-2025-10-15",
+      "modelKeys": [
+        "qwen3-vl-flash-2025-10-15"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 642
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen3-vl-flash-2025-10-15",
+      "modelKeys": [
+        "qwen3-vl-flash-2025-10-15"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 0.6,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 643
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-max > 当前能力等同于qwen-vl-max-2025-08-13 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen-vl-max",
+        "qwen-vl-max-2025-08-13"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 649
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-max-latest > Batch调用半价",
+      "modelKeys": [
+        "qwen-vl-max-latest"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 650
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-max-2025-08-13",
+      "modelKeys": [
+        "qwen-vl-max-2025-08-13"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 1.6,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 651
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-max-2025-04-08",
+      "modelKeys": [
+        "qwen-vl-max-2025-04-08"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 3,
+      "outputYuanPerMillion": 9,
+      "sourceLine": 652
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-max-2025-04-02",
+      "modelKeys": [
+        "qwen-vl-max-2025-04-02"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 3,
+      "outputYuanPerMillion": 9,
+      "sourceLine": 653
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-max-2025-01-25",
+      "modelKeys": [
+        "qwen-vl-max-2025-01-25"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 3,
+      "outputYuanPerMillion": 9,
+      "sourceLine": 654
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-max-2024-12-30",
+      "modelKeys": [
+        "qwen-vl-max-2024-12-30"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 3,
+      "outputYuanPerMillion": 9,
+      "sourceLine": 655
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-max-2024-11-19",
+      "modelKeys": [
+        "qwen-vl-max-2024-11-19"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 3,
+      "outputYuanPerMillion": 9,
+      "sourceLine": 656
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-plus > 当前能力等同于qwen-vl-plus-2025-08-15 > Batch调用半价 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen-vl-plus",
+        "qwen-vl-plus-2025-08-15"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 657
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-plus-latest > Batch调用半价",
+      "modelKeys": [
+        "qwen-vl-plus-latest"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 658
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-plus-2025-08-15",
+      "modelKeys": [
+        "qwen-vl-plus-2025-08-15"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 659
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-plus-2025-07-10",
+      "modelKeys": [
+        "qwen-vl-plus-2025-07-10"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 0.15,
+      "outputYuanPerMillion": 1.5,
+      "sourceLine": 660
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-plus-2025-05-07",
+      "modelKeys": [
+        "qwen-vl-plus-2025-05-07"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 4.5,
+      "sourceLine": 661
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-plus-2025-01-25",
+      "modelKeys": [
+        "qwen-vl-plus-2025-01-25"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 4.5,
+      "sourceLine": 662
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问VL",
+      "modelRaw": "qwen-vl-plus-2025-01-02",
+      "modelKeys": [
+        "qwen-vl-plus-2025-01-02"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 4.5,
+      "sourceLine": 663
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问OCR",
+      "modelRaw": "qwen-vl-ocr > Batch调用半价",
+      "modelKeys": [
+        "qwen-vl-ocr"
+      ],
+      "tierRaw": "0.3元",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.5,
+      "sourceLine": 783
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问OCR",
+      "modelRaw": "qwen-vl-ocr-latest > Batch调用半价",
+      "modelKeys": [
+        "qwen-vl-ocr-latest"
+      ],
+      "tierRaw": "0.3元",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.5,
+      "sourceLine": 784
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问OCR",
+      "modelRaw": "qwen-vl-ocr-2025-11-20",
+      "modelKeys": [
+        "qwen-vl-ocr-2025-11-20"
+      ],
+      "tierRaw": "0.3元",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.5,
+      "sourceLine": 785
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问OCR",
+      "modelRaw": "qwen-vl-ocr-2025-08-28",
+      "modelKeys": [
+        "qwen-vl-ocr-2025-08-28"
+      ],
+      "tierRaw": "5元",
+      "inputYuanPerMillion": 5,
+      "outputYuanPerMillion": 5,
+      "sourceLine": 786
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问OCR",
+      "modelRaw": "qwen-vl-ocr-2025-04-13",
+      "modelKeys": [
+        "qwen-vl-ocr-2025-04-13"
+      ],
+      "tierRaw": "5元",
+      "inputYuanPerMillion": 5,
+      "outputYuanPerMillion": 5,
+      "sourceLine": 787
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问OCR",
+      "modelRaw": "qwen-vl-ocr-2024-10-28",
+      "modelKeys": [
+        "qwen-vl-ocr-2024-10-28"
+      ],
+      "tierRaw": "5元",
+      "inputYuanPerMillion": 5,
+      "outputYuanPerMillion": 5,
+      "sourceLine": 788
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus > 当前能力等同于qwen3-coder-plus-2025-09-23 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-coder-plus",
+        "qwen3-coder-plus-2025-09-23"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 856
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus > 当前能力等同于qwen3-coder-plus-2025-09-23 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-coder-plus",
+        "qwen3-coder-plus-2025-09-23"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 6,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 857
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus > 当前能力等同于qwen3-coder-plus-2025-09-23 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-coder-plus",
+        "qwen3-coder-plus-2025-09-23"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 10,
+      "outputYuanPerMillion": 40,
+      "sourceLine": 858
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus > 当前能力等同于qwen3-coder-plus-2025-09-23 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "qwen3-coder-plus",
+        "qwen3-coder-plus-2025-09-23"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 20,
+      "outputYuanPerMillion": 200,
+      "sourceLine": 859
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus-2025-09-23",
+      "modelKeys": [
+        "qwen3-coder-plus-2025-09-23"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 860
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus-2025-09-23",
+      "modelKeys": [
+        "qwen3-coder-plus-2025-09-23"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 6,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 861
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus-2025-09-23",
+      "modelKeys": [
+        "qwen3-coder-plus-2025-09-23"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 10,
+      "outputYuanPerMillion": 40,
+      "sourceLine": 862
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus-2025-09-23",
+      "modelKeys": [
+        "qwen3-coder-plus-2025-09-23"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 20,
+      "outputYuanPerMillion": 200,
+      "sourceLine": 863
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus-2025-07-22",
+      "modelKeys": [
+        "qwen3-coder-plus-2025-07-22"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 864
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus-2025-07-22",
+      "modelKeys": [
+        "qwen3-coder-plus-2025-07-22"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 6,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 865
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus-2025-07-22",
+      "modelKeys": [
+        "qwen3-coder-plus-2025-07-22"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 10,
+      "outputYuanPerMillion": 40,
+      "sourceLine": 866
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-plus-2025-07-22",
+      "modelKeys": [
+        "qwen3-coder-plus-2025-07-22"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 20,
+      "outputYuanPerMillion": 200,
+      "sourceLine": 867
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-flash > 当前能力等同于qwen3-coder-flash-2025-07-28",
+      "modelKeys": [
+        "qwen3-coder-flash",
+        "qwen3-coder-flash-2025-07-28"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 868
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-flash > 当前能力等同于qwen3-coder-flash-2025-07-28",
+      "modelKeys": [
+        "qwen3-coder-flash",
+        "qwen3-coder-flash-2025-07-28"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 869
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-flash > 当前能力等同于qwen3-coder-flash-2025-07-28",
+      "modelKeys": [
+        "qwen3-coder-flash",
+        "qwen3-coder-flash-2025-07-28"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 2.5,
+      "outputYuanPerMillion": 10,
+      "sourceLine": 870
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-flash > 当前能力等同于qwen3-coder-flash-2025-07-28",
+      "modelKeys": [
+        "qwen3-coder-flash",
+        "qwen3-coder-flash-2025-07-28"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 5,
+      "outputYuanPerMillion": 25,
+      "sourceLine": 871
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-flash-2025-07-28",
+      "modelKeys": [
+        "qwen3-coder-flash-2025-07-28"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 872
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-flash-2025-07-28",
+      "modelKeys": [
+        "qwen3-coder-flash-2025-07-28"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 873
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-flash-2025-07-28",
+      "modelKeys": [
+        "qwen3-coder-flash-2025-07-28"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 2.5,
+      "outputYuanPerMillion": 10,
+      "sourceLine": 874
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen3-coder-flash-2025-07-28",
+      "modelKeys": [
+        "qwen3-coder-flash-2025-07-28"
+      ],
+      "tierRaw": "256K<Token≤1M",
+      "inputYuanPerMillion": 5,
+      "outputYuanPerMillion": 25,
+      "sourceLine": 875
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen-coder-plus > 当前能力等同于qwen-coder-plus-2024-11-06",
+      "modelKeys": [
+        "qwen-coder-plus",
+        "qwen-coder-plus-2024-11-06"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 3.5,
+      "outputYuanPerMillion": 7,
+      "sourceLine": 881
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen-coder-plus-latest",
+      "modelKeys": [
+        "qwen-coder-plus-latest"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 3.5,
+      "outputYuanPerMillion": 7,
+      "sourceLine": 882
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen-coder-plus-2024-11-06",
+      "modelKeys": [
+        "qwen-coder-plus-2024-11-06"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 3.5,
+      "outputYuanPerMillion": 7,
+      "sourceLine": 883
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen-coder-turbo > 当前能力等同于qwen-coder-turbo-2024-09-19",
+      "modelKeys": [
+        "qwen-coder-turbo",
+        "qwen-coder-turbo-2024-09-19"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 884
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen-coder-turbo-latest",
+      "modelKeys": [
+        "qwen-coder-turbo-latest"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 885
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问Coder",
+      "modelRaw": "qwen-coder-turbo-2024-09-19",
+      "modelKeys": [
+        "qwen-coder-turbo-2024-09-19"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 886
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问翻译模型",
+      "modelRaw": "qwen-mt-plus",
+      "modelKeys": [
+        "qwen-mt-plus"
+      ],
+      "tierRaw": "1.8元",
+      "inputYuanPerMillion": 1.8,
+      "outputYuanPerMillion": 5.4,
+      "sourceLine": 960
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问翻译模型",
+      "modelRaw": "qwen-mt-flash",
+      "modelKeys": [
+        "qwen-mt-flash"
+      ],
+      "tierRaw": "0.7元",
+      "inputYuanPerMillion": 0.7,
+      "outputYuanPerMillion": 1.95,
+      "sourceLine": 961
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问翻译模型",
+      "modelRaw": "qwen-mt-lite",
+      "modelKeys": [
+        "qwen-mt-lite"
+      ],
+      "tierRaw": "0.6元",
+      "inputYuanPerMillion": 0.6,
+      "outputYuanPerMillion": 1.6,
+      "sourceLine": 962
+    },
+    {
+      "sectionH2": "文本生成-千问",
+      "sectionH3": "千问翻译模型",
+      "modelRaw": "qwen-mt-turbo",
+      "modelKeys": [
+        "qwen-mt-turbo"
+      ],
+      "tierRaw": "0.7元",
+      "inputYuanPerMillion": 0.7,
+      "outputYuanPerMillion": 1.95,
+      "sourceLine": 963
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.6",
+      "modelRaw": "qwen3.6-35b-a3b",
+      "modelKeys": [
+        "qwen3.6-35b-a3b"
+      ],
+      "tierRaw": "0<Token≤256K",
+      "inputYuanPerMillion": 1.8,
+      "outputYuanPerMillion": 10.8,
+      "sourceLine": 1056
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.6",
+      "modelRaw": "qwen3.6-27b",
+      "modelKeys": [
+        "qwen3.6-27b"
+      ],
+      "tierRaw": "0<Token≤256K",
+      "inputYuanPerMillion": 3,
+      "outputYuanPerMillion": 18,
+      "sourceLine": 1057
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.5",
+      "modelRaw": "qwen3.5-397b-a17b",
+      "modelKeys": [
+        "qwen3.5-397b-a17b"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 1.2,
+      "outputYuanPerMillion": 7.2,
+      "sourceLine": 1089
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.5",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "3元",
+      "inputYuanPerMillion": 18,
+      "outputYuanPerMillion": 18,
+      "sourceLine": 1090
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.5",
+      "modelRaw": "qwen3.5-122b-a10b",
+      "modelKeys": [
+        "qwen3.5-122b-a10b"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 6.4,
+      "sourceLine": 1091
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.5",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 16,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 1092
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.5",
+      "modelRaw": "qwen3.5-27b",
+      "modelKeys": [
+        "qwen3.5-27b"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.6,
+      "outputYuanPerMillion": 4.8,
+      "sourceLine": 1093
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.5",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "1.8元",
+      "inputYuanPerMillion": 14.4,
+      "outputYuanPerMillion": 14.4,
+      "sourceLine": 1094
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.5",
+      "modelRaw": "qwen3.5-35b-a3b",
+      "modelKeys": [
+        "qwen3.5-35b-a3b"
+      ],
+      "tierRaw": "0<Token≤128K",
+      "inputYuanPerMillion": 0.4,
+      "outputYuanPerMillion": 3.2,
+      "sourceLine": 1095
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3.5",
+      "modelRaw": "128K<Token≤256K",
+      "modelKeys": [
+        "128k<token≤256k"
+      ],
+      "tierRaw": "1.6元",
+      "inputYuanPerMillion": 12.8,
+      "outputYuanPerMillion": 12.8,
+      "sourceLine": 1096
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-next-80b-a3b-instruct",
+      "modelKeys": [
+        "qwen3-next-80b-a3b-instruct"
+      ],
+      "tierRaw": "仅非思考模式",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 1138
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-235b-a22b-instruct-2507",
+      "modelKeys": [
+        "qwen3-235b-a22b-instruct-2507"
+      ],
+      "tierRaw": "仅非思考模式",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 8,
+      "sourceLine": 1140
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-30b-a3b-instruct-2507",
+      "modelKeys": [
+        "qwen3-30b-a3b-instruct-2507"
+      ],
+      "tierRaw": "仅非思考模式",
+      "inputYuanPerMillion": 0.75,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 1142
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-235b-a22b",
+      "modelKeys": [
+        "qwen3-235b-a22b"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 8,
+      "sourceLine": 1143
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-32b",
+      "modelKeys": [
+        "qwen3-32b"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 8,
+      "sourceLine": 1144
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-30b-a3b",
+      "modelKeys": [
+        "qwen3-30b-a3b"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 0.75,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 1145
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-14b",
+      "modelKeys": [
+        "qwen3-14b"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 1146
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-8b",
+      "modelKeys": [
+        "qwen3-8b"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 0.5,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 1147
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-4b",
+      "modelKeys": [
+        "qwen3-4b"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 1.2,
+      "sourceLine": 1148
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-1.7b",
+      "modelKeys": [
+        "qwen3-1.7b"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 1.2,
+      "sourceLine": 1149
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3",
+      "modelRaw": "qwen3-0.6b",
+      "modelKeys": [
+        "qwen3-0.6b"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 1.2,
+      "sourceLine": 1150
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen2.5",
+      "modelRaw": "qwen2.5-14b-instruct-1m",
+      "modelKeys": [
+        "qwen2.5-14b-instruct-1m"
+      ],
+      "tierRaw": "1元",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 1229
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen2.5",
+      "modelRaw": "qwen2.5-7b-instruct-1m",
+      "modelKeys": [
+        "qwen2.5-7b-instruct-1m"
+      ],
+      "tierRaw": "0.5元",
+      "inputYuanPerMillion": 0.5,
+      "outputYuanPerMillion": 1,
+      "sourceLine": 1230
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen2.5",
+      "modelRaw": "qwen2.5-72b-instruct",
+      "modelKeys": [
+        "qwen2.5-72b-instruct"
+      ],
+      "tierRaw": "4元",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 1231
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen2.5",
+      "modelRaw": "qwen2.5-32b-instruct",
+      "modelKeys": [
+        "qwen2.5-32b-instruct"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 1232
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen2.5",
+      "modelRaw": "qwen2.5-14b-instruct",
+      "modelKeys": [
+        "qwen2.5-14b-instruct"
+      ],
+      "tierRaw": "1元",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 1233
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen2.5",
+      "modelRaw": "qwen2.5-7b-instruct",
+      "modelKeys": [
+        "qwen2.5-7b-instruct"
+      ],
+      "tierRaw": "0.5元",
+      "inputYuanPerMillion": 0.5,
+      "outputYuanPerMillion": 1,
+      "sourceLine": 1234
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen2.5",
+      "modelRaw": "qwen2.5-3b-instruct",
+      "modelKeys": [
+        "qwen2.5-3b-instruct"
+      ],
+      "tierRaw": "0.3元",
+      "inputYuanPerMillion": 0.3,
+      "outputYuanPerMillion": 0.9,
+      "sourceLine": 1235
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Omni",
+      "modelRaw": "qwen2.5-omni-7b",
+      "modelKeys": [
+        "qwen2.5-omni-7b"
+      ],
+      "tierRaw": "0.6元",
+      "inputYuanPerMillion": 0.6,
+      "outputYuanPerMillion": 2.4,
+      "sourceLine": 1279
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen3-Omni-Captioner",
+      "modelRaw": "qwen3-omni-30b-a3b-captioner",
+      "modelKeys": [
+        "qwen3-omni-30b-a3b-captioner"
+      ],
+      "tierRaw": "15.8元",
+      "inputYuanPerMillion": 15.8,
+      "outputYuanPerMillion": 12.7,
+      "sourceLine": 1304
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen3-vl-235b-a22b-thinking",
+      "modelKeys": [
+        "qwen3-vl-235b-a22b-thinking"
+      ],
+      "tierRaw": "仅思考模式",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 20,
+      "sourceLine": 1328
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen3-vl-235b-a22b-instruct",
+      "modelKeys": [
+        "qwen3-vl-235b-a22b-instruct"
+      ],
+      "tierRaw": "仅非思考模式",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 8,
+      "sourceLine": 1329
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen3-vl-32b-thinking",
+      "modelKeys": [
+        "qwen3-vl-32b-thinking"
+      ],
+      "tierRaw": "仅思考模式",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 20,
+      "sourceLine": 1330
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen3-vl-32b-instruct",
+      "modelKeys": [
+        "qwen3-vl-32b-instruct"
+      ],
+      "tierRaw": "仅非思考模式",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 8,
+      "sourceLine": 1331
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen3-vl-30b-a3b-thinking",
+      "modelKeys": [
+        "qwen3-vl-30b-a3b-thinking"
+      ],
+      "tierRaw": "仅思考模式",
+      "inputYuanPerMillion": 0.75,
+      "outputYuanPerMillion": 7.5,
+      "sourceLine": 1332
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen3-vl-30b-a3b-instruct",
+      "modelKeys": [
+        "qwen3-vl-30b-a3b-instruct"
+      ],
+      "tierRaw": "仅非思考模式",
+      "inputYuanPerMillion": 0.75,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 1333
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen3-vl-8b-thinking",
+      "modelKeys": [
+        "qwen3-vl-8b-thinking"
+      ],
+      "tierRaw": "仅思考模式",
+      "inputYuanPerMillion": 0.5,
+      "outputYuanPerMillion": 5,
+      "sourceLine": 1334
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen3-vl-8b-instruct",
+      "modelKeys": [
+        "qwen3-vl-8b-instruct"
+      ],
+      "tierRaw": "仅非思考模式",
+      "inputYuanPerMillion": 0.5,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 1335
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen2.5-vl-72b-instruct",
+      "modelKeys": [
+        "qwen2.5-vl-72b-instruct"
+      ],
+      "tierRaw": "16元",
+      "inputYuanPerMillion": 16,
+      "outputYuanPerMillion": 48,
+      "sourceLine": 1341
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen2.5-vl-32b-instruct",
+      "modelKeys": [
+        "qwen2.5-vl-32b-instruct"
+      ],
+      "tierRaw": "8元",
+      "inputYuanPerMillion": 8,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 1342
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen2.5-vl-7b-instruct",
+      "modelKeys": [
+        "qwen2.5-vl-7b-instruct"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 5,
+      "sourceLine": 1343
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-VL",
+      "modelRaw": "qwen2.5-vl-3b-instruct",
+      "modelKeys": [
+        "qwen2.5-vl-3b-instruct"
+      ],
+      "tierRaw": "1.2元",
+      "inputYuanPerMillion": 1.2,
+      "outputYuanPerMillion": 3.6,
+      "sourceLine": 1344
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen3-coder-next",
+      "modelKeys": [
+        "qwen3-coder-next"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 4,
+      "sourceLine": 1412
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen3-coder-next",
+      "modelKeys": [
+        "qwen3-coder-next"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 1413
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen3-coder-next",
+      "modelKeys": [
+        "qwen3-coder-next"
+      ],
+      "tierRaw": "128K<Token≤256K",
+      "inputYuanPerMillion": 2.5,
+      "outputYuanPerMillion": 10,
+      "sourceLine": 1414
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen3-coder-480b-a35b-instruct",
+      "modelKeys": [
+        "qwen3-coder-480b-a35b-instruct"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 6,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 1415
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen3-coder-480b-a35b-instruct",
+      "modelKeys": [
+        "qwen3-coder-480b-a35b-instruct"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 9,
+      "outputYuanPerMillion": 36,
+      "sourceLine": 1416
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen3-coder-480b-a35b-instruct",
+      "modelKeys": [
+        "qwen3-coder-480b-a35b-instruct"
+      ],
+      "tierRaw": "128K<Token≤200K",
+      "inputYuanPerMillion": 15,
+      "outputYuanPerMillion": 60,
+      "sourceLine": 1417
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen3-coder-30b-a3b-instruct",
+      "modelKeys": [
+        "qwen3-coder-30b-a3b-instruct"
+      ],
+      "tierRaw": "0<Token≤32K",
+      "inputYuanPerMillion": 1.5,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 1418
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen3-coder-30b-a3b-instruct",
+      "modelKeys": [
+        "qwen3-coder-30b-a3b-instruct"
+      ],
+      "tierRaw": "32K<Token≤128K",
+      "inputYuanPerMillion": 2.25,
+      "outputYuanPerMillion": 9,
+      "sourceLine": 1419
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen3-coder-30b-a3b-instruct",
+      "modelKeys": [
+        "qwen3-coder-30b-a3b-instruct"
+      ],
+      "tierRaw": "128K<Token≤200K",
+      "inputYuanPerMillion": 3.75,
+      "outputYuanPerMillion": 15,
+      "sourceLine": 1420
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen2.5-coder-32b-instruct",
+      "modelKeys": [
+        "qwen2.5-coder-32b-instruct"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 1421
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen2.5-coder-14b-instruct",
+      "modelKeys": [
+        "qwen2.5-coder-14b-instruct"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 1422
+    },
+    {
+      "sectionH2": "文本生成-千问-开源版",
+      "sectionH3": "Qwen-Coder",
+      "modelRaw": "qwen2.5-coder-7b-instruct",
+      "modelKeys": [
+        "qwen2.5-coder-7b-instruct"
+      ],
+      "tierRaw": "无阶梯计价",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 1423
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-v4-pro > 上下文缓存享有折扣",
+      "modelKeys": [
+        "deepseek-v4-pro"
+      ],
+      "tierRaw": "12元",
+      "inputYuanPerMillion": 12,
+      "outputYuanPerMillion": 24,
+      "sourceLine": 1490
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-v4-flash > 上下文缓存享有折扣",
+      "modelKeys": [
+        "deepseek-v4-flash"
+      ],
+      "tierRaw": "1元",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 1491
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-v3.2 > 上下文缓存享有折扣",
+      "modelKeys": [
+        "deepseek-v3.2"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 1492
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-v3.2-exp",
+      "modelKeys": [
+        "deepseek-v3.2-exp"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 1493
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-v3.1",
+      "modelKeys": [
+        "deepseek-v3.1"
+      ],
+      "tierRaw": "4元",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 12,
+      "sourceLine": 1494
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-r1 > Batch调用半价",
+      "modelKeys": [
+        "deepseek-r1"
+      ],
+      "tierRaw": "4元",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 1495
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-r1-0528",
+      "modelKeys": [
+        "deepseek-r1-0528"
+      ],
+      "tierRaw": "4元",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 1496
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-v3 > Batch调用半价",
+      "modelKeys": [
+        "deepseek-v3"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 8,
+      "sourceLine": 1497
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-r1-distill-qwen-7b",
+      "modelKeys": [
+        "deepseek-r1-distill-qwen-7b"
+      ],
+      "tierRaw": "0.5元",
+      "inputYuanPerMillion": 0.5,
+      "outputYuanPerMillion": 1,
+      "sourceLine": 1499
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-r1-distill-qwen-14b",
+      "modelKeys": [
+        "deepseek-r1-distill-qwen-14b"
+      ],
+      "tierRaw": "1元",
+      "inputYuanPerMillion": 1,
+      "outputYuanPerMillion": 3,
+      "sourceLine": 1500
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "DeepSeek",
+      "modelRaw": "deepseek-r1-distill-qwen-32b",
+      "modelKeys": [
+        "deepseek-r1-distill-qwen-32b"
+      ],
+      "tierRaw": "2元",
+      "inputYuanPerMillion": 2,
+      "outputYuanPerMillion": 6,
+      "sourceLine": 1501
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "Kimi",
+      "modelRaw": "kimi-k2.6",
+      "modelKeys": [
+        "kimi-k2.6"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 6.5,
+      "outputYuanPerMillion": 27,
+      "sourceLine": 1565
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "Kimi",
+      "modelRaw": "kimi-k2.5",
+      "modelKeys": [
+        "kimi-k2.5"
+      ],
+      "tierRaw": "非思考和思考模式",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 21,
+      "sourceLine": 1566
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "Kimi",
+      "modelRaw": "kimi-k2-thinking",
+      "modelKeys": [
+        "kimi-k2-thinking"
+      ],
+      "tierRaw": "仅思考模式",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 1567
+    },
+    {
+      "sectionH2": "文本生成-第三方模型",
+      "sectionH3": "Kimi",
+      "modelRaw": "Moonshot-Kimi-K2-Instruct",
+      "modelKeys": [
+        "moonshot-kimi-k2-instruct"
+      ],
+      "tierRaw": "非思考模式",
+      "inputYuanPerMillion": 4,
+      "outputYuanPerMillion": 16,
+      "sourceLine": 1568
+    },
+    {
+      "sectionH2": "语音识别（语音转文本）与翻译（语音转成指定语种的文本）",
+      "sectionH3": "千问3-LiveTranslate-Flash-Realtime",
+      "modelRaw": "qwen3-livetranslate-flash-realtime",
+      "modelKeys": [
+        "qwen3-livetranslate-flash-realtime"
+      ],
+      "tierRaw": "64元",
+      "inputYuanPerMillion": 64,
+      "outputYuanPerMillion": 64,
+      "sourceLine": 2435
+    },
+    {
+      "sectionH2": "语音识别（语音转文本）与翻译（语音转成指定语种的文本）",
+      "sectionH3": "千问3-LiveTranslate-Flash-Realtime",
+      "modelRaw": "qwen3-livetranslate-flash-realtime-2025-09-22",
+      "modelKeys": [
+        "qwen3-livetranslate-flash-realtime-2025-09-22"
+      ],
+      "tierRaw": "64元",
+      "inputYuanPerMillion": 64,
+      "outputYuanPerMillion": 64,
+      "sourceLine": 2436
+    },
+    {
+      "sectionH2": "视频生成-第三方模型",
+      "sectionH3": "角色扮演",
+      "modelRaw": "qwen-plus-character > Session Cache享有折扣",
+      "modelKeys": [
+        "qwen-plus-character"
+      ],
+      "tierRaw": "0.8元",
+      "inputYuanPerMillion": 0.8,
+      "outputYuanPerMillion": 2,
+      "sourceLine": 3692
+    },
+    {
+      "sectionH2": "视频生成-第三方模型",
+      "sectionH3": "角色扮演",
+      "modelRaw": "qwen-flash-character > Session Cache享有折扣",
+      "modelKeys": [
+        "qwen-flash-character"
+      ],
+      "tierRaw": "0.25元",
+      "inputYuanPerMillion": 0.25,
+      "outputYuanPerMillion": 1.5,
+      "sourceLine": 3693
+    },
+    {
+      "sectionH2": "视频生成-第三方模型",
+      "sectionH3": "角色扮演",
+      "modelRaw": "qwen-flash-character-2026-02-26 > Session Cache享有折扣",
+      "modelKeys": [
+        "qwen-flash-character-2026-02-26"
+      ],
+      "tierRaw": "0.18元",
+      "inputYuanPerMillion": 0.18,
+      "outputYuanPerMillion": 1.5,
+      "sourceLine": 3694
+    }
+  ]
+}

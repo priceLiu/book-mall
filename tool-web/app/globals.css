@@ -634,6 +634,8 @@ button.tool-renew {
 .tool-main-scroll:has(.visual-lab-theme-root) {
   display: flex;
   flex-direction: column;
+  /* 避免下拉/内容增高时主列突然出现系统滚动条导致整页横向跳动 */
+  scrollbar-gutter: stable;
 }
 
 /* 视觉实验室 · 分析室沉浸式：隐藏侧栏与工具顶栏，主列铺满 */

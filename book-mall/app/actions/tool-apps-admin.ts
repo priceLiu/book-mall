@@ -37,24 +37,37 @@ export async function updateToolNavVisibility(formData: FormData) {
     where: { navKey },
     data: { visible },
   });
-  revalidatePath("/admin/tool-apps/manage");
+  revalidatePath("/admin/tool-apps/tool-menu");
 }
 
-/** 新增一条按次单价（priceYuan → 点 / pricePoints） */
+function parseNonnegativeCostYuan(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) throw new Error("成本（元）须为非负数");
+  return n;
+}
+
+function parsePositiveRetailMultiplier(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) throw new Error("零售系数 M 须为正数");
+  return n;
+}
+
 export async function createToolBillablePrice(formData: FormData) {
   await assertAdmin();
   const toolKey = String(formData.get("toolKey") ?? "").trim();
   const actionRaw = String(formData.get("action") ?? "").trim();
-  const yuan = Number(formData.get("priceYuan"));
   const effectiveFromRaw = String(formData.get("effectiveFrom") ?? "").trim();
   const effectiveToRaw = String(formData.get("effectiveTo") ?? "").trim();
   const noteRaw = String(formData.get("note") ?? "").trim();
+  const refModelRaw = String(formData.get("schemeARefModelKey") ?? "").trim();
   const active = formData.get("active") === "on";
 
+  const costYuan = parseNonnegativeCostYuan(formData.get("schemeAUnitCostYuan"));
+  const mult = parsePositiveRetailMultiplier(formData.get("schemeAAdminRetailMultiplier"));
+  const pricePoints = Math.round(costYuan * mult * 100);
+  if (pricePoints < 0 || !Number.isInteger(pricePoints)) throw new Error("点数控件无效");
+
   if (!toolKey) throw new Error("toolKey 必填");
-  if (!Number.isFinite(yuan) || yuan < 0) throw new Error("单价（元）无效");
-  const pricePoints = Math.round(yuan * 100);
-  if (pricePoints < 0 || !Number.isInteger(pricePoints)) throw new Error("单价换算点无效");
 
   const effectiveFrom = parseCnWallDatetimeLocal(effectiveFromRaw);
   const effectiveTo = optionalCnWallEnd(effectiveToRaw);
@@ -68,39 +81,32 @@ export async function createToolBillablePrice(formData: FormData) {
       effectiveTo,
       active,
       note: noteRaw.length > 0 ? noteRaw : null,
+      schemeARefModelKey: refModelRaw.length > 0 ? refModelRaw : null,
+      schemeAUnitCostYuan: costYuan,
+      schemeAAdminRetailMultiplier: mult,
     },
   });
   revalidatePath("/admin/tool-apps/manage");
 }
 
-/** 更新已有定价行（仅改单价、区间、启用与备注） */
+/** 更新已有定价行：仅允许修改生效止（避免手改成本/M/点数导致与工具站计算不一致）；调价须「新增定价」建新行。 */
 export async function updateToolBillablePrice(formData: FormData) {
   await assertAdmin();
   const id = String(formData.get("id") ?? "").trim();
   if (!id) throw new Error("缺少 id");
 
-  const yuan = Number(formData.get("priceYuan"));
-  const effectiveFromRaw = String(formData.get("effectiveFrom") ?? "").trim();
   const effectiveToRaw = String(formData.get("effectiveTo") ?? "").trim();
-  const noteRaw = String(formData.get("note") ?? "").trim();
-  const active = formData.get("active") === "on";
-
-  if (!Number.isFinite(yuan) || yuan < 0) throw new Error("单价（元）无效");
-  const pricePoints = Math.round(yuan * 100);
-  if (pricePoints < 0 || !Number.isInteger(pricePoints)) throw new Error("单价换算点无效");
-
-  const effectiveFrom = parseCnWallDatetimeLocal(effectiveFromRaw);
   const effectiveTo = optionalCnWallEnd(effectiveToRaw);
+
+  const existing = await prisma.toolBillablePrice.findUnique({ where: { id } });
+  if (!existing) throw new Error("记录不存在");
+  if (existing.effectiveTo != null) {
+    throw new Error("该行已设置生效止，不可再改；请使用「新增定价」或联系数据库运维。");
+  }
 
   await prisma.toolBillablePrice.update({
     where: { id },
-    data: {
-      pricePoints,
-      effectiveFrom,
-      effectiveTo,
-      active,
-      note: noteRaw.length > 0 ? noteRaw : null,
-    },
+    data: { effectiveTo },
   });
   revalidatePath("/admin/tool-apps/manage");
 }

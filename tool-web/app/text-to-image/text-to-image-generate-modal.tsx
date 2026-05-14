@@ -23,8 +23,7 @@ const MAX_POLLS = 90;
 const SETTLE_ATTEMPTS = 4;
 const SETTLE_BASE_DELAY_MS = 350;
 
-const TTI_CHARGE_TITLE =
-  "单次任务按 50 点（¥0.50，100 点=1 元）从工具账户扣费，以主站「工具管理」定价为准。";
+const TTI_BATCH_N = 4;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -73,6 +72,9 @@ export function TextToImageGenerateModal({
   const [settleNeedsRetry, setSettleNeedsRetry] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [chargeTitleHint, setChargeTitleHint] = useState<string>(
+    "单次任务扣费按方案 A（张数×官网单价×2）；标价加载中…",
+  );
 
   const abortPollRef = useRef(false);
   const settleTaskIdRef = useRef<string | null>(null);
@@ -89,6 +91,31 @@ export function TextToImageGenerateModal({
       document.body.style.overflow = prevOverflow;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (!hasTokenCookie) return;
+        const r = await fetch(`/api/text-to-image/billable-hint?n=${TTI_BATCH_N}`, {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const j = (await r.json().catch(() => ({}))) as { pricePoints?: number };
+        if (cancelled || !r.ok || typeof j.pricePoints !== "number") return;
+        const pts = Math.max(0, Math.floor(j.pricePoints));
+        setChargeTitleHint(
+          `本任务一次生成 ${TTI_BATCH_N} 张，全部成功时按方案 A 合计 ${pts.toLocaleString("zh-CN")} 点（¥${(pts / 100).toFixed(2)}，100 点=1 元）扣费；实扣张数以任务结果为准。`,
+        );
+      } catch {
+        /* 展示回退文案 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, hasTokenCookie]);
 
   useEffect(() => {
     if (!open) return;
@@ -295,7 +322,7 @@ export function TextToImageGenerateModal({
         body: JSON.stringify({
           prompt: p,
           negativePrompt: negativePrompt.trim() || undefined,
-          n: 4,
+          n: TTI_BATCH_N,
         }),
       });
       const startJson = (await startR.json()) as {
@@ -461,7 +488,7 @@ export function TextToImageGenerateModal({
                 primaryLabel="生成 4 张图片"
                 busyLabel="生成中…"
                 chargeLine="一次生成 4 张图，扣费 50 点（¥0.50）"
-                chargeTitle={TTI_CHARGE_TITLE}
+                chargeTitle={chargeTitleHint}
                 idleIcon={<Sparkles className="h-4 w-4" aria-hidden />}
               />
             </div>

@@ -3,11 +3,16 @@ import { NextResponse } from "next/server";
 import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getQwenApiKey } from "@/lib/qwen-env";
-import { wanxGetTextImageTask } from "@/lib/text-to-image-dashscope";
+import { wanxGetTextImageTask, countWanxSucceededImages } from "@/lib/text-to-image-dashscope";
+import {
+  computeTextToImageChargePoints,
+  getTextToImageSchemeModelId,
+} from "@/lib/tools-scheme-a-pricing";
+import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
 
 export const runtime = "nodejs";
 
-/** 文生图单次生成扣费（与 ToolBillablePrice text-to-image / invoke 对齐，默认 0.5 元）。幂等键 meta.taskId = DashScope task_id */
+/** 文生图单次生成扣费：方案 A 按成功张数 × 官网单价 × 系数；幂等 meta.taskId */
 export async function POST(req: Request) {
   const suite = await requireToolSuiteNavAccess("text-to-image");
   if (!suite.ok) return suite.response;
@@ -51,13 +56,33 @@ export async function POST(req: Request) {
   }
 
   const billTaskId = polled.output.task_id?.trim() || taskId;
+  const imgModel = getTextToImageSchemeModelId();
+  const imageCount = countWanxSucceededImages(polled.output);
+  const { multiplier: retailMult } = await getSchemeARetailMultiplierServer({
+    toolKey: "text-to-image",
+    modelKey: imgModel,
+  });
+  const costPoints = computeTextToImageChargePoints(imageCount, imgModel, retailMult);
+  if (costPoints <= 0) {
+    return NextResponse.json(
+      { error: "文生图方案 A 无法解析扣费点数，请联系管理员检查 tools-scheme-a-catalog" },
+      { status: 503 },
+    );
+  }
 
   let usage;
   try {
     usage = await postToolUsageFromServerWithRetries({
       toolKey: "text-to-image",
       action: "invoke",
-      meta: { taskId: billTaskId },
+      costPoints,
+      meta: {
+        taskId: billTaskId,
+        pricingScheme: "tools_scheme_a",
+        textToImageModel: imgModel,
+        imageCount,
+        retailMultiplier: retailMult,
+      },
     });
   } catch (e) {
     console.error("[text-to-image/settle] usage POST failed after retries", e);

@@ -5,10 +5,16 @@ import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getQwenApiKey } from "@/lib/qwen-env";
 import { i2vGetVideoTask } from "@/lib/image-to-video-dashscope";
 import { formatDashScopeI2vFailureForUser } from "@/lib/image-to-video-task-errors";
+import {
+  extractVideoTaskBillingContext,
+  videoBillingHintFromJsonBody,
+} from "@/lib/image-to-video-task-billing";
+import { computeVideoChargePoints } from "@/lib/tools-scheme-a-pricing";
+import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
 
 export const runtime = "nodejs";
 
-/** 视频工具单次成功扣费：ToolBillablePrice `image-to-video` / `invoke`（产品侧展示 15 元/次，以主站定价为准）。幂等 meta.taskId */
+/** 视频工具成功扣费：方案 A 按 usage 时长×官网单价×系数；幂等 meta.taskId */
 export async function POST(req: Request) {
   const suite = await requireToolSuiteNavAccess("image-to-video");
   if (!suite.ok) return suite.response;
@@ -67,12 +73,48 @@ export async function POST(req: Request) {
       ? polled.output.video_url.trim()
       : "";
 
+  const hint = videoBillingHintFromJsonBody(body);
+  const vCtx = extractVideoTaskBillingContext(polled.raw, hint);
+  if (!vCtx) {
+    return NextResponse.json(
+      {
+        error:
+          "无法从任务详情解析计费上下文（缺少模型 id；任务 JSON 无 model 时请在请求体附带 billingHint.apiModel）。",
+      },
+      { status: 503 },
+    );
+  }
+
+  const { multiplier: retailMult } = await getSchemeARetailMultiplierServer({
+    toolKey: "image-to-video",
+    modelKey: vCtx.apiModel,
+  });
+  const costPoints = computeVideoChargePoints(vCtx, retailMult);
+  if (costPoints <= 0) {
+    return NextResponse.json(
+      {
+        error: `视频模型「${vCtx.apiModel}」暂无方案 A 单价配置，请同步 tools-scheme-a-catalog.json`,
+      },
+      { status: 503 },
+    );
+  }
+
   let usage;
   try {
     usage = await postToolUsageFromServerWithRetries({
       toolKey: "image-to-video",
       action: "invoke",
-      meta: { taskId: billTaskId, videoUrl },
+      costPoints,
+      meta: {
+        taskId: billTaskId,
+        videoUrl,
+        pricingScheme: "tools_scheme_a",
+        videoModel: vCtx.apiModel,
+        videoDurationSec: vCtx.durationSec,
+        videoSr: vCtx.sr,
+        videoAudio: vCtx.audio,
+        retailMultiplier: retailMult,
+      },
     });
   } catch (e) {
     console.error("[image-to-video/settle] usage POST failed after retries", e);

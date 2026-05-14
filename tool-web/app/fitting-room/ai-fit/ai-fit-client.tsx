@@ -158,6 +158,9 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
   const [closetSaveError, setClosetSaveError] = useState<string | null>(null);
   const [tryOnUsageWarn, setTryOnUsageWarn] = useState<string | null>(null);
   const [tryOnBillingLine, setTryOnBillingLine] = useState<string>("");
+  const [billableTryOnPts, setBillableTryOnPts] = useState<number | null | "loading">(
+    "loading",
+  );
 
   const restoreRightRef = useRef<Exclude<RightPanel, "loading">>("idle");
 
@@ -171,6 +174,63 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
   const lastAppliedOutfitIdRef = useRef<string | null>(null);
 
   const selectedModel = useMemo(() => models.find((m) => m.selected) ?? null, [models]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBillableTryOnPts("loading");
+    (async () => {
+      try {
+        const r = await fetch("/api/ai-fit/billable-hint", { cache: "no-store" });
+        const data = (await r.json().catch(() => null)) as {
+          pricePoints?: unknown;
+        } | null;
+        if (cancelled) return;
+        if (
+          !r.ok ||
+          !data ||
+          typeof data.pricePoints !== "number" ||
+          !Number.isFinite(data.pricePoints)
+        ) {
+          setBillableTryOnPts(null);
+          return;
+        }
+        setBillableTryOnPts(data.pricePoints);
+      } catch {
+        if (!cancelled) setBillableTryOnPts(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
+
+  const { tryOnChargeLine, tryOnChargeTitle } = useMemo(() => {
+    if (billableTryOnPts === "loading") {
+      return {
+        tryOnChargeLine: t("tryOnChargeLineLoading"),
+        tryOnChargeTitle: t("tryOnChargeLineTitle"),
+      };
+    }
+    if (billableTryOnPts != null && billableTryOnPts > 0) {
+      const pts = billableTryOnPts;
+      const y = (pts / 100).toFixed(2);
+      const ptsStr = pts.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
+      if (locale === "zh") {
+        return {
+          tryOnChargeLine: `成片 1 次，扣费 ${ptsStr} 点（¥${y}）`,
+          tryOnChargeTitle: `单次成片按 ${ptsStr} 点（¥${y}，方案 A）扣费；仅在试衣成片成功后结算。实扣以结果为准。`,
+        };
+      }
+      return {
+        tryOnChargeLine: `1 try-on, ${ptsStr} pts (¥${y})`,
+        tryOnChargeTitle: `Scheme A: ${ptsStr} pts (¥${y}) per successful render. Charged only after success.`,
+      };
+    }
+    return {
+      tryOnChargeLine: t("tryOnChargeLineSub"),
+      tryOnChargeTitle: t("tryOnChargeLineTitleFallback"),
+    };
+  }, [billableTryOnPts, locale, t]);
 
   useEffect(() => {
     if (!outfitIdFromUrl) {
@@ -767,16 +827,6 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
             </div>
           </section>
 
-          <div className={styles.quotaBox}>
-            <div className={styles.quotaTop}>
-              <span>{t("freeQuota")}</span>
-              <span>{t("quotaValueDemo")}</span>
-            </div>
-            <div className={styles.quotaBar}>
-              <div className={styles.quotaFill} />
-            </div>
-          </div>
-
           {formError ? <p className={styles.validationBanner}>{formError}</p> : null}
           </div>
 
@@ -787,8 +837,8 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
               onClick={handleStart}
               primaryLabel={t("startFitting")}
               busyLabel={t("tryOnBusy")}
-              chargeLine={t("tryOnChargeLineSub")}
-              chargeTitle={t("tryOnChargeLineTitle")}
+              chargeLine={tryOnChargeLine}
+              chargeTitle={tryOnChargeTitle}
               idleIcon={<Sparkles className="h-4 w-4" aria-hidden />}
             />
 

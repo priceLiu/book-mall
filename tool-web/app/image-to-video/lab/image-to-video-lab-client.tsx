@@ -419,7 +419,7 @@ export function ImageToVideoLabClient() {
       const y = (pts / 100).toFixed(2);
       return {
         chargeLine: `生成 1 个视频，扣费 ${pts.toLocaleString("zh-CN")} 点（¥${y}）`,
-        chargeTitle: `单次生成按 ${pts.toLocaleString("zh-CN")} 点/次（¥${y}，100 点=1 元）从工具账户扣费，与主站「工具管理」标价一致。`,
+        chargeTitle: `单次生成按 ${pts.toLocaleString("zh-CN")} 点（¥${y}，方案 A 估算）扣费；实扣以任务 usage 时长/模型为准。`,
       };
     }
     return {
@@ -431,26 +431,6 @@ export function ImageToVideoLabClient() {
 
   useEffect(() => {
     setOverlayMounted(true);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const r = await fetch("/api/image-to-video/billable-hint", {
-          credentials: "same-origin",
-        });
-        const j = (await r.json().catch(() => ({}))) as { pricePoints?: number };
-        if (!cancelled && r.ok && typeof j.pricePoints === "number") {
-          setBillablePricePoints(Math.max(0, Math.floor(j.pricePoints)));
-        }
-      } catch {
-        /* 标价仅影响展示，计费以主站结算为准 */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {
@@ -490,6 +470,44 @@ export function ImageToVideoLabClient() {
     }
     return getImageToVideoModelById(selectedModelId) ?? IMAGE_TO_VIDEO_MODELS[0]!;
   }, [modeTab, selectedModelId]);
+
+  const billableHintDurationSec = useMemo(() => {
+    if (modeTab === "t2v") {
+      const te = getTextToVideoModelById(selectedModelId) ?? TEXT_TO_VIDEO_MODELS[0]!;
+      return te.apiModel.startsWith("happyhorse-")
+        ? Math.min(15, Math.max(3, Math.round(durationSec)))
+        : durationSec <= 7
+          ? 5
+          : 10;
+    }
+    return durationSec;
+  }, [modeTab, selectedModelId, durationSec]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const qs = new URLSearchParams({
+          apiModel: selectedModel.apiModel,
+          durationSec: String(billableHintDurationSec),
+          resolution,
+          audio: "true",
+        });
+        const r = await fetch(`/api/image-to-video/billable-hint?${qs}`, {
+          credentials: "same-origin",
+        });
+        const j = (await r.json().catch(() => ({}))) as { pricePoints?: number };
+        if (!cancelled && r.ok && typeof j.pricePoints === "number") {
+          setBillablePricePoints(Math.max(0, Math.floor(j.pricePoints)));
+        }
+      } catch {
+        /* 标价仅影响展示 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModel.apiModel, resolution, billableHintDurationSec]);
 
   const labModelPickerList = useMemo(() => {
     if (modeTab === "t2v") return TEXT_TO_VIDEO_MODELS;
@@ -690,6 +708,7 @@ export function ImageToVideoLabClient() {
     const snapSeed = seed.trim() || "";
     const snapMode: LabModeTab = modeTab;
     const snapModelTitle = selectedModel.title;
+    const snapApiModel = selectedModel.apiModel;
 
     try {
       let startBody: Record<string, unknown>;
@@ -786,7 +805,15 @@ export function ImageToVideoLabClient() {
             method: "POST",
             credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ taskId }),
+            body: JSON.stringify({
+              taskId,
+              billingHint: {
+                apiModel: snapApiModel,
+                durationSec: snapDur,
+                resolution: snapRes,
+                audio: true,
+              },
+            }),
           });
           const settleParsed = await readJsonBody<Record<string, unknown>>(settleR);
           if (!settleParsed.ok) throw new Error(settleParsed.message);
@@ -806,7 +833,7 @@ export function ImageToVideoLabClient() {
             settleHintForJob = "计费记录已存在（幂等），无需重复扣款。";
           } else if (settleJson.recorded === true) {
             settleHintForJob =
-              "已按单次生成计费（定价以管理后台「工具管理」为准），可在费用明细查看。";
+              "已按方案 A（任务返回的时长、分辨率与模型）完成计费，可在费用明细查看。";
           }
 
           const doneAt = new Date().toLocaleString("zh-CN", {

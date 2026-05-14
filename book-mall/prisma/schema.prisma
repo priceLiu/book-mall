@@ -249,6 +249,12 @@ model ToolBillablePrice {
   effectiveTo   DateTime?
   active        Boolean   @default(true)
   note          String?
+  /// 方案 A 展示用：与工具站 catalog 一致的参考模型 id
+  schemeARefModelKey String?
+  /// 方案 A：后台维护的单位成本（元，税前/官网口径与价目库一致）；与 schemeAAdminRetailMultiplier 相乘生成标价
+  schemeAUnitCostYuan          Float?
+  /// 方案 A：后台为该行指定的零售系数 M（生成 pricePoints；工具站 SSO 按 toolKey+schemeARefModelKey 读此行）
+  schemeAAdminRetailMultiplier Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -280,6 +286,76 @@ model PlatformConfig {
   /// 异常消耗：超过近均值的百分比即告警，如 300=3 倍
   usageAnomalyRatioPercent  Int @default(300)
   updatedAt            DateTime @updatedAt
+}
+
+/// 价目导入版本（成本唯一源头；current 仅一条 isCurrent=true）。
+model PricingSourceVersion {
+  id               String    @id @default(cuid())
+  kind             String
+  sourceSha256     String
+  regionScope      String    @default("china_mainland")
+  label            String?
+  importedAt       DateTime  @default(now())
+  importedByUserId String?
+  parseWarnings    Json?
+  rowCount         Int       @default(0)
+  isCurrent        Boolean   @default(false)
+
+  lines       PricingSourceLine[]
+  changesFrom PricingLineChangeEvent[] @relation("PricingChangeFrom")
+  changesTo   PricingLineChangeEvent[] @relation("PricingChangeTo")
+
+  @@index([isCurrent])
+  @@index([importedAt])
+}
+
+enum PricingBillingKind {
+  TOKEN_IN_OUT
+  OUTPUT_IMAGE
+  COST_PER_IMAGE
+  VIDEO_MODEL_SPEC
+}
+
+/// 单条成本行（某版本快照内唯一 fingerprint）。
+model PricingSourceLine {
+  id                   String             @id @default(cuid())
+  versionId            String
+  sectionH2            String             @default("")
+  sectionH3            String             @default("")
+  modelKey             String
+  modelLabelRaw        String             @db.Text
+  tierRaw              String             @default("")
+  billingKind          PricingBillingKind @default(TOKEN_IN_OUT)
+  inputYuanPerMillion  Float?
+  outputYuanPerMillion Float?
+  costJson             Json?
+  fingerprint          String
+  sourceLine           Int?
+
+  version PricingSourceVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, fingerprint])
+  @@index([versionId, modelKey])
+}
+
+/// 版本间 diff（历史审计）。
+model PricingLineChangeEvent {
+  id            String             @id @default(cuid())
+  fromVersionId String?
+  toVersionId   String
+  modelKey      String
+  tierRaw       String             @default("")
+  billingKind   PricingBillingKind
+  changeType    String
+  oldSnapshot   Json?
+  newSnapshot   Json?
+  createdAt     DateTime           @default(now())
+
+  fromVersion PricingSourceVersion? @relation("PricingChangeFrom", fields: [fromVersionId], references: [id], onDelete: SetNull)
+  toVersion   PricingSourceVersion  @relation("PricingChangeTo", fields: [toVersionId], references: [id], onDelete: Cascade)
+
+  @@index([toVersionId])
+  @@index([modelKey])
 }
 
 // —— 钱包 ——

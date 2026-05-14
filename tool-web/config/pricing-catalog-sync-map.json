@@ -1,0 +1,46 @@
+{
+  "visualLabAnalysis": {
+    "catalogRelativePath": "config/visual-lab-analysis-scheme-a-catalog.json",
+    "models": [
+      { "catalogId": "qwen3.6-plus", "modelKey": "qwen3.6-plus", "tierRaw": "0<Token≤256K" },
+      { "catalogId": "qwen3.6-flash", "modelKey": "qwen3.6-flash", "tierRaw": "0<Token≤256K" },
+      { "catalogId": "qwen3.5-plus", "modelKey": "qwen3.5-plus", "tierRaw": "0<Token≤128K" },
+      { "catalogId": "qwen3.5-flash", "modelKey": "qwen3.5-flash", "tierRaw": "0<Token≤128K" },
+      { "catalogId": "qwen3-vl-plus", "modelKey": "qwen3-vl-plus", "tierRaw": "0<Token≤32K" },
+      { "catalogId": "qwen3-vl-flash", "modelKey": "qwen3-vl-flash", "tierRaw": "0<Token≤32K" },
+      { "catalogId": "qwen-vl-max", "modelKey": "qwen-vl-max", "tierRaw": "无阶梯计价" },
+      { "catalogId": "qwen-vl-plus", "modelKey": "qwen-vl-plus", "tierRaw": "无阶梯计价" }
+    ]
+  },
+  "toolsSchemeA": {
+    "catalogRelativePath": "config/tools-scheme-a-catalog.json",
+    "aiTryOn": {
+      "aitryon": { "modelKey": "aitryon", "billingKind": "OUTPUT_IMAGE" },
+      "aitryon-plus": { "modelKey": "aitryon-plus", "billingKind": "OUTPUT_IMAGE" }
+    },
+    "textToImage": {
+      "wanx2.1-t2i-plus": { "modelKey": "wanx2.1-t2i-plus", "billingKind": "COST_PER_IMAGE" }
+    },
+    "video": {
+      "happyhorse-1.0-i2v": { "modelKey": "happyhorse-1.0-i2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "happyhorse-1.0-t2v": { "modelKey": "happyhorse-1.0-t2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "happyhorse-1.0-r2v": { "modelKey": "happyhorse-1.0-r2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.7-i2v-2026-04-25": { "modelKey": "wan2.7-i2v-2026-04-25", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.7-i2v": { "modelKey": "wan2.7-i2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.7-t2v-2026-04-25": { "modelKey": "wan2.7-t2v-2026-04-25", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.7-t2v": { "modelKey": "wan2.7-t2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.7-r2v": { "modelKey": "wan2.7-r2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.6-i2v": { "modelKey": "wan2.6-i2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.6-t2v": { "modelKey": "wan2.6-t2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.6-r2v": { "modelKey": "wan2.6-r2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.6-i2v-flash": { "modelKey": "wan2.6-i2v-flash", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.6-r2v-flash": { "modelKey": "wan2.6-r2v-flash", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.5-i2v-preview": { "modelKey": "wan2.5-i2v-preview", "billingKind": "VIDEO_MODEL_SPEC" },
+      "wan2.5-t2v-preview": { "modelKey": "wan2.5-t2v-preview", "billingKind": "VIDEO_MODEL_SPEC" },
+      "pixverse-c1-it2v": { "modelKey": "pixverse-c1-it2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "pixverse-c1-t2v": { "modelKey": "pixverse-c1-t2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "pixverse-v6-it2v": { "modelKey": "pixverse-v6-it2v", "billingKind": "VIDEO_MODEL_SPEC" },
+      "pixverse-v6-t2v": { "modelKey": "pixverse-v6-t2v", "billingKind": "VIDEO_MODEL_SPEC" }
+    }
+  }
+}

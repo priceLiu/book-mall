@@ -150,6 +150,9 @@ export function AdminNav({
             <DropdownMenuLabel>工具应用管理</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
+              <Link href="/admin/tool-apps/tool-menu">工具菜单</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link href="/admin/tool-apps/manage">工具管理</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>

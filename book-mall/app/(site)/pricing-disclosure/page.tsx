@@ -127,11 +127,12 @@ export default async function PricingDisclosurePage() {
           以下单价适用于已标价的工具行为；实际扣费以执行成功为准，与后台「工具管理」配置的生效区间一致。
         </p>
         <div className="overflow-x-auto rounded-lg border border-secondary">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="border-b border-secondary bg-muted/50">
               <tr>
                 <th className="p-3 font-medium">工具</th>
                 <th className="p-3 font-medium">行为</th>
+                <th className="p-3 font-medium">参考模型</th>
                 <th className="p-3 font-medium text-right">单价（点）</th>
                 <th className="p-3 font-medium text-right">单价（元）</th>
                 <th className="p-3 font-medium">生效区间（本地时间）</th>
@@ -141,18 +142,24 @@ export default async function PricingDisclosurePage() {
             <tbody>
               {billable.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-3 text-muted-foreground">
+                  <td colSpan={7} className="p-3 text-muted-foreground">
                     当前无生效中的按次标价。
                   </td>
                 </tr>
               ) : (
                 billable.map((r) => (
-                  <tr key={`${r.toolKey}-${r.action ?? ""}-${r.effectiveFrom.toISOString()}`} className="border-b border-secondary/80 align-top last:border-0">
+                  <tr
+                    key={`${r.toolKey}-${r.action ?? ""}-${r.schemeARefModelKey ?? ""}-${r.effectiveFrom.toISOString()}`}
+                    className="border-b border-secondary/80 align-top last:border-0"
+                  >
                     <td className="p-3">
                       <span className="font-medium">{toolKeyToLabel(r.toolKey)}</span>
                       <div className="text-xs text-muted-foreground font-mono">{r.toolKey}</div>
                     </td>
                     <td className="p-3">{actionLabel(r.action)}</td>
+                    <td className="p-3 font-mono text-xs text-muted-foreground">
+                      {r.schemeARefModelKey?.trim() ? r.schemeARefModelKey : "—"}
+                    </td>
                     <td className="p-3 text-right tabular-nums">{r.pricePoints.toLocaleString("zh-CN")}</td>
                     <td className="p-3 text-right tabular-nums">¥{formatPointsAsYuan(r.pricePoints)}</td>
                     <td className="p-3 whitespace-nowrap text-muted-foreground">

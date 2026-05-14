@@ -303,35 +303,6 @@
   opacity: 0.88;
 }
 
-.quotaBox {
-  padding: 0.65rem 0.75rem;
-  border-radius: 10px;
-  background: var(--tool-bg, #f4f4f5);
-  border: 1px solid var(--tool-border, #e4e4e7);
-}
-
-.quotaTop {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.8125rem;
-  margin-bottom: 0.45rem;
-}
-
-.quotaBar {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--tool-border, #e4e4e7);
-  overflow: hidden;
-}
-
-.quotaFill {
-  height: 100%;
-  width: 96%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--ai-accent), #a78bfa);
-}
-
 .validationBanner {
   margin: 0;
   padding: 0.45rem 0.55rem;

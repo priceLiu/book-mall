@@ -20,6 +20,17 @@ function parseMeta(v: unknown): Prisma.InputJsonValue | undefined {
   return v as Prisma.InputJsonValue;
 }
 
+function schemeARefModelFromUsageBody(body: Record<string, unknown>): string | undefined {
+  const raw = body.meta;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const m = raw as Record<string, unknown>;
+  const id = m.modelId;
+  if (typeof id === "string" && id.trim().length > 0) return id.trim();
+  const api = m.apiModel;
+  if (typeof api === "string" && api.trim().length > 0) return api.trim();
+  return undefined;
+}
+
 function verifyBearer(req: Request):
   | { ok: true; userId: string }
   | { ok: false; res: NextResponse } {
@@ -60,7 +71,9 @@ async function resolveCostPointsForEvent(
   if (typeof raw === "number" && Number.isFinite(raw)) {
     return Math.max(0, Math.floor(raw));
   }
-  const fromTable = await resolveBillablePricePoints(toolKey, action);
+  const fromTable = await resolveBillablePricePoints(toolKey, action, {
+    schemeARefModelKey: schemeARefModelFromUsageBody(body),
+  });
   if (fromTable != null) return fromTable;
   /**
  * AI智能试衣：仅成片成功后的 try_on 自动标价（见 tool-web/doc/payment.md）；page_view 不写单价。

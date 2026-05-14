@@ -2,11 +2,16 @@ import OpenAI from "openai";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { getDashscopeOpenAiCompatBaseUrl } from "@/lib/dashscope-openai-env";
 import { getQwenApiKey } from "@/lib/qwen-env";
-import { postToolUsageFromServer } from "@/lib/forward-tools-usage-server";
+import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import {
   VISUAL_LAB_ANALYSIS_ACTION,
   VISUAL_LAB_ANALYSIS_TOOL_KEY,
 } from "@/lib/visual-lab-analysis-billing";
+import {
+  computeVisualLabAnalysisChargePoints,
+  computeVisualLabAnalysisSchemeBreakdown,
+} from "@/lib/visual-lab-analysis-scheme-a";
+import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
 import {
   getVisualLabAnalysisModelById,
   VISUAL_LAB_ANALYSIS_MODELS,
@@ -225,10 +230,37 @@ export async function POST(req: Request) {
     );
   }
 
-  const usage = await postToolUsageFromServer({
+  const { multiplier: retailMult } = await getSchemeARetailMultiplierServer({
+    toolKey: VISUAL_LAB_ANALYSIS_TOOL_KEY,
+    modelKey: modelId,
+  });
+  const costPoints = computeVisualLabAnalysisChargePoints(modelId, retailMult);
+  if (costPoints <= 0) {
+    return Response.json(
+      {
+        error: "pricing_unavailable",
+        message: "当前模型缺少方案 A 标价配置，请换模型或联系管理员",
+      },
+      { status: 503 },
+    );
+  }
+  const schemeBreakdown = computeVisualLabAnalysisSchemeBreakdown(modelId, retailMult)!;
+
+  const usage = await postToolUsageFromServerWithRetries({
     toolKey: VISUAL_LAB_ANALYSIS_TOOL_KEY,
     action: VISUAL_LAB_ANALYSIS_ACTION,
-    meta: { taskId: billingRaw },
+    costPoints,
+    meta: {
+      taskId: billingRaw,
+      modelId,
+      apiModel: meta.apiModel,
+      pricingScheme: "visual_lab_scheme_a",
+      equivalentInputMillionTokens: schemeBreakdown.equivalentInputMillion,
+      equivalentOutputMillionTokens: schemeBreakdown.equivalentOutputMillion,
+      costYuanUpstreamApprox: schemeBreakdown.costYuan,
+      retailMultiplier: schemeBreakdown.retailMultiplier,
+      retailYuanApprox: schemeBreakdown.retailYuan,
+    },
   });
   if (!usage.ok) {
     const msg =
@@ -259,9 +291,9 @@ export async function POST(req: Request) {
     }
     return Response.json(
       {
-        error: "billing_unconfigured",
+        error: "billing_record_skipped",
         message:
-          "主站未配置分析室标价：请在「工具管理 → 按次单价」添加 visual-lab__analysis / invoke",
+          "扣费未被主站接受（点数无效或配置异常）。若持续出现请联系管理员。",
       },
       { status: 503 },
     );

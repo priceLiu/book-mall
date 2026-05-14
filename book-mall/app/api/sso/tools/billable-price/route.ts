@@ -47,6 +47,10 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const toolKey = url.searchParams.get("toolKey")?.trim() ?? "";
   const action = url.searchParams.get("action")?.trim() ?? "";
+  const schemeARefModelKey =
+    url.searchParams.get("schemeARefModelKey")?.trim() ??
+    url.searchParams.get("modelKey")?.trim() ??
+    "";
 
   if (!toolKey || toolKey.length > MAX_TOOL_KEY) {
     return NextResponse.json({ error: "toolKey 无效" }, { status: 400 });
@@ -55,7 +59,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "action 无效" }, { status: 400 });
   }
 
-  const pricePoints = await resolveBillablePricePoints(toolKey, action);
+  const pricePoints = await resolveBillablePricePoints(toolKey, action, {
+    schemeARefModelKey: schemeARefModelKey.length > 0 ? schemeARefModelKey : undefined,
+  });
   if (pricePoints == null) {
     return NextResponse.json(
       { error: "未找到当前生效单价，请在管理后台「工具管理」配置" },
@@ -67,6 +73,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     toolKey,
     action,
+    schemeARefModelKey: schemeARefModelKey.length > 0 ? schemeARefModelKey : null,
     pricePoints,
     yuan,
   });

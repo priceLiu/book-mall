@@ -1,0 +1,138 @@
+{
+  "retailMultiplier": 2,
+  "schemeNote": "非 retailMultiplier 的成本数字由主站 PricingSourceLine 经 pnpm pricing:emit-catalogs 同步；请勿手改成本列。",
+  "aiTryOn": {
+    "defaultModel": "aitryon",
+    "models": {
+      "aitryon": {
+        "costYuanPerOutputImage": 0.2,
+        "tierNote": "AI试衣-基础版 · 中国内地（元/张输出）"
+      },
+      "aitryon-plus": {
+        "costYuanPerOutputImage": 0.5,
+        "tierNote": "AI试衣-Plus版 · 中国内地（元/张输出）"
+      }
+    }
+  },
+  "textToImage": {
+    "defaultModel": "wanx2.1-t2i-plus",
+    "models": {
+      "wanx2.1-t2i-plus": {
+        "costYuanPerImage": 0.2,
+        "tierNote": "万相文生图 wanx2.1-t2i-plus · 中国内地（元/张）"
+      }
+    }
+  },
+  "video": {
+    "comment": "视频类：成本 = durationSec × costYuanPerSecond（按 output usage.SR 与 audio 档位取价，见各模型）",
+    "models": {
+      "happyhorse-1.0-i2v": {
+        "flatYuanPerSecond": 0.9
+      },
+      "happyhorse-1.0-t2v": {
+        "flatYuanPerSecond": 0.9
+      },
+      "happyhorse-1.0-r2v": {
+        "flatYuanPerSecond": 0.9
+      },
+      "wan2.7-i2v-2026-04-25": {
+        "bySr": {
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "wan2.7-i2v": {
+        "bySr": {
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "wan2.7-t2v-2026-04-25": {
+        "bySr": {
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "wan2.7-t2v": {
+        "bySr": {
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "wan2.7-r2v": {
+        "bySr": {
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "wan2.6-i2v": {
+        "bySr": {
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "wan2.6-t2v": {
+        "bySr": {
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "wan2.6-r2v": {
+        "bySr": {
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "wan2.6-i2v-flash": {
+        "bySrAudio": {
+          "720": {
+            "true": 0.3,
+            "false": 0.15
+          },
+          "1080": {
+            "true": 0.5,
+            "false": 0.25
+          }
+        }
+      },
+      "wan2.6-r2v-flash": {
+        "bySrAudio": {
+          "720": {
+            "true": 0.3,
+            "false": 0.15
+          },
+          "1080": {
+            "true": 0.5,
+            "false": 0.25
+          }
+        }
+      },
+      "wan2.5-i2v-preview": {
+        "bySr": {
+          "480": 0.3,
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "wan2.5-t2v-preview": {
+        "bySr": {
+          "480": 0.3,
+          "720": 0.6,
+          "1080": 1
+        }
+      },
+      "pixverse-c1-it2v": {
+        "flatYuanPerSecond": 0.24
+      },
+      "pixverse-c1-t2v": {
+        "flatYuanPerSecond": 0.24
+      },
+      "pixverse-v6-it2v": {
+        "flatYuanPerSecond": 0.21
+      },
+      "pixverse-v6-t2v": {
+        "flatYuanPerSecond": 0.21
+      }
+    }
+  }
+}

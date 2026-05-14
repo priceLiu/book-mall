@@ -13,12 +13,13 @@ export const en = {
     uploadOnePiece: "Upload one-piece",
     uploadHint: "Click or drag an image here",
     uploadOfficialSample: "No image? Use a sample",
-    freeQuota: "Free quota",
-    quotaValueDemo: "385 / 400",
     startFitting: "Start try-on",
-    tryOnChargeLineSub: "100 pts (¥1.00) per successful try-on",
+    tryOnChargeLineSub: "1 try-on — see Fee → Price list for points",
+    tryOnChargeLineLoading: "1 try-on — calculating…",
     tryOnChargeLineTitle:
-      "Billed per main-site tools pricing from your tools wallet; charged only after a successful render.",
+      "Charged from your tools wallet only after a successful render; see Fee → Price list (Scheme A).",
+    tryOnChargeLineTitleFallback:
+      "Per-render points follow main-site billing; if the estimate failed to load, refresh or check with an admin.",
     tryOnBusy: "Trying on…",
     disclaimer:
       "Demo output is for reference only. Do not use AI-generated content for unlawful purposes.",
