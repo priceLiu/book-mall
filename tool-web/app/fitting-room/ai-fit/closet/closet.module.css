@@ -79,6 +79,36 @@
   filter: brightness(1.05);
 }
 
+/* 配额说明内「申请扩容」：与 .cta 同款轮廓（无实体描边），主色换为橙 */
+.quotaExpand {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #c2410c 0%, #ea580c 45%, #f97316 100%);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  vertical-align: middle;
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
+}
+
+.quotaExpand:hover {
+  filter: brightness(1.06);
+}
+
+.quotaExpand:focus {
+  outline: none;
+}
+
+.quotaExpand:focus-visible {
+  outline: 2px solid #fb923c;
+  outline-offset: 2px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

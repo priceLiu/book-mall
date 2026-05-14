@@ -25,6 +25,10 @@ export default function VisualLabImplementationPage() {
             <code>Canvas</code> 下采样读取 <code>ImageData</code>，计算宽高、化简宽高比、平均 RGB 与亮度近似；可选备注与「保存到成果展」写入{" "}
             <code>localStorage</code>（键见 <code>lib/visual-lab-gallery.ts</code>
             ）。<Link href="/visual-lab/gallery">成果展</Link> 读取同键列表展示缩略图与元数据，支持单条删除与清空。
+            「分析快照」与「仅保存模型回复（Markdown）」共用常数{" "}
+            <code>VISUAL_LAB_GALLERY_SNAPSHOT_MAX</code>（当前为 10）条上限：新写入超过上限时会从列表中移除{" "}
+            <strong>最早的一条</strong>同类型槽位条目，形成固定长度的循环覆盖；从回复里单独保存的图片 / 视频走另一套配额（
+            <code>appendVisualLabReplyMediaItem</code>）。
           </p>
           <p>
             <strong>主站侧栏</strong>：分组 <code>navKey: visual-lab</code>，与{" "}
@@ -40,8 +44,9 @@ export default function VisualLabImplementationPage() {
         <ToolImplementationSection heading="2. 关键事项">
           <ul>
             <li>
-              快照含 JPEG data URL，体量随用户积累增长；上限见{" "}
-              <code>VISUAL_LAB_GALLERY_MAX_ITEMS</code>。生产若改为 OSS + 主站表，应替换存储层并迁移展示路由。
+              快照与纯回复条目含 data URL / 长文本；分析室侧以 <code>VISUAL_LAB_GALLERY_SNAPSHOT_MAX</code>{" "}
+             （当前 10）限制「快照 + 仅保存的 Markdown 正文」条数，超出时按列表顺序丢弃最旧的一条 notebook 项。
+              生产若改为 OSS + 主站表，应替换存储层并迁移展示路由。
             </li>
             <li>
               分析室仅做像素统计，不提供语义标签；请勿将当前数值用作版权或合规终裁依据。
@@ -70,7 +75,8 @@ export default function VisualLabImplementationPage() {
           <ToolImplementationCode
             caption="成果展持久化键与类型（lib/visual-lab-gallery.ts）"
             code={`export const VISUAL_LAB_GALLERY_STORAGE_KEY = "visual-lab-gallery-v1";
-export type VisualLabGalleryItem = { id, createdAt, imageName, note, thumbDataUrl, stats };`}
+export const VISUAL_LAB_GALLERY_SNAPSHOT_MAX = 10; // 快照 + reply-markdown，超出轮删最旧
+export type VisualLabGalleryItem = { id, createdAt, imageName, note, thumbDataUrl, stats, kind?, replyMarkdown? };`}
           />
         </ToolImplementationSection>
       </ToolImplementationDoc>

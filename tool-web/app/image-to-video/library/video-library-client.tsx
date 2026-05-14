@@ -190,10 +190,7 @@ export function ImageToVideoLibraryClient() {
         </span>
         。默认每人最多 {quota.max} 条；为控制存储成本，建议每条保留约 {RETENTION_DAYS}{" "}
         天，到期后管理员可按需清理，重要内容请下载备份。
-        <button
-          type="button"
-          className="ml-1 font-medium text-violet-700 underline decoration-violet-600/40 underline-offset-2 dark:text-violet-300"
-          onClick={() =>
+        <button type="button" className={styles.quotaExpand} onClick={() =>
             alert(
               "视频库扩容为付费增值服务，即将开放自助申请。如需洽谈企业套餐，请通过网站联系方式或客服渠道联络。",
             )

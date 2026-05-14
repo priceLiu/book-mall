@@ -249,7 +249,7 @@ function LibraryView() {
             张；超出请删除旧图或使用「申请扩容」（付费功能即将开放）。
             <button
               type="button"
-              className="ml-1 font-medium text-violet-700 underline decoration-violet-600/40 underline-offset-2 dark:text-violet-300"
+              className={styles.quotaExpand}
               onClick={() =>
                 alert(
                   "图片库扩容为付费增值服务，即将开放自助申请。如需洽谈企业套餐，请通过网站联系方式联络。",
