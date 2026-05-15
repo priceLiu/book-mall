@@ -20,12 +20,22 @@ function normalizeHttpOriginUrl(raw: string): URL | null {
 }
 
 /**
- * 生产环境若 `TOOLS_PUBLIC_ORIGIN` 仍误填云托管默认域（*.sh.run.tcloudbase.com），
- * 且 `NEXTAUTH_URL` 已为自定义主站 `https://book.*`，则签发 SSO 时回落到同协议、
- * 同父域的 `https://tool.*`，避免从主站跳进默认网关 URL。
- * 仍建议在控制台将 `TOOLS_PUBLIC_ORIGIN` 显式改为用户访问的工具站 origin。
+ * 浏览器应打开的工具站 Origin（无末尾 `/`），用于 SSO 换票跳转等。
+ *
+ * 优先级：
+ * 1. `TOOLS_SSO_ISSUE_ORIGIN`（可选）— 仅主站读取；当控制台仍留着云托管默认 `TOOLS_PUBLIC_ORIGIN`、
+ *    但用户实际访问 `https://tool.ai-code8.com` 时，可单独设此项指向自定义域。
+ * 2. `TOOLS_PUBLIC_ORIGIN` + 生产环境下一层推导（自定义域 `book.*`→`tool.*`，或见下）。
+ *
+ * 仍建议最终将 `TOOLS_PUBLIC_ORIGIN` / `NEXTAUTH_URL` 都改为线上自定义域。
  */
 export function getToolsPublicOrigin(): string | null {
+  const issueOverride = process.env.TOOLS_SSO_ISSUE_ORIGIN?.trim();
+  if (issueOverride) {
+    const ou = normalizeHttpOriginUrl(issueOverride);
+    if (ou) return ou.origin;
+  }
+
   const raw = process.env.TOOLS_PUBLIC_ORIGIN?.trim();
   if (!raw) return null;
   const u = normalizeHttpOriginUrl(raw);
@@ -101,31 +111,43 @@ export function getToolsJwtTtlSec(): number {
 export function getToolsSsoSetupDiagnostics(): { ready: boolean; issues: string[] } {
   const issues: string[] = [];
 
+  const issueRaw = process.env.TOOLS_SSO_ISSUE_ORIGIN?.trim();
   const rawOrigin = process.env.TOOLS_PUBLIC_ORIGIN?.trim();
+  const issueParsed = issueRaw ? normalizeHttpOriginUrl(issueRaw) : null;
+  const rawParsed = rawOrigin ? normalizeHttpOriginUrl(rawOrigin) : null;
   const origin = getToolsPublicOrigin();
-  if (!rawOrigin) {
+
+  if (!rawOrigin && !issueRaw) {
     issues.push(
-      "未设置 TOOLS_PUBLIC_ORIGIN（本地示例：http://127.0.0.1:3001 ，须含协议、无末尾 /）",
+      "未设置 TOOLS_PUBLIC_ORIGIN（本地示例：http://localhost:3001）；生产也可仅设 TOOLS_SSO_ISSUE_ORIGIN 作为签发用工具站 origin。",
     );
-  } else if (!origin) {
+  } else if (rawOrigin && !rawParsed) {
     issues.push(
       "TOOLS_PUBLIC_ORIGIN 无法解析为有效 http(s) URL（请检查是否漏写 http:// 或拼写错误）",
     );
-  } else if (rawOrigin) {
+  } else if (issueRaw && !issueParsed) {
+    issues.push("TOOLS_SSO_ISSUE_ORIGIN 无法解析为有效 http(s) URL");
+  } else if (!origin) {
+    issues.push("无法解析最终工具站 origin");
+  }
+
+  if (origin && rawParsed) {
     try {
-      const rawHost = normalizeHttpOriginUrl(rawOrigin)?.hostname ?? "";
+      const rawHost = rawParsed.hostname;
+      const resolvedHost = new URL(origin).hostname;
       if (
         rawHost.endsWith(".sh.run.tcloudbase.com") &&
-        process.env.NODE_ENV === "production"
+        process.env.NODE_ENV === "production" &&
+        resolvedHost.endsWith(".sh.run.tcloudbase.com")
       ) {
         const main = normalizeHttpOriginUrl(process.env.NEXTAUTH_URL?.trim() ?? "");
-        const canDerive =
-          !!main &&
-          !main.hostname.endsWith(".sh.run.tcloudbase.com") &&
-          main.hostname.startsWith("book.");
-        if (!canDerive) {
+        const nextAuthIsCustom =
+          !!main && !main.hostname.endsWith(".sh.run.tcloudbase.com");
+        const nextAuthBookPrefix = !!main && main.hostname.startsWith("book.");
+        const haveOverride = !!issueParsed;
+        if (!((nextAuthIsCustom && nextAuthBookPrefix) || haveOverride)) {
           issues.push(
-            `TOOLS_PUBLIC_ORIGIN 仍指向云托管默认域（${rawHost}）；生产环境请改为用户实际打开工具站的 HTTPS 自定义域（如 https://tool.ai-code8.com），须可与 NEXTAUTH_URL（book.*）配对。`,
+            `NEXTAUTH_URL 与 TOOLS_PUBLIC_ORIGIN 仍为云托管默认域（签发结果仍会落在 ${resolvedHost}）。请将 NEXTAUTH_URL 改为 https://book.ai-code8.com、TOOLS_PUBLIC_ORIGIN 改为 https://tool.ai-code8.com；或在主站增设 TOOLS_SSO_ISSUE_ORIGIN=https://tool.ai-code8.com（工具站 env 中 TOOLS_PUBLIC_ORIGIN 须与用户访问域名一致）。`,
           );
         }
       }

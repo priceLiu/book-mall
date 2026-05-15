@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 type Props = {
   resolvedOrigin: string | null;
   rawToolsPublicOrigin: string;
+  /** 可选：覆盖签发用工具站 origin（见 TOOLS_SSO_ISSUE_ORIGIN） */
+  rawIssueOrigin: string;
   nextAuthUrl: string;
   ssoReady: boolean;
   ssoIssues: string[];
@@ -22,6 +24,7 @@ type Props = {
 export function ToolsSsoTestClient({
   resolvedOrigin,
   rawToolsPublicOrigin,
+  rawIssueOrigin,
   nextAuthUrl,
   ssoReady,
   ssoIssues,
@@ -99,9 +102,10 @@ export function ToolsSsoTestClient({
     }
   }
 
-  const usingFallback =
+  const usingBookHeuristic =
     !!resolvedOrigin &&
     !!rawToolsPublicOrigin &&
+    !rawIssueOrigin &&
     (() => {
       try {
         const rawHost = new URL(rawToolsPublicOrigin).hostname;
@@ -147,15 +151,30 @@ export function ToolsSsoTestClient({
             </p>
           </div>
           <div>
+            <span className="text-muted-foreground">
+              TOOLS_SSO_ISSUE_ORIGIN（可选，覆盖签发用 Origin）
+            </span>
+            <p className="mt-0.5 break-all font-mono text-xs">
+              {rawIssueOrigin || "（未设置）"}
+            </p>
+          </div>
+          <div>
             <span className="text-muted-foreground">NEXTAUTH_URL</span>
             <p className="mt-0.5 break-all font-mono text-xs">
               {nextAuthUrl || "（未设置）"}
             </p>
           </div>
-          {usingFallback ? (
+          {rawIssueOrigin ? (
+            <p className="rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-900 dark:text-sky-100">
+              已启用 TOOLS_SSO_ISSUE_ORIGIN：签发跳转优先使用该值（典型：
+              https://tool.ai-code8.com）。工具站进程内 TOOLS_PUBLIC_ORIGIN 仍须与用户地址栏一致。
+            </p>
+          ) : null}
+          {usingBookHeuristic ? (
             <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">
-              检测到 TOOLS_PUBLIC_ORIGIN 仍为云托管默认域，线上正按 NEXTAUTH_URL 的 book.* → tool.*
-              规则推导签发地址；请在云托管将 TOOLS_PUBLIC_ORIGIN 改为实际自定义工具域。
+              检测到 TOOLS_PUBLIC_ORIGIN 仍为云托管默认域，且 NEXTAUTH_URL 为自定义 book.*，
+              已按 book.* → tool.* 推导签发地址；若当前 NEXTAUTH 仍是 *.sh.run，请改控制台或使用
+              TOOLS_SSO_ISSUE_ORIGIN。
             </p>
           ) : null}
           {!ssoReady ? (
