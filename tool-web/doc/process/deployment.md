@@ -16,7 +16,7 @@
 
 可选：`TOOL_WEB_*`，模板见 `config/tool-web.env.example`，读取 `lib/tool-config.ts`。
 
-主站侧 **`TOOLS_PUBLIC_ORIGIN`** 与工具站侧 **`TOOLS_PUBLIC_ORIGIN`** 须 **完全一致**，且与浏览器访问的工具站 origin **一致**（含协议与 host）。
+主站侧 **`TOOLS_PUBLIC_ORIGIN`** 与工具站侧 **`TOOLS_PUBLIC_ORIGIN`** 须 **完全一致**，且与浏览器访问的工具站 origin **一致**（含协议与 host）。生产当前约定：`MAIN_SITE_ORIGIN=https://book.ai-code8.com`，`TOOLS_PUBLIC_ORIGIN=https://tool.ai-code8.com`（与主站该变量 **同一字符串**）。
 
 ## 本地联调（最短）
 

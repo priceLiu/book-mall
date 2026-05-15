@@ -43,15 +43,15 @@
 在 **主站服务** 的环境变量 / 配置中心里填写（名称与本地 `.env` 一致），至少包括：
 
 - `DATABASE_URL` — PostgreSQL（镜像启动时会执行 `prisma migrate deploy`）
-- `NEXTAUTH_URL` — **浏览器里打开主站的完整 origin**，如 `https://mall.example.com`
+- `NEXTAUTH_URL` — **浏览器里打开主站的完整 origin**，如 `https://book.ai-code8.com`
 - `NEXTAUTH_SECRET`
-- `TOOLS_PUBLIC_ORIGIN` — **浏览器里打开工具站的 origin**，如 `https://tools.example.com`
+- `TOOLS_PUBLIC_ORIGIN` — **浏览器里打开工具站的 origin**，如 `https://tool.ai-code8.com`
 - `TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET` — 须与工具站 **完全一致**
 
 在 **工具站服务** 里填写：
 
-- `MAIN_SITE_ORIGIN` — 与主站公网 origin 一致（无末尾 `/`），如 `https://mall.example.com`
-- `TOOLS_PUBLIC_ORIGIN` — **须与主站 `TOOLS_PUBLIC_ORIGIN` 完全一致**（浏览器访问工具站的 Origin）；生产必填，否则换票重定向可能变成 `http://0.0.0.0:3001/...`
+- `MAIN_SITE_ORIGIN` — 与主站公网 origin 一致（无末尾 `/`），如 `https://book.ai-code8.com`
+- `TOOLS_PUBLIC_ORIGIN` — **须与主站 `TOOLS_PUBLIC_ORIGIN` 完全一致**（浏览器访问工具站的 Origin），如 `https://tool.ai-code8.com`；生产必填，否则换票重定向可能变成 `http://0.0.0.0:3001/...`
 - `TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET` — 与主站相同  
 
 更全的可选项见：`book-mall/.env.example`、`tool-web/.env.example`。

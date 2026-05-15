@@ -37,6 +37,34 @@
 3. [ ] 工具站 **SSO / `usage` 上报** 中的 **`modelKey`** 是否与主站行 **字符串完全一致**？  
 4. [ ] 是否知悉：**已有行**在后台 **仅允许补一次「生效止」**；改 **\(M\)** 或改 **成本** 须 **新增定价行**（§5.4.1），避免在线改价破坏稽核？
 
+### 0.4 与当前实现结论（对照）
+
+下列为 **§0 口号与 book-mall / tool-web 现状** 的一一核对，便于产品、研发、运维统一判断是否「已经做成文档里说的那样」。
+
+| 文档归纳 | 当前实现要点 |
+|----------|----------------|
+| **模型单独计价** | **是**。同一 **`toolKey`** 下按 **`ToolBillablePrice.schemeARefModelKey`** 分行，与工具站 **`modelId`**、SSO **`modelKey`** 对齐；扣费与 **`GET /api/sso/tools/scheme-a-retail-multiplier`** 均按 **`toolKey` + `modelKey`** 命中**该行**。 |
+| **成本系统计算** | **是**（**系统按价目链给出参考成本**）：**`PricingSourceLine`** + **`pricing-catalog-sync-map.json`** + **`loadSchemeAModelCatalog`**（及 **`pnpm pricing:emit-catalogs`** 回填 catalog）形成闭环；后台「新增定价」**预填 `schemeAUnitCostYuan`**。**仍允许手填成本**作过渡，但主线是价目链 + 预填，不以手编为常态。 |
+| **系数按模型自定** | **是**。每条定价行独立 **`schemeAAdminRetailMultiplier`**，SSO **按行**返回 \(M\)；已删除全局/覆盖系数表（§5.4.3）。 |
+| **现在都是 2.0** | 指 **现网配置习惯与兜底**：各行 **`schemeAAdminRetailMultiplier` 多为 `2.0`**；**代码未写死**「全系必须 2」——行上写什么 SSO 回什么，可按模型改为非 2。缺行或字段不全时，实现上仍有 **\(M=2\)** 等兜底（§1），生产应靠**补全定价行**收口。**迁移/seed 不会自动把该列写成 2.0，库内可为 NULL**，实测见 **§0.5**。 |
+
+**结论**：**§0 所述「重大成果」与当前数据模型、主站与工具站结算路径一致**；「**都是 2.0**」应理解为 **当前常见配置与应急兜底**，**不是**程序里只允许 2.0。若需证明「库表里是否恰好全为 2.0」，须直接查询 **`ToolBillablePrice.schemeAAdminRetailMultiplier`**（属数据稽核，非本文替代）。
+
+### 0.5 仓库与数据库核查说明（否定「未查库即可断言全是 2.0」）
+
+对 **本仓库 + Prisma 迁移** 的核查结论如下（截至文档修订日）：
+
+| 核查项 | 结论 |
+|--------|------|
+| **迁移是否把 `schemeAAdminRetailMultiplier` 写成 2.0？** | **否**。`20260624120000_tool_billable_price_cost_and_admin_mult` **仅新增可空列**，其后迁移 **无** 对全表 `UPDATE` 将该列批量设为 `2` 或 `2.0`。 |
+| **`seed.ts` 是否写入定价行？** | **否**。`prisma/seed.ts` **不创建/更新** `ToolBillablePrice`。 |
+| **仅 migrate、未走后台「新增定价」补列时？** | 历史行上 **`schemeAAdminRetailMultiplier` / `schemeAUnitCostYuan` 可为 `NULL`**；运行时 SSO 可走 **由 `pricePoints` 与成本反推** 或 **§1 兜底 \(M=2\)**（见 `tool-scheme-a-resolve-retail-multiplier.ts`）。这与「库中已持久化全是 2.0」**不是同一句话**。 |
+| **如何得到某一环境的真实分布？** | 在该环境配置 **`DATABASE_URL`** 后执行 SQL（或 Prisma 查询），例如：  
+`SELECT "schemeAAdminRetailMultiplier", COUNT(*) AS n FROM "ToolBillablePrice" GROUP BY "schemeAAdminRetailMultiplier" ORDER BY n DESC;`  
+并另行统计 **`WHERE "schemeAAdminRetailMultiplier" IS NULL`** 的行数。 |
+
+**文档中「现网多为 2.0」**：指 **产品配置惯例**与 **后台「新增定价」表单默认系数为 2**、以及 **未命中时的兜底 2**，**不能**替代上表 SQL 在你方 **staging/production** 上的实测结果。
+
 ---
 
 ## 1. 核心公式（必须统一）
@@ -367,5 +395,5 @@
 | 1.1 | 2026-05-14 | **§5.4.1**：**已有 `ToolBillablePrice` 行** 仅可改 **`effectiveTo`**；调价须新增行；`updateToolBillablePrice` 仅持久化生效止 |
 | 1.2 | 2026-05-14 | **§5.4.1**：已有行 **仅当 `effectiveTo` 为空时可填一次**结束时间；已设结束时间后 UI 只读 + 服务端拒绝更新 |
 | **2.0** | **2026-05-14** | **§0（新增）**：**重大成果**声明——**模型单独计价**、**成本系统计算**、**\(M\) 按模型自定**；**当前 \(M\) 多为 2.0** 但语义按行可配；**开发工具/计费前必读** |
-
-*路径：`tool-web/doc/product/learning-pricing-solution.md` — 与 `learning-pricing-requirements.md` 配套使用。*
+| 2.1 | 2026-05-14 | **§0.4**：**与当前实现结论（对照）**表——口号与代码/数据语义逐项核对；「都是 2.0」= 常见配置非硬编码；稽核需查库 |
+| 2.2 | 2026-05-14 | **§0.5**：仓库核查——迁移/seed **未**批量写入 `schemeAAdminRetailMultiplier=2`；列可为 **NULL**；「多为 2.0」**不可替代**环境内 SQL 统计 |

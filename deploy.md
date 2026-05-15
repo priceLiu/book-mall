@@ -15,6 +15,17 @@
 - **同一 Git 仓库，一般需要两套部署（两个云托管服务）**，分别绑定上述目录与端口；不要把仓库根目录当成构建根目录。  
 - GitHub 上仓库名可能仍为 `book-mall`，工具站在子目录 **`tool-web/`** 下。
 
+### 1.1 生产域名（当前正式）
+
+本地开发保持 **`http://localhost:3000` / `http://localhost:3001`**（见各项目 `.env.example`）。**生产环境**在云托管控制台为两套服务分别绑定 HTTPS 自定义域，并填入下表（与 `deploy/tencent/*.env.example` 一致）：
+
+| 角色 | 用户访问的 Origin | book-mall | tool-web |
+|------|-------------------|-----------|----------|
+| 主站 | `https://book.ai-code8.com` | `NEXTAUTH_URL` | `MAIN_SITE_ORIGIN` |
+| 工具站 | `https://tool.ai-code8.com` | `TOOLS_PUBLIC_ORIGIN` | `TOOLS_PUBLIC_ORIGIN`（须与主站 **字符串完全一致**） |
+
+`NEXTAUTH_URL` 与 `MAIN_SITE_ORIGIN` 须指向同一主站入口；`TOOLS_PUBLIC_ORIGIN` 在两套服务中须相同且与浏览器打开工具站的地址栏一致。
+
 ---
 
 ## 2. 控制台必填（易错）

@@ -106,8 +106,10 @@ pnpm run start        # next start
 1. 将本仓库推送到 GitHub，在 [Vercel](https://vercel.com/) 中 **Import** 该仓库，Framework Preset 选 **Next.js**，**Root Directory** 若 monorepo 则指向 `book-mall`。
 2. 在 Vercel **Environment Variables**（Production / Preview 按需）中添加：
    - `DATABASE_URL`
-   - `NEXTAUTH_URL`（生产域名，如 `https://www.example.com`）
+   - `NEXTAUTH_URL`（生产主站 origin，如 `https://book.ai-code8.com`）
    - `NEXTAUTH_SECRET`
+   - `TOOLS_PUBLIC_ORIGIN`（工具站 origin，须与浏览器一致，如 `https://tool.ai-code8.com`）
+   - `TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`（与工具站 **完全相同**）
    - `ADMIN_EMAILS`（可先留空，注册后再填并重跑 seed）
 3. **Build Command** 保持默认 `pnpm run build`（或 `npm run build`）即可：已与迁移串联。
 4. 首次部署成功后，在 **能访问生产数据库** 的环境执行一次种子（写入订阅档位、分类等；`ADMIN_EMAILS` 中的邮箱须已在站点注册）：

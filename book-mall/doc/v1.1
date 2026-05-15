@@ -18,10 +18,10 @@
 
 ## 3. 域名与部署（约定占位）
 
-| 角色 | 占位域名（可替换） | 说明 |
+| 角色 | 当前生产域名 | 说明 |
 |------|-------------------|------|
-| 主站 | `https://www.ai-code8.com` | Next.js 本站 |
-| 工具站 | `https://tools.ai-code8.com` | 独立项目；环境变量 **`TOOLS_PUBLIC_ORIGIN`** 指向其 **Origin**（无末尾 `/`） |
+| 主站 | `https://book.ai-code8.com` | Next.js 本站（`NEXTAUTH_URL` / 与工具站 `MAIN_SITE_ORIGIN` 对齐） |
+| 工具站 | `https://tool.ai-code8.com` | 独立项目；环境变量 **`TOOLS_PUBLIC_ORIGIN`**（主站与工具站 **同一取值**）指向其 **Origin**（无末尾 `/`） |
 
 生产环境须使用 **HTTPS**。Preview / Staging 可使用各自子域，**密钥与 AppId 隔离**。
 

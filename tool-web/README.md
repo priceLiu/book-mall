@@ -21,6 +21,8 @@
 
 3. 浏览器登录主站 → 个人中心 → **打开试衣间**，或 **管理后台** → **工具站** → 默认落在本站 `/fitting-room`。
 
+**生产环境**（自动部署）：控制台注入 `MAIN_SITE_ORIGIN=https://book.ai-code8.com`、`TOOLS_PUBLIC_ORIGIN=https://tool.ai-code8.com`（与主站该变量完全一致），详见仓库根目录 **`deploy.md`**、**`deploy/tencent/README.md`**。
+
 ## 工具站自有配置（大模型 Key 等）
 
 主站的 `.env.local`**不要**写工具推理 Key。请在 **`tool-web/.env.local`**（或由宿主注入进程环境变量）填写；变量名模板见 **`config/tool-web.env.example`**。
