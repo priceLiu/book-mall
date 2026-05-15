@@ -46,9 +46,13 @@
 
 `NODE_ENV`、`DATABASE_URL`、`NEXTAUTH_URL`、`NEXTAUTH_SECRET`、`TOOLS_PUBLIC_ORIGIN`、`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`（可选 `ADMIN_EMAILS` 等）。
 
+**Docker 部署**：若容器启动时 **`NEXTAUTH_URL` / `TOOLS_PUBLIC_ORIGIN` 未设置或为空**，`book-mall/docker-entrypoint.sh` 会回落到 **`https://book.ai-code8.com`** 与 **`https://tool.ai-code8.com`**；云托管控制台已配置时优先生效。
+
 ### 3.2 工具站 `tool-web`（至少）
 
 `NODE_ENV`、`MAIN_SITE_ORIGIN`、与主站完全一致的 **`TOOLS_PUBLIC_ORIGIN`**（浏览器访问工具站的 Origin；生产必填，否则换票失败页可能跳到 **`http://0.0.0.0:3001`**）、`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`；AI/OSS 见 `tool-web/.env.example`。
+
+**Docker 部署**：若容器启动时上述 Origin 类变量 **未设置或为空**，`tool-web/docker-entrypoint.sh` 会回落到 **`MAIN_SITE_ORIGIN=https://book.ai-code8.com`**、**`TOOLS_PUBLIC_ORIGIN=https://tool.ai-code8.com`**；云托管控制台已配置时优先生效。
 
 ### 3.3 Origin 写法（必读）
 
