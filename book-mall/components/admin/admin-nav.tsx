@@ -161,6 +161,9 @@ export function AdminNav({
             <DropdownMenuItem asChild>
               <Link href="/admin/tool-usage">工具使用明细与费用</Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/tools-sso-test">工具站跳转测试</Link>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
