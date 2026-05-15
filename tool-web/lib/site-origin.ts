@@ -1,3 +1,7 @@
+import { applyToolWebProductionOriginDefaults } from "./production-origin";
+
+applyToolWebProductionOriginDefaults();
+
 /** 主站 Origin（无末尾 `/`），用于服务端调用 introspect。 */
 
 /** 与 book-mall `normalizeHttpOriginUrl` 同源：纠正 `https://host/:3000` → `https://host:3000`。 */

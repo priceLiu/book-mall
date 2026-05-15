@@ -1,3 +1,7 @@
+import { applyBookMallProductionOriginDefaults } from "./production-origin";
+
+applyBookMallProductionOriginDefaults();
+
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
