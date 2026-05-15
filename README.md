@@ -42,7 +42,7 @@ pnpm dev
 
 浏览器：<http://localhost:3001>（`package.json` 里已写死 `-p 3001`）
 
-SSO 联调时：主站 `.env.local` 设置 `TOOLS_PUBLIC_ORIGIN=http://localhost:3001`（与地址栏访问工具站的 host **一致**，勿混用 `127.0.0.1`），工具站 `.env.local` 设置 `MAIN_SITE_ORIGIN=http://localhost:3000`，两端 Secret 一致。详见 **`book-mall/doc/tech/tools-sso-environment.md`**、**`tool-web/README.md`**。
+SSO 联调时：主站 `.env.local` 设置 `TOOLS_PUBLIC_ORIGIN=http://localhost:3001`（与地址栏访问工具站的 host **一致**，勿混用 `127.0.0.1`），工具站 `.env.local` 设置 `MAIN_SITE_ORIGIN=http://localhost:3000`，两端 Secret 一致。未单独写在 `.env.local` 时，开发模式会回落到各项目目录下的 **`.env.development`**（localhost）。生产构建见 **`book-mall/.env.production`** / **`tool-web/.env.production`**；Docker 镜像若未注入 `NEXTAUTH_URL` / `TOOLS_PUBLIC_ORIGIN`（及工具站 `MAIN_SITE_ORIGIN`），入口脚本会使用 **`https://book.ai-code8.com`** / **`https://tool.ai-code8.com`**。详见 **`book-mall/doc/tech/tools-sso-environment.md`**、**`tool-web/README.md`**。
 
 ## 工具站清理重装（可选）
 
