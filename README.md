@@ -77,6 +77,15 @@ git rm -r --cached .pnpm-store
 
 主站与工具站已含 Dockerfile。**云托管 CloudBase Run**：同一仓库建两个服务，**目标目录**分别填 `book-mall`、`tool-web`，端口 **3000** / **3001**，环境变量在控制台填写（勿提交密钥）。详见 **`deploy/tencent/README.md`** 中的「云托管 CloudBase Run」小节；构建失败与 SSO 排障见根目录 **`deploy.md`**。
 
+**当前生产域名约定**（自动部署时在控制台对齐即可；本地仍用 `localhost`）：
+
+| 服务 | 浏览器 Origin | book-mall | tool-web |
+|------|----------------|-----------|----------|
+| 主站 | `https://book.ai-code8.com` | `NEXTAUTH_URL` | `MAIN_SITE_ORIGIN` |
+| 工具站 | `https://tool.ai-code8.com` | `TOOLS_PUBLIC_ORIGIN` | `TOOLS_PUBLIC_ORIGIN`（与主站完全一致） |
+
+`TOOLS_SSO_SERVER_SECRET` / `TOOLS_SSO_JWT_SECRET` 两端必须相同。模板见 **`deploy/tencent/book-mall.env.example`**、**`deploy/tencent/tool-web.env.example`**。
+
 若在本机或自建机编排，可用根目录 **`docker-compose.yml`**。
 
 ## 仓库根上移（仅需做一次）

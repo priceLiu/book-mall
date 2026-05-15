@@ -4,7 +4,7 @@
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `TOOLS_PUBLIC_ORIGIN` | 接入工具站时 **必填** | 工具站站点根 URL，无末尾 `/`。例：`https://tools.ai-code8.com`；本地常见 `http://localhost:3001`（须与浏览器地址栏 **同源**，勿混用 `localhost` 与 `127.0.0.1`） |
+| `TOOLS_PUBLIC_ORIGIN` | 接入工具站时 **必填** | 工具站站点根 URL，无末尾 `/`。生产例：`https://tool.ai-code8.com`；本地常见 `http://localhost:3001`（须与浏览器地址栏 **同源**，勿混用 `localhost` 与 `127.0.0.1`） |
 | `TOOLS_SSO_SERVER_SECRET` | **必填** | 随机长字符串（≥16）；工具站 **服务端** 调用 `exchange` 时 `Authorization: Bearer <值>` |
 | `TOOLS_SSO_JWT_SECRET` | **必填** | JWT HS256 密钥（≥16）；主站签名，工具站 **若自行验签** 须配置同一值（建议只在服务端） |
 | `TOOLS_SSO_CODE_TTL_SECONDS` | 否 | 授权码 TTL，30–300，默认 **90** |
@@ -16,7 +16,7 @@
 
 | 变量 | 说明 |
 |------|------|
-| `MAIN_SITE_ORIGIN` | 主站 origin，无末尾 `/`。例：`https://www.ai-code8.com` |
+| `MAIN_SITE_ORIGIN` | 主站 origin，无末尾 `/`。例：`https://book.ai-code8.com` |
 | `TOOLS_SSO_SERVER_SECRET` | 与主站 **完全一致** |
 | `TOOLS_SSO_JWT_SECRET` | **强烈建议与主站一致**：服务端 **`resolveToolsShellSession`** 优先本地验签 JWT（内含 `email`/`name`/`image` 裁剪字段）；未配置或验签失败时壳层降级为 **`GET introspect`** |
 | `TOOL_WEB_*` | **可选**：大模型 / 兼容接口 Key、Base URL、模型名等；仅写在工具站 `.env.local`，模板见 **`tool-web/config/tool-web.env.example`**，读取 **`tool-web/lib/tool-config.ts`** |

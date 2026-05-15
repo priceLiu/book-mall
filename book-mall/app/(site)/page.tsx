@@ -18,7 +18,7 @@ export const metadata = {
     "一人公司、创业老板、自由职业的专属 AI 加油站；一站式找工具、用应用、学课程，打通「找、用、学」闭环。",
   openGraph: {
     type: "website",
-    url: "https://ai-code8.com",
+    url: "https://book.ai-code8.com",
     title: "智选 AI Mall｜找AI上智选",
     description:
       "一人公司、创业老板、自由职业的专属 AI 加油站；一站式找工具、用应用、学课程，打通「找、用、学」闭环。",
@@ -33,7 +33,7 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    site: "https://ai-code8.com",
+    site: "https://book.ai-code8.com",
     title: "智选 AI Mall｜找AI上智选",
     description:
       "一人公司、创业老板、自由职业的专属 AI 加油站；一站式找工具、用应用、学课程，打通「找、用、学」闭环。",
