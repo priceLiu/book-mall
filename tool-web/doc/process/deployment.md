@@ -35,6 +35,8 @@ pnpm build
 
 生产环境由宿主注入上述环境变量；确保 HTTPS、Cookie `Secure` 策略与文档一致（按 Next 与部署平台配置）。
 
+**自定义域与默认网关域**：若工具站控制台已设 `TOOLS_PUBLIC_ORIGIN=https://tool.ai-code8.com`，但用户仍从主站被发到 `*.sh.run.tcloudbase.com`，仓库内 **`middleware.ts`** 会在生产环境把这些 Host 上的页面级 GET/HEAD（不含 `/api`）**308** 到 `TOOLS_PUBLIC_ORIGIN`，换票回调也会并入该策略。仍建议在主站把 **`TOOLS_PUBLIC_ORIGIN` 改为自定义域**，减少一次跳转。
+
 ## 文档与规则
 
 - 索引：[README](../README.md)
