@@ -19,11 +19,40 @@ function normalizeHttpOriginUrl(raw: string): URL | null {
   }
 }
 
+/**
+ * 生产环境若 `TOOLS_PUBLIC_ORIGIN` 仍误填云托管默认域（*.sh.run.tcloudbase.com），
+ * 且 `NEXTAUTH_URL` 已为自定义主站 `https://book.*`，则签发 SSO 时回落到同协议、
+ * 同父域的 `https://tool.*`，避免从主站跳进默认网关 URL。
+ * 仍建议在控制台将 `TOOLS_PUBLIC_ORIGIN` 显式改为用户访问的工具站 origin。
+ */
 export function getToolsPublicOrigin(): string | null {
   const raw = process.env.TOOLS_PUBLIC_ORIGIN?.trim();
   if (!raw) return null;
   const u = normalizeHttpOriginUrl(raw);
   if (!u) return null;
+
+  if (
+    process.env.NODE_ENV === "production" &&
+    u.hostname.endsWith(".sh.run.tcloudbase.com")
+  ) {
+    const main = normalizeHttpOriginUrl(process.env.NEXTAUTH_URL?.trim() ?? "");
+    if (
+      main &&
+      !main.hostname.endsWith(".sh.run.tcloudbase.com") &&
+      main.hostname.startsWith("book.")
+    ) {
+      const toolHost = `tool.${main.hostname.slice("book.".length)}`;
+      const derived = `${main.protocol}//${toolHost}`;
+      if (process.env.TOOLS_DIAGNOSTICS === "1") {
+        console.warn(
+          "[sso-tools-env] TOOLS_PUBLIC_ORIGIN is CloudBase default host; deriving tools origin from NEXTAUTH_URL:",
+          derived,
+        );
+      }
+      return derived;
+    }
+  }
+
   return u.origin;
 }
 
@@ -82,6 +111,27 @@ export function getToolsSsoSetupDiagnostics(): { ready: boolean; issues: string[
     issues.push(
       "TOOLS_PUBLIC_ORIGIN 无法解析为有效 http(s) URL（请检查是否漏写 http:// 或拼写错误）",
     );
+  } else if (rawOrigin) {
+    try {
+      const rawHost = normalizeHttpOriginUrl(rawOrigin)?.hostname ?? "";
+      if (
+        rawHost.endsWith(".sh.run.tcloudbase.com") &&
+        process.env.NODE_ENV === "production"
+      ) {
+        const main = normalizeHttpOriginUrl(process.env.NEXTAUTH_URL?.trim() ?? "");
+        const canDerive =
+          !!main &&
+          !main.hostname.endsWith(".sh.run.tcloudbase.com") &&
+          main.hostname.startsWith("book.");
+        if (!canDerive) {
+          issues.push(
+            `TOOLS_PUBLIC_ORIGIN 仍指向云托管默认域（${rawHost}）；生产环境请改为用户实际打开工具站的 HTTPS 自定义域（如 https://tool.ai-code8.com），须可与 NEXTAUTH_URL（book.*）配对。`,
+          );
+        }
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   const server = process.env.TOOLS_SSO_SERVER_SECRET?.trim();
