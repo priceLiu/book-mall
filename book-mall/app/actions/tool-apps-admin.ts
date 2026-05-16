@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
+import { PricingBillingKind } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -52,6 +53,36 @@ function parsePositiveRetailMultiplier(raw: unknown): number {
   return n;
 }
 
+function parseOptionalString(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const t = raw.trim();
+  return t.length > 0 ? t : null;
+}
+
+function parseOptionalBillingKind(raw: unknown): PricingBillingKind | null {
+  if (typeof raw !== "string") return null;
+  const t = raw.trim();
+  if (!t) return null;
+  if (!(t in PricingBillingKind)) throw new Error(`计费维度无效：${t}`);
+  return PricingBillingKind[t as keyof typeof PricingBillingKind];
+}
+
+/**
+ * v002 P1-2 强约束：服务端永远以 `pricePoints = round(cost × M × 100)` 为准；
+ * 前端表单的 `pricePoints` 输入只作为校验时的展示，不写入。
+ * 同时禁止 cost = 0（成本必须存在；如想白嫖请直接停用此行）。
+ */
+function computePricePointsStrict(costYuan: number, mult: number): number {
+  if (costYuan === 0) {
+    throw new Error("成本（元）= 0 的定价行不允许保存；请取消勾选 `active` 或删除");
+  }
+  const v = Math.round(costYuan * mult * 100);
+  if (!Number.isInteger(v) || v < 1) {
+    throw new Error("根据 cost × M 计算出的点数 < 1，请提高成本或系数");
+  }
+  return v;
+}
+
 export async function createToolBillablePrice(formData: FormData) {
   await assertAdmin();
   const toolKey = String(formData.get("toolKey") ?? "").trim();
@@ -64,10 +95,13 @@ export async function createToolBillablePrice(formData: FormData) {
 
   const costYuan = parseNonnegativeCostYuan(formData.get("schemeAUnitCostYuan"));
   const mult = parsePositiveRetailMultiplier(formData.get("schemeAAdminRetailMultiplier"));
-  const pricePoints = Math.round(costYuan * mult * 100);
-  if (pricePoints < 0 || !Number.isInteger(pricePoints)) throw new Error("点数控件无效");
+  const pricePoints = computePricePointsStrict(costYuan, mult);
 
   if (!toolKey) throw new Error("toolKey 必填");
+
+  const cloudModelKey = parseOptionalString(formData.get("cloudModelKey"));
+  const cloudTierRaw = parseOptionalString(formData.get("cloudTierRaw"));
+  const cloudBillingKind = parseOptionalBillingKind(formData.get("cloudBillingKind"));
 
   const effectiveFrom = parseCnWallDatetimeLocal(effectiveFromRaw);
   const effectiveTo = optionalCnWallEnd(effectiveToRaw);
@@ -84,6 +118,9 @@ export async function createToolBillablePrice(formData: FormData) {
       schemeARefModelKey: refModelRaw.length > 0 ? refModelRaw : null,
       schemeAUnitCostYuan: costYuan,
       schemeAAdminRetailMultiplier: mult,
+      cloudModelKey,
+      cloudTierRaw,
+      cloudBillingKind,
     },
   });
   revalidatePath("/admin/tool-apps/manage");

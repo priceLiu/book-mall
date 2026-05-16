@@ -24,7 +24,17 @@
     "pricing:import-markdown": "dotenv -e .env.local -- tsx scripts/pricing-import-markdown.ts",
     "pricing:import-csv": "dotenv -e .env.local -- tsx scripts/pricing-import-csv.ts",
     "pricing:emit-catalogs": "dotenv -e .env.local -- tsx scripts/pricing-emit-catalogs.ts",
-    "pricing:normalize-upload-csv": "tsx scripts/pricing-normalize-upload-csv.ts"
+    "pricing:verify-billable-formula": "dotenv -e .env.local -- tsx scripts/pricing-verify-billable-formula.ts",
+    "pricing:audit-billable-vs-source": "dotenv -e .env.local -- tsx scripts/pricing-audit-billable-vs-source.ts",
+    "pricing:normalize-upload-csv": "tsx scripts/pricing-normalize-upload-csv.ts",
+    "billing:backfill-internal-pricing": "dotenv -e .env.local -- tsx scripts/billing-backfill-internal-pricing.ts",
+    "billing:backfill-tool-usage-lines": "dotenv -e .env.local -- tsx scripts/billing-backfill-tool-usage-lines.ts",
+    "billing:refresh-tool-usage-snapshot": "dotenv -e .env.local -- tsx scripts/billing-refresh-tool-usage-snapshot.ts",
+    "billing:backfill-schemea-unit-cost": "dotenv -e .env.local -- tsx scripts/billing-backfill-schemea-unit-cost.ts",
+    "dev:reset-user-billing": "dotenv -e .env.local -- tsx scripts/dev-reset-user-billing.ts",
+    "reconciliation:run": "dotenv -e .env.local -- tsx scripts/reconciliation-run-cli.ts",
+    "billing:print-dev-user": "dotenv -e .env.local -- tsx scripts/print-dev-user-id.ts",
+    "db:apply-pending": "dotenv -e .env.local -- tsx scripts/apply-pending-migrations.ts"
   },
   "dependencies": {
     "@devnomic/marquee": "^1.0.2",
@@ -46,6 +56,7 @@
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "csv-parse": "^5.6.0",
     "echarts": "^6.0.0",
     "embla-carousel-react": "^8.1.3",
     "lucide-react": "^0.383.0",

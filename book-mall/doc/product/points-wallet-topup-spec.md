@@ -45,7 +45,7 @@
 | 项目 | 说明 |
 |------|------|
 | **老订单 meta** | 无 `meta.topup` 的老 `WALLET_TOPUP`：`parseOrderTopupBreakdown` 为 `null` 时按 **paid = amountPoints, bonus = 0**。 |
-| **财务核对页** | **`/admin/finance/reconciliation`** 与 CSV 仍可按 `meta.topup` 拆实收/赠送；`rechargeCouponId` 可导出入库后做二次核对。 |
+| **云级费用明细** | 导入后的 `ToolBillingDetailLine` 由财务控制台（finance-web）与 `GET /api/account/billing-detail-lines` 展示；工具站经 `/api/tool-billing-detail-lines` 代理拉取。充值实收/赠送仍以钱包流水与 `meta.topup` 为准。 |
 | **真实支付** | notify 验签成功后调用 **`fulfillWalletTopupCredits`**，须带上用户当笔支付意图中的 **`rechargeCouponId`**（若有）；见 `doc/process/real-payment-integration.md`。 |
 | **风控** | `assertReasonableTopupBonus`（`lib/wallet-topup-fulfill-shared.ts`）约束单笔赠送上限；券路径使用快照中的 `bonusPointsSnap`。 |
 | **提现** | 赠送与本金合并为同一余额；法规若要求区分可退范围，需另议（当前未实现）。 |

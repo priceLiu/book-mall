@@ -1,12 +1,14 @@
 import { cookies } from "next/headers";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
-/** AI智能试衣：成片成功且写出计费点后上报主站 try_on（与 Beacon page_view 分离）；详见 doc/payment.md。 */
+/**
+ * v002（清理）：向主站 `/api/sso/tools/usage` 上报使用事件。
+ * - 不再支持 `costPoints` 字段：定价由主站 `ToolBillablePrice` 表唯一决定，工具站只发 toolKey/action/meta。
+ * - meta 必须能解析到模型 key（任一字段：`modelId / apiModel / videoModel / textToImageModel / tryOnModel`），否则主站无法定价。
+ */
 export async function recordToolUsageFromServer(opts: {
   toolKey: string;
   action: string;
-  /** 主站优先采用的扣费点数（正整数）；与 book-mall `POST /api/sso/tools/usage` 一致。 */
-  costPoints?: number;
   meta?: Record<string, unknown>;
 }): Promise<void> {
   const token = cookies().get("tools_token")?.value?.trim();
@@ -25,11 +27,6 @@ export async function recordToolUsageFromServer(opts: {
       body: JSON.stringify({
         toolKey: opts.toolKey,
         action: opts.action,
-        ...(typeof opts.costPoints === "number" &&
-        Number.isFinite(opts.costPoints) &&
-        opts.costPoints > 0
-          ? { costPoints: Math.floor(opts.costPoints) }
-          : {}),
         ...(opts.meta ? { meta: opts.meta } : {}),
       }),
       cache: "no-store",
@@ -50,7 +47,6 @@ export async function recordToolUsageFromServer(opts: {
 export async function postToolUsageFromServer(opts: {
   toolKey: string;
   action: string;
-  costPoints?: number;
   meta?: Record<string, unknown>;
 }): Promise<
   | { ok: false; reason: "no_session" | "no_origin" }
@@ -71,11 +67,6 @@ export async function postToolUsageFromServer(opts: {
     body: JSON.stringify({
       toolKey: opts.toolKey,
       action: opts.action,
-      ...(typeof opts.costPoints === "number" &&
-      Number.isFinite(opts.costPoints) &&
-      opts.costPoints > 0
-        ? { costPoints: Math.floor(opts.costPoints) }
-        : {}),
       ...(opts.meta ? { meta: opts.meta } : {}),
     }),
     cache: "no-store",
