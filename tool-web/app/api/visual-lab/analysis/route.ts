@@ -249,7 +249,6 @@ export async function POST(req: Request) {
   const usage = await postToolUsageFromServerWithRetries({
     toolKey: VISUAL_LAB_ANALYSIS_TOOL_KEY,
     action: VISUAL_LAB_ANALYSIS_ACTION,
-    costPoints,
     meta: {
       taskId: billingRaw,
       modelId,

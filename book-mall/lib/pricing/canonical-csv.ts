@@ -17,27 +17,110 @@ const REQUIRED = [
   "cost_json",
 ] as const;
 
+/**
+ * 表头别名 → 规范英文列。
+ *
+ * 已知 vendor CSV 表头（按 norm 后 lowercase 形式）：
+ * - **阿里云**：`region/区域`、`model_key/modelid/模型`、`tier/规格`、`billing_kind/计费类型`、`input_yuan_per_million/输入(元/百万tokens)`、`output_yuan_per_million/输出(元/百万tokens)`、`cost_json/成本json`
+ * - **腾讯云**：`地域/region`、`产品/模型`、`计费方式/billing_kind`、`输入价格元/百万tokens`、`输出价格元/百万tokens`
+ * - **火山引擎/Doubao**：`region`、`model_name`、`billing_type`、`input_price_per_million_tokens_yuan`、`output_price_per_million_tokens_yuan`
+ * - **智谱 AI / Moonshot**：`region`、`model`、`type`、`input_price_per_1m_tokens`、`output_price_per_1m_tokens`
+ * - **百度文心**：`region`、`model_id`、`billing_kind`、`input_yuan_per_million_tokens`、`output_yuan_per_million_tokens`
+ *
+ * 未识别表头时，由 UI 转换器把原始表头并排到规范名，提示运营手动改头或粘贴 JSON 别名补丁。
+ */
 const HEADER_ALIASES: Record<string, string> = {
+  // region
   地域: "region",
-  模型键: "model_key",
-  modelkey: "model_key",
+  区域: "region",
+  地区: "region",
+  region_code: "region",
+  // model_key
   模型: "model_key",
+  模型键: "model_key",
+  模型id: "model_key",
+  modelid: "model_key",
+  modelkey: "model_key",
+  model: "model_key",
+  model_name: "model_key",
+  model_id: "model_key",
+  产品: "model_key",
+  // tier_raw
   阶梯: "tier_raw",
+  规格: "tier_raw",
+  档位: "tier_raw",
   tier: "tier_raw",
+  spec: "tier_raw",
+  // billing_kind
   计费类型: "billing_kind",
+  计费方式: "billing_kind",
+  类型: "billing_kind",
+  type: "billing_kind",
   billingkind: "billing_kind",
+  billing_type: "billing_kind",
   "billing kind": "billing_kind",
+  // input_yuan_per_million
   输入元每百万token: "input_yuan_per_million",
+  输入元每百万tokens: "input_yuan_per_million",
+  "输入(元/百万tokens)": "input_yuan_per_million",
+  "输入(元/百万token)": "input_yuan_per_million",
+  输入元百万tokens: "input_yuan_per_million", // stripped form
+  输入元百万token: "input_yuan_per_million", // stripped form
+  输入: "input_yuan_per_million",
+  输入价格元百万tokens: "input_yuan_per_million",
+  "输入价格(元/百万tokens)": "input_yuan_per_million",
+  输入价格元百万token: "input_yuan_per_million",
+  input_price_per_million_tokens_yuan: "input_yuan_per_million",
+  input_price_per_million: "input_yuan_per_million",
+  input_price_per_1m_tokens: "input_yuan_per_million",
+  input_yuan_per_million_tokens: "input_yuan_per_million",
+  in_yuan_per_mtok: "input_yuan_per_million",
+  // output_yuan_per_million
   输出元每百万token: "output_yuan_per_million",
+  输出元每百万tokens: "output_yuan_per_million",
+  "输出(元/百万tokens)": "output_yuan_per_million",
+  "输出(元/百万token)": "output_yuan_per_million",
+  输出元百万tokens: "output_yuan_per_million",
+  输出元百万token: "output_yuan_per_million",
+  输出: "output_yuan_per_million",
+  输出价格元百万tokens: "output_yuan_per_million",
+  "输出价格(元/百万tokens)": "output_yuan_per_million",
+  输出价格元百万token: "output_yuan_per_million",
+  output_price_per_million_tokens_yuan: "output_yuan_per_million",
+  output_price_per_million: "output_yuan_per_million",
+  output_price_per_1m_tokens: "output_yuan_per_million",
+  output_yuan_per_million_tokens: "output_yuan_per_million",
+  out_yuan_per_mtok: "output_yuan_per_million",
+  // cost_json
   成本json: "cost_json",
+  cost: "cost_json",
+  spec_json: "cost_json",
+  cost_object: "cost_json",
 };
 
+/** 规范列名（与 REQUIRED 同序），供上传 UI / CLI 引用。 */
+export const CANONICAL_COLUMNS = REQUIRED;
+
+/** 多级 fallback 归一化：原 → trim → lower → 去标点/空格 → 别名表 */
 function normHeader(h: string): string {
   const raw = h.replace(/\uFEFF/g, "").trim();
   if (HEADER_ALIASES[raw]) return HEADER_ALIASES[raw]!;
-  const t = raw.toLowerCase().replace(/\s+/g, "_");
-  if (HEADER_ALIASES[t]) return HEADER_ALIASES[t]!;
-  return t;
+
+  const lower = raw.toLowerCase();
+  if (HEADER_ALIASES[lower]) return HEADER_ALIASES[lower]!;
+
+  // 中英括号、斜线、空格、连字符、句点 → 全部去掉，便于对齐 alias 表
+  const stripped = lower
+    .replace(/\s+/g, "")
+    .replace(/[()（）\[\]【】{}]/g, "")
+    .replace(/[\/\\\-_.·]/g, "");
+  if (HEADER_ALIASES[stripped]) return HEADER_ALIASES[stripped]!;
+
+  // 仅含字母数字下划线的紧凑形
+  const compact = lower.replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+  if (HEADER_ALIASES[compact]) return HEADER_ALIASES[compact]!;
+
+  return compact;
 }
 
 function parseCsvLine(line: string): string[] {
@@ -73,10 +156,32 @@ export type CsvParseResult =
   | { ok: true; rows: PricingDraftLine[]; normalizedHeader: string[] }
   | { ok: false; error: string };
 
-export function buildColumnIndex(rawHeaders: string[]): { ok: true; index: Record<string, number> } | { ok: false; error: string } {
+/** 把额外的 raw → canonical 别名补丁（来自 UI / 运营手填）合并进 normHeader 的查找路径。 */
+function applyExtraAliases(
+  raw: string,
+  extra: Record<string, string> | undefined,
+): string | null {
+  if (!extra) return null;
+  // 1) 原样
+  if (extra[raw] && (REQUIRED as readonly string[]).includes(extra[raw]!)) {
+    return extra[raw]!;
+  }
+  // 2) lower
+  const lower = raw.toLowerCase();
+  if (extra[lower] && (REQUIRED as readonly string[]).includes(extra[lower]!)) {
+    return extra[lower]!;
+  }
+  return null;
+}
+
+export function buildColumnIndex(
+  rawHeaders: string[],
+  extraAliases?: Record<string, string>,
+): { ok: true; index: Record<string, number> } | { ok: false; error: string } {
   const index: Record<string, number> = {};
   rawHeaders.forEach((raw, i) => {
-    const canon = normHeader(raw);
+    const fromExtra = applyExtraAliases(raw, extraAliases);
+    const canon = fromExtra ?? normHeader(raw);
     index[canon] = i;
   });
   const miss = REQUIRED.filter((k) => index[k] === undefined);
@@ -89,12 +194,56 @@ export function buildColumnIndex(rawHeaders: string[]): { ok: true; index: Recor
   return { ok: true, index };
 }
 
-export function parseCanonicalPricingCsv(text: string): CsvParseResult {
+/** 表头识别报告：哪些列已识别 → 规范名，哪些没识别，哪些规范列还缺失。 */
+export type HeaderAnalysis = {
+  rawHeaders: string[];
+  recognized: Array<{ raw: string; canonical: string }>;
+  unrecognized: string[];
+  missingCanonical: string[];
+};
+
+/** 对单行表头做识别（不解析数据），供 UI 转换器使用。 */
+export function analyzeCsvHeader(
+  text: string,
+  extraAliases?: Record<string, string>,
+): { ok: true; report: HeaderAnalysis } | { ok: false; error: string } {
+  const firstLine = text.split(/\r?\n/).find((l) => l.trim().length > 0);
+  if (!firstLine) return { ok: false, error: "空文件" };
+  const rawHeaders = parseCsvLine(firstLine);
+  const recognized: HeaderAnalysis["recognized"] = [];
+  const unrecognized: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of rawHeaders) {
+    const fromExtra = applyExtraAliases(raw, extraAliases);
+    const canon = fromExtra ?? normHeader(raw);
+    if ((REQUIRED as readonly string[]).includes(canon)) {
+      recognized.push({ raw, canonical: canon });
+      seen.add(canon);
+    } else {
+      unrecognized.push(raw);
+    }
+  }
+  const missing = REQUIRED.filter((k) => !seen.has(k));
+  return {
+    ok: true,
+    report: {
+      rawHeaders,
+      recognized,
+      unrecognized,
+      missingCanonical: [...missing],
+    },
+  };
+}
+
+export function parseCanonicalPricingCsv(
+  text: string,
+  extraAliases?: Record<string, string>,
+): CsvParseResult {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) return { ok: false, error: "CSV 至少需要表头+一行数据" };
 
   const headerCells = parseCsvLine(lines[0]!);
-  const hi = buildColumnIndex(headerCells);
+  const hi = buildColumnIndex(headerCells, extraAliases);
   if (!hi.ok) return hi;
   const I = hi.index;
   const rows: PricingDraftLine[] = [];
@@ -164,11 +313,14 @@ export function parseCanonicalPricingCsv(text: string): CsvParseResult {
 }
 
 /** 将上传 CSV 转为**规范列序** CSV（首行英文规范名，列按 REQUIRED 顺序输出）。 */
-export function rewriteCsvToCanonicalOrder(csvText: string): { ok: true; out: string } | { ok: false; error: string } {
+export function rewriteCsvToCanonicalOrder(
+  csvText: string,
+  extraAliases?: Record<string, string>,
+): { ok: true; out: string } | { ok: false; error: string } {
   const lines = csvText.split(/\r?\n/);
   if (lines.length < 1 || !lines[0]?.trim()) return { ok: false, error: "空文件" };
   const headerCells = parseCsvLine(lines[0]!);
-  const hi = buildColumnIndex(headerCells);
+  const hi = buildColumnIndex(headerCells, extraAliases);
   if (!hi.ok) return hi;
   const I = hi.index;
   const head = [...REQUIRED].join(",");

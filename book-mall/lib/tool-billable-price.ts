@@ -15,18 +15,34 @@ export type ResolveBillablePriceOpts = {
 };
 
 /**
- * 解析当前生效的按次单价（点，1 点 = ¥0.01）。
- * 匹配同一 toolKey 下 effectiveFrom ≤ now ≤ effectiveTo（或 effectiveTo 为空），
- * 且 action 等于给定 action，或定价行为 null（通配该工具下 action）。
- * 优先采用「action 精确匹配」的行；否则采用 action 为 null 的行。
- * 若多行 action 相同且均带 schemeARefModelKey（如分析室 8 模型），用 opts.schemeARefModelKey 命中；
- * 未传 schemeARefModelKey 时：分析室回落 qwen3.6-plus；AI 试衣页回落 aitryon；图生视频回落 happyhorse-1.0-i2v。
+ * v002 引入：解析「定价快照」——除点数外，附带云成本单价、零售系数、命中行 id 与模型键。
+ * 用于在 `recordToolUsageAndConsumeWallet` 写 ToolBillingDetailLine 时一次性固化 internal* 列。
+ *
+ * - `points`：本次扣减点数（与旧 `resolveBillablePricePoints` 同口径）
+ * - `unitCostYuan`：命中行 `schemeAUnitCostYuan`，未填则 null
+ * - `retailMultiplier`：命中行 `schemeAAdminRetailMultiplier`，未填则 null
+ * - `ourUnitYuan`：cost × M（任一缺失则 null）
+ * - `schemeARefModelKey`：命中行的 catalog 模型 id
+ * - `billablePriceId`：命中行 id（便于审计）
  */
-export async function resolveBillablePricePoints(
+export type BillableSnapshot = {
+  points: number;
+  unitCostYuan: number | null;
+  retailMultiplier: number | null;
+  ourUnitYuan: number | null;
+  schemeARefModelKey: string | null;
+  billablePriceId: string;
+};
+
+/**
+ * 解析当前生效的「按次定价行」——返回包含成本快照的完整对象（v002）。
+ * 旧函数 `resolveBillablePricePoints` 仍保留为兼容封装，仅返回 `points`。
+ */
+export async function resolveBillableSnapshot(
   toolKey: string,
   action: string,
   opts?: ResolveBillablePriceOpts,
-): Promise<number | undefined> {
+): Promise<BillableSnapshot | undefined> {
   const now = new Date();
   const rows = await prisma.toolBillablePrice.findMany({
     where: {
@@ -83,6 +99,51 @@ export async function resolveBillablePricePoints(
   }
 
   const row = chosen[0]!;
-  const v = row.pricePoints;
-  return typeof v === "number" && v > 0 ? v : undefined;
+  const points = typeof row.pricePoints === "number" && row.pricePoints > 0 ? row.pricePoints : 0;
+  if (points <= 0) return undefined;
+
+  const storedCost =
+    typeof row.schemeAUnitCostYuan === "number" && Number.isFinite(row.schemeAUnitCostYuan) && row.schemeAUnitCostYuan > 0
+      ? row.schemeAUnitCostYuan
+      : null;
+  const mult =
+    typeof row.schemeAAdminRetailMultiplier === "number" && Number.isFinite(row.schemeAAdminRetailMultiplier) && row.schemeAAdminRetailMultiplier > 0
+      ? row.schemeAAdminRetailMultiplier
+      : null;
+
+  /**
+   * v002 兼容：早期管理端只填了 `pricePoints` 与 `schemeAAdminRetailMultiplier`，
+   * 没维护 `schemeAUnitCostYuan` 时，按定义反推：cost = pricePoints / M / 100。
+   * 这样 `ToolBillingDetailLine.internalCloudCostUnitYuan` 不再为 null，财务表能立即展示。
+   */
+  const cost =
+    storedCost != null
+      ? storedCost
+      : mult != null
+        ? points / mult / 100
+        : null;
+
+  const ourUnit = cost != null && mult != null ? cost * mult : null;
+
+  return {
+    points,
+    unitCostYuan: cost,
+    retailMultiplier: mult,
+    ourUnitYuan: ourUnit,
+    schemeARefModelKey: row.schemeARefModelKey ?? null,
+    billablePriceId: row.id,
+  };
+}
+
+/**
+ * 兼容封装：保留旧 API 形态，仅返回 points。
+ * 新代码请用 `resolveBillableSnapshot` 以拿到 cost / M / 命中行 id。
+ */
+export async function resolveBillablePricePoints(
+  toolKey: string,
+  action: string,
+  opts?: ResolveBillablePriceOpts,
+): Promise<number | undefined> {
+  const snap = await resolveBillableSnapshot(toolKey, action, opts);
+  return snap?.points;
 }

@@ -104,10 +104,10 @@ export async function POST(req: Request) {
     usage = await postToolUsageFromServerWithRetries({
       toolKey: "image-to-video",
       action: "invoke",
-      costPoints,
       meta: {
         taskId: billTaskId,
         videoUrl,
+        modelId: vCtx.apiModel,
         pricingScheme: "tools_scheme_a",
         videoModel: vCtx.apiModel,
         videoDurationSec: vCtx.durationSec,

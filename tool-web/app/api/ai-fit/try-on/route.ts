@@ -68,11 +68,11 @@ async function reportAiFitTryOnUsage(opts: {
     const usage = await postToolUsageFromServerWithRetries({
       toolKey: AI_FIT_USAGE_TOOL_KEY,
       action: "try_on",
-      costPoints: billingPoints,
       meta: {
         taskId: opts.taskId,
         resultImageUrl: opts.imageUrl,
         persistedToOwnOss: opts.persistedToOwnOss,
+        modelId: tryOnModelId,
         pricingScheme: "tools_scheme_a",
         tryOnModel: tryOnModelId,
         retailMultiplier: retailMult,

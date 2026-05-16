@@ -35,7 +35,9 @@
 | `/fitting-room` | 试衣间（页面级仍可 introspect；壳层优先 JWT） |
 | `/text-to-image` | 文生图 |
 | `/text-to-image/implementation` | 文生图 · 实现逻辑（摘录） |
-| `/image-to-video` | 图生视频 |
+| `/image-to-video` | 图生视频 · 首页 |
+| `/image-to-video/lab` | 图生视频 · 实验室（i2v / r2v / t2v） |
+| `/image-to-video/library` | 图生视频 · 我的视频库 |
 | `/image-to-video/implementation` | 图生视频 · 实现逻辑（摘录） |
 | `/visual-lab` | 视觉实验室 · 首页 |
 | `/visual-lab/analysis` | 视觉实验室 · 分析室 |

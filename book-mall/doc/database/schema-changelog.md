@@ -79,6 +79,15 @@
 - **后台**：`/admin/finance/promo-templates`。  
 - **应用**：`pnpm run db:deploy`。
 
+## 2026-05-16 — 订阅套餐版本谱系（停旧发新 · 价不可改）
+
+- **迁移目录**：`prisma/migrations/20260516191500_subscription_plan_lineage/`
+- **SubscriptionPlan**：新增 `archivedAt DateTime?`、`parentPlanId String?` + self-relation（`PlanLineage`），新增复合索引 `(active, archivedAt)`。
+- **原因**：原后台「订阅与充值」直接 `UPDATE SubscriptionPlan.pricePoints` 会破坏老用户「当时订阅价」的溯源；现改为「发布新版本」——旧 plan 改名为 `${slug}__v${ts}` + `active=false` + `archivedAt=now`，新 plan 继承主 slug 并通过 `parentPlanId` 串接历史链。
+- **关键不变量**：`Subscription.planId` 仍指向归档 plan，可读到当时的 `pricePoints` / `name` / `toolsNavAllowlist`；前台 `findFirst { slug, active: true }` 自动取到当前版本。
+- **应用**：`pnpm db:apply-pending`（或 `pnpm db:deploy`），随后 `pnpm prisma generate`。
+- **配套文档**：[`doc/releases/2026-05-16-subscription-plan-lineage.md`](../releases/2026-05-16-subscription-plan-lineage.md)。
+
 ## 2026-06-15 — 工具站「视觉实验室」侧栏分组
 
 - **迁移目录**：`prisma/migrations/20260615120000_tool_nav_visual_lab/`  

@@ -46,7 +46,8 @@ export async function GET(req: Request) {
 }
 
 /**
- * 代理主站写入 `ToolUsageEvent`：**仅当主站解析出正金额 costPoints 时才会入库**；否则 `{ recorded: false }`。
+ * 代理主站写入 `ToolUsageEvent`：主站根据 `meta.modelId / apiModel / ...` 自身从 `ToolBillablePrice` 解析
+ * 单价；只有解析出正金额时才会入库，否则返回 `{ recorded: false }`。客户端不再发 `costPoints` 字段。
  */
 export async function POST(req: Request) {
   const gate = await requireActiveToolsSession();

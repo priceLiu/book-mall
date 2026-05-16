@@ -3,6 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -14,12 +15,16 @@ import {
   createToolBillablePrice,
   updateToolBillablePrice,
 } from "@/app/actions/tool-apps-admin";
-import type { BillableRowPayload } from "@/lib/tool-billable-row-payloads";
+import type {
+  BillableRowPayload,
+  BillableRowStatus,
+} from "@/lib/tool-billable-row-payloads";
 import type { SchemeAModelOption } from "@/lib/tool-billable-scheme-a-shared";
 import { schemeABillableOptionsKey } from "@/lib/tool-billable-scheme-a-shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 function formatDatetimeLocalChina(dIso: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -269,12 +274,40 @@ function schemeMismatchHint(
   return null;
 }
 
+const STATUS_LABEL: Record<BillableRowStatus, string> = {
+  current: "当前生效",
+  future: "未来生效",
+  expired: "已过期",
+  inactive: "已停用",
+};
+
+function StatusBadge({ status }: { status: BillableRowStatus }) {
+  const cls =
+    status === "current"
+      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/15"
+      : status === "future"
+        ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 hover:bg-sky-500/15"
+        : status === "expired"
+          ? "bg-muted text-muted-foreground hover:bg-muted"
+          : "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-500/15";
+  return (
+    <Badge
+      variant="secondary"
+      className={`${cls} whitespace-nowrap px-1.5 py-0 text-[10px]`}
+    >
+      {STATUS_LABEL[status]}
+    </Badge>
+  );
+}
+
 function BillableRowEditor({
   row,
   options,
+  showToolKeyCell,
 }: {
   row: BillableRowPayload;
   options: SchemeAModelOption[];
+  showToolKeyCell: boolean;
 }) {
   const [pickingEffectiveEnd, setPickingEffectiveEnd] = useState(false);
   const modelId = row.schemeARefModelKey ?? "";
@@ -294,24 +327,51 @@ function BillableRowEditor({
       })
     : "—";
   const canEditEffectiveTo = row.effectiveTo.trim().length === 0;
+  const isCurrent = row.status === "current";
+  const dimRow = row.status === "inactive" || row.status === "expired";
+
+  const driftAbs =
+    row.cloudCostDriftPercent != null
+      ? Math.abs(row.cloudCostDriftPercent)
+      : null;
+  const driftHigh = driftAbs != null && driftAbs >= 0.01;
+  const driftText =
+    row.cloudCostDriftPercent != null
+      ? `${row.cloudCostDriftPercent > 0 ? "+" : ""}${(row.cloudCostDriftPercent * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%`
+      : null;
 
   return (
     <tr
       className={
-        row.active
-          ? "border-b border-secondary/70 align-middle last:border-0 hover:bg-muted/20"
-          : "border-b border-secondary/70 align-middle last:border-0 bg-muted/25 text-muted-foreground hover:bg-muted/30"
+        dimRow
+          ? "border-b border-secondary/70 align-middle last:border-0 bg-muted/25 text-muted-foreground hover:bg-muted/30"
+          : isCurrent
+            ? "border-b border-secondary/70 align-middle last:border-0 hover:bg-muted/20"
+            : "border-b border-secondary/70 align-middle last:border-0 hover:bg-muted/20"
       }
     >
       <td className="p-2 align-top">
-        <span className="break-all font-mono text-xs leading-snug">{row.toolKey}</span>
+        {showToolKeyCell ? (
+          <span className="break-all font-mono text-xs leading-snug">{row.toolKey}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground/60">↳</span>
+        )}
       </td>
       <td className="p-2 align-top font-mono text-xs">{row.action ?? "—"}</td>
       <td className="p-2 align-top">
         <div className="space-y-1">
-          <span className="block break-all font-mono text-xs" title="不可在此修改；调价请下方「新增定价」">
-            {modelId || "—"}
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="break-all font-mono text-xs" title="不可在此修改；调价请下方「新增定价」">
+              {modelId || "—"}
+            </span>
+            <StatusBadge status={row.status} />
+          </div>
+          {row.cloudBillingKind ? (
+            <div className="text-[10px] leading-snug text-muted-foreground">
+              <span className="font-mono">{row.cloudBillingKind}</span>
+              {row.cloudTierRaw ? <span> · {row.cloudTierRaw}</span> : null}
+            </div>
+          ) : null}
           {rowHint ? (
             <p className="max-w-[14rem] text-[11px] leading-snug text-amber-700 dark:text-amber-400">
               {rowHint}
@@ -319,7 +379,28 @@ function BillableRowEditor({
           ) : null}
         </div>
       </td>
-      <td className="p-2 align-top font-mono text-xs tabular-nums text-muted-foreground">{costDisp}</td>
+      <td className="p-2 align-top">
+        <div className="flex flex-col gap-0.5 font-mono text-xs tabular-nums">
+          <span title="本行落库时的成本快照 (schemeAUnitCostYuan)">
+            行：{costDisp}
+          </span>
+          {row.cloudCostDisplay ? (
+            <span
+              className={driftHigh ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}
+              title={
+                row.cloudUnitLabel
+                  ? `云厂商当前 (${row.cloudUnitLabel})`
+                  : "云厂商当前"
+              }
+            >
+              云：{row.cloudCostDisplay}
+              {driftText ? <span className="ml-1">({driftText})</span> : null}
+            </span>
+          ) : (
+            <span className="text-muted-foreground/70">云：—</span>
+          )}
+        </div>
+      </td>
       <td className="p-2 align-top font-mono text-xs tabular-nums text-muted-foreground">{multDisp}</td>
       <td className="p-2 align-top font-mono text-xs tabular-nums text-muted-foreground">
         {retailYuanFromDb.toLocaleString("zh-CN", {
@@ -374,6 +455,8 @@ function BillableRowEditor({
   );
 }
 
+const ALL_STATUSES: BillableRowStatus[] = ["current", "future", "expired", "inactive"];
+
 export function AdminToolBillablePricingClient({
   rowPayloads,
   optionsByKeyJson,
@@ -404,6 +487,66 @@ export function AdminToolBillablePricingClient({
   const newRetail = retailYuan(newCost, newMult);
   const newHint = schemeMismatchHint(newModel, newOpts);
 
+  // —— 筛选与搜索 ——
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+  const allToolKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of rowPayloads) s.add(r.toolKey);
+    return Array.from(s).sort();
+  }, [rowPayloads]);
+  const [tkSel, setTkSel] = useState<Set<string>>(new Set());
+  const [stSel, setStSel] = useState<Set<BillableRowStatus>>(
+    new Set(ALL_STATUSES),
+  );
+  const [driftOnly, setDriftOnly] = useState(false);
+
+  const toggleSet = <T,>(prev: Set<T>, v: T) => {
+    const next = new Set(prev);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    return next;
+  };
+
+  const filteredRows = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    return rowPayloads.filter((r) => {
+      if (tkSel.size > 0 && !tkSel.has(r.toolKey)) return false;
+      if (!stSel.has(r.status)) return false;
+      if (
+        driftOnly &&
+        !(
+          r.cloudCostDriftPercent != null &&
+          Math.abs(r.cloudCostDriftPercent) >= 0.01
+        )
+      )
+        return false;
+      if (q) {
+        const hay = `${r.toolKey} ${r.action ?? ""} ${r.schemeARefModelKey ?? ""} ${r.cloudModelKey ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [rowPayloads, tkSel, stSel, driftOnly, deferredQuery]);
+
+  // —— 按 toolKey 分组：保留原顺序，连续相同 toolKey 视为同组；首行单元格显示 toolKey，其余仅显示 ↳ ——
+  type Group = { toolKey: string; rows: BillableRowPayload[] };
+  const groups = useMemo(() => {
+    const out: Group[] = [];
+    let cur: Group | null = null;
+    for (const r of filteredRows) {
+      if (!cur || cur.toolKey !== r.toolKey) {
+        cur = { toolKey: r.toolKey, rows: [] };
+        out.push(cur);
+      }
+      cur.rows.push(r);
+    }
+    return out;
+  }, [filteredRows]);
+
+  const groupCurrentCount = (rows: BillableRowPayload[]) =>
+    rows.filter((r) => r.status === "current").length;
+
   return (
     <>
       <p className="text-sm text-muted-foreground">
@@ -414,6 +557,109 @@ export function AdminToolBillablePricingClient({
         下表<strong className="text-foreground">已有行</strong>若当前为<strong className="text-foreground">长期有效</strong>（生效止为空），可<strong className="text-foreground">填一次生效止</strong>并保存；已设结束时间的行不可再改。
         「新增」仍支持建议列表与手填参考模型；价目未匹配时请 import/映射或手填成本。
       </p>
+
+      {/* —— 工具栏：搜索 + toolKey 多选 + 状态多选 + 仅漂移 —— */}
+      <div className="space-y-3 rounded-lg border border-border bg-card/40 p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-[18rem] flex-1">
+            <Label htmlFor="bp-search" className="sr-only">
+              搜索
+            </Label>
+            <Input
+              id="bp-search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜索 toolKey / action / 模型 id / cloudModelKey"
+              className="h-9 font-mono text-xs"
+              spellCheck={false}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={driftOnly}
+              onChange={(e) => setDriftOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <span>仅看与云厂商成本漂移 ≥ 1%</span>
+          </label>
+          <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+            筛选后 {filteredRows.length} 行 / {groups.length} 个 toolKey
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-muted-foreground">toolKey</span>
+            <div className="flex flex-wrap gap-1">
+              <Button
+                type="button"
+                variant={tkSel.size === 0 ? "secondary" : "outline"}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setTkSel(new Set())}
+              >
+                全部
+              </Button>
+              {allToolKeys.map((tk) => {
+                const on = tkSel.has(tk);
+                return (
+                  <Button
+                    key={tk}
+                    type="button"
+                    variant={on ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-7 px-2 font-mono text-xs"
+                    onClick={() => setTkSel((p) => toggleSet(p, tk))}
+                  >
+                    {tk}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] font-medium text-muted-foreground">状态</span>
+            <div className="flex flex-wrap gap-1">
+              {ALL_STATUSES.map((st) => {
+                const on = stSel.has(st);
+                return (
+                  <Button
+                    key={st}
+                    type="button"
+                    variant={on ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setStSel((p) => toggleSet(p, st))}
+                  >
+                    {STATUS_LABEL[st]}
+                  </Button>
+                );
+              })}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setStSel(new Set(["current"]))}
+                title="只看运行时实扣的「当前生效」行"
+              >
+                仅当前生效
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setStSel(new Set(ALL_STATUSES))}
+              >
+                全部状态
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="hidden" aria-hidden="true">
         {rowPayloads.map((r) => (
           <form key={`upd-${r.id}`} id={`upd-tool-price-${r.id}`} action={updateToolBillablePrice}>
@@ -423,16 +669,18 @@ export function AdminToolBillablePricingClient({
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-secondary">
-        <table className="w-full min-w-[1180px] text-left text-sm">
+        <table className="w-full min-w-[1280px] text-left text-sm">
           <thead className="border-b border-secondary bg-muted/50">
             <tr className="text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="p-2 font-medium normal-case tracking-normal text-foreground">toolKey</th>
+              <th className="p-2 font-medium normal-case tracking-normal text-foreground w-[12rem]">
+                toolKey
+              </th>
               <th className="p-2 font-medium normal-case tracking-normal text-foreground">action</th>
               <th className="p-2 font-medium normal-case tracking-normal text-foreground min-w-[16rem]">
-                参考模型
+                参考模型 · 状态
               </th>
-              <th className="p-2 font-medium normal-case tracking-normal text-foreground w-[100px]">
-                成本(元)
+              <th className="p-2 font-medium normal-case tracking-normal text-foreground w-[180px]">
+                成本(元) — 行 / 云
               </th>
               <th className="p-2 font-medium normal-case tracking-normal text-foreground w-[88px]">
                 系数 M
@@ -453,22 +701,43 @@ export function AdminToolBillablePricingClient({
             </tr>
           </thead>
           <tbody>
-            {rowPayloads.length === 0 ? (
+            {filteredRows.length === 0 ? (
               <tr>
                 <td colSpan={10} className="p-4 text-muted-foreground">
-                  暂无定价；请在下方新增。
+                  {rowPayloads.length === 0
+                    ? "暂无定价；请在下方新增。"
+                    : "没有匹配当前筛选的行；请清空筛选或切换关键字。"}
                 </td>
               </tr>
             ) : (
-              rowPayloads.map((r) => (
-                <BillableRowEditor
-                  key={`${r.id}-${r.effectiveTo || "long"}`}
-                  row={r}
-                  options={
-                    optionsByKey[schemeABillableOptionsKey(r.toolKey, r.action)] ?? []
-                  }
-                />
-              ))
+              groups.flatMap((g) => {
+                const head = (
+                  <tr
+                    key={`grp-${g.toolKey}`}
+                    className="border-y border-secondary/80 bg-muted/40"
+                  >
+                    <td colSpan={10} className="px-2 py-1 text-xs">
+                      <span className="font-mono font-semibold text-foreground">
+                        {g.toolKey}
+                      </span>
+                      <span className="ml-2 text-muted-foreground">
+                        {g.rows.length} 行 · 当前生效 {groupCurrentCount(g.rows)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+                const rows = g.rows.map((r, idx) => (
+                  <BillableRowEditor
+                    key={`${r.id}-${r.effectiveTo || "long"}`}
+                    row={r}
+                    options={
+                      optionsByKey[schemeABillableOptionsKey(r.toolKey, r.action)] ?? []
+                    }
+                    showToolKeyCell={idx === 0}
+                  />
+                ));
+                return [head, ...rows];
+              })
             )}
           </tbody>
         </table>

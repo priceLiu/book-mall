@@ -1,11 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { formatPointsAsYuan } from "@/lib/currency";
-import {
-  updatePlatformBillingConfig,
-  updateSubscriptionPlanPrice,
-  updateSubscriptionPlanToolsAllowlist,
-  extendActiveSubscription,
-} from "@/app/actions/billing";
 import { createSubscriptionRefundRequest } from "@/app/actions/refunds";
 import {
   Card,
@@ -15,43 +9,85 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
+import { PlatformConfigForm } from "./platform-config-form";
+import { ExtendSubscriptionForm } from "./extend-subscription-form";
+import {
+  SubscriptionPlanCard,
+  type PlanRow,
+} from "./subscription-plan-card";
 
 export const metadata = {
   title: "订阅与计费 — 管理后台",
 };
 
-const SUITE_LABEL: Record<string, string> = {
-  "fitting-room": "试衣间",
-  "text-to-image": "文生图",
-  "image-to-video": "图生视频",
-  "visual-lab": "视觉实验室",
-  "smart-support": "AI智能客服",
-  "app-history": "费用明细",
-};
-
 export default async function AdminBillingPage() {
-  const [config, plans, orders, rechargeAgg] = await Promise.all([
-    prisma.platformConfig.findUnique({ where: { id: "default" } }),
-    prisma.subscriptionPlan.findMany({ orderBy: { interval: "asc" } }),
-    prisma.order.findMany({
-      take: 80,
-      orderBy: { createdAt: "desc" },
-      include: { user: { select: { email: true } } },
-    }),
-    prisma.walletEntry.aggregate({
-      where: { type: "RECHARGE" },
-      _sum: { amountPoints: true },
-    }),
-  ]);
+  const [config, plans, planSubCounts, orders, rechargeAgg] = await Promise.all(
+    [
+      prisma.platformConfig.findUnique({ where: { id: "default" } }),
+      prisma.subscriptionPlan.findMany({
+        orderBy: [{ interval: "asc" }, { archivedAt: "asc" }, { id: "asc" }],
+      }),
+      prisma.subscription.groupBy({
+        by: ["planId"],
+        _count: { _all: true },
+      }),
+      prisma.order.findMany({
+        take: 80,
+        orderBy: { createdAt: "desc" },
+        include: { user: { select: { email: true } } },
+      }),
+      prisma.walletEntry.aggregate({
+        where: { type: "RECHARGE" },
+        _sum: { amountPoints: true },
+      }),
+    ],
+  );
 
   if (!config) {
     return <p className="text-destructive text-sm">请先执行 pnpm db:seed</p>;
   }
 
   const totalRecharge = rechargeAgg._sum.amountPoints ?? 0;
+  const subCountByPlan = new Map<string, number>();
+  for (const row of planSubCounts) {
+    subCountByPlan.set(row.planId, row._count._all);
+  }
+
+  const planRows: PlanRow[] = plans.map((p) => ({
+    id: p.id,
+    slug: p.slug,
+    name: p.name,
+    interval: p.interval,
+    pricePoints: p.pricePoints,
+    active: p.active,
+    archivedAt: p.archivedAt,
+    parentPlanId: p.parentPlanId,
+    toolsNavAllowlist: p.toolsNavAllowlist,
+    subscriptionsCount: subCountByPlan.get(p.id) ?? 0,
+  }));
+
+  // 按 lineage 串：active plan 一行，沿 parentPlanId 上溯收集其所有祖先作为「历史版本」。
+  const byId = new Map(planRows.map((p) => [p.id, p]));
+  const collectAncestors = (start: PlanRow): PlanRow[] => {
+    const out: PlanRow[] = [];
+    let cur = start.parentPlanId ? byId.get(start.parentPlanId) : undefined;
+    let safety = 50;
+    while (cur && safety-- > 0) {
+      out.push(cur);
+      cur = cur.parentPlanId ? byId.get(cur.parentPlanId) : undefined;
+    }
+    return out;
+  };
+
+  const activePlans = planRows.filter((p) => p.active && !p.archivedAt);
+  const orphanArchived = planRows.filter((p) => {
+    if (p.active && !p.archivedAt) return false;
+    // 已被某个 active plan 的链条覆盖到的旧版本不再单独列
+    for (const a of activePlans) {
+      if (collectAncestors(a).some((x) => x.id === p.id)) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-10">
@@ -59,14 +95,21 @@ export default async function AdminBillingPage() {
         <h1 className="text-2xl font-bold">订阅与充值管理（5.3）</h1>
         <p className="text-sm text-muted-foreground">
           计费配置、订阅套餐价格、订单查阅、手动续期与订阅提现审核入口；前台「第七章」细则见{" "}
-          <a href="/pricing-disclosure" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+          <a
+            href="/pricing-disclosure"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline"
+          >
             价格公示与使用说明
           </a>
           与首页计费摘要。
         </p>
         <p className="mt-2 text-sm tabular-nums">
           历史充值入账合计（流水 RECHARGE）：{" "}
-          <span className="font-semibold">¥{formatPointsAsYuan(totalRecharge)}</span>
+          <span className="font-semibold">
+            ¥{formatPointsAsYuan(totalRecharge)}
+          </span>
         </p>
       </div>
 
@@ -78,100 +121,83 @@ export default async function AdminBillingPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={updatePlatformBillingConfig} className="grid gap-4 sm:grid-cols-2">
-            <Field label="最低余额线（点）" name="minBalanceLinePoints" defaultValue={config.minBalanceLinePoints} />
-            <Field label="较高预警线（点）" name="balanceWarnHighPoints" defaultValue={config.balanceWarnHighPoints} />
-            <Field label="中等预警线（点）" name="balanceWarnMidPoints" defaultValue={config.balanceWarnMidPoints} />
-            <Field label="LLM 输入 / 千 token（点）" name="llmInputPer1kTokensPoints" defaultValue={config.llmInputPer1kTokensPoints} />
-            <Field label="LLM 输出 / 千 token（点）" name="llmOutputPer1kTokensPoints" defaultValue={config.llmOutputPer1kTokensPoints} />
-            <Field label="工具单次调用（点）" name="toolInvokePerCallPoints" defaultValue={config.toolInvokePerCallPoints} />
-            <Field label="异常消耗倍数（%）" name="usageAnomalyRatioPercent" defaultValue={config.usageAnomalyRatioPercent} />
-            <div className="sm:col-span-2">
-              <Button type="submit">保存配置</Button>
-            </div>
-          </form>
+          <PlatformConfigForm
+            config={{
+              minBalanceLinePoints: config.minBalanceLinePoints,
+              balanceWarnHighPoints: config.balanceWarnHighPoints,
+              balanceWarnMidPoints: config.balanceWarnMidPoints,
+              llmInputPer1kTokensPoints: config.llmInputPer1kTokensPoints,
+              llmOutputPer1kTokensPoints: config.llmOutputPer1kTokensPoints,
+              toolInvokePerCallPoints: config.toolInvokePerCallPoints,
+              usageAnomalyRatioPercent: config.usageAnomalyRatioPercent,
+            }}
+          />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>订阅套餐价格</CardTitle>
-          <CardDescription>月度/年度标价（点）；真实支付接入后可与订单联动</CardDescription>
+          <CardTitle>订阅套餐版本</CardTitle>
+          <CardDescription>
+            订阅价不可直接改，避免破坏老用户的订阅价溯源。如需调价，请发布新版本（旧版本将归档为 <code className="font-mono">{`${"<slug>"}__v${"<时间戳>"}`}</code>，老用户的 Subscription.planId 仍指向旧版本，可在「历史版本」中查询当时价）。
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-8">
-          {plans.map((plan) => (
-            <div key={plan.id} className="space-y-5 border-b border-secondary/80 pb-8 last:border-0 last:pb-0">
-              <form
-                action={updateSubscriptionPlanPrice}
-                className="flex flex-wrap items-end gap-4"
-              >
-                <input type="hidden" name="planId" value={plan.id} />
-                <div>
-                  <p className="text-sm font-medium">
-                    {plan.name}{" "}
-                    <span className="text-muted-foreground">({plan.slug})</span>
-                  </p>
-                  <Label className="text-xs text-muted-foreground">价格（点）</Label>
-                  <Input
-                    name="pricePoints"
-                    type="number"
-                    className="mt-1 w-40"
-                    defaultValue={plan.pricePoints}
-                    required
-                    min={0}
-                  />
-                </div>
-                <Button type="submit" size="sm" variant="secondary">
-                  保存价格
-                </Button>
-              </form>
-
-              <form action={updateSubscriptionPlanToolsAllowlist} className="space-y-3">
-                <input type="hidden" name="planId" value={plan.id} />
-                <p className="text-xs font-medium text-muted-foreground">
-                  工具站套件（JWT / introspect <code className="font-mono">tools_nav_keys</code>）
-                </p>
-                <div className="flex flex-col gap-2 text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="toolsAllowMode"
-                      value="all"
-                      defaultChecked={plan.toolsNavAllowlist.length === 0}
-                    />
-                    <span>
-                      订阅享有<strong>全部</strong>套件分组（白名单留空）
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="toolsAllowMode"
-                      value="pick"
-                      defaultChecked={plan.toolsNavAllowlist.length > 0}
-                    />
-                    <span>仅勾选的分组（自定义）</span>
-                  </label>
-                </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                  {TOOL_SUITE_NAV_KEYS.map((key) => (
-                    <label key={key} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="toolsNavKey"
-                        value={key}
-                        defaultChecked={plan.toolsNavAllowlist.includes(key)}
-                      />
-                      <span>{SUITE_LABEL[key] ?? key}</span>
-                    </label>
-                  ))}
-                </div>
-                <Button type="submit" size="sm" variant="outline">
-                  保存套件范围
-                </Button>
-              </form>
-            </div>
+        <CardContent className="space-y-6">
+          {activePlans.map((p) => (
+            <SubscriptionPlanCard
+              key={p.id}
+              active={p}
+              history={collectAncestors(p)}
+            />
           ))}
+          {activePlans.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              当前没有 active 的订阅套餐，请先执行 <code>pnpm db:seed</code>。
+            </p>
+          )}
+          {orphanArchived.length > 0 && (
+            <details className="rounded-md border border-border/60 bg-muted/30">
+              <summary className="cursor-pointer select-none px-3 py-2 text-xs text-muted-foreground hover:bg-muted/50">
+                未挂在当前链上的归档套餐（{orphanArchived.length}）
+              </summary>
+              <div className="overflow-x-auto px-3 pb-3 pt-2">
+                <table className="w-full min-w-[560px] text-left text-xs">
+                  <thead className="text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-3">slug</th>
+                      <th className="py-1 pr-3">名称</th>
+                      <th className="py-1 pr-3">类型</th>
+                      <th className="py-1 pr-3 tabular-nums">价</th>
+                      <th className="py-1 pr-3">归档时间</th>
+                      <th className="py-1 pr-3 tabular-nums">关联订阅</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orphanArchived.map((p) => (
+                      <tr key={p.id} className="border-t border-border/60">
+                        <td className="py-1 pr-3 font-mono text-[11px]">{p.slug}</td>
+                        <td className="py-1 pr-3">{p.name}</td>
+                        <td className="py-1 pr-3">
+                          {p.interval === "YEAR" ? "年" : "月"}
+                        </td>
+                        <td className="py-1 pr-3 tabular-nums">
+                          {p.pricePoints} 点
+                        </td>
+                        <td className="py-1 pr-3 text-muted-foreground">
+                          {p.archivedAt
+                            ? p.archivedAt.toLocaleString("zh-CN")
+                            : "—"}
+                        </td>
+                        <td className="py-1 pr-3 tabular-nums">
+                          {p.subscriptionsCount}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
         </CardContent>
       </Card>
 
@@ -181,17 +207,7 @@ export default async function AdminBillingPage() {
           <CardDescription>按用户邮箱延长当前有效订阅的结束日</CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={extendActiveSubscription} className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1">
-              <Label htmlFor="sub-email">用户邮箱</Label>
-              <Input id="sub-email" name="email" type="email" required className="w-64" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="sub-days">延长天数</Label>
-              <Input id="sub-days" name="days" type="number" min={1} max={3650} required className="w-32" defaultValue={30} />
-            </div>
-            <Button type="submit">续期</Button>
-          </form>
+          <ExtendSubscriptionForm />
         </CardContent>
       </Card>
 
@@ -228,7 +244,9 @@ export default async function AdminBillingPage() {
                   <td className="p-2">{o.user.email}</td>
                   <td className="p-2">{o.type}</td>
                   <td className="p-2">{o.status}</td>
-                  <td className="p-2 tabular-nums">¥{formatPointsAsYuan(o.amountPoints)}</td>
+                  <td className="p-2 tabular-nums">
+                    ¥{formatPointsAsYuan(o.amountPoints)}
+                  </td>
                   <td className="p-2">{o.refundedAt ? "已提" : "—"}</td>
                   <td className="p-2">
                     {o.type === "SUBSCRIPTION" &&
@@ -250,23 +268,6 @@ export default async function AdminBillingPage() {
           </table>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  name,
-  defaultValue,
-}: {
-  label: string;
-  name: string;
-  defaultValue: number;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Input name={name} type="number" required min={0} defaultValue={defaultValue} />
     </div>
   );
 }

@@ -1,170 +1,169 @@
-# 部署与构建排障（private_website）
+# 部署指南（生产：腾讯云托管 / 开发：本机）
 
-本文汇总 **主站 `book-mall` + 工具站 `tool-web`** 在云托管 / Docker 部署过程中出现过的问题、注意事项与仓库内对应处理方式。  
-腾讯云控制台逐项配置仍以 **[deploy/tencent/README.md](./deploy/tencent/README.md)** 为准；本文侧重 **构建失败、环境变量与 SSO 跳转** 的共性原因。
+本仓库三个 Next.js 工程：
 
----
+| 工程 | 角色 | 开发端口 | 生产域名（示例）|
+|------|------|---------|---------------|
+| `book-mall` | 主站（认证 / 钱包 / 工具 SSO / 财务 API / 管理后台） | `3000` | `book.ai-code8.com` |
+| `tool-web` | 工具站（试衣 / 文生图 / 图生视频 / vlab） | `3001` | `tool.ai-code8.com` |
+| `finance-web` | 财务控制台（用户账单详情 / 管理员账单管理） | `3002` | `f.ai-code8.com` |
 
-## 1. 架构要点
-
-| 项目 | 目录 | 容器监听端口 | 说明 |
-|------|------|----------------|------|
-| 主站 | `book-mall/` | **3000** | Prisma、NextAuth、工具站 SSO 签发 |
-| 工具站 | `tool-web/` | **3001** | 独立域名；换票回调 `/auth/sso/callback` |
-
-- **同一 Git 仓库，一般需要两套部署（两个云托管服务）**，分别绑定上述目录与端口；不要把仓库根目录当成构建根目录。  
-- GitHub 上仓库名可能仍为 `book-mall`，工具站在子目录 **`tool-web/`** 下。
-
-### 1.1 生产域名（当前正式）
-
-本地开发保持 **`http://localhost:3000` / `http://localhost:3001`**（见各项目 `.env.example`）。**生产环境**在云托管控制台为两套服务分别绑定 HTTPS 自定义域，并填入下表（与 `deploy/tencent/*.env.example` 一致）：
-
-| 角色 | 用户访问的 Origin | book-mall | tool-web |
-|------|-------------------|-----------|----------|
-| 主站 | `https://book.ai-code8.com` | `NEXTAUTH_URL` | `MAIN_SITE_ORIGIN` |
-| 工具站 | `https://tool.ai-code8.com` | `TOOLS_PUBLIC_ORIGIN` | `TOOLS_PUBLIC_ORIGIN`（须与主站 **字符串完全一致**） |
-
-`NEXTAUTH_URL` 与 `MAIN_SITE_ORIGIN` 须指向同一主站入口；`TOOLS_PUBLIC_ORIGIN` 在两套服务中须相同且与浏览器打开工具站的地址栏一致。
+> 三个工程相互通过 HTTPS 跨域调用；浏览器 Cookie 走主站签发，财务控制台与工具站通过 CORS（`lib/finance/cors.ts`）放行已配置的 `NEXT_PUBLIC_FINANCE_WEB_ORIGIN` 与 `TOOLS_PUBLIC_ORIGIN`。
 
 ---
 
-## 2. 控制台必填（易错）
-
-| 配置项 | book-mall | tool-web |
-|--------|-----------|----------|
-| 目标目录 / 构建上下文 | `book-mall` | `tool-web` |
-| Dockerfile | 有，`Dockerfile` | 同上 |
-| **服务端口（进程监听）** | **3000** | **3001** |
-
-勿把「访问端口 / 网关 80」与「容器内进程端口」混填：进程必须与健康检查一致（3000 / 3001）。
-
----
-
-## 3. 环境变量与 SSO（高频故障）
-
-### 3.1 主站 `book-mall`（至少）
-
-`NODE_ENV`、`DATABASE_URL`、`NEXTAUTH_URL`、`NEXTAUTH_SECRET`、`TOOLS_PUBLIC_ORIGIN`、`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`（可选 `ADMIN_EMAILS` 等）。
-
-**Docker 部署**：`docker-entrypoint.sh` 在 **`NODE_ENV=production`** 且未设 **`ALLOW_CLOUDBASE_DEFAULT_ORIGINS=1`** 时，若 **`NEXTAUTH_URL` / `TOOLS_PUBLIC_ORIGIN` 为空或仍为 `*.sh.run.tcloudbase.com`**，会纠正为 **`https://book.ai-code8.com`** / **`https://tool.ai-code8.com`**（与进程内 `lib/production-origin.ts` 一致）。
-
-### 3.2 工具站 `tool-web`（至少）
-
-`NODE_ENV`、`MAIN_SITE_ORIGIN`、与主站完全一致的 **`TOOLS_PUBLIC_ORIGIN`**（浏览器访问工具站的 Origin；生产必填，否则换票失败页可能跳到 **`http://0.0.0.0:3001`**）、`TOOLS_SSO_SERVER_SECRET`、`TOOLS_SSO_JWT_SECRET`；AI/OSS 见 `tool-web/.env.example`。
-
-**Docker 部署**：入口脚本在同样条件下把 **`MAIN_SITE_ORIGIN` / `TOOLS_PUBLIC_ORIGIN` 的空值或 `*.sh.run.tcloudbase.com`** 纠正为 **`https://book.ai-code8.com`** / **`https://tool.ai-code8.com`**。
-
-- **Docker / 进程内纠正**：若 `NEXTAUTH_URL` / `TOOLS_PUBLIC_ORIGIN`（主站）或 `MAIN_SITE_ORIGIN` / `TOOLS_PUBLIC_ORIGIN`（工具站）**为空或仍为 `*.sh.run.tcloudbase.com`**，容器入口脚本与 **`lib/production-origin.ts`（`instrumentation` + 主站 `lib/auth` 首载）** 会在 **`NODE_ENV=production`** 下统一改为 **`https://book.ai-code8.com`**、**`https://tool.ai-code8.com`**。本地 `pnpm dev` **不会**执行纠正。若须保留网关默认域（预发），请设置 **`ALLOW_CLOUDBASE_DEFAULT_ORIGINS=1`**。
-
-### 3.3 Origin 写法（必读）
-
-- 必须使用 **`https://`**（生产），与用户浏览器地址栏 **协议 + 主机 + 端口** 一致。  
-- **`NEXTAUTH_URL`（主站）** 与 **`MAIN_SITE_ORIGIN`（工具站）** 语义对齐（同一主站访问入口）。  
-- **`TOOLS_PUBLIC_ORIGIN`（主站）** = 用户打开 **工具站** 的 Origin。  
-- **禁止**写成 `https://域名/:3001`（端口写在路径里）。错误示例会导致跳转  
-  `…tcloudbase.com/:3001/auth/sso/callback`，Next 无法匹配路由 → **404**。  
-  正确示例：`https://tool-web-xxx.sh.run.tcloudbase.com`（云托管多数无需在 URL 里写 `:3001`），或 `https://主机:3001`（端口紧跟主机名）。
-
-仓库已在 **`book-mall/lib/sso-tools-env.ts`**（`TOOLS_PUBLIC_ORIGIN`）与 **`tool-web/lib/site-origin.ts`**（`MAIN_SITE_ORIGIN`）对「域名/:端口」误填做 **自动纠正**，仍建议在控制台改为规范写法。
-
----
-
-## 4. 构建阶段常见问题与处理
-
-### 4.1 自动部署开启失败：仓库里找不到 Dockerfile
-
-**原因**：平台默认在 **仓库根** 查找 `Dockerfile`；本仓库 Dockerfile 在子目录。  
-
-**处理**：目标目录填 **`book-mall`** 或 **`tool-web`**；确认对应分支已推送且该目录下存在 `Dockerfile`。
-
-### 4.2 book-mall：`pnpm install` 阶段 Prisma 找不到 `schema.prisma`
-
-**现象**：`schema.prisma: file not found`，发生在 Docker `deps` 层执行 `pnpm install` 时（触发了 `postinstall` → `prisma generate`）。  
-
-**原因**：`Dockerfile` 原先只复制了 `package.json` / lockfile，未复制 `prisma/`。  
-
-**处理**：已在 **`book-mall/Dockerfile`** 的 `deps` 阶段于 `pnpm install` **之前**增加 `COPY prisma ./prisma`。
-
-### 4.3 book-mall：`next build` 报 Prisma `groupBy` 缺少 `orderBy`
-
-**现象**：`Property 'orderBy' is missing … toolUsageEvent.groupBy`。  
-
-**原因**：Prisma 6 类型要求 `groupBy` 显式 `orderBy`。  
-
-**处理**：在相关 `groupBy` 上补充 `orderBy`（如 `{ toolKey: "asc" }`）；并对 `_count` / `_sum` 聚合结果做安全读取（见 `app/admin/page.tsx`、`app/api/sso/tools/usage/route.ts`）。
-
-### 4.4 book-mall：构建或静态分析阶段报 `DATABASE_URL` 未定义
-
-**现象**：日志中出现 `Environment variable not found: DATABASE_URL`，栈涉及页面或 **Route Handler** 的预收集。  
-
-**原因**：多数云平台 **构建镜像时不注入** `DATABASE_URL`，仅运行时注入；Next 默认会对部分路由做构建期处理，从而执行带 Prisma 的代码。  
-
-**处理（仓库已做）**：  
-- 在 **`app/(site)/layout.tsx`**、**`app/admin/layout.tsx`**、**`app/(account)/layout.tsx`** 声明 **`export const dynamic = "force-dynamic"`**，避免依赖数据库的页面在构建期预渲染。  
-- 对所有 **`app/api/**/route.ts`** 中可能间接命中数据库的路由补充 **`export const dynamic = "force-dynamic"`**。
-
-本地可模拟：  
-`env -u DATABASE_URL pnpm run build:docker`（在 `book-mall/` 下）。
-
-### 4.5 tool-web：`Route` 导出非法字段导致类型检查失败
-
-**现象**：`"AI_FIT_USAGE_TOOL_KEY" is not a valid Route export field`。  
-
-**原因**：App Router 的 `route.ts` 只能导出约定字段（如 `GET`、`dynamic`、`runtime` 等），不能把业务常量 **`export`** 出去。  
-
-**处理**：将常量改为模块内 **`const`**（见 **`app/api/ai-fit/try-on/route.ts`**）。
-
-### 4.6 tool-web：`formatTryOnBillingLine` 与 `t` 类型不兼容
-
-**处理**：调用处对 `t` 做收窄（如 `t as (key: string) => string`），见 **`app/fitting-room/ai-fit/ai-fit-client.tsx`**。
-
-### 4.7 tool-web：`next build` 收集路由时 `ali-oss` 触发系统调用失败
-
-**现象**：如 `uv_interface_addresses` / `networkInterfaces` 相关错误（部分 CI / 沙箱环境）。  
-
-**原因**：顶层 `import OSS from "ali-oss"` 在加载模块时初始化 SDK。  
-
-**处理**：在 **`tool-web/lib/oss-client.ts`** 中改为 **`await import("ali-oss")`** 再实例化客户端；**`ai-fit-oss-upload.ts`** 对 `createOssClientFrom` 使用 `await`。
-
----
-
-## 5. 运行时与联调
-
-| 现象 | 排查方向 |
-|------|----------|
-| 主站 → 工具站 SSO **404**，URL 含 **`/:3001/`** | 修正 **`TOOLS_PUBLIC_ORIGIN`**；部署含 Origin 规范化代码的版本 |
-| 换票后跳到 **`0.0.0.0:3001`**、`ERR_CONNECTION_CLOSED` | 工具站环境变量增加与主站一致的 **`TOOLS_PUBLIC_ORIGIN`**；代码已用其作为 **`/auth/sso/callback`** 重定向基地址（见 **`tool-web/lib/site-origin.ts`**） |
-| **`/sso-error?reason=exchange_401`** | 主站 **`/api/sso/tools/exchange`** 校验 **`Authorization: Bearer`** 未通过：核对两端 **`TOOLS_SSO_SERVER_SECRET`** 是否完全一致（无空格、换行、引号） |
-| Cookie / 登录异常 | `NEXTAUTH_URL`、`TOOLS_PUBLIC_ORIGIN`、`MAIN_SITE_ORIGIN` 是否与浏览器完全一致；勿混用 `http`/`https`、勿漏协议 |
-| Prisma 迁移失败 | 运行时 **`DATABASE_URL`**、数据库白名单、容器能否连库 |
-| 502 / 健康检查失败 | 平台端口是否为 **3000** / **3001** |
-
----
-
-## 6. 本地快速自检
+## 1. 本机开发
 
 ```bash
-# 主站类型检查 + 无库构建（验证 DATABASE_URL 不设时能否通过构建）
-cd book-mall && pnpm exec tsc --noEmit && env -u DATABASE_URL pnpm run build:docker
+# 主站
+cd book-mall && pnpm install && pnpm dev          # http://localhost:3000
 
 # 工具站
-cd tool-web && pnpm exec tsc --noEmit && pnpm run build:docker
+cd tool-web && pnpm install && pnpm dev           # http://localhost:3001
+
+# 财务控制台
+cd finance-web && pnpm install && pnpm dev        # http://localhost:3002
+```
+
+各工程对应的 `.env.example` / `.env.development` 描述必填项；最重要的：
+
+- `book-mall/.env.local`：`DATABASE_URL`、`NEXTAUTH_URL=http://localhost:3000`、`TOOLS_PUBLIC_ORIGIN=http://localhost:3001`、`NEXT_PUBLIC_FINANCE_WEB_ORIGIN=http://localhost:3002`、`TOOLS_SSO_*` 双方一致、`SSO_TOOLS_BEARER_TOKEN`。
+- `tool-web/.env.local`：`MAIN_SITE_ORIGIN=http://localhost:3000`、`TOOLS_SSO_*` 与主站对齐、阿里云 DashScope / OSS 凭据。
+- `finance-web/.env.local`：`BOOK_MALL_BILLING_INTERNAL_ORIGIN=http://localhost:3000`（服务端代理目标）。
+
+数据库初始化：
+
+```bash
+cd book-mall
+pnpm db:apply-pending          # 应用任何未跑的迁移（绕过 Prisma CLI 的 P1001 路径）
+pnpm prisma generate
+pnpm pricing:import-markdown   # 从 tool-web/doc/price.md 导入价目源
 ```
 
 ---
 
-## 7. 相关文件索引
+## 2. 生产：腾讯云 CloudBase Run（容器托管）
 
-| 文件 | 用途 |
-|------|------|
-| [deploy/tencent/README.md](./deploy/tencent/README.md) | 腾讯云步骤、变量列表、官方文档链接 |
-| [deploy/tencent/book-mall.env.example](./deploy/tencent/book-mall.env.example) | 主站 Compose / 对照用变量模板 |
-| [deploy/tencent/tool-web.env.example](./deploy/tencent/tool-web.env.example) | 工具站模板 |
-| [docker-compose.yml](./docker-compose.yml) | 本地双容器编排 |
-| `book-mall/.env.example`、`tool-web/.env.example` | 开发与文档说明 |
+三个工程都有 `Dockerfile` + `docker-entrypoint.sh`，可独立构建为容器镜像并部署。
+
+### 2.1 构建
+
+CloudBase 控制台的「云托管 / 容器服务」绑定本仓库的 GitHub/腾讯工蜂分支后，**为每个服务**指定子目录与 Dockerfile：
+
+| 服务 | 构建目录 | 启动端口 | 自动构建 |
+|------|---------|---------|---------|
+| `book-mall` | `book-mall/` | `3000` | 推送 `main` 即触发 |
+| `tool-web` | `tool-web/` | `3000` | 推送 `main` 即触发 |
+| `finance-web` | `finance-web/` | `3000` | 推送 `main` 即触发 |
+
+> 三个 `Dockerfile` 都使用多阶段构建，runner 阶段以 `node:20-bookworm-slim` + Next.js standalone 启动；`book-mall` 在 entrypoint 中执行 `prisma migrate deploy`，因此**第一次部署**必须保证 `DATABASE_URL` 已经在云托管「环境变量」面板配置。
+
+### 2.2 自定义域名 / TLS
+
+在云托管「访问设置」绑定域名（须先在 DNSPod 解析到云托管 CNAME），TLS 由腾讯云自动签发：
+
+| 服务 | 自定义域 |
+|------|---------|
+| book-mall | `book.ai-code8.com` |
+| tool-web | `tool.ai-code8.com` |
+| finance-web | `f.ai-code8.com` |
+
+### 2.3 必填环境变量
+
+参考 [`.env.example`](book-mall/.env.example) / [`tool-web/.env.example`](tool-web/.env.example) / [`finance-web/.env.example`](finance-web/.env.example)。三方都必填且互相一致的关键项：
+
+- `book-mall`
+  - `DATABASE_URL`（腾讯云 PostgreSQL 直连 URL；逻辑库 `tool_mall`）
+  - `NEXTAUTH_SECRET`、`NEXTAUTH_URL=https://book.ai-code8.com`
+  - `TOOLS_PUBLIC_ORIGIN=https://tool.ai-code8.com`、`TOOLS_SSO_JWT_SECRET`、`TOOLS_SSO_SERVER_SECRET`
+  - `SSO_TOOLS_BEARER_TOKEN`（财务控制台到主站的 server-to-server）
+  - `NEXT_PUBLIC_FINANCE_WEB_ORIGIN=https://f.ai-code8.com`
+  - DashScope / OSS / SMS 等业务凭据
+- `tool-web`
+  - `MAIN_SITE_ORIGIN=https://book.ai-code8.com`
+  - 同主站一致的 `TOOLS_SSO_JWT_SECRET / TOOLS_SSO_SERVER_SECRET`
+  - DashScope key、OSS 凭据
+- `finance-web`
+  - `BOOK_MALL_BILLING_INTERNAL_ORIGIN=https://book.ai-code8.com`（服务端代理调用主站 API）
+  - `BOOK_MALL_BILLING_BEARER`（≡ `book-mall/SSO_TOOLS_BEARER_TOKEN`）
+
+> `book-mall/docker-entrypoint.sh` 会在 `NODE_ENV=production` 且未设置 `ALLOW_CLOUDBASE_DEFAULT_ORIGINS=1` 的情况下，把空 `NEXTAUTH_URL / TOOLS_PUBLIC_ORIGIN` 自动纠正为正式域；想保留云托管 `*.sh.run.tcloudbase.com` 默认域临时调试请设 `ALLOW_CLOUDBASE_DEFAULT_ORIGINS=1`。
+> `finance-web/docker-entrypoint.sh` 同样会把空 `BOOK_MALL_BILLING_INTERNAL_ORIGIN` 纠正为 `https://book.ai-code8.com`。
+
+### 2.4 首次部署流程
+
+```text
+1) DNSPod 解析 *.ai-code8.com → 云托管 CNAME
+2) 云托管控制台为三个服务分别绑定本仓库的同一分支（一般 main）
+3) 为每个服务在「环境变量」面板贴上 .env.example 列出的全部生产值
+4) 触发首次构建：book-mall 自动跑 prisma migrate deploy；tool-web/finance-web 直接起服务
+5) 等三个服务都 RUNNING；浏览器打开 book.ai-code8.com 验证登录 → 工具站 SSO → 财务控制台
+```
+
+### 2.5 后续重发
+
+```text
+- 代码改完直接推 main → 云托管收到 webhook 后自动构建并平滑替换实例
+- 涉及数据库 schema：写迁移 → push → book-mall 的 entrypoint 自动 prisma migrate deploy
+- 涉及 .env 变量：在云托管「环境变量」面板改完后手动触发一次「重启服务」即可
+```
 
 ---
 
-## 8. 修订说明
+## 3. v002 财务模块涉及的脚本（部署后/迁移后常用）
 
-文档随部署踩坑更新；若云平台行为变更（构建是否注入构建期环境变量等），以控制台说明为准，并可在本节追加条目。
+> 全部在 `book-mall/` 目录执行；使用 `.env.local` 或在 shell 中导出 `DATABASE_URL` 后用 `dotenv -e` 自带的方式跑。
+
+```bash
+# 数据库
+pnpm db:apply-pending                       # 应用未跑迁移（CLI P1001 退路）
+pnpm prisma generate
+
+# 价目与定价
+pnpm pricing:import-markdown                # 从 tool-web/doc/price.md 导入 → PricingSourceVersion + Lines
+pnpm pricing:verify-billable-formula        # pricePoints = round(cost × M × 100) 自洽校验
+pnpm pricing:audit-billable-vs-source       # 把 stored cost vs PricingSourceLine 摆成对照表（供运营手核）
+
+# 历史数据维护
+pnpm billing:backfill-tool-usage-lines      # 从 ToolUsageEvent 反向生成 ToolBillingDetailLine
+pnpm billing:refresh-tool-usage-snapshot    # 用当前 ToolBillablePrice 重填 internal* 列
+pnpm billing:backfill-internal-pricing      # CLOUD_CSV_IMPORT 行从 cloudRow 反推 internal*
+pnpm billing:backfill-schemea-unit-cost     # 反推 ToolBillablePrice.schemeAUnitCostYuan（一次性）
+
+# 对账（管理端 UI：/admin/finance/reconciliation）
+pnpm reconciliation:run -- --csv=./path/to/aliyun.csv [--admin-user-id=cmp...]
+```
+
+---
+
+## 4. 服务相互调用拓扑（仅供运维参考）
+
+```
+浏览器
+ ├─ https://book.ai-code8.com   (book-mall)            → PostgreSQL (tool_mall)
+ │        │
+ │        ├─ /api/sso/tools/code → /api/sso/tools/usage  → ToolBillingDetailLine
+ │        ├─ /api/admin/finance/reconciliation/{run,bind,[id]/clawback}
+ │        └─ /api/admin/finance/billing-detail-lines  (财务控制台拉的明细)
+ │
+ ├─ https://tool.ai-code8.com   (tool-web)
+ │        │
+ │        └─ /api/{ai-fit,text-to-image,image-to-video,visual-lab}/...
+ │             └─ postToolUsageFromServerWithRetries → book-mall /api/sso/tools/usage
+ │
+ └─ https://f.ai-code8.com      (finance-web)
+          │
+          └─ /api/account/billing-detail-lines (proxy)
+              ├─ /api/account/billing-detail-lines    →  book-mall
+              ├─ /api/admin/billing-detail-lines      →  book-mall
+              └─ /api/sso/tools/billing-detail-lines  →  book-mall
+```
+
+---
+
+## 5. 故障速查
+
+- **Prisma CLI P1001（数据库连不上）**：通常是 DNS / 出口安全组；先用 `pnpm db:apply-pending` 走纯 SQL 应用迁移（在 `scripts/apply-pending-migrations.ts` 里）。
+- **"Failed to fetch" / CORS**：finance-web 应通过 `/api/.../*` server proxy 调主站，不要直接 fetch 主站 origin；检查 `NEXT_PUBLIC_FINANCE_WEB_ORIGIN` 是否与 `lib/finance/cors.ts` 一致。
+- **工具站 402 余额不足**：响应里附 `watermarkPoints + gate`；用户应充值后重试（水位线见 v002 文档 P2-3）。
+- **对账 0 行**：检查 `ToolBillingDetailLine.cloudRow.账单信息/账单月份` 是否为 `YYYYMM`（不是 `YYYY-MM`）；脚本 `billing-refresh-tool-usage-snapshot` 已经把日期格式归一化。

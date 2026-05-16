@@ -16,10 +16,15 @@
 | [06-flows.md](./product/06-flows.md) | 核心业务流程 |
 | [07-operations.md](./product/07-operations.md) | 运营与公示要求 |
 | [08-independent-tools-sso.md](./product/08-independent-tools-sso.md) | 独立工具站 · 黄金会员与 SSO 边界 |
+| [**09-finance-refactor-and-tool-federation.md**](./product/09-finance-refactor-and-tool-federation.md) | **财务模块重构与工具联邦**（技术草案：API 映射、序列图、Billing v1） |
+| [**10-multimodal-studio-and-finance-master-plan.md**](./product/10-multimodal-studio-and-finance-master-plan.md) | **全模态工作室 + 财务重构 — 整体方案（通俗版）**：`m.ai-code8.com` 与 `book`/`tool` 分工、用户/后台/核算、落地顺序 |
 
 协作需求草案：[**v1.1**](./v1.1)（独立 AI 工具集成 · 试衣间等）。
 
-版本里程碑（大块迭代）：[**v2.0 — 订阅中心 · 工具套件 · 课程占位**](./releases/v2.0-tools-subscription-courses.md)。
+版本里程碑（大块迭代）：
+
+- [**v2.0 — 订阅中心 · 工具套件 · 课程占位**](./releases/v2.0-tools-subscription-courses.md)
+- [**2026-05-16 — 订阅套餐版本谱系（停旧发新 · 价不可改）**](./releases/2026-05-16-subscription-plan-lineage.md)
 
 ## 技术与环境
 
@@ -36,6 +41,7 @@
 | [mock-payment-checkout.md](./process/mock-payment-checkout.md) | 模拟收银（过渡）：订阅 + 钱包充值、假二维码、`ALLOW_MOCK_PAYMENT` 与安全说明 |
 | [real-payment-integration.md](./process/real-payment-integration.md) | **正式接入支付**（支付宝扫码等）：异步通知、幂等、合规要点 |
 | [2026-05-11-tools-sso-gold-member.md](./plans/2026-05-11-tools-sso-gold-member.md) | v1.1 工具站 SSO + 黄金会员 — 计划与进度 |
+| [**2026-finance-billing-rollout.md**](./plans/2026-finance-billing-rollout.md) | **财务 / Billing 演进分阶段清单**（与 09 架构草案配套） |
 | [schema-changelog.md](./database/schema-changelog.md) | 数据库结构变更登记 |
 | [logic/README.md](./logic/README.md) | 功能逻辑类文档存放约定 |
 | [tools-sso-session.md](./logic/tools-sso-session.md) | 工具站 SSO 时序、失败分支与实现清单 |

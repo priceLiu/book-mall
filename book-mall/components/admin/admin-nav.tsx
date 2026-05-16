@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
+import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
 
 /** Ghost 顶栏按钮默认不显式前景色时，在深色/磨砂背景下可能被「吃掉」；与 `bg-card` 顶栏对齐为 card 前景色 */
 const ADMIN_NAV_GHOST =
@@ -81,6 +82,8 @@ export function AdminNav({
   toolsSsoReady: boolean;
   toolsSsoIssues: string[];
 }) {
+  const financeWebOrigin = getFinanceWebPublicOrigin();
+
   return (
     <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-2 text-card-foreground">
       <div className="flex flex-wrap items-center gap-1">
@@ -105,14 +108,46 @@ export function AdminNav({
               <Link href="/admin/finance/recharges">充值明细</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/admin/finance/reconciliation">财务核对</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
               <Link href="/admin/finance/promo-templates">充值优惠模板</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/admin/refunds">提现审核</Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/usage-overview">费用多维度概览</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/reconciliation">云账单对账</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/pricing-templates">计费模板与公式</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/cloud-pricing">云厂商价目表</Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {financeWebOrigin ? (
+              <>
+                <DropdownMenuItem asChild>
+                  <a
+                    href={`${financeWebOrigin}/fees/billing/details`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    财务控制台 · 账单详情
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`${financeWebOrigin}/admin`} target="_blank" rel="noopener noreferrer">
+                    财务控制台 · 管理端
+                  </a>
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <DropdownMenuItem disabled className="text-muted-foreground">
+                财务控制台（未配置 NEXT_PUBLIC_FINANCE_WEB_ORIGIN）
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { resolveBillablePricePoints } from "@/lib/tool-billable-price";
+import { resolveBillableSnapshot, type BillableSnapshot } from "@/lib/tool-billable-price";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
 import { recordToolUsageAndConsumeWallet } from "@/lib/wallet-record-tool-usage-consume";
+import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
 
@@ -20,80 +21,63 @@ function parseMeta(v: unknown): Prisma.InputJsonValue | undefined {
   return v as Prisma.InputJsonValue;
 }
 
+/**
+ * 从 settle/usage body.meta 抽取模型 key（用于 ToolBillablePrice 查找）。
+ * 兼容历史几个 meta 字段名：`modelId / apiModel / videoModel / textToImageModel / tryOnModel`。
+ * 注意：本路由不再接受 `body.costPoints`（v002 清理）；定价完全由服务端 `ToolBillablePrice` 决定。
+ */
 function schemeARefModelFromUsageBody(body: Record<string, unknown>): string | undefined {
   const raw = body.meta;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const m = raw as Record<string, unknown>;
-  const id = m.modelId;
-  if (typeof id === "string" && id.trim().length > 0) return id.trim();
-  const api = m.apiModel;
-  if (typeof api === "string" && api.trim().length > 0) return api.trim();
+  const keys = ["modelId", "apiModel", "videoModel", "textToImageModel", "tryOnModel"] as const;
+  for (const k of keys) {
+    const v = m[k];
+    if (typeof v === "string" && v.trim().length > 0) return v.trim();
+  }
   return undefined;
 }
 
-function verifyBearer(req: Request):
-  | { ok: true; userId: string }
-  | { ok: false; res: NextResponse } {
-  let jwtSecret: string;
-  try {
-    jwtSecret = requireToolsJwtSecret();
-  } catch {
-    return {
-      ok: false,
-      res: NextResponse.json({ error: "JWT 密钥未配置" }, { status: 503 }),
-    };
-  }
-  const auth = req.headers.get("authorization");
-  const raw =
-    auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
-  if (!raw) {
-    return {
-      ok: false,
-      res: NextResponse.json({ error: "缺少 Bearer Token" }, { status: 401 }),
-    };
-  }
-  const verified = verifyToolsAccessToken(raw, jwtSecret);
-  if (!verified) {
-    return {
-      ok: false,
-      res: NextResponse.json({ error: "无效或过期的工具令牌" }, { status: 401 }),
-    };
-  }
-  return { ok: true, userId: verified.sub };
-}
+type CostResolution = {
+  costPoints: number;
+  snapshot: BillableSnapshot;
+};
 
-async function resolveCostPointsForEvent(
+/**
+ * v002（清理后）：只信服务端 `ToolBillablePrice` 给出的 `points`；
+ * 客户端再也不能传 `costPoints` 来"自定价"。命中行不存在则返回 undefined → 不入库（recorded:false）。
+ *
+ * 唯一旧逻辑退路（保留）：`fitting-room__ai-fit / try_on` 在没有 ToolBillablePrice 命中时回退到
+ * `PlatformConfig.toolInvokePerCallPoints`（产品配置面板单价），保证试衣不漏扣。
+ */
+async function resolveCostAndSnapshotForEvent(
   body: Record<string, unknown>,
   toolKey: string,
   action: string,
-): Promise<number | undefined> {
-  const raw = body.costPoints ?? (body as { costMinor?: unknown }).costMinor;
-  if (typeof raw === "number" && Number.isFinite(raw)) {
-    return Math.max(0, Math.floor(raw));
-  }
-  const fromTable = await resolveBillablePricePoints(toolKey, action, {
+): Promise<CostResolution | undefined> {
+  const snap = await resolveBillableSnapshot(toolKey, action, {
     schemeARefModelKey: schemeARefModelFromUsageBody(body),
   });
-  if (fromTable != null) return fromTable;
-  /**
- * AI智能试衣：仅成片成功后的 try_on 自动标价（见 tool-web/doc/payment.md）；page_view 不写单价。
-   * 图生视频：仅任务 SUCCEEDED 后 settle 上报的 invoke 自动标价（toolKey image-to-video）；
-   * 套装 / 试衣间父路由 / 衣柜等不设自动单价。
-   */
+  if (snap && snap.points > 0) {
+    return { costPoints: snap.points, snapshot: snap };
+  }
+
   if (action === "try_on" && toolKey === "fitting-room__ai-fit") {
     const cfg = await prisma.platformConfig.findUnique({
       where: { id: "default" },
       select: { toolInvokePerCallPoints: true },
     });
     const v = cfg?.toolInvokePerCallPoints;
-    if (typeof v === "number" && v > 0) return v;
+    if (typeof v === "number" && v > 0 && snap) {
+      return { costPoints: v, snapshot: snap };
+    }
   }
   return undefined;
 }
 
 /** 当前用户在工具站产生的使用明细（分页：`page` + `limit`，默认每页 50 条）。 */
 export async function GET(req: Request) {
-  const v = verifyBearer(req);
+  const v = verifyToolsBearer(req);
   if (!v.ok) return v.res;
 
   const url = new URL(req.url);
@@ -210,13 +194,14 @@ export async function POST(req: Request) {
       : "page_view";
 
   const meta = parseMeta(body.meta);
-  const costPoints = await resolveCostPointsForEvent(body, rawToolKey, actionRaw);
+  const resolution = await resolveCostAndSnapshotForEvent(body, rawToolKey, actionRaw);
 
   /** 仅入库「已标价且金额 > 0」的流水；浏览与非计费动作不入库（见 tool-web/doc/payment.md）。 */
-  if (costPoints === undefined || costPoints <= 0) {
+  if (!resolution || resolution.costPoints <= 0) {
     return NextResponse.json({ ok: true, recorded: false });
   }
-
+  const costPoints = resolution.costPoints;
+  const snap = resolution.snapshot;
   try {
     const outcome = await recordToolUsageAndConsumeWallet({
       userId: verified.sub,
@@ -224,6 +209,13 @@ export async function POST(req: Request) {
       action: actionRaw,
       costPoints,
       meta,
+      pricingSnapshot: {
+        unitCostYuan: snap.unitCostYuan,
+        retailMultiplier: snap.retailMultiplier,
+        ourUnitYuan: snap.ourUnitYuan,
+        schemeARefModelKey: snap.schemeARefModelKey,
+        billablePriceId: snap.billablePriceId,
+      },
     });
 
     if (!outcome.ok) {
@@ -240,6 +232,8 @@ export async function POST(req: Request) {
           error: "insufficient_balance",
           balancePoints: outcome.balancePoints,
           requiredPoints: costPoints,
+          watermarkPoints: outcome.watermarkPoints ?? null,
+          gate: outcome.gate ?? "balance",
         },
         { status: 402 },
       );

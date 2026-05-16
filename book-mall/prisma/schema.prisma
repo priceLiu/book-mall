@@ -78,6 +78,8 @@ model User {
   courseLessonProgress         CourseLessonProgress[]
   userProductSubscriptions     UserProductSubscription[]
   userRechargeCoupons          UserRechargeCoupon[]
+  toolBillingDetailLines       ToolBillingDetailLine[]
+  cloudAccountBindings         CloudAccountBinding[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -234,8 +236,47 @@ model ToolUsageEvent {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  toolBillingDetailLines ToolBillingDetailLine[]
+
   @@index([userId, toolKey, createdAt])
   @@index([toolKey, createdAt])
+}
+
+/// 财务：与云 consumedetailbillv2 等颗粒度对齐的明细行（cloudRow 存云侧原文；对内计价快照存 internal*；计价逻辑按 pricingTemplateKey 选模板）。
+enum ToolBillingDetailSource {
+  CLOUD_CSV_IMPORT
+  TOOL_USAGE_GENERATED
+}
+
+model ToolBillingDetailLine {
+  id     String @id @default(cuid())
+  userId String
+  /// 可选：与单次工具扣费事件关联，便于对账
+  toolUsageEventId String?
+
+  source   ToolBillingDetailSource @default(CLOUD_CSV_IMPORT)
+  /// 云 CSV 列名 -> 字符串值（完整明细快照）
+  cloudRow Json
+
+  /// 入库或回填时固化的对内计价快照（便于按行追溯当时口径；勿在读接口依赖实时重算）
+  internalCloudCostUnitYuan Decimal?  @db.Decimal(24, 10)
+  internalRetailMultiplier  Decimal?  @db.Decimal(12, 6)
+  internalOurUnitYuan       Decimal?  @db.Decimal(24, 10)
+  internalFormulaText       String?   @db.Text
+  internalChargedPoints     Int?
+  internalYuanReference     Decimal?  @db.Decimal(24, 10)
+  internalCapturedAt      DateTime?
+
+  /// 对内计价所用模板（多云厂商扩展）；如 aliyun.consumedetail_bill_v2
+  pricingTemplateKey        String    @default("aliyun.consumedetail_bill_v2")
+
+  createdAt DateTime @default(now())
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  toolUsageEvent ToolUsageEvent? @relation(fields: [toolUsageEventId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([toolUsageEventId])
 }
 
 /// 工具应用按次计费单价（点，1 点 = ¥0.01）；生效区间内匹配 toolKey + action，优先精确 action，其次 action 为空表示该工具通配。
@@ -256,10 +297,18 @@ model ToolBillablePrice {
   /// 方案 A：后台为该行指定的零售系数 M（生成 pricePoints；工具站 SSO 按 toolKey+schemeARefModelKey 读此行）
   schemeAAdminRetailMultiplier Float?
 
+  /// v002：回链到 PricingSourceLine.modelKey（云厂商成本真源），便于 pricing:verify 漂移检查
+  cloudModelKey   String?
+  /// v002：回链到 PricingSourceLine.tierRaw（规格/档位，如 "1080P"、"720P"、"-"）
+  cloudTierRaw    String?
+  /// v002：回链到 PricingSourceLine.billingKind（计费维度），用于选 internal.tool_usage_* 模板
+  cloudBillingKind PricingBillingKind?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([toolKey, effectiveFrom])
+  @@index([cloudModelKey, cloudTierRaw, cloudBillingKind])
 }
 
 /// 工具站左侧菜单项是否在导航中展示（由主站后台维护）；navKey 与 tool-web `config/nav-tools` 约定一致。
@@ -332,10 +381,90 @@ model PricingSourceLine {
   fingerprint          String
   sourceLine           Int?
 
+  /// v002：有效成本系数（如 0.8 表示 8 折促销）；解析器暂不写，由对账脚本回填
+  effectiveDiscount   Float?
+  /// v002：促销说明（来源/期限/规则），由对账脚本从 CSV 的 `优惠详情` 推断
+  effectivePromoNote  String? @db.Text
+  /// v002：促销快照采集时间
+  effectiveCapturedAt DateTime?
+
   version PricingSourceVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
   @@unique([versionId, fingerprint])
   @@index([versionId, modelKey])
+}
+
+/// v002 P5：云厂商「资源购买账号 ID」与平台 User 的绑定（解决 CSV 上传时归属判定）。
+model CloudAccountBinding {
+  id              String   @id @default(cuid())
+  /// 云厂商账号 ID（如阿里云 `资源购买账号ID = 1068915519298264`）；规范化为大小写不敏感唯一
+  cloudAccountId  String   @unique
+  /// 云厂商账号名（仅展示，如 `viclau620`）
+  cloudAccountName String?
+  /// 绑定的平台 User.id
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// v002 P5：一次「上传 CSV → 自动对账」的批次记录。
+model BillingReconciliationRun {
+  id              String   @id @default(cuid())
+  /// 上传 CSV 的 SHA-256，防重复
+  csvSha256       String
+  /// 原始文件名（便于审计）
+  csvFilename     String
+  /// CSV 内涉及的账单月份（多月情形以逗号分隔）
+  monthsCovered   String
+  /// 触发此批次的管理员 User.id
+  importedByUserId String
+  /// 自动统计摘要（JSON）：内/外行数、内/外总金额、差额、verdict、unbound 账号列表等
+  summary         Json
+  /// 状态：READY（已生成报告）、CLAWED_BACK（已补扣过任意行）、ARCHIVED（管理员归档）
+  status          String   @default("READY")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lines           BillingReconciliationLine[]
+
+  @@unique([csvSha256])
+  @@index([createdAt])
+  @@index([importedByUserId])
+}
+
+/// v002 P5：一次对账批次下的「单用户 × 单(模型/计费维度)」一行；补扣由本表的 `clawback*` 字段记录。
+model BillingReconciliationLine {
+  id            String   @id @default(cuid())
+  runId         String
+  run           BillingReconciliationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  /// 平台用户 id（CSV 行通过 CloudAccountBinding 映射来）；可为 null 表示未绑定云账号
+  userId        String?
+  /// 云账号 id（便于显示 unbound 行）
+  cloudAccountId String?
+  modelKey      String
+  billingKind   String
+  internalCount Int      @default(0)
+  internalYuan  Decimal  @default(0) @db.Decimal(18, 4)
+  cloudCount    Int      @default(0)
+  cloudPayableYuan Decimal @default(0) @db.Decimal(18, 4)
+  diffYuan      Decimal  @default(0) @db.Decimal(18, 4)
+  /// BOTH / INTERNAL_ONLY / CLOUD_ONLY / UNBOUND
+  matchKind     String
+
+  /// 已补扣的金额（点）；null 表示未补扣
+  clawbackPoints Int?
+  /// 补扣对应的 WalletEntry.id；用于审计
+  clawbackEntryId String?
+  clawedAt      DateTime?
+
+  createdAt     DateTime @default(now())
+
+  @@index([runId, userId])
+  @@index([runId, matchKind])
 }
 
 /// 版本间 diff（历史审计）。
@@ -414,7 +543,17 @@ model SubscriptionPlan {
   /// 工具站侧栏分组 navKey 白名单；空数组表示订阅期内可使用「当前套件」内全部工具分组。
   toolsNavAllowlist String[] @default([])
 
+  /// 价格不可直接修改：发布新版本时旧 plan 归档（archivedAt + active=false），
+  /// 主 slug 让位给新 plan，旧 slug 改为 `${slug}__v${ts}`；老 Subscription.planId
+  /// 仍指向归档 plan，可完整溯源当时订阅价/名称/工具范围。
+  archivedAt   DateTime?
+  parentPlanId String?
+  parent       SubscriptionPlan?  @relation("PlanLineage", fields: [parentPlanId], references: [id], onDelete: SetNull)
+  successors   SubscriptionPlan[] @relation("PlanLineage")
+
   subscriptions Subscription[]
+
+  @@index([active, archivedAt])
 }
 
 enum SubscriptionStatus {

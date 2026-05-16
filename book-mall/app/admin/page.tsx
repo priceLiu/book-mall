@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
 
 const AdminToolUsageBarChart = dynamic(
   () =>
@@ -59,6 +60,8 @@ export default async function AdminDashboardPage() {
   const totalBalance = balanceSum._sum.balancePoints ?? 0;
   const totalRecharge = rechargeSum._sum.amountPoints ?? 0;
 
+  const financeWebOrigin = getFinanceWebPublicOrigin();
+
   const toolUsageChartData = [...toolUsageGroups]
     .sort(
       (a, b) =>
@@ -79,10 +82,6 @@ export default async function AdminDashboardPage() {
           元）；充值与工具消耗明细见对应入口。
         </p>
         <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-          <Link href="/admin/finance/reconciliation" className="font-medium text-primary underline-offset-4 hover:underline">
-            财务核对
-          </Link>
-          <span className="text-muted-foreground">·</span>
           <Link
             href="/pricing-disclosure"
             target="_blank"
@@ -91,6 +90,28 @@ export default async function AdminDashboardPage() {
           >
             前台价格公示
           </Link>
+          {financeWebOrigin ? (
+            <>
+              <span className="text-muted-foreground">·</span>
+              <a
+                href={`${financeWebOrigin}/fees/billing/details`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                财务控制台 · 账单详情
+              </a>
+              <span className="text-muted-foreground">·</span>
+              <a
+                href={`${financeWebOrigin}/admin`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                财务控制台 · 管理端
+              </a>
+            </>
+          ) : null}
         </p>
       </div>
 

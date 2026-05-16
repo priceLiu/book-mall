@@ -75,9 +75,9 @@ export async function POST(req: Request) {
     usage = await postToolUsageFromServerWithRetries({
       toolKey: "text-to-image",
       action: "invoke",
-      costPoints,
       meta: {
         taskId: billTaskId,
+        modelId: imgModel,
         pricingScheme: "tools_scheme_a",
         textToImageModel: imgModel,
         imageCount,

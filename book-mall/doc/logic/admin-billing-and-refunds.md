@@ -6,12 +6,14 @@
 
 ## 5.3 已实现能力（首期）
 
-- **计费配置**：写入 `PlatformConfig` 单行（含 LLM/工具参考单价、异常倍数）。  
-- **订阅价**：更新 `SubscriptionPlan.pricePoints`。  
-- **手动续期**：按邮箱找到当前有效 `Subscription`，延长 `currentPeriodEnd`。  
-- **订单列表**：`Order` + 对订阅已支付未 `refundedAt` 的订单 **发起订阅提现审核**。  
+- **计费配置**：写入 `PlatformConfig` 单行（含 LLM/工具参考单价、异常倍数）。
+- **订阅价（停旧发新 · 不可原地改）**：通过 `publishNewSubscriptionPlanVersion` 在事务里把旧 plan 改名为 `${slug}__v${ts}` + `active=false` + `archivedAt=now`，并复制创建持有主 slug 的新 plan，`parentPlanId` 串接历史链。老用户 `Subscription.planId` 仍指向归档 plan，可完整溯源当时价 / 名称 / 工具范围。前端有二次确认复选框 + 保存 banner；详见 `doc/releases/2026-05-16-subscription-plan-lineage.md`。
+- **订阅工具白名单**：`updateSubscriptionPlanToolsAllowlist` 仅允许在 active 且未归档的 plan 上修改；已归档 plan 锁死，保证"当时权益快照"不被改写。
+- **手动续期**：按邮箱找到当前有效 `Subscription`，延长 `currentPeriodEnd`。
+- **订单列表**：`Order` + 对订阅已支付未 `refundedAt` 的订单 **发起订阅提现审核**。
 - **充值统计**：`WalletEntry` 类型 `RECHARGE` 的 `amountPoints` 汇总（到账口径，非支付渠道流水）。
 - **充值优惠模板**：`/admin/finance/promo-templates` 维护 `RechargePromoTemplate`；用户侧领取与核销约定见 `doc/product/points-wallet-topup-spec.md`。
+- **保存反馈**：上述所有 form action 统一返回 `BillingActionState = { kind: "ok" | "error", message }`，前端 `useActionState` 显式 banner 回显，不再"无声成功 / 无声失败"。
 
 ## 6.3 余额提现
 

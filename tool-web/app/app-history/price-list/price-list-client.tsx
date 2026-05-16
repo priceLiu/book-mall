@@ -237,8 +237,10 @@ export function PriceListClient() {
       ) : null}
       <p className={styles.footerNote}>
         主站表内为其它工具仍生效的「工具管理 → 按次单价」行；分析室与试衣 / 文生图 / 视频以方案 A
-        列表及实扣为准。规则见{" "}
-        <Link href="/app-history/plan-rules">计费规则说明</Link>。
+        列表及实扣为准。与云账单同颗粒度的导入明细见财务控制台费用详表（配置{" "}
+        <code className={styles.mono}>NEXT_PUBLIC_FINANCE_WEB_ORIGIN</code> 后，「费用使用明细」页会显示入口链接）。规则见{" "}
+        <Link href="/app-history/plan-rules">计费规则说明</Link>
+        、<Link href="/app-history">费用使用明细</Link>。
       </p>
     </>
   );
