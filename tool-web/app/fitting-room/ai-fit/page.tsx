@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { AiFitModelRecord } from "@/lib/ai-fit-types";
+import { getMainSiteOrigin } from "@/lib/site-origin";
 import modelsJson from "@/mock/models.json";
 import { AiFitClient } from "./ai-fit-client";
 
@@ -9,11 +10,12 @@ export const metadata = {
 
 export default function AiFitPage() {
   const initialModels = modelsJson as AiFitModelRecord[];
+  const mainSiteOrigin = getMainSiteOrigin();
 
   return (
     <main className="tw-main fitting-room-main">
       <Suspense fallback={null}>
-        <AiFitClient initialModels={initialModels} />
+        <AiFitClient initialModels={initialModels} mainSiteOrigin={mainSiteOrigin} />
       </Suspense>
     </main>
   );

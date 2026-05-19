@@ -8,6 +8,7 @@ import {
 } from "@/components/fitting-room-locale-context";
 import { useToolsSession } from "@/components/tool-shell-client";
 import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
+import { FittingRoomPricingLink } from "@/components/fitting-room-pricing-link";
 import { FittingRoomGallery } from "./fitting-room-gallery";
 import {
   LocaleSwitcher,
@@ -58,6 +59,7 @@ function FittingRoomPageBody({
 
       <p className="tw-muted">{t("pageSubtitle")}</p>
       <ToolImplementationCrossLink href="/fitting-room/implementation" />
+      <FittingRoomPricingLink mainOrigin={mainOrigin} />
 
       {loading ? (
         <p className="tw-muted" role="status">

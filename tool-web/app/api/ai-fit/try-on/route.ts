@@ -99,6 +99,7 @@ async function reportAiFitTryOnUsage(opts: {
         resultImageUrl: opts.imageUrl,
         persistedToOwnOss: opts.persistedToOwnOss,
         modelId: tryOnModelId,
+        imageCount: 1,
         pricingScheme: "tools_scheme_a",
         tryOnModel: tryOnModelId,
         retailMultiplier: retailMult,

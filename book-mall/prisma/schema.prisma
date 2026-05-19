@@ -81,9 +81,28 @@ model User {
   toolBillingDetailLines       ToolBillingDetailLine[]
   cloudAccountBindings         CloudAccountBinding[]
   walletHolds                  WalletHold[]
+  toolModelUsageCounters       ToolModelUsageCounter[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// 按用户 + 模型 + 账期累计用量（用于云厂商阶梯价，如 aitryon-refiner 按生成张数分档）。
+model ToolModelUsageCounter {
+  id        String   @id @default(cuid())
+  userId    String
+  /// 与 ToolBillablePrice.schemeARefModelKey / 云 API model 一致，如 aitryon-refiner
+  modelKey  String
+  /// 账期键，UTC 自然月 YYYY-MM（与需求 v1.0.0 约定一致）
+  periodKey String
+  quantity  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, modelKey, periodKey])
+  @@index([userId, modelKey])
 }
 
 /// 课程课时学习进度（与 Product.slug 知识型课程关联）

@@ -157,7 +157,7 @@ BILLING_IMPORT_PRICING_TEMPLATE=aliyun.consumedetail_bill_v2 pnpm billing:import
 ### 5.3 用户可见入口
 
 - **费用使用明细**（`/app-history`）：配置财务 Origin 后，说明 **云级明细**、财务控制台链接、以及 `GET /api/tool-billing-detail-lines` 的 JSON 用途。
-- **价格表**（`/app-history/price-list`）：脚注链到规则、费用明细与财务控制台配置说明。
+- **价格公示**：统一为主站 `/pricing-disclosure`（工具站链出，无站内重复「价格表」页）；脚注链到规则、费用明细与财务控制台配置说明。
 
 **区分**：本页「使用明细」仍以 **`ToolUsageEvent` 按次扣费** 为主；云 CSV 颗粒度行为见 **`ToolBillingDetailLine`** 与 finance-web 表。
 

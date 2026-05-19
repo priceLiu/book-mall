@@ -13,7 +13,7 @@
 | 文档 | 说明 |
 |------|------|
 | [product/overview.md](./product/overview.md) | 定位、功能范围、与主站关系 |
-| [product/billing-plan-rules.md](./product/billing-plan-rules.md) | **计费规则说明**：免责、充值与明细、AI 试衣 / 文生图口径、超时与云账单（站内路由 `/app-history/plan-rules`）；**价格表**见 `/app-history/price-list` |
+| [product/billing-plan-rules.md](./product/billing-plan-rules.md) | **计费规则说明**：免责、充值与明细、AI 试衣 / 文生图口径、超时与云账单（站内 `/app-history/plan-rules`）；**价目**统一见主站 `/pricing-disclosure` |
 | [product/learning-pricing-dev-prerequisites.md](./product/learning-pricing-dev-prerequisites.md) | **【开发必读】** 学习端计费与水位线、视觉实验室前置约定、推荐初值 8000 点 |
 | [product/learning-pricing-requirements.md](./product/learning-pricing-requirements.md) | **学习端轻量报价 · 需求**：国内 only、无免费额度对客、×2.0 系数、范围与非目标、修订跟踪 |
 | [product/learning-pricing-solution.md](./product/learning-pricing-solution.md) | **学习端轻量报价 · 方案**：公式、catalog 落地、主站衔接、分期实施、平台复制清单 |

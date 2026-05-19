@@ -194,7 +194,7 @@ export default async function AccountPage({
               </Button>
             ) : null}
             <Button asChild variant="outline" size="sm">
-              <Link href="/account/pricing">平台价目表（按工具 / 模型查询）</Link>
+              <Link href="/pricing-disclosure?from=account">平台价目表（价格公示）</Link>
             </Button>
           </CardContent>
         </Card>

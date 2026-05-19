@@ -110,6 +110,23 @@
 - **ToolNavVisibility**：新增 `navKey = visual-lab`，`label = 视觉实验室`；`sortOrder >= 4` 的既有行顺延。  
 - **应用**：`pnpm run db:deploy`（工具站 `config/nav-tools.ts` 已同步四项子菜单）。
 
+## 2026-05-19 — AI 试衣四模型 ModelCatalog 入库（v1.0.0）
+
+- **迁移目录**：`prisma/migrations/20260519120000_model_catalog_ai_tryon_models/`
+- **ModelCatalog**：`aitryon`、`aitryon-plus`、`aitryon-parsing-v1`、`aitryon-refiner`（阿里云百炼；含 vendor 5 列）
+- **ModelAlias**：`INTERNAL_SCHEME_A_MODEL` → 上述 canonical
+- **原因**：试衣成本模板 v1.0.0；账单 `meta.modelId` 反查与后续 D 表 / 阶梯扣费
+- **应用**：`pnpm db:deploy`
+- **需求/发布**：[`doc/product/11-ai-tryon-cost-template-v1.0.md`](../product/11-ai-tryon-cost-template-v1.0.md)、[`doc/releases/2026-05-19-ai-tryon-cost-template-v1.0.md`](../releases/2026-05-19-ai-tryon-cost-template-v1.0.md)
+- **说明**：目录层；D 表扩展见 `20260519140000_ai_tryon_usage_counter_and_billable`
+
+## 2026-05-19 — AI 试衣累计用量 + D 表 parsing/refiner
+
+- **迁移目录**：`prisma/migrations/20260519140000_ai_tryon_usage_counter_and_billable/`
+- **ToolModelUsageCounter**：`userId` + `modelKey` + `periodKey`（UTC 月）+ `quantity`
+- **ToolBillablePrice**：`aitryon-parsing-v1` 一行；`aitryon-refiner` 七档阶梯行
+- **应用**：`pnpm db:deploy` → `pnpm pricing:realign-from-md:apply` → `pnpm pricing:inspect-billable-vs-md`
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

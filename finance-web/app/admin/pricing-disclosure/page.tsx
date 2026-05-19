@@ -8,8 +8,7 @@ import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
 /**
  * 价格公示（统一入口）。
  *
- * 与个人中心 `/account/pricing`、前台 `/pricing-disclosure` 共用同一份「平台价目表」组件，
- * 整站只此一处展示；本页只做"打开 book-mall 公示页"的入口卡片，保持 finance-web 视觉统一。
+ * 价目唯一展示在 book-mall `/pricing-disclosure`（AI 试衣 #ai-tryon）；`/account/pricing` 重定向至该页。
  */
 export default function AdminPricingDisclosurePage() {
   const [base, setBase] = useState<string | null>(null);
@@ -18,15 +17,14 @@ export default function AdminPricingDisclosurePage() {
   }, []);
 
   const target = base ? `${base}/pricing-disclosure` : "/pricing-disclosure";
-  const accountTarget = base ? `${base}/account/pricing` : "/account/pricing";
+  const aiTryonTarget = `${target}#ai-tryon`;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <header className="border-b border-[#e8e8e8] bg-white px-6 py-4">
         <h1 className="text-base font-medium text-[#262626]">价格公示</h1>
         <p className="mt-1 text-xs text-[#8c8c8c]">
-          全站统一价目表（云挂牌价 × M = 平台零售价）。本页与个人中心、前台公示页共用同一组件、同一数据源，
-          确保任何调整一次同步生效。
+          全站统一价目表（云挂牌价 × M = 平台零售价），唯一页面为 book-mall 价格公示。
         </p>
       </header>
       <div className="flex-1 overflow-y-auto bg-[#f5f5f5] p-6">
@@ -57,12 +55,12 @@ export default function AdminPricingDisclosurePage() {
                 <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               </Link>
               <Link
-                href={accountTarget}
+                href={aiTryonTarget}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded border border-[#d9d9d9] bg-white px-3 py-1.5 text-sm text-[#262626] hover:border-[#1890ff] hover:text-[#1890ff]"
               >
-                打开个人中心价目表
+                AI 试衣价目（含阶梯）
                 <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               </Link>
             </div>

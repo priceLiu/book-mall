@@ -28,8 +28,8 @@ function qp(sp: Props["searchParams"], key: string): string {
 /**
  * 云厂商价目表 · 管理后台。
  *
- * 整合（2026-05-18）：原"在库价目"（master view）已删除——其内容与 `/account/pricing`、
- * `/pricing-disclosure` 完全一致，并入同一个页面以避免三处不一致。本页只保留「导入版本」管理（
+ * 整合（2026-05-18）：原"在库价目"（master view）已删除——价目统一在 `/pricing-disclosure`
+ * （AI 试衣见 #ai-tryon）。本页只保留「导入版本」管理（
  * PricingSourceVersion）以及顶部的跳转入口。
  */
 export default async function CloudPricingIndexPage({ searchParams }: Props) {
@@ -96,37 +96,26 @@ export default async function CloudPricingIndexPage({ searchParams }: Props) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm">
-              平台价目表（前台公示）
+              平台价目表（唯一公示页）
               <Badge variant="outline" className="text-[10px] font-mono">/pricing-disclosure</Badge>
             </CardTitle>
             <CardDescription className="text-xs">
-              对外公开的价目表，含云挂牌价 / 系数 M / 平台单价 / 公式 / 厂商商品；与个人中心同源（管理员在个人中心亦可看全列；普通用户仅见平台单价与点数等）。
+              对外价目唯一入口：含云挂牌价 / M / 平台单价 / 厂商商品。AI 试衣（含 refiner 阶梯）见页内{" "}
+              <code className="text-[10px]">#ai-tryon</code>；其余工具见 <code className="text-[10px]">#all-tools</code>。
+              <code className="text-[10px]">/account/pricing</code> 已重定向到本页。
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-wrap gap-2">
             <Button asChild size="sm" variant="default">
               <Link href="/pricing-disclosure" target="_blank" rel="noopener noreferrer">
                 打开公示页
                 <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden />
               </Link>
             </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              平台价目表（个人中心）
-              <Badge variant="outline" className="text-[10px] font-mono">/account/pricing</Badge>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              已登录用户视图：列与公示页一致（管理员看全列；普通用户仅展示平台零售价相关列，不含云成本与系数）。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
             <Button asChild size="sm" variant="outline">
-              <Link href="/account/pricing">
-                打开个人中心价目表
-                <ChevronRight className="ml-0.5 h-3.5 w-3.5" aria-hidden />
+              <Link href="/pricing-disclosure#ai-tryon" target="_blank" rel="noopener noreferrer">
+                AI 试衣价目
+                <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden />
               </Link>
             </Button>
           </CardContent>

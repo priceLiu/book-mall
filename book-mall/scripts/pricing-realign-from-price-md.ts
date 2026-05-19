@@ -26,7 +26,7 @@ type ImageExpect = {
   action: string;
   schemeARefModelKey: string;
   cloudModelKey: string;
-  cloudTierRaw: ""; // 图片类不带档位
+  cloudTierRaw: string; // 图片类通常 ""；refiner 为阶梯 tierRaw
   cloudBillingKind: "OUTPUT_IMAGE" | "COST_PER_IMAGE";
   costYuan: number;
   note?: string;
@@ -94,6 +94,34 @@ const EXPECTATIONS: Expect[] = [
     costYuan: 0.5,
     note: "AI 试衣 Plus版（按张）",
   },
+  {
+    toolKey: TOOL_FITTING,
+    action: "try_on",
+    schemeARefModelKey: "aitryon-parsing-v1",
+    cloudModelKey: "aitryon-parsing-v1",
+    cloudTierRaw: "",
+    cloudBillingKind: "COST_PER_IMAGE",
+    costYuan: 0.004,
+    note: "AI 试衣-图片分割（按输入张）",
+  },
+  ...([
+    { tier: "生成≤25张", cost: 0.3 },
+    { tier: "25<生成≤125张", cost: 0.275 },
+    { tier: "125<生成≤250张", cost: 0.25 },
+    { tier: "250<生成≤1250张", cost: 0.225 },
+    { tier: "1250<生成≤2500张", cost: 0.2 },
+    { tier: "2500<生成≤2.5万张", cost: 0.175 },
+    { tier: ">2.5万张", cost: 0.15 },
+  ] as const).map<ImageExpect>(({ tier, cost }) => ({
+    toolKey: TOOL_FITTING,
+    action: "try_on",
+    schemeARefModelKey: "aitryon-refiner",
+    cloudModelKey: "aitryon-refiner",
+    cloudTierRaw: tier,
+    cloudBillingKind: "OUTPUT_IMAGE",
+    costYuan: cost,
+    note: `AI 试衣精修 ${tier}`,
+  })),
   // ============ 图片：文生图 ============
   {
     toolKey: TOOL_T2I,

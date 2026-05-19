@@ -8,6 +8,7 @@
  *   exit 0 = 全部对齐；非 0 = 有偏差。
  */
 import { prisma } from "../lib/prisma";
+import { REFINER_VOLUME_TIERS } from "../lib/pricing/ai-tryon-cost";
 
 /** B：把 price_0518.md 中"中国内地"段对照我们用的模型抽出来；
  *  数值原样来自该 md（截至 2026-05-18 校对的版本）。
@@ -16,12 +17,21 @@ import { prisma } from "../lib/prisma";
 const PRICE_MD: Record<
   string,
   | { kind: "image_per"; perUnitYuan: number }
+  | {
+      kind: "image_per_volume_tier";
+      tiers: ReadonlyArray<{ tierRaw: string; costYuan: number }>;
+    }
   | { kind: "video_per_sec_bySr"; bySr: Record<string, number> }
   | { kind: "video_per_sec_bySrAudio"; bySrAudio: Record<string, { true: number; false: number }> }
 > = {
   // —— 试衣（按张） ——
   aitryon: { kind: "image_per", perUnitYuan: 0.2 },
   "aitryon-plus": { kind: "image_per", perUnitYuan: 0.5 },
+  "aitryon-parsing-v1": { kind: "image_per", perUnitYuan: 0.004 },
+  "aitryon-refiner": {
+    kind: "image_per_volume_tier",
+    tiers: REFINER_VOLUME_TIERS.map((t) => ({ tierRaw: t.tierRaw, costYuan: t.costYuan })),
+  },
   // —— 文生图（按张） ——
   "wanx2.1-t2i-plus": { kind: "image_per", perUnitYuan: 0.2 },
   // —— happyhorse 视频系列：720P 0.9 / 1080P 1.6 ——
@@ -71,6 +81,9 @@ const PRICE_MD: Record<
 
 function fmtMd(p: (typeof PRICE_MD)[string]): string {
   if (p.kind === "image_per") return `${p.perUnitYuan} 元/张`;
+  if (p.kind === "image_per_volume_tier") {
+    return p.tiers.map((t) => `${t.tierRaw}:${t.costYuan}`).join(" / ");
+  }
   if (p.kind === "video_per_sec_bySr") {
     return Object.entries(p.bySr)
       .map(([sr, v]) => `${sr}P:${v}`)
@@ -154,6 +167,23 @@ async function main() {
               desc: `cost=${cost} ≠ 挂牌 ${md.perUnitYuan} 元/张`,
             });
           }
+        } else if (md.kind === "image_per_volume_tier") {
+          const hit = md.tiers.find((t) => t.tierRaw === rawTier);
+          if (!hit) {
+            issues.push({
+              severity: "⚠️",
+              modelKey,
+              rowId: r.id,
+              desc: `tier=${rawTier || "-"} 不在 refiner 挂牌档位中`,
+            });
+          } else if (cost == null || Math.abs(cost - hit.costYuan) > 1e-6) {
+            issues.push({
+              severity: "❌",
+              modelKey,
+              rowId: r.id,
+              desc: `cost=${cost} ≠ 挂牌 ${hit.tierRaw} ${hit.costYuan} 元/张`,
+            });
+          }
         } else if (md.kind === "video_per_sec_bySr") {
           const expected = md.bySr[tierSr];
           if (expected == null) {
@@ -232,6 +262,19 @@ async function main() {
             modelKey,
             rowId: "(no row)",
             desc: `挂牌档位 ${t}P 在 D 中没有对应的行`,
+          });
+        }
+      }
+    }
+    if (md && md.kind === "image_per_volume_tier") {
+      const tiersInD = new Set(list.map((r) => (r.cloudTierRaw ?? "").trim()));
+      for (const t of md.tiers) {
+        if (!tiersInD.has(t.tierRaw)) {
+          issues.push({
+            severity: "❌",
+            modelKey,
+            rowId: "(no row)",
+            desc: `挂牌档位 ${t.tierRaw} 在 D 中没有对应的行`,
           });
         }
       }

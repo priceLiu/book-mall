@@ -1,11 +1,19 @@
 import Link from "next/link";
 import type { SubscriptionInterval } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isPrismaConnectionUnavailable, logDbUnavailable } from "@/lib/db-unavailable";
 import { formatPointsAsYuan } from "@/lib/currency";
-import { getPricingTableRowsForDisclosure } from "@/lib/pricing-disclosure";
-import { PricingTable } from "@/components/pricing/pricing-table";
-import { PricingFormulaCard } from "@/components/pricing/pricing-formula-card";
+import {
+  isPricingFromAccount,
+  resolveShowPricingInternals,
+} from "@/lib/pricing-disclosure-view";
+import {
+  getAiTryonPricingTableRowsForDisclosure,
+  getNonAiTryonPricingTableRowsForDisclosure,
+} from "@/lib/pricing-disclosure";
+import { PricingDisclosureMeteredSection } from "@/components/pricing/pricing-disclosure-metered";
 import { BillingPolicySection } from "@/components/layout/sections/billing-policy";
 import { SubscriptionPlansTable } from "@/components/pricing/subscription-plans-table";
 import { Button } from "@/components/ui/button";
@@ -23,19 +31,32 @@ function intervalLabel(interval: SubscriptionInterval): string {
 /**
  * 价格公示页（公开访问）。
  *
- * 整合（2026-05-18）：「按次扣费单价」表与个人中心 `/account/pricing` 共用同一份组件 + 同一函数读
- * （getPricingTableRowsForDisclosure），这是整站统一的「平台价目表」展示来源。admin 端
- * `/admin/finance/cloud-pricing` 已删除"在库价目"section，跳转到本页。
+ * 整站唯一价目展示页：第二节整合按次扣费（#ai-tryon 试衣完整价目 + #all-tools 其他）。
+ * `/account/pricing` 重定向到本页。
  */
-export default async function PricingDisclosurePage() {
-  let rows: Awaited<ReturnType<typeof getPricingTableRowsForDisclosure>> = [];
+export default async function PricingDisclosurePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string | string[] }>;
+}) {
+  const sp = await searchParams;
+  const fromAccount = isPricingFromAccount(sp);
+  const session = await getServerSession(authOptions);
+  const showPricingInternals = resolveShowPricingInternals({
+    fromAccount,
+    isAdmin: session?.user?.role === "ADMIN",
+  });
+
+  let otherToolRows: Awaited<ReturnType<typeof getNonAiTryonPricingTableRowsForDisclosure>> = [];
+  let aiTryonRows: Awaited<ReturnType<typeof getAiTryonPricingTableRowsForDisclosure>> = [];
   let plans: Awaited<ReturnType<typeof prisma.subscriptionPlan.findMany>> = [];
   let config: Awaited<ReturnType<typeof prisma.platformConfig.findUnique>> = null;
   let dbUnavailable = false;
 
   try {
-    [rows, plans, config] = await Promise.all([
-      getPricingTableRowsForDisclosure(),
+    [otherToolRows, aiTryonRows, plans, config] = await Promise.all([
+      getNonAiTryonPricingTableRowsForDisclosure(),
+      getAiTryonPricingTableRowsForDisclosure(),
       prisma.subscriptionPlan.findMany({
         where: { active: true },
         orderBy: { interval: "asc" },
@@ -48,12 +69,17 @@ export default async function PricingDisclosurePage() {
     dbUnavailable = true;
   }
 
-  const findPrice = (toolKey: string, action: string | null) =>
-    rows.find((r) => r.toolKey === toolKey && (r.action ?? "") === (action ?? ""));
+  const findPrice = (
+    list: typeof otherToolRows,
+    toolKey: string,
+    action: string | null,
+  ) => list.find((r) => r.toolKey === toolKey && (r.action ?? "") === (action ?? ""));
 
-  const aiFit = findPrice("fitting-room__ai-fit", "try_on");
-  const tti = findPrice("text-to-image", "invoke");
-  const itv = findPrice("image-to-video", "invoke");
+  const aiFitBase = aiTryonRows.find(
+    (r) => r.schemeARefModelKey === "aitryon" && !(r.cloudTierRaw ?? "").trim(),
+  );
+  const tti = findPrice(otherToolRows, "text-to-image", "invoke");
+  const itv = findPrice(otherToolRows, "image-to-video", "invoke");
 
   const subscriptionPlanRows = plans.map((p) => ({
     id: p.id,
@@ -70,10 +96,19 @@ export default async function PricingDisclosurePage() {
         <p className="text-sm text-muted-foreground leading-relaxed">
           以下数据与主站管理后台、计费结算同源；货币为人民币。账户以<strong>点</strong>为单位记账，
           <strong className="text-foreground">1 点 = ¥0.01</strong>（与历史「分」整数口径一致）。
-          <br />
-          平台零售价 ={" "}
-          <strong className="text-foreground">云厂商挂牌价（成本价）× M</strong>
-          ；当前 M = 2（每个模型 / 档位独立公示）。
+          {showPricingInternals ? (
+            <>
+              <br />
+              平台零售价 ={" "}
+              <strong className="text-foreground">云厂商挂牌价（成本价）× M</strong>
+              ；当前 M = 2（每个模型 / 档位独立公示）。
+            </>
+          ) : (
+            <>
+              <br />
+              按次工具价目见下文「平台单价」与「点数」列；实际扣费以调用成功为准。
+            </>
+          )}
         </p>
       </div>
 
@@ -99,21 +134,12 @@ export default async function PricingDisclosurePage() {
         </p>
       </section>
 
-      <section className="mt-12 space-y-4">
-        <h2 className="text-lg font-semibold">二、按次扣费单价（工具）</h2>
-        <p className="text-sm text-muted-foreground">
-          以下单价适用于已标价的工具行为；实际扣费以执行成功为准，与后台「工具管理」配置的生效区间一致。
-        </p>
-        <PricingFormulaCard />
-        <PricingTable rows={rows} />
-        <p className="text-xs text-muted-foreground">
-          说明：
-          <strong className="text-foreground">云挂牌价（成本）</strong>来自云厂商官方挂牌（不计折扣），是平台的成本价；
-          <strong className="text-foreground">平台单价</strong> = 云挂牌价 × M；
-          视频模型按「输出秒数」计费（不足
-          {config?.minBilledVideoSec ?? 5} 秒按 {config?.minBilledVideoSec ?? 5} 秒兜底），图片按「输出张数」，Token 类按调用次数计点。
-        </p>
-      </section>
+      <PricingDisclosureMeteredSection
+        aiTryonRows={aiTryonRows}
+        otherToolRows={otherToolRows}
+        minBilledVideoSec={config?.minBilledVideoSec ?? 5}
+        showPricingInternals={showPricingInternals}
+      />
 
       <section className="mt-12 space-y-4">
         <h2 className="text-lg font-semibold">三、平台余额线（参考配置）</h2>
@@ -152,16 +178,21 @@ export default async function PricingDisclosurePage() {
         <ul className="list-disc space-y-3 pl-5 text-sm text-muted-foreground">
           <li>
             <strong className="text-foreground">AI 智能试衣 · 生成一次试衣成片</strong>
-            {aiFit ? (
+            （基础版 <code className="text-xs">aitryon</code>，详见{" "}
+            <Link href="#ai-tryon" className="text-primary underline">
+              第二节 · AI 试衣完整价目
+            </Link>
+            ）
+            {aiFitBase ? (
               <>
                 ：扣费{" "}
                 <span className="tabular-nums font-medium text-foreground">
-                  {aiFit.pricePoints.toLocaleString("zh-CN")} 点
+                  {aiFitBase.pricePoints.toLocaleString("zh-CN")} 点
                 </span>
-                （¥{formatPointsAsYuan(aiFit.pricePoints)}）。
+                （¥{formatPointsAsYuan(aiFitBase.pricePoints)}）。Plus / 分割 / 精修等模型见上表各档。
               </>
             ) : (
-              <>：当前公示表未列出该档单价，请以「按次扣费单价」表或应用内提示为准。</>
+              <>：请以「AI 试衣模型单价」表或应用内提示为准。</>
             )}
           </li>
           <li>
