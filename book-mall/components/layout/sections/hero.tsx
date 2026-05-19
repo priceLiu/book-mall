@@ -3,13 +3,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, Maximize2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const HERO_VIDEO_SRC = "/home-hero.mp4";
-/** 首帧占位：仍在本地，避免视频首包前留白过久 */
 const HERO_POSTER = "/main-hero.jpg";
+/** 与历史首页大图一致，避免布局跳动 */
+const POSTER_DIM = { w: 1920, h: 1013 } as const;
 
 function requestVideoFullscreen(video: HTMLVideoElement) {
   if (video.requestFullscreen) {
@@ -31,13 +33,21 @@ function requestVideoFullscreen(video: HTMLVideoElement) {
 
 export const HeroSection = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [mounted, setMounted] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   const [videoError, setVideoError] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const onFullscreen = useCallback(() => {
     const v = videoRef.current;
     if (v) requestVideoFullscreen(v);
   }, []);
+
+  /** 仅客户端挂载 video：带 controls 时浏览器会改写 video 内部 DOM，与 SSR 不一致会触发 hydration error */
+  const showLoadingOverlay = mounted && !videoReady && !videoError;
 
   return (
     <section className="container w-full">
@@ -55,7 +65,14 @@ export const HeroSection = () => {
               <span className="whitespace-nowrap text-base sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl">
                 一人公司
               </span>
-              <span className="whitespace-nowrap text-xl sm:text-4xl md:text-5xl lg:text-7xl xl:text-8xl text-transparent bg-gradient-to-r from-[#D247BF] to-primary bg-clip-text">
+              <span
+                className={cn(
+                  "inline-block whitespace-nowrap text-xl sm:text-4xl md:text-5xl lg:text-7xl xl:text-8xl",
+                  "bg-gradient-to-r from-[#D247BF] to-primary bg-clip-text text-transparent",
+                  // iOS / WebKit：仅 `color: transparent` 时常出现渐变色块盖住字形，需同步 -webkit 裁剪与填充
+                  "[-webkit-background-clip:text] [-webkit-text-fill-color:transparent]",
+                )}
+              >
                 AI打工仔
               </span>
               <span className="whitespace-nowrap text-base sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl">
@@ -87,13 +104,12 @@ export const HeroSection = () => {
               "shadow-sm",
             )}
           >
-            {/* 加载中：海报已显示，叠一层轻提示 */}
             <div
               className={cn(
                 "pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/40 transition-opacity duration-300",
-                videoReady || videoError ? "pointer-events-none opacity-0" : "opacity-100",
+                showLoadingOverlay ? "opacity-100" : "pointer-events-none opacity-0",
               )}
-              aria-hidden={videoReady || videoError}
+              aria-hidden={!showLoadingOverlay}
             >
               <Loader2 className="size-10 animate-spin text-primary" aria-label="视频加载中" />
             </div>
@@ -102,6 +118,18 @@ export const HeroSection = () => {
               <div className="relative aspect-video w-full flex flex-col items-center justify-center gap-2 bg-muted p-8 text-center text-muted-foreground">
                 <p>视频暂时无法播放，请刷新页面或检查网络。</p>
               </div>
+            ) : !mounted ? (
+              <Image
+                width={POSTER_DIM.w}
+                height={POSTER_DIM.h}
+                sizes="(max-width: 1280px) calc(100vw - 1rem), 1280px"
+                priority
+                placeholder="blur"
+                blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+                className="relative z-[1] w-full h-auto max-h-[min(85vh,1013px)] object-contain mx-auto bg-black/5"
+                src={HERO_POSTER}
+                alt="智选 AI Mall 主视觉"
+              />
             ) : (
               <>
                 <video
@@ -116,10 +144,7 @@ export const HeroSection = () => {
                   loop
                   onLoadedData={(e) => {
                     setVideoReady(true);
-                    if (
-                      typeof window !== "undefined" &&
-                      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-                    ) {
+                    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
                       e.currentTarget.pause();
                       e.currentTarget.removeAttribute("autoplay");
                     }
@@ -131,7 +156,6 @@ export const HeroSection = () => {
                   }}
                 >
                   <source src={HERO_VIDEO_SRC} type="video/mp4" />
-                  您的浏览器不支持 HTML5 视频，请升级浏览器。
                 </video>
 
                 <div className="absolute top-3 right-3 z-[2] flex gap-2">

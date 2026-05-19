@@ -140,13 +140,10 @@ async function main() {
     where: { slug: "ai-courses" },
   });
 
-  /** 首页「推荐产品」封面：按应用场景区分，便于识别 */
-  const coverAiFit =
-    "https://images.unsplash.com/photo-1531746797559-117fa8cfb90d?auto=format&fit=crop&w=600&q=85";
-  const coverTextToImage =
-    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=85";
-  const coverSmartSupport =
-    "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=600&q=85";
+  /** 首页「推荐产品」封面：与 `public/home-showcase-*.png` 一致（文生图 / 智能客服 / 试衣间） */
+  const coverTextToImage = "/home-showcase-text-to-image.png";
+  const coverSmartSupport = "/home-showcase-smart-support.png";
+  const coverAiFit = "/home-showcase-fitting-room.png";
   const coverCoursePrompt =
     "https://images.unsplash.com/photo-1517842645767-c639b880efb6?auto=format&fit=crop&w=600&q=85";
   const coverCourseWorkflow =
@@ -202,7 +199,7 @@ async function main() {
       coverImageUrl: coverTextToImage,
       status: "PUBLISHED",
       featuredHome: true,
-      featuredSort: 20,
+      featuredSort: 10,
       categoryId: appsCat?.id ?? null,
       toolNavKey: "text-to-image",
       toolPermissions: "工具站套件 navKey：text-to-image",
@@ -218,7 +215,7 @@ async function main() {
       coverImageUrl: coverTextToImage,
       status: "PUBLISHED",
       featuredHome: true,
-      featuredSort: 20,
+      featuredSort: 10,
       categoryId: appsCat?.id ?? null,
       toolNavKey: "text-to-image",
       toolPermissions: "工具站套件 navKey：text-to-image",
@@ -239,7 +236,7 @@ async function main() {
       coverImageUrl: coverSmartSupport,
       status: "PUBLISHED",
       featuredHome: true,
-      featuredSort: 10,
+      featuredSort: 20,
       categoryId: appsCat?.id ?? null,
       toolNavKey: "smart-support",
       toolPermissions: "工具站套件 navKey：smart-support",
@@ -255,7 +252,7 @@ async function main() {
       coverImageUrl: coverSmartSupport,
       status: "PUBLISHED",
       featuredHome: true,
-      featuredSort: 10,
+      featuredSort: 20,
       categoryId: appsCat?.id ?? null,
       toolNavKey: "smart-support",
       toolPermissions: "工具站套件 navKey：smart-support",
