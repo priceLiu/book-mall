@@ -1,12 +1,12 @@
 # finance-web
 
-财务控制台：表头与 **`consumedetailbillv2`** 对齐，并带 **对内计价** 列。产品说明见 `tool-web/doc/reconciliation-baseline-2026-05-16.md` §8.6。**整体架构与三端接口**见 [`tool-web/doc/product/finance-billing-architecture-refactor.md`](../tool-web/doc/product/finance-billing-architecture-refactor.md)。
+finance-web：表头与 **`consumedetailbillv2`** 对齐，并带 **对内计价** 列。产品说明见 `tool-web/doc/reconciliation-baseline-2026-05-16.md` §8.6。**整体架构与三端接口**见 [`tool-web/doc/product/finance-billing-architecture-refactor.md`](../tool-web/doc/product/finance-billing-architecture-refactor.md)。
 
 ## 「ToolBillingDetailLine + 登录用户」指什么？
 
 - **`ToolBillingDetailLine`** 是 book-mall 里的一张表：每一行 = 云账单的一行粒度，完整列放在 JSON **`cloudRow`**，并带有 **`userId`**（**你们平台上的用户**，不是阿里云主账号那一列）。
 - **登录用户**：`GET /api/account/billing-detail-lines` 用 NextAuth **`session.user.id`**，只返回 **当前登录会员** 的行，并带上 **钱包 `balancePoints`**。这样 finance-web 展示的是「**这个人**在平台上的明细与余额」，而不是整张混在一起的云 CSV。
-- **finance-web** 仅从 **book-mall HTTP API** 读数（`GET /api/account/billing-detail-lines` 或管理端 `GET /api/admin/finance/billing-detail-lines`），**不直连数据库**，也不再用仓库内 CSV 兜底。
+- **finance-web** 仅从 **book-mall HTTP API** 读数（`GET /api/account/billing-detail-lines` 与（需管理员）`GET /api/admin/finance/billing-detail-lines`），**不直连数据库**，也不再用仓库内 CSV 兜底。
 - **工具站**：已登录工具会话时可通过 `GET /api/tool-billing-detail-lines`（tool-web 代理 `GET /api/sso/tools/billing-detail-lines`）取与本页同形 JSON。
 
 ## 开发与端口
@@ -38,8 +38,8 @@ npm run dev
 
 ## 页面
 
-- **用户端**：`/fees/billing/details`  
-- **管理端**：`/admin`、`/admin/billing/users/<User.id>`（需管理员已在 book-mall 登录）、`/admin/models/coefficients`
+- **费用明细（本人）**：`/fees/billing/details`  
+- **`/admin` 区**：`/admin`、`/admin/billing/users/<User.id>`（需管理员已在 book-mall 登录）、`/admin/models/coefficients`
 
 ## 构建
 

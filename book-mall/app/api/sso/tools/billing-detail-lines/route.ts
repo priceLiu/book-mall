@@ -35,7 +35,7 @@ export async function GET(req: Request) {
       select: { balancePoints: true },
     }),
     prisma.toolBillingDetailLine.findMany({
-      // 与用户端 `/api/account/billing-detail-lines` 一致：仅工具站产生的扣费行（非云 CSV 导入对账行）
+      // 与 `/api/account/billing-detail-lines` 一致：仅工具站产生的扣费行（非云 CSV 导入对账行）
       where: { userId, source: "TOOL_USAGE_GENERATED" },
       orderBy: { createdAt: "desc" },
     }),

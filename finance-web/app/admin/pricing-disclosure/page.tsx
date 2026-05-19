@@ -6,7 +6,7 @@ import { ExternalLink } from "lucide-react";
 import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
 
 /**
- * 财务管理端 · 价格公示（统一入口）。
+ * 价格公示（统一入口）。
  *
  * 与个人中心 `/account/pricing`、前台 `/pricing-disclosure` 共用同一份「平台价目表」组件，
  * 整站只此一处展示；本页只做"打开 book-mall 公示页"的入口卡片，保持 finance-web 视觉统一。

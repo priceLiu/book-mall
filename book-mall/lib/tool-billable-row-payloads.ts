@@ -80,7 +80,10 @@ export type AdminRowInput = Pick<
   | "cloudBillingKind"
 >;
 
-function deriveStatus(row: AdminRowInput, now: Date): BillableRowStatus {
+export function deriveBillableRowStatus(
+  row: AdminRowInput,
+  now: Date = new Date(),
+): BillableRowStatus {
   if (!row.active) return "inactive";
   if (row.effectiveFrom.getTime() > now.getTime()) return "future";
   if (row.effectiveTo && row.effectiveTo.getTime() < now.getTime()) return "expired";
@@ -115,7 +118,7 @@ export function buildRowPayloads(
       effectiveTo: p.effectiveTo ? formatDatetimeLocalChina(p.effectiveTo.toISOString()) : "",
       active: p.active,
       note: p.note,
-      status: deriveStatus(p, now),
+      status: deriveBillableRowStatus(p, now),
       cloudModelKey: overlay.cloudModelKey,
       cloudTierRaw: overlay.cloudTierRaw,
       cloudBillingKind: overlay.cloudBillingKind,

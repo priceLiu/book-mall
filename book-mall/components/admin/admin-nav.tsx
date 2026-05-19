@@ -141,12 +141,12 @@ export function AdminNav({
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  财务控制台 · 管理端
+                  账单明细（按用户）
                 </a>
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem disabled className="text-muted-foreground">
-                财务控制台（未配置 NEXT_PUBLIC_FINANCE_WEB_ORIGIN）
+                账单明细（未配置 NEXT_PUBLIC_FINANCE_WEB_ORIGIN）
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>

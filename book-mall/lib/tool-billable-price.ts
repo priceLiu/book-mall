@@ -254,7 +254,7 @@ export async function resolveBillableSnapshot(
       : null;
 
   /**
-   * v002 兼容：早期管理端只填了 `pricePoints` 与 `schemeAAdminRetailMultiplier`，
+   * v002 兼容：早期表单只填了 `pricePoints` 与 `schemeAAdminRetailMultiplier`，
    * 没维护 `schemeAUnitCostYuan` 时，按定义反推：cost = pricePoints / M / 100。
    * 这样 cloudRow 内「厂商定价/官网目录价」不再为空，财务表能立即展示。
    */
