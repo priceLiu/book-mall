@@ -7,15 +7,8 @@ import { getPricingTableRowsForDisclosure } from "@/lib/pricing-disclosure";
 import { PricingTable } from "@/components/pricing/pricing-table";
 import { PricingFormulaCard } from "@/components/pricing/pricing-formula-card";
 import { BillingPolicySection } from "@/components/layout/sections/billing-policy";
+import { SubscriptionPlansTable } from "@/components/pricing/subscription-plans-table";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 export const metadata = {
   title: "价格公示与使用说明",
@@ -62,6 +55,14 @@ export default async function PricingDisclosurePage() {
   const tti = findPrice("text-to-image", "invoke");
   const itv = findPrice("image-to-video", "invoke");
 
+  const subscriptionPlanRows = plans.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    intervalLabel: intervalLabel(p.interval),
+    priceDisplay: `¥${formatPointsAsYuan(p.pricePoints)}`,
+  }));
+
   return (
     <main className="container max-w-screen-2xl mx-auto px-4 pb-24 pt-8 md:pt-12">
       <div className="space-y-2">
@@ -88,39 +89,7 @@ export default async function PricingDisclosurePage() {
           订阅费用于解锁会员身份与普通型权益；
           <strong className="text-foreground">不可</strong>用钱包余额抵扣。 如需使用按量工具，请在订阅开通后在个人中心为钱包充值，并满足最低余额线。
         </p>
-        <div className="overflow-hidden rounded-lg border border-secondary">
-          <Table className="min-w-[560px]">
-            <TableHeader>
-              <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead>套餐</TableHead>
-                <TableHead>计费周期</TableHead>
-                <TableHead className="text-right">标价</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {plans.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-muted-foreground">
-                    暂无在售订阅档位。
-                  </TableCell>
-                </TableRow>
-              ) : (
-                plans.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <span className="font-medium">{p.name}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">({p.slug})</span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{intervalLabel(p.interval)}</TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      ¥{formatPointsAsYuan(p.pricePoints)}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <SubscriptionPlansTable rows={subscriptionPlanRows} />
         <p className="text-xs text-muted-foreground">
           购买入口参见{" "}
           <Link href="/subscribe" className="text-primary underline">
