@@ -37,7 +37,7 @@ function ProductMegaMenuContent() {
   return (
     <div className="flex gap-6 p-4">
       <Image
-        src="/logo.jpg"
+        src="/logo2.png"
         alt="智选AI"
         className="h-44 w-44 shrink-0 rounded-md object-contain bg-transparent dark:mix-blend-screen"
         width={400}
@@ -81,7 +81,7 @@ function BrandLogoLink({ onNavigate }: { onNavigate?: () => void }) {
       aria-label="智选AI 首页"
     >
       <Image
-        src="/logo.jpg"
+        src="/logo2.png"
         alt="智选AI — ai-code8.com"
         width={144}
         height={144}
