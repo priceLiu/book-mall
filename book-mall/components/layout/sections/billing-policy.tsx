@@ -1,4 +1,4 @@
-/** 第七章：用户知情权·计费与提现公示（落地页可锚点 #billing-policy） */
+/** 计费与提现说明（锚点 #billing-policy）；主站入口见 /pricing-disclosure#billing-policy */
 export function BillingPolicySection() {
   return (
     <section

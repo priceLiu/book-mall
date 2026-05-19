@@ -6,6 +6,7 @@ import { formatPointsAsYuan } from "@/lib/currency";
 import { getPricingTableRowsForDisclosure } from "@/lib/pricing-disclosure";
 import { PricingTable } from "@/components/pricing/pricing-table";
 import { PricingFormulaCard } from "@/components/pricing/pricing-formula-card";
+import { BillingPolicySection } from "@/components/layout/sections/billing-policy";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
@@ -221,11 +222,13 @@ export default async function PricingDisclosurePage() {
         </ul>
       </section>
 
+      <BillingPolicySection />
+
       <section className="mt-12 rounded-xl border border-secondary bg-muted/30 p-6 text-sm text-muted-foreground">
         <p className="font-medium text-foreground">说明与权利保留</p>
         <p className="mt-2 leading-relaxed">
-          单价与订阅价可能随运营策略变更；新价格仅在生效时间之后适用。完整计费与提现规则摘要见首页{" "}
-          <Link href="/#billing-policy" className="text-primary underline">
+          单价与订阅价可能随运营策略变更；新价格仅在生效时间之后适用。完整计费与提现规则摘要见本页{" "}
+          <Link href="#billing-policy" className="text-primary underline">
             计费、余额与提现说明
           </Link>
           。
