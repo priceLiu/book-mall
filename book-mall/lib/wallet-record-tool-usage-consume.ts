@@ -7,6 +7,7 @@ import {
   type ToolUsageCanonicalHint,
   type ToolUsageUserHint,
 } from "@/lib/finance/tool-usage-billing-line";
+import { incrementModelUsage } from "@/lib/tool-model-usage-counter";
 
 /**
  * v004：事务前一次 SELECT 用户的"对外标识"，注入 cloudRow 的「平台/用户名」+「平台/用户ID」。
@@ -28,6 +29,16 @@ async function resolveUserHint(userId: string): Promise<ToolUsageUserHint> {
  *
  * v008：禁止使用 `aliasValue: { in: [...] }` + `findFirst`——多值时数据库返回顺序不确定，可能命中错误目录。
  */
+function schemeARefModelFromMeta(meta: Prisma.InputJsonValue | undefined): string | undefined {
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return undefined;
+  const m = meta as Record<string, unknown>;
+  for (const k of ["modelId", "tryOnModel", "apiModel"] as const) {
+    const v = m[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return undefined;
+}
+
 async function resolveCanonicalFromMeta(
   meta: Prisma.InputJsonValue | undefined,
 ): Promise<ToolUsageCanonicalHint | null> {
@@ -281,6 +292,17 @@ export async function recordToolUsageAndConsumeWallet(opts: {
           description: `工具消耗 · ${opts.toolKey} · ${opts.action} · ¥${(opts.costPoints / 100).toFixed(2)}`,
         },
       });
+
+      const refModel = schemeARefModelFromMeta(opts.meta);
+      if (refModel === "aitryon-refiner" && opts.costPoints > 0) {
+        const billed =
+          opts.pricingSnapshot?.billedUnit === "张" &&
+          typeof opts.pricingSnapshot.billedQty === "number" &&
+          opts.pricingSnapshot.billedQty > 0
+            ? opts.pricingSnapshot.billedQty
+            : 1;
+        await incrementModelUsage(tx, opts.userId, "aitryon-refiner", billed);
+      }
 
       if (opts.costPoints > 0) {
         await tx.toolBillingDetailLine.create({

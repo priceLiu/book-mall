@@ -109,10 +109,17 @@ async function resolveCostAndSnapshotForEvent(
   body: Record<string, unknown>,
   toolKey: string,
   action: string,
+  userId: string,
 ): Promise<CostResolution | undefined> {
+  const actuals = actualsFromUsageBody(body);
   const snap = await resolveBillableSnapshot(toolKey, action, {
+    userId,
     schemeARefModelKey: schemeARefModelFromUsageBody(body),
-    actuals: actualsFromUsageBody(body),
+    actuals:
+      actuals ??
+      (action === "try_on" && toolKey === "fitting-room__ai-fit"
+        ? { imageCount: 1 }
+        : undefined),
   });
   if (snap && snap.points > 0) {
     return { costPoints: snap.points, snapshot: snap };
@@ -382,7 +389,12 @@ export async function POST(req: Request) {
       : "page_view";
 
   const meta = parseMeta(body.meta);
-  const resolution = await resolveCostAndSnapshotForEvent(body, rawToolKey, actionRaw);
+  const resolution = await resolveCostAndSnapshotForEvent(
+    body,
+    rawToolKey,
+    actionRaw,
+    verified.sub,
+  );
 
   /** 仅入库「已标价且金额 > 0」的流水；浏览与非计费动作不入库（见 tool-web/doc/payment.md）。 */
   if (!resolution || resolution.costPoints <= 0) {

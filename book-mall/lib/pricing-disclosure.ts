@@ -9,6 +9,11 @@ import {
   type SourceLineRef,
 } from "@/lib/finance/billable-row-classifier";
 import type { PricingRow } from "@/components/pricing/pricing-table";
+import {
+  AI_TRYON_MODEL_KEYS,
+  isAiTryonModelKey,
+  REFINER_VOLUME_TIERS,
+} from "@/lib/pricing/ai-tryon-cost";
 
 export type EffectiveBillableRow = {
   toolKey: string;
@@ -163,8 +168,47 @@ export function actionLabelFor(action: string | null | undefined): string {
 
 /**
  * v005（2026-05-18）整合：把 EffectiveBillableRow 拉直成共享 PricingTable 组件需要的 PricingRow 列表。
- * `/account/pricing` 与 `/pricing-disclosure` 都以这个函数为唯一入口，避免再出现"两个表两套口径"。
+ * 价目展示唯一入口为 `/pricing-disclosure`（试衣 #ai-tryon，其余 #all-tools）。
  */
+/** 试衣价目排序：基础版 → Plus → 分割 → 精修（七档阶梯按官方表顺序） */
+function sortAiTryonDisclosureRows(rows: PricingRow[]): PricingRow[] {
+  const modelOrder = new Map(AI_TRYON_MODEL_KEYS.map((k, i) => [k, i]));
+  const refinerTierOrder = new Map<string, number>(
+    REFINER_VOLUME_TIERS.map((t, i) => [t.tierRaw, i]),
+  );
+  return [...rows].sort((a, b) => {
+    const ma = a.schemeARefModelKey ?? "";
+    const mb = b.schemeARefModelKey ?? "";
+    const oa = modelOrder.get(ma as (typeof AI_TRYON_MODEL_KEYS)[number]) ?? 99;
+    const ob = modelOrder.get(mb as (typeof AI_TRYON_MODEL_KEYS)[number]) ?? 99;
+    if (oa !== ob) return oa - ob;
+    if (ma === "aitryon-refiner") {
+      const ta = refinerTierOrder.get((a.cloudTierRaw ?? "").trim()) ?? 99;
+      const tb = refinerTierOrder.get((b.cloudTierRaw ?? "").trim()) ?? 99;
+      return ta - tb;
+    }
+    return (a.cloudTierRaw ?? "").localeCompare(b.cloudTierRaw ?? "", "zh-CN");
+  });
+}
+
+/** 试衣四模型完整价目（公示锚点 #ai-tryon；含 refiner 全部阶梯行） */
+export async function getAiTryonPricingTableRowsForDisclosure(
+  now = new Date(),
+): Promise<PricingRow[]> {
+  const rows = await getPricingTableRowsForDisclosure(now);
+  return sortAiTryonDisclosureRows(
+    rows.filter((r) => isAiTryonModelKey(r.schemeARefModelKey)),
+  );
+}
+
+/** 全工具价目（不含 AI 试衣四模型；试衣见 {@link getAiTryonPricingTableRowsForDisclosure} / #ai-tryon） */
+export async function getNonAiTryonPricingTableRowsForDisclosure(
+  now = new Date(),
+): Promise<PricingRow[]> {
+  const rows = await getPricingTableRowsForDisclosure(now);
+  return rows.filter((r) => !isAiTryonModelKey(r.schemeARefModelKey));
+}
+
 export async function getPricingTableRowsForDisclosure(now = new Date()): Promise<PricingRow[]> {
   const [billable, currentVersion] = await Promise.all([
     getEffectiveBillablePricesForDisclosure(now),

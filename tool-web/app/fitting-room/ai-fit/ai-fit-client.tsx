@@ -12,6 +12,7 @@ import { OUTFITS } from "@/lib/fitting-room-data";
 import { FITTING_ROOM_IMG_FALLBACK } from "@/lib/fitting-room-fallback-image";
 import { fittingRoomImageSrc } from "@/lib/fitting-room-image-url";
 import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
+import { FittingRoomPricingLink } from "@/components/fitting-room-pricing-link";
 import { AiFitAddModelModal, type AddModelPayload } from "./ai-fit-add-model-modal";
 import styles from "./ai-fit.module.css";
 
@@ -128,7 +129,13 @@ function handleModelImageError(e: SyntheticEvent<HTMLImageElement>) {
   el.src = FITTING_ROOM_IMG_FALLBACK;
 }
 
-function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }) {
+function AiFitWorkspace({
+  initialModels,
+  mainSiteOrigin,
+}: {
+  initialModels: AiFitModelRecord[];
+  mainSiteOrigin: string | null;
+}) {
   const { locale, setLocale, t } = useMessagesLocale();
   const initialCatalogRef = useRef(initialModels);
   initialCatalogRef.current = initialModels;
@@ -638,6 +645,7 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
         </div>
       </header>
       <ToolImplementationCrossLink href="/fitting-room/ai-fit/implementation" />
+      <FittingRoomPricingLink mainOrigin={mainSiteOrigin} />
 
       <div className={styles.layout}>
         <aside className={styles.leftPanel}>
@@ -1037,10 +1045,16 @@ function AiFitWorkspace({ initialModels }: { initialModels: AiFitModelRecord[] }
   );
 }
 
-export function AiFitClient({ initialModels }: { initialModels: AiFitModelRecord[] }) {
+export function AiFitClient({
+  initialModels,
+  mainSiteOrigin = null,
+}: {
+  initialModels: AiFitModelRecord[];
+  mainSiteOrigin?: string | null;
+}) {
   return (
     <MessagesLocaleProvider>
-      <AiFitWorkspace initialModels={initialModels} />
+      <AiFitWorkspace initialModels={initialModels} mainSiteOrigin={mainSiteOrigin} />
     </MessagesLocaleProvider>
   );
 }

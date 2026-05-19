@@ -11,6 +11,14 @@
       "aitryon-plus": {
         "costYuanPerOutputImage": 0.5,
         "tierNote": "AI试衣-Plus版 · 中国内地（元/张输出）"
+      },
+      "aitryon-parsing-v1": {
+        "costYuanPerOutputImage": 0.004,
+        "tierNote": "AI试衣-图片分割 · 按输入张（元/张）"
+      },
+      "aitryon-refiner": {
+        "costYuanPerOutputImage": 0.3,
+        "tierNote": "AI试衣-精修 · reserve 按首档 0.30 元/张（结算按账期阶梯）"
       }
     }
   },

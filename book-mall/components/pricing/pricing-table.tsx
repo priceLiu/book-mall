@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 /**
  * 平台价目表（共享组件）。
  *
- * 同时被 `/account/pricing` 与 `/pricing-disclosure` 引用，确保对外可见的「按次 / 按图 / 按秒」
+ * 由 `/pricing-disclosure` 引用（#ai-tryon 试衣 / #all-tools 其他），确保对外可见的「按次 / 按图 / 按秒」
  * 平台零售价与 ToolBillablePrice 真源同源。本组件不直接读 DB，调用方通过 `rows` 注入。
  *
  * `showPlatformCostColumns=false`（个人中心普通用户）：隐藏云挂牌价、M、公式三列（仅管理员可见）。

@@ -1,5 +1,7 @@
 import { PricingBillingKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { pickRefinerTierByOrdinal } from "@/lib/pricing/ai-tryon-cost";
+import { getCumulativeModelUsage } from "@/lib/tool-model-usage-counter";
 
 /** 与工具站 visual-lab-analysis-models 默认模型 id（qwen3.6-plus）一致 */
 export const VISUAL_LAB_ANALYSIS_DEFAULT_SCHEME_A_MODEL_KEY = "qwen3.6-plus";
@@ -16,6 +18,8 @@ const FALLBACK_MIN_BILLED_IMAGE_COUNT = 1;
 const FALLBACK_MIN_CHARGE_POINTS = 1;
 
 export type ResolveBillablePriceOpts = {
+  /** 结算用户；aitryon-refiner 阶梯价按账期累计用量选档时需要 */
+  userId?: string;
   /** 对应 Prisma `ToolBillablePrice.schemeARefModelKey`；分析室等多模型共用同一 toolKey+action 时用于命中行 */
   schemeARefModelKey?: string | null;
   /**
@@ -145,9 +149,11 @@ function computeChargePointsFromActuals(input: {
   }
 
   if (billingKind === PricingBillingKind.OUTPUT_IMAGE || billingKind === PricingBillingKind.COST_PER_IMAGE) {
-    const n = typeof actuals.imageCount === "number" && Number.isFinite(actuals.imageCount) ? actuals.imageCount : NaN;
-    if (!Number.isFinite(n) || n <= 0) return null;
-    const billed = Math.max(input.minBilledImageCount, Math.ceil(n));
+    const nRaw =
+      typeof actuals.imageCount === "number" && Number.isFinite(actuals.imageCount) && actuals.imageCount > 0
+        ? actuals.imageCount
+        : 1;
+    const billed = Math.max(input.minBilledImageCount, Math.ceil(nRaw));
     const yuan = unitCostYuan * billed * retailMultiplier;
     const pts = Math.max(input.minChargePointsPerInvoke, Math.round(yuan * 100));
     return { chargePoints: pts, billedVideoSec: null, billedImageCount: billed };
@@ -194,6 +200,15 @@ export async function resolveBillableSnapshot(
   if (mk) {
     const hit = pool.filter((r) => r.schemeARefModelKey === mk);
     if (hit.length > 0) chosen = hit;
+  }
+
+  /** aitryon-refiner：按账期累计 + 本次首张序号选 cloudTierRaw 行 */
+  if (mk === "aitryon-refiner" && opts?.userId && chosen.length > 0) {
+    const cumulative = await getCumulativeModelUsage(opts.userId, "aitryon-refiner");
+    const ordinal = cumulative + 1;
+    const { tierRaw } = pickRefinerTierByOrdinal(ordinal);
+    const tierHit = chosen.filter((r) => (r.cloudTierRaw ?? "").trim() === tierRaw);
+    if (tierHit.length > 0) chosen = tierHit;
   }
 
   /**

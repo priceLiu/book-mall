@@ -15,6 +15,7 @@
 | [05-admin.md](./product/05-admin.md) | 后台管理（含预警与对账） |
 | [06-flows.md](./product/06-flows.md) | 核心业务流程 |
 | [07-operations.md](./product/07-operations.md) | 运营与公示要求 |
+| [**11-ai-tryon-cost-template-v1.0.md**](./product/11-ai-tryon-cost-template-v1.0.md) | **AI 试衣成本模板 v1.0.0**（四模型挂牌、阶梯、用量/价库、试衣间报价链接） |
 | [08-independent-tools-sso.md](./product/08-independent-tools-sso.md) | 独立工具站 · 黄金会员与 SSO 边界 |
 | [**09-finance-refactor-and-tool-federation.md**](./product/09-finance-refactor-and-tool-federation.md) | **财务模块重构与工具联邦**（技术草案：API 映射、序列图、Billing v1） |
 | [**10-multimodal-studio-and-finance-master-plan.md**](./product/10-multimodal-studio-and-finance-master-plan.md) | **全模态工作室 + 财务重构 — 整体方案（通俗版）**：`m.ai-code8.com` 与 `book`/`tool` 分工、用户/后台/核算、落地顺序 |
@@ -32,6 +33,7 @@
 - [**2026-05-16 — 订阅套餐版本谱系（停旧发新 · 价不可改）**](./releases/2026-05-16-subscription-plan-lineage.md)
 - [**2026-05-16 — 按秒计费（WalletHold）+ 模型校准（ModelCatalog / ModelAlias）**](./releases/2026-05-16-per-second-billing-and-model-calibration.md)
 - [**2026-05-18 — 价格基线重对齐 / 公示统一 / 全用户明细 / 误扣修正**](./releases/2026-05-18-pricing-baseline-realign-and-disclosure.md)
+- [**2026-05-19 — AI 试衣成本计算模板 v1.0.0**](./releases/2026-05-19-ai-tryon-cost-template-v1.0.md)（草稿 · 见 [产品需求](./product/11-ai-tryon-cost-template-v1.0.md)）
 
 ## 技术与环境
 

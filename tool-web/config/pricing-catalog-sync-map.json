@@ -16,7 +16,9 @@
     "catalogRelativePath": "config/tools-scheme-a-catalog.json",
     "aiTryOn": {
       "aitryon": { "modelKey": "aitryon", "billingKind": "OUTPUT_IMAGE" },
-      "aitryon-plus": { "modelKey": "aitryon-plus", "billingKind": "OUTPUT_IMAGE" }
+      "aitryon-plus": { "modelKey": "aitryon-plus", "billingKind": "OUTPUT_IMAGE" },
+      "aitryon-parsing-v1": { "modelKey": "aitryon-parsing-v1", "billingKind": "COST_PER_IMAGE" },
+      "aitryon-refiner": { "modelKey": "aitryon-refiner", "billingKind": "OUTPUT_IMAGE" }
     },
     "textToImage": {
       "wanx2.1-t2i-plus": { "modelKey": "wanx2.1-t2i-plus", "billingKind": "COST_PER_IMAGE" }

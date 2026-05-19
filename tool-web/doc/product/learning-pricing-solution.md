@@ -182,7 +182,7 @@
 | 计算与价格表行生成 | `tool-web/lib/visual-lab-analysis-scheme-a.ts` |
 | 分析请求扣费（服务端算 `costPoints` 上报主站） | `tool-web/app/api/visual-lab/analysis/route.ts` |
 | 前端单次标价提示 | `GET tool-web/app/api/visual-lab/billable-hint/route.ts`（Query：`modelId`） |
-| 「价格表」页：主站标价 + 分析室按模型表 | `tool-web/app/api/tool-billable-prices/route.ts`（剔除旧 `visual-lab__analysis`/`invoke` 行，附加 `analysisSchemeA`）；页面 `app-history/price-list/price-list-client.tsx` |
+| ~~工具站「价格表」页~~（已删 v1.0.1） | 价目统一主站 `/pricing-disclosure`；原 `tool-billable-prices` API 与 `app-history/price-list` 已移除 |
 | 上报主站 body | `tool-web/lib/forward-tools-usage-server.ts` 可选字段 `costPoints` |
 | 流水 meta（稽核） | 分析接口写入 `meta`：`modelId`、`pricingScheme: visual_lab_scheme_a`、`equivalentInputMillionTokens`、`equivalentOutputMillionTokens`、`costYuanUpstreamApprox`、`retailMultiplier`、`retailYuanApprox` 等 |
 

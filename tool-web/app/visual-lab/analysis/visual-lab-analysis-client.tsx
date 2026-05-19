@@ -1245,9 +1245,18 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
             </div>
             <p className="vl-muted mt-2 text-center text-xs leading-relaxed">
               单次分析按主站标价扣费一次（与{" "}
-              <Link href="/app-history/price-list" className="underline decoration-dotted underline-offset-2">
-                价格表
-              </Link>{" "}
+              {mainSiteOrigin ? (
+                <a
+                  href={`${mainSiteOrigin.replace(/\/$/, "")}/pricing-disclosure#all-tools`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-dotted underline-offset-2"
+                >
+                  主站价格公示
+                </a>
+              ) : (
+                "主站价格公示"
+              )}{" "}
               中「视觉实验室 · 分析室」一致）。
               {billablePriceLoading && billablePricePoints == null ? (
                 <>
