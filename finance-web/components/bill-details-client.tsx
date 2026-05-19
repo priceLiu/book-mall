@@ -13,16 +13,16 @@ import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export type BillDetailsClientProps = {
-  /** 管理端：book-mall 用户 id（走管理员 API，需在 book-mall 以管理员登录） */
+  /** 指定 book-mall 用户 id（走管理员 API，需在 book-mall 以管理员登录） */
   adminTargetUserId?: string;
   /**
-   * 视角：默认 `user`（不展示「云成本单价」「零售系数」两列）；管理端调用方传 `admin` 才展示完整列。
+   * 视角：默认 `user`（不展示「云成本单价」「零售系数」两列）；传入 `admin` 时展示完整列。
    */
   viewerRole?: BillViewerRole;
   /**
-   * `all-users` 模式（管理端"全部用户费用明细汇总"）：
+   * `all-users` 模式（全部用户费用明细汇总）：
    *   - 调用 `/api/admin/finance/billing-detail-lines-all`（一次拉所有用户）
-   *   - 隐藏顶部「本页位置与数据口径」「当前账单归属」「数据来源」三块（按图示要求）
+   *   - 隐藏「当前账单归属」等与单一登录用户绑定的顶部信息（按图示要求）
    *   - 不依赖 walletBalance（因没有"单一目标用户"概念），头部"钱包余额/余额减扣点"列折叠掉
    */
   mode?: "single-user" | "all-users";
@@ -297,30 +297,11 @@ export function BillDetailsClient({
   const pageSafe = Math.min(page, pageCount);
   const paged = filtered.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
-  const billingPagePath = "/fees/billing/details";
   const isDevImpersonation = !adminTargetUserId && viewerAuthMode === "dev_user_id";
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto bg-[#f5f5f5]">
+    <div className="flex flex-1 flex-col overflow-y-auto bg-[#f0f2f5]">
       <div className="mx-4 mt-4 space-y-3">
-        {/* 「本页位置与数据口径」「当前账单归属」「数据来源」三块在 all-users 模式下整体隐藏（按图示要求） */}
-        {!isAllUsers ? (
-          <div className="rounded border border-[#d9d9d9] bg-white px-4 py-3 text-sm shadow-sm">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[#f0f0f0] pb-2">
-              <span className="font-medium text-[#262626]">本页位置与数据口径</span>
-              <code className="rounded bg-[#fafafa] px-2 py-0.5 text-xs text-[#595959]">
-                finance-web · {billingPagePath}
-              </code>
-            </div>
-            <p className="text-xs leading-relaxed text-[#8c8c8c]">
-              浏览器地址栏为财务控制台（finance-web）。下方表格来自主站{" "}
-              <strong className="text-[#595959]">book-mall</strong> 接口{" "}
-              <code className="rounded bg-[#fafafa] px-1">GET /api/account/billing-detail-lines</code>
-              ，与您在 localhost 不同端口「浏览器里先打开了谁」无必然关系——以本节「登录邮箱」与接口返回为准。请与主站个人中心的登录账号交叉核对。
-            </p>
-          </div>
-        ) : null}
-
         {!isAllUsers && isDevImpersonation ? (
           <div className="rounded border-2 border-[#ff4d4f] bg-[#fff1f0] px-4 py-3 text-sm shadow-sm">
             <p className="text-base font-bold text-[#a8071a]">⚠️ 当前并非以你浏览器登录的真实账号在拉账单</p>
@@ -381,7 +362,7 @@ export function BillDetailsClient({
               </div>
             </dl>
             {effectiveRole === "admin" ? (
-              <p className="mt-2 text-xs text-[#8c8c8c]">管理端代查指定用户时，以上为目标用户身份。</p>
+              <p className="mt-2 text-xs text-[#8c8c8c]">代查指定用户时，以上为目标账号信息。</p>
             ) : (
               <p className="mt-2 text-xs text-[#8c8c8c]">
                 认证方式：
@@ -397,18 +378,24 @@ export function BillDetailsClient({
           </div>
         ) : null}
 
-        {!isAllUsers ? (
-          <div className="rounded border border-[#bae0ff] bg-[#e6f7ff] px-4 py-2 text-sm text-[#262626]">
-            数据来源：
+        {!isAllUsers && (loadState === "loading" || loadState === "error" || (loadState === "idle" && hint)) ? (
+          <div
+            className={cn(
+              "rounded border px-4 py-2 text-sm",
+              loadState === "error"
+                ? "border-[#ffccc7] bg-[#fff2f0] text-[#a8071a]"
+                : loadState === "idle" && hint
+                  ? "border-[#ffe58f] bg-[#fffbe6] text-[#874d00]"
+                  : "border-[#d9d9d9] bg-white text-[#595959]",
+            )}
+          >
             {loadState === "loading" && "正在请求 book-mall …"}
-            {loadState === "ok" && "book-mall 数据库（ToolBillingDetailLine），对内计价在接口侧按当前规则计算。"}
-            {loadState === "error" && "上次请求失败，表中为当前页内数据（可能为空）。"}
-            {loadState === "idle" && !hint && rows.length === 0 && "等待加载或缺少配置。"}
-            {hint && <span className="mt-1 block text-[#d4380d]">{hint}</span>}
-            详细规则见{" "}
-            <code className="rounded bg-white px-1">tool-web/doc/reconciliation-baseline-2026-05-16.md</code>。
+            {(loadState === "error" || (loadState === "idle" && hint)) && hint ? (
+              <span className="block">{hint}</span>
+            ) : null}
           </div>
         ) : null}
+
         {isAllUsers && (loadState === "loading" || loadState === "error" || hint) ? (
           <div
             className={cn(

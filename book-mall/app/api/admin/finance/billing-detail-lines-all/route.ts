@@ -29,7 +29,7 @@ const MAX_TAKE = 5000;
  * 查询参数：
  *   - `from`、`to`：ISO 日期范围（按 `ToolBillingDetailLine.createdAt` 过滤），可缺省。
  *   - `take`：单次最多返回行数（默认 1000，上限 5000）。
- *   - `userId`：可选，留作"管理端再过滤回单用户"用——一般用 single-user 接口替代。
+ *   - `userId`：可选，留作「再过滤回单用户」用——一般用 single-user 接口替代。
  *
  * 安全：必须 ADMIN 角色（同 single-user 接口）。
  */

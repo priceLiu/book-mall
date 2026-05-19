@@ -99,7 +99,7 @@ export default async function AdminDashboardPage() {
                 rel="noopener noreferrer"
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
-                财务控制台 · 管理端
+                账单明细（按用户）
               </a>
             </>
           ) : null}

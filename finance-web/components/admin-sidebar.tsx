@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, ListChecks, Tags, UserCircle2, Wrench } from "lucide-react";
+import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
 
 const nav = [
   { href: "/admin", label: "概览", icon: LayoutDashboard, exact: true },
@@ -13,12 +15,71 @@ const nav = [
   { href: "/admin/models/coefficients", label: "模型系数", icon: Wrench, prefix: "/admin/models" },
 ] as const;
 
+type ViewerPayload = {
+  user: {
+    id: string;
+    email: string | null;
+    name: string | null;
+    role: string;
+  } | null;
+};
+
 export function AdminSidebar() {
   const pathname = usePathname();
+  const [viewer, setViewer] = useState<ViewerPayload["user"] | undefined>(undefined);
+  const [viewerErr, setViewerErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    const base = getBookMallBaseUrl();
+    if (!base) {
+      setViewer(null);
+      setViewerErr("未配置 NEXT_PUBLIC_BOOK_MALL_URL");
+      return;
+    }
+    let cancelled = false;
+    setViewerErr(null);
+    setViewer(undefined);
+    fetch(`${base}/api/finance/viewer-session`, { credentials: "include", mode: "cors", cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.json() as Promise<ViewerPayload>;
+      })
+      .then((j) => {
+        if (!cancelled) setViewer(j.user);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setViewer(null);
+          setViewerErr("无法读取主站登录态");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-[#e8e8e8] bg-[#001529] text-sm text-white/85">
-      <div className="flex h-12 items-center border-b border-white/10 px-3 font-medium">管理端</div>
-      <nav className="flex-1 space-y-0.5 p-2">
+      <div className="shrink-0 border-b border-white/10 px-3 py-3 leading-snug">
+        {viewerErr ? (
+          <p className="text-sm text-[#ffccc7]">{viewerErr}</p>
+        ) : viewer === undefined ? (
+          <p className="text-sm text-white/45">加载中…</p>
+        ) : viewer === null ? (
+          <p className="text-sm text-white/70">
+            未登录。请先在主站以管理员登录，并与此站同浏览器会话。
+          </p>
+        ) : (
+          <>
+            <p className="text-base font-semibold text-white">{viewer.name?.trim() || "—"}</p>
+            <p className="mt-1 break-all text-sm text-white/80">{viewer.email?.trim() || "—"}</p>
+            <p className="mt-2 text-sm text-white/75">
+              角色：{viewer.role === "ADMIN" ? "管理员" : viewer.role}
+            </p>
+          </>
+        )}
+      </div>
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {nav.map((item) => {
           const Icon = item.icon;
           const active =
@@ -42,11 +103,6 @@ export function AdminSidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-white/10 p-2 text-xs text-white/45">
-        <Link href="/fees/billing/details" className="text-[#69c0ff] hover:underline">
-          返回用户端账单详情
-        </Link>
-      </div>
     </aside>
   );
 }

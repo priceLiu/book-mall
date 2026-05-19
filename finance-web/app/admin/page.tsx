@@ -3,11 +3,6 @@ import Link from "next/link";
 export default function AdminHomePage() {
   return (
     <div className="p-6">
-      <h1 className="mb-2 text-lg font-medium text-[#262626]">财务 · 管理端</h1>
-      <p className="mb-6 max-w-2xl text-sm text-[#595959]">
-        管理端在用户视角的基础上展示<strong>完整 31 列 / 7 组</strong>（含厂商产品 / 资源 / 定价 / 优惠 + 系数 M + 计费公式），
-        用于按用户对账与利润核算。
-      </p>
       <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
         <Link
           href="/admin/billing/users"
@@ -33,16 +28,16 @@ export default function AdminHomePage() {
         >
           <div className="mb-1 text-base font-medium text-[#262626]">价格公示 →</div>
           <div className="text-xs text-[#8c8c8c]">
-            与个人中心 / 前台公示页共用同一份「平台价目表」（云挂牌价 × M = 平台单价）。
+            与个人中心 / 前台公示页共用同一份「平台价目表」（云挂牌价 × 系数 = 平台单价）。
           </div>
         </Link>
         <Link
           href="/admin/models/coefficients"
           className="block rounded border border-[#e8e8e8] bg-white p-4 hover:border-[#1890ff] hover:shadow-sm"
         >
-          <div className="mb-1 text-base font-medium text-[#262626]">模型 / 零售系数（M）→</div>
+          <div className="mb-1 text-base font-medium text-[#262626]">模型 / 零售系数 →</div>
           <div className="text-xs text-[#8c8c8c]">
-            系数 M 默认 2.0；逐工具 + 逐参考模型独立配置。
+            系数默认 2.0；逐工具 + 逐参考模型独立配置。
           </div>
         </Link>
       </div>

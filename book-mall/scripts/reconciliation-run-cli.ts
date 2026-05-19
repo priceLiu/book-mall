@@ -11,7 +11,7 @@
  *   - 同 SHA-256 已上传 → 默认复用旧 run；`--force` 时报错。
  *
  * 旧脚本 `reconcile-against-cloud-csv`/`billing-deficit-claw-back`/`billing-import-cloud-csv` 已删除；
- * 补扣请走管理端 UI 二次确认或直接发 POST 到 `/api/admin/finance/reconciliation/[runId]/clawback`。
+ * 补扣请走 book-mall 对账 UI 二次确认或直接发 POST 到 `/api/admin/finance/reconciliation/[runId]/clawback`。
  */
 import fs from "node:fs";
 import path from "node:path";

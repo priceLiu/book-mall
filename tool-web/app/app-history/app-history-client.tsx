@@ -511,7 +511,7 @@ export function AppHistoryClient() {
                 rel="noopener noreferrer"
                 className="tw-text-[var(--tool-text)] tw-underline tw-underline-offset-2"
               >
-                财务控制台
+                账单详表
               </a>
               打开完整表（建议在主站已登录同账号的浏览器中访问）。本页的「使用明细」仍为按次扣费流水；云级行也可经本站的{" "}
               <code className="tw-font-mono tw-text-[0.7rem]">GET /api/tool-billing-detail-lines</code>{" "}

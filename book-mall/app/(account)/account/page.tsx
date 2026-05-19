@@ -109,7 +109,7 @@ export default async function AccountPage({
   const financeWebOrigin = getFinanceWebPublicOrigin();
   const toolsPublicOrigin = getToolsPublicOrigin();
   const financeBillingDetailsUrl = financeWebOrigin
-    ? `${financeWebOrigin}/fees/billing/details`
+    ? `${financeWebOrigin}/fees/billing/details?from=account`
     : null;
   const toolsExpenseHistoryUrl = toolsPublicOrigin
     ? `${toolsPublicOrigin}/app-history`
@@ -168,8 +168,8 @@ export default async function AccountPage({
               <CardTitle className="text-base">费用与明细</CardTitle>
             </div>
             <CardDescription className="text-xs">
-              「工具站费用明细」按次扣费流水（工具站产生）；「财务控制台账单详情」云级账单对齐明细（导入后筛选 / 查对内计价）。
-              打开账单详情前请保持本站已登录，以便财务页带会话访问本站接口。
+              「工具站费用明细」为工具站内的按次扣费流水。「账单详情」为主站侧与云账单对齐的明细（导入后可筛选、查看对内计价）。
+              打开账单详情前请保持本站已登录，以便账单页使用与主站相同的浏览器会话拉取数据。
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
@@ -189,7 +189,7 @@ export default async function AccountPage({
               <Button asChild variant="outline" size="sm">
                 <a href={financeBillingDetailsUrl} target="_blank" rel="noopener noreferrer">
                   <ListChecks className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                  财务控制台账单详情
+                  账单详情
                 </a>
               </Button>
             ) : null}

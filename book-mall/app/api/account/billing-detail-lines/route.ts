@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       select: { balancePoints: true },
     }),
     prisma.toolBillingDetailLine.findMany({
-      // v006 Round 4：用户端仅展示自己的工具站调用记录（TOOL_USAGE_GENERATED）；
+      // v006 Round 4：`/api/account` 仅展示当前会员自己的工具站调用记录（TOOL_USAGE_GENERATED）；
       // CLOUD_CSV_IMPORT 是平台拉到的云厂商账单 raw 行，**仅 admin** 视角对账可见。
       where: { userId, source: "TOOL_USAGE_GENERATED" },
       orderBy: { createdAt: "desc" },

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "财务控制台 · finance-web",
+  title: "finance-web",
   description: "账单明细与对内计价演示（对齐云 consumedetailbillv2）",
 };
 

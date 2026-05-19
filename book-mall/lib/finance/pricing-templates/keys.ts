@@ -4,7 +4,7 @@ export const PRICING_TEMPLATE_ALIYUN_CONSUMEDETAIL_BILL_V2 =
 
 /**
  * 工具站内部使用计费（TOOL_USAGE_GENERATED）：直接来自 `ToolUsageEvent` 的点数扣费，
- * 不需要重算云厂商有效单价；用于在财务控制台展示用户实际产生的扣点流水。
+ * 不需要重算云厂商有效单价；用于在费用流水展示用户实际产生的扣点。
  *
  * v004 起 cloudRow 已不再写"对内计价/*"列；本 key 仅作 ToolBillingDetailLine 的
  * `pricingTemplateKey` 字段值，让 registry 仍能解析到一个无害的 fallback compute()。
