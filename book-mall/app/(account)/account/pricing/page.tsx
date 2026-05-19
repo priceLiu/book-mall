@@ -17,5 +17,5 @@ export default async function MyPricingTablePage() {
   if (!session?.user?.id) {
     redirect("/login?next=/account/pricing");
   }
-  redirect("/pricing-disclosure?from=account");
+  redirect("/pricing-disclosure/from-account");
 }

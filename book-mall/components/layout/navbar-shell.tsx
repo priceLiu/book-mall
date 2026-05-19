@@ -102,8 +102,12 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
     const read = () => setHash(typeof window !== "undefined" ? window.location.hash : "");
     read();
     window.addEventListener("hashchange", read);
-    return () => window.removeEventListener("hashchange", read);
-  }, []);
+    window.addEventListener("popstate", read);
+    return () => {
+      window.removeEventListener("hashchange", read);
+      window.removeEventListener("popstate", read);
+    };
+  }, [pathname]);
 
   const isProductPath =
     pathname.startsWith("/products/") ||
@@ -133,10 +137,28 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
     (href: string) => {
       setProductMenuOpen(false);
       if (href === NAV_PRODUCT_VALUE) return;
-      const target = href.startsWith("#") ? `/${href}` : href;
-      void router.push(target);
+
+      if (href.startsWith("#")) {
+        setHash(href);
+        const target = `/${href}`;
+        const sectionId = href.slice(1);
+
+        if (pathname === "/") {
+          void router.push(target, { scroll: false });
+          requestAnimationFrame(() => {
+            document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
+          });
+          return;
+        }
+
+        void router.push(target);
+        router.refresh();
+        return;
+      }
+
+      void router.push(href);
     },
-    [router],
+    [pathname, router],
   );
 
   return (

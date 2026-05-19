@@ -50,9 +50,6 @@ const featureList: FeaturesProps[] = [
 export const FeaturesSection = () => {
   return (
     <section id="features" className="container py-24 sm:py-32">
-      <h2 className="text-lg text-primary text-center mb-2 tracking-wider">
-        功能
-      </h2>
 
       <h2 className="text-3xl md:text-4xl text-center font-bold mb-4">
         我们的不同之处

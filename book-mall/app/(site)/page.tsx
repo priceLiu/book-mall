@@ -8,6 +8,9 @@ import { PricingSection } from "@/components/layout/sections/pricing";
 import { SponsorsSection } from "@/components/layout/sections/sponsors";
 import { TestimonialSection } from "@/components/layout/sections/testimonial";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata = {
   title: "智选 AI Mall｜找AI上智选",
   description:

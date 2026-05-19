@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import type { SubscriptionInterval } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -13,10 +14,15 @@ import {
   getAiTryonPricingTableRowsForDisclosure,
   getNonAiTryonPricingTableRowsForDisclosure,
 } from "@/lib/pricing-disclosure";
+import { PricingDisclosureRouteSync } from "@/components/pricing/pricing-disclosure-route-sync";
 import { PricingDisclosureMeteredSection } from "@/components/pricing/pricing-disclosure-metered";
 import { BillingPolicySection } from "@/components/layout/sections/billing-policy";
 import { SubscriptionPlansTable } from "@/components/pricing/subscription-plans-table";
 import { Button } from "@/components/ui/button";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export const metadata = {
   title: "价格公示与使用说明",
@@ -91,6 +97,9 @@ export default async function PricingDisclosurePage({
 
   return (
     <main className="container max-w-screen-2xl mx-auto px-4 pb-24 pt-8 md:pt-12">
+      <Suspense fallback={null}>
+        <PricingDisclosureRouteSync />
+      </Suspense>
       <div className="space-y-2">
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">价格公示与使用说明</h1>
         <p className="text-sm text-muted-foreground leading-relaxed">

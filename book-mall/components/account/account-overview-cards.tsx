@@ -231,7 +231,7 @@ export function AccountOverviewCards({
               </Button>
             )}
             <Button asChild variant="outline" size="sm" className="flex-1">
-              <Link href="/pricing-disclosure?from=account">价目表</Link>
+              <a href="/pricing-disclosure/from-account">价目表</a>
             </Button>
           </div>
         </CardContent>

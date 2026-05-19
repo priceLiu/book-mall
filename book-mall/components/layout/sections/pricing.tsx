@@ -100,8 +100,6 @@ export async function PricingSection() {
 
   return (
     <section id="pricing" className="container py-24 sm:py-32">
-      <h2 className="text-lg text-primary text-center mb-2 tracking-wider">价格</h2>
-
       <h2 className="text-3xl md:text-4xl text-center font-bold mb-4">会员与订阅</h2>
 
       <h3 className="md:w-1/2 mx-auto text-xl text-center text-muted-foreground pb-4">
@@ -109,9 +107,7 @@ export async function PricingSection() {
       </h3>
 
       <p className="text-center text-sm text-muted-foreground pb-14">
-        <Link href="/pricing-disclosure" className="text-primary underline font-medium">
-          查看完整价格公示与使用案例
-        </Link>
+
       </p>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-4">
