@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useMemo, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +18,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 /**
@@ -138,6 +147,23 @@ export function PricingTable({
   const toolCount = grouped.length;
   const hasAnyFilter = tool !== ALL || model !== ALL || q.trim().length > 0;
 
+  const reduceMotion = useReducedMotion();
+  const rowVariants = useMemo(
+    () => ({
+      hidden: { opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 16 },
+      visible: (i: number) => ({
+        opacity: 1,
+        y: 0,
+        transition: {
+          delay: reduceMotion ? 0 : i * 0.05,
+          duration: reduceMotion ? 0 : 0.34,
+          ease: [0.22, 1, 0.36, 1] as const,
+        },
+      }),
+    }),
+    [reduceMotion],
+  );
+
   return (
     <TooltipProvider delayDuration={200} skipDelayDuration={0}>
       <div className="space-y-5">
@@ -257,7 +283,7 @@ export function PricingTable({
         {grouped.map(([toolKey, list]) => (
           <section
             key={toolKey}
-            className="overflow-hidden rounded-lg border border-border bg-card shadow-sm"
+            className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm"
           >
             <header className="flex flex-wrap items-baseline gap-2 border-b border-border bg-muted/40 px-4 py-2.5">
               <span className="text-sm font-medium text-foreground">{list[0]!.toolLabel}</span>
@@ -266,123 +292,128 @@ export function PricingTable({
                 {list.length} 行
               </Badge>
             </header>
-            <div className="overflow-x-auto">
-              <table
-                className={cn(
-                  "w-full text-sm",
-                  showPlatformCostColumns ? "min-w-[1180px]" : "min-w-[720px]",
-                )}
-              >
-                <thead>
-                  <tr className="text-xs text-muted-foreground">
-                    <th className="border-b border-border px-3 py-2 text-left font-medium">
-                      模型 / 档位
-                    </th>
-                    <th className="border-b border-border px-3 py-2 text-left font-medium">动作</th>
-                    <th className="border-b border-border px-3 py-2 text-left font-medium">
-                      云厂商产品 / 商品
-                    </th>
-                    <th className="border-b border-border px-3 py-2 text-left font-medium">
-                      计价单位
-                    </th>
-                    {showPlatformCostColumns ? (
-                      <>
-                        <th className="border-b border-border px-3 py-2 text-right font-medium">
-                          云挂牌价（成本）
-                        </th>
-                        <th className="border-b border-border px-3 py-2 text-right font-medium">系数</th>
-                      </>
-                    ) : null}
-                    <th className="border-b border-border px-3 py-2 text-right font-medium">
-                      平台单价
-                    </th>
-                    {showPlatformCostColumns ? (
-                      <th className="border-b border-border px-3 py-2 text-left font-medium max-w-[11rem] w-[11rem]">
-                        公式
-                      </th>
-                    ) : null}
-                    <th className="border-b border-border px-3 py-2 text-right font-medium whitespace-nowrap">
-                      点数
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((r) => {
-                    const ours =
-                      r.schemeAUnitCostYuan != null && r.retailMultiplier != null
-                        ? r.schemeAUnitCostYuan * r.retailMultiplier
-                        : null;
-                    return (
-                      <tr key={r.id} className="text-sm transition-colors hover:bg-muted/30">
-                        <td className="border-b border-border/60 px-3 py-2">
-                          <div className="font-medium text-foreground">
-                            {r.modelDisplayName ?? "—"}
-                          </div>
-                          <code className="text-[11px] text-muted-foreground">
-                            {r.schemeARefModelKey ?? "—"}
-                            {r.cloudTierRaw ? <> · {r.cloudTierRaw}</> : null}
-                          </code>
-                        </td>
-                        <td className="border-b border-border/60 px-3 py-2 text-xs">
-                          <code className="text-muted-foreground">{r.action ?? "(*)"}</code>
-                        </td>
-                        <td className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
-                          <div>{r.vendorProductName ?? "—"}</div>
-                          <div className="text-[11px] opacity-80">
-                            {r.vendorCommodityName ?? "—"}
-                          </div>
-                        </td>
-                        <td className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
-                          {r.unitLabel}
-                          {r.cloudBillingKind ? (
-                            <Badge
-                              variant="outline"
-                              className="ml-1 font-mono text-[9px] align-middle"
-                            >
-                              {r.cloudBillingKind}
-                            </Badge>
-                          ) : null}
-                        </td>
-                        {showPlatformCostColumns ? (
-                          <>
-                            <td className="border-b border-border/60 px-3 py-2 text-right tabular-nums text-muted-foreground">
-                              {fmtMoney(r.schemeAUnitCostYuan)}
-                            </td>
-                            <td className="border-b border-border/60 px-3 py-2 text-right tabular-nums text-muted-foreground">
-                              {r.retailMultiplier != null ? `×${r.retailMultiplier}` : "—"}
-                            </td>
-                          </>
+            <Table
+              className={cn(showPlatformCostColumns ? "min-w-[1180px]" : "min-w-[720px]")}
+            >
+              <TableHeader>
+                <TableRow className="text-muted-foreground hover:bg-transparent">
+                  <TableHead className="h-auto px-3 py-2 text-left text-xs font-medium">
+                    模型 / 档位
+                  </TableHead>
+                  <TableHead className="h-auto px-3 py-2 text-left text-xs font-medium">动作</TableHead>
+                  <TableHead className="h-auto px-3 py-2 text-left text-xs font-medium">
+                    云厂商产品 / 商品
+                  </TableHead>
+                  <TableHead className="h-auto px-3 py-2 text-left text-xs font-medium">
+                    计价单位
+                  </TableHead>
+                  {showPlatformCostColumns ? (
+                    <>
+                      <TableHead className="h-auto px-3 py-2 text-right text-xs font-medium">
+                        云挂牌价（成本）
+                      </TableHead>
+                      <TableHead className="h-auto px-3 py-2 text-right text-xs font-medium">
+                        系数
+                      </TableHead>
+                    </>
+                  ) : null}
+                  <TableHead className="h-auto px-3 py-2 text-right text-xs font-medium">
+                    平台单价
+                  </TableHead>
+                  {showPlatformCostColumns ? (
+                    <TableHead className="h-auto max-w-[11rem] w-[11rem] px-3 py-2 text-left text-xs font-medium">
+                      公式
+                    </TableHead>
+                  ) : null}
+                  <TableHead className="h-auto whitespace-nowrap px-3 py-2 text-right text-xs font-medium">
+                    点数
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {list.map((r, rowIndex) => {
+                  const ours =
+                    r.schemeAUnitCostYuan != null && r.retailMultiplier != null
+                      ? r.schemeAUnitCostYuan * r.retailMultiplier
+                      : null;
+                  return (
+                    <motion.tr
+                      key={r.id}
+                      custom={rowIndex}
+                      initial="hidden"
+                      animate="visible"
+                      variants={rowVariants}
+                      className={cn(
+                        "border-b text-sm transition-colors",
+                        "hover:bg-muted/50 data-[state=selected]:bg-muted",
+                      )}
+                    >
+                      <TableCell className="px-3 py-2.5 align-middle">
+                        <div className="font-semibold leading-snug tracking-tight text-foreground">
+                          {r.modelDisplayName ?? "—"}
+                        </div>
+                        <code className="text-[11px] text-muted-foreground">
+                          {r.schemeARefModelKey ?? "—"}
+                          {r.cloudTierRaw ? <> · {r.cloudTierRaw}</> : null}
+                        </code>
+                      </TableCell>
+                      <TableCell className="px-3 py-2.5 text-xs align-middle">
+                        <code className="text-muted-foreground">{r.action ?? "(*)"}</code>
+                      </TableCell>
+                      <TableCell className="px-3 py-2.5 text-xs text-muted-foreground align-middle">
+                        <div>{r.vendorProductName ?? "—"}</div>
+                        <div className="text-[11px] opacity-80">{r.vendorCommodityName ?? "—"}</div>
+                      </TableCell>
+                      <TableCell className="px-3 py-2.5 text-xs text-muted-foreground align-middle">
+                        {r.unitLabel}
+                        {r.cloudBillingKind ? (
+                          <Badge
+                            variant="outline"
+                            className="ml-1 align-middle font-mono text-[9px]"
+                          >
+                            {r.cloudBillingKind}
+                          </Badge>
                         ) : null}
-                        <td className="border-b border-border/60 px-3 py-2 text-right tabular-nums font-medium text-foreground">
-                          {fmtMoney(ours)}
-                        </td>
-                        {showPlatformCostColumns ? (
-                          <td className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground max-w-[11rem] w-[11rem]">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <code className="block w-full min-w-0 cursor-help truncate border-b border-dotted border-muted-foreground/45 text-[11px] underline-offset-2">
-                                  {r.formulaText}
-                                </code>
-                              </TooltipTrigger>
-                              <TooltipContent
-                                side="top"
-                                align="start"
-                                className="max-w-lg whitespace-pre-wrap break-words text-left text-sm leading-relaxed font-mono"
-                              >
+                      </TableCell>
+                      {showPlatformCostColumns ? (
+                        <>
+                          <TableCell className="px-3 py-2.5 text-right align-middle tabular-nums text-muted-foreground">
+                            {fmtMoney(r.schemeAUnitCostYuan)}
+                          </TableCell>
+                          <TableCell className="px-3 py-2.5 text-right align-middle tabular-nums text-muted-foreground">
+                            {r.retailMultiplier != null ? `×${r.retailMultiplier}` : "—"}
+                          </TableCell>
+                        </>
+                      ) : null}
+                      <TableCell className="px-3 py-2.5 text-right align-middle font-medium tabular-nums text-foreground">
+                        {fmtMoney(ours)}
+                      </TableCell>
+                      {showPlatformCostColumns ? (
+                        <TableCell className="max-w-[11rem] w-[11rem] px-3 py-2.5 text-xs text-muted-foreground align-middle">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <code className="block w-full min-w-0 cursor-help truncate border-b border-dotted border-muted-foreground/45 text-[11px] underline-offset-2">
                                 {r.formulaText}
-                              </TooltipContent>
-                            </Tooltip>
-                          </td>
-                        ) : null}
-                        <td className="border-b border-border/60 px-3 py-2 text-right font-medium text-foreground tabular-nums whitespace-nowrap">
-                          {r.pricePoints.toLocaleString("zh-CN")} 点
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                              </code>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="top"
+                              align="start"
+                              className="max-w-lg whitespace-pre-wrap break-words text-left font-mono text-sm leading-relaxed"
+                            >
+                              {r.formulaText}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                      ) : null}
+                      <TableCell className="whitespace-nowrap px-3 py-2.5 text-right align-middle font-medium tabular-nums text-foreground">
+                        {r.pricePoints.toLocaleString("zh-CN")} 点
+                      </TableCell>
+                    </motion.tr>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </section>
         ))}
         {grouped.length === 0 ? (
