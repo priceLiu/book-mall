@@ -30,7 +30,6 @@ const routeList: RouteProps[] = [
   { href: "#hero-video", label: "主屏" },
   { href: "#testimonials", label: "客户评价" },
   { href: "#pricing", label: "价格" },
-  { href: "#contact", label: "联系" },
 ];
 
 function ProductMegaMenuContent() {

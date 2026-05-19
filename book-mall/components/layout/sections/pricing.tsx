@@ -88,7 +88,7 @@ export async function PricingSection() {
       priceLine: "面议",
       description: "私有化交付、企业采购、培训与集成方案，由顾问为您配置。",
       buttonText: "高级定制",
-      href: "/#contact",
+      href: "#community",
       benefitList: [
         "方案与报价单独评估",
         "可包含实施与培训",

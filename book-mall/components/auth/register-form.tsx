@@ -64,19 +64,19 @@ export function RegisterForm() {
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", duration: 0.8 }}
-          className="relative mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/10"
+          className="relative mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-border/60 dark:border-white/10"
         >
-          <span className="bg-gradient-to-b from-white to-white/70 bg-clip-text text-lg font-bold text-transparent">
+          <span className="bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-lg font-bold text-transparent">
             智
           </span>
-          <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50" />
+          <div className="absolute inset-0 bg-gradient-to-br from-foreground/10 to-transparent opacity-50 dark:from-white/10" />
         </motion.div>
 
         <motion.h1
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-gradient-to-b from-white to-white/80 bg-clip-text text-xl font-bold text-transparent"
+          className="bg-gradient-to-b from-foreground to-foreground/80 bg-clip-text text-xl font-bold text-transparent"
         >
           创建账号
         </motion.h1>
@@ -85,7 +85,7 @@ export function RegisterForm() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="text-xs text-white/60"
+          className="text-xs text-muted-foreground"
         >
           加入智选 AI Mall，开启订阅与工具权益
         </motion.p>
@@ -101,7 +101,7 @@ export function RegisterForm() {
             <div className="relative flex items-center overflow-hidden rounded-lg">
               <User
                 className={`absolute left-3 h-4 w-4 transition-all duration-300 ${
-                  focusedInput === "name" ? "text-white" : "text-white/40"
+                  focusedInput === "name" ? "text-foreground" : "text-muted-foreground"
                 }`}
                 aria-hidden
               />
@@ -126,7 +126,7 @@ export function RegisterForm() {
             <div className="relative flex items-center overflow-hidden rounded-lg">
               <Mail
                 className={`absolute left-3 h-4 w-4 transition-all duration-300 ${
-                  focusedInput === "email" ? "text-white" : "text-white/40"
+                  focusedInput === "email" ? "text-foreground" : "text-muted-foreground"
                 }`}
                 aria-hidden
               />
@@ -152,7 +152,7 @@ export function RegisterForm() {
             <div className="relative flex items-center overflow-hidden rounded-lg">
               <Lock
                 className={`absolute left-3 h-4 w-4 transition-all duration-300 ${
-                  focusedInput === "password" ? "text-white" : "text-white/40"
+                  focusedInput === "password" ? "text-foreground" : "text-muted-foreground"
                 }`}
                 aria-hidden
               />
@@ -172,7 +172,7 @@ export function RegisterForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 cursor-pointer rounded p-0.5 text-white/40 transition-colors hover:text-white"
+                className="absolute right-3 cursor-pointer rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                 aria-label={showPassword ? "隐藏密码" : "显示密码"}
               >
                 {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -194,8 +194,8 @@ export function RegisterForm() {
           disabled={loading}
           className="group/button relative mt-2 w-full"
         >
-          <div className="absolute inset-0 rounded-lg bg-white/10 opacity-0 blur-lg transition-opacity duration-300 group-hover/button:opacity-70" />
-          <div className="relative flex h-10 items-center justify-center overflow-hidden rounded-lg bg-white font-medium text-black transition-all duration-300">
+          <div className="absolute inset-0 rounded-lg bg-foreground/10 opacity-0 blur-lg transition-opacity duration-300 group-hover/button:opacity-70 dark:bg-white/10" />
+          <div className="relative flex h-10 items-center justify-center overflow-hidden rounded-lg bg-foreground font-medium text-background transition-all duration-300 dark:bg-white dark:text-black">
             <AnimatePresence mode="wait">
               {loading ? (
                 <motion.div
@@ -205,7 +205,7 @@ export function RegisterForm() {
                   exit={{ opacity: 0 }}
                   className="flex items-center justify-center"
                 >
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-black/70 border-t-transparent" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-background/70 border-t-transparent dark:border-black/70" />
                 </motion.div>
               ) : (
                 <motion.span
@@ -226,9 +226,9 @@ export function RegisterForm() {
         {showGoogle ? (
           <>
             <div className="relative mt-2 mb-5 flex items-center">
-              <div className="grow border-t border-white/5" />
-              <span className="mx-3 text-xs text-white/40">或</span>
-              <div className="grow border-t border-white/5" />
+              <div className="grow border-t border-border dark:border-white/5" />
+              <span className="mx-3 text-xs text-muted-foreground">或</span>
+              <div className="grow border-t border-border dark:border-white/5" />
             </div>
 
             <motion.button
@@ -238,10 +238,10 @@ export function RegisterForm() {
               className="group/google relative w-full"
               onClick={() => void signIn("google", { callbackUrl: "/account" })}
             >
-              <div className="absolute inset-0 rounded-lg bg-white/5 opacity-0 blur transition-opacity duration-300 group-hover/google:opacity-70" />
-              <div className="relative flex h-10 items-center justify-center gap-2 overflow-hidden rounded-lg border border-white/10 bg-white/5 font-medium text-white transition-all duration-300 hover:border-white/20">
-                <span className="text-sm text-white/80 group-hover/google:text-white">G</span>
-                <span className="text-xs text-white/80 group-hover/google:text-white">
+              <div className="absolute inset-0 rounded-lg bg-foreground/5 opacity-0 blur transition-opacity duration-300 group-hover/google:opacity-70 dark:bg-white/5" />
+              <div className="relative flex h-10 items-center justify-center gap-2 overflow-hidden rounded-lg border border-border bg-muted/50 font-medium text-foreground transition-all duration-300 hover:border-foreground/20 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-white/20">
+                <span className="text-sm text-muted-foreground group-hover/google:text-foreground dark:text-white/80 dark:group-hover/google:text-white">G</span>
+                <span className="text-xs text-muted-foreground group-hover/google:text-foreground dark:text-white/80 dark:group-hover/google:text-white">
                   使用 Google 注册
                 </span>
               </div>
@@ -250,13 +250,13 @@ export function RegisterForm() {
         ) : null}
 
         <motion.p
-          className="mt-4 text-center text-xs text-white/60"
+          className="mt-4 text-center text-xs text-muted-foreground"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
           已有账号？{" "}
-          <Link href="/login" className="font-medium text-white hover:text-white/80">
+          <Link href="/login" className="font-medium text-foreground hover:text-foreground/80">
             登录
           </Link>
         </motion.p>

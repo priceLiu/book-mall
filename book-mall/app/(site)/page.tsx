@@ -1,6 +1,5 @@
 import { BenefitsSection } from "@/components/layout/sections/benefits";
 import { CommunitySection } from "@/components/layout/sections/community";
-import { ContactSection } from "@/components/layout/sections/contact";
 import { FeaturesSection } from "@/components/layout/sections/features";
 import { FeaturedProductsSection } from "@/components/layout/sections/featured-products";
 import { FooterSection } from "@/components/layout/sections/footer";
@@ -51,7 +50,6 @@ export default function Home() {
       <TestimonialSection />
       <CommunitySection />
       <PricingSection />
-      <ContactSection />
       <FooterSection />
     </>
   );
