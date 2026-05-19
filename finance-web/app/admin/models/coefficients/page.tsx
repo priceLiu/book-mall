@@ -18,7 +18,7 @@ export default function AdminModelCoefficientsPage() {
             <tr>
               <td className="border border-[#e8e8e8] px-3 py-2">方案 A 默认</td>
               <td className="border border-[#e8e8e8] px-3 py-2">
-                我方单价（元/单位）= 云有效成本单价 × M；扣点 ≈ round(单价×用量×100)（演示口径，与 book-mall 对齐时再收紧）。
+                平台单价（元/单位）= 云有效成本单价 × M；扣点 ≈ round(单价×用量×100)（演示口径，与 book-mall 对齐时再收紧）。
               </td>
               <td className="border border-[#e8e8e8] px-3 py-2 font-mono">{RETAIL_MULTIPLIER_DEFAULT}</td>
               <td className="border border-[#e8e8e8] px-3 py-2">

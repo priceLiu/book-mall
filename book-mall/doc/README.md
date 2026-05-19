@@ -21,10 +21,17 @@
 
 协作需求草案：[**v1.1**](./v1.1)（独立 AI 工具集成 · 试衣间等）。
 
+财务规则总则（**强制**）：
+
+- [**finance-rule-v1.0**](./finance/finance-rule-v1.0.md) — 价格 / 扣费 / 钱包 / 快照 / 财务页面 全流程**唯一规则源**（任何与本文冲突的代码与文档须修复）
+- [财务总宪（v0）：价格基线 / 公式 / 偏差登记](./finance/00-pricing-source-of-truth.md)
+
 版本里程碑（大块迭代）：
 
 - [**v2.0 — 订阅中心 · 工具套件 · 课程占位**](./releases/v2.0-tools-subscription-courses.md)
 - [**2026-05-16 — 订阅套餐版本谱系（停旧发新 · 价不可改）**](./releases/2026-05-16-subscription-plan-lineage.md)
+- [**2026-05-16 — 按秒计费（WalletHold）+ 模型校准（ModelCatalog / ModelAlias）**](./releases/2026-05-16-per-second-billing-and-model-calibration.md)
+- [**2026-05-18 — 价格基线重对齐 / 公示统一 / 全用户明细 / 误扣修正**](./releases/2026-05-18-pricing-baseline-realign-and-disclosure.md)
 
 ## 技术与环境
 

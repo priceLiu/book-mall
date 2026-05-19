@@ -14,7 +14,11 @@ import {
   dashscopeGetTask,
 } from "@/lib/ai-fit-dashscope";
 import { readOssEnv } from "@/lib/oss-client";
-import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
+import {
+  postToolUsageFromServerWithRetries,
+  reserveWalletHoldFromServer,
+  releaseWalletHoldFromServer,
+} from "@/lib/forward-tools-usage-server";
 import {
   computeAiTryOnChargePoints,
   resolveAiTryOnBillingModelId,
@@ -42,6 +46,25 @@ const tryOnBillingSnapByTaskId = new Map<string, TryOnBillingSnap>();
  */
 const AI_FIT_USAGE_TOOL_KEY = "fitting-room__ai-fit";
 
+/**
+ * v003：POST 阶段 reserve 后把 holdId 缓存到 (taskId → holdId)，
+ * GET 阶段 settle（reportAiFitTryOnUsage）按 taskId 反查并附带给主站完成 hold→SETTLED。
+ * 与 `persistedTryOnResultUrlByTask` 同生命周期，TTL 20 分钟。
+ */
+const holdIdByTryOnTaskId = new Map<string, { holdId: string; at: number }>();
+function rememberTryOnHoldId(taskId: string, holdId: string): void {
+  holdIdByTryOnTaskId.set(taskId, { holdId, at: Date.now() });
+}
+function readTryOnHoldId(taskId: string): string | undefined {
+  const row = holdIdByTryOnTaskId.get(taskId);
+  if (!row) return undefined;
+  if (Date.now() - row.at > PERSISTED_TRY_ON_TTL_MS) {
+    holdIdByTryOnTaskId.delete(taskId);
+    return undefined;
+  }
+  return row.holdId;
+}
+
 type AiFitTryOnUsagePayload = {
   recorded: boolean;
   insufficientBalance?: boolean;
@@ -65,6 +88,9 @@ async function reportAiFitTryOnUsage(opts: {
     if (billingPoints <= 0) {
       return { recorded: false, error: "试衣方案 A 标价未配置或无效" };
     }
+    /** v003：若 POST 阶段已 reserve，settle 时附带 holdId 让主站把 hold 转 SETTLED；
+     * 找不到（hold 已 expire / 跨进程冷启动）则走旧 auto 路径，依靠主站 settle 自身的水位线兜底。 */
+    const holdId = readTryOnHoldId(opts.taskId);
     const usage = await postToolUsageFromServerWithRetries({
       toolKey: AI_FIT_USAGE_TOOL_KEY,
       action: "try_on",
@@ -77,6 +103,7 @@ async function reportAiFitTryOnUsage(opts: {
         tryOnModel: tryOnModelId,
         retailMultiplier: retailMult,
       },
+      ...(holdId ? { holdId } : {}),
     });
     if (!usage.ok) {
       const msg =
@@ -140,6 +167,7 @@ function cachedPersistedUrl(taskId: string): string | undefined {
     recordedTryOnUsageTasks.delete(taskId);
     recordedTryOnUsageInsufficientTasks.delete(taskId);
     tryOnBillingSnapByTaskId.delete(taskId);
+    holdIdByTryOnTaskId.delete(taskId);
     return undefined;
   }
   return row.url;
@@ -309,6 +337,47 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  /**
+   * v003：在调云前 reserve 一次试衣单价（POST 阶段返回 200 前，先占住可用余额）。
+   * - 失败（余额不足 / 水位线）→ 402 直接透传，避免无谓的百炼调用；
+   * - catalog 不到对应单价 → 跳过 reserve，让旧 auto-settle 路径兜底；
+   * - 调云失败 → release。
+   */
+  let reservedHoldId: string | null = null;
+  try {
+    const tryOnModelId = resolveAiTryOnBillingModelId();
+    const { multiplier } = await getSchemeARetailMultiplierServer({
+      toolKey: AI_FIT_USAGE_TOOL_KEY,
+      modelKey: tryOnModelId,
+    });
+    const estimatedMaxPoints = computeAiTryOnChargePoints(tryOnModelId, multiplier);
+    if (estimatedMaxPoints > 0) {
+      const r = await reserveWalletHoldFromServer({
+        toolKey: AI_FIT_USAGE_TOOL_KEY,
+        action: "try_on",
+        estimatedMaxPoints,
+        meta: { modelId: tryOnModelId },
+      });
+      if (!r.ok) {
+        return NextResponse.json(
+          {
+            error: r.reason === "no_session" ? "请先登录工具站" : "工具站未配置 MAIN_SITE_ORIGIN",
+          },
+          { status: 503 },
+        );
+      }
+      if (r.status === 402) {
+        return NextResponse.json(r.data, { status: 402 });
+      }
+      if (r.status >= 200 && r.status < 300 && typeof r.data.holdId === "string") {
+        reservedHoldId = r.data.holdId;
+      }
+    }
+  } catch (e) {
+    console.error("[ai-fit try-on reserve]", e);
+    // fail-open：reserve 失败不阻塞业务，依赖主站 settle 自带水位线门禁。
+  }
+
   const created = await dashscopeCreateTryOnTask({
     apiKey,
     personImageUrl: personRes.url,
@@ -318,7 +387,17 @@ export async function POST(req: NextRequest) {
   });
 
   if ("error" in created) {
+    if (reservedHoldId) {
+      await releaseWalletHoldFromServer({
+        holdId: reservedHoldId,
+        reason: `tryon_create_failed:${created.error.slice(0, 100)}`,
+      });
+    }
     return NextResponse.json({ error: created.error }, { status: 502 });
+  }
+
+  if (reservedHoldId) {
+    rememberTryOnHoldId(created.taskId, reservedHoldId);
   }
 
   return NextResponse.json({

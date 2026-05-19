@@ -5,6 +5,11 @@ import { getMainSiteOrigin } from "@/lib/site-origin";
 
 const UPSTREAM = "/api/sso/tools/billing-detail-lines";
 
+const BILLING_PROXY_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  Vary: "Authorization, Cookie",
+} as const;
+
 function originOrError(): string | NextResponse {
   const origin = getMainSiteOrigin();
   if (!origin || origin.trim().length === 0) {
@@ -24,7 +29,10 @@ export async function GET() {
   const jar = cookies();
   const token = jar.get("tools_token")?.value?.trim();
   if (!token) {
-    return NextResponse.json({ error: "no_session" }, { status: 401 });
+    return NextResponse.json(
+      { error: "no_session" },
+      { status: 401, headers: BILLING_PROXY_HEADERS },
+    );
   }
 
   const base = originOrError();
@@ -38,6 +46,6 @@ export async function GET() {
   const text = await r.text();
   return new NextResponse(text, {
     status: r.status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...BILLING_PROXY_HEADERS },
   });
 }

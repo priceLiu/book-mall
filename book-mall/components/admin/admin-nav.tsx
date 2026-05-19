@@ -123,26 +123,27 @@ export function AdminNav({
               <Link href="/admin/finance/pricing-templates">计费模板与公式</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/admin/finance/cloud-pricing">云厂商价目表</Link>
+              <Link href="/pricing-disclosure" target="_blank" rel="noopener noreferrer">
+                平台价目表（前台公示）
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/cloud-pricing">价目导入版本</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/model-calibration">模型校准（按厂商）</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {financeWebOrigin ? (
-              <>
-                <DropdownMenuItem asChild>
-                  <a
-                    href={`${financeWebOrigin}/fees/billing/details`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    财务控制台 · 账单详情
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={`${financeWebOrigin}/admin`} target="_blank" rel="noopener noreferrer">
-                    财务控制台 · 管理端
-                  </a>
-                </DropdownMenuItem>
-              </>
+              <DropdownMenuItem asChild>
+                <a
+                  href={`${financeWebOrigin}/admin/billing/users`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  财务控制台 · 管理端
+                </a>
+              </DropdownMenuItem>
             ) : (
               <DropdownMenuItem disabled className="text-muted-foreground">
                 财务控制台（未配置 NEXT_PUBLIC_FINANCE_WEB_ORIGIN）

@@ -25,6 +25,28 @@
 
 后台为 **每个工具** 配置：类型、单价、免费额度（若有）、与 **最低余额线** 的联动（见二册）。
 
+### 1.3 按秒计费 + WalletHold（reserve→settle，2026-05-16 起）
+
+**问题**：按秒计费的视频工具（如 HappyHorse 系列 0.9–1.6 元/秒）若沿用"固定 pricePoints"扣费，1 秒视频与 15 秒视频会扣同样点数；并且若不在调用云厂商前做余额门禁，可能出现余额 ¥10 而实际扣到 ¥30 的"扣到负"。
+
+**方案**：采用业界标准 **reserve / settle / release** 流程：
+
+1. **reserve（用户点击生成时）**：按用户选的 `(modelKey, durationSec, resolution)` 估算"最坏情况"上限，再叠 1.2× 安全边际写入 `WalletHold` HELD 状态。可用余额 = `balance − Σ HELD.reservedPoints`；硬门禁拦截不足者，避免无谓的云厂商 API 调用。
+2. **settle（云厂商返回成功）**：拿到真实 `durationSec`（向上取整，并按 `PlatformConfig.minBilledVideoSec=5` 做最低秒数兜底），按 **挂牌价 × 用量 × 系数** 算实际扣点。**仅按挂牌价**，不解析云侧促销折扣 / 免费额度——这些是平台利润空间。
+3. **release（云厂商失败 / 用户取消）**：把 HELD 转 RELEASED（幂等）。
+4. **TTL 自动 EXPIRED**：超过 `PlatformConfig.walletHoldDefaultTtlMin=30` 分钟仍 HELD 的预占用由 cron / reserve 路径中"机会主义"打扫批量转 EXPIRED，释放可用余额。
+
+**PlatformConfig 新增参数**：
+
+| 字段 | 默认 | 说明 |
+|------|------|------|
+| `minBilledVideoSec` | 5 | 视频最低计费秒数兜底（向上取整后再取 max(本值, ceil(dur))） |
+| `minBilledImageCount` | 1 | 图片最低计费张数 |
+| `minChargePointsPerInvoke` | 1 | 单次调用最低扣点（避免 0 元/极低费用流水） |
+| `walletHoldDefaultTtlMin` | 30 | hold 默认存活分钟（超时自动 RELEASED→EXPIRED） |
+
+**API 形态**：`POST /api/sso/tools/usage` 支持 `phase=reserve | settle | release`；不带 phase 为 `auto`（旧路径，结合新引入的 `actuals` 也已自然按秒扣对）。详见 `doc/releases/2026-05-16-per-second-billing-and-model-calibration.md`。
+
 ## 2. 最低水位线（与二册一致）
 
 - **硬闸**：可用余额 **&lt; 最低余额线（默认 20 元）** → **禁止** 新建大模型/高阶按量任务；进行中的任务按规则 **允许完成当前轮** 或 **优雅终止**（产品需二选一并在逻辑文档写明）。  

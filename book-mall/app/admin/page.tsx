@@ -94,16 +94,7 @@ export default async function AdminDashboardPage() {
             <>
               <span className="text-muted-foreground">·</span>
               <a
-                href={`${financeWebOrigin}/fees/billing/details`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                财务控制台 · 账单详情
-              </a>
-              <span className="text-muted-foreground">·</span>
-              <a
-                href={`${financeWebOrigin}/admin`}
+                href={`${financeWebOrigin}/admin/billing/users`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-primary underline-offset-4 hover:underline"

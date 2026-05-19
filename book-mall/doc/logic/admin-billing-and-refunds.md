@@ -14,6 +14,10 @@
 - **充值统计**：`WalletEntry` 类型 `RECHARGE` 的 `amountPoints` 汇总（到账口径，非支付渠道流水）。
 - **充值优惠模板**：`/admin/finance/promo-templates` 维护 `RechargePromoTemplate`；用户侧领取与核销约定见 `doc/product/points-wallet-topup-spec.md`。
 - **保存反馈**：上述所有 form action 统一返回 `BillingActionState = { kind: "ok" | "error", message }`，前端 `useActionState` 显式 banner 回显，不再"无声成功 / 无声失败"。
+- **按秒计费 + WalletHold（2026-05-16）**：视频工具改为 **reserve→settle / release** 模式。`/api/sso/tools/usage` 加 `phase=reserve|settle|release|auto`；`PlatformConfig` 新增 `minBilledVideoSec=5 / minBilledImageCount=1 / minChargePointsPerInvoke=1 / walletHoldDefaultTtlMin=30`。**价格只按挂牌价**——云侧促销 / 免费额度不算成本，沉淀为平台利润。详见 `doc/releases/2026-05-16-per-second-billing-and-model-calibration.md` §按秒计费、§WalletHold。
+- **reserve 覆盖范围**：image-to-video / 文生视频 / 参考生视频 / 文生图 / AI 试衣 在 start 阶段均会 reserve；调云失败必 release；settle 在事务内把 hold 转 SETTLED 并按"扣后水位线 = 余额 − frozen − Σ(其它 HELD)"硬门禁。**visual-lab/analysis 例外**：它在调云前已经同步 settle 完成扣费（强一致模式），不需要再加 reserve。
+- **自动校准（2026-05-16）**：`/admin/finance/model-calibration` 顶栏「一键自动校准」按钮，调 `runFullAutoCalibration`：从 `ToolBillablePrice` 派生 catalog → 从 `PricingSourceLine` 派生 → 重扫 pending alias 把 HIGH/MEDIUM 自动绑定（LOW 留待审）。**每次 CSV 对账后**也会自动跑一遍。`recordToolUsageAndConsumeWallet` 同步在写 ToolBillingDetailLine 前反查 `INTERNAL_SCHEME_A_MODEL` 别名 → catalog，把 canonical 直接写进 cloudRow，让"同模型多名字"差额在**写入时**就归并；读侧 `applyCanonicalOverlayBatch` 仍兜底覆盖历史行。
+- **模型校准（2026-05-16）**：`/admin/finance/model-calibration` 把"云·商品 Code/计费项 Code/规格/产品名称"、"我们·toolKey/scheme A 模型"、"price.md 标签"统一映射到 `canonicalKey`；提供 **单个录入** + **批量导入候选 JSON** + 自动建议（exact / prefix / fuzzy），HIGH 可一键批准。导入云 CSV 时自动 ingest 候选别名。
 
 ## 6.3 余额提现
 

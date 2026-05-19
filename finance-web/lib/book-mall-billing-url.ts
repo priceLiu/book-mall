@@ -4,6 +4,8 @@ export function getBookMallBaseUrl(): string {
 }
 
 export function getFinanceDevUserId(): string | undefined {
+  /** 生产构建绝不允许带固定 devUserId——否则一旦主站会话 Cookie 未带到 CORS 请求，且误开 FINANCE_ALLOW_DEV_USER_QUERY，会泄漏「样板用户」明细。 */
+  if (process.env.NODE_ENV === "production") return undefined;
   const v = process.env.NEXT_PUBLIC_FINANCE_DEV_USER_ID?.trim();
   return v || undefined;
 }

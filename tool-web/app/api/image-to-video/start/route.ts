@@ -17,6 +17,12 @@ import {
   T2V_ASPECT_RATIO_OPTIONS,
   t2vAspectRatioToSize,
 } from "@/lib/image-to-video-models";
+import {
+  reserveWalletHoldFromServer,
+  releaseWalletHoldFromServer,
+} from "@/lib/forward-tools-usage-server";
+import { computeVideoChargePoints } from "@/lib/tools-scheme-a-pricing";
+import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
 
 export const runtime = "nodejs";
 
@@ -39,6 +45,71 @@ function normalizeReferenceVideoPrompt(prompt: string, imageCount: number): stri
     out = out.replace(re, `[Image ${n}]`);
   }
   return out;
+}
+
+/**
+ * v003：图生/文生/参考生视频在调用云厂商前的"预占用"门禁。
+ * 估算逻辑：按用户选择的 (模型, 时长, 分辨率) 用 catalog 单价 × 系数算出"预计扣点"，安全边际由主站 reserveWalletHold 再叠 1.2x。
+ * 调用方式：成功返回 { ok:true, holdId, reservedPoints }；失败 402 直接透传给前端（避免无谓的云调用）。
+ */
+async function reserveBeforeVideoStart(input: {
+  apiModel: string;
+  durationSec: number;
+  resolution: "720P" | "1080P";
+  audio: boolean;
+}): Promise<
+  | { ok: true; holdId: string | null; reservedPoints: number }
+  | { ok: false; status: number; data: Record<string, unknown> }
+> {
+  try {
+    const { multiplier } = await getSchemeARetailMultiplierServer({
+      toolKey: "image-to-video",
+      modelKey: input.apiModel,
+    });
+    const sr = input.resolution === "1080P" ? 1080 : 720;
+    const estimatedMaxPoints = computeVideoChargePoints(
+      {
+        apiModel: input.apiModel,
+        durationSec: input.durationSec,
+        sr,
+        audio: input.audio,
+      },
+      multiplier,
+    );
+    if (estimatedMaxPoints <= 0) {
+      // catalog 无该模型单价：不阻塞，但跳过 reserve（settle 时再尝试 ToolBillablePrice 命中）
+      return { ok: true, holdId: null, reservedPoints: 0 };
+    }
+    const r = await reserveWalletHoldFromServer({
+      toolKey: "image-to-video",
+      action: "invoke",
+      estimatedMaxPoints,
+      meta: {
+        modelId: input.apiModel,
+        durationSec: input.durationSec,
+        resolution: input.resolution,
+        audio: input.audio,
+      },
+    });
+    if (!r.ok) {
+      return {
+        ok: false,
+        status: 503,
+        data: { error: r.reason === "no_session" ? "请先登录工具站" : "工具站未配置 MAIN_SITE_ORIGIN" },
+      };
+    }
+    if (r.status >= 200 && r.status < 300) {
+      const holdId = typeof r.data.holdId === "string" ? r.data.holdId : null;
+      const reservedPoints =
+        typeof r.data.reservedPoints === "number" ? r.data.reservedPoints : 0;
+      return { ok: true, holdId, reservedPoints };
+    }
+    return { ok: false, status: r.status, data: r.data };
+  } catch (e) {
+    console.error("[reserveBeforeVideoStart]", e);
+    // 预占用失败不应阻塞业务流（运维问题），主站 settle 仍能扣对；这里 fail-open，holdId 留 null。
+    return { ok: true, holdId: null, reservedPoints: 0 };
+  }
 }
 
 export async function POST(req: Request) {
@@ -120,6 +191,18 @@ export async function POST(req: Request) {
     );
     const aspectForSize = aspectAllowed.has(aspectRaw) ? aspectRaw : "16:9";
     const isHappyHorseT2v = modelEntry.apiModel.startsWith("happyhorse-");
+    const happyhorseDur = Math.min(15, Math.max(3, duration));
+    const wanDur: 5 | 10 = duration <= 7 ? 5 : 10;
+    const estimatedDur = isHappyHorseT2v ? happyhorseDur : wanDur;
+    const reserveT2v = await reserveBeforeVideoStart({
+      apiModel: modelEntry.apiModel,
+      durationSec: estimatedDur,
+      resolution,
+      audio: false,
+    });
+    if (!reserveT2v.ok) {
+      return NextResponse.json(reserveT2v.data, { status: reserveT2v.status });
+    }
     const created = isHappyHorseT2v
       ? await t2vCreateVideoTask({
           apiKey,
@@ -129,7 +212,7 @@ export async function POST(req: Request) {
           parameterStyle: "resolutionRatio",
           resolution,
           ratio: aspectForSize,
-          duration: Math.min(15, Math.max(3, duration)),
+          duration: happyhorseDur,
           seedStr,
           watermark,
         })
@@ -140,12 +223,18 @@ export async function POST(req: Request) {
           prompt,
           parameterStyle: "wanSize",
           size: t2vAspectRatioToSize(aspectForSize, resolution),
-          duration: duration <= 7 ? 5 : 10,
+          duration: wanDur,
         });
     if (!created.ok) {
+      if (reserveT2v.holdId) {
+        await releaseWalletHoldFromServer({
+          holdId: reserveT2v.holdId,
+          reason: `t2v_create_failed:${created.error.slice(0, 100)}`,
+        });
+      }
       return NextResponse.json({ error: created.error }, { status: 502 });
     }
-    return NextResponse.json({ taskId: created.taskId });
+    return NextResponse.json({ taskId: created.taskId, holdId: reserveT2v.holdId });
   }
 
   if (kind === "ref") {
@@ -187,6 +276,15 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+    const reserveR2v = await reserveBeforeVideoStart({
+      apiModel: refModelEntry.apiModel,
+      durationSec: duration,
+      resolution,
+      audio: false,
+    });
+    if (!reserveR2v.ok) {
+      return NextResponse.json(reserveR2v.data, { status: reserveR2v.status });
+    }
     const created = await r2vCreateReferenceVideoTask({
       apiKey,
       model: refModelEntry.apiModel,
@@ -200,9 +298,15 @@ export async function POST(req: Request) {
       watermark,
     });
     if (!created.ok) {
+      if (reserveR2v.holdId) {
+        await releaseWalletHoldFromServer({
+          holdId: reserveR2v.holdId,
+          reason: `r2v_create_failed:${created.error.slice(0, 100)}`,
+        });
+      }
       return NextResponse.json({ error: created.error }, { status: 502 });
     }
-    return NextResponse.json({ taskId: created.taskId });
+    return NextResponse.json({ taskId: created.taskId, holdId: reserveR2v.holdId });
   }
 
   const firstFrame =
@@ -226,6 +330,16 @@ export async function POST(req: Request) {
     );
   }
 
+  const reserveI2v = await reserveBeforeVideoStart({
+    apiModel: modelEntry.apiModel,
+    durationSec: duration,
+    resolution,
+    audio: false,
+  });
+  if (!reserveI2v.ok) {
+    return NextResponse.json(reserveI2v.data, { status: reserveI2v.status });
+  }
+
   const created = await i2vCreateVideoTask({
     apiKey,
     model: modelEntry.apiModel,
@@ -239,8 +353,14 @@ export async function POST(req: Request) {
   });
 
   if (!created.ok) {
+    if (reserveI2v.holdId) {
+      await releaseWalletHoldFromServer({
+        holdId: reserveI2v.holdId,
+        reason: `i2v_create_failed:${created.error.slice(0, 100)}`,
+      });
+    }
     return NextResponse.json({ error: created.error }, { status: 502 });
   }
 
-  return NextResponse.json({ taskId: created.taskId });
+  return NextResponse.json({ taskId: created.taskId, holdId: reserveI2v.holdId });
 }

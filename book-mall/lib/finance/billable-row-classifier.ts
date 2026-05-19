@@ -106,7 +106,7 @@ export function unitLabelFor(
 export function formulaTextFor(bk: PricingBillingKind | null | undefined): string {
   switch (bk) {
     case "TOKEN_IN_OUT":
-      return "in×M / 1e6 × 点率 + out×M / 1e6 × 点率（按 token 实际加权）";
+      return "in×系数 / 1e6 × 点率 + out×系数 / 1e6 × 点率（按 token 实际加权）";
     case "OUTPUT_IMAGE":
     case "COST_PER_IMAGE":
       return "成本 × 系数 × 100 → 取整（最少 1 点）";

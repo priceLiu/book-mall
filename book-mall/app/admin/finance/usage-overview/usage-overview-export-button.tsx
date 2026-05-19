@@ -12,9 +12,12 @@ export type ExportLine = {
   toolKey: string;
   modelKey: string;
   pricingTemplateKey: string | null;
-  internalCloudCostUnitYuan: string | null;
-  internalRetailMultiplier: string | null;
-  internalChargedPoints: number | null;
+  /** v006 Round 4：来自 cloudRow["厂商定价/官网目录价"]——云目录单价（元）；缺失为 null */
+  cloudUnitCostYuan: string | null;
+  /** v005：来自 cloudRow["平台/系数(M)"]——平台溢价系数；缺失为 null */
+  retailMultiplier: string | null;
+  /** v005：来自 cloudRow["平台/扣点"]——实际扣点；0/缺失为 null */
+  chargedPoints: number | null;
   yuan: number;
 };
 
@@ -37,9 +40,9 @@ export function UsageOverviewExportButton({
         { key: "toolKey", label: "工具" },
         { key: "modelKey", label: "模型" },
         { key: "pricingTemplateKey", label: "计价模板" },
-        { key: "internalCloudCostUnitYuan", label: "云成本(¥)" },
-        { key: "internalRetailMultiplier", label: "系数 M" },
-        { key: "internalChargedPoints", label: "扣点" },
+        { key: "cloudUnitCostYuan", label: "云成本(¥)" },
+        { key: "retailMultiplier", label: "系数 M" },
+        { key: "chargedPoints", label: "扣点" },
         { key: "yuan", label: "≈¥" },
       ],
       rows,

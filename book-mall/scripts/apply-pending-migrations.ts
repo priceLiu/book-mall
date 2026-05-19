@@ -70,21 +70,25 @@ async function main() {
       const statements = splitSqlStatements(sql);
       console.log(`[apply-pending]   ${statements.length} statements`);
 
-      await prisma.$transaction(async (tx) => {
-        await tx.$executeRawUnsafe(
-          "insert into _prisma_migrations (id, checksum, migration_name, started_at, applied_steps_count) values ($1,$2,$3, now(), 0)",
-          id,
-          checksum,
-          name,
-        );
-        for (const stmt of statements) {
-          await tx.$executeRawUnsafe(stmt);
-        }
-        await tx.$executeRawUnsafe(
-          "update _prisma_migrations set finished_at = now(), applied_steps_count = 1 where id = $1",
-          id,
-        );
-      });
+      await prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRawUnsafe(
+            "insert into _prisma_migrations (id, checksum, migration_name, started_at, applied_steps_count) values ($1,$2,$3, now(), 0)",
+            id,
+            checksum,
+            name,
+          );
+          for (const stmt of statements) {
+            await tx.$executeRawUnsafe(stmt);
+          }
+          await tx.$executeRawUnsafe(
+            "update _prisma_migrations set finished_at = now(), applied_steps_count = 1 where id = $1",
+            id,
+          );
+        },
+        // 多 DDL 迁移可能超过默认 5s；放宽到 120s 以兼容首次新建表多于 10 个的情况。
+        { maxWait: 10_000, timeout: 120_000 },
+      );
 
       console.log(`[apply-pending] applied ${name}`);
     }

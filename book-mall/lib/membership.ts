@@ -16,7 +16,11 @@ export async function getMembershipFlags(userId: string): Promise<{
 }> {
   const now = new Date();
 
-  const [config, wallet, sub, toolProdCount, courseProdCount] = await Promise.all([
+  /**
+   * 用单笔 $transaction 顺序执行，避免 Promise.all 并行占 5 条连接。
+   * 与 account 页其它并行 prisma 调用叠加时，易触发「connection pool timeout」（Neon pooler 尤甚）。
+   */
+  const [config, wallet, sub, toolProdCount, courseProdCount] = await prisma.$transaction([
     prisma.platformConfig.findUnique({ where: { id: "default" } }),
     prisma.wallet.findUnique({ where: { userId } }),
     prisma.subscription.findFirst({

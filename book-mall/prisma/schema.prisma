@@ -80,6 +80,7 @@ model User {
   userRechargeCoupons          UserRechargeCoupon[]
   toolBillingDetailLines       ToolBillingDetailLine[]
   cloudAccountBindings         CloudAccountBinding[]
+  walletHolds                  WalletHold[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -232,11 +233,16 @@ model ToolUsageEvent {
   meta      Json?
   /// 单次消耗点数（1 点 = ¥0.01）；可与 PlatformConfig.toolInvokePerCallPoints 对齐，或由调用方传入
   costPoints Int?
+  /// 视频类工具实际计费秒数（向上取整后 + minBilledVideoSec 兜底；用于审计与按秒计费溯源）
+  billedVideoSec Int?
+  /// 关联的预占用 hold（若使用 reserve→settle 流程上报）
+  walletHoldId String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   toolBillingDetailLines ToolBillingDetailLine[]
+  walletHold             WalletHold?            @relation("HoldSettledByEvent", fields: [walletHoldId], references: [id], onDelete: SetNull)
 
   @@index([userId, toolKey, createdAt])
   @@index([toolKey, createdAt])
@@ -255,17 +261,10 @@ model ToolBillingDetailLine {
   toolUsageEventId String?
 
   source   ToolBillingDetailSource @default(CLOUD_CSV_IMPORT)
-  /// 云 CSV 列名 -> 字符串值（完整明细快照）
+  /// v005：完整账单明细快照（与云 CSV 同字段名 + 平台 8 列）；所有"对内计价"信息（云成本单价、
+  /// 系数 M、我方单价、本行扣点）都在此 JSON 内的「定价信息/官网目录价 + 平台/系数(M) + 平台/定价
+  /// + 平台/扣点」键里。删除了 v004 的 7 列 Decimal 镜像（internalCloudCostUnitYuan 等），单一数据源。
   cloudRow Json
-
-  /// 入库或回填时固化的对内计价快照（便于按行追溯当时口径；勿在读接口依赖实时重算）
-  internalCloudCostUnitYuan Decimal?  @db.Decimal(24, 10)
-  internalRetailMultiplier  Decimal?  @db.Decimal(12, 6)
-  internalOurUnitYuan       Decimal?  @db.Decimal(24, 10)
-  internalFormulaText       String?   @db.Text
-  internalChargedPoints     Int?
-  internalYuanReference     Decimal?  @db.Decimal(24, 10)
-  internalCapturedAt      DateTime?
 
   /// 对内计价所用模板（多云厂商扩展）；如 aliyun.consumedetail_bill_v2
   pricingTemplateKey        String    @default("aliyun.consumedetail_bill_v2")
@@ -334,6 +333,16 @@ model PlatformConfig {
   toolInvokePerCallPoints    Int @default(0)
   /// 异常消耗：超过近均值的百分比即告警，如 300=3 倍
   usageAnomalyRatioPercent  Int @default(300)
+  /// v003：视频按秒计费的最低计费秒数兜底（不足按此秒计；建议 5）
+  minBilledVideoSec        Int  @default(5)
+  /// v003：图片按张计费的最低张数兜底
+  minBilledImageCount      Int  @default(1)
+  /// v003：单次调用的最低扣点（避免 0 元/极低费用）
+  minChargePointsPerInvoke Int  @default(1)
+  /// v003：WalletHold（预占用）默认 TTL（分钟）；超时未 settle 由 cron 自动 RELEASED→EXPIRED
+  /// v005（2026-05-18）：默认从 30 → 10。视频任务实际生成大多 < 5 分钟；
+  /// 留 10 分钟兜底足够，避免长尾未 settle 的 hold 长期占住用户余额。
+  walletHoldDefaultTtlMin  Int  @default(10)
   updatedAt            DateTime @updatedAt
 }
 
@@ -525,6 +534,138 @@ model WalletEntry {
   createdAt DateTime @default(now())
 
   @@index([walletId, createdAt])
+}
+
+/// v003：钱包预占用（reservation/hold）状态。
+/// HELD：reserve 已扣"可用余额"但未真实扣 balancePoints；
+/// SETTLED：settle 时按真实用量扣 balancePoints 并写 ToolUsageEvent；
+/// RELEASED：调用方明确释放（生成失败/取消）；
+/// EXPIRED：超过 expiresAt 由 cron 自动 RELEASED 的别名（保留枚举便于查询）。
+enum WalletHoldStatus {
+  HELD
+  SETTLED
+  RELEASED
+  EXPIRED
+}
+
+/// v003：钱包预占用记录——按秒计费场景下"先估上限、后按真实用量结算"。
+/// 可用余额 = balancePoints − Σ(WalletHold WHERE status=HELD).reservedPoints。
+model WalletHold {
+  id             String           @id @default(cuid())
+  userId         String
+  toolKey        String
+  action         String?
+  /// 预占点数（1 点 = ¥0.01）；以"最大可能用量 × 系数 × 1.2 安全边际"估算
+  reservedPoints Int
+  status         WalletHoldStatus @default(HELD)
+  /// 任务幂等键（典型：云厂商 taskId）；与 (userId) 共同唯一，避免同任务重复 reserve
+  taskKey        String?
+  /// 提示性元信息（estimated durationSec / modelKey / resolution 等）
+  meta           Json?
+  /// 自动释放时间（默认 PlatformConfig.walletHoldDefaultTtlMin）
+  expiresAt      DateTime
+  /// SETTLED 时落本次实际扣点；与 ToolUsageEvent.costPoints 一致
+  settledChargePoints Int?
+  /// SETTLED 时回填，便于审计与流水回查
+  settledUsageEventId String?
+  /// RELEASED/EXPIRED 时的原因，便于运维查问
+  releaseReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settledUsageEvents ToolUsageEvent[] @relation("HoldSettledByEvent")
+
+  @@unique([userId, taskKey])
+  @@index([userId, status])
+  @@index([status, expiresAt])
+}
+
+/// v003 模型校准：标准模型（canonical）目录。
+/// 一个 canonicalKey 在内部所有列展示与对账中作为"模型"主键；通过 ModelAlias 挂接云厂商/工具站/价目表等各自的字串。
+model ModelCatalog {
+  id              String              @id @default(cuid())
+  /// 标准模型 key（人可读，跨表用作 group 键）；如 `happyhorse-1.0-i2v`
+  canonicalKey    String              @unique
+  /// 显示名（含规格/中文）；如 `HappyHorse 图生视频 1.0`
+  displayName     String
+  /// 厂商（aliyun / tencent / huawei / volcengine / ...）
+  vendor          String
+  /// 默认档位（1080P/720P/-）；对账可二级聚合
+  defaultTierRaw  String?
+  /// 计费维度（与 PricingSourceLine.billingKind 对齐）
+  billingKind     PricingBillingKind
+  /// 显示单位标签（"元/秒"/"元/张"/"元/百万 tokens"）
+  unitLabel       String
+  active          Boolean             @default(true)
+  note            String?             @db.Text
+
+  /// v006（2026-05-17）：云厂商账单 5 列的"本 catalog 主映射"——配合费用明细展示。
+  /// 一个 canonical 配 1 个 primary vendor 映射；未来若同 canonical 跨多家云需要并存，
+  /// 再 split 出独立的 `ModelCatalogVendorBinding(1:N)` 表，把这 5 列迁过去（schema 演进路径已规划）。
+  ///
+  /// 「厂商产品/产品名称」如 "大模型服务平台百炼"
+  vendorProductName        String?
+  /// 「厂商产品/商品Code」如 "sfm_inference_public_cn"
+  vendorCommodityCode      String?
+  /// 「厂商产品/商品名称」如 "百炼大模型推理"
+  vendorCommodityName      String?
+  /// 「厂商产品/计费项Code」如 "image_number"
+  vendorBillableItemCode   String?
+  /// 「厂商产品/计费项名称」如 "大模型图片生成量"
+  vendorBillableItemName   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  aliases ModelAlias[]
+
+  @@index([vendor, active])
+}
+
+enum ModelAliasSource {
+  VENDOR_COMMODITY_CODE
+  VENDOR_BILLABLE_ITEM
+  VENDOR_RESOURCE_SPEC
+  VENDOR_PRODUCT_NAME
+  INTERNAL_TOOLKEY
+  INTERNAL_ACTION
+  INTERNAL_SCHEME_A_MODEL
+  PRICE_MD_LABEL
+  MANUAL_OTHER
+}
+
+enum AliasConfidence {
+  HIGH
+  MEDIUM
+  LOW
+  MANUAL
+}
+
+/// v003 模型校准：单条别名（来自云 CSV / 工具站 toolKey / price.md / 手动）。
+/// 自动建议时 catalogId 可空（pending review）；人工"接受建议"后绑定到具体 ModelCatalog。
+model ModelAlias {
+  id           String           @id @default(cuid())
+  catalogId    String?
+  catalog      ModelCatalog?    @relation(fields: [catalogId], references: [id], onDelete: SetNull)
+
+  source       ModelAliasSource
+  aliasValue   String
+  tierRawHint  String?
+  confidence   AliasConfidence  @default(LOW)
+  /// 自动匹配算法名（exact/prefix/fuzzy/manual）
+  matchedBy    String?
+  /// 评估证据样本（如来自哪行 CSV、命中哪几条规则）
+  evidence     Json?
+  active       Boolean          @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([source, aliasValue])
+  @@index([catalogId, source])
+  @@index([catalogId])
 }
 
 // —— 订阅 ——

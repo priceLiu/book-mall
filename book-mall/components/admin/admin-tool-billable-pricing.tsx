@@ -195,6 +195,7 @@ function SchemeARefModelCombo({
                 key={o.catalogModelId}
                 type="button"
                 role="option"
+                aria-selected={o.catalogModelId === value}
                 className="flex w-full flex-col items-stretch gap-0.5 px-3 py-2 text-left text-xs hover:bg-muted/80 focus:bg-muted/80 focus:outline-none"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
