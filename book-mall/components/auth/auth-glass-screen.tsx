@@ -4,7 +4,7 @@ import { type ReactNode } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 
 /**
- * 全屏紫黑渐变 + 玻璃拟态卡片容器（登录 / 注册页共用）
+ * 全屏黑灰渐变 + 玻璃拟态卡片容器（登录 / 注册页共用）
  */
 export function AuthGlassScreen({ children }: { children: ReactNode }) {
   const mouseX = useMotionValue(0);
@@ -24,8 +24,8 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black">
-      <div className="absolute inset-0 bg-gradient-to-b from-purple-500/40 via-purple-700/50 to-black" />
+    <motion.div className="relative -mt-4 flex min-h-[calc(100vh-3.5rem)] w-full items-start justify-center overflow-hidden bg-zinc-100 pt-[14vh] sm:-mt-5 sm:min-h-[calc(100vh-4rem)] sm:pt-[16vh] dark:bg-black">
+      <div className="absolute inset-0 bg-gradient-to-b from-zinc-300/90 via-zinc-100 to-white dark:from-black dark:via-zinc-950/85 dark:to-zinc-600/30" />
 
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.03] mix-blend-soft-light"
@@ -35,10 +35,10 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
         }}
       />
 
-      <div className="pointer-events-none absolute top-0 left-1/2 h-[60vh] w-[120vh] -translate-x-1/2 rounded-b-[50%] bg-purple-400/20 blur-[80px]" />
+      <div className="pointer-events-none absolute top-0 left-1/2 h-[50vh] w-[120vh] -translate-x-1/2 rounded-b-[50%] bg-zinc-400/30 blur-[80px] dark:bg-zinc-800/25" />
       <motion.div
-      aria-hidden
-        className="pointer-events-none absolute top-0 left-1/2 h-[60vh] w-[100vh] -translate-x-1/2 rounded-b-full bg-purple-300/20 blur-[60px]"
+        aria-hidden
+        className="pointer-events-none absolute top-0 left-1/2 h-[50vh] w-[100vh] -translate-x-1/2 rounded-b-full bg-zinc-300/25 blur-[60px] dark:bg-zinc-700/20"
         animate={{
           opacity: [0.15, 0.3, 0.15],
           scale: [0.98, 1.02, 0.98],
@@ -51,7 +51,7 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
       />
       <motion.div
         aria-hidden
-        className="pointer-events-none absolute bottom-0 left-1/2 h-[90vh] w-[90vh] -translate-x-1/2 rounded-t-full bg-purple-400/20 blur-[60px]"
+        className="pointer-events-none absolute bottom-0 left-1/2 h-[90vh] w-[90vh] -translate-x-1/2 rounded-t-full bg-zinc-200/50 blur-[60px] dark:bg-zinc-400/25"
         animate={{
           opacity: [0.3, 0.5, 0.3],
           scale: [1, 1.1, 1],
@@ -64,10 +64,10 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
         }}
       />
 
-      <div className="pointer-events-none absolute top-1/4 left-1/4 h-96 w-96 animate-pulse rounded-full bg-white/5 opacity-40 blur-[100px]" />
-      <div
+      <div className="pointer-events-none absolute top-[12%] left-1/4 h-72 w-72 animate-pulse rounded-full bg-zinc-400/20 opacity-40 blur-[100px] dark:bg-zinc-700/10 dark:opacity-30" />
+      <motion.div
         aria-hidden
-        className="pointer-events-none absolute right-1/4 bottom-1/4 h-96 w-96 animate-pulse rounded-full bg-white/5 opacity-40 blur-[100px] [animation-delay:1s]"
+        className="pointer-events-none absolute right-1/4 bottom-[8%] h-96 w-96 animate-pulse rounded-full bg-zinc-300/25 opacity-50 blur-[100px] [animation-delay:1s] dark:bg-zinc-400/15"
       />
 
       <motion.div
@@ -106,7 +106,7 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
             <div className="absolute -inset-[1px] overflow-hidden rounded-2xl">
               <motion.div
                 aria-hidden
-                className="absolute top-0 left-0 h-[3px] w-[50%] bg-gradient-to-r from-transparent via-white to-transparent opacity-70"
+                className="absolute top-0 left-0 h-[3px] w-[50%] bg-gradient-to-r from-transparent via-foreground/30 to-transparent opacity-50 dark:via-white dark:opacity-70"
                 initial={{ filter: "blur(2px)" }}
                 animate={{
                   left: ["-50%", "100%"],
@@ -134,7 +134,7 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
               />
               <motion.div
                 aria-hidden
-                className="absolute top-0 right-0 h-[50%] w-[3px] bg-gradient-to-b from-transparent via-white to-transparent opacity-70"
+                className="absolute top-0 right-0 h-[50%] w-[3px] bg-gradient-to-b from-transparent via-foreground/30 to-transparent opacity-50 dark:via-white dark:opacity-70"
                 initial={{ filter: "blur(2px)" }}
                 animate={{
                   top: ["-50%", "100%"],
@@ -165,7 +165,7 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
               />
               <motion.div
                 aria-hidden
-                className="absolute right-0 bottom-0 h-[3px] w-[50%] bg-gradient-to-r from-transparent via-white to-transparent opacity-70"
+                className="absolute right-0 bottom-0 h-[3px] w-[50%] bg-gradient-to-r from-transparent via-foreground/30 to-transparent opacity-50 dark:via-white dark:opacity-70"
                 initial={{ filter: "blur(2px)" }}
                 animate={{
                   right: ["-50%", "100%"],
@@ -196,7 +196,7 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
               />
               <motion.div
                 aria-hidden
-                className="absolute bottom-0 left-0 h-[50%] w-[3px] bg-gradient-to-b from-transparent via-white to-transparent opacity-70"
+                className="absolute bottom-0 left-0 h-[50%] w-[3px] bg-gradient-to-b from-transparent via-foreground/30 to-transparent opacity-50 dark:via-white dark:opacity-70"
                 initial={{ filter: "blur(2px)" }}
                 animate={{
                   bottom: ["-50%", "100%"],
@@ -227,12 +227,21 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
               />
             </div>
 
-            <div className="absolute -inset-[0.5px] rounded-2xl bg-gradient-to-r from-white/[0.03] via-white/[0.07] to-white/[0.03] opacity-0 transition-opacity duration-500 group-hover:opacity-70" />
+            <div className="absolute -inset-[0.5px] rounded-2xl bg-gradient-to-r from-foreground/[0.04] via-foreground/[0.08] to-foreground/[0.04] opacity-0 transition-opacity duration-500 group-hover:opacity-70 dark:from-white/[0.03] dark:via-white/[0.07] dark:to-white/[0.03]" />
 
-            <div className="relative overflow-hidden rounded-2xl border border-white/[0.05] bg-black/40 p-6 shadow-2xl backdrop-blur-xl">
+            <div className="relative overflow-hidden rounded-2xl border border-zinc-200/80 bg-white/80 p-6 shadow-xl backdrop-blur-xl dark:border-white/[0.05] dark:bg-black/40 dark:shadow-2xl">
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-0 opacity-[0.03]"
+                className="pointer-events-none absolute inset-0 opacity-[0.05] dark:hidden"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(135deg, rgba(0,0,0,0.1) 0.5px, transparent 0.5px), linear-gradient(45deg, rgba(0,0,0,0.1) 0.5px, transparent 0.5px)",
+                  backgroundSize: "30px 30px",
+                }}
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 hidden opacity-[0.03] dark:block"
                 style={{
                   backgroundImage:
                     "linear-gradient(135deg, white 0.5px, transparent 0.5px), linear-gradient(45deg, white 0.5px, transparent 0.5px)",
@@ -244,11 +253,11 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
           </div>
         </motion.div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
-/** 与玻璃卡片内深色输入一致的 text input */
+/** 登录 / 注册输入框（随浅色 / 深色主题切换） */
 export function AuthGlassInput({
   className = "",
   ...props
@@ -257,7 +266,7 @@ export function AuthGlassInput({
     <input
       data-slot="auth-glass-input"
       className={
-        "file:text-foreground placeholder:text-white/30 selection:bg-primary selection:text-primary-foreground flex h-10 w-full min-w-0 rounded-lg border border-transparent bg-white/5 px-3 py-1 pl-10 pr-3 text-base text-white shadow-none transition-all duration-300 outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium focus:border-white/20 focus:bg-white/10 focus-visible:ring-0 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm " +
+        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground flex h-10 w-full min-w-0 rounded-lg border border-transparent bg-zinc-200/70 px-3 py-1 pl-10 pr-3 text-base text-foreground shadow-none transition-all duration-300 outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium focus:border-zinc-300 focus:bg-white focus-visible:ring-0 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/5 dark:text-white dark:placeholder:text-white/30 dark:focus:border-white/20 dark:focus:bg-white/10 md:text-sm " +
         className
       }
       {...props}
