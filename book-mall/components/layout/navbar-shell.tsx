@@ -2,6 +2,9 @@
 
 import { Menu } from "lucide-react";
 import React from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Sheet,
   SheetContent,
@@ -11,18 +14,12 @@ import {
   SheetTrigger,
 } from "../ui/sheet";
 import { Separator } from "../ui/separator";
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-} from "../ui/navigation-menu";
 import { Button } from "../ui/button";
-import Link from "next/link";
-import Image from "next/image";
+import { NotchNav, type NotchNavItem } from "../ui/notch-nav";
 import { ToggleTheme } from "./toogle-theme";
+
+/** 与 NotchNav 中「产品」项 value 一致，用于凹槽高亮与路由判断 */
+const NAV_PRODUCT_VALUE = "__nav_products__";
 
 interface RouteProps {
   href: string;
@@ -30,16 +27,56 @@ interface RouteProps {
 }
 
 const routeList: RouteProps[] = [
+  { href: "#hero-video", label: "主屏" },
   { href: "#testimonials", label: "客户评价" },
   { href: "#pricing", label: "价格" },
   { href: "#contact", label: "联系" },
 ];
 
+function ProductMegaMenuContent() {
+  return (
+    <div className="flex gap-6 p-4">
+      <Image
+        src="/logo.jpg"
+        alt="智选AI"
+        className="h-44 w-44 shrink-0 rounded-md object-contain bg-transparent dark:mix-blend-screen"
+        width={400}
+        height={400}
+      />
+      <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
+        <Link
+          href="/products/ai-apps"
+          className="flex min-h-[120px] flex-col justify-center rounded-md border border-transparent p-4 hover:border-secondary hover:bg-muted"
+        >
+          <p className="mb-1 font-semibold leading-none text-foreground">AI 应用</p>
+          <p className="line-clamp-3 text-sm text-muted-foreground">工具型产品与在线应用</p>
+        </Link>
+        <Link
+          href="/products/ai-courses"
+          className="flex min-h-[120px] flex-col justify-center rounded-md border border-transparent p-4 hover:border-secondary hover:bg-muted"
+        >
+          <p className="mb-1 font-semibold leading-none text-foreground">AI 课程（导购）</p>
+          <p className="line-clamp-3 text-sm text-muted-foreground">商品化的课程产品介绍</p>
+        </Link>
+        <Link
+          href="/courses"
+          className="col-span-2 flex min-h-[96px] flex-col justify-center rounded-md border border-transparent p-4 hover:border-secondary hover:bg-muted"
+        >
+          <p className="mb-1 font-semibold leading-none text-foreground">AI 学堂</p>
+          <p className="line-clamp-2 text-sm text-muted-foreground">
+            课程站占位路由 · 后续接入学习与订阅权益
+          </p>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function BrandLogoLink({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <Link
       href="/"
-      className="flex items-center shrink-0"
+      className="flex shrink-0 items-center"
       onClick={onNavigate}
       aria-label="智选AI 首页"
     >
@@ -57,8 +94,54 @@ function BrandLogoLink({ onNavigate }: { onNavigate?: () => void }) {
 
 export function NavbarShell({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [productMenuOpen, setProductMenuOpen] = React.useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const [hash, setHash] = React.useState("");
+
+  React.useEffect(() => {
+    const read = () => setHash(typeof window !== "undefined" ? window.location.hash : "");
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+
+  const isProductPath =
+    pathname.startsWith("/products/") ||
+    pathname === "/courses" ||
+    pathname.startsWith("/courses/");
+
+  const notchAnchorValue = React.useMemo(() => {
+    if (isProductPath || productMenuOpen) return NAV_PRODUCT_VALUE;
+    if (pathname !== "/") return routeList[0]?.href ?? "";
+    const hit = routeList.find((r) => r.href === hash);
+    return hit?.href ?? routeList[0]?.href ?? "";
+  }, [pathname, hash, isProductPath, productMenuOpen]);
+
+  const notchItems = React.useMemo((): NotchNavItem[] => {
+    return [
+      {
+        value: NAV_PRODUCT_VALUE,
+        label: "产品",
+        dropdown: <ProductMegaMenuContent />,
+        onDropdownOpenChange: setProductMenuOpen,
+      },
+      ...routeList.map((r) => ({ value: r.href, label: r.label })),
+    ];
+  }, []);
+
+  const navigateNotch = React.useCallback(
+    (href: string) => {
+      setProductMenuOpen(false);
+      if (href === NAV_PRODUCT_VALUE) return;
+      const target = href.startsWith("#") ? `/${href}` : href;
+      void router.push(target);
+    },
+    [router],
+  );
+
   return (
-    <header className="sticky top-5 z-50 mx-auto flex min-h-12 w-[90%] items-center justify-between gap-3 rounded-2xl border border-border/80 bg-card/95 px-2 py-2 shadow-md backdrop-blur-md supports-[backdrop-filter]:bg-card/90 md:w-[70%] lg:w-[75%] lg:max-w-screen-xl">
+    <header className="sticky top-5 z-50 mx-auto flex min-h-12 w-[90%] items-center justify-between gap-3 overflow-visible rounded-2xl border border-border/80 bg-card/95 px-2 py-2 shadow-md backdrop-blur-md supports-[backdrop-filter]:bg-card/90 md:w-[70%] lg:w-[75%] lg:max-w-screen-xl">
       <div className="flex h-9 shrink-0 items-center">
         <BrandLogoLink />
       </div>
@@ -74,7 +157,7 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
 
           <SheetContent
             side="left"
-            className="flex flex-col justify-between rounded-tr-2xl rounded-br-2xl bg-card border-secondary"
+            className="flex flex-col justify-between rounded-tr-2xl rounded-br-2xl border-secondary bg-card"
           >
             <div>
               <SheetHeader className="mb-4 ml-4">
@@ -120,13 +203,13 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
                     variant="ghost"
                     className="justify-start text-base"
                   >
-                    <Link href={href}>{label}</Link>
+                    <Link href={href.startsWith("#") ? `/${href}` : href}>{label}</Link>
                   </Button>
                 ))}
               </div>
             </div>
 
-            <SheetFooter className="flex-col sm:flex-col justify-start items-stretch">
+            <SheetFooter className="flex-col justify-start items-stretch sm:flex-col">
               <Separator className="mb-2" />
               <div className="flex flex-wrap items-center gap-2">
                 {children}
@@ -137,74 +220,15 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
         </Sheet>
       </div>
 
-      <div className="hidden min-h-9 min-w-0 flex-1 items-center justify-center lg:flex">
-        <NavigationMenu className="relative z-10 flex max-w-max flex-1 items-center justify-center">
-          <NavigationMenuList className="flex items-center gap-1">
-            <NavigationMenuItem>
-              <NavigationMenuTrigger className="h-9 bg-card px-3 text-base">
-                产品
-              </NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <div className="flex w-[680px] gap-6 p-4">
-                <Image
-                  src="/logo.jpg"
-                  alt="智选AI"
-                  className="h-44 w-44 shrink-0 rounded-md object-contain bg-transparent dark:mix-blend-screen"
-                  width={400}
-                  height={400}
-                />
-                <div className="grid min-w-0 flex-1 grid-cols-2 gap-3">
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/products/ai-apps"
-                      className="rounded-md border border-transparent p-4 hover:border-secondary hover:bg-muted flex flex-col justify-center min-h-[120px]"
-                    >
-                      <p className="mb-1 font-semibold leading-none text-foreground">AI 应用</p>
-                      <p className="line-clamp-3 text-sm text-muted-foreground">
-                        工具型产品与在线应用
-                      </p>
-                    </Link>
-                  </NavigationMenuLink>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/products/ai-courses"
-                      className="rounded-md border border-transparent p-4 hover:border-secondary hover:bg-muted flex flex-col justify-center min-h-[120px]"
-                    >
-                      <p className="mb-1 font-semibold leading-none text-foreground">
-                        AI 课程（导购）
-                      </p>
-                      <p className="line-clamp-3 text-sm text-muted-foreground">
-                        商品化的课程产品介绍
-                      </p>
-                    </Link>
-                  </NavigationMenuLink>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/courses"
-                      className="col-span-2 rounded-md border border-transparent p-4 hover:border-secondary hover:bg-muted flex flex-col justify-center min-h-[96px]"
-                    >
-                      <p className="mb-1 font-semibold leading-none text-foreground">AI 学堂</p>
-                      <p className="line-clamp-2 text-sm text-muted-foreground">
-                        课程站占位路由 · 后续接入学习与订阅权益
-                      </p>
-                    </Link>
-                  </NavigationMenuLink>
-                </div>
-              </div>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
-
-          <NavigationMenuItem>
-            {routeList.map(({ href, label }) => (
-              <NavigationMenuLink key={href} asChild>
-                <Link href={href} className="inline-flex h-9 items-center px-2 text-base">
-                  {label}
-                </Link>
-              </NavigationMenuLink>
-            ))}
-          </NavigationMenuItem>
-        </NavigationMenuList>
-        </NavigationMenu>
+      <div className="hidden min-h-9 min-w-0 flex-1 items-center justify-center overflow-visible lg:flex">
+        <NotchNav
+          key={pathname}
+          items={notchItems}
+          value={notchAnchorValue}
+          onValueChange={navigateNotch}
+          ariaLabel="主导航"
+          className="shrink-0"
+        />
       </div>
 
       <div className="hidden h-9 shrink-0 items-center gap-2 lg:flex">
