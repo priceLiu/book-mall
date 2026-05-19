@@ -138,7 +138,7 @@ export default async function AccountPage({
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
             账户、钱包、订阅与计费明细的统一入口。
-            <Link href="/#billing-policy" className="ml-1 text-primary hover:underline">
+            <Link href="/pricing-disclosure#billing-policy" className="ml-1 text-primary hover:underline">
               查看计费与提现公示 →
             </Link>
           </p>
@@ -284,7 +284,7 @@ export default async function AccountPage({
             <CardDescription className="text-xs leading-relaxed">
               订阅费不可用余额抵扣；高阶 / 按量依赖余额且须不低于最低可用线；余额提现须先结清应扣未扣。
               完整说明见{" "}
-              <Link href="/#billing-policy" className="text-primary underline">
+              <Link href="/pricing-disclosure#billing-policy" className="text-primary underline">
                 本站公示
               </Link>
               。

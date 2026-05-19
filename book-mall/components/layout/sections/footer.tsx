@@ -66,7 +66,7 @@ export const FooterSection = () => {
             </div>
 
             <div>
-              <Link href="/#billing-policy" className="opacity-60 hover:opacity-100">
+              <Link href="/pricing-disclosure#billing-policy" className="opacity-60 hover:opacity-100">
                 计费与提现
               </Link>
             </div>
