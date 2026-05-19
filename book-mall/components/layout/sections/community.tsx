@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export const CommunitySection = () => {
   return (
@@ -17,8 +18,15 @@ export const CommunitySection = () => {
             <CardHeader>
               <CardTitle className="text-3xl md:text-5xl font-bold leading-snug">
                 准备好，写上你的需求，
-                <span className="text-transparent pl-2 bg-gradient-to-r from-[#D247BF] to-primary bg-clip-text">
-                加入
+                <span
+                  className={cn(
+                    "inline-block pl-2",
+                    "bg-gradient-to-r from-[#D247BF] to-primary bg-clip-text text-transparent",
+                    // iOS / WebKit：与首页 Hero 一致，避免渐变色块不按字形裁剪
+                    "[-webkit-background-clip:text] [-webkit-text-fill-color:transparent]",
+                  )}
+                >
+                  加入
                 </span>
                 。
               </CardTitle>
