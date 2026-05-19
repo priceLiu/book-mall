@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, UserCircle2, Wrench } from "lucide-react";
+import { LayoutDashboard, ListChecks, Tags, UserCircle2, Wrench } from "lucide-react";
 
 const nav = [
   { href: "/admin", label: "概览", icon: LayoutDashboard, exact: true },
   { href: "/admin/billing/users", label: "用户明细", icon: UserCircle2, prefix: "/admin/billing/users" },
+  { href: "/admin/billing/all", label: "费用明细（全部）", icon: ListChecks, prefix: "/admin/billing/all" },
+  { href: "/admin/pricing-disclosure", label: "价格公示", icon: Tags, prefix: "/admin/pricing-disclosure" },
   { href: "/admin/models/coefficients", label: "模型系数", icon: Wrench, prefix: "/admin/models" },
 ] as const;
 

@@ -78,6 +78,8 @@ export function TextToImageGenerateModal({
 
   const abortPollRef = useRef(false);
   const settleTaskIdRef = useRef<string | null>(null);
+  /** v003：start 返回的 WalletHold.id；attemptSettle 时连同 taskId 一起传给 /api/text-to-image/settle。 */
+  const settleHoldIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -152,6 +154,7 @@ export function TextToImageGenerateModal({
       setSettlingBilling(false);
       setSettleNeedsRetry(false);
       settleTaskIdRef.current = null;
+      settleHoldIdRef.current = null;
       setPreviewUrl(null);
       setSaveToast(null);
     }
@@ -196,11 +199,12 @@ export function TextToImageGenerateModal({
 
   const attemptSettle = useCallback(async (taskId: string) => {
     const runOnce = async () => {
+      const holdId = settleHoldIdRef.current?.trim() || undefined;
       const settleR = await fetch("/api/text-to-image/settle", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
+        body: JSON.stringify({ taskId, ...(holdId ? { holdId } : {}) }),
       });
       const settleJson = (await settleR.json().catch(() => ({}))) as Record<
         string,
@@ -327,6 +331,7 @@ export function TextToImageGenerateModal({
       });
       const startJson = (await startR.json()) as {
         taskId?: string;
+        holdId?: string | null;
         error?: string;
       };
       if (!startR.ok) {
@@ -336,6 +341,10 @@ export function TextToImageGenerateModal({
       if (!taskId) throw new Error("接口未返回任务编号");
 
       settleTaskIdRef.current = taskId;
+      settleHoldIdRef.current =
+        typeof startJson.holdId === "string" && startJson.holdId.trim().length > 0
+          ? startJson.holdId.trim()
+          : null;
 
       const output = await pollUntilDone(taskId);
       if (!output || abortPollRef.current) return;

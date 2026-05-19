@@ -1,30 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { ChevronRight, FileUp, Upload } from "lucide-react";
+import { ChevronRight, ExternalLink, FileUp, Upload } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { toolKeyToLabel } from "@/lib/tool-key-label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  buildSourceLineLookup,
-  classifyBillableRow,
-  formulaTextFor,
-  unitLabelFor,
-  type SourceLineRef,
-} from "@/lib/finance/billable-row-classifier";
-import {
-  CloudPricingMasterClient,
-  vendorOfModelKey,
-  type MasterRow,
-} from "./cloud-pricing-master-client";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "云厂商价目表 — 管理后台",
+  title: "云厂商价目表（导入版本） — 管理后台",
 };
 
 const PAGE_SIZE = 30;
@@ -38,6 +25,13 @@ function qp(sp: Props["searchParams"], key: string): string {
   return typeof v === "string" ? v : Array.isArray(v) ? (v[0] ?? "") : "";
 }
 
+/**
+ * 云厂商价目表 · 管理后台。
+ *
+ * 整合（2026-05-18）：原"在库价目"（master view）已删除——其内容与 `/account/pricing`、
+ * `/pricing-disclosure` 完全一致，并入同一个页面以避免三处不一致。本页只保留「导入版本」管理（
+ * PricingSourceVersion）以及顶部的跳转入口。
+ */
 export default async function CloudPricingIndexPage({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || session.user.role !== "ADMIN") {
@@ -48,34 +42,7 @@ export default async function CloudPricingIndexPage({ searchParams }: Props) {
   const page = Math.max(1, parseInt(qp(searchParams, "page") || "1", 10) || 1);
 
   const versionWhere = kindFilter ? { kind: kindFilter } : {};
-  /** 同时拉当前生效价目版本的 PricingSourceLine，给 classifier 做 modelKey 反查兜底。 */
-  const currentVersion = await prisma.pricingSourceVersion.findFirst({
-    where: { isCurrent: true },
-    select: { id: true },
-  });
-  const [billables, sourceLines, total, versions, kinds] = await Promise.all([
-    prisma.toolBillablePrice.findMany({
-      where: { active: true },
-      orderBy: [{ toolKey: "asc" }, { schemeARefModelKey: "asc" }, { action: "asc" }],
-      select: {
-        id: true,
-        toolKey: true,
-        action: true,
-        schemeARefModelKey: true,
-        cloudModelKey: true,
-        cloudTierRaw: true,
-        cloudBillingKind: true,
-        schemeAUnitCostYuan: true,
-        schemeAAdminRetailMultiplier: true,
-        pricePoints: true,
-      },
-    }),
-    currentVersion
-      ? prisma.pricingSourceLine.findMany({
-          where: { versionId: currentVersion.id },
-          select: { modelKey: true, tierRaw: true, billingKind: true },
-        })
-      : Promise.resolve([] as SourceLineRef[]),
+  const [total, versions, kinds] = await Promise.all([
     prisma.pricingSourceVersion.count({ where: versionWhere }),
     prisma.pricingSourceVersion.findMany({
       where: versionWhere,
@@ -100,38 +67,18 @@ export default async function CloudPricingIndexPage({ searchParams }: Props) {
     }),
   ]);
   const totalPages = total === 0 ? 0 : Math.ceil(total / PAGE_SIZE);
-  const lookup = buildSourceLineLookup(sourceLines as SourceLineRef[]);
-
-  const masterRows: MasterRow[] = billables.map((r) => {
-    const modelKey = r.schemeARefModelKey ?? r.cloudModelKey ?? null;
-    const cls = classifyBillableRow(r, lookup);
-    return {
-      id: r.id,
-      toolKey: r.toolKey,
-      toolLabel: toolKeyToLabel(r.toolKey),
-      action: r.action,
-      modelKey,
-      cloudVendor: vendorOfModelKey(modelKey),
-      costYuan: r.schemeAUnitCostYuan,
-      multiplier: r.schemeAAdminRetailMultiplier,
-      pricePoints: r.pricePoints,
-      billingKind: cls.billingKind,
-      unitLabel: unitLabelFor(cls.billingKind, cls.tierRaw),
-      formulaText: formulaTextFor(cls.billingKind),
-    };
-  });
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
-            云厂商价目表
+            云厂商价目表（导入版本）
           </h1>
           <p className="max-w-3xl text-sm text-muted-foreground leading-relaxed">
-            上半部「在库价目」是当前对外定价（来自 <code className="text-foreground">ToolBillablePrice</code>，是真正用于扣费的数据）；
-            下半部「导入版本」展示由 <code className="text-foreground">price.md</code> / CSV 导入产生的{" "}
-            <code className="text-foreground">PricingSourceVersion</code>（含历史快照）。
+            「在库价目」（当前对外定价）已与个人中心 / 公示页统一，参见下方跳转入口；本页只保留由{" "}
+            <code className="text-foreground">price.md</code> / CSV 导入产生的{" "}
+            <code className="text-foreground">PricingSourceVersion</code>（含历史快照），用于审计与回溯。
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -144,21 +91,49 @@ export default async function CloudPricingIndexPage({ searchParams }: Props) {
         </div>
       </header>
 
-      {/* 1. 在库价目 (master view) */}
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-baseline gap-2">
-          <h2 className="text-base font-semibold tracking-tight text-foreground">在库价目</h2>
-          <Badge variant="secondary" className="text-[10px]">
-            {masterRows.length} 行
-          </Badge>
-          <span className="text-xs text-muted-foreground">
-            云厂商 · 工具 · 模型 · 成本价 · 系数 · 对外单价 · 计价标准 · 计价单位 · 公式
-          </span>
-        </div>
-        <CloudPricingMasterClient rows={masterRows} />
+      {/* 1. 统一跳转入口（替代原"在库价目"section） */}
+      <section className="grid gap-3 md:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              平台价目表（前台公示）
+              <Badge variant="outline" className="text-[10px] font-mono">/pricing-disclosure</Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              对外公开的价目表，含云挂牌价 / 系数 M / 平台单价 / 公式 / 厂商商品；与个人中心同源（管理员在个人中心亦可看全列；普通用户仅见平台单价与点数等）。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild size="sm" variant="default">
+              <Link href="/pricing-disclosure" target="_blank" rel="noopener noreferrer">
+                打开公示页
+                <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              平台价目表（个人中心）
+              <Badge variant="outline" className="text-[10px] font-mono">/account/pricing</Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              已登录用户视图：列与公示页一致（管理员看全列；普通用户仅展示平台零售价相关列，不含云成本与系数）。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/account/pricing">
+                打开个人中心价目表
+                <ChevronRight className="ml-0.5 h-3.5 w-3.5" aria-hidden />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </section>
 
-      {/* 2. 导入版本（次级） */}
+      {/* 2. 导入版本（保留） */}
       <section className="space-y-3 pt-2">
         <div className="flex flex-wrap items-baseline gap-2">
           <h2 className="text-base font-semibold tracking-tight text-foreground">导入版本</h2>

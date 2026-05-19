@@ -38,6 +38,10 @@ export async function POST(req: Request) {
   if (!taskId) {
     return NextResponse.json({ error: "缺少 taskId" }, { status: 400 });
   }
+  const holdId =
+    typeof body.holdId === "string" && body.holdId.trim().length > 0
+      ? body.holdId.trim()
+      : undefined;
 
   const polled = await wanxGetTextImageTask({ apiKey, taskId });
   if (!polled.ok) {
@@ -83,6 +87,7 @@ export async function POST(req: Request) {
         imageCount,
         retailMultiplier: retailMult,
       },
+      ...(holdId ? { holdId } : {}),
     });
   } catch (e) {
     console.error("[text-to-image/settle] usage POST failed after retries", e);

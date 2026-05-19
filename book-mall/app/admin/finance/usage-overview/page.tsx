@@ -34,19 +34,6 @@ function ymKey(d: Date | string): string {
   return `${y}${String(m).padStart(2, "0")}`;
 }
 
-function asNumber(v: unknown): number {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string") {
-    const n = parseFloat(v);
-    return Number.isFinite(n) ? n : 0;
-  }
-  if (v && typeof v === "object" && "toString" in (v as object)) {
-    const n = parseFloat(String(v));
-    return Number.isFinite(n) ? n : 0;
-  }
-  return 0;
-}
-
 export default async function AdminFinanceUsageOverviewPage({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || session.user.role !== "ADMIN") {
@@ -70,7 +57,7 @@ export default async function AdminFinanceUsageOverviewPage({ searchParams }: Pr
     ...(onlyTool
       ? {
           cloudRow: {
-            path: ["产品信息/计费项Code"],
+            path: ["平台/计费项Code"],
             string_contains: onlyTool,
           },
         }
@@ -83,15 +70,34 @@ export default async function AdminFinanceUsageOverviewPage({ searchParams }: Pr
       id: true,
       userId: true,
       createdAt: true,
-      internalChargedPoints: true,
-      internalYuanReference: true,
-      internalRetailMultiplier: true,
-      internalCloudCostUnitYuan: true,
       cloudRow: true,
       pricingTemplateKey: true,
     },
     take: 5000,
   });
+
+  // v005：所有"对内计价"信息从 cloudRow JSON 里读，schema 的 internal* 列已删除。
+  function platformPointsOf(l: { cloudRow: unknown }): number {
+    const cr = (l.cloudRow ?? {}) as Record<string, unknown>;
+    const v = cr["平台/扣点"];
+    const n = typeof v === "string" ? parseInt(v, 10) : typeof v === "number" ? v : NaN;
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+  function platformMultOf(l: { cloudRow: unknown }): number | null {
+    const cr = (l.cloudRow ?? {}) as Record<string, unknown>;
+    const v = cr["平台/系数(M)"];
+    if (v == null || v === "") return null;
+    const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  function cloudUnitCostYuanOf(l: { cloudRow: unknown }): number | null {
+    const cr = (l.cloudRow ?? {}) as Record<string, unknown>;
+    // v006 Round 4：新 key 名「厂商定价/官网目录价」；兼容旧 key 名兜底（reset 前的历史行可能仍是旧 key）
+    const v = cr["厂商定价/官网目录价"] ?? cr["定价信息/官网目录价"];
+    if (v == null || v === "") return null;
+    const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
 
   const users = await prisma.user.findMany({
     where: { id: { in: Array.from(new Set(lines.map((l) => l.userId))) } },
@@ -101,13 +107,26 @@ export default async function AdminFinanceUsageOverviewPage({ searchParams }: Pr
 
   function toolKeyOf(l: { cloudRow: unknown }): string {
     const cr = (l.cloudRow ?? {}) as Record<string, unknown>;
-    const v = cr["产品信息/计费项Code"] ?? cr["toolKey"] ?? cr["tool_key"];
+    // v006 Round 4：优先「平台/计费项Code」（toolKey:action 格式）；
+    // 兜底回旧 key 与 CSV 行原列「厂商产品/计费项Code」（新前缀） / 「产品信息/计费项Code」（旧前缀）。
+    const v =
+      cr["平台/计费项Code"] ??
+      cr["厂商产品/计费项Code"] ??
+      cr["产品信息/计费项Code"] ??
+      cr["toolKey"] ??
+      cr["tool_key"];
     return typeof v === "string" && v.length > 0 ? v : "(unknown)";
   }
   function modelKeyOf(l: { cloudRow: unknown }): string {
     const cr = (l.cloudRow ?? {}) as Record<string, unknown>;
+    // v006 Round 4：优先「平台/产品Code」（canonical key）；兜底 CSV 原列与历史字段。
     const v =
-      cr["产品信息/规格"] ?? cr["modelId"] ?? cr["apiModel"] ?? cr["videoModel"] ?? cr["tryOnModel"];
+      cr["平台/产品Code"] ??
+      cr["产品信息/规格"] ??
+      cr["modelId"] ??
+      cr["apiModel"] ??
+      cr["videoModel"] ??
+      cr["tryOnModel"];
     return typeof v === "string" && v.length > 0 ? v : "(unknown)";
   }
 
@@ -120,9 +139,7 @@ export default async function AdminFinanceUsageOverviewPage({ searchParams }: Pr
   let totalCount = 0;
 
   for (const l of lines) {
-    const yuan = l.internalYuanReference != null
-      ? asNumber(l.internalYuanReference)
-      : (l.internalChargedPoints ?? 0) / 100;
+    const yuan = platformPointsOf(l) / 100;
     totalYuan += yuan;
     totalCount += 1;
     const m = ymKey(l.createdAt);
@@ -152,10 +169,10 @@ export default async function AdminFinanceUsageOverviewPage({ searchParams }: Pr
   /** 生成导出用的扁平行（包含 user 名 + 邮箱），让客户端直接转 CSV。 */
   const exportRows: ExportLine[] = lines.map((l) => {
     const u = userMap.get(l.userId);
-    const yuan =
-      l.internalYuanReference != null
-        ? asNumber(l.internalYuanReference)
-        : (l.internalChargedPoints ?? 0) / 100;
+    const points = platformPointsOf(l);
+    const yuan = points / 100;
+    const mult = platformMultOf(l);
+    const cloudCost = cloudUnitCostYuanOf(l);
     return {
       createdAt: l.createdAt.toISOString().replace("T", " ").slice(0, 19),
       userId: l.userId,
@@ -164,13 +181,9 @@ export default async function AdminFinanceUsageOverviewPage({ searchParams }: Pr
       toolKey: toolKeyOf(l),
       modelKey: modelKeyOf(l),
       pricingTemplateKey: l.pricingTemplateKey ?? null,
-      internalCloudCostUnitYuan:
-        l.internalCloudCostUnitYuan != null
-          ? asNumber(l.internalCloudCostUnitYuan).toFixed(4)
-          : null,
-      internalRetailMultiplier:
-        l.internalRetailMultiplier != null ? String(l.internalRetailMultiplier) : null,
-      internalChargedPoints: l.internalChargedPoints ?? null,
+      cloudUnitCostYuan: cloudCost != null ? cloudCost.toFixed(4) : null,
+      retailMultiplier: mult != null ? String(mult) : null,
+      chargedPoints: points > 0 ? points : null,
       yuan: Number(yuan.toFixed(2)),
     };
   });
@@ -192,7 +205,7 @@ export default async function AdminFinanceUsageOverviewPage({ searchParams }: Pr
           <p className="max-w-3xl text-sm text-muted-foreground leading-relaxed">
             来源：<code className="text-foreground">ToolBillingDetailLine</code>（仅 <code className="text-foreground">TOOL_USAGE_GENERATED</code>，
             即工具站实际调用产生的内部计价行）。所有金额均为
-            <strong className="font-medium text-foreground">我方零售价</strong>（cost × 系数）。
+            <strong className="font-medium text-foreground">平台零售价</strong>（cost × 系数）。
           </p>
         </div>
         <UsageOverviewExportButton rows={exportRows} rangeLabel={exportRangeLabel} />
@@ -282,9 +295,10 @@ export default async function AdminFinanceUsageOverviewPage({ searchParams }: Pr
                 .slice(0, 50)
                 .map((l) => {
                   const u = userMap.get(l.userId);
-                  const yuan = l.internalYuanReference != null
-                    ? asNumber(l.internalYuanReference)
-                    : (l.internalChargedPoints ?? 0) / 100;
+                  const points = platformPointsOf(l);
+                  const yuan = points / 100;
+                  const mult = platformMultOf(l);
+                  const cloudCost = cloudUnitCostYuanOf(l);
                   return (
                     <tr key={l.id} className="bg-white hover:bg-[#fafafa]">
                       <td className="border-b px-2 py-1.5 text-muted-foreground">
@@ -307,17 +321,13 @@ export default async function AdminFinanceUsageOverviewPage({ searchParams }: Pr
                         </code>
                       </td>
                       <td className="border-b px-2 py-1.5 text-right">
-                        {l.internalCloudCostUnitYuan != null
-                          ? asNumber(l.internalCloudCostUnitYuan).toFixed(4)
-                          : "—"}
+                        {cloudCost != null ? cloudCost.toFixed(4) : "—"}
                       </td>
                       <td className="border-b px-2 py-1.5 text-right">
-                        {l.internalRetailMultiplier != null
-                          ? String(l.internalRetailMultiplier)
-                          : "—"}
+                        {mult != null ? String(mult) : "—"}
                       </td>
                       <td className="border-b px-2 py-1.5 text-right">
-                        {l.internalChargedPoints ?? "—"}
+                        {points > 0 ? points : "—"}
                       </td>
                       <td className="border-b px-2 py-1.5 text-right">¥{yuan.toFixed(2)}</td>
                     </tr>

@@ -19,6 +19,13 @@ export type BillDetailsClientProps = {
    * 视角：默认 `user`（不展示「云成本单价」「零售系数」两列）；管理端调用方传 `admin` 才展示完整列。
    */
   viewerRole?: BillViewerRole;
+  /**
+   * `all-users` 模式（管理端"全部用户费用明细汇总"）：
+   *   - 调用 `/api/admin/finance/billing-detail-lines-all`（一次拉所有用户）
+   *   - 隐藏顶部「本页位置与数据口径」「当前账单归属」「数据来源」三块（按图示要求）
+   *   - 不依赖 walletBalance（因没有"单一目标用户"概念），头部"钱包余额/余额减扣点"列折叠掉
+   */
+  mode?: "single-user" | "all-users";
 };
 
 type RemotePayload = {
@@ -26,14 +33,44 @@ type RemotePayload = {
   user: { id: string; name: string | null; email: string | null };
   balancePoints: number;
   rows: Record<string, string>[];
+  /** 主站 API 返回：是否凭 NextAuth 会话拉取（本地 devUserId / 代理则非 session） */
+  viewer?: { authMode: "session" | "dev_user_id" };
+};
+
+type AllUsersPayload = {
+  source: string;
+  rows: Record<string, string>[];
+  total: number;
+  returned: number;
+  take: number;
+  truncated: boolean;
 };
 
 const PAGE_SIZES = [10, 20, 50];
 
-const K_BILL_MONTH = "账单信息/账单月份";
-const K_FEE_TYPE = "账单信息/费用类型";
-const K_PRODUCT = "产品信息/产品名称";
-const K_COMMODITY = "产品信息/商品名称";
+// v004：以「平台/*」作为主筛选维度——「平台/产品名称」是 catalog 命中后的 canonical 显示名，
+// 在 TOOL_USAGE_GENERATED 与 CLOUD_CSV_IMPORT 两类行之间天然一致。
+const K_BILL_MONTH = "平台账单/账单月份";
+const K_FEE_TYPE = "平台账单/费用类型";
+const K_PRODUCT = "平台/产品名称";
+const K_COMMODITY = "厂商产品/商品名称";
+const K_PLATFORM_POINTS = "平台/扣点";
+/**
+ * v007 Round 5：
+ *   - 「厂商费用/目录总价」已删除（admin 心算可得，纯冗余）；
+ *   - 「厂商应付/应付金额（含税）」→ 「平台/应付金额」（用户对平台应付，不是云口径）。
+ */
+const K_PAYABLE_YUAN = "平台/应付金额";
+const K_USAGE_STEP_BAND = "厂商定价/目录价用量阶梯";
+
+/** v004：阶梯字段「[0,9999999999999]」是"无阶梯占位"，前端折叠为友好文案；其它值原样显示。 */
+function formatUsageStepBand(raw: string): string {
+  if (!raw) return "";
+  const t = raw.trim();
+  if (t === "[0,9999999999999]") return "无阶梯";
+  if (/^\[0,9{10,}\]$/.test(t)) return "无阶梯";
+  return raw;
+}
 
 function matchesMulti(
   cell: string,
@@ -48,24 +85,51 @@ function matchesMulti(
 export function BillDetailsClient({
   adminTargetUserId,
   viewerRole,
+  mode = "single-user",
 }: BillDetailsClientProps) {
+  const isAllUsers = mode === "all-users";
   const effectiveRole: BillViewerRole =
-    viewerRole ?? (adminTargetUserId ? "admin" : "user");
+    viewerRole ?? (adminTargetUserId || isAllUsers ? "admin" : "user");
+  const [allTotal, setAllTotal] = useState<number | null>(null);
+  const [allTruncated, setAllTruncated] = useState(false);
   const columnGroups = useMemo(
     () => filterColumnGroupsByRole(BILL_COLUMN_GROUPS, effectiveRole),
     [effectiveRole],
   );
+  /**
+   * v007 Round 5 hotfix-3：筛选器也得跟随 admin-only 集合显示/隐藏。
+   * 用户视角下「厂商产品/商品名称」整组隐藏 → 该筛选器不应渲染（否则用户能筛选自己看不见的列）。
+   */
+  const visibleKeys = useMemo(
+    () => new Set(columnGroups.flatMap((g) => g.keys)),
+    [columnGroups],
+  );
+  const canFilterCommodity = visibleKeys.has(K_COMMODITY);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [loadState, setLoadState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [hint, setHint] = useState<string | null>(null);
   const [remoteUser, setRemoteUser] = useState<RemotePayload["user"] | null>(null);
   const [walletBalancePoints, setWalletBalancePoints] = useState<number | null>(null);
+  const [viewerAuthMode, setViewerAuthMode] = useState<
+    "session" | "dev_user_id" | undefined
+  >(undefined);
 
   useEffect(() => {
-    const useDevProxy = getFinanceUseDevProxy();
+    /**
+     * v009：默认浏览器直连 book-mall 接口，使用主站真实 NextAuth 登录态。
+     *   - localhost 跨端口（3002↔3000）属同站点，SameSite=Lax 的 session Cookie 会被发送；
+     *   - 仅当用户在 URL 上显式 `?asDev=1` 时，才允许带 `?devUserId=` 模拟（仅本地）；
+     *   - 仅当用户在 URL 上显式 `?useProxy=1` 时，才走 finance-web 服务端代理（即"以 FINANCE_DEV_USER_ID 模拟"）。
+     *
+     * 这两个开关都有强烈的红色顶部提示，避免再次出现「登录 A 看到 B 的明细」。
+     */
+    const search = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const explicitProxy = search?.get("useProxy") === "1";
+    const explicitAsDev = search?.get("asDev") === "1";
+    const useDevProxy = explicitProxy && getFinanceUseDevProxy();
     const base = getBookMallBaseUrl();
 
-    if (adminTargetUserId) {
+    if (adminTargetUserId || isAllUsers) {
       if (!base) {
         setLoadState("idle");
         setHint("未配置 NEXT_PUBLIC_BOOK_MALL_URL，无法请求 book-mall 拉取明细。");
@@ -79,9 +143,11 @@ export function BillDetailsClient({
       return;
     }
 
-    const devId = getFinanceDevUserId();
+    const devId = explicitAsDev ? getFinanceDevUserId() : undefined;
     let url: string;
-    if (adminTargetUserId) {
+    if (isAllUsers) {
+      url = `${base}/api/admin/finance/billing-detail-lines-all?take=2000`;
+    } else if (adminTargetUserId) {
       url = `${base}/api/admin/finance/billing-detail-lines?userId=${encodeURIComponent(adminTargetUserId)}`;
     } else if (useDevProxy) {
       url = "/api/dev/book-mall-account-billing";
@@ -93,23 +159,36 @@ export function BillDetailsClient({
     let cancelled = false;
     setLoadState("loading");
     const fetchInit: RequestInit =
-      useDevProxy && !adminTargetUserId
-        ? { credentials: "same-origin" }
-        : { credentials: "include", mode: "cors" };
+      useDevProxy && !adminTargetUserId && !isAllUsers
+        ? { credentials: "same-origin", cache: "no-store" }
+        : { credentials: "include", mode: "cors", cache: "no-store" };
 
     fetch(url, fetchInit)
       .then(async (res) => {
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string; hint?: string };
-          throw new Error(j.hint || j.error || res.statusText);
+          throw new Error(j.hint || j.error || `${res.status} ${res.statusText}`);
         }
-        return res.json() as Promise<RemotePayload>;
+        return res.json() as Promise<RemotePayload | AllUsersPayload>;
       })
       .then((data) => {
         if (cancelled) return;
         setRows(data.rows);
-        setRemoteUser(data.user);
-        setWalletBalancePoints(data.balancePoints);
+        if (isAllUsers) {
+          const ad = data as AllUsersPayload;
+          setAllTotal(ad.total);
+          setAllTruncated(ad.truncated);
+          setRemoteUser(null);
+          setWalletBalancePoints(null);
+          setViewerAuthMode(undefined);
+        } else {
+          const ud = data as RemotePayload;
+          setRemoteUser(ud.user);
+          setWalletBalancePoints(ud.balancePoints);
+          setViewerAuthMode(
+            ud.viewer?.authMode ?? ((useDevProxy || devId) && !adminTargetUserId ? "dev_user_id" : "session"),
+          );
+        }
         setLoadState("ok");
         setHint(null);
       })
@@ -119,20 +198,20 @@ export function BillDetailsClient({
         setLoadState("error");
         setRemoteUser(null);
         setWalletBalancePoints(null);
+        setViewerAuthMode(undefined);
+        setAllTotal(null);
+        setAllTruncated(false);
         const msg = e instanceof Error ? e.message : String(e);
-        const devProxyHint =
-          useDevProxy && !adminTargetUserId
-            ? "（开发代理）请确认 finance-web .env.local 已设 FINANCE_DEV_USER_ID 与 BOOK_MALL_URL，主站 FINANCE_ALLOW_DEV_USER_QUERY=1，且 book-mall 已启动。"
-            : adminTargetUserId
-              ? "管理员已在 book-mall 登录"
-              : "用户已在 book-mall 登录，或本地开发已配置 NEXT_PUBLIC_FINANCE_DEV_USER_ID 且主站 FINANCE_ALLOW_DEV_USER_QUERY=1";
-        setHint(`未能从 book-mall 拉取明细（${msg}）。请确认：① book-mall 已启动且可达；② ${devProxyHint}。`);
+        const tip = adminTargetUserId || isAllUsers
+          ? "请确认：① book-mall 已启动且可达；② 当前浏览器以 ADMIN 角色登录到 book-mall（同浏览器打开 http://localhost:3000 → /login）。"
+          : "请确认：① book-mall 已启动且可达；② 当前浏览器以你的真实账号登录到 book-mall（同浏览器打开 http://localhost:3000 → /login，再回到本页刷新）。";
+        setHint(`未能从 book-mall 拉取明细（${msg}）。${tip}`);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [adminTargetUserId]);
+  }, [adminTargetUserId, isAllUsers]);
 
   const [billMonth, setBillMonth] = useState("");
   const [feeType, setFeeType] = useState("");
@@ -181,10 +260,10 @@ export function BillDetailsClient({
     return rows.filter((r) => {
       if (billMonth && r[K_BILL_MONTH] !== billMonth) return false;
       if (!matchesMulti(r[K_PRODUCT] ?? "", productSelected, productMode)) return false;
-      if (!matchesMulti(r[K_COMMODITY] ?? "", commoditySelected, commodityMode)) return false;
+      if (canFilterCommodity && !matchesMulti(r[K_COMMODITY] ?? "", commoditySelected, commodityMode)) return false;
       if (feeType && r[K_FEE_TYPE] !== feeType) return false;
       if (!includeZero) {
-        const payable = parseFloat(r["应付信息/应付金额（含税）"] || "0");
+        const payable = parseFloat(r[K_PAYABLE_YUAN] || "0");
         if (!payable) return false;
       }
       return true;
@@ -200,35 +279,152 @@ export function BillDetailsClient({
     commodityMode,
   ]);
 
-  const totalPoints = useMemo(
-    () => filtered.reduce((s, r) => s + (parseInt(r["对内计价/本行扣点"], 10) || 0), 0),
+  /** v004：用「平台/扣点」做"平台扣点合计"——TOOL_USAGE_GENERATED 行真值，CLOUD_CSV_IMPORT 行为空（不计入）。 */
+  const totalPlatformPoints = useMemo(
+    () => filtered.reduce((s, r) => s + (parseInt(r[K_PLATFORM_POINTS], 10) || 0), 0),
+    [filtered],
+  );
+  /** v007 Round 5：「平台/应付金额」合计——用户对平台应付（= 平台扣点折元）。 */
+  const totalPayableYuan = useMemo(
+    () => filtered.reduce((s, r) => s + (parseFloat(r[K_PAYABLE_YUAN]) || 0), 0),
     [filtered],
   );
 
   const balanceAfter =
-    walletBalancePoints != null ? walletBalancePoints - totalPoints : null;
+    walletBalancePoints != null ? walletBalancePoints - totalPlatformPoints : null;
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageSafe = Math.min(page, pageCount);
   const paged = filtered.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
 
+  const billingPagePath = "/fees/billing/details";
+  const isDevImpersonation = !adminTargetUserId && viewerAuthMode === "dev_user_id";
+
   return (
     <div className="flex flex-1 flex-col overflow-y-auto bg-[#f5f5f5]">
-      <div className="mx-4 mt-4 space-y-2">
-        <div className="rounded border border-[#bae0ff] bg-[#e6f7ff] px-4 py-2 text-sm text-[#262626]">
-          数据来源：
-          {loadState === "loading" && "正在请求 book-mall …"}
-          {loadState === "ok" && "book-mall 数据库（ToolBillingDetailLine），对内计价在接口侧按当前规则计算。"}
-          {loadState === "error" && "上次请求失败，表中为当前页内数据（可能为空）。"}
-          {loadState === "idle" && !hint && rows.length === 0 && "等待加载或缺少配置。"}
-          {hint && <span className="mt-1 block text-[#d4380d]">{hint}</span>}
-          详细规则见{" "}
-          <code className="rounded bg-white px-1">tool-web/doc/reconciliation-baseline-2026-05-16.md</code>。
-        </div>
-        {remoteUser ? (
-          <div className="rounded border border-[#d9d9d9] bg-white px-4 py-2 text-sm text-[#595959]">
-            平台用户：<span className="text-[#262626]">{remoteUser.name || remoteUser.email || remoteUser.id}</span>（
-            <code className="text-xs">{remoteUser.id}</code>）
+      <div className="mx-4 mt-4 space-y-3">
+        {/* 「本页位置与数据口径」「当前账单归属」「数据来源」三块在 all-users 模式下整体隐藏（按图示要求） */}
+        {!isAllUsers ? (
+          <div className="rounded border border-[#d9d9d9] bg-white px-4 py-3 text-sm shadow-sm">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-[#f0f0f0] pb-2">
+              <span className="font-medium text-[#262626]">本页位置与数据口径</span>
+              <code className="rounded bg-[#fafafa] px-2 py-0.5 text-xs text-[#595959]">
+                finance-web · {billingPagePath}
+              </code>
+            </div>
+            <p className="text-xs leading-relaxed text-[#8c8c8c]">
+              浏览器地址栏为财务控制台（finance-web）。下方表格来自主站{" "}
+              <strong className="text-[#595959]">book-mall</strong> 接口{" "}
+              <code className="rounded bg-[#fafafa] px-1">GET /api/account/billing-detail-lines</code>
+              ，与您在 localhost 不同端口「浏览器里先打开了谁」无必然关系——以本节「登录邮箱」与接口返回为准。请与主站个人中心的登录账号交叉核对。
+            </p>
+          </div>
+        ) : null}
+
+        {!isAllUsers && isDevImpersonation ? (
+          <div className="rounded border-2 border-[#ff4d4f] bg-[#fff1f0] px-4 py-3 text-sm shadow-sm">
+            <p className="text-base font-bold text-[#a8071a]">⚠️ 当前并非以你浏览器登录的真实账号在拉账单</p>
+            <p className="mt-1 leading-relaxed text-[#820014]">
+              主站接口报告 <code className="rounded bg-white px-1">authMode = dev_user_id</code>——这意味着请求里没有有效的{" "}
+              <strong>NextAuth 会话 Cookie</strong>，主站改用了开发回退（URL 上的 <code className="rounded bg-white px-1">?devUserId=</code>{" "}
+              或开发代理里的固定用户）。下方表格里的明细是<strong>那个固定用户</strong>的，不是你登录的账号的。
+            </p>
+            <p className="mt-2 leading-relaxed text-[#820014]">
+              立即恢复正确账号的步骤：
+            </p>
+            <ol className="mt-1 list-inside list-decimal space-y-1 text-[#820014]">
+              <li>
+                同浏览器打开 <a className="underline" href="http://localhost:3000/login" target="_blank" rel="noreferrer">http://localhost:3000/login</a>{" "}
+                以你的真实账号登录；
+              </li>
+              <li>
+                关闭 finance-web 项目根的 <code className="rounded bg-white px-1">.env.development</code> /{" "}
+                <code className="rounded bg-white px-1">.env.local</code> 里的{" "}
+                <code className="rounded bg-white px-1">NEXT_PUBLIC_FINANCE_USE_DEV_PROXY</code>（不要默认开），并清掉{" "}
+                <code className="rounded bg-white px-1">NEXT_PUBLIC_FINANCE_DEV_USER_ID</code>；
+              </li>
+              <li>重启 finance-web，刷新本页（带 <code className="rounded bg-white px-1">Cmd/Ctrl + Shift + R</code> 硬刷新）。</li>
+            </ol>
+          </div>
+        ) : null}
+
+        {!isAllUsers && remoteUser ? (
+          <div
+            className={cn(
+              "rounded border px-4 py-3 text-sm shadow-sm",
+              isDevImpersonation
+                ? "border-[#ff4d4f] bg-white"
+                : "border-[#1890ff] bg-[#f0f7ff]",
+            )}
+          >
+            <div className={cn("mb-2 font-medium", isDevImpersonation ? "text-[#a8071a]" : "text-[#0958d9]")}>
+              {isDevImpersonation
+                ? "下表对应的「目标账号」（非你的真实登录态）"
+                : "当前账单归属（主站账号 · 与明细行锁定同一用户）"}
+            </div>
+            <dl className="grid gap-2 sm:grid-cols-1 md:grid-cols-3">
+              <div>
+                <dt className="text-xs text-[#8c8c8c]">登录邮箱</dt>
+                <dd className="mt-0.5 break-all font-medium text-[#262626]">
+                  {remoteUser.email?.trim() || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[#8c8c8c]">昵称</dt>
+                <dd className="mt-0.5 font-medium text-[#262626]">
+                  {remoteUser.name?.trim() || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[#8c8c8c]">用户 ID（book-mall User.id）</dt>
+                <dd className="mt-0.5 break-all font-mono text-xs text-[#262626]">{remoteUser.id}</dd>
+              </div>
+            </dl>
+            {effectiveRole === "admin" ? (
+              <p className="mt-2 text-xs text-[#8c8c8c]">管理端代查指定用户时，以上为目标用户身份。</p>
+            ) : (
+              <p className="mt-2 text-xs text-[#8c8c8c]">
+                认证方式：
+                {viewerAuthMode === "session" ? (
+                  <span className="text-[#262626]">主站 NextAuth 会话（Cookie 已随请求到达 book-mall）</span>
+                ) : viewerAuthMode === "dev_user_id" ? (
+                  <span className="font-medium text-[#a8071a]">开发回退（非会话）——上方红框已说明如何切回真实账号</span>
+                ) : (
+                  <span className="text-[#595959]">加载完成后显示</span>
+                )}
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {!isAllUsers ? (
+          <div className="rounded border border-[#bae0ff] bg-[#e6f7ff] px-4 py-2 text-sm text-[#262626]">
+            数据来源：
+            {loadState === "loading" && "正在请求 book-mall …"}
+            {loadState === "ok" && "book-mall 数据库（ToolBillingDetailLine），对内计价在接口侧按当前规则计算。"}
+            {loadState === "error" && "上次请求失败，表中为当前页内数据（可能为空）。"}
+            {loadState === "idle" && !hint && rows.length === 0 && "等待加载或缺少配置。"}
+            {hint && <span className="mt-1 block text-[#d4380d]">{hint}</span>}
+            详细规则见{" "}
+            <code className="rounded bg-white px-1">tool-web/doc/reconciliation-baseline-2026-05-16.md</code>。
+          </div>
+        ) : null}
+        {isAllUsers && (loadState === "loading" || loadState === "error" || hint) ? (
+          <div
+            className={cn(
+              "rounded border px-4 py-2 text-sm",
+              loadState === "error"
+                ? "border-[#ffccc7] bg-[#fff2f0] text-[#a8071a]"
+                : "border-[#d9d9d9] bg-white text-[#595959]",
+            )}
+          >
+            {loadState === "loading" && "正在请求 book-mall …"}
+            {hint && <span className="block">{hint}</span>}
+          </div>
+        ) : null}
+        {isAllUsers && allTruncated && allTotal != null ? (
+          <div className="rounded border border-[#ffe58f] bg-[#fffbe6] px-4 py-2 text-sm text-[#874d00]">
+            当前显示前 {rows.length} 条；数据库共 {allTotal} 条已截断。如需更多请细化日期范围或联系开发扩容。
           </div>
         ) : null}
       </div>
@@ -287,7 +483,13 @@ export function BillDetailsClient({
               </select>
             </label>
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div
+            className={
+              canFilterCommodity
+                ? "grid gap-4 lg:grid-cols-2"
+                : "grid gap-4"
+            }
+          >
             <BillMultiFilter
               label="产品名称"
               options={products}
@@ -303,21 +505,23 @@ export function BillDetailsClient({
               }}
               disabled={rows.length === 0}
             />
-            <BillMultiFilter
-              label="商品名称"
-              options={commodities}
-              mode={commodityMode}
-              onModeChange={(m) => {
-                setCommodityMode(m);
-                setPage(1);
-              }}
-              selected={commoditySelected}
-              onSelectedChange={(next) => {
-                setCommoditySelected(next);
-                setPage(1);
-              }}
-              disabled={rows.length === 0}
-            />
+            {canFilterCommodity && (
+              <BillMultiFilter
+                label="商品名称"
+                options={commodities}
+                mode={commodityMode}
+                onModeChange={(m) => {
+                  setCommodityMode(m);
+                  setPage(1);
+                }}
+                selected={commoditySelected}
+                onSelectedChange={(next) => {
+                  setCommoditySelected(next);
+                  setPage(1);
+                }}
+                disabled={rows.length === 0}
+              />
+            )}
           </div>
         </div>
 
@@ -326,29 +530,52 @@ export function BillDetailsClient({
             <span className="text-[#8c8c8c]">筛选条数：</span>
             <span className="font-medium text-[#262626]">{filtered.length}</span>
           </div>
+          {/* v007 Round 5：双栏合计——平台扣点 + 应付金额（用户对平台支付）。云目录总价合计已删除（admin 心算可得） */}
           <div>
-            <span className="text-[#8c8c8c]">筛选范围内扣点合计：</span>
-            <span className="font-medium text-[#262626]">{totalPoints}</span>
+            <span className="text-[#8c8c8c]">平台扣点合计：</span>
+            <span className="font-medium text-[#1d39c4]">{totalPlatformPoints}</span>
           </div>
           <div>
-            <span className="text-[#8c8c8c]">钱包余额（点）：</span>
-            <span className="font-medium text-[#262626]">
-              {walletBalancePoints != null ? walletBalancePoints : "—"}
-            </span>
+            <span className="text-[#8c8c8c]">应付金额合计：</span>
+            <span className="font-medium text-[#262626]">¥{totalPayableYuan.toFixed(2)}</span>
           </div>
-          {balanceAfter != null ? (
+          {!isAllUsers ? (
             <div>
-              <span className="text-[#8c8c8c]">余额 − 筛选扣点合计：</span>
-              <span className={cn("font-medium", balanceAfter < 0 ? "text-[#ff4d4f]" : "text-[#262626]")}>
-                {balanceAfter}
+              <span className="text-[#8c8c8c]">钱包余额（点）：</span>
+              <span className="font-medium text-[#262626]">
+                {walletBalancePoints != null ? walletBalancePoints : "—"}
               </span>
             </div>
-          ) : (
+          ) : null}
+          {!isAllUsers ? (
+            balanceAfter != null ? (
+              <div>
+                <span className="text-[#8c8c8c]">余额 − 平台扣点合计：</span>
+                <span
+                  className={cn(
+                    "font-medium",
+                    balanceAfter < 0 ? "text-[#ff4d4f]" : "text-[#262626]",
+                  )}
+                >
+                  {balanceAfter}
+                </span>
+              </div>
+            ) : (
+              <div>
+                <span className="text-[#8c8c8c]">余额 − 平台扣点：</span>
+                <span className="font-medium text-[#8c8c8c]">登录主站后可算</span>
+              </div>
+            )
+          ) : null}
+          {isAllUsers && allTotal != null ? (
             <div>
-              <span className="text-[#8c8c8c]">余额 − 筛选扣点：</span>
-              <span className="font-medium text-[#8c8c8c]">登录主站后可算</span>
+              <span className="text-[#8c8c8c]">DB 总条数：</span>
+              <span className="font-medium text-[#262626]">{allTotal}</span>
+              {allTruncated ? (
+                <span className="ml-1 text-xs text-[#fa8c16]">（已截断）</span>
+              ) : null}
             </div>
-          )}
+          ) : null}
         </div>
 
         <div className="overflow-x-auto border border-[#e8e8e8]">
@@ -380,15 +607,21 @@ export function BillDetailsClient({
             </thead>
             <tbody>
               {paged.map((row, ri) => (
-                <tr key={row["标识信息/账单明细ID"] || String(ri)} className="bg-white hover:bg-[#fafafa]">
+                // v006 Round 4：「平台/用户ID + 平台账单/消费时间 + 平台/计费项Code + 平台用量/用量」拼成稳定 key
+                <tr
+                  key={
+                    [row["平台/用户ID"], row["平台账单/消费时间"], row["平台/计费项Code"], row["平台用量/用量"]]
+                      .filter(Boolean)
+                      .join("|") || String(ri)
+                  }
+                  className="bg-white hover:bg-[#fafafa]"
+                >
                   {columnGroups.flatMap((g) =>
                     g.keys.map((k) => {
-                      const v = row[k] ?? "";
-                      const isVerbose =
-                        k.includes("详情") ||
-                        k.includes("过程") ||
-                        k.includes("公式") ||
-                        k.includes("转换信息");
+                      const rawV = row[k] ?? "";
+                      // v006 Round 4：「厂商定价/目录价用量阶梯」= [0,9999999999999] 折叠为"无阶梯"
+                      const v = k === K_USAGE_STEP_BAND ? formatUsageStepBand(rawV) : rawV;
+                      const isVerbose = k.includes("详情") || k.includes("公式");
                       const limit = isVerbose ? 200 : 80;
                       const long = v.length > limit;
                       return (

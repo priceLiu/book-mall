@@ -15,11 +15,10 @@ import { createHash } from "node:crypto";
 import { parse as parseCsv } from "csv-parse/sync";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import {
-  computeInternalPricingWithTemplate,
-  prismaDataFromInternalSnapshot,
-} from "@/lib/finance/cloud-bill-enrich";
+import { ModelAliasSource } from "@prisma/client";
+import { computeInternalPricingWithTemplate } from "@/lib/finance/cloud-bill-enrich";
 import { DEFAULT_PRICING_TEMPLATE_KEY } from "@/lib/finance/pricing-templates/keys";
+import { canonicalKeysByAliases } from "@/lib/model-catalog/resolve";
 
 type CsvRow = Record<string, string>;
 
@@ -68,6 +67,10 @@ function parseFloatLoose(s: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * v003：从 CSV 行抽出"原始模型字串"（用于回填到对账行）。校准映射在另外的 `applyCanonicalKeyOverlay`
+ * 步骤里做（避免在解析阶段就吃一次 DB 查询）。
+ */
 function modelKeyFromCloudRow(row: CsvRow): string {
   const spec = row["产品信息/规格"]?.trim();
   if (spec) return spec;
@@ -88,6 +91,50 @@ function modelKeyFromCloudRow(row: CsvRow): string {
     row["产品信息/产品Code"]?.trim() ||
     "(unknown)"
   );
+}
+
+/**
+ * v003：把"CSV 行 → 候选别名集合"展开（用于把云行的多面别名一次性 ingest 到 ModelAlias 表）。
+ * 在 `runReconciliationFromCsv` 完成后调用一次，让管理后台校准页能看到这些候选。
+ */
+export function candidateAliasesFromCloudRow(row: CsvRow): Array<{
+  source:
+    | "VENDOR_COMMODITY_CODE"
+    | "VENDOR_BILLABLE_ITEM"
+    | "VENDOR_RESOURCE_SPEC"
+    | "VENDOR_PRODUCT_NAME";
+  aliasValue: string;
+  tierRawHint?: string | null;
+}> {
+  const out: ReturnType<typeof candidateAliasesFromCloudRow> = [];
+  const commodity = row["产品信息/商品Code"]?.trim();
+  if (commodity) out.push({ source: "VENDOR_COMMODITY_CODE", aliasValue: commodity });
+  const billable = row["产品信息/计费项Code"]?.trim();
+  if (billable) out.push({ source: "VENDOR_BILLABLE_ITEM", aliasValue: billable });
+  const product = row["产品信息/产品名称"]?.trim();
+  if (product) out.push({ source: "VENDOR_PRODUCT_NAME", aliasValue: product });
+  // 资源信息/实例ID 形如 ";llm-...;happyhorse-1.0-i2v;1080P;bmp;0"
+  const sel = row["产品信息/选型配置"]?.trim() ?? "";
+  const parts = sel.split(";").map((p) => p.trim()).filter(Boolean);
+  for (const p of parts) {
+    if (
+      p.startsWith("happyhorse") ||
+      p.startsWith("qwen") ||
+      p.startsWith("wan") ||
+      p.startsWith("pixverse")
+    ) {
+      out.push({ source: "VENDOR_RESOURCE_SPEC", aliasValue: p });
+      // 通常下一段是分辨率：先简单从 parts 找一个像 720P/1080P 的
+      const tier = parts.find((q) => /^(720P|1080P|480P)$/i.test(q));
+      if (tier) {
+        out[out.length - 1]!.tierRawHint = tier;
+      }
+      break;
+    }
+  }
+  const spec = row["产品信息/规格"]?.trim();
+  if (spec) out.push({ source: "VENDOR_RESOURCE_SPEC", aliasValue: spec });
+  return out;
 }
 
 function billingKindFromRow(row: CsvRow): string {
@@ -196,7 +243,6 @@ export async function runReconciliationFromCsv(opts: RunReconciliationOpts): Pro
 
   let importedCloudLines = 0;
   let skippedExistingCloudLines = 0;
-  const capturedAt = new Date();
   const templateKey = DEFAULT_PRICING_TEMPLATE_KEY;
 
   for (const { userId, rows } of boundEntries) {
@@ -220,20 +266,60 @@ export async function runReconciliationFromCsv(opts: RunReconciliationOpts): Pro
         skippedExistingCloudLines += 1;
         continue;
       }
+      // v005：把"对内计价快照"直接写到 cloudRow 内的「平台/系数(M) + 平台/定价 + 平台/扣点」键；
+      // 不再写 DB internal* 列（schema 已移除）。reconciliation 聚合也从 cloudRow 读这几个键。
       const snap = computeInternalPricingWithTemplate(r, templateKey);
-      const internal = prismaDataFromInternalSnapshot(snap, capturedAt);
+      const enrichedRow: Record<string, string> = {
+        ...r,
+        "平台/系数(M)": snap.retailMultiplier && snap.retailMultiplier !== "0" ? snap.retailMultiplier : "",
+        "平台/定价": snap.ourUnitYuan && parseFloat(snap.ourUnitYuan) > 0 ? snap.ourUnitYuan : "",
+        "平台/扣点": snap.chargedPoints > 0 ? String(snap.chargedPoints) : "",
+      };
       fresh.push({
         userId,
         source: "CLOUD_CSV_IMPORT",
-        cloudRow: r as unknown as Prisma.InputJsonValue,
+        cloudRow: enrichedRow as unknown as Prisma.InputJsonValue,
         pricingTemplateKey: templateKey,
-        ...internal,
       });
     }
     if (fresh.length > 0) {
       const ins = await prisma.toolBillingDetailLine.createMany({ data: fresh });
       importedCloudLines += ins.count;
     }
+  }
+
+  // v003：把本次 CSV 涉及的所有"模型字串"作为候选 ingest 到 ModelAlias 表（自动建议匹配）。
+  // 这样校准页打开时就能看到 happyhorse-1.0-i2v / sfm_inferenceHH_public_cn / video_duration / 百炼大模型Happy系列 等待审项。
+  // 紧接着跑一遍 `runFullAutoCalibration`：
+  //   - 从 ToolBillablePrice / PricingSourceLine 自动 seed catalog；
+  //   - 把 HIGH/MEDIUM 置信的 pending alias 自动绑定。
+  // 这样**本次对账聚合**就能直接吃到 canonical，「同模型多名字」差额在写入时就归并。
+  try {
+    const { ingestCandidateAliases, runFullAutoCalibration } = await import("@/lib/model-catalog");
+    const candidateSet = new Map<string, {
+      source:
+        | "VENDOR_COMMODITY_CODE"
+        | "VENDOR_BILLABLE_ITEM"
+        | "VENDOR_RESOURCE_SPEC"
+        | "VENDOR_PRODUCT_NAME";
+      aliasValue: string;
+      tierRawHint?: string | null;
+    }>();
+    for (const { rows } of boundEntries) {
+      for (const r of rows) {
+        for (const c of candidateAliasesFromCloudRow(r)) {
+          const k = `${c.source}::${c.aliasValue}`;
+          if (!candidateSet.has(k)) candidateSet.set(k, c);
+        }
+      }
+    }
+    if (candidateSet.size > 0) {
+      await ingestCandidateAliases(Array.from(candidateSet.values()));
+    }
+    // 即使候选为 0 也跑一次 auto-calibrate：第一次导入时表里可能有"老 pending"等着 seed 后接管。
+    await runFullAutoCalibration();
+  } catch (e) {
+    console.warn("[reconciliation-run] ingest + auto-calibrate failed (skip)", e);
   }
 
   type AggKey = string;
@@ -253,21 +339,67 @@ export async function runReconciliationFromCsv(opts: RunReconciliationOpts): Pro
   }
   const months = Array.from(monthsSet).sort();
 
+  /**
+   * v003：聚合前先把"本次涉及到的所有 cloudRow 的别名候选"批量解析为 canonicalKey，
+   * 把"同模型 5 个名字"自动归并：例如 `happyhorse-1.0-i2v` / `sfm_inferenceHH_public_cn` /
+   * `百炼大模型 Happy 系列` 等都映射到同一行 ModelCatalog.canonicalKey。
+   * 未命中的 modelKey 退回原值（保留兼容）。
+   */
+  const aliasCollect: Array<{ source: ModelAliasSource; aliasValue: string }> = [];
+  function pushAliasInputsFromRow(row: CsvRow): void {
+    const spec = row["产品信息/规格"]?.trim();
+    if (spec) aliasCollect.push({ source: ModelAliasSource.VENDOR_RESOURCE_SPEC, aliasValue: spec });
+    const commodity = row["产品信息/商品Code"]?.trim();
+    if (commodity) aliasCollect.push({ source: ModelAliasSource.VENDOR_COMMODITY_CODE, aliasValue: commodity });
+    const billable = row["产品信息/计费项Code"]?.trim();
+    if (billable) aliasCollect.push({ source: ModelAliasSource.VENDOR_BILLABLE_ITEM, aliasValue: billable });
+    const product = row["产品信息/产品名称"]?.trim();
+    if (product) aliasCollect.push({ source: ModelAliasSource.VENDOR_PRODUCT_NAME, aliasValue: product });
+  }
+
+  for (const { userId } of boundEntries) {
+    const sampleLines = await prisma.toolBillingDetailLine.findMany({
+      where: { userId },
+      select: { cloudRow: true },
+    });
+    for (const l of sampleLines) {
+      pushAliasInputsFromRow(cloudRowFromBillingLine(l.cloudRow as unknown));
+    }
+  }
+  for (const u of unbound) {
+    const sample = byCloudAccount.get(u.cloudAccountId)?.rows?.[0];
+    if (sample) pushAliasInputsFromRow(sample);
+  }
+  const aliasLookup = await canonicalKeysByAliases(aliasCollect);
+  function resolveCanonical(row: CsvRow): string {
+    const candidates: Array<[ModelAliasSource, string | undefined]> = [
+      [ModelAliasSource.VENDOR_RESOURCE_SPEC, row["产品信息/规格"]?.trim()],
+      [ModelAliasSource.VENDOR_COMMODITY_CODE, row["产品信息/商品Code"]?.trim()],
+      [ModelAliasSource.VENDOR_BILLABLE_ITEM, row["产品信息/计费项Code"]?.trim()],
+      [ModelAliasSource.VENDOR_PRODUCT_NAME, row["产品信息/产品名称"]?.trim()],
+    ];
+    for (const [src, v] of candidates) {
+      if (!v) continue;
+      const k = `${src}::${v}`;
+      const canon = aliasLookup.get(k);
+      if (canon) return canon;
+    }
+    return modelKeyFromCloudRow(row);
+  }
+
   for (const { userId, cloudAccountId } of boundEntries) {
     const lines = await prisma.toolBillingDetailLine.findMany({
       where: { userId },
       select: {
         source: true,
         cloudRow: true,
-        internalChargedPoints: true,
-        internalYuanReference: true,
       },
     });
     for (const l of lines) {
       const row = cloudRowFromBillingLine(l.cloudRow as unknown);
       const m = row["账单信息/账单月份"];
       if (m && months.length > 0 && !months.includes(m)) continue;
-      const modelKey = modelKeyFromCloudRow(row);
+      const modelKey = resolveCanonical(row);
       const billingKind = billingKindFromRow(row);
       const k = `${userId}::${modelKey}::${billingKind}`;
       const entry = pushAgg(k, () => ({
@@ -283,9 +415,9 @@ export async function runReconciliationFromCsv(opts: RunReconciliationOpts): Pro
         matchKind: "BOTH",
       }));
       if (l.source === "TOOL_USAGE_GENERATED") {
-        const yuan = l.internalYuanReference
-          ? Number(l.internalYuanReference)
-          : (l.internalChargedPoints ?? 0) / 100;
+        // v005：从 cloudRow["平台/扣点"] 折元，不再读 DB internal* 列
+        const points = parseFloatLoose(row["平台/扣点"]);
+        const yuan = Number.isFinite(points) && points > 0 ? points / 100 : 0;
         entry.internalCount += 1;
         entry.internalYuan += yuan;
       } else if (l.source === "CLOUD_CSV_IMPORT") {
@@ -301,7 +433,7 @@ export async function runReconciliationFromCsv(opts: RunReconciliationOpts): Pro
     const sample =
       byCloudAccount.get(u.cloudAccountId)?.rows?.[0];
     if (sample) {
-      modelKey = modelKeyFromCloudRow(sample);
+      modelKey = resolveCanonical(sample);
       billingKind = billingKindFromRow(sample);
     }
     const k = `unbound::${u.cloudAccountId}::${modelKey}::${billingKind}`;

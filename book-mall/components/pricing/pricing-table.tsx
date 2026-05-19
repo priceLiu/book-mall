@@ -11,30 +11,72 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+/**
+ * 平台价目表（共享组件）。
+ *
+ * 同时被 `/account/pricing` 与 `/pricing-disclosure` 引用，确保对外可见的「按次 / 按图 / 按秒」
+ * 平台零售价与 ToolBillablePrice 真源同源。本组件不直接读 DB，调用方通过 `rows` 注入。
+ *
+ * `showPlatformCostColumns=false`（个人中心普通用户）：隐藏云挂牌价、M、公式三列（仅管理员可见）。
+ *
+ * 列设计：
+ *   工具分组卡片头部：toolLabel + toolKey
+ *   表内列：
+ *     模型 / 档位 · 动作 · 云厂商产品/商品 · 计价单位
+ *     [管理端 / 公示全文] 云挂牌价（成本）· M · 平台单价 · 公式 · 点数
+ *     [个人中心用户] 平台单价 · 点数
+ */
 export type PricingRow = {
   id: string;
   toolKey: string;
   toolLabel: string;
   action: string | null;
+  /** 例：try_on（如 AI 试衣成片） / invoke（一次生成任务） */
+  actionLabel: string;
   schemeARefModelKey: string | null;
   cloudTierRaw: string | null;
   cloudBillingKind: string | null;
   /** 已基于 billingKind + tier 提前算好的「计价单位」文案，如「元 / 秒（720P）」 */
   unitLabel: string;
+  /** 计算公式简述：「成本 × 系数 × 100 → 取整」等 */
+  formulaText: string;
   pricePoints: number;
+  schemeAUnitCostYuan: number | null;
+  retailMultiplier: number | null;
+  vendorProductName: string | null;
+  vendorCommodityName: string | null;
+  modelDisplayName: string | null;
+  vendor: string | null;
 };
 
 const ALL = "__all__";
 
-export function PricingTableClient({ rows }: { rows: PricingRow[] }) {
+function fmtMoney(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return `¥${v.toFixed(v < 1 ? 4 : 2)}`;
+}
+
+export function PricingTable({
+  rows,
+  /** 为 false 时隐藏「云挂牌价（成本）」「M」「公式」（个人中心普通用户）。公示页 / 管理员见全文。 */
+  showPlatformCostColumns = true,
+}: {
+  rows: PricingRow[];
+  showPlatformCostColumns?: boolean;
+}) {
   const [tool, setTool] = useState<string>(ALL);
   const [model, setModel] = useState<string>(ALL);
   const [q, setQ] = useState<string>("");
   const qDeferred = useDeferredValue(q);
 
-  /** 工具维度：从 rows 抽取出唯一工具列表（label + key + 行数） */
   const tools = useMemo(() => {
     const map = new Map<string, { toolKey: string; toolLabel: string; count: number }>();
     for (const r of rows) {
@@ -45,7 +87,6 @@ export function PricingTableClient({ rows }: { rows: PricingRow[] }) {
     return Array.from(map.values()).sort((a, b) => a.toolLabel.localeCompare(b.toolLabel, "zh-CN"));
   }, [rows]);
 
-  /** 模型 chip：只列出当前所选工具范围内的唯一模型 */
   const models = useMemo(() => {
     const scoped = tool === ALL ? rows : rows.filter((r) => r.toolKey === tool);
     const set = new Map<string, number>();
@@ -58,7 +99,6 @@ export function PricingTableClient({ rows }: { rows: PricingRow[] }) {
       .sort((a, b) => a.modelKey.localeCompare(b.modelKey));
   }, [rows, tool]);
 
-  /** 真正展示的行 */
   const filtered = useMemo(() => {
     const text = qDeferred.trim().toLowerCase();
     return rows.filter((r) => {
@@ -69,9 +109,12 @@ export function PricingTableClient({ rows }: { rows: PricingRow[] }) {
         r.toolKey,
         r.toolLabel,
         r.action ?? "",
+        r.actionLabel,
         r.schemeARefModelKey ?? "",
         r.cloudTierRaw ?? "",
         r.cloudBillingKind ?? "",
+        r.vendorProductName ?? "",
+        r.vendorCommodityName ?? "",
       ]
         .join(" ")
         .toLowerCase();
@@ -79,7 +122,6 @@ export function PricingTableClient({ rows }: { rows: PricingRow[] }) {
     });
   }, [rows, tool, model, qDeferred]);
 
-  /** 按工具分组结果（保持原页"每工具一表"风格） */
   const grouped = useMemo(() => {
     const map = new Map<string, PricingRow[]>();
     for (const r of filtered) {
@@ -97,8 +139,9 @@ export function PricingTableClient({ rows }: { rows: PricingRow[] }) {
   const hasAnyFilter = tool !== ALL || model !== ALL || q.trim().length > 0;
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
+    <TooltipProvider delayDuration={200} skipDelayDuration={0}>
+      <div className="space-y-5">
+        <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-[260px_1fr] md:items-center">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">工具</label>
@@ -134,7 +177,7 @@ export function PricingTableClient({ rows }: { rows: PricingRow[] }) {
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="可输入：模型片段、动作、计费类型；不输入即不过滤"
+                placeholder="可输入：模型片段、动作、计费类型、厂商商品名；不输入即不过滤"
                 className="pl-8 pr-9"
               />
               {q.length > 0 ? (
@@ -217,61 +260,126 @@ export function PricingTableClient({ rows }: { rows: PricingRow[] }) {
             className="overflow-hidden rounded-lg border border-border bg-card shadow-sm"
           >
             <header className="flex flex-wrap items-baseline gap-2 border-b border-border bg-muted/40 px-4 py-2.5">
-              <span className="text-sm font-medium text-foreground">
-                {list[0]!.toolLabel}
-              </span>
+              <span className="text-sm font-medium text-foreground">{list[0]!.toolLabel}</span>
               <code className="text-xs text-muted-foreground">{toolKey}</code>
               <Badge variant="secondary" className="ml-auto text-[10px]">
                 {list.length} 行
               </Badge>
             </header>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table
+                className={cn(
+                  "w-full text-sm",
+                  showPlatformCostColumns ? "min-w-[1180px]" : "min-w-[720px]",
+                )}
+              >
                 <thead>
                   <tr className="text-xs text-muted-foreground">
+                    <th className="border-b border-border px-3 py-2 text-left font-medium">
+                      模型 / 档位
+                    </th>
                     <th className="border-b border-border px-3 py-2 text-left font-medium">动作</th>
-                    <th className="border-b border-border px-3 py-2 text-left font-medium">模型</th>
-                    <th className="border-b border-border px-3 py-2 text-left font-medium">计价标准</th>
-                    <th className="border-b border-border px-3 py-2 text-left font-medium">计价单位</th>
-                    <th className="border-b border-border px-3 py-2 text-right font-medium">单价（点）</th>
-                    <th className="border-b border-border px-3 py-2 text-right font-medium">≈ 元</th>
+                    <th className="border-b border-border px-3 py-2 text-left font-medium">
+                      云厂商产品 / 商品
+                    </th>
+                    <th className="border-b border-border px-3 py-2 text-left font-medium">
+                      计价单位
+                    </th>
+                    {showPlatformCostColumns ? (
+                      <>
+                        <th className="border-b border-border px-3 py-2 text-right font-medium">
+                          云挂牌价（成本）
+                        </th>
+                        <th className="border-b border-border px-3 py-2 text-right font-medium">系数</th>
+                      </>
+                    ) : null}
+                    <th className="border-b border-border px-3 py-2 text-right font-medium">
+                      平台单价
+                    </th>
+                    {showPlatformCostColumns ? (
+                      <th className="border-b border-border px-3 py-2 text-left font-medium max-w-[11rem] w-[11rem]">
+                        公式
+                      </th>
+                    ) : null}
+                    <th className="border-b border-border px-3 py-2 text-right font-medium whitespace-nowrap">
+                      点数
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((r) => (
-                    <tr
-                      key={r.id}
-                      className="text-sm transition-colors hover:bg-muted/30"
-                    >
-                      <td className="border-b border-border/60 px-3 py-2">
-                        <code className="text-xs text-muted-foreground">{r.action ?? "(*)"}</code>
-                      </td>
-                      <td className="border-b border-border/60 px-3 py-2">
-                        <code className="text-xs text-foreground">{r.schemeARefModelKey ?? "—"}</code>
-                      </td>
-                      <td className="border-b border-border/60 px-3 py-2">
-                        {r.cloudBillingKind ? (
-                          <Badge variant="outline" className="font-mono text-[10px]">
-                            {r.cloudBillingKind}
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
-                        {r.unitLabel}
-                        {r.cloudTierRaw && !r.unitLabel.includes(r.cloudTierRaw) ? (
-                          <span className="ml-1 text-[10px] opacity-70">· {r.cloudTierRaw}</span>
+                  {list.map((r) => {
+                    const ours =
+                      r.schemeAUnitCostYuan != null && r.retailMultiplier != null
+                        ? r.schemeAUnitCostYuan * r.retailMultiplier
+                        : null;
+                    return (
+                      <tr key={r.id} className="text-sm transition-colors hover:bg-muted/30">
+                        <td className="border-b border-border/60 px-3 py-2">
+                          <div className="font-medium text-foreground">
+                            {r.modelDisplayName ?? "—"}
+                          </div>
+                          <code className="text-[11px] text-muted-foreground">
+                            {r.schemeARefModelKey ?? "—"}
+                            {r.cloudTierRaw ? <> · {r.cloudTierRaw}</> : null}
+                          </code>
+                        </td>
+                        <td className="border-b border-border/60 px-3 py-2 text-xs">
+                          <code className="text-muted-foreground">{r.action ?? "(*)"}</code>
+                        </td>
+                        <td className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                          <div>{r.vendorProductName ?? "—"}</div>
+                          <div className="text-[11px] opacity-80">
+                            {r.vendorCommodityName ?? "—"}
+                          </div>
+                        </td>
+                        <td className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground">
+                          {r.unitLabel}
+                          {r.cloudBillingKind ? (
+                            <Badge
+                              variant="outline"
+                              className="ml-1 font-mono text-[9px] align-middle"
+                            >
+                              {r.cloudBillingKind}
+                            </Badge>
+                          ) : null}
+                        </td>
+                        {showPlatformCostColumns ? (
+                          <>
+                            <td className="border-b border-border/60 px-3 py-2 text-right tabular-nums text-muted-foreground">
+                              {fmtMoney(r.schemeAUnitCostYuan)}
+                            </td>
+                            <td className="border-b border-border/60 px-3 py-2 text-right tabular-nums text-muted-foreground">
+                              {r.retailMultiplier != null ? `×${r.retailMultiplier}` : "—"}
+                            </td>
+                          </>
                         ) : null}
-                      </td>
-                      <td className="border-b border-border/60 px-3 py-2 text-right font-medium text-foreground tabular-nums">
-                        {r.pricePoints} 点
-                      </td>
-                      <td className="border-b border-border/60 px-3 py-2 text-right text-muted-foreground tabular-nums">
-                        ¥{(r.pricePoints / 100).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="border-b border-border/60 px-3 py-2 text-right tabular-nums font-medium text-foreground">
+                          {fmtMoney(ours)}
+                        </td>
+                        {showPlatformCostColumns ? (
+                          <td className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground max-w-[11rem] w-[11rem]">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <code className="block w-full min-w-0 cursor-help truncate border-b border-dotted border-muted-foreground/45 text-[11px] underline-offset-2">
+                                  {r.formulaText}
+                                </code>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="top"
+                                align="start"
+                                className="max-w-lg whitespace-pre-wrap break-words text-left text-sm leading-relaxed font-mono"
+                              >
+                                {r.formulaText}
+                              </TooltipContent>
+                            </Tooltip>
+                          </td>
+                        ) : null}
+                        <td className="border-b border-border/60 px-3 py-2 text-right font-medium text-foreground tabular-nums whitespace-nowrap">
+                          {r.pricePoints.toLocaleString("zh-CN")} 点
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -295,7 +403,8 @@ export function PricingTableClient({ rows }: { rows: PricingRow[] }) {
             ) : null}
           </div>
         ) : null}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

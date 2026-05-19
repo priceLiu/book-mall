@@ -1,62 +1,29 @@
-import type { InternalPricingSnapshot, PricingTemplateModule } from "./types";
-import { cloudJsonToRawRow } from "./cloud-row-json";
-
 /**
- * 「工具站内部使用」对内计价模板（与云对账的 `aliyun.consumedetail_bill_v2` 同等地位）。
+ * v005（2026-05-17）：「工具站内部使用」对内计价模板。
  *
- * v002（2026-05-16）变更：`compute(cloudRow)` 优先从 cloudRow 反推已经固化的
- * `对内计价/云成本单价(元/单位)`、`对内计价/零售系数`、`对内计价/我方单价(元/单位)`、`对内计价/本行扣点`；
- * 三者缺失时（旧行/兜底）才退回到「点数直扣」展示（云成本单价/系数仍标空，便于一眼看出缺快照）。
+ * v005 起 `ToolBillingDetailLine.internal*` 7 列已从 schema 删除，"对内计价快照"统一存在
+ * cloudRow JSON 内的「平台/系数(M) + 平台/定价 + 平台/扣点」键里（`buildCloudRowFromUsage` 写入）。
  *
- * 适用：`ToolBillingDetailLine.source = TOOL_USAGE_GENERATED`，由 `recordToolUsageAndConsumeWallet`
- * 在用户每次成功扣费的同事务里写入，且 `internal*` 列在写入时已固化；本 compute 仅作为
- * `enrichBillingLineToFlatRow` 在 `internalChargedPoints` 为 null 的极端情况下的回放兜底。
+ * 因此本模块 `compute(cloudRow)` 已变为**兜底死路径**——`enrichBillingLineToFlatRow` 不再
+ * 调它（直接读 cloudRow 的「平台/*」键）。仅当 reconciliation 流程或异常路径需要"按模板算个快照"
+ * 时才会进入；返回全 0 占位即可。
+ *
+ * 保留模板 id 与 label：`pricingTemplateKey` 历史值 `internal.tool_usage_v1` 仍指向本模块，
+ * 避免 registry fallback 到 aliyun 模板时把 TOOL_USAGE_GENERATED 行错按 CSV 公式估算。
  */
-function parseDecimalLoose(raw: string | undefined): number {
-  if (raw == null) return NaN;
-  const n = parseFloat(String(raw).replace(/,/g, "").trim());
-  return Number.isFinite(n) ? n : NaN;
-}
+import type { InternalPricingSnapshot, PricingTemplateModule } from "./types";
 
 export const internalToolUsageV1Template: PricingTemplateModule = {
   id: "internal.tool_usage_v1",
-  label: "工具站使用 · 按公式快照",
-  compute(cloudRow: unknown): InternalPricingSnapshot {
-    const row = cloudJsonToRawRow(cloudRow);
-    const charged = parseInt(row["对内计价/本行扣点"] || "0", 10);
-    const chargedPoints = Number.isFinite(charged) && charged > 0 ? charged : 0;
-    const yuan = chargedPoints / 100;
-
-    const costRaw = parseDecimalLoose(row["对内计价/云成本单价(元/单位)"]);
-    const multRaw = parseDecimalLoose(row["对内计价/零售系数"]);
-    const ourRaw = parseDecimalLoose(row["对内计价/我方单价(元/单位)"]);
-
-    const hasCost = Number.isFinite(costRaw) && costRaw > 0;
-    const hasMult = Number.isFinite(multRaw) && multRaw > 0;
-    const hasOur = Number.isFinite(ourRaw) && ourRaw > 0;
-
-    const cost = hasCost ? costRaw : 0;
-    const mult = hasMult ? multRaw : 0;
-    const ourUnit = hasOur ? ourRaw : cost * mult;
-
-    const qtyRaw = parseDecimalLoose(row["用量信息/用量"]);
-    const qty = Number.isFinite(qtyRaw) ? qtyRaw : 0;
-    const unit = row["用量信息/用量单位"] || "次";
-
-    const formulaPersisted = row["对内计价/计价公式与例"]?.trim();
-    const formula =
-      formulaPersisted ||
-      (hasCost || hasMult
-        ? `云成本单价=${cost.toFixed(6)} 元/${unit}；系数=${mult || "?"}；我方单价=${ourUnit.toFixed(6)} 元/${unit}；用量=${qty} ${unit}；本行扣点=${chargedPoints}（折元 ¥${yuan.toFixed(2)}）；模板=${internalToolUsageV1Template.label}`
-        : `本行扣点=${chargedPoints}（折元 ¥${yuan.toFixed(2)}）；缺少 cost/系数快照，回放仅展示扣点；模板=${internalToolUsageV1Template.label}`);
-
+  label: "工具站使用 · DB 快照",
+  compute(_cloudRow: unknown): InternalPricingSnapshot {
     return {
-      cloudCostUnitYuan: cost.toFixed(6),
-      retailMultiplier: mult ? String(mult) : "0",
-      ourUnitYuan: ourUnit.toFixed(6),
-      formulaText: formula,
-      chargedPoints,
-      yuanReference: yuan.toFixed(4),
+      cloudCostUnitYuan: "0.000000",
+      retailMultiplier: "0",
+      ourUnitYuan: "0.000000",
+      formulaText: "",
+      chargedPoints: 0,
+      yuanReference: "0.0000",
     };
   },
 };

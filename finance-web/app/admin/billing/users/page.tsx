@@ -1,16 +1,131 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
+
+type BillingUser = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  lineCount: number;
+  latestAt: string | null;
+};
 
 export default function AdminBillingUsersIndexPage() {
+  const [users, setUsers] = useState<BillingUser[] | null>(null);
+  const [loadState, setLoadState] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [hint, setHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    const base = getBookMallBaseUrl();
+    if (!base) {
+      setLoadState("error");
+      setHint("未配置 NEXT_PUBLIC_BOOK_MALL_URL，无法拉取用户列表。");
+      return;
+    }
+    let cancelled = false;
+    setLoadState("loading");
+    fetch(`${base}/api/admin/finance/billing-users`, {
+      credentials: "include",
+      mode: "cors",
+    })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.status === 403) {
+          setLoadState("error");
+          setHint("需要以管理员身份登录 book-mall（在 book-mall 站点登录后再回到本页）。");
+          return;
+        }
+        if (!res.ok) {
+          setLoadState("error");
+          setHint(`接口错误 HTTP ${res.status}`);
+          return;
+        }
+        const data = (await res.json()) as { users: BillingUser[] };
+        setUsers(data.users);
+        setLoadState("ok");
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setLoadState("error");
+        setHint(`请求失败：${(e as Error).message}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
-    <div className="p-6 text-sm text-[#595959]">
-      <p className="mb-2">
-        请访问{" "}
-        <code className="rounded bg-white px-1 text-[#262626]">/admin/billing/users/&lt;book-mall User.id&gt;</code>{" "}
-        ，例如从 book-mall 用户表复制 id。
-      </p>
-      <Link href="/admin" className="text-[#1890ff] hover:underline">
-        返回管理概览
-      </Link>
+    <div className="p-6">
+      <h1 className="mb-4 text-lg font-medium text-[#262626]">有账单明细的用户</h1>
+
+      {loadState === "loading" && (
+        <p className="text-sm text-[#8c8c8c]">正在加载…</p>
+      )}
+
+      {loadState === "error" && (
+        <div className="rounded border border-[#ffccc7] bg-[#fff2f0] p-3 text-sm text-[#a8071a]">
+          {hint ?? "加载失败"}
+          <div className="mt-2 text-xs text-[#595959]">
+            或者你可以直接在 URL 里填入用户 id，例如{" "}
+            <code className="rounded bg-white px-1 text-[#262626]">
+              /admin/billing/users/&lt;book-mall User.id&gt;
+            </code>
+          </div>
+        </div>
+      )}
+
+      {loadState === "ok" && users && users.length === 0 && (
+        <p className="text-sm text-[#8c8c8c]">暂无有账单明细的用户。</p>
+      )}
+
+      {loadState === "ok" && users && users.length > 0 && (
+        <div className="overflow-x-auto rounded border border-[#e8e8e8] bg-white">
+          <table className="w-full min-w-[640px] border-collapse text-sm">
+            <thead>
+              <tr className="bg-[#fafafa] text-left text-[#595959]">
+                <th className="border border-[#e8e8e8] px-3 py-2">用户</th>
+                <th className="border border-[#e8e8e8] px-3 py-2">邮箱</th>
+                <th className="border border-[#e8e8e8] px-3 py-2">明细行数</th>
+                <th className="border border-[#e8e8e8] px-3 py-2">最近一条</th>
+                <th className="border border-[#e8e8e8] px-3 py-2">查看明细</th>
+              </tr>
+            </thead>
+            <tbody className="text-[#262626]">
+              {users.map((u) => (
+                <tr key={u.id} className="hover:bg-[#fafafa]">
+                  <td className="border border-[#e8e8e8] px-3 py-2 font-medium">
+                    {u.name ?? <span className="text-[#bfbfbf]">—</span>}
+                  </td>
+                  <td className="border border-[#e8e8e8] px-3 py-2 text-[#595959]">
+                    {u.email ?? <span className="text-[#bfbfbf]">—</span>}
+                  </td>
+                  <td className="border border-[#e8e8e8] px-3 py-2 font-mono text-[#262626]">
+                    {u.lineCount}
+                  </td>
+                  <td className="border border-[#e8e8e8] px-3 py-2 text-[#595959]">
+                    {u.latestAt ? new Date(u.latestAt).toLocaleString("zh-CN") : "—"}
+                  </td>
+                  <td className="border border-[#e8e8e8] px-3 py-2">
+                    <Link
+                      href={`/admin/billing/users/${u.id}`}
+                      className="text-[#1890ff] hover:underline"
+                    >
+                      管理员视角 →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="mt-4 text-xs text-[#8c8c8c]">
+        管理员视角可见全部 31 列 / 7 组（含厂商产品 / 资源 / 定价 / 优惠 / 系数 M / 计费公式）。
+        用户视角仅 16 列 / 3 组。
+      </div>
     </div>
   );
 }

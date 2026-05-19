@@ -3,8 +3,9 @@ import type { SubscriptionInterval } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isPrismaConnectionUnavailable, logDbUnavailable } from "@/lib/db-unavailable";
 import { formatPointsAsYuan } from "@/lib/currency";
-import { getEffectiveBillablePricesForDisclosure } from "@/lib/pricing-disclosure";
-import { toolKeyToLabel } from "@/lib/tool-key-label";
+import { getPricingTableRowsForDisclosure } from "@/lib/pricing-disclosure";
+import { PricingTable } from "@/components/pricing/pricing-table";
+import { PricingFormulaCard } from "@/components/pricing/pricing-formula-card";
 import { Button } from "@/components/ui/button";
 
 export const metadata = {
@@ -17,24 +18,22 @@ function intervalLabel(interval: SubscriptionInterval): string {
   return interval === "MONTH" ? "按月" : interval === "YEAR" ? "按年" : String(interval);
 }
 
-function actionLabel(action: string | null): string {
-  if (action == null || !action.trim()) return "未限定行为（通配该工具）";
-  const a = action.trim();
-  if (a === "try_on") return "try_on（如 AI 试衣成片）";
-  if (a === "invoke") return "invoke（一次生成任务）";
-  return a;
-}
-
+/**
+ * 价格公示页（公开访问）。
+ *
+ * 整合（2026-05-18）：「按次扣费单价」表与个人中心 `/account/pricing` 共用同一份组件 + 同一函数读
+ * （getPricingTableRowsForDisclosure），这是整站统一的「平台价目表」展示来源。admin 端
+ * `/admin/finance/cloud-pricing` 已删除"在库价目"section，跳转到本页。
+ */
 export default async function PricingDisclosurePage() {
-  let billable: Awaited<ReturnType<typeof getEffectiveBillablePricesForDisclosure>> = [];
+  let rows: Awaited<ReturnType<typeof getPricingTableRowsForDisclosure>> = [];
   let plans: Awaited<ReturnType<typeof prisma.subscriptionPlan.findMany>> = [];
   let config: Awaited<ReturnType<typeof prisma.platformConfig.findUnique>> = null;
   let dbUnavailable = false;
 
   try {
-    const now = new Date();
-    ;[billable, plans, config] = await Promise.all([
-      getEffectiveBillablePricesForDisclosure(now),
+    [rows, plans, config] = await Promise.all([
+      getPricingTableRowsForDisclosure(),
       prisma.subscriptionPlan.findMany({
         where: { active: true },
         orderBy: { interval: "asc" },
@@ -48,22 +47,23 @@ export default async function PricingDisclosurePage() {
   }
 
   const findPrice = (toolKey: string, action: string | null) =>
-    billable.find(
-      (r) =>
-        r.toolKey === toolKey && (r.action ?? "") === (action ?? ""),
-    );
+    rows.find((r) => r.toolKey === toolKey && (r.action ?? "") === (action ?? ""));
 
   const aiFit = findPrice("fitting-room__ai-fit", "try_on");
   const tti = findPrice("text-to-image", "invoke");
   const itv = findPrice("image-to-video", "invoke");
 
   return (
-    <main className="container max-w-screen-lg mx-auto px-4 pb-24 pt-8 md:pt-12">
+    <main className="container max-w-screen-2xl mx-auto px-4 pb-24 pt-8 md:pt-12">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">价格公示与使用说明</h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
           以下数据与主站管理后台、计费结算同源；货币为人民币。账户以<strong>点</strong>为单位记账，
           <strong className="text-foreground">1 点 = ¥0.01</strong>（与历史「分」整数口径一致）。
+          <br />
+          平台零售价 ={" "}
+          <strong className="text-foreground">云厂商挂牌价（成本价）× M</strong>
+          ；当前 M = 2（每个模型 / 档位独立公示）。
         </p>
       </div>
 
@@ -76,8 +76,8 @@ export default async function PricingDisclosurePage() {
       <section className="mt-10 space-y-4">
         <h2 className="text-lg font-semibold">一、订阅会员价格</h2>
         <p className="text-sm text-muted-foreground">
-          订阅费用于解锁会员身份与普通型权益；<strong className="text-foreground">不可</strong>用钱包余额抵扣。
-          如需使用按量工具，请在订阅开通后在个人中心为钱包充值，并满足最低余额线。
+          订阅费用于解锁会员身份与普通型权益；
+          <strong className="text-foreground">不可</strong>用钱包余额抵扣。 如需使用按量工具，请在订阅开通后在个人中心为钱包充值，并满足最低余额线。
         </p>
         <div className="overflow-x-auto rounded-lg border border-secondary">
           <table className="w-full min-w-[560px] text-left text-sm">
@@ -126,62 +126,22 @@ export default async function PricingDisclosurePage() {
         <p className="text-sm text-muted-foreground">
           以下单价适用于已标价的工具行为；实际扣费以执行成功为准，与后台「工具管理」配置的生效区间一致。
         </p>
-        <div className="overflow-x-auto rounded-lg border border-secondary">
-          <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="border-b border-secondary bg-muted/50">
-              <tr>
-                <th className="p-3 font-medium">工具</th>
-                <th className="p-3 font-medium">行为</th>
-                <th className="p-3 font-medium">参考模型</th>
-                <th className="p-3 font-medium text-right">单价（点）</th>
-                <th className="p-3 font-medium text-right">单价（元）</th>
-                <th className="p-3 font-medium">生效区间（本地时间）</th>
-                <th className="p-3 font-medium">备注</th>
-              </tr>
-            </thead>
-            <tbody>
-              {billable.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-3 text-muted-foreground">
-                    当前无生效中的按次标价。
-                  </td>
-                </tr>
-              ) : (
-                billable.map((r) => (
-                  <tr
-                    key={`${r.toolKey}-${r.action ?? ""}-${r.schemeARefModelKey ?? ""}-${r.effectiveFrom.toISOString()}`}
-                    className="border-b border-secondary/80 align-top last:border-0"
-                  >
-                    <td className="p-3">
-                      <span className="font-medium">{toolKeyToLabel(r.toolKey)}</span>
-                      <div className="text-xs text-muted-foreground font-mono">{r.toolKey}</div>
-                    </td>
-                    <td className="p-3">{actionLabel(r.action)}</td>
-                    <td className="p-3 font-mono text-xs text-muted-foreground">
-                      {r.schemeARefModelKey?.trim() ? r.schemeARefModelKey : "—"}
-                    </td>
-                    <td className="p-3 text-right tabular-nums">{r.pricePoints.toLocaleString("zh-CN")}</td>
-                    <td className="p-3 text-right tabular-nums">¥{formatPointsAsYuan(r.pricePoints)}</td>
-                    <td className="p-3 whitespace-nowrap text-muted-foreground">
-                      {r.effectiveFrom.toLocaleString("zh-CN", { dateStyle: "short", timeStyle: "short" })}
-                      {" — "}
-                      {r.effectiveTo
-                        ? r.effectiveTo.toLocaleString("zh-CN", { dateStyle: "short", timeStyle: "short" })
-                        : "至今"}
-                    </td>
-                    <td className="p-3 max-w-[14rem] text-muted-foreground">{r.note ?? "—"}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <PricingFormulaCard />
+        <PricingTable rows={rows} />
+        <p className="text-xs text-muted-foreground">
+          说明：
+          <strong className="text-foreground">云挂牌价（成本）</strong>来自云厂商官方挂牌（不计折扣），是平台的成本价；
+          <strong className="text-foreground">平台单价</strong> = 云挂牌价 × M；
+          视频模型按「输出秒数」计费（不足
+          {config?.minBilledVideoSec ?? 5} 秒按 {config?.minBilledVideoSec ?? 5} 秒兜底），图片按「输出张数」，Token 类按调用次数计点。
+        </p>
       </section>
 
       <section className="mt-12 space-y-4">
         <h2 className="text-lg font-semibold">三、平台余额线（参考配置）</h2>
         <p className="text-sm text-muted-foreground">
-          使用依赖余额的高阶/按量能力前，可用余额通常须不低于<strong className="text-foreground">最低余额线</strong>
+          使用依赖余额的高阶/按量能力前，可用余额通常须不低于
+          <strong className="text-foreground">最低余额线</strong>
           （运营可在后台调整）。以下为当前配置快照：
         </p>
         {config ? (

@@ -5,21 +5,12 @@ export const PRICING_TEMPLATE_ALIYUN_CONSUMEDETAIL_BILL_V2 =
 /**
  * 工具站内部使用计费（TOOL_USAGE_GENERATED）：直接来自 `ToolUsageEvent` 的点数扣费，
  * 不需要重算云厂商有效单价；用于在财务控制台展示用户实际产生的扣点流水。
+ *
+ * v004 起 cloudRow 已不再写"对内计价/*"列；本 key 仅作 ToolBillingDetailLine 的
+ * `pricingTemplateKey` 字段值，让 registry 仍能解析到一个无害的 fallback compute()。
  */
 export const PRICING_TEMPLATE_INTERNAL_TOOL_USAGE_V1 =
   "internal.tool_usage_v1" as const;
-
-/** v002 P2-2：文本类（token in/out 计费）公式模板。 */
-export const PRICING_TEMPLATE_INTERNAL_TOOL_USAGE_TOKEN_V1 =
-  "internal.tool_usage_token_v1" as const;
-
-/** v002 P2-2：视频按秒类公式模板（含 happyhorse 系列）。 */
-export const PRICING_TEMPLATE_INTERNAL_TOOL_USAGE_SECONDS_V1 =
-  "internal.tool_usage_seconds_v1" as const;
-
-/** v002 P2-2：图像按张类公式模板（文生图、图生图等）。 */
-export const PRICING_TEMPLATE_INTERNAL_TOOL_USAGE_IMAGE_V1 =
-  "internal.tool_usage_image_v1" as const;
 
 export type PricingTemplateKey = string;
 

@@ -20,6 +20,8 @@
 2. 充值记录、到账核对、总充值统计。
 3. **计费配置**：**最低余额线**、**前台预警线**、LLM/工具单价、异常阈值（见三册 4.5）。
 4. **订阅套餐版本（停旧发新）**：订阅价 **不可原地修改**（会破坏老用户当时订阅价的溯源）。如需调价，须**发布新版本**——旧 plan 归档为 `${slug}__v${ts}` + `active=false`，新 plan 持有主 slug 并通过 `parentPlanId` 串接历史链；老用户的 `Subscription.planId` 仍指向归档 plan，可在「历史版本」中查询当时价。前端有二次确认 + 保存 banner。已归档 plan 不允许再改工具白名单。实现与验收清单见 [`doc/releases/2026-05-16-subscription-plan-lineage.md`](../releases/2026-05-16-subscription-plan-lineage.md)。
+5. **模型校准（按厂商）**：路径 `/admin/finance/model-calibration`。把"云厂商账单里的 `商品 Code / 计费项 Code / 规格 / 产品名称`"、"我们的 `toolKey / scheme A 模型`"、"price.md 标签"等统一映射到一个 **标准模型名（canonicalKey）**。每次导入云厂商账单（reconciliation）会自动 ingest 候选别名，按 `exact / prefix / fuzzy` 三级给出建议；HIGH 可一键批准、其他需手动归口。**支持单个录入**：弹窗一次性新建 canonicalKey + 多条别名（满足"在没收到 CSV 之前先把模型登记起来"的诉求）。详见 [`doc/releases/2026-05-16-per-second-billing-and-model-calibration.md`](../releases/2026-05-16-per-second-billing-and-model-calibration.md)。
+6. **按秒计费 + WalletHold（2026-05-16）**：视频工具改为 reserve（按预估上限做余额门禁）+ settle（按 DashScope 返回真实 `durationSec` 扣费，最低 5 秒兜底）+ release / TTL 自动 EXPIRED（30 分钟）；**只按挂牌价计费**，不解析云侧促销 / 免费额度——这些是平台利润空间。`PlatformConfig` 新增 4 个调节参数（`minBilledVideoSec/minBilledImageCount/minChargePointsPerInvoke/walletHoldDefaultTtlMin`）。
 
 ## 5.4 交易与数据统计
 

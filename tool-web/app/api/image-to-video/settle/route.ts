@@ -99,6 +99,12 @@ export async function POST(req: Request) {
     );
   }
 
+  // v003：前端 start 返回的 holdId 透传过来；settle 在主站把对应 hold 转 SETTLED。
+  const holdId =
+    typeof body.holdId === "string" && body.holdId.trim().length > 0
+      ? body.holdId.trim()
+      : undefined;
+
   let usage;
   try {
     usage = await postToolUsageFromServerWithRetries({
@@ -115,6 +121,7 @@ export async function POST(req: Request) {
         videoAudio: vCtx.audio,
         retailMultiplier: retailMult,
       },
+      ...(holdId ? { holdId } : {}),
     });
   } catch (e) {
     console.error("[image-to-video/settle] usage POST failed after retries", e);

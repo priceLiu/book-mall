@@ -22,7 +22,7 @@ const TEMPLATE_DESCRIPTIONS: Record<
     appliesTo: "阿里云 ConsumeDetailBill V2 CSV 导入（CLOUD_CSV_IMPORT 来源）",
     formula:
       "cost = 应付金额(含税); ourUnit = cost × M(系数); chargedPoints = round(ourUnit × 100)",
-    example: "云行 ¥0.20/张 × M=2 → 我方 ¥0.40 → 扣 40 点",
+    example: "云行 ¥0.20/张 × M=2 → 平台 ¥0.40 → 扣 40 点",
     source: "lib/finance/pricing-templates/aliyun-consumedetail-bill-v2.ts",
   },
   "internal.tool_usage_v1": {
@@ -75,7 +75,7 @@ export default async function PricingTemplatesPage() {
       <header className="space-y-1">
         <h1 className="text-xl font-medium">计费模板与公式</h1>
         <p className="text-sm text-muted-foreground">
-          每个 `ToolBillingDetailLine` 都关联一个 `pricingTemplateKey`，决定如何从云行/工具事件计算 cost、系数、我方单价。
+          每个 `ToolBillingDetailLine` 都关联一个 `pricingTemplateKey`，决定如何从云行/工具事件计算 cost、系数、平台单价。
           以下是当前注册的所有模板。
         </p>
       </header>

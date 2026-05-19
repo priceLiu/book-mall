@@ -76,19 +76,24 @@ export default async function AccountPage({
   const toolsBanner =
     toolsSsoErr.length > 0 ? toolsSsoErrBanner(toolsSsoErr) : null;
 
-  const [flags, walletRefunds, goldAccess, accountSecrets] = await Promise.all([
+  /** 合并为单笔 transaction，减少与个人中心其它并行调用的连接池叠加。 */
+  const [flags, goldAccess, refundAndUser] = await Promise.all([
     getMembershipFlags(session.user.id),
-    prisma.walletRefundRequest.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: "desc" },
-      take: 15,
-    }),
     getGoldMemberAccess(session.user.id),
-    prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { passwordHash: true },
-    }),
+    prisma.$transaction([
+      prisma.walletRefundRequest.findMany({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: "desc" },
+        take: 15,
+      }),
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { passwordHash: true },
+      }),
+    ]),
   ]);
+
+  const [walletRefunds, accountSecrets] = refundAndUser;
 
   const hasPassword = Boolean(accountSecrets?.passwordHash);
   const hasPendingWalletRefund = walletRefunds.some((r) => r.status === "PENDING");
@@ -189,7 +194,7 @@ export default async function AccountPage({
               </Button>
             ) : null}
             <Button asChild variant="outline" size="sm">
-              <Link href="/account/pricing">我方价目表（按工具 / 模型查询）</Link>
+              <Link href="/account/pricing">平台价目表（按工具 / 模型查询）</Link>
             </Button>
           </CardContent>
         </Card>

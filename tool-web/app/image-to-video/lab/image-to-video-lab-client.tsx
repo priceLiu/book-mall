@@ -765,16 +765,20 @@ export function ImageToVideoLabClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(startBody),
       });
-      const startParsed = await readJsonBody<{ taskId?: string; error?: string }>(
-        startR,
-      );
+      const startParsed = await readJsonBody<{
+        taskId?: string;
+        holdId?: string | null;
+        error?: string;
+      }>(startR);
       if (!startParsed.ok) throw new Error(startParsed.message);
       const startJson = startParsed.data;
       if (!startR.ok) {
+        // v003：reserve 余额不足时主站返回 402；这里把后端错误透传给用户，避免无意义的轮询
         throw new Error(startJson.error ?? `创建任务失败（HTTP ${startR.status}）`);
       }
       const taskId = startJson.taskId?.trim();
       if (!taskId) throw new Error("未返回任务 ID");
+      const holdId = typeof startJson.holdId === "string" ? startJson.holdId : null;
 
       for (let i = 0; i < MAX_POLLS; i++) {
         if (i > 0) {
@@ -807,6 +811,7 @@ export function ImageToVideoLabClient() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               taskId,
+              ...(holdId ? { holdId } : {}),
               billingHint: {
                 apiModel: snapApiModel,
                 durationSec: snapDur,
@@ -870,10 +875,24 @@ export function ImageToVideoLabClient() {
             st === "FAILED"
               ? formatDashScopeI2vFailureForUser(output, st)
               : st;
+          // v003：生成失败 → 释放 reserve hold（幂等接口，失败不影响业务）
+          if (holdId) {
+            try {
+              await fetch("/api/image-to-video/release-hold", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ holdId, reason: `video_${st.toLowerCase()}` }),
+              });
+            } catch {
+              /* ignore — main site cron 会兜底自动 EXPIRED */
+            }
+          }
           throw new Error(`生成失败：${detail}`);
         }
       }
 
+      // 轮询超时：保留 hold 让 TTL 自动 EXPIRED；不主动 release，避免误释放还在生成中的任务
       throw new Error("等待结果超时，请稍后在任务列表或费用明细核对");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "生成出错";

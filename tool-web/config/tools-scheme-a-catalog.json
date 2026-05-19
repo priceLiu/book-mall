@@ -27,13 +27,28 @@
     "comment": "视频类：成本 = durationSec × costYuanPerSecond（按 output usage.SR 与 audio 档位取价，见各模型）",
     "models": {
       "happyhorse-1.0-i2v": {
-        "flatYuanPerSecond": 0.9
+        "bySr": {
+          "720": 0.9,
+          "1080": 1.6
+        }
       },
       "happyhorse-1.0-t2v": {
-        "flatYuanPerSecond": 0.9
+        "bySr": {
+          "720": 0.9,
+          "1080": 1.6
+        }
       },
       "happyhorse-1.0-r2v": {
-        "flatYuanPerSecond": 0.9
+        "bySr": {
+          "720": 0.9,
+          "1080": 1.6
+        }
+      },
+      "happyhorse-1.0-video-edit": {
+        "bySr": {
+          "720": 0.9,
+          "1080": 1.6
+        }
       },
       "wan2.7-i2v-2026-04-25": {
         "bySr": {
@@ -122,16 +137,24 @@
         }
       },
       "pixverse-c1-it2v": {
-        "flatYuanPerSecond": 0.24
+        "bySr": {
+          "360": 0.24
+        }
       },
       "pixverse-c1-t2v": {
-        "flatYuanPerSecond": 0.24
+        "bySr": {
+          "360": 0.24
+        }
       },
       "pixverse-v6-it2v": {
-        "flatYuanPerSecond": 0.21
+        "bySr": {
+          "360": 0.21
+        }
       },
       "pixverse-v6-t2v": {
-        "flatYuanPerSecond": 0.21
+        "bySr": {
+          "360": 0.21
+        }
       }
     }
   }

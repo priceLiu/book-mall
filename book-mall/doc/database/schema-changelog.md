@@ -5,6 +5,22 @@
 
 ---
 
+## 2026-05-16 — 按秒计费（WalletHold）+ 模型校准（ModelCatalog / ModelAlias）
+
+- **迁移目录**：`prisma/migrations/20260516220000_per_second_billing_and_model_calibration/`
+- **新枚举**：`WalletHoldStatus`（`HELD` | `SETTLED` | `RELEASED` | `EXPIRED`）；`ModelAliasSource`（9 种来源：云·商品 Code / 计费项 Code / 规格 / 产品名称、内部 toolKey / action / scheme A 模型、price.md 标签、其他）；`AliasConfidence`（`HIGH` | `MEDIUM` | `LOW` | `MANUAL`）。
+- **新表**：
+  - `WalletHold`——钱包预占用（reservation / hold）。reserve 申请、settle 与 ToolUsageEvent 绑定、release 取消、TTL 自动 EXPIRED。`@@unique([userId, taskKey])` 保证同任务幂等。
+  - `ModelCatalog`——标准模型目录。`canonicalKey` 全站唯一，作为对账与账单详情的"模型"主键。
+  - `ModelAlias`——别名（来自云 CSV / 内部 toolKey / price.md / 手动），可由自动建议器挂到 catalog；`@@unique([source, aliasValue])`。
+- **PlatformConfig 新增字段**：`minBilledVideoSec`（默认 5）、`minBilledImageCount`（默认 1）、`minChargePointsPerInvoke`（默认 1）、`walletHoldDefaultTtlMin`（默认 30）。
+- **ToolUsageEvent 新增字段**：`billedVideoSec`（按秒计费实际秒数审计）、`walletHoldId`（与 SETTLED hold 绑定）。
+- **应用**：`pnpm db:apply-pending`（事务超时已放宽到 120s，避免多 DDL 集中执行 5s 超时）。
+- **逻辑**：详见 `doc/releases/2026-05-16-per-second-billing-and-model-calibration.md`、`doc/product/03-metering-llm-and-tools.md`、`doc/logic/admin-billing-and-refunds.md`。
+- **回滚**：开发环境可手动 `DROP TABLE "WalletHold","ModelAlias","ModelCatalog" CASCADE;` + 对应 enum + 从 PlatformConfig/ToolUsageEvent 删字段；生产严禁直接回滚（迁移记录在 `_prisma_migrations`）。
+
+---
+
 ## 2026-05-11 — 工具站 SSO 一次性授权码
 
 - **迁移目录**：`prisma/migrations/20260511180000_sso_tools_authorization_code/`  

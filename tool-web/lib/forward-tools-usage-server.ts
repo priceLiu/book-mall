@@ -43,10 +43,15 @@ export async function recordToolUsageFromServer(opts: {
   }
 }
 
-/** 同步调用主站计费接口并返回响应体（用于余额不足 402 等需告知前端的场景）。 */
-export async function postToolUsageFromServer(opts: {
+/**
+ * v003：reserve 一笔预占用（hold）。
+ * 用于按秒/按张计费工具在调用云厂商前做水位线门禁；若返回 402，前端提示"先充值再生成"，避免无谓的云调用。
+ */
+export async function reserveWalletHoldFromServer(opts: {
   toolKey: string;
-  action: string;
+  action?: string;
+  estimatedMaxPoints: number;
+  taskKey?: string;
   meta?: Record<string, unknown>;
 }): Promise<
   | { ok: false; reason: "no_session" | "no_origin" }
@@ -58,7 +63,80 @@ export async function postToolUsageFromServer(opts: {
   const origin = getMainSiteOrigin()?.replace(/\/$/, "");
   if (!origin?.length) return { ok: false, reason: "no_origin" };
 
-  const r = await fetch(`${origin}/api/sso/tools/usage`, {
+  const r = await fetch(`${origin}/api/sso/tools/usage?phase=reserve`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      phase: "reserve",
+      toolKey: opts.toolKey,
+      action: opts.action ?? null,
+      estimatedMaxPoints: opts.estimatedMaxPoints,
+      ...(opts.taskKey ? { taskKey: opts.taskKey } : {}),
+      ...(opts.meta ? { meta: opts.meta } : {}),
+    }),
+    cache: "no-store",
+  });
+  const data = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+  return { ok: true, status: r.status, data };
+}
+
+/**
+ * v003：release 一笔预占用（hold）。
+ * 用于云生成失败或用户取消时释放 reserved 点数（幂等，已 SETTLED 时返回 409 不影响业务）。
+ */
+export async function releaseWalletHoldFromServer(opts: {
+  holdId?: string;
+  taskKey?: string;
+  reason?: string;
+}): Promise<{ ok: boolean; status?: number; data?: Record<string, unknown> }> {
+  const token = cookies().get("tools_token")?.value?.trim();
+  if (!token) return { ok: false };
+  const origin = getMainSiteOrigin()?.replace(/\/$/, "");
+  if (!origin?.length) return { ok: false };
+  try {
+    const r = await fetch(`${origin}/api/sso/tools/usage?phase=release`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        phase: "release",
+        ...(opts.holdId ? { holdId: opts.holdId } : {}),
+        ...(opts.taskKey ? { taskKey: opts.taskKey } : {}),
+        ...(opts.reason ? { reason: opts.reason } : {}),
+      }),
+      cache: "no-store",
+    });
+    const data = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+    return { ok: true, status: r.status, data };
+  } catch (e) {
+    console.error("[releaseWalletHoldFromServer]", e);
+    return { ok: false };
+  }
+}
+
+/** 同步调用主站计费接口并返回响应体（用于余额不足 402 等需告知前端的场景）。 */
+export async function postToolUsageFromServer(opts: {
+  toolKey: string;
+  action: string;
+  meta?: Record<string, unknown>;
+  /** v003：settle 时若已 reserve，可附带 holdId 让主站 settle 内同步把 hold 转 SETTLED */
+  holdId?: string;
+}): Promise<
+  | { ok: false; reason: "no_session" | "no_origin" }
+  | { ok: true; status: number; data: Record<string, unknown> }
+> {
+  const token = cookies().get("tools_token")?.value?.trim();
+  if (!token) return { ok: false, reason: "no_session" };
+
+  const origin = getMainSiteOrigin()?.replace(/\/$/, "");
+  if (!origin?.length) return { ok: false, reason: "no_origin" };
+
+  const r = await fetch(`${origin}/api/sso/tools/usage${opts.holdId ? "?phase=settle" : ""}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -68,6 +146,7 @@ export async function postToolUsageFromServer(opts: {
       toolKey: opts.toolKey,
       action: opts.action,
       ...(opts.meta ? { meta: opts.meta } : {}),
+      ...(opts.holdId ? { phase: "settle", holdId: opts.holdId } : {}),
     }),
     cache: "no-store",
   });

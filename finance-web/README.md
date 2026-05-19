@@ -18,7 +18,9 @@ npm run dev
 # http://localhost:3002 → 「费用 → 账单详情」
 ```
 
-配置示例见 `.env.example`（`NEXT_PUBLIC_BOOK_MALL_URL`、可选 `NEXT_PUBLIC_FINANCE_DEV_USER_ID`）。
+配置示例见 `.env.example`。**默认浏览器直连 book-mall**，使用主站真实 NextAuth 会话拉账单（localhost:3002↔3000 同站点，SameSite=Lax 的 session Cookie 会被发送）。
+
+> ⚠️ **不要默认开** `NEXT_PUBLIC_FINANCE_USE_DEV_PROXY=1`、`NEXT_PUBLIC_FINANCE_DEV_USER_ID=...`。一旦开启，账单接口将以**固定的 dev User.id** 替你拉数据，**与你浏览器实际登录的账号无关**——会出现「登录 A 却看到 B 的明细」。这两个开关现在仅在 URL 显式带 `?useProxy=1` / `?asDev=1` 时生效，并在页面顶部以红色阻断框警示。
 
 ## 与 book-mall 联调
 
@@ -30,7 +32,9 @@ npm run dev
    BILLING_IMPORT_USER_ID=<User.id> BILLING_IMPORT_REPLACE=1 pnpm billing:import-cloud-csv
    ```
 
-3. book-mall `.env.local` 可选：`FINANCE_WEB_ORIGINS=http://localhost:3002`、`FINANCE_ALLOW_DEV_USER_QUERY=1`（本地用 `?devUserId=` 代替 Cookie 时使用）。
+3. book-mall `.env.local` 必填（本地）：`FINANCE_WEB_ORIGINS=http://localhost:3002`（CORS）。  
+   仅在「故意以某个 User.id 模拟」场景下临时把 `FINANCE_ALLOW_DEV_USER_QUERY=1` 打开，并在 finance-web 页面 URL 上带 `?asDev=1`（或 `?useProxy=1`）。  
+4. **使用真实账号**：在同浏览器打开 `http://localhost:3000/login` 登录后回到 `http://localhost:3002/fees/billing/details` 刷新即可。顶部「当前账单归属」应显示你的邮箱与 `authMode = session`。
 
 ## 页面
 
