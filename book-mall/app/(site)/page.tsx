@@ -2,7 +2,6 @@ import { BenefitsSection } from "@/components/layout/sections/benefits";
 import { BillingPolicySection } from "@/components/layout/sections/billing-policy";
 import { CommunitySection } from "@/components/layout/sections/community";
 import { ContactSection } from "@/components/layout/sections/contact";
-import { FAQSection } from "@/components/layout/sections/faq";
 import { FeaturesSection } from "@/components/layout/sections/features";
 import { FeaturedProductsSection } from "@/components/layout/sections/featured-products";
 import { FooterSection } from "@/components/layout/sections/footer";
@@ -56,7 +55,6 @@ export default function Home() {
       <CommunitySection />
       <PricingSection />
       <ContactSection />
-      <FAQSection />
       <BillingPolicySection />
       <FooterSection />
     </>

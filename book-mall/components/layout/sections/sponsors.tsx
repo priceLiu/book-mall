@@ -25,7 +25,7 @@ export const SponsorsSection = () => {
     <section id="more-ai-apps" className="max-w-[75%] mx-auto pb-24 sm:pb-32">
       <h2 className="text-lg md:text-xl text-center mb-2">更多的 AI 应用</h2>
       <p className="text-sm text-muted-foreground text-center mb-8 max-w-xl mx-auto">
-        下列为当前工具站内已接入的分组名称；开通会员订阅并按规则充值钱包后，可在独立工具站中使用。
+        开通会员订阅并按规则充值钱包后，可在独立工具站中使用。
       </p>
 
       <div className="mx-auto">
