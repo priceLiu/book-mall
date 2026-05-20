@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { LaunchToolsAppButton } from "@/components/account/launch-tools-app";
 import { formatPointsAsYuan } from "@/lib/currency";
+import { PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS } from "@/lib/pricing-disclosure-view";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -231,7 +232,7 @@ export function AccountOverviewCards({
               </Button>
             )}
             <Button asChild variant="outline" size="sm" className="flex-1">
-              <a href="/pricing-disclosure/from-account">价目表</a>
+              <a href={PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS}>价目表</a>
             </Button>
           </div>
         </CardContent>

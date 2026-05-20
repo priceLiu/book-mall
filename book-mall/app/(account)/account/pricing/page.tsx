@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS } from "@/lib/pricing-disclosure-view";
 
 export const dynamic = "force-dynamic";
 
@@ -17,5 +18,5 @@ export default async function MyPricingTablePage() {
   if (!session?.user?.id) {
     redirect("/login?next=/account/pricing");
   }
-  redirect("/pricing-disclosure/from-account");
+  redirect(PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS);
 }

@@ -24,7 +24,11 @@ export function AuthGlassScreen({ children }: { children: ReactNode }) {
   };
 
   return (
-    <motion.div className="relative -mt-4 flex min-h-[calc(100vh-3.5rem)] w-full items-start justify-center overflow-hidden bg-zinc-100 pt-[14vh] sm:-mt-5 sm:min-h-[calc(100vh-4rem)] sm:pt-[16vh] dark:bg-black">
+    /*
+     * (site) layout：Navbar（min-h-12 + py-2 ≈ 4rem）+ 外层 pt-4 md:pt-5（由 -mt 抵消）。
+     * 固定 h 而非 min-h，且扣 5rem，避免总高度超出 100dvh 出现页面滚动条。
+     */
+    <motion.div className="relative -mt-4 flex h-[calc(100dvh-5rem)] max-h-[calc(100dvh-5rem)] w-full items-start justify-center overflow-hidden bg-zinc-100 pt-[12vh] md:-mt-5 md:pt-[14vh] dark:bg-black">
       <div className="absolute inset-0 bg-gradient-to-b from-zinc-300/90 via-zinc-100 to-white dark:from-black dark:via-zinc-950/85 dark:to-zinc-600/30" />
 
       <div
