@@ -17,6 +17,8 @@ import { Separator } from "../ui/separator";
 import { Button } from "../ui/button";
 import { NotchNav, type NotchNavItem } from "../ui/notch-nav";
 import { ToggleTheme } from "./toogle-theme";
+import { siteHeaderWidthClass } from "@/lib/site-layout";
+import { cn } from "@/lib/utils";
 
 /** 与 NotchNav 中「产品」项 value 一致，用于凹槽高亮与路由判断 */
 const NAV_PRODUCT_VALUE = "__nav_products__";
@@ -162,7 +164,12 @@ export function NavbarShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <header className="sticky top-5 z-50 mx-auto flex min-h-12 w-[90%] items-center justify-between gap-3 overflow-visible rounded-2xl border border-border/80 bg-card/95 px-2 py-2 shadow-md backdrop-blur-md supports-[backdrop-filter]:bg-card/90 md:w-[70%] lg:w-[75%] lg:max-w-screen-xl">
+    <header
+      className={cn(
+        "sticky top-5 z-50 flex min-h-12 items-center justify-between gap-3 overflow-visible rounded-2xl border border-border/80 bg-card/95 px-2 py-2 shadow-md backdrop-blur-md supports-[backdrop-filter]:bg-card/90",
+        siteHeaderWidthClass,
+      )}
+    >
       <div className="flex h-9 shrink-0 items-center">
         <BrandLogoLink />
       </div>
