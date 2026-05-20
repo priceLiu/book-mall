@@ -21,6 +21,10 @@ import { AccountDevActions } from "@/components/account/account-dev-actions";
 import { WalletRefundRequestForm } from "@/components/account/wallet-refund-request-form";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
 import { AccountOverviewCards } from "@/components/account/account-overview-cards";
+import {
+  hrefPricingDisclosureFromAccount,
+  PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS,
+} from "@/lib/pricing-disclosure-view";
 
 export const metadata = {
   title: "个人中心 — AI Mall",
@@ -138,9 +142,12 @@ export default async function AccountPage({
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
             账户、钱包、订阅与计费明细的统一入口。
-            <Link href="/pricing-disclosure#billing-policy" className="ml-1 text-primary hover:underline">
+            <a
+              href={hrefPricingDisclosureFromAccount({ hash: "billing-policy" })}
+              className="ml-1 text-primary hover:underline"
+            >
               查看计费与提现公示 →
-            </Link>
+            </a>
           </p>
         </header>
 
@@ -194,7 +201,7 @@ export default async function AccountPage({
               </Button>
             ) : null}
             <Button asChild variant="outline" size="sm">
-              <a href="/pricing-disclosure/from-account">平台价目表（价格公示）</a>
+              <a href={PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS}>平台价目表（价格公示）</a>
             </Button>
           </CardContent>
         </Card>
@@ -284,9 +291,12 @@ export default async function AccountPage({
             <CardDescription className="text-xs leading-relaxed">
               订阅费不可用余额抵扣；高阶 / 按量依赖余额且须不低于最低可用线；余额提现须先结清应扣未扣。
               完整说明见{" "}
-              <Link href="/pricing-disclosure#billing-policy" className="text-primary underline">
+              <a
+                href={hrefPricingDisclosureFromAccount({ hash: "billing-policy" })}
+                className="text-primary underline"
+              >
                 本站公示
-              </Link>
+              </a>
               。
             </CardDescription>
           </CardHeader>
