@@ -81,6 +81,7 @@ export function AuthOrbitStage({ brandingText = "智选 AI MALL" }: Props) {
         mainCircleSize={rippleMain}
         rippleStep={rippleStep}
         numCircles={RIPPLE_RING_COUNT}
+        maskBottom={false}
         className="inset-0 z-0 max-w-none"
       />
       <OrbitPathRings radiiPx={ringRadiiPx} className="z-[5]" />
