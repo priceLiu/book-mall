@@ -4,9 +4,16 @@ import { type FormEvent, useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
-import { AuthGlassInput, AuthGlassScreen } from "@/components/auth/auth-glass-screen";
+import {
+  AuthAnimatedScreen,
+} from "@/components/auth/auth-animated-screen";
+import {
+  AnimatedAuthFields,
+  AuthOrDivider,
+  AuthSubmitButton,
+  BoxReveal,
+  GoogleAuthButton,
+} from "@/components/auth/animated-auth-ui";
 
 function safeNextPath(raw: string | null): string {
   if (!raw) return "/account";
@@ -25,7 +32,6 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [focusedInput, setFocusedInput] = useState<"email" | "password" | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
 
   const showGoogle = process.env.NEXT_PUBLIC_AUTH_GOOGLE === "1";
@@ -49,201 +55,99 @@ export function LoginForm() {
   }
 
   return (
-    <AuthGlassScreen>
-      <div className="mb-5 space-y-1 text-center">
-        <motion.div
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", duration: 0.8 }}
-          className="relative mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-border/60 dark:border-white/10"
-        >
-          <span className="bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-lg font-bold text-transparent">
-            智
-          </span>
-          <div className="absolute inset-0 bg-gradient-to-br from-foreground/10 to-transparent opacity-50 dark:from-white/10" />
-        </motion.div>
+    <AuthAnimatedScreen brandingText="智选 AI MALL">
+      <section className="mx-auto flex w-full max-w-md flex-col gap-4">
+        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
+          <h2 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">
+            欢迎回来
+          </h2>
+        </BoxReveal>
 
-        <motion.h1
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-gradient-to-b from-foreground to-foreground/80 bg-clip-text text-xl font-bold text-transparent"
-        >
-          欢迎回来
-        </motion.h1>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-xs text-muted-foreground"
-        >
-          登录以继续使用智选 AI Mall
-        </motion.p>
-      </div>
-
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-3">
-          <motion.div
-            className={focusedInput === "email" ? "relative z-10" : "relative"}
-            whileHover={{ scale: 1.01 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          >
-            <div className="relative flex items-center overflow-hidden rounded-lg">
-              <Mail
-                className={`absolute left-3 h-4 w-4 transition-all duration-300 ${
-                  focusedInput === "email" ? "text-foreground" : "text-muted-foreground"
-                }`}
-                aria-hidden
-              />
-              <AuthGlassInput
-                type="email"
-                name="email"
-                autoComplete="email"
-                required
-                placeholder="邮箱"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onFocus={() => setFocusedInput("email")}
-                onBlur={() => setFocusedInput(null)}
-                aria-invalid={!!error}
-              />
-            </div>
-          </motion.div>
-
-          <motion.div
-            className={focusedInput === "password" ? "relative z-10" : "relative"}
-            whileHover={{ scale: 1.01 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          >
-            <div className="relative flex items-center overflow-hidden rounded-lg">
-              <Lock
-                className={`absolute left-3 h-4 w-4 transition-all duration-300 ${
-                  focusedInput === "password" ? "text-foreground" : "text-muted-foreground"
-                }`}
-                aria-hidden
-              />
-              <AuthGlassInput
-                type={showPassword ? "text" : "password"}
-                name="password"
-                autoComplete="current-password"
-                required
-                placeholder="密码"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onFocus={() => setFocusedInput("password")}
-                onBlur={() => setFocusedInput(null)}
-                className="pl-10 pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 cursor-pointer rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                aria-label={showPassword ? "隐藏密码" : "显示密码"}
-              >
-                {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-
-        {error ? (
-          <p className="text-center text-xs text-red-400" role="alert">
-            {error}
+        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} className="pb-2">
+          <p className="max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
+            登录以继续使用智选 AI Mall
           </p>
-        ) : null}
-
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center space-x-2">
-            <input
-              id="remember-me"
-              name="remember-me"
-              type="checkbox"
-              checked={rememberMe}
-              onChange={() => setRememberMe(!rememberMe)}
-              className="h-4 w-4 appearance-none rounded border border-border bg-muted transition-all duration-200 checked:border-primary checked:bg-primary focus:outline-none focus:ring-1 focus:ring-ring/30 dark:border-white/20 dark:bg-white/5 dark:checked:border-white dark:checked:bg-white dark:focus:ring-white/30"
-            />
-            <label htmlFor="remember-me" className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-              记住我
-            </label>
-          </div>
-          <span className="text-xs text-muted-foreground" title="请联系客服协助处理账号问题">
-            忘记密码？
-          </span>
-        </div>
-
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          type="submit"
-          disabled={loading}
-          className="group/button relative mt-5 w-full"
-        >
-          <div className="absolute inset-0 rounded-lg bg-foreground/10 opacity-0 blur-lg transition-opacity duration-300 group-hover/button:opacity-70 dark:bg-white/10" />
-          <div className="relative flex h-10 items-center justify-center overflow-hidden rounded-lg bg-foreground font-medium text-background transition-all duration-300 dark:bg-white dark:text-black">
-            <AnimatePresence mode="wait">
-              {loading ? (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center justify-center"
-                >
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-background/70 border-t-transparent dark:border-black/70" />
-                </motion.div>
-              ) : (
-                <motion.span
-                  key="btn"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center gap-1 text-sm font-medium"
-                >
-                  登录
-                  <ArrowRight className="h-3 w-3 transition-transform duration-300 group-hover/button:translate-x-1" />
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.button>
+        </BoxReveal>
 
         {showGoogle ? (
           <>
-            <div className="relative mt-2 mb-5 flex items-center">
-              <div className="grow border-t border-border dark:border-white/5" />
-              <span className="mx-3 text-xs text-muted-foreground">或</span>
-              <div className="grow border-t border-border dark:border-white/5" />
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="button"
-              className="group/google relative w-full"
+            <GoogleAuthButton
+              label="使用 Google 登录"
               onClick={() => void signIn("google", { callbackUrl: next })}
-            >
-              <div className="absolute inset-0 rounded-lg bg-foreground/5 opacity-0 blur transition-opacity duration-300 group-hover/google:opacity-70 dark:bg-white/5" />
-              <div className="relative flex h-10 items-center justify-center gap-2 overflow-hidden rounded-lg border border-border bg-muted/50 font-medium text-foreground transition-all duration-300 hover:border-foreground/20 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-white/20">
-                <span className="text-sm text-muted-foreground group-hover/google:text-foreground dark:text-white/80 dark:group-hover/google:text-white">G</span>
-                <span className="text-xs text-muted-foreground group-hover/google:text-foreground dark:text-white/80 dark:group-hover/google:text-white">使用 Google 登录</span>
-              </div>
-            </motion.button>
+            />
+            <AuthOrDivider />
           </>
         ) : null}
 
-        <motion.p
-          className="mt-4 text-center text-xs text-muted-foreground"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          还没有账号？{" "}
-          <Link href="/register" className="relative inline-block font-medium text-foreground hover:text-foreground/80">
-            注册
-          </Link>
-        </motion.p>
-      </form>
-    </AuthGlassScreen>
+        <form onSubmit={onSubmit}>
+          <AnimatedAuthFields
+            fields={[
+              {
+                name: "email",
+                label: "邮箱",
+                type: "email",
+                placeholder: "请输入邮箱",
+                value: email,
+                onChange: (e) => setEmail(e.target.value),
+              },
+              {
+                name: "password",
+                label: "密码",
+                type: "password",
+                placeholder: "请输入密码",
+                value: password,
+                onChange: (e) => setPassword(e.target.value),
+              },
+            ]}
+            passwordVisible={showPassword}
+            onTogglePassword={() => setShowPassword((v) => !v)}
+          />
+
+          {error ? (
+            <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} width="100%">
+              <p className="mb-4 text-sm text-red-500" role="alert">
+                {error}
+              </p>
+            </BoxReveal>
+          ) : null}
+
+          <div className="mb-4 flex items-center justify-between">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+              <input
+                id="remember-me"
+                name="remember-me"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={() => setRememberMe((v) => !v)}
+                className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600"
+              />
+              记住我
+            </label>
+            <span
+              className="text-sm text-blue-600 dark:text-blue-400"
+              title="请联系客服协助处理账号问题"
+            >
+              忘记密码？
+            </span>
+          </div>
+
+          <AuthSubmitButton disabled={loading} loading={loading}>
+            登录 &rarr;
+          </AuthSubmitButton>
+        </form>
+
+        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
+          <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-300">
+            还没有账号？{" "}
+            <Link
+              href="/register"
+              className="font-medium text-blue-600 outline-none hover:underline dark:text-blue-400"
+            >
+              注册
+            </Link>
+          </p>
+        </BoxReveal>
+      </section>
+    </AuthAnimatedScreen>
   );
 }

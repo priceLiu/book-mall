@@ -26,6 +26,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "avatars.githubusercontent.com",
       },
+      {
+        protocol: "https",
+        hostname: "cdn1.iconfinder.com",
+      },
     ],
   },
 };

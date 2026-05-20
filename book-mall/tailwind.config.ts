@@ -100,6 +100,22 @@ module.exports = {
           "0%": { backgroundPosition: "0% 50%" },
           "100%": { backgroundPosition: "200% 50%" },
         },
+        orbit: {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
+        ripple: {
+          "0%, 100%": { transform: "translate(-50%, -50%) scale(1)" },
+          "50%": { transform: "translate(-50%, -50%) scale(0.9)" },
+        },
+        "pulse-ring": {
+          "0%": { transform: "translate(-50%, -50%) scale(0.88)", opacity: "0.35" },
+          "100%": { transform: "translate(-50%, -50%) scale(1.08)", opacity: "0" },
+        },
+        "auth-float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-14px)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -112,6 +128,10 @@ module.exports = {
         "tools-bot-run": "tools-bot-run 0.78s ease-in-out infinite",
         "tools-scan-line": "tools-scan-line 1.6s ease-in-out infinite",
         "tools-text-shimmer": "tools-text-shimmer 2.9s linear infinite",
+        orbit: "orbit calc(var(--duration) * 1s) linear infinite",
+        ripple: "ripple 8s ease calc(var(--delay, 0) * 1s) infinite",
+        "pulse-ring": "pulse-ring 4s ease-out calc(var(--delay, 0) * 1s) infinite",
+        "auth-float": "auth-float 5s ease-in-out calc(var(--delay, 0) * 1s) infinite",
       },
     },
   },
