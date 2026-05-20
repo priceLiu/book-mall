@@ -161,6 +161,8 @@ type RippleProps = {
   numCircles?: number;
   /** 同心圆间距（默认 70，随舞台缩放传入） */
   rippleStep?: number;
+  /** 底部渐隐：登录标题居中需保持完整动效，仅用轻微边缘淡出 */
+  maskBottom?: boolean;
   className?: string;
 };
 
@@ -201,6 +203,7 @@ export const Ripple = memo(function Ripple({
   mainCircleOpacity = 0.38,
   numCircles = 5,
   rippleStep = 70,
+  maskBottom = false,
   className = "",
 }: RippleProps) {
   return (
@@ -208,7 +211,8 @@ export const Ripple = memo(function Ripple({
       className={cn(
         "pointer-events-none absolute inset-0 flex items-center justify-center",
         "bg-sky-100/40 dark:bg-sky-400/[0.02]",
-        "[mask-image:linear-gradient(to_bottom,black_72%,transparent)]",
+        maskBottom &&
+          "[mask-image:linear-gradient(to_bottom,black_88%,transparent_100%)]",
         className
       )}
     >
@@ -285,6 +289,12 @@ export const OrbitingCircles = memo(function OrbitingCircles({
   );
 });
 
+/** 品牌标题渐变（对齐 modern-animated-sign-in：上亮下融入背景） */
+export const AUTH_BRANDING_TITLE_GRADIENT = cn(
+  "bg-gradient-to-b from-black to-gray-300/80 bg-clip-text text-transparent",
+  "dark:from-white dark:to-slate-900/10"
+);
+
 // —— TechOrbitDisplay ——
 
 export type OrbitIconConfig = {
@@ -322,7 +332,8 @@ export const TechOrbitDisplay = memo(function TechOrbitDisplay({
       ))}
       <span
         className={cn(
-          "pointer-events-none relative z-30 whitespace-pre-wrap bg-gradient-to-b from-zinc-900 to-zinc-500/90 bg-clip-text text-center font-semibold leading-none tracking-tight text-transparent dark:from-white dark:to-slate-400/50",
+          "pointer-events-none relative z-30 whitespace-pre-wrap text-center font-semibold leading-none tracking-tight",
+          AUTH_BRANDING_TITLE_GRADIENT,
           titleClassName
         )}
       >

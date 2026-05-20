@@ -1,22 +1,24 @@
 "use client";
 
+import { AUTH_BRANDING_TITLE_GRADIENT } from "@/components/auth/animated-auth-ui";
 import { cn } from "@/lib/utils";
 
 type Props = {
   brandingText?: string;
 };
 
-/** 注册页全屏粒子上的左侧品牌标题（大屏显示） */
+/** 注册页品牌标题：左侧区域内、单行、偏大、略偏上 */
 export function AuthRegisterBranding({ brandingText = "智选 AI MALL" }: Props) {
   return (
     <div
-      className="pointer-events-none absolute inset-y-0 left-0 z-[5] hidden w-1/2 items-center justify-center px-8 lg:flex"
+      className="pointer-events-none absolute left-0 top-[34%] z-[5] hidden w-1/2 px-6 text-center lg:block xl:px-10"
       aria-hidden
     >
       <span
         className={cn(
-          "whitespace-pre-wrap bg-gradient-to-b from-zinc-900 to-zinc-500/90 bg-clip-text text-center font-semibold leading-none tracking-tight text-transparent",
-          "text-5xl xl:text-6xl 2xl:text-7xl dark:from-white dark:to-slate-400/50"
+          "inline-block whitespace-nowrap font-semibold leading-none tracking-tight",
+          "text-6xl xl:text-7xl 2xl:text-8xl",
+          AUTH_BRANDING_TITLE_GRADIENT
         )}
       >
         {brandingText}
