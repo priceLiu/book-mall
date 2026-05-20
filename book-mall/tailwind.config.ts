@@ -116,6 +116,36 @@ module.exports = {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-14px)" },
         },
+        "gradient-border": {
+          "0%, 100%": {
+            borderRadius: "30% 70% 70% 30% / 30% 30% 70% 70%",
+          },
+          "25%": {
+            borderRadius: "58% 42% 75% 25% / 76% 24% 76% 24%",
+          },
+          "50%": {
+            borderRadius: "50% 50% 33% 67% / 55% 27% 73% 45%",
+          },
+          "75%": {
+            borderRadius: "33% 67% 58% 42% / 63% 37% 63% 37%",
+          },
+        },
+        "gradient-1": {
+          "0%, 100%": { transform: "translate(0%, 0%) scale(1)" },
+          "50%": { transform: "translate(20%, -25%) scale(1.1)" },
+        },
+        "gradient-2": {
+          "0%, 100%": { transform: "translate(0%, 0%) scale(1)" },
+          "50%": { transform: "translate(-25%, 25%) scale(1.15)" },
+        },
+        "gradient-3": {
+          "0%, 100%": { transform: "translate(0%, 0%) scale(1)" },
+          "50%": { transform: "translate(25%, 25%) scale(1.1)" },
+        },
+        "gradient-4": {
+          "0%, 100%": { transform: "translate(0%, 0%) scale(1)" },
+          "50%": { transform: "translate(-20%, -25%) scale(1.2)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -132,6 +162,11 @@ module.exports = {
         ripple: "ripple 8s ease calc(var(--delay, 0) * 1s) infinite",
         "pulse-ring": "pulse-ring 4s ease-out calc(var(--delay, 0) * 1s) infinite",
         "auth-float": "auth-float 5s ease-in-out calc(var(--delay, 0) * 1s) infinite",
+        "gradient-border": "gradient-border 6s ease-in-out infinite",
+        "gradient-1": "gradient-1 12s ease-in-out infinite alternate",
+        "gradient-2": "gradient-2 12s ease-in-out infinite alternate",
+        "gradient-3": "gradient-3 12s ease-in-out infinite alternate",
+        "gradient-4": "gradient-4 12s ease-in-out infinite alternate",
       },
     },
   },
