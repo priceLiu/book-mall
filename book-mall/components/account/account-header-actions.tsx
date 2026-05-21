@@ -6,6 +6,15 @@ import { Button } from "@/components/ui/button";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 import { LaunchToolsAppButton } from "@/components/account/launch-tools-app";
 
+async function fullSignOut() {
+  try {
+    await signOut({ redirect: false });
+  } catch {
+    /* 走兜底清理 */
+  }
+  window.location.href = "/api/auth/full-signout?callbackUrl=/";
+}
+
 export function AccountHeaderActions({
   isAdmin,
   showCoursesCta,
@@ -51,7 +60,7 @@ export function AccountHeaderActions({
         variant="outline"
         size="sm"
         className="h-9 shrink-0 px-3"
-        onClick={() => void signOut({ callbackUrl: "/", redirect: true })}
+        onClick={() => void fullSignOut()}
       >
         退出
       </Button>

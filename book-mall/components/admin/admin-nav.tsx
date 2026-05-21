@@ -16,6 +16,15 @@ import {
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 
+async function fullSignOut() {
+  try {
+    await signOut({ redirect: false });
+  } catch {
+    /* 走兜底清理 */
+  }
+  window.location.href = "/api/auth/full-signout?callbackUrl=/";
+}
+
 /** Ghost 顶栏按钮默认不显式前景色时，在深色/磨砂背景下可能被「吃掉」；与 `bg-card` 顶栏对齐为 card 前景色 */
 const ADMIN_NAV_GHOST =
   "h-9 px-2 text-sm font-normal text-card-foreground hover:bg-accent hover:text-accent-foreground";
@@ -238,7 +247,7 @@ export function AdminNav({
           variant="ghost"
           size="sm"
           className={ADMIN_NAV_GHOST}
-          onClick={() => void signOut({ callbackUrl: "/", redirect: true })}
+          onClick={() => void fullSignOut()}
         >
           退出
         </Button>
