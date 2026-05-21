@@ -27,7 +27,7 @@ services:
       context: ./finance-web
       dockerfile: Dockerfile
     ports:
-      - "${FINANCE_WEB_PORT:-3002}:3000"
+      - "${FINANCE_WEB_PORT:-3002}:3002"
     env_file:
       - ./deploy/tencent/finance-web.env
     restart: unless-stopped

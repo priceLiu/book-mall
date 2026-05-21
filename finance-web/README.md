@@ -13,8 +13,8 @@ finance-web：表头与 **`consumedetailbillv2`** 对齐，并带 **对内计价
 
 ```bash
 cd finance-web
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 # http://localhost:3002 → 「费用 → 账单详情」
 ```
 
@@ -44,12 +44,12 @@ npm run dev
 ## 构建
 
 ```bash
-npm run build && npm start
+pnpm run build && pnpm start
 ```
 
 ## 腾讯云 CloudBase 部署
 
 **Git 仓库列表里不会出现名为 `finance-web` 的仓库**——它与 `book-mall`、`tool-web` 同在 **`priceLiu/book-mall`** Monorepo 中。
 
-在控制台 **再新建一个 Git 服务**，仍选该仓库，**目标目录** 填 **`finance-web`**，容器端口 **3000**，自定义域示例 **`f.ai-code8.com`**。  
+在控制台 **再新建一个 Git 服务**，仍选该仓库，**目标目录** 填 **`finance-web`**，容器端口 **3002**（与 `tool-web` 用 **3001** 同理），自定义域示例 **`f.ai-code8.com`**。  
 逐步说明与环境变量见 [`deploy/tencent/README.md`](../deploy/tencent/README.md)、[`deploy/tencent/finance-web.env.example`](../deploy/tencent/finance-web.env.example)。
