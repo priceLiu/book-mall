@@ -68,11 +68,21 @@ function safeRedirectTarget(raw: string | null): string {
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
+  /**
+   * 用相对路径作 Location，让浏览器按当前请求的 origin 解析。
+   * CloudBase Run 容器里 `request.nextUrl.origin` 会是内部 0.0.0.0:3000，
+   * 用绝对 URL 重定向会跳到无法访问的地址。
+   */
   const callbackUrl = safeRedirectTarget(
     request.nextUrl.searchParams.get("callbackUrl"),
   );
-  const target = new URL(callbackUrl, request.nextUrl.origin);
-  const res = NextResponse.redirect(target, 302);
+  const res = new NextResponse(null, {
+    status: 302,
+    headers: {
+      Location: callbackUrl,
+      "Cache-Control": "no-store",
+    },
+  });
 
   const secure = process.env.NODE_ENV === "production";
   const domain = sharedDomain();
