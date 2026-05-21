@@ -1,6 +1,8 @@
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { FinanceAppTopBar } from "@/components/finance-app-top-bar";
 
+export const dynamic = "force-dynamic";
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">

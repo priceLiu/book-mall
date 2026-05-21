@@ -1,6 +1,8 @@
 import { FeesSidebar } from "@/components/fees-sidebar";
 import { FinanceAppTopBar } from "@/components/finance-app-top-bar";
 
+export const dynamic = "force-dynamic";
+
 export default function FeesLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
