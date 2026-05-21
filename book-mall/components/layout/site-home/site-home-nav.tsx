@@ -2,18 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
-import { ProductMegaMenuContent } from "@/components/layout/product-mega-menu";
-import { ToggleTheme } from "@/components/layout/toogle-theme";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  SITE_HOME_PRODUCT_OPTIONS,
+  SiteHomeProductNav,
+} from "@/components/layout/site-home/site-home-product-nav";
+import { ToggleTheme } from "@/components/layout/toogle-theme";
+import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -34,26 +31,10 @@ const anchorNavLinks: NavItem[] = [
   { label: "价格", href: "#pricing" },
 ];
 
-const productSubLinks: NavItem[] = [
-  { label: "AI 应用", href: "/products/ai-apps" },
-  { label: "AI 课程", href: "/products/ai-courses" },
-  { label: "AI 学堂", href: "/courses" },
-];
-
-function isProductPath(pathname: string) {
-  return (
-    pathname.startsWith("/products/") ||
-    pathname === "/courses" ||
-    pathname.startsWith("/courses/")
-  );
-}
-
 export function SiteHomeNav({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [productMenuOpen, setProductMenuOpen] = useState(false);
-  const onProductSection = isProductPath(pathname);
 
   const navigate = (href: string) => {
     setOpen(false);
@@ -85,26 +66,7 @@ export function SiteHomeNav({ children }: { children: React.ReactNode }) {
 
         <nav className="site-home-side-nav hidden lg:flex" aria-label="主导航">
           <div className="site-home-side-nav-item site-home-side-nav-item-first">
-            <DropdownMenu open={productMenuOpen} onOpenChange={setProductMenuOpen}>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={cn("site-home-nav-link", onProductSection && "site-home-nav-link-active")}
-                  aria-haspopup="menu"
-                  aria-expanded={productMenuOpen}
-                >
-                  <span>产品</span>
-                  <ChevronDown className="size-3 opacity-60" aria-hidden />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                sideOffset={10}
-                className="w-[min(92vw,680px)] overflow-hidden p-0"
-              >
-                <ProductMegaMenuContent />
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <SiteHomeProductNav />
           </div>
 
           {anchorNavLinks.map((item) => (
@@ -139,14 +101,15 @@ export function SiteHomeNav({ children }: { children: React.ReactNode }) {
               </SheetHeader>
               <div className="mt-6 flex flex-col gap-1">
                 <p className="px-3 text-xs font-medium text-muted-foreground">产品</p>
-                {productSubLinks.map((item) => (
+                {SITE_HOME_PRODUCT_OPTIONS.map((item) => (
                   <button
                     key={item.href}
                     type="button"
-                    className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm font-semibold hover:bg-white/5"
+                    className="flex flex-col gap-0.5 rounded-md px-3 py-2.5 text-left hover:bg-white/5"
                     onClick={() => navigate(item.href)}
                   >
-                    {item.label}
+                    <span className="text-sm font-semibold">{item.label}</span>
+                    <span className="text-xs text-muted-foreground">{item.description}</span>
                   </button>
                 ))}
                 <div className="my-2 border-t border-border/60" />

@@ -1,18 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
 import {
   billingActionIdle,
   extendActiveSubscription,
   type BillingActionState,
 } from "@/app/actions/billing";
-import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/ui/form-submit-button";
 import { Input } from "@/components/ui/input";
+import { useActionState } from "@/lib/use-action-state";
 import { Label } from "@/components/ui/label";
 import { FeedbackBanner } from "./feedback-banner";
 
 export function ExtendSubscriptionForm() {
-  const [state, action, pending] = useActionState<BillingActionState, FormData>(
+  const [state, action] = useActionState<BillingActionState, FormData>(
     extendActiveSubscription,
     billingActionIdle,
   );
@@ -37,9 +37,7 @@ export function ExtendSubscriptionForm() {
             defaultValue={30}
           />
         </div>
-        <Button type="submit" disabled={pending}>
-          {pending ? "续期中…" : "续期"}
-        </Button>
+        <FormSubmitButton idleLabel="续期" pendingLabel="续期中…" />
       </form>
       <FeedbackBanner state={state} />
     </div>
