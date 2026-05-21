@@ -1,4 +1,4 @@
-# 单仓库双应用：主站 + 工具站
+# 单仓库三应用：主站 + 工具站 + 财务控制台
 # 使用方法：deploy/tencent/README.md
 
 services:
@@ -20,4 +20,14 @@ services:
       - "${TOOL_WEB_PORT:-3001}:3001"
     env_file:
       - ./deploy/tencent/tool-web.env
+    restart: unless-stopped
+
+  finance-web:
+    build:
+      context: ./finance-web
+      dockerfile: Dockerfile
+    ports:
+      - "${FINANCE_WEB_PORT:-3002}:3000"
+    env_file:
+      - ./deploy/tencent/finance-web.env
     restart: unless-stopped

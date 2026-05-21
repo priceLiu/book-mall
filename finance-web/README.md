@@ -46,3 +46,10 @@ npm run dev
 ```bash
 npm run build && npm start
 ```
+
+## 腾讯云 CloudBase 部署
+
+**Git 仓库列表里不会出现名为 `finance-web` 的仓库**——它与 `book-mall`、`tool-web` 同在 **`priceLiu/book-mall`** Monorepo 中。
+
+在控制台 **再新建一个 Git 服务**，仍选该仓库，**目标目录** 填 **`finance-web`**，容器端口 **3000**，自定义域示例 **`f.ai-code8.com`**。  
+逐步说明与环境变量见 [`deploy/tencent/README.md`](../deploy/tencent/README.md)、[`deploy/tencent/finance-web.env.example`](../deploy/tencent/finance-web.env.example)。

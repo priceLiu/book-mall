@@ -16,4 +16,4 @@
 3. 增加「执行 Shell」步骤：`docker compose build`，再将镜像推送到 **容器镜像服务 TCR**（或使用云托管直接从 Dockerfile 构建）。  
 4. 部署阶段：在云主机执行 `docker compose pull && docker compose up -d`，或在云托管发布新版本。
 
-两条服务的环境变量建议在 **控制台「应用配置」** 或 **SSH 下发 `deploy/tencent/book-mall.env`、`deploy/tencent/tool-web.env`**，勿把真实密钥写入 Git。
+三个服务的环境变量建议在 **控制台「应用配置」** 或 **SSH 下发 `deploy/tencent/book-mall.env`、`tool-web.env`、`finance-web.env`**，勿把真实密钥写入 Git。财务服务构建目录为 **`finance-web`**，容器端口 **3000**。

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 mkdir -p deploy/tencent
-for pair in book-mall tool-web; do
+for pair in book-mall tool-web finance-web; do
   ex="deploy/tencent/${pair}.env.example"
   out="deploy/tencent/${pair}.env"
   if [[ ! -f "$out" ]]; then
