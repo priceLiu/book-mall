@@ -49,7 +49,8 @@ pnpm run build && pnpm start
 
 ## 腾讯云 CloudBase 部署
 
-**Git 仓库列表里不会出现名为 `finance-web` 的仓库**——它与 `book-mall`、`tool-web` 同在 **`priceLiu/book-mall`** Monorepo 中。
+**默认**：与 `tool-web` 相同，代码在 **`priceLiu/book-mall`** Monorepo 的 `finance-web/` 子目录，云托管选该仓库 + 目标目录 `finance-web`。
 
-在控制台 **再新建一个 Git 服务**，仍选该仓库，**目标目录** 填 **`finance-web`**，容器端口 **3002**（与 `tool-web` 用 **3001** 同理），自定义域示例 **`f.ai-code8.com`**。  
-逐步说明与环境变量见 [`deploy/tencent/README.md`](../deploy/tencent/README.md)、[`deploy/tencent/finance-web.env.example`](../deploy/tencent/finance-web.env.example)。
+**若要在 Git 下拉框直接看到 `priceLiu/finance-web`**：先在 GitHub 创建空仓库 `priceLiu/finance-web`，再在 Monorepo 根执行 `./scripts/publish-standalone-repo.sh finance-web`，云托管选该仓库、目标目录留空、端口 **3002**。
+
+逐步说明见 [`deploy/tencent/README.md`](../deploy/tencent/README.md)、[`deploy/tencent/finance-web.env.example`](../deploy/tencent/finance-web.env.example)。

@@ -7,16 +7,32 @@
 
 ---
 
-## 为什么 Git 仓库列表里看不到「finance-web」？
+## Git 仓库现状（已核对 GitHub）
 
-云托管「新建 Git 平台部署」的下拉框列出的是 **GitHub 仓库名**，不是 Monorepo 里的子目录。
+云托管下拉框列出的是 **GitHub 仓库名**，不是子目录名。
 
-| 你以为的 | 实际情况 |
-|----------|----------|
-| 单独仓库 `finance-web` | **不存在**；与主站、工具站同在 **`priceLiu/book-mall`** |
-| 再选一次同一仓库 | 再 **新建一个服务**，**目标目录** 填 `finance-web` |
+| 仓库名 | GitHub 是否存在 | 云构建怎么选 |
+|--------|----------------|-------------|
+| `priceLiu/book-mall` | ✅ 有（Monorepo 根目录含 `book-mall/`、`tool-web/`、`finance-web/`） | 可选；主站目标目录 `book-mall` |
+| `priceLiu/tool-web` | ❌ **没有**（404） | 不能搜到；须用上一行 + 目标目录 `tool-web` |
+| `priceLiu/finance-web` | ❌ **没有**（404） | 不能搜到；见下两种方案 |
 
-三个线上服务 = **同一仓库、三次部署配置、三个不同子目录**。
+> **说明**：工具站与主站一样，目前也是 **`priceLiu/book-mall` 子目录部署**，并不是独立仓库 `priceLiu/tool-web`。若下拉框里「看起来像」三个项目，那是 **服务名称**，不是三个 Git 仓库。
+
+### 方案 A（当前 Monorepo，无需新仓库）
+
+三个服务都选 **`priceLiu/book-mall`**，仅 **目标目录** 不同：`book-mall` / `tool-web` / `finance-web`。
+
+### 方案 B（与「仓库名 = 项目名」一致，推荐若要在 Git 里看到 `priceLiu/finance-web`）
+
+在 GitHub **新建空仓库** `priceLiu/finance-web`（以及若要一致则再建 `priceLiu/tool-web`），然后在 Monorepo 根执行：
+
+```bash
+./scripts/publish-standalone-repo.sh finance-web
+# ./scripts/publish-standalone-repo.sh tool-web
+```
+
+推送成功后，云托管 **Git 仓库** 可直接选 **`priceLiu/finance-web`**，**目标目录留空**（仓库根即 `Dockerfile` 所在目录），端口 **3002**。
 
 ---
 
