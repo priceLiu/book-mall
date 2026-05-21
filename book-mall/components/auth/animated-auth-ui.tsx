@@ -138,6 +138,7 @@ export const BoxReveal = memo(function BoxReveal({
         initial="hidden"
         animate={slideControls}
         transition={{ duration: duration ?? 0.5, ease: "easeIn" }}
+        className="pointer-events-none"
         style={{
           position: "absolute",
           top: 4,

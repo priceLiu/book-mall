@@ -238,7 +238,7 @@ export function AdminNav({
           variant="ghost"
           size="sm"
           className={ADMIN_NAV_GHOST}
-          onClick={() => signOut({ callbackUrl: "/" })}
+          onClick={() => void signOut({ callbackUrl: "/", redirect: true })}
         >
           退出
         </Button>
