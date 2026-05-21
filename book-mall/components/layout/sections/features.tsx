@@ -17,7 +17,7 @@ const featureList: FeaturesProps[] = [
   },
   {
     icon: "BadgeCheck",
-    title: "课程+工具闭环",
+    title: "课程 + 工具闭环",
     description:
       "每个核心工具都配套实战课程：从“这是什么”到“怎么用”到“用在哪儿”。不只是教操作，而是教会用户把AI嵌入真实工作流。学完就能用，用完就提效。",
   },
@@ -29,13 +29,13 @@ const featureList: FeaturesProps[] = [
   },
   {
     icon: "PictureInPicture",
-    title: "零基础友好+持续陪伴",
+    title: "零基础友好 + 持续陪跑",
     description:
       "设有“AI新手村”：入门指南、工具对比、每周技巧、常见问题FAQ。解决“不知道从哪开始”、“怕学不会”、“没人问”的痛点。课程阶梯式设计，从零到一，再到精通，长期陪跑。",
   },
   {
     icon: "MousePointerClick",
-    title: "移动优先+快速上手",
+    title: "移动优先 + 快速上手",
     description:
       "自适应布局与触控优化，手机/平板同样清晰可操作。课程支持碎片化学习，工具即开即用。主按钮与行动路径一目了然，减少找教程、找入口的时间浪费。",
   },
@@ -56,7 +56,7 @@ export const FeaturesSection = () => {
       </h2>
 
       <h3 className="md:w-1/2 mx-auto text-xl text-center text-muted-foreground mb-8">
-      从找到到学会，按角色陪跑、课程闭环，让AI真正为你所用
+      从找到学，按角色陪跑、课程闭环，让AI真正为你所用
       </h3>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

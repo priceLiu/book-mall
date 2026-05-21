@@ -73,77 +73,76 @@ html {
   }
 } */
 
-/* *=========== Orange theme =========== */
+/* *=========== Blue theme（主站 Semi 蓝，替代原橙色） =========== */
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 20 14.3% 4.1%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 20 14.3% 4.1%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 20 14.3% 4.1%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 24.6 95% 53.1%;
-    --primary-foreground: 60 9.1% 97.8%;
+    --primary: 214 100% 52%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 60 4.8% 95.9%;
-    --secondary-foreground: 24 9.8% 10%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 60 4.8% 95.9%;
-    --muted-foreground: 25 5.3% 44.7%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 46%;
 
-    --accent: 60 4.8% 95.9%;
-    --accent-foreground: 24 9.8% 10%;
+    --accent: 214 100% 96%;
+    --accent-foreground: 214 100% 40%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 60 9.1% 97.8%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 20 5.9% 90%;
-    --input: 20 5.9% 90%;
-    --ring: 24.6 95% 53.1%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 214 100% 52%;
     --radius: 0.5rem;
 
-    /* GradientText 彩色光斑 */
-    --color-1: 343 88% 60%;
-    --color-2: 280 85% 58%;
-    --color-3: 210 92% 55%;
+    --color-1: 214 100% 55%;
+    --color-2: 199 89% 48%;
+    --color-3: 262 83% 58%;
     --color-4: 170 80% 50%;
   }
 
   .dark {
-    --background: 20 14.3% 4.1%;
-    --foreground: 60 9.1% 97.8%;
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
 
-    --card: 24 9.8% 8%;
-    --card-foreground: 0 0% 95%;
+    --card: 222 40% 9%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 20 14.3% 4.1%;
-    --popover-foreground: 60 9.1% 97.8%;
+    --popover: 222 40% 9%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 20.5 90.2% 48.2%;
-    --primary-foreground: 60 9.1% 97.8%;
+    --primary: 214 100% 52%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 12 6.5% 15.1%;
-    --secondary-foreground: 60 9.1% 97.8%;
+    --secondary: 222 30% 14%;
+    --secondary-foreground: 210 25% 90%;
 
-    --muted: 12 6.5% 15.1%;
-    --muted-foreground: 24 5.4% 63.9%;
+    --muted: 222 28% 12%;
+    --muted-foreground: 215 16% 65%;
 
-    --accent: 12 6.5% 15.1%;
-    --accent-foreground: 60 9.1% 97.8%;
+    --accent: 222 30% 16%;
+    --accent-foreground: 210 40% 98%;
 
     --destructive: 0 72.2% 50.6%;
-    --destructive-foreground: 60 9.1% 97.8%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 12 6.5% 15.1%;
-    --input: 12 6.5% 15.1%;
-    --ring: 20.5 90.2% 48.2%;
+    --border: 222 24% 18%;
+    --input: 222 24% 18%;
+    --ring: 214 100% 52%;
 
-    --color-1: 343 88% 62%;
-    --color-2: 280 85% 60%;
-    --color-3: 210 92% 58%;
+    --color-1: 214 100% 58%;
+    --color-2: 199 89% 52%;
+    --color-3: 262 83% 62%;
     --color-4: 170 80% 52%;
   }
 }
@@ -172,8 +171,8 @@ html {
     background: radial-gradient(
       circle at 40% 50%,
       rgba(255, 255, 255, 0.65) 0%,
-      rgba(255, 237, 213, 0.32) 50%,
-      rgba(255, 251, 245, 0.92) 100%
+      rgba(219, 234, 254, 0.35) 50%,
+      rgba(248, 250, 252, 0.92) 100%
     );
     border: 1px solid hsl(var(--primary) / 0.14);
     border-radius: 1rem;
