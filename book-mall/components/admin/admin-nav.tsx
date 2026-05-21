@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 import { ChevronDown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -16,12 +15,8 @@ import {
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 
-async function fullSignOut() {
-  try {
-    await signOut({ redirect: false });
-  } catch {
-    /* 走兜底清理 */
-  }
+/** 见 navbar-sign-out-button.tsx 注释：直接走 full-signout 路由。 */
+function navigateToFullSignOut() {
   window.location.href = "/api/auth/full-signout?callbackUrl=/";
 }
 
@@ -247,7 +242,7 @@ export function AdminNav({
           variant="ghost"
           size="sm"
           className={ADMIN_NAV_GHOST}
-          onClick={() => void fullSignOut()}
+          onClick={navigateToFullSignOut}
         >
           退出
         </Button>
