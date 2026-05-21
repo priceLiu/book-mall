@@ -49,8 +49,6 @@ pnpm run build && pnpm start
 
 ## 腾讯云 CloudBase 部署
 
-**默认**：与 `tool-web` 相同，代码在 **`priceLiu/book-mall`** Monorepo 的 `finance-web/` 子目录，云托管选该仓库 + 目标目录 `finance-web`。
-
-**若要在 Git 下拉框直接看到 `priceLiu/finance-web`**：先在 GitHub 创建空仓库 `priceLiu/finance-web`，再在 Monorepo 根执行 `./scripts/publish-standalone-repo.sh finance-web`，云托管选该仓库、目标目录留空、端口 **3002**。
+与 `tool-web` 相同：代码在 **`priceLiu/book-mall`** 仓库的 **`finance-web/`** 子目录；云托管 **Git 仓库选 `priceLiu/book-mall`**，**目标目录填 `finance-web`**（不需要新建独立 Git 仓库）。
 
 逐步说明见 [`deploy/tencent/README.md`](../deploy/tencent/README.md)、[`deploy/tencent/finance-web.env.example`](../deploy/tencent/finance-web.env.example)。
