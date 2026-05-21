@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
-import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
 
 /** Ghost 顶栏按钮默认不显式前景色时，在深色/磨砂背景下可能被「吃掉」；与 `bg-card` 顶栏对齐为 card 前景色 */
 const ADMIN_NAV_GHOST =
@@ -77,12 +76,14 @@ export function AdminNav({
   user,
   toolsSsoReady,
   toolsSsoIssues,
+  financeWebOrigin,
 }: {
   user: AdminNavUserProps;
   toolsSsoReady: boolean;
   toolsSsoIssues: string[];
+  /** 由服务端 layout 注入；勿在 client 读 NEXT_PUBLIC_*（构建时内联，运行时改 env 不生效） */
+  financeWebOrigin: string | null;
 }) {
-  const financeWebOrigin = getFinanceWebPublicOrigin();
 
   return (
     <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-2 text-card-foreground">
