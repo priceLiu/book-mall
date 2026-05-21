@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
+import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 
 type BillingUser = {
   id: string;
@@ -27,10 +28,8 @@ export default function AdminBillingUsersIndexPage() {
     }
     let cancelled = false;
     setLoadState("loading");
-    fetch(`${base}/api/admin/finance/billing-users`, {
-      credentials: "include",
-      mode: "cors",
-    })
+    const { url, init } = resolveBookMallBrowserRequest(base, "/api/admin/finance/billing-users");
+    fetch(url, init)
       .then(async (res) => {
         if (cancelled) return;
         if (res.status === 403) {

@@ -1,3 +1,5 @@
+import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
+
 export type BookMallViewerUser = {
   id: string;
   email: string | null;
@@ -14,12 +16,10 @@ export async function fetchBookMallViewerUser(
 ): Promise<BookMallViewerUser | null> {
   if (!base) return null;
   try {
-    const res = await fetch(`${base}/api/finance/viewer-session`, {
-      credentials: "include",
-      mode: "cors",
-      cache: "no-store",
+    const { url, init } = resolveBookMallBrowserRequest(base, "/api/finance/viewer-session", {
       signal,
     });
+    const res = await fetch(url, init);
     if (!res.ok) return null;
     const j = (await res.json()) as { user: BookMallViewerUser | null };
     return j.user ?? null;
