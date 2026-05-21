@@ -1,17 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 import { LaunchToolsAppButton } from "@/components/account/launch-tools-app";
 
-async function fullSignOut() {
-  try {
-    await signOut({ redirect: false });
-  } catch {
-    /* 走兜底清理 */
-  }
+/** 见 navbar-sign-out-button.tsx 注释：直接走 full-signout 路由，避免 NextAuth signOut 在容器内构造出 0.0.0.0 回调。 */
+function navigateToFullSignOut() {
   window.location.href = "/api/auth/full-signout?callbackUrl=/";
 }
 
@@ -60,7 +55,7 @@ export function AccountHeaderActions({
         variant="outline"
         size="sm"
         className="h-9 shrink-0 px-3"
-        onClick={() => void fullSignOut()}
+        onClick={navigateToFullSignOut}
       >
         退出
       </Button>
