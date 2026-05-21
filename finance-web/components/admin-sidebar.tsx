@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, ListChecks, Tags, UserCircle2, Wrench } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
 
 const nav = [
   { href: "/admin", label: "概览", icon: LayoutDashboard, exact: true },
@@ -62,12 +63,36 @@ export function AdminSidebar() {
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-[#e8e8e8] bg-[#001529] text-sm text-white/85">
       <div className="shrink-0 border-b border-white/10 px-3 py-3 leading-snug">
         {viewerErr ? (
-          <p className="text-sm text-[#ffccc7]">{viewerErr}</p>
+          <p className="text-sm text-[#ffccc7]">
+            {viewerErr}
+            {base ? (
+              <>
+                {" "}
+                <a
+                  href={bookMallLoginHint(base, "admin").loginUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#91d5ff] underline"
+                >
+                  去主站登录
+                </a>
+              </>
+            ) : null}
+          </p>
         ) : viewer === undefined ? (
           <p className="text-sm text-white/45">加载中…</p>
         ) : viewer === null ? (
           <p className="text-sm text-white/70">
-            未登录。请先在主站以管理员登录，并与此站同浏览器会话。
+            未登录。请先在{" "}
+            <a
+              href={bookMallLoginHint(base, "admin").loginUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#91d5ff] underline"
+            >
+              主站登录
+            </a>
+            （管理员），再回到本页刷新。
           </p>
         ) : (
           <>

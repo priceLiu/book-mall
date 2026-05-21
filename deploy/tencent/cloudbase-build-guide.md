@@ -141,6 +141,7 @@ BOOK_MALL_URL=https://book.ai-code8.com
 | 构建过程报 `Dockerfile not found` | 「目标目录」误填为仓库根；改为 `book-mall` / `tool-web` / `finance-web` |
 | `502 Bad Gateway` | 服务端口与 `Dockerfile` 不一致；分别改回 `3000` / `3001` / `3002` |
 | 财务页 403 / 拉不到用户 | 检查主站 `FINANCE_WEB_ORIGINS` 是否含财务域；管理员是否在主站登录 |
+| 财务页 **Failed to fetch**（非 403） | 多为 CloudBase 网关与应用 **重复 CORS 头**；部署含 `lib/finance/cors.ts` 跳过重写的 book-mall 后 **重启主站** |
 | SSO 跳转地址带 `/:3001` | `TOOLS_PUBLIC_ORIGIN` 把端口写到了路径里；改成 `https://tool.ai-code8.com`（端口紧跟域名） |
 | `node:sqlite` 报错 | 镜像是 Node 20；本仓库要求 Node 22+，重建即可 |
 | `prisma migrate deploy` 失败 | RDS 白名单 / 安全组 / `DATABASE_URL`；本地用 `pnpm db:apply-pending` 临时绕过 |
