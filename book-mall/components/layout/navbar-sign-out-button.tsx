@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 
 export function NavbarSignOutButton() {
   return (
-    <Button variant="outline" size="sm" className="h-9 shrink-0 px-3" onClick={() => signOut({ callbackUrl: "/" })}>
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-9 shrink-0 px-3"
+      onClick={() => void signOut({ callbackUrl: "/", redirect: true })}
+    >
       退出
     </Button>
   );

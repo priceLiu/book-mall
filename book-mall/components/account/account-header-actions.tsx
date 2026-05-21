@@ -47,7 +47,12 @@ export function AccountHeaderActions({
       <Button asChild variant="ghost" size="sm" className="h-9 shrink-0 px-3">
         <Link href="/account">个人中心</Link>
       </Button>
-      <Button variant="outline" size="sm" className="h-9 shrink-0 px-3" onClick={() => signOut({ callbackUrl: "/" })}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-9 shrink-0 px-3"
+        onClick={() => void signOut({ callbackUrl: "/", redirect: true })}
+      >
         退出
       </Button>
       <ToggleTheme iconOnly className="shrink-0" />

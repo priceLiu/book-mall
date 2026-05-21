@@ -40,18 +40,27 @@ export function LoginForm() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
-    setLoading(false);
-    if (res?.error) {
-      setError("邮箱或密码错误");
-      return;
+    try {
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+      if (res?.error) {
+        setError("邮箱或密码错误");
+        return;
+      }
+      if (!res?.ok) {
+        setError("登录请求失败，请清除本站 Cookie 后重试或稍后再试");
+        return;
+      }
+      router.push(next);
+      router.refresh();
+    } catch {
+      setError("无法连接登录服务，请刷新页面后重试");
+    } finally {
+      setLoading(false);
     }
-    router.push(next);
-    router.refresh();
   }
 
   return (

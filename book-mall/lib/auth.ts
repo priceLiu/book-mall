@@ -15,7 +15,10 @@ function nextAuthSharedCookieDomain(): string | undefined {
   return d || undefined;
 }
 
-/** NextAuth v4 要求每个 cookie 含 `name`；csrf 保持默认 __Host-（不可设 domain）。 */
+/**
+ * 跨子域共享会话时须同时覆盖 csrfToken。
+ * 默认 `__Host-next-auth.csrf-token` 不能设 Domain，会导致登录/退出 CSRF 校验失败（前端表现为点了没反应）。
+ */
 function buildNextAuthSharedCookies(): NextAuthOptions["cookies"] | undefined {
   const domain = nextAuthSharedCookieDomain();
   if (!domain) return undefined;
@@ -25,16 +28,18 @@ function buildNextAuthSharedCookies(): NextAuthOptions["cookies"] | undefined {
     (process.env.NEXTAUTH_URL ?? "").startsWith("https://");
   const prefix = secure ? "__Secure-" : "";
 
+  const sharedHttpOnly = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    path: "/",
+    secure,
+    domain,
+  };
+
   return {
     sessionToken: {
       name: `${prefix}next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure,
-        domain,
-      },
+      options: sharedHttpOnly,
     },
     callbackUrl: {
       name: `${prefix}next-auth.callback-url`,
@@ -45,6 +50,10 @@ function buildNextAuthSharedCookies(): NextAuthOptions["cookies"] | undefined {
         secure,
         domain,
       },
+    },
+    csrfToken: {
+      name: `${prefix}next-auth.csrf-token`,
+      options: sharedHttpOnly,
     },
   };
 }
