@@ -1,19 +1,19 @@
 FROM node:22-bookworm-slim AS base
 ENV NODE_OPTIONS="--experimental-sqlite"
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 FROM base AS deps
-COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && corepack prepare pnpm@9.15.5 --activate \
+  && pnpm install --frozen-lockfile
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN corepack enable && corepack prepare pnpm@9.15.5 --activate \
+  && pnpm run build:docker
 
 FROM base AS runner
 ENV NODE_ENV=production
@@ -30,8 +30,8 @@ COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh && chown nextjs:nodejs docker-entrypoint.sh
 
 USER nextjs
-EXPOSE 3000
-ENV PORT=3000
+EXPOSE 3002
+ENV PORT=3002
 ENV HOSTNAME=0.0.0.0
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
