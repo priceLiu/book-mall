@@ -15,26 +15,46 @@ function nextAuthSharedCookieDomain(): string | undefined {
   return d || undefined;
 }
 
-function nextAuthCookieOptions() {
+/** NextAuth v4 要求每个 cookie 含 `name`；csrf 保持默认 __Host-（不可设 domain）。 */
+function buildNextAuthSharedCookies(): NextAuthOptions["cookies"] | undefined {
   const domain = nextAuthSharedCookieDomain();
   if (!domain) return undefined;
-  return { domain, path: "/", sameSite: "lax" as const };
+
+  const secure =
+    process.env.NODE_ENV === "production" ||
+    (process.env.NEXTAUTH_URL ?? "").startsWith("https://");
+  const prefix = secure ? "__Secure-" : "";
+
+  return {
+    sessionToken: {
+      name: `${prefix}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure,
+        domain,
+      },
+    },
+    callbackUrl: {
+      name: `${prefix}next-auth.callback-url`,
+      options: {
+        httpOnly: false,
+        sameSite: "lax",
+        path: "/",
+        secure,
+        domain,
+      },
+    },
+  };
 }
 
-const sharedCookieOpts = nextAuthCookieOptions();
+const sharedCookies = buildNextAuthSharedCookies();
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
-  ...(sharedCookieOpts
-    ? {
-        cookies: {
-          sessionToken: { options: sharedCookieOpts },
-          callbackUrl: { options: sharedCookieOpts },
-          csrfToken: { options: sharedCookieOpts },
-        },
-      }
-    : {}),
+  ...(sharedCookies ? { cookies: sharedCookies } : {}),
   pages: {
     signIn: "/login",
   },
