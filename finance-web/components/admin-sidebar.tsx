@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, ListChecks, Tags, UserCircle2, Wrench } from "lucide-react";
-import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 
 const nav = [
   { href: "/admin", label: "概览", icon: LayoutDashboard, exact: true },
@@ -26,11 +26,11 @@ type ViewerPayload = {
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const base = useBookMallBaseUrl();
   const [viewer, setViewer] = useState<ViewerPayload["user"] | undefined>(undefined);
   const [viewerErr, setViewerErr] = useState<string | null>(null);
 
   useEffect(() => {
-    const base = getBookMallBaseUrl();
     if (!base) {
       setViewer(null);
       setViewerErr("未配置 NEXT_PUBLIC_BOOK_MALL_URL");
@@ -56,7 +56,7 @@ export function AdminSidebar() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [base]);
 
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-[#e8e8e8] bg-[#001529] text-sm text-white/85">

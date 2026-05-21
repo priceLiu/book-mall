@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 
 type BillingUser = {
   id: string;
@@ -13,12 +13,12 @@ type BillingUser = {
 };
 
 export default function AdminBillingUsersIndexPage() {
+  const base = useBookMallBaseUrl();
   const [users, setUsers] = useState<BillingUser[] | null>(null);
   const [loadState, setLoadState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
-    const base = getBookMallBaseUrl();
     if (!base) {
       setLoadState("error");
       setHint("未配置 NEXT_PUBLIC_BOOK_MALL_URL，无法拉取用户列表。");
@@ -54,7 +54,7 @@ export default function AdminBillingUsersIndexPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [base]);
 
   return (
     <div className="p-6">

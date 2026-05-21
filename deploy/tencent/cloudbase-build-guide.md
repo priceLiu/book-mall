@@ -96,9 +96,11 @@ TOOLS_SSO_JWT_SECRET=与book-mall一致
 
 ```env
 NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com
+BOOK_MALL_URL=https://book.ai-code8.com
 ```
 
-> 主站 `FINANCE_WEB_ORIGINS` 必须包含 `https://f.ai-code8.com`，否则财务页跨域请求会被 CORS 拦。
+> 主站 **book-mall** 的 `FINANCE_WEB_ORIGINS` 必须包含 `https://f.ai-code8.com`，否则财务页跨域请求会被 CORS 拦。  
+> `NEXT_PUBLIC_BOOK_MALL_URL` 在客户端组件中会在 **构建时内联**；代码已改为服务端 layout 注入，**改环境变量后重启 finance-web 即可**（仍建议重新构建一次以更新前端包）。
 
 ### 4.4 调试用（默认不要开）
 

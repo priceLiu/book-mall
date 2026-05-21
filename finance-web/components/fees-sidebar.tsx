@@ -9,7 +9,7 @@ import {
   FEES_FROM_ACCOUNT_QUERY,
   FEES_FROM_ACCOUNT_VALUE,
 } from "@/lib/fees-from-account";
-import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { fetchBookMallViewerUser, type BookMallViewerUser } from "@/lib/book-mall-viewer-session";
 
 const billingChildren = [
@@ -21,6 +21,7 @@ const billingChildren = [
 function FeesSidebarNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const base = useBookMallBaseUrl();
   const fromAccount = searchParams.get(FEES_FROM_ACCOUNT_QUERY) === FEES_FROM_ACCOUNT_VALUE;
   const querySuffix = fromAccount ? `?${FEES_FROM_ACCOUNT_QUERY}=${FEES_FROM_ACCOUNT_VALUE}` : "";
   const [openFees, setOpenFees] = useState(true);
@@ -28,15 +29,14 @@ function FeesSidebarNav() {
   const [viewer, setViewer] = useState<BookMallViewerUser | null | undefined>(undefined);
 
   useEffect(() => {
-    const base = getBookMallBaseUrl();
     if (!base) {
       setViewer(null);
       return;
     }
     const ac = new AbortController();
-    fetchBookMallViewerUser(ac.signal).then(setViewer);
+    fetchBookMallViewerUser(base, ac.signal).then(setViewer);
     return () => ac.abort();
-  }, []);
+  }, [base]);
 
   /** 普通用户或从个人中心进入：不显示顶部格图标；管理员直连 `/fees` 且已确认为 ADMIN 时保留。加载中（非个人中心入口）暂显示以免高度跳动。 */
   const showTopIconStrip =

@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
-import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 
 /**
  * 价格公示（统一入口）。
@@ -11,10 +10,7 @@ import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
  * 价目唯一展示在 book-mall `/pricing-disclosure`（AI 试衣 #ai-tryon）；`/account/pricing` 重定向至该页。
  */
 export default function AdminPricingDisclosurePage() {
-  const [base, setBase] = useState<string | null>(null);
-  useEffect(() => {
-    setBase(getBookMallBaseUrl() ?? null);
-  }, []);
+  const base = useBookMallBaseUrl();
 
   const target = base ? `${base}/pricing-disclosure` : "/pricing-disclosure";
   const aiTryonTarget = `${target}#ai-tryon`;

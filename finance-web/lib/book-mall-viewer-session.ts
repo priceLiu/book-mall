@@ -1,5 +1,3 @@
-import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
-
 export type BookMallViewerUser = {
   id: string;
   email: string | null;
@@ -10,8 +8,10 @@ export type BookMallViewerUser = {
 /**
  * 读主站 NextAuth 会话（含 role），供 finance-web 顶栏 / 费用头等区分管理员与普通用户。
  */
-export async function fetchBookMallViewerUser(signal?: AbortSignal): Promise<BookMallViewerUser | null> {
-  const base = getBookMallBaseUrl();
+export async function fetchBookMallViewerUser(
+  base: string,
+  signal?: AbortSignal,
+): Promise<BookMallViewerUser | null> {
   if (!base) return null;
   try {
     const res = await fetch(`${base}/api/finance/viewer-session`, {
