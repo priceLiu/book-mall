@@ -1,12 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
 import {
   billingActionIdle,
   updatePlatformBillingConfig,
   type BillingActionState,
 } from "@/app/actions/billing";
-import { Button } from "@/components/ui/button";
+import { FormSubmitButton } from "@/components/ui/form-submit-button";
+import { useActionState } from "@/lib/use-action-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FeedbackBanner } from "./feedback-banner";
@@ -22,7 +22,7 @@ type Config = {
 };
 
 export function PlatformConfigForm({ config }: { config: Config }) {
-  const [state, action, pending] = useActionState<BillingActionState, FormData>(
+  const [state, action] = useActionState<BillingActionState, FormData>(
     updatePlatformBillingConfig,
     billingActionIdle,
   );
@@ -65,9 +65,7 @@ export function PlatformConfigForm({ config }: { config: Config }) {
         defaultValue={config.usageAnomalyRatioPercent}
       />
       <div className="sm:col-span-2 flex items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? "保存中…" : "保存配置"}
-        </Button>
+        <FormSubmitButton idleLabel="保存配置" pendingLabel="保存中…" />
         <div className="flex-1">
           <FeedbackBanner state={state} />
         </div>

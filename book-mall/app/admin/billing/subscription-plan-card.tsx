@@ -1,13 +1,14 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
+import { FormSubmitButton } from "@/components/ui/form-submit-button";
+import { useActionState } from "@/lib/use-action-state";
 import {
   billingActionIdle,
   publishNewSubscriptionPlanVersion,
   updateSubscriptionPlanToolsAllowlist,
   type BillingActionState,
 } from "@/app/actions/billing";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -75,7 +76,7 @@ export function SubscriptionPlanCard({
 }
 
 function PublishNewVersionForm({ plan }: { plan: PlanRow }) {
-  const [state, action, pending] = useActionState<BillingActionState, FormData>(
+  const [state, action] = useActionState<BillingActionState, FormData>(
     publishNewSubscriptionPlanVersion,
     billingActionIdle,
   );
@@ -117,9 +118,12 @@ function PublishNewVersionForm({ plan }: { plan: PlanRow }) {
             我已知晓：旧版本将归档，<strong>无法恢复</strong>；老用户订阅仍可溯源旧价。
           </span>
         </label>
-        <Button type="submit" size="sm" disabled={pending || !confirm}>
-          {pending ? "发布中…" : "发布新版本"}
-        </Button>
+        <FormSubmitButton
+          size="sm"
+          disabled={!confirm}
+          idleLabel="发布新版本"
+          pendingLabel="发布中…"
+        />
       </form>
       <FeedbackBanner state={state} />
     </div>
@@ -127,7 +131,7 @@ function PublishNewVersionForm({ plan }: { plan: PlanRow }) {
 }
 
 function ToolsAllowlistForm({ plan }: { plan: PlanRow }) {
-  const [state, action, pending] = useActionState<BillingActionState, FormData>(
+  const [state, action] = useActionState<BillingActionState, FormData>(
     updateSubscriptionPlanToolsAllowlist,
     billingActionIdle,
   );
@@ -176,9 +180,12 @@ function ToolsAllowlistForm({ plan }: { plan: PlanRow }) {
         ))}
       </div>
       <div className="flex items-center gap-3">
-        <Button type="submit" size="sm" variant="outline" disabled={pending}>
-          {pending ? "保存中…" : "保存套件范围"}
-        </Button>
+        <FormSubmitButton
+          size="sm"
+          variant="outline"
+          idleLabel="保存套件范围"
+          pendingLabel="保存中…"
+        />
         <div className="flex-1">
           <FeedbackBanner state={state} />
         </div>

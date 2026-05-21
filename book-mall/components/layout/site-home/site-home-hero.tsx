@@ -119,8 +119,7 @@ function SiteHomeVideo() {
 export function SiteHomeHeroSection() {
   return (
     <section id="hero-video" className="site-home-hero">
-      <div className="site-home-hero-glow" aria-hidden />
-      <div className="site-home-hero-glow-right" aria-hidden />
+      <div className="site-home-hero-ambient" aria-hidden />
 
       <div className="site-home-hero-inner">
         <div className="site-home-hero-content">
@@ -147,7 +146,7 @@ export function SiteHomeHeroSection() {
         </div>
 
         <div className="site-home-hero-visual-wrap">
-          <div className="site-home-hero-visual-bg" aria-hidden />
+          <div className="site-home-hero-visual-spotlight" aria-hidden />
           <SiteHomeVideo />
         </div>
       </div>
