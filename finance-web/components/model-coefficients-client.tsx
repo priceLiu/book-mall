@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RETAIL_MULTIPLIER_DEFAULT } from "@/lib/bill-config";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +55,7 @@ function fmtCost(v: number | null): string {
 }
 
 export function ModelCoefficientsClient() {
-  const base = getBookMallBaseUrl();
+  const base = useBookMallBaseUrl();
   const [q, setQ] = useState("");
   const qDeferred = useDeferredValue(q);
   const [toolKey, setToolKey] = useState("");

@@ -1,4 +1,7 @@
-/** book-mall 基础 URL，如 http://localhost:3000 */
+/**
+ * @deprecated 客户端请用 `useBookMallBaseUrl()`；服务端请用 `getBookMallBaseUrlServer()`。
+ * 保留仅供尚未迁移的调用方；在 client 组件中可能因构建期内联而为空。
+ */
 export function getBookMallBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_BOOK_MALL_URL ?? "").replace(/\/$/, "");
 }

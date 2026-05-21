@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { getBookMallBaseUrl } from "@/lib/book-mall-billing-url";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { fetchBookMallViewerUser, type BookMallViewerUser } from "@/lib/book-mall-viewer-session";
 import {
   FEES_FROM_ACCOUNT_QUERY,
@@ -12,7 +12,7 @@ import {
 export type FinanceAppTopBarScope = "fees" | "admin";
 
 function FinanceAppTopBarInner({ scope }: { scope: FinanceAppTopBarScope }) {
-  const base = getBookMallBaseUrl();
+  const base = useBookMallBaseUrl();
   const searchParams = useSearchParams();
   const fromPersonalCenter =
     scope === "fees" && searchParams.get(FEES_FROM_ACCOUNT_QUERY) === FEES_FROM_ACCOUNT_VALUE;
@@ -28,7 +28,7 @@ function FinanceAppTopBarInner({ scope }: { scope: FinanceAppTopBarScope }) {
       return;
     }
     const ac = new AbortController();
-    fetchBookMallViewerUser(ac.signal).then((u) => {
+    fetchBookMallViewerUser(base, ac.signal).then((u) => {
       setViewer(u);
     });
     return () => ac.abort();

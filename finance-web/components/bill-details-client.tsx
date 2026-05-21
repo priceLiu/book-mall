@@ -6,7 +6,8 @@ import {
   filterColumnGroupsByRole,
   type BillViewerRole,
 } from "@/lib/bill-config";
-import { getBookMallBaseUrl, getFinanceDevUserId, getFinanceUseDevProxy } from "@/lib/book-mall-billing-url";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { getFinanceDevUserId, getFinanceUseDevProxy } from "@/lib/book-mall-billing-url";
 import { mergeFeeTypeOptions } from "@/lib/cloud-bill-fee-types";
 import { BillMultiFilter, type BillMultiFilterMode } from "@/components/bill-multi-filter";
 import { cn } from "@/lib/utils";
@@ -87,6 +88,7 @@ export function BillDetailsClient({
   viewerRole,
   mode = "single-user",
 }: BillDetailsClientProps) {
+  const base = useBookMallBaseUrl();
   const isAllUsers = mode === "all-users";
   const effectiveRole: BillViewerRole =
     viewerRole ?? (adminTargetUserId || isAllUsers ? "admin" : "user");
@@ -127,7 +129,6 @@ export function BillDetailsClient({
     const explicitProxy = search?.get("useProxy") === "1";
     const explicitAsDev = search?.get("asDev") === "1";
     const useDevProxy = explicitProxy && getFinanceUseDevProxy();
-    const base = getBookMallBaseUrl();
 
     if (adminTargetUserId || isAllUsers) {
       if (!base) {
@@ -211,7 +212,7 @@ export function BillDetailsClient({
     return () => {
       cancelled = true;
     };
-  }, [adminTargetUserId, isAllUsers]);
+  }, [adminTargetUserId, isAllUsers, base]);
 
   const [billMonth, setBillMonth] = useState("");
   const [feeType, setFeeType] = useState("");
