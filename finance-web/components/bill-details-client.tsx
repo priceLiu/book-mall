@@ -7,6 +7,7 @@ import {
   type BillViewerRole,
 } from "@/lib/bill-config";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
 import { getFinanceDevUserId, getFinanceUseDevProxy } from "@/lib/book-mall-billing-url";
 import { mergeFeeTypeOptions } from "@/lib/cloud-bill-fee-types";
 import { BillMultiFilter, type BillMultiFilterMode } from "@/components/bill-multi-filter";
@@ -203,9 +204,10 @@ export function BillDetailsClient({
         setAllTotal(null);
         setAllTruncated(false);
         const msg = e instanceof Error ? e.message : String(e);
-        const tip = adminTargetUserId || isAllUsers
-          ? "请确认：① book-mall 已启动且可达；② 当前浏览器以 ADMIN 角色登录到 book-mall（同浏览器打开 http://localhost:3000 → /login）。"
-          : "请确认：① book-mall 已启动且可达；② 当前浏览器以你的真实账号登录到 book-mall（同浏览器打开 http://localhost:3000 → /login，再回到本页刷新）。";
+        const tip = bookMallLoginHint(
+          base,
+          adminTargetUserId || isAllUsers ? "admin" : "user",
+        ).text;
         setHint(`未能从 book-mall 拉取明细（${msg}）。${tip}`);
       });
 

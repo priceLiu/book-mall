@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
 
 type BillingUser = {
   id: string;
@@ -34,7 +35,7 @@ export default function AdminBillingUsersIndexPage() {
         if (cancelled) return;
         if (res.status === 403) {
           setLoadState("error");
-          setHint("需要以管理员身份登录 book-mall（在 book-mall 站点登录后再回到本页）。");
+          setHint(bookMallLoginHint(base, "admin").text);
           return;
         }
         if (!res.ok) {
