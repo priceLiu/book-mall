@@ -30,7 +30,12 @@ function LogoItem({
       <span
         className={`flex size-9 items-center justify-center rounded-lg bg-white/5 ${accent}`}
       >
-        <Icon name={icon as keyof typeof icons} size={22} className="shrink-0" />
+        <Icon
+          name={icon as keyof typeof icons}
+          size={22}
+          color="currentColor"
+          className="shrink-0"
+        />
       </span>
       <span className="text-lg font-medium tracking-tight text-foreground/90 md:text-xl">
         {name}

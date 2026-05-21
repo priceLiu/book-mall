@@ -7,8 +7,8 @@ export const Icon = ({
   className,
 }: {
   name: keyof typeof icons;
-  color: string;
-  size: number;
+  color?: string;
+  size?: number;
   className?: string;
 }) => {
   const LucideIcon = icons[name as keyof typeof icons];
