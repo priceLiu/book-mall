@@ -16,6 +16,18 @@ if [ "$NODE_ENV" = "production" ] && [ "${ALLOW_CLOUDBASE_DEFAULT_ORIGINS:-}" !=
       echo "[book-mall] TOOLS_PUBLIC_ORIGIN -> ${TOOLS_PUBLIC_ORIGIN}"
       ;;
   esac
+  case "${NEXT_PUBLIC_FINANCE_WEB_ORIGIN:-}" in
+    ""|*"sh.run.tcloudbase.com"*)
+      export NEXT_PUBLIC_FINANCE_WEB_ORIGIN="https://f.ai-code8.com"
+      echo "[book-mall] NEXT_PUBLIC_FINANCE_WEB_ORIGIN -> ${NEXT_PUBLIC_FINANCE_WEB_ORIGIN}"
+      ;;
+  esac
+  case "${FINANCE_WEB_ORIGINS:-}" in
+    ""|*"sh.run.tcloudbase.com"*)
+      export FINANCE_WEB_ORIGINS="https://f.ai-code8.com"
+      echo "[book-mall] FINANCE_WEB_ORIGINS -> ${FINANCE_WEB_ORIGINS}"
+      ;;
+  esac
 fi
 
 if [ -z "$DATABASE_URL" ]; then

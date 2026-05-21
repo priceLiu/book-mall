@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getToolsSsoSetupDiagnostics } from "@/lib/sso-tools-env";
+import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
 
 import { AdminNav } from "@/components/admin/admin-nav";
 
@@ -23,6 +24,7 @@ export default async function AdminLayout({
   if (session.user.role !== "ADMIN") redirect("/account");
 
   const toolsSsoDiag = getToolsSsoSetupDiagnostics();
+  const financeWebOrigin = getFinanceWebPublicOrigin();
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,6 +42,7 @@ export default async function AdminLayout({
             }}
             toolsSsoReady={toolsSsoDiag.ready}
             toolsSsoIssues={toolsSsoDiag.issues}
+            financeWebOrigin={financeWebOrigin}
           />
         </div>
       </header>

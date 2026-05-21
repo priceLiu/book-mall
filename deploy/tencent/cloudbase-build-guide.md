@@ -81,6 +81,8 @@ FINANCE_WEB_ORIGINS=https://f.ai-code8.com
 ADMIN_EMAILS=admin1@example.com,admin2@example.com
 ```
 
+> **管理后台「账单明细」菜单**：须在 **book-mall 服务**（不是 finance-web）配置上述两行财务变量。`docker-entrypoint.sh` 会在生产且未显式配置时自动改写为 `https://f.ai-code8.com`；改完环境变量后 **重启 book-mall 服务** 即可（不必等 finance-web 重建）。
+
 ### 4.2 tool-web（工具站）
 
 ```env
