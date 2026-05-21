@@ -8,7 +8,12 @@ export const dynamic = "force-dynamic";
  * 背景：升级到 `NEXTAUTH_COOKIE_DOMAIN=.ai-code8.com` 后，浏览器里仍残留升级前
  * 签发的 host-only `__Secure-next-auth.session-token` / `__Host-next-auth.csrf-token`。
  * NextAuth 自带的 signOut 只按当前配置清新版 Cookie，旧 Cookie 不会被清，导致
- * 「点了退出还是登录态」的现象。本路由按所有名称 + 域 + 是否安全前缀逐一清空。
+ * 「正常模式点了退出还是登录态、无痕模式正常」的现象。
+ *
+ * 实现要点：浏览器把 (name, domain, path) 视作不同 Cookie——
+ * 同名但 domain 不同的 host-only / 共享域 Cookie 必须用 **多条同名 Set-Cookie**
+ * 分别清。`NextResponse.cookies.set` 内部按 name 去重，会把 host-only 的 Set-Cookie
+ * 覆盖成共享域版，所以这里改为手动 `headers.append('Set-Cookie', ...)`。
  */
 
 const SESSION_COOKIE_NAMES = [
@@ -42,23 +47,24 @@ function sharedDomain(): string | undefined {
   return d || undefined;
 }
 
-function clearCookie(
-  res: NextResponse,
+function buildClearingCookieHeader(
   name: string,
   domain: string | undefined,
   secure: boolean,
-) {
-  res.cookies.set({
-    name,
-    value: "",
-    path: "/",
-    domain,
-    maxAge: 0,
-    expires: new Date(0),
-    secure,
-    httpOnly: true,
-    sameSite: "lax",
-  });
+): string {
+  /** `__Host-` 前缀按规范禁止 Domain；只能按 host-only 清。 */
+  const isHostPrefix = name.startsWith("__Host-");
+  const parts = [
+    `${name}=`,
+    "Path=/",
+    "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+    "Max-Age=0",
+    "SameSite=Lax",
+  ];
+  if (!isHostPrefix && domain) parts.push(`Domain=${domain}`);
+  if (secure || name.startsWith("__Secure-") || isHostPrefix) parts.push("Secure");
+  parts.push("HttpOnly");
+  return parts.join("; ");
 }
 
 function safeRedirectTarget(raw: string | null): string {
@@ -87,10 +93,6 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   const secure = process.env.NODE_ENV === "production";
   const domain = sharedDomain();
 
-  /** host-only（升级前默认）+ 共享域（升级后默认）两种变体都清。 */
-  const domainVariants: Array<string | undefined> = [undefined];
-  if (domain) domainVariants.push(domain);
-
   const allNames = [
     ...SESSION_COOKIE_NAMES,
     ...CSRF_COOKIE_NAMES,
@@ -100,8 +102,17 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   ];
 
   for (const name of allNames) {
-    for (const d of domainVariants) {
-      clearCookie(res, name, d, secure);
+    /** host-only（升级前默认）；__Host- 前缀强制按此清。 */
+    res.headers.append(
+      "Set-Cookie",
+      buildClearingCookieHeader(name, undefined, secure),
+    );
+    /** 共享域（升级后默认）；__Host- 跳过。 */
+    if (domain && !name.startsWith("__Host-")) {
+      res.headers.append(
+        "Set-Cookie",
+        buildClearingCookieHeader(name, domain, secure),
+      );
     }
   }
 
