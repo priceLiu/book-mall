@@ -1,4 +1,5 @@
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
+ENV NODE_OPTIONS="--experimental-sqlite"
 WORKDIR /app
 
 FROM base AS deps
