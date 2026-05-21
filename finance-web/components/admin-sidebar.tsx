@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { LayoutDashboard, ListChecks, Tags, UserCircle2, Wrench } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
+import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 
 const nav = [
   { href: "/admin", label: "概览", icon: LayoutDashboard, exact: true },
@@ -40,7 +41,8 @@ export function AdminSidebar() {
     let cancelled = false;
     setViewerErr(null);
     setViewer(undefined);
-    fetch(`${base}/api/finance/viewer-session`, { credentials: "include", mode: "cors", cache: "no-store" })
+    const { url, init } = resolveBookMallBrowserRequest(base, "/api/finance/viewer-session");
+    fetch(url, init)
       .then(async (res) => {
         if (!res.ok) throw new Error(`${res.status}`);
         return res.json() as Promise<ViewerPayload>;

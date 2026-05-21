@@ -8,6 +8,7 @@ import {
 } from "@/lib/bill-config";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
+import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 import { getFinanceDevUserId, getFinanceUseDevProxy } from "@/lib/book-mall-billing-url";
 import { mergeFeeTypeOptions } from "@/lib/cloud-bill-fee-types";
 import { BillMultiFilter, type BillMultiFilterMode } from "@/components/bill-multi-filter";
@@ -147,23 +148,25 @@ export function BillDetailsClient({
 
     const devId = explicitAsDev ? getFinanceDevUserId() : undefined;
     let url: string;
-    if (isAllUsers) {
-      url = `${base}/api/admin/finance/billing-detail-lines-all?take=2000`;
-    } else if (adminTargetUserId) {
-      url = `${base}/api/admin/finance/billing-detail-lines?userId=${encodeURIComponent(adminTargetUserId)}`;
-    } else if (useDevProxy) {
+    let fetchInit: RequestInit;
+    if (useDevProxy && !adminTargetUserId && !isAllUsers) {
       url = "/api/dev/book-mall-account-billing";
+      fetchInit = { credentials: "same-origin", cache: "no-store" };
     } else {
-      const q = devId ? `?devUserId=${encodeURIComponent(devId)}` : "";
-      url = `${base}/api/account/billing-detail-lines${q}`;
+      let apiPath: string;
+      if (isAllUsers) {
+        apiPath = "/api/admin/finance/billing-detail-lines-all?take=2000";
+      } else if (adminTargetUserId) {
+        apiPath = `/api/admin/finance/billing-detail-lines?userId=${encodeURIComponent(adminTargetUserId)}`;
+      } else {
+        const q = devId ? `?devUserId=${encodeURIComponent(devId)}` : "";
+        apiPath = `/api/account/billing-detail-lines${q}`;
+      }
+      ({ url, init: fetchInit } = resolveBookMallBrowserRequest(base, apiPath));
     }
 
     let cancelled = false;
     setLoadState("loading");
-    const fetchInit: RequestInit =
-      useDevProxy && !adminTargetUserId && !isAllUsers
-        ? { credentials: "same-origin", cache: "no-store" }
-        : { credentials: "include", mode: "cors", cache: "no-store" };
 
     fetch(url, fetchInit)
       .then(async (res) => {

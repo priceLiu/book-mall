@@ -2,6 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 import { RETAIL_MULTIPLIER_DEFAULT } from "@/lib/bill-config";
 import { cn } from "@/lib/utils";
 
@@ -82,12 +83,12 @@ export function ModelCoefficientsClient() {
     if (qDeferred.trim()) qs.set("q", qDeferred.trim());
     if (toolKey) qs.set("toolKey", toolKey);
     qs.set("scope", scope);
-    fetch(`${base}/api/admin/finance/tool-billable-prices?${qs.toString()}`, {
-      credentials: "include",
-      mode: "cors",
-      cache: "no-store",
-      signal: ac.signal,
-    })
+    const { url, init } = resolveBookMallBrowserRequest(
+      base,
+      `/api/admin/finance/tool-billable-prices?${qs.toString()}`,
+      { signal: ac.signal },
+    );
+    fetch(url, init)
       .then(async (res) => {
         if (!res.ok) {
           const j = (await res.json().catch(() => ({}))) as { error?: string };
@@ -142,13 +143,16 @@ export function ModelCoefficientsClient() {
     setSavingId(r.id);
     setRowErr((p) => ({ ...p, [r.id]: "" }));
     try {
-      const res = await fetch(`${base}/api/admin/finance/tool-billable-prices/${encodeURIComponent(r.id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        mode: "cors",
-        body: JSON.stringify({ schemeAAdminRetailMultiplier: n }),
-      });
+      const { url, init } = resolveBookMallBrowserRequest(
+        base,
+        `/api/admin/finance/tool-billable-prices/${encodeURIComponent(r.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ schemeAAdminRetailMultiplier: n }),
+        },
+      );
+      const res = await fetch(url, init);
       const j = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         error?: string;

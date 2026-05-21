@@ -9,9 +9,32 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
+/** 生产跨子域（book / f / tool）共享会话；本地不设 domain，保持 host-only Cookie。 */
+function nextAuthSharedCookieDomain(): string | undefined {
+  const d = process.env.NEXTAUTH_COOKIE_DOMAIN?.trim();
+  return d || undefined;
+}
+
+function nextAuthCookieOptions() {
+  const domain = nextAuthSharedCookieDomain();
+  if (!domain) return undefined;
+  return { domain, path: "/", sameSite: "lax" as const };
+}
+
+const sharedCookieOpts = nextAuthCookieOptions();
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
+  ...(sharedCookieOpts
+    ? {
+        cookies: {
+          sessionToken: { options: sharedCookieOpts },
+          callbackUrl: { options: sharedCookieOpts },
+          csrfToken: { options: sharedCookieOpts },
+        },
+      }
+    : {}),
   pages: {
     signIn: "/login",
   },

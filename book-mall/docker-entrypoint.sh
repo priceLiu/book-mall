@@ -28,6 +28,12 @@ if [ "$NODE_ENV" = "production" ] && [ "${ALLOW_CLOUDBASE_DEFAULT_ORIGINS:-}" !=
       echo "[book-mall] FINANCE_WEB_ORIGINS -> ${FINANCE_WEB_ORIGINS}"
       ;;
   esac
+  case "${NEXTAUTH_COOKIE_DOMAIN:-}" in
+    "")
+      export NEXTAUTH_COOKIE_DOMAIN=".ai-code8.com"
+      echo "[book-mall] NEXTAUTH_COOKIE_DOMAIN -> ${NEXTAUTH_COOKIE_DOMAIN}"
+      ;;
+  esac
 fi
 
 if [ -z "$DATABASE_URL" ]; then
