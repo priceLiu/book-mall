@@ -385,6 +385,11 @@ async function main() {
     data: { label: "视觉实验室" },
   });
 
+  await prisma.toolNavVisibility.updateMany({
+    where: { navKey: "story-theater" },
+    data: { label: "漫剧剧场" },
+  });
+
   await syncPilotSubscriptions(PILOT_SYNC_EMAIL);
 }
 

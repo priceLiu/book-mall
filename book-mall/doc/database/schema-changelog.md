@@ -127,6 +127,18 @@
 - **ToolBillablePrice**：`aitryon-parsing-v1` 一行；`aitryon-refiner` 七档阶梯行
 - **应用**：`pnpm db:deploy` → `pnpm pricing:realign-from-md:apply` → `pnpm pricing:inspect-billable-vs-md`
 
+## 2026-07-04 — story-web 二期（个人空间 + 引擎模型 + 发布）
+
+- **迁移目录**：`prisma/migrations/20260704120000_story_web_phase2/`（另含 `20260703120000_tool_nav_story_theater` 侧栏菜单）
+- **新枚举**：`StoryEngineRole`（LLM / IMAGE / VIDEO）；`StorySpaceTemplateKey`（`CLASSIC_V1`）；`StorySpacePublishStatus`（DRAFT / PUBLISHED）
+- **新表**：
+  - `StoryEngineModel`——平台维护的可选 AI 引擎（种子含 Gemini、Nano Banana、万相、Veo、可灵等）
+  - `StorySpace`——用户漫剧个人空间（`userId` 唯一、`slug` 唯一；可关联 `Product` 发布）
+  - `StorySpaceModelSelection`——空间内启用/主模型配置
+- **Product**：反向可选 `storySpaceAsPublished`（通过 `StorySpace.publishedProductId`）
+- **API**：`/api/story/*`（viewer-session、space、model-config、engine-models、publish）；CORS 由 `STORY_WEB_ORIGINS` 控制
+- **应用**：`pnpm db:deploy`
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

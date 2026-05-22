@@ -13,6 +13,9 @@ export function toolKeyToLabel(toolKey: string): string {
     "image-to-video__library": "我的视频库",
     "visual-lab": "视觉实验室",
     "visual-lab__analysis": "视觉实验室 · 分析室",
+    "story-theater": "漫剧剧场",
+    "story-theater__creator": "漫剧剧场 · 创作幻想家",
+    "story-theater__library": "我的剧场",
     "app-history": "费用使用明细",
   };
   if (exact[key]) return exact[key];
@@ -24,6 +27,7 @@ export function toolKeyToLabel(toolKey: string): string {
   if (key.startsWith("image-to-video__library")) return "我的视频库";
   if (key.startsWith("image-to-video")) return "图生视频";
   if (key.startsWith("visual-lab")) return "视觉实验室";
+  if (key.startsWith("story-theater")) return "漫剧剧场";
   if (key.startsWith("app-history")) return "费用使用明细";
   return key;
 }

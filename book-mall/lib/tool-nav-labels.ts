@@ -4,6 +4,7 @@ export const TOOL_NAV_LABEL: Record<string, string> = {
   "text-to-image": "文生图",
   "image-to-video": "图生视频",
   "visual-lab": "视觉实验室",
+  "story-theater": "漫剧剧场",
   "smart-support": "AI智能客服",
   "app-history": "费用与计费说明",
 };

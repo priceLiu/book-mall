@@ -28,6 +28,18 @@ if [ "$NODE_ENV" = "production" ] && [ "${ALLOW_CLOUDBASE_DEFAULT_ORIGINS:-}" !=
       echo "[book-mall] FINANCE_WEB_ORIGINS -> ${FINANCE_WEB_ORIGINS}"
       ;;
   esac
+  case "${NEXT_PUBLIC_STORY_WEB_ORIGIN:-}" in
+    ""|*"sh.run.tcloudbase.com"*)
+      export NEXT_PUBLIC_STORY_WEB_ORIGIN="https://story.ai-code8.com"
+      echo "[book-mall] NEXT_PUBLIC_STORY_WEB_ORIGIN -> ${NEXT_PUBLIC_STORY_WEB_ORIGIN}"
+      ;;
+  esac
+  case "${STORY_WEB_ORIGINS:-}" in
+    ""|*"sh.run.tcloudbase.com"*)
+      export STORY_WEB_ORIGINS="https://story.ai-code8.com"
+      echo "[book-mall] STORY_WEB_ORIGINS -> ${STORY_WEB_ORIGINS}"
+      ;;
+  esac
   case "${NEXTAUTH_COOKIE_DOMAIN:-}" in
     "")
       export NEXTAUTH_COOKIE_DOMAIN=".ai-code8.com"

@@ -43,6 +43,10 @@
 | `/visual-lab/analysis` | 视觉实验室 · 分析室 |
 | `/visual-lab/gallery` | 视觉实验室 · 成果展 |
 | `/visual-lab/implementation` | 视觉实验室 · 实现逻辑（摘录） |
+| `/story-theater` | 漫剧剧场 · 首页 |
+| `/story-theater/creator` | 漫剧剧场 · 创作幻想家（外链 story-web） |
+| `/story-theater/library` | 漫剧剧场 · 我的剧场 |
+| `/story-theater/implementation` | 漫剧剧场 · 实现逻辑（摘录） |
 | `/fitting-room/implementation` | 试衣间套装 · 实现逻辑 |
 | `/fitting-room/ai-fit/implementation` | AI试衣 · 实现逻辑 |
 | `/smart-support` | 智能客服首页（Hero + 入口） |
