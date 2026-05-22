@@ -1,15 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ExternalLink, Loader2, Maximize2 } from "lucide-react";
+import { useCallback, useState } from "react";
+import { ExternalLink, Maximize2 } from "lucide-react";
 import { getStoryWebOrigin } from "@/lib/story-web-origin";
 import {
   appendStoryTheaterLibrary,
   listStoryTheaterLibrary,
 } from "@/lib/story-theater-library";
-
-const DEMO_VIDEO = "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
 
 function requestVideoFullscreen(video: HTMLVideoElement) {
   if (video.requestFullscreen) {
@@ -27,20 +25,16 @@ function requestVideoFullscreen(video: HTMLVideoElement) {
   }
 }
 
-export function StoryTheaterCreatorClient() {
+type StoryTheaterCreatorClientProps = {
+  videos: string[];
+};
+
+export function StoryTheaterCreatorClient({ videos }: StoryTheaterCreatorClientProps) {
   const storyOrigin = getStoryWebOrigin();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [mounted, setMounted] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
   const [savedHint, setSavedHint] = useState<string | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const onFullscreen = useCallback(() => {
-    const v = videoRef.current;
-    if (v) requestVideoFullscreen(v);
+  const onFullscreen = useCallback((video: HTMLVideoElement) => {
+    requestVideoFullscreen(video);
   }, []);
 
   const onSaveToLibrary = useCallback(() => {
@@ -58,52 +52,47 @@ export function StoryTheaterCreatorClient() {
   }, [storyOrigin]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:py-14">
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
       <div className="mb-8">
         <Link href="/story-theater" className="text-sm text-neutral-500 hover:text-neutral-800">
           ← 漫剧剧场首页
         </Link>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">创作幻想家</h1>
         <p className="mt-2 max-w-2xl text-neutral-600">
-          观看概念片，然后进入 story-web 个人空间开始搭建首页与后续创作流程。
+          观看社区漫剧片段，然后进入 story-web 个人空间开始搭建首页与后续创作流程。每次刷新会随机展示不同作品。
         </p>
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-black shadow-lg">
-        {mounted && !videoReady ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-neutral-900">
-            <Loader2 className="size-10 animate-spin text-white/80" aria-label="视频加载中" />
-          </div>
-        ) : null}
-        {mounted ? (
-          <>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {videos.map((src, index) => (
+          <div
+            key={src}
+            className="group relative overflow-hidden rounded-2xl border border-neutral-200 bg-black shadow-lg"
+          >
             <video
-              ref={videoRef}
               className="aspect-video w-full object-cover"
               controls
               playsInline
-              preload="auto"
+              preload="metadata"
               muted
-              autoPlay
+              autoPlay={index === 0}
               loop
-              onLoadedData={() => setVideoReady(true)}
-              onCanPlay={() => setVideoReady(true)}
-              onError={() => setVideoReady(true)}
-            >
-              <source src={DEMO_VIDEO} type="video/mp4" />
-            </video>
+              src={src}
+            />
             <button
               type="button"
-              className="absolute bottom-4 right-4 rounded-lg bg-black/60 p-2 text-white hover:bg-black/80"
-              onClick={onFullscreen}
+              className="absolute bottom-3 right-3 rounded-lg bg-black/60 p-2 text-white opacity-0 transition group-hover:opacity-100 hover:bg-black/80"
+              onClick={(e) => {
+                const video = (e.currentTarget.parentElement?.querySelector("video") ??
+                  null) as HTMLVideoElement | null;
+                if (video) onFullscreen(video);
+              }}
               aria-label="全屏播放"
             >
               <Maximize2 className="size-4" />
             </button>
-          </>
-        ) : (
-          <div className="aspect-video bg-neutral-900" />
-        )}
+          </div>
+        ))}
       </div>
 
       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">

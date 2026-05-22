@@ -139,6 +139,28 @@
 - **API**：`/api/story/*`（viewer-session、space、model-config、engine-models、publish）；CORS 由 `STORY_WEB_ORIGINS` 控制
 - **应用**：`pnpm db:deploy`
 
+---
+
+## 2026-07-05 — story-web 三期（AI 创作生产线表结构）
+
+- **迁移目录**：`prisma/migrations/20260705120000_story_web_phase3/`
+- **新枚举**：
+  - `StoryProjectAspect`（`RATIO_16_9` / `RATIO_9_16`）
+  - `StoryProjectStatus`（`DRAFT` / `INITIALIZING` / `READY` / `ARCHIVED`）
+  - `StoryGenerationKind`（`COVER_IMAGE` / `CHARACTER_AVATAR` / `FRAME_IMAGE` / `FRAME_VIDEO`）
+  - `StoryGenerationStatus`（`PENDING` / `SUBMITTED` / `SUCCEEDED` / `FAILED` / `CANCELLED`）
+- **新表**：
+  - `StoryProject` —— 漫剧项目主表（含 `storyOutline`、`coverImageUrl`、`status`、`deletedAt` 软删；`@@index([userId, deletedAt, updatedAt])`、`@@index([status])`）
+  - `StoryCharacter` —— 项目角色（`imagePrompt` 仅含外观/构图/白底，调用 KIE 时由后端实时拼接 `[STYLE]`；`@@index([projectId, sortOrder])`）
+  - `StoryStoryboardFrame` —— 分镜（`characterIds: TEXT[]`、`@@unique([projectId, index])`，删除角色时由服务层 `array_remove`）
+  - `StoryGenerationTask` —— 统一任务表（覆盖封面/头像/分镜图/分镜视频；`kieTaskId UNIQUE`；`@@index([status, submittedAt])` 支持轮询 worker；`inputPayload/resultPayload JSONB`）
+  - `StoryOssCleanupQueue` —— OSS 异步清理队列（`notBefore` 支持"先写新图再删旧图"窗口期，`attempts ≥ 3` 后停手等人工排查）
+- **User**：反向关系 `storyProjects StoryProject[]`
+- **API（B1+ 即将新增）**：`/api/story/projects/*`、`/api/story/kie/{callback,poll,cleanup}`；CORS 复用 `STORY_WEB_ORIGINS`
+- **应用**：`pnpm db:deploy`（已成功，2026-05-22 落地 `tool_mall@sh-postgres-i556nz8q`）
+- **逻辑**：详见 `doc/logic/story-ai-pipeline.md`、`story-web/docs/ai/plan.md`、`story-web/docs/ai/todo.md`
+- **回滚**：开发环境可手动 `DROP TABLE "StoryOssCleanupQueue","StoryGenerationTask","StoryStoryboardFrame","StoryCharacter","StoryProject" CASCADE;` + `DROP TYPE "StoryGenerationStatus","StoryGenerationKind","StoryProjectStatus","StoryProjectAspect" CASCADE;` 并从 User 删反向关系；生产严禁回滚
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

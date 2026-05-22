@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   bookMallLoginHref,
   fetchStoryViewerUser,
@@ -10,6 +11,7 @@ import {
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 
 export function StoryAuthBar() {
+  const pathname = usePathname() || "/";
   const base = useBookMallBaseUrl();
   const [user, setUser] = useState<StoryViewerUser | null | undefined>(undefined);
 
@@ -20,6 +22,10 @@ export function StoryAuthBar() {
     }
     void fetchStoryViewerUser(base).then(setUser);
   }, [base]);
+
+  if (pathname.startsWith("/project/")) {
+    return null;
+  }
 
   if (user === undefined) {
     return (

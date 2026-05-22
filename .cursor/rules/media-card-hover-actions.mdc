@@ -1,0 +1,85 @@
+---
+description: 图片/视频卡片的 hover 双图标交互（编辑 + 预览/播放）与全屏预览统一规约
+globs: story-web/components/**/*.tsx,story-web/app/**/*.tsx,book-mall/components/**/*.tsx,book-mall/app/**/*.tsx,tool-web/components/**/*.tsx,tool-web/app/**/*.tsx
+alwaysApply: false
+---
+
+# 媒体卡 Hover 操作 + 全屏预览
+
+凡是项目里**展示图片或视频**的卡片（封面、角色头像、分镜图、分镜视频、用户库的图片视频条目等），鼠标悬停时**必须**统一展现两个浮层小按钮，并支持全屏预览/播放。
+
+## 必备组件（已实现，请直接复用，勿自造轮子）
+
+- `story-web/components/project-workspace/media-hover-actions.tsx` — hover 双图标按钮（铅笔编辑 + 眼睛/播放）
+- `story-web/components/project-workspace/media-lightbox.tsx` — 黑底全屏预览（图片 contain，视频 controls/autoPlay）
+- `story-web/components/project-workspace/media-placeholder.tsx` — loading/empty/failed 状态的占位图层
+
+## 必须遵守的视觉与交互
+
+1. **外层容器** 须有 `group relative overflow-hidden` 三件套（让 hover overlay 与定位生效）。
+2. **卡片中央浮现 2 个大号圆形按钮**（默认 hidden，hover 时整卡叠暗色蒙层 + 按钮 fade in，size-12 ≈ 48px，便于点击）：
+   - 铅笔 = 编辑提示词 / 元数据
+   - 眼睛 = 全屏预览（image kind）
+   - 播放三角 = 全屏播放（video kind）
+3. **整块点击行为**：
+   - 已有素材 → 全屏预览/播放
+   - 尚未生成 → 打开编辑提示词 modal
+4. **左上角小标签**（"分镜图" / "分镜视频" / "封面" 等）使用 `pointer-events-none` 不挡操作。
+5. **空/失败/加载状态**一律走 `MediaPlaceholder`，禁用纯黑死框。
+6. **全屏预览**走 `MediaLightbox`：
+   - Esc 与点击背景关闭
+   - 视频带 `controls` + `autoPlay` + `playsInline` + `poster`（用首帧图）
+
+## 标准用法示例
+
+```tsx
+<div
+  className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black"
+  style={{ aspectRatio: "16 / 9" }}
+>
+  <MediaHoverActions
+    kind="image"
+    hasPreview={!!frame.imageUrl}
+    onEdit={openPromptEditor}
+    onPreview={openLightbox}
+  />
+  <button
+    type="button"
+    onClick={frame.imageUrl ? openLightbox : openPromptEditor}
+    className="absolute inset-0 cursor-pointer"
+    aria-label={frame.imageUrl ? "全屏预览" : "编辑提示词"}
+  />
+  {frame.imageUrl ? (
+    <Image src={frame.imageUrl} alt={...} fill className="pointer-events-none object-cover" unoptimized />
+  ) : (
+    <MediaPlaceholder fallbackUrl={fallback} state={inflight ? "loading" : "empty"} />
+  )}
+  <span className="pointer-events-none absolute left-3 top-3 z-10 rounded-md bg-black/55 px-2 py-0.5 text-[10px] text-white">
+    分镜图
+  </span>
+</div>
+```
+
+## 反例
+
+- ❌ 不要直接用一个大 `<button>` 包整个图片，导致无法在内部嵌按钮。
+- ❌ 不要把"编辑"塞到底部条 / 角落小图标位置 —— 必须放居中 hover overlay。
+- ❌ 不要省略 `MediaPlaceholder`，让 loading/empty 都是死黑无动画。
+- ❌ 不要在按钮覆盖时省略 `pointer-events-none / group-hover:pointer-events-auto`，否则非 hover 时会挡住卡片下方的「整块点击 = 预览/编辑」交互。
+
+## 衍生场景
+
+- 工具站「我的视频库 / 我的图片库 / 我的衣柜」、book-mall 管理后台的资源库 thumbnail 等等也都遵守此规约（如尚未改造，新功能落地时一并更新）。
+- 删除按钮**不算**这两个之一；它独立放在卡片下方文字操作区，遵守已有的二次确认规则（见 `destructive-delete-confirmation.mdc`）。
+
+## 弹层（Modal / Lightbox / Confirm）必须 Portal 到 body
+
+任何**全屏遮罩弹层**（编辑提示词、媒体 Lightbox、二次确认、设置弹窗等）：
+
+1. **必须**用 `story-web/components/common/modal-portal.tsx` 的 `<ModalPortal>` 把内容 createPortal 到 `document.body`。
+2. 否则只要其某个 ancestor 上有 `transform` / `filter` / `backdrop-filter`，就会让 `position: fixed` 子元素相对该 ancestor 而非视口定位，出现"顶部遮罩盖不住 sticky header"等诡异现象。
+3. z-index 约定：
+   - `z-[100]` 普通编辑/参数弹层（PromptEditModal, FrameVideoEditModal, CharacterEditModal）
+   - `z-[105]` 全屏 Lightbox（位于普通弹层之上）
+   - `z-[110]` 二次确认 DestructiveConfirmModal（最高，位于一切之上）
+4. 背景遮罩统一 `bg-black/85 backdrop-blur-sm`，避免半透明导致下方 header 漏出。

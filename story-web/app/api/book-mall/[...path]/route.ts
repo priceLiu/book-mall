@@ -60,6 +60,11 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
   return proxyToBookMall(request, path);
 }
 
+export async function DELETE(request: NextRequest, ctx: RouteCtx) {
+  const { path } = await ctx.params;
+  return proxyToBookMall(request, path);
+}
+
 export async function OPTIONS(request: NextRequest, ctx: RouteCtx) {
   const { path } = await ctx.params;
   return proxyToBookMall(request, path);

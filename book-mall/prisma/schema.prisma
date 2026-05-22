@@ -83,6 +83,7 @@ model User {
   walletHolds                  WalletHold[]
   toolModelUsageCounters       ToolModelUsageCounter[]
   storySpace                   StorySpace?
+  storyProjects                StoryProject[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1080,4 +1081,196 @@ model StorySpaceModelSelection {
 
   @@unique([storySpaceId, engineModelId])
   @@index([storySpaceId, enabled])
+}
+
+// —— story-web 三期：AI 创作生产线（项目 / 角色 / 分镜 / 任务 / OSS 清理队列） ——
+// 详见 story-web/docs/ai/plan.md §2
+
+enum StoryProjectAspect {
+  RATIO_16_9
+  RATIO_9_16
+}
+
+enum StoryProjectStatus {
+  DRAFT
+  INITIALIZING
+  READY
+  ARCHIVED
+}
+
+enum StoryGenerationKind {
+  COVER_IMAGE
+  CHARACTER_AVATAR
+  FRAME_IMAGE
+  FRAME_VIDEO
+}
+
+enum StoryGenerationStatus {
+  PENDING
+  SUBMITTED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+/// 漫剧项目主表
+model StoryProject {
+  id             String              @id @default(cuid())
+  userId         String
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name           String
+  description    String              @db.Text
+  aspectRatio    StoryProjectAspect
+  /// 关联 story-web/src/shared/styles/index.json 的 id
+  styleId        Int
+
+  /// AI 一键初始化产出，初始为空字符串
+  storyOutline   String              @default("") @db.Text
+
+  /// 封面图 OSS 公网 URL；初始空
+  coverImageUrl  String              @default("")
+  /// 当前封面任务 id（用于前端轮询/进度显示），仅引用不做 FK
+  coverTaskId    String?
+
+  status         StoryProjectStatus  @default(DRAFT)
+  /// 软删时间；查询默认过滤
+  deletedAt      DateTime?
+
+  characters     StoryCharacter[]
+  frames         StoryStoryboardFrame[]
+  tasks          StoryGenerationTask[]
+  cleanupItems   StoryOssCleanupQueue[]
+
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([userId, deletedAt, updatedAt])
+  @@index([status])
+}
+
+/// 项目角色
+model StoryCharacter {
+  id             String              @id @default(cuid())
+  projectId      String
+  project        StoryProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name           String
+  role           String              @default("")
+  description    String              @default("") @db.Text
+  /// 角色外观提示词（仅外观/构图/白底，不含风格段；调用 KIE 时由后端按 styleId 实时拼接 [STYLE]）
+  imagePrompt    String              @db.Text
+  /// 角色头像 OSS 公网 URL；初始空
+  avatarUrl      String              @default("")
+  /// 当前头像任务 id；仅引用不做 FK
+  avatarTaskId   String?
+
+  /// 同项目下排序
+  sortOrder      Int                 @default(0)
+
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([projectId, sortOrder])
+}
+
+/// 分镜
+model StoryStoryboardFrame {
+  id                String         @id @default(cuid())
+  projectId         String
+  project           StoryProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// 第几格（1-based）
+  index             Int
+  sceneText         String         @default("")
+  sceneDescription  String         @default("") @db.Text
+  /// 该分镜涉及的角色 id 列表（StoryCharacter.id），按出场先后；删除角色时由服务层 array_remove
+  characterIds      String[]       @default([])
+
+  /// 分镜图 prompt：角色描述 + 场景描述（不含风格，调用时拼装）
+  imagePrompt       String         @db.Text
+  /// 运镜 prompt（不含风格）
+  videoPrompt       String         @db.Text
+
+  /// 分镜图 OSS 公网 URL（初始空）
+  imageUrl          String         @default("")
+  imageTaskId       String?
+
+  /// 分镜视频 OSS 公网 URL（初始空）
+  videoUrl          String         @default("")
+  videoTaskId       String?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([projectId, index])
+  @@index([projectId])
+}
+
+/// 统一的 KIE/AI 生成任务表（覆盖封面/角色/分镜图/分镜视频四类）
+model StoryGenerationTask {
+  id              String                 @id @default(cuid())
+  projectId       String
+  project         StoryProject           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// 关联的目标实体（按 kind 二选一）
+  characterId     String?
+  frameId         String?
+
+  kind            StoryGenerationKind
+  status          StoryGenerationStatus  @default(PENDING)
+
+  /// KIE 模型名：nano-banana-pro / wan/2-7-image-pro
+  model           String
+  /// KIE 返回的 taskId（提交后填入，用于回调/轮询匹配）
+  kieTaskId       String?                @unique
+  /// 提交给 KIE 的完整 input（便于排查与重放，含已拼接的风格段）
+  inputPayload    Json
+  /// KIE 回调或 recordInfo 原始响应（最近一次）
+  resultPayload   Json?
+  /// KIE 返回的临时 URL（OSS 上传失败时保留作为人工补救入口）
+  ephemeralUrl    String?
+  /// 落 OSS 后的稳定 URL（成功时回写到目标实体相同字段）
+  ossUrl          String?
+
+  failCode        String?
+  failMessage     String?
+
+  submittedAt     DateTime?
+  completedAt     DateTime?
+  lastPolledAt    DateTime?
+  pollCount       Int                    @default(0)
+
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([status, submittedAt])
+  @@index([projectId, kind])
+  @@index([characterId])
+  @@index([frameId])
+}
+
+/// OSS 异步清理队列：删除 / 重新生成时旧的稳定 URL 入队，由 cron worker 调 deleteManagedOssObjectByUrl 清理
+model StoryOssCleanupQueue {
+  id          String       @id @default(cuid())
+  /// 来源上下文（仅排查用，例 "project_delete:cuid_xxx" / "regenerate_cover:cuid"）
+  source      String?
+  /// 关联项目（项目硬删后允许保留为 null）
+  projectId   String?
+  project     StoryProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  /// 待清理的 OSS 公网 URL
+  ossUrl      String
+  /// 不要在该时间之前清理（用于"先生成新图再删旧图"的窗口期）
+  notBefore   DateTime     @default(now())
+  /// 已尝试次数；>=3 视为失败，等人工排查
+  attempts    Int          @default(0)
+  lastTriedAt DateTime?
+  lastError   String?
+  /// 完成时间；非空即视为已清理（保留作为审计）
+  doneAt      DateTime?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([doneAt, notBefore])
+  @@index([projectId])
 }

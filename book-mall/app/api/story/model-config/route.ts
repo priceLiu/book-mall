@@ -25,7 +25,11 @@ export async function GET(request: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: jsonHeaders(request) });
   }
-  const space = await ensureStorySpaceForUser(session.user);
+  const space = await ensureStorySpaceForUser({
+    id: session.user.id,
+    name: session.user.name ?? null,
+    email: session.user.email ?? null,
+  });
   return NextResponse.json(
     { space, selections: space.modelSelections },
     { headers: jsonHeaders(request) },

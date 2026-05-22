@@ -1,0 +1,13 @@
+{
+  "name": "private-website",
+  "private": true,
+  "description": "Monorepo dev orchestration (book-mall, tool-web, finance-web, story-web)",
+  "scripts": {
+    "dev:all": "node -e \"console.log('\\n  >>> 开发导航: http://localhost:3000/dev\\n')\" && concurrently -k -n mall,tool,finance,story -c blue,green,yellow,magenta \"pnpm --dir book-mall dev\" \"pnpm --dir tool-web dev\" \"pnpm --dir finance-web dev\" \"pnpm --dir story-web dev\"",
+    "dev:all:story": "node -e \"console.log('\\n  >>> 开发导航: http://localhost:3000/dev\\n')\" && concurrently -k -n mall,tool,finance,story,poll -c blue,green,yellow,magenta,cyan \"pnpm --dir book-mall dev\" \"pnpm --dir tool-web dev\" \"pnpm --dir finance-web dev\" \"pnpm --dir story-web dev\" \"pnpm --dir book-mall story:poll-loop\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "packageManager": "pnpm@11.1.3+sha512.c85357fe17ca12dd23dd7071822666dfd7e3cb76fe214e3370b5ea2fb34f2a231185509b63e717f3cd0acb38dd3f8d82bcd5e8172400ae678b70ea4fbed0896d"
+}

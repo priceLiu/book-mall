@@ -1,48 +1,50 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { DEMO_SPACE } from "@/lib/site-config";
+import { useRouter } from "next/navigation";
 import type { LandingShowcase } from "@/lib/landing-showcase";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { LandingHome } from "@/components/landing/landing-home";
 import { StorySpaceHome } from "@/components/landing/story-space-home";
 import { fetchMyStorySpace, publishStorySpace, type StorySpaceData } from "@/lib/story-api";
 import { fetchStoryViewerUser } from "@/lib/story-viewer-session";
 
+type LoadState = "pending" | "guest" | "ready";
+
 export function StoryHomePageClient({ showcase }: { showcase: LandingShowcase }) {
   const base = useBookMallBaseUrl();
+  const router = useRouter();
+  const [loadState, setLoadState] = useState<LoadState>("pending");
   const [space, setSpace] = useState<StorySpaceData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!base) {
-      setLoading(false);
-      return;
-    }
+    if (!base) return;
     let cancelled = false;
     (async () => {
       const user = await fetchStoryViewerUser(base);
       if (cancelled) return;
       if (!user) {
-        setSpace(null);
-        setLoading(false);
+        setLoadState("guest");
         return;
       }
       try {
         const s = await fetchMyStorySpace(base);
-        if (!cancelled) setSpace(s);
+        if (cancelled) return;
+        setSpace(s);
+        setLoadState("ready");
       } catch {
-        if (!cancelled) setSpace(null);
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadState("guest");
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [base]);
+
+  useEffect(() => {
+    if (loadState === "guest") router.replace("/projects");
+  }, [loadState, router]);
 
   const onPublish = useCallback(async () => {
     if (!base) return;
@@ -58,25 +60,15 @@ export function StoryHomePageClient({ showcase }: { showcase: LandingShowcase })
     }
   }, [base]);
 
-  if (loading) {
-    return (
-      <div className="story-container py-24 text-center text-[var(--story-muted)]">
-        加载个人空间…
-      </div>
-    );
-  }
+  if (loadState !== "ready" || !space) return null;
 
-  if (space) {
-    return (
-      <StorySpaceHome
-        space={space}
-        showcase={showcase}
-        onPublish={onPublish}
-        publishing={publishing}
-        publishError={publishError}
-      />
-    );
-  }
-
-  return <LandingHome demo={DEMO_SPACE} showcase={showcase} />;
+  return (
+    <StorySpaceHome
+      space={space}
+      showcase={showcase}
+      onPublish={onPublish}
+      publishing={publishing}
+      publishError={publishError}
+    />
+  );
 }
