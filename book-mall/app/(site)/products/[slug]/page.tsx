@@ -6,10 +6,11 @@ import { productPricingFootnote } from "@/lib/product-pricing-footnote";
 import { getProductHeroMarkdown } from "@/lib/product-detail-hero-markdown";
 import { ProductHeroMarkdown } from "@/components/products/product-hero-markdown";
 import { ProductDescriptionBody } from "@/components/products/product-description-body";
+import { StoryProductFeaturedVideo } from "@/components/products/story-product-featured-video";
 import type { Prisma } from "@prisma/client";
 
 type ProductWithCategory = Prisma.ProductGetPayload<{
-  include: { category: true };
+  include: { category: true; storySpaceAsPublished: true };
 }>;
 
 const kindLabel: Record<string, string> = {
@@ -31,7 +32,7 @@ export default async function ProductDetailPage({
   try {
     product = await prisma.product.findUnique({
       where: { slug: params.slug },
-      include: { category: true },
+      include: { category: true, storySpaceAsPublished: true },
     });
   } catch (e) {
     if (!isPrismaConnectionUnavailable(e)) throw e;
@@ -53,6 +54,7 @@ export default async function ProductDetailPage({
   const listHref = product.kind === "TOOL" ? "/products/ai-apps" : "/products/ai-courses";
   const listLabel = product.kind === "TOOL" ? "AI 应用" : "AI 课程";
   const heroMarkdown = getProductHeroMarkdown(product.slug);
+  const storySpace = product.storySpaceAsPublished;
 
   return (
     <main className="container max-w-screen-lg mx-auto px-4 pb-16 pt-6 sm:pt-8 md:pt-10">
@@ -97,6 +99,14 @@ export default async function ProductDetailPage({
                 </p>
               </>
             )}
+
+            {storySpace ? (
+              <StoryProductFeaturedVideo
+                videoUrl={storySpace.featuredVideoUrl}
+                posterUrl={storySpace.featuredVideoPosterUrl}
+                title={storySpace.featuredWorkTitle}
+              />
+            ) : null}
 
             <div className="prose prose-invert mt-5 max-w-none dark:prose-invert md:mt-6">
               <h2 className="mb-2 mt-0 text-lg font-semibold first:mt-0">详情</h2>

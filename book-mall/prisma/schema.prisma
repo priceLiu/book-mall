@@ -82,6 +82,7 @@ model User {
   cloudAccountBindings         CloudAccountBinding[]
   walletHolds                  WalletHold[]
   toolModelUsageCounters       ToolModelUsageCounter[]
+  storySpace                   StorySpace?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -974,6 +975,7 @@ model Product {
   category   ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   userProductSubscriptions UserProductSubscription[]
+  storySpaceAsPublished    StorySpace? @relation("StorySpacePublishedProduct")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -995,4 +997,87 @@ model SsoAuthorizationCode {
   createdAt DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+// —— story-web 漫剧个人空间 ——
+
+enum StoryEngineRole {
+  LLM
+  IMAGE
+  VIDEO
+}
+
+enum StorySpaceTemplateKey {
+  CLASSIC_V1
+}
+
+enum StorySpacePublishStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// story-web 可选 AI 引擎模型目录（平台维护；用户空间内勾选主用模型）
+model StoryEngineModel {
+  id            String          @id @default(cuid())
+  modelKey      String          @unique
+  displayName   String
+  vendor        String
+  role          StoryEngineRole
+  description   String?         @db.Text
+  sortOrder     Int             @default(0)
+  active        Boolean         @default(true)
+  defaultParams Json?
+
+  selections StorySpaceModelSelection[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role, active, sortOrder])
+}
+
+/// 用户漫剧个人空间（一人一条；slug 对外访问）
+model StorySpace {
+  id                       String                  @id @default(cuid())
+  userId                   String                  @unique
+  user                     User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug                     String                  @unique
+  templateKey              StorySpaceTemplateKey   @default(CLASSIC_V1)
+  title                    String
+  tagline                  String
+  subtitle                 String                  @db.Text
+  ownerDisplayName         String?
+  featuredWorkTitle        String
+  featuredWorkDescription  String?
+  featuredVideoUrl         String
+  featuredVideoPosterUrl   String?
+  publishStatus            StorySpacePublishStatus @default(DRAFT)
+  publishedAt              DateTime?
+  publishedProductId       String?                 @unique
+  publishedProduct         Product?                @relation("StorySpacePublishedProduct", fields: [publishedProductId], references: [id], onDelete: SetNull)
+
+  modelSelections StorySpaceModelSelection[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([publishStatus])
+}
+
+/// 空间内启用的引擎模型（每 role 可设 isPrimary）
+model StorySpaceModelSelection {
+  id            String           @id @default(cuid())
+  storySpaceId  String
+  storySpace    StorySpace       @relation(fields: [storySpaceId], references: [id], onDelete: Cascade)
+  engineModelId String
+  engineModel   StoryEngineModel @relation(fields: [engineModelId], references: [id], onDelete: Cascade)
+  enabled       Boolean          @default(true)
+  isPrimary     Boolean          @default(false)
+  params        Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storySpaceId, engineModelId])
+  @@index([storySpaceId, enabled])
 }

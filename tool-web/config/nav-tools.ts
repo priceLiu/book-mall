@@ -76,6 +76,17 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
     ],
   },
   {
+    label: "漫剧剧场",
+    navKey: "story-theater",
+    defaultOpen: true,
+    children: [
+      { href: "/story-theater", label: "首页" },
+      { href: "/story-theater/creator", label: "创作幻想家" },
+      { href: "/story-theater/library", label: "我的剧场" },
+      { href: "/story-theater/implementation", label: "实现逻辑" },
+    ],
+  },
+  {
     label: "AI智能客服",
     navKey: "smart-support",
     defaultOpen: true,
