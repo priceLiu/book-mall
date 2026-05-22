@@ -3,8 +3,9 @@
   "private": true,
   "description": "Monorepo dev orchestration (book-mall, tool-web, finance-web, story-web)",
   "scripts": {
-    "dev:all": "node -e \"console.log('\\n  >>> 开发导航: http://localhost:3000/dev\\n')\" && concurrently -k -n mall,tool,finance,story -c blue,green,yellow,magenta \"pnpm --dir book-mall dev\" \"pnpm --dir tool-web dev\" \"pnpm --dir finance-web dev\" \"pnpm --dir story-web dev\"",
-    "dev:all:story": "node -e \"console.log('\\n  >>> 开发导航: http://localhost:3000/dev\\n')\" && concurrently -k -n mall,tool,finance,story,poll -c blue,green,yellow,magenta,cyan \"pnpm --dir book-mall dev\" \"pnpm --dir tool-web dev\" \"pnpm --dir finance-web dev\" \"pnpm --dir story-web dev\" \"pnpm --dir book-mall story:poll-loop\""
+    "dev:all": "node -e \"console.log('\\n  >>> 开发导航: http://localhost:3000/dev\\n  >>> KIE 任务: http://localhost:3000/dev/story/tasks\\n')\" && concurrently -k -n mall,tool,finance,story,poll -c blue,green,yellow,magenta,cyan \"pnpm --dir book-mall dev\" \"pnpm --dir tool-web dev\" \"pnpm --dir finance-web dev\" \"pnpm --dir story-web dev\" \"pnpm --dir book-mall story:poll-loop\"",
+    "dev:all:story": "pnpm dev:all",
+    "dev:all:nopoll": "node -e \"console.log('\\n  >>> 开发导航: http://localhost:3000/dev\\n  >>> 注意：未启动 story:poll-loop，漫剧任务会一直停留在生成中。\\n')\" && concurrently -k -n mall,tool,finance,story -c blue,green,yellow,magenta \"pnpm --dir book-mall dev\" \"pnpm --dir tool-web dev\" \"pnpm --dir finance-web dev\" \"pnpm --dir story-web dev\""
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

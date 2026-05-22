@@ -76,8 +76,8 @@ export function getDevHubBackgroundTasks(): DevHubBackgroundTask[] {
       id: "story-poll",
       label: "story:poll-loop",
       description:
-        "漫剧 KIE 任务轮询（本地无公网回调时必开）；无网页，日志在终端",
-      command: "pnpm dev:all:story  （或 book-mall 内 pnpm story:poll-loop）",
+        "漫剧 KIE 任务轮询（本地无公网回调时必开）；pnpm dev:all 已默认启动，日志在 [poll] 颜色行；任务详情看 /dev/story/tasks",
+      command: "pnpm dev:all  （单独运行：pnpm --filter book-mall run story:poll-loop）",
     },
   ];
 }

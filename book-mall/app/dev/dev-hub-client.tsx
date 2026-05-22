@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { DevHubBackgroundTask, DevHubService } from "@/lib/dev-hub-services";
 
@@ -84,12 +85,16 @@ export function DevHubClient({
           <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200">
             pnpm dev:all
           </code>{" "}
-          或{" "}
-          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-zinc-200">
-            pnpm dev:all:story
-          </code>
-          后，从下方进入各子站。状态每 15 秒自动刷新。
+          后，从下方进入各子站。该命令已默认包含 story:poll-loop。状态每 15 秒自动刷新。
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/dev/story/tasks"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-200 transition hover:border-sky-400 hover:bg-sky-500/20"
+          >
+            漫剧 KIE 任务看板 →
+          </Link>
+        </div>
         <p className="mt-3 text-xs text-zinc-500">
           上次检测：{new Date(checkedAt).toLocaleString("zh-CN")}
           <button
