@@ -14,15 +14,14 @@
 
 ## 1. 本机开发
 
+**一键启动（推荐）**：在仓库根目录 `pnpm install` 后执行 `pnpm dev:all`（同时起 3000–3003）；漫剧开发用 `pnpm dev:all:story`（额外带 `story:poll-loop`）。启动后打开开发导航页 http://localhost:3000/dev 。详见 [`docs/dev.md`](docs/dev.md)。
+
 ```bash
-# 主站
+# 或分别启动
 cd book-mall && pnpm install && pnpm dev          # http://localhost:3000
-
-# 工具站
 cd tool-web && pnpm install && pnpm dev           # http://localhost:3001
-
-# 财务控制台
 cd finance-web && pnpm install && pnpm dev        # http://localhost:3002
+cd story-web && pnpm install && pnpm dev          # http://localhost:3003
 ```
 
 各工程对应的 `.env.example` / `.env.development` 描述必填项；最重要的：

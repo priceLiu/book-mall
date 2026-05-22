@@ -146,7 +146,7 @@ export async function ensureStorySpaceForUser(user: Pick<User, "id" | "name" | "
       title: "漫剧个人空间",
       tagline: "用 AI 速度，讲好你的漫剧故事",
       subtitle:
-        "一人即剧场的创作空间：首页可发布到 book-mall，创作室、影像室与模型配置逐步接入。",
+        "一人即剧场的创作空间",
       ownerDisplayName: user.name ?? user.email?.split("@")[0] ?? "创作者",
       featuredWorkTitle: "《星尘旅人》预告",
       featuredWorkDescription: "科幻漫剧片段 · 可直接播放",

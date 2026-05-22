@@ -9,6 +9,11 @@ import { cn } from "@/lib/utils";
 export function StoryShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const isHome = pathname === "/" || pathname.startsWith("/space/");
+  const isProjectWorkspace = pathname.startsWith("/project/");
+
+  if (isProjectWorkspace) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--story-bg)]">
@@ -28,7 +33,12 @@ export function StoryShell({ children }: { children: React.ReactNode }) {
 
           <nav className="flex items-center gap-1" aria-label="空间导航">
             {STORY_NAV_ITEMS.map(({ href, label }) => {
-              const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+              const active =
+                href === "/"
+                  ? pathname === "/"
+                  : href === "/projects"
+                    ? pathname.startsWith("/projects")
+                    : pathname.startsWith(href);
               return (
                 <Link
                   key={href}

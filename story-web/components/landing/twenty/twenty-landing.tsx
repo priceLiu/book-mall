@@ -40,7 +40,7 @@ export function TwentyLanding({
           {subtitle}
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/studio" className="twenty-btn">
+          <Link href="/projects" className="twenty-btn">
             进入创作室
           </Link>
           <Link href="/models" className="twenty-btn-ghost">
