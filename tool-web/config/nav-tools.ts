@@ -87,6 +87,17 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
     ],
   },
   {
+    label: "AI 海报画布",
+    navKey: "ai-poster-canvas",
+    defaultOpen: true,
+    children: [
+      { href: "/ai-poster-canvas", label: "首页" },
+      { href: "/ai-poster-canvas/studio", label: "创意画室" },
+      { href: "/ai-poster-canvas/gallery", label: "画作" },
+      { href: "/ai-poster-canvas/implementation", label: "实现逻辑" },
+    ],
+  },
+  {
     label: "AI智能客服",
     navKey: "smart-support",
     defaultOpen: true,

@@ -1,0 +1,839 @@
+/**
+ * canvas-web AI 任务调度服务（KIE）。
+ *
+ * 状态机：
+ *   PENDING ──createTask 200──▶ SUBMITTED ──callback/poll success──▶ SUCCEEDED
+ *      │                                ╲──fail/timeout──▶ FAILED
+ *      └──createTask 5xx, retry≤3──▶ FAILED
+ *
+ * mirror book-mall/lib/story/story-task-service.ts，但任务以 nodeId 维度且节点输入由前端整理后传入。
+ */
+import { createHash } from "node:crypto";
+import type {
+  CanvasGenerationKind,
+  CanvasGenerationStatus,
+  CanvasGenerationTask,
+  Prisma,
+} from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import {
+  CANVAS_AI_TASK_TIMEOUT_MIN,
+  buildCanvasAiKieCallbackUrl,
+  getCanvasProjectInflightMax,
+  getCanvasUserInflightMax,
+} from "./canvas-constants";
+import {
+  createKieTask,
+  extractKieResultUrl,
+  getKieTask,
+  KieError,
+  logKieEvent,
+  type KieAspectRatio,
+  type KieImageInput,
+  type KieRecordResponse,
+  type CreateKieTaskArgs,
+} from "@/lib/story/kie-client";
+import { persistCanvasKieResultToOss } from "./canvas-oss";
+import { CanvasProjectError } from "./canvas-project-service";
+import { buildKieImageCreateArgs } from "./providers/kie";
+
+// —— Types ——
+
+/** 节点运行的轻量描述：由 canvas-web 前端整理上游解析后传入 */
+export type CanvasRunNodeInput = {
+  /** 例：'image-gen' / 'ai-text' / 'image' / 'text' / 'product-params' / 'output' */
+  type: string;
+  /** 仅 image-gen / ai-text 真正会创建任务，其它由前端短路。 */
+  modelKey?: string;
+  /** 节点配置 + 上游解析后的字段（已扁平化） */
+  data: Record<string, unknown>;
+  /** 上游图片节点解析的 OSS / blob URL 列表（按端口顺序） */
+  imageInputs?: string[];
+  /** 上游文本节点解析的字符串（按端口顺序，已 join） */
+  textInputs?: string[];
+};
+
+export type SubmitCanvasNodeArgs = {
+  userId: string;
+  projectId: string;
+  nodeId: string;
+  node: CanvasRunNodeInput;
+};
+
+// —— Helpers ——
+
+async function ensureUserInflightCapacity(
+  userId: string,
+  addingCount = 1,
+): Promise<void> {
+  const max = getCanvasUserInflightMax();
+  const current = await prisma.canvasGenerationTask.count({
+    where: {
+      project: { userId, deletedAt: null },
+      status: { in: ["PENDING", "SUBMITTED"] },
+    },
+  });
+  if (current + addingCount > max) {
+    throw new CanvasProjectError(
+      "TOO_MANY_INFLIGHT",
+      `inflight tasks ${current + addingCount} exceeds limit ${max}`,
+      429,
+    );
+  }
+}
+
+async function ensureProjectInflightCapacity(
+  projectId: string,
+): Promise<void> {
+  const max = getCanvasProjectInflightMax();
+  const current = await prisma.canvasGenerationTask.count({
+    where: {
+      projectId,
+      status: { in: ["PENDING", "SUBMITTED"] },
+    },
+  });
+  if (current >= max) {
+    throw new CanvasProjectError(
+      "TOO_MANY_INFLIGHT",
+      `project inflight ${current} exceeds limit ${max}`,
+      429,
+    );
+  }
+}
+
+async function ensureNoActiveTaskForNode(
+  projectId: string,
+  nodeId: string,
+): Promise<void> {
+  const active = await prisma.canvasGenerationTask.findFirst({
+    where: {
+      projectId,
+      nodeId,
+      status: { in: ["PENDING", "SUBMITTED"] },
+    },
+    select: { id: true },
+  });
+  if (active) {
+    throw new CanvasProjectError(
+      "TASK_ALREADY_INFLIGHT",
+      `node ${nodeId} task already in progress`,
+      409,
+    );
+  }
+}
+
+function computeInputHash(args: {
+  modelKey: string;
+  prompt: string;
+  imageUrls: string[];
+  params: Record<string, unknown>;
+}): string {
+  const payload = {
+    modelKey: args.modelKey,
+    prompt: args.prompt,
+    imageUrls: [...args.imageUrls].sort(),
+    params: args.params,
+  };
+  const json = JSON.stringify(payload);
+  return createHash("sha256").update(json).digest("hex");
+}
+
+// —— Build KIE input for ImageGen node ——
+
+type BuiltKieInput = {
+  model: string;
+  input: Record<string, unknown>;
+  prompt: string;
+  imageUrls: string[];
+  params: Record<string, unknown>;
+};
+
+function clampInt(n: unknown, min: number, max: number, fallback: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(v)));
+}
+
+function pickAspectRatio(v: unknown): "16:9" | "9:16" | "1:1" {
+  if (v === "16:9" || v === "9:16" || v === "1:1") return v;
+  return "1:1";
+}
+
+function pickResolution(v: unknown): "1K" | "2K" {
+  if (v === "1K" || v === "2K") return v;
+  return "2K";
+}
+
+function pickOutputFormat(v: unknown): "png" | "jpeg" | "webp" {
+  if (v === "png" || v === "jpeg" || v === "webp") return v;
+  return "png";
+}
+
+function buildImageGenKieInput(node: CanvasRunNodeInput): BuiltKieInput {
+  const modelKey = (node.modelKey ?? "").trim();
+  if (!modelKey) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "image-gen node requires modelKey",
+    );
+  }
+  const promptParts: string[] = [];
+  const directPrompt =
+    typeof node.data.prompt === "string" ? node.data.prompt.trim() : "";
+  if (directPrompt) promptParts.push(directPrompt);
+  for (const t of node.textInputs ?? []) {
+    if (t && t.trim()) promptParts.push(t.trim());
+  }
+  const prompt = promptParts.join("\n").slice(0, 4000);
+  if (!prompt) {
+    throw new CanvasProjectError(
+      "EMPTY_PROMPT",
+      "image-gen node prompt is empty",
+    );
+  }
+
+  const imageUrls = (node.imageInputs ?? []).filter(
+    (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
+  ).slice(0, 8);
+
+  const aspect_ratio = pickAspectRatio(node.data.aspectRatio);
+  const resolution = pickResolution(node.data.resolution);
+  const output_format = pickOutputFormat(node.data.outputFormat);
+  const n = clampInt(node.data.n, 1, 4, 1);
+
+  const mapped = buildKieImageCreateArgs({
+    modelKey,
+    prompt,
+    imageUrls,
+    params: {
+      aspect_ratio,
+      resolution,
+      output_format,
+      n: n > 1 ? n : undefined,
+    },
+  });
+  return {
+    model: mapped.model,
+    input: mapped.input,
+    prompt,
+    imageUrls,
+    params: { aspect_ratio, resolution, output_format, n },
+  };
+}
+
+// —— Submit ——
+
+async function findReusableSucceededTask(args: {
+  projectId: string;
+  nodeId: string;
+  inputHash: string;
+}): Promise<CanvasGenerationTask | null> {
+  return prisma.canvasGenerationTask.findFirst({
+    where: {
+      projectId: args.projectId,
+      nodeId: args.nodeId,
+      status: "SUCCEEDED",
+      inputHash: args.inputHash,
+    },
+    orderBy: { completedAt: "desc" },
+  });
+}
+
+export type SubmitCanvasNodeResult =
+  | { reused: true; task: CanvasGenerationTask }
+  | { reused: false; task: CanvasGenerationTask };
+
+export async function submitCanvasNodeTask(
+  args: SubmitCanvasNodeArgs,
+): Promise<SubmitCanvasNodeResult> {
+  const project = await prisma.canvasProject.findFirst({
+    where: { id: args.projectId, userId: args.userId, deletedAt: null },
+    select: { id: true, userId: true },
+  });
+  if (!project) {
+    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  }
+
+  if (args.node.type !== "image-gen") {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      `node type ${args.node.type} is not runnable`,
+    );
+  }
+
+  const built = buildImageGenKieInput(args.node);
+  const inputHash = computeInputHash({
+    modelKey: built.model,
+    prompt: built.prompt,
+    imageUrls: built.imageUrls,
+    params: built.params,
+  });
+
+  // 缓存命中 —— 直接复用
+  const reusable = await findReusableSucceededTask({
+    projectId: args.projectId,
+    nodeId: args.nodeId,
+    inputHash,
+  });
+  if (reusable) {
+    return { reused: true, task: reusable };
+  }
+
+  await ensureNoActiveTaskForNode(args.projectId, args.nodeId);
+  await ensureProjectInflightCapacity(args.projectId);
+  await ensureUserInflightCapacity(args.userId);
+
+  const created = await prisma.canvasGenerationTask.create({
+    data: {
+      projectId: args.projectId,
+      nodeId: args.nodeId,
+      kind: "IMAGE",
+      model: built.model,
+      inputPayload: built.input as Prisma.InputJsonValue,
+      inputHash,
+      status: "PENDING",
+    },
+  });
+
+  const callBackUrl = buildCanvasAiKieCallbackUrl("image", created.id);
+  try {
+    const { taskId } = await createKieTask({
+      model: built.model,
+      input: built.input as never,
+      callBackUrl,
+    });
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "SUBMITTED",
+        kieTaskId: taskId,
+        submittedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const code = e instanceof KieError ? e.code : "KIE_HTTP_ERROR";
+    logKieEvent("warn", `[canvas] createTask failed (will retry via poll worker)`, {
+      taskId: created.id,
+      code,
+      msg,
+    });
+    await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: { failCode: code, failMessage: msg.slice(0, 500) },
+    });
+    return { reused: false, task: created };
+  }
+}
+
+// —— Apply result ——
+
+export async function applyCanvasKieTaskResult(
+  taskId: string,
+  record: KieRecordResponse,
+): Promise<void> {
+  const task = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    include: { project: true },
+  });
+  if (!task) {
+    logKieEvent("warn", "[canvas] applyKieTaskResult: task not found", { taskId });
+    return;
+  }
+  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+
+  if (record.state === "success") {
+    const ephemeralUrl = extractKieResultUrl(record);
+    if (!ephemeralUrl) {
+      await prisma.canvasGenerationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "FAILED",
+          failCode: "KIE_NO_RESULT_URL",
+          failMessage: "KIE returned success but resultUrls empty",
+          resultPayload: record as unknown as Prisma.InputJsonValue,
+          completedAt: new Date(),
+        },
+      });
+      return;
+    }
+    let ossUrl: string | null = null;
+    let ossError: string | null = null;
+    try {
+      ossUrl = await persistCanvasKieResultToOss({
+        ephemeralUrl,
+        kind: "node-image",
+        projectId: task.projectId,
+      });
+    } catch (e) {
+      ossError = e instanceof Error ? e.message : String(e);
+      logKieEvent("error", "[canvas] persistKieResultToOss failed", {
+        taskId,
+        ephemeralUrl,
+        ossError,
+      });
+    }
+    if (!ossUrl) {
+      await prisma.canvasGenerationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "FAILED",
+          failCode: "OSS_UPLOAD_FAILED",
+          failMessage: ossError ?? "OSS upload failed",
+          ephemeralUrl,
+          resultPayload: record as unknown as Prisma.InputJsonValue,
+          completedAt: new Date(),
+        },
+      });
+      return;
+    }
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "SUCCEEDED",
+        ossUrl,
+        ephemeralUrl,
+        resultPayload: record as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    logKieEvent("info", "[canvas] task succeeded", {
+      taskId,
+      kind: task.kind,
+      ossUrl,
+    });
+  } else if (record.state === "fail") {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: record.failCode || "KIE_FAILED",
+        failMessage: record.failMsg ?? null,
+        resultPayload: record as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    logKieEvent("warn", "[canvas] task failed", {
+      taskId,
+      kind: task.kind,
+      failCode: record.failCode,
+      failMsg: record.failMsg,
+    });
+  }
+}
+
+// —— Polling worker ——
+
+const POLL_BATCH = 20;
+const POLL_INNER_TIMEOUT_MS = 8000;
+const RETRY_PENDING_LIMIT = 3;
+/** ai-engine 同步 LLM 若进程中断，PENDING 任务超过此时间则标记失败 */
+const TEXT_PENDING_STALE_MS = 15 * 60 * 1000;
+
+/**
+ * poll worker 仅对「KIE 异步出图」的 PENDING 任务重试 createTask。
+ * v1 image-gen 的 inputPayload 即 KIE input；v2 image-engine 包一层 kind。
+ * TEXT / ai-engine 为同步 LLM，不得走 createTask。
+ */
+function resolvePendingKieCreateArgs(
+  task: Pick<CanvasGenerationTask, "kind" | "model" | "inputPayload">,
+): CreateKieTaskArgs | null {
+  if (task.kind !== "IMAGE") return null;
+  const payload = task.inputPayload;
+  if (!payload || typeof payload !== "object") return null;
+  const p = payload as Record<string, unknown>;
+
+  if (p.kind === "ai-engine") return null;
+
+  if (p.kind === "image-engine") {
+    const prompt = String(p.prompt ?? "").trim();
+    if (!prompt) return null;
+    const params = (p.params as Record<string, unknown>) ?? {};
+    const imageUrls = Array.isArray(p.imageUrls)
+      ? p.imageUrls.filter(
+          (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
+        )
+      : [];
+    return buildKieImageCreateArgs({
+      modelKey: task.model,
+      prompt,
+      imageUrls,
+      params,
+    }) as CreateKieTaskArgs;
+  }
+
+  // v1 image-gen：inputPayload 本身就是 KIE input（gpt-image-1 需重新映射）
+  if (typeof p.prompt === "string" && p.prompt.trim()) {
+    if (task.model === "gpt-image-1") {
+      const imageUrls = Array.isArray(p.image_input)
+        ? p.image_input.filter(
+            (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
+          )
+        : [];
+      return buildKieImageCreateArgs({
+        modelKey: task.model,
+        prompt: p.prompt,
+        imageUrls,
+        params: {
+          aspect_ratio: p.aspect_ratio,
+          quality: p.quality,
+        },
+      }) as CreateKieTaskArgs;
+    }
+    return { model: task.model, input: p as KieImageInput };
+  }
+
+  return null;
+}
+
+function shouldPollNow(
+  task: Pick<CanvasGenerationTask, "lastPolledAt" | "pollCount">,
+): boolean {
+  if (!task.lastPolledAt) return true;
+  const intervalSec = Math.min(2 * 2 ** task.pollCount, 60);
+  return Date.now() - task.lastPolledAt.getTime() >= intervalSec * 1000;
+}
+
+export async function runCanvasPollWorker(): Promise<{
+  scanned: number;
+  retried: number;
+  succeeded: number;
+  failed: number;
+  timedOut: number;
+}> {
+  const result = { scanned: 0, retried: 0, succeeded: 0, failed: 0, timedOut: 0 };
+
+  // 1) PENDING（KIE createTask 失败 / 中断）：仅 IMAGE 异步出图重试
+  const pendings = await prisma.canvasGenerationTask.findMany({
+    where: { status: "PENDING", pollCount: { lt: RETRY_PENDING_LIMIT } },
+    orderBy: { createdAt: "asc" },
+    take: POLL_BATCH,
+  });
+  for (const task of pendings) {
+    result.scanned++;
+
+    // ai-engine 同步 LLM 若遗留 PENDING（进程崩溃等），超时后标记失败
+    if (task.kind === "TEXT") {
+      if (Date.now() - task.createdAt.getTime() >= TEXT_PENDING_STALE_MS) {
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            status: "FAILED",
+            failCode: "SYNC_LLM_STALE",
+            failMessage: "sync LLM task stuck in PENDING (server interrupted?)",
+            completedAt: new Date(),
+            lastPolledAt: new Date(),
+          },
+        });
+        result.failed++;
+      }
+      continue;
+    }
+
+    const createArgs = resolvePendingKieCreateArgs(task);
+    if (!createArgs) continue;
+
+    if (!shouldPollNow(task)) continue;
+    const callBackUrl = buildCanvasAiKieCallbackUrl("image", task.id);
+    try {
+      const { taskId } = await Promise.race([
+        createKieTask({
+          ...createArgs,
+          callBackUrl,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("createTask retry timeout")),
+            POLL_INNER_TIMEOUT_MS,
+          ),
+        ),
+      ]);
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          status: "SUBMITTED",
+          kieTaskId: taskId,
+          submittedAt: new Date(),
+          lastPolledAt: new Date(),
+          pollCount: task.pollCount + 1,
+        },
+      });
+      result.retried++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const nextCount = task.pollCount + 1;
+      const failed = nextCount >= RETRY_PENDING_LIMIT;
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          lastPolledAt: new Date(),
+          pollCount: nextCount,
+          ...(failed
+            ? {
+                status: "FAILED" as CanvasGenerationStatus,
+                failCode: "KIE_CREATE_RETRIES_EXHAUSTED",
+                failMessage: msg.slice(0, 500),
+                completedAt: new Date(),
+              }
+            : { failMessage: msg.slice(0, 500) }),
+        },
+      });
+      if (failed) result.failed++;
+    }
+  }
+
+  // 2) SUBMITTED：查询 recordInfo
+  const submitted = await prisma.canvasGenerationTask.findMany({
+    where: { status: "SUBMITTED", kieTaskId: { not: null } },
+    orderBy: { lastPolledAt: { sort: "asc", nulls: "first" } },
+    take: POLL_BATCH,
+  });
+  const timeoutMs = CANVAS_AI_TASK_TIMEOUT_MIN * 60 * 1000;
+  const now = Date.now();
+  for (const task of submitted) {
+    result.scanned++;
+    if (!task.kieTaskId) continue;
+    if (!shouldPollNow(task)) continue;
+
+    const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
+    if (now - submittedTs >= timeoutMs) {
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          status: "FAILED",
+          failCode: "timeout",
+          failMessage: `task exceeded ${CANVAS_AI_TASK_TIMEOUT_MIN} min`,
+          lastPolledAt: new Date(),
+          pollCount: task.pollCount + 1,
+          completedAt: new Date(),
+        },
+      });
+      result.timedOut++;
+      continue;
+    }
+
+    try {
+      const record = await Promise.race([
+        getKieTask(task.kieTaskId),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("recordInfo timeout")),
+            POLL_INNER_TIMEOUT_MS,
+          ),
+        ),
+      ]);
+      const before = task.status;
+      await applyCanvasKieTaskResult(task.id, record);
+      const after = await prisma.canvasGenerationTask.findUnique({
+        where: { id: task.id },
+        select: { status: true },
+      });
+      if (after?.status === "SUCCEEDED" && before !== "SUCCEEDED") {
+        result.succeeded++;
+      } else if (after?.status === "FAILED" && before !== "FAILED") {
+        result.failed++;
+      }
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logKieEvent("warn", "[canvas] poll iteration error", {
+        taskId: task.id,
+        msg,
+      });
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          lastPolledAt: new Date(),
+          pollCount: task.pollCount + 1,
+        },
+      });
+    }
+  }
+
+  return result;
+}
+
+// —— Cleanup worker ——
+
+const CLEANUP_BATCH = 20;
+const CLEANUP_RETRY_LIMIT = 3;
+
+export async function runCanvasCleanupWorker(): Promise<{
+  scanned: number;
+  done: number;
+  failed: number;
+}> {
+  const out = { scanned: 0, done: 0, failed: 0 };
+  const items = await prisma.canvasOssCleanupQueue.findMany({
+    where: {
+      doneAt: null,
+      notBefore: { lte: new Date() },
+      attempts: { lt: CLEANUP_RETRY_LIMIT },
+    },
+    orderBy: { notBefore: "asc" },
+    take: CLEANUP_BATCH,
+  });
+  if (items.length === 0) return out;
+
+  let deleteFn: ((url: string) => Promise<void>) | null = null;
+  try {
+    const mod = await import("@/lib/oss-delete-object");
+    if (typeof mod.deleteManagedOssObjectByUrl === "function") {
+      deleteFn = async (url) => {
+        await mod.deleteManagedOssObjectByUrl(url);
+      };
+    }
+  } catch {
+    // 不应到这里；若失败则后面把任务标 failed
+  }
+
+  for (const item of items) {
+    out.scanned++;
+    if (!deleteFn) {
+      await prisma.canvasOssCleanupQueue.update({
+        where: { id: item.id },
+        data: {
+          attempts: item.attempts + 1,
+          lastError: "oss-delete-object not available",
+          lastTriedAt: new Date(),
+        },
+      });
+      out.failed++;
+      continue;
+    }
+    try {
+      await deleteFn(item.ossUrl);
+      await prisma.canvasOssCleanupQueue.update({
+        where: { id: item.id },
+        data: { doneAt: new Date(), lastTriedAt: new Date() },
+      });
+      out.done++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await prisma.canvasOssCleanupQueue.update({
+        where: { id: item.id },
+        data: {
+          attempts: item.attempts + 1,
+          lastError: msg.slice(0, 500),
+          lastTriedAt: new Date(),
+        },
+      });
+      out.failed++;
+    }
+  }
+  return out;
+}
+
+// —— Soft delete for stage 4 ——
+
+/**
+ * 软删 task 并把 ossUrl 入清理队列。
+ * 调用方（前端 UI）须做两次确认（参 .cursor/rules/destructive-delete-confirmation.mdc）。
+ */
+export async function softDeleteCanvasTask(args: {
+  userId: string;
+  projectId: string;
+  taskId: string;
+}): Promise<{ ok: true }> {
+  const project = await prisma.canvasProject.findFirst({
+    where: { id: args.projectId, userId: args.userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!project) {
+    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  }
+  const task = await prisma.canvasGenerationTask.findFirst({
+    where: { id: args.taskId, projectId: args.projectId },
+  });
+  if (!task) {
+    throw new CanvasProjectError("NOT_FOUND", "task not found", 404);
+  }
+  await prisma.$transaction(async (tx) => {
+    await tx.canvasGenerationTask.update({
+      where: { id: args.taskId },
+      data: { deletedAt: new Date() },
+    });
+    if (task.ossUrl) {
+      await tx.canvasOssCleanupQueue.create({
+        data: {
+          source: "canvas-task-soft-delete",
+          projectId: args.projectId,
+          ossUrl: task.ossUrl,
+          notBefore: new Date(),
+        },
+      });
+    }
+  });
+  return { ok: true };
+}
+
+// —— Listing for project tasks API ——
+
+export async function listProjectTasks(args: {
+  userId: string;
+  projectId: string;
+  nodeIds?: string[];
+}): Promise<
+  Array<
+    Pick<
+      CanvasGenerationTask,
+      | "id"
+      | "nodeId"
+      | "kind"
+      | "status"
+      | "model"
+      | "ossUrl"
+      | "ephemeralUrl"
+      | "textOutput"
+      | "failCode"
+      | "failMessage"
+      | "submittedAt"
+      | "completedAt"
+      | "createdAt"
+      | "updatedAt"
+    >
+  >
+> {
+  const project = await prisma.canvasProject.findFirst({
+    where: { id: args.projectId, userId: args.userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!project) {
+    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  }
+  const where: Prisma.CanvasGenerationTaskWhereInput = {
+    projectId: args.projectId,
+    deletedAt: null,
+    ...(args.nodeIds && args.nodeIds.length > 0
+      ? { nodeId: { in: args.nodeIds } }
+      : {}),
+  };
+  const rows = await prisma.canvasGenerationTask.findMany({
+    where,
+    orderBy: { updatedAt: "desc" },
+    take: 200,
+    select: {
+      id: true,
+      nodeId: true,
+      kind: true,
+      status: true,
+      model: true,
+      ossUrl: true,
+      ephemeralUrl: true,
+      textOutput: true,
+      failCode: true,
+      failMessage: true,
+      submittedAt: true,
+      completedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  return rows;
+}
+
+export type CanvasGenerationKindAlias = CanvasGenerationKind;

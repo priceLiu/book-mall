@@ -13,6 +13,7 @@ import {
   runCleanupWorker,
   runPollWorker,
 } from "@/lib/story/story-task-service";
+import { createHeartbeat } from "@/lib/dev-heartbeat";
 
 const POLL_INTERVAL_MS = (() => {
   const raw = Number(process.env.STORY_POLL_INTERVAL_MS ?? "");
@@ -26,6 +27,10 @@ const CLEANUP_EVERY_N = (() => {
 
 let stopping = false;
 let iter = 0;
+const heartbeat = createHeartbeat({
+  id: "story-poll",
+  intervalMs: POLL_INTERVAL_MS,
+});
 
 function nowHHMMSS(): string {
   const d = new Date();
@@ -35,8 +40,10 @@ function nowHHMMSS(): string {
 
 async function tick() {
   iter += 1;
+  let lastResult: Record<string, unknown> | null = null;
   try {
     const r = await runPollWorker();
+    lastResult = r as unknown as Record<string, unknown>;
     if (r.scanned > 0) {
       console.log(
         `[${nowHHMMSS()}] poll #${iter}`,
@@ -45,6 +52,7 @@ async function tick() {
     }
   } catch (e) {
     console.error(`[${nowHHMMSS()}] poll #${iter} error`, e);
+    await heartbeat.recordError(e);
   }
 
   if (iter % CLEANUP_EVERY_N === 0) {
@@ -60,6 +68,8 @@ async function tick() {
       console.error(`[${nowHHMMSS()}] cleanup #${iter} error`, e);
     }
   }
+
+  await heartbeat.recordTick(lastResult);
 }
 
 async function main() {

@@ -67,6 +67,17 @@ export function getDevHubServices(): DevHubService[] {
       port: 3003,
       openable: true,
     },
+    {
+      id: "canvas",
+      label: "canvas-web",
+      description: "AI 海报画布 · 节点工作流 / 多模型 / 多图融合",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_CANVAS_WEB_ORIGIN,
+        "http://localhost:3004",
+      ),
+      port: 3004,
+      openable: true,
+    },
   ];
 }
 
@@ -76,8 +87,15 @@ export function getDevHubBackgroundTasks(): DevHubBackgroundTask[] {
       id: "story-poll",
       label: "story:poll-loop",
       description:
-        "漫剧 KIE 任务轮询（本地无公网回调时必开）；pnpm dev:all 已默认启动，日志在 [poll] 颜色行；任务详情看 /dev/story/tasks",
+        "漫剧 KIE 任务轮询（本地无公网回调时必开）；pnpm dev:all 已默认启动，日志在 [story-poll] 颜色行；任务详情看 /dev/story/tasks",
       command: "pnpm dev:all  （单独运行：pnpm --filter book-mall run story:poll-loop）",
+    },
+    {
+      id: "canvas-poll",
+      label: "canvas:poll-loop",
+      description:
+        "画布 KIE 任务轮询（本地无公网回调时必开）；pnpm dev:all 已默认启动，日志在 [canvas-poll] 颜色行；任务详情看 /dev/canvas/tasks",
+      command: "pnpm dev:all  （单独运行：pnpm --filter book-mall run canvas:poll-loop）",
     },
   ];
 }

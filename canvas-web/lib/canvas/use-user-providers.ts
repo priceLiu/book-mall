@@ -1,0 +1,67 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import {
+  listCanvasProviders,
+  type CanvasProviderDto,
+} from "@/lib/canvas-providers-api";
+
+const CACHE: { value: CanvasProviderDto[] | null; ts: number } = {
+  value: null,
+  ts: 0,
+};
+const TTL_MS = 30_000;
+
+/**
+ * 取当前用户的全部 Provider（含 models）。
+ * 节点上的 Provider/Model 二级 dropdown 都用它。
+ *
+ * 简易缓存 30s；切换页面后 hook 第一次会重新拉。
+ */
+export function useUserProviders(opts?: { forceRefresh?: boolean }) {
+  const base = useBookMallBaseUrl();
+  const [providers, setProviders] = useState<CanvasProviderDto[]>(
+    CACHE.value ?? [],
+  );
+  const [loading, setLoading] = useState(!CACHE.value);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!base) return;
+    const fresh = CACHE.value && Date.now() - CACHE.ts < TTL_MS;
+    if (fresh && !opts?.forceRefresh) {
+      setProviders(CACHE.value!);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    void listCanvasProviders(base)
+      .then((list) => {
+        if (cancelled) return;
+        CACHE.value = list;
+        CACHE.ts = Date.now();
+        setProviders(list);
+        setError(null);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "加载 Providers 失败");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [base, opts?.forceRefresh]);
+
+  return { providers, loading, error };
+}
+
+export function invalidateUserProvidersCache() {
+  CACHE.value = null;
+  CACHE.ts = 0;
+}

@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全站细滚动条（深色主题） */
+*,
+*::before,
+*::after {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:root {
+  --canvas-bg: #0b0b14;
+  --canvas-surface: #13131f;
+  --canvas-surface-2: #1a1a2b;
+  --canvas-border: rgba(255, 255, 255, 0.1);
+  --canvas-ink: #f5f5f7;
+  --canvas-muted: #a3a3b3;
+  --canvas-accent: #a78bfa;
+  --canvas-accent-soft: #7c5cff;
+  --canvas-accent-glow: rgba(167, 139, 250, 0.35);
+}
+
+body {
+  @apply m-0 min-h-screen bg-[var(--canvas-bg)] text-[var(--canvas-ink)] antialiased;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+  .canvas-container {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .canvas-serif {
+    font-family: var(--font-playfair), "Songti SC", "Noto Serif SC", Georgia, serif;
+  }
+
+  .canvas-sans {
+    font-family: var(--font-inter), "PingFang SC", "Noto Sans SC", sans-serif;
+  }
+
+  .twenty-eyebrow {
+    @apply canvas-sans text-xs font-medium uppercase tracking-[0.2em] text-[var(--canvas-muted)];
+  }
+
+  .twenty-headline {
+    @apply canvas-serif text-balance text-4xl font-normal leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-[4.25rem];
+  }
+
+  .twenty-section-headline {
+    @apply canvas-serif text-balance text-3xl font-normal leading-tight text-white sm:text-4xl md:text-[2.75rem];
+  }
+
+  .twenty-body {
+    @apply canvas-sans text-sm leading-7 text-[var(--canvas-muted)] sm:text-[15px];
+  }
+
+  .twenty-btn {
+    @apply canvas-sans inline-flex items-center justify-center rounded-full border border-white/20 bg-white px-6 py-2.5 text-sm font-medium text-black transition hover:bg-white/90;
+  }
+
+  .twenty-btn-ghost {
+    @apply canvas-sans inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-2.5 text-sm font-medium text-white transition hover:border-white/30 hover:bg-white/5;
+  }
+
+  .twenty-btn-accent {
+    @apply canvas-sans inline-flex items-center justify-center rounded-full bg-[var(--canvas-accent)] px-6 py-2.5 text-sm font-medium text-black transition hover:bg-[var(--canvas-accent-soft)] hover:text-white;
+  }
+
+  .canvas-glow {
+    box-shadow:
+      0 0 0 1px rgba(167, 139, 250, 0.25),
+      0 12px 40px -12px var(--canvas-accent-glow);
+  }
+
+  .impl-list {
+    @apply canvas-sans space-y-1.5 text-[14px] leading-7 text-[var(--canvas-muted)];
+  }
+  .impl-list li {
+    @apply pl-4 relative;
+  }
+  .impl-list li::before {
+    content: "•";
+    @apply absolute left-0 text-[var(--canvas-accent)];
+  }
+  .impl-list code {
+    @apply rounded bg-white/5 px-1.5 py-0.5 text-[12px] text-white/90;
+  }
+  .impl-table {
+    @apply mt-2 w-full border-separate border-spacing-0 rounded-xl border border-white/10 text-left text-[13px];
+  }
+  .impl-table thead {
+    @apply bg-white/[0.04] uppercase tracking-wider text-[11px] text-[var(--canvas-muted)];
+  }
+  .impl-table th,
+  .impl-table td {
+    @apply px-4 py-2.5 align-top;
+  }
+  .impl-table tbody tr + tr td {
+    @apply border-t border-white/5;
+  }
+  .impl-table td:first-child {
+    @apply font-mono text-[12px] text-white;
+  }
+  .impl-table td:last-child {
+    @apply text-[var(--canvas-muted)];
+  }
+}
+
+/* ----------------------------------------
+ * React Flow group 节点 — 移除内置背景 / 边框 / 内边距，
+ * 让我们的 <GroupNode> 完全接管视觉（只染边框、背景透明）。
+ * ---------------------------------------- */
+.react-flow__node-group {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.react-flow__node-group.selected,
+.react-flow__node-group:focus,
+.react-flow__node-group:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* ----------------------------------------
+ * 可删除的连线 ✕ 按钮：
+ *   - hover 整条 edge 时 也显示
+ *   - selected 时一直显示
+ * ---------------------------------------- */
+.canvas-edge-delete {
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
+}
+.canvas-edge-delete.is-selected,
+.canvas-edge-delete:hover,
+.react-flow__edge:hover .canvas-edge-delete {
+  opacity: 1;
+}
+
+/* 让 edge 的可点击区域宽一点（默认很难命中） */
+.react-flow__edge-interaction {
+  stroke-width: 22 !important;
+}
+
+/* ----------------------------------------
+ * 拖线连接状态：源 handle 鼠标按下后，画布根添加 .canvas-connecting
+ * 此时所有非 group 节点 hover 高亮，提示"可以释放在这里"。
+ * ---------------------------------------- */
+.canvas-connecting .react-flow__node:not(.react-flow__node-group):not(.dragging) {
+  cursor: crosshair;
+}
+.canvas-connecting
+  .react-flow__node:not(.react-flow__node-group):not(.dragging):hover
+  .canvas-node-shell {
+  outline: 2px solid var(--canvas-accent) !important;
+  box-shadow: 0 0 0 4px var(--canvas-accent-glow) !important;
+}
+
+/* ----------------------------------------
+ * 拖动节点期间，悬停在某个分组上方时该分组高亮（实色边框 + 微微填充）
+ * 由 FlowCanvas 通过 store.dragHoverGroupId 在对应 group 节点上加 .is-drop-target 类
+ * ---------------------------------------- */
+.react-flow__node-group.is-drop-target .canvas-group-node {
+  outline: 3px solid var(--canvas-accent) !important;
+  outline-offset: -2px;
+  box-shadow: 0 0 0 6px var(--canvas-accent-glow) !important;
+  background: rgba(167, 139, 250, 0.06) !important;
+}
