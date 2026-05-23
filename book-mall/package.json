@@ -44,7 +44,9 @@
     "story:sync-styles:check": "tsx scripts/sync-story-styles.ts --check",
     "story:poll-once": "dotenv -e .env.local -- tsx scripts/story-ai-poll.ts",
     "story:cleanup-once": "dotenv -e .env.local -- tsx scripts/story-ai-cleanup.ts",
-    "story:poll-loop": "dotenv -e .env.local -- tsx scripts/story-ai-poll-loop.ts"
+    "story:poll-loop": "dotenv -e .env.local -- tsx scripts/story-ai-poll-loop.ts",
+    "canvas:poll-once": "dotenv -e .env.local -- tsx scripts/canvas-ai-poll.ts",
+    "canvas:poll-loop": "dotenv -e .env.local -- tsx scripts/canvas-ai-poll-loop.ts"
   },
   "dependencies": {
     "@devnomic/marquee": "^1.0.2",

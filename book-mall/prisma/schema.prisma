@@ -84,6 +84,10 @@ model User {
   toolModelUsageCounters       ToolModelUsageCounter[]
   storySpace                   StorySpace?
   storyProjects                StoryProject[]
+  canvasProjects               CanvasProject[]
+  canvasTemplates              CanvasTemplate[]
+  canvasProviders              CanvasProvider[]
+  canvasPromptTemplates        CanvasPromptTemplate[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1273,4 +1277,244 @@ model StoryOssCleanupQueue {
 
   @@index([doneAt, notBefore])
   @@index([projectId])
+}
+
+// —— canvas-web AI 海报画布 ——
+// 详见 canvas-web/docs/plan.md
+
+enum CanvasModelRole {
+  IMAGE
+  VIDEO
+  LLM
+}
+
+enum CanvasGenerationKind {
+  IMAGE
+  TEXT
+}
+
+enum CanvasGenerationStatus {
+  PENDING
+  SUBMITTED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+/// 用户级 Provider 类型；canvas v2
+enum CanvasProviderKind {
+  KIE
+  ALI_BAILIAN
+  OPENAI_COMPAT
+  GEMINI_NATIVE
+}
+
+/// 画布可选 AI 引擎模型目录（user/admin 可在 canvas-web /models 配置；首批种子三条）
+model CanvasEngineModel {
+  id            String          @id @default(cuid())
+  modelKey      String          @unique
+  displayName   String
+  vendor        String
+  role          CanvasModelRole
+  description   String?         @db.Text
+  sortOrder     Int             @default(0)
+  active        Boolean         @default(true)
+  defaultParams Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role, active, sortOrder])
+}
+
+/// 画布项目（一份完整的节点工作流 + 视图）
+model CanvasProject {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name          String
+  description   String   @default("") @db.Text
+
+  /// 整张画布 JSON：{ schemaVersion, nodes[], edges[], viewport }
+  canvas        Json
+  /// 缩略图（最近一张 OutputNode 输出）
+  thumbnailUrl  String   @default("")
+
+  deletedAt     DateTime?
+
+  tasks         CanvasGenerationTask[]
+  cleanupItems  CanvasOssCleanupQueue[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, deletedAt, updatedAt])
+}
+
+/// 画布模板：系统模板（builtin=true 且 ownerUserId=null）+ 用户私有模板
+model CanvasTemplate {
+  id            String   @id @default(cuid())
+  ownerUserId   String?
+  owner         User?    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  category      String
+  name          String
+  thumbnail     String   @default("")
+  /// 同 CanvasProject.canvas 结构
+  canvas        Json
+  builtin       Boolean  @default(false)
+  sortOrder     Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([ownerUserId, sortOrder])
+  @@index([builtin, sortOrder])
+}
+
+/// 用户自定义提示词模板（LLM / IMAGE 合计最多 8 条活跃；删除软归档保留快照；内置在代码里）
+model CanvasPromptTemplate {
+  id        String                 @id @default(cuid())
+  userId    String
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  engine    CanvasPromptEngineKind
+  name      String
+  content   String                 @db.Text
+  sortOrder Int                    @default(0)
+  deletedAt DateTime?
+
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  @@index([userId, engine, sortOrder])
+  @@index([userId, deletedAt])
+}
+
+enum CanvasPromptEngineKind {
+  LLM
+  IMAGE
+}
+
+/// 画布节点级 KIE 任务表（mirror StoryGenerationTask，加 nodeId / inputHash 实现节点缓存）
+model CanvasGenerationTask {
+  id              String                 @id @default(cuid())
+  projectId       String
+  project         CanvasProject          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// 画布内节点 id（与 canvas.nodes[].id 一致）
+  nodeId          String
+
+  kind            CanvasGenerationKind
+  status          CanvasGenerationStatus @default(PENDING)
+
+  /// KIE 模型键（如 nano-banana-pro / gpt-image-1 / kling-image）
+  model           String
+  kieTaskId       String?                @unique
+  inputPayload    Json
+  resultPayload   Json?
+  /// 节点输入 + 参数的 sha256，用于缓存命中
+  inputHash       String
+
+  ephemeralUrl    String?
+  ossUrl          String?
+
+  /// 文本类节点结果（kind=TEXT 时使用）
+  textOutput      String?                @db.Text
+
+  failCode        String?
+  failMessage     String?
+
+  /// canvas v2: 关联到调用的用户 Provider；系统/兜底调用为 null
+  providerId      String?
+  provider        CanvasProvider?        @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  /// canvas v2: 软删；用于「删除单次结果」（OSS 清理由 cleanup queue 异步处理）
+  deletedAt       DateTime?
+
+  submittedAt     DateTime?
+  completedAt     DateTime?
+  lastPolledAt    DateTime?
+  pollCount       Int                    @default(0)
+
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([status, submittedAt])
+  @@index([projectId, nodeId])
+  @@index([projectId, inputHash])
+  @@index([providerId])
+  @@index([projectId, nodeId, deletedAt, createdAt])
+}
+
+/// 画布 OSS 清理队列（mirror StoryOssCleanupQueue）
+model CanvasOssCleanupQueue {
+  id          String         @id @default(cuid())
+  source      String?
+  projectId   String?
+  project     CanvasProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  ossUrl      String
+  notBefore   DateTime       @default(now())
+  attempts    Int            @default(0)
+  lastTriedAt DateTime?
+  lastError   String?
+  doneAt      DateTime?
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([doneAt, notBefore])
+  @@index([projectId])
+}
+
+/// canvas v2 · 用户级 AI/生图 Provider 凭据
+model CanvasProvider {
+  id              String                @id @default(cuid())
+  userId          String
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 用户起的别名，例如 "我的 KIE 账号"
+  alias           String
+  kind            CanvasProviderKind
+  /// AES-256-GCM 加密后的 API Key（格式：`v1.<iv>.<cipher>.<authTag>`，base64）
+  apiKeyEncrypted String                @db.Text
+  /// OPENAI_COMPAT 必填；其余 kind 走默认 baseUrl
+  baseUrl         String?
+  active          Boolean               @default(true)
+
+  lastTestedAt    DateTime?
+  /// "ok" / "error:reason"
+  lastTestStatus  String?
+
+  models          CanvasProviderModel[]
+  tasks           CanvasGenerationTask[]
+
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([userId, active])
+}
+
+/// canvas v2 · Provider 下的具体模型
+model CanvasProviderModel {
+  id              String                @id @default(cuid())
+  providerId      String
+  provider        CanvasProvider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  /// provider 端的模型 id
+  modelKey        String
+  displayName     String
+  role            CanvasModelRole
+  description     String?               @db.Text
+  /// 节点 UI 渲染参数（JSON Schema-like）
+  paramsSchema    Json?
+  defaultParams   Json?
+  enabled         Boolean               @default(true)
+  sortOrder       Int                   @default(0)
+
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@unique([providerId, modelKey])
+  @@index([providerId, enabled, sortOrder])
+  @@index([role])
 }
