@@ -214,7 +214,7 @@ export function FrameVideoEditModal({
           {/* 模型选择 */}
           <div>
             <p className="mb-2 text-xs text-[var(--story-muted)]">视频模型</p>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {STORY_VIDEO_MODEL_LIST.map((m) => {
                 const selected = m.id === modelId;
                 const disabled = m.requiresImage && !hasFrameImage;

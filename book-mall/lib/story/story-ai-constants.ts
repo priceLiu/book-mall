@@ -15,14 +15,16 @@ export const STORY_AI_KIE_MODELS = {
  *  - buildInput：把通用 options + frame 转成模型特定的 KIE input 形状
  *
  * 当前接入（均为图生视频，匹配漫剧分镜「先出图、再出视频」的工作流）：
- *   - bytedance/seedance-2      字节豆包  docs/kie/seedance-2.md
- *   - wan/2-7-image-to-video    阿里通义万相  docs/kie/wan 2.7 img 2 video.md
+ *   - bytedance/seedance-2        字节豆包       docs/kie/seedance-2.md
+ *   - wan/2-7-image-to-video       阿里通义万相    docs/kie/wan 2.7 img 2 video.md
+ *   - happyhorse/image-to-video    Happy Horse    docs/kie/happy-horse img 2 video.md
  *
  * 注意：之前曾误用 `wan/2-7-text-to-video`（文生视频，丢失分镜图一致性），已切换。
  */
 export const STORY_VIDEO_MODEL_IDS = [
   "bytedance/seedance-2",
   "wan/2-7-image-to-video",
+  "happyhorse/image-to-video",
 ] as const;
 export type StoryVideoModelId = (typeof STORY_VIDEO_MODEL_IDS)[number];
 
@@ -90,6 +92,17 @@ export const STORY_VIDEO_MODELS: Record<
     },
     durationRange: [2, 15] as const,
     supports: { generateAudio: false, promptExtend: true, watermark: true },
+  },
+  "happyhorse/image-to-video": {
+    id: "happyhorse/image-to-video",
+    label: "Happy Horse",
+    description:
+      "Happy Horse · 图生视频，性价比高的备选；画风偏写实/影视感。",
+    requiresImage: true,
+    resolutions: ["720p", "1080p"] as const,
+    defaults: { resolution: "1080p", duration: 5 },
+    durationRange: [3, 15] as const,
+    supports: { generateAudio: false, promptExtend: false, watermark: false },
   },
 };
 

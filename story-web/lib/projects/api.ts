@@ -260,7 +260,8 @@ export async function apiSubmitFrameImage(
 
 export type StoryVideoModelId =
   | "bytedance/seedance-2"
-  | "wan/2-7-image-to-video";
+  | "wan/2-7-image-to-video"
+  | "happyhorse/image-to-video";
 
 export type StoryVideoOptions = {
   resolution?: string;

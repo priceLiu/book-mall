@@ -13,7 +13,7 @@
 | 项目 / Project | 一部漫剧的最小创作单元（含名称、描述、画幅比、风格、封面、大纲、角色、分镜） |
 | 角色 / Character | 项目下的一个人物，含 `prompt` 与 `avatarUrl`（白底参考图） |
 | 分镜 / Frame | 项目下的一个分镜节点，含场景、所选角色、`imagePrompt`、`videoPrompt`、生成的 `imageUrl`/`videoUrl` |
-| KIE | `https://api.kie.ai`，统一 `createTask` + `recordInfo` 接口；`nano-banana-pro` 出图；视频用户可在弹层选 `bytedance/seedance-2`（默认）或 `wan/2-7-image-to-video`，**两者都是图生视频**。⚠️ 早期误用 `wan/2-7-image-pro`（图生图）/ `wan/2-7-text-to-video`（文生视频），均已纠正。 |
+| KIE | `https://api.kie.ai`，统一 `createTask` + `recordInfo` 接口；`nano-banana-pro` 出图；视频用户可在弹层选 `bytedance/seedance-2`（默认）/ `wan/2-7-image-to-video` / `happyhorse/image-to-video`，**三者都是图生视频**（happyhorse 只接 `image_urls` + `prompt/resolution/duration`，不支持 audio/promptExtend/watermark）。⚠️ 早期误用 `wan/2-7-image-pro`（图生图）/ `wan/2-7-text-to-video`（文生视频），均已纠正。 |
 | KIE Gemini 3 Flash | KIE.AI 托管的 OpenAI 兼容 LLM 端点 `POST {KIE_API_BASE}/gemini-3-flash/v1/chat/completions`，鉴权与图像/视频共用同一把 `KIE_API_KEY`（详见 `story-web/docs/kie/gemini 3 Flash.md`） |
 | Style Prompt | `src/shared/styles/index.json` 中按 `id` 取出的 `prompt` 字段，必须拼接进所有图像生成提示词以保证全局风格一致 |
 
