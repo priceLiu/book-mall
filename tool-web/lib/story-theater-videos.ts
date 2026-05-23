@@ -1,4 +1,4 @@
-import manifest from "../../story-web/src/shared/landing-videos.manifest.json";
+import manifest from "./story-theater-videos.manifest.json";
 
 const FALLBACK = [
   "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
