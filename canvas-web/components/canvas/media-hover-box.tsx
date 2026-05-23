@@ -1,8 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Eye, Upload, X } from "lucide-react";
+import {
+  buildSideOptions,
+  canShowCompare,
+  defaultCompareSides,
+  type MediaCompareContext,
+} from "./compare-utils";
+import { CompareSplitView, CompareToolbar, useCompareSides } from "./compare-view";
 
 /** 根据 URL 猜测是否为视频 */
 export function isVideoMediaUrl(url: string): boolean {
@@ -10,29 +17,26 @@ export function isVideoMediaUrl(url: string): boolean {
 }
 
 export type MediaHoverBoxProps = {
-  /** 媒体地址；空则显示 placeholder */
   src?: string;
-  /** 显式指定类型；缺省则按 URL 后缀推断 */
   mediaKind?: "image" | "video";
-  /**
-   * uploadable：用户上传区（hover 显示 上传 + 预览）
-   * generated：生成结果（hover 仅 预览）
-   */
   variant?: "uploadable" | "generated";
   onUpload?: () => void;
   alt?: string;
   className?: string;
-  /** 无 src 时的占位 */
   placeholder?: ReactNode;
-  /** img object-fit */
   fit?: "cover" | "contain";
+  naturalSize?: boolean;
+  clickToPreview?: boolean;
+  /** 传入后预览弹层内可切换「大图 / 对比」 */
+  compareContext?: MediaCompareContext;
+  /** 打开时默认视图 */
+  initialView?: "single" | "compare";
 };
 
-/**
- * 画布内图片 / 视频预览区：鼠标移入显示操作 logo。
- * - 图片（可上传）：上传 + 预览
- * - 图片 / 视频（生成结果）：仅预览
- */
+const ACTION_BTN =
+  "nodrag pointer-events-auto inline-flex min-w-[52px] flex-col items-center gap-1 rounded-xl border border-white/25 bg-black/75 px-3 py-2.5 text-white shadow-xl transition hover:scale-[1.03] hover:border-white/50 hover:bg-black/90";
+const ACTION_ICON = "grid size-11 place-items-center rounded-full bg-white/10";
+
 export function MediaHoverBox({
   src,
   mediaKind,
@@ -42,6 +46,10 @@ export function MediaHoverBox({
   className = "",
   placeholder,
   fit = "contain",
+  naturalSize = false,
+  clickToPreview = false,
+  compareContext,
+  initialView = "single",
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const kind =
@@ -50,8 +58,8 @@ export function MediaHoverBox({
   const showUpload = variant === "uploadable" && !!onUpload;
 
   const openPreview = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
+    (e?: React.MouseEvent) => {
+      e?.stopPropagation();
       if (canPreview) setPreviewOpen(true);
     },
     [canPreview],
@@ -65,19 +73,32 @@ export function MediaHoverBox({
     [onUpload],
   );
 
+  const onSurfaceClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!clickToPreview || !canPreview) return;
+      openPreview(e);
+    },
+    [clickToPreview, canPreview, openPreview],
+  );
+
   return (
     <>
       <div
-        className={`group/media relative h-full w-full overflow-hidden ${className}`}
+        className={`group/media relative overflow-hidden ${
+          naturalSize ? "w-full" : "h-full w-full"
+        } ${clickToPreview && canPreview ? "cursor-zoom-in" : ""} ${className}`}
+        onClick={onSurfaceClick}
       >
         {src ? (
           kind === "video" ? (
             <video
               src={src}
               className={
-                fit === "cover"
-                  ? "h-full w-full object-cover"
-                  : "h-full w-full object-contain"
+                naturalSize
+                  ? "block w-full"
+                  : fit === "cover"
+                    ? "h-full w-full object-cover"
+                    : "h-full w-full object-contain"
               }
               muted
               playsInline
@@ -89,9 +110,11 @@ export function MediaHoverBox({
               src={src}
               alt={alt}
               className={
-                fit === "cover"
-                  ? "h-full w-full object-cover"
-                  : "h-full w-full object-contain"
+                naturalSize
+                  ? "block h-auto w-full object-contain"
+                  : fit === "cover"
+                    ? "h-full w-full object-cover"
+                    : "h-full w-full object-contain"
               }
               draggable={false}
             />
@@ -101,39 +124,46 @@ export function MediaHoverBox({
         )}
 
         {(showUpload || canPreview) && src ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition group-hover/media:bg-black/45 group-hover/media:opacity-100">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-3 bg-black/0 opacity-0 transition group-hover/media:bg-black/45 group-hover/media:opacity-100">
             {showUpload ? (
               <button
                 type="button"
                 title="上传 / 替换"
                 onClick={triggerUpload}
-                className="nodrag pointer-events-auto grid size-9 place-items-center rounded-full border border-white/20 bg-black/70 text-white shadow-lg transition hover:scale-105 hover:border-white/50 hover:bg-black/90"
+                className={ACTION_BTN}
               >
-                <Upload className="size-4" />
+                <span className={ACTION_ICON}>
+                  <Upload className="size-6" strokeWidth={1.75} />
+                </span>
+                <span className="text-[11px] font-medium text-white/90">上传</span>
               </button>
             ) : null}
             {canPreview ? (
               <button
                 type="button"
-                title="预览"
+                title="预览大图"
                 onClick={openPreview}
-                className="nodrag pointer-events-auto grid size-9 place-items-center rounded-full border border-white/20 bg-black/70 text-white shadow-lg transition hover:scale-105 hover:border-white/50 hover:bg-black/90"
+                className={ACTION_BTN}
               >
-                <Eye className="size-4" />
+                <span className={ACTION_ICON}>
+                  <Eye className="size-6" strokeWidth={1.75} />
+                </span>
+                <span className="text-[11px] font-medium text-white/90">预览</span>
               </button>
             ) : null}
           </div>
         ) : null}
 
-        {/* 空态也可点上传 */}
         {!src && showUpload ? (
           <button
             type="button"
             onClick={triggerUpload}
-            className="nodrag absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/20 text-[11px] text-white/60 transition hover:bg-black/35 hover:text-white/90"
+            className="nodrag absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/20 text-white/70 transition hover:bg-black/35 hover:text-white"
           >
-            <Upload className="size-5" />
-            点击上传
+            <span className="grid size-14 place-items-center rounded-full border border-white/20 bg-black/50">
+              <Upload className="size-7" strokeWidth={1.75} />
+            </span>
+            <span className="text-[12px] font-medium">点击上传</span>
           </button>
         ) : null}
       </div>
@@ -143,6 +173,8 @@ export function MediaHoverBox({
           src={src}
           kind={kind}
           alt={alt}
+          compareContext={compareContext}
+          initialView={initialView}
           onClose={() => setPreviewOpen(false)}
         />
       ) : null}
@@ -150,76 +182,166 @@ export function MediaHoverBox({
   );
 }
 
-/** 全屏预览弹层（可单独用于 chip 等小区域） */
+/** 全屏预览 / 对比一体弹层 */
 export function MediaPreviewLightbox({
   src,
   kind,
   alt,
+  compareContext,
+  initialView = "single",
   onClose,
 }: {
   src: string;
   kind: "image" | "video";
   alt: string;
+  compareContext?: MediaCompareContext;
+  initialView?: "single" | "compare";
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const showCompare = compareContext ? canShowCompare(compareContext) : false;
+  const [view, setView] = useState<"single" | "compare">(
+    initialView === "compare" && showCompare ? "compare" : "single",
+  );
+
+  const options = useMemo(
+    () =>
+      compareContext
+        ? buildSideOptions(
+            compareContext.tasks,
+            compareContext.referenceImages ?? [],
+          )
+        : [],
+    [compareContext],
+  );
+
+  const defaults = useMemo(
+    () =>
+      defaultCompareSides(
+        options,
+        compareContext?.defaultLeftId,
+        compareContext?.defaultRightId,
+        compareContext?.focusTaskId,
+        (compareContext?.referenceImages?.length ?? 0) > 0,
+      ),
+    [options, compareContext],
+  );
+
+  const { leftId, rightId, setLeftId, setRightId, stepRight } =
+    useCompareSides(options, defaults);
 
   useEffect(() => {
     setMounted(true);
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
+      } else if (view === "compare" && e.key === "ArrowLeft") {
+        e.preventDefault();
+        stepRight(-1);
+      } else if (view === "compare" && e.key === "ArrowRight") {
+        e.preventDefault();
+        stepRight(1);
       }
     };
     window.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [onClose]);
+  }, [onClose, view, stepRight]);
 
   if (!mounted) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-black/94 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
+      aria-label={view === "compare" ? "图片对比" : "媒体预览"}
     >
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute right-4 top-4 grid size-9 place-items-center rounded-full border border-white/20 bg-black/60 text-white hover:bg-black/80"
-        aria-label="关闭预览"
-      >
-        <X className="size-5" />
-      </button>
+      <header className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 sm:px-4">
+        {showCompare ? (
+          <div className="flex shrink-0 rounded-full border border-white/10 bg-white/5 p-0.5">
+            <button
+              type="button"
+              onClick={() => setView("single")}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                view === "single"
+                  ? "bg-white/15 text-white"
+                  : "text-white/60 hover:text-white"
+              }`}
+            >
+              大图
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("compare")}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                view === "compare"
+                  ? "bg-[var(--canvas-accent)]/25 text-white"
+                  : "text-white/60 hover:text-white"
+              }`}
+            >
+              对比
+            </button>
+          </div>
+        ) : (
+          <p className="shrink-0 text-sm font-medium text-white">预览</p>
+        )}
+        {view === "compare" && showCompare ? (
+          <CompareToolbar
+            options={options}
+            leftId={leftId}
+            rightId={rightId}
+            onLeftChange={setLeftId}
+            onRightChange={setRightId}
+          />
+        ) : null}
+        <button
+          type="button"
+          onClick={onClose}
+          className="ml-auto shrink-0 rounded-full border border-white/10 p-1.5 text-white/70 hover:border-white/30 hover:bg-white/10 hover:text-white"
+          aria-label="关闭"
+        >
+          <X className="size-5" />
+        </button>
+      </header>
+
       <div
-        className="max-h-[90vh] max-w-[min(92vw,1200px)] overflow-hidden rounded-lg"
+        className="flex min-h-0 flex-1 flex-col p-2 sm:p-3"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        {kind === "video" ? (
-          <video
-            src={src}
-            controls
-            autoPlay
-            className="max-h-[90vh] max-w-full"
+        {view === "compare" && showCompare ? (
+          <CompareSplitView
+            options={options}
+            leftId={leftId}
+            rightId={rightId}
           />
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={src}
-            alt={alt}
-            className="max-h-[90vh] max-w-full object-contain"
-          />
+          <div className="flex min-h-0 flex-1 items-center justify-center">
+            {kind === "video" ? (
+              <video
+                src={src}
+                controls
+                autoPlay
+                className="max-h-[calc(100dvh-56px)] max-w-[98vw] object-contain"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src}
+                alt={alt}
+                className="max-h-[calc(100dvh-56px)] max-w-[98vw] object-contain"
+              />
+            )}
+          </div>
         )}
       </div>
     </div>,
     document.body,
   );
 }
+
+export type { MediaCompareContext } from "./compare-utils";

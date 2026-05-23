@@ -141,6 +141,7 @@ body {
   padding: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+  overflow: visible !important;
 }
 .react-flow__node-group.selected,
 .react-flow__node-group:focus,

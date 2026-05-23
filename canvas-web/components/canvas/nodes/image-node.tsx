@@ -60,6 +60,7 @@ export function ImageNode({ id, data, selected }: NodeProps) {
             src={previewUrl || undefined}
             variant="uploadable"
             onUpload={onPick}
+            clickToPreview
             alt={d.label ?? "image"}
             placeholder={
               <div className="flex h-full items-center justify-center text-[var(--canvas-muted)]">
