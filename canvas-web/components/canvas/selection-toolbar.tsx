@@ -6,6 +6,11 @@ import { LayoutGrid, FolderPlus, Trash2 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { GROUP_COLOR_PRESETS, isGroupNode } from "@/lib/canvas/types";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import {
+  CanvasPillToolbar,
+  CanvasToolIcon,
+  CanvasToolbarBadge,
+} from "./canvas-floating-toolbar";
 
 const TOOLBAR_HEIGHT = 44;
 const HEADER_RESERVED = 56; // 顶部留给项目头条 + 节点 logo 面板的区域，工具条不能挤到这里之上
@@ -105,22 +110,24 @@ export function SelectionToolbar() {
       onClick={(e) => e.stopPropagation()}
     >
       {!groupOpen ? (
-        <div className="flex items-center gap-1 rounded-full border border-white/15 bg-black/85 px-1 py-1 shadow-xl backdrop-blur-md">
-          <ToolIcon
+        <CanvasPillToolbar
+          badge={<CanvasToolbarBadge>已选 {selectedIds.length}</CanvasToolbarBadge>}
+        >
+          <CanvasToolIcon
             label="分组"
             hint={`将选中 ${selectedIds.length} 个节点装进分组`}
             onClick={() => setGroupOpen(true)}
           >
-            <FolderPlus className="size-[15px]" />
-          </ToolIcon>
-          <ToolIcon
+            <FolderPlus className="size-[18px]" strokeWidth={1.75} />
+          </CanvasToolIcon>
+          <CanvasToolIcon
             label="自动整理"
             hint="按拓扑顺序左→右排列（Dagre LR）；分组会同步收紧"
             onClick={() => autoLayoutNodes(selectedIdsRef.current)}
           >
-            <LayoutGrid className="size-[15px]" />
-          </ToolIcon>
-          <ToolIcon
+            <LayoutGrid className="size-[18px]" strokeWidth={1.75} />
+          </CanvasToolIcon>
+          <CanvasToolIcon
             label="删除选中"
             hint={`删除选中的 ${selectedIds.length} 个节点（不可恢复）`}
             danger
@@ -146,15 +153,9 @@ export function SelectionToolbar() {
               for (const id of ids) removeNode(id);
             }}
           >
-            <Trash2 className="size-[15px]" />
-          </ToolIcon>
-          <span
-            className="ml-0.5 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/85"
-            aria-label={`已选 ${selectedIds.length}`}
-          >
-            已选 {selectedIds.length}
-          </span>
-        </div>
+            <Trash2 className="size-[18px]" strokeWidth={1.75} />
+          </CanvasToolIcon>
+        </CanvasPillToolbar>
       ) : (
         <div className="w-[260px] rounded-2xl border border-white/15 bg-black/90 p-3 shadow-2xl backdrop-blur-md">
           <div className="mb-2 flex items-center justify-between text-[11px] font-medium">
@@ -229,42 +230,5 @@ export function SelectionToolbar() {
         </div>
       )}
     </div>
-  );
-}
-
-function ToolIcon({
-  children,
-  label,
-  hint,
-  danger,
-  onClick,
-}: {
-  children: React.ReactNode;
-  label: string;
-  hint: string;
-  danger?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseDown={(e) => e.stopPropagation()}
-      aria-label={`${label} — ${hint}`}
-      className={`group/tooltip relative flex size-8 items-center justify-center rounded-full text-white/85 transition ${
-        danger
-          ? "hover:bg-red-500/20 hover:text-red-200"
-          : "hover:bg-white/10 hover:text-white"
-      }`}
-    >
-      {children}
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/95 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/tooltip:opacity-100"
-      >
-        <span className="font-medium">{label}</span>
-        <span className="ml-1 text-white/55">· {hint}</span>
-      </span>
-    </button>
   );
 }

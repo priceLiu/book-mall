@@ -60,6 +60,8 @@ type CanvasState = {
   addNode: (type: CanvasNodeType, position: { x: number; y: number }, data?: Record<string, unknown>) => string;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
   setNodeRuntime: (id: string, runtime: Partial<CanvasNodeRuntime>) => void;
+  /** 程序化调整节点尺寸（选中时仍可用 NodeResizer 手动覆盖） */
+  resizeNode: (id: string, size: { width: number; height: number }) => void;
   removeNode: (id: string) => void;
   duplicateNode: (id: string) => string | null;
 
@@ -134,10 +136,30 @@ export const useCanvasStore = create<CanvasState>()(
       setEdges: (updater) => set({ edges: updater(get().edges) }),
       setViewport: (v) => set({ viewport: v }),
 
-      onNodesChange: (changes) =>
-        set({
-          nodes: applyNodeChanges(changes, get().nodes) as CanvasFlowNode[],
-        }),
+      onNodesChange: (changes) => {
+        const prev = get().nodes;
+        const manualIds = new Set<string>();
+        for (const ch of changes) {
+          if (
+            ch.type === "dimensions" &&
+            "id" in ch &&
+            ch.id &&
+            "resizing" in ch &&
+            ch.resizing === false
+          ) {
+            manualIds.add(ch.id);
+          }
+        }
+        let next = applyNodeChanges(changes, prev) as CanvasFlowNode[];
+        if (manualIds.size > 0) {
+          next = next.map((n) =>
+            manualIds.has(n.id)
+              ? { ...n, data: { ...n.data, manualSize: true } }
+              : n,
+          );
+        }
+        set({ nodes: next });
+      },
       onEdgesChange: (changes) =>
         set({ edges: applyEdgeChanges(changes, get().edges) }),
       onConnect: (connection) => {
@@ -197,6 +219,21 @@ export const useCanvasStore = create<CanvasState>()(
               data: { ...n.data, runtime: { ...prev, ...runtime } },
             };
           }),
+        });
+      },
+
+      resizeNode: (id, { width, height }) => {
+        set({
+          nodes: get().nodes.map((n) =>
+            n.id === id
+              ? {
+                  ...n,
+                  width,
+                  height,
+                  style: { ...n.style, width, height },
+                }
+              : n,
+          ),
         });
       },
 

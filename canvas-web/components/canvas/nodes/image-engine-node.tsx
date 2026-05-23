@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import {
   Download,
@@ -15,15 +15,18 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { ImageEngineNodeData } from "@/lib/canvas/types";
-import {
-  deleteCanvasTask,
-  listCanvasProjectTasks,
-  type CanvasTaskRecord,
-} from "@/lib/canvas-api";
+import { deleteCanvasTask } from "@/lib/canvas-api";
 import { RF_NODE_SCROLL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { resolveReferencedNodeIds } from "@/lib/canvas/referenced-nodes";
+import { resolveProductMainImage } from "@/lib/canvas/upstream-images";
+import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { NodeShell } from "../node-shell";
-import { CompareModal } from "../compare-modal";
+import {
+  CompareModal,
+  refSideId,
+  taskSideId,
+  type CompareReferenceImage,
+} from "../compare-modal";
 import { EnginePicker } from "../engine-picker";
 import { MediaHoverBox } from "../media-hover-box";
 import { PromptTemplatePicker } from "../prompt-template-picker";
@@ -34,48 +37,51 @@ import {
 } from "../mentions/MentionsTextarea";
 import { UpstreamChipRow, useUpstreamChips, sortUpstreamChips } from "../upstream-chips";
 
+type CompareState = {
+  defaultLeftId?: string;
+  defaultRightId?: string;
+};
+
 export function ImageEngineNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const { doubleConfirm, alert } = useDialogs();
 
-  const [history, setHistory] = useState<CanvasTaskRecord[]>([]);
-  const [compareOpen, setCompareOpen] = useState(false);
+  const { history, succeeded, refreshHistory } = useNodeTaskHistory(id);
+  const [compareState, setCompareState] = useState<CompareState | null>(null);
 
   const d = data as unknown as ImageEngineNodeData;
 
-  const refreshHistory = useCallback(async () => {
-    if (!base || !projectId) return;
-    try {
-      const tasks = await listCanvasProjectTasks(base, projectId, [id]);
-      setHistory(tasks);
-    } catch {
-      // ignore
-    }
-  }, [base, projectId, id]);
+  const productMain = useMemo(
+    () => resolveProductMainImage(nodes, edges, id),
+    [nodes, edges, id],
+  );
 
-  // 首次加载 + 每次 runtime 变化时刷新历史
-  useEffect(() => {
-    void refreshHistory();
-  }, [refreshHistory, d.runtime?.taskId, d.runtime?.status]);
+  const referenceImages = useMemo<CompareReferenceImage[]>(() => {
+    if (!productMain) return [];
+    return [{ id: "product-main", url: productMain.url, label: productMain.label }];
+  }, [productMain]);
 
-  // 历史里 active task 的 OSS URL（不在 runtime 时回退到最新）
   const activeTask = useMemo(() => {
     if (!history.length) return null;
     if (d.activeTaskId) {
       const t = history.find((x) => x.id === d.activeTaskId);
       if (t) return t;
     }
-    return history.find((t) => t.status === "SUCCEEDED" && t.ossUrl) ?? null;
-  }, [history, d.activeTaskId]);
-
-  const oss = activeTask?.ossUrl ?? d.runtime?.ossUrl ?? "";
+    return succeeded[succeeded.length - 1] ?? null;
+  }, [history, d.activeTaskId, succeeded]);
 
   const hasGenerated =
-    Boolean(oss) ||
+    succeeded.length > 0 ||
     d.runtime?.status === "done" ||
-    history.some((t) => t.status === "SUCCEEDED" && t.ossUrl);
+    Boolean(d.runtime?.ossUrl);
+
+  const canCompare =
+    (succeeded.length >= 2) ||
+    (succeeded.length >= 1 && referenceImages.length > 0);
 
   const chips = sortUpstreamChips(useUpstreamChips(id));
   const mentionables = useMemo<MentionableItem[]>(
@@ -87,6 +93,10 @@ export function ImageEngineNode({ id, data, selected }: NodeProps) {
     () => resolveReferencedNodeIds(d.prompt ?? "", chips),
     [d.prompt, chips],
   );
+
+  const openCompare = useCallback((state?: CompareState) => {
+    setCompareState(state ?? {});
+  }, []);
 
   const onPickEngine = (next: {
     providerId: string;
@@ -191,12 +201,10 @@ export function ImageEngineNode({ id, data, selected }: NodeProps) {
         }
       >
         <div className="flex h-full flex-col gap-2">
-          {/* 1. 上游 chip 行 */}
           {chips.length > 0 ? (
             <UpstreamChipRow chips={chips} referenced={referenced} />
           ) : null}
 
-          {/* 2. prompt 输入 */}
           <MentionsTextarea
             value={d.prompt ?? ""}
             onChange={onPromptChange}
@@ -211,40 +219,116 @@ export function ImageEngineNode({ id, data, selected }: NodeProps) {
             onApply={onApplyTemplate}
           />
 
-          {/* 3. 结果预览（占据剩余空间） */}
-          <div className="min-h-[180px] flex-1 overflow-hidden rounded-lg border border-white/10 bg-black">
-            <MediaHoverBox
-              src={oss || undefined}
-              variant="generated"
-              alt="生成结果"
-              placeholder={
-                <div className="flex h-full items-center justify-center text-[var(--canvas-muted)]">
-                  <ImageIcon className="size-6 opacity-40" />
-                </div>
-              }
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-1">
-            {oss ? (
-              <a
-                href={oss}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="nodrag inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/80 hover:border-white/30 hover:text-white"
-              >
-                <Download className="size-3" /> 下载
-              </a>
-            ) : null}
-            {history.filter((t) => t.status === "SUCCEEDED" && t.ossUrl).length >= 2 ? (
+          {/* 全部生成结果纵向展示，不再只显示最新一张 */}
+          {canCompare ? (
+            <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
-                onClick={() => setCompareOpen(true)}
-                className="nodrag inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/80 hover:border-white/30 hover:text-white"
+                onClick={() => openCompare()}
+                className="nodrag inline-flex items-center gap-1.5 rounded-md border border-[var(--canvas-accent)]/40 bg-[var(--canvas-accent)]/10 px-2.5 py-1.5 text-[11px] font-medium text-white hover:border-[var(--canvas-accent)]/70 hover:bg-[var(--canvas-accent)]/20"
               >
-                <Split className="size-3" /> 对比
+                <Split className="size-3.5" /> 对比
               </button>
-            ) : null}
+              {productMain && succeeded.length >= 1 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    openCompare({
+                      defaultLeftId: refSideId("product-main"),
+                      defaultRightId: taskSideId(
+                        succeeded[succeeded.length - 1]!.id,
+                      ),
+                    })
+                  }
+                  className="nodrag inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1.5 text-[11px] text-white/80 hover:border-white/30 hover:text-white"
+                >
+                  与主图对比
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div
+            className={`min-h-[180px] flex-1 space-y-2 overflow-y-auto rounded-lg border border-white/10 bg-black/40 p-1.5 ${RF_NODE_SCROLL}`}
+          >
+            {succeeded.length > 0 ? (
+              succeeded.map((t, idx) => {
+                const isActive = activeTask?.id === t.id;
+                const prev = idx > 0 ? succeeded[idx - 1] : null;
+                return (
+                  <div
+                    key={t.id}
+                    className={`overflow-hidden rounded-md border ${
+                      isActive
+                        ? "border-[var(--canvas-accent)]"
+                        : "border-white/10"
+                    }`}
+                  >
+                    <MediaHoverBox
+                        src={t.ossUrl!}
+                        variant="generated"
+                        alt={`生成结果 ${idx + 1}`}
+                        naturalSize
+                        clickToPreview
+                        compareContext={
+                          canCompare
+                            ? {
+                                tasks: history,
+                                referenceImages,
+                                focusTaskId: t.id,
+                              }
+                            : undefined
+                        }
+                      />
+                    <div className="flex flex-wrap items-center gap-1 border-t border-white/5 bg-black/50 px-1.5 py-1">
+                      <span className="text-[10px] text-white/50">
+                        #{idx + 1}
+                      </span>
+                      {productMain ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openCompare({
+                              defaultLeftId: refSideId("product-main"),
+                              defaultRightId: taskSideId(t.id),
+                            })
+                          }
+                          className="nodrag rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/75 hover:border-white/30 hover:text-white"
+                        >
+                          与主图对比
+                        </button>
+                      ) : null}
+                      {prev ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openCompare({
+                              defaultLeftId: taskSideId(prev.id),
+                              defaultRightId: taskSideId(t.id),
+                            })
+                          }
+                          className="nodrag rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/75 hover:border-white/30 hover:text-white"
+                        >
+                          与上一张对比
+                        </button>
+                      ) : null}
+                      <a
+                        href={t.ossUrl!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="nodrag ml-auto inline-flex items-center gap-0.5 rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/75 hover:border-white/30 hover:text-white"
+                      >
+                        <Download className="size-2.5" /> 下载
+                      </a>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex h-full min-h-[160px] items-center justify-center text-[var(--canvas-muted)]">
+                <ImageIcon className="size-6 opacity-40" />
+              </div>
+            )}
           </div>
 
           {history.length > 0 ? (
@@ -311,7 +395,6 @@ export function ImageEngineNode({ id, data, selected }: NodeProps) {
             </p>
           ) : null}
 
-          {/* 5. 模型选择 + 生成按钮（贴底） */}
           <div className="mt-1 space-y-1.5 border-t border-white/5 pt-2">
             <p className="text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
               选择模型
@@ -344,8 +427,14 @@ export function ImageEngineNode({ id, data, selected }: NodeProps) {
         </div>
       </NodeShell>
 
-      {compareOpen ? (
-        <CompareModal tasks={history} onClose={() => setCompareOpen(false)} />
+      {compareState ? (
+        <CompareModal
+          tasks={history}
+          referenceImages={referenceImages}
+          defaultLeftId={compareState.defaultLeftId}
+          defaultRightId={compareState.defaultRightId}
+          onClose={() => setCompareState(null)}
+        />
       ) : null}
     </>
   );
