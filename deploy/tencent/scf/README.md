@@ -1,22 +1,68 @@
-# 腾讯云 SCF：story KIE 定时 poll / cleanup
+# 腾讯云 SCF：book-mall KIE 定时 poll / cleanup
 
-## Zip 包（直接上传）
+## Zip 包（本地上传）
 
-| 文件 | 云函数名建议 | 定时规则 |
-|------|-------------|---------|
-| `book-mall-story-kie-poll.zip` | `book-mall-story-kie-poll` | 每 1 分钟（或 30 秒，若触发器支持） |
-| `book-mall-story-kie-cleanup.zip` | `book-mall-story-kie-cleanup` | 每 1 分钟 |
+| Zip 文件 | 云函数名建议 | 调用接口 | 定时规则 |
+|----------|-------------|----------|----------|
+| `book-mall-story-kie-poll.zip` | `book-mall-story-kie-poll` | `POST /api/story/kie/poll` | 每 1 分钟 |
+| `book-mall-story-kie-cleanup.zip` | `book-mall-story-kie-cleanup` | `POST /api/story/kie/cleanup` | 每 1 分钟 |
+| `book-mall-canvas-kie-poll.zip` | `book-mall-canvas-kie-poll` | `POST /api/canvas/kie/poll` | 每 1 分钟 |
+| `book-mall-canvas-kie-cleanup.zip` | `book-mall-canvas-kie-cleanup` | `POST /api/canvas/kie/cleanup` | 每 1 分钟 |
 
-## 控制台配置
+重新打包（仓库根目录执行）：
 
-1. **运行环境**：Node.js 18（或 16+）
+```bash
+cd deploy/tencent/scf
+for d in book-mall-story-kie-poll book-mall-story-kie-cleanup book-mall-canvas-kie-poll book-mall-canvas-kie-cleanup; do
+  (cd "$d" && zip -r "../${d}.zip" index.js)
+done
+```
+
+## 云函数控制台（四个函数配置相同）
+
+1. **运行环境**：Node.js 18+
 2. **执行方法**：`index.main`
 3. **环境变量**（必填）：
-   - `STORY_AI_POLL_TOKEN` = 与 book-mall 控制台相同
-   - （可选）`BOOK_MALL_HOST` = `book.ai-code8.com`（默认已是此值）
+   - `STORY_AI_POLL_TOKEN` = 与 book-mall 生产环境 **完全相同**
+   - （可选）`BOOK_MALL_HOST` = `book.ai-code8.com`（默认已是）
 4. **超时时间**：60 秒
-5. **上传方式**：本地上传 zip → 选对应 zip 文件
+5. **上传**：本地上传 → 选对应 zip
+6. **触发器**：定时触发器，Cron 示例（7 段，每秒位）：
+   - poll：`0 */1 * * * *`（每分钟第 0 秒）
+   - cleanup：`30 */1 * * * *`（每分钟第 30 秒，与 poll 错开）
 
 ## 验收
 
 云函数「测试」或等定时触发后，日志应出现 `"ok": true, "status": 200`。
+
+手动 curl（替换 token）：
+
+```bash
+curl -s -X POST 'https://book.ai-code8.com/api/canvas/kie/poll' \
+  -H 'Authorization: Bearer <STORY_AI_POLL_TOKEN>'
+```
+
+---
+
+## canvas-web 上线前 book-mall 必配（与云函数无关但缺一不可）
+
+在 **book-mall 生产环境** 确认已配置：
+
+```ini
+OSS_ACCESS_KEY_ID=
+OSS_ACCESS_KEY_SECRET=
+OSS_BUCKET=tool-mall
+OSS_REGION=oss-cn-guangzhou
+
+KIE_API_KEY=
+KIE_CALLBACK_TOKEN=
+STORY_AI_PUBLIC_BASE=https://book.ai-code8.com
+STORY_AI_POLL_TOKEN=          # 与上面四个云函数相同
+
+CANVAS_WEB_ORIGINS=https://canvas.ai-code8.com
+CANVAS_CORS_IN_APP=1
+CANVAS_SECRET_KEY=            # openssl rand -base64 32，部署前固定
+NEXTAUTH_COOKIE_DOMAIN=.ai-code8.com
+```
+
+并确保 book-mall 已部署含 canvas 迁移的版本（`prisma migrate deploy`）。
