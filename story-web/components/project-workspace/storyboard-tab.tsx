@@ -59,9 +59,7 @@ type Props = {
 };
 
 /**
- * 是否有该帧 / 该 kind 的进行中任务。
- * 后端 frame.imageTaskId / videoTaskId 仅在任务**成功**后才回写，
- * 因此进行中状态需以 project.pendingTasks 作为真相之源。
+ * 进行中 / 失败状态：pendingTasks + frame.*TaskStatus 双通道（提交时已回写 *TaskId）。
  */
 function hasPendingFor(
   pendingTasks: ComicProject["pendingTasks"],
@@ -75,27 +73,35 @@ function hasPendingFor(
       (t.status === "PENDING" || t.status === "SUBMITTED"),
   );
 }
-function hasFailedFor(
+
+function isFrameImageInflight(
   pendingTasks: ComicProject["pendingTasks"],
-  frameId: string,
-  kind: "FRAME_IMAGE" | "FRAME_VIDEO",
+  frame: StoryboardFrame,
 ): boolean {
-  return pendingTasks.some(
-    (t) => t.frameId === frameId && t.kind === kind && t.status === "FAILED",
+  return (
+    hasPendingFor(pendingTasks, frame.id, "FRAME_IMAGE") ||
+    frame.imageTaskStatus === "PENDING" ||
+    frame.imageTaskStatus === "SUBMITTED"
   );
 }
 
-/** 取该 frame+kind 最近一条 FAILED 任务的失败原因 */
-function failedReasonFor(
+function isFrameVideoInflight(
   pendingTasks: ComicProject["pendingTasks"],
-  frameId: string,
-  kind: "FRAME_IMAGE" | "FRAME_VIDEO",
-): { failCode: string | null; failMessage: string | null } | null {
-  const t = pendingTasks.find(
-    (x) => x.frameId === frameId && x.kind === kind && x.status === "FAILED",
+  frame: StoryboardFrame,
+): boolean {
+  return (
+    hasPendingFor(pendingTasks, frame.id, "FRAME_VIDEO") ||
+    frame.videoTaskStatus === "PENDING" ||
+    frame.videoTaskStatus === "SUBMITTED"
   );
-  if (!t) return null;
-  return { failCode: t.failCode, failMessage: t.failMessage };
+}
+
+function isFrameImageFailed(frame: StoryboardFrame): boolean {
+  return frame.imageTaskStatus === "FAILED";
+}
+
+function isFrameVideoFailed(frame: StoryboardFrame): boolean {
+  return frame.videoTaskStatus === "FAILED";
 }
 
 type LightboxRequest = {
@@ -133,20 +139,16 @@ function FrameCard({
   const aspectRatioStyle =
     project.aspectRatio === "9:16" ? ("9 / 16" as const) : ("16 / 9" as const);
 
-  const imgInflight = hasPendingFor(project.pendingTasks, frame.id, "FRAME_IMAGE");
-  const vidInflight = hasPendingFor(project.pendingTasks, frame.id, "FRAME_VIDEO");
-  const imgFailed = hasFailedFor(project.pendingTasks, frame.id, "FRAME_IMAGE");
-  const vidFailed = hasFailedFor(project.pendingTasks, frame.id, "FRAME_VIDEO");
-  const imgFailReason = failedReasonFor(
-    project.pendingTasks,
-    frame.id,
-    "FRAME_IMAGE",
-  );
-  const vidFailReason = failedReasonFor(
-    project.pendingTasks,
-    frame.id,
-    "FRAME_VIDEO",
-  );
+  const imgInflight = isFrameImageInflight(project.pendingTasks, frame);
+  const vidInflight = isFrameVideoInflight(project.pendingTasks, frame);
+  const imgFailed = isFrameImageFailed(frame);
+  const vidFailed = isFrameVideoFailed(frame);
+  const imgFailReason = imgFailed
+    ? { failCode: frame.imageTaskFailCode, failMessage: frame.imageTaskFailMessage }
+    : null;
+  const vidFailReason = vidFailed
+    ? { failCode: frame.videoTaskFailCode, failMessage: frame.videoTaskFailMessage }
+    : null;
   const imgBusy = busyImageId === frame.id || imgInflight;
   const vidBusy = busyVideoId === frame.id || vidInflight;
 

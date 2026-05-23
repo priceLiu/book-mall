@@ -12,6 +12,7 @@ import {
   type StoryCharacterCount,
 } from "@/lib/story/story-initializer";
 import { GeminiLlmError } from "@/lib/story/gemini-llm-client";
+import { schedulePollWorkerForProject } from "@/lib/story/story-task-service";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
     const result = await initializeStoryProject(guard.user.id, id, {
       characterCount,
     });
+    schedulePollWorkerForProject(id);
     return NextResponse.json(result, { headers: jsonHeaders(request) });
   } catch (err) {
     if (err instanceof GeminiLlmError) {

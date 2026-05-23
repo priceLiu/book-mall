@@ -45,6 +45,8 @@ export type CharacterDto = {
   imagePrompt: string;
   avatarUrl: string;
   avatarTaskStatus: AvatarTaskStatus | null;
+  avatarTaskFailCode: string | null;
+  avatarTaskFailMessage: string | null;
   sortOrder: number;
 };
 
@@ -60,6 +62,10 @@ export type FrameDto = {
   videoUrl: string;
   imageTaskStatus: FrameTaskStatus | null;
   videoTaskStatus: FrameTaskStatus | null;
+  imageTaskFailCode: string | null;
+  imageTaskFailMessage: string | null;
+  videoTaskFailCode: string | null;
+  videoTaskFailMessage: string | null;
   imageCostMs: number | null;
   videoCostMs: number | null;
   videoModelId: string | null;
@@ -76,6 +82,9 @@ export type PendingTaskDto = {
 };
 
 export type ProjectDetailDto = ProjectListItemDto & {
+  coverTaskStatus: FrameTaskStatus | null;
+  coverTaskFailCode: string | null;
+  coverTaskFailMessage: string | null;
   characters: CharacterDto[];
   frames: FrameDto[];
   pendingTasks: PendingTaskDto[];

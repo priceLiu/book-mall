@@ -189,12 +189,41 @@ export async function getKieTask(taskId: string): Promise<KieRecordResponse> {
 export function extractKieResultUrl(record: KieRecordResponse): string | null {
   if (!record.resultJson) return null;
   try {
-    const parsed = JSON.parse(record.resultJson) as { resultUrls?: string[] };
-    const url = parsed.resultUrls?.[0];
-    return typeof url === "string" && url ? url : null;
+    let parsed: unknown = JSON.parse(record.resultJson);
+    if (typeof parsed === "string") {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        /* keep string */
+      }
+    }
+    if (typeof parsed === "string" && /^https?:\/\//i.test(parsed)) {
+      return parsed;
+    }
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed as Record<string, unknown>;
+      const urls = obj.resultUrls;
+      if (Array.isArray(urls)) {
+        const first = urls.find((u) => typeof u === "string" && u);
+        if (typeof first === "string") return first;
+      }
+      for (const key of ["url", "imageUrl", "videoUrl", "output"]) {
+        const v = obj[key];
+        if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
+      }
+    }
   } catch {
     return null;
   }
+  return null;
+}
+
+export function isKieRecordSuccess(state: string | undefined | null): boolean {
+  return (state ?? "").trim().toLowerCase() === "success";
+}
+
+export function isKieRecordFail(state: string | undefined | null): boolean {
+  return (state ?? "").trim().toLowerCase() === "fail";
 }
 
 export function logKieEvent(

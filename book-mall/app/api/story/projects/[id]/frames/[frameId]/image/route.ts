@@ -5,7 +5,7 @@ import {
   requireSessionUser,
   storyErrorToResponse,
 } from "@/lib/story/api-helpers";
-import { submitFrameImage } from "@/lib/story/story-task-service";
+import { submitFrameImage, schedulePollWorkerForProject } from "@/lib/story/story-task-service";
 
 type RouteCtx = { params: Promise<{ id: string; frameId: string }> };
 
@@ -22,6 +22,7 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
   const { id, frameId } = await ctx.params;
   try {
     const taskId = await submitFrameImage(guard.user.id, id, frameId);
+    schedulePollWorkerForProject(id);
     return NextResponse.json({ taskId }, { headers: jsonHeaders(request) });
   } catch (err) {
     return storyErrorToResponse(request, err);

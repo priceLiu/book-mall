@@ -82,12 +82,19 @@ export type StoryCharacterDto = {
   imagePrompt: string;
   avatarUrl: string;
   avatarTaskStatus: StoryGenerationStatus | null;
+  avatarTaskFailCode: string | null;
+  avatarTaskFailMessage: string | null;
   sortOrder: number;
 };
 
+type CharacterTaskFields = Pick<
+  StoryGenerationTask,
+  "status" | "failCode" | "failMessage"
+>;
+
 export function serializeCharacter(
   c: StoryCharacter,
-  task: Pick<StoryGenerationTask, "status"> | null = null,
+  task: CharacterTaskFields | null = null,
 ): StoryCharacterDto {
   return {
     id: c.id,
@@ -97,6 +104,8 @@ export function serializeCharacter(
     imagePrompt: c.imagePrompt,
     avatarUrl: c.avatarUrl,
     avatarTaskStatus: task?.status ?? null,
+    avatarTaskFailCode: task?.failCode ?? null,
+    avatarTaskFailMessage: task?.failMessage ?? null,
     sortOrder: c.sortOrder,
   };
 }
@@ -113,6 +122,10 @@ export type StoryFrameDto = {
   videoUrl: string;
   imageTaskStatus: StoryGenerationStatus | null;
   videoTaskStatus: StoryGenerationStatus | null;
+  imageTaskFailCode: string | null;
+  imageTaskFailMessage: string | null;
+  videoTaskFailCode: string | null;
+  videoTaskFailMessage: string | null;
   /** 该 frame 当前 imageUrl 对应任务的 KIE 计算耗时（ms） */
   imageCostMs: number | null;
   /** 该 frame 当前 videoUrl 对应任务的 KIE 计算耗时（ms） */
@@ -123,7 +136,7 @@ export type StoryFrameDto = {
 
 type FrameTaskFields = Pick<
   StoryGenerationTask,
-  "status" | "model" | "resultPayload"
+  "status" | "model" | "resultPayload" | "failCode" | "failMessage"
 >;
 
 function extractCostMs(task: FrameTaskFields | null): number | null {
@@ -153,6 +166,10 @@ export function serializeFrame(
     videoUrl: f.videoUrl,
     imageTaskStatus: imageTask?.status ?? null,
     videoTaskStatus: videoTask?.status ?? null,
+    imageTaskFailCode: imageTask?.failCode ?? null,
+    imageTaskFailMessage: imageTask?.failMessage ?? null,
+    videoTaskFailCode: videoTask?.failCode ?? null,
+    videoTaskFailMessage: videoTask?.failMessage ?? null,
     imageCostMs: extractCostMs(imageTask),
     videoCostMs: extractCostMs(videoTask),
     videoModelId: videoTask?.model ?? null,
@@ -160,6 +177,9 @@ export function serializeFrame(
 }
 
 export type StoryProjectDetailDto = StoryProjectListDto & {
+  coverTaskStatus: StoryGenerationStatus | null;
+  coverTaskFailCode: string | null;
+  coverTaskFailMessage: string | null;
   characters: StoryCharacterDto[];
   frames: StoryFrameDto[];
   pendingTasks: PendingTaskDto[];
@@ -238,6 +258,9 @@ export async function getProjectDetail(
       })
     : [];
   const tasksById = new Map(tasks.map((t) => [t.id, t]));
+  const coverTask = project.coverTaskId
+    ? (tasksById.get(project.coverTaskId) ?? null)
+    : null;
 
   const pendingTasks = await prisma.storyGenerationTask.findMany({
     where: {
@@ -249,6 +272,9 @@ export async function getProjectDetail(
 
   return {
     ...serializeProjectListItem(project),
+    coverTaskStatus: coverTask?.status ?? null,
+    coverTaskFailCode: coverTask?.failCode ?? null,
+    coverTaskFailMessage: coverTask?.failMessage ?? null,
     characters: project.characters.map((c) =>
       serializeCharacter(
         c,

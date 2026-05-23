@@ -22,6 +22,8 @@ export type ProjectCharacter = {
   imagePrompt: string;
   avatarUrl: string;
   avatarTaskStatus: GenerationStatus | null;
+  avatarTaskFailCode: string | null;
+  avatarTaskFailMessage: string | null;
   sortOrder?: number;
 };
 
@@ -38,6 +40,10 @@ export type StoryboardFrame = {
   videoUrl: string;
   imageTaskStatus: GenerationStatus | null;
   videoTaskStatus: GenerationStatus | null;
+  imageTaskFailCode: string | null;
+  imageTaskFailMessage: string | null;
+  videoTaskFailCode: string | null;
+  videoTaskFailMessage: string | null;
   /** 当前 imageUrl 对应任务的耗时（ms） */
   imageCostMs: number | null;
   /** 当前 videoUrl 对应任务的耗时（ms） */
@@ -74,6 +80,9 @@ export type ComicProjectListItem = {
 
 /** 项目「详情态」DTO（含角色/分镜/进行中任务） */
 export type ComicProject = ComicProjectListItem & {
+  coverTaskStatus: GenerationStatus | null;
+  coverTaskFailCode: string | null;
+  coverTaskFailMessage: string | null;
   characters: ProjectCharacter[];
   storyboardFrames: StoryboardFrame[];
   pendingTasks: PendingTask[];

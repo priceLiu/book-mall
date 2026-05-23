@@ -11,6 +11,8 @@ import {
   patchProjectForUser,
   softDeleteProjectForUser,
 } from "@/lib/story/story-project-service";
+import { runPollWorker } from "@/lib/story/story-task-service";
+import { prisma } from "@/lib/prisma";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -23,6 +25,20 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
   if (!guard.ok) return guard.response;
   const { id } = await ctx.params;
   try {
+    const inflight = await prisma.storyGenerationTask.count({
+      where: {
+        projectId: id,
+        project: { userId: guard.user.id, deletedAt: null },
+        status: { in: ["PENDING", "SUBMITTED"] },
+      },
+    });
+    if (inflight > 0) {
+      try {
+        await runPollWorker({ projectId: id });
+      } catch (e) {
+        console.warn("[story/project GET] opportunistic poll failed", e);
+      }
+    }
     const project = await getProjectDetail(guard.user.id, id);
     return NextResponse.json({ project }, { headers: jsonHeaders(request) });
   } catch (err) {

@@ -6,7 +6,7 @@ import {
   requireSessionUser,
   storyErrorToResponse,
 } from "@/lib/story/api-helpers";
-import { submitFrameVideo } from "@/lib/story/story-task-service";
+import { submitFrameVideo, schedulePollWorkerForProject } from "@/lib/story/story-task-service";
 import type { StoryVideoOptions } from "@/lib/story/story-ai-constants";
 
 type RouteCtx = { params: Promise<{ id: string; frameId: string }> };
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
       modelId,
       options,
     });
+    schedulePollWorkerForProject(id);
     return NextResponse.json({ taskId }, { headers: jsonHeaders(request) });
   } catch (err) {
     return storyErrorToResponse(request, err);
