@@ -55,11 +55,23 @@ export const STORY_VIDEO_MODELS: Record<
     durationRange: [2, 15],
     supports: { generateAudio: false, promptExtend: true, watermark: true },
   },
+  "happyhorse/image-to-video": {
+    id: "happyhorse/image-to-video",
+    label: "Happy Horse",
+    description:
+      "Happy Horse · 图生视频，性价比高的备选；画风偏写实/影视感。",
+    requiresImage: true,
+    resolutions: ["720p", "1080p"],
+    defaults: { resolution: "1080p", duration: 5 },
+    durationRange: [3, 15],
+    supports: { generateAudio: false, promptExtend: false, watermark: false },
+  },
 };
 
 export const STORY_VIDEO_MODEL_LIST: StoryVideoModelDescriptor[] = [
   STORY_VIDEO_MODELS["bytedance/seedance-2"],
   STORY_VIDEO_MODELS["wan/2-7-image-to-video"],
+  STORY_VIDEO_MODELS["happyhorse/image-to-video"],
 ];
 
 export function getStoryVideoModel(

@@ -131,10 +131,11 @@ function buildFrameImageKieInput(args: {
 /**
  * 按所选视频模型构造 KIE 入参。
  *
- * 不同模型字段不同（两者皆图生视频）：
- *  - bytedance/seedance-2     使用 reference_image_urls(数组) + aspect_ratio
- *  - wan/2-7-image-to-video    使用 first_frame_url(单张) + prompt_extend / watermark
- *                              （画幅由首帧图自动决定，KIE 文档未提供 ratio 字段）
+ * 不同模型字段不同（皆图生视频）：
+ *  - bytedance/seedance-2       reference_image_urls(数组) + aspect_ratio
+ *  - wan/2-7-image-to-video      first_frame_url(单张) + prompt_extend / watermark
+ *                                （画幅由首帧图自动决定，KIE 文档未提供 ratio 字段）
+ *  - happyhorse/image-to-video   image_urls(单元素数组) + 仅 prompt/resolution/duration
  */
 function buildFrameVideoKieInput(args: {
   project: StoryProject;
@@ -159,6 +160,18 @@ function buildFrameVideoKieInput(args: {
           args.options.generateAudio ??
           desc.defaults.generateAudio ??
           false,
+      },
+    };
+  }
+
+  if (args.modelId === "happyhorse/image-to-video") {
+    return {
+      model: "happyhorse/image-to-video",
+      input: {
+        prompt: args.frame.videoPrompt,
+        image_urls: args.frame.imageUrl ? [args.frame.imageUrl] : [],
+        resolution,
+        duration,
       },
     };
   }
