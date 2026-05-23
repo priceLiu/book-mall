@@ -69,25 +69,51 @@ export function StorySetupTab({ project, onProjectChange, reload }: Props) {
 
   const isUninitialized = !project.storyOutline.trim();
 
-  const coverPending = project.pendingTasks.some(
-    (t) =>
-      t.kind === "COVER_IMAGE" &&
-      (t.status === "PENDING" || t.status === "SUBMITTED"),
-  );
-  const coverFailedTask = project.pendingTasks.find(
-    (t) => t.kind === "COVER_IMAGE" && t.status === "FAILED",
-  );
-  const coverFailed = !!coverFailedTask;
-  const failedAvatarTaskByCharId = new Map(
-    project.pendingTasks
-      .filter(
-        (t) =>
-          t.kind === "CHARACTER_AVATAR" &&
-          t.status === "FAILED" &&
-          t.characterId,
-      )
-      .map((t) => [t.characterId as string, t] as const),
-  );
+  const coverPending =
+    project.pendingTasks.some(
+      (t) =>
+        t.kind === "COVER_IMAGE" &&
+        (t.status === "PENDING" || t.status === "SUBMITTED"),
+    ) ||
+    project.coverTaskStatus === "PENDING" ||
+    project.coverTaskStatus === "SUBMITTED";
+  const coverFailed =
+    project.coverTaskStatus === "FAILED" ||
+    project.pendingTasks.some(
+      (t) => t.kind === "COVER_IMAGE" && t.status === "FAILED",
+    );
+  const coverFailMessage =
+    project.coverTaskFailMessage ??
+    project.pendingTasks.find(
+      (t) => t.kind === "COVER_IMAGE" && t.status === "FAILED",
+    )?.failMessage ??
+    null;
+  const avatarInflight = (characterId: string, c: ProjectCharacter) =>
+    project.pendingTasks.some(
+      (t) =>
+        t.kind === "CHARACTER_AVATAR" &&
+        t.characterId === characterId &&
+        (t.status === "PENDING" || t.status === "SUBMITTED"),
+    ) ||
+    c.avatarTaskStatus === "PENDING" ||
+    c.avatarTaskStatus === "SUBMITTED";
+  const avatarFailed = (characterId: string, c: ProjectCharacter) =>
+    c.avatarTaskStatus === "FAILED" ||
+    project.pendingTasks.some(
+      (t) =>
+        t.kind === "CHARACTER_AVATAR" &&
+        t.characterId === characterId &&
+        t.status === "FAILED",
+    );
+  const avatarFailMessage = (characterId: string, c: ProjectCharacter) =>
+    c.avatarTaskFailMessage ??
+    project.pendingTasks.find(
+      (t) =>
+        t.kind === "CHARACTER_AVATAR" &&
+        t.characterId === characterId &&
+        t.status === "FAILED",
+    )?.failMessage ??
+    null;
 
   const handleRetryCover = async () => {
     if (!base) return;
@@ -280,8 +306,8 @@ export function StorySetupTab({ project, onProjectChange, reload }: Props) {
                       : "empty"
                 }
                 loadingLabel="封面生成中…"
-                failedReason={coverFailedTask?.failMessage ?? null}
-                failedCode={coverFailedTask?.failCode ?? null}
+                failedReason={coverFailMessage}
+                failedCode={project.coverTaskFailCode ?? null}
               />
             )}
           </div>
@@ -354,9 +380,8 @@ export function StorySetupTab({ project, onProjectChange, reload }: Props) {
             )}
           >
             {project.characters.map((character) => {
-              const avatarInflight =
-                character.avatarTaskStatus === "PENDING" ||
-                character.avatarTaskStatus === "SUBMITTED";
+              const charInflight = avatarInflight(character.id, character);
+              const charFailed = avatarFailed(character.id, character);
               return (
               <li key={character.id} className="min-w-0">
                 <div
@@ -374,7 +399,7 @@ export function StorySetupTab({ project, onProjectChange, reload }: Props) {
                         name: character.name,
                         imagePrompt: character.imagePrompt,
                         hasAvatar: !!character.avatarUrl,
-                        avatarInflight,
+                        avatarInflight: charInflight,
                       })
                     }
                     onPreview={() => {
@@ -404,7 +429,7 @@ export function StorySetupTab({ project, onProjectChange, reload }: Props) {
                           name: character.name,
                           imagePrompt: character.imagePrompt,
                           hasAvatar: false,
-                          avatarInflight,
+                          avatarInflight: charInflight,
                         });
                       }
                     }}
@@ -428,20 +453,23 @@ export function StorySetupTab({ project, onProjectChange, reload }: Props) {
                     <MediaPlaceholder
                       fallbackUrl={project.styleFallbackUrl}
                       state={
-                        avatarInflight
+                        charInflight
                           ? "loading"
-                          : character.avatarTaskStatus === "FAILED"
+                          : charFailed
                             ? "failed"
                             : "empty"
                       }
                       loadingLabel="头像生成中"
-                      failedReason={
-                        failedAvatarTaskByCharId.get(character.id)
-                          ?.failMessage ?? null
-                      }
+                      failedReason={avatarFailMessage(character.id, character)}
                       failedCode={
-                        failedAvatarTaskByCharId.get(character.id)
-                          ?.failCode ?? null
+                        character.avatarTaskFailCode ??
+                        project.pendingTasks.find(
+                          (t) =>
+                            t.kind === "CHARACTER_AVATAR" &&
+                            t.characterId === character.id &&
+                            t.status === "FAILED",
+                        )?.failCode ??
+                        null
                       }
                     />
                   )}
@@ -462,10 +490,7 @@ export function StorySetupTab({ project, onProjectChange, reload }: Props) {
                       <Pencil className="size-3" />
                       编辑信息
                     </button>
-                    {(character.avatarTaskStatus === "FAILED" ||
-                      !character.avatarUrl) &&
-                    character.avatarTaskStatus !== "PENDING" &&
-                    character.avatarTaskStatus !== "SUBMITTED" ? (
+                    {(charFailed || !character.avatarUrl) && !charInflight ? (
                       <button
                         type="button"
                         onClick={() => void handleRetryAvatar(character.id)}

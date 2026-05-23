@@ -34,6 +34,8 @@ import {
   createKieTask,
   extractKieResultUrl,
   getKieTask,
+  isKieRecordFail,
+  isKieRecordSuccess,
   KieError,
   logKieEvent,
   type KieRecordResponse,
@@ -276,6 +278,40 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
     },
   });
 
+  // 提交即关联 *TaskId，前端可通过 imageTaskStatus 等字段感知进行中/失败（不仅靠 pendingTasks）
+  switch (args.kind) {
+    case "COVER_IMAGE":
+      await prisma.storyProject.update({
+        where: { id: args.projectId },
+        data: { coverTaskId: task.id },
+      });
+      break;
+    case "CHARACTER_AVATAR":
+      if (args.characterId) {
+        await prisma.storyCharacter.update({
+          where: { id: args.characterId },
+          data: { avatarTaskId: task.id },
+        });
+      }
+      break;
+    case "FRAME_IMAGE":
+      if (args.frameId) {
+        await prisma.storyStoryboardFrame.update({
+          where: { id: args.frameId },
+          data: { imageTaskId: task.id },
+        });
+      }
+      break;
+    case "FRAME_VIDEO":
+      if (args.frameId) {
+        await prisma.storyStoryboardFrame.update({
+          where: { id: args.frameId },
+          data: { videoTaskId: task.id },
+        });
+      }
+      break;
+  }
+
   const callBackUrl =
     args.kind === "FRAME_VIDEO"
       ? buildStoryAiKieCallbackUrl("video", task.id)
@@ -340,7 +376,7 @@ export async function applyKieTaskResult(
     return; // 幂等
   }
 
-  if (record.state === "success") {
+  if (isKieRecordSuccess(record.state)) {
     const ephemeralUrl = extractKieResultUrl(record);
     if (!ephemeralUrl) {
       await prisma.storyGenerationTask.update({
@@ -525,7 +561,7 @@ export async function applyKieTaskResult(
       kind: task.kind,
       ossUrl,
     });
-  } else if (record.state === "fail") {
+  } else if (isKieRecordFail(record.state)) {
     await prisma.storyGenerationTask.update({
       where: { id: taskId },
       data: {
@@ -868,6 +904,16 @@ async function assertNoActiveTaskForFrameVideo(
 
 // —— Polling worker ——
 
+/** 提交 KIE 任务后异步 poll 一次，避免仅依赖 cron/回调 */
+export function schedulePollWorkerForProject(projectId: string): void {
+  void runPollWorker({ projectId }).catch((e) => {
+    console.warn("[story] opportunistic poll failed", {
+      projectId,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  });
+}
+
 const POLL_BATCH = 20;
 const POLL_INNER_TIMEOUT_MS = 8000;
 const RETRY_PENDING_LIMIT = 3;
@@ -886,7 +932,10 @@ function shouldPollNow(
  * 选取一批 PENDING（重试 createTask）+ SUBMITTED（查询 KIE）任务推进。
  * 由 cron `/api/story/kie/poll` 与脚本 `pnpm story:poll-once` 调用。
  */
-export async function runPollWorker(): Promise<{
+export async function runPollWorker(opts?: {
+  /** 仅推进指定项目的任务（项目页 GET 按需 poll 用） */
+  projectId?: string;
+}): Promise<{
   scanned: number;
   retried: number;
   succeeded: number;
@@ -894,10 +943,15 @@ export async function runPollWorker(): Promise<{
   timedOut: number;
 }> {
   const result = { scanned: 0, retried: 0, succeeded: 0, failed: 0, timedOut: 0 };
+  const projectFilter = opts?.projectId ? { projectId: opts.projectId } : {};
 
   // 1) PENDING 任务（createTask 失败的）：重试 createTask，最多 RETRY_PENDING_LIMIT 次
   const pendings = await prisma.storyGenerationTask.findMany({
-    where: { status: "PENDING", pollCount: { lt: RETRY_PENDING_LIMIT } },
+    where: {
+      status: "PENDING",
+      pollCount: { lt: RETRY_PENDING_LIMIT },
+      ...projectFilter,
+    },
     orderBy: { createdAt: "asc" },
     take: POLL_BATCH,
   });
@@ -958,7 +1012,11 @@ export async function runPollWorker(): Promise<{
 
   // 2) SUBMITTED 任务：查询 recordInfo
   const submitted = await prisma.storyGenerationTask.findMany({
-    where: { status: "SUBMITTED", kieTaskId: { not: null } },
+    where: {
+      status: "SUBMITTED",
+      kieTaskId: { not: null },
+      ...projectFilter,
+    },
     orderBy: { lastPolledAt: { sort: "asc", nulls: "first" } },
     take: POLL_BATCH,
   });
@@ -1004,10 +1062,10 @@ export async function runPollWorker(): Promise<{
           pollCount: task.pollCount + 1,
         },
       });
-      if (record.state === "success") {
+      if (isKieRecordSuccess(record.state)) {
         await applyKieTaskResult(task.id, record);
         result.succeeded++;
-      } else if (record.state === "fail") {
+      } else if (isKieRecordFail(record.state)) {
         await applyKieTaskResult(task.id, record);
         result.failed++;
       }

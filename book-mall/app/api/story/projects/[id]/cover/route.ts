@@ -5,7 +5,7 @@ import {
   requireSessionUser,
   storyErrorToResponse,
 } from "@/lib/story/api-helpers";
-import { submitCoverRegeneration } from "@/lib/story/story-task-service";
+import { submitCoverRegeneration, schedulePollWorkerForProject } from "@/lib/story/story-task-service";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -22,6 +22,7 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
   const { id } = await ctx.params;
   try {
     const taskId = await submitCoverRegeneration(guard.user.id, id);
+    schedulePollWorkerForProject(id);
     return NextResponse.json({ taskId }, { headers: jsonHeaders(request) });
   } catch (err) {
     return storyErrorToResponse(request, err);

@@ -12,6 +12,7 @@ import {
   BookMallApiError,
 } from "@/lib/projects/api";
 import type { ComicProject, ProjectStep } from "@/lib/projects/types";
+import { projectHasInflightTasks, countInflightTasks } from "@/lib/projects/task-status";
 import { cn } from "@/lib/utils";
 import { StorySetupTab } from "./story-setup-tab";
 import { StoryboardTab } from "./storyboard-tab";
@@ -42,6 +43,9 @@ export function ProjectWorkspaceClient({
       const dto = await apiGetProject(base, projectId);
       setProject({
         ...dto,
+        coverTaskStatus: dto.coverTaskStatus,
+        coverTaskFailCode: dto.coverTaskFailCode,
+        coverTaskFailMessage: dto.coverTaskFailMessage,
         characters: dto.characters,
         storyboardFrames: dto.frames,
         pendingTasks: dto.pendingTasks,
@@ -64,11 +68,10 @@ export function ProjectWorkspaceClient({
     void reload();
   }, [reload]);
 
-  // 自动轮询：当存在 PENDING/SUBMITTED 任务时每 5s 刷新一次
+  // 自动轮询：存在进行中任务时每 5s 刷新（pendingTasks + *TaskStatus 双通道）
   useEffect(() => {
     if (!project) return;
-    const hasInflight = project.pendingTasks.length > 0;
-    if (!hasInflight) return;
+    if (!projectHasInflightTasks(project)) return;
     const t = setInterval(() => {
       void reload();
     }, 5000);
@@ -113,9 +116,9 @@ export function ProjectWorkspaceClient({
             <h1 className="truncate text-sm font-medium text-white sm:text-base">
               {project.name}
             </h1>
-            {project.pendingTasks.length > 0 ? (
+            {projectHasInflightTasks(project) ? (
               <span className="hidden rounded-md bg-emerald-500/85 px-2 py-0.5 text-[10px] text-black sm:inline">
-                {project.pendingTasks.length} 个任务进行中
+                {countInflightTasks(project)} 个任务进行中
               </span>
             ) : null}
           </div>
