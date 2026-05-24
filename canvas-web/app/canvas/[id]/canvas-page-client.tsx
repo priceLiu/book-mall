@@ -7,6 +7,7 @@ import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { MyTemplatesPanel } from "@/components/canvas/my-templates-panel";
+import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -26,6 +27,7 @@ import {
   getCanvasProject,
   patchCanvasProject,
   saveCanvasTemplate,
+  type CanvasCharacterRecord,
   type CanvasProjectDetail,
 } from "@/lib/canvas-api";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
@@ -50,6 +52,7 @@ function Inner({ projectId }: { projectId: string }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [myTemplatesOpen, setMyTemplatesOpen] = useState(false);
+  const [myCharactersOpen, setMyCharactersOpen] = useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
 
   const { enqueueNode } = useCanvasRunner();
@@ -189,6 +192,17 @@ function Inner({ projectId }: { projectId: string }) {
     [addNode],
   );
 
+  const onInsertCharacter = useCallback(
+    (character: CanvasCharacterRecord) => {
+      const center = { x: 240 + Math.random() * 80, y: 160 + Math.random() * 80 };
+      addNode("image", center, {
+        ossUrl: character.imageUrl,
+        label: character.name,
+      });
+    },
+    [addNode],
+  );
+
   const onSaveTemplate = useCallback(async () => {
     if (!base) return;
     const tplName = await dialogs.prompt({
@@ -270,6 +284,7 @@ function Inner({ projectId }: { projectId: string }) {
         onRedo={redo}
         onRunAll={runAll}
         onOpenMyTemplates={() => setMyTemplatesOpen(true)}
+        onOpenMyCharacters={() => setMyCharactersOpen(true)}
         onSaveTemplate={() => void onSaveTemplate()}
         running={inflightTaskCount > 0}
         inflightTaskCount={inflightTaskCount}
@@ -278,6 +293,11 @@ function Inner({ projectId }: { projectId: string }) {
         open={myTemplatesOpen}
         onClose={() => setMyTemplatesOpen(false)}
         refreshKey={templatesRefreshKey}
+      />
+      <MyCharactersPanel
+        open={myCharactersOpen}
+        onClose={() => setMyCharactersOpen(false)}
+        onInsertCharacter={onInsertCharacter}
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <FlowCanvas onUndo={undo} onRedo={redo} />
