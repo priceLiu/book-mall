@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   ArrowLeft,
+  Bookmark,
   BookmarkPlus,
   Loader2,
   Play,
@@ -23,6 +24,7 @@ export function CanvasToolbar({
   onRedo,
   onRunAll,
   onSaveTemplate,
+  onOpenMyTemplates,
   running,
   inflightTaskCount = 0,
 }: {
@@ -37,6 +39,7 @@ export function CanvasToolbar({
   onRedo: () => void;
   onRunAll: () => void;
   onSaveTemplate?: () => void;
+  onOpenMyTemplates?: () => void;
   running: boolean;
   inflightTaskCount?: number;
 }) {
@@ -106,6 +109,16 @@ export function CanvasToolbar({
           {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
           手动保存
         </button>
+        {onOpenMyTemplates ? (
+          <button
+            type="button"
+            onClick={onOpenMyTemplates}
+            className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-white/30 hover:text-white"
+          >
+            <Bookmark className="size-3" />
+            我的模板
+          </button>
+        ) : null}
         {onSaveTemplate ? (
           <button
             type="button"

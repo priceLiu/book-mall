@@ -41,6 +41,9 @@ const edgeTypes = {
   default: DeletableEdge,
 } as const;
 
+export const canvasFlowNodeTypes = nodeTypes;
+export const canvasFlowEdgeTypes = edgeTypes;
+
 /**
  * 进程内（同标签页）节点剪贴板。
  * 不进系统剪贴板，避免与"复制图片"混淆；用 sessionStorage 让 reload 后仍在。

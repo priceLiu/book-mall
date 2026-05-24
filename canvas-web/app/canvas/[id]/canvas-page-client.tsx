@@ -6,6 +6,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
+import { MyTemplatesPanel } from "@/components/canvas/my-templates-panel";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -48,6 +49,8 @@ function Inner({ projectId }: { projectId: string }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [myTemplatesOpen, setMyTemplatesOpen] = useState(false);
+  const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
 
   const { enqueueNode } = useCanvasRunner();
   const inflightTaskCount = useCanvasInflightTaskCount();
@@ -206,9 +209,10 @@ function Inner({ projectId }: { projectId: string }) {
         category: "user",
       });
       setSaveError(null);
+      setTemplatesRefreshKey((k) => k + 1);
       await dialogs.alert({
         title: "已保存",
-        message: "模板已保存，可在「新建画布」中复用。",
+        message: "模板已保存，可在工具栏「我的模板」中查看。",
         variant: "success",
       });
     } catch (e) {
@@ -265,9 +269,15 @@ function Inner({ projectId }: { projectId: string }) {
         onUndo={undo}
         onRedo={redo}
         onRunAll={runAll}
+        onOpenMyTemplates={() => setMyTemplatesOpen(true)}
         onSaveTemplate={() => void onSaveTemplate()}
         running={inflightTaskCount > 0}
         inflightTaskCount={inflightTaskCount}
+      />
+      <MyTemplatesPanel
+        open={myTemplatesOpen}
+        onClose={() => setMyTemplatesOpen(false)}
+        refreshKey={templatesRefreshKey}
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <FlowCanvas onUndo={undo} onRedo={redo} />
