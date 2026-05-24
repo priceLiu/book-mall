@@ -504,14 +504,14 @@ export function StoryEngineActionsModal({
                     </div>
                     <p className="text-[10px] text-[var(--canvas-muted)]">
                       {kind === "storyboard"
-                        ? "已存在的镜号会跳过创建，但会补全 @ 角色关联与参考图连线。"
+                        ? "已存在的镜号会跳过创建，但会补写对白 / 视频提示，并补全 @ 角色与三视图连线。"
                         : "批量任务排队依次执行，降低 API 429 限流风险。"}
                     </p>
                   </>
                 )}
                 {kind === "storyboard" ? (
                   <p className="text-[11px] text-[var(--canvas-muted)]">
-                    创建前按镜号校验出镜角色三视图是否已生成；鼠标悬停镜号可查看完整分镜内容。无需一次性创建全部角色。
+                    新建镜号前会校验出镜角色三视图；若镜号已有分镜图，可直接点「创建选中」补写对白。悬停镜号可看完整分镜。
                   </p>
                 ) : null}
               </div>

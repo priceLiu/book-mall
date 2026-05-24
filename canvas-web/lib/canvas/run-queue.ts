@@ -33,7 +33,13 @@ import {
   pickRuntimeImagePreviewUrl,
   pickTaskImagePreviewUrl,
   pickTaskModelDownloadUrl,
+  pickTaskResultMediaUrl,
 } from "./task-media-url";
+import {
+  backfillFrameVideoRuntimesFromTasks,
+  pickPreferredCanvasTask,
+  preferredTasksByNode,
+} from "./task-pick";
 
 const POLL_INTERVAL_MS = 2000;
 /** 每 N 次 tick 做一次全项目任务扫描，避免刷新后 runtime 丢失导致轮询停住 */
@@ -54,17 +60,7 @@ function isServerInflightStatus(status?: string): boolean {
 function latestTasksByNode(
   tasks: CanvasTaskRecord[],
 ): Map<string, CanvasTaskRecord> {
-  const latestByNode = new Map<string, CanvasTaskRecord>();
-  for (const t of tasks) {
-    const prev = latestByNode.get(t.nodeId);
-    if (
-      !prev ||
-      new Date(t.updatedAt).getTime() > new Date(prev.updatedAt).getTime()
-    ) {
-      latestByNode.set(t.nodeId, t);
-    }
-  }
-  return latestByNode;
+  return preferredTasksByNode(tasks);
 }
 
 /** 顶部工具栏：进行中的节点数（pending + running） */
@@ -290,17 +286,14 @@ export function useCanvasRunner(fallbackProjectId?: string) {
         taskByNodeRef.current.set(nodeId, r.task.id);
         if (
           r.task.status === "SUCCEEDED" &&
-          (r.task.ossUrl ||
-            r.task.textOutput ||
-            pickTaskImagePreviewUrl(r.task) ||
-            pickTaskModelDownloadUrl(r.task))
+          (r.task.textOutput || pickTaskResultMediaUrl(r.task))
         ) {
           // ai-engine 同步成功 / 缓存命中 / image-engine 同步出图：直接落 done
           setNodeRuntime(nodeId, {
             status: "done",
             taskId: r.task.id,
             ossUrl:
-              pickTaskImagePreviewUrl(r.task) ?? r.task.ossUrl ?? undefined,
+              pickTaskResultMediaUrl(r.task) ?? r.task.ossUrl ?? undefined,
             ephemeralUrl: r.task.ephemeralUrl ?? undefined,
             textOutput: r.task.textOutput ?? undefined,
           });
@@ -331,24 +324,17 @@ export function useCanvasRunner(fallbackProjectId?: string) {
           // 提交后立即拉一次任务（服务端 tasks GET 会 opportunistic poll KIE）
           void listCanvasProjectTasks(base, projectId, [nodeId])
             .then((tasks) => {
-              const latest = tasks.sort(
-                (a, b) =>
-                  new Date(b.updatedAt).getTime() -
-                  new Date(a.updatedAt).getTime(),
-              )[0];
+              const latest = pickPreferredCanvasTask(tasks);
               if (!latest) return;
               if (
                 latest.status === "SUCCEEDED" &&
-                (latest.ossUrl ||
-                  latest.textOutput ||
-                  pickTaskImagePreviewUrl(latest) ||
-                  pickTaskModelDownloadUrl(latest))
+                (latest.textOutput || pickTaskResultMediaUrl(latest))
               ) {
                 setNodeRuntime(nodeId, {
                   status: "done",
                   taskId: latest.id,
                   ossUrl:
-                    pickTaskImagePreviewUrl(latest) ?? latest.ossUrl ?? undefined,
+                    pickTaskResultMediaUrl(latest) ?? latest.ossUrl ?? undefined,
                   ephemeralUrl: latest.ephemeralUrl ?? undefined,
                   textOutput: latest.textOutput ?? undefined,
                 });
@@ -544,15 +530,12 @@ export function useCanvasRunner(fallbackProjectId?: string) {
 
       if (
         t.status === "SUCCEEDED" &&
-        (t.ossUrl ||
-          t.textOutput ||
-          pickTaskImagePreviewUrl(t) ||
-          pickTaskModelDownloadUrl(t))
+        (t.textOutput || pickTaskResultMediaUrl(t))
       ) {
         setNodeRuntime(nodeId, {
           status: "done",
           taskId: t.id,
-          ossUrl: pickTaskImagePreviewUrl(t) ?? t.ossUrl ?? undefined,
+          ossUrl: pickTaskResultMediaUrl(t) ?? t.ossUrl ?? undefined,
           ephemeralUrl: t.ephemeralUrl ?? undefined,
           textOutput: t.textOutput ?? undefined,
         });
@@ -615,6 +598,13 @@ export function useCanvasRunner(fallbackProjectId?: string) {
           if (isServerInflightStatus(t.status)) serverInflight++;
           applyTaskUpdate(t, nodeId, state.nodes);
         });
+        if (fullScan) {
+          backfillFrameVideoRuntimesFromTasks(
+            state.nodes,
+            tasks,
+            setNodeRuntime,
+          );
+        }
         serverInflightRef.current = serverInflight > 0;
       } catch {
         // 网络抖动忽略

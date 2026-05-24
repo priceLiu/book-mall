@@ -31,6 +31,7 @@ import {
   type KieAspectRatio,
   type KieImageInput,
   type KieRecordResponse,
+  type KieVideoInput,
   type CreateKieTaskArgs,
 } from "@/lib/story/kie-client";
 import { persistCanvasKieResultToOss } from "./canvas-oss";
@@ -645,6 +646,18 @@ function resolvePendingKieCreateArgs(
     }) as CreateKieTaskArgs;
   }
 
+  if (p.kind === "video-engine") {
+    const kieModel = String(p.kieModel ?? task.model);
+    const kieInput = p.kieInput;
+    if (!kieInput || typeof kieInput !== "object") return null;
+    return {
+      model: kieModel,
+      input: kieInput as KieVideoInput,
+    };
+  }
+
+  if (p.kind === "tts-engine") return null;
+
   // v1 image-gen：inputPayload 本身就是 KIE input（gpt-image-1 需重新映射）
   if (typeof p.prompt === "string" && p.prompt.trim()) {
     if (task.model === "gpt-image-1") {
@@ -667,6 +680,17 @@ function resolvePendingKieCreateArgs(
   }
 
   return null;
+}
+
+function resolveKieCallbackKind(
+  task: Pick<CanvasGenerationTask, "inputPayload">,
+): "image" | "video" {
+  const payload = task.inputPayload;
+  if (payload && typeof payload === "object") {
+    const kind = (payload as Record<string, unknown>).kind;
+    if (kind === "video-engine") return "video";
+  }
+  return "image";
 }
 
 function shouldPollNow(
@@ -729,7 +753,10 @@ export async function runCanvasPollWorker(opts?: {
     if (!createArgs) continue;
 
     if (!shouldPollNow(task)) continue;
-    const callBackUrl = buildCanvasAiKieCallbackUrl("image", task.id);
+    const callBackUrl = buildCanvasAiKieCallbackUrl(
+      resolveKieCallbackKind(task),
+      task.id,
+    );
     try {
       const { taskId } = await Promise.race([
         createKieTask({
