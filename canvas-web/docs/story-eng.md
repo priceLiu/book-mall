@@ -23,7 +23,7 @@
 | 故事大纲 | 摘要 + 状态 | 文案、预览 | 文案 / 预览 |
 | 角色设定 | 摘要 + 状态 | 文案、三视图 | 文案 / 三视图 / 预览 |
 | 分镜脚本 | 摘要 + 状态 | 文案、分镜图 | 文案 / 分镜图 / 预览 |
-| 分镜图 · 镜N | 左 Prompt + 右预览图 | 重新生成、生成视频、生成对白、视频+对白 | 四个 Tab 对应四项操作 |
+| 分镜图 · 镜N | 左 Prompt + 右预览图 | **分镜图生成** → 生成中… → **重新生成**；生成视频 / 对白 / 视频+对白 | 四个 Tab 对应四项操作 |
 
 - 节点本体 **不** 放长表单、全宽「重新生成」条；模型选择与执行均在 **弹出层** 内完成。
 - Story LLM / 分镜图节点底栏：左侧 **橙色 logo + 类型名**，右侧 **状态徽章**（待生成 / 生成中 / 已完成 / 失败）。
@@ -77,7 +77,7 @@
    `镜 3：祝小萤（未创建三视图）`  
    `镜 5：徐风清（三视图未生成）`  
    提示用户到 **角色设定 → 三视图** 补做 **对应角色** 即可，无需一次性做完所有角色。
-5. 校验通过后：创建节点、连线、写入 IMAGE 模型默认值；**不自动生图**，用户到各 **分镜图 · 镜N** 手动点 **重新生成**。
+5. 校验通过后：创建节点、连线、写入 IMAGE 模型默认值；**不自动生图**，用户到各 **分镜图 · 镜N** 手动点 **分镜图生成**（首次）或 **重新生成**（已有图后）。
 
 #### 4.3 分镜图 Tab · 镜号列表 UI
 
@@ -89,7 +89,7 @@
 
 每个 **分镜图 · 镜N** 节点：
 
-1. **重新生成** Tab：编辑 Prompt、选 IMAGE 模型、生成静帧；点击生成后 **关闭弹层**。
+1. **分镜图生成 / 重新生成** Tab：编辑 Prompt、选 IMAGE 模型、生成静帧；首态按钮 **分镜图生成**，生成中 **生成中…**，完成后 **重新生成**；点击生成后 **关闭弹层**。
 2. **生成视频** Tab：展示带入的 `frameVideoPrompt`，选 VIDEO 模型；若无现成 `video-engine` 则 **spawn** 并连线本镜分镜图 → 再提交 KIE。
 3. **生成对白** Tab：展示 `frameDialogue`，选 TTS 模型；spawn `tts-engine` 并跑任务（无对白文本则不可用）。
 4. **视频+对白** Tab：两项模型一起配置，顺序触发生成。
@@ -151,8 +151,9 @@
 
 ## Provider 配置（勿在文档写 Key）
 
-- **DeepSeek**：OpenAI 兼容，`baseUrl=https://api.deepseek.com/v1`，`modelKey=deepseek-chat`
-- **通义千问**：阿里百炼或 dashscope OpenAI 兼容
+- **DeepSeek（推荐 · 漫剧文案）**：在 **book-mall** `.env.local` 配置 `DEEPSEEK_API_KEY` 后，画布 Provider 列表会出现 **系统 · DeepSeek（共享 key）**（`system:deepseek`）；OpenAI 兼容 `baseUrl=https://api.deepseek.com/v1`，`modelKey=deepseek-chat`。故事大纲 / 角色设定 / 分镜脚本文案 Tab 与漫剧启动节点均可选。
+- **KIE Gemini**：`KIE_API_KEY` → **系统 · KIE**，`modelKey=gemini-3-flash`
+- **通义千问**：阿里百炼或 dashscope OpenAI 兼容（用户自建 Provider）
 - **TTS**：OpenAI 兼容 `/audio/speech`，模型 `tts-1`
 - **视频**：KIE 系统 Provider（Seedance / 万相 / Happy Horse）
 

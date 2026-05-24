@@ -7,7 +7,6 @@ import {
 } from "@/lib/canvas/api-helpers";
 import { testProviderForUser } from "@/lib/canvas/canvas-provider-service";
 import {
-  isKieSystemEnabled,
   isSystemProviderId,
   resolveSystemProvider,
 } from "@/lib/canvas/canvas-system-provider";
@@ -24,14 +23,14 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   if (!guard.ok) return guard.response;
   const { id } = await ctx.params;
   if (isSystemProviderId(id)) {
-    if (!isKieSystemEnabled()) {
+    const sys = resolveSystemProvider(id);
+    if (!sys) {
       return NextResponse.json(
-        { ok: false, message: "系统 KIE Key 未配置" },
+        { ok: false, message: "该系统 Provider 未启用（请检查 book-mall .env）" },
         { headers: jsonHeaders(request) },
       );
     }
     try {
-      const sys = resolveSystemProvider(id)!;
       const gateway = getGatewayForKind(sys.kind, sys.config);
       const result = await gateway.testConnection();
       return NextResponse.json(result, { headers: jsonHeaders(request) });

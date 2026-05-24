@@ -43,6 +43,8 @@ import {
 } from "@/lib/canvas/parse-md-tables";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
 import type { MentionableItem } from "../mentions/MentionsTextarea";
 
 const ERROR_TOAST_MS = 8000;
@@ -144,6 +146,7 @@ function StoryEngineNodeInner({
 }) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const d = data as unknown as StoryEngineNodeData;
+  const { providers } = useUserProviders();
   const meta = META[nodeType];
   const runtimeStatus = d.runtime?.status ?? "idle";
   const [modalState, setModalState] = useState<{
@@ -175,6 +178,16 @@ function StoryEngineNodeInner({
   const hasGenerated = Boolean(text?.trim()) || d.runtime?.status === "done";
   const isGenerating =
     runtimeStatus === "running" || runtimeStatus === "pending";
+
+  useEffect(() => {
+    if (d.providerId?.trim() && d.modelKey?.trim()) return;
+    const pick = pickDefaultStoryLlmEngine(providers);
+    if (!pick) return;
+    updateNodeData(id, {
+      providerId: pick.providerId,
+      modelKey: pick.modelKey,
+    });
+  }, [d.providerId, d.modelKey, providers, id, updateNodeData]);
 
   useEffect(() => {
     if (runtimeStatus === "running" || runtimeStatus === "pending") {

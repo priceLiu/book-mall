@@ -22,6 +22,8 @@ import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { storyLlmNodeIsComplete, storyLlmNodeNeedsRun } from "@/lib/canvas/story-llm-runtime";
 import { NodeShell, ENGINE_ACCENT, NodeStatusBadge } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
+import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
 
 const STAGE_LABELS: Record<string, string> = {
   idle: "1/5 · 填写主题并开始",
@@ -106,6 +108,7 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
   );
 
   const d = data as unknown as StoryComicStarterNodeData;
+  const { providers } = useUserProviders();
   const stage = d.pipelineStage ?? "idle";
   const hasLlmEngines = useMemo(
     () =>
@@ -122,6 +125,16 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
   const isGenerating =
     pipeline.status === "running" || pipeline.status === "pending";
   const canRun = Boolean(d.theme?.trim() && d.providerId && d.modelKey);
+
+  useEffect(() => {
+    if (d.providerId?.trim() && d.modelKey?.trim()) return;
+    const pick = pickDefaultStoryLlmEngine(providers);
+    if (!pick) return;
+    updateNodeData(id, {
+      providerId: pick.providerId,
+      modelKey: pick.modelKey,
+    });
+  }, [d.providerId, d.modelKey, providers, id, updateNodeData]);
 
   const onPickEngine = (next: {
     providerId: string;

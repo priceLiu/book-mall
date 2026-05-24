@@ -62,12 +62,29 @@ type CompareState = {
   defaultRightId?: string;
 };
 
-const FRAME_QUICK_ACTIONS: Array<{ tab: FrameImageModalTab; label: string }> = [
-  { tab: "regenerate", label: "重新生成" },
+const FRAME_QUICK_ACTIONS: Array<{
+  tab: FrameImageModalTab;
+  label: string;
+  dynamic?: "frameImage";
+}> = [
+  { tab: "regenerate", label: "重新生成", dynamic: "frameImage" },
   { tab: "video", label: "生成视频" },
   { tab: "dialogue", label: "生成对白" },
   { tab: "both", label: "视频+对白" },
 ];
+
+function frameImageActionLabel(
+  hasGenerated: boolean,
+  isGenerating: boolean,
+): string {
+  if (isGenerating) return "生成中…";
+  if (hasGenerated) return "重新生成";
+  return "分镜图生成";
+}
+
+function frameRegenerateTabLabel(hasGenerated: boolean): string {
+  return hasGenerated ? "重新生成" : "分镜图生成";
+}
 
 function frameStatusLabel(status: string, isGenerating: boolean): string {
   if (isGenerating) return "生成中…";
@@ -237,18 +254,37 @@ export function ImageEngineNode({ id, data, selected }: NodeProps) {
     return idx >= 0 ? idx + 1 : succeeded.length;
   }, [activeTask, succeeded]);
 
+  const frameCompareContext = useMemo(
+    () =>
+      canCompare
+        ? {
+            tasks: history,
+            referenceImages,
+            focusTaskId: activeTask?.id,
+          }
+        : undefined,
+    [canCompare, history, referenceImages, activeTask?.id],
+  );
+
   const engineFooter = isStoryFrameShot ? (
     <div className="flex gap-1 border-t border-white/10 pt-2">
-      {FRAME_QUICK_ACTIONS.map(({ tab, label }) => (
-        <button
-          key={tab}
-          type="button"
-          className={NODE_BTN_FRAME_ACTION}
-          onClick={() => setModalState({ open: true, tab })}
-        >
-          {label}
-        </button>
-      ))}
+      {FRAME_QUICK_ACTIONS.map(({ tab, label, dynamic }) => {
+        const text =
+          dynamic === "frameImage"
+            ? frameImageActionLabel(hasGenerated, isGenerating)
+            : label;
+        return (
+          <button
+            key={tab}
+            type="button"
+            disabled={dynamic === "frameImage" && isGenerating}
+            className={NODE_BTN_FRAME_ACTION}
+            onClick={() => setModalState({ open: true, tab })}
+          >
+            {text}
+          </button>
+        );
+      })}
     </div>
   ) : (
     <NodeEngineFooter
@@ -359,6 +395,10 @@ export function ImageEngineNode({ id, data, selected }: NodeProps) {
             mediaUrl={previewUrl}
             status={d.runtime?.status}
             failMessage={d.runtime?.failMessage}
+            compareContext={
+              isStoryFrameShot ? frameCompareContext : undefined
+            }
+            prompt={isStoryFrameShot ? (d.prompt ?? "") : undefined}
           />
         }
         footer={
@@ -433,15 +473,8 @@ export function ImageEngineNode({ id, data, selected }: NodeProps) {
                           alt={`镜${d.frameIndex} 分镜图`}
                           fit="contain"
                           clickToPreview
-                          compareContext={
-                            canCompare
-                              ? {
-                                  tasks: history,
-                                  referenceImages,
-                                  focusTaskId: activeTask?.id,
-                                }
-                              : undefined
-                          }
+                          prompt={d.prompt ?? ""}
+                          compareContext={frameCompareContext}
                         />
                       </NodeMediaStage>
                     ) : (
@@ -449,7 +482,7 @@ export function ImageEngineNode({ id, data, selected }: NodeProps) {
                         fill
                         icon={<ImageIcon className="size-6 opacity-40" />}
                         message={
-                          isGenerating ? "生成中…" : "点下方「重新生成」"
+                          isGenerating ? "生成中…" : "点下方「分镜图生成」"
                         }
                       />
                     )}

@@ -1,8 +1,10 @@
 "use client";
 
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   Brain,
+  ChevronLeft,
+  ChevronRight,
   Clapperboard,
   ClipboardList,
   Download,
@@ -129,7 +131,57 @@ const PALETTE: Array<{
   },
 ];
 
-function PaletteDivider() {
+const PALETTE_COLLAPSED_KEY = "canvas-node-palette-collapsed";
+
+function PaletteIconButton({
+  p,
+  collapsed,
+  onDragStart,
+  onAdd,
+}: {
+  p: (typeof PALETTE)[number];
+  collapsed: boolean;
+  onDragStart: (
+    event: React.DragEvent<HTMLButtonElement>,
+    type: CanvasContentNodeType,
+    presetId?: string,
+  ) => void;
+  onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      draggable
+      onDragStart={(ev) => onDragStart(ev, p.type, p.presetId)}
+      onClick={() => onAdd(p.type, p.presetId)}
+      aria-label={`${p.label} — ${p.hint}`}
+      className="group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+    >
+      {p.icon}
+      <span
+        className={`pointer-events-none absolute z-50 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100 ${
+          collapsed
+            ? "right-full top-1/2 mr-2 -translate-y-1/2"
+            : "left-1/2 top-full mt-2 -translate-x-1/2"
+        }`}
+        role="tooltip"
+      >
+        <span className="font-medium">{p.label}</span>
+        <span className="ml-1 text-white/55">· {p.hint}</span>
+      </span>
+    </button>
+  );
+}
+
+function PaletteDivider({ vertical = false }: { vertical?: boolean }) {
+  if (vertical) {
+    return (
+      <span
+        className="my-0.5 block h-px w-6 shrink-0 bg-white/20"
+        aria-hidden
+      />
+    );
+  }
   return (
     <span
       className="select-none px-0.5 text-[16px] font-extralight leading-none text-white/45"
@@ -165,6 +217,28 @@ export function NodePalette({
   onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(PALETTE_COLLAPSED_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(PALETTE_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+    setHelpOpen(false);
+  }, []);
 
   const onDragStart = useCallback(
     (
@@ -183,64 +257,132 @@ export function NodePalette({
 
   return (
     <>
-      <div
-        className="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2"
-        role="toolbar"
-        aria-label="节点面板"
-      >
-        <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md">
-          {PALETTE.map((p) => (
-            <Fragment key={`${p.type}/${p.presetId ?? "_"}`}>
-              {p.dividerBefore ? <PaletteDivider /> : null}
-              <button
-                type="button"
-                draggable
-                onDragStart={(ev) => onDragStart(ev, p.type, p.presetId)}
-                onClick={() => onAdd(p.type, p.presetId)}
-                aria-label={`${p.label} — ${p.hint}`}
-                className="group/palette relative flex size-9 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
-              >
-                {p.icon}
-                <span
-                  className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
-                  role="tooltip"
-                >
-                  <span className="font-medium">{p.label}</span>
-                  <span className="ml-1 text-white/55">· {p.hint}</span>
-                </span>
-              </button>
-              {p.dividerAfter ? <PaletteDivider /> : null}
-            </Fragment>
-          ))}
-          <PaletteDivider />
-          {/* 快捷键 / 操作方式 */}
-          <button
-            type="button"
-            onClick={() => setHelpOpen((v) => !v)}
-            aria-label="操作方式 / 快捷键"
-            aria-expanded={helpOpen}
-            className={`group/palette relative flex size-9 items-center justify-center rounded-full transition ${
-              helpOpen
-                ? "bg-[var(--canvas-accent)]/30 text-white"
-                : "text-white/80 hover:bg-[var(--canvas-accent)]/20 hover:text-white"
-            }`}
-          >
-            <HelpCircle className="size-[18px]" />
-            <span
-              className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
-              role="tooltip"
+      {collapsed ? (
+        <div
+          className="pointer-events-none fixed right-3 top-1/2 z-40 -translate-y-1/2"
+          role="toolbar"
+          aria-label="节点面板（已收起）"
+        >
+          <div className="pointer-events-auto flex flex-col items-center gap-0.5 rounded-2xl border border-white/10 bg-black/75 py-2 pl-1.5 pr-1 shadow-2xl backdrop-blur-md">
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="展开工具栏"
+              title="展开工具栏"
+              className="group/palette relative mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
             >
-              <span className="font-medium">操作方式</span>
-              <span className="ml-1 text-white/55">· 快捷键 & 用法</span>
-            </span>
-          </button>
+              <ChevronLeft className="size-[18px]" />
+              <span
+                className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
+                role="tooltip"
+              >
+                展开工具栏
+              </span>
+            </button>
+            <PaletteDivider vertical />
+            {PALETTE.map((p) => (
+              <Fragment key={`${p.type}/${p.presetId ?? "_"}-c`}>
+                {p.dividerBefore ? <PaletteDivider vertical /> : null}
+                <PaletteIconButton
+                  p={p}
+                  collapsed
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+                {p.dividerAfter ? <PaletteDivider vertical /> : null}
+              </Fragment>
+            ))}
+            <PaletteDivider vertical />
+            <button
+              type="button"
+              onClick={() => setHelpOpen((v) => !v)}
+              aria-label="操作方式 / 快捷键"
+              aria-expanded={helpOpen}
+              className={`group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full transition ${
+                helpOpen
+                  ? "bg-[var(--canvas-accent)]/30 text-white"
+                  : "text-white/80 hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+              }`}
+            >
+              <HelpCircle className="size-[18px]" />
+              <span
+                className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
+                role="tooltip"
+              >
+                <span className="font-medium">操作方式</span>
+                <span className="ml-1 text-white/55">· 快捷键 & 用法</span>
+              </span>
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div
+          className="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2"
+          role="toolbar"
+          aria-label="节点面板"
+        >
+          <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md">
+            {PALETTE.map((p) => (
+              <Fragment key={`${p.type}/${p.presetId ?? "_"}`}>
+                {p.dividerBefore ? <PaletteDivider /> : null}
+                <PaletteIconButton
+                  p={p}
+                  collapsed={false}
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+                {p.dividerAfter ? <PaletteDivider /> : null}
+              </Fragment>
+            ))}
+            <PaletteDivider />
+            <button
+              type="button"
+              onClick={() => setHelpOpen((v) => !v)}
+              aria-label="操作方式 / 快捷键"
+              aria-expanded={helpOpen}
+              className={`group/palette relative flex size-9 items-center justify-center rounded-full transition ${
+                helpOpen
+                  ? "bg-[var(--canvas-accent)]/30 text-white"
+                  : "text-white/80 hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+              }`}
+            >
+              <HelpCircle className="size-[18px]" />
+              <span
+                className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
+                role="tooltip"
+              >
+                <span className="font-medium">操作方式</span>
+                <span className="ml-1 text-white/55">· 快捷键 & 用法</span>
+              </span>
+            </button>
+            <PaletteDivider />
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="收到右侧"
+              title="收到右侧"
+              className="group/palette relative flex size-9 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+            >
+              <ChevronRight className="size-[18px]" />
+              <span
+                className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
+                role="tooltip"
+              >
+                收到右侧
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 快捷键卡片（点 ? 切换） */}
       {helpOpen ? (
         <div
-          className="pointer-events-auto absolute left-1/2 top-[52px] z-40 w-[420px] max-w-[92vw] -translate-x-1/2"
+          className={`pointer-events-auto z-40 w-[420px] max-w-[92vw] ${
+            collapsed
+              ? "fixed right-16 top-1/2 -translate-y-1/2"
+              : "absolute left-1/2 top-[52px] -translate-x-1/2"
+          }`}
           role="dialog"
           aria-label="操作方式"
         >
