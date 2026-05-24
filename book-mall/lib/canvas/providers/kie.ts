@@ -585,7 +585,10 @@ export class KieGateway implements CanvasProviderGateway {
     }
   }
 
-  async pollImageTask(taskId: string): Promise<CanvasGatewayPollResult> {
+  async pollImageTask(
+    taskId: string,
+    _opts?: { modelKey?: string },
+  ): Promise<CanvasGatewayPollResult> {
     try {
       const record = await getKieTask(taskId);
       if (record.state === "success") {

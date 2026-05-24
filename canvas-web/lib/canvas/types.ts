@@ -1,10 +1,15 @@
 import type { Edge, Node, Viewport } from "@xyflow/react";
-import { AI_ENGINE_PROMPT_TEMPLATE } from "./builtin-prompt-templates";
+import {
+  AI_ENGINE_PROMPT_TEMPLATE,
+  THREE_VIEW_ENGINE_PROMPT_DEFAULT,
+} from "./builtin-prompt-templates";
 
 export {
   AI_ENGINE_PROMPT_TEMPLATE,
   AI_ENGINE_PROMPT_TEMPLATE_V2,
   IMAGE_ENGINE_PROMPT_TEMPLATE_DEFAULT,
+  THREE_VIEW_ENGINE_PROMPT_DEFAULT,
+  THREE_VIEW_ENGINE_MODEL_KEYS,
 } from "./builtin-prompt-templates";
 
 /**
@@ -18,6 +23,7 @@ export type CanvasNodeType =
   | "text"
   | "ai-engine"
   | "image-engine"
+  | "three-view-engine"
   | "output"
   | "group";
 
@@ -27,6 +33,7 @@ export type CanvasContentNodeType =
   | "text"
   | "ai-engine"
   | "image-engine"
+  | "three-view-engine"
   | "output";
 
 /** 内容节点（非 group / 非 v1 兼容）按钮面板用。 */
@@ -35,6 +42,7 @@ export const CONTENT_NODE_TYPES: CanvasContentNodeType[] = [
   "text",
   "ai-engine",
   "image-engine",
+  "three-view-engine",
   "output",
 ];
 
@@ -122,6 +130,9 @@ export type ImageEngineNodeData = {
   runtime?: CanvasNodeRuntime;
 };
 
+/** 三视图引擎：结构与生图引擎相同，默认 prompt / 模型白名单不同。 */
+export type ThreeViewEngineNodeData = ImageEngineNodeData;
+
 export type OutputNodeData = {
   title: string;
   saveToGallery: boolean;
@@ -140,6 +151,7 @@ export type CanvasNodeData =
   | (TextNodeData & { __t: "text" })
   | (AiEngineNodeData & { __t: "ai-engine" })
   | (ImageEngineNodeData & { __t: "image-engine" })
+  | (ThreeViewEngineNodeData & { __t: "three-view-engine" })
   | (OutputNodeData & { __t: "output" })
   | (GroupNodeData & { __t: "group" });
 
@@ -178,6 +190,13 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     referencedNodeIds: [],
     params: { aspect_ratio: "1:1", resolution: "2K", output_format: "png" },
   } satisfies ImageEngineNodeData as Record<string, unknown>,
+  "three-view-engine": {
+    providerId: "",
+    modelKey: "",
+    prompt: THREE_VIEW_ENGINE_PROMPT_DEFAULT,
+    referencedNodeIds: [],
+    params: { aspect_ratio: "16:9", resolution: "2K", output_format: "png" },
+  } satisfies ThreeViewEngineNodeData as Record<string, unknown>,
   output: {
     title: "未命名画作",
     saveToGallery: true,
@@ -200,6 +219,7 @@ export const NODE_DEFAULT_SIZE: Record<
   text: { width: 380, height: 260 },
   "ai-engine": { width: 480, height: 540 },
   "image-engine": { width: 460, height: 720 },
+  "three-view-engine": { width: 460, height: 680 },
   output: { width: 340, height: 360 },
   group: { width: 360, height: 240 },
 };
@@ -219,13 +239,14 @@ export const NODE_OUTPUT_KIND: Record<CanvasNodeType, "image" | "text" | "none">
   text: "text",
   "ai-engine": "text",
   "image-engine": "image",
+  "three-view-engine": "image",
   output: "none",
   group: "none",
 };
 
 /** 节点是否实际触发后端任务（其它节点为"被动数据源"） */
 export function isRunnableNodeType(t: CanvasNodeType): boolean {
-  return t === "ai-engine" || t === "image-engine";
+  return t === "ai-engine" || t === "image-engine" || t === "three-view-engine";
 }
 
 /** group 节点是容器、不参与拓扑 / 输入解析。 */

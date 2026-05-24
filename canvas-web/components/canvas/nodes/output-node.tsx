@@ -31,7 +31,7 @@ function resolveUpstreamImageEngineId(
 ): string | null {
   for (const pid of directPredecessors(edges, nodeId)) {
     const n = nodes.find((x) => x.id === pid);
-    if (n?.type === "image-engine") return pid;
+    if (n?.type === "image-engine" || n?.type === "three-view-engine") return pid;
   }
   return null;
 }

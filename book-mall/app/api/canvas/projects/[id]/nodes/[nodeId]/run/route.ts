@@ -6,7 +6,10 @@ import {
   readJsonBody,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
-import { submitCanvasNodeTask } from "@/lib/canvas/canvas-task-service";
+import {
+  scheduleCanvasPollWorkerForProject,
+  submitCanvasNodeTask,
+} from "@/lib/canvas/canvas-task-service";
 import {
   runAiEngineNode,
   runImageEngineNode,
@@ -64,11 +67,17 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     let result;
     if (node.type === "ai-engine") {
       result = await runAiEngineNode({ ...baseArgs, forceFresh });
-    } else if (node.type === "image-engine") {
+    } else if (node.type === "image-engine" || node.type === "three-view-engine") {
       result = await runImageEngineNode({ ...baseArgs, forceFresh });
     } else {
       // v1 兼容：image-gen 仍走旧路径
       result = await submitCanvasNodeTask(baseArgs);
+    }
+    if (
+      result.task.status === "PENDING" ||
+      result.task.status === "SUBMITTED"
+    ) {
+      scheduleCanvasPollWorkerForProject(projectId);
     }
     return NextResponse.json(
       { reused: result.reused, task: result.task },

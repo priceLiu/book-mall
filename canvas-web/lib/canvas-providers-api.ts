@@ -8,7 +8,8 @@ export type CanvasProviderKindLiteral =
   | "KIE"
   | "ALI_BAILIAN"
   | "OPENAI_COMPAT"
-  | "GEMINI_NATIVE";
+  | "GEMINI_NATIVE"
+  | "HUNYUAN_3D";
 
 export type CanvasParamSchemaItem =
   | {

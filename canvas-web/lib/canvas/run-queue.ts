@@ -19,7 +19,9 @@ import type {
 } from "./types";
 
 const MAX_CONCURRENT = 5;
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 2000;
+/** 每 N 次 tick 做一次全项目任务扫描，避免刷新后 runtime 丢失导致轮询停住 */
+const FULL_SCAN_EVERY_N_TICKS = 3;
 
 function nodeRuntimeStatus(node: CanvasFlowNode): string | undefined {
   return (node.data as { runtime?: { status?: string } }).runtime?.status;
@@ -70,7 +72,7 @@ function resolveImageInputs(
     if (p.type === "image") {
       const d = p.data as unknown as ImageNodeData;
       if (d.ossUrl) out.push(d.ossUrl);
-    } else if (p.type === "image-engine") {
+    } else if (p.type === "image-engine" || p.type === "three-view-engine") {
       const d = p.data as unknown as ImageEngineNodeData;
       if (d.runtime?.ossUrl) out.push(d.runtime.ossUrl);
     }
@@ -195,6 +197,36 @@ export function useCanvasRunner() {
             failCode: undefined,
             failMessage: undefined,
           });
+          // 提交后立即拉一次任务（服务端 tasks GET 会 opportunistic poll KIE）
+          void listCanvasProjectTasks(base, projectId, [nodeId])
+            .then((tasks) => {
+              const latest = tasks.sort(
+                (a, b) =>
+                  new Date(b.updatedAt).getTime() -
+                  new Date(a.updatedAt).getTime(),
+              )[0];
+              if (!latest) return;
+              if (
+                latest.status === "SUCCEEDED" &&
+                (latest.ossUrl || latest.textOutput)
+              ) {
+                setNodeRuntime(nodeId, {
+                  status: "done",
+                  taskId: latest.id,
+                  ossUrl: latest.ossUrl ?? undefined,
+                  ephemeralUrl: latest.ephemeralUrl ?? undefined,
+                  textOutput: latest.textOutput ?? undefined,
+                });
+              } else if (latest.status === "FAILED") {
+                setNodeRuntime(nodeId, {
+                  status: "error",
+                  taskId: latest.id,
+                  failCode: latest.failCode ?? "FAILED",
+                  failMessage: latest.failMessage ?? undefined,
+                });
+              }
+            })
+            .catch(() => {});
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -250,6 +282,7 @@ export function useCanvasRunner() {
   useEffect(() => {
     if (!base || !projectId) return;
     let cancelled = false;
+    let tickCount = 0;
     const serverInflightRef = { current: false };
     const applyTaskUpdate = (
       t: CanvasTaskRecord,
@@ -289,12 +322,17 @@ export function useCanvasRunner() {
     };
 
     const tick = async (forceFullScan = false) => {
+      tickCount++;
+      const periodicFullScan =
+        !forceFullScan && tickCount % FULL_SCAN_EVERY_N_TICKS === 0;
+      const fullScan = forceFullScan || periodicFullScan;
+
       const state = useCanvasStore.getState();
       const localInflight = state.nodes.filter((n) =>
         isLocalInflightStatus(nodeRuntimeStatus(n)),
       );
       const shouldPoll =
-        forceFullScan ||
+        fullScan ||
         localInflight.length > 0 ||
         serverInflightRef.current ||
         inflightRef.current.size > 0 ||
@@ -302,7 +340,7 @@ export function useCanvasRunner() {
       if (!shouldPoll) return;
 
       const nodeIds =
-        forceFullScan || serverInflightRef.current
+        fullScan || serverInflightRef.current
           ? undefined
           : localInflight.map((n) => n.id);
 

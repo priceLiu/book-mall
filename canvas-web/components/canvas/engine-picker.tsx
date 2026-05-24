@@ -17,6 +17,8 @@ import {
 export type EnginePickerProps = {
   /** 过滤模型 role：LLM / IMAGE */
   role: "LLM" | "IMAGE";
+  /** 仅展示这些 modelKey（三视图引擎白名单等） */
+  allowedModelKeys?: string[];
   /** 当前选中 */
   providerId: string;
   modelKey: string;
@@ -40,6 +42,7 @@ export type EnginePickerProps = {
  */
 export function EnginePicker({
   role,
+  allowedModelKeys,
   providerId,
   modelKey,
   params = {},
@@ -48,16 +51,26 @@ export function EnginePicker({
   const { providers, loading } = useUserProviders();
   const [open, setOpen] = useState(false);
 
+  const allowedSet = useMemo(
+    () => (allowedModelKeys?.length ? new Set(allowedModelKeys) : null),
+    [allowedModelKeys],
+  );
+
   const filtered = useMemo(
     () =>
       providers
         .filter((p) => p.active)
         .map((p) => ({
           provider: p,
-          models: p.models.filter((m) => m.role === role && m.enabled),
+          models: p.models.filter(
+            (m) =>
+              m.role === role &&
+              m.enabled &&
+              (!allowedSet || allowedSet.has(m.modelKey)),
+          ),
         }))
         .filter((g) => g.models.length > 0),
-    [providers, role],
+    [providers, role, allowedSet],
   );
 
   const current = useMemo(() => {

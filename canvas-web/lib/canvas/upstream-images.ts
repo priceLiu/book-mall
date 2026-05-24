@@ -20,7 +20,7 @@ export function resolveUpstreamImageUrls(
       const d = p.data as ImageNodeData;
       const url = d.ossUrl || d.blobUrl;
       if (url) out.push(url);
-    } else if (p.type === "image-engine") {
+    } else if (p.type === "image-engine" || p.type === "three-view-engine") {
       const d = p.data as ImageEngineNodeData;
       if (d.runtime?.ossUrl) out.push(d.runtime.ossUrl);
     }

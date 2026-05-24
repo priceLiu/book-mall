@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 import {
   Brain,
   ClipboardList,
   HelpCircle,
   Image as ImageIcon,
   ImagePlus,
+  LayoutGrid,
   Save,
   Type,
   X,
@@ -25,6 +26,8 @@ const PALETTE: Array<{
   icon: React.ReactNode;
   hint: string;
   presetId?: string;
+  /** 在该按钮左侧插入竖线，区分「内容节点」与「引擎节点」 */
+  dividerBefore?: boolean;
 }> = [
   {
     type: "image",
@@ -50,6 +53,7 @@ const PALETTE: Array<{
     label: "AI 引擎",
     icon: <Brain className="size-[18px]" />,
     hint: "调 LLM 出方案文本",
+    dividerBefore: true,
   },
   {
     type: "image-engine",
@@ -58,12 +62,29 @@ const PALETTE: Array<{
     hint: "调图像模型出图",
   },
   {
+    type: "three-view-engine",
+    label: "三视图",
+    icon: <LayoutGrid className="size-[18px]" />,
+    hint: "角色正/侧/背三视图 · 上游接参考图",
+  },
+  {
     type: "output",
     label: "输出",
     icon: <Save className="size-[18px]" />,
     hint: "导出 / 入画作库",
   },
 ];
+
+function PaletteDivider() {
+  return (
+    <span
+      className="select-none px-0.5 text-[16px] font-extralight leading-none text-white/45"
+      aria-hidden
+    >
+      |
+    </span>
+  );
+}
 
 const SHORTCUTS: Array<{ keys: string[]; desc: string }> = [
   { keys: ["拖空白处"], desc: "框选多个节点" },
@@ -115,27 +136,28 @@ export function NodePalette({
       >
         <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md">
           {PALETTE.map((p) => (
-            <button
-              key={`${p.type}/${p.presetId ?? "_"}`}
-              type="button"
-              draggable
-              onDragStart={(ev) => onDragStart(ev, p.type, p.presetId)}
-              onClick={() => onAdd(p.type, p.presetId)}
-              aria-label={`${p.label} — ${p.hint}`}
-              className="group/palette relative flex size-9 cursor-grab items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white active:cursor-grabbing"
-            >
-              {p.icon}
-              <span
-                className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
-                role="tooltip"
+            <Fragment key={`${p.type}/${p.presetId ?? "_"}`}>
+              {p.dividerBefore ? <PaletteDivider /> : null}
+              <button
+                type="button"
+                draggable
+                onDragStart={(ev) => onDragStart(ev, p.type, p.presetId)}
+                onClick={() => onAdd(p.type, p.presetId)}
+                aria-label={`${p.label} — ${p.hint}`}
+                className="group/palette relative flex size-9 cursor-grab items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white active:cursor-grabbing"
               >
-                <span className="font-medium">{p.label}</span>
-                <span className="ml-1 text-white/55">· {p.hint}</span>
-              </span>
-            </button>
+                {p.icon}
+                <span
+                  className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
+                  role="tooltip"
+                >
+                  <span className="font-medium">{p.label}</span>
+                  <span className="ml-1 text-white/55">· {p.hint}</span>
+                </span>
+              </button>
+            </Fragment>
           ))}
-          {/* 分隔线 */}
-          <span className="mx-0.5 h-5 w-px bg-white/10" />
+          <PaletteDivider />
           {/* 快捷键 / 操作方式 */}
           <button
             type="button"

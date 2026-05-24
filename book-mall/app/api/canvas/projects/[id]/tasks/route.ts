@@ -5,7 +5,11 @@ import {
   jsonHeaders,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
-import { listProjectTasks } from "@/lib/canvas/canvas-task-service";
+import {
+  listProjectTasks,
+  runCanvasPollWorker,
+} from "@/lib/canvas/canvas-task-service";
+import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,6 +27,20 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     ? nodeIdsParam.split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
   try {
+    const inflight = await prisma.canvasGenerationTask.count({
+      where: {
+        projectId,
+        project: { userId: guard.user.id, deletedAt: null },
+        status: { in: ["PENDING", "SUBMITTED"] },
+      },
+    });
+    if (inflight > 0) {
+      try {
+        await runCanvasPollWorker({ projectId });
+      } catch (e) {
+        console.warn("[canvas/tasks GET] opportunistic poll failed", e);
+      }
+    }
     const tasks = await listProjectTasks({
       userId: guard.user.id,
       projectId,

@@ -12,6 +12,7 @@ import type { CanvasProvider, CanvasProviderKind } from "@prisma/client";
 import { decryptApiKey } from "../secret";
 
 import { AliBailianGateway } from "./ali-bailian";
+import { Hunyuan3DGateway } from "./hunyuan-3d";
 import { KieGateway } from "./kie";
 import { OpenAiCompatGateway } from "./openai-compat";
 import {
@@ -51,6 +52,8 @@ export function getGatewayForKind(
       return new OpenAiCompatGateway(config, {
         kind: "OPENAI_COMPAT",
       });
+    case "HUNYUAN_3D":
+      return new Hunyuan3DGateway(config);
     case "GEMINI_NATIVE":
       throw new CanvasGatewayError(
         "PROVIDER_UNSUPPORTED",
