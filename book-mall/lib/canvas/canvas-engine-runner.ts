@@ -193,7 +193,7 @@ async function loadProviderForUser(
     if (!sys) {
       throw new CanvasProjectError(
         "MODEL_NOT_AVAILABLE",
-        `系统 Provider ${providerId} 未启用（请检查 .env 是否配置 KIE_API_KEY）`,
+        `系统 Provider ${providerId} 未启用（请检查 .env 是否配置 KIE_API_KEY / HUNYUAN_3D_API_KEY）`,
         503,
       );
     }
@@ -397,10 +397,27 @@ export async function runImageEngineNode(
   const promptRaw = String(data.prompt ?? "");
   const params = (data.params as Record<string, unknown>) ?? {};
 
+  const engineKind =
+    node.type === "three-view-engine" ? "three-view-engine" : "image-engine";
+
   if (!providerId)
-    throw new CanvasProjectError("INVALID_INPUT", "image-engine 缺少 providerId");
+    throw new CanvasProjectError("INVALID_INPUT", `${engineKind} 缺少 providerId`);
   if (!modelKey)
-    throw new CanvasProjectError("INVALID_INPUT", "image-engine 缺少 modelKey");
+    throw new CanvasProjectError("INVALID_INPUT", `${engineKind} 缺少 modelKey`);
+
+  if (engineKind === "three-view-engine") {
+    const allowed = new Set([
+      "nano-banana-pro",
+      "hunyuan-3d-pro",
+      "hunyuan-3d-express",
+    ]);
+    if (!allowed.has(modelKey)) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "三视图引擎仅支持 Nano Banana Pro 或混元生3D（专业版 / 极速版）",
+      );
+    }
+  }
 
   // 上游 textInputs（含 ai-engine 输出）+ 节点 prompt 拼接
   const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());
@@ -409,7 +426,7 @@ export async function runImageEngineNode(
     node,
   );
   if (!expandedPrompt.trim()) {
-    throw new CanvasProjectError("EMPTY_PROMPT", "image-engine prompt 为空");
+    throw new CanvasProjectError("EMPTY_PROMPT", `${engineKind} prompt 为空`);
   }
 
   const imageUrls = (node.imageInputs ?? [])
@@ -448,7 +465,7 @@ export async function runImageEngineNode(
       providerId: provider.dbProviderId,
       inputHash,
       inputPayload: {
-        kind: "image-engine",
+        kind: engineKind,
         prompt: clipPrompt(expandedPrompt),
         params,
         providerId,

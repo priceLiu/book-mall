@@ -12,7 +12,7 @@ export function pickProjectThumbnailUrl(graph: CanvasGraph): string {
   const nodes = [...(graph.nodes ?? [])].reverse();
 
   for (const n of nodes) {
-    if (n.type !== "image-engine") continue;
+    if (n.type !== "image-engine" && n.type !== "three-view-engine") continue;
     const url = (n.data as unknown as ImageEngineNodeData).runtime?.ossUrl;
     if (url) return url;
   }

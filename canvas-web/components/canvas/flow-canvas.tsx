@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Background,
-  Controls,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
@@ -20,6 +19,7 @@ import { ImageNode } from "./nodes/image-node";
 import { TextNode } from "./nodes/text-node";
 import { AiEngineNode } from "./nodes/ai-engine-node";
 import { ImageEngineNode } from "./nodes/image-engine-node";
+import { ThreeViewEngineNode } from "./nodes/three-view-engine-node";
 import { OutputNode } from "./nodes/output-node";
 import { GroupNode } from "./nodes/group-node";
 import { SelectionToolbar } from "./selection-toolbar";
@@ -32,6 +32,7 @@ const nodeTypes = {
   text: TextNode,
   "ai-engine": AiEngineNode,
   "image-engine": ImageEngineNode,
+  "three-view-engine": ThreeViewEngineNode,
   output: OutputNode,
   group: GroupNode,
 } as const;
@@ -444,7 +445,6 @@ function FlowCanvasInner() {
           maskColor="rgba(11,11,20,0.8)"
           className="!bg-[var(--canvas-surface)] !border !border-white/10 !rounded-md"
         />
-        <Controls className="!bg-[var(--canvas-surface)] !border !border-white/10" />
       </ReactFlow>
       <SelectionToolbar />
     </div>

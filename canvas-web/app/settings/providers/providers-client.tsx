@@ -40,11 +40,16 @@ import {
 } from "@/lib/canvas-api";
 import { PromptTemplatesTab } from "./prompt-templates-tab";
 
+const HUNYUAN_PRO_BASE = "https://api.ai3d.cloud.tencent.com";
+const HUNYUAN_TC_API_BASE = "https://ai3d.tencentcloudapi.com";
+const HUNYUAN_TOKENHUB_BASE = "https://tokenhub.tencentmaas.com";
+
 const KIND_LABEL: Record<CanvasProviderKindLiteral, string> = {
   KIE: "KIE.ai 聚合（推荐）",
   ALI_BAILIAN: "阿里百炼 / DashScope",
   OPENAI_COMPAT: "OpenAI 兼容（自定义 baseUrl）",
   GEMINI_NATIVE: "Google AI Studio · 原生（暂不可用）",
+  HUNYUAN_3D: "腾讯混元生3D",
 };
 
 const KIND_HINT: Record<CanvasProviderKindLiteral, string> = {
@@ -53,15 +58,23 @@ const KIND_HINT: Record<CanvasProviderKindLiteral, string> = {
     "DashScope OpenAI 兼容入口。baseUrl 默认 https://dashscope.aliyuncs.com/compatible-mode/v1",
   OPENAI_COMPAT: "通用 OpenAI 兼容服务（如 OpenRouter / 自部署）。必须填 baseUrl",
   GEMINI_NATIVE: "（占位）请改用 OPENAI_COMPAT 接入第三方网关",
+  HUNYUAN_3D:
+    "混元生3D：专业版走 api.ai3d（sk- Key）；极速版/普通版走官方 API（SecretId + SecretKey）。",
 };
 
-type Tab = "providers" | "models" | "system" | "prompts";
+type HunyuanTier = "pro" | "express";
+type HunyuanExpressAuth = "tc3" | "tokenhub";
 
 type AddForm = {
   alias: string;
   kind: CanvasProviderKindLiteral;
   apiKey: string;
   baseUrl: string;
+  hunyuanTier: HunyuanTier;
+  hunyuanExpressAuth: HunyuanExpressAuth;
+  hunyuanSecretId: string;
+  hunyuanSecretKey: string;
+  hunyuanRegion: string;
 };
 
 const EMPTY_ADD: AddForm = {
@@ -69,7 +82,41 @@ const EMPTY_ADD: AddForm = {
   kind: "KIE",
   apiKey: "",
   baseUrl: "",
+  hunyuanTier: "pro",
+  hunyuanExpressAuth: "tc3",
+  hunyuanSecretId: "",
+  hunyuanSecretKey: "",
+  hunyuanRegion: "ap-guangzhou",
 };
+
+function hunyuanPreset(tier: HunyuanTier): Partial<AddForm> {
+  if (tier === "express") {
+    return {
+      kind: "HUNYUAN_3D",
+      hunyuanTier: "express",
+      hunyuanExpressAuth: "tc3",
+      alias: "混元生3D · 极速版",
+      baseUrl: HUNYUAN_TC_API_BASE,
+      apiKey: "",
+      hunyuanSecretId: "",
+      hunyuanSecretKey: "",
+      hunyuanRegion: "ap-guangzhou",
+    };
+  }
+  return {
+    kind: "HUNYUAN_3D",
+    hunyuanTier: "pro",
+    hunyuanExpressAuth: "tc3",
+    alias: "混元生3D · 专业版",
+    baseUrl: HUNYUAN_PRO_BASE,
+    apiKey: "",
+    hunyuanSecretId: "",
+    hunyuanSecretKey: "",
+    hunyuanRegion: "ap-guangzhou",
+  };
+}
+
+type Tab = "providers" | "models" | "system" | "prompts";
 
 function Inner() {
   const base = useBookMallBaseUrl();
@@ -80,6 +127,7 @@ function Inner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [addInitial, setAddInitial] = useState<Partial<AddForm> | null>(null);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
@@ -255,14 +303,30 @@ function Inner() {
             Provider、模型与提示词模板：配置后画布节点可直接选用。
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="twenty-btn-accent"
-        >
-          <Plus className="mr-2 size-4" />
-          添加 Provider
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setAddInitial(hunyuanPreset("express"));
+              setAddOpen(true);
+            }}
+            className="rounded-lg border border-[var(--canvas-accent)]/50 bg-[var(--canvas-accent)]/10 px-3 py-2 text-sm text-white hover:border-[var(--canvas-accent)]/80"
+          >
+            <Plus className="mr-2 inline size-4" />
+            添加混元极速版（普通）
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAddInitial(null);
+              setAddOpen(true);
+            }}
+            className="twenty-btn-accent"
+          >
+            <Plus className="mr-2 size-4" />
+            添加 Provider
+          </button>
+        </div>
       </header>
 
       <div className="mb-6 flex items-center gap-1 rounded-xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-1 text-sm">
@@ -322,9 +386,14 @@ function Inner() {
       {addOpen ? (
         <AddProviderModal
           base={base}
-          onClose={() => setAddOpen(false)}
+          initial={addInitial}
+          onClose={() => {
+            setAddOpen(false);
+            setAddInitial(null);
+          }}
           onCreated={async () => {
             setAddOpen(false);
+            setAddInitial(null);
             await load();
           }}
         />
@@ -697,24 +766,51 @@ function SystemModelsTab({ models }: { models: CanvasEngineModel[] }) {
 
 function AddProviderModal({
   base,
+  initial,
   onClose,
   onCreated,
 }: {
   base: string;
+  initial?: Partial<AddForm> | null;
   onClose: () => void;
   onCreated: () => void | Promise<void>;
 }) {
-  const [form, setForm] = useState<AddForm>(EMPTY_ADD);
+  const [form, setForm] = useState<AddForm>({
+    ...EMPTY_ADD,
+    ...(initial ?? {}),
+  });
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const onChangeKind = (e: ChangeEvent<HTMLSelectElement>) => {
     const kind = e.target.value as CanvasProviderKindLiteral;
+    if (kind === "HUNYUAN_3D") {
+      setForm({ ...form, kind, ...hunyuanPreset(form.hunyuanTier) });
+      return;
+    }
     setForm({ ...form, kind, baseUrl: "" });
   };
 
+  const onChangeHunyuanTier = (tier: HunyuanTier) => {
+    setForm({ ...form, ...hunyuanPreset(tier) });
+  };
+
   const onSubmit = async () => {
-    if (!form.alias.trim() || !form.apiKey.trim()) {
+    const isHunyuanExpressTc3 =
+      form.kind === "HUNYUAN_3D" &&
+      form.hunyuanTier === "express" &&
+      form.hunyuanExpressAuth === "tc3";
+
+    if (!form.alias.trim()) {
+      setErr("别名不能为空");
+      return;
+    }
+    if (isHunyuanExpressTc3) {
+      if (!form.hunyuanSecretId.trim() || !form.hunyuanSecretKey.trim()) {
+        setErr("极速版需填写 SecretId 与 SecretKey");
+        return;
+      }
+    } else if (!form.apiKey.trim()) {
       setErr("alias / apiKey 不能为空");
       return;
     }
@@ -722,14 +818,35 @@ function AddProviderModal({
       setErr("OPENAI_COMPAT 必须填写 baseUrl");
       return;
     }
+    if (form.kind === "HUNYUAN_3D" && !form.baseUrl.trim()) {
+      setErr("混元 Provider 必须选择版本（专业版 / 极速版）");
+      return;
+    }
+
+    let apiKey = form.apiKey.trim();
+    let baseUrl = form.baseUrl.trim() || null;
+    if (form.kind === "HUNYUAN_3D" && form.hunyuanTier === "express") {
+      if (form.hunyuanExpressAuth === "tc3") {
+        apiKey = JSON.stringify({
+          t: "tc3",
+          id: form.hunyuanSecretId.trim(),
+          key: form.hunyuanSecretKey.trim(),
+          region: form.hunyuanRegion.trim() || "ap-guangzhou",
+        });
+        baseUrl = HUNYUAN_TC_API_BASE;
+      } else {
+        baseUrl = HUNYUAN_TOKENHUB_BASE;
+      }
+    }
+
     setSubmitting(true);
     setErr(null);
     try {
       await createCanvasProvider(base, {
         alias: form.alias.trim(),
         kind: form.kind,
-        apiKey: form.apiKey.trim(),
-        baseUrl: form.baseUrl.trim() || null,
+        apiKey,
+        baseUrl,
       });
       await onCreated();
     } catch (e) {
@@ -738,6 +855,18 @@ function AddProviderModal({
       setSubmitting(false);
     }
   };
+
+  const showHunyuanTc3Fields =
+    form.kind === "HUNYUAN_3D" &&
+    form.hunyuanTier === "express" &&
+    form.hunyuanExpressAuth === "tc3";
+
+  const apiKeyPlaceholder =
+    form.kind === "HUNYUAN_3D" && form.hunyuanTier === "express"
+      ? "TokenHub API Key（非 AKID SecretId）"
+      : form.kind === "HUNYUAN_3D"
+        ? "sk-...（混元控制台 → API Key 管理）"
+        : "sk-... 或厂商签发的 key";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -770,7 +899,7 @@ function AddProviderModal({
               className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[13px] focus:border-[var(--canvas-accent)]/60 focus:outline-none"
             >
               {(
-                ["KIE", "ALI_BAILIAN", "OPENAI_COMPAT", "GEMINI_NATIVE"] as CanvasProviderKindLiteral[]
+                ["KIE", "ALI_BAILIAN", "OPENAI_COMPAT", "HUNYUAN_3D", "GEMINI_NATIVE"] as CanvasProviderKindLiteral[]
               ).map((k) => (
                 <option key={k} value={k} disabled={k === "GEMINI_NATIVE"}>
                   {KIND_LABEL[k]}
@@ -782,31 +911,162 @@ function AddProviderModal({
             </span>
           </label>
 
+          {form.kind === "HUNYUAN_3D" ? (
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
+                混元版本
+              </span>
+              <select
+                value={form.hunyuanTier}
+                onChange={(e) =>
+                  onChangeHunyuanTier(e.target.value as HunyuanTier)
+                }
+                className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[13px] focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+              >
+                <option value="pro">专业版 · api.ai3d.cloud.tencent.com</option>
+                <option value="express">
+                  极速版 / 普通版 · ai3d.tencentcloudapi.com（约 90 秒出模）
+                </option>
+              </select>
+              {form.hunyuanTier === "express" ? (
+                <select
+                  value={form.hunyuanExpressAuth}
+                  onChange={(e) => {
+                    const auth = e.target.value as HunyuanExpressAuth;
+                    setForm({
+                      ...form,
+                      hunyuanExpressAuth: auth,
+                      baseUrl:
+                        auth === "tc3" ? HUNYUAN_TC_API_BASE : HUNYUAN_TOKENHUB_BASE,
+                      apiKey: "",
+                      hunyuanSecretId: "",
+                      hunyuanSecretKey: "",
+                    });
+                  }}
+                  className="mt-2 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[13px] focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+                >
+                  <option value="tc3">官方 API · SecretId + SecretKey（推荐）</option>
+                  <option value="tokenhub">TokenHub · 单独 API Key（可选）</option>
+                </select>
+              ) : null}
+              <span className="mt-1 block text-[10px] leading-relaxed text-[var(--canvas-muted)]">
+                {form.hunyuanTier === "express" ? (
+                  form.hunyuanExpressAuth === "tc3" ? (
+                    <>
+                      使用腾讯云{" "}
+                      <a
+                        href="https://cloud.tencent.com/document/product/1804/123463"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--canvas-accent-soft)] underline"
+                      >
+                        SubmitHunyuanTo3DRapidJob
+                      </a>
+                      ；在{" "}
+                      <a
+                        href="https://console.cloud.tencent.com/cam/capi"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--canvas-accent-soft)] underline"
+                      >
+                        访问管理 → API 密钥
+                      </a>{" "}
+                      获取 SecretId / SecretKey。模型为{" "}
+                      <code className="text-white/80">hunyuan-3d-express</code>。
+                    </>
+                  ) : (
+                    <>
+                      在{" "}
+                      <a
+                        href="https://cloud.tencent.com/document/product/1823/130082"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--canvas-accent-soft)] underline"
+                      >
+                        TokenHub 混元生3D
+                      </a>{" "}
+                      创建 API Key 后粘贴（与官方 SecretId 不是同一套凭证）。
+                    </>
+                  )
+                ) : (
+                  <>
+                    在{" "}
+                    <a
+                      href="https://console.cloud.tencent.com/ai3d/start"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[var(--canvas-accent-soft)] underline"
+                    >
+                      混元控制台
+                    </a>{" "}
+                    创建 <code className="text-white/80">sk-</code> 开头 API Key。模型为{" "}
+                    <code className="text-white/80">hunyuan-3d-pro</code>。
+                  </>
+                )}
+              </span>
+            </label>
+          ) : null}
+
           <Field
             label="别名（仅供你识别）"
             value={form.alias}
             placeholder="如：我的 KIE 账号"
             onChange={(v) => setForm({ ...form, alias: v })}
           />
-          <Field
-            label="API Key"
-            value={form.apiKey}
-            placeholder="sk-... 或厂商签发的 key"
-            onChange={(v) => setForm({ ...form, apiKey: v })}
-            isPassword
-          />
-          <Field
-            label={`baseUrl ${form.kind === "OPENAI_COMPAT" ? "(必填)" : "(可选，留空走默认)"}`}
-            value={form.baseUrl}
-            placeholder={
-              form.kind === "ALI_BAILIAN"
-                ? "https://dashscope.aliyuncs.com/compatible-mode/v1"
-                : form.kind === "KIE"
-                  ? "https://api.kie.ai"
-                  : "https://example.com/v1"
-            }
-            onChange={(v) => setForm({ ...form, baseUrl: v })}
-          />
+          {showHunyuanTc3Fields ? (
+            <>
+              <Field
+                label="SecretId（AKID 开头）"
+                value={form.hunyuanSecretId}
+                placeholder="AKID..."
+                onChange={(v) => setForm({ ...form, hunyuanSecretId: v })}
+              />
+              <Field
+                label="SecretKey"
+                value={form.hunyuanSecretKey}
+                placeholder="在访问管理 → API 密钥中查看"
+                onChange={(v) => setForm({ ...form, hunyuanSecretKey: v })}
+                isPassword
+              />
+              <Field
+                label="Region（地域）"
+                value={form.hunyuanRegion}
+                placeholder="ap-guangzhou"
+                onChange={(v) => setForm({ ...form, hunyuanRegion: v })}
+                hint="默认 ap-guangzhou，详见混元生3D 地域列表"
+              />
+            </>
+          ) : (
+            <Field
+              label="API Key"
+              value={form.apiKey}
+              placeholder={apiKeyPlaceholder}
+              onChange={(v) => setForm({ ...form, apiKey: v })}
+              isPassword
+            />
+          )}
+          {form.kind === "HUNYUAN_3D" ? (
+            <Field
+              label="baseUrl（按版本自动填写）"
+              value={form.baseUrl}
+              placeholder={HUNYUAN_PRO_BASE}
+              onChange={(v) => setForm({ ...form, baseUrl: v })}
+              hint="极速版官方 API 为 ai3d.tencentcloudapi.com；专业版为 api.ai3d.cloud.tencent.com"
+            />
+          ) : (
+            <Field
+              label={`baseUrl ${form.kind === "OPENAI_COMPAT" ? "(必填)" : "(可选，留空走默认)"}`}
+              value={form.baseUrl}
+              placeholder={
+                form.kind === "ALI_BAILIAN"
+                  ? "https://dashscope.aliyuncs.com/compatible-mode/v1"
+                  : form.kind === "KIE"
+                    ? "https://api.kie.ai"
+                    : "https://example.com/v1"
+              }
+              onChange={(v) => setForm({ ...form, baseUrl: v })}
+            />
+          )}
         </div>
         <footer className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-3">
           <button

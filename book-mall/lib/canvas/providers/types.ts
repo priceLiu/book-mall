@@ -150,7 +150,10 @@ export interface CanvasProviderGateway {
   /** 出图；可能 sync 也可能 async */
   createImageTask(req: CanvasGatewayImageRequest): Promise<CanvasGatewayImageTask>;
   /** 轮询异步图像任务（async 模式才需要） */
-  pollImageTask?(taskId: string): Promise<CanvasGatewayPollResult>;
+  pollImageTask?(
+    taskId: string,
+    opts?: { modelKey?: string },
+  ): Promise<CanvasGatewayPollResult>;
 }
 
 export class CanvasGatewayError extends Error {
@@ -183,6 +186,11 @@ export function getDefaultProviderBaseUrl(
       return "https://dashscope.aliyuncs.com/compatible-mode/v1";
     case "OPENAI_COMPAT":
       return null;
+    case "HUNYUAN_3D":
+      return (
+        process.env.HUNYUAN_3D_API_BASE?.trim() ||
+        "https://api.ai3d.cloud.tencent.com"
+      );
     case "GEMINI_NATIVE":
       return "https://generativelanguage.googleapis.com/v1beta";
     default:

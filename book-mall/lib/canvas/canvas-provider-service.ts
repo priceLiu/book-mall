@@ -43,6 +43,7 @@ const ALLOWED_KINDS: CanvasProviderKind[] = [
   "ALI_BAILIAN",
   "OPENAI_COMPAT",
   "GEMINI_NATIVE",
+  "HUNYUAN_3D",
 ];
 
 export type CanvasProviderModelDto = {

@@ -11,6 +11,8 @@ import {
   softDeleteCanvasProjectForUser,
   updateCanvasProjectForUser,
 } from "@/lib/canvas/canvas-project-service";
+import { runCanvasPollWorker } from "@/lib/canvas/canvas-task-service";
+import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -23,6 +25,20 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   if (!guard.ok) return guard.response;
   const { id } = await ctx.params;
   try {
+    const inflight = await prisma.canvasGenerationTask.count({
+      where: {
+        projectId: id,
+        project: { userId: guard.user.id, deletedAt: null },
+        status: { in: ["PENDING", "SUBMITTED"] },
+      },
+    });
+    if (inflight > 0) {
+      try {
+        await runCanvasPollWorker({ projectId: id });
+      } catch (e) {
+        console.warn("[canvas/project GET] opportunistic poll failed", e);
+      }
+    }
     const project = await getCanvasProjectForUser(guard.user.id, id);
     return NextResponse.json({ project }, { headers: jsonHeaders(request) });
   } catch (err) {

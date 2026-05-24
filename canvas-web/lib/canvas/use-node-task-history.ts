@@ -6,6 +6,8 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { listCanvasProjectTasks, type CanvasTaskRecord } from "@/lib/canvas-api";
 import { useCanvasStore } from "./store";
 
+const TASK_HISTORY_POLL_MS = 2000;
+
 /** 拉取某节点的任务历史；生图引擎 / 输出节点复用。 */
 export function useNodeTaskHistory(nodeId: string | null | undefined) {
   const base = useBookMallBaseUrl();
@@ -37,6 +39,13 @@ export function useNodeTaskHistory(nodeId: string | null | undefined) {
   useEffect(() => {
     void refreshHistory();
   }, [refreshHistory, runtimeTaskId, runtimeStatus]);
+
+  /** 进行中时额外拉历史，避免 KIE 已完成但节点 runtime 尚未同步 */
+  useEffect(() => {
+    if (runtimeStatus !== "running" && runtimeStatus !== "pending") return;
+    const id = window.setInterval(() => void refreshHistory(), TASK_HISTORY_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [runtimeStatus, refreshHistory]);
 
   const succeeded = useMemo(
     () =>

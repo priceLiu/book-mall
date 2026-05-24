@@ -35,6 +35,18 @@ import {
 } from "@/lib/story/kie-client";
 import { persistCanvasKieResultToOss } from "./canvas-oss";
 import { CanvasProjectError } from "./canvas-project-service";
+import {
+  SYSTEM_HUNYUAN_3D_PROVIDER_ID,
+  isSystemProviderId,
+  resolveSystemProvider,
+} from "./canvas-system-provider";
+import {
+  buildGatewayConfig,
+  getGatewayForKind,
+  type CanvasGatewayPollResult,
+  type CanvasProviderGateway,
+} from "./providers";
+import { extractHunyuan3DResultUrls } from "./providers/hunyuan-3d";
 import { buildKieImageCreateArgs } from "./providers/kie";
 
 // —— Types ——
@@ -423,7 +435,144 @@ export async function applyCanvasKieTaskResult(
   }
 }
 
+async function resolveGatewayForCanvasTask(
+  task: Pick<CanvasGenerationTask, "providerId" | "inputPayload">,
+): Promise<CanvasProviderGateway | null> {
+  const payload =
+    task.inputPayload && typeof task.inputPayload === "object"
+      ? (task.inputPayload as Record<string, unknown>)
+      : {};
+  const payloadProviderId =
+    typeof payload.providerId === "string" ? payload.providerId : "";
+
+  if (payloadProviderId && isSystemProviderId(payloadProviderId)) {
+    const sys = resolveSystemProvider(payloadProviderId);
+    if (!sys) return null;
+    return getGatewayForKind(sys.kind, sys.config);
+  }
+
+  if (task.providerId) {
+    const provider = await prisma.canvasProvider.findUnique({
+      where: { id: task.providerId },
+    });
+    if (provider?.active) {
+      return getGatewayForKind(provider.kind, buildGatewayConfig(provider));
+    }
+  }
+
+  return null;
+}
+
+/** 混元生3D 等非 KIE 异步任务 poll 结果落库 */
+export async function applyCanvasGatewayPollResult(
+  taskId: string,
+  poll: CanvasGatewayPollResult,
+): Promise<void> {
+  const task = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    include: { project: true },
+  });
+  if (!task) {
+    logKieEvent("warn", "[canvas] applyGatewayPollResult: task not found", {
+      taskId,
+    });
+    return;
+  }
+  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+
+  if (poll.state === "failed") {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: poll.errorCode ?? "PROVIDER_FAILED",
+        failMessage: poll.errorMessage?.slice(0, 500) ?? null,
+        resultPayload: (poll.rawPayload ?? null) as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  if (poll.state !== "succeeded") return;
+
+  const { previewUrl, modelUrl } = extractHunyuan3DResultUrls(poll);
+  const imageEphemeral = previewUrl ?? poll.resultUrls?.[0];
+  if (!imageEphemeral) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "PROVIDER_NO_RESULT_URL",
+        failMessage: "Provider returned success but resultUrls empty",
+        resultPayload: (poll.rawPayload ?? null) as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  let ossUrl: string | null = null;
+  let ossError: string | null = null;
+  try {
+    ossUrl = await persistCanvasKieResultToOss({
+      ephemeralUrl: imageEphemeral,
+      kind: "node-image",
+      projectId: task.projectId,
+    });
+  } catch (e) {
+    ossError = e instanceof Error ? e.message : String(e);
+    logKieEvent("error", "[canvas] persistGatewayResultToOss failed", {
+      taskId,
+      imageEphemeral,
+      ossError,
+    });
+  }
+
+  if (!ossUrl) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "OSS_UPLOAD_FAILED",
+        failMessage: ossError ?? "OSS upload failed",
+        ephemeralUrl: imageEphemeral,
+        resultPayload: (poll.rawPayload ?? null) as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  await prisma.canvasGenerationTask.update({
+    where: { id: taskId },
+    data: {
+      status: "SUCCEEDED",
+      ossUrl,
+      ephemeralUrl: modelUrl ?? imageEphemeral,
+      resultPayload: (poll.rawPayload ?? null) as Prisma.InputJsonValue,
+      completedAt: new Date(),
+    },
+  });
+  logKieEvent("info", "[canvas] gateway task succeeded", {
+    taskId,
+    kind: task.kind,
+    ossUrl,
+    modelUrl,
+  });
+}
+
 // —— Polling worker ——
+
+/** 提交 KIE 任务后异步 poll 一次，避免仅依赖 cron/回调 */
+export function scheduleCanvasPollWorkerForProject(projectId: string): void {
+  void runCanvasPollWorker({ projectId }).catch((e) => {
+    console.warn("[canvas] opportunistic poll failed", {
+      projectId,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  });
+}
 
 const POLL_BATCH = 20;
 const POLL_INNER_TIMEOUT_MS = 8000;
@@ -446,7 +595,15 @@ function resolvePendingKieCreateArgs(
 
   if (p.kind === "ai-engine") return null;
 
-  if (p.kind === "image-engine") {
+  if (p.kind === "image-engine" || p.kind === "three-view-engine") {
+    const providerId = String(p.providerId ?? "");
+    if (
+      providerId === SYSTEM_HUNYUAN_3D_PROVIDER_ID ||
+      task.model === "hunyuan-3d-pro" ||
+      task.model === "hunyuan-3d-express"
+    ) {
+      return null;
+    }
     const prompt = String(p.prompt ?? "").trim();
     if (!prompt) return null;
     const params = (p.params as Record<string, unknown>) ?? {};
@@ -495,7 +652,18 @@ function shouldPollNow(
   return Date.now() - task.lastPolledAt.getTime() >= intervalSec * 1000;
 }
 
-export async function runCanvasPollWorker(): Promise<{
+/** SUBMITTED 异步出图：固定短间隔，避免指数退避拖到 60s 才同步 KIE 结果 */
+function shouldPollSubmittedNow(
+  task: Pick<CanvasGenerationTask, "lastPolledAt">,
+): boolean {
+  if (!task.lastPolledAt) return true;
+  return Date.now() - task.lastPolledAt.getTime() >= 3_000;
+}
+
+export async function runCanvasPollWorker(opts?: {
+  /** 仅推进指定项目的任务（项目页 GET / 提交后按需 poll 用） */
+  projectId?: string;
+}): Promise<{
   scanned: number;
   retried: number;
   succeeded: number;
@@ -503,10 +671,11 @@ export async function runCanvasPollWorker(): Promise<{
   timedOut: number;
 }> {
   const result = { scanned: 0, retried: 0, succeeded: 0, failed: 0, timedOut: 0 };
+  const projectFilter = opts?.projectId ? { projectId: opts.projectId } : {};
 
   // 1) PENDING（KIE createTask 失败 / 中断）：仅 IMAGE 异步出图重试
   const pendings = await prisma.canvasGenerationTask.findMany({
-    where: { status: "PENDING", pollCount: { lt: RETRY_PENDING_LIMIT } },
+    where: { status: "PENDING", pollCount: { lt: RETRY_PENDING_LIMIT }, ...projectFilter },
     orderBy: { createdAt: "asc" },
     take: POLL_BATCH,
   });
@@ -585,7 +754,7 @@ export async function runCanvasPollWorker(): Promise<{
 
   // 2) SUBMITTED：查询 recordInfo
   const submitted = await prisma.canvasGenerationTask.findMany({
-    where: { status: "SUBMITTED", kieTaskId: { not: null } },
+    where: { status: "SUBMITTED", kieTaskId: { not: null }, ...projectFilter },
     orderBy: { lastPolledAt: { sort: "asc", nulls: "first" } },
     take: POLL_BATCH,
   });
@@ -594,7 +763,7 @@ export async function runCanvasPollWorker(): Promise<{
   for (const task of submitted) {
     result.scanned++;
     if (!task.kieTaskId) continue;
-    if (!shouldPollNow(task)) continue;
+    if (!shouldPollSubmittedNow(task)) continue;
 
     const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
     if (now - submittedTs >= timeoutMs) {
@@ -614,17 +783,33 @@ export async function runCanvasPollWorker(): Promise<{
     }
 
     try {
-      const record = await Promise.race([
-        getKieTask(task.kieTaskId),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("recordInfo timeout")),
-            POLL_INNER_TIMEOUT_MS,
-          ),
-        ),
-      ]);
+      const gateway = await resolveGatewayForCanvasTask(task);
       const before = task.status;
-      await applyCanvasKieTaskResult(task.id, record);
+
+      if (gateway?.kind === "HUNYUAN_3D" && gateway.pollImageTask) {
+        const poll = await Promise.race([
+          gateway.pollImageTask(task.kieTaskId, { modelKey: task.model }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("gateway poll timeout")),
+              POLL_INNER_TIMEOUT_MS,
+            ),
+          ),
+        ]);
+        await applyCanvasGatewayPollResult(task.id, poll);
+      } else {
+        const record = await Promise.race([
+          getKieTask(task.kieTaskId),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("recordInfo timeout")),
+              POLL_INNER_TIMEOUT_MS,
+            ),
+          ),
+        ]);
+        await applyCanvasKieTaskResult(task.id, record);
+      }
+
       const after = await prisma.canvasGenerationTask.findUnique({
         where: { id: task.id },
         select: { status: true },
