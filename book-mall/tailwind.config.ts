@@ -100,6 +100,48 @@ module.exports = {
           "0%": { backgroundPosition: "0% 50%" },
           "100%": { backgroundPosition: "200% 50%" },
         },
+        /** /story-open 漫剧过渡 */
+        "story-clap": {
+          "0%, 100%": { transform: "rotate(-8deg) translateY(0)" },
+          "50%": { transform: "rotate(6deg) translateY(-4px)" },
+        },
+        "story-reel": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
+        "story-film-track": {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        "story-spotlight": {
+          "0%, 100%": { transform: "translateX(-120%)", opacity: "0.35" },
+          "50%": { transform: "translateX(220%)", opacity: "1" },
+        },
+        /** /canvas-open 画布过渡 */
+        "canvas-node-a": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-5px)" },
+        },
+        "canvas-node-b": {
+          "0%, 100%": { transform: "translateY(-3px)" },
+          "50%": { transform: "translateY(4px)" },
+        },
+        "canvas-node-c": {
+          "0%, 100%": { transform: "translateY(2px)" },
+          "50%": { transform: "translateY(-6px)" },
+        },
+        "canvas-edge-draw": {
+          "0%": { strokeDashoffset: "120" },
+          "100%": { strokeDashoffset: "0" },
+        },
+        "canvas-grid-pulse": {
+          "0%, 100%": { opacity: "0.55" },
+          "50%": { opacity: "1" },
+        },
+        "canvas-sparkle": {
+          "0%, 100%": { transform: "scale(1) rotate(0deg)", opacity: "0.65" },
+          "50%": { transform: "scale(1.15) rotate(12deg)", opacity: "1" },
+        },
         orbit: {
           from: { transform: "rotate(0deg)" },
           to: { transform: "rotate(360deg)" },
@@ -158,6 +200,16 @@ module.exports = {
         "tools-bot-run": "tools-bot-run 0.78s ease-in-out infinite",
         "tools-scan-line": "tools-scan-line 1.6s ease-in-out infinite",
         "tools-text-shimmer": "tools-text-shimmer 2.9s linear infinite",
+        "story-clap": "story-clap 1.1s ease-in-out infinite",
+        "story-reel": "story-reel 4.5s linear infinite",
+        "story-film-track": "story-film-track 2.4s linear infinite",
+        "story-spotlight": "story-spotlight 1.8s ease-in-out infinite",
+        "canvas-node-a": "canvas-node-a 1.35s ease-in-out infinite",
+        "canvas-node-b": "canvas-node-b 1.55s ease-in-out 0.15s infinite",
+        "canvas-node-c": "canvas-node-c 1.45s ease-in-out 0.3s infinite",
+        "canvas-edge-draw": "canvas-edge-draw 1.6s ease-in-out infinite alternate",
+        "canvas-grid-pulse": "canvas-grid-pulse 2.2s ease-in-out infinite",
+        "canvas-sparkle": "canvas-sparkle 1.2s ease-in-out infinite",
         orbit: "orbit calc(var(--duration) * 1s) linear infinite",
         ripple: "ripple 8s ease calc(var(--delay, 0) * 1s) infinite",
         "pulse-ring": "pulse-ring 4s ease-out calc(var(--delay, 0) * 1s) infinite",

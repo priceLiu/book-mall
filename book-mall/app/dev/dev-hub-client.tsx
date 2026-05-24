@@ -234,7 +234,13 @@ export function DevHubClient({
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <a
-                    href={s.url}
+                    href={
+                      s.id === "story"
+                        ? `${services.find((x) => x.id === "mall")?.url ?? ""}/story-open?path=${encodeURIComponent("/")}`
+                        : s.id === "canvas"
+                          ? `${services.find((x) => x.id === "mall")?.url ?? ""}/canvas-open?path=${encodeURIComponent("/projects")}`
+                          : s.url
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-zinc-900 transition hover:bg-zinc-200"
