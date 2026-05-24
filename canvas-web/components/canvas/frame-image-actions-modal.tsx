@@ -13,6 +13,7 @@ import {
 import {
   spawnFrameTtsForImage,
   spawnFrameVideoForImage,
+  resolveFrameMediaForImage,
 } from "@/lib/canvas/story-batch-spawn";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
@@ -29,12 +30,24 @@ export type FrameImageModalTab =
   | "dialogue"
   | "both";
 
-const TAB_LABELS: Record<FrameImageModalTab, string> = {
-  regenerate: "重新生成",
+const TAB_LABELS: Record<Exclude<FrameImageModalTab, "regenerate">, string> = {
   video: "生成视频",
   dialogue: "生成对白",
   both: "视频+对白",
 };
+
+function frameRegenerateTabLabel(hasGenerated: boolean): string {
+  return hasGenerated ? "重新生成" : "分镜图生成";
+}
+
+function frameImageRunButtonLabel(
+  hasGenerated: boolean,
+  isGenerating: boolean,
+): string {
+  if (isGenerating) return "生成中…";
+  if (hasGenerated) return "重新生成";
+  return "分镜图生成";
+}
 
 const TAB_IDS: FrameImageModalTab[] = [
   "regenerate",
@@ -105,8 +118,18 @@ export function FrameImageActionsModal({
   const [mounted, setMounted] = useState(false);
 
   const fi = data.frameIndex;
-  const videoPrompt = data.frameVideoPrompt?.trim();
-  const dialogue = data.frameDialogue?.trim();
+
+  const { videoPromptDisplay, dialogue } = useMemo(
+    () =>
+      resolveFrameMediaForImage({
+        imgData: data,
+        nodes,
+        edges,
+        imageEngineId,
+      }),
+    [data, nodes, edges, imageEngineId],
+  );
+  const dialogueDisplay = dialogue.trim();
 
   const linkedVideo = useMemo(
     () =>
@@ -164,8 +187,7 @@ export function FrameImageActionsModal({
 
   const ensureTts = (): string | null => {
     if (!data.frameTts?.providerId || !data.frameTts.modelKey) return null;
-    const d = data.frameDialogue?.trim();
-    if (!d || d === "—" || d === "-") return null;
+    if (!dialogueDisplay) return null;
     return spawnFrameTtsForImage({
       ...spawnBase,
       ttsPick: data.frameTts,
@@ -301,7 +323,9 @@ export function FrameImageActionsModal({
                   : "text-white/60 hover:bg-white/5 hover:text-white"
               }`}
             >
-              {TAB_LABELS[id]}
+              {id === "regenerate"
+                ? frameRegenerateTabLabel(hasGenerated)
+                : TAB_LABELS[id]}
             </button>
           ))}
         </div>
@@ -345,13 +369,14 @@ export function FrameImageActionsModal({
                     <>
                       <RefreshCw className="size-3.5 animate-spin" /> 生成中…
                     </>
-                  ) : hasGenerated ? (
-                    <>
-                      <RefreshCw className="size-3.5" /> 重新生成
-                    </>
                   ) : (
                     <>
-                      <Play className="size-3.5" /> 生成
+                      {hasGenerated ? (
+                        <RefreshCw className="size-3.5" />
+                      ) : (
+                        <Play className="size-3.5" />
+                      )}{" "}
+                      {frameImageRunButtonLabel(hasGenerated, isGenerating)}
                     </>
                   )}
                 </button>
@@ -371,15 +396,20 @@ export function FrameImageActionsModal({
 
           {tab === "video" ? (
             <div className="space-y-4">
-              {videoPrompt ? (
-                <p className="rounded-md border border-white/10 bg-black/30 p-3 text-[12px] leading-relaxed text-white/80">
-                  <span className="text-[#fdba74]">视频提示</span> · {videoPrompt}
+              <div>
+                <p className="mb-2 text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
+                  视频提示
                 </p>
-              ) : (
-                <p className="text-[12px] text-[var(--canvas-muted)]">
-                  本镜暂无视频提示，可在分镜脚本中补充后重新创建分镜图节点。
-                </p>
-              )}
+                {videoPromptDisplay ? (
+                  <p className="whitespace-pre-wrap rounded-md border border-white/10 bg-black/30 p-3 text-[13px] leading-relaxed text-white/90">
+                    {videoPromptDisplay}
+                  </p>
+                ) : (
+                  <p className="text-[12px] text-[var(--canvas-muted)]">
+                    本镜暂无视频提示，可在分镜脚本中补充后重新创建分镜图节点。
+                  </p>
+                )}
+              </div>
               <div>
                 <p className="mb-2 text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
                   VIDEO 模型
@@ -426,15 +456,21 @@ export function FrameImageActionsModal({
 
           {tab === "dialogue" ? (
             <div className="space-y-4">
-              {dialogue ? (
-                <p className="rounded-md border border-white/10 bg-black/30 p-3 text-[12px] leading-relaxed text-white/80">
-                  <span className="text-emerald-300/90">对白</span> · {dialogue}
+              <div>
+                <p className="mb-2 text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
+                  对白
                 </p>
-              ) : (
-                <p className="text-[12px] text-[var(--canvas-muted)]">
-                  本镜暂无对白文本。
-                </p>
-              )}
+                {dialogueDisplay ? (
+                  <p className="whitespace-pre-wrap rounded-md border border-white/10 bg-black/30 p-3 text-[13px] leading-relaxed text-white/90">
+                    {dialogueDisplay}
+                  </p>
+                ) : (
+                  <p className="text-[12px] text-[var(--canvas-muted)]">
+                    本镜暂无对白文本。可在分镜脚本「台词 / 对白」列补充，或在分镜图
+                    Tab 重新创建以刷新带入。
+                  </p>
+                )}
+              </div>
               <div>
                 <p className="mb-2 text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
                   TTS 模型
@@ -458,7 +494,7 @@ export function FrameImageActionsModal({
               </div>
               <button
                 type="button"
-                disabled={ttsRunning || !dialogue}
+                disabled={ttsRunning || !dialogueDisplay}
                 className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-[#fb923c] px-3 py-2 text-[13px] font-medium text-black disabled:opacity-50"
                 onClick={() => void onGenerateTts()}
               >
@@ -481,17 +517,35 @@ export function FrameImageActionsModal({
 
           {tab === "both" ? (
             <div className="space-y-4">
-              <div className="space-y-2 text-[12px] leading-relaxed text-white/80">
-                {videoPrompt ? (
-                  <p className="rounded-md border border-white/10 bg-black/30 p-3">
-                    <span className="text-[#fdba74]">视频</span> · {videoPrompt}
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-2 text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
+                    视频提示
                   </p>
-                ) : null}
-                {dialogue ? (
-                  <p className="rounded-md border border-white/10 bg-black/30 p-3">
-                    <span className="text-emerald-300/90">对白</span> · {dialogue}
+                  {videoPromptDisplay ? (
+                    <p className="whitespace-pre-wrap rounded-md border border-white/10 bg-black/30 p-3 text-[13px] leading-relaxed text-white/90">
+                      {videoPromptDisplay}
+                    </p>
+                  ) : (
+                    <p className="text-[12px] text-[var(--canvas-muted)]">
+                      本镜暂无视频提示。
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="mb-2 text-[11px] uppercase tracking-wider text-[var(--canvas-muted)]">
+                    对白
                   </p>
-                ) : null}
+                  {dialogueDisplay ? (
+                    <p className="whitespace-pre-wrap rounded-md border border-white/10 bg-black/30 p-3 text-[13px] leading-relaxed text-white/90">
+                      {dialogueDisplay}
+                    </p>
+                  ) : (
+                    <p className="text-[12px] text-[var(--canvas-muted)]">
+                      本镜暂无对白文本。
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
@@ -539,7 +593,7 @@ export function FrameImageActionsModal({
               </div>
               <button
                 type="button"
-                disabled={videoRunning || ttsRunning || !dialogue}
+                disabled={videoRunning || ttsRunning || !dialogueDisplay}
                 className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-[#fb923c] px-3 py-2 text-[13px] font-medium text-black disabled:opacity-50"
                 onClick={() => void onGenerateBoth()}
               >

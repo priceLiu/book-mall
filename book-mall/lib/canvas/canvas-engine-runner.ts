@@ -199,7 +199,7 @@ async function loadProviderForUser(
     if (!sys) {
       throw new CanvasProjectError(
         "MODEL_NOT_AVAILABLE",
-        `系统 Provider ${providerId} 未启用（请检查 .env 是否配置 KIE_API_KEY / HUNYUAN_3D_API_KEY）`,
+        `系统 Provider ${providerId} 未启用（请检查 .env 是否配置 DEEPSEEK_API_KEY / KIE_API_KEY / HUNYUAN_3D_API_KEY）`,
         503,
       );
     }

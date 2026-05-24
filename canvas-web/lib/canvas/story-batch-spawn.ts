@@ -764,6 +764,53 @@ export function findStoryboardEngineForNode(
   return nodes.find((n) => n.type === "storyboard-engine");
 }
 
+function storyboardRowForFrame(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  imageEngineId: string,
+  frameIndex: number,
+) {
+  const sb = findStoryboardEngineForNode(nodes, edges, imageEngineId);
+  const md = String(
+    (sb?.data as { runtime?: { textOutput?: string } })?.runtime?.textOutput ??
+      "",
+  );
+  return parseStoryboardRows(md).find((r) => r.frameIndex === frameIndex);
+}
+
+/** 分镜图节点 · 视频提示 / 对白：优先节点字段，缺省回退分镜表 Markdown。 */
+export function resolveFrameMediaForImage(args: {
+  imgData: ImageEngineNodeData;
+  nodes: CanvasFlowNode[];
+  edges: CanvasFlowEdge[];
+  imageEngineId: string;
+}): {
+  /** 供 TTS / 展示：节点或分镜表真实对白 */
+  dialogue: string;
+  /** 供展示：节点或分镜表真实视频提示（不含默认模板） */
+  videoPromptDisplay: string;
+  /** 供视频引擎 spawn：含默认模板兜底 */
+  videoPrompt: string;
+} {
+  const fi = args.imgData.frameIndex;
+  const row =
+    fi != null
+      ? storyboardRowForFrame(
+          args.nodes,
+          args.edges,
+          args.imageEngineId,
+          fi,
+        )
+      : undefined;
+  const videoFromSource =
+    args.imgData.frameVideoPrompt?.trim() || row?.videoPrompt?.trim() || "";
+  return {
+    dialogue: resolveFrameDialogue(args.imgData, row),
+    videoPromptDisplay: videoFromSource,
+    videoPrompt: resolveFrameVideoPrompt(args.imgData, row),
+  };
+}
+
 function findFrameNodeId(
   nodes: CanvasFlowNode[],
   type: CanvasNodeType,

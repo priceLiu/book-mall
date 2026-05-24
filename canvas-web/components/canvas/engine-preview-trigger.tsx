@@ -7,6 +7,7 @@ import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { NodeStatusBadge } from "./node-shell";
 import { MarkdownFullscreenLightbox } from "./markdown-fullscreen-lightbox";
 import { MediaPreviewLightbox } from "./media-hover-box";
+import type { MediaCompareContext } from "./compare-utils";
 import { AudioFullscreenLightbox } from "./audio-fullscreen-lightbox";
 
 export type EnginePreviewKind = "markdown" | "image" | "video" | "audio";
@@ -19,6 +20,8 @@ export function EnginePreviewTrigger({
   status,
   failMessage,
   extra,
+  compareContext,
+  prompt,
 }: {
   title: string;
   kind: EnginePreviewKind;
@@ -28,6 +31,9 @@ export function EnginePreviewTrigger({
   failMessage?: string | null;
   /** 标题栏左侧额外按钮（复制、批量等） */
   extra?: React.ReactNode;
+  compareContext?: MediaCompareContext;
+  /** 分镜图预览：左侧 Prompt */
+  prompt?: string;
 }) {
   const [open, setOpen] = useState(false);
   const disabled =
@@ -69,6 +75,8 @@ export function EnginePreviewTrigger({
           src={mediaUrl}
           kind="image"
           alt={title}
+          compareContext={compareContext}
+          prompt={prompt}
           onClose={() => setOpen(false)}
         />
       ) : null}

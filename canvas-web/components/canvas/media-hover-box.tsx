@@ -29,6 +29,8 @@ export type MediaHoverBoxProps = {
   clickToPreview?: boolean;
   /** 传入后预览弹层内可切换「大图 / 对比」 */
   compareContext?: MediaCompareContext;
+  /** 分镜图预览：左侧展示 Prompt */
+  prompt?: string;
   /** 打开时默认视图 */
   initialView?: "single" | "compare";
 };
@@ -49,6 +51,7 @@ export function MediaHoverBox({
   naturalSize = false,
   clickToPreview = false,
   compareContext,
+  prompt,
   initialView = "single",
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -174,6 +177,7 @@ export function MediaHoverBox({
           kind={kind}
           alt={alt}
           compareContext={compareContext}
+          prompt={prompt}
           initialView={initialView}
           onClose={() => setPreviewOpen(false)}
         />
@@ -188,6 +192,7 @@ export function MediaPreviewLightbox({
   kind,
   alt,
   compareContext,
+  prompt,
   initialView = "single",
   onClose,
 }: {
@@ -195,11 +200,14 @@ export function MediaPreviewLightbox({
   kind: "image" | "video";
   alt: string;
   compareContext?: MediaCompareContext;
+  /** 分镜图等：单图预览时左侧展示 Prompt（约 30% 宽） */
+  prompt?: string;
   initialView?: "single" | "compare";
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   const showCompare = compareContext ? canShowCompare(compareContext) : false;
+  const splitPrompt = Boolean(prompt?.trim()) && kind === "image";
   const [view, setView] = useState<"single" | "compare">(
     initialView === "compare" && showCompare ? "compare" : "single",
   );
@@ -288,7 +296,9 @@ export function MediaPreviewLightbox({
             </button>
           </div>
         ) : (
-          <p className="shrink-0 text-sm font-medium text-white">预览</p>
+          <p className="shrink-0 text-sm font-medium text-white">
+            {splitPrompt ? alt : "预览"}
+          </p>
         )}
         {view === "compare" && showCompare ? (
           <CompareToolbar
@@ -319,6 +329,25 @@ export function MediaPreviewLightbox({
             leftId={leftId}
             rightId={rightId}
           />
+        ) : splitPrompt ? (
+          <div className="flex min-h-0 flex-1 gap-3">
+            <div className="flex w-[30%] min-w-0 shrink-0 flex-col border-r border-white/10 pr-3">
+              <p className="mb-2 shrink-0 text-[11px] uppercase tracking-wider text-white/50">
+                Prompt
+              </p>
+              <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-relaxed text-white/90">
+                {prompt}
+              </div>
+            </div>
+            <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={src}
+                alt={alt}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+          </div>
         ) : (
           <div className="flex min-h-0 flex-1 items-center justify-center">
             {kind === "video" ? (

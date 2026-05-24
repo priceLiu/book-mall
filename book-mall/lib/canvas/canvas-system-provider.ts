@@ -12,6 +12,7 @@
 
 import type { CanvasProviderKind } from "@prisma/client";
 
+import { DEEPSEEK_KNOWN_MODELS, DEEPSEEK_SYSTEM_BASE_URL } from "./providers/deepseek-system";
 import { KIE_KNOWN_MODELS } from "./providers/kie";
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
 import {
@@ -22,7 +23,12 @@ import type { CanvasProviderDto } from "./canvas-provider-service";
 
 export const SYSTEM_PROVIDER_PREFIX = "system:";
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
+export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
 export const SYSTEM_HUNYUAN_3D_PROVIDER_ID = "system:hunyuan-3d";
+
+export function isDeepSeekSystemEnabled(): boolean {
+  return !!process.env.DEEPSEEK_API_KEY?.trim();
+}
 
 export function isSystemProviderId(id: string | null | undefined): boolean {
   return !!id && id.startsWith(SYSTEM_PROVIDER_PREFIX);
@@ -44,6 +50,32 @@ export function isHunyuan3DSystemEnabled(): boolean {
 /** 列出所有启用的系统 Provider DTO（用于 GET /providers 列表前置）。 */
 export function listSystemProviderDtos(): CanvasProviderDto[] {
   const out: CanvasProviderDto[] = [];
+  if (isDeepSeekSystemEnabled()) {
+    out.push({
+      id: SYSTEM_DEEPSEEK_PROVIDER_ID,
+      alias: "系统 · DeepSeek（共享 key）",
+      kind: "OPENAI_COMPAT",
+      baseUrl: DEEPSEEK_SYSTEM_BASE_URL,
+      apiKeyMasked: "system",
+      active: true,
+      lastTestedAt: null,
+      lastTestStatus: "system",
+      models: DEEPSEEK_KNOWN_MODELS.map((m, idx) => ({
+        id: `${SYSTEM_DEEPSEEK_PROVIDER_ID}::${m.modelKey}`,
+        modelKey: m.modelKey,
+        displayName: m.displayName,
+        role: m.role,
+        description: m.description ?? null,
+        paramsSchema: m.paramsSchema ?? null,
+        defaultParams:
+          (m.defaultParams as Record<string, unknown> | undefined) ?? null,
+        enabled: true,
+        sortOrder: idx,
+      })),
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+    });
+  }
   if (isKieSystemEnabled()) {
     out.push({
       id: SYSTEM_KIE_PROVIDER_ID,
@@ -108,6 +140,20 @@ export type ResolvedSystemProvider = {
 export function resolveSystemProvider(
   providerId: string,
 ): ResolvedSystemProvider | null {
+  if (providerId === SYSTEM_DEEPSEEK_PROVIDER_ID) {
+    const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
+    if (!apiKey) return null;
+    return {
+      kind: "OPENAI_COMPAT",
+      config: {
+        id: SYSTEM_DEEPSEEK_PROVIDER_ID,
+        alias: "系统 · DeepSeek",
+        kind: "OPENAI_COMPAT",
+        apiKey,
+        baseUrl: DEEPSEEK_SYSTEM_BASE_URL,
+      },
+    };
+  }
   if (providerId === SYSTEM_KIE_PROVIDER_ID) {
     const apiKey = process.env.KIE_API_KEY?.trim();
     if (!apiKey) return null;
