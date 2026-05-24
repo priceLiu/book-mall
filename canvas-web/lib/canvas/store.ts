@@ -26,15 +26,33 @@ import {
   CANVAS_SCHEMA_VERSION,
   NODE_DEFAULT_DATA,
   NODE_DEFAULT_SIZE,
+  STORY_FRAME_IMAGE_ENGINE_SIZE,
   isGroupNode,
 } from "./types";
 import { migrateGraphV1ToV2 } from "./migrate";
+import {
+  detachChildrenOfRemovedGroups,
+  normalizeCanvasNodes,
+  reflowStoryTemplateGroups as reflowStoryTemplateGroupsOnNodes,
+  sortNodesForReactFlow,
+} from "./normalize-graph-nodes";
+import { reflowStoryComicFlat } from "./story-comic-layout";
+import {
+  repairStoryPreviewEdges,
+  stripStoryPreviewNodes,
+} from "./story-comic-edges";
+import { applyStoryFrameEdgeConnection } from "./story-frame-connect";
 
 type CanvasState = {
   projectId: string | null;
   nodes: CanvasFlowNode[];
   edges: CanvasFlowEdge[];
   viewport: Viewport;
+  /** 递增后触发 React Flow fitView（漫剧重排等） */
+  fitViewNonce: number;
+  /** 生成中聚焦某节点（选中 + 平移，不写 undo 栈） */
+  runningFocusNodeId: string | null;
+  runningFocusNonce: number;
 
   /**
    * 瞬时态（不进 undo 栈、不进图保存）：
@@ -58,6 +76,13 @@ type CanvasState = {
   onConnect: (c: Connection) => void;
 
   addNode: (type: CanvasNodeType, position: { x: number; y: number }, data?: Record<string, unknown>) => string;
+  /** 在 group 内一次性创建子节点（避免先 add 再 reparent 触发 RF 父节点缺失）。 */
+  addNodeInGroup: (
+    type: CanvasNodeType,
+    groupId: string,
+    relativePosition: { x: number; y: number },
+    data?: Record<string, unknown>,
+  ) => string;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
   setNodeRuntime: (id: string, runtime: Partial<CanvasNodeRuntime>) => void;
   /** 程序化调整节点尺寸（选中时仍可用 NodeResizer 手动覆盖） */
@@ -88,6 +113,10 @@ type CanvasState = {
    * 自动换算 position 使屏幕坐标不变；并设置 / 清除 extent='parent'。
    */
   reparentNode: (nodeId: string, newParentGroupId: string | null) => void;
+  /** 漫剧模板：重排「角色三视图 / 分镜媒体」分组内节点并放大框体（旧版分组画布）。 */
+  reflowStoryTemplateGroups: () => void;
+  /** 漫剧全链路 · 扁平画布一键重排。 */
+  reflowStoryComicLayout: () => void;
 };
 
 function emptyGraph(): CanvasGraph {
@@ -99,6 +128,16 @@ function emptyGraph(): CanvasGraph {
   };
 }
 
+function defaultNodeSize(
+  type: CanvasNodeType,
+  data?: Record<string, unknown>,
+): { width: number; height: number } {
+  if (type === "image-engine" && typeof data?.frameIndex === "number") {
+    return STORY_FRAME_IMAGE_ENGINE_SIZE;
+  }
+  return NODE_DEFAULT_SIZE[type] ?? { width: 320, height: 240 };
+}
+
 export const useCanvasStore = create<CanvasState>()(
   temporal(
     (set, get) => ({
@@ -106,6 +145,9 @@ export const useCanvasStore = create<CanvasState>()(
       nodes: [],
       edges: [],
       viewport: { x: 0, y: 0, zoom: 1 },
+      fitViewNonce: 0,
+      runningFocusNodeId: null,
+      runningFocusNonce: 0,
       connectingFromNodeId: null,
       dragHoverGroupId: null,
       setConnectingFrom: (id) => set({ connectingFromNodeId: id }),
@@ -114,10 +156,19 @@ export const useCanvasStore = create<CanvasState>()(
       hydrate: (projectId, graph) => {
         const raw = graph && Array.isArray(graph.nodes) ? graph : emptyGraph();
         const g = migrateGraphV1ToV2(raw);
+        let nodes = normalizeCanvasNodes(
+          g.nodes as CanvasFlowNode[],
+          g.edges as CanvasFlowEdge[],
+        );
+        let edges = g.edges as CanvasFlowEdge[];
+        const stripped = stripStoryPreviewNodes(nodes, edges);
+        nodes = stripped.nodes;
+        edges = stripped.edges;
+        edges = repairStoryPreviewEdges(nodes, edges);
         set({
           projectId,
-          nodes: g.nodes as CanvasFlowNode[],
-          edges: g.edges as CanvasFlowEdge[],
+          nodes,
+          edges,
           viewport: g.viewport ?? { x: 0, y: 0, zoom: 1 },
         });
       },
@@ -132,7 +183,12 @@ export const useCanvasStore = create<CanvasState>()(
         };
       },
 
-      setNodes: (updater) => set({ nodes: updater(get().nodes) }),
+      setNodes: (updater) => {
+        const edges = get().edges;
+        set({
+          nodes: normalizeCanvasNodes(updater(get().nodes), edges),
+        });
+      },
       setEdges: (updater) => set({ edges: updater(get().edges) }),
       setViewport: (v) => set({ viewport: v }),
 
@@ -151,6 +207,8 @@ export const useCanvasStore = create<CanvasState>()(
           }
         }
         let next = applyNodeChanges(changes, prev) as CanvasFlowNode[];
+        next = detachChildrenOfRemovedGroups(prev, next);
+        next = normalizeCanvasNodes(next, get().edges);
         if (manualIds.size > 0) {
           next = next.map((n) =>
             manualIds.has(n.id)
@@ -173,7 +231,15 @@ export const useCanvasStore = create<CanvasState>()(
           targetHandle: connection.targetHandle ?? undefined,
           animated: false,
         };
-        set({ edges: [...get().edges, newEdge] });
+        const state = get();
+        let edges = [...state.edges, newEdge];
+        edges = applyStoryFrameEdgeConnection({
+          connection,
+          nodes: state.nodes,
+          edges,
+          updateNodeData: (nodeId, patch) => get().updateNodeData(nodeId, patch),
+        });
+        set({ edges });
       },
 
       addNode: (type, position, data) => {
@@ -183,7 +249,7 @@ export const useCanvasStore = create<CanvasState>()(
           ...(data ?? {}),
           __t: type,
         };
-        const size = NODE_DEFAULT_SIZE[type] ?? { width: 320, height: 240 };
+        const size = defaultNodeSize(type, data);
         const node: CanvasFlowNode = {
           id,
           type,
@@ -196,6 +262,32 @@ export const useCanvasStore = create<CanvasState>()(
         return id;
       },
 
+      addNodeInGroup: (type, groupId, relativePosition, data) => {
+        const all = get().nodes;
+        const group = all.find((n) => n.id === groupId);
+        if (!group || !isGroupNode(group.type)) {
+          return get().addNode(type, relativePosition, data);
+        }
+        const id = `n_${nanoid(8)}`;
+        const initialData = {
+          ...(NODE_DEFAULT_DATA[type] ?? {}),
+          ...(data ?? {}),
+          __t: type,
+        };
+        const size = defaultNodeSize(type, data);
+        const node: CanvasFlowNode = {
+          id,
+          type,
+          position: relativePosition,
+          parentId: groupId,
+          extent: "parent",
+          data: initialData,
+          style: { width: size.width, height: size.height },
+        };
+        set({ nodes: sortNodesForReactFlow([...all, node]) });
+        return id;
+      },
+
       updateNodeData: (id, patch) => {
         set({
           nodes: get().nodes.map((n) =>
@@ -205,20 +297,48 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       setNodeRuntime: (id, runtime) => {
+        const all = get().nodes;
+        const target = all.find((n) => n.id === id);
+        if (!target || isGroupNode(target.type)) return;
+
+        const data = target.data as Record<string, unknown> & {
+          runtime?: CanvasNodeRuntime;
+        };
+        const prev = data.runtime ?? { status: "idle" as const };
+        const next = { ...prev, ...runtime };
+        const unchanged =
+          prev.status === next.status &&
+          prev.taskId === next.taskId &&
+          prev.failCode === next.failCode &&
+          prev.failMessage === next.failMessage &&
+          prev.textOutput === next.textOutput &&
+          prev.ossUrl === next.ossUrl &&
+          prev.ephemeralUrl === next.ephemeralUrl;
+        if (unchanged) return;
+
+        const wasInflight =
+          prev.status === "pending" || prev.status === "running";
+        const nowInflight =
+          next.status === "pending" || next.status === "running";
+        const focusNode = nowInflight && !wasInflight;
+
         set({
-          nodes: get().nodes.map((n) => {
-            if (n.id !== id) return n;
-            // group 容器没有 runtime 字段，直接跳过
-            if (isGroupNode(n.type)) return n;
-            const data = n.data as Record<string, unknown> & {
-              runtime?: CanvasNodeRuntime;
-            };
-            const prev = data.runtime ?? { status: "idle" as const };
+          nodes: all.map((n) => {
+            if (n.id !== id) {
+              return focusNode ? { ...n, selected: false } : n;
+            }
             return {
               ...n,
-              data: { ...n.data, runtime: { ...prev, ...runtime } },
+              selected: focusNode ? true : n.selected,
+              data: { ...n.data, runtime: next },
             };
           }),
+          ...(focusNode
+            ? {
+                runningFocusNodeId: id,
+                runningFocusNonce: get().runningFocusNonce + 1,
+              }
+            : {}),
         });
       },
 
@@ -339,7 +459,7 @@ export const useCanvasStore = create<CanvasState>()(
             newNodes.push(n);
           }
         }
-        set({ nodes: newNodes });
+        set({ nodes: normalizeCanvasNodes(newNodes, get().edges) });
         return groupId;
       },
 
@@ -364,7 +484,7 @@ export const useCanvasStore = create<CanvasState>()(
             next.push(n);
           }
         }
-        set({ nodes: next });
+        set({ nodes: normalizeCanvasNodes(next, get().edges) });
       },
 
       autoLayoutNodes: (nodeIds) => {
@@ -523,9 +643,27 @@ export const useCanvasStore = create<CanvasState>()(
             : n,
         );
         // React Flow 要求父节点先于子节点出现：重排，把所有 group 放最前
-        const groups = updated.filter((n) => isGroupNode(n.type));
-        const others = updated.filter((n) => !isGroupNode(n.type));
-        set({ nodes: [...groups, ...others], dragHoverGroupId: null });
+        set({
+          nodes: sortNodesForReactFlow(updated),
+          dragHoverGroupId: null,
+        });
+      },
+
+      reflowStoryTemplateGroups: () => {
+        const { nodes, edges } = get();
+        set({
+          nodes: reflowStoryTemplateGroupsOnNodes(nodes, edges),
+        });
+      },
+
+      reflowStoryComicLayout: () => {
+        const { nodes, edges } = get();
+        const repaired = repairStoryPreviewEdges(nodes, edges);
+        set({
+          nodes: reflowStoryComicFlat(nodes, repaired),
+          edges: repaired,
+          fitViewNonce: get().fitViewNonce + 1,
+        });
       },
     }),
     {

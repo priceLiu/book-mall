@@ -52,23 +52,31 @@ export function NodeShell({
   headerRight,
 }: NodeShellProps) {
   const status = runtime?.status ?? "idle";
+  const isGenerating = status === "running" || status === "pending";
   const tint = accent ?? (engine ? ENGINE_ACCENT : "var(--canvas-accent)");
-  const borderColor = engine
-    ? selected
-      ? ENGINE_ACCENT
-      : `${ENGINE_ACCENT}99` /* 60% 橙：未选中时的引擎边框 */
-    : selected
-      ? "var(--canvas-accent)"
-      : "rgba(255,255,255,0.10)";
+  const borderColor = isGenerating
+    ? tint
+    : engine
+      ? selected
+        ? ENGINE_ACCENT
+        : `${ENGINE_ACCENT}99` /* 60% 橙：未选中时的引擎边框 */
+      : selected
+        ? "var(--canvas-accent)"
+        : "rgba(255,255,255,0.10)";
   return (
     <div
       className={cn(
         "canvas-node-shell relative flex h-full w-full flex-col rounded-xl border bg-[var(--canvas-surface)] text-[12px] text-white shadow-lg transition-shadow",
+        isGenerating && "canvas-node-generating",
       )}
       style={{
         borderColor,
-        borderWidth: engine ? 2 : 1,
-        boxShadow: selected ? `0 0 0 2px ${tint}` : undefined,
+        borderWidth: engine || isGenerating ? 2 : 1,
+        boxShadow: selected
+          ? `0 0 0 2px ${tint}`
+          : isGenerating
+            ? `0 0 0 2px ${tint}, 0 0 18px ${tint}66`
+            : undefined,
       }}
     >
       <NodeResizer
@@ -82,7 +90,7 @@ export function NodeShell({
 
       <header
         className={cn(
-          "flex items-center justify-between rounded-t-xl border-b px-3 py-2",
+          "shrink-0 flex items-center justify-between rounded-t-xl border-b px-3 py-2",
           engine ? "" : "border-white/10 bg-white/[0.04]",
         )}
         style={
@@ -113,12 +121,19 @@ export function NodeShell({
         )}
       </header>
 
-      <div className={cn("min-h-0 flex-1 overflow-auto px-3 py-3", RF_NODE_SCROLL)}>
+      <div
+        className={cn(
+          "flex flex-col px-3",
+          engine
+            ? "min-h-0 flex-1 overflow-hidden py-3"
+            : cn("min-h-0 flex-1 overflow-auto py-3", RF_NODE_SCROLL),
+        )}
+      >
         {children}
       </div>
 
       {footer ? (
-        <div className="border-t border-white/10 px-3 py-2 text-[11px] text-[var(--canvas-muted)]">
+        <div className="shrink-0 border-t border-white/10 px-3 py-2 text-[11px] text-[var(--canvas-muted)]">
           {footer}
         </div>
       ) : null}

@@ -42,7 +42,7 @@ export function getCanvasAiPublicBase(): string | null {
 }
 
 export function buildCanvasAiKieCallbackUrl(
-  kind: "image" | "text",
+  kind: "image" | "text" | "video",
   taskRef: string,
 ): string | null {
   const base = getCanvasAiPublicBase();
@@ -53,7 +53,12 @@ export function buildCanvasAiKieCallbackUrl(
 }
 
 /** OSS key 命名 */
-export type CanvasOssKind = "node-image" | "node-output" | "user-upload";
+export type CanvasOssKind =
+  | "node-image"
+  | "node-video"
+  | "node-audio"
+  | "node-output"
+  | "user-upload";
 
 export function buildCanvasOssKey(
   kind: CanvasOssKind,

@@ -10,7 +10,7 @@ type RouteCtx = { params: Promise<{ kind: string }> };
 
 export async function POST(request: NextRequest, ctx: RouteCtx) {
   const { kind } = await ctx.params;
-  if (kind !== "image" && kind !== "text") {
+  if (kind !== "image" && kind !== "text" && kind !== "video") {
     return NextResponse.json({ error: "invalid_kind" }, { status: 400 });
   }
   const expectedToken = getCanvasAiKieCallbackToken();

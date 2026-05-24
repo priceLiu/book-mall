@@ -3,13 +3,19 @@
 import { Fragment, useCallback, useState } from "react";
 import {
   Brain,
+  Clapperboard,
   ClipboardList,
+  Download,
+  FileText,
+  Film,
   HelpCircle,
   Image as ImageIcon,
   ImagePlus,
-  LayoutGrid,
+  Mic,
   Save,
   Type,
+  Users,
+  Video,
   X,
 } from "lucide-react";
 import type { CanvasContentNodeType } from "@/lib/canvas/types";
@@ -26,8 +32,10 @@ const PALETTE: Array<{
   icon: React.ReactNode;
   hint: string;
   presetId?: string;
-  /** 在该按钮左侧插入竖线，区分「内容节点」与「引擎节点」 */
+  /** 在该按钮左侧插入竖线 */
   dividerBefore?: boolean;
+  /** 在该按钮右侧插入竖线 */
+  dividerAfter?: boolean;
 }> = [
   {
     type: "image",
@@ -62,16 +70,62 @@ const PALETTE: Array<{
     hint: "调图像模型出图",
   },
   {
-    type: "three-view-engine",
-    label: "三视图",
-    icon: <LayoutGrid className="size-[18px]" />,
-    hint: "角色正/侧/背三视图 · 上游接参考图",
+    type: "story-comic-starter",
+    label: "漫剧启动",
+    icon: <Clapperboard className="size-[18px]" />,
+    hint: "主题 + 模型 → 向导式漫剧",
+    dividerBefore: true,
+  },
+  {
+    type: "story-outline-engine",
+    label: "故事大纲",
+    icon: <FileText className="size-[18px]" />,
+    hint: "创意 → Markdown 大纲",
+    dividerBefore: true,
+  },
+  {
+    type: "character-engine",
+    label: "角色",
+    icon: <Users className="size-[18px]" />,
+    hint: "大纲 → 角色 GFM 表",
+  },
+  {
+    type: "storyboard-engine",
+    label: "分镜",
+    icon: <Clapperboard className="size-[18px]" />,
+    hint: "分镜脚本 GFM 表",
+  },
+  {
+    type: "image-engine",
+    label: "分镜图",
+    icon: <Film className="size-[18px]" />,
+    hint: "单镜静帧 · 右侧拖线连视频/语音",
+    presetId: "story-frame",
+  },
+  {
+    type: "video-engine",
+    label: "视频",
+    icon: <Video className="size-[18px]" />,
+    hint: "从分镜图连入 · 选模型后生成",
+  },
+  {
+    type: "tts-engine",
+    label: "语音",
+    icon: <Mic className="size-[18px]" />,
+    hint: "从分镜图连入 · 对白 TTS",
   },
   {
     type: "output",
     label: "输出",
     icon: <Save className="size-[18px]" />,
     hint: "导出 / 入画作库",
+  },
+  {
+    type: "jianying-export",
+    label: "剪映",
+    icon: <Download className="size-[18px]" />,
+    hint: "分镜包 / 草稿 ZIP",
+    dividerBefore: true,
   },
 ];
 
@@ -144,7 +198,7 @@ export function NodePalette({
                 onDragStart={(ev) => onDragStart(ev, p.type, p.presetId)}
                 onClick={() => onAdd(p.type, p.presetId)}
                 aria-label={`${p.label} — ${p.hint}`}
-                className="group/palette relative flex size-9 cursor-grab items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white active:cursor-grabbing"
+                className="group/palette relative flex size-9 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
               >
                 {p.icon}
                 <span
@@ -155,6 +209,7 @@ export function NodePalette({
                   <span className="ml-1 text-white/55">· {p.hint}</span>
                 </span>
               </button>
+              {p.dividerAfter ? <PaletteDivider /> : null}
             </Fragment>
           ))}
           <PaletteDivider />

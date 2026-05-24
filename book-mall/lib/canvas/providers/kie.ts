@@ -90,6 +90,104 @@ function qwenImageSizeFromAspect(aspect: string): string {
   return map[aspect] ?? "square_hd";
 }
 
+type KieChatChoice = {
+  finish_reason?: string;
+  message?: Record<string, unknown>;
+};
+
+/** 从 KIE Gemini chat message 提取文本（兼容 string / 多模态 array / reasoning 字段）。 */
+function extractKieChatText(message: Record<string, unknown> | undefined): string {
+  if (!message) return "";
+
+  const raw = message.content;
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+
+  if (Array.isArray(raw)) {
+    const parts: string[] = [];
+    for (const part of raw) {
+      if (typeof part === "string" && part.trim()) {
+        parts.push(part.trim());
+        continue;
+      }
+      if (!part || typeof part !== "object") continue;
+      const p = part as Record<string, unknown>;
+      if (p.type === "text" && typeof p.text === "string" && p.text.trim()) {
+        parts.push(p.text.trim());
+      }
+    }
+    if (parts.length) return parts.join("\n").trim();
+  }
+
+  for (const key of [
+    "reasoning_content",
+    "reasoning",
+    "thoughts",
+    "reasoning_text",
+  ]) {
+    const v = message[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+
+  const refusal = message.refusal;
+  if (typeof refusal === "string" && refusal.trim()) return refusal.trim();
+
+  return "";
+}
+
+/** KIE 业务错误常包在 HTTP 200 的 { code, msg, data } 里，而非 OpenAI choices。 */
+function throwIfKieEnvelopeError(parsed: unknown): void {
+  if (!parsed || typeof parsed !== "object") return;
+  const obj = parsed as Record<string, unknown>;
+  const code = obj.code;
+  if (typeof code !== "number") return;
+  if (Array.isArray(obj.choices) && obj.choices.length > 0) return;
+
+  const msg =
+    (typeof obj.msg === "string" && obj.msg.trim()) ||
+    (typeof obj.message === "string" && obj.message.trim()) ||
+    `KIE API error (${code})`;
+
+  if (code === 402 || /quota|insufficient|credit|balance/i.test(msg)) {
+    throw new CanvasGatewayError(
+      "PROVIDER_QUOTA_EXCEEDED",
+      "KIE 余额不足，请充值后重试",
+      402,
+      false,
+    );
+  }
+  if (code === 401 || code === 403) {
+    throw new CanvasGatewayError("PROVIDER_AUTH_ERROR", msg, code, false);
+  }
+  if (code === 429) {
+    throw new CanvasGatewayError("PROVIDER_HTTP_ERROR", msg, 429, true);
+  }
+  if (code !== 200) {
+    throw new CanvasGatewayError(
+      "PROVIDER_HTTP_ERROR",
+      `KIE chat error ${code}: ${msg.slice(0, 400)}`,
+      code >= 400 && code < 600 ? code : 502,
+      code >= 500,
+    );
+  }
+}
+
+function kieChatEmptyError(choice: KieChatChoice | undefined, rawBody: string): never {
+  if (/credits insufficient|quota|余额/i.test(rawBody)) {
+    throw new CanvasGatewayError(
+      "PROVIDER_QUOTA_EXCEEDED",
+      "KIE 余额不足，请充值后重试",
+      402,
+      false,
+    );
+  }
+  const finish = choice?.finish_reason ?? "unknown";
+  const snippet = rawBody.slice(0, 280).replace(/\s+/g, " ");
+  throw new CanvasGatewayError(
+    "PROVIDER_INVALID_RESPONSE",
+    `KIE chat empty content (finish_reason=${finish})${snippet ? `: ${snippet}` : ""}`,
+  );
+}
+
 export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
   {
     modelKey: "gemini-3-flash",
@@ -269,6 +367,91 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
       },
     ] satisfies CanvasParamSchema,
     defaultParams: { aspect_ratio: "1:1", output_format: "png" },
+  },
+  {
+    modelKey: "bytedance/seedance-2",
+    displayName: "Seedance 2 (KIE · 图生视频)",
+    role: "VIDEO",
+    description: "字节豆包 · 分镜图驱动视频。",
+    paramsSchema: [
+      {
+        key: "resolution",
+        label: "分辨率",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        defaultValue: "1080p",
+      },
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 4,
+        max: 15,
+        step: 1,
+        defaultValue: 5,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { resolution: "1080p", duration: 5 },
+  },
+  {
+    modelKey: "wan/2-7-image-to-video",
+    displayName: "Wan 2.7 i2v (KIE)",
+    role: "VIDEO",
+    description: "通义万相 · 图生视频。",
+    paramsSchema: [
+      {
+        key: "resolution",
+        label: "分辨率",
+        type: "select",
+        options: [
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        defaultValue: "1080p",
+      },
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 2,
+        max: 15,
+        step: 1,
+        defaultValue: 5,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { resolution: "1080p", duration: 5 },
+  },
+  {
+    modelKey: "happyhorse/image-to-video",
+    displayName: "Happy Horse i2v (KIE)",
+    role: "VIDEO",
+    description: "Happy Horse · 图生视频。",
+    paramsSchema: [
+      {
+        key: "resolution",
+        label: "分辨率",
+        type: "select",
+        options: [
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        defaultValue: "1080p",
+      },
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 3,
+        max: 15,
+        step: 1,
+        defaultValue: 5,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { resolution: "1080p", duration: 5 },
   },
 ];
 
@@ -469,87 +652,108 @@ export class KieGateway implements CanvasProviderGateway {
   }
 
   async chat(req: CanvasGatewayChatRequest): Promise<CanvasGatewayChatResponse> {
-    // KIE 当前 LLM 接入只有 gemini-3-flash 一条路径；不论传哪个 modelKey，
-    // 都打到 /gemini-3-flash/v1/chat/completions。messages 直接转发（支持
-    // string / 多模态 array content）。
+    // KIE 当前 LLM 接入只有 gemini-3-flash 一条路径
     const url = `${this.baseUrl}/gemini-3-flash/v1/chat/completions`;
-    const body: Record<string, unknown> = {
-      messages: req.messages,
-      stream: false,
-      include_thoughts: false,
-    };
-    if (req.params) {
-      const { reasoning_effort, max_tokens, temperature } = req.params as Record<
-        string,
-        unknown
-      >;
-      if (reasoning_effort) body.reasoning_effort = reasoning_effort;
-      if (max_tokens) body.max_tokens = max_tokens;
-      if (temperature !== undefined) body.temperature = temperature;
-    }
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-    const text = await r.text();
-    if (!r.ok) {
-      if (r.status === 401 || r.status === 403) {
+
+    const callOnce = async (
+      includeThoughts: boolean,
+    ): Promise<{
+      text: string;
+      parsed: unknown;
+      usage?: CanvasGatewayChatResponse["usage"];
+    }> => {
+      const body: Record<string, unknown> = {
+        messages: req.messages,
+        stream: false,
+        include_thoughts: includeThoughts,
+      };
+      if (req.params) {
+        const { reasoning_effort, max_tokens, temperature } = req.params as Record<
+          string,
+          unknown
+        >;
+        if (reasoning_effort) body.reasoning_effort = reasoning_effort;
+        if (max_tokens) body.max_tokens = max_tokens;
+        if (temperature !== undefined) body.temperature = temperature;
+      }
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const text = await r.text();
+      if (!r.ok) {
+        if (r.status === 401 || r.status === 403) {
+          throw new CanvasGatewayError(
+            "PROVIDER_AUTH_ERROR",
+            `KIE auth failed: ${text.slice(0, 200)}`,
+            r.status,
+            false,
+          );
+        }
+        if (r.status === 402 || /quota|insufficient|balance/i.test(text)) {
+          throw new CanvasGatewayError(
+            "PROVIDER_QUOTA_EXCEEDED",
+            "KIE 配额不足",
+            402,
+            false,
+          );
+        }
         throw new CanvasGatewayError(
-          "PROVIDER_AUTH_ERROR",
-          `KIE auth failed: ${text.slice(0, 200)}`,
-          r.status,
-          false,
+          "PROVIDER_HTTP_ERROR",
+          `KIE chat HTTP ${r.status}: ${text.slice(0, 400)}`,
         );
       }
-      if (r.status === 402 || /quota|insufficient|balance/i.test(text)) {
+      let parsed: unknown;
+      try {
+        parsed = text ? JSON.parse(text) : null;
+      } catch {
         throw new CanvasGatewayError(
-          "PROVIDER_QUOTA_EXCEEDED",
-          "KIE 配额不足",
-          402,
-          false,
+          "PROVIDER_INVALID_RESPONSE",
+          `non-JSON KIE chat body: ${text.slice(0, 200)}`,
         );
       }
-      throw new CanvasGatewayError(
-        "PROVIDER_HTTP_ERROR",
-        `KIE chat HTTP ${r.status}: ${text.slice(0, 400)}`,
-      );
-    }
-    let parsed: unknown;
-    try {
-      parsed = text ? JSON.parse(text) : null;
-    } catch {
-      throw new CanvasGatewayError(
-        "PROVIDER_INVALID_RESPONSE",
-        `non-JSON KIE chat body: ${text.slice(0, 200)}`,
-      );
-    }
-    const obj = parsed as {
-      choices?: { message?: { content?: string } }[];
-      usage?: {
-        prompt_tokens?: number;
-        completion_tokens?: number;
-        total_tokens?: number;
+      throwIfKieEnvelopeError(parsed);
+      const obj = parsed as {
+        choices?: KieChatChoice[];
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+        };
+      };
+      const choice = obj.choices?.[0];
+      const out = extractKieChatText(choice?.message);
+      if (!out) {
+        return { text: "", parsed, usage: undefined };
+      }
+      return {
+        text: out,
+        parsed,
+        usage: {
+          promptTokens: obj.usage?.prompt_tokens,
+          completionTokens: obj.usage?.completion_tokens,
+          totalTokens: obj.usage?.total_tokens,
+        },
       };
     };
-    const out = obj.choices?.[0]?.message?.content;
-    if (typeof out !== "string" || !out) {
-      throw new CanvasGatewayError(
-        "PROVIDER_INVALID_RESPONSE",
-        "KIE chat empty content",
-      );
+
+    let result = await callOnce(false);
+    if (!result.text.trim()) {
+      result = await callOnce(true);
     }
+    if (!result.text.trim()) {
+      const choice = (result.parsed as { choices?: KieChatChoice[] })?.choices?.[0];
+      kieChatEmptyError(choice, JSON.stringify(result.parsed ?? {}).slice(0, 500));
+    }
+
     return {
-      text: out,
-      rawPayload: parsed,
-      usage: {
-        promptTokens: obj.usage?.prompt_tokens,
-        completionTokens: obj.usage?.completion_tokens,
-        totalTokens: obj.usage?.total_tokens,
-      },
+      text: result.text,
+      rawPayload: result.parsed,
+      usage: result.usage,
     };
   }
 

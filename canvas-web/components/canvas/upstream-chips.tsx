@@ -57,14 +57,18 @@ export function useUpstreamChips(nodeId: string): UpstreamChip[] {
           thumb,
         });
       } else if (t === "image-engine" || t === "three-view-engine") {
-        const dd = p.data as ImageEngineNodeData;
+        const dd = p.data as ImageEngineNodeData & { characterName?: string };
         const thumb = dd.runtime?.ossUrl;
+        const charName =
+          t === "three-view-engine" ? dd.characterName?.trim() : "";
         out.push({
           id: pid,
           kind: "image",
           label:
             t === "three-view-engine"
-              ? `三视图 · ${pid.slice(-4)}`
+              ? charName
+                ? `三视图 · ${charName}`
+                : `三视图 · ${pid.slice(-4)}`
               : `生图 · ${pid.slice(-4)}`,
           thumb,
         });

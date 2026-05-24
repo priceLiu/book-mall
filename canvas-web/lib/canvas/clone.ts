@@ -16,6 +16,13 @@ export function cloneGraphForNewProject(src: CanvasGraph): CanvasGraph {
     const newId = `n_${nanoid(8)}`;
     idMap.set(n.id, newId);
     return { ...n, id: newId };
+  }).map((n) => {
+    if (!n.parentId) return n;
+    const parentId = idMap.get(n.parentId);
+    if (!parentId) {
+      return { ...n, parentId: undefined, extent: undefined };
+    }
+    return { ...n, parentId };
   });
   const edges = cleaned.edges.map((e) => ({
     ...e,

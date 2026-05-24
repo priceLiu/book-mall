@@ -13,6 +13,9 @@ import {
 import {
   runAiEngineNode,
   runImageEngineNode,
+  runStoryLlmEngineNode,
+  runTtsEngineNode,
+  runVideoEngineNode,
 } from "@/lib/canvas/canvas-engine-runner";
 
 type Ctx = { params: Promise<{ id: string; nodeId: string }> };
@@ -67,6 +70,20 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     let result;
     if (node.type === "ai-engine") {
       result = await runAiEngineNode({ ...baseArgs, forceFresh });
+    } else if (
+      node.type === "story-outline-engine" ||
+      node.type === "character-engine" ||
+      node.type === "storyboard-engine"
+    ) {
+      result = await runStoryLlmEngineNode({
+        ...baseArgs,
+        forceFresh,
+        engineKind: node.type,
+      });
+    } else if (node.type === "video-engine") {
+      result = await runVideoEngineNode({ ...baseArgs, forceFresh });
+    } else if (node.type === "tts-engine") {
+      result = await runTtsEngineNode({ ...baseArgs, forceFresh });
     } else if (node.type === "image-engine" || node.type === "three-view-engine") {
       result = await runImageEngineNode({ ...baseArgs, forceFresh });
     } else {

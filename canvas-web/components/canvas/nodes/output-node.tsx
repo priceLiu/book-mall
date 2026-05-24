@@ -12,7 +12,6 @@ import type {
   OutputNodeData,
 } from "@/lib/canvas/types";
 import { resolveProductMainImage } from "@/lib/canvas/upstream-images";
-import { useAutoFitNodeSize } from "@/lib/canvas/use-auto-fit-node-size";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { NodeShell } from "../node-shell";
@@ -23,6 +22,15 @@ import {
   type CompareReferenceImage,
 } from "../compare-modal";
 import { MediaHoverBox } from "../media-hover-box";
+import {
+  NODE_BTN_ACCENT,
+  NODE_BTN_GHOST,
+  NODE_MEDIA_MIN_WIDTH,
+  NodeMediaEmpty,
+  NodeMediaGallery,
+  NodeMediaItem,
+  NodeMediaStage,
+} from "../node-ui";
 
 function resolveUpstreamImageEngineId(
   edges: CanvasFlowEdge[],
@@ -58,9 +66,6 @@ type CompareState = {
   defaultRightId?: string;
 };
 
-/** 输出节点壳层 + 表单区固定高度（不含图片列表） */
-const OUTPUT_CHROME_HEIGHT = 158;
-const OUTPUT_PER_IMAGE_CHROME = 34;
 
 export function OutputNode({ id, data, selected }: NodeProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -105,15 +110,6 @@ export function OutputNode({ id, data, selected }: NodeProps) {
     succeeded.length >= 2 ||
     (succeeded.length >= 1 && referenceImages.length > 0);
 
-  useAutoFitNodeSize(id, {
-    imageUrls: previewUrls,
-    chromeHeight: OUTPUT_CHROME_HEIGHT + (canCompare ? 44 : 0),
-    perImageChrome: succeeded.length > 0 ? OUTPUT_PER_IMAGE_CHROME : 0,
-    minWidth: 280,
-    minHeight: 280,
-    maxWidth: 520,
-  });
-
   const openCompare = useCallback((state?: CompareState) => {
     setCompareState(state ?? {});
   }, []);
@@ -125,19 +121,15 @@ export function OutputNode({ id, data, selected }: NodeProps) {
         subtitle={d.title ?? "未命名画作"}
         selected={selected}
         runtime={d.runtime}
-        minWidth={260}
-        minHeight={200}
+        minWidth={NODE_MEDIA_MIN_WIDTH}
+        minHeight={480}
         inputs={[{ id: "in_image", label: "最终画面", kind: "image" }]}
       >
         <div className="flex h-full flex-col gap-2">
           {canCompare ? (
             <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => openCompare()}
-                className="nodrag inline-flex items-center gap-1.5 rounded-md border border-[var(--canvas-accent)]/40 bg-[var(--canvas-accent)]/10 px-2.5 py-1.5 text-[11px] font-medium text-white hover:border-[var(--canvas-accent)]/70 hover:bg-[var(--canvas-accent)]/20"
-              >
-                <Split className="size-3.5" /> 对比
+              <button type="button" onClick={() => openCompare()} className={NODE_BTN_ACCENT}>
+                <Split className="size-3" /> 对比
               </button>
               {productMain && succeeded.length >= 1 ? (
                 <button
@@ -150,7 +142,7 @@ export function OutputNode({ id, data, selected }: NodeProps) {
                       ),
                     })
                   }
-                  className="nodrag inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1.5 text-[11px] text-white/80 hover:border-white/30 hover:text-white"
+                  className={NODE_BTN_GHOST}
                 >
                   与主图对比
                 </button>
@@ -158,93 +150,97 @@ export function OutputNode({ id, data, selected }: NodeProps) {
             </div>
           ) : null}
 
-          <div className="space-y-2 rounded-lg border border-white/10 bg-black p-1.5">
+          <NodeMediaGallery>
             {succeeded.length > 0 ? (
               succeeded.map((t, idx) => {
                 const prev = idx > 0 ? succeeded[idx - 1] : null;
                 return (
-                  <div
+                  <NodeMediaItem
                     key={t.id}
-                    className="overflow-hidden rounded-md border border-white/10"
-                  >
-                    <MediaHoverBox
-                      src={t.ossUrl!}
-                      variant="generated"
-                      alt={`output-${idx + 1}`}
-                      naturalSize
-                      clickToPreview
-                      compareContext={
-                        canCompare && upstreamEngineId
-                          ? {
-                              tasks: history,
-                              referenceImages,
-                              focusTaskId: t.id,
+                    stage={
+                      <NodeMediaStage>
+                        <MediaHoverBox
+                          src={t.ossUrl!}
+                          variant="generated"
+                          alt={`output-${idx + 1}`}
+                          fit="contain"
+                          clickToPreview
+                          compareContext={
+                            canCompare && upstreamEngineId
+                              ? {
+                                  tasks: history,
+                                  referenceImages,
+                                  focusTaskId: t.id,
+                                }
+                              : undefined
+                          }
+                        />
+                      </NodeMediaStage>
+                    }
+                    actions={
+                      <>
+                        <span className="text-[11px] text-white/50">#{idx + 1}</span>
+                        {productMain ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openCompare({
+                                defaultLeftId: refSideId("product-main"),
+                                defaultRightId: taskSideId(t.id),
+                              })
                             }
-                          : undefined
-                      }
-                    />
-                    <div className="flex flex-wrap items-center gap-1 border-t border-white/5 bg-black/50 px-1.5 py-1">
-                      <span className="text-[10px] text-white/50">#{idx + 1}</span>
-                      {productMain ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openCompare({
-                              defaultLeftId: refSideId("product-main"),
-                              defaultRightId: taskSideId(t.id),
-                            })
-                          }
-                          className="nodrag rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/75 hover:border-white/30 hover:text-white"
+                            className={NODE_BTN_GHOST}
+                          >
+                            与主图对比
+                          </button>
+                        ) : null}
+                        {prev ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openCompare({
+                                defaultLeftId: taskSideId(prev.id),
+                                defaultRightId: taskSideId(t.id),
+                              })
+                            }
+                            className={NODE_BTN_GHOST}
+                          >
+                            与上一张对比
+                          </button>
+                        ) : null}
+                        <a
+                          href={t.ossUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`${NODE_BTN_GHOST} ml-auto`}
                         >
-                          与主图对比
-                        </button>
-                      ) : null}
-                      {prev ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openCompare({
-                              defaultLeftId: taskSideId(prev.id),
-                              defaultRightId: taskSideId(t.id),
-                            })
-                          }
-                          className="nodrag rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/75 hover:border-white/30 hover:text-white"
-                        >
-                          与上一张对比
-                        </button>
-                      ) : null}
-                      <a
-                        href={t.ossUrl!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="nodrag ml-auto inline-flex items-center gap-0.5 rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/75 hover:border-white/30 hover:text-white"
-                      >
-                        <Download className="size-2.5" /> 下载
-                      </a>
-                    </div>
-                  </div>
+                          <Download className="size-3" /> 下载
+                        </a>
+                      </>
+                    }
+                  />
                 );
               })
             ) : previewUrls.length > 0 ? (
               previewUrls.map((url, idx) => (
-                <div
+                <NodeMediaItem
                   key={`${url}-${idx}`}
-                  className="overflow-hidden rounded-md border border-white/10"
-                >
-                  <MediaHoverBox
-                    src={url}
-                    variant="generated"
-                    alt={`output-${idx + 1}`}
-                    naturalSize
-                  />
-                </div>
+                  stage={
+                    <NodeMediaStage>
+                      <MediaHoverBox
+                        src={url}
+                        variant="generated"
+                        alt={`output-${idx + 1}`}
+                        fit="contain"
+                      />
+                    </NodeMediaStage>
+                  }
+                />
               ))
             ) : (
-              <div className="flex min-h-[120px] items-center justify-center text-[var(--canvas-muted)]">
-                <ImageIcon className="size-6 opacity-40" />
-              </div>
+              <NodeMediaEmpty icon={<ImageIcon className="size-6 opacity-40" />} />
             )}
-          </div>
+          </NodeMediaGallery>
 
           <input
             type="text"

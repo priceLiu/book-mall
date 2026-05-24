@@ -15,8 +15,8 @@ import {
 } from "./dynamic-param-form";
 
 export type EnginePickerProps = {
-  /** 过滤模型 role：LLM / IMAGE */
-  role: "LLM" | "IMAGE";
+  /** 过滤模型 role：LLM / IMAGE / VIDEO */
+  role: "LLM" | "IMAGE" | "VIDEO";
   /** 仅展示这些 modelKey（三视图引擎白名单等） */
   allowedModelKeys?: string[];
   /** 当前选中 */
@@ -34,8 +34,10 @@ export type EnginePickerProps = {
   }) => void;
 };
 
+/* 须高于 story-engine-actions-modal (1090) 等嵌套宿主 */
+const ENGINE_PICKER_MODAL_Z = 1200;
+
 /**
- * 引擎模型选择器（卡片式弹层 + 参数面板）：
  * - 触发按钮显示当前选中
  * - 弹层：模型卡片 → 下方动态参数（分段按钮 / 滑条 / 复选框）
  * - 确认后写回节点
@@ -88,8 +90,11 @@ export function EnginePicker({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[12px] text-white hover:border-white/30"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className="nodrag nowheel flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[12px] text-white hover:border-white/30"
       >
         <span className="truncate">
           {loading ? (
@@ -102,7 +107,7 @@ export function EnginePicker({
             </>
           ) : (
             <span className="text-[var(--canvas-muted)]">
-              选择 {role === "LLM" ? "AI 引擎模型" : "生图模型"}
+              选择 {role === "LLM" ? "AI 引擎模型" : role === "VIDEO" ? "视频模型" : "生图模型"}
             </span>
           )}
         </span>
@@ -149,7 +154,7 @@ function EngineModelModal({
   onClose,
   onConfirm,
 }: {
-  role: "LLM" | "IMAGE";
+  role: "LLM" | "IMAGE" | "VIDEO";
   groups: Group[];
   providerId: string;
   modelKey: string;
@@ -174,31 +179,40 @@ function EngineModelModal({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
       }
     };
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
       document.body.style.overflow = "";
     };
   }, [providerId, modelKey, params, groups, onClose]);
 
   if (!mounted) return null;
 
-  const title = role === "LLM" ? "选择 AI 引擎模型" : "选择生图模型";
+  const title =
+    role === "LLM"
+      ? "选择 AI 引擎模型"
+      : role === "VIDEO"
+        ? "选择视频模型"
+        : "选择生图模型";
   const subtitle =
     role === "LLM"
       ? "选模型并调整推理参数，用于生成设计方案。"
-      : "选模型并调整比例 / 分辨率等，用于最终出图。";
+      : role === "VIDEO"
+        ? "图生视频模型，需 KIE 系统 Provider。"
+        : "选模型并调整比例 / 分辨率等，用于最终出图。";
 
   const hasParams =
     !!draft?.model.paramsSchema && draft.model.paramsSchema.length > 0;
 
   const node = (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/65 backdrop-blur-sm p-4"
+      className="fixed inset-0 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4"
+      style={{ zIndex: ENGINE_PICKER_MODAL_Z }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -206,7 +220,7 @@ function EngineModelModal({
       aria-modal="true"
     >
       <div
-        className="flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--canvas-surface,#161427)] shadow-2xl"
+        className="nodrag nowheel flex w-full max-w-3xl max-h-[90vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--canvas-surface,#161427)] shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-white/5 px-5 py-4">
@@ -459,14 +473,14 @@ function roleTone(role: string): string {
   }
 }
 
-function EmptyState({ role }: { role: "LLM" | "IMAGE" }) {
+function EmptyState({ role }: { role: "LLM" | "IMAGE" | "VIDEO" }) {
   return (
     <div className="grid place-items-center gap-3 px-4 py-10 text-center text-[13px] text-white/70">
       <p>
         还没有可用的
         <span className="font-medium text-white">
           {" "}
-          {role === "LLM" ? "LLM" : "IMAGE"}{" "}
+          {role === "LLM" ? "LLM" : role === "VIDEO" ? "VIDEO" : "IMAGE"}{" "}
         </span>
         模型。
       </p>

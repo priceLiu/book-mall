@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { LayoutTemplate, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -11,12 +12,14 @@ import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { busEnqueueNodesSequential } from "@/lib/canvas/canvas-run-bus";
 import {
+  CanvasRunnerHost,
   useCanvasInflightTaskCount,
-  useCanvasRunner,
 } from "@/lib/canvas/run-queue";
 import { stripRuntimeForTemplate } from "@/lib/canvas/sanitize";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
+import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { topoSort } from "@/lib/canvas/topo";
 import type {
   CanvasContentNodeType,
@@ -31,9 +34,12 @@ import {
   type CanvasProjectDetail,
 } from "@/lib/canvas-api";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
+import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
+import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
+const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 
 function Inner({ projectId }: { projectId: string }) {
   const base = useBookMallBaseUrl();
@@ -43,6 +49,10 @@ function Inner({ projectId }: { projectId: string }) {
   const addNode = useCanvasStore((s) => s.addNode);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const reflowStoryComicLayout = useCanvasStore(
+    (s) => s.reflowStoryComicLayout,
+  );
+  const isStoryComicCanvas = hasStoryComicPipeline(nodes);
 
   const [project, setProject] = useState<CanvasProjectDetail | null>(null);
   const [nameDraft, setNameDraft] = useState("");
@@ -55,21 +65,34 @@ function Inner({ projectId }: { projectId: string }) {
   const [myCharactersOpen, setMyCharactersOpen] = useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
 
-  const { enqueueNode } = useCanvasRunner();
+  /** 加载完成时的节点数；用于阻止误把「有内容的画布」自动保存成空。 */
+  const loadedNodeCountRef = useRef(0);
+  const canvasReadyRef = useRef(false);
+
   const inflightTaskCount = useCanvasInflightTaskCount();
 
   // Load project
   useEffect(() => {
     if (!base) return;
     let cancelled = false;
+    canvasReadyRef.current = false;
+    setProject(null);
+    setLoading(true);
     void (async () => {
-      setLoading(true);
       try {
         const p = await getCanvasProject(base, projectId);
         if (cancelled) return;
+        const rawCanvas = p.canvas as { nodes?: unknown[] } | null;
+        loadedNodeCountRef.current = Array.isArray(rawCanvas?.nodes)
+          ? rawCanvas.nodes.length
+          : 0;
+        useCanvasStore.temporal.getState().pause();
+        hydrate(projectId, p.canvas as never);
+        useCanvasStore.temporal.getState().clear();
+        useCanvasStore.temporal.getState().resume();
         setProject(p);
         setNameDraft(p.name);
-        hydrate(projectId, p.canvas as never);
+        canvasReadyRef.current = true;
         setLoadError(null);
       } catch (e) {
         if (!cancelled) {
@@ -87,7 +110,15 @@ function Inner({ projectId }: { projectId: string }) {
   // Autosave on changes (debounced)
   const autosaveTimerRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!project || !base) return;
+    if (!project || !base || loading || !canvasReadyRef.current) return;
+    if (
+      nodes.length === 0 &&
+      loadedNodeCountRef.current > 0 &&
+      edges.length === 0
+    ) {
+      setSaveError("检测到画布被清空，已阻止自动保存。请刷新或点「恢复漫剧模板」。");
+      return;
+    }
     if (autosaveTimerRef.current !== null) {
       window.clearTimeout(autosaveTimerRef.current);
     }
@@ -95,6 +126,13 @@ function Inner({ projectId }: { projectId: string }) {
       setSaving(true);
       try {
         const graph = toGraph();
+        if (
+          graph.nodes.length === 0 &&
+          loadedNodeCountRef.current > 0
+        ) {
+          setSaveError("检测到画布被清空，已阻止自动保存。");
+          return;
+        }
         const thumb = pickProjectThumbnailUrl(graph);
         const patch: {
           canvas: typeof graph;
@@ -104,6 +142,7 @@ function Inner({ projectId }: { projectId: string }) {
           patch.thumbnailUrl = thumb;
         }
         await patchCanvasProject(base, projectId, patch);
+        loadedNodeCountRef.current = graph.nodes.length;
         if (patch.thumbnailUrl) {
           setProject((p) =>
             p ? { ...p, thumbnailUrl: patch.thumbnailUrl! } : p,
@@ -122,7 +161,7 @@ function Inner({ projectId }: { projectId: string }) {
         window.clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [nodes, edges, project, base, projectId, toGraph]);
+  }, [nodes, edges, project, base, projectId, toGraph, loading]);
 
   const undo = useCallback(() => {
     const tStore = useCanvasStore.temporal.getState();
@@ -148,6 +187,7 @@ function Inner({ projectId }: { projectId: string }) {
         patch.thumbnailUrl = thumb;
       }
       await patchCanvasProject(base, projectId, patch);
+      loadedNodeCountRef.current = graph.nodes.length;
       if (patch.thumbnailUrl) {
         setProject((p) =>
           p ? { ...p, thumbnailUrl: patch.thumbnailUrl! } : p,
@@ -186,7 +226,9 @@ function Inner({ projectId }: { projectId: string }) {
       const initialData =
         type === "text" && presetId
           ? buildTextNodeDataFromPreset(presetId)
-          : undefined;
+          : type === "image-engine" && presetId
+            ? buildImageEngineDataFromPreset(presetId)
+            : undefined;
       addNode(type, center, initialData);
     },
     [addNode],
@@ -234,6 +276,25 @@ function Inner({ projectId }: { projectId: string }) {
     }
   }, [base, project?.name, toGraph, dialogs]);
 
+  const restoreStoryComicTemplate = useCallback(async () => {
+    const tpl = getBuiltinCanvasTemplate(STORY_COMIC_TEMPLATE_ID);
+    if (!tpl) return;
+    const ok = await dialogs.confirm({
+      title: "载入漫剧全链路模板？",
+      message: "将用官方向导模板（漫剧启动 + 导出）覆盖当前画布结构。",
+      confirmLabel: "载入",
+    });
+    if (!ok) return;
+    useCanvasStore.temporal.getState().pause();
+    hydrate(projectId, tpl);
+    useCanvasStore.temporal.getState().clear();
+    useCanvasStore.temporal.getState().resume();
+    loadedNodeCountRef.current = tpl.nodes.length;
+    setSaveError(null);
+    reflowStoryComicLayout();
+    await manualSave();
+  }, [dialogs, hydrate, manualSave, projectId, reflowStoryComicLayout]);
+
   const runAll = useCallback(() => {
     let order: string[];
     try {
@@ -242,25 +303,24 @@ function Inner({ projectId }: { projectId: string }) {
       setSaveError(e instanceof Error ? e.message : "拓扑失败");
       return;
     }
-    for (const id of order) {
+    const runnableIds = order.filter((id) => {
       const n = nodes.find((x) => x.id === id);
-      if (n && isRunnableNodeType(n.type as CanvasNodeType)) {
-        enqueueNode(id);
-      }
-    }
-  }, [nodes, edges, enqueueNode]);
+      return n && isRunnableNodeType(n.type as CanvasNodeType);
+    });
+    if (!runnableIds.length) return;
+    busEnqueueNodesSequential(runnableIds);
+  }, [nodes, edges]);
 
+  let body: React.ReactNode;
   if (loading) {
-    return (
+    body = (
       <div className="flex h-screen items-center justify-center bg-[var(--canvas-bg)] text-[var(--canvas-muted)]">
         <Loader2 className="mr-2 size-5 animate-spin" />
         加载画布…
       </div>
     );
-  }
-
-  if (loadError || !project) {
-    return (
+  } else if (loadError || !project) {
+    body = (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-[var(--canvas-bg)] text-sm text-red-200">
         <p>无法加载画布：{loadError ?? "未知错误"}</p>
         <a href="/projects" className="underline">
@@ -268,11 +328,10 @@ function Inner({ projectId }: { projectId: string }) {
         </a>
       </div>
     );
-  }
-
-  return (
-    <div className="flex h-screen flex-col bg-[var(--canvas-bg)]">
-      <CanvasToolbar
+  } else {
+    body = (
+      <div className="flex h-screen flex-col bg-[var(--canvas-bg)]">
+        <CanvasToolbar
         projectName={nameDraft}
         onProjectNameChange={setNameDraft}
         onProjectNameCommit={() => void commitProjectName()}
@@ -285,6 +344,9 @@ function Inner({ projectId }: { projectId: string }) {
         onRunAll={runAll}
         onOpenMyTemplates={() => setMyTemplatesOpen(true)}
         onOpenMyCharacters={() => setMyCharactersOpen(true)}
+        onReflowStoryLayout={
+          isStoryComicCanvas ? () => reflowStoryComicLayout() : undefined
+        }
         onSaveTemplate={() => void onSaveTemplate()}
         running={inflightTaskCount > 0}
         inflightTaskCount={inflightTaskCount}
@@ -301,10 +363,66 @@ function Inner({ projectId }: { projectId: string }) {
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <FlowCanvas onUndo={undo} onRedo={redo} />
+        {isStoryComicCanvas && nodes.length > 0 ? (
+          <button
+            type="button"
+            className="absolute bottom-6 right-6 z-20 inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-[var(--canvas-surface)]/95 px-4 py-2 text-xs font-medium text-emerald-100 shadow-lg hover:border-emerald-400/60 hover:bg-emerald-500/15"
+            title="按漫剧工作流重新排列所有节点"
+            onClick={() => reflowStoryComicLayout()}
+          >
+            <LayoutTemplate className="size-3.5" />
+            重排
+          </button>
+        ) : null}
+        {nodes.length === 0 && !loading && loadedNodeCountRef.current > 0 ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
+            <div className="pointer-events-auto max-w-md rounded-xl border border-white/10 bg-[var(--canvas-surface)]/95 px-6 py-5 text-center shadow-xl">
+              <p className="text-sm font-medium text-white">节点数据丢失</p>
+              <p className="mt-2 text-xs leading-relaxed text-[var(--canvas-muted)]">
+                云端记录里这个画布已被保存为空。若还有其他副本，请到
+                <Link href="/projects" className="mx-1 underline">
+                  我的画布
+                </Link>
+                打开；否则可重新载入模板。
+              </p>
+              <button
+                type="button"
+                className="mt-4 rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-500"
+                onClick={() => void restoreStoryComicTemplate()}
+              >
+                恢复「漫剧全链路」模板
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {nodes.length === 0 && !loading && loadedNodeCountRef.current === 0 ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
+            <div className="pointer-events-auto max-w-sm rounded-xl border border-white/10 bg-black/50 px-5 py-4 text-center">
+              <p className="text-xs text-[var(--canvas-muted)]">
+                空白画布 · 从上方工具栏拖入节点
+              </p>
+              <button
+                type="button"
+                className="mt-3 rounded-md border border-emerald-400/30 px-3 py-1.5 text-[11px] text-emerald-100 hover:bg-emerald-500/10"
+                onClick={() => void restoreStoryComicTemplate()}
+              >
+                载入「漫剧全链路」模板
+              </button>
+            </div>
+          </div>
+        ) : null}
         {/* 画布内顶部居中节点面板（位于工具栏下方，勿用 fixed 顶到视口顶端） */}
         <NodePalette onAdd={onAddViaPalette} />
       </div>
     </div>
+    );
+  }
+
+  return (
+    <>
+      <CanvasRunnerHost projectId={projectId} />
+      {body}
+    </>
   );
 }
 

@@ -194,3 +194,18 @@ body {
   box-shadow: 0 0 0 6px var(--canvas-accent-glow) !important;
   background: rgba(167, 139, 250, 0.06) !important;
 }
+
+/* 生成中节点：边框呼吸光晕 */
+@keyframes canvas-node-generating-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.08);
+  }
+}
+
+.react-flow__node .canvas-node-shell.canvas-node-generating {
+  animation: canvas-node-generating-pulse 1.6s ease-in-out infinite;
+}

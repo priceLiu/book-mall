@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NodeResizer, useReactFlow, useViewport, type NodeProps } from "@xyflow/react";
-import { LayoutGrid, Palette, Trash2 } from "lucide-react";
+import { LayoutGrid, LayoutTemplate, Palette, Trash2 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   GROUP_COLOR_PRESETS,
@@ -38,6 +38,9 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const ungroup = useCanvasStore((s) => s.ungroup);
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
+  const reflowStoryTemplateGroups = useCanvasStore(
+    (s) => s.reflowStoryTemplateGroups,
+  );
   const allNodes = useCanvasStore((s) => s.nodes);
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
   const viewport = useViewport();
@@ -54,6 +57,8 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
   const d = data as unknown as GroupNodeData;
   const color = d.color || GROUP_COLOR_PRESETS[0];
+  const isStoryTemplateGroup =
+    id === "sc-group-characters" || id === "sc-group-media";
 
   const childrenIds = useMemo(
     () =>
@@ -280,6 +285,15 @@ export function GroupNode({ id, data, selected }: NodeProps) {
                   >
                     <LayoutGrid className="size-[18px]" strokeWidth={1.75} />
                   </CanvasToolIcon>
+                  {isStoryTemplateGroup ? (
+                    <CanvasToolIcon
+                      label="修复"
+                      hint="收拢散落节点并重排（组内为 0 时也可用）"
+                      onClick={() => reflowStoryTemplateGroups()}
+                    >
+                      <LayoutTemplate className="size-[18px]" strokeWidth={1.75} />
+                    </CanvasToolIcon>
+                  ) : null}
                   <CanvasToolIcon
                     label="解散"
                     hint="保留子节点、移除分组容器"

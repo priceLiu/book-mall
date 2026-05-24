@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { listCanvasProjectTasks, type CanvasTaskRecord } from "@/lib/canvas-api";
+import { taskHasDisplayableResult } from "./task-media-url";
 import { useCanvasStore } from "./store";
 
 const TASK_HISTORY_POLL_MS = 2000;
@@ -50,7 +51,7 @@ export function useNodeTaskHistory(nodeId: string | null | undefined) {
   const succeeded = useMemo(
     () =>
       history
-        .filter((t) => t.status === "SUCCEEDED" && t.ossUrl)
+        .filter((t) => taskHasDisplayableResult(t))
         .sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),

@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Bookmark,
   BookmarkPlus,
+  LayoutTemplate,
   Loader2,
   Play,
   Redo2,
@@ -27,6 +28,7 @@ export function CanvasToolbar({
   onSaveTemplate,
   onOpenMyTemplates,
   onOpenMyCharacters,
+  onReflowStoryLayout,
   running,
   inflightTaskCount = 0,
 }: {
@@ -43,6 +45,7 @@ export function CanvasToolbar({
   onSaveTemplate?: () => void;
   onOpenMyTemplates?: () => void;
   onOpenMyCharacters?: () => void;
+  onReflowStoryLayout?: () => void;
   running: boolean;
   inflightTaskCount?: number;
 }) {
@@ -130,6 +133,17 @@ export function CanvasToolbar({
           >
             <UserRound className="size-3" />
             我的角色
+          </button>
+        ) : null}
+        {onReflowStoryLayout ? (
+          <button
+            type="button"
+            onClick={onReflowStoryLayout}
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-100 hover:border-emerald-400/50 hover:bg-emerald-500/20"
+            title="按漫剧工作流重新排列节点"
+          >
+            <LayoutTemplate className="size-3" />
+            重排
           </button>
         ) : null}
         {onSaveTemplate ? (
