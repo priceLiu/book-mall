@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { ExternalLink, Maximize2 } from "lucide-react";
 import { getStoryWebOrigin } from "@/lib/story-web-origin";
+import { mainSiteStoryOpenHref } from "@/lib/main-site-app-open-links";
 import {
   appendStoryTheaterLibrary,
   listStoryTheaterLibrary,
@@ -31,6 +32,7 @@ type StoryTheaterCreatorClientProps = {
 
 export function StoryTheaterCreatorClient({ videos }: StoryTheaterCreatorClientProps) {
   const storyOrigin = getStoryWebOrigin();
+  const storyOpenHref = mainSiteStoryOpenHref("/");
   const [savedHint, setSavedHint] = useState<string | null>(null);
 
   const onFullscreen = useCallback((video: HTMLVideoElement) => {
@@ -97,7 +99,7 @@ export function StoryTheaterCreatorClient({ videos }: StoryTheaterCreatorClientP
 
       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
         <a
-          href={storyOrigin}
+          href={storyOpenHref}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-2 rounded-full bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-800"

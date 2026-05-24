@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, ExternalLink, ImageIcon } from "lucide-react";
-import { getCanvasWebOrigin } from "@/lib/canvas-web-origin";
+import { mainSiteCanvasOpenHref } from "@/lib/main-site-app-open-links";
 
 const PREVIEW_SLOTS = [
   { hint: "电商产品海报" },
@@ -14,7 +14,8 @@ const PREVIEW_SLOTS = [
 ];
 
 export function AiPosterCanvasGalleryClient() {
-  const canvasOrigin = getCanvasWebOrigin();
+  const canvasGalleryHref = mainSiteCanvasOpenHref("/gallery");
+  const canvasProjectsHref = mainSiteCanvasOpenHref("/projects");
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
@@ -34,7 +35,7 @@ export function AiPosterCanvasGalleryClient() {
 
       <div className="mb-8 flex flex-wrap items-center gap-3">
         <a
-          href={`${canvasOrigin}/gallery`}
+          href={canvasGalleryHref}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-neutral-800"
@@ -43,7 +44,7 @@ export function AiPosterCanvasGalleryClient() {
           <ExternalLink className="size-4" />
         </a>
         <a
-          href={`${canvasOrigin}/projects`}
+          href={canvasProjectsHref}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-medium text-neutral-900 hover:bg-neutral-50"

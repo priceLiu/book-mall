@@ -3,10 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Layers, Palette, Wand2 } from "lucide-react";
-import { getCanvasWebOrigin } from "@/lib/canvas-web-origin";
+import { mainSiteCanvasOpenHref } from "@/lib/main-site-app-open-links";
 
 export function AiPosterCanvasStudioClient() {
-  const canvasOrigin = getCanvasWebOrigin();
+  const canvasOpenHref = mainSiteCanvasOpenHref("/");
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
@@ -25,7 +25,7 @@ export function AiPosterCanvasStudioClient() {
       </div>
 
       <a
-        href={canvasOrigin}
+        href={canvasOpenHref}
         target="_blank"
         rel="noopener noreferrer"
         className="group relative block aspect-[16/9] w-full overflow-hidden rounded-3xl border border-neutral-200 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-cyan-50 shadow-xl transition hover:shadow-2xl"
@@ -51,7 +51,7 @@ export function AiPosterCanvasStudioClient() {
             6 类节点自由拼接，多模型一键切换。
           </p>
           <div className="flex items-center gap-2 text-sm font-medium text-white">
-            打开 {canvasOrigin}
+            打开 canvas-web
             <ExternalLink className="size-4 transition group-hover:translate-x-0.5" />
           </div>
         </div>

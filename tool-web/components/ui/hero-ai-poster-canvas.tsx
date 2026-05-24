@@ -3,10 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ExternalLink, Layers, Palette, Sparkles, Wand2 } from "lucide-react";
-import { getCanvasWebOrigin } from "@/lib/canvas-web-origin";
+import { mainSiteCanvasOpenHref } from "@/lib/main-site-app-open-links";
 
 export function AiPosterCanvasHero() {
-  const canvasOrigin = getCanvasWebOrigin();
+  const canvasOpenHref = mainSiteCanvasOpenHref("/");
 
   return (
     <div className="w-full py-12 lg:py-16">
@@ -45,7 +45,7 @@ export function AiPosterCanvasHero() {
                 进入创意画室 <Sparkles className="size-4" />
               </Link>
               <a
-                href={canvasOrigin}
+                href={canvasOpenHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-medium text-neutral-900 hover:bg-neutral-50"

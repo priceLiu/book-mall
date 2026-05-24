@@ -3,10 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Clapperboard, ExternalLink, Sparkles, Theater } from "lucide-react";
-import { getStoryWebOrigin } from "@/lib/story-web-origin";
+import { mainSiteStoryOpenHref } from "@/lib/main-site-app-open-links";
 
 export function StoryTheaterHero() {
-  const storyOrigin = getStoryWebOrigin();
+  const storyOpenHref = mainSiteStoryOpenHref("/");
 
   return (
     <div className="w-full py-12 lg:py-16">
@@ -31,7 +31,7 @@ export function StoryTheaterHero() {
                 创作幻想家 <Sparkles className="size-4" />
               </Link>
               <a
-                href={storyOrigin}
+                href={storyOpenHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-medium text-neutral-900 hover:bg-neutral-50"
