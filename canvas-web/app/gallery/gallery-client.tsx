@@ -5,10 +5,17 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
-import { listCanvasWorks, type CanvasWorkRecord } from "@/lib/canvas-api";
+import { GalleryMediaCard } from "@/components/gallery/gallery-media-card";
+import {
+  listCanvasCharacters,
+  listCanvasWorks,
+  type CanvasCharacterRecord,
+  type CanvasWorkRecord,
+} from "@/lib/canvas-api";
 
 function Inner() {
   const base = useBookMallBaseUrl();
+  const [characters, setCharacters] = useState<CanvasCharacterRecord[]>([]);
   const [works, setWorks] = useState<CanvasWorkRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,8 +24,12 @@ function Inner() {
     if (!base) return;
     setLoading(true);
     try {
-      const list = await listCanvasWorks(base);
-      setWorks(list);
+      const [charList, workList] = await Promise.all([
+        listCanvasCharacters(base),
+        listCanvasWorks(base),
+      ]);
+      setCharacters(charList);
+      setWorks(workList);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败");
@@ -31,13 +42,15 @@ function Inner() {
     void load();
   }, [load]);
 
+  const empty = !loading && characters.length === 0 && works.length === 0;
+
   return (
     <div className="canvas-container py-10">
-      <header className="mb-6">
+      <header className="mb-8">
         <p className="twenty-eyebrow">canvas-web · gallery</p>
         <h1 className="canvas-serif mt-2 text-3xl text-white">画作</h1>
         <p className="mt-2 text-sm text-[var(--canvas-muted)]">
-          所有画布运行成功的图像生成结果，按时间倒序展示。点图查看大图。
+          保存的三视图角色与全部生成结果。鼠标移上图卡可预览或下载。
         </p>
       </header>
 
@@ -52,46 +65,70 @@ function Inner() {
           <Loader2 className="size-4 animate-spin" />
           加载中…
         </div>
-      ) : works.length === 0 ? (
+      ) : empty ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-12 text-center text-sm text-[var(--canvas-muted)]">
-          还没有画作。先去
+          还没有内容。先去
           <Link href="/projects" className="mx-1 text-[var(--canvas-accent)] hover:underline">
             我的画布
           </Link>
-          运行一个生成节点试试。
+          运行三视图或生图节点试试。
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {works.map((w) => (
-            <li
-              key={w.id}
-              className="group rounded-xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-2 transition hover:border-[var(--canvas-accent)]/40"
-            >
-              <a href={w.ossUrl} target="_blank" rel="noopener noreferrer" className="block">
-                <div className="aspect-square overflow-hidden rounded-lg bg-black">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={w.ossUrl}
-                    alt={w.project?.name ?? "画作"}
-                    className="h-full w-full object-cover transition group-hover:scale-[1.02]"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="px-1 pb-1 pt-2">
-                  <p className="truncate text-xs text-white">
-                    {w.project?.name ?? "未命名"}
-                  </p>
-                  <p className="truncate text-[10px] text-[var(--canvas-muted)]">
-                    {w.model} ·{" "}
-                    {w.completedAt
-                      ? new Date(w.completedAt).toLocaleString("zh-CN")
-                      : "—"}
-                  </p>
-                </div>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-10">
+          {characters.length > 0 ? (
+            <section>
+              <h2 className="mb-3 text-lg font-medium text-white">人物三视图</h2>
+              <p className="mb-4 text-[12px] text-[var(--canvas-muted)]">
+                从三视图节点保存的角色，可在画布「我的角色」中快速插入图片节点。
+              </p>
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {characters.map((c) => (
+                  <li key={c.id}>
+                    <GalleryMediaCard
+                      src={c.imageUrl}
+                      alt={c.name}
+                      title={c.name}
+                      subtitle={
+                        c.model
+                          ? `${c.model} · ${new Date(c.updatedAt).toLocaleString("zh-CN")}`
+                          : new Date(c.updatedAt).toLocaleString("zh-CN")
+                      }
+                      downloadName={`${c.name}.png`}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {works.length > 0 ? (
+            <section>
+              <h2 className="mb-3 text-lg font-medium text-white">全部画作</h2>
+              <p className="mb-4 text-[12px] text-[var(--canvas-muted)]">
+                所有画布运行成功的图像生成结果，按时间倒序展示。
+              </p>
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {works.map((w) => (
+                  <li key={w.id}>
+                    <GalleryMediaCard
+                      src={w.ossUrl}
+                      alt={w.project?.name ?? "画作"}
+                      title={w.project?.name ?? "未命名"}
+                      subtitle={
+                        w.model +
+                        " · " +
+                        (w.completedAt
+                          ? new Date(w.completedAt).toLocaleString("zh-CN")
+                          : "—")
+                      }
+                      downloadName={`canvas-${w.id}.png`}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
       )}
     </div>
   );

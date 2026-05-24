@@ -24,6 +24,8 @@ export type NodeShellProps = {
   minHeight?: number;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** 传入时替换默认 StatusBadge（用于引擎节点自定义标题栏右侧） */
+  headerRight?: React.ReactNode;
 };
 
 const KIND_COLOR: Record<"image" | "text", string> = {
@@ -47,6 +49,7 @@ export function NodeShell({
   minHeight = 160,
   children,
   footer,
+  headerRight,
 }: NodeShellProps) {
   const status = runtime?.status ?? "idle";
   const tint = accent ?? (engine ? ENGINE_ACCENT : "var(--canvas-accent)");
@@ -105,7 +108,9 @@ export function NodeShell({
             <p className="truncate text-[11px] text-white/80">{subtitle}</p>
           ) : null}
         </div>
-        <StatusBadge status={status} message={runtime?.failMessage ?? null} />
+        {headerRight ?? (
+          <NodeStatusBadge status={status} message={runtime?.failMessage ?? null} />
+        )}
       </header>
 
       <div className={cn("min-h-0 flex-1 overflow-auto px-3 py-3", RF_NODE_SCROLL)}>
@@ -150,7 +155,7 @@ export function NodeShell({
   );
 }
 
-function StatusBadge({
+export function NodeStatusBadge({
   status,
   message,
 }: {

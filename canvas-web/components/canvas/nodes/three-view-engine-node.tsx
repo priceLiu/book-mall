@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import {
+  AlertTriangle,
   Download,
   ImageIcon,
-  LayoutGrid,
   Play,
   RefreshCw,
   Split,
   Trash2,
+  UserRound,
 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -17,11 +18,12 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { ThreeViewEngineNodeData } from "@/lib/canvas/types";
 import { THREE_VIEW_ENGINE_MODEL_KEYS } from "@/lib/canvas/types";
-import { deleteCanvasTask } from "@/lib/canvas-api";
+import { deleteCanvasTask, saveCanvasCharacter } from "@/lib/canvas-api";
 import { RF_NODE_SCROLL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { resolveReferencedNodeIds } from "@/lib/canvas/referenced-nodes";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
-import { NodeShell } from "../node-shell";
+import { useAutoFitNodeSize } from "@/lib/canvas/use-auto-fit-node-size";
+import { NodeShell, NodeStatusBadge } from "../node-shell";
 import {
   CompareModal,
   type CompareReferenceImage,
@@ -39,17 +41,30 @@ type CompareState = {
   defaultRightId?: string;
 };
 
+/** 三视图节点壳层 + 控件区（不含图片展示区） */
+const THREE_VIEW_CHROME_HEIGHT = 292;
+const THREE_VIEW_PER_IMAGE_CHROME = 0;
+const ERROR_TOAST_MS = 8000;
+
+const HEADER_ACTION_BTN =
+  "nodrag inline-flex shrink-0 items-center gap-0.5 rounded border px-1.5 py-0.5 text-[10px] transition";
+
 /** 三视图生成引擎：上游接参考图，输出标准正/侧/背人设图。 */
 export function ThreeViewEngineNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const { doubleConfirm, alert } = useDialogs();
+  const { doubleConfirm, alert, prompt } = useDialogs();
 
   const { history, succeeded, refreshHistory } = useNodeTaskHistory(id);
   const [compareState, setCompareState] = useState<CompareState | null>(null);
+  const [errorToast, setErrorToast] = useState<{
+    code?: string;
+    message: string;
+  } | null>(null);
 
   const d = data as unknown as ThreeViewEngineNodeData;
+  const runtimeStatus = d.runtime?.status ?? "idle";
 
   const chips = sortUpstreamChips(
     useUpstreamChips(id).filter((c) => c.kind === "image"),
@@ -85,6 +100,39 @@ export function ThreeViewEngineNode({ id, data, selected }: NodeProps) {
     Boolean(d.runtime?.ossUrl);
 
   const canCompare = succeeded.length >= 2;
+
+  const fitImageUrls = useMemo(() => {
+    const url = activeTask?.ossUrl ?? succeeded[succeeded.length - 1]?.ossUrl;
+    return url ? [url] : [];
+  }, [activeTask?.ossUrl, succeeded]);
+
+  const fitChromeHeight =
+    THREE_VIEW_CHROME_HEIGHT +
+    (canCompare ? 44 : 0) +
+    (history.length > 0 ? 72 : 0);
+
+  useEffect(() => {
+    if (runtimeStatus === "running" || runtimeStatus === "pending") {
+      setErrorToast(null);
+      return;
+    }
+    if (runtimeStatus !== "error" || !d.runtime?.failMessage) return;
+    setErrorToast({
+      code: d.runtime.failCode,
+      message: d.runtime.failMessage,
+    });
+    const timer = window.setTimeout(() => setErrorToast(null), ERROR_TOAST_MS);
+    return () => window.clearTimeout(timer);
+  }, [runtimeStatus, d.runtime?.failCode, d.runtime?.failMessage]);
+
+  useAutoFitNodeSize(id, {
+    imageUrls: fitImageUrls,
+    chromeHeight: fitChromeHeight,
+    perImageChrome: fitImageUrls.length > 0 ? THREE_VIEW_PER_IMAGE_CHROME : 0,
+    minWidth: 360,
+    minHeight: 420,
+    maxWidth: 760,
+  });
 
   const openCompare = useCallback((state?: CompareState) => {
     setCompareState(state ?? {});
@@ -159,6 +207,131 @@ export function ThreeViewEngineNode({ id, data, selected }: NodeProps) {
     }
   };
 
+  const onSaveAsCharacter = useCallback(async (task: {
+    id: string;
+    ossUrl: string | null;
+    model: string;
+  }) => {
+    if (!base || !projectId || !task.ossUrl) return;
+    const defaultName = `角色 ${new Date().toLocaleString("zh-CN", {
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+    const name = await prompt({
+      title: "保存为角色",
+      message: "角色三视图将加入「我的角色」与画廊，可在画布快速插入图片节点。",
+      label: "角色名",
+      defaultValue: defaultName,
+      placeholder: "请输入角色名",
+      confirmLabel: "保存",
+      validate: (v) => (v.trim() ? null : "角色名不能为空"),
+    });
+    if (!name) return;
+    try {
+      await saveCanvasCharacter(base, {
+        name: name.trim(),
+        imageUrl: task.ossUrl,
+        model: task.model,
+        sourceTaskId: task.id,
+        sourceProjectId: projectId,
+      });
+      window.dispatchEvent(new CustomEvent("canvas:characters-changed"));
+      await alert({
+        title: "已保存",
+        message: "角色已保存，可在工具栏「我的角色」或画廊中查看。",
+        variant: "success",
+      });
+    } catch (e) {
+      await alert({
+        title: "保存失败",
+        message: e instanceof Error ? e.message : String(e),
+        variant: "error",
+      });
+    }
+  }, [base, projectId, prompt, alert]);
+
+  const onSaveActiveAsCharacter = useCallback(async () => {
+    if (!activeTask?.ossUrl) return;
+    await onSaveAsCharacter({
+      id: activeTask.id,
+      ossUrl: activeTask.ossUrl,
+      model: activeTask.model,
+    });
+  }, [activeTask, onSaveAsCharacter]);
+
+  const headerRight = useMemo(() => {
+    if (errorToast) {
+      const label = errorToast.code
+        ? `${errorToast.code} · ${errorToast.message}`
+        : errorToast.message;
+      return (
+        <span
+          className="inline-flex max-w-[min(240px,42vw)] items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] text-red-200"
+          title={label}
+        >
+          <AlertTriangle className="size-3 shrink-0" />
+          <span className="truncate">{label}</span>
+        </span>
+      );
+    }
+    if (runtimeStatus === "running" || runtimeStatus === "pending") {
+      return (
+        <NodeStatusBadge
+          status={runtimeStatus}
+          message={d.runtime?.failMessage ?? null}
+        />
+      );
+    }
+    if (activeTask?.ossUrl) {
+      const isHunyuan3d =
+        activeTask.model === "hunyuan-3d-pro" ||
+        activeTask.model === "hunyuan-3d-express";
+      const has3d =
+        isHunyuan3d &&
+        activeTask.ephemeralUrl &&
+        activeTask.ephemeralUrl !== activeTask.ossUrl;
+      return (
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => void onSaveActiveAsCharacter()}
+            className={`${HEADER_ACTION_BTN} border-white/10 text-white/75 hover:border-white/30 hover:text-white`}
+          >
+            <UserRound className="size-2.5" /> 保存角色
+          </button>
+          {has3d ? (
+            <a
+              href={activeTask.ephemeralUrl!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${HEADER_ACTION_BTN} border-[var(--canvas-accent)]/40 text-[var(--canvas-accent-soft)] hover:border-[var(--canvas-accent)]/70`}
+            >
+              <Download className="size-2.5" /> 3D
+            </a>
+          ) : null}
+          <a
+            href={activeTask.ossUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${HEADER_ACTION_BTN} border-white/10 text-white/75 hover:border-white/30 hover:text-white`}
+          >
+            <Download className="size-2.5" />{" "}
+            {isHunyuan3d ? "预览图" : "下载"}
+          </a>
+        </div>
+      );
+    }
+    return null;
+  }, [
+    errorToast,
+    runtimeStatus,
+    d.runtime?.failMessage,
+    activeTask,
+    onSaveActiveAsCharacter,
+  ]);
+
   return (
     <>
       <NodeShell
@@ -168,19 +341,10 @@ export function ThreeViewEngineNode({ id, data, selected }: NodeProps) {
         runtime={d.runtime}
         engine
         minWidth={360}
-        minHeight={480}
+        minHeight={420}
         inputs={[{ id: "in_image", label: "参考图", kind: "image" }]}
         outputs={[{ id: "image", label: "三视图", kind: "image" }]}
-        footer={
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1">
-              <LayoutGrid className="size-3" /> 正 / 侧 / 背
-            </span>
-            <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-[var(--canvas-muted)]">
-              三视图
-            </span>
-          </div>
-        }
+        headerRight={headerRight}
       >
         <div className="flex h-full flex-col gap-2">
           {chips.length > 0 ? (
@@ -196,8 +360,8 @@ export function ThreeViewEngineNode({ id, data, selected }: NodeProps) {
             onChange={onPromptChange}
             mentionables={mentionables}
             placeholder="三视图描述（默认已填，可编辑风格 / 体型 / 服饰等）"
-            rows={5}
-            className={`${RF_NODE_SCROLL} max-h-[180px] min-h-[96px] w-full resize-y rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+            rows={4}
+            className={`${RF_NODE_SCROLL} max-h-[140px] min-h-[80px] w-full resize-y rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
           />
 
           {canCompare ? (
@@ -211,7 +375,7 @@ export function ThreeViewEngineNode({ id, data, selected }: NodeProps) {
           ) : null}
 
           <div
-            className={`min-h-[160px] flex-1 space-y-2 overflow-y-auto rounded-lg border border-white/10 bg-black/40 p-1.5 ${RF_NODE_SCROLL}`}
+            className={`min-h-[220px] flex-1 space-y-2 overflow-y-auto rounded-lg border border-white/10 bg-black/40 p-1.5 ${RF_NODE_SCROLL}`}
           >
             {succeeded.length > 0 ? (
               succeeded.map((t, idx) => (
@@ -239,41 +403,6 @@ export function ThreeViewEngineNode({ id, data, selected }: NodeProps) {
                         : undefined
                     }
                   />
-                  <div className="flex items-center gap-1 border-t border-white/5 bg-black/50 px-1.5 py-1">
-                    <span className="text-[10px] text-white/50">#{idx + 1}</span>
-                    {(t.model === "hunyuan-3d-pro" ||
-                      t.model === "hunyuan-3d-express") &&
-                    t.ephemeralUrl &&
-                    t.ephemeralUrl !== t.ossUrl ? (
-                      <a
-                        href={t.ephemeralUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="nodrag ml-auto inline-flex items-center gap-0.5 rounded border border-[var(--canvas-accent)]/40 px-1.5 py-0.5 text-[10px] text-[var(--canvas-accent-soft)] hover:border-[var(--canvas-accent)]/70"
-                      >
-                        <Download className="size-2.5" /> 3D 模型
-                      </a>
-                    ) : null}
-                    <a
-                      href={t.ossUrl!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`nodrag inline-flex items-center gap-0.5 rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/75 hover:border-white/30 hover:text-white ${
-                        (t.model === "hunyuan-3d-pro" ||
-                          t.model === "hunyuan-3d-express") &&
-                        t.ephemeralUrl &&
-                        t.ephemeralUrl !== t.ossUrl
-                          ? ""
-                          : "ml-auto"
-                      }`}
-                    >
-                      <Download className="size-2.5" />{" "}
-                      {t.model === "hunyuan-3d-pro" ||
-                      t.model === "hunyuan-3d-express"
-                        ? "预览图"
-                        : "下载"}
-                    </a>
-                  </div>
                 </div>
               ))
             ) : (
@@ -340,27 +469,22 @@ export function ThreeViewEngineNode({ id, data, selected }: NodeProps) {
             </div>
           ) : null}
 
-          {d.runtime?.failMessage ? (
-            <p className="rounded-md border border-red-400/30 bg-red-500/10 p-2 text-[10px] text-red-200">
-              {d.runtime?.failCode ? (
-                <code className="mr-1">{d.runtime.failCode}</code>
-              ) : null}
-              {d.runtime.failMessage}
-            </p>
-          ) : null}
-
-          <div className="mt-1 space-y-1.5 border-t border-white/5 pt-2">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
-              选择模型
-            </p>
-            <EnginePicker
-              role="IMAGE"
-              allowedModelKeys={[...THREE_VIEW_ENGINE_MODEL_KEYS]}
-              providerId={d.providerId}
-              modelKey={d.modelKey}
-              params={d.params ?? {}}
-              onChange={onPickEngine}
-            />
+          <div className="mt-1 shrink-0 space-y-1.5 border-t border-white/5 pt-2">
+            <div className="flex items-center gap-2">
+              <p className="shrink-0 text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
+                模型
+              </p>
+              <div className="min-w-0 flex-1">
+                <EnginePicker
+                  role="IMAGE"
+                  allowedModelKeys={[...THREE_VIEW_ENGINE_MODEL_KEYS]}
+                  providerId={d.providerId}
+                  modelKey={d.modelKey}
+                  params={d.params ?? {}}
+                  onChange={onPickEngine}
+                />
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => onRun(hasGenerated)}

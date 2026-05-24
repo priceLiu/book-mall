@@ -86,6 +86,7 @@ model User {
   storyProjects                StoryProject[]
   canvasProjects               CanvasProject[]
   canvasTemplates              CanvasTemplate[]
+  canvasCharacters             CanvasCharacter[]
   canvasProviders              CanvasProvider[]
   canvasPromptTemplates        CanvasPromptTemplate[]
 
@@ -1372,6 +1373,24 @@ model CanvasTemplate {
 
   @@index([ownerUserId, sortOrder])
   @@index([builtin, sortOrder])
+}
+
+/// 用户保存的三视图角色（从三视图引擎生成后入库，可在画布快速插入图片节点）
+model CanvasCharacter {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name            String
+  imageUrl        String
+  model           String?
+  sourceTaskId    String?
+  sourceProjectId String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, updatedAt])
 }
 
 /// 用户自定义提示词模板（LLM / IMAGE 合计最多 8 条活跃；删除软归档保留快照；内置在代码里）

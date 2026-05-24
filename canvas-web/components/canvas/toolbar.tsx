@@ -10,6 +10,7 @@ import {
   Redo2,
   Save,
   Undo2,
+  UserRound,
 } from "lucide-react";
 
 export function CanvasToolbar({
@@ -25,6 +26,7 @@ export function CanvasToolbar({
   onRunAll,
   onSaveTemplate,
   onOpenMyTemplates,
+  onOpenMyCharacters,
   running,
   inflightTaskCount = 0,
 }: {
@@ -40,6 +42,7 @@ export function CanvasToolbar({
   onRunAll: () => void;
   onSaveTemplate?: () => void;
   onOpenMyTemplates?: () => void;
+  onOpenMyCharacters?: () => void;
   running: boolean;
   inflightTaskCount?: number;
 }) {
@@ -117,6 +120,16 @@ export function CanvasToolbar({
           >
             <Bookmark className="size-3" />
             我的模板
+          </button>
+        ) : null}
+        {onOpenMyCharacters ? (
+          <button
+            type="button"
+            onClick={onOpenMyCharacters}
+            className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-white/30 hover:text-white"
+          >
+            <UserRound className="size-3" />
+            我的角色
           </button>
         ) : null}
         {onSaveTemplate ? (

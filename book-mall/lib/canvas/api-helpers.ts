@@ -5,6 +5,7 @@ import { canvasCorsHeaders } from "./cors";
 import { CanvasProjectError } from "./canvas-project-service";
 import { CanvasProviderError } from "./canvas-provider-service";
 import { CanvasSecretError } from "./secret";
+import { CanvasCharacterError } from "./canvas-character-service";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
@@ -78,6 +79,12 @@ export function canvasErrorToResponse(
     return NextResponse.json(
       { error: err.code, message: err.message },
       { status: 500, headers: jsonHeaders(request) },
+    );
+  }
+  if (err instanceof CanvasCharacterError) {
+    return NextResponse.json(
+      { error: err.code, message: err.message },
+      { status: err.httpStatus, headers: jsonHeaders(request) },
     );
   }
   console.error("[canvas-api] unexpected error", err);

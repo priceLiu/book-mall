@@ -346,3 +346,57 @@ export async function saveCanvasTemplate(
   );
   return j.template;
 }
+
+// ── characters (三视图角色) ──
+
+export type CanvasCharacterRecord = {
+  id: string;
+  name: string;
+  imageUrl: string;
+  model: string | null;
+  sourceTaskId: string | null;
+  sourceProjectId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listCanvasCharacters(
+  base: string,
+): Promise<CanvasCharacterRecord[]> {
+  const j = await call<{ characters: CanvasCharacterRecord[] }>(
+    base,
+    "/api/canvas/characters",
+  );
+  return j.characters;
+}
+
+export async function saveCanvasCharacter(
+  base: string,
+  args: {
+    name: string;
+    imageUrl: string;
+    model?: string | null;
+    sourceTaskId?: string | null;
+    sourceProjectId?: string | null;
+  },
+): Promise<CanvasCharacterRecord> {
+  const j = await call<{ character: CanvasCharacterRecord }>(
+    base,
+    "/api/canvas/characters",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(args),
+    },
+  );
+  return j.character;
+}
+
+export async function deleteCanvasCharacter(
+  base: string,
+  id: string,
+): Promise<void> {
+  await call(base, `/api/canvas/characters/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
