@@ -8,10 +8,14 @@ export function getCanvasUserInflightMax(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : 50;
 }
 
-/** 单画布项目并发上限（前端运行队列 + 后端校验） */
+/**
+ * 单画布项目并发上限（前端运行队列 + 后端校验）。
+ * 默认 0 = 不限制；设为正整数则启用上限。
+ */
 export function getCanvasProjectInflightMax(): number {
   const raw = Number(process.env.CANVAS_PROJECT_INFLIGHT_MAX ?? "");
-  return Number.isFinite(raw) && raw > 0 ? raw : 5;
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  return raw;
 }
 
 /** 由 KIE 异步轮询入口校验的 Bearer token（沿用 story 的） */

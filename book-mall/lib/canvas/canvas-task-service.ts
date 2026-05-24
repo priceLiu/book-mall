@@ -98,6 +98,7 @@ async function ensureProjectInflightCapacity(
   projectId: string,
 ): Promise<void> {
   const max = getCanvasProjectInflightMax();
+  if (max <= 0) return;
   const current = await prisma.canvasGenerationTask.count({
     where: {
       projectId,

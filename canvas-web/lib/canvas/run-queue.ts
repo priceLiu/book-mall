@@ -18,7 +18,6 @@ import type {
   AiEngineNodeData,
 } from "./types";
 
-const MAX_CONCURRENT = 5;
 const POLL_INTERVAL_MS = 2000;
 /** 每 N 次 tick 做一次全项目任务扫描，避免刷新后 runtime 丢失导致轮询停住 */
 const FULL_SCAN_EVERY_N_TICKS = 3;
@@ -246,10 +245,7 @@ export function useCanvasRunner() {
   );
 
   const drain = useCallback(() => {
-    while (
-      inflightRef.current.size < MAX_CONCURRENT &&
-      queueRef.current.length > 0
-    ) {
+    while (queueRef.current.length > 0) {
       const item = queueRef.current.shift()!;
       if (inflightRef.current.has(item.nodeId)) continue;
       inflightRef.current.add(item.nodeId);
