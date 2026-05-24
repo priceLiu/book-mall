@@ -9,6 +9,7 @@ import type { VideoEngineNodeData } from "@/lib/canvas/types";
 import { STORY_VIDEO_MODEL_KEYS } from "@/lib/canvas/types";
 import { resolveReferencedNodeIds } from "@/lib/canvas/referenced-nodes";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
+import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import { NodeShell } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 import { EnginePreviewTrigger } from "../engine-preview-trigger";
@@ -50,6 +51,7 @@ export function VideoEngineNode({ id, data, selected }: NodeProps) {
   const videoUrl =
     d.runtime?.ossUrl ??
     d.runtime?.ephemeralUrl ??
+    pickTaskResultMediaUrl(succeeded[succeeded.length - 1] ?? {}) ??
     succeeded[succeeded.length - 1]?.ossUrl ??
     succeeded[succeeded.length - 1]?.ephemeralUrl;
 

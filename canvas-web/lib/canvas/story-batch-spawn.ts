@@ -88,6 +88,17 @@ function hasFrameNode(
   );
 }
 
+/** 选中镜号是否都已有分镜图节点（仅更新对白/连线时可跳过三视图校验） */
+export function allFrameImageNodesExist(
+  nodes: CanvasFlowNode[],
+  frameIndices: number[],
+): boolean {
+  return (
+    frameIndices.length > 0 &&
+    frameIndices.every((fi) => hasFrameNode(nodes, "image-engine", fi))
+  );
+}
+
 function connectEdge(
   setEdges: BatchArgs["setEdges"],
   source: string,
@@ -823,6 +834,114 @@ function findFrameNodeId(
   )?.id;
 }
 
+/** 按镜号或分镜图连线查找已有 video / tts 引擎（避免重复 spawn） */
+function scoreFrameMediaEngineNode(
+  node: CanvasFlowNode,
+  imageEngineId: string,
+  edges: CanvasFlowEdge[],
+): number {
+  let score = 0;
+  const rt = (
+    node.data as {
+      runtime?: {
+        status?: string;
+        ossUrl?: string;
+        ephemeralUrl?: string;
+      };
+    }
+  ).runtime;
+  const linked = edges.some(
+    (e) =>
+      (e.source === imageEngineId && e.target === node.id) ||
+      (e.target === imageEngineId && e.source === node.id),
+  );
+  if (linked) score += 200;
+  if (rt?.status === "done" && (rt.ossUrl || rt.ephemeralUrl)) score += 100;
+  if (rt?.status === "running" || rt?.status === "pending") score += 50;
+  if (rt?.status === "error") score -= 20;
+  return score;
+}
+
+function collectFrameMediaEngineCandidates(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  imageEngineId: string,
+  mediaType: "video-engine" | "tts-engine",
+  frameIndex: number,
+): CanvasFlowNode[] {
+  const byId = new Map<string, CanvasFlowNode>();
+  for (const n of nodes) {
+    if (n.type !== mediaType) continue;
+    if ((n.data as { frameIndex?: number }).frameIndex === frameIndex) {
+      byId.set(n.id, n);
+    }
+  }
+  for (const e of edges) {
+    let peerId: string | undefined;
+    if (e.source === imageEngineId) peerId = e.target;
+    else if (e.target === imageEngineId) peerId = e.source;
+    else continue;
+    const n = nodes.find((x) => x.id === peerId && x.type === mediaType);
+    if (n) byId.set(n.id, n);
+  }
+  return Array.from(byId.values());
+}
+
+function findFrameMediaEngineId(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  imageEngineId: string,
+  mediaType: "video-engine" | "tts-engine",
+  frameIndex: number,
+): string | undefined {
+  const candidates = collectFrameMediaEngineCandidates(
+    nodes,
+    edges,
+    imageEngineId,
+    mediaType,
+    frameIndex,
+  );
+  if (!candidates.length) return undefined;
+  candidates.sort(
+    (a, b) =>
+      scoreFrameMediaEngineNode(b, imageEngineId, edges) -
+      scoreFrameMediaEngineNode(a, imageEngineId, edges),
+  );
+  return candidates[0]?.id;
+}
+
+/** 供 UI 绑定：与 spawn 使用同一套「主」媒体节点选择逻辑 */
+export function resolvePrimaryFrameMediaEngineId(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  imageEngineId: string,
+  mediaType: "video-engine" | "tts-engine",
+  frameIndex: number,
+): string | undefined {
+  return findFrameMediaEngineId(
+    nodes,
+    edges,
+    imageEngineId,
+    mediaType,
+    frameIndex,
+  );
+}
+
+export function isFrameMediaInflight(
+  nodes: CanvasFlowNode[],
+  mediaType: "video-engine" | "tts-engine",
+  frameIndex: number,
+): boolean {
+  return nodes.some((n) => {
+    if (n.type !== mediaType) return false;
+    if ((n.data as { frameIndex?: number }).frameIndex !== frameIndex) {
+      return false;
+    }
+    const st = (n.data as { runtime?: { status?: string } }).runtime?.status;
+    return st === "running" || st === "pending";
+  });
+}
+
 export type FrameMediaSpawnArgs = {
   imageEngineId: string;
   nodes: CanvasFlowNode[];
@@ -929,7 +1048,13 @@ export function spawnFrameVideoForImage(
   const prompt = resolveFrameVideoPrompt(imgData, row);
   const pick = args.videoPick ?? imgData.frameVideo;
 
-  const existing = findFrameNodeId(nodes, "video-engine", fi);
+  const existing = findFrameMediaEngineId(
+    nodes,
+    args.edges,
+    args.imageEngineId,
+    "video-engine",
+    fi,
+  );
   if (existing) {
     syncFrameVideoNode(args, existing, imgNode, fi, prompt, pick);
     return existing;
@@ -991,7 +1116,13 @@ export function spawnFrameTtsForImage(
 
   const pick = args.ttsPick ?? imgData.frameTts;
 
-  const existing = findFrameNodeId(nodes, "tts-engine", fi);
+  const existing = findFrameMediaEngineId(
+    nodes,
+    args.edges,
+    args.imageEngineId,
+    "tts-engine",
+    fi,
+  );
   if (existing) {
     args.updateNodeData?.(existing, {
       text: dialogue,

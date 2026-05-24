@@ -33,6 +33,7 @@ import {
   batchCreateFrameImages,
   collectFrameEngineIds,
   findStoryboardFramesMissingThreeView,
+  allFrameImageNodesExist,
   collectThreeViewEngineIdsForCharacters,
   wireFrameImageCharacterRefs,
   applyEnginePickToNodes,
@@ -611,28 +612,32 @@ function StoryboardEngineNodeWithBatch(props: NodeProps) {
     }
     if (!md.trim()) return;
 
-    const frameGaps = findStoryboardFramesMissingThreeView({
-      markdown: md,
-      nodes,
-      onlyFrameIndices: frameIndices,
-    });
-    if (frameGaps.length) {
-      const lines = frameGaps.map((g) => {
-        const chars = g.characters
-          .map((c) =>
-            c.reason === "no_node"
-              ? `${c.name}（未创建三视图）`
-              : `${c.name}（三视图未生成）`,
-          )
-          .join("、");
-        return `镜 ${g.frameIndex}：${chars}`;
+    const updateOnly = allFrameImageNodesExist(nodes, frameIndices);
+
+    if (!updateOnly) {
+      const frameGaps = findStoryboardFramesMissingThreeView({
+        markdown: md,
+        nodes,
+        onlyFrameIndices: frameIndices,
       });
-      await dialogs.alert({
-        title: "请先完成本镜涉及的角色三视图",
-        message: `以下选中镜号涉及的角色三视图尚未就绪：\n\n${lines.map((l) => `· ${l}`).join("\n")}\n\n请先到「角色设定」→ 三视图，为对应角色创建并生成；无需一次性创建全部角色。`,
-        variant: "warning",
-      });
-      return;
+      if (frameGaps.length) {
+        const lines = frameGaps.map((g) => {
+          const chars = g.characters
+            .map((c) =>
+              c.reason === "no_node"
+                ? `${c.name}（未创建三视图）`
+                : `${c.name}（三视图未生成）`,
+            )
+            .join("、");
+          return `镜 ${g.frameIndex}：${chars}`;
+        });
+        await dialogs.alert({
+          title: "请先完成本镜涉及的角色三视图",
+          message: `以下选中镜号涉及的角色三视图尚未就绪：\n\n${lines.map((l) => `· ${l}`).join("\n")}\n\n请先到「角色设定」→ 三视图，为对应角色创建并生成；无需一次性创建全部角色。`,
+          variant: "warning",
+        });
+        return;
+      }
     }
 
     batchCreateFrameImages({

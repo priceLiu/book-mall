@@ -14,6 +14,8 @@ import {
   spawnFrameTtsForImage,
   spawnFrameVideoForImage,
   resolveFrameMediaForImage,
+  resolvePrimaryFrameMediaEngineId,
+  isFrameMediaInflight,
 } from "@/lib/canvas/story-batch-spawn";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueNode } from "@/lib/canvas/canvas-run-bus";
@@ -109,13 +111,11 @@ export function FrameImageActionsModal({
   const setEdges = useCanvasStore((s) => s.setEdges);
   const reparentNode = useCanvasStore((s) => s.reparentNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const reflowStoryComicLayout = useCanvasStore(
-    (s) => s.reflowStoryComicLayout,
-  );
   const { alert } = useDialogs();
 
   const [tab, setTab] = useState<FrameImageModalTab>("regenerate");
   const [mounted, setMounted] = useState(false);
+  const [mediaSubmitting, setMediaSubmitting] = useState(false);
 
   const fi = data.frameIndex;
 
@@ -131,28 +131,29 @@ export function FrameImageActionsModal({
   );
   const dialogueDisplay = dialogue.trim();
 
-  const linkedVideo = useMemo(
-    () =>
-      fi == null
-        ? undefined
-        : nodes.find(
-            (n) =>
-              n.type === "video-engine" &&
-              (n.data as { frameIndex?: number }).frameIndex === fi,
-          ),
-    [nodes, fi],
-  );
-  const linkedTts = useMemo(
-    () =>
-      fi == null
-        ? undefined
-        : nodes.find(
-            (n) =>
-              n.type === "tts-engine" &&
-              (n.data as { frameIndex?: number }).frameIndex === fi,
-          ),
-    [nodes, fi],
-  );
+  const linkedVideo = useMemo(() => {
+    if (fi == null) return undefined;
+    const id = resolvePrimaryFrameMediaEngineId(
+      nodes,
+      edges,
+      imageEngineId,
+      "video-engine",
+      fi,
+    );
+    return id ? nodes.find((n) => n.id === id) : undefined;
+  }, [nodes, edges, imageEngineId, fi]);
+
+  const linkedTts = useMemo(() => {
+    if (fi == null) return undefined;
+    const id = resolvePrimaryFrameMediaEngineId(
+      nodes,
+      edges,
+      imageEngineId,
+      "tts-engine",
+      fi,
+    );
+    return id ? nodes.find((n) => n.id === id) : undefined;
+  }, [nodes, edges, imageEngineId, fi]);
 
   const videoRunning = isRunning(
     (linkedVideo?.data as { runtime?: { status?: string } })?.runtime?.status,
@@ -177,6 +178,15 @@ export function FrameImageActionsModal({
     busEnqueueNode(nodeId, forceFresh);
   };
 
+  const finishMediaRun = (nodeId: string) => {
+    const live = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
+    const done =
+      (live?.data as { runtime?: { status?: string } })?.runtime?.status ===
+      "done";
+    runNode(nodeId, Boolean(done));
+    onCloseAfterRun?.();
+  };
+
   const ensureVideo = (): string | null => {
     if (!data.frameVideo?.providerId || !data.frameVideo.modelKey) return null;
     return spawnFrameVideoForImage({
@@ -195,6 +205,15 @@ export function FrameImageActionsModal({
   };
 
   const onGenerateVideo = async () => {
+    if (mediaSubmitting || videoRunning) return;
+    if (fi != null && isFrameMediaInflight(nodes, "video-engine", fi)) {
+      await alert({
+        title: "视频生成中",
+        message: "本镜已有视频任务在排队或运行，请稍候再试。",
+        variant: "warning",
+      });
+      return;
+    }
     if (!data.frameVideo?.providerId || !data.frameVideo.modelKey) {
       await alert({
         title: "请选择 VIDEO 模型",
@@ -203,23 +222,33 @@ export function FrameImageActionsModal({
       });
       return;
     }
-    const vidId = ensureVideo();
-    if (!vidId) {
-      await alert({
-        title: "无法创建视频节点",
-        message: "请确认已连接分镜脚本节点。",
-        variant: "error",
-      });
-      return;
+    setMediaSubmitting(true);
+    try {
+      const vidId = ensureVideo();
+      if (!vidId) {
+        await alert({
+          title: "无法创建视频节点",
+          message: "请确认已连接分镜脚本节点。",
+          variant: "error",
+        });
+        return;
+      }
+      finishMediaRun(vidId);
+    } finally {
+      setMediaSubmitting(false);
     }
-    reflowStoryComicLayout();
-    const hasDone =
-      (linkedVideo?.data as { runtime?: { status?: string } })?.runtime
-        ?.status === "done";
-    runNode(vidId, Boolean(hasDone));
   };
 
   const onGenerateTts = async () => {
+    if (mediaSubmitting || ttsRunning) return;
+    if (fi != null && isFrameMediaInflight(nodes, "tts-engine", fi)) {
+      await alert({
+        title: "对白合成中",
+        message: "本镜已有配音任务在排队或运行，请稍候再试。",
+        variant: "warning",
+      });
+      return;
+    }
     if (!data.frameTts?.providerId || !data.frameTts.modelKey) {
       await alert({
         title: "请选择 TTS 模型",
@@ -228,31 +257,102 @@ export function FrameImageActionsModal({
       });
       return;
     }
-    const ttsId = ensureTts();
-    if (!ttsId) {
+    setMediaSubmitting(true);
+    try {
+      const ttsId = ensureTts();
+      if (!ttsId) {
+        await alert({
+          title: "无法创建配音",
+          message: "本镜无对白文本，或尚未连接分镜脚本。",
+          variant: "warning",
+        });
+        return;
+      }
+      finishMediaRun(ttsId);
+    } finally {
+      setMediaSubmitting(false);
+    }
+  };
+
+  const onGenerateBoth = async () => {
+    if (mediaSubmitting || videoRunning || ttsRunning) return;
+    if (!data.frameVideo?.providerId || !data.frameVideo.modelKey) {
       await alert({
-        title: "无法创建配音",
-        message: "本镜无对白文本，或尚未连接分镜脚本。",
+        title: "请选择 VIDEO 模型",
+        message: "在下方选择视频模型后再生成。",
         variant: "warning",
       });
       return;
     }
-    reflowStoryComicLayout();
-    const hasDone =
-      (linkedTts?.data as { runtime?: { status?: string } })?.runtime
-        ?.status === "done";
-    runNode(ttsId, Boolean(hasDone));
-  };
-
-  const onGenerateBoth = async () => {
-    await onGenerateVideo();
-    await onGenerateTts();
+    if (!data.frameTts?.providerId || !data.frameTts.modelKey) {
+      await alert({
+        title: "请选择 TTS 模型",
+        message: "在下方选择配音模型后再生成。",
+        variant: "warning",
+      });
+      return;
+    }
+    if (!dialogueDisplay) {
+      await alert({
+        title: "无法创建配音",
+        message: "本镜无对白文本。",
+        variant: "warning",
+      });
+      return;
+    }
+    setMediaSubmitting(true);
+    try {
+      const vidId = ensureVideo();
+      const ttsId = ensureTts();
+      if (!vidId || !ttsId) {
+        await alert({
+          title: "无法创建媒体节点",
+          message: "请确认分镜脚本与对白文本已就绪。",
+          variant: "error",
+        });
+        return;
+      }
+      const live = useCanvasStore.getState().nodes;
+      const vidDone =
+        (live.find((n) => n.id === vidId)?.data as { runtime?: { status?: string } })
+          ?.runtime?.status === "done";
+      const ttsDone =
+        (live.find((n) => n.id === ttsId)?.data as { runtime?: { status?: string } })
+          ?.runtime?.status === "done";
+      runNode(vidId, Boolean(vidDone));
+      runNode(ttsId, Boolean(ttsDone));
+      onCloseAfterRun?.();
+    } finally {
+      setMediaSubmitting(false);
+    }
   };
 
   const runRegenerate = (forceFresh: boolean) => {
     onRunRegenerate(forceFresh);
     onCloseAfterRun?.();
   };
+
+  useEffect(() => {
+    if (!open) return;
+    const resolved = resolveFrameMediaForImage({
+      imgData: data,
+      nodes,
+      edges,
+      imageEngineId,
+    });
+    const patch: Record<string, unknown> = {};
+    if (!data.frameDialogue?.trim() && resolved.dialogue.trim()) {
+      patch.frameDialogue = resolved.dialogue.trim();
+    }
+    if (!data.frameVideoPrompt?.trim() && resolved.videoPromptDisplay.trim()) {
+      patch.frameVideoPrompt = resolved.videoPromptDisplay.trim();
+    }
+    if (Object.keys(patch).length > 0) {
+      updateNodeData(imageEngineId, patch);
+    }
+    // 打开弹层时从分镜脚本补写对白/视频提示到节点（仅缺字段时）
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在 open 时补一次
+  }, [open, imageEngineId]);
 
   useEffect(() => {
     setMounted(true);
@@ -433,11 +533,11 @@ export function FrameImageActionsModal({
               </div>
               <button
                 type="button"
-                disabled={videoRunning}
+                disabled={videoRunning || mediaSubmitting}
                 className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-[#fb923c] px-3 py-2 text-[13px] font-medium text-black disabled:opacity-50"
                 onClick={() => void onGenerateVideo()}
               >
-                {videoRunning ? (
+                {videoRunning || mediaSubmitting ? (
                   <>
                     <RefreshCw className="size-3.5 animate-spin" /> 生成中…
                   </>
@@ -494,11 +594,11 @@ export function FrameImageActionsModal({
               </div>
               <button
                 type="button"
-                disabled={ttsRunning || !dialogueDisplay}
+                disabled={ttsRunning || mediaSubmitting || !dialogueDisplay}
                 className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-[#fb923c] px-3 py-2 text-[13px] font-medium text-black disabled:opacity-50"
                 onClick={() => void onGenerateTts()}
               >
-                {ttsRunning ? (
+                {ttsRunning || mediaSubmitting ? (
                   <>
                     <RefreshCw className="size-3.5 animate-spin" /> 合成中…
                   </>
@@ -593,11 +693,16 @@ export function FrameImageActionsModal({
               </div>
               <button
                 type="button"
-                disabled={videoRunning || ttsRunning || !dialogueDisplay}
+                disabled={
+                  videoRunning ||
+                  ttsRunning ||
+                  mediaSubmitting ||
+                  !dialogueDisplay
+                }
                 className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-[#fb923c] px-3 py-2 text-[13px] font-medium text-black disabled:opacity-50"
                 onClick={() => void onGenerateBoth()}
               >
-                {videoRunning || ttsRunning ? (
+                {videoRunning || ttsRunning || mediaSubmitting ? (
                   <>
                     <RefreshCw className="size-3.5 animate-spin" /> 生成中…
                   </>
