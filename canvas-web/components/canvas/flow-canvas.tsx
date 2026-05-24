@@ -14,12 +14,26 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { CanvasNodeType } from "@/lib/canvas/types";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
+import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { uploadCanvasImage } from "@/lib/canvas-api";
 import { ImageNode } from "./nodes/image-node";
 import { TextNode } from "./nodes/text-node";
 import { AiEngineNode } from "./nodes/ai-engine-node";
 import { ImageEngineNode } from "./nodes/image-engine-node";
 import { ThreeViewEngineNode } from "./nodes/three-view-engine-node";
+import { StoryComicStarterNode } from "./nodes/story-comic-starter-node";
+import {
+  StoryOutlineEngineNode,
+  CharacterEngineNode,
+  StoryboardEngineNode,
+} from "./nodes/story-engine-node";
+import { MdPreviewNode } from "./nodes/md-preview-node";
+import { VideoEngineNode } from "./nodes/video-engine-node";
+import { TtsEngineNode } from "./nodes/tts-engine-node";
+import { AudioPreviewNode } from "./nodes/audio-preview-node";
+import { ImagePreviewNode } from "./nodes/image-preview-node";
+import { VideoPreviewNode } from "./nodes/video-preview-node";
+import { JianyingExportNode } from "./nodes/jianying-export-node";
 import { OutputNode } from "./nodes/output-node";
 import { GroupNode } from "./nodes/group-node";
 import { SelectionToolbar } from "./selection-toolbar";
@@ -30,9 +44,20 @@ import { DeletableEdge } from "./edges/deletable-edge";
 const nodeTypes = {
   image: ImageNode,
   text: TextNode,
+  "story-comic-starter": StoryComicStarterNode,
   "ai-engine": AiEngineNode,
   "image-engine": ImageEngineNode,
   "three-view-engine": ThreeViewEngineNode,
+  "story-outline-engine": StoryOutlineEngineNode,
+  "character-engine": CharacterEngineNode,
+  "storyboard-engine": StoryboardEngineNode,
+  "video-engine": VideoEngineNode,
+  "tts-engine": TtsEngineNode,
+  "md-preview": MdPreviewNode,
+  "audio-preview": AudioPreviewNode,
+  "video-preview": VideoPreviewNode,
+  "image-preview": ImagePreviewNode,
+  "jianying-export": JianyingExportNode,
   output: OutputNode,
   group: GroupNode,
 } as const;
@@ -75,6 +100,33 @@ function FlowCanvasInner() {
   const setDragHoverGroup = useCanvasStore((s) => s.setDragHoverGroup);
   const reparentNode = useCanvasStore((s) => s.reparentNode);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
+  const fitViewNonce = useCanvasStore((s) => s.fitViewNonce);
+  const runningFocusNodeId = useCanvasStore((s) => s.runningFocusNodeId);
+  const runningFocusNonce = useCanvasStore((s) => s.runningFocusNonce);
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    if (fitViewNonce <= 0) return;
+    const t = window.requestAnimationFrame(() => {
+      void fitView({ padding: 0.12, duration: 280 });
+    });
+    return () => window.cancelAnimationFrame(t);
+  }, [fitViewNonce, fitView]);
+
+  /** 某节点开始生成时，平移视口使其进入视野 */
+  useEffect(() => {
+    if (runningFocusNonce <= 0 || !runningFocusNodeId) return;
+    const nodeId = runningFocusNodeId;
+    const t = window.requestAnimationFrame(() => {
+      void fitView({
+        nodes: [{ id: nodeId }],
+        padding: 0.45,
+        duration: 320,
+        maxZoom: 1.05,
+      });
+    });
+    return () => window.cancelAnimationFrame(t);
+  }, [runningFocusNonce, runningFocusNodeId, fitView]);
 
   /** 上传一个图片 File，并在指定位置创建 image 节点。返回新节点 id。 */
   const ingestImageFile = useCallback(
@@ -198,7 +250,9 @@ function FlowCanvasInner() {
         const initialData =
           palette === "text" && presetId
             ? buildTextNodeDataFromPreset(presetId)
-            : undefined;
+            : palette === "image-engine" && presetId
+              ? buildImageEngineDataFromPreset(presetId)
+              : undefined;
         addNode(palette as CanvasNodeType, position, initialData);
         return;
       }

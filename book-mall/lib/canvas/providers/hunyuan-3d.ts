@@ -397,6 +397,51 @@ function buildTokenHubSubmitBody(req: CanvasGatewayImageRequest): Record<string,
   return body;
 }
 
+const HUNYUAN_MODEL_EXT = /\.(glb|gltf|obj|fbx|stl|usdz|mp4)(\?|#|$)/i;
+const HUNYUAN_RASTER_EXT = /\.(png|jpe?g|webp|gif)(\?|#|$)/i;
+
+function isHunyuanModelUrl(url: string): boolean {
+  return HUNYUAN_MODEL_EXT.test(url.trim());
+}
+
+function isHunyuanRasterUrl(url: string): boolean {
+  const u = url.trim();
+  return !!u && !isHunyuanModelUrl(u) && HUNYUAN_RASTER_EXT.test(u);
+}
+
+function pickHunyuanPreviewUrl(
+  files: Array<{ PreviewImageUrl?: string; Url?: string; url?: string; preview_image_url?: string }>,
+): string | undefined {
+  const previewField = files.find((f) => f.PreviewImageUrl)?.PreviewImageUrl
+    ?? files.find((f) => f.preview_image_url)?.preview_image_url;
+  if (previewField) return previewField;
+  return files.find((f) => {
+    const u = f.Url ?? f.url;
+    return typeof u === "string" && isHunyuanRasterUrl(u);
+  })?.Url ?? files.find((f) => {
+    const u = f.url;
+    return typeof u === "string" && isHunyuanRasterUrl(u);
+  })?.url;
+}
+
+function pickHunyuanModelUrl(
+  files: Array<{ Url?: string; url?: string; Type?: string; type?: string }>,
+  preview?: string,
+): string | undefined {
+  const fromField = files.find((f) => {
+    const u = f.Url ?? f.url;
+    return typeof u === "string" && isHunyuanModelUrl(u);
+  });
+  if (fromField) return fromField.Url ?? fromField.url;
+  return files.find((f) => {
+    const u = f.Url ?? f.url;
+    return typeof u === "string" && u.length > 0 && u !== preview;
+  })?.Url ?? files.find((f) => {
+    const u = f.url;
+    return typeof u === "string" && u.length > 0 && u !== preview;
+  })?.url;
+}
+
 function pollFromProQuery(resp: HunyuanQueryResponse): CanvasGatewayPollResult {
   const status = (resp.Status ?? "").toUpperCase();
   if (status === "WAIT") return { state: "pending", rawPayload: resp };
@@ -411,10 +456,8 @@ function pollFromProQuery(resp: HunyuanQueryResponse): CanvasGatewayPollResult {
   }
   if (status === "DONE") {
     const files = resp.ResultFile3Ds ?? [];
-    const preview =
-      files.find((f) => f.PreviewImageUrl)?.PreviewImageUrl ??
-      files.find((f) => f.Url)?.Url;
-    const modelUrl = files.find((f) => f.Url)?.Url;
+    const preview = pickHunyuanPreviewUrl(files);
+    const modelUrl = pickHunyuanModelUrl(files, preview);
     const urls = [preview, modelUrl].filter(
       (u): u is string => typeof u === "string" && u.length > 0,
     );
@@ -689,10 +732,8 @@ export class Hunyuan3DGateway implements CanvasProviderGateway {
       }
       if (st === "completed") {
         const files = resp.data ?? [];
-        const preview =
-          files.find((f) => f.preview_image_url)?.preview_image_url ??
-          files.find((f) => f.url)?.url;
-        const modelUrl = files.find((f) => f.url)?.url;
+        const preview = pickHunyuanPreviewUrl(files);
+        const modelUrl = pickHunyuanModelUrl(files, preview);
         const urls = [preview, modelUrl].filter(
           (u): u is string => typeof u === "string" && u.length > 0,
         );
@@ -721,19 +762,23 @@ export function extractHunyuan3DResultUrls(poll: CanvasGatewayPollResult): {
   const raw = poll.rawPayload;
   if (raw && typeof raw === "object" && "data" in raw) {
     const files = (raw as TokenHubQueryResponse).data ?? [];
+    const preview = pickHunyuanPreviewUrl(files);
+    const modelUrl = pickHunyuanModelUrl(files, preview);
     const primary = files[0];
     return {
-      previewUrl: primary?.preview_image_url ?? poll.resultUrls?.[0],
-      modelUrl: primary?.url ?? poll.resultUrls?.[1],
+      previewUrl: preview,
+      modelUrl,
       modelType: primary?.type,
     };
   }
   const pro = raw as HunyuanQueryResponse | undefined;
   const files = pro?.ResultFile3Ds ?? [];
+  const preview = pickHunyuanPreviewUrl(files);
+  const modelUrl = pickHunyuanModelUrl(files, preview);
   const primary = files[0];
   return {
-    previewUrl: primary?.PreviewImageUrl ?? poll.resultUrls?.[0],
-    modelUrl: primary?.Url ?? poll.resultUrls?.[1],
+    previewUrl: preview,
+    modelUrl,
     modelType: primary?.Type,
   };
 }

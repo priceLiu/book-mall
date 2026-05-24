@@ -320,6 +320,34 @@ const THREE_VIEW_TEMPLATE: CanvasGraph = {
   ],
 };
 
+/** 漫剧向导式工作流：启动节点 + 导出；LLM/媒体节点由启动器与分步批量创建 */
+const STORY_COMIC_PIPELINE: CanvasGraph = {
+  schemaVersion: CANVAS_SCHEMA_VERSION,
+  viewport: { x: 0, y: 0, zoom: 0.75 },
+  nodes: [
+    {
+      id: "sc-starter",
+      type: "story-comic-starter",
+      position: col(0, 200),
+      data: {
+        theme:
+          "故事创意：例如「赛博朋克城市里，外卖员发现 AI 有了自我意识…」",
+        providerId: "",
+        modelKey: "",
+        params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+        pipelineStage: "idle",
+      },
+    },
+    {
+      id: "sc-export",
+      type: "jianying-export",
+      position: col(2, 200),
+      data: { label: "剪映导出" },
+    },
+  ],
+  edges: [],
+};
+
 export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
   {
     id: "builtin/product-poster",
@@ -343,7 +371,22 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     description: "同一产品图 + 三视角描述 → 三个生图引擎并行 → 正/侧/后三张视图。",
     canvas: THREE_VIEW_TEMPLATE,
   },
+  {
+    id: "builtin/story-comic-pipeline",
+    category: "builtin",
+    name: "漫剧全链路",
+    description:
+      "创意 → 大纲 → 角色 → 分镜 → 批量生图/视频/配音 → 剪映 ZIP 导出（Mac）。DeepSeek 等走 Provider 配置。",
+    canvas: STORY_COMIC_PIPELINE,
+  },
 ];
+
+/** 深拷贝内置模板 graph（新建画布 / 空画布恢复用）。 */
+export function getBuiltinCanvasTemplate(id: string): CanvasGraph | null {
+  const hit = BUILTIN_CANVAS_TEMPLATES.find((t) => t.id === id);
+  if (!hit) return null;
+  return structuredClone(hit.canvas);
+}
 
 /** 空白模板（默认使用） */
 export const BLANK_CANVAS: CanvasGraph = {

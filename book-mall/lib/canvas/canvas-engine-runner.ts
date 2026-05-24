@@ -39,6 +39,11 @@ import {
   resolveSystemProvider,
 } from "./canvas-system-provider";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
+import { createKieTask, type KieVideoInput } from "@/lib/story/kie-client";
+import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
+import { persistCanvasBufferToOss } from "./canvas-oss";
+import { buildCanvasVideoKieInput } from "./canvas-video-kie";
+import { storyEngineSystemFallback } from "./story-engine-prompts";
 
 const MAX_PROMPT_LEN = 16000;
 
@@ -616,4 +621,390 @@ function expandMentionsText(prompt: string, node: CanvasRunNodeInput): string {
     );
   }
   return segs.join("\n");
+}
+
+type StoryLlmKind =
+  | "story-outline-engine"
+  | "character-engine"
+  | "storyboard-engine";
+
+/** Story LLM 引擎 —— 同步 Markdown 文本，不注入海报 system prompt。 */
+export async function runStoryLlmEngineNode(
+  args: RunEngineNodeArgs & { engineKind: StoryLlmKind },
+): Promise<RunEngineNodeResult> {
+  const { userId, projectId, nodeId, node, engineKind } = args;
+  const data = node.data ?? {};
+  const providerId = String(data.providerId ?? "");
+  const modelKey = String(data.modelKey ?? node.modelKey ?? "");
+  const promptRaw = String(data.prompt ?? "");
+  const params = (data.params as Record<string, unknown>) ?? {};
+
+  if (!providerId)
+    throw new CanvasProjectError("INVALID_INPUT", `${engineKind} 缺少 providerId`);
+  if (!modelKey)
+    throw new CanvasProjectError("INVALID_INPUT", `${engineKind} 缺少 modelKey`);
+
+  const expandedPrompt = expandMentionsText(promptRaw, node);
+  if (!expandedPrompt.trim() && (node.textInputs ?? []).length === 0) {
+    throw new CanvasProjectError(
+      "EMPTY_PROMPT",
+      `${engineKind} 既没有 prompt 也没有上游文本`,
+    );
+  }
+
+  const imageUrls = (node.imageInputs ?? []).filter(
+    (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
+  );
+  const inputHash = computeInputHash({
+    modelKey,
+    prompt: expandedPrompt,
+    imageUrls,
+    params,
+    providerId,
+  });
+
+  if (!args.forceFresh) {
+    const reusable = await findReusableSucceededTask({
+      projectId,
+      nodeId,
+      inputHash,
+    });
+    if (reusable) return { reused: true, task: reusable };
+  }
+
+  await ensureNoActiveTaskForNode(projectId, nodeId);
+  await ensureProjectInflightCapacity(projectId);
+  await ensureUserInflightCapacity(userId);
+
+  const provider = await loadProviderForUser(userId, providerId);
+
+  const created = await prisma.canvasGenerationTask.create({
+    data: {
+      projectId,
+      nodeId,
+      kind: "TEXT",
+      model: modelKey,
+      providerId: provider.dbProviderId,
+      inputHash,
+      inputPayload: {
+        kind: engineKind,
+        prompt: clipPrompt(expandedPrompt),
+        params,
+        providerId,
+        modelKey,
+        textInputs: node.textInputs ?? [],
+      } as Prisma.InputJsonValue,
+      status: "SUBMITTED",
+      submittedAt: new Date(),
+    },
+  });
+
+  try {
+    const gateway = getGatewayForKind(provider.kind, provider.config);
+    const systemPrompt = storyEngineSystemFallback(engineKind);
+    const userContent: (
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    )[] = [];
+    for (const u of imageUrls) {
+      userContent.push({ type: "image_url", image_url: { url: u } });
+    }
+    userContent.push({ type: "text", text: clipPrompt(expandedPrompt) });
+
+    const messages: import("./providers/types").CanvasChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content:
+          userContent.length === 1 && userContent[0].type === "text"
+            ? userContent[0].text
+            : userContent,
+      },
+    ];
+    const resp = await gateway.chat({ modelKey, messages, params });
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "SUCCEEDED",
+        textOutput: resp.text,
+        resultPayload: (resp.rawPayload ?? null) as
+          | Prisma.InputJsonValue
+          | undefined,
+        submittedAt: new Date(),
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const code =
+      e instanceof CanvasGatewayError ? e.code : "STORY_LLM_FAILED";
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "FAILED",
+        failCode: code,
+        failMessage: msg.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  }
+}
+
+/** 视频引擎 —— KIE 图生视频，异步 poll。 */
+export async function runVideoEngineNode(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const { userId, projectId, nodeId, node } = args;
+  const data = node.data ?? {};
+  const providerId = String(data.providerId ?? "");
+  const modelKey = String(data.modelKey ?? node.modelKey ?? "");
+  const promptRaw = String(data.prompt ?? "");
+  const params = (data.params as Record<string, unknown>) ?? {};
+
+  if (!providerId)
+    throw new CanvasProjectError("INVALID_INPUT", "video-engine 缺少 providerId");
+  if (!modelKey)
+    throw new CanvasProjectError("INVALID_INPUT", "video-engine 缺少 modelKey");
+  if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(modelKey)) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      `video-engine 不支持模型 ${modelKey}`,
+    );
+  }
+
+  const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());
+  const expandedPrompt = expandMentions(
+    [promptRaw.trim(), ...upstreamText].filter(Boolean).join("\n\n"),
+    node,
+  );
+  if (!expandedPrompt.trim()) {
+    throw new CanvasProjectError("EMPTY_PROMPT", "video-engine prompt 为空");
+  }
+
+  const imageUrls = (node.imageInputs ?? [])
+    .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u))
+    .slice(0, 1);
+  if (imageUrls.length === 0) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "video-engine 需要上游分镜图",
+    );
+  }
+
+  const provider = await loadProviderForUser(userId, providerId);
+  if (provider.kind !== "KIE") {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "video-engine 当前仅支持 KIE 系统 Provider",
+    );
+  }
+
+  const inputHash = computeInputHash({
+    modelKey,
+    prompt: expandedPrompt,
+    imageUrls,
+    params,
+    providerId,
+  });
+
+  if (!args.forceFresh) {
+    const reusable = await findReusableSucceededTask({
+      projectId,
+      nodeId,
+      inputHash,
+    });
+    if (reusable) return { reused: true, task: reusable };
+  }
+
+  await ensureNoActiveTaskForNode(projectId, nodeId);
+  await ensureProjectInflightCapacity(projectId);
+  await ensureUserInflightCapacity(userId);
+
+  const { model, input } = buildCanvasVideoKieInput({
+    modelKey,
+    prompt: expandedPrompt,
+    imageUrl: imageUrls[0] ?? null,
+    options: {
+      resolution: String(params.resolution ?? "1080p"),
+      duration: Number(params.duration ?? 5),
+      generateAudio: params.generateAudio === true,
+      promptExtend: params.promptExtend !== false,
+      watermark: params.watermark === true,
+    },
+    aspectRatio: params.aspect_ratio === "9:16" ? "9:16" : "16:9",
+  });
+
+  const created = await prisma.canvasGenerationTask.create({
+    data: {
+      projectId,
+      nodeId,
+      kind: "IMAGE",
+      model: modelKey,
+      providerId: provider.dbProviderId,
+      inputHash,
+      inputPayload: {
+        kind: "video-engine",
+        prompt: clipPrompt(expandedPrompt),
+        params,
+        providerId,
+        modelKey,
+        imageUrls,
+        kieModel: model,
+        kieInput: input,
+      } as Prisma.InputJsonValue,
+      status: "PENDING",
+    },
+  });
+
+  const callBackUrl = buildCanvasAiKieCallbackUrl("video", created.id);
+
+  try {
+    const { taskId } = await createKieTask({
+      model,
+      input: input as KieVideoInput,
+      callBackUrl,
+    });
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "SUBMITTED",
+        kieTaskId: taskId,
+        submittedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "FAILED",
+        failCode: "VIDEO_ENGINE_FAILED",
+        failMessage: msg.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  }
+}
+
+/** TTS 引擎 —— OpenAI 兼容 /audio/speech，同步落 OSS。 */
+export async function runTtsEngineNode(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const { userId, projectId, nodeId, node } = args;
+  const data = node.data ?? {};
+  const providerId = String(data.providerId ?? "");
+  const modelKey = String(data.modelKey ?? node.modelKey ?? "tts-1");
+  const nodeText = String(data.text ?? "");
+  const params = (data.params as Record<string, unknown>) ?? {};
+
+  if (!providerId)
+    throw new CanvasProjectError("INVALID_INPUT", "tts-engine 缺少 providerId");
+
+  const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());
+  const text = [nodeText.trim(), ...upstreamText].filter(Boolean).join("\n").trim();
+  if (!text) {
+    throw new CanvasProjectError("EMPTY_PROMPT", "tts-engine 台词为空");
+  }
+
+  const provider = await loadProviderForUser(userId, providerId);
+  const inputHash = computeInputHash({
+    modelKey,
+    prompt: text,
+    imageUrls: [],
+    params,
+    providerId,
+  });
+
+  if (!args.forceFresh) {
+    const reusable = await findReusableSucceededTask({
+      projectId,
+      nodeId,
+      inputHash,
+    });
+    if (reusable) return { reused: true, task: reusable };
+  }
+
+  await ensureNoActiveTaskForNode(projectId, nodeId);
+  await ensureProjectInflightCapacity(projectId);
+  await ensureUserInflightCapacity(userId);
+
+  const created = await prisma.canvasGenerationTask.create({
+    data: {
+      projectId,
+      nodeId,
+      kind: "IMAGE",
+      model: modelKey,
+      providerId: provider.dbProviderId,
+      inputHash,
+      inputPayload: {
+        kind: "tts-engine",
+        text: text.slice(0, 4096),
+        params,
+        providerId,
+        modelKey,
+      } as Prisma.InputJsonValue,
+      status: "SUBMITTED",
+      submittedAt: new Date(),
+    },
+  });
+
+  const baseUrl = (
+    provider.config.baseUrl ?? "https://api.openai.com/v1"
+  ).replace(/\/$/, "");
+  const voice = String(params.voice ?? "alloy");
+
+  try {
+    const r = await fetch(`${baseUrl}/audio/speech`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: modelKey,
+        input: text.slice(0, 4096),
+        voice,
+        response_format: "mp3",
+      }),
+    });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => "");
+      throw new Error(`TTS HTTP ${r.status}: ${errText.slice(0, 200)}`);
+    }
+    const buf = Buffer.from(await r.arrayBuffer());
+    const ossUrl = await persistCanvasBufferToOss({
+      buf,
+      contentType: "audio/mpeg",
+      kind: "node-audio",
+      projectId,
+      userId,
+      ext: "mp3",
+    });
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "SUCCEEDED",
+        ossUrl,
+        textOutput: text.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "FAILED",
+        failCode: "TTS_ENGINE_FAILED",
+        failMessage: msg.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  }
 }

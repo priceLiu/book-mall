@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import {
@@ -31,6 +32,12 @@ export function CompareModal({
   defaultRightId,
   onClose,
 }: CompareModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const options = useMemo(
     () => buildSideOptions(tasks, referenceImages),
     [tasks, referenceImages],
@@ -66,9 +73,9 @@ export function CompareModal({
     };
   }, [onClose, stepRight]);
 
-  if (options.length < 2) return null;
+  if (!mounted || options.length < 2) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-black/94 backdrop-blur-md"
       role="dialog"
@@ -100,6 +107,7 @@ export function CompareModal({
           rightId={rightId}
         />
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

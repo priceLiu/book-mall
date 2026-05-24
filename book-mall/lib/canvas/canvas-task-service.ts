@@ -373,10 +373,18 @@ export async function applyCanvasKieTaskResult(
     }
     let ossUrl: string | null = null;
     let ossError: string | null = null;
+    const payload = task.inputPayload as { kind?: string } | null;
+    const engineKind = payload?.kind ?? "";
+    const ossKind =
+      engineKind === "video-engine"
+        ? "node-video"
+        : engineKind === "tts-engine"
+          ? "node-audio"
+          : "node-image";
     try {
       ossUrl = await persistCanvasKieResultToOss({
         ephemeralUrl,
-        kind: "node-image",
+        kind: ossKind,
         projectId: task.projectId,
       });
     } catch (e) {
@@ -498,8 +506,24 @@ export async function applyCanvasGatewayPollResult(
   if (poll.state !== "succeeded") return;
 
   const { previewUrl, modelUrl } = extractHunyuan3DResultUrls(poll);
-  const imageEphemeral = previewUrl ?? poll.resultUrls?.[0];
+  const imageEphemeral = previewUrl;
   if (!imageEphemeral) {
+    if (modelUrl) {
+      await prisma.canvasGenerationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "SUCCEEDED",
+          ephemeralUrl: modelUrl,
+          resultPayload: (poll.rawPayload ?? null) as Prisma.InputJsonValue,
+          completedAt: new Date(),
+        },
+      });
+      logKieEvent("info", "[canvas] gateway task succeeded (model only)", {
+        taskId,
+        modelUrl,
+      });
+      return;
+    }
     await prisma.canvasGenerationTask.update({
       where: { id: taskId },
       data: {

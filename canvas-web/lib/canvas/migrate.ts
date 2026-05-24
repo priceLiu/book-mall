@@ -21,6 +21,7 @@ import {
   CANVAS_SCHEMA_VERSION,
   NODE_DEFAULT_SIZE,
 } from "./types";
+import { normalizeCanvasNodes } from "./normalize-graph-nodes";
 
 // 这个文件需要识别 v1 的节点字符串字面量，但 v6 阶段后 CanvasNodeType 已经
 // 不再包含它们。所以这里把 type 弱化成 string，避免 TS 报"无 overlap"。
@@ -129,10 +130,13 @@ export function migrateGraphV1ToV2(graph: CanvasGraph): CanvasGraph {
   const rawNodes = graph.nodes ?? [];
   const transform = (n: LooseNode) =>
     backfillNodeSize(ver >= 2 ? n : migrateNode(n));
-  const nodes = rawNodes.map((n) =>
-    transform(n as unknown as LooseNode),
-  ) as unknown as CanvasFlowNode[];
   const edges: CanvasFlowEdge[] = graph.edges ?? [];
+  const nodes = normalizeCanvasNodes(
+    rawNodes.map((n) =>
+      transform(n as unknown as LooseNode),
+    ) as unknown as CanvasFlowNode[],
+    edges,
+  );
   return {
     ...graph,
     schemaVersion: CANVAS_SCHEMA_VERSION,

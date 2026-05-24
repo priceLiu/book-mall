@@ -400,3 +400,45 @@ export async function deleteCanvasCharacter(
     method: "DELETE",
   });
 }
+
+// ── 剪映导出 ──
+
+export type JianyingExportFrame = {
+  frameIndex: number;
+  dialogue: string;
+  videoUrl?: string | null;
+  audioUrl?: string | null;
+  durationSec?: number;
+};
+
+export async function exportJianyingZip(
+  base: string,
+  projectId: string,
+  args: { format: "bundle" | "draft"; frames: JianyingExportFrame[] },
+): Promise<void> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    `/api/canvas/projects/${encodeURIComponent(projectId)}/export/jianying`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ format: args.format, frames: args.frames }),
+    },
+  );
+  const r = await fetch(url, init);
+  if (!r.ok) {
+    const raw = await r.text();
+    throw new Error(raw || `export failed HTTP ${r.status}`);
+  }
+  const blob = await r.blob();
+  const filename =
+    args.format === "draft"
+      ? `jianying-draft-${projectId.slice(0, 8)}.zip`
+      : `story-bundle-${projectId.slice(0, 8)}.zip`;
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(href);
+}

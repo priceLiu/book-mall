@@ -9,6 +9,11 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import type { ImageNodeData } from "@/lib/canvas/types";
 import { MediaHoverBox } from "../media-hover-box";
 import { NodeShell } from "../node-shell";
+import {
+  NODE_MEDIA_MIN_WIDTH,
+  NODE_MEDIA_UPLOAD_HEIGHT,
+  NodeMediaStage,
+} from "../node-ui";
 
 export function ImageNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
@@ -50,25 +55,26 @@ export function ImageNode({ id, data, selected }: NodeProps) {
       subtitle={d.label ?? "本地上传 / 拖入"}
       selected={selected}
       runtime={d.runtime}
-      minWidth={220}
-      minHeight={260}
+      minWidth={NODE_MEDIA_MIN_WIDTH}
+      minHeight={NODE_MEDIA_UPLOAD_HEIGHT}
       outputs={[{ id: "image", label: "图片", kind: "image" }]}
     >
       <div className="flex h-full flex-col gap-2">
-        <div className="min-h-[120px] flex-1 overflow-hidden rounded-lg border border-white/10 bg-black">
+        <NodeMediaStage>
           <MediaHoverBox
             src={previewUrl || undefined}
             variant="uploadable"
             onUpload={onPick}
             clickToPreview
             alt={d.label ?? "image"}
+            fit="contain"
             placeholder={
               <div className="flex h-full items-center justify-center text-[var(--canvas-muted)]">
                 <ImageIcon className="size-6 opacity-50" />
               </div>
             }
           />
-        </div>
+        </NodeMediaStage>
         <div className="flex items-center justify-end gap-2">
           {d.uploading ? (
             <span className="inline-flex items-center gap-1 text-[10px] text-amber-200">

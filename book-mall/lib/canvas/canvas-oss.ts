@@ -10,6 +10,8 @@ import {
 import { buildCanvasOssKey, type CanvasOssKind } from "./canvas-constants";
 
 const MAX_IMAGE_BYTES = 30 * 1024 * 1024; // 30MB
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB
+const MAX_AUDIO_BYTES = 20 * 1024 * 1024; // 20MB
 
 function virtualHostedPublicUrl(cfg: OssEnvConfig, key: string): string {
   const base = process.env.OSS_PUBLIC_URL_BASE?.trim().replace(/\/$/, "");
@@ -30,6 +32,9 @@ function extForMime(contentType: string): string {
   if (base === "image/jpeg" || base === "image/jpg") return "jpg";
   if (base === "image/png") return "png";
   if (base === "image/webp") return "webp";
+  if (base === "video/mp4") return "mp4";
+  if (base === "audio/mpeg" || base === "audio/mp3") return "mp3";
+  if (base === "audio/wav" || base === "audio/x-wav") return "wav";
   return "";
 }
 
@@ -99,6 +104,13 @@ export async function persistCanvasKieResultToOss(args: {
   }
   const cfg = cfgRaw;
 
+  const maxBytes =
+    args.kind === "node-video"
+      ? MAX_VIDEO_BYTES
+      : args.kind === "node-audio"
+        ? MAX_AUDIO_BYTES
+        : MAX_IMAGE_BYTES;
+
   const sleeps = [0, 500, 2000];
   let lastError: unknown = null;
   for (let attempt = 0; attempt < sleeps.length; attempt++) {
@@ -106,18 +118,30 @@ export async function persistCanvasKieResultToOss(args: {
       await new Promise((r) => setTimeout(r, sleeps[attempt]));
     }
     try {
-      const dl = await downloadToBuffer(args.ephemeralUrl, MAX_IMAGE_BYTES);
-      const ext = dl.ext || "png";
+      const dl = await downloadToBuffer(args.ephemeralUrl, maxBytes);
+      const ext =
+        dl.ext ||
+        (args.kind === "node-video"
+          ? "mp4"
+          : args.kind === "node-audio"
+            ? "mp3"
+            : "png");
       const key = buildCanvasOssKey(args.kind, {
         projectId: args.projectId,
         userId: args.userId,
         ext,
       });
+      const defaultCt =
+        args.kind === "node-video"
+          ? "video/mp4"
+          : args.kind === "node-audio"
+            ? "audio/mpeg"
+            : "image/png";
       const ossUrl = await uploadBufferToOss({
         cfg,
         key,
         buf: dl.buf,
-        contentType: dl.contentType || "image/png",
+        contentType: dl.contentType || defaultCt,
       });
       return ossUrl;
     } catch (e) {
@@ -127,6 +151,32 @@ export async function persistCanvasKieResultToOss(args: {
   throw lastError instanceof Error
     ? lastError
     : new Error(String(lastError ?? "persistCanvasKieResultToOss failed"));
+}
+
+/** 直接上传 buffer（TTS 等同步生成）。 */
+export async function persistCanvasBufferToOss(args: {
+  buf: Buffer;
+  contentType: string;
+  kind: CanvasOssKind;
+  projectId?: string;
+  userId?: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildCanvasOssKey(args.kind, {
+    projectId: args.projectId,
+    userId: args.userId,
+    ext: args.ext,
+  });
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
 }
 
 /** 用户直传：把 buffer 上传到 OSS 并返回公网 URL。 */

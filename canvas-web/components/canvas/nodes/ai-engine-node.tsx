@@ -96,6 +96,8 @@ export function AiEngineNode({ id, data, selected }: NodeProps) {
   const text = d.runtime?.textOutput;
   const hasGenerated =
     Boolean(text?.trim()) || d.runtime?.status === "done";
+  const isGenerating =
+    d.runtime?.status === "running" || d.runtime?.status === "pending";
 
   return (
     <NodeShell
@@ -191,11 +193,21 @@ export function AiEngineNode({ id, data, selected }: NodeProps) {
                 }),
               );
             }}
-            disabled={!d.providerId || !d.modelKey}
-            title={hasGenerated ? "跳过缓存，强制创建新任务" : undefined}
-            className="nodrag inline-flex w-full items-center justify-center gap-1 rounded-md bg-[var(--canvas-accent)] px-2 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft)] hover:text-white disabled:opacity-50"
+            disabled={!d.providerId || !d.modelKey || isGenerating}
+            title={
+              isGenerating
+                ? "生成进行中"
+                : hasGenerated
+                  ? "跳过缓存，强制创建新任务"
+                  : undefined
+            }
+            className="nodrag inline-flex w-full items-center justify-center gap-1 rounded-md bg-[var(--canvas-accent)] px-2 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {hasGenerated ? (
+            {isGenerating ? (
+              <>
+                <RefreshCw className="size-3 animate-spin" /> 生成中…
+              </>
+            ) : hasGenerated ? (
               <>
                 <RefreshCw className="size-3" /> 重新生成
               </>

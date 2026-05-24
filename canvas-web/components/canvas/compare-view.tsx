@@ -152,8 +152,7 @@ function CompareSliderPane({
   return (
     <div
       ref={wrapRef}
-      className="relative min-h-0 flex-1 select-none overflow-hidden rounded-xl border border-white/10 bg-black"
-      style={{ minHeight: "calc(100dvh - 120px)" }}
+      className="relative h-full min-h-[280px] w-full flex-1 select-none overflow-hidden rounded-xl border border-white/10 bg-black"
       onMouseDown={(e) => {
         dragging.current = true;
         onMove(e.clientX);
@@ -164,14 +163,14 @@ function CompareSliderPane({
         src={right.url}
         alt={right.label}
         draggable={false}
-        className="pointer-events-none absolute inset-0 m-auto h-full w-full object-contain object-center"
+        className="pointer-events-none absolute left-0 top-0 h-full w-full object-contain object-center"
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={left.url}
         alt={left.label}
         draggable={false}
-        className="pointer-events-none absolute inset-0 m-auto h-full w-full object-contain object-center"
+        className="pointer-events-none absolute left-0 top-0 h-full w-full object-contain object-center"
         style={{ clipPath: `inset(0 ${rightClip}% 0 0)` }}
       />
       <div
@@ -207,7 +206,7 @@ export function CompareSplitView({
   if (!left?.url || !right?.url) return null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       <CompareSliderPane left={left} right={right} />
     </div>
   );
