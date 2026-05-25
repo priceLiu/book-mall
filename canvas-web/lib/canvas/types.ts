@@ -1,6 +1,7 @@
 import type { Edge, Node, Viewport } from "@xyflow/react";
 import {
   AI_ENGINE_PROMPT_TEMPLATE,
+  IMAGE_ENGINE_PROMPT_TEMPLATE_DEFAULT,
   THREE_VIEW_ENGINE_PROMPT_DEFAULT,
 } from "./builtin-prompt-templates";
 import {
@@ -369,7 +370,7 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
   "image-engine": {
     providerId: "",
     modelKey: "",
-    prompt: "",
+    prompt: IMAGE_ENGINE_PROMPT_TEMPLATE_DEFAULT,
     referencedNodeIds: [],
     params: { aspect_ratio: "1:1", resolution: "2K", output_format: "png" },
   } satisfies ImageEngineNodeData as Record<string, unknown>,

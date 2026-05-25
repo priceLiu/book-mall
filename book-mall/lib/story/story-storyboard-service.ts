@@ -138,10 +138,19 @@ export async function generateStoryboardForProject(
     };
   });
 
+  if (framesData.length === 0) {
+    throw new StoryProjectError(
+      "LLM_INVALID_OUTPUT",
+      "LLM returned no usable frames",
+      502,
+    );
+  }
+
   // 长度对不上：用最后一帧补位（极少见，但避免严格抛错破坏体验）
   while (framesData.length < count) {
+    const last = framesData[framesData.length - 1]!;
     framesData.push({
-      ...framesData[framesData.length - 1],
+      ...last,
       index: framesData.length + 1,
     });
   }

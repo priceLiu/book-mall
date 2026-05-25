@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { applyMockSubscriptionPayment } from "../lib/apply-mock-subscription";
+import { runPostDbBillingSetup } from "../lib/post-db-billing-setup";
 
 const prisma = new PrismaClient();
 
@@ -391,6 +392,9 @@ async function main() {
   });
 
   await syncPilotSubscriptions(PILOT_SYNC_EMAIL);
+
+  console.log("[seed] 价目/模型目录/账单快照后置修复 …");
+  await runPostDbBillingSetup();
 }
 
 main()
