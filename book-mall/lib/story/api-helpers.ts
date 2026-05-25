@@ -60,8 +60,16 @@ export function storyErrorToResponse(
   }
   // 不向客户端暴露内部错误细节
   console.error("[story-api] unexpected error", err);
+  const detail =
+    err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500);
   return NextResponse.json(
-    { error: "INTERNAL_ERROR" },
+    {
+      error: "INTERNAL_ERROR",
+      message:
+        process.env.NODE_ENV === "production"
+          ? "服务器处理失败，请稍后重试。"
+          : detail || "unexpected server error",
+    },
     { status: 500, headers: jsonHeaders(request) },
   );
 }

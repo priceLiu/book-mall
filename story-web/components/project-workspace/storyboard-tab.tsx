@@ -26,6 +26,7 @@ import {
   type StoryVideoOptions,
 } from "@/lib/projects/api";
 import type { ComicProject, StoryboardFrame } from "@/lib/projects/types";
+import { storyApiErrorText } from "@/lib/story-api-error-message";
 import { cn } from "@/lib/utils";
 import {
   formatCostMs,
@@ -453,14 +454,13 @@ export function StoryboardTab({ project, onProjectChange, reload }: Props) {
         pendingTasks: r.project.pendingTasks,
       });
     } catch (e) {
-      const code = e instanceof BookMallApiError ? e.code : "UNKNOWN";
-      const msg =
+      const text =
         e instanceof BookMallApiError
-          ? e.message
+          ? storyApiErrorText(e.code, e.message)
           : e instanceof Error
             ? e.message
-            : "生成失败";
-      setGenError(`${code}: ${msg}`);
+            : "生成失败，请稍后重试";
+      setGenError(text);
       void reload();
     } finally {
       setGenerating(false);
@@ -476,7 +476,7 @@ export function StoryboardTab({ project, onProjectChange, reload }: Props) {
     } catch (e) {
       setFrameError(
         e instanceof BookMallApiError
-          ? `${e.code}: ${e.message}`
+          ? storyApiErrorText(e.code, e.message)
           : e instanceof Error
             ? e.message
             : "提交失败",
@@ -502,7 +502,7 @@ export function StoryboardTab({ project, onProjectChange, reload }: Props) {
     } catch (e) {
       setFrameError(
         e instanceof BookMallApiError
-          ? `${e.code}: ${e.message}`
+          ? storyApiErrorText(e.code, e.message)
           : e instanceof Error
             ? e.message
             : "提交失败",

@@ -1,0 +1,125 @@
+import { execSync } from "child_process";
+import path from "path";
+import { fileURLToPath } from "url";
+import { prisma } from "@/lib/prisma";
+import { runFullAutoCalibration } from "@/lib/model-catalog/auto-calibrate";
+import { backfillModelCatalogVendorFields } from "@/lib/model-catalog/backfill-vendor-fields";
+
+const BOOK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+const MIN_ACTIVE_BILLABLE_ROWS = 50;
+
+export type PostDbBillingSetupResult = {
+  realignRan: boolean;
+  bootstrapRan: boolean;
+  autoCalibrate: Awaited<ReturnType<typeof runFullAutoCalibration>>;
+  vendorBackfill: Awaited<ReturnType<typeof backfillModelCatalogVendorFields>>;
+  refreshRan: boolean;
+  refreshSummary: string | null;
+  counts: {
+    activeBillablePrices: number;
+    modelCatalog: number;
+    modelAlias: number;
+    catalogWithVendor: number;
+    toolUsageBillingLines: number;
+  };
+};
+
+function runPnpm(script: string): void {
+  execSync(`pnpm ${script}`, {
+    cwd: BOOK_ROOT,
+    stdio: "inherit",
+    env: process.env,
+  });
+}
+
+/**
+ * 迁移/重建库后的价目 + 模型目录 + 账单快照一站式修复（幂等，可重复执行）。
+ * 供 `db:seed` 与 `pnpm db:post-billing-setup` 共用。
+ */
+export async function runPostDbBillingSetup(opts?: {
+  /** 跳过历史 ToolBillingDetailLine cloudRow 刷新（仅 seed 加速时可关） */
+  skipRefreshSnapshots?: boolean;
+}): Promise<PostDbBillingSetupResult> {
+  console.log("[post-billing] start …");
+
+  const activeBefore = await prisma.toolBillablePrice.count({
+    where: { active: true },
+  });
+  let realignRan = false;
+  if (activeBefore < MIN_ACTIVE_BILLABLE_ROWS) {
+    console.log(
+      `[post-billing] ToolBillablePrice active=${activeBefore} < ${MIN_ACTIVE_BILLABLE_ROWS} → pricing:realign-from-md:apply`,
+    );
+    runPnpm("pricing:realign-from-md:apply");
+    realignRan = true;
+  } else {
+    console.log(
+      `[post-billing] skip realign (active ToolBillablePrice=${activeBefore})`,
+    );
+  }
+
+  const pricingCurrent = await prisma.pricingSourceVersion.findFirst({
+    where: { isCurrent: true },
+    select: { id: true },
+  });
+  let bootstrapRan = false;
+  if (!pricingCurrent) {
+    console.log("[post-billing] no current PricingSourceVersion → pricing:bootstrap");
+    runPnpm("pricing:bootstrap");
+    bootstrapRan = true;
+  } else {
+    console.log(
+      `[post-billing] skip bootstrap (current PricingSourceVersion=${pricingCurrent.id})`,
+    );
+  }
+
+  console.log("[post-billing] runFullAutoCalibration …");
+  const autoCalibrate = await runFullAutoCalibration();
+  console.log("[post-billing] auto-calibrate:", autoCalibrate);
+
+  const vendorBackfill = await backfillModelCatalogVendorFields();
+  console.log("[post-billing] vendor backfill:", vendorBackfill);
+
+  const lineCount = await prisma.toolBillingDetailLine.count({
+    where: { source: "TOOL_USAGE_GENERATED" },
+  });
+  let refreshRan = false;
+  let refreshSummary: string | null = null;
+  if (!opts?.skipRefreshSnapshots && lineCount > 0) {
+    console.log(
+      `[post-billing] refresh ${lineCount} TOOL_USAGE_GENERATED billing lines …`,
+    );
+    runPnpm("billing:refresh-tool-usage-snapshot");
+    refreshRan = true;
+    refreshSummary = "see billing:refresh-tool-usage-snapshot stdout";
+  } else if (opts?.skipRefreshSnapshots) {
+    console.log("[post-billing] skip refresh (skipRefreshSnapshots)");
+  } else {
+    console.log("[post-billing] skip refresh (no billing lines)");
+  }
+
+  const counts = {
+    activeBillablePrices: await prisma.toolBillablePrice.count({
+      where: { active: true },
+    }),
+    modelCatalog: await prisma.modelCatalog.count({ where: { active: true } }),
+    modelAlias: await prisma.modelAlias.count({ where: { active: true } }),
+    catalogWithVendor: await prisma.modelCatalog.count({
+      where: { active: true, vendorProductName: { not: null } },
+    }),
+    toolUsageBillingLines: lineCount,
+  };
+
+  console.log("[post-billing] done:", counts);
+
+  return {
+    realignRan,
+    bootstrapRan,
+    autoCalibrate,
+    vendorBackfill,
+    refreshRan,
+    refreshSummary,
+    counts,
+  };
+}

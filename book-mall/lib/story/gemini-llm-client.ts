@@ -77,14 +77,24 @@ export async function chatJson<S extends ZodTypeAny>(
   } as const;
 
   const callOnce = async (): Promise<z.infer<S>> => {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+    let r: Response;
+    try {
+      r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      throw new GeminiLlmError(
+        "LLM_HTTP_ERROR",
+        `network error calling gemini-3-flash: ${detail}`,
+        502,
+      );
+    }
     const text = await r.text();
     if (!r.ok) {
       if (r.status === 404 || /model_not_found|invalid model/i.test(text)) {

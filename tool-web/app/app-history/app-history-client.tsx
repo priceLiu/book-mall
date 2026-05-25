@@ -34,6 +34,16 @@ type WalletPayload = {
 
 const PAGE_SIZE = 50;
 
+function usageErrorMessage(code: string): string {
+  if (code === "tools_session_inactive" || code === "no_session") {
+    return "工具站会话未就绪，请从主站重新进入工具站（SSO）后再查看明细。";
+  }
+  if (code === "tools_access_denied") {
+    return "暂无工具站准入，请充值或联系管理员。";
+  }
+  return code;
+}
+
 function formatYuanFromPoints(points: number | null | undefined): string {
   if (points == null || !Number.isFinite(points)) return "—";
   return `${(points / 100).toFixed(2)}`;
@@ -324,16 +334,12 @@ export function AppHistoryClient() {
   }, [orphanRows, quickQuery]);
 
   const walletHintForStrip =
-    walletError != null
-      ? walletError === "no_session"
-        ? "未登录工具站会话"
-        : walletError
-      : null;
+    walletError != null ? usageErrorMessage(walletError) : null;
 
   const showPager = total > 0 && totalPages > 0;
 
   const inlineBalance = (() => {
-    if (walletPending) return <span className={styles.balanceMuted}>余额读取中…</span>;
+    if (walletPending) return <span className={styles.balanceMuted}>读取中…</span>;
     if (walletHintForStrip) {
       return <span className={styles.balanceMuted}>{walletHintForStrip}</span>;
     }
@@ -343,11 +349,12 @@ export function AppHistoryClient() {
     if (wallet?.balancePoints == null) {
       return <span className={styles.balanceMuted}>—</span>;
     }
+    const pts = wallet.balancePoints;
     return (
-      <span className={styles.inlineBalanceAmt}>
-        {wallet.balancePoints.toLocaleString("zh-CN")} 点（¥
-        {formatYuanFromPoints(wallet.balancePoints)}）
-      </span>
+      <>
+        {pts.toLocaleString("zh-CN")} 点
+        <span className={styles.balanceMuted}>（¥{formatYuanFromPoints(pts)}）</span>
+      </>
     );
   })();
 
@@ -381,8 +388,8 @@ export function AppHistoryClient() {
           {new Date(row.createdAt).toLocaleString("zh-CN")}
         </div>
         <div className={styles.detailTool}>
-          {toolKeyToLabel(row.toolKey)}
-          <code>{row.toolKey}</code>
+          <span>{toolKeyToLabel(row.toolKey)}</span>
+          <code className={styles.toolKeyBadge}>{row.toolKey}</code>
         </div>
         <div className={styles.detailAction}>{row.action}</div>
         <div className={`${unitCls} ${styles.cellNumeric}`}>{unit.text}</div>
@@ -410,132 +417,113 @@ export function AppHistoryClient() {
     });
   }, [events, quickQuery]);
 
+  const financeOrigin =
+    process.env.NEXT_PUBLIC_FINANCE_WEB_ORIGIN?.replace(/\/$/, "") ?? "";
+
   return (
-    <div>
-      {/* 顶部筛选 + 导出工具栏 */}
-      <div
-        className="tw-mb-3 tw-flex tw-flex-wrap tw-items-end tw-gap-2"
-        aria-label="筛选与导出"
-      >
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <label className="tw-text-xs tw-text-[var(--tool-muted)]">按工具筛选</label>
+    <div className={styles.root}>
+      <section className={styles.filterCard} aria-label="筛选与导出">
+        <div className={styles.filterField}>
+          <label className={styles.filterLabel} htmlFor="app-history-tool-filter">
+            按工具筛选
+          </label>
           <select
+            id="app-history-tool-filter"
             value={toolFilter}
             onChange={(e) => {
               setToolFilter(e.target.value);
               setPage(1);
             }}
-            className="tw-h-9 tw-rounded tw-border tw-border-[var(--tool-border,#d1d5db)] tw-bg-[var(--tool-bg,#fff)] tw-px-2 tw-text-sm tw-text-[var(--tool-text)]"
+            className={styles.filterControl}
             disabled={usageLoading || exporting}
           >
             <option value="">全部工具</option>
             {summaryByTool.map((s) => (
               <option key={s.toolKey} value={s.toolKey}>
-                {s.label}（{s.toolKey}）
+                {s.label}
               </option>
             ))}
           </select>
         </div>
-        <div className="tw-flex tw-flex-col tw-gap-1 tw-flex-1 tw-min-w-[200px]">
-          <label className="tw-text-xs tw-text-[var(--tool-muted)]">本页快速搜索</label>
+        <div className={`${styles.filterField} ${styles.filterFieldGrow}`}>
+          <label className={styles.filterLabel} htmlFor="app-history-quick-search">
+            本页快速搜索
+          </label>
           <input
+            id="app-history-quick-search"
             type="search"
             value={quickQuery}
             onChange={(e) => setQuickQuery(e.target.value)}
-            placeholder="模型片段 / 工具名 / 动作"
-            className="tw-h-9 tw-rounded tw-border tw-border-[var(--tool-border,#d1d5db)] tw-bg-[var(--tool-bg,#fff)] tw-px-2 tw-text-sm tw-text-[var(--tool-text)]"
+            placeholder="模型 / 工具名 / 动作"
+            className={styles.filterControl}
           />
         </div>
-        <div className="tw-flex tw-flex-col tw-gap-1">
-          <span className="tw-text-xs tw-text-[var(--tool-muted)] tw-invisible">导出</span>
+        <div className={styles.filterField}>
+          <span className={styles.filterLabel} aria-hidden>
+            导出
+          </span>
           <button
             type="button"
             onClick={() => void exportAllCsv()}
             disabled={exporting || total === 0}
-            className="tw-h-9 tw-rounded tw-border tw-border-[var(--tool-border,#d1d5db)] tw-bg-[var(--tool-bg,#fff)] tw-px-3 tw-text-sm tw-text-[var(--tool-text)] hover:tw-bg-[var(--tool-bg-hover,#f5f5f5)] disabled:tw-opacity-60"
+            className={styles.btnSecondary}
           >
-            {exporting ? "正在导出…" : `导出 CSV（全部 ${total > 0 ? total : 0} 条）`}
+            {exporting ? "正在导出…" : `导出 CSV（${total} 条）`}
           </button>
         </div>
-        {exportMsg ? (
-          <span className="tw-self-end tw-text-xs tw-text-[var(--tool-muted)] tw-py-2">
-            {exportMsg}
-          </span>
-        ) : null}
-      </div>
+        {exportMsg ? <span className={styles.exportHint}>{exportMsg}</span> : null}
+      </section>
 
-      <div className={styles.detailToolbarRow}>
-        <div className={styles.detailToolbarMain}>
-          <p className={styles.detailSectionTitle}>使用明细（扣费）</p>
+      <div className={styles.metaRow}>
+        <div className={styles.metaLeft}>
+          <h2 className={styles.sectionHeading}>使用明细（扣费）</h2>
           <button type="button" className={styles.refreshBtn} onClick={() => void refreshAll()}>
-            刷新余额与明细
+            刷新
           </button>
         </div>
-        <div className={styles.detailToolbarRight}>
-          <div className={styles.inlineBalance}>
-            <span className={styles.inlineBalanceLabel}>当前余额</span>
-            {inlineBalance}
+        <div className={styles.metaRight}>
+          <div className={styles.balanceCard} aria-live="polite">
+            <span className={styles.balanceCardLabel}>当前余额</span>
+            <div className={styles.balanceCardAmt}>{inlineBalance}</div>
           </div>
-          <div className={styles.toolNotes} aria-label="各工具扣费笔记">
-            <div className={styles.toolNotesTitle}>扣费工具摘要（全部分页合计）</div>
-            {summaryByTool.length === 0 ? (
-              <p className={styles.toolNotesEmpty}>暂无汇总</p>
-            ) : (
-              <ul className={styles.toolNotesList}>
-                {summaryByTool.map((s) => (
-                  <li key={s.toolKey} className={styles.toolNotesLi}>
-                    {s.label} · {s.billCount} 笔 ·{" "}
-                    {s.sumPoints.toLocaleString("zh-CN")} 点（¥
-                    {(s.sumPoints / 100).toFixed(2)}）
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {summaryByTool.length > 0 ? (
+            <div className={styles.summaryChips} aria-label="各工具扣费合计">
+              {summaryByTool.map((s) => (
+                <span key={s.toolKey} className={styles.summaryChip}>
+                  {s.label} · <strong>{s.billCount}</strong> 笔 ·{" "}
+                  {s.sumPoints.toLocaleString("zh-CN")} 点
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 
-      {(() => {
-        const fin = process.env.NEXT_PUBLIC_FINANCE_WEB_ORIGIN?.replace(/\/$/, "") ?? "";
-        if (!fin) return null;
-        return (
-          <div className={styles.toolNotes} style={{ marginBottom: "1rem" }} aria-label="云级费用明细说明">
-            <div className={styles.toolNotesTitle}>云级费用明细</div>
-            <p className="tw-m-0 tw-text-sm tw-leading-snug tw-text-[var(--tool-muted)]">
-              与云账单 CSV 同颗粒度（主站{" "}
-              <code className="tw-font-mono tw-text-[0.7rem]">ToolBillingDetailLine</code>
-              ）。在{" "}
-              <a
-                href={`${fin}/fees/billing/details`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="tw-text-[var(--tool-text)] tw-underline tw-underline-offset-2"
-              >
-                账单详表
-              </a>
-              打开完整表（建议在主站已登录同账号的浏览器中访问）。本页的「使用明细」仍为按次扣费流水；云级行也可经本站的{" "}
-              <code className="tw-font-mono tw-text-[0.7rem]">GET /api/tool-billing-detail-lines</code>{" "}
-              取 JSON。
-            </p>
-          </div>
-        );
-      })()}
+      {financeOrigin ? (
+        <details className={styles.cloudCallout}>
+          <summary className={styles.cloudCalloutSummary}>云级费用明细（与阿里云 CSV 同颗粒度）</summary>
+          <p className={styles.cloudCalloutBody}>
+            主站 <code>ToolBillingDetailLine</code> 完整表请在{" "}
+            <a href={`${financeOrigin}/fees/billing/details`} target="_blank" rel="noopener noreferrer">
+              财务管理后台 · 账单详表
+            </a>{" "}
+            查看（需同账号已登录主站）。本页为按次扣费流水；JSON 接口{" "}
+            <code>GET /api/tool-billing-detail-lines</code>。
+          </p>
+        </details>
+      ) : null}
 
       {usageLoading && events.length === 0 ? (
-        <p className="tw-muted">加载中…</p>
+        <p className={styles.stateBoxMuted}>加载中…</p>
       ) : error ? (
-        <p className="tw-muted" style={{ color: "crimson" }}>
-          {error}
-          {" · "}
+        <div className={`${styles.stateBox} ${styles.stateBoxError}`} role="alert">
+          {usageErrorMessage(error)}
           <button type="button" onClick={() => void refreshAll()}>
             重试
           </button>
-          {"（未登录工具站会话时会提示 no_session）"}
-        </p>
+        </div>
       ) : total === 0 ? (
-        <p className="tw-muted">
-          暂无扣费记录。产生试衣成功等事件后将在此列出。
-        </p>
+        <p className={styles.stateBoxMuted}>暂无扣费记录。成功扣费后将在此列出。</p>
       ) : (
         <div className={styles.detailCard}>
           <div className={styles.detailHead}>

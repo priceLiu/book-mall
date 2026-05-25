@@ -12,7 +12,8 @@ import { GeminiLlmError } from "@/lib/story/gemini-llm-client";
 type RouteCtx = { params: Promise<{ id: string }> };
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+/** 5~8 镜分镜 JSON 常需 60s+，避免 Next 提前断连变成 INTERNAL_ERROR */
+export const maxDuration = 120;
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);

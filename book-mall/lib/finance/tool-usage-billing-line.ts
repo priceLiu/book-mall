@@ -92,23 +92,55 @@ function pickNumber(meta: MetaObject, key: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const BILLING_TZ = "Asia/Shanghai";
+
+/** 平台账单时间列与账单月份/日期统一按中国内地（UTC+8）日历，避免本地日 + UTC 时刻混用。 */
+function beijingCalendarParts(d: Date): {
+  y: string;
+  m: string;
+  day: string;
+  h: string;
+  min: string;
+  sec: string;
+} {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BILLING_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const g = (t: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === t)?.value ?? "";
+  return {
+    y: g("year"),
+    m: g("month"),
+    day: g("day"),
+    h: g("hour"),
+    min: g("minute"),
+    sec: g("second"),
+  };
+}
+
 /** v002：与云 CSV `账单信息/账单月份` 格式一致（YYYYMM），便于 reconcile 直接 join。 */
 function fmtYyyyMm(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const { y, m } = beijingCalendarParts(d);
   return `${y}${m}`;
 }
 
 /** v002：与云 CSV `账单信息/账单日期` 格式一致（YYYYMMDD）。 */
 function fmtYyyyMmDd(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const { y, m, day } = beijingCalendarParts(d);
   return `${y}${m}${day}`;
 }
 
+/** 与阿里云消费明细习惯一致：无时区后缀的本地时刻字符串（Asia/Shanghai）。 */
 function fmtBeijingIso(d: Date): string {
-  return d.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
+  const { y, m, day, h, min, sec } = beijingCalendarParts(d);
+  return `${y}-${m}-${day} ${h}:${min}:${sec}`;
 }
 
 /** v004：从 cloudBillingKind / 单位 派生"价格单位"列（用于显示） */

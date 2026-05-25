@@ -17,6 +17,7 @@
     "db:push": "dotenv -e .env.local -- prisma db push",
     "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
     "db:seed": "dotenv -e .env.local -- prisma db seed",
+    "db:post-billing-setup": "dotenv -e .env.local -- tsx scripts/post-db-billing-setup.ts",
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",
     "db:calibrate-pilot": "dotenv -e .env.local -- tsx scripts/calibrate-pilot-tool-billing.ts",
