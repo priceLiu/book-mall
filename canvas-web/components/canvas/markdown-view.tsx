@@ -3,6 +3,14 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import {
+  storyMdTablePadClass,
+  storyMdTableTextClass,
+  storyMdTableWrapperClass,
+  storyMdTdClass,
+  storyMdThClass,
+  type StoryMdTableVariant,
+} from "@/lib/canvas/story-md-table-chrome";
 
 export function MarkdownView({
   content,
@@ -23,15 +31,12 @@ export function MarkdownView({
   const isDoc = variant === "document";
   const isNodePreview = variant === "nodePreview";
   const isLightDoc = isDoc || isNodePreview;
+  const tableVariant: StoryMdTableVariant = isNodePreview
+    ? "nodePreview"
+    : "document";
 
-  const tableCell =
-    isDoc ? "text-[15px] leading-relaxed"
-    : isNodePreview ? "text-[12px] leading-relaxed"
-    : "text-[11px]";
-  const tablePad =
-    isDoc ? "px-4 py-2.5"
-    : isNodePreview ? "px-2.5 py-1.5"
-    : "px-2 py-1";
+  const tableCell = storyMdTableTextClass(tableVariant);
+  const tablePad = storyMdTablePadClass(tableVariant);
 
   return (
     <div
@@ -116,8 +121,8 @@ export function MarkdownView({
               }`}
             >
               <table
-                className={`min-w-full border-collapse text-left ${tableCell} ${
-                  isLightDoc ? "border border-neutral-300" : ""
+                className={`${storyMdTableWrapperClass(tableVariant)} ${tableCell} ${
+                  isLightDoc ? "" : "border border-white/10"
                 }`}
               >
                 {children}
@@ -126,21 +131,21 @@ export function MarkdownView({
           ),
           th: ({ children }) => (
             <th
-              className={`border font-semibold ${
-                isDoc
-                  ? `border-neutral-300 bg-neutral-100 ${tablePad} text-[15px] text-neutral-900`
-                  : isNodePreview
-                    ? `border-neutral-300 bg-neutral-100 ${tablePad} text-[12px] text-neutral-900`
-                    : `border-white/15 bg-white/5 ${tablePad}`
-              }`}
+              className={
+                isLightDoc
+                  ? storyMdThClass(tableVariant)
+                  : `border border-white/15 bg-white/5 font-semibold ${tablePad}`
+              }
             >
               {children}
             </th>
           ),
           td: ({ children }) => (
             <td
-              className={`border align-top ${tablePad} ${
-                isLightDoc ? "border-neutral-200 bg-white" : "border-white/10"
+              className={`align-top ${
+                isLightDoc
+                  ? storyMdTdClass(tableVariant)
+                  : `border border-white/10 ${tablePad}`
               }`}
             >
               {children}

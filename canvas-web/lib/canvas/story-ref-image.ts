@@ -33,7 +33,7 @@ export function storyCharacterRefCatalog(
 ): StoryRefImage[] {
   return characterRows.map((c) => ({
     id: `ref-char-${c.key}`,
-    label: `${c.name}·三视图`,
+    label: c.name,
     url: c.runtime?.ossUrl ?? c.runtime?.ephemeralUrl,
   }));
 }
@@ -48,7 +48,7 @@ export function storyGeneratedCharacterMentionables(
     if (!url || !/^https?:\/\//.test(url)) continue;
     out.push({
       id: `ref-char-${c.key}`,
-      label: `${c.name}·三视图`,
+      label: c.name,
       kind: "image",
       previewUrl: url,
     });

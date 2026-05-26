@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { Eye, RefreshCw, X } from "lucide-react";
+import { Clapperboard, Eye, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORY_MEDIA_COL_WIDTH } from "@/lib/canvas/story-ref-image";
+
+const REFRESH_BTN =
+  "nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/45 bg-[#fb923c]/20 text-[#fdba74] hover:bg-[#fb923c]/30";
 
 /** 第 3 列：输出图/视频；中央生成，有图时叠放生成与预览图标 */
 export function StoryColumnMediaPanel({
@@ -13,8 +16,10 @@ export function StoryColumnMediaPanel({
   videoUrl,
   audioUrl,
   generating,
-  generateTitle = "生成",
+  generateDisabled,
+  mediaMode = "character",
   onGenerate,
+  onGenerateVideo,
   onPreview,
   previewDisabled,
 }: {
@@ -22,14 +27,19 @@ export function StoryColumnMediaPanel({
   videoUrl?: string;
   audioUrl?: string;
   generating?: boolean;
-  /** 悬停/空态按钮 tooltip，不显示文字 */
-  generateTitle?: string;
+  generateDisabled?: boolean;
+  /** 分镜脚本列：空态生分镜图，有图时 hover 预览 + 生成视频 */
+  mediaMode?: "character" | "frame";
   onGenerate: () => void;
+  onGenerateVideo?: () => void;
   onPreview?: () => void;
   previewDisabled?: boolean;
 }) {
   const hasVisual = Boolean(imageUrl || videoUrl);
   const showPreview = Boolean(onPreview && hasVisual && !previewDisabled);
+  const isFrame = mediaMode === "frame";
+  const hasFrameImage = Boolean(imageUrl);
+  const btnDisabled = Boolean(generateDisabled || generating);
 
   return (
     <div
@@ -67,20 +77,45 @@ export function StoryColumnMediaPanel({
         <div
           className={cn(
             "absolute inset-0 flex items-center justify-center gap-2 transition-opacity",
-            hasVisual
+            hasVisual && !(isFrame && hasFrameImage)
               ? "opacity-0 group-hover:opacity-100 group-hover:bg-black/45"
-              : "opacity-100",
+              : isFrame && hasFrameImage
+                ? "opacity-0 group-hover:opacity-100 group-hover:bg-black/45"
+                : "opacity-100",
           )}
         >
           {generating ? (
             <div className="relative z-10 flex flex-col items-center gap-1">
               <RefreshCw className="size-6 animate-spin text-[#fdba74]" />
             </div>
+          ) : isFrame && hasFrameImage ? (
+            <>
+              {showPreview ? (
+                <button
+                  type="button"
+                  aria-label="预览分镜图"
+                  className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm hover:bg-black/75"
+                  onClick={onPreview}
+                >
+                  <Eye className="size-4" />
+                </button>
+              ) : null}
+              {onGenerateVideo ? (
+                <button
+                  type="button"
+                  aria-label="生成分镜视频"
+                  className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/40 bg-black/55 text-[#fdba74] shadow-lg backdrop-blur-sm hover:bg-black/75"
+                  onClick={onGenerateVideo}
+                >
+                  <Clapperboard className="size-4" />
+                </button>
+              ) : null}
+            </>
           ) : hasVisual ? (
             <>
               <button
                 type="button"
-                title={generateTitle}
+                aria-label="重新生成"
                 className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/40 bg-black/55 text-[#fdba74] shadow-lg backdrop-blur-sm hover:bg-black/75"
                 onClick={onGenerate}
               >
@@ -89,7 +124,7 @@ export function StoryColumnMediaPanel({
               {showPreview ? (
                 <button
                   type="button"
-                  title="预览"
+                  aria-label="预览"
                   className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm hover:bg-black/75"
                   onClick={onPreview}
                 >
@@ -100,8 +135,13 @@ export function StoryColumnMediaPanel({
           ) : (
             <button
               type="button"
-              title={generateTitle}
-              className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/45 bg-[#fb923c]/20 text-[#fdba74] hover:bg-[#fb923c]/30"
+              disabled={btnDisabled}
+              aria-label={isFrame ? "生成分镜图" : "生成"}
+              title={generateDisabled ? "请先在上方选择分镜图 IMAGE 模型" : undefined}
+              className={cn(
+                REFRESH_BTN,
+                generateDisabled && "cursor-not-allowed opacity-40",
+              )}
               onClick={onGenerate}
             >
               <RefreshCw className="size-4" />

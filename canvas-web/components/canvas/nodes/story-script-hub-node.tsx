@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { GitBranch } from "lucide-react";
+import { GitBranch, Play, RefreshCw } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
-import { runStoryHubSectionsSequential } from "@/lib/canvas/batch-run-nodes";
+import { runStoryHubSection } from "@/lib/canvas/batch-run-nodes";
 import {
   spawnStoryMediaColumns,
   STORY_HUB_SECTION_ORDER,
@@ -41,6 +41,10 @@ const SECTION_LABEL: Record<StoryLlmSection, string> = {
   character: "角色",
   storyboard: "分镜",
 };
+
+function isHubLlmSection(section: HubPreviewSection): section is StoryLlmSection {
+  return section === "outline" || section === "character" || section === "storyboard";
+}
 
 function selectHubData(
   nodes: { id: string; data: unknown }[],
@@ -285,6 +289,24 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
           ?.failMessage,
     ).find(Boolean) ?? null;
 
+  const canRunLlm = Boolean(d.providerId?.trim() && d.modelKey?.trim());
+  const activeLlmSection = isHubLlmSection(activeSection)
+    ? activeSection
+    : null;
+  const activeSectionRunning = activeLlmSection
+    ? hubSectionIsRunning(hubNode, activeLlmSection)
+    : false;
+  const reviewSectionRunning =
+    reviewOpen && isHubLlmSection(reviewSection)
+      ? hubSectionIsRunning(hubNode, reviewSection)
+      : false;
+
+  const runHubSection = (section: StoryLlmSection) => {
+    if (!canRunLlm || hubSectionIsRunning(hubNode, section)) return;
+    const forceFresh = hubSectionIsReady(hubNode, section);
+    runStoryHubSection(id, section, { forceFresh });
+  };
+
   return (
     <>
       <NodeShell
@@ -316,31 +338,56 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         }
         footer={
           <StoryNodeFooterShell>
-            <button
-              type="button"
-              disabled={
-                outputBusy ||
-                anyRunning ||
-                aggregateStatus !== "done" ||
-                hasMediaColumns
-              }
-              className={STORY_NODE_ACTION_BTN_CLASS}
-              title={
-                aggregateStatus !== "done"
-                  ? "请等待剧本生成完成"
+            <div className="flex flex-wrap gap-2">
+              {activeLlmSection ? (
+                <button
+                  type="button"
+                  disabled={!canRunLlm || activeSectionRunning}
+                  className={STORY_NODE_ACTION_BTN_CLASS}
+                  title={!canRunLlm ? "请配置 LLM 模型" : undefined}
+                  onClick={() => runHubSection(activeLlmSection)}
+                >
+                  {activeSectionRunning ? (
+                    <>
+                      <RefreshCw className="size-3.5 animate-spin" /> 生成中…
+                    </>
+                  ) : hubSectionIsReady(hubNode, activeLlmSection) ? (
+                    <>
+                      <RefreshCw className="size-3.5" /> 重新生成{SECTION_LABEL[activeLlmSection]}
+                    </>
+                  ) : (
+                    <>
+                      <Play className="size-3.5" /> 生成{SECTION_LABEL[activeLlmSection]}
+                    </>
+                  )}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={
+                  outputBusy ||
+                  anyRunning ||
+                  aggregateStatus !== "done" ||
+                  hasMediaColumns
+                }
+                className={STORY_NODE_ACTION_BTN_CLASS}
+                title={
+                  aggregateStatus !== "done"
+                    ? "请等待剧本生成完成"
+                    : hasMediaColumns
+                      ? "已输出工作流"
+                      : undefined
+                }
+                onClick={() => void onOutputWorkflow()}
+              >
+                <GitBranch className="size-3.5 shrink-0" />
+                {outputBusy
+                  ? "输出中…"
                   : hasMediaColumns
                     ? "已输出工作流"
-                    : undefined
-              }
-              onClick={() => void onOutputWorkflow()}
-            >
-              <GitBranch className="size-3.5 shrink-0" />
-              {outputBusy
-                ? "输出中…"
-                : hasMediaColumns
-                  ? "已输出工作流"
-                  : "输出工作流"}
-            </button>
+                    : "输出工作流"}
+              </button>
+            </div>
           </StoryNodeFooterShell>
         }
       >
@@ -398,6 +445,9 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
           syncColumnsIfPresent({ storyboardMd: md });
           reflowStoryComicLayout();
         }}
+        onRunSection={runHubSection}
+        sectionIsRunning={reviewSectionRunning}
+        canRunLlm={canRunLlm}
       />
     </>
   );

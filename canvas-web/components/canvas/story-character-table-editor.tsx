@@ -7,6 +7,12 @@ import {
   formatCharacterTableMarkdown,
   parseCharacterRows,
 } from "@/lib/canvas/parse-md-tables";
+import {
+  storyMdTableWrapperClass,
+  storyMdTdClass,
+  storyMdThClass,
+} from "@/lib/canvas/story-md-table-chrome";
+import { storyTableTextareaRows } from "@/lib/canvas/story-table-textarea-rows";
 
 export type CharacterTableRow = {
   name: string;
@@ -29,20 +35,12 @@ export function canEditCharacterAsTable(md: string): boolean {
   return characterRowsFromMd(md).length > 0;
 }
 
-function textareaRows(text: string, min: number, charsPerLine: number): number {
-  const lines = text.split("\n").length;
-  const wrapped = Math.ceil(text.length / charsPerLine);
-  return Math.max(min, lines, wrapped);
-}
-
 /** 与右侧原稿 GFM 表格同款的编辑表 */
-const TABLE =
-  "w-full table-fixed border-collapse border border-neutral-300 text-left text-[15px] leading-relaxed";
-const TH =
-  "border border-neutral-300 bg-neutral-100 px-4 py-2.5 font-semibold text-neutral-900";
-const TD = "border border-neutral-200 bg-white p-0 align-top";
+const TABLE = storyMdTableWrapperClass("editor");
+const TH = storyMdThClass("editor");
+const TD = `${storyMdTdClass("editor")} p-0 align-top`;
 const FIELD =
-  "block w-full resize-none border-0 bg-transparent px-4 py-2.5 text-[15px] leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-400 focus:bg-amber-50/50";
+  "block w-full min-h-[2.75rem] resize-y border-0 bg-transparent outline-none ring-0 whitespace-pre-wrap break-words placeholder:text-neutral-400 focus:bg-amber-50/50";
 
 export function StoryCharacterTableEditor({
   value,
@@ -77,12 +75,12 @@ export function StoryCharacterTableEditor({
       <p className="text-[12px] text-neutral-500">
         点击单元格编辑，版式与右侧原稿一致；保存后同步。
       </p>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-visible">
         <table className={TABLE}>
           <colgroup>
-            <col className="w-[96px]" />
-            <col className="w-[32%]" />
-            <col />
+            <col className="min-w-[96px]" />
+            <col className="min-w-[180px]" />
+            <col className="min-w-[280px]" />
             <col className="w-9" />
           </colgroup>
           <thead>
@@ -98,7 +96,7 @@ export function StoryCharacterTableEditor({
               <tr key={`${row.name}-${index}`}>
                 <td className={TD}>
                   <input
-                    className={FIELD}
+                    className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed text-neutral-800`}
                     value={row.name}
                     placeholder="角色名"
                     onChange={(e) => patchRow(index, { name: e.target.value })}
@@ -106,8 +104,8 @@ export function StoryCharacterTableEditor({
                 </td>
                 <td className={TD}>
                   <textarea
-                    className={FIELD}
-                    rows={textareaRows(row.role, 2, 22)}
+                    className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed text-neutral-800`}
+                    rows={storyTableTextareaRows(row.role, 2, 14)}
                     value={row.role}
                     placeholder="身份、立场、与主线关系"
                     onChange={(e) => patchRow(index, { role: e.target.value })}
@@ -115,8 +113,8 @@ export function StoryCharacterTableEditor({
                 </td>
                 <td className={TD}>
                   <textarea
-                    className={FIELD}
-                    rows={textareaRows(row.appearance, 3, 28)}
+                    className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed text-neutral-800`}
+                    rows={storyTableTextareaRows(row.appearance, 3, 16)}
                     value={row.appearance}
                     placeholder="画像用外观描述"
                     onChange={(e) =>

@@ -28,6 +28,7 @@ import {
 } from "./canvas-run-bus";
 import { countCanvasInflightWork, collectCanvasInflightNodeIds } from "./story-column-runtime";
 import { reconcileStaleInflightRuntimes } from "./story-inflight-reconcile";
+import { resolveStoryHubSectionTextInputs } from "./story-hub-text-inputs";
 import {
   storyApplyTaskResult,
   storyRunPendingPatch,
@@ -37,7 +38,9 @@ import { isStoryWorkspaceNodeType } from "./types";
 import {
   hubSectionIsComplete,
   hubSectionNeedsRun,
+  hubSectionRuntime,
 } from "./story-hub-runtime";
+import { isCanvasInflightStatus } from "./story-column-runtime";
 import {
   storyLlmNodeIsComplete,
   storyLlmNodeNeedsRun,
@@ -392,7 +395,11 @@ export function useCanvasRunner(fallbackProjectId?: string) {
       }
 
       const imageInputs = resolveImageInputs(state.nodes, state.edges, nodeId);
-      const textInputs = resolveTextInputs(state.nodes, state.edges, nodeId);
+      const textInputs = resolveStoryHubSectionTextInputs(
+        node,
+        job.llmSection,
+        resolveTextInputs(state.nodes, state.edges, nodeId),
+      );
 
       try {
         const data = node.data as Record<string, unknown>;
@@ -672,6 +679,10 @@ export function useCanvasRunner(fallbackProjectId?: string) {
       if (inflightRef.current.has(key)) return;
       if (queueRef.current.some((q) => runKey(q) === key)) return;
       const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
+      if (node?.type === "story-script-hub" && job.llmSection) {
+        const st = hubSectionRuntime(node, job.llmSection)?.status;
+        if (isCanvasInflightStatus(st)) return;
+      }
       const rowSt = storyRowRuntimeStatus(node, job);
       if (rowSt === "running" || rowSt === "pending" || rowSt === "queued") {
         return;
@@ -866,6 +877,22 @@ export function useCanvasRunner(fallbackProjectId?: string) {
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (!nodeTasks.length) continue;
 
+        if (node.type === "story-script-hub") {
+          for (const section of ["outline", "character", "storyboard"] as const) {
+            const scope = { llmSection: section };
+            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            if (!pick) continue;
+            const job: CanvasStoryRunJob =
+              jobByTaskRef.current.get(pick.id) ??
+              storyRunContextFromScope(node.id, scope);
+            storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
+            if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
+              inflightRef.current.delete(runKey(job));
+            }
+          }
+          continue;
+        }
+
         if (node.type === "story-character-column") {
           const rows =
             (node.data as { rows?: { key: string }[] }).rows ?? [];
@@ -948,11 +975,23 @@ export function useCanvasRunner(fallbackProjectId?: string) {
           if (
             job.llmSection &&
             (t.status === "SUBMITTED" || t.status === "PENDING") &&
-            hubSectionIsComplete(node, job.llmSection)
+            hubSectionIsComplete(node, job.llmSection) &&
+            !isCanvasInflightStatus(hubSectionRuntime(node, job.llmSection)?.status)
           ) {
             return;
           }
           storyApplyTaskResult(node, t, job, updateNodeData, nodes);
+        } else {
+          const scope = t.storyScope ?? {};
+          if (scope.llmSection || scope.rowKey || scope.mediaKind) {
+            storyApplyTaskResult(
+              node,
+              t,
+              storyRunContextFromScope(nodeId, scope),
+              updateNodeData,
+              nodes,
+            );
+          }
         }
         return;
       }

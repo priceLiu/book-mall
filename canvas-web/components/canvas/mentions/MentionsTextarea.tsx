@@ -236,10 +236,10 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
 
     const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (!popoverOpen) return;
-      if (e.key === "ArrowDown") {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
         setPopoverIndex((idx) => Math.min(filtered.length - 1, idx + 1));
-      } else if (e.key === "ArrowUp") {
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
         setPopoverIndex((idx) => Math.max(0, idx - 1));
       } else if (e.key === "Enter") {
@@ -279,7 +279,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           anchorEl={wrapperRef.current}
           items={filtered}
           selectedIndex={popoverIndex}
-          emptyHint="暂无已生成的角色三视图，请先在角色列生成。"
+          emptyHint="暂无已生成的角色图，请先在角色列生成。"
           onSelect={insertToken}
           onHoverIndex={setPopoverIndex}
           onClose={closePopover}

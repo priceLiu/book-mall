@@ -61,12 +61,16 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
 
   const syncRowsFromFrame = useCallback((): typeof stored => {
     if (!frameColumnId) return stored;
-    const frameNode = nodes.find((n) => n.id === frameColumnId);
+    const state = useCanvasStore.getState();
+    const frameNode = state.nodes.find((n) => n.id === frameColumnId);
     const frameStored =
       (frameNode?.data as StoryFrameColumnNodeData)?.rows ?? [];
-    const frameRows = displayFrameRows(nodes, frameColumnId, frameStored);
-    return patchVideoRowsFromFrameRows(stored, frameRows);
-  }, [frameColumnId, nodes, stored]);
+    const frameRows = displayFrameRows(state.nodes, frameColumnId, frameStored);
+    const videoStored =
+      (state.nodes.find((n) => n.id === id)?.data as StoryVideoColumnNodeData)
+        ?.rows ?? stored;
+    return patchVideoRowsFromFrameRows(videoStored, frameRows);
+  }, [frameColumnId, id, stored]);
 
   const runRowVideo = (key: string, forceFresh?: boolean) => {
     if (!batchVideo?.providerId) return;
@@ -88,14 +92,14 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
           ? "视频生成中…"
           : nodeRuntime.status === "error"
             ? "部分生成失败"
-            : "各镜成片 · 在分镜脚本列生成"
+            : "各镜成片 · 点击生成"
       }
       selected={selected}
       engine
       bodyExpand
       runtime={nodeRuntime}
       accent={ENGINE_ACCENT}
-      minWidth={360}
+      minWidth={400}
       minHeight={280}
       inputs={[{ id: "in_text", label: "分镜", kind: "text" }]}
       outputs={[{ id: "text", label: "视频", kind: "image" }]}
@@ -106,7 +110,7 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
       >
         {!displayRows.length ? (
           <p className="text-[11px] text-[var(--canvas-muted)]">
-            在「分镜脚本」列生成后，各镜成片将纵向排列显示于此。
+            在「分镜脚本」列生成分镜图后，点击此处或分镜图上的视频图标生成成片。
           </p>
         ) : (
           displayRows.map((row) => {
@@ -114,11 +118,15 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
               row.videoRuntime?.ossUrl ?? row.videoRuntime?.ephemeralUrl;
             const st = row.videoRuntime?.status ?? "idle";
             const running = st === "running" || st === "pending";
+            const videoPrompt =
+              (row.videoPrompt ?? "").trim() ||
+              [row.dialogue].filter(Boolean).join("\n");
             return (
               <StoryVideoRowSlot
                 key={row.key}
                 frameIndex={row.frameIndex}
                 videoUrl={vid}
+                videoPrompt={videoPrompt}
                 generating={running}
                 onGenerate={() => runRowVideo(row.key, Boolean(vid))}
                 onPreview={

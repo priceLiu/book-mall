@@ -337,3 +337,27 @@ export function patchStoryboardDialogue(
   }
   return md;
 }
+
+function escapeMdTableCell(text: string): string {
+  return text.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
+}
+
+export function formatStoryboardTableMarkdown(
+  rows: Array<{
+    frameIndex: number;
+    scene: string;
+    description: string;
+    dialogue: string;
+    videoPrompt: string;
+  }>,
+): string {
+  if (!rows.length) return "";
+  return [
+    "| 镜号 | 场景 | 画面描述 | 台词 | 视频提示 |",
+    "|------|------|----------|------|----------|",
+    ...rows.map(
+      (r) =>
+        `| ${r.frameIndex} | ${escapeMdTableCell(r.scene)} | ${escapeMdTableCell(r.description)} | ${escapeMdTableCell(r.dialogue)} | ${escapeMdTableCell(r.videoPrompt)} |`,
+    ),
+  ].join("\n");
+}

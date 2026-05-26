@@ -162,8 +162,10 @@ export function StoryColumnRowCard({
   videoUrl,
   audioUrl,
   generating,
-  generateTitle,
+  generateDisabled,
+  mediaMode,
   onGenerate,
+  onGenerateVideo,
   onPreview,
   promptHint,
 }: {
@@ -183,8 +185,11 @@ export function StoryColumnRowCard({
   videoUrl?: string;
   audioUrl?: string;
   generating?: boolean;
-  generateTitle?: string;
+  /** 未配置模型等：按钮置灰 */
+  generateDisabled?: boolean;
+  mediaMode?: "character" | "frame";
   onGenerate: () => void;
+  onGenerateVideo?: () => void;
   onPreview?: () => void;
 }) {
   const [mainDraft, setMainDraft] = useState(promptValue);
@@ -314,8 +319,10 @@ export function StoryColumnRowCard({
           videoUrl={videoUrl}
           audioUrl={audioUrl}
           generating={generating}
-          generateTitle={generateTitle}
+          generateDisabled={generateDisabled}
+          mediaMode={mediaMode}
           onGenerate={onGenerate}
+          onGenerateVideo={onGenerateVideo}
           onPreview={onPreview}
         />
       </div>

@@ -11,7 +11,8 @@ import {
   syncColumnsFromHub,
   syncDownstreamMediaColumns,
 } from "./story-column-sync";
-import { hubSectionIsReady } from "./story-hub-runtime";
+import { hubSectionIsReady, hubSectionRuntime } from "./story-hub-runtime";
+import { isCanvasInflightStatus } from "./story-column-runtime";
 import type {
   StoryLlmSection,
   StoryRunContext,
@@ -125,7 +126,8 @@ export function storyApplyTaskResult(
   if (node.type === "story-script-hub" && ctx?.llmSection) {
     if (
       (task.status === "SUBMITTED" || task.status === "PENDING") &&
-      hubSectionIsReady(node, ctx.llmSection)
+      hubSectionIsReady(node, ctx.llmSection) &&
+      !isCanvasInflightStatus(hubSectionRuntime(node, ctx.llmSection)?.status)
     ) {
       return;
     }

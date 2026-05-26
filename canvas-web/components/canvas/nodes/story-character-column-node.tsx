@@ -154,7 +154,7 @@ export function StoryCharacterColumnNode({ id, data, selected }: NodeProps) {
                   promptValue={row.prompt}
                   onSavePrompt={(p) => saveRowPrompt(row.key, p)}
                   generating={running}
-                  generateTitle={url ? "重生成" : "生成"}
+                  mediaMode="character"
                   imageUrl={url}
                   onGenerate={() => runRow(row.key, Boolean(url))}
                   onPreview={
