@@ -1,0 +1,31 @@
+---
+description: 漫剧画布 · 文案 Markdown 表格预览/编辑统一版式
+globs: canvas-web/components/canvas/**,canvas-web/lib/canvas/story-*.ts,canvas-web/lib/canvas/parse-md-tables.ts
+alwaysApply: false
+---
+
+# 漫剧文案 · 表格预览与编辑
+
+## 统一版式（必须）
+
+角色设定、分镜脚本等 **GFM 表格** 的预览与编辑，须与「角色设定表」同款样式：
+
+- 共享常量：`canvas-web/lib/canvas/story-md-table-chrome.ts`
+- 预览渲染：`MarkdownView` 的 `document` / `nodePreview` variant
+- 可编辑表：`StoryCharacterTableEditor`、`StoryStoryboardTableEditor`
+
+样式要点：
+
+- 外框 `border-neutral-300`，表头 `bg-neutral-100`，单元格 `bg-white`
+- 文档审阅：`text-[15px]` + `px-4 py-2.5`
+- 节点内预览：`text-[12px]` + `px-2.5 py-1.5`（比例缩小，风格一致）
+
+## 禁止
+
+- 不要在漫剧表格预览里单独写一套 prose/table 样式
+- 不要用纯 Markdown 源码 textarea 作为默认编辑方式（表格可解析时优先表格编辑）
+
+## 分镜 ↔ 角色名
+
+- 分镜 LLM 须带上游 `characterMd`（见 `story-hub-text-inputs.ts`）
+- 台词说话人须与角色表「角色」列一致（生成约束写在 prompt，**不在 UI 弹黄色警告**）

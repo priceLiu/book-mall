@@ -49,8 +49,23 @@ export function collectStoryWorkspaceRunJobs(
     }
   }
 
-  const videoCol = nodes.find((n) => n.type === "story-video-column");
   const frameCol = nodes.find((n) => n.type === "story-frame-column");
+  if (frameCol) {
+    const d = frameCol.data as unknown as StoryFrameColumnNodeData;
+    if (d.batchImage?.providerId) {
+      for (const r of d.rows ?? []) {
+        if (rowNeedsMedia(r.runtime)) {
+          jobs.push({
+            nodeId: frameCol.id,
+            rowKey: r.key,
+            mediaKind: "frameImage",
+          });
+        }
+      }
+    }
+  }
+
+  const videoCol = nodes.find((n) => n.type === "story-video-column");
   const frameBatch =
     (frameCol?.data as StoryFrameColumnNodeData)?.batchVideo ??
     (frameCol?.data as StoryFrameColumnNodeData)?.batchImage;

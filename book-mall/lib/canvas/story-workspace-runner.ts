@@ -65,6 +65,19 @@ function resolveStoryRowRefUrls(row: StoryRow, promptField = "prompt"): string[]
   return [];
 }
 
+/** 分镜视频：分镜图 + @ 角色参考图（分镜图始终在前，供 image-to-video） */
+function collectStoryVideoImageInputs(row: StoryRow): string[] {
+  const urls: string[] = [];
+  const add = (raw: unknown) => {
+    const u = String(raw ?? "").trim();
+    if (!/^https?:\/\//.test(u)) return;
+    if (!urls.includes(u)) urls.push(u);
+  };
+  add(row.frameImageUrl);
+  for (const u of resolveStoryRowRefUrls(row, "videoPrompt")) add(u);
+  return urls.slice(0, 8);
+}
+
 function pickRow(rows: StoryRow[], rowKey: string): StoryRow {
   const row = rows.find((r) => String(r.key ?? "") === rowKey);
   if (!row) {
@@ -191,13 +204,14 @@ export async function runStoryVideoColumnVideoRow(
   const modelKey = String(batch.modelKey ?? "");
   const params = (batch.params as Record<string, unknown>) ?? {};
   const refUrls = resolveStoryRowRefUrls(row, "videoPrompt");
-  const legacyFrame = String(row.frameImageUrl ?? "");
-  const imageInputs = refUrls.length
-    ? refUrls
-    : legacyFrame && /^https?:\/\//.test(legacyFrame)
-      ? [legacyFrame]
-      : [];
-  const prompt = String(row.videoPrompt ?? "").trim() || "分镜视频";
+  const imageInputs = collectStoryVideoImageInputs(row);
+  const promptBase = String(row.videoPrompt ?? "").trim() || "分镜视频";
+  const prompt =
+    imageInputs.length && refUrls.length
+      ? `${promptBase}\n\n（以分镜图为主参考，保持构图与角色一致；@ 角色参考图辅助人设）`
+      : imageInputs.length
+        ? `${promptBase}\n\n（以分镜图为主参考生成视频，保持构图与角色一致）`
+        : promptBase;
   const salt = hashSalt({ rowKey: args.rowKey, mediaKind: "video" });
 
   return runVideoEngineNode({
@@ -216,7 +230,7 @@ export async function runStoryVideoColumnVideoRow(
         prompt: `${prompt}\n\n<!-- ${salt} -->`,
         frameIndex: row.frameIndex,
       },
-      imageInputs: imageInputs.slice(0, 8),
+      imageInputs,
       textInputs: [],
     },
   });

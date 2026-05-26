@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Save, X } from "lucide-react";
+import { Save, X, Play, RefreshCw } from "lucide-react";
 
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { STORY_HUB_SECTION_ORDER } from "@/lib/canvas/spawn-story-workspace";
@@ -12,7 +12,7 @@ import {
   outlineDisplayMd,
   type HubPreviewSection,
 } from "@/lib/canvas/story-hub-runtime";
-import type { StoryScriptHubNodeData } from "@/lib/canvas/story-workspace-types";
+import type { StoryLlmSection, StoryScriptHubNodeData } from "@/lib/canvas/story-workspace-types";
 import {
   formatRevisionTime,
   type StoryTextRevision,
@@ -28,6 +28,10 @@ import {
   canEditCharacterAsTable,
   StoryCharacterTableEditor,
 } from "./story-character-table-editor";
+import {
+  canEditStoryboardAsTable,
+  StoryStoryboardTableEditor,
+} from "./story-storyboard-table-editor";
 
 const TAB_LABEL: Record<HubPreviewSection, string> = {
   outline: "故事大纲",
@@ -56,6 +60,9 @@ export function StoryScriptHubModal({
   onSaveCharacter,
   onSaveStoryboard,
   onSaveStoryboardMd,
+  onRunSection,
+  sectionIsRunning,
+  canRunLlm,
 }: {
   open: boolean;
   /** 打开时定位到的 Tab（与节点预览当前段一致） */
@@ -66,12 +73,17 @@ export function StoryScriptHubModal({
   onSaveCharacter: (md: string) => void;
   onSaveStoryboard: (md: string) => void;
   onSaveStoryboardMd: (md: string) => void;
+  /** 单段 LLM 生成（大纲 / 角色 / 分镜） */
+  onRunSection?: (section: StoryLlmSection) => void;
+  sectionIsRunning?: boolean;
+  canRunLlm?: boolean;
 }) {
   const [section, setSection] = useState<HubPreviewSection>("outline");
   const [draft, setDraft] = useState("");
   const [mounted, setMounted] = useState(false);
   const [savedHint, setSavedHint] = useState(false);
   const [characterRawMd, setCharacterRawMd] = useState(false);
+  const [storyboardRawMd, setStoryboardRawMd] = useState(false);
   const previewBodyRef = useRef<HTMLDivElement>(null);
   const [previewBodyH, setPreviewBodyH] = useState<number | null>(null);
 
@@ -105,6 +117,27 @@ export function StoryScriptHubModal({
   );
 
   const dirty = section === "dialogue" ? false : draft !== persistedMd;
+
+  const llmSection =
+    section === "outline" || section === "character" || section === "storyboard"
+      ? section
+      : null;
+  const sectionHasContent = llmSection
+    ? Boolean(persistedMd.trim())
+    : false;
+  const runDisabled =
+    !llmSection ||
+    !onRunSection ||
+    !canRunLlm ||
+    sectionIsRunning ||
+    dirty;
+  const runTitle = !canRunLlm
+    ? "请先在故事主题或本节点配置 LLM 模型"
+    : dirty
+      ? "请先保存当前编辑，再生成"
+      : sectionIsRunning
+        ? "本段生成中…"
+        : undefined;
 
   useEffect(() => {
     setMounted(true);
@@ -140,10 +173,18 @@ export function StoryScriptHubModal({
     if (section === "character") {
       setCharacterRawMd(!canEditCharacterAsTable(persistedMd));
     }
+    if (section === "storyboard") {
+      setStoryboardRawMd(!canEditStoryboardAsTable(persistedMd));
+    }
   }, [open, section, persistedMd, data.storyboardMd]);
 
   const characterTableMode =
     section === "character" && !characterRawMd && canEditCharacterAsTable(draft || persistedMd);
+
+  const storyboardTableMode =
+    section === "storyboard" &&
+    !storyboardRawMd &&
+    canEditStoryboardAsTable(draft || persistedMd);
 
   const mergeOutlineRoles = () => {
     if (!outlineBrief.length) return;
@@ -256,15 +297,38 @@ export function StoryScriptHubModal({
           ) : null}
         </span>
         {section !== "dialogue" ? (
-          <button
-            type="button"
-            disabled={!dirty}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-[#fb923c] px-3 py-1.5 text-[12px] font-medium text-black disabled:opacity-40"
-            onClick={saveCurrent}
-          >
-            <Save className="size-3.5" />
-            保存
-          </button>
+          <>
+            <button
+              type="button"
+              disabled={runDisabled}
+              title={runTitle}
+              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#fb923c]/50 bg-[#fb923c]/15 px-3 py-1.5 text-[12px] font-medium text-[#fdba74] disabled:opacity-40"
+              onClick={() => llmSection && onRunSection?.(llmSection)}
+            >
+              {sectionIsRunning ? (
+                <>
+                  <RefreshCw className="size-3.5 animate-spin" /> 生成中…
+                </>
+              ) : sectionHasContent ? (
+                <>
+                  <RefreshCw className="size-3.5" /> 重新生成
+                </>
+              ) : (
+                <>
+                  <Play className="size-3.5" /> 生成
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              disabled={!dirty}
+              className="inline-flex shrink-0 items-center gap-1 rounded-md bg-[#fb923c] px-3 py-1.5 text-[12px] font-medium text-black disabled:opacity-40"
+              onClick={saveCurrent}
+            >
+              <Save className="size-3.5" />
+              保存
+            </button>
+          </>
         ) : null}
         <button
           type="button"
@@ -290,6 +354,10 @@ export function StoryScriptHubModal({
               {section === "character" ? (
                 <p className="text-[10px] text-neutral-500">
                   左侧表格编辑 · 右侧为渲染原稿；保存后写入角色设定
+                </p>
+              ) : section === "storyboard" ? (
+                <p className="text-[10px] text-neutral-500">
+                  左侧表格编辑 · 右侧为渲染原稿；台词说话人须与角色表一致
                 </p>
               ) : section !== "dialogue" ? (
                 <p className="text-[10px] text-neutral-500">
@@ -357,6 +425,33 @@ export function StoryScriptHubModal({
                   </div>
                   {characterTableMode ? (
                     <StoryCharacterTableEditor
+                      value={draft}
+                      onChange={setDraft}
+                    />
+                  ) : (
+                    <textarea
+                      className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
+                      style={editBodyStyle}
+                      rows={editRows}
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      spellCheck={false}
+                    />
+                  )}
+                </div>
+              ) : section === "storyboard" && (draft.trim() || persistedMd.trim()) ? (
+                <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      className="rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-[11px] text-neutral-600 hover:bg-neutral-50"
+                      onClick={() => setStoryboardRawMd((v) => !v)}
+                    >
+                      {storyboardRawMd ? "切换表格编辑" : "切换 Markdown 源码"}
+                    </button>
+                  </div>
+                  {storyboardTableMode ? (
+                    <StoryStoryboardTableEditor
                       value={draft}
                       onChange={setDraft}
                     />

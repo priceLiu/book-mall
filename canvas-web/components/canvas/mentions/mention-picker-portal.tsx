@@ -7,11 +7,18 @@ import { GripVertical, X } from "lucide-react";
 import { RF_NO_DRAG, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import type { MentionableItem } from "./MentionsTextarea";
 
-const PICKER_W = 620;
-const PICKER_MAX_H = 780;
-const THUMB_W = 112;
-const THUMB_H = 150;
+const ITEM_W = 200;
+const THUMB_H = 240;
 const GAP = 12;
+const PICKER_PAD = 16;
+const PICKER_MIN_W = 320;
+const PICKER_MAX_W = 960;
+
+function pickerWidthForCount(count: number): number {
+  if (count <= 0) return PICKER_MIN_W;
+  const content = count * ITEM_W + Math.max(0, count - 1) * 8 + PICKER_PAD;
+  return Math.min(PICKER_MAX_W, Math.max(PICKER_MIN_W, content));
+}
 
 export function MentionPickerPortal({
   open,
@@ -50,14 +57,12 @@ export function MentionPickerPortal({
   const updateAnchor = useCallback(() => {
     if (!anchorEl) return;
     const r = anchorEl.getBoundingClientRect();
+    const w = pickerWidthForCount(items.length);
     setBasePos({
-      left: Math.min(
-        Math.max(12, r.left),
-        window.innerWidth - PICKER_W - 12,
-      ),
+      left: Math.min(Math.max(12, r.left), window.innerWidth - w - 12),
       top: r.top - GAP,
     });
-  }, [anchorEl]);
+  }, [anchorEl, items.length]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -108,6 +113,7 @@ export function MentionPickerPortal({
 
   const left = basePos.left + drag.x;
   const top = basePos.top + drag.y;
+  const pickerW = pickerWidthForCount(items.length);
 
   return createPortal(
     <div
@@ -115,8 +121,7 @@ export function MentionPickerPortal({
       style={{
         left,
         top,
-        width: PICKER_W,
-        maxHeight: PICKER_MAX_H,
+        width: pickerW,
         transform: "translateY(-100%)",
       }}
       onMouseDown={(e) => e.stopPropagation()}
@@ -131,7 +136,7 @@ export function MentionPickerPortal({
       >
         <GripVertical className="size-3.5 shrink-0 text-white/40" />
         <p className="min-w-0 flex-1 text-[10px] text-[var(--canvas-muted)]">
-          角色三视图 · 拖标题栏移动 · ↑↓ Enter 插入
+          角色 · 拖标题栏移动 · ←→ Enter 插入
         </p>
         <button
           type="button"
@@ -141,47 +146,50 @@ export function MentionPickerPortal({
           <X className="size-3.5" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto py-1">
+      <div className="overflow-x-auto p-2">
         {items.length ? (
-          items.map((m, i) => (
-            <button
-              key={m.id}
-              type="button"
-              className={`flex w-full items-center gap-4 px-4 py-3 text-left ${
-                i === selectedIndex
-                  ? "bg-[var(--canvas-accent)]/25 text-white"
-                  : "text-white/85 hover:bg-white/8"
-              }`}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onSelect(m);
-              }}
-              onMouseEnter={() => onHoverIndex(i)}
-            >
-              {m.previewUrl ? (
-                <span
-                  className="relative shrink-0 overflow-hidden rounded-md border border-white/15"
-                  style={{ width: THUMB_W, height: THUMB_H }}
-                >
-                  <Image
-                    src={m.previewUrl}
-                    alt=""
-                    fill
-                    className="object-contain bg-black/40"
-                    unoptimized
+          <div className="flex flex-nowrap gap-2">
+            {items.map((m, i) => (
+              <button
+                key={m.id}
+                type="button"
+                className={`flex shrink-0 flex-col items-stretch gap-2 rounded-lg p-2 text-center transition ${
+                  i === selectedIndex
+                    ? "bg-[var(--canvas-accent)]/25 text-white ring-1 ring-[var(--canvas-accent)]/40"
+                    : "text-white/85 hover:bg-white/8"
+                }`}
+                style={{ width: ITEM_W }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onSelect(m);
+                }}
+                onMouseEnter={() => onHoverIndex(i)}
+              >
+                {m.previewUrl ? (
+                  <span
+                    className="relative w-full overflow-hidden rounded-md border border-white/15 bg-black/40"
+                    style={{ height: THUMB_H }}
+                  >
+                    <Image
+                      src={m.previewUrl}
+                      alt=""
+                      fill
+                      className="object-contain"
+                      unoptimized
+                    />
+                  </span>
+                ) : (
+                  <span
+                    className="w-full rounded-md border border-dashed border-white/15 bg-white/5"
+                    style={{ height: THUMB_H }}
                   />
+                )}
+                <span className="line-clamp-2 text-[11px] leading-snug">
+                  @{m.label}
                 </span>
-              ) : (
-                <span
-                  className="shrink-0 rounded-md border border-dashed border-white/15 bg-white/5"
-                  style={{ width: THUMB_W, height: THUMB_H }}
-                />
-              )}
-              <span className="min-w-0 flex-1 text-sm leading-snug">
-                @{m.label}
-              </span>
-            </button>
-          ))
+              </button>
+            ))}
+          </div>
         ) : (
           <p className="px-3 py-6 text-center text-[11px] leading-relaxed text-[var(--canvas-muted)]">
             {emptyHint}

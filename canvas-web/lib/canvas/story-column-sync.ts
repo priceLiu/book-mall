@@ -87,7 +87,7 @@ function buildFrameRefImagesForCharacters(
 ): StoryRefImage[] {
   return characters.map((c) => ({
     id: `ref-char-${c.key}`,
-    label: `${c.name}·三视图`,
+    label: c.name,
     url: c.runtime?.ossUrl ?? c.runtime?.ephemeralUrl,
   }));
 }
@@ -218,6 +218,8 @@ export function buildVideoRowsFromFrames(
       videoPrompt: script,
       refImages,
       videoReferencedNodeIds: f.referencedNodeIds ?? [],
+      frameImageUrl:
+        f.runtime?.ossUrl ?? f.runtime?.ephemeralUrl ?? undefined,
     };
   });
 }
@@ -238,6 +240,10 @@ export function patchVideoRowsFromFrameRows(
       videoPrompt: script,
       refImages: (f.refImages ?? []).filter((r) => r.id.startsWith("ref-char-")),
       videoReferencedNodeIds: f.referencedNodeIds ?? [],
+      frameImageUrl:
+        f.runtime?.ossUrl ??
+        f.runtime?.ephemeralUrl ??
+        v.frameImageUrl,
     };
   });
 }
@@ -366,6 +372,7 @@ function mergeVideoRowsFromFrames(
       refImages: rebuilt.refImages?.length ? rebuilt.refImages : row.refImages,
       videoReferencedNodeIds:
         rebuilt.videoReferencedNodeIds ?? row.videoReferencedNodeIds,
+      frameImageUrl: rebuilt.frameImageUrl ?? row.frameImageUrl,
     };
   });
 }

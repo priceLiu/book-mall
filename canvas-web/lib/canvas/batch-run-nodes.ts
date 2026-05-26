@@ -51,6 +51,19 @@ export function runStoryHubSectionsSequential(
   );
 }
 
+/** 文案中枢 · 单段生成（审阅弹窗 / 节点底栏） */
+export function runStoryHubSection(
+  hubId: string,
+  section: StoryLlmSection,
+  options?: { forceFresh?: boolean },
+) {
+  busEnqueueStoryRun({
+    nodeId: hubId,
+    llmSection: section,
+    forceFresh: options?.forceFresh,
+  });
+}
+
 /** 列节点 · 按行顺序跑 */
 export function batchRunStoryRowsSequential(
   columnNodeId: string,

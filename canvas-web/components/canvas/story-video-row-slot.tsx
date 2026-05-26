@@ -4,27 +4,32 @@ import { Film, Play, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORY_VIDEO_SLOT } from "@/lib/canvas/story-column-layout";
 
-/** 分镜视频列 · 纵向成片（无边框，固定格高） */
+const REFRESH_BTN =
+  "nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/45 bg-[#fb923c]/20 text-[#fdba74] hover:bg-[#fb923c]/30";
+
+/** 分镜视频列 · 纵向成片（手动点击生成，无文案 overlay） */
 export function StoryVideoRowSlot({
   frameIndex,
   videoUrl,
+  videoPrompt,
   generating,
-  generateTitle = "按分镜脚本重新生成",
   onGenerate,
   onPreview,
 }: {
   frameIndex: number;
   videoUrl?: string;
+  /** hover 时在视频右侧展示完整视频提示词 */
+  videoPrompt?: string;
   generating?: boolean;
-  generateTitle?: string;
   onGenerate: () => void;
   onPreview?: () => void;
 }) {
   const hasVideo = Boolean(videoUrl);
+  const promptText = (videoPrompt ?? "").trim();
 
   return (
     <article
-      className="flex w-full flex-col"
+      className="group/slot relative flex w-full flex-col"
       style={{ gap: STORY_VIDEO_SLOT.labelThumbGap }}
     >
       <header
@@ -38,62 +43,78 @@ export function StoryVideoRowSlot({
         <span className="text-[10px] text-white/25">镜 {frameIndex}</span>
       </header>
 
-      <div
-        className={cn(
-          "group relative w-full shrink-0 overflow-hidden rounded-lg bg-[#1a1a1a]",
-          generating && "canvas-story-media-generating",
-        )}
-        style={{ height: STORY_VIDEO_SLOT.thumbHeight }}
-      >
-        {hasVideo ? (
-          <video
-            src={videoUrl}
-            className="absolute inset-0 h-full w-full object-cover"
-            playsInline
-            muted
-            preload="metadata"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-black/40" />
-        )}
+      <div className="relative">
+        <div
+          className={cn(
+            "group relative w-full shrink-0 overflow-hidden rounded-lg border border-white/10 bg-[#1a1a1a]",
+            generating && "canvas-story-media-generating border-[#fb923c]/50",
+          )}
+          style={{ height: STORY_VIDEO_SLOT.thumbHeight }}
+        >
+          {hasVideo ? (
+            <video
+              src={videoUrl}
+              className="absolute inset-0 h-full w-full object-cover"
+              playsInline
+              muted
+              preload="metadata"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-black/40" />
+          )}
 
-        {!hasVideo && !generating ? (
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[11px] text-white/20">
-            待生成
-          </span>
-        ) : null}
+          {generating ? (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45">
+              <RefreshCw className="size-8 animate-spin text-[#fdba74]" />
+            </div>
+          ) : !hasVideo ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center">
+              <button
+                type="button"
+                aria-label="生成分镜视频"
+                className={REFRESH_BTN}
+                onClick={onGenerate}
+              >
+                <RefreshCw className="size-4" />
+              </button>
+            </div>
+          ) : null}
 
-        {generating ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45">
-            <RefreshCw className="size-8 animate-spin text-white/70" />
+          {hasVideo && !generating && onPreview ? (
+            <button
+              type="button"
+              aria-label="播放"
+              className="nodrag absolute inset-0 z-10 flex items-center justify-center"
+              onClick={onPreview}
+            >
+              <span className="flex size-12 items-center justify-center rounded-full bg-white/25 shadow-lg backdrop-blur-sm transition-transform group-hover:scale-105">
+                <Play className="ml-0.5 size-5 fill-white text-white" />
+              </span>
+            </button>
+          ) : null}
+
+          {hasVideo && !generating ? (
+            <button
+              type="button"
+              aria-label="重新生成视频"
+              className="nodrag absolute right-2 top-2 z-20 inline-flex size-8 items-center justify-center rounded-full border border-[#fb923c]/40 bg-black/55 text-[#fdba74] opacity-0 shadow-md backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-black/75"
+              onClick={(e) => {
+                e.stopPropagation();
+                onGenerate();
+              }}
+            >
+              <RefreshCw className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
+
+        {hasVideo && promptText ? (
+          <div
+            className="pointer-events-none absolute left-[calc(100%+8px)] top-0 z-30 hidden max-h-[min(200px,100%)] w-[min(240px,calc(100vw-420px))] overflow-y-auto rounded-md border border-white/15 bg-black/90 px-2.5 py-2 text-[10px] leading-relaxed text-white/75 shadow-xl group-hover/slot:block"
+            aria-hidden
+          >
+            {promptText}
           </div>
-        ) : null}
-
-        {hasVideo && !generating && onPreview ? (
-          <button
-            type="button"
-            title="播放"
-            className="nodrag absolute inset-0 z-10 flex items-center justify-center"
-            onClick={onPreview}
-          >
-            <span className="flex size-12 items-center justify-center rounded-full bg-white/25 shadow-lg backdrop-blur-sm transition-transform group-hover:scale-105">
-              <Play className="ml-0.5 size-5 fill-white text-white" />
-            </span>
-          </button>
-        ) : null}
-
-        {hasVideo && !generating ? (
-          <button
-            type="button"
-            title={generateTitle}
-            className="nodrag absolute right-2 top-2 z-20 inline-flex size-8 items-center justify-center rounded-full bg-black/55 text-white/80 opacity-0 shadow-md backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-black/75 hover:text-white"
-            onClick={(e) => {
-              e.stopPropagation();
-              onGenerate();
-            }}
-          >
-            <RefreshCw className="size-3.5" />
-          </button>
         ) : null}
       </div>
     </article>
