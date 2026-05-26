@@ -2,6 +2,7 @@
 
 在 **canvas-web** 画布内分步完成漫剧生产；与 story-web **数据不互通**。
 
+> **标准工作流（唯一真源 · 开发必读）**：[story-workflow-canonical.md](./story-workflow-canonical.md)  
 > **操作手册**：[story-ops.md](./story-ops.md)  
 > **设计规范（尺寸 / 按钮 / 弹层 / 文案 / 对比）**：[design.md](./design.md)
 

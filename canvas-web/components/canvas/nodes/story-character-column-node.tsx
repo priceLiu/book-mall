@@ -151,7 +151,7 @@ export function StoryCharacterColumnNode({ id, data, selected }: NodeProps) {
         <div className="space-y-2">
           {!displayRows.length ? (
             <p className="text-[11px] text-[var(--canvas-muted)]">
-              在「故事大纲」生成角色设定后，此处显示各角色与三视图。
+              定稿大纲中若无角色设定，此列可为空；需要时再生成三视图。
             </p>
           ) : (
             displayRows.map((row) => {

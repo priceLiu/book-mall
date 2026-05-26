@@ -8,7 +8,6 @@ import {
   parseCharacterListFromSection,
   parseOutlineBriefCharacters,
   parseStoryboardRows,
-  inferCharacterNamesFromStoryboard,
   extractCharacterSectionFromOutline,
 } from "./parse-md-tables";
 import {
@@ -43,7 +42,7 @@ export function buildCharacterRowsFromMd(md: string): StoryCharacterRow[] {
   return parseCharacterRows(md).map((c) => characterRowFromParts(c));
 }
 
-/** 以角色设定表为准；遗留大纲人物表 / 列表 / 分镜对白推断 */
+/** 以定稿大纲中的角色设定为准；无角色则返回空行（仍创建角色列节点） */
 export function buildCharacterRowsFromHub(
   d: StoryScriptHubNodeData,
 ): StoryCharacterRow[] {
@@ -62,17 +61,6 @@ export function buildCharacterRowsFromHub(
         name: b.name,
         role: b.role || "",
         appearance: b.appearance,
-      }),
-    );
-  }
-  const storyboardMd = resolveHubStoryboardMd(synced);
-  const inferred = inferCharacterNamesFromStoryboard(storyboardMd);
-  if (inferred.length > 0) {
-    return inferred.map((name) =>
-      characterRowFromParts({
-        name,
-        role: "",
-        appearance: "（待补充外观，可在故事大纲·角色设定中完善）",
       }),
     );
   }

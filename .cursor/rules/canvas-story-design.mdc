@@ -6,13 +6,14 @@ alwaysApply: false
 
 # 漫剧画布设计规范
 
-完整说明见 `canvas-web/docs/design.md`。改 UI 须遵守以下硬约束。
+完整说明见 `canvas-web/docs/design.md`。**工作流顺序与拆分语义**见 `canvas-web/docs/story-workflow-canonical.md`（开发前必读）。
 
 ## 固定尺寸（勿随意改常量）
 
 - 故事主题 + 故事大纲：**1020×1200**（`STORY_CONTROL_NODE_*`）
-- 角色列（三视图）：**560×2100**；分镜列：**1080×2100**；分镜视频列：**500×2100**
-- 流程：**主题 → 大纲（创作剧本）→ 审阅确认 → 输出工作流 → 三视图/分镜图/分镜视频/剪映**；多工作流须按 `scriptHubId` 隔离，禁止共用第一个 starter 的 `workspaceIds` 判断「已输出」
+- 角色列（三视图）：**560×2100**；分镜列：**1080×2100**；分镜视频列：**500×2100**；剪映：**400×280**（顶对齐控制行）
+- 标准流程见 **story-workflow-canonical.md**：定稿 → 输出工作流（仅拆分）→ 用户手动生成媒体
+- 多工作流须按 `scriptHubId` / `hubNodeId` 隔离
 - 三视图：**670×880**
 - 行内参考图 **220**、输出图 **248**
 - 真源：`story-node-chrome.ts`、`types.ts` `NODE_DEFAULT_SIZE`、`story-ref-image.ts`

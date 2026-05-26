@@ -146,6 +146,23 @@ export function reconcileStoryStarterWorkspaces(
   });
 }
 
+/** 用户删除本套媒体列后 · 解除故事大纲定稿锁定，允许重新编辑/定稿 */
+export function reconcileStoryHubFinalized(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): CanvasFlowNode[] {
+  return nodes.map((n) => {
+    if (n.type !== "story-script-hub") return n;
+    const d = n.data as { scriptFinalized?: boolean };
+    if (!d.scriptFinalized) return n;
+    if (scriptHubHasOutputWorkflow(nodes, edges, n.id)) return n;
+    return {
+      ...n,
+      data: { ...n.data, scriptFinalized: false },
+    };
+  });
+}
+
 /** 完整四节点工作区（含媒体列，后续步骤启用） */
 export function findStoryWorkspaceForStarter(
   nodes: CanvasFlowNode[],

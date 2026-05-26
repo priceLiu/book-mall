@@ -11,7 +11,7 @@ import {
   findStoryScriptHubForStarter,
   findWorkspaceForScriptHub,
   reconcileStoryStarterWorkspaces,
-  reconcileStoryWorkspaceEdges,
+  reconcileStoryHubFinalized,
   resolveJianyingExportId,
 } from "./spawn-story-workspace";
 import type { StoryWorkspaceIds } from "./story-workspace-types";
@@ -155,6 +155,7 @@ export function reflowStoryComicWorkspace(
   if (!hasStoryComicPipeline(nodes)) return nodes;
 
   let next = reconcileStoryStarterWorkspaces(nodes, edges);
+  next = reconcileStoryHubFinalized(next, edges);
   next = applyStoryColumnHeights(next);
   next = applyStoryControlRowHeights(next);
 

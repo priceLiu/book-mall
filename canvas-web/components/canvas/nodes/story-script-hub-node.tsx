@@ -23,6 +23,8 @@ import {
   hubCanOutputWorkflow,
   hubDataForColumnSync,
   hubDialogueIsReady,
+  hubIsScriptFinalized,
+  hubScriptEditable,
   hubSectionIsReady,
   hubSectionIsRunning,
   hubSectionPreviewContent,
@@ -188,6 +190,13 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
     [nodes, edges, id],
   );
 
+  const scriptEditable = useMemo(
+    () => hubScriptEditable(d, hasMediaColumns),
+    [d, hasMediaColumns],
+  );
+
+  const scriptFinalized = hubIsScriptFinalized(d);
+
   useEffect(() => {
     const starter = findStarterForScriptHub(nodes, edges, id);
     if (!starter) return;
@@ -205,10 +214,13 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
     ) {
       patch.pipelineStage = "llm_done";
     }
+    if (!workspaceMediaColumnsLive(nodes, ws, id) && d.scriptFinalized) {
+      updateNodeData(id, { scriptFinalized: false });
+    }
     if (Object.keys(patch).length) {
       updateNodeData(starter.id, patch);
     }
-  }, [nodes, edges, id, updateNodeData]);
+  }, [nodes, edges, id, d.scriptFinalized, updateNodeData]);
 
   const syncColumnsIfPresent = (
     patch: Partial<StoryScriptHubNodeData>,
@@ -250,6 +262,7 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
   }, [d.outlineMd, d.characterMd, d.storyboardMd, hasMediaColumns]);
 
   const patchSectionMd = (section: StoryLlmSection, value: string) => {
+    if (!scriptEditable) return;
     if (section === "outline") {
       const promoted = promoteEmbeddedPackFromOutline(
         value,
@@ -377,6 +390,7 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         providers,
       );
       reflowStoryComicLayout();
+      updateNodeData(id, { scriptFinalized: true });
       updateNodeData(starter.id, { pipelineStage: "finalized" });
     } finally {
       setOutputBusy(false);
@@ -407,6 +421,7 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
   }, [id, resizeNode]);
 
   const runHubSection = (section: StoryLlmSection) => {
+    if (!scriptEditable) return;
     if (!canRunLlm || hubSectionIsRunning(hubNode, section)) return;
     const forceFresh = hubSectionIsReady(hubNode, section);
     runStoryHubSection(id, section, { forceFresh });
@@ -417,15 +432,13 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
       <NodeShell
         title="故事大纲"
         subtitle={
-          hasMediaColumns
-            ? "工作流已输出"
-            : aggregateStatus === "done"
-              ? "剧本就绪 · 可输出工作流"
-              : canOutputWorkflow
-                ? "大纲就绪 · 可输出工作流"
-                : anyRunning
-                  ? "文案生成中…"
-                  : "大纲 · 角色 · 分镜 · 对白"
+          hasMediaColumns && scriptFinalized
+            ? "已定稿 · 工作流已生成"
+            : canOutputWorkflow
+              ? "大纲就绪 · 可定稿生成工作流"
+              : anyRunning
+                ? "文案生成中…"
+                : "大纲 · 角色 · 分镜 · 对白"
         }
         selected={selected}
         engine
@@ -455,19 +468,19 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
                 hubSectionIsRunning(hubNode, "outline")
                   ? "大纲生成中…"
                   : !canOutputWorkflow
-                    ? "请先在故事主题点击「创作剧本」生成大纲"
+                    ? "请先创作剧本并填写故事大纲"
                     : hasMediaColumns
-                      ? "已输出工作流"
-                      : undefined
+                      ? "已定稿 · 工作流已生成"
+                      : "确认当前大纲并拆分生成下游节点（不自动生成图片/视频）"
               }
               onClick={() => void onOutputWorkflow()}
             >
               <GitBranch className="size-3.5 shrink-0" />
               {outputBusy
-                ? "输出中…"
+                ? "生成中…"
                 : hasMediaColumns
-                  ? "已输出工作流"
-                  : "输出工作流"}
+                  ? "已定稿 · 工作流已生成"
+                  : "定稿生成工作流"}
             </button>
           </StoryNodeFooterShell>
         }
@@ -521,6 +534,7 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         onSaveCharacter={(md) => patchSectionMd("character", md)}
         onSaveStoryboard={(md) => patchSectionMd("storyboard", md)}
         onSaveStoryboardMd={(md) => {
+          if (!scriptEditable) return;
           updateNodeData(id, {
             storyboardMd: md,
             storyboardHistory: pushStoryRevision(d.storyboardHistory, md),
@@ -531,6 +545,7 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         onRunSection={runHubSection}
         sectionIsRunning={reviewSectionRunning}
         canRunLlm={canRunLlm}
+        readOnly={!scriptEditable}
       />
     </>
   );

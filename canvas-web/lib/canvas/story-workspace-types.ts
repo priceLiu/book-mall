@@ -72,6 +72,8 @@ export type StoryScriptHubNodeData = {
   characterHistory?: StoryTextRevision[];
   storyboardHistory?: StoryTextRevision[];
   referencedNodeIds?: string[];
+  /** 已定稿并生成工作流后锁定 hub 文案；删除本套媒体列后自动解除 */
+  scriptFinalized?: boolean;
 };
 
 export type StoryCharacterColumnNodeData = {
