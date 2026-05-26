@@ -4,9 +4,10 @@ import { nanoid } from "nanoid";
 import type { CanvasFlowEdge, CanvasFlowNode, StoryLlmEngineIds } from "./types";
 import {
   STORY_CHARACTER_ENGINE_PROMPT,
-  STORY_OUTLINE_ENGINE_PROMPT,
+  STORY_OUTLINE_USER_PROMPT,
   STORY_STORYBOARD_ENGINE_PROMPT,
 } from "./story-prompts";
+import { spawnStoryComicColumnGroups } from "./story-comic-groups";
 
 export type { StoryLlmEngineIds };
 
@@ -80,14 +81,18 @@ export function findStoryLlmEngines(
 
 type SpawnArgs = {
   starterNodeId: string;
-  theme: string;
+  systemPrompt: string;
   providerId: string;
   modelKey: string;
   params: Record<string, unknown>;
   nodes: CanvasFlowNode[];
   edges: CanvasFlowEdge[];
   addNode: (
-    type: "story-outline-engine" | "character-engine" | "storyboard-engine",
+    type:
+      | "story-outline-engine"
+      | "character-engine"
+      | "storyboard-engine"
+      | "group",
     position: { x: number; y: number },
     data: Record<string, unknown>,
   ) => string;
@@ -153,6 +158,17 @@ export function spawnStoryLlmEngines(args: SpawnArgs): StoryLlmEngineIds {
 
   const base = starter?.position ?? { x: 400, y: 200 };
 
+  spawnStoryComicColumnGroups({
+    starterNodeId: args.starterNodeId,
+    nodes: args.nodes,
+    addNode: (type, position, data) =>
+      args.addNode(
+        type as "story-outline-engine" | "character-engine" | "storyboard-engine" | "group",
+        position,
+        data,
+      ),
+  });
+
   const sharedEngine = {
     providerId: args.providerId,
     modelKey: args.modelKey,
@@ -165,7 +181,8 @@ export function spawnStoryLlmEngines(args: SpawnArgs): StoryLlmEngineIds {
     { x: base.x + 400, y: base.y },
     {
       ...sharedEngine,
-      prompt: `${STORY_OUTLINE_ENGINE_PROMPT}\n\n# 用户创意\n${args.theme.trim()}`,
+      outlineSystemPrompt: args.systemPrompt.trim(),
+      prompt: STORY_OUTLINE_USER_PROMPT,
       params: { ...LLM_PARAMS, ...args.params },
     },
   );
@@ -216,7 +233,7 @@ export function storyLlmPipelineNodeIds(ids: StoryLlmEngineIds): string[] {
 /** 漫剧启动重跑时，把 Provider / 主题同步到已存在的三文案引擎 */
 export function syncStoryLlmEnginesFromStarter(args: {
   starterNodeId: string;
-  theme: string;
+  systemPrompt: string;
   providerId: string;
   modelKey: string;
   params: Record<string, unknown>;
@@ -231,7 +248,8 @@ export function syncStoryLlmEnginesFromStarter(args: {
   };
   args.updateNodeData(args.ids.outlineId, {
     ...shared,
-    prompt: `${STORY_OUTLINE_ENGINE_PROMPT}\n\n# 用户创意\n${args.theme.trim()}`,
+    outlineSystemPrompt: args.systemPrompt.trim(),
+    prompt: STORY_OUTLINE_USER_PROMPT,
   });
   args.updateNodeData(args.ids.characterId, {
     ...shared,

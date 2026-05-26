@@ -10,8 +10,32 @@ import type {
   StoryEngineNodeData,
   StoryLlmNodeType,
 } from "@/lib/canvas/types";
-import { THREE_VIEW_ENGINE_MODEL_KEYS } from "@/lib/canvas/types";
+import {
+  THREE_VIEW_ENGINE_MODEL_KEYS,
+  STORY_VIDEO_MODEL_KEYS,
+} from "@/lib/canvas/types";
 import { batchRunNodesSequential } from "@/lib/canvas/batch-run-nodes";
+import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
+import { findStoryWorkspaceIds } from "@/lib/canvas/story-column-display";
+import {
+  runThreeViewBatchAction,
+  runFrameImagesBatchAction,
+  runFrameMediaBatchAction,
+  getCharacterMarkdown,
+  getStoryboardMarkdown,
+  buildCharacterBatchSelectItems,
+  buildStoryboardBatchSelectItems,
+  resolveStoryEngineIds,
+  type StoryBatchStore,
+} from "@/lib/canvas/story-batch-actions";
+import {
+  collectCharacterColumnRows,
+  collectStoryboardColumnRows,
+} from "@/lib/canvas/story-column-bindings";
+import {
+  StoryCharacterColumnPanel,
+  StoryFrameColumnPanel,
+} from "../story-column-panel";
 import { resolveReferencedNodeIds } from "@/lib/canvas/referenced-nodes";
 import { NodeShell } from "../node-shell";
 import { EnginePreviewTrigger } from "../engine-preview-trigger";
@@ -28,20 +52,6 @@ import {
   useUpstreamChips,
   sortUpstreamChips,
 } from "../upstream-chips";
-import {
-  batchCreateThreeView,
-  batchCreateFrameImages,
-  collectFrameEngineIds,
-  findStoryboardFramesMissingThreeView,
-  allFrameImageNodesExist,
-  collectThreeViewEngineIdsForCharacters,
-  wireFrameImageCharacterRefs,
-  applyEnginePickToNodes,
-} from "@/lib/canvas/story-batch-spawn";
-import {
-  parseCharacterRows,
-  parseStoryboardRows,
-} from "@/lib/canvas/parse-md-tables";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
@@ -77,23 +87,29 @@ const MODAL_KIND: Record<StoryLlmNodeType, StoryEngineModalKind> = {
   "storyboard-engine": "storyboard",
 };
 
-const NODE_QUICK_ACTIONS: Record<
-  StoryLlmNodeType,
-  Array<{ tab: StoryEngineModalTab; label: string }>
-> = {
-  "story-outline-engine": [
-    { tab: "copy", label: "文案" },
-    { tab: "preview", label: "预览" },
-  ],
-  "character-engine": [
-    { tab: "copy", label: "文案" },
-    { tab: "next", label: "三视图" },
-  ],
-  "storyboard-engine": [
-    { tab: "copy", label: "文案" },
-    { tab: "next", label: "分镜图" },
-  ],
-};
+function useStoryBatchStore(): StoryBatchStore {
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
+  const setEdges = useCanvasStore((s) => s.setEdges);
+  const reparentNode = useCanvasStore((s) => s.reparentNode);
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const reflowStoryComicLayout = useCanvasStore(
+    (s) => s.reflowStoryComicLayout,
+  );
+  return {
+    nodes,
+    edges,
+    getNodes: () => useCanvasStore.getState().nodes,
+    addNode,
+    addNodeInGroup,
+    setEdges,
+    reparentNode,
+    updateNodeData,
+    reflowStoryComicLayout,
+  };
+}
 
 function patchStarterPipelineStage(stage: StoryComicPipelineStage) {
   const starter = useCanvasStore
@@ -137,6 +153,9 @@ function StoryEngineNodeInner({
   isNextRunning,
   batchSelectItems,
   batchImageAllowedKeys,
+  footerExtra,
+  columnPanel,
+  minHeight = 220,
 }: NodeProps & {
   nodeType: StoryLlmNodeType;
   onRunNext?: (opts: StoryBatchRunOptions) => void;
@@ -144,6 +163,9 @@ function StoryEngineNodeInner({
   isNextRunning?: boolean;
   batchSelectItems?: BatchSelectItem[];
   batchImageAllowedKeys?: readonly string[];
+  footerExtra?: React.ReactNode;
+  columnPanel?: React.ReactNode;
+  minHeight?: number;
 }) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const d = data as unknown as StoryEngineNodeData;
@@ -154,8 +176,6 @@ function StoryEngineNodeInner({
     open: boolean;
     tab?: StoryEngineModalTab;
   }>({ open: false });
-  const quickActions = NODE_QUICK_ACTIONS[nodeType];
-
   const openModal = (tab: StoryEngineModalTab) => {
     setModalState({ open: true, tab });
   };
@@ -260,8 +280,8 @@ function StoryEngineNodeInner({
         subtitle={d.modelKey || "推荐 DeepSeek / Gemini"}
         selected={selected}
         engine
-        minWidth={320}
-        minHeight={220}
+        minWidth={nodeType === "story-outline-engine" ? 360 : 520}
+        minHeight={minHeight}
         inputs={[{ id: "in_text", label: "上游文本", kind: "text" }]}
         outputs={[{ id: "text", label: meta.outputLabel, kind: "text" }]}
         headerRight={
@@ -320,17 +340,24 @@ function StoryEngineNodeInner({
       >
         <NodeEngineLayout
           engineFooter={
-            <div className="flex gap-1.5 border-t border-white/10 pt-2">
-              {quickActions.map(({ tab, label }) => (
+            <div className="flex flex-wrap gap-1.5 border-t border-white/10 pt-2">
+              <button
+                type="button"
+                className={NODE_BTN_STORY_ACTION}
+                onClick={() => openModal("copy")}
+              >
+                文案
+              </button>
+              {nodeType === "story-outline-engine" ? (
                 <button
-                  key={tab}
                   type="button"
                   className={NODE_BTN_STORY_ACTION}
-                  onClick={() => openModal(tab)}
+                  onClick={() => openModal("preview")}
                 >
-                  {label}
+                  预览
                 </button>
-              ))}
+              ) : null}
+              {footerExtra}
             </div>
           }
         >
@@ -342,21 +369,26 @@ function StoryEngineNodeInner({
             </p>
           )}
 
-          <div className="min-h-[72px] flex-1 rounded-md border border-white/10 bg-black/30 p-2">
-            {runtimeStatus === "error" && d.runtime?.failMessage ? (
-              <p className="text-[11px] leading-relaxed text-red-200">
-                {formatCanvasTaskError(d.runtime.failCode, d.runtime.failMessage)}
-              </p>
-            ) : previewLine ? (
-              <p className="line-clamp-4 text-[11px] leading-relaxed text-white/75">
-                {previewLine}
-              </p>
-            ) : (
-              <p className="text-[11px] text-[var(--canvas-muted)]">
-                点下方「文案」编辑 Prompt 并生成本步
-              </p>
-            )}
-          </div>
+          {columnPanel ?? (
+            <div className="min-h-[72px] flex-1 rounded-md border border-white/10 bg-black/30 p-2">
+              {runtimeStatus === "error" && d.runtime?.failMessage ? (
+                <p className="text-[11px] leading-relaxed text-red-200">
+                  {formatCanvasTaskError(
+                    d.runtime.failCode,
+                    d.runtime.failMessage,
+                  )}
+                </p>
+              ) : previewLine ? (
+                <p className="line-clamp-4 text-[11px] leading-relaxed text-white/75">
+                  {previewLine}
+                </p>
+              ) : (
+                <p className="text-[11px] text-[var(--canvas-muted)]">
+                  点「文案」编辑 Prompt 并生成本步
+                </p>
+              )}
+            </div>
+          )}
         </NodeEngineLayout>
       </NodeShell>
 
@@ -390,8 +422,72 @@ function StoryEngineNodeInner({
 }
 
 export function StoryOutlineEngineNode(props: NodeProps) {
+  return <StoryOutlineEngineNodeWithActions {...props} />;
+}
+
+function StoryOutlineEngineNodeWithActions(props: NodeProps) {
+  const dialogs = useDialogs();
+  const store = useStoryBatchStore();
+  const [busy, setBusy] = useState(false);
+  const ids = resolveStoryEngineIds(store);
+  const charNode = store.nodes.find((n) => n.id === ids?.characterId);
+  const charData = charNode?.data as StoryEngineNodeData | undefined;
+  const charMd = getCharacterMarkdown(store);
+  const batchItems = buildCharacterBatchSelectItems(charMd);
+
+  const onGenerateThreeView = async () => {
+    if (!ids?.characterId) {
+      await dialogs.alert({
+        title: "缺少角色设定节点",
+        message: "请先完成漫剧启动的文案生成。",
+        variant: "warning",
+      });
+      return;
+    }
+    const batchImage = charData?.batchImage;
+    if (!batchImage?.providerId || !batchImage.modelKey) {
+      await dialogs.alert({
+        title: "请选择 IMAGE 模型",
+        message: "请打开「角色设定」→「文案」弹层，在「三视图」Tab 选择生图模型。",
+        variant: "warning",
+      });
+      return;
+    }
+    const keys = batchItems.map((b) => b.key);
+    if (!keys.length) return;
+    setBusy(true);
+    const res = await runThreeViewBatchAction(store, {
+      selectedKeys: keys,
+      forceFresh: false,
+      characterNodeId: ids.characterId,
+      batchImage,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      await dialogs.alert({
+        title: res.title,
+        message: res.message,
+        variant: "warning",
+      });
+    }
+  };
+
   return (
-    <StoryEngineNodeInner {...props} nodeType="story-outline-engine" />
+    <StoryEngineNodeInner
+      {...props}
+      nodeType="story-outline-engine"
+      minHeight={280}
+      footerExtra={
+        <button
+          type="button"
+          className={NODE_BTN_STORY_ACTION}
+          disabled={busy}
+          onClick={() => void onGenerateThreeView()}
+        >
+          {busy ? "生成中…" : "生成三视图"}
+        </button>
+      }
+    />
   );
 }
 
@@ -401,114 +497,109 @@ export function CharacterEngineNode(props: NodeProps) {
 
 function CharacterEngineNodeWithBatch(props: NodeProps) {
   const dialogs = useDialogs();
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
-  const addNode = useCanvasStore((s) => s.addNode);
-  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
-  const setEdges = useCanvasStore((s) => s.setEdges);
-  const reparentNode = useCanvasStore((s) => s.reparentNode);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const reflowStoryComicLayout = useCanvasStore(
-    (s) => s.reflowStoryComicLayout,
-  );
+  const store = useStoryBatchStore();
+  const storeNodes = store.nodes;
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [footerBusy, setFooterBusy] = useState(false);
 
   const isNextRunning = useMemo(
     () =>
-      nodes.some((n) => {
+      storeNodes.some((n) => {
         if (n.type !== "three-view-engine") return false;
         const st = (n.data as { runtime?: { status?: string } }).runtime
           ?.status;
         return isNodeRunning(st);
       }),
-    [nodes],
+    [storeNodes],
   );
 
-  const charMd =
-    (props.data as unknown as StoryEngineNodeData).runtime?.textOutput ?? "";
-  const batchSelectItems = useMemo<BatchSelectItem[]>(
-    () =>
-      parseCharacterRows(charMd).map((c) => ({
-        key: c.name,
-        label: c.name,
-        hint: c.role,
-      })),
+  const d = props.data as unknown as StoryEngineNodeData;
+  const charMd = d.runtime?.textOutput ?? "";
+  const batchSelectItems = useMemo(
+    () => buildCharacterBatchSelectItems(charMd),
     [charMd],
   );
+  const columnRows = useMemo(
+    () => collectCharacterColumnRows(store.getNodes(), charMd),
+    [store.nodes, charMd],
+  );
 
-  const batchBase = {
-    sourceNodeId: props.id,
-    nodes,
-    getNodes: () => useCanvasStore.getState().nodes,
-    edges,
-    addNode,
-    addNodeInGroup,
-    setEdges,
-    reparentNode: (nodeId: string, groupId: string) =>
-      reparentNode(nodeId, groupId),
+  const runThreeViewBatch = async (opts: StoryBatchRunOptions) => {
+    const batchImage = d.batchImage;
+    if (!batchImage?.providerId || !batchImage.modelKey) return;
+    const res = await runThreeViewBatchAction(store, {
+      ...opts,
+      characterNodeId: props.id,
+      batchImage,
+    });
+    if (!res.ok) {
+      await dialogs.alert({
+        title: res.title,
+        message: res.message,
+        variant: "warning",
+      });
+    }
   };
 
-  const runThreeViewBatch = async ({
-    forceFresh,
-    selectedKeys,
-  }: StoryBatchRunOptions) => {
-    const d = props.data as unknown as StoryEngineNodeData;
-    const md = d.runtime?.textOutput ?? "";
-    const batchImage = d.batchImage;
-    if (!selectedKeys.length) {
+  const onRegenerateAll = async () => {
+    setFooterBusy(true);
+    window.dispatchEvent(
+      new CustomEvent("canvas:run-node", {
+        detail: { nodeId: props.id, forceFresh: true },
+      }),
+    );
+    await new Promise((r) => window.setTimeout(r, 800));
+    const keys = batchSelectItems.map((b) => b.key);
+    if (keys.length && d.batchImage?.providerId && d.batchImage.modelKey) {
+      await runThreeViewBatch({ selectedKeys: keys, forceFresh: true });
+    }
+    setFooterBusy(false);
+  };
+
+  const onSpawnFrames = async () => {
+    const ids = resolveStoryEngineIds(store);
+    if (!ids?.storyboardId) {
       await dialogs.alert({
-        title: "未选择角色",
-        message: "请至少勾选一个要生成三视图的角色。",
+        title: "缺少分镜脚本",
+        message: "请先完成漫剧启动的全文案生成。",
         variant: "warning",
       });
       return;
     }
-    if (!batchImage?.providerId?.trim() || !batchImage?.modelKey?.trim()) {
+    const sbMd = getStoryboardMarkdown(store);
+    const sbNode = store.nodes.find((n) => n.id === ids.storyboardId);
+    const batchImage =
+      (sbNode?.data as StoryEngineNodeData).batchImage ?? d.batchImage;
+    if (!batchImage?.providerId || !batchImage.modelKey) {
       await dialogs.alert({
         title: "请选择 IMAGE 模型",
-        message: "点节点「三视图」选择生图 Provider 后再批量生成。",
+        message: "请在分镜脚本或本节点配置分镜图模型。",
         variant: "warning",
       });
       return;
     }
-    if (!md.trim()) {
-      await dialogs.alert({
-        title: "请先运行角色设定",
-        message: "需要先生成角色 Markdown 表格，再批量创建三视图。",
-        variant: "warning",
-      });
-      return;
-    }
-    const parsed = parseCharacterRows(md);
-    if (!parsed.length) {
-      await dialogs.alert({
-        title: "无法解析角色表",
-        message:
-          "请确认输出为 GFM 表格，且含「角色 / Character」与「外观描述 / Appearance」列。",
-        variant: "warning",
-      });
-      return;
-    }
-
-    batchCreateThreeView({
-      ...batchBase,
-      markdown: md,
-      onlyCharacterNames: selectedKeys,
-      imageDefaults: {
-        providerId: batchImage.providerId,
-        modelKey: batchImage.modelKey,
-        params: batchImage.params ?? {},
-      },
+    const keys = buildStoryboardBatchSelectItems(sbMd).map((b) => b.key);
+    const autoRun = await dialogs.confirm({
+      title: "生成分镜图节点",
+      message: `将为 ${keys.length} 镜创建分镜图节点。创建后立即批量生图？`,
+      confirmLabel: "创建并生图",
+      cancelLabel: "仅创建",
     });
-    reflowStoryComicLayout();
-
-    const live = () => useCanvasStore.getState().nodes;
-    const tvIds = collectThreeViewEngineIdsForCharacters(live(), selectedKeys);
-    applyEnginePickToNodes(tvIds, batchImage, updateNodeData);
-
-    window.setTimeout(() => {
-      batchRunNodesSequential(tvIds, { forceFresh });
-    }, 0);
-    patchStarterPipelineStage("tv_done");
+    setFooterBusy(true);
+    const res = await runFrameImagesBatchAction(store, {
+      selectedKeys: keys,
+      storyboardNodeId: ids.storyboardId,
+      batchImage,
+      autoRunImages: autoRun,
+    });
+    setFooterBusy(false);
+    if (!res.ok) {
+      await dialogs.alert({
+        title: res.title,
+        message: res.message,
+        variant: "warning",
+      });
+    }
   };
 
   return (
@@ -520,6 +611,56 @@ function CharacterEngineNodeWithBatch(props: NodeProps) {
       isNextRunning={isNextRunning}
       batchSelectItems={batchSelectItems}
       batchImageAllowedKeys={THREE_VIEW_ENGINE_MODEL_KEYS}
+      minHeight={420}
+      columnPanel={
+        <StoryCharacterColumnPanel
+          rows={columnRows}
+          busyKey={busyKey}
+          onRegenerateRow={(row) => {
+            const ws = findStoryWorkspaceIds(store.getNodes());
+            const columnId = ws?.characterColumnId;
+            setBusyKey(row.key);
+            if (columnId) {
+              busEnqueueStoryRun({
+                nodeId: columnId,
+                rowKey: row.key,
+                mediaKind: "threeView",
+                forceFresh: true,
+              });
+            } else if (row.threeViewNodeId) {
+              window.dispatchEvent(
+                new CustomEvent("canvas:run-node", {
+                  detail: { nodeId: row.threeViewNodeId, forceFresh: true },
+                }),
+              );
+            } else {
+              setBusyKey(null);
+              return;
+            }
+            window.setTimeout(() => setBusyKey(null), 2000);
+          }}
+        />
+      }
+      footerExtra={
+        <>
+          <button
+            type="button"
+            className={NODE_BTN_STORY_ACTION}
+            disabled={footerBusy}
+            onClick={() => void onRegenerateAll()}
+          >
+            {footerBusy ? "处理中…" : "全部重新生成"}
+          </button>
+          <button
+            type="button"
+            className={NODE_BTN_STORY_ACTION}
+            disabled={footerBusy}
+            onClick={() => void onSpawnFrames()}
+          >
+            生成分镜
+          </button>
+        </>
+      }
     />
   );
 }
@@ -530,139 +671,103 @@ export function StoryboardEngineNode(props: NodeProps) {
 
 function StoryboardEngineNodeWithBatch(props: NodeProps) {
   const dialogs = useDialogs();
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
-  const addNode = useCanvasStore((s) => s.addNode);
-  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
-  const setEdges = useCanvasStore((s) => s.setEdges);
-  const reparentNode = useCanvasStore((s) => s.reparentNode);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const reflowStoryComicLayout = useCanvasStore(
-    (s) => s.reflowStoryComicLayout,
-  );
+  const store = useStoryBatchStore();
+  const updateNodeData = store.updateNodeData;
+  const storeNodes = store.nodes;
+  const [footerBusy, setFooterBusy] = useState(false);
 
   const d = props.data as unknown as StoryEngineNodeData;
   const md = d.runtime?.textOutput ?? "";
 
   const isNextRunning = useMemo(
     () =>
-      nodes.some((n) => {
+      storeNodes.some((n) => {
         if (n.type !== "image-engine") return false;
         if ((n.data as { frameIndex?: number }).frameIndex == null) return false;
         const st = (n.data as { runtime?: { status?: string } }).runtime
           ?.status;
         return isNodeRunning(st);
       }),
-    [nodes],
+    [storeNodes],
   );
 
-  const batchSelectItems = useMemo<BatchSelectItem[]>(
-    () =>
-      parseStoryboardRows(md).map((r) => {
-        const tipLines = [
-          r.scene ? `场景：${r.scene}` : null,
-          r.description ? `画面：${r.description}` : null,
-          r.dialogue ? `对白：${r.dialogue}` : null,
-          r.videoPrompt ? `视频：${r.videoPrompt}` : null,
-        ].filter(Boolean);
-        return {
-          key: String(r.frameIndex),
-          label: `镜 ${r.frameIndex}`,
-          hint: r.scene || r.description.slice(0, 24),
-          tip: tipLines.length ? tipLines.join("\n") : undefined,
-        };
-      }),
+  const batchSelectItems = useMemo(
+    () => buildStoryboardBatchSelectItems(md),
     [md],
   );
+  const columnRows = useMemo(
+    () => collectStoryboardColumnRows(store.getNodes(), md),
+    [store.nodes, md],
+  );
 
-  const batchBase = {
-    sourceNodeId: props.id,
-    nodes,
-    getNodes: () => useCanvasStore.getState().nodes,
-    edges,
-    addNode,
-    addNodeInGroup,
-    setEdges,
-    reparentNode: (nodeId: string, groupId: string) =>
-      reparentNode(nodeId, groupId),
+  const runFrameImagesBatch = async (opts: StoryBatchRunOptions) => {
+    const batchImage = d.batchImage;
+    if (!batchImage?.providerId || !batchImage.modelKey) return;
+    const res = await runFrameImagesBatchAction(store, {
+      ...opts,
+      storyboardNodeId: props.id,
+      batchImage,
+    });
+    if (!res.ok) {
+      await dialogs.alert({
+        title: res.title,
+        message: res.message,
+        variant: "warning",
+      });
+    }
   };
 
-  const runFrameImagesBatch = async ({
-    selectedKeys,
-  }: StoryBatchRunOptions) => {
-    const batchImage = d.batchImage;
-    const frameIndices = selectedKeys
-      .map((k) => parseInt(k, 10))
-      .filter((n) => !Number.isNaN(n));
-    if (!frameIndices.length) {
+  const onRegenerateScript = async () => {
+    setFooterBusy(true);
+    window.dispatchEvent(
+      new CustomEvent("canvas:run-node", {
+        detail: { nodeId: props.id, forceFresh: true },
+      }),
+    );
+    await new Promise((r) => window.setTimeout(r, 800));
+    const keys = batchSelectItems.map((b) => b.key);
+    if (keys.length && d.batchImage?.providerId && d.batchImage.modelKey) {
+      await runFrameImagesBatch({ selectedKeys: keys });
+    }
+    setFooterBusy(false);
+  };
+
+  const onSpawnMedia = async () => {
+    const video =
+      d.batchVideo ??
+      (d.providerId && d.modelKey ?
+        {
+          providerId: d.providerId,
+          modelKey: STORY_VIDEO_MODEL_KEYS[0] ?? d.modelKey,
+          params: d.params ?? {},
+        }
+      : undefined);
+    const tts = d.batchTts;
+    if (!video?.providerId || !video.modelKey) {
       await dialogs.alert({
-        title: "未选择镜号",
-        message: "请至少勾选一镜要创建的分镜图节点。",
+        title: "请选择 VIDEO 模型",
+        message: "请先在「文案」弹层配置 LLM/Provider，或设置 batchVideo。",
         variant: "warning",
       });
       return;
     }
-    if (!batchImage?.providerId?.trim() || !batchImage?.modelKey?.trim()) {
+    if (!d.batchVideo) {
+      updateNodeData(props.id, { batchVideo: video });
+    }
+    setFooterBusy(true);
+    const res = await runFrameMediaBatchAction(store, {
+      storyboardNodeId: props.id,
+      videoDefaults: video,
+      ttsDefaults: tts,
+    });
+    setFooterBusy(false);
+    if (!res.ok) {
       await dialogs.alert({
-        title: "请选择 IMAGE 模型",
-        message: "点节点「分镜图」选择生图 Provider 后再创建节点。",
+        title: res.title,
+        message: res.message,
         variant: "warning",
       });
-      return;
     }
-    if (!md.trim()) return;
-
-    const updateOnly = allFrameImageNodesExist(nodes, frameIndices);
-
-    if (!updateOnly) {
-      const frameGaps = findStoryboardFramesMissingThreeView({
-        markdown: md,
-        nodes,
-        onlyFrameIndices: frameIndices,
-      });
-      if (frameGaps.length) {
-        const lines = frameGaps.map((g) => {
-          const chars = g.characters
-            .map((c) =>
-              c.reason === "no_node"
-                ? `${c.name}（未创建三视图）`
-                : `${c.name}（三视图未生成）`,
-            )
-            .join("、");
-          return `镜 ${g.frameIndex}：${chars}`;
-        });
-        await dialogs.alert({
-          title: "请先完成本镜涉及的角色三视图",
-          message: `以下选中镜号涉及的角色三视图尚未就绪：\n\n${lines.map((l) => `· ${l}`).join("\n")}\n\n请先到「角色设定」→ 三视图，为对应角色创建并生成；无需一次性创建全部角色。`,
-          variant: "warning",
-        });
-        return;
-      }
-    }
-
-    batchCreateFrameImages({
-      ...batchBase,
-      markdown: md,
-      onlyFrameIndices: frameIndices,
-      imageDefaults: {
-        providerId: batchImage.providerId,
-        modelKey: batchImage.modelKey,
-        params: batchImage.params ?? {},
-      },
-    });
-    wireFrameImageCharacterRefs({
-      ...batchBase,
-      markdown: md,
-      onlyFrameIndices: frameIndices,
-      updateNodeData,
-    });
-    reflowStoryComicLayout();
-
-    const live = useCanvasStore.getState().nodes;
-    const imgIds = collectFrameEngineIds(live, "image-engine", frameIndices);
-    applyEnginePickToNodes(imgIds, batchImage, updateNodeData);
-
-    patchStarterPipelineStage("frames_done");
   };
 
   return (
@@ -673,6 +778,42 @@ function StoryboardEngineNodeWithBatch(props: NodeProps) {
       onRunNextForce={runFrameImagesBatch}
       isNextRunning={isNextRunning}
       batchSelectItems={batchSelectItems}
+      minHeight={420}
+      columnPanel={
+        <StoryFrameColumnPanel
+          rows={columnRows}
+          onOpenRow={(row) => {
+            const targetId = row.imageNodeId;
+            if (!targetId) return;
+            useCanvasStore.getState().setNodes((nodes) =>
+              nodes.map((n) => ({
+                ...n,
+                selected: n.id === targetId,
+              })),
+            );
+          }}
+        />
+      }
+      footerExtra={
+        <>
+          <button
+            type="button"
+            className={NODE_BTN_STORY_ACTION}
+            disabled={footerBusy}
+            onClick={() => void onRegenerateScript()}
+          >
+            {footerBusy ? "处理中…" : "重新生成"}
+          </button>
+          <button
+            type="button"
+            className={NODE_BTN_STORY_ACTION}
+            disabled={footerBusy}
+            onClick={() => void onSpawnMedia()}
+          >
+            生成分镜视频+对白
+          </button>
+        </>
+      }
     />
   );
 }

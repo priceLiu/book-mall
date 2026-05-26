@@ -11,6 +11,10 @@
  */
 
 import {
+  STORY_OUTLINE_USER_PROMPT,
+  STORY_THEME_SYSTEM_PROMPT_DEFAULT,
+} from "./story-prompts";
+import {
   AI_ENGINE_PROMPT_TEMPLATE,
   CANVAS_SCHEMA_VERSION,
   type CanvasGraph,
@@ -328,10 +332,10 @@ const STORY_COMIC_PIPELINE: CanvasGraph = {
     {
       id: "sc-starter",
       type: "story-comic-starter",
-      position: col(0, 200),
+      position: col(0, 120),
       data: {
-        theme:
-          "故事创意：例如「赛博朋克城市里，外卖员发现 AI 有了自我意识…」",
+        systemPrompt: STORY_THEME_SYSTEM_PROMPT_DEFAULT,
+        systemPromptTemplateId: "full-pack-detailed",
         providerId: "",
         modelKey: "",
         params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
@@ -339,13 +343,38 @@ const STORY_COMIC_PIPELINE: CanvasGraph = {
       },
     },
     {
+      id: "sc-hub",
+      type: "story-script-hub",
+      position: col(1, 120),
+      data: {
+        outlineMd: "",
+        characterMd: "",
+        storyboardMd: "",
+        providerId: "",
+        modelKey: "",
+        params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+        outlineSystemPrompt: STORY_THEME_SYSTEM_PROMPT_DEFAULT,
+        promptOutline: STORY_OUTLINE_USER_PROMPT,
+        promptCharacter: "",
+        promptStoryboard: "",
+      },
+    },
+    {
       id: "sc-export",
       type: "jianying-export",
-      position: col(2, 200),
+      position: col(2, 120),
       data: { label: "剪映导出" },
     },
   ],
-  edges: [],
+  edges: [
+    {
+      id: "sc-e1",
+      source: "sc-starter",
+      target: "sc-hub",
+      sourceHandle: "text",
+      targetHandle: "in_text",
+    },
+  ],
 };
 
 export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
@@ -376,7 +405,7 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     category: "builtin",
     name: "漫剧全链路",
     description:
-      "创意 → 大纲 → 角色 → 分镜 → 批量生图/视频/配音 → 剪映 ZIP 导出（Mac）。DeepSeek 等走 Provider 配置。",
+      "创意 → 创作剧本（漫剧文案）→ 弹出层审阅大纲/角色/分镜/对白；媒体列后续添加。",
     canvas: STORY_COMIC_PIPELINE,
   },
 ];

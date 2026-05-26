@@ -75,10 +75,11 @@ export function CanvasToolbar({
         />
         {inflightTaskCount > 0 ? (
           <span
-            className="shrink-0 rounded-md bg-emerald-500/85 px-2 py-0.5 text-[10px] font-medium text-black"
-            title="画布上有节点正在生成"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-violet-500/25 px-2 py-0.5 text-[10px] font-medium text-violet-100"
+            title="画布上有任务正在生成"
           >
-            {inflightTaskCount} 个任务进行中
+            <Loader2 className="size-3 animate-spin" />
+            生成中 · {inflightTaskCount} 个任务
           </span>
         ) : null}
         <span className="hidden shrink-0 text-[11px] text-[var(--canvas-muted)] sm:inline">

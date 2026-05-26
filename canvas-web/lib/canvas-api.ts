@@ -49,6 +49,12 @@ export type CanvasEngineModel = {
   builtin?: boolean;
 };
 
+export type CanvasTaskStoryScope = {
+  rowKey?: string;
+  mediaKind?: string;
+  llmSection?: string;
+};
+
 export type CanvasTaskRecord = {
   id: string;
   nodeId: string;
@@ -64,6 +70,8 @@ export type CanvasTaskRecord = {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** 漫剧列行 / 文案段（来自任务 inputPayload.storyScope） */
+  storyScope?: CanvasTaskStoryScope;
 };
 
 async function call<T>(
@@ -227,6 +235,9 @@ export async function runCanvasNode(
     };
     /** 阶段 4：跳过缓存，强制创建新任务（"重新生成"） */
     forceFresh?: boolean;
+    llmSection?: "outline" | "character" | "storyboard";
+    rowKey?: string;
+    mediaKind?: "threeView" | "frameImage" | "video" | "tts";
   },
 ): Promise<{ reused: boolean; task: CanvasTaskRecord }> {
   return call<{ reused: boolean; task: CanvasTaskRecord }>(

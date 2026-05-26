@@ -8,9 +8,14 @@ import {
   STORY_CHARACTER_ENGINE_PROMPT,
   STORY_FRAME_IMAGE_PROMPT_DEFAULT,
   STORY_OUTLINE_ENGINE_PROMPT,
+  STORY_OUTLINE_USER_PROMPT,
   STORY_STORYBOARD_ENGINE_PROMPT,
+  STORY_THEME_SYSTEM_PROMPT_DEFAULT,
+  STORY_THEME_SYSTEM_PROMPT_TEMPLATES,
+  type StoryThemeSystemPromptTemplateId,
   STORY_VIDEO_ENGINE_PROMPT_DEFAULT,
 } from "./story-prompts";
+import { storyComicStarterNodeHeight } from "./story-node-chrome";
 
 export {
   AI_ENGINE_PROMPT_TEMPLATE,
@@ -22,8 +27,12 @@ export {
 
 export {
   STORY_OUTLINE_ENGINE_PROMPT,
+  STORY_OUTLINE_USER_PROMPT,
   STORY_CHARACTER_ENGINE_PROMPT,
   STORY_STORYBOARD_ENGINE_PROMPT,
+  STORY_THEME_SYSTEM_PROMPT_DEFAULT,
+  STORY_THEME_SYSTEM_PROMPT_TEMPLATES,
+  type StoryThemeSystemPromptTemplateId,
   STORY_LLM_MODEL_KEYS,
   STORY_VIDEO_MODEL_KEYS,
   STORY_TTS_MODEL_KEYS,
@@ -39,6 +48,10 @@ export type CanvasNodeType =
   | "image"
   | "text"
   | "story-comic-starter"
+  | "story-script-hub"
+  | "story-character-column"
+  | "story-frame-column"
+  | "story-video-column"
   | "ai-engine"
   | "image-engine"
   | "three-view-engine"
@@ -60,6 +73,10 @@ export type CanvasContentNodeType =
   | "image"
   | "text"
   | "story-comic-starter"
+  | "story-script-hub"
+  | "story-character-column"
+  | "story-frame-column"
+  | "story-video-column"
   | "ai-engine"
   | "image-engine"
   | "three-view-engine"
@@ -80,6 +97,10 @@ export const CONTENT_NODE_TYPES: CanvasContentNodeType[] = [
   "image",
   "text",
   "story-comic-starter",
+  "story-script-hub",
+  "story-character-column",
+  "story-frame-column",
+  "story-video-column",
   "ai-engine",
   "image-engine",
   "three-view-engine",
@@ -219,6 +240,8 @@ export type CanvasEnginePick = {
 
 /** Story LLM 引擎族：结构与 ai-engine 相同，默认 prompt 不同。 */
 export type StoryEngineNodeData = AiEngineNodeData & {
+  /** 大纲引擎 · system（故事主题同步） */
+  outlineSystemPrompt?: string;
   /** 「三视图 / 分镜图」Tab 选择的 IMAGE 模型 */
   batchImage?: CanvasEnginePick;
   /** 「对白」Tab 选择的 TTS 模型（供分镜图节点 + 配音 继承） */
@@ -232,7 +255,9 @@ export type StoryComicPipelineStage =
   | "llm_done"
   | "tv_done"
   | "frames_done"
-  | "media_done";
+  | "media_done"
+  /** 故事大纲已「输出工作流」，故事主题锁定 */
+  | "finalized";
 
 export type StoryLlmEngineIds = {
   outlineId: string;
@@ -241,13 +266,19 @@ export type StoryLlmEngineIds = {
 };
 
 export type StoryComicStarterNodeData = {
-  theme: string;
+  /** 大纲 LLM 的 system 提示词（可编辑） */
+  systemPrompt: string;
+  /** 当前选用的内置模板 id；与正文不一致时视为自定义 */
+  systemPromptTemplateId?: StoryThemeSystemPromptTemplateId;
+  /** @deprecated 已并入 systemPrompt；加载时迁移 */
+  theme?: string;
   providerId: string;
   modelKey: string;
   params?: Record<string, unknown>;
   pipelineStage?: StoryComicPipelineStage;
-  /** 本启动节点创建/绑定的三文案引擎 id（避免画布上有多套引擎时跑错节点） */
+  /** @deprecated 旧三引擎；新画布用 workspaceIds */
   llmEngineIds?: StoryLlmEngineIds;
+  workspaceIds?: import("./story-workspace-types").StoryWorkspaceIds;
   runtime?: CanvasNodeRuntime;
 };
 
@@ -316,6 +347,18 @@ export type CanvasNodeData =
   | (ImageNodeData & { __t: "image" })
   | (TextNodeData & { __t: "text" })
   | (StoryComicStarterNodeData & { __t: "story-comic-starter" })
+  | (import("./story-workspace-types").StoryScriptHubNodeData & {
+      __t: "story-script-hub";
+    })
+  | (import("./story-workspace-types").StoryCharacterColumnNodeData & {
+      __t: "story-character-column";
+    })
+  | (import("./story-workspace-types").StoryFrameColumnNodeData & {
+      __t: "story-frame-column";
+    })
+  | (import("./story-workspace-types").StoryVideoColumnNodeData & {
+      __t: "story-video-column";
+    })
   | (AiEngineNodeData & { __t: "ai-engine" })
   | (ImageEngineNodeData & { __t: "image-engine" })
   | (ThreeViewEngineNodeData & { __t: "three-view-engine" })
@@ -354,12 +397,39 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
   image: {} satisfies ImageNodeData as Record<string, unknown>,
   text: { text: "", mode: "manual" } satisfies TextNodeData as Record<string, unknown>,
   "story-comic-starter": {
-    theme: "故事创意：例如「赛博朋克城市里，外卖员发现 AI 有了自我意识…」",
+    systemPrompt: STORY_THEME_SYSTEM_PROMPT_DEFAULT,
+    systemPromptTemplateId: "full-pack-detailed",
     providerId: "",
     modelKey: "",
     params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
     pipelineStage: "idle",
   } satisfies StoryComicStarterNodeData as Record<string, unknown>,
+  "story-script-hub": {
+    outlineMd: "",
+    characterMd: "",
+    storyboardMd: "",
+    providerId: "",
+    modelKey: "",
+    params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+    outlineSystemPrompt: "",
+    promptOutline: STORY_OUTLINE_USER_PROMPT,
+    promptCharacter: STORY_CHARACTER_ENGINE_PROMPT,
+    promptStoryboard: STORY_STORYBOARD_ENGINE_PROMPT,
+    referencedNodeIds: [],
+  } as Record<string, unknown>,
+  "story-character-column": {
+    rows: [],
+    batchImage: undefined,
+  } as Record<string, unknown>,
+  "story-frame-column": {
+    rows: [],
+    batchImage: undefined,
+  } as Record<string, unknown>,
+  "story-video-column": {
+    rows: [],
+    batchVideo: undefined,
+    batchTts: undefined,
+  } as Record<string, unknown>,
   "ai-engine": {
     providerId: "",
     modelKey: "",
@@ -384,7 +454,8 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
   "story-outline-engine": {
     providerId: "",
     modelKey: "",
-    prompt: STORY_OUTLINE_ENGINE_PROMPT,
+    outlineSystemPrompt: "",
+    prompt: STORY_OUTLINE_USER_PROMPT,
     referencedNodeIds: [],
     params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
   } satisfies StoryEngineNodeData as Record<string, unknown>,
@@ -450,7 +521,11 @@ export const NODE_DEFAULT_SIZE: Record<
 > = {
   image: { width: 380, height: 320 },
   text: { width: 380, height: 260 },
-  "story-comic-starter": { width: 420, height: 380 },
+  "story-comic-starter": { width: 420, height: storyComicStarterNodeHeight() },
+  "story-script-hub": { width: 720, height: storyComicStarterNodeHeight() },
+  "story-character-column": { width: 560, height: 960 },
+  "story-frame-column": { width: 880, height: 1040 },
+  "story-video-column": { width: 400, height: 480 },
   "ai-engine": { width: 480, height: 540 },
   "image-engine": { width: 380, height: 560 },
   "three-view-engine": { width: 420, height: 480 },
@@ -491,6 +566,10 @@ export const NODE_OUTPUT_KIND: Record<
   image: "image",
   text: "text",
   "story-comic-starter": "text",
+  "story-script-hub": "text",
+  "story-character-column": "image",
+  "story-frame-column": "image",
+  "story-video-column": "video",
   "ai-engine": "text",
   "image-engine": "image",
   "three-view-engine": "image",
@@ -515,8 +594,21 @@ export function isRunnableNodeType(t: CanvasNodeType): boolean {
     t === "image-engine" ||
     t === "three-view-engine" ||
     isStoryLlmNodeType(t) ||
+    t === "story-script-hub" ||
+    t === "story-character-column" ||
+    t === "story-frame-column" ||
+    t === "story-video-column" ||
     t === "video-engine" ||
     t === "tts-engine"
+  );
+}
+
+export function isStoryWorkspaceNodeType(t: string): boolean {
+  return (
+    t === "story-script-hub" ||
+    t === "story-character-column" ||
+    t === "story-frame-column" ||
+    t === "story-video-column"
   );
 }
 

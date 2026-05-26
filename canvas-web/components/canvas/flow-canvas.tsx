@@ -22,11 +22,10 @@ import { AiEngineNode } from "./nodes/ai-engine-node";
 import { ImageEngineNode } from "./nodes/image-engine-node";
 import { ThreeViewEngineNode } from "./nodes/three-view-engine-node";
 import { StoryComicStarterNode } from "./nodes/story-comic-starter-node";
-import {
-  StoryOutlineEngineNode,
-  CharacterEngineNode,
-  StoryboardEngineNode,
-} from "./nodes/story-engine-node";
+import { StoryScriptHubNode } from "./nodes/story-script-hub-node";
+import { StoryCharacterColumnNode } from "./nodes/story-character-column-node";
+import { StoryFrameColumnNode } from "./nodes/story-frame-column-node";
+import { StoryVideoColumnNode } from "./nodes/story-video-column-node";
 import { MdPreviewNode } from "./nodes/md-preview-node";
 import { VideoEngineNode } from "./nodes/video-engine-node";
 import { TtsEngineNode } from "./nodes/tts-engine-node";
@@ -48,9 +47,10 @@ const nodeTypes = {
   "ai-engine": AiEngineNode,
   "image-engine": ImageEngineNode,
   "three-view-engine": ThreeViewEngineNode,
-  "story-outline-engine": StoryOutlineEngineNode,
-  "character-engine": CharacterEngineNode,
-  "storyboard-engine": StoryboardEngineNode,
+  "story-script-hub": StoryScriptHubNode,
+  "story-character-column": StoryCharacterColumnNode,
+  "story-frame-column": StoryFrameColumnNode,
+  "story-video-column": StoryVideoColumnNode,
   "video-engine": VideoEngineNode,
   "tts-engine": TtsEngineNode,
   "md-preview": MdPreviewNode,
@@ -491,6 +491,7 @@ function FlowCanvasInner() {
         // 缩放：滚轮在画布空白处缩放；节点内带 nowheel 的区域自行滚动
         zoomOnScroll
         noWheelClassName="nowheel"
+        noDragClassName="nodrag"
         minZoom={0.1}
         maxZoom={2.5}
       >

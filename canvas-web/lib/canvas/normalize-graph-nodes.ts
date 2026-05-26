@@ -75,6 +75,29 @@ function belongsInCharacterGroup(n: CanvasFlowNode): boolean {
   return Boolean((n.data as { characterName?: string }).characterName);
 }
 
+function belongsInFramesGroup(n: CanvasFlowNode): boolean {
+  if (shouldNeverBeInStoryGroup(n)) return false;
+  if (n.id.startsWith("sc-f")) return true;
+  const fi = (n.data as { frameIndex?: number }).frameIndex;
+  if (typeof fi !== "number") return false;
+  return (
+    n.type === "image-engine" ||
+    (n.type === "image-preview" && typeof fi === "number")
+  );
+}
+
+function belongsInVideosGroup(n: CanvasFlowNode): boolean {
+  if (shouldNeverBeInStoryGroup(n)) return false;
+  const fi = (n.data as { frameIndex?: number }).frameIndex;
+  if (typeof fi !== "number") return false;
+  return (
+    n.type === "video-engine" ||
+    n.type === "tts-engine" ||
+    n.type === "video-preview" ||
+    n.type === "audio-preview"
+  );
+}
+
 function belongsInMediaGroup(n: CanvasFlowNode): boolean {
   if (shouldNeverBeInStoryGroup(n)) return false;
   if (n.id.startsWith("sc-f")) return true;
@@ -314,41 +337,30 @@ export function reattachStoryTemplateOrphans(
   nodes: CanvasFlowNode[],
 ): CanvasFlowNode[] {
   const charGroup = nodes.find((n) => n.id === "sc-group-characters");
+  const framesGroup = nodes.find((n) => n.id === "sc-group-frames");
+  const videosGroup = nodes.find((n) => n.id === "sc-group-videos");
   const mediaGroup = nodes.find((n) => n.id === "sc-group-media");
-  if (!charGroup && !mediaGroup) return nodes;
-
-  const inStoryGroup = belongsInCharacterGroup;
-  const inMediaGroup = belongsInMediaGroup;
+  if (!charGroup && !mediaGroup && !framesGroup && !videosGroup) return nodes;
 
   return nodes.map((n) => {
     if (n.parentId || isGroupNode(n.type) || shouldNeverBeInStoryGroup(n)) {
       return n;
     }
 
-    if (charGroup && inStoryGroup(n)) {
-      const abs = n.position;
-      return {
-        ...n,
-        parentId: charGroup.id,
-        extent: "parent",
-        position: {
-          x: abs.x - charGroup.position.x,
-          y: abs.y - charGroup.position.y,
-        },
-      } as CanvasFlowNode;
+    if (charGroup && belongsInCharacterGroup(n)) {
+      return attachNodeToGroup(n, charGroup, nodes);
     }
 
-    if (mediaGroup && inMediaGroup(n)) {
-      const abs = n.position;
-      return {
-        ...n,
-        parentId: mediaGroup.id,
-        extent: "parent",
-        position: {
-          x: abs.x - mediaGroup.position.x,
-          y: abs.y - mediaGroup.position.y,
-        },
-      } as CanvasFlowNode;
+    if (framesGroup && belongsInFramesGroup(n)) {
+      return attachNodeToGroup(n, framesGroup, nodes);
+    }
+
+    if (videosGroup && belongsInVideosGroup(n)) {
+      return attachNodeToGroup(n, videosGroup, nodes);
+    }
+
+    if (mediaGroup && belongsInMediaGroup(n)) {
+      return attachNodeToGroup(n, mediaGroup, nodes);
     }
 
     return n;
@@ -487,14 +499,81 @@ function layoutMediaGroup(
   return layoutPositions(nodes, groupId, positions);
 }
 
+/** 分镜图列：每镜一行 image-engine */
+function layoutFramesGroup(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+): CanvasFlowNode[] {
+  const children = nodes.filter((n) => n.parentId === groupId);
+  if (children.length === 0) return nodes;
+
+  const frameIndexes = new Set<number>();
+  for (const c of children) {
+    const fi = (c.data as { frameIndex?: number }).frameIndex;
+    frameIndexes.add(typeof fi === "number" ? fi : 0);
+  }
+  const frames = Array.from(frameIndexes).sort((a, b) => a - b);
+  const positions = new Map<string, { x: number; y: number }>();
+  let rowY = 56;
+
+  for (const fi of frames) {
+    const img = children.find(
+      (n) =>
+        n.type === "image-engine" &&
+        ((n.data as { frameIndex?: number }).frameIndex ?? 0) === fi,
+    );
+    if (img) positions.set(img.id, { x: 24, y: rowY });
+    rowY += 300;
+  }
+
+  return layoutPositions(nodes, groupId, positions);
+}
+
+/** 视频列：每镜 video + tts */
+function layoutVideosGroup(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+): CanvasFlowNode[] {
+  const children = nodes.filter((n) => n.parentId === groupId);
+  if (children.length === 0) return nodes;
+
+  const frameIndexes = new Set<number>();
+  for (const c of children) {
+    const fi = (c.data as { frameIndex?: number }).frameIndex;
+    frameIndexes.add(typeof fi === "number" ? fi : 0);
+  }
+  const frames = Array.from(frameIndexes).sort((a, b) => a - b);
+  const positions = new Map<string, { x: number; y: number }>();
+  let rowY = 56;
+
+  for (const fi of frames) {
+    const bucket = children.filter(
+      (n) => ((n.data as { frameIndex?: number }).frameIndex ?? 0) === fi,
+    );
+    const vid = bucket.find((n) => n.type === "video-engine");
+    const tts = bucket.find((n) => n.type === "tts-engine");
+    if (vid) positions.set(vid.id, { x: 24, y: rowY });
+    if (tts) positions.set(tts.id, { x: 24, y: rowY + 200 });
+    rowY += 320;
+  }
+
+  return layoutPositions(nodes, groupId, positions);
+}
+
 export function layoutStoryTemplateGroups(
   nodes: CanvasFlowNode[],
 ): CanvasFlowNode[] {
   const hasChar = nodes.some((n) => n.id === "sc-group-characters");
+  const hasFrames = nodes.some((n) => n.id === "sc-group-frames");
+  const hasVideos = nodes.some((n) => n.id === "sc-group-videos");
   const hasMedia = nodes.some((n) => n.id === "sc-group-media");
   let next = nodes;
   if (hasChar) next = layoutCharacterGroup(next, "sc-group-characters");
-  if (hasMedia) next = layoutMediaGroup(next, "sc-group-media");
+  if (hasFrames) next = layoutFramesGroup(next, "sc-group-frames");
+  if (hasVideos) next = layoutVideosGroup(next, "sc-group-videos");
+  if (hasMedia && !hasFrames && !hasVideos) {
+    next = layoutMediaGroup(next, "sc-group-media");
+  }
   return next;
 }
 

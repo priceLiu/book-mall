@@ -1,191 +1,42 @@
-# 漫剧向导式 Canvas 工作流
+# 漫剧向导式 Canvas 工作流（四节点）
 
 在 **canvas-web** 画布内分步完成漫剧生产；与 story-web **数据不互通**。
 
-> **操作手册（日常使用）**：[story-ops.md](./story-ops.md) — 五步流程、删除后重生成、对白补写、工具栏、故障排查。
+> **操作手册**：[story-ops.md](./story-ops.md)
 
-## 快速开始
+## 四节点架构
 
-1. 新建画布 → 选择模板 **「漫剧全链路」**（仅 **漫剧启动** + **剪映导出** 两个节点）
-2. 在 **设置 → Provider** 配置 LLM（DeepSeek / Gemini / 通义）与 TTS、生图、视频模型
-3. 在 **漫剧启动** 节点填写主题、选 LLM → **开始生成**  
-   → 自动创建并顺序跑：**故事大纲 → 角色设定 → 分镜脚本**
-4. 在各 Story 引擎节点点底部 **文案 / 三视图**（或 **文案 / 分镜图**）打开弹窗，按 Tab 分步操作
-5. 在各 **分镜图 · 镜N** 节点点底部四按钮打开弹窗，生成静帧 / 视频 / 对白
-6. **剪映导出** 下载 ZIP（含视频、音频、全集 SRT 字幕）
-
----
-
-## 业务逻辑（产品规则）
-
-### 1. 节点与弹窗
-
-| 节点类型 | 节点本体 | 底部操作 | 弹窗 Tab |
-|----------|----------|----------|----------|
-| 故事大纲 | 摘要 + 状态 | 文案、预览 | 文案 / 预览 |
-| 角色设定 | 摘要 + 状态 | 文案、三视图 | 文案 / 三视图 / 预览 |
-| 分镜脚本 | 摘要 + 状态 | 文案、分镜图 | 文案 / 分镜图 / 预览 |
-| 分镜图 · 镜N | 左 Prompt + 右预览图 | **分镜图生成** → 生成中… → **重新生成**；生成视频 / 对白 / 视频+对白 | 四个 Tab 对应四项操作 |
-
-- 节点本体 **不** 放长表单、全宽「重新生成」条；模型选择与执行均在 **弹出层** 内完成。
-- Story LLM / 分镜图节点底栏：左侧 **橙色 logo + 类型名**，右侧 **状态徽章**（待生成 / 生成中 / 已完成 / 失败）。
-- 分镜图节点初始尺寸：**640 × 480**（横向矩形）；中间为 Prompt 与预览 **左右 5:5**。
-
-### 2. 文案链（漫剧启动）
-
-1. **漫剧启动** 首次点击 → 在画布创建三个 Story 引擎节点（大纲、角色、分镜），并按拓扑 **顺序** 跑 LLM（避免并发 429）。
-2. 各 Story 引擎 **文案 Tab**：编辑 Prompt、选 LLM、生成本步 Markdown；可「强制跳过缓存」重跑。
-3. **预览 Tab**：只读查看当前 Markdown。
-
-### 3. 角色三视图（角色设定 → 三视图 Tab）
-
-1. 解析角色表 Markdown，列出可勾选角色。
-2. **生成选中 / 生成全部**：为每个角色 **创建** `three-view-engine` 节点（已存在则跳过），写入 turnaround Prompt 与 IMAGE 模型。
-3. 创建后 **排队依次生图**（`batchRunNodesSequential`），降低 API 限流风险。
-4. **不要求** 一次性为全部角色创建或生成；用户可按需分批勾选。
-
-**三视图「就绪」判定**（供分镜图创建前校验）：
-
-- 存在 `three-view-engine` 节点，且 `characterName` 与角色表名字一致；
-- 且 `runtime.status === done`，且已有图片 URL（`ossUrl` 或 `ephemeralUrl`）。
-
-### 4. 分镜脚本 → 分镜图（核心）
-
-**分镜脚本节点的职责只有：批量创建分镜图节点，并带入文本字段。**  
-**不在** 分镜脚本节点批量生成视频或 TTS；视频 / 对白在 **各分镜图节点** 内单独或一并生成。
-
-#### 4.1 分镜表 → 分镜图节点写入字段
-
-从分镜表每一行创建（或更新）一个 `image-engine` 节点（`frameIndex = 镜号`）：
-
-| 写入字段 | 来源列 |
-|----------|--------|
-| `prompt` | 场景 + 画面描述 + @ 角色三视图引用 + 默认分镜图 Prompt 模板 |
-| `frameVideoPrompt` | 视频提示 / 运镜 |
-| `frameDialogue` | 台词 / 对白 |
-| `referencedNodeIds` | 分镜脚本节点 + 本镜出镜角色的三视图节点 |
-| 入边 `in_image` | 本镜出镜角色已生成的三视图 → 作参考图 |
-
-已存在的同镜号分镜图节点：**跳过创建**，但会 **补连** 三视图参考边并刷新 Prompt / 视频 / 对白字段（`wireFrameImageCharacterRefs`）。
-
-#### 4.2 创建前校验（按镜号，非全量角色）
-
-用户勾选镜号并点 **创建选中 / 创建全部** 时：
-
-1. **仅** 对 **本次勾选的镜号** 逐镜处理（不要求项目中所有角色三视图都已完成）。
-2. 对每一镜，从 **场景 + 画面 + 对白** 文本中 **匹配角色表里的角色名**（子串匹配）。
-3. 对每个匹配到的角色，检查其三视图是否 **就绪**（见 §3）。
-4. 若有任一镜、任一出镜角色未就绪 → **整批拦截**，弹窗按镜号列出，例如：  
-   `镜 3：祝小萤（未创建三视图）`  
-   `镜 5：徐风清（三视图未生成）`  
-   提示用户到 **角色设定 → 三视图** 补做 **对应角色** 即可，无需一次性做完所有角色。
-5. 校验通过后：创建节点、连线、写入 IMAGE 模型默认值；**不自动生图**，用户到各 **分镜图 · 镜N** 手动点 **分镜图生成**（首次）或 **重新生成**（已有图后）。
-
-#### 4.3 分镜图 Tab · 镜号列表 UI
-
-- 每行：`镜 N` + 场景摘要（截断）。
-- **鼠标悬停**：tip 展示该镜完整内容（场景 / 画面 / 对白 / 视频提示）。
-- 可取消勾选跳过某些镜号。
-
-### 5. 分镜图节点 · 单镜媒体
-
-每个 **分镜图 · 镜N** 节点：
-
-1. **分镜图生成 / 重新生成** Tab：编辑 Prompt、选 IMAGE 模型、生成静帧；首态按钮 **分镜图生成**，生成中 **生成中…**，完成后 **重新生成**；点击生成后 **关闭弹层**。
-2. **生成视频** Tab：展示带入的 `frameVideoPrompt`，选 VIDEO 模型；若无现成 `video-engine` 则 **spawn** 并连线本镜分镜图 → 再提交 KIE。
-3. **生成对白** Tab：展示 `frameDialogue`，选 TTS 模型；spawn `tts-engine` 并跑任务（无对白文本则不可用）。
-4. **视频+对白** Tab：两项模型一起配置，顺序触发生成。
-
-视频 / 对白 Prompt 优先读节点上的 `frameVideoPrompt` / `frameDialogue`；缺省时再回退分镜表 Markdown。
-
-### 6. 运行队列与并发
-
-| 行为 | 规则 |
+| 节点 | 职责 |
 |------|------|
-| 单节点「重新生成」 | `busEnqueueNode` 入队；同一节点已在排队或运行中则 **忽略重复入队** |
-| 工具栏「运行全部」 | 按拓扑 **顺序** 执行可运行节点（`busEnqueueNodesSequential`），避免多镜 / 多引擎同时打满 KIE |
-| 角色三视图批量 | 创建节点后 **顺序** 生图 |
-| 漫剧启动文案链 | 大纲 → 角色 → 分镜 **顺序** LLM |
+| **漫剧启动** | 主题 + LLM 模型；**创建工作区**（不自动跑文案） |
+| **漫剧文案** `story-script-hub` | 同屏四段：大纲 / 角色表 / 分镜表 / 对白；每段独立 **生成** |
+| **角色列** | 行级三视图预览 + 批量生图 |
+| **分镜列** | 左文案右分镜图（FrameCard 风格）+ 对比 |
+| **视频列** | 分镜视频 + 配音 |
+| **剪映导出** | 从视频列/分镜列组装 ZIP |
 
-**注意**：误点「运行全部」曾会导致多个分镜图同时提交；现已改为顺序执行。单镜「重新生成」一次只应产生 **一条** KIE 任务。
+不再使用 `sc-group-*` 分组框与散落的 `three-view-engine` / 分镜 `image-engine` 子节点；媒体结果存在列节点 `rows[]` 内，book-mall run 通过 `rowKey` + `mediaKind` 区分任务。
 
-### 7. 数据流总览
+## 数据流
 
 ```text
-漫剧启动
-  └─► 故事大纲 (LLM MD)
-  └─► 角色设定 (LLM 角色表)
-        └─► 三视图 × N（IMAGE，可分批）
-  └─► 分镜脚本 (LLM 分镜表)
-        └─► 分镜图 × 镜号（仅创建节点 + 带入 Prompt / 视频 / 对白）
-              ├─► 重新生成 → 静帧 (IMAGE)
-              ├─► 生成视频 → video-engine (VIDEO)
-              └─► 生成对白 → tts-engine (TTS)
-  └─► 剪映导出（汇总各镜视频 / 音频 / SRT）
+漫剧启动 → 创建工作区
+  └─► 漫剧文案（按需生成各段 LLM）
+  └─► 角色列 · 三视图（rowKey + threeView）
+  └─► 分镜列 · 静帧（frameImage）
+  └─► 视频列 · 视频 + TTS
+  └─► 剪映导出
 ```
 
----
+## 实现索引
 
-## Story 引擎 · 操作弹窗（Tab）
-
-| 节点 | Tab | 模型选择 |
-|------|-----|----------|
-| 故事大纲 | **文案** / **预览** | 文案：LLM |
-| 角色设定 | **文案** / **三视图** / **预览** | 文案：LLM；三视图：IMAGE |
-| 分镜脚本 | **文案** / **分镜图** / **预览** | 文案：LLM；分镜图：IMAGE（只创建节点，不自动生图） |
-| 分镜图 · 镜N | 底部四按钮 → 弹窗 | 重新生成：IMAGE；视频 / 对白 / 视频+对白：VIDEO + TTS |
-
-各 Tab 内模型均来自 **设置 → Provider**；不继承画布上其他节点的 Provider 选择。
-
----
-
-## 5 步向导（用户路径）
-
-| 步骤 | 操作 | 说明 |
-|------|------|------|
-| 1 | 漫剧启动 · 开始生成 | 创建三文案引擎 + 顺序 LLM |
-| 2 | 角色设定 · 三视图 | 勾选角色 → 生成选中/全部；可分批，不必一次做完 |
-| 3 | 分镜脚本 · 分镜图 | 勾选镜号 → 按镜校验三视图 → 创建分镜图节点；悬停看 tip |
-| 4 | 分镜图 · 镜N | 重新生成静帧；再按需生成视频 / 对白 |
-| 5 | 剪映导出 | 分镜包 ZIP 或 Mac 草稿 ZIP |
-
----
-
-## Provider 配置（勿在文档写 Key）
-
-- **DeepSeek（推荐 · 漫剧文案）**：在 **book-mall** `.env.local` 配置 `DEEPSEEK_API_KEY` 后，画布 Provider 列表会出现 **系统 · DeepSeek（共享 key）**（`system:deepseek`）；OpenAI 兼容 `baseUrl=https://api.deepseek.com/v1`，`modelKey=deepseek-chat`。故事大纲 / 角色设定 / 分镜脚本文案 Tab 与漫剧启动节点均可选。
-- **KIE Gemini**：`KIE_API_KEY` → **系统 · KIE**，`modelKey=gemini-3-flash`
-- **通义千问**：阿里百炼或 dashscope OpenAI 兼容（用户自建 Provider）
-- **TTS**：OpenAI 兼容 `/audio/speech`，模型 `tts-1`
-- **视频**：KIE 系统 Provider（Seedance / 万相 / Happy Horse）
-
----
-
-## 剪映导出（Mac）
-
-### A · 分镜包 ZIP（推荐）
-
-含 `videos/镜01.mp4`、`audio/镜01.mp3`、`全集.srt`、`README.txt`。SRT 来自分镜表 **台词 / 对白** 列。
-
-### B · 剪映草稿 ZIP
-
-解压到剪映草稿目录；剪映 6+ 可能加密，打不开请用 A。
-
----
-
-## 旧画布 / 数据修补
-
-- 打开含 `md-preview` / `image-preview` 等预览节点的旧项目时，hydrate 会 **自动移除** 预览节点；请在各引擎节点右上角使用预览。
-- 已存在的分镜图节点若缺少 `frameVideoPrompt` / `frameDialogue`：在 **分镜脚本 · 分镜图** Tab 重新勾选对应镜号并 **创建**，会刷新带入字段与三视图连线（已存在节点不重复创建）。详见 [story-ops.md §4](./story-ops.md#4-常见修补操作)。
-
----
-
-## 实现索引（开发）
-
-| 逻辑 | 主要代码 |
-|------|----------|
-| 分镜批量创建 / 三视图校验 | `canvas-web/lib/canvas/story-batch-spawn.ts`（`findStoryboardFramesMissingThreeView`、`batchCreateFrameImages`） |
-| 分镜脚本节点 | `canvas-web/components/canvas/nodes/story-engine-node.tsx` |
-| 分镜图节点 + 四按钮弹窗 | `canvas-web/components/canvas/nodes/image-engine-node.tsx`、`frame-image-actions-modal.tsx` |
-| 运行队列 / 顺序执行 | `canvas-web/lib/canvas/run-queue.ts`、`canvas-run-bus.ts` |
-| 分镜表解析 | `canvas-web/lib/canvas/parse-md-tables.ts` |
+| 模块 | 路径 |
+|------|------|
+| 类型与默认 data | `lib/canvas/story-workspace-types.ts`、`types.ts` |
+| 创建工作区 | `lib/canvas/spawn-story-workspace.ts` |
+| 列同步 | `lib/canvas/story-column-sync.ts` |
+| 任务落库到行 | `lib/canvas/story-run-apply.ts` |
+| 运行队列 | `lib/canvas/run-queue.ts`、`lib/canvas/canvas-run-bus.ts` |
+| book-mall run | `book-mall/lib/canvas/story-workspace-runner.ts` |
+| 节点 UI | `components/canvas/nodes/story-*-*.tsx` |
+| 布局 | `lib/canvas/story-comic-workspace-layout.ts` |

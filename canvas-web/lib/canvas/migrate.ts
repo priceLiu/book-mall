@@ -22,6 +22,7 @@ import {
   NODE_DEFAULT_SIZE,
 } from "./types";
 import { normalizeCanvasNodes } from "./normalize-graph-nodes";
+import { migrateStoryComicStarterNode } from "./story-starter-migrate";
 
 // 这个文件需要识别 v1 的节点字符串字面量，但 v6 阶段后 CanvasNodeType 已经
 // 不再包含它们。所以这里把 type 弱化成 string，避免 TS 报"无 overlap"。
@@ -129,7 +130,9 @@ export function migrateGraphV1ToV2(graph: CanvasGraph): CanvasGraph {
   const ver = typeof graph.schemaVersion === "number" ? graph.schemaVersion : 0;
   const rawNodes = graph.nodes ?? [];
   const transform = (n: LooseNode) =>
-    backfillNodeSize(ver >= 2 ? n : migrateNode(n));
+    migrateStoryComicStarterNode(
+      backfillNodeSize(ver >= 2 ? n : migrateNode(n)) as CanvasFlowNode,
+    );
   const edges: CanvasFlowEdge[] = graph.edges ?? [];
   const nodes = normalizeCanvasNodes(
     rawNodes.map((n) =>

@@ -1,6 +1,13 @@
 "use client";
 
-import { busEnqueueNode, busEnqueueNodesSequential } from "./canvas-run-bus";
+import {
+  busEnqueueNode,
+  busEnqueueNodesSequential,
+  busEnqueueStoryRun,
+  busEnqueueStoryRunsSequential,
+} from "./canvas-run-bus";
+import type { StoryLlmSection } from "./story-workspace-types";
+import { STORY_HUB_SECTION_ORDER } from "./spawn-story-workspace";
 
 /** 按顺序触发节点运行（避免并发 429）。 */
 export function batchRunNodesSequential(
@@ -27,3 +34,39 @@ export function runStoryLlmPipelineSequential(
 ) {
   busEnqueueNodesSequential(nodeIds, options);
 }
+
+/** 文案中枢 · 按段顺序生成 */
+export function runStoryHubSectionsSequential(
+  hubId: string,
+  sections: readonly StoryLlmSection[] = STORY_HUB_SECTION_ORDER,
+  options?: { forceFresh?: boolean },
+) {
+  busEnqueueStoryRunsSequential(
+    sections.map((llmSection) => ({
+      nodeId: hubId,
+      llmSection,
+      forceFresh: options?.forceFresh,
+    })),
+    options,
+  );
+}
+
+/** 列节点 · 按行顺序跑 */
+export function batchRunStoryRowsSequential(
+  columnNodeId: string,
+  rowKeys: string[],
+  mediaKind: "threeView" | "frameImage" | "video" | "tts",
+  options?: { forceFresh?: boolean },
+) {
+  busEnqueueStoryRunsSequential(
+    rowKeys.map((rowKey) => ({
+      nodeId: columnNodeId,
+      rowKey,
+      mediaKind,
+      forceFresh: options?.forceFresh,
+    })),
+    options,
+  );
+}
+
+export { busEnqueueStoryRun };

@@ -28,6 +28,7 @@ import {
   NODE_DEFAULT_SIZE,
   STORY_FRAME_IMAGE_ENGINE_SIZE,
   isGroupNode,
+  isStoryWorkspaceNodeType,
 } from "./types";
 import { migrateGraphV1ToV2 } from "./migrate";
 import {
@@ -37,11 +38,16 @@ import {
   sortNodesForReactFlow,
 } from "./normalize-graph-nodes";
 import { reflowStoryComicFlat } from "./story-comic-layout";
+import { reflowStoryComicColumns } from "./story-comic-columns-layout";
+import { applyStoryColumnHeights } from "./story-column-layout";
+import { reflowStoryComicWorkspace } from "./story-comic-workspace-layout";
+import { hasStoryComicColumnGroups } from "./story-comic-groups";
 import {
   repairStoryPreviewEdges,
   stripStoryPreviewNodes,
 } from "./story-comic-edges";
 import { applyStoryFrameEdgeConnection } from "./story-frame-connect";
+import type { HubPreviewSection } from "./story-hub-runtime";
 
 type CanvasState = {
   projectId: string | null;
@@ -63,6 +69,11 @@ type CanvasState = {
   dragHoverGroupId: string | null;
   setConnectingFrom: (id: string | null) => void;
   setDragHoverGroup: (id: string | null) => void;
+
+  /** 故事大纲审阅弹窗（全局，避免节点重渲染丢失 open 状态） */
+  storyHubReview: { hubId: string; section: HubPreviewSection } | null;
+  openStoryHubReview: (hubId: string, section: HubPreviewSection) => void;
+  closeStoryHubReview: () => void;
 
   hydrate: (projectId: string, graph: CanvasGraph | undefined) => void;
   toGraph: () => CanvasGraph;
@@ -153,6 +164,11 @@ export const useCanvasStore = create<CanvasState>()(
       setConnectingFrom: (id) => set({ connectingFromNodeId: id }),
       setDragHoverGroup: (id) => set({ dragHoverGroupId: id }),
 
+      storyHubReview: null,
+      openStoryHubReview: (hubId, section) =>
+        set({ storyHubReview: { hubId, section } }),
+      closeStoryHubReview: () => set({ storyHubReview: null }),
+
       hydrate: (projectId, graph) => {
         const raw = graph && Array.isArray(graph.nodes) ? graph : emptyGraph();
         const g = migrateGraphV1ToV2(raw);
@@ -170,6 +186,7 @@ export const useCanvasStore = create<CanvasState>()(
           nodes,
           edges,
           viewport: g.viewport ?? { x: 0, y: 0, zoom: 1 },
+          storyHubReview: null,
         });
       },
 
@@ -289,17 +306,27 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       updateNodeData: (id, patch) => {
-        set({
-          nodes: get().nodes.map((n) =>
-            n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
-          ),
-        });
+        let nodes = get().nodes.map((n) =>
+          n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
+        );
+        if (patch.rows !== undefined) {
+          const t = nodes.find((n) => n.id === id)?.type;
+          if (
+            t === "story-character-column" ||
+            t === "story-frame-column" ||
+            t === "story-video-column"
+          ) {
+            nodes = applyStoryColumnHeights(nodes);
+          }
+        }
+        set({ nodes });
       },
 
       setNodeRuntime: (id, runtime) => {
         const all = get().nodes;
         const target = all.find((n) => n.id === id);
         if (!target || isGroupNode(target.type)) return;
+        if (isStoryWorkspaceNodeType(target.type ?? "")) return;
 
         const data = target.data as Record<string, unknown> & {
           runtime?: CanvasNodeRuntime;
@@ -659,8 +686,14 @@ export const useCanvasStore = create<CanvasState>()(
       reflowStoryComicLayout: () => {
         const { nodes, edges } = get();
         const repaired = repairStoryPreviewEdges(nodes, edges);
+        const hasWorkspace = nodes.some((n) => n.type === "story-script-hub");
+        const laid = hasWorkspace
+          ? reflowStoryComicWorkspace(nodes, repaired)
+          : hasStoryComicColumnGroups(nodes)
+            ? reflowStoryComicColumns(nodes, repaired)
+            : reflowStoryComicFlat(nodes, repaired);
         set({
-          nodes: reflowStoryComicFlat(nodes, repaired),
+          nodes: laid,
           edges: repaired,
           fitViewNonce: get().fitViewNonce + 1,
         });

@@ -1,6 +1,53 @@
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
+import type { CanvasStoryRunJob } from "./canvas-run-bus";
+import type { StoryRunContext } from "./story-workspace-types";
 import { pickTaskResultMediaUrl } from "./task-media-url";
+
+export type CanvasTaskStoryScope = {
+  rowKey?: string;
+  mediaKind?: string;
+  llmSection?: string;
+};
+
+export function taskStoryScope(
+  task: Pick<CanvasTaskRecord, "storyScope">,
+): CanvasTaskStoryScope | undefined {
+  return task.storyScope;
+}
+
+/** 漫剧列行级任务：按 storyScope 过滤，避免同节点多行时 pick 到其它行的历史成功任务 */
+export function tasksMatchStoryScope(
+  task: CanvasTaskRecord,
+  scope: CanvasTaskStoryScope,
+): boolean {
+  const t = taskStoryScope(task);
+  if (!t) return false;
+  if (scope.rowKey && t.rowKey !== scope.rowKey) return false;
+  if (scope.mediaKind && t.mediaKind !== scope.mediaKind) return false;
+  if (scope.llmSection && t.llmSection !== scope.llmSection) return false;
+  return true;
+}
+
+export function pickPreferredCanvasTaskForScope(
+  tasks: CanvasTaskRecord[],
+  scope: CanvasTaskStoryScope,
+): CanvasTaskRecord | undefined {
+  const scoped = tasks.filter((t) => tasksMatchStoryScope(t, scope));
+  return pickPreferredCanvasTask(scoped);
+}
+
+export function storyRunContextFromScope(
+  nodeId: string,
+  scope: CanvasTaskStoryScope,
+): CanvasStoryRunJob {
+  return {
+    nodeId,
+    rowKey: scope.rowKey,
+    mediaKind: scope.mediaKind as StoryRunContext["mediaKind"],
+    llmSection: scope.llmSection as StoryRunContext["llmSection"],
+  };
+}
 
 function taskDisplayRank(t: CanvasTaskRecord): number {
   if (t.status === "SUCCEEDED" && (t.textOutput || pickTaskResultMediaUrl(t))) {

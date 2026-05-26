@@ -23,8 +23,21 @@ import { isStoryLlmNodeType } from "./types";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import {
   registerCanvasRunBus,
+  type CanvasStoryRunJob,
   unregisterCanvasRunBus,
 } from "./canvas-run-bus";
+import { countCanvasInflightWork, collectCanvasInflightNodeIds } from "./story-column-runtime";
+import { reconcileStaleInflightRuntimes } from "./story-inflight-reconcile";
+import {
+  storyApplyTaskResult,
+  storyRunPendingPatch,
+} from "./story-run-apply";
+import type { StoryRunContext } from "./story-workspace-types";
+import { isStoryWorkspaceNodeType } from "./types";
+import {
+  hubSectionIsComplete,
+  hubSectionNeedsRun,
+} from "./story-hub-runtime";
 import {
   storyLlmNodeIsComplete,
   storyLlmNodeNeedsRun,
@@ -38,7 +51,9 @@ import {
 import {
   backfillFrameVideoRuntimesFromTasks,
   pickPreferredCanvasTask,
+  pickPreferredCanvasTaskForScope,
   preferredTasksByNode,
+  storyRunContextFromScope,
 } from "./task-pick";
 
 const POLL_INTERVAL_MS = 2000;
@@ -57,18 +72,61 @@ function isServerInflightStatus(status?: string): boolean {
   return status === "PENDING" || status === "SUBMITTED";
 }
 
+type StoryRowJob = Pick<CanvasStoryRunJob, "rowKey" | "mediaKind" | "llmSection">;
+
+function storyRowRuntimeStatus(
+  node: CanvasFlowNode | undefined,
+  job: StoryRowJob,
+): string | undefined {
+  if (!node || !job.rowKey) return undefined;
+  const rows = (
+    node.data as {
+      rows?: {
+        key: string;
+        runtime?: { status?: string };
+        videoRuntime?: { status?: string };
+        ttsRuntime?: { status?: string };
+      }[];
+    }
+  ).rows;
+  const row = rows?.find((r) => r.key === job.rowKey);
+  if (!row) return undefined;
+  if (node.type === "story-video-column") {
+    return job.mediaKind === "tts"
+      ? row.ttsRuntime?.status
+      : row.videoRuntime?.status;
+  }
+  return row.runtime?.status;
+}
+
+function shouldReleaseStoryRunInflight(
+  node: CanvasFlowNode | undefined,
+  job: StoryRowJob & { nodeId?: string; llmSection?: string },
+): boolean {
+  if (node?.type === "story-script-hub" && job.llmSection) {
+    const st = hubSectionIsComplete(node, job.llmSection);
+    return st;
+  }
+  if (job.rowKey && node && isStoryWorkspaceNodeType(node.type ?? "")) {
+    const st = storyRowRuntimeStatus(node, job);
+    return st === "done" || st === "error";
+  }
+  if (node && isStoryLlmNodeType(node.type ?? "")) {
+    const st = nodeRuntimeStatus(node);
+    return st === "done" || st === "error";
+  }
+  return true;
+}
+
 function latestTasksByNode(
   tasks: CanvasTaskRecord[],
 ): Map<string, CanvasTaskRecord> {
   return preferredTasksByNode(tasks);
 }
 
-/** 顶部工具栏：进行中的节点数（pending + running） */
+/** 顶部工具栏：进行中的生成任务数（含漫剧行级 / 文案段） */
 export function useCanvasInflightTaskCount(): number {
-  return useCanvasStore(
-    (s) =>
-      s.nodes.filter((n) => isLocalInflightStatus(nodeRuntimeStatus(n))).length,
-  );
+  return useCanvasStore((s) => countCanvasInflightWork(s.nodes));
 }
 
 /** 解析单个生图引擎节点上游的图片 URL 列表（保持顺序去重）。 */
@@ -149,7 +207,17 @@ function resolveTextInputs(
       if (d.runtime?.textOutput?.trim()) out.push(d.runtime.textOutput.trim());
     } else if (p.type === "story-comic-starter") {
       const d = p.data as unknown as StoryComicStarterNodeData;
-      if (d.theme?.trim()) out.push(d.theme.trim());
+      const sp = d.systemPrompt?.trim() || d.theme?.trim();
+      if (sp) out.push(sp);
+    } else if (p.type === "story-script-hub") {
+      const d = p.data as {
+        outlineMd?: string;
+        characterMd?: string;
+        storyboardMd?: string;
+      };
+      for (const part of [d.outlineMd, d.characterMd, d.storyboardMd]) {
+        if (part?.trim()) out.push(part.trim());
+      }
     }
   }
   return out;
@@ -165,105 +233,161 @@ export function useCanvasRunner(fallbackProjectId?: string) {
   const projectId = storeProjectId ?? fallbackProjectId ?? null;
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
 
-  const queueRef = useRef<Array<{ nodeId: string; forceFresh?: boolean }>>(
-    [],
-  );
+  type QueueItem = CanvasStoryRunJob;
+
+  const queueRef = useRef<QueueItem[]>([]);
   const inflightRef = useRef<Set<string>>(new Set());
   const taskByNodeRef = useRef<Map<string, string>>(new Map());
+  const jobByTaskRef = useRef<Map<string, QueueItem>>(new Map());
   const sequentialRef = useRef<{
-    nodeIds: string[];
+    jobs: QueueItem[];
     cursor: number;
     forceFresh?: boolean;
-    activeNodeId: string | null;
+    activeKey: string | null;
   } | null>(null);
+
+  const runKey = (job: QueueItem) => {
+    const parts = [job.nodeId];
+    if (job.llmSection) parts.push(job.llmSection);
+    if (job.rowKey) parts.push(job.rowKey);
+    if (job.mediaKind) parts.push(job.mediaKind);
+    return parts.join(":");
+  };
   const drainRef = useRef<() => void>(() => {});
   const pumpSequentialRef = useRef<() => void>(() => {});
 
+  /** 顺序链单步完成：防止 subscribe 与 finally 重复推进 cursor */
+  const finishSequentialStep = useCallback((completedKey: string) => {
+    const seq = sequentialRef.current;
+    if (!seq || seq.activeKey !== completedKey) return;
+    seq.activeKey = null;
+    seq.cursor += 1;
+    pumpSequentialRef.current();
+  }, []);
+
+  const abortSequentialOnError = useCallback((completedKey: string) => {
+    const seq = sequentialRef.current;
+    if (!seq || seq.activeKey !== completedKey) return;
+    seq.activeKey = null;
+    sequentialRef.current = null;
+  }, []);
+
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+
   const abortSequential = useCallback(
-    (nodeId?: string, message?: string) => {
-      if (nodeId && message) {
-        setNodeRuntime(nodeId, {
-          status: "error",
-          failCode: "RUN_ABORTED",
-          failMessage: formatCanvasTaskError("RUN_ABORTED", message),
-        });
+    (job?: QueueItem, message?: string) => {
+      if (job?.nodeId && message) {
+        const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
+        if (node && isStoryWorkspaceNodeType(node.type ?? "")) {
+          storyApplyTaskResult(
+            node,
+            {
+              id: "",
+              nodeId: job.nodeId,
+              kind: "TEXT",
+              status: "FAILED",
+              model: "",
+              ossUrl: null,
+              ephemeralUrl: null,
+              textOutput: null,
+              failCode: "RUN_ABORTED",
+              failMessage: message,
+              submittedAt: null,
+              completedAt: null,
+              createdAt: "",
+              updatedAt: "",
+            },
+            job,
+            updateNodeData,
+            useCanvasStore.getState().nodes,
+          );
+        } else if (job.nodeId) {
+          setNodeRuntime(job.nodeId, {
+            status: "error",
+            failCode: "RUN_ABORTED",
+            failMessage: formatCanvasTaskError("RUN_ABORTED", message),
+          });
+        }
       }
       sequentialRef.current = null;
     },
-    [setNodeRuntime],
+    [setNodeRuntime, updateNodeData],
   );
 
   const pumpSequential = useCallback(() => {
     const seq = sequentialRef.current;
     if (!seq) return;
-    if (seq.cursor >= seq.nodeIds.length) {
+    if (seq.cursor >= seq.jobs.length) {
       sequentialRef.current = null;
       return;
     }
-    if (seq.activeNodeId) return;
+    if (seq.activeKey) return;
 
-    const nodeId = seq.nodeIds[seq.cursor]!;
-    const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
-    if (!node) {
-      abortSequential(
-        nodeId,
-        "找不到文案引擎节点，请刷新页面或重新载入漫剧模板",
-      );
+    const job = seq.jobs[seq.cursor];
+    if (!job) {
+      sequentialRef.current = null;
       return;
     }
-    const st = nodeRuntimeStatus(node);
-    // 仅跳过真正有输出的 Story LLM；空 done / error 必须重跑
+    const key = runKey(job);
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
+    if (!node) {
+      abortSequential(job, "找不到节点，请刷新页面或重新创建工作区");
+      return;
+    }
+
     if (
       !seq.forceFresh &&
-      st === "done" &&
+      node.type === "story-script-hub" &&
+      job.llmSection &&
+      hubSectionIsComplete(node, job.llmSection)
+    ) {
+      seq.cursor += 1;
+      seq.activeKey = null;
+      pumpSequential();
+      return;
+    }
+    if (
+      !seq.forceFresh &&
+      isStoryLlmNodeType(node.type ?? "") &&
+      nodeRuntimeStatus(node) === "done" &&
       !storyLlmNodeNeedsRun(node, false)
     ) {
       seq.cursor += 1;
-      seq.activeNodeId = null;
+      seq.activeKey = null;
       pumpSequential();
       return;
     }
 
-    seq.activeNodeId = nodeId;
-    setNodeRuntime(nodeId, {
-      status: "pending",
-      failCode: undefined,
-      failMessage: undefined,
-    });
-    queueRef.current.push({ nodeId, forceFresh: seq.forceFresh });
+    seq.activeKey = key;
+    const pending = storyRunPendingPatch(node, job);
+    if (pending) updateNodeData(job.nodeId, pending);
+    else {
+      setNodeRuntime(job.nodeId, {
+        status: "pending",
+        failCode: undefined,
+        failMessage: undefined,
+      });
+    }
+    queueRef.current.push({ ...job, forceFresh: seq.forceFresh });
     drainRef.current();
-  }, [abortSequential, setNodeRuntime]);
+  }, [abortSequential, setNodeRuntime, updateNodeData]);
 
   useEffect(() => {
     pumpSequentialRef.current = pumpSequential;
   }, [pumpSequential]);
 
   const runOne = useCallback(
-    async (nodeId: string, forceFresh?: boolean) => {
+    async (job: QueueItem) => {
+      const key = runKey(job);
+      const { nodeId, forceFresh } = job;
       if (!base || !projectId) {
-        setNodeRuntime(nodeId, {
-          status: "error",
-          failCode: "NOT_READY",
-          failMessage: formatCanvasTaskError(
-            "NOT_READY",
-            "画布未就绪，请刷新页面后重试",
-          ),
-        });
-        abortSequential();
+        abortSequential(job, "画布未就绪，请刷新页面后重试");
         return;
       }
       const state = useCanvasStore.getState();
       const node = state.nodes.find((n) => n.id === nodeId);
       if (!node) {
-        setNodeRuntime(nodeId, {
-          status: "error",
-          failCode: "NODE_NOT_FOUND",
-          failMessage: formatCanvasTaskError(
-            "NODE_NOT_FOUND",
-            "找不到该节点，请刷新页面",
-          ),
-        });
-        abortSequential();
+        abortSequential(job, "找不到该节点，请刷新页面");
         return;
       }
 
@@ -272,7 +396,8 @@ export function useCanvasRunner(fallbackProjectId?: string) {
 
       try {
         const data = node.data as Record<string, unknown>;
-        const modelKey = typeof data.modelKey === "string" ? data.modelKey : undefined;
+        const modelKey =
+          typeof data.modelKey === "string" ? data.modelKey : undefined;
         const r = await runCanvasNode(base, projectId, nodeId, {
           node: {
             type: node.type ?? "image-engine",
@@ -282,118 +407,258 @@ export function useCanvasRunner(fallbackProjectId?: string) {
             textInputs,
           },
           forceFresh,
+          llmSection: job.llmSection,
+          rowKey: job.rowKey,
+          mediaKind: job.mediaKind,
         });
-        taskByNodeRef.current.set(nodeId, r.task.id);
+        taskByNodeRef.current.set(key, r.task.id);
+        jobByTaskRef.current.set(r.task.id, job);
+        const nodesNow = useCanvasStore.getState().nodes;
+        const nodeNow = nodesNow.find((n) => n.id === nodeId) ?? node;
         if (
           r.task.status === "SUCCEEDED" &&
           (r.task.textOutput || pickTaskResultMediaUrl(r.task))
         ) {
-          // ai-engine 同步成功 / 缓存命中 / image-engine 同步出图：直接落 done
-          setNodeRuntime(nodeId, {
-            status: "done",
-            taskId: r.task.id,
-            ossUrl:
-              pickTaskResultMediaUrl(r.task) ?? r.task.ossUrl ?? undefined,
-            ephemeralUrl: r.task.ephemeralUrl ?? undefined,
-            textOutput: r.task.textOutput ?? undefined,
-          });
-          if (r.task.textOutput && (node.type === "ai-engine" || isStoryLlmNodeType(node.type ?? ""))) {
-            propagateTextOutputToDownstream(
-              nodeId,
-              r.task.textOutput,
-              setNodeRuntime,
+          if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
+            storyApplyTaskResult(
+              nodeNow,
+              r.task,
+              job,
+              updateNodeData,
+              nodesNow,
             );
+          } else {
+            setNodeRuntime(nodeId, {
+              status: "done",
+              taskId: r.task.id,
+              ossUrl:
+                pickTaskResultMediaUrl(r.task) ?? r.task.ossUrl ?? undefined,
+              ephemeralUrl: r.task.ephemeralUrl ?? undefined,
+              textOutput: r.task.textOutput ?? undefined,
+            });
+            if (
+              r.task.textOutput &&
+              (nodeNow.type === "ai-engine" ||
+                isStoryLlmNodeType(nodeNow.type ?? ""))
+            ) {
+              propagateTextOutputToDownstream(
+                nodeId,
+                r.task.textOutput,
+                setNodeRuntime,
+              );
+            }
           }
         } else if (r.task.status === "FAILED") {
-          setNodeRuntime(nodeId, {
-            status: "error",
-            taskId: r.task.id,
-            failCode: r.task.failCode ?? "FAILED",
-            failMessage: formatCanvasTaskError(
-              r.task.failCode,
-              r.task.failMessage,
-            ),
-          });
+          if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
+            storyApplyTaskResult(
+              nodeNow,
+              r.task,
+              job,
+              updateNodeData,
+              nodesNow,
+            );
+          } else {
+            setNodeRuntime(nodeId, {
+              status: "error",
+              taskId: r.task.id,
+              failCode: r.task.failCode ?? "FAILED",
+              failMessage: formatCanvasTaskError(
+                r.task.failCode,
+                r.task.failMessage,
+              ),
+            });
+          }
+        } else if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
+          storyApplyTaskResult(
+            nodeNow,
+            r.task,
+            job,
+            updateNodeData,
+            nodesNow,
+          );
         } else {
           setNodeRuntime(nodeId, {
             status: "running",
             taskId: r.task.id,
-            failCode: undefined,
-            failMessage: undefined,
           });
-          // 提交后立即拉一次任务（服务端 tasks GET 会 opportunistic poll KIE）
           void listCanvasProjectTasks(base, projectId, [nodeId])
             .then((tasks) => {
-              const latest = pickPreferredCanvasTask(tasks);
+              const scope =
+                job.rowKey || job.mediaKind || job.llmSection
+                  ? {
+                      rowKey: job.rowKey,
+                      mediaKind: job.mediaKind,
+                      llmSection: job.llmSection,
+                    }
+                  : undefined;
+              const latest = scope
+                ? pickPreferredCanvasTaskForScope(tasks, scope)
+                : pickPreferredCanvasTask(tasks);
               if (!latest) return;
-              if (
-                latest.status === "SUCCEEDED" &&
-                (latest.textOutput || pickTaskResultMediaUrl(latest))
-              ) {
-                setNodeRuntime(nodeId, {
-                  status: "done",
-                  taskId: latest.id,
-                  ossUrl:
-                    pickTaskResultMediaUrl(latest) ?? latest.ossUrl ?? undefined,
-                  ephemeralUrl: latest.ephemeralUrl ?? undefined,
-                  textOutput: latest.textOutput ?? undefined,
-                });
-              } else if (latest.status === "FAILED") {
-                setNodeRuntime(nodeId, {
-                  status: "error",
-                  taskId: latest.id,
-                  failCode: latest.failCode ?? "FAILED",
-                  failMessage: formatCanvasTaskError(
-                    latest.failCode,
-                    latest.failMessage,
-                  ),
-                });
-              }
+              const n = useCanvasStore.getState().nodes.find((x) => x.id === nodeId);
+              if (!n) return;
+              storyApplyTaskResult(n, latest, job, updateNodeData, useCanvasStore.getState().nodes);
             })
             .catch(() => {});
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        setNodeRuntime(nodeId, {
-          status: "error",
-          failCode: "REQUEST_FAILED",
-          failMessage: formatCanvasTaskError("REQUEST_FAILED", msg),
-        });
+        const isInflightConflict =
+          msg.includes("409") &&
+          (msg.includes("in progress") ||
+            msg.includes("TASK_ALREADY_INFLIGHT"));
+        if (isInflightConflict && base && projectId) {
+          try {
+            const tasks = await listCanvasProjectTasks(base, projectId, [nodeId]);
+            const scoped = tasks.filter((t) => t.nodeId === nodeId);
+            const scope = {
+              rowKey: job.rowKey,
+              mediaKind: job.mediaKind,
+              llmSection: job.llmSection,
+            };
+            const pick =
+              job.rowKey || job.mediaKind || job.llmSection
+                ? pickPreferredCanvasTaskForScope(scoped, scope)
+                : pickPreferredCanvasTask(scoped);
+            if (pick) {
+              taskByNodeRef.current.set(key, pick.id);
+              jobByTaskRef.current.set(pick.id, job);
+              const nodeNow =
+                useCanvasStore.getState().nodes.find((n) => n.id === nodeId) ??
+                node;
+              if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
+                storyApplyTaskResult(
+                  nodeNow,
+                  pick,
+                  job,
+                  updateNodeData,
+                  useCanvasStore.getState().nodes,
+                );
+              } else if (
+                pick.status === "SUCCEEDED" &&
+                (pick.textOutput || pickTaskResultMediaUrl(pick))
+              ) {
+                setNodeRuntime(nodeId, {
+                  status: "done",
+                  taskId: pick.id,
+                  ossUrl:
+                    pickTaskResultMediaUrl(pick) ?? pick.ossUrl ?? undefined,
+                  ephemeralUrl: pick.ephemeralUrl ?? undefined,
+                  textOutput: pick.textOutput ?? undefined,
+                });
+              } else if (pick.status === "FAILED") {
+                setNodeRuntime(nodeId, {
+                  status: "error",
+                  taskId: pick.id,
+                  failCode: pick.failCode ?? "FAILED",
+                  failMessage: formatCanvasTaskError(
+                    pick.failCode,
+                    pick.failMessage,
+                  ),
+                });
+              } else {
+                setNodeRuntime(nodeId, {
+                  status: pick.status === "PENDING" ? "pending" : "running",
+                  taskId: pick.id,
+                });
+              }
+              return;
+            }
+          } catch {
+            /* fall through to error state */
+          }
+        }
+        if (isStoryWorkspaceNodeType(node.type ?? "")) {
+          storyApplyTaskResult(
+            node,
+            {
+              id: "",
+              nodeId,
+              kind: "TEXT",
+              status: "FAILED",
+              model: "",
+              ossUrl: null,
+              ephemeralUrl: null,
+              textOutput: null,
+              failCode: "REQUEST_FAILED",
+              failMessage: msg,
+              submittedAt: null,
+              completedAt: null,
+              createdAt: "",
+              updatedAt: "",
+            },
+            job,
+            updateNodeData,
+            state.nodes,
+          );
+        } else {
+          setNodeRuntime(nodeId, {
+            status: "error",
+            failCode: "REQUEST_FAILED",
+            failMessage: formatCanvasTaskError("REQUEST_FAILED", msg),
+          });
+        }
       } finally {
-        inflightRef.current.delete(nodeId);
+        const nodeAfter = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
+        if (shouldReleaseStoryRunInflight(nodeAfter, job)) {
+          inflightRef.current.delete(key);
+        }
         const seq = sequentialRef.current;
-        if (seq?.activeNodeId === nodeId) {
-          const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
-          const st = node ? nodeRuntimeStatus(node) : undefined;
-          if (st === "error") {
-            seq.activeNodeId = null;
-            sequentialRef.current = null;
-          } else if (st === "done") {
-            if (
+        if (seq?.activeKey === key) {
+          const node = nodeAfter;
+          let done = false;
+          if (node?.type === "story-script-hub" && job.llmSection) {
+            done = hubSectionIsComplete(node, job.llmSection);
+          } else if (node && isStoryLlmNodeType(node.type ?? "")) {
+            done =
+              nodeRuntimeStatus(node) === "done" &&
+              storyLlmNodeIsComplete(node);
+          } else if (node && job.rowKey) {
+            const st = storyRowRuntimeStatus(node, job);
+            done = st === "done" || st === "error";
+          } else if (node) {
+            done =
+              nodeRuntimeStatus(node) === "done" ||
+              nodeRuntimeStatus(node) === "error";
+          }
+          if (done) {
+            const rowErr =
+              job.rowKey &&
               node &&
-              isStoryLlmNodeType(node.type ?? "") &&
-              !storyLlmNodeIsComplete(node)
-            ) {
-              // 等 textOutput 落库后再推进顺序链
+              (
+                node.data as {
+                  rows?: { key: string; runtime?: { status?: string } }[];
+                }
+              ).rows?.find((r) => r.key === job.rowKey)?.runtime?.status ===
+                "error";
+            if (rowErr || (node && nodeRuntimeStatus(node) === "error")) {
+              abortSequentialOnError(key);
             } else {
-              seq.activeNodeId = null;
-              seq.cursor += 1;
-              pumpSequentialRef.current();
+              finishSequentialStep(key);
             }
           }
         }
         drainRef.current();
       }
     },
-    [abortSequential, base, projectId, setNodeRuntime],
+    [
+      abortSequential,
+      abortSequentialOnError,
+      base,
+      finishSequentialStep,
+      projectId,
+      setNodeRuntime,
+      updateNodeData,
+    ],
   );
 
   const drain = useCallback(() => {
     while (queueRef.current.length > 0) {
       const item = queueRef.current.shift()!;
-      if (inflightRef.current.has(item.nodeId)) continue;
-      inflightRef.current.add(item.nodeId);
-      void runOne(item.nodeId, item.forceFresh);
+      const key = runKey(item);
+      if (inflightRef.current.has(key)) continue;
+      inflightRef.current.add(key);
+      void runOne(item);
     }
   }, [runOne]);
 
@@ -401,50 +666,114 @@ export function useCanvasRunner(fallbackProjectId?: string) {
     drainRef.current = drain;
   }, [drain]);
 
-  const enqueueNode = useCallback(
-    (nodeId: string, forceFresh?: boolean) => {
-      if (inflightRef.current.has(nodeId)) return;
-      if (queueRef.current.some((q) => q.nodeId === nodeId)) return;
-      setNodeRuntime(nodeId, {
-        status: "pending",
-        failCode: undefined,
-        failMessage: undefined,
-      });
-      queueRef.current.push({ nodeId, forceFresh });
+  const enqueueStoryRun = useCallback(
+    (job: QueueItem) => {
+      const key = runKey(job);
+      if (inflightRef.current.has(key)) return;
+      if (queueRef.current.some((q) => runKey(q) === key)) return;
+      const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
+      const rowSt = storyRowRuntimeStatus(node, job);
+      if (rowSt === "running" || rowSt === "pending" || rowSt === "queued") {
+        return;
+      }
+      if (node) {
+        const pending = storyRunPendingPatch(node, job);
+        if (pending) updateNodeData(job.nodeId, pending);
+        else {
+          setNodeRuntime(job.nodeId, {
+            status: "pending",
+            failCode: undefined,
+            failMessage: undefined,
+          });
+        }
+      }
+      queueRef.current.push(job);
       drain();
     },
-    [drain, setNodeRuntime],
+    [drain, setNodeRuntime, updateNodeData],
+  );
+
+  const enqueueNode = useCallback(
+    (nodeId: string, forceFresh?: boolean) => {
+      enqueueStoryRun({ nodeId, forceFresh });
+    },
+    [enqueueStoryRun],
   );
 
   const enqueueNodesSequential = useCallback(
     (nodeIds: string[], forceFresh?: boolean) => {
       if (!nodeIds.length) return;
       sequentialRef.current = {
-        nodeIds,
+        jobs: nodeIds.map((nodeId) => ({ nodeId, forceFresh })),
         cursor: 0,
         forceFresh,
-        activeNodeId: null,
+        activeKey: null,
       };
       pumpSequential();
     },
     [pumpSequential],
   );
 
-  const enqueueNodeRef = useRef(enqueueNode);
+  const enqueueStoryRunsSequential = useCallback(
+    (jobs: QueueItem[], forceFresh?: boolean) => {
+      if (!jobs.length) return;
+      const seq = sequentialRef.current;
+      const head = jobs[0];
+      if (head) {
+        const headKey = runKey(head);
+        if (
+          inflightRef.current.has(headKey) ||
+          queueRef.current.some((q) => runKey(q) === headKey)
+        ) {
+          return;
+        }
+        if (
+          seq?.activeKey &&
+          (seq.activeKey === headKey ||
+            seq.jobs.some(
+              (j) =>
+                runKey(j) === headKey ||
+                (head.llmSection &&
+                  j.nodeId === head.nodeId &&
+                  j.llmSection === head.llmSection),
+            ))
+        ) {
+          return;
+        }
+      }
+      sequentialRef.current = {
+        jobs: jobs.map((j) => ({ ...j, forceFresh: j.forceFresh ?? forceFresh })),
+        cursor: 0,
+        forceFresh,
+        activeKey: null,
+      };
+      pumpSequential();
+    },
+    [pumpSequential],
+  );
+
+  const enqueueStoryRunRef = useRef(enqueueStoryRun);
   const enqueueNodesSequentialRef = useRef(enqueueNodesSequential);
+  const enqueueStoryRunsSequentialRef = useRef(enqueueStoryRunsSequential);
   useEffect(() => {
-    enqueueNodeRef.current = enqueueNode;
-  }, [enqueueNode]);
+    enqueueStoryRunRef.current = enqueueStoryRun;
+  }, [enqueueStoryRun]);
   useEffect(() => {
     enqueueNodesSequentialRef.current = enqueueNodesSequential;
   }, [enqueueNodesSequential]);
+  useEffect(() => {
+    enqueueStoryRunsSequentialRef.current = enqueueStoryRunsSequential;
+  }, [enqueueStoryRunsSequential]);
 
   useEffect(() => {
     registerCanvasRunBus({
       enqueueNode: (nodeId, forceFresh) =>
-        enqueueNodeRef.current(nodeId, forceFresh),
+        enqueueStoryRunRef.current({ nodeId, forceFresh }),
+      enqueueStoryRun: (job) => enqueueStoryRunRef.current(job),
       enqueueNodesSequential: (nodeIds, opts) =>
         enqueueNodesSequentialRef.current(nodeIds, opts?.forceFresh),
+      enqueueStoryRunsSequential: (jobs, opts) =>
+        enqueueStoryRunsSequentialRef.current(jobs, opts?.forceFresh),
     });
     return () => unregisterCanvasRunBus();
   }, []);
@@ -452,54 +781,76 @@ export function useCanvasRunner(fallbackProjectId?: string) {
   /** 监听节点自己抛的 "canvas:run-node" 事件（兼容旧路径） */
   useEffect(() => {
     const handler = (ev: Event) => {
-      const e = ev as CustomEvent<{ nodeId: string; forceFresh?: boolean }>;
+      const e = ev as CustomEvent<CanvasStoryRunJob>;
       if (!e.detail?.nodeId) return;
-      enqueueNode(e.detail.nodeId, e.detail.forceFresh);
+      enqueueStoryRun(e.detail);
     };
     window.addEventListener("canvas:run-node", handler);
     return () => window.removeEventListener("canvas:run-node", handler);
-  }, [enqueueNode]);
+  }, [enqueueStoryRun]);
 
   useEffect(() => {
     const handler = (ev: Event) => {
       const e = ev as CustomEvent<{
-        nodeIds: string[];
+        nodeIds?: string[];
+        jobs?: QueueItem[];
         forceFresh?: boolean;
       }>;
+      if (e.detail?.jobs?.length) {
+        enqueueStoryRunsSequential(e.detail.jobs, e.detail.forceFresh);
+        return;
+      }
       if (!e.detail?.nodeIds?.length) return;
       enqueueNodesSequential(e.detail.nodeIds, e.detail.forceFresh);
     };
     window.addEventListener("canvas:run-nodes-sequential", handler);
-    return () =>
+    window.addEventListener("canvas:run-jobs-sequential", handler);
+    return () => {
       window.removeEventListener("canvas:run-nodes-sequential", handler);
-  }, [enqueueNodesSequential]);
+      window.removeEventListener("canvas:run-jobs-sequential", handler);
+    };
+  }, [enqueueNodesSequential, enqueueStoryRunsSequential]);
 
   /** 异步任务完成时推进顺序链 */
   useEffect(() => {
     return useCanvasStore.subscribe((state) => {
       const seq = sequentialRef.current;
-      if (!seq?.activeNodeId) return;
-      const node = state.nodes.find((n) => n.id === seq.activeNodeId);
-      const st = node ? nodeRuntimeStatus(node) : undefined;
-      if (st === "error") {
-        seq.activeNodeId = null;
-        sequentialRef.current = null;
+      if (!seq?.activeKey) return;
+      const job = seq.jobs[seq.cursor];
+      if (!job) return;
+      const node = state.nodes.find((n) => n.id === job.nodeId);
+      if (!node) return;
+      let done = false;
+      if (node.type === "story-script-hub" && job.llmSection) {
+        done = hubSectionIsComplete(node, job.llmSection);
+      } else if (job.rowKey) {
+        const row = (
+          node.data as { rows?: { key: string; runtime?: { status?: string } }[] }
+        ).rows?.find((r) => r.key === job.rowKey);
+        done =
+          row?.runtime?.status === "done" || row?.runtime?.status === "error";
+      } else if (isStoryLlmNodeType(node.type ?? "")) {
+        done =
+          nodeRuntimeStatus(node) === "done" && storyLlmNodeIsComplete(node);
+      } else {
+        done =
+          nodeRuntimeStatus(node) === "done" ||
+          nodeRuntimeStatus(node) === "error";
+      }
+      if (!done) return;
+      const key = runKey(job);
+      const rowErr =
+        job.rowKey &&
+        (
+          node.data as { rows?: { key: string; runtime?: { status?: string } }[] }
+        ).rows?.find((r) => r.key === job.rowKey)?.runtime?.status === "error";
+      if (rowErr || nodeRuntimeStatus(node) === "error") {
+        abortSequentialOnError(key);
         return;
       }
-      if (st === "done") {
-        if (
-          node &&
-          isStoryLlmNodeType(node.type ?? "") &&
-          !storyLlmNodeIsComplete(node)
-        ) {
-          return;
-        }
-        seq.activeNodeId = null;
-        seq.cursor += 1;
-        pumpSequentialRef.current();
-      }
+      finishSequentialStep(key);
     });
-  }, []);
+  }, [abortSequentialOnError, finishSequentialStep]);
 
   /** 5 秒轮询：同步服务端任务状态；刷新后也能恢复进行中的异步任务 */
   useEffect(() => {
@@ -507,15 +858,113 @@ export function useCanvasRunner(fallbackProjectId?: string) {
     let cancelled = false;
     let tickCount = 0;
     const serverInflightRef = { current: false };
+    const applyStoryColumnRowTasks = (
+      tasks: CanvasTaskRecord[],
+      nodes: CanvasFlowNode[],
+    ) => {
+      for (const node of nodes) {
+        const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
+        if (!nodeTasks.length) continue;
+
+        if (node.type === "story-character-column") {
+          const rows =
+            (node.data as { rows?: { key: string }[] }).rows ?? [];
+          for (const row of rows) {
+            const scope = { rowKey: row.key, mediaKind: "threeView" };
+            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            if (!pick) continue;
+            const job: CanvasStoryRunJob =
+              jobByTaskRef.current.get(pick.id) ??
+              storyRunContextFromScope(node.id, scope);
+            storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
+            if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
+              inflightRef.current.delete(runKey(job));
+            }
+          }
+          continue;
+        }
+
+        if (node.type === "story-frame-column") {
+          const rows =
+            (node.data as { rows?: { key: string }[] }).rows ?? [];
+          for (const row of rows) {
+            const scope = { rowKey: row.key, mediaKind: "frameImage" };
+            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            if (!pick) continue;
+            const job: CanvasStoryRunJob =
+              jobByTaskRef.current.get(pick.id) ??
+              storyRunContextFromScope(node.id, scope);
+            storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
+            if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
+              inflightRef.current.delete(runKey(job));
+            }
+          }
+          continue;
+        }
+
+        if (node.type === "story-video-column") {
+          const rows =
+            (node.data as { rows?: { key: string }[] }).rows ?? [];
+          for (const row of rows) {
+            for (const mediaKind of ["video", "tts"] as const) {
+              const scope = { rowKey: row.key, mediaKind };
+              const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+              if (!pick) continue;
+              const job: CanvasStoryRunJob =
+                jobByTaskRef.current.get(pick.id) ??
+                storyRunContextFromScope(node.id, scope);
+              storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
+              if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
+                inflightRef.current.delete(runKey(job));
+              }
+            }
+          }
+        }
+      }
+    };
+
+    const storyColumnNodeIds = () =>
+      new Set(
+        useCanvasStore
+          .getState()
+          .nodes.filter(
+            (n) =>
+              n.type === "story-character-column" ||
+              n.type === "story-frame-column" ||
+              n.type === "story-video-column",
+          )
+          .map((n) => n.id),
+      );
+
     const applyTaskUpdate = (
       t: CanvasTaskRecord,
       nodeId: string,
       nodes: CanvasFlowNode[],
     ) => {
       const node = nodes.find((n) => n.id === nodeId);
+      const job = jobByTaskRef.current.get(t.id);
+      if (node && isStoryWorkspaceNodeType(node.type ?? "")) {
+        if (job) {
+          if (
+            job.llmSection &&
+            (t.status === "SUBMITTED" || t.status === "PENDING") &&
+            hubSectionIsComplete(node, job.llmSection)
+          ) {
+            return;
+          }
+          storyApplyTaskResult(node, t, job, updateNodeData, nodes);
+        }
+        return;
+      }
+
       const localSt = node ? nodeRuntimeStatus(node) : undefined;
-      const boundTaskId = taskByNodeRef.current.get(nodeId);
-      // POST 尚未返回时，不要用历史 FAILED/SUCCEEDED 覆盖 pending
+      let boundTaskId: string | undefined;
+      for (const [k, tid] of Array.from(taskByNodeRef.current.entries())) {
+        if (k.startsWith(`${nodeId}:`) || k === nodeId) {
+          if (tid === t.id) boundTaskId = tid;
+        }
+      }
+      boundTaskId ??= taskByNodeRef.current.get(nodeId);
       if (isLocalInflightStatus(localSt) && !boundTaskId) {
         if (t.status === "FAILED" || t.status === "SUCCEEDED") return;
       }
@@ -540,7 +989,6 @@ export function useCanvasRunner(fallbackProjectId?: string) {
           textOutput: t.textOutput ?? undefined,
         });
         if (t.textOutput) {
-          const node = nodes.find((n) => n.id === nodeId);
           if (node?.type === "ai-engine" || isStoryLlmNodeType(node?.type ?? "")) {
             propagateTextOutputToDownstream(
               nodeId,
@@ -573,12 +1021,10 @@ export function useCanvasRunner(fallbackProjectId?: string) {
       const fullScan = forceFullScan || periodicFullScan;
 
       const state = useCanvasStore.getState();
-      const localInflight = state.nodes.filter((n) =>
-        isLocalInflightStatus(nodeRuntimeStatus(n)),
-      );
+      const localInflightIds = collectCanvasInflightNodeIds(state.nodes);
       const shouldPoll =
         fullScan ||
-        localInflight.length > 0 ||
+        localInflightIds.length > 0 ||
         serverInflightRef.current ||
         inflightRef.current.size > 0 ||
         queueRef.current.length > 0;
@@ -587,20 +1033,34 @@ export function useCanvasRunner(fallbackProjectId?: string) {
       const nodeIds =
         fullScan || serverInflightRef.current
           ? undefined
-          : localInflight.map((n) => n.id);
+          : localInflightIds;
 
       try {
         const tasks = await listCanvasProjectTasks(base, projectId, nodeIds);
         if (cancelled) return;
+        const nodesNow = useCanvasStore.getState().nodes;
+        applyStoryColumnRowTasks(tasks, nodesNow);
+        reconcileStaleInflightRuntimes(
+          useCanvasStore.getState().nodes,
+          tasks,
+          updateNodeData,
+          setNodeRuntime,
+        );
+        const columnIds = storyColumnNodeIds();
         const latestByNode = latestTasksByNode(tasks);
         let serverInflight = 0;
         latestByNode.forEach((t, nodeId) => {
           if (isServerInflightStatus(t.status)) serverInflight++;
-          applyTaskUpdate(t, nodeId, state.nodes);
+          if (!columnIds.has(nodeId)) {
+            applyTaskUpdate(t, nodeId, useCanvasStore.getState().nodes);
+          }
         });
+        for (const t of tasks) {
+          if (isServerInflightStatus(t.status)) serverInflight++;
+        }
         if (fullScan) {
           backfillFrameVideoRuntimesFromTasks(
-            state.nodes,
+            useCanvasStore.getState().nodes,
             tasks,
             setNodeRuntime,
           );
@@ -617,7 +1077,7 @@ export function useCanvasRunner(fallbackProjectId?: string) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [base, projectId, setNodeRuntime]);
+  }, [base, projectId, setNodeRuntime, updateNodeData]);
 
   return { enqueueNode };
 }

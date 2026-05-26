@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NodeResizer, useReactFlow, useViewport, type NodeProps } from "@xyflow/react";
 import { LayoutGrid, LayoutTemplate, Palette, Trash2 } from "lucide-react";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   GROUP_COLOR_PRESETS,
@@ -35,6 +36,7 @@ function pointInRect(x: number, y: number, r: ScreenRect) {
 
 /** 组容器节点：透明背景、彩色边框；hover 时在顶部边框出现屏幕固定胶囊工具条（不随画布缩放变小） */
 export function GroupNode({ id, data, selected }: NodeProps) {
+  const dialogs = useDialogs();
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const ungroup = useCanvasStore((s) => s.ungroup);
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
@@ -58,7 +60,10 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as GroupNodeData;
   const color = d.color || GROUP_COLOR_PRESETS[0];
   const isStoryTemplateGroup =
-    id === "sc-group-characters" || id === "sc-group-media";
+    id === "sc-group-characters" ||
+    id === "sc-group-media" ||
+    id === "sc-group-frames" ||
+    id === "sc-group-videos";
 
   const childrenIds = useMemo(
     () =>
