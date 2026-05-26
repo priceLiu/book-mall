@@ -162,12 +162,28 @@ export function hubAggregateStatus(
   return "idle";
 }
 
-/** 是否允许「输出工作流」：至少有大纲且大纲段未在跑/失败（角色/分镜可仍在生成） */
+/** 是否允许「定稿生成工作流」：至少有大纲且大纲段未在跑/失败 */
 export function hubCanOutputWorkflow(node: CanvasFlowNode): boolean {
   const d = node.data as unknown as StoryScriptHubNodeData;
   if (hubSectionRuntime(node, "outline")?.status === "error") return false;
   if (hubSectionIsRunning(node, "outline")) return false;
   return Boolean(resolveHubSectionMd(d, "outline").trim());
+}
+
+/** 故事大纲是否已定稿（生成工作流后锁定，删列后解除） */
+export function hubIsScriptFinalized(
+  d: StoryScriptHubNodeData,
+): boolean {
+  return Boolean(d.scriptFinalized);
+}
+
+/** 定稿前可编辑；定稿后仅只读审阅（删本套媒体列后 reconcile 解除定稿） */
+export function hubScriptEditable(
+  d: StoryScriptHubNodeData,
+  hasMediaColumns: boolean,
+): boolean {
+  if (!hubIsScriptFinalized(d)) return true;
+  return !hasMediaColumns;
 }
 
 export function hubPreviewMarkdown(d: StoryScriptHubNodeData): string {

@@ -51,11 +51,14 @@ export function storyBottomAlignedY(
   return rowBottom - h;
 }
 
-/** 工作区节点 Y：媒体列与剪映均底对齐控制行底边（剪映贴列底） */
+/** 工作区节点 Y：三列媒体底对齐控制行底；剪映顶对齐控制行（与主题/大纲同高） */
 export function storyMediaColumnY(
-  _originY: number,
+  originY: number,
   rowBottom: number,
   nodeType: CanvasNodeType,
 ): number {
+  if (nodeType === "jianying-export") {
+    return originY;
+  }
   return storyBottomAlignedY(rowBottom, nodeType);
 }

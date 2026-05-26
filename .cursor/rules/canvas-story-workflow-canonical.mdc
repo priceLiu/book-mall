@@ -1,0 +1,30 @@
+---
+description: 漫剧故事创作标准工作流（定稿→拆分→手动生成媒体）— 开发前必读
+globs: canvas-web/**/*
+alwaysApply: false
+---
+
+# 漫剧 · 标准工作流（强制）
+
+**完整真源**：`canvas-web/docs/story-workflow-canonical.md`
+
+## 三阶段
+
+1. **定稿前**：主题 → 创作剧本 → 用户在故事大纲 **编辑保存**（大纲非空即可，角色/分镜不强制）。
+2. **定稿生成工作流**：用户点 **「定稿生成工作流」** → `scriptFinalized=true` → 创建节点链 + **仅拆分** rows；**禁止**自动媒体。
+3. **媒体**：用户在各列单镜或底栏全部生成。
+
+## 定稿
+
+- 定稿后 hub **只读**；删本套媒体列 → `reconcileStoryHubFinalized` 解除定稿，可再编辑/定稿。
+- 角色列可无 rows；不拦「非正常」用法（如分镜列手写 prompt 生视频）。
+
+## 多工作流
+
+按 `scriptHubId` / `hubNodeId` 隔离；禁止全局 `find(第一个某类型)`.
+
+## 自检
+
+- [ ] 按钮文案：**定稿生成工作流** / **已定稿 · 工作流已生成**
+- [ ] `onOutputWorkflow` 设置 `scriptFinalized`，无 `kickoffStoryWorkspaceMediaRuns`
+- [ ] `hubScriptEditable` 控制审阅弹层与 patch

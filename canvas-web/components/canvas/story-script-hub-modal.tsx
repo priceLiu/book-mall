@@ -65,6 +65,7 @@ export function StoryScriptHubModal({
   onRunSection,
   sectionIsRunning,
   canRunLlm,
+  readOnly = false,
 }: {
   open: boolean;
   /** 打开时定位到的 Tab（与节点预览当前段一致） */
@@ -79,6 +80,8 @@ export function StoryScriptHubModal({
   onRunSection?: (section: StoryLlmSection) => void;
   sectionIsRunning?: boolean;
   canRunLlm?: boolean;
+  /** 已定稿生成工作流后只读审阅 */
+  readOnly?: boolean;
 }) {
   const [section, setSection] = useState<HubPreviewSection>("outline");
   const [draft, setDraft] = useState("");
@@ -130,12 +133,15 @@ export function StoryScriptHubModal({
     ? Boolean((data[`${llmSection}Md` as keyof StoryScriptHubNodeData] as string | undefined)?.trim())
     : false;
   const runDisabled =
+    readOnly ||
     !llmSection ||
     !onRunSection ||
     !canRunLlm ||
     sectionIsRunning ||
     dirty;
-  const runTitle = !canRunLlm
+  const runTitle = readOnly
+    ? "已定稿，不可再生成或修改。删除下游媒体列后可重新编辑。"
+    : !canRunLlm
     ? "请先在故事主题或本节点配置 LLM 模型"
     : dirty
       ? "请先保存当前编辑，再生成"
@@ -257,7 +263,9 @@ export function StoryScriptHubModal({
       }}
     >
       <header className="nodrag flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10 bg-neutral-900/85 px-4 py-3">
-        <p className="shrink-0 text-sm font-medium text-white">故事大纲 · 审阅与保存</p>
+        <p className="shrink-0 text-sm font-medium text-white">
+          {readOnly ? "故事大纲 · 已定稿（只读）" : "故事大纲 · 审阅与保存"}
+        </p>
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-1">
           {([...STORY_HUB_SECTION_ORDER, "dialogue"] as const).map((key) => (
             <button
@@ -301,7 +309,7 @@ export function StoryScriptHubModal({
             <span className="text-amber-300">未保存</span>
           ) : null}
         </span>
-        {section !== "dialogue" ? (
+        {section !== "dialogue" && !readOnly ? (
           <>
             <button
               type="button"
@@ -334,6 +342,10 @@ export function StoryScriptHubModal({
               保存
             </button>
           </>
+        ) : readOnly ? (
+          <span className="shrink-0 text-[11px] text-white/50">
+            删除本套媒体列后可重新编辑并定稿
+          </span>
         ) : null}
         <button
           type="button"
@@ -353,7 +365,7 @@ export function StoryScriptHubModal({
           <div className="flex min-h-full flex-col border-r border-neutral-200">
             <div className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-100 px-4 py-2.5">
               <p className="text-xs font-medium text-neutral-600">
-                编辑
+                {readOnly ? "只读" : "编辑"}
                 {section === "dialogue" ? " · 对白" : ` · ${TAB_LABEL[section]}`}
               </p>
               {section === "character" ? (
@@ -390,7 +402,9 @@ export function StoryScriptHubModal({
                           className={DOC_TEXT}
                           rows={Math.max(2, Math.ceil(line.dialogue.length / 36) + 1)}
                           value={line.dialogue}
+                          readOnly={readOnly}
                           onChange={(e) => {
+                            if (readOnly) return;
                             const next = patchStoryboardDialogue(
                               resolvedStoryboardMd,
                               line.frameIndex,
@@ -405,6 +419,7 @@ export function StoryScriptHubModal({
                 )
               ) : section === "character" && (draft.trim() || persistedMd.trim()) ? (
                 <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
+                  {!readOnly ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {outlineBrief.length > 0 ? (
                       <button
@@ -428,7 +443,8 @@ export function StoryScriptHubModal({
                       </span>
                     ) : null}
                   </div>
-                  {characterTableMode ? (
+                  ) : null}
+                  {characterTableMode && !readOnly ? (
                     <StoryCharacterTableEditor
                       value={draft}
                       onChange={setDraft}
@@ -439,6 +455,7 @@ export function StoryScriptHubModal({
                       style={editBodyStyle}
                       rows={editRows}
                       value={draft}
+                      readOnly={readOnly}
                       onChange={(e) => setDraft(e.target.value)}
                       spellCheck={false}
                     />
@@ -446,6 +463,7 @@ export function StoryScriptHubModal({
                 </div>
               ) : section === "storyboard" && (draft.trim() || persistedMd.trim()) ? (
                 <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
+                  {!readOnly ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
@@ -455,7 +473,8 @@ export function StoryScriptHubModal({
                       {storyboardRawMd ? "切换表格编辑" : "切换 Markdown 源码"}
                     </button>
                   </div>
-                  {storyboardTableMode ? (
+                  ) : null}
+                  {storyboardTableMode && !readOnly ? (
                     <StoryStoryboardTableEditor
                       value={draft}
                       onChange={setDraft}
@@ -466,6 +485,7 @@ export function StoryScriptHubModal({
                       style={editBodyStyle}
                       rows={editRows}
                       value={draft}
+                      readOnly={readOnly}
                       onChange={(e) => setDraft(e.target.value)}
                       spellCheck={false}
                     />
@@ -477,6 +497,7 @@ export function StoryScriptHubModal({
                   style={editBodyStyle}
                   rows={editRows}
                   value={draft}
+                  readOnly={readOnly}
                   onChange={(e) => setDraft(e.target.value)}
                   spellCheck={false}
                 />
