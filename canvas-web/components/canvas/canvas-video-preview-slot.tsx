@@ -1,15 +1,21 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Play, RefreshCw } from "lucide-react";
+import { Download, Play, RefreshCw } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+
+const SLOT_CORNER_BTN =
+  "nodrag absolute z-20 inline-flex size-8 items-center justify-center rounded-full border shadow-md backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100";
 
 /** 与分镜视频列 StoryVideoRowSlot 一致：原生 video 缩略 + 居中播放钮，点击由父级弹层播放 */
 export function CanvasVideoPreviewSlot({
   videoUrl,
   generating,
   onPreview,
+  downloadHref,
+  downloadFileName,
+  generatingLabel = "视频生成中…",
   className,
   emptyIcon,
   emptyMessage,
@@ -17,6 +23,9 @@ export function CanvasVideoPreviewSlot({
   videoUrl?: string;
   generating?: boolean;
   onPreview?: () => void;
+  downloadHref?: string;
+  downloadFileName?: string;
+  generatingLabel?: string;
   className?: string;
   emptyIcon?: ReactNode;
   emptyMessage?: string;
@@ -53,9 +62,30 @@ export function CanvasVideoPreviewSlot({
       ) : null}
 
       {generating ? (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/50">
           <RefreshCw className="size-8 animate-spin text-[#fdba74]" />
+          <span className="text-[11px] font-medium text-[#fdba74]">
+            {generatingLabel}
+          </span>
         </div>
+      ) : null}
+
+      {hasVideo && !generating && downloadHref ? (
+        <a
+          href={downloadHref}
+          download={downloadFileName}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="下载视频"
+          title="下载 mp4"
+          className={cn(
+            SLOT_CORNER_BTN,
+            "left-2 top-2 border-white/25 bg-black/55 text-white/90 hover:bg-black/75",
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Download className="size-3.5 pointer-events-none" />
+        </a>
       ) : null}
 
       {hasVideo && !generating && onPreview ? (

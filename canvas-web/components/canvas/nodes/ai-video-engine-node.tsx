@@ -39,6 +39,7 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as AiVideoEngineNodeData;
   const { succeeded } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [runPending, setRunPending] = useState(false);
 
   useEffect(() => {
     if (d.providerId && d.modelKey) return;
@@ -76,7 +77,14 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
   const isGenerating =
     d.runtime?.status === "running" || d.runtime?.status === "pending";
 
+  const showGenerating = isGenerating || runPending;
+
+  useEffect(() => {
+    if (!isGenerating) setRunPending(false);
+  }, [isGenerating]);
+
   const onRun = (forceFresh: boolean) => {
+    setRunPending(true);
     window.dispatchEvent(
       new CustomEvent("canvas:run-node", { detail: { nodeId: id, forceFresh } }),
     );
@@ -92,6 +100,7 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
       subtitle={d.modelKey || "参考生视频"}
       selected={selected}
       engine
+      runtime={d.runtime}
       minWidth={REF_VIDEO_NODE_SIZE.width}
       minHeight={REF_VIDEO_NODE_SIZE.height}
       inputs={[{ id: "in_refs", label: "参考图", kind: "image" }]}
@@ -151,11 +160,16 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
           <CanvasVideoPreviewSlot
             className="min-h-0 flex-1 basis-0"
             videoUrl={videoUrl ?? undefined}
-            generating={isGenerating && !videoUrl}
-            onPreview={videoUrl ? openPreview : undefined}
+            downloadHref={videoUrl ?? undefined}
+            downloadFileName="ref-video.mp4"
+            generating={showGenerating}
+            onPreview={videoUrl && !showGenerating ? openPreview : undefined}
             emptyIcon={<Video className="size-6 opacity-30" />}
             emptyMessage={
-              isGenerating ? "视频生成中…" : "生成结果将显示在此"
+              showGenerating ? undefined : "生成结果将显示在此"
+            }
+            generatingLabel={
+              d.runtime?.status === "pending" ? "排队中…" : "视频生成中…"
             }
           />
         </div>
@@ -180,7 +194,7 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
             }
             runLabel="生成视频"
             runAgainLabel="重新生成"
-            isGenerating={isGenerating}
+            isGenerating={showGenerating}
             hasGenerated={hasGenerated}
             runDisabled={
               !d.providerId ||
