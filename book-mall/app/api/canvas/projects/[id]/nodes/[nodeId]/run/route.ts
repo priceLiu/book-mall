@@ -16,6 +16,7 @@ import {
   runStoryLlmEngineNode,
   runTtsEngineNode,
   runVideoEngineNode,
+  runRefVideoEngineNode,
 } from "@/lib/canvas/canvas-engine-runner";
 import {
   runStoryCharacterColumnRow,
@@ -142,6 +143,8 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       });
     } else if (node.type === "video-engine") {
       result = await runVideoEngineNode({ ...baseArgs, forceFresh });
+    } else if (node.type === "ai-video-engine") {
+      result = await runRefVideoEngineNode({ ...baseArgs, forceFresh });
     } else if (node.type === "tts-engine") {
       result = await runTtsEngineNode({ ...baseArgs, forceFresh });
     } else if (node.type === "image-engine" || node.type === "three-view-engine") {

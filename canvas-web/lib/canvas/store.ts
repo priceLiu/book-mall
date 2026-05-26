@@ -48,6 +48,10 @@ import {
   stripStoryPreviewNodes,
 } from "./story-comic-edges";
 import { applyStoryFrameEdgeConnection } from "./story-frame-connect";
+import {
+  applyRefVideoEdgeConnection,
+  validateRefVideoConnection,
+} from "./ref-video-edges";
 import type { HubPreviewSection } from "./story-hub-runtime";
 
 type CanvasState = {
@@ -240,6 +244,16 @@ export const useCanvasStore = create<CanvasState>()(
         set({ edges: applyEdgeChanges(changes, get().edges) }),
       onConnect: (connection) => {
         if (!connection.source || !connection.target) return;
+        const state = get();
+        const validation = validateRefVideoConnection(
+          connection,
+          state.nodes,
+          state.edges,
+        );
+        if (!validation.ok) {
+          console.warn("[canvas] connection rejected:", validation.reason);
+          return;
+        }
         const id = `e_${connection.source}_${connection.target}_${Date.now()}`;
         const newEdge: Edge = {
           id,
@@ -249,12 +263,16 @@ export const useCanvasStore = create<CanvasState>()(
           targetHandle: connection.targetHandle ?? undefined,
           animated: false,
         };
-        const state = get();
         let edges = [...state.edges, newEdge];
         edges = applyStoryFrameEdgeConnection({
           connection,
           nodes: state.nodes,
           edges,
+          updateNodeData: (nodeId, patch) => get().updateNodeData(nodeId, patch),
+        });
+        applyRefVideoEdgeConnection({
+          connection,
+          nodes: state.nodes,
           updateNodeData: (nodeId, patch) => get().updateNodeData(nodeId, patch),
         });
         set({ edges });

@@ -9,6 +9,8 @@ import {
 } from "@/lib/canvas-api";
 import { useCanvasStore } from "./store";
 import { directPredecessors } from "./topo";
+import { collectRefImageUrlsFromGridNode } from "./ref-video-edges";
+import { isRefGridNodeType } from "./ref-video-models";
 import type {
   CanvasFlowEdge,
   CanvasFlowNode,
@@ -145,6 +147,8 @@ function resolveImageInputs(
     if (p.type === "image") {
       const d = p.data as unknown as ImageNodeData;
       if (d.ossUrl) out.push(d.ossUrl);
+    } else if (isRefGridNodeType(p.type ?? "")) {
+      out.push(...collectRefImageUrlsFromGridNode(p));
     } else if (p.type === "image-engine" || p.type === "three-view-engine" || p.type === "video-engine") {
       const d = p.data as unknown as ImageEngineNodeData;
       const url =

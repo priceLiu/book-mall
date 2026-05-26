@@ -90,3 +90,37 @@ export function buildCanvasVideoKieInput(args: {
     },
   };
 }
+
+/** 参考生视频 · 多图 Seedance（无单独主图） */
+export function buildCanvasRefVideoKieInput(args: {
+  modelKey: string;
+  prompt: string;
+  referenceImageUrls: string[];
+  options?: StoryVideoOptions;
+  aspectRatio?: string;
+}): { model: string; input: Record<string, unknown> } {
+  if (args.modelKey !== "bytedance/seedance-2") {
+    throw new Error(`unsupported ref video kie model: ${args.modelKey}`);
+  }
+  const desc = STORY_VIDEO_MODELS["bytedance/seedance-2"];
+  const resolution = args.options?.resolution ?? desc.defaults.resolution;
+  const duration = args.options?.duration ?? desc.defaults.duration;
+  const aspect = args.aspectRatio?.trim() || "16:9";
+  const reference_image_urls = args.referenceImageUrls
+    .map((u) => u.trim())
+    .filter((u) => /^https?:\/\//.test(u))
+    .slice(0, 8);
+
+  return {
+    model: "bytedance/seedance-2",
+    input: {
+      prompt: args.prompt,
+      reference_image_urls,
+      aspect_ratio: aspect,
+      resolution,
+      duration,
+      generate_audio:
+        args.options?.generateAudio ?? desc.defaults.generateAudio ?? false,
+    },
+  };
+}

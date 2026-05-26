@@ -6,6 +6,7 @@ import { Eye } from "lucide-react";
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { NodeStatusBadge } from "./node-shell";
 import { MarkdownFullscreenLightbox } from "./markdown-fullscreen-lightbox";
+import { StoryMediaPreviewModal } from "./story-column-media-panel";
 import { MediaPreviewLightbox } from "./media-hover-box";
 import type { MediaCompareContext } from "./compare-utils";
 import { AudioFullscreenLightbox } from "./audio-fullscreen-lightbox";
@@ -81,10 +82,10 @@ export function EnginePreviewTrigger({
         />
       ) : null}
       {open && kind === "video" && mediaUrl ? (
-        <MediaPreviewLightbox
-          src={mediaUrl}
+        <StoryMediaPreviewModal
+          url={mediaUrl}
           kind="video"
-          alt={title}
+          title={title}
           onClose={() => setOpen(false)}
         />
       ) : null}

@@ -54,6 +54,11 @@ import {
 } from "./providers";
 import { extractHunyuan3DResultUrls } from "./providers/hunyuan-3d";
 import { buildKieImageCreateArgs } from "./providers/kie";
+import {
+  bailianR2vGetTask,
+  getDashScopeApiKey,
+  type BailianR2vTaskOutput,
+} from "./canvas-video-bailian-r2v";
 
 // —— Types ——
 
@@ -364,6 +369,107 @@ async function claimCanvasTaskForResultApply(taskId: string): Promise<boolean> {
   return claimed.count > 0;
 }
 
+export async function applyCanvasBailianR2vPollResult(
+  taskId: string,
+  polled:
+    | { ok: true; output: BailianR2vTaskOutput; raw: unknown }
+    | { ok: false; error: string },
+): Promise<void> {
+  const task = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    include: { project: true },
+  });
+  if (!task) return;
+  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+  if (!(await claimCanvasTaskForResultApply(taskId))) return;
+
+  if (!polled.ok) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "BAILIAN_POLL_FAILED",
+        failMessage: polled.error.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  const status = polled.output.task_status ?? "";
+  if (status === "FAILED" || polled.output.code) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: polled.output.code ?? "BAILIAN_R2V_FAILED",
+        failMessage: (polled.output.message ?? "参考生视频失败").slice(0, 500),
+        resultPayload: polled.raw as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  if (status !== "SUCCEEDED") return;
+
+  const ephemeralUrl = polled.output.video_url?.trim();
+  if (!ephemeralUrl) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "BAILIAN_NO_VIDEO_URL",
+        failMessage: "任务成功但未返回 video_url",
+        resultPayload: polled.raw as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  let ossUrl: string | null = null;
+  let ossError: string | null = null;
+  try {
+    ossUrl = await persistCanvasKieResultToOss({
+      ephemeralUrl,
+      kind: "node-video",
+      projectId: task.projectId,
+    });
+  } catch (e) {
+    ossError = e instanceof Error ? e.message : String(e);
+  }
+
+  if (!ossUrl) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "OSS_UPLOAD_FAILED",
+        failMessage: ossError ?? "OSS upload failed",
+        ephemeralUrl,
+        resultPayload: polled.raw as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  await prisma.canvasGenerationTask.updateMany({
+    where: {
+      id: taskId,
+      status: { in: ["PENDING", "SUBMITTED"] },
+    },
+    data: {
+      status: "SUCCEEDED",
+      ossUrl,
+      ephemeralUrl,
+      resultPayload: polled.raw as Prisma.InputJsonValue,
+      completedAt: new Date(),
+    },
+  });
+}
+
 export async function applyCanvasKieTaskResult(
   taskId: string,
   record: KieRecordResponse,
@@ -399,7 +505,7 @@ export async function applyCanvasKieTaskResult(
     const payload = task.inputPayload as { kind?: string } | null;
     const engineKind = payload?.kind ?? "";
     const ossKind =
-      engineKind === "video-engine"
+      engineKind === "video-engine" || engineKind === "ai-video-engine"
         ? "node-video"
         : engineKind === "tts-engine"
           ? "node-audio"
@@ -683,6 +789,20 @@ function resolvePendingKieCreateArgs(
     };
   }
 
+  if (p.kind === "ai-video-engine" && p.providerKind === "KIE") {
+    const kieModel = String(p.kieModel ?? task.model);
+    const kieInput = p.kieInput;
+    if (!kieInput || typeof kieInput !== "object") return null;
+    return {
+      model: kieModel,
+      input: kieInput as KieVideoInput,
+    };
+  }
+
+  if (p.kind === "ai-video-engine" && p.providerKind === "BAILIAN_R2V") {
+    return null;
+  }
+
   if (p.kind === "tts-engine") return null;
 
   // v1 image-gen：inputPayload 本身就是 KIE input（gpt-image-1 需重新映射）
@@ -715,7 +835,7 @@ function resolveKieCallbackKind(
   const payload = task.inputPayload;
   if (payload && typeof payload === "object") {
     const kind = (payload as Record<string, unknown>).kind;
-    if (kind === "video-engine") return "video";
+    if (kind === "video-engine" || kind === "ai-video-engine") return "video";
   }
   return "image";
 }
@@ -882,8 +1002,27 @@ export async function runCanvasPollWorker(opts?: {
     try {
       const gateway = await resolveGatewayForCanvasTask(task);
       const before = task.status;
+      const payload =
+        task.inputPayload && typeof task.inputPayload === "object"
+          ? (task.inputPayload as Record<string, unknown>)
+          : null;
 
-      if (gateway?.kind === "HUNYUAN_3D" && gateway.pollImageTask) {
+      if (payload?.providerKind === "BAILIAN_R2V" && task.kieTaskId) {
+        const apiKey = getDashScopeApiKey();
+        if (!apiKey) {
+          throw new Error("DASHSCOPE_API_KEY not configured");
+        }
+        const polled = await Promise.race([
+          bailianR2vGetTask({ apiKey, taskId: task.kieTaskId }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("bailian poll timeout")),
+              POLL_INNER_TIMEOUT_MS,
+            ),
+          ),
+        ]);
+        await applyCanvasBailianR2vPollResult(task.id, polled);
+      } else if (gateway?.kind === "HUNYUAN_3D" && gateway.pollImageTask) {
         const poll = await Promise.race([
           gateway.pollImageTask(task.kieTaskId, { modelKey: task.model }),
           new Promise<never>((_, reject) =>

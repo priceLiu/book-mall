@@ -13,8 +13,10 @@ import {
   HelpCircle,
   Image as ImageIcon,
   ImagePlus,
+  LayoutGrid,
   Mic,
   Save,
+  Sparkles,
   Type,
   Users,
   Video,
@@ -128,6 +130,41 @@ const STORY_PALETTE: PaletteItem[] = [
     icon: <Download className="size-[18px]" />,
     hint: "分镜包 / 草稿 ZIP",
     dividerBefore: true,
+  },
+];
+
+/** 参考生视频 · 宫格 → AI 视频引擎 → 视频生成 */
+const REF_VIDEO_PALETTE: PaletteItem[] = [
+  {
+    type: "ref-grid-4",
+    label: "四宫格",
+    icon: <LayoutGrid className="size-[18px]" />,
+    hint: "4 格参考图",
+  },
+  {
+    type: "ref-grid-6",
+    label: "六宫格",
+    icon: <LayoutGrid className="size-[18px]" />,
+    hint: "6 格参考图",
+  },
+  {
+    type: "ref-grid-9",
+    label: "九宫格",
+    icon: <LayoutGrid className="size-[18px]" />,
+    hint: "9 格参考图",
+  },
+  {
+    type: "ai-video-engine",
+    label: "AI 视频引擎",
+    icon: <Sparkles className="size-[18px]" />,
+    hint: "参考生视频 · 选模型",
+    dividerBefore: true,
+  },
+  {
+    type: "video-generate",
+    label: "视频生成",
+    icon: <Video className="size-[18px]" />,
+    hint: "成片预览",
   },
 ];
 
@@ -433,6 +470,14 @@ export function NodePalette({
               onAdd={onAdd}
             />
             <PaletteDivider vertical />
+            <PalettePill
+              label="参考"
+              items={REF_VIDEO_PALETTE}
+              collapsed
+              onDragStart={onDragStart}
+              onAdd={onAdd}
+            />
+            <PaletteDivider vertical />
             {helpButton}
           </div>
         </div>
@@ -452,6 +497,13 @@ export function NodePalette({
             />
             <PalettePill
               items={STORY_PALETTE}
+              collapsed={false}
+              onDragStart={onDragStart}
+              onAdd={onAdd}
+            />
+            <PalettePill
+              label="参考生视频"
+              items={REF_VIDEO_PALETTE}
               collapsed={false}
               onDragStart={onDragStart}
               onAdd={onAdd}
