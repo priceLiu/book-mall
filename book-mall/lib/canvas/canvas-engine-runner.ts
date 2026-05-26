@@ -805,15 +805,28 @@ export async function runVideoEngineNode(
     throw new CanvasProjectError("EMPTY_PROMPT", "video-engine prompt 为空");
   }
 
-  const imageUrls = (node.imageInputs ?? [])
-    .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u))
-    .slice(0, 1);
-  if (imageUrls.length === 0) {
+  const imageInputs = (node.imageInputs ?? []).filter(
+    (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
+  );
+  const mainFrameImageUrl = String(
+    data.mainFrameImageUrl ?? imageInputs[0] ?? "",
+  ).trim();
+  const referenceImageUrls = Array.isArray(data.referenceImageUrls)
+    ? (data.referenceImageUrls as unknown[]).filter(
+        (u): u is string =>
+          typeof u === "string" &&
+          /^https?:\/\//.test(u) &&
+          u !== mainFrameImageUrl,
+      )
+    : imageInputs.slice(1);
+  if (!mainFrameImageUrl) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
-      "video-engine 需要上游分镜图",
+      "video-engine 需要分镜图作为主图",
     );
   }
+
+  const imageUrls = [mainFrameImageUrl];
 
   const provider = await loadProviderForUser(userId, providerId);
   if (provider.kind !== "KIE") {
@@ -847,7 +860,8 @@ export async function runVideoEngineNode(
   const { model, input } = buildCanvasVideoKieInput({
     modelKey,
     prompt: expandedPrompt,
-    imageUrl: imageUrls[0] ?? null,
+    imageUrl: mainFrameImageUrl,
+    referenceImageUrls,
     options: {
       resolution: String(params.resolution ?? "1080p"),
       duration: Number(params.duration ?? 5),
@@ -873,6 +887,8 @@ export async function runVideoEngineNode(
         providerId,
         modelKey,
         imageUrls,
+        mainFrameImageUrl,
+        referenceImageUrls,
         kieModel: model,
         kieInput: input,
         ...(args.storyScope ? { storyScope: args.storyScope } : {}),

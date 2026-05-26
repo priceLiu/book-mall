@@ -1,16 +1,19 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   displayFrameRows,
   displayVideoRows,
-  findStoryWorkspaceIds,
+  findWorkspaceForColumnId,
 } from "@/lib/canvas/story-column-display";
-import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
-import { patchVideoRowsFromFrameRows } from "@/lib/canvas/story-column-sync";
+import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
+import { NODE_DEFAULT_SIZE } from "@/lib/canvas/types";
+import { commitStoryVideoRowRun } from "@/lib/canvas/story-video-run";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type {
   StoryFrameColumnNodeData,
@@ -26,17 +29,36 @@ import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { NodeShell, ENGINE_ACCENT } from "../node-shell";
 
 export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
+  const base = useBookMallBaseUrl();
+  const projectId = useCanvasStore((s) => s.projectId);
   const nodes = useCanvasStore((s) => s.nodes);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const edges = useCanvasStore((s) => s.edges);
+  const resizeNode = useCanvasStore((s) => s.resizeNode);
   const d = data as unknown as StoryVideoColumnNodeData;
   const stored = d.rows ?? [];
+  const { alert } = useDialogs();
   const [preview, setPreview] = useState<{
     url: string;
     title: string;
   } | null>(null);
+  const [videoInflightKeys, setVideoInflightKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
 
-  const ws = useMemo(() => findStoryWorkspaceIds(nodes), [nodes]);
+  const ws = useMemo(
+    () => findWorkspaceForColumnId(nodes, edges, id),
+    [nodes, edges, id],
+  );
   const frameColumnId = d.frameColumnId ?? ws?.frameColumnId;
+
+  const frameRows = useMemo(() => {
+    const colFrameId = frameColumnId ?? ws?.frameColumnId;
+    if (!colFrameId) return [];
+    const frameNode = nodes.find((n) => n.id === colFrameId);
+    const frameStored =
+      (frameNode?.data as StoryFrameColumnNodeData | undefined)?.rows ?? [];
+    return displayFrameRows(nodes, colFrameId, frameStored);
+  }, [nodes, frameColumnId, ws?.frameColumnId]);
 
   const displayRows = useMemo(
     () => displayVideoRows(nodes, id, stored),
@@ -49,6 +71,15 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
   );
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
 
+  useEffect(() => {
+    const def = NODE_DEFAULT_SIZE["story-video-column"];
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    if (!node) return;
+    const { w, h } = nodeMeasuredSize(node);
+    if (Math.abs(h - def.height) < 4 && Math.abs(w - def.width) < 4) return;
+    resizeNode(id, { width: def.width, height: def.height });
+  }, [id, resizeNode]);
+
   const batchVideo = useMemo((): CanvasEnginePick | undefined => {
     if (d.batchVideo?.providerId) return d.batchVideo;
     if (!frameColumnId) return d.batchVideo;
@@ -59,29 +90,50 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
     return fromFrame?.providerId ? fromFrame : d.batchVideo;
   }, [d.batchVideo, frameColumnId, nodes]);
 
-  const syncRowsFromFrame = useCallback((): typeof stored => {
-    if (!frameColumnId) return stored;
-    const state = useCanvasStore.getState();
-    const frameNode = state.nodes.find((n) => n.id === frameColumnId);
-    const frameStored =
-      (frameNode?.data as StoryFrameColumnNodeData)?.rows ?? [];
-    const frameRows = displayFrameRows(state.nodes, frameColumnId, frameStored);
-    const videoStored =
-      (state.nodes.find((n) => n.id === id)?.data as StoryVideoColumnNodeData)
-        ?.rows ?? stored;
-    return patchVideoRowsFromFrameRows(videoStored, frameRows);
-  }, [frameColumnId, id, stored]);
+  const runRowVideo = async (key: string) => {
+    if (!batchVideo?.providerId?.trim() || !batchVideo?.modelKey?.trim()) return;
+    const colFrameId = frameColumnId ?? ws?.frameColumnId;
+    if (!colFrameId) return;
 
-  const runRowVideo = (key: string, forceFresh?: boolean) => {
-    if (!batchVideo?.providerId) return;
-    const patched = syncRowsFromFrame();
-    updateNodeData(id, { rows: patched });
-    busEnqueueStoryRun({
-      nodeId: id,
-      rowKey: key,
-      mediaKind: "video",
-      forceFresh,
-    });
+    setVideoInflightKeys((prev) => new Set(prev).add(key));
+
+    const frameNode = nodes.find((n) => n.id === colFrameId);
+    const frameStored =
+      (frameNode?.data as StoryFrameColumnNodeData | undefined)?.rows ?? [];
+    const frameRows = displayFrameRows(nodes, colFrameId, frameStored);
+    const frameRow = frameRows.find((r) => r.key === key);
+    const frameImageUrl =
+      frameRow?.runtime?.ossUrl ?? frameRow?.runtime?.ephemeralUrl;
+
+    try {
+      const result = await commitStoryVideoRowRun({
+        base,
+        projectId,
+        videoColumnId: id,
+        frameColumnId: colFrameId,
+        rowKey: key,
+        frameImageUrl,
+        batchVideo: {
+          providerId: batchVideo.providerId,
+          modelKey: batchVideo.modelKey,
+          params: batchVideo.params ?? {},
+        },
+        forceFresh: true,
+      });
+      if (!result.ok) {
+        void alert({
+          title: "分镜视频生成失败",
+          message: result.error,
+          variant: "error",
+        });
+      }
+    } finally {
+      setVideoInflightKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
   };
 
   return (
@@ -96,11 +148,11 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
       }
       selected={selected}
       engine
-      bodyExpand
+      bodyScroll
       runtime={nodeRuntime}
       accent={ENGINE_ACCENT}
-      minWidth={400}
-      minHeight={280}
+      minWidth={NODE_DEFAULT_SIZE["story-video-column"].width}
+      minHeight={NODE_DEFAULT_SIZE["story-video-column"].height}
       inputs={[{ id: "in_text", label: "分镜", kind: "text" }]}
       outputs={[{ id: "text", label: "视频", kind: "image" }]}
     >
@@ -117,18 +169,32 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
             const vid =
               row.videoRuntime?.ossUrl ?? row.videoRuntime?.ephemeralUrl;
             const st = row.videoRuntime?.status ?? "idle";
-            const running = st === "running" || st === "pending";
+            const running =
+              st === "running" ||
+              st === "pending" ||
+              videoInflightKeys.has(row.key);
+            const videoError =
+              st === "error" ? row.videoRuntime?.failMessage : undefined;
+            const frameRow = frameRows.find((f) => f.key === row.key);
             const videoPrompt =
+              frameRow?.prompt?.trim() ||
               (row.videoPrompt ?? "").trim() ||
-              [row.dialogue].filter(Boolean).join("\n");
+              (row.dialogue ?? "").trim();
+            const videoRefLabels = (
+              row.refImages?.length ? row.refImages : frameRow?.refImages ?? []
+            )
+              .filter((r) => r.id.startsWith("ref-char-"))
+              .map((r) => r.label);
             return (
               <StoryVideoRowSlot
                 key={row.key}
                 frameIndex={row.frameIndex}
                 videoUrl={vid}
                 videoPrompt={videoPrompt}
+                videoRefLabels={videoRefLabels}
                 generating={running}
-                onGenerate={() => runRowVideo(row.key, Boolean(vid))}
+                errorMessage={videoError}
+                onGenerate={() => void runRowVideo(row.key)}
                 onPreview={
                   vid
                     ? () =>

@@ -8,6 +8,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingExportNodeData } from "@/lib/canvas/types";
 import { collectJianyingFramesFromWorkspace } from "@/lib/canvas/jianying-from-workspace";
+import { findWorkspaceForScriptHub } from "@/lib/canvas/spawn-story-workspace";
 import {
   collectJianyingFrames,
   findUpstreamStoryboardId,
@@ -24,7 +25,12 @@ export function JianyingExportNode({ id, data, selected }: NodeProps) {
   const [loading, setLoading] = useState<"bundle" | "draft" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const workspaceFrames = collectJianyingFramesFromWorkspace(nodes);
+  const ws = d.hubNodeId
+    ? findWorkspaceForScriptHub(nodes, edges, d.hubNodeId)
+    : null;
+  const workspaceFrames = ws
+    ? collectJianyingFramesFromWorkspace(nodes, ws)
+    : [];
   const storyboardId = findUpstreamStoryboardId(nodes, edges, id);
   const frames = (
     workspaceFrames.length > 0
@@ -83,7 +89,7 @@ export function JianyingExportNode({ id, data, selected }: NodeProps) {
             onClick={() => void onExport("bundle")}
           >
             <Download className="size-4" />
-            {loading === "bundle" ? "打包中…" : "下载分镜包 ZIP（推荐）"}
+            {loading === "bundle" ? "打包中…" : "分包导入 · 分镜包 ZIP（推荐）"}
           </button>
           <button
             type="button"
@@ -92,7 +98,7 @@ export function JianyingExportNode({ id, data, selected }: NodeProps) {
             onClick={() => void onExport("draft")}
           >
             <Film className="size-4" />
-            {loading === "draft" ? "生成中…" : "下载剪映草稿 ZIP（Mac）"}
+            {loading === "draft" ? "生成中…" : "全包导入 · 剪映草稿 ZIP（Mac）"}
           </button>
         </div>
         <p className="text-[10px] leading-relaxed text-[var(--canvas-muted)]">

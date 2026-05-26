@@ -3,11 +3,28 @@ import { NODE_DEFAULT_SIZE } from "./types";
 import { nodeMeasuredSize, sortNodesForReactFlow } from "./normalize-graph-nodes";
 import { applyStoryColumnHeights } from "./story-column-layout";
 import { hasStoryComicPipeline } from "./story-comic-layout";
-import { storyComicStarterNodeHeight } from "./story-node-chrome";
+import {
+  STORY_CONTROL_NODE_HEIGHT,
+  STORY_CONTROL_NODE_WIDTH,
+} from "./story-node-chrome";
+import {
+  findStoryScriptHubForStarter,
+  findWorkspaceForScriptHub,
+  reconcileStoryStarterWorkspaces,
+  reconcileStoryWorkspaceEdges,
+  resolveJianyingExportId,
+} from "./spawn-story-workspace";
+import type { StoryWorkspaceIds } from "./story-workspace-types";
+import {
+  STORY_WORKSPACE_COL_H_GAP,
+  storyControlRowBottom,
+  storyMediaColumnXs,
+  storyMediaColumnY,
+} from "./story-workspace-layout";
 
-const COL_H_GAP = 120;
+export { STORY_WORKSPACE_COL_H_GAP };
 
-/** 重排横向步进：取 style/width、RF measured、类型默认宽度的最大值，避免列视觉重叠 */
+/** 重排横向步进：取 style/width、RF measured、类型默认宽度的最大值 */
 function nodeReflowWidth(n: CanvasFlowNode): number {
   const { w } = nodeMeasuredSize(n);
   const t = (n.type ?? "text") as CanvasNodeType;
@@ -16,7 +33,6 @@ function nodeReflowWidth(n: CanvasFlowNode): number {
   return Math.max(w, def, measured ?? 0);
 }
 
-/** 节点可视高度（与 nodeReflowWidth 对称） */
 function nodeReflowHeight(n: CanvasFlowNode): number {
   const { h } = nodeMeasuredSize(n);
   const t = (n.type ?? "text") as CanvasNodeType;
@@ -35,73 +51,116 @@ function applyNodeHeight(n: CanvasFlowNode, height: number): CanvasFlowNode {
   } as CanvasFlowNode;
 }
 
-/** 故事主题 / 故事大纲同高（按最长模板推算，底边对齐） */
 function applyStoryControlRowHeights(nodes: CanvasFlowNode[]): CanvasFlowNode[] {
-  const rowH = storyComicStarterNodeHeight();
   return nodes.map((n) => {
-    if (n.type === "story-comic-starter" || n.type === "story-script-hub") {
-      return applyNodeHeight(n, rowH);
+    if (n.type !== "story-comic-starter" && n.type !== "story-script-hub") {
+      return n;
     }
-    return n;
+    return applyNodeHeight(
+      { ...n, style: { ...(n.style ?? {}), width: STORY_CONTROL_NODE_WIDTH } } as CanvasFlowNode,
+      STORY_CONTROL_NODE_HEIGHT,
+    );
   });
 }
 
-const ROW_Y = 120;
+function placeNode(
+  node: CanvasFlowNode,
+  x: number,
+  y: number,
+): CanvasFlowNode {
+  const w = nodeReflowWidth(node);
+  const h = nodeReflowHeight(node);
+  return {
+    ...node,
+    position: { x, y },
+    width: w,
+    height: h,
+    style: { ...(node.style ?? {}), width: w, height: h },
+  } as CanvasFlowNode;
+}
 
-const WORKSPACE_COLUMN_TYPES: CanvasNodeType[] = [
-  "story-comic-starter",
-  "story-script-hub",
-  "story-character-column",
-  "story-frame-column",
-  "story-video-column",
-];
+function resolveStarterWorkspace(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  starter: CanvasFlowNode,
+): StoryWorkspaceIds | null {
+  const stored = (starter.data as { workspaceIds?: StoryWorkspaceIds })
+    .workspaceIds;
+  const hubLink = findStoryScriptHubForStarter(
+    nodes,
+    edges,
+    starter.id,
+    stored,
+  );
+  if (!hubLink) return null;
+  return findWorkspaceForScriptHub(nodes, edges, hubLink.scriptHubId);
+}
 
-/** 漫剧工作流：启动 | 文案中枢 | 角色列 | 分镜列 | 视频列 | 导出 */
+/** 单套工作流：主题 → 大纲 → 角色列 → 分镜列 → 视频列 → 剪映 */
+function reflowStarterChain(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  starterId: string,
+): CanvasFlowNode[] {
+  const starter = nodes.find((n) => n.id === starterId);
+  if (!starter || starter.type !== "story-comic-starter") return nodes;
+
+  const ws = resolveStarterWorkspace(nodes, edges, starter);
+  const hubId = ws?.scriptHubId;
+  const origin = starter.position;
+  const rowBottom = storyControlRowBottom(origin.y);
+
+  let next = nodes;
+
+  next = next.map((n) =>
+    n.id === starterId
+      ? placeNode(n, origin.x, origin.y)
+      : n,
+  );
+
+  if (hubId) {
+    const hubX = origin.x + STORY_CONTROL_NODE_WIDTH + STORY_WORKSPACE_COL_H_GAP;
+    const hubY = origin.y;
+    next = next.map((n) =>
+      n.id === hubId ? placeNode(n, hubX, hubY) : n,
+    );
+
+    const [charX, frameX, videoX, jianyingX] = storyMediaColumnXs(hubX);
+    const jianyingId = resolveJianyingExportId(next, edges, hubId, ws);
+    const placements: Array<{ id?: string; x: number; type: CanvasNodeType }> =
+      [
+        { id: ws?.characterColumnId, x: charX, type: "story-character-column" },
+        { id: ws?.frameColumnId, x: frameX, type: "story-frame-column" },
+        { id: ws?.videoColumnId, x: videoX, type: "story-video-column" },
+        { id: jianyingId, x: jianyingX, type: "jianying-export" },
+      ];
+
+    for (const p of placements) {
+      if (!p.id) continue;
+      const node = next.find((n) => n.id === p.id);
+      if (!node) continue;
+      const y = storyMediaColumnY(origin.y, rowBottom, p.type);
+      next = next.map((n) => (n.id === p.id ? placeNode(n, p.x, y) : n));
+    }
+  }
+
+  return next;
+}
+
+/** 漫剧工作流：按每套 story-comic-starter 独立重排（多工作流互不干扰） */
 export function reflowStoryComicWorkspace(
   nodes: CanvasFlowNode[],
-  _edges: CanvasFlowEdge[] = [],
+  edges: CanvasFlowEdge[] = [],
 ): CanvasFlowNode[] {
   if (!hasStoryComicPipeline(nodes)) return nodes;
 
-  let next = applyStoryColumnHeights(nodes);
+  let next = reconcileStoryStarterWorkspaces(nodes, edges);
+  next = applyStoryColumnHeights(next);
   next = applyStoryControlRowHeights(next);
 
-  const starter = next.find((n) => n.type === "story-comic-starter");
-  const exportNode = next.find((n) => n.type === "jianying-export");
-  const origin = starter?.position ?? { x: 80, y: ROW_Y };
-  const rowBottom =
-    origin.y + (starter ? nodeReflowHeight(starter) : NODE_DEFAULT_SIZE["story-comic-starter"].height);
-
-  const placeBottomAligned = (node: CanvasFlowNode, x: number) => {
-    const h = nodeReflowHeight(node);
-    return {
-      ...node,
-      position: { x, y: rowBottom - h },
-    } as CanvasFlowNode;
-  };
-
-  let x = origin.x;
-
-  for (const type of WORKSPACE_COLUMN_TYPES) {
-    const node = next.find((n) => n.type === type);
-    if (!node) continue;
-    const id = node.id;
-    const placed = placeBottomAligned(node, x);
-    next = next.map((n) => (n.id === id ? placed : n));
-    x += nodeReflowWidth(node) + COL_H_GAP;
-  }
-
-  if (exportNode) {
-    const ref =
-      next.find((n) => n.type === "story-video-column") ??
-      next.find((n) => n.type === "story-frame-column") ??
-      next.find((n) => n.type === "story-character-column") ??
-      next.find((n) => n.type === "story-script-hub") ??
-      starter;
-    const refPos = ref?.position ?? { x: origin.x, y: origin.y };
-    const refW = ref ? nodeReflowWidth(ref) : 400;
-    const placed = placeBottomAligned(exportNode, refPos.x + refW + COL_H_GAP);
-    next = next.map((n) => (n.id === exportNode.id ? placed : n));
+  const starters = next.filter((n) => n.type === "story-comic-starter");
+  for (const starter of starters) {
+    next = reflowStarterChain(next, edges, starter.id);
   }
 
   return sortNodesForReactFlow(next);

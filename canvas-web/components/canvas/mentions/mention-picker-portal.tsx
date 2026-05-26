@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { GripVertical, X } from "lucide-react";
-import { RF_NO_DRAG, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { RF_NODE_DRAG_HANDLE, RF_NO_DRAG, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import type { MentionableItem } from "./MentionsTextarea";
 
 const ITEM_W = 200;
@@ -42,13 +42,6 @@ export function MentionPickerPortal({
   const [mounted, setMounted] = useState(false);
   const [basePos, setBasePos] = useState({ left: 80, top: 120 });
   const [drag, setDrag] = useState({ x: 0, y: 0 });
-  const dragRef = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    ox: number;
-    oy: number;
-  } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -68,6 +61,12 @@ export function MentionPickerPortal({
     if (!open) return;
     setDrag({ x: 0, y: 0 });
     updateAnchor();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅打开时复位位置，避免拖移中被 scroll/resize 重置
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updateAnchor();
   }, [open, updateAnchor]);
 
   useEffect(() => {
@@ -82,31 +81,28 @@ export function MentionPickerPortal({
   }, [open, updateAnchor]);
 
   const onHeaderPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    dragRef.current = {
-      pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      ox: drag.x,
-      oy: drag.y,
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const ox = drag.x;
+    const oy = drag.y;
+
+    const onMove = (ev: PointerEvent) => {
+      setDrag({
+        x: ox + (ev.clientX - startX),
+        y: oy + (ev.clientY - startY),
+      });
     };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const onHeaderPointerMove = (e: React.PointerEvent) => {
-    const d = dragRef.current;
-    if (!d || d.pointerId !== e.pointerId) return;
-    setDrag({
-      x: d.ox + (e.clientX - d.startX),
-      y: d.oy + (e.clientY - d.startY),
-    });
-  };
-
-  const onHeaderPointerUp = (e: React.PointerEvent) => {
-    if (dragRef.current?.pointerId === e.pointerId) {
-      dragRef.current = null;
-    }
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onUp);
   };
 
   if (!mounted || !open) return null;
@@ -130,9 +126,6 @@ export function MentionPickerPortal({
       <div
         className="flex cursor-grab items-center gap-1 border-b border-white/10 bg-white/[0.04] px-2 py-1.5 active:cursor-grabbing"
         onPointerDown={onHeaderPointerDown}
-        onPointerMove={onHeaderPointerMove}
-        onPointerUp={onHeaderPointerUp}
-        onPointerCancel={onHeaderPointerUp}
       >
         <GripVertical className="size-3.5 shrink-0 text-white/40" />
         <p className="min-w-0 flex-1 text-[10px] text-[var(--canvas-muted)]">

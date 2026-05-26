@@ -75,9 +75,15 @@ const CANVAS_PALETTE: PaletteItem[] = [
     hint: "导出 / 入画作库",
     dividerBefore: true,
   },
+  {
+    type: "jianying-export",
+    label: "剪映",
+    icon: <Download className="size-[18px]" />,
+    hint: "分镜包 / 草稿 ZIP",
+  },
 ];
 
-/** 漫剧全链路节点（与海报工作流分栏展示）。 */
+/** 故事 / 分镜全链路节点（与通用画布分栏展示）。 */
 const STORY_PALETTE: PaletteItem[] = [
   {
     type: "story-comic-starter",
@@ -224,7 +230,6 @@ function PalettePill({
   items,
   collapsed,
   trailing,
-  bare,
   onDragStart,
   onAdd,
 }: {
@@ -232,8 +237,6 @@ function PalettePill({
   items: PaletteItem[];
   collapsed: boolean;
   trailing?: React.ReactNode;
-  /** 已包在外层工具条容器内，不再单独描边 */
-  bare?: boolean;
   onDragStart: (
     event: React.DragEvent<HTMLButtonElement>,
     type: CanvasContentNodeType,
@@ -261,11 +264,7 @@ function PalettePill({
 
   return (
     <div
-      className={
-        bare
-          ? "flex items-center gap-1"
-          : "flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md"
-      }
+      className="flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md"
       role="group"
       aria-label={label ? `${label}节点` : "画布节点"}
     >
@@ -289,6 +288,8 @@ function PalettePill({
 const SHORTCUTS: Array<{ keys: string[]; desc: string }> = [
   { keys: ["拖空白处"], desc: "框选多个节点" },
   { keys: ["中键 / 右键 拖"], desc: "平移画布" },
+  { keys: ["Space", "+ 拖"], desc: "平移画布" },
+  { keys: ["节点标题栏", "⋮⋮"], desc: "拖动节点（内容区为编辑/滚动）" },
   { keys: ["滚轮 / 触控板"], desc: "缩放画布" },
   { keys: ["⌘", "或", "⇧", "+ 点击"], desc: "添加 / 移除 多选" },
   { keys: ["⌘", "Z"], desc: "撤销" },
@@ -299,7 +300,7 @@ const SHORTCUTS: Array<{ keys: string[]; desc: string }> = [
 ];
 
 /**
- * 顶部浮动节点面板：通用画布 + 漫剧 两条工具条分开展示。
+ * 顶部浮动节点面板：通用画布 + 故事工作流 两条工具条分开展示。
  */
 export function NodePalette({
   onAdd,
@@ -426,7 +427,6 @@ export function NodePalette({
             />
             <PaletteDivider vertical />
             <PalettePill
-              label="漫剧"
               items={STORY_PALETTE}
               collapsed
               onDragStart={onDragStart}
@@ -442,24 +442,20 @@ export function NodePalette({
           role="toolbar"
           aria-label="节点面板"
         >
-          <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md">
+          <div className="pointer-events-auto flex items-center gap-8">
             <PalettePill
               items={CANVAS_PALETTE}
               collapsed={false}
-              bare
+              trailing={canvasTrailing}
               onDragStart={onDragStart}
               onAdd={onAdd}
             />
-            <PaletteDivider />
             <PalettePill
-              label="漫剧"
               items={STORY_PALETTE}
               collapsed={false}
-              bare
               onDragStart={onDragStart}
               onAdd={onAdd}
             />
-            {canvasTrailing}
           </div>
         </div>
       )}
@@ -510,7 +506,7 @@ export function NodePalette({
               ))}
             </ul>
             <div className="border-t border-white/10 px-4 py-2 text-[11px] text-white/45">
-              提示：选中 ≥2 个节点会在选区上方浮出「分组 / 自动整理 / 删除」。漫剧节点在同行「漫剧」工具条。
+              提示：选中 ≥2 个节点会在选区上方浮出「分组 / 自动整理 / 删除」。故事 / 分镜节点在右侧工具条。
             </div>
           </div>
         </div>

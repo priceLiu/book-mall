@@ -103,4 +103,5 @@ export type StoryWorkspaceIds = {
   characterColumnId?: string;
   frameColumnId?: string;
   videoColumnId?: string;
+  jianyingExportId?: string;
 };

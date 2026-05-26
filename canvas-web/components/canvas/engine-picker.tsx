@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Cog, ExternalLink, Sparkles, X } from "lucide-react";
 
@@ -172,10 +172,10 @@ function EngineModelModal({
   const [draft, setDraft] = useState<DraftSelection | null>(() =>
     resolveInitialDraft(groups, providerId, modelKey, params),
   );
+  const userPickedRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
-    setDraft(resolveInitialDraft(groups, providerId, modelKey, params));
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -189,7 +189,13 @@ function EngineModelModal({
       window.removeEventListener("keydown", onKey, true);
       document.body.style.overflow = "";
     };
-  }, [providerId, modelKey, params, groups, onClose]);
+  }, [onClose]);
+
+  /** Provider 异步加载完成时补全初始 draft；用户已在弹层内点选后不再覆盖 */
+  useEffect(() => {
+    if (userPickedRef.current) return;
+    setDraft(resolveInitialDraft(groups, providerId, modelKey, params));
+  }, [groups, providerId, modelKey, params]);
 
   if (!mounted) return null;
 
@@ -253,6 +259,7 @@ function EngineModelModal({
                   models={models}
                   draft={draft}
                   onSelectModel={(m) => {
+                    userPickedRef.current = true;
                     const same =
                       draft?.provider.id === provider.id &&
                       draft?.model.modelKey === m.modelKey;
@@ -422,7 +429,11 @@ function ModelCard({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       className={[
         "group relative flex h-full flex-col gap-1.5 rounded-xl border px-3 py-2.5 text-left transition",
         selected

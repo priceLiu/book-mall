@@ -65,17 +65,23 @@ function resolveStoryRowRefUrls(row: StoryRow, promptField = "prompt"): string[]
   return [];
 }
 
-/** 分镜视频：分镜图 + @ 角色参考图（分镜图始终在前，供 image-to-video） */
-function collectStoryVideoImageInputs(row: StoryRow): string[] {
-  const urls: string[] = [];
-  const add = (raw: unknown) => {
-    const u = String(raw ?? "").trim();
-    if (!/^https?:\/\//.test(u)) return;
-    if (!urls.includes(u)) urls.push(u);
+/** 分镜视频：分镜图为主图；@ 三视图仅作参考（不替代主图） */
+function collectStoryVideoImageInputs(row: StoryRow): {
+  frameImageUrl: string;
+  referenceImageUrls: string[];
+} {
+  const frameImageUrl = String(row.frameImageUrl ?? "").trim();
+  const refUrls = resolveStoryRowRefUrls(row, "videoPrompt");
+  const referenceImageUrls: string[] = [];
+  for (const u of refUrls) {
+    if (!/^https?:\/\//.test(u)) continue;
+    if (u === frameImageUrl) continue;
+    if (!referenceImageUrls.includes(u)) referenceImageUrls.push(u);
+  }
+  return {
+    frameImageUrl,
+    referenceImageUrls: referenceImageUrls.slice(0, 7),
   };
-  add(row.frameImageUrl);
-  for (const u of resolveStoryRowRefUrls(row, "videoPrompt")) add(u);
-  return urls.slice(0, 8);
 }
 
 function pickRow(rows: StoryRow[], rowKey: string): StoryRow {
@@ -204,14 +210,15 @@ export async function runStoryVideoColumnVideoRow(
   const modelKey = String(batch.modelKey ?? "");
   const params = (batch.params as Record<string, unknown>) ?? {};
   const refUrls = resolveStoryRowRefUrls(row, "videoPrompt");
-  const imageInputs = collectStoryVideoImageInputs(row);
+  const { frameImageUrl, referenceImageUrls } = collectStoryVideoImageInputs(row);
+  if (!/^https?:\/\//.test(frameImageUrl)) {
+    throw new Error("分镜视频需要已生成的分镜图（主图），请先生成分镜图");
+  }
   const promptBase = String(row.videoPrompt ?? "").trim() || "分镜视频";
   const prompt =
-    imageInputs.length && refUrls.length
-      ? `${promptBase}\n\n（以分镜图为主参考，保持构图与角色一致；@ 角色参考图辅助人设）`
-      : imageInputs.length
-        ? `${promptBase}\n\n（以分镜图为主参考生成视频，保持构图与角色一致）`
-        : promptBase;
+    referenceImageUrls.length && refUrls.length
+      ? `${promptBase}\n\n（以分镜图为主参考，保持构图与角色一致；@ 角色三视图仅辅助人设）`
+      : `${promptBase}\n\n（以分镜图为主参考生成视频，保持构图与角色一致）`;
   const salt = hashSalt({ rowKey: args.rowKey, mediaKind: "video" });
 
   return runVideoEngineNode({
@@ -229,8 +236,10 @@ export async function runStoryVideoColumnVideoRow(
         params,
         prompt: `${prompt}\n\n<!-- ${salt} -->`,
         frameIndex: row.frameIndex,
+        mainFrameImageUrl: frameImageUrl,
+        referenceImageUrls,
       },
-      imageInputs,
+      imageInputs: [frameImageUrl, ...referenceImageUrls],
       textInputs: [],
     },
   });

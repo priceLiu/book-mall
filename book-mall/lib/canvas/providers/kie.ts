@@ -386,6 +386,30 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
     defaultParams: { aspect_ratio: "1:1", output_format: "png" },
   },
   {
+    modelKey: "kling-2.6/image-to-video",
+    displayName: "Kling 2.6 i2v (KIE)",
+    role: "VIDEO",
+    description: "快手可灵 · 图生视频。",
+    paramsSchema: [
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 5,
+        max: 10,
+        step: 5,
+        defaultValue: 5,
+      },
+      {
+        key: "generateAudio",
+        label: "生成配音",
+        type: "boolean",
+        defaultValue: false,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { duration: 5, generateAudio: false },
+  },
+  {
     modelKey: "bytedance/seedance-2",
     displayName: "Seedance 2 (KIE · 图生视频)",
     role: "VIDEO",

@@ -9,7 +9,7 @@ export const STORY_THEME_SYSTEM_PROMPT_THEME_PLACEHOLDER =
   "赛博朋克城市里，外卖员发现 AI 有了自我意识";
 
 /** 故事主题 · 系统提示词模板（用户可切换，内容仍可编辑） */
-export const STORY_THEME_SYSTEM_PROMPT_TEMPLATE_1 = `你是一名资深漫剧编剧与分镜师，擅长创作赛博朋克题材的短篇漫画剧本。请根据以下主题，生成一份完整的漫剧制作包。
+export const STORY_THEME_SYSTEM_PROMPT_TEMPLATE_1 = `你是一名资深编剧与分镜师，擅长创作赛博朋克题材的短篇剧本。请根据以下主题，生成一份完整的制作包。
 
 【主题】
 ${STORY_THEME_SYSTEM_PROMPT_THEME_PLACEHOLDER}
@@ -44,7 +44,7 @@ ${STORY_THEME_SYSTEM_PROMPT_THEME_PLACEHOLDER}
 - 每段分镜需体现节奏变化（紧张/安静/爆发）`;
 
 export const STORY_THEME_SYSTEM_PROMPT_TEMPLATE_2 = `主题：${STORY_THEME_SYSTEM_PROMPT_THEME_PLACEHOLDER}
-请输出一份完整的漫剧制作包，包含：
+请输出一份完整的制作包，包含：
 
 1. 故事大纲（400-600字，起承转合四段）
 2. 角色设定卡（2-4人，每人：名字/外貌/性格/主题关联）
@@ -185,6 +185,7 @@ export const STORY_LLM_MODEL_KEYS = [
 ] as const;
 
 export const STORY_VIDEO_MODEL_KEYS = [
+  "kling-2.6/image-to-video",
   "bytedance/seedance-2",
   "wan/2-7-image-to-video",
   "happyhorse/image-to-video",

@@ -9,7 +9,8 @@ import { STORY_HUB_SECTION_ORDER } from "@/lib/canvas/spawn-story-workspace";
 import {
   hubDialoguePreviewMd,
   hubSectionPreviewContent,
-  outlineDisplayMd,
+  resolveHubSectionMd,
+  resolveHubStoryboardMd,
   type HubPreviewSection,
 } from "@/lib/canvas/story-hub-runtime";
 import type { StoryLlmSection, StoryScriptHubNodeData } from "@/lib/canvas/story-workspace-types";
@@ -22,6 +23,7 @@ import {
   parseOutlineBriefCharacters,
   parseStoryboardRows,
   patchStoryboardDialogue,
+  compactGfmTables,
 } from "@/lib/canvas/parse-md-tables";
 import { MarkdownView } from "./markdown-view";
 import {
@@ -100,10 +102,7 @@ export function StoryScriptHubModal({
   }, [section, data.outlineHistory, data.characterHistory, data.storyboardHistory]);
 
   const persistedMd = useMemo(() => {
-    if (section === "outline") return outlineDisplayMd(data.outlineMd ?? "");
-    if (section === "character") return data.characterMd ?? "";
-    if (section === "storyboard") return data.storyboardMd ?? "";
-    return data.storyboardMd ?? "";
+    return resolveHubSectionMd(data, section);
   }, [
     section,
     data.outlineMd,
@@ -111,9 +110,14 @@ export function StoryScriptHubModal({
     data.storyboardMd,
   ]);
 
+  const resolvedStoryboardMd = useMemo(
+    () => resolveHubStoryboardMd(data),
+    [data.outlineMd, data.storyboardMd],
+  );
+
   const dialogueLines = useMemo(
-    () => parseStoryboardRows(data.storyboardMd ?? ""),
-    [data.storyboardMd],
+    () => parseStoryboardRows(resolvedStoryboardMd),
+    [resolvedStoryboardMd],
   );
 
   const dirty = section === "dialogue" ? false : draft !== persistedMd;
@@ -123,7 +127,7 @@ export function StoryScriptHubModal({
       ? section
       : null;
   const sectionHasContent = llmSection
-    ? Boolean(persistedMd.trim())
+    ? Boolean((data[`${llmSection}Md` as keyof StoryScriptHubNodeData] as string | undefined)?.trim())
     : false;
   const runDisabled =
     !llmSection ||
@@ -166,7 +170,7 @@ export function StoryScriptHubModal({
   useEffect(() => {
     if (!open) return;
     if (section === "dialogue") {
-      setDraft(data.storyboardMd ?? "");
+      setDraft(resolvedStoryboardMd);
       return;
     }
     setDraft(persistedMd);
@@ -176,7 +180,7 @@ export function StoryScriptHubModal({
     if (section === "storyboard") {
       setStoryboardRawMd(!canEditStoryboardAsTable(persistedMd));
     }
-  }, [open, section, persistedMd, data.storyboardMd]);
+  }, [open, section, persistedMd, resolvedStoryboardMd]);
 
   const characterTableMode =
     section === "character" && !characterRawMd && canEditCharacterAsTable(draft || persistedMd);
@@ -206,12 +210,13 @@ export function StoryScriptHubModal({
     window.setTimeout(() => setSavedHint(false), 2000);
   };
 
-  const previewMd =
+  const previewMd = compactGfmTables(
     section === "dialogue"
-      ? hubDialoguePreviewMd(data.storyboardMd ?? "")
+      ? hubDialoguePreviewMd(resolvedStoryboardMd)
       : draft.trim() || persistedMd.trim()
         ? draft
-        : hubSectionPreviewContent(data, section);
+        : hubSectionPreviewContent(data, section),
+  );
 
   const editRows = useMemo(() => {
     if (section === "dialogue") return 32;
@@ -344,7 +349,7 @@ export function StoryScriptHubModal({
         className={`${RF_NODE_SCROLL} nodrag min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-8`}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto grid w-full max-w-[min(96vw,1400px)] grid-cols-2 items-stretch overflow-hidden rounded-sm bg-white shadow-2xl">
+        <div className="mx-auto grid w-full max-w-[min(96vw,1400px)] grid-cols-2 items-stretch rounded-sm bg-white shadow-2xl">
           <div className="flex min-h-full flex-col border-r border-neutral-200">
             <div className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-100 px-4 py-2.5">
               <p className="text-xs font-medium text-neutral-600">
@@ -387,7 +392,7 @@ export function StoryScriptHubModal({
                           value={line.dialogue}
                           onChange={(e) => {
                             const next = patchStoryboardDialogue(
-                              data.storyboardMd ?? "",
+                              resolvedStoryboardMd,
                               line.frameIndex,
                               e.target.value,
                             );

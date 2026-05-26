@@ -89,5 +89,7 @@ export function storyRefUrlsForPrompt(
 }
 
 export const STORY_ROW_LABEL_COL_WIDTH = 56;
-export const STORY_UPSTREAM_COL_WIDTH = 120;
-export const STORY_MEDIA_COL_WIDTH = 148;
+/** 分镜列 · 上游参考图列宽 */
+export const STORY_UPSTREAM_COL_WIDTH = 220;
+/** 角色/分镜列 · 输出图列宽 */
+export const STORY_MEDIA_COL_WIDTH = 248;

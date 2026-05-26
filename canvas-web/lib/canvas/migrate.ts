@@ -23,6 +23,7 @@ import {
 } from "./types";
 import { normalizeCanvasNodes } from "./normalize-graph-nodes";
 import { migrateStoryComicStarterNode } from "./story-starter-migrate";
+import { STORY_CONTROL_NODE_HEIGHT, STORY_CONTROL_NODE_WIDTH } from "./story-node-chrome";
 
 // 这个文件需要识别 v1 的节点字符串字面量，但 v6 阶段后 CanvasNodeType 已经
 // 不再包含它们。所以这里把 type 弱化成 string，避免 TS 报"无 overlap"。
@@ -117,6 +118,17 @@ function backfillNodeSize(n: LooseNode): LooseNode {
   if (cur.height === undefined || cur.height === null) {
     next.height = def.height;
     changed = true;
+  }
+  if (t === "story-comic-starter" || t === "story-script-hub") {
+    const targetH = STORY_CONTROL_NODE_HEIGHT;
+    const targetW = STORY_CONTROL_NODE_WIDTH;
+    const w = Number(next.width ?? cur.width) || def.width;
+    const h = Number(next.height ?? cur.height) || def.height;
+    if (w < targetW * 0.75 || h < targetH * 0.85 || h > targetH * 1.08 || w > targetW * 1.08) {
+      next.width = targetW;
+      next.height = targetH;
+      changed = true;
+    }
   }
   if (!changed) return n;
   return { ...n, style: next };

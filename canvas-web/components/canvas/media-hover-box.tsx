@@ -10,6 +10,7 @@ import {
   type MediaCompareContext,
 } from "./compare-utils";
 import { CompareSplitView, CompareToolbar, useCompareSides } from "./compare-view";
+import { CanvasVideoPlayer } from "./canvas-video-player";
 
 /** 根据 URL 猜测是否为视频 */
 export function isVideoMediaUrl(url: string): boolean {
@@ -268,8 +269,12 @@ export function MediaPreviewLightbox({
       role="dialog"
       aria-modal="true"
       aria-label={view === "compare" ? "图片对比" : "媒体预览"}
+      onClick={onClose}
     >
-      <header className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 sm:px-4">
+      <header
+        className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2 sm:px-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         {showCompare ? (
           <div className="flex shrink-0 rounded-full border border-white/10 bg-white/5 p-0.5">
             <button
@@ -319,54 +324,56 @@ export function MediaPreviewLightbox({
         </button>
       </header>
 
-      <div
-        className="flex min-h-0 flex-1 flex-col p-2 sm:p-3"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        {view === "compare" && showCompare ? (
-          <CompareSplitView
-            options={options}
-            leftId={leftId}
-            rightId={rightId}
-          />
-        ) : splitPrompt ? (
-          <div className="flex min-h-0 flex-1 gap-3">
-            <div className="flex w-[30%] min-w-0 shrink-0 flex-col border-r border-white/10 pr-3">
-              <p className="mb-2 shrink-0 text-[11px] uppercase tracking-wider text-white/50">
-                Prompt
-              </p>
-              <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-relaxed text-white/90">
-                {prompt}
+      <div className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-3">
+        <div
+          className="flex max-h-full max-w-full min-h-0 flex-1 flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {view === "compare" && showCompare ? (
+            <CompareSplitView
+              options={options}
+              leftId={leftId}
+              rightId={rightId}
+            />
+          ) : splitPrompt ? (
+            <div className="flex min-h-0 flex-1 gap-3">
+              <div className="flex w-[30%] min-w-0 shrink-0 flex-col border-r border-white/10 pr-3">
+                <p className="mb-2 shrink-0 text-[11px] uppercase tracking-wider text-white/50">
+                  Prompt
+                </p>
+                <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap font-mono text-sm leading-relaxed text-white/90">
+                  {prompt}
+                </div>
+              </div>
+              <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={src}
+                  alt={alt}
+                  className="max-h-full max-w-full object-contain"
+                />
               </div>
             </div>
-            <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={src}
-                alt={alt}
-                className="max-h-full max-w-full object-contain"
-              />
+          ) : (
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              {kind === "video" ? (
+                <CanvasVideoPlayer
+                  src={src}
+                  autoPlay
+                  persistentControls
+                  className="max-h-[calc(100dvh-72px)] w-[min(98vw,960px)]"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={src}
+                  alt={alt}
+                  className="max-h-[calc(100dvh-56px)] max-w-[98vw] object-contain"
+                />
+              )}
             </div>
-          </div>
-        ) : (
-          <div className="flex min-h-0 flex-1 items-center justify-center">
-            {kind === "video" ? (
-              <video
-                src={src}
-                controls
-                autoPlay
-                className="max-h-[calc(100dvh-56px)] max-w-[98vw] object-contain"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={src}
-                alt={alt}
-                className="max-h-[calc(100dvh-56px)] max-w-[98vw] object-contain"
-              />
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>,
     document.body,

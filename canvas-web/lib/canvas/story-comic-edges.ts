@@ -166,5 +166,24 @@ export function repairStoryPreviewEdges(
     }
   }
 
+  const videoCol = nodes.find((n) => n.type === "story-video-column");
+  const frameCol = nodes.find((n) => n.type === "story-frame-column");
+  if (exportNode && videoCol && !hasEdge(next, videoCol.id, exportNode.id)) {
+    next = upsertEdge(next, {
+      source: videoCol.id,
+      target: exportNode.id,
+      sourceHandle: "text",
+      targetHandle: "in_storyboard",
+    });
+  }
+  if (exportNode && frameCol && !hasEdge(next, frameCol.id, exportNode.id)) {
+    next = upsertEdge(next, {
+      source: frameCol.id,
+      target: exportNode.id,
+      sourceHandle: "text",
+      targetHandle: "in_storyboard",
+    });
+  }
+
   return next;
 }

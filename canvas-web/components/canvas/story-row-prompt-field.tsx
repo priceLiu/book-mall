@@ -11,11 +11,12 @@ import {
 } from "@/lib/canvas/story-ref-image";
 import type { MentionableItem } from "./mentions/MentionsTextarea";
 import { MentionsTextarea } from "./mentions/MentionsTextarea";
+import { STORY_HINT_BODY_CLASS } from "@/lib/canvas/story-column-sync";
 import { StoryColumnMediaPanel } from "./story-column-media-panel";
 
 const SAVE_DEBOUNCE_MS = 600;
 /** 与 story-column-layout MEDIA_COL_MIN 对齐 */
-const ROW_MEDIA_MIN_H = 148;
+const ROW_MEDIA_MIN_H = 248;
 
 function idsEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -168,6 +169,9 @@ export function StoryColumnRowCard({
   onGenerateVideo,
   onPreview,
   promptHint,
+  mediaError,
+  videoPrompt,
+  videoRefLabels,
 }: {
   rowTitle: string;
   promptValue: string;
@@ -191,6 +195,11 @@ export function StoryColumnRowCard({
   onGenerate: () => void;
   onGenerateVideo?: () => void;
   onPreview?: () => void;
+  /** 分镜视频生成失败时的行内提示 */
+  mediaError?: string;
+  /** 分镜列 hover 分镜图：展示将传给视频模型的完整提示词 */
+  videoPrompt?: string;
+  videoRefLabels?: string[];
 }) {
   const [mainDraft, setMainDraft] = useState(promptValue);
   const [mainReferencedIds, setMainReferencedIds] = useState<string[]>([]);
@@ -284,9 +293,7 @@ export function StoryColumnRowCard({
             />
           )}
           {promptHint ? (
-            <p className="text-[10px] leading-relaxed text-[#60a5fa]">
-              {promptHint}
-            </p>
+            <p className={STORY_HINT_BODY_CLASS}>{promptHint}</p>
           ) : null}
           {extraPrompts?.map((extra, i) => (
             <div key={extra.subLabel} className="space-y-0.5">
@@ -324,6 +331,9 @@ export function StoryColumnRowCard({
           onGenerate={onGenerate}
           onGenerateVideo={onGenerateVideo}
           onPreview={onPreview}
+          errorMessage={mediaError}
+          videoPrompt={videoPrompt}
+          videoRefLabels={videoRefLabels}
         />
       </div>
     </div>

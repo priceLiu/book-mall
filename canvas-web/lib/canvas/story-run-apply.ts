@@ -19,6 +19,7 @@ import type {
   StoryScriptHubNodeData,
 } from "./story-workspace-types";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
+import { formatCanvasTaskError } from "./friendly-task-error";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 
 function hubSectionPatchChanged(
@@ -117,7 +118,10 @@ export function storyApplyTaskResult(
             status: "error",
             taskId: task.id,
             failCode: task.failCode ?? "FAILED",
-            failMessage: task.failMessage ?? undefined,
+            failMessage: formatCanvasTaskError(
+              task.failCode,
+              task.failMessage,
+            ),
           }
         : task.status === "SUBMITTED"
           ? { status: "running", taskId: task.id }
@@ -279,7 +283,8 @@ export function storyApplyTaskResult(
   }
 
   if (node.type === "story-video-column" && ctx?.rowKey && ctx.mediaKind) {
-    const rows = (node.data as { rows: { key: string }[] }).rows ?? [];
+    const latest = allNodes.find((n) => n.id === node.id) ?? node;
+    const rows = (latest.data as { rows: { key: string }[] }).rows ?? [];
     updateNodeData(node.id, {
       rows: applyVideoRowRuntime(
         rows as never,

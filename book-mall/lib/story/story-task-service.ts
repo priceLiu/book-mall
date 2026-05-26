@@ -134,6 +134,7 @@ function buildFrameImageKieInput(args: {
  * 按所选视频模型构造 KIE 入参。
  *
  * 不同模型字段不同（皆图生视频）：
+ *  - kling-2.6/image-to-video    image_urls + sound + duration(5|10)
  *  - bytedance/seedance-2       reference_image_urls(数组) + aspect_ratio
  *  - wan/2-7-image-to-video      first_frame_url(单张) + prompt_extend / watermark
  *                                （画幅由首帧图自动决定，KIE 文档未提供 ratio 字段）
@@ -174,6 +175,23 @@ function buildFrameVideoKieInput(args: {
         image_urls: args.frame.imageUrl ? [args.frame.imageUrl] : [],
         resolution,
         duration,
+      },
+    };
+  }
+
+  if (args.modelId === "kling-2.6/image-to-video") {
+    const rawDur = Number(args.options.duration ?? desc.defaults.duration);
+    const dur = Number.isFinite(rawDur) && rawDur >= 10 ? "10" : "5";
+    return {
+      model: "kling-2.6/image-to-video",
+      input: {
+        prompt: args.frame.videoPrompt,
+        image_urls: args.frame.imageUrl ? [args.frame.imageUrl] : [],
+        sound:
+          args.options.generateAudio ??
+          desc.defaults.generateAudio ??
+          false,
+        duration: dur,
       },
     };
   }

@@ -1,9 +1,9 @@
 "use client";
 
 import { Handle, NodeResizer, Position } from "@xyflow/react";
-import { AlertTriangle, Check, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, GripVertical, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { RF_NODE_DRAG_HANDLE, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { STORY_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-node-chrome";
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 
@@ -97,7 +97,7 @@ export function NodeShell({
 
       <header
         className={cn(
-          "shrink-0 flex items-center justify-between rounded-t-xl border-b px-3 py-2",
+          "shrink-0 flex items-center justify-between gap-2 rounded-t-xl border-b px-2 py-2",
           engine ? "" : "border-white/10 bg-white/[0.04]",
         )}
         style={
@@ -109,19 +109,28 @@ export function NodeShell({
             : undefined
         }
       >
-        <div className="min-w-0">
-          <p
-            className={cn(
-              "truncate text-[11px] font-medium uppercase tracking-wider",
-              engine ? "" : "text-[var(--canvas-muted)]",
-            )}
-            style={engine ? { color: ENGINE_ACCENT } : undefined}
-          >
-            {title}
-          </p>
-          {subtitle ? (
-            <p className="truncate text-[11px] text-white/80">{subtitle}</p>
-          ) : null}
+        <div
+          className={cn(
+            RF_NODE_DRAG_HANDLE,
+            "flex min-w-0 flex-1 cursor-grab items-center gap-1.5 active:cursor-grabbing",
+          )}
+          title="拖动标题栏移动节点"
+        >
+          <GripVertical className="size-3.5 shrink-0 text-white/35" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p
+              className={cn(
+                "truncate text-[11px] font-medium uppercase tracking-wider",
+                engine ? "" : "text-[var(--canvas-muted)]",
+              )}
+              style={engine ? { color: ENGINE_ACCENT } : undefined}
+            >
+              {title}
+            </p>
+            {subtitle ? (
+              <p className="truncate text-[11px] text-white/80">{subtitle}</p>
+            ) : null}
+          </div>
         </div>
         {headerRight ?? (
           <NodeStatusBadge status={status} message={runtime?.failMessage ?? null} />

@@ -24,6 +24,7 @@ import {
 import { stripRuntimeForTemplate } from "@/lib/canvas/sanitize";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
+import { flowPositionAtViewportCenter } from "@/lib/canvas/viewport-placement";
 import { topoSort } from "@/lib/canvas/topo";
 import type {
   CanvasContentNodeType,
@@ -226,25 +227,26 @@ function Inner({ projectId }: { projectId: string }) {
 
   const onAddViaPalette = useCallback(
     (type: CanvasContentNodeType, presetId?: string) => {
-      const center = { x: 240 + Math.random() * 60, y: 160 + Math.random() * 60 };
       const initialData =
         type === "text" && presetId
           ? buildTextNodeDataFromPreset(presetId)
           : type === "image-engine" && presetId
             ? buildImageEngineDataFromPreset(presetId)
             : undefined;
-      addNode(type, center, initialData);
+      const position = flowPositionAtViewportCenter(type, initialData);
+      addNode(type, position, initialData);
     },
     [addNode],
   );
 
   const onInsertCharacter = useCallback(
     (character: CanvasCharacterRecord) => {
-      const center = { x: 240 + Math.random() * 80, y: 160 + Math.random() * 80 };
-      addNode("image", center, {
+      const data = {
         ossUrl: character.imageUrl,
         label: character.name,
-      });
+      };
+      const position = flowPositionAtViewportCenter("image", data);
+      addNode("image", position, data);
     },
     [addNode],
   );
@@ -300,7 +302,7 @@ function Inner({ projectId }: { projectId: string }) {
   }, [dialogs, hydrate, manualSave, projectId, reflowStoryComicLayout]);
 
   const runAll = useCallback(() => {
-    const workspaceJobs = collectStoryWorkspaceRunJobs(nodes);
+    const workspaceJobs = collectStoryWorkspaceRunJobs(nodes, edges);
     if (workspaceJobs.length) {
       busEnqueueStoryRunsSequential(workspaceJobs);
       return;

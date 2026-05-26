@@ -2,7 +2,8 @@
 
 在 **canvas-web** 画布内分步完成漫剧生产；与 story-web **数据不互通**。
 
-> **操作手册**：[story-ops.md](./story-ops.md)
+> **操作手册**：[story-ops.md](./story-ops.md)  
+> **设计规范（尺寸 / 按钮 / 弹层 / 文案 / 对比）**：[design.md](./design.md)
 
 ## 四节点架构
 

@@ -12,6 +12,8 @@ export function buildCanvasVideoKieInput(args: {
   modelKey: string;
   prompt: string;
   imageUrl: string | null;
+  /** Seedance 等多图模型：三视图等附加参考（分镜图已在 imageUrl） */
+  referenceImageUrls?: string[];
   options?: StoryVideoOptions;
   aspectRatio?: "16:9" | "9:16";
 }): { model: string; input: Record<string, unknown> } {
@@ -24,13 +26,21 @@ export function buildCanvasVideoKieInput(args: {
   const resolution = args.options?.resolution ?? desc.defaults.resolution;
   const duration = args.options?.duration ?? desc.defaults.duration;
   const aspect = args.aspectRatio ?? "16:9";
+  const mainUrl = args.imageUrl?.trim() || null;
+  const extraRefs = (args.referenceImageUrls ?? [])
+    .map((u) => u.trim())
+    .filter((u) => /^https?:\/\//.test(u) && u !== mainUrl);
 
   if (modelId === "bytedance/seedance-2") {
+    const reference_image_urls = [
+      ...(mainUrl ? [mainUrl] : []),
+      ...extraRefs,
+    ].slice(0, 8);
     return {
       model: "bytedance/seedance-2",
       input: {
         prompt: args.prompt,
-        reference_image_urls: args.imageUrl ? [args.imageUrl] : [],
+        reference_image_urls,
         aspect_ratio: aspect,
         resolution,
         duration,
@@ -48,6 +58,21 @@ export function buildCanvasVideoKieInput(args: {
         image_urls: args.imageUrl ? [args.imageUrl] : [],
         resolution,
         duration,
+      },
+    };
+  }
+
+  if (modelId === "kling-2.6/image-to-video") {
+    const rawDur = Number(args.options?.duration ?? desc.defaults.duration);
+    const dur = Number.isFinite(rawDur) && rawDur >= 10 ? "10" : "5";
+    return {
+      model: "kling-2.6/image-to-video",
+      input: {
+        prompt: args.prompt,
+        image_urls: args.imageUrl ? [args.imageUrl] : [],
+        sound:
+          args.options?.generateAudio ?? desc.defaults.generateAudio ?? false,
+        duration: dur,
       },
     };
   }

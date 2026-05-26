@@ -1,6 +1,6 @@
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { THREE_VIEW_ENGINE_MODEL_KEYS } from "./builtin-prompt-templates";
-import { STORY_LLM_MODEL_KEYS } from "./types";
+import { STORY_LLM_MODEL_KEYS, STORY_VIDEO_MODEL_KEYS } from "./types";
 
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
 export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
@@ -100,6 +100,52 @@ export function pickDefaultStoryImageEngine(
         m.role === "IMAGE" &&
         m.enabled &&
         STORY_IMAGE_ALLOWED.has(m.modelKey)
+      ) {
+        return { providerId: provider.id, modelKey: m.modelKey };
+      }
+    }
+  }
+
+  return null;
+}
+
+const STORY_VIDEO_ALLOWED = new Set<string>(STORY_VIDEO_MODEL_KEYS);
+
+function findVideoOnProvider(
+  provider: CanvasProviderDto,
+  modelKey: string,
+): { providerId: string; modelKey: string } | null {
+  const m = provider.models.find(
+    (x) =>
+      x.role === "VIDEO" &&
+      x.enabled &&
+      x.modelKey === modelKey &&
+      STORY_VIDEO_ALLOWED.has(x.modelKey),
+  );
+  if (!m) return null;
+  return { providerId: provider.id, modelKey: m.modelKey };
+}
+
+/** 漫剧分镜视频 · 默认 VIDEO 模型（KIE seedance / wan 等） */
+export function pickDefaultStoryVideoEngine(
+  providers: CanvasProviderDto[],
+): { providerId: string; modelKey: string } | null {
+  const active = providers.filter((p) => p.active);
+
+  const kie = active.find((p) => p.id === SYSTEM_KIE_PROVIDER_ID);
+  if (kie) {
+    for (const key of STORY_VIDEO_MODEL_KEYS) {
+      const hit = findVideoOnProvider(kie, key);
+      if (hit) return hit;
+    }
+  }
+
+  for (const provider of active) {
+    for (const m of provider.models) {
+      if (
+        m.role === "VIDEO" &&
+        m.enabled &&
+        STORY_VIDEO_ALLOWED.has(m.modelKey)
       ) {
         return { providerId: provider.id, modelKey: m.modelKey };
       }

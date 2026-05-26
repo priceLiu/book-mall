@@ -1,5 +1,9 @@
 import type { CanvasFlowNode } from "./types";
-import type { StoryFrameColumnNodeData, StoryVideoColumnNodeData } from "./story-workspace-types";
+import type {
+  StoryFrameColumnNodeData,
+  StoryVideoColumnNodeData,
+  StoryWorkspaceIds,
+} from "./story-workspace-types";
 
 export type JianyingFrameExport = {
   frameIndex: number;
@@ -10,9 +14,14 @@ export type JianyingFrameExport = {
 
 export function collectJianyingFramesFromWorkspace(
   nodes: CanvasFlowNode[],
+  ws: Pick<StoryWorkspaceIds, "frameColumnId" | "videoColumnId">,
 ): JianyingFrameExport[] {
-  const frameCol = nodes.find((n) => n.type === "story-frame-column");
-  const videoCol = nodes.find((n) => n.type === "story-video-column");
+  const frameCol = ws.frameColumnId
+    ? nodes.find((n) => n.id === ws.frameColumnId)
+    : undefined;
+  const videoCol = ws.videoColumnId
+    ? nodes.find((n) => n.id === ws.videoColumnId)
+    : undefined;
   if (!frameCol && !videoCol) return [];
 
   const frameRows = (frameCol?.data as StoryFrameColumnNodeData)?.rows ?? [];

@@ -2,21 +2,33 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { GitBranch, Play, RefreshCw } from "lucide-react";
+import { GitBranch } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
 import { runStoryHubSection } from "@/lib/canvas/batch-run-nodes";
 import {
   spawnStoryMediaColumns,
   STORY_HUB_SECTION_ORDER,
+  findStarterForScriptHub,
+  findStoryWorkspaceForStarter,
+  findWorkspaceForScriptHub,
+  scriptHubHasOutputWorkflow,
+  workspaceMediaColumnsLive,
 } from "@/lib/canvas/spawn-story-workspace";
 import {
+  applyDefaultStoryColumnEngines,
+} from "@/lib/canvas/story-workspace-output";
+import {
   hubAggregateStatus,
+  hubCanOutputWorkflow,
+  hubDataForColumnSync,
   hubDialogueIsReady,
   hubSectionIsReady,
   hubSectionIsRunning,
   hubSectionPreviewContent,
   hubSectionRuntime,
+  promoteEmbeddedPackFromOutline,
+  resolveHubStoryboardMd,
   type HubPreviewSection,
 } from "@/lib/canvas/story-hub-runtime";
 import { normalizeOutlineSection } from "@/lib/canvas/parse-md-tables";
@@ -25,7 +37,6 @@ import { pushStoryRevision } from "@/lib/canvas/story-revision";
 import type {
   StoryLlmSection,
   StoryScriptHubNodeData,
-  StoryWorkspaceIds,
 } from "@/lib/canvas/story-workspace-types";
 import { NodeShell, ENGINE_ACCENT, NodeStatusBadge } from "../node-shell";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
@@ -33,8 +44,13 @@ import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
 import { StoryHubNodePreviewPane } from "../story-hub-node-preview-pane";
 import { StoryPreviewMagnifyButton } from "../story-preview-magnify-button";
 import { StoryScriptHubModal } from "../story-script-hub-modal";
-import { STORY_NODE_ACTION_BTN_CLASS } from "@/lib/canvas/story-node-chrome";
+import {
+  STORY_CONTROL_NODE_HEIGHT,
+  STORY_CONTROL_NODE_WIDTH,
+  STORY_NODE_ACTION_BTN_CLASS,
+} from "@/lib/canvas/story-node-chrome";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
+import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
 
 const SECTION_LABEL: Record<StoryLlmSection, string> = {
   outline: "大纲",
@@ -58,9 +74,11 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
   const hubFromStore = useCanvasStore((s) => selectHubData(s.nodes, id));
   const d = { ...(data as StoryScriptHubNodeData), ...hubFromStore };
   const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const resizeNode = useCanvasStore((s) => s.resizeNode);
   const reflowStoryComicLayout = useCanvasStore(
     (s) => s.reflowStoryComicLayout,
   );
@@ -108,6 +126,7 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
   );
 
   const aggregateStatus = hubAggregateStatus(hubNode);
+  const canOutputWorkflow = hubCanOutputWorkflow(hubNode);
   const anyRunning = aggregateStatus === "running";
 
   const sectionChips = useMemo(() => {
@@ -123,7 +142,7 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         err,
       };
     });
-    const dialogueReady = hubDialogueIsReady(d.storyboardMd ?? "");
+    const dialogueReady = hubDialogueIsReady(resolveHubStoryboardMd(d));
     return [
       ...llm,
       {
@@ -164,27 +183,51 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
     return `暂无${labels[activeSection]} · 创作剧本后悬停白纸区，点击打开审阅`;
   }, [activeSection]);
 
-  const hasMediaColumns = useMemo(() => {
-    const starter = nodes.find((n) => n.type === "story-comic-starter");
-    const ws = (starter?.data as { workspaceIds?: StoryWorkspaceIds })
-      ?.workspaceIds;
-    return Boolean(
-      ws?.characterColumnId && ws.frameColumnId && ws.videoColumnId,
-    );
-  }, [nodes]);
+  const hasMediaColumns = useMemo(
+    () => scriptHubHasOutputWorkflow(nodes, edges, id),
+    [nodes, edges, id],
+  );
+
+  useEffect(() => {
+    const starter = findStarterForScriptHub(nodes, edges, id);
+    if (!starter) return;
+    const stored = (starter.data as { workspaceIds?: import("@/lib/canvas/story-workspace-types").StoryWorkspaceIds })
+      .workspaceIds;
+    const ws = findStoryWorkspaceForStarter(nodes, edges, starter.id, stored);
+    if (!ws) return;
+    const patch: Record<string, unknown> = {};
+    if (JSON.stringify(stored ?? {}) !== JSON.stringify(ws)) {
+      patch.workspaceIds = ws;
+    }
+    if (
+      !workspaceMediaColumnsLive(nodes, ws, id) &&
+      (starter.data as { pipelineStage?: string }).pipelineStage === "finalized"
+    ) {
+      patch.pipelineStage = "llm_done";
+    }
+    if (Object.keys(patch).length) {
+      updateNodeData(starter.id, patch);
+    }
+  }, [nodes, edges, id, updateNodeData]);
 
   const syncColumnsIfPresent = (
     patch: Partial<StoryScriptHubNodeData>,
   ) => {
-    const starter = nodes.find((n) => n.type === "story-comic-starter");
-    const ws = (starter?.data as { workspaceIds?: StoryWorkspaceIds })
-      ?.workspaceIds;
-    if (!ws?.scriptHubId || ws.scriptHubId !== id) return;
-    if (!ws.characterColumnId || !ws.frameColumnId || !ws.videoColumnId) {
+    if (!scriptHubHasOutputWorkflow(nodes, edges, id)) return;
+    const ws = findWorkspaceForScriptHub(nodes, edges, id);
+    if (!ws?.characterColumnId || !ws.frameColumnId || !ws.videoColumnId) {
       return;
     }
     const nextNodes = useCanvasStore.getState().nodes.map((n) =>
-      n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
+      n.id === id
+        ? {
+            ...n,
+            data: hubDataForColumnSync({
+              ...(n.data as StoryScriptHubNodeData),
+              ...patch,
+            }),
+          }
+        : n,
     );
     const synced = syncColumnsFromHub(
       nextNodes,
@@ -208,9 +251,14 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
 
   const patchSectionMd = (section: StoryLlmSection, value: string) => {
     if (section === "outline") {
-      const { outlineMd, characterMd } = normalizeOutlineSection(
+      const promoted = promoteEmbeddedPackFromOutline(
         value,
         d.characterMd ?? "",
+        d.storyboardMd ?? "",
+      );
+      const { outlineMd, characterMd } = normalizeOutlineSection(
+        promoted.outlineMd,
+        promoted.characterMd,
       );
       const outlineHist = pushStoryRevision(d.outlineHistory, outlineMd);
       const patch: Partial<StoryScriptHubNodeData> = {
@@ -222,6 +270,16 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         patch.characterHistory = pushStoryRevision(
           d.characterHistory,
           characterMd,
+        );
+      }
+      if (
+        promoted.storyboardMd.trim() &&
+        promoted.storyboardMd !== (d.storyboardMd ?? "")
+      ) {
+        patch.storyboardMd = promoted.storyboardMd;
+        patch.storyboardHistory = pushStoryRevision(
+          d.storyboardHistory,
+          promoted.storyboardMd,
         );
       }
       updateNodeData(id, patch);
@@ -243,10 +301,39 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
   };
 
   const onOutputWorkflow = async () => {
-    const starter = nodes.find((n) => n.type === "story-comic-starter");
+    const starter = findStarterForScriptHub(nodes, edges, id);
     if (!starter) return;
     setOutputBusy(true);
     try {
+      const hubData = useCanvasStore.getState().nodes.find((n) => n.id === id)
+        ?.data as StoryScriptHubNodeData | undefined;
+      const promoted = promoteEmbeddedPackFromOutline(
+        hubData?.outlineMd ?? d.outlineMd ?? "",
+        hubData?.characterMd ?? d.characterMd ?? "",
+        hubData?.storyboardMd ?? d.storyboardMd ?? "",
+      );
+      const hubPatch: Partial<StoryScriptHubNodeData> = {};
+      if (promoted.characterMd.trim() && promoted.characterMd !== (d.characterMd ?? "")) {
+        hubPatch.characterMd = promoted.characterMd;
+        hubPatch.characterHistory = pushStoryRevision(
+          d.characterHistory,
+          promoted.characterMd,
+        );
+      }
+      if (
+        promoted.storyboardMd.trim() &&
+        promoted.storyboardMd !== (d.storyboardMd ?? "")
+      ) {
+        hubPatch.storyboardMd = promoted.storyboardMd;
+        hubPatch.storyboardHistory = pushStoryRevision(
+          d.storyboardHistory,
+          promoted.storyboardMd,
+        );
+      }
+      if (Object.keys(hubPatch).length) {
+        updateNodeData(id, hubPatch);
+      }
+
       const state = useCanvasStore.getState();
       const ids = spawnStoryMediaColumns({
         starterNodeId: starter.id,
@@ -263,8 +350,16 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         setEdges,
         updateNodeData,
       });
+      const afterSpawn = useCanvasStore.getState().nodes;
+      const promotedHub = hubDataForColumnSync({
+        ...(afterSpawn.find((n) => n.id === id)?.data as StoryScriptHubNodeData),
+        ...hubPatch,
+      });
+      const nodesForSync = afterSpawn.map((n) =>
+        n.id === id ? { ...n, data: promotedHub } : n,
+      );
       const synced = syncColumnsFromHub(
-        useCanvasStore.getState().nodes,
+        nodesForSync,
         id,
         ids.characterColumnId!,
         ids.frameColumnId!,
@@ -275,6 +370,12 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         updateNodeData(ids.frameColumnId!, synced.framePatch);
         updateNodeData(ids.videoColumnId!, synced.videoPatch);
       }
+      applyDefaultStoryColumnEngines(
+        updateNodeData,
+        useCanvasStore.getState().nodes,
+        ids,
+        providers,
+      );
       reflowStoryComicLayout();
       updateNodeData(starter.id, { pipelineStage: "finalized" });
     } finally {
@@ -290,16 +391,20 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
     ).find(Boolean) ?? null;
 
   const canRunLlm = Boolean(d.providerId?.trim() && d.modelKey?.trim());
-  const activeLlmSection = isHubLlmSection(activeSection)
-    ? activeSection
-    : null;
-  const activeSectionRunning = activeLlmSection
-    ? hubSectionIsRunning(hubNode, activeLlmSection)
-    : false;
   const reviewSectionRunning =
     reviewOpen && isHubLlmSection(reviewSection)
       ? hubSectionIsRunning(hubNode, reviewSection)
       : false;
+
+  useEffect(() => {
+    const targetH = STORY_CONTROL_NODE_HEIGHT;
+    const targetW = STORY_CONTROL_NODE_WIDTH;
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    if (!node) return;
+    const { w, h } = nodeMeasuredSize(node);
+    if (Math.abs(h - targetH) < 4 && Math.abs(w - targetW) < 4) return;
+    resizeNode(id, { width: targetW, height: targetH });
+  }, [id, resizeNode]);
 
   const runHubSection = (section: StoryLlmSection) => {
     if (!canRunLlm || hubSectionIsRunning(hubNode, section)) return;
@@ -316,15 +421,17 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
             ? "工作流已输出"
             : aggregateStatus === "done"
               ? "剧本就绪 · 可输出工作流"
-              : anyRunning
-                ? "文案生成中…"
-                : "大纲 · 角色 · 分镜 · 对白"
+              : canOutputWorkflow
+                ? "大纲就绪 · 可输出工作流"
+                : anyRunning
+                  ? "文案生成中…"
+                  : "大纲 · 角色 · 分镜 · 对白"
         }
         selected={selected}
         engine
         accent={ENGINE_ACCENT}
-        minWidth={400}
-        minHeight={360}
+        minWidth={STORY_CONTROL_NODE_WIDTH}
+        minHeight={STORY_CONTROL_NODE_HEIGHT}
         inputs={[{ id: "in_text", label: "创意", kind: "text" }]}
         outputs={[{ id: "text", label: "文案", kind: "text" }]}
         headerRight={
@@ -338,60 +445,34 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         }
         footer={
           <StoryNodeFooterShell>
-            <div className="flex flex-wrap gap-2">
-              {activeLlmSection ? (
-                <button
-                  type="button"
-                  disabled={!canRunLlm || activeSectionRunning}
-                  className={STORY_NODE_ACTION_BTN_CLASS}
-                  title={!canRunLlm ? "请配置 LLM 模型" : undefined}
-                  onClick={() => runHubSection(activeLlmSection)}
-                >
-                  {activeSectionRunning ? (
-                    <>
-                      <RefreshCw className="size-3.5 animate-spin" /> 生成中…
-                    </>
-                  ) : hubSectionIsReady(hubNode, activeLlmSection) ? (
-                    <>
-                      <RefreshCw className="size-3.5" /> 重新生成{SECTION_LABEL[activeLlmSection]}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="size-3.5" /> 生成{SECTION_LABEL[activeLlmSection]}
-                    </>
-                  )}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                disabled={
-                  outputBusy ||
-                  anyRunning ||
-                  aggregateStatus !== "done" ||
-                  hasMediaColumns
-                }
-                className={STORY_NODE_ACTION_BTN_CLASS}
-                title={
-                  aggregateStatus !== "done"
-                    ? "请等待剧本生成完成"
+            <button
+              type="button"
+              disabled={
+                outputBusy || !canOutputWorkflow || hasMediaColumns
+              }
+              className={STORY_NODE_ACTION_BTN_CLASS}
+              title={
+                hubSectionIsRunning(hubNode, "outline")
+                  ? "大纲生成中…"
+                  : !canOutputWorkflow
+                    ? "请先在故事主题点击「创作剧本」生成大纲"
                     : hasMediaColumns
                       ? "已输出工作流"
                       : undefined
-                }
-                onClick={() => void onOutputWorkflow()}
-              >
-                <GitBranch className="size-3.5 shrink-0" />
-                {outputBusy
-                  ? "输出中…"
-                  : hasMediaColumns
-                    ? "已输出工作流"
-                    : "输出工作流"}
-              </button>
-            </div>
+              }
+              onClick={() => void onOutputWorkflow()}
+            >
+              <GitBranch className="size-3.5 shrink-0" />
+              {outputBusy
+                ? "输出中…"
+                : hasMediaColumns
+                  ? "已输出工作流"
+                  : "输出工作流"}
+            </button>
           </StoryNodeFooterShell>
         }
       >
-        <div className="flex h-full min-h-0 flex-1 flex-col gap-2">
+        <div className="flex h-full min-h-0 flex-col gap-2">
           <div className="flex shrink-0 flex-wrap gap-1">
             {sectionChips.map((c) => (
               <button
@@ -421,11 +502,13 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
             ))}
           </div>
 
-          <StoryHubNodePreviewPane
-            content={previewMd}
-            emptyHint={previewEmptyHint}
-            onOpenPreview={() => openPreview(activeSection)}
-          />
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <StoryHubNodePreviewPane
+              content={previewMd}
+              emptyHint={previewEmptyHint}
+              onOpenPreview={() => openPreview(activeSection)}
+            />
+          </div>
         </div>
       </NodeShell>
 

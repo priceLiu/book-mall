@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Users } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
-import { THREE_VIEW_ENGINE_MODEL_KEYS } from "@/lib/canvas/types";
+import { NODE_DEFAULT_SIZE, THREE_VIEW_ENGINE_MODEL_KEYS } from "@/lib/canvas/types";
+import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { displayCharacterRows } from "@/lib/canvas/story-column-display";
@@ -25,6 +26,7 @@ import { EnginePicker } from "../engine-picker";
 export function StoryCharacterColumnNode({ id, data, selected }: NodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const resizeNode = useCanvasStore((s) => s.resizeNode);
   const d = data as unknown as StoryCharacterColumnNodeData;
   const stored = d.rows ?? [];
   const [preview, setPreview] = useState<{
@@ -42,6 +44,15 @@ export function StoryCharacterColumnNode({ id, data, selected }: NodeProps) {
     [displayRows],
   );
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
+
+  useEffect(() => {
+    const def = NODE_DEFAULT_SIZE["story-character-column"];
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    if (!node) return;
+    const { w, h } = nodeMeasuredSize(node);
+    if (Math.abs(h - def.height) < 4 && Math.abs(w - def.width) < 4) return;
+    resizeNode(id, { width: def.width, height: def.height });
+  }, [id, resizeNode]);
 
   const updateRows = (next: typeof displayRows) => {
     updateNodeData(id, { rows: next });
@@ -106,8 +117,8 @@ export function StoryCharacterColumnNode({ id, data, selected }: NodeProps) {
       bodyScroll
       runtime={nodeRuntime}
       accent={ENGINE_ACCENT}
-      minWidth={520}
-      minHeight={480}
+      minWidth={NODE_DEFAULT_SIZE["story-character-column"].width}
+      minHeight={NODE_DEFAULT_SIZE["story-character-column"].height}
       inputs={[
         { id: "in_text", label: "角色设定", kind: "text" },
       ]}
