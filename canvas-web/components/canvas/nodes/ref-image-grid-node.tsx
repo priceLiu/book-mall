@@ -187,11 +187,10 @@ export function RefImageGridNode({ id, data, type, selected }: NodeProps) {
                   unoptimized
                 />
               ) : (
-                <span className="flex size-full flex-col items-center justify-center gap-4 text-white/50">
+                <span className="flex size-full items-center justify-center text-white/50">
                   <span className="grid size-[5.5rem] place-items-center rounded-full border border-dashed border-white/30 bg-white/[0.06]">
                     <Upload className="size-10" strokeWidth={1.75} />
                   </span>
-                  <span className="text-[22px]">上传</span>
                 </span>
               )}
             </button>

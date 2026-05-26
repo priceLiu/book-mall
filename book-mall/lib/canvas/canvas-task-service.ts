@@ -1216,6 +1216,7 @@ export async function listProjectTasks(args: {
       | "completedAt"
       | "createdAt"
       | "updatedAt"
+      | "kieTaskId"
     > & {
       storyScope?: {
         rowKey?: string;
@@ -1258,6 +1259,7 @@ export async function listProjectTasks(args: {
       completedAt: true,
       createdAt: true,
       updatedAt: true,
+      kieTaskId: true,
       inputPayload: true,
     },
   });

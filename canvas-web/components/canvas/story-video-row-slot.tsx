@@ -11,6 +11,9 @@ const REFRESH_BTN =
 const SLOT_CORNER_BTN =
   "nodrag absolute z-20 inline-flex size-8 items-center justify-center rounded-full border shadow-md backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100";
 
+const SLOT_DOWNLOAD_BTN =
+  "nodrag absolute z-20 inline-flex size-11 items-center justify-center rounded-full border border-white/30 bg-black/70 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/90 hover:scale-105";
+
 /** 分镜视频列 · 纵向成片（手动点击生成，无文案 overlay） */
 export function StoryVideoRowSlot({
   frameIndex,
@@ -109,13 +112,10 @@ export function StoryVideoRowSlot({
               rel="noopener noreferrer"
               aria-label="下载视频"
               title="下载 mp4"
-              className={cn(
-                SLOT_CORNER_BTN,
-                "left-2 top-2 border-white/25 bg-black/55 text-white/90 hover:bg-black/75",
-              )}
+              className={cn(SLOT_DOWNLOAD_BTN, "right-2.5 bottom-2.5")}
               onClick={(e) => e.stopPropagation()}
             >
-              <Download className="size-3.5 pointer-events-none" />
+              <Download className="size-5 pointer-events-none" />
             </a>
           ) : null}
 

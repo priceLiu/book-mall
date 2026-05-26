@@ -262,6 +262,8 @@ function PaletteItemsRow({
   );
 }
 
+const PALETTE_LABEL_CLASS = "text-[#fb923c]";
+
 function PalettePill({
   label,
   items,
@@ -285,7 +287,9 @@ function PalettePill({
     return (
       <div className="flex w-full flex-col items-center">
         {label ? (
-          <span className="mb-1 max-w-[2.5rem] truncate text-center text-[9px] font-medium uppercase tracking-wide text-emerald-400/90">
+          <span
+            className={`mb-1 max-w-[2.5rem] truncate text-center text-[9px] font-medium tracking-wide ${PALETTE_LABEL_CLASS}`}
+          >
             {label}
           </span>
         ) : null}
@@ -306,7 +310,9 @@ function PalettePill({
       aria-label={label ? `${label}节点` : "画布节点"}
     >
       {label ? (
-        <span className="select-none pr-0.5 text-[10px] font-medium tracking-wide text-emerald-400/90">
+        <span
+          className={`select-none pr-0.5 text-[10px] font-medium tracking-wide ${PALETTE_LABEL_CLASS}`}
+        >
           {label}
         </span>
       ) : null}
@@ -457,6 +463,7 @@ export function NodePalette({
             {collapseButton}
             <PaletteDivider vertical />
             <PalettePill
+              label="海报创作"
               items={CANVAS_PALETTE}
               collapsed
               onDragStart={onDragStart}
@@ -464,6 +471,7 @@ export function NodePalette({
             />
             <PaletteDivider vertical />
             <PalettePill
+              label="故事创作"
               items={STORY_PALETTE}
               collapsed
               onDragStart={onDragStart}
@@ -471,7 +479,7 @@ export function NodePalette({
             />
             <PaletteDivider vertical />
             <PalettePill
-              label="参考"
+              label="参考生视频"
               items={REF_VIDEO_PALETTE}
               collapsed
               onDragStart={onDragStart}
@@ -489,6 +497,7 @@ export function NodePalette({
         >
           <div className="pointer-events-auto flex items-center gap-8">
             <PalettePill
+              label="海报创作"
               items={CANVAS_PALETTE}
               collapsed={false}
               trailing={canvasTrailing}
@@ -496,6 +505,7 @@ export function NodePalette({
               onAdd={onAdd}
             />
             <PalettePill
+              label="故事创作"
               items={STORY_PALETTE}
               collapsed={false}
               onDragStart={onDragStart}

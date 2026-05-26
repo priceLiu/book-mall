@@ -5,6 +5,7 @@ import { hubSectionMd } from "./story-hub-runtime";
 import {
   pickPreferredCanvasTask,
   pickPreferredCanvasTaskForScope,
+  runtimePatchFromCanvasTask,
   storyRunContextFromScope,
   tasksMatchStoryScope,
   type CanvasTaskStoryScope,
@@ -237,13 +238,18 @@ export function reconcileStaleInflightRuntimes(
 
     const pick = pickPreferredCanvasTask(nodeTasks);
     if (pick && (pick.status === "SUCCEEDED" || pick.status === "FAILED")) {
-      storyApplyTaskResult(
-        node,
-        pick,
-        storyRunContextFromScope(node.id, {}),
-        updateNodeData,
-        nodes,
-      );
+      if (isStoryWorkspaceNodeType(node.type ?? "")) {
+        storyApplyTaskResult(
+          node,
+          pick,
+          storyRunContextFromScope(node.id, {}),
+          updateNodeData,
+          nodes,
+        );
+      } else {
+        const patch = runtimePatchFromCanvasTask(pick);
+        if (patch) setNodeRuntime(node.id, patch);
+      }
       continue;
     }
 

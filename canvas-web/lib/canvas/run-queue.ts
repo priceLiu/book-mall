@@ -58,6 +58,7 @@ import {
   pickPreferredCanvasTask,
   pickPreferredCanvasTaskForScope,
   preferredTasksByNode,
+  runtimePatchFromCanvasTask,
   storyRunContextFromScope,
 } from "./task-pick";
 
@@ -1019,29 +1020,21 @@ export function useCanvasRunner(fallbackProjectId?: string) {
         }
       }
       boundTaskId ??= taskByNodeRef.current.get(nodeId);
-      if (isLocalInflightStatus(localSt) && !boundTaskId) {
-        if (t.status === "FAILED" || t.status === "SUCCEEDED") return;
-      }
+      const isTerminal =
+        t.status === "SUCCEEDED" || t.status === "FAILED";
+      // 仍绑定其它 taskId 时，忽略「非当前任务」的终态，避免旧成功覆盖新提交
       if (
         isLocalInflightStatus(localSt) &&
         boundTaskId &&
         t.id !== boundTaskId &&
-        (t.status === "FAILED" || t.status === "SUCCEEDED")
+        isTerminal
       ) {
         return;
       }
 
-      if (
-        t.status === "SUCCEEDED" &&
-        (t.textOutput || pickTaskResultMediaUrl(t))
-      ) {
-        setNodeRuntime(nodeId, {
-          status: "done",
-          taskId: t.id,
-          ossUrl: pickTaskResultMediaUrl(t) ?? t.ossUrl ?? undefined,
-          ephemeralUrl: t.ephemeralUrl ?? undefined,
-          textOutput: t.textOutput ?? undefined,
-        });
+      const patch = runtimePatchFromCanvasTask(t);
+      if (patch) {
+        setNodeRuntime(nodeId, patch);
         if (t.textOutput) {
           if (node?.type === "ai-engine" || isStoryLlmNodeType(node?.type ?? "")) {
             propagateTextOutputToDownstream(
@@ -1051,20 +1044,6 @@ export function useCanvasRunner(fallbackProjectId?: string) {
             );
           }
         }
-      } else if (t.status === "FAILED") {
-        setNodeRuntime(nodeId, {
-          status: "error",
-          taskId: t.id,
-          failCode: t.failCode ?? "FAILED",
-          failMessage: formatCanvasTaskError(
-            t.failCode,
-            t.failMessage,
-          ),
-        });
-      } else if (t.status === "SUBMITTED") {
-        setNodeRuntime(nodeId, { status: "running", taskId: t.id });
-      } else if (t.status === "PENDING") {
-        setNodeRuntime(nodeId, { status: "pending", taskId: t.id });
       }
     };
 

@@ -10,10 +10,12 @@ import type { AiVideoEngineNodeData } from "@/lib/canvas/types";
 import {
   REF_VIDEO_MODEL_KEYS,
   REF_VIDEO_NODE_SIZE,
+  refVideoProviderKind,
 } from "@/lib/canvas/ref-video-models";
 import { collectRefImageUrlsFromGridNode } from "@/lib/canvas/ref-video-edges";
 import { directPredecessors } from "@/lib/canvas/topo";
 import { pickDefaultRefVideoEngine } from "@/lib/canvas/system-providers";
+import { runtimePatchFromCanvasTask } from "@/lib/canvas/task-pick";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
@@ -31,15 +33,28 @@ import {
 
 const REF_VIDEO_PROMPT_CLASS = `${RF_NODE_SCROLL} min-h-[128px] max-h-[240px] w-full shrink-0 resize-y rounded-md border border-white/10 bg-black/30 p-2.5 font-mono text-[12px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
 
+function useElapsedMinutes(sinceIso: string | null | undefined): number | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!sinceIso) return;
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, [sinceIso]);
+  if (!sinceIso) return null;
+  const ms = Math.max(0, now - new Date(sinceIso).getTime());
+  return Math.floor(ms / 60_000);
+}
+
 export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const { providers } = useUserProviders();
   const d = data as unknown as AiVideoEngineNodeData;
-  const { succeeded } = useNodeTaskHistory(id);
+  const { history, succeeded } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [runPending, setRunPending] = useState(false);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
 
   useEffect(() => {
     if (d.providerId && d.modelKey) return;
@@ -79,9 +94,43 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
 
   const showGenerating = isGenerating || runPending;
 
+  const inflightTask = useMemo(() => {
+    const boundId = d.runtime?.taskId;
+    if (boundId) {
+      const bound = history.find((t) => t.id === boundId);
+      if (
+        bound &&
+        (bound.status === "PENDING" || bound.status === "SUBMITTED")
+      ) {
+        return bound;
+      }
+    }
+    return history.find(
+      (t) => t.status === "PENDING" || t.status === "SUBMITTED",
+    );
+  }, [history, d.runtime?.taskId]);
+
+  const waitSince =
+    inflightTask?.submittedAt ?? inflightTask?.createdAt ?? null;
+  const waitMinutes = useElapsedMinutes(showGenerating ? waitSince : null);
+  const isBailian =
+    refVideoProviderKind(d.modelKey ?? "") === "BAILIAN_R2V";
+  const bailianTaskId = isBailian ? inflightTask?.kieTaskId : null;
+
   useEffect(() => {
     if (!isGenerating) setRunPending(false);
   }, [isGenerating]);
+
+  /** 任务已在服务端成功但 runtime 未同步时（刷新 / 轮询竞态）立即对齐 */
+  useEffect(() => {
+    if (!isGenerating && !runPending) return;
+    const latest = succeeded[succeeded.length - 1];
+    if (!latest || latest.status !== "SUCCEEDED") return;
+    const patch = runtimePatchFromCanvasTask(latest);
+    if (!patch || patch.status !== "done") return;
+    setNodeRuntime(id, patch);
+    setRunPending(false);
+  }, [succeeded, isGenerating, runPending, id, setNodeRuntime]);
 
   const onRun = (forceFresh: boolean) => {
     setRunPending(true);
@@ -172,6 +221,13 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
               d.runtime?.status === "pending" ? "排队中…" : "视频生成中…"
             }
           />
+
+          {showGenerating && waitMinutes !== null ? (
+            <p className="shrink-0 truncate px-0.5 font-mono text-[10px] leading-snug text-white/45">
+              已等待 {waitMinutes} 分钟
+              {bailianTaskId ? ` / 百炼 ${bailianTaskId}` : null}
+            </p>
+          ) : null}
         </div>
 
         <div className="shrink-0 pt-2">
