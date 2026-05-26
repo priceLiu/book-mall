@@ -68,6 +68,8 @@ export type CanvasTaskRecord = {
   failMessage: string | null;
   submittedAt: string | null;
   completedAt: string | null;
+  /** 百炼 / KIE 等外部异步任务 ID */
+  kieTaskId: string | null;
   createdAt: string;
   updatedAt: string;
   /** 漫剧列行 / 文案段（来自任务 inputPayload.storyScope） */

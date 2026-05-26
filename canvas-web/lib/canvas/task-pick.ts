@@ -2,6 +2,7 @@ import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import type { CanvasStoryRunJob } from "./canvas-run-bus";
 import type { StoryRunContext } from "./story-workspace-types";
+import { formatCanvasTaskError } from "./friendly-task-error";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 
 export type CanvasTaskStoryScope = {
@@ -9,6 +10,48 @@ export type CanvasTaskStoryScope = {
   mediaKind?: string;
   llmSection?: string;
 };
+
+function taskHasSuccessPayload(task: CanvasTaskRecord): boolean {
+  return Boolean(
+    task.textOutput?.trim() ||
+      pickTaskResultMediaUrl(task) ||
+      task.ossUrl?.trim() ||
+      task.ephemeralUrl?.trim(),
+  );
+}
+
+/** 引擎 / 预览节点：把任务终态写进 node.runtime */
+export function runtimePatchFromCanvasTask(
+  task: CanvasTaskRecord,
+): Partial<CanvasNodeRuntime> | null {
+  if (task.status === "SUCCEEDED") {
+    if (!taskHasSuccessPayload(task)) return null;
+    return {
+      status: "done",
+      taskId: task.id,
+      ossUrl: pickTaskResultMediaUrl(task) ?? task.ossUrl ?? undefined,
+      ephemeralUrl: task.ephemeralUrl ?? undefined,
+      textOutput: task.textOutput ?? undefined,
+      failCode: undefined,
+      failMessage: undefined,
+    };
+  }
+  if (task.status === "FAILED") {
+    return {
+      status: "error",
+      taskId: task.id,
+      failCode: task.failCode ?? "FAILED",
+      failMessage: formatCanvasTaskError(task.failCode, task.failMessage),
+    };
+  }
+  if (task.status === "SUBMITTED") {
+    return { status: "running", taskId: task.id };
+  }
+  if (task.status === "PENDING") {
+    return { status: "pending", taskId: task.id };
+  }
+  return null;
+}
 
 export function taskStoryScope(
   task: Pick<CanvasTaskRecord, "storyScope">,
@@ -50,7 +93,7 @@ export function storyRunContextFromScope(
 }
 
 function taskDisplayRank(t: CanvasTaskRecord): number {
-  if (t.status === "SUCCEEDED" && (t.textOutput || pickTaskResultMediaUrl(t))) {
+  if (t.status === "SUCCEEDED" && taskHasSuccessPayload(t)) {
     return 4;
   }
   if (t.status === "SUBMITTED" || t.status === "PENDING") return 3;
