@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { NodeResizer, useReactFlow, useViewport, type NodeProps } from "@xyflow/react";
-import { LayoutGrid, LayoutTemplate, Palette, Trash2 } from "lucide-react";
+import { LayoutGrid, LayoutTemplate, Palette, Trash2, GripVertical } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
@@ -15,6 +15,7 @@ import {
   CanvasToolIcon,
   CanvasToolbarBadge,
 } from "../canvas-floating-toolbar";
+import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 
 const TOOLBAR_GAP = 8;
 /** 分组顶边以上仍算作「在分组上」，便于移向悬浮工具条 */
@@ -240,7 +241,13 @@ export function GroupNode({ id, data, selected }: NodeProps) {
         handleStyle={{ background: color, border: "none", width: 8, height: 8 }}
       />
 
-      <div className="flex h-8 items-center gap-2 rounded-t-[14px] px-3 pt-1 text-[12px] font-medium text-white">
+      <div className="flex h-8 items-center gap-1 rounded-t-[14px] px-2 pt-1 text-[12px] font-medium text-white">
+        <div
+          className={`${RF_NODE_DRAG_HANDLE} flex shrink-0 cursor-grab items-center active:cursor-grabbing`}
+          title="拖动移动分组"
+        >
+          <GripVertical className="size-3.5 text-white/35" aria-hidden />
+        </div>
         <span
           aria-hidden
           className="size-2.5 shrink-0 rounded-full"

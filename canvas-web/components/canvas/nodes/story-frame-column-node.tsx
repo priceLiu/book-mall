@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { ImageIcon } from "lucide-react";
 
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   STORY_VIDEO_MODEL_KEYS,
@@ -13,10 +15,12 @@ import {
   displayCharacterRows,
   displayFrameRows,
   displayVideoRows,
-  findStoryWorkspaceIds,
+  findWorkspaceForColumnId,
+  resolveStoryVideoColumnId,
 } from "@/lib/canvas/story-column-display";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import { commitStoryVideoRowRun } from "@/lib/canvas/story-video-run";
 import { pushStoryRevision } from "@/lib/canvas/story-revision";
 import {
   storyGeneratedCharacterMentionables,
@@ -26,6 +30,8 @@ import {
 import {
   FRAME_ROW_AT_HINT,
   patchVideoRowsFromFrameRows,
+  STORY_HINT_BODY_CLASS,
+  STORY_HINT_LABEL_CLASS,
   sanitizeLegacyFramePrompt,
   stripFrameRowAtHint,
 } from "@/lib/canvas/story-column-sync";
@@ -38,6 +44,8 @@ import {
   aggregateStoryColumnRuntime,
   storyColumnIsGenerating,
 } from "@/lib/canvas/story-column-runtime";
+import { NODE_DEFAULT_SIZE } from "@/lib/canvas/types";
+import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
 import { StoryColumnBatchFooter } from "../story-column-batch-footer";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { StoryColumnRowCard } from "../story-row-prompt-field";
@@ -45,28 +53,46 @@ import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { NodeShell, ENGINE_ACCENT } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
-import { pickDefaultStoryImageEngine } from "@/lib/canvas/system-providers";
+import { pickDefaultStoryImageEngine, pickDefaultStoryVideoEngine } from "@/lib/canvas/system-providers";
 
 export function StoryFrameColumnNode({ id, data, selected }: NodeProps) {
+  const base = useBookMallBaseUrl();
+  const projectId = useCanvasStore((s) => s.projectId);
   const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const resizeNode = useCanvasStore((s) => s.resizeNode);
   const d = data as unknown as StoryFrameColumnNodeData;
   const stored = d.rows ?? [];
   const batchImage = d.batchImage;
   const batchVideo = d.batchVideo;
   const { providers } = useUserProviders();
+  const { alert } = useDialogs();
 
   const canGenerateFrame = Boolean(
     batchImage?.providerId?.trim() && batchImage?.modelKey?.trim(),
+  );
+
+  const canGenerateVideo = Boolean(
+    batchVideo?.providerId?.trim() && batchVideo?.modelKey?.trim(),
   );
 
   const [preview, setPreview] = useState<{
     url: string;
     title: string;
   } | null>(null);
+  const [videoInflightKeys, setVideoInflightKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
 
-  const ws = useMemo(() => findStoryWorkspaceIds(nodes), [nodes]);
-  const videoColumnId = ws?.videoColumnId;
+  const ws = useMemo(
+    () => findWorkspaceForColumnId(nodes, edges, id),
+    [nodes, edges, id],
+  );
+  const videoColumnId = useMemo(
+    () => resolveStoryVideoColumnId(nodes, edges, id, ws),
+    [nodes, edges, id, ws],
+  );
 
   const characterRows = useMemo(() => {
     if (!ws?.characterColumnId) return [];
@@ -105,6 +131,15 @@ export function StoryFrameColumnNode({ id, data, selected }: NodeProps) {
     [displayRows],
   );
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
+
+  useEffect(() => {
+    const def = NODE_DEFAULT_SIZE["story-frame-column"];
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    if (!node) return;
+    const { w, h } = nodeMeasuredSize(node);
+    if (Math.abs(h - def.height) < 4 && Math.abs(w - def.width) < 4) return;
+    resizeNode(id, { width: def.width, height: def.height });
+  }, [id, resizeNode]);
 
   /** 旧画布可能只配了 VIDEO；自动继承角色列 IMAGE 或系统默认 */
   useEffect(() => {
@@ -145,39 +180,68 @@ export function StoryFrameColumnNode({ id, data, selected }: NodeProps) {
     ws?.characterColumnId,
   ]);
 
+  /** 旧画布可能未配 VIDEO；自动选系统默认 */
+  useEffect(() => {
+    if (batchVideo?.providerId?.trim() && batchVideo?.modelKey?.trim()) {
+      return;
+    }
+    const pick = pickDefaultStoryVideoEngine(providers);
+    if (!pick) return;
+    const next = {
+      providerId: pick.providerId,
+      modelKey: pick.modelKey,
+      params: batchVideo?.params ?? {},
+    };
+    updateNodeData(id, { batchVideo: next });
+    if (videoColumnId) {
+      updateNodeData(videoColumnId, { batchVideo: next });
+    }
+  }, [
+    batchVideo?.modelKey,
+    batchVideo?.params,
+    batchVideo?.providerId,
+    id,
+    providers,
+    updateNodeData,
+    videoColumnId,
+  ]);
+
   const updateRows = (next: typeof displayRows) => {
     updateNodeData(id, { rows: next });
   };
 
-  const syncVideoRows = useCallback(
-    (frameRows: typeof displayRows) => {
-      if (!videoColumnId) return null;
-      const state = useCanvasStore.getState();
-      const videoNode = state.nodes.find((n) => n.id === videoColumnId);
-      const videoStored =
-        (videoNode?.data as StoryVideoColumnNodeData)?.rows ?? [];
-      return patchVideoRowsFromFrameRows(videoStored, frameRows);
-    },
-    [videoColumnId],
-  );
-
-  const runRowVideo = (key: string, forceFresh?: boolean) => {
-    if (!videoColumnId || !batchVideo?.providerId) return;
-    const state = useCanvasStore.getState();
-    const frameStored =
-      (state.nodes.find((n) => n.id === id)?.data as StoryFrameColumnNodeData)
-        ?.rows ?? stored;
-    const latestFrames = displayFrameRows(state.nodes, id, frameStored);
-    const patched = syncVideoRows(latestFrames);
-    if (patched) {
-      updateNodeData(videoColumnId, { rows: patched });
+  const runRowVideo = async (key: string, frameUrl?: string) => {
+    if (!videoColumnId || !canGenerateVideo || !batchVideo) return;
+    setVideoInflightKeys((prev) => new Set(prev).add(key));
+    try {
+      const result = await commitStoryVideoRowRun({
+        base,
+        projectId,
+        videoColumnId,
+        frameColumnId: id,
+        rowKey: key,
+        frameImageUrl: frameUrl,
+        batchVideo: {
+          providerId: batchVideo.providerId,
+          modelKey: batchVideo.modelKey,
+          params: batchVideo.params ?? {},
+        },
+        forceFresh: true,
+      });
+      if (!result.ok) {
+        void alert({
+          title: "分镜视频生成失败",
+          message: result.error,
+          variant: "error",
+        });
+      }
+    } finally {
+      setVideoInflightKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
-    busEnqueueStoryRun({
-      nodeId: videoColumnId,
-      rowKey: key,
-      mediaKind: "video",
-      forceFresh,
-    });
   };
 
   const runRowFrame = (key: string, forceFresh?: boolean) => {
@@ -245,8 +309,8 @@ export function StoryFrameColumnNode({ id, data, selected }: NodeProps) {
       bodyScroll
       runtime={nodeRuntime}
       accent={ENGINE_ACCENT}
-      minWidth={880}
-      minHeight={520}
+      minWidth={NODE_DEFAULT_SIZE["story-frame-column"].width}
+      minHeight={NODE_DEFAULT_SIZE["story-frame-column"].height}
       inputs={[{ id: "in_text", label: "分镜脚本", kind: "text" }]}
       outputs={[{ id: "text", label: "分镜图", kind: "image" }]}
       footer={
@@ -267,7 +331,7 @@ export function StoryFrameColumnNode({ id, data, selected }: NodeProps) {
     >
       <div className="flex shrink-0 flex-col gap-2">
         <div className="space-y-1.5">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
+          <p className={STORY_HINT_LABEL_CLASS}>
             分镜图 · IMAGE
             {!canGenerateFrame ? (
               <span className="ml-1 normal-case text-amber-300/90">
@@ -293,8 +357,13 @@ export function StoryFrameColumnNode({ id, data, selected }: NodeProps) {
           />
         </div>
         <div className="space-y-1.5 border-t border-white/5 pt-2">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
+          <p className={STORY_HINT_LABEL_CLASS}>
             分镜视频 · VIDEO（点击生成，不自动跑）
+            {!canGenerateVideo ? (
+              <span className="ml-1 normal-case text-amber-300/90">
+                · 请先选择视频模型
+              </span>
+            ) : null}
           </p>
           <EnginePicker
             role="VIDEO"
@@ -317,7 +386,7 @@ export function StoryFrameColumnNode({ id, data, selected }: NodeProps) {
         </div>
         <div className="space-y-2">
           {!displayRows.length ? (
-            <p className="text-[11px] text-[var(--canvas-muted)]">
+            <p className={STORY_HINT_BODY_CLASS}>
               完成分镜脚本后，在此编辑场景、镜头描述与运镜；@ 角色三视图后生成分镜图，再手动触发生成视频。
             </p>
           ) : (
@@ -326,13 +395,17 @@ export function StoryFrameColumnNode({ id, data, selected }: NodeProps) {
                 row.runtime?.ossUrl ?? row.runtime?.ephemeralUrl;
               const fst = row.runtime?.status ?? "idle";
               const frameRunning = fst === "running" || fst === "pending";
+              const vr = videoRows.find((v) => v.key === row.key);
+              const vst = vr?.videoRuntime?.status ?? "idle";
+              const videoRunning =
+                vst === "running" ||
+                vst === "pending" ||
+                videoInflightKeys.has(row.key);
+              const videoError =
+                vst === "error" ? vr?.videoRuntime?.failMessage : undefined;
               const upstreamImages = storyRefImagesFromPrompt(
                 row.prompt,
                 characterCatalog,
-              );
-              const vr = videoRows.find((v) => v.key === row.key);
-              const hasVideo = Boolean(
-                vr?.videoRuntime?.ossUrl ?? vr?.videoRuntime?.ephemeralUrl,
               );
               return (
                 <StoryColumnRowCard
@@ -348,14 +421,19 @@ export function StoryFrameColumnNode({ id, data, selected }: NodeProps) {
                   onSavePrompt={(p, refs) => saveRowPrompt(row.key, p, refs)}
                   mediaMode="frame"
                   imageUrl={frameUrl}
-                  generating={frameRunning}
+                  generating={frameRunning || videoRunning}
                   generateDisabled={!canGenerateFrame}
                   onGenerate={() => runRowFrame(row.key, Boolean(frameUrl))}
                   onGenerateVideo={
-                    frameUrl && batchVideo?.providerId && videoColumnId
-                      ? () => runRowVideo(row.key, hasVideo)
+                    frameUrl && canGenerateVideo && videoColumnId
+                      ? () => void runRowVideo(row.key, frameUrl)
                       : undefined
                   }
+                  mediaError={videoError}
+                  videoPrompt={row.prompt}
+                  videoRefLabels={upstreamImages
+                    .filter((r) => r.id.startsWith("ref-char-"))
+                    .map((r) => r.label)}
                   onPreview={
                     frameUrl
                       ? () =>

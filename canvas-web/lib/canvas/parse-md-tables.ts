@@ -30,6 +30,7 @@ export function parseMdTable(md: string): { headers: string[]; rows: MdTableRow[
   const rows: MdTableRow[] = [];
   for (let i = headerIdx + 2; i < lines.length; i++) {
     const line = lines[i];
+    if (!line.trim()) continue;
     if (!line.startsWith("|")) break;
     if (/^[\|\s\-:]+$/.test(line)) continue;
     const cells = line
@@ -43,6 +44,47 @@ export function parseMdTable(md: string): { headers: string[]; rows: MdTableRow[
     rows.push(row);
   }
   return { headers, rows };
+}
+
+/** 从段落正文解析角色（GFM 表 · 列表 · 「角色名 · …」行） */
+export function parseCharacterListFromSection(body: string): Array<{
+  name: string;
+  role: string;
+  appearance: string;
+}> {
+  const fromTable = parseCharacterRows(body);
+  if (fromTable.length) return fromTable;
+
+  const out: Array<{ name: string; role: string; appearance: string }> = [];
+  for (const raw of body.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const bullet = line.replace(/^[-*•]\s+/, "");
+    if (bullet === line && !/^角色名/m.test(line)) continue;
+    const src = bullet === line ? line : bullet;
+    const parts = src.split(/[·•|｜]/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length < 1) continue;
+    const name = parts[0]!.replace(/^角色名\s*/i, "").trim();
+    if (!name || name.length > 40) continue;
+    out.push({
+      name,
+      role: parts[1] ?? "",
+      appearance: parts.slice(2).join(" · ") || parts[1] || "（待补充外观）",
+    });
+  }
+  return out;
+}
+
+/** 从分镜对白推断说话角色（「林晨：」） */
+export function inferCharacterNamesFromStoryboard(md: string): string[] {
+  const names = new Set<string>();
+  for (const row of parseStoryboardRows(md)) {
+    const d = row.dialogue.trim();
+    if (!d) continue;
+    const m = d.match(/^([^：:\(（\n]{1,24})[：:(（]/);
+    if (m?.[1]?.trim()) names.add(m[1].trim());
+  }
+  return Array.from(names);
 }
 
 /** 角色表 → 三视图批量数据 */
@@ -189,6 +231,87 @@ export function normalizeOutlineSection(
   };
 }
 
+/** 去掉 GFM 表格行之间的空行（避免预览/解析在中间截断） */
+export function compactGfmTables(md: string): string {
+  const lines = md.split(/\r?\n/);
+  const out: string[] = [];
+  let inTable = false;
+  for (const line of lines) {
+    const t = line.trim();
+    const isPipe = t.startsWith("|");
+    const isSep = isPipe && /^[\|\s\-:]+$/.test(t);
+    if (isPipe) {
+      inTable = true;
+      out.push(line);
+      continue;
+    }
+    if (inTable && !t) continue;
+    inTable = false;
+    out.push(line);
+  }
+  return out.join("\n");
+}
+
+function extractMarkdownSectionByHeader(
+  md: string,
+  titlePattern: RegExp,
+): string {
+  const re = /^##\s+(.+)$/gm;
+  let match: RegExpExecArray | null;
+  const hits: Array<{ start: number; end: number; title: string }> = [];
+  while ((match = re.exec(md)) !== null) {
+    hits.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      title: match[1]?.trim() ?? "",
+    });
+  }
+  const idx = hits.findIndex((h) => titlePattern.test(h.title));
+  if (idx < 0) return "";
+  const bodyStart = hits[idx].end;
+  const bodyEnd = idx + 1 < hits.length ? hits[idx + 1].start : md.length;
+  return md.slice(bodyStart, bodyEnd).trim();
+}
+
+/** 大纲展示：去掉嵌入的「制作包」段落（角色 / 关系 / 分镜 / 核心对白） */
+export function stripOutlineEmbeddedPackSections(md: string): string {
+  let s = stripOutlineCharacterTable(md);
+  s = s.replace(/\n##\s*[二三四五]、[\s\S]*?(?=\n##\s|$)/g, "").trim();
+  s = s.replace(
+    /\n##\s*(?:角色设定|角色设定卡|角色关系|分镜脚本|核心对白)[^\n]*\n[\s\S]*?(?=\n##\s|$)/gi,
+    "",
+  ).trim();
+  return s.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** 从大纲正文中提取「角色设定」段（表格或列表） */
+export function extractCharacterSectionFromOutline(md: string): string {
+  const body = extractMarkdownSectionByHeader(
+    md,
+    /角色设定|人物表|角色设定卡|角色关系|角色/i,
+  );
+  if (!body) return "";
+  const rows = parseCharacterListFromSection(body);
+  if (rows.length) return formatCharacterTableMarkdown(rows);
+  return body;
+}
+
+/** 从大纲正文中提取「分镜脚本」段 */
+export function extractStoryboardSectionFromOutline(md: string): string {
+  const body = extractMarkdownSectionByHeader(md, /分镜脚本|分镜表/);
+  if (!body) return "";
+  return compactGfmTables(body);
+}
+
+/** 主题模板分镜表 → 标准 hub 分镜 GFM 表 */
+export function normalizeStoryboardSectionFromOutline(md: string): string {
+  const section = extractStoryboardSectionFromOutline(md);
+  if (!section) return "";
+  const rows = parseStoryboardRows(section);
+  if (!rows.length) return section;
+  return formatStoryboardTableMarkdown(rows);
+}
+
 /** 故事大纲里的「人物表（简要）」— 仅角色名与定位 */
 export function parseOutlineBriefCharacters(md: string): Array<{
   name: string;
@@ -248,14 +371,29 @@ export function parseStoryboardRows(md: string): Array<{
   return rows
     .map((r, i) => {
       const rawIdx =
-        pickColumn(r, ["镜号", "index", "frame", "shot"]) ||
+        pickColumn(r, [
+          "镜号",
+          "镜头编号",
+          "编号",
+          "index",
+          "frame",
+          "shot",
+        ]) ||
         r["镜号"] ||
+        r["镜头编号"] ||
         r["index"] ||
         String(i + 1);
       const frameIndex = parseInt(String(rawIdx), 10) || i + 1;
+      const shotSize = pickColumn(r, ["景别", "shot size", "framing"]);
+      const scene =
+        pickColumn(r, ["场景", "scene", "location"]) ||
+        r["场景"] ||
+        shotSize ||
+        "";
+      const duration = pickColumn(r, ["时长", "duration", "时长(秒)"]);
       return {
         frameIndex,
-        scene: pickColumn(r, ["场景", "scene", "location"]) || r["场景"] || "",
+        scene,
         description:
           pickColumn(r, ["画面描述", "description", "visual", "画面"]) ||
           r["画面描述"] ||
@@ -264,17 +402,20 @@ export function parseStoryboardRows(md: string): Array<{
           pickColumn(r, [
             "台词",
             "对白",
+            "对白/音效",
             "dialogue",
             "scenetext",
             "scene text",
             "旁白",
+            "音效",
           ]) ||
           r["台词"] ||
+          r["对白/音效"] ||
           "",
         videoPrompt:
           pickColumn(r, ["视频提示", "videoprompt", "video prompt", "运镜"]) ||
           r["视频提示"] ||
-          "",
+          (duration ? `时长 ${duration} 秒` : ""),
       };
     })
     .sort((a, b) => a.frameIndex - b.frameIndex);

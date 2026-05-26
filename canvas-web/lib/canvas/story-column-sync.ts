@@ -1,11 +1,15 @@
 "use client";
 
 import { THREE_VIEW_ENGINE_PROMPT_DEFAULT } from "./types";
+import { hubDataForColumnSync, resolveHubStoryboardMd } from "./story-hub-runtime";
 import {
   outlineCharacterNamesAlign,
   parseCharacterRows,
+  parseCharacterListFromSection,
   parseOutlineBriefCharacters,
   parseStoryboardRows,
+  inferCharacterNamesFromStoryboard,
+  extractCharacterSectionFromOutline,
 } from "./parse-md-tables";
 import {
   storyRefIdsFromPrompt,
@@ -39,30 +43,40 @@ export function buildCharacterRowsFromMd(md: string): StoryCharacterRow[] {
   return parseCharacterRows(md).map((c) => characterRowFromParts(c));
 }
 
-/** 以角色设定表为准；遗留大纲人物表仅作定位回填 */
+/** 以角色设定表为准；遗留大纲人物表 / 列表 / 分镜对白推断 */
 export function buildCharacterRowsFromHub(
   d: StoryScriptHubNodeData,
 ): StoryCharacterRow[] {
-  const fromCharacter = parseCharacterRows(d.characterMd ?? "");
+  const synced = hubDataForColumnSync(d);
+  const characterSource =
+    (synced.characterMd ?? "").trim() ||
+    extractCharacterSectionFromOutline(d.outlineMd ?? "");
+  const fromCharacter = parseCharacterListFromSection(characterSource);
   if (fromCharacter.length > 0) {
     return fromCharacter.map((c) => characterRowFromParts(c));
   }
   const fromBrief = parseOutlineBriefCharacters(d.outlineMd ?? "");
-  if (fromBrief.length === 0) {
-    return [];
-  }
-  const byName = new Map(fromCharacter.map((c) => [c.name, c]));
-  return fromBrief.map((b) => {
-    const detail = byName.get(b.name);
-    const appearance =
-      detail?.appearance?.trim() &&
-      !detail.appearance.startsWith("（待补充")
-        ? detail.appearance
-        : b.appearance;
-    return characterRowFromParts(
-      { name: b.name, role: b.role || detail?.role || "", appearance },
+  if (fromBrief.length > 0) {
+    return fromBrief.map((b) =>
+      characterRowFromParts({
+        name: b.name,
+        role: b.role || "",
+        appearance: b.appearance,
+      }),
     );
-  });
+  }
+  const storyboardMd = resolveHubStoryboardMd(synced);
+  const inferred = inferCharacterNamesFromStoryboard(storyboardMd);
+  if (inferred.length > 0) {
+    return inferred.map((name) =>
+      characterRowFromParts({
+        name,
+        role: "",
+        appearance: "（待补充外观，可在故事大纲·角色设定中完善）",
+      }),
+    );
+  }
+  return [];
 }
 
 export function hubCharacterCastOutOfSync(d: StoryScriptHubNodeData): boolean {
@@ -94,6 +108,13 @@ function buildFrameRefImagesForCharacters(
 
 /** 分镜列「镜 1」栏展示的 @ 引用说明（不写入每镜 prompt 正文） */
 export const FRAME_ROW_AT_HINT = "（输入 @ 可引用已生成的角色三视图）";
+
+/** 漫剧工作区 · 统一蓝色提示文案 */
+export const STORY_HINT_BLUE_CLASS = "text-[#60a5fa]";
+/** 模型选择 / 分镜图·视频 等区块标签：蓝色 + 左侧竖线 */
+export const STORY_HINT_LABEL_CLASS = `border-l-2 border-[#60a5fa] pl-2 text-[10px] uppercase tracking-wider ${STORY_HINT_BLUE_CLASS}`;
+/** 行内说明、@ 引用提示等正文级提示 */
+export const STORY_HINT_BODY_CLASS = `text-[10px] leading-relaxed ${STORY_HINT_BLUE_CLASS}`;
 
 /** 从已保存 prompt 中去掉 @ 说明行（历史数据可能写在每镜末尾） */
 export function stripFrameRowAtHint(prompt: string): string {
@@ -224,26 +245,22 @@ export function buildVideoRowsFromFrames(
   });
 }
 
-/** 分镜列保存 / 生成前：把脚本与 @ 参考同步到视频列同行 */
+/** 分镜列保存 / 生成前：把脚本与 @ 参考同步到视频列同行（含从分镜行重建缺失行） */
 export function patchVideoRowsFromFrameRows(
   videoRows: StoryVideoRow[],
   frameRows: StoryFrameRow[],
 ): StoryVideoRow[] {
-  const byKey = new Map(frameRows.map((f) => [f.key, f]));
-  return videoRows.map((v) => {
-    const f = byKey.get(v.key);
-    if (!f) return v;
-    const script = f.prompt?.trim() || buildFrameRowScriptPrompt(f);
+  const prevByKey = new Map(videoRows.map((v) => [v.key, v]));
+  return buildVideoRowsFromFrames(frameRows).map((built) => {
+    const prev = prevByKey.get(built.key);
+    if (!prev) return built;
     return {
-      ...v,
-      dialogue: f.dialogue,
-      videoPrompt: script,
-      refImages: (f.refImages ?? []).filter((r) => r.id.startsWith("ref-char-")),
-      videoReferencedNodeIds: f.referencedNodeIds ?? [],
-      frameImageUrl:
-        f.runtime?.ossUrl ??
-        f.runtime?.ephemeralUrl ??
-        v.frameImageUrl,
+      ...built,
+      videoPromptHistory: prev.videoPromptHistory,
+      ttsPrompt: prev.ttsPrompt,
+      ttsPromptHistory: prev.ttsPromptHistory,
+      videoRuntime: prev.videoRuntime,
+      ttsRuntime: prev.ttsRuntime,
     };
   });
 }
@@ -265,7 +282,7 @@ export function syncColumnsFromHub(
 } | null {
   const hub = nodes.find((n) => n.id === hubId);
   if (!hub || hub.type !== "story-script-hub") return null;
-  const d = hub.data as unknown as StoryScriptHubNodeData;
+  const d = hubDataForColumnSync(hub.data as unknown as StoryScriptHubNodeData);
   const charRows = buildCharacterRowsFromHub(d);
   const existingChar = (
     nodes.find((n) => n.id === characterColumnId)?.data as {
@@ -284,7 +301,7 @@ export function syncColumnsFromHub(
       runtime: prev.runtime,
     };
   });
-  const frameRows = buildFrameRowsFromMd(d.storyboardMd ?? "", mergedChar);
+  const frameRows = buildFrameRowsFromMd(resolveHubStoryboardMd(d), mergedChar);
   const existingFrame = (
     nodes.find((n) => n.id === frameColumnId)?.data as {
       rows?: StoryFrameRow[];
@@ -361,20 +378,7 @@ function mergeVideoRowsFromFrames(
   videoRows: StoryVideoRow[],
   frameRows: StoryFrameRow[],
 ): StoryVideoRow[] {
-  const fromFrames = buildVideoRowsFromFrames(frameRows);
-  const byKey = new Map(fromFrames.map((r) => [r.key, r]));
-  return videoRows.map((row) => {
-    const rebuilt = byKey.get(row.key);
-    if (!rebuilt) return row;
-    return {
-      ...row,
-      videoPrompt: rebuilt.videoPrompt ?? row.videoPrompt,
-      refImages: rebuilt.refImages?.length ? rebuilt.refImages : row.refImages,
-      videoReferencedNodeIds:
-        rebuilt.videoReferencedNodeIds ?? row.videoReferencedNodeIds,
-      frameImageUrl: rebuilt.frameImageUrl ?? row.frameImageUrl,
-    };
-  });
+  return patchVideoRowsFromFrameRows(videoRows, frameRows);
 }
 
 /** 角色列 / 分镜列生成后：把上游图同步到分镜参考图与视频首帧 */

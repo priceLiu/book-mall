@@ -20,8 +20,8 @@ export const NODE_STORY_FRAME_MIN_HEIGHT = 480;
 export const NODE_STORY_FRAME_SPLIT_MIN_H = 240;
 
 /** 三视图节点：上下结构（Prompt 上 · 图下） */
-export const NODE_THREE_VIEW_MIN_WIDTH = 420;
-export const NODE_THREE_VIEW_MIN_HEIGHT = 480;
+export const NODE_THREE_VIEW_MIN_WIDTH = 670;
+export const NODE_THREE_VIEW_MIN_HEIGHT = 880;
 
 export const NODE_THREE_VIEW_PROMPT_CLASS = `${RF_NODE_SCROLL} max-h-[72px] min-h-[52px] w-full resize-none rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[11px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
 

@@ -15,7 +15,7 @@ const ENGINE_BLOCK = 76;
 const FOOTER_BTN = 60;
 const ROW_GAP = 12;
 const ROW_CARD_CHROME = 32;
-const MEDIA_COL_MIN = 148;
+const MEDIA_COL_MIN = 248;
 const UPSTREAM_REF_SLOT_H = 100;
 const COLUMN_EXTRA_PAD = 48;
 const CHARS_PER_LINE_FRAME = 56;
@@ -23,8 +23,8 @@ const CHARS_PER_LINE_CHAR = 38;
 
 const EMPTY_LIST = 72;
 const MIN_COL_H_EMPTY = 400;
-/** 节点外框可视高度；超出部分在 NodeShell 最外层滚动 */
-export const STORY_COLUMN_VIEWPORT_H = 1180;
+/** 节点外框固定高度；角色/分镜列内容超出时在 NodeShell bodyScroll 内滚 */
+export const STORY_COLUMN_VIEWPORT_H = 2100;
 
 function estimatePromptHeight(text: string, charsPerLine = 42): number {
   const t = text.trim();
@@ -130,36 +130,23 @@ function columnHeight(
   return Math.min(Math.max(raw, 360), STORY_COLUMN_VIEWPORT_H);
 }
 
-export function storyCharacterColumnSize(rows: StoryCharacterRow[]) {
+export function storyCharacterColumnSize(_rows: StoryCharacterRow[]) {
   const def = NODE_DEFAULT_SIZE["story-character-column"];
-  const heights = rows.map(characterRowHeight);
-  return {
-    width: def.width,
-    height: columnHeight(heights, 1),
-  };
+  return { width: def.width, height: def.height };
 }
 
-export function storyFrameColumnSize(rows: StoryFrameRow[]) {
+export function storyFrameColumnSize(_rows: StoryFrameRow[]) {
   const def = NODE_DEFAULT_SIZE["story-frame-column"];
-  const heights = rows.map(frameRowHeight);
-  return {
-    width: def.width,
-    height: columnHeight(heights, 1),
-  };
+  return { width: def.width, height: def.height };
 }
 
 /** @param frameRowCount 分镜脚本行数（与视频列对齐，用于输出工作流后预先撑高） */
 export function storyVideoColumnSize(
-  rows: StoryVideoRow[],
-  frameRowCount?: number,
+  _rows: StoryVideoRow[],
+  _frameRowCount?: number,
 ) {
   const def = NODE_DEFAULT_SIZE["story-video-column"];
-  const count = Math.max(rows.length, frameRowCount ?? 0);
-  const height =
-    count > 0
-      ? storyVideoColumnContentHeight(count)
-      : Math.max(storyVideoColumnContentHeight(0), MIN_COL_H_EMPTY);
-  return { width: def.width, height };
+  return { width: def.width, height: def.height };
 }
 
 function applyNodeSize(

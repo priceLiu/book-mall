@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Lock, PenLine, RefreshCw, Sparkles } from "lucide-react";
 
@@ -9,17 +9,21 @@ import type { StoryComicStarterNodeData } from "@/lib/canvas/types";
 import {
   STORY_LLM_MODEL_KEYS,
   STORY_THEME_SYSTEM_PROMPT_TEMPLATES,
-  type StoryThemeSystemPromptTemplateId,
 } from "@/lib/canvas/types";
-import { matchStoryThemeSystemPromptTemplateId } from "@/lib/canvas/story-prompts";
+import type { StoryThemeSystemPromptTemplateId } from "@/lib/canvas/story-prompts";
+import { storyThemePromptDisplayMd } from "@/lib/canvas/story-theme-prompt-display";
 import {
+  STORY_CONTROL_NODE_HEIGHT,
+  STORY_CONTROL_NODE_WIDTH,
   STORY_NODE_ACTION_BTN_CLASS,
-  storyComicStarterNodeHeight,
-  storyStarterPromptTextareaMinHeight,
+  STORY_NODE_ENGINE_DOCK_CLASS,
 } from "@/lib/canvas/story-node-chrome";
+import { STORY_HINT_LABEL_CLASS } from "@/lib/canvas/story-column-sync";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
+import { StoryThemePromptPreviewPane } from "../story-theme-prompt-preview-pane";
+import { StoryThemePromptModal } from "../story-theme-prompt-modal";
+import { StoryPreviewMagnifyButton } from "../story-preview-magnify-button";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
-import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { runStoryHubSectionsSequential } from "@/lib/canvas/batch-run-nodes";
 import {
   findStoryScriptHubForStarter,
@@ -54,12 +58,17 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
     (s) => s.reflowStoryComicLayout,
   );
 
-  const promptMinHeight = storyStarterPromptTextareaMinHeight();
-
   const d = data as unknown as StoryComicStarterNodeData;
   const { providers } = useUserProviders();
   const stage = d.pipelineStage ?? "idle";
   const isFinalized = stage === "finalized";
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+
+  const systemPrompt = d.systemPrompt ?? "";
+  const promptPreviewMd = useMemo(
+    () => storyThemePromptDisplayMd(systemPrompt),
+    [systemPrompt],
+  );
 
   const scriptHub = useMemo(
     () =>
@@ -92,9 +101,10 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
   }, [nodes, scriptHub]);
 
   const canRun = Boolean(
-    !isFinalized && d.systemPrompt?.trim() && d.providerId && d.modelKey,
+    !isFinalized && systemPrompt.trim() && d.providerId && d.modelKey,
   );
   const isGenerating = hubStatus.status === "running";
+  const promptEditLocked = isGenerating || isFinalized;
 
   const hasScriptDraft = useMemo(() => {
     if (!scriptHub) return false;
@@ -125,37 +135,16 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
     updateNodeData,
   ]);
 
-  const activeTemplateId = useMemo((): StoryThemeSystemPromptTemplateId | "custom" => {
+  const activeTemplateLabel = useMemo(() => {
     if (d.systemPromptTemplateId) {
-      const tpl = STORY_THEME_SYSTEM_PROMPT_TEMPLATES.find(
-        (t) => t.id === d.systemPromptTemplateId,
+      return (
+        STORY_THEME_SYSTEM_PROMPT_TEMPLATES.find(
+          (t) => t.id === d.systemPromptTemplateId,
+        )?.label ?? "自定义"
       );
-      if (tpl && d.systemPrompt?.trim() === tpl.content.trim()) {
-        return d.systemPromptTemplateId;
-      }
     }
-    return matchStoryThemeSystemPromptTemplateId(d.systemPrompt ?? "") ?? "custom";
-  }, [d.systemPrompt, d.systemPromptTemplateId]);
-
-  const applyTemplate = (templateId: StoryThemeSystemPromptTemplateId) => {
-    const tpl = STORY_THEME_SYSTEM_PROMPT_TEMPLATES.find((t) => t.id === templateId);
-    if (!tpl) return;
-    updateNodeData(id, {
-      systemPromptTemplateId: templateId,
-      systemPrompt: tpl.content,
-    });
-    if (scriptHub) {
-      syncStoryHubFromStarter({
-        starterNodeId: id,
-        systemPrompt: tpl.content,
-        providerId: d.providerId,
-        modelKey: d.modelKey,
-        params: d.params ?? {},
-        scriptHubId: scriptHub.scriptHubId,
-        updateNodeData,
-      });
-    }
-  };
+    return "自定义";
+  }, [d.systemPromptTemplateId]);
 
   useEffect(() => {
     if (d.providerId?.trim() && d.modelKey?.trim()) return;
@@ -168,35 +157,45 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
   }, [d.providerId, d.modelKey, providers, id, updateNodeData]);
 
   useEffect(() => {
-    const targetH = storyComicStarterNodeHeight();
+    const targetH = STORY_CONTROL_NODE_HEIGHT;
+    const targetW = STORY_CONTROL_NODE_WIDTH;
     const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
     if (!node) return;
     const { w, h } = nodeMeasuredSize(node);
-    if (Math.abs(h - targetH) < 4) return;
-    resizeNode(id, { width: w, height: targetH });
-    reflowStoryComicLayout();
-  }, [id, resizeNode, reflowStoryComicLayout]);
+    if (Math.abs(h - targetH) < 4 && Math.abs(w - targetW) < 4) return;
+    resizeNode(id, { width: targetW, height: targetH });
+  }, [id, resizeNode]);
 
-  const syncHubIfConnected = useCallback(() => {
-    if (!scriptHub) return;
-    syncStoryHubFromStarter({
-      starterNodeId: id,
-      systemPrompt: d.systemPrompt ?? "",
-      providerId: d.providerId,
-      modelKey: d.modelKey,
-      params: d.params ?? {},
-      scriptHubId: scriptHub.scriptHubId,
+  const onSavePrompt = useCallback(
+    (next: {
+      systemPrompt: string;
+      systemPromptTemplateId?: StoryThemeSystemPromptTemplateId;
+    }) => {
+      updateNodeData(id, {
+        systemPrompt: next.systemPrompt,
+        systemPromptTemplateId: next.systemPromptTemplateId,
+      });
+      if (scriptHub) {
+        syncStoryHubFromStarter({
+          starterNodeId: id,
+          systemPrompt: next.systemPrompt,
+          providerId: d.providerId,
+          modelKey: d.modelKey,
+          params: d.params ?? {},
+          scriptHubId: scriptHub.scriptHubId,
+          updateNodeData,
+        });
+      }
+    },
+    [
+      id,
+      scriptHub,
+      d.providerId,
+      d.modelKey,
+      d.params,
       updateNodeData,
-    });
-  }, [
-    scriptHub,
-    id,
-    d.systemPrompt,
-    d.providerId,
-    d.modelKey,
-    d.params,
-    updateNodeData,
-  ]);
+    ],
+  );
 
   const onPickEngine = (next: {
     providerId: string;
@@ -211,7 +210,7 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
     if (scriptHub) {
       syncStoryHubFromStarter({
         starterNodeId: id,
-        systemPrompt: d.systemPrompt,
+        systemPrompt,
         providerId: next.providerId,
         modelKey: next.modelKey,
         params: next.params ?? {},
@@ -234,7 +233,7 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
       ? existingHub.scriptHubId
       : spawnStoryScriptHub({
           starterNodeId: id,
-          systemPrompt: d.systemPrompt,
+          systemPrompt,
           providerId: d.providerId,
           modelKey: d.modelKey,
           params: d.params ?? {},
@@ -245,8 +244,18 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
           setEdges,
           updateNodeData,
         }).scriptHubId;
+    if (existingHub) {
+      syncStoryHubFromStarter({
+        starterNodeId: id,
+        systemPrompt,
+        providerId: d.providerId,
+        modelKey: d.modelKey,
+        params: d.params ?? {},
+        scriptHubId,
+        updateNodeData,
+      });
+    }
     reflowStoryComicLayout();
-    /** 首次：只生成大纲（1 次 LLM）；重新生成：大纲→角色→分镜顺序各 1 次 */
     const sections = hasScriptDraft
       ? STORY_HUB_SECTION_ORDER
       : (["outline"] as const);
@@ -256,118 +265,107 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
   };
 
   return (
-    <NodeShell
-      title="故事主题"
-      subtitle={STAGE_LABELS[stage] ?? STAGE_LABELS.idle}
-      selected={selected}
-      engine
-      accent={ENGINE_ACCENT}
-      minWidth={400}
-      minHeight={storyComicStarterNodeHeight()}
-      outputs={[{ id: "text", label: "创意", kind: "text" }]}
-      headerRight={
-        <NodeStatusBadge
-          status={scriptHub ? hubStatus.status : "idle"}
-          message={hubStatus.failMessage}
-        />
-      }
-      footer={
-        <StoryNodeFooterShell
-          hint={
-            <span className="flex items-center gap-1">
-              <Sparkles className="size-3 shrink-0" /> 自动连接「故事大纲」· 弹出层审阅
-            </span>
-          }
-        >
-          <button
-            type="button"
-            disabled={!canRun || isGenerating}
-            className={STORY_NODE_ACTION_BTN_CLASS}
-            onClick={onCreateScript}
-          >
-            {isFinalized ? (
-              <>
-                <Lock className="size-3.5" /> 已定稿
-              </>
-            ) : isGenerating ? (
-              <>
-                <RefreshCw className="size-3.5 animate-spin" /> 剧本生成中…
-              </>
-            ) : hasScriptDraft ? (
-              <>
-                <RefreshCw className="size-3.5" /> 重新生成剧本
-              </>
-            ) : (
-              <>
-                <PenLine className="size-3.5" /> 创作剧本
-              </>
-            )}
-          </button>
-        </StoryNodeFooterShell>
-      }
-    >
-      <div className="flex h-full min-h-0 flex-col gap-2">
-        <div className="flex shrink-0 flex-col">
-          <div className="mb-1 flex shrink-0 flex-wrap items-center gap-1.5">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
-              系统提示词
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {STORY_THEME_SYSTEM_PROMPT_TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  type="button"
-                  title={tpl.description}
-            disabled={isGenerating || isFinalized}
-            className={`nodrag rounded px-2 py-0.5 text-[10px] font-medium transition ${
-                    activeTemplateId === tpl.id
-                      ? "bg-[#fb923c]/30 text-[#fdba74]"
-                      : "bg-white/5 text-[var(--canvas-muted)] hover:bg-white/10 hover:text-white"
-                  } disabled:opacity-50`}
-                  onClick={() => applyTemplate(tpl.id)}
-                >
-                  {tpl.label}
-                </button>
-              ))}
-              {activeTemplateId === "custom" ? (
-                <span className="rounded bg-white/5 px-2 py-0.5 text-[10px] text-amber-200/90">
-                  自定义
-                </span>
-              ) : null}
-            </div>
+    <>
+      <NodeShell
+        title="故事主题"
+        subtitle={STAGE_LABELS[stage] ?? STAGE_LABELS.idle}
+        selected={selected}
+        engine
+        accent={ENGINE_ACCENT}
+        minWidth={STORY_CONTROL_NODE_WIDTH}
+        minHeight={STORY_CONTROL_NODE_HEIGHT}
+        outputs={[{ id: "text", label: "创意", kind: "text" }]}
+        headerRight={
+          <div className="nodrag nowheel pointer-events-auto flex shrink-0 items-center gap-1.5">
+            <StoryPreviewMagnifyButton
+              variant="onDark"
+              onClick={() => setPromptModalOpen(true)}
+            />
+            <NodeStatusBadge
+              status={scriptHub ? hubStatus.status : "idle"}
+              message={hubStatus.failMessage}
+            />
           </div>
-          <textarea
-            className="nodrag w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 text-[12px] leading-[17px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[#fb923c]/60 focus:outline-none disabled:opacity-60"
-            style={{ minHeight: promptMinHeight, height: promptMinHeight }}
-            value={d.systemPrompt ?? ""}
-            placeholder="大纲 LLM 的 system 指令（含主题与约束）…"
-            disabled={isGenerating || isFinalized}
-            onChange={(e) =>
-              updateNodeData(id, {
-                systemPrompt: e.target.value,
-                systemPromptTemplateId: undefined,
-              })
-            }
-            onBlur={syncHubIfConnected}
-          />
-        </div>
-
-        <div className="space-y-1.5 border-t border-white/5 pt-2">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
-            LLM 模型（文案共用）
+        }
+        footer={
+          <div className="nodrag flex w-full flex-col">
+            <div className={STORY_NODE_ENGINE_DOCK_CLASS}>
+              <p className={STORY_HINT_LABEL_CLASS}>LLM 模型（文案共用）</p>
+              <div
+                className={
+                  isFinalized ? "pointer-events-none opacity-50" : undefined
+                }
+              >
+                <EnginePicker
+                  role="LLM"
+                  allowedModelKeys={[...STORY_LLM_MODEL_KEYS]}
+                  providerId={d.providerId ?? ""}
+                  modelKey={d.modelKey ?? ""}
+                  params={d.params ?? {}}
+                  onChange={onPickEngine}
+                />
+              </div>
+            </div>
+            <StoryNodeFooterShell
+              hint={
+                <span className="flex items-center gap-1">
+                  <Sparkles className="size-3 shrink-0" /> 自动连接「故事大纲」·
+                  弹出层审阅
+                </span>
+              }
+            >
+              <button
+                type="button"
+                disabled={!canRun || isGenerating}
+                className={STORY_NODE_ACTION_BTN_CLASS}
+                onClick={onCreateScript}
+              >
+                {isFinalized ? (
+                  <>
+                    <Lock className="size-3.5" /> 已定稿
+                  </>
+                ) : isGenerating ? (
+                  <>
+                    <RefreshCw className="size-3.5 animate-spin" /> 剧本生成中…
+                  </>
+                ) : hasScriptDraft ? (
+                  <>
+                    <RefreshCw className="size-3.5" /> 重新生成剧本
+                  </>
+                ) : (
+                  <>
+                    <PenLine className="size-3.5" /> 创作剧本
+                  </>
+                )}
+              </button>
+            </StoryNodeFooterShell>
+          </div>
+        }
+      >
+        <div className="flex h-full min-h-0 flex-col gap-2">
+          <p className="shrink-0 text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
+            系统提示词 · {activeTemplateLabel}
           </p>
-          <div className={isFinalized ? "pointer-events-none opacity-50" : undefined}>
-            <EnginePicker
-              role="LLM"
-              allowedModelKeys={[...STORY_LLM_MODEL_KEYS]}
-              providerId={d.providerId ?? ""}
-              modelKey={d.modelKey ?? ""}
-              params={d.params ?? {}}
-              onChange={onPickEngine}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <StoryThemePromptPreviewPane
+              displayMd={promptPreviewMd}
+              emptyHint="悬停预览 · 点击打开审阅弹层编辑"
+              disabled={isGenerating}
+              onOpen={() => setPromptModalOpen(true)}
             />
           </div>
         </div>
-      </div>
-    </NodeShell>
+      </NodeShell>
+
+      <StoryThemePromptModal
+        open={promptModalOpen}
+        initialTab={d.systemPromptTemplateId ?? "custom"}
+        templateId={d.systemPromptTemplateId}
+        onClose={() => setPromptModalOpen(false)}
+        value={systemPrompt}
+        onSave={onSavePrompt}
+        readOnly={promptEditLocked}
+      />
+    </>
   );
 }

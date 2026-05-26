@@ -383,25 +383,25 @@ export function useCanvasRunner(fallbackProjectId?: string) {
     async (job: QueueItem) => {
       const key = runKey(job);
       const { nodeId, forceFresh } = job;
-      if (!base || !projectId) {
-        abortSequential(job, "画布未就绪，请刷新页面后重试");
-        return;
-      }
-      const state = useCanvasStore.getState();
-      const node = state.nodes.find((n) => n.id === nodeId);
-      if (!node) {
-        abortSequential(job, "找不到该节点，请刷新页面");
-        return;
-      }
-
-      const imageInputs = resolveImageInputs(state.nodes, state.edges, nodeId);
-      const textInputs = resolveStoryHubSectionTextInputs(
-        node,
-        job.llmSection,
-        resolveTextInputs(state.nodes, state.edges, nodeId),
-      );
-
       try {
+        if (!base || !projectId) {
+          abortSequential(job, "画布未就绪，请刷新页面后重试");
+          return;
+        }
+        const state = useCanvasStore.getState();
+        const node = state.nodes.find((n) => n.id === nodeId);
+        if (!node) {
+          abortSequential(job, "找不到该节点，请刷新页面");
+          return;
+        }
+
+        const imageInputs = resolveImageInputs(state.nodes, state.edges, nodeId);
+        const textInputs = resolveStoryHubSectionTextInputs(
+          node,
+          job.llmSection,
+          resolveTextInputs(state.nodes, state.edges, nodeId),
+        );
+
         const data = node.data as Record<string, unknown>;
         const modelKey =
           typeof data.modelKey === "string" ? data.modelKey : undefined;
@@ -510,6 +510,8 @@ export function useCanvasRunner(fallbackProjectId?: string) {
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        const errState = useCanvasStore.getState();
+        const errNode = errState.nodes.find((n) => n.id === nodeId);
         const isInflightConflict =
           msg.includes("409") &&
           (msg.includes("in progress") ||
@@ -532,7 +534,7 @@ export function useCanvasRunner(fallbackProjectId?: string) {
               jobByTaskRef.current.set(pick.id, job);
               const nodeNow =
                 useCanvasStore.getState().nodes.find((n) => n.id === nodeId) ??
-                node;
+                errNode;
               if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
                 storyApplyTaskResult(
                   nodeNow,
@@ -575,9 +577,9 @@ export function useCanvasRunner(fallbackProjectId?: string) {
             /* fall through to error state */
           }
         }
-        if (isStoryWorkspaceNodeType(node.type ?? "")) {
+        if (errNode && isStoryWorkspaceNodeType(errNode.type ?? "")) {
           storyApplyTaskResult(
-            node,
+            errNode,
             {
               id: "",
               nodeId,
@@ -596,7 +598,7 @@ export function useCanvasRunner(fallbackProjectId?: string) {
             },
             job,
             updateNodeData,
-            state.nodes,
+            errState.nodes,
           );
         } else {
           setNodeRuntime(nodeId, {
@@ -607,7 +609,8 @@ export function useCanvasRunner(fallbackProjectId?: string) {
         }
       } finally {
         const nodeAfter = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
-        if (shouldReleaseStoryRunInflight(nodeAfter, job)) {
+        const taskStarted = taskByNodeRef.current.has(key);
+        if (shouldReleaseStoryRunInflight(nodeAfter, job) || !taskStarted) {
           inflightRef.current.delete(key);
         }
         const seq = sequentialRef.current;
@@ -661,9 +664,10 @@ export function useCanvasRunner(fallbackProjectId?: string) {
 
   const drain = useCallback(() => {
     while (queueRef.current.length > 0) {
-      const item = queueRef.current.shift()!;
+      const item = queueRef.current[0]!;
       const key = runKey(item);
-      if (inflightRef.current.has(key)) continue;
+      if (inflightRef.current.has(key)) break;
+      queueRef.current.shift();
       inflightRef.current.add(key);
       void runOne(item);
     }
@@ -676,6 +680,10 @@ export function useCanvasRunner(fallbackProjectId?: string) {
   const enqueueStoryRun = useCallback(
     (job: QueueItem) => {
       const key = runKey(job);
+      if (job.forceFresh) {
+        inflightRef.current.delete(key);
+        queueRef.current = queueRef.current.filter((q) => runKey(q) !== key);
+      }
       if (inflightRef.current.has(key)) return;
       if (queueRef.current.some((q) => runKey(q) === key)) return;
       const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
@@ -684,7 +692,10 @@ export function useCanvasRunner(fallbackProjectId?: string) {
         if (isCanvasInflightStatus(st)) return;
       }
       const rowSt = storyRowRuntimeStatus(node, job);
-      if (rowSt === "running" || rowSt === "pending" || rowSt === "queued") {
+      if (
+        !job.forceFresh &&
+        (rowSt === "running" || rowSt === "pending" || rowSt === "queued")
+      ) {
         return;
       }
       if (node) {

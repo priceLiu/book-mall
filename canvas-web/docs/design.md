@@ -1,0 +1,326 @@
+# 漫剧画布 · 设计规范
+
+canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案显示、编辑模式、对比图** 约定。实现时以代码常量为真源；改尺寸须同步更新本文与 `normalize-graph-nodes.ts` / `NODE_DEFAULT_SIZE`。
+
+相关文档：[story-eng.md](./story-eng.md) · [story-ops.md](./story-ops.md)
+
+---
+
+## 1. 尺寸常量（真源）
+
+| 常量 | 值 | 文件 |
+|------|-----|------|
+| `STORY_CONTROL_NODE_WIDTH` | **1020** | `lib/canvas/story-node-chrome.ts` |
+| `STORY_CONTROL_NODE_HEIGHT` | **1200** | 同上 |
+| `NODE_DEFAULT_SIZE["story-video-column"]` | **500 × 2100** | `lib/canvas/types.ts` |
+| `NODE_DEFAULT_SIZE["story-frame-column"]` | **1080 × 2100** | 同上 |
+| `NODE_DEFAULT_SIZE["story-character-column"]` | **560 × 2100** | 同上 |
+| `NODE_DEFAULT_SIZE["jianying-export"]` | **400 × 280** | 同上 |
+| `NODE_DEFAULT_SIZE["three-view-engine"]` | **670 × 880** | 同上 |
+| `NODE_THREE_VIEW_MIN_*` | 670 × 880 | `components/canvas/node-ui.tsx` |
+| `STORY_ROW_LABEL_COL_WIDTH` | **56** | `lib/canvas/story-ref-image.ts` |
+| `STORY_UPSTREAM_COL_WIDTH`（参考图） | **220** | 同上 |
+| `STORY_MEDIA_COL_WIDTH`（分镜/角色输出图） | **248** | 同上 |
+| `MEDIA_COL_MIN` / 行媒体最小高 | **248** | `lib/canvas/story-column-layout.ts` |
+| `STORY_COLUMN_VIEWPORT_H` | **2100** | 同上（与分镜列固定高对齐） |
+
+### 1.1 控制节点（故事主题 + 故事大纲）
+
+- 类型：`story-comic-starter`、`story-script-hub`
+- **固定 1020 × 1200**，二者同宽同高
+- 禁止按内容动态撑高节点外框；内容在预览区 **flex-1 内滚**，底栏 **固定不滚**
+- 加载 / 重排 / migrate 须写回上述尺寸（见 `normalizeStoryControlNodeSizes`、`applyStoryControlRowHeights`）
+
+### 1.2 三视图节点
+
+- 类型：`three-view-engine`
+- **固定 670 × 880**（Prompt 上 · 三视图下）
+- 持久化尺寸偏差过大时 normalize 收拢到默认
+
+### 1.3 角色列 + 分镜脚本列（图 2 工作区）
+
+- **角色列** `story-character-column`：**560 × 2100**
+- **分镜列** `story-frame-column`：**1080 × 2100**
+- **分镜视频列** `story-video-column`：**500 × 2100**
+- 宽度不变；**禁止**再按 rows 内容动态撑节点外框高
+- 行列表在 `NodeShell bodyScroll` 内滚动；底栏批量按钮固定
+- 行内列宽：标签 56 · 提示词 flex-1 · 参考图 220 · 输出图 248
+- 加载 / 重排 / migrate 须写回上述尺寸（`normalizeStoryMediaColumnSizes`、`storyCharacterColumnSize` / `storyFrameColumnSize` 仅返回默认宽高）
+
+### 1.4 剪映导出节点
+
+- 类型：`jianying-export`
+- **固定 400 × 280**
+- 每套工作流 **独立** 创建，数据字段 `hubNodeId` 绑定所属故事大纲
+- 连线：本分镜视频列 → 本剪映导出；旧工作流的剪映 **不可复用**
+
+### 1.5 工作区横向重排（多工作流）
+
+真源：`lib/canvas/story-workspace-layout.ts` · `lib/canvas/story-comic-workspace-layout.ts`
+
+- 列间距 `STORY_WORKSPACE_COL_H_GAP = 120`
+- 控制行：主题 `x` → 大纲 `x + 1020 + 120`
+- 媒体列 X（从大纲左缘起）：  
+  `hubLeftX + 1020 + 120`，再依次 + `(列宽 + 120)`  
+  列宽序列：**560 · 1080 · 500 · 400**（角色 · 分镜 · 视频 · 剪映）
+- 媒体列 Y：**底对齐** 控制行底边（1200 高）  
+  `y = controlRowBottom - columnHeight`（2100 高列显著上探）
+- **剪映导出** Y：**底对齐** 控制行底边（与三列媒体列底边齐平，高度 280 贴底）
+- **每套** `story-comic-starter` 独立 `reflowStarterChain`，互不覆盖
+- 步进宽度取 `style.width`、RF measured、类型默认的 **最大值**，避免重叠
+
+---
+
+## 2. 节点壳布局
+
+所有带底栏的漫剧节点统一结构：
+
+```text
+┌─ NodeShell header ─────────────────────┐
+├─ 区块标签（蓝色提示，见 §8）        │
+├─ flex-1 min-h-0 预览/列表区（overflow-y）│
+├─ STORY_NODE_SHELL_FOOTER_CLASS ────────┤
+│   · 可选 EnginePicker 区（故事主题）     │
+│   · StoryNodeFooterShell               │
+│     ├ 主按钮 h-9 (36px)                │
+│     └ 提示行 h-4 (16px，无文案也占位)   │
+└────────────────────────────────────────┘
+```
+
+共享类名（`story-node-chrome.ts`）：
+
+- `STORY_NODE_SHELL_FOOTER_CLASS` — 底栏容器
+- `STORY_NODE_PREVIEW_SCROLL_CLASS` — 预览滚动区
+- `STORY_NODE_ENGINE_DOCK_CLASS` — 故事主题 LLM 选择区（不进滚动）
+
+---
+
+## 3. 按钮
+
+### 3.1 漫剧主操作（橙实心）
+
+- 常量：`STORY_ORANGE_BTN_CLASS`（`story-column-batch-footer.tsx`）
+- 色：`#fb923c` / hover `#fdba74`；**禁用时不变暗**（保持可读）
+- 高度：**h-9（36px）**，字号 12px
+- 用法：
+  - 节点底栏全宽：`STORY_NODE_ACTION_BTN_CLASS`
+  - 大纲双按钮并排：`STORY_NODE_ACTION_BTN_SPLIT_CLASS`
+  - 三列批量：`StoryColumnBatchFooter`
+
+### 3.2 引擎节点主按钮
+
+- `NODE_BTN_ENGINE_PRIMARY`（`node-ui.tsx`）— 与漫剧橙同色
+
+### 3.3 弹层顶栏
+
+| 类型 | 样式 |
+|------|------|
+| Tab 选中 | `bg-[#fb923c]/25 text-[#fdba74]` |
+| Tab 未选 | `text-white/60 hover:bg-white/10` |
+| 保存（实心） | `bg-[#fb923c] text-black`，未改时 `disabled:opacity-40` |
+| 生成 / 重新生成 | 描边 `border-[#fb923c]/50 bg-[#fb923c]/15 text-[#fdba74]` |
+| 关闭 | 圆形 `border-white/10`，X 图标 |
+
+### 3.4 列内媒体操作（圆形浮层）
+
+- 生成 / 重生成：`size-9`，橙描边 `border-[#fb923c]/40`
+- 预览：`size-9`，白描边 `border-white/20`
+- 分镜视频快捷：`size-8` 右下角 Clapperboard
+- 生成中：中央 `RefreshCw` 旋转 + `canvas-story-media-generating` 橙边
+
+### 3.5 放大镜预览
+
+- 组件：`StoryPreviewMagnifyButton`
+- 标题栏：`onDark` — 橙底描边 28×28
+- 白纸预览 hover：`onLight` — 白底橙字
+- 预览纸 hover  overlay：居中 44×44 圆 + Search 图标
+
+---
+
+## 4. 弹出层
+
+### 4.1 通用遮罩
+
+| 用途 | z-index | 背景 |
+|------|---------|------|
+| 审阅弹层 / Word 全屏 / 对比 | **1100** | `bg-neutral-600/90 backdrop-blur-sm` 或 `bg-black/92~94` |
+| EnginePicker 下拉 | 1200 | — |
+
+- `createPortal` 挂 `document.body`
+- 打开时 `document.body.style.overflow = hidden`
+- `Escape` 关闭；审阅弹层点击遮罩关闭
+- 内容区加 `nodrag` / `stopPropagation`，避免拖动画布
+
+### 4.2 双栏审阅弹层（故事主题 / 故事大纲）
+
+组件：`StoryThemePromptModal`、`StoryScriptHubModal`
+
+```text
+顶栏：标题 + Tab + 保存状态 + 操作 + 关闭
+正文：max-w-[min(96vw,1400px)] grid-cols-2 白底卡片
+  左 · 编辑   │ 右 · 原稿/预览
+  sticky 栏   │ sticky 栏
+  DOC_PAD     │ DOC_PAD + MarkdownView document
+```
+
+- 左右 **等高**：右侧 `ResizeObserver` 量高，左侧 `minHeight` 对齐
+- 故事主题顶栏 Tab：**模板一 / 模板二 / … / 自定义**（不在节点上放 Tab）
+- 故事大纲顶栏 Tab：**故事大纲 / 角色设定 / 分镜脚本 / 对白**
+
+### 4.3 Word 式全屏阅读
+
+组件：`MarkdownFullscreenLightbox`
+
+- 居中纸页：`max-w-[820px]`，`px-10 py-12 sm:px-14 sm:py-16`
+- `MarkdownView variant="document"`
+
+### 4.4 媒体预览
+
+- 单图/视频：`StoryMediaPreviewModal` — 黑底居中，`max-w-[min(96vw,960px)]`
+- 带 Prompt 侧栏：`MediaHoverBox` 预览弹层（分镜图可左 Prompt 右图）
+
+---
+
+## 5. 文案显示（Markdown）
+
+### 5.1 MarkdownView 变体
+
+| variant | 场景 | 排版 |
+|---------|------|------|
+| `document` | 弹层右栏、Word 全屏 | 17px / leading 1.75，prose-neutral 深字 |
+| `nodePreview` | 故事大纲节点白纸预览 | 13px，浅灰底 `neutral-50` |
+| `darkPreview` | 故事主题节点黑底预览 | 13px，prose-invert 白字 |
+| `inline` | 引擎节点内嵌 | 12px 暗色 |
+
+### 5.2 节点内预览纸
+
+| 节点 | 背景 | 组件 |
+|------|------|------|
+| 故事主题 | **黑底** `bg-black` | `StoryThemePromptPreviewPane` |
+| 故事大纲 | **白纸** `bg-neutral-50` | `StoryHubNodePreviewPane` |
+
+- 有内容：整纸可点 → 打开审阅弹层；hover 橙边 + 居中放大镜
+- 无内容：虚线框 + 居中提示，不可打开
+
+### 5.3 GFM 表格
+
+- 统一 chrome：`lib/canvas/story-md-table-chrome.ts`
+- 预览/编辑同款：外框 `border-neutral-300`，表头 `bg-neutral-100`，单元格 `bg-white`
+- document：`15px` + `px-4 py-2.5`；nodePreview：`12px` + `px-2.5 py-1.5`
+- 角色/分镜默认可解析为表格编辑，见 §6
+
+---
+
+## 6. 编辑模式
+
+### 6.1 故事主题
+
+- 节点：只读预览；编辑仅在 `StoryThemePromptModal`
+- 左栏：`textarea`，`DOC_TEXT`（17px sans，`leading-[1.85]`）
+- 模板 Tab 切换载入模板正文；改动后保存可落为自定义
+
+### 6.2 故事大纲审阅
+
+| 段 | 默认编辑 | 可切换 |
+|----|----------|--------|
+| 故事大纲 | Markdown textarea | — |
+| 角色设定 | **表格** `StoryCharacterTableEditor` | Markdown 源码 |
+| 分镜脚本 | **表格** `StoryStoryboardTableEditor` | Markdown 源码 |
+| 对白 | 按镜号 textarea 列表 | 只读依赖分镜表 |
+
+- 大纲/角色/分镜支持 **历史版本** 下拉恢复
+- 单段 **生成 / 重新生成** LLM；保存写入 hub node data
+- **禁止**在 UI 弹黄色台词/角色名警告（约束写在 prompt）
+
+### 6.3 分镜列行编辑
+
+- 提示词：`MentionsTextarea`，支持 `@<ref-char-*>` 引用角色三视图
+- 600ms debounce 写回 `rows`
+- 参考图列只读展示上游；输出图列生成/预览/分镜视频
+
+---
+
+## 7. 参考图与对比
+
+### 7.1 分镜行 · 上游参考图（对比参照）
+
+- 宽 **220**，最小高 **248**
+- 被 `@` 引用的图：**橙色激活框**  
+  `border-[#fb923c]` + `shadow-[0_0_0_1px_#fb923c,0_0_10px_rgba(251,146,60,0.4)]`
+- 未引用：`border-white/15`
+- 无图占位：「待上游」/ 虚线 `—`
+
+### 7.2 输出图列
+
+- 宽 **248**；`object-contain` 黑底槽
+- hover 显示生成/预览；分镜有图时右下角 **生视频** 钮
+
+### 7.3 历史对比弹层（引擎节点）
+
+组件：`CompareModal` / `CompareSplitView` / `MediaHoverBox`
+
+- 全屏 `z-[1100]`，`bg-black/94`
+- 顶栏 `CompareToolbar`：左图/右图下拉 + 步进
+- 视图：**重叠 + 竖向滑块** 切分对比（非简单并排）
+- 默认：主图 vs 参考图，或主图 vs 上一张任务
+- 键盘：`←` / `→` 切右图，`Escape` 关闭
+- 预览弹层内 Tab：**大图 | 对比**（需传入 `compareContext`）
+
+---
+
+## 8. 蓝色提示文案（模型 / @ 引用）
+
+真源：`lib/canvas/story-column-sync.ts`
+
+| 常量 | 用途 | 样式 |
+|------|------|------|
+| `STORY_HINT_BLUE_CLASS` | 蓝色字色 | `text-[#60a5fa]` |
+| `STORY_HINT_LABEL_CLASS` | 区块标签 | 左竖线 `border-l-2 border-[#60a5fa] pl-2` + 10px uppercase 蓝字 |
+| `STORY_HINT_BODY_CLASS` | 行内说明、@ 提示 | 10px `leading-relaxed` 蓝字 |
+
+固定文案与用法：
+
+- **故事主题** 底栏：`LLM 模型（文案共用）` → `STORY_HINT_LABEL_CLASS`
+- **分镜列** 模型区：`分镜图 · IMAGE`、`分镜视频 · VIDEO` → `STORY_HINT_LABEL_CLASS`
+- **镜 1 @ 提示**：`FRAME_ROW_AT_HINT` = `（输入 @ 可引用已生成的角色三视图）` → `STORY_HINT_BODY_CLASS`，显示在提示词输入框下方
+- **空列表说明**、textarea placeholder「输入 @ 引用角色三视图」等同系蓝色提示
+
+橙色 `#fb923c` **仅**用于主按钮、Tab 选中、**@ 激活的参考图边框**；操作说明与模型标签一律蓝色，勿用 muted 灰或橙字。
+
+---
+
+## 9. 色彩与强调
+
+| 用途 | 色值 |
+|------|------|
+| 漫剧强调橙 | `#fb923c` / `#fdba74` / `#ea580c` |
+| 操作提示蓝 | `#60a5fa`（见 §8） |
+| 画布 muted 文案 | `var(--canvas-muted)` |
+| 画布表面 | `var(--canvas-surface)` |
+| 成功/未保存 | `text-emerald-300` / `text-amber-300` |
+
+---
+
+## 10. 功能与模块索引
+
+| 功能 | 入口 / 模块 |
+|------|-------------|
+| 创作剧本 | 故事主题底栏 → 顺序生成大纲/角色/分镜 |
+| 审阅保存 | 放大镜 / 预览纸 → `StoryScriptHubModal` |
+| 系统提示词 | 故事主题 → `StoryThemePromptModal` |
+| Word 全屏 | 弹层内或 hub 预览链 → `MarkdownFullscreenLightbox` |
+| 列批量生成 | 角色/分镜/视频列底栏 `StoryColumnBatchFooter` |
+| 工作区重排 | `reflowStoryComicWorkspace` |
+| 尺寸迁移 | `normalizeCanvasNodes`、`migrateGraphV1ToV2` |
+
+---
+
+## 11. 修改尺寸检查清单
+
+改任何固定尺寸时：
+
+1. 更新 `story-node-chrome.ts` / `types.ts` `NODE_DEFAULT_SIZE` / `story-ref-image.ts` / `node-ui.tsx`
+2. 更新 `story-column-layout.ts` 内 `MEDIA_COL_MIN` 等与列相关的估算
+3. 更新 `normalize-graph-nodes.ts` 收拢阈值（若逻辑硬编码）
+4. 更新 **本文档** §1 表格
+5. 已有项目：刷新后 normalize；列位重叠则 **重排**

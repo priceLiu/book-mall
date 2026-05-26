@@ -8,6 +8,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import type { VideoEngineNodeData, VideoPreviewNodeData } from "@/lib/canvas/types";
 import { directPredecessors } from "@/lib/canvas/topo";
 import { NodeShell } from "../node-shell";
+import { CanvasVideoPlayer } from "../canvas-video-player";
 import { MediaPreviewLightbox } from "../media-hover-box";
 import { PreviewNodeHeader } from "../preview-node-header";
 import {
@@ -81,13 +82,10 @@ export function VideoPreviewNode({ id, data, selected }: NodeProps) {
         {url ? (
           <div className="flex flex-col gap-2">
             <NodeMediaStage>
-              <video
+              <CanvasVideoPlayer
                 key={url}
                 src={url}
-                controls
-                playsInline
-                preload="metadata"
-                className="nodrag h-full w-full object-contain"
+                className="h-full w-full rounded-none border-0"
               />
             </NodeMediaStage>
             <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import type { CanvasFlowNode, CanvasNodeType, CanvasFlowEdge } from "./types";
 import { isGroupNode, NODE_DEFAULT_SIZE } from "./types";
+import { STORY_CONTROL_NODE_HEIGHT, STORY_CONTROL_NODE_WIDTH } from "./story-node-chrome";
 
 const GROUP_PADDING = 28;
 const GROUP_HEADER = 40;
@@ -679,7 +680,7 @@ export function hasStoryTemplateGroups(nodes: CanvasFlowNode[]): boolean {
   );
 }
 
-/** 三视图节点高度曾用 520/640，超出新布局时收拢到默认尺寸 */
+/** 三视图节点：纠正与默认尺寸偏差过大的持久化宽高 */
 function normalizeThreeViewNodeSizes(
   nodes: CanvasFlowNode[],
 ): CanvasFlowNode[] {
@@ -689,7 +690,69 @@ function normalizeThreeViewNodeSizes(
     const { w, h } = nodeMeasuredSize(n);
     const nextW =
       w > def.width + 60 || w < def.width - 40 ? def.width : w;
-    const nextH = h > def.height + 16 ? def.height : h;
+    const nextH =
+      h > def.height + 16 || h < def.height - 40 ? def.height : h;
+    if (nextW === w && nextH === h) return n;
+    return {
+      ...n,
+      width: nextW,
+      height: nextH,
+      style: {
+        ...(typeof n.style === "object" && n.style ? n.style : {}),
+        width: nextW,
+        height: nextH,
+      },
+    } as CanvasFlowNode;
+  });
+}
+
+/** 角色列 / 分镜列：固定宽高（内容超出时 bodyScroll 内滚） */
+function normalizeStoryMediaColumnSizes(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  return nodes.map((n) => {
+    if (
+      n.type !== "story-character-column" &&
+      n.type !== "story-frame-column" &&
+      n.type !== "story-video-column"
+    ) {
+      return n;
+    }
+    const def = NODE_DEFAULT_SIZE[n.type];
+    const { w, h } = nodeMeasuredSize(n);
+    const tooSmall = w < def.width * 0.9 || h < def.height * 0.9;
+    const nextW = tooSmall || w !== def.width ? def.width : w;
+    const nextH = tooSmall || h !== def.height ? def.height : h;
+    if (nextW === w && nextH === h) return n;
+    return {
+      ...n,
+      width: nextW,
+      height: nextH,
+      style: {
+        ...(typeof n.style === "object" && n.style ? n.style : {}),
+        width: nextW,
+        height: nextH,
+      },
+    } as CanvasFlowNode;
+  });
+}
+
+/** 故事主题 / 故事大纲：纠正异常偏小的持久化尺寸；保留用户加长后的高度 */
+function normalizeStoryControlNodeSizes(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  const fixedW = STORY_CONTROL_NODE_WIDTH;
+  const fixedH = STORY_CONTROL_NODE_HEIGHT;
+
+  return nodes.map((n) => {
+    if (n.type !== "story-comic-starter" && n.type !== "story-script-hub") {
+      return n;
+    }
+    const { w, h } = nodeMeasuredSize(n);
+    const tooSmall = w < fixedW * 0.75 || h < fixedH * 0.85;
+    const tooTall = h > fixedH * 1.08 || w > fixedW * 1.08;
+    const nextW = tooSmall || tooTall || w !== fixedW ? fixedW : w;
+    const nextH = tooSmall || tooTall || h !== fixedH ? fixedH : h;
     if (nextW === w && nextH === h) return n;
     return {
       ...n,
@@ -708,7 +771,9 @@ export function normalizeCanvasNodes(
   nodes: CanvasFlowNode[],
   edges?: CanvasFlowEdge[],
 ): CanvasFlowNode[] {
-  const sized = normalizeThreeViewNodeSizes(nodes);
+  const sized = normalizeStoryControlNodeSizes(
+    normalizeStoryMediaColumnSizes(normalizeThreeViewNodeSizes(nodes)),
+  );
   if (!hasStoryTemplateGroups(sized)) {
     return sortNodesForReactFlow(repairOrphanParentIds(sized));
   }

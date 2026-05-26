@@ -1,4 +1,11 @@
-import { stripOutlineCharacterTable, parseStoryboardRows } from "./parse-md-tables";
+import {
+  stripOutlineCharacterTable,
+  stripOutlineEmbeddedPackSections,
+  extractCharacterSectionFromOutline,
+  normalizeStoryboardSectionFromOutline,
+  compactGfmTables,
+  parseStoryboardRows,
+} from "./parse-md-tables";
 import type { CanvasFlowNode } from "./types";
 import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-types";
 
@@ -12,9 +19,68 @@ export function hubSectionRuntime(
   return d.storyboardRuntime;
 }
 
-/** 故事大纲展示用（不含人物表简表） */
+/** 故事大纲展示用（不含人物表简表与嵌入的制作包段落） */
 export function outlineDisplayMd(md: string): string {
-  return stripOutlineCharacterTable(md ?? "");
+  return stripOutlineEmbeddedPackSections(stripOutlineCharacterTable(md ?? ""));
+}
+
+/** 解析各 Tab 展示/编辑用 Markdown：优先独立字段，否则从大纲嵌入段回落 */
+export function resolveHubSectionMd(
+  d: StoryScriptHubNodeData,
+  section: HubPreviewSection,
+): string {
+  if (section === "outline") {
+    return outlineDisplayMd(d.outlineMd ?? "");
+  }
+  if (section === "character") {
+    const dedicated = (d.characterMd ?? "").trim();
+    if (dedicated) return dedicated;
+    return extractCharacterSectionFromOutline(d.outlineMd ?? "");
+  }
+  if (section === "storyboard") {
+    const dedicated = (d.storyboardMd ?? "").trim();
+    if (dedicated) return dedicated;
+    return normalizeStoryboardSectionFromOutline(d.outlineMd ?? "");
+  }
+  const storyboard = resolveHubSectionMd(d, "storyboard");
+  return hubDialoguePreviewMd(storyboard);
+}
+
+export function resolveHubStoryboardMd(d: StoryScriptHubNodeData): string {
+  return resolveHubSectionMd(d, "storyboard");
+}
+
+/** 将大纲嵌入段拆入 hub 各字段，供 syncColumnsFromHub 使用 */
+export function hubDataForColumnSync(
+  d: StoryScriptHubNodeData,
+): StoryScriptHubNodeData {
+  const promoted = promoteEmbeddedPackFromOutline(
+    d.outlineMd ?? "",
+    d.characterMd ?? "",
+    d.storyboardMd ?? "",
+  );
+  return {
+    ...d,
+    outlineMd: promoted.outlineMd || d.outlineMd || "",
+    characterMd: promoted.characterMd || d.characterMd || "",
+    storyboardMd: promoted.storyboardMd || d.storyboardMd || "",
+  };
+}
+
+/** 保存大纲时：将嵌入的制作包段落拆到独立字段，避免其他 Tab 读不到 */
+export function promoteEmbeddedPackFromOutline(
+  outlineMd: string,
+  characterMd = "",
+  storyboardMd = "",
+): { outlineMd: string; characterMd: string; storyboardMd: string } {
+  return {
+    outlineMd: outlineDisplayMd(outlineMd),
+    characterMd:
+      characterMd.trim() || extractCharacterSectionFromOutline(outlineMd),
+    storyboardMd:
+      storyboardMd.trim() ||
+      normalizeStoryboardSectionFromOutline(outlineMd),
+  };
 }
 
 export function hubSectionMd(
@@ -53,8 +119,11 @@ export function hubSectionIsReady(
   node: CanvasFlowNode,
   section: StoryLlmSection,
 ): boolean {
-  const md = hubSectionMd(node, section);
-  if (!md.trim()) return false;
+  const d = node.data as unknown as StoryScriptHubNodeData;
+  const dedicated = hubSectionMd(node, section).trim();
+  const md = dedicated || resolveHubSectionMd(d, section).trim();
+  if (!md) return false;
+  if (!dedicated) return true;
   const st = hubSectionRuntime(node, section)?.status;
   if (st === "running" || st === "pending" || st === "error") return false;
   return true;
@@ -69,7 +138,7 @@ export function hubSectionIsRunning(
 }
 
 export function hubDialogueIsReady(storyboardMd: string): boolean {
-  const rows = parseStoryboardRows(storyboardMd ?? "");
+  const rows = parseStoryboardRows(compactGfmTables(storyboardMd ?? ""));
   if (!rows.length) return false;
   return rows.some((r) => {
     const d = (r.dialogue ?? "").trim();
@@ -88,9 +157,17 @@ export function hubAggregateStatus(
   if (sections.some((s) => hubSectionIsRunning(node, s))) return "running";
   const scriptReady =
     sections.every((s) => hubSectionIsReady(node, s)) &&
-    hubDialogueIsReady(d.storyboardMd ?? "");
+    hubDialogueIsReady(resolveHubStoryboardMd(d));
   if (scriptReady) return "done";
   return "idle";
+}
+
+/** 是否允许「输出工作流」：至少有大纲且大纲段未在跑/失败（角色/分镜可仍在生成） */
+export function hubCanOutputWorkflow(node: CanvasFlowNode): boolean {
+  const d = node.data as unknown as StoryScriptHubNodeData;
+  if (hubSectionRuntime(node, "outline")?.status === "error") return false;
+  if (hubSectionIsRunning(node, "outline")) return false;
+  return Boolean(resolveHubSectionMd(d, "outline").trim());
 }
 
 export function hubPreviewMarkdown(d: StoryScriptHubNodeData): string {
@@ -104,7 +181,7 @@ export function hubPreviewMarkdown(d: StoryScriptHubNodeData): string {
 }
 
 export function hubDialoguePreviewMd(storyboardMd: string): string {
-  const rows = parseStoryboardRows(storyboardMd ?? "");
+  const rows = parseStoryboardRows(compactGfmTables(storyboardMd ?? ""));
   if (!rows.length) return "";
   return rows
     .map(
@@ -120,10 +197,5 @@ export function hubSectionPreviewContent(
   d: StoryScriptHubNodeData,
   section: HubPreviewSection,
 ): string {
-  if (section === "dialogue") return hubDialoguePreviewMd(d.storyboardMd ?? "");
-  if (section === "outline") return outlineDisplayMd(d.outlineMd ?? "");
-  return hubSectionMd(
-    { id: "", data: d, type: "story-script-hub", position: { x: 0, y: 0 } },
-    section,
-  );
+  return resolveHubSectionMd(d, section);
 }

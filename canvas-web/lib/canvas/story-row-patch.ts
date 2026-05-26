@@ -18,6 +18,7 @@ import {
   parseOutlineBriefCharacters,
 } from "./parse-md-tables";
 import { pushStoryRevision } from "./story-revision";
+import { promoteEmbeddedPackFromOutline } from "./story-hub-runtime";
 
 export function applyHubSectionFromTask(
   data: StoryScriptHubNodeData,
@@ -29,9 +30,14 @@ export function applyHubSectionFromTask(
   if (section === "outline") {
     patch.outlineRuntime = runtime;
     if (textOutput?.trim()) {
-      const { outlineMd, characterMd } = normalizeOutlineSection(
+      const promoted = promoteEmbeddedPackFromOutline(
         textOutput,
         data.characterMd ?? "",
+        data.storyboardMd ?? "",
+      );
+      const { outlineMd, characterMd } = normalizeOutlineSection(
+        promoted.outlineMd,
+        promoted.characterMd,
       );
       patch.outlineMd = outlineMd;
       patch.outlineHistory = pushStoryRevision(data.outlineHistory, outlineMd);
@@ -40,6 +46,16 @@ export function applyHubSectionFromTask(
         patch.characterHistory = pushStoryRevision(
           data.characterHistory,
           characterMd,
+        );
+      }
+      if (
+        promoted.storyboardMd.trim() &&
+        promoted.storyboardMd !== (data.storyboardMd ?? "")
+      ) {
+        patch.storyboardMd = promoted.storyboardMd;
+        patch.storyboardHistory = pushStoryRevision(
+          data.storyboardHistory,
+          promoted.storyboardMd,
         );
       }
     }

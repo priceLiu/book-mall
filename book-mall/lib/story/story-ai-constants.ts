@@ -15,6 +15,7 @@ export const STORY_AI_KIE_MODELS = {
  *  - buildInput：把通用 options + frame 转成模型特定的 KIE input 形状
  *
  * 当前接入（均为图生视频，匹配漫剧分镜「先出图、再出视频」的工作流）：
+ *   - kling-2.6/image-to-video       快手可灵 2.6   docs.kie.ai/market/kling/image-to-video
  *   - bytedance/seedance-2        字节豆包       docs/kie/seedance-2.md
  *   - wan/2-7-image-to-video       阿里通义万相    docs/kie/wan 2.7 img 2 video.md
  *   - happyhorse/image-to-video    Happy Horse    docs/kie/happy-horse img 2 video.md
@@ -22,6 +23,7 @@ export const STORY_AI_KIE_MODELS = {
  * 注意：之前曾误用 `wan/2-7-text-to-video`（文生视频，丢失分镜图一致性），已切换。
  */
 export const STORY_VIDEO_MODEL_IDS = [
+  "kling-2.6/image-to-video",
   "bytedance/seedance-2",
   "wan/2-7-image-to-video",
   "happyhorse/image-to-video",
@@ -67,6 +69,16 @@ export const STORY_VIDEO_MODELS: Record<
   StoryVideoModelId,
   StoryVideoModelDescriptor
 > = {
+  "kling-2.6/image-to-video": {
+    id: "kling-2.6/image-to-video",
+    label: "Kling 2.6",
+    description: "快手可灵 · 图生视频，分镜图驱动，可选配音。",
+    requiresImage: true,
+    resolutions: ["720p"] as const,
+    defaults: { resolution: "720p", duration: 5, generateAudio: false },
+    durationRange: [5, 10] as const,
+    supports: { generateAudio: true, promptExtend: false, watermark: false },
+  },
   "bytedance/seedance-2": {
     id: "bytedance/seedance-2",
     label: "Seedance 2",

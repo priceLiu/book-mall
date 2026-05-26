@@ -3,6 +3,7 @@
 import { Film, Play, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORY_VIDEO_SLOT } from "@/lib/canvas/story-column-layout";
+import { StoryVideoPromptPopover } from "./story-video-prompt-popover";
 
 const REFRESH_BTN =
   "nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/45 bg-[#fb923c]/20 text-[#fdba74] hover:bg-[#fb923c]/30";
@@ -12,7 +13,9 @@ export function StoryVideoRowSlot({
   frameIndex,
   videoUrl,
   videoPrompt,
+  videoRefLabels = [],
   generating,
+  errorMessage,
   onGenerate,
   onPreview,
 }: {
@@ -20,7 +23,9 @@ export function StoryVideoRowSlot({
   videoUrl?: string;
   /** hover 时在视频右侧展示完整视频提示词 */
   videoPrompt?: string;
+  videoRefLabels?: string[];
   generating?: boolean;
+  errorMessage?: string;
   onGenerate: () => void;
   onPreview?: () => void;
 }) {
@@ -108,15 +113,16 @@ export function StoryVideoRowSlot({
           ) : null}
         </div>
 
-        {hasVideo && promptText ? (
-          <div
-            className="pointer-events-none absolute left-[calc(100%+8px)] top-0 z-30 hidden max-h-[min(200px,100%)] w-[min(240px,calc(100vw-420px))] overflow-y-auto rounded-md border border-white/15 bg-black/90 px-2.5 py-2 text-[10px] leading-relaxed text-white/75 shadow-xl group-hover/slot:block"
-            aria-hidden
-          >
-            {promptText}
-          </div>
+        {promptText ? (
+          <StoryVideoPromptPopover
+            prompt={promptText}
+            refLabels={videoRefLabels}
+          />
         ) : null}
       </div>
+      {errorMessage && !generating ? (
+        <p className="text-[10px] leading-snug text-red-400/90">{errorMessage}</p>
+      ) : null}
     </article>
   );
 }

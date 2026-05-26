@@ -15,7 +15,10 @@ import {
   type StoryThemeSystemPromptTemplateId,
   STORY_VIDEO_ENGINE_PROMPT_DEFAULT,
 } from "./story-prompts";
-import { storyComicStarterNodeHeight } from "./story-node-chrome";
+import {
+  STORY_CONTROL_NODE_HEIGHT,
+  STORY_CONTROL_NODE_WIDTH,
+} from "./story-node-chrome";
 
 export {
   AI_ENGINE_PROMPT_TEMPLATE,
@@ -327,6 +330,8 @@ export type ImagePreviewNodeData = {
 
 export type JianyingExportNodeData = {
   label?: string;
+  /** 所属故事大纲 hub，多工作流画布按此隔离帧数据 */
+  hubNodeId?: string;
   runtime?: CanvasNodeRuntime;
 };
 
@@ -521,14 +526,20 @@ export const NODE_DEFAULT_SIZE: Record<
 > = {
   image: { width: 380, height: 320 },
   text: { width: 380, height: 260 },
-  "story-comic-starter": { width: 420, height: storyComicStarterNodeHeight() },
-  "story-script-hub": { width: 720, height: storyComicStarterNodeHeight() },
-  "story-character-column": { width: 560, height: 960 },
-  "story-frame-column": { width: 880, height: 1040 },
-  "story-video-column": { width: 400, height: 480 },
+  "story-comic-starter": {
+    width: STORY_CONTROL_NODE_WIDTH,
+    height: STORY_CONTROL_NODE_HEIGHT,
+  },
+  "story-script-hub": {
+    width: STORY_CONTROL_NODE_WIDTH,
+    height: STORY_CONTROL_NODE_HEIGHT,
+  },
+  "story-character-column": { width: 560, height: 2100 },
+  "story-frame-column": { width: 1080, height: 2100 },
+  "story-video-column": { width: 500, height: 2100 },
   "ai-engine": { width: 480, height: 540 },
   "image-engine": { width: 380, height: 560 },
-  "three-view-engine": { width: 420, height: 480 },
+  "three-view-engine": { width: 670, height: 880 },
   "story-outline-engine": { width: 480, height: 540 },
   "character-engine": { width: 480, height: 540 },
   "storyboard-engine": { width: 500, height: 560 },

@@ -16,6 +16,11 @@ import type { CanvasNodeType } from "@/lib/canvas/types";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { uploadCanvasImage } from "@/lib/canvas-api";
+import {
+  registerCanvasViewportPlacement,
+  unregisterCanvasViewportPlacement,
+} from "@/lib/canvas/viewport-placement";
+import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 import { ImageNode } from "./nodes/image-node";
 import { TextNode } from "./nodes/text-node";
 import { AiEngineNode } from "./nodes/ai-engine-node";
@@ -104,6 +109,14 @@ function FlowCanvasInner() {
   const runningFocusNodeId = useCanvasStore((s) => s.runningFocusNodeId);
   const runningFocusNonce = useCanvasStore((s) => s.runningFocusNonce);
   const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    registerCanvasViewportPlacement({
+      screenToFlowPosition,
+      getContainer: () => wrapRef.current,
+    });
+    return () => unregisterCanvasViewportPlacement();
+  }, [screenToFlowPosition]);
 
   useEffect(() => {
     if (fitViewNonce <= 0) return;
@@ -481,9 +494,11 @@ function FlowCanvasInner() {
         fitView
         proOptions={{ hideAttribution: true }}
         className="bg-[var(--canvas-bg)]"
-        // 框选：拖空白即可框选；按住 space 或 中键拖动来平移；多选支持 partial overlap
+        // 框选：拖空白即可框选；按住 Space 或 中键/右键 拖动来平移
         selectionOnDrag
         panOnDrag={[1, 2]}
+        panActivationKeyCode="Space"
+        nodeDragHandle={`.${RF_NODE_DRAG_HANDLE}`}
         selectionMode={SelectionMode.Partial}
         multiSelectionKeyCode={["Meta", "Shift", "Control"]}
         // 删除键：选中 edge / node 后可删除（Mac 用 Backspace 也支持）

@@ -19,8 +19,8 @@ export function MarkdownView({
 }: {
   content: string;
   className?: string;
-  /** inline=暗色节点；nodePreview=节点内白纸预览；document=全屏 Word 式阅读 */
-  variant?: "inline" | "document" | "nodePreview";
+  /** inline=暗色节点；nodePreview=节点内白纸预览；document=全屏 Word 式阅读；darkPreview=黑底白字节点预览 */
+  variant?: "inline" | "document" | "nodePreview" | "darkPreview";
 }) {
   if (!content.trim()) {
     return (
@@ -30,10 +30,13 @@ export function MarkdownView({
 
   const isDoc = variant === "document";
   const isNodePreview = variant === "nodePreview";
+  const isDarkPreview = variant === "darkPreview";
   const isLightDoc = isDoc || isNodePreview;
   const tableVariant: StoryMdTableVariant = isNodePreview
     ? "nodePreview"
-    : "document";
+    : isDarkPreview
+      ? "inline"
+      : "document";
 
   const tableCell = storyMdTableTextClass(tableVariant);
   const tablePad = storyMdTablePadClass(tableVariant);
@@ -45,7 +48,9 @@ export function MarkdownView({
           ? `prose prose-neutral max-w-none text-[17px] leading-[1.75] text-neutral-900 ${className}`
           : isNodePreview
             ? `prose prose-neutral max-w-none text-[13px] leading-[1.7] text-neutral-800 ${className}`
-            : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${className}`
+            : isDarkPreview
+              ? `prose prose-invert max-w-none text-[13px] leading-[1.75] text-white ${className}`
+              : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${className}`
       }
     >
       <ReactMarkdown
@@ -69,7 +74,9 @@ export function MarkdownView({
                   ? "mb-4 mt-8 text-[22px] font-semibold text-neutral-800"
                   : isNodePreview
                     ? "mb-2 mt-5 border-b border-neutral-200 pb-1 text-[15px] font-semibold text-neutral-800 first:mt-0"
-                    : undefined
+                    : isDarkPreview
+                      ? "mb-2 mt-5 border-b border-white/15 pb-1 text-[14px] font-semibold text-white first:mt-0"
+                      : undefined
               }
             >
               {children}
@@ -82,7 +89,9 @@ export function MarkdownView({
                   ? "mb-3 mt-6 text-[18px] font-semibold text-neutral-800"
                   : isNodePreview
                     ? "mb-2 mt-4 text-[14px] font-semibold text-neutral-800"
-                    : undefined
+                    : isDarkPreview
+                      ? "mb-2 mt-4 text-[13px] font-semibold text-white/95"
+                      : undefined
               }
             >
               {children}
@@ -95,7 +104,9 @@ export function MarkdownView({
                   ? "mb-4 text-[17px] leading-[1.85] text-neutral-800"
                   : isNodePreview
                     ? "mb-3 text-[13px] leading-[1.75] text-neutral-700"
-                    : undefined
+                    : isDarkPreview
+                      ? "mb-3 text-[13px] leading-[1.75] text-white/90"
+                      : undefined
               }
             >
               {children}
@@ -106,6 +117,7 @@ export function MarkdownView({
               className={
                 isDoc ? "text-[17px] leading-[1.75]"
                 : isNodePreview ? "text-[13px] leading-[1.7]"
+                : isDarkPreview ? "text-[13px] leading-[1.7] text-white/90"
                 : undefined
               }
             >
