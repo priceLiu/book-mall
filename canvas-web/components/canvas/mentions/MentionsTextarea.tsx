@@ -1,13 +1,5 @@
 "use client";
 
-/**
- * 轻量 Mentions 编辑器
- *
- * - 存储格式：`@<nodeId>`（与后端 expandMentions 兼容）
- * - 编辑显示：`@文件名` / `@文 · …`（来自 mentionables.label）
- * - 输入 `@` 弹出上游列表；在光标处插入，不会跑到文末
- */
-
 import {
   forwardRef,
   useCallback,
@@ -21,13 +13,16 @@ import {
   type CSSProperties,
 } from "react";
 
-import { RF_NODE_SCROLL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { MentionPickerPortal } from "./mention-picker-portal";
 
 export type MentionableItem = {
   id: string;
   /** popover / 正文里显示的标签，如 "1.png" */
   label: string;
   kind?: string;
+  /** @ 列表缩略图（角色三视图等） */
+  previewUrl?: string;
 };
 
 export type MentionsTextareaProps = {
@@ -113,9 +108,9 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
     },
     ref,
   ) {
+    const wrapperRef = useRef<HTMLDivElement | null>(null);
     const innerRef = useRef<HTMLTextAreaElement | null>(null);
     const mentionAnchorRef = useRef<MentionAnchor | null>(null);
-    /** 本地编辑后待恢复的光标（受控 value 重渲染会冲掉浏览器光标） */
     const pendingCaretRef = useRef<number | null>(null);
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [popoverFilter, setPopoverFilter] = useState("");
@@ -161,6 +156,13 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       const clamped = Math.min(pos, el.value.length);
       el.setSelectionRange(clamped, clamped);
       pendingCaretRef.current = null;
+    }, [displayValue]);
+
+    useLayoutEffect(() => {
+      const el = innerRef.current;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
     }, [displayValue]);
 
     const closePopover = () => {
@@ -236,10 +238,10 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       if (!popoverOpen) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setPopoverIndex((i) => Math.min(filtered.length - 1, i + 1));
+        setPopoverIndex((idx) => Math.min(filtered.length - 1, idx + 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setPopoverIndex((i) => Math.max(0, i - 1));
+        setPopoverIndex((idx) => Math.max(0, idx - 1));
       } else if (e.key === "Enter") {
         const item = filtered[popoverIndex];
         if (item) {
@@ -253,7 +255,10 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
     };
 
     return (
-      <div className={wrapperClassName ? `relative ${wrapperClassName}` : "relative"}>
+      <div
+        ref={wrapperRef}
+        className={wrapperClassName ? `relative ${wrapperClassName}` : "relative"}
+      >
         <textarea
           ref={setRef}
           value={displayValue}
@@ -265,40 +270,20 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           aria-label={ariaLabel}
           className={
             className ??
-            `${RF_NODE_SCROLL} w-full resize-none rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`
+            `${RF_NODE_SCROLL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`
           }
           style={style}
         />
-        {popoverOpen && filtered.length > 0 ? (
-          <div className={`nodrag absolute left-2 top-full z-30 mt-1 max-h-64 w-72 max-w-[90vw] overflow-y-auto rounded-md border border-white/15 bg-black/95 text-[12px] shadow-2xl ${RF_NO_WHEEL}`}>
-            <div className="border-b border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
-              引用上游 · ↑↓ 选择 · Enter 插入 · Esc 取消
-            </div>
-            {filtered.map((m, i) => (
-              <button
-                key={m.id}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  insertToken(m);
-                }}
-                onMouseEnter={() => setPopoverIndex(i)}
-                className={`flex w-full items-center justify-between px-2 py-1.5 text-left ${
-                  i === popoverIndex
-                    ? "bg-[var(--canvas-accent)]/30 text-white"
-                    : "text-white/80 hover:bg-white/10"
-                }`}
-              >
-                <span className="truncate">@{m.label}</span>
-                {m.kind ? (
-                  <span className="ml-2 shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/70">
-                    {m.kind}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        <MentionPickerPortal
+          open={popoverOpen}
+          anchorEl={wrapperRef.current}
+          items={filtered}
+          selectedIndex={popoverIndex}
+          emptyHint="暂无已生成的角色三视图，请先在角色列生成。"
+          onSelect={insertToken}
+          onHoverIndex={setPopoverIndex}
+          onClose={closePopover}
+        />
       </div>
     );
   },

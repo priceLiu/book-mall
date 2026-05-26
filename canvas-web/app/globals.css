@@ -209,3 +209,33 @@ body {
 .react-flow__node .canvas-node-shell.canvas-node-generating {
   animation: canvas-node-generating-pulse 1.6s ease-in-out infinite;
 }
+
+/* 漫剧列 · 单行图/视频框生成中 */
+@keyframes canvas-story-media-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.canvas-story-media-generating {
+  box-shadow: 0 0 0 1px rgba(251, 146, 60, 0.55),
+    0 0 16px rgba(251, 146, 60, 0.35);
+}
+
+.canvas-story-media-generating::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(251, 146, 60, 0.22) 50%,
+    transparent 65%
+  );
+  animation: canvas-story-media-shimmer 1.4s ease-in-out infinite;
+  pointer-events: none;
+}

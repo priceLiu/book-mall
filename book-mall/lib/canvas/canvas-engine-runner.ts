@@ -28,6 +28,11 @@ import {
 } from "./canvas-constants";
 import { persistCanvasKieResultToOss } from "./canvas-oss";
 import { CanvasProjectError } from "./canvas-project-service";
+import type { CanvasTaskStoryScope } from "./canvas-story-scope";
+import {
+  extractStoryScopeFromInputPayload,
+  storyScopesConflict,
+} from "./canvas-story-scope";
 import {
   CanvasGatewayError,
   buildGatewayConfig,
@@ -154,24 +159,28 @@ async function ensureProjectInflightCapacity(projectId: string): Promise<void> {
   }
 }
 
-async function ensureNoActiveTaskForNode(
+async function ensureNoActiveTaskForScope(
   projectId: string,
   nodeId: string,
+  storyScope?: CanvasTaskStoryScope,
 ): Promise<void> {
-  const active = await prisma.canvasGenerationTask.findFirst({
+  const active = await prisma.canvasGenerationTask.findMany({
     where: {
       projectId,
       nodeId,
       status: { in: ["PENDING", "SUBMITTED"] },
     },
-    select: { id: true },
+    select: { id: true, inputPayload: true },
   });
-  if (active) {
-    throw new CanvasProjectError(
-      "TASK_ALREADY_INFLIGHT",
-      `node ${nodeId} task already in progress`,
-      409,
-    );
+  for (const t of active) {
+    const existingScope = extractStoryScopeFromInputPayload(t.inputPayload);
+    if (storyScopesConflict(storyScope, existingScope)) {
+      throw new CanvasProjectError(
+        "TASK_ALREADY_INFLIGHT",
+        `node ${nodeId} task already in progress`,
+        409,
+      );
+    }
   }
 }
 
@@ -239,6 +248,8 @@ async function findReusableSucceededTask(args: {
   });
 }
 
+export type { CanvasTaskStoryScope } from "./canvas-story-scope";
+
 export type RunEngineNodeArgs = {
   userId: string;
   projectId: string;
@@ -246,6 +257,8 @@ export type RunEngineNodeArgs = {
   node: CanvasRunNodeInput;
   /** 跳过缓存，强制创建新任务（"重新生成"用） */
   forceFresh?: boolean;
+  /** 漫剧列行 / 文案段，用于同节点多任务区分 */
+  storyScope?: CanvasTaskStoryScope;
 };
 
 export type RunEngineNodeResult =
@@ -300,7 +313,7 @@ export async function runAiEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForNode(projectId, nodeId);
+  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
@@ -458,7 +471,7 @@ export async function runImageEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForNode(projectId, nodeId);
+  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
@@ -477,6 +490,7 @@ export async function runImageEngineNode(
         providerId,
         modelKey,
         imageUrls,
+        ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
       status: "PENDING",
     },
@@ -672,7 +686,7 @@ export async function runStoryLlmEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForNode(projectId, nodeId);
+  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
@@ -693,6 +707,7 @@ export async function runStoryLlmEngineNode(
         providerId,
         modelKey,
         textInputs: node.textInputs ?? [],
+        ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
       status: "SUBMITTED",
       submittedAt: new Date(),
@@ -701,7 +716,14 @@ export async function runStoryLlmEngineNode(
 
   try {
     const gateway = getGatewayForKind(provider.kind, provider.config);
-    const systemPrompt = storyEngineSystemFallback(engineKind);
+    const customSystem =
+      engineKind === "story-outline-engine"
+        ? String(
+            data.outlineSystemPrompt ?? data.systemPrompt ?? "",
+          ).trim()
+        : "";
+    const systemPrompt =
+      customSystem || storyEngineSystemFallback(engineKind);
     const userContent: (
       | { type: "text"; text: string }
       | { type: "image_url"; image_url: { url: string } }
@@ -818,7 +840,7 @@ export async function runVideoEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForNode(projectId, nodeId);
+  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
@@ -853,6 +875,7 @@ export async function runVideoEngineNode(
         imageUrls,
         kieModel: model,
         kieInput: input,
+        ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
       status: "PENDING",
     },
@@ -928,7 +951,7 @@ export async function runTtsEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForNode(projectId, nodeId);
+  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
@@ -946,6 +969,7 @@ export async function runTtsEngineNode(
         params,
         providerId,
         modelKey,
+        ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
       status: "SUBMITTED",
       submittedAt: new Date(),

@@ -22,23 +22,20 @@ import {
 } from "lucide-react";
 import type { CanvasContentNodeType } from "@/lib/canvas/types";
 
-/**
- * 顶部 palette 项。
- * - `presetId` 可选：对应 `lib/canvas/text-templates.ts` 中模板的 id；
- *   设了之后该按钮会创建 text 节点并预填该模板内容。
- *   （这是"产品参数"等"快捷入口"的实现方式：节点类型仍是 text，避免再回到 v1 多 type 模型。）
- */
-const PALETTE: Array<{
+export type PaletteItem = {
   type: CanvasContentNodeType;
   label: string;
   icon: React.ReactNode;
   hint: string;
   presetId?: string;
-  /** 在该按钮左侧插入竖线 */
   dividerBefore?: boolean;
-  /** 在该按钮右侧插入竖线 */
   dividerAfter?: boolean;
-}> = [
+};
+
+/**
+ * 通用画布节点（海报 / 方案 / 生图工作流）。
+ */
+const CANVAS_PALETTE: PaletteItem[] = [
   {
     type: "image",
     label: "图片",
@@ -72,55 +69,52 @@ const PALETTE: Array<{
     hint: "调图像模型出图",
   },
   {
-    type: "story-comic-starter",
-    label: "漫剧启动",
-    icon: <Clapperboard className="size-[18px]" />,
-    hint: "主题 + 模型 → 向导式漫剧",
+    type: "output",
+    label: "输出",
+    icon: <Save className="size-[18px]" />,
+    hint: "导出 / 入画作库",
     dividerBefore: true,
   },
+];
+
+/** 漫剧全链路节点（与海报工作流分栏展示）。 */
+const STORY_PALETTE: PaletteItem[] = [
   {
-    type: "story-outline-engine",
+    type: "story-comic-starter",
+    label: "故事主题",
+    icon: <Clapperboard className="size-[18px]" />,
+    hint: "主题 + 模型 → 创作剧本",
+  },
+  {
+    type: "story-script-hub",
     label: "故事大纲",
     icon: <FileText className="size-[18px]" />,
-    hint: "创意 → Markdown 大纲",
+    hint: "大纲 · 角色 · 分镜 · 对白",
     dividerBefore: true,
   },
   {
-    type: "character-engine",
-    label: "角色",
+    type: "story-character-column",
+    label: "角色设定与三视图",
     icon: <Users className="size-[18px]" />,
-    hint: "大纲 → 角色 GFM 表",
+    hint: "三视图批量",
   },
   {
-    type: "storyboard-engine",
-    label: "分镜",
-    icon: <Clapperboard className="size-[18px]" />,
-    hint: "分镜脚本 GFM 表",
-  },
-  {
-    type: "image-engine",
-    label: "分镜图",
+    type: "story-frame-column",
+    label: "分镜脚本",
     icon: <Film className="size-[18px]" />,
-    hint: "单镜静帧 · 右侧拖线连视频/语音",
-    presetId: "story-frame",
+    hint: "场景·镜头描述·生成视频",
   },
   {
-    type: "video-engine",
-    label: "视频",
+    type: "story-video-column",
+    label: "分镜视频",
     icon: <Video className="size-[18px]" />,
-    hint: "从分镜图连入 · 选模型后生成",
+    hint: "视频 + 配音",
   },
   {
     type: "tts-engine",
     label: "语音",
     icon: <Mic className="size-[18px]" />,
-    hint: "从分镜图连入 · 对白 TTS",
-  },
-  {
-    type: "output",
-    label: "输出",
-    icon: <Save className="size-[18px]" />,
-    hint: "导出 / 入画作库",
+    hint: "各镜成片预览",
   },
   {
     type: "jianying-export",
@@ -139,7 +133,7 @@ function PaletteIconButton({
   onDragStart,
   onAdd,
 }: {
-  p: (typeof PALETTE)[number];
+  p: PaletteItem;
   collapsed: boolean;
   onDragStart: (
     event: React.DragEvent<HTMLButtonElement>,
@@ -192,6 +186,106 @@ function PaletteDivider({ vertical = false }: { vertical?: boolean }) {
   );
 }
 
+function PaletteItemsRow({
+  items,
+  collapsed,
+  onDragStart,
+  onAdd,
+}: {
+  items: PaletteItem[];
+  collapsed: boolean;
+  onDragStart: (
+    event: React.DragEvent<HTMLButtonElement>,
+    type: CanvasContentNodeType,
+    presetId?: string,
+  ) => void;
+  onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
+}) {
+  return (
+    <>
+      {items.map((p) => (
+        <Fragment key={`${p.type}/${p.presetId ?? "_"}`}>
+          {p.dividerBefore ? <PaletteDivider vertical={collapsed} /> : null}
+          <PaletteIconButton
+            p={p}
+            collapsed={collapsed}
+            onDragStart={onDragStart}
+            onAdd={onAdd}
+          />
+          {p.dividerAfter ? <PaletteDivider vertical={collapsed} /> : null}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+function PalettePill({
+  label,
+  items,
+  collapsed,
+  trailing,
+  bare,
+  onDragStart,
+  onAdd,
+}: {
+  label?: string;
+  items: PaletteItem[];
+  collapsed: boolean;
+  trailing?: React.ReactNode;
+  /** 已包在外层工具条容器内，不再单独描边 */
+  bare?: boolean;
+  onDragStart: (
+    event: React.DragEvent<HTMLButtonElement>,
+    type: CanvasContentNodeType,
+    presetId?: string,
+  ) => void;
+  onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
+}) {
+  if (collapsed) {
+    return (
+      <div className="flex w-full flex-col items-center">
+        {label ? (
+          <span className="mb-1 max-w-[2.5rem] truncate text-center text-[9px] font-medium uppercase tracking-wide text-emerald-400/90">
+            {label}
+          </span>
+        ) : null}
+        <PaletteItemsRow
+          items={items}
+          collapsed
+          onDragStart={onDragStart}
+          onAdd={onAdd}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={
+        bare
+          ? "flex items-center gap-1"
+          : "flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md"
+      }
+      role="group"
+      aria-label={label ? `${label}节点` : "画布节点"}
+    >
+      {label ? (
+        <span className="select-none pr-0.5 text-[10px] font-medium tracking-wide text-emerald-400/90">
+          {label}
+        </span>
+      ) : null}
+      {label ? <PaletteDivider /> : null}
+      <PaletteItemsRow
+        items={items}
+        collapsed={false}
+        onDragStart={onDragStart}
+        onAdd={onAdd}
+      />
+      {trailing}
+    </div>
+  );
+}
+
 const SHORTCUTS: Array<{ keys: string[]; desc: string }> = [
   { keys: ["拖空白处"], desc: "框选多个节点" },
   { keys: ["中键 / 右键 拖"], desc: "平移画布" },
@@ -201,15 +295,11 @@ const SHORTCUTS: Array<{ keys: string[]; desc: string }> = [
   { keys: ["⌘", "⇧", "Z"], desc: "重做" },
   { keys: ["Backspace", "Delete"], desc: "删除选中节点" },
   { keys: ["拖入图片文件"], desc: "在画布生成「图片」节点并自动上传到 OSS" },
-  { keys: ["从顶部 logo 拖到画布"], desc: "新建对应类型节点" },
+  { keys: ["从顶部工具条拖到画布"], desc: "新建对应类型节点" },
 ];
 
 /**
- * 顶部居中浮动节点面板：圆形 icon 按钮 + ? 帮助按钮。
- * - 拖到画布：用 dataTransfer 协议（`application/canvas-node-type` + `application/canvas-node-preset`）
- * - 点击：直接 onAdd(type, presetId?)
- * - hover 出气泡（label + hint）
- * - ? 按钮点击弹出快捷键卡片
+ * 顶部浮动节点面板：通用画布 + 漫剧 两条工具条分开展示。
  */
 export function NodePalette({
   onAdd,
@@ -255,6 +345,68 @@ export function NodePalette({
     [],
   );
 
+  const helpButton = (
+    <button
+      type="button"
+      onClick={() => setHelpOpen((v) => !v)}
+      aria-label="操作方式 / 快捷键"
+      aria-expanded={helpOpen}
+      className={`group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full transition ${
+        helpOpen
+          ? "bg-[var(--canvas-accent)]/30 text-white"
+          : "text-white/80 hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+      }`}
+    >
+      <HelpCircle className="size-[18px]" />
+      <span
+        className={`pointer-events-none absolute z-50 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100 ${
+          collapsed
+            ? "right-full top-1/2 mr-2 -translate-y-1/2"
+            : "left-1/2 top-full mt-2 -translate-x-1/2"
+        }`}
+        role="tooltip"
+      >
+        <span className="font-medium">操作方式</span>
+        <span className="ml-1 text-white/55">· 快捷键 & 用法</span>
+      </span>
+    </button>
+  );
+
+  const collapseButton = (
+    <button
+      type="button"
+      onClick={toggleCollapsed}
+      aria-label={collapsed ? "展开工具栏" : "收到右侧"}
+      title={collapsed ? "展开工具栏" : "收到右侧"}
+      className="group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+    >
+      {collapsed ? (
+        <ChevronLeft className="size-[18px]" />
+      ) : (
+        <ChevronRight className="size-[18px]" />
+      )}
+      <span
+        className={`pointer-events-none absolute z-50 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100 ${
+          collapsed
+            ? "right-full top-1/2 mr-2 -translate-y-1/2"
+            : "left-1/2 top-full mt-2 -translate-x-1/2"
+        }`}
+        role="tooltip"
+      >
+        {collapsed ? "展开工具栏" : "收到右侧"}
+      </span>
+    </button>
+  );
+
+  const canvasTrailing = collapsed ? null : (
+    <>
+      <PaletteDivider />
+      {helpButton}
+      <PaletteDivider />
+      {collapseButton}
+    </>
+  );
+
   return (
     <>
       {collapsed ? (
@@ -263,56 +415,25 @@ export function NodePalette({
           role="toolbar"
           aria-label="节点面板（已收起）"
         >
-          <div className="pointer-events-auto flex flex-col items-center gap-0.5 rounded-2xl border border-white/10 bg-black/75 py-2 pl-1.5 pr-1 shadow-2xl backdrop-blur-md">
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              aria-label="展开工具栏"
-              title="展开工具栏"
-              className="group/palette relative mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
-            >
-              <ChevronLeft className="size-[18px]" />
-              <span
-                className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
-                role="tooltip"
-              >
-                展开工具栏
-              </span>
-            </button>
+          <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-black/75 py-2 pl-1.5 pr-1 shadow-2xl backdrop-blur-md">
+            {collapseButton}
             <PaletteDivider vertical />
-            {PALETTE.map((p) => (
-              <Fragment key={`${p.type}/${p.presetId ?? "_"}-c`}>
-                {p.dividerBefore ? <PaletteDivider vertical /> : null}
-                <PaletteIconButton
-                  p={p}
-                  collapsed
-                  onDragStart={onDragStart}
-                  onAdd={onAdd}
-                />
-                {p.dividerAfter ? <PaletteDivider vertical /> : null}
-              </Fragment>
-            ))}
+            <PalettePill
+              items={CANVAS_PALETTE}
+              collapsed
+              onDragStart={onDragStart}
+              onAdd={onAdd}
+            />
             <PaletteDivider vertical />
-            <button
-              type="button"
-              onClick={() => setHelpOpen((v) => !v)}
-              aria-label="操作方式 / 快捷键"
-              aria-expanded={helpOpen}
-              className={`group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full transition ${
-                helpOpen
-                  ? "bg-[var(--canvas-accent)]/30 text-white"
-                  : "text-white/80 hover:bg-[var(--canvas-accent)]/20 hover:text-white"
-              }`}
-            >
-              <HelpCircle className="size-[18px]" />
-              <span
-                className="pointer-events-none absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
-                role="tooltip"
-              >
-                <span className="font-medium">操作方式</span>
-                <span className="ml-1 text-white/55">· 快捷键 & 用法</span>
-              </span>
-            </button>
+            <PalettePill
+              label="漫剧"
+              items={STORY_PALETTE}
+              collapsed
+              onDragStart={onDragStart}
+              onAdd={onAdd}
+            />
+            <PaletteDivider vertical />
+            {helpButton}
           </div>
         </div>
       ) : (
@@ -322,60 +443,27 @@ export function NodePalette({
           aria-label="节点面板"
         >
           <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md">
-            {PALETTE.map((p) => (
-              <Fragment key={`${p.type}/${p.presetId ?? "_"}`}>
-                {p.dividerBefore ? <PaletteDivider /> : null}
-                <PaletteIconButton
-                  p={p}
-                  collapsed={false}
-                  onDragStart={onDragStart}
-                  onAdd={onAdd}
-                />
-                {p.dividerAfter ? <PaletteDivider /> : null}
-              </Fragment>
-            ))}
+            <PalettePill
+              items={CANVAS_PALETTE}
+              collapsed={false}
+              bare
+              onDragStart={onDragStart}
+              onAdd={onAdd}
+            />
             <PaletteDivider />
-            <button
-              type="button"
-              onClick={() => setHelpOpen((v) => !v)}
-              aria-label="操作方式 / 快捷键"
-              aria-expanded={helpOpen}
-              className={`group/palette relative flex size-9 items-center justify-center rounded-full transition ${
-                helpOpen
-                  ? "bg-[var(--canvas-accent)]/30 text-white"
-                  : "text-white/80 hover:bg-[var(--canvas-accent)]/20 hover:text-white"
-              }`}
-            >
-              <HelpCircle className="size-[18px]" />
-              <span
-                className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
-                role="tooltip"
-              >
-                <span className="font-medium">操作方式</span>
-                <span className="ml-1 text-white/55">· 快捷键 & 用法</span>
-              </span>
-            </button>
-            <PaletteDivider />
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              aria-label="收到右侧"
-              title="收到右侧"
-              className="group/palette relative flex size-9 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
-            >
-              <ChevronRight className="size-[18px]" />
-              <span
-                className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100"
-                role="tooltip"
-              >
-                收到右侧
-              </span>
-            </button>
+            <PalettePill
+              label="漫剧"
+              items={STORY_PALETTE}
+              collapsed={false}
+              bare
+              onDragStart={onDragStart}
+              onAdd={onAdd}
+            />
+            {canvasTrailing}
           </div>
         </div>
       )}
 
-      {/* 快捷键卡片（点 ? 切换） */}
       {helpOpen ? (
         <div
           className={`pointer-events-auto z-40 w-[420px] max-w-[92vw] ${
@@ -422,7 +510,7 @@ export function NodePalette({
               ))}
             </ul>
             <div className="border-t border-white/10 px-4 py-2 text-[11px] text-white/45">
-              提示：选中 ≥2 个节点会在选区上方浮出「分组 / 自动整理 / 删除」。
+              提示：选中 ≥2 个节点会在选区上方浮出「分组 / 自动整理 / 删除」。漫剧节点在同行「漫剧」工具条。
             </div>
           </div>
         </div>

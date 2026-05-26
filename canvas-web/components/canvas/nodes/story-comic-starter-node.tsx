@@ -1,101 +1,47 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { Clapperboard, Play, RefreshCw, Sparkles } from "lucide-react";
+import { Lock, PenLine, RefreshCw, Sparkles } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
-import type {
-  CanvasNodeRuntime,
-  StoryComicStarterNodeData,
-} from "@/lib/canvas/types";
-import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
-import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
-import { runStoryLlmPipelineSequential } from "@/lib/canvas/batch-run-nodes";
+import type { StoryComicStarterNodeData } from "@/lib/canvas/types";
 import {
-  findStoryLlmEnginesForStarter,
-  spawnStoryLlmEngines,
-  storyLlmPipelineNodeIds,
-  syncStoryLlmEnginesFromStarter,
-} from "@/lib/canvas/spawn-story-llm-engines";
-import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
-import { storyLlmNodeIsComplete, storyLlmNodeNeedsRun } from "@/lib/canvas/story-llm-runtime";
+  STORY_LLM_MODEL_KEYS,
+  STORY_THEME_SYSTEM_PROMPT_TEMPLATES,
+  type StoryThemeSystemPromptTemplateId,
+} from "@/lib/canvas/types";
+import { matchStoryThemeSystemPromptTemplateId } from "@/lib/canvas/story-prompts";
+import {
+  STORY_NODE_ACTION_BTN_CLASS,
+  storyComicStarterNodeHeight,
+  storyStarterPromptTextareaMinHeight,
+} from "@/lib/canvas/story-node-chrome";
+import { StoryNodeFooterShell } from "../story-node-footer-shell";
+import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
+import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { runStoryHubSectionsSequential } from "@/lib/canvas/batch-run-nodes";
+import {
+  findStoryScriptHubForStarter,
+  spawnStoryScriptHub,
+  STORY_HUB_SECTION_ORDER,
+  syncStoryHubFromStarter,
+} from "@/lib/canvas/spawn-story-workspace";
+import {
+  hubAggregateStatus,
+  hubSectionRuntime,
+} from "@/lib/canvas/story-hub-runtime";
+import type { StoryScriptHubNodeData } from "@/lib/canvas/story-workspace-types";
 import { NodeShell, ENGINE_ACCENT, NodeStatusBadge } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
 
 const STAGE_LABELS: Record<string, string> = {
-  idle: "1/5 · 填写主题并开始",
-  llm_done: "2/5 · 确认文案 → 生成三视图",
-  tv_done: "3/5 · 确认三视图 → 生成分镜图",
-  frames_done: "4/5 · 确认分镜图 → 视频/配音",
-  media_done: "5/5 · 下载剪映包",
+  idle: "填写创意 → 创作剧本",
+  llm_done: "剧本已生成 · 打开「故事大纲」审阅",
+  finalized: "已定稿 · 工作流已输出",
 };
-
-function aggregateLlmPipelineStatus(
-  nodes: ReturnType<typeof useCanvasStore.getState>["nodes"],
-  edges: ReturnType<typeof useCanvasStore.getState>["edges"],
-  starterNodeId: string,
-  storedIds?: StoryComicStarterNodeData["llmEngineIds"],
-): {
-  status: CanvasNodeRuntime["status"];
-  failMessage: string | null;
-} {
-  const ids = findStoryLlmEnginesForStarter(
-    nodes,
-    edges,
-    starterNodeId,
-    storedIds,
-  );
-  if (!ids) return { status: "idle", failMessage: null };
-
-  const statuses = storyLlmPipelineNodeIds(ids).map((id) => {
-    const n = nodes.find((x) => x.id === id);
-    return (
-      (n?.data as { runtime?: CanvasNodeRuntime })?.runtime?.status ?? "idle"
-    );
-  });
-
-  if (statuses.some((s) => s === "running")) {
-    return { status: "running", failMessage: null };
-  }
-  if (statuses.some((s) => s === "pending")) {
-    return { status: "pending", failMessage: null };
-  }
-  if (statuses.some((s) => s === "error")) {
-    const errNode = storyLlmPipelineNodeIds(ids)
-      .map((id) => nodes.find((x) => x.id === id))
-      .find(
-        (n) =>
-          (n?.data as { runtime?: CanvasNodeRuntime })?.runtime?.status ===
-          "error",
-      );
-    const msg =
-      formatCanvasTaskError(
-        (errNode?.data as { runtime?: CanvasNodeRuntime })?.runtime?.failCode,
-        (errNode?.data as { runtime?: CanvasNodeRuntime })?.runtime
-          ?.failMessage,
-      ) || "文案生成失败";
-    return { status: "error", failMessage: msg };
-  }
-  if (statuses.length > 0 && statuses.every((s) => s === "done")) {
-    const allHaveText = storyLlmPipelineNodeIds(ids).every((nodeId) => {
-      const n = nodes.find((x) => x.id === nodeId);
-      return n ? storyLlmNodeIsComplete(n) : false;
-    });
-    if (allHaveText) return { status: "done", failMessage: null };
-  }
-  if (
-    storyLlmPipelineNodeIds(ids).some((nodeId) => {
-      const n = nodes.find((x) => x.id === nodeId);
-      return n ? storyLlmNodeNeedsRun(n, false) : true;
-    })
-  ) {
-    return { status: "idle", failMessage: null };
-  }
-  return { status: "idle", failMessage: null };
-}
 
 export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
@@ -103,28 +49,113 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const resizeNode = useCanvasStore((s) => s.resizeNode);
   const reflowStoryComicLayout = useCanvasStore(
     (s) => s.reflowStoryComicLayout,
   );
 
+  const promptMinHeight = storyStarterPromptTextareaMinHeight();
+
   const d = data as unknown as StoryComicStarterNodeData;
   const { providers } = useUserProviders();
   const stage = d.pipelineStage ?? "idle";
-  const hasLlmEngines = useMemo(
+  const isFinalized = stage === "finalized";
+
+  const scriptHub = useMemo(
     () =>
-      Boolean(
-        findStoryLlmEnginesForStarter(nodes, edges, id, d.llmEngineIds),
-      ),
-    [nodes, edges, id, d.llmEngineIds],
+      findStoryScriptHubForStarter(nodes, edges, id, d.workspaceIds),
+    [nodes, edges, id, d.workspaceIds],
   );
 
-  const pipeline = useMemo(
-    () => aggregateLlmPipelineStatus(nodes, edges, id, d.llmEngineIds),
-    [nodes, edges, id, d.llmEngineIds],
+  const hubStatus = useMemo(() => {
+    if (!scriptHub) return { status: "idle" as const, failMessage: null };
+    const hub = nodes.find((n) => n.id === scriptHub.scriptHubId);
+    if (!hub) return { status: "idle" as const, failMessage: null };
+    const runtimes = ["outline", "character", "storyboard"] as const;
+    if (
+      runtimes.some((s) => {
+        const st = hubSectionRuntime(hub, s)?.status;
+        return st === "running" || st === "pending";
+      })
+    ) {
+      return { status: "running" as const, failMessage: null };
+    }
+    if (runtimes.some((s) => hubSectionRuntime(hub, s)?.status === "error")) {
+      return {
+        status: "error" as const,
+        failMessage:
+          (hubSectionRuntime(hub, "outline") as { failMessage?: string })
+            ?.failMessage ?? "剧本生成失败",
+      };
+    }
+    return { status: "idle" as const, failMessage: null };
+  }, [nodes, scriptHub]);
+
+  const canRun = Boolean(
+    !isFinalized && d.systemPrompt?.trim() && d.providerId && d.modelKey,
   );
-  const isGenerating =
-    pipeline.status === "running" || pipeline.status === "pending";
-  const canRun = Boolean(d.theme?.trim() && d.providerId && d.modelKey);
+  const isGenerating = hubStatus.status === "running";
+
+  const hasScriptDraft = useMemo(() => {
+    if (!scriptHub) return false;
+    const hub = nodes.find((n) => n.id === scriptHub.scriptHubId);
+    if (!hub) return false;
+    const hd = hub.data as StoryScriptHubNodeData;
+    if ((hd.outlineMd ?? "").trim()) return true;
+    return hubAggregateStatus(hub) === "done";
+  }, [nodes, scriptHub]);
+
+  useEffect(() => {
+    if (isFinalized || !scriptHub) return;
+    const ws = d.workspaceIds;
+    if (
+      ws?.characterColumnId &&
+      ws.frameColumnId &&
+      ws.videoColumnId
+    ) {
+      updateNodeData(id, { pipelineStage: "finalized" });
+    }
+  }, [
+    isFinalized,
+    scriptHub,
+    d.workspaceIds?.characterColumnId,
+    d.workspaceIds?.frameColumnId,
+    d.workspaceIds?.videoColumnId,
+    id,
+    updateNodeData,
+  ]);
+
+  const activeTemplateId = useMemo((): StoryThemeSystemPromptTemplateId | "custom" => {
+    if (d.systemPromptTemplateId) {
+      const tpl = STORY_THEME_SYSTEM_PROMPT_TEMPLATES.find(
+        (t) => t.id === d.systemPromptTemplateId,
+      );
+      if (tpl && d.systemPrompt?.trim() === tpl.content.trim()) {
+        return d.systemPromptTemplateId;
+      }
+    }
+    return matchStoryThemeSystemPromptTemplateId(d.systemPrompt ?? "") ?? "custom";
+  }, [d.systemPrompt, d.systemPromptTemplateId]);
+
+  const applyTemplate = (templateId: StoryThemeSystemPromptTemplateId) => {
+    const tpl = STORY_THEME_SYSTEM_PROMPT_TEMPLATES.find((t) => t.id === templateId);
+    if (!tpl) return;
+    updateNodeData(id, {
+      systemPromptTemplateId: templateId,
+      systemPrompt: tpl.content,
+    });
+    if (scriptHub) {
+      syncStoryHubFromStarter({
+        starterNodeId: id,
+        systemPrompt: tpl.content,
+        providerId: d.providerId,
+        modelKey: d.modelKey,
+        params: d.params ?? {},
+        scriptHubId: scriptHub.scriptHubId,
+        updateNodeData,
+      });
+    }
+  };
 
   useEffect(() => {
     if (d.providerId?.trim() && d.modelKey?.trim()) return;
@@ -136,6 +167,37 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
     });
   }, [d.providerId, d.modelKey, providers, id, updateNodeData]);
 
+  useEffect(() => {
+    const targetH = storyComicStarterNodeHeight();
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    if (!node) return;
+    const { w, h } = nodeMeasuredSize(node);
+    if (Math.abs(h - targetH) < 4) return;
+    resizeNode(id, { width: w, height: targetH });
+    reflowStoryComicLayout();
+  }, [id, resizeNode, reflowStoryComicLayout]);
+
+  const syncHubIfConnected = useCallback(() => {
+    if (!scriptHub) return;
+    syncStoryHubFromStarter({
+      starterNodeId: id,
+      systemPrompt: d.systemPrompt ?? "",
+      providerId: d.providerId,
+      modelKey: d.modelKey,
+      params: d.params ?? {},
+      scriptHubId: scriptHub.scriptHubId,
+      updateNodeData,
+    });
+  }, [
+    scriptHub,
+    id,
+    d.systemPrompt,
+    d.providerId,
+    d.modelKey,
+    d.params,
+    updateNodeData,
+  ]);
+
   const onPickEngine = (next: {
     providerId: string;
     modelKey: string;
@@ -146,166 +208,164 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
       modelKey: next.modelKey,
       params: next.params,
     });
+    if (scriptHub) {
+      syncStoryHubFromStarter({
+        starterNodeId: id,
+        systemPrompt: d.systemPrompt,
+        providerId: next.providerId,
+        modelKey: next.modelKey,
+        params: next.params ?? {},
+        scriptHubId: scriptHub.scriptHubId,
+        updateNodeData,
+      });
+    }
   };
 
-  const runPipeline = (forceFresh: boolean) => {
+  const onCreateScript = () => {
     if (!canRun || isGenerating) return;
-
     const state = useCanvasStore.getState();
-    const linked = findStoryLlmEnginesForStarter(
+    const existingHub = findStoryScriptHubForStarter(
       state.nodes,
       state.edges,
       id,
-      d.llmEngineIds,
+      d.workspaceIds,
     );
-    const effectiveForceFresh =
-      forceFresh ||
-      pipeline.status === "error" ||
-      Boolean(
-        linked &&
-          storyLlmPipelineNodeIds(linked).some((nodeId) => {
-            const n = state.nodes.find((x) => x.id === nodeId);
-            if (!n) return false;
-            const rt = (n.data as { runtime?: CanvasNodeRuntime }).runtime;
-            return (
-              rt?.status === "error" ||
-              (rt?.status === "done" && !storyLlmNodeIsComplete(n))
-            );
-          }),
-      );
-
-    const hadEngines = Boolean(linked);
-
-    const ids = spawnStoryLlmEngines({
-      starterNodeId: id,
-      theme: d.theme,
-      providerId: d.providerId,
-      modelKey: d.modelKey,
-      params: d.params ?? {},
-      nodes: state.nodes,
-      edges: state.edges,
-      addNode: (type, position, nodeData) =>
-        addNode(type, position, nodeData),
-      setEdges,
-      updateNodeData,
-    });
-
-    syncStoryLlmEnginesFromStarter({
-      starterNodeId: id,
-      theme: d.theme,
-      providerId: d.providerId,
-      modelKey: d.modelKey,
-      params: d.params ?? {},
-      ids,
-      updateNodeData,
-    });
-
-    if (!hadEngines) {
-      reflowStoryComicLayout();
-    }
-
-    const nodeIds = storyLlmPipelineNodeIds(ids);
-    runStoryLlmPipelineSequential(nodeIds, {
-      forceFresh: effectiveForceFresh,
+    const scriptHubId = existingHub
+      ? existingHub.scriptHubId
+      : spawnStoryScriptHub({
+          starterNodeId: id,
+          systemPrompt: d.systemPrompt,
+          providerId: d.providerId,
+          modelKey: d.modelKey,
+          params: d.params ?? {},
+          nodes: state.nodes,
+          edges: state.edges,
+          addNode: (type, position, nodeData) =>
+            addNode(type, position, nodeData),
+          setEdges,
+          updateNodeData,
+        }).scriptHubId;
+    reflowStoryComicLayout();
+    /** 首次：只生成大纲（1 次 LLM）；重新生成：大纲→角色→分镜顺序各 1 次 */
+    const sections = hasScriptDraft
+      ? STORY_HUB_SECTION_ORDER
+      : (["outline"] as const);
+    runStoryHubSectionsSequential(scriptHubId, sections, {
+      forceFresh: hasScriptDraft,
     });
   };
 
-  useEffect(() => {
-    if (pipeline.status === "done" && hasLlmEngines) {
-      updateNodeData(id, { pipelineStage: "llm_done" });
-    }
-  }, [pipeline.status, hasLlmEngines, id, updateNodeData]);
-
   return (
     <NodeShell
-      title="漫剧启动"
+      title="故事主题"
       subtitle={STAGE_LABELS[stage] ?? STAGE_LABELS.idle}
       selected={selected}
       engine
       accent={ENGINE_ACCENT}
       minWidth={400}
-      minHeight={360}
+      minHeight={storyComicStarterNodeHeight()}
       outputs={[{ id: "text", label: "创意", kind: "text" }]}
       headerRight={
         <NodeStatusBadge
-          status={hasLlmEngines ? pipeline.status : "idle"}
-          message={pipeline.failMessage}
+          status={scriptHub ? hubStatus.status : "idle"}
+          message={hubStatus.failMessage}
         />
       }
       footer={
-        <span className="flex items-center gap-1 text-[10px] text-[var(--canvas-muted)]">
-          <Sparkles className="size-3" /> 向导式漫剧 · 分步批量生成
-        </span>
+        <StoryNodeFooterShell
+          hint={
+            <span className="flex items-center gap-1">
+              <Sparkles className="size-3 shrink-0" /> 自动连接「故事大纲」· 弹出层审阅
+            </span>
+          }
+        >
+          <button
+            type="button"
+            disabled={!canRun || isGenerating}
+            className={STORY_NODE_ACTION_BTN_CLASS}
+            onClick={onCreateScript}
+          >
+            {isFinalized ? (
+              <>
+                <Lock className="size-3.5" /> 已定稿
+              </>
+            ) : isGenerating ? (
+              <>
+                <RefreshCw className="size-3.5 animate-spin" /> 剧本生成中…
+              </>
+            ) : hasScriptDraft ? (
+              <>
+                <RefreshCw className="size-3.5" /> 重新生成剧本
+              </>
+            ) : (
+              <>
+                <PenLine className="size-3.5" /> 创作剧本
+              </>
+            )}
+          </button>
+        </StoryNodeFooterShell>
       }
     >
-      <div className="flex h-full flex-col gap-3">
-        <div>
-          <p className="mb-1 text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
-            主题 / 概要
-          </p>
+      <div className="flex h-full min-h-0 flex-col gap-2">
+        <div className="flex shrink-0 flex-col">
+          <div className="mb-1 flex shrink-0 flex-wrap items-center gap-1.5">
+            <p className="text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
+              系统提示词
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {STORY_THEME_SYSTEM_PROMPT_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  title={tpl.description}
+            disabled={isGenerating || isFinalized}
+            className={`nodrag rounded px-2 py-0.5 text-[10px] font-medium transition ${
+                    activeTemplateId === tpl.id
+                      ? "bg-[#fb923c]/30 text-[#fdba74]"
+                      : "bg-white/5 text-[var(--canvas-muted)] hover:bg-white/10 hover:text-white"
+                  } disabled:opacity-50`}
+                  onClick={() => applyTemplate(tpl.id)}
+                >
+                  {tpl.label}
+                </button>
+              ))}
+              {activeTemplateId === "custom" ? (
+                <span className="rounded bg-white/5 px-2 py-0.5 text-[10px] text-amber-200/90">
+                  自定义
+                </span>
+              ) : null}
+            </div>
+          </div>
           <textarea
-            className={`${RF_NODE_SCROLL} nodrag min-h-[120px] w-full resize-y rounded-md border border-white/10 bg-black/30 p-2 text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[#fb923c]/60 focus:outline-none disabled:opacity-60`}
-            value={d.theme ?? ""}
-            placeholder="描述故事创意、风格、人物关系…"
-            disabled={isGenerating}
-            onChange={(e) => updateNodeData(id, { theme: e.target.value })}
+            className="nodrag w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 text-[12px] leading-[17px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[#fb923c]/60 focus:outline-none disabled:opacity-60"
+            style={{ minHeight: promptMinHeight, height: promptMinHeight }}
+            value={d.systemPrompt ?? ""}
+            placeholder="大纲 LLM 的 system 指令（含主题与约束）…"
+            disabled={isGenerating || isFinalized}
+            onChange={(e) =>
+              updateNodeData(id, {
+                systemPrompt: e.target.value,
+                systemPromptTemplateId: undefined,
+              })
+            }
+            onBlur={syncHubIfConnected}
           />
         </div>
 
         <div className="space-y-1.5 border-t border-white/5 pt-2">
           <p className="text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
-            LLM 模型（三文案引擎共用）
+            LLM 模型（文案共用）
           </p>
-          <EnginePicker
-            role="LLM"
-            allowedModelKeys={[...STORY_LLM_MODEL_KEYS]}
-            providerId={d.providerId ?? ""}
-            modelKey={d.modelKey ?? ""}
-            params={d.params ?? {}}
-            onChange={onPickEngine}
-          />
-        </div>
-
-        <div className="mt-auto flex flex-col gap-2 border-t border-white/10 pt-2">
-          <button
-            type="button"
-            disabled={!canRun || isGenerating}
-            className="nodrag inline-flex w-full items-center justify-center gap-1 rounded-md bg-[#fb923c] px-2 py-2 text-[12px] font-medium text-black hover:bg-[#fdba74] disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={() => runPipeline(hasLlmEngines)}
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw className="size-3.5 animate-spin" /> 文案生成中…
-              </>
-            ) : hasLlmEngines ? (
-              <>
-                <RefreshCw className="size-3.5" /> 重新生成全部文案
-              </>
-            ) : (
-              <>
-                <Play className="size-3.5" /> 开始生成（大纲+角色+分镜）
-              </>
-            )}
-          </button>
-          {hasLlmEngines ? (
-            <button
-              type="button"
-              disabled={!canRun || isGenerating}
-              className="nodrag inline-flex w-full items-center justify-center gap-1 rounded-md border border-white/15 px-2 py-1.5 text-[11px] text-white/85 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => runPipeline(true)}
-            >
-              <RefreshCw className="size-3" /> 强制跳过缓存重跑
-            </button>
-          ) : null}
-          {pipeline.status === "error" && pipeline.failMessage ? (
-            <p className="rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1.5 text-[11px] leading-relaxed text-red-200">
-              {pipeline.failMessage}
-            </p>
-          ) : null}
-          <p className="text-[10px] text-[var(--canvas-muted)]">
-            <Clapperboard className="mr-0.5 inline size-3" />
-            将自动创建故事大纲、角色设定、分镜脚本三个引擎并按顺序生成
-          </p>
+          <div className={isFinalized ? "pointer-events-none opacity-50" : undefined}>
+            <EnginePicker
+              role="LLM"
+              allowedModelKeys={[...STORY_LLM_MODEL_KEYS]}
+              providerId={d.providerId ?? ""}
+              modelKey={d.modelKey ?? ""}
+              params={d.params ?? {}}
+              onChange={onPickEngine}
+            />
+          </div>
         </div>
       </div>
     </NodeShell>

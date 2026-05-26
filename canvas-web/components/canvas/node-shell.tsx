@@ -4,6 +4,7 @@ import { Handle, NodeResizer, Position } from "@xyflow/react";
 import { AlertTriangle, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { STORY_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-node-chrome";
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 
 export type NodeShellProps = {
@@ -26,6 +27,10 @@ export type NodeShellProps = {
   footer?: React.ReactNode;
   /** 传入时替换默认 StatusBadge（用于引擎节点自定义标题栏右侧） */
   headerRight?: React.ReactNode;
+  /** 引擎节点：内容在壳内自然撑开，超出时在最外框滚动（非内层列表滚动） */
+  bodyScroll?: boolean;
+  /** 引擎节点：按内容撑开节点高度，壳内不出现滚动条 */
+  bodyExpand?: boolean;
 };
 
 const KIND_COLOR: Record<"image" | "text", string> = {
@@ -50,6 +55,8 @@ export function NodeShell({
   children,
   footer,
   headerRight,
+  bodyScroll = false,
+  bodyExpand = false,
 }: NodeShellProps) {
   const status = runtime?.status ?? "idle";
   const isGenerating = status === "running" || status === "pending";
@@ -125,7 +132,11 @@ export function NodeShell({
         className={cn(
           "flex flex-col px-3",
           engine
-            ? "min-h-0 flex-1 overflow-hidden py-3"
+            ? bodyExpand
+              ? "shrink-0 overflow-visible py-3"
+              : bodyScroll
+                ? cn("min-h-0 flex-1 overflow-y-auto py-3", RF_NODE_SCROLL)
+                : "min-h-0 flex-1 overflow-hidden py-3"
             : cn("min-h-0 flex-1 overflow-auto py-3", RF_NODE_SCROLL),
         )}
       >
@@ -133,9 +144,7 @@ export function NodeShell({
       </div>
 
       {footer ? (
-        <div className="shrink-0 border-t border-white/10 px-3 py-2 text-[11px] text-[var(--canvas-muted)]">
-          {footer}
-        </div>
+        <div className={STORY_NODE_SHELL_FOOTER_CLASS}>{footer}</div>
       ) : null}
 
       {inputs.map((p, i) => (

@@ -34,6 +34,11 @@ import {
   type KieVideoInput,
   type CreateKieTaskArgs,
 } from "@/lib/story/kie-client";
+import {
+  extractStoryScopeFromInputPayload,
+  storyScopesConflict,
+  type CanvasTaskStoryScope,
+} from "./canvas-story-scope";
 import { persistCanvasKieResultToOss } from "./canvas-oss";
 import { CanvasProjectError } from "./canvas-project-service";
 import {
@@ -115,24 +120,28 @@ async function ensureProjectInflightCapacity(
   }
 }
 
-async function ensureNoActiveTaskForNode(
+async function ensureNoActiveTaskForScope(
   projectId: string,
   nodeId: string,
+  storyScope?: CanvasTaskStoryScope,
 ): Promise<void> {
-  const active = await prisma.canvasGenerationTask.findFirst({
+  const active = await prisma.canvasGenerationTask.findMany({
     where: {
       projectId,
       nodeId,
       status: { in: ["PENDING", "SUBMITTED"] },
     },
-    select: { id: true },
+    select: { id: true, inputPayload: true },
   });
-  if (active) {
-    throw new CanvasProjectError(
-      "TASK_ALREADY_INFLIGHT",
-      `node ${nodeId} task already in progress`,
-      409,
-    );
+  for (const t of active) {
+    const existingScope = extractStoryScopeFromInputPayload(t.inputPayload);
+    if (storyScopesConflict(storyScope, existingScope)) {
+      throw new CanvasProjectError(
+        "TASK_ALREADY_INFLIGHT",
+        `node ${nodeId} task already in progress`,
+        409,
+      );
+    }
   }
 }
 
@@ -293,7 +302,7 @@ export async function submitCanvasNodeTask(
     return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForNode(args.projectId, args.nodeId);
+  await ensureNoActiveTaskForScope(args.projectId, args.nodeId);
   await ensureProjectInflightCapacity(args.projectId);
   await ensureUserInflightCapacity(args.userId);
 
@@ -343,6 +352,18 @@ export async function submitCanvasNodeTask(
 
 // —— Apply result ——
 
+/** 仅允许一个并发路径把 SUBMITTED/PENDING 任务推进到终态，避免重复 OSS 上传与多次 success 日志 */
+async function claimCanvasTaskForResultApply(taskId: string): Promise<boolean> {
+  const claimed = await prisma.canvasGenerationTask.updateMany({
+    where: {
+      id: taskId,
+      status: { in: ["PENDING", "SUBMITTED"] },
+    },
+    data: { lastPolledAt: new Date() },
+  });
+  return claimed.count > 0;
+}
+
 export async function applyCanvasKieTaskResult(
   taskId: string,
   record: KieRecordResponse,
@@ -356,6 +377,7 @@ export async function applyCanvasKieTaskResult(
     return;
   }
   if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+  if (!(await claimCanvasTaskForResultApply(taskId))) return;
 
   if (record.state === "success") {
     const ephemeralUrl = extractKieResultUrl(record);
@@ -410,8 +432,11 @@ export async function applyCanvasKieTaskResult(
       });
       return;
     }
-    await prisma.canvasGenerationTask.update({
-      where: { id: taskId },
+    const applied = await prisma.canvasGenerationTask.updateMany({
+      where: {
+        id: taskId,
+        status: { in: ["PENDING", "SUBMITTED"] },
+      },
       data: {
         status: "SUCCEEDED",
         ossUrl,
@@ -420,6 +445,7 @@ export async function applyCanvasKieTaskResult(
         completedAt: new Date(),
       },
     });
+    if (applied.count === 0) return;
     logKieEvent("info", "[canvas] task succeeded", {
       taskId,
       kind: task.kind,
@@ -489,6 +515,7 @@ export async function applyCanvasGatewayPollResult(
     return;
   }
   if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+  if (!(await claimCanvasTaskForResultApply(taskId))) return;
 
   if (poll.state === "failed") {
     await prisma.canvasGenerationTask.update({
@@ -745,6 +772,24 @@ export async function runCanvasPollWorker(opts?: {
           },
         });
         result.failed++;
+      }
+      continue;
+    }
+
+    const fresh = await prisma.canvasGenerationTask.findUnique({
+      where: { id: task.id },
+      select: { status: true, kieTaskId: true, submittedAt: true },
+    });
+    if (fresh?.kieTaskId) {
+      if (fresh.status === "PENDING") {
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            status: "SUBMITTED",
+            submittedAt: fresh.submittedAt ?? new Date(),
+            lastPolledAt: new Date(),
+          },
+        });
       }
       continue;
     }
@@ -1032,7 +1077,13 @@ export async function listProjectTasks(args: {
       | "completedAt"
       | "createdAt"
       | "updatedAt"
-    >
+    > & {
+      storyScope?: {
+        rowKey?: string;
+        mediaKind?: string;
+        llmSection?: string;
+      };
+    }
   >
 > {
   const project = await prisma.canvasProject.findFirst({
@@ -1068,9 +1119,13 @@ export async function listProjectTasks(args: {
       completedAt: true,
       createdAt: true,
       updatedAt: true,
+      inputPayload: true,
     },
   });
-  return rows;
+  return rows.map(({ inputPayload, ...row }) => ({
+    ...row,
+    storyScope: extractStoryScopeFromInputPayload(inputPayload),
+  }));
 }
 
 export type CanvasGenerationKindAlias = CanvasGenerationKind;

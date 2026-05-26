@@ -17,6 +17,14 @@ import {
   runTtsEngineNode,
   runVideoEngineNode,
 } from "@/lib/canvas/canvas-engine-runner";
+import {
+  runStoryCharacterColumnRow,
+  runStoryFrameColumnRow,
+  runStoryScriptHubSection,
+  runStoryVideoColumnTtsRow,
+  runStoryVideoColumnVideoRow,
+  type StoryLlmSection,
+} from "@/lib/canvas/story-workspace-runner";
 
 type Ctx = { params: Promise<{ id: string; nodeId: string }> };
 
@@ -47,10 +55,24 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     );
   }
   const forceFresh = body.body.forceFresh === true;
+  const llmSection = body.body.llmSection as StoryLlmSection | undefined;
+  const rowKey =
+    typeof body.body.rowKey === "string" ? body.body.rowKey : undefined;
+  const mediaKind = body.body.mediaKind as
+    | "threeView"
+    | "frameImage"
+    | "video"
+    | "tts"
+    | undefined;
+  const storyScope =
+    rowKey || mediaKind || llmSection
+      ? { rowKey, mediaKind, llmSection }
+      : undefined;
   const baseArgs = {
     userId: guard.user.id,
     projectId,
     nodeId,
+    storyScope,
     node: {
       type: node.type,
       modelKey: node.modelKey,
@@ -70,6 +92,44 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     let result;
     if (node.type === "ai-engine") {
       result = await runAiEngineNode({ ...baseArgs, forceFresh });
+    } else if (node.type === "story-script-hub" && llmSection) {
+      result = await runStoryScriptHubSection({
+        ...baseArgs,
+        forceFresh,
+        llmSection,
+      });
+    } else if (
+      node.type === "story-character-column" && rowKey && mediaKind === "threeView"
+    ) {
+      result = await runStoryCharacterColumnRow({
+        ...baseArgs,
+        forceFresh,
+        rowKey,
+      });
+    } else if (
+      node.type === "story-frame-column" && rowKey && mediaKind === "frameImage"
+    ) {
+      result = await runStoryFrameColumnRow({
+        ...baseArgs,
+        forceFresh,
+        rowKey,
+      });
+    } else if (
+      node.type === "story-video-column" && rowKey && mediaKind === "video"
+    ) {
+      result = await runStoryVideoColumnVideoRow({
+        ...baseArgs,
+        forceFresh,
+        rowKey,
+      });
+    } else if (
+      node.type === "story-video-column" && rowKey && mediaKind === "tts"
+    ) {
+      result = await runStoryVideoColumnTtsRow({
+        ...baseArgs,
+        forceFresh,
+        rowKey,
+      });
     } else if (
       node.type === "story-outline-engine" ||
       node.type === "character-engine" ||

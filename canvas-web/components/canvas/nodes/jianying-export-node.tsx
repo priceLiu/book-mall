@@ -7,6 +7,7 @@ import { Download, Film } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { JianyingExportNodeData } from "@/lib/canvas/types";
+import { collectJianyingFramesFromWorkspace } from "@/lib/canvas/jianying-from-workspace";
 import {
   collectJianyingFrames,
   findUpstreamStoryboardId,
@@ -23,14 +24,22 @@ export function JianyingExportNode({ id, data, selected }: NodeProps) {
   const [loading, setLoading] = useState<"bundle" | "draft" | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  const workspaceFrames = collectJianyingFramesFromWorkspace(nodes);
   const storyboardId = findUpstreamStoryboardId(nodes, edges, id);
-  const frames = storyboardId
-    ? collectJianyingFrames(nodes, edges, storyboardId)
-    : [];
+  const frames = (
+    workspaceFrames.length > 0
+      ? workspaceFrames
+      : storyboardId
+        ? collectJianyingFrames(nodes, edges, storyboardId)
+        : []
+  ).map((f) => ({
+    ...f,
+    dialogue: f.dialogue ?? "",
+  }));
 
   const onExport = async (format: "bundle" | "draft") => {
     if (!base || !projectId || !frames.length) {
-      setErr("请先连接分镜引擎并生成各镜 video/tts");
+      setErr("请先完成视频列各镜视频与配音，或连接旧版分镜引擎");
       return;
     }
     setLoading(format);

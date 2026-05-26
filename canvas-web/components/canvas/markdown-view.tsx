@@ -11,8 +11,8 @@ export function MarkdownView({
 }: {
   content: string;
   className?: string;
-  /** inline=节点内小字；document=全屏 Word 式阅读 */
-  variant?: "inline" | "document";
+  /** inline=暗色节点；nodePreview=节点内白纸预览；document=全屏 Word 式阅读 */
+  variant?: "inline" | "document" | "nodePreview";
 }) {
   if (!content.trim()) {
     return (
@@ -21,16 +21,26 @@ export function MarkdownView({
   }
 
   const isDoc = variant === "document";
+  const isNodePreview = variant === "nodePreview";
+  const isLightDoc = isDoc || isNodePreview;
 
-  const tableCell = isDoc ? "text-[15px] leading-relaxed" : "text-[11px]";
-  const tablePad = isDoc ? "px-4 py-2.5" : "px-2 py-1";
+  const tableCell =
+    isDoc ? "text-[15px] leading-relaxed"
+    : isNodePreview ? "text-[12px] leading-relaxed"
+    : "text-[11px]";
+  const tablePad =
+    isDoc ? "px-4 py-2.5"
+    : isNodePreview ? "px-2.5 py-1.5"
+    : "px-2 py-1";
 
   return (
     <div
       className={
         isDoc
           ? `prose prose-neutral max-w-none text-[17px] leading-[1.75] text-neutral-900 ${className}`
-          : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${className}`
+          : isNodePreview
+            ? `prose prose-neutral max-w-none text-[13px] leading-[1.7] text-neutral-800 ${className}`
+            : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${className}`
       }
     >
       <ReactMarkdown
@@ -52,7 +62,9 @@ export function MarkdownView({
               className={
                 isDoc
                   ? "mb-4 mt-8 text-[22px] font-semibold text-neutral-800"
-                  : undefined
+                  : isNodePreview
+                    ? "mb-2 mt-5 border-b border-neutral-200 pb-1 text-[15px] font-semibold text-neutral-800 first:mt-0"
+                    : undefined
               }
             >
               {children}
@@ -61,25 +73,51 @@ export function MarkdownView({
           h3: ({ children }) => (
             <h3
               className={
-                isDoc ? "mb-3 mt-6 text-[18px] font-semibold text-neutral-800" : undefined
+                isDoc
+                  ? "mb-3 mt-6 text-[18px] font-semibold text-neutral-800"
+                  : isNodePreview
+                    ? "mb-2 mt-4 text-[14px] font-semibold text-neutral-800"
+                    : undefined
               }
             >
               {children}
             </h3>
           ),
           p: ({ children }) => (
-            <p className={isDoc ? "mb-4 text-[17px] leading-[1.85] text-neutral-800" : undefined}>
+            <p
+              className={
+                isDoc
+                  ? "mb-4 text-[17px] leading-[1.85] text-neutral-800"
+                  : isNodePreview
+                    ? "mb-3 text-[13px] leading-[1.75] text-neutral-700"
+                    : undefined
+              }
+            >
               {children}
             </p>
           ),
           li: ({ children }) => (
-            <li className={isDoc ? "text-[17px] leading-[1.75]" : undefined}>{children}</li>
+            <li
+              className={
+                isDoc ? "text-[17px] leading-[1.75]"
+                : isNodePreview ? "text-[13px] leading-[1.7]"
+                : undefined
+              }
+            >
+              {children}
+            </li>
           ),
           table: ({ children }) => (
-            <div className={`overflow-x-auto ${isDoc ? "my-6" : ""}`}>
+            <div
+              className={`overflow-x-auto ${
+                isDoc ? "my-6"
+                : isNodePreview ? "my-3"
+                : "my-4"
+              }`}
+            >
               <table
                 className={`min-w-full border-collapse text-left ${tableCell} ${
-                  isDoc ? "border border-neutral-300" : ""
+                  isLightDoc ? "border border-neutral-300" : ""
                 }`}
               >
                 {children}
@@ -91,7 +129,9 @@ export function MarkdownView({
               className={`border font-semibold ${
                 isDoc
                   ? `border-neutral-300 bg-neutral-100 ${tablePad} text-[15px] text-neutral-900`
-                  : `border-white/15 bg-white/5 ${tablePad}`
+                  : isNodePreview
+                    ? `border-neutral-300 bg-neutral-100 ${tablePad} text-[12px] text-neutral-900`
+                    : `border-white/15 bg-white/5 ${tablePad}`
               }`}
             >
               {children}
@@ -100,7 +140,7 @@ export function MarkdownView({
           td: ({ children }) => (
             <td
               className={`border align-top ${tablePad} ${
-                isDoc ? "border-neutral-200 bg-white" : "border-white/10"
+                isLightDoc ? "border-neutral-200 bg-white" : "border-white/10"
               }`}
             >
               {children}

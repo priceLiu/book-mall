@@ -12,7 +12,11 @@ import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { busEnqueueNodesSequential } from "@/lib/canvas/canvas-run-bus";
+import {
+  busEnqueueNodesSequential,
+  busEnqueueStoryRunsSequential,
+} from "@/lib/canvas/canvas-run-bus";
+import { collectStoryWorkspaceRunJobs } from "@/lib/canvas/story-run-all";
 import {
   CanvasRunnerHost,
   useCanvasInflightTaskCount,
@@ -296,6 +300,12 @@ function Inner({ projectId }: { projectId: string }) {
   }, [dialogs, hydrate, manualSave, projectId, reflowStoryComicLayout]);
 
   const runAll = useCallback(() => {
+    const workspaceJobs = collectStoryWorkspaceRunJobs(nodes);
+    if (workspaceJobs.length) {
+      busEnqueueStoryRunsSequential(workspaceJobs);
+      return;
+    }
+
     let order: string[];
     try {
       order = topoSort(nodes, edges);
@@ -305,7 +315,28 @@ function Inner({ projectId }: { projectId: string }) {
     }
     const runnableIds = order.filter((id) => {
       const n = nodes.find((x) => x.id === id);
-      return n && isRunnableNodeType(n.type as CanvasNodeType);
+      if (!n || !isRunnableNodeType(n.type as CanvasNodeType)) return false;
+      if (n.type === "three-view-engine") {
+        const starter = nodes.find((x) => x.type === "story-comic-starter");
+        const stage = (starter?.data as { pipelineStage?: string })
+          ?.pipelineStage;
+        if (stage === "idle" || stage === "llm_done") return false;
+      }
+      if (n.type === "image-engine" && (n.data as { frameIndex?: number }).frameIndex != null) {
+        const starter = nodes.find((x) => x.type === "story-comic-starter");
+        const stage = (starter?.data as { pipelineStage?: string })
+          ?.pipelineStage;
+        if (stage === "idle" || stage === "llm_done" || stage === "tv_done") {
+          return false;
+        }
+      }
+      if (n.type === "video-engine" || n.type === "tts-engine") {
+        const starter = nodes.find((x) => x.type === "story-comic-starter");
+        const stage = (starter?.data as { pipelineStage?: string })
+          ?.pipelineStage;
+        if (stage !== "frames_done" && stage !== "media_done") return false;
+      }
+      return true;
     });
     if (!runnableIds.length) return;
     busEnqueueNodesSequential(runnableIds);

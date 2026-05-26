@@ -9,6 +9,11 @@ import {
 import { THREE_VIEW_ENGINE_PROMPT_DEFAULT } from "./builtin-prompt-templates";
 import { parseCharacterRows, parseStoryboardRows } from "./parse-md-tables";
 import { directPredecessors } from "./topo";
+import {
+  STORY_GROUP_CHARACTERS,
+  STORY_GROUP_FRAMES,
+  STORY_GROUP_VIDEOS,
+} from "./story-comic-groups";
 
 type StoreAddNode = (
   type: CanvasNodeType,
@@ -16,7 +21,7 @@ type StoreAddNode = (
   data?: Record<string, unknown>,
 ) => string;
 
-type BatchArgs = {
+export type BatchArgs = {
   sourceNodeId: string;
   markdown: string;
   /** 批量开始时的节点快照（兼容）；实时读 store 请用 getNodes */
@@ -60,7 +65,7 @@ function sourcePosition(nodes: CanvasFlowNode[], id: string) {
   return n?.position ?? { x: 400, y: 200 };
 }
 
-/** 模板内「分镜媒体」分组，或 label 含分镜媒体的 group */
+/** 模板内「分镜媒体」分组（旧模板兼容） */
 export function findMediaGroupId(nodes: CanvasFlowNode[]): string | null {
   const byId = nodes.find((n) => n.id === "sc-group-media");
   if (byId) return byId.id;
@@ -70,6 +75,33 @@ export function findMediaGroupId(nodes: CanvasFlowNode[]): string | null {
       String((n.data as { label?: string }).label ?? "").includes("分镜媒体"),
   );
   return byLabel?.id ?? null;
+}
+
+/** 分镜图列分组 */
+export function findFramesGroupId(nodes: CanvasFlowNode[]): string | null {
+  const byId = nodes.find((n) => n.id === STORY_GROUP_FRAMES);
+  if (byId) return byId.id;
+  const byLabel = nodes.find(
+    (n) =>
+      n.type === "group" &&
+      (String((n.data as { label?: string }).label ?? "").includes("分镜列") ||
+        String((n.data as { label?: string }).label ?? "").includes("分镜资产")),
+  );
+  if (byLabel) return byLabel.id;
+  return findMediaGroupId(nodes);
+}
+
+/** 分镜视频列分组 */
+export function findVideosGroupId(nodes: CanvasFlowNode[]): string | null {
+  const byId = nodes.find((n) => n.id === STORY_GROUP_VIDEOS);
+  if (byId) return byId.id;
+  const byLabel = nodes.find(
+    (n) =>
+      n.type === "group" &&
+      String((n.data as { label?: string }).label ?? "").includes("视频列"),
+  );
+  if (byLabel) return byLabel.id;
+  return findMediaGroupId(nodes);
 }
 
 export function findExportNodeId(nodes: CanvasFlowNode[]): string | null {
@@ -155,12 +187,15 @@ function nextFrameRowY(nodes: CanvasFlowNode[], groupId: string): number {
 
 /** 模板内「角色三视图」分组 */
 export function findCharacterGroupId(nodes: CanvasFlowNode[]): string | null {
-  const byId = nodes.find((n) => n.id === "sc-group-characters");
+  const byId = nodes.find((n) => n.id === STORY_GROUP_CHARACTERS);
   if (byId) return byId.id;
+  const byIdLegacy = nodes.find((n) => n.id === "sc-group-characters");
+  if (byIdLegacy) return byIdLegacy.id;
   const byLabel = nodes.find(
     (n) =>
       n.type === "group" &&
-      String((n.data as { label?: string }).label ?? "").includes("角色三视图"),
+      (String((n.data as { label?: string }).label ?? "").includes("角色列") ||
+        String((n.data as { label?: string }).label ?? "").includes("角色三视图")),
   );
   return byLabel?.id ?? null;
 }
@@ -496,7 +531,7 @@ export function batchCreateFrameImages(args: BatchArgs) {
   if (!frames.length) return;
   const nodes = liveNodes(args);
   const charRows = parseCharacterRows(findCharacterMarkdown(nodes));
-  const groupId = findMediaGroupId(nodes);
+  const groupId = findFramesGroupId(nodes);
   let rowY = groupId ? nextFrameRowY(nodes, groupId) : 0;
   const imageDefaults = args.imageDefaults;
 
@@ -596,7 +631,8 @@ export function batchCreateFrameVideos(args: BatchArgs) {
   );
   if (!frames.length) return;
   const nodes = liveNodes(args);
-  const groupId = findMediaGroupId(nodes);
+  const groupId = findVideosGroupId(nodes);
+  const framesGroupId = findFramesGroupId(nodes);
   const exportId = findExportNodeId(nodes);
   const videoDefaults = args.videoDefaults;
 
@@ -621,18 +657,12 @@ export function batchCreateFrameVideos(args: BatchArgs) {
     };
 
     let vidId: string;
-    if (groupId && imgNode?.parentId === groupId) {
-      vidId = placeInGroup(
-        args,
-        groupId,
-        imgNode.position.x + 396,
-        imgNode.position.y,
-        "video-engine",
-        vidData,
-      );
-    } else if (groupId) {
-      const rowY = nextFrameRowY(liveNodes(args), groupId);
-      vidId = placeInGroup(args, groupId, 420, rowY, "video-engine", vidData);
+    if (groupId) {
+      const rowY =
+        imgNode?.parentId === framesGroupId && imgNode ?
+          imgNode.position.y
+        : nextFrameRowY(liveNodes(args), groupId);
+      vidId = placeInGroup(args, groupId, 24, rowY, "video-engine", vidData);
     } else {
       const base = sourcePosition(liveNodes(args), args.sourceNodeId);
       vidId = args.addNode(
@@ -656,7 +686,8 @@ export function batchCreateFrameTts(args: BatchArgs) {
   const frames = parseStoryboardRows(args.markdown);
   if (!frames.length) return;
   const nodes = liveNodes(args);
-  const groupId = findMediaGroupId(nodes);
+  const groupId = findVideosGroupId(nodes);
+  const framesGroupId = findFramesGroupId(nodes);
   const exportId = findExportNodeId(nodes);
 
   frames.forEach((f) => {
@@ -670,14 +701,14 @@ export function batchCreateFrameTts(args: BatchArgs) {
         (n.data as { frameIndex?: number }).frameIndex === f.frameIndex,
     );
     const rowY =
-      imgNode?.parentId === groupId
-        ? imgNode.position.y + 164
-        : groupId
-          ? nextFrameRowY(liveNodes(args), groupId) + 164
-          : 0;
+      groupId ?
+        imgNode?.parentId === framesGroupId && imgNode ?
+          imgNode.position.y + 120
+        : nextFrameRowY(liveNodes(args), groupId) + 120
+      : 0;
 
     const ttsId = groupId
-      ? placeInGroup(args, groupId, imgNode?.position.x ?? 24, rowY, "tts-engine", {
+      ? placeInGroup(args, groupId, 24, rowY, "tts-engine", {
           text: dialogue,
           frameIndex: f.frameIndex,
           params: { voice: "alloy" },
@@ -1061,7 +1092,7 @@ export function spawnFrameVideoForImage(
   }
 
   const batch = toBatchArgs(args, sb.id);
-  const groupId = findMediaGroupId(nodes);
+  const groupId = findVideosGroupId(nodes);
   const exportId = findExportNodeId(nodes);
   const videoData = {
     prompt,
@@ -1076,11 +1107,13 @@ export function spawnFrameVideoForImage(
   };
 
   let vidId: string;
-  if (groupId && imgNode.parentId === groupId) {
-    vidId = placeInGroup(batch, groupId, imgNode.position.x + 396, imgNode.position.y, "video-engine", videoData);
-  } else if (groupId) {
-    const rowY = nextFrameRowY(nodes, groupId);
-    vidId = placeInGroup(batch, groupId, 420, rowY, "video-engine", videoData);
+  if (groupId) {
+    const framesGroupId = findFramesGroupId(nodes);
+    const rowY =
+      imgNode.parentId === framesGroupId ?
+        imgNode.position.y
+      : nextFrameRowY(nodes, groupId);
+    vidId = placeInGroup(batch, groupId, 24, rowY, "video-engine", videoData);
   } else {
     const base = imgNode.position;
     vidId = args.addNode("video-engine", { x: base.x + 400, y: base.y }, videoData);
@@ -1140,7 +1173,7 @@ export function spawnFrameTtsForImage(
   }
 
   const batch = toBatchArgs(args, sb.id);
-  const groupId = findMediaGroupId(nodes);
+  const groupId = findVideosGroupId(nodes);
   const exportId = findExportNodeId(nodes);
   const ttsData = {
     text: dialogue,
@@ -1153,15 +1186,16 @@ export function spawnFrameTtsForImage(
         }
       : {}),
   };
+  const framesGroupId = findFramesGroupId(nodes);
   const rowY =
-    imgNode.parentId === groupId
-      ? imgNode.position.y + 164
-      : groupId
-        ? nextFrameRowY(nodes, groupId) + 164
-        : imgNode.position.y + 200;
+    groupId ?
+      imgNode.parentId === framesGroupId ?
+        imgNode.position.y + 120
+      : nextFrameRowY(nodes, groupId) + 120
+    : imgNode.position.y + 200;
 
   const ttsId = groupId
-    ? placeInGroup(batch, groupId, imgNode.position.x, rowY, "tts-engine", ttsData)
+    ? placeInGroup(batch, groupId, 24, rowY, "tts-engine", ttsData)
     : args.addNode(
         "tts-engine",
         { x: imgNode.position.x, y: rowY },

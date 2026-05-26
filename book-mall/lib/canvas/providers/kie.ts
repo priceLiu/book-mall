@@ -188,45 +188,62 @@ function kieChatEmptyError(choice: KieChatChoice | undefined, rawBody: string): 
   );
 }
 
+const GEMINI_3_FLASH_LLM_PARAMS = [
+  {
+    key: "reasoning_effort",
+    label: "推理深度",
+    type: "select",
+    options: [
+      { value: "low", label: "low（快）" },
+      { value: "high", label: "high（深，慢）" },
+    ],
+    defaultValue: "low",
+  },
+  {
+    key: "max_tokens",
+    label: "max_tokens",
+    type: "number",
+    min: 256,
+    max: 16000,
+    step: 128,
+    defaultValue: 4000,
+    help: "输出越长消耗越高，漫剧大纲推荐 4000。",
+  },
+  {
+    key: "temperature",
+    label: "temperature",
+    type: "number",
+    min: 0,
+    max: 2,
+    step: 0.1,
+    defaultValue: 0.7,
+  },
+] satisfies CanvasParamSchema;
+
+const GEMINI_3_FLASH_LLM_DEFAULTS = {
+  reasoning_effort: "low",
+  max_tokens: 4000,
+  temperature: 0.7,
+};
+
 export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
+  {
+    modelKey: "google/gemini-3-flash-preview",
+    displayName: "Gemini 3 Flash Preview (KIE)",
+    role: "LLM",
+    description:
+      "与 story-web 生成故事大纲同款；多模态理解 + 文本生成（KIE gemini-3-flash 端点）。",
+    paramsSchema: GEMINI_3_FLASH_LLM_PARAMS,
+    defaultParams: GEMINI_3_FLASH_LLM_DEFAULTS,
+  },
   {
     modelKey: "gemini-3-flash",
     displayName: "Gemini 3 Flash (KIE · 多模态)",
     role: "LLM",
     description:
       "多模态视觉理解 + 文本生成。上游连接产品图 / 风格图 / 参数即可直接出设计方案。",
-    paramsSchema: [
-      {
-        key: "reasoning_effort",
-        label: "推理深度",
-        type: "select",
-        options: [
-          { value: "low", label: "low（快）" },
-          { value: "high", label: "high（深，慢）" },
-        ],
-        defaultValue: "low",
-      },
-      {
-        key: "max_tokens",
-        label: "max_tokens",
-        type: "number",
-        min: 256,
-        max: 16000,
-        step: 128,
-        defaultValue: 4000,
-        help: "输出越长消耗越高，方案生成推荐 4000。",
-      },
-      {
-        key: "temperature",
-        label: "temperature",
-        type: "number",
-        min: 0,
-        max: 2,
-        step: 0.1,
-        defaultValue: 0.7,
-      },
-    ] satisfies CanvasParamSchema,
-    defaultParams: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+    paramsSchema: GEMINI_3_FLASH_LLM_PARAMS,
+    defaultParams: GEMINI_3_FLASH_LLM_DEFAULTS,
   },
   {
     modelKey: "nano-banana-pro",
