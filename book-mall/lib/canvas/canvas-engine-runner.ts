@@ -42,12 +42,21 @@ import type { CanvasProviderConfig } from "./providers/types";
 import {
   isSystemProviderId,
   resolveSystemProvider,
+  SYSTEM_BAILIAN_R2V_PROVIDER_ID,
 } from "./canvas-system-provider";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
 import { createKieTask, type KieVideoInput } from "@/lib/story/kie-client";
 import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
 import { persistCanvasBufferToOss } from "./canvas-oss";
-import { buildCanvasVideoKieInput } from "./canvas-video-kie";
+import {
+  buildCanvasVideoKieInput,
+  buildCanvasRefVideoKieInput,
+} from "./canvas-video-kie";
+import {
+  bailianR2vCreateTask,
+  getDashScopeApiKey,
+} from "./canvas-video-bailian-r2v";
+import { BAILIAN_R2V_MODEL_IDS } from "./providers/bailian-r2v";
 import { storyEngineSystemFallback } from "./story-engine-prompts";
 
 const MAX_PROMPT_LEN = 16000;
@@ -1041,6 +1050,240 @@ export async function runTtsEngineNode(
       data: {
         status: "FAILED",
         failCode: "TTS_ENGINE_FAILED",
+        failMessage: msg.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  }
+}
+
+const REF_VIDEO_KIE_MODEL = "bytedance/seedance-2";
+
+function isRefVideoBailianModel(modelKey: string): boolean {
+  return (BAILIAN_R2V_MODEL_IDS as readonly string[]).includes(modelKey);
+}
+
+/** 参考生视频 · AI 视频引擎（百炼 R2V + KIE Seedance） */
+export async function runRefVideoEngineNode(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const { userId, projectId, nodeId, node } = args;
+  const data = node.data ?? {};
+  const providerId = String(data.providerId ?? "");
+  const modelKey = String(data.modelKey ?? node.modelKey ?? "");
+  const promptRaw = String(data.prompt ?? "");
+  const params = (data.params as Record<string, unknown>) ?? {};
+
+  if (!providerId) {
+    throw new CanvasProjectError("INVALID_INPUT", "ai-video-engine 缺少 providerId");
+  }
+  if (!modelKey) {
+    throw new CanvasProjectError("INVALID_INPUT", "ai-video-engine 缺少 modelKey");
+  }
+
+  const isBailian = isRefVideoBailianModel(modelKey);
+  const isKieSeedance = modelKey === REF_VIDEO_KIE_MODEL;
+  if (!isBailian && !isKieSeedance) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      `ai-video-engine 不支持模型 ${modelKey}`,
+    );
+  }
+
+  const expandedPrompt = promptRaw.trim();
+  if (!expandedPrompt) {
+    throw new CanvasProjectError("EMPTY_PROMPT", "ai-video-engine 提示词为空");
+  }
+
+  const referenceImageUrls = (node.imageInputs ?? []).filter(
+    (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
+  );
+  if (referenceImageUrls.length < 1) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "ai-video-engine 需要至少 1 张参考图（连接宫格）",
+    );
+  }
+
+  const maxRef = isBailian ? 9 : 8;
+  const refs = referenceImageUrls.slice(0, maxRef);
+
+  const provider = await loadProviderForUser(userId, providerId);
+  const inputHash = computeInputHash({
+    modelKey,
+    prompt: expandedPrompt,
+    imageUrls: refs,
+    params,
+    providerId,
+  });
+
+  if (!args.forceFresh) {
+    const reusable = await findReusableSucceededTask({
+      projectId,
+      nodeId,
+      inputHash,
+    });
+    if (reusable) return { reused: true, task: reusable };
+  }
+
+  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
+  await ensureProjectInflightCapacity(projectId);
+  await ensureUserInflightCapacity(userId);
+
+  if (isBailian) {
+    if (providerId !== SYSTEM_BAILIAN_R2V_PROVIDER_ID) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "百炼 R2V 须使用系统 Provider",
+      );
+    }
+    const apiKey = getDashScopeApiKey();
+    if (!apiKey) {
+      throw new CanvasProjectError(
+        "MODEL_NOT_AVAILABLE",
+        "未配置 DASHSCOPE_API_KEY / QWEN_API_KEY",
+        503,
+      );
+    }
+
+    const resolution =
+      String(params.resolution ?? "1080P") === "720P" ? "720P" : "1080P";
+    const ratio = String(params.ratio ?? "16:9");
+    const duration = Number(params.duration ?? 5);
+    const seedStr = String(params.seed ?? "");
+    const parameterExtras: Record<string, unknown> = {};
+    if (modelKey.startsWith("wan2.")) {
+      parameterExtras.prompt_extend = params.prompt_extend !== false;
+    }
+
+    const created = await prisma.canvasGenerationTask.create({
+      data: {
+        projectId,
+        nodeId,
+        kind: "IMAGE",
+        model: modelKey,
+        providerId: provider.dbProviderId,
+        inputHash,
+        inputPayload: {
+          kind: "ai-video-engine",
+          providerKind: "BAILIAN_R2V",
+          prompt: clipPrompt(expandedPrompt),
+          params,
+          providerId,
+          modelKey,
+          referenceImageUrls: refs,
+        } as Prisma.InputJsonValue,
+        status: "PENDING",
+      },
+    });
+
+    try {
+      const createdTask = await bailianR2vCreateTask({
+        apiKey,
+        model: modelKey,
+        prompt: expandedPrompt,
+        referenceImageUrls: refs,
+        resolution,
+        ratio,
+        duration,
+        seedStr,
+        parameterExtras,
+      });
+      if (!createdTask.ok) {
+        throw new Error(createdTask.error);
+      }
+      const updated = await prisma.canvasGenerationTask.update({
+        where: { id: created.id },
+        data: {
+          status: "SUBMITTED",
+          kieTaskId: createdTask.taskId,
+          submittedAt: new Date(),
+        },
+      });
+      return { reused: false, task: updated };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const updated = await prisma.canvasGenerationTask.update({
+        where: { id: created.id },
+        data: {
+          status: "FAILED",
+          failCode: "REF_VIDEO_FAILED",
+          failMessage: msg.slice(0, 500),
+          completedAt: new Date(),
+        },
+      });
+      return { reused: false, task: updated };
+    }
+  }
+
+  if (provider.kind !== "KIE") {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "Seedance 2 当前仅支持 KIE 系统 Provider",
+    );
+  }
+
+  const aspectRatio = String(params.aspect_ratio ?? "16:9");
+  const { model, input } = buildCanvasRefVideoKieInput({
+    modelKey,
+    prompt: expandedPrompt,
+    referenceImageUrls: refs,
+    options: {
+      resolution: String(params.resolution ?? "1080p"),
+      duration: Number(params.duration ?? 5),
+      generateAudio: params.generateAudio === true,
+    },
+    aspectRatio,
+  });
+
+  const created = await prisma.canvasGenerationTask.create({
+    data: {
+      projectId,
+      nodeId,
+      kind: "IMAGE",
+      model: modelKey,
+      providerId: provider.dbProviderId,
+      inputHash,
+      inputPayload: {
+        kind: "ai-video-engine",
+        providerKind: "KIE",
+        prompt: clipPrompt(expandedPrompt),
+        params,
+        providerId,
+        modelKey,
+        referenceImageUrls: refs,
+        kieModel: model,
+        kieInput: input,
+      } as Prisma.InputJsonValue,
+      status: "PENDING",
+    },
+  });
+
+  const callBackUrl = buildCanvasAiKieCallbackUrl("video", created.id);
+
+  try {
+    const { taskId } = await createKieTask({
+      model,
+      input: input as KieVideoInput,
+      callBackUrl,
+    });
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "SUBMITTED",
+        kieTaskId: taskId,
+        submittedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: created.id },
+      data: {
+        status: "FAILED",
+        failCode: "REF_VIDEO_FAILED",
         failMessage: msg.slice(0, 500),
         completedAt: new Date(),
       },

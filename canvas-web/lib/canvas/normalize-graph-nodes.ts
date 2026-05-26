@@ -767,12 +767,46 @@ function normalizeStoryControlNodeSizes(
   });
 }
 
+const REF_VIDEO_WORKFLOW_NODE_TYPES = new Set<string>([
+  "ref-grid-4",
+  "ref-grid-6",
+  "ref-grid-9",
+  "ai-video-engine",
+  "video-generate",
+]);
+
+/** 参考生视频工作流节点：过小节点还原为默认尺寸 */
+function normalizeRefVideoWorkflowNodeSizes(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  return nodes.map((n) => {
+    const t = n.type ?? "";
+    if (!REF_VIDEO_WORKFLOW_NODE_TYPES.has(t)) return n;
+    const def = NODE_DEFAULT_SIZE[t as CanvasNodeType];
+    const { w, h } = nodeMeasuredSize(n);
+    const tooSmall = w < def.width * 0.9 || h < def.height * 0.9;
+    if (!tooSmall) return n;
+    return {
+      ...n,
+      width: def.width,
+      height: def.height,
+      style: {
+        ...(typeof n.style === "object" && n.style ? n.style : {}),
+        width: def.width,
+        height: def.height,
+      },
+    } as CanvasFlowNode;
+  });
+}
+
 export function normalizeCanvasNodes(
   nodes: CanvasFlowNode[],
   edges?: CanvasFlowEdge[],
 ): CanvasFlowNode[] {
   const sized = normalizeStoryControlNodeSizes(
-    normalizeStoryMediaColumnSizes(normalizeThreeViewNodeSizes(nodes)),
+    normalizeStoryMediaColumnSizes(
+      normalizeRefVideoWorkflowNodeSizes(normalizeThreeViewNodeSizes(nodes)),
+    ),
   );
   if (!hasStoryTemplateGroups(sized)) {
     return sortNodesForReactFlow(repairOrphanParentIds(sized));

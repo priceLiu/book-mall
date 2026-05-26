@@ -38,6 +38,9 @@ import { AudioPreviewNode } from "./nodes/audio-preview-node";
 import { ImagePreviewNode } from "./nodes/image-preview-node";
 import { VideoPreviewNode } from "./nodes/video-preview-node";
 import { JianyingExportNode } from "./nodes/jianying-export-node";
+import { RefImageGridNode } from "./nodes/ref-image-grid-node";
+import { AiVideoEngineNode } from "./nodes/ai-video-engine-node";
+import { VideoGenerateNode } from "./nodes/video-generate-node";
 import { OutputNode } from "./nodes/output-node";
 import { GroupNode } from "./nodes/group-node";
 import { SelectionToolbar } from "./selection-toolbar";
@@ -57,6 +60,11 @@ const nodeTypes = {
   "story-frame-column": StoryFrameColumnNode,
   "story-video-column": StoryVideoColumnNode,
   "video-engine": VideoEngineNode,
+  "ref-grid-4": RefImageGridNode,
+  "ref-grid-6": RefImageGridNode,
+  "ref-grid-9": RefImageGridNode,
+  "ai-video-engine": AiVideoEngineNode,
+  "video-generate": VideoGenerateNode,
   "tts-engine": TtsEngineNode,
   "md-preview": MdPreviewNode,
   "audio-preview": AudioPreviewNode,

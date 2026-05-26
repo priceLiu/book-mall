@@ -14,6 +14,7 @@ import type { CanvasProviderKind } from "@prisma/client";
 
 import { DEEPSEEK_KNOWN_MODELS, DEEPSEEK_SYSTEM_BASE_URL } from "./providers/deepseek-system";
 import { KIE_KNOWN_MODELS } from "./providers/kie";
+import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
 import {
   getDefaultProviderBaseUrl,
@@ -25,6 +26,13 @@ export const SYSTEM_PROVIDER_PREFIX = "system:";
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
 export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
 export const SYSTEM_HUNYUAN_3D_PROVIDER_ID = "system:hunyuan-3d";
+export const SYSTEM_BAILIAN_R2V_PROVIDER_ID = "system:bailian-r2v";
+
+export function isBailianR2vSystemEnabled(): boolean {
+  return !!(
+    process.env.DASHSCOPE_API_KEY?.trim() || process.env.QWEN_API_KEY?.trim()
+  );
+}
 
 export function isDeepSeekSystemEnabled(): boolean {
   return !!process.env.DEEPSEEK_API_KEY?.trim();
@@ -102,6 +110,32 @@ export function listSystemProviderDtos(): CanvasProviderDto[] {
       updatedAt: new Date(0).toISOString(),
     });
   }
+  if (isBailianR2vSystemEnabled()) {
+    out.push({
+      id: SYSTEM_BAILIAN_R2V_PROVIDER_ID,
+      alias: "系统 · 百炼参考生视频",
+      kind: "ALI_BAILIAN",
+      baseUrl: "https://dashscope.aliyuncs.com",
+      apiKeyMasked: "system",
+      active: true,
+      lastTestedAt: null,
+      lastTestStatus: "system",
+      models: BAILIAN_R2V_KNOWN_MODELS.map((m, idx) => ({
+        id: `${SYSTEM_BAILIAN_R2V_PROVIDER_ID}::${m.modelKey}`,
+        modelKey: m.modelKey,
+        displayName: m.displayName,
+        role: m.role,
+        description: m.description ?? null,
+        paramsSchema: m.paramsSchema ?? null,
+        defaultParams:
+          (m.defaultParams as Record<string, unknown> | undefined) ?? null,
+        enabled: true,
+        sortOrder: idx,
+      })),
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+    });
+  }
   if (isHunyuan3DSystemEnabled()) {
     out.push({
       id: SYSTEM_HUNYUAN_3D_PROVIDER_ID,
@@ -165,6 +199,22 @@ export function resolveSystemProvider(
         kind: "KIE",
         apiKey,
         baseUrl: getDefaultProviderBaseUrl("KIE"),
+      },
+    };
+  }
+  if (providerId === SYSTEM_BAILIAN_R2V_PROVIDER_ID) {
+    const apiKey =
+      process.env.DASHSCOPE_API_KEY?.trim() ||
+      process.env.QWEN_API_KEY?.trim();
+    if (!apiKey) return null;
+    return {
+      kind: "ALI_BAILIAN",
+      config: {
+        id: SYSTEM_BAILIAN_R2V_PROVIDER_ID,
+        alias: "系统 · 百炼参考生视频",
+        kind: "ALI_BAILIAN",
+        apiKey,
+        baseUrl: "https://dashscope.aliyuncs.com",
       },
     };
   }

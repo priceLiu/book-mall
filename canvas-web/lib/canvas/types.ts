@@ -19,6 +19,13 @@ import {
   STORY_CONTROL_NODE_HEIGHT,
   STORY_CONTROL_NODE_WIDTH,
 } from "./story-node-chrome";
+import {
+  REF_GRID_NODE_SIZE,
+  REF_VIDEO_DEFAULT_MODEL_KEY,
+  REF_VIDEO_MODEL_META,
+  REF_VIDEO_NODE_SIZE,
+  emptyRefGridSlots,
+} from "./ref-video-models";
 
 export {
   AI_ENGINE_PROMPT_TEMPLATE,
@@ -62,6 +69,11 @@ export type CanvasNodeType =
   | "character-engine"
   | "storyboard-engine"
   | "video-engine"
+  | "ref-grid-4"
+  | "ref-grid-6"
+  | "ref-grid-9"
+  | "ai-video-engine"
+  | "video-generate"
   | "tts-engine"
   | "md-preview"
   | "audio-preview"
@@ -87,6 +99,11 @@ export type CanvasContentNodeType =
   | "character-engine"
   | "storyboard-engine"
   | "video-engine"
+  | "ref-grid-4"
+  | "ref-grid-6"
+  | "ref-grid-9"
+  | "ai-video-engine"
+  | "video-generate"
   | "tts-engine"
   | "md-preview"
   | "audio-preview"
@@ -111,6 +128,11 @@ export const CONTENT_NODE_TYPES: CanvasContentNodeType[] = [
   "character-engine",
   "storyboard-engine",
   "video-engine",
+  "ref-grid-4",
+  "ref-grid-6",
+  "ref-grid-9",
+  "ai-video-engine",
+  "video-generate",
   "tts-engine",
   "md-preview",
   "audio-preview",
@@ -291,6 +313,37 @@ export type VideoEngineNodeData = ImageEngineNodeData & {
   frameIndex?: number;
 };
 
+export type RefImageGridSlot = {
+  ossUrl?: string;
+  blobUrl?: string;
+  uploading?: boolean;
+  uploadError?: string;
+};
+
+/** 四 / 六 / 九宫格参考图 */
+export type RefImageGridNodeData = {
+  slots: RefImageGridSlot[];
+  /** 粘贴 / 点击目标格（0-based） */
+  activeSlotIndex?: number;
+  runtime?: CanvasNodeRuntime;
+};
+
+/** 参考生视频 · AI 视频引擎 */
+export type AiVideoEngineNodeData = {
+  providerId: string;
+  modelKey: string;
+  prompt: string;
+  params?: Record<string, unknown>;
+  linkedGridSlotCount?: number;
+  runtime?: CanvasNodeRuntime;
+};
+
+/** 参考生视频 · 成片展示 */
+export type VideoGenerateNodeData = {
+  label?: string;
+  runtime?: CanvasNodeRuntime;
+};
+
 /** TTS 引擎：一镜一条台词 → 一条音频。 */
 export type TtsEngineNodeData = {
   providerId: string;
@@ -371,6 +424,11 @@ export type CanvasNodeData =
   | (StoryEngineNodeData & { __t: "character-engine" })
   | (StoryEngineNodeData & { __t: "storyboard-engine" })
   | (VideoEngineNodeData & { __t: "video-engine" })
+  | (RefImageGridNodeData & { __t: "ref-grid-4" })
+  | (RefImageGridNodeData & { __t: "ref-grid-6" })
+  | (RefImageGridNodeData & { __t: "ref-grid-9" })
+  | (AiVideoEngineNodeData & { __t: "ai-video-engine" })
+  | (VideoGenerateNodeData & { __t: "video-generate" })
   | (TtsEngineNodeData & { __t: "tts-engine" })
   | (MdPreviewNodeData & { __t: "md-preview" })
   | (AudioPreviewNodeData & { __t: "audio-preview" })
@@ -485,6 +543,29 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     referencedNodeIds: [],
     params: { resolution: "1080p", duration: 5 },
   } satisfies VideoEngineNodeData as Record<string, unknown>,
+  "ref-grid-4": {
+    slots: emptyRefGridSlots(4),
+    activeSlotIndex: 0,
+  } satisfies RefImageGridNodeData as Record<string, unknown>,
+  "ref-grid-6": {
+    slots: emptyRefGridSlots(6),
+    activeSlotIndex: 0,
+  } satisfies RefImageGridNodeData as Record<string, unknown>,
+  "ref-grid-9": {
+    slots: emptyRefGridSlots(9),
+    activeSlotIndex: 0,
+  } satisfies RefImageGridNodeData as Record<string, unknown>,
+  "ai-video-engine": {
+    providerId: "",
+    modelKey: REF_VIDEO_DEFAULT_MODEL_KEY,
+    prompt: "",
+    params: {
+      ...REF_VIDEO_MODEL_META[REF_VIDEO_DEFAULT_MODEL_KEY].defaultParams,
+    },
+  } satisfies AiVideoEngineNodeData as Record<string, unknown>,
+  "video-generate": {
+    label: "视频生成",
+  } satisfies VideoGenerateNodeData as Record<string, unknown>,
   "tts-engine": {
     providerId: "",
     modelKey: "",
@@ -544,6 +625,11 @@ export const NODE_DEFAULT_SIZE: Record<
   "character-engine": { width: 480, height: 540 },
   "storyboard-engine": { width: 500, height: 560 },
   "video-engine": { width: 380, height: 560 },
+  "ref-grid-4": REF_GRID_NODE_SIZE["ref-grid-4"],
+  "ref-grid-6": REF_GRID_NODE_SIZE["ref-grid-6"],
+  "ref-grid-9": REF_GRID_NODE_SIZE["ref-grid-9"],
+  "ai-video-engine": REF_VIDEO_NODE_SIZE,
+  "video-generate": REF_VIDEO_NODE_SIZE,
   "tts-engine": { width: 380, height: 360 },
   "md-preview": { width: 420, height: 360 },
   "audio-preview": { width: 380, height: 200 },
@@ -588,6 +674,11 @@ export const NODE_OUTPUT_KIND: Record<
   "character-engine": "text",
   "storyboard-engine": "text",
   "video-engine": "video",
+  "ref-grid-4": "image",
+  "ref-grid-6": "image",
+  "ref-grid-9": "image",
+  "ai-video-engine": "video",
+  "video-generate": "none",
   "tts-engine": "audio",
   "md-preview": "none",
   "audio-preview": "none",
@@ -610,6 +701,7 @@ export function isRunnableNodeType(t: CanvasNodeType): boolean {
     t === "story-frame-column" ||
     t === "story-video-column" ||
     t === "video-engine" ||
+    t === "ai-video-engine" ||
     t === "tts-engine"
   );
 }

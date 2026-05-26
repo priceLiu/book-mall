@@ -1,9 +1,16 @@
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import { THREE_VIEW_ENGINE_MODEL_KEYS } from "./builtin-prompt-templates";
+import {
+  REF_VIDEO_DEFAULT_MODEL_KEY,
+  REF_VIDEO_MODEL_KEYS,
+  REF_VIDEO_MODEL_META,
+  isRefVideoModelKey,
+} from "./ref-video-models";
 import { STORY_LLM_MODEL_KEYS, STORY_VIDEO_MODEL_KEYS } from "./types";
 
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
 export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
+export const SYSTEM_BAILIAN_R2V_PROVIDER_ID = "system:bailian-r2v";
 /** 与 story-web 初始化大纲一致，走 KIE gemini-3-flash 端点 */
 export const STORY_LLM_PREFERRED_MODEL_KEY = "google/gemini-3-flash-preview";
 
@@ -149,6 +156,74 @@ export function pickDefaultStoryVideoEngine(
       ) {
         return { providerId: provider.id, modelKey: m.modelKey };
       }
+    }
+  }
+
+  return null;
+}
+
+const REF_VIDEO_ALLOWED = new Set<string>(REF_VIDEO_MODEL_KEYS);
+
+function findRefVideoOnProvider(
+  provider: CanvasProviderDto,
+  modelKey: string,
+): {
+  providerId: string;
+  modelKey: string;
+  params: Record<string, unknown>;
+} | null {
+  const m = provider.models.find(
+    (x) =>
+      x.role === "VIDEO" &&
+      x.enabled &&
+      x.modelKey === modelKey &&
+      REF_VIDEO_ALLOWED.has(x.modelKey),
+  );
+  if (!m) return null;
+  const defaults = isRefVideoModelKey(modelKey)
+    ? REF_VIDEO_MODEL_META[modelKey].defaultParams
+    : (m.defaultParams ?? {});
+  return {
+    providerId: provider.id,
+    modelKey: m.modelKey,
+    params: defaults,
+  };
+}
+
+/** 参考生视频 · 默认 HappyHorse R2V，其次其它百炼 / Seedance */
+export function pickDefaultRefVideoEngine(
+  providers: CanvasProviderDto[],
+): {
+  providerId: string;
+  modelKey: string;
+  params: Record<string, unknown>;
+} | null {
+  const active = providers.filter((p) => p.active);
+
+  const bailian = active.find((p) => p.id === SYSTEM_BAILIAN_R2V_PROVIDER_ID);
+  if (bailian) {
+    const preferred = findRefVideoOnProvider(
+      bailian,
+      REF_VIDEO_DEFAULT_MODEL_KEY,
+    );
+    if (preferred) return preferred;
+    for (const key of REF_VIDEO_MODEL_KEYS) {
+      if (REF_VIDEO_MODEL_META[key].providerKind !== "BAILIAN_R2V") continue;
+      const hit = findRefVideoOnProvider(bailian, key);
+      if (hit) return hit;
+    }
+  }
+
+  const kie = active.find((p) => p.id === SYSTEM_KIE_PROVIDER_ID);
+  if (kie) {
+    const seedance = findRefVideoOnProvider(kie, "bytedance/seedance-2");
+    if (seedance) return seedance;
+  }
+
+  for (const provider of active) {
+    for (const key of REF_VIDEO_MODEL_KEYS) {
+      const hit = findRefVideoOnProvider(provider, key);
+      if (hit) return hit;
     }
   }
 
