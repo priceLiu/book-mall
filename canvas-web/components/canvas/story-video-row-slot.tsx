@@ -1,12 +1,15 @@
 "use client";
 
-import { Film, Play, RefreshCw } from "lucide-react";
+import { Download, Film, Play, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORY_VIDEO_SLOT } from "@/lib/canvas/story-column-layout";
 import { StoryVideoPromptPopover } from "./story-video-prompt-popover";
 
 const REFRESH_BTN =
   "nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/45 bg-[#fb923c]/20 text-[#fdba74] hover:bg-[#fb923c]/30";
+
+const SLOT_CORNER_BTN =
+  "nodrag absolute z-20 inline-flex size-8 items-center justify-center rounded-full border shadow-md backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100";
 
 /** 分镜视频列 · 纵向成片（手动点击生成，无文案 overlay） */
 export function StoryVideoRowSlot({
@@ -99,10 +102,31 @@ export function StoryVideoRowSlot({
           ) : null}
 
           {hasVideo && !generating ? (
+            <a
+              href={videoUrl}
+              download={`story-video-${frameIndex}.mp4`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="下载视频"
+              title="下载 mp4"
+              className={cn(
+                SLOT_CORNER_BTN,
+                "left-2 top-2 border-white/25 bg-black/55 text-white/90 hover:bg-black/75",
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download className="size-3.5 pointer-events-none" />
+            </a>
+          ) : null}
+
+          {hasVideo && !generating ? (
             <button
               type="button"
               aria-label="重新生成视频"
-              className="nodrag absolute right-2 top-2 z-20 inline-flex size-8 items-center justify-center rounded-full border border-[#fb923c]/40 bg-black/55 text-[#fdba74] opacity-0 shadow-md backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-black/75"
+              className={cn(
+                SLOT_CORNER_BTN,
+                "right-2 top-2 border-[#fb923c]/40 bg-black/55 text-[#fdba74] hover:bg-black/75",
+              )}
               onClick={(e) => {
                 e.stopPropagation();
                 onGenerate();

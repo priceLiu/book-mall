@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { Clapperboard, Eye, RefreshCw, X } from "lucide-react";
+import { Clapperboard, Download, Eye, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORY_MEDIA_COL_WIDTH } from "@/lib/canvas/story-ref-image";
 import { CanvasVideoPlayer } from "./canvas-video-player";
@@ -230,13 +230,27 @@ export function StoryMediaPreviewModal({
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-sm text-white/80">{title ?? "预览"}</p>
-        <button
-          type="button"
-          className="rounded p-1 text-white/70 hover:bg-white/10"
-          onClick={onClose}
-        >
-          <X className="size-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {kind === "video" ? (
+            <a
+              href={url}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="nodrag inline-flex items-center gap-1 rounded-md border border-white/20 px-2.5 py-1 text-[12px] text-white/85 hover:bg-white/10"
+            >
+              <Download className="size-3.5" />
+              下载 mp4
+            </a>
+          ) : null}
+          <button
+            type="button"
+            className="rounded p-1 text-white/70 hover:bg-white/10"
+            onClick={onClose}
+          >
+            <X className="size-5" />
+          </button>
+        </div>
       </div>
       <div className="flex min-h-0 flex-1 items-center justify-center p-4">
         <div onClick={(e) => e.stopPropagation()} className="max-w-full">

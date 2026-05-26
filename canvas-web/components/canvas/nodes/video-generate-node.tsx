@@ -64,6 +64,7 @@ export function VideoGenerateNode({ id, data, selected }: NodeProps) {
       <NodeShell
         title={title}
         selected={selected}
+        runtime={upstreamRuntime}
         minWidth={REF_VIDEO_NODE_SIZE.width}
         minHeight={REF_VIDEO_NODE_SIZE.height}
         inputs={[{ id: "in_video", label: "视频", kind: "image" }]}
@@ -85,10 +86,17 @@ export function VideoGenerateNode({ id, data, selected }: NodeProps) {
           <CanvasVideoPreviewSlot
             className="min-h-0 flex-1"
             videoUrl={url}
-            generating={generating && !url}
-            onPreview={url ? openPreview : undefined}
+            downloadHref={url}
+            downloadFileName="video-generate.mp4"
+            generating={generating}
+            generatingLabel={
+              upstreamRuntime?.status === "pending" ? "排队中…" : "视频生成中…"
+            }
+            onPreview={url && !generating ? openPreview : undefined}
             emptyIcon={<Video className="size-24" strokeWidth={1.25} />}
-            emptyMessage="连接 AI 视频引擎后生成"
+            emptyMessage={
+              generating ? undefined : "连接 AI 视频引擎后生成"
+            }
           />
         </div>
       </NodeShell>
