@@ -39,6 +39,8 @@ import {
   type CanvasProjectDetail,
 } from "@/lib/canvas-api";
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
+import { GatewayLinkBanner } from "@/components/canvas/gateway-link-banner";
+import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
@@ -48,6 +50,12 @@ const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 
 function Inner({ projectId }: { projectId: string }) {
   const base = useBookMallBaseUrl();
+  const {
+    linked: gatewayLinked,
+    accountUrl: gatewayAccountUrl,
+    loading: gatewayLinkLoading,
+  } = useGatewayLinkStatus();
+  const gatewayLinkBlocked = !gatewayLinkLoading && !gatewayLinked;
   const dialogs = useDialogs();
   const hydrate = useCanvasStore((s) => s.hydrate);
   const toGraph = useCanvasStore((s) => s.toGraph);
@@ -302,6 +310,7 @@ function Inner({ projectId }: { projectId: string }) {
   }, [dialogs, hydrate, manualSave, projectId, reflowStoryComicLayout]);
 
   const runAll = useCallback(() => {
+    if (gatewayLinkBlocked) return;
     const workspaceJobs = collectStoryWorkspaceRunJobs(nodes, edges);
     if (workspaceJobs.length) {
       busEnqueueStoryRunsSequential(workspaceJobs);
@@ -342,7 +351,7 @@ function Inner({ projectId }: { projectId: string }) {
     });
     if (!runnableIds.length) return;
     busEnqueueNodesSequential(runnableIds);
-  }, [nodes, edges]);
+  }, [nodes, edges, gatewayLinkBlocked]);
 
   let body: React.ReactNode;
   if (loading) {
@@ -383,7 +392,9 @@ function Inner({ projectId }: { projectId: string }) {
         onSaveTemplate={() => void onSaveTemplate()}
         running={inflightTaskCount > 0}
         inflightTaskCount={inflightTaskCount}
+        runAllDisabled={gatewayLinkBlocked}
       />
+      <GatewayLinkBanner />
       <MyTemplatesPanel
         open={myTemplatesOpen}
         onClose={() => setMyTemplatesOpen(false)}
@@ -453,7 +464,11 @@ function Inner({ projectId }: { projectId: string }) {
 
   return (
     <>
-      <CanvasRunnerHost projectId={projectId} />
+      <CanvasRunnerHost
+        projectId={projectId}
+        gatewayLinkBlocked={gatewayLinkBlocked}
+        gatewayLinkAccountUrl={gatewayAccountUrl}
+      />
       {body}
     </>
   );

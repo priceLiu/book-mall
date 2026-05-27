@@ -90,6 +90,11 @@ model User {
   canvasProviders              CanvasProvider[]
   canvasPromptTemplates        CanvasPromptTemplate[]
 
+  /// Canvas 经 Gateway 代理：关联的 sk-gw API Key（验证后仅存 id，不存明文）
+  gatewayApiKeyId       String?   @unique
+  gatewayApiKeyLinkedAt DateTime?
+  linkedGatewayApiKey   GatewayApiKey? @relation(fields: [gatewayApiKeyId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1228,6 +1233,8 @@ model StoryGenerationTask {
   model           String
   /// KIE 返回的 taskId（提交后填入，用于回调/轮询匹配）
   kieTaskId       String?                @unique
+  /// Gateway 请求日志 id（经 Gateway 代理时写入）
+  gatewayLogId    String?
   /// 提交给 KIE 的完整 input（便于排查与重放，含已拼接的风格段）
   inputPayload    Json
   /// KIE 回调或 recordInfo 原始响应（最近一次）
@@ -1537,4 +1544,173 @@ model CanvasProviderModel {
   @@unique([providerId, modelKey])
   @@index([providerId, enabled, sortOrder])
   @@index([role])
+}
+
+// —— gateway-web BYOK 代理路由 ——
+
+enum GatewayUserSource {
+  BOOK_SYNC
+  LOCAL
+}
+
+enum GatewayProviderKind {
+  KIE
+  BAILIAN
+  DEEPSEEK
+  HUNYUAN
+  DASHSCOPE
+}
+
+enum GatewayRequestStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum GatewayRequestKind {
+  CHAT
+  IMAGE
+  VIDEO
+  OTHER
+  TTS
+  TRYON
+}
+
+enum GatewayMetricsSource {
+  VENDOR
+  PLATFORM
+  UNAVAILABLE
+}
+
+enum GatewayClientSource {
+  GATEWAY_CONSOLE
+  CANVAS
+  STORY
+  TOOL
+  EXTERNAL
+}
+
+model GatewayUser {
+  id           String            @id @default(cuid())
+  email        String            @unique
+  passwordHash String?
+  name         String?
+  image        String?
+  bookUserId   String?           @unique
+  source       GatewayUserSource @default(LOCAL)
+
+  credentials GatewayVendorCredential[]
+  apiKeys     GatewayApiKey[]
+  requestLogs GatewayRequestLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GatewayVendorCredential {
+  id              String              @id @default(cuid())
+  userId          String
+  user            GatewayUser         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alias           String
+  providerKind    GatewayProviderKind
+  apiKeyEncrypted String              @db.Text
+  baseUrl         String?
+  active          Boolean             @default(true)
+  lastTestedAt    DateTime?
+  lastTestStatus  String?
+
+  apiKeyBindings GatewayApiKeyCredential[]
+  requestLogs    GatewayRequestLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, active])
+}
+
+model GatewayApiKey {
+  id             String    @id @default(cuid())
+  userId         String
+  user           GatewayUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  keyPrefix      String
+  keyHash        String
+  ipWhitelist    Json?
+  spendLimitUsd  Decimal?  @db.Decimal(12, 4)
+  revokedAt      DateTime?
+
+  bindings    GatewayApiKeyCredential[]
+  requestLogs GatewayRequestLog[]
+  linkedBookUser User?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, revokedAt])
+  @@index([keyPrefix])
+}
+
+model GatewayApiKeyCredential {
+  apiKeyId     String
+  credentialId String
+  apiKey       GatewayApiKey           @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  credential   GatewayVendorCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@id([apiKeyId, credentialId])
+}
+
+model GatewayRequestLog {
+  id              String               @id @default(cuid())
+  userId          String
+  user            GatewayUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKeyId        String
+  apiKey          GatewayApiKey        @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  credentialId    String?
+  credential      GatewayVendorCredential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  providerKind    GatewayProviderKind?
+  model           String
+  endpoint        String
+  requestKind     GatewayRequestKind     @default(OTHER)
+  status          GatewayRequestStatus   @default(PENDING)
+  externalTaskId  String?
+  clientSource    GatewayClientSource    @default(EXTERNAL)
+  clientPage      String?
+  storyProjectId  String?
+  storyTaskId     String?
+
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  hasTokenUsage    Boolean              @default(false)
+  metricsSource    GatewayMetricsSource @default(UNAVAILABLE)
+  durationMs       Int?
+  vendorDurationMs Int?
+
+  pricingModelKey           String?
+  pricingTierRaw            String?
+  billingKind               String?
+  vendorListUnitCostYuan    Decimal? @db.Decimal(16, 8)
+  estimatedVendorCostYuan   Decimal? @db.Decimal(16, 6)
+
+  inputSummary  Json?
+  resultSummary Json?
+  failCode      String?
+  failMessage   String? @db.Text
+
+  submittedAt   DateTime  @default(now())
+  completedAt   DateTime?
+  lastPolledAt  DateTime?
+  pollCount     Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, submittedAt])
+  @@index([apiKeyId, submittedAt])
+  @@index([externalTaskId])
+  @@index([status])
+  @@index([clientSource, submittedAt])
 }

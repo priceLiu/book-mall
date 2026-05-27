@@ -2,6 +2,10 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { storyCorsHeaders } from "@/lib/story/cors";
+import {
+  assertGatewayApiKeyLinkedForUser,
+  GatewayRequiredError,
+} from "@/lib/gateway/book-gateway-link";
 import { StoryProjectError } from "./story-project-service";
 
 const privateHeaders = {
@@ -45,6 +49,29 @@ export async function requireSessionUser(
       email: session.user.email ?? null,
     },
   };
+}
+
+/** Story AI 路由：登录 + 已关联 Gateway Key */
+export async function requireStoryGatewayUser(
+  request: NextRequest,
+): Promise<AuthGuardResult> {
+  const guard = await requireSessionUser(request);
+  if (!guard.ok) return guard;
+  try {
+    await assertGatewayApiKeyLinkedForUser(guard.user.id);
+  } catch (e) {
+    if (e instanceof GatewayRequiredError) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: e.code, message: e.message },
+          { status: e.httpStatus, headers: jsonHeaders(request) },
+        ),
+      };
+    }
+    throw e;
+  }
+  return guard;
 }
 
 /** 把 StoryProjectError / 未知错误映射为 NextResponse。 */

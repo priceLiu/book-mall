@@ -11,10 +11,61 @@ import { STORY_LLM_MODEL_KEYS, STORY_VIDEO_MODEL_KEYS } from "./types";
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
 export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
 export const SYSTEM_BAILIAN_R2V_PROVIDER_ID = "system:bailian-r2v";
+export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
+export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
+export const GATEWAY_BAILIAN_PROVIDER_ID = "gateway:bailian";
+export const GATEWAY_HUNYUAN_PROVIDER_ID = "gateway:hunyuan";
 /** 与 story-web 初始化大纲一致，走 KIE gemini-3-flash 端点 */
 export const STORY_LLM_PREFERRED_MODEL_KEY = "google/gemini-3-flash-preview";
 
+const DEEPSEEK_BASE_URL_MARK = "deepseek.com";
+
 const STORY_LLM_ALLOWED = new Set<string>(STORY_LLM_MODEL_KEYS);
+
+export function isSystemProviderId(id: string): boolean {
+  return id.startsWith("system:");
+}
+
+export function isGatewayProviderId(id: string): boolean {
+  return id.startsWith("gateway:");
+}
+
+function activeCanvasProviders(providers: CanvasProviderDto[]): CanvasProviderDto[] {
+  return providers.filter(
+    (p) =>
+      p.active && (isGatewayProviderId(p.id) || !isSystemProviderId(p.id)),
+  );
+}
+
+function findProviderByKind(
+  providers: CanvasProviderDto[],
+  kind: CanvasProviderDto["kind"],
+): CanvasProviderDto | undefined {
+  const active = activeCanvasProviders(providers);
+  const gateway = active.find(
+    (p) => isGatewayProviderId(p.id) && p.kind === kind,
+  );
+  if (gateway) return gateway;
+  return active.find((p) => p.kind === kind);
+}
+
+function findDeepSeekProvider(
+  providers: CanvasProviderDto[],
+): CanvasProviderDto | undefined {
+  const active = activeCanvasProviders(providers);
+  const gateway = active.find(
+    (p) =>
+      isGatewayProviderId(p.id) &&
+      p.kind === "OPENAI_COMPAT" &&
+      (p.baseUrl?.includes(DEEPSEEK_BASE_URL_MARK) ?? true),
+  );
+  if (gateway) return gateway;
+  return active.find(
+    (p) =>
+      p.kind === "OPENAI_COMPAT" &&
+      (p.baseUrl?.includes(DEEPSEEK_BASE_URL_MARK) ?? false),
+  );
+}
 
 function findLlmOnProvider(
   provider: CanvasProviderDto,
@@ -31,13 +82,13 @@ function findLlmOnProvider(
   return { providerId: provider.id, modelKey: m.modelKey };
 }
 
-/** 漫剧 Story LLM 默认：KIE · google/gemini-3-flash-preview（story 大纲同款），其次 gemini-3-flash / DeepSeek。 */
+/** 漫剧 Story LLM 默认：Gateway KIE · gemini-3-flash-preview，其次 Gateway / 用户 DeepSeek。 */
 export function pickDefaultStoryLlmEngine(
   providers: CanvasProviderDto[],
 ): { providerId: string; modelKey: string } | null {
-  const active = providers.filter((p) => p.active);
+  const active = activeCanvasProviders(providers);
 
-  const kie = active.find((p) => p.id === SYSTEM_KIE_PROVIDER_ID);
+  const kie = findProviderByKind(providers, "KIE");
   if (kie) {
     const preferred = findLlmOnProvider(kie, STORY_LLM_PREFERRED_MODEL_KEY);
     if (preferred) return preferred;
@@ -45,7 +96,7 @@ export function pickDefaultStoryLlmEngine(
     if (legacy) return legacy;
   }
 
-  const deepseek = active.find((p) => p.id === SYSTEM_DEEPSEEK_PROVIDER_ID);
+  const deepseek = findDeepSeekProvider(providers);
   if (deepseek) {
     const v4Flash = findLlmOnProvider(deepseek, "deepseek-v4-flash");
     if (v4Flash) return v4Flash;
@@ -55,7 +106,7 @@ export function pickDefaultStoryLlmEngine(
     if (legacy) return legacy;
   }
 
-  for (const provider of active) {
+  for (const provider of activeCanvasProviders(providers)) {
     for (const m of provider.models) {
       if (
         m.role === "LLM" &&
@@ -87,13 +138,11 @@ function findImageOnProvider(
   return { providerId: provider.id, modelKey: m.modelKey };
 }
 
-/** 漫剧分镜图 / 三视图 · 默认 IMAGE 模型（KIE nano-banana-pro 等） */
+/** 漫剧分镜图 / 三视图 · 默认 Gateway / 用户 KIE IMAGE 模型 */
 export function pickDefaultStoryImageEngine(
   providers: CanvasProviderDto[],
 ): { providerId: string; modelKey: string } | null {
-  const active = providers.filter((p) => p.active);
-
-  const kie = active.find((p) => p.id === SYSTEM_KIE_PROVIDER_ID);
+  const kie = findProviderByKind(providers, "KIE");
   if (kie) {
     for (const key of THREE_VIEW_ENGINE_MODEL_KEYS) {
       const hit = findImageOnProvider(kie, key);
@@ -101,7 +150,7 @@ export function pickDefaultStoryImageEngine(
     }
   }
 
-  for (const provider of active) {
+  for (const provider of activeCanvasProviders(providers)) {
     for (const m of provider.models) {
       if (
         m.role === "IMAGE" &&
@@ -133,13 +182,11 @@ function findVideoOnProvider(
   return { providerId: provider.id, modelKey: m.modelKey };
 }
 
-/** 漫剧分镜视频 · 默认 VIDEO 模型（KIE seedance / wan 等） */
+/** 漫剧分镜视频 · 默认 Gateway / 用户 KIE VIDEO 模型 */
 export function pickDefaultStoryVideoEngine(
   providers: CanvasProviderDto[],
 ): { providerId: string; modelKey: string } | null {
-  const active = providers.filter((p) => p.active);
-
-  const kie = active.find((p) => p.id === SYSTEM_KIE_PROVIDER_ID);
+  const kie = findProviderByKind(providers, "KIE");
   if (kie) {
     for (const key of STORY_VIDEO_MODEL_KEYS) {
       const hit = findVideoOnProvider(kie, key);
@@ -147,7 +194,7 @@ export function pickDefaultStoryVideoEngine(
     }
   }
 
-  for (const provider of active) {
+  for (const provider of activeCanvasProviders(providers)) {
     for (const m of provider.models) {
       if (
         m.role === "VIDEO" &&
@@ -190,7 +237,7 @@ function findRefVideoOnProvider(
   };
 }
 
-/** 参考生视频 · 默认 HappyHorse R2V，其次其它百炼 / Seedance */
+/** 参考生视频 · 默认 Gateway / 用户百炼 HappyHorse R2V，其次 KIE Seedance */
 export function pickDefaultRefVideoEngine(
   providers: CanvasProviderDto[],
 ): {
@@ -198,9 +245,7 @@ export function pickDefaultRefVideoEngine(
   modelKey: string;
   params: Record<string, unknown>;
 } | null {
-  const active = providers.filter((p) => p.active);
-
-  const bailian = active.find((p) => p.id === SYSTEM_BAILIAN_R2V_PROVIDER_ID);
+  const bailian = findProviderByKind(providers, "ALI_BAILIAN");
   if (bailian) {
     const preferred = findRefVideoOnProvider(
       bailian,
@@ -214,13 +259,13 @@ export function pickDefaultRefVideoEngine(
     }
   }
 
-  const kie = active.find((p) => p.id === SYSTEM_KIE_PROVIDER_ID);
+  const kie = findProviderByKind(providers, "KIE");
   if (kie) {
     const seedance = findRefVideoOnProvider(kie, "bytedance/seedance-2");
     if (seedance) return seedance;
   }
 
-  for (const provider of active) {
+  for (const provider of activeCanvasProviders(providers)) {
     for (const key of REF_VIDEO_MODEL_KEYS) {
       const hit = findRefVideoOnProvider(provider, key);
       if (hit) return hit;

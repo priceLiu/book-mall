@@ -46,11 +46,15 @@ function buildCharacterImagePrompt(appearance: string): string {
 }
 
 async function generateOutline(args: {
+  userId: string;
+  storyProjectId: string;
   name: string;
   description: string;
   styleHint: string;
 }): Promise<string> {
   const data = await chatJson({
+    userId: args.userId,
+    storyProjectId: args.storyProjectId,
     schema: OutlineSchema,
     reasoningEffort: "low",
     systemPrompt: [
@@ -80,6 +84,8 @@ export const STORY_CHARACTER_COUNT_OPTIONS = [3, 5, 8] as const;
 export type StoryCharacterCount = (typeof STORY_CHARACTER_COUNT_OPTIONS)[number];
 
 async function generateCharacters(args: {
+  userId: string;
+  storyProjectId: string;
   name: string;
   description: string;
   outline: string;
@@ -94,6 +100,8 @@ async function generateCharacters(args: {
   }>
 > {
   const data = await chatJson({
+    userId: args.userId,
+    storyProjectId: args.storyProjectId,
     schema: CharactersSchema,
     reasoningEffort: "low",
     systemPrompt: [
@@ -169,6 +177,8 @@ export async function initializeStoryProject(
 
   if (!outline.trim()) {
     outline = await generateOutline({
+      userId,
+      storyProjectId: project.id,
       name: project.name,
       description: project.description,
       styleHint,
@@ -186,6 +196,8 @@ export async function initializeStoryProject(
 
   if (project.characters.length === 0) {
     const characters = await generateCharacters({
+      userId,
+      storyProjectId: project.id,
       name: project.name,
       description: project.description,
       outline,

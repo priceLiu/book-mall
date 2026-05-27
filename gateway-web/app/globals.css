@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gw-bg: #0c0c0f;
+  --gw-surface: #141419;
+  --gw-border: rgba(255, 255, 255, 0.08);
+  --gw-ink: #f4f4f5;
+  --gw-muted: #a1a1aa;
+  --gw-accent: #fb923c;
+  --gw-log-tip-max-h: 680px;
+  --gw-log-tip-body-max-h: 580px;
+  --gw-log-tip-width: 720px;
+  --gw-log-params-cell-min-w: 380px;
+  --gw-log-params-cell-max-w: 520px;
+}
+
+body {
+  @apply m-0 min-h-screen bg-[var(--gw-bg)] text-[var(--gw-ink)] antialiased;
+}
+
+@layer components {
+  .gw-card {
+    @apply rounded-xl border border-white/10 bg-[var(--gw-surface)] p-5;
+  }
+
+  .gw-input {
+    @apply w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[var(--gw-accent)];
+  }
+
+  .gw-btn {
+    @apply inline-flex items-center justify-center rounded-lg bg-[var(--gw-accent)] px-4 py-2 text-sm font-medium text-black transition hover:bg-orange-400;
+  }
+
+  .gw-btn-ghost {
+    @apply inline-flex items-center justify-center rounded-lg border border-white/15 px-4 py-2 text-sm text-white transition hover:border-white/30 hover:bg-white/5;
+  }
+
+  .gw-btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-orange-400/40 bg-orange-500/10 px-4 py-2 text-sm font-medium text-orange-300 transition hover:bg-orange-500/20;
+  }
+
+  .gw-table {
+    @apply w-full text-left text-sm;
+  }
+
+  .gw-table th {
+    @apply border-b border-white/10 px-3 py-2 text-xs font-medium uppercase tracking-wide text-[var(--gw-muted)];
+  }
+
+  .gw-table td {
+    @apply border-b border-white/5 px-3 py-2 align-top;
+  }
+
+  .gw-logs-table {
+    @apply w-full text-left text-sm;
+  }
+
+  .gw-logs-table th {
+    @apply border-b border-white/[0.08] bg-[#121218] px-4 py-3 text-xs font-normal text-zinc-500;
+  }
+
+  .gw-logs-table td {
+    @apply border-b border-white/[0.05] px-4 py-3 align-top;
+  }
+
+  .gw-logs-row {
+    @apply transition-colors hover:bg-white/[0.03];
+  }
+
+  /** 日志 Params / Result 悬停 Tip · 细滚动条（见 docs/design.md §3） */
+  .gw-scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  }
+
+  .gw-scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .gw-scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .gw-scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+  }
+
+  .gw-scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.34);
+  }
+
+  .gw-log-preview-tip {
+    @apply fixed z-[9999] rounded-xl border border-white/10 bg-[#23232c] shadow-2xl;
+    width: min(var(--gw-log-tip-width), calc(100vw - 32px));
+    max-height: min(var(--gw-log-tip-max-h), calc(100vh - 24px));
+  }
+
+  .gw-log-preview-tip__body {
+    @apply gw-scrollbar-thin overflow-auto px-4 pb-3 pt-4;
+    max-height: min(var(--gw-log-tip-body-max-h), calc(100vh - 120px));
+  }
+
+  .gw-log-preview-tip__footer {
+    @apply border-t border-white/[0.08] px-3 py-2.5;
+  }
+
+  .gw-log-params-cell {
+    min-width: var(--gw-log-params-cell-min-w);
+    max-width: var(--gw-log-params-cell-max-w);
+    width: 100%;
+  }
+}

@@ -1,7 +1,5 @@
-import OpenAI from "openai";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
-import { getDashscopeOpenAiCompatBaseUrl } from "@/lib/dashscope-openai-env";
-import { getQwenApiKey } from "@/lib/qwen-env";
+import { chatStreamFromGateway } from "@/lib/forward-gateway-chat-server";
 import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import {
   VISUAL_LAB_ANALYSIS_ACTION,
@@ -102,8 +100,8 @@ function docToTextPart(name: string, mime: string, buf: Buffer): { type: "text";
 function buildUserContent(
   prompt: string,
   list: AttachmentPayload[],
-): OpenAI.Chat.ChatCompletionContentPart[] {
-  const parts: OpenAI.Chat.ChatCompletionContentPart[] = [];
+): { type: string; [key: string]: unknown }[] {
+  const parts: { type: string; [key: string]: unknown }[] = [];
   if (list.length === 0) {
     parts.push({ type: "text", text: prompt });
     return parts;
@@ -128,7 +126,7 @@ function buildUserContent(
         type: "video_url",
         video_url: { url: dataUrl },
         fps: 2,
-      } as unknown as OpenAI.Chat.ChatCompletionContentPart);
+      });
     }
   }
   parts.push({ type: "text", text: prompt });
@@ -138,14 +136,6 @@ function buildUserContent(
 export async function POST(req: Request) {
   const gate = await requireToolSuiteNavAccess("visual-lab");
   if (!gate.ok) return gate.response;
-
-  const apiKey = getQwenApiKey();
-  if (!apiKey) {
-    return Response.json(
-      { error: "missing_api_key", message: "服务端未配置 QWEN_API_KEY 或 DASHSCOPE_API_KEY" },
-      { status: 503 },
-    );
-  }
 
   let body: Body;
   try {
@@ -200,7 +190,7 @@ export async function POST(req: Request) {
       ? Math.max(1024, Math.min(131_072, Math.floor(rawBudget)))
       : 8192;
 
-  let userContent: OpenAI.Chat.ChatCompletionContentPart[];
+  let userContent: { type: string; [key: string]: unknown }[];
   try {
     userContent = buildUserContent(prompt, list);
   } catch (e) {
@@ -298,42 +288,42 @@ export async function POST(req: Request) {
     );
   }
 
-  const client = new OpenAI({
-    apiKey,
-    baseURL: getDashscopeOpenAiCompatBaseUrl(),
-  });
-
-  type ThinkingCreateParams = OpenAI.Chat.ChatCompletionCreateParamsStreaming & {
-    enable_thinking?: boolean;
-    thinking_budget?: number;
-  };
-
-  const streamParams: ThinkingCreateParams = {
+  const streamParams: Record<string, unknown> = {
     model: meta.apiModel,
     messages: [{ role: "user", content: userContent }],
-    stream: true,
     ...(enableThinking ? { enable_thinking: true, thinking_budget: thinkingBudget } : {}),
+    clientPage: "visual-lab/analysis",
   };
 
-  let upstream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
-  try {
-    upstream = await client.chat.completions.create(streamParams);
-  } catch (e: unknown) {
-    const status =
-      e && typeof e === "object" && "status" in e && typeof (e as { status: unknown }).status === "number"
-        ? (e as { status: number }).status
-        : 502;
+  const gw = await chatStreamFromGateway(streamParams);
+  if (!gw.ok) {
     const message =
-      e && typeof e === "object" && "message" in e && typeof (e as Error).message === "string"
-        ? (e as Error).message
-        : "upstream_error";
+      gw.reason === "no_session"
+        ? "请先登录工具站"
+        : gw.reason === "no_origin"
+          ? "工具站未配置 MAIN_SITE_ORIGIN"
+          : gw.error ?? "Gateway 调用失败";
+    const status = gw.status === 403 ? 403 : gw.status === 402 ? 402 : 503;
     return Response.json(
-      { error: "dashscope_error", message, detail: String(message) },
-      { status: status >= 400 && status < 600 ? status : 502 },
+      {
+        error: gw.status === 403 ? "gateway_key_required" : "gateway_error",
+        message,
+        code: gw.status === 403 ? "GATEWAY_KEY_REQUIRED" : undefined,
+      },
+      { status },
+    );
+  }
+
+  const upstream = gw.response;
+  if (!upstream.body) {
+    return Response.json(
+      { error: "gateway_error", message: "上游未返回流式响应" },
+      { status: 502 },
     );
   }
 
   const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
 
   type StreamEv =
     | { type: "reasoning"; text: string }
@@ -346,21 +336,36 @@ export async function POST(req: Request) {
       const send = (ev: StreamEv) => {
         controller.enqueue(encoder.encode(`${JSON.stringify(ev)}\n`));
       };
+      const reader = upstream.body!.getReader();
+      let sseBuffer = "";
       try {
-        for await (const chunk of upstream) {
-          const delta = chunk.choices[0]?.delta as
-            | {
-                content?: string | null;
-                reasoning_content?: string | null;
-              }
-            | undefined;
-          const r = delta?.reasoning_content;
-          if (typeof r === "string" && r.length > 0) {
-            send({ type: "reasoning", text: r });
-          }
-          const c = delta?.content;
-          if (typeof c === "string" && c.length > 0) {
-            send({ type: "content", text: c });
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          sseBuffer += decoder.decode(value, { stream: true });
+          const lines = sseBuffer.split("\n");
+          sseBuffer = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const payload = trimmed.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            let chunk: Record<string, unknown>;
+            try {
+              chunk = JSON.parse(payload) as Record<string, unknown>;
+            } catch {
+              continue;
+            }
+            const delta = (chunk.choices as { delta?: Record<string, unknown> }[] | undefined)?.[0]
+              ?.delta;
+            const r = delta?.reasoning_content;
+            if (typeof r === "string" && r.length > 0) {
+              send({ type: "reasoning", text: r });
+            }
+            const c = delta?.content;
+            if (typeof c === "string" && c.length > 0) {
+              send({ type: "content", text: c });
+            }
           }
         }
         send({ type: "done" });
@@ -369,6 +374,8 @@ export async function POST(req: Request) {
         const message = err instanceof Error ? err.message : "stream_error";
         send({ type: "error", message });
         controller.close();
+      } finally {
+        reader.releaseLock();
       }
     },
   });

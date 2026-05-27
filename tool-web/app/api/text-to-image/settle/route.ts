@@ -2,8 +2,11 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
-import { getQwenApiKey } from "@/lib/qwen-env";
-import { wanxGetTextImageTask, countWanxSucceededImages } from "@/lib/text-to-image-dashscope";
+import { pollDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
+import {
+  countWanxSucceededImages,
+  type WanxTaskPollOutput,
+} from "@/lib/text-to-image-dashscope";
 import {
   computeTextToImageChargePoints,
   getTextToImageSchemeModelId,
@@ -22,11 +25,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });
   }
 
-  const apiKey = getQwenApiKey();
-  if (!apiKey) {
-    return NextResponse.json({ error: "服务端未配置 QWEN_API_KEY 或 DASHSCOPE_API_KEY" }, { status: 503 });
-  }
-
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -42,13 +40,18 @@ export async function POST(req: Request) {
     typeof body.holdId === "string" && body.holdId.trim().length > 0
       ? body.holdId.trim()
       : undefined;
+  const gatewayLogId =
+    typeof body.gatewayLogId === "string" && body.gatewayLogId.trim().length > 0
+      ? body.gatewayLogId.trim()
+      : undefined;
 
-  const polled = await wanxGetTextImageTask({ apiKey, taskId });
+  const polled = await pollDashscopeJobFromServer({ taskId, gatewayLogId });
   if (!polled.ok) {
-    return NextResponse.json({ error: polled.error }, { status: 502 });
+    return NextResponse.json({ error: polled.error }, { status: polled.status ?? 502 });
   }
 
-  const status = polled.output.task_status ?? "";
+  const output = polled.output as WanxTaskPollOutput;
+  const status = output.task_status ?? "";
   if (status !== "SUCCEEDED") {
     return NextResponse.json(
       {
@@ -59,9 +62,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const billTaskId = polled.output.task_id?.trim() || taskId;
+  const billTaskId = output.task_id?.trim() || taskId;
   const imgModel = getTextToImageSchemeModelId();
-  const imageCount = countWanxSucceededImages(polled.output);
+  const imageCount = countWanxSucceededImages(output);
   const { multiplier: retailMult } = await getSchemeARetailMultiplierServer({
     toolKey: "text-to-image",
     modelKey: imgModel,

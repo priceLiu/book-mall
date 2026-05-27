@@ -10,6 +10,7 @@ import {
   scheduleCanvasPollWorkerForProject,
   submitCanvasNodeTask,
 } from "@/lib/canvas/canvas-task-service";
+import { assertGatewayApiKeyLinkedForUser } from "@/lib/canvas/book-gateway-link";
 import {
   runAiEngineNode,
   runImageEngineNode,
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     userId: guard.user.id,
     projectId,
     nodeId,
+    clientPage: `canvas/${projectId}`,
     storyScope,
     node: {
       type: node.type,
@@ -90,6 +92,9 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     },
   };
   try {
+    await assertGatewayApiKeyLinkedForUser(guard.user.id, {
+      role: guard.user.role ?? null,
+    });
     let result;
     if (node.type === "ai-engine") {
       result = await runAiEngineNode({ ...baseArgs, forceFresh });

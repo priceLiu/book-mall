@@ -3,7 +3,7 @@ import {
   corsOptionsResponse,
   jsonHeaders,
   readJsonBody,
-  requireSessionUser,
+  requireStoryGatewayUser,
   storyErrorToResponse,
 } from "@/lib/story/api-helpers";
 import { submitFrameVideo, schedulePollWorkerForProject } from "@/lib/story/story-task-service";
@@ -19,7 +19,7 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest, ctx: RouteCtx) {
-  const guard = await requireSessionUser(request);
+  const guard = await requireStoryGatewayUser(request);
   if (!guard.ok) return guard.response;
   const { id, frameId } = await ctx.params;
 

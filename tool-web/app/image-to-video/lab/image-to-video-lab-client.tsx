@@ -768,6 +768,7 @@ export function ImageToVideoLabClient() {
       const startParsed = await readJsonBody<{
         taskId?: string;
         holdId?: string | null;
+        gatewayLogId?: string;
         error?: string;
       }>(startR);
       if (!startParsed.ok) throw new Error(startParsed.message);
@@ -779,13 +780,19 @@ export function ImageToVideoLabClient() {
       const taskId = startJson.taskId?.trim();
       if (!taskId) throw new Error("未返回任务 ID");
       const holdId = typeof startJson.holdId === "string" ? startJson.holdId : null;
+      const gatewayLogId =
+        typeof startJson.gatewayLogId === "string" && startJson.gatewayLogId.trim().length > 0
+          ? startJson.gatewayLogId.trim()
+          : null;
 
       for (let i = 0; i < MAX_POLLS; i++) {
         if (i > 0) {
           await new Promise((r) => setTimeout(r, POLL_MS));
         }
+        const pollQs = new URLSearchParams({ id: taskId });
+        if (gatewayLogId) pollQs.set("gatewayLogId", gatewayLogId);
         const tr = await fetch(
-          `/api/image-to-video/task?id=${encodeURIComponent(taskId)}`,
+          `/api/image-to-video/task?${pollQs}`,
           { cache: "no-store", credentials: "same-origin" },
         );
         const tjParsed = await readJsonBody<{ output?: TaskPollOutput; error?: string }>(
@@ -812,6 +819,7 @@ export function ImageToVideoLabClient() {
             body: JSON.stringify({
               taskId,
               ...(holdId ? { holdId } : {}),
+              ...(gatewayLogId ? { gatewayLogId } : {}),
               billingHint: {
                 apiModel: snapApiModel,
                 durationSec: snapDur,

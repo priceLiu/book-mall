@@ -47,7 +47,8 @@
     "story:cleanup-once": "dotenv -e .env.local -- tsx scripts/story-ai-cleanup.ts",
     "story:poll-loop": "dotenv -e .env.local -- tsx scripts/story-ai-poll-loop.ts",
     "canvas:poll-once": "dotenv -e .env.local -- tsx scripts/canvas-ai-poll.ts",
-    "canvas:poll-loop": "dotenv -e .env.local -- tsx scripts/canvas-ai-poll-loop.ts"
+    "canvas:poll-loop": "dotenv -e .env.local -- tsx scripts/canvas-ai-poll-loop.ts",
+    "gateway:poll-loop": "dotenv -e .env.local -- tsx scripts/gateway-poll-loop.ts"
   },
   "dependencies": {
     "@devnomic/marquee": "^1.0.2",

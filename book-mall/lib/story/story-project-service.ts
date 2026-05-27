@@ -18,7 +18,11 @@ export class StoryProjectError extends Error {
       | "EMPTY_PROMPT"
       | "MISSING_DEPENDENCY"
       | "TASK_ALREADY_INFLIGHT"
-      | "TOO_MANY_INFLIGHT",
+      | "TOO_MANY_INFLIGHT"
+      | "GATEWAY_KEY_REQUIRED"
+      | "MODEL_NOT_AVAILABLE"
+      | "LLM_HTTP_ERROR"
+      | "LLM_INVALID_OUTPUT",
     message: string,
     public httpStatus: number = 400,
   ) {

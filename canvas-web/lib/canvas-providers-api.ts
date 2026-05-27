@@ -76,6 +76,21 @@ export type CanvasProviderDto = {
   updatedAt: string;
 };
 
+export type GatewayLinkStatusDto = {
+  linked: boolean;
+  gatewayApiKeyId: string | null;
+  keyPrefix: string | null;
+  keyName: string | null;
+  linkedAt: string | null;
+  boundKinds: Array<"KIE" | "BAILIAN" | "DEEPSEEK" | "DASHSCOPE" | "HUNYUAN">;
+  revoked: boolean;
+};
+
+export type ListCanvasProvidersResult = {
+  providers: CanvasProviderDto[];
+  gatewayLink: GatewayLinkStatusDto;
+};
+
 async function call<T>(
   base: string,
   apiPath: string,
@@ -106,12 +121,14 @@ async function call<T>(
 
 export async function listCanvasProviders(
   base: string,
-): Promise<CanvasProviderDto[]> {
-  const j = await call<{ providers: CanvasProviderDto[] }>(
-    base,
-    "/api/canvas/providers",
-  );
-  return j.providers;
+): Promise<ListCanvasProvidersResult> {
+  return call<ListCanvasProvidersResult>(base, "/api/canvas/providers");
+}
+
+export async function fetchGatewayLinkStatus(
+  base: string,
+): Promise<GatewayLinkStatusDto> {
+  return call<GatewayLinkStatusDto>(base, "/api/canvas/gateway-link-status");
 }
 
 export async function createCanvasProvider(

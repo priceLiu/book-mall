@@ -31,6 +31,7 @@ export function CanvasToolbar({
   onReflowStoryLayout,
   running,
   inflightTaskCount = 0,
+  runAllDisabled = false,
 }: {
   projectName: string;
   onProjectNameChange: (name: string) => void;
@@ -48,6 +49,7 @@ export function CanvasToolbar({
   onReflowStoryLayout?: () => void;
   running: boolean;
   inflightTaskCount?: number;
+  runAllDisabled?: boolean;
 }) {
   return (
     <header className="relative z-50 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white">
@@ -160,7 +162,12 @@ export function CanvasToolbar({
         <button
           type="button"
           onClick={onRunAll}
-          disabled={running}
+          disabled={running || runAllDisabled}
+          title={
+            runAllDisabled
+              ? "请先在 Book 个人中心绑定 AI 模型密钥"
+              : undefined
+          }
           className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas-accent)] px-3 py-1 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft)] hover:text-white disabled:opacity-60"
         >
           {running ? <Loader2 className="size-3 animate-spin" /> : <Play className="size-3" />}

@@ -5,10 +5,16 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   listCanvasProviders,
   type CanvasProviderDto,
+  type GatewayLinkStatusDto,
 } from "@/lib/canvas-providers-api";
 
-const CACHE: { value: CanvasProviderDto[] | null; ts: number } = {
+const CACHE: {
+  value: CanvasProviderDto[] | null;
+  gatewayLink: GatewayLinkStatusDto | null;
+  ts: number;
+} = {
   value: null,
+  gatewayLink: null,
   ts: 0,
 };
 const TTL_MS = 30_000;
@@ -24,6 +30,9 @@ export function useUserProviders(opts?: { forceRefresh?: boolean }) {
   const [providers, setProviders] = useState<CanvasProviderDto[]>(
     CACHE.value ?? [],
   );
+  const [gatewayLink, setGatewayLink] = useState<GatewayLinkStatusDto | null>(
+    CACHE.gatewayLink,
+  );
   const [loading, setLoading] = useState(!CACHE.value);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,17 +41,20 @@ export function useUserProviders(opts?: { forceRefresh?: boolean }) {
     const fresh = CACHE.value && Date.now() - CACHE.ts < TTL_MS;
     if (fresh && !opts?.forceRefresh) {
       setProviders(CACHE.value!);
+      setGatewayLink(CACHE.gatewayLink);
       setLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
     void listCanvasProviders(base)
-      .then((list) => {
+      .then((result) => {
         if (cancelled) return;
-        CACHE.value = list;
+        CACHE.value = result.providers;
+        CACHE.gatewayLink = result.gatewayLink;
         CACHE.ts = Date.now();
-        setProviders(list);
+        setProviders(result.providers);
+        setGatewayLink(result.gatewayLink);
         setError(null);
       })
       .catch((e) => {
@@ -58,10 +70,17 @@ export function useUserProviders(opts?: { forceRefresh?: boolean }) {
     };
   }, [base, opts?.forceRefresh]);
 
-  return { providers, loading, error };
+  return {
+    providers,
+    gatewayLink,
+    gatewayLinked: Boolean(gatewayLink?.linked && !gatewayLink?.revoked),
+    loading,
+    error,
+  };
 }
 
 export function invalidateUserProvidersCache() {
   CACHE.value = null;
+  CACHE.gatewayLink = null;
   CACHE.ts = 0;
 }

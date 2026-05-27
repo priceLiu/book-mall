@@ -7,22 +7,29 @@ import {
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
 import {
-  deleteProviderForUser,
   getProviderForUser,
-  updateProviderForUser,
 } from "@/lib/canvas/canvas-provider-service";
+import { getGatewayVirtualProviderForUser } from "@/lib/canvas/canvas-gateway-providers";
+import { isGatewayVirtualProviderId } from "@/lib/canvas/canvas-gateway-providers";
 import { isSystemProviderId } from "@/lib/canvas/canvas-system-provider";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function rejectIfSystem(id: string, request: NextRequest): NextResponse | null {
-  if (isSystemProviderId(id)) {
+function rejectProviderMutation(id: string, request: NextRequest): NextResponse {
+  if (isSystemProviderId(id) || isGatewayVirtualProviderId(id)) {
     return NextResponse.json(
-      { error: "FORBIDDEN", message: "系统 Provider 不可修改 / 删除" },
+      { error: "FORBIDDEN", message: "Gateway / 系统 Provider 不可修改 / 删除" },
       { status: 403, headers: jsonHeaders(request) },
     );
   }
-  return null;
+  return NextResponse.json(
+    {
+      error: "FORBIDDEN",
+      message:
+        "Canvas 自建 Provider 已下线。请在 Gateway 控制台绑定厂商凭证，并在 Book 个人中心关联 sk-gw",
+    },
+    { status: 403, headers: jsonHeaders(request) },
+  );
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -34,6 +41,13 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   if (!guard.ok) return guard.response;
   const { id } = await ctx.params;
   try {
+    const gatewayRow = await getGatewayVirtualProviderForUser(guard.user.id, id);
+    if (gatewayRow) {
+      return NextResponse.json(
+        { provider: gatewayRow },
+        { headers: jsonHeaders(request) },
+      );
+    }
     const row = await getProviderForUser(guard.user.id, id);
     if (!row) {
       return NextResponse.json(
@@ -56,42 +70,12 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   const body = await readJsonBody(request);
   if (!body.ok) return body.response;
   const { id } = await ctx.params;
-  const sysReject = rejectIfSystem(id, request);
-  if (sysReject) return sysReject;
-  try {
-    const provider = await updateProviderForUser(guard.user.id, id, {
-      alias:
-        typeof body.body.alias === "string" ? body.body.alias : undefined,
-      apiKey:
-        typeof body.body.apiKey === "string" ? body.body.apiKey : undefined,
-      baseUrl:
-        body.body.baseUrl === null
-          ? null
-          : typeof body.body.baseUrl === "string"
-            ? body.body.baseUrl
-            : undefined,
-      active:
-        typeof body.body.active === "boolean" ? body.body.active : undefined,
-    });
-    return NextResponse.json(
-      { provider },
-      { headers: jsonHeaders(request) },
-    );
-  } catch (err) {
-    return canvasErrorToResponse(request, err);
-  }
+  return rejectProviderMutation(id, request);
 }
 
 export async function DELETE(request: NextRequest, ctx: Ctx) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   const { id } = await ctx.params;
-  const sysReject = rejectIfSystem(id, request);
-  if (sysReject) return sysReject;
-  try {
-    await deleteProviderForUser(guard.user.id, id);
-    return NextResponse.json({ ok: true }, { headers: jsonHeaders(request) });
-  } catch (err) {
-    return canvasErrorToResponse(request, err);
-  }
+  return rejectProviderMutation(id, request);
 }

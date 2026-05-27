@@ -13,6 +13,7 @@ import type {
   CanvasGenerationKind,
   CanvasGenerationStatus,
   CanvasGenerationTask,
+  GatewayProviderKind,
   Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -23,9 +24,7 @@ import {
   getCanvasUserInflightMax,
 } from "./canvas-constants";
 import {
-  createKieTask,
   extractKieResultUrl,
-  getKieTask,
   KieError,
   logKieEvent,
   type KieAspectRatio,
@@ -40,25 +39,24 @@ import {
   type CanvasTaskStoryScope,
 } from "./canvas-story-scope";
 import { persistCanvasKieResultToOss } from "./canvas-oss";
-import { CanvasProjectError } from "./canvas-project-service";
+import {
+  canvasGwCreateBailianR2vJob,
+  canvasGwCreateKieJob,
+  canvasGwRecordInfo,
+} from "./canvas-gateway-client";
+import { isGatewayVirtualProviderId } from "./canvas-gateway-providers";
+import { shouldCanvasUseGateway } from "./canvas-gateway-run";
 import {
   SYSTEM_HUNYUAN_3D_PROVIDER_ID,
   isSystemProviderId,
-  resolveSystemProvider,
 } from "./canvas-system-provider";
 import {
-  buildGatewayConfig,
-  getGatewayForKind,
   type CanvasGatewayPollResult,
-  type CanvasProviderGateway,
 } from "./providers";
 import { extractHunyuan3DResultUrls } from "./providers/hunyuan-3d";
 import { buildKieImageCreateArgs } from "./providers/kie";
-import {
-  bailianR2vGetTask,
-  getDashScopeApiKey,
-  type BailianR2vTaskOutput,
-} from "./canvas-video-bailian-r2v";
+import { type BailianR2vTaskOutput } from "./canvas-video-bailian-r2v";
+import { CanvasProjectError } from "./canvas-project-service";
 
 // —— Types ——
 
@@ -81,9 +79,47 @@ export type SubmitCanvasNodeArgs = {
   projectId: string;
   nodeId: string;
   node: CanvasRunNodeInput;
+  clientPage?: string;
 };
 
 // —— Helpers ——
+
+function taskInputPayload(
+  task: Pick<CanvasGenerationTask, "inputPayload">,
+): Record<string, unknown> | null {
+  if (!task.inputPayload || typeof task.inputPayload !== "object") return null;
+  return task.inputPayload as Record<string, unknown>;
+}
+
+function isGatewayCanvasTaskPayload(
+  payload: Record<string, unknown> | null,
+): boolean {
+  if (!payload) return false;
+  if (payload.gatewayLogId) return true;
+  const pid = typeof payload.providerId === "string" ? payload.providerId : "";
+  return isGatewayVirtualProviderId(pid) || pid.startsWith("system:");
+}
+
+async function shouldCanvasTaskUseGateway(
+  userId: string,
+  payload: Record<string, unknown> | null,
+): Promise<boolean> {
+  if (isGatewayCanvasTaskPayload(payload)) return true;
+  if (!payload) return false;
+  const pid = typeof payload.providerId === "string" ? payload.providerId : "";
+  const modelKey =
+    typeof payload.modelKey === "string" ? payload.modelKey : undefined;
+  return shouldCanvasUseGateway(userId, pid, modelKey);
+}
+
+function gatewayProviderKindFromPayload(
+  payload: Record<string, unknown>,
+): GatewayProviderKind {
+  const pk = payload.providerKind;
+  if (pk === "BAILIAN_R2V" || pk === "BAILIAN") return "BAILIAN";
+  if (pk === "HUNYUAN" || pk === "HUNYUAN_3D") return "HUNYUAN";
+  return "KIE";
+}
 
 async function ensureUserInflightCapacity(
   userId: string,
@@ -317,7 +353,12 @@ export async function submitCanvasNodeTask(
       nodeId: args.nodeId,
       kind: "IMAGE",
       model: built.model,
-      inputPayload: built.input as Prisma.InputJsonValue,
+      providerId: null,
+      inputPayload: {
+        ...built.input,
+        providerId: "gateway:kie",
+        providerKind: "KIE",
+      } as Prisma.InputJsonValue,
       inputHash,
       status: "PENDING",
     },
@@ -325,17 +366,24 @@ export async function submitCanvasNodeTask(
 
   const callBackUrl = buildCanvasAiKieCallbackUrl("image", created.id);
   try {
-    const { taskId } = await createKieTask({
+    const job = await canvasGwCreateKieJob(args.userId, {
       model: built.model,
-      input: built.input as never,
+      input: built.input as Record<string, unknown>,
       callBackUrl,
+      clientPage: args.clientPage ?? `canvas/${args.projectId}`,
     });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
       data: {
         status: "SUBMITTED",
-        kieTaskId: taskId,
+        kieTaskId: job.taskId,
         submittedAt: new Date(),
+        inputPayload: {
+          ...built.input,
+          providerId: "gateway:kie",
+          providerKind: "KIE",
+          gatewayLogId: job.logId,
+        } as Prisma.InputJsonValue,
       },
     });
     return { reused: false, task: updated };
@@ -575,34 +623,6 @@ export async function applyCanvasKieTaskResult(
       failMsg: record.failMsg,
     });
   }
-}
-
-async function resolveGatewayForCanvasTask(
-  task: Pick<CanvasGenerationTask, "providerId" | "inputPayload">,
-): Promise<CanvasProviderGateway | null> {
-  const payload =
-    task.inputPayload && typeof task.inputPayload === "object"
-      ? (task.inputPayload as Record<string, unknown>)
-      : {};
-  const payloadProviderId =
-    typeof payload.providerId === "string" ? payload.providerId : "";
-
-  if (payloadProviderId && isSystemProviderId(payloadProviderId)) {
-    const sys = resolveSystemProvider(payloadProviderId);
-    if (!sys) return null;
-    return getGatewayForKind(sys.kind, sys.config);
-  }
-
-  if (task.providerId) {
-    const provider = await prisma.canvasProvider.findUnique({
-      where: { id: task.providerId },
-    });
-    if (provider?.active) {
-      return getGatewayForKind(provider.kind, buildGatewayConfig(provider));
-    }
-  }
-
-  return null;
 }
 
 /** 混元生3D 等非 KIE 异步任务 poll 结果落库 */
@@ -874,6 +894,7 @@ export async function runCanvasPollWorker(opts?: {
     where: { status: "PENDING", pollCount: { lt: RETRY_PENDING_LIMIT }, ...projectFilter },
     orderBy: { createdAt: "asc" },
     take: POLL_BATCH,
+    include: { project: { select: { userId: true } } },
   });
   for (const task of pendings) {
     result.scanned++;
@@ -914,6 +935,90 @@ export async function runCanvasPollWorker(opts?: {
       continue;
     }
 
+    const payload = taskInputPayload(task);
+    const useGateway = await shouldCanvasTaskUseGateway(
+      task.project.userId,
+      payload,
+    );
+
+    if (
+      useGateway &&
+      payload?.providerKind === "BAILIAN_R2V" &&
+      !fresh?.kieTaskId
+    ) {
+      if (!shouldPollNow(task)) continue;
+      const refs = Array.isArray(payload.referenceImageUrls)
+        ? payload.referenceImageUrls.filter(
+            (u): u is string =>
+              typeof u === "string" && /^https?:\/\//.test(u),
+          )
+        : [];
+      const params = (payload.params as Record<string, unknown>) ?? {};
+      const resolution =
+        String(params.resolution ?? "1080P") === "720P" ? "720P" : "1080P";
+      const modelKey = String(payload.modelKey ?? task.model);
+      try {
+        const job = await Promise.race([
+          canvasGwCreateBailianR2vJob(task.project.userId, {
+            model: modelKey,
+            prompt: String(payload.prompt ?? ""),
+            referenceImageUrls: refs,
+            resolution,
+            ratio: String(params.ratio ?? "16:9"),
+            duration: Number(params.duration ?? 5),
+            seedStr: String(params.seed ?? ""),
+            parameterExtras:
+              modelKey.startsWith("wan2.")
+                ? { prompt_extend: params.prompt_extend !== false }
+                : undefined,
+            clientPage: `canvas/${task.projectId}`,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("createTask retry timeout")),
+              POLL_INNER_TIMEOUT_MS,
+            ),
+          ),
+        ]);
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            status: "SUBMITTED",
+            kieTaskId: job.taskId,
+            submittedAt: new Date(),
+            lastPolledAt: new Date(),
+            pollCount: task.pollCount + 1,
+            inputPayload: {
+              ...payload,
+              gatewayLogId: job.logId,
+            } as Prisma.InputJsonValue,
+          },
+        });
+        result.retried++;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        const nextCount = task.pollCount + 1;
+        const failed = nextCount >= RETRY_PENDING_LIMIT;
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            lastPolledAt: new Date(),
+            pollCount: nextCount,
+            ...(failed
+              ? {
+                  status: "FAILED" as CanvasGenerationStatus,
+                  failCode: "BAILIAN_CREATE_RETRIES_EXHAUSTED",
+                  failMessage: msg.slice(0, 500),
+                  completedAt: new Date(),
+                }
+              : { failMessage: msg.slice(0, 500) }),
+          },
+        });
+        if (failed) result.failed++;
+      }
+      continue;
+    }
+
     const createArgs = resolvePendingKieCreateArgs(task);
     if (!createArgs) continue;
 
@@ -923,10 +1028,34 @@ export async function runCanvasPollWorker(opts?: {
       task.id,
     );
     try {
-      const { taskId } = await Promise.race([
-        createKieTask({
-          ...createArgs,
+      if (!useGateway) {
+        const nextCount = task.pollCount + 1;
+        const failed = nextCount >= RETRY_PENDING_LIMIT;
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            lastPolledAt: new Date(),
+            pollCount: nextCount,
+            ...(failed
+              ? {
+                  status: "FAILED" as CanvasGenerationStatus,
+                  failCode: "GATEWAY_LEGACY_TASK",
+                  failMessage: "旧任务须经 Gateway，请重新生成",
+                  completedAt: new Date(),
+                }
+              : {}),
+          },
+        });
+        if (failed) result.failed++;
+        continue;
+      }
+
+      const job = await Promise.race([
+        canvasGwCreateKieJob(task.project.userId, {
+          model: createArgs.model,
+          input: createArgs.input as Record<string, unknown>,
           callBackUrl,
+          clientPage: `canvas/${task.projectId}`,
         }),
         new Promise<never>((_, reject) =>
           setTimeout(
@@ -939,10 +1068,17 @@ export async function runCanvasPollWorker(opts?: {
         where: { id: task.id },
         data: {
           status: "SUBMITTED",
-          kieTaskId: taskId,
+          kieTaskId: job.taskId,
           submittedAt: new Date(),
           lastPolledAt: new Date(),
           pollCount: task.pollCount + 1,
+          inputPayload: payload
+            ? ({
+                ...payload,
+                gatewayLogId: job.logId,
+                providerKind: payload.providerKind ?? "KIE",
+              } as Prisma.InputJsonValue)
+            : undefined,
         },
       });
       result.retried++;
@@ -974,6 +1110,7 @@ export async function runCanvasPollWorker(opts?: {
     where: { status: "SUBMITTED", kieTaskId: { not: null }, ...projectFilter },
     orderBy: { lastPolledAt: { sort: "asc", nulls: "first" } },
     take: POLL_BATCH,
+    include: { project: { select: { userId: true } } },
   });
   const timeoutMs = CANVAS_AI_TASK_TIMEOUT_MIN * 60 * 1000;
   const now = Date.now();
@@ -1000,50 +1137,73 @@ export async function runCanvasPollWorker(opts?: {
     }
 
     try {
-      const gateway = await resolveGatewayForCanvasTask(task);
       const before = task.status;
-      const payload =
-        task.inputPayload && typeof task.inputPayload === "object"
-          ? (task.inputPayload as Record<string, unknown>)
-          : null;
+      const payload = taskInputPayload(task);
+      const useGateway = await shouldCanvasTaskUseGateway(
+        task.project.userId,
+        payload,
+      );
 
-      if (payload?.providerKind === "BAILIAN_R2V" && task.kieTaskId) {
-        const apiKey = getDashScopeApiKey();
-        if (!apiKey) {
-          throw new Error("DASHSCOPE_API_KEY not configured");
+      if (!useGateway || !task.kieTaskId || !payload?.gatewayLogId) {
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            status: "FAILED",
+            failCode: "GATEWAY_LEGACY_TASK",
+            failMessage: "旧任务无 Gateway 日志，请重新生成",
+            completedAt: new Date(),
+            lastPolledAt: new Date(),
+            pollCount: task.pollCount + 1,
+          },
+        });
+        result.failed++;
+        continue;
+      }
+
+      const providerKind = gatewayProviderKindFromPayload(payload);
+      const gw = await Promise.race([
+        canvasGwRecordInfo(task.project.userId, {
+          taskId: task.kieTaskId,
+          providerKind,
+          gatewayLogId: String(payload.gatewayLogId),
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("gateway recordInfo timeout")),
+            POLL_INNER_TIMEOUT_MS,
+          ),
+        ),
+      ]);
+      if (gw.providerKind === "BAILIAN") {
+        await applyCanvasBailianR2vPollResult(task.id, {
+          ok: true,
+          output: gw.output,
+          raw: gw.output,
+        });
+      } else if (gw.providerKind === "KIE") {
+        await applyCanvasKieTaskResult(task.id, gw.record);
+      } else if (gw.providerKind === "HUNYUAN") {
+        const polled = gw.polled;
+        if (polled.state === "succeeded" && polled.resultUrls?.[0]) {
+          await prisma.canvasGenerationTask.update({
+            where: { id: task.id },
+            data: {
+              status: "SUCCEEDED",
+              ossUrl: polled.resultUrls[0],
+              completedAt: new Date(),
+            },
+          });
+        } else if (polled.state === "failed") {
+          await prisma.canvasGenerationTask.update({
+            where: { id: task.id },
+            data: {
+              status: "FAILED",
+              failCode: polled.errorCode ?? "HUNYUAN_FAILED",
+              failMessage: polled.errorMessage?.slice(0, 500),
+              completedAt: new Date(),
+            },
+          });
         }
-        const polled = await Promise.race([
-          bailianR2vGetTask({ apiKey, taskId: task.kieTaskId }),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error("bailian poll timeout")),
-              POLL_INNER_TIMEOUT_MS,
-            ),
-          ),
-        ]);
-        await applyCanvasBailianR2vPollResult(task.id, polled);
-      } else if (gateway?.kind === "HUNYUAN_3D" && gateway.pollImageTask) {
-        const poll = await Promise.race([
-          gateway.pollImageTask(task.kieTaskId, { modelKey: task.model }),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error("gateway poll timeout")),
-              POLL_INNER_TIMEOUT_MS,
-            ),
-          ),
-        ]);
-        await applyCanvasGatewayPollResult(task.id, poll);
-      } else {
-        const record = await Promise.race([
-          getKieTask(task.kieTaskId),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error("recordInfo timeout")),
-              POLL_INNER_TIMEOUT_MS,
-            ),
-          ),
-        ]);
-        await applyCanvasKieTaskResult(task.id, record);
       }
 
       const after = await prisma.canvasGenerationTask.findUnique({

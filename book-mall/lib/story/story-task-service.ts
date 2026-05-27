@@ -31,9 +31,11 @@ import {
   type StoryVideoOptions,
 } from "./story-ai-constants";
 import {
-  createKieTask,
+  storyGwCreateKieJob,
+  storyGwRecordInfo,
+} from "./story-gateway-client";
+import {
   extractKieResultUrl,
-  getKieTask,
   isKieRecordFail,
   isKieRecordSuccess,
   KieError,
@@ -336,16 +338,27 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
       : buildStoryAiKieCallbackUrl("image", task.id);
 
   try {
-    const { taskId } = await createKieTask({
+    const project = await prisma.storyProject.findUnique({
+      where: { id: args.projectId },
+      select: { userId: true },
+    });
+    if (!project) {
+      throw new StoryProjectError("NOT_FOUND", "project not found", 404);
+    }
+
+    const { taskId, logId } = await storyGwCreateKieJob(project.userId, {
       model: args.model,
-      input: args.input as never,
+      input: args.input,
       callBackUrl,
+      storyProjectId: args.projectId,
+      storyTaskId: task.id,
     });
     await prisma.storyGenerationTask.update({
       where: { id: task.id },
       data: {
         status: "SUBMITTED",
         kieTaskId: taskId,
+        gatewayLogId: logId,
         submittedAt: new Date(),
       },
     });
@@ -981,11 +994,19 @@ export async function runPollWorker(opts?: {
         ? buildStoryAiKieCallbackUrl("video", task.id)
         : buildStoryAiKieCallbackUrl("image", task.id);
     try {
-      const { taskId } = await Promise.race([
-        createKieTask({
+      const project = await prisma.storyProject.findUnique({
+        where: { id: task.projectId },
+        select: { userId: true },
+      });
+      if (!project) continue;
+
+      const { taskId, logId } = await Promise.race([
+        storyGwCreateKieJob(project.userId, {
           model: task.model,
-          input: task.inputPayload as never,
+          input: task.inputPayload as Record<string, unknown>,
           callBackUrl,
+          storyProjectId: task.projectId,
+          storyTaskId: task.id,
         }),
         new Promise<never>((_, reject) =>
           setTimeout(
@@ -999,6 +1020,7 @@ export async function runPollWorker(opts?: {
         data: {
           status: "SUBMITTED",
           kieTaskId: taskId,
+          gatewayLogId: logId,
           submittedAt: new Date(),
           lastPolledAt: new Date(),
           pollCount: task.pollCount + 1,
@@ -1064,8 +1086,17 @@ export async function runPollWorker(opts?: {
     }
 
     try {
+      const project = await prisma.storyProject.findUnique({
+        where: { id: task.projectId },
+        select: { userId: true },
+      });
+      if (!project) continue;
+
       const record = await Promise.race([
-        getKieTask(task.kieTaskId),
+        storyGwRecordInfo(project.userId, {
+          taskId: task.kieTaskId,
+          gatewayLogId: task.gatewayLogId,
+        }),
         new Promise<never>((_, reject) =>
           setTimeout(
             () => reject(new Error("recordInfo timeout")),

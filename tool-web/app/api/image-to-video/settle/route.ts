@@ -2,8 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
-import { getQwenApiKey } from "@/lib/qwen-env";
-import { i2vGetVideoTask } from "@/lib/image-to-video-dashscope";
+import { pollDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
+import type { I2vTaskOutput } from "@/lib/image-to-video-dashscope";
 import { formatDashScopeI2vFailureForUser } from "@/lib/image-to-video-task-errors";
 import {
   extractVideoTaskBillingContext,
@@ -24,14 +24,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });
   }
 
-  const apiKey = getQwenApiKey();
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "服务端未配置 QWEN_API_KEY 或 DASHSCOPE_API_KEY" },
-      { status: 503 },
-    );
-  }
-
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -44,16 +36,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "缺少 taskId" }, { status: 400 });
   }
 
-  const polled = await i2vGetVideoTask({ apiKey, taskId });
+  const gatewayLogId =
+    typeof body.gatewayLogId === "string" && body.gatewayLogId.trim().length > 0
+      ? body.gatewayLogId.trim()
+      : undefined;
+
+  const polled = await pollDashscopeJobFromServer({ taskId, gatewayLogId });
   if (!polled.ok) {
-    return NextResponse.json({ error: polled.error }, { status: 502 });
+    return NextResponse.json({ error: polled.error }, { status: polled.status ?? 502 });
   }
 
-  const status = polled.output.task_status ?? "";
+  const output = polled.output as I2vTaskOutput;
+  const status = output.task_status ?? "";
   if (status !== "SUCCEEDED") {
     const detail =
       status === "FAILED"
-        ? formatDashScopeI2vFailureForUser(polled.output, status)
+        ? formatDashScopeI2vFailureForUser(output, status)
         : status || "UNKNOWN";
     return NextResponse.json(
       {
@@ -67,14 +65,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const billTaskId = polled.output.task_id?.trim() || taskId;
+  const billTaskId = output.task_id?.trim() || taskId;
   const videoUrl =
-    typeof polled.output.video_url === "string"
-      ? polled.output.video_url.trim()
+    typeof output.video_url === "string"
+      ? output.video_url.trim()
       : "";
 
   const hint = videoBillingHintFromJsonBody(body);
-  const vCtx = extractVideoTaskBillingContext(polled.raw, hint);
+  const vCtx = extractVideoTaskBillingContext({ output }, hint);
   if (!vCtx) {
     return NextResponse.json(
       {

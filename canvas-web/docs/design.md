@@ -324,3 +324,32 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 3. 更新 `normalize-graph-nodes.ts` 收拢阈值（若逻辑硬编码）
 4. 更新 **本文档** §1 表格
 5. 已有项目：刷新后 normalize；列位重叠则 **重排**
+
+---
+
+## 12. 视频播放控件（必须）
+
+与 **tool-web 图生视频实验室** 成片播放一致；Canvas 内禁止第二套自定义控制条。
+
+### 12.1 唯一播放组件
+
+- 真源：[`components/canvas/canvas-video-player.tsx`](../components/canvas/canvas-video-player.tsx) · **`CanvasVideoPlayer`**
+- 结构：`relative aspect-video bg-black/95` 容器 + 原生 `<video controls playsInline preload="metadata" class="h-full w-full object-contain">`
+
+### 12.2 使用范围
+
+| 场景 | 做法 |
+|------|------|
+| 节点内联播放 | `CanvasVideoPlayer`（如 `video-preview-node`） |
+| 弹层全屏预览 | `StoryMediaPreviewModal` / `MediaPreviewLightbox` 内 `CanvasVideoPlayer`，`autoPlay` |
+| 缩略图槽位 | 允许 **muted、无 controls** 的 `<video>` 仅作封面；点击后弹层必须用 `CanvasVideoPlayer` |
+
+### 12.3 禁止
+
+- 节点/弹层内自定义 seek 条、hover 才出现的控制条、或裸 `<video controls>` 绕过 `CanvasVideoPlayer`
+- 与实验室不一致的播放器皮肤
+
+### 12.4 弹层
+
+- 视频预览弹层 z-index：**1100**（与 §6 一致）
+- 弹层 header 可保留下载/关闭；**播放控件**仅走 `CanvasVideoPlayer`
