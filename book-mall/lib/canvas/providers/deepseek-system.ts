@@ -25,7 +25,7 @@ const LLM_TEMP_SCHEMA = [
     min: 256,
     max: 16000,
     step: 128,
-    defaultValue: 4000,
+    defaultValue: 16000,
   },
 ];
 
@@ -38,7 +38,7 @@ export const DEEPSEEK_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     paramsSchema: LLM_TEMP_SCHEMA,
     defaultParams: {
       temperature: 0.7,
-      max_tokens: 4000,
+      max_tokens: 16000,
     },
   },
   {
@@ -49,7 +49,7 @@ export const DEEPSEEK_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     paramsSchema: LLM_TEMP_SCHEMA,
     defaultParams: {
       temperature: 0.7,
-      max_tokens: 4000,
+      max_tokens: 16000,
     },
   },
   {
@@ -60,7 +60,7 @@ export const DEEPSEEK_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     paramsSchema: LLM_TEMP_SCHEMA,
     defaultParams: {
       temperature: 0.7,
-      max_tokens: 4000,
+      max_tokens: 16000,
     },
   },
   {
@@ -76,11 +76,11 @@ export const DEEPSEEK_KNOWN_MODELS: CanvasGatewayListedModel[] = [
         min: 256,
         max: 16000,
         step: 128,
-        defaultValue: 8000,
+        defaultValue: 16000,
       },
     ],
     defaultParams: {
-      max_tokens: 8000,
+      max_tokens: 16000,
     },
   },
 ];

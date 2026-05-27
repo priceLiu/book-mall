@@ -34,17 +34,18 @@ import {
   resolveStarterForHub,
 } from "@/lib/canvas/story-workspace-resolver";
 import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout";
-import { NodeShell, ENGINE_ACCENT, NodeStatusBadge } from "../node-shell";
+import { ProNodeShell } from "../pro-node-shell";
+import { NodeStatusBadge } from "../node-shell";
+import { StoryProGuidePanel } from "../story-pro-guide-panel";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
 import { StoryHubNodePreviewPane } from "../story-hub-node-preview-pane";
-import { StoryPreviewMagnifyButton } from "../story-preview-magnify-button";
 import { StoryScriptHubModal } from "../story-script-hub-modal";
 import {
-  STORY_CONTROL_NODE_HEIGHT,
-  STORY_CONTROL_NODE_WIDTH,
-  STORY_NODE_ACTION_BTN_CLASS,
-} from "@/lib/canvas/story-node-chrome";
+  STORY_PRO_CONTROL_NODE_HEIGHT,
+  STORY_PRO_CONTROL_NODE_WIDTH,
+  PRO_NODE_ACTION_BTN_CLASS,
+} from "@/lib/canvas/story-pro-node-chrome";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
 
@@ -140,6 +141,38 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
 
   const scriptFinalized = hubIsScriptFinalized(d);
 
+  const hubSubtitle = useMemo(() => {
+    if (scriptFinalized && hasStyleNode) {
+      return "故事已定稿 · 风格层已连接";
+    }
+    if (hasStyleNode && !scriptFinalized) {
+      return "风格层已连接 · 请确认故事定稿以解锁";
+    }
+    if (canOutputWorkflow) return "大纲就绪 · 可故事定稿";
+    if (anyRunning) return "文案生成中…";
+    return "大纲 · 角色 · 分镜 · 对白";
+  }, [
+    scriptFinalized,
+    hasStyleNode,
+    canOutputWorkflow,
+    anyRunning,
+  ]);
+
+  const finalizeBtnLabel = useMemo(() => {
+    if (outputBusy) return "处理中…";
+    if (scriptFinalized) return "故事已定稿 · 风格层已连接";
+    if (hasStyleNode) return "确认故事定稿 · 解锁风格层";
+    return "故事定稿 · 进入风格层";
+  }, [outputBusy, scriptFinalized, hasStyleNode]);
+
+  const finalizeDisabled =
+    outputBusy || !canOutputWorkflow || scriptFinalized;
+
+  const proCompletedStages = useMemo(
+    () => (scriptFinalized ? (["story"] as const) : []),
+    [scriptFinalized],
+  );
+
   const feasibilityHighRisk = d.feasibility?.highRiskCount ?? 0;
 
   const sectionChips = useMemo(() => {
@@ -176,13 +209,16 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
   );
 
   const previewEmptyHint = useMemo(() => {
-    const labels: Record<HubPreviewSection, string> = {
-      outline: "大纲",
-      character: "角色设定",
-      storyboard: "分镜脚本",
-      dialogue: "对白",
-    };
-    return `暂无${labels[activeSection]} · 创作剧本后悬停白纸区，点击打开审阅`;
+    if (activeSection === "character") {
+      return "暂无角色设定 · 创作剧本后依次生成角色段，或在大纲「主要角色」中查看";
+    }
+    if (activeSection === "storyboard") {
+      return "暂无分镜 · 大纲/角色完成后自动生成分镜段，或打开审阅点「生成」";
+    }
+    if (activeSection === "dialogue") {
+      return "暂无对白 · 分镜表生成后从「对白」列提取";
+    }
+    return "暂无大纲 · 在「影视专业·启动」点击创作剧本";
   }, [activeSection]);
 
   useEffect(() => {
@@ -190,14 +226,12 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
     if (!starter) return;
     if (!hasStyleNode && scriptFinalized && !hasMediaColumns) {
       updateNodeData(id, { scriptFinalized: false });
-    }
-    if (
-      hasStyleNode &&
-      !hasMediaColumns &&
-      (starter.data as { pipelineStage?: string }).pipelineStage ===
-        "style_finalized"
-    ) {
-      updateNodeData(starter.id, { pipelineStage: "script_finalized" });
+      if (
+        (starter.data as { pipelineStage?: string }).pipelineStage ===
+        "script_finalized"
+      ) {
+        updateNodeData(starter.id, { pipelineStage: "llm_done" });
+      }
     }
   }, [
     nodes,
@@ -326,6 +360,8 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
       updateNodeData(id, { scriptFinalized: true });
       updateNodeData(starter.id, { pipelineStage: "script_finalized" });
       reflowProLayout();
+      // reflow 内 reconcile 会校验风格节点；再次确保定稿标记落库
+      updateNodeData(id, { scriptFinalized: true });
     } finally {
       setOutputBusy(false);
     }
@@ -345,8 +381,8 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
       : false;
 
   useEffect(() => {
-    const targetH = STORY_CONTROL_NODE_HEIGHT;
-    const targetW = STORY_CONTROL_NODE_WIDTH;
+    const targetH = STORY_PRO_CONTROL_NODE_HEIGHT;
+    const targetW = STORY_PRO_CONTROL_NODE_WIDTH;
     const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
     if (!node) return;
     const { w, h } = nodeMeasuredSize(node);
@@ -363,32 +399,19 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
 
   return (
     <>
-      <NodeShell
+      <ProNodeShell
         title="故事剧本"
-        subtitle={
-          hasStyleNode && scriptFinalized
-            ? "故事已定稿 · 风格层已连接"
-            : canOutputWorkflow
-              ? "大纲就绪 · 可故事定稿"
-              : anyRunning
-                ? "文案生成中…"
-                : "大纲 · 角色 · 分镜 · 对白"
-        }
+        subtitle={hubSubtitle}
         selected={selected}
-        engine
-        accent={ENGINE_ACCENT}
-        minWidth={STORY_CONTROL_NODE_WIDTH}
-        minHeight={STORY_CONTROL_NODE_HEIGHT}
+        activeStage="story"
+        completedStages={[...proCompletedStages]}
+        guide={<StoryProGuidePanel stage="story" />}
+        minWidth={STORY_PRO_CONTROL_NODE_WIDTH}
+        minHeight={STORY_PRO_CONTROL_NODE_HEIGHT}
         inputs={[{ id: "in_text", label: "创意", kind: "text" }]}
         outputs={[{ id: "text", label: "文案", kind: "text" }]}
         headerRight={
-          <div className="nodrag nowheel pointer-events-auto flex shrink-0 items-center gap-1.5">
-            <StoryPreviewMagnifyButton
-              variant="onDark"
-              onClick={() => openPreview(activeSection)}
-            />
-            <NodeStatusBadge status={aggregateStatus} message={failMsg} />
-          </div>
+          <NodeStatusBadge status={aggregateStatus} message={failMsg} />
         }
         footer={
           <StoryNodeFooterShell
@@ -397,30 +420,32 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
                 <span className="text-amber-300/90">
                   可行性：{feasibilityHighRisk} 项高风险
                 </span>
+              ) : hasStyleNode && !scriptFinalized ? (
+                <span className="text-cyan-200/80">
+                  风格节点已连接，确认定稿后即可编辑风格层
+                </span>
               ) : undefined
             }
           >
             <button
               type="button"
-              disabled={outputBusy || !canOutputWorkflow || hasStyleNode}
-              className={STORY_NODE_ACTION_BTN_CLASS}
+              disabled={finalizeDisabled}
+              className={PRO_NODE_ACTION_BTN_CLASS}
               title={
                 hubSectionIsRunning(hubNode, "outline")
                   ? "大纲生成中…"
                   : !canOutputWorkflow
                     ? "请先创作剧本并填写故事大纲"
-                    : hasStyleNode
-                      ? "故事已定稿 · 风格层已连接"
-                      : "确认故事剧本并进入风格定义（不自动生成媒体）"
+                    : scriptFinalized
+                      ? "故事已定稿"
+                      : hasStyleNode
+                        ? "确认故事定稿，解锁风格定义节点"
+                        : "确认故事剧本并进入风格定义（不自动生成媒体）"
               }
               onClick={() => void onFinalizeScript()}
             >
               <GitBranch className="size-3.5 shrink-0" />
-              {outputBusy
-                ? "处理中…"
-                : hasStyleNode
-                  ? "故事已定稿 · 风格层已连接"
-                  : "故事定稿 · 进入风格层"}
+              {finalizeBtnLabel}
             </button>
           </StoryNodeFooterShell>
         }
@@ -461,7 +486,7 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
             />
           </div>
         </div>
-      </NodeShell>
+      </ProNodeShell>
 
       <StoryScriptHubModal
         open={reviewOpen}

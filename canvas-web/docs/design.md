@@ -223,10 +223,12 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 
 | 段 | 默认编辑 | 可切换 |
 |----|----------|--------|
-| 故事大纲 | Markdown textarea | — |
+| 故事大纲 | **块级渲染编辑** `StoryOutlineDocumentEditor` | Markdown 源码 |
 | 角色设定 | **表格** `StoryCharacterTableEditor` | Markdown 源码 |
 | 分镜脚本 | **表格** `StoryStoryboardTableEditor` | Markdown 源码 |
 | 对白 | 按镜号 textarea 列表 | 只读依赖分镜表 |
+
+- LLM **首次「创作剧本」** 须按 `story-prompts.ts` · `STORY_PACK_MARKDOWN_STRUCTURE` 一次输出 **起承转合 + ## 角色设定 + ## 分镜脚本** GFM 表；落库时 `promoteEmbeddedPackFromOutline` 自动拆入各 Tab（对白来自分镜表「台词」列）。
 
 - 大纲/角色/分镜支持 **历史版本** 下拉恢复
 - 单段 **生成 / 重新生成** LLM；保存写入 hub node data
@@ -237,6 +239,59 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 - 提示词：`MentionsTextarea`，支持 `@<ref-char-*>` 引用角色三视图
 - 600ms debounce 写回 `rows`
 - 参考图列只读展示上游；输出图列生成/预览/分镜视频
+
+### 6.4 文案编辑 UX 铁律（致命，必守）
+
+> **左侧必须能「看到渲染」再编辑；禁止默认整篇 Markdown 源码；禁止引入未验证的 WYSIWYG 导致白屏崩溃。**
+
+#### 6.4.1 编辑入口一览（真源组件）
+
+| 入口 | 组件 | 节点外壳 | 左栏默认 | 右栏 / 预览 |
+|------|------|----------|----------|-------------|
+| 故事大纲审阅 | `StoryScriptHubModal` | `StoryHubNodePreviewPane` · 只读 | 见 §6.2 各 Tab | `MarkdownView` · `document` |
+| 故事主题 | `StoryThemePromptModal` | `StoryThemePromptPreviewPane` · 只读 | `textarea` / `MentionsTextarea`（系统提示词，非 GFM 剧本） | `MarkdownView` · `document` |
+| Word 全屏 | `MarkdownFullscreenLightbox` | — | — | `MarkdownView` · `document` |
+| 上传剧本预览 | `StoryProScriptUploadPreviewModal` | — | 只读 | `MarkdownView` · `document` |
+| 引擎 LLM 输出 | `story-engine-actions-modal` | 节点内嵌 | 只读 | `MarkdownView` · `inline` |
+
+**统一 chrome 常量**：`lib/canvas/story-hub-editor-chrome.ts`（切换按钮文案、左栏说明）。
+
+#### 6.4.2 `StoryScriptHubModal` 各 Tab 左栏（默认模式）
+
+| Tab | 默认左栏 | 切换按钮 | 禁止 |
+|-----|----------|----------|------|
+| **故事大纲** | `StoryOutlineDocumentEditor`：GFM 表 → `StoryGenericMdTableEditor`；正文 → `MarkdownView` 渲染，点段落后 **上方保持渲染**、下方 Markdown  textarea | 「切换 Markdown 源码」↔「切换渲染编辑」 | 禁止默认整篇 textarea；禁止点击段落后 **仅** 显示源码而隐藏渲染 |
+| **角色设定** | `StoryCharacterTableEditor`（表格单元格可编辑，样式同预览） | 「切换 Markdown 源码」↔「切换表格编辑」 | 禁止默认可解析表时仍用 textarea |
+| **分镜脚本** | `StoryStoryboardTableEditor` | 同上 | 同上 |
+| **对白** | 按镜号 textarea（结构化字段，非 Markdown 文档） | — | — |
+
+- 右栏 **始终** `MarkdownView variant="document"` 实时预览（与左侧同源 `draft`）。
+- 空内容时仍进入对应编辑器（表格 Tab 可「添加行」/ 大纲可空白撰写），**不得**因 `trim()` 为空而只显示占位、隐藏编辑器。
+- **节点外壳**（画布上）一律只读预览；**所有改稿仅在弹层**完成。
+
+#### 6.4.3 表格与 Markdown 解析
+
+- 预览 / 编辑表格样式：`story-md-table-chrome.ts`（§5.3）。
+- 可编辑表：`StoryCharacterTableEditor`、`StoryStoryboardTableEditor`、`StoryGenericMdTableEditor`。
+- 解析写回：`parse-md-tables.ts`；单元格展示须 `stripInlineMarkdownCell`（去掉 `**加粗**` 等，避免左侧表格显示 `**` 而右侧已渲染）。
+- 列匹配：`pickColumn` **按别名优先级**（如「姓名」优先于「角色」），避免大纲人物表解析错列。
+
+#### 6.4.4 禁止事项（曾导致生产级 UX 事故）
+
+1. **禁止**在审阅弹层默认左侧整篇 Markdown 源码（「切换 Markdown 源码」除外）。
+2. **禁止**未经隔离验证引入 Lexical / MDXEditor 等第三方 WYSIWYG（易 `removeChild` 白屏，旧项目 Markdown 挂载即崩）。
+3. **禁止**编辑时让 React 与编辑器 **双向强同步** 同一份 DOM（应：挂载时初始化，编辑自治，外部换稿仅 `key` remount）。
+4. **禁止**表格可解析时默认 textarea；**禁止**为表格单独写一套 prose 样式。
+5. **禁止**在 UI 弹黄色角色名/台词警告（约束在 prompt，见 §6.2）。
+
+#### 6.4.5 改编辑相关代码时的自检
+
+- [ ] 左栏默认是否为 **渲染态 / 表格态**（非整篇源码）？
+- [ ] 大纲正文编辑时 **MarkdownView 是否仍可见**？
+- [ ] 右栏是否仍为 `MarkdownView document`？
+- [ ] 切换按钮文案是否与 `story-hub-editor-chrome.ts` 一致？
+- [ ] 空内容是否仍能进入编辑器？
+- [ ] 是否更新本文 §6 与 `.cursor/rules/canvas-story-design.mdc`？
 
 ---
 

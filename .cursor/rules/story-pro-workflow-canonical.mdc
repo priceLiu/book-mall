@@ -32,3 +32,6 @@ alwaysApply: false
 - [ ] 定稿不自动跑媒体
 - [ ] style 未定稿时下游 run 拒绝
 - [ ] prompt 经 `prependStoryProStyleAnchor`
+- [ ] 故事剧本 LLM 输出符合 `story-pro-script-pack.ts`（影响定稿拆分）
+
+**故事剧本结构真源**：`canvas-web/lib/canvas/story-pro-script-pack.ts` · `canvas-story-pro-script-pack.mdc`

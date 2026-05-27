@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import type { CanvasFlowEdge, CanvasFlowNode, StoryLlmEngineIds } from "./types";
 import {
   STORY_CHARACTER_ENGINE_PROMPT,
+  STORY_OUTLINE_LLM_PARAMS,
   STORY_OUTLINE_USER_PROMPT,
   STORY_STORYBOARD_ENGINE_PROMPT,
 } from "./story-prompts";
@@ -124,11 +125,7 @@ function connect(
   });
 }
 
-const LLM_PARAMS = {
-  reasoning_effort: "low",
-  max_tokens: 4000,
-  temperature: 0.7,
-};
+const LLM_PARAMS = { ...STORY_OUTLINE_LLM_PARAMS };
 
 function persistStarterEngineIds(
   updateNodeData: SpawnArgs["updateNodeData"],

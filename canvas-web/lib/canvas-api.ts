@@ -286,6 +286,13 @@ export async function uploadCanvasImage(
   base: string,
   file: File,
 ): Promise<string> {
+  return uploadCanvasFile(base, file);
+}
+
+export async function uploadCanvasFile(
+  base: string,
+  file: File,
+): Promise<string> {
   const form = new FormData();
   form.append("file", file);
   const { url, init } = resolveBookMallBrowserRequest(
@@ -295,7 +302,14 @@ export async function uploadCanvasImage(
   );
   const r = await fetch(url, init);
   if (!r.ok) {
-    throw new Error(`upload failed ${r.status}`);
+    let detail = String(r.status);
+    try {
+      const j = (await r.json()) as { message?: string; error?: string };
+      detail = j.message ?? j.error ?? detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`upload failed: ${detail}`);
   }
   const j = (await r.json()) as { ossUrl?: string };
   if (!j.ossUrl) throw new Error("upload missing ossUrl");

@@ -206,8 +206,8 @@ const GEMINI_3_FLASH_LLM_PARAMS = [
     min: 256,
     max: 16000,
     step: 128,
-    defaultValue: 4000,
-    help: "输出越长消耗越高，漫剧大纲推荐 4000。",
+    defaultValue: 16000,
+    help: "输出 token 上限；故事大纲等长文本推荐 16000。",
   },
   {
     key: "temperature",
@@ -222,7 +222,7 @@ const GEMINI_3_FLASH_LLM_PARAMS = [
 
 const GEMINI_3_FLASH_LLM_DEFAULTS = {
   reasoning_effort: "low",
-  max_tokens: 4000,
+  max_tokens: 16000,
   temperature: 0.7,
 };
 

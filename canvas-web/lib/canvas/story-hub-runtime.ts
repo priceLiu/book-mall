@@ -3,7 +3,6 @@ import {
   stripOutlineEmbeddedPackSections,
   extractCharacterSectionFromOutline,
   normalizeStoryboardSectionFromOutline,
-  compactGfmTables,
   parseStoryboardRows,
 } from "./parse-md-tables";
 import type { CanvasFlowNode } from "./types";
@@ -19,9 +18,14 @@ export function hubSectionRuntime(
   return d.storyboardRuntime;
 }
 
+/** 故事大纲落库：剥离嵌入段 / 简表，不做预览排版 */
+function outlineStripMd(md: string): string {
+  return stripOutlineEmbeddedPackSections(stripOutlineCharacterTable(md ?? ""));
+}
+
 /** 故事大纲展示用（不含人物表简表与嵌入的制作包段落） */
 export function outlineDisplayMd(md: string): string {
-  return stripOutlineEmbeddedPackSections(stripOutlineCharacterTable(md ?? ""));
+  return outlineStripMd(md);
 }
 
 /** 解析各 Tab 展示/编辑用 Markdown：优先独立字段，否则从大纲嵌入段回落 */
@@ -74,7 +78,7 @@ export function promoteEmbeddedPackFromOutline(
   storyboardMd = "",
 ): { outlineMd: string; characterMd: string; storyboardMd: string } {
   return {
-    outlineMd: outlineDisplayMd(outlineMd),
+    outlineMd: outlineStripMd(outlineMd),
     characterMd:
       characterMd.trim() || extractCharacterSectionFromOutline(outlineMd),
     storyboardMd:
@@ -138,7 +142,7 @@ export function hubSectionIsRunning(
 }
 
 export function hubDialogueIsReady(storyboardMd: string): boolean {
-  const rows = parseStoryboardRows(compactGfmTables(storyboardMd ?? ""));
+  const rows = parseStoryboardRows(storyboardMd ?? "");
   if (!rows.length) return false;
   return rows.some((r) => {
     const d = (r.dialogue ?? "").trim();
@@ -197,7 +201,7 @@ export function hubPreviewMarkdown(d: StoryScriptHubNodeData): string {
 }
 
 export function hubDialoguePreviewMd(storyboardMd: string): string {
-  const rows = parseStoryboardRows(compactGfmTables(storyboardMd ?? ""));
+  const rows = parseStoryboardRows(storyboardMd ?? "");
   if (!rows.length) return "";
   return rows
     .map(
@@ -213,5 +217,8 @@ export function hubSectionPreviewContent(
   d: StoryScriptHubNodeData,
   section: HubPreviewSection,
 ): string {
+  if (section === "outline") {
+    return (d.outlineMd ?? "").trim();
+  }
   return resolveHubSectionMd(d, section);
 }

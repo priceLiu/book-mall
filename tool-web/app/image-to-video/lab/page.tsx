@@ -1,3 +1,5 @@
+import { getMainSiteOrigin } from "@/lib/site-origin";
+import { mainSiteToolsReEnterHref } from "@/lib/main-site-tools-links";
 import { ImageToVideoLabClient } from "./image-to-video-lab-client";
 
 export const metadata = {
@@ -5,9 +7,12 @@ export const metadata = {
 };
 
 export default function ImageToVideoLabPage() {
+  const origin = getMainSiteOrigin();
+  const renewHref = mainSiteToolsReEnterHref(origin, "/image-to-video/lab");
+
   return (
     <main className="tw-main fitting-room-main image-to-video-lab-main">
-      <ImageToVideoLabClient />
+      <ImageToVideoLabClient renewHref={renewHref} mainOrigin={origin} />
     </main>
   );
 }

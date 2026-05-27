@@ -6,6 +6,7 @@ import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { NODE_DEFAULT_SIZE } from "./types";
 import {
   STORY_CHARACTER_ENGINE_PROMPT,
+  STORY_OUTLINE_LLM_PARAMS,
   STORY_OUTLINE_USER_PROMPT,
   STORY_STORYBOARD_ENGINE_PROMPT,
 } from "./story-prompts";
@@ -284,11 +285,7 @@ type SpawnHubArgs = {
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
 };
 
-const LLM_PARAMS = {
-  reasoning_effort: "low",
-  max_tokens: 4000,
-  temperature: 0.7,
-};
+const LLM_PARAMS = { ...STORY_OUTLINE_LLM_PARAMS };
 
 /** 仅创建并连接「漫剧文案」节点（不创建角色/分镜/视频列） */
 export function spawnStoryScriptHub(args: SpawnHubArgs): { scriptHubId: string } {

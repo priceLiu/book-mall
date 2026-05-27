@@ -14,16 +14,25 @@ export function storyMdTablePadClass(variant: StoryMdTableVariant): string {
 
 export function storyMdTableWrapperClass(variant: StoryMdTableVariant): string {
   const text = storyMdTableTextClass(variant);
-  const layout = variant === "editor" ? "table-auto" : "table-fixed";
+  const layout =
+    variant === "editor" || variant === "document" ? "table-auto" : "table-fixed";
   const minW = variant === "editor" ? "min-w-[880px]" : "min-w-full";
   return `w-full ${minW} ${layout} border-collapse border border-neutral-300 text-left ${text}`;
 }
 
 export function storyMdThClass(variant: StoryMdTableVariant): string {
-  return `border border-neutral-300 bg-neutral-100 font-semibold text-neutral-900 ${storyMdTablePadClass(variant)}`;
+  const wrap =
+    variant === "document" || variant === "nodePreview"
+      ? "break-words whitespace-pre-wrap"
+      : "";
+  return `border border-neutral-300 bg-neutral-100 font-semibold text-neutral-900 ${storyMdTablePadClass(variant)} ${wrap}`;
 }
 
 export function storyMdTdClass(variant: StoryMdTableVariant): string {
   const overflow = variant === "editor" ? "overflow-visible" : "";
-  return `border border-neutral-200 bg-white align-top text-neutral-800 ${storyMdTablePadClass(variant)} ${overflow}`;
+  const wrap =
+    variant === "document" || variant === "nodePreview" || variant === "editor"
+      ? "break-words whitespace-pre-wrap"
+      : "";
+  return `border border-neutral-200 bg-white align-top text-neutral-800 ${storyMdTablePadClass(variant)} ${overflow} ${wrap}`;
 }

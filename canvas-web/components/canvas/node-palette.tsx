@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Brain,
   ChevronLeft,
@@ -25,6 +25,9 @@ import {
   X,
 } from "lucide-react";
 import type { CanvasContentNodeType } from "@/lib/canvas/types";
+import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
+import { useCanvasStore } from "@/lib/canvas/store";
+import { PRO_NODE_ACCENT } from "@/lib/canvas/story-pro-node-chrome";
 
 export type PaletteItem = {
   type: CanvasContentNodeType;
@@ -231,6 +234,7 @@ function PaletteIconButton({
   collapsed,
   onDragStart,
   onAdd,
+  proTheme = false,
 }: {
   p: PaletteItem;
   collapsed: boolean;
@@ -240,6 +244,7 @@ function PaletteIconButton({
     presetId?: string,
   ) => void;
   onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
+  proTheme?: boolean;
 }) {
   return (
     <button
@@ -248,7 +253,11 @@ function PaletteIconButton({
       onDragStart={(ev) => onDragStart(ev, p.type, p.presetId)}
       onClick={() => onAdd(p.type, p.presetId)}
       aria-label={`${p.label} — ${p.hint}`}
-      className="group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+      className={
+        proTheme
+          ? "group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full text-cyan-100/80 transition hover:bg-cyan-500/20 hover:text-cyan-50"
+          : "group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+      }
     >
       {p.icon}
       <span
@@ -290,6 +299,7 @@ function PaletteItemsRow({
   collapsed,
   onDragStart,
   onAdd,
+  proTheme = false,
 }: {
   items: PaletteItem[];
   collapsed: boolean;
@@ -299,6 +309,7 @@ function PaletteItemsRow({
     presetId?: string,
   ) => void;
   onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
+  proTheme?: boolean;
 }) {
   return (
     <>
@@ -310,6 +321,7 @@ function PaletteItemsRow({
             collapsed={collapsed}
             onDragStart={onDragStart}
             onAdd={onAdd}
+            proTheme={proTheme}
           />
           {p.dividerAfter ? <PaletteDivider vertical={collapsed} /> : null}
         </Fragment>
@@ -319,6 +331,7 @@ function PaletteItemsRow({
 }
 
 const PALETTE_LABEL_CLASS = "text-[#fb923c]";
+const PRO_PALETTE_LABEL_CLASS = "text-cyan-300";
 
 function PalettePill({
   label,
@@ -327,6 +340,7 @@ function PalettePill({
   trailing,
   onDragStart,
   onAdd,
+  proTheme = false,
 }: {
   label?: string;
   items: PaletteItem[];
@@ -338,13 +352,19 @@ function PalettePill({
     presetId?: string,
   ) => void;
   onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
+  proTheme?: boolean;
 }) {
+  const labelClass = proTheme ? PRO_PALETTE_LABEL_CLASS : PALETTE_LABEL_CLASS;
+  const pillClass = proTheme
+    ? "flex items-center gap-1 rounded-full border border-cyan-400/25 bg-gradient-to-r from-cyan-950/40 to-black/75 px-2 py-1.5 shadow-2xl shadow-cyan-950/30 backdrop-blur-md"
+    : "flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md";
+
   if (collapsed) {
     return (
       <div className="flex w-full flex-col items-center">
         {label ? (
           <span
-            className={`mb-1 max-w-[2.5rem] truncate text-center text-[9px] font-medium tracking-wide ${PALETTE_LABEL_CLASS}`}
+            className={`mb-1 max-w-[2.5rem] truncate text-center text-[9px] font-medium tracking-wide ${labelClass}`}
           >
             {label}
           </span>
@@ -354,6 +374,7 @@ function PalettePill({
           collapsed
           onDragStart={onDragStart}
           onAdd={onAdd}
+          proTheme={proTheme}
         />
       </div>
     );
@@ -361,13 +382,18 @@ function PalettePill({
 
   return (
     <div
-      className="flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md"
+      className={pillClass}
       role="group"
       aria-label={label ? `${label}节点` : "画布节点"}
+      style={
+        proTheme
+          ? { boxShadow: `0 0 0 1px ${PRO_NODE_ACCENT}18, 0 8px 32px rgba(0,0,0,0.45)` }
+          : undefined
+      }
     >
       {label ? (
         <span
-          className={`select-none pr-0.5 text-[10px] font-medium tracking-wide ${PALETTE_LABEL_CLASS}`}
+          className={`select-none pr-0.5 text-[10px] font-medium tracking-wide ${labelClass}`}
         >
           {label}
         </span>
@@ -378,6 +404,7 @@ function PalettePill({
         collapsed={false}
         onDragStart={onDragStart}
         onAdd={onAdd}
+        proTheme={proTheme}
       />
       {trailing}
     </div>
@@ -408,6 +435,15 @@ export function NodePalette({
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const proOnly = useCanvasStore((s) => hasStoryProPipeline(s.nodes));
+
+  const proPaletteItems = useMemo(
+    () =>
+      STORY_PRO_PALETTE.map((item, i) =>
+        i === 0 ? { ...item, dividerBefore: false } : item,
+      ),
+    [],
+  );
 
   useEffect(() => {
     try {
@@ -513,42 +549,56 @@ export function NodePalette({
         <div
           className="pointer-events-none fixed right-3 top-1/2 z-40 -translate-y-1/2"
           role="toolbar"
-          aria-label="节点面板（已收起）"
+          aria-label={proOnly ? "影视专业版节点面板（已收起）" : "节点面板（已收起）"}
         >
           <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-black/75 py-2 pl-1.5 pr-1 shadow-2xl backdrop-blur-md">
             {collapseButton}
             <PaletteDivider vertical />
-            <PalettePill
-              label="海报创作"
-              items={CANVAS_PALETTE}
-              collapsed
-              onDragStart={onDragStart}
-              onAdd={onAdd}
-            />
-            <PaletteDivider vertical />
-            <PalettePill
-              label="故事创作"
-              items={STORY_PALETTE}
-              collapsed
-              onDragStart={onDragStart}
-              onAdd={onAdd}
-            />
-            <PaletteDivider vertical />
-            <PalettePill
-              label="影视专业版"
-              items={STORY_PRO_PALETTE}
-              collapsed
-              onDragStart={onDragStart}
-              onAdd={onAdd}
-            />
-            <PaletteDivider vertical />
-            <PalettePill
-              label="参考生视频"
-              items={REF_VIDEO_PALETTE}
-              collapsed
-              onDragStart={onDragStart}
-              onAdd={onAdd}
-            />
+            {proOnly ? (
+              <PalettePill
+                label="影视专业版"
+                items={proPaletteItems}
+                collapsed
+                proTheme
+                onDragStart={onDragStart}
+                onAdd={onAdd}
+              />
+            ) : (
+              <>
+                <PalettePill
+                  label="海报创作"
+                  items={CANVAS_PALETTE}
+                  collapsed
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+                <PaletteDivider vertical />
+                <PalettePill
+                  label="故事创作"
+                  items={STORY_PALETTE}
+                  collapsed
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+                <PaletteDivider vertical />
+                <PalettePill
+                  label="影视专业版"
+                  items={STORY_PRO_PALETTE}
+                  collapsed
+                  proTheme
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+                <PaletteDivider vertical />
+                <PalettePill
+                  label="参考生视频"
+                  items={REF_VIDEO_PALETTE}
+                  collapsed
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+              </>
+            )}
             <PaletteDivider vertical />
             {helpButton}
           </div>
@@ -557,38 +607,53 @@ export function NodePalette({
         <div
           className="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2"
           role="toolbar"
-          aria-label="节点面板"
+          aria-label={proOnly ? "影视专业版节点面板" : "节点面板"}
         >
           <div className="pointer-events-auto flex items-center gap-8">
-            <PalettePill
-              label="海报创作"
-              items={CANVAS_PALETTE}
-              collapsed={false}
-              trailing={canvasTrailing}
-              onDragStart={onDragStart}
-              onAdd={onAdd}
-            />
-            <PalettePill
-              label="故事创作"
-              items={STORY_PALETTE}
-              collapsed={false}
-              onDragStart={onDragStart}
-              onAdd={onAdd}
-            />
-            <PalettePill
-              label="影视专业版"
-              items={STORY_PRO_PALETTE}
-              collapsed={false}
-              onDragStart={onDragStart}
-              onAdd={onAdd}
-            />
-            <PalettePill
-              label="参考生视频"
-              items={REF_VIDEO_PALETTE}
-              collapsed={false}
-              onDragStart={onDragStart}
-              onAdd={onAdd}
-            />
+            {proOnly ? (
+              <PalettePill
+                label="影视专业版"
+                items={proPaletteItems}
+                collapsed={false}
+                proTheme
+                trailing={canvasTrailing}
+                onDragStart={onDragStart}
+                onAdd={onAdd}
+              />
+            ) : (
+              <>
+                <PalettePill
+                  label="海报创作"
+                  items={CANVAS_PALETTE}
+                  collapsed={false}
+                  trailing={canvasTrailing}
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+                <PalettePill
+                  label="故事创作"
+                  items={STORY_PALETTE}
+                  collapsed={false}
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+                <PalettePill
+                  label="影视专业版"
+                  items={STORY_PRO_PALETTE}
+                  collapsed={false}
+                  proTheme
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+                <PalettePill
+                  label="参考生视频"
+                  items={REF_VIDEO_PALETTE}
+                  collapsed={false}
+                  onDragStart={onDragStart}
+                  onAdd={onAdd}
+                />
+              </>
+            )}
           </div>
         </div>
       )}

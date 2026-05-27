@@ -1,6 +1,7 @@
 import type { CanvasFlowNode, CanvasNodeType, CanvasFlowEdge } from "./types";
 import { isGroupNode, NODE_DEFAULT_SIZE } from "./types";
 import { STORY_CONTROL_NODE_HEIGHT, STORY_CONTROL_NODE_WIDTH } from "./story-node-chrome";
+import { migrateStoryOutlineLlmParamsAll } from "./story-llm-params-migrate";
 
 const GROUP_PADDING = 28;
 const GROUP_HEADER = 40;
@@ -803,9 +804,10 @@ export function normalizeCanvasNodes(
   nodes: CanvasFlowNode[],
   edges?: CanvasFlowEdge[],
 ): CanvasFlowNode[] {
+  const withLlmParams = migrateStoryOutlineLlmParamsAll(nodes);
   const sized = normalizeStoryControlNodeSizes(
     normalizeStoryMediaColumnSizes(
-      normalizeRefVideoWorkflowNodeSizes(normalizeThreeViewNodeSizes(nodes)),
+      normalizeRefVideoWorkflowNodeSizes(normalizeThreeViewNodeSizes(withLlmParams)),
     ),
   );
   if (!hasStoryTemplateGroups(sized)) {

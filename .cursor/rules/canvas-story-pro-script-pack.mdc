@@ -1,0 +1,46 @@
+---
+description: 影视专业版 · 故事剧本 LLM 输出结构（定稿拆分真源，致命）
+globs: canvas-web/lib/canvas/story-pro-*.ts, canvas-web/components/canvas/nodes/story-pro-*.tsx, canvas-web/docs/story-pro-*.md
+alwaysApply: false
+---
+
+# 影视专业版 · 故事剧本制作包结构（强制）
+
+**真源**：`canvas-web/lib/canvas/story-pro-script-pack.ts` · 文档 `canvas-web/docs/story-pro-workflow-canonical.md` §5
+
+## 原则
+
+- **上传剧本文件不改**；仅约束 LLM **返回** 的 Markdown 结构。
+- 结构错误 → hub Tab 空、定稿后 `story-pro-column-sync` 拆不出 character/scene/frame/video 行。
+
+## 导演模板（启动页默认 · `director-from-script`）
+
+须含全部 `##` 章节 + 三张 GFM 表（表头不可改）：
+
+| 章节 | 用途 |
+|------|------|
+| `## 视觉风格总纲` | 大纲 Tab |
+| `## 场景视觉辞典` | 大纲 Tab → 下游 scene 列 |
+| `## 核心冲突与结构摘要` | 大纲 Tab |
+| `## 角色视觉辞典` | 角色 Tab → character 列 |
+| `## 分镜脚本` | 分镜/对白 Tab → frame/video 列 |
+| `## 下一步交接清单` | 大纲 Tab |
+
+分镜表头：`镜号 | 景别 | 运镜 | 画面描述 | 对白 | 时长(秒) | AI视频提示词(英文) | 口型/配音备注`
+
+## Hub 三段 prompt
+
+与 `STORY_PRO_OUTLINE_USER_PROMPT` / `CHARACTER` / `STORYBOARD` 对齐；共用 `STORY_PRO_PACK_OUTPUT_RULES`。
+
+## 解析
+
+- `extractCharacterSectionFromOutline` 须认 `角色视觉辞典`
+- `stripOutlineEmbeddedPackSections` 剥离 `角色视觉辞典`、`分镜脚本`（**不**剥离 `场景视觉辞典`）
+- 对白 Tab：`parseStoryboardRows` ·「对白」列
+
+## 禁止
+
+- 禁止 `1. 2. 3.` 列表代替 `##` + GFM
+- 禁止分镜只有 3～5 个概括镜头
+- 禁止对白只写在画面描述、不填「对白」列
+- 改结构须同步 `story-pro-script-pack.ts`、hub prompt、本文与 `story-pro-workflow-canonical.md`

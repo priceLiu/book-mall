@@ -31,3 +31,10 @@
 ## 6. Cursor / AI 协作
 
 项目规则见 **`.cursor/rules/ai-mall-product-doc.mdc`**，与本文档一致。
+
+## 7. 平台联邦（新应用必遵）
+
+1. 阅读 **[12-platform-app-federation.md](../product/12-platform-app-federation.md)** 与实施计划 **[2026-platform-unification-rollout.md](../plans/2026-platform-unification-rollout.md)**。  
+2. Cursor 持续规则：**`.cursor/rules/platform-app-federation.mdc`**（`alwaysApply`）。  
+3. 新应用 **禁止** 以 NextAuth Cookie 透传作为唯一鉴权；须 Book SSO + Gateway + Platform API。  
+4. 计划文件须标注 Phase（A–F）与验收项。

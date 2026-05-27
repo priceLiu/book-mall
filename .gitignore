@@ -1,9 +1,11 @@
 # pnpm 全局/工作区 store（勿提交）
 .pnpm-store/
 
-# tool-web（独立构建产物）
-/tool-web/node_modules/
-/tool-web/.next/
+# —— 各子应用构建产物（勿提交；此前 gateway-web/.next 曾误入库，已 git rm --cached）——
+**/node_modules/
+**/.next/
+**/out/
+**/.turbo/
 
 # 工具站本地密钥与环境（勿提交）
 tool-web/.env.local

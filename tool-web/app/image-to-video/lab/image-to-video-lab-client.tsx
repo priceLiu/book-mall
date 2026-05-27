@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chipVariants } from "@/components/ui/chip";
+import { useToolsSession } from "@/components/tool-shell-client";
 import { ToolChargeSubmitButton } from "@/components/ui/tool-charge-submit-button";
 import { ToolImplementationCrossLink } from "@/components/tool-implementation-crosslink";
 import { formatDashScopeI2vFailureForUser } from "@/lib/image-to-video-task-errors";
@@ -329,6 +330,27 @@ type TaskPollOutput = {
   code?: string;
 };
 
+function readApiErrorMessage(
+  data: { error?: string; message?: string },
+  status: number,
+  fallback: string,
+): string {
+  const msg =
+    typeof data.message === "string" && data.message.trim()
+      ? data.message.trim()
+      : "";
+  if (msg) return msg;
+  const err =
+    typeof data.error === "string" && data.error.trim()
+      ? data.error.trim()
+      : "";
+  if (err === "tools_session_inactive" || err === "no_session") {
+    return "请先通过主站登录并连接工具站（可点右上角「重新连接」）";
+  }
+  if (err) return err;
+  return fallback;
+}
+
 async function readJsonBody<T>(res: Response): Promise<
   { ok: true; data: T } | { ok: false; message: string }
 > {
@@ -359,7 +381,16 @@ type LabJob = {
   modelLabel: string;
 };
 
-export function ImageToVideoLabClient() {
+export function ImageToVideoLabClient({
+  renewHref,
+  mainOrigin,
+}: {
+  renewHref: string | null;
+  mainOrigin: string | null;
+}) {
+  const { loading: sessLoading, session, hasTokenCookie } = useToolsSession();
+  const originConfigured =
+    typeof mainOrigin === "string" && mainOrigin.trim().length > 0;
   const [modeTab, setModeTab] = useState<LabModeTab>("i2v");
   const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
   const [i2vExamplePresets, setI2vExamplePresets] = useState<ExamplePreset[]>(() =>
@@ -666,6 +697,13 @@ export function ImageToVideoLabClient() {
 
   async function runGeneration() {
     if (generatingBusy) return;
+    if (sessLoading) return;
+    if (!hasTokenCookie) {
+      setFlowError(
+        "未检测到工具站会话。请从主站登录后进入工具站，或点击右上角「重新连接」领取令牌后再生成。",
+      );
+      return;
+    }
     const promptCurrent =
       modeTab === "i2v" ? promptI2v : modeTab === "ref" ? promptRef : promptT2v;
     if (!promptCurrent.trim()) {
@@ -775,7 +813,13 @@ export function ImageToVideoLabClient() {
       const startJson = startParsed.data;
       if (!startR.ok) {
         // v003：reserve 余额不足时主站返回 402；这里把后端错误透传给用户，避免无意义的轮询
-        throw new Error(startJson.error ?? `创建任务失败（HTTP ${startR.status}）`);
+        throw new Error(
+          readApiErrorMessage(
+            startJson,
+            startR.status,
+            `创建任务失败（HTTP ${startR.status}）`,
+          ),
+        );
       }
       const taskId = startJson.taskId?.trim();
       if (!taskId) throw new Error("未返回任务 ID");
@@ -801,7 +845,13 @@ export function ImageToVideoLabClient() {
         if (!tjParsed.ok) throw new Error(tjParsed.message);
         const tj = tjParsed.data;
         if (!tr.ok) {
-          throw new Error(tj.error ?? `查询任务失败（HTTP ${tr.status}）`);
+          throw new Error(
+            readApiErrorMessage(
+              tj,
+              tr.status,
+              `查询任务失败（HTTP ${tr.status}）`,
+            ),
+          );
         }
         const output = tj.output;
         const st = output?.task_status ?? "";
@@ -913,9 +963,11 @@ export function ImageToVideoLabClient() {
   }
 
   const canSubmitGenerate =
-    (modeTab === "i2v" && i2vFirstFrameSrc !== null) ||
-    modeTab === "t2v" ||
-    (modeTab === "ref" && refImages.length > 0);
+    !sessLoading &&
+    hasTokenCookie &&
+    ((modeTab === "i2v" && i2vFirstFrameSrc !== null) ||
+      modeTab === "t2v" ||
+      (modeTab === "ref" && refImages.length > 0));
 
   const dismissJob = (id: string) => {
     setJobs((prev) => prev.filter((j) => j.id !== id));
@@ -1143,6 +1195,53 @@ export function ImageToVideoLabClient() {
           ))}
         </nav>
       </header>
+
+      {sessLoading ? (
+        <p className="tw-muted mb-3 text-sm" role="status">
+          正在同步工具站会话…
+        </p>
+      ) : null}
+
+      {!sessLoading && !hasTokenCookie ? (
+        <div className="tw-note mb-3 max-w-3xl">
+          <p className="mb-2 text-sm">
+            生成视频前须先通过主站登录并连接工具站。若直接打开本页或未登录，会出现点击「开始生成」无反应或立即失败。
+          </p>
+          {renewHref ? (
+            <p className="mb-2 text-sm">
+              <Link href={renewHref} className="text-primary underline">
+                从主站重新连接工具站（返回实验室）
+              </Link>
+            </p>
+          ) : null}
+          {originConfigured ? (
+            <p className="text-xs text-muted-foreground">
+              <Link href={`${mainOrigin}/account`} className="underline">
+                个人中心
+              </Link>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {!sessLoading && hasTokenCookie && !session.active ? (
+        <div className="tw-note mb-3 max-w-3xl">
+          <p className="mb-2 text-sm">
+            令牌已写入，但主站尚未确认有效会话。可先尝试生成；若仍失败请
+            {renewHref ? (
+              <>
+                {" "}
+                <Link href={renewHref} className="text-primary underline">
+                  重新连接
+                </Link>
+              </>
+            ) : (
+              " 点击右上角「重新连接」"
+            )}
+            。
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-6">
         <aside className="relative flex w-full min-h-0 max-h-[calc(100dvh-5.25rem)] flex-col lg:sticky lg:top-3 lg:max-h-[calc(100dvh-4.75rem)] lg:w-[400px] xl:w-[420px]">
@@ -1679,15 +1778,27 @@ export function ImageToVideoLabClient() {
               busy={generatingBusy}
               disabled={!canSubmitGenerate}
               onClick={handleGenerate}
-              primaryLabel="开始生成"
+              primaryLabel={
+                !sessLoading && !hasTokenCookie ? "请先连接工具站" : "开始生成"
+              }
               busyLabel="生成中"
               chargeLine={chargeLine}
               chargeTitle={chargeTitle}
               idleIcon={<Wand2 className="h-4 w-4" aria-hidden />}
             />
             {flowError ? (
-              <p className="mt-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <p
+                className="mt-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                role="alert"
+              >
                 {flowError}
+              </p>
+            ) : null}
+            {!sessLoading && !hasTokenCookie && renewHref ? (
+              <p className="mt-1.5 text-center text-xs">
+                <Link href={renewHref} className="text-primary underline">
+                  从主站登录并返回本页
+                </Link>
               </p>
             ) : null}
             <p className="mt-1.5 text-center text-[0.65rem] leading-snug text-muted-foreground">

@@ -22,6 +22,7 @@ import {
   useCanvasInflightTaskCount,
 } from "@/lib/canvas/run-queue";
 import { stripRuntimeForTemplate } from "@/lib/canvas/sanitize";
+import { stripStoryProUploadedScriptMdForPersist } from "@/lib/canvas/story-pro-upload-script";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { flowPositionAtViewportCenter } from "@/lib/canvas/viewport-placement";
@@ -42,6 +43,7 @@ import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { GatewayLinkBanner } from "@/components/canvas/gateway-link-banner";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
+import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
 
@@ -101,6 +103,10 @@ function Inner({ projectId }: { projectId: string }) {
           : 0;
         useCanvasStore.temporal.getState().pause();
         hydrate(projectId, p.canvas as never);
+        const laid = useCanvasStore.getState().nodes;
+        if (hasStoryComicPipeline(laid) || hasStoryProPipeline(laid)) {
+          useCanvasStore.getState().reflowStoryComicLayout();
+        }
         useCanvasStore.temporal.getState().clear();
         useCanvasStore.temporal.getState().resume();
         setProject(p);
@@ -138,7 +144,7 @@ function Inner({ projectId }: { projectId: string }) {
     autosaveTimerRef.current = window.setTimeout(async () => {
       setSaving(true);
       try {
-        const graph = toGraph();
+        const graph = stripStoryProUploadedScriptMdForPersist(toGraph());
         if (
           graph.nodes.length === 0 &&
           loadedNodeCountRef.current > 0
@@ -190,7 +196,7 @@ function Inner({ projectId }: { projectId: string }) {
     if (!base || !project) return;
     setSaving(true);
     try {
-      const graph = toGraph();
+      const graph = stripStoryProUploadedScriptMdForPersist(toGraph());
       const thumb = pickProjectThumbnailUrl(graph);
       const patch: {
         canvas: typeof graph;

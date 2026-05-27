@@ -1,4 +1,10 @@
 import type { StoryScriptHubNodeData } from "./story-workspace-types";
+import {
+  isAnyStoryCharacterColumnType,
+  isAnyStoryFrameColumnType,
+  isAnyStoryScriptHubType,
+  isAnyStoryVideoColumnType,
+} from "./story-workspace-resolver";
 import type {
   CanvasFlowNode,
   CanvasNodeRuntime,
@@ -62,13 +68,28 @@ export function isCanvasInflightStatus(status?: string): boolean {
   return status === "pending" || status === "running";
 }
 
+function hubSectionInflightCount(d: StoryScriptHubNodeData): number {
+  let count = 0;
+  if (isCanvasInflightStatus(d.outlineRuntime?.status)) count += 1;
+  if (isCanvasInflightStatus(d.characterRuntime?.status)) count += 1;
+  if (isCanvasInflightStatus(d.storyboardRuntime?.status)) count += 1;
+  return count;
+}
+
+function hubHasInflightWork(d: StoryScriptHubNodeData): boolean {
+  return hubSectionInflightCount(d) > 0;
+}
+
 /** 单节点是否仍有进行中的生成（含漫剧列行级 / 文案段 runtime） */
 export function canvasNodeHasInflightWork(node: CanvasFlowNode): boolean {
-  if (node.type === "story-character-column" || node.type === "story-frame-column") {
+  if (
+    isAnyStoryCharacterColumnType(node.type ?? "") ||
+    isAnyStoryFrameColumnType(node.type ?? "")
+  ) {
     const rows = (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
     return rows.some((r) => isCanvasInflightStatus(r.runtime?.status));
   }
-  if (node.type === "story-video-column") {
+  if (isAnyStoryVideoColumnType(node.type ?? "")) {
     const rows = (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
     return rows.some(
       (r) =>
@@ -76,13 +97,9 @@ export function canvasNodeHasInflightWork(node: CanvasFlowNode): boolean {
         isCanvasInflightStatus(r.ttsRuntime?.status),
     );
   }
-  if (node.type === "story-script-hub") {
+  if (isAnyStoryScriptHubType(node.type ?? "")) {
     const d = node.data as unknown as StoryScriptHubNodeData;
-    return (
-      isCanvasInflightStatus(d.outlineRuntime?.status) ||
-      isCanvasInflightStatus(d.characterRuntime?.status) ||
-      isCanvasInflightStatus(d.storyboardRuntime?.status)
-    );
+    return hubHasInflightWork(d);
   }
   const top = (node.data as { runtime?: { status?: string } }).runtime?.status;
   return isCanvasInflightStatus(top);
@@ -97,13 +114,16 @@ export function collectCanvasInflightNodeIds(nodes: CanvasFlowNode[]): string[] 
 export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
   let count = 0;
   for (const node of nodes) {
-    if (node.type === "story-character-column" || node.type === "story-frame-column") {
+    if (
+      isAnyStoryCharacterColumnType(node.type ?? "") ||
+      isAnyStoryFrameColumnType(node.type ?? "")
+    ) {
       const rows =
         (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
       count += rows.filter((r) => isCanvasInflightStatus(r.runtime?.status)).length;
       continue;
     }
-    if (node.type === "story-video-column") {
+    if (isAnyStoryVideoColumnType(node.type ?? "")) {
       const rows =
         (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
       for (const r of rows) {
@@ -112,11 +132,9 @@ export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
       }
       continue;
     }
-    if (node.type === "story-script-hub") {
+    if (isAnyStoryScriptHubType(node.type ?? "")) {
       const d = node.data as unknown as StoryScriptHubNodeData;
-      if (isCanvasInflightStatus(d.outlineRuntime?.status)) count += 1;
-      if (isCanvasInflightStatus(d.characterRuntime?.status)) count += 1;
-      if (isCanvasInflightStatus(d.storyboardRuntime?.status)) count += 1;
+      count += hubSectionInflightCount(d);
       continue;
     }
     const top = (node.data as { runtime?: { status?: string } }).runtime?.status;

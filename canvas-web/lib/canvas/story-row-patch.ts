@@ -14,6 +14,7 @@ import type {
 import type { StoryRunContext } from "./story-workspace-types";
 import {
   mergeOutlineRolesIntoCharacterMd,
+  normalizeCharacterTableMd,
   normalizeOutlineSection,
   parseOutlineBriefCharacters,
 } from "./parse-md-tables";
@@ -63,10 +64,11 @@ export function applyHubSectionFromTask(
     patch.characterRuntime = runtime;
     if (textOutput?.trim()) {
       const brief = parseOutlineBriefCharacters(data.outlineMd ?? "");
-      const characterMd =
+      const characterMd = normalizeCharacterTableMd(
         brief.length > 0
           ? mergeOutlineRolesIntoCharacterMd(textOutput, brief)
-          : textOutput;
+          : textOutput,
+      );
       patch.characterMd = characterMd;
       patch.characterHistory = pushStoryRevision(
         data.characterHistory,
