@@ -27,6 +27,17 @@ import {
   runStoryVideoColumnVideoRow,
   type StoryLlmSection,
 } from "@/lib/canvas/story-workspace-runner";
+import {
+  runStoryProCharacterRow,
+  runStoryProFrameRow,
+  runStoryProSceneRow,
+  runStoryProScriptHubSection,
+  runStoryProStyleDraft,
+  runStoryProTtsRow,
+  runStoryProVideoRow,
+  type StoryProLlmSection,
+} from "@/lib/canvas/story-pro-workspace-runner";
+import { storyProStyleGateError } from "@/lib/canvas/story-pro-style-anchor";
 
 type Ctx = { params: Promise<{ id: string; nodeId: string }> };
 
@@ -65,16 +76,27 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     | "frameImage"
     | "video"
     | "tts"
+    | "sceneRef"
     | undefined;
   const storyScope =
     rowKey || mediaKind || llmSection
       ? { rowKey, mediaKind, llmSection }
       : undefined;
+  const isPro = node.type.startsWith("story-pro-");
+  const styleAnchor = body.body.styleAnchor as
+    | {
+        styleAnchorZh?: string;
+        styleAnchorEn?: string;
+        negativePrompt?: string;
+      }
+    | undefined;
+  const styleFinalized = body.body.styleFinalized === true;
+  const proClientPage = `canvas/${projectId}/story-pro`;
   const baseArgs = {
     userId: guard.user.id,
     projectId,
     nodeId,
-    clientPage: `canvas/${projectId}`,
+    clientPage: isPro ? proClientPage : `canvas/${projectId}`,
     storyScope,
     node: {
       type: node.type,
@@ -95,8 +117,78 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     await assertGatewayApiKeyLinkedForUser(guard.user.id, {
       role: guard.user.role ?? null,
     });
+    const requireProStyle = () => {
+      if (!styleFinalized) storyProStyleGateError();
+    };
     let result;
-    if (node.type === "ai-engine") {
+    if (node.type === "story-pro-script-hub" && llmSection) {
+      result = await runStoryProScriptHubSection({
+        ...baseArgs,
+        forceFresh,
+        llmSection: llmSection as StoryProLlmSection,
+      });
+    } else if (node.type === "story-pro-style") {
+      result = await runStoryProStyleDraft({ ...baseArgs, forceFresh });
+    } else if (
+      node.type === "story-pro-character" &&
+      rowKey &&
+      mediaKind === "threeView"
+    ) {
+      requireProStyle();
+      result = await runStoryProCharacterRow({
+        ...baseArgs,
+        forceFresh,
+        rowKey,
+        styleAnchor,
+      });
+    } else if (
+      node.type === "story-pro-scene" &&
+      rowKey &&
+      mediaKind === "sceneRef"
+    ) {
+      requireProStyle();
+      result = await runStoryProSceneRow({
+        ...baseArgs,
+        forceFresh,
+        rowKey,
+        styleAnchor,
+      });
+    } else if (
+      node.type === "story-pro-frame" &&
+      rowKey &&
+      mediaKind === "frameImage"
+    ) {
+      requireProStyle();
+      result = await runStoryProFrameRow({
+        ...baseArgs,
+        forceFresh,
+        rowKey,
+        styleAnchor,
+      });
+    } else if (
+      node.type === "story-pro-video" &&
+      rowKey &&
+      mediaKind === "video"
+    ) {
+      requireProStyle();
+      result = await runStoryProVideoRow({
+        ...baseArgs,
+        forceFresh,
+        rowKey,
+        styleAnchor,
+      });
+    } else if (
+      node.type === "story-pro-video" &&
+      rowKey &&
+      mediaKind === "tts"
+    ) {
+      requireProStyle();
+      result = await runStoryProTtsRow({
+        ...baseArgs,
+        forceFresh,
+        rowKey,
+      });
+    } else if (node.type === "ai-engine") {
       result = await runAiEngineNode({ ...baseArgs, forceFresh });
     } else if (node.type === "story-script-hub" && llmSection) {
       result = await runStoryScriptHubSection({

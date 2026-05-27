@@ -119,7 +119,7 @@ function backfillNodeSize(n: LooseNode): LooseNode {
     next.height = def.height;
     changed = true;
   }
-  if (t === "story-comic-starter" || t === "story-script-hub") {
+  if (t === "story-comic-starter" || t === "story-script-hub" || t.startsWith("story-pro-") || t === "jianying-export-pro") {
     const targetH = STORY_CONTROL_NODE_HEIGHT;
     const targetW = STORY_CONTROL_NODE_WIDTH;
     const w = Number(next.width ?? cur.width) || def.width;

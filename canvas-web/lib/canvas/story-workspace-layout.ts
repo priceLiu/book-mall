@@ -55,10 +55,10 @@ export function storyBottomAlignedY(
 export function storyMediaColumnY(
   originY: number,
   rowBottom: number,
-  nodeType: CanvasNodeType,
+  nodeType: CanvasNodeType | string,
 ): number {
-  if (nodeType === "jianying-export") {
+  if (nodeType === "jianying-export" || nodeType === "jianying-export-pro") {
     return originY;
   }
-  return storyBottomAlignedY(rowBottom, nodeType);
+  return storyBottomAlignedY(rowBottom, nodeType as CanvasNodeType);
 }

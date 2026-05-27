@@ -21,6 +21,13 @@ import type {
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import { pickTaskResultMediaUrl } from "./task-media-url";
+import {
+  findStarterByHubId,
+  isAnyStoryCharacterColumnType,
+  isAnyStoryFrameColumnType,
+  isAnyStoryScriptHubType,
+  isAnyStoryVideoColumnType,
+} from "./story-workspace-resolver";
 
 function hubSectionPatchChanged(
   prev: StoryScriptHubNodeData,
@@ -52,7 +59,7 @@ export function storyRunPendingPatch(
   node: CanvasFlowNode,
   ctx?: StoryRunContext,
 ): Record<string, unknown> | null {
-  if (node.type === "story-script-hub" && ctx?.llmSection) {
+  if (isAnyStoryScriptHubType(node.type ?? "") && ctx?.llmSection) {
     const rt: CanvasNodeRuntime = {
       status: "pending",
       failCode: undefined,
@@ -64,13 +71,15 @@ export function storyRunPendingPatch(
   }
   if (
     (node.type === "story-character-column" ||
-      node.type === "story-frame-column") &&
+      node.type === "story-pro-character" ||
+      node.type === "story-frame-column" ||
+      node.type === "story-pro-frame") &&
     ctx?.rowKey
   ) {
     const rows = (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
       .rows;
     if (!rows) return null;
-    if (node.type === "story-character-column") {
+    if (node.type === "story-character-column" || node.type === "story-pro-character") {
       return {
         rows: applyCharacterRowRuntime(rows as never, ctx.rowKey, {
           status: "pending",
@@ -81,7 +90,7 @@ export function storyRunPendingPatch(
       rows: applyFrameRowRuntime(rows as never, ctx.rowKey, { status: "pending" }),
     };
   }
-  if (node.type === "story-video-column" && ctx?.rowKey && ctx.mediaKind) {
+  if (isAnyStoryVideoColumnType(node.type ?? "") && ctx?.rowKey && ctx.mediaKind) {
     const rows = (node.data as { rows?: { key: string }[] }).rows;
     if (!rows) return null;
     return {
@@ -127,7 +136,7 @@ export function storyApplyTaskResult(
           ? { status: "running", taskId: task.id }
           : { status: "pending", taskId: task.id };
 
-  if (node.type === "story-script-hub" && ctx?.llmSection) {
+  if (isAnyStoryScriptHubType(node.type ?? "") && ctx?.llmSection) {
     if (
       (task.status === "SUBMITTED" || task.status === "PENDING") &&
       hubSectionIsReady(node, ctx.llmSection) &&
@@ -144,7 +153,7 @@ export function storyApplyTaskResult(
     );
     if (!hubSectionPatchChanged(prev, ctx.llmSection, patch)) return;
     updateNodeData(node.id, patch);
-    const starter = allNodes.find((n) => n.type === "story-comic-starter");
+    const starter = findStarterByHubId(allNodes, node.id);
     const ws = (
       starter?.data as {
         workspaceIds?: {
@@ -188,7 +197,7 @@ export function storyApplyTaskResult(
     return;
   }
 
-  if (node.type === "story-character-column" && ctx?.rowKey) {
+  if (isAnyStoryCharacterColumnType(node.type ?? "") && ctx?.rowKey) {
     const rows = (node.data as { rows: { key: string }[] }).rows ?? [];
     const nextRows = applyCharacterRowRuntime(
       rows as never,
@@ -196,7 +205,7 @@ export function storyApplyTaskResult(
       runtime,
     );
     updateNodeData(node.id, { rows: nextRows });
-    const starter = allNodes.find((n) => n.type === "story-comic-starter");
+    const starter = findStarterByHubId(allNodes, node.id);
     const ws = (
       starter?.data as {
         workspaceIds?: {
@@ -237,11 +246,14 @@ export function storyApplyTaskResult(
     return;
   }
 
-  if (node.type === "story-frame-column" && ctx?.rowKey) {
+  if (isAnyStoryFrameColumnType(node.type ?? "") && ctx?.rowKey) {
     const rows = (node.data as { rows: { key: string }[] }).rows ?? [];
     const nextRows = applyFrameRowRuntime(rows as never, ctx.rowKey, runtime);
     updateNodeData(node.id, { rows: nextRows });
-    const starterFrame = allNodes.find((n) => n.type === "story-comic-starter");
+    const starterFrame = findStarterByHubId(
+      allNodes,
+      (node.data as { hubNodeId?: string }).hubNodeId ?? "",
+    );
     const ws = (
       starterFrame?.data as {
         workspaceIds?: {
@@ -282,7 +294,7 @@ export function storyApplyTaskResult(
     return;
   }
 
-  if (node.type === "story-video-column" && ctx?.rowKey && ctx.mediaKind) {
+  if (isAnyStoryVideoColumnType(node.type ?? "") && ctx?.rowKey && ctx.mediaKind) {
     const latest = allNodes.find((n) => n.id === node.id) ?? node;
     const rows = (latest.data as { rows: { key: string }[] }).rows ?? [];
     updateNodeData(node.id, {
@@ -293,7 +305,10 @@ export function storyApplyTaskResult(
         runtime,
       ),
     });
-    const starterVid = allNodes.find((n) => n.type === "story-comic-starter");
+    const starterVid = findStarterByHubId(
+      allNodes,
+      (node.data as { hubNodeId?: string }).hubNodeId ?? "",
+    );
     if (starterVid && runtime.status === "done" && ctx.mediaKind === "tts") {
       updateNodeData(starterVid.id, { pipelineStage: "media_done" });
     }

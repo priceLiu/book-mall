@@ -1,0 +1,25 @@
+---
+description: Canvas / Story / 影视专业版 · Gateway 断直连（强制）
+globs: canvas-web/**/*,book-mall/lib/canvas/**/*,book-mall/lib/story/**/*,book-mall/app/api/canvas/**/*
+alwaysApply: false
+---
+
+# Gateway 断直连（强制）
+
+## 禁止
+
+1. Canvas、Story、**影视专业版（story-pro）** 直连厂商 API（KIE、百炼、DashScope、DeepSeek、混元等）。
+2. 恢复或新增用户自建 Provider；运行期只允许 `gateway:*` / `system:*`（见 `book-mall/lib/canvas/canvas-gateway-run.ts`）。
+3. 在 canvas-web 或 book-mall 内对 vendor 域名做 `fetch` / axios 绕过 Gateway。
+4. Gateway `model-router` 无法路由的模型：**换模型**，不得加直连 fallback。
+
+## 必须
+
+1. LLM / 生图 / 生视频 / TTS 走 `canvas-gateway-client.ts` 或 `story-gateway-client.ts`。
+2. 新 run 入口保留 `assertGatewayApiKeyLinkedForUser`（`run/route.ts` 等）。
+3. 写 Gateway 日志时带 `clientPage`（专业版：`canvas/{projectId}/story-pro`）。
+4. 新模型先查 `book-mall/doc/product/story-gateway-models.md` 与 `model-router.ts`。
+
+## 影视专业版
+
+story-pro 新增能力 **不得** 引入新直连集成；与快手版共用 Gateway 客户端，仅扩展 runner 分支与 prompt 注入。

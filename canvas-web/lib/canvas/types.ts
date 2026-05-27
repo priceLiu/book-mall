@@ -16,6 +16,12 @@ import {
   STORY_VIDEO_ENGINE_PROMPT_DEFAULT,
 } from "./story-prompts";
 import {
+  STORY_PRO_CHARACTER_PROMPT,
+  STORY_PRO_OUTLINE_USER_PROMPT,
+  STORY_PRO_STORYBOARD_PROMPT,
+  STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
+} from "./story-pro-prompts";
+import {
   STORY_CONTROL_NODE_HEIGHT,
   STORY_CONTROL_NODE_WIDTH,
 } from "./story-node-chrome";
@@ -62,6 +68,14 @@ export type CanvasNodeType =
   | "story-character-column"
   | "story-frame-column"
   | "story-video-column"
+  | "story-pro-starter"
+  | "story-pro-script-hub"
+  | "story-pro-style"
+  | "story-pro-character"
+  | "story-pro-scene"
+  | "story-pro-frame"
+  | "story-pro-video"
+  | "jianying-export-pro"
   | "ai-engine"
   | "image-engine"
   | "three-view-engine"
@@ -92,6 +106,14 @@ export type CanvasContentNodeType =
   | "story-character-column"
   | "story-frame-column"
   | "story-video-column"
+  | "story-pro-starter"
+  | "story-pro-script-hub"
+  | "story-pro-style"
+  | "story-pro-character"
+  | "story-pro-scene"
+  | "story-pro-frame"
+  | "story-pro-video"
+  | "jianying-export-pro"
   | "ai-engine"
   | "image-engine"
   | "three-view-engine"
@@ -121,6 +143,14 @@ export const CONTENT_NODE_TYPES: CanvasContentNodeType[] = [
   "story-character-column",
   "story-frame-column",
   "story-video-column",
+  "story-pro-starter",
+  "story-pro-script-hub",
+  "story-pro-style",
+  "story-pro-character",
+  "story-pro-scene",
+  "story-pro-frame",
+  "story-pro-video",
+  "jianying-export-pro",
   "ai-engine",
   "image-engine",
   "three-view-engine",
@@ -493,6 +523,55 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     batchVideo: undefined,
     batchTts: undefined,
   } as Record<string, unknown>,
+  "story-pro-starter": {
+    systemPrompt: STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
+    providerId: "",
+    modelKey: "",
+    params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+    pipelineStage: "idle",
+  } as Record<string, unknown>,
+  "story-pro-script-hub": {
+    outlineMd: "",
+    characterMd: "",
+    storyboardMd: "",
+    providerId: "",
+    modelKey: "",
+    params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+    outlineSystemPrompt: "",
+    promptOutline: STORY_PRO_OUTLINE_USER_PROMPT,
+    promptCharacter: STORY_PRO_CHARACTER_PROMPT,
+    promptStoryboard: STORY_PRO_STORYBOARD_PROMPT,
+    referencedNodeIds: [],
+  } as Record<string, unknown>,
+  "story-pro-style": {
+    styleAnchorZh: "",
+    styleAnchorEn: "",
+    negativePrompt: "",
+    refImages: [],
+    styleFinalized: false,
+    providerId: "",
+    modelKey: "",
+  } as Record<string, unknown>,
+  "story-pro-character": { rows: [], batchImage: undefined } as Record<
+    string,
+    unknown
+  >,
+  "story-pro-scene": { rows: [], batchImage: undefined } as Record<
+    string,
+    unknown
+  >,
+  "story-pro-frame": { rows: [], batchVideo: undefined } as Record<
+    string,
+    unknown
+  >,
+  "story-pro-video": {
+    rows: [],
+    batchVideo: undefined,
+    batchTts: undefined,
+  } as Record<string, unknown>,
+  "jianying-export-pro": {
+    label: "剪映导出 · 专业版",
+  } as Record<string, unknown>,
   "ai-engine": {
     providerId: "",
     modelKey: "",
@@ -618,6 +697,23 @@ export const NODE_DEFAULT_SIZE: Record<
   "story-character-column": { width: 560, height: 2100 },
   "story-frame-column": { width: 1080, height: 2100 },
   "story-video-column": { width: 500, height: 2100 },
+  "story-pro-starter": {
+    width: STORY_CONTROL_NODE_WIDTH,
+    height: STORY_CONTROL_NODE_HEIGHT,
+  },
+  "story-pro-script-hub": {
+    width: STORY_CONTROL_NODE_WIDTH,
+    height: STORY_CONTROL_NODE_HEIGHT,
+  },
+  "story-pro-style": {
+    width: STORY_CONTROL_NODE_WIDTH,
+    height: STORY_CONTROL_NODE_HEIGHT + 80,
+  },
+  "story-pro-character": { width: 560, height: 2100 },
+  "story-pro-scene": { width: 480, height: 2100 },
+  "story-pro-frame": { width: 1080, height: 2100 },
+  "story-pro-video": { width: 500, height: 2100 },
+  "jianying-export-pro": { width: 400, height: 280 },
   "ai-engine": { width: 480, height: 540 },
   "image-engine": { width: 380, height: 560 },
   "three-view-engine": { width: 670, height: 880 },
@@ -667,6 +763,14 @@ export const NODE_OUTPUT_KIND: Record<
   "story-character-column": "image",
   "story-frame-column": "image",
   "story-video-column": "video",
+  "story-pro-starter": "text",
+  "story-pro-script-hub": "text",
+  "story-pro-style": "text",
+  "story-pro-character": "image",
+  "story-pro-scene": "image",
+  "story-pro-frame": "image",
+  "story-pro-video": "video",
+  "jianying-export-pro": "none",
   "ai-engine": "text",
   "image-engine": "image",
   "three-view-engine": "image",
@@ -700,6 +804,12 @@ export function isRunnableNodeType(t: CanvasNodeType): boolean {
     t === "story-character-column" ||
     t === "story-frame-column" ||
     t === "story-video-column" ||
+    t === "story-pro-script-hub" ||
+    t === "story-pro-style" ||
+    t === "story-pro-character" ||
+    t === "story-pro-scene" ||
+    t === "story-pro-frame" ||
+    t === "story-pro-video" ||
     t === "video-engine" ||
     t === "ai-video-engine" ||
     t === "tts-engine"
@@ -711,7 +821,26 @@ export function isStoryWorkspaceNodeType(t: string): boolean {
     t === "story-script-hub" ||
     t === "story-character-column" ||
     t === "story-frame-column" ||
-    t === "story-video-column"
+    t === "story-video-column" ||
+    t === "story-pro-script-hub" ||
+    t === "story-pro-style" ||
+    t === "story-pro-character" ||
+    t === "story-pro-scene" ||
+    t === "story-pro-frame" ||
+    t === "story-pro-video"
+  );
+}
+
+export function isStoryProPipelineNode(t: string): boolean {
+  return (
+    t === "story-pro-starter" ||
+    t === "story-pro-script-hub" ||
+    t === "story-pro-style" ||
+    t === "story-pro-character" ||
+    t === "story-pro-scene" ||
+    t === "story-pro-frame" ||
+    t === "story-pro-video" ||
+    t === "jianying-export-pro"
   );
 }
 

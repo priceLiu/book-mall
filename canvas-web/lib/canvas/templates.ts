@@ -15,6 +15,12 @@ import {
   STORY_THEME_SYSTEM_PROMPT_DEFAULT,
 } from "./story-prompts";
 import {
+  STORY_PRO_CHARACTER_PROMPT,
+  STORY_PRO_OUTLINE_USER_PROMPT,
+  STORY_PRO_STORYBOARD_PROMPT,
+  STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
+} from "./story-pro-prompts";
+import {
   AI_ENGINE_PROMPT_TEMPLATE,
   CANVAS_SCHEMA_VERSION,
   type CanvasGraph,
@@ -377,6 +383,52 @@ const STORY_COMIC_PIPELINE: CanvasGraph = {
   ],
 };
 
+/** 影视专业版：启动 + 故事剧本；风格/媒体列由定稿流程创建 */
+const STORY_PRO_PIPELINE: CanvasGraph = {
+  schemaVersion: CANVAS_SCHEMA_VERSION,
+  viewport: { x: 0, y: 0, zoom: 0.75 },
+  nodes: [
+    {
+      id: "sp-starter",
+      type: "story-pro-starter",
+      position: col(0, 120),
+      data: {
+        systemPrompt: STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
+        providerId: "",
+        modelKey: "",
+        params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+        pipelineStage: "idle",
+      },
+    },
+    {
+      id: "sp-hub",
+      type: "story-pro-script-hub",
+      position: col(1, 120),
+      data: {
+        outlineMd: "",
+        characterMd: "",
+        storyboardMd: "",
+        providerId: "",
+        modelKey: "",
+        params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+        outlineSystemPrompt: STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
+        promptOutline: STORY_PRO_OUTLINE_USER_PROMPT,
+        promptCharacter: STORY_PRO_CHARACTER_PROMPT,
+        promptStoryboard: STORY_PRO_STORYBOARD_PROMPT,
+      },
+    },
+  ],
+  edges: [
+    {
+      id: "sp-e1",
+      source: "sp-starter",
+      target: "sp-hub",
+      sourceHandle: "text",
+      targetHandle: "in_text",
+    },
+  ],
+};
+
 export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
   {
     id: "builtin/product-poster",
@@ -407,6 +459,14 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     description:
       "创意 → 创作剧本（漫剧文案）→ 弹出层审阅大纲/角色/分镜/对白；媒体列后续添加。",
     canvas: STORY_COMIC_PIPELINE,
+  },
+  {
+    id: "builtin/story-pro-pipeline",
+    category: "builtin",
+    name: "影视专业版",
+    description:
+      "五阶段 SOP：故事定稿 → 风格锚定 → 人物/场景/分镜/视频；与快手版完全隔离。",
+    canvas: STORY_PRO_PIPELINE,
   },
 ];
 

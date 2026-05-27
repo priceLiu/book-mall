@@ -1,5 +1,6 @@
 "use client";
 
+import type { StoryProRunContext } from "./story-pro-workspace-types";
 import type { StoryRunContext } from "./story-workspace-types";
 
 /** 画布节点运行总线：避免 CustomEvent 在部分时序下未被 runner 接收。 */
@@ -9,7 +10,7 @@ export type CanvasRunSequentialOpts = { forceFresh?: boolean };
 export type CanvasStoryRunJob = {
   nodeId: string;
   forceFresh?: boolean;
-} & StoryRunContext;
+} & (StoryRunContext | StoryProRunContext);
 
 type CanvasRunBusHandlers = {
   enqueueNode: (nodeId: string, forceFresh?: boolean) => void;

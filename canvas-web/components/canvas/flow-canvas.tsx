@@ -38,6 +38,11 @@ import { AudioPreviewNode } from "./nodes/audio-preview-node";
 import { ImagePreviewNode } from "./nodes/image-preview-node";
 import { VideoPreviewNode } from "./nodes/video-preview-node";
 import { JianyingExportNode } from "./nodes/jianying-export-node";
+import { StoryProStarterNode } from "./nodes/story-pro-starter-node";
+import { StoryProScriptHubNode } from "./nodes/story-pro-script-hub-node";
+import { StoryProStyleNode } from "./nodes/story-pro-style-node";
+import { StoryProSceneColumnNode } from "./nodes/story-pro-scene-column-node";
+import { JianyingExportProNode } from "./nodes/jianying-export-pro-node";
 import { RefImageGridNode } from "./nodes/ref-image-grid-node";
 import { AiVideoEngineNode } from "./nodes/ai-video-engine-node";
 import { VideoGenerateNode } from "./nodes/video-generate-node";
@@ -71,6 +76,14 @@ const nodeTypes = {
   "video-preview": VideoPreviewNode,
   "image-preview": ImagePreviewNode,
   "jianying-export": JianyingExportNode,
+  "story-pro-starter": StoryProStarterNode,
+  "story-pro-script-hub": StoryProScriptHubNode,
+  "story-pro-style": StoryProStyleNode,
+  "story-pro-scene": StoryProSceneColumnNode,
+  "story-pro-character": StoryCharacterColumnNode,
+  "story-pro-frame": StoryFrameColumnNode,
+  "story-pro-video": StoryVideoColumnNode,
+  "jianying-export-pro": JianyingExportProNode,
   output: OutputNode,
   group: GroupNode,
 } as const;
