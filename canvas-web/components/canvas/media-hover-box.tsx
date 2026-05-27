@@ -360,7 +360,6 @@ export function MediaPreviewLightbox({
                 <CanvasVideoPlayer
                   src={src}
                   autoPlay
-                  persistentControls
                   className="max-h-[calc(100dvh-72px)] w-[min(98vw,960px)]"
                 />
               ) : (

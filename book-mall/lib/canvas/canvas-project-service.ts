@@ -13,7 +13,9 @@ export class CanvasProjectError extends Error {
       | "TOO_MANY_INFLIGHT"
       | "TASK_ALREADY_INFLIGHT"
       | "EMPTY_PROMPT"
-      | "MODEL_NOT_AVAILABLE",
+      | "MODEL_NOT_AVAILABLE"
+      | "PROVIDER_KEYS_REQUIRED"
+      | "GATEWAY_KEY_REQUIRED",
     message: string,
     public httpStatus = 400,
   ) {

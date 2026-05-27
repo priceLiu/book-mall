@@ -42,3 +42,14 @@
 ## 4.8 帮助与反馈
 
 FAQ（权限、计费、**提现与应扣未扣**）、意见反馈、客服入口。
+
+## 4.9 Gateway API Key（Canvas）
+
+Canvas AI 生成经 **Gateway 代理**；厂商 Key 不在 Book 保存。
+
+1. **进入 Gateway**：个人中心 **Gateway API Key** 卡片 → **「用 Book 账号打开 Gateway」**（SSO；或 Gateway 登录页「使用 Book 账号登录」）。  
+2. **Gateway 内**：绑定厂商凭证 → 创建 `sk-gw-...`。  
+3. **回到 Book**：同一卡片粘贴 sk-gw 验证关联。  
+4. **用量**：Gateway 控制台「用量 / 日志」；Book 本卡片仅显示关联状态与前缀。  
+
+详细说明见 [gateway-user-guide.md](./gateway-user-guide.md)。

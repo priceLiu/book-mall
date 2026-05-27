@@ -235,8 +235,16 @@ function resolveTextInputs(
  * 运行队列 + 5s 任务轮询 hook。
  * 在 canvas page 挂载一次即可。
  */
-export function useCanvasRunner(fallbackProjectId?: string) {
+export function useCanvasRunner(
+  fallbackProjectId?: string,
+  opts?: {
+    gatewayLinkBlocked?: boolean;
+    gatewayLinkAccountUrl?: string | null;
+  },
+) {
   const base = useBookMallBaseUrl();
+  const gatewayLinkBlocked = opts?.gatewayLinkBlocked ?? false;
+  const gatewayLinkAccountUrl = opts?.gatewayLinkAccountUrl ?? null;
   const storeProjectId = useCanvasStore((s) => s.projectId);
   const projectId = storeProjectId ?? fallbackProjectId ?? null;
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
@@ -684,6 +692,19 @@ export function useCanvasRunner(fallbackProjectId?: string) {
 
   const enqueueStoryRun = useCallback(
     (job: QueueItem) => {
+      if (gatewayLinkBlocked) {
+        const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
+        if (node) {
+          setNodeRuntime(job.nodeId, {
+            status: "error",
+            failCode: "GATEWAY_KEY_REQUIRED",
+            failMessage: gatewayLinkAccountUrl
+              ? `请先在 Book 个人中心关联 Gateway API Key：${gatewayLinkAccountUrl}`
+              : "请先在 Book 个人中心关联 Gateway API Key",
+          });
+        }
+        return;
+      }
       const key = runKey(job);
       if (job.forceFresh) {
         inflightRef.current.delete(key);
@@ -717,7 +738,7 @@ export function useCanvasRunner(fallbackProjectId?: string) {
       queueRef.current.push(job);
       drain();
     },
-    [drain, setNodeRuntime, updateNodeData],
+    [drain, setNodeRuntime, updateNodeData, gatewayLinkAccountUrl, gatewayLinkBlocked],
   );
 
   const enqueueNode = useCallback(
@@ -1116,7 +1137,15 @@ export function useCanvasRunner(fallbackProjectId?: string) {
 }
 
 /** 独立挂载，避免与页面其它 hooks 热更新时顺序错乱。 */
-export function CanvasRunnerHost({ projectId }: { projectId: string }) {
-  useCanvasRunner(projectId);
+export function CanvasRunnerHost({
+  projectId,
+  gatewayLinkBlocked,
+  gatewayLinkAccountUrl,
+}: {
+  projectId: string;
+  gatewayLinkBlocked?: boolean;
+  gatewayLinkAccountUrl?: string | null;
+}) {
+  useCanvasRunner(projectId, { gatewayLinkBlocked, gatewayLinkAccountUrl });
   return null;
 }

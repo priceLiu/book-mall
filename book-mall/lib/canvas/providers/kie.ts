@@ -6,9 +6,9 @@
  */
 
 import {
-  createKieTask,
+  createKieTaskWithKey,
   extractKieResultUrl,
-  getKieTask,
+  getKieTaskWithKey,
   KieError,
   type KieAspectRatio,
   type KieImageInput,
@@ -822,7 +822,7 @@ export class KieGateway implements CanvasProviderGateway {
     });
 
     try {
-      const { taskId } = await createKieTask({
+      const { taskId } = await createKieTaskWithKey(this.apiKey, {
         model,
         input: input as KieImageInput,
         callBackUrl: req.callBackUrl ?? null,
@@ -848,7 +848,7 @@ export class KieGateway implements CanvasProviderGateway {
     _opts?: { modelKey?: string },
   ): Promise<CanvasGatewayPollResult> {
     try {
-      const record = await getKieTask(taskId);
+      const record = await getKieTaskWithKey(this.apiKey, taskId);
       if (record.state === "success") {
         const url = extractKieResultUrl(record);
         return {

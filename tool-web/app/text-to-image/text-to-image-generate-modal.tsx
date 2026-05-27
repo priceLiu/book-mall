@@ -80,6 +80,7 @@ export function TextToImageGenerateModal({
   const settleTaskIdRef = useRef<string | null>(null);
   /** v003：start 返回的 WalletHold.id；attemptSettle 时连同 taskId 一起传给 /api/text-to-image/settle。 */
   const settleHoldIdRef = useRef<string | null>(null);
+  const settleGatewayLogIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -155,6 +156,7 @@ export function TextToImageGenerateModal({
       setSettleNeedsRetry(false);
       settleTaskIdRef.current = null;
       settleHoldIdRef.current = null;
+      settleGatewayLogIdRef.current = null;
       setPreviewUrl(null);
       setSaveToast(null);
     }
@@ -174,12 +176,14 @@ export function TextToImageGenerateModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onOpenChange, previewUrl]);
 
-  const pollUntilDone = useCallback(async (taskId: string): Promise<TaskOutput | null> => {
+  const pollUntilDone = useCallback(async (taskId: string, gatewayLogId?: string): Promise<TaskOutput | null> => {
     abortPollRef.current = false;
     for (let i = 0; i < MAX_POLLS; i++) {
       if (abortPollRef.current) return null;
+      const qs = new URLSearchParams({ id: taskId });
+      if (gatewayLogId) qs.set("gatewayLogId", gatewayLogId);
       const r = await fetch(
-        `/api/text-to-image/task?id=${encodeURIComponent(taskId)}`,
+        `/api/text-to-image/task?${qs}`,
         { cache: "no-store", credentials: "same-origin" },
       );
       const data = (await r.json()) as { output?: TaskOutput; error?: string };
@@ -200,11 +204,16 @@ export function TextToImageGenerateModal({
   const attemptSettle = useCallback(async (taskId: string) => {
     const runOnce = async () => {
       const holdId = settleHoldIdRef.current?.trim() || undefined;
+      const gatewayLogId = settleGatewayLogIdRef.current?.trim() || undefined;
       const settleR = await fetch("/api/text-to-image/settle", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId, ...(holdId ? { holdId } : {}) }),
+        body: JSON.stringify({
+          taskId,
+          ...(holdId ? { holdId } : {}),
+          ...(gatewayLogId ? { gatewayLogId } : {}),
+        }),
       });
       const settleJson = (await settleR.json().catch(() => ({}))) as Record<
         string,
@@ -332,6 +341,7 @@ export function TextToImageGenerateModal({
       const startJson = (await startR.json()) as {
         taskId?: string;
         holdId?: string | null;
+        gatewayLogId?: string;
         error?: string;
       };
       if (!startR.ok) {
@@ -345,8 +355,12 @@ export function TextToImageGenerateModal({
         typeof startJson.holdId === "string" && startJson.holdId.trim().length > 0
           ? startJson.holdId.trim()
           : null;
+      settleGatewayLogIdRef.current =
+        typeof startJson.gatewayLogId === "string" && startJson.gatewayLogId.trim().length > 0
+          ? startJson.gatewayLogId.trim()
+          : null;
 
-      const output = await pollUntilDone(taskId);
+      const output = await pollUntilDone(taskId, settleGatewayLogIdRef.current ?? undefined);
       if (!output || abortPollRef.current) return;
 
       const urls = (output.results ?? [])

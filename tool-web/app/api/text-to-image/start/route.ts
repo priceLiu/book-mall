@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
-import { getQwenApiKey } from "@/lib/qwen-env";
-import { wanxCreateTextToImageTask } from "@/lib/text-to-image-dashscope";
+import { createDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
+import { WANX_TEXT2IMAGE_PLUS_MODEL } from "@/lib/text-to-image-dashscope";
 import {
   reserveWalletHoldFromServer,
   releaseWalletHoldFromServer,
@@ -76,14 +76,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });
   }
 
-  const apiKey = getQwenApiKey();
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "服务端未配置 QWEN_API_KEY 或 DASHSCOPE_API_KEY，无法调用通义文生图" },
-      { status: 503 },
-    );
-  }
-
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -115,22 +107,31 @@ export async function POST(req: Request) {
     return NextResponse.json(reserved.data, { status: reserved.status });
   }
 
-  const created = await wanxCreateTextToImageTask({
-    apiKey,
+  const created = await createDashscopeJobFromServer({
+    kind: "wanx",
+    model: WANX_TEXT2IMAGE_PLUS_MODEL,
     prompt,
     negativePrompt,
     n,
+    clientPage: "text-to-image",
   });
 
   if (!created.ok) {
     if (reserved.holdId) {
       await releaseWalletHoldFromServer({
         holdId: reserved.holdId,
-        reason: `tti_create_failed:${created.error.slice(0, 100)}`,
+        reason: `tti_create_failed:${(created.error ?? "gateway").slice(0, 100)}`,
       });
     }
-    return NextResponse.json({ error: created.error }, { status: 502 });
+    return NextResponse.json(
+      { error: created.error ?? "Gateway 调用失败", code: created.status === 403 ? "GATEWAY_KEY_REQUIRED" : undefined },
+      { status: created.status ?? 502 },
+    );
   }
 
-  return NextResponse.json({ taskId: created.taskId, holdId: reserved.holdId });
+  return NextResponse.json({
+    taskId: created.taskId,
+    gatewayLogId: created.logId,
+    holdId: reserved.holdId,
+  });
 }

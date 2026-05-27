@@ -3,7 +3,7 @@ import {
   corsOptionsResponse,
   jsonHeaders,
   readJsonBody,
-  requireSessionUser,
+  requireStoryGatewayUser,
   storyErrorToResponse,
 } from "@/lib/story/api-helpers";
 import {
@@ -25,7 +25,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest, ctx: RouteCtx) {
-  const guard = await requireSessionUser(request);
+  const guard = await requireStoryGatewayUser(request);
   if (!guard.ok) return guard.response;
 
   const { id } = await ctx.params;

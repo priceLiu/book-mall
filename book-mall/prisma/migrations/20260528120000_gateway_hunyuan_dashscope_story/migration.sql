@@ -1,0 +1,11 @@
+-- Gateway 扩展：HUNYUAN / DASHSCOPE 厂商；TTS / TRYON 请求类型；TOOL 来源；Story gatewayLogId
+
+ALTER TYPE "GatewayProviderKind" ADD VALUE IF NOT EXISTS 'HUNYUAN';
+ALTER TYPE "GatewayProviderKind" ADD VALUE IF NOT EXISTS 'DASHSCOPE';
+
+ALTER TYPE "GatewayRequestKind" ADD VALUE IF NOT EXISTS 'TTS';
+ALTER TYPE "GatewayRequestKind" ADD VALUE IF NOT EXISTS 'TRYON';
+
+ALTER TYPE "GatewayClientSource" ADD VALUE IF NOT EXISTS 'TOOL';
+
+ALTER TABLE "StoryGenerationTask" ADD COLUMN IF NOT EXISTS "gatewayLogId" TEXT;

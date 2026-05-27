@@ -1,0 +1,104 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { resolveGatewayApiKeyFromBearer } from "@/lib/gateway/api-key-service";
+import {
+  createRequestLog,
+  finalizeRequestLog,
+  forwardChatCompletions,
+  parseOpenAiUsage,
+  pickCredentialForKind,
+} from "@/lib/gateway/proxy-common";
+import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
+import { buildGatewayChatResultSummary } from "@/lib/gateway/log-result-summary";
+import { routeGatewayModel } from "@/lib/gateway/model-router";
+import { runGatewayPollWorker } from "@/lib/gateway/poll-service";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(request: NextRequest) {
+  try {
+    await runGatewayPollWorker({ limit: 3 });
+  } catch {
+    /* opportunistic */
+  }
+
+  const auth = await resolveGatewayApiKeyFromBearer(
+    request.headers.get("authorization"),
+  );
+  if (!auth) {
+    return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const model = typeof body.model === "string" ? body.model : "";
+  if (!model) {
+    return NextResponse.json({ error: "model required" }, { status: 400 });
+  }
+
+  const route = routeGatewayModel(model);
+  const credentialId = pickCredentialForKind(auth.credentials, route.providerKind);
+  if (!credentialId) {
+    return NextResponse.json(
+      { error: `No ${route.providerKind} credential bound to this API key` },
+      { status: 400 },
+    );
+  }
+
+  const clientSource =
+    request.headers.get("x-gateway-client")?.toUpperCase() === "STORY"
+      ? "STORY"
+      : request.headers.get("x-gateway-client")?.toUpperCase() === "CANVAS"
+        ? "CANVAS"
+        : "EXTERNAL";
+
+  const { model: _modelField, ...restBody } = body;
+  const log = await createRequestLog({
+    userId: auth.userId,
+    apiKeyId: auth.id,
+    credentialId,
+    model,
+    endpoint: "/v1/chat/completions",
+    clientSource: clientSource as "EXTERNAL" | "STORY" | "CANVAS",
+    inputSummary: buildGatewayInputSummary(model, restBody),
+  });
+
+  try {
+    const result = await forwardChatCompletions({
+      credentialId,
+      providerKind: route.providerKind,
+      body,
+    });
+    let parsed: unknown = null;
+    try {
+      parsed = result.text ? JSON.parse(result.text) : null;
+    } catch {
+      parsed = null;
+    }
+    const usage = parseOpenAiUsage(parsed);
+    await finalizeRequestLog(log.id, {
+      status: result.status >= 200 && result.status < 300 ? "SUCCEEDED" : "FAILED",
+      durationMs: result.durationMs,
+      usage,
+      resultSummary: buildGatewayChatResultSummary(parsed) ?? undefined,
+      failMessage: result.status >= 300 ? result.text.slice(0, 500) : undefined,
+      model,
+    });
+    return new NextResponse(result.text, {
+      status: result.status,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: 0,
+      failMessage: (e as Error).message,
+      model,
+    });
+    return NextResponse.json({ error: (e as Error).message }, { status: 502 });
+  }
+}

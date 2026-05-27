@@ -94,6 +94,8 @@ export async function generateStoryboardForProject(
   const styleHint = style ? `${style.name_cn} · ${style.prompt}` : "";
 
   const llm = await chatJson({
+    userId,
+    storyProjectId: projectId,
     schema: FrameOutputSchema,
     reasoningEffort: "low",
     systemPrompt: [

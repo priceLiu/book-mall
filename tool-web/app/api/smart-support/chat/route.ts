@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
-import OpenAI from "openai";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
-import { getDeepseekApiKey } from "@/lib/deepseek-env";
+import { chatStreamFromGateway } from "@/lib/forward-gateway-chat-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,12 +16,12 @@ const MAX_CONTENT_CHARS = 12000;
 
 type ClientTurn = { role: string; content: unknown };
 
-function sanitizeChatMessages(raw: unknown): OpenAI.Chat.ChatCompletionMessageParam[] {
+function sanitizeChatMessages(raw: unknown): { role: "user" | "assistant"; content: string }[] {
   if (!Array.isArray(raw)) {
     throw new Error("messages_must_be_array");
   }
   const slice = raw.slice(-MAX_MESSAGES);
-  const out: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  const out: { role: "user" | "assistant"; content: string }[] = [];
   for (const item of slice) {
     if (!item || typeof item !== "object") continue;
     const { role, content } = item as ClientTurn;
@@ -50,14 +49,6 @@ export async function POST(req: Request) {
     });
   }
 
-  const apiKey = getDeepseekApiKey();
-  if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: "服务端未配置 DEEPSEEK_API_KEY，无法调用 DeepSeek" }),
-      { status: 503, headers: { "Content-Type": "application/json" } },
-    );
-  }
-
   let body: { messages?: unknown };
   try {
     body = (await req.json()) as { messages?: unknown };
@@ -68,7 +59,7 @@ export async function POST(req: Request) {
     });
   }
 
-  let userAssistantTurns: OpenAI.Chat.ChatCompletionMessageParam[];
+  let userAssistantTurns: { role: "user" | "assistant"; content: string }[];
   try {
     userAssistantTurns = sanitizeChatMessages(body.messages);
   } catch (e) {
@@ -87,7 +78,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const lastTurn = userAssistantTurns[userAssistantTurns.length - 1];
+  const lastTurn = userAssistantTurns[userAssistantTurns.length - 1]!;
   if (lastTurn.role !== "user") {
     return new Response(JSON.stringify({ error: "最后一条消息须为用户提问" }), {
       status: 400,
@@ -95,46 +86,76 @@ export async function POST(req: Request) {
     });
   }
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: SMART_SUPPORT_SYSTEM_PROMPT },
-    ...userAssistantTurns,
-  ];
-
-  const client = new OpenAI({
-    baseURL: "https://api.deepseek.com",
-    apiKey,
+  const gw = await chatStreamFromGateway({
+    model: "deepseek-chat",
+    messages: [
+      { role: "system", content: SMART_SUPPORT_SYSTEM_PROMPT },
+      ...userAssistantTurns,
+    ],
+    clientPage: "smart-support/chat",
   });
 
-  let stream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
-  try {
-    stream = await client.chat.completions.create({
-      model: "deepseek-chat",
-      messages,
-      stream: true,
-    });
-  } catch (e) {
+  if (!gw.ok) {
     const message =
-      e && typeof e === "object" && "message" in e && typeof (e as Error).message === "string"
-        ? (e as Error).message
-        : "upstream_error";
-    return new Response(JSON.stringify({ error: message }), {
+      gw.reason === "no_session"
+        ? "请先登录工具站"
+        : gw.reason === "no_origin"
+          ? "工具站未配置 MAIN_SITE_ORIGIN"
+          : gw.error ?? "Gateway 调用失败";
+    const status = gw.status === 403 ? 403 : 503;
+    return new Response(
+      JSON.stringify({
+        error: gw.status === 403 ? "gateway_key_required" : "gateway_error",
+        message,
+        code: gw.status === 403 ? "GATEWAY_KEY_REQUIRED" : undefined,
+      }),
+      { status, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const upstream = gw.response;
+  if (!upstream.body) {
+    return new Response(JSON.stringify({ error: "upstream_empty" }), {
       status: 502,
       headers: { "Content-Type": "application/json" },
     });
   }
 
   const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
 
   const readable = new ReadableStream({
     async start(controller) {
+      const reader = upstream.body!.getReader();
+      let sseBuffer = "";
       try {
-        for await (const chunk of stream) {
-          const piece = chunk.choices[0]?.delta?.content ?? "";
-          if (piece) controller.enqueue(encoder.encode(piece));
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          sseBuffer += decoder.decode(value, { stream: true });
+          const lines = sseBuffer.split("\n");
+          sseBuffer = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const payload = trimmed.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            try {
+              const chunk = JSON.parse(payload) as {
+                choices?: { delta?: { content?: string | null } }[];
+              };
+              const piece = chunk.choices?.[0]?.delta?.content ?? "";
+              if (piece) controller.enqueue(encoder.encode(piece));
+            } catch {
+              /* ignore */
+            }
+          }
         }
         controller.close();
       } catch (err) {
         controller.error(err);
+      } finally {
+        reader.releaseLock();
       }
     },
   });

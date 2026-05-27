@@ -82,9 +82,12 @@ export type CreateKieTaskArgs = {
   callBackUrl?: string | null;
 };
 
-export async function createKieTask(args: CreateKieTaskArgs): Promise<{ taskId: string }> {
-  const apiKey = getApiKey();
-  const url = `${getBase()}/api/v1/jobs/createTask`;
+async function createKieTaskWithApiKey(
+  apiKey: string,
+  base: string,
+  args: CreateKieTaskArgs,
+): Promise<{ taskId: string }> {
+  const url = `${base.replace(/\/$/, "")}/api/v1/jobs/createTask`;
   const body: Record<string, unknown> = { model: args.model, input: args.input };
   if (args.callBackUrl) body.callBackUrl = args.callBackUrl;
 
@@ -110,7 +113,6 @@ export async function createKieTask(args: CreateKieTaskArgs): Promise<{ taskId: 
       502,
     );
   }
-  // KIE 标准响应：{ code: 200, data: { taskId } }
   const code = (json as { code?: number })?.code;
   if (code !== 200) {
     const msg = (json as { msg?: string })?.msg ?? text;
@@ -132,9 +134,26 @@ export async function createKieTask(args: CreateKieTaskArgs): Promise<{ taskId: 
   return { taskId };
 }
 
-export async function getKieTask(taskId: string): Promise<KieRecordResponse> {
-  const apiKey = getApiKey();
-  const url = `${getBase()}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`;
+export async function createKieTaskWithKey(
+  apiKey: string,
+  args: CreateKieTaskArgs,
+  baseUrl?: string,
+): Promise<{ taskId: string }> {
+  const base = baseUrl?.trim() || getBase();
+  return createKieTaskWithApiKey(apiKey, base, args);
+}
+
+/** @deprecated Story 主路径请使用 story-gateway-client；保留供 KIE callback / 兼容 */
+export async function createKieTask(args: CreateKieTaskArgs): Promise<{ taskId: string }> {
+  return createKieTaskWithApiKey(getApiKey(), getBase(), args);
+}
+
+async function getKieTaskWithApiKey(
+  apiKey: string,
+  base: string,
+  taskId: string,
+): Promise<KieRecordResponse> {
+  const url = `${base.replace(/\/$/, "")}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`;
   const r = await fetch(url, {
     method: "GET",
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -180,6 +199,19 @@ export async function getKieTask(taskId: string): Promise<KieRecordResponse> {
     );
   }
   return data;
+}
+
+export async function getKieTaskWithKey(
+  apiKey: string,
+  taskId: string,
+  baseUrl?: string,
+): Promise<KieRecordResponse> {
+  const base = baseUrl?.trim() || getBase();
+  return getKieTaskWithApiKey(apiKey, base, taskId);
+}
+
+export async function getKieTask(taskId: string): Promise<KieRecordResponse> {
+  return getKieTaskWithKey(getApiKey(), taskId);
 }
 
 /**

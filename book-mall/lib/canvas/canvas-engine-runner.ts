@@ -16,7 +16,6 @@ import { createHash } from "node:crypto";
 import type {
   CanvasGenerationTask,
   Prisma,
-  CanvasProviderKind,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -26,7 +25,6 @@ import {
   getCanvasProjectInflightMax,
   getCanvasUserInflightMax,
 } from "./canvas-constants";
-import { persistCanvasKieResultToOss } from "./canvas-oss";
 import { CanvasProjectError } from "./canvas-project-service";
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
 import {
@@ -34,28 +32,21 @@ import {
   storyScopesConflict,
 } from "./canvas-story-scope";
 import {
-  CanvasGatewayError,
-  buildGatewayConfig,
-  getGatewayForKind,
-} from "./providers";
-import type { CanvasProviderConfig } from "./providers/types";
-import {
-  isSystemProviderId,
-  resolveSystemProvider,
-  SYSTEM_BAILIAN_R2V_PROVIDER_ID,
-} from "./canvas-system-provider";
-import type { CanvasRunNodeInput } from "./canvas-task-service";
-import { createKieTask, type KieVideoInput } from "@/lib/story/kie-client";
-import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
+  canvasGwChat,
+  canvasGwCreateBailianR2vJob,
+  canvasGwCreateHunyuanJob,
+  canvasGwCreateKieJob,
+  canvasGwTts,
+} from "./canvas-gateway-client";
+import { shouldCanvasUseGateway } from "./canvas-gateway-run";
 import { persistCanvasBufferToOss } from "./canvas-oss";
+import type { CanvasRunNodeInput } from "./canvas-task-service";
 import {
-  buildCanvasVideoKieInput,
   buildCanvasRefVideoKieInput,
+  buildCanvasVideoKieInput,
 } from "./canvas-video-kie";
-import {
-  bailianR2vCreateTask,
-  getDashScopeApiKey,
-} from "./canvas-video-bailian-r2v";
+import { buildKieImageCreateArgs } from "./providers/kie";
+import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
 import { BAILIAN_R2V_MODEL_IDS } from "./providers/bailian-r2v";
 import { storyEngineSystemFallback } from "./story-engine-prompts";
 
@@ -193,59 +184,13 @@ async function ensureNoActiveTaskForScope(
   }
 }
 
-/**
- * Provider 解析：兼容用户 Provider 与系统 Provider（共享 KIE Key）。
- *
- * - 系统 Provider：id 以 `system:` 开头；`dbProviderId = null`，task 落库时
- *   `providerId` 写 null（避免 FK 失败），但 `inputHash / inputPayload.providerId`
- *   仍记录 system id 以正确做缓存命中区分。
- * - 用户 Provider：从 DB 加载，必须 active=true 且属于该 user。
- */
-type LoadedProvider = {
-  kind: CanvasProviderKind;
-  config: CanvasProviderConfig;
-  /** 写到 CanvasGenerationTask.providerId 的值（系统 Provider 写 null） */
-  dbProviderId: string | null;
-};
-
-async function loadProviderForUser(
-  userId: string,
-  providerId: string,
-): Promise<LoadedProvider> {
-  if (isSystemProviderId(providerId)) {
-    const sys = resolveSystemProvider(providerId);
-    if (!sys) {
-      throw new CanvasProjectError(
-        "MODEL_NOT_AVAILABLE",
-        `系统 Provider ${providerId} 未启用（请检查 .env 是否配置 DEEPSEEK_API_KEY / KIE_API_KEY / HUNYUAN_3D_API_KEY）`,
-        503,
-      );
-    }
-    return { kind: sys.kind, config: sys.config, dbProviderId: null };
-  }
-  const provider = await prisma.canvasProvider.findFirst({
-    where: { id: providerId, userId, active: true },
-  });
-  if (!provider) {
-    throw new CanvasProjectError(
-      "MODEL_NOT_AVAILABLE",
-      `Provider ${providerId} 不存在或已停用`,
-      404,
-    );
-  }
-  return {
-    kind: provider.kind,
-    config: buildGatewayConfig(provider),
-    dbProviderId: provider.id,
-  };
-}
-
 async function findReusableSucceededTask(args: {
   projectId: string;
   nodeId: string;
   inputHash: string;
+  useGateway?: boolean;
 }): Promise<CanvasGenerationTask | null> {
-  return prisma.canvasGenerationTask.findFirst({
+  const task = await prisma.canvasGenerationTask.findFirst({
     where: {
       projectId: args.projectId,
       nodeId: args.nodeId,
@@ -255,6 +200,17 @@ async function findReusableSucceededTask(args: {
     },
     orderBy: { completedAt: "desc" },
   });
+  if (!task) return null;
+  if (args.useGateway && !taskInputHasGatewayAudit(task)) return null;
+  return task;
+}
+
+function taskInputHasGatewayAudit(task: CanvasGenerationTask): boolean {
+  if (!task.inputPayload || typeof task.inputPayload !== "object") return false;
+  const p = task.inputPayload as Record<string, unknown>;
+  if (p.gatewayLogId) return true;
+  const pid = typeof p.providerId === "string" ? p.providerId : "";
+  return pid.startsWith("gateway:");
 }
 
 export type { CanvasTaskStoryScope } from "./canvas-story-scope";
@@ -268,17 +224,24 @@ export type RunEngineNodeArgs = {
   forceFresh?: boolean;
   /** 漫剧列行 / 文案段，用于同节点多任务区分 */
   storyScope?: CanvasTaskStoryScope;
+  /** Gateway 日志页面来源，如 canvas/{projectId} */
+  clientPage?: string;
 };
 
 export type RunEngineNodeResult =
   | { reused: true; task: CanvasGenerationTask }
   | { reused: false; task: CanvasGenerationTask };
 
+function resolveCanvasClientPage(projectId: string, clientPage?: string): string {
+  return clientPage ?? `canvas/${projectId}`;
+}
+
 /** AI 引擎（LLM）—— 同步出文本。 */
 export async function runAiEngineNode(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const { userId, projectId, nodeId, node } = args;
+  const gwClientPage = resolveCanvasClientPage(projectId, args.clientPage);
   const data = node.data ?? {};
   const providerId = String(data.providerId ?? "");
   const modelKey = String(data.modelKey ?? node.modelKey ?? "");
@@ -299,7 +262,7 @@ export async function runAiEngineNode(
     );
   }
 
-  const provider = await loadProviderForUser(userId, providerId);
+  await shouldCanvasUseGateway(userId, providerId, modelKey);
 
   // 上游图片不传给 LLM（LLM 通常仅文本入）；但 imageInputs 仍参与 hash，避免缓存错配
   const imageUrls = (node.imageInputs ?? []).filter(
@@ -318,6 +281,7 @@ export async function runAiEngineNode(
       projectId,
       nodeId,
       inputHash,
+      useGateway: true,
     });
     if (reusable) return { reused: true, task: reusable };
   }
@@ -332,7 +296,7 @@ export async function runAiEngineNode(
       nodeId,
       kind: "TEXT",
       model: modelKey,
-      providerId: provider.dbProviderId,
+      providerId: null,
       inputHash,
       inputPayload: {
         kind: "ai-engine",
@@ -351,15 +315,10 @@ export async function runAiEngineNode(
 
   // 同步调 LLM
   try {
-    const gateway = getGatewayForKind(provider.kind, provider.config);
-
-    // 默认设计方案 system prompt：当用户的 prompt 太"轻量"（没有自带"系统任务"段时），
-    // 注入这个商业级公共指令。这样用户只需要连接产品图 + 风格图 + 参数文本即可一键出方案。
     const hasSelfSystem =
       /【系统任务】|【强制运算逻辑】|^system\s*[:：]/im.test(promptRaw);
     const systemPrompt = hasSelfSystem ? null : CANVAS_DESIGN_PLAN_SYSTEM_PROMPT;
 
-    // 多模态 user content：把上游 imageUrls 作为 image_url part 传给 LLM
     const userContent: (
       | { type: "text"; text: string }
       | { type: "image_url"; image_url: { url: string } }
@@ -379,10 +338,16 @@ export async function runAiEngineNode(
       role: "user",
       content:
         userContent.length === 1 && userContent[0].type === "text"
-          ? userContent[0].text // 无图时退化为纯文本，更省 tokens
+          ? userContent[0].text
           : userContent,
     });
-    const resp = await gateway.chat({ modelKey, messages, params });
+
+    const resp = await canvasGwChat(userId, {
+      modelKey,
+      messages,
+      params,
+      clientPage: gwClientPage,
+    });
     const text = resp.text;
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
@@ -392,6 +357,16 @@ export async function runAiEngineNode(
         resultPayload: (resp.rawPayload ?? null) as
           | Prisma.InputJsonValue
           | undefined,
+        inputPayload: {
+          kind: "ai-engine",
+          prompt: clipPrompt(expandedPrompt),
+          params,
+          providerId,
+          modelKey,
+          imageUrls,
+          textInputs: node.textInputs ?? [],
+          gatewayLogId: resp.logId,
+        } as Prisma.InputJsonValue,
         submittedAt: new Date(),
         completedAt: new Date(),
       },
@@ -399,8 +374,7 @@ export async function runAiEngineNode(
     return { reused: false, task: updated };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    const code =
-      e instanceof CanvasGatewayError ? e.code : "AI_ENGINE_FAILED";
+    const code = "AI_ENGINE_FAILED";
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
       data: {
@@ -419,6 +393,7 @@ export async function runImageEngineNode(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const { userId, projectId, nodeId, node } = args;
+  const gwClientPage = resolveCanvasClientPage(projectId, args.clientPage);
   const data = node.data ?? {};
   const providerId = String(data.providerId ?? "");
   const modelKey = String(data.modelKey ?? node.modelKey ?? "");
@@ -461,7 +436,9 @@ export async function runImageEngineNode(
     .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u))
     .slice(0, 8);
 
-  const provider = await loadProviderForUser(userId, providerId);
+  const isHunyuan =
+    modelKey === "hunyuan-3d-pro" || modelKey === "hunyuan-3d-express";
+  await shouldCanvasUseGateway(userId, providerId, modelKey);
 
   const inputHash = computeInputHash({
     modelKey,
@@ -476,6 +453,7 @@ export async function runImageEngineNode(
       projectId,
       nodeId,
       inputHash,
+      useGateway: true,
     });
     if (reusable) return { reused: true, task: reusable };
   }
@@ -490,7 +468,7 @@ export async function runImageEngineNode(
       nodeId,
       kind: "IMAGE",
       model: modelKey,
-      providerId: provider.dbProviderId,
+      providerId: null,
       inputHash,
       inputPayload: {
         kind: engineKind,
@@ -505,85 +483,76 @@ export async function runImageEngineNode(
     },
   });
 
-  const gateway = getGatewayForKind(provider.kind, provider.config);
-  const callBackUrl =
-    provider.kind === "KIE"
-      ? buildCanvasAiKieCallbackUrl("image", created.id)
-      : null;
+  const callBackUrl = buildCanvasAiKieCallbackUrl("image", created.id);
 
   try {
-    const result = await gateway.createImageTask({
-      modelKey,
-      prompt: clipPrompt(expandedPrompt),
-      imageUrls,
-      params,
-      callBackUrl,
-    });
+      if (isHunyuan) {
+        const job = await canvasGwCreateHunyuanJob(userId, {
+          model: modelKey,
+          prompt: clipPrompt(expandedPrompt),
+          imageUrls,
+          params,
+          clientPage: gwClientPage,
+        });
+        const updated = await prisma.canvasGenerationTask.update({
+          where: { id: created.id },
+          data: {
+            status: "SUBMITTED",
+            kieTaskId: job.taskId,
+            submittedAt: new Date(),
+            inputPayload: {
+              kind: engineKind,
+              prompt: clipPrompt(expandedPrompt),
+              params,
+              providerId,
+              modelKey,
+              imageUrls,
+              gatewayLogId: job.logId,
+              providerKind: "HUNYUAN",
+              ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+            } as Prisma.InputJsonValue,
+          },
+        });
+        return { reused: false, task: updated };
+      }
 
-    if (result.mode === "async") {
+      const { model, input } = buildKieImageCreateArgs({
+        modelKey,
+        prompt: clipPrompt(expandedPrompt),
+        imageUrls,
+        params,
+      });
+      const job = await canvasGwCreateKieJob(userId, {
+        model,
+        input: input as Record<string, unknown>,
+        callBackUrl,
+        clientPage: gwClientPage,
+      });
       const updated = await prisma.canvasGenerationTask.update({
         where: { id: created.id },
         data: {
           status: "SUBMITTED",
-          kieTaskId: result.taskId,
+          kieTaskId: job.taskId,
           submittedAt: new Date(),
+          inputPayload: {
+            kind: engineKind,
+            prompt: clipPrompt(expandedPrompt),
+            params,
+            providerId,
+            modelKey,
+            imageUrls,
+            gatewayLogId: job.logId,
+            providerKind: "KIE",
+            kieModel: model,
+            kieInput: input,
+            ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+          } as Prisma.InputJsonValue,
         },
       });
       return { reused: false, task: updated };
-    }
-
-    // 同步：直接落 OSS 并 SUCCEEDED
-    const url0 = result.resultUrls[0];
-    if (!url0) {
-      throw new CanvasGatewayError(
-        "PROVIDER_INVALID_RESPONSE",
-        "image gateway 同步出图但 resultUrls 为空",
-      );
-    }
-    let ossUrl: string | null = null;
-    try {
-      ossUrl = await persistCanvasKieResultToOss({
-        ephemeralUrl: url0,
-        kind: "node-image",
-        projectId,
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      const updated = await prisma.canvasGenerationTask.update({
-        where: { id: created.id },
-        data: {
-          status: "FAILED",
-          failCode: "OSS_UPLOAD_FAILED",
-          failMessage: msg.slice(0, 500),
-          ephemeralUrl: url0,
-          resultPayload: (result.rawPayload ?? null) as
-            | Prisma.InputJsonValue
-            | undefined,
-          submittedAt: new Date(),
-          completedAt: new Date(),
-        },
-      });
-      return { reused: false, task: updated };
-    }
-
-    const updated = await prisma.canvasGenerationTask.update({
-      where: { id: created.id },
-      data: {
-        status: "SUCCEEDED",
-        ossUrl,
-        ephemeralUrl: url0,
-        resultPayload: (result.rawPayload ?? null) as
-          | Prisma.InputJsonValue
-          | undefined,
-        submittedAt: new Date(),
-        completedAt: new Date(),
-      },
-    });
-    return { reused: false, task: updated };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    const code =
-      e instanceof CanvasGatewayError ? e.code : "IMAGE_ENGINE_FAILED";
+    const code = "IMAGE_ENGINE_FAILED";
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
       data: {
@@ -656,6 +625,7 @@ export async function runStoryLlmEngineNode(
   args: RunEngineNodeArgs & { engineKind: StoryLlmKind },
 ): Promise<RunEngineNodeResult> {
   const { userId, projectId, nodeId, node, engineKind } = args;
+  const gwClientPage = resolveCanvasClientPage(projectId, args.clientPage);
   const data = node.data ?? {};
   const providerId = String(data.providerId ?? "");
   const modelKey = String(data.modelKey ?? node.modelKey ?? "");
@@ -686,11 +656,14 @@ export async function runStoryLlmEngineNode(
     providerId,
   });
 
+  await shouldCanvasUseGateway(userId, providerId, modelKey);
+
   if (!args.forceFresh) {
     const reusable = await findReusableSucceededTask({
       projectId,
       nodeId,
       inputHash,
+      useGateway: true,
     });
     if (reusable) return { reused: true, task: reusable };
   }
@@ -699,15 +672,13 @@ export async function runStoryLlmEngineNode(
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
-  const provider = await loadProviderForUser(userId, providerId);
-
   const created = await prisma.canvasGenerationTask.create({
     data: {
       projectId,
       nodeId,
       kind: "TEXT",
       model: modelKey,
-      providerId: provider.dbProviderId,
+      providerId: null,
       inputHash,
       inputPayload: {
         kind: engineKind,
@@ -724,7 +695,6 @@ export async function runStoryLlmEngineNode(
   });
 
   try {
-    const gateway = getGatewayForKind(provider.kind, provider.config);
     const customSystem =
       engineKind === "story-outline-engine"
         ? String(
@@ -752,7 +722,12 @@ export async function runStoryLlmEngineNode(
             : userContent,
       },
     ];
-    const resp = await gateway.chat({ modelKey, messages, params });
+    const resp = await canvasGwChat(userId, {
+      modelKey,
+      messages,
+      params,
+      clientPage: gwClientPage,
+    });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
       data: {
@@ -761,6 +736,16 @@ export async function runStoryLlmEngineNode(
         resultPayload: (resp.rawPayload ?? null) as
           | Prisma.InputJsonValue
           | undefined,
+        inputPayload: {
+          kind: engineKind,
+          prompt: clipPrompt(expandedPrompt),
+          params,
+          providerId,
+          modelKey,
+          textInputs: node.textInputs ?? [],
+          ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+          gatewayLogId: resp.logId,
+        } as Prisma.InputJsonValue,
         submittedAt: new Date(),
         completedAt: new Date(),
       },
@@ -768,8 +753,7 @@ export async function runStoryLlmEngineNode(
     return { reused: false, task: updated };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    const code =
-      e instanceof CanvasGatewayError ? e.code : "STORY_LLM_FAILED";
+    const code = "STORY_LLM_FAILED";
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
       data: {
@@ -788,6 +772,7 @@ export async function runVideoEngineNode(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const { userId, projectId, nodeId, node } = args;
+  const gwClientPage = resolveCanvasClientPage(projectId, args.clientPage);
   const data = node.data ?? {};
   const providerId = String(data.providerId ?? "");
   const modelKey = String(data.modelKey ?? node.modelKey ?? "");
@@ -837,13 +822,7 @@ export async function runVideoEngineNode(
 
   const imageUrls = [mainFrameImageUrl];
 
-  const provider = await loadProviderForUser(userId, providerId);
-  if (provider.kind !== "KIE") {
-    throw new CanvasProjectError(
-      "INVALID_INPUT",
-      "video-engine 当前仅支持 KIE 系统 Provider",
-    );
-  }
+  await shouldCanvasUseGateway(userId, providerId, modelKey);
 
   const inputHash = computeInputHash({
     modelKey,
@@ -858,6 +837,7 @@ export async function runVideoEngineNode(
       projectId,
       nodeId,
       inputHash,
+      useGateway: true,
     });
     if (reusable) return { reused: true, task: reusable };
   }
@@ -887,7 +867,7 @@ export async function runVideoEngineNode(
       nodeId,
       kind: "IMAGE",
       model: modelKey,
-      providerId: provider.dbProviderId,
+      providerId: null,
       inputHash,
       inputPayload: {
         kind: "video-engine",
@@ -909,17 +889,33 @@ export async function runVideoEngineNode(
   const callBackUrl = buildCanvasAiKieCallbackUrl("video", created.id);
 
   try {
-    const { taskId } = await createKieTask({
+    const job = await canvasGwCreateKieJob(userId, {
       model,
-      input: input as KieVideoInput,
+      input: input as Record<string, unknown>,
       callBackUrl,
+      clientPage: gwClientPage,
     });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
       data: {
         status: "SUBMITTED",
-        kieTaskId: taskId,
+        kieTaskId: job.taskId,
         submittedAt: new Date(),
+        inputPayload: {
+          kind: "video-engine",
+          prompt: clipPrompt(expandedPrompt),
+          params,
+          providerId,
+          modelKey,
+          imageUrls,
+          mainFrameImageUrl,
+          referenceImageUrls,
+          gatewayLogId: job.logId,
+          providerKind: "KIE",
+          kieModel: model,
+          kieInput: input,
+          ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+        } as Prisma.InputJsonValue,
       },
     });
     return { reused: false, task: updated };
@@ -943,6 +939,7 @@ export async function runTtsEngineNode(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const { userId, projectId, nodeId, node } = args;
+  const gwClientPage = resolveCanvasClientPage(projectId, args.clientPage);
   const data = node.data ?? {};
   const providerId = String(data.providerId ?? "");
   const modelKey = String(data.modelKey ?? node.modelKey ?? "tts-1");
@@ -958,7 +955,8 @@ export async function runTtsEngineNode(
     throw new CanvasProjectError("EMPTY_PROMPT", "tts-engine 台词为空");
   }
 
-  const provider = await loadProviderForUser(userId, providerId);
+  await shouldCanvasUseGateway(userId, providerId, modelKey);
+
   const inputHash = computeInputHash({
     modelKey,
     prompt: text,
@@ -986,7 +984,7 @@ export async function runTtsEngineNode(
       nodeId,
       kind: "IMAGE",
       model: modelKey,
-      providerId: provider.dbProviderId,
+      providerId: null,
       inputHash,
       inputPayload: {
         kind: "tts-engine",
@@ -1001,30 +999,17 @@ export async function runTtsEngineNode(
     },
   });
 
-  const baseUrl = (
-    provider.config.baseUrl ?? "https://api.openai.com/v1"
-  ).replace(/\/$/, "");
   const voice = String(params.voice ?? "alloy");
 
   try {
-    const r = await fetch(`${baseUrl}/audio/speech`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${provider.config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: modelKey,
-        input: text.slice(0, 4096),
+    const buf = (
+      await canvasGwTts(userId, {
+        modelKey,
+        text,
         voice,
-        response_format: "mp3",
-      }),
-    });
-    if (!r.ok) {
-      const errText = await r.text().catch(() => "");
-      throw new Error(`TTS HTTP ${r.status}: ${errText.slice(0, 200)}`);
-    }
-    const buf = Buffer.from(await r.arrayBuffer());
+        clientPage: gwClientPage,
+      })
+    ).buffer;
     const ossUrl = await persistCanvasBufferToOss({
       buf,
       contentType: "audio/mpeg",
@@ -1069,6 +1054,7 @@ export async function runRefVideoEngineNode(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const { userId, projectId, nodeId, node } = args;
+  const gwClientPage = resolveCanvasClientPage(projectId, args.clientPage);
   const data = node.data ?? {};
   const providerId = String(data.providerId ?? "");
   const modelKey = String(data.modelKey ?? node.modelKey ?? "");
@@ -1109,7 +1095,8 @@ export async function runRefVideoEngineNode(
   const maxRef = isBailian ? 9 : 8;
   const refs = referenceImageUrls.slice(0, maxRef);
 
-  const provider = await loadProviderForUser(userId, providerId);
+  await shouldCanvasUseGateway(userId, providerId, modelKey);
+
   const inputHash = computeInputHash({
     modelKey,
     prompt: expandedPrompt,
@@ -1123,6 +1110,7 @@ export async function runRefVideoEngineNode(
       projectId,
       nodeId,
       inputHash,
+      useGateway: true,
     });
     if (reusable) return { reused: true, task: reusable };
   }
@@ -1132,21 +1120,6 @@ export async function runRefVideoEngineNode(
   await ensureUserInflightCapacity(userId);
 
   if (isBailian) {
-    if (providerId !== SYSTEM_BAILIAN_R2V_PROVIDER_ID) {
-      throw new CanvasProjectError(
-        "INVALID_INPUT",
-        "百炼 R2V 须使用系统 Provider",
-      );
-    }
-    const apiKey = getDashScopeApiKey();
-    if (!apiKey) {
-      throw new CanvasProjectError(
-        "MODEL_NOT_AVAILABLE",
-        "未配置 DASHSCOPE_API_KEY / QWEN_API_KEY",
-        503,
-      );
-    }
-
     const resolution =
       String(params.resolution ?? "1080P") === "720P" ? "720P" : "1080P";
     const ratio = String(params.ratio ?? "16:9");
@@ -1163,7 +1136,7 @@ export async function runRefVideoEngineNode(
         nodeId,
         kind: "IMAGE",
         model: modelKey,
-        providerId: provider.dbProviderId,
+        providerId: null,
         inputHash,
         inputPayload: {
           kind: "ai-video-engine",
@@ -1179,8 +1152,7 @@ export async function runRefVideoEngineNode(
     });
 
     try {
-      const createdTask = await bailianR2vCreateTask({
-        apiKey,
+      const job = await canvasGwCreateBailianR2vJob(userId, {
         model: modelKey,
         prompt: expandedPrompt,
         referenceImageUrls: refs,
@@ -1189,16 +1161,24 @@ export async function runRefVideoEngineNode(
         duration,
         seedStr,
         parameterExtras,
+        clientPage: gwClientPage,
       });
-      if (!createdTask.ok) {
-        throw new Error(createdTask.error);
-      }
       const updated = await prisma.canvasGenerationTask.update({
         where: { id: created.id },
         data: {
           status: "SUBMITTED",
-          kieTaskId: createdTask.taskId,
+          kieTaskId: job.taskId,
           submittedAt: new Date(),
+          inputPayload: {
+            kind: "ai-video-engine",
+            providerKind: "BAILIAN_R2V",
+            prompt: clipPrompt(expandedPrompt),
+            params,
+            providerId,
+            modelKey,
+            referenceImageUrls: refs,
+            gatewayLogId: job.logId,
+          } as Prisma.InputJsonValue,
         },
       });
       return { reused: false, task: updated };
@@ -1215,13 +1195,6 @@ export async function runRefVideoEngineNode(
       });
       return { reused: false, task: updated };
     }
-  }
-
-  if (provider.kind !== "KIE") {
-    throw new CanvasProjectError(
-      "INVALID_INPUT",
-      "Seedance 2 当前仅支持 KIE 系统 Provider",
-    );
   }
 
   const aspectRatio = String(params.aspect_ratio ?? "16:9");
@@ -1243,7 +1216,7 @@ export async function runRefVideoEngineNode(
       nodeId,
       kind: "IMAGE",
       model: modelKey,
-      providerId: provider.dbProviderId,
+      providerId: null,
       inputHash,
       inputPayload: {
         kind: "ai-video-engine",
@@ -1263,17 +1236,30 @@ export async function runRefVideoEngineNode(
   const callBackUrl = buildCanvasAiKieCallbackUrl("video", created.id);
 
   try {
-    const { taskId } = await createKieTask({
+    const job = await canvasGwCreateKieJob(userId, {
       model,
-      input: input as KieVideoInput,
+      input: input as Record<string, unknown>,
       callBackUrl,
+      clientPage: gwClientPage,
     });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
       data: {
         status: "SUBMITTED",
-        kieTaskId: taskId,
+        kieTaskId: job.taskId,
         submittedAt: new Date(),
+        inputPayload: {
+          kind: "ai-video-engine",
+          providerKind: "KIE",
+          prompt: clipPrompt(expandedPrompt),
+          params,
+          providerId,
+          modelKey,
+          referenceImageUrls: refs,
+          gatewayLogId: job.logId,
+          kieModel: model,
+          kieInput: input,
+        } as Prisma.InputJsonValue,
       },
     });
     return { reused: false, task: updated };

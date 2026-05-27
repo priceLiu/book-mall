@@ -1,0 +1,33 @@
+---
+description: Gateway 控制台日志 Tip、滚动条与 Status 设计规范
+globs: gateway-web/components/logs/**,gateway-web/app/globals.css,gateway-web/docs/design.md,gateway-web/lib/gateway-log-*.ts
+alwaysApply: false
+---
+
+# Gateway 日志 UI 设计规范
+
+完整说明见 `gateway-web/docs/design.md`。
+
+## 悬停 Tip 尺寸（勿随意改）
+
+- 外框最大高：**680px**（`--gw-log-tip-max-h`）
+- 内容区最大高：**580px**（`--gw-log-tip-body-max-h`）
+- Params 宽度：**720px**（`--gw-log-tip-width`）
+- 真源：`app/globals.css` CSS 变量 + `.gw-log-preview-tip*`
+
+## 细滚动条（强制）
+
+- 类名：**`.gw-scrollbar-thin`**
+- WebKit 宽 **4px**，滑块半透明白、轨道透明
+- 所有 Params / Result Tip 内容区必须使用，禁止粗滚动条
+
+## Params Tip 结构
+
+- 两行：`input:` + 格式化 JSON；`model:` + 模型名
+- footer 分隔线 + 左下复制图标
+- 鼠标可移入 Tip；280ms 延迟关闭
+
+## Status
+
+- 圆点颜色用 **inline style**（`#22c55e` success / `#f97316` running）
+- running、pending 带 `#2a2a32` pill 背景

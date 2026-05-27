@@ -9,9 +9,11 @@ import {
 } from "@/lib/ai-fit-oss-upload";
 import { parseImageDataUrl } from "@/lib/ai-fit-data-url";
 import {
-  dashscopeCreateTryOnTask,
+  createDashscopeJobFromServer,
+  pollDashscopeJobFromServer,
+} from "@/lib/forward-gateway-dashscope-server";
+import {
   dashscopeExtractTaskImageUrl,
-  dashscopeGetTask,
 } from "@/lib/ai-fit-dashscope";
 import { readOssEnv } from "@/lib/oss-client";
 import {
@@ -237,14 +239,6 @@ export async function POST(req: NextRequest) {
   const suite = await requireToolSuiteNavAccess("fitting-room");
   if (!suite.ok) return suite.response;
 
-  const apiKey = process.env.DASHSCOPE_API_KEY?.trim();
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "未配置 DASHSCOPE_API_KEY，无法调用 AI 试衣" },
-      { status: 503 },
-    );
-  }
-
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -379,22 +373,27 @@ export async function POST(req: NextRequest) {
     // fail-open：reserve 失败不阻塞业务，依赖主站 settle 自带水位线门禁。
   }
 
-  const created = await dashscopeCreateTryOnTask({
-    apiKey,
+  const tryOnModel = process.env.DASHSCOPE_TRYON_MODEL?.trim() || "aitryon";
+  const created = await createDashscopeJobFromServer({
+    kind: "tryon",
+    model: tryOnModel,
     personImageUrl: personRes.url,
     topGarmentUrl: topUrl,
     bottomGarmentUrl: bottomUrl,
-    model: process.env.DASHSCOPE_TRYON_MODEL?.trim() || "aitryon",
+    clientPage: "fitting-room/ai-fit",
   });
 
-  if ("error" in created) {
+  if (!created.ok) {
     if (reservedHoldId) {
       await releaseWalletHoldFromServer({
         holdId: reservedHoldId,
-        reason: `tryon_create_failed:${created.error.slice(0, 100)}`,
+        reason: `tryon_create_failed:${(created.error ?? "gateway").slice(0, 100)}`,
       });
     }
-    return NextResponse.json({ error: created.error }, { status: 502 });
+    return NextResponse.json(
+      { error: created.error ?? "Gateway 调用失败" },
+      { status: created.status ?? 502 },
+    );
   }
 
   if (reservedHoldId) {
@@ -403,6 +402,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     taskId: created.taskId,
+    gatewayLogId: created.logId,
     resolvedUrls: {
       personImage: personRes.url,
       topGarment: topUrl ?? null,
@@ -416,30 +416,21 @@ export async function GET(req: NextRequest) {
   const suite = await requireToolSuiteNavAccess("fitting-room");
   if (!suite.ok) return suite.response;
 
-  const apiKey = process.env.DASHSCOPE_API_KEY?.trim();
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "未配置 DASHSCOPE_API_KEY" },
-      { status: 503 },
-    );
-  }
   const taskId = req.nextUrl.searchParams.get("taskId")?.trim();
+  const gatewayLogId = req.nextUrl.searchParams.get("gatewayLogId")?.trim() || undefined;
   if (!taskId) {
     return NextResponse.json({ error: "缺少 taskId" }, { status: 400 });
   }
 
-  const json = await dashscopeGetTask({ apiKey, taskId });
-  const output = json.output as Record<string, unknown> | undefined;
-  if (!output) {
-    const msg =
-      typeof json.message === "string"
-        ? json.message
-        : typeof json.code === "string"
-          ? json.code
-          : "无效响应";
-    return NextResponse.json({ status: "UNKNOWN", error: msg }, { status: 502 });
+  const polled = await pollDashscopeJobFromServer({ taskId, gatewayLogId });
+  if (!polled.ok) {
+    return NextResponse.json(
+      { status: "UNKNOWN", error: polled.error },
+      { status: polled.status ?? 502 },
+    );
   }
 
+  const output = polled.output;
   const status =
     typeof output.task_status === "string" ? output.task_status : "UNKNOWN";
   const rawEphemeralUrl = dashscopeExtractTaskImageUrl(output);

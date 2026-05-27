@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { syncGatewayUserFromBookUser } from "@/lib/gateway/sync-user";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
+    let createdUserId: string | null = null;
     await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -46,10 +48,23 @@ export async function POST(request: Request) {
           name: parsed.data.name?.trim() || null,
         },
       });
+      createdUserId = user.id;
       await tx.wallet.create({
         data: { userId: user.id },
       });
     });
+
+    if (createdUserId) {
+      try {
+        await syncGatewayUserFromBookUser({
+          bookUserId: createdUserId,
+          email,
+          name: parsed.data.name,
+        });
+      } catch (syncErr) {
+        console.warn("[register] gateway sync failed", syncErr);
+      }
+    }
 
     await prisma.platformConfig.upsert({
       where: { id: "default" },

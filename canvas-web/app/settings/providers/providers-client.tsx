@@ -39,6 +39,12 @@ import {
   type CanvasEngineModel,
 } from "@/lib/canvas-api";
 import { PromptTemplatesTab } from "./prompt-templates-tab";
+import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
+import { isGatewayProviderId } from "@/lib/canvas/system-providers";
+
+function isManagedProviderId(id: string): boolean {
+  return id.startsWith("system:") || isGatewayProviderId(id);
+}
 
 const HUNYUAN_PRO_BASE = "https://api.ai3d.cloud.tencent.com";
 const HUNYUAN_TC_API_BASE = "https://ai3d.tencentcloudapi.com";
@@ -121,6 +127,13 @@ type Tab = "providers" | "models" | "system" | "prompts";
 function Inner() {
   const base = useBookMallBaseUrl();
   const dialogs = useDialogs();
+  const {
+    linked: gatewayLinked,
+    boundKinds,
+    accountUrl,
+    gatewayConsoleUrl,
+    gatewayGuideUrl,
+  } = useGatewayLinkStatus();
   const [tab, setTab] = useState<Tab>("providers");
   const [providers, setProviders] = useState<CanvasProviderDto[]>([]);
   const [systemModels, setSystemModels] = useState<CanvasEngineModel[]>([]);
@@ -134,11 +147,11 @@ function Inner() {
     if (!base) return;
     setLoading(true);
     try {
-      const [list, sysRes] = await Promise.all([
+      const [listRes, sysRes] = await Promise.all([
         listCanvasProviders(base),
         listCanvasEngineModels(base).catch(() => ({ models: [] as CanvasEngineModel[] })),
       ]);
-      setProviders(list);
+      setProviders(listRes.providers);
       setSystemModels(sysRes.models);
       setError(null);
     } catch (e) {
@@ -300,38 +313,84 @@ function Inner() {
           <p className="twenty-eyebrow">canvas-web · settings</p>
           <h1 className="canvas-serif mt-2 text-3xl text-white">画布配置</h1>
           <p className="mt-2 text-sm text-[var(--canvas-muted)]">
-            Provider、模型与提示词模板：配置后画布节点可直接选用。
+            AI 能力经 Gateway 代理（断直连）。在 Gateway 控制台绑定厂商凭证，并在 Book 个人中心关联 sk-gw 后即可选用下方模型。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setAddInitial(hunyuanPreset("express"));
-              setAddOpen(true);
-            }}
-            className="rounded-lg border border-[var(--canvas-accent)]/50 bg-[var(--canvas-accent)]/10 px-3 py-2 text-sm text-white hover:border-[var(--canvas-accent)]/80"
-          >
-            <Plus className="mr-2 inline size-4" />
-            添加混元极速版（普通）
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAddInitial(null);
-              setAddOpen(true);
-            }}
-            className="twenty-btn-accent"
-          >
-            <Plus className="mr-2 size-4" />
-            添加 Provider
-          </button>
+          {gatewayConsoleUrl ? (
+            <a
+              href={gatewayConsoleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-white/10 px-3 py-2 text-sm text-white hover:border-white/30"
+            >
+              Gateway 控制台
+            </a>
+          ) : null}
+          {accountUrl ? (
+            <a
+              href={accountUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="twenty-btn-accent"
+            >
+              Book 个人中心关联 sk-gw
+            </a>
+          ) : null}
         </div>
       </header>
 
+      {gatewayLinked ? (
+        <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+          Gateway 已关联
+          {boundKinds.length > 0
+            ? ` · 已绑定：${boundKinds.join(" / ")}`
+            : " · 请在 Gateway 控制台绑定厂商凭证"}
+        </div>
+      ) : (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <p className="font-medium">尚未关联 Gateway API Key</p>
+          <p className="mt-1 text-amber-100/85">
+            流程：Gateway 绑定 KIE / 百炼 / DeepSeek / 混元 → 创建 sk-gw → Book 个人中心粘贴验证。
+          </p>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {gatewayGuideUrl ? (
+              <a
+                href={gatewayGuideUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-amber-200 underline underline-offset-2 hover:text-white"
+              >
+                用户需知 →
+              </a>
+            ) : null}
+            {gatewayConsoleUrl ? (
+              <a
+                href={gatewayConsoleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-amber-200 underline underline-offset-2 hover:text-white"
+              >
+                Gateway 控制台 →
+              </a>
+            ) : null}
+            {accountUrl ? (
+              <a
+                href={accountUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-amber-200 underline underline-offset-2 hover:text-white"
+              >
+                Book 个人中心关联 →
+              </a>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       <div className="mb-6 flex items-center gap-1 rounded-xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-1 text-sm">
         {[
-          { k: "providers" as const, label: `我的 Providers (${providers.length})` },
+          { k: "providers" as const, label: `Gateway Providers (${providers.length})` },
           { k: "models" as const, label: `我的模型 (${allMyModels.length})` },
           { k: "prompts" as const, label: "提示词模板" },
           { k: "system" as const, label: `系统模板模型 (${systemModels.length})` },
@@ -426,7 +485,7 @@ function ProvidersTab({
   if (providers.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-white/10 bg-[var(--canvas-surface)] px-6 py-10 text-center text-sm text-[var(--canvas-muted)]">
-        还没有 Provider。点右上角「添加 Provider」开始接入你的 API Key。
+        尚未加载到 Gateway Provider。请先在 Gateway 控制台绑定厂商凭证，并在 Book 个人中心关联 sk-gw。
       </div>
     );
   }
@@ -482,10 +541,12 @@ function ProvidersTab({
               ) : null}
 
               <div className="ml-auto flex flex-wrap items-center gap-2">
-                {p.id.startsWith("system:") ? (
+                {isManagedProviderId(p.id) ? (
                   <>
                     <span className="rounded-full border border-[var(--canvas-accent)]/40 bg-[var(--canvas-accent)]/15 px-2 py-0.5 text-[11px] text-white/85">
-                      系统共享 · 无需配置
+                      {isGatewayProviderId(p.id)
+                        ? "Gateway 代理 · 只读"
+                        : "系统共享 · 无需配置"}
                     </span>
                     <button
                       type="button"

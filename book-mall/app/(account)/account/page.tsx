@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { AccountDevActions } from "@/components/account/account-dev-actions";
 import { WalletRefundRequestForm } from "@/components/account/wallet-refund-request-form";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
+import { GatewayApiKeyForm } from "@/components/account/gateway-api-key-form";
 import { AccountOverviewCards } from "@/components/account/account-overview-cards";
 import {
   hrefPricingDisclosureFromAccount,
@@ -206,7 +207,20 @@ export default async function AccountPage({
           </CardContent>
         </Card>
 
-        {/* 3. 账户与安全（账号 / 修改密码 并排） */}
+        {/* 3. Canvas Gateway API Key */}
+        <Card id="gateway-api-key">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Gateway API Key（Canvas / Story / 工具站）</CardTitle>
+            <CardDescription className="text-xs leading-relaxed">
+              先点「用 Book 账号打开 Gateway」绑定厂商凭证并创建 sk-gw-...，再在此关联。Canvas 经 Gateway 代理，Book 不保存厂商 Key。详见 Gateway 用户需知。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GatewayApiKeyForm />
+          </CardContent>
+        </Card>
+
+        {/* 4. 账户与安全（账号 / 修改密码 并排） */}
         <section className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader className="pb-3">
@@ -239,7 +253,7 @@ export default async function AccountPage({
           </Card>
         </section>
 
-        {/* 4. 余额提现 */}
+        {/* 5. 余额提现 */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">余额提现申请</CardTitle>
@@ -284,7 +298,7 @@ export default async function AccountPage({
           </CardContent>
         </Card>
 
-        {/* 5. 政策摘要（轻量收尾） */}
+        {/* 6. 政策摘要（轻量收尾） */}
         <Card className="border-dashed bg-muted/20">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">计费与提现政策（摘要）</CardTitle>

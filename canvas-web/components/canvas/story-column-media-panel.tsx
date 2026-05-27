@@ -258,7 +258,6 @@ export function StoryMediaPreviewModal({
             <CanvasVideoPlayer
               src={url}
               autoPlay
-              persistentControls
               className="max-h-[calc(100dvh-88px)] w-[min(96vw,960px)]"
             />
           ) : (

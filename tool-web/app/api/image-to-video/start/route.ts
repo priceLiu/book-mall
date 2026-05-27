@@ -1,11 +1,11 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
-import { getQwenApiKey } from "@/lib/qwen-env";
+import { createDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
 import {
-  i2vCreateVideoTask,
-  r2vCreateReferenceVideoTask,
-  t2vCreateVideoTask,
+  buildI2vVideoBody,
+  buildR2vVideoBody,
+  buildT2vVideoBody,
 } from "@/lib/image-to-video-dashscope";
 import {
   getImageToVideoModelByApiModel,
@@ -112,6 +112,43 @@ async function reserveBeforeVideoStart(input: {
   }
 }
 
+async function submitVideoJob(opts: {
+  model: string;
+  videoBody: Record<string, unknown>;
+  holdId: string | null;
+  failReasonPrefix: string;
+}): Promise<
+  | { ok: true; taskId: string; gatewayLogId: string; holdId: string | null }
+  | { ok: false; status: number; error: string; code?: string }
+> {
+  const created = await createDashscopeJobFromServer({
+    kind: "video",
+    model: opts.model,
+    videoBody: opts.videoBody,
+    clientPage: "image-to-video",
+  });
+  if (!created.ok) {
+    if (opts.holdId) {
+      await releaseWalletHoldFromServer({
+        holdId: opts.holdId,
+        reason: `${opts.failReasonPrefix}:${(created.error ?? "gateway").slice(0, 100)}`,
+      });
+    }
+    return {
+      ok: false,
+      status: created.status ?? 502,
+      error: created.error ?? "Gateway 调用失败",
+      code: created.status === 403 ? "GATEWAY_KEY_REQUIRED" : undefined,
+    };
+  }
+  return {
+    ok: true,
+    taskId: created.taskId,
+    gatewayLogId: created.logId,
+    holdId: opts.holdId,
+  };
+}
+
 export async function POST(req: Request) {
   const suite = await requireToolSuiteNavAccess("image-to-video");
   if (!suite.ok) return suite.response;
@@ -119,17 +156,6 @@ export async function POST(req: Request) {
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });
-  }
-
-  const apiKey = getQwenApiKey();
-  if (!apiKey) {
-    return NextResponse.json(
-      {
-        error:
-          "服务端未配置 QWEN_API_KEY 或 DASHSCOPE_API_KEY，无法调用视频合成（北京地域）",
-      },
-      { status: 503 },
-    );
   }
 
   let body: Record<string, unknown>;
@@ -203,10 +229,9 @@ export async function POST(req: Request) {
     if (!reserveT2v.ok) {
       return NextResponse.json(reserveT2v.data, { status: reserveT2v.status });
     }
-    const created = isHappyHorseT2v
-      ? await t2vCreateVideoTask({
-          apiKey,
-          model: modelEntry.apiModel,
+
+    const built = isHappyHorseT2v
+      ? buildT2vVideoBody({
           parameterExtras: modelEntry.defaultParameters,
           prompt,
           parameterStyle: "resolutionRatio",
@@ -216,25 +241,40 @@ export async function POST(req: Request) {
           seedStr,
           watermark,
         })
-      : await t2vCreateVideoTask({
-          apiKey,
-          model: modelEntry.apiModel,
+      : buildT2vVideoBody({
           parameterExtras: modelEntry.defaultParameters,
           prompt,
           parameterStyle: "wanSize",
           size: t2vAspectRatioToSize(aspectForSize, resolution),
           duration: wanDur,
         });
-    if (!created.ok) {
+    if (!built.ok) {
       if (reserveT2v.holdId) {
         await releaseWalletHoldFromServer({
           holdId: reserveT2v.holdId,
-          reason: `t2v_create_failed:${created.error.slice(0, 100)}`,
+          reason: `t2v_build_failed:${built.error.slice(0, 100)}`,
         });
       }
-      return NextResponse.json({ error: created.error }, { status: 502 });
+      return NextResponse.json({ error: built.error }, { status: 400 });
     }
-    return NextResponse.json({ taskId: created.taskId, holdId: reserveT2v.holdId });
+
+    const submitted = await submitVideoJob({
+      model: modelEntry.apiModel,
+      videoBody: built.body,
+      holdId: reserveT2v.holdId,
+      failReasonPrefix: "t2v_create_failed",
+    });
+    if (!submitted.ok) {
+      return NextResponse.json(
+        { error: submitted.error, code: submitted.code },
+        { status: submitted.status },
+      );
+    }
+    return NextResponse.json({
+      taskId: submitted.taskId,
+      gatewayLogId: submitted.gatewayLogId,
+      holdId: submitted.holdId,
+    });
   }
 
   if (kind === "ref") {
@@ -285,9 +325,8 @@ export async function POST(req: Request) {
     if (!reserveR2v.ok) {
       return NextResponse.json(reserveR2v.data, { status: reserveR2v.status });
     }
-    const created = await r2vCreateReferenceVideoTask({
-      apiKey,
-      model: refModelEntry.apiModel,
+
+    const built = buildR2vVideoBody({
       parameterExtras: refModelEntry.defaultParameters,
       prompt: normalizedPrompt,
       referenceImageUrls: urls,
@@ -297,16 +336,33 @@ export async function POST(req: Request) {
       seedStr,
       watermark,
     });
-    if (!created.ok) {
+    if (!built.ok) {
       if (reserveR2v.holdId) {
         await releaseWalletHoldFromServer({
           holdId: reserveR2v.holdId,
-          reason: `r2v_create_failed:${created.error.slice(0, 100)}`,
+          reason: `r2v_build_failed:${built.error.slice(0, 100)}`,
         });
       }
-      return NextResponse.json({ error: created.error }, { status: 502 });
+      return NextResponse.json({ error: built.error }, { status: 400 });
     }
-    return NextResponse.json({ taskId: created.taskId, holdId: reserveR2v.holdId });
+
+    const submitted = await submitVideoJob({
+      model: refModelEntry.apiModel,
+      videoBody: built.body,
+      holdId: reserveR2v.holdId,
+      failReasonPrefix: "r2v_create_failed",
+    });
+    if (!submitted.ok) {
+      return NextResponse.json(
+        { error: submitted.error, code: submitted.code },
+        { status: submitted.status },
+      );
+    }
+    return NextResponse.json({
+      taskId: submitted.taskId,
+      gatewayLogId: submitted.gatewayLogId,
+      holdId: submitted.holdId,
+    });
   }
 
   const firstFrame =
@@ -340,9 +396,7 @@ export async function POST(req: Request) {
     return NextResponse.json(reserveI2v.data, { status: reserveI2v.status });
   }
 
-  const created = await i2vCreateVideoTask({
-    apiKey,
-    model: modelEntry.apiModel,
+  const built = buildI2vVideoBody({
     parameterExtras: modelEntry.defaultParameters,
     prompt,
     firstFrame,
@@ -351,16 +405,32 @@ export async function POST(req: Request) {
     seedStr,
     watermark,
   });
-
-  if (!created.ok) {
+  if (!built.ok) {
     if (reserveI2v.holdId) {
       await releaseWalletHoldFromServer({
         holdId: reserveI2v.holdId,
-        reason: `i2v_create_failed:${created.error.slice(0, 100)}`,
+        reason: `i2v_build_failed:${built.error.slice(0, 100)}`,
       });
     }
-    return NextResponse.json({ error: created.error }, { status: 502 });
+    return NextResponse.json({ error: built.error }, { status: 400 });
   }
 
-  return NextResponse.json({ taskId: created.taskId, holdId: reserveI2v.holdId });
+  const submitted = await submitVideoJob({
+    model: modelEntry.apiModel,
+    videoBody: built.body,
+    holdId: reserveI2v.holdId,
+    failReasonPrefix: "i2v_create_failed",
+  });
+  if (!submitted.ok) {
+    return NextResponse.json(
+      { error: submitted.error, code: submitted.code },
+      { status: submitted.status },
+    );
+  }
+
+  return NextResponse.json({
+    taskId: submitted.taskId,
+    gatewayLogId: submitted.gatewayLogId,
+    holdId: submitted.holdId,
+  });
 }
