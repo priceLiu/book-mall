@@ -239,7 +239,7 @@ export async function runCanvasNode(
     forceFresh?: boolean;
     llmSection?: "outline" | "character" | "storyboard";
     rowKey?: string;
-    mediaKind?: "threeView" | "frameImage" | "video" | "tts";
+    mediaKind?: "threeView" | "frameImage" | "video" | "tts" | "sceneRef";
   },
 ): Promise<{ reused: boolean; task: CanvasTaskRecord }> {
   return call<{ reused: boolean; task: CanvasTaskRecord }>(

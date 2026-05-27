@@ -14,7 +14,9 @@ import {
   Image as ImageIcon,
   ImagePlus,
   LayoutGrid,
+  MapPin,
   Mic,
+  Palette,
   Save,
   Sparkles,
   Type,
@@ -129,6 +131,60 @@ const STORY_PALETTE: PaletteItem[] = [
     label: "剪映",
     icon: <Download className="size-[18px]" />,
     hint: "分镜包 / 草稿 ZIP",
+    dividerBefore: true,
+  },
+];
+
+/** 影视专业版 · 五阶段工作流（与快手版完全隔离） */
+const STORY_PRO_PALETTE: PaletteItem[] = [
+  {
+    type: "story-pro-starter",
+    label: "影视专业 · 启动",
+    icon: <Clapperboard className="size-[18px]" />,
+    hint: "五阶段 SOP · 风格锚定",
+    dividerBefore: true,
+  },
+  {
+    type: "story-pro-script-hub",
+    label: "故事剧本",
+    icon: <ClipboardList className="size-[18px]" />,
+    hint: "大纲 + 可行性",
+  },
+  {
+    type: "story-pro-style",
+    label: "风格定义",
+    icon: <Palette className="size-[18px]" />,
+    hint: "锚定词 · 参考图",
+  },
+  {
+    type: "story-pro-character",
+    label: "人物设计",
+    icon: <Users className="size-[18px]" />,
+    hint: "三视图",
+  },
+  {
+    type: "story-pro-scene",
+    label: "场景设计",
+    icon: <MapPin className="size-[18px]" />,
+    hint: "场景资产",
+  },
+  {
+    type: "story-pro-frame",
+    label: "分镜脚本",
+    icon: <Film className="size-[18px]" />,
+    hint: "镜号/景别/运镜",
+  },
+  {
+    type: "story-pro-video",
+    label: "分镜视频",
+    icon: <Video className="size-[18px]" />,
+    hint: "视频 + 配音",
+  },
+  {
+    type: "jianying-export-pro",
+    label: "剪映 · 专业版",
+    icon: <Download className="size-[18px]" />,
+    hint: "导出 ZIP",
     dividerBefore: true,
   },
 ];
@@ -479,6 +535,14 @@ export function NodePalette({
             />
             <PaletteDivider vertical />
             <PalettePill
+              label="影视专业版"
+              items={STORY_PRO_PALETTE}
+              collapsed
+              onDragStart={onDragStart}
+              onAdd={onAdd}
+            />
+            <PaletteDivider vertical />
+            <PalettePill
               label="参考生视频"
               items={REF_VIDEO_PALETTE}
               collapsed
@@ -507,6 +571,13 @@ export function NodePalette({
             <PalettePill
               label="故事创作"
               items={STORY_PALETTE}
+              collapsed={false}
+              onDragStart={onDragStart}
+              onAdd={onAdd}
+            />
+            <PalettePill
+              label="影视专业版"
+              items={STORY_PRO_PALETTE}
               collapsed={false}
               onDragStart={onDragStart}
               onAdd={onAdd}

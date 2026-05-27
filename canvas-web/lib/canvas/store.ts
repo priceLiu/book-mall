@@ -41,6 +41,10 @@ import { reflowStoryComicFlat } from "./story-comic-layout";
 import { reflowStoryComicColumns } from "./story-comic-columns-layout";
 import { applyStoryColumnHeights } from "./story-column-layout";
 import { reflowStoryComicWorkspace } from "./story-comic-workspace-layout";
+import {
+  hasStoryProPipeline,
+  reflowStoryProWorkspace,
+} from "./story-pro-workspace-layout";
 import { reconcileStoryWorkspaceEdges } from "./spawn-story-workspace";
 import { hasStoryComicColumnGroups } from "./story-comic-groups";
 import {
@@ -714,8 +718,11 @@ export const useCanvasStore = create<CanvasState>()(
           : hasStoryComicColumnGroups(nodes)
             ? reflowStoryComicColumns(nodes, repaired)
             : reflowStoryComicFlat(nodes, repaired);
+        const withPro = hasStoryProPipeline(laid)
+          ? reflowStoryProWorkspace(laid, repaired)
+          : laid;
         set({
-          nodes: laid,
+          nodes: withPro,
           edges: repaired,
           fitViewNonce: get().fitViewNonce + 1,
         });
