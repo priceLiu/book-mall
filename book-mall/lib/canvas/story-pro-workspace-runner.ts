@@ -150,7 +150,7 @@ export async function runStoryProSceneRow(
   return runImageEngineNode({
     ...args,
     clientPage: proClientPage(args.projectId),
-    storyScope: { rowKey: args.rowKey, mediaKind: "frameImage" },
+    storyScope: { rowKey: args.rowKey, mediaKind: "sceneRef" },
     node,
   });
 }
