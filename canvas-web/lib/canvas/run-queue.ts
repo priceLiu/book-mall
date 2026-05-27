@@ -22,6 +22,7 @@ import type {
   StoryComicStarterNodeData,
 } from "./types";
 import { isStoryLlmNodeType } from "./types";
+import { isAnyStoryScriptHubType } from "./story-workspace-resolver";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import {
   registerCanvasRunBus,
@@ -31,6 +32,7 @@ import {
 import { countCanvasInflightWork, collectCanvasInflightNodeIds } from "./story-column-runtime";
 import { reconcileStaleInflightRuntimes } from "./story-inflight-reconcile";
 import { resolveStoryHubSectionTextInputs } from "./story-hub-text-inputs";
+import { resolveStoryProStarterScriptInput } from "./story-pro-starter-text";
 import {
   storyApplyTaskResult,
   storyRunPendingPatch,
@@ -109,9 +111,8 @@ function shouldReleaseStoryRunInflight(
   node: CanvasFlowNode | undefined,
   job: StoryRowJob & { nodeId?: string; llmSection?: string },
 ): boolean {
-  if (node?.type === "story-script-hub" && job.llmSection) {
-    const st = hubSectionIsComplete(node, job.llmSection);
-    return st;
+  if (node && isAnyStoryScriptHubType(node.type ?? "") && job.llmSection) {
+    return hubSectionIsComplete(node, job.llmSection);
   }
   if (job.rowKey && node && isStoryWorkspaceNodeType(node.type ?? "")) {
     const st = storyRowRuntimeStatus(node, job);
@@ -217,7 +218,14 @@ function resolveTextInputs(
       const d = p.data as unknown as StoryComicStarterNodeData;
       const sp = d.systemPrompt?.trim() || d.theme?.trim();
       if (sp) out.push(sp);
-    } else if (p.type === "story-script-hub") {
+    } else if (p.type === "story-pro-starter") {
+      const d = p.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
+      const script = resolveStoryProStarterScriptInput(nodes, edges, pid);
+      if (script) out.push(script);
+      if (d.systemPrompt?.trim()) {
+        out.push(`## 导演提示词\n\n${d.systemPrompt.trim()}`);
+      }
+    } else if (isAnyStoryScriptHubType(p.type ?? "")) {
       const d = p.data as {
         outlineMd?: string;
         characterMd?: string;
@@ -353,7 +361,7 @@ export function useCanvasRunner(
 
     if (
       !seq.forceFresh &&
-      node.type === "story-script-hub" &&
+      isAnyStoryScriptHubType(node.type ?? "") &&
       job.llmSection &&
       hubSectionIsComplete(node, job.llmSection)
     ) {
@@ -630,7 +638,7 @@ export function useCanvasRunner(
         if (seq?.activeKey === key) {
           const node = nodeAfter;
           let done = false;
-          if (node?.type === "story-script-hub" && job.llmSection) {
+          if (isAnyStoryScriptHubType(node?.type ?? "") && job.llmSection) {
             done = hubSectionIsComplete(node, job.llmSection);
           } else if (node && isStoryLlmNodeType(node.type ?? "")) {
             done =
@@ -869,7 +877,7 @@ export function useCanvasRunner(
       const node = state.nodes.find((n) => n.id === job.nodeId);
       if (!node) return;
       let done = false;
-      if (node.type === "story-script-hub" && job.llmSection) {
+      if (isAnyStoryScriptHubType(node.type ?? "") && job.llmSection) {
         done = hubSectionIsComplete(node, job.llmSection);
       } else if (job.rowKey) {
         const row = (
@@ -914,7 +922,7 @@ export function useCanvasRunner(
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (!nodeTasks.length) continue;
 
-        if (node.type === "story-script-hub") {
+        if (isAnyStoryScriptHubType(node.type ?? "")) {
           for (const section of ["outline", "character", "storyboard"] as const) {
             const scope = { llmSection: section };
             const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);

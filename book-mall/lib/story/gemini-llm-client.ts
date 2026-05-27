@@ -28,6 +28,7 @@ type ChatJsonOptions<S extends ZodTypeAny> = {
   userPrompt: string;
   schema: S;
   reasoningEffort?: "low" | "high";
+  maxTokens?: number;
 };
 
 const GEMINI_MODEL = "gemini-3-flash";
@@ -48,6 +49,7 @@ export async function chatJson<S extends ZodTypeAny>(
           include_thoughts: false,
           reasoning_effort: opts.reasoningEffort ?? "low",
           response_format: { type: "json_object" },
+          ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
         },
         storyProjectId: opts.storyProjectId,
       });

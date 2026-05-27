@@ -8,18 +8,21 @@ alwaysApply: false
 
 ## 统一版式（必须）
 
-角色设定、分镜脚本等 **GFM 表格** 的预览与编辑，须与「角色设定表」同款样式：
+角色设定、分镜脚本、**故事大纲** 等 **GFM 表格** 的预览与编辑，须与「角色设定表」同款样式：
 
 - 共享常量：`canvas-web/lib/canvas/story-md-table-chrome.ts`
 - 预览渲染：`MarkdownView` 的 `document` / `nodePreview` variant
-- 可编辑表：`StoryCharacterTableEditor`、`StoryStoryboardTableEditor`
+- 可编辑表：`StoryCharacterTableEditor`、`StoryStoryboardTableEditor`、**`StoryGenericMdTableEditor`**（大纲内嵌表）
+- 大纲正文：`StoryOutlineDocumentEditor`（块级 `MarkdownView` + 表格编辑器，见 `design.md` §6.4）
 
 样式要点见 [design.md §5.3](../../docs/design.md#53-gfm-表格) 与 `story-md-table-chrome.ts`：
 
 ## 禁止
 
 - 不要在漫剧表格预览里单独写一套 prose/table 样式
-- 不要用纯 Markdown 源码 textarea 作为默认编辑方式（表格可解析时优先表格编辑）
+- 不要用纯 Markdown 源码 textarea 作为默认编辑方式（表格可解析时优先表格编辑；大纲须块级渲染编辑）
+- **禁止**引入 MDXEditor/Lexical 等未验证 WYSIWYG（见 `design.md` §6.4.4）
+- 切换按钮 / 左栏说明文案须用 `story-hub-editor-chrome.ts`，勿各写一套
 
 ## 分镜 ↔ 角色名
 

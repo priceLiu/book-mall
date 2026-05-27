@@ -11,6 +11,7 @@
  */
 
 import {
+  STORY_OUTLINE_LLM_PARAMS,
   STORY_OUTLINE_USER_PROMPT,
   STORY_THEME_SYSTEM_PROMPT_DEFAULT,
 } from "./story-prompts";
@@ -18,8 +19,15 @@ import {
   STORY_PRO_CHARACTER_PROMPT,
   STORY_PRO_OUTLINE_USER_PROMPT,
   STORY_PRO_STORYBOARD_PROMPT,
+  STORY_PRO_HUB_LLM_SYSTEM,
+  STORY_PRO_LLM_PARAMS_DEFAULT,
   STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
 } from "./story-pro-prompts";
+import { storyProControlRowX } from "./story-pro-control-layout";
+import {
+  STORY_PRO_CONTROL_NODE_HEIGHT,
+  STORY_PRO_CONTROL_NODE_WIDTH,
+} from "./story-pro-node-chrome";
 import {
   AI_ENGINE_PROMPT_TEMPLATE,
   CANVAS_SCHEMA_VERSION,
@@ -344,7 +352,7 @@ const STORY_COMIC_PIPELINE: CanvasGraph = {
         systemPromptTemplateId: "full-pack-detailed",
         providerId: "",
         modelKey: "",
-        params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+        params: { ...STORY_OUTLINE_LLM_PARAMS },
         pipelineStage: "idle",
       },
     },
@@ -358,7 +366,7 @@ const STORY_COMIC_PIPELINE: CanvasGraph = {
         storyboardMd: "",
         providerId: "",
         modelKey: "",
-        params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+        params: { ...STORY_OUTLINE_LLM_PARAMS },
         outlineSystemPrompt: STORY_THEME_SYSTEM_PROMPT_DEFAULT,
         promptOutline: STORY_OUTLINE_USER_PROMPT,
         promptCharacter: "",
@@ -384,6 +392,11 @@ const STORY_COMIC_PIPELINE: CanvasGraph = {
 };
 
 /** 影视专业版：启动 + 故事剧本；风格/媒体列由定稿流程创建 */
+const STORY_PRO_STARTER_ORIGIN = { x: 80, y: 120 };
+const STORY_PRO_PIPELINE_HUB_X = storyProControlRowX(
+  STORY_PRO_STARTER_ORIGIN.x,
+).hubX;
+
 const STORY_PRO_PIPELINE: CanvasGraph = {
   schemaVersion: CANVAS_SCHEMA_VERSION,
   viewport: { x: 0, y: 0, zoom: 0.75 },
@@ -391,27 +404,42 @@ const STORY_PRO_PIPELINE: CanvasGraph = {
     {
       id: "sp-starter",
       type: "story-pro-starter",
-      position: col(0, 120),
+      position: STORY_PRO_STARTER_ORIGIN,
+      width: STORY_PRO_CONTROL_NODE_WIDTH,
+      height: STORY_PRO_CONTROL_NODE_HEIGHT,
+      style: {
+        width: STORY_PRO_CONTROL_NODE_WIDTH,
+        height: STORY_PRO_CONTROL_NODE_HEIGHT,
+      },
       data: {
+        starterMode: "upload",
+        uploadedScriptMd: "",
         systemPrompt: STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
+        systemPromptTemplateId: "director-from-script",
         providerId: "",
         modelKey: "",
-        params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
+        params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
         pipelineStage: "idle",
       },
     },
     {
       id: "sp-hub",
       type: "story-pro-script-hub",
-      position: col(1, 120),
+      position: { x: STORY_PRO_PIPELINE_HUB_X, y: STORY_PRO_STARTER_ORIGIN.y },
+      width: STORY_PRO_CONTROL_NODE_WIDTH,
+      height: STORY_PRO_CONTROL_NODE_HEIGHT,
+      style: {
+        width: STORY_PRO_CONTROL_NODE_WIDTH,
+        height: STORY_PRO_CONTROL_NODE_HEIGHT,
+      },
       data: {
         outlineMd: "",
         characterMd: "",
         storyboardMd: "",
         providerId: "",
         modelKey: "",
-        params: { reasoning_effort: "low", max_tokens: 4000, temperature: 0.7 },
-        outlineSystemPrompt: STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
+        params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
+        outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
         promptOutline: STORY_PRO_OUTLINE_USER_PROMPT,
         promptCharacter: STORY_PRO_CHARACTER_PROMPT,
         promptStoryboard: STORY_PRO_STORYBOARD_PROMPT,

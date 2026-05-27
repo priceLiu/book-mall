@@ -20,10 +20,10 @@ import {
 } from "@/lib/canvas/story-revision";
 import {
   mergeOutlineRolesIntoCharacterMd,
+  normalizeCharacterTableMd,
   parseOutlineBriefCharacters,
   parseStoryboardRows,
   patchStoryboardDialogue,
-  compactGfmTables,
 } from "@/lib/canvas/parse-md-tables";
 import { MarkdownView } from "./markdown-view";
 import {
@@ -34,6 +34,15 @@ import {
   canEditStoryboardAsTable,
   StoryStoryboardTableEditor,
 } from "./story-storyboard-table-editor";
+import { StoryOutlineDocumentEditor } from "./story-outline-document-editor";
+import {
+  STORY_HUB_LEFT_HINT,
+  STORY_HUB_RIGHT_PREVIEW_HINT,
+  STORY_HUB_TOGGLE_BTN_CLASS,
+  STORY_HUB_TOGGLE_TO_RENDER_LABEL,
+  STORY_HUB_TOGGLE_TO_SOURCE_LABEL,
+  STORY_HUB_TOGGLE_TO_TABLE_LABEL,
+} from "@/lib/canvas/story-hub-editor-chrome";
 
 const TAB_LABEL: Record<HubPreviewSection, string> = {
   outline: "故事大纲",
@@ -89,6 +98,7 @@ export function StoryScriptHubModal({
   const [savedHint, setSavedHint] = useState(false);
   const [characterRawMd, setCharacterRawMd] = useState(false);
   const [storyboardRawMd, setStoryboardRawMd] = useState(false);
+  const [outlineRawMd, setOutlineRawMd] = useState(false);
   const previewBodyRef = useRef<HTMLDivElement>(null);
   const [previewBodyH, setPreviewBodyH] = useState<number | null>(null);
 
@@ -105,6 +115,7 @@ export function StoryScriptHubModal({
   }, [section, data.outlineHistory, data.characterHistory, data.storyboardHistory]);
 
   const persistedMd = useMemo(() => {
+    if (section === "outline") return data.outlineMd ?? "";
     return resolveHubSectionMd(data, section);
   }, [
     section,
@@ -130,7 +141,7 @@ export function StoryScriptHubModal({
       ? section
       : null;
   const sectionHasContent = llmSection
-    ? Boolean((data[`${llmSection}Md` as keyof StoryScriptHubNodeData] as string | undefined)?.trim())
+    ? Boolean(resolveHubSectionMd(data, llmSection).trim())
     : false;
   const runDisabled =
     readOnly ||
@@ -179,9 +190,15 @@ export function StoryScriptHubModal({
       setDraft(resolvedStoryboardMd);
       return;
     }
-    setDraft(persistedMd);
     if (section === "character") {
-      setCharacterRawMd(!canEditCharacterAsTable(persistedMd));
+      const normalized = normalizeCharacterTableMd(persistedMd);
+      setDraft(normalized);
+      setCharacterRawMd(!canEditCharacterAsTable(normalized));
+      return;
+    }
+    setDraft(persistedMd);
+    if (section === "outline") {
+      setOutlineRawMd(false);
     }
     if (section === "storyboard") {
       setStoryboardRawMd(!canEditStoryboardAsTable(persistedMd));
@@ -208,7 +225,7 @@ export function StoryScriptHubModal({
     if (section === "outline") {
       onSaveOutline(draft);
     } else if (section === "character") {
-      onSaveCharacter(draft);
+      onSaveCharacter(normalizeCharacterTableMd(draft));
     } else if (section === "storyboard") {
       onSaveStoryboard(draft);
     }
@@ -216,20 +233,21 @@ export function StoryScriptHubModal({
     window.setTimeout(() => setSavedHint(false), 2000);
   };
 
-  const previewMd = compactGfmTables(
+  const editMd = draft || persistedMd;
+
+  const previewMd =
     section === "dialogue"
       ? hubDialoguePreviewMd(resolvedStoryboardMd)
-      : draft.trim() || persistedMd.trim()
-        ? draft
-        : hubSectionPreviewContent(data, section),
-  );
+      : editMd.trim()
+        ? editMd
+        : hubSectionPreviewContent(data, section);
 
   const editRows = useMemo(() => {
     if (section === "dialogue") return 32;
-    const fromDraft = textareaRows(draft || persistedMd);
+    const fromDraft = textareaRows(editMd);
     const fromPreview = textareaRows(previewMd);
     return Math.max(fromDraft, fromPreview);
-  }, [section, draft, persistedMd, previewMd]);
+  }, [section, editMd, previewMd]);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -247,7 +265,7 @@ export function StoryScriptHubModal({
 
   const editBodyStyle =
     previewBodyH != null && previewBodyH > 0
-      ? { minHeight: previewBodyH }
+      ? { minHeight: Math.min(previewBodyH, 2400) }
       : undefined;
 
   if (!mounted || !open) return null;
@@ -361,8 +379,8 @@ export function StoryScriptHubModal({
         className={`${RF_NODE_SCROLL} nodrag min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-8`}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto grid w-full max-w-[min(96vw,1400px)] grid-cols-2 items-stretch rounded-sm bg-white shadow-2xl">
-          <div className="flex min-h-full flex-col border-r border-neutral-200">
+        <div className="mx-auto grid w-full max-w-[min(96vw,1400px)] grid-cols-2 items-stretch overflow-hidden rounded-sm bg-white shadow-2xl">
+          <div className="flex min-h-full min-w-0 flex-col overflow-hidden border-r border-neutral-200">
             <div className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-100 px-4 py-2.5">
               <p className="text-xs font-medium text-neutral-600">
                 {readOnly ? "只读" : "编辑"}
@@ -370,22 +388,23 @@ export function StoryScriptHubModal({
               </p>
               {section === "character" ? (
                 <p className="text-[10px] text-neutral-500">
-                  左侧表格编辑 · 右侧为渲染原稿；保存后写入角色设定
+                  {STORY_HUB_LEFT_HINT.character}
                 </p>
               ) : section === "storyboard" ? (
                 <p className="text-[10px] text-neutral-500">
-                  左侧表格编辑 · 右侧为渲染原稿；台词说话人须与角色表一致
+                  {STORY_HUB_LEFT_HINT.storyboard}
+                </p>
+              ) : section === "outline" ? (
+                <p className="text-[10px] text-neutral-500">
+                  {STORY_HUB_LEFT_HINT.outline}
                 </p>
               ) : section !== "dialogue" ? (
                 <p className="text-[10px] text-neutral-500">
-                  与右侧原稿同字号；保存后写入正式剧本
+                  {STORY_HUB_LEFT_HINT.sourceOnly}
                 </p>
               ) : null}
             </div>
-            <div
-              className={`flex min-h-0 flex-1 flex-col ${DOC_PAD}`}
-              style={editBodyStyle}
-            >
+            <div className={`flex min-h-0 flex-1 flex-col ${DOC_PAD}`}>
               {section === "dialogue" ? (
                 dialogueLines.length === 0 ? (
                   <p className="text-[17px] leading-[1.85] text-neutral-500">
@@ -417,7 +436,7 @@ export function StoryScriptHubModal({
                     ))}
                   </div>
                 )
-              ) : section === "character" && (draft.trim() || persistedMd.trim()) ? (
+              ) : section === "character" ? (
                 <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
                   {!readOnly ? (
                   <div className="flex flex-wrap items-center gap-2">
@@ -432,10 +451,12 @@ export function StoryScriptHubModal({
                     ) : null}
                     <button
                       type="button"
-                      className="rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-[11px] text-neutral-600 hover:bg-neutral-50"
+                      className={STORY_HUB_TOGGLE_BTN_CLASS}
                       onClick={() => setCharacterRawMd((v) => !v)}
                     >
-                      {characterRawMd ? "切换表格编辑" : "切换 Markdown 源码"}
+                      {characterRawMd
+                        ? STORY_HUB_TOGGLE_TO_TABLE_LABEL
+                        : STORY_HUB_TOGGLE_TO_SOURCE_LABEL}
                     </button>
                     {!characterRawMd ? (
                       <span className="text-[11px] text-neutral-400">
@@ -449,28 +470,34 @@ export function StoryScriptHubModal({
                       value={draft}
                       onChange={setDraft}
                     />
+                  ) : readOnly && !editMd.trim() ? (
+                    <p className="text-[17px] leading-[1.85] text-neutral-500">
+                      尚无角色设定。点击顶栏「生成」或返回启动页「创作剧本」等待角色段跑完；若大纲已含「主要角色」表，保存大纲后会自动回落展示。
+                    </p>
                   ) : (
                     <textarea
                       className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
                       style={editBodyStyle}
                       rows={editRows}
-                      value={draft}
+                      value={editMd}
                       readOnly={readOnly}
                       onChange={(e) => setDraft(e.target.value)}
                       spellCheck={false}
                     />
                   )}
                 </div>
-              ) : section === "storyboard" && (draft.trim() || persistedMd.trim()) ? (
+              ) : section === "storyboard" ? (
                 <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
                   {!readOnly ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      className="rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-[11px] text-neutral-600 hover:bg-neutral-50"
+                      className={STORY_HUB_TOGGLE_BTN_CLASS}
                       onClick={() => setStoryboardRawMd((v) => !v)}
                     >
-                      {storyboardRawMd ? "切换表格编辑" : "切换 Markdown 源码"}
+                      {storyboardRawMd
+                        ? STORY_HUB_TOGGLE_TO_TABLE_LABEL
+                        : STORY_HUB_TOGGLE_TO_SOURCE_LABEL}
                     </button>
                   </div>
                   ) : null}
@@ -479,44 +506,84 @@ export function StoryScriptHubModal({
                       value={draft}
                       onChange={setDraft}
                     />
+                  ) : readOnly && !editMd.trim() ? (
+                    <p className="text-[17px] leading-[1.85] text-neutral-500">
+                      尚无分镜脚本。影视专业版需单独生成「分镜」段（大纲 → 角色 → 分镜顺序执行）；也可点顶栏「生成」。
+                    </p>
                   ) : (
                     <textarea
                       className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
                       style={editBodyStyle}
                       rows={editRows}
-                      value={draft}
+                      value={editMd}
                       readOnly={readOnly}
                       onChange={(e) => setDraft(e.target.value)}
                       spellCheck={false}
                     />
                   )}
                 </div>
-              ) : draft.trim() || persistedMd.trim() ? (
+              ) : section === "outline" ? (
+                <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
+                  {!readOnly ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className={STORY_HUB_TOGGLE_BTN_CLASS}
+                        onClick={() => setOutlineRawMd((v) => !v)}
+                      >
+                        {outlineRawMd
+                          ? STORY_HUB_TOGGLE_TO_RENDER_LABEL
+                          : STORY_HUB_TOGGLE_TO_SOURCE_LABEL}
+                      </button>
+                    </div>
+                  ) : null}
+                  {!readOnly && outlineRawMd ? (
+                    <textarea
+                      className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
+                      style={editBodyStyle}
+                      rows={editRows}
+                      value={editMd}
+                      onChange={(e) => setDraft(e.target.value)}
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <StoryOutlineDocumentEditor
+                      value={draft}
+                      onChange={setDraft}
+                      readOnly={readOnly}
+                    />
+                  )}
+                </div>
+              ) : editMd.trim() ? (
                 <textarea
                   className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
                   style={editBodyStyle}
                   rows={editRows}
-                  value={draft}
+                  value={editMd}
                   readOnly={readOnly}
                   onChange={(e) => setDraft(e.target.value)}
                   spellCheck={false}
                 />
               ) : (
                 <p className="text-[17px] leading-[1.85] text-neutral-500">
-                  尚无内容，可先「创作剧本」或在此直接撰写后保存。
+                  {section === "character"
+                    ? "尚无角色设定。点击顶栏「生成」或返回启动页「创作剧本」等待角色段跑完；若大纲已含「主要角色」表，保存大纲后会自动回落展示。"
+                    : section === "storyboard"
+                      ? "尚无分镜脚本。影视专业版需单独生成「分镜」段（大纲 → 角色 → 分镜顺序执行）；也可点顶栏「生成」。"
+                      : "尚无内容，可先「创作剧本」或在此直接撰写后保存。"}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="flex min-h-full flex-col bg-neutral-50/80">
-            <div className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-100/90 px-4 py-2.5">
-              <p className="text-xs font-medium text-neutral-600">原稿</p>
-              <p className="text-[10px] text-neutral-500">整页滚动 · 随左侧实时更新</p>
+          <div className="flex min-h-full min-w-0 flex-col overflow-hidden bg-neutral-50/80">
+            <div className="sticky top-0 z-10 shrink-0 border-b border-neutral-200 bg-neutral-100/90 px-4 py-2.5">
+              <p className="text-xs font-medium text-neutral-600">渲染预览</p>
+              <p className="text-[10px] text-neutral-500">{STORY_HUB_RIGHT_PREVIEW_HINT}</p>
             </div>
-            <div ref={previewBodyRef} className={DOC_PAD}>
+            <div ref={previewBodyRef} className={`${DOC_PAD} min-w-0 w-full overflow-x-auto`}>
               {previewMd.trim() ? (
-                <MarkdownView content={previewMd} variant="document" />
+                <MarkdownView content={previewMd} variant="document" className="w-full" />
               ) : (
                 <p className="text-[17px] leading-[1.85] text-neutral-500">
                   （暂无内容）

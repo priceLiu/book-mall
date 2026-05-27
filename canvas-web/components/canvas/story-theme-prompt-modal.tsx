@@ -8,15 +8,29 @@ import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { storyThemePromptDisplayMd } from "@/lib/canvas/story-theme-prompt-display";
 import {
   STORY_THEME_SYSTEM_PROMPT_TEMPLATES,
-  type StoryThemeSystemPromptTemplateId,
+  applyThemeToStorySystemPrompt,
+  extractThemeFromStorySystemPrompt,
+  isLegacyStoryPackSystemPrompt,
+  storyThemeSystemPromptForTemplate,
 } from "@/lib/canvas/story-prompts";
+import { isLegacyStoryProDirectorPrompt } from "@/lib/canvas/story-pro-script-pack";
+import { storyProThemeSystemPromptForTemplate } from "@/lib/canvas/story-pro-theme-templates";
 import { MarkdownView } from "./markdown-view";
+import type { MentionableItem } from "./mentions/MentionsTextarea";
+import { MentionsTextarea } from "./mentions/MentionsTextarea";
 
 const DOC_PAD = "px-10 py-12 sm:px-14 sm:py-16";
 const DOC_TEXT =
   "w-full resize-none border-0 bg-transparent font-sans text-[17px] leading-[1.85] text-neutral-800 shadow-none focus:outline-none focus:ring-0";
 
-export type StoryThemePromptTab = StoryThemeSystemPromptTemplateId | "custom";
+export type StoryThemePromptTemplate = {
+  id: string;
+  label: string;
+  description: string;
+  content: string;
+};
+
+export type StoryThemePromptTab = string | "custom";
 
 function textareaRows(text: string): number {
   const lines = text.split("\n").length;
@@ -26,14 +40,15 @@ function textareaRows(text: string): number {
 function resolveSavePayload(
   tab: StoryThemePromptTab,
   draft: string,
+  templates: readonly StoryThemePromptTemplate[],
 ): {
   systemPrompt: string;
-  systemPromptTemplateId?: StoryThemeSystemPromptTemplateId;
+  systemPromptTemplateId?: string;
 } {
   if (tab === "custom") {
     return { systemPrompt: draft, systemPromptTemplateId: undefined };
   }
-  const tpl = STORY_THEME_SYSTEM_PROMPT_TEMPLATES.find((t) => t.id === tab);
+  const tpl = templates.find((t) => t.id === tab);
   const matches = tpl && draft.trim() === tpl.content.trim();
   return {
     systemPrompt: draft,
@@ -48,20 +63,32 @@ export function StoryThemePromptModal({
   onClose,
   value,
   templateId,
+  templates = STORY_THEME_SYSTEM_PROMPT_TEMPLATES,
+  dialogTitle = "故事主题 · 系统提示词",
   onSave,
   readOnly,
+  mentionables,
+  editHint,
+  proDirectorPack = false,
 }: {
   open: boolean;
   /** 打开时定位到的 Tab（与节点当前模板一致） */
   initialTab?: StoryThemePromptTab;
   onClose: () => void;
   value: string;
-  templateId?: StoryThemeSystemPromptTemplateId;
+  templateId?: string;
+  templates?: readonly StoryThemePromptTemplate[];
+  dialogTitle?: string;
   onSave: (next: {
     systemPrompt: string;
-    systemPromptTemplateId?: StoryThemeSystemPromptTemplateId;
+    systemPromptTemplateId?: string;
   }) => void;
   readOnly?: boolean;
+  /** 非空时左侧用 @ 富文本编辑器（如引用上传剧本） */
+  mentionables?: MentionableItem[];
+  editHint?: string;
+  /** 影视专业版：启用导演模板陈旧检测与「应用最新模板」 */
+  proDirectorPack?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<StoryThemePromptTab>("custom");
   const [draft, setDraft] = useState(value);
@@ -72,13 +99,53 @@ export function StoryThemePromptModal({
 
   const previewMd = useMemo(() => storyThemePromptDisplayMd(draft), [draft]);
 
+  const linkedTemplate = useMemo(
+    () =>
+      templateId
+        ? templates.find((t) => t.id === templateId)
+        : undefined,
+    [templateId, templates],
+  );
+
+  const storedTemplateStale = useMemo(() => {
+    if (!linkedTemplate) return false;
+    return value.trim() !== linkedTemplate.content.trim();
+  }, [linkedTemplate, value]);
+
+  const legacyCustomPrompt = useMemo(() => {
+    if (proDirectorPack) {
+      return (
+        isLegacyStoryProDirectorPrompt(value) ||
+        (templateId === "director-from-script" && storedTemplateStale)
+      );
+    }
+    return !templateId && isLegacyStoryPackSystemPrompt(value);
+  }, [proDirectorPack, templateId, value, storedTemplateStale]);
+
+  const applyLatestTemplate = () => {
+    if (proDirectorPack) {
+      const id = "director-from-script";
+      setActiveTab(id);
+      setDraft(storyProThemeSystemPromptForTemplate(id));
+      return;
+    }
+    const id = templateId ?? "full-pack-detailed";
+    const theme = extractThemeFromStorySystemPrompt(value || draft);
+    const content = applyThemeToStorySystemPrompt(
+      storyThemeSystemPromptForTemplate(id as "full-pack-detailed"),
+      theme,
+    );
+    setActiveTab(id);
+    setDraft(content);
+  };
+
   const dirty = useMemo(() => {
-    const next = resolveSavePayload(activeTab, draft);
+    const next = resolveSavePayload(activeTab, draft, templates);
     return (
       next.systemPrompt !== value ||
       next.systemPromptTemplateId !== templateId
     );
-  }, [activeTab, draft, value, templateId]);
+  }, [activeTab, draft, value, templateId, templates]);
 
   useEffect(() => {
     setMounted(true);
@@ -109,11 +176,9 @@ export function StoryThemePromptModal({
       setDraft(value);
       return;
     }
-    const tpl = STORY_THEME_SYSTEM_PROMPT_TEMPLATES.find(
-      (t) => t.id === activeTab,
-    );
+    const tpl = templates.find((t) => t.id === activeTab);
     setDraft(tpl?.content ?? value);
-  }, [open, activeTab, value]);
+  }, [open, activeTab, value, templates]);
 
   useEffect(() => {
     if (!open) return;
@@ -135,7 +200,7 @@ export function StoryThemePromptModal({
 
   const save = () => {
     if (readOnly) return;
-    onSave(resolveSavePayload(activeTab, draft));
+    onSave(resolveSavePayload(activeTab, draft, templates));
     setSavedHint(true);
     window.setTimeout(() => onClose(), 320);
   };
@@ -147,17 +212,15 @@ export function StoryThemePromptModal({
       className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-neutral-600/90 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-label="故事主题 · 系统提示词"
+      aria-label={dialogTitle}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <header className="nodrag flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10 bg-neutral-900/85 px-4 py-3">
-        <p className="shrink-0 text-sm font-medium text-white">
-          故事主题 · 系统提示词
-        </p>
+        <p className="shrink-0 text-sm font-medium text-white">{dialogTitle}</p>
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-start gap-1">
-          {STORY_THEME_SYSTEM_PROMPT_TEMPLATES.map((tpl) => (
+          {templates.map((tpl) => (
             <button
               key={tpl.id}
               type="button"
@@ -214,6 +277,35 @@ export function StoryThemePromptModal({
         </button>
       </header>
 
+      {!readOnly && (storedTemplateStale || legacyCustomPrompt) ? (
+        <div className="nodrag flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-amber-400/30 bg-amber-950/90 px-4 py-2 text-[12px] text-amber-100">
+          <span>
+            {proDirectorPack ? (
+              <>
+                导演模板已升级：须含{" "}
+                <strong className="font-medium">## 角色视觉辞典</strong> 与{" "}
+                <strong className="font-medium">## 分镜脚本</strong>（含对白列），
+                保存后「解析剧本」才能正确拆分至故事剧本 / 下游列。
+              </>
+            ) : (
+              <>
+                内置模板已升级：须含{" "}
+                <strong className="font-medium">## 角色设定</strong> 与{" "}
+                <strong className="font-medium">## 分镜脚本</strong> GFM
+                表，保存后「创作剧本」才会自动填入分镜/对白 Tab。
+              </>
+            )}
+          </span>
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-amber-400 px-2.5 py-1 text-[11px] font-medium text-black hover:bg-amber-300"
+            onClick={applyLatestTemplate}
+          >
+            应用最新模板并编辑
+          </button>
+        </div>
+      ) : null}
+
       <div
         className={`${RF_NODE_SCROLL} nodrag min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-8`}
         onMouseDown={(e) => e.stopPropagation()}
@@ -223,9 +315,10 @@ export function StoryThemePromptModal({
             <div className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-100 px-4 py-2.5">
               <p className="text-xs font-medium text-neutral-600">编辑</p>
               <p className="text-[10px] text-neutral-500">
-                {activeTab === "custom"
-                  ? "自定义文案 · 与右侧预览同步"
-                  : `${STORY_THEME_SYSTEM_PROMPT_TEMPLATES.find((t) => t.id === activeTab)?.label ?? "模板"} · 修改后保存将视为自定义`}
+                {editHint ??
+                  (activeTab === "custom"
+                    ? "自定义文案 · 与右侧预览同步"
+                    : `${templates.find((t) => t.id === activeTab)?.label ?? "模板"} · 修改后保存将视为自定义`)}
               </p>
             </div>
             <div
@@ -236,6 +329,15 @@ export function StoryThemePromptModal({
                 <pre className="whitespace-pre-wrap font-sans text-[17px] leading-[1.85] text-neutral-800">
                   {draft || "（空）"}
                 </pre>
+              ) : mentionables?.length ? (
+                <MentionsTextarea
+                  className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
+                  style={editBodyStyle}
+                  value={draft}
+                  mentionables={mentionables}
+                  onChange={(next) => setDraft(next)}
+                  placeholder="输入 @ 引用上传剧本…"
+                />
               ) : (
                 <textarea
                   className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}

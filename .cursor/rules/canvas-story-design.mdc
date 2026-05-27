@@ -40,8 +40,9 @@ alwaysApply: false
 ## 文案显示
 
 - 故事主题节点：**黑底** `darkPreview`；故事大纲：**白纸** `nodePreview`
-- 表格统一 `story-md-table-chrome.ts`；角色/分镜默认可表格编辑，可切 Markdown 源码
+- 角色/分镜默认可表格编辑，可切 Markdown 源码；**故事大纲**默认 `StoryOutlineDocumentEditor` 块级渲染编辑（见 `design.md` §6.4）
 - Word 全屏：`MarkdownFullscreenLightbox`，820px 纸宽
+- **文案编辑 UX 铁律**见 `design.md` §6.4（致命：左栏须渲染/表格态，禁止默认整篇源码与未验证 WYSIWYG）
 
 ## 参考图 / 对比
 

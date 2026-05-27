@@ -425,8 +425,8 @@ export async function patchProjectForUser(
     if (typeof patch.storyOutline !== "string") {
       throw new StoryProjectError("INVALID_INPUT", "storyOutline must be string");
     }
-    if (patch.storyOutline.length > 8000) {
-      throw new StoryProjectError("INVALID_INPUT", "storyOutline too long (<=8000)");
+    if (patch.storyOutline.length > 128_000) {
+      throw new StoryProjectError("INVALID_INPUT", "storyOutline too long (<=128000)");
     }
     data.storyOutline = patch.storyOutline;
   }

@@ -6,10 +6,6 @@ import { NODE_DEFAULT_SIZE } from "./types";
 import { nodeMeasuredSize, sortNodesForReactFlow } from "./normalize-graph-nodes";
 import { applyStoryColumnHeights } from "./story-column-layout";
 import {
-  STORY_CONTROL_NODE_HEIGHT,
-  STORY_CONTROL_NODE_WIDTH,
-} from "./story-node-chrome";
-import {
   findStoryProScriptHubForStarter,
   findStoryProWorkspaceForStarter,
   reconcileStoryProHubFinalized,
@@ -21,6 +17,15 @@ import {
   storyMediaColumnY,
 } from "./story-workspace-layout";
 import { isStoryProPipelineNode } from "./types";
+import {
+  STORY_PRO_CONTROL_NODE_HEIGHT,
+  STORY_PRO_CONTROL_NODE_WIDTH,
+  STORY_PRO_STYLE_NODE_EXTRA_H,
+} from "./story-pro-node-chrome";
+import {
+  storyProControlRowX,
+  storyProMediaColumnStartX,
+} from "./story-pro-control-layout";
 
 export function hasStoryProPipeline(nodes: CanvasFlowNode[]): boolean {
   return nodes.some((n) => isStoryProPipelineNode(n.type ?? ""));
@@ -50,7 +55,23 @@ function applyNodeHeight(n: CanvasFlowNode, height: number): CanvasFlowNode {
   } as CanvasFlowNode;
 }
 
-function proMediaColumnXs(hubLeftX: number): number[] {
+function placeNode(
+  node: CanvasFlowNode,
+  x: number,
+  y: number,
+): CanvasFlowNode {
+  const w = nodeReflowWidth(node);
+  const h = nodeReflowHeight(node);
+  return {
+    ...node,
+    position: { x, y },
+    width: w,
+    height: h,
+    style: { ...(node.style ?? {}), width: w, height: h },
+  } as CanvasFlowNode;
+}
+
+function proMediaColumnXs(controlAnchorLeftX: number): number[] {
   const types: CanvasNodeType[] = [
     "story-pro-character",
     "story-pro-scene",
@@ -58,7 +79,7 @@ function proMediaColumnXs(hubLeftX: number): number[] {
     "story-pro-video",
     "jianying-export-pro",
   ];
-  let x = hubLeftX + STORY_CONTROL_NODE_WIDTH + STORY_WORKSPACE_COL_H_GAP;
+  let x = storyProMediaColumnStartX(controlAnchorLeftX);
   return types.map((t) => {
     const left = x;
     x += (NODE_DEFAULT_SIZE[t]?.width ?? 400) + STORY_WORKSPACE_COL_H_GAP;
@@ -93,50 +114,59 @@ export function reflowStoryProWorkspace(
     if (!ws) continue;
 
     const originY = starter.position.y ?? 120;
+    const originX = starter.position.x ?? 80;
+    const { hubX, styleX } = storyProControlRowX(originX);
+    const rowBottom = storyControlRowBottom(originY);
+
     const hub = next.find((n) => n.id === ws.scriptHubId);
     const style = ws.styleNodeId
       ? next.find((n) => n.id === ws.styleNodeId)
       : undefined;
-    const hubLeftX = style?.position.x ?? hub?.position.x ?? 560;
-    const rowBottom = storyControlRowBottom(originY);
-    const [charX, sceneX, frameX, videoX, exportX] = proMediaColumnXs(hubLeftX);
+
+    const controlAnchorX = style ? styleX : hubX;
+    const [charX, sceneX, frameX, videoX, exportX] =
+      proMediaColumnXs(controlAnchorX);
+
+    next = next.map((n) =>
+      n.id === starter.id
+        ? applyNodeHeight(
+            placeNode(n, originX, originY),
+            STORY_PRO_CONTROL_NODE_HEIGHT,
+          )
+        : n,
+    );
+
+    if (hub) {
+      next = next.map((n) =>
+        n.id === hub.id
+          ? applyNodeHeight(
+              placeNode(n, hubX, originY),
+              STORY_PRO_CONTROL_NODE_HEIGHT,
+            )
+          : n,
+      );
+    }
+    if (style) {
+      next = next.map((n) =>
+        n.id === style.id
+          ? applyNodeHeight(
+              placeNode(n, styleX, originY),
+              STORY_PRO_CONTROL_NODE_HEIGHT + STORY_PRO_STYLE_NODE_EXTRA_H,
+            )
+          : n,
+      );
+    }
 
     const place = (id: string | undefined, x: number, type: CanvasNodeType) => {
       if (!id) return;
-      const idx = next.findIndex((n) => n.id === id);
-      if (idx < 0) return;
+      const node = next.find((n) => n.id === id);
+      if (!node) return;
       const y =
         type === "jianying-export-pro"
           ? originY
           : storyMediaColumnY(originY, rowBottom, type);
-      next[idx] = {
-        ...next[idx]!,
-        position: { x, y },
-        width: nodeReflowWidth(next[idx]!),
-        height: nodeReflowHeight(next[idx]!),
-      } as CanvasFlowNode;
+      next = next.map((n) => (n.id === id ? placeNode(n, x, y) : n));
     };
-
-    if (hub) {
-      const hi = next.findIndex((n) => n.id === hub.id);
-      next[hi] = applyNodeHeight(
-        {
-          ...next[hi]!,
-          position: { x: starter.position.x + 480, y: originY },
-        } as CanvasFlowNode,
-        STORY_CONTROL_NODE_HEIGHT,
-      );
-    }
-    if (style) {
-      const si = next.findIndex((n) => n.id === style.id);
-      next[si] = applyNodeHeight(
-        {
-          ...next[si]!,
-          position: { x: (hub?.position.x ?? 560) + 480, y: originY },
-        } as CanvasFlowNode,
-        STORY_CONTROL_NODE_HEIGHT + 80,
-      );
-    }
 
     place(ws.characterColumnId, charX, "story-pro-character");
     place(ws.sceneColumnId, sceneX, "story-pro-scene");

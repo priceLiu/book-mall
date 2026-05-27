@@ -20,6 +20,7 @@
 | [08-independent-tools-sso.md](./product/08-independent-tools-sso.md) | 独立工具站 · 黄金会员与 SSO 边界 |
 | [**09-finance-refactor-and-tool-federation.md**](./product/09-finance-refactor-and-tool-federation.md) | **财务模块重构与工具联邦**（技术草案：API 映射、序列图、Billing v1） |
 | [**10-multimodal-studio-and-finance-master-plan.md**](./product/10-multimodal-studio-and-finance-master-plan.md) | **全模态工作室 + 财务重构 — 整体方案（通俗版）**：`m.ai-code8.com` 与 `book`/`tool` 分工、用户/后台/核算、落地顺序 |
+| [**12-platform-app-federation.md**](./product/12-platform-app-federation.md) | **平台联邦架构**（独立部署、门户、Book SSO、Gateway、第三方接入） |
 
 协作需求草案：[**v1.1**](./v1.1)（独立 AI 工具集成 · 试衣间等）。
 
@@ -48,6 +49,7 @@
 | 文档 | 说明 |
 |------|------|
 | [development-constraints.md](./process/development-constraints.md) | 开发前读文档、计划勾选、归类写入 |
+| [**2026-platform-unification-rollout.md**](./plans/2026-platform-unification-rollout.md) | **平台统一改造实施计划**（SSO、Gateway 财务、Canvas/Story 迁移） |
 | [mock-payment-checkout.md](./process/mock-payment-checkout.md) | 模拟收银（过渡）：订阅 + 钱包充值、假二维码、`ALLOW_MOCK_PAYMENT` 与安全说明 |
 | [real-payment-integration.md](./process/real-payment-integration.md) | **正式接入支付**（支付宝扫码等）：异步通知、幂等、合规要点 |
 | [2026-05-11-tools-sso-gold-member.md](./plans/2026-05-11-tools-sso-gold-member.md) | v1.1 工具站 SSO + 黄金会员 — 计划与进度 |

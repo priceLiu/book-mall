@@ -2,6 +2,7 @@
  * 影视专业版（story-pro）工作区类型 — 与快手版完全隔离
  */
 import type { CanvasEnginePick, CanvasNodeRuntime } from "./types";
+import type { StoryProThemeSystemPromptTemplateId } from "./story-pro-theme-templates";
 import type { StoryTextRevision } from "./story-revision";
 import type { StoryRefImage } from "./story-ref-image";
 import type { StoryLlmSection } from "./story-workspace-types";
@@ -176,9 +177,25 @@ export type StoryProVideoColumnNodeData = {
   frameColumnId?: string;
 };
 
+export type StoryProUploadedScriptMeta = {
+  fileName: string;
+  format: "md" | "txt";
+  charCount: number;
+  uploadedAt: string;
+};
+
+export type StoryProStarterMode = "upload" | "generate";
+
 export type StoryProStarterNodeData = {
+  /** upload=上传剧本（当前默认）；generate=上游「创作剧本」节点（预留） */
+  starterMode?: StoryProStarterMode;
+  /** 运行时内存/会话用；autosave 时剥离，以 OSS 为准 */
+  uploadedScriptMd?: string;
+  /** 剧本正文 OSS URL（持久化） */
+  uploadedScriptOssUrl?: string;
+  uploadedScriptMeta?: StoryProUploadedScriptMeta;
   systemPrompt: string;
-  systemPromptTemplateId?: string;
+  systemPromptTemplateId?: StoryProThemeSystemPromptTemplateId;
   providerId: string;
   modelKey: string;
   params?: Record<string, unknown>;

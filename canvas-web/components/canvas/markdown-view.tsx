@@ -1,10 +1,11 @@
 "use client";
 
+import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { prepareMarkdownForPreview } from "@/lib/canvas/parse-md-tables";
 import {
-  storyMdTablePadClass,
   storyMdTableTextClass,
   storyMdTableWrapperClass,
   storyMdTdClass,
@@ -12,47 +13,29 @@ import {
   type StoryMdTableVariant,
 } from "@/lib/canvas/story-md-table-chrome";
 
-export function MarkdownView({
+function MarkdownProse({
   content,
-  className = "",
-  variant = "inline",
+  className,
+  variant,
+  tableVariant,
+  isDoc,
+  isNodePreview,
+  isDarkPreview,
+  isLightDoc,
 }: {
   content: string;
-  className?: string;
-  /** inline=暗色节点；nodePreview=节点内白纸预览；document=全屏 Word 式阅读；darkPreview=黑底白字节点预览 */
-  variant?: "inline" | "document" | "nodePreview" | "darkPreview";
+  className: string;
+  variant: "inline" | "document" | "nodePreview" | "darkPreview";
+  tableVariant: StoryMdTableVariant;
+  isDoc: boolean;
+  isNodePreview: boolean;
+  isDarkPreview: boolean;
+  isLightDoc: boolean;
 }) {
-  if (!content.trim()) {
-    return (
-      <p className="text-[11px] text-[var(--canvas-muted)]">（暂无 Markdown 内容）</p>
-    );
-  }
-
-  const isDoc = variant === "document";
-  const isNodePreview = variant === "nodePreview";
-  const isDarkPreview = variant === "darkPreview";
-  const isLightDoc = isDoc || isNodePreview;
-  const tableVariant: StoryMdTableVariant = isNodePreview
-    ? "nodePreview"
-    : isDarkPreview
-      ? "inline"
-      : "document";
-
-  const tableCell = storyMdTableTextClass(tableVariant);
-  const tablePad = storyMdTablePadClass(tableVariant);
+  const tablePad = isLightDoc ? "px-4 py-2.5" : "px-2 py-1";
 
   return (
-    <div
-      className={
-        isDoc
-          ? `prose prose-neutral max-w-none text-[17px] leading-[1.75] text-neutral-900 ${className}`
-          : isNodePreview
-            ? `prose prose-neutral max-w-none text-[13px] leading-[1.7] text-neutral-800 ${className}`
-            : isDarkPreview
-              ? `prose prose-invert max-w-none text-[13px] leading-[1.75] text-white ${className}`
-              : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${className}`
-      }
-    >
+    <div className={`w-full min-w-0 ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -60,7 +43,7 @@ export function MarkdownView({
             <h1
               className={
                 isDoc
-                  ? "mb-6 border-b border-neutral-200 pb-3 text-[28px] font-bold text-neutral-900"
+                  ? "mb-6 border-b border-neutral-200 pb-3 text-[28px] font-bold leading-tight text-neutral-900"
                   : undefined
               }
             >
@@ -71,11 +54,11 @@ export function MarkdownView({
             <h2
               className={
                 isDoc
-                  ? "mb-4 mt-8 text-[22px] font-semibold text-neutral-800"
+                  ? "mb-4 mt-8 text-[22px] font-semibold leading-snug text-neutral-800"
                   : isNodePreview
-                    ? "mb-2 mt-5 border-b border-neutral-200 pb-1 text-[15px] font-semibold text-neutral-800 first:mt-0"
+                    ? "mb-2 mt-5 border-b border-neutral-200 pb-1 text-[15px] font-semibold leading-snug text-neutral-800 first:mt-0"
                     : isDarkPreview
-                      ? "mb-2 mt-5 border-b border-white/15 pb-1 text-[14px] font-semibold text-white first:mt-0"
+                      ? "mb-2 mt-5 border-b border-white/15 pb-1 text-[14px] font-semibold leading-snug text-white first:mt-0"
                       : undefined
               }
             >
@@ -86,11 +69,11 @@ export function MarkdownView({
             <h3
               className={
                 isDoc
-                  ? "mb-3 mt-6 text-[18px] font-semibold text-neutral-800"
+                  ? "mb-3 mt-6 text-[18px] font-semibold leading-snug text-neutral-800"
                   : isNodePreview
-                    ? "mb-2 mt-4 text-[14px] font-semibold text-neutral-800"
+                    ? "mb-2 mt-4 text-[14px] font-semibold leading-snug text-neutral-800"
                     : isDarkPreview
-                      ? "mb-2 mt-4 text-[13px] font-semibold text-white/95"
+                      ? "mb-2 mt-4 text-[13px] font-semibold leading-snug text-white/95"
                       : undefined
               }
             >
@@ -115,10 +98,13 @@ export function MarkdownView({
           li: ({ children }) => (
             <li
               className={
-                isDoc ? "text-[17px] leading-[1.75]"
-                : isNodePreview ? "text-[13px] leading-[1.7]"
-                : isDarkPreview ? "text-[13px] leading-[1.7] text-white/90"
-                : undefined
+                isDoc
+                  ? "text-[17px] leading-[1.75]"
+                  : isNodePreview
+                    ? "text-[13px] leading-[1.7]"
+                    : isDarkPreview
+                      ? "text-[13px] leading-[1.7] text-white/90"
+                      : undefined
               }
             >
               {children}
@@ -126,14 +112,12 @@ export function MarkdownView({
           ),
           table: ({ children }) => (
             <div
-              className={`overflow-x-auto ${
-                isDoc ? "my-6"
-                : isNodePreview ? "my-3"
-                : "my-4"
+              className={`max-w-full overflow-x-auto ${
+                isDoc ? "my-6" : isNodePreview ? "my-3" : "my-4"
               }`}
             >
               <table
-                className={`${storyMdTableWrapperClass(tableVariant)} ${tableCell} ${
+                className={`${storyMdTableWrapperClass(tableVariant)} ${storyMdTableTextClass(tableVariant)} ${
                   isLightDoc ? "" : "border border-white/10"
                 }`}
               >
@@ -168,5 +152,57 @@ export function MarkdownView({
         {content}
       </ReactMarkdown>
     </div>
+  );
+}
+
+export function MarkdownView({
+  content,
+  className = "",
+  variant = "inline",
+  /** 已由调用方 prepare 过时设为 true，避免重复处理 */
+  prepared = false,
+}: {
+  content: string;
+  className?: string;
+  /** inline=暗色节点；nodePreview=节点内白纸预览；document=全屏 Word 式阅读；darkPreview=黑底白字节点预览 */
+  variant?: "inline" | "document" | "nodePreview" | "darkPreview";
+  prepared?: boolean;
+}) {
+  if (!content.trim()) {
+    return (
+      <p className="text-[11px] text-[var(--canvas-muted)]">（暂无 Markdown 内容）</p>
+    );
+  }
+
+  const isDoc = variant === "document";
+  const isNodePreview = variant === "nodePreview";
+  const isDarkPreview = variant === "darkPreview";
+  const isLightDoc = isDoc || isNodePreview;
+  const tableVariant: StoryMdTableVariant = isNodePreview ? "nodePreview" : "document";
+
+  const proseClass = isDoc
+    ? `max-w-none text-[17px] leading-[1.75] text-neutral-900 ${className}`
+    : isNodePreview
+      ? `max-w-none text-[13px] leading-[1.7] text-neutral-800 ${className}`
+      : isDarkPreview
+        ? `max-w-none text-[13px] leading-[1.75] text-white ${className}`
+        : `${RF_NODE_SCROLL} prose prose-invert prose-sm max-w-none text-[12px] ${className}`;
+
+  const useRichPreview =
+    variant === "document" || variant === "nodePreview" || variant === "darkPreview";
+  const md =
+    useRichPreview && !prepared ? prepareMarkdownForPreview(content) : content;
+
+  return (
+    <MarkdownProse
+      content={md}
+      className={proseClass}
+      variant={variant}
+      tableVariant={tableVariant}
+      isDoc={isDoc}
+      isNodePreview={isNodePreview}
+      isDarkPreview={isDarkPreview}
+      isLightDoc={isLightDoc}
+    />
   );
 }

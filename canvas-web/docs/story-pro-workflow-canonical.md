@@ -38,7 +38,23 @@
 
 ---
 
-## 3. 固定节点链
+## 3. 故事剧本 · LLM 输出结构（定稿拆分真源 · 致命）
+
+上传剧本 **不改**；LLM 须按 `lib/canvas/story-pro-script-pack.ts` 输出 Markdown：
+
+| 章节 | Hub Tab / 下游 |
+|------|----------------|
+| `## 视觉风格总纲` · `## 场景视觉辞典` · `## 核心冲突与结构摘要` · `## 下一步交接清单` | 大纲 Tab |
+| `## 角色视觉辞典`（GFM：`姓名 \| 身份 \| 外貌/服装/标志性动作 \| 性格`） | 角色 Tab → `story-pro-character` |
+| `## 分镜脚本`（GFM 8 列，**对白列必填**） | 分镜/对白 Tab → `story-pro-frame` / `story-pro-video` |
+
+- 启动页默认模板：`STORY_PRO_DIRECTOR_FROM_SCRIPT_PROMPT`（`@<ref-uploaded-script>` 不变）
+- Hub 段 prompt：`STORY_PRO_OUTLINE_USER_PROMPT` / `CHARACTER` / `STORYBOARD` 与上表对齐
+- 解析：`promoteEmbeddedPackFromOutline` · `story-pro-column-sync.ts`
+
+---
+
+## 4. 固定节点链
 
 | 顺序 | type | 名称 |
 |------|------|------|
@@ -55,7 +71,7 @@
 
 ---
 
-## 4. 门禁
+## 5. 门禁
 
 | 门禁 | 条件 |
 |------|------|
@@ -65,7 +81,7 @@
 
 ---
 
-## 5. 隔离
+## 6. 隔离
 
 - `StoryProWorkspaceIds.scriptHubId` + 列节点 `hubNodeId`
 - 禁止 `find(第一个 story-comic-starter)`；用 `resolveStarterForHub(hubNodeId)`
@@ -73,7 +89,7 @@
 
 ---
 
-## 6. Gateway
+## 7. Gateway
 
 - 全部经 Gateway；见 `.cursor/rules/canvas-gateway-no-direct-connect.mdc`
 - `clientPage`: `canvas/{projectId}/story-pro`
@@ -81,7 +97,7 @@
 
 ---
 
-## 7. 代码锚点
+## 8. 代码锚点
 
 | Concern | 模块 |
 |---------|------|
@@ -94,10 +110,11 @@
 | 节点 UI | `components/canvas/nodes/story-pro-*` |
 | Palette | `node-palette.tsx` · `STORY_PRO_PALETTE` |
 | 模板 | `templates.ts` · `builtin/story-pro-pipeline` |
+| 故事剧本结构 | `story-pro-script-pack.ts` · `.cursor/rules/canvas-story-pro-script-pack.mdc` |
 
 ---
 
-## 8. 进度
+## 9. 进度
 
 | Phase | 内容 | 状态 |
 |-------|------|------|
@@ -111,6 +128,6 @@
 
 ---
 
-## 9. 变更本规范
+## 10. 变更本规范
 
-须同步更新本文、`story-pro-edition-requirements.md`、`.cursor/rules/story-pro-workflow-canonical.mdc`。
+须同步更新本文、`story-pro-edition-requirements.md`、`.cursor/rules/story-pro-workflow-canonical.mdc`、`.cursor/rules/canvas-story-pro-script-pack.mdc`。

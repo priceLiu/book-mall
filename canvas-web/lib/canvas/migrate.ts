@@ -23,6 +23,8 @@ import {
 } from "./types";
 import { normalizeCanvasNodes } from "./normalize-graph-nodes";
 import { migrateStoryComicStarterNode } from "./story-starter-migrate";
+import { migrateStoryOutlineLlmParams } from "./story-llm-params-migrate";
+import { migrateStoryPromptPackAll } from "./story-prompt-pack-migrate";
 import { STORY_CONTROL_NODE_HEIGHT, STORY_CONTROL_NODE_WIDTH } from "./story-node-chrome";
 
 // 这个文件需要识别 v1 的节点字符串字面量，但 v6 阶段后 CanvasNodeType 已经
@@ -142,15 +144,19 @@ export function migrateGraphV1ToV2(graph: CanvasGraph): CanvasGraph {
   const ver = typeof graph.schemaVersion === "number" ? graph.schemaVersion : 0;
   const rawNodes = graph.nodes ?? [];
   const transform = (n: LooseNode) =>
-    migrateStoryComicStarterNode(
-      backfillNodeSize(ver >= 2 ? n : migrateNode(n)) as CanvasFlowNode,
+    migrateStoryOutlineLlmParams(
+      migrateStoryComicStarterNode(
+        backfillNodeSize(ver >= 2 ? n : migrateNode(n)) as CanvasFlowNode,
+      ),
     );
   const edges: CanvasFlowEdge[] = graph.edges ?? [];
-  const nodes = normalizeCanvasNodes(
-    rawNodes.map((n) =>
-      transform(n as unknown as LooseNode),
-    ) as unknown as CanvasFlowNode[],
-    edges,
+  const nodes = migrateStoryPromptPackAll(
+    normalizeCanvasNodes(
+      rawNodes.map((n) =>
+        transform(n as unknown as LooseNode),
+      ) as unknown as CanvasFlowNode[],
+      edges,
+    ),
   );
   return {
     ...graph,

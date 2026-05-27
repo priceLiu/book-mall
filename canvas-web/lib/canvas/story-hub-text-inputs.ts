@@ -1,8 +1,13 @@
-import { parseCharacterRows } from "./parse-md-tables";
-import { outlineDisplayMd } from "./story-hub-runtime";
+import { parseCharacterRows, prepareMarkdownForPreview } from "./parse-md-tables";
 import type { StoryLlmSection } from "./story-workspace-types";
 import type { CanvasFlowNode } from "./types";
 import type { StoryScriptHubNodeData } from "./story-workspace-types";
+import { isAnyStoryScriptHubType } from "./story-workspace-resolver";
+
+/** 下游 LLM 用完整大纲（不做展示层剥离，避免场景/对白被截断） */
+function outlineTextInputMd(md: string): string {
+  return prepareMarkdownForPreview(md.trim());
+}
 
 /** 文案中枢各段 LLM 须带上节点内已落库的上游段落（不只靠画布入边）。 */
 export function resolveStoryHubSectionTextInputs(
@@ -10,14 +15,14 @@ export function resolveStoryHubSectionTextInputs(
   section: StoryLlmSection | undefined,
   upstreamTextInputs: string[],
 ): string[] {
-  if (node.type !== "story-script-hub" || !section) {
+  if (!isAnyStoryScriptHubType(node.type ?? "") || !section) {
     return upstreamTextInputs;
   }
   const d = node.data as unknown as StoryScriptHubNodeData;
   const out = [...upstreamTextInputs];
 
   if (section === "character") {
-    const outline = outlineDisplayMd(d.outlineMd ?? "").trim();
+    const outline = outlineTextInputMd(d.outlineMd ?? "");
     if (outline) {
       out.push(`## 故事大纲\n\n${outline}`);
     }
@@ -25,7 +30,7 @@ export function resolveStoryHubSectionTextInputs(
   }
 
   if (section === "storyboard") {
-    const outline = outlineDisplayMd(d.outlineMd ?? "").trim();
+    const outline = outlineTextInputMd(d.outlineMd ?? "");
     const character = (d.characterMd ?? "").trim();
     const names = parseCharacterRows(character)
       .map((c) => c.name.trim())

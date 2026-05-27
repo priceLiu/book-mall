@@ -57,6 +57,23 @@ export function findProStyleForHub(
     .find((n) => n?.type === "story-pro-style");
 }
 
+/** 风格节点 → 所属故事剧本 hub（data.hubNodeId 或入边） */
+export function findProScriptHubForStyle(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  styleNodeId: string,
+  hubNodeId?: string,
+): CanvasFlowNode | undefined {
+  if (hubNodeId) {
+    const hub = nodes.find((n) => n.id === hubNodeId);
+    if (hub?.type === "story-pro-script-hub") return hub;
+  }
+  return edges
+    .filter((e) => e.target === styleNodeId)
+    .map((e) => nodes.find((n) => n.id === e.source))
+    .find((n) => n?.type === "story-pro-script-hub");
+}
+
 export function findStarterByHubId(
   nodes: CanvasFlowNode[],
   hubNodeId: string,

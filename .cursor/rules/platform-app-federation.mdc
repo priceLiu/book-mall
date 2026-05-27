@@ -1,0 +1,55 @@
+---
+description: 平台联邦架构——新应用须独立部署、自有门户、Book SSO 互通、Gateway 调用、单点入账
+alwaysApply: true
+---
+
+# 平台联邦：新应用开发约束
+
+Book（book-mall）是 **平台层**（身份、订阅/套件准入、Gateway 关联、Platform API），不是业务单体。
+**整站未正式上线前**，新代码须按统一协议实现；历史例外（canvas Cookie 透传）在迁移计划中消除，**禁止在新应用中复制**。
+
+权威文档：
+
+- `book-mall/doc/product/12-platform-app-federation.md`
+- `book-mall/doc/plans/2026-platform-unification-rollout.md`
+- `book-mall/doc/product/09-finance-refactor-and-tool-federation.md`
+
+## 1. 独立部署、低耦合
+
+- 每个应用 **独立 package / 进程 / 域名**，可单独发布与扩缩容。
+- **禁止** 应用直连 book-mall 的 PostgreSQL（读价、扣钱包、写流水）。
+- **禁止** 在应用内复制 book 的计费/准入规则（Single Writer：账与策略只在 book / Platform API）。
+- 允许的运行时依赖：Book **Platform API**（SSO、introspect、usage、library 代理）、**Gateway**（厂商 AI 调用）。
+
+## 2. 自有门户 + 账号互通
+
+- 每个应用 **自有首页/导航/品牌**（门户）。
+- 账号互通 **统一经 Book SSO**（`issue` / `re-enter` → 子站 `/auth/sso/callback` → platform token）。
+- **禁止** 新应用以「仅 NextAuth Cookie 透传」作为唯一鉴权方案。
+- 未登录/令牌失效：**静默 re-enter** 或跳转 Book 登录；禁止无说明的 401「闪一下」。
+
+## 3. Book 作框架、可第三方接入
+
+- 新能力通过 **注册 `toolKey` / `navKey`** 与 Platform API 对接。
+- 厂商 AI 调用 **必须经 Gateway**（见 `canvas-gateway-no-direct-connect.mdc`）。
+- 新增 HTTP 契约须版本化并写入 `book-mall/doc/tech/`。
+
+## 4. 财务与 Gateway（目标态）
+
+- **Gateway BYOK**：用户自担厂商成本；Book 不卖 Token、不代扣云厂商账单（Canvas/Story/工具生成均经 Gateway）。
+- **Book 收费**：订阅 / 工具套件 **准入**（entitlement），非按次点数（legacy 点数路径迁移中移除）。
+- 工具 **不双写** `Wallet` / `ToolUsageEvent`；入账只经 Platform API。
+
+## 5. 新应用 checklist
+
+- [ ] 独立 `package.json`、端口、部署目录
+- [ ] SSO 换票 + `MAIN_SITE_ORIGIN` / `TOOLS_PUBLIC_ORIGIN`
+- [ ] API 鉴权用 platform token（非 NextAuth Cookie 透传）
+- [ ] 生成前：`introspect` 套件门禁 + Gateway `sk-gw` 关联检查
+- [ ] 不双写账本表
+- [ ] 破坏性删除：二次确认（`destructive-delete-confirmation.mdc`）
+
+## 6. 参考实现
+
+- **目标样板**：`tool-web`（SSO + Platform API + Gateway 转发）
+- **待迁移**：`canvas-web`、`story-web`（Cookie 代理 → 统一 SSO）

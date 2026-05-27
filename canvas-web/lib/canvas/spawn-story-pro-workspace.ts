@@ -7,15 +7,17 @@ import {
   STORY_PRO_CHARACTER_PROMPT,
   STORY_PRO_OUTLINE_USER_PROMPT,
   STORY_PRO_STORYBOARD_PROMPT,
+  STORY_PRO_HUB_LLM_SYSTEM,
+  STORY_PRO_LLM_PARAMS_DEFAULT,
   STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
 } from "./story-pro-prompts";
 import type { StoryProWorkspaceIds } from "./story-pro-workspace-types";
-import { STORY_CONTROL_NODE_WIDTH } from "./story-node-chrome";
 import { STORY_WORKSPACE_COL_H_GAP } from "./story-comic-workspace-layout";
 import {
   storyControlRowBottom,
   storyMediaColumnY,
 } from "./story-workspace-layout";
+import { storyProControlRowX, storyProMediaColumnStartX } from "./story-pro-control-layout";
 
 export type { StoryProWorkspaceIds };
 
@@ -142,11 +144,7 @@ export function findStoryProWorkspaceForStarter(
   return ids;
 }
 
-const LLM_PARAMS = {
-  reasoning_effort: "low",
-  max_tokens: 4000,
-  temperature: 0.7,
-};
+const LLM_PARAMS = STORY_PRO_LLM_PARAMS_DEFAULT;
 
 type SpawnProHubArgs = {
   starterNodeId: string;
@@ -183,6 +181,7 @@ export function spawnStoryProScriptHub(args: SpawnProHubArgs): {
 
   const starter = args.nodes.find((n) => n.id === args.starterNodeId);
   const base = starter?.position ?? { x: 80, y: 120 };
+  const { hubX } = storyProControlRowX(base.x);
   const sharedLlm = {
     providerId: args.providerId,
     modelKey: args.modelKey,
@@ -192,13 +191,13 @@ export function spawnStoryProScriptHub(args: SpawnProHubArgs): {
 
   const scriptHubId = args.addNode(
     "story-pro-script-hub",
-    { x: base.x + 480, y: base.y },
+    { x: hubX, y: base.y },
     {
       ...sharedLlm,
       outlineMd: "",
       characterMd: "",
       storyboardMd: "",
-      outlineSystemPrompt: args.systemPrompt.trim(),
+      outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
       promptOutline: STORY_PRO_OUTLINE_USER_PROMPT,
       promptCharacter: STORY_PRO_CHARACTER_PROMPT,
       promptStoryboard: STORY_PRO_STORYBOARD_PROMPT,
@@ -223,10 +222,12 @@ export function spawnStoryProStyleNode(
   if (existing) return existing.id;
 
   const hub = args.nodes.find((n) => n.id === args.scriptHubId);
-  const base = hub?.position ?? { x: 560, y: 120 };
+  const starter = args.nodes.find((n) => n.id === args.starterNodeId);
+  const originX = starter?.position.x ?? hub?.position.x ?? 80;
+  const { styleX } = storyProControlRowX(originX);
   const styleId = args.addNode(
     "story-pro-style",
-    { x: base.x + 480, y: base.y },
+    { x: styleX, y: hub?.position.y ?? 120 },
     {
       hubNodeId: args.scriptHubId,
       styleAnchorZh: "",
@@ -251,14 +252,20 @@ export function spawnStoryProStyleNode(
   return styleId;
 }
 
-function proMediaColumnXs(hubLeftX: number): [number, number, number, number, number] {
+function proMediaColumnXs(styleLeftX: number): [number, number, number, number, number] {
   const wChar = NODE_DEFAULT_SIZE["story-pro-character"].width;
   const wScene = NODE_DEFAULT_SIZE["story-pro-scene"].width;
   const wFrame = NODE_DEFAULT_SIZE["story-pro-frame"].width;
   const wVideo = NODE_DEFAULT_SIZE["story-pro-video"].width;
   const gap = STORY_WORKSPACE_COL_H_GAP;
-  const x0 = hubLeftX + STORY_CONTROL_NODE_WIDTH + gap;
-  return [x0, x0 + wChar + gap, x0 + wChar + gap + wScene + gap, x0 + wChar + gap + wScene + gap + wFrame + gap, x0 + wChar + gap + wScene + gap + wFrame + gap + wVideo + gap];
+  const x0 = storyProMediaColumnStartX(styleLeftX);
+  return [
+    x0,
+    x0 + wChar + gap,
+    x0 + wChar + gap + wScene + gap,
+    x0 + wChar + gap + wScene + gap + wFrame + gap,
+    x0 + wChar + gap + wScene + gap + wFrame + gap + wVideo + gap,
+  ];
 }
 
 export function spawnStoryProMediaColumns(
@@ -331,14 +338,32 @@ export function storyProHubHasOutputWorkflow(
   );
 }
 
+/** 故事剧本已定稿并进入风格层（专业版：仅有风格节点、尚无媒体列也算定稿） */
+export function storyProHubHasStyleLayer(
+  nodes: CanvasFlowNode[],
+  scriptHubId: string,
+): boolean {
+  return nodes.some(
+    (n) => n.type === "story-pro-style" && belongsToHub(n, scriptHubId),
+  );
+}
+
 export function reconcileStoryProHubFinalized(
   nodes: CanvasFlowNode[],
 ): CanvasFlowNode[] {
   return nodes.map((n) => {
     if (n.type !== "story-pro-script-hub") return n;
     const d = n.data as { scriptFinalized?: boolean };
+    const hasStyle = storyProHubHasStyleLayer(nodes, n.id);
+    const hasMedia = storyProHubHasOutputWorkflow(nodes, n.id);
+
+    // 修复旧逻辑误清：已有风格节点即视为故事已定稿
+    if (!d.scriptFinalized && hasStyle && !hasMedia) {
+      return { ...n, data: { ...n.data, scriptFinalized: true } };
+    }
+
     if (!d.scriptFinalized) return n;
-    if (storyProHubHasOutputWorkflow(nodes, n.id)) return n;
+    if (hasMedia || hasStyle) return n;
     return { ...n, data: { ...n.data, scriptFinalized: false } };
   });
 }

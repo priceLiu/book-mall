@@ -42,7 +42,7 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
 
 const STAGE_LABELS: Record<string, string> = {
-  idle: "填写创意 → 创作剧本",
+  idle: "填写创意 → 创作剧本（含角色表+分镜表）",
   llm_done: "剧本已生成 · 打开「故事大纲」审阅",
   finalized: "已定稿 · 工作流已输出",
 };
@@ -169,11 +169,13 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
   const onSavePrompt = useCallback(
     (next: {
       systemPrompt: string;
-      systemPromptTemplateId?: StoryThemeSystemPromptTemplateId;
+      systemPromptTemplateId?: string;
     }) => {
       updateNodeData(id, {
         systemPrompt: next.systemPrompt,
-        systemPromptTemplateId: next.systemPromptTemplateId,
+        systemPromptTemplateId: next.systemPromptTemplateId as
+          | StoryThemeSystemPromptTemplateId
+          | undefined,
       });
       if (scriptHub) {
         syncStoryHubFromStarter({
@@ -310,7 +312,7 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
               hint={
                 <span className="flex items-center gap-1">
                   <Sparkles className="size-3 shrink-0" /> 自动连接「故事大纲」·
-                  弹出层审阅
+                  一次生成大纲+角色+分镜
                 </span>
               }
             >
@@ -365,6 +367,7 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
         value={systemPrompt}
         onSave={onSavePrompt}
         readOnly={promptEditLocked}
+        editHint="系统提示词 · 须含 ## 角色设定 与 ## 分镜脚本 GFM 表（与右侧预览同步）"
       />
     </>
   );

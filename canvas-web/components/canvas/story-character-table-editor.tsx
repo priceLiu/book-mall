@@ -18,6 +18,7 @@ export type CharacterTableRow = {
   name: string;
   role: string;
   appearance: string;
+  personality: string;
 };
 
 export function characterRowsFromMd(md: string): CharacterTableRow[] {
@@ -25,6 +26,7 @@ export function characterRowsFromMd(md: string): CharacterTableRow[] {
     name: r.name,
     role: r.role,
     appearance: r.appearance,
+    personality: r.personality ?? "",
   }));
 }
 
@@ -35,7 +37,7 @@ export function canEditCharacterAsTable(md: string): boolean {
   return characterRowsFromMd(md).length > 0;
 }
 
-/** 与右侧原稿 GFM 表格同款的编辑表 */
+/** 与分镜脚本表同款的 GFM 角色编辑表 */
 const TABLE = storyMdTableWrapperClass("editor");
 const TH = storyMdThClass("editor");
 const TD = `${storyMdTdClass("editor")} p-0 align-top`;
@@ -52,7 +54,11 @@ export function StoryCharacterTableEditor({
   const rows = useMemo(() => characterRowsFromMd(value), [value]);
 
   const commit = (next: CharacterTableRow[]) => {
-    onChange(formatCharacterTableMarkdown(next.filter((r) => r.name.trim())));
+    onChange(
+      formatCharacterTableMarkdown(
+        next.filter((r) => r.name.trim()),
+      ),
+    );
   };
 
   const patchRow = (index: number, patch: Partial<CharacterTableRow>) => {
@@ -62,7 +68,12 @@ export function StoryCharacterTableEditor({
   const addRow = () => {
     commit([
       ...rows,
-      { name: "", role: "", appearance: "（待补充外观）" },
+      {
+        name: "",
+        role: "",
+        appearance: "",
+        personality: "",
+      },
     ]);
   };
 
@@ -78,16 +89,18 @@ export function StoryCharacterTableEditor({
       <div className="overflow-x-auto overflow-y-visible">
         <table className={TABLE}>
           <colgroup>
-            <col className="min-w-[96px]" />
-            <col className="min-w-[180px]" />
-            <col className="min-w-[280px]" />
+            <col className="min-w-[88px]" />
+            <col className="min-w-[140px]" />
+            <col className="min-w-[220px]" />
+            <col className="min-w-[120px]" />
             <col className="w-9" />
           </colgroup>
           <thead>
             <tr>
-              <th className={TH}>角色</th>
-              <th className={TH}>定位</th>
-              <th className={TH}>外观描述</th>
+              <th className={TH}>姓名</th>
+              <th className={TH}>身份</th>
+              <th className={TH}>外貌关键词</th>
+              <th className={TH}>性格</th>
               <th className={`${TH} w-9 px-0`} aria-hidden />
             </tr>
           </thead>
@@ -107,7 +120,7 @@ export function StoryCharacterTableEditor({
                     className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed text-neutral-800`}
                     rows={storyTableTextareaRows(row.role, 2, 14)}
                     value={row.role}
-                    placeholder="身份、立场、与主线关系"
+                    placeholder="身份、立场"
                     onChange={(e) => patchRow(index, { role: e.target.value })}
                   />
                 </td>
@@ -116,9 +129,20 @@ export function StoryCharacterTableEditor({
                     className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed text-neutral-800`}
                     rows={storyTableTextareaRows(row.appearance, 3, 16)}
                     value={row.appearance}
-                    placeholder="画像用外观描述"
+                    placeholder="外貌、服装、气质关键词"
                     onChange={(e) =>
                       patchRow(index, { appearance: e.target.value })
+                    }
+                  />
+                </td>
+                <td className={TD}>
+                  <textarea
+                    className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed text-neutral-800`}
+                    rows={storyTableTextareaRows(row.personality, 2, 12)}
+                    value={row.personality}
+                    placeholder="性格、情绪基调"
+                    onChange={(e) =>
+                      patchRow(index, { personality: e.target.value })
                     }
                   />
                 </td>

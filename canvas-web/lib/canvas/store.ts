@@ -45,6 +45,7 @@ import {
   hasStoryProPipeline,
   reflowStoryProWorkspace,
 } from "./story-pro-workspace-layout";
+import { reconcileStoryProHubFinalized } from "./spawn-story-pro-workspace";
 import { reconcileStoryWorkspaceEdges } from "./spawn-story-workspace";
 import { hasStoryComicColumnGroups } from "./story-comic-groups";
 import {
@@ -181,9 +182,11 @@ export const useCanvasStore = create<CanvasState>()(
       hydrate: (projectId, graph) => {
         const raw = graph && Array.isArray(graph.nodes) ? graph : emptyGraph();
         const g = migrateGraphV1ToV2(raw);
-        let nodes = normalizeCanvasNodes(
-          g.nodes as CanvasFlowNode[],
-          g.edges as CanvasFlowEdge[],
+        let nodes = reconcileStoryProHubFinalized(
+          normalizeCanvasNodes(
+            g.nodes as CanvasFlowNode[],
+            g.edges as CanvasFlowEdge[],
+          ),
         );
         let edges = g.edges as CanvasFlowEdge[];
         const stripped = stripStoryPreviewNodes(nodes, edges);

@@ -10,13 +10,35 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_BYTES = 30 * 1024 * 1024;
-const ACCEPTED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ACCEPTED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ACCEPTED_TEXT_MIME = new Set([
+  "text/plain",
+  "text/markdown",
+  "application/octet-stream",
+]);
 
-function extForMime(m: string): string {
+function extForMime(m: string, fileName?: string): string {
+  const lower = (fileName ?? "").toLowerCase();
+  if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "md";
+  if (lower.endsWith(".txt")) return "txt";
+  if (m === "text/markdown") return "md";
+  if (m === "text/plain") return "txt";
   if (m === "image/jpeg") return "jpg";
   if (m === "image/png") return "png";
   if (m === "image/webp") return "webp";
   return "bin";
+}
+
+function isTextUpload(mime: string, fileName: string): boolean {
+  const lower = fileName.toLowerCase();
+  if (
+    lower.endsWith(".md") ||
+    lower.endsWith(".markdown") ||
+    lower.endsWith(".txt")
+  ) {
+    return true;
+  }
+  return ACCEPTED_TEXT_MIME.has(mime.toLowerCase());
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -59,19 +81,34 @@ export async function POST(request: NextRequest) {
     );
   }
   const mime = file.type.toLowerCase();
-  if (!ACCEPTED_MIME.has(mime)) {
+  const fileName = file.name.trim();
+  const textUpload = isTextUpload(mime, fileName);
+  if (!textUpload && !ACCEPTED_IMAGE_MIME.has(mime)) {
     return NextResponse.json(
       { error: "UNSUPPORTED_MIME", mime },
       { status: 415, headers: jsonHeaders(request) },
     );
   }
   const buf = Buffer.from(await file.arrayBuffer());
+  if (textUpload) {
+    const sample = buf.subarray(0, Math.min(buf.length, 4096)).toString("utf8");
+    if (sample.includes("\0")) {
+      return NextResponse.json(
+        { error: "INVALID_TEXT", message: "binary content in text file" },
+        { status: 400, headers: jsonHeaders(request) },
+      );
+    }
+  }
   try {
     const ossUrl = await uploadCanvasUserBuffer({
       buf,
-      contentType: mime,
+      contentType: textUpload
+        ? mime === "text/markdown"
+          ? "text/markdown; charset=utf-8"
+          : "text/plain; charset=utf-8"
+        : mime,
       userId: guard.user.id,
-      ext: extForMime(mime),
+      ext: extForMime(mime, fileName),
     });
     return NextResponse.json(
       { ossUrl },
