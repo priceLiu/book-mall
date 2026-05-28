@@ -123,6 +123,7 @@ export function StoryProSceneColumnNode({ id, data, selected }: NodeProps) {
       engine
       bodyScroll
       runtime={nodeRuntime}
+      disableGeneratingChrome
       accent={storyEditionAccent("pro")}
       minWidth={NODE_DEFAULT_SIZE["story-pro-scene"].width}
       minHeight={NODE_DEFAULT_SIZE["story-pro-scene"].height}

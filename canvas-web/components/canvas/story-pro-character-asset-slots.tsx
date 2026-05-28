@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Lock, Trash2, Upload, Wand2 } from "lucide-react";
+import { Eye, Lock, Trash2, Upload, Wand2 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   autoFillStoryProCharacterSlotsFromThreeView,
   deleteStoryProCharacterAssetRef,
@@ -66,6 +67,7 @@ export function StoryProCharacterAssetSlots({
   onPreview?: (url: string, title: string) => void;
 }) {
   const base = useBookMallBaseUrl();
+  const { doubleConfirm } = useDialogs();
   const fileRef = useRef<HTMLInputElement>(null);
   useImagePasteRouter();
   const [pendingKind, setPendingKind] = useState<StoryProAssetRefKind | null>(
@@ -315,14 +317,24 @@ export function StoryProCharacterAssetSlots({
 
   const removeRef = async (refId: string, label: string) => {
     if (assetLocked || !base?.trim()) return;
-    if (!window.confirm(`从角色资产库删除「${label}」？`)) return;
-    if (
-      !window.confirm(
-        "此操作不可恢复；将同时删除云端存储（OSS）中的该参考图记录。确定删除？",
-      )
-    ) {
-      return;
-    }
+    const ok = await doubleConfirm({
+      first: {
+        title: "删除角色参考图",
+        message: `从角色资产库删除「${label}」？`,
+        confirmLabel: "继续",
+        cancelLabel: "取消",
+        danger: true,
+      },
+      second: {
+        title: "不可恢复",
+        message:
+          "此操作不可恢复；将同时删除云端存储（OSS）中的该参考图记录。确定删除？",
+        confirmLabel: "确定删除",
+        cancelLabel: "取消",
+        danger: true,
+      },
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await deleteStoryProCharacterAssetRef(base, refId);
@@ -399,8 +411,12 @@ export function StoryProCharacterAssetSlots({
               <button
                 type="button"
                 className={cn(
-                  "nodrag relative aspect-[3/4] w-full overflow-hidden rounded hover:ring-1 hover:ring-white/15",
-                  kind === "outfit" && url ? "bg-white" : "bg-black/40",
+                  "group/asset-slot nodrag relative aspect-[3/4] w-full overflow-hidden rounded hover:ring-1 hover:ring-white/15",
+                  kind === "outfit" && url
+                    ? "bg-white"
+                    : url
+                      ? "bg-black/50"
+                      : "bg-black/40",
                   dragOverKind === kind && "ring-1 ring-white/40",
                   activeKind === kind && canUpload && "ring-1 ring-white/20",
                 )}
@@ -433,15 +449,22 @@ export function StoryProCharacterAssetSlots({
                 }}
               >
                 {url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={url}
-                    alt={STORY_PRO_ASSET_REF_KIND_LABELS[kind]}
-                    className={cn(
-                      "size-full",
-                      kind === "outfit" ? "object-contain" : "object-cover",
-                    )}
-                  />
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={STORY_PRO_ASSET_REF_KIND_LABELS[kind]}
+                      className="size-full object-contain"
+                    />
+                    {onPreview ? (
+                      <span
+                        className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover/asset-slot:opacity-100"
+                        aria-hidden
+                      >
+                        <Eye className="size-4 text-white/90" />
+                      </span>
+                    ) : null}
+                  </>
                 ) : (
                   <span className="flex size-full flex-col items-center justify-center gap-0.5 px-1 text-center text-[8px] leading-tight text-white/25">
                     <span>空</span>

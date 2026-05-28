@@ -112,8 +112,11 @@ export function LogsTable({ logs }: { logs: GatewayLogRow[] }) {
               <th className="w-[88px]">Duration</th>
               <th className="min-w-[168px]">Submitted</th>
               <th className="min-w-[168px]">Completed</th>
-              <th className="w-[120px]" title="有定价时为预估成本（元），否则为 Token 用量">
-                Credits Consumed
+              <th
+                className="w-[120px]"
+                title="用量观测：LLM 为 Token（tok）；部分任务为挂牌参考（元）。非钱包 Credits、非平台扣费。"
+              >
+                Usage
               </th>
               <th className="min-w-[240px]">Task ID</th>
               <th className="w-[150px]">Results</th>
@@ -217,9 +220,11 @@ export function LogsTable({ logs }: { logs: GatewayLogRow[] }) {
                   </td>
                   <td
                     className="align-middle font-mono text-sm text-zinc-300"
-                    title={credits.title}
+                    title={
+                      isInProgress ? "任务进行中，完成后写入预估成本" : credits.title
+                    }
                   >
-                    {credits.value}
+                    {isInProgress ? "—" : credits.value}
                   </td>
                   <td className="align-middle">
                     <span

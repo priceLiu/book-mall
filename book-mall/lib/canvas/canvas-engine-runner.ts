@@ -28,6 +28,11 @@ import {
 import { CanvasProjectError } from "./canvas-project-service";
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
 import {
+  assertNoProjectInflightByInputHash,
+  claimCanvasTaskKieSubmit,
+} from "./canvas-kie-gateway-claim";
+import {
+  createStoryScopedCanvasTask,
   extractStoryScopeFromInputPayload,
   storyScopesConflict,
 } from "./canvas-story-scope";
@@ -460,29 +465,35 @@ export async function runImageEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
+  if (!args.forceFresh) {
+    await assertNoProjectInflightByInputHash(projectId, inputHash);
+  }
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
-  const created = await prisma.canvasGenerationTask.create({
+  const imageInputPayload = {
+    kind: engineKind,
+    prompt: clipPrompt(expandedPrompt),
+    params,
+    providerId,
+    modelKey,
+    imageUrls,
+    clientPage: gwClientPage,
+    /** run API 同步提交 Gateway；poll worker 勿在短时内二次 createTask */
+    syncGatewaySubmit: true,
+    ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+  } as Prisma.InputJsonValue;
+
+  const created = await createStoryScopedCanvasTask({
+    projectId,
+    nodeId,
+    storyScope: args.storyScope,
     data: {
-      projectId,
-      nodeId,
       kind: "IMAGE",
       model: modelKey,
       providerId: null,
       inputHash,
-      inputPayload: {
-        kind: engineKind,
-        prompt: clipPrompt(expandedPrompt),
-        params,
-        providerId,
-        modelKey,
-        imageUrls,
-        clientPage: gwClientPage,
-        ...(args.storyScope ? { storyScope: args.storyScope } : {}),
-      } as Prisma.InputJsonValue,
-      status: "PENDING",
+      inputPayload: imageInputPayload,
     },
   });
 
@@ -526,6 +537,24 @@ export async function runImageEngineNode(
         imageUrls,
         params,
       });
+
+      const { claimed, task: claimedTask } = await claimCanvasTaskKieSubmit(
+        created.id,
+      );
+      if (!claimed) {
+        const fresh = await prisma.canvasGenerationTask.findUnique({
+          where: { id: created.id },
+        });
+        if (fresh?.kieTaskId) {
+          return { reused: false, task: fresh };
+        }
+        throw new CanvasProjectError(
+          "TASK_ALREADY_INFLIGHT",
+          "image gateway submit already in progress",
+          409,
+        );
+      }
+
       const job = await canvasGwCreateKieJob(userId, {
         model,
         input: input as Record<string, unknown>,
@@ -533,7 +562,7 @@ export async function runImageEngineNode(
         clientPage: gwClientPage,
       });
       const updated = await prisma.canvasGenerationTask.update({
-        where: { id: created.id },
+        where: { id: claimedTask.id },
         data: {
           status: "SUBMITTED",
           kieTaskId: job.taskId,
@@ -546,6 +575,8 @@ export async function runImageEngineNode(
             modelKey,
             imageUrls,
             clientPage: gwClientPage,
+            syncGatewaySubmit: true,
+            gatewayKieSubmitClaimed: true,
             gatewayLogId: job.logId,
             providerKind: "KIE",
             kieModel: model,
@@ -883,7 +914,9 @@ export async function runVideoEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
+  if (!args.forceFresh) {
+    await assertNoProjectInflightByInputHash(projectId, inputHash);
+  }
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
@@ -902,10 +935,11 @@ export async function runVideoEngineNode(
     aspectRatio: params.aspect_ratio === "9:16" ? "9:16" : "16:9",
   });
 
-  const created = await prisma.canvasGenerationTask.create({
+  const created = await createStoryScopedCanvasTask({
+    projectId,
+    nodeId,
+    storyScope: args.storyScope,
     data: {
-      projectId,
-      nodeId,
       kind: "IMAGE",
       model: modelKey,
       providerId: null,
@@ -921,15 +955,48 @@ export async function runVideoEngineNode(
         referenceImageUrls,
         kieModel: model,
         kieInput: input,
+        syncGatewaySubmit: true,
         ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
-      status: "PENDING",
     },
   });
 
   const callBackUrl = buildCanvasAiKieCallbackUrl("video", created.id);
 
+  const submitPayloadBase = {
+    kind: "video-engine" as const,
+    prompt: clipPrompt(expandedPrompt),
+    params,
+    providerId,
+    modelKey,
+    imageUrls,
+    mainFrameImageUrl,
+    referenceImageUrls,
+    syncGatewaySubmit: true,
+    providerKind: "KIE" as const,
+    kieModel: model,
+    kieInput: input,
+    ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+  };
+
   try {
+    const { claimed, task: claimedTask } = await claimCanvasTaskKieSubmit(
+      created.id,
+    );
+    if (!claimed) {
+      const fresh = await prisma.canvasGenerationTask.findUnique({
+        where: { id: created.id },
+      });
+      if (fresh?.kieTaskId) {
+        return { reused: false, task: fresh };
+      }
+      throw new CanvasProjectError(
+        "TASK_ALREADY_INFLIGHT",
+        "video gateway submit already in progress",
+        409,
+      );
+    }
+
     const job = await canvasGwCreateKieJob(userId, {
       model,
       input: input as Record<string, unknown>,
@@ -937,25 +1004,15 @@ export async function runVideoEngineNode(
       clientPage: gwClientPage,
     });
     const updated = await prisma.canvasGenerationTask.update({
-      where: { id: created.id },
+      where: { id: claimedTask.id },
       data: {
         status: "SUBMITTED",
         kieTaskId: job.taskId,
         submittedAt: new Date(),
         inputPayload: {
-          kind: "video-engine",
-          prompt: clipPrompt(expandedPrompt),
-          params,
-          providerId,
-          modelKey,
-          imageUrls,
-          mainFrameImageUrl,
-          referenceImageUrls,
+          ...submitPayloadBase,
           gatewayLogId: job.logId,
-          providerKind: "KIE",
-          kieModel: model,
-          kieInput: input,
-          ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+          gatewayKieSubmitClaimed: true,
         } as Prisma.InputJsonValue,
       },
     });
@@ -969,6 +1026,10 @@ export async function runVideoEngineNode(
         failCode: "VIDEO_ENGINE_FAILED",
         failMessage: msg.slice(0, 500),
         completedAt: new Date(),
+        inputPayload: {
+          ...submitPayloadBase,
+          gatewayKieSubmitClaimed: false,
+        } as Prisma.InputJsonValue,
       },
     });
     return { reused: false, task: updated };
@@ -1015,14 +1076,15 @@ export async function runTtsEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
-  const created = await prisma.canvasGenerationTask.create({
+  const created = await createStoryScopedCanvasTask({
+    projectId,
+    nodeId,
+    storyScope: args.storyScope,
+    initialStatus: "SUBMITTED",
     data: {
-      projectId,
-      nodeId,
       kind: "IMAGE",
       model: modelKey,
       providerId: null,
@@ -1035,29 +1097,31 @@ export async function runTtsEngineNode(
         modelKey,
         ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
-      status: "SUBMITTED",
       submittedAt: new Date(),
     },
   });
 
-  const voice = String(params.voice ?? "alloy");
+  const voice = String(params.voice ?? "Cherry");
+  const languageType =
+    typeof params.language_type === "string"
+      ? params.language_type
+      : undefined;
 
   try {
-    const buf = (
-      await canvasGwTts(userId, {
-        modelKey,
-        text,
-        voice,
-        clientPage: gwClientPage,
-      })
-    ).buffer;
+    const ttsOut = await canvasGwTts(userId, {
+      modelKey,
+      text,
+      voice,
+      languageType,
+      clientPage: gwClientPage,
+    });
     const ossUrl = await persistCanvasBufferToOss({
-      buf,
-      contentType: "audio/mpeg",
+      buf: ttsOut.buffer,
+      contentType: ttsOut.contentType,
       kind: "node-audio",
       projectId,
       userId,
-      ext: "mp3",
+      ext: ttsOut.ext,
     });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },

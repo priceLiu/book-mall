@@ -149,21 +149,22 @@ export function formatCreditsDisplay(
     if (!Number.isNaN(n) && n > 0) {
       return {
         value: n < 1 ? n.toFixed(4) : n.toFixed(2),
-        title: "预估厂商成本（元）",
+        title:
+          "挂牌参考用量（元，非钱包扣点）· 来自 B 表定价估算，非平台计费",
       };
     }
   }
   if (totalTokens != null && totalTokens > 0) {
     const detail =
       promptTokens != null && completionTokens != null
-        ? `输入 ${promptTokens} + 输出 ${completionTokens}`
-        : "LLM Token 总用量";
+        ? `Token 用量：输入 ${promptTokens} + 输出 ${completionTokens}`
+        : "LLM Token 总用量（非钱包扣点）";
     return {
       value: `${totalTokens} tok`,
       title: detail,
     };
   }
-  return { value: "0", title: "暂无用量" };
+  return { value: "0", title: "暂无用量记录（非扣费失败）" };
 }
 
 export function isImageResultUrl(url: string): boolean {

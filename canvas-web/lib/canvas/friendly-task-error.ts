@@ -26,6 +26,13 @@ export function formatCanvasTaskError(
   if (blob.includes("kie chat empty content")) {
     return "KIE Gemini 返回空内容（可能被安全策略拦截或 reasoning 未输出正文）。请稍后重试，或换 deepseek-chat 等模型。";
   }
+  if (
+    blob.includes("fetch failed") ||
+    blob.includes("failed to fetch") ||
+    blob.includes("network")
+  ) {
+    return "网络请求失败。若 Gateway 日志仍为 running，任务可能仍在生成，请稍候勿重复点击。";
+  }
   if (msg) return msg;
   if (code) return code;
   return "生成失败";

@@ -33,6 +33,8 @@ export type NodeShellProps = {
   bodyExpand?: boolean;
   /** 底栏容器 class；影视专业版列节点传 PRO_NODE_SHELL_FOOTER_CLASS */
   footerClassName?: string;
+  /** 漫剧多行列：生成态只在行内媒体区展示，勿让整个节点壳脉冲 */
+  disableGeneratingChrome?: boolean;
 };
 
 const KIND_COLOR: Record<"image" | "text", string> = {
@@ -60,9 +62,12 @@ export function NodeShell({
   bodyScroll = false,
   bodyExpand = false,
   footerClassName,
+  disableGeneratingChrome = false,
 }: NodeShellProps) {
   const status = runtime?.status ?? "idle";
-  const isGenerating = status === "running" || status === "pending";
+  const isGenerating =
+    !disableGeneratingChrome &&
+    (status === "running" || status === "pending");
   const tint = accent ?? (engine ? ENGINE_ACCENT : "var(--canvas-accent)");
   const engineTint = accent ?? ENGINE_ACCENT;
   const borderColor = isGenerating

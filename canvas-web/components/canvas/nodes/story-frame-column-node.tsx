@@ -76,7 +76,13 @@ import {
 } from "@/lib/canvas/story-pro-node-chrome";
 import { STORY_HINT_LABEL_CLASS, STORY_HINT_BODY_CLASS, FRAME_ROW_AT_HINT, stripFrameRowAtHint, sanitizeLegacyFramePrompt, patchVideoRowsFromFrameRows } from "@/lib/canvas/story-column-sync";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
-import { storyFrameColumnSize } from "@/lib/canvas/story-column-layout";
+import {
+  storyFrameColumnSize,
+  storyFrameVideoRowBlockH,
+  STORY_MEDIA_ROW_GAP,
+} from "@/lib/canvas/story-column-layout";
+import { StoryEnginePickerStack } from "../story-engine-picker-stack";
+import { StoryFrameVideoEnginePanel } from "../story-frame-video-engine-panel";
 import { StoryColumnBatchFooter } from "../story-column-batch-footer";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { StoryColumnRowCard } from "../story-row-prompt-field";
@@ -104,7 +110,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const batchImage = d.batchImage;
   const injectStyleRefs = d.injectStyleRefs === true;
   const { providers } = useUserProviders();
-  const { alert } = useDialogs();
+  const { alert, confirm, prompt } = useDialogs();
   const { assets: projectCharacterAssets } = useStoryProCharacterAssets(
     edition === "pro" ? projectId : null,
   );
@@ -169,7 +175,21 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     const storedChar =
       (charNode?.data as { rows?: Parameters<typeof displayCharacterRows>[2] })
         ?.rows ?? [];
-    return displayCharacterRows(nodes, charColId, storedChar);
+    const synced = displayCharacterRows(nodes, charColId, storedChar);
+    return synced.map((row) => {
+      const prev = storedChar.find(
+        (r) => r.key === row.key || r.name === row.name,
+      );
+      if (!prev) return row;
+      return {
+        ...row,
+        runtime: prev.runtime ?? row.runtime,
+        assetId: (prev as { assetId?: string }).assetId ?? (row as { assetId?: string }).assetId,
+        lockedRefIds:
+          (prev as { lockedRefIds?: string[] }).lockedRefIds ??
+          (row as { lockedRefIds?: string[] }).lockedRefIds,
+      };
+    });
   }, [nodes, proWorkspaceIds?.characterColumnId, ws?.characterColumnId]);
 
   const assetRefsByKey = useMemo(
@@ -374,23 +394,6 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
 
   const runRowFrame = (key: string, forceFresh?: boolean) => {
     if (!canGenerateFrame) return;
-    if (edition === "pro") {
-      const row = displayRows.find((r) => r.key === key);
-      if (row) {
-        const readiness = assessFrameRowAssetReadiness(
-          row,
-          characterRows,
-          projectCharacterAssets,
-          projectId,
-        );
-        if (readiness.level === "missing") {
-          const ok = window.confirm(
-            "本镜出场角色资产尚未就绪（缺少三视图等）。仍要生成分镜静帧？",
-          );
-          if (!ok) return;
-        }
-      }
-    }
     updateRows(displayRows);
     busEnqueueStoryRun({
       nodeId: id,
@@ -517,8 +520,17 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     });
   };
 
-  const rejectFrameRow = (key: string) => {
-    const reason = window.prompt("驳回原因（可选）", "") ?? "";
+  const rejectFrameRow = async (key: string) => {
+    const reason = await prompt({
+      title: "驳回分镜图",
+      message: "可选填写驳回原因，留空则使用默认文案。",
+      label: "驳回原因",
+      placeholder: "需重新生成分镜图",
+      defaultValue: "",
+      confirmLabel: "确认驳回",
+      cancelLabel: "取消",
+    });
+    if (reason === null) return;
     patchFrameRow(key, {
       frameApprovedAt: undefined,
       frameRejectedReason: reason.trim() || "需重新生成分镜图",
@@ -548,6 +560,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
       engine
       bodyScroll
       runtime={nodeRuntime}
+      disableGeneratingChrome
       accent={storyEditionAccent(edition)}
       minWidth={targetSize.width}
       minHeight={targetSize.height}
@@ -585,51 +598,81 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
         </StoryNodeFooterShell>
       }
     >
-      <div className="flex shrink-0 flex-col gap-2">
-        {edition === "pro" ? (
-          <label className="nodrag flex cursor-pointer items-center gap-2 text-[11px] text-cyan-200/80">
-            <input
-              type="checkbox"
-              className="rounded border-cyan-400/40"
-              checked={injectStyleRefs}
-              onChange={(e) =>
-                updateNodeData(id, { injectStyleRefs: e.target.checked })
+      <div
+        className="flex w-full flex-col"
+        style={{ gap: STORY_MEDIA_ROW_GAP }}
+      >
+        <StoryFrameVideoEnginePanel
+          row1={
+            edition === "pro" ? (
+              <label className="nodrag flex h-full cursor-pointer items-center gap-2 text-[11px] leading-tight text-cyan-200/80">
+                <input
+                  type="checkbox"
+                  className="rounded border-cyan-400/40"
+                  checked={injectStyleRefs}
+                  onChange={(e) =>
+                    updateNodeData(id, { injectStyleRefs: e.target.checked })
+                  }
+                />
+                静帧生成时注入风格参考图（最多 2 张）
+              </label>
+            ) : (
+              <p className="flex h-full items-center text-[10px] leading-tight text-white/25">
+                分镜静帧
+              </p>
+            )
+          }
+          row2={
+            edition === "pro" ? (
+              <p
+                className={`flex h-full items-center leading-tight ${STORY_HINT_BODY_CLASS}`}
+              >
+                {FRAME_ROW_AT_HINT}
+              </p>
+            ) : (
+              <p className="flex h-full items-center text-[10px] text-white/20">
+                —
+              </p>
+            )
+          }
+          row3={
+            <StoryEnginePickerStack
+              label={
+                <>
+                  分镜图 · IMAGE
+                  {!canGenerateFrame ? (
+                    <span className="ml-1 normal-case text-amber-300/90">
+                      · 请先选择生图模型
+                    </span>
+                  ) : null}
+                </>
               }
-            />
-            静帧生成时注入风格参考图（最多 2 张）
-          </label>
-        ) : null}
-        <div className="space-y-1.5">
-          <p className={hintLabelClass}>
-            分镜图 · IMAGE
-            {!canGenerateFrame ? (
-              <span className="ml-1 normal-case text-amber-300/90">
-                · 请先选择生图模型
-              </span>
-            ) : null}
-          </p>
-          <EnginePicker
-            role="IMAGE"
-            allowedModelKeys={frameImageModelKeys}
-            capabilityHint="分镜含 @ 多角色参考时，请选 nano-banana-pro / flux-2-pro / seedream / gpt-image 等 multi_ref 模型；无 @ 时可用 qwen"
-            providerId={batchImage?.providerId ?? ""}
-            modelKey={batchImage?.modelKey ?? ""}
-            params={batchImage?.params ?? {}}
-            onChange={(next) => {
-              updateNodeData(id, {
-                batchImage: {
-                  providerId: next.providerId,
-                  modelKey: next.modelKey,
-                  params: next.params,
-                },
-              });
-            }}
-          />
-        </div>
-        <div className="space-y-2">
-          {edition === "pro" ? (
-            <p className={STORY_HINT_BODY_CLASS}>{FRAME_ROW_AT_HINT}</p>
-          ) : null}
+              labelClassName={hintLabelClass}
+            >
+              <EnginePicker
+                role="IMAGE"
+                allowedModelKeys={frameImageModelKeys}
+                capabilityHint="分镜含 @ 多角色参考时，请选 nano-banana-pro / flux-2-pro / seedream / gpt-image 等 multi_ref 模型；无 @ 时可用 qwen"
+                providerId={batchImage?.providerId ?? ""}
+                modelKey={batchImage?.modelKey ?? ""}
+                params={batchImage?.params ?? {}}
+                onChange={(next) => {
+                  updateNodeData(id, {
+                    batchImage: {
+                      providerId: next.providerId,
+                      modelKey: next.modelKey,
+                      params: next.params,
+                    },
+                  });
+                }}
+              />
+            </StoryEnginePickerStack>
+          }
+        />
+        <div
+          className="flex w-full flex-col"
+          style={{ gap: STORY_MEDIA_ROW_GAP }}
+        >
           {!displayRows.length ? (
             <p className={STORY_HINT_BODY_CLASS}>
               完成分镜脚本后，在此编辑场景、镜头描述与运镜；@ 角色三视图后生成分镜图，再手动触发生成视频。
@@ -663,6 +706,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                       characterRows,
                       projectCharacterAssets,
                       projectId,
+                      assetRefsByKey,
                     )
                   : { level: "none" as const, characters: [] };
               const stale =
@@ -676,6 +720,9 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                   rowTitle={`镜 ${row.frameIndex}`}
                   promptValue={stripFrameRowAtHint(row.prompt)}
                   compactFrameLayout
+                  rowBlockMinHeight={storyFrameVideoRowBlockH({
+                    pro: edition === "pro",
+                  })}
                   belowPrompt={
                     edition === "pro" ? (
                       <div className="space-y-1">
@@ -731,6 +778,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                           })
                       : undefined
                   }
+                  onPreviewRef={(url, title) => setPreview({ url, title })}
                 />
               );
             })

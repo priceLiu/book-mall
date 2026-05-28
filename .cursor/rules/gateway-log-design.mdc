@@ -32,6 +32,21 @@ alwaysApply: false
 - running、pending 带 `#2a2a32` pill 背景
 - 实现：`gateway-web/components/logs/log-status-badge.tsx`
 
+## Usage 列（原 Credits Consumed，强制语义）
+
+表头文案：**Usage**（`logs-table.tsx`）。此列是 **Gateway 请求用量观测**，**不是** Book 钱包扣点、**不是**「Credits 余额」、**不是**平台对用户计费。
+
+| 展示 | 含义 |
+|------|------|
+| `4626 tok` 等 | LLM **Token 总用量**（悬停可看 prompt/completion 拆分） |
+| 小数 / 两位元 | 可选 **挂牌参考（元）**（`estimatedVendorCostYuan`，B 表估算，BYOK 场景仅作观测） |
+| `—` | 任务 **RUNNING / PENDING**，尚未 finalize |
+| `0` | 无 Token、无挂牌行；**不表示**「免费」或「未扣钱包」 |
+
+- 实现：`gateway-web/lib/gateway-log-params.ts` · `formatCreditsDisplay`
+- 文案/表头变更须同步 `gateway-web/docs/design.md` §2 与本节
+- **禁止**在 UI 或文档中把该列称为「已扣费」「成本结算」「Credits 消耗」
+
 ## Failed 悬停（必须）
 
 凡 `status === FAILED`，**必须**能悬停查看原因，禁止「仅有 failed 字样、无 Tip」：

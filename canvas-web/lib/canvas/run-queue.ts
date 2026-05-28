@@ -45,7 +45,11 @@ import {
   storyRunPendingPatch,
 } from "./story-run-apply";
 import { resolveStoryProRunStylePayload } from "./story-pro-run-style-context";
-import type { StoryRunContext } from "./story-workspace-types";
+import { commitStoryVideoRowRun } from "./story-video-run";
+import type {
+  StoryRunContext,
+  StoryVideoColumnNodeData,
+} from "./story-workspace-types";
 import { isStoryWorkspaceNodeType } from "./types";
 import {
   hubSectionIsComplete,
@@ -451,6 +455,50 @@ export function useCanvasRunner(
           state.edges,
           node,
         );
+
+        if (
+          job.mediaKind === "video" &&
+          job.rowKey &&
+          isAnyStoryVideoColumnType(node.type ?? "")
+        ) {
+          const vd = node.data as StoryVideoColumnNodeData;
+          const frameColumnId = vd.frameColumnId;
+          const batchVideo = vd.batchVideo;
+          if (
+            !frameColumnId ||
+            !batchVideo?.providerId?.trim() ||
+            !batchVideo?.modelKey?.trim()
+          ) {
+            abortSequential(
+              job,
+              "分镜视频列未关联分镜列或未选择视频模型，无法生成。",
+            );
+            return;
+          }
+          const vr = await commitStoryVideoRowRun({
+            base,
+            projectId,
+            videoColumnId: nodeId,
+            frameColumnId,
+            rowKey: job.rowKey,
+            batchVideo: {
+              providerId: batchVideo.providerId,
+              modelKey: batchVideo.modelKey,
+              params: batchVideo.params ?? {},
+            },
+            forceFresh,
+          });
+          if (!vr.ok) {
+            abortSequential(job, vr.error);
+            return;
+          }
+          if (vr.taskId) {
+            taskByNodeRef.current.set(key, vr.taskId);
+            jobByTaskRef.current.set(vr.taskId, job);
+          }
+          return;
+        }
+
         const r = await runCanvasNode(base, projectId, nodeId, {
           node: {
             type: node.type ?? "image-engine",

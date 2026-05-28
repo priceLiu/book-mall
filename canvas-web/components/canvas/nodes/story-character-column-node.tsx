@@ -226,6 +226,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
       engine
       bodyScroll
       runtime={nodeRuntime}
+      disableGeneratingChrome
       accent={storyEditionAccent(edition)}
       minWidth={targetSize.width}
       minHeight={targetSize.height}
@@ -280,6 +281,8 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
                       characterAssets,
                       row.key,
                       projectId,
+                      row.name,
+                      row.assetId,
                     )
                   : undefined;
               const rowAudioAsset =

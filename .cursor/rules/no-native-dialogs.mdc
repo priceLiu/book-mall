@@ -1,0 +1,41 @@
+---
+description: 产品 UI 禁止使用浏览器原生 alert/confirm/prompt，须用 DialogProvider
+alwaysApply: true
+---
+
+# 禁止原生浏览器弹窗
+
+## 适用范围
+
+凡 **canvas-web**（及同仓库内面向用户的前端界面）中的确认、提示、输入框，**不得**使用：
+
+- `window.alert`
+- `window.confirm`
+- `window.prompt`
+
+包括 Story-Pro 节点、项目资产页、工具站等所有用户可见交互。
+
+## 统一实现
+
+使用 `canvas-web/components/dialogs/dialog-provider.tsx`：
+
+```tsx
+const { confirm, alert, prompt, doubleConfirm } = useDialogs();
+
+if (!(await confirm({ title: "…", message: "…" }))) return;
+await alert({ title: "…", message: "…", variant: "error" });
+const value = await prompt({ title: "…", label: "…" });
+if (value === null) return; // 用户取消
+```
+
+- 组件须在 `<DialogProvider>` 子树内（画布根布局已包裹）。
+- 破坏性删除仍须 **二次确认**，优先 `doubleConfirm`；见 `destructive-delete-confirmation.mdc`。
+- Promise 化：`async` 处理点击回调，禁止同步 `if (!confirm(...))` 阻塞写法。
+
+## 设计规范
+
+视觉与交互见 `canvas-web/docs/design.md` §4.5。
+
+## Code Review
+
+新增或修改 UI 时，若出现 `window.alert` / `window.confirm` / `window.prompt`，应改为 `useDialogs` 后再合并。

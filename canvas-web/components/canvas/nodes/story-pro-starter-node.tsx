@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { uploadCanvasFile } from "@/lib/canvas-api";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
@@ -79,6 +80,7 @@ const STAGE_LABELS: Record<string, string> = {
 
 export function StoryProStarterNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
+  const { alert, doubleConfirm } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -325,7 +327,11 @@ export function StoryProStarterNode({ id, data, selected }: NodeProps) {
     try {
       const parsed = await parseStoryProUploadScriptFile(file);
       if (!parsed.ok) {
-        window.alert(parsed.error);
+        await alert({
+          title: "无法解析剧本",
+          message: parsed.error,
+          variant: "error",
+        });
         return;
       }
       let ossUrl = "";
@@ -341,9 +347,11 @@ export function StoryProStarterNode({ id, data, selected }: NodeProps) {
         });
         ossUrl = await uploadCanvasFile(base, uploadFile);
       } catch (e) {
-        window.alert(
-          formatCanvasFetchError(e, "剧本上传云端失败"),
-        );
+        await alert({
+          title: "上传失败",
+          message: formatCanvasFetchError(e, "剧本上传云端失败"),
+          variant: "error",
+        });
         return;
       }
       updateNodeData(id, {
@@ -370,24 +378,35 @@ export function StoryProStarterNode({ id, data, selected }: NodeProps) {
       updateNodeData(id, { uploadedScriptMd: md });
       return true;
     } catch (e) {
-      window.alert(
-        formatCanvasFetchError(e, "无法从云端读取剧本"),
-      );
+      await alert({
+        title: "读取失败",
+        message: formatCanvasFetchError(e, "无法从云端读取剧本"),
+        variant: "error",
+      });
       return false;
     }
   };
 
-  const clearUploadedScript = () => {
+  const clearUploadedScript = async () => {
     if (fieldsLocked || !hasUploadedScript) return;
     const name = d.uploadedScriptMeta?.fileName ?? "上传剧本";
-    if (!window.confirm(`移除已上传的「${name}」？`)) return;
-    if (
-      !window.confirm(
-        "移除后需重新上传才能解析；此操作不可恢复。确定继续？",
-      )
-    ) {
-      return;
-    }
+    const ok = await doubleConfirm({
+      first: {
+        title: "移除上传剧本",
+        message: `移除已上传的「${name}」？`,
+        confirmLabel: "继续",
+        cancelLabel: "取消",
+        danger: true,
+      },
+      second: {
+        title: "不可恢复",
+        message: "移除后需重新上传才能解析；此操作不可恢复。确定继续？",
+        confirmLabel: "确定移除",
+        cancelLabel: "取消",
+        danger: true,
+      },
+    });
+    if (!ok) return;
     updateNodeData(id, {
       uploadedScriptMd: "",
       uploadedScriptOssUrl: "",

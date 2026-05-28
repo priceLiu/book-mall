@@ -73,12 +73,18 @@ function pickAssetForKey(
 /** 每角色一行 → 资产库多 ref（供分镜 @ 目录） */
 export function buildAssetRefsByCharacterKey(
   assets: StoryProCharacterAssetRecord[],
-  rows: { key: string; lockedRefIds?: string[] }[],
+  rows: { key: string; name?: string; lockedRefIds?: string[] }[],
   projectId?: string | null,
 ): Record<string, StoryRefImage[]> {
   const out: Record<string, StoryRefImage[]> = {};
   for (const row of rows) {
-    const asset = pickAssetForKey(assets, row.key, projectId);
+    const asset = findAssetForCharacterRow(
+      assets,
+      row.key,
+      projectId,
+      row.name,
+      row.assetId,
+    );
     if (!asset?.refs.length) continue;
 
     let refs = [...asset.refs].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -103,12 +109,51 @@ export function buildAssetRefsByCharacterKey(
   return out;
 }
 
+function pickBestAsset(
+  matches: StoryProCharacterAssetRecord[],
+  projectId?: string | null,
+): StoryProCharacterAssetRecord | undefined {
+  if (!matches.length) return undefined;
+  const pid = projectId?.trim() || null;
+  const candidates = matches.filter(
+    (a) => a.projectId === pid || !a.projectId,
+  );
+  const pool = candidates.length ? candidates : matches;
+  return [...pool].sort((a, b) => {
+    const aScoped = a.projectId === pid ? 1 : 0;
+    const bScoped = b.projectId === pid ? 1 : 0;
+    if (bScoped !== aScoped) return bScoped - aScoped;
+    return b.refs.length - a.refs.length;
+  })[0];
+}
+
 export function findAssetForCharacterRow(
   assets: StoryProCharacterAssetRecord[],
   characterKey: string,
   projectId?: string | null,
+  displayName?: string,
+  assetId?: string | null,
 ): StoryProCharacterAssetRecord | undefined {
-  return pickAssetForKey(assets, characterKey, projectId);
+  const id = assetId?.trim();
+  if (id) {
+    const byId = assets.find((a) => a.id === id);
+    if (byId) return byId;
+  }
+
+  const byKey = pickAssetForKey(assets, characterKey, projectId);
+  if (byKey?.refs.length) return byKey;
+
+  const name = displayName?.trim();
+  if (name) {
+    const byName = assets.filter((a) => a.displayName.trim() === name);
+    const best = pickBestAsset(byName, projectId);
+    if (best?.refs.length) return best;
+  }
+
+  return byKey ?? (name ? pickBestAsset(
+    assets.filter((a) => a.displayName.trim() === name),
+    projectId,
+  ) : undefined);
 }
 
 export function findAudioAssetForCharacterRow(

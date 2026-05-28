@@ -30,7 +30,7 @@ gateway-web 深色控制台 UI 约定。实现时以 **CSS 变量 + `globals.css
 | Model | 蓝 pill 模型名 → 时间戳 → `Duration: N` |
 | Params | 缩略卡片 + 悬停 Tip（§3） |
 | Status | 圆点 + 小写英文；running/pending 带深灰 pill |
-| Credits Consumed | 有 **预估成本（元）** 时显示金额；否则显示 **`4626 tok`** 等 Token 总用量（悬停可看输入/输出拆分） |
+| Usage | **用量观测**（非钱包扣点）：LLM 多为 **`4626 tok`**（悬停可看输入/输出）；少数行有挂牌参考 **元**（B 表估算，非平台计费）。进行中显示 `—` |
 | Task ID | 完整 monospace |
 | Results | Result 按钮 + 复制 + 悬停预览（§3） |
 | Retry Callback | 暂无则 `—` |

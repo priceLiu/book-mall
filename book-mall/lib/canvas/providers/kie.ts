@@ -448,8 +448,19 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
         step: 1,
         defaultValue: 5,
       },
+      {
+        key: "generateAudio",
+        label: "生成配音",
+        type: "boolean",
+        defaultValue: false,
+      },
     ] satisfies CanvasParamSchema,
-    defaultParams: { aspect_ratio: "16:9", resolution: "1080p", duration: 5 },
+    defaultParams: {
+      aspect_ratio: "16:9",
+      resolution: "1080p",
+      duration: 5,
+      generateAudio: false,
+    },
   },
   {
     modelKey: "wan/2-7-image-to-video",

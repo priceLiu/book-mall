@@ -179,6 +179,26 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 - 单图/视频：`StoryMediaPreviewModal` — 黑底居中，`max-w-[min(96vw,960px)]`
 - 带 Prompt 侧栏：`MediaHoverBox` 预览弹层（分镜图可左 Prompt 右图）
 
+### 4.5 确认 / 提示 / 输入（禁止原生弹窗）
+
+组件：`DialogProvider` + `useDialogs()`（`components/dialogs/dialog-provider.tsx`）
+
+| API | 用途 |
+|-----|------|
+| `confirm` | 单次确认（锁定、套用模板、继续定稿等） |
+| `doubleConfirm` | 二次确认（删除库条目、移除 OSS 资源等） |
+| `alert` | 只读提示（错误 / 成功 / 警告，`variant`） |
+| `prompt` | 单行输入（如驳回原因）；取消返回 `null` |
+
+**硬性约束**
+
+- **禁止** `window.alert` / `window.confirm` / `window.prompt`
+- z-index **1000**；暗紫卡片 + 遮罩 `bg-black/60 backdrop-blur-sm`
+- `Esc` 与点遮罩 = 取消；`Enter` = 确认；`danger: true` 时确认钮红色
+- 同时仅一个对话框；队列顺序弹出
+
+Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
+
 ---
 
 ## 5. 文案显示（Markdown）
