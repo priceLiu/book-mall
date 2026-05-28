@@ -2,10 +2,7 @@
  * 分镜静帧 → 视频 · UI / 客户端门禁（与 book-mall story-frame-gate 语义一致）
  */
 
-import {
-  filterModelKeysByStoryCapabilities,
-  modelHasStoryCapabilities,
-} from "@/lib/canvas/story-model-capabilities";
+import { modelHasStoryCapabilities } from "@/lib/canvas/story-model-capabilities";
 
 export type StoryFrameGateCode =
   | "FRAME_IMAGE_REQUIRED"
@@ -41,11 +38,19 @@ export function storyVideoGenerateBlockReason(
   return null;
 }
 
-/** 影视专业版 / 漫剧 · 分镜视频仅允许 i2v 模型 */
-export function isStoryProVideoI2vModel(modelKey: string): boolean {
-  return modelHasStoryCapabilities(modelKey, ["video_i2v"]);
+/** 影视专业版 / 漫剧 · 分镜视频：图生视频（i2v）或参考生视频（R2V） */
+export function isStoryProVideoModel(modelKey: string): boolean {
+  return (
+    modelHasStoryCapabilities(modelKey, ["video_i2v"]) ||
+    modelHasStoryCapabilities(modelKey, ["video_r2v"])
+  );
 }
 
+export function filterStoryProVideoModelKeys(keys: readonly string[]): string[] {
+  return keys.filter(isStoryProVideoModel);
+}
+
+/** @deprecated 使用 filterStoryProVideoModelKeys */
 export function filterStoryProVideoI2vModelKeys(keys: readonly string[]): string[] {
-  return filterModelKeysByStoryCapabilities(keys, ["video_i2v"]);
+  return filterStoryProVideoModelKeys(keys);
 }

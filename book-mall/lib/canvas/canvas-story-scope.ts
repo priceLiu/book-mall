@@ -38,3 +38,18 @@ export function storyScopesConflict(
   if (!a || !b) return true;
   return a === b;
 }
+
+/** Poll 重试 / Gateway 日志：优先 payload.clientPage，否则按 storyScope 推断专业版路径 */
+export function resolveCanvasTaskClientPage(
+  projectId: string,
+  inputPayload: unknown,
+): string {
+  if (inputPayload && typeof inputPayload === "object") {
+    const page = (inputPayload as Record<string, unknown>).clientPage;
+    if (typeof page === "string" && page.trim()) return page.trim();
+  }
+  if (extractStoryScopeFromInputPayload(inputPayload)) {
+    return `canvas/${projectId}/story-pro`;
+  }
+  return `canvas/${projectId}`;
+}

@@ -204,13 +204,21 @@ export function displayFrameRows(
     siblings.videoColumnId,
   );
   const rows = synced?.framePatch.rows ?? stored;
+  const storedByKey = new Map(stored.map((r) => [r.key, r]));
   return rows.map((row) => {
+    const prev = storedByKey.get(row.key);
     const cleaned = row.prompt?.trim()
       ? sanitizeLegacyFramePrompt(row.prompt)
       : "";
     const prompt = cleaned || buildDefaultFrameRowPrompt(row);
-    if (prompt === row.prompt) return row;
-    return { ...row, prompt };
+    let next = prompt === row.prompt ? row : { ...row, prompt };
+    if (prev?.frameApprovedAt) {
+      next = { ...next, frameApprovedAt: prev.frameApprovedAt };
+    }
+    if (prev?.frameRejectedReason) {
+      next = { ...next, frameRejectedReason: prev.frameRejectedReason };
+    }
+    return next;
   });
 }
 
@@ -231,6 +239,8 @@ export function frameRowsForVideoSync(
       prompt: prev.prompt?.trim() ? prev.prompt : row.prompt,
       refImages: prev.refImages?.length ? prev.refImages : row.refImages,
       referencedNodeIds: prev.referencedNodeIds ?? row.referencedNodeIds,
+      frameApprovedAt: prev.frameApprovedAt ?? row.frameApprovedAt,
+      frameRejectedReason: prev.frameRejectedReason ?? row.frameRejectedReason,
     };
   });
 }

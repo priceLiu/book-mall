@@ -105,15 +105,19 @@ export function applyFrameRowRuntime(
 ): StoryFrameRow[] {
   return rows.map((r) => {
     if (r.key !== rowKey) return r;
+    const prevUrl = r.runtime?.ossUrl ?? r.runtime?.ephemeralUrl;
+    const nextUrl = runtime.ossUrl ?? runtime.ephemeralUrl;
     const next: StoryFrameRow = {
       ...r,
       runtime: { ...r.runtime, ...runtime },
     };
-    if (
-      runtime.status === "pending" ||
-      runtime.status === "running" ||
-      runtime.status === "done"
-    ) {
+    const regenStarted =
+      runtime.status === "pending" || runtime.status === "running";
+    const imageChanged =
+      Boolean(nextUrl?.trim()) &&
+      nextUrl !== prevUrl &&
+      (runtime.status === "done" || Boolean(nextUrl));
+    if (regenStarted || imageChanged) {
       next.frameApprovedAt = undefined;
       next.frameRejectedReason = undefined;
     }

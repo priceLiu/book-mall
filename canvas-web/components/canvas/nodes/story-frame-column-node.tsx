@@ -8,7 +8,6 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
-  STORY_VIDEO_MODEL_KEYS,
   THREE_VIEW_ENGINE_MODEL_KEYS,
   STORY_PRO_FRAME_IMAGE_MODEL_KEYS,
   STORY_PRO_FRAME_IMAGE_SINGLE_REF_MODEL_KEYS,
@@ -63,7 +62,6 @@ import {
   storyColumnIsGenerating,
 } from "@/lib/canvas/story-column-runtime";
 import {
-  filterStoryProVideoI2vModelKeys,
   isStoryFrameApproved,
   storyVideoGenerateBlockReason,
 } from "@/lib/canvas/story-frame-gate";
@@ -77,8 +75,8 @@ import {
   PRO_NODE_SHELL_FOOTER_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
 import { STORY_HINT_LABEL_CLASS, STORY_HINT_BODY_CLASS, FRAME_ROW_AT_HINT, stripFrameRowAtHint, sanitizeLegacyFramePrompt, patchVideoRowsFromFrameRows } from "@/lib/canvas/story-column-sync";
-import { NODE_DEFAULT_SIZE } from "@/lib/canvas/types";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
+import { storyFrameColumnSize } from "@/lib/canvas/story-column-layout";
 import { StoryColumnBatchFooter } from "../story-column-batch-footer";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { StoryColumnRowCard } from "../story-row-prompt-field";
@@ -86,16 +84,13 @@ import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { NodeShell } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
-import { pickDefaultStoryImageEngine, pickDefaultStoryVideoEngine } from "@/lib/canvas/system-providers";
+import { pickDefaultStoryImageEngine } from "@/lib/canvas/system-providers";
+import type { CanvasEnginePick } from "@/lib/canvas/types";
 import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
 import type { StoryProWorkspaceIds } from "@/lib/canvas/story-pro-workspace-types";
 
 export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const edition = storyEditionFromNodeType(type);
-  const sizeKey =
-    type && type in NODE_DEFAULT_SIZE
-      ? (type as keyof typeof NODE_DEFAULT_SIZE)
-      : "story-frame-column";
   const hintLabelClass =
     edition === "pro" ? PRO_HINT_LABEL_CLASS : STORY_HINT_LABEL_CLASS;
   const base = useBookMallBaseUrl();
@@ -107,7 +102,6 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const d = data as unknown as StoryFrameColumnNodeData;
   const stored = d.rows ?? [];
   const batchImage = d.batchImage;
-  const batchVideo = d.batchVideo;
   const injectStyleRefs = d.injectStyleRefs === true;
   const { providers } = useUserProviders();
   const { alert } = useDialogs();
@@ -122,10 +116,6 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     batchImage?.providerId?.trim() && batchImage?.modelKey?.trim(),
   );
 
-  const canGenerateVideo = Boolean(
-    batchVideo?.providerId?.trim() && batchVideo?.modelKey?.trim(),
-  );
-
   const [preview, setPreview] = useState<{
     url: string;
     title: string;
@@ -138,9 +128,26 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     () => findWorkspaceForColumnId(nodes, edges, id),
     [nodes, edges, id],
   );
+
   const videoColumnId = useMemo(
     () => resolveStoryVideoColumnId(nodes, edges, id, ws),
     [nodes, edges, id, ws],
+  );
+
+  const resolvedBatchVideo = useMemo((): CanvasEnginePick | undefined => {
+    if (videoColumnId) {
+      const vd = nodes.find((n) => n.id === videoColumnId)?.data as
+        | StoryVideoColumnNodeData
+        | undefined;
+      if (vd?.batchVideo?.providerId?.trim()) return vd.batchVideo;
+    }
+    const legacy = d.batchVideo ?? batchImage;
+    return legacy?.providerId?.trim() ? legacy : undefined;
+  }, [videoColumnId, nodes, d.batchVideo, batchImage]);
+
+  const canGenerateVideo = Boolean(
+    resolvedBatchVideo?.providerId?.trim() &&
+      resolvedBatchVideo?.modelKey?.trim(),
   );
 
   const proWorkspaceIds = useMemo((): StoryProWorkspaceIds | null => {
@@ -243,14 +250,23 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   );
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
 
+  const targetSize = useMemo(
+    () => storyFrameColumnSize(displayRows, { pro: edition === "pro" }),
+    [displayRows, edition],
+  );
+
   useEffect(() => {
-    const def = NODE_DEFAULT_SIZE[sizeKey];
     const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
     if (!node) return;
     const { w, h } = nodeMeasuredSize(node);
-    if (Math.abs(h - def.height) < 4 && Math.abs(w - def.width) < 4) return;
-    resizeNode(id, { width: def.width, height: def.height });
-  }, [id, resizeNode]);
+    if (
+      Math.abs(h - targetSize.height) < 4 &&
+      Math.abs(w - targetSize.width) < 4
+    ) {
+      return;
+    }
+    resizeNode(id, { width: targetSize.width, height: targetSize.height });
+  }, [id, resizeNode, targetSize]);
 
   /** 旧画布可能只配了 VIDEO；自动继承角色列 IMAGE 或系统默认 */
   useEffect(() => {
@@ -291,32 +307,6 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     ws?.characterColumnId,
   ]);
 
-  /** 旧画布可能未配 VIDEO；自动选系统默认 */
-  useEffect(() => {
-    if (batchVideo?.providerId?.trim() && batchVideo?.modelKey?.trim()) {
-      return;
-    }
-    const pick = pickDefaultStoryVideoEngine(providers);
-    if (!pick) return;
-    const next = {
-      providerId: pick.providerId,
-      modelKey: pick.modelKey,
-      params: batchVideo?.params ?? {},
-    };
-    updateNodeData(id, { batchVideo: next });
-    if (videoColumnId) {
-      updateNodeData(videoColumnId, { batchVideo: next });
-    }
-  }, [
-    batchVideo?.modelKey,
-    batchVideo?.params,
-    batchVideo?.providerId,
-    id,
-    providers,
-    updateNodeData,
-    videoColumnId,
-  ]);
-
   const styleNodeId = useMemo(
     () => proWorkspaceIds?.styleNodeId,
     [proWorkspaceIds?.styleNodeId],
@@ -349,7 +339,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   };
 
   const runRowVideo = async (key: string, frameUrl?: string) => {
-    if (!videoColumnId || !canGenerateVideo || !batchVideo) return;
+    if (!videoColumnId || !canGenerateVideo || !resolvedBatchVideo) return;
     setVideoInflightKeys((prev) => new Set(prev).add(key));
     try {
       const result = await commitStoryVideoRowRun({
@@ -360,9 +350,9 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
         rowKey: key,
         frameImageUrl: frameUrl,
         batchVideo: {
-          providerId: batchVideo.providerId,
-          modelKey: batchVideo.modelKey,
-          params: batchVideo.params ?? {},
+          providerId: resolvedBatchVideo.providerId,
+          modelKey: resolvedBatchVideo.modelKey,
+          params: resolvedBatchVideo.params ?? {},
         },
         forceFresh: true,
       });
@@ -535,14 +525,6 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     });
   };
 
-  const storyVideoModelKeys = useMemo(
-    () =>
-      edition === "pro"
-        ? filterStoryProVideoI2vModelKeys(STORY_VIDEO_MODEL_KEYS)
-        : [...STORY_VIDEO_MODEL_KEYS],
-    [edition],
-  );
-
   const frameImageModelKeys = useMemo(() => {
     if (edition !== "pro") return [...THREE_VIEW_ENGINE_MODEL_KEYS];
     const multi = [...STORY_PRO_FRAME_IMAGE_MODEL_KEYS];
@@ -567,8 +549,8 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
       bodyScroll
       runtime={nodeRuntime}
       accent={storyEditionAccent(edition)}
-      minWidth={NODE_DEFAULT_SIZE[sizeKey].width}
-      minHeight={NODE_DEFAULT_SIZE[sizeKey].height}
+      minWidth={targetSize.width}
+      minHeight={targetSize.height}
       inputs={[{ id: "in_text", label: "分镜脚本", kind: "text" }]}
       outputs={[{ id: "text", label: "分镜图", kind: "image" }]}
       footerClassName={
@@ -644,37 +626,10 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
             }}
           />
         </div>
-        <div className="space-y-1.5 border-t border-white/5 pt-2">
-          <p className={hintLabelClass}>
-            分镜视频 · VIDEO（点击生成，不自动跑）
-            {!canGenerateVideo ? (
-              <span className="ml-1 normal-case text-amber-300/90">
-                · 请先选择视频模型
-              </span>
-            ) : null}
-          </p>
-          <EnginePicker
-            role="VIDEO"
-            allowedModelKeys={storyVideoModelKeys}
-            requiredCapabilities={edition === "pro" ? ["video_i2v"] : undefined}
-            capabilityHint="影视专业版分镜视频仅支持图生视频（i2v）模型"
-            providerId={batchVideo?.providerId ?? ""}
-            modelKey={batchVideo?.modelKey ?? ""}
-            params={batchVideo?.params ?? {}}
-            onChange={(next) => {
-              const pick = {
-                providerId: next.providerId,
-                modelKey: next.modelKey,
-                params: next.params,
-              };
-              updateNodeData(id, { batchVideo: pick });
-              if (videoColumnId) {
-                updateNodeData(videoColumnId, { batchVideo: pick });
-              }
-            }}
-          />
-        </div>
         <div className="space-y-2">
+          {edition === "pro" ? (
+            <p className={STORY_HINT_BODY_CLASS}>{FRAME_ROW_AT_HINT}</p>
+          ) : null}
           {!displayRows.length ? (
             <p className={STORY_HINT_BODY_CLASS}>
               完成分镜脚本后，在此编辑场景、镜头描述与运镜；@ 角色三视图后生成分镜图，再手动触发生成视频。
@@ -720,9 +675,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                   edition={edition}
                   rowTitle={`镜 ${row.frameIndex}`}
                   promptValue={stripFrameRowAtHint(row.prompt)}
-                  promptHint={
-                    row.frameIndex === 1 ? FRAME_ROW_AT_HINT : undefined
-                  }
+                  compactFrameLayout
                   belowPrompt={
                     edition === "pro" ? (
                       <div className="space-y-1">

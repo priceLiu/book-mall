@@ -44,19 +44,30 @@ export function assetRefToStoryRefImage(
   };
 }
 
+/** 与 book-mall resolveCharacterRowAssetRefUrls 一致：同 key + 项目/全局，优先有 refs 的记录 */
 function pickAssetForKey(
   assets: StoryProCharacterAssetRecord[],
   characterKey: string,
   projectId?: string | null,
 ): StoryProCharacterAssetRecord | undefined {
   const k = normalizeStoryProCharacterKey(characterKey);
+  const pid = projectId?.trim() || null;
   const matches = assets.filter(
     (a) => normalizeStoryProCharacterKey(a.characterKey) === k,
   );
   if (!matches.length) return undefined;
-  const projectScoped = matches.find((a) => a.projectId === projectId);
-  if (projectScoped) return projectScoped;
-  return matches.find((a) => !a.projectId) ?? matches[0];
+
+  const candidates = matches.filter(
+    (a) => a.projectId === pid || !a.projectId,
+  );
+  const pool = candidates.length ? candidates : matches;
+
+  return [...pool].sort((a, b) => {
+    const aScoped = a.projectId === pid ? 1 : 0;
+    const bScoped = b.projectId === pid ? 1 : 0;
+    if (bScoped !== aScoped) return bScoped - aScoped;
+    return b.refs.length - a.refs.length;
+  })[0];
 }
 
 /** 每角色一行 → 资产库多 ref（供分镜 @ 目录） */

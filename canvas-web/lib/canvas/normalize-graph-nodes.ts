@@ -2,6 +2,7 @@ import type { CanvasFlowNode, CanvasNodeType, CanvasFlowEdge } from "./types";
 import { isGroupNode, NODE_DEFAULT_SIZE } from "./types";
 import { STORY_CONTROL_NODE_HEIGHT, STORY_CONTROL_NODE_WIDTH } from "./story-node-chrome";
 import { migrateStoryOutlineLlmParamsAll } from "./story-llm-params-migrate";
+import { applyStoryColumnHeights, isStoryMediaColumnType } from "./story-column-layout";
 
 const GROUP_PADDING = 28;
 const GROUP_HEADER = 40;
@@ -707,35 +708,12 @@ function normalizeThreeViewNodeSizes(
   });
 }
 
-/** 角色列 / 分镜列：固定宽高（内容超出时 bodyScroll 内滚） */
+/** 角色列 / 分镜列 / 视频列：按行数估算高度（内容超出时 bodyScroll 内滚） */
 function normalizeStoryMediaColumnSizes(
   nodes: CanvasFlowNode[],
 ): CanvasFlowNode[] {
-  return nodes.map((n) => {
-    if (
-      n.type !== "story-character-column" &&
-      n.type !== "story-frame-column" &&
-      n.type !== "story-video-column"
-    ) {
-      return n;
-    }
-    const def = NODE_DEFAULT_SIZE[n.type];
-    const { w, h } = nodeMeasuredSize(n);
-    const tooSmall = w < def.width * 0.9 || h < def.height * 0.9;
-    const nextW = tooSmall || w !== def.width ? def.width : w;
-    const nextH = tooSmall || h !== def.height ? def.height : h;
-    if (nextW === w && nextH === h) return n;
-    return {
-      ...n,
-      width: nextW,
-      height: nextH,
-      style: {
-        ...(typeof n.style === "object" && n.style ? n.style : {}),
-        width: nextW,
-        height: nextH,
-      },
-    } as CanvasFlowNode;
-  });
+  if (!nodes.some((n) => isStoryMediaColumnType(n.type))) return nodes;
+  return applyStoryColumnHeights(nodes);
 }
 
 /** 故事主题 / 故事大纲：纠正异常偏小的持久化尺寸；保留用户加长后的高度 */

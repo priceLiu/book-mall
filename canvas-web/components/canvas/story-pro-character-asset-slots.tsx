@@ -34,9 +34,11 @@ import {
   StoryStatusLine,
 } from "@/components/canvas/story-status-line";
 import {
+  activateImagePasteTarget,
   bindImageDragDropHandlers,
+  deactivateImagePasteTarget,
   firstImageFileFromDataTransfer,
-  useImagePasteWhenActive,
+  useImagePasteRouter,
 } from "@/lib/canvas/image-upload-handlers";
 import { normalizeStoryProCharacterKey } from "@/lib/canvas/story-pro-character-key";
 import { notifyStoryProCharacterAssetsChanged } from "@/lib/canvas/use-story-pro-character-assets";
@@ -65,6 +67,7 @@ export function StoryProCharacterAssetSlots({
 }) {
   const base = useBookMallBaseUrl();
   const fileRef = useRef<HTMLInputElement>(null);
+  useImagePasteRouter();
   const [pendingKind, setPendingKind] = useState<StoryProAssetRefKind | null>(
     null,
   );
@@ -181,17 +184,30 @@ export function StoryProCharacterAssetSlots({
     [base, canUpload, onRowPatch, projectId, row.key, row.name],
   );
 
-  useImagePasteWhenActive(
-    activeKind != null,
-    (file) => {
-      if (activeKind) void uploadFileToKind(activeKind, file);
+  const pasteTargetId = (kind: StoryProAssetRefKind) =>
+    `char-asset:${normalizeStoryProCharacterKey(row.key)}:${kind}`;
+
+  const bindSlotPaste = (kind: StoryProAssetRefKind) => ({
+    onMouseEnter: () => {
+      if (!canUpload) return;
+      setActiveKind(kind);
+      activateImagePasteTarget(pasteTargetId(kind), (file) => {
+        void uploadFileToKind(kind, file);
+      });
     },
-    canUpload,
-  );
+    onMouseLeave: () => {
+      deactivateImagePasteTarget(pasteTargetId(kind));
+      setActiveKind((prev) => (prev === kind ? null : prev));
+      setDragOverKind((prev) => (prev === kind ? null : prev));
+    },
+  });
 
   const onUploadClick = (kind: StoryProAssetRefKind) => {
     if (!canUpload) return;
     setActiveKind(kind);
+    activateImagePasteTarget(pasteTargetId(kind), (file) => {
+      void uploadFileToKind(kind, file);
+    });
     setPendingKind(kind);
     fileRef.current?.click();
   };
@@ -375,7 +391,7 @@ export function StoryProCharacterAssetSlots({
             <div
               key={kind}
               className="flex flex-col gap-1 rounded border border-white/8 bg-black/25 p-1"
-              onMouseEnter={() => setActiveKind(kind)}
+              {...bindSlotPaste(kind)}
             >
               <p className={`truncate text-center ${STORY_ROW_SUBLABEL_CLASS}`}>
                 {STORY_PRO_ASSET_REF_KIND_LABELS[kind]}
@@ -384,7 +400,7 @@ export function StoryProCharacterAssetSlots({
                 type="button"
                 className={cn(
                   "nodrag relative aspect-[3/4] w-full overflow-hidden rounded hover:ring-1 hover:ring-white/15",
-                  kind === "outfit" ? "bg-white" : "bg-black/40",
+                  kind === "outfit" && url ? "bg-white" : "bg-black/40",
                   dragOverKind === kind && "ring-1 ring-white/40",
                   activeKind === kind && canUpload && "ring-1 ring-white/20",
                 )}

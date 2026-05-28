@@ -16,6 +16,10 @@ const MAX_AUDIO_BYTES = 20 * 1024 * 1024; // 20MB
 function virtualHostedPublicUrl(cfg: OssEnvConfig, key: string): string {
   const base = process.env.OSS_PUBLIC_URL_BASE?.trim().replace(/\/$/, "");
   if (base) return `${base}/${key}`;
+  return directBucketPublicUrl(cfg, key);
+}
+
+function directBucketPublicUrl(cfg: OssEnvConfig, key: string): string {
   return `https://${cfg.bucket}.${cfg.region}.aliyuncs.com/${key}`;
 }
 
@@ -67,6 +71,8 @@ async function uploadBufferToOss(args: {
   key: string;
   buf: Buffer;
   contentType: string;
+  /** 百炼等阿里云服务拉取：用 bucket 直链，避免自定义 CDN 域返回异常 */
+  preferBucketUrl?: boolean;
 }): Promise<string> {
   const client = await createOssClientFrom(args.cfg);
   const ct = args.contentType.split(";")[0].trim() || "application/octet-stream";
@@ -88,6 +94,12 @@ async function uploadBufferToOss(args: {
     throw e;
   }
   const u = typeof result.url === "string" ? result.url.trim() : "";
+  if (args.preferBucketUrl) {
+    if (/^https:\/\//i.test(u) && u.includes(`${args.cfg.bucket}.`)) {
+      return u;
+    }
+    return directBucketPublicUrl(args.cfg, args.key);
+  }
   if (/^https:\/\//i.test(u)) return u;
   return virtualHostedPublicUrl(args.cfg, args.key);
 }
@@ -185,6 +197,7 @@ export async function uploadCanvasUserBuffer(args: {
   contentType: string;
   userId: string;
   ext: string;
+  preferBucketUrl?: boolean;
 }): Promise<string> {
   const cfgRaw = readOssEnv();
   if ("error" in cfgRaw) {
@@ -199,5 +212,6 @@ export async function uploadCanvasUserBuffer(args: {
     key,
     buf: args.buf,
     contentType: args.contentType,
+    preferBucketUrl: args.preferBucketUrl,
   });
 }

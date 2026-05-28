@@ -35,6 +35,7 @@ import {
 } from "@/lib/story/kie-client";
 import {
   extractStoryScopeFromInputPayload,
+  resolveCanvasTaskClientPage,
   storyScopesConflict,
   type CanvasTaskStoryScope,
 } from "./canvas-story-scope";
@@ -971,7 +972,7 @@ export async function runCanvasPollWorker(opts?: {
               modelKey.startsWith("wan2.")
                 ? { prompt_extend: params.prompt_extend !== false }
                 : undefined,
-            clientPage: `canvas/${task.projectId}`,
+            clientPage: resolveCanvasTaskClientPage(task.projectId, payload),
           }),
           new Promise<never>((_, reject) =>
             setTimeout(
@@ -1055,7 +1056,7 @@ export async function runCanvasPollWorker(opts?: {
           model: createArgs.model,
           input: createArgs.input as Record<string, unknown>,
           callBackUrl,
-          clientPage: `canvas/${task.projectId}`,
+          clientPage: resolveCanvasTaskClientPage(task.projectId, payload),
         }),
         new Promise<never>((_, reject) =>
           setTimeout(

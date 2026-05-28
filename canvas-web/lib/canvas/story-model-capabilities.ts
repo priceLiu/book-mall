@@ -6,6 +6,7 @@ export type StoryModelCapability =
   | "image_t2i"
   | "image_multi_ref"
   | "video_i2v"
+  | "video_r2v"
   | "video_t2v";
 
 const EXPLICIT: Record<string, StoryModelCapability[]> = {
@@ -42,6 +43,9 @@ function inferCapabilities(modelKey: string): StoryModelCapability[] {
     k.includes("happyhorse");
 
   if (isVideo) {
+    if (k.includes("-r2v") || k.endsWith("r2v")) {
+      caps.push("video_r2v");
+    }
     if (
       k.includes("image-to-video") ||
       k.includes("i2v") ||
@@ -107,6 +111,7 @@ export function storyCapabilityHint(
     image_t2i: "文生图",
     image_multi_ref: "多参考图",
     video_i2v: "图生视频",
+    video_r2v: "参考生视频",
     video_t2v: "文生视频",
   };
   return required.map((c) => labels[c]).join(" · ");

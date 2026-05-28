@@ -26,6 +26,7 @@ import {
   findStarterByHubId,
   isAnyStoryCharacterColumnType,
   isAnyStoryFrameColumnType,
+  isAnyStorySceneColumnType,
   isAnyStoryScriptHubType,
   isAnyStoryVideoColumnType,
 } from "./story-workspace-resolver";
@@ -56,6 +57,13 @@ function hubSectionPatchChanged(
   return false;
 }
 
+const STORY_ROW_PENDING_RUNTIME: Partial<CanvasNodeRuntime> = {
+  status: "pending",
+  taskId: undefined,
+  failCode: undefined,
+  failMessage: undefined,
+};
+
 export function storyRunPendingPatch(
   node: CanvasFlowNode,
   ctx?: StoryRunContext,
@@ -71,24 +79,34 @@ export function storyRunPendingPatch(
     return { storyboardRuntime: rt };
   }
   if (
-    (node.type === "story-character-column" ||
-      node.type === "story-pro-character" ||
-      node.type === "story-frame-column" ||
-      node.type === "story-pro-frame") &&
+    (isAnyStoryCharacterColumnType(node.type ?? "") ||
+      isAnyStorySceneColumnType(node.type ?? "")) &&
     ctx?.rowKey
   ) {
     const rows = (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
       .rows;
     if (!rows) return null;
-    if (node.type === "story-character-column" || node.type === "story-pro-character") {
-      return {
-        rows: applyCharacterRowRuntime(rows as never, ctx.rowKey, {
-          status: "pending",
-        }),
-      };
-    }
     return {
-      rows: applyFrameRowRuntime(rows as never, ctx.rowKey, { status: "pending" }),
+      rows: applyCharacterRowRuntime(
+        rows as never,
+        ctx.rowKey,
+        STORY_ROW_PENDING_RUNTIME,
+      ),
+    };
+  }
+  if (
+    isAnyStoryFrameColumnType(node.type ?? "") &&
+    ctx?.rowKey
+  ) {
+    const rows = (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
+      .rows;
+    if (!rows) return null;
+    return {
+      rows: applyFrameRowRuntime(
+        rows as never,
+        ctx.rowKey,
+        STORY_ROW_PENDING_RUNTIME,
+      ),
     };
   }
   if (isAnyStoryVideoColumnType(node.type ?? "") && ctx?.rowKey && ctx.mediaKind) {
@@ -99,7 +117,7 @@ export function storyRunPendingPatch(
         rows as never,
         ctx.rowKey,
         ctx.mediaKind === "tts" ? "tts" : "video",
-        { status: "pending" },
+        STORY_ROW_PENDING_RUNTIME,
       ),
     };
   }
@@ -195,6 +213,14 @@ export function storyApplyTaskResult(
         }
       }
     }
+    return;
+  }
+
+  if (isAnyStorySceneColumnType(node.type ?? "") && ctx?.rowKey) {
+    const rows = (node.data as { rows: { key: string }[] }).rows ?? [];
+    updateNodeData(node.id, {
+      rows: applyCharacterRowRuntime(rows as never, ctx.rowKey, runtime),
+    });
     return;
   }
 

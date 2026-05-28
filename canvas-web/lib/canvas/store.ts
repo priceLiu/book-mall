@@ -39,13 +39,17 @@ import {
 } from "./normalize-graph-nodes";
 import { reflowStoryComicFlat } from "./story-comic-layout";
 import { reflowStoryComicColumns } from "./story-comic-columns-layout";
-import { applyStoryColumnHeights } from "./story-column-layout";
+import { applyStoryColumnHeights, isStoryMediaColumnType } from "./story-column-layout";
+import { canAddStoryNodeType } from "./story-edition-isolation";
+import { hasStoryComicPipeline } from "./story-comic-layout";
 import { reflowStoryComicWorkspace } from "./story-comic-workspace-layout";
 import {
   hasStoryProPipeline,
   reflowStoryProWorkspace,
 } from "./story-pro-workspace-layout";
 import { reconcileStoryProWorkspace } from "./spawn-story-pro-workspace";
+import { canvasNotify } from "./canvas-notify";
+import { validateStoryPipelineDeletion } from "./story-pipeline-delete-guard";
 import { reconcileStoryWorkspaceEdges } from "./spawn-story-workspace";
 import { hasStoryComicColumnGroups } from "./story-comic-groups";
 import {
@@ -223,8 +227,35 @@ export const useCanvasStore = create<CanvasState>()(
 
       onNodesChange: (changes) => {
         const prev = get().nodes;
+        const edges = get().edges;
+        const removeIds = changes
+          .filter((c): c is NodeChange & { type: "remove"; id: string } =>
+            c.type === "remove" && "id" in c && typeof c.id === "string",
+          )
+          .map((c) => c.id);
+        let filteredChanges = changes;
+        if (removeIds.length) {
+          const validation = validateStoryPipelineDeletion(
+            removeIds,
+            prev,
+            edges,
+          );
+          const allowed = new Set(validation.allowedIds);
+          if (!validation.ok) {
+            canvasNotify({
+              title: "无法删除该节点",
+              message: validation.message,
+              variant: "error",
+            });
+          }
+          filteredChanges = changes.filter(
+            (c) =>
+              c.type !== "remove" ||
+              ("id" in c && typeof c.id === "string" && allowed.has(c.id)),
+          );
+        }
         const manualIds = new Set<string>();
-        for (const ch of changes) {
+        for (const ch of filteredChanges) {
           if (
             ch.type === "dimensions" &&
             "id" in ch &&
@@ -235,7 +266,7 @@ export const useCanvasStore = create<CanvasState>()(
             manualIds.add(ch.id);
           }
         }
-        let next = applyNodeChanges(changes, prev) as CanvasFlowNode[];
+        let next = applyNodeChanges(filteredChanges, prev) as CanvasFlowNode[];
         next = detachChildrenOfRemovedGroups(prev, next);
         next = normalizeCanvasNodes(next, get().edges);
         if (
@@ -291,6 +322,11 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       addNode: (type, position, data) => {
+        const blocked = canAddStoryNodeType(type, get().nodes);
+        if (!blocked.ok) {
+          console.warn("[canvas] addNode blocked:", blocked.message);
+          return "";
+        }
         const id = `n_${nanoid(8)}`;
         const initialData = {
           ...(NODE_DEFAULT_DATA[type] ?? {}),
@@ -342,11 +378,7 @@ export const useCanvasStore = create<CanvasState>()(
         );
         if (patch.rows !== undefined) {
           const t = nodes.find((n) => n.id === id)?.type;
-          if (
-            t === "story-character-column" ||
-            t === "story-frame-column" ||
-            t === "story-video-column"
-          ) {
+          if (isStoryMediaColumnType(t)) {
             nodes = applyStoryColumnHeights(nodes);
           }
         }
@@ -416,6 +448,19 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       removeNode: (id) => {
+        const validation = validateStoryPipelineDeletion(
+          [id],
+          get().nodes,
+          get().edges,
+        );
+        if (!validation.ok || !validation.allowedIds.includes(id)) {
+          canvasNotify({
+            title: "无法删除该节点",
+            message: validation.message,
+            variant: "error",
+          });
+          return;
+        }
         const edges = get().edges.filter((e) => e.source !== id && e.target !== id);
         const nodes = reconcileStoryProWorkspace(
           get().nodes.filter((n) => n.id !== id),
@@ -721,17 +766,20 @@ export const useCanvasStore = create<CanvasState>()(
           nodes,
           repairStoryPreviewEdges(nodes, edges),
         );
-        const hasWorkspace = nodes.some((n) => n.type === "story-script-hub");
-        const laid = hasWorkspace
-          ? reflowStoryComicWorkspace(nodes, repaired)
-          : hasStoryComicColumnGroups(nodes)
-            ? reflowStoryComicColumns(nodes, repaired)
-            : reflowStoryComicFlat(nodes, repaired);
-        const withPro = hasStoryProPipeline(laid)
-          ? reflowStoryProWorkspace(laid, repaired)
-          : laid;
+        let laid = nodes;
+        if (hasStoryComicPipeline(nodes)) {
+          const hasWorkspace = nodes.some((n) => n.type === "story-script-hub");
+          laid = hasWorkspace
+            ? reflowStoryComicWorkspace(nodes, repaired)
+            : hasStoryComicColumnGroups(nodes)
+              ? reflowStoryComicColumns(nodes, repaired)
+              : reflowStoryComicFlat(nodes, repaired);
+        }
+        if (hasStoryProPipeline(laid)) {
+          laid = reflowStoryProWorkspace(laid, repaired);
+        }
         set({
-          nodes: withPro,
+          nodes: laid,
           edges: repaired,
           fitViewNonce: get().fitViewNonce + 1,
         });

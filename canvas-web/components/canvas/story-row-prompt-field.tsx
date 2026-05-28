@@ -10,7 +10,12 @@ import {
 } from "@/lib/canvas/story-ref-image";
 import type { MentionableItem } from "./mentions/MentionsTextarea";
 import { MentionsTextarea } from "./mentions/MentionsTextarea";
-import { STORY_HINT_BODY_CLASS } from "@/lib/canvas/story-column-sync";
+import { STORY_HINT_BODY_CLASS, STORY_HINT_GOLD_CLASS } from "@/lib/canvas/story-column-sync";
+import {
+  STORY_FRAME_ROW_BELOW_PROMPT_H,
+  STORY_FRAME_ROW_STRIP_H,
+} from "@/lib/canvas/story-column-layout";
+import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import type { StoryEdition } from "@/lib/canvas/story-edition-chrome";
 import { storyEditionActiveRefBorderClass } from "@/lib/canvas/story-edition-chrome";
@@ -43,19 +48,24 @@ function StoryUpstreamImageColumn({
   images,
   activeIds,
   edition = "comic",
+  stripHeight,
 }: {
   images: StoryRefImage[];
   activeIds: string[];
   edition?: StoryEdition;
+  stripHeight?: number;
 }) {
   return (
     <div
-      className="flex shrink-0 self-stretch"
-      style={{ width: STORY_UPSTREAM_COL_WIDTH }}
+      className="flex shrink-0 self-start"
+      style={{
+        width: STORY_UPSTREAM_COL_WIDTH,
+        height: stripHeight,
+        minHeight: stripHeight ?? ROW_MEDIA_MIN_H,
+      }}
     >
       <div
-        className="flex w-full flex-col gap-1"
-        style={{ minHeight: ROW_MEDIA_MIN_H }}
+        className="flex h-full w-full flex-col gap-1"
       >
         {images.length ? (
           images.map((ref) => {
@@ -88,7 +98,7 @@ function StoryUpstreamImageColumn({
             );
           })
         ) : (
-          <div className="flex h-full min-h-[72px] flex-1 items-center justify-center rounded-md border border-dashed border-white/12 bg-black/25">
+          <div className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-md border border-dashed border-white/12 bg-black/25">
             <span className="text-[8px] text-[var(--canvas-muted)]">—</span>
           </div>
         )}
@@ -188,6 +198,8 @@ export function StoryColumnRowCard({
   onApproveFrame,
   onRejectFrame,
   belowPrompt,
+  compactFrameLayout,
+  belowPromptMinHeight,
 }: {
   rowTitle: string;
   promptValue: string;
@@ -223,6 +235,9 @@ export function StoryColumnRowCard({
   onApproveFrame?: () => void;
   onRejectFrame?: () => void;
   belowPrompt?: React.ReactNode;
+  /** 分镜列：文案/参考/输出同高横条，元信息沉底 */
+  compactFrameLayout?: boolean;
+  belowPromptMinHeight?: number;
 }) {
   const [mainDraft, setMainDraft] = useState(promptValue);
   const [mainReferencedIds, setMainReferencedIds] = useState<string[]>([]);
@@ -283,92 +298,165 @@ export function StoryColumnRowCard({
     };
   }, [extraDrafts, extraPrompts, disabled]);
 
+  const promptMinH = compactFrameLayout
+    ? STORY_FRAME_ROW_STRIP_H
+    : ROW_MEDIA_MIN_H;
+
+  const mediaPanel = (
+    <StoryColumnMediaPanel
+      imageUrl={imageUrl}
+      videoUrl={videoUrl}
+      audioUrl={audioUrl}
+      generating={generating}
+      generateDisabled={generateDisabled}
+      mediaMode={mediaMode}
+      onGenerate={onGenerate}
+      onGenerateVideo={onGenerateVideo}
+      onPreview={onPreview}
+      errorMessage={compactFrameLayout ? undefined : mediaError}
+      videoPrompt={videoPrompt}
+      videoRefLabels={videoRefLabels}
+      edition={edition}
+      frameApproved={frameApproved}
+      frameRejectedReason={compactFrameLayout ? undefined : frameRejectedReason}
+      videoBlockReason={compactFrameLayout ? undefined : videoBlockReason}
+      onApproveFrame={onApproveFrame}
+      onRejectFrame={onRejectFrame}
+      stripLayout={compactFrameLayout}
+      hideFooters={compactFrameLayout}
+    />
+  );
+
+  const frameFooters =
+    compactFrameLayout && mediaMode === "frame" ? (
+      <div className="space-y-1">
+        {mediaError && !generating ? (
+          <StoryErrorLine message={mediaError} />
+        ) : null}
+        {videoBlockReason && imageUrl && !generating ? (
+          <p className={`text-[10px] leading-snug ${STORY_HINT_GOLD_CLASS}`}>
+            {videoBlockReason}
+          </p>
+        ) : null}
+        {frameRejectedReason?.trim() ? (
+          <StoryErrorLine message={`驳回：${frameRejectedReason}`} />
+        ) : null}
+      </div>
+    ) : null;
+
+  const promptField = useMentions ? (
+    <MentionsTextarea
+      value={mainDraft}
+      mentionables={mentionables ?? []}
+      disabled={disabled}
+      rows={3}
+      fillHeight={compactFrameLayout}
+      placeholder="场景、镜头描述；输入 @ 引用角色三视图"
+      wrapperClassName={cn(
+        "nodrag w-full min-w-0",
+        compactFrameLayout ? "h-full" : "min-h-[var(--row-media-min,248px)]",
+      )}
+      className={cn(
+        `${RF_NODE_SCROLL} w-full resize-none rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`,
+        compactFrameLayout
+          ? "min-h-0 flex-1 overflow-y-auto"
+          : "h-full min-h-[var(--row-media-min,248px)] overflow-hidden",
+      )}
+      onChange={(next, referencedIds) => {
+        setMainDraft(next);
+        setMainReferencedIds(referencedIds);
+      }}
+    />
+  ) : (
+    <AutoGrowTextarea
+      value={mainDraft}
+      disabled={disabled}
+      matchMediaHeight={!compactFrameLayout}
+      onChange={setMainDraft}
+    />
+  );
+
   return (
     <div
       className="relative rounded-lg border border-white/10 bg-black/25 px-2 py-2"
       style={
         {
-          ["--row-media-min" as string]: `${ROW_MEDIA_MIN_H}px`,
+          ["--row-media-min" as string]: `${promptMinH}px`,
         } as React.CSSProperties
       }
     >
       <StoryRowTitleBadge title={rowTitle} />
-      <div className="flex items-stretch gap-2">
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          {useMentions ? (
-            <MentionsTextarea
-              value={mainDraft}
-              mentionables={mentionables ?? []}
-              disabled={disabled}
-              rows={3}
-              placeholder="场景、镜头描述；输入 @ 引用角色三视图"
-              wrapperClassName="nodrag w-full min-w-0 min-h-[var(--row-media-min,248px)]"
-              className={`${RF_NODE_SCROLL} h-full min-h-[var(--row-media-min,248px)] w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
-              onChange={(next, referencedIds) => {
-                setMainDraft(next);
-                setMainReferencedIds(referencedIds);
-              }}
-            />
-          ) : (
-            <AutoGrowTextarea
-              value={mainDraft}
-              disabled={disabled}
-              matchMediaHeight
-              onChange={setMainDraft}
-            />
-          )}
-          {promptHint ? (
-            <p className={STORY_HINT_BODY_CLASS}>{promptHint}</p>
-          ) : null}
-          {belowPrompt}
-          {extraPrompts?.map((extra, i) => (
-            <div key={extra.subLabel} className="space-y-0.5">
-              <p className="text-[9px] text-[var(--canvas-muted)]">
-                {extra.subLabel}
-              </p>
-              <AutoGrowTextarea
-                rows={2}
-                value={extraDrafts[i] ?? extra.value}
-                disabled={disabled}
-                onChange={(next) => {
-                  setExtraDrafts((prev) => {
-                    const copy = [...prev];
-                    copy[i] = next;
-                    return copy;
-                  });
-                }}
-              />
+      {compactFrameLayout ? (
+        <div className="flex flex-col gap-1.5">
+          <div
+            className="flex items-stretch gap-2"
+            style={{ height: STORY_FRAME_ROW_STRIP_H }}
+          >
+            <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              {promptField}
             </div>
-          ))}
+            {showUpstream ? (
+              <StoryUpstreamImageColumn
+                images={upstreamImages ?? refImages}
+                activeIds={activeRefIds}
+                edition={edition}
+                stripHeight={STORY_FRAME_ROW_STRIP_H}
+              />
+            ) : null}
+            {mediaPanel}
+          </div>
+          {belowPrompt}
+          {frameFooters}
         </div>
-        {showUpstream ? (
-          <StoryUpstreamImageColumn
-            images={upstreamImages ?? refImages}
-            activeIds={activeRefIds}
-            edition={edition}
-          />
-        ) : null}
-        <StoryColumnMediaPanel
-          imageUrl={imageUrl}
-          videoUrl={videoUrl}
-          audioUrl={audioUrl}
-          generating={generating}
-          generateDisabled={generateDisabled}
-          mediaMode={mediaMode}
-          onGenerate={onGenerate}
-          onGenerateVideo={onGenerateVideo}
-          onPreview={onPreview}
-          errorMessage={mediaError}
-          videoPrompt={videoPrompt}
-          videoRefLabels={videoRefLabels}
-          edition={edition}
-          frameApproved={frameApproved}
-          frameRejectedReason={frameRejectedReason}
-          videoBlockReason={videoBlockReason}
-          onApproveFrame={onApproveFrame}
-          onRejectFrame={onRejectFrame}
-        />
-      </div>
+      ) : (
+        <div className="flex items-stretch gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            {promptField}
+            {promptHint ? (
+              <p className={STORY_HINT_BODY_CLASS}>{promptHint}</p>
+            ) : null}
+            {belowPrompt != null ? (
+              <div
+                className="shrink-0"
+                style={
+                  belowPromptMinHeight
+                    ? { minHeight: belowPromptMinHeight }
+                    : undefined
+                }
+              >
+                {belowPrompt}
+              </div>
+            ) : null}
+            {extraPrompts?.map((extra, i) => (
+              <div key={extra.subLabel} className="space-y-0.5">
+                <p className="text-[9px] text-[var(--canvas-muted)]">
+                  {extra.subLabel}
+                </p>
+                <AutoGrowTextarea
+                  rows={2}
+                  value={extraDrafts[i] ?? extra.value}
+                  disabled={disabled}
+                  onChange={(next) => {
+                    setExtraDrafts((prev) => {
+                      const copy = [...prev];
+                      copy[i] = next;
+                      return copy;
+                    });
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          {showUpstream ? (
+            <StoryUpstreamImageColumn
+              images={upstreamImages ?? refImages}
+              activeIds={activeRefIds}
+              edition={edition}
+            />
+          ) : null}
+          {mediaPanel}
+        </div>
+      )}
     </div>
   );
 }

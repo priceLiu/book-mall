@@ -57,8 +57,8 @@ export function CanvasToolbar({
   runAllDisabled?: boolean;
 }) {
   return (
-    <header className="relative z-50 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white">
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+    <header className="relative flex shrink-0 flex-col gap-1.5 border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white">
+      <div className="flex min-w-0 items-center gap-2">
         <Link
           href="/projects"
           className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-white/30 hover:text-white"
@@ -99,7 +99,7 @@ export function CanvasToolbar({
                 : ""}
         </span>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={onUndo}
