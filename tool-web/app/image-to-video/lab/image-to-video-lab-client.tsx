@@ -435,6 +435,7 @@ export function ImageToVideoLabClient({
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const [generatingModelLabel, setGeneratingModelLabel] = useState("");
   const [billablePricePoints, setBillablePricePoints] = useState<number | null>(null);
+  const [serviceFeeCharge, setServiceFeeCharge] = useState(false);
   const [librarySaveBusyId, setLibrarySaveBusyId] = useState<string | null>(null);
   const [librarySavedByJobId, setLibrarySavedByJobId] = useState<Record<string, boolean>>(
     {},
@@ -445,6 +446,13 @@ export function ImageToVideoLabClient({
   const [overlayMounted, setOverlayMounted] = useState(false);
 
   const { chargeLine, chargeTitle } = useMemo(() => {
+    if (serviceFeeCharge) {
+      return {
+        chargeLine: "已含在工具技术服务费内，单次生成不另扣点",
+        chargeTitle:
+          "工具使用权按月技术服务费扣点；云厂商费用走 Gateway BYOK，单次生成不另扣钱包点数。",
+      };
+    }
     if (billablePricePoints != null && billablePricePoints > 0) {
       const pts = billablePricePoints;
       const y = (pts / 100).toFixed(2);
@@ -458,7 +466,7 @@ export function ImageToVideoLabClient({
       chargeTitle:
         "单次生成按主站「工具管理」配置的按次单价（点）扣费；标价加载失败时请刷新页面或查看管理后台。",
     };
-  }, [billablePricePoints]);
+  }, [billablePricePoints, serviceFeeCharge]);
 
   useEffect(() => {
     setOverlayMounted(true);
@@ -527,8 +535,17 @@ export function ImageToVideoLabClient({
         const r = await fetch(`/api/image-to-video/billable-hint?${qs}`, {
           credentials: "same-origin",
         });
-        const j = (await r.json().catch(() => ({}))) as { pricePoints?: number };
+        const j = (await r.json().catch(() => ({}))) as {
+          pricePoints?: number;
+          serviceFeeMode?: boolean;
+        };
+        if (!cancelled && r.ok && j.serviceFeeMode) {
+          setServiceFeeCharge(true);
+          setBillablePricePoints(null);
+          return;
+        }
         if (!cancelled && r.ok && typeof j.pricePoints === "number") {
+          setServiceFeeCharge(false);
           setBillablePricePoints(Math.max(0, Math.floor(j.pricePoints)));
         }
       } catch {

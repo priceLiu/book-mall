@@ -329,11 +329,21 @@ export function storyProHubHasOutputWorkflow(
   nodes: CanvasFlowNode[],
   scriptHubId: string,
 ): boolean {
+  return storyProHubHasMediaColumns(nodes, scriptHubId);
+}
+
+/** 风格定稿后 spawn 的任一媒体/导出列仍存在 */
+export function storyProHubHasMediaColumns(
+  nodes: CanvasFlowNode[],
+  scriptHubId: string,
+): boolean {
   return nodes.some(
     (n) =>
       (n.type === "story-pro-character" ||
+        n.type === "story-pro-scene" ||
         n.type === "story-pro-frame" ||
-        n.type === "story-pro-video") &&
+        n.type === "story-pro-video" ||
+        n.type === "jianying-export-pro") &&
       belongsToHub(n, scriptHubId),
   );
 }
@@ -355,7 +365,7 @@ export function reconcileStoryProHubFinalized(
     if (n.type !== "story-pro-script-hub") return n;
     const d = n.data as { scriptFinalized?: boolean };
     const hasStyle = storyProHubHasStyleLayer(nodes, n.id);
-    const hasMedia = storyProHubHasOutputWorkflow(nodes, n.id);
+    const hasMedia = storyProHubHasMediaColumns(nodes, n.id);
 
     // 修复旧逻辑误清：已有风格节点即视为故事已定稿
     if (!d.scriptFinalized && hasStyle && !hasMedia) {
@@ -366,6 +376,49 @@ export function reconcileStoryProHubFinalized(
     if (hasMedia || hasStyle) return n;
     return { ...n, data: { ...n.data, scriptFinalized: false } };
   });
+}
+
+/** 删下游列后解除风格定稿，允许再次「风格定稿 · 生成工作流」 */
+export function reconcileStoryProStyleFinalized(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  let next = nodes;
+  for (const styleNode of nodes) {
+    if (styleNode.type !== "story-pro-style") continue;
+    const d = styleNode.data as { styleFinalized?: boolean; hubNodeId?: string };
+    if (!d.styleFinalized) continue;
+    const hubId = d.hubNodeId;
+    if (!hubId) continue;
+    if (storyProHubHasMediaColumns(next, hubId)) continue;
+
+    next = next.map((n) =>
+      n.id === styleNode.id
+        ? { ...n, data: { ...n.data, styleFinalized: false } }
+        : n,
+    );
+    next = next.map((n) => {
+      if (n.type !== "story-pro-starter") return n;
+      const ws = (n.data as { workspaceIds?: StoryProWorkspaceIds })
+        .workspaceIds;
+      if (ws?.scriptHubId !== hubId) return n;
+      const stage = (n.data as { pipelineStage?: string }).pipelineStage;
+      if (stage === "style_finalized" || stage === "finalized") {
+        return {
+          ...n,
+          data: { ...n.data, pipelineStage: "script_finalized" },
+        };
+      }
+      return n;
+    });
+  }
+  return next;
+}
+
+/** hydrate / 删节点 / reflow 后统一校正 story-pro 定稿状态 */
+export function reconcileStoryProWorkspace(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  return reconcileStoryProStyleFinalized(reconcileStoryProHubFinalized(nodes));
 }
 
 export const STORY_PRO_HUB_SECTION_ORDER = [

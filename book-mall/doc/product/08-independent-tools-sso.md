@@ -1,10 +1,14 @@
 # 独立工具站与黄金会员（〇八）
 
+> **Phase D（2026-05-27）**：工具站 SSO 准入已改为 **有效工具技术服务费周期**（见 [13-tool-service-fee-and-wallet.md](./13-tool-service-fee-and-wallet.md)）。下文「黄金会员」章节为 **legacy**，代码中 `getGoldMemberAccess` 仍供 introspect 余额字段，但 **不再** 作为工具 SSO 硬门槛。
+
 ## 文档目的
 
 约定 **主站与独立部署 AI 工具** 之间的准入规则（**黄金会员**）与集成边界，避免与站内「订阅 + 余额」的高级计量权益混淆。
 
-## 黄金会员（工具站）
+## 黄金会员（工具站）— legacy
+
+> Phase D 起工具 SSO **不再** 要求黄金会员；保留本节供历史对账与 introspect 余额字段说明。
 
 须 **同时** 满足：
 

@@ -1,17 +1,21 @@
 "use client";
 
-import { AppOpenTransitionShell } from "@/components/app-open/app-open-transition-shell";
+import { useEffect } from "react";
 import { StoryOpenLoader } from "@/components/app-open/story-open-loader";
 
-export function StoryOpenClient({ targetUrl }: { targetUrl: string }) {
+export function StoryOpenClient({ reEnterPath }: { reEnterPath: string }) {
+  useEffect(() => {
+    window.location.replace(reEnterPath);
+  }, [reEnterPath]);
+
   return (
-    <AppOpenTransitionShell
-      targetUrl={targetUrl}
-      loader={<StoryOpenLoader />}
-      title="正在打开漫剧剧场…"
-      subtitle="场记就绪 · 胶片入槽 · 即将进入 story-web"
-      hint="若长时间停留在此页，请关闭标签后从工具站或开发导航重试。"
-      gradientClassName="bg-gradient-to-b from-amber-500/[0.08] via-transparent to-orange-500/[0.06] dark:from-amber-500/[0.12] dark:to-orange-500/[0.08]"
-    />
+    <div
+      className="relative flex min-h-[100dvh] flex-col items-center justify-center gap-6 overflow-hidden bg-background px-4"
+      role="status"
+      aria-live="polite"
+    >
+      <StoryOpenLoader />
+      <p className="text-sm text-muted-foreground">正在通过 Book SSO 打开漫剧剧场…</p>
+    </div>
   );
 }

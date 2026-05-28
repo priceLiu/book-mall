@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
+  serviceFeeBillableHintJson,
+  TOOL_SERVICE_FEE_MODE,
+} from "@/lib/tool-service-fee-mode";
+import {
   DEFAULT_VISUAL_LAB_ANALYSIS_MODEL_ID,
   getVisualLabAnalysisModelById,
 } from "@/lib/visual-lab-analysis-models";
@@ -22,6 +26,10 @@ export async function GET(req: Request) {
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });
+  }
+
+  if (TOOL_SERVICE_FEE_MODE) {
+    return NextResponse.json(serviceFeeBillableHintJson());
   }
 
   const url = new URL(req.url);

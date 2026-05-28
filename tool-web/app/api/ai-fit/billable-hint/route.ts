@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
+  serviceFeeBillableHintJson,
+  TOOL_SERVICE_FEE_MODE,
+} from "@/lib/tool-service-fee-mode";
+import {
   computeAiTryOnChargePoints,
   resolveAiTryOnBillingModelId,
 } from "@/lib/tools-scheme-a-pricing";
@@ -11,11 +15,15 @@ export const dynamic = "force-dynamic";
 
 const AI_FIT_BILLING_TOOL_KEY = "fitting-room__ai-fit";
 
-/** AI 试衣单次成片方案 A 标价提示（与 try-on 结算同源）。 */
+/** AI 试衣标价提示：Phase D 返回技术服务费说明；legacy 仍返回方案 A 点数。 */
 export async function GET() {
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });
+  }
+
+  if (TOOL_SERVICE_FEE_MODE) {
+    return NextResponse.json(serviceFeeBillableHintJson());
   }
 
   const model = resolveAiTryOnBillingModelId();

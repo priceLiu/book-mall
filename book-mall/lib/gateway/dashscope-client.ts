@@ -11,7 +11,19 @@ const WANX_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis";
 const VIDEO_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
+const IMAGE_PROCESS_URL =
+  "https://dashscope.aliyuncs.com/api/v1/services/vision/image-process/process";
 const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";
+
+export const AITRYON_PARSING_MODEL = "aitryon-parsing-v1";
+
+export type DashscopeClothesType = "upper" | "lower" | "dress";
+
+export type DashscopeParsingOutput = {
+  parsing_img_url?: (string | null)[];
+  crop_img_url?: (string | null)[];
+  bbox?: (number[] | null)[] | null;
+};
 
 export type DashscopeTaskOutput = {
   task_id?: string;
@@ -247,6 +259,82 @@ export async function dashscopeCreateVideoTask(opts: {
     };
   }
   return { ok: true, taskId };
+}
+
+function pickParsingUrlList(raw: unknown): (string | null)[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.map((item) => {
+    if (item == null) return null;
+    if (typeof item === "string" && item.trim()) {
+      return upgradeAliyunHttpToHttps(item.trim());
+    }
+    return null;
+  });
+}
+
+/** AI 试衣 · 图片分割（同步） */
+export async function dashscopeImageParsing(opts: {
+  apiKey: string;
+  imageUrl: string;
+  clothesType?: DashscopeClothesType[];
+  model?: string;
+}): Promise<
+  | { ok: true; output: DashscopeParsingOutput; requestId?: string }
+  | { ok: false; error: string }
+> {
+  const imageUrl = upgradeAliyunHttpToHttps(opts.imageUrl.trim());
+  if (!/^https:\/\//.test(imageUrl)) {
+    return { ok: false, error: "image_url 须为 https 公网地址" };
+  }
+  const clothesType = opts.clothesType?.length
+    ? opts.clothesType
+    : (["upper", "lower"] as DashscopeClothesType[]);
+  const model = opts.model?.trim() || AITRYON_PARSING_MODEL;
+
+  const res = await fetch(IMAGE_PROCESS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      input: { image_url: imageUrl },
+      parameters: { clothes_type: clothesType },
+    }),
+  });
+
+  const json = (await res.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null;
+  if (!res.ok || !json) {
+    const msg =
+      typeof json?.message === "string"
+        ? json.message
+        : typeof json?.code === "string"
+          ? json.code
+          : `分割失败（HTTP ${res.status}）`;
+    return { ok: false, error: msg };
+  }
+
+  const output = json.output as Record<string, unknown> | undefined;
+  if (!output) {
+    return { ok: false, error: "分割接口未返回 output" };
+  }
+
+  return {
+    ok: true,
+    output: {
+      parsing_img_url: pickParsingUrlList(output.parsing_img_url),
+      crop_img_url: pickParsingUrlList(output.crop_img_url),
+      bbox: Array.isArray(output.bbox)
+        ? (output.bbox as (number[] | null)[])
+        : undefined,
+    },
+    requestId:
+      typeof json.request_id === "string" ? json.request_id : undefined,
+  };
 }
 
 export function countWanxSucceededImages(output: DashscopeTaskOutput): number {

@@ -1,15 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { resolvePlatformUser } from "@/lib/platform-auth";
 import { canvasCorsHeaders } from "./cors";
 import { CanvasProjectError } from "./canvas-project-service";
 import { CanvasProviderError } from "./canvas-provider-service";
 import { CanvasSecretError } from "./secret";
 import { CanvasCharacterError } from "./canvas-character-service";
+import { StoryFrameGateError } from "./story-frame-gate";
+import { StoryModelCapabilityError } from "./story-model-capabilities";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
-  Vary: "Cookie",
+  Vary: "Cookie, Authorization",
 };
 
 export function jsonHeaders(request: NextRequest): Record<string, string> {
@@ -34,8 +35,8 @@ export type AuthGuardResult =
 export async function requireSessionUser(
   request: NextRequest,
 ): Promise<AuthGuardResult> {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await resolvePlatformUser(request);
+  if (!user) {
     return {
       ok: false,
       response: NextResponse.json(
@@ -47,10 +48,10 @@ export async function requireSessionUser(
   return {
     ok: true,
     user: {
-      id: session.user.id,
-      name: session.user.name ?? null,
-      email: session.user.email ?? null,
-      role: session.user.role,
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
     },
   };
 }
@@ -82,6 +83,18 @@ export function canvasErrorToResponse(
     );
   }
   if (err instanceof CanvasCharacterError) {
+    return NextResponse.json(
+      { error: err.code, message: err.message },
+      { status: err.httpStatus, headers: jsonHeaders(request) },
+    );
+  }
+  if (err instanceof StoryFrameGateError) {
+    return NextResponse.json(
+      { error: err.code, message: err.message },
+      { status: err.httpStatus, headers: jsonHeaders(request) },
+    );
+  }
+  if (err instanceof StoryModelCapabilityError) {
     return NextResponse.json(
       { error: err.code, message: err.message },
       { status: err.httpStatus, headers: jsonHeaders(request) },

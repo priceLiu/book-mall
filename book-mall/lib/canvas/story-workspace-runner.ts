@@ -11,8 +11,12 @@ import {
   type RunEngineNodeArgs,
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
+import { assertStoryVideoFrameGate } from "./story-frame-gate";
+import { resolveStoryRowRefUrls } from "./story-row-ref-urls";
 
-export type StoryLlmSection = "outline" | "character" | "storyboard";
+type StoryLlmSection = "outline" | "character" | "storyboard";
+
+export type { StoryLlmSection };
 
 const SECTION_ENGINE: Record<
   StoryLlmSection,
@@ -30,40 +34,6 @@ const PROMPT_KEY: Record<StoryLlmSection, string> = {
 };
 
 type StoryRow = Record<string, unknown>;
-
-type StoryRefImageRow = { id: string; url?: string };
-
-function parseMentionIds(prompt: string): string[] {
-  const ids: string[] = [];
-  const re = /@<([^>\s]+)>/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(prompt)) !== null) {
-    ids.push(m[1]!);
-  }
-  return ids;
-}
-
-function resolveStoryRowRefUrls(row: StoryRow, promptField = "prompt"): string[] {
-  const prompt = String(row[promptField] ?? row.prompt ?? "");
-  const refImages = row.refImages as StoryRefImageRow[] | undefined;
-  if (refImages?.length) {
-    const byId = new Map(
-      refImages
-        .filter((r) => r.url && /^https?:\/\//.test(String(r.url)))
-        .map((r) => [r.id, String(r.url)]),
-    );
-    const fromMentions = parseMentionIds(prompt)
-      .map((id) => byId.get(id))
-      .filter((u): u is string => Boolean(u));
-    if (fromMentions.length) return fromMentions;
-    return Array.from(byId.values());
-  }
-  const legacy = row.refImageUrls;
-  if (Array.isArray(legacy)) {
-    return legacy.filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u));
-  }
-  return [];
-}
 
 /** 分镜视频：分镜图为主图；@ 三视图仅作参考（不替代主图） */
 function collectStoryVideoImageInputs(row: StoryRow): {
@@ -211,9 +181,7 @@ export async function runStoryVideoColumnVideoRow(
   const params = (batch.params as Record<string, unknown>) ?? {};
   const refUrls = resolveStoryRowRefUrls(row, "videoPrompt");
   const { frameImageUrl, referenceImageUrls } = collectStoryVideoImageInputs(row);
-  if (!/^https?:\/\//.test(frameImageUrl)) {
-    throw new Error("分镜视频需要已生成的分镜图（主图），请先生成分镜图");
-  }
+  assertStoryVideoFrameGate(row);
   const promptBase = String(row.videoPrompt ?? "").trim() || "分镜视频";
   const prompt =
     referenceImageUrls.length && refUrls.length

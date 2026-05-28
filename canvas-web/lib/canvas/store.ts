@@ -45,7 +45,7 @@ import {
   hasStoryProPipeline,
   reflowStoryProWorkspace,
 } from "./story-pro-workspace-layout";
-import { reconcileStoryProHubFinalized } from "./spawn-story-pro-workspace";
+import { reconcileStoryProWorkspace } from "./spawn-story-pro-workspace";
 import { reconcileStoryWorkspaceEdges } from "./spawn-story-workspace";
 import { hasStoryComicColumnGroups } from "./story-comic-groups";
 import {
@@ -182,7 +182,7 @@ export const useCanvasStore = create<CanvasState>()(
       hydrate: (projectId, graph) => {
         const raw = graph && Array.isArray(graph.nodes) ? graph : emptyGraph();
         const g = migrateGraphV1ToV2(raw);
-        let nodes = reconcileStoryProHubFinalized(
+        let nodes = reconcileStoryProWorkspace(
           normalizeCanvasNodes(
             g.nodes as CanvasFlowNode[],
             g.edges as CanvasFlowEdge[],
@@ -238,6 +238,11 @@ export const useCanvasStore = create<CanvasState>()(
         let next = applyNodeChanges(changes, prev) as CanvasFlowNode[];
         next = detachChildrenOfRemovedGroups(prev, next);
         next = normalizeCanvasNodes(next, get().edges);
+        if (
+          next.some((n) => String(n.type ?? "").startsWith("story-pro-"))
+        ) {
+          next = reconcileStoryProWorkspace(next);
+        }
         if (manualIds.size > 0) {
           next = next.map((n) =>
             manualIds.has(n.id)
@@ -411,10 +416,11 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       removeNode: (id) => {
-        set({
-          nodes: get().nodes.filter((n) => n.id !== id),
-          edges: get().edges.filter((e) => e.source !== id && e.target !== id),
-        });
+        const edges = get().edges.filter((e) => e.source !== id && e.target !== id);
+        const nodes = reconcileStoryProWorkspace(
+          get().nodes.filter((n) => n.id !== id),
+        );
+        set({ nodes, edges });
       },
 
       duplicateNode: (id) => {

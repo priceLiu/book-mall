@@ -25,8 +25,8 @@
 | 项 | 现状 | 差距 |
 |----|------|------|
 | tool-web | SSO + 点数扣费 + Gateway 部分已接 | 仍要 gold 充值线；401 UX 差；部分 API 不重查 entitlement |
-| canvas-web | Cookie 代理 + Gateway | 非标准 SSO；难接第三方 |
-| story-web | Cookie 代理 + KIE/Gateway | 同 canvas |
+| canvas-web | SSO + Bearer BFF + Gateway | Cookie 代理已降级为同域 BFF；媒体/OSS 见 `media-storage-oss-vs-db.mdc` |
+| story-web | SSO + Bearer BFF + Gateway | 同 canvas |
 | gateway-web | Book SSO | 已较标准 |
 | git | `gateway-web/.next` 曾误入库 | Phase A 已 `git rm --cached` + 根 `.gitignore` 加强 |
 | 文档 | 09 联邦草案 | 缺 12 产品约束 + 本计划 + Cursor 规则 |
@@ -62,6 +62,7 @@ Phase F  第三方接入准备（可选）          ~2 周+
 - [x] `book-mall/doc/product/12-platform-app-federation.md`
 - [x] `book-mall/doc/plans/2026-platform-unification-rollout.md`（本文）
 - [x] `.cursor/rules/platform-app-federation.mdc`
+- [x] `.cursor/rules/media-storage-oss-vs-db.mdc`（图片/视频 OSS，其余 DB）
 - [x] `book-mall/doc/README.md` 索引更新
 - [x] `book-mall/doc/process/development-constraints.md` §7 平台联邦
 
@@ -143,50 +144,17 @@ Phase F  第三方接入准备（可选）          ~2 周+
 
 ---
 
-## 6. Phase D — 财务收敛（订阅 + Gateway）
+## 6. Phase D — 技术服务费 + Gateway（详见子计划）
 
-**目标**：AI 能力不再走 Book 点数扣费；准入 = 订阅套件 + Gateway 已关联。
+**子计划（任务勾选）**：[2026-phase-d-service-fee-billing.md](./2026-phase-d-service-fee-billing.md)
 
-### D.1 产品决策（须书面确认）
+**已确认**：
 
-- [ ] AI 生成 **不再** 对用户展示「扣点 / 充值再生成」
-- [ ] 订阅套餐包含哪些 `navKey`（工具站全套 / canvas / story 分套件）
-- [ ] 钱包是否仅保留 **课程/非 AI 商品**（若是，UI 隐藏工具扣费文案）
+- AI 生成 **不按次扣点**；全部 Gateway BYOK  
+- **课程**会员计划 **仅课程**；工具 **按月技术服务费**（钱包）  
+- 进度以子计划 D0–D5 checklist 为准  
 
-### D.2 准入规则替换
-
-| 旧规则 | 新规则 |
-|--------|--------|
-| `getGoldMemberAccess`（RECHARGE + 余额线） | `getToolsSsoEligibility` 仅 **订阅/套件**（改 `tools-sso-access.ts`） |
-| `reserveBeforeVideoStart` / settle | **删除或 no-op**（tool-web start/settle routes） |
-| `ToolChargeSubmitButton` 扣费行 | 改为「须有效订阅 + Gateway 已关联」 |
-
-涉及文件（非 exhaustive）：
-
-- `book-mall/lib/tools-sso-access.ts`
-- `book-mall/lib/gold-member.ts`（标记 deprecated 或删除引用）
-- `tool-web/app/api/image-to-video/start/route.ts`
-- `tool-web/app/api/text-to-image/*`
-- `tool-web/app/api/ai-fit/*`
-- `tool-web/components/ui/tool-charge-submit-button.tsx` 文案策略
-- `book-mall/doc/product/08-independent-tools-sso.md` 更新
-
-### D.3 Gateway 强制
-
-- [ ] tool-web 所有生成路径已走 `forward-gateway-dashscope-server`（核查直连残留）
-- [ ] 未 link `gatewayApiKeyId` → 403 `GATEWAY_KEY_REQUIRED` +  immobilization UI
-
-### D.4 数据与迁移
-
-- 未上线：**可不迁移** 历史 Wallet 测试数据；Prisma 保留表结构供课程/充值
-- 文档：更新 `02-users-billing`、`gateway-user-guide`、`finance-rule` 中 AI 工具章节
-
-### D.5 验收
-
-- 新用户：注册 → 订阅（或 admin）→ link Gateway → 工具/Canvas 生成 **无点数扣减**
-- introspect 订阅失效 → 生成拒绝（含 gateway 路径 entitlement 复核）
-
-**估时**：10–15 人日
+- **状态**：已完成（见子计划 checklist）
 
 ---
 
@@ -242,32 +210,36 @@ Phase F  第三方接入准备（可选）          ~2 周+
 
 ## 11. 任务勾选（总览）
 
+**上线前验收**（按应用逐项勾选）：[2026-platform-prelaunch-checklist.md](./2026-platform-prelaunch-checklist.md)
+
 ### Phase A
 - [x] gitignore + untrack `.next`
 - [x] 12 产品文档 + 本计划 + Cursor 规则
-- [ ] 提交 A（含 canvas story-pro、tool 实验室 session 等存量改动）
+- [x] `.cursor/rules/media-storage-oss-vs-db.mdc`
+- [ ] git 提交（含平台统一、分析室/Canvas/Gateway 日志等存量改动）
+- [ ] 预发全链路验收（见 prelaunch checklist §0–§8）
 
 ### Phase B
-- [ ] 静默 re-enter
-- [ ] 401 统一处理
+- [x] 静默 re-enter
+- [x] 401 统一处理（tool-shell 静默换票 + serviceFee 文案）
 
 ### Phase C
-- [ ] canvas SSO
-- [ ] story SSO
-- [ ] book Platform auth helper
+- [x] canvas SSO（callback + tools-session + re-enter + Bearer BFF）
+- [x] story SSO（同上）
+- [x] book Platform auth helper（`lib/platform-auth.ts`）
 
 ### Phase D
-- [ ] 产品确认
-- [ ] 退役 gold 充值线
-- [ ] 退役 tool reserve/settle（AI）
-- [ ] UI 扣费文案调整
+- [x] 产品确认
+- [x] 退役 gold 充值线（工具 SSO）
+- [x] 退役 tool reserve/settle（AI）
+- [x] UI 扣费文案调整
 
 ### Phase E
-- [ ] entitlement 每次 gateway 校验
-- [ ] platform-api-v1 文档
+- [x] entitlement 每次 gateway 校验（`assertPlatformGatewayEntitlement`）
+- [x] platform-api-v1 文档
 
 ### Phase F
-- [ ] 第三方 client 注册（可选）
+- [x] 第三方 client 注册（`SsoClient` + `/admin/sso-clients` + `allowedNavKeys` 裁剪 + 示例 app）
 
 ---
 
@@ -286,12 +258,16 @@ tool-web/
   lib/tools-introspect.ts
 
 canvas-web/
-  lib/book-mall-client-request.ts   # 待迁移
+  lib/book-mall-client-request.ts   # 跨源 BFF 代理（SSO 已迁）
+  app/api/canvas/oss-text/          # 剧本 OSS 服务端读取
   components/auth/require-auth.tsx
 
-.cursor/rules/platform-app-federation.mdc
+.cursor/rules/
+  platform-app-federation.mdc
+  media-storage-oss-vs-db.mdc
+  gateway-log-design.mdc
 ```
 
 ---
 
-**下一步（Agent）**：完成 Phase A  git 提交后，按用户确认从 **Phase B** 或 **C** 开始编码。
+**当前状态（2026-05-27）**：Phase B–F 代码与文档已完成；**待 git 提交 + [上线前验收清单](./2026-platform-prelaunch-checklist.md)** 全绿后再正式上线。

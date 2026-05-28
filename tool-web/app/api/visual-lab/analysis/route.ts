@@ -1,6 +1,7 @@
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { chatStreamFromGateway } from "@/lib/forward-gateway-chat-server";
 import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
+import { TOOL_SERVICE_FEE_MODE } from "@/lib/tool-service-fee-mode";
 import {
   VISUAL_LAB_ANALYSIS_ACTION,
   VISUAL_LAB_ANALYSIS_TOOL_KEY,
@@ -224,68 +225,75 @@ export async function POST(req: Request) {
     toolKey: VISUAL_LAB_ANALYSIS_TOOL_KEY,
     modelKey: modelId,
   });
-  const costPoints = computeVisualLabAnalysisChargePoints(modelId, retailMult);
-  if (costPoints <= 0) {
-    return Response.json(
-      {
-        error: "pricing_unavailable",
-        message: "当前模型缺少方案 A 标价配置，请换模型或联系管理员",
-      },
-      { status: 503 },
-    );
-  }
-  const schemeBreakdown = computeVisualLabAnalysisSchemeBreakdown(modelId, retailMult)!;
-
-  const usage = await postToolUsageFromServerWithRetries({
-    toolKey: VISUAL_LAB_ANALYSIS_TOOL_KEY,
-    action: VISUAL_LAB_ANALYSIS_ACTION,
-    meta: {
-      taskId: billingRaw,
-      modelId,
-      apiModel: meta.apiModel,
-      pricingScheme: "visual_lab_scheme_a",
-      equivalentInputMillionTokens: schemeBreakdown.equivalentInputMillion,
-      equivalentOutputMillionTokens: schemeBreakdown.equivalentOutputMillion,
-      costYuanUpstreamApprox: schemeBreakdown.costYuan,
-      retailMultiplier: schemeBreakdown.retailMultiplier,
-      retailYuanApprox: schemeBreakdown.retailYuan,
-    },
-  });
-  if (!usage.ok) {
-    const msg =
-      usage.reason === "no_session" ? "请先登录工具站" : "工具站未配置主站地址，无法计费";
-    return Response.json({ error: "billing_unavailable", message: msg }, { status: 503 });
-  }
-  if (usage.status === 402) {
-    return Response.json(usage.data, { status: 402 });
-  }
-  if (usage.status !== 200) {
-    const d = usage.data;
-    return Response.json(
-      {
-        error: "billing_failed",
-        message: typeof d.error === "string" ? d.error : "计费失败",
-        ...d,
-      },
-      { status: usage.status >= 400 && usage.status < 600 ? usage.status : 502 },
-    );
-  }
-  const billed = usage.data as Record<string, unknown>;
-  if (billed.recorded !== true) {
-    if (billed.duplicate === true) {
+  if (!TOOL_SERVICE_FEE_MODE) {
+    const costPoints = computeVisualLabAnalysisChargePoints(modelId, retailMult);
+    if (costPoints <= 0) {
       return Response.json(
-        { error: "duplicate_billing", message: "该次分析已扣费，请勿重复提交同一请求" },
-        { status: 409 },
+        {
+          error: "pricing_unavailable",
+          message: "当前模型缺少方案 A 标价配置，请换模型或联系管理员",
+        },
+        { status: 503 },
       );
     }
-    return Response.json(
-      {
-        error: "billing_record_skipped",
-        message:
-          "扣费未被主站接受（点数无效或配置异常）。若持续出现请联系管理员。",
+  }
+
+  const schemeBreakdown = TOOL_SERVICE_FEE_MODE
+    ? null
+    : computeVisualLabAnalysisSchemeBreakdown(modelId, retailMult)!;
+
+  if (!TOOL_SERVICE_FEE_MODE) {
+    const usage = await postToolUsageFromServerWithRetries({
+      toolKey: VISUAL_LAB_ANALYSIS_TOOL_KEY,
+      action: VISUAL_LAB_ANALYSIS_ACTION,
+      meta: {
+        taskId: billingRaw,
+        modelId,
+        apiModel: meta.apiModel,
+        pricingScheme: "visual_lab_scheme_a",
+        equivalentInputMillionTokens: schemeBreakdown!.equivalentInputMillion,
+        equivalentOutputMillionTokens: schemeBreakdown!.equivalentOutputMillion,
+        costYuanUpstreamApprox: schemeBreakdown!.costYuan,
+        retailMultiplier: schemeBreakdown!.retailMultiplier,
+        retailYuanApprox: schemeBreakdown!.retailYuan,
       },
-      { status: 503 },
-    );
+    });
+    if (!usage.ok) {
+      const msg =
+        usage.reason === "no_session" ? "请先登录工具站" : "工具站未配置主站地址，无法计费";
+      return Response.json({ error: "billing_unavailable", message: msg }, { status: 503 });
+    }
+    if (usage.status === 402) {
+      return Response.json(usage.data, { status: 402 });
+    }
+    if (usage.status !== 200) {
+      const d = usage.data;
+      return Response.json(
+        {
+          error: "billing_failed",
+          message: typeof d.error === "string" ? d.error : "计费失败",
+          ...d,
+        },
+        { status: usage.status >= 400 && usage.status < 600 ? usage.status : 502 },
+      );
+    }
+    const billed = usage.data as Record<string, unknown>;
+    if (billed.recorded !== true) {
+      if (billed.duplicate === true) {
+        return Response.json(
+          { error: "duplicate_billing", message: "该次分析已扣费，请勿重复提交同一请求" },
+          { status: 409 },
+        );
+      }
+      return Response.json(
+        {
+          error: "billing_record_skipped",
+          message:
+            "扣费未被主站接受（点数无效或配置异常）。若持续出现请联系管理员。",
+        },
+        { status: 503 },
+      );
+    }
   }
 
   const streamParams: Record<string, unknown> = {
@@ -302,13 +310,26 @@ export async function POST(req: Request) {
         ? "请先登录工具站"
         : gw.reason === "no_origin"
           ? "工具站未配置 MAIN_SITE_ORIGIN"
-          : gw.error ?? "Gateway 调用失败";
-    const status = gw.status === 403 ? 403 : gw.status === 402 ? 402 : 503;
+          : gw.message ?? gw.error ?? "Gateway 调用失败";
+    const code = gw.code ?? "";
+    const isKeyRequired = code === "GATEWAY_KEY_REQUIRED";
+    const status =
+      gw.reason === "no_session"
+        ? 401
+        : gw.reason === "no_origin"
+          ? 503
+          : isKeyRequired
+            ? 403
+            : gw.status === 402
+              ? 402
+              : gw.status && gw.status >= 400 && gw.status < 600
+                ? gw.status
+                : 502;
     return Response.json(
       {
-        error: gw.status === 403 ? "gateway_key_required" : "gateway_error",
+        error: isKeyRequired ? "gateway_key_required" : "gateway_error",
         message,
-        code: gw.status === 403 ? "GATEWAY_KEY_REQUIRED" : undefined,
+        code: code || undefined,
       },
       { status },
     );
@@ -356,6 +377,12 @@ export async function POST(req: Request) {
             } catch {
               continue;
             }
+            const upstreamErr = chunk.error as { message?: string } | undefined;
+            if (typeof upstreamErr?.message === "string" && upstreamErr.message.trim()) {
+              send({ type: "error", message: upstreamErr.message.trim() });
+              controller.close();
+              return;
+            }
             const delta = (chunk.choices as { delta?: Record<string, unknown> }[] | undefined)?.[0]
               ?.delta;
             const r = delta?.reasoning_content;
@@ -365,6 +392,30 @@ export async function POST(req: Request) {
             const c = delta?.content;
             if (typeof c === "string" && c.length > 0) {
               send({ type: "content", text: c });
+            }
+          }
+        }
+        if (!sseBuffer.includes('"choices"') && !sseBuffer.includes('"error"')) {
+          const trimmedBuf = sseBuffer.trim();
+          if (trimmedBuf.startsWith("{")) {
+            try {
+              const maybe = JSON.parse(trimmedBuf) as Record<string, unknown>;
+              const err = maybe.error as { message?: string } | string | undefined;
+              const errMsg =
+                typeof err === "string"
+                  ? err
+                  : typeof err?.message === "string"
+                    ? err.message
+                    : typeof maybe.message === "string"
+                      ? maybe.message
+                      : null;
+              if (errMsg?.trim()) {
+                send({ type: "error", message: errMsg.trim() });
+                controller.close();
+                return;
+              }
+            } catch {
+              /* ignore */
             }
           }
         }

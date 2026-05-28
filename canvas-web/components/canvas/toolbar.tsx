@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Bookmark,
   BookmarkPlus,
+  BookOpen,
   LayoutTemplate,
   Loader2,
   Play,
@@ -28,6 +29,8 @@ export function CanvasToolbar({
   onSaveTemplate,
   onOpenMyTemplates,
   onOpenMyCharacters,
+  onOpenMySavedScripts,
+  onOpenProjectCharacterAssets,
   onReflowStoryLayout,
   running,
   inflightTaskCount = 0,
@@ -46,6 +49,8 @@ export function CanvasToolbar({
   onSaveTemplate?: () => void;
   onOpenMyTemplates?: () => void;
   onOpenMyCharacters?: () => void;
+  onOpenMySavedScripts?: () => void;
+  onOpenProjectCharacterAssets?: () => void;
   onReflowStoryLayout?: () => void;
   running: boolean;
   inflightTaskCount?: number;
@@ -71,7 +76,7 @@ export function CanvasToolbar({
             }
           }}
           maxLength={80}
-          className="min-w-0 max-w-[280px] truncate rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium text-white hover:border-white/10 focus:border-[var(--canvas-accent)]/50 focus:bg-black/20 focus:outline-none"
+          className="min-w-0 max-w-[280px] truncate rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium text-emerald-200 hover:border-white/10 focus:border-emerald-400/40 focus:bg-black/20 focus:outline-none"
           title="点击编辑画布名称"
           aria-label="画布名称"
         />
@@ -84,11 +89,11 @@ export function CanvasToolbar({
             生成中 · {inflightTaskCount} 个任务
           </span>
         ) : null}
-        <span className="hidden shrink-0 text-[11px] text-[var(--canvas-muted)] sm:inline">
+        <span className="hidden shrink-0 text-[11px] text-emerald-300/75 sm:inline">
           {saving
             ? "保存中…"
             : saveError
-              ? <span className="text-red-300">保存失败：{saveError}</span>
+              ? <span className="truncate text-red-400/90" title={`保存失败：${saveError}`}>保存失败：{saveError}</span>
               : lastSavedAt
                 ? `已保存 ${lastSavedAt.toLocaleTimeString("zh-CN")}`
                 : ""}
@@ -136,6 +141,28 @@ export function CanvasToolbar({
           >
             <UserRound className="size-3" />
             我的角色
+          </button>
+        ) : null}
+        {onOpenMySavedScripts ? (
+          <button
+            type="button"
+            onClick={onOpenMySavedScripts}
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-400/25 bg-emerald-500/8 px-2 py-1 text-[11px] text-emerald-100/90 hover:border-emerald-400/40 hover:bg-emerald-500/15 hover:text-emerald-50"
+            title="查看本画布内故事定稿的只读剧本历史"
+          >
+            <BookOpen className="size-3" />
+            我保存的剧本
+          </button>
+        ) : null}
+        {onOpenProjectCharacterAssets ? (
+          <button
+            type="button"
+            onClick={onOpenProjectCharacterAssets}
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-400/25 bg-emerald-500/8 px-2 py-1 text-[11px] text-emerald-100/90 hover:border-emerald-400/40 hover:bg-emerald-500/15 hover:text-emerald-50"
+            title="查看本项目角色与场景资产库"
+          >
+            <UserRound className="size-3" />
+            项目资产
           </button>
         ) : null}
         {onReflowStoryLayout ? (

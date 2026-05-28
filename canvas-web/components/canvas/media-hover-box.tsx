@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { createPortal } from "react-dom";
 import { Eye, Upload, X } from "lucide-react";
 import {
+  bindImageDragDropHandlers,
+  firstImageFileFromDataTransfer,
+} from "@/lib/canvas/image-upload-handlers";
+import {
   buildSideOptions,
   canShowCompare,
   defaultCompareSides,
@@ -22,6 +26,8 @@ export type MediaHoverBoxProps = {
   mediaKind?: "image" | "video";
   variant?: "uploadable" | "generated";
   onUpload?: () => void;
+  /** 拖入图片文件时回调（与 onUpload 互补） */
+  onImageFile?: (file: File) => void;
   alt?: string;
   className?: string;
   placeholder?: ReactNode;
@@ -45,6 +51,7 @@ export function MediaHoverBox({
   mediaKind,
   variant = "generated",
   onUpload,
+  onImageFile,
   alt = "media",
   className = "",
   placeholder,
@@ -56,10 +63,25 @@ export function MediaHoverBox({
   initialView = "single",
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const kind =
     mediaKind ?? (src && isVideoMediaUrl(src) ? "video" : "image");
   const canPreview = !!src;
-  const showUpload = variant === "uploadable" && !!onUpload;
+  const showUpload = variant === "uploadable" && (!!onUpload || !!onImageFile);
+  const acceptImageFile = useCallback(
+    (file: File) => {
+      if (!file.type.startsWith("image/")) return;
+      onImageFile?.(file);
+    },
+    [onImageFile],
+  );
+  const dragDrop = useMemo(
+    () =>
+      onImageFile
+        ? bindImageDragDropHandlers(acceptImageFile)
+        : null,
+    [acceptImageFile, onImageFile],
+  );
 
   const openPreview = useCallback(
     (e?: React.MouseEvent) => {
@@ -90,8 +112,23 @@ export function MediaHoverBox({
       <div
         className={`group/media relative overflow-hidden ${
           naturalSize ? "w-full" : "h-full w-full"
-        } ${clickToPreview && canPreview ? "cursor-zoom-in" : ""} ${className}`}
+        } ${clickToPreview && canPreview ? "cursor-zoom-in" : ""} ${
+          dragOver ? "ring-2 ring-white/30" : ""
+        } ${className}`}
         onClick={onSurfaceClick}
+        {...(dragDrop ?? {})}
+        onDragEnter={(e) => {
+          dragDrop?.onDragEnter(e);
+          if (firstImageFileFromDataTransfer(e.dataTransfer)) setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          dragDrop?.onDragLeave(e);
+          setDragOver(false);
+        }}
+        onDrop={(e) => {
+          dragDrop?.onDrop(e);
+          setDragOver(false);
+        }}
       >
         {src ? (
           kind === "video" ? (
@@ -167,7 +204,7 @@ export function MediaHoverBox({
             <span className="grid size-14 place-items-center rounded-full border border-white/20 bg-black/50">
               <Upload className="size-7" strokeWidth={1.75} />
             </span>
-            <span className="text-[12px] font-medium">点击上传</span>
+            <span className="text-[12px] font-medium">点击 / 拖入 / 粘贴</span>
           </button>
         ) : null}
       </div>

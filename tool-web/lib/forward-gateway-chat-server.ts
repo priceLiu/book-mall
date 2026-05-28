@@ -4,7 +4,14 @@ import { cookies } from "next/headers";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
 export async function chatStreamFromGateway(body: Record<string, unknown>): Promise<
-  | { ok: false; reason: "no_session" | "no_origin"; status?: number; error?: string }
+  | {
+      ok: false;
+      reason: "no_session" | "no_origin" | "upstream_error";
+      status?: number;
+      error?: string;
+      message?: string;
+      code?: string;
+    }
   | { ok: true; response: Response }
 > {
   const token = cookies().get("tools_token")?.value?.trim();
@@ -25,11 +32,21 @@ export async function chatStreamFromGateway(body: Record<string, unknown>): Prom
 
   if (!r.ok) {
     const data = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+    const errText =
+      typeof data.error === "string" && data.error.trim()
+        ? data.error.trim()
+        : `HTTP ${r.status}`;
+    const message =
+      typeof data.error === "string" && data.error.trim()
+        ? data.error.trim()
+        : errText;
     return {
       ok: false,
-      reason: "no_session",
+      reason: "upstream_error",
       status: r.status,
-      error: typeof data.error === "string" ? data.error : `HTTP ${r.status}`,
+      error: errText,
+      message,
+      code: typeof data.code === "string" ? data.code : undefined,
     };
   }
 

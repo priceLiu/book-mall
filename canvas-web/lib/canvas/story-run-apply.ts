@@ -21,6 +21,7 @@ import type {
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import { pickTaskResultMediaUrl } from "./task-media-url";
+import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
 import {
   findStarterByHubId,
   isAnyStoryCharacterColumnType,
@@ -291,6 +292,12 @@ export function storyApplyTaskResult(
     if (starterFrame && runtime.status === "done") {
       updateNodeData(starterFrame.id, { pipelineStage: "frames_done" });
     }
+    return;
+  }
+
+  if (node.type === "story-pro-style") {
+    const patch = buildStoryProStyleDraftApplyPatch(task);
+    if (patch) updateNodeData(node.id, patch);
     return;
   }
 

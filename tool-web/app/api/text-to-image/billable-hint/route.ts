@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
+  serviceFeeBillableHintJson,
+  TOOL_SERVICE_FEE_MODE,
+} from "@/lib/tool-service-fee-mode";
+import {
   computeTextToImageChargePoints,
   getTextToImageSchemeModelId,
 } from "@/lib/tools-scheme-a-pricing";
@@ -9,11 +13,15 @@ import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multipli
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** 文生图方案 A 标价：按张数 × 官网单价 × 系数。Query：n=1..4（默认 1）。 */
+/** 文生图标价提示：Phase D 返回技术服务费说明；legacy 仍返回方案 A 点数。 */
 export async function GET(req: Request) {
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });
+  }
+
+  if (TOOL_SERVICE_FEE_MODE) {
+    return NextResponse.json(serviceFeeBillableHintJson());
   }
 
   const url = new URL(req.url);

@@ -1,33 +1,62 @@
 ---
-description: Gateway 控制台日志 Tip、滚动条与 Status 设计规范
-globs: gateway-web/components/logs/**,gateway-web/app/globals.css,gateway-web/docs/design.md,gateway-web/lib/gateway-log-*.ts
+description: Gateway 日志 UI（Tip/Status）与失败字段 failCode/failMessage 规范
+globs: gateway-web/components/logs/**,gateway-web/app/globals.css,gateway-web/docs/design.md,gateway-web/lib/gateway-log-*.ts,book-mall/lib/gateway/**,book-mall/app/api/gateway/logs/**
 alwaysApply: false
 ---
 
-# Gateway 日志 UI 设计规范
+# Gateway 日志 UI 与失败记录规范
 
-完整说明见 `gateway-web/docs/design.md`。
+完整 UI 说明见 `gateway-web/docs/design.md`。
 
 ## 悬停 Tip 尺寸（勿随意改）
 
 - 外框最大高：**680px**（`--gw-log-tip-max-h`）
 - 内容区最大高：**580px**（`--gw-log-tip-body-max-h`）
 - Params 宽度：**720px**（`--gw-log-tip-width`）
-- 真源：`app/globals.css` CSS 变量 + `.gw-log-preview-tip*`
+- 真源：`gateway-web/app/globals.css` CSS 变量 + `.gw-log-preview-tip*`（`z-index: 9999`）
 
 ## 细滚动条（强制）
 
 - 类名：**`.gw-scrollbar-thin`**
 - WebKit 宽 **4px**，滑块半透明白、轨道透明
-- 所有 Params / Result Tip 内容区必须使用，禁止粗滚动条
+- 所有 Params / Result / Failed Tip 内容区必须使用，禁止粗滚动条
 
-## Params Tip 结构
+## Params / Result Tip
 
-- 两行：`input:` + 格式化 JSON；`model:` + 模型名
-- footer 分隔线 + 左下复制图标
-- 鼠标可移入 Tip；280ms 延迟关闭
+- Params：两行 `input:` + JSON、`model:` + 模型名；footer 复制
+- 鼠标可移入 Tip；**280ms** 延迟关闭（`use-log-hover-tip.ts`）
 
-## Status
+## Status 展示
 
-- 圆点颜色用 **inline style**（`#22c55e` success / `#f97316` running）
+- 圆点颜色用 **inline style**（success `#22c55e` / failed `#ef4444` / running `#f97316`）
 - running、pending 带 `#2a2a32` pill 背景
+- 实现：`gateway-web/components/logs/log-status-badge.tsx`
+
+## Failed 悬停（必须）
+
+凡 `status === FAILED`，**必须**能悬停查看原因，禁止「仅有 failed 字样、无 Tip」：
+
+1. **UI**：`LogStatusBadge` 对一切 `FAILED` 启用 `useLogHoverTip`（`enabled: true`），展示 `code` + `message` 两块；锚点加 `title` 作原生兜底、`cursor-help`。
+2. **无库内详情时**：`failMessage` 为空则显示固定说明文案（未记录原因 / 建议看 Params），**不得**因 `failMessage`/`failCode` 为空而关闭 Tip。
+3. **有详情时**：优先展示库里的 `failCode`、`failMessage`；可复制 `code + message`。
+
+## 服务端写入失败（必须）
+
+`GatewayRequestLog` 标记为 `FAILED` 时，**同时**写入可读的 `failCode` 与 `failMessage`（经 `finalizeRequestLog`）：
+
+| 场景 | failCode 示例 | failMessage |
+|------|----------------|-------------|
+| 上游 HTTP 非 2xx | `UPSTREAM_HTTP_404` 等 | `summarizeUpstreamFailMessage(...)`，禁止空字符串 |
+| 流式 SSE 厂商 error | `STREAM_VENDOR_ERROR` | SSE `error.message` |
+| 流中断 / 读流异常 | `STREAM_INTERRUPTED` | 异常 message 或「流式连接中断」 |
+| 轮询超时等 | 已有如 `STALE_TIMEOUT` | 已有中文说明 |
+
+- **禁止**：`status: FAILED` 且 `failMessage` 为空（上游空 body 时用 `上游服务返回 HTTP {status}`）。
+- **禁止**：用 `GatewayRequiredError` / `GATEWAY_KEY_REQUIRED` 掩盖上游 404 等业务错误（须 `UPSTREAM_ERROR` + 真实 message）。
+- Chat 兼容地址：百炼/DashScope 根域名须规范为 `…/compatible-mode/v1`（`resolveOpenAiCompatibleBaseUrl`）。
+
+## 涉及文件
+
+- UI：`log-status-badge.tsx`、`log-preview-tip-shell.tsx`、`logs-table.tsx`
+- 写入：`book-mall/lib/gateway/proxy-common.ts`（`finalizeRequestLog`）、`tool-gateway-client.ts` 等
+- API：`book-mall/app/api/gateway/logs/route.ts` 须返回 `failCode`、`failMessage`

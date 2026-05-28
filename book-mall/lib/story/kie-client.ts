@@ -144,6 +144,7 @@ export async function createKieTaskWithKey(
 }
 
 /** @deprecated Story 主路径请使用 story-gateway-client；保留供 KIE callback / 兼容 */
+/** @deprecated Phase D：Story 已走 Gateway；createKieTask 无运行时调用，保留供迁移参考。 */
 export async function createKieTask(args: CreateKieTaskArgs): Promise<{ taskId: string }> {
   return createKieTaskWithApiKey(getApiKey(), getBase(), args);
 }

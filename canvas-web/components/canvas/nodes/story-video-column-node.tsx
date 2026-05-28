@@ -12,6 +12,12 @@ import {
   findWorkspaceForColumnId,
 } from "@/lib/canvas/story-column-display";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
+import { PRO_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-pro-node-chrome";
+import {
+  storyEditionAccent,
+  storyEditionFromNodeType,
+} from "@/lib/canvas/story-edition-chrome";
+import { storyVideoGenerateBlockReason } from "@/lib/canvas/story-frame-gate";
 import { NODE_DEFAULT_SIZE } from "@/lib/canvas/types";
 import { commitStoryVideoRowRun } from "@/lib/canvas/story-video-run";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
@@ -26,9 +32,14 @@ import {
 } from "@/lib/canvas/story-column-runtime";
 import { StoryVideoRowSlot } from "../story-video-row-slot";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
-import { NodeShell, ENGINE_ACCENT } from "../node-shell";
+import { NodeShell } from "../node-shell";
 
-export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
+export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
+  const edition = storyEditionFromNodeType(type);
+  const sizeKey =
+    type && type in NODE_DEFAULT_SIZE
+      ? (type as keyof typeof NODE_DEFAULT_SIZE)
+      : "story-video-column";
   const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId);
   const nodes = useCanvasStore((s) => s.nodes);
@@ -72,7 +83,7 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
 
   useEffect(() => {
-    const def = NODE_DEFAULT_SIZE["story-video-column"];
+    const def = NODE_DEFAULT_SIZE[sizeKey];
     const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
     if (!node) return;
     const { w, h } = nodeMeasuredSize(node);
@@ -150,11 +161,14 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
       engine
       bodyScroll
       runtime={nodeRuntime}
-      accent={ENGINE_ACCENT}
-      minWidth={NODE_DEFAULT_SIZE["story-video-column"].width}
-      minHeight={NODE_DEFAULT_SIZE["story-video-column"].height}
+      accent={storyEditionAccent(edition)}
+      minWidth={NODE_DEFAULT_SIZE[sizeKey].width}
+      minHeight={NODE_DEFAULT_SIZE[sizeKey].height}
       inputs={[{ id: "in_text", label: "分镜", kind: "text" }]}
       outputs={[{ id: "text", label: "视频", kind: "image" }]}
+      footerClassName={
+        edition === "pro" ? PRO_NODE_SHELL_FOOTER_CLASS : undefined
+      }
     >
       <div
         className="flex w-full flex-col"
@@ -176,6 +190,7 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
             const videoError =
               st === "error" ? row.videoRuntime?.failMessage : undefined;
             const frameRow = frameRows.find((f) => f.key === row.key);
+            const videoBlockReason = storyVideoGenerateBlockReason(frameRow);
             const videoPrompt =
               frameRow?.prompt?.trim() ||
               (row.videoPrompt ?? "").trim() ||
@@ -188,12 +203,14 @@ export function StoryVideoColumnNode({ id, data, selected }: NodeProps) {
             return (
               <StoryVideoRowSlot
                 key={row.key}
+                edition={edition}
                 frameIndex={row.frameIndex}
                 videoUrl={vid}
                 videoPrompt={videoPrompt}
                 videoRefLabels={videoRefLabels}
                 generating={running}
                 errorMessage={videoError}
+                videoBlockReason={videoBlockReason}
                 onGenerate={() => void runRowVideo(row.key)}
                 onPreview={
                   vid

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { GitBranch } from "lucide-react";
+import { BookOpen, GitBranch } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
 import { runStoryHubSection } from "@/lib/canvas/batch-run-nodes";
@@ -27,6 +27,11 @@ import {
 } from "@/lib/canvas/story-hub-runtime";
 import { normalizeOutlineSection } from "@/lib/canvas/parse-md-tables";
 import { pushStoryRevision } from "@/lib/canvas/story-revision";
+import {
+  pushStoryProFinalizedSnapshot,
+  resolveStoryProFinalizedScriptView,
+} from "@/lib/canvas/story-pro-finalized-script";
+import { extractThemeFromStorySystemPrompt } from "@/lib/canvas/story-prompts";
 import type { StoryLlmSection } from "@/lib/canvas/story-workspace-types";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import {
@@ -46,6 +51,8 @@ import {
   STORY_PRO_CONTROL_NODE_WIDTH,
   PRO_NODE_ACTION_BTN_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
+import { storyEditionSectionChipRingClass } from "@/lib/canvas/story-edition-chrome";
+import { StoryProFinalizedScriptModal } from "../story-pro-finalized-script-modal";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
 
@@ -84,6 +91,7 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
   const [activeSection, setActiveSection] =
     useState<HubPreviewSection>("outline");
   const [outputBusy, setOutputBusy] = useState(false);
+  const [finalizedScriptOpen, setFinalizedScriptOpen] = useState(false);
 
   const reviewOpen = storyHubReview?.hubId === id;
   const reviewSection = storyHubReview?.section ?? activeSection;
@@ -140,6 +148,26 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
   );
 
   const scriptFinalized = hubIsScriptFinalized(d);
+
+  const starterForHub = useMemo(
+    () => resolveStarterForHub(nodes, edges, id),
+    [nodes, edges, id],
+  );
+
+  const finalizedScriptView = useMemo(() => {
+    if (!scriptFinalized) return null;
+    const systemPrompt =
+      (starterForHub?.data as { systemPrompt?: string } | undefined)
+        ?.systemPrompt ?? "";
+    return resolveStoryProFinalizedScriptView(d, systemPrompt);
+  }, [
+    scriptFinalized,
+    starterForHub,
+    d.outlineMd,
+    d.characterMd,
+    d.storyboardMd,
+    d.finalizedScriptHistory,
+  ]);
 
   const hubSubtitle = useMemo(() => {
     if (scriptFinalized && hasStyleNode) {
@@ -341,6 +369,32 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
         updateNodeData(id, hubPatch);
       }
 
+      const hubAfterPromote = {
+        ...d,
+        ...hubPatch,
+        outlineMd: hubData?.outlineMd ?? d.outlineMd ?? "",
+        characterMd:
+          hubPatch.characterMd ?? hubData?.characterMd ?? d.characterMd ?? "",
+        storyboardMd:
+          hubPatch.storyboardMd ??
+          hubData?.storyboardMd ??
+          d.storyboardMd ??
+          "",
+      };
+      const theme = extractThemeFromStorySystemPrompt(
+        (starter.data as { systemPrompt?: string }).systemPrompt ?? "",
+      );
+      const finalizedHistory = pushStoryProFinalizedSnapshot(
+        d.finalizedScriptHistory,
+        {
+          theme,
+          finalizedAt: new Date().toISOString(),
+          outlineMd: hubAfterPromote.outlineMd,
+          characterMd: hubAfterPromote.characterMd,
+          storyboardMd: hubAfterPromote.storyboardMd,
+        },
+      );
+
       const state = useCanvasStore.getState();
       spawnStoryProStyleNode({
         starterNodeId: starter.id,
@@ -357,11 +411,17 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
         setEdges,
         updateNodeData,
       });
-      updateNodeData(id, { scriptFinalized: true });
+      updateNodeData(id, {
+        scriptFinalized: true,
+        finalizedScriptHistory: finalizedHistory,
+      });
       updateNodeData(starter.id, { pipelineStage: "script_finalized" });
       reflowProLayout();
       // reflow 内 reconcile 会校验风格节点；再次确保定稿标记落库
-      updateNodeData(id, { scriptFinalized: true });
+      updateNodeData(id, {
+        scriptFinalized: true,
+        finalizedScriptHistory: finalizedHistory,
+      });
     } finally {
       setOutputBusy(false);
     }
@@ -427,26 +487,52 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
               ) : undefined
             }
           >
-            <button
-              type="button"
-              disabled={finalizeDisabled}
-              className={PRO_NODE_ACTION_BTN_CLASS}
-              title={
-                hubSectionIsRunning(hubNode, "outline")
-                  ? "大纲生成中…"
-                  : !canOutputWorkflow
-                    ? "请先创作剧本并填写故事大纲"
-                    : scriptFinalized
-                      ? "故事已定稿"
+            {scriptFinalized ? (
+              <div className="flex w-full flex-col gap-2">
+                <button
+                  type="button"
+                  disabled
+                  className={PRO_NODE_ACTION_BTN_CLASS}
+                  title="故事已定稿"
+                >
+                  <GitBranch className="size-3.5 shrink-0" />
+                  {finalizeBtnLabel}
+                </button>
+                <button
+                  type="button"
+                  disabled={!finalizedScriptView}
+                  className={PRO_NODE_ACTION_BTN_CLASS}
+                  title={
+                    finalizedScriptView
+                      ? "以 Word 式文档查看定稿剧本（只读，含主题与版本号）"
+                      : "暂无定稿内容"
+                  }
+                  onClick={() => setFinalizedScriptOpen(true)}
+                >
+                  <BookOpen className="size-3.5 shrink-0" />
+                  查看定稿剧本
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={finalizeDisabled}
+                className={PRO_NODE_ACTION_BTN_CLASS}
+                title={
+                  hubSectionIsRunning(hubNode, "outline")
+                    ? "大纲生成中…"
+                    : !canOutputWorkflow
+                      ? "请先创作剧本并填写故事大纲"
                       : hasStyleNode
                         ? "确认故事定稿，解锁风格定义节点"
                         : "确认故事剧本并进入风格定义（不自动生成媒体）"
-              }
-              onClick={() => void onFinalizeScript()}
-            >
-              <GitBranch className="size-3.5 shrink-0" />
-              {finalizeBtnLabel}
-            </button>
+                }
+                onClick={() => void onFinalizeScript()}
+              >
+                <GitBranch className="size-3.5 shrink-0" />
+                {finalizeBtnLabel}
+              </button>
+            )}
           </StoryNodeFooterShell>
         }
       >
@@ -457,7 +543,7 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
                 key={c.key}
                 type="button"
                 className={`nodrag rounded px-1.5 py-0.5 text-[10px] transition ${
-                  activeSection === c.key ? "ring-1 ring-[#fb923c]/60" : ""
+                  storyEditionSectionChipRingClass("pro", activeSection === c.key)
                 } ${
                   c.running
                     ? "bg-amber-500/20 text-amber-200"
@@ -487,6 +573,13 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
           </div>
         </div>
       </ProNodeShell>
+
+      <StoryProFinalizedScriptModal
+        open={finalizedScriptOpen}
+        onClose={() => setFinalizedScriptOpen(false)}
+        history={d.finalizedScriptHistory}
+        fallbackView={finalizedScriptView ?? undefined}
+      />
 
       <StoryScriptHubModal
         open={reviewOpen}

@@ -31,6 +31,8 @@ export type NodeShellProps = {
   bodyScroll?: boolean;
   /** 引擎节点：按内容撑开节点高度，壳内不出现滚动条 */
   bodyExpand?: boolean;
+  /** 底栏容器 class；影视专业版列节点传 PRO_NODE_SHELL_FOOTER_CLASS */
+  footerClassName?: string;
 };
 
 const KIND_COLOR: Record<"image" | "text", string> = {
@@ -57,16 +59,18 @@ export function NodeShell({
   headerRight,
   bodyScroll = false,
   bodyExpand = false,
+  footerClassName,
 }: NodeShellProps) {
   const status = runtime?.status ?? "idle";
   const isGenerating = status === "running" || status === "pending";
   const tint = accent ?? (engine ? ENGINE_ACCENT : "var(--canvas-accent)");
+  const engineTint = accent ?? ENGINE_ACCENT;
   const borderColor = isGenerating
     ? tint
     : engine
       ? selected
-        ? ENGINE_ACCENT
-        : `${ENGINE_ACCENT}99` /* 60% 橙：未选中时的引擎边框 */
+        ? engineTint
+        : `${engineTint}99` /* 60%：未选中时的引擎边框 */
       : selected
         ? "var(--canvas-accent)"
         : "rgba(255,255,255,0.10)";
@@ -103,8 +107,8 @@ export function NodeShell({
         style={
           engine
             ? {
-                borderColor: `${ENGINE_ACCENT}33`,
-                background: `linear-gradient(180deg, ${ENGINE_ACCENT}1A, transparent)`,
+                borderColor: `${engineTint}33`,
+                background: `linear-gradient(180deg, ${engineTint}1A, transparent)`,
               }
             : undefined
         }
@@ -123,12 +127,12 @@ export function NodeShell({
                 "truncate text-[11px] font-medium uppercase tracking-wider",
                 engine ? "" : "text-[var(--canvas-muted)]",
               )}
-              style={engine ? { color: ENGINE_ACCENT } : undefined}
+              style={engine ? { color: engineTint } : undefined}
             >
               {title}
             </p>
             {subtitle ? (
-              <p className="truncate text-[11px] text-white/80">{subtitle}</p>
+              <p className="truncate text-[11px] text-emerald-300/85">{subtitle}</p>
             ) : null}
           </div>
         </div>
@@ -153,7 +157,9 @@ export function NodeShell({
       </div>
 
       {footer ? (
-        <div className={STORY_NODE_SHELL_FOOTER_CLASS}>{footer}</div>
+        <div className={footerClassName ?? STORY_NODE_SHELL_FOOTER_CLASS}>
+          {footer}
+        </div>
       ) : null}
 
       {inputs.map((p, i) => (
@@ -228,7 +234,7 @@ export function NodeStatusBadge({
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300/90">
           就绪
         </span>
       );

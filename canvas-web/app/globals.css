@@ -109,6 +109,27 @@ body {
   .impl-list code {
     @apply rounded bg-white/5 px-1.5 py-0.5 text-[12px] text-white/90;
   }
+
+  .guide-list {
+    @apply canvas-sans space-y-2 text-[14px] leading-7 text-[var(--canvas-muted)];
+  }
+  .guide-list li {
+    @apply pl-4 relative;
+  }
+  .guide-list li::before {
+    content: "•";
+    @apply absolute left-0 text-cyan-400/80;
+  }
+  .guide-p {
+    @apply canvas-sans text-[14px] leading-7 text-[var(--canvas-muted)];
+  }
+  .guide-card {
+    @apply rounded-lg border border-cyan-400/15 bg-cyan-950/15 p-4;
+  }
+  .guide-code {
+    @apply rounded bg-white/5 px-1.5 py-0.5 text-[12px] text-white/90;
+  }
+
   .impl-table {
     @apply mt-2 w-full border-separate border-spacing-0 rounded-xl border border-white/10 text-left text-[13px];
   }
@@ -238,4 +259,19 @@ body {
   );
   animation: canvas-story-media-shimmer 1.4s ease-in-out infinite;
   pointer-events: none;
+}
+
+/* 影视专业版 · 列节点生成中光晕（cyan） */
+.canvas-story-media-generating-pro {
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.55),
+    0 0 16px rgba(34, 211, 238, 0.35);
+}
+
+.canvas-story-media-generating-pro::after {
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(34, 211, 238, 0.22) 50%,
+    transparent 65%
+  );
 }

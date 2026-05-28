@@ -127,7 +127,7 @@ export default function DashboardCredentialsPage() {
             </span>
             <input
               className="gw-input font-mono text-xs"
-              placeholder="https://…"
+              placeholder="百炼 Chat 留空或填 https://dashscope.aliyuncs.com/compatible-mode/v1"
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
             />

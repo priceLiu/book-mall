@@ -3,6 +3,11 @@ import {
   GatewayRequiredError,
   assertGatewayApiKeyLinkedForUser,
 } from "@/lib/gateway/book-gateway-link";
+import {
+  assertPlatformGatewayEntitlement,
+  PlatformEntitlementError,
+} from "@/lib/platform-gateway-entitlement";
+import { clientPageToServiceNavKey } from "@/lib/tool-service-fee/tool-key-nav";
 import { toolGwChatStream } from "@/lib/gateway/tool-gateway-client";
 
 export const dynamic = "force-dynamic";
@@ -20,20 +25,30 @@ export async function POST(request: Request) {
     return Response.json({ error: "未登录" }, { status: 401 });
   }
 
-  try {
-    await assertGatewayApiKeyLinkedForUser(userId);
-  } catch (e) {
-    if (e instanceof GatewayRequiredError) {
-      return Response.json({ error: e.message, code: e.code }, { status: 403 });
-    }
-    throw e;
-  }
-
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  try {
+    await assertGatewayApiKeyLinkedForUser(userId);
+    const clientPage =
+      typeof body.clientPage === "string" ? body.clientPage.trim() : "";
+    const nav = clientPage ? clientPageToServiceNavKey(clientPage) : null;
+    await assertPlatformGatewayEntitlement(userId, nav ? { navKey: nav } : {});
+  } catch (e) {
+    if (e instanceof PlatformEntitlementError) {
+      return Response.json({ error: e.message, code: e.code }, { status: e.httpStatus });
+    }
+    if (e instanceof GatewayRequiredError) {
+      return Response.json(
+        { error: e.message, code: e.code },
+        { status: e.httpStatus },
+      );
+    }
+    throw e;
   }
 
   const model = typeof body.model === "string" ? body.model.trim() : "";
@@ -67,7 +82,10 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     if (e instanceof GatewayRequiredError) {
-      return Response.json({ error: e.message, code: e.code }, { status: 403 });
+      return Response.json(
+        { error: e.message, code: e.code },
+        { status: e.httpStatus },
+      );
     }
     return Response.json({ error: (e as Error).message }, { status: 502 });
   }

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { buildAppWebUrl, getStoryWebOrigin } from "@/lib/app-web-origins";
 import { sanitizeAppRedirectPath } from "@/lib/sanitize-app-redirect-path";
 
 import { StoryOpenClient } from "./story-open-client";
@@ -16,6 +15,7 @@ export default function StoryOpenPage({
   searchParams: { path?: string };
 }) {
   const path = sanitizeAppRedirectPath(searchParams.path);
-  const targetUrl = buildAppWebUrl(getStoryWebOrigin(), path);
-  return <StoryOpenClient targetUrl={targetUrl} />;
+  const reEnterPath = `/api/sso/tools/re-enter?app=story&redirect=${encodeURIComponent(path)}`;
+
+  return <StoryOpenClient reEnterPath={reEnterPath} />;
 }

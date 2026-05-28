@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -46,6 +47,13 @@ import {
 } from "@/lib/visual-lab-analysis-models";
 import { VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS } from "@/lib/visual-lab-analysis-billing";
 import { formatReferencePricingLine } from "@/lib/visual-lab-analysis-reference-pricing";
+import type { AnalysisTemplate } from "./visual-lab-analysis-template-types";
+
+const VisualLabAnalysisTemplates = dynamic(
+  () =>
+    import("./visual-lab-analysis-templates").then((m) => m.VisualLabAnalysisTemplates),
+  { ssr: false },
+);
 
 const MAX_DOC = 1;
 const MAX_IMG = 5;
@@ -56,26 +64,6 @@ const VID_MAX_BYTES = 500 * 1024 * 1024;
 const THINK_MIN = 1024;
 const THINK_MAX = 32768;
 const THINK_DEFAULT = 4000;
-
-type AnalysisTemplate =
-  | {
-      id: string;
-      mode: "video";
-      title: string;
-      description: string;
-      videoSrc: string;
-      fileName: string;
-      prompt: string;
-    }
-  | {
-      id: string;
-      mode: "image-send";
-      title: string;
-      description: string;
-      imageSrc: string;
-      fileName: string;
-      prompt: string;
-    };
 
 const TEMPLATE_PROMPT_VIDEO_REPLICATE =
   "根据这个视频，在一个 HTML 中，复刻视频中的网站，需要尽量和视频中一致，不丢失细节";
@@ -359,7 +347,7 @@ async function readVisualLabAnalysisStream(
   signal: AbortSignal,
   onReasoning: (full: string) => void,
   onContent: (full: string) => void,
-): Promise<void> {
+): Promise<{ reasoning: string; content: string }> {
   const reader = res.body?.getReader();
   if (!reader) throw new Error("无法读取响应流");
 
@@ -441,9 +429,45 @@ async function readVisualLabAnalysisStream(
   } finally {
     signal.removeEventListener("abort", onAbort);
   }
+  return { reasoning, content };
 }
 
-export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: string | null }) {
+function formatAnalysisHttpError(
+  status: number,
+  data: Record<string, unknown> | null,
+): string {
+  const code = typeof data?.code === "string" ? data.code : "";
+  if (code === "GATEWAY_KEY_REQUIRED" || data?.error === "gateway_key_required") {
+    const detailed =
+      (typeof data?.message === "string" && data.message.trim()) ||
+      (typeof data?.error === "string" &&
+      data.error.trim() &&
+      data.error !== "gateway_key_required"
+        ? data.error.trim()
+        : "");
+    if (detailed) return detailed;
+    return "请先在 Gateway 控制台关联 API Key（sk-gw-…）后再试。";
+  }
+  if (code === "FORBIDDEN_SUITE" || code === "TOOLS_ACCESS_DENIED") {
+    return typeof data?.error === "string" && data.error.trim()
+      ? data.error.trim()
+      : "当前未开通视觉实验室技术服务费或套件权限。";
+  }
+  const msg =
+    (typeof data?.message === "string" && data.message.trim()) ||
+    (typeof data?.error === "string" && data.error.trim()) ||
+    "";
+  if (msg) return msg;
+  return `请求失败（HTTP ${status}）`;
+}
+
+export function VisualLabAnalysisClient({
+  mainSiteOrigin,
+  gatewayOrigin,
+}: {
+  mainSiteOrigin: string | null;
+  gatewayOrigin: string;
+}) {
   const docInputRef = useRef<HTMLInputElement>(null);
   const imgInputRef = useRef<HTMLInputElement>(null);
   const vidInputRef = useRef<HTMLInputElement>(null);
@@ -488,6 +512,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
   );
 
   const [billablePricePoints, setBillablePricePoints] = useState<number | null>(null);
+  const [billableServiceFeeMode, setBillableServiceFeeMode] = useState(false);
   const [billablePriceLoading, setBillablePriceLoading] = useState(true);
 
   const refetchBillablePrice = useCallback(async () => {
@@ -498,13 +523,22 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
         cache: "no-store",
         credentials: "same-origin",
       });
-      const d = (await r.json().catch(() => null)) as { pricePoints?: unknown } | null;
-      if (r.ok && d && typeof d.pricePoints === "number" && Number.isFinite(d.pricePoints)) {
+      const d = (await r.json().catch(() => null)) as {
+        pricePoints?: unknown;
+        serviceFeeMode?: boolean;
+      } | null;
+      if (r.ok && d?.serviceFeeMode) {
+        setBillableServiceFeeMode(true);
+        setBillablePricePoints(null);
+      } else if (r.ok && d && typeof d.pricePoints === "number" && Number.isFinite(d.pricePoints)) {
+        setBillableServiceFeeMode(false);
         setBillablePricePoints(Math.max(0, Math.floor(d.pricePoints)));
       } else {
+        setBillableServiceFeeMode(false);
         setBillablePricePoints(null);
       }
     } catch {
+      setBillableServiceFeeMode(false);
       setBillablePricePoints(null);
     } finally {
       setBillablePriceLoading(false);
@@ -519,6 +553,15 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
     () => billablePricePoints ?? VISUAL_LAB_ANALYSIS_DEFAULT_PRICE_POINTS,
     [billablePricePoints],
   );
+
+  const accountGatewayHref =
+    mainSiteOrigin != null
+      ? `${mainSiteOrigin.replace(/\/$/, "")}/account#gateway-api-key`
+      : null;
+
+  const isGatewayKeyError =
+    Boolean(analysisError?.includes("Gateway")) ||
+    Boolean(uploadFailText?.includes("Gateway"));
 
   const showUploadFail = useCallback((msg: string) => {
     setUploadFailText(msg);
@@ -928,11 +971,7 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
             const suffix = formatRequiredPointsShortfall(req ?? displayPricePoints);
             throw new Error(`余额不足：${suffix}`);
           }
-          const msg =
-            (typeof data?.message === "string" && data.message) ||
-            (typeof data?.error === "string" && data.error) ||
-            `请求失败（${res.status}）`;
-          throw new Error(msg);
+          throw new Error(formatAnalysisHttpError(res.status, data));
         }
 
         const turnDisplay = await buildUserTurnDisplay(attSnap, promptSnap);
@@ -952,12 +991,17 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
 
         const ct = res.headers.get("content-type") ?? "";
         if (ct.includes("ndjson")) {
-          await readVisualLabAnalysisStream(
+          const streamed = await readVisualLabAnalysisStream(
             res,
             ac.signal,
             (full) => setAnalysisReasoning(full),
             (full) => setAnalysisReply(full),
           );
+          if (!streamed.content.trim() && !streamed.reasoning.trim()) {
+            throw new Error(
+              "模型未返回内容。若 Gateway 日志为失败，请检查 API Key、模型名与百炼配额后重试。",
+            );
+          }
         } else {
           const data = (await res.json().catch(() => null)) as {
             content?: unknown;
@@ -1090,7 +1134,9 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
               <Info className="h-3 w-3" strokeWidth={2.5} />
             </span>
             <p className="vl-analysis-info-banner-text">
-              点击「发送」或下方体验模板并成功发起请求时，将按次从钱包扣点；余额不足将无法继续。模型失败或中断通常不退款。上游阿里云 Token 用量费用另见百炼账单。
+              {billableServiceFeeMode
+                ? "分析室已含在「工具技术服务费」内，单次分析不另扣钱包点数；须在 Gateway 绑定百炼等厂商 Key 并在 Book 个人中心关联 sk-gw-...。云厂商 Token 费用走 BYOK，另见百炼账单。"
+                : "点击「发送」或下方体验模板并成功发起请求时，将按次从钱包扣点；余额不足将无法继续。模型失败或中断通常不退款。上游阿里云 Token 用量费用另见百炼账单。"}
             </p>
             <button
               type="button"
@@ -1103,17 +1149,67 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
           </div>
         ) : null}
 
-        {uploadFailText ? (
+        {uploadFailText || analysisError ? (
           <div className="vl-upload-fail-banner" role="alert">
             <span className="vl-upload-fail-banner-icon" aria-hidden>
               <X className="h-3.5 w-3.5" strokeWidth={2.5} />
             </span>
-            <p className="vl-upload-fail-banner-text">{uploadFailText}</p>
+            <div className="vl-upload-fail-banner-text">
+              <p>{uploadFailText ?? analysisError}</p>
+              {isGatewayKeyError ? (
+                <p className="mt-2 text-xs leading-relaxed opacity-95">
+                  <a
+                    href={gatewayOrigin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2"
+                  >
+                    ① 打开 Gateway 控制台
+                  </a>
+                  {" · "}
+                  <a
+                    href={`${gatewayOrigin}/dashboard/credentials`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2"
+                  >
+                    绑定百炼 Key
+                  </a>
+                  {accountGatewayHref ? (
+                    <>
+                      {" · "}
+                      <a
+                        href={accountGatewayHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        ② Book 个人中心关联 sk-gw
+                      </a>
+                      {" · "}
+                      <a
+                        href={
+                          mainSiteOrigin
+                            ? `${mainSiteOrigin.replace(/\/$/, "")}/api/sso/tools/re-enter?app=tool&redirect=${encodeURIComponent("/visual-lab/analysis")}`
+                            : "#"
+                        }
+                        className="underline underline-offset-2"
+                      >
+                        ③ 工具站重新连接
+                      </a>
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
+            </div>
             <button
               type="button"
               className="vl-upload-fail-banner-dismiss"
               aria-label="关闭"
-              onClick={() => setUploadFailText(null)}
+              onClick={() => {
+                setUploadFailText(null);
+                setAnalysisError(null);
+              }}
             >
               <X className="h-4 w-4" />
             </button>
@@ -1244,36 +1340,58 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
               </button>
             </div>
             <p className="vl-muted mt-2 text-center text-xs leading-relaxed">
-              单次分析按主站标价扣费一次（与{" "}
-              {mainSiteOrigin ? (
-                <a
-                  href={`${mainSiteOrigin.replace(/\/$/, "")}/pricing-disclosure#all-tools`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline decoration-dotted underline-offset-2"
-                >
-                  主站价格公示
-                </a>
-              ) : (
-                "主站价格公示"
-              )}{" "}
-              中「视觉实验室 · 分析室」一致）。
-              {billablePriceLoading && billablePricePoints == null ? (
+              {billableServiceFeeMode ? (
                 <>
-                  {" "}
-                  单价<strong className="tabular-nums text-[var(--vl-fg)]">读取中…</strong>
+                  单次分析<strong className="text-[var(--vl-fg)]">不另扣钱包点数</strong>
+                  ，已含在
+                  {mainSiteOrigin ? (
+                    <a
+                      href={`${mainSiteOrigin.replace(/\/$/, "")}/account/tool-service-fee`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-dotted underline-offset-2"
+                    >
+                      工具技术服务费
+                    </a>
+                  ) : (
+                    "工具技术服务费"
+                  )}
+                  内；云厂商费用走 Gateway BYOK。
                 </>
               ) : (
                 <>
-                  {" "}
-                  当前为{" "}
-                  <strong className="tabular-nums text-[var(--vl-fg)]">
-                    {displayPricePoints.toLocaleString("zh-CN")} 点
-                  </strong>
-                  <span className="opacity-90">（¥{(displayPricePoints / 100).toFixed(2)}）</span>
-                  {billablePricePoints == null ? (
-                    <span className="opacity-80">（以下为主站未返回时的参考值）</span>
-                  ) : null}
+                  单次分析按主站标价扣费一次（与{" "}
+                  {mainSiteOrigin ? (
+                    <a
+                      href={`${mainSiteOrigin.replace(/\/$/, "")}/pricing-disclosure#all-tools`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-dotted underline-offset-2"
+                    >
+                      主站价格公示
+                    </a>
+                  ) : (
+                    "主站价格公示"
+                  )}{" "}
+                  中「视觉实验室 · 分析室」一致）。
+                  {billablePriceLoading && billablePricePoints == null ? (
+                    <>
+                      {" "}
+                      单价<strong className="tabular-nums text-[var(--vl-fg)]">读取中…</strong>
+                    </>
+                  ) : (
+                    <>
+                      {" "}
+                      当前为{" "}
+                      <strong className="tabular-nums text-[var(--vl-fg)]">
+                        {displayPricePoints.toLocaleString("zh-CN")} 点
+                      </strong>
+                      <span className="opacity-90">（¥{(displayPricePoints / 100).toFixed(2)}）</span>
+                      {billablePricePoints == null ? (
+                        <span className="opacity-80">（以下为主站未返回时的参考值）</span>
+                      ) : null}
+                    </>
+                  )}
                 </>
               )}
             </p>
@@ -1446,16 +1564,28 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
 
                 <span
                   className="vl-compose-per-call"
-                  title="每次点击发送或模板即扣费一次，金额与主站「按次单价」及价格表一致"
+                  title={
+                    billableServiceFeeMode
+                      ? "已含在工具技术服务费内，单次不另扣点"
+                      : "每次点击发送或模板即扣费一次，金额与主站「按次单价」及价格表一致"
+                  }
                 >
-                  每次{" "}
-                  <strong className="tabular-nums">
-                    {billablePriceLoading && billablePricePoints == null
-                      ? "…"
-                      : displayPricePoints.toLocaleString("zh-CN")}
-                  </strong>
-                  {billablePriceLoading && billablePricePoints == null ? null : (
-                    <span className="opacity-80">（¥{(displayPricePoints / 100).toFixed(2)}）</span>
+                  {billableServiceFeeMode ? (
+                    <>
+                      单次<strong>不另扣点</strong>（技术服务费）
+                    </>
+                  ) : (
+                    <>
+                      每次{" "}
+                      <strong className="tabular-nums">
+                        {billablePriceLoading && billablePricePoints == null
+                          ? "…"
+                          : displayPricePoints.toLocaleString("zh-CN")}
+                      </strong>
+                      {billablePriceLoading && billablePricePoints == null ? null : (
+                        <span className="opacity-80">（¥{(displayPricePoints / 100).toFixed(2)}）</span>
+                      )}
+                    </>
                   )}
                 </span>
 
@@ -1523,49 +1653,14 @@ export function VisualLabAnalysisClient({ mainSiteOrigin }: { mainSiteOrigin: st
           </div>
 
           {!submitted ? (
-            <section className="vl-analysis-templates" aria-label="体验模板">
-              <h2 className="vl-analysis-templates-title">选择模板，一键体验</h2>
-              <div className="vl-analysis-templates-grid">
-                {ANALYSIS_TEMPLATES.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className="vl-analysis-template-card"
-                    disabled={analyzing}
-                    onClick={() => void handleTemplateClick(t)}
-                  >
-                    <span className="vl-analysis-template-card-kicker">{t.title}</span>
-                    <p className="vl-analysis-template-card-desc">{t.description}</p>
-                    <span className="vl-analysis-template-card-charge" aria-hidden>
-                      每次{" "}
-                      {billablePriceLoading && billablePricePoints == null
-                        ? "…"
-                        : `${displayPricePoints.toLocaleString("zh-CN")} 点`}
-                    </span>
-                    <div className="vl-analysis-template-card-media">
-                      {t.mode === "video" ? (
-                        <video
-                          className="vl-analysis-template-card-video"
-                          src={t.videoSrc}
-                          muted
-                          playsInline
-                          preload="metadata"
-                          aria-hidden
-                        />
-                      ) : (
-                        <Image
-                          src={t.imageSrc}
-                          alt=""
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 640px) 100vw, (max-width: 1280px) 34vw, 260px"
-                        />
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
+            <VisualLabAnalysisTemplates
+              templates={ANALYSIS_TEMPLATES}
+              analyzing={analyzing}
+              billableServiceFeeMode={billableServiceFeeMode}
+              billablePriceLoading={billablePriceLoading}
+              displayPricePoints={displayPricePoints}
+              onTemplateClick={(t) => void handleTemplateClick(t)}
+            />
           ) : null}
 
           {saveHint ? <p className="vl-ok-hint mt-3 text-center text-sm">{saveHint}</p> : null}

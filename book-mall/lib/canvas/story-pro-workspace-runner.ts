@@ -11,6 +11,10 @@ import {
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
 import { prependStoryProStyleAnchor } from "./story-pro-style-anchor";
+import { assertStoryVideoFrameGate } from "./story-frame-gate";
+import { resolveStoryRowRefUrls } from "./story-row-ref-urls";
+import { resolveCharacterRowAssetRefUrls } from "./story-pro-character-ref-resolve";
+import { buildStoryProFrameImageInputs } from "./story-pro-frame-image-inputs";
 
 function proClientPage(projectId: string): string {
   return `canvas/${projectId}/story-pro`;
@@ -66,17 +70,27 @@ export async function runStoryProScriptHubSection(
   });
 }
 
+const STORY_PRO_STYLE_DRAFT_SYSTEM = `你是视觉导演。根据剧本题材与基调，输出 JSON：
+{
+  "mainStyle": "anime|american-comic|webtoon|chibi|cg|photorealistic|game-cg|chinese-3d|other",
+  "colorTone": "bright-warm|dark-moody|vivid|soft|high-contrast",
+  "renderQuality": "flat|thick-paint|watercolor|oil",
+  "styleAnchorZh": "中文风格锚定段落",
+  "styleAnchorEn": "English style anchor paragraph",
+  "negativePrompt": "comma separated negatives"
+}`;
+
 export async function runStoryProStyleDraft(
   args: RunEngineNodeArgs,
 ): Promise<RunEngineNodeResult> {
   const data = args.node.data ?? {};
+  const outline = (args.node.textInputs ?? []).filter(Boolean).join("\n\n");
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "ai-engine",
     data: {
       ...data,
-      prompt:
-        "根据已连接的故事大纲，生成影视专业版风格定义 JSON（mainStyle,colorTone,renderQuality,styleAnchorZh,styleAnchorEn,negativePrompt）。",
+      prompt: `【系统任务】\n${STORY_PRO_STYLE_DRAFT_SYSTEM}\n\n根据已连接的故事大纲，输出影视专业版风格定义 JSON（仅输出 JSON 对象，不要 markdown 说明）。\n\n--- 故事大纲 ---\n${outline || "（未连接故事剧本或无大纲正文）"}`,
     },
   };
   return runAiEngineNodeFromArgs(args, node);
@@ -104,6 +118,15 @@ export async function runStoryProCharacterRow(
   const row = pickRow(rows, args.rowKey);
   const rawPrompt = String(row.prompt ?? "");
   const prompt = prependStoryProStyleAnchor(rawPrompt, args.styleAnchor);
+  const assetRefUrls = await resolveCharacterRowAssetRefUrls(
+    args.userId,
+    args.projectId,
+    {
+      key: String(row.key ?? ""),
+      lockedRefIds: row.lockedRefIds as string[] | undefined,
+    },
+    { excludeThreeView: true },
+  );
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "three-view-engine",
@@ -118,6 +141,7 @@ export async function runStoryProCharacterRow(
       params: (args.node.data?.batchImage as { params?: Record<string, unknown> })
         ?.params,
     },
+    imageInputs: assetRefUrls,
   };
   return runImageEngineNode({
     ...args,
@@ -163,17 +187,24 @@ export async function runStoryProFrameRow(
 ): Promise<RunEngineNodeResult> {
   const rows = (args.node.data?.rows as StoryRow[]) ?? [];
   const row = pickRow(rows, args.rowKey);
-  const prompt = prependStoryProStyleAnchor(String(row.prompt ?? ""), args.styleAnchor);
+  const nodeData = args.node.data ?? {};
+  const { imageInputs, promptSuffix } = buildStoryProFrameImageInputs({
+    row,
+    nodeData,
+  });
+  let prompt = prependStoryProStyleAnchor(String(row.prompt ?? ""), args.styleAnchor);
+  if (promptSuffix) prompt = `${prompt}\n\n${promptSuffix}`;
+  const batch = (nodeData.batchImage as Record<string, unknown>) ?? {};
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "image-engine",
     data: {
       prompt,
-      providerId: (args.node.data?.batchVideo as { providerId?: string })?.providerId,
-      modelKey: (args.node.data?.batchVideo as { modelKey?: string })?.modelKey,
-      params: (args.node.data?.batchVideo as { params?: Record<string, unknown> })
-        ?.params,
+      providerId: batch.providerId,
+      modelKey: batch.modelKey,
+      params: batch.params,
     },
+    imageInputs,
   };
   return runImageEngineNode({
     ...args,
@@ -191,6 +222,11 @@ export async function runStoryProVideoRow(
 ): Promise<RunEngineNodeResult> {
   const rows = (args.node.data?.rows as StoryRow[]) ?? [];
   const row = pickRow(rows, args.rowKey);
+  const frameImageUrl = assertStoryVideoFrameGate(row);
+  const refUrls = resolveStoryRowRefUrls(row, "videoPrompt");
+  const referenceImageUrls = refUrls
+    .filter((u) => u !== frameImageUrl)
+    .slice(0, 7);
   const videoPrompt = prependStoryProStyleAnchor(
     String(row.videoPrompt ?? row.dialogue ?? ""),
     args.styleAnchor,
@@ -204,9 +240,11 @@ export async function runStoryProVideoRow(
       modelKey: (args.node.data?.batchVideo as { modelKey?: string })?.modelKey,
       params: (args.node.data?.batchVideo as { params?: Record<string, unknown> })
         ?.params,
-      frameImageUrl: row.frameImageUrl,
+      frameImageUrl,
+      mainFrameImageUrl: frameImageUrl,
+      referenceImageUrls,
     },
-    imageInputs: row.frameImageUrl ? [String(row.frameImageUrl)] : [],
+    imageInputs: [frameImageUrl, ...referenceImageUrls],
   };
   return runVideoEngineNode({
     ...args,

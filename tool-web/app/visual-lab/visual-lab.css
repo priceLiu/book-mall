@@ -1815,17 +1815,23 @@
     transform 0.12s ease;
   box-sizing: border-box;
   min-height: 0;
+  outline: none;
 }
 
-.visual-lab-theme-root .vl-analysis-template-card:hover:not(:disabled) {
+.visual-lab-theme-root .vl-analysis-template-card:focus-visible {
+  box-shadow: 0 0 0 2px var(--vl-accent);
+}
+
+.visual-lab-theme-root .vl-analysis-template-card:hover:not([aria-disabled="true"]) {
   border-color: var(--vl-accent);
   box-shadow: 0 4px 18px rgba(249, 115, 22, 0.15);
   transform: translateY(-1px);
 }
 
-.visual-lab-theme-root .vl-analysis-template-card:disabled {
+.visual-lab-theme-root .vl-analysis-template-card[aria-disabled="true"] {
   opacity: 0.55;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .visual-lab-theme-root .vl-analysis-template-card-kicker {

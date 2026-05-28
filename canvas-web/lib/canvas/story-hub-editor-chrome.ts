@@ -14,6 +14,8 @@ export const STORY_HUB_LEFT_HINT = {
   storyboard: "左侧表格编辑 · 右侧为渲染原稿；台词说话人须与角色表一致",
   dialogue: "",
   sourceOnly: "左侧 Markdown 源码 · 右侧为渲染预览；保存后写入正式副本",
+  readOnlyTable: "已定稿只读 · 左侧为表格排版审阅（非 Markdown 源码）",
+  readOnlyOutline: "已定稿只读 · 块级渲染审阅",
 } as const;
 
 export const STORY_HUB_RIGHT_PREVIEW_HINT =

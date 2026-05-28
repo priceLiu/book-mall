@@ -63,24 +63,24 @@ Book 提供 **Platform API**（非业务 UI 单体）：
 
 ---
 
-## 4. 财务：Gateway 时代的目标态
+## 4. 财务：Gateway + 工具技术服务费
 
 ### 4.1 两层分离
 
 | 层 | 职责 |
 |----|------|
 | **Gateway** | 用户绑定厂商 Key；**厂商成本用户自担**；用量/日志在 Gateway 控制台 |
-| **Book** | **订阅 / 工具套件准入**（卖使用权）；SSO；可选保留钱包用于 **非 AI 商品**（课程等） |
+| **Book** | **课程会员订阅**（仅课程）；**工具按月技术服务费**（钱包扣点）；SSO 准入 |
 
-### 4.2 退役方向（未上线，可激进）
+详见 [13-tool-service-fee-and-wallet.md](./13-tool-service-fee-and-wallet.md)。
 
-以下 **legacy** 路径在统一改造中移除或降级为仅管理员/兼容：
+### 4.2 退役方向（Phase D，未上线可激进）
 
-- 工具站 **黄金会员 = 必须 RECHARGE + 余额线**（`gold-member.ts`）→ 改为 **有效订阅 / 套件 + Gateway 已关联**
-- 工具生成 **reserve/settle 点数扣费**（方案 A 按点）→ 改为 **订阅门禁 + Gateway 代调用**（与 Canvas 一致）
-- 用户心智：**不为 AI Token 充值**；只为 **订阅套餐** 付费（若产品确认）
+- 工具 **黄金会员 = RECHARGE + 余额线** → **有效工具技术服务费周期**
+- 工具 **reserve/settle 按次扣点** → 仅 **月费 + Gateway BYOK**
+- 课程 `Subscription` **不再** 附带工具 navKey
 
-**注意**：退役 wallet 扣点前须完成 tool-web 全链路改 Gateway + introspect 门禁；详见实施计划 Phase D。
+实施：[../plans/2026-phase-d-service-fee-billing.md](../plans/2026-phase-d-service-fee-billing.md)
 
 ### 4.3 仍保留的单点写入
 
@@ -118,6 +118,8 @@ Book 提供 **Platform API**（非业务 UI 单体）：
 | 资源 | 路径 |
 |------|------|
 | 实施计划（分阶段任务） | [../plans/2026-platform-unification-rollout.md](../plans/2026-platform-unification-rollout.md) |
+| Phase D 技术服务费 | [../plans/2026-phase-d-service-fee-billing.md](../plans/2026-phase-d-service-fee-billing.md) |
+| 工具月费产品说明 | [13-tool-service-fee-and-wallet.md](./13-tool-service-fee-and-wallet.md) |
 | Cursor 持续规则 | `/.cursor/rules/platform-app-federation.mdc` |
 | SSO 环境变量 | [../tech/tools-sso-environment.md](../tech/tools-sso-environment.md) |
 | Gateway 用户流程 | [gateway-user-guide.md](./gateway-user-guide.md) |

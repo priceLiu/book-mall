@@ -9,12 +9,16 @@ import {
 import { signToolsAccessToken } from "@/lib/tools-sso-token";
 import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
+import {
+  intersectNavKeysWithSsoClient,
+  loadActiveSsoClient,
+} from "@/lib/sso-client-scope";
 
 export const dynamic = "force-dynamic";
 
 /**
  * 工具站服务端调用：用一次性 code 换短时 access token（JWT）。
- * 准入：管理员直通；普通用户须为黄金会员且具备有效订阅。JWT `tier` 分别为 `gold` / `admin`，载荷含 `tools_nav_keys`。
+ * 准入：管理员直通；普通用户须至少一个有效工具技术服务费周期。JWT `tier` 分别为 `gold` / `admin`（legacy 字段名），载荷含 `tools_nav_keys` 与 `tool_service_periods`。
  * 须在服务端发起；Bearer 为 TOOLS_SSO_SERVER_SECRET。
  */
 export async function POST(req: Request) {
@@ -50,16 +54,37 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "当前不满足工具站准入条件（须管理员，或黄金会员且具备会员计划或单品工具订阅），授权码已作废",
+          "当前不满足工具站准入条件（须管理员，或至少一项有效工具技术服务费），授权码已作废",
       },
       { status: 403 },
     );
   }
 
   const resolvedNav = await resolveToolsNavKeysForUser(row.userId);
-  const toolsNavKeys = elig.isAdmin
+  let toolsNavKeys = elig.isAdmin
     ? [...TOOL_SUITE_NAV_KEYS]
     : resolvedNav.keys;
+
+  if (row.clientId?.trim()) {
+    const client = await loadActiveSsoClient(row.clientId);
+    if (!client) {
+      await prisma.ssoAuthorizationCode.update({
+        where: { id: row.id },
+        data: { consumedAt: now },
+      });
+      return NextResponse.json(
+        { error: "无效的 client_id 或客户端已停用", code: "SSO_CLIENT_INVALID" },
+        { status: 403 },
+      );
+    }
+    if (!elig.isAdmin) {
+      toolsNavKeys = intersectNavKeysWithSsoClient(
+        toolsNavKeys,
+        client.allowedNavKeys,
+      ) as typeof toolsNavKeys;
+    }
+  }
+
   if (!elig.isAdmin && toolsNavKeys.length === 0) {
     await prisma.ssoAuthorizationCode.update({
       where: { id: row.id },
@@ -68,7 +93,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "当前订阅未包含任何可用工具分组，请先在个人中心核对套件权益后再试",
+          "当前未开通任何工具分组的技术服务费，请先在个人中心「工具技术服务费」页开通后再试",
       },
       { status: 403 },
     );

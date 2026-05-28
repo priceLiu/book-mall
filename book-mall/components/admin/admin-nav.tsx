@@ -194,6 +194,12 @@ export function AdminNav({
               <Link href="/admin/tool-apps/tool-menu">工具菜单</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
+              <Link href="/admin/sso-clients">Platform SSO 客户端</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/tool-service-fee">工具技术服务费</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link href="/admin/tool-apps/manage">工具管理</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>

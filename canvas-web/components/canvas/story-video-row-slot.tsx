@@ -3,10 +3,17 @@
 import { Download, Film, Play, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORY_VIDEO_SLOT } from "@/lib/canvas/story-column-layout";
+import {
+  storyEditionCornerRegenBtnClass,
+  storyEditionGeneratingBorderClass,
+  storyEditionIconBtnClass,
+  storyEditionSpinClass,
+  type StoryEdition,
+} from "@/lib/canvas/story-edition-chrome";
+import { Lock } from "lucide-react";
+import { StoryErrorLine } from "@/components/canvas/story-status-line";
+import { STORY_HINT_GOLD_CLASS } from "@/lib/canvas/story-column-sync";
 import { StoryVideoPromptPopover } from "./story-video-prompt-popover";
-
-const REFRESH_BTN =
-  "nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/45 bg-[#fb923c]/20 text-[#fdba74] hover:bg-[#fb923c]/30";
 
 const SLOT_CORNER_BTN =
   "nodrag absolute z-20 inline-flex size-8 items-center justify-center rounded-full border shadow-md backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100";
@@ -24,6 +31,8 @@ export function StoryVideoRowSlot({
   errorMessage,
   onGenerate,
   onPreview,
+  edition = "comic",
+  videoBlockReason,
 }: {
   frameIndex: number;
   videoUrl?: string;
@@ -34,6 +43,9 @@ export function StoryVideoRowSlot({
   errorMessage?: string;
   onGenerate: () => void;
   onPreview?: () => void;
+  edition?: StoryEdition;
+  /** 静帧/过审未满足时的提示 */
+  videoBlockReason?: string | null;
 }) {
   const hasVideo = Boolean(videoUrl);
   const promptText = (videoPrompt ?? "").trim();
@@ -58,7 +70,7 @@ export function StoryVideoRowSlot({
         <div
           className={cn(
             "group relative w-full shrink-0 overflow-hidden rounded-lg border border-white/10 bg-[#1a1a1a]",
-            generating && "canvas-story-media-generating border-[#fb923c]/50",
+            generating && storyEditionGeneratingBorderClass(edition),
           )}
           style={{ height: STORY_VIDEO_SLOT.thumbHeight }}
         >
@@ -76,18 +88,27 @@ export function StoryVideoRowSlot({
 
           {generating ? (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45">
-              <RefreshCw className="size-8 animate-spin text-[#fdba74]" />
+              <RefreshCw className={storyEditionSpinClass(edition, "lg")} />
             </div>
           ) : !hasVideo ? (
-            <div className="absolute inset-0 z-10 flex items-center justify-center">
-              <button
-                type="button"
-                aria-label="生成分镜视频"
-                className={REFRESH_BTN}
-                onClick={onGenerate}
-              >
-                <RefreshCw className="size-4" />
-              </button>
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 px-2">
+              {videoBlockReason ? (
+                <>
+                  <Lock className={`size-4 ${STORY_HINT_GOLD_CLASS}`} />
+                  <p className={`text-center text-[9px] leading-snug ${STORY_HINT_GOLD_CLASS}`}>
+                    {videoBlockReason}
+                  </p>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="生成分镜视频"
+                  className={storyEditionIconBtnClass(edition)}
+                  onClick={onGenerate}
+                >
+                  <RefreshCw className="size-4" />
+                </button>
+              )}
             </div>
           ) : null}
 
@@ -125,7 +146,7 @@ export function StoryVideoRowSlot({
               aria-label="重新生成视频"
               className={cn(
                 SLOT_CORNER_BTN,
-                "right-2 top-2 border-[#fb923c]/40 bg-black/55 text-[#fdba74] hover:bg-black/75",
+                storyEditionCornerRegenBtnClass(edition),
               )}
               onClick={(e) => {
                 e.stopPropagation();
@@ -145,7 +166,7 @@ export function StoryVideoRowSlot({
         ) : null}
       </div>
       {errorMessage && !generating ? (
-        <p className="text-[10px] leading-snug text-red-400/90">{errorMessage}</p>
+        <StoryErrorLine message={errorMessage} />
       ) : null}
     </article>
   );

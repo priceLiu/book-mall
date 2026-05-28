@@ -35,6 +35,7 @@ import {
   StoryStoryboardTableEditor,
 } from "./story-storyboard-table-editor";
 import { StoryOutlineDocumentEditor } from "./story-outline-document-editor";
+import { StoryHubReadonlyPane } from "./story-hub-readonly-pane";
 import {
   STORY_HUB_LEFT_HINT,
   STORY_HUB_RIGHT_PREVIEW_HINT,
@@ -388,15 +389,21 @@ export function StoryScriptHubModal({
               </p>
               {section === "character" ? (
                 <p className="text-[10px] text-neutral-500">
-                  {STORY_HUB_LEFT_HINT.character}
+                  {readOnly
+                    ? STORY_HUB_LEFT_HINT.readOnlyTable
+                    : STORY_HUB_LEFT_HINT.character}
                 </p>
               ) : section === "storyboard" ? (
                 <p className="text-[10px] text-neutral-500">
-                  {STORY_HUB_LEFT_HINT.storyboard}
+                  {readOnly
+                    ? STORY_HUB_LEFT_HINT.readOnlyTable
+                    : STORY_HUB_LEFT_HINT.storyboard}
                 </p>
               ) : section === "outline" ? (
                 <p className="text-[10px] text-neutral-500">
-                  {STORY_HUB_LEFT_HINT.outline}
+                  {readOnly
+                    ? STORY_HUB_LEFT_HINT.readOnlyOutline
+                    : STORY_HUB_LEFT_HINT.outline}
                 </p>
               ) : section !== "dialogue" ? (
                 <p className="text-[10px] text-neutral-500">
@@ -474,13 +481,16 @@ export function StoryScriptHubModal({
                     <p className="text-[17px] leading-[1.85] text-neutral-500">
                       尚无角色设定。点击顶栏「生成」或返回启动页「创作剧本」等待角色段跑完；若大纲已含「主要角色」表，保存大纲后会自动回落展示。
                     </p>
+                  ) : readOnly ? (
+                    <StoryHubReadonlyPane
+                      md={normalizeCharacterTableMd(editMd)}
+                    />
                   ) : (
                     <textarea
                       className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
                       style={editBodyStyle}
                       rows={editRows}
                       value={editMd}
-                      readOnly={readOnly}
                       onChange={(e) => setDraft(e.target.value)}
                       spellCheck={false}
                     />
@@ -510,13 +520,14 @@ export function StoryScriptHubModal({
                     <p className="text-[17px] leading-[1.85] text-neutral-500">
                       尚无分镜脚本。影视专业版需单独生成「分镜」段（大纲 → 角色 → 分镜顺序执行）；也可点顶栏「生成」。
                     </p>
+                  ) : readOnly ? (
+                    <StoryHubReadonlyPane md={editMd} />
                   ) : (
                     <textarea
                       className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
                       style={editBodyStyle}
                       rows={editRows}
                       value={editMd}
-                      readOnly={readOnly}
                       onChange={(e) => setDraft(e.target.value)}
                       spellCheck={false}
                     />

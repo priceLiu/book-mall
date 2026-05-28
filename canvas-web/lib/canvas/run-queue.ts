@@ -37,6 +37,7 @@ import {
   storyApplyTaskResult,
   storyRunPendingPatch,
 } from "./story-run-apply";
+import { resolveStoryProRunStylePayload } from "./story-pro-run-style-context";
 import type { StoryRunContext } from "./story-workspace-types";
 import { isStoryWorkspaceNodeType } from "./types";
 import {
@@ -426,6 +427,11 @@ export function useCanvasRunner(
         const data = node.data as Record<string, unknown>;
         const modelKey =
           typeof data.modelKey === "string" ? data.modelKey : undefined;
+        const stylePayload = resolveStoryProRunStylePayload(
+          state.nodes,
+          state.edges,
+          node,
+        );
         const r = await runCanvasNode(base, projectId, nodeId, {
           node: {
             type: node.type ?? "image-engine",
@@ -438,6 +444,7 @@ export function useCanvasRunner(
           llmSection: job.llmSection,
           rowKey: job.rowKey,
           mediaKind: job.mediaKind,
+          ...stylePayload,
         });
         taskByNodeRef.current.set(key, r.task.id);
         jobByTaskRef.current.set(r.task.id, job);

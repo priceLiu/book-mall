@@ -18,9 +18,8 @@ import {
 import { readOssEnv } from "@/lib/oss-client";
 import {
   postToolUsageFromServerWithRetries,
-  reserveWalletHoldFromServer,
-  releaseWalletHoldFromServer,
 } from "@/lib/forward-tools-usage-server";
+import { TOOL_SERVICE_FEE_MODE } from "@/lib/tool-service-fee-mode";
 import {
   computeAiTryOnChargePoints,
   resolveAiTryOnBillingModelId,
@@ -73,6 +72,7 @@ type AiFitTryOnUsagePayload = {
   error?: string | null;
   chargedPoints?: number;
   billingDuplicate?: boolean;
+  serviceFeeMode?: boolean;
 };
 
 async function reportAiFitTryOnUsage(opts: {
@@ -80,6 +80,9 @@ async function reportAiFitTryOnUsage(opts: {
   imageUrl: string;
   persistedToOwnOss: boolean;
 }): Promise<AiFitTryOnUsagePayload> {
+  if (TOOL_SERVICE_FEE_MODE) {
+    return { recorded: true, serviceFeeMode: true, error: null };
+  }
   try {
     const tryOnModelId = resolveAiTryOnBillingModelId();
     const { multiplier: retailMult } = await getSchemeARetailMultiplierServer({
@@ -332,47 +335,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  /**
-   * v003：在调云前 reserve 一次试衣单价（POST 阶段返回 200 前，先占住可用余额）。
-   * - 失败（余额不足 / 水位线）→ 402 直接透传，避免无谓的百炼调用；
-   * - catalog 不到对应单价 → 跳过 reserve，让旧 auto-settle 路径兜底；
-   * - 调云失败 → release。
-   */
-  let reservedHoldId: string | null = null;
-  try {
-    const tryOnModelId = resolveAiTryOnBillingModelId();
-    const { multiplier } = await getSchemeARetailMultiplierServer({
-      toolKey: AI_FIT_USAGE_TOOL_KEY,
-      modelKey: tryOnModelId,
-    });
-    const estimatedMaxPoints = computeAiTryOnChargePoints(tryOnModelId, multiplier);
-    if (estimatedMaxPoints > 0) {
-      const r = await reserveWalletHoldFromServer({
-        toolKey: AI_FIT_USAGE_TOOL_KEY,
-        action: "try_on",
-        estimatedMaxPoints,
-        meta: { modelId: tryOnModelId },
-      });
-      if (!r.ok) {
-        return NextResponse.json(
-          {
-            error: r.reason === "no_session" ? "请先登录工具站" : "工具站未配置 MAIN_SITE_ORIGIN",
-          },
-          { status: 503 },
-        );
-      }
-      if (r.status === 402) {
-        return NextResponse.json(r.data, { status: 402 });
-      }
-      if (r.status >= 200 && r.status < 300 && typeof r.data.holdId === "string") {
-        reservedHoldId = r.data.holdId;
-      }
-    }
-  } catch (e) {
-    console.error("[ai-fit try-on reserve]", e);
-    // fail-open：reserve 失败不阻塞业务，依赖主站 settle 自带水位线门禁。
-  }
-
   const tryOnModel = process.env.DASHSCOPE_TRYON_MODEL?.trim() || "aitryon";
   const created = await createDashscopeJobFromServer({
     kind: "tryon",
@@ -384,20 +346,10 @@ export async function POST(req: NextRequest) {
   });
 
   if (!created.ok) {
-    if (reservedHoldId) {
-      await releaseWalletHoldFromServer({
-        holdId: reservedHoldId,
-        reason: `tryon_create_failed:${(created.error ?? "gateway").slice(0, 100)}`,
-      });
-    }
     return NextResponse.json(
       { error: created.error ?? "Gateway 调用失败" },
       { status: created.status ?? 502 },
     );
-  }
-
-  if (reservedHoldId) {
-    rememberTryOnHoldId(created.taskId, reservedHoldId);
   }
 
   return NextResponse.json({

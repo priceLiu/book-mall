@@ -78,6 +78,18 @@
 | 故事定稿 | 大纲非空 + 可行性软确认（高风险二次 confirm） |
 | 风格定稿 | 锚定词中英非空 + refImages ≥ 3 |
 | 下游 run | `styleFinalized === true`，否则 403 |
+| 分镜视频 · 静帧 | 须有分镜图 URL，否则 `FRAME_IMAGE_REQUIRED` |
+| 分镜视频 · 过审 | 分镜行 `frameApprovedAt` 非空，否则 `FRAME_NOT_APPROVED` |
+| 视频模型 | 影视专业版仅 i2v 类模型（EnginePicker + run 校验） |
+| 多参考图 | 分镜 @ 角色资产时须 `image_multi_ref` 生图模型 |
+| 静帧 IMAGE 白名单 | 影视专业版见 `STORY_PRO_FRAME_IMAGE_MODEL_KEYS`（KIE multi_ref + qwen 单 ref） |
+
+### 5.1 角色资产库（横切）
+
+- 数据：`StoryProCharacterAsset` · 四槽 ref · 工具栏「项目角色资产」
+- 消费：分镜 `@` → runner `imageInputs[]`
+- 操作说明：[story-pro-character-asset-workflow.md](./story-pro-character-asset-workflow.md)
+- 增强计划：[2026-story-pro-asset-workflow-rollout.md](../../book-mall/doc/plans/2026-story-pro-asset-workflow-rollout.md)
 
 ---
 

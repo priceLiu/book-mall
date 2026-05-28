@@ -1,44 +1,42 @@
 import { prisma } from "@/lib/prisma";
 import { getGoldMemberAccess } from "@/lib/gold-member";
 import { getMembershipFlags } from "@/lib/membership";
+import { userHasAnyActiveToolService } from "@/lib/tool-service-fee/periods";
 
 export type ToolsSsoEligibility = {
   ok: boolean;
   isAdmin: boolean;
+  /** @deprecated Phase D：工具 SSO 不再要求黄金会员；保留字段供 introspect 兼容 */
   gold: Awaited<ReturnType<typeof getGoldMemberAccess>>;
-  /** 会员计划（月度/年度）是否在有效期内 */
+  /** 课程会员计划是否在有效期内（仅课程，不含工具） */
   hasMembershipSubscription: boolean;
-  /** 是否有单品工具订阅（有效期内） */
+  /** @deprecated 单品工具订阅；Phase D 改用 UserToolServicePeriod */
   hasToolProductSubscription: boolean;
-  /**
-   * 兼容 introspect 字段名：会员计划 **或** 单品工具订阅任一有效即为 true
-   * （仍需黄金会员或管理员，见 ok）
-   */
+  /** 是否至少有一个有效的工具技术服务费周期 */
+  hasActiveToolService: boolean;
+  /** 兼容 introspect：hasActiveToolService */
   hasActiveSubscription: boolean;
-  /** 与 role 同次查询带出，供 introspect 避免第二次 hit User */
   email: string | null;
   name: string | null;
   image: string | null;
 };
 
-/** 工具站 SSO：管理员直通；普通用户须黄金会员且（会员计划 **或** 单品工具订阅）有效。 */
+/** 工具站 SSO：管理员直通；普通用户须至少一个有效工具技术服务费周期。 */
 export async function getToolsSsoEligibility(userId: string): Promise<ToolsSsoEligibility> {
-  const [user, gold, membership] = await Promise.all([
+  const [user, gold, membership, hasToolService] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { role: true, email: true, name: true, image: true },
     }),
     getGoldMemberAccess(userId),
     getMembershipFlags(userId),
+    userHasAnyActiveToolService(userId),
   ]);
   const isAdmin = user?.role === "ADMIN";
   const hasMembershipSubscription = membership.hasActiveSubscription;
   const hasToolProductSubscription = membership.hasActiveToolProductSubscription;
-  const hasToolsBillingGate =
-    hasMembershipSubscription || hasToolProductSubscription;
-  /** introspect / 旧文案沿用字段：任一订阅通路有效 */
-  const hasActiveSubscription = hasToolsBillingGate;
-  let ok = isAdmin || (gold.isGoldMember && hasToolsBillingGate);
+  const hasActiveToolService = hasToolService;
+  let ok = isAdmin || hasActiveToolService;
 
   const relaxDev =
     process.env.NODE_ENV === "development" &&
@@ -47,7 +45,7 @@ export async function getToolsSsoEligibility(userId: string): Promise<ToolsSsoEl
   if (relaxDev && user) {
     if (!ok) {
       console.warn(
-        "[tools-sso] TOOLS_SSO_RELAX_MEMBERSHIP=1：开发模式下放行工具站 SSO（非管理员且非黄金会员）",
+        "[tools-sso] TOOLS_SSO_RELAX_MEMBERSHIP=1：开发模式下放行工具站 SSO（无工具技术服务费）",
       );
     }
     ok = true;
@@ -59,7 +57,8 @@ export async function getToolsSsoEligibility(userId: string): Promise<ToolsSsoEl
     gold,
     hasMembershipSubscription,
     hasToolProductSubscription,
-    hasActiveSubscription,
+    hasActiveToolService,
+    hasActiveSubscription: hasActiveToolService,
     email: user?.email ?? null,
     name: user?.name ?? null,
     image: user?.image ?? null,

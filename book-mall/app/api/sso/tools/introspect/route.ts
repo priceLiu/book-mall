@@ -6,6 +6,7 @@ import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
+import { getActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,14 @@ export async function GET(req: Request) {
   });
 
   const resolvedNav = await resolveToolsNavKeysForUser(verified.sub);
+  const servicePeriods = elig.isAdmin
+    ? []
+    : (await getActiveToolServicePeriods(verified.sub)).map((p) => ({
+        toolNavKey: p.toolNavKey,
+        periodEnd: p.periodEnd.toISOString(),
+        lastChargedPoints: p.lastChargedPoints,
+      }));
+
   const tools_nav_keys = elig.isAdmin
     ? [...TOOL_SUITE_NAV_KEYS]
     : resolvedNav.keys;
@@ -133,7 +142,10 @@ export async function GET(req: Request) {
     balance_points: elig.gold.balancePoints,
     min_balance_line_points: elig.gold.minBalanceLinePoints,
     has_recharge_history: elig.gold.hasRechargeHistory,
-    has_active_subscription: elig.hasActiveSubscription,
+    has_active_subscription: elig.hasActiveToolService,
+    has_active_tool_service: elig.hasActiveToolService,
+    has_course_subscription: elig.hasMembershipSubscription,
+    tool_service_periods: servicePeriods,
     tools_nav_keys,
     email: elig.email,
     name: elig.name,

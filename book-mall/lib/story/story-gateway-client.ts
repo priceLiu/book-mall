@@ -9,6 +9,7 @@ import {
   assertGatewayApiKeyLinkedForUser,
   resolveGatewayAuthForBookUser,
 } from "@/lib/gateway/book-gateway-link";
+import { assertPlatformGatewayEntitlement } from "@/lib/platform-gateway-entitlement";
 import {
   createRequestLog,
   finalizeRequestLog,
@@ -33,6 +34,7 @@ import {
 const CLIENT_SOURCE: GatewayClientSource = "STORY";
 
 async function requireGatewayAuth(userId: string) {
+  await assertPlatformGatewayEntitlement(userId, { navKey: "story-theater" });
   await assertGatewayApiKeyLinkedForUser(userId);
   const auth = await resolveGatewayAuthForBookUser(userId);
   if (!auth) {

@@ -28,6 +28,10 @@ import { mapFetchToolsSessionResultToShell } from "@/lib/map-fetch-tools-session
 import type { FetchToolsSessionResult } from "@/lib/tools-introspect";
 import type { ToolShellSession } from "@/lib/tool-shell-session-types";
 import { GUEST_TOOL_SHELL_SESSION } from "@/lib/tool-shell-session-types";
+import {
+  buildSilentReEnterHref,
+  shouldAttemptSilentSso,
+} from "@/lib/tools-silent-sso";
 
 export type { ToolShellSession } from "@/lib/tool-shell-session-types";
 
@@ -242,15 +246,15 @@ function ToolRouteEntitlementGate({
   return (
     <div className="tw-note" style={{ margin: "1rem auto", maxWidth: "32rem" }}>
       <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>
-        当前订阅不包含该工具套件
+        当前未开通该工具分组的技术服务费
       </h1>
       <p className="tw-muted">
-        请在主站打开订阅中心，确认套餐所含工具分组；更新订阅后在工具站点击「重新连接」刷新令牌。
+        请在主站「工具技术服务费」页开通对应分组；开通后在工具站点击「重新连接」刷新令牌。
       </p>
       {subscriptionCenterHref ? (
         <p style={{ marginTop: "0.75rem" }}>
           <a href={subscriptionCenterHref} target="_blank" rel="noopener noreferrer">
-            订阅中心
+            工具技术服务费
           </a>
         </p>
       ) : (
@@ -343,6 +347,26 @@ export function ToolShellClient({
     void loadSession();
   }, [loadSession]);
 
+  /** Phase B：无 token 时自动跳转主站 re-enter（一次）。 */
+  const silentAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (silentAttemptedRef.current) return;
+    if (
+      !shouldAttemptSilentSso({
+        hasTokenCookie,
+        sessionActive: session.active,
+        loading,
+        isPublicPath: isToolPublicPath(pathname),
+      })
+    ) {
+      return;
+    }
+    const href = buildSilentReEnterHref(mainOrigin, pathname, "tool");
+    if (!href) return;
+    silentAttemptedRef.current = true;
+    window.location.href = href;
+  }, [loading, hasTokenCookie, session.active, pathname, mainOrigin]);
+
   useLayoutEffect(() => {
     try {
       if (localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1") {
@@ -392,7 +416,7 @@ export function ToolShellClient({
 
   const subscriptionCenterHref =
     mainOrigin != null && mainOrigin.length > 0
-      ? `${mainOrigin.replace(/\/$/, "")}/account/subscription`
+      ? `${mainOrigin.replace(/\/$/, "")}/account/tool-service-fee`
       : null;
 
   const mainHref = mainOrigin != null ? `${mainOrigin.replace(/\/$/, "")}/` : null;

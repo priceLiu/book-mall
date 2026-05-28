@@ -75,6 +75,9 @@ export function TextToImageGenerateModal({
   const [chargeTitleHint, setChargeTitleHint] = useState<string>(
     "单次任务扣费按方案 A（张数×官网单价×2）；标价加载中…",
   );
+  const [chargeLineHint, setChargeLineHint] = useState<string>(
+    "已含在工具技术服务费内，单次生成不另扣点",
+  );
 
   const abortPollRef = useRef(false);
   const settleTaskIdRef = useRef<string | null>(null);
@@ -105,11 +108,25 @@ export function TextToImageGenerateModal({
           credentials: "same-origin",
           cache: "no-store",
         });
-        const j = (await r.json().catch(() => ({}))) as { pricePoints?: number };
-        if (cancelled || !r.ok || typeof j.pricePoints !== "number") return;
+        const j = (await r.json().catch(() => ({}))) as {
+          pricePoints?: number;
+          serviceFeeMode?: boolean;
+          chargeLine?: string;
+          chargeTitle?: string;
+        };
+        if (cancelled || !r.ok) return;
+        if (j.serviceFeeMode) {
+          if (typeof j.chargeLine === "string") setChargeLineHint(j.chargeLine);
+          if (typeof j.chargeTitle === "string") setChargeTitleHint(j.chargeTitle);
+          return;
+        }
+        if (typeof j.pricePoints !== "number") return;
         const pts = Math.max(0, Math.floor(j.pricePoints));
         setChargeTitleHint(
           `本任务一次生成 ${TTI_BATCH_N} 张，全部成功时按方案 A 合计 ${pts.toLocaleString("zh-CN")} 点（¥${(pts / 100).toFixed(2)}，100 点=1 元）扣费；实扣张数以任务结果为准。`,
+        );
+        setChargeLineHint(
+          `一次生成 ${TTI_BATCH_N} 张图，扣费 ${pts.toLocaleString("zh-CN")} 点（¥${(pts / 100).toFixed(2)}）`,
         );
       } catch {
         /* 展示回退文案 */
@@ -510,7 +527,7 @@ export function TextToImageGenerateModal({
                 onClick={() => void handleGenerate()}
                 primaryLabel="生成 4 张图片"
                 busyLabel="生成中…"
-                chargeLine="一次生成 4 张图，扣费 50 点（¥0.50）"
+                chargeLine={chargeLineHint}
                 chargeTitle={chargeTitleHint}
                 idleIcon={<Sparkles className="h-4 w-4" aria-hidden />}
               />

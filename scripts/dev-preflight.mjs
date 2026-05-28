@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * dev:all 启动前的端口预检：
- *   - 检查 3000-3004 是否被占
+ *   - 检查 3000-3005 是否被占
  *   - 如果有占用：打印占用 PID + 命令名，并给出处置建议（kill 命令），随后退出 1
  *   - 全空闲：静默通过
  *
@@ -19,6 +19,7 @@ const PORTS = [
   { port: 3002, label: "finance-web" },
   { port: 3003, label: "story-web" },
   { port: 3004, label: "canvas-web" },
+  { port: 3005, label: "gateway-web" },
 ];
 
 function listListenersOnPort(port) {

@@ -49,6 +49,16 @@ alwaysApply: false
 - `@` 激活参考图：橙框 `#fb923c` + glow；未激活 `border-white/15`
 - 引擎对比：`CompareModal` 滑块重叠对比，非简单并排
 
+## 视频播放
+
+- 唯一组件：`CanvasVideoPlayer`（`design.md` §12）；禁止节点/弹层第二套控制条
+
+## 图片上传
+
+- **必须**同时支持：点击、拖入、粘贴（`design.md` §13）
+- 真源：`lib/canvas/image-upload-handlers.ts` · `MediaHoverBox.onImageFile`
+- 多槽须激活目标后再 paste；drop/paste 须 `stopPropagation` 避免画布全局建节点
+
 ## 改尺寸时
 
 同步 `normalize-graph-nodes.ts` 与 `docs/design.md` §1。

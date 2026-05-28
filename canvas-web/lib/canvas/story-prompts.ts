@@ -255,6 +255,27 @@ export const STORY_VIDEO_MODEL_KEYS = [
   "happyhorse/image-to-video",
 ] as const;
 
+/**
+ * 影视专业版 · 分镜静帧（IMAGE）白名单
+ * 与 KIE_KNOWN_MODELS 对齐；含多参考图（image_input / image_urls / input_urls）
+ */
+export const STORY_PRO_FRAME_IMAGE_MODEL_KEYS = [
+  "nano-banana-pro",
+  "flux-2-pro",
+  "seedream-5-lite",
+  "seedream-4.5",
+  "gpt-image-2",
+  "gpt-image-1",
+  /** 混元经 Gateway HUNYUAN，非 KIE，但支持专业版三视图/静帧 */
+  "hunyuan-3d-pro",
+  "hunyuan-3d-express",
+] as const;
+
+/** 仅单参考图（image_url），无 @ 多角色时可选 */
+export const STORY_PRO_FRAME_IMAGE_SINGLE_REF_MODEL_KEYS = [
+  "qwen-text-to-image",
+] as const;
+
 export const STORY_TTS_MODEL_KEYS = [
   "tts-1",
   "tts-1-hd",

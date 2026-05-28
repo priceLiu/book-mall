@@ -36,5 +36,6 @@
 
 1. 阅读 **[12-platform-app-federation.md](../product/12-platform-app-federation.md)** 与实施计划 **[2026-platform-unification-rollout.md](../plans/2026-platform-unification-rollout.md)**。  
 2. Cursor 持续规则：**`.cursor/rules/platform-app-federation.mdc`**（`alwaysApply`）。  
-3. 新应用 **禁止** 以 NextAuth Cookie 透传作为唯一鉴权；须 Book SSO + Gateway + Platform API。  
-4. 计划文件须标注 Phase（A–F）与验收项。
+3. 媒体持久化：**`.cursor/rules/media-storage-oss-vs-db.mdc`** — 图片/视频/音频走 OSS，其余结构化数据走数据库。  
+4. 新应用 **禁止** 以 NextAuth Cookie 透传作为唯一鉴权；须 Book SSO + Gateway + Platform API。  
+5. 计划文件须标注 Phase（A–F）与验收项。

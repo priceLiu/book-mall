@@ -1,0 +1,9 @@
+{
+  "name": "platform-client-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env.local server.mjs",
+    "start": "node --env-file=.env.local server.mjs"
+  }
+}

@@ -9,6 +9,8 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { MyTemplatesPanel } from "@/components/canvas/my-templates-panel";
 import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
+import { MySavedScriptsPanel } from "@/components/canvas/my-saved-scripts-panel";
+import { MyProjectCharacterAssetsPanel } from "@/components/canvas/my-project-character-assets-panel";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -68,6 +70,7 @@ function Inner({ projectId }: { projectId: string }) {
     (s) => s.reflowStoryComicLayout,
   );
   const isStoryComicCanvas = hasStoryComicPipeline(nodes);
+  const isStoryProCanvas = hasStoryProPipeline(nodes);
 
   const [project, setProject] = useState<CanvasProjectDetail | null>(null);
   const [nameDraft, setNameDraft] = useState("");
@@ -78,6 +81,9 @@ function Inner({ projectId }: { projectId: string }) {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [myTemplatesOpen, setMyTemplatesOpen] = useState(false);
   const [myCharactersOpen, setMyCharactersOpen] = useState(false);
+  const [mySavedScriptsOpen, setMySavedScriptsOpen] = useState(false);
+  const [myProjectCharacterAssetsOpen, setMyProjectCharacterAssetsOpen] =
+    useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
 
   /** 加载完成时的节点数；用于阻止误把「有内容的画布」自动保存成空。 */
@@ -392,6 +398,14 @@ function Inner({ projectId }: { projectId: string }) {
         onRunAll={runAll}
         onOpenMyTemplates={() => setMyTemplatesOpen(true)}
         onOpenMyCharacters={() => setMyCharactersOpen(true)}
+        onOpenMySavedScripts={
+          isStoryProCanvas ? () => setMySavedScriptsOpen(true) : undefined
+        }
+        onOpenProjectCharacterAssets={
+          isStoryProCanvas
+            ? () => setMyProjectCharacterAssetsOpen(true)
+            : undefined
+        }
         onReflowStoryLayout={
           isStoryComicCanvas ? () => reflowStoryComicLayout() : undefined
         }
@@ -410,6 +424,14 @@ function Inner({ projectId }: { projectId: string }) {
         open={myCharactersOpen}
         onClose={() => setMyCharactersOpen(false)}
         onInsertCharacter={onInsertCharacter}
+      />
+      <MySavedScriptsPanel
+        open={mySavedScriptsOpen}
+        onClose={() => setMySavedScriptsOpen(false)}
+      />
+      <MyProjectCharacterAssetsPanel
+        open={myProjectCharacterAssetsOpen}
+        onClose={() => setMyProjectCharacterAssetsOpen(false)}
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <FlowCanvas onUndo={undo} onRedo={redo} />

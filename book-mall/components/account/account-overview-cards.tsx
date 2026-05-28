@@ -21,6 +21,8 @@ type Props = {
   membershipPlanName: string | null;
   subscriptionEndsAt: Date | null;
   hasActiveToolProductSubscription: boolean;
+  /** Phase D：至少一个有效工具技术服务费周期 */
+  hasActiveToolService: boolean;
   goldIsActive: boolean;
   goldMinBalanceLinePoints: number;
   goldHasRechargeHistory: boolean;
@@ -65,19 +67,15 @@ export function AccountOverviewCards({
   membershipPlanName,
   subscriptionEndsAt,
   hasActiveToolProductSubscription,
-  goldIsActive,
-  goldMinBalanceLinePoints,
-  goldHasRechargeHistory,
+  hasActiveToolService,
+  goldIsActive: _goldIsActive,
+  goldMinBalanceLinePoints: _goldMinBalanceLinePoints,
+  goldHasRechargeHistory: _goldHasRechargeHistory,
   canLaunchTools,
   showToolsCta,
 }: Props) {
   const balanceYuan = formatPointsAsYuan(balancePoints);
   const minBalanceYuan = formatPointsAsYuan(minBalanceLinePoints);
-  const goldMinBalanceYuan = formatPointsAsYuan(goldMinBalanceLinePoints);
-
-  /** 工具站准入：黄金会员 + （计划 OR 单品） */
-  const hasPlanOrTool = hasActiveSubscription || hasActiveToolProductSubscription;
-  const toolsReady = goldIsActive && hasPlanOrTool;
 
   return (
     <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -89,7 +87,7 @@ export function AccountOverviewCards({
             <Wallet className="h-4 w-4 text-muted-foreground" aria-hidden />
           </div>
           <CardDescription className="text-xs">
-            100 点 = 1 元 · 实际可用余额
+            100 点 = 1 元 · 主要用于支付工具技术服务费
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col space-y-3">
@@ -138,7 +136,7 @@ export function AccountOverviewCards({
             <BadgeCheck className="h-4 w-4 text-muted-foreground" aria-hidden />
           </div>
           <CardDescription className="text-xs">
-            会员计划 · AI 学堂 · 工具单品
+            会员计划 · AI 学堂（不含工具使用权）
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col space-y-3">
@@ -159,17 +157,17 @@ export function AccountOverviewCards({
             ) : null}
           </div>
           <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            单品工具订阅：
-            <span className="ml-1 font-medium text-foreground">
-              {hasActiveToolProductSubscription ? "有" : "无"}
-            </span>
+            工具技术服务费：
+            <Link href="/account/tool-service-fee" className="ml-1 font-medium text-primary underline">
+              {hasActiveToolService ? "已开通" : "未开通"}
+            </Link>
           </div>
           <div className="mt-auto flex gap-2 pt-1">
             <Button asChild variant="subscription" size="sm" className="flex-1">
               <Link href="/account/subscription">订阅中心</Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="flex-1">
-              <Link href="/courses">AI 学堂</Link>
+              <Link href="/account/tool-service-fee">工具月费</Link>
             </Button>
           </div>
         </CardContent>
@@ -183,31 +181,24 @@ export function AccountOverviewCards({
             <Zap className="h-4 w-4 text-muted-foreground" aria-hidden />
           </div>
           <CardDescription className="text-xs">
-            黄金会员 + 计划/单品订阅 = 准入
+            有效工具技术服务费 + Gateway BYOK
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col space-y-3">
           <div>
             <div className="flex items-center gap-2">
-              <StatusDot ok={toolsReady} />
+              <StatusDot ok={hasActiveToolService} />
               <p className="text-lg font-semibold leading-none">
-                {toolsReady ? "已开放" : "未达标"}
+                {hasActiveToolService ? "已开放" : "未开通"}
               </p>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              准入门槛 ≥ {goldMinBalanceLinePoints.toLocaleString("zh-CN")} 点
-              （¥{goldMinBalanceYuan}）+ 历史有充值记录
+              须在「工具技术服务费」页开通对应分组；单次生成不另扣点。
             </p>
           </div>
           <ul className="space-y-1 rounded-md bg-muted/40 px-3 py-2">
-            <ChecklistRow ok={goldHasRechargeHistory}>有充值记录</ChecklistRow>
-            <ChecklistRow ok={balancePoints >= goldMinBalanceLinePoints}>
-              余额达标
-            </ChecklistRow>
-            <ChecklistRow ok={hasActiveSubscription}>会员计划有效</ChecklistRow>
-            <ChecklistRow ok={hasActiveToolProductSubscription}>
-              或工具单品有效
-            </ChecklistRow>
+            <ChecklistRow ok={hasActiveToolService}>有效工具技术服务费</ChecklistRow>
+            <ChecklistRow ok={balancePoints > 0}>钱包有余额（开通/续订时扣费）</ChecklistRow>
           </ul>
           <div className="mt-auto flex gap-2 pt-1">
             {showToolsCta ? (

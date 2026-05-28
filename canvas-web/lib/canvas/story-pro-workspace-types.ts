@@ -28,6 +28,16 @@ export type StoryProFeasibilityAssessment = {
   confirmedAt?: string;
 };
 
+/** 故事定稿瞬间的剧本快照（只读历史，最多保留 10 条） */
+export type StoryProFinalizedScriptSnapshot = {
+  version: number;
+  theme: string;
+  finalizedAt: string;
+  outlineMd: string;
+  characterMd: string;
+  storyboardMd: string;
+};
+
 export type StoryProStyleRefImage = StoryRefImage & {
   kind?: "character" | "scene" | "atmosphere";
   note?: string;
@@ -92,6 +102,8 @@ export type StoryProScriptHubNodeData = {
   storyboardHistory?: StoryTextRevision[];
   referencedNodeIds?: string[];
   scriptFinalized?: boolean;
+  /** 每次「故事定稿」追加一条，供「查看定稿剧本」只读历史 */
+  finalizedScriptHistory?: StoryProFinalizedScriptSnapshot[];
   feasibility?: StoryProFeasibilityAssessment;
 };
 
@@ -102,6 +114,9 @@ export type StoryProCharacterRow = {
   appearance: string;
   prompt: string;
   promptHistory?: StoryTextRevision[];
+  /** 绑定角色资产库 */
+  assetId?: string;
+  lockedRefIds?: string[];
   runtime?: CanvasNodeRuntime;
 };
 
@@ -134,6 +149,12 @@ export type StoryProFrameRow = {
   runtime?: CanvasNodeRuntime;
   refImages?: StoryRefImage[];
   refImageUrls?: string[];
+  frameApprovedAt?: string;
+  frameRejectedReason?: string;
+  /** P-B2 · 保存 @ 引用时的资产 version 快照 */
+  characterRefSnapshotAt?: string;
+  characterAssetVersions?: Record<string, number>;
+  characterRefIds?: string[];
 };
 
 export type StoryProVideoRow = {
@@ -165,8 +186,12 @@ export type StoryProSceneColumnNodeData = {
 
 export type StoryProFrameColumnNodeData = {
   rows: StoryProFrameRow[];
+  batchImage?: CanvasEnginePick;
   batchVideo?: CanvasEnginePick;
   hubNodeId?: string;
+  /** P-A2 · 静帧生成时追加风格节点参考图（最多 2 张） */
+  injectStyleRefs?: boolean;
+  styleRefImageUrls?: string[];
 };
 
 export type StoryProVideoColumnNodeData = {
