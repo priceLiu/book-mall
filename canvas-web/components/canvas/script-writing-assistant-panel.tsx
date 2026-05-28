@@ -1,21 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import {
   ChevronLeft,
   ChevronRight,
   Copy,
   Download,
-  FileInput,
+  Eye,
   GripHorizontal,
   Loader2,
+  Maximize2,
   MessageSquareText,
   PanelLeft,
   Send,
 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { ScriptAssistantPackPreviewModal } from "@/components/canvas/script-assistant-pack-preview-modal";
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import {
   clearScriptAssistantHistory,
@@ -25,12 +28,22 @@ import {
   type ScriptAssistantMessage,
 } from "@/lib/canvas-api";
 import { STORY_CHROME_GREEN_CLASS } from "@/lib/canvas/story-column-sync";
+import { useCanvasStore } from "@/lib/canvas/store";
+import {
+  SCRIPT_ASSISTANT_OUTPUT_MODES,
+  SCRIPT_ASSISTANT_WELCOME_MESSAGE,
+  storyProAssistantImportGate,
+  type ScriptAssistantOutputMode,
+} from "@/lib/canvas/story-pro-script-assistant";
 import { cn } from "@/lib/utils";
 
 type ChatMessage = ScriptAssistantMessage;
 type LayoutMode = "dock" | "immersive";
 
 const ASSISTANT_FLOAT_Z = 1050;
+const ASSISTANT_SCRIM_Z = ASSISTANT_FLOAT_Z - 1;
+const PANEL_SOLID_CLASS = "bg-[var(--canvas-surface,#13131f)]";
+const PANEL_BODY_SOLID_CLASS = "bg-[var(--canvas-surface-2,#1a1a2b)]";
 const DOCK_WIDTH_PX = 320;
 const FLOAT_WIDTH_PX = 920;
 const FLOAT_HEIGHT_PX = 720;
@@ -142,9 +155,50 @@ function useFloatingDrag(enabled: boolean) {
   return { pos, panelRef, onDragStart, resetCenter };
 }
 
+function AssistantModeBar({
+  mode,
+  onModeChange,
+  immersive,
+}: {
+  mode: ScriptAssistantOutputMode;
+  onModeChange: (m: ScriptAssistantOutputMode) => void;
+  immersive: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 flex-wrap gap-1 border-b border-white/10",
+        PANEL_BODY_SOLID_CLASS,
+        immersive ? "px-5 py-2" : "px-3 py-1.5",
+      )}
+    >
+      {SCRIPT_ASSISTANT_OUTPUT_MODES.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          title={opt.hint}
+          className={cn(
+            "rounded-md border px-2 py-1 text-left transition",
+            immersive ? "text-[11px]" : "text-[10px]",
+            mode === opt.id
+              ? "border-emerald-400/45 bg-emerald-500/15 text-emerald-100"
+              : "border-white/10 text-white/55 hover:border-white/20 hover:text-white/80",
+          )}
+          onClick={() => onModeChange(opt.id)}
+        >
+          <span className="font-medium">{opt.label}</span>
+          <span className="mt-0.5 block text-[9px] opacity-75">{opt.hint}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 type AssistantPanelBodyProps = {
   immersive: boolean;
-  scriptFinalized: boolean;
+  showPackPreview: boolean;
+  previewReady: boolean;
+  onOpenPreview: () => void;
   messages: ChatMessage[];
   loadingHistory: boolean;
   sending: boolean;
@@ -156,12 +210,13 @@ type AssistantPanelBodyProps = {
   lastAssistant?: ChatMessage;
   onCopyLast: () => void;
   onDownloadLast: () => void;
-  onImportLast: () => void;
 };
 
 function AssistantPanelBody({
   immersive,
-  scriptFinalized,
+  showPackPreview,
+  previewReady,
+  onOpenPreview,
   messages,
   loadingHistory,
   sending,
@@ -173,7 +228,6 @@ function AssistantPanelBody({
   lastAssistant,
   onCopyLast,
   onDownloadLast,
-  onImportLast,
 }: AssistantPanelBodyProps) {
   const textSize = immersive ? "text-[13px]" : "text-[11px]";
   const inputSize = immersive ? "text-[13px]" : "text-[11px]";
@@ -191,16 +245,22 @@ function AssistantPanelBody({
         {loadingHistory ? (
           <p className="text-white/40">加载历史…</p>
         ) : messages.length === 0 ? (
-          <p
+          <div
             className={cn(
-              "leading-relaxed text-amber-300/80",
-              immersive && "max-w-2xl text-[14px]",
+              "select-text rounded-lg px-3 py-2 leading-relaxed whitespace-pre-wrap text-white/90",
+              immersive
+                ? "mr-auto max-w-[92%] bg-neutral-900"
+                : "mr-2 bg-neutral-900/95",
             )}
           >
-            描述你的故事创意、类型、集数或角色，我会帮你起草 Markdown
-            剧本大纲。发送后将进入宽幅对话视图；生成后可「导入到启动节点」或自行上传
-            .md。
-          </p>
+            {SCRIPT_ASSISTANT_WELCOME_MESSAGE}
+            {showPackPreview ? (
+              <p className="mt-3 border-t border-white/10 pt-2 text-[10px] leading-snug text-cyan-200/85">
+                「创作并导入故事剧本」模式生成制作包；预览满意后「确定导入」将启动<strong>全新</strong>工作流（仅 Hub
+                尚无大纲/定稿/下游列时可用）。
+              </p>
+            ) : null}
+          </div>
         ) : (
           messages.map((m) => (
             <div
@@ -210,11 +270,11 @@ function AssistantPanelBody({
                 immersive ? "max-w-3xl" : "",
                 m.role === "user"
                   ? immersive
-                    ? "ml-auto max-w-[85%] bg-emerald-500/15 text-emerald-50"
-                    : "ml-4 bg-emerald-500/10 text-emerald-50"
+                    ? "ml-auto max-w-[85%] bg-emerald-950 text-emerald-50"
+                    : "ml-4 bg-emerald-950/90 text-emerald-50"
                   : immersive
-                    ? "mr-auto max-w-[92%] bg-black/35 text-white/90"
-                    : "mr-2 bg-black/30 text-white/85",
+                    ? "mr-auto max-w-[92%] bg-neutral-900 text-white/92"
+                    : "mr-2 bg-neutral-900/95 text-white/88",
               )}
             >
               {m.content ||
@@ -270,13 +330,19 @@ function AssistantPanelBody({
           >
             <Download className="size-3" /> 下载 .md
           </button>
-          {!scriptFinalized ? (
+          {showPackPreview ? (
             <button
               type="button"
-              className="inline-flex items-center gap-0.5 rounded border border-emerald-400/30 px-2 py-1 text-[10px] text-emerald-200 hover:bg-emerald-500/10"
-              onClick={onImportLast}
+              disabled={!previewReady}
+              title={
+                previewReady
+                  ? "全屏弹层审阅 · 与故事大纲同款"
+                  : "需先由助手生成制作包正文"
+              }
+              className="inline-flex items-center gap-0.5 rounded border border-cyan-400/30 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={onOpenPreview}
             >
-              <FileInput className="size-3" /> 导入启动节点
+              <Eye className="size-3" /> 制作包预览
             </button>
           ) : null}
         </div>
@@ -292,9 +358,13 @@ function AssistantPanelBody({
           <textarea
             value={input}
             rows={immersive ? 3 : 2}
-            placeholder="描述剧本需求…"
+            placeholder={
+              showPackPreview
+                ? "描述修改意见，发送后助手会更新制作包…"
+                : "描述剧本需求…"
+            }
             className={cn(
-              "flex-1 select-text resize-none rounded-md border border-white/10 bg-black/30 px-3 py-2 text-white placeholder:text-white/30 focus:border-emerald-400/40 focus:outline-none",
+              "flex-1 select-text resize-none rounded-md border border-white/10 bg-neutral-950 px-3 py-2 text-white placeholder:text-white/30 focus:border-emerald-400/40 focus:outline-none",
               immersive ? "min-h-[72px] text-[13px]" : "min-h-[52px]",
               inputSize,
             )}
@@ -348,10 +418,18 @@ export function ScriptWritingAssistantPanel({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [portalMounted, setPortalMounted] = useState(false);
+  const [outputMode, setOutputMode] =
+    useState<ScriptAssistantOutputMode>("chat");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const persistRef = useRef(false);
+  const { confirm } = useDialogs();
+
+  const nodes = useCanvasStore((s) => s.nodes);
+  const importGate = useMemo(() => storyProAssistantImportGate(nodes), [nodes]);
 
   const immersive = layoutMode === "immersive" && open;
+  const showPackPreview = outputMode === "pack";
   const { pos, panelRef, onDragStart, resetCenter } = useFloatingDrag(immersive);
 
   useEffect(() => setPortalMounted(true), []);
@@ -401,6 +479,11 @@ export function ScriptWritingAssistantPanel({
     setLayoutMode("dock");
   }, []);
 
+  const expandToImmersive = useCallback(() => {
+    setLayoutMode("immersive");
+    resetCenter();
+  }, [resetCenter]);
+
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || sending || !base?.trim()) return;
@@ -439,7 +522,7 @@ export function ScriptWritingAssistantPanel({
     scrollToBottom();
 
     try {
-      const res = await streamScriptAssistantChat(base, historyForApi);
+      const res = await streamScriptAssistantChat(base, historyForApi, outputMode);
       if (!res.ok) {
         let msg = `请求失败（HTTP ${res.status}）`;
         try {
@@ -495,6 +578,7 @@ export function ScriptWritingAssistantPanel({
     input,
     layoutMode,
     messages,
+    outputMode,
     persistIfNeeded,
     resetCenter,
     scrollToBottom,
@@ -523,11 +607,26 @@ export function ScriptWritingAssistantPanel({
     URL.revokeObjectURL(href);
   };
 
-  const importLast = () => {
-    const text = lastAssistant?.content?.trim();
-    if (!text) return;
+  const previewMd = lastAssistant?.content?.trim() ?? "";
+
+  const confirmImportAndStart = useCallback(async () => {
+    const text = previewMd;
+    if (!text || !importGate.allowed) return;
+    if (
+      !(await confirm({
+        title: "确定导入并开始制作",
+        message:
+          "将把当前制作包写入故事启动节点，并作为全新工作流起点。导入后请在启动页运行导演向生成，再在 Hub 定稿并生成下游列。",
+        confirmLabel: "确定导入",
+        cancelLabel: "再改改",
+      }))
+    ) {
+      return;
+    }
     onImportScript(text);
-  };
+    setPreviewOpen(false);
+    setLayoutMode("dock");
+  }, [confirm, importGate.allowed, onImportScript, previewMd]);
 
   const collapse = () => {
     setOpen(false);
@@ -538,9 +637,13 @@ export function ScriptWritingAssistantPanel({
     ? "定稿后对话不保存"
     : "定稿前自动保存历史";
 
+  const previewReady = Boolean(previewMd);
+
   const bodyProps: AssistantPanelBodyProps = {
     immersive: layoutMode === "immersive",
-    scriptFinalized,
+    showPackPreview,
+    previewReady,
+    onOpenPreview: () => setPreviewOpen(true),
     messages,
     loadingHistory,
     sending,
@@ -552,7 +655,6 @@ export function ScriptWritingAssistantPanel({
     lastAssistant,
     onCopyLast: copyLast,
     onDownloadLast: downloadLast,
-    onImportLast: importLast,
   };
 
   const collapsedTab = (
@@ -570,9 +672,20 @@ export function ScriptWritingAssistantPanel({
     </button>
   );
 
+  const modeBar = (
+    <AssistantModeBar
+      mode={outputMode}
+      onModeChange={setOutputMode}
+      immersive={layoutMode === "immersive"}
+    />
+  );
+
   const immersiveHeader = (
     <header
-      className="nodrag flex shrink-0 cursor-grab items-center gap-2 border-b border-white/10 bg-emerald-950/20 px-4 py-2.5 active:cursor-grabbing"
+      className={cn(
+        "nodrag flex shrink-0 cursor-grab items-center gap-2 border-b border-white/10 px-4 py-2.5 active:cursor-grabbing",
+        PANEL_SOLID_CLASS,
+      )}
       onMouseDown={onDragStart}
     >
       <GripHorizontal className="size-4 shrink-0 text-white/35" aria-hidden />
@@ -614,14 +727,25 @@ export function ScriptWritingAssistantPanel({
           deepseek-chat · {headerSubtitle}
         </p>
       </div>
-      <button
-        type="button"
-        className="rounded p-1 text-white/50 hover:bg-white/5 hover:text-white"
-        title="折叠"
-        onClick={collapse}
-      >
-        <ChevronLeft className="size-4" />
-      </button>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          className="inline-flex items-center gap-0.5 rounded border border-emerald-400/30 px-1.5 py-0.5 text-[9px] text-emerald-200 hover:bg-emerald-500/10"
+          title="展开到画布中央（宽幅对话）"
+          onClick={expandToImmersive}
+        >
+          <Maximize2 className="size-3" />
+          展开
+        </button>
+        <button
+          type="button"
+          className="rounded p-1 text-white/50 hover:bg-white/5 hover:text-white"
+          title="折叠"
+          onClick={collapse}
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+      </div>
     </header>
   );
 
@@ -630,22 +754,35 @@ export function ScriptWritingAssistantPanel({
   const immersivePanel =
     portalMounted && immersive && pos
       ? createPortal(
-          <div
-            ref={panelRef}
-            className="nodrag nowheel fixed flex flex-col overflow-hidden rounded-2xl border border-emerald-400/25 bg-[var(--canvas-surface)]/98 shadow-2xl shadow-black/50 ring-1 ring-white/10"
-            style={{
-              zIndex: ASSISTANT_FLOAT_Z,
-              left: pos.x,
-              top: pos.y,
-              width: floatSize.w,
-              height: floatSize.h,
-            }}
-            role="dialog"
-            aria-label="剧本创作助手 · 宽幅对话"
-          >
-            {immersiveHeader}
-            <AssistantPanelBody {...bodyProps} immersive />
-          </div>,
+          <>
+            <div
+              className="pointer-events-none fixed inset-0 bg-black/50"
+              style={{ zIndex: ASSISTANT_SCRIM_Z }}
+              aria-hidden
+            />
+            <div
+              ref={panelRef}
+              className={cn(
+                "nodrag nowheel fixed flex flex-col overflow-hidden rounded-2xl border border-emerald-400/30 shadow-2xl shadow-black/70 ring-1 ring-white/15",
+                PANEL_SOLID_CLASS,
+              )}
+              style={{
+                zIndex: ASSISTANT_FLOAT_Z,
+                left: pos.x,
+                top: pos.y,
+                width: floatSize.w,
+                height: floatSize.h,
+              }}
+              role="dialog"
+              aria-label="剧本创作助手 · 宽幅对话"
+            >
+              {immersiveHeader}
+              {modeBar}
+              <div className={cn("flex min-h-0 flex-1 flex-col", PANEL_BODY_SOLID_CLASS)}>
+                <AssistantPanelBody {...bodyProps} immersive />
+              </div>
+            </div>
+          </>,
           document.body,
         )
       : null;
@@ -656,15 +793,29 @@ export function ScriptWritingAssistantPanel({
 
   return (
     <>
+      <ScriptAssistantPackPreviewModal
+        open={previewOpen}
+        md={previewMd}
+        importAllowed={importGate.allowed}
+        importBlockReason={importGate.reason}
+        onClose={() => setPreviewOpen(false)}
+        onConfirmImport={() => void confirmImportAndStart()}
+      />
       {immersivePanel}
       {layoutMode === "dock" ? (
         <aside
-          className="nodrag relative z-30 flex shrink-0 flex-col border-r border-white/10 bg-[var(--canvas-surface)]/98"
+          className={cn(
+            "nodrag relative z-30 flex shrink-0 flex-col border-r border-white/10",
+            PANEL_SOLID_CLASS,
+          )}
           style={{ width: DOCK_WIDTH_PX }}
           aria-label="剧本创作助手"
         >
           {dockHeader}
-          <AssistantPanelBody {...bodyProps} immersive={false} />
+          {modeBar}
+          <div className={cn("flex min-h-0 flex-1 flex-col", PANEL_BODY_SOLID_CLASS)}>
+            <AssistantPanelBody {...bodyProps} immersive={false} />
+          </div>
         </aside>
       ) : null}
     </>

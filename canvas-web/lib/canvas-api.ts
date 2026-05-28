@@ -844,6 +844,7 @@ export async function clearScriptAssistantHistory(
 export async function streamScriptAssistantChat(
   base: string,
   messages: { role: "user" | "assistant"; content: string }[],
+  outputMode: "chat" | "pack" = "chat",
 ): Promise<Response> {
   const { url, init } = resolveBookMallBrowserRequest(
     base,
@@ -851,7 +852,7 @@ export async function streamScriptAssistantChat(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, outputMode }),
     },
   );
   return fetch(url, init);
