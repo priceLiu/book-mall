@@ -482,6 +482,8 @@ function FlowCanvasInner() {
       if (!(e.metaKey || e.ctrlKey)) return;
       const k = e.key.toLowerCase();
       if (k === "c" || k === "x") {
+        const textSel = window.getSelection()?.toString().trim();
+        if (textSel) return;
         const did = copySelectedToClipboard(k === "x");
         if (did) e.preventDefault();
       }

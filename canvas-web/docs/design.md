@@ -256,7 +256,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 
 ### 6.3 分镜列行编辑
 
-- 提示词：`MentionsTextarea`，支持 `@<ref-char-*>` 引用角色三视图
+- 提示词：`MentionsTextarea`，支持 `@<ref-char-*>`、`@<ref-asset-*>` 等上游参考（见 §7.1.1）
 - 600ms debounce 写回 `rows`
 - 参考图列只读展示上游；输出图列生成/预览/分镜视频
 
@@ -328,6 +328,12 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 - **生成中**：仅 **整列外框** 扫光（§15.3），**禁止**单格旋转圈
 - 无图占位：格内「待上游」/ 空列 `—`
 - 分镜图过审：仅 **「通过」**（无驳回）；未过审不可生视频（`story-frame-gate.ts`）
+
+### 7.1.1 分镜视频 · 多 `@` 参考与 Gateway 入参
+
+- 分镜/视频行 `refImages` 须 **完整同步** 分镜行上的 `ref-char-*`、`ref-asset-*`、`ref-scene-asset-*`（`story-column-sync` · `patchVideoRowsForRun`）；禁止仅保留 `ref-char-*`。
+- 服务端 `resolveStoryRowRefUrls` 按 `videoPrompt` 内 `@<id>` 从 `refImages[].url` 解析；`imageInputs = [分镜主图, …参考图]`，展开后 prompt 末尾带 `[参考图片]` 图1…图N。
+- **Kling 2.6 i2v**（及同类单槽 i2v）：Gateway `image_urls` **仅 1 张**（分镜静帧）；其余 `@` 参考只进 **prompt 文本**（`[参考图片]` 图2+），非 API 多图槽。多图 i2v 选 **Seedance 2** 等（`reference_image_urls`）。
 
 ### 7.2 输出图列
 

@@ -238,9 +238,8 @@ export function buildVideoRowsFromFrames(
   return frameRows.map((f) => {
     const script =
       f.prompt?.trim() || buildFrameRowScriptPrompt(f);
-    const refImages = (f.refImages ?? []).filter((r) =>
-      r.id.startsWith("ref-char-"),
-    );
+    /** 含 ref-asset / ref-char / ref-scene-asset，供视频 run 解析 @ */
+    const refImages = f.refImages ?? [];
     return {
       frameIndex: f.frameIndex,
       key: String(f.frameIndex),
@@ -358,9 +357,7 @@ export function syncColumnsFromHub(
       videoPromptHistory: prev?.videoPromptHistory,
       videoRuntime: prev?.videoRuntime,
       ttsRuntime: prev?.ttsRuntime,
-      refImages: frameRow?.refImages?.length
-        ? frameRow.refImages.filter((r) => r.id.startsWith("ref-char-"))
-        : row.refImages,
+      refImages: frameRow?.refImages?.length ? frameRow.refImages : row.refImages,
       videoReferencedNodeIds:
         frameRow?.referencedNodeIds ?? row.videoReferencedNodeIds,
     };
