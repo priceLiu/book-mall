@@ -102,13 +102,17 @@ export function StoryColumnMediaPanel({
     >
       <div
         className={cn(
-          "group/frame-prompt relative min-h-0 rounded-md border border-white/10 bg-black/45",
-          stripLayout ? "h-full overflow-visible" : "overflow-visible",
+          "group/frame-prompt relative min-h-0 overflow-hidden rounded-md border border-white/10 bg-black/45",
+          stripLayout ? "h-full" : "",
           !stripLayout && "min-h-[var(--row-media-min,248px)] flex-1",
-          generating && storyEditionGeneratingBorderClass(edition),
         )}
       >
-        <div className="absolute inset-0 overflow-hidden rounded-md">
+        <div
+          className={cn(
+            "absolute inset-0 overflow-hidden rounded-md",
+            generating && storyEditionGeneratingBorderClass(edition),
+          )}
+        >
         {imageUrl ? (
           <Image
             src={imageUrl}
@@ -116,7 +120,7 @@ export function StoryColumnMediaPanel({
             fill
             className={cn(
               "pointer-events-none",
-              isFrame && stripLayout ? "object-cover" : "object-contain",
+              "object-contain",
             )}
             unoptimized
           />
@@ -127,7 +131,9 @@ export function StoryColumnMediaPanel({
             aria-label="生成分镜视频"
             title="生成分镜视频（图生视频 · 首帧锁定）"
             className={storyEditionVideoOverlayBtnClass(edition)}
-            onPointerDown={(e) => {
+            disabled={generating}
+            onClick={(e) => {
+              e.stopPropagation();
               blockCanvasPointer(e);
               onGenerateVideo?.();
             }}
@@ -135,14 +141,22 @@ export function StoryColumnMediaPanel({
             <Clapperboard className="size-4 pointer-events-none" />
           </button>
         ) : null}
-        {isFrame && hasFrameImage && !frameApproved && !generating ? (
+        {isFrame && hasFrameImage ? (
           <div className="pointer-events-auto absolute bottom-1.5 left-1.5 z-20 flex gap-1">
             {onApproveFrame ? (
               <button
                 type="button"
-                className="nodrag rounded border border-emerald-400/40 bg-emerald-500/20 px-1.5 py-0.5 text-[9px] text-emerald-100 hover:bg-emerald-500/30"
+                disabled={generating}
+                className={cn(
+                  "nodrag rounded border px-1.5 py-0.5 text-[9px] transition-colors",
+                  frameApproved
+                    ? "border-emerald-300/60 bg-emerald-500/35 text-emerald-50"
+                    : "border-emerald-400/40 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30",
+                  generating && "cursor-not-allowed opacity-50",
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (generating) return;
                   onApproveFrame();
                 }}
               >
@@ -153,9 +167,14 @@ export function StoryColumnMediaPanel({
             {onRejectFrame ? (
               <button
                 type="button"
-                className="nodrag rounded border border-red-400/30 bg-red-500/15 px-1.5 py-0.5 text-[9px] text-red-200 hover:bg-red-500/25"
+                disabled={generating}
+                className={cn(
+                  "nodrag rounded border border-red-400/30 bg-red-500/15 px-1.5 py-0.5 text-[9px] text-red-200 hover:bg-red-500/25",
+                  generating && "cursor-not-allowed opacity-50",
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (generating) return;
                   onRejectFrame();
                 }}
               >

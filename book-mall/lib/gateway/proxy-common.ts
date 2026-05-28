@@ -6,6 +6,7 @@ import {
   resolveOpenAiCompatibleBaseUrl,
   routeGatewayModel,
 } from "./model-router";
+import { forwardQwenTtsSpeech, isQwenTtsModel } from "./qwen-tts-proxy";
 import { estimateVendorCost } from "./pricing-estimate";
 
 export type UsageFromResponse = {
@@ -197,7 +198,18 @@ export async function forwardAudioSpeech(opts: {
   providerKind: GatewayProviderKind;
   body: Record<string, unknown>;
   baseUrlOverride?: string | null;
-}): Promise<{ status: number; buffer: Buffer; durationMs: number }> {
+}): Promise<{
+  status: number;
+  buffer: Buffer;
+  durationMs: number;
+  contentType?: string;
+  ext?: string;
+}> {
+  const model = String(opts.body.model ?? "").trim();
+  if (isQwenTtsModel(model)) {
+    return forwardQwenTtsSpeech(opts);
+  }
+
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
 

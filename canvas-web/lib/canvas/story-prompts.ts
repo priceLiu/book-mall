@@ -291,7 +291,7 @@ export const STORY_PRO_FRAME_IMAGE_SINGLE_REF_MODEL_KEYS = [
 ] as const;
 
 export const STORY_TTS_MODEL_KEYS = [
+  "qwen3-tts",
   "tts-1",
   "tts-1-hd",
-  "qwen3-tts",
 ] as const;

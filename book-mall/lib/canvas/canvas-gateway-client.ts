@@ -18,6 +18,7 @@ import {
 } from "@/lib/gateway/proxy-common";
 import { summarizeUpstreamFailMessage } from "@/lib/gateway/book-gateway-link";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
+import { isQwenTtsModel } from "@/lib/gateway/qwen-tts-proxy";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { buildGatewayChatResultSummary } from "@/lib/gateway/log-result-summary";
 import {
@@ -340,9 +341,10 @@ export async function canvasGwTts(
     modelKey: string;
     text: string;
     voice?: string;
+    languageType?: string;
     clientPage?: string;
   },
-): Promise<{ buffer: Buffer; logId: string }> {
+): Promise<{ buffer: Buffer; logId: string; contentType: string; ext: string }> {
   const auth = await requireGatewayAuth(userId);
   const model = opts.modelKey.trim();
   const route = routeGatewayModel(model);
@@ -360,6 +362,9 @@ export async function canvasGwTts(
     input: opts.text.slice(0, 4096),
     voice: opts.voice ?? "alloy",
     response_format: "mp3",
+    ...(opts.languageType?.trim()
+      ? { language_type: opts.languageType.trim() }
+      : {}),
   };
 
   const log = await createRequestLog({
@@ -367,7 +372,9 @@ export async function canvasGwTts(
     apiKeyId: auth.id,
     credentialId,
     model,
-    endpoint: "/v1/audio/speech",
+    endpoint: isQwenTtsModel(model)
+      ? "/services/aigc/multimodal-generation/generation"
+      : "/v1/audio/speech",
     providerKind: route.providerKind,
     requestKind: "TTS",
     clientSource: CLIENT_SOURCE,
@@ -393,13 +400,21 @@ export async function canvasGwTts(
     model,
   });
   if (!ok) {
+    const detail = result.buffer.toString("utf8").slice(0, 200).trim();
     throw new CanvasProjectError(
       "MODEL_NOT_AVAILABLE",
-      `TTS HTTP ${result.status}`,
+      detail
+        ? `TTS HTTP ${result.status}: ${detail}`
+        : `TTS HTTP ${result.status}`,
       502,
     );
   }
-  return { buffer: result.buffer, logId: log.id };
+  return {
+    buffer: result.buffer,
+    logId: log.id,
+    contentType: result.contentType ?? "audio/mpeg",
+    ext: result.ext ?? "mp3",
+  };
 }
 
 export type CanvasGwPollResult =

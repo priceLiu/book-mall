@@ -5,12 +5,19 @@ import {
   sanitizeLegacyFramePrompt,
   syncColumnsFromHub,
 } from "./story-column-sync";
+import { syncStoryProColumnRows } from "./story-pro-column-sync";
 import type {
   StoryCharacterRow,
   StoryFrameRow,
   StoryVideoRow,
   StoryWorkspaceIds,
 } from "./story-workspace-types";
+import type {
+  StoryProCharacterRow,
+  StoryProFrameRow,
+  StoryProScriptHubNodeData,
+  StoryProVideoRow,
+} from "./story-pro-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { isCanvasInflightStatus } from "./story-column-runtime";
 import { findWorkspaceForScriptHub } from "./spawn-story-workspace";
@@ -124,9 +131,15 @@ function siblingColumnsForHub(
   } = {};
   for (const n of nodes) {
     if (columnHubNodeId(n) !== hubNodeId) continue;
-    if (n.type === "story-character-column") out.characterColumnId = n.id;
-    if (n.type === "story-frame-column") out.frameColumnId = n.id;
-    if (n.type === "story-video-column") out.videoColumnId = n.id;
+    if (n.type === "story-character-column" || n.type === "story-pro-character") {
+      out.characterColumnId = n.id;
+    }
+    if (n.type === "story-frame-column" || n.type === "story-pro-frame") {
+      out.frameColumnId = n.id;
+    }
+    if (n.type === "story-video-column" || n.type === "story-pro-video") {
+      out.videoColumnId = n.id;
+    }
   }
   return out;
 }
@@ -150,6 +163,23 @@ export function displayCharacterRows(
     return stored;
   }
   const hub = nodes.find((n) => n.id === hubNodeId);
+  if (hub?.type === "story-pro-script-hub") {
+    const charNode = nodes.find((n) => n.id === siblings.characterColumnId);
+    const frameNode = nodes.find((n) => n.id === siblings.frameColumnId);
+    const videoNode = nodes.find((n) => n.id === siblings.videoColumnId);
+    const synced = syncStoryProColumnRows(
+      hubDataForColumnSync(
+        hub.data as StoryProScriptHubNodeData,
+      ) as StoryProScriptHubNodeData,
+      {
+        characterRows: (charNode?.data as { rows?: StoryProCharacterRow[] })
+          ?.rows,
+        frameRows: (frameNode?.data as { rows?: StoryProFrameRow[] })?.rows,
+        videoRows: (videoNode?.data as { rows?: StoryProVideoRow[] })?.rows,
+      },
+    );
+    return synced.characterRows;
+  }
   const hubData = hub?.data as import("./story-workspace-types").StoryScriptHubNodeData | undefined;
   const nodesForSync =
     hub && hubData

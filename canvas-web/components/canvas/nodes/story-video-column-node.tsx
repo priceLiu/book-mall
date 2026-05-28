@@ -2,14 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
+import { cn } from "@/lib/utils";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { filterStoryProVideoModelKeys } from "@/lib/canvas/story-frame-gate";
-import { pickDefaultStoryVideoEngine } from "@/lib/canvas/system-providers";
-import { STORY_PRO_VIDEO_MODEL_KEYS } from "@/lib/canvas/types";
+import {
+  pickDefaultStoryTtsEngine,
+  pickDefaultStoryVideoEngine,
+} from "@/lib/canvas/system-providers";
+import { STORY_PRO_VIDEO_MODEL_KEYS, STORY_TTS_MODEL_KEYS } from "@/lib/canvas/types";
 import {
   displayFrameRows,
   displayVideoRows,
@@ -28,17 +32,31 @@ import {
 import { storyVideoGenerateBlockReason } from "@/lib/canvas/story-frame-gate";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import { commitStoryVideoRowRun } from "@/lib/canvas/story-video-run";
+import {
+  commitStoryTtsRowRun,
+  storyTtsDialogueText,
+  storyTtsGenerateBlockReason,
+} from "@/lib/canvas/story-tts-run";
 import type {
   StoryFrameColumnNodeData,
   StoryVideoColumnNodeData,
 } from "@/lib/canvas/story-workspace-types";
-import { STORY_VIDEO_SLOT, storyVideoColumnSize } from "@/lib/canvas/story-column-layout";
+import {
+  STORY_MEDIA_ROW_GAP,
+  STORY_VIDEO_INTRA_ROW_GAP,
+  storyFrameVideoRowBlockH,
+  storyVideoColumnSize,
+} from "@/lib/canvas/story-column-layout";
+import { StoryEnginePickerStack } from "../story-engine-picker-stack";
+import { StoryFrameVideoEnginePanel } from "../story-frame-video-engine-panel";
 import {
   aggregateStoryColumnRuntime,
   storyColumnIsGenerating,
 } from "@/lib/canvas/story-column-runtime";
 import { StoryVideoRowSlot } from "../story-video-row-slot";
+import { StoryTtsRowSlot } from "../story-tts-row-slot";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
+import { AudioFullscreenLightbox } from "../audio-fullscreen-lightbox";
 import { EnginePicker } from "../engine-picker";
 import { NodeShell } from "../node-shell";
 
@@ -59,8 +77,12 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const [preview, setPreview] = useState<{
     url: string;
     title: string;
+    kind: "video" | "audio";
   } | null>(null);
   const [videoInflightKeys, setVideoInflightKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [ttsInflightKeys, setTtsInflightKeys] = useState<Set<string>>(
     () => new Set(),
   );
 
@@ -91,8 +113,11 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
 
   const targetSize = useMemo(
-    () => storyVideoColumnSize(displayRows, frameRows.length),
-    [displayRows, frameRows.length],
+    () =>
+      storyVideoColumnSize(displayRows, frameRows.length, {
+        pro: edition === "pro",
+      }),
+    [displayRows, frameRows.length, edition],
   );
 
   useEffect(() => {
@@ -118,8 +143,14 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
     return fromFrame?.providerId ? fromFrame : d.batchVideo;
   }, [d.batchVideo, frameColumnId, nodes]);
 
+  const batchTts = d.batchTts;
+
   const canGenerateVideo = Boolean(
     batchVideo?.providerId?.trim() && batchVideo?.modelKey?.trim(),
+  );
+
+  const canGenerateTts = Boolean(
+    batchTts?.providerId?.trim() && batchTts?.modelKey?.trim(),
   );
 
   const storyVideoModelKeys = useMemo(
@@ -171,6 +202,34 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
     updateNodeData,
   ]);
 
+  /** 默认 TTS · Gateway · 百炼 */
+  useEffect(() => {
+    if (d.batchTts?.providerId?.trim() && d.batchTts?.modelKey?.trim()) {
+      return;
+    }
+    const pick = pickDefaultStoryTtsEngine(providers);
+    if (!pick) return;
+    updateNodeData(id, {
+      batchTts: {
+        providerId: pick.providerId,
+        modelKey: pick.modelKey,
+        params: d.batchTts?.params ?? {
+          voice: "Cherry",
+          language_type: "Chinese",
+        },
+      },
+      frameColumnId,
+    });
+  }, [
+    d.batchTts?.modelKey,
+    d.batchTts?.params,
+    d.batchTts?.providerId,
+    frameColumnId,
+    id,
+    providers,
+    updateNodeData,
+  ]);
+
   const runRowVideo = async (key: string) => {
     if (!batchVideo?.providerId?.trim() || !batchVideo?.modelKey?.trim()) return;
     const colFrameId = frameColumnId ?? ws?.frameColumnId;
@@ -217,20 +276,66 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
     }
   };
 
+  const runRowTts = async (key: string) => {
+    if (!batchTts?.providerId?.trim() || !batchTts?.modelKey?.trim()) return;
+    const row = displayRows.find((r) => r.key === key);
+    const dialogue = row ? storyTtsDialogueText(row) : "";
+    const block = storyTtsGenerateBlockReason(row);
+    if (block) {
+      void alert({
+        title: "无法生成配音",
+        message: block,
+        variant: "warning",
+      });
+      return;
+    }
+
+    setTtsInflightKeys((prev) => new Set(prev).add(key));
+    try {
+      const result = await commitStoryTtsRowRun({
+        base,
+        projectId,
+        videoColumnId: id,
+        rowKey: key,
+        dialogue,
+        batchTts: {
+          providerId: batchTts.providerId,
+          modelKey: batchTts.modelKey,
+          params: batchTts.params ?? {},
+        },
+        forceFresh: true,
+      });
+      if (!result.ok) {
+        void alert({
+          title: "分镜配音生成失败",
+          message: result.error,
+          variant: "error",
+        });
+      }
+    } finally {
+      setTtsInflightKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
   return (
     <NodeShell
       title="分镜视频"
       subtitle={
         columnGenerating
-          ? "视频生成中…"
+          ? "媒体生成中…"
           : nodeRuntime.status === "error"
             ? "部分生成失败"
-            : "各镜成片 · 点击生成"
+            : "各镜视频 + 配音 · 点击生成"
       }
       selected={selected}
       engine
       bodyScroll
       runtime={nodeRuntime}
+      disableGeneratingChrome
       accent={storyEditionAccent(edition)}
       minWidth={targetSize.width}
       minHeight={targetSize.height}
@@ -240,38 +345,83 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
         edition === "pro" ? PRO_NODE_SHELL_FOOTER_CLASS : undefined
       }
     >
-      <div className="flex w-full flex-col gap-2">
-        <div className="shrink-0 space-y-1.5">
-          <p className={hintLabelClass}>
-            分镜视频 · VIDEO（点击生成，不自动跑）
-            {!canGenerateVideo ? (
-              <span className="ml-1 normal-case text-amber-300/90">
-                · 请先选择视频模型
-              </span>
-            ) : null}
-          </p>
-          <EnginePicker
-            role="VIDEO"
-            allowedModelKeys={storyVideoModelKeys}
-            capabilityHint="分镜视频支持 KIE 图生视频（含 Seedance 2 多参考）与 Gateway · 百炼参考生视频（万相 / HappyHorse R2V）"
-            providerId={batchVideo?.providerId ?? ""}
-            modelKey={batchVideo?.modelKey ?? ""}
-            params={batchVideo?.params ?? {}}
-            onChange={(next) => {
-              updateNodeData(id, {
-                batchVideo: {
-                  providerId: next.providerId,
-                  modelKey: next.modelKey,
-                  params: next.params,
-                },
-                frameColumnId,
-              });
-            }}
-          />
-        </div>
+      <div
+        className="flex w-full flex-col"
+        style={{ gap: STORY_MEDIA_ROW_GAP }}
+      >
+        <StoryFrameVideoEnginePanel
+          row1={
+            <StoryEnginePickerStack
+              label={
+                <>
+                  分镜视频 · VIDEO（点击生成，不自动跑）
+                  {!canGenerateVideo ? (
+                    <span className="ml-1 normal-case text-amber-300/90">
+                      · 请先选择视频模型
+                    </span>
+                  ) : null}
+                </>
+              }
+              labelClassName={hintLabelClass}
+            >
+              <EnginePicker
+                role="VIDEO"
+                allowedModelKeys={storyVideoModelKeys}
+                capabilityHint="经 Gateway · KIE：Kling 2.6 / Seedance 2（可选生成配音）/ Wan / HappyHorse；经 Gateway · 百炼：万相 / HappyHorse R2V"
+                providerId={batchVideo?.providerId ?? ""}
+                modelKey={batchVideo?.modelKey ?? ""}
+                params={batchVideo?.params ?? {}}
+                onChange={(next) => {
+                  updateNodeData(id, {
+                    batchVideo: {
+                      providerId: next.providerId,
+                      modelKey: next.modelKey,
+                      params: next.params,
+                    },
+                    frameColumnId,
+                  });
+                }}
+              />
+            </StoryEnginePickerStack>
+          }
+          row2={
+            <StoryEnginePickerStack
+              label={
+                <>
+                  分镜配音 · TTS（剪映导出 audio 轨，经 Gateway）
+                  {!canGenerateTts ? (
+                    <span className="ml-1 normal-case text-amber-300/90">
+                      · 请先选择 TTS 模型
+                    </span>
+                  ) : null}
+                </>
+              }
+              labelClassName={hintLabelClass}
+            >
+              <EnginePicker
+                role="LLM"
+                allowedModelKeys={[...STORY_TTS_MODEL_KEYS]}
+                capabilityHint="经 Gateway · 百炼：qwen3-tts / tts-1 / tts-1-hd（OpenAI 兼容语音）"
+                providerId={batchTts?.providerId ?? ""}
+                modelKey={batchTts?.modelKey ?? ""}
+                params={batchTts?.params ?? {}}
+                onChange={(next) => {
+                  updateNodeData(id, {
+                    batchTts: {
+                      providerId: next.providerId,
+                      modelKey: next.modelKey,
+                      params: next.params,
+                    },
+                    frameColumnId,
+                  });
+                }}
+              />
+            </StoryEnginePickerStack>
+          }
+        />
         <div
           className="flex w-full flex-col"
-          style={{ gap: STORY_VIDEO_SLOT.slotGap }}
+          style={{ gap: STORY_MEDIA_ROW_GAP }}
         >
         {!displayRows.length ? (
           <p className="text-[11px] text-[var(--canvas-muted)]">
@@ -299,38 +449,85 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
             )
               .filter((r) => r.id.startsWith("ref-char-"))
               .map((r) => r.label);
+            const aud =
+              row.ttsRuntime?.ossUrl ?? row.ttsRuntime?.ephemeralUrl;
+            const ttsSt = row.ttsRuntime?.status ?? "idle";
+            const ttsRunning =
+              ttsSt === "running" ||
+              ttsSt === "pending" ||
+              ttsInflightKeys.has(row.key);
+            const ttsError =
+              ttsSt === "error" ? row.ttsRuntime?.failMessage : undefined;
+            const ttsBlockReason = storyTtsGenerateBlockReason(row);
+
             return (
-              <StoryVideoRowSlot
+              <div
                 key={row.key}
-                edition={edition}
-                frameIndex={row.frameIndex}
-                videoUrl={vid}
-                videoPrompt={videoPrompt}
-                videoRefLabels={videoRefLabels}
-                generating={running}
-                errorMessage={videoError}
-                videoBlockReason={videoBlockReason}
-                onGenerate={() => void runRowVideo(row.key)}
-                onPreview={
-                  vid
-                    ? () =>
-                        setPreview({
-                          url: vid,
-                          title: `镜 ${row.frameIndex}`,
-                        })
-                    : undefined
-                }
-              />
+                className="flex w-full flex-col"
+                style={{
+                  minHeight: storyFrameVideoRowBlockH({ pro: edition === "pro" }),
+                  gap: STORY_VIDEO_INTRA_ROW_GAP,
+                }}
+              >
+                <StoryVideoRowSlot
+                  edition={edition}
+                  frameIndex={row.frameIndex}
+                  videoUrl={vid}
+                  videoPrompt={videoPrompt}
+                  videoRefLabels={videoRefLabels}
+                  generating={running}
+                  errorMessage={videoError}
+                  videoBlockReason={videoBlockReason}
+                  onGenerate={() => void runRowVideo(row.key)}
+                  onPreview={
+                    vid
+                      ? () =>
+                          setPreview({
+                            url: vid,
+                            title: `镜 ${row.frameIndex} · 视频`,
+                            kind: "video",
+                          })
+                      : undefined
+                  }
+                />
+                <StoryTtsRowSlot
+                  edition={edition}
+                  frameIndex={row.frameIndex}
+                  audioUrl={aud}
+                  dialoguePreview={storyTtsDialogueText(row)}
+                  generating={ttsRunning}
+                  errorMessage={ttsError}
+                  blockReason={ttsBlockReason}
+                  onGenerate={() => void runRowTts(row.key)}
+                  onPreview={
+                    aud
+                      ? () =>
+                          setPreview({
+                            url: aud,
+                            title: `镜 ${row.frameIndex} · 配音`,
+                            kind: "audio",
+                          })
+                      : undefined
+                  }
+                />
+              </div>
             );
           })
         )}
         </div>
       </div>
-      {preview ? (
+      {preview?.kind === "video" ? (
         <StoryMediaPreviewModal
           url={preview.url}
           kind="video"
           title={preview.title}
+          onClose={() => setPreview(null)}
+        />
+      ) : null}
+      {preview?.kind === "audio" ? (
+        <AudioFullscreenLightbox
+          title={preview.title}
+          src={preview.url}
           onClose={() => setPreview(null)}
         />
       ) : null}

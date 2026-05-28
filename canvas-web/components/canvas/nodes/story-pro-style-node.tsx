@@ -6,6 +6,7 @@ import { GitBranch, Loader2, Palette, Sparkles, Upload, X } from "lucide-react";
 import Image from "next/image";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { saveStoryProStyleProfile, uploadCanvasImage } from "@/lib/canvas-api";
 import {
   bindImageDragDropHandlers,
@@ -73,6 +74,7 @@ function selectStyleData(
 
 export function StoryProStyleNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
+  const { alert, confirm, doubleConfirm } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -163,32 +165,42 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
     setNodes(() => reflowStoryProWorkspace(state.nodes, state.edges));
   };
 
-  const onGenerateDraft = () => {
+  const onGenerateDraft = async () => {
     if (styleFinalized) {
-      window.alert("风格已定稿，无需再生成草稿。");
+      await alert({
+        title: "风格已定稿",
+        message: "风格已定稿，无需再生成草稿。",
+      });
       return;
     }
     if (!scriptFinalized) {
-      window.alert(
-        "请先在「故事剧本」节点完成大纲并点击「故事定稿」，再使用 AI 生成草稿。",
-      );
+      await alert({
+        title: "请先故事定稿",
+        message:
+          "请先在「故事剧本」节点完成大纲并点击「故事定稿」，再使用 AI 生成草稿。",
+      });
       return;
     }
     if (isGenerating) return;
     if (!gatewayLoading && !gatewayLinked) {
-      window.alert(
-        "请先在 Book 个人中心关联 Gateway API Key（sk-gw-…），并在 Gateway 控制台绑定百炼凭证。",
-      );
+      await alert({
+        title: "需要 Gateway",
+        message:
+          "请先在 Book 个人中心关联 Gateway API Key（sk-gw-…），并在 Gateway 控制台绑定百炼凭证。",
+      });
       return;
     }
     if (!d.providerId?.trim() || !d.modelKey?.trim()) {
-      window.alert("未配置 LLM 模型，请稍候或到设置页检查 Provider。");
+      await alert({
+        title: "未配置模型",
+        message: "未配置 LLM 模型，请稍候或到设置页检查 Provider。",
+      });
       return;
     }
     busEnqueueStoryRun({ nodeId: id, forceFresh: true });
   };
 
-  const applyStyleTemplate = (tpl: StoryProStyleAnchorTemplate) => {
+  const applyStyleTemplate = async (tpl: StoryProStyleAnchorTemplate) => {
     if (styleFinalized || !scriptFinalized) return;
     const hasContent =
       Boolean(d.styleAnchorZh?.trim()) ||
@@ -196,7 +208,12 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
       Boolean(d.negativePrompt?.trim());
     if (
       hasContent &&
-      !window.confirm(`套用「${tpl.label}」将替换当前锚定词，是否继续？`)
+      !(await confirm({
+        title: "套用风格模板",
+        message: `套用「${tpl.label}」将替换当前锚定词，是否继续？`,
+        confirmLabel: "继续套用",
+        cancelLabel: "取消",
+      }))
     ) {
       return;
     }
@@ -384,16 +401,26 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
     disabled: fieldsLocked || refUploadBusy,
   });
 
-  const removeRefImage = (refId: string, label: string) => {
+  const removeRefImage = async (refId: string, label: string) => {
     if (fieldsLocked) return;
-    if (!window.confirm(`从风格参考图中移除「${label}」？`)) return;
-    if (
-      !window.confirm(
-        "此操作不可恢复；若图片已上传至云端存储（OSS），将仅从本节点移除引用。确定删除？",
-      )
-    ) {
-      return;
-    }
+    const ok = await doubleConfirm({
+      first: {
+        title: "移除风格参考图",
+        message: `从风格参考图中移除「${label}」？`,
+        confirmLabel: "继续",
+        cancelLabel: "取消",
+        danger: true,
+      },
+      second: {
+        title: "不可恢复",
+        message:
+          "此操作不可恢复；若图片已上传至云端存储（OSS），将仅从本节点移除引用。确定删除？",
+        confirmLabel: "确定删除",
+        cancelLabel: "取消",
+        danger: true,
+      },
+    });
+    if (!ok) return;
     updateNodeData(id, {
       refImages: (d.refImages ?? []).filter((r) => r.id !== refId),
     });

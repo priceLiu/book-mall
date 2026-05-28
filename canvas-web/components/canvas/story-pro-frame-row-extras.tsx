@@ -9,6 +9,7 @@ import {
 import {
   frameRowHasStaleAssetSnapshot,
   readinessClass,
+  readinessDetail,
   readinessLabel,
   type FrameRowAssetReadiness,
 } from "@/lib/canvas/story-pro-asset-readiness";
@@ -75,7 +76,7 @@ export function StoryProFrameAssetReadinessBar({
         <span className={readinessClass(readiness.level)}>
           {readinessLabel(readiness.level)}
           {readiness.characters.length
-            ? ` · ${readiness.characters.map((c) => `${c.name}(${c.level === "ready" ? "✓" : c.level === "partial" ? "~" : "!"})`).join(" ")}`
+            ? ` · ${readinessDetail(readiness.level, readiness.characters)}`
             : ""}
         </span>
       ) : null}

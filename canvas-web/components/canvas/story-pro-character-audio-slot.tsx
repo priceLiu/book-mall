@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Lock, Mic, Upload } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   saveStoryProCharacterAudioAsset,
   setStoryProCharacterAudioAssetLocked,
@@ -35,6 +36,7 @@ export function StoryProCharacterAudioSlot({
   audioAsset: StoryProCharacterAudioAssetRecord | undefined;
 }) {
   const base = useBookMallBaseUrl();
+  const { confirm } = useDialogs();
   const fileRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [busy, setBusy] = useState(false);
@@ -76,7 +78,16 @@ export function StoryProCharacterAudioSlot({
     if (!base?.trim() || !audioAsset) return;
     const next = !audioAsset.locked;
     const verb = next ? "锁定" : "解锁";
-    if (!window.confirm(`${verb}角色音频「${rowName}」？`)) return;
+    if (
+      !(await confirm({
+        title: `${verb}角色音频`,
+        message: `${verb}角色音频「${rowName}」？`,
+        confirmLabel: verb,
+        cancelLabel: "取消",
+      }))
+    ) {
+      return;
+    }
     setBusy(true);
     setStatusHint(null);
     try {

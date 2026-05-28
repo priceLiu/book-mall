@@ -1,4 +1,8 @@
-import { assertStoryModelCapabilities, modelHasStoryCapabilities } from "./story-model-capabilities";
+import {
+  assertStoryModelCapabilities,
+  StoryModelCapabilityError,
+  modelHasStoryCapabilities,
+} from "./story-model-capabilities";
 import { resolveStoryRowRefUrls } from "./story-row-ref-urls";
 
 function batchModelKey(
@@ -41,6 +45,14 @@ export function assertStoryProRunModelCapabilities(args: {
       refCount > 0 ? ["image_multi_ref"] : ["image_t2i"],
       "分镜静帧",
     );
+    return;
+  }
+
+  if (nodeType === "story-pro-video" && mediaKind === "tts") {
+    const modelKey = batchModelKey(nodeData, "batchTts");
+    if (!modelKey) {
+      throw new StoryModelCapabilityError("分镜配音：请选择 TTS 模型");
+    }
     return;
   }
 

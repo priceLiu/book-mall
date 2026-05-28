@@ -12,6 +12,8 @@ import { matchCharactersInFrameText } from "@/lib/canvas/story-pro-frame-ref-sug
 import {
   storyRefIdsFromPrompt,
 } from "@/lib/canvas/story-ref-image";
+import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
+import { charactersInFrameScript } from "@/lib/canvas/story-column-sync";
 
 export type AssetReadinessLevel = "ready" | "partial" | "missing" | "none";
 
@@ -33,6 +35,7 @@ type FrameRowLike = {
   description?: string;
   scene?: string;
   prompt?: string;
+  refImages?: StoryRefImage[];
   characterRefSnapshotAt?: string;
   characterAssetVersions?: Record<string, number>;
   characterRefIds?: string[];
@@ -41,6 +44,7 @@ type FrameRowLike = {
 type CharacterRowForReadiness = {
   key: string;
   name: string;
+  assetId?: string;
   runtime?: { ossUrl?: string; ephemeralUrl?: string };
 };
 
@@ -56,23 +60,32 @@ function characterReadiness(
   key: string,
   asset: StoryProCharacterAssetRecord | undefined,
   runtime?: { ossUrl?: string; ephemeralUrl?: string },
+  catalogRefs?: StoryRefImage[],
 ): CharacterAssetReadiness {
   const hasThreeViewFromAsset = Boolean(
     asset?.refs.some((r) => r.kind === "three_view"),
   );
   const hasThreeViewFromRuntime = hasGeneratedThreeView(runtime);
-  const hasThreeView = hasThreeViewFromAsset || hasThreeViewFromRuntime;
+  const hasThreeViewFromCatalog = Boolean(
+    catalogRefs?.some((r) => r.url && /^https?:\/\//.test(r.url)),
+  );
+  const hasAnyCatalogRef = Boolean(
+    catalogRefs?.some((r) => r.url && /^https?:\/\//.test(r.url)),
+  );
+  const hasThreeView =
+    hasThreeViewFromAsset ||
+    hasThreeViewFromRuntime ||
+    hasThreeViewFromCatalog;
 
-  if (!asset?.refs.length && !hasThreeViewFromRuntime) {
+  if (!asset?.refs.length && !hasThreeViewFromRuntime && !hasAnyCatalogRef) {
     return { key, name, level: "missing", hasThreeView: false };
   }
 
-  const hasFace = asset?.refs.some((r) => r.kind === "face") ?? false;
   if (hasThreeView) {
     return {
       key,
       name,
-      level: hasFace ? "ready" : "partial",
+      level: "ready",
       hasThreeView: true,
       assetVersion: asset?.version,
     };
@@ -96,6 +109,19 @@ function matchCharactersForFrameRow(
     .join("\n");
   const matched = matchCharactersInFrameText(text, characterRows);
   const seen = new Set(matched.map((c) => c.key));
+  for (const c of charactersInFrameScript(
+    {
+      scene: row.scene ?? "",
+      description: row.description ?? "",
+      dialogue: row.dialogue ?? "",
+    },
+    characterRows,
+  )) {
+    if (!seen.has(c.key)) {
+      seen.add(c.key);
+      matched.push(c);
+    }
+  }
 
   const prompt = row.prompt ?? "";
   for (const refId of storyRefIdsFromPrompt(prompt)) {
@@ -135,17 +161,35 @@ export function assessFrameRowAssetReadiness(
   characterRows: CharacterRowForReadiness[],
   assets: StoryProCharacterAssetRecord[],
   projectId?: string | null,
+  assetRefsByKey?: Record<string, StoryRefImage[]>,
 ): FrameRowAssetReadiness {
   const matched = matchCharactersForFrameRow(row, characterRows, assets);
   if (!matched.length) {
     return { level: "none", characters: [] };
   }
+  const rowRefByCharKey = new Map<string, StoryRefImage[]>();
+  for (const ref of row.refImages ?? []) {
+    if (ref.id.startsWith("ref-char-")) {
+      const k = ref.id.slice("ref-char-".length);
+      rowRefByCharKey.set(k, [...(rowRefByCharKey.get(k) ?? []), ref]);
+    }
+  }
   const characters = matched.map((c) =>
     characterReadiness(
       c.name,
       c.key,
-      findAssetForCharacterRow(assets, c.key, projectId),
+      findAssetForCharacterRow(
+        assets,
+        c.key,
+        projectId,
+        c.name,
+        c.assetId,
+      ),
       c.runtime,
+      [
+        ...(assetRefsByKey?.[c.key] ?? []),
+        ...(rowRefByCharKey.get(c.key) ?? []),
+      ],
     ),
   );
   if (characters.every((c) => c.level === "ready")) {
@@ -208,6 +252,29 @@ export function readinessLabel(level: AssetReadinessLevel): string {
     default:
       return "";
   }
+}
+
+export function readinessDetail(
+  level: AssetReadinessLevel,
+  characters: CharacterAssetReadiness[],
+): string {
+  if (level === "none" || !characters.length) return "";
+  const parts = characters.map((c) => {
+    if (c.level === "ready") return `${c.name}(✓)`;
+    if (c.level === "partial") return `${c.name}(~)`;
+    return `${c.name}(!)`;
+  });
+  const missingNames = characters
+    .filter((c) => c.level === "missing")
+    .map((c) => c.name)
+    .join("、");
+  const hint =
+    level === "missing"
+      ? ` · 请在「人物设计」列为 ${missingNames || "上述角色"} 生成三视图（每镜出场角色须各自入库）`
+      : level === "partial"
+        ? " · 建议补全三视图后再生成"
+        : "";
+  return `${parts.join(" ")}${hint}`;
 }
 
 export function readinessClass(level: AssetReadinessLevel): string {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   storyRefIdsFromPrompt,
@@ -49,11 +50,13 @@ function StoryUpstreamImageColumn({
   activeIds,
   edition = "comic",
   stripHeight,
+  onPreviewRef,
 }: {
   images: StoryRefImage[];
   activeIds: string[];
   edition?: StoryEdition;
   stripHeight?: number;
+  onPreviewRef?: (url: string, title: string) => void;
 }) {
   return (
     <div
@@ -75,20 +78,41 @@ function StoryUpstreamImageColumn({
                 key={ref.id}
                 title={ref.label}
                 className={cn(
-                  "relative min-h-[72px] flex-1 overflow-hidden rounded-md border-2 transition-shadow",
+                  "group/ref-thumb relative min-h-[72px] flex-1 overflow-hidden rounded-md border-2 bg-black/40 transition-shadow",
                   active
                     ? storyEditionActiveRefBorderClass(edition)
                     : "border-white/15",
+                  ref.url && onPreviewRef && "cursor-pointer",
                 )}
+                onClick={() => {
+                  if (ref.url && onPreviewRef) onPreviewRef(ref.url, ref.label);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && ref.url && onPreviewRef) {
+                    onPreviewRef(ref.url, ref.label);
+                  }
+                }}
+                role={ref.url && onPreviewRef ? "button" : undefined}
+                tabIndex={ref.url && onPreviewRef ? 0 : undefined}
               >
                 {ref.url ? (
-                  <Image
-                    src={ref.url}
-                    alt={ref.label}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
+                  <>
+                    <Image
+                      src={ref.url}
+                      alt={ref.label}
+                      fill
+                      className="object-contain"
+                      unoptimized
+                    />
+                    {onPreviewRef ? (
+                      <span
+                        className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover/ref-thumb:opacity-100"
+                        aria-hidden
+                      >
+                        <Eye className="size-4 text-white/90" />
+                      </span>
+                    ) : null}
+                  </>
                 ) : (
                   <span className="flex h-full items-center justify-center px-1 text-center text-[8px] leading-tight text-[var(--canvas-muted)]">
                     待上游
@@ -187,6 +211,7 @@ export function StoryColumnRowCard({
   onGenerate,
   onGenerateVideo,
   onPreview,
+  onPreviewRef,
   promptHint,
   mediaError,
   videoPrompt,
@@ -200,6 +225,7 @@ export function StoryColumnRowCard({
   belowPrompt,
   compactFrameLayout,
   belowPromptMinHeight,
+  rowBlockMinHeight,
 }: {
   rowTitle: string;
   promptValue: string;
@@ -223,6 +249,8 @@ export function StoryColumnRowCard({
   onGenerate: () => void;
   onGenerateVideo?: () => void;
   onPreview?: () => void;
+  /** 上游参考图 · 点击/悬停预览 */
+  onPreviewRef?: (url: string, title: string) => void;
   /** 分镜视频生成失败时的行内提示 */
   mediaError?: string;
   /** 分镜列 hover 分镜图：展示将传给视频模型的完整提示词 */
@@ -238,6 +266,8 @@ export function StoryColumnRowCard({
   /** 分镜列：文案/参考/输出同高横条，元信息沉底 */
   compactFrameLayout?: boolean;
   belowPromptMinHeight?: number;
+  /** 与分镜视频列同行块对齐（见 storyFrameVideoRowBlockH） */
+  rowBlockMinHeight?: number;
 }) {
   const [mainDraft, setMainDraft] = useState(promptValue);
   const [mainReferencedIds, setMainReferencedIds] = useState<string[]>([]);
@@ -382,14 +412,17 @@ export function StoryColumnRowCard({
       style={
         {
           ["--row-media-min" as string]: `${promptMinH}px`,
+          ...(rowBlockMinHeight != null
+            ? { minHeight: rowBlockMinHeight }
+            : {}),
         } as React.CSSProperties
       }
     >
       <StoryRowTitleBadge title={rowTitle} />
       {compactFrameLayout ? (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex h-full min-h-0 flex-1 flex-col gap-1.5">
           <div
-            className="flex items-stretch gap-2"
+            className="flex shrink-0 items-stretch gap-2"
             style={{ height: STORY_FRAME_ROW_STRIP_H }}
           >
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -401,12 +434,15 @@ export function StoryColumnRowCard({
                 activeIds={activeRefIds}
                 edition={edition}
                 stripHeight={STORY_FRAME_ROW_STRIP_H}
+                onPreviewRef={onPreviewRef}
               />
             ) : null}
             {mediaPanel}
           </div>
-          {belowPrompt}
-          {frameFooters}
+          <div className="mt-auto flex min-h-0 flex-col gap-1">
+            {belowPrompt}
+            {frameFooters}
+          </div>
         </div>
       ) : (
         <div className="flex items-stretch gap-2">
@@ -452,6 +488,7 @@ export function StoryColumnRowCard({
               images={upstreamImages ?? refImages}
               activeIds={activeRefIds}
               edition={edition}
+              onPreviewRef={onPreviewRef}
             />
           ) : null}
           {mediaPanel}

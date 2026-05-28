@@ -1,3 +1,4 @@
+import { CookieConsentBanner } from "@/components/layout/cookie-consent-banner";
 import { NavbarAuth } from "@/components/layout/navbar-auth";
 import { SiteLayoutShell } from "@/components/layout/site-home/site-layout-shell";
 import "../site-home.css";
@@ -6,5 +7,10 @@ import "../site-home.css";
 export const dynamic = "force-dynamic";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
-  return <SiteLayoutShell navAuth={<NavbarAuth />}>{children}</SiteLayoutShell>;
+  return (
+    <SiteLayoutShell navAuth={<NavbarAuth />}>
+      {children}
+      <CookieConsentBanner />
+    </SiteLayoutShell>
+  );
 }

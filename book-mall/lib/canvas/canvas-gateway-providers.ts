@@ -8,6 +8,7 @@ import type { CanvasProviderDto } from "./canvas-provider-service";
 import { KIE_KNOWN_MODELS } from "./providers/kie";
 import { DEEPSEEK_KNOWN_MODELS, DEEPSEEK_SYSTEM_BASE_URL } from "./providers/deepseek-system";
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
+import { STORY_TTS_GATEWAY_MODELS } from "./providers/story-tts";
 import { getGatewayLinkStatusForUser } from "@/lib/gateway/book-gateway-link";
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
 
@@ -47,17 +48,32 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
       sortOrder: idx,
     }));
   }
-  return BAILIAN_R2V_KNOWN_MODELS.map((m, idx) => ({
-    id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
-    modelKey: m.modelKey,
-    displayName: m.displayName,
-    role: m.role,
-    description: m.description ?? null,
-    paramsSchema: m.paramsSchema ?? null,
-    defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
-    enabled: true,
-    sortOrder: idx,
-  }));
+  if (kind === "BAILIAN") {
+    const r2v = BAILIAN_R2V_KNOWN_MODELS.map((m, idx) => ({
+      id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
+      modelKey: m.modelKey,
+      displayName: m.displayName,
+      role: m.role,
+      description: m.description ?? null,
+      paramsSchema: m.paramsSchema ?? null,
+      defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+      enabled: true,
+      sortOrder: idx,
+    }));
+    const tts = STORY_TTS_GATEWAY_MODELS.map((m, idx) => ({
+      id: `${GATEWAY_BAILIAN_PROVIDER_ID}::${m.modelKey}`,
+      modelKey: m.modelKey,
+      displayName: m.displayName,
+      role: m.role,
+      description: m.description ?? null,
+      paramsSchema: m.paramsSchema ?? null,
+      defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+      enabled: true,
+      sortOrder: r2v.length + idx,
+    }));
+    return [...r2v, ...tts];
+  }
+  return [];
 }
 
 export async function listGatewayVirtualProvidersForUser(

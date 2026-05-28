@@ -33,6 +33,7 @@ import {
   type KieVideoInput,
   type CreateKieTaskArgs,
 } from "@/lib/story/kie-client";
+import { claimCanvasTaskKieSubmit } from "./canvas-kie-gateway-claim";
 import {
   extractStoryScopeFromInputPayload,
   resolveCanvasTaskClientPage,
@@ -759,6 +760,8 @@ const POLL_INNER_TIMEOUT_MS = 8000;
 const RETRY_PENDING_LIMIT = 3;
 /** ai-engine 同步 LLM 若进程中断，PENDING 任务超过此时间则标记失败 */
 const TEXT_PENDING_STALE_MS = 15 * 60 * 1000;
+/** runImageEngineNode 在 API 内同步提交 Gateway；此窗口内 poll 不得二次 createTask（防 KIE 双扣） */
+const SYNC_GATEWAY_SUBMIT_GRACE_MS = 2 * 60 * 1000;
 
 /**
  * poll worker 仅对「KIE 异步出图」的 PENDING 任务重试 createTask。
@@ -867,6 +870,17 @@ function shouldPollNow(
   if (!task.lastPolledAt) return true;
   const intervalSec = Math.min(2 * 2 ** task.pollCount, 60);
   return Date.now() - task.lastPolledAt.getTime() >= intervalSec * 1000;
+}
+
+/** image-engine / three-view-engine 由 run API 同步调 Gateway；短时内勿让 poll 再 createTask */
+function shouldDeferPollSyncGatewaySubmit(
+  task: Pick<CanvasGenerationTask, "createdAt" | "inputPayload">,
+): boolean {
+  const payload = task.inputPayload;
+  if (!payload || typeof payload !== "object") return false;
+  const p = payload as Record<string, unknown>;
+  if (p.syncGatewaySubmit !== true) return false;
+  return Date.now() - task.createdAt.getTime() < SYNC_GATEWAY_SUBMIT_GRACE_MS;
 }
 
 /** SUBMITTED 异步出图：固定短间隔，避免指数退避拖到 60s 才同步 KIE 结果 */
@@ -1022,6 +1036,37 @@ export async function runCanvasPollWorker(opts?: {
 
     const createArgs = resolvePendingKieCreateArgs(task);
     if (!createArgs) continue;
+    if (shouldDeferPollSyncGatewaySubmit(task)) continue;
+
+    const claim = await claimCanvasTaskKieSubmit(task.id);
+    if (!claim.claimed) {
+      const freshClaim = await prisma.canvasGenerationTask.findUnique({
+        where: { id: task.id },
+        select: { status: true, kieTaskId: true, submittedAt: true, inputPayload: true },
+      });
+      if (freshClaim?.kieTaskId) {
+        if (freshClaim.status === "PENDING") {
+          await prisma.canvasGenerationTask.update({
+            where: { id: task.id },
+            data: {
+              status: "SUBMITTED",
+              submittedAt: freshClaim.submittedAt ?? new Date(),
+              lastPolledAt: new Date(),
+            },
+          });
+        }
+        continue;
+      }
+      const p = freshClaim?.inputPayload;
+      if (
+        p &&
+        typeof p === "object" &&
+        !Array.isArray(p) &&
+        (p as Record<string, unknown>).gatewayKieSubmitClaimed === true
+      ) {
+        continue;
+      }
+    }
 
     if (!shouldPollNow(task)) continue;
     const callBackUrl = buildCanvasAiKieCallbackUrl(

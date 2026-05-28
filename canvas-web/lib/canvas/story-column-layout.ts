@@ -60,8 +60,38 @@ export function storyVideoSlotBlockHeight(): number {
   );
 }
 
-/** 图3 · 单分镜视频槽块高 */
-export const STORY_VIDEO_ROW_BLOCK_H = storyVideoSlotBlockHeight();
+/** 分镜视频列 · 每镜 TTS 配音槽 */
+export const STORY_TTS_SLOT = {
+  labelHeight: 22,
+  labelThumbGap: 8,
+  thumbHeight: 52,
+} as const;
+
+export function storyTtsSlotBlockHeight(): number {
+  return (
+    STORY_TTS_SLOT.labelHeight +
+    STORY_TTS_SLOT.labelThumbGap +
+    STORY_TTS_SLOT.thumbHeight
+  );
+}
+
+/** 视频槽与 TTS 槽之间的间距（计入单行块高） */
+export const STORY_VIDEO_INTRA_ROW_GAP = 10;
+
+/** 图3 · 单镜：视频槽 + TTS 槽 */
+export function storyVideoRowBlockHeight(): number {
+  return (
+    storyVideoSlotBlockHeight() +
+    STORY_VIDEO_INTRA_ROW_GAP +
+    storyTtsSlotBlockHeight()
+  );
+}
+
+/** @deprecated 使用 storyVideoRowBlockHeight */
+export const STORY_VIDEO_ROW_BLOCK_H = storyVideoRowBlockHeight();
+
+/** 列内行列表纵向间距（分镜脚本 / 分镜视频须一致，便于镜 N 对齐） */
+export const STORY_MEDIA_ROW_GAP = ROW_GAP;
 
 const STORY_MEDIA_COLUMN_TYPES = new Set([
   "story-character-column",
@@ -83,8 +113,64 @@ function storyFrameHeaderH(pro?: boolean): number {
   return STORY_COLUMN_SHELL_H + ENGINE_BLOCK + 20 + (pro ? 28 : 0);
 }
 
-/** 分镜视频列：shell + 单 VIDEO 引擎区 */
-const STORY_VIDEO_HEADER_H = STORY_COLUMN_SHELL_H + ENGINE_BLOCK + 20;
+/** 引擎区 · 单列（标签行 + EnginePicker 触发钮 + 段内 gap-1.5） */
+export const STORY_ENGINE_LABEL_H = 16;
+export const STORY_ENGINE_PICKER_H = 32;
+export const STORY_ENGINE_STACK_GAP = 6;
+export const STORY_ENGINE_STACK_H =
+  STORY_ENGINE_LABEL_H + STORY_ENGINE_STACK_GAP + STORY_ENGINE_PICKER_H;
+
+/** 分镜脚本列 · 引擎面板行数（勾选 | @ 提示 | IMAGE） */
+export const STORY_FRAME_SCRIPT_ENGINE_ROW_COUNT = 3;
+
+/** 分镜视频列 · 引擎面板行数（VIDEO | TTS） */
+export const STORY_VIDEO_ENGINE_ROW_COUNT = 2;
+
+export function storyEnginePanelH(rowCount: number): number {
+  return (
+    STORY_ENGINE_STACK_H * rowCount +
+    STORY_ENGINE_STACK_GAP * Math.max(0, rowCount - 1)
+  );
+}
+
+export const STORY_FRAME_SCRIPT_ENGINE_PANEL_H = storyEnginePanelH(
+  STORY_FRAME_SCRIPT_ENGINE_ROW_COUNT,
+);
+
+export const STORY_VIDEO_ENGINE_PANEL_H = storyEnginePanelH(
+  STORY_VIDEO_ENGINE_ROW_COUNT,
+);
+
+/** @deprecated 使用 STORY_VIDEO_ENGINE_PANEL_H 或 STORY_FRAME_SCRIPT_ENGINE_PANEL_H */
+export const STORY_FRAME_VIDEO_ENGINE_PANEL_H = STORY_VIDEO_ENGINE_PANEL_H;
+
+/** 分镜脚本列 · 动态高度估算后再加，避免 body 内滚动条 */
+export const STORY_FRAME_COLUMN_EXTRA_H = 200;
+
+/** 分镜脚本列 · 列头区高 */
+export function storyFrameScriptHeaderH(_opts?: { pro?: boolean }): number {
+  return STORY_COLUMN_SHELL_H + STORY_FRAME_SCRIPT_ENGINE_PANEL_H;
+}
+
+/** 分镜视频列 · 列头区高 */
+export function storyFrameVideoHeaderH(_opts?: { pro?: boolean }): number {
+  return STORY_COLUMN_SHELL_H + STORY_VIDEO_ENGINE_PANEL_H;
+}
+
+/** 分镜脚本行 + 分镜视频行 · 单镜块统一高 */
+export function storyFrameVideoRowBlockH(opts?: { pro?: boolean }): number {
+  const frameBlock = opts?.pro
+    ? STORY_PRO_FRAME_ROW_BLOCK_H
+    : STORY_COMIC_FRAME_ROW_BLOCK_H;
+  return Math.max(frameBlock, storyVideoRowBlockHeight());
+}
+
+/** @deprecated 使用 STORY_VIDEO_ENGINE_PANEL_H */
+export function storyFrameVideoEngineBodyMinH(_opts?: {
+  pro?: boolean;
+}): number {
+  return STORY_VIDEO_ENGINE_PANEL_H;
+}
 
 function storyColumnHeightFromRows(
   headerH: number,
@@ -121,15 +207,16 @@ export function storyFrameColumnSize(
   opts?: { pro?: boolean },
 ) {
   const def = NODE_DEFAULT_SIZE["story-frame-column"];
-  const blockH = opts?.pro
-    ? STORY_PRO_FRAME_ROW_BLOCK_H
-    : STORY_COMIC_FRAME_ROW_BLOCK_H;
+  const calculated = storyColumnHeightFromRows(
+    storyFrameScriptHeaderH(opts),
+    storyFrameVideoRowBlockH(opts),
+    rows.length,
+  );
   return {
     width: def.width,
-    height: storyColumnHeightFromRows(
-      storyFrameHeaderH(opts?.pro),
-      blockH,
-      rows.length,
+    height: Math.max(
+      STORY_COLUMN_MIN_H,
+      calculated + STORY_FRAME_COLUMN_EXTRA_H,
     ),
   };
 }
@@ -138,14 +225,15 @@ export function storyFrameColumnSize(
 export function storyVideoColumnSize(
   rows: StoryVideoRow[],
   frameRowCount?: number,
+  opts?: { pro?: boolean },
 ) {
   const def = NODE_DEFAULT_SIZE["story-video-column"];
   const count = Math.max(rows.length, frameRowCount ?? 0);
   return {
     width: def.width,
     height: storyColumnHeightFromRows(
-      STORY_VIDEO_HEADER_H,
-      STORY_VIDEO_ROW_BLOCK_H,
+      storyFrameVideoHeaderH(opts),
+      storyFrameVideoRowBlockH(opts),
       count,
     ),
   };
@@ -184,7 +272,7 @@ function applyStoryComicColumnHeights(
   const charSize = char ? storyCharacterColumnSize(charRows, { pro: false }) : null;
   const frameSize = frame ? storyFrameColumnSize(frameRows, { pro: false }) : null;
   const videoSize = video
-    ? storyVideoColumnSize(videoRows, frameRows.length)
+    ? storyVideoColumnSize(videoRows, frameRows.length, { pro: false })
     : null;
 
   const charDef = NODE_DEFAULT_SIZE["story-character-column"].width;
@@ -217,7 +305,7 @@ function applyStoryProColumnHeights(
   const charSize = char ? storyCharacterColumnSize(charRows, { pro: true }) : null;
   const frameSize = frame ? storyFrameColumnSize(frameRows, { pro: true }) : null;
   const videoSize = video
-    ? storyVideoColumnSize(videoRows, frameRows.length)
+    ? storyVideoColumnSize(videoRows, frameRows.length, { pro: true })
     : null;
 
   const charDef = NODE_DEFAULT_SIZE["story-pro-character"].width;

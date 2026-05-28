@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { BookOpen, Layers, Lock, LockOpen, MapPin, Mic, Palette, Users } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   setStoryProCharacterAssetLocked,
   setStoryProCharacterAudioAssetLocked,
@@ -48,6 +49,7 @@ export function ProjectAssetsView({
   compact?: boolean;
 }) {
   const base = useBookMallBaseUrl();
+  const { confirm, doubleConfirm } = useDialogs();
   const { assets: characterAssets, loading: charLoading, refresh: refreshChar } =
     useStoryProCharacterAssets(projectId);
   const { assets: sceneAssets, loading: sceneLoading, refresh: refreshScene } =
@@ -102,15 +104,29 @@ export function ProjectAssetsView({
     if (!base?.trim()) return;
     const next = !asset.locked;
     const verb = next ? "锁定" : "解锁";
-    if (!window.confirm(`${verb}角色资产「${asset.displayName}」？`)) return;
-    if (
-      next &&
-      !window.confirm(
-        "锁定后无法上传、删除或替换该角色的参考图。确定锁定？",
-      )
-    ) {
-      return;
-    }
+    const ok = next
+      ? await doubleConfirm({
+          first: {
+            title: `${verb}角色资产`,
+            message: `${verb}角色资产「${asset.displayName}」？`,
+            confirmLabel: "继续",
+            cancelLabel: "取消",
+          },
+          second: {
+            title: "确认锁定",
+            message:
+              "锁定后无法上传、删除或替换该角色的参考图。确定锁定？",
+            confirmLabel: "确定锁定",
+            cancelLabel: "取消",
+          },
+        })
+      : await confirm({
+          title: `${verb}角色资产`,
+          message: `${verb}角色资产「${asset.displayName}」？`,
+          confirmLabel: verb,
+          cancelLabel: "取消",
+        });
+    if (!ok) return;
     setBusyId(asset.id);
     try {
       await setStoryProCharacterAssetLocked(base, asset.id, next);
@@ -125,15 +141,29 @@ export function ProjectAssetsView({
     if (!base?.trim()) return;
     const next = !asset.locked;
     const verb = next ? "锁定" : "解锁";
-    if (!window.confirm(`${verb}场景资产「${asset.displayName}」？`)) return;
-    if (
-      next &&
-      !window.confirm(
-        "锁定后无法上传、删除或替换该场景的参考图。确定锁定？",
-      )
-    ) {
-      return;
-    }
+    const ok = next
+      ? await doubleConfirm({
+          first: {
+            title: `${verb}场景资产`,
+            message: `${verb}场景资产「${asset.displayName}」？`,
+            confirmLabel: "继续",
+            cancelLabel: "取消",
+          },
+          second: {
+            title: "确认锁定",
+            message:
+              "锁定后无法上传、删除或替换该场景的参考图。确定锁定？",
+            confirmLabel: "确定锁定",
+            cancelLabel: "取消",
+          },
+        })
+      : await confirm({
+          title: `${verb}场景资产`,
+          message: `${verb}场景资产「${asset.displayName}」？`,
+          confirmLabel: verb,
+          cancelLabel: "取消",
+        });
+    if (!ok) return;
     setBusyId(asset.id);
     try {
       await setStoryProSceneAssetLocked(base, asset.id, next);
@@ -148,7 +178,16 @@ export function ProjectAssetsView({
     if (!base?.trim()) return;
     const next = !profile.locked;
     const verb = next ? "锁定" : "解锁";
-    if (!window.confirm(`${verb}全局风格「${profile.displayName}」？`)) return;
+    if (
+      !(await confirm({
+        title: `${verb}全局风格`,
+        message: `${verb}全局风格「${profile.displayName}」？`,
+        confirmLabel: verb,
+        cancelLabel: "取消",
+      }))
+    ) {
+      return;
+    }
     setBusyId(profile.id);
     try {
       await setStoryProStyleProfileLocked(base, profile.id, next);
@@ -163,7 +202,16 @@ export function ProjectAssetsView({
     if (!base?.trim()) return;
     const next = !asset.locked;
     const verb = next ? "锁定" : "解锁";
-    if (!window.confirm(`${verb}角色音频「${asset.displayName}」？`)) return;
+    if (
+      !(await confirm({
+        title: `${verb}角色音频`,
+        message: `${verb}角色音频「${asset.displayName}」？`,
+        confirmLabel: verb,
+        cancelLabel: "取消",
+      }))
+    ) {
+      return;
+    }
     setBusyId(asset.id);
     try {
       await setStoryProCharacterAudioAssetLocked(base, asset.id, next);
@@ -330,7 +378,7 @@ export function ProjectAssetsView({
                         <img
                           src={ref.ossUrl}
                           alt=""
-                          className="size-full object-cover"
+                          className="size-full object-contain"
                         />
                         <span className="absolute inset-x-0 bottom-0 bg-black/65 px-0.5 py-0.5 text-[8px] text-white/90">
                           {STORY_PRO_ASSET_REF_KIND_LABELS[ref.kind]}
@@ -407,7 +455,7 @@ export function ProjectAssetsView({
                       <img
                         src={ref.ossUrl}
                         alt=""
-                        className="size-full object-cover"
+                        className="size-full object-contain"
                       />
                       <span className="absolute inset-x-0 bottom-0 bg-black/65 px-0.5 py-0.5 text-[8px] text-white/90">
                         {STORY_PRO_SCENE_REF_KIND_LABELS[ref.kind]}
@@ -529,7 +577,7 @@ export function ProjectAssetsView({
                           }
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt="" className="size-full object-cover" />
+                          <img src={url} alt="" className="size-full object-contain" />
                         </button>
                       ))}
                     </div>

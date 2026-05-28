@@ -13,7 +13,7 @@ alwaysApply: true
 
 1. **第一次**：说明删除对象（例如「从我的视频库删除本条」）。
 2. **第二次**：明确 **不可恢复**；若接口会删除或尝试删除 **OSS / 云端文件**，第二次文案须写明 **云端存储（OSS）**。
-3. 实现上使用两次 `window.confirm`、自定义 Modal 二次确认、或等效「必须点两次肯定」的流程均可，禁止单次确认即发起破坏性删除 API。
+3. 实现上使用 **DialogProvider** 的 `confirm` / `doubleConfirm`（`useDialogs()`），或等效自定义 Modal 二次确认；**禁止** `window.confirm` / `window.alert`（见 `no-native-dialogs.mdc`）。禁止单次确认即发起破坏性删除 API。
 
 ## 服务端
 

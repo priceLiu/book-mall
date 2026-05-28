@@ -57,8 +57,8 @@ export function CanvasToolbar({
   runAllDisabled?: boolean;
 }) {
   return (
-    <header className="relative flex shrink-0 flex-col gap-1.5 border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white">
-      <div className="flex min-w-0 items-center gap-2">
+    <header className="relative flex shrink-0 items-center gap-2 border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white">
+      <div className="flex min-w-0 shrink items-center gap-2">
         <Link
           href="/projects"
           className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-white/30 hover:text-white"
@@ -76,7 +76,7 @@ export function CanvasToolbar({
             }
           }}
           maxLength={80}
-          className="min-w-0 max-w-[280px] truncate rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium text-emerald-200 hover:border-white/10 focus:border-emerald-400/40 focus:bg-black/20 focus:outline-none"
+          className="min-w-0 max-w-[min(280px,28vw)] truncate rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium text-emerald-200 hover:border-white/10 focus:border-emerald-400/40 focus:bg-black/20 focus:outline-none"
           title="点击编辑画布名称"
           aria-label="画布名称"
         />
@@ -89,7 +89,7 @@ export function CanvasToolbar({
             生成中 · {inflightTaskCount} 个任务
           </span>
         ) : null}
-        <span className="hidden shrink-0 text-[11px] text-emerald-300/75 sm:inline">
+        <span className="hidden shrink-0 text-[11px] text-emerald-300/75 lg:inline">
           {saving
             ? "保存中…"
             : saveError
@@ -99,7 +99,7 @@ export function CanvasToolbar({
                 : ""}
         </span>
       </div>
-      <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={onUndo}

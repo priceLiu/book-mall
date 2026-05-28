@@ -5,6 +5,7 @@ import type { NodeProps } from "@xyflow/react";
 import { BookOpen, GitBranch } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { clearScriptAssistantOnFinalize } from "@/components/canvas/script-writing-assistant-panel";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { runStoryHubSection } from "@/lib/canvas/batch-run-nodes";
@@ -78,6 +79,7 @@ function selectHubData(
 
 export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
+  const { confirm } = useDialogs();
   const projectId = useCanvasStore((s) => s.projectId);
   const hubFromStore = useCanvasStore((s) => selectHubData(s.nodes, id));
   const d = { ...(data as StoryProScriptHubNodeData), ...hubFromStore };
@@ -334,9 +336,12 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
     const starter = resolveStarterForHub(nodes, edges, id);
     if (!starter) return;
     if (feasibilityHighRisk > 0) {
-      const ok = window.confirm(
-        `AI 可行性评估发现 ${feasibilityHighRisk} 项高风险。故事定稿后进入风格层，是否继续？`,
-      );
+      const ok = await confirm({
+        title: "可行性高风险",
+        message: `AI 可行性评估发现 ${feasibilityHighRisk} 项高风险。故事定稿后进入风格层，是否继续？`,
+        confirmLabel: "继续定稿",
+        cancelLabel: "取消",
+      });
       if (!ok) return;
     }
     setOutputBusy(true);

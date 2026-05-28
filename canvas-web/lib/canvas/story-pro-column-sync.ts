@@ -161,6 +161,8 @@ function mergeProCharacterRows(
       prompt: prev.prompt?.trim() ? prev.prompt : row.prompt,
       promptHistory: prev.promptHistory,
       runtime: prev.runtime,
+      assetId: prev.assetId,
+      lockedRefIds: prev.lockedRefIds,
     };
   });
 }

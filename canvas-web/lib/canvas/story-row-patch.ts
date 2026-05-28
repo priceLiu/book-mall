@@ -111,13 +111,12 @@ export function applyFrameRowRuntime(
       ...r,
       runtime: { ...r.runtime, ...runtime },
     };
-    const regenStarted =
-      runtime.status === "pending" || runtime.status === "running";
+    /** 仅在新图落库且 URL 变化时取消过审；重生成 pending/running 保留过审标记（旧图仍有效直至新图成功） */
     const imageChanged =
+      runtime.status === "done" &&
       Boolean(nextUrl?.trim()) &&
-      nextUrl !== prevUrl &&
-      (runtime.status === "done" || Boolean(nextUrl));
-    if (regenStarted || imageChanged) {
+      nextUrl !== prevUrl;
+    if (imageChanged) {
       next.frameApprovedAt = undefined;
       next.frameRejectedReason = undefined;
     }

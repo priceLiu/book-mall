@@ -6,7 +6,11 @@ import {
   REF_VIDEO_MODEL_META,
   isRefVideoModelKey,
 } from "./ref-video-models";
-import { STORY_LLM_MODEL_KEYS, STORY_PRO_VIDEO_MODEL_KEYS } from "./types";
+import {
+  STORY_LLM_MODEL_KEYS,
+  STORY_PRO_VIDEO_MODEL_KEYS,
+  STORY_TTS_MODEL_KEYS,
+} from "./types";
 
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
 export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
@@ -200,6 +204,50 @@ export function pickDefaultStoryVideoEngine(
         m.role === "VIDEO" &&
         m.enabled &&
         STORY_VIDEO_ALLOWED.has(m.modelKey)
+      ) {
+        return { providerId: provider.id, modelKey: m.modelKey };
+      }
+    }
+  }
+
+  return null;
+}
+
+const STORY_TTS_ALLOWED = new Set<string>(STORY_TTS_MODEL_KEYS);
+
+function findTtsOnProvider(
+  provider: CanvasProviderDto,
+  modelKey: string,
+): { providerId: string; modelKey: string } | null {
+  const m = provider.models.find(
+    (x) =>
+      x.role === "LLM" &&
+      x.enabled &&
+      x.modelKey === modelKey &&
+      STORY_TTS_ALLOWED.has(x.modelKey),
+  );
+  if (!m) return null;
+  return { providerId: provider.id, modelKey: m.modelKey };
+}
+
+/** 漫剧分镜配音 · 默认 Gateway · 百炼 TTS */
+export function pickDefaultStoryTtsEngine(
+  providers: CanvasProviderDto[],
+): { providerId: string; modelKey: string } | null {
+  const bailian = findProviderByKind(providers, "ALI_BAILIAN");
+  if (bailian) {
+    for (const key of STORY_TTS_MODEL_KEYS) {
+      const hit = findTtsOnProvider(bailian, key);
+      if (hit) return hit;
+    }
+  }
+
+  for (const provider of activeCanvasProviders(providers)) {
+    for (const m of provider.models) {
+      if (
+        m.role === "LLM" &&
+        m.enabled &&
+        STORY_TTS_ALLOWED.has(m.modelKey)
       ) {
         return { providerId: provider.id, modelKey: m.modelKey };
       }
