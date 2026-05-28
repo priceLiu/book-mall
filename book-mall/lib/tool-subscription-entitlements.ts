@@ -3,6 +3,7 @@ import {
   TOOL_SUITE_NAV_KEYS,
   type ToolSuiteNavKey,
 } from "@/lib/tool-suite-nav-keys";
+import { navKeysFromActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
 
 const ALLOWED = new Set<string>(TOOL_SUITE_NAV_KEYS);
 
@@ -15,7 +16,7 @@ function normalizeAllowlist(raw: string[]): ToolSuiteNavKey[] {
   return out;
 }
 
-/** 单品工具订阅：当前有效周期内的 navKey（去重） */
+/** @deprecated Phase D：改用 UserToolServicePeriod */
 export async function navKeysFromActiveToolProductSubscriptions(
   userId: string,
 ): Promise<ToolSuiteNavKey[]> {
@@ -37,20 +38,8 @@ export async function navKeysFromActiveToolProductSubscriptions(
   return Array.from(keys);
 }
 
-function mergeNavKeys(
-  a: ToolSuiteNavKey[],
-  b: ToolSuiteNavKey[],
-): ToolSuiteNavKey[] {
-  const s = new Set<ToolSuiteNavKey>();
-  for (const x of a) s.add(x);
-  for (const x of b) s.add(x);
-  return Array.from(s);
-}
-
 /**
- * 解析当前用户可用的工具站分组 navKey。
- * - 会员计划订阅：沿用计划 toolsNavAllowlist（空 = 套件全集）
- * - 单品工具订阅：合并对应 Product.toolNavKey
+ * 解析当前用户可用的工具站分组 navKey（Phase D：来自有效工具技术服务费周期）。
  */
 export async function resolveToolsNavKeysForUser(userId: string): Promise<{
   keys: ToolSuiteNavKey[];
@@ -61,9 +50,31 @@ export async function resolveToolsNavKeysForUser(userId: string): Promise<{
     process.env.NODE_ENV === "development" &&
     process.env.TOOLS_SSO_RELAX_MEMBERSHIP?.trim() === "1";
 
-  const now = new Date();
-  const productKeys = await navKeysFromActiveToolProductSubscriptions(userId);
+  const serviceKeys = await navKeysFromActiveToolServicePeriods(userId);
+  if (serviceKeys.length > 0) {
+    return {
+      keys: serviceKeys,
+      planName: "工具技术服务费",
+      planSlug: null,
+    };
+  }
 
+  if (relaxMembership) {
+    return {
+      keys: [...TOOL_SUITE_NAV_KEYS],
+      planName: null,
+      planSlug: null,
+    };
+  }
+
+  return { keys: [], planName: null, planSlug: null };
+}
+
+/** 课程会员计划的 toolsNavAllowlist（仅文档/legacy；Phase D 不再用于工具 navKey） */
+export async function coursePlanToolsNavAllowlistLegacy(
+  userId: string,
+): Promise<ToolSuiteNavKey[]> {
+  const now = new Date();
   const sub = await prisma.subscription.findFirst({
     where: {
       userId,
@@ -73,32 +84,7 @@ export async function resolveToolsNavKeysForUser(userId: string): Promise<{
     orderBy: { currentPeriodEnd: "desc" },
     include: { plan: true },
   });
-
-  let planKeys: ToolSuiteNavKey[] = [];
-  let planName: string | null = null;
-  let planSlug: string | null = null;
-
-  if (sub) {
-    planName = sub.plan.name;
-    planSlug = sub.plan.slug;
-    const rawList = sub.plan.toolsNavAllowlist ?? [];
-    planKeys =
-      rawList.length === 0 ? [...TOOL_SUITE_NAV_KEYS] : normalizeAllowlist(rawList);
-  }
-
-  const merged = mergeNavKeys(planKeys, productKeys);
-
-  if (merged.length > 0) {
-    return { keys: merged, planName, planSlug };
-  }
-
-  if (!sub && relaxMembership) {
-    return {
-      keys: [...TOOL_SUITE_NAV_KEYS],
-      planName: null,
-      planSlug: null,
-    };
-  }
-
-  return { keys: [], planName: null, planSlug: null };
+  if (!sub) return [];
+  const rawList = sub.plan.toolsNavAllowlist ?? [];
+  return rawList.length === 0 ? [...TOOL_SUITE_NAV_KEYS] : normalizeAllowlist(rawList);
 }

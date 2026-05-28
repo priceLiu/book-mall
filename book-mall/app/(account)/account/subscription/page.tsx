@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatPointsAsYuan } from "@/lib/currency";
-import { TOOL_NAV_LABEL } from "@/lib/tool-nav-labels";
 import {
   Card,
   CardContent,
@@ -38,11 +37,7 @@ export default async function AccountSubscriptionPage() {
 
   const now = new Date();
 
-  const [toolCatalog, courseCatalog, productSubs, orders, membershipSub] = await Promise.all([
-    prisma.product.findMany({
-      where: { kind: "TOOL", status: "PUBLISHED" },
-      orderBy: [{ featuredSort: "asc" }, { updatedAt: "desc" }],
-    }),
+  const [courseCatalog, productSubs, orders, membershipSub] = await Promise.all([
     prisma.product.findMany({
       where: { kind: "KNOWLEDGE", status: "PUBLISHED" },
       orderBy: [{ featuredSort: "asc" }, { updatedAt: "desc" }],
@@ -72,9 +67,6 @@ export default async function AccountSubscriptionPage() {
     }),
   ]);
 
-  const toolSubByProductId = new Map(
-    productSubs.filter((s) => s.product.kind === "TOOL").map((s) => [s.productId, s]),
-  );
   const courseSubByProductId = new Map(
     productSubs.filter((s) => s.product.kind === "KNOWLEDGE").map((s) => [s.productId, s]),
   );
@@ -89,14 +81,12 @@ export default async function AccountSubscriptionPage() {
         </p>
         <h1 className="text-2xl md:text-3xl font-bold">订阅中心</h1>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
-          会员计划、AI 课程单品与 AI 工具单品互相关联：打开工具站仍需<strong className="text-foreground">
-            黄金会员
-          </strong>
-          （充值记录 + 余额不低于最低线），并须具备<strong className="text-foreground">
-            会员计划或单品工具订阅
-          </strong>
-          之一；课程学习支持会员计划<strong className="text-foreground">或</strong>
-          单品课程订阅。
+          <strong className="text-foreground">课程会员计划</strong>仅覆盖 AI 学堂，不含工具使用权。
+          工具须单独在{" "}
+          <Link href="/account/tool-service-fee" className="text-primary underline">
+            工具技术服务费
+          </Link>
+          页按月开通；单次 AI 生成走 Gateway BYOK，不另扣钱包点数。
         </p>
       </div>
 
@@ -145,97 +135,23 @@ export default async function AccountSubscriptionPage() {
         </Card>
       </section>
 
-      {/* 第二版块：AI 工具订阅 */}
+      {/* 第二版块：工具技术服务费 */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">AI 工具订阅</h2>
+        <h2 className="text-lg font-semibold">工具技术服务费</h2>
         <Card>
-          <CardContent className="pt-6 overflow-x-auto">
-            {toolCatalog.length === 0 ? (
-              <p className="text-sm text-muted-foreground">暂无上架工具商品。</p>
-            ) : (
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="border-b border-secondary">
-                  <tr className="text-muted-foreground">
-                    <th className="pb-2 pr-4 font-medium align-bottom w-[12rem]">工具名</th>
-                    <th className="pb-2 pr-4 font-medium align-bottom">简单介绍</th>
-                    <th className="pb-2 pr-4 font-medium align-bottom whitespace-nowrap w-[11rem]">
-                      订阅时间
-                    </th>
-                    <th className="pb-2 pr-4 font-medium align-bottom whitespace-nowrap w-[7rem]">
-                      状态
-                    </th>
-                    <th className="pb-2 font-medium align-bottom w-[10rem]">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {toolCatalog.map((p) => {
-                    const sub = toolSubByProductId.get(p.id);
-                    const navHint = p.toolNavKey
-                      ? `${p.toolNavKey}${TOOL_NAV_LABEL[p.toolNavKey] ? ` · ${TOOL_NAV_LABEL[p.toolNavKey]}` : ""}`
-                      : null;
-                    const canSubscribe =
-                      Boolean(p.toolNavKey?.trim()) && !p.catalogUnavailable;
-                    return (
-                      <tr key={p.id} className="border-b border-secondary/60 align-top">
-                        <td className="py-3 pr-4">
-                          <span className="font-medium text-foreground block">{p.title}</span>
-                          {navHint ? (
-                            <span className="text-xs text-muted-foreground block mt-0.5 font-mono">
-                              {navHint}
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="py-3 pr-4 text-muted-foreground leading-relaxed">
-                          {p.summary || "—"}
-                        </td>
-                        <td className="py-3 pr-4 text-muted-foreground tabular-nums whitespace-nowrap">
-                          {sub
-                            ? `${sub.currentPeriodStart.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} – ${sub.currentPeriodEnd.toLocaleString("zh-CN")}`
-                            : "—"}
-                        </td>
-                        <td className="py-3 pr-4">
-                          {sub ? (
-                            <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                              订阅中
-                            </span>
-                          ) : !canSubscribe ? (
-                            <span className="text-amber-600 dark:text-amber-400">不可订</span>
-                          ) : (
-                            <span className="text-muted-foreground">未订阅</span>
-                          )}
-                        </td>
-                        <td className="py-3">
-                          {sub ? (
-                            <form action={cancelProductSubscriptionMock}>
-                              <input type="hidden" name="productId" value={p.id} />
-                              <Button type="submit" size="sm" variant="outline" className="whitespace-nowrap">
-                                取消订阅
-                              </Button>
-                            </form>
-                          ) : canSubscribe ? (
-                            <form action={subscribeProductMock}>
-                              <input type="hidden" name="productId" value={p.id} />
-                              <Button type="submit" size="sm" variant="subscription" className="whitespace-nowrap">
-                                订阅
-                              </Button>
-                            </form>
-                          ) : (
-                            <Button type="button" size="sm" variant="outline" disabled className="whitespace-nowrap">
-                              暂不可订
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
+          <CardContent className="space-y-4 pt-6">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              按工具分组（试衣间、文生图、图生视频等）按月从钱包扣固定点数，每周期 30 天。
+              与课程会员订阅独立。
+            </p>
+            <Button asChild size="sm" variant="subscription">
+              <Link href="/account/tool-service-fee">开通 / 续订工具月费</Link>
+            </Button>
           </CardContent>
         </Card>
       </section>
 
-      {/* 第三版块：AI 课程 */}
+      {/* 第三版块：AI 课程（原第三版块） */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">AI 课程</h2>
         <Card>

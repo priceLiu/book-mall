@@ -367,6 +367,7 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 | 列批量生成 | 角色/分镜/视频列底栏 `StoryColumnBatchFooter` |
 | 工作区重排 | `reflowStoryComicWorkspace` |
 | 尺寸迁移 | `normalizeCanvasNodes`、`migrateGraphV1ToV2` |
+| 图片上传（点击/拖入/粘贴） | §13 · `image-upload-handlers.ts` · `MediaHoverBox` |
 
 ---
 
@@ -408,3 +409,71 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 
 - 视频预览弹层 z-index：**1100**（与 §6 一致）
 - 弹层 header 可保留下载/关闭；**播放控件**仅走 `CanvasVideoPlayer`
+
+---
+
+## 13. 图片上传控件（必须）
+
+凡 canvas-web 内 **用户可主动上传 / 替换图片** 的控件（资产槽、参考图区、图片节点、宫格参考图等），须 **同时** 支持三种入口，禁止只做「点击选文件」一种。
+
+### 13.1 三种入口（缺一不可）
+
+| 入口 | 行为 | 说明 |
+|------|------|------|
+| **点击** | 隐藏 `<input type="file" accept="image/*">` 或等效文件选择 | 空态点击区域应能直接打开选文件；有图时点击可为预览，上传仍可通过 ↑ 或 hover 后粘贴 |
+| **拖入** | `dragover` + `drop`，仅接受 `image/*` | 须 `preventDefault` + `stopPropagation`，避免触发画布根级 `onDrop` 新建节点 |
+| **粘贴** | 全局 `paste`（capture）或控件级监听 | 仅当粘贴内容为图片文件时拦截；**不得**抢占 textarea / input 内的文字粘贴 |
+
+文案统一提示：**「点击 / 拖入 / 粘贴」**（多选场景可写「点击 / 拖入 / 粘贴（支持多选）」）。
+
+### 13.2 共享实现（真源）
+
+| 模块 | 路径 | 职责 |
+|------|------|------|
+| 工具函数 | `lib/canvas/image-upload-handlers.ts` | `firstImageFileFromDataTransfer`、`bindImageDragDropHandlers`、`useImagePasteWhenActive`、`isEditablePasteTarget` |
+| 媒体槽 UI | `components/canvas/media-hover-box.tsx` | 可选 `onImageFile`：拖入 + 空态文案 |
+| 上传 API | `lib/canvas-api.ts` · `uploadCanvasImage` | 直传 OSS；上传期间控件 `busy`，不重复提交 |
+
+**新上传点必须先复用上述模块**，禁止各写一套 paste/drop 逻辑。
+
+### 13.3 粘贴目标（多槽 / 多格）
+
+存在 **多个上传目标**（如角色四槽、场景三槽、宫格 N 格）时：
+
+1. 维护 **当前激活槽** `activeKind` / `activeSlotIndex`（`mouseEnter`、点击上传、拖入落点均可设置）。
+2. 仅当激活槽存在且控件未 `disabled` / 未锁定时，`useImagePasteWhenActive(true, …)` 在 **capture** 阶段拦截 paste，避免与 `flow-canvas.tsx` 全局粘贴（新建图片节点）冲突。
+3. 未激活任何槽时，paste 行为交给画布全局规则，**不得**静默丢进随机槽。
+
+### 13.4 交互与视觉
+
+- **拖入反馈**：目标区域 `ring-1 ring-white/40`（或项目内统一的 hover ring）；`dragOverKind` 状态与激活槽可并存。
+- **空槽占位**：除「空」外可加一行小字 **「拖入 / 粘贴」**（`text-[9px]` muted）。
+- **格式**：仅 `file.type.startsWith("image/")`；非图片拖入/粘贴 **忽略**，不弹错（除非产品明确要求 toast）。
+- **锁定 / 禁用**：`assetLocked`、`fieldsLocked`、`busy` 时三种入口均不可用，且不注册 paste 拦截。
+- **画布节点**：选中节点时可 paste 到该节点（如 `image-node`）；须同样走 capture 拦截，避免与全局 paste 重复建节点。
+
+### 13.5 与画布全局行为的关系
+
+- 根级：`flow-canvas.tsx` 在无激活上传控件时，paste 图片 → 视口中心新建 `image` 节点（保留）。
+- 根级：`onDrop` 外部图片 → 同上（保留）。
+- **控件级 drop/paste 必须 stopPropagation**，且优先于根级行为。
+
+### 13.6 已落地参考（改代码时对照）
+
+| 场景 | 组件 |
+|------|------|
+| 角色资产四槽 | `story-pro-character-asset-slots.tsx` |
+| 场景资产三槽 | `story-pro-scene-asset-slots.tsx` |
+| 风格参考图（多选） | `story-pro-style-node.tsx` |
+| 图片节点 | `image-node.tsx` + `MediaHoverBox` |
+| 四/六/九宫格参考 | `ref-image-grid-node.tsx` |
+
+### 13.7 新增上传控件自检
+
+- [ ] 点击、拖入、粘贴三种入口均已实现？
+- [ ] 使用 `image-upload-handlers.ts`，未复制粘贴/drop 代码？
+- [ ] 多槽是否有激活目标 + paste 拦截？
+- [ ] textarea 内粘贴文字不受影响？
+- [ ] drop/paste 已 `stopPropagation`，不会误触画布建节点？
+- [ ] 文案含「点击 / 拖入 / 粘贴」？
+- [ ] 是否更新本文 §13 与 `.cursor/rules/canvas-story-design.mdc`？

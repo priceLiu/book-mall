@@ -8,7 +8,7 @@ import { applyStoryColumnHeights } from "./story-column-layout";
 import {
   findStoryProScriptHubForStarter,
   findStoryProWorkspaceForStarter,
-  reconcileStoryProHubFinalized,
+  reconcileStoryProWorkspace,
 } from "./spawn-story-pro-workspace";
 import type { StoryProWorkspaceIds } from "./story-pro-workspace-types";
 import { STORY_WORKSPACE_COL_H_GAP } from "./story-comic-workspace-layout";
@@ -91,7 +91,7 @@ export function reflowStoryProWorkspace(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
 ): CanvasFlowNode[] {
-  let next = reconcileStoryProHubFinalized(nodes);
+  let next = reconcileStoryProWorkspace(nodes);
   const starters = next.filter((n) => n.type === "story-pro-starter");
   if (!starters.length) return next;
 

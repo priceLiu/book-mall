@@ -8,6 +8,7 @@ import {
   assertGatewayApiKeyLinkedForUser,
   GatewayRequiredError,
   resolveGatewayAuthForBookUser,
+  summarizeUpstreamFailMessage,
 } from "@/lib/gateway/book-gateway-link";
 import {
   createRequestLog,
@@ -232,12 +233,17 @@ export async function toolGwChat(
     durationMs: result.durationMs,
     usage,
     resultSummary: buildGatewayChatResultSummary(parsed) ?? undefined,
-    failMessage: ok ? undefined : result.text.slice(0, 500),
+    failCode: ok ? undefined : `UPSTREAM_HTTP_${result.status}`,
+    failMessage: ok
+      ? undefined
+      : summarizeUpstreamFailMessage(result.text, result.status),
     model,
   });
   if (!ok) {
     throw new GatewayRequiredError(
-      result.text.slice(0, 500) || `HTTP ${result.status}`,
+      summarizeUpstreamFailMessage(result.text, result.status),
+      "UPSTREAM_ERROR",
+      502,
     );
   }
   const choice = (parsed as { choices?: { message?: { content?: string } }[] })
@@ -289,6 +295,7 @@ function wrapChatStreamWithLogFinalize(
           status: failMessage ? "FAILED" : "SUCCEEDED",
           durationMs: ctx.startedMs,
           usage: lastUsage,
+          failCode: failMessage ? "STREAM_VENDOR_ERROR" : undefined,
           failMessage,
           model: ctx.model,
         });
@@ -297,7 +304,8 @@ function wrapChatStreamWithLogFinalize(
         await finalizeRequestLog(ctx.logId, {
           status: "FAILED",
           durationMs: ctx.startedMs,
-          failMessage: (e as Error).message,
+          failCode: "STREAM_INTERRUPTED",
+          failMessage: (e as Error).message || "流式连接中断",
           model: ctx.model,
         });
         controller.error(e);
@@ -356,13 +364,19 @@ export async function toolGwChatStream(
     const errText = result.body
       ? await new Response(result.body).text()
       : `HTTP ${result.status}`;
+    const failMessage = summarizeUpstreamFailMessage(errText, result.status);
     await finalizeRequestLog(log.id, {
       status: "FAILED",
       durationMs: result.durationMs,
-      failMessage: errText.slice(0, 500),
+      failCode: `UPSTREAM_HTTP_${result.status}`,
+      failMessage,
       model,
     });
-    throw new GatewayRequiredError(errText.slice(0, 500) || `HTTP ${result.status}`);
+    throw new GatewayRequiredError(
+      summarizeUpstreamFailMessage(errText, result.status),
+      "UPSTREAM_ERROR",
+      502,
+    );
   }
 
   return {

@@ -1,3 +1,7 @@
+/**
+ * @deprecated Phase D：用户路径已改走 Gateway（forward-gateway-dashscope-server）。仅保留 body 构建 helper 与类型。
+ * 下列 dashscopeCreateTryOnTask / dashscopeGetTask 为直连 DashScope 死代码，勿在新功能中调用。
+ */
 const SYNTHESIS_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/image-synthesis/";
 

@@ -240,6 +240,13 @@ export async function runCanvasNode(
     llmSection?: "outline" | "character" | "storyboard";
     rowKey?: string;
     mediaKind?: "threeView" | "frameImage" | "video" | "tts" | "sceneRef";
+    /** 影视专业版 · 风格定稿门禁 */
+    styleFinalized?: boolean;
+    styleAnchor?: {
+      styleAnchorZh?: string;
+      styleAnchorEn?: string;
+      negativePrompt?: string;
+    };
   },
 ): Promise<{ reused: boolean; task: CanvasTaskRecord }> {
   return call<{ reused: boolean; task: CanvasTaskRecord }>(
@@ -426,6 +433,228 @@ export async function deleteCanvasCharacter(
   await call(base, `/api/canvas/characters/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
+}
+
+// ── 影视专业版 · 角色资产库 ──
+
+export type StoryProCharacterAssetRefRecord = {
+  id: string;
+  kind: "face" | "full_body" | "outfit" | "three_view";
+  ossUrl: string;
+  sortOrder: number;
+  label: string | null;
+  sourceTaskId: string | null;
+  createdAt: string;
+};
+
+export type StoryProCharacterAssetRecord = {
+  id: string;
+  characterKey: string;
+  displayName: string;
+  projectId: string | null;
+  locked: boolean;
+  version: number;
+  refs: StoryProCharacterAssetRefRecord[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listStoryProCharacterAssets(
+  base: string,
+  projectId?: string | null,
+): Promise<StoryProCharacterAssetRecord[]> {
+  const q =
+    projectId != null && projectId !== ""
+      ? `?projectId=${encodeURIComponent(projectId)}`
+      : "";
+  const j = await call<{ assets: StoryProCharacterAssetRecord[] }>(
+    base,
+    `/api/canvas/story-pro/character-assets${q}`,
+  );
+  return j.assets;
+}
+
+export async function saveStoryProCharacterAssetRef(
+  base: string,
+  args: {
+    characterKey: string;
+    displayName: string;
+    projectId?: string | null;
+    kind?: StoryProCharacterAssetRefRecord["kind"];
+    ossUrl: string;
+    label?: string | null;
+    sourceTaskId?: string | null;
+  },
+): Promise<StoryProCharacterAssetRecord> {
+  const j = await call<{ asset: StoryProCharacterAssetRecord }>(
+    base,
+    "/api/canvas/story-pro/character-assets",
+    {
+      method: "POST",
+      body: JSON.stringify(args),
+    },
+  );
+  return j.asset;
+}
+
+export async function setStoryProCharacterAssetLocked(
+  base: string,
+  assetId: string,
+  locked: boolean,
+): Promise<StoryProCharacterAssetRecord> {
+  const j = await call<{ asset: StoryProCharacterAssetRecord }>(
+    base,
+    `/api/canvas/story-pro/character-assets/${encodeURIComponent(assetId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ locked }),
+    },
+  );
+  return j.asset;
+}
+
+export async function deleteStoryProCharacterAssetRef(
+  base: string,
+  refId: string,
+): Promise<StoryProCharacterAssetRecord> {
+  const j = await call<{ asset: StoryProCharacterAssetRecord }>(
+    base,
+    `/api/canvas/story-pro/character-assets/refs/${encodeURIComponent(refId)}`,
+    { method: "DELETE" },
+  );
+  return j.asset;
+}
+
+export async function autoFillStoryProCharacterSlotsFromThreeView(
+  base: string,
+  args: {
+    characterKey: string;
+    displayName: string;
+    projectId?: string | null;
+    threeViewUrl: string;
+    sourceTaskId?: string | null;
+    onlyEmpty?: boolean;
+  },
+): Promise<{
+  filled: ("face" | "full_body" | "outfit")[];
+  skipped: ("face" | "full_body" | "outfit")[];
+  asset: StoryProCharacterAssetRecord;
+}> {
+  return call(base, "/api/canvas/story-pro/character-assets/auto-fill-from-three-view", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+}
+
+/** 以全身槽图经 Gateway 百炼分割，覆盖服装槽 */
+export async function parseStoryProOutfitFromFullBody(
+  base: string,
+  args: {
+    characterKey: string;
+    displayName: string;
+    projectId?: string | null;
+    fullBodyUrl: string;
+    sourceTaskId?: string | null;
+  },
+): Promise<{
+  asset: StoryProCharacterAssetRecord;
+  outfitOssUrl: string;
+  segments: number;
+}> {
+  return call(
+    base,
+    "/api/canvas/story-pro/character-assets/parse-outfit-from-full-body",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(args),
+    },
+  );
+}
+
+// ── 影视专业版 · 场景资产库 ──
+
+export type StoryProSceneAssetRefRecord = {
+  id: string;
+  kind: "establishing" | "detail" | "mood";
+  ossUrl: string;
+  sortOrder: number;
+  label: string | null;
+  sourceTaskId: string | null;
+  createdAt: string;
+};
+
+export type StoryProSceneAssetRecord = {
+  id: string;
+  sceneKey: string;
+  displayName: string;
+  projectId: string | null;
+  locked: boolean;
+  version: number;
+  refs: StoryProSceneAssetRefRecord[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listStoryProSceneAssets(
+  base: string,
+  projectId?: string | null,
+): Promise<StoryProSceneAssetRecord[]> {
+  const q =
+    projectId != null && projectId !== ""
+      ? `?projectId=${encodeURIComponent(projectId)}`
+      : "";
+  const j = await call<{ assets: StoryProSceneAssetRecord[] }>(
+    base,
+    `/api/canvas/story-pro/scene-assets${q}`,
+  );
+  return j.assets;
+}
+
+export async function saveStoryProSceneAssetRef(
+  base: string,
+  args: {
+    sceneKey: string;
+    displayName: string;
+    projectId?: string | null;
+    kind?: StoryProSceneAssetRefRecord["kind"];
+    ossUrl: string;
+    label?: string | null;
+    sourceTaskId?: string | null;
+  },
+): Promise<StoryProSceneAssetRecord> {
+  const j = await call<{ asset: StoryProSceneAssetRecord }>(
+    base,
+    "/api/canvas/story-pro/scene-assets",
+    { method: "POST", body: JSON.stringify(args) },
+  );
+  return j.asset;
+}
+
+export async function setStoryProSceneAssetLocked(
+  base: string,
+  assetId: string,
+  locked: boolean,
+): Promise<StoryProSceneAssetRecord> {
+  const j = await call<{ asset: StoryProSceneAssetRecord }>(
+    base,
+    `/api/canvas/story-pro/scene-assets/${encodeURIComponent(assetId)}`,
+    { method: "PATCH", body: JSON.stringify({ locked }) },
+  );
+  return j.asset;
+}
+
+export async function deleteStoryProSceneAssetRef(
+  base: string,
+  refId: string,
+): Promise<StoryProSceneAssetRecord> {
+  const j = await call<{ asset: StoryProSceneAssetRecord }>(
+    base,
+    `/api/canvas/story-pro/scene-assets/refs/${encodeURIComponent(refId)}`,
+    { method: "DELETE" },
+  );
+  return j.asset;
 }
 
 // ── 剪映导出 ──

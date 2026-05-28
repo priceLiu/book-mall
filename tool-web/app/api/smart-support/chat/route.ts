@@ -101,13 +101,24 @@ export async function POST(req: Request) {
         ? "请先登录工具站"
         : gw.reason === "no_origin"
           ? "工具站未配置 MAIN_SITE_ORIGIN"
-          : gw.error ?? "Gateway 调用失败";
-    const status = gw.status === 403 ? 403 : 503;
+          : gw.message ?? gw.error ?? "Gateway 调用失败";
+    const code = gw.code ?? "";
+    const isKeyRequired = code === "GATEWAY_KEY_REQUIRED";
+    const status =
+      gw.reason === "no_session"
+        ? 401
+        : gw.reason === "no_origin"
+          ? 503
+          : isKeyRequired
+            ? 403
+            : gw.status && gw.status >= 400 && gw.status < 600
+              ? gw.status
+              : 502;
     return new Response(
       JSON.stringify({
-        error: gw.status === 403 ? "gateway_key_required" : "gateway_error",
+        error: isKeyRequired ? "gateway_key_required" : "gateway_error",
         message,
-        code: gw.status === 403 ? "GATEWAY_KEY_REQUIRED" : undefined,
+        code: code || undefined,
       }),
       { status, headers: { "Content-Type": "application/json" } },
     );

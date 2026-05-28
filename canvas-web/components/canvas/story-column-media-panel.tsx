@@ -3,14 +3,21 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { Clapperboard, Download, Eye, RefreshCw, X } from "lucide-react";
+import { Clapperboard, Check, Download, Eye, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORY_MEDIA_COL_WIDTH } from "@/lib/canvas/story-ref-image";
 import { CanvasVideoPlayer } from "./canvas-video-player";
+import {
+  storyEditionGeneratingBorderClass,
+  storyEditionIconBtnClass,
+  storyEditionOverlayIconBtnClass,
+  storyEditionSpinClass,
+  storyEditionVideoOverlayBtnClass,
+  type StoryEdition,
+} from "@/lib/canvas/story-edition-chrome";
+import { StoryErrorLine } from "@/components/canvas/story-status-line";
+import { STORY_HINT_GOLD_CLASS } from "@/lib/canvas/story-column-sync";
 import { StoryVideoPromptPopover } from "./story-video-prompt-popover";
-
-const REFRESH_BTN =
-  "nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/45 bg-[#fb923c]/20 text-[#fdba74] hover:bg-[#fb923c]/30";
 
 function blockCanvasPointer(e: React.MouseEvent | React.PointerEvent) {
   e.stopPropagation();
@@ -32,6 +39,12 @@ export function StoryColumnMediaPanel({
   errorMessage,
   videoPrompt,
   videoRefLabels,
+  edition = "comic",
+  frameApproved,
+  frameRejectedReason,
+  videoBlockReason,
+  onApproveFrame,
+  onRejectFrame,
 }: {
   imageUrl?: string;
   videoUrl?: string;
@@ -48,12 +61,24 @@ export function StoryColumnMediaPanel({
   /** 分镜列：hover 分镜图时展示将传给视频模型的完整提示词 */
   videoPrompt?: string;
   videoRefLabels?: string[];
+  edition?: StoryEdition;
+  frameApproved?: boolean;
+  frameRejectedReason?: string;
+  videoBlockReason?: string | null;
+  onApproveFrame?: () => void;
+  onRejectFrame?: () => void;
 }) {
   const hasVisual = Boolean(imageUrl || videoUrl);
   const showPreview = Boolean(onPreview && hasVisual && !previewDisabled);
   const isFrame = mediaMode === "frame";
   const hasFrameImage = Boolean(imageUrl);
   const btnDisabled = Boolean(generateDisabled || generating);
+  const canGenerateVideo =
+    Boolean(onGenerateVideo) &&
+    hasFrameImage &&
+    frameApproved &&
+    !videoBlockReason &&
+    !generating;
 
   return (
     <div
@@ -63,7 +88,7 @@ export function StoryColumnMediaPanel({
       <div
         className={cn(
           "group/frame-prompt relative min-h-[var(--row-media-min,248px)] flex-1 overflow-visible rounded-md border border-white/10 bg-black/45",
-          generating && "canvas-story-media-generating border-[#fb923c]/50",
+          generating && storyEditionGeneratingBorderClass(edition),
         )}
       >
         <div className="absolute inset-0 overflow-hidden rounded-md">
@@ -76,19 +101,53 @@ export function StoryColumnMediaPanel({
             unoptimized
           />
         ) : null}
-        {isFrame && hasFrameImage && onGenerateVideo && !generating ? (
+        {isFrame && hasFrameImage && canGenerateVideo ? (
           <button
             type="button"
             aria-label="生成分镜视频"
-            title="生成分镜视频"
-            className="nodrag pointer-events-auto absolute bottom-1.5 right-1.5 z-20 inline-flex size-8 items-center justify-center rounded-full border border-[#fb923c]/50 bg-black/70 text-[#fdba74] shadow-lg backdrop-blur-sm hover:bg-black/85"
+            title="生成分镜视频（图生视频 · 首帧锁定）"
+            className={storyEditionVideoOverlayBtnClass(edition)}
             onPointerDown={(e) => {
               blockCanvasPointer(e);
-              onGenerateVideo();
+              onGenerateVideo?.();
             }}
           >
             <Clapperboard className="size-4 pointer-events-none" />
           </button>
+        ) : null}
+        {isFrame && hasFrameImage && !frameApproved && !generating ? (
+          <div className="pointer-events-auto absolute bottom-1.5 left-1.5 z-20 flex gap-1">
+            {onApproveFrame ? (
+              <button
+                type="button"
+                className="nodrag rounded border border-emerald-400/40 bg-emerald-500/20 px-1.5 py-0.5 text-[9px] text-emerald-100 hover:bg-emerald-500/30"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onApproveFrame();
+                }}
+              >
+                <Check className="mr-0.5 inline size-3" />
+                通过
+              </button>
+            ) : null}
+            {onRejectFrame ? (
+              <button
+                type="button"
+                className="nodrag rounded border border-red-400/30 bg-red-500/15 px-1.5 py-0.5 text-[9px] text-red-200 hover:bg-red-500/25"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRejectFrame();
+                }}
+              >
+                驳回
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {isFrame && hasFrameImage && frameApproved ? (
+          <span className="pointer-events-none absolute left-1.5 top-1.5 z-20 rounded border border-emerald-400/35 bg-emerald-950/70 px-1.5 py-0.5 text-[9px] text-emerald-200">
+            已过审
+          </span>
         ) : null}
         {videoUrl && !imageUrl ? (
           <video
@@ -117,7 +176,7 @@ export function StoryColumnMediaPanel({
         >
           {generating ? (
             <div className="relative z-10 flex flex-col items-center gap-1">
-              <RefreshCw className="size-6 animate-spin text-[#fdba74]" />
+              <RefreshCw className={storyEditionSpinClass(edition)} />
             </div>
           ) : isFrame && hasFrameImage ? (
             showPreview ? (
@@ -140,19 +199,29 @@ export function StoryColumnMediaPanel({
               <button
                 type="button"
                 aria-label="重新生成"
-                className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-[#fb923c]/40 bg-black/55 text-[#fdba74] shadow-lg backdrop-blur-sm hover:bg-black/75"
-                onClick={onGenerate}
+                className={cn(storyEditionOverlayIconBtnClass(edition), "nodrag")}
+                onPointerDown={blockCanvasPointer}
+                onMouseDown={blockCanvasPointer}
+                onClick={(e) => {
+                  blockCanvasPointer(e);
+                  onGenerate();
+                }}
               >
-                <RefreshCw className="size-4" />
+                <RefreshCw className="size-4 pointer-events-none" />
               </button>
               {showPreview ? (
                 <button
                   type="button"
                   aria-label="预览"
                   className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm hover:bg-black/75"
-                  onClick={onPreview}
+                  onPointerDown={blockCanvasPointer}
+                  onMouseDown={blockCanvasPointer}
+                  onClick={(e) => {
+                    blockCanvasPointer(e);
+                    onPreview?.();
+                  }}
                 >
-                  <Eye className="size-4" />
+                  <Eye className="size-4 pointer-events-none" />
                 </button>
               ) : null}
             </>
@@ -161,14 +230,33 @@ export function StoryColumnMediaPanel({
               type="button"
               disabled={btnDisabled}
               aria-label={isFrame ? "生成分镜图" : "生成"}
-              title={generateDisabled ? "请先在上方选择分镜图 IMAGE 模型" : undefined}
+              title={
+                generateDisabled
+                  ? isFrame
+                    ? "请先在上方选择分镜图 IMAGE 模型"
+                    : "请先在上方选择生图模型"
+                  : undefined
+              }
               className={cn(
-                REFRESH_BTN,
+                storyEditionIconBtnClass(edition),
+                "nodrag",
                 generateDisabled && "cursor-not-allowed opacity-40",
               )}
-              onClick={onGenerate}
+              onPointerDown={(e) => {
+                if (btnDisabled) return;
+                blockCanvasPointer(e);
+              }}
+              onMouseDown={(e) => {
+                if (btnDisabled) return;
+                blockCanvasPointer(e);
+              }}
+              onClick={(e) => {
+                blockCanvasPointer(e);
+                if (btnDisabled) return;
+                onGenerate();
+              }}
             >
-              <RefreshCw className="size-4" />
+              <RefreshCw className="size-4 pointer-events-none" />
             </button>
           )}
         </div>
@@ -185,7 +273,15 @@ export function StoryColumnMediaPanel({
         <audio src={audioUrl} controls className="nodrag h-7 w-full shrink-0" />
       ) : null}
       {errorMessage && !generating ? (
-        <p className="text-[10px] leading-snug text-red-400/90">{errorMessage}</p>
+        <StoryErrorLine message={errorMessage} />
+      ) : null}
+      {isFrame && videoBlockReason && hasFrameImage && !generating ? (
+        <p className={`text-[10px] leading-snug ${STORY_HINT_GOLD_CLASS}`}>
+          {videoBlockReason}
+        </p>
+      ) : null}
+      {isFrame && frameRejectedReason?.trim() ? (
+        <StoryErrorLine message={`驳回：${frameRejectedReason}`} />
       ) : null}
     </div>
   );

@@ -35,6 +35,13 @@ export type StoryFrameRow = {
   refImages?: StoryRefImage[];
   /** @deprecated 由 refImages 推导；runner 兼容 */
   refImageUrls?: string[];
+  /** 分镜静帧人工过审时间（ISO）；空 = 未过审，不可生成视频 */
+  frameApprovedAt?: string;
+  frameRejectedReason?: string;
+  /** 影视专业版 · P-B2 资产 version 快照 */
+  characterRefSnapshotAt?: string;
+  characterAssetVersions?: Record<string, number>;
+  characterRefIds?: string[];
 };
 
 export type StoryVideoRow = {
@@ -49,6 +56,8 @@ export type StoryVideoRow = {
   /** 分镜图参考 */
   refImages?: StoryRefImage[];
   frameImageUrl?: string;
+  /** 从分镜行同步 · 视频门禁 */
+  frameApprovedAt?: string;
   videoRuntime?: CanvasNodeRuntime;
   ttsRuntime?: CanvasNodeRuntime;
 };
@@ -89,6 +98,9 @@ export type StoryFrameColumnNodeData = {
   /** @deprecated 改用 batchVideo */
   batchImage?: CanvasEnginePick;
   hubNodeId?: string;
+  /** 影视专业版 · P-A2 静帧注入风格参考图 */
+  injectStyleRefs?: boolean;
+  styleRefImageUrls?: string[];
 };
 
 export type StoryVideoColumnNodeData = {

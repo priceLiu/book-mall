@@ -31,10 +31,15 @@ import { extractKieResultUrl, type KieRecordResponse } from "@/lib/story/kie-cli
 import type { BailianR2vTaskOutput } from "./canvas-video-bailian-r2v";
 import type { CanvasGatewayPollResult } from "./providers/types";
 import {
+  AITRYON_PARSING_MODEL,
+  dashscopeImageParsing,
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
+  type DashscopeClothesType,
+  type DashscopeParsingOutput,
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
+import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 
 const CLIENT_SOURCE = "CANVAS" as const;
 
@@ -545,4 +550,92 @@ export function isBailianR2vSucceeded(output: BailianR2vTaskOutput): boolean {
 export function isBailianR2vFailed(output: BailianR2vTaskOutput): boolean {
   const s = output.task_status?.toUpperCase() ?? "";
   return s === "FAILED" || s === "CANCELED" || s === "UNKNOWN";
+}
+
+/** Canvas · 百炼 AI 试衣图片分割（同步，经 Gateway 凭证） */
+export async function canvasGwImageParsing(
+  userId: string,
+  opts: {
+    imageUrl: string;
+    clothesType?: DashscopeClothesType[];
+    clientPage?: string;
+  },
+): Promise<{ output: DashscopeParsingOutput; logId: string }> {
+  const auth = await requireGatewayAuth(userId);
+  const model = AITRYON_PARSING_MODEL;
+  const credentialId = pickCredentialForKind(auth.credentials, "DASHSCOPE");
+  if (!credentialId) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定 DashScope 凭证",
+      503,
+    );
+  }
+
+  const clothesType = opts.clothesType?.length
+    ? opts.clothesType
+    : (["upper", "lower"] as DashscopeClothesType[]);
+
+  const log = await createRequestLog({
+    userId: auth.userId,
+    apiKeyId: auth.id,
+    credentialId,
+    model,
+    endpoint: "/v1/image-process/process",
+    providerKind: "DASHSCOPE",
+    requestKind: "TRYON",
+    clientSource: CLIENT_SOURCE,
+    clientPage: opts.clientPage,
+    inputSummary: buildGatewayInputSummary(model, {
+      imageUrl: opts.imageUrl,
+      clothesType,
+    }),
+  });
+
+  const started = Date.now();
+  try {
+    const cred = await getDecryptedCredentialApiKey(credentialId);
+    if (!cred) {
+      throw new CanvasProjectError(
+        "MODEL_NOT_AVAILABLE",
+        "DashScope 凭证不可用",
+        503,
+      );
+    }
+    const result = await dashscopeImageParsing({
+      apiKey: cred.apiKey,
+      imageUrl: opts.imageUrl,
+      clothesType,
+      model,
+    });
+    if (!result.ok) {
+      await finalizeRequestLog(log.id, {
+        status: "FAILED",
+        durationMs: Date.now() - started,
+        failMessage: result.error,
+        model,
+      });
+      throw new CanvasProjectError(
+        "MODEL_NOT_AVAILABLE",
+        result.error,
+        502,
+      );
+    }
+    await finalizeRequestLog(log.id, {
+      status: "SUCCEEDED",
+      durationMs: Date.now() - started,
+      resultSummary: result.output,
+      model,
+    });
+    return { output: result.output, logId: log.id };
+  } catch (e) {
+    if (e instanceof CanvasProjectError) throw e;
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: Date.now() - started,
+      failMessage: (e as Error).message,
+      model,
+    });
+    throw e;
+  }
 }

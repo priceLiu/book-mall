@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
+import { serviceFeeSettleJson, TOOL_SERVICE_FEE_MODE } from "@/lib/tool-service-fee-mode";
+import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import { pollDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
 import type { I2vTaskOutput } from "@/lib/image-to-video-dashscope";
 import { formatDashScopeI2vFailureForUser } from "@/lib/image-to-video-task-errors";
@@ -14,7 +15,7 @@ import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multipli
 
 export const runtime = "nodejs";
 
-/** 视频工具成功扣费：方案 A 按 usage 时长×官网单价×系数；幂等 meta.taskId */
+/** 视频工具成功扣费：Phase D 技术服务费模式下不扣点；legacy 仍走方案 A。 */
 export async function POST(req: Request) {
   const suite = await requireToolSuiteNavAccess("image-to-video");
   if (!suite.ok) return suite.response;
@@ -65,6 +66,10 @@ export async function POST(req: Request) {
     );
   }
 
+  if (TOOL_SERVICE_FEE_MODE) {
+    return NextResponse.json(serviceFeeSettleJson());
+  }
+
   const billTaskId = output.task_id?.trim() || taskId;
   const videoUrl =
     typeof output.video_url === "string"
@@ -97,7 +102,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // v003：前端 start 返回的 holdId 透传过来；settle 在主站把对应 hold 转 SETTLED。
   const holdId =
     typeof body.holdId === "string" && body.holdId.trim().length > 0
       ? body.holdId.trim()

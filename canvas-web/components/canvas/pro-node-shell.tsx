@@ -121,11 +121,11 @@ export function ProNodeShell({
               aria-hidden
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-cyan-300">
+              <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-emerald-300">
                 {title}
               </p>
               {subtitle ? (
-                <p className="truncate text-[11px] text-white/75">{subtitle}</p>
+                <p className="truncate text-[11px] text-emerald-200/80">{subtitle}</p>
               ) : null}
             </div>
           </div>

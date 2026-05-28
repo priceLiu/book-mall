@@ -1,19 +1,24 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import {
+  serviceFeeBillableHintJson,
+  TOOL_SERVICE_FEE_MODE,
+} from "@/lib/tool-service-fee-mode";
 import { computeVideoChargePoints } from "@/lib/tools-scheme-a-pricing";
 import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * 图生视频 / 文生视频 / 参考生 单次标价提示（方案 A，与 settle 同源公式）。
- * Query：apiModel（必选，DashScope model）、durationSec（默认 5）、resolution（720P|1080P，默认 1080P）、audio（默认 true）。
- */
+/** 视频单次标价提示：Phase D 返回技术服务费说明；legacy 仍返回方案 A 点数。 */
 export async function GET(req: Request) {
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
     return NextResponse.json({ error: "请先登录工具站" }, { status: 401 });
+  }
+
+  if (TOOL_SERVICE_FEE_MODE) {
+    return NextResponse.json(serviceFeeBillableHintJson());
   }
 
   const url = new URL(req.url);

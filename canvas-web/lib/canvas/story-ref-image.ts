@@ -30,12 +30,22 @@ export function storyRefMentionables(refImages: StoryRefImage[]): MentionableIte
 /** 角色列全量三视图目录（含未出图条目，供解析 @ 与同步 URL） */
 export function storyCharacterRefCatalog(
   characterRows: StoryCharacterRow[],
+  assetRefsByKey?: Record<string, StoryRefImage[]>,
 ): StoryRefImage[] {
-  return characterRows.map((c) => ({
-    id: `ref-char-${c.key}`,
-    label: c.name,
-    url: c.runtime?.ossUrl ?? c.runtime?.ephemeralUrl,
-  }));
+  const out: StoryRefImage[] = [];
+  for (const c of characterRows) {
+    const assetRefs = assetRefsByKey?.[c.key];
+    if (assetRefs?.length) {
+      out.push(...assetRefs);
+      continue;
+    }
+    out.push({
+      id: `ref-char-${c.key}`,
+      label: c.name,
+      url: c.runtime?.ossUrl ?? c.runtime?.ephemeralUrl,
+    });
+  }
+  return out;
 }
 
 /** @ 菜单：仅已生成出图的角色三视图（含缩略图） */

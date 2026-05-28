@@ -1,0 +1,34 @@
+---
+description: 媒体文件走 OSS，结构化业务数据走数据库；禁止大文本/二进制塞进 DB
+globs: book-mall/lib/**,book-mall/app/api/**,canvas-web/**,story-web/**,tool-web/**,gateway-web/**
+alwaysApply: false
+---
+
+# 媒体 OSS · 其余数据库
+
+## 分工（强制）
+
+| 类型 | 存储 | 库内字段 |
+|------|------|----------|
+| **图片、视频、音频** 及同类大文件 | **OSS**（公网或签名 URL） | 只存 `ossUrl` / `thumbnailUrl` 等 URL；可选短生命周期 `ephemeralUrl` |
+| **其余**（用户、订单、任务状态、画布拓扑、prompt、日志摘要、Gateway 元数据等） | **PostgreSQL** | `String` / `Text` / `Json` 等，体量须可控 |
+
+## 必须遵守
+
+1. **上传产物**：生成或用户上传的图片/视频/音频，经现有 OSS 管线落库（如 `uploadCanvasUserBuffer`、`persistCanvasKieResultToOss`、story/canvas OSS 模块），**禁止**把文件 bytes/base64 写入业务表。
+2. **大文本**：长 Markdown 剧本、万字 prompt、整文件内容 **不要** 长期塞进 `canvas` JSON 或 `Text` 列；应上传 OSS 后节点/记录只保留 **URL + 元数据**（文件名、字数、格式）。
+3. **浏览器读 OSS**：跨域场景 **禁止** 页面直连 OSS 拉正文；须经 **book-mall 服务端代理**（如 `GET /api/canvas/oss-text`），避免 CORS 导致 `Failed to fetch`。
+4. **删除**：删库记录若对应 OSS 对象，遵守 `destructive-delete-confirmation.mdc`（二次确认；涉及云存储须在第二次文案写明 OSS）。
+
+## 示例
+
+- ✅ Canvas 节点：`uploadedScriptOssUrl` 在库；autosave 前剥离 `uploadedScriptMd`（见 `stripStoryProUploadedScriptMdForPersist`）
+- ✅ 任务表：`ossUrl` + `textOutput`（LLM 短文本可入 DB）
+- ❌ 画布 `canvas` JSON 内嵌 MB 级 base64 图
+- ❌ Gateway `inputSummary` 存整张图片二进制
+
+## 相关实现
+
+- `book-mall/lib/canvas/canvas-oss.ts`、`canvas-user-oss-read.ts`
+- `book-mall/app/api/canvas/uploads/`、`oss-text/`
+- Story / Tool 媒体删除队列见 `book-mall/doc/logic/story-ai-pipeline.md`

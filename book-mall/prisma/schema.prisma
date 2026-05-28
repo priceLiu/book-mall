@@ -87,8 +87,11 @@ model User {
   canvasProjects               CanvasProject[]
   canvasTemplates              CanvasTemplate[]
   canvasCharacters             CanvasCharacter[]
+  storyProCharacterAssets      StoryProCharacterAsset[]
+  storyProSceneAssets          StoryProSceneAsset[]
   canvasProviders              CanvasProvider[]
   canvasPromptTemplates        CanvasPromptTemplate[]
+  toolServicePeriods           UserToolServicePeriod[]
 
   /// Canvas 经 Gateway 代理：关联的 sk-gw API Key（验证后仅存 id，不存明文）
   gatewayApiKeyId       String?   @unique
@@ -339,6 +342,49 @@ model ToolBillablePrice {
 
   @@index([toolKey, effectiveFrom])
   @@index([cloudModelKey, cloudTierRaw, cloudBillingKind])
+}
+
+/// 工具套件按月技术服务费定价（点/月）；与 toolNavKey 一一对应。
+model ToolServiceFeePlan {
+  id               String   @id @default(cuid())
+  toolNavKey       String   @unique
+  label            String
+  monthlyFeePoints Int      @default(0)
+  active           Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  note             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  periods UserToolServicePeriod[]
+}
+
+enum ToolServicePeriodStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+/// 用户某工具套件的有效技术服务费周期（开通/续订后写入）。
+model UserToolServicePeriod {
+  id                String                  @id @default(cuid())
+  userId            String
+  toolNavKey        String
+  planId            String?
+  periodStart       DateTime
+  periodEnd         DateTime
+  status            ToolServicePeriodStatus @default(ACTIVE)
+  lastChargedPoints Int?
+  walletEntryId     String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  user User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan ToolServiceFeePlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([userId, toolNavKey, status])
+  @@index([userId, periodEnd])
+  @@index([toolNavKey, periodEnd])
 }
 
 /// 工具站左侧菜单项是否在导航中展示（由主站后台维护）；navKey 与 tool-web `config/nav-tools` 约定一致。
@@ -1000,6 +1046,8 @@ model SsoAuthorizationCode {
   id         String    @id @default(cuid())
   code       String    @unique
   userId     String
+  /// Phase F：第三方 client_id（可选）
+  clientId   String?
   expiresAt  DateTime
   consumedAt DateTime?
 
@@ -1008,6 +1056,22 @@ model SsoAuthorizationCode {
   createdAt DateTime @default(now())
 
   @@index([expiresAt])
+  @@index([clientId])
+}
+
+/// Phase F：第三方 Platform SSO 客户端注册
+model SsoClient {
+  id               String   @id @default(cuid())
+  clientId         String   @unique
+  name             String
+  /// 注册回调 URI 白名单（完整 URL，不含 query）
+  redirectUris     String[]
+  /// 允许访问的工具 navKey 子集；空 = 不额外限制（仍须用户自身服务期）
+  allowedNavKeys   String[] @default([])
+  active           Boolean  @default(true)
+  note             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 // —— story-web 漫剧个人空间 ——
@@ -1398,6 +1462,83 @@ model CanvasCharacter {
   updatedAt       DateTime @updatedAt
 
   @@index([userId, updatedAt])
+}
+
+enum StoryProCharacterAssetRefKind {
+  face
+  full_body
+  outfit
+  three_view
+}
+
+/// 影视专业版 · 角色资产库（characterKey → 多图 ref）
+model StoryProCharacterAsset {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characterKey String
+  displayName  String
+  projectId    String?
+  locked       Boolean  @default(false)
+  version      Int      @default(1)
+  refs         StoryProCharacterAssetRef[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, characterKey, projectId])
+  @@index([userId, updatedAt])
+}
+
+model StoryProCharacterAssetRef {
+  id           String                        @id @default(cuid())
+  assetId      String
+  asset        StoryProCharacterAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  kind         StoryProCharacterAssetRefKind
+  ossUrl       String
+  sortOrder    Int                           @default(0)
+  label        String?
+  sourceTaskId String?
+  createdAt    DateTime                      @default(now())
+
+  @@index([assetId, sortOrder])
+}
+
+enum StoryProSceneAssetRefKind {
+  establishing
+  detail
+  mood
+}
+
+/// 影视专业版 · 场景资产库（sceneKey → 多图 ref）
+model StoryProSceneAsset {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sceneKey    String
+  displayName String
+  projectId   String?
+  locked      Boolean  @default(false)
+  version     Int      @default(1)
+  refs        StoryProSceneAssetRef[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, sceneKey, projectId])
+  @@index([userId, updatedAt])
+}
+
+model StoryProSceneAssetRef {
+  id           String                    @id @default(cuid())
+  assetId      String
+  asset        StoryProSceneAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  kind         StoryProSceneAssetRefKind
+  ossUrl       String
+  sortOrder    Int                       @default(0)
+  label        String?
+  sourceTaskId String?
+  createdAt    DateTime                  @default(now())
+
+  @@index([assetId, sortOrder])
 }
 
 /// 用户自定义提示词模板（LLM / IMAGE 合计最多 8 条活跃；删除软归档保留快照；内置在代码里）

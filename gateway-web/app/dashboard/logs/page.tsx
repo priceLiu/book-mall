@@ -13,7 +13,7 @@ export default async function DashboardLogsPage() {
       <div>
         <h1 className="text-xl font-semibold text-white">Logs</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          最近 50 条 · 悬停 Params / Result 查看完整内容
+          最近 50 条 · 悬停 Params / Result / failed 状态查看详情
         </p>
       </div>
 

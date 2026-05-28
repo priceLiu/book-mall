@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
+import { serviceFeeSettleJson, TOOL_SERVICE_FEE_MODE } from "@/lib/tool-service-fee-mode";
+import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import { pollDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
 import {
   countWanxSucceededImages,
@@ -15,7 +16,7 @@ import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multipli
 
 export const runtime = "nodejs";
 
-/** 文生图单次生成扣费：方案 A 按成功张数 × 官网单价 × 系数；幂等 meta.taskId */
+/** 文生图单次生成扣费：Phase D 技术服务费模式下不扣点；legacy 仍走方案 A。 */
 export async function POST(req: Request) {
   const suite = await requireToolSuiteNavAccess("text-to-image");
   if (!suite.ok) return suite.response;
@@ -36,6 +37,32 @@ export async function POST(req: Request) {
   if (!taskId) {
     return NextResponse.json({ error: "缺少 taskId" }, { status: 400 });
   }
+
+  if (TOOL_SERVICE_FEE_MODE) {
+    const polled = await pollDashscopeJobFromServer({
+      taskId,
+      gatewayLogId:
+        typeof body.gatewayLogId === "string" && body.gatewayLogId.trim().length > 0
+          ? body.gatewayLogId.trim()
+          : undefined,
+    });
+    if (!polled.ok) {
+      return NextResponse.json({ error: polled.error }, { status: polled.status ?? 502 });
+    }
+    const output = polled.output as WanxTaskPollOutput;
+    const status = output.task_status ?? "";
+    if (status !== "SUCCEEDED") {
+      return NextResponse.json(
+        {
+          error: `任务未完成，当前状态：${status || "UNKNOWN"}`,
+          taskStatus: status,
+        },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json(serviceFeeSettleJson());
+  }
+
   const holdId =
     typeof body.holdId === "string" && body.holdId.trim().length > 0
       ? body.holdId.trim()

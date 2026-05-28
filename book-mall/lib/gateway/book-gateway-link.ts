@@ -12,15 +12,37 @@ import {
 } from "@/lib/gateway/api-key-service";
 import { findGatewayUserByBookUserId } from "@/lib/gateway/sync-user";
 
+export type GatewayErrorCode =
+  | "GATEWAY_KEY_REQUIRED"
+  | "INVALID_INPUT"
+  | "FORBIDDEN"
+  | "UPSTREAM_ERROR";
+
 export class GatewayRequiredError extends Error {
   constructor(
     message: string,
-    public code: "GATEWAY_KEY_REQUIRED" | "INVALID_INPUT" | "FORBIDDEN" = "GATEWAY_KEY_REQUIRED",
+    public code: GatewayErrorCode = "GATEWAY_KEY_REQUIRED",
     public httpStatus = 403,
   ) {
     super(message);
     this.name = "GatewayRequiredError";
   }
+}
+
+export function summarizeUpstreamFailMessage(raw: string, status: number): string {
+  const t = raw.trim();
+  if (!t) return `上游服务返回 HTTP ${status}`;
+  try {
+    const j = JSON.parse(t) as {
+      error?: { message?: string; code?: string };
+      message?: string;
+    };
+    const msg = j.error?.message ?? j.message;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+  } catch {
+    /* plain text */
+  }
+  return t.length > 500 ? `${t.slice(0, 500)}…` : t;
 }
 
 export type GatewayLinkStatusDto = {

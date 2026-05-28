@@ -97,12 +97,28 @@ type TryOnPollUsage = {
   error?: string | null;
   chargedPoints?: number;
   billingDuplicate?: boolean;
+  serviceFeeMode?: boolean;
 };
+
+function isTryOnBillingSettled(u: TryOnPollUsage | undefined): boolean {
+  if (u == null) return true;
+  if (u.recorded === true || u.insufficientBalance === true) return true;
+  /** Phase D：按次扣点已退役，服务端标记 serviceFeeMode 或无 error 的 recorded:false 均视为完成 */
+  if (u.serviceFeeMode === true) return true;
+  if (u.recorded === false && !(u.error?.trim())) return true;
+  return false;
+}
 
 function formatTryOnBillingLine(
   u: TryOnPollUsage | undefined,
   t: (key: string) => string,
+  locale: "zh" | "en",
 ): string {
+  if (u?.serviceFeeMode) {
+    return locale === "zh"
+      ? "已含在工具技术服务费内，单次试衣不另扣点"
+      : "Included in monthly tool service fee";
+  }
   if (!u?.recorded) return t("billingReminderAfterTryOn");
   const amount =
     u.chargedPoints != null
@@ -165,7 +181,9 @@ function AiFitWorkspace({
   const [closetSaveError, setClosetSaveError] = useState<string | null>(null);
   const [tryOnUsageWarn, setTryOnUsageWarn] = useState<string | null>(null);
   const [tryOnBillingLine, setTryOnBillingLine] = useState<string>("");
-  const [billableTryOnPts, setBillableTryOnPts] = useState<number | null | "loading">(
+  const [billableTryOnPts, setBillableTryOnPts] = useState<
+    number | null | "loading" | "service_fee"
+  >(
     "loading",
   );
 
@@ -190,8 +208,15 @@ function AiFitWorkspace({
         const r = await fetch("/api/ai-fit/billable-hint", { cache: "no-store" });
         const data = (await r.json().catch(() => null)) as {
           pricePoints?: unknown;
+          serviceFeeMode?: boolean;
+          chargeLine?: string;
+          chargeTitle?: string;
         } | null;
         if (cancelled) return;
+        if (data?.serviceFeeMode) {
+          setBillableTryOnPts("service_fee");
+          return;
+        }
         if (
           !r.ok ||
           !data ||
@@ -218,7 +243,19 @@ function AiFitWorkspace({
         tryOnChargeTitle: t("tryOnChargeLineTitle"),
       };
     }
-    if (billableTryOnPts != null && billableTryOnPts > 0) {
+    if (billableTryOnPts === "service_fee") {
+      return {
+        tryOnChargeLine:
+          locale === "zh"
+            ? "已含在工具技术服务费内，单次试衣不另扣点"
+            : "Included in monthly tool service fee",
+        tryOnChargeTitle:
+          locale === "zh"
+            ? "工具使用权按月技术服务费扣点；云厂商费用走 Gateway BYOK。"
+            : "Tool access billed monthly; vendor usage via Gateway BYOK.",
+      };
+    }
+    if (typeof billableTryOnPts === "number" && billableTryOnPts > 0) {
       const pts = billableTryOnPts;
       const y = (pts / 100).toFixed(2);
       const ptsStr = pts.toLocaleString(locale === "zh" ? "zh-CN" : "en-US");
@@ -524,6 +561,7 @@ function AiFitWorkspace({
       });
       const sj = (await start.json()) as {
         taskId?: string;
+        gatewayLogId?: string;
         error?: string;
         resolvedUrls?: {
           personImage?: string | null;
@@ -542,10 +580,14 @@ function AiFitWorkspace({
       const deadline = Date.now() + 180_000;
       let imageUrl: string | null = null;
       let lastUsage: TryOnPollUsage | undefined;
+      const pollQs = new URLSearchParams({ taskId: sj.taskId });
+      if (sj.gatewayLogId?.trim()) {
+        pollQs.set("gatewayLogId", sj.gatewayLogId.trim());
+      }
       while (Date.now() < deadline) {
         await delay(2800);
         const pr = await fetch(
-          `/api/ai-fit/try-on?taskId=${encodeURIComponent(sj.taskId)}`,
+          `/api/ai-fit/try-on?${pollQs.toString()}`,
           { cache: "no-store" },
         );
         const pj = (await pr.json()) as {
@@ -564,11 +606,7 @@ function AiFitWorkspace({
         if (done) {
           imageUrl = pj.imageUrl!;
           lastUsage = pj.usage;
-          const billingDone =
-            lastUsage == null ||
-            lastUsage.recorded === true ||
-            lastUsage.insufficientBalance === true;
-          if (billingDone) break;
+          if (isTryOnBillingSettled(lastUsage)) break;
           /** 成片已返回但计费未落库：继续轮询以便服务端重试上报（幂等 taskId） */
           await delay(2800);
           continue;
@@ -585,12 +623,14 @@ function AiFitWorkspace({
       }
 
       const usageWarn =
-        lastUsage && !lastUsage.recorded
+        lastUsage &&
+        !lastUsage.recorded &&
+        !lastUsage.serviceFeeMode
           ? (lastUsage.error?.trim() || t("tryOnUsageRecordPending"))
           : null;
       setTryOnUsageWarn(usageWarn);
       setTryOnBillingLine(
-        formatTryOnBillingLine(lastUsage, t as (key: string) => string),
+        formatTryOnBillingLine(lastUsage, t as (key: string) => string, locale),
       );
 
       setTryOnResultUrl(normalizeTryOnImageUrl(imageUrl));

@@ -5,6 +5,11 @@ import {
   assertGatewayApiKeyLinkedForUser,
 } from "@/lib/gateway/book-gateway-link";
 import {
+  assertPlatformGatewayEntitlement,
+  PlatformEntitlementError,
+} from "@/lib/platform-gateway-entitlement";
+import { clientPageToServiceNavKey } from "@/lib/tool-service-fee/tool-key-nav";
+import {
   toolGwCreateDashscopeJob,
   toolGwPollDashscope,
 } from "@/lib/gateway/tool-gateway-client";
@@ -23,20 +28,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  try {
-    await assertGatewayApiKeyLinkedForUser(userId);
-  } catch (e) {
-    if (e instanceof GatewayRequiredError) {
-      return NextResponse.json({ error: e.message, code: e.code }, { status: 403 });
-    }
-    throw e;
-  }
-
   let body: Record<string, unknown>;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  try {
+    await assertGatewayApiKeyLinkedForUser(userId);
+    const clientPageRaw =
+      typeof body.clientPage === "string" ? body.clientPage.trim() : "";
+    const navFromPage = clientPageRaw ? clientPageToServiceNavKey(clientPageRaw) : null;
+    await assertPlatformGatewayEntitlement(userId, navFromPage ? { navKey: navFromPage } : {});
+  } catch (e) {
+    if (e instanceof PlatformEntitlementError) {
+      return NextResponse.json({ error: e.message, code: e.code }, { status: e.httpStatus });
+    }
+    if (e instanceof GatewayRequiredError) {
+      return NextResponse.json({ error: e.message, code: e.code }, { status: 403 });
+    }
+    throw e;
   }
 
   const kind = String(body.kind ?? "");

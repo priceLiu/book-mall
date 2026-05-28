@@ -1,7 +1,11 @@
 import type { GatewayClientSource, GatewayProviderKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDecryptedCredentialApiKey } from "./credential-service";
-import { defaultBaseUrl, routeGatewayModel } from "./model-router";
+import {
+  defaultBaseUrl,
+  resolveOpenAiCompatibleBaseUrl,
+  routeGatewayModel,
+} from "./model-router";
 import { estimateVendorCost } from "./pricing-estimate";
 
 export type UsageFromResponse = {
@@ -74,6 +78,7 @@ export async function finalizeRequestLog(
     vendorDurationMs?: number;
     resultSummary?: unknown;
     failMessage?: string;
+    failCode?: string;
     externalTaskId?: string;
     model?: string;
     pricingTierRaw?: string;
@@ -108,6 +113,7 @@ export async function finalizeRequestLog(
       metricsSource: hasToken ? "VENDOR" : "UNAVAILABLE",
       resultSummary: patch.resultSummary ?? undefined,
       failMessage: patch.failMessage,
+      failCode: patch.failCode,
       externalTaskId: patch.externalTaskId,
       completedAt: new Date(),
       pricingModelKey: estimate.pricingModelKey,
@@ -128,11 +134,14 @@ export async function forwardChatCompletions(opts: {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
 
-  const base = opts.baseUrlOverride || cred.baseUrl || defaultBaseUrl(cred.providerKind);
-  let url = `${base.replace(/\/$/, "")}/chat/completions`;
+  const base = resolveOpenAiCompatibleBaseUrl(
+    cred.providerKind,
+    opts.baseUrlOverride || cred.baseUrl,
+  );
+  let url = `${base}/chat/completions`;
 
   if (cred.providerKind === "KIE") {
-    url = `${base.replace(/\/$/, "")}/gemini-3-flash/v1/chat/completions`;
+    url = `${base}/gemini-3-flash/v1/chat/completions`;
   }
 
   const started = Date.now();
@@ -157,11 +166,14 @@ export async function forwardChatCompletionsStream(opts: {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
 
-  const base = opts.baseUrlOverride || cred.baseUrl || defaultBaseUrl(cred.providerKind);
-  let url = `${base.replace(/\/$/, "")}/chat/completions`;
+  const base = resolveOpenAiCompatibleBaseUrl(
+    cred.providerKind,
+    opts.baseUrlOverride || cred.baseUrl,
+  );
+  let url = `${base}/chat/completions`;
 
   if (cred.providerKind === "KIE") {
-    url = `${base.replace(/\/$/, "")}/gemini-3-flash/v1/chat/completions`;
+    url = `${base}/gemini-3-flash/v1/chat/completions`;
   }
 
   const started = Date.now();
@@ -189,11 +201,11 @@ export async function forwardAudioSpeech(opts: {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
 
-  const base =
-    opts.baseUrlOverride ||
-    cred.baseUrl ||
-    defaultBaseUrl(cred.providerKind === "DASHSCOPE" ? "BAILIAN" : cred.providerKind);
-  const url = `${base.replace(/\/$/, "")}/audio/speech`;
+  const base = resolveOpenAiCompatibleBaseUrl(
+    cred.providerKind === "DASHSCOPE" ? "BAILIAN" : cred.providerKind,
+    opts.baseUrlOverride || cred.baseUrl,
+  );
+  const url = `${base}/audio/speech`;
 
   const started = Date.now();
   const r = await fetch(url, {

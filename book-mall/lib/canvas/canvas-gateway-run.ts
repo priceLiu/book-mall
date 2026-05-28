@@ -6,6 +6,10 @@ import {
   assertGatewayApiKeyLinkedForUser,
   getGatewayLinkStatusForUser,
 } from "@/lib/gateway/book-gateway-link";
+import {
+  assertPlatformGatewayEntitlement,
+  PlatformEntitlementError,
+} from "@/lib/platform-gateway-entitlement";
 import { CanvasProjectError } from "./canvas-project-service";
 import { isGatewayVirtualProviderId } from "./canvas-gateway-providers";
 import { isSystemProviderId } from "./canvas-system-provider";
@@ -36,6 +40,14 @@ export async function shouldCanvasUseGateway(
   _modelKey?: string,
 ): Promise<boolean> {
   assertCanvasProviderGatewayOnly(providerId);
+  try {
+    await assertPlatformGatewayEntitlement(userId, { navKey: "ai-poster-canvas" });
+  } catch (e) {
+    if (e instanceof PlatformEntitlementError) {
+      throw new CanvasProjectError("FORBIDDEN", e.message, e.httpStatus);
+    }
+    throw e;
+  }
   const link = await getGatewayLinkStatusForUser(userId);
   if (!link.linked) {
     throw new CanvasProjectError(

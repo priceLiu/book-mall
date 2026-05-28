@@ -1,6 +1,7 @@
 /**
  * 影视专业版 · 上传剧本（Markdown / 纯文本）
  */
+import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 import type { CanvasGraph } from "./types";
 import type { StoryProUploadedScriptMeta } from "./story-pro-workspace-types";
 
@@ -123,10 +124,57 @@ export function stripStoryProUploadedScriptMdForPersist(
   };
 }
 
-export async function fetchUploadedScriptFromOss(ossUrl: string): Promise<string> {
-  const r = await fetch(ossUrl, { cache: "no-store" });
-  if (!r.ok) {
-    throw new Error(`读取剧本失败（HTTP ${r.status}）`);
+/** 将浏览器 fetch 网络错误转为可操作提示 */
+export function formatCanvasFetchError(
+  e: unknown,
+  fallback: string,
+): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg === "Failed to fetch" || msg.includes("NetworkError")) {
+    return `${fallback}：无法连接主站（请确认 book-mall 已启动，且已登录 Canvas）`;
   }
-  return normalizeUploadedScriptText(await r.text());
+  if (msg.includes("401") || msg.includes("UNAUTHORIZED")) {
+    return `${fallback}：未登录，请从主站重新进入 Canvas`;
+  }
+  return msg.trim() ? `${fallback}：${msg}` : fallback;
+}
+
+/** 经 book-mall 代理读取 OSS 剧本，避免浏览器直连 OSS 触发 CORS */
+export async function fetchUploadedScriptFromOss(
+  base: string,
+  ossUrl: string,
+): Promise<string> {
+  if (!base?.trim()) {
+    throw new Error("主站地址未配置");
+  }
+  const q = new URLSearchParams({ url: ossUrl.trim() });
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    `/api/canvas/oss-text?${q.toString()}`,
+  );
+  let r: Response;
+  try {
+    r = await fetch(url, init);
+  } catch (e) {
+    throw new Error(formatCanvasFetchError(e, "读取剧本失败"));
+  }
+  const raw = await r.text();
+  if (!r.ok) {
+    let detail = `HTTP ${r.status}`;
+    try {
+      const j = JSON.parse(raw) as { message?: string; error?: string };
+      detail = j.message ?? j.error ?? detail;
+    } catch {
+      if (raw.trim()) detail = raw.slice(0, 200);
+    }
+    throw new Error(`读取剧本失败（${detail}）`);
+  }
+  let text = "";
+  try {
+    const j = JSON.parse(raw) as { text?: string };
+    text = typeof j.text === "string" ? j.text : "";
+  } catch {
+    throw new Error("读取剧本失败：响应格式异常");
+  }
+  return normalizeUploadedScriptText(text);
 }

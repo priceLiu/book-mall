@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getMembershipFlags } from "@/lib/membership";
-import { getGoldMemberAccess } from "@/lib/gold-member";
+import { userHasAnyActiveToolService } from "@/lib/tool-service-fee/periods";
 import { isToolsSsoConfigured } from "@/lib/sso-tools-env";
 import { Button } from "@/components/ui/button";
 import { LaunchToolsAppButton } from "@/components/account/launch-tools-app";
@@ -25,18 +25,15 @@ export async function NavbarAuth() {
   }
 
   const userId = session.user.id;
-  const [flags, goldAccess] = await Promise.all([
+  const [flags, hasToolService] = await Promise.all([
     getMembershipFlags(userId),
-    getGoldMemberAccess(userId),
+    userHasAnyActiveToolService(userId),
   ]);
 
   const toolsSsoReady = isToolsSsoConfigured();
   const isAdminUser = session.user.role === "ADMIN";
   const canLaunchTools =
-    toolsSsoReady &&
-    (isAdminUser ||
-      (goldAccess.isGoldMember &&
-        (flags.hasActiveSubscription || flags.hasActiveToolProductSubscription)));
+    toolsSsoReady && (isAdminUser || hasToolService);
 
   const showCoursesCta =
     flags.hasActiveSubscription || flags.hasActiveCourseProductSubscription;

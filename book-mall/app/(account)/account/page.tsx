@@ -7,6 +7,7 @@ import { getMembershipFlags } from "@/lib/membership";
 import { formatPointsAsYuan } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 import { getGoldMemberAccess } from "@/lib/gold-member";
+import { userHasAnyActiveToolService } from "@/lib/tool-service-fee/periods";
 import { isToolsSsoConfigured, getToolsPublicOrigin } from "@/lib/sso-tools-env";
 import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
 import {
@@ -37,7 +38,7 @@ function toolsSsoErrBanner(code: string): { title: string; body: string } | null
       return {
         title: "未能打开 AI 工具站",
         body:
-          "当前账号不满足工具站准入：须为主站管理员，或同时具备「黄金会员」（钱包充值记录且不低于最低线）与「有效会员计划 或 单品工具订阅」。请在「钱包余额」与「AI 工具站」概览卡查看具体未满足项。",
+          "当前账号不满足工具站准入：须为主站管理员，或至少开通一项有效的工具技术服务费。请在「工具技术服务费」页开通对应分组。",
       };
     case "SSO_CODE_PERSIST_FAILED":
       return {
@@ -82,9 +83,10 @@ export default async function AccountPage({
     toolsSsoErr.length > 0 ? toolsSsoErrBanner(toolsSsoErr) : null;
 
   /** 合并为单笔 transaction，减少与个人中心其它并行调用的连接池叠加。 */
-  const [flags, goldAccess, refundAndUser] = await Promise.all([
+  const [flags, goldAccess, hasToolService, refundAndUser] = await Promise.all([
     getMembershipFlags(session.user.id),
     getGoldMemberAccess(session.user.id),
+    userHasAnyActiveToolService(session.user.id),
     prisma.$transaction([
       prisma.walletRefundRequest.findMany({
         where: { userId: session.user.id },
@@ -106,10 +108,7 @@ export default async function AccountPage({
   const toolsSsoReady = isToolsSsoConfigured();
   const isAdminUser = session.user.role === "ADMIN";
   const canLaunchTools =
-    toolsSsoReady &&
-    (isAdminUser ||
-      (goldAccess.isGoldMember &&
-        (flags.hasActiveSubscription || flags.hasActiveToolProductSubscription)));
+    toolsSsoReady && (isAdminUser || hasToolService);
 
   const financeWebOrigin = getFinanceWebPublicOrigin();
   const toolsPublicOrigin = getToolsPublicOrigin();
@@ -164,6 +163,7 @@ export default async function AccountPage({
           goldIsActive={goldAccess.isGoldMember}
           goldMinBalanceLinePoints={goldAccess.minBalanceLinePoints}
           goldHasRechargeHistory={goldAccess.hasRechargeHistory}
+          hasActiveToolService={hasToolService}
           canLaunchTools={canLaunchTools}
           showToolsCta={toolsSsoReady}
         />
@@ -176,7 +176,7 @@ export default async function AccountPage({
               <CardTitle className="text-base">费用与明细</CardTitle>
             </div>
             <CardDescription className="text-xs">
-              「工具站费用明细」为工具站内的按次扣费流水。「账单详情」为主站侧与云账单对齐的明细（导入后可筛选、查看对内计价）。
+              「工具站费用明细」为工具站内的历史按次流水（Phase D 起单次生成不扣点）。「账单详情」为主站侧与云账单对齐的明细（导入后可筛选、查看对内计价）。
               打开账单详情前请保持本站已登录，以便账单页使用与主站相同的浏览器会话拉取数据。
             </CardDescription>
           </CardHeader>

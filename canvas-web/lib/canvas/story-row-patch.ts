@@ -103,9 +103,22 @@ export function applyFrameRowRuntime(
   rowKey: string,
   runtime: CanvasNodeRuntime,
 ): StoryFrameRow[] {
-  return rows.map((r) =>
-    r.key === rowKey ? { ...r, runtime: { ...r.runtime, ...runtime } } : r,
-  );
+  return rows.map((r) => {
+    if (r.key !== rowKey) return r;
+    const next: StoryFrameRow = {
+      ...r,
+      runtime: { ...r.runtime, ...runtime },
+    };
+    if (
+      runtime.status === "pending" ||
+      runtime.status === "running" ||
+      runtime.status === "done"
+    ) {
+      next.frameApprovedAt = undefined;
+      next.frameRejectedReason = undefined;
+    }
+    return next;
+  });
 }
 
 export function applyVideoRowRuntime(

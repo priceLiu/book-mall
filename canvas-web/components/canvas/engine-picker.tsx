@@ -13,12 +13,21 @@ import {
   DynamicParamForm,
   buildModelParams,
 } from "./dynamic-param-form";
+import {
+  modelHasStoryCapabilities,
+  storyCapabilityHint,
+  type StoryModelCapability,
+} from "@/lib/canvas/story-model-capabilities";
 
 export type EnginePickerProps = {
   /** 过滤模型 role：LLM / IMAGE / VIDEO */
   role: "LLM" | "IMAGE" | "VIDEO";
   /** 仅展示这些 modelKey（三视图引擎白名单等） */
   allowedModelKeys?: string[];
+  /** 须具备的能力（如 image_multi_ref / video_i2v） */
+  requiredCapabilities?: StoryModelCapability[];
+  /** 当前模型不兼容时的提示文案 */
+  capabilityHint?: string;
   /** 当前选中 */
   providerId: string;
   modelKey: string;
@@ -45,6 +54,8 @@ const ENGINE_PICKER_MODAL_Z = 1200;
 export function EnginePicker({
   role,
   allowedModelKeys,
+  requiredCapabilities,
+  capabilityHint,
   providerId,
   modelKey,
   params = {},
@@ -68,12 +79,23 @@ export function EnginePicker({
             (m) =>
               m.role === role &&
               m.enabled &&
-              (!allowedSet || allowedSet.has(m.modelKey)),
+              (!allowedSet || allowedSet.has(m.modelKey)) &&
+              (!requiredCapabilities?.length ||
+                modelHasStoryCapabilities(m.modelKey, requiredCapabilities)),
           ),
         }))
         .filter((g) => g.models.length > 0),
-    [providers, role, allowedSet],
+    [providers, role, allowedSet, requiredCapabilities],
   );
+
+  const capabilityMismatch = useMemo(() => {
+    if (!requiredCapabilities?.length || !modelKey.trim()) return null;
+    if (modelHasStoryCapabilities(modelKey, requiredCapabilities)) return null;
+    return (
+      capabilityHint ??
+      `当前模型可能不支持 ${storyCapabilityHint(requiredCapabilities)}，建议重新选择`
+    );
+  }, [requiredCapabilities, modelKey, capabilityHint]);
 
   const current = useMemo(() => {
     for (const g of filtered) {
@@ -113,6 +135,11 @@ export function EnginePicker({
         </span>
         <ChevronDown className="size-3 shrink-0 text-white/50" />
       </button>
+      {capabilityMismatch ? (
+        <p className="nodrag mt-1 rounded border border-amber-400/25 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-100/90">
+          {capabilityMismatch}
+        </p>
+      ) : null}
 
       {open ? (
         <EngineModelModal

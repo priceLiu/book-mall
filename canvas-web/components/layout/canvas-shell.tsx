@@ -49,8 +49,8 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "canvas-sans rounded-full px-3 py-1.5 text-sm transition",
                     active
-                      ? "bg-white/10 font-medium text-white ring-1 ring-white/15"
-                      : "text-[var(--canvas-muted)] hover:text-white",
+                      ? "bg-emerald-500/15 font-medium text-emerald-200 ring-1 ring-emerald-400/30"
+                      : "text-emerald-300/70 hover:text-emerald-200",
                   )}
                 >
                   {label}

@@ -781,4 +781,18 @@ wallet-holds:expire                # 兜底脚本（非 Vercel 部署）
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
 | v1.0 | 2026-05-18 | 首版整合：B/C/D/R 四层 + reserve/settle/release/expire 状态机 + cloudRow 修正凭证规范 + finance-web 全用户明细 + 价格公示统一组件。 |
+| v1.0-phase-d | 2026-05-27 | **附录 A**：工具按月技术服务费；AI 类 toolKey 的 usage reserve/settle **不再扣钱包**；课程 `Subscription` 与工具准入解耦。详见 `doc/logic/tool-monthly-service-fee.md`。 |
+
+---
+
+## 附录 A — Phase D 工具技术服务费（2026-05-27）
+
+自 Phase D 起，工具站 AI 生成路径（试衣、文生图、图生视频、视觉实验室、智能客服等）：
+
+1. **准入**：用户须具备对应 `toolNavKey` 的 **有效 `UserToolServicePeriod`**（管理员直通）；不再要求「黄金会员 + 课程/单品工具订阅」。
+2. **扣费**：开通/续订时从钱包 **一次性扣 `ToolServiceFeePlan.monthlyFeePoints`**，延长 30 天；**单次生成不扣点**（`isServiceFeeMeteredToolKey` 跳过 usage 钱包扣费）。
+3. **云厂商**：用户 BYOK 经 Gateway；Book 不对每次生成记 `ToolUsageEvent` 扣点（可保留 audit-only，`costPoints=0`）。
+4. **课程**：`Subscription` 会员计划 **仅课程**；`toolsNavAllowlist` 不再用于工具 navKey 解析。
+
+WalletHold / Scheme A 按次扣点规则仍适用于 **非 AI 服务类** toolKey（若有）；AI 类前缀见 `book-mall/lib/tool-service-fee/config.ts`。
 

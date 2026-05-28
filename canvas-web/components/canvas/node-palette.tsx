@@ -228,6 +228,28 @@ const REF_VIDEO_PALETTE: PaletteItem[] = [
 ];
 
 const PALETTE_COLLAPSED_KEY = "canvas-node-palette-collapsed";
+const PALETTE_DOCK_KEY = "canvas-node-palette-dock";
+
+type PaletteDock = "top" | "right";
+
+function readPaletteDock(): PaletteDock {
+  try {
+    const dock = localStorage.getItem(PALETTE_DOCK_KEY);
+    if (dock === "top" || dock === "right") return dock;
+    return localStorage.getItem(PALETTE_COLLAPSED_KEY) === "1" ? "right" : "top";
+  } catch {
+    return "top";
+  }
+}
+
+function writePaletteDock(dock: PaletteDock) {
+  try {
+    localStorage.setItem(PALETTE_DOCK_KEY, dock);
+    localStorage.setItem(PALETTE_COLLAPSED_KEY, dock === "right" ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
 
 function PaletteIconButton({
   p,
@@ -434,8 +456,10 @@ export function NodePalette({
   onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [dock, setDock] = useState<PaletteDock>("top");
   const proOnly = useCanvasStore((s) => hasStoryProPipeline(s.nodes));
+
+  const collapsed = dock === "right";
 
   const proPaletteItems = useMemo(
     () =>
@@ -446,25 +470,18 @@ export function NodePalette({
   );
 
   useEffect(() => {
-    try {
-      setCollapsed(localStorage.getItem(PALETTE_COLLAPSED_KEY) === "1");
-    } catch {
-      /* ignore */
-    }
+    setDock(readPaletteDock());
   }, []);
 
-  const toggleCollapsed = useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(PALETTE_COLLAPSED_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
+  const setDockPersist = useCallback((next: PaletteDock) => {
+    setDock(next);
+    writePaletteDock(next);
     setHelpOpen(false);
   }, []);
+
+  const toggleDock = useCallback(() => {
+    setDockPersist(dock === "top" ? "right" : "top");
+  }, [dock, setDockPersist]);
 
   const onDragStart = useCallback(
     (
@@ -511,9 +528,9 @@ export function NodePalette({
   const collapseButton = (
     <button
       type="button"
-      onClick={toggleCollapsed}
-      aria-label={collapsed ? "展开工具栏" : "收到右侧"}
-      title={collapsed ? "展开工具栏" : "收到右侧"}
+      onClick={toggleDock}
+      aria-label={collapsed ? "移到顶部" : "收到右侧"}
+      title={collapsed ? "移到顶部" : "收到右侧"}
       className="group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
     >
       {collapsed ? (
@@ -529,7 +546,7 @@ export function NodePalette({
         }`}
         role="tooltip"
       >
-        {collapsed ? "展开工具栏" : "收到右侧"}
+        {collapsed ? "移到顶部" : "收到右侧"}
       </span>
     </button>
   );
@@ -545,11 +562,22 @@ export function NodePalette({
 
   return (
     <>
+      {/* 始终可见：找不到节点面板时点这里恢复 */}
+      <button
+        type="button"
+        onClick={toggleDock}
+        className="fixed bottom-5 left-5 z-[100] inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/80 px-3 py-1.5 text-[11px] text-white/90 shadow-lg backdrop-blur-md hover:border-cyan-400/40 hover:bg-black/90"
+        title={collapsed ? "节点面板在右侧 · 点击移到顶部" : "节点面板在顶部 · 点击收到右侧"}
+      >
+        <LayoutGrid className="size-3.5 text-cyan-300" />
+        {collapsed ? "节点面板 · 右侧" : "节点面板 · 顶部"}
+      </button>
+
       {collapsed ? (
         <div
-          className="pointer-events-none fixed right-3 top-1/2 z-40 -translate-y-1/2"
+          className="pointer-events-none fixed right-3 top-1/2 z-[100] -translate-y-1/2"
           role="toolbar"
-          aria-label={proOnly ? "影视专业版节点面板（已收起）" : "节点面板（已收起）"}
+          aria-label={proOnly ? "影视专业版节点面板（右侧）" : "节点面板（右侧）"}
         >
           <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-black/75 py-2 pl-1.5 pr-1 shadow-2xl backdrop-blur-md">
             {collapseButton}
@@ -605,7 +633,7 @@ export function NodePalette({
         </div>
       ) : (
         <div
-          className="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2"
+          className="pointer-events-none fixed left-1/2 top-[3.25rem] z-[100] -translate-x-1/2"
           role="toolbar"
           aria-label={proOnly ? "影视专业版节点面板" : "节点面板"}
         >
@@ -660,10 +688,10 @@ export function NodePalette({
 
       {helpOpen ? (
         <div
-          className={`pointer-events-auto z-40 w-[420px] max-w-[92vw] ${
+          className={`pointer-events-auto z-[100] w-[420px] max-w-[92vw] ${
             collapsed
               ? "fixed right-16 top-1/2 -translate-y-1/2"
-              : "absolute left-1/2 top-[52px] -translate-x-1/2"
+              : "fixed left-1/2 top-[calc(3.25rem+52px)] -translate-x-1/2"
           }`}
           role="dialog"
           aria-label="操作方式"

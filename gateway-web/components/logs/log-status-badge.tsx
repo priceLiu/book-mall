@@ -43,15 +43,16 @@ export function LogStatusBadge({
   const dotColor = statusDotColor(status);
   const anchorRef = useRef<HTMLSpanElement>(null);
 
-  const code = failCode?.trim() || "FAILED";
-  const message = failMessage?.trim() || "";
-  const hasFailTip =
-    normalized === "FAILED" && (message.length > 0 || Boolean(failCode?.trim()));
-  const copyText = hasFailTip
-    ? message.length > 0
-      ? `code: ${code}\n\nmessage: ${message}`
-      : `code: ${code}`
-    : undefined;
+  const isFailed = normalized === "FAILED";
+  const code = failCode?.trim() || (isFailed ? "FAILED" : "");
+  const message =
+    failMessage?.trim() ||
+    (isFailed
+      ? "未记录详细原因（常见于上游空响应、连接中断或旧版日志）。请悬停查看 Params，或重试请求。"
+      : "");
+  const hasFailTip = isFailed;
+  const copyText = hasFailTip ? `code: ${code}\n\nmessage: ${message}` : undefined;
+  const nativeTitle = hasFailTip ? `${code}: ${message}` : undefined;
 
   const { open, pos, bindAnchor, bindTip } = useLogHoverTip({
     tipWidth: 520,
@@ -65,9 +66,10 @@ export function LogStatusBadge({
     <>
       <span
         ref={anchorRef}
+        title={nativeTitle}
         className={`inline-flex items-center gap-2 ${
           isActive ? "rounded-md bg-[#2a2a32] px-2.5 py-1" : ""
-        } ${hasFailTip ? "cursor-default" : ""}`}
+        } ${hasFailTip ? "cursor-help" : ""}`}
         onMouseEnter={hasFailTip ? anchorHandlers.onMouseEnter : undefined}
         onMouseLeave={hasFailTip ? anchorHandlers.onMouseLeave : undefined}
       >
@@ -97,16 +99,14 @@ export function LogStatusBadge({
               </div>
               <pre className="whitespace-pre-wrap break-all text-zinc-300">{code}</pre>
             </div>
-            {message.length > 0 ? (
-              <div>
-                <div className="mb-1 font-sans text-[13px] font-medium text-zinc-200">
-                  message:
-                </div>
-                <pre className="whitespace-pre-wrap break-all text-zinc-300">
-                  {message}
-                </pre>
+            <div>
+              <div className="mb-1 font-sans text-[13px] font-medium text-zinc-200">
+                message:
               </div>
-            ) : null}
+              <pre className="whitespace-pre-wrap break-all text-zinc-300">
+                {message}
+              </pre>
+            </div>
           </div>
         </LogPreviewTipShell>
       ) : null}

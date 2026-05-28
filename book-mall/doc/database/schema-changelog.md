@@ -159,7 +159,26 @@
 - **API（B1+ 即将新增）**：`/api/story/projects/*`、`/api/story/kie/{callback,poll,cleanup}`；CORS 复用 `STORY_WEB_ORIGINS`
 - **应用**：`pnpm db:deploy`（已成功，2026-05-22 落地 `tool_mall@sh-postgres-i556nz8q`）
 - **逻辑**：详见 `doc/logic/story-ai-pipeline.md`、`story-web/docs/ai/plan.md`、`story-web/docs/ai/todo.md`
-- **回滚**：开发环境可手动 `DROP TABLE "StoryOssCleanupQueue","StoryGenerationTask","StoryStoryboardFrame","StoryCharacter","StoryProject" CASCADE;` + `DROP TYPE "StoryGenerationStatus","StoryGenerationKind","StoryProjectStatus","StoryProjectAspect" CASCADE;` 并从 User 删反向关系；生产严禁回滚
+- **回滚**：开发环境可手动 `DROP TABLE "StoryOssCleanupQueue",...`; 生产严禁回滚
+
+## 2026-07-11 — Phase D 工具技术服务费（ToolServiceFeePlan / UserToolServicePeriod）
+
+- **迁移目录**：`prisma/migrations/20260711120000_tool_service_fee_plans/`
+- **新枚举**：`ToolServicePeriodStatus`（`ACTIVE` | `EXPIRED` | `SUSPENDED`）
+- **新表**：
+  - `ToolServiceFeePlan`——按 `toolNavKey` 配置月费点数（`monthlyFeePoints`）、展示名、是否可开通
+  - `UserToolServicePeriod`——用户 × 工具分组的服务周期（`periodStart` / `periodEnd`、关联钱包流水）
+- **种子**：试衣 3000 点/月，其余工具占位定价；`app-history` 0 点
+- **应用**：`pnpm run db:deploy`（book-mall 目录）
+- **逻辑**：`doc/logic/tool-monthly-service-fee.md`、`doc/plans/2026-phase-d-service-fee-billing.md`
+
+## 2026-07-11 — Phase F Platform SSO 客户端（SsoClient）
+
+- **迁移目录**：`prisma/migrations/20260711140000_sso_client_platform_f/`
+- **新表**：`SsoClient`（client_id、redirectUris、allowedNavKeys）
+- **SsoAuthorizationCode**：可选 `clientId`
+- **应用**：`pnpm run db:deploy`
+- **文档**：`doc/tech/platform-api-v1.md`
 
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题

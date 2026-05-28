@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { issueToolsSsoRedirect } from "@/lib/issue-tools-sso-redirect";
+import { parsePlatformSsoApp } from "@/lib/platform-app-sso";
 import { sanitizeToolsRedirectPath } from "@/lib/sanitize-tools-redirect-path";
 
 const RE_ENTER_PATH = "/api/sso/tools/re-enter";
@@ -10,19 +11,29 @@ const RE_ENTER_PATH = "/api/sso/tools/re-enter";
 export const dynamic = "force-dynamic";
 
 /**
- * GET：会话失效后从工具站打开此链接；未登录则跳转登录（callbackUrl 带回本接口），
- * 已登录则直接签发 code 并 302 至工具站 `/auth/sso/callback`。
+ * GET：会话失效后从子应用打开此链接；未登录则跳转登录（callbackUrl 带回本接口），
+ * 已登录则直接签发 code 并 302 至子应用 `/auth/sso/callback`（或第三方 redirect_uri）。
  *
- * Query：`redirect` — 工具站内路径，默认 `/fitting-room`，须以 `/` 开头。
+ * Query：
+ * - `redirect` — 子应用内路径，默认 `/fitting-room`
+ * - `app` — tool | canvas | story（默认 tool）
+ * - `client_id` + `redirect_uri` — Phase F 第三方注册客户端
  */
 export async function GET(req: NextRequest) {
   const rp = req.nextUrl.searchParams.get("redirect") ?? undefined;
   const redirectPath = sanitizeToolsRedirectPath(rp);
+  const app = parsePlatformSsoApp(req.nextUrl.searchParams.get("app"));
+  const clientId = req.nextUrl.searchParams.get("client_id")?.trim() || undefined;
+  const redirectUri = req.nextUrl.searchParams.get("redirect_uri")?.trim() || undefined;
 
   const session = await getServerSession(authOptions);
 
   const loginUrl = new URL("/login", req.nextUrl.origin);
-  const returnTo = `${RE_ENTER_PATH}?redirect=${encodeURIComponent(redirectPath)}`;
+  const returnParams = new URLSearchParams({ redirect: redirectPath });
+  if (app !== "tool") returnParams.set("app", app);
+  if (clientId) returnParams.set("client_id", clientId);
+  if (redirectUri) returnParams.set("redirect_uri", redirectUri);
+  const returnTo = `${RE_ENTER_PATH}?${returnParams}`;
   loginUrl.searchParams.set("callbackUrl", returnTo);
 
   if (!session?.user?.id) {
@@ -32,6 +43,9 @@ export async function GET(req: NextRequest) {
   const result = await issueToolsSsoRedirect({
     userId: session.user.id,
     redirectPath,
+    app,
+    clientId,
+    redirectUri,
   });
 
   if (!result.ok) {

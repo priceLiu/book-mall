@@ -21,6 +21,7 @@
 | [**09-finance-refactor-and-tool-federation.md**](./product/09-finance-refactor-and-tool-federation.md) | **财务模块重构与工具联邦**（技术草案：API 映射、序列图、Billing v1） |
 | [**10-multimodal-studio-and-finance-master-plan.md**](./product/10-multimodal-studio-and-finance-master-plan.md) | **全模态工作室 + 财务重构 — 整体方案（通俗版）**：`m.ai-code8.com` 与 `book`/`tool` 分工、用户/后台/核算、落地顺序 |
 | [**12-platform-app-federation.md**](./product/12-platform-app-federation.md) | **平台联邦架构**（独立部署、门户、Book SSO、Gateway、第三方接入） |
+| [**13-tool-service-fee-and-wallet.md**](./product/13-tool-service-fee-and-wallet.md) | **工具技术服务费与钱包**（月费 + Gateway BYOK，退役按次扣点） |
 
 协作需求草案：[**v1.1**](./v1.1)（独立 AI 工具集成 · 试衣间等）。
 
@@ -43,6 +44,7 @@
 |------|------|
 | [stack-and-environment.md](./tech/stack-and-environment.md) | Neon、Vercel、支付、SSO 摘要、样式与环境变量约定 |
 | [tools-sso-environment.md](./tech/tools-sso-environment.md) | 独立工具站 SSO：环境变量、`issue` / `exchange` / `introspect` API |
+| [platform-api-v1.md](./tech/platform-api-v1.md) | **Platform API v1**（SSO / Gateway / 错误码 / 第三方接入） |
 
 若外部协作方只接受单文件入口，可使用根目录 **[product.md](./product.md)**（索引）。
 
@@ -50,6 +52,8 @@
 |------|------|
 | [development-constraints.md](./process/development-constraints.md) | 开发前读文档、计划勾选、归类写入 |
 | [**2026-platform-unification-rollout.md**](./plans/2026-platform-unification-rollout.md) | **平台统一改造实施计划**（SSO、Gateway 财务、Canvas/Story 迁移） |
+| [**2026-platform-prelaunch-checklist.md**](./plans/2026-platform-prelaunch-checklist.md) | **上线前验收清单**（按 book / tool / canvas / story / gateway 分项） |
+| [**2026-phase-d-service-fee-billing.md**](./plans/2026-phase-d-service-fee-billing.md) | **Phase D 技术服务费**（任务勾选与验收） |
 | [mock-payment-checkout.md](./process/mock-payment-checkout.md) | 模拟收银（过渡）：订阅 + 钱包充值、假二维码、`ALLOW_MOCK_PAYMENT` 与安全说明 |
 | [real-payment-integration.md](./process/real-payment-integration.md) | **正式接入支付**（支付宝扫码等）：异步通知、幂等、合规要点 |
 | [2026-05-11-tools-sso-gold-member.md](./plans/2026-05-11-tools-sso-gold-member.md) | v1.1 工具站 SSO + 黄金会员 — 计划与进度 |
@@ -57,6 +61,7 @@
 | [schema-changelog.md](./database/schema-changelog.md) | 数据库结构变更登记 |
 | [logic/README.md](./logic/README.md) | 功能逻辑类文档存放约定 |
 | [tools-sso-session.md](./logic/tools-sso-session.md) | 工具站 SSO 时序、失败分支与实现清单 |
+| [tool-monthly-service-fee.md](./logic/tool-monthly-service-fee.md) | **工具按月技术服务费**（课程 vs 工具、扣款、Gateway） |
 
 ## 模板
 

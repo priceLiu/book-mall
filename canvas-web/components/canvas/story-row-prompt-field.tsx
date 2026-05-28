@@ -5,13 +5,15 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import {
   storyRefIdsFromPrompt,
-  STORY_ROW_LABEL_COL_WIDTH,
   STORY_UPSTREAM_COL_WIDTH,
   type StoryRefImage,
 } from "@/lib/canvas/story-ref-image";
 import type { MentionableItem } from "./mentions/MentionsTextarea";
 import { MentionsTextarea } from "./mentions/MentionsTextarea";
 import { STORY_HINT_BODY_CLASS } from "@/lib/canvas/story-column-sync";
+import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import type { StoryEdition } from "@/lib/canvas/story-edition-chrome";
+import { storyEditionActiveRefBorderClass } from "@/lib/canvas/story-edition-chrome";
 import { StoryColumnMediaPanel } from "./story-column-media-panel";
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -25,16 +27,14 @@ function idsEqual(a: string[], b: string[]): boolean {
   return sa === sb;
 }
 
-function StoryRowTitleColumn({ title }: { title: string }) {
+function StoryRowTitleBadge({ title }: { title: string }) {
   return (
-    <div
-      className="flex shrink-0 items-start pt-1"
-      style={{ width: STORY_ROW_LABEL_COL_WIDTH }}
+    <span
+      className="pointer-events-none absolute left-2 top-0 z-10 max-w-[min(12rem,calc(100%-1rem))] -translate-y-1/2 truncate rounded border border-emerald-400/25 bg-[#0c1424] px-1.5 py-px text-[10px] font-semibold leading-tight text-emerald-200/95 shadow-sm"
+      title={title}
     >
-      <p className="text-[11px] font-semibold leading-tight text-white">
-        {title}
-      </p>
-    </div>
+      {title}
+    </span>
   );
 }
 
@@ -42,13 +42,15 @@ function StoryRowTitleColumn({ title }: { title: string }) {
 function StoryUpstreamImageColumn({
   images,
   activeIds,
+  edition = "comic",
 }: {
   images: StoryRefImage[];
   activeIds: string[];
+  edition?: StoryEdition;
 }) {
   return (
     <div
-      className="flex shrink-0 self-start"
+      className="flex shrink-0 self-stretch"
       style={{ width: STORY_UPSTREAM_COL_WIDTH }}
     >
       <div
@@ -65,7 +67,7 @@ function StoryUpstreamImageColumn({
                 className={cn(
                   "relative min-h-[72px] flex-1 overflow-hidden rounded-md border-2 transition-shadow",
                   active
-                    ? "border-[#fb923c] shadow-[0_0_0_1px_#fb923c,0_0_10px_rgba(251,146,60,0.4)]"
+                    ? storyEditionActiveRefBorderClass(edition)
                     : "border-white/15",
                 )}
               >
@@ -101,12 +103,15 @@ function AutoGrowTextarea({
   rows = 3,
   placeholder,
   onChange,
+  matchMediaHeight,
 }: {
   value: string;
   disabled?: boolean;
   rows?: number;
   placeholder?: string;
   onChange: (next: string) => void;
+  /** 与右侧媒体列最小高度对齐 */
+  matchMediaHeight?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -114,8 +119,9 @@ function AutoGrowTextarea({
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, []);
+    const minPx = matchMediaHeight ? ROW_MEDIA_MIN_H : 0;
+    el.style.height = `${Math.max(el.scrollHeight, minPx)}px`;
+  }, [matchMediaHeight]);
 
   useEffect(() => {
     syncHeight();
@@ -124,7 +130,10 @@ function AutoGrowTextarea({
   return (
     <textarea
       ref={ref}
-      className="nodrag block w-full resize-none overflow-hidden rounded border border-white/10 bg-black/35 px-2 py-1.5 font-mono text-[10px] leading-snug text-white/90"
+      className={cn(
+        "nodrag block w-full resize-none overflow-hidden rounded border border-white/10 bg-black/35 px-2 py-1.5 font-mono text-[10px] leading-snug text-white/90",
+        matchMediaHeight && "min-h-[var(--row-media-min,248px)]",
+      )}
       rows={rows}
       value={value}
       disabled={disabled}
@@ -172,6 +181,13 @@ export function StoryColumnRowCard({
   mediaError,
   videoPrompt,
   videoRefLabels,
+  edition = "comic",
+  frameApproved,
+  frameRejectedReason,
+  videoBlockReason,
+  onApproveFrame,
+  onRejectFrame,
+  belowPrompt,
 }: {
   rowTitle: string;
   promptValue: string;
@@ -200,6 +216,13 @@ export function StoryColumnRowCard({
   /** 分镜列 hover 分镜图：展示将传给视频模型的完整提示词 */
   videoPrompt?: string;
   videoRefLabels?: string[];
+  edition?: StoryEdition;
+  frameApproved?: boolean;
+  frameRejectedReason?: string;
+  videoBlockReason?: string | null;
+  onApproveFrame?: () => void;
+  onRejectFrame?: () => void;
+  belowPrompt?: React.ReactNode;
 }) {
   const [mainDraft, setMainDraft] = useState(promptValue);
   const [mainReferencedIds, setMainReferencedIds] = useState<string[]>([]);
@@ -262,15 +285,15 @@ export function StoryColumnRowCard({
 
   return (
     <div
-      className="rounded-lg border border-white/10 bg-black/25 px-2 py-2"
+      className="relative rounded-lg border border-white/10 bg-black/25 px-2 py-2"
       style={
         {
           ["--row-media-min" as string]: `${ROW_MEDIA_MIN_H}px`,
         } as React.CSSProperties
       }
     >
-      <div className="flex items-start gap-2">
-        <StoryRowTitleColumn title={rowTitle} />
+      <StoryRowTitleBadge title={rowTitle} />
+      <div className="flex items-stretch gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           {useMentions ? (
             <MentionsTextarea
@@ -279,7 +302,8 @@ export function StoryColumnRowCard({
               disabled={disabled}
               rows={3}
               placeholder="场景、镜头描述；输入 @ 引用角色三视图"
-              wrapperClassName="nodrag w-full min-w-0"
+              wrapperClassName="nodrag w-full min-w-0 min-h-[var(--row-media-min,248px)]"
+              className={`${RF_NODE_SCROLL} h-full min-h-[var(--row-media-min,248px)] w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
               onChange={(next, referencedIds) => {
                 setMainDraft(next);
                 setMainReferencedIds(referencedIds);
@@ -289,12 +313,14 @@ export function StoryColumnRowCard({
             <AutoGrowTextarea
               value={mainDraft}
               disabled={disabled}
+              matchMediaHeight
               onChange={setMainDraft}
             />
           )}
           {promptHint ? (
             <p className={STORY_HINT_BODY_CLASS}>{promptHint}</p>
           ) : null}
+          {belowPrompt}
           {extraPrompts?.map((extra, i) => (
             <div key={extra.subLabel} className="space-y-0.5">
               <p className="text-[9px] text-[var(--canvas-muted)]">
@@ -319,6 +345,7 @@ export function StoryColumnRowCard({
           <StoryUpstreamImageColumn
             images={upstreamImages ?? refImages}
             activeIds={activeRefIds}
+            edition={edition}
           />
         ) : null}
         <StoryColumnMediaPanel
@@ -334,6 +361,12 @@ export function StoryColumnRowCard({
           errorMessage={mediaError}
           videoPrompt={videoPrompt}
           videoRefLabels={videoRefLabels}
+          edition={edition}
+          frameApproved={frameApproved}
+          frameRejectedReason={frameRejectedReason}
+          videoBlockReason={videoBlockReason}
+          onApproveFrame={onApproveFrame}
+          onRejectFrame={onRejectFrame}
         />
       </div>
     </div>

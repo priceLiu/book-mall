@@ -2,51 +2,44 @@
 
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import {
-  bookMallLoginHref,
-  fetchStoryViewerUser,
-  type StoryViewerUser,
-} from "@/lib/story-viewer-session";
+import { bookMallLoginHref, bookMallReEnterHref } from "@/lib/platform-sso-links";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const base = useBookMallBaseUrl();
-  const [user, setUser] = useState<StoryViewerUser | null | undefined>(undefined);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!base) {
-      setUser(null);
-      return;
-    }
     let cancelled = false;
-    void fetchStoryViewerUser(base).then((u) => {
-      if (cancelled) return;
-      if (!u) {
-        const returnTo =
-          typeof window !== "undefined" ? window.location.href : `${base}/login`;
-        window.location.href = bookMallLoginHref(base, returnTo);
-        return;
+    void (async () => {
+      try {
+        const r = await fetch("/api/tools-session", { cache: "no-store" });
+        const j = (await r.json().catch(() => null)) as { active?: boolean } | null;
+        if (cancelled) return;
+        if (j?.active) {
+          setReady(true);
+          return;
+        }
+        const path = typeof window !== "undefined" ? window.location.pathname : "/";
+        const reEnter = bookMallReEnterHref(path, "story");
+        if (reEnter) {
+          window.location.href = reEnter;
+          return;
+        }
+        const login = bookMallLoginHref(typeof window !== "undefined" ? window.location.href : "/");
+        if (login) window.location.href = login;
+      } catch {
+        if (!cancelled) setReady(false);
       }
-      setUser(u);
-    });
+    })();
     return () => {
       cancelled = true;
     };
-  }, [base]);
+  }, []);
 
-  if (user === undefined) {
+  if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--story-bg)] text-[var(--story-muted)]">
+      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
         <Loader2 className="mr-2 size-5 animate-spin" />
-        校验登录态…
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--story-bg)] text-[var(--story-muted)]">
-        正在跳转登录…
+        连接 Book 账号…
       </div>
     );
   }

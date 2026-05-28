@@ -103,6 +103,7 @@ export function routeGatewayModel(model: string): RoutedModel {
   return { providerKind: "KIE", requestKind: "OTHER" };
 }
 
+/** OpenAI 兼容 Chat/TTS 的 DashScope 根地址（勿与 api/v1 异步任务根混用） */
 export function defaultBaseUrl(kind: GatewayProviderKind): string {
   switch (kind) {
     case "DEEPSEEK":
@@ -120,3 +121,37 @@ export function defaultBaseUrl(kind: GatewayProviderKind): string {
       );
   }
 }
+
+const DASHSCOPE_HOST_RE = /^https?:\/\/dashscope\.aliyuncs\.com\/?$/i;
+
+/**
+ * 将用户填写的 DashScope 根域名规范为 compatible-mode/v1，避免请求 /chat/completions 404。
+ */
+export function resolveOpenAiCompatibleBaseUrl(
+  kind: GatewayProviderKind,
+  baseUrl: string | null | undefined,
+): string {
+  const fallback = defaultBaseUrl(
+    kind === "DASHSCOPE" ? "BAILIAN" : kind,
+  ).replace(/\/$/, "");
+
+  if (kind !== "BAILIAN" && kind !== "DASHSCOPE") {
+    return (baseUrl?.trim() || fallback).replace(/\/$/, "");
+  }
+
+  const raw = (baseUrl?.trim() || fallback).replace(/\/$/, "");
+  if (!raw) return fallback;
+
+  if (/\/compatible-mode\/v\d+$/i.test(raw)) return raw;
+  if (/\/compatible-mode$/i.test(raw)) return `${raw}/v1`;
+  if (DASHSCOPE_HOST_RE.test(raw)) return `${raw}/compatible-mode/v1`;
+
+  return raw;
+}
+
+export {
+  assertStoryModelCapabilities,
+  getStoryModelCapabilities,
+  modelHasStoryCapabilities,
+  type StoryModelCapability,
+} from "@/lib/canvas/story-model-capabilities";

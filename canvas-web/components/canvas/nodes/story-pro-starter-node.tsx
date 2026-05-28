@@ -53,6 +53,7 @@ import {
   STORY_PRO_UPLOAD_SCRIPT_ACCEPT,
   STORY_PRO_UPLOADED_SCRIPT_REF_ID,
   fetchUploadedScriptFromOss,
+  formatCanvasFetchError,
   storyProUploadedScriptMentionLabel,
 } from "@/lib/canvas/story-pro-upload-script";
 import { resolveStoryProStarterScriptInput } from "@/lib/canvas/story-pro-starter-text";
@@ -301,7 +302,7 @@ export function StoryProStarterNode({ id, data, selected }: NodeProps) {
     if (d.uploadedScriptMd?.trim() || !d.uploadedScriptOssUrl?.trim()) return;
     let cancelled = false;
     setScriptLoadBusy(true);
-    void fetchUploadedScriptFromOss(d.uploadedScriptOssUrl)
+    void fetchUploadedScriptFromOss(base, d.uploadedScriptOssUrl)
       .then((md) => {
         if (!cancelled) updateNodeData(id, { uploadedScriptMd: md });
       })
@@ -316,7 +317,7 @@ export function StoryProStarterNode({ id, data, selected }: NodeProps) {
     return () => {
       cancelled = true;
     };
-  }, [d.uploadedScriptOssUrl, d.uploadedScriptMd, id, updateNodeData]);
+  }, [base, d.uploadedScriptOssUrl, d.uploadedScriptMd, id, updateNodeData]);
 
   const ingestScriptFile = async (file: File) => {
     if (fieldsLocked) return;
@@ -341,9 +342,7 @@ export function StoryProStarterNode({ id, data, selected }: NodeProps) {
         ossUrl = await uploadCanvasFile(base, uploadFile);
       } catch (e) {
         window.alert(
-          e instanceof Error
-            ? `剧本上传云端失败：${e.message}`
-            : "剧本上传云端失败",
+          formatCanvasFetchError(e, "剧本上传云端失败"),
         );
         return;
       }
@@ -364,12 +363,15 @@ export function StoryProStarterNode({ id, data, selected }: NodeProps) {
     if (latest?.uploadedScriptMd?.trim()) return true;
     if (!latest?.uploadedScriptOssUrl?.trim()) return Boolean(upstreamScript);
     try {
-      const md = await fetchUploadedScriptFromOss(latest.uploadedScriptOssUrl);
+      const md = await fetchUploadedScriptFromOss(
+        base,
+        latest.uploadedScriptOssUrl,
+      );
       updateNodeData(id, { uploadedScriptMd: md });
       return true;
     } catch (e) {
       window.alert(
-        e instanceof Error ? e.message : "无法从云端读取剧本，请稍后重试",
+        formatCanvasFetchError(e, "无法从云端读取剧本"),
       );
       return false;
     }

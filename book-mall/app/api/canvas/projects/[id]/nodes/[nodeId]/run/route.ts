@@ -38,6 +38,9 @@ import {
   type StoryProLlmSection,
 } from "@/lib/canvas/story-pro-workspace-runner";
 import { storyProStyleGateError } from "@/lib/canvas/story-pro-style-anchor";
+import { resolveCharacterRowAssetRefUrls } from "@/lib/canvas/story-pro-character-ref-resolve";
+import { assertStoryProRunModelCapabilities } from "@/lib/canvas/story-pro-run-guards";
+import { assertStoryModelCapabilities } from "@/lib/canvas/story-model-capabilities";
 
 type Ctx = { params: Promise<{ id: string; nodeId: string }> };
 
@@ -120,6 +123,36 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     const requireProStyle = () => {
       if (!styleFinalized) storyProStyleGateError();
     };
+    if (isPro && rowKey && mediaKind) {
+      if (
+        node.type === "story-pro-character" &&
+        mediaKind === "threeView"
+      ) {
+        const rows =
+          (baseArgs.node.data.rows as { key?: string; lockedRefIds?: string[] }[]) ??
+          [];
+        const row = rows.find((r) => String(r.key ?? "") === rowKey);
+        const refUrls = await resolveCharacterRowAssetRefUrls(
+          guard.user.id,
+          projectId,
+          { key: rowKey, lockedRefIds: row?.lockedRefIds },
+          { excludeThreeView: true },
+        );
+        const batch = (baseArgs.node.data.batchImage as { modelKey?: string }) ?? {};
+        assertStoryModelCapabilities(
+          String(batch.modelKey ?? "").trim(),
+          refUrls.length > 0 ? ["image_multi_ref"] : ["image_t2i"],
+          "角色三视图",
+        );
+      } else {
+        assertStoryProRunModelCapabilities({
+          nodeType: node.type,
+          mediaKind,
+          nodeData: baseArgs.node.data,
+          rowKey,
+        });
+      }
+    }
     let result;
     if (node.type === "story-pro-script-hub" && llmSection) {
       result = await runStoryProScriptHubSection({

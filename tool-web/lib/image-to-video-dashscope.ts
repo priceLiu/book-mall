@@ -3,6 +3,7 @@
  * 文档：doc/pic-video.md、doc/chanaosheng.md、doc/wen-video.md（HappyHorse 文生 parameters）
  */
 
+/** @deprecated Phase D：直连 DashScope 死代码；保留 build*VideoBody helper 供 Gateway 路径使用。 */
 const CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
 const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";

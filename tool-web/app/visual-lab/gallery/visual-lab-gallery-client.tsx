@@ -116,10 +116,17 @@ export function VisualLabGalleryClient() {
         <ul className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((it) => (
             <li key={it.id} className="vl-gallery-card">
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
                 className="vl-gallery-card-media-btn"
                 onClick={() => setDetail(it)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setDetail(it);
+                  }
+                }}
                 aria-label={`查看「${it.imageName}」详情`}
               >
                 <div className="vl-gallery-thumb-bg vl-gallery-thumb-bg--reflect">
@@ -145,7 +152,7 @@ export function VisualLabGalleryClient() {
                     <span className="vl-gallery-eye-caption">查看回复</span>
                   </span>
                 </div>
-              </button>
+              </div>
               <div className="space-y-2 p-4 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-md border border-[var(--vl-border-strong)] bg-[var(--vl-surface-2)] px-2 py-0.5 text-xs font-medium text-[var(--vl-muted)]">

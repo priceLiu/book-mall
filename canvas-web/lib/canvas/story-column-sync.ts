@@ -97,12 +97,33 @@ function buildFrameRefImagesForCharacters(
 /** 分镜列「镜 1」栏展示的 @ 引用说明（不写入每镜 prompt 正文） */
 export const FRAME_ROW_AT_HINT = "（输入 @ 可引用已生成的角色三视图）";
 
-/** 漫剧工作区 · 统一蓝色提示文案 */
-export const STORY_HINT_BLUE_CLASS = "text-[#60a5fa]";
-/** 模型选择 / 分镜图·视频 等区块标签：蓝色 + 左侧竖线 */
-export const STORY_HINT_LABEL_CLASS = `border-l-2 border-[#60a5fa] pl-2 text-[10px] uppercase tracking-wider ${STORY_HINT_BLUE_CLASS}`;
+/** 图 2 · 锁定 / 前置条件 / @ 说明等提示文案（金黄） */
+export const STORY_HINT_GOLD_CLASS = "text-amber-300/90";
+export const STORY_HINT_GOLD_BORDER_CLASS = "border-amber-400/55";
+/** @deprecated 保留别名，新代码请用 STORY_HINT_GOLD_CLASS */
+export const STORY_HINT_BLUE_CLASS = STORY_HINT_GOLD_CLASS;
+/** 模型选择 / 分镜图·视频 等区块标签：金黄 + 左侧竖线 */
+export const STORY_HINT_LABEL_CLASS = `border-l-2 ${STORY_HINT_GOLD_BORDER_CLASS} pl-2 text-[10px] uppercase tracking-wider ${STORY_HINT_GOLD_CLASS}`;
 /** 行内说明、@ 引用提示等正文级提示 */
-export const STORY_HINT_BODY_CLASS = `text-[10px] leading-relaxed ${STORY_HINT_BLUE_CLASS}`;
+export const STORY_HINT_BODY_CLASS = `text-[10px] leading-relaxed ${STORY_HINT_GOLD_CLASS}`;
+/** 菜单 / 节点头 / 状态类文案（绿色） */
+export const STORY_CHROME_GREEN_CLASS = "text-emerald-300/90";
+/** 资产槽 / 分镜行辅助说明（提示语，金黄） */
+export const STORY_ROW_META_CLASS = STORY_HINT_BODY_CLASS;
+/** 节点内区块标题 / 状态说明（绿色） */
+export const STORY_ROW_SECTION_CLASS = `text-[10px] leading-relaxed ${STORY_CHROME_GREEN_CLASS}`;
+/** 资产槽内次级标签（槽位名等） */
+export const STORY_ROW_SUBLABEL_CLASS =
+  "text-[9px] text-emerald-200/75";
+/** 错误信息：单行省略，hover title 展示全文 */
+export const STORY_ERROR_LINE_CLASS =
+  "truncate text-[10px] leading-snug text-red-400/90";
+/** 行内轻量操作按钮 */
+export const STORY_ROW_ACTION_BTN_CLASS =
+  "nodrag rounded border border-white/15 px-2 py-0.5 text-[10px] text-white/75 hover:bg-white/5 disabled:opacity-40";
+/** 行内提示条（入库、建议 @ 等） */
+export const STORY_ROW_BANNER_CLASS =
+  "flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/25 px-2 py-1.5";
 
 /** 从已保存 prompt 中去掉 @ 说明行（历史数据可能写在每镜末尾） */
 export function stripFrameRowAtHint(prompt: string): string {
@@ -229,6 +250,7 @@ export function buildVideoRowsFromFrames(
       videoReferencedNodeIds: f.referencedNodeIds ?? [],
       frameImageUrl:
         f.runtime?.ossUrl ?? f.runtime?.ephemeralUrl ?? undefined,
+      frameApprovedAt: f.frameApprovedAt,
     };
   });
 }

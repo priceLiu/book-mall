@@ -1,0 +1,378 @@
+"use client";
+
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { BookOpen, Layers, Lock, LockOpen, MapPin, Users } from "lucide-react";
+
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import {
+  setStoryProCharacterAssetLocked,
+  setStoryProSceneAssetLocked,
+  type StoryProCharacterAssetRecord,
+  type StoryProSceneAssetRecord,
+} from "@/lib/canvas-api";
+import { STORY_PRO_ASSET_REF_KIND_LABELS } from "@/lib/canvas/story-pro-character-asset-catalog";
+import { STORY_PRO_SCENE_REF_KIND_LABELS } from "@/lib/canvas/story-pro-scene-asset-catalog";
+import {
+  notifyStoryProCharacterAssetsChanged,
+  useStoryProCharacterAssets,
+} from "@/lib/canvas/use-story-pro-character-assets";
+import {
+  notifyStoryProSceneAssetsChanged,
+  useStoryProSceneAssets,
+} from "@/lib/canvas/use-story-pro-scene-assets";
+import { StoryMediaPreviewModal } from "./story-column-media-panel";
+
+export type ProjectAssetTab = "character" | "scene";
+
+export function ProjectAssetsView({
+  projectId,
+  initialTab = "character",
+  compact = false,
+}: {
+  projectId: string | null | undefined;
+  initialTab?: ProjectAssetTab;
+  /** 侧栏模式：略紧凑 */
+  compact?: boolean;
+}) {
+  const base = useBookMallBaseUrl();
+  const { assets: characterAssets, loading: charLoading, refresh: refreshChar } =
+    useStoryProCharacterAssets(projectId);
+  const { assets: sceneAssets, loading: sceneLoading, refresh: refreshScene } =
+    useStoryProSceneAssets(projectId);
+  const [tab, setTab] = useState<ProjectAssetTab>(initialTab);
+  const [preview, setPreview] = useState<{ url: string; title: string } | null>(
+    null,
+  );
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const sortedCharacters = useMemo(
+    () =>
+      [...characterAssets].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
+    [characterAssets],
+  );
+
+  const sortedScenes = useMemo(
+    () =>
+      [...sceneAssets].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
+    [sceneAssets],
+  );
+
+  const toggleCharacterLock = async (asset: StoryProCharacterAssetRecord) => {
+    if (!base?.trim()) return;
+    const next = !asset.locked;
+    const verb = next ? "锁定" : "解锁";
+    if (!window.confirm(`${verb}角色资产「${asset.displayName}」？`)) return;
+    if (
+      next &&
+      !window.confirm(
+        "锁定后无法上传、删除或替换该角色的参考图。确定锁定？",
+      )
+    ) {
+      return;
+    }
+    setBusyId(asset.id);
+    try {
+      await setStoryProCharacterAssetLocked(base, asset.id, next);
+      notifyStoryProCharacterAssetsChanged();
+      await refreshChar();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const toggleSceneLock = async (asset: StoryProSceneAssetRecord) => {
+    if (!base?.trim()) return;
+    const next = !asset.locked;
+    const verb = next ? "锁定" : "解锁";
+    if (!window.confirm(`${verb}场景资产「${asset.displayName}」？`)) return;
+    if (
+      next &&
+      !window.confirm(
+        "锁定后无法上传、删除或替换该场景的参考图。确定锁定？",
+      )
+    ) {
+      return;
+    }
+    setBusyId(asset.id);
+    try {
+      await setStoryProSceneAssetLocked(base, asset.id, next);
+      notifyStoryProSceneAssetsChanged();
+      await refreshScene();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const loading = tab === "character" ? charLoading : sceneLoading;
+  const emptyProjectHint = !projectId?.trim();
+
+  return (
+    <>
+      <div className={compact ? "space-y-2" : "space-y-4"}>
+        {!compact ? (
+          <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
+            影视专业版项目级角色 / 场景参考库，与画布内四槽、三槽面板数据同步。
+            <Link
+              href="/guides/project-assets"
+              className="ml-1 text-cyan-300/90 underline-offset-2 hover:underline"
+            >
+              查看使用说明
+            </Link>
+          </p>
+        ) : null}
+
+        <div className="flex gap-1">
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+              tab === "character"
+                ? "bg-cyan-500/20 text-cyan-50"
+                : "text-white/60 hover:bg-white/5"
+            }`}
+            onClick={() => setTab("character")}
+          >
+            <Users className="size-3" />
+            角色
+          </button>
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+              tab === "scene"
+                ? "bg-cyan-500/20 text-cyan-50"
+                : "text-white/60 hover:bg-white/5"
+            }`}
+            onClick={() => setTab("scene")}
+          >
+            <MapPin className="size-3" />
+            场景
+          </button>
+          {!compact ? (
+            <Link
+              href="/guides/project-assets"
+              className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-cyan-200/70 hover:bg-white/5 hover:text-cyan-100"
+            >
+              <BookOpen className="size-3" />
+              使用说明
+            </Link>
+          ) : null}
+        </div>
+
+        {emptyProjectHint ? (
+          <p className="text-[12px] text-[var(--canvas-muted)]">
+            请先选择或进入一个画布项目；资产按项目隔离存储。
+          </p>
+        ) : loading ? (
+          <p className="text-[12px] text-[var(--canvas-muted)]">加载中…</p>
+        ) : tab === "character" ? (
+          sortedCharacters.length === 0 ? (
+            <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
+              还没有角色资产。在画布「人物设计」列生成三视图后，可通过四槽面板上传脸 / 全身 / 服装 / 三视图。
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {sortedCharacters.map((asset) => (
+                <li
+                  key={asset.id}
+                  className="rounded-lg border border-cyan-400/15 bg-cyan-950/20 p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-medium text-cyan-50">
+                        {asset.displayName}
+                      </p>
+                      <p className="text-[10px] text-cyan-200/50">
+                        key: {asset.characterKey}
+                        {asset.projectId ? " · 本项目" : " · 全局"}
+                        {" · v"}
+                        {asset.version ?? 1}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${
+                        asset.locked
+                          ? "border-amber-400/40 text-amber-200"
+                          : "border-white/15 text-white/60 hover:border-cyan-400/30"
+                      }`}
+                      disabled={busyId === asset.id}
+                      onClick={() => void toggleCharacterLock(asset)}
+                    >
+                      {asset.locked ? (
+                        <Lock className="inline size-3" />
+                      ) : (
+                        <LockOpen className="inline size-3" />
+                      )}{" "}
+                      {asset.locked ? "已锁" : "锁定"}
+                    </button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {asset.refs.map((ref) => (
+                      <button
+                        key={ref.id}
+                        type="button"
+                        className="group relative size-14 overflow-hidden rounded border border-white/10 bg-black/30"
+                        title={
+                          ref.label ??
+                          STORY_PRO_ASSET_REF_KIND_LABELS[ref.kind]
+                        }
+                        onClick={() =>
+                          setPreview({
+                            url: ref.ossUrl,
+                            title:
+                              ref.label ??
+                              `${asset.displayName} · ${STORY_PRO_ASSET_REF_KIND_LABELS[ref.kind]}`,
+                          })
+                        }
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={ref.ossUrl}
+                          alt=""
+                          className="size-full object-cover"
+                        />
+                        <span className="absolute inset-x-0 bottom-0 bg-black/65 px-0.5 py-0.5 text-[8px] text-white/90">
+                          {STORY_PRO_ASSET_REF_KIND_LABELS[ref.kind]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : sortedScenes.length === 0 ? (
+          <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
+            还没有场景资产。在画布「场景设计」列生成参考图后，可通过三槽面板保存全景 / 细节 / 氛围。
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {sortedScenes.map((asset) => (
+              <li
+                key={asset.id}
+                className="rounded-lg border border-cyan-400/15 bg-cyan-950/20 p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-cyan-50">
+                      {asset.displayName}
+                    </p>
+                    <p className="text-[10px] text-cyan-200/50">
+                      key: {asset.sceneKey}
+                      {asset.projectId ? " · 本项目" : " · 全局"}
+                      {" · v"}
+                      {asset.version ?? 1}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${
+                      asset.locked
+                        ? "border-amber-400/40 text-amber-200"
+                        : "border-white/15 text-white/60 hover:border-cyan-400/30"
+                    }`}
+                    disabled={busyId === asset.id}
+                    onClick={() => void toggleSceneLock(asset)}
+                  >
+                    {asset.locked ? (
+                      <Lock className="inline size-3" />
+                    ) : (
+                      <LockOpen className="inline size-3" />
+                    )}{" "}
+                    {asset.locked ? "已锁" : "锁定"}
+                  </button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {asset.refs.map((ref) => (
+                    <button
+                      key={ref.id}
+                      type="button"
+                      className="group relative size-14 overflow-hidden rounded border border-white/10 bg-black/30"
+                      title={
+                        ref.label ??
+                        STORY_PRO_SCENE_REF_KIND_LABELS[ref.kind]
+                      }
+                      onClick={() =>
+                        setPreview({
+                          url: ref.ossUrl,
+                          title:
+                            ref.label ??
+                            `${asset.displayName} · ${STORY_PRO_SCENE_REF_KIND_LABELS[ref.kind]}`,
+                        })
+                      }
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={ref.ossUrl}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                      <span className="absolute inset-x-0 bottom-0 bg-black/65 px-0.5 py-0.5 text-[8px] text-white/90">
+                        {STORY_PRO_SCENE_REF_KIND_LABELS[ref.kind]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {preview ? (
+        <StoryMediaPreviewModal
+          url={preview.url}
+          title={preview.title}
+          onClose={() => setPreview(null)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function ProjectAssetsTabBar({
+  tab,
+  onTab,
+}: {
+  tab: ProjectAssetTab;
+  onTab: (t: ProjectAssetTab) => void;
+}) {
+  return (
+    <div className="flex gap-1">
+      <button
+        type="button"
+        className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+          tab === "character"
+            ? "bg-cyan-500/20 text-cyan-50"
+            : "text-white/60 hover:bg-white/5"
+        }`}
+        onClick={() => onTab("character")}
+      >
+        <Users className="size-3" />
+        角色
+      </button>
+      <button
+        type="button"
+        className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+          tab === "scene"
+            ? "bg-cyan-500/20 text-cyan-50"
+            : "text-white/60 hover:bg-white/5"
+        }`}
+        onClick={() => onTab("scene")}
+      >
+        <MapPin className="size-3" />
+        场景
+      </button>
+    </div>
+  );
+}
+
+export function ProjectAssetsPanelIcon() {
+  return <Layers className="size-4 text-cyan-300" />;
+}

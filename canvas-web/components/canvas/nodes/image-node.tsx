@@ -5,6 +5,7 @@ import type { NodeProps } from "@xyflow/react";
 import { ImageIcon, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
+import { useImagePasteWhenActive } from "@/lib/canvas/image-upload-handlers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { ImageNodeData } from "@/lib/canvas/types";
 import { MediaHoverBox } from "../media-hover-box";
@@ -25,7 +26,7 @@ export function ImageNode({ id, data, selected }: NodeProps) {
 
   const onFile = useCallback(
     async (file: File) => {
-      if (!file) return;
+      if (!file || !file.type.startsWith("image/")) return;
       const blobUrl = URL.createObjectURL(file);
       updateNodeData(id, {
         blobUrl,
@@ -47,6 +48,8 @@ export function ImageNode({ id, data, selected }: NodeProps) {
     [base, id, updateNodeData],
   );
 
+  useImagePasteWhenActive(Boolean(selected), (file) => void onFile(file));
+
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
 
   return (
@@ -65,6 +68,7 @@ export function ImageNode({ id, data, selected }: NodeProps) {
             src={previewUrl || undefined}
             variant="uploadable"
             onUpload={onPick}
+            onImageFile={(file) => void onFile(file)}
             clickToPreview
             alt={d.label ?? "image"}
             fit="contain"

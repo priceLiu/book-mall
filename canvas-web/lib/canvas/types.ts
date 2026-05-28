@@ -54,6 +54,8 @@ export {
   type StoryThemeSystemPromptTemplateId,
   STORY_LLM_MODEL_KEYS,
   STORY_VIDEO_MODEL_KEYS,
+  STORY_PRO_FRAME_IMAGE_MODEL_KEYS,
+  STORY_PRO_FRAME_IMAGE_SINGLE_REF_MODEL_KEYS,
   STORY_TTS_MODEL_KEYS,
 } from "./story-prompts";
 

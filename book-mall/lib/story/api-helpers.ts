@@ -1,16 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { resolvePlatformUser } from "@/lib/platform-auth";
 import { storyCorsHeaders } from "@/lib/story/cors";
 import {
   assertGatewayApiKeyLinkedForUser,
   GatewayRequiredError,
 } from "@/lib/gateway/book-gateway-link";
+import {
+  assertPlatformGatewayEntitlement,
+  PlatformEntitlementError,
+} from "@/lib/platform-gateway-entitlement";
 import { StoryProjectError } from "./story-project-service";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
-  Vary: "Cookie",
+  Vary: "Cookie, Authorization",
 };
 
 export function jsonHeaders(request: NextRequest): Record<string, string> {
@@ -31,8 +34,8 @@ export type AuthGuardResult =
 export async function requireSessionUser(
   request: NextRequest,
 ): Promise<AuthGuardResult> {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const user = await resolvePlatformUser(request);
+  if (!user) {
     return {
       ok: false,
       response: NextResponse.json(
@@ -44,22 +47,34 @@ export async function requireSessionUser(
   return {
     ok: true,
     user: {
-      id: session.user.id,
-      name: session.user.name ?? null,
-      email: session.user.email ?? null,
+      id: user.id,
+      name: user.name,
+      email: user.email,
     },
   };
 }
 
-/** Story AI 路由：登录 + 已关联 Gateway Key */
+/** Story AI 路由：登录 + 漫剧月费 + Gateway Key */
 export async function requireStoryGatewayUser(
   request: NextRequest,
 ): Promise<AuthGuardResult> {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard;
   try {
+    await assertPlatformGatewayEntitlement(guard.user.id, {
+      navKey: "story-theater",
+    });
     await assertGatewayApiKeyLinkedForUser(guard.user.id);
   } catch (e) {
+    if (e instanceof PlatformEntitlementError) {
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: e.code, message: e.message },
+          { status: e.httpStatus, headers: jsonHeaders(request) },
+        ),
+      };
+    }
     if (e instanceof GatewayRequiredError) {
       return {
         ok: false,

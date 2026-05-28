@@ -1,6 +1,7 @@
 import type { GatewayProviderKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encryptApiKey, maskApiKey } from "@/lib/canvas/secret";
+import { resolveOpenAiCompatibleBaseUrl } from "@/lib/gateway/model-router";
 
 export async function listGatewayCredentials(userId: string) {
   const rows = await prisma.gatewayVendorCredential.findMany({
@@ -29,13 +30,19 @@ export async function createGatewayCredential(opts: {
   baseUrl?: string | null;
 }) {
   const blob = encryptApiKey(opts.apiKey.trim());
+  const rawBase = opts.baseUrl?.trim() || null;
+  const baseUrl =
+    rawBase &&
+    (opts.providerKind === "BAILIAN" || opts.providerKind === "DASHSCOPE")
+      ? resolveOpenAiCompatibleBaseUrl(opts.providerKind, rawBase)
+      : rawBase;
   return prisma.gatewayVendorCredential.create({
     data: {
       userId: opts.userId,
       alias: opts.alias.trim() || opts.providerKind,
       providerKind: opts.providerKind,
       apiKeyEncrypted: blob,
-      baseUrl: opts.baseUrl?.trim() || null,
+      baseUrl,
     },
   });
 }

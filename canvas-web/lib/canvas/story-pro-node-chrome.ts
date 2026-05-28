@@ -20,7 +20,7 @@ export const PRO_NODE_ACTION_BTN_SPLIT_CLASS =
   "nodrag inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-md border border-cyan-400/40 bg-cyan-500/15 px-2 text-[12px] font-medium leading-tight text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40";
 
 export const PRO_HINT_LABEL_CLASS =
-  "text-[10px] font-medium uppercase tracking-wider text-cyan-200/55";
+  "text-[10px] font-medium uppercase tracking-wider text-emerald-300/85";
 
 export const PRO_SELECT_CLASS =
   "w-full rounded border border-cyan-400/20 bg-black/40 px-2 py-1.5 text-[12px] text-white disabled:cursor-not-allowed disabled:opacity-45";

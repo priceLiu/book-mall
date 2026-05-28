@@ -8,6 +8,10 @@ import { patchVideoRowsFromFrameRows } from "@/lib/canvas/story-column-sync";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { applyVideoRowRuntime } from "@/lib/canvas/story-row-patch";
 import { storyApplyTaskResult } from "@/lib/canvas/story-run-apply";
+import { resolveStoryProRunStylePayload } from "@/lib/canvas/story-pro-run-style-context";
+import {
+  storyVideoGenerateBlockReason,
+} from "@/lib/canvas/story-frame-gate";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type {
   StoryFrameRow,
@@ -113,7 +117,11 @@ export async function commitStoryVideoRowRun(
   const updateNodeData = useCanvasStore.getState().updateNodeData;
   const state = useCanvasStore.getState();
   const videoNode = state.nodes.find((n) => n.id === videoColumnId);
-  if (!videoNode || videoNode.type !== "story-video-column") {
+  if (
+    !videoNode ||
+    (videoNode.type !== "story-video-column" &&
+      videoNode.type !== "story-pro-video")
+  ) {
     return { ok: false, error: "找不到分镜视频列，请检查工作区是否完整。" };
   }
 
@@ -124,6 +132,11 @@ export async function commitStoryVideoRowRun(
       }
     )?.rows ?? [];
   const frameRows = frameRowsForVideoSync(state.nodes, frameColumnId, frameStored);
+  const frameRow = frameRows.find((r) => r.key === rowKey);
+  const blockReason = storyVideoGenerateBlockReason(frameRow);
+  if (blockReason) {
+    return { ok: false, error: blockReason };
+  }
   const videoStored =
     (videoNode.data as StoryVideoColumnNodeData).rows ?? [];
   const patched = patchVideoRowsForRun(
@@ -162,9 +175,15 @@ export async function commitStoryVideoRowRun(
     videoNode;
 
   try {
+    const store = useCanvasStore.getState();
+    const stylePayload = resolveStoryProRunStylePayload(
+      store.nodes,
+      store.edges,
+      nodeAfter,
+    );
     const r = await runCanvasNode(base, projectId, videoColumnId, {
       node: {
-        type: "story-video-column",
+        type: videoNode.type,
         data: nodeAfter.data as Record<string, unknown>,
         imageInputs: [],
         textInputs: [],
@@ -172,6 +191,7 @@ export async function commitStoryVideoRowRun(
       forceFresh,
       rowKey,
       mediaKind: "video",
+      ...stylePayload,
     });
     let task = r.task;
     storyApplyTaskResult(
