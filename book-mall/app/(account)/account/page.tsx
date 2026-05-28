@@ -10,6 +10,8 @@ import { getGoldMemberAccess } from "@/lib/gold-member";
 import { userHasAnyActiveToolService } from "@/lib/tool-service-fee/periods";
 import { isToolsSsoConfigured, getToolsPublicOrigin } from "@/lib/sso-tools-env";
 import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
+import { getGatewayLinkStatusForUser } from "@/lib/canvas/book-gateway-link";
+import { getCanvasWebOrigin } from "@/lib/app-web-origins";
 import {
   Card,
   CardContent,
@@ -83,7 +85,8 @@ export default async function AccountPage({
     toolsSsoErr.length > 0 ? toolsSsoErrBanner(toolsSsoErr) : null;
 
   /** 合并为单笔 transaction，减少与个人中心其它并行调用的连接池叠加。 */
-  const [flags, goldAccess, hasToolService, refundAndUser] = await Promise.all([
+  const [flags, goldAccess, hasToolService, refundAndUser, gatewayStatus] =
+    await Promise.all([
     getMembershipFlags(session.user.id),
     getGoldMemberAccess(session.user.id),
     userHasAnyActiveToolService(session.user.id),
@@ -98,6 +101,7 @@ export default async function AccountPage({
         select: { passwordHash: true },
       }),
     ]),
+    getGatewayLinkStatusForUser(session.user.id),
   ]);
 
   const [walletRefunds, accountSecrets] = refundAndUser;
@@ -109,6 +113,9 @@ export default async function AccountPage({
   const isAdminUser = session.user.role === "ADMIN";
   const canLaunchTools =
     toolsSsoReady && (isAdminUser || hasToolService);
+  const canLaunchCanvas = canLaunchTools;
+  const canvasOriginConfigured = Boolean(getCanvasWebOrigin().startsWith("http"));
+  const gatewayLinked = gatewayStatus.linked;
 
   const financeWebOrigin = getFinanceWebPublicOrigin();
   const toolsPublicOrigin = getToolsPublicOrigin();
@@ -166,6 +173,9 @@ export default async function AccountPage({
           hasActiveToolService={hasToolService}
           canLaunchTools={canLaunchTools}
           showToolsCta={toolsSsoReady}
+          gatewayLinked={gatewayLinked}
+          canLaunchCanvas={canLaunchCanvas}
+          canvasOriginConfigured={canvasOriginConfigured}
         />
 
         {/* 2. 费用明细入口 */}
@@ -212,7 +222,7 @@ export default async function AccountPage({
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Gateway API Key（Canvas / Story / 工具站）</CardTitle>
             <CardDescription className="text-xs leading-relaxed">
-              先点「用 Book 账号打开 Gateway」绑定厂商凭证并创建 sk-gw-...，再在此关联。Canvas 经 Gateway 代理，Book 不保存厂商 Key。详见 Gateway 用户需知。
+              先点「用 Book 账号打开 Gateway」绑定厂商凭证并创建 sk-gw-...，再在此关联。Canvas / Story / 工具站经 Gateway 代理；新用户打开 AI 画布前须完成本步骤。
             </CardDescription>
           </CardHeader>
           <CardContent>

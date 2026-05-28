@@ -47,7 +47,7 @@ function Inner() {
           <div>
             <h1 className="canvas-serif text-3xl text-white">我的项目资产</h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--canvas-muted)]">
-              影视专业版角色 / 场景参考库，按画布项目隔离。在任意画布内入库后，此处与侧栏同步可见。
+              影视专业版四类资产：角色视觉 / 角色音频 / 场景·道具 / 全局风格。在画布内入库后，此处与侧栏同步可见。
             </p>
           </div>
           <Link

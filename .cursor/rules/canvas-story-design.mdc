@@ -20,10 +20,12 @@ alwaysApply: false
 
 控制节点与角色/分镜列：**外框固定尺寸**，内容区滚动。禁止再按 rows 动态撑节点高。
 
-## 蓝色提示
+## 文案色阶（提示 / 状态 / 错误）
 
-- 模型标签 / @ 说明：`STORY_HINT_LABEL_CLASS`、`STORY_HINT_BODY_CLASS`（`#60a5fa` + 左竖线）
-- 真源：`story-column-sync.ts` · 详见 `design.md` §8
+- **提示**（@ 说明、前置条件、锁定占位）：`STORY_HINT_*` 金黄 · 见 `design.md` §8
+- **节点 chrome**（导航、标题、状态）：`STORY_CHROME_GREEN_CLASS` / `PRO_HINT_LABEL_CLASS` 绿色
+- **错误**：`StoryErrorLine` · 单行 `truncate` + `title` 悬停全文
+- 规则详情：`.cursor/rules/canvas-story-typography.mdc`
 
 ## 按钮
 

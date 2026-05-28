@@ -323,24 +323,42 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 
 ---
 
-## 8. 蓝色提示文案（模型 / @ 引用）
+## 8. 文案色阶（提示 / 状态 / 错误）
 
-真源：`lib/canvas/story-column-sync.ts`
+真源：`lib/canvas/story-column-sync.ts` · 组件：`components/canvas/story-status-line.tsx`
 
-| 常量 | 用途 | 样式 |
-|------|------|------|
-| `STORY_HINT_BLUE_CLASS` | 蓝色字色 | `text-[#60a5fa]` |
-| `STORY_HINT_LABEL_CLASS` | 区块标签 | 左竖线 `border-l-2 border-[#60a5fa] pl-2` + 10px uppercase 蓝字 |
-| `STORY_HINT_BODY_CLASS` | 行内说明、@ 提示 | 10px `leading-relaxed` 蓝字 |
+| 语义 | 常量 / 组件 | 样式 | 用途 |
+|------|-------------|------|------|
+| **提示**（图 2 金黄） | `STORY_HINT_GOLD_CLASS` | `text-amber-300/90` | 前置条件、@ 说明、锁定占位、视频未就绪说明 |
+| 提示区块标签 | `STORY_HINT_LABEL_CLASS` | 左竖线 `border-amber-400/55` + 10px uppercase 金字 |
+| 提示正文 | `STORY_HINT_BODY_CLASS` | 10px `leading-relaxed` 金字 |
+| **节点 chrome**（绿色） | `STORY_CHROME_GREEN_CLASS` | `text-emerald-300/90` | 顶部导航、工具栏项目名、节点标题/副标题、行标题徽章、状态文案 |
+| 节点区块标题 | `STORY_ROW_SECTION_CLASS` | 10px 绿色 | 资产四槽区标题、「资产就绪」类状态 |
+| 槽位次级标签 | `STORY_ROW_SUBLABEL_CLASS` | 9px `text-emerald-200/75` | 脸 / 全身 / 服装等槽名 |
+| 影视专业版字段标签 | `PRO_HINT_LABEL_CLASS` | 10px uppercase `text-emerald-300/85` | 风格节点「主风格 / 锚定词」等 |
+| **错误**（图 3 红） | `STORY_ERROR_LINE_CLASS` / `StoryErrorLine` | `truncate text-red-400/90` | 单行省略；**必须** `title={全文}` 悬停展示 |
 
 固定文案与用法：
 
-- **故事主题** 底栏：`LLM 模型（文案共用）` → `STORY_HINT_LABEL_CLASS`
+- **故事主题** 底栏：`LLM 模型（文案共用）` → `STORY_HINT_LABEL_CLASS`（金黄）
 - **分镜列** 模型区：`分镜图 · IMAGE`、`分镜视频 · VIDEO` → `STORY_HINT_LABEL_CLASS`
-- **镜 1 @ 提示**：`FRAME_ROW_AT_HINT` = `（输入 @ 可引用已生成的角色三视图）` → `STORY_HINT_BODY_CLASS`，显示在提示词输入框下方
-- **空列表说明**、textarea placeholder「输入 @ 引用角色三视图」等同系蓝色提示
+- **镜 1 @ 提示**：`FRAME_ROW_AT_HINT` → `STORY_HINT_BODY_CLASS`，显示在提示词输入框下方
+- **视频锁定占位**（静帧先行）：锁图标 + 文案 → `STORY_HINT_GOLD_CLASS`（与图 2 一致）
+- **生成失败 / API 错误**：统一 `StoryErrorLine`，禁止多行撑高节点行
 
-橙色 `#fb923c` **仅**用于主按钮、Tab 选中、**@ 激活的参考图边框**；操作说明与模型标签一律蓝色，勿用 muted 灰或橙字。
+### 8.1 禁止混用
+
+- 提示语 **不得** 用 `var(--canvas-muted)` 或蓝色 `#60a5fa`（已废弃）
+- 节点标题 / 菜单 / 状态 **不得** 用金黄或 muted 代替绿色
+- 错误 **不得** 用 amber 或 muted；非错误状态 **不得** 用红色
+- 橙色 `#fb923c` **仅**用于主按钮、Tab 选中、**@ 激活的参考图边框**
+
+### 8.2 新增 UI 自检
+
+- [ ] 说明类文案是否走 `STORY_HINT_*`（金黄）？
+- [ ] 标题 / 导航 / 状态是否走 `STORY_CHROME_*` / `PRO_HINT_*`（绿）？
+- [ ] 错误是否走 `StoryErrorLine` 且悬停可见全文？
+- [ ] 是否同步 `.cursor/rules/canvas-story-design.mdc`？
 
 ---
 
@@ -349,10 +367,11 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 | 用途 | 色值 |
 |------|------|
 | 漫剧强调橙 | `#fb923c` / `#fdba74` / `#ea580c` |
-| 操作提示蓝 | `#60a5fa`（见 §8） |
-| 画布 muted 文案 | `var(--canvas-muted)` |
+| 提示金黄 | `text-amber-300/90`（见 §8） |
+| 节点 chrome 绿 | `text-emerald-300/90` / `text-emerald-200/75` |
+| 错误红 | `text-red-400/90` |
+| 画布 muted 文案 | `var(--canvas-muted)`（**非**提示/状态/错误） |
 | 画布表面 | `var(--canvas-surface)` |
-| 成功/未保存 | `text-emerald-300` / `text-amber-300` |
 
 ---
 

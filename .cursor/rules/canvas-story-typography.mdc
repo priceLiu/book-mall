@@ -1,0 +1,28 @@
+---
+description: 漫剧画布文案色阶（提示金黄 / chrome 绿 / 错误红）
+globs: canvas-web/components/canvas/**,canvas-web/lib/canvas/story-column-sync.ts,canvas-web/components/layout/canvas-shell.tsx,canvas-web/docs/design.md
+alwaysApply: false
+---
+
+# 漫剧画布 · 文案色阶
+
+完整说明见 `canvas-web/docs/design.md` §8–§9。真源常量：`lib/canvas/story-column-sync.ts`。
+
+## 三色分工
+
+| 语义 | 常量 / 组件 | 禁止替代 |
+|------|-------------|----------|
+| **提示**（前置条件、@ 说明） | `STORY_HINT_GOLD_CLASS`、`STORY_HINT_BODY_CLASS`、`StoryHintLine` | muted、蓝色 `#60a5fa` |
+| **节点 chrome**（导航、标题、状态） | `STORY_CHROME_GREEN_CLASS`、`STORY_ROW_SECTION_CLASS`、`PRO_HINT_LABEL_CLASS` | 金黄、muted |
+| **错误** | `StoryErrorLine`、`STORY_ERROR_LINE_CLASS` | amber、多行撑高 |
+
+## 错误行（必须）
+
+- 使用 `StoryErrorLine` 或等价：`truncate` + **`title={完整 message}`** 悬停全文
+- 禁止错误文案换行占高；驳回/失败/API 400 等均走此组件
+
+## 改样式时
+
+1. 优先改 `story-column-sync.ts` 常量，勿在组件内硬编码色值
+2. 同步 `docs/design.md` §8
+3. 新 Story 相关 UI 对照 §8.2 自检清单

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LaunchToolsAppButton } from "@/components/account/launch-tools-app";
+import { AccountCanvasCard } from "@/components/account/account-canvas-card";
 import { formatPointsAsYuan } from "@/lib/currency";
 import { PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS } from "@/lib/pricing-disclosure-view";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,9 @@ type Props = {
   goldHasRechargeHistory: boolean;
   canLaunchTools: boolean;
   showToolsCta: boolean;
+  gatewayLinked: boolean;
+  canLaunchCanvas: boolean;
+  canvasOriginConfigured: boolean;
 };
 
 /** 状态点：绿 / 灰 */
@@ -73,12 +77,15 @@ export function AccountOverviewCards({
   goldHasRechargeHistory: _goldHasRechargeHistory,
   canLaunchTools,
   showToolsCta,
+  gatewayLinked,
+  canLaunchCanvas,
+  canvasOriginConfigured,
 }: Props) {
   const balanceYuan = formatPointsAsYuan(balancePoints);
   const minBalanceYuan = formatPointsAsYuan(minBalanceLinePoints);
 
   return (
-    <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {/* 钱包余额 */}
       <Card className="flex flex-col">
         <CardHeader className="pb-3">
@@ -174,7 +181,7 @@ export function AccountOverviewCards({
       </Card>
 
       {/* AI 工具站 */}
-      <Card className="flex flex-col md:col-span-2 lg:col-span-1">
+      <Card className="flex flex-col md:col-span-2 xl:col-span-1">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">AI 工具站</CardTitle>
@@ -228,6 +235,12 @@ export function AccountOverviewCards({
           </div>
         </CardContent>
       </Card>
+
+      <AccountCanvasCard
+        gatewayLinked={gatewayLinked}
+        canLaunchCanvas={canLaunchCanvas}
+        canvasOriginConfigured={canvasOriginConfigured}
+      />
     </section>
   );
 }

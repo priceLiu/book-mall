@@ -3,6 +3,15 @@ import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
 
 export const dynamic = "force-dynamic";
 
+/** SSE / 纯文本流式接口须透传 body，不可 buffer 成一次性响应 */
+function shouldStreamProxyResponse(contentType: string, path: string): boolean {
+  const ct = contentType.toLowerCase();
+  if (ct.includes("text/event-stream")) return true;
+  if (ct.startsWith("text/plain")) return true;
+  if (path.includes("script-assistant/chat")) return true;
+  return false;
+}
+
 async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
   const base = getBookMallBaseUrlServer();
   if (!base) {
@@ -35,11 +44,21 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
       body,
       cache: "no-store",
     });
+    const contentType = r.headers.get("content-type") ?? "application/json";
+    if (shouldStreamProxyResponse(contentType, path) && r.body) {
+      const outHeaders = new Headers();
+      outHeaders.set("Content-Type", contentType);
+      outHeaders.set("Cache-Control", "no-store");
+      outHeaders.set("X-Accel-Buffering", "no");
+      const encoding = r.headers.get("content-encoding");
+      if (encoding) outHeaders.set("Content-Encoding", encoding);
+      return new NextResponse(r.body, { status: r.status, headers: outHeaders });
+    }
     const respBuf = await r.arrayBuffer();
     return new NextResponse(respBuf, {
       status: r.status,
       headers: {
-        "Content-Type": r.headers.get("content-type") ?? "application/json",
+        "Content-Type": contentType,
       },
     });
   } catch (e: unknown) {

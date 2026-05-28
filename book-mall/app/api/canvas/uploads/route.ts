@@ -11,6 +11,17 @@ export const maxDuration = 60;
 
 const MAX_BYTES = 30 * 1024 * 1024;
 const ACCEPTED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ACCEPTED_AUDIO_MIME = new Set([
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/mp4",
+  "audio/aac",
+  "audio/ogg",
+  "audio/webm",
+  "audio/x-m4a",
+]);
 const ACCEPTED_TEXT_MIME = new Set([
   "text/plain",
   "text/markdown",
@@ -26,7 +37,29 @@ function extForMime(m: string, fileName?: string): string {
   if (m === "image/jpeg") return "jpg";
   if (m === "image/png") return "png";
   if (m === "image/webp") return "webp";
+  if (m.startsWith("audio/")) {
+    if (m.includes("mpeg") || m.includes("mp3")) return "mp3";
+    if (m.includes("wav")) return "wav";
+    if (m.includes("ogg")) return "ogg";
+    if (m.includes("aac") || m.includes("m4a") || m.includes("mp4")) return "m4a";
+    if (m.includes("webm")) return "webm";
+  }
   return "bin";
+}
+
+function isAudioUpload(mime: string, fileName: string): boolean {
+  const lower = fileName.toLowerCase();
+  if (
+    lower.endsWith(".mp3") ||
+    lower.endsWith(".wav") ||
+    lower.endsWith(".m4a") ||
+    lower.endsWith(".aac") ||
+    lower.endsWith(".ogg") ||
+    lower.endsWith(".webm")
+  ) {
+    return true;
+  }
+  return ACCEPTED_AUDIO_MIME.has(mime.toLowerCase());
 }
 
 function isTextUpload(mime: string, fileName: string): boolean {
@@ -83,7 +116,8 @@ export async function POST(request: NextRequest) {
   const mime = file.type.toLowerCase();
   const fileName = file.name.trim();
   const textUpload = isTextUpload(mime, fileName);
-  if (!textUpload && !ACCEPTED_IMAGE_MIME.has(mime)) {
+  const audioUpload = isAudioUpload(mime, fileName);
+  if (!textUpload && !audioUpload && !ACCEPTED_IMAGE_MIME.has(mime)) {
     return NextResponse.json(
       { error: "UNSUPPORTED_MIME", mime },
       { status: 415, headers: jsonHeaders(request) },
@@ -106,7 +140,9 @@ export async function POST(request: NextRequest) {
         ? mime === "text/markdown"
           ? "text/markdown; charset=utf-8"
           : "text/plain; charset=utf-8"
-        : mime,
+        : audioUpload && !mime.startsWith("audio/")
+          ? "audio/mpeg"
+          : mime,
       userId: guard.user.id,
       ext: extForMime(mime, fileName),
     });
