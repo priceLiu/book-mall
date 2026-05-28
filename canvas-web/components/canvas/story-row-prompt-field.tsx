@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   storyRefIdsFromPrompt,
   STORY_UPSTREAM_COL_WIDTH,
+  STORY_UPSTREAM_REF_GRID_COLS,
   type StoryRefImage,
 } from "@/lib/canvas/story-ref-image";
 import type { MentionableItem } from "./mentions/MentionsTextarea";
@@ -19,7 +20,10 @@ import {
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import type { StoryEdition } from "@/lib/canvas/story-edition-chrome";
-import { storyEditionActiveRefBorderClass } from "@/lib/canvas/story-edition-chrome";
+import {
+  storyEditionActiveRefBorderClass,
+  storyEditionGeneratingBorderClass,
+} from "@/lib/canvas/story-edition-chrome";
 import { StoryColumnMediaPanel } from "./story-column-media-panel";
 
 const SAVE_DEBOUNCE_MS = 600;
@@ -44,85 +48,102 @@ function StoryRowTitleBadge({ title }: { title: string }) {
   );
 }
 
-/** 上游传入图（提示词与输出之间），无列标题 */
+/** 上游 @ 参考图：3 列宫格，悬停 Eye 预览、点击全屏预览 */
 function StoryUpstreamImageColumn({
   images,
   activeIds,
   edition = "comic",
   stripHeight,
   onPreviewRef,
+  generating = false,
 }: {
   images: StoryRefImage[];
   activeIds: string[];
   edition?: StoryEdition;
   stripHeight?: number;
   onPreviewRef?: (url: string, title: string) => void;
+  /** 分镜图生成中：整列扫光（无旋转圈，与改版前一致） */
+  generating?: boolean;
 }) {
+  const h = stripHeight ?? ROW_MEDIA_MIN_H;
   return (
     <div
       className="flex shrink-0 self-start"
       style={{
         width: STORY_UPSTREAM_COL_WIDTH,
-        height: stripHeight,
-        minHeight: stripHeight ?? ROW_MEDIA_MIN_H,
+        height: h,
+        minHeight: h,
       }}
     >
       <div
-        className="flex h-full w-full flex-col gap-1"
+        className={cn(
+          "relative h-full w-full overflow-y-auto overflow-x-hidden rounded-md border border-white/10 bg-black/25 p-1",
+          RF_NODE_SCROLL,
+          generating && storyEditionGeneratingBorderClass(edition),
+        )}
       >
         {images.length ? (
-          images.map((ref) => {
-            const active = activeIds.includes(ref.id);
-            return (
-              <div
-                key={ref.id}
-                title={ref.label}
-                className={cn(
-                  "group/ref-thumb relative min-h-[72px] flex-1 overflow-hidden rounded-md border-2 bg-black/40 transition-shadow",
-                  active
-                    ? storyEditionActiveRefBorderClass(edition)
-                    : "border-white/15",
-                  ref.url && onPreviewRef && "cursor-pointer",
-                )}
-                onClick={() => {
-                  if (ref.url && onPreviewRef) onPreviewRef(ref.url, ref.label);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && ref.url && onPreviewRef) {
-                    onPreviewRef(ref.url, ref.label);
-                  }
-                }}
-                role={ref.url && onPreviewRef ? "button" : undefined}
-                tabIndex={ref.url && onPreviewRef ? 0 : undefined}
-              >
-                {ref.url ? (
-                  <>
-                    <Image
-                      src={ref.url}
-                      alt={ref.label}
-                      fill
-                      className="object-contain"
-                      unoptimized
-                    />
-                    {onPreviewRef ? (
-                      <span
-                        className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover/ref-thumb:opacity-100"
-                        aria-hidden
-                      >
-                        <Eye className="size-4 text-white/90" />
-                      </span>
-                    ) : null}
-                  </>
-                ) : (
-                  <span className="flex h-full items-center justify-center px-1 text-center text-[8px] leading-tight text-[var(--canvas-muted)]">
-                    待上游
-                  </span>
-                )}
-              </div>
-            );
-          })
+          <div
+            className="grid content-start items-start gap-1"
+            style={{
+              gridTemplateColumns: `repeat(${STORY_UPSTREAM_REF_GRID_COLS}, minmax(0, 1fr))`,
+              gridAutoRows: "min-content",
+            }}
+          >
+            {images.map((ref) => {
+              const active = activeIds.includes(ref.id);
+              const canPreview = Boolean(ref.url && onPreviewRef);
+              return (
+                <div
+                  key={ref.id}
+                  title={ref.label}
+                  className={cn(
+                    "group/ref-thumb relative aspect-square overflow-hidden rounded border bg-black/40 transition-shadow",
+                    active
+                      ? storyEditionActiveRefBorderClass(edition)
+                      : "border-white/15",
+                    canPreview && !generating && "cursor-pointer",
+                  )}
+                  onClick={() => {
+                    if (canPreview && !generating) onPreviewRef!(ref.url!, ref.label);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && canPreview) {
+                      onPreviewRef!(ref.url!, ref.label);
+                    }
+                  }}
+                  role={canPreview ? "button" : undefined}
+                  tabIndex={canPreview ? 0 : undefined}
+                >
+                  {ref.url ? (
+                    <>
+                      <Image
+                        src={ref.url}
+                        alt={ref.label}
+                        fill
+                        className="object-contain"
+                        unoptimized
+                      />
+                      {onPreviewRef && !generating ? (
+                        <span
+                          className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover/ref-thumb:opacity-100"
+                          aria-hidden
+                        >
+                          <Eye className="size-4 text-white/90" />
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="flex h-full items-center justify-center px-0.5 text-center text-[7px] leading-tight text-[var(--canvas-muted)]">
+                      待上游
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         ) : (
-          <div className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-md border border-dashed border-white/12 bg-black/25">
+          <div className="flex h-full min-h-[72px] items-center justify-center rounded border border-dashed border-white/12">
             <span className="text-[8px] text-[var(--canvas-muted)]">—</span>
           </div>
         )}
@@ -218,10 +239,9 @@ export function StoryColumnRowCard({
   videoRefLabels,
   edition = "comic",
   frameApproved,
-  frameRejectedReason,
   videoBlockReason,
   onApproveFrame,
-  onRejectFrame,
+  upstreamGenerating,
   belowPrompt,
   compactFrameLayout,
   belowPromptMinHeight,
@@ -258,10 +278,10 @@ export function StoryColumnRowCard({
   videoRefLabels?: string[];
   edition?: StoryEdition;
   frameApproved?: boolean;
-  frameRejectedReason?: string;
   videoBlockReason?: string | null;
   onApproveFrame?: () => void;
-  onRejectFrame?: () => void;
+  /** 分镜图生成中时参考图宫格 shimmer（默认与 generating 相同） */
+  upstreamGenerating?: boolean;
   belowPrompt?: React.ReactNode;
   /** 分镜列：文案/参考/输出同高横条，元信息沉底 */
   compactFrameLayout?: boolean;
@@ -332,6 +352,9 @@ export function StoryColumnRowCard({
     ? STORY_FRAME_ROW_STRIP_H
     : ROW_MEDIA_MIN_H;
 
+  const refGridGenerating =
+    upstreamGenerating ?? (mediaMode === "frame" ? generating : false);
+
   const mediaPanel = (
     <StoryColumnMediaPanel
       imageUrl={imageUrl}
@@ -348,10 +371,8 @@ export function StoryColumnRowCard({
       videoRefLabels={videoRefLabels}
       edition={edition}
       frameApproved={frameApproved}
-      frameRejectedReason={compactFrameLayout ? undefined : frameRejectedReason}
       videoBlockReason={compactFrameLayout ? undefined : videoBlockReason}
       onApproveFrame={onApproveFrame}
-      onRejectFrame={onRejectFrame}
       stripLayout={compactFrameLayout}
       hideFooters={compactFrameLayout}
     />
@@ -367,9 +388,6 @@ export function StoryColumnRowCard({
           <p className={`text-[10px] leading-snug ${STORY_HINT_GOLD_CLASS}`}>
             {videoBlockReason}
           </p>
-        ) : null}
-        {frameRejectedReason?.trim() ? (
-          <StoryErrorLine message={`驳回：${frameRejectedReason}`} />
         ) : null}
       </div>
     ) : null;
@@ -435,6 +453,7 @@ export function StoryColumnRowCard({
                 edition={edition}
                 stripHeight={STORY_FRAME_ROW_STRIP_H}
                 onPreviewRef={onPreviewRef}
+                generating={refGridGenerating}
               />
             ) : null}
             {mediaPanel}
@@ -489,6 +508,7 @@ export function StoryColumnRowCard({
               activeIds={activeRefIds}
               edition={edition}
               onPreviewRef={onPreviewRef}
+              generating={refGridGenerating}
             />
           ) : null}
           {mediaPanel}

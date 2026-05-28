@@ -110,7 +110,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const batchImage = d.batchImage;
   const injectStyleRefs = d.injectStyleRefs === true;
   const { providers } = useUserProviders();
-  const { alert, confirm, prompt } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const { assets: projectCharacterAssets } = useStoryProCharacterAssets(
     edition === "pro" ? projectId : null,
   );
@@ -520,23 +520,6 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     });
   };
 
-  const rejectFrameRow = async (key: string) => {
-    const reason = await prompt({
-      title: "驳回分镜图",
-      message: "可选填写驳回原因，留空则使用默认文案。",
-      label: "驳回原因",
-      placeholder: "需重新生成分镜图",
-      defaultValue: "",
-      confirmLabel: "确认驳回",
-      cancelLabel: "取消",
-    });
-    if (reason === null) return;
-    patchFrameRow(key, {
-      frameApprovedAt: undefined,
-      frameRejectedReason: reason.trim() || "需重新生成分镜图",
-    });
-  };
-
   const frameImageModelKeys = useMemo(() => {
     if (edition !== "pro") return [...THREE_VIEW_ENGINE_MODEL_KEYS];
     const multi = [...STORY_PRO_FRAME_IMAGE_MODEL_KEYS];
@@ -745,15 +728,12 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                   mediaMode="frame"
                   imageUrl={frameUrl}
                   generating={frameRunning || videoRunning}
+                  upstreamGenerating={frameRunning}
                   generateDisabled={!canGenerateFrame}
                   frameApproved={isStoryFrameApproved(row)}
-                  frameRejectedReason={row.frameRejectedReason}
                   videoBlockReason={videoBlockReason}
                   onApproveFrame={
                     frameUrl ? () => approveFrameRow(row.key) : undefined
-                  }
-                  onRejectFrame={
-                    frameUrl ? () => rejectFrameRow(row.key) : undefined
                   }
                   onGenerate={() => runRowFrame(row.key, Boolean(frameUrl))}
                   onGenerateVideo={

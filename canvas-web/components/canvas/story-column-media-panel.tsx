@@ -42,10 +42,8 @@ export function StoryColumnMediaPanel({
   videoRefLabels,
   edition = "comic",
   frameApproved,
-  frameRejectedReason,
   videoBlockReason,
   onApproveFrame,
-  onRejectFrame,
   stripLayout,
   hideFooters,
 }: {
@@ -66,10 +64,8 @@ export function StoryColumnMediaPanel({
   videoRefLabels?: string[];
   edition?: StoryEdition;
   frameApproved?: boolean;
-  frameRejectedReason?: string;
   videoBlockReason?: string | null;
   onApproveFrame?: () => void;
-  onRejectFrame?: () => void;
   /** 分镜行横条：填满 strip 高度，与参考图同高 */
   stripLayout?: boolean;
   hideFooters?: boolean;
@@ -162,23 +158,6 @@ export function StoryColumnMediaPanel({
               >
                 <Check className="mr-0.5 inline size-3" />
                 通过
-              </button>
-            ) : null}
-            {onRejectFrame ? (
-              <button
-                type="button"
-                disabled={generating}
-                className={cn(
-                  "nodrag rounded border border-red-400/30 bg-red-500/15 px-1.5 py-0.5 text-[9px] text-red-200 hover:bg-red-500/25",
-                  generating && "cursor-not-allowed opacity-50",
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (generating) return;
-                  onRejectFrame();
-                }}
-              >
-                驳回
               </button>
             ) : null}
           </div>
@@ -350,9 +329,6 @@ export function StoryColumnMediaPanel({
         <p className={`text-[10px] leading-snug ${STORY_HINT_GOLD_CLASS}`}>
           {videoBlockReason}
         </p>
-      ) : null}
-      {!hideFooters && isFrame && frameRejectedReason?.trim() ? (
-        <StoryErrorLine message={`驳回：${frameRejectedReason}`} />
       ) : null}
     </div>
   );
