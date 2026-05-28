@@ -86,6 +86,20 @@ export const BAILIAN_R2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     },
   },
   {
+    modelKey: "wan2.6-r2v-flash",
+    displayName: "万相 2.6 R2V Flash",
+    role: "VIDEO",
+    description: "百炼 wan2.6-r2v-flash · 更快、性价比更高",
+    paramsSchema: [...R2V_PARAMS_SCHEMA, ...WAN_EXTRA_SCHEMA],
+    defaultParams: {
+      ratio: "16:9",
+      resolution: "1080P",
+      duration: 5,
+      seed: "",
+      prompt_extend: true,
+    },
+  },
+  {
     modelKey: "wan2.7-r2v",
     displayName: "万相 2.7 · 参考生视频",
     role: "VIDEO",

@@ -1,4 +1,4 @@
-import { assertStoryModelCapabilities } from "./story-model-capabilities";
+import { assertStoryModelCapabilities, modelHasStoryCapabilities } from "./story-model-capabilities";
 import { resolveStoryRowRefUrls } from "./story-row-ref-urls";
 
 function batchModelKey(
@@ -45,11 +45,14 @@ export function assertStoryProRunModelCapabilities(args: {
   }
 
   if (nodeType === "story-pro-video" && mediaKind === "video") {
-    assertStoryModelCapabilities(
-      batchModelKey(nodeData, "batchVideo"),
-      ["video_i2v"],
-      "分镜视频",
-    );
+    const modelKey = batchModelKey(nodeData, "batchVideo");
+    if (
+      modelHasStoryCapabilities(modelKey, ["video_i2v"]) ||
+      modelHasStoryCapabilities(modelKey, ["video_r2v"])
+    ) {
+      return;
+    }
+    assertStoryModelCapabilities(modelKey, ["video_i2v"], "分镜视频");
     return;
   }
 

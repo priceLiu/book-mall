@@ -23,9 +23,11 @@ import {
   STORY_ROW_SUBLABEL_CLASS,
 } from "@/lib/canvas/story-column-sync";
 import {
+  activateImagePasteTarget,
   bindImageDragDropHandlers,
+  deactivateImagePasteTarget,
   firstImageFileFromDataTransfer,
-  useImagePasteWhenActive,
+  useImagePasteRouter,
 } from "@/lib/canvas/image-upload-handlers";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +50,7 @@ export function StoryProSceneAssetSlots({
 }) {
   const base = useBookMallBaseUrl();
   const fileRef = useRef<HTMLInputElement>(null);
+  useImagePasteRouter();
   const [pendingKind, setPendingKind] = useState<StoryProSceneRefKind | null>(
     null,
   );
@@ -110,17 +113,30 @@ export function StoryProSceneAssetSlots({
     [base, canUpload, projectId, row.key, row.name],
   );
 
-  useImagePasteWhenActive(
-    activeKind != null,
-    (file) => {
-      if (activeKind) void uploadFileToKind(activeKind, file);
+  const pasteTargetId = (kind: StoryProSceneRefKind) =>
+    `scene-asset:${normalizeStoryProSceneKey(row.key)}:${kind}`;
+
+  const bindSlotPaste = (kind: StoryProSceneRefKind) => ({
+    onMouseEnter: () => {
+      if (!canUpload) return;
+      setActiveKind(kind);
+      activateImagePasteTarget(pasteTargetId(kind), (file) => {
+        void uploadFileToKind(kind, file);
+      });
     },
-    canUpload,
-  );
+    onMouseLeave: () => {
+      deactivateImagePasteTarget(pasteTargetId(kind));
+      setActiveKind((prev) => (prev === kind ? null : prev));
+      setDragOverKind((prev) => (prev === kind ? null : prev));
+    },
+  });
 
   const onUploadClick = (kind: StoryProSceneRefKind) => {
     if (!canUpload) return;
     setActiveKind(kind);
+    activateImagePasteTarget(pasteTargetId(kind), (file) => {
+      void uploadFileToKind(kind, file);
+    });
     setPendingKind(kind);
     fileRef.current?.click();
   };
@@ -185,7 +201,7 @@ export function StoryProSceneAssetSlots({
             <div
               key={kind}
               className="flex flex-col gap-1 rounded border border-white/8 bg-black/25 p-1"
-              onMouseEnter={() => setActiveKind(kind)}
+              {...bindSlotPaste(kind)}
             >
               <p className={`truncate text-center ${STORY_ROW_SUBLABEL_CLASS}`}>
                 {STORY_PRO_SCENE_REF_KIND_LABELS[kind]}

@@ -1,4 +1,4 @@
-import { useEffect, type DragEventHandler } from "react";
+import { useEffect, useRef, type DragEventHandler } from "react";
 
 /** 从剪贴板或拖放 DataTransfer 中取第一张图片文件 */
 export function firstImageFileFromDataTransfer(
@@ -62,26 +62,85 @@ export function bindImageDragDropHandlers(
   };
 }
 
-/**
- * 当 `active` 为 true 时，在 capture 阶段拦截全局 paste，
- * 避免画布根级 paste 新建图片节点。
- */
-export function useImagePasteWhenActive(
-  active: boolean,
-  onFile: (file: File) => void,
-  enabled = true,
-) {
-  useEffect(() => {
-    if (!enabled || !active) return;
-    const onPaste = (e: ClipboardEvent) => {
+type ImagePasteTarget = {
+  gen: number;
+  onFile: (file: File) => void;
+};
+
+const imagePasteTargets = new Map<string, ImagePasteTarget>();
+let imagePasteGen = 0;
+let imagePasteRouterInstalled = false;
+
+function pickImagePasteTarget(): ImagePasteTarget | null {
+  let best: ImagePasteTarget | null = null;
+  for (const entry of imagePasteTargets.values()) {
+    if (!best || entry.gen > best.gen) best = entry;
+  }
+  return best;
+}
+
+function ensureImagePasteRouter() {
+  if (imagePasteRouterInstalled) return;
+  imagePasteRouterInstalled = true;
+  window.addEventListener(
+    "paste",
+    (e) => {
+      const target = pickImagePasteTarget();
+      if (!target) return;
       if (isEditablePasteTarget(e.target)) return;
       const file = firstImageFileFromDataTransfer(e.clipboardData);
       if (!file) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      onFile(file);
-    };
-    window.addEventListener("paste", onPaste, true);
-    return () => window.removeEventListener("paste", onPaste, true);
-  }, [active, enabled, onFile]);
+      target.onFile(file);
+    },
+    true,
+  );
+}
+
+/** 悬停槽位时激活粘贴目标；多槽同时激活时以最近一次 activate 为准。 */
+export function activateImagePasteTarget(
+  id: string,
+  onFile: (file: File) => void,
+) {
+  ensureImagePasteRouter();
+  imagePasteTargets.set(id, { gen: ++imagePasteGen, onFile });
+}
+
+export function deactivateImagePasteTarget(id: string) {
+  imagePasteTargets.delete(id);
+}
+
+/** 确保全局 paste 路由已安装（资产槽等按需调用一次）。 */
+export function useImagePasteRouter() {
+  useEffect(() => {
+    ensureImagePasteRouter();
+  }, []);
+}
+
+/**
+ * 当 `active` 为 true 时注册粘贴目标，走全局单例路由，
+ * 避免多个槽位各自监听 paste 时互相抢占。
+ */
+export function useImagePasteWhenActive(
+  active: boolean,
+  onFile: (file: File) => void,
+  enabled = true,
+  targetId?: string,
+) {
+  const autoIdRef = useRef(
+    `paste-${Math.random().toString(36).slice(2, 10)}`,
+  );
+  const onFileRef = useRef(onFile);
+  onFileRef.current = onFile;
+  const id = targetId ?? autoIdRef.current;
+
+  useEffect(() => {
+    if (!enabled || !active) {
+      deactivateImagePasteTarget(id);
+      return;
+    }
+    activateImagePasteTarget(id, (file) => onFileRef.current(file));
+    return () => deactivateImagePasteTarget(id);
+  }, [active, enabled, id]);
 }

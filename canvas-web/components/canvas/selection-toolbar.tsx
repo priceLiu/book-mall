@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNodes, useReactFlow } from "@xyflow/react";
 import { LayoutGrid, FolderPlus, Trash2 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
+import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import { GROUP_COLOR_PRESETS, isGroupNode } from "@/lib/canvas/types";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
@@ -13,7 +15,7 @@ import {
 } from "./canvas-floating-toolbar";
 
 const TOOLBAR_HEIGHT = 44;
-const HEADER_RESERVED = 56; // 顶部留给项目头条 + 节点 logo 面板的区域，工具条不能挤到这里之上
+const HEADER_RESERVED = 56; // 顶部项目工具栏区域，选区浮动条勿与之重叠
 const GAP = 6;
 
 /**
@@ -134,6 +136,17 @@ export function SelectionToolbar() {
             onClick={async () => {
               const ids = [...selectedIdsRef.current];
               if (ids.length === 0) return;
+              const nodes = useCanvasStore.getState().nodes;
+              const edges = useCanvasStore.getState().edges;
+              const validation = validateStoryPipelineDeletion(ids, nodes, edges);
+              if (!validation.ok) {
+                canvasNotify({
+                  title: "无法删除该节点",
+                  message: validation.message,
+                  variant: "error",
+                });
+                return;
+              }
               const ok = await doubleConfirm({
                 first: {
                   title: `从画布删除 ${ids.length} 个节点？`,
@@ -150,7 +163,7 @@ export function SelectionToolbar() {
                 },
               });
               if (!ok) return;
-              for (const id of ids) removeNode(id);
+              for (const id of validation.allowedIds) removeNode(id);
             }}
           >
             <Trash2 className="size-[18px]" strokeWidth={1.75} />

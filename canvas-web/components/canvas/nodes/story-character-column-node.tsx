@@ -12,7 +12,7 @@ import {
   storyEditionFromNodeType,
 } from "@/lib/canvas/story-edition-chrome";
 import { PRO_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-pro-node-chrome";
-import { NODE_DEFAULT_SIZE, THREE_VIEW_ENGINE_MODEL_KEYS } from "@/lib/canvas/types";
+import { THREE_VIEW_ENGINE_MODEL_KEYS } from "@/lib/canvas/types";
 import {
   autoFillStoryProCharacterSlotsFromThreeView,
   saveStoryProCharacterAssetRef,
@@ -23,6 +23,7 @@ import { findAssetForCharacterRow, findAudioAssetForCharacterRow } from "@/lib/c
 import { useStoryProCharacterAssets, notifyStoryProCharacterAssetsChanged } from "@/lib/canvas/use-story-pro-character-assets";
 import { useStoryProCharacterAudioAssets } from "@/lib/canvas/use-story-pro-audio-assets";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
+import { storyCharacterColumnSize } from "@/lib/canvas/story-column-layout";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { displayCharacterRows } from "@/lib/canvas/story-column-display";
@@ -46,10 +47,6 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   const projectId = useCanvasStore((s) => s.projectId);
   const { alert } = useDialogs();
   const edition = storyEditionFromNodeType(type);
-  const sizeKey =
-    type && type in NODE_DEFAULT_SIZE
-      ? (type as keyof typeof NODE_DEFAULT_SIZE)
-      : "story-character-column";
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const resizeNode = useCanvasStore((s) => s.resizeNode);
@@ -77,14 +74,26 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   );
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
 
+  const targetSize = useMemo(
+    () =>
+      storyCharacterColumnSize(displayRows, {
+        pro: edition === "pro",
+      }),
+    [displayRows, edition],
+  );
+
   useEffect(() => {
-    const def = NODE_DEFAULT_SIZE[sizeKey];
     const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
     if (!node) return;
     const { w, h } = nodeMeasuredSize(node);
-    if (Math.abs(h - def.height) < 4 && Math.abs(w - def.width) < 4) return;
-    resizeNode(id, { width: def.width, height: def.height });
-  }, [id, resizeNode]);
+    if (
+      Math.abs(h - targetSize.height) < 4 &&
+      Math.abs(w - targetSize.width) < 4
+    ) {
+      return;
+    }
+    resizeNode(id, { width: targetSize.width, height: targetSize.height });
+  }, [id, resizeNode, targetSize]);
 
   const updateRows = (next: typeof displayRows) => {
     updateNodeData(id, { rows: next });
@@ -218,8 +227,8 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
       bodyScroll
       runtime={nodeRuntime}
       accent={storyEditionAccent(edition)}
-      minWidth={NODE_DEFAULT_SIZE[sizeKey].width}
-      minHeight={NODE_DEFAULT_SIZE[sizeKey].height}
+      minWidth={targetSize.width}
+      minHeight={targetSize.height}
       inputs={[
         { id: "in_text", label: "角色设定", kind: "text" },
       ]}

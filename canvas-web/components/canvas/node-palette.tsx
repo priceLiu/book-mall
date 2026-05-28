@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import type { CanvasContentNodeType } from "@/lib/canvas/types";
 import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
+import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO_NODE_ACCENT } from "@/lib/canvas/story-pro-node-chrome";
 
@@ -447,8 +448,52 @@ const SHORTCUTS: Array<{ keys: string[]; desc: string }> = [
   { keys: ["从顶部工具条拖到画布"], desc: "新建对应类型节点" },
 ];
 
+function HelpShortcutsPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/12 bg-black/90 shadow-2xl backdrop-blur-lg">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
+        <div className="flex items-center gap-2 text-[13px] text-white">
+          <HelpCircle className="size-4 text-[var(--canvas-accent)]" />
+          <span className="font-medium">操作方式 · 快捷键</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="关闭"
+          className="rounded p-1 text-white/60 hover:bg-white/10 hover:text-white"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+      <ul className="divide-y divide-white/5">
+        {SHORTCUTS.map((s, idx) => (
+          <li
+            key={idx}
+            className="flex items-center justify-between gap-3 px-4 py-2 text-[12px]"
+          >
+            <div className="flex flex-wrap items-center gap-1">
+              {s.keys.map((k, i) => (
+                <span
+                  key={i}
+                  className="rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 font-mono text-[11px] text-white"
+                >
+                  {k}
+                </span>
+              ))}
+            </div>
+            <span className="text-white/70">{s.desc}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="border-t border-white/10 px-4 py-2 text-[11px] text-white/45">
+        提示：选中 ≥2 个节点会在选区上方浮出「分组 / 自动整理 / 删除」。故事 / 分镜节点在右侧工具条。
+      </div>
+    </div>
+  );
+}
+
 /**
- * 顶部浮动节点面板：通用画布 + 故事工作流 两条工具条分开展示。
+ * 顶部节点面板：位于项目工具栏下方（文档流），避免生成中 fitView 时大节点盖住 fixed 浮层。
  */
 export function NodePalette({
   onAdd,
@@ -458,6 +503,7 @@ export function NodePalette({
   const [helpOpen, setHelpOpen] = useState(false);
   const [dock, setDock] = useState<PaletteDock>("top");
   const proOnly = useCanvasStore((s) => hasStoryProPipeline(s.nodes));
+  const comicOnly = useCanvasStore((s) => hasStoryComicPipeline(s.nodes));
 
   const collapsed = dock === "right";
 
@@ -563,6 +609,21 @@ export function NodePalette({
   return (
     <>
       {collapsed ? (
+        <>
+        <div
+          className="flex shrink-0 items-center justify-center border-b border-white/5 bg-[var(--canvas-surface)]/95 px-3 py-1"
+          role="toolbar"
+          aria-label={proOnly ? "影视专业版节点面板（已收到右侧）" : "节点面板（已收到右侧）"}
+        >
+          <button
+            type="button"
+            onClick={toggleDock}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/75 transition hover:border-white/25 hover:text-white"
+          >
+            <ChevronLeft className="size-3" />
+            节点面板在右侧 · 点击展开到顶部
+          </button>
+        </div>
         <div
           className="pointer-events-none fixed right-3 top-1/2 z-[100] -translate-y-1/2"
           role="toolbar"
@@ -598,14 +659,16 @@ export function NodePalette({
                   onAdd={onAdd}
                 />
                 <PaletteDivider vertical />
-                <PalettePill
-                  label="影视专业版"
-                  items={STORY_PRO_PALETTE}
-                  collapsed
-                  proTheme
-                  onDragStart={onDragStart}
-                  onAdd={onAdd}
-                />
+                {!comicOnly ? (
+                  <PalettePill
+                    label="影视专业版"
+                    items={STORY_PRO_PALETTE}
+                    collapsed
+                    proTheme
+                    onDragStart={onDragStart}
+                    onAdd={onAdd}
+                  />
+                ) : null}
                 <PaletteDivider vertical />
                 <PalettePill
                   label="参考生视频"
@@ -620,13 +683,14 @@ export function NodePalette({
             {helpButton}
           </div>
         </div>
+        </>
       ) : (
         <div
-          className="pointer-events-none fixed left-1/2 top-[3.25rem] z-[100] -translate-x-1/2"
+          className="relative flex shrink-0 justify-center border-b border-white/5 bg-[var(--canvas-surface)]/95 px-3 py-1.5"
           role="toolbar"
           aria-label={proOnly ? "影视专业版节点面板" : "节点面板"}
         >
-          <div className="pointer-events-auto flex items-center gap-8">
+          <div className="flex items-center gap-8">
             {proOnly ? (
               <PalettePill
                 label="影视专业版"
@@ -654,14 +718,16 @@ export function NodePalette({
                   onDragStart={onDragStart}
                   onAdd={onAdd}
                 />
-                <PalettePill
-                  label="影视专业版"
-                  items={STORY_PRO_PALETTE}
-                  collapsed={false}
-                  proTheme
-                  onDragStart={onDragStart}
-                  onAdd={onAdd}
-                />
+                {!comicOnly ? (
+                  <PalettePill
+                    label="影视专业版"
+                    items={STORY_PRO_PALETTE}
+                    collapsed={false}
+                    proTheme
+                    onDragStart={onDragStart}
+                    onAdd={onAdd}
+                  />
+                ) : null}
                 <PalettePill
                   label="参考生视频"
                   items={REF_VIDEO_PALETTE}
@@ -672,58 +738,26 @@ export function NodePalette({
               </>
             )}
           </div>
+
+          {helpOpen ? (
+            <div
+              className="pointer-events-auto absolute left-1/2 top-full z-[100] mt-2 w-[420px] max-w-[92vw] -translate-x-1/2"
+              role="dialog"
+              aria-label="操作方式"
+            >
+              <HelpShortcutsPanel onClose={() => setHelpOpen(false)} />
+            </div>
+          ) : null}
         </div>
       )}
 
-      {helpOpen ? (
+      {helpOpen && collapsed ? (
         <div
-          className={`pointer-events-auto z-[100] w-[420px] max-w-[92vw] ${
-            collapsed
-              ? "fixed right-16 top-1/2 -translate-y-1/2"
-              : "fixed left-1/2 top-[calc(3.25rem+52px)] -translate-x-1/2"
-          }`}
+          className="pointer-events-auto fixed right-16 top-1/2 z-[100] w-[420px] max-w-[92vw] -translate-y-1/2"
           role="dialog"
           aria-label="操作方式"
         >
-          <div className="overflow-hidden rounded-2xl border border-white/12 bg-black/90 shadow-2xl backdrop-blur-lg">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
-              <div className="flex items-center gap-2 text-[13px] text-white">
-                <HelpCircle className="size-4 text-[var(--canvas-accent)]" />
-                <span className="font-medium">操作方式 · 快捷键</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setHelpOpen(false)}
-                aria-label="关闭"
-                className="rounded p-1 text-white/60 hover:bg-white/10 hover:text-white"
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>
-            <ul className="divide-y divide-white/5">
-              {SHORTCUTS.map((s, idx) => (
-                <li
-                  key={idx}
-                  className="flex items-center justify-between gap-3 px-4 py-2 text-[12px]"
-                >
-                  <div className="flex flex-wrap items-center gap-1">
-                    {s.keys.map((k, i) => (
-                      <span
-                        key={i}
-                        className="rounded border border-white/15 bg-white/[0.06] px-1.5 py-0.5 font-mono text-[11px] text-white"
-                      >
-                        {k}
-                      </span>
-                    ))}
-                  </div>
-                  <span className="text-white/70">{s.desc}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="border-t border-white/10 px-4 py-2 text-[11px] text-white/45">
-              提示：选中 ≥2 个节点会在选区上方浮出「分组 / 自动整理 / 删除」。故事 / 分镜节点在右侧工具条。
-            </div>
-          </div>
+          <HelpShortcutsPanel onClose={() => setHelpOpen(false)} />
         </div>
       ) : null}
     </>

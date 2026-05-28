@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Clapperboard, Check, Download, Eye, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORY_MEDIA_COL_WIDTH } from "@/lib/canvas/story-ref-image";
+import { STORY_FRAME_ROW_STRIP_H } from "@/lib/canvas/story-column-layout";
 import { CanvasVideoPlayer } from "./canvas-video-player";
 import {
   storyEditionGeneratingBorderClass,
@@ -45,6 +46,8 @@ export function StoryColumnMediaPanel({
   videoBlockReason,
   onApproveFrame,
   onRejectFrame,
+  stripLayout,
+  hideFooters,
 }: {
   imageUrl?: string;
   videoUrl?: string;
@@ -67,6 +70,9 @@ export function StoryColumnMediaPanel({
   videoBlockReason?: string | null;
   onApproveFrame?: () => void;
   onRejectFrame?: () => void;
+  /** 分镜行横条：填满 strip 高度，与参考图同高 */
+  stripLayout?: boolean;
+  hideFooters?: boolean;
 }) {
   const hasVisual = Boolean(imageUrl || videoUrl);
   const showPreview = Boolean(onPreview && hasVisual && !previewDisabled);
@@ -82,12 +88,23 @@ export function StoryColumnMediaPanel({
 
   return (
     <div
-      className="flex shrink-0 flex-col gap-1 self-start"
-      style={{ width: STORY_MEDIA_COL_WIDTH, minHeight: "var(--row-media-min, 248px)" }}
+      className={cn(
+        "flex shrink-0 flex-col gap-1 self-start",
+        stripLayout && "overflow-visible",
+      )}
+      style={{
+        width: STORY_MEDIA_COL_WIDTH,
+        height: stripLayout ? STORY_FRAME_ROW_STRIP_H : undefined,
+        minHeight: stripLayout
+          ? STORY_FRAME_ROW_STRIP_H
+          : "var(--row-media-min, 248px)",
+      }}
     >
       <div
         className={cn(
-          "group/frame-prompt relative min-h-[var(--row-media-min,248px)] flex-1 overflow-visible rounded-md border border-white/10 bg-black/45",
+          "group/frame-prompt relative min-h-0 rounded-md border border-white/10 bg-black/45",
+          stripLayout ? "h-full overflow-visible" : "overflow-visible",
+          !stripLayout && "min-h-[var(--row-media-min,248px)] flex-1",
           generating && storyEditionGeneratingBorderClass(edition),
         )}
       >
@@ -97,7 +114,10 @@ export function StoryColumnMediaPanel({
             src={imageUrl}
             alt=""
             fill
-            className="pointer-events-none object-contain"
+            className={cn(
+              "pointer-events-none",
+              isFrame && stripLayout ? "object-cover" : "object-contain",
+            )}
             unoptimized
           />
         ) : null}
@@ -179,21 +199,53 @@ export function StoryColumnMediaPanel({
               <RefreshCw className={storyEditionSpinClass(edition)} />
             </div>
           ) : isFrame && hasFrameImage ? (
-            showPreview ? (
+            <>
               <button
                 type="button"
-                aria-label="预览分镜图"
-                className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm hover:bg-black/75"
-                onPointerDown={blockCanvasPointer}
-                onMouseDown={blockCanvasPointer}
+                disabled={btnDisabled}
+                aria-label="重新生成分镜图"
+                title={
+                  generateDisabled
+                    ? "请先在上方选择分镜图 IMAGE 模型"
+                    : "重新生成分镜图"
+                }
+                className={cn(
+                  storyEditionOverlayIconBtnClass(edition),
+                  "nodrag",
+                  btnDisabled && "cursor-not-allowed opacity-40",
+                )}
+                onPointerDown={(e) => {
+                  if (btnDisabled) return;
+                  blockCanvasPointer(e);
+                }}
+                onMouseDown={(e) => {
+                  if (btnDisabled) return;
+                  blockCanvasPointer(e);
+                }}
                 onClick={(e) => {
                   blockCanvasPointer(e);
-                  onPreview?.();
+                  if (btnDisabled) return;
+                  onGenerate();
                 }}
               >
-                <Eye className="size-4 pointer-events-none" />
+                <RefreshCw className="size-4 pointer-events-none" />
               </button>
-            ) : null
+              {showPreview ? (
+                <button
+                  type="button"
+                  aria-label="预览分镜图"
+                  className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm hover:bg-black/75"
+                  onPointerDown={blockCanvasPointer}
+                  onMouseDown={blockCanvasPointer}
+                  onClick={(e) => {
+                    blockCanvasPointer(e);
+                    onPreview?.();
+                  }}
+                >
+                  <Eye className="size-4 pointer-events-none" />
+                </button>
+              ) : null}
+            </>
           ) : hasVisual ? (
             <>
               <button
@@ -272,15 +324,15 @@ export function StoryColumnMediaPanel({
       {audioUrl ? (
         <audio src={audioUrl} controls className="nodrag h-7 w-full shrink-0" />
       ) : null}
-      {errorMessage && !generating ? (
+      {!hideFooters && errorMessage && !generating ? (
         <StoryErrorLine message={errorMessage} />
       ) : null}
-      {isFrame && videoBlockReason && hasFrameImage && !generating ? (
+      {!hideFooters && isFrame && videoBlockReason && hasFrameImage && !generating ? (
         <p className={`text-[10px] leading-snug ${STORY_HINT_GOLD_CLASS}`}>
           {videoBlockReason}
         </p>
       ) : null}
-      {isFrame && frameRejectedReason?.trim() ? (
+      {!hideFooters && isFrame && frameRejectedReason?.trim() ? (
         <StoryErrorLine message={`驳回：${frameRejectedReason}`} />
       ) : null}
     </div>

@@ -20,6 +20,32 @@ function taskHasSuccessPayload(task: CanvasTaskRecord): boolean {
   );
 }
 
+function isServerInflightTaskStatus(status: string): boolean {
+  return status === "PENDING" || status === "SUBMITTED";
+}
+
+function newestTaskByUpdatedAt(
+  tasks: CanvasTaskRecord[],
+): CanvasTaskRecord | undefined {
+  if (!tasks.length) return undefined;
+  return [...tasks].sort(
+    (a, b) =>
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  )[0];
+}
+
+/** 重新生成时本地已 pending/running，勿用旧终态任务覆盖 UI */
+export function shouldSkipStoryRowTaskApply(
+  localRuntime: CanvasNodeRuntime | undefined,
+  pick: CanvasTaskRecord,
+): boolean {
+  const localSt = localRuntime?.status;
+  if (localSt !== "pending" && localSt !== "running") return false;
+  if (isServerInflightTaskStatus(pick.status)) return false;
+  if (localRuntime?.taskId && pick.id === localRuntime.taskId) return false;
+  return pick.status === "SUCCEEDED" || pick.status === "FAILED";
+}
+
 /** 引擎 / 预览节点：把任务终态写进 node.runtime */
 export function runtimePatchFromCanvasTask(
   task: CanvasTaskRecord,
@@ -92,28 +118,16 @@ export function storyRunContextFromScope(
   };
 }
 
-function taskDisplayRank(t: CanvasTaskRecord): number {
-  if (t.status === "SUCCEEDED" && taskHasSuccessPayload(t)) {
-    return 4;
-  }
-  if (t.status === "SUBMITTED" || t.status === "PENDING") return 3;
-  if (t.status === "SUCCEEDED") return 2;
-  if (t.status === "FAILED") return 1;
-  return 0;
-}
-
-/** 同一节点多条任务时：优先展示成功且有结果，其次进行中，最后才用失败记录。 */
+/**
+ * 同一 scope 多条任务：优先最新进行中，否则取最新一条（含重新生成后的失败终态）。
+ */
 export function pickPreferredCanvasTask(
   tasks: CanvasTaskRecord[],
 ): CanvasTaskRecord | undefined {
   if (!tasks.length) return undefined;
-  return [...tasks].sort((a, b) => {
-    const rankDiff = taskDisplayRank(b) - taskDisplayRank(a);
-    if (rankDiff !== 0) return rankDiff;
-    return (
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
-  })[0];
+  const inflight = tasks.filter((t) => isServerInflightTaskStatus(t.status));
+  if (inflight.length) return newestTaskByUpdatedAt(inflight);
+  return newestTaskByUpdatedAt(tasks);
 }
 
 export function preferredTasksByNode(

@@ -56,12 +56,9 @@ export function applyDefaultStoryColumnEngines(
   }
   if (frame && imageBatch) {
     const d = frame.data as unknown as StoryFrameColumnNodeData;
-    const patch: Record<string, unknown> = {};
-    if (!d.batchImage?.providerId?.trim()) patch.batchImage = imageBatch;
-    if (!d.batchVideo?.providerId?.trim() && videoBatch) {
-      patch.batchVideo = videoBatch;
+    if (!d.batchImage?.providerId?.trim()) {
+      updateNodeData(frame.id, { batchImage: imageBatch });
     }
-    if (Object.keys(patch).length) updateNodeData(frame.id, patch);
   }
   if (video && videoBatch) {
     const d = video.data as unknown as StoryVideoColumnNodeData;

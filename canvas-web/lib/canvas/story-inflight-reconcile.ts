@@ -3,12 +3,20 @@
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import { hubSectionMd } from "./story-hub-runtime";
 import {
+  isAnyStoryCharacterColumnType,
+  isAnyStoryFrameColumnType,
+  isAnyStorySceneColumnType,
+  isAnyStoryScriptHubType,
+  isAnyStoryVideoColumnType,
+} from "./story-workspace-resolver";
+import {
   pickPreferredCanvasTask,
   pickPreferredCanvasTaskForScope,
   runtimePatchFromCanvasTask,
   storyRunContextFromScope,
   tasksMatchStoryScope,
   type CanvasTaskStoryScope,
+  shouldSkipStoryRowTaskApply,
 } from "./task-pick";
 import { storyApplyTaskResult } from "./story-run-apply";
 import type {
@@ -114,14 +122,14 @@ export function reconcileStaleInflightRuntimes(
   setNodeRuntime: (id: string, patch: Partial<CanvasNodeRuntime>) => void,
 ): void {
   for (const node of nodes) {
-    if (node.type === "story-script-hub") {
+    if (isAnyStoryScriptHubType(node.type ?? "")) {
       for (const section of ["outline", "character", "storyboard"] as const) {
         reconcileHubSection(node, section, tasks, updateNodeData, nodes);
       }
       continue;
     }
 
-    if (node.type === "story-character-column") {
+    if (isAnyStoryCharacterColumnType(node.type ?? "")) {
       const rows =
         (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
           .rows ?? [];
@@ -133,13 +141,15 @@ export function reconcileStaleInflightRuntimes(
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
         const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
         if (pick) {
-          storyApplyTaskResult(
-            node,
-            pick,
-            storyRunContextFromScope(node.id, scope),
-            updateNodeData,
-            nodes,
-          );
+          if (!shouldSkipStoryRowTaskApply(row.runtime, pick)) {
+            storyApplyTaskResult(
+              node,
+              pick,
+              storyRunContextFromScope(node.id, scope),
+              updateNodeData,
+              nodes,
+            );
+          }
           return row;
         }
         changed = true;
@@ -152,7 +162,40 @@ export function reconcileStaleInflightRuntimes(
       continue;
     }
 
-    if (node.type === "story-frame-column") {
+    if (isAnyStorySceneColumnType(node.type ?? "")) {
+      const rows =
+        (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
+          .rows ?? [];
+      let changed = false;
+      const nextRows = rows.map((row) => {
+        if (!isInflightStatus(row.runtime?.status)) return row;
+        const scope = { rowKey: row.key, mediaKind: "sceneRef" };
+        const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
+        if (hasServerInflightForScope(tasks, node.id, scope)) return row;
+        const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+        if (pick) {
+          if (!shouldSkipStoryRowTaskApply(row.runtime, pick)) {
+            storyApplyTaskResult(
+              node,
+              pick,
+              storyRunContextFromScope(node.id, scope),
+              updateNodeData,
+              nodes,
+            );
+          }
+          return row;
+        }
+        changed = true;
+        return {
+          ...row,
+          runtime: clearInflightRuntime(row.runtime),
+        };
+      });
+      if (changed) updateNodeData(node.id, { rows: nextRows });
+      continue;
+    }
+
+    if (isAnyStoryFrameColumnType(node.type ?? "")) {
       const rows =
         (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
           .rows ?? [];
@@ -164,13 +207,15 @@ export function reconcileStaleInflightRuntimes(
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
         const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
         if (pick) {
-          storyApplyTaskResult(
-            node,
-            pick,
-            storyRunContextFromScope(node.id, scope),
-            updateNodeData,
-            nodes,
-          );
+          if (!shouldSkipStoryRowTaskApply(row.runtime, pick)) {
+            storyApplyTaskResult(
+              node,
+              pick,
+              storyRunContextFromScope(node.id, scope),
+              updateNodeData,
+              nodes,
+            );
+          }
           return row;
         }
         changed = true;
@@ -183,7 +228,7 @@ export function reconcileStaleInflightRuntimes(
       continue;
     }
 
-    if (node.type === "story-video-column") {
+    if (isAnyStoryVideoColumnType(node.type ?? "")) {
       const rows =
         (node.data as {
           rows?: {
@@ -204,13 +249,15 @@ export function reconcileStaleInflightRuntimes(
           if (hasServerInflightForScope(tasks, node.id, scope)) continue;
           const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
           if (pick) {
-            storyApplyTaskResult(
-              node,
-              pick,
-              storyRunContextFromScope(node.id, scope),
-              updateNodeData,
-              nodes,
-            );
+            if (!shouldSkipStoryRowTaskApply(rt, pick)) {
+              storyApplyTaskResult(
+                node,
+                pick,
+                storyRunContextFromScope(node.id, scope),
+                updateNodeData,
+                nodes,
+              );
+            }
             continue;
           }
           changed = true;

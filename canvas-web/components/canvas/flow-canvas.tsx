@@ -147,16 +147,16 @@ function FlowCanvasInner() {
     return () => window.cancelAnimationFrame(t);
   }, [fitViewNonce, fitView]);
 
-  /** 某节点开始生成时，平移视口使其进入视野 */
+  /** 某节点开始生成时，仅在视口内微调平移，避免 fitView 把大列节点顶到顶栏下方造成「菜单被盖住」的错觉 */
   useEffect(() => {
     if (runningFocusNonce <= 0 || !runningFocusNodeId) return;
     const nodeId = runningFocusNodeId;
     const t = window.requestAnimationFrame(() => {
       void fitView({
         nodes: [{ id: nodeId }],
-        padding: 0.45,
-        duration: 320,
-        maxZoom: 1.05,
+        padding: { top: 140, right: 72, bottom: 72, left: 72 },
+        duration: 280,
+        maxZoom: 0.92,
       });
     });
     return () => window.cancelAnimationFrame(t);

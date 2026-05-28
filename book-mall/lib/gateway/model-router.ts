@@ -22,6 +22,7 @@ const KIE_JOB_PREFIXES = [
 const BAILIAN_R2V = new Set([
   "happyhorse-1.0-r2v",
   "wan2.6-r2v",
+  "wan2.6-r2v-flash",
   "wan2.7-r2v",
 ]);
 

@@ -21,12 +21,19 @@ export function StoryProFrameRefSuggestBar({
   suggestions,
   currentPrompt,
   onApply,
+  reserveSpace,
 }: {
   suggestions: FrameRefSuggestion[];
   currentPrompt: string;
   onApply: (nextPrompt: string) => void;
+  /** 占位统一行高：无建议时也保留高度 */
+  reserveSpace?: boolean;
 }) {
-  if (!suggestions.length) return null;
+  if (!suggestions.length) {
+    return reserveSpace ? (
+      <div className="min-h-[26px]" aria-hidden />
+    ) : null;
+  }
   const names = suggestions.map((s) => s.name).join("、");
   return (
     <div className={STORY_ROW_BANNER_CLASS}>
@@ -51,11 +58,17 @@ export function StoryProFrameRefSuggestBar({
 export function StoryProFrameAssetReadinessBar({
   readiness,
   stale,
+  reserveSpace,
 }: {
   readiness: FrameRowAssetReadiness;
   stale?: boolean;
+  reserveSpace?: boolean;
 }) {
-  if (readiness.level === "none" && !stale) return null;
+  if (readiness.level === "none" && !stale) {
+    return reserveSpace ? (
+      <div className="min-h-[22px]" aria-hidden />
+    ) : null;
+  }
   return (
     <div className="flex flex-wrap items-center gap-2 text-[10px]">
       {readiness.level !== "none" ? (

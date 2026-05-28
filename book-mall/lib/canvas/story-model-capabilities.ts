@@ -6,6 +6,7 @@ export type StoryModelCapability =
   | "image_t2i"
   | "image_multi_ref"
   | "video_i2v"
+  | "video_r2v"
   | "video_t2v";
 
 export class StoryModelCapabilityError extends Error {
@@ -32,6 +33,11 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "flux-kontext-pro": ["image_t2i", "image_multi_ref"],
   "flux-kontext-max": ["image_t2i", "image_multi_ref"],
   "qwen-text-to-image": ["image_t2i"],
+  "bytedance/seedance-2": ["video_i2v", "video_r2v"],
+  "happyhorse-1.0-r2v": ["video_r2v"],
+  "wan2.6-r2v": ["video_r2v"],
+  "wan2.6-r2v-flash": ["video_r2v"],
+  "wan2.7-r2v": ["video_r2v"],
 };
 
 function inferCapabilities(modelKey: string): StoryModelCapability[] {
@@ -51,6 +57,9 @@ function inferCapabilities(modelKey: string): StoryModelCapability[] {
     k.includes("happyhorse");
 
   if (isVideo) {
+    if (k.includes("-r2v") || k.endsWith("r2v")) {
+      caps.push("video_r2v");
+    }
     if (
       k.includes("image-to-video") ||
       k.includes("i2v") ||

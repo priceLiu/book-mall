@@ -37,6 +37,8 @@ export type MentionsTextareaProps = {
   style?: CSSProperties;
   disabled?: boolean;
   ariaLabel?: string;
+  /** 在 flex 父级内撑满剩余高度（分镜行文案区） */
+  fillHeight?: boolean;
 };
 
 const TOKEN_RE = /@<([^>\s]+)>/g;
@@ -105,6 +107,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       style,
       disabled,
       ariaLabel,
+      fillHeight = false,
     },
     ref,
   ) {
@@ -257,20 +260,24 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
     return (
       <div
         ref={wrapperRef}
-        className={wrapperClassName ? `relative ${wrapperClassName}` : "relative"}
+        className={
+          wrapperClassName
+            ? `relative ${fillHeight ? "flex h-full min-h-0 flex-col " : ""}${wrapperClassName}`
+            : `relative${fillHeight ? " flex h-full min-h-0 flex-col" : ""}`
+        }
       >
         <textarea
           ref={setRef}
           value={displayValue}
           onChange={onTextChange}
           onKeyDown={onKeyDown}
-          rows={rows}
+          rows={fillHeight ? 1 : rows}
           placeholder={placeholder}
           disabled={disabled}
           aria-label={ariaLabel}
           className={
             className ??
-            `${RF_NODE_SCROLL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`
+            `${RF_NODE_SCROLL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none${fillHeight ? " min-h-0 flex-1 h-full overflow-y-auto" : ""}`
           }
           style={style}
         />

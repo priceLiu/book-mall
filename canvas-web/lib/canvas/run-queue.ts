@@ -14,6 +14,7 @@ import { isRefGridNodeType } from "./ref-video-models";
 import type {
   CanvasFlowEdge,
   CanvasFlowNode,
+  CanvasNodeRuntime,
   ImageNodeData,
   ImageEngineNodeData,
   TextNodeData,
@@ -22,7 +23,13 @@ import type {
   StoryComicStarterNodeData,
 } from "./types";
 import { isStoryLlmNodeType } from "./types";
-import { isAnyStoryScriptHubType } from "./story-workspace-resolver";
+import {
+  isAnyStoryCharacterColumnType,
+  isAnyStoryFrameColumnType,
+  isAnyStorySceneColumnType,
+  isAnyStoryScriptHubType,
+  isAnyStoryVideoColumnType,
+} from "./story-workspace-resolver";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import {
   registerCanvasRunBus,
@@ -62,6 +69,7 @@ import {
   pickPreferredCanvasTaskForScope,
   preferredTasksByNode,
   runtimePatchFromCanvasTask,
+  shouldSkipStoryRowTaskApply,
   storyRunContextFromScope,
 } from "./task-pick";
 
@@ -100,7 +108,7 @@ function storyRowRuntimeStatus(
   ).rows;
   const row = rows?.find((r) => r.key === job.rowKey);
   if (!row) return undefined;
-  if (node.type === "story-video-column") {
+  if (isAnyStoryVideoColumnType(node.type ?? "")) {
     return job.mediaKind === "tts"
       ? row.ttsRuntime?.status
       : row.videoRuntime?.status;
@@ -262,6 +270,8 @@ export function useCanvasRunner(
 
   const queueRef = useRef<QueueItem[]>([]);
   const inflightRef = useRef<Set<string>>(new Set());
+  /** forceFresh 时若同 key 仍在跑，等当前 runOne 结束后再替换执行 */
+  const deferredForceFreshRef = useRef<Map<string, QueueItem>>(new Map());
   const taskByNodeRef = useRef<Map<string, string>>(new Map());
   const jobByTaskRef = useRef<Map<string, QueueItem>>(new Map());
   const sequentialRef = useRef<{
@@ -280,6 +290,15 @@ export function useCanvasRunner(
   };
   const drainRef = useRef<() => void>(() => {});
   const pumpSequentialRef = useRef<() => void>(() => {});
+
+  const releaseInflightKey = useCallback((key: string) => {
+    if (!inflightRef.current.delete(key)) return;
+    const deferred = deferredForceFreshRef.current.get(key);
+    if (!deferred) return;
+    deferredForceFreshRef.current.delete(key);
+    queueRef.current.push(deferred);
+    drainRef.current();
+  }, []);
 
   /** 顺序链单步完成：防止 subscribe 与 finally 重复推进 cursor */
   const finishSequentialStep = useCallback((completedKey: string) => {
@@ -639,7 +658,7 @@ export function useCanvasRunner(
         const nodeAfter = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
         const taskStarted = taskByNodeRef.current.has(key);
         if (shouldReleaseStoryRunInflight(nodeAfter, job) || !taskStarted) {
-          inflightRef.current.delete(key);
+          releaseInflightKey(key);
         }
         const seq = sequentialRef.current;
         if (seq?.activeKey === key) {
@@ -685,6 +704,7 @@ export function useCanvasRunner(
       base,
       finishSequentialStep,
       projectId,
+      releaseInflightKey,
       setNodeRuntime,
       updateNodeData,
     ],
@@ -722,8 +742,16 @@ export function useCanvasRunner(
       }
       const key = runKey(job);
       if (job.forceFresh) {
-        inflightRef.current.delete(key);
         queueRef.current = queueRef.current.filter((q) => runKey(q) !== key);
+        if (inflightRef.current.has(key)) {
+          deferredForceFreshRef.current.set(key, job);
+          const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
+          if (node) {
+            const pending = storyRunPendingPatch(node, job);
+            if (pending) updateNodeData(job.nodeId, pending);
+          }
+          return;
+        }
       }
       if (inflightRef.current.has(key)) return;
       if (queueRef.current.some((q) => runKey(q) === key)) return;
@@ -925,6 +953,19 @@ export function useCanvasRunner(
       tasks: CanvasTaskRecord[],
       nodes: CanvasFlowNode[],
     ) => {
+      const applyRowPick = (
+        node: CanvasFlowNode,
+        pick: CanvasTaskRecord,
+        job: CanvasStoryRunJob,
+        localRuntime: CanvasNodeRuntime | undefined,
+      ) => {
+        if (shouldSkipStoryRowTaskApply(localRuntime, pick)) return;
+        storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
+        if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
+          releaseInflightKey(runKey(job));
+        }
+      };
+
       for (const node of nodes) {
         const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
         if (!nodeTasks.length) continue;
@@ -939,15 +980,37 @@ export function useCanvasRunner(
               storyRunContextFromScope(node.id, scope);
             storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
             if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
-              inflightRef.current.delete(runKey(job));
+              releaseInflightKey(runKey(job));
             }
           }
           continue;
         }
 
-        if (node.type === "story-character-column") {
+        if (isAnyStorySceneColumnType(node.type ?? "")) {
           const rows =
             (node.data as { rows?: { key: string }[] }).rows ?? [];
+          for (const row of rows) {
+            const scope = { rowKey: row.key, mediaKind: "sceneRef" as const };
+            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            if (!pick) continue;
+            const job: CanvasStoryRunJob =
+              jobByTaskRef.current.get(pick.id) ??
+              storyRunContextFromScope(node.id, scope);
+            applyRowPick(
+              node,
+              pick,
+              job,
+              (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
+                .rows?.find((r) => r.key === row.key)?.runtime,
+            );
+          }
+          continue;
+        }
+
+        if (isAnyStoryCharacterColumnType(node.type ?? "")) {
+          const rows =
+            (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
+              .rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "threeView" };
             const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
@@ -955,17 +1018,15 @@ export function useCanvasRunner(
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
               storyRunContextFromScope(node.id, scope);
-            storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
-            if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
-              inflightRef.current.delete(runKey(job));
-            }
+            applyRowPick(node, pick, job, row.runtime);
           }
           continue;
         }
 
-        if (node.type === "story-frame-column") {
+        if (isAnyStoryFrameColumnType(node.type ?? "")) {
           const rows =
-            (node.data as { rows?: { key: string }[] }).rows ?? [];
+            (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
+              .rows ?? [];
           for (const row of rows) {
             const scope = { rowKey: row.key, mediaKind: "frameImage" };
             const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
@@ -973,17 +1034,20 @@ export function useCanvasRunner(
             const job: CanvasStoryRunJob =
               jobByTaskRef.current.get(pick.id) ??
               storyRunContextFromScope(node.id, scope);
-            storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
-            if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
-              inflightRef.current.delete(runKey(job));
-            }
+            applyRowPick(node, pick, job, row.runtime);
           }
           continue;
         }
 
-        if (node.type === "story-video-column") {
+        if (isAnyStoryVideoColumnType(node.type ?? "")) {
           const rows =
-            (node.data as { rows?: { key: string }[] }).rows ?? [];
+            (node.data as {
+              rows?: {
+                key: string;
+                videoRuntime?: CanvasNodeRuntime;
+                ttsRuntime?: CanvasNodeRuntime;
+              }[];
+            }).rows ?? [];
           for (const row of rows) {
             for (const mediaKind of ["video", "tts"] as const) {
               const scope = { rowKey: row.key, mediaKind };
@@ -992,10 +1056,12 @@ export function useCanvasRunner(
               const job: CanvasStoryRunJob =
                 jobByTaskRef.current.get(pick.id) ??
                 storyRunContextFromScope(node.id, scope);
-              storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
-              if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
-                inflightRef.current.delete(runKey(job));
-              }
+              applyRowPick(
+                node,
+                pick,
+                job,
+                mediaKind === "tts" ? row.ttsRuntime : row.videoRuntime,
+              );
             }
           }
         }
@@ -1009,8 +1075,12 @@ export function useCanvasRunner(
           .nodes.filter(
             (n) =>
               n.type === "story-character-column" ||
+              n.type === "story-pro-character" ||
+              n.type === "story-pro-scene" ||
               n.type === "story-frame-column" ||
-              n.type === "story-video-column",
+              n.type === "story-pro-frame" ||
+              n.type === "story-video-column" ||
+              n.type === "story-pro-video",
           )
           .map((n) => n.id),
       );
@@ -1146,7 +1216,7 @@ export function useCanvasRunner(
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [base, projectId, setNodeRuntime, updateNodeData]);
+  }, [base, projectId, releaseInflightKey, setNodeRuntime, updateNodeData]);
 
   return { enqueueNode };
 }

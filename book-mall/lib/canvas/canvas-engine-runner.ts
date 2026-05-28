@@ -479,6 +479,7 @@ export async function runImageEngineNode(
         providerId,
         modelKey,
         imageUrls,
+        clientPage: gwClientPage,
         ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
       status: "PENDING",
@@ -509,6 +510,7 @@ export async function runImageEngineNode(
               providerId,
               modelKey,
               imageUrls,
+              clientPage: gwClientPage,
               gatewayLogId: job.logId,
               providerKind: "HUNYUAN",
               ...(args.storyScope ? { storyScope: args.storyScope } : {}),
@@ -543,6 +545,7 @@ export async function runImageEngineNode(
             providerId,
             modelKey,
             imageUrls,
+            clientPage: gwClientPage,
             gatewayLogId: job.logId,
             providerKind: "KIE",
             kieModel: model,
@@ -795,12 +798,6 @@ export async function runVideoEngineNode(
     throw new CanvasProjectError("INVALID_INPUT", "video-engine 缺少 providerId");
   if (!modelKey)
     throw new CanvasProjectError("INVALID_INPUT", "video-engine 缺少 modelKey");
-  if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(modelKey)) {
-    throw new CanvasProjectError(
-      "INVALID_INPUT",
-      `video-engine 不支持模型 ${modelKey}`,
-    );
-  }
 
   const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());
   const expandedPrompt = expandMentions(
@@ -829,6 +826,38 @@ export async function runVideoEngineNode(
     throw new CanvasProjectError(
       "INVALID_INPUT",
       "video-engine 需要分镜图作为主图",
+    );
+  }
+
+  const isBailianR2v = (BAILIAN_R2V_MODEL_IDS as readonly string[]).includes(
+    modelKey,
+  );
+  if (isBailianR2v) {
+    const referenceImageUrlsForR2v = [
+      mainFrameImageUrl,
+      ...referenceImageUrls,
+    ].filter((u, i, arr) => arr.indexOf(u) === i);
+    return runRefVideoEngineNode({
+      ...args,
+      node: {
+        type: "ai-video-engine",
+        modelKey,
+        data: {
+          providerId,
+          modelKey,
+          params,
+          prompt: expandedPrompt,
+        },
+        imageInputs: referenceImageUrlsForR2v,
+        textInputs: [],
+      },
+    });
+  }
+
+  if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(modelKey)) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      `video-engine 不支持模型 ${modelKey}`,
     );
   }
 

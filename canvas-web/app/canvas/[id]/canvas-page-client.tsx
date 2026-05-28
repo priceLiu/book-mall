@@ -6,6 +6,7 @@ import { LayoutTemplate, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { ScriptWritingAssistantPanel } from "@/components/canvas/script-writing-assistant-panel";
 import { MyTemplatesPanel } from "@/components/canvas/my-templates-panel";
@@ -47,6 +48,7 @@ import { GatewayLinkBanner } from "@/components/canvas/gateway-link-banner";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
+import { canAddStoryNodeType } from "@/lib/canvas/story-edition-isolation";
 import { storyProStarterHasScriptSource } from "@/lib/canvas/story-pro-starter-sync";
 import type {
   StoryProScriptHubNodeData,
@@ -123,6 +125,28 @@ function Inner({ projectId }: { projectId: string }) {
   const canvasReadyRef = useRef(false);
 
   const inflightTaskCount = useCanvasInflightTaskCount();
+
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
+
+  useEffect(() => {
+    registerCanvasNotifier(({ title, message, variant }) => {
+      void dialogs.alert({
+        title,
+        message,
+        variant: variant === "error" ? "error" : "info",
+      });
+    });
+    return () => registerCanvasNotifier(null);
+  }, [dialogs]);
 
   // Load project
   useEffect(() => {
@@ -279,6 +303,18 @@ function Inner({ projectId }: { projectId: string }) {
 
   const onAddViaPalette = useCallback(
     (type: CanvasContentNodeType, presetId?: string) => {
+      const blocked = canAddStoryNodeType(
+        type,
+        useCanvasStore.getState().nodes,
+      );
+      if (!blocked.ok) {
+        void dialogs.alert({
+          title: "无法添加该节点",
+          message: blocked.message,
+          variant: "warning",
+        });
+        return;
+      }
       const initialData =
         type === "text" && presetId
           ? buildTextNodeDataFromPreset(presetId)
@@ -288,7 +324,7 @@ function Inner({ projectId }: { projectId: string }) {
       const position = flowPositionAtViewportCenter(type, initialData);
       addNode(type, position, initialData);
     },
-    [addNode],
+    [addNode, dialogs],
   );
 
   const onInsertCharacter = useCallback(
@@ -416,37 +452,36 @@ function Inner({ projectId }: { projectId: string }) {
     );
   } else {
     body = (
-      <div className="flex h-screen flex-col bg-[var(--canvas-bg)]">
-        <CanvasToolbar
-        projectName={nameDraft}
-        onProjectNameChange={setNameDraft}
-        onProjectNameCommit={() => void commitProjectName()}
-        saving={saving}
-        saveError={saveError}
-        lastSavedAt={lastSavedAt}
-        onSave={() => void manualSave()}
-        onUndo={undo}
-        onRedo={redo}
-        onRunAll={runAll}
-        onOpenMyTemplates={() => setMyTemplatesOpen(true)}
-        onOpenMyCharacters={() => setMyCharactersOpen(true)}
-        onOpenMySavedScripts={
-          isStoryProCanvas ? () => setMySavedScriptsOpen(true) : undefined
-        }
-        onOpenProjectCharacterAssets={
-          isStoryProCanvas
-            ? () => setMyProjectCharacterAssetsOpen(true)
-            : undefined
-        }
-        onReflowStoryLayout={
-          isStoryComicCanvas ? () => reflowStoryComicLayout() : undefined
-        }
-        onSaveTemplate={() => void onSaveTemplate()}
-        running={inflightTaskCount > 0}
-        inflightTaskCount={inflightTaskCount}
-        runAllDisabled={gatewayLinkBlocked}
-      />
-      <GatewayLinkBanner />
+      <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--canvas-bg)]">
+        <div className="sticky top-0 z-[300] shrink-0 bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)]">
+          <CanvasToolbar
+            projectName={nameDraft}
+            onProjectNameChange={setNameDraft}
+            onProjectNameCommit={() => void commitProjectName()}
+            saving={saving}
+            saveError={saveError}
+            lastSavedAt={lastSavedAt}
+            onSave={() => void manualSave()}
+            onUndo={undo}
+            onRedo={redo}
+            onRunAll={runAll}
+            onOpenMyTemplates={() => setMyTemplatesOpen(true)}
+            onOpenMyCharacters={() => setMyCharactersOpen(true)}
+            onOpenMySavedScripts={
+              isStoryProCanvas ? () => setMySavedScriptsOpen(true) : undefined
+            }
+            onOpenProjectCharacterAssets={() => setMyProjectCharacterAssetsOpen(true)}
+            onReflowStoryLayout={
+              isStoryComicCanvas ? () => reflowStoryComicLayout() : undefined
+            }
+            onSaveTemplate={() => void onSaveTemplate()}
+            running={inflightTaskCount > 0}
+            inflightTaskCount={inflightTaskCount}
+            runAllDisabled={gatewayLinkBlocked}
+          />
+          <GatewayLinkBanner />
+          <NodePalette onAdd={onAddViaPalette} />
+        </div>
       <MyTemplatesPanel
         open={myTemplatesOpen}
         onClose={() => setMyTemplatesOpen(false)}
@@ -465,7 +500,7 @@ function Inner({ projectId }: { projectId: string }) {
         open={myProjectCharacterAssetsOpen}
         onClose={() => setMyProjectCharacterAssetsOpen(false)}
       />
-      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+      <div className="relative z-0 flex min-h-0 flex-1 overflow-hidden isolate">
         {isStoryProCanvas && project ? (
           <ScriptWritingAssistantPanel
             projectId={projectId}
@@ -524,8 +559,6 @@ function Inner({ projectId }: { projectId: string }) {
             </div>
           </div>
         ) : null}
-        {/* 画布内顶部居中节点面板（位于工具栏下方，勿用 fixed 顶到视口顶端） */}
-        <NodePalette onAdd={onAddViaPalette} />
         </div>
       </div>
     </div>

@@ -48,7 +48,7 @@ export function ImageNode({ id, data, selected }: NodeProps) {
     [base, id, updateNodeData],
   );
 
-  useImagePasteWhenActive(Boolean(selected), (file) => void onFile(file));
+  useImagePasteWhenActive(Boolean(selected), (file) => void onFile(file), true, `image-${id}`);
 
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
 

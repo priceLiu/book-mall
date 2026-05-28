@@ -255,6 +255,20 @@ export const STORY_VIDEO_MODEL_KEYS = [
   "happyhorse/image-to-video",
 ] as const;
 
+/** 影视专业版 · 百炼参考生视频（Gateway · 百炼，非 KIE 直连） */
+export const STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS = [
+  "happyhorse-1.0-r2v",
+  "wan2.7-r2v",
+  "wan2.6-r2v",
+  "wan2.6-r2v-flash",
+] as const;
+
+/** 影视专业版分镜视频 · KIE 图生/多参考 + 百炼 R2V */
+export const STORY_PRO_VIDEO_MODEL_KEYS = [
+  ...STORY_VIDEO_MODEL_KEYS,
+  ...STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS,
+] as const;
+
 /**
  * 影视专业版 · 分镜静帧（IMAGE）白名单
  * 与 KIE_KNOWN_MODELS 对齐；含多参考图（image_input / image_urls / input_urls）

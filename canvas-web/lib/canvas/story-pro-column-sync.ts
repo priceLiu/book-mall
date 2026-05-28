@@ -140,6 +140,8 @@ function mergeProFrameRows(
       refImages: prev.refImages,
       refImageUrls: prev.refImageUrls,
       referencedNodeIds: prev.referencedNodeIds,
+      frameApprovedAt: prev.frameApprovedAt,
+      frameRejectedReason: prev.frameRejectedReason,
     };
   });
 }

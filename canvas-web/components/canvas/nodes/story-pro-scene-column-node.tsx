@@ -180,7 +180,7 @@ export function StoryProSceneColumnNode({ id, data, selected }: NodeProps) {
                       !d.batchImage?.providerId?.trim() ||
                       !d.batchImage?.modelKey?.trim()
                     }
-                    mediaMode="frame"
+                    mediaMode="character"
                     imageUrl={url}
                     mediaError={
                       st === "error" ? row.runtime?.failMessage : undefined

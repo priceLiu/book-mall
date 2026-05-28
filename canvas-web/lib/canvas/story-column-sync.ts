@@ -330,6 +330,8 @@ export function syncColumnsFromHub(
             : row.prompt,
           promptHistory: prev.promptHistory,
           runtime: prev.runtime,
+          frameApprovedAt: prev.frameApprovedAt,
+          frameRejectedReason: prev.frameRejectedReason,
         }
       : row;
     return syncFrameRowCharacterRefs(base, mergedChar);

@@ -6,7 +6,7 @@ import {
   REF_VIDEO_MODEL_META,
   isRefVideoModelKey,
 } from "./ref-video-models";
-import { STORY_LLM_MODEL_KEYS, STORY_VIDEO_MODEL_KEYS } from "./types";
+import { STORY_LLM_MODEL_KEYS, STORY_PRO_VIDEO_MODEL_KEYS } from "./types";
 
 export const SYSTEM_KIE_PROVIDER_ID = "system:kie";
 export const SYSTEM_DEEPSEEK_PROVIDER_ID = "system:deepseek";
@@ -165,7 +165,7 @@ export function pickDefaultStoryImageEngine(
   return null;
 }
 
-const STORY_VIDEO_ALLOWED = new Set<string>(STORY_VIDEO_MODEL_KEYS);
+const STORY_VIDEO_ALLOWED = new Set<string>(STORY_PRO_VIDEO_MODEL_KEYS);
 
 function findVideoOnProvider(
   provider: CanvasProviderDto,
@@ -188,7 +188,7 @@ export function pickDefaultStoryVideoEngine(
 ): { providerId: string; modelKey: string } | null {
   const kie = findProviderByKind(providers, "KIE");
   if (kie) {
-    for (const key of STORY_VIDEO_MODEL_KEYS) {
+    for (const key of STORY_PRO_VIDEO_MODEL_KEYS) {
       const hit = findVideoOnProvider(kie, key);
       if (hit) return hit;
     }

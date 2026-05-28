@@ -376,6 +376,8 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
   useImagePasteWhenActive(
     Boolean(selected) && !fieldsLocked && !refUploadBusy,
     onRefImageFile,
+    true,
+    `style-${id}`,
   );
 
   const refUploadDragDrop = bindImageDragDropHandlers(onRefImageFile, {

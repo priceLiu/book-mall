@@ -3,8 +3,15 @@
  */
 
 import type { StoryProCharacterAssetRecord } from "@/lib/canvas-api";
-import { findAssetForCharacterRow } from "@/lib/canvas/story-pro-character-asset-catalog";
+import {
+  findAssetForCharacterRow,
+  storyProAssetRefMentionId,
+} from "@/lib/canvas/story-pro-character-asset-catalog";
+import { normalizeStoryProCharacterKey } from "@/lib/canvas/story-pro-character-key";
 import { matchCharactersInFrameText } from "@/lib/canvas/story-pro-frame-ref-suggest";
+import {
+  storyRefIdsFromPrompt,
+} from "@/lib/canvas/story-ref-image";
 
 export type AssetReadinessLevel = "ready" | "partial" | "missing" | "none";
 
@@ -31,23 +38,43 @@ type FrameRowLike = {
   characterRefIds?: string[];
 };
 
+type CharacterRowForReadiness = {
+  key: string;
+  name: string;
+  runtime?: { ossUrl?: string; ephemeralUrl?: string };
+};
+
+function hasGeneratedThreeView(
+  runtime?: { ossUrl?: string; ephemeralUrl?: string },
+): boolean {
+  const url = runtime?.ossUrl ?? runtime?.ephemeralUrl;
+  return Boolean(url && /^https?:\/\//.test(url));
+}
+
 function characterReadiness(
   name: string,
   key: string,
   asset: StoryProCharacterAssetRecord | undefined,
+  runtime?: { ossUrl?: string; ephemeralUrl?: string },
 ): CharacterAssetReadiness {
-  if (!asset?.refs.length) {
+  const hasThreeViewFromAsset = Boolean(
+    asset?.refs.some((r) => r.kind === "three_view"),
+  );
+  const hasThreeViewFromRuntime = hasGeneratedThreeView(runtime);
+  const hasThreeView = hasThreeViewFromAsset || hasThreeViewFromRuntime;
+
+  if (!asset?.refs.length && !hasThreeViewFromRuntime) {
     return { key, name, level: "missing", hasThreeView: false };
   }
-  const hasThreeView = asset.refs.some((r) => r.kind === "three_view");
-  const hasFace = asset.refs.some((r) => r.kind === "face");
+
+  const hasFace = asset?.refs.some((r) => r.kind === "face") ?? false;
   if (hasThreeView) {
     return {
       key,
       name,
       level: hasFace ? "ready" : "partial",
       hasThreeView: true,
-      assetVersion: asset.version,
+      assetVersion: asset?.version,
     };
   }
   return {
@@ -55,18 +82,61 @@ function characterReadiness(
     name,
     level: "partial",
     hasThreeView: false,
-    assetVersion: asset.version,
+    assetVersion: asset?.version,
   };
+}
+
+function matchCharactersForFrameRow(
+  row: FrameRowLike,
+  characterRows: CharacterRowForReadiness[],
+  assets: StoryProCharacterAssetRecord[],
+): CharacterRowForReadiness[] {
+  const text = [row.dialogue, row.description, row.scene, row.prompt]
+    .filter(Boolean)
+    .join("\n");
+  const matched = matchCharactersInFrameText(text, characterRows);
+  const seen = new Set(matched.map((c) => c.key));
+
+  const prompt = row.prompt ?? "";
+  for (const refId of storyRefIdsFromPrompt(prompt)) {
+    if (refId.startsWith("ref-char-")) {
+      const charKey = refId.slice("ref-char-".length);
+      const rowHit = characterRows.find((c) => c.key === charKey);
+      if (rowHit && !seen.has(rowHit.key)) {
+        seen.add(rowHit.key);
+        matched.push(rowHit);
+      }
+      continue;
+    }
+    if (!refId.startsWith("ref-asset-")) continue;
+    for (const asset of assets) {
+      const rowHit = characterRows.find(
+        (c) =>
+          normalizeStoryProCharacterKey(c.key) ===
+          normalizeStoryProCharacterKey(asset.characterKey),
+      );
+      if (!rowHit || seen.has(rowHit.key)) continue;
+      const hit = asset.refs.some(
+        (ref) => storyProAssetRefMentionId(asset.id, ref.id) === refId,
+      );
+      if (hit) {
+        seen.add(rowHit.key);
+        matched.push(rowHit);
+        break;
+      }
+    }
+  }
+
+  return matched;
 }
 
 export function assessFrameRowAssetReadiness(
   row: FrameRowLike,
-  characterRows: { key: string; name: string }[],
+  characterRows: CharacterRowForReadiness[],
   assets: StoryProCharacterAssetRecord[],
   projectId?: string | null,
 ): FrameRowAssetReadiness {
-  const text = [row.dialogue, row.description, row.scene].join("\n");
-  const matched = matchCharactersInFrameText(text, characterRows);
+  const matched = matchCharactersForFrameRow(row, characterRows, assets);
   if (!matched.length) {
     return { level: "none", characters: [] };
   }
@@ -75,6 +145,7 @@ export function assessFrameRowAssetReadiness(
       c.name,
       c.key,
       findAssetForCharacterRow(assets, c.key, projectId),
+      c.runtime,
     ),
   );
   if (characters.every((c) => c.level === "ready")) {

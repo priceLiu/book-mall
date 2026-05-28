@@ -102,6 +102,10 @@ export function isAnyStoryFrameColumnType(t: string): boolean {
   return t === "story-frame-column" || t === "story-pro-frame";
 }
 
+export function isAnyStorySceneColumnType(t: string): boolean {
+  return t === "story-pro-scene";
+}
+
 export function isAnyStoryVideoColumnType(t: string): boolean {
   return t === "story-video-column" || t === "story-pro-video";
 }

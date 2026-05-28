@@ -9,6 +9,7 @@ import {
 } from "@/lib/canvas/api-helpers";
 import { parseOutfitFromFullBodyViaGateway } from "@/lib/canvas/story-pro-character-outfit-parsing";
 import { StoryProCharacterAssetError } from "@/lib/canvas/story-pro-character-asset-service";
+import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
 
 export async function OPTIONS(request: NextRequest) {
   return corsOptionsResponse(request);
@@ -34,6 +35,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: err.code, message: err.message },
         { status: err.httpStatus, headers: jsonHeaders(request) },
+      );
+    }
+    if (err instanceof CanvasProjectError) {
+      return canvasErrorToResponse(request, err);
+    }
+    if (err instanceof Error && err.message.trim()) {
+      return NextResponse.json(
+        { error: "PARSE_OUTFIT_FAILED", message: err.message },
+        { status: 400, headers: jsonHeaders(request) },
       );
     }
     return canvasErrorToResponse(request, err);
