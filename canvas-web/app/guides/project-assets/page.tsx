@@ -67,7 +67,7 @@ export default function ProjectAssetsGuidePage() {
       <GuideSection title="剧本创作助手">
         <ul className="guide-list">
           <li>
-            影视专业版画布<strong>左侧</strong>「剧本创作助手」：DeepSeek 流式对话，辅助起草 Markdown 剧本。
+            影视专业版画布<strong>左侧</strong>「剧本创作助手」：DeepSeek 流式对话，辅助起草 Markdown 剧本；<strong>发送后</strong>自动展开为画布中央宽幅浮层（可拖标题栏移动），也可「收回侧栏」回到左侧窄栏。
           </li>
           <li>
             <strong>无剧本</strong>时默认展开；<strong>已有剧本</strong>时默认折叠，点击可展开。

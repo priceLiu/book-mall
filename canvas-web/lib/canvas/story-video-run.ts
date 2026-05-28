@@ -73,9 +73,24 @@ function patchVideoRowsForRun(
     frameRow?.runtime?.ossUrl ||
     frameRow?.runtime?.ephemeralUrl;
   if (!frameUrl) return null;
-  patched = patched.map((v) =>
-    v.key === rowKey ? { ...v, frameImageUrl: frameUrl } : v,
-  );
+  const frameScript = frameRow?.prompt?.trim();
+  patched = patched.map((v) => {
+    if (v.key !== rowKey) return v;
+    return {
+      ...v,
+      frameImageUrl: frameUrl,
+      ...(frameRow
+        ? {
+            videoPrompt: frameScript || v.videoPrompt,
+            refImages: frameRow.refImages?.length
+              ? frameRow.refImages
+              : v.refImages,
+            videoReferencedNodeIds:
+              frameRow.referencedNodeIds ?? v.videoReferencedNodeIds,
+          }
+        : {}),
+    };
+  });
   return patched;
 }
 

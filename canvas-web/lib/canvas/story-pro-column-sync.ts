@@ -193,9 +193,7 @@ function mergeProVideoRows(
       ttsRuntime: prev?.ttsRuntime,
       ttsPrompt: prev?.ttsPrompt,
       ttsPromptHistory: prev?.ttsPromptHistory,
-      refImages: frameRow?.refImages?.length
-        ? frameRow.refImages.filter((r) => r.id.startsWith("ref-char-"))
-        : row.refImages,
+      refImages: frameRow?.refImages?.length ? frameRow.refImages : row.refImages,
       videoReferencedNodeIds:
         frameRow?.referencedNodeIds ?? row.videoReferencedNodeIds,
     };
