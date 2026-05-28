@@ -6,7 +6,7 @@ import { GitBranch, Loader2, Palette, Sparkles, Upload, X } from "lucide-react";
 import Image from "next/image";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { uploadCanvasImage } from "@/lib/canvas-api";
+import { saveStoryProStyleProfile, uploadCanvasImage } from "@/lib/canvas-api";
 import {
   bindImageDragDropHandlers,
   firstImageFileFromDataTransfer,
@@ -50,6 +50,7 @@ import {
   PRO_TEXTAREA_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
+import { StoryErrorLine, StoryStatusLine } from "@/components/canvas/story-status-line";
 import { ProNodeShell } from "../pro-node-shell";
 import { NodeStatusBadge } from "../node-shell";
 import { StoryProGuidePanel } from "../story-pro-guide-panel";
@@ -57,6 +58,7 @@ import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
+import { notifyStoryProStyleProfilesChanged } from "@/lib/canvas/use-story-pro-style-profiles";
 
 const STYLE_NODE_EXTRA = STORY_PRO_STYLE_NODE_EXTRA_H;
 
@@ -84,7 +86,10 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
   const d = selectStyleData(nodes, id, data);
   const [outputBusy, setOutputBusy] = useState(false);
   const [refUploadBusy, setRefUploadBusy] = useState(false);
+  const [styleSaveBusy, setStyleSaveBusy] = useState(false);
+  const [styleSaveHint, setStyleSaveHint] = useState<string | null>(null);
   const refInputRef = useRef<HTMLInputElement>(null);
+  const projectId = useCanvasStore((s) => s.projectId);
 
   const scriptHub = useMemo(
     () => findProScriptHubForStyle(nodes, edges, id, d.hubNodeId),
@@ -300,6 +305,33 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
   };
 
   const fieldsLocked = styleFinalized || !scriptFinalized;
+
+  const saveStyleToProjectAssets = async () => {
+    if (!base?.trim() || fieldsLocked || styleSaveBusy) return;
+    setStyleSaveBusy(true);
+    setStyleSaveHint(null);
+    try {
+      await saveStoryProStyleProfile(base, {
+        projectId: projectId ?? null,
+        displayName: "项目全局风格",
+        mainStyle: d.mainStyle ?? null,
+        colorTone: d.colorTone ?? null,
+        renderQuality: d.renderQuality ?? null,
+        anchorZh: d.styleAnchorZh ?? null,
+        anchorEn: d.styleAnchorEn ?? null,
+        negativePrompt: d.negativePrompt ?? null,
+        refImageUrls: (d.refImages ?? [])
+          .map((r) => r.url)
+          .filter((u): u is string => Boolean(u && /^https?:\/\//.test(u))),
+      });
+      notifyStoryProStyleProfilesChanged();
+      setStyleSaveHint("已保存到项目资产 · 全局风格");
+    } catch (e) {
+      setStyleSaveHint(e instanceof Error ? e.message : String(e));
+    } finally {
+      setStyleSaveBusy(false);
+    }
+  };
 
   const onPickRefImages = () => {
     if (fieldsLocked || refUploadBusy) return;
@@ -634,6 +666,21 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
             </div>
           ) : null}
         </div>
+        {styleSaveHint ? (
+          styleSaveHint.startsWith("已") ? (
+            <StoryStatusLine message={styleSaveHint} className="mt-1" />
+          ) : (
+            <StoryErrorLine message={styleSaveHint} className="mt-1" />
+          )
+        ) : null}
+        <button
+          type="button"
+          disabled={fieldsLocked || styleSaveBusy}
+          className="nodrag mt-1 w-full rounded border border-emerald-400/25 bg-emerald-500/8 px-2 py-1.5 text-[11px] text-emerald-100 hover:bg-emerald-500/15 disabled:opacity-40"
+          onClick={() => void saveStyleToProjectAssets()}
+        >
+          {styleSaveBusy ? "保存中…" : "保存到项目资产（全局风格）"}
+        </button>
       </div>
     </ProNodeShell>
   );

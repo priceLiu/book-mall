@@ -1,6 +1,7 @@
 import type {
   StoryProCharacterAssetRecord,
   StoryProCharacterAssetRefRecord,
+  StoryProCharacterAudioAssetRecord,
 } from "@/lib/canvas-api";
 import { normalizeStoryProCharacterKey } from "@/lib/canvas/story-pro-character-key";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
@@ -97,6 +98,21 @@ export function findAssetForCharacterRow(
   projectId?: string | null,
 ): StoryProCharacterAssetRecord | undefined {
   return pickAssetForKey(assets, characterKey, projectId);
+}
+
+export function findAudioAssetForCharacterRow(
+  assets: StoryProCharacterAudioAssetRecord[],
+  characterKey: string,
+  projectId?: string | null,
+): StoryProCharacterAudioAssetRecord | undefined {
+  const k = normalizeStoryProCharacterKey(characterKey);
+  const matches = assets.filter(
+    (a) => normalizeStoryProCharacterKey(a.characterKey) === k,
+  );
+  if (!matches.length) return undefined;
+  const projectScoped = matches.find((a) => a.projectId === projectId);
+  if (projectScoped) return projectScoped;
+  return matches.find((a) => !a.projectId) ?? matches[0];
 }
 
 export function latestRefForKind(

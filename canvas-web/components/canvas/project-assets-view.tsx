@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { BookOpen, Layers, Lock, LockOpen, MapPin, Users } from "lucide-react";
+import { BookOpen, Layers, Lock, LockOpen, MapPin, Mic, Palette, Users } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   setStoryProCharacterAssetLocked,
+  setStoryProCharacterAudioAssetLocked,
   setStoryProSceneAssetLocked,
+  setStoryProStyleProfileLocked,
   type StoryProCharacterAssetRecord,
+  type StoryProCharacterAudioAssetRecord,
   type StoryProSceneAssetRecord,
+  type StoryProStyleProfileRecord,
 } from "@/lib/canvas-api";
 import { STORY_PRO_ASSET_REF_KIND_LABELS } from "@/lib/canvas/story-pro-character-asset-catalog";
 import { STORY_PRO_SCENE_REF_KIND_LABELS } from "@/lib/canvas/story-pro-scene-asset-catalog";
@@ -18,12 +22,20 @@ import {
   useStoryProCharacterAssets,
 } from "@/lib/canvas/use-story-pro-character-assets";
 import {
+  notifyStoryProAudioAssetsChanged,
+  useStoryProCharacterAudioAssets,
+} from "@/lib/canvas/use-story-pro-audio-assets";
+import {
   notifyStoryProSceneAssetsChanged,
   useStoryProSceneAssets,
 } from "@/lib/canvas/use-story-pro-scene-assets";
+import {
+  notifyStoryProStyleProfilesChanged,
+  useStoryProStyleProfiles,
+} from "@/lib/canvas/use-story-pro-style-profiles";
 import { StoryMediaPreviewModal } from "./story-column-media-panel";
 
-export type ProjectAssetTab = "character" | "scene";
+export type ProjectAssetTab = "character" | "audio" | "scene" | "style";
 
 export function ProjectAssetsView({
   projectId,
@@ -40,6 +52,10 @@ export function ProjectAssetsView({
     useStoryProCharacterAssets(projectId);
   const { assets: sceneAssets, loading: sceneLoading, refresh: refreshScene } =
     useStoryProSceneAssets(projectId);
+  const { profiles: styleProfiles, loading: styleLoading, refresh: refreshStyle } =
+    useStoryProStyleProfiles(projectId);
+  const { assets: audioAssets, loading: audioLoading, refresh: refreshAudio } =
+    useStoryProCharacterAudioAssets(projectId);
   const [tab, setTab] = useState<ProjectAssetTab>(initialTab);
   const [preview, setPreview] = useState<{ url: string; title: string } | null>(
     null,
@@ -62,6 +78,24 @@ export function ProjectAssetsView({
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
       ),
     [sceneAssets],
+  );
+
+  const sortedStyles = useMemo(
+    () =>
+      [...styleProfiles].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
+    [styleProfiles],
+  );
+
+  const sortedAudio = useMemo(
+    () =>
+      [...audioAssets].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
+    [audioAssets],
   );
 
   const toggleCharacterLock = async (asset: StoryProCharacterAssetRecord) => {
@@ -110,7 +144,44 @@ export function ProjectAssetsView({
     }
   };
 
-  const loading = tab === "character" ? charLoading : sceneLoading;
+  const toggleStyleLock = async (profile: StoryProStyleProfileRecord) => {
+    if (!base?.trim()) return;
+    const next = !profile.locked;
+    const verb = next ? "锁定" : "解锁";
+    if (!window.confirm(`${verb}全局风格「${profile.displayName}」？`)) return;
+    setBusyId(profile.id);
+    try {
+      await setStoryProStyleProfileLocked(base, profile.id, next);
+      notifyStoryProStyleProfilesChanged();
+      await refreshStyle();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const toggleAudioLock = async (asset: StoryProCharacterAudioAssetRecord) => {
+    if (!base?.trim()) return;
+    const next = !asset.locked;
+    const verb = next ? "锁定" : "解锁";
+    if (!window.confirm(`${verb}角色音频「${asset.displayName}」？`)) return;
+    setBusyId(asset.id);
+    try {
+      await setStoryProCharacterAudioAssetLocked(base, asset.id, next);
+      notifyStoryProAudioAssetsChanged();
+      await refreshAudio();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const loading =
+    tab === "character"
+      ? charLoading
+      : tab === "scene"
+        ? sceneLoading
+        : tab === "style"
+          ? styleLoading
+          : audioLoading;
   const emptyProjectHint = !projectId?.trim();
 
   return (
@@ -118,40 +189,64 @@ export function ProjectAssetsView({
       <div className={compact ? "space-y-2" : "space-y-4"}>
         {!compact ? (
           <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
-            影视专业版项目级角色 / 场景参考库，与画布内四槽、三槽面板数据同步。
+            四类项目资产：角色视觉 / 角色音频 / 场景·道具 / 全局风格。单槽或整包入库，与画布内面板同步。
             <Link
               href="/guides/project-assets"
-              className="ml-1 text-cyan-300/90 underline-offset-2 hover:underline"
+              className="ml-1 text-emerald-300/90 underline-offset-2 hover:underline"
             >
               查看使用说明
             </Link>
           </p>
         ) : null}
 
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           <button
             type="button"
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
               tab === "character"
-                ? "bg-cyan-500/20 text-cyan-50"
+                ? "bg-emerald-500/20 text-emerald-50"
                 : "text-white/60 hover:bg-white/5"
             }`}
             onClick={() => setTab("character")}
           >
             <Users className="size-3" />
-            角色
+            角色视觉
+          </button>
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+              tab === "audio"
+                ? "bg-emerald-500/20 text-emerald-50"
+                : "text-white/60 hover:bg-white/5"
+            }`}
+            onClick={() => setTab("audio")}
+          >
+            <Mic className="size-3" />
+            角色音频
           </button>
           <button
             type="button"
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
               tab === "scene"
-                ? "bg-cyan-500/20 text-cyan-50"
+                ? "bg-emerald-500/20 text-emerald-50"
                 : "text-white/60 hover:bg-white/5"
             }`}
             onClick={() => setTab("scene")}
           >
             <MapPin className="size-3" />
-            场景
+            场景/道具
+          </button>
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+              tab === "style"
+                ? "bg-emerald-500/20 text-emerald-50"
+                : "text-white/60 hover:bg-white/5"
+            }`}
+            onClick={() => setTab("style")}
+          >
+            <Palette className="size-3" />
+            全局风格
           </button>
           {!compact ? (
             <Link
@@ -247,7 +342,8 @@ export function ProjectAssetsView({
               ))}
             </ul>
           )
-        ) : sortedScenes.length === 0 ? (
+        ) : tab === "scene" ? (
+          sortedScenes.length === 0 ? (
           <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
             还没有场景资产。在画布「场景设计」列生成参考图后，可通过三槽面板保存全景 / 细节 / 氛围。
           </p>
@@ -322,7 +418,127 @@ export function ProjectAssetsView({
               </li>
             ))}
           </ul>
-        )}
+        )
+        ) : tab === "audio" ? (
+          sortedAudio.length === 0 ? (
+            <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
+              还没有角色音频资产。可通过 API 入库音色样本；后续将在人物列提供绑定入口。
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {sortedAudio.map((asset) => (
+                <li
+                  key={asset.id}
+                  className="rounded-lg border border-emerald-400/15 bg-emerald-950/15 p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-medium text-emerald-50">
+                        {asset.displayName}
+                      </p>
+                      <p className="text-[10px] text-emerald-200/50">
+                        {asset.voiceLabel ?? asset.voiceId ?? asset.characterKey}
+                        {asset.projectId ? " · 本项目" : " · 全局"}
+                        {" · v"}
+                        {asset.version}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${
+                        asset.locked
+                          ? "border-amber-400/40 text-amber-200"
+                          : "border-white/15 text-white/60"
+                      }`}
+                      disabled={busyId === asset.id}
+                      onClick={() => void toggleAudioLock(asset)}
+                    >
+                      {asset.locked ? (
+                        <Lock className="inline size-3" />
+                      ) : (
+                        <LockOpen className="inline size-3" />
+                      )}{" "}
+                      {asset.locked ? "已锁" : "锁定"}
+                    </button>
+                  </div>
+                  {asset.notes ? (
+                    <p className="mt-1 line-clamp-2 text-[10px] text-white/55">
+                      {asset.notes}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )
+        ) : tab === "style" ? (
+          sortedStyles.length === 0 ? (
+            <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
+              还没有全局风格配置。在画布「风格定义」节点填写锚定词后，点击「保存到项目资产（全局风格）」。
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {sortedStyles.map((profile) => (
+                <li
+                  key={profile.id}
+                  className="rounded-lg border border-emerald-400/15 bg-emerald-950/15 p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium text-emerald-50">
+                        {profile.displayName}
+                      </p>
+                      <p className="text-[10px] text-emerald-200/50">
+                        {profile.mainStyle ?? "—"} / {profile.colorTone ?? "—"}
+                        {profile.projectId ? " · 本项目" : " · 全局"}
+                        {" · v"}
+                        {profile.version}
+                      </p>
+                      {profile.anchorZh ? (
+                        <p className="mt-1 line-clamp-3 text-[10px] leading-relaxed text-white/60">
+                          {profile.anchorZh}
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${
+                        profile.locked
+                          ? "border-amber-400/40 text-amber-200"
+                          : "border-white/15 text-white/60"
+                      }`}
+                      disabled={busyId === profile.id}
+                      onClick={() => void toggleStyleLock(profile)}
+                    >
+                      {profile.locked ? (
+                        <Lock className="inline size-3" />
+                      ) : (
+                        <LockOpen className="inline size-3" />
+                      )}{" "}
+                      {profile.locked ? "已锁" : "锁定"}
+                    </button>
+                  </div>
+                  {profile.refImageUrls.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {profile.refImageUrls.map((url) => (
+                        <button
+                          key={url}
+                          type="button"
+                          className="size-14 overflow-hidden rounded border border-white/10 bg-black/30"
+                          onClick={() =>
+                            setPreview({ url, title: profile.displayName })
+                          }
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="" className="size-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )
+        ) : null}
       </div>
 
       {preview ? (

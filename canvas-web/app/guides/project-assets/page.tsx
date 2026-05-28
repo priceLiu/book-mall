@@ -25,6 +25,62 @@ export default function ProjectAssetsGuidePage() {
         </div>
       </header>
 
+      <GuideSection title="四类项目资产（一致性基础）">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-white/10 text-emerald-200/90">
+                <th className="py-2 pr-3">资产类别</th>
+                <th className="py-2 pr-3">内容示例</th>
+                <th className="py-2">解决的一致性问题</th>
+              </tr>
+            </thead>
+            <tbody className="text-[var(--canvas-muted)]">
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-3 text-white/85">角色视觉</td>
+                <td className="py-2 pr-3">三视图、脸/全身/服装</td>
+                <td className="py-2">脸、身材、服装不穿帮</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-3 text-white/85">角色音频</td>
+                <td className="py-2 pr-3">克隆音色、语气样本</td>
+                <td className="py-2">声音前后一致</td>
+              </tr>
+              <tr className="border-b border-white/5">
+                <td className="py-2 pr-3 text-white/85">场景/道具</td>
+                <td className="py-2 pr-3">室内布局、关键物品</td>
+                <td className="py-2">地点、物件不突变</td>
+              </tr>
+              <tr>
+                <td className="py-2 pr-3 text-white/85">全局风格</td>
+                <td className="py-2 pr-3">画风/色彩/光影配置</td>
+                <td className="py-2">全剧画面质感统一</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="guide-p mt-4">
+          可<strong>单槽入库</strong>（各槽 ↑ 上传），也可<strong>整包入库</strong>（如风格节点「保存到项目资产」、三视图入库自动裁切其余槽）。长期反复使用的角色、音频、风格建议锁定进资产库。
+        </p>
+      </GuideSection>
+
+      <GuideSection title="剧本创作助手">
+        <ul className="guide-list">
+          <li>
+            影视专业版画布<strong>左侧</strong>「剧本创作助手」：DeepSeek 流式对话，辅助起草 Markdown 剧本。
+          </li>
+          <li>
+            <strong>无剧本</strong>时默认展开；<strong>已有剧本</strong>时默认折叠，点击可展开。
+          </li>
+          <li>
+            <strong>故事定稿前</strong>对话历史自动保存；<strong>定稿后</strong>仍可咨询，但不再持久化（刷新后清空）。
+          </li>
+          <li>
+            助手回复可「复制 / 下载 .md / 导入启动节点」，与上传 .md 走同一解析流程。
+          </li>
+        </ul>
+      </GuideSection>
+
       <GuideSection title="入口在哪里？">
         <ul className="guide-list">
           <li>
@@ -38,7 +94,7 @@ export default function ProjectAssetsGuidePage() {
             <strong>画布内</strong>：影视专业版画布工具栏「项目资产」侧栏，与全站页数据一致。
           </li>
           <li>
-            <strong>行内编辑</strong>：人物设计列、场景设计列每行下方的四槽 / 三槽面板，用于上传与入库。
+            <strong>行内编辑</strong>：人物设计列、场景设计列每行下方的四槽 / 三槽面板，以及人物列<strong>音色样本</strong>上传，用于入库。
           </li>
         </ul>
       </GuideSection>
@@ -158,12 +214,6 @@ export default function ProjectAssetsGuidePage() {
             <dt className="font-medium text-white">上方已有三视图，四槽还是空的？</dt>
             <dd className="mt-1 text-[var(--canvas-muted)]">
               预览区不会自动入库。在四槽上方点「保存到三视图槽」，或三视图槽下的「入库」，或底部「快捷保存上方三视图到资产库」。<strong>不需要在四槽再生成一次。</strong>
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium text-white">节点面板不见了？</dt>
-            <dd className="mt-1 text-[var(--canvas-muted)]">
-              画布左下角有「节点面板 · 顶部/右侧」按钮，点击可在顶部与右侧之间切换。
             </dd>
           </div>
           <div>

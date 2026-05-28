@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
+import { ScriptWritingAssistantPanel } from "@/components/canvas/script-writing-assistant-panel";
 import { MyTemplatesPanel } from "@/components/canvas/my-templates-panel";
 import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
 import { MySavedScriptsPanel } from "@/components/canvas/my-saved-scripts-panel";
@@ -46,6 +47,11 @@ import { GatewayLinkBanner } from "@/components/canvas/gateway-link-banner";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
+import { storyProStarterHasScriptSource } from "@/lib/canvas/story-pro-starter-sync";
+import type {
+  StoryProScriptHubNodeData,
+  StoryProStarterNodeData,
+} from "@/lib/canvas/story-pro-workspace-types";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
 
@@ -70,7 +76,33 @@ function Inner({ projectId }: { projectId: string }) {
     (s) => s.reflowStoryComicLayout,
   );
   const isStoryComicCanvas = hasStoryComicPipeline(nodes);
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const isStoryProCanvas = hasStoryProPipeline(nodes);
+
+  const storyProScriptState = useMemo(() => {
+    const starter = nodes.find((n) => n.type === "story-pro-starter");
+    const hub = nodes.find((n) => n.type === "story-pro-script-hub");
+    const sd = (starter?.data ?? {}) as StoryProStarterNodeData;
+    const hd = (hub?.data ?? {}) as StoryProScriptHubNodeData;
+    const scriptFinalized = Boolean(hd.scriptFinalized);
+    const hasScript =
+      storyProStarterHasScriptSource(sd) ||
+      Boolean(hd.outlineMd?.trim()) ||
+      Boolean(hd.characterMd?.trim());
+    return { scriptFinalized, hasScript, starterId: starter?.id };
+  }, [nodes]);
+
+  const onImportScriptFromAssistant = useCallback(
+    (md: string) => {
+      const sid = storyProScriptState.starterId;
+      if (!sid) return;
+      updateNodeData(sid, {
+        uploadedScriptMd: md,
+        starterMode: "upload",
+      });
+    },
+    [storyProScriptState.starterId, updateNodeData],
+  );
 
   const [project, setProject] = useState<CanvasProjectDetail | null>(null);
   const [nameDraft, setNameDraft] = useState("");
@@ -433,7 +465,16 @@ function Inner({ projectId }: { projectId: string }) {
         open={myProjectCharacterAssetsOpen}
         onClose={() => setMyProjectCharacterAssetsOpen(false)}
       />
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        {isStoryProCanvas && project ? (
+          <ScriptWritingAssistantPanel
+            projectId={projectId}
+            scriptFinalized={storyProScriptState.scriptFinalized}
+            hasScript={storyProScriptState.hasScript}
+            onImportScript={onImportScriptFromAssistant}
+          />
+        ) : null}
+        <div className="relative min-h-0 flex-1 overflow-hidden">
         <FlowCanvas onUndo={undo} onRedo={redo} />
         {isStoryComicCanvas && nodes.length > 0 ? (
           <button
@@ -485,6 +526,7 @@ function Inner({ projectId }: { projectId: string }) {
         ) : null}
         {/* 画布内顶部居中节点面板（位于工具栏下方，勿用 fixed 顶到视口顶端） */}
         <NodePalette onAdd={onAddViaPalette} />
+        </div>
       </div>
     </div>
     );

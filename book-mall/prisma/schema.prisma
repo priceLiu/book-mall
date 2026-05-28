@@ -89,6 +89,9 @@ model User {
   canvasCharacters             CanvasCharacter[]
   storyProCharacterAssets      StoryProCharacterAsset[]
   storyProSceneAssets          StoryProSceneAsset[]
+  storyProStyleProfiles        StoryProStyleProfile[]
+  storyProCharacterAudioAssets StoryProCharacterAudioAsset[]
+  storyProScriptAssistantHistories StoryProScriptAssistantHistory[]
   canvasProviders              CanvasProvider[]
   canvasPromptTemplates        CanvasPromptTemplate[]
   toolServicePeriods           UserToolServicePeriod[]
@@ -1539,6 +1542,65 @@ model StoryProSceneAssetRef {
   createdAt    DateTime                  @default(now())
 
   @@index([assetId, sortOrder])
+}
+
+/// 影视专业版 · 全局风格配置（可按 project 或用户级 profileKey 入库）
+model StoryProStyleProfile {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId      String?
+  profileKey     String   @default("default")
+  displayName    String
+  locked         Boolean  @default(false)
+  version        Int      @default(1)
+  mainStyle      String?
+  colorTone      String?
+  renderQuality  String?
+  anchorZh       String?  @db.Text
+  anchorEn       String?  @db.Text
+  negativePrompt String?  @db.Text
+  refImageUrls   Json     @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, projectId, profileKey])
+  @@index([userId, updatedAt])
+}
+
+/// 影视专业版 · 角色音频资产（音色样本 / voiceId）
+model StoryProCharacterAudioAsset {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characterKey String
+  displayName  String
+  projectId    String?
+  locked       Boolean  @default(false)
+  version      Int      @default(1)
+  voiceLabel   String?
+  voiceId      String?
+  sampleOssUrl String?
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, characterKey, projectId])
+  @@index([userId, updatedAt])
+}
+
+/// 剧本创作助手 · 定稿前对话历史（定稿后清空，不再写入）
+model StoryProScriptAssistantHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  messages  Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, projectId])
+  @@index([userId, updatedAt])
 }
 
 /// 用户自定义提示词模板（LLM / IMAGE 合计最多 8 条活跃；删除软归档保留快照；内置在代码里）

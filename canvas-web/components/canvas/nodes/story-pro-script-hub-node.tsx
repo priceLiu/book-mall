@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { BookOpen, GitBranch } from "lucide-react";
 
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { clearScriptAssistantOnFinalize } from "@/components/canvas/script-writing-assistant-panel";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { runStoryHubSection } from "@/lib/canvas/batch-run-nodes";
 import {
@@ -75,6 +77,8 @@ function selectHubData(
 }
 
 export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
+  const base = useBookMallBaseUrl();
+  const projectId = useCanvasStore((s) => s.projectId);
   const hubFromStore = useCanvasStore((s) => selectHubData(s.nodes, id));
   const d = { ...(data as StoryProScriptHubNodeData), ...hubFromStore };
   const nodes = useCanvasStore((s) => s.nodes);
@@ -415,6 +419,9 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
         scriptFinalized: true,
         finalizedScriptHistory: finalizedHistory,
       });
+      if (base?.trim() && projectId) {
+        void clearScriptAssistantOnFinalize(base, projectId);
+      }
       updateNodeData(starter.id, { pipelineStage: "script_finalized" });
       reflowProLayout();
       // reflow 内 reconcile 会校验风格节点；再次确保定稿标记落库

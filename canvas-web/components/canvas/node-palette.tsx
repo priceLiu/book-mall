@@ -562,17 +562,6 @@ export function NodePalette({
 
   return (
     <>
-      {/* 始终可见：找不到节点面板时点这里恢复 */}
-      <button
-        type="button"
-        onClick={toggleDock}
-        className="fixed bottom-5 left-5 z-[100] inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/80 px-3 py-1.5 text-[11px] text-white/90 shadow-lg backdrop-blur-md hover:border-cyan-400/40 hover:bg-black/90"
-        title={collapsed ? "节点面板在右侧 · 点击移到顶部" : "节点面板在顶部 · 点击收到右侧"}
-      >
-        <LayoutGrid className="size-3.5 text-cyan-300" />
-        {collapsed ? "节点面板 · 右侧" : "节点面板 · 顶部"}
-      </button>
-
       {collapsed ? (
         <div
           className="pointer-events-none fixed right-3 top-1/2 z-[100] -translate-y-1/2"

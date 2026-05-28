@@ -11,9 +11,12 @@ import {
   finalizeRequestLog,
   forwardAudioSpeech,
   forwardChatCompletions,
+  forwardChatCompletionsStream,
   parseOpenAiUsage,
   pickCredentialForKind,
+  type UsageFromResponse,
 } from "@/lib/gateway/proxy-common";
+import { summarizeUpstreamFailMessage } from "@/lib/gateway/book-gateway-link";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { buildGatewayChatResultSummary } from "@/lib/gateway/log-result-summary";
@@ -638,4 +641,140 @@ export async function canvasGwImageParsing(
     });
     throw e;
   }
+}
+
+function wrapCanvasChatStreamWithLogFinalize(
+  upstream: ReadableStream<Uint8Array>,
+  ctx: { logId: string; model: string; startedMs: number },
+): ReadableStream<Uint8Array> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let lastUsage: UsageFromResponse | undefined;
+  let failMessage: string | undefined;
+
+  return new ReadableStream({
+    async start(controller) {
+      const reader = upstream.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n");
+          buffer = parts.pop() ?? "";
+          for (const line of parts) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const payload = trimmed.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            try {
+              const json = JSON.parse(payload) as Record<string, unknown>;
+              const u = parseOpenAiUsage(json);
+              if (u.totalTokens != null) lastUsage = u;
+              const err = json.error as { message?: string } | undefined;
+              if (typeof err?.message === "string") failMessage = err.message;
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        await finalizeRequestLog(ctx.logId, {
+          status: failMessage ? "FAILED" : "SUCCEEDED",
+          durationMs: ctx.startedMs,
+          usage: lastUsage,
+          failCode: failMessage ? "STREAM_VENDOR_ERROR" : undefined,
+          failMessage,
+          model: ctx.model,
+        });
+        controller.close();
+      } catch (e) {
+        await finalizeRequestLog(ctx.logId, {
+          status: "FAILED",
+          durationMs: ctx.startedMs,
+          failCode: "STREAM_INTERRUPTED",
+          failMessage: (e as Error).message || "流式连接中断",
+          model: ctx.model,
+        });
+        controller.error(e);
+      } finally {
+        reader.releaseLock();
+      }
+    },
+  });
+}
+
+/** Canvas 剧本助手等 · Gateway 流式 Chat */
+export async function canvasGwChatStream(
+  userId: string,
+  opts: {
+    modelKey: string;
+    messages: CanvasChatMessage[];
+    params?: Record<string, unknown>;
+    clientPage?: string;
+  },
+): Promise<{ logId: string; status: number; body: ReadableStream<Uint8Array> }> {
+  const auth = await requireGatewayAuth(userId);
+  const model = opts.modelKey.trim();
+  const route = routeGatewayModel(model);
+  const credentialId = pickCredentialForKind(auth.credentials, route.providerKind);
+  if (!credentialId) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      `Gateway Key 未绑定 ${route.providerKind} 凭证`,
+      503,
+    );
+  }
+
+  const body: Record<string, unknown> = {
+    model,
+    messages: opts.messages,
+    stream: true,
+    stream_options: { include_usage: true },
+    ...(opts.params ?? {}),
+  };
+
+  const log = await createRequestLog({
+    userId: auth.userId,
+    apiKeyId: auth.id,
+    credentialId,
+    model,
+    endpoint: "/v1/chat/completions",
+    providerKind: route.providerKind,
+    requestKind: "CHAT",
+    clientSource: CLIENT_SOURCE,
+    clientPage: opts.clientPage,
+    inputSummary: buildGatewayInputSummary(model, body),
+  });
+
+  const result = await forwardChatCompletionsStream({
+    credentialId,
+    providerKind: route.providerKind,
+    body,
+  });
+
+  if (!result.body || result.status >= 300) {
+    const errText = result.body
+      ? await new Response(result.body).text()
+      : `HTTP ${result.status}`;
+    const failMessage = summarizeUpstreamFailMessage(errText, result.status);
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: result.durationMs,
+      failCode: `UPSTREAM_HTTP_${result.status}`,
+      failMessage,
+      model,
+    });
+    throw new CanvasProjectError("MODEL_NOT_AVAILABLE", failMessage, 502);
+  }
+
+  return {
+    logId: log.id,
+    status: result.status,
+    body: wrapCanvasChatStreamWithLogFinalize(result.body, {
+      logId: log.id,
+      model,
+      startedMs: result.durationMs,
+    }),
+  };
 }

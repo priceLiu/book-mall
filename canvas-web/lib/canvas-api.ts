@@ -657,6 +657,206 @@ export async function deleteStoryProSceneAssetRef(
   return j.asset;
 }
 
+// ── 影视专业版 · 全局风格配置 ──
+
+export type StoryProStyleProfileRecord = {
+  id: string;
+  projectId: string | null;
+  profileKey: string;
+  displayName: string;
+  locked: boolean;
+  version: number;
+  mainStyle: string | null;
+  colorTone: string | null;
+  renderQuality: string | null;
+  anchorZh: string | null;
+  anchorEn: string | null;
+  negativePrompt: string | null;
+  refImageUrls: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listStoryProStyleProfiles(
+  base: string,
+  projectId?: string | null,
+): Promise<StoryProStyleProfileRecord[]> {
+  const q =
+    projectId != null && projectId !== ""
+      ? `?projectId=${encodeURIComponent(projectId)}`
+      : "";
+  const j = await call<{ profiles: StoryProStyleProfileRecord[] }>(
+    base,
+    `/api/canvas/story-pro/style-profiles${q}`,
+  );
+  return j.profiles;
+}
+
+export async function saveStoryProStyleProfile(
+  base: string,
+  args: {
+    projectId?: string | null;
+    profileKey?: string;
+    displayName: string;
+    mainStyle?: string | null;
+    colorTone?: string | null;
+    renderQuality?: string | null;
+    anchorZh?: string | null;
+    anchorEn?: string | null;
+    negativePrompt?: string | null;
+    refImageUrls?: string[];
+  },
+): Promise<StoryProStyleProfileRecord> {
+  const j = await call<{ profile: StoryProStyleProfileRecord }>(
+    base,
+    "/api/canvas/story-pro/style-profiles",
+    { method: "POST", body: JSON.stringify(args) },
+  );
+  return j.profile;
+}
+
+export async function setStoryProStyleProfileLocked(
+  base: string,
+  profileId: string,
+  locked: boolean,
+): Promise<StoryProStyleProfileRecord> {
+  const j = await call<{ profile: StoryProStyleProfileRecord }>(
+    base,
+    "/api/canvas/story-pro/style-profiles",
+    { method: "PATCH", body: JSON.stringify({ profileId, locked }) },
+  );
+  return j.profile;
+}
+
+// ── 影视专业版 · 角色音频资产 ──
+
+export type StoryProCharacterAudioAssetRecord = {
+  id: string;
+  characterKey: string;
+  displayName: string;
+  projectId: string | null;
+  locked: boolean;
+  version: number;
+  voiceLabel: string | null;
+  voiceId: string | null;
+  sampleOssUrl: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function listStoryProCharacterAudioAssets(
+  base: string,
+  projectId?: string | null,
+): Promise<StoryProCharacterAudioAssetRecord[]> {
+  const q =
+    projectId != null && projectId !== ""
+      ? `?projectId=${encodeURIComponent(projectId)}`
+      : "";
+  const j = await call<{ assets: StoryProCharacterAudioAssetRecord[] }>(
+    base,
+    `/api/canvas/story-pro/audio-assets${q}`,
+  );
+  return j.assets;
+}
+
+export async function saveStoryProCharacterAudioAsset(
+  base: string,
+  args: {
+    characterKey: string;
+    displayName: string;
+    projectId?: string | null;
+    voiceLabel?: string | null;
+    voiceId?: string | null;
+    sampleOssUrl?: string | null;
+    notes?: string | null;
+  },
+): Promise<StoryProCharacterAudioAssetRecord> {
+  const j = await call<{ asset: StoryProCharacterAudioAssetRecord }>(
+    base,
+    "/api/canvas/story-pro/audio-assets",
+    { method: "POST", body: JSON.stringify(args) },
+  );
+  return j.asset;
+}
+
+export async function setStoryProCharacterAudioAssetLocked(
+  base: string,
+  assetId: string,
+  locked: boolean,
+): Promise<StoryProCharacterAudioAssetRecord> {
+  const j = await call<{ asset: StoryProCharacterAudioAssetRecord }>(
+    base,
+    "/api/canvas/story-pro/audio-assets",
+    { method: "PATCH", body: JSON.stringify({ assetId, locked }) },
+  );
+  return j.asset;
+}
+
+// ── 剧本创作助手 ──
+
+export type ScriptAssistantMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+};
+
+export async function getScriptAssistantHistory(
+  base: string,
+  projectId: string,
+): Promise<ScriptAssistantMessage[]> {
+  const j = await call<{ messages: ScriptAssistantMessage[] }>(
+    base,
+    `/api/canvas/story-pro/script-assistant/history?projectId=${encodeURIComponent(projectId)}`,
+  );
+  return j.messages;
+}
+
+export async function saveScriptAssistantHistory(
+  base: string,
+  projectId: string,
+  messages: ScriptAssistantMessage[],
+): Promise<ScriptAssistantMessage[]> {
+  const j = await call<{ messages: ScriptAssistantMessage[] }>(
+    base,
+    "/api/canvas/story-pro/script-assistant/history",
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, messages }),
+    },
+  );
+  return j.messages;
+}
+
+export async function clearScriptAssistantHistory(
+  base: string,
+  projectId: string,
+): Promise<void> {
+  await call<{ ok: boolean }>(
+    base,
+    `/api/canvas/story-pro/script-assistant/history?projectId=${encodeURIComponent(projectId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function streamScriptAssistantChat(
+  base: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+): Promise<Response> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    "/api/canvas/story-pro/script-assistant/chat",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+    },
+  );
+  return fetch(url, init);
+}
+
 // ── 剪映导出 ──
 
 export type JianyingExportFrame = {

@@ -19,8 +19,9 @@ import {
 } from "@/lib/canvas-api";
 import { normalizeStoryProCharacterKey } from "@/lib/canvas/story-pro-character-key";
 import { formatAutoFillSlotsMessage } from "@/lib/canvas/story-pro-character-asset-auto-fill";
-import { findAssetForCharacterRow } from "@/lib/canvas/story-pro-character-asset-catalog";
+import { findAssetForCharacterRow, findAudioAssetForCharacterRow } from "@/lib/canvas/story-pro-character-asset-catalog";
 import { useStoryProCharacterAssets, notifyStoryProCharacterAssetsChanged } from "@/lib/canvas/use-story-pro-character-assets";
+import { useStoryProCharacterAudioAssets } from "@/lib/canvas/use-story-pro-audio-assets";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
@@ -38,6 +39,7 @@ import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { NodeShell } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 import { StoryProCharacterAssetSlots } from "../story-pro-character-asset-slots";
+import { StoryProCharacterAudioSlot } from "../story-pro-character-audio-slot";
 
 export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps) {
   const base = useBookMallBaseUrl();
@@ -54,6 +56,9 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   const d = data as unknown as StoryCharacterColumnNodeData;
   const stored = d.rows ?? [];
   const { assets: characterAssets } = useStoryProCharacterAssets(
+    edition === "pro" ? projectId : null,
+  );
+  const { assets: audioAssets } = useStoryProCharacterAudioAssets(
     edition === "pro" ? projectId : null,
   );
   const [preview, setPreview] = useState<{
@@ -268,6 +273,14 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
                       projectId,
                     )
                   : undefined;
+              const rowAudioAsset =
+                edition === "pro"
+                  ? findAudioAssetForCharacterRow(
+                      audioAssets,
+                      row.key,
+                      projectId,
+                    )
+                  : undefined;
               return (
                 <div key={row.key} className="space-y-1">
                   <StoryColumnRowCard
@@ -302,6 +315,14 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
                         patchCharacterRow(row.key, patch as Partial<(typeof displayRows)[number]>)
                       }
                       onPreview={(u, title) => setPreview({ url: u, title })}
+                    />
+                  ) : null}
+                  {edition === "pro" ? (
+                    <StoryProCharacterAudioSlot
+                      rowKey={row.key}
+                      rowName={row.name}
+                      projectId={projectId}
+                      audioAsset={rowAudioAsset}
                     />
                   ) : null}
                   {edition === "pro" && url ? (

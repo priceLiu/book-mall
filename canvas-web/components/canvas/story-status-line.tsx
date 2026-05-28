@@ -1,5 +1,8 @@
 "use client";
 
+import { useCallback, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
 import { cn } from "@/lib/utils";
 import {
   STORY_CHROME_GREEN_CLASS,
@@ -7,7 +10,7 @@ import {
   STORY_HINT_GOLD_CLASS,
 } from "@/lib/canvas/story-column-sync";
 
-/** 错误信息：单行省略，hover 显示全文（图 3） */
+/** 错误信息：单行省略，悬停即时展示全文（portal，避免被节点 overflow 裁切） */
 export function StoryErrorLine({
   message,
   className,
@@ -15,10 +18,57 @@ export function StoryErrorLine({
   message: string;
   className?: string;
 }) {
+  const elRef = useRef<HTMLSpanElement>(null);
+  const [tipPos, setTipPos] = useState<{ left: number; top: number } | null>(
+    null,
+  );
+
+  const showTip = useCallback(() => {
+    const el = elRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setTipPos({ left: r.left, top: r.top - 6 });
+  }, []);
+
+  const hideTip = useCallback(() => setTipPos(null), []);
+
   return (
-    <p className={cn(STORY_ERROR_LINE_CLASS, className)} title={message}>
-      {message}
-    </p>
+    <>
+      <span
+        ref={elRef}
+        className={cn(
+          "block min-w-0 max-w-full cursor-help truncate",
+          STORY_ERROR_LINE_CLASS,
+          className,
+        )}
+        title={message}
+        role="alert"
+        aria-label={message}
+        tabIndex={0}
+        onMouseEnter={showTip}
+        onMouseLeave={hideTip}
+        onFocus={showTip}
+        onBlur={hideTip}
+      >
+        {message}
+      </span>
+      {tipPos && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              role="tooltip"
+              className="pointer-events-none fixed z-[9999] max-w-[min(92vw,420px)] rounded-md border border-red-400/35 bg-black/95 px-2.5 py-1.5 text-[10px] leading-snug text-red-100 shadow-xl"
+              style={{
+                left: tipPos.left,
+                top: tipPos.top,
+                transform: "translateY(-100%)",
+              }}
+            >
+              {message}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
 
