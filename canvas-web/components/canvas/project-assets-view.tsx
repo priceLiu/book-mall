@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { BookOpen, Layers, Lock, LockOpen, MapPin, Mic, Palette, Users } from "lucide-react";
+import { BookOpen, Lock, LockOpen, MapPin, Mic, Palette, Users } from "lucide-react";
+
+import { StoryProAssetImportIcon } from "@/components/canvas/story-pro-asset-import-icon";
+import {
+  PRO_ASSETS_CARD_CLASS,
+  PRO_ASSETS_LINK_CLASS,
+  PRO_ASSETS_TAB_ACTIVE_CLASS,
+  PRO_ASSETS_TAB_IDLE_CLASS,
+} from "@/lib/canvas/story-pro-node-chrome";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -252,8 +260,8 @@ export function ProjectAssetsView({
             type="button"
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
               tab === "character"
-                ? "bg-emerald-500/20 text-emerald-50"
-                : "text-white/60 hover:bg-white/5"
+                ? PRO_ASSETS_TAB_ACTIVE_CLASS
+                : PRO_ASSETS_TAB_IDLE_CLASS
             }`}
             onClick={() => setTab("character")}
           >
@@ -264,8 +272,8 @@ export function ProjectAssetsView({
             type="button"
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
               tab === "audio"
-                ? "bg-emerald-500/20 text-emerald-50"
-                : "text-white/60 hover:bg-white/5"
+                ? PRO_ASSETS_TAB_ACTIVE_CLASS
+                : PRO_ASSETS_TAB_IDLE_CLASS
             }`}
             onClick={() => setTab("audio")}
           >
@@ -276,8 +284,8 @@ export function ProjectAssetsView({
             type="button"
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
               tab === "scene"
-                ? "bg-emerald-500/20 text-emerald-50"
-                : "text-white/60 hover:bg-white/5"
+                ? PRO_ASSETS_TAB_ACTIVE_CLASS
+                : PRO_ASSETS_TAB_IDLE_CLASS
             }`}
             onClick={() => setTab("scene")}
           >
@@ -288,8 +296,8 @@ export function ProjectAssetsView({
             type="button"
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
               tab === "style"
-                ? "bg-emerald-500/20 text-emerald-50"
-                : "text-white/60 hover:bg-white/5"
+                ? PRO_ASSETS_TAB_ACTIVE_CLASS
+                : PRO_ASSETS_TAB_IDLE_CLASS
             }`}
             onClick={() => setTab("style")}
           >
@@ -299,7 +307,7 @@ export function ProjectAssetsView({
           {!compact ? (
             <Link
               href="/guides/project-assets"
-              className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-cyan-200/70 hover:bg-white/5 hover:text-cyan-100"
+              className={`ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${PRO_ASSETS_LINK_CLASS}`}
             >
               <BookOpen className="size-3" />
               使用说明
@@ -323,7 +331,7 @@ export function ProjectAssetsView({
               {sortedCharacters.map((asset) => (
                 <li
                   key={asset.id}
-                  className="rounded-lg border border-cyan-400/15 bg-cyan-950/20 p-3"
+                  className={PRO_ASSETS_CARD_CLASS}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -400,7 +408,7 @@ export function ProjectAssetsView({
             {sortedScenes.map((asset) => (
               <li
                 key={asset.id}
-                className="rounded-lg border border-cyan-400/15 bg-cyan-950/20 p-3"
+                className={PRO_ASSETS_CARD_CLASS}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -638,5 +646,5 @@ export function ProjectAssetsTabBar({
 }
 
 export function ProjectAssetsPanelIcon() {
-  return <Layers className="size-4 text-cyan-300" />;
+  return <StoryProAssetImportIcon className="size-4 text-cyan-300" />;
 }

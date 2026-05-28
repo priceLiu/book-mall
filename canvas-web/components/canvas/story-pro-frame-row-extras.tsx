@@ -2,10 +2,10 @@
 
 import type { StoryProCharacterAssetRecord } from "@/lib/canvas-api";
 import {
-  STORY_ROW_ACTION_BTN_CLASS,
   STORY_ROW_BANNER_CLASS,
   STORY_ROW_META_CLASS,
 } from "@/lib/canvas/story-column-sync";
+import { PRO_ROW_SECONDARY_BTN_CLASS } from "@/lib/canvas/story-pro-node-chrome";
 import {
   frameRowHasStaleAssetSnapshot,
   readinessClass,
@@ -41,7 +41,7 @@ export function StoryProFrameRefSuggestBar({
       <span className={STORY_ROW_META_CLASS}>建议 @：{names}</span>
       <button
         type="button"
-        className={STORY_ROW_ACTION_BTN_CLASS}
+        className={PRO_ROW_SECONDARY_BTN_CLASS}
         onClick={() => {
           const { prompt } = applyFrameRefSuggestionsToPrompt(
             currentPrompt,

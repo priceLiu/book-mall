@@ -1,6 +1,6 @@
 ---
 description: 漫剧画布固定尺寸、按钮、弹层、文案与对比图设计规范
-globs: canvas-web/components/canvas/**,canvas-web/lib/canvas/story-*.ts,canvas-web/lib/canvas/types.ts,canvas-web/lib/canvas/normalize-graph-nodes.ts,canvas-web/docs/design.md
+globs: canvas-web/components/canvas/**,canvas-web/lib/canvas/story-*.ts,canvas-web/lib/canvas/story-pro-node-chrome.ts,canvas-web/lib/canvas/story-edition-chrome.ts,canvas-web/lib/canvas/types.ts,canvas-web/lib/canvas/normalize-graph-nodes.ts,canvas-web/docs/design.md
 alwaysApply: false
 ---
 
@@ -10,13 +10,13 @@ alwaysApply: false
 
 ## 固定尺寸（勿随意改常量）
 
-- 故事主题 + 故事大纲：**1020×1200**（`STORY_CONTROL_NODE_*`）
+- 故事主题 + 故事大纲：**1020×1200**（`STORY_CONTROL_NODE_*` / `STORY_PRO_CONTROL_NODE_*`）
 - 角色列（三视图）宽 **560**；分镜列宽 **1080**；分镜视频列宽 **500**；高度按行数估算（`story-column-layout.ts`，上限 2100）
 - 标准流程见 **story-workflow-canonical.md**：定稿 → 输出工作流（仅拆分）→ 用户手动生成媒体
 - 多工作流须按 `scriptHubId` / `hubNodeId` 隔离
 - 三视图：**670×880**
 - 行内参考图 **220**、输出图 **248**
-- 真源：`story-node-chrome.ts`、`types.ts` `NODE_DEFAULT_SIZE`、`story-ref-image.ts`
+- 真源：`story-node-chrome.ts`、`story-pro-node-chrome.ts`、`types.ts` `NODE_DEFAULT_SIZE`、`story-ref-image.ts`
 
 控制节点固定尺寸；角色/分镜/视频列高度 = **头部 + 单行块高 × 行数 + 100px**，最小 **2100px**。分镜行块高约 **320px**；视频槽 **280px** 高、列宽 **540px**。
 
@@ -29,15 +29,26 @@ alwaysApply: false
 
 ## 按钮
 
-- 漫剧主操作：`STORY_ORANGE_BTN_CLASS` / `STORY_NODE_ACTION_BTN_CLASS`，**h-9**，禁用不变暗
+- **快手漫剧**主操作：`STORY_ORANGE_BTN_CLASS` / `STORY_NODE_ACTION_BTN_CLASS`，**h-9**
+- **影视专业版**主操作：`PRO_NODE_ACTION_BTN_CLASS` · 青描边（`story-pro-node-chrome.ts`）
+- 列批量：`storyEditionBatchBtnClass(edition)`（`story-edition-chrome.ts`）
 - 底栏骨架：`StoryNodeFooterShell`（按钮 + 16px 提示占位）
-- 弹层 Tab 选中：`bg-[#fb923c]/25 text-[#fdba74]`；保存实心橙
+- 弹层 Tab/保存：快手橙 · 专业版青 — `storyEditionModalTabClass` / `Save` / `Outline`（§14）
+
+## 影视专业版（Story Pro）
+
+- 真源：`story-pro-node-chrome.ts` + `story-edition-chrome.ts` · 全文 `design.md` **§14**
+- 节点 `story-pro-*` · 共用列传 `edition="pro"`
+- 审阅弹层：`StoryScriptHubModal edition="pro"`；导演提示词：`proDirectorPack`
+- 入库：`StoryProAssetImportIcon`（禁止「入库」二字）
+- **禁止**专业版 UI 使用橙色 `#fb923c` 作主强调
 
 ## 弹出层
 
 - 审阅 / Word / 对比：`z-[1100]`，`createPortal`，`body overflow hidden`，Esc 关闭
 - 双栏：`grid-cols-2` 白卡片，左编辑右 `MarkdownView document`，左右等高（ResizeObserver）
 - **模板 Tab 只在故事主题弹层顶栏**，不在节点外壳上
+- 确认/提示：`useDialogs()`，禁止 `window.alert/confirm/prompt`
 
 ## 文案显示
 
@@ -48,7 +59,7 @@ alwaysApply: false
 
 ## 参考图 / 对比
 
-- `@` 激活参考图：橙框 `#fb923c` + glow；未激活 `border-white/15`
+- `@` 激活参考图：快手橙 / 专业版青 — `storyEditionActiveRefBorderClass(edition)`
 - 引擎对比：`CompareModal` 滑块重叠对比，非简单并排
 
 ## 视频播放

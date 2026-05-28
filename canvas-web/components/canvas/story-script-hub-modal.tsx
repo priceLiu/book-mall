@@ -44,6 +44,12 @@ import {
   STORY_HUB_TOGGLE_TO_SOURCE_LABEL,
   STORY_HUB_TOGGLE_TO_TABLE_LABEL,
 } from "@/lib/canvas/story-hub-editor-chrome";
+import {
+  storyEditionModalOutlineBtnClass,
+  storyEditionModalSaveBtnClass,
+  storyEditionModalTabClass,
+  type StoryEdition,
+} from "@/lib/canvas/story-edition-chrome";
 
 const TAB_LABEL: Record<HubPreviewSection, string> = {
   outline: "故事大纲",
@@ -76,6 +82,7 @@ export function StoryScriptHubModal({
   sectionIsRunning,
   canRunLlm,
   readOnly = false,
+  edition = "comic",
 }: {
   open: boolean;
   /** 打开时定位到的 Tab（与节点预览当前段一致） */
@@ -92,6 +99,8 @@ export function StoryScriptHubModal({
   canRunLlm?: boolean;
   /** 已定稿生成工作流后只读审阅 */
   readOnly?: boolean;
+  /** 影视专业版用青色 Tab/按钮；快手漫剧用橙色 */
+  edition?: StoryEdition;
 }) {
   const [section, setSection] = useState<HubPreviewSection>("outline");
   const [draft, setDraft] = useState("");
@@ -291,11 +300,7 @@ export function StoryScriptHubModal({
               key={key}
               type="button"
               onClick={() => setSection(key)}
-              className={`rounded-md px-2.5 py-1.5 text-[12px] font-medium transition ${
-                section === key
-                  ? "bg-[#fb923c]/25 text-[#fdba74]"
-                  : "text-white/60 hover:bg-white/10 hover:text-white"
-              }`}
+              className={storyEditionModalTabClass(edition, section === key)}
             >
               {TAB_LABEL[key]}
             </button>
@@ -334,7 +339,7 @@ export function StoryScriptHubModal({
               type="button"
               disabled={runDisabled}
               title={runTitle}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#fb923c]/50 bg-[#fb923c]/15 px-3 py-1.5 text-[12px] font-medium text-[#fdba74] disabled:opacity-40"
+              className={storyEditionModalOutlineBtnClass(edition)}
               onClick={() => llmSection && onRunSection?.(llmSection)}
             >
               {sectionIsRunning ? (
@@ -354,7 +359,7 @@ export function StoryScriptHubModal({
             <button
               type="button"
               disabled={!dirty}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md bg-[#fb923c] px-3 py-1.5 text-[12px] font-medium text-black disabled:opacity-40"
+              className={storyEditionModalSaveBtnClass(edition)}
               onClick={saveCurrent}
             >
               <Save className="size-3.5" />

@@ -13,6 +13,12 @@ import {
 } from "@/lib/canvas/story-pro-finalized-script";
 import type { StoryProFinalizedScriptSnapshot } from "@/lib/canvas/story-pro-workspace-types";
 import { formatRevisionTime } from "@/lib/canvas/story-revision";
+import {
+  PRO_ICON_ACCENT_CLASS,
+  PRO_MODAL_HEADER_CLASS,
+  PRO_MODAL_SUBTITLE_CLASS,
+  PRO_MODAL_TITLE_CLASS,
+} from "@/lib/canvas/story-pro-node-chrome";
 import { MarkdownView } from "./markdown-view";
 
 const DOC_PAD = "px-10 py-12 sm:px-14 sm:py-16";
@@ -109,13 +115,11 @@ export function StoryProFinalizedScriptModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <header className="nodrag flex shrink-0 items-center gap-3 border-b border-cyan-400/20 bg-gradient-to-r from-cyan-950/50 via-[#0b1220] to-cyan-950/30 px-4 py-3">
-        <BookOpen className="size-4 shrink-0 text-cyan-300" />
+      <header className={PRO_MODAL_HEADER_CLASS}>
+        <BookOpen className={`size-4 shrink-0 ${PRO_ICON_ACCENT_CLASS}`} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-cyan-50">
-            定稿剧本 · 历史记录
-          </p>
-          <p className="truncate text-[11px] text-cyan-200/55">
+          <p className={PRO_MODAL_TITLE_CLASS}>定稿剧本 · 历史记录</p>
+          <p className={PRO_MODAL_SUBTITLE_CLASS}>
             {formatFinalizedScriptMetaLine(
               active.theme,
               active.version,

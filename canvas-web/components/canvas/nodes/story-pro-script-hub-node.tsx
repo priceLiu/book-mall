@@ -597,6 +597,7 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
         open={reviewOpen}
         initialSection={reviewSection}
         onClose={closeStoryHubReview}
+        edition="pro"
         data={d}
         onSaveOutline={(md) => patchSectionMd("outline", md)}
         onSaveCharacter={(md) => patchSectionMd("character", md)}

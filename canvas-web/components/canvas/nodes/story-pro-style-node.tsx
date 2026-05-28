@@ -45,6 +45,9 @@ import {
   STORY_PRO_CONTROL_NODE_WIDTH,
   STORY_PRO_STYLE_NODE_EXTRA_H,
   PRO_HINT_LABEL_CLASS,
+  PRO_REF_THUMB_CLASS,
+  PRO_SAVE_TO_ASSETS_BTN_CLASS,
+  PRO_UPLOAD_DROPZONE_CLASS,
   PRO_NODE_ACTION_BTN_SPLIT_CLASS,
   PRO_SELECT_CLASS,
   PRO_TEMPLATE_CHIP_CLASS,
@@ -648,7 +651,7 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
                 if (one) void onRefFilesSelected([one]);
               }
             }}
-            className="nodrag flex w-full items-center gap-2 rounded border border-dashed border-cyan-400/25 bg-cyan-500/8 px-2 py-2 text-left text-[11px] text-white/80 transition hover:border-cyan-400/45 hover:bg-cyan-500/12 disabled:cursor-not-allowed disabled:opacity-45"
+            className={PRO_UPLOAD_DROPZONE_CLASS}
           >
             {refUploadBusy ? (
               <Loader2 className="size-3.5 shrink-0 animate-spin text-cyan-400" />
@@ -665,7 +668,7 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
               {(d.refImages ?? []).map((ref) => (
                 <div
                   key={ref.id}
-                  className="group relative size-14 overflow-hidden rounded border border-cyan-400/20 bg-black/40"
+                  className={PRO_REF_THUMB_CLASS}
                 >
                   {ref.url ? (
                     <Image
@@ -705,7 +708,7 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
         <button
           type="button"
           disabled={fieldsLocked || styleSaveBusy}
-          className="nodrag mt-1 w-full rounded border border-emerald-400/25 bg-emerald-500/8 px-2 py-1.5 text-[11px] text-emerald-100 hover:bg-emerald-500/15 disabled:opacity-40"
+          className={`nodrag mt-1 ${PRO_SAVE_TO_ASSETS_BTN_CLASS}`}
           onClick={() => void saveStyleToProjectAssets()}
         >
           {styleSaveBusy ? "保存中…" : "保存到项目资产（全局风格）"}

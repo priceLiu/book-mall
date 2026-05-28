@@ -2,6 +2,13 @@
  * 漫剧（快手版 orange）与影视专业版（cyan）列节点共用组件时的配色分流。
  */
 
+import {
+  PRO_MODAL_OUTLINE_BTN_CLASS,
+  PRO_MODAL_SAVE_BTN_CLASS,
+  PRO_MODAL_TAB_IDLE_CLASS,
+  PRO_MODAL_TAB_SELECTED_CLASS,
+} from "./story-pro-node-chrome";
+
 export type StoryEdition = "comic" | "pro";
 
 export const STORY_COMIC_ACCENT = "#fb923c";
@@ -86,4 +93,40 @@ export function storyEditionCornerRegenBtnClass(edition: StoryEdition): string {
   return edition === "pro"
     ? "right-2 top-2 border-cyan-400/40 bg-black/55 text-cyan-200 hover:bg-black/75"
     : "right-2 top-2 border-[#fb923c]/40 bg-black/55 text-[#fdba74] hover:bg-black/75";
+}
+
+const STORY_MODAL_TAB_BASE =
+  "rounded-md px-2.5 py-1.5 text-[12px] font-medium transition disabled:opacity-50";
+
+const STORY_COMIC_MODAL_TAB_SELECTED = "bg-[#fb923c]/25 text-[#fdba74]";
+const STORY_COMIC_MODAL_TAB_IDLE =
+  "text-white/60 hover:bg-white/10 hover:text-white";
+
+/** 审阅 / 系统提示词弹层 Tab */
+export function storyEditionModalTabClass(
+  edition: StoryEdition,
+  active: boolean,
+): string {
+  if (edition === "pro") {
+    return `${STORY_MODAL_TAB_BASE} ${
+      active ? PRO_MODAL_TAB_SELECTED_CLASS : PRO_MODAL_TAB_IDLE_CLASS
+    }`;
+  }
+  return `${STORY_MODAL_TAB_BASE} ${
+    active ? STORY_COMIC_MODAL_TAB_SELECTED : STORY_COMIC_MODAL_TAB_IDLE
+  }`;
+}
+
+/** 审阅弹层 · 保存（实心主钮） */
+export function storyEditionModalSaveBtnClass(edition: StoryEdition): string {
+  return edition === "pro"
+    ? PRO_MODAL_SAVE_BTN_CLASS
+    : "inline-flex shrink-0 items-center gap-1 rounded-md bg-[#fb923c] px-3 py-1.5 text-[12px] font-medium text-black disabled:opacity-40";
+}
+
+/** 审阅弹层 · 生成 / 重新生成（描边） */
+export function storyEditionModalOutlineBtnClass(edition: StoryEdition): string {
+  return edition === "pro"
+    ? PRO_MODAL_OUTLINE_BTN_CLASS
+    : "inline-flex shrink-0 items-center gap-1 rounded-md border border-[#fb923c]/50 bg-[#fb923c]/15 px-3 py-1.5 text-[12px] font-medium text-[#fdba74] disabled:opacity-40";
 }

@@ -13,6 +13,10 @@ import {
   isLegacyStoryPackSystemPrompt,
   storyThemeSystemPromptForTemplate,
 } from "@/lib/canvas/story-prompts";
+import {
+  storyEditionModalSaveBtnClass,
+  storyEditionModalTabClass,
+} from "@/lib/canvas/story-edition-chrome";
 import { isLegacyStoryProDirectorPrompt } from "@/lib/canvas/story-pro-script-pack";
 import { storyProThemeSystemPromptForTemplate } from "@/lib/canvas/story-pro-theme-templates";
 import { MarkdownView } from "./markdown-view";
@@ -227,11 +231,10 @@ export function StoryThemePromptModal({
               title={tpl.description}
               disabled={readOnly}
               onClick={() => setActiveTab(tpl.id)}
-              className={`rounded-md px-2.5 py-1.5 text-[12px] font-medium transition disabled:opacity-50 ${
-                activeTab === tpl.id
-                  ? "bg-[#fb923c]/25 text-[#fdba74]"
-                  : "text-white/60 hover:bg-white/10 hover:text-white"
-              }`}
+              className={storyEditionModalTabClass(
+                proDirectorPack ? "pro" : "comic",
+                activeTab === tpl.id,
+              )}
             >
               {tpl.label}
             </button>
@@ -240,11 +243,10 @@ export function StoryThemePromptModal({
             type="button"
             disabled={readOnly}
             onClick={() => setActiveTab("custom")}
-            className={`rounded-md px-2.5 py-1.5 text-[12px] font-medium transition disabled:opacity-50 ${
-              activeTab === "custom"
-                ? "bg-[#fb923c]/25 text-[#fdba74]"
-                : "text-white/60 hover:bg-white/10 hover:text-white"
-            }`}
+            className={storyEditionModalTabClass(
+              proDirectorPack ? "pro" : "comic",
+              activeTab === "custom",
+            )}
           >
             自定义
           </button>
@@ -260,7 +262,7 @@ export function StoryThemePromptModal({
           <button
             type="button"
             disabled={!dirty}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-[#fb923c] px-3 py-1.5 text-[12px] font-medium text-black disabled:opacity-40"
+            className={storyEditionModalSaveBtnClass(proDirectorPack ? "pro" : "comic")}
             onClick={save}
           >
             <Save className="size-3.5" />

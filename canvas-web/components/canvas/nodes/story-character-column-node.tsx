@@ -11,7 +11,10 @@ import {
   storyEditionAccent,
   storyEditionFromNodeType,
 } from "@/lib/canvas/story-edition-chrome";
-import { PRO_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-pro-node-chrome";
+import {
+  PRO_NODE_SHELL_FOOTER_CLASS,
+  PRO_ROW_PRIMARY_BTN_CLASS,
+} from "@/lib/canvas/story-pro-node-chrome";
 import { THREE_VIEW_ENGINE_MODEL_KEYS } from "@/lib/canvas/types";
 import {
   autoFillStoryProCharacterSlotsFromThreeView,
@@ -340,7 +343,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
                   {edition === "pro" && url ? (
                     <button
                       type="button"
-                      className="nodrag w-full rounded border border-cyan-400/30 bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-500/20"
+                      className={`nodrag ${PRO_ROW_PRIMARY_BTN_CLASS}`}
                       onClick={() => void saveRowToAssetLibrary(row)}
                     >
                       快捷保存上方三视图到资产库
