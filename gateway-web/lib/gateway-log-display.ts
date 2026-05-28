@@ -8,6 +8,19 @@ export type LogClientSource =
   | "EXTERNAL"
   | string;
 
+/** 日志页 · 按工具应用筛选（value 空 = 全部） */
+export const LOG_APP_FILTER_OPTIONS: {
+  value: "" | LogClientSource;
+  label: string;
+}[] = [
+  { value: "", label: "全部" },
+  { value: "CANVAS", label: "画布" },
+  { value: "TOOL", label: "工具站" },
+  { value: "STORY", label: "漫剧" },
+  { value: "GATEWAY_CONSOLE", label: "控制台" },
+  { value: "EXTERNAL", label: "外部 API" },
+];
+
 export type LogProviderKind =
   | "KIE"
   | "BAILIAN"
@@ -48,6 +61,53 @@ const PROVIDER_LABEL: Record<string, string> = {
   DASHSCOPE: "DashScope",
   HUNYUAN: "混元 3D",
 };
+
+/** 日志页厂商筛选 · 展示顺序 */
+export const LOG_PROVIDER_KIND_ORDER = [
+  "KIE",
+  "BAILIAN",
+  "DEEPSEEK",
+  "DASHSCOPE",
+  "HUNYUAN",
+] as const;
+
+export function sortLogProviderKinds(kinds: Iterable<string>): string[] {
+  const list = [...new Set(kinds)].filter(Boolean);
+  return list.sort((a, b) => {
+    const ia = LOG_PROVIDER_KIND_ORDER.indexOf(
+      a as (typeof LOG_PROVIDER_KIND_ORDER)[number],
+    );
+    const ib = LOG_PROVIDER_KIND_ORDER.indexOf(
+      b as (typeof LOG_PROVIDER_KIND_ORDER)[number],
+    );
+    const ao = ia === -1 ? 999 : ia;
+    const bo = ib === -1 ? 999 : ib;
+    if (ao !== bo) return ao - bo;
+    return a.localeCompare(b);
+  });
+}
+
+/** 从当前日志批次提取厂商（去重、排序） */
+export function collectLogProviderKinds(
+  logs: { providerKind: string | null }[],
+): string[] {
+  return sortLogProviderKinds(
+    logs.map((l) => l.providerKind).filter((k): k is string => !!k),
+  );
+}
+
+/** 从当前日志批次提取 modelKey（可按厂商收窄） */
+export function collectLogModels(
+  logs: { model: string; providerKind: string | null }[],
+  providerKind?: string,
+): string[] {
+  const models = new Set<string>();
+  for (const l of logs) {
+    if (providerKind && l.providerKind !== providerKind) continue;
+    if (l.model?.trim()) models.add(l.model);
+  }
+  return [...models].sort((a, b) => a.localeCompare(b));
+}
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "排队",
