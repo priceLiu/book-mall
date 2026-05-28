@@ -1,5 +1,6 @@
 /**
  * 影视专业版 · 故事剧本制作包 prompt 真源（上传剧本不改 · LLM 输出结构固定 · 定稿拆分依赖）
+ * book-mall/lib/canvas/story-pro-script-pack.ts 须与本文件 STRUCTURE / RULES 保持同步（剧本创作助手 API 使用）
  */
 
 /** 加载画布时低于此版本则刷新「导演·上传剧本」与 hub 段 prompt */

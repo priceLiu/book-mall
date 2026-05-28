@@ -9,25 +9,23 @@ import {
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
 import { sanitizeClientChatTurns } from "@/lib/canvas/story-pro-script-assistant-service";
+import {
+  buildScriptAssistantSystemPrompt,
+  parseScriptAssistantOutputMode,
+} from "@/lib/canvas/story-pro-script-assistant-prompts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const SCRIPT_ASSISTANT_SYSTEM_PROMPT = `你是「剧本创作助手」，服务于影视专业版 AI 短剧画布。
-帮助用户撰写、润色、扩写剧本、故事大纲、角色设定与分镜脚本。
-输出尽量使用 Markdown；可含角色表、场景表、分镜表。
-语气专业、简洁；默认简体中文。
-若用户要可直接导入画布的完整剧本，请给出结构清晰的 Markdown 全文。`;
 
 export async function POST(request: NextRequest) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
 
-  let body: { messages?: unknown };
+  let body: { messages?: unknown; outputMode?: unknown };
   try {
     const parsed = await readJsonBody(request);
     if (!parsed.ok) return parsed.response;
-    body = parsed.body as { messages?: unknown };
+    body = parsed.body as { messages?: unknown; outputMode?: unknown };
   } catch {
     return NextResponse.json(
       { error: "invalid_json" },
@@ -57,11 +55,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const outputMode = parseScriptAssistantOutputMode(body.outputMode);
+  const systemPrompt = buildScriptAssistantSystemPrompt(outputMode);
+
   try {
     const gw = await canvasGwChatStream(guard.user.id, {
       modelKey: "deepseek-chat",
       messages: [
-        { role: "system", content: SCRIPT_ASSISTANT_SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         ...turns,
       ],
       clientPage: "canvas/script-assistant",
