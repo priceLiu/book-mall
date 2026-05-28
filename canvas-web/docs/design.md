@@ -123,10 +123,10 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 
 ### 3.4 列内媒体操作（圆形浮层）
 
-- 生成 / 重生成：`size-9`，橙描边 `border-[#fb923c]/40`
+- 生成 / 重生成：`size-9`，橙描边 `border-[#fb923c]/40`（专业版见 `storyEditionIconBtnClass`）
 - 预览：`size-9`，白描边 `border-white/20`
-- 分镜视频快捷：`size-8` 右下角 Clapperboard
-- 生成中：中央 `RefreshCw` 旋转 + `canvas-story-media-generating` 橙边
+- 分镜视频快捷：`size-8` 右下角 `Clapperboard`
+- **生成中动效**（扫光 / 旋转圈 / 图标分工）：见 **§15**
 
 ### 3.5 放大镜预览
 
@@ -319,16 +319,21 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 
 ### 7.1 分镜行 · 上游参考图（对比参照）
 
-- 宽 **220**，最小高 **248**
-- 被 `@` 引用的图：**橙色激活框**  
-  `border-[#fb923c]` + `shadow-[0_0_0_1px_#fb923c,0_0_10px_rgba(251,146,60,0.4)]`
+- 宽 **220**，与分镜图条同高 **248**（`STORY_FRAME_ROW_STRIP_H`）
+- 布局：**3 列宫格**（`STORY_UPSTREAM_REF_GRID_COLS`），`content-start` + `grid-auto-rows: min-content`（**禁止** `min-h-full` 撑开行距）
+- 多图时列内 **纵向滚动**（`StoryUpstreamImageColumn`）
+- 被 `@` 引用的图：快手 **橙框** / 专业版 **青框** — `storyEditionActiveRefBorderClass(edition)`
 - 未引用：`border-white/15`
-- 无图占位：「待上游」/ 虚线 `—`
+- 有图：悬停居中 **Eye**；**点击** → `StoryMediaPreviewModal`（生成中隐藏 Eye，见 §15.3）
+- **生成中**：仅 **整列外框** 扫光（§15.3），**禁止**单格旋转圈
+- 无图占位：格内「待上游」/ 空列 `—`
+- 分镜图过审：仅 **「通过」**（无驳回）；未过审不可生视频（`story-frame-gate.ts`）
 
 ### 7.2 输出图列
 
 - 宽 **248**；`object-contain` 黑底槽
-- hover 显示生成/预览；分镜有图时右下角 **生视频** 钮
+- hover 显示生成/重生成/预览；分镜有图时右下角 **Clapperboard** 生视频
+- **生成中**：扫光 + 中央 **RefreshCw** 旋转（§15.3）
 
 ### 7.3 历史对比弹层（引擎节点）
 
@@ -407,6 +412,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 | 工作区重排 | `reflowStoryComicWorkspace` |
 | 尺寸迁移 | `normalizeCanvasNodes`、`migrateGraphV1ToV2` |
 | 图片上传（点击/拖入/粘贴） | §13 · `image-upload-handlers.ts` · `MediaHoverBox` |
+| 列内生成中动效 / 预览图标 | §15 · `story-edition-chrome.ts` · `globals.css` |
 
 ---
 
@@ -572,10 +578,12 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 | 行为 | 函数 |
 |------|------|
 | @ 激活参考图边框 | `storyEditionActiveRefBorderClass("pro")` |
-| 生成中动画边框 | `storyEditionGeneratingBorderClass("pro")` |
+| 生成中扫光 | `storyEditionGeneratingBorderClass("pro")` · 左列整框 / 右列输出槽（§15） |
+| 生成中旋转圈 | `storyEditionSpinClass("pro")` · **仅右列输出**，左 @ 列禁止 |
 | 圆形生成/预览钮 | `storyEditionIconBtnClass` / `OverlayIconBtnClass` |
-| 分镜右下角生视频 | `storyEditionVideoOverlayBtnClass` |
+| 分镜右下角生视频 | `storyEditionVideoOverlayBtnClass` · `Clapperboard` |
 | 视频列重新生成 | `storyEditionCornerRegenBtnClass` |
+| 宫格悬停预览 | **Eye**（§15.2） |
 | 模型区标签 | `PRO_HINT_LABEL_CLASS`（pro）/ `STORY_HINT_LABEL_CLASS`（comic） |
 
 ### 14.5 弹层
@@ -634,3 +642,82 @@ Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtn
 - [ ] 提示/错误是否仍走 §8 金黄/红，标题是否走绿 `PRO_HINT` / `STORY_ROW_SECTION`？
 - [ ] 入库是否用 `StoryProAssetImportIcon`，而非「入库」文案？
 - [ ] 是否更新本文 §14 与 `.cursor/rules/canvas-story-design.mdc`？
+
+---
+
+## 15. 列内媒体 · 生成中动效与预览图标
+
+漫剧列（角色 / 分镜 / 视频）与影视专业版共用组件，经 `edition: "comic" | "pro"` 分流颜色。**禁止**自写第二套 shimmer 或换用其他 loading 图标。
+
+### 15.1 扫光动效（CSS 真源）
+
+| 项 | 位置 | 说明 |
+|----|------|------|
+| 动画名 | `canvas-web/app/globals.css` | `@keyframes canvas-story-media-shimmer` · 1.4s · `translateX(-100%→100%)` |
+| 基础类 | `.canvas-story-media-generating` | 外框光晕（橙）+ `::after` 斜向渐变扫光 |
+| 专业版叠加 | `.canvas-story-media-generating-pro` | 扫光色改为青 `rgba(34,211,238,0.22)` |
+| React 挂载 | `storyEditionGeneratingBorderClass(edition)` | 同时含 `relative`/`overflow-hidden` 容器 + 上述 class + `border-*` |
+
+挂载容器须 **`position: relative`** 且 **`overflow: hidden`**（或 `overflow-y-auto` 的满高外框），使 `::after` 覆盖**可见区域整块**，而非单个缩略图。
+
+### 15.2 图标分工（lucide-react）
+
+| 图标 | 场景 | 组件 | 禁止 |
+|------|------|------|------|
+| **Eye** | 悬停预览 overlay（半透明黑底居中） | 分镜 @ 宫格、资产槽、输出图预览钮 | 勿用 Search 替代宫格悬停 |
+| **RefreshCw** | 生成中 **旋转**（`animate-spin`） | 输出图/视频槽中央 overlay | **禁止**用于左侧 @ 参考图列 |
+| **RefreshCw**（静态） | 重新生成钮（非 spin） | `storyEditionOverlayIconBtnClass` | — |
+| **Clapperboard** | 分镜图右下角「生视频」 | `storyEditionVideoOverlayBtnClass` | — |
+| **Search** | 故事主题/大纲 **节点头** 打开审阅 | `StoryPreviewMagnifyButton` | 勿用于列内宫格 |
+| **Layers** | 入库到项目资产 | `StoryProAssetImportIcon` | 禁止「入库」二字 |
+| **Upload** | 槽位上传 | 资产四槽/三槽工具栏 | — |
+| **Check** | 分镜图「通过」 | `story-column-media-panel` 左下角 | 已移除「驳回」 |
+
+旋转圈颜色：`storyEditionSpinClass(edition)` — 快手 `#fdba74` · 专业版 `text-cyan-300`（`size-6` / `size-8`）。
+
+### 15.3 分镜行 · 左参考图列 vs 右输出列（硬性）
+
+组件：`story-row-prompt-field.tsx` · `StoryUpstreamImageColumn` · `StoryColumnMediaPanel`
+
+| 列 | 宽×高 | 生成中状态 | 动效 |
+|----|-------|------------|------|
+| **左 · @ 参考图** | 220×248 | `upstreamGenerating={frameRunning}` | **仅**外框 `storyEditionGeneratingBorderClass` 扫光；**无** `RefreshCw` |
+| **右 · 分镜图** | 248×248 | `generating={frameRunning \|\| videoRunning}` | 扫光 + 中央 **`RefreshCw` 旋转** |
+
+左列实现要点：
+
+1. `storyEditionGeneratingBorderClass` 加在 **满高** 滚动外框（`h-full w-full`），不是宫格 `grid` 内层。
+2. 宫格 `grid content-start items-start`，`grid-auto-rows: min-content`；**禁止** `min-h-full`（会导致行轨均分、中间留白）。
+3. 生成中：`pointer-events` 禁用预览；不渲染 Eye overlay。
+
+右列实现要点：`StoryColumnMediaPanel` 内层 `absolute inset-0` + generating class；overlay 内 `RefreshCw` + `storyEditionSpinClass`。
+
+仅 **分镜图**生成（`frameRunning`）时左列扫光；**仅视频**生成（`videoRunning`）时不扫左列。
+
+### 15.4 其他列（同一套分流）
+
+| 列 / 槽 | 组件 | 生成中 |
+|---------|------|--------|
+| 角色三视图输出 | `StoryColumnMediaPanel` | 扫光 + 中央旋转圈 |
+| 分镜视频 | `story-video-row-slot.tsx` | 扫光 + 旋转圈（`size-8`） |
+| TTS 配音 | `story-tts-row-slot.tsx` | 扫光 + 旋转圈 |
+| 资产槽预览 | `story-pro-*-asset-slots` | 悬停 **Eye**；无列级扫光 |
+
+节点外壳生成：`ProNodeShell` / `NodeShell` · `canvas-node-generating` 边框呼吸（`canvas-node-generating-pulse`），与列内媒体扫光**叠加**、不替代。
+
+### 15.5 禁止事项
+
+1. **禁止**在 @ 参考图宫格或单格上加 `RefreshCw` / 旋转圈。
+2. **禁止**对每个缩略图单独挂 `canvas-story-media-generating`（会变成「多宫格各自扫光」）。
+3. **禁止**宫格 `min-h-full` / 默认 `1fr` 行高撑满列高。
+4. **禁止**列内预览悬停改用 Search；节点头审阅放大镜仍用 `StoryPreviewMagnifyButton`（Search）。
+5. 专业版生成中 **禁止**橙色扫光（须 `canvas-story-media-generating-pro`）。
+
+### 15.6 新增/改动媒体 UI 自检
+
+- [ ] 扫光是否只 via `storyEditionGeneratingBorderClass` + `globals.css`？
+- [ ] 左 @ 列是否仅整列外框扫光、无旋转圈？
+- [ ] 右输出列是否在扫光上叠加 `RefreshCw` spin？
+- [ ] 宫格是否 `content-start`，无中间空行？
+- [ ] 悬停预览是否 **Eye**（非 Search）？
+- [ ] 是否更新本文 §15 与 `.cursor/rules/canvas-story-design.mdc`？

@@ -1,6 +1,6 @@
 ---
 description: 漫剧画布固定尺寸、按钮、弹层、文案与对比图设计规范
-globs: canvas-web/components/canvas/**,canvas-web/lib/canvas/story-*.ts,canvas-web/lib/canvas/story-pro-node-chrome.ts,canvas-web/lib/canvas/story-edition-chrome.ts,canvas-web/lib/canvas/types.ts,canvas-web/lib/canvas/normalize-graph-nodes.ts,canvas-web/docs/design.md
+globs: canvas-web/components/canvas/**,canvas-web/lib/canvas/story-*.ts,canvas-web/lib/canvas/story-pro-node-chrome.ts,canvas-web/lib/canvas/story-edition-chrome.ts,canvas-web/lib/canvas/types.ts,canvas-web/lib/canvas/normalize-graph-nodes.ts,canvas-web/app/globals.css,canvas-web/docs/design.md
 alwaysApply: false
 ---
 
@@ -60,7 +60,16 @@ alwaysApply: false
 ## 参考图 / 对比
 
 - `@` 激活参考图：快手橙 / 专业版青 — `storyEditionActiveRefBorderClass(edition)`
+- 分镜 @ 宫格：3 列、`content-start`、悬停 **Eye**、点击全屏预览（§7.1）
 - 引擎对比：`CompareModal` 滑块重叠对比，非简单并排
+
+## 生成中动效与预览图标（§15）
+
+- **扫光 CSS**：`globals.css` · `.canvas-story-media-generating` / `-pro` · `storyEditionGeneratingBorderClass(edition)`
+- **左 @ 参考图列**（220×248）：`upstreamGenerating={frameRunning}` · **仅整列外框扫光** · **禁止** `RefreshCw` · 禁止宫格 `min-h-full`
+- **右输出图列**（248）：扫光 + 中央 **`RefreshCw` + `storyEditionSpinClass`**
+- **悬停预览**：列内宫格/槽位用 **Eye**；节点头审阅用 `StoryPreviewMagnifyButton`（Search）
+- **入库**：`StoryProAssetImportIcon`（Layers）· 生视频 **Clapperboard** · 过审 **Check**（无驳回）
 
 ## 视频播放
 

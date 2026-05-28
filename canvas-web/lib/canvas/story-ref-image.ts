@@ -101,5 +101,7 @@ export function storyRefUrlsForPrompt(
 export const STORY_ROW_LABEL_COL_WIDTH = 56;
 /** 分镜列 · 上游参考图列宽 */
 export const STORY_UPSTREAM_COL_WIDTH = 220;
+/** @ 参考图宫格列数（3 列 × N 行，约 70px/格） */
+export const STORY_UPSTREAM_REF_GRID_COLS = 3;
 /** 角色/分镜列 · 输出图列宽 */
 export const STORY_MEDIA_COL_WIDTH = 248;
