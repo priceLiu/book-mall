@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LogParamsCell } from "./log-params-cell";
 import { LogResultCell } from "./log-result-cell";
 import { LogStatusBadge } from "./log-status-badge";
@@ -8,11 +8,17 @@ import {
   formatCreditsDisplay,
   formatDurationSeconds,
   formatLogTimestamp,
+  isLogDateRangeInvalid,
+  logSubmittedInUtcDateRange,
   resolveLogDurationMs,
 } from "@/lib/gateway-log-params";
 import {
+  collectLogModels,
+  collectLogProviderKinds,
   formatLogPageLabel,
   formatLogSourceTooltip,
+  formatProviderKindLabel,
+  LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
 
 export type GatewayLogRow = {
@@ -47,14 +53,113 @@ const STATUS_OPTIONS = [
   { value: "CANCELLED", label: "cancelled" },
 ];
 
-export function LogsTable({ logs }: { logs: GatewayLogRow[] }) {
+function logFilterChipClass(active: boolean): string {
+  return active
+    ? "rounded-lg border border-sky-500/45 bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-100"
+    : "rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200";
+}
+
+function clearSelectionOnFilter(setSelected: (s: Set<string>) => void) {
+  setSelected(new Set());
+}
+
+export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
+  const [logs, setLogs] = useState(initialLogs);
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [providerFilter, setProviderFilter] = useState("");
+  const [modelFilter, setModelFilter] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const dateRangeInvalid = isLogDateRangeInvalid(fromDate, toDate);
+  const hasDateFilter = !!(fromDate || toDate);
+
+  useEffect(() => {
+    setLogs(initialLogs);
+  }, [initialLogs]);
+
+  useEffect(() => {
+    if (!hasDateFilter) {
+      setLogs(initialLogs);
+      setFetchError(null);
+      setLoading(false);
+      return;
+    }
+    if (dateRangeInvalid) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setLoading(true);
+        setFetchError(null);
+        try {
+          const params = new URLSearchParams({ limit: "100" });
+          if (fromDate) params.set("from", fromDate);
+          if (toDate) params.set("to", toDate);
+          const res = await fetch(
+            `/api/book-mall/api/gateway/logs?${params.toString()}`,
+          );
+          const data = (await res.json().catch(() => null)) as {
+            logs?: GatewayLogRow[];
+            error?: string;
+          } | null;
+          if (cancelled) return;
+          if (!res.ok) {
+            setFetchError(data?.error ?? "加载日志失败");
+            return;
+          }
+          setLogs(data?.logs ?? []);
+        } catch {
+          if (!cancelled) setFetchError("加载日志失败");
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+    }, 280);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [fromDate, toDate, hasDateFilter, dateRangeInvalid, initialLogs]);
+
+  const providerKinds = useMemo(() => collectLogProviderKinds(logs), [logs]);
+
+  const modelOptions = useMemo(
+    () => collectLogModels(logs, providerFilter || undefined),
+    [logs, providerFilter],
+  );
 
   const filtered = useMemo(() => {
-    if (!statusFilter) return logs;
-    return logs.filter((l) => l.status === statusFilter);
-  }, [logs, statusFilter]);
+    return logs.filter((l) => {
+      if (
+        hasDateFilter &&
+        !dateRangeInvalid &&
+        !logSubmittedInUtcDateRange(l.submittedAt, fromDate, toDate)
+      ) {
+        return false;
+      }
+      if (sourceFilter && l.clientSource !== sourceFilter) return false;
+      if (providerFilter && l.providerKind !== providerFilter) return false;
+      if (modelFilter && l.model !== modelFilter) return false;
+      if (statusFilter && l.status !== statusFilter) return false;
+      return true;
+    });
+  }, [
+    logs,
+    hasDateFilter,
+    dateRangeInvalid,
+    fromDate,
+    toDate,
+    sourceFilter,
+    providerFilter,
+    modelFilter,
+    statusFilter,
+  ]);
 
   const allSelected =
     filtered.length > 0 && filtered.every((l) => selected.has(l.id));
@@ -78,18 +183,163 @@ export function LogsTable({ logs }: { logs: GatewayLogRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="min-w-[160px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20"
-        >
-          {STATUS_OPTIONS.map((o) => (
-            <option key={o.value || "all"} value={o.value}>
-              {o.label}
-            </option>
+      <div className="space-y-2.5 rounded-xl border border-white/[0.06] bg-[#0f0f14] px-3 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="mr-1 shrink-0 text-xs text-zinc-500">应用</span>
+            {LOG_APP_FILTER_OPTIONS.map((opt) => {
+              const active = sourceFilter === opt.value;
+              return (
+                <button
+                  key={opt.value || "all"}
+                  type="button"
+                  className={logFilterChipClass(active)}
+                  onClick={() => {
+                    setSourceFilter(opt.value);
+                    clearSelectionOnFilter(setSelected);
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+            <span className="ml-2 shrink-0 text-[11px] text-zinc-600">
+              {loading
+                ? "加载中…"
+                : `${filtered.length} / ${logs.length} 条`}
+              {hasDateFilter && !loading ? " · 按日期" : ""}
+            </span>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <div className="flex flex-wrap items-end justify-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-zinc-500">开始日期</span>
+                <input
+                  type="date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    clearSelectionOnFilter(setSelected);
+                  }}
+                  className="w-[148px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20 [color-scheme:dark]"
+                  aria-label="开始日期"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-zinc-500">结束日期</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={(e) => {
+                    setToDate(e.target.value);
+                    clearSelectionOnFilter(setSelected);
+                  }}
+                  className="w-[148px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20 [color-scheme:dark]"
+                  aria-label="结束日期"
+                />
+              </label>
+              {fromDate || toDate ? (
+                <button
+                  type="button"
+                  className="mb-0.5 rounded-lg border border-white/10 px-2.5 py-2 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200"
+                  onClick={() => {
+                    setFromDate("");
+                    setToDate("");
+                    clearSelectionOnFilter(setSelected);
+                  }}
+                >
+                  清除
+                </button>
+              ) : null}
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  clearSelectionOnFilter(setSelected);
+                }}
+                className="mb-0.5 min-w-[160px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20"
+                aria-label="按状态筛选"
+              >
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value || "all"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {dateRangeInvalid ? (
+              <span className="text-xs text-amber-400/90">
+                结束日期不能早于开始日期
+              </span>
+            ) : fetchError ? (
+              <span className="text-xs text-red-400/90">{fetchError}</span>
+            ) : hasDateFilter && !loading ? (
+              <span className="text-[11px] text-zinc-600">
+                按 Submitted 筛选，最多 100 条
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-white/[0.06] pt-2.5">
+          <span className="mr-1 shrink-0 text-xs text-zinc-500">厂商</span>
+          <button
+            type="button"
+            className={logFilterChipClass(!providerFilter)}
+            onClick={() => {
+              setProviderFilter("");
+              setModelFilter("");
+              clearSelectionOnFilter(setSelected);
+            }}
+          >
+            全部
+          </button>
+          {providerKinds.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className={logFilterChipClass(providerFilter === kind)}
+              onClick={() => {
+                setProviderFilter(kind);
+                setModelFilter("");
+                clearSelectionOnFilter(setSelected);
+              }}
+            >
+              {formatProviderKindLabel(kind)}
+            </button>
           ))}
-        </select>
+          {!providerKinds.length ? (
+            <span className="text-[11px] text-zinc-600">当前批次无厂商标记</span>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
+          <span className="shrink-0 text-xs text-zinc-500">模型</span>
+          <select
+            value={modelFilter}
+            onChange={(e) => {
+              setModelFilter(e.target.value);
+              clearSelectionOnFilter(setSelected);
+            }}
+            disabled={!modelOptions.length}
+            className="min-w-[min(100%,320px)] max-w-xl flex-1 rounded-lg border border-white/10 bg-[#141419] px-3 py-2 font-mono text-xs text-zinc-300 outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="按模型筛选"
+          >
+            <option value="">全部模型</option>
+            {modelOptions.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+          {providerFilter ? (
+            <span className="shrink-0 text-[11px] text-zinc-600">
+              已按 {formatProviderKindLabel(providerFilter)} 收窄
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
@@ -252,7 +502,9 @@ export function LogsTable({ logs }: { logs: GatewayLogRow[] }) {
                   colSpan={12}
                   className="py-16 text-center text-sm text-zinc-500"
                 >
-                  暂无日志
+                  {logs.length
+                    ? "暂无符合筛选条件的日志"
+                    : "暂无日志"}
                 </td>
               </tr>
             ) : null}

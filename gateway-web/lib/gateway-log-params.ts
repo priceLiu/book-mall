@@ -216,6 +216,32 @@ export function formatCreditsConsumed(
   ).value;
 }
 
+const LOG_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isLogDateRangeInvalid(from: string, to: string): boolean {
+  if (!from || !to) return false;
+  return from > to;
+}
+
+/** 按 Submitted 是否在开始/结束日期内（闭区间，与 API from/to 同为 UTC 日历日） */
+export function logSubmittedInUtcDateRange(
+  submittedAt: string,
+  from: string,
+  to: string,
+): boolean {
+  const t = new Date(submittedAt).getTime();
+  if (Number.isNaN(t)) return false;
+  if (from && LOG_DATE_ONLY.test(from.trim())) {
+    const start = new Date(`${from.trim()}T00:00:00.000Z`).getTime();
+    if (t < start) return false;
+  }
+  if (to && LOG_DATE_ONLY.test(to.trim())) {
+    const end = new Date(`${to.trim()}T23:59:59.999Z`).getTime();
+    if (t > end) return false;
+  }
+  return true;
+}
+
 export async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);

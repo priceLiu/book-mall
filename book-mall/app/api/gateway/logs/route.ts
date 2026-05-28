@@ -4,6 +4,10 @@ import {
   expireStaleGatewayLogs,
   runGatewayPollWorker,
 } from "@/lib/gateway/poll-service";
+import {
+  parseLogSubmittedFromParam,
+  parseLogSubmittedToParam,
+} from "@/lib/gateway/log-query-params";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -28,11 +32,25 @@ export async function GET(request: NextRequest) {
     Math.max(1, Number(request.nextUrl.searchParams.get("limit") ?? "50")),
   );
   const status = request.nextUrl.searchParams.get("status")?.trim();
+  const submittedFrom = parseLogSubmittedFromParam(
+    request.nextUrl.searchParams.get("from"),
+  );
+  const submittedTo = parseLogSubmittedToParam(
+    request.nextUrl.searchParams.get("to"),
+  );
 
   const logs = await prisma.gatewayRequestLog.findMany({
     where: {
       userId: user.id,
       ...(status ? { status: status as never } : {}),
+      ...(submittedFrom || submittedTo
+        ? {
+            submittedAt: {
+              ...(submittedFrom ? { gte: submittedFrom } : {}),
+              ...(submittedTo ? { lte: submittedTo } : {}),
+            },
+          }
+        : {}),
     },
     orderBy: { submittedAt: "desc" },
     take: limit,

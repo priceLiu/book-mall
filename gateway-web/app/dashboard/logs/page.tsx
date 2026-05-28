@@ -13,7 +13,7 @@ export default async function DashboardLogsPage() {
       <div>
         <h1 className="text-xl font-semibold text-white">Logs</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          最近 50 条 · 悬停 Params / Result / failed 状态查看详情
+          最近 50 条 · 可按应用 / 厂商 / 模型 / 提交日期筛选 · 悬停 Params / Result 查看详情
         </p>
       </div>
 
@@ -22,7 +22,7 @@ export default async function DashboardLogsPage() {
         「重新生成」或修改 prompt 后再跑。新请求会记录完整 Params 与 Results 预览。
       </div>
 
-      <LogsTable logs={data?.logs ?? []} />
+      <LogsTable initialLogs={data?.logs ?? []} />
     </div>
   );
 }
