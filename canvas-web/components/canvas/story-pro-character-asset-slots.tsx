@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { Eye, Lock, Trash2, Upload, Wand2 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { StoryProAssetImportIcon } from "@/components/canvas/story-pro-asset-import-icon";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   autoFillStoryProCharacterSlotsFromThreeView,
@@ -24,11 +25,17 @@ import {
   type StoryProAssetRefKind,
 } from "@/lib/canvas/story-pro-character-asset-catalog";
 import {
-  STORY_ROW_ACTION_BTN_CLASS,
   STORY_ROW_BANNER_CLASS,
   STORY_ROW_SECTION_CLASS,
   STORY_ROW_SUBLABEL_CLASS,
 } from "@/lib/canvas/story-column-sync";
+import {
+  PRO_ASSET_PANEL_CLASS,
+  PRO_ROW_PRIMARY_BTN_CLASS,
+  PRO_ROW_SECONDARY_BTN_CLASS,
+  PRO_SLOT_IMPORT_BTN_CLASS,
+  PRO_SLOT_TOOLBAR_BTN_CLASS,
+} from "@/lib/canvas/story-pro-node-chrome";
 import {
   StoryErrorLine,
   StoryHintLine,
@@ -349,7 +356,7 @@ export function StoryProCharacterAssetSlots({
   };
 
   return (
-    <div className="rounded-md border border-white/10 bg-black/25 p-2">
+    <div className={PRO_ASSET_PANEL_CLASS}>
       <input
         ref={fileRef}
         type="file"
@@ -367,7 +374,7 @@ export function StoryProCharacterAssetSlots({
           <StoryHintLine message="上方预览已生成 · 入库后自动裁切脸/全身/服装" />
           <button
             type="button"
-            className={STORY_ROW_ACTION_BTN_CLASS}
+            className={PRO_ROW_SECONDARY_BTN_CLASS}
             onClick={() => void importGeneratedThreeView()}
             disabled={busy}
           >
@@ -379,7 +386,7 @@ export function StoryProCharacterAssetSlots({
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className={STORY_ROW_ACTION_BTN_CLASS}
+            className={PRO_ROW_SECONDARY_BTN_CLASS}
             onClick={() => void autoCropFromSavedThreeView()}
             disabled={busy}
           >
@@ -490,7 +497,7 @@ export function StoryProCharacterAssetSlots({
                   <button
                     type="button"
                     title="上传替换"
-                    className="nodrag rounded p-0.5 text-white/45 hover:bg-white/5 hover:text-white/75"
+                    className={PRO_SLOT_TOOLBAR_BTN_CLASS}
                     onClick={() => onUploadClick(kind)}
                     disabled={busy}
                   >
@@ -501,11 +508,12 @@ export function StoryProCharacterAssetSlots({
                   <button
                     type="button"
                     title="把上方预览的三视图保存到资产库，并自动裁切其余三槽"
-                    className="nodrag rounded px-0.5 text-[8px] text-white/45 hover:text-white/75 disabled:opacity-30"
+                    aria-label="入库到项目资产"
+                    className={PRO_SLOT_IMPORT_BTN_CLASS}
                     onClick={() => void importGeneratedThreeView()}
                     disabled={busy || !hasGeneratedPreview}
                   >
-                    入库
+                    <StoryProAssetImportIcon />
                   </button>
                 ) : null}
                 {ref ? (

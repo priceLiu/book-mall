@@ -3,6 +3,18 @@
 import { cn } from "@/lib/utils";
 import {
   PRO_NODE_ACCENT,
+  PRO_STAGE_BADGE_CLASS,
+  PRO_STAGE_CHIP_ACTIVE_CLASS,
+  PRO_STAGE_CHIP_DONE_CLASS,
+  PRO_STAGE_CHIP_IDLE_CLASS,
+  PRO_STAGE_CONNECTOR_DONE_CLASS,
+  PRO_STAGE_CONNECTOR_IDLE_CLASS,
+  PRO_STAGE_LABEL_ACTIVE_CLASS,
+  PRO_STAGE_LABEL_DONE_CLASS,
+  PRO_STAGE_LABEL_IDLE_CLASS,
+  PRO_STAGE_STEP_ACTIVE_CLASS,
+  PRO_STAGE_STEP_DONE_CLASS,
+  PRO_STAGE_STEP_IDLE_CLASS,
   STORY_PRO_PIPELINE_STAGES,
   type StoryProStageId,
 } from "@/lib/canvas/story-pro-node-chrome";
@@ -26,7 +38,7 @@ export function StoryProStageRail({
               <span
                 className={cn(
                   "mx-0.5 h-px w-3 shrink-0",
-                  isDone ? "bg-cyan-400/50" : "bg-white/10",
+                  isDone ? PRO_STAGE_CONNECTOR_DONE_CLASS : PRO_STAGE_CONNECTOR_IDLE_CLASS,
                 )}
                 aria-hidden
               />
@@ -35,10 +47,10 @@ export function StoryProStageRail({
               className={cn(
                 "flex min-w-0 flex-col rounded-md border px-1.5 py-0.5 transition",
                 isActive
-                  ? "border-cyan-400/50 bg-cyan-500/15"
+                  ? PRO_STAGE_CHIP_ACTIVE_CLASS
                   : isDone
-                    ? "border-emerald-400/30 bg-emerald-500/8"
-                    : "border-white/8 bg-white/[0.03]",
+                    ? PRO_STAGE_CHIP_DONE_CLASS
+                    : PRO_STAGE_CHIP_IDLE_CLASS,
               )}
               title={s.shortHint}
             >
@@ -46,10 +58,10 @@ export function StoryProStageRail({
                 className={cn(
                   "text-[9px] font-mono tabular-nums",
                   isActive
-                    ? "text-cyan-300"
+                    ? PRO_STAGE_STEP_ACTIVE_CLASS
                     : isDone
-                      ? "text-emerald-300/80"
-                      : "text-white/35",
+                      ? PRO_STAGE_STEP_DONE_CLASS
+                      : PRO_STAGE_STEP_IDLE_CLASS,
                 )}
               >
                 {String(s.step).padStart(2, "0")}
@@ -58,10 +70,10 @@ export function StoryProStageRail({
                 className={cn(
                   "truncate text-[10px] font-medium",
                   isActive
-                    ? "text-cyan-100"
+                    ? PRO_STAGE_LABEL_ACTIVE_CLASS
                     : isDone
-                      ? "text-emerald-200/90"
-                      : "text-white/45",
+                      ? PRO_STAGE_LABEL_DONE_CLASS
+                      : PRO_STAGE_LABEL_IDLE_CLASS,
                 )}
               >
                 {s.label}
@@ -70,10 +82,7 @@ export function StoryProStageRail({
           </div>
         );
       })}
-      <span
-        className="ml-1 shrink-0 rounded px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest text-cyan-400/40"
-        style={{ color: `${PRO_NODE_ACCENT}66` }}
-      >
+      <span className={PRO_STAGE_BADGE_CLASS} style={{ color: `${PRO_NODE_ACCENT}66` }}>
         PRO
       </span>
     </div>

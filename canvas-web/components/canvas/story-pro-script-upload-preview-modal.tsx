@@ -6,6 +6,12 @@ import { FileText, X } from "lucide-react";
 
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import type { StoryProUploadedScriptMeta } from "@/lib/canvas/story-pro-workspace-types";
+import {
+  PRO_ICON_ACCENT_CLASS,
+  PRO_MODAL_HEADER_CLASS,
+  PRO_MODAL_SUBTITLE_CLASS,
+  PRO_MODAL_TITLE_CLASS,
+} from "@/lib/canvas/story-pro-node-chrome";
 import { MarkdownView } from "./markdown-view";
 
 const DOC_PAD = "px-10 py-12 sm:px-14 sm:py-16";
@@ -68,13 +74,11 @@ export function StoryProScriptUploadPreviewModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <header className="nodrag flex shrink-0 items-center gap-3 border-b border-white/10 bg-neutral-900/85 px-4 py-3">
-        <FileText className="size-4 shrink-0 text-cyan-300" />
+      <header className={PRO_MODAL_HEADER_CLASS}>
+        <FileText className={`size-4 shrink-0 ${PRO_ICON_ACCENT_CLASS}`} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-white">
-            {meta?.fileName ?? "上传剧本"}
-          </p>
-          <p className="text-[11px] text-white/50">
+          <p className={PRO_MODAL_TITLE_CLASS}>{meta?.fileName ?? "上传剧本"}</p>
+          <p className={PRO_MODAL_SUBTITLE_CLASS}>
             {meta?.format === "txt" ? "纯文本" : "Markdown"} ·{" "}
             {(meta?.charCount ?? md.length).toLocaleString()} 字
           </p>

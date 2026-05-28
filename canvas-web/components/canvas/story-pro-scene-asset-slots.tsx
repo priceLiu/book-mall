@@ -3,6 +3,8 @@
 import { useCallback, useRef, useState } from "react";
 import { Eye, Trash2, Upload } from "lucide-react";
 
+import { StoryProAssetImportIcon } from "@/components/canvas/story-pro-asset-import-icon";
+
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
@@ -23,6 +25,11 @@ import {
   STORY_ROW_SECTION_CLASS,
   STORY_ROW_SUBLABEL_CLASS,
 } from "@/lib/canvas/story-column-sync";
+import {
+  PRO_ASSET_PANEL_CLASS,
+  PRO_SLOT_IMPORT_BTN_CLASS,
+  PRO_SLOT_TOOLBAR_BTN_CLASS,
+} from "@/lib/canvas/story-pro-node-chrome";
 import {
   activateImagePasteTarget,
   bindImageDragDropHandlers,
@@ -193,7 +200,7 @@ export function StoryProSceneAssetSlots({
   };
 
   return (
-    <div className="rounded-md border border-white/10 bg-black/25 p-2">
+    <div className={PRO_ASSET_PANEL_CLASS}>
       <input
         ref={fileRef}
         type="file"
@@ -280,7 +287,7 @@ export function StoryProSceneAssetSlots({
                   <>
                     <button
                       type="button"
-                      className="nodrag rounded p-0.5 text-white/45 hover:bg-white/5 hover:text-white/75"
+                      className={PRO_SLOT_TOOLBAR_BTN_CLASS}
                       onClick={() => onUploadClick(kind)}
                       disabled={busy}
                       title="上传"
@@ -290,10 +297,13 @@ export function StoryProSceneAssetSlots({
                     {!ref && (row.runtime?.ossUrl ?? row.runtime?.ephemeralUrl) ? (
                       <button
                         type="button"
-                        className="nodrag text-[8px] text-white/45 hover:text-white/75"
+                        title="把上方预览保存到项目资产库"
+                        aria-label="入库到项目资产"
+                        className={PRO_SLOT_IMPORT_BTN_CLASS}
                         onClick={() => void importGenerated(kind)}
+                        disabled={busy}
                       >
-                        入库
+                        <StoryProAssetImportIcon />
                       </button>
                     ) : null}
                     {ref ? (

@@ -355,7 +355,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 | **节点 chrome**（绿色） | `STORY_CHROME_GREEN_CLASS` | `text-emerald-300/90` | 顶部导航、工具栏项目名、节点标题/副标题、行标题徽章、状态文案 |
 | 节点区块标题 | `STORY_ROW_SECTION_CLASS` | 10px 绿色 | 资产四槽区标题、「资产就绪」类状态 |
 | 槽位次级标签 | `STORY_ROW_SUBLABEL_CLASS` | 9px `text-emerald-200/75` | 脸 / 全身 / 服装等槽名 |
-| 影视专业版字段标签 | `PRO_HINT_LABEL_CLASS` | 10px uppercase `text-emerald-300/85` | 风格节点「主风格 / 锚定词」等 |
+| 影视专业版字段标签 | `PRO_HINT_LABEL_CLASS` | 10px uppercase `text-emerald-300/85` | 风格节点「主风格 / 锚定词」等（详见 §14） |
 | **错误**（图 3 红） | `STORY_ERROR_LINE_CLASS` / `StoryErrorLine` | `truncate text-red-400/90` | 单行省略；**必须** `title={全文}` 悬停展示 |
 
 固定文案与用法：
@@ -371,7 +371,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 - 提示语 **不得** 用 `var(--canvas-muted)` 或蓝色 `#60a5fa`（已废弃）
 - 节点标题 / 菜单 / 状态 **不得** 用金黄或 muted 代替绿色
 - 错误 **不得** 用 amber 或 muted；非错误状态 **不得** 用红色
-- 橙色 `#fb923c` **仅**用于主按钮、Tab 选中、**@ 激活的参考图边框**
+- 橙色 `#fb923c` **仅**用于快手漫剧主按钮、Tab、**@ 激活参考图**；影视专业版用青色（§14）
 
 ### 8.2 新增 UI 自检
 
@@ -516,3 +516,121 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 - [ ] drop/paste 已 `stopPropagation`，不会误触画布建节点？
 - [ ] 文案含「点击 / 拖入 / 粘贴」？
 - [ ] 是否更新本文 §13 与 `.cursor/rules/canvas-story-design.mdc`？
+
+---
+
+## 14. 影视专业版（Story Pro）视觉规范
+
+与 **快手漫剧版**（橙色 `#fb923c`）并列的第二套工作流。节点类型前缀 `story-pro-*`；共用列组件通过 `edition: "pro"` 分流配色。
+
+**真源常量**：`lib/canvas/story-pro-node-chrome.ts` · **列/媒体分流**：`lib/canvas/story-edition-chrome.ts`（`storyEditionFromNodeType` → `story-pro-*` 为 pro）
+
+### 14.1 色彩分工（勿混用）
+
+| 语义 | 色 | 常量 / 函数 | 用途 |
+|------|-----|-------------|------|
+| **专业版主强调** | 青 `#22d3ee` / `cyan-400` | `PRO_NODE_ACCENT` · `storyEditionAccent("pro")` | 节点边框、底栏主钮、弹层 Tab/保存、批量生成、@ 激活参考图、生成中描边 |
+| **节点 chrome / 字段标签** | 翡翠 `emerald-300` | `PRO_HINT_LABEL_CLASS` · `STORY_ROW_SECTION_CLASS` | 表单标签、资产区标题、就绪状态（与 §8 绿色一致） |
+| **提示 / 前置条件** | 金黄 `amber-300` | `STORY_HINT_*`（§8，两版共用） | @ 说明、锁定占位、模型区标签 |
+| **错误** | 红 `red-400` | `StoryErrorLine`（§8，两版共用） | API / 校验失败 |
+| **入库 / 保存到资产库** | 青图标 + 翡翠 CTA | `StoryProAssetImportIcon` · `PRO_SAVE_TO_ASSETS_BTN_CLASS` | 槽位「入库」用 Layers 图标；「保存到项目资产」用翡翠描边钮 |
+
+**禁止**：专业版节点/弹层主操作使用橙色 `#fb923c`（仅快手版）；提示语勿用 `var(--canvas-muted)` 代替金黄（§8.1）。
+
+### 14.2 节点壳与底栏
+
+| 项 | 规范 |
+|----|------|
+| 外壳 | `ProNodeShell` · 渐变深底 · 边框 `PRO_NODE_ACCENT` / `PRO_NODE_BORDER` |
+| 底栏 | `PRO_NODE_SHELL_FOOTER_CLASS` · 顶部分割 `border-cyan-400/15` |
+| 主操作钮 | `PRO_NODE_ACTION_BTN_CLASS` / `_SPLIT_` · h-9 · 青描边实心 |
+| 列批量 | `storyEditionBatchBtnClass("pro")` → `STORY_PRO_BATCH_BTN_CLASS` |
+| 五阶段 | `StoryProStageRail` · 当前=青 · 已完成=翡翠 · 未开始=白/灰 |
+| 指引 | `StoryProGuidePanel` · `PRO_GUIDE_*` |
+
+控制节点尺寸：`STORY_PRO_CONTROL_NODE_WIDTH` × `STORY_PRO_CONTROL_NODE_HEIGHT`（1020×1200，与漫剧控制行对齐）。
+
+### 14.3 行内资产槽（人物四槽 / 场景三槽）
+
+| 项 | 常量 |
+|----|------|
+| 面板容器 | `PRO_ASSET_PANEL_CLASS` |
+| 槽位名 | `STORY_ROW_SUBLABEL_CLASS` |
+| 区标题 | `STORY_ROW_SECTION_CLASS` |
+| 提示条 | `STORY_ROW_BANNER_CLASS` + `StoryHintLine` |
+| 工具栏上传/锁/删 | `PRO_SLOT_TOOLBAR_BTN_CLASS` |
+| **入库** | `PRO_SLOT_IMPORT_BTN_CLASS` + `StoryProAssetImportIcon`（禁止「入库」二字） |
+| 次要行操作 | `PRO_ROW_SECONDARY_BTN_CLASS` |
+| 快捷保存三视图 | `PRO_ROW_PRIMARY_BTN_CLASS` |
+
+上传：§13 三入口；空槽文案含「拖入 / 粘贴」。
+
+### 14.4 媒体列（与快手共用组件）
+
+`story-column-media-panel` · `story-video-row-slot` · `story-row-prompt-field` 传入 `edition="pro"` 时：
+
+| 行为 | 函数 |
+|------|------|
+| @ 激活参考图边框 | `storyEditionActiveRefBorderClass("pro")` |
+| 生成中动画边框 | `storyEditionGeneratingBorderClass("pro")` |
+| 圆形生成/预览钮 | `storyEditionIconBtnClass` / `OverlayIconBtnClass` |
+| 分镜右下角生视频 | `storyEditionVideoOverlayBtnClass` |
+| 视频列重新生成 | `storyEditionCornerRegenBtnClass` |
+| 模型区标签 | `PRO_HINT_LABEL_CLASS`（pro）/ `STORY_HINT_LABEL_CLASS`（comic） |
+
+### 14.5 弹层
+
+| 弹层 | 顶栏 / Tab |
+|------|------------|
+| 故事剧本审阅 | `StoryScriptHubModal` · **`edition="pro"`**（由 `story-pro-script-hub-node` 传入） |
+| 导演提示词 | `StoryThemePromptModal` · **`proDirectorPack`** → 青 Tab/保存 |
+| 定稿剧本历史 | `StoryProFinalizedScriptModal` · `PRO_MODAL_HEADER_CLASS` |
+| 上传剧本预览 | `StoryProScriptUploadPreviewModal` · 同上 |
+| 审阅双栏正文 | 与 §4.2 相同（白卡片 + `MarkdownView document`） |
+
+Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtnClass` · `storyEditionModalOutlineBtnClass`。
+
+### 14.6 项目资产侧栏 / `/assets`
+
+| 项 | 常量 |
+|----|------|
+| 侧栏边框 | `border-cyan-400/15`（`PRO_ASSETS_SIDEBAR_BORDER_CLASS`） |
+| 列表卡片 | `PRO_ASSETS_CARD_CLASS` |
+| Tab 选中 | `PRO_ASSETS_TAB_ACTIVE_CLASS`（青，非翡翠） |
+| 标题图标 | `StoryProAssetImportIcon` · `ProjectAssetsPanelIcon` |
+
+### 14.7 组件核查清单（改 UI 时对照）
+
+| 组件 | 状态 | 要点 |
+|------|------|------|
+| `pro-node-shell.tsx` | ✅ | `PRO_NODE_ACCENT` 边框 |
+| `story-pro-starter-node.tsx` | ✅ | `PRO_*` 表单/底栏/模板 chip |
+| `story-pro-script-hub-node.tsx` | ✅ | 审阅弹层 `edition="pro"` |
+| `story-pro-style-node.tsx` | ✅ | `PRO_UPLOAD_DROPZONE` · `PRO_SAVE_TO_ASSETS` |
+| `story-pro-stage-rail.tsx` | ✅ | `PRO_STAGE_*` |
+| `story-pro-guide-panel.tsx` | ✅ | `PRO_GUIDE_*` |
+| `story-pro-character-asset-slots.tsx` | ✅ | 面板/工具栏/入库图标 |
+| `story-pro-scene-asset-slots.tsx` | ✅ | 同上 |
+| `story-pro-character-audio-slot.tsx` | ✅ | `STORY_ROW_SECTION` 绿标题 |
+| `story-pro-frame-row-extras.tsx` | ✅ | `PRO_ROW_SECONDARY` |
+| `story-character-column-node.tsx` | ✅ | `edition` 分流 + `PRO_ROW_PRIMARY` |
+| `story-frame-column-node.tsx` | ✅ | `edition="pro"` 媒体/标签 |
+| `story-video-column-node.tsx` | ✅ | 同上 |
+| `story-pro-scene-column-node.tsx` | ✅ | pro 列 |
+| `story-script-hub-modal.tsx` | ✅ | `edition` prop |
+| `story-theme-prompt-modal.tsx` | ✅ | `proDirectorPack` → 青 |
+| `story-pro-finalized-script-modal.tsx` | ✅ | `PRO_MODAL_HEADER` |
+| `story-pro-script-upload-preview-modal.tsx` | ✅ | 同上 |
+| `project-assets-view.tsx` | ✅ | Tab/卡片/链接常量 |
+| `my-project-character-assets-panel.tsx` | ✅ | 侧栏青边 + 资产图标 |
+| `story-column-media-panel.tsx` | ✅ | `storyEdition*` 分流 |
+| `story-column-batch-footer.tsx` | ✅ | `storyEditionBatchBtnClass` |
+| `jianying-export-pro-node.tsx` | — | 沿用 pro 节点壳 |
+
+### 14.8 新增专业版 UI 自检
+
+- [ ] 是否从 `story-pro-node-chrome.ts` / `story-edition-chrome.ts` 取类名，而非手写 `border-cyan-*`？
+- [ ] 共用弹层是否传入 `edition="pro"` 或 `proDirectorPack`？
+- [ ] 提示/错误是否仍走 §8 金黄/红，标题是否走绿 `PRO_HINT` / `STORY_ROW_SECTION`？
+- [ ] 入库是否用 `StoryProAssetImportIcon`，而非「入库」文案？
+- [ ] 是否更新本文 §14 与 `.cursor/rules/canvas-story-design.mdc`？

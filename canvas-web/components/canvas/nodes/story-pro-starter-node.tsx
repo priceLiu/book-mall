@@ -27,6 +27,7 @@ import {
   PRO_HINT_LABEL_CLASS,
   PRO_NODE_ACTION_BTN_CLASS,
   PRO_TEMPLATE_CHIP_CLASS,
+  PRO_TEMPLATE_CHIP_SELECTED_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { StoryThemePromptPreviewPane } from "../story-theme-prompt-preview-pane";
@@ -603,7 +604,7 @@ export function StoryProStarterNode({ id, data, selected }: NodeProps) {
                 onClick={onPickScriptFile}
                 className={`nodrag inline-flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded border border-dashed px-2 py-2 text-[11px] transition disabled:cursor-not-allowed disabled:opacity-45 ${
                   dragOver
-                    ? "border-cyan-300/70 bg-cyan-500/20 text-cyan-50"
+                    ? PRO_TEMPLATE_CHIP_SELECTED_CLASS
                     : "border-cyan-400/30 bg-cyan-500/8 text-cyan-100/90 hover:border-cyan-400/50 hover:bg-cyan-500/14"
                 }`}
               >
