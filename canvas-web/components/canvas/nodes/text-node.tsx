@@ -7,7 +7,7 @@ import { Edit3, FilePlus2 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { TextNodeData } from "@/lib/canvas/types";
 import { CANVAS_TEXT_TEMPLATES } from "@/lib/canvas/text-templates";
-import { RF_NODE_SCROLL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { RF_FORM_CONTROL, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { NodeShell } from "../node-shell";
 
 export function TextNode({ id, data, selected }: NodeProps) {
@@ -92,7 +92,7 @@ export function TextNode({ id, data, selected }: NodeProps) {
             onChange={(e) => onTextChange(e.target.value)}
             readOnly={piped}
             placeholder={piped ? "等待上游 AI 引擎写入…" : "例如：极简风格，紫色主调"}
-            className={`${RF_NODE_SCROLL} h-full w-full resize-none rounded-md border border-white/10 bg-black/30 p-2 text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+            className={`${RF_FORM_CONTROL} h-full w-full resize-none rounded-md border border-white/10 bg-black/30 p-2 text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
           />
           {piped ? (
             <button
@@ -114,7 +114,7 @@ export function TextNode({ id, data, selected }: NodeProps) {
             <FilePlus2 className="size-3" /> 插入模板
           </button>
           {tplOpen ? (
-            <div className={`nodrag absolute bottom-full left-0 z-30 mb-1 w-72 max-h-64 overflow-y-auto rounded-md border border-white/15 bg-black/95 text-[12px] shadow-2xl ${RF_NO_WHEEL}`}>
+            <div className={`${RF_NODE_SCROLL} absolute bottom-full left-0 z-30 mb-1 w-72 max-h-64 overflow-y-auto rounded-md border border-white/15 bg-black/95 text-[12px] shadow-2xl`}>
               {CANVAS_TEXT_TEMPLATES.map((t) => (
                 <button
                   key={t.id}

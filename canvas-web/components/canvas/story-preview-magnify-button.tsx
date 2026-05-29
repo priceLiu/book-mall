@@ -26,7 +26,7 @@ export function StoryPreviewMagnifyButton({
       title="打开预览"
       aria-label="打开预览"
       className={cn(
-        "nodrag nowheel pointer-events-auto inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border transition",
+        "nodrag pointer-events-auto inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border transition",
         variant === "onDark"
           ? "border-[#fb923c]/40 bg-[#fb923c]/15 text-[#fdba74] hover:bg-[#fb923c]/25"
           : "border-neutral-200 bg-white text-[#ea580c] shadow-sm hover:border-[#fb923c]/50 hover:bg-white",

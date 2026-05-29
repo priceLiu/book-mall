@@ -1,7 +1,8 @@
 "use client";
 
 import type { CanvasParamSchema } from "@/lib/canvas-providers-api";
-import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
+import { RF_FORM_CONTROL, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 
 export type DynamicParamFormProps = {
   schema: CanvasParamSchema | null | undefined;
@@ -165,7 +166,7 @@ function PanelField({
               step={step}
               value={num}
               onChange={(e) => onPatch(Number(e.target.value))}
-              className="RF_NODE_SCROLL flex-1 accent-[var(--canvas-accent,#a78bfa)]"
+              className={`${RF_NODE_SCROLL} flex-1 accent-[var(--canvas-accent,#a78bfa)]`}
             />
             <span className="min-w-[3.5rem] rounded-md border border-white/15 px-2 py-1 text-center text-[12px] text-white/85">
               {num}
@@ -192,7 +193,7 @@ function PanelField({
             const v = e.target.value === "" ? undefined : Number(e.target.value);
             onPatch(v);
           }}
-          className="RF_NODE_SCROLL mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[13px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+          className={`${RF_NODE_SCROLL} mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[13px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
         />
         {item.help ? (
           <p className="mt-1 text-[10px] text-white/45">{item.help}</p>
@@ -209,7 +210,7 @@ function PanelField({
           type="checkbox"
           checked={checked}
           onChange={(e) => onPatch(e.target.checked)}
-          className="RF_NODE_SCROLL mt-0.5 accent-[var(--canvas-accent,#a78bfa)]"
+          className={`${RF_NODE_SCROLL} mt-0.5 accent-[var(--canvas-accent,#a78bfa)]`}
         />
         <span>
           <span className="font-medium text-white">{item.label}</span>
@@ -230,7 +231,8 @@ function PanelField({
           value={typeof cur === "string" ? cur : item.defaultValue ?? ""}
           placeholder={item.placeholder}
           onChange={(e) => onPatch(e.target.value)}
-          className="RF_NODE_SCROLL mt-2 w-full resize-y rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+          onWheel={onCanvasFormWheel}
+          className={`${RF_FORM_CONTROL} mt-2 max-h-40 overflow-y-auto resize-y rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
         />
         {item.help ? (
           <p className="mt-1 text-[10px] text-white/45">{item.help}</p>
@@ -247,7 +249,7 @@ function PanelField({
         value={typeof cur === "string" ? cur : item.defaultValue ?? ""}
         placeholder={item.placeholder}
         onChange={(e) => onPatch(e.target.value)}
-        className="RF_NODE_SCROLL mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[13px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+        className={`${RF_NODE_SCROLL} mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[13px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
       />
       {item.help ? (
         <p className="mt-1 text-[10px] text-white/45">{item.help}</p>
@@ -276,7 +278,8 @@ function CompactField({
         <select
           value={String(cur ?? item.defaultValue ?? "")}
           onChange={(e) => onPatch(e.target.value)}
-          className="RF_NODE_SCROLL mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+          onWheel={onCanvasFormWheel}
+          className={`${RF_FORM_CONTROL} mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
         >
           {item.options.map((o) => (
             <option key={o.value} value={o.value}>
@@ -303,7 +306,7 @@ function CompactField({
             const v = e.target.value === "" ? undefined : Number(e.target.value);
             onPatch(v);
           }}
-          className="RF_NODE_SCROLL mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+          className={`${RF_NODE_SCROLL} mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
         />
       </label>
     );
@@ -316,7 +319,7 @@ function CompactField({
           type="checkbox"
           checked={checked}
           onChange={(e) => onPatch(e.target.checked)}
-          className="RF_NODE_SCROLL"
+          className={RF_NODE_SCROLL}
         />
         <span>{item.label}</span>
       </label>
@@ -333,7 +336,8 @@ function CompactField({
           value={typeof cur === "string" ? cur : item.defaultValue ?? ""}
           placeholder={item.placeholder}
           onChange={(e) => onPatch(e.target.value)}
-          className="RF_NODE_SCROLL mt-0.5 w-full resize-none rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+          onWheel={onCanvasFormWheel}
+          className={`${RF_FORM_CONTROL} mt-0.5 max-h-32 w-full resize-none overflow-y-auto rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
         />
       </label>
     );
@@ -348,7 +352,7 @@ function CompactField({
         value={typeof cur === "string" ? cur : item.defaultValue ?? ""}
         placeholder={item.placeholder}
         onChange={(e) => onPatch(e.target.value)}
-        className="RF_NODE_SCROLL mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none"
+        className={`${RF_NODE_SCROLL} mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
       />
     </label>
   );

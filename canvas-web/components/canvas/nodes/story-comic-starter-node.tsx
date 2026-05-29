@@ -278,7 +278,7 @@ export function StoryComicStarterNode({ id, data, selected }: NodeProps) {
         minHeight={STORY_CONTROL_NODE_HEIGHT}
         outputs={[{ id: "text", label: "创意", kind: "text" }]}
         headerRight={
-          <div className="nodrag nowheel pointer-events-auto flex shrink-0 items-center gap-1.5">
+          <div className="nodrag pointer-events-auto flex shrink-0 items-center gap-1.5">
             <StoryPreviewMagnifyButton
               variant="onDark"
               onClick={() => setPromptModalOpen(true)}

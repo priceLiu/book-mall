@@ -3,12 +3,14 @@
 import { useMemo } from "react";
 import {
   Background,
+  PanOnScrollMode,
   ReactFlow,
   ReactFlowProvider,
   type DefaultEdgeOptions,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
 import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
 import {
@@ -48,7 +50,11 @@ function TemplateReadonlyCanvasInner({ graph }: { graph: CanvasGraph }) {
       edgesFocusable={false}
       nodesFocusable={false}
       panOnDrag
-      zoomOnScroll
+      panOnScroll
+      panOnScrollMode={PanOnScrollMode.Free}
+      zoomOnScroll={false}
+      zoomActivationKeyCode="Control"
+      noWheelClassName="nowheel"
       selectionOnDrag={false}
       deleteKeyCode={null}
       fitView
@@ -64,7 +70,10 @@ function TemplateReadonlyCanvasInner({ graph }: { graph: CanvasGraph }) {
 export function TemplateReadonlyCanvas({ graph }: { graph: CanvasGraph }) {
   return (
     <ReactFlowProvider>
-      <div className="h-full w-full [&_.react-flow__edge]:pointer-events-none [&_.react-flow__node]:pointer-events-none">
+      <div
+        className="h-full w-full [&_.react-flow__edge]:pointer-events-none [&_.react-flow__node]:pointer-events-none"
+        onWheelCapture={onCanvasFormWheel}
+      >
         <TemplateReadonlyCanvasInner graph={graph} />
       </div>
     </ReactFlowProvider>

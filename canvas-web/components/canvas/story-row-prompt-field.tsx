@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   storyRefIdsFromPrompt,
   STORY_UPSTREAM_COL_WIDTH,
-  STORY_UPSTREAM_REF_GRID_COLS,
   type StoryRefImage,
 } from "@/lib/canvas/story-ref-image";
 import type { MentionableItem } from "./mentions/MentionsTextarea";
@@ -18,7 +17,7 @@ import {
   STORY_FRAME_ROW_STRIP_H,
 } from "@/lib/canvas/story-column-layout";
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
-import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { RF_FORM_CONTROL, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import type { StoryEdition } from "@/lib/canvas/story-edition-chrome";
 import {
   storyEditionActiveRefBorderClass,
@@ -48,7 +47,7 @@ function StoryRowTitleBadge({ title }: { title: string }) {
   );
 }
 
-/** 上游 @ 参考图：3 列宫格，悬停 Eye 预览、点击全屏预览 */
+/** 上游 @ 参考图：单槽 fill；多图时左右切换，悬停 Eye、点击全屏预览 */
 function StoryUpstreamImageColumn({
   images,
   activeIds,
@@ -66,6 +65,29 @@ function StoryUpstreamImageColumn({
   generating?: boolean;
 }) {
   const h = stripHeight ?? ROW_MEDIA_MIN_H;
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    setIndex((i) => {
+      if (images.length === 0) return 0;
+      return Math.min(i, images.length - 1);
+    });
+  }, [images]);
+
+  const current = images[index];
+  const multi = images.length > 1;
+  const active = current ? activeIds.includes(current.id) : false;
+  const canPreview = Boolean(current?.url && onPreviewRef);
+
+  const step = (delta: number) => {
+    if (images.length < 2) return;
+    setIndex((i) => (i + delta + images.length) % images.length);
+  };
+
+  const stopNodeDrag = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
     <div
       className="flex shrink-0 self-start"
@@ -77,73 +99,86 @@ function StoryUpstreamImageColumn({
     >
       <div
         className={cn(
-          "relative h-full w-full overflow-y-auto overflow-x-hidden rounded-md border border-white/10 bg-black/25 p-1",
+          "relative h-full w-full overflow-hidden rounded-md border border-white/10 bg-black/25",
           RF_NODE_SCROLL,
+          active && storyEditionActiveRefBorderClass(edition),
           generating && storyEditionGeneratingBorderClass(edition),
         )}
       >
-        {images.length ? (
+        {current ? (
           <div
-            className="grid content-start items-start gap-1"
-            style={{
-              gridTemplateColumns: `repeat(${STORY_UPSTREAM_REF_GRID_COLS}, minmax(0, 1fr))`,
-              gridAutoRows: "min-content",
+            className={cn(
+              "group/ref-fill relative h-full w-full",
+              canPreview && !generating && "cursor-pointer",
+            )}
+            title={current.label}
+            onClick={() => {
+              if (canPreview && !generating) onPreviewRef!(current.url!, current.label);
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && canPreview) {
+                onPreviewRef!(current.url!, current.label);
+              }
+            }}
+            role={canPreview ? "button" : undefined}
+            tabIndex={canPreview ? 0 : undefined}
           >
-            {images.map((ref) => {
-              const active = activeIds.includes(ref.id);
-              const canPreview = Boolean(ref.url && onPreviewRef);
-              return (
-                <div
-                  key={ref.id}
-                  title={ref.label}
-                  className={cn(
-                    "group/ref-thumb relative aspect-square overflow-hidden rounded border bg-black/40 transition-shadow",
-                    active
-                      ? storyEditionActiveRefBorderClass(edition)
-                      : "border-white/15",
-                    canPreview && !generating && "cursor-pointer",
-                  )}
-                  onClick={() => {
-                    if (canPreview && !generating) onPreviewRef!(ref.url!, ref.label);
+            {current.url ? (
+              <>
+                <Image
+                  src={current.url}
+                  alt={current.label}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+                {onPreviewRef && !generating ? (
+                  <span
+                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover/ref-fill:opacity-100"
+                    aria-hidden
+                  >
+                    <Eye className="size-5 text-white/90" />
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <span className="flex h-full items-center justify-center px-2 text-center text-[10px] text-[var(--canvas-muted)]">
+                待上游
+              </span>
+            )}
+
+            {multi && !generating ? (
+              <>
+                <button
+                  type="button"
+                  className="nodrag absolute left-1 top-1/2 z-20 flex size-7 -translate-y-1/2 items-center justify-center rounded-md border border-white/15 bg-black/65 text-white/85 shadow-md transition hover:border-white/35 hover:bg-black/80"
+                  aria-label="上一张参考图"
+                  onClick={(e) => {
+                    stopNodeDrag(e);
+                    step(-1);
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && canPreview) {
-                      onPreviewRef!(ref.url!, ref.label);
-                    }
-                  }}
-                  role={canPreview ? "button" : undefined}
-                  tabIndex={canPreview ? 0 : undefined}
                 >
-                  {ref.url ? (
-                    <>
-                      <Image
-                        src={ref.url}
-                        alt={ref.label}
-                        fill
-                        className="object-contain"
-                        unoptimized
-                      />
-                      {onPreviewRef && !generating ? (
-                        <span
-                          className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover/ref-thumb:opacity-100"
-                          aria-hidden
-                        >
-                          <Eye className="size-4 text-white/90" />
-                        </span>
-                      ) : null}
-                    </>
-                  ) : (
-                    <span className="flex h-full items-center justify-center px-0.5 text-center text-[7px] leading-tight text-[var(--canvas-muted)]">
-                      待上游
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+                  <ChevronLeft className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  className="nodrag absolute right-1 top-1/2 z-20 flex size-7 -translate-y-1/2 items-center justify-center rounded-md border border-white/15 bg-black/65 text-white/85 shadow-md transition hover:border-white/35 hover:bg-black/80"
+                  aria-label="下一张参考图"
+                  onClick={(e) => {
+                    stopNodeDrag(e);
+                    step(1);
+                  }}
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+                <span className="pointer-events-none absolute bottom-1 right-1 z-20 rounded bg-black/60 px-1.5 py-0.5 text-[9px] tabular-nums text-white/75">
+                  {index + 1}/{images.length}
+                </span>
+              </>
+            ) : null}
           </div>
         ) : (
-          <div className="flex h-full min-h-[72px] items-center justify-center rounded border border-dashed border-white/12">
+          <div className="flex h-full min-h-[72px] items-center justify-center border border-dashed border-white/12">
             <span className="text-[8px] text-[var(--canvas-muted)]">—</span>
           </div>
         )}
@@ -280,7 +315,7 @@ export function StoryColumnRowCard({
   frameApproved?: boolean;
   videoBlockReason?: string | null;
   onApproveFrame?: () => void;
-  /** 分镜图生成中时参考图宫格 shimmer（默认与 generating 相同） */
+  /** 分镜图生成中时参考图列 shimmer（默认与 generating 相同） */
   upstreamGenerating?: boolean;
   belowPrompt?: React.ReactNode;
   /** 分镜列：文案/参考/输出同高横条，元信息沉底 */
@@ -405,7 +440,7 @@ export function StoryColumnRowCard({
         compactFrameLayout ? "h-full" : "min-h-[var(--row-media-min,248px)]",
       )}
       className={cn(
-        `${RF_NODE_SCROLL} w-full resize-none rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`,
+        `${RF_FORM_CONTROL} w-full resize-none rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`,
         compactFrameLayout
           ? "min-h-0 flex-1 overflow-y-auto"
           : "h-full min-h-[var(--row-media-min,248px)] overflow-hidden",

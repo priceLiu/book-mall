@@ -32,9 +32,9 @@ export function StoryHubNodePreviewPane({
       role={hasContent ? "button" : undefined}
       tabIndex={hasContent ? 0 : undefined}
       aria-label={hasContent ? "打开预览" : undefined}
-      className={`nodrag nowheel group/paper relative h-full min-h-0 rounded-md border shadow-inner transition duration-200 ${
+      className={`${RF_NODE_SCROLL} group/paper relative h-full min-h-0 rounded-md border shadow-inner transition duration-200 ${
         hasContent
-          ? `cursor-pointer border-white/15 bg-neutral-50 hover:border-[#fb923c]/55 hover:bg-neutral-100 hover:shadow-[0_0_0_1px_rgba(251,146,60,0.25),inset_0_0_0_1px_rgba(251,146,60,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#fb923c]/70 ${RF_NODE_SCROLL} overflow-y-auto nowheel`
+          ? `cursor-pointer border-white/15 bg-neutral-50 hover:border-[#fb923c]/55 hover:bg-neutral-100 hover:shadow-[0_0_0_1px_rgba(251,146,60,0.25),inset_0_0_0_1px_rgba(251,146,60,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#fb923c]/70 overflow-y-auto`
           : "flex cursor-default items-center justify-center border-white/15 bg-neutral-50/80"
       }`}
       onPointerDown={blockBubble}

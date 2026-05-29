@@ -21,7 +21,7 @@ export function StoryVideoPromptPopover({
   return (
     <div
       className={cn(
-        "nodrag nowheel pointer-events-auto absolute left-[calc(100%+8px)] top-0 z-30 hidden w-[min(380px,calc(100vw-300px))] max-h-[min(72vh,560px)] flex-col overflow-hidden rounded-lg border border-white/15 bg-black/94 shadow-2xl",
+        "nodrag pointer-events-auto absolute left-[calc(100%+8px)] top-0 z-30 hidden w-[min(380px,calc(100vw-300px))] max-h-[min(72vh,560px)] flex-col overflow-hidden rounded-lg border border-white/15 bg-black/94 shadow-2xl",
         groupHoverClass,
         className,
       )}

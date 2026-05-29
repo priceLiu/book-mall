@@ -41,7 +41,7 @@ export function StoryThemePromptPreviewPane({
             ? "cursor-pointer border-white/15 bg-black hover:border-[#fb923c]/55 hover:shadow-[0_0_0_1px_rgba(251,146,60,0.25)]"
             : "cursor-pointer border-dashed border-white/20 bg-black/80 hover:border-[#fb923c]/40"
           : "cursor-default border-white/15 bg-black/90"
-      } ${hasContent ? `${RF_NODE_SCROLL} overflow-y-auto nowheel` : "flex items-center justify-center"}`}
+      } ${hasContent ? `${RF_NODE_SCROLL} overflow-y-auto` : "flex items-center justify-center"}`}
       onPointerDown={blockBubble}
       onMouseDown={blockBubble}
       onClick={openPreview}

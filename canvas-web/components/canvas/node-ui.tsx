@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Play, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { RF_NODE_SCROLL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { RF_FORM_CONTROL, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 
 /** 含图片/视频的节点统一尺寸（与 types.NODE_DEFAULT_SIZE 对齐） */
 export const NODE_MEDIA_MIN_WIDTH = 380;
@@ -23,14 +23,14 @@ export const NODE_STORY_FRAME_SPLIT_MIN_H = 240;
 export const NODE_THREE_VIEW_MIN_WIDTH = 670;
 export const NODE_THREE_VIEW_MIN_HEIGHT = 880;
 
-export const NODE_THREE_VIEW_PROMPT_CLASS = `${RF_NODE_SCROLL} max-h-[72px] min-h-[52px] w-full resize-none rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[11px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
+export const NODE_THREE_VIEW_PROMPT_CLASS = `${RF_FORM_CONTROL} max-h-[72px] min-h-[52px] w-full resize-none overflow-y-auto rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[11px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
 
-export const NODE_STORY_FRAME_PROMPT_CLASS = `${RF_NODE_SCROLL} min-h-0 flex-1 w-full resize-none rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[12px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
+export const NODE_STORY_FRAME_PROMPT_CLASS = `${RF_FORM_CONTROL} min-h-0 flex-1 w-full resize-none overflow-y-auto rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[12px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
 
 export const NODE_SECTION_LABEL =
   "shrink-0 text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]";
 
-export const NODE_PROMPT_CLASS = `${RF_NODE_SCROLL} max-h-[120px] min-h-[64px] w-full resize-y rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
+export const NODE_PROMPT_CLASS = `${RF_FORM_CONTROL} max-h-[120px] min-h-[64px] w-full resize-y overflow-y-auto rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
 
 const BTN_BASE =
   "nodrag inline-flex items-center justify-center gap-1 rounded-md font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
@@ -213,7 +213,7 @@ export function NodeHistoryStrip({
   return (
     <div className="space-y-1">
       <p className={NODE_SECTION_LABEL}>{label}</p>
-      <div className={cn("flex gap-1 overflow-x-auto pb-1", RF_NO_WHEEL)}>
+      <div className={cn("flex gap-1 overflow-x-auto pb-1", RF_NODE_SCROLL)}>
         {children}
       </div>
     </div>

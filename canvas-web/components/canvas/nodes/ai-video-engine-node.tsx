@@ -33,13 +33,13 @@ import { CanvasVideoPreviewSlot } from "../canvas-video-preview-slot";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { EnginePicker } from "../engine-picker";
 import { EnginePreviewTrigger } from "../engine-preview-trigger";
-import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
 import {
   NodeEngineFooter,
   NodeEngineShellFooter,
 } from "../node-ui";
 
-const REF_VIDEO_PROMPT_CLASS = `${RF_NODE_SCROLL} h-full min-h-0 w-full flex-1 resize-none rounded-md border border-white/10 bg-black/30 p-2.5 font-mono text-[12px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
+const REF_VIDEO_PROMPT_CLASS = `${RF_FORM_CONTROL} h-full min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-md border border-white/10 bg-black/30 p-2.5 font-mono text-[12px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
 const REF_VIDEO_PREVIEW_CLASS = "h-full min-h-0 w-full";
 
 function useElapsedMinutes(sinceIso: string | null | undefined): number | null {

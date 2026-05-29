@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { GripHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { RF_NO_DRAG, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
 import type { AiVideoEngineNodeData } from "@/lib/canvas/types";
 
 /** 视频预览区占分隔容器高度比例（0–1） */
@@ -172,7 +172,6 @@ export function CanvasPromptVideoSplit({
         aria-valuenow={Math.round(displayRatio * 100) / 100}
         className={cn(
           RF_NO_DRAG,
-          RF_NO_WHEEL,
           "relative z-10 flex shrink-0 cursor-row-resize touch-none select-none items-center justify-center",
           dragging ? "h-4" : "h-3",
         )}
