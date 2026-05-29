@@ -209,6 +209,25 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 
 新增/改版顶部 UI 时须对照本节；常量与类名优先收口到 `node-palette.tsx`，避免在页面层重复写布局。
 
+### 3.7 画布视口 · 鼠标滚轮
+
+**适用范围**：`FlowCanvas`（`flow-canvas.tsx`）、模板只读预览（`template-readonly-canvas.tsx`）、画布项目页（`canvas-page-client.tsx` 文档级拦截）。
+
+| 操作 | 行为 |
+|------|------|
+| 滚轮（画布内任意位置，**除**下方表单控件） | **平移**视口（`panOnScroll` + `PanOnScrollMode.Free`；横向可用 Shift+滚轮） |
+| **Ctrl + 滚轮** | **缩放**（`zoomOnScroll={false}` + `zoomActivationKeyCode="Control"`） |
+| Space + 拖 / 中键·右键拖 | 平移（与改前一致） |
+| 拖空白 | 框选（`selectionOnDrag`） |
+
+**文本框 / 原生 `<select>`**：
+
+- 类名：`RF_FORM_CONTROL`（仅 `nodrag`，**禁止** `nowheel`），真源 `lib/canvas/react-flow-classes.ts`。
+- 滚轮 **不** 滚动框内内容，**与节点其它区域相同** 用于 **平移画布**；浏览超长文案仅 **拖动滚动条**（`overflow-y-auto` + `max-h-*` / 分隔布局）。
+- 实现：`canvas-form-wheel.ts` 在控件上 `preventDefault`（不 `stopPropagation`）；`CanvasPromptTextarea` 默认 `RF_FORM_CONTROL` + `onWheel`。
+
+节点内 **预览区 / 画廊 / 按钮 / 节点外壳滚动区**（`RF_NODE_SCROLL` = 仅 `nodrag`）与空白处相同：**滚轮平移画布**（不再使用 `nowheel` 阻断）。
+
 ---
 
 ## 4. 弹出层
@@ -394,8 +413,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 ### 7.1 分镜行 · 上游参考图（对比参照）
 
 - 宽 **220**，与分镜图条同高 **248**（`STORY_FRAME_ROW_STRIP_H`）
-- 布局：**3 列宫格**（`STORY_UPSTREAM_REF_GRID_COLS`），`content-start` + `grid-auto-rows: min-content`（**禁止** `min-h-full` 撑开行距）
-- 多图时列内 **纵向滚动**（`StoryUpstreamImageColumn`）
+- 布局：**单槽 fill**（`object-cover` 铺满列高）；多图时 **左右 `<` `>`** 切换（`StoryUpstreamImageColumn`），角标 `当前/总数`
 - 被 `@` 引用的图：快手 **橙框** / 专业版 **青框** — `storyEditionActiveRefBorderClass(edition)`
 - 未引用：`border-white/15`
 - 有图：悬停居中 **Eye**；**点击** → `StoryMediaPreviewModal`（生成中隐藏 Eye，见 §15.3）
@@ -774,9 +792,9 @@ Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtn
 
 左列实现要点：
 
-1. `storyEditionGeneratingBorderClass` 加在 **满高** 滚动外框（`h-full w-full`），不是宫格 `grid` 内层。
-2. 宫格 `grid content-start items-start`，`grid-auto-rows: min-content`；**禁止** `min-h-full`（会导致行轨均分、中间留白）。
-3. 生成中：`pointer-events` 禁用预览；不渲染 Eye overlay。
+1. `storyEditionGeneratingBorderClass` 加在 **满高** 外框（`h-full w-full overflow-hidden`）。
+2. 单图 **`object-cover` fill**；多图时 **左右 Chevron** + 角标 `n/total`（`StoryUpstreamImageColumn`）。
+3. 生成中：`pointer-events` 禁用预览与切换；不渲染 Eye overlay。
 
 右列实现要点：`StoryColumnMediaPanel` 内层 `absolute inset-0` + generating class；overlay 内 `RefreshCw` + `storyEditionSpinClass`。
 
@@ -795,9 +813,9 @@ Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtn
 
 ### 15.5 禁止事项
 
-1. **禁止**在 @ 参考图宫格或单格上加 `RefreshCw` / 旋转圈。
-2. **禁止**对每个缩略图单独挂 `canvas-story-media-generating`（会变成「多宫格各自扫光」）。
-3. **禁止**宫格 `min-h-full` / 默认 `1fr` 行高撑满列高。
+1. **禁止**在 @ 参考图槽上加 `RefreshCw` / 旋转圈。
+2. **禁止**恢复 3 列小图宫格（多图须用左右切换，单槽 fill）。
+3. **禁止**参考图列 `overflow-y` 纵向滚一堆缩略图。
 4. **禁止**列内预览悬停改用 Search；节点头审阅放大镜仍用 `StoryPreviewMagnifyButton`（Search）。
 5. 专业版生成中 **禁止**橙色扫光（须 `canvas-story-media-generating-pro`）。
 
@@ -806,6 +824,6 @@ Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtn
 - [ ] 扫光是否只 via `storyEditionGeneratingBorderClass` + `globals.css`？
 - [ ] 左 @ 列是否仅整列外框扫光、无旋转圈？
 - [ ] 右输出列是否在扫光上叠加 `RefreshCw` spin？
-- [ ] 宫格是否 `content-start`，无中间空行？
+- [ ] 多图参考是否仅左右切换 + fill，无小图宫格？
 - [ ] 悬停预览是否 **Eye**（非 Search）？
 - [ ] 是否更新本文 §15 与 `.cursor/rules/canvas-story-design.mdc`？

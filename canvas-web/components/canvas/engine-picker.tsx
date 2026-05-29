@@ -116,7 +116,7 @@ export function EnginePicker({
           e.stopPropagation();
           setOpen(true);
         }}
-        className="nodrag nowheel flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[12px] text-white hover:border-white/30"
+        className="nodrag flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-left text-[12px] text-white hover:border-white/30"
       >
         <span className="truncate">
           {loading ? (

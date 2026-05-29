@@ -6,6 +6,7 @@ import { LayoutTemplate, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { blockCanvasFormWheelScroll } from "@/lib/canvas/canvas-form-wheel";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { ScriptWritingAssistantPanel } from "@/components/canvas/script-writing-assistant-panel";
@@ -123,6 +124,13 @@ function Inner({ projectId }: { projectId: string }) {
   const [myProjectCharacterAssetsOpen, setMyProjectCharacterAssetsOpen] =
     useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => blockCanvasFormWheelScroll(e);
+    document.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    return () =>
+      document.removeEventListener("wheel", onWheel, { capture: true });
+  }, []);
 
   /** 加载完成时的节点数；用于阻止误把「有内容的画布」自动保存成空。 */
   const loadedNodeCountRef = useRef(0);

@@ -25,10 +25,10 @@ export const PRO_HINT_LABEL_CLASS =
   "text-[10px] font-medium uppercase tracking-wider text-emerald-300/85";
 
 export const PRO_SELECT_CLASS =
-  "w-full rounded border border-cyan-400/20 bg-black/40 px-2 py-1.5 text-[12px] text-white disabled:cursor-not-allowed disabled:opacity-45";
+  "nodrag w-full rounded border border-cyan-400/20 bg-black/40 px-2 py-1.5 text-[12px] text-white disabled:cursor-not-allowed disabled:opacity-45";
 
 export const PRO_TEXTAREA_CLASS =
-  "w-full resize-y rounded border border-cyan-400/20 bg-black/40 px-2 py-1.5 text-[12px] text-white disabled:cursor-not-allowed disabled:opacity-45";
+  "nodrag w-full resize-y overflow-y-auto rounded border border-cyan-400/20 bg-black/40 px-2 py-1.5 text-[12px] text-white disabled:cursor-not-allowed disabled:opacity-45";
 
 export const PRO_TEMPLATE_CHIP_CLASS =
   "nodrag rounded border border-cyan-400/15 bg-cyan-500/8 px-1.5 py-0.5 text-[10px] text-cyan-100/90 transition hover:border-cyan-400/45 hover:bg-cyan-500/18 disabled:cursor-not-allowed disabled:opacity-40";

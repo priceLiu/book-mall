@@ -7,7 +7,7 @@ import { Play, RefreshCw, Sparkles } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { AiEngineNodeData } from "@/lib/canvas/types";
 import { resolveReferencedNodeIds } from "@/lib/canvas/referenced-nodes";
-import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { RF_FORM_CONTROL, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { NodeShell } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 import { PromptTemplatePicker } from "../prompt-template-picker";
@@ -140,7 +140,7 @@ export function AiEngineNode({ id, data, selected }: NodeProps) {
             mentionables={mentionables}
             placeholder="连接产品图 + 风格图后，选用提示词模板或自行编辑；@ 可引用上游节点"
             wrapperClassName="flex h-full min-h-0 flex-col"
-            className={`${RF_NODE_SCROLL} h-full min-h-[120px] w-full flex-1 resize-none rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+            className={`${RF_FORM_CONTROL} h-full min-h-[120px] w-full flex-1 resize-none rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[12px] text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
           />
         </div>
 

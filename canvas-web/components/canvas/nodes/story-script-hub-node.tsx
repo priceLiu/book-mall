@@ -448,7 +448,7 @@ export function StoryScriptHubNode({ id, data, selected }: NodeProps) {
         inputs={[{ id: "in_text", label: "创意", kind: "text" }]}
         outputs={[{ id: "text", label: "文案", kind: "text" }]}
         headerRight={
-          <div className="nodrag nowheel pointer-events-auto flex shrink-0 items-center gap-1.5">
+          <div className="nodrag pointer-events-auto flex shrink-0 items-center gap-1.5">
             <StoryPreviewMagnifyButton
               variant="onDark"
               onClick={() => openPreview(activeSection)}

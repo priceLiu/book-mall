@@ -13,7 +13,7 @@ import {
   type CSSProperties,
 } from "react";
 
-import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
 import { MentionPickerPortal } from "./mention-picker-portal";
 
 export type MentionableItem = {
@@ -277,7 +277,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           aria-label={ariaLabel}
           className={
             className ??
-            `${RF_NODE_SCROLL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none${fillHeight ? " min-h-0 flex-1 h-full overflow-y-auto" : ""}`
+            `${RF_FORM_CONTROL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none${fillHeight ? " min-h-0 flex-1 h-full overflow-y-auto" : ""}`
           }
           style={style}
         />

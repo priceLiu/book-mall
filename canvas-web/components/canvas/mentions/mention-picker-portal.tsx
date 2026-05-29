@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { GripVertical, X } from "lucide-react";
-import { RF_NODE_DRAG_HANDLE, RF_NO_DRAG, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { RF_NODE_DRAG_HANDLE, RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
 import type { MentionableItem } from "./MentionsTextarea";
 
 const ITEM_W = 200;
@@ -113,7 +113,7 @@ export function MentionPickerPortal({
 
   return createPortal(
     <div
-      className={`${RF_NO_DRAG} ${RF_NO_WHEEL} nopan fixed z-[1200] flex flex-col overflow-hidden rounded-xl border border-white/15 bg-[#141414]/98 shadow-2xl backdrop-blur-md`}
+      className={`${RF_NO_DRAG} nopan fixed z-[1200] flex flex-col overflow-hidden rounded-xl border border-white/15 bg-[#141414]/98 shadow-2xl backdrop-blur-md`}
       style={{
         left,
         top,

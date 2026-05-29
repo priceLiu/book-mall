@@ -46,7 +46,7 @@ export const STORY_NODE_ENGINE_DOCK_CLASS =
 
 /** 故事主题 / 大纲 · 预览滚动区外壳 */
 export const STORY_NODE_PREVIEW_SCROLL_CLASS =
-  "nodrag nowheel min-h-0 flex-1 overflow-y-auto";
+  "nodrag min-h-0 flex-1 overflow-y-auto";
 
 function storyThemeTemplateOneContent(): string {
   const hit = STORY_THEME_SYSTEM_PROMPT_TEMPLATES.find(

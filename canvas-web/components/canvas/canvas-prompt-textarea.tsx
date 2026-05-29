@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
+import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
+import { cn } from "@/lib/utils";
 
 type CanvasPromptTextareaProps = {
   value: string;
@@ -45,7 +48,12 @@ export function CanvasPromptTextarea({
       placeholder={placeholder}
       disabled={disabled}
       aria-label={ariaLabel}
-      className={className}
+      className={cn(
+        RF_FORM_CONTROL,
+        "overflow-y-auto",
+        className,
+      )}
+      onWheel={onCanvasFormWheel}
       onChange={(e) => {
         const next = e.target.value;
         setDraft(next);

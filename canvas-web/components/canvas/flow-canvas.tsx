@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Background,
   MiniMap,
+  PanOnScrollMode,
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
@@ -21,6 +22,7 @@ import {
   registerCanvasViewportPlacement,
   unregisterCanvasViewportPlacement,
 } from "@/lib/canvas/viewport-placement";
+import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
 import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 import { ImageNode } from "./nodes/image-node";
 import { TextNode } from "./nodes/text-node";
@@ -514,6 +516,7 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
       className={`relative z-0 h-full w-full ${connectingFromNodeId ? "canvas-connecting" : ""}`}
       onDrop={onDrop}
       onDragOver={onDragOver}
+      onWheelCapture={onCanvasFormWheel}
     >
       <ReactFlow
         key={projectId}
@@ -542,8 +545,11 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
         multiSelectionKeyCode={["Meta", "Shift", "Control"]}
         // 删除键：选中 edge / node 后可删除（Mac 用 Backspace 也支持）
         deleteKeyCode={["Backspace", "Delete"]}
-        // 缩放：滚轮在画布空白处缩放；节点内带 nowheel 的区域自行滚动
-        zoomOnScroll
+        // 视口：滚轮平移；Ctrl+滚轮缩放；textarea/select 无 nowheel，滚轮仍平移画布
+        panOnScroll
+        panOnScrollMode={PanOnScrollMode.Free}
+        zoomOnScroll={false}
+        zoomActivationKeyCode="Control"
         noWheelClassName="nowheel"
         noDragClassName="nodrag"
         minZoom={0.1}
