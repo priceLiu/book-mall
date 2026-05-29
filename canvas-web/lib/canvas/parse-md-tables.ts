@@ -652,6 +652,51 @@ export function stripOutlineEmbeddedPackSections(md: string): string {
   return s.replace(/\n{3,}/g, "\n\n").trim();
 }
 
+export type SceneVisualDictionaryRow = {
+  name: string;
+  environment: string;
+  time: string;
+  mood: string;
+  imageKeywords: string;
+};
+
+/** 解析「场景视觉辞典」GFM 表 */
+export function parseSceneVisualDictionaryRows(md: string): SceneVisualDictionaryRow[] {
+  const section = extractSceneVisualDictionaryFromOutline(md);
+  if (!section.trim()) return [];
+  const { rows } = parseMdTable(compactGfmTables(section));
+  const out: SceneVisualDictionaryRow[] = [];
+  for (const r of rows) {
+    const name =
+      pickColumn(r, ["场景名", "场景", "scene name", "scene", "location", "name"]) ||
+      "";
+    if (!name.trim()) continue;
+    out.push({
+      name: name.trim(),
+      environment: pickColumn(r, ["环境", "environment", "env"]),
+      time: pickColumn(r, ["时间", "time", "timeofday"]),
+      mood: pickColumn(r, ["气氛", "氛围", "mood", "atmosphere"]),
+      imageKeywords: pickColumn(r, [
+        "生图关键词",
+        "关键词",
+        "image prompt",
+        "image keywords",
+        "prompt",
+      ]),
+    });
+  }
+  return out;
+}
+
+/** 从大纲正文中提取「场景视觉辞典」段 */
+export function extractSceneVisualDictionaryFromOutline(md: string): string {
+  const body = extractMarkdownSectionByHeader(
+    md,
+    /场景视觉辞典|场景辞典|场景设定|场景表/,
+  );
+  return body ? compactGfmTables(body) : "";
+}
+
 /** 从大纲正文中提取「角色设定」段（表格或列表） */
 export function extractCharacterSectionFromOutline(md: string): string {
   const body = extractMarkdownSectionByHeader(
@@ -755,6 +800,7 @@ function normalizeDialogueCell(raw: string, description: string): string {
 export function parseStoryboardRows(md: string): Array<{
   frameIndex: number;
   scene: string;
+  shotSize: string;
   description: string;
   dialogue: string;
   videoPrompt: string;
@@ -778,10 +824,7 @@ export function parseStoryboardRows(md: string): Array<{
       const frameIndex = parseInt(String(rawIdx), 10) || i + 1;
       const shotSize = pickColumn(r, ["景别", "shot size", "framing"]);
       const scene =
-        pickColumn(r, ["场景", "scene", "location"]) ||
-        r["场景"] ||
-        shotSize ||
-        "";
+        pickColumn(r, ["场景", "scene", "location"]) || r["场景"] || "";
       const duration = pickColumn(r, ["时长", "duration", "时长(秒)"]);
       const description =
         pickColumn(r, ["画面描述", "description", "visual", "画面"]) ||
@@ -804,6 +847,7 @@ export function parseStoryboardRows(md: string): Array<{
       return {
         frameIndex,
         scene,
+        shotSize,
         description,
         dialogue: normalizeDialogueCell(dialogueRaw, description),
         videoPrompt:

@@ -1,22 +1,52 @@
 import { useEffect, useRef, type DragEventHandler } from "react";
 
+function isClipboardImageFile(file: File): boolean {
+  if (file.type.startsWith("image/")) return true;
+  if (!file.type && /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name)) return true;
+  return false;
+}
+
 /** 从剪贴板或拖放 DataTransfer 中取第一张图片文件 */
 export function firstImageFileFromDataTransfer(
   dt: DataTransfer | null | undefined,
 ): File | null {
   if (!dt) return null;
   for (const f of Array.from(dt.files)) {
-    if (f.type.startsWith("image/")) return f;
+    if (isClipboardImageFile(f)) return f;
   }
   if (dt.items) {
     for (const item of Array.from(dt.items)) {
-      if (item.kind === "file" && item.type.startsWith("image/")) {
-        const f = item.getAsFile();
-        if (f) return f;
+      if (item.kind !== "file") continue;
+      const type = item.type ?? "";
+      if (!type.startsWith("image/") && type !== "public.png" && type !== "public.jpeg") {
+        continue;
       }
+      const f = item.getAsFile();
+      if (f && isClipboardImageFile(f)) return f;
     }
   }
   return null;
+}
+
+/** 剪贴板仅有图片 URL（复制链接）时的回落 */
+export async function imageFileFromClipboardUrl(
+  dt: DataTransfer | null | undefined,
+): Promise<File | null> {
+  if (!dt) return null;
+  const plain = dt.getData("text/plain")?.trim() ?? "";
+  const html = dt.getData("text/html") ?? "";
+  const fromHtml = html.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1];
+  const candidate = fromHtml?.trim() || plain;
+  if (!candidate || !/^https?:\/\//i.test(candidate)) return null;
+  try {
+    const res = await fetch(candidate);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    if (!blob.type.startsWith("image/")) return null;
+    return new File([blob], "pasted-image", { type: blob.type });
+  } catch {
+    return null;
+  }
 }
 
 export function isEditablePasteTarget(target: EventTarget | null): boolean {
@@ -79,6 +109,26 @@ function pickImagePasteTarget(): ImagePasteTarget | null {
   return best;
 }
 
+async function resolveClipboardImageFile(
+  dt: DataTransfer | null | undefined,
+): Promise<File | null> {
+  const direct = firstImageFileFromDataTransfer(dt);
+  if (direct) return direct;
+  return imageFileFromClipboardUrl(dt);
+}
+
+/** 剪贴板图片是否应写入当前悬停的资产槽（供画布全局 paste 让路） */
+export async function routeClipboardImageToActivePasteSlot(
+  dt: DataTransfer | null | undefined,
+): Promise<boolean> {
+  const target = pickImagePasteTarget();
+  if (!target) return false;
+  const file = await resolveClipboardImageFile(dt);
+  if (!file) return false;
+  target.onFile(file);
+  return true;
+}
+
 function ensureImagePasteRouter() {
   if (imagePasteRouterInstalled) return;
   imagePasteRouterInstalled = true;
@@ -87,12 +137,23 @@ function ensureImagePasteRouter() {
     (e) => {
       const target = pickImagePasteTarget();
       if (!target) return;
-      if (isEditablePasteTarget(e.target)) return;
-      const file = firstImageFileFromDataTransfer(e.clipboardData);
-      if (!file) return;
+      const direct = firstImageFileFromDataTransfer(e.clipboardData);
+      if (direct) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        target.onFile(direct);
+        return;
+      }
+      const html = e.clipboardData?.getData("text/html") ?? "";
+      const plain = e.clipboardData?.getData("text/plain")?.trim() ?? "";
+      const maybeUrl =
+        html.includes("<img") || /^https?:\/\//i.test(plain);
+      if (!maybeUrl) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      target.onFile(file);
+      void resolveClipboardImageFile(e.clipboardData).then((file) => {
+        if (file) target.onFile(file);
+      });
     },
     true,
   );

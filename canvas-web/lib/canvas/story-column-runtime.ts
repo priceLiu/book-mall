@@ -2,6 +2,7 @@ import type { StoryScriptHubNodeData } from "./story-workspace-types";
 import {
   isAnyStoryCharacterColumnType,
   isAnyStoryFrameColumnType,
+  isAnyStorySceneColumnType,
   isAnyStoryScriptHubType,
   isAnyStoryVideoColumnType,
 } from "./story-workspace-resolver";
@@ -81,13 +82,18 @@ function hubHasInflightWork(d: StoryScriptHubNodeData): boolean {
 }
 
 /** 单节点是否仍有进行中的生成（含漫剧列行级 / 文案段 runtime） */
+function storyImageColumnInflightCount(node: CanvasFlowNode): number {
+  const rows = (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
+  return rows.filter((r) => isCanvasInflightStatus(r.runtime?.status)).length;
+}
+
 export function canvasNodeHasInflightWork(node: CanvasFlowNode): boolean {
   if (
     isAnyStoryCharacterColumnType(node.type ?? "") ||
+    isAnyStorySceneColumnType(node.type ?? "") ||
     isAnyStoryFrameColumnType(node.type ?? "")
   ) {
-    const rows = (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
-    return rows.some((r) => isCanvasInflightStatus(r.runtime?.status));
+    return storyImageColumnInflightCount(node) > 0;
   }
   if (isAnyStoryVideoColumnType(node.type ?? "")) {
     const rows = (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
@@ -116,11 +122,10 @@ export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
   for (const node of nodes) {
     if (
       isAnyStoryCharacterColumnType(node.type ?? "") ||
+      isAnyStorySceneColumnType(node.type ?? "") ||
       isAnyStoryFrameColumnType(node.type ?? "")
     ) {
-      const rows =
-        (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
-      count += rows.filter((r) => isCanvasInflightStatus(r.runtime?.status)).length;
+      count += storyImageColumnInflightCount(node);
       continue;
     }
     if (isAnyStoryVideoColumnType(node.type ?? "")) {

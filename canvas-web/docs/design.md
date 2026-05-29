@@ -458,7 +458,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 | **节点 chrome**（绿色） | `STORY_CHROME_GREEN_CLASS` | `text-emerald-300/90` | 顶部导航、工具栏项目名、节点标题/副标题、行标题徽章、状态文案 |
 | 节点区块标题 | `STORY_ROW_SECTION_CLASS` | 10px 绿色 | 资产四槽区标题、「资产就绪」类状态 |
 | 槽位次级标签 | `STORY_ROW_SUBLABEL_CLASS` | 9px `text-emerald-200/75` | 脸 / 全身 / 服装等槽名 |
-| 影视专业版字段标签 | `PRO_HINT_LABEL_CLASS` | 10px uppercase `text-emerald-300/85` | 风格节点「主风格 / 锚定词」等（详见 §14） |
+| 影视专业版字段标签 | `PRO_HINT_LABEL_CLASS` | 10px uppercase `text-emerald-300/85` | 风格节点「风格库 / 锚定词」等（详见 §14） |
 | **错误**（图 3 红） | `STORY_ERROR_LINE_CLASS` / `StoryErrorLine` | `truncate text-red-400/90` | 单行省略；**必须** `title={全文}` 悬停展示 |
 
 固定文案与用法：
@@ -724,7 +724,7 @@ Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtn
 | 本地图源 | `canvas-web/assets/style-library-source/{id}.webp` |
 | UI | `StyleLibraryGrid`：分类 pill + `minmax(190px,1fr)` 网格；hover 底部 overlay 显示 `prompt` |
 | 画布入口 | 工具栏「风格库」→ `StyleLibraryModal`（`max-w-6xl`）；风格节点「浏览风格库…」 |
-| 套用 | `useApplyStyleLibraryPreset` → 写入 `story-pro-style`：`styleAnchorZh` + 分类下拉 + 可选 `refImages` |
+| 套用 | `useApplyStyleLibraryPreset` → 写入 `story-pro-style`：`styleAnchorZh` + 可选 `refImages`（分类→内部元数据，无下拉 UI） |
 | 禁止 | 外网预览 URL；不自动写入全局风格 Profile |
 
 ### 14.8 组件核查清单（改 UI 时对照）

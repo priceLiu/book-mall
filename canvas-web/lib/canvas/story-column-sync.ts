@@ -8,13 +8,17 @@ import {
   parseCharacterListFromSection,
   parseOutlineBriefCharacters,
   parseStoryboardRows,
+  parseSceneVisualDictionaryRows,
   extractCharacterSectionFromOutline,
+  type SceneVisualDictionaryRow,
 } from "./parse-md-tables";
 import {
   storyRefIdsFromPrompt,
   storyRefImagesFromPrompt,
   type StoryRefImage,
 } from "./story-ref-image";
+import { storyProSceneRowKey } from "./story-pro-scene-asset-catalog";
+import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import type {
   StoryCharacterRow,
   StoryFrameRow,
@@ -150,16 +154,18 @@ function dialogueLine(dialogue?: string): string {
   return `对白：${d}`;
 }
 
-/** 分镜脚本列 / 视频生成共用：场景 + 镜头描述 + 对白 + 运镜 */
+/** 分镜脚本列 / 视频生成共用：镜号 + 景别 + 场景 + 镜头描述 + 对白 + 运镜 */
 export function buildFrameRowScriptPrompt(frame: {
   frameIndex: number;
   scene: string;
+  shotSize?: string;
   description: string;
   dialogue?: string;
   videoPrompt?: string;
 }): string {
   const parts = [
     `镜 ${frame.frameIndex}`,
+    frame.shotSize?.trim() ? `景别：${frame.shotSize.trim()}` : "",
     frame.scene?.trim() ? `场景：${frame.scene.trim()}` : "",
     frame.description?.trim() ? `镜头描述：${frame.description.trim()}` : "",
     dialogueLine(frame.dialogue),
@@ -181,11 +187,78 @@ function resolveFrameRowPrompt(frame: StoryFrameRow): string {
 export function buildDefaultFrameRowPrompt(frame: {
   frameIndex: number;
   scene: string;
+  shotSize?: string;
   description: string;
   dialogue?: string;
   videoPrompt?: string;
 }): string {
   return buildFrameRowScriptPrompt(frame);
+}
+
+const SHOT_SIZE_SCENE_LABELS = new Set([
+  "远景",
+  "全景",
+  "中景",
+  "近景",
+  "特写",
+  "大特写",
+  "大全景",
+  "中近景",
+  "过肩",
+]);
+
+export function isShotSizeSceneLabel(name: string): boolean {
+  const t = name.trim();
+  if (!t) return true;
+  if (SHOT_SIZE_SCENE_LABELS.has(t)) return true;
+  return /^(远景|全景|中景|近景|特写)/.test(t);
+}
+
+/** 场景设计列：环境参考图 prompt（非分镜脚本） */
+export function buildDefaultSceneRowPrompt(
+  row: SceneVisualDictionaryRow & { description?: string },
+): string {
+  const parts = [
+    row.name.trim() ? `场景：${row.name.trim()}` : "",
+    row.environment?.trim() ? `环境：${row.environment.trim()}` : "",
+    row.time?.trim() ? `时间：${row.time.trim()}` : "",
+    row.mood?.trim() ? `气氛：${row.mood.trim()}` : "",
+    row.imageKeywords?.trim() ? `生图：${row.imageKeywords.trim()}` : "",
+    !row.environment?.trim() &&
+    !row.imageKeywords?.trim() &&
+    row.description?.trim()
+      ? `画面：${row.description.trim()}`
+      : "",
+  ].filter(Boolean);
+  return parts.join("\n");
+}
+
+/** 分镜脚本格式误入场景列时识别并覆盖 */
+export function isFrameScriptPrompt(prompt: string): boolean {
+  const p = prompt.trim();
+  if (!p) return false;
+  if (/^镜\s*\d/m.test(p)) return true;
+  return (
+    p.includes("镜头描述：") ||
+    p.includes("运镜：") ||
+    p.includes("对白：")
+  );
+}
+
+/** 从故事剧本大纲「场景视觉辞典」拆分场景行（定稿真源） */
+export function buildSceneRowsFromHub(
+  d: StoryScriptHubNodeData,
+  scriptHubId: string,
+): StoryProSceneRow[] {
+  const synced = hubDataForColumnSync(d);
+  const dictRows = parseSceneVisualDictionaryRows(synced.outlineMd ?? "");
+  const hub = scriptHubId.trim();
+  return dictRows.map((r) => ({
+    key: hub ? storyProSceneRowKey(hub, r.name) : r.name,
+    name: r.name,
+    description: [r.environment, r.time, r.mood].filter(Boolean).join(" · "),
+    prompt: buildDefaultSceneRowPrompt(r),
+  }));
 }
 
 /**
@@ -222,6 +295,7 @@ export function buildFrameRowsFromMd(
         frameIndex: r.frameIndex,
         key: String(r.frameIndex),
         scene: r.scene,
+        shotSize: r.shotSize,
         description: r.description,
         dialogue: r.dialogue,
         videoPrompt: r.videoPrompt,

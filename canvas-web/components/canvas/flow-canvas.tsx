@@ -23,6 +23,7 @@ import {
   unregisterCanvasViewportPlacement,
 } from "@/lib/canvas/viewport-placement";
 import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
+import { routeClipboardImageToActivePasteSlot } from "@/lib/canvas/image-upload-handlers";
 import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 import { ImageNode } from "./nodes/image-node";
 import { TextNode } from "./nodes/text-node";
@@ -450,6 +451,10 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
         }
       }
       if (files.length > 0) {
+        if (await routeClipboardImageToActivePasteSlot(dt)) {
+          event.preventDefault();
+          return;
+        }
         event.preventDefault();
         // 视口中心放第一个，后续依次偏移
         const wrap = wrapRef.current;

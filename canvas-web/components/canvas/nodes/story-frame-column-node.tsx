@@ -90,10 +90,9 @@ import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { NodeShell } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
-import { pickDefaultStoryImageEngine } from "@/lib/canvas/system-providers";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
-import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
-import type { StoryProWorkspaceIds } from "@/lib/canvas/story-pro-workspace-types";
+import { findStoryProWorkspaceFromHub } from "@/lib/canvas/spawn-story-pro-workspace";
+import { ensureStoryColumnImageEngineDefault } from "@/lib/canvas/story-column-engine-defaults";
 
 export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const edition = storyEditionFromNodeType(type);
@@ -155,26 +154,22 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
       resolvedBatchVideo?.modelKey?.trim(),
   );
 
-  const proWorkspaceIds = useMemo((): StoryProWorkspaceIds | null => {
+  const proWs = useMemo(() => {
     if (edition !== "pro") return null;
-    const col = nodes.find((n) => n.id === id);
-    const hubNodeId = (col?.data as { hubNodeId?: string }).hubNodeId;
+    const hubNodeId = (nodes.find((n) => n.id === id)?.data as { hubNodeId?: string })
+      ?.hubNodeId;
     if (!hubNodeId) return null;
-    const starter = resolveStarterForHub(nodes, edges, hubNodeId);
-    return (
-      (starter?.data as { workspaceIds?: StoryProWorkspaceIds }).workspaceIds ??
-      null
-    );
+    return findStoryProWorkspaceFromHub(nodes, edges, hubNodeId);
   }, [edition, nodes, edges, id]);
 
   const characterRows = useMemo(() => {
-    const charColId = proWorkspaceIds?.characterColumnId ?? ws?.characterColumnId;
+    const charColId = proWs?.characterColumnId ?? ws?.characterColumnId;
     if (!charColId) return [];
     const charNode = nodes.find((n) => n.id === charColId);
     const storedChar =
       (charNode?.data as { rows?: Parameters<typeof displayCharacterRows>[2] })
         ?.rows ?? [];
-    const synced = displayCharacterRows(nodes, charColId, storedChar);
+    const synced = displayCharacterRows(nodes, charColId, storedChar, edges);
     return synced.map((row) => {
       const prev = storedChar.find(
         (r) => r.key === row.key || r.name === row.name,
@@ -189,7 +184,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
           (row as { lockedRefIds?: string[] }).lockedRefIds,
       };
     });
-  }, [nodes, proWorkspaceIds?.characterColumnId, ws?.characterColumnId]);
+  }, [nodes, edges, proWs?.characterColumnId, ws?.characterColumnId]);
 
   const assetRefsByKey = useMemo(
     () =>
@@ -209,16 +204,21 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   );
 
   const sceneRows = useMemo(() => {
-    const sceneColId = proWorkspaceIds?.sceneColumnId;
+    const sceneColId = proWs?.sceneColumnId;
     if (edition !== "pro" || !sceneColId) return [];
     const sceneNode = nodes.find((n) => n.id === sceneColId);
     return (sceneNode?.data as StoryProSceneColumnNodeData | undefined)?.rows ?? [];
-  }, [edition, nodes, proWorkspaceIds?.sceneColumnId]);
+  }, [edition, nodes, proWs?.sceneColumnId]);
 
   const sceneAssetRefsByKey = useMemo(
     () =>
       edition === "pro"
-        ? buildAssetRefsBySceneKey(projectSceneAssets, sceneRows, projectId)
+        ? buildAssetRefsBySceneKey(
+            projectSceneAssets,
+            sceneRows,
+            projectId,
+            proWs?.scriptHubId,
+          )
         : {},
     [edition, projectSceneAssets, sceneRows, projectId],
   );
@@ -281,49 +281,25 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
 
   useStoryColumnAutoSize(id, targetSize, displayRows.length);
 
-  /** 旧画布可能只配了 VIDEO；自动继承角色列 IMAGE 或系统默认 */
   useEffect(() => {
-    if (batchImage?.providerId?.trim() && batchImage?.modelKey?.trim()) {
-      return;
-    }
-    const charCol = ws?.characterColumnId
-      ? nodes.find((n) => n.id === ws.characterColumnId)
-      : undefined;
-    const charBatch = (charCol?.data as StoryCharacterColumnNodeData | undefined)
-      ?.batchImage;
-    if (charBatch?.providerId?.trim() && charBatch?.modelKey?.trim()) {
-      updateNodeData(id, {
-        batchImage: {
-          providerId: charBatch.providerId,
-          modelKey: charBatch.modelKey,
-          params: charBatch.params ?? {},
-        },
-      });
-      return;
-    }
-    const pick = pickDefaultStoryImageEngine(providers);
-    if (!pick) return;
-    updateNodeData(id, {
-      batchImage: {
-        providerId: pick.providerId,
-        modelKey: pick.modelKey,
-        params: { aspect_ratio: "16:9", resolution: "2K", output_format: "png" },
-      },
+    ensureStoryColumnImageEngineDefault({
+      nodes,
+      edges,
+      columnId: id,
+      updateNodeData,
+      providers,
     });
   }, [
+    nodes,
+    edges,
+    id,
+    updateNodeData,
+    providers,
     batchImage?.providerId,
     batchImage?.modelKey,
-    id,
-    nodes,
-    providers,
-    updateNodeData,
-    ws?.characterColumnId,
   ]);
 
-  const styleNodeId = useMemo(
-    () => proWorkspaceIds?.styleNodeId,
-    [proWorkspaceIds?.styleNodeId],
-  );
+  const styleNodeId = useMemo(() => proWs?.styleNodeId, [proWs?.styleNodeId]);
 
   useEffect(() => {
     if (edition !== "pro" || !injectStyleRefs || !styleNodeId) return;

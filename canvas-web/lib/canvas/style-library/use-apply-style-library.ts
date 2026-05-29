@@ -6,7 +6,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import type { StoryProStyleNodeData } from "../story-pro-workspace-types";
 import {
   buildStyleLibraryPresetPatch,
-  styleNodeFieldsLocked,
+  resolveStyleLibraryApplyTarget,
   styleNodeHasAnchorContent,
 } from "./apply-preset";
 import type { StyleLibraryPreset } from "./catalog";
@@ -18,42 +18,24 @@ export function useApplyStyleLibraryPreset() {
 
   return useCallback(
     async (preset: StyleLibraryPreset): Promise<boolean> => {
-      const styleNode = nodes.find((n) => n.type === "story-pro-style");
-      if (!styleNode) {
+      const selectedStyleNodeId = nodes.find(
+        (n) => n.selected && n.type === "story-pro-style",
+      )?.id;
+
+      const target = resolveStyleLibraryApplyTarget(nodes, {
+        selectedStyleNodeId,
+      });
+      if (!target.ok) {
         await dialogs.alert({
-          title: "未找到风格节点",
-          message:
-            "当前画布没有「风格定义」节点。请先使用影视专业版工作流模板。",
+          title: target.title,
+          message: target.message,
           variant: "error",
         });
         return false;
       }
 
+      const { styleNode } = target;
       const d = styleNode.data as StoryProStyleNodeData;
-      const hubId = d.hubNodeId;
-      const hub = hubId
-        ? nodes.find((n) => n.id === hubId && n.type === "story-pro-script-hub")
-        : null;
-      const hubData = (hub?.data ?? {}) as { scriptFinalized?: boolean };
-      if (!hubData.scriptFinalized) {
-        await dialogs.alert({
-          title: "请先故事定稿",
-          message:
-            "请先在「故事剧本」节点完成大纲并点击「故事定稿」，再套用风格库。",
-          variant: "error",
-        });
-        return false;
-      }
-
-      const lock = styleNodeFieldsLocked(d);
-      if (lock.locked) {
-        await dialogs.alert({
-          title: "无法套用",
-          message: lock.reason ?? "风格节点当前不可编辑。",
-          variant: "error",
-        });
-        return false;
-      }
 
       if (
         styleNodeHasAnchorContent(d) &&

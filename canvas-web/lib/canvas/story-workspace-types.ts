@@ -24,6 +24,8 @@ export type StoryFrameRow = {
   frameIndex: number;
   key: string;
   scene: string;
+  /** 分镜表「景别」列；与场景名列分离，勿用景别充当场景设计行名 */
+  shotSize?: string;
   description: string;
   dialogue: string;
   videoPrompt: string;
