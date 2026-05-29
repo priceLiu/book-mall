@@ -372,6 +372,10 @@ export type AiVideoEngineNodeData = {
   prompt: string;
   params?: Record<string, unknown>;
   linkedGridSlotCount?: number;
+  /** 视频预览区占分隔容器高度比例（0.15–0.68），分隔条拖拽持久化 */
+  videoPreviewRatio?: number;
+  /** @deprecated 旧版 px 高度，加载时迁移为 videoPreviewRatio */
+  videoPreviewHeight?: number;
   runtime?: CanvasNodeRuntime;
 };
 

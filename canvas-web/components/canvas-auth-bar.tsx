@@ -20,7 +20,16 @@ export function CanvasAuthBar() {
       setUser(null);
       return;
     }
-    void fetchCanvasViewerUser(base).then(setUser);
+    const ac = new AbortController();
+    const timer = window.setTimeout(() => ac.abort(), 12_000);
+    void fetchCanvasViewerUser(base, ac.signal)
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => window.clearTimeout(timer));
+    return () => {
+      ac.abort();
+      window.clearTimeout(timer);
+    };
   }, [base]);
 
   // 画布编辑器全屏，不显示登录条

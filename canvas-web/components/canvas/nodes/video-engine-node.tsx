@@ -10,6 +10,7 @@ import { STORY_VIDEO_MODEL_KEYS } from "@/lib/canvas/types";
 import { resolveReferencedNodeIds } from "@/lib/canvas/referenced-nodes";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
+import { SaveVideoToLibraryButton } from "../save-video-to-library-button";
 import { NodeShell } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 import { EnginePreviewTrigger } from "../engine-preview-trigger";
@@ -164,14 +165,25 @@ export function VideoEngineNode({ id, data, selected }: NodeProps) {
                 </NodeMediaStage>
               }
               actions={
-                <a
-                  href={videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={NODE_BTN_GHOST}
-                >
-                  <Download className="size-3" /> 下载 mp4
-                </a>
+                <>
+                  <SaveVideoToLibraryButton
+                    variant="inline"
+                    videoUrl={videoUrl}
+                    saveInput={{
+                      mode: "i2v",
+                      prompt: d.prompt,
+                      modelLabel: d.modelKey,
+                    }}
+                  />
+                  <a
+                    href={videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${NODE_BTN_GHOST} ml-auto`}
+                  >
+                    <Download className="size-3" /> 下载 mp4
+                  </a>
+                </>
               }
             />
           ) : (

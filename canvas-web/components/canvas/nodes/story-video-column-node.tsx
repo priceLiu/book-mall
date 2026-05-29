@@ -479,6 +479,15 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
                   errorMessage={videoError}
                   videoBlockReason={videoBlockReason}
                   onGenerate={() => void runRowVideo(row.key)}
+                  saveToLibrary={
+                    vid
+                      ? {
+                          mode: "i2v",
+                          prompt: videoPrompt,
+                          modelLabel: batchVideo?.modelKey,
+                        }
+                      : null
+                  }
                   onPreview={
                     vid
                       ? () =>

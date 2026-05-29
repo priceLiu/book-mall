@@ -7,6 +7,10 @@ import { Video } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { AiVideoEngineNodeData, VideoGenerateNodeData } from "@/lib/canvas/types";
 import { directPredecessors } from "@/lib/canvas/topo";
+import {
+  refVideoDurationFromParams,
+  refVideoResolutionFromParams,
+} from "@/lib/canvas-video-library";
 import { REF_VIDEO_NODE_SIZE } from "@/lib/canvas/ref-video-models";
 import { NodeShell } from "../node-shell";
 import { CanvasVideoPreviewSlot } from "../canvas-video-preview-slot";
@@ -55,6 +59,16 @@ export function VideoGenerateNode({ id, data, selected }: NodeProps) {
     upstreamRuntime?.status === "running" ||
     upstreamRuntime?.status === "pending";
 
+  const upstreamEngine = useMemo(() => {
+    for (const pid of directPredecessors(edges, id)) {
+      const p = nodes.find((n) => n.id === pid);
+      if (p?.type === "ai-video-engine") {
+        return p.data as unknown as AiVideoEngineNodeData;
+      }
+    }
+    return null;
+  }, [nodes, edges, id]);
+
   const openPreview = () => {
     if (url) setPreviewOpen(true);
   };
@@ -96,6 +110,21 @@ export function VideoGenerateNode({ id, data, selected }: NodeProps) {
             emptyIcon={<Video className="size-24" strokeWidth={1.25} />}
             emptyMessage={
               generating ? undefined : "连接 AI 视频引擎后生成"
+            }
+            saveToLibrary={
+              url && !generating
+                ? {
+                    mode: "ref",
+                    prompt: upstreamEngine?.prompt,
+                    modelLabel: upstreamEngine?.modelKey,
+                    resolution: refVideoResolutionFromParams(
+                      upstreamEngine?.params,
+                    ),
+                    durationSec: refVideoDurationFromParams(
+                      upstreamEngine?.params,
+                    ),
+                  }
+                : null
             }
           />
         </div>

@@ -353,11 +353,67 @@ function PaletteItemsRow({
   );
 }
 
-const PALETTE_LABEL_CLASS = "text-[#fb923c]";
-const PRO_PALETTE_LABEL_CLASS = "text-cyan-300";
+const PALETTE_BADGE_CLASS = "text-[#fb923c]";
+const PRO_PALETTE_BADGE_CLASS = "text-cyan-300";
+
+/** 分组徽标（替代「海报创作」等文字标签） */
+const PALETTE_GROUPS = {
+  poster: {
+    label: "海报创作",
+    icon: <Palette className="size-[18px]" aria-hidden />,
+  },
+  story: {
+    label: "故事创作",
+    icon: <Clapperboard className="size-[18px]" aria-hidden />,
+  },
+  refVideo: {
+    label: "参考生视频",
+    icon: <Video className="size-[18px]" aria-hidden />,
+  },
+  pro: {
+    label: "影视专业版",
+    icon: <Sparkles className="size-[18px]" aria-hidden />,
+  },
+} as const;
+
+function PaletteGroupBadge({
+  label,
+  icon,
+  collapsed,
+  proTheme = false,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  collapsed: boolean;
+  proTheme?: boolean;
+}) {
+  const colorClass = proTheme ? PRO_PALETTE_BADGE_CLASS : PALETTE_BADGE_CLASS;
+  return (
+    <span
+      className={`group/badge relative inline-flex shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] ${
+        collapsed ? "mb-1 size-8" : "size-9"
+      } ${colorClass}`}
+      title={label}
+      aria-label={label}
+    >
+      {icon}
+      <span
+        className={`pointer-events-none absolute z-50 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/badge:opacity-100 ${
+          collapsed
+            ? "right-full top-1/2 mr-2 -translate-y-1/2"
+            : "left-1/2 top-full mt-2 -translate-x-1/2"
+        }`}
+        role="tooltip"
+      >
+        {label}
+      </span>
+    </span>
+  );
+}
 
 function PalettePill({
-  label,
+  groupLabel,
+  groupIcon,
   items,
   collapsed,
   trailing,
@@ -365,7 +421,8 @@ function PalettePill({
   onAdd,
   proTheme = false,
 }: {
-  label?: string;
+  groupLabel?: string;
+  groupIcon?: React.ReactNode;
   items: PaletteItem[];
   collapsed: boolean;
   trailing?: React.ReactNode;
@@ -377,20 +434,20 @@ function PalettePill({
   onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
   proTheme?: boolean;
 }) {
-  const labelClass = proTheme ? PRO_PALETTE_LABEL_CLASS : PALETTE_LABEL_CLASS;
   const pillClass = proTheme
-    ? "flex items-center gap-1 rounded-full border border-cyan-400/25 bg-gradient-to-r from-cyan-950/40 to-black/75 px-2 py-1.5 shadow-2xl shadow-cyan-950/30 backdrop-blur-md"
-    : "flex items-center gap-1 rounded-full border border-white/10 bg-black/70 px-2 py-1.5 shadow-2xl backdrop-blur-md";
+    ? "inline-flex w-fit max-w-full items-center gap-0.5 rounded-full border border-cyan-400/25 bg-[var(--canvas-surface)]/80 px-1 py-0.5 shadow-md backdrop-blur-sm"
+    : "inline-flex w-fit max-w-full items-center gap-0.5 rounded-full border border-white/12 bg-[var(--canvas-surface)]/75 px-1 py-0.5 shadow-md backdrop-blur-sm";
 
   if (collapsed) {
     return (
-      <div className="flex w-full flex-col items-center">
-        {label ? (
-          <span
-            className={`mb-1 max-w-[2.5rem] truncate text-center text-[9px] font-medium tracking-wide ${labelClass}`}
-          >
-            {label}
-          </span>
+      <div className="flex flex-col items-center">
+        {groupLabel && groupIcon ? (
+          <PaletteGroupBadge
+            label={groupLabel}
+            icon={groupIcon}
+            collapsed
+            proTheme={proTheme}
+          />
         ) : null}
         <PaletteItemsRow
           items={items}
@@ -407,21 +464,24 @@ function PalettePill({
     <div
       className={pillClass}
       role="group"
-      aria-label={label ? `${label}节点` : "画布节点"}
+      aria-label={groupLabel ? `${groupLabel}节点` : "画布节点"}
       style={
         proTheme
           ? { boxShadow: `0 0 0 1px ${PRO_NODE_ACCENT}18, 0 8px 32px rgba(0,0,0,0.45)` }
           : undefined
       }
     >
-      {label ? (
-        <span
-          className={`select-none pr-0.5 text-[10px] font-medium tracking-wide ${labelClass}`}
-        >
-          {label}
-        </span>
+      {groupLabel && groupIcon ? (
+        <>
+          <PaletteGroupBadge
+            label={groupLabel}
+            icon={groupIcon}
+            collapsed={false}
+            proTheme={proTheme}
+          />
+          <PaletteDivider />
+        </>
       ) : null}
-      {label ? <PaletteDivider /> : null}
       <PaletteItemsRow
         items={items}
         collapsed={false}
@@ -611,30 +671,17 @@ export function NodePalette({
       {collapsed ? (
         <>
         <div
-          className="flex shrink-0 items-center justify-center border-b border-white/5 bg-[var(--canvas-surface)]/95 px-3 py-1"
-          role="toolbar"
-          aria-label={proOnly ? "影视专业版节点面板（已收到右侧）" : "节点面板（已收到右侧）"}
-        >
-          <button
-            type="button"
-            onClick={toggleDock}
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/75 transition hover:border-white/25 hover:text-white"
-          >
-            <ChevronLeft className="size-3" />
-            节点面板在右侧 · 点击展开到顶部
-          </button>
-        </div>
-        <div
           className="pointer-events-none fixed right-3 top-1/2 z-[100] -translate-y-1/2"
           role="toolbar"
           aria-label={proOnly ? "影视专业版节点面板（右侧）" : "节点面板（右侧）"}
         >
-          <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-2xl border border-white/10 bg-black/75 py-2 pl-1.5 pr-1 shadow-2xl backdrop-blur-md">
+          <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-2xl border border-white/12 bg-[var(--canvas-surface)]/85 py-2 pl-1.5 pr-1 shadow-lg backdrop-blur-md">
             {collapseButton}
             <PaletteDivider vertical />
             {proOnly ? (
               <PalettePill
-                label="影视专业版"
+                groupLabel={PALETTE_GROUPS.pro.label}
+                groupIcon={PALETTE_GROUPS.pro.icon}
                 items={proPaletteItems}
                 collapsed
                 proTheme
@@ -644,7 +691,8 @@ export function NodePalette({
             ) : (
               <>
                 <PalettePill
-                  label="海报创作"
+                  groupLabel={PALETTE_GROUPS.poster.label}
+                  groupIcon={PALETTE_GROUPS.poster.icon}
                   items={CANVAS_PALETTE}
                   collapsed
                   onDragStart={onDragStart}
@@ -652,26 +700,17 @@ export function NodePalette({
                 />
                 <PaletteDivider vertical />
                 <PalettePill
-                  label="故事创作"
+                  groupLabel={PALETTE_GROUPS.story.label}
+                  groupIcon={PALETTE_GROUPS.story.icon}
                   items={STORY_PALETTE}
                   collapsed
                   onDragStart={onDragStart}
                   onAdd={onAdd}
                 />
                 <PaletteDivider vertical />
-                {!comicOnly ? (
-                  <PalettePill
-                    label="影视专业版"
-                    items={STORY_PRO_PALETTE}
-                    collapsed
-                    proTheme
-                    onDragStart={onDragStart}
-                    onAdd={onAdd}
-                  />
-                ) : null}
-                <PaletteDivider vertical />
                 <PalettePill
-                  label="参考生视频"
+                  groupLabel={PALETTE_GROUPS.refVideo.label}
+                  groupIcon={PALETTE_GROUPS.refVideo.icon}
                   items={REF_VIDEO_PALETTE}
                   collapsed
                   onDragStart={onDragStart}
@@ -686,14 +725,15 @@ export function NodePalette({
         </>
       ) : (
         <div
-          className="relative flex shrink-0 justify-center border-b border-white/5 bg-[var(--canvas-surface)]/95 px-3 py-1.5"
+          className="pointer-events-auto relative"
           role="toolbar"
           aria-label={proOnly ? "影视专业版节点面板" : "节点面板"}
         >
-          <div className="flex items-center gap-8">
+          <div className="inline-flex w-fit max-w-[min(100%,calc(100vw-1.5rem))] flex-wrap items-center justify-center gap-1.5">
             {proOnly ? (
               <PalettePill
-                label="影视专业版"
+                groupLabel={PALETTE_GROUPS.pro.label}
+                groupIcon={PALETTE_GROUPS.pro.icon}
                 items={proPaletteItems}
                 collapsed={false}
                 proTheme
@@ -704,44 +744,37 @@ export function NodePalette({
             ) : (
               <>
                 <PalettePill
-                  label="海报创作"
+                  groupLabel={PALETTE_GROUPS.poster.label}
+                  groupIcon={PALETTE_GROUPS.poster.icon}
                   items={CANVAS_PALETTE}
                   collapsed={false}
-                  trailing={canvasTrailing}
                   onDragStart={onDragStart}
                   onAdd={onAdd}
                 />
                 <PalettePill
-                  label="故事创作"
+                  groupLabel={PALETTE_GROUPS.story.label}
+                  groupIcon={PALETTE_GROUPS.story.icon}
                   items={STORY_PALETTE}
                   collapsed={false}
                   onDragStart={onDragStart}
                   onAdd={onAdd}
                 />
-                {!comicOnly ? (
-                  <PalettePill
-                    label="影视专业版"
-                    items={STORY_PRO_PALETTE}
-                    collapsed={false}
-                    proTheme
-                    onDragStart={onDragStart}
-                    onAdd={onAdd}
-                  />
-                ) : null}
                 <PalettePill
-                  label="参考生视频"
+                  groupLabel={PALETTE_GROUPS.refVideo.label}
+                  groupIcon={PALETTE_GROUPS.refVideo.icon}
                   items={REF_VIDEO_PALETTE}
                   collapsed={false}
                   onDragStart={onDragStart}
                   onAdd={onAdd}
                 />
+                {canvasTrailing}
               </>
             )}
           </div>
 
           {helpOpen ? (
             <div
-              className="pointer-events-auto absolute left-1/2 top-full z-[100] mt-2 w-[420px] max-w-[92vw] -translate-x-1/2"
+              className="pointer-events-auto absolute left-1/2 top-[calc(100%+0.5rem)] z-[100] w-[420px] max-w-[92vw] -translate-x-1/2"
               role="dialog"
               aria-label="操作方式"
             >

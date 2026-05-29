@@ -1251,12 +1251,30 @@ export async function runRefVideoEngineNode(
           providerId,
           modelKey,
           referenceImageUrls: refs,
+          syncGatewaySubmit: true,
         } as Prisma.InputJsonValue,
         status: "PENDING",
       },
     });
 
     try {
+      const { claimed, task: claimedTask } = await claimCanvasTaskKieSubmit(
+        created.id,
+      );
+      if (!claimed) {
+        const fresh = await prisma.canvasGenerationTask.findUnique({
+          where: { id: created.id },
+        });
+        if (fresh?.kieTaskId) {
+          return { reused: false, task: fresh };
+        }
+        throw new CanvasProjectError(
+          "TASK_ALREADY_INFLIGHT",
+          "ref-video gateway submit already in progress",
+          409,
+        );
+      }
+
       const job = await canvasGwCreateBailianR2vJob(userId, {
         model: modelKey,
         prompt: expandedPrompt,
@@ -1269,7 +1287,7 @@ export async function runRefVideoEngineNode(
         clientPage: gwClientPage,
       });
       const updated = await prisma.canvasGenerationTask.update({
-        where: { id: created.id },
+        where: { id: claimedTask.id },
         data: {
           status: "SUBMITTED",
           kieTaskId: job.taskId,
@@ -1282,6 +1300,8 @@ export async function runRefVideoEngineNode(
             providerId,
             modelKey,
             referenceImageUrls: refs,
+            syncGatewaySubmit: true,
+            gatewayKieSubmitClaimed: true,
             gatewayLogId: job.logId,
           } as Prisma.InputJsonValue,
         },
@@ -1333,6 +1353,7 @@ export async function runRefVideoEngineNode(
         referenceImageUrls: refs,
         kieModel: model,
         kieInput: input,
+        syncGatewaySubmit: true,
       } as Prisma.InputJsonValue,
       status: "PENDING",
     },
@@ -1341,6 +1362,23 @@ export async function runRefVideoEngineNode(
   const callBackUrl = buildCanvasAiKieCallbackUrl("video", created.id);
 
   try {
+    const { claimed, task: claimedTask } = await claimCanvasTaskKieSubmit(
+      created.id,
+    );
+    if (!claimed) {
+      const fresh = await prisma.canvasGenerationTask.findUnique({
+        where: { id: created.id },
+      });
+      if (fresh?.kieTaskId) {
+        return { reused: false, task: fresh };
+      }
+      throw new CanvasProjectError(
+        "TASK_ALREADY_INFLIGHT",
+        "ref-video gateway submit already in progress",
+        409,
+      );
+    }
+
     const job = await canvasGwCreateKieJob(userId, {
       model,
       input: input as Record<string, unknown>,
@@ -1348,7 +1386,7 @@ export async function runRefVideoEngineNode(
       clientPage: gwClientPage,
     });
     const updated = await prisma.canvasGenerationTask.update({
-      where: { id: created.id },
+      where: { id: claimedTask.id },
       data: {
         status: "SUBMITTED",
         kieTaskId: job.taskId,
@@ -1361,6 +1399,8 @@ export async function runRefVideoEngineNode(
           providerId,
           modelKey,
           referenceImageUrls: refs,
+          syncGatewaySubmit: true,
+          gatewayKieSubmitClaimed: true,
           gatewayLogId: job.logId,
           kieModel: model,
           kieInput: input,
