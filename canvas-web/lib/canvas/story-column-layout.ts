@@ -29,6 +29,9 @@ export const STORY_COLUMN_VIEWPORT_H = STORY_COLUMN_MIN_H;
 /** 行数公式尾部留白（含底栏批量按钮区） */
 export const STORY_COLUMN_TAIL_PAD = 100;
 
+/** 分镜脚本列 · 列表底部额外留白（在通用尾留白之上再加 100px） */
+export const STORY_FRAME_COLUMN_TAIL_PAD = STORY_COLUMN_TAIL_PAD + 100;
+
 /**
  * 图1 · 影视专业版 · 单角色行块高（248px 预览 + 四槽 + 音频，实测近似）
  */
@@ -210,11 +213,12 @@ function storyColumnHeightFromRows(
   headerH: number,
   rowBlockH: number,
   rowCount: number,
+  tailPad: number = STORY_COLUMN_TAIL_PAD,
 ): number {
   if (rowCount <= 0) return STORY_COLUMN_MIN_H;
   const listH =
     rowCount * rowBlockH + Math.max(0, rowCount - 1) * ROW_GAP;
-  const calculated = headerH + listH + STORY_COLUMN_TAIL_PAD;
+  const calculated = headerH + listH + tailPad;
   return Math.max(STORY_COLUMN_MIN_H, calculated);
 }
 
@@ -249,6 +253,7 @@ export function storyFrameColumnSize(
       storyMediaColumnListHeaderH(opts),
       storyMediaAlignedRowHeight(opts),
       count,
+      STORY_FRAME_COLUMN_TAIL_PAD,
     ),
   };
 }
