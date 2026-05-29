@@ -10,7 +10,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
+import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
 import { migrateGraphV1ToV2 } from "@/lib/canvas/migrate";
 import type { CanvasGraph } from "@/lib/canvas/types";
 import {
@@ -71,8 +71,8 @@ export function TemplateReadonlyCanvas({ graph }: { graph: CanvasGraph }) {
   return (
     <ReactFlowProvider>
       <div
-        className="h-full w-full [&_.react-flow__edge]:pointer-events-none [&_.react-flow__node]:pointer-events-none"
-        onWheelCapture={onCanvasFormWheel}
+        className="canvas-flow-wrap h-full w-full overscroll-none [&_.react-flow__edge]:pointer-events-none [&_.react-flow__node]:pointer-events-none"
+        onWheelCapture={onCanvasWheelCapture}
       >
         <TemplateReadonlyCanvasInner graph={graph} />
       </div>

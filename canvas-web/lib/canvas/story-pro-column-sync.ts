@@ -124,7 +124,7 @@ function mergeProFrameRows(
   existing?: StoryProFrameRow[],
 ): StoryProFrameRow[] {
   if (!existing?.length) return built;
-  return built.map((row) => {
+  const merged = built.map((row) => {
     const prev = existing.find(
       (r) => r.key === row.key || r.frameIndex === row.frameIndex,
     );
@@ -144,6 +144,12 @@ function mergeProFrameRows(
       frameRejectedReason: prev.frameRejectedReason,
     };
   });
+  const mergedKeys = new Set(merged.map((r) => r.key));
+  const mergedIndexes = new Set(merged.map((r) => r.frameIndex));
+  const extras = existing.filter(
+    (r) => !mergedKeys.has(r.key) && !mergedIndexes.has(r.frameIndex),
+  );
+  return extras.length ? [...merged, ...extras] : merged;
 }
 
 function mergeProCharacterRows(
@@ -172,14 +178,15 @@ function mergeProVideoRows(
   existing?: StoryProVideoRow[],
   frameRows?: StoryProFrameRow[],
 ): StoryProVideoRow[] {
-  const merged = patchVideoRowsFromFrameRows(
+  const frames = (frameRows ?? []) as StoryFrameRow[];
+  const aligned = patchVideoRowsFromFrameRows(
     existing ?? [],
-    (frameRows ?? []) as StoryFrameRow[],
+    frames.length > 0 ? frames : (built as StoryFrameRow[]),
   );
   const prevByKey = new Map((existing ?? []).map((v) => [v.key, v]));
-  return built.map((row) => {
-    const prev = prevByKey.get(row.key) ?? merged.find((m) => m.key === row.key);
-    const frameRow = frameRows?.find(
+  return aligned.map((row) => {
+    const prev = prevByKey.get(row.key);
+    const frameRow = frames.find(
       (f) => f.key === row.key || f.frameIndex === row.frameIndex,
     );
     const script = frameRow

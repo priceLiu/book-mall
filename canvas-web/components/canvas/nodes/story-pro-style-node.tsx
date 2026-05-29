@@ -568,7 +568,19 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
         </div>
 
         <div className="space-y-1">
-          <span className={PRO_HINT_LABEL_CLASS}>风格模板 · 一键填入锚定词</span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className={PRO_HINT_LABEL_CLASS}>风格模板 · 一键填入锚定词</span>
+            <button
+              type="button"
+              disabled={fieldsLocked}
+              className="nodrag text-[10px] text-cyan-300/90 underline-offset-2 hover:text-cyan-200 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("canvas:open-style-library"));
+              }}
+            >
+              浏览风格库…
+            </button>
+          </div>
           <div className="flex flex-wrap gap-1">
             {STORY_PRO_STYLE_ANCHOR_TEMPLATES.map((tpl) => (
               <button

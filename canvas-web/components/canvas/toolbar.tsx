@@ -7,6 +7,7 @@ import {
   BookmarkPlus,
   BookOpen,
   Film,
+  LayoutGrid,
   LayoutTemplate,
   Loader2,
   Play,
@@ -33,6 +34,7 @@ export function CanvasToolbar({
   onOpenMySavedScripts,
   onOpenMyVideoLibrary,
   onOpenProjectCharacterAssets,
+  onOpenStyleLibrary,
   onReflowStoryLayout,
   running,
   inflightTaskCount = 0,
@@ -54,6 +56,7 @@ export function CanvasToolbar({
   onOpenMySavedScripts?: () => void;
   onOpenMyVideoLibrary?: () => void;
   onOpenProjectCharacterAssets?: () => void;
+  onOpenStyleLibrary?: () => void;
   onReflowStoryLayout?: () => void;
   running: boolean;
   inflightTaskCount?: number;
@@ -177,6 +180,17 @@ export function CanvasToolbar({
           >
             <UserRound className="size-3" />
             项目资产
+          </button>
+        ) : null}
+        {onOpenStyleLibrary ? (
+          <button
+            type="button"
+            onClick={onOpenStyleLibrary}
+            className="inline-flex items-center gap-1 rounded-md border border-cyan-400/25 bg-cyan-500/8 px-2 py-1 text-[11px] text-cyan-100/90 hover:border-cyan-400/40 hover:bg-cyan-500/15 hover:text-cyan-50"
+            title="浏览平台内置风格库并套用到风格定义节点"
+          >
+            <LayoutGrid className="size-3" />
+            风格库
           </button>
         ) : null}
         {onReflowStoryLayout ? (

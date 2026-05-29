@@ -38,6 +38,13 @@ import {
   useImagePasteRouter,
 } from "@/lib/canvas/image-upload-handlers";
 import { cn } from "@/lib/utils";
+import {
+  STYLE_LIBRARY_CARD_FOOTER,
+  STYLE_LIBRARY_CARD_SHELL,
+  STYLE_LIBRARY_CARD_TITLE,
+  STYLE_LIBRARY_HOVER_PROMPT_OVERLAY,
+  STYLE_LIBRARY_MEDIA_FRAME,
+} from "@/lib/canvas/style-library-card-chrome";
 
 type RowLike = {
   key: string;
@@ -212,25 +219,29 @@ export function StoryProSceneAssetSlots({
         场景资产 · 三槽参考（点击 / 拖入 / 悬停后粘贴）
         {assetLocked ? <span className="ml-1">· 已锁定</span> : null}
       </p>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-3 gap-2">
         {STORY_PRO_SCENE_REF_KINDS.map((kind) => {
           const ref = latestSceneRefForKind(asset, kind);
           const url = ref?.ossUrl;
+          const kindLabel = STORY_PRO_SCENE_REF_KIND_LABELS[kind];
           return (
-            <div
+            <article
               key={kind}
-              className="flex flex-col gap-1 rounded border border-white/8 bg-black/25 p-1"
+              className={cn(
+                "group/asset-slot nodrag",
+                STYLE_LIBRARY_CARD_SHELL,
+                dragOverKind === kind && "ring-1 ring-white/30",
+              )}
               {...bindSlotPaste(kind)}
             >
-              <p className={`truncate text-center ${STORY_ROW_SUBLABEL_CLASS}`}>
-                {STORY_PRO_SCENE_REF_KIND_LABELS[kind]}
-              </p>
               <button
                 type="button"
                 className={cn(
-                  "group/asset-slot nodrag relative aspect-video w-full overflow-hidden rounded bg-black/50 hover:ring-1 hover:ring-white/15",
-                  dragOverKind === kind && "ring-1 ring-white/40",
-                  activeKind === kind && canUpload && "ring-1 ring-white/20",
+                  "nodrag relative w-full overflow-hidden",
+                  STYLE_LIBRARY_MEDIA_FRAME,
+                  "h-[120px]",
+                  url ? "bg-black/50" : "bg-black/40",
+                  activeKind === kind && canUpload && "ring-1 ring-inset ring-white/20",
                 )}
                 onClick={() => {
                   if (url) {
@@ -263,7 +274,11 @@ export function StoryProSceneAssetSlots({
                 {url ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="size-full object-contain" />
+                    <img
+                      src={url}
+                      alt={kindLabel}
+                      className="absolute inset-0 size-full object-cover"
+                    />
                     {onPreview ? (
                       <span
                         className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover/asset-slot:opacity-100"
@@ -281,8 +296,17 @@ export function StoryProSceneAssetSlots({
                     ) : null}
                   </span>
                 )}
+                {ref?.label ? (
+                  <div className={STYLE_LIBRARY_HOVER_PROMPT_OVERLAY} aria-hidden>
+                    {ref.label}
+                  </div>
+                ) : null}
               </button>
-              <div className="flex justify-center gap-0.5">
+              <div className={cn(STYLE_LIBRARY_CARD_FOOTER, "px-2 py-2")}>
+                <p className={cn(STYLE_LIBRARY_CARD_TITLE, "text-[12px]")}>
+                  {kindLabel}
+                </p>
+                <div className="mt-1 flex flex-wrap justify-center gap-0.5">
                 {!assetLocked ? (
                   <>
                     <button
@@ -322,8 +346,9 @@ export function StoryProSceneAssetSlots({
                     ) : null}
                   </>
                 ) : null}
+                </div>
               </div>
-            </div>
+            </article>
           );
         })}
       </div>

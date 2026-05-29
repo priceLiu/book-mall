@@ -25,7 +25,7 @@ export default function ProjectAssetsGuidePage() {
         </div>
       </header>
 
-      <GuideSection title="四类项目资产（一致性基础）">
+      <GuideSection title="项目资产类别（一致性基础）">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <thead>
@@ -51,10 +51,15 @@ export default function ProjectAssetsGuidePage() {
                 <td className="py-2 pr-3">室内布局、关键物品</td>
                 <td className="py-2">地点、物件不突变</td>
               </tr>
-              <tr>
+              <tr className="border-b border-white/5">
                 <td className="py-2 pr-3 text-white/85">全局风格</td>
-                <td className="py-2 pr-3">画风/色彩/光影配置</td>
+                <td className="py-2 pr-3">画风/色彩/光影配置（自建入库）</td>
                 <td className="py-2">全剧画面质感统一</td>
+              </tr>
+              <tr>
+                <td className="py-2 pr-3 text-white/85">风格库</td>
+                <td className="py-2 pr-3">平台内置 135 条风格预设</td>
+                <td className="py-2">快速选型与提示词参考</td>
               </tr>
             </tbody>
           </table>
@@ -77,6 +82,23 @@ export default function ProjectAssetsGuidePage() {
           </li>
           <li>
             助手支持 <strong>闲聊 / 润色</strong> 与 <strong>创作并导入故事剧本</strong> 两种模式；「确定导入」<strong>仅用于全新工作流</strong>（未定稿、Hub 无大纲/下游列）。进行中或已定稿项目可对话与预览，不可导入以免打乱进度。
+          </li>
+        </ul>
+      </GuideSection>
+
+      <GuideSection title="风格库（平台内置）">
+        <ul className="guide-list">
+          <li>
+            <strong>/assets</strong> 页「风格库」Tab：浏览分类与卡片，悬停查看风格提示词。
+          </li>
+          <li>
+            <strong>画布</strong>：影视专业版工具栏「风格库」或风格节点「浏览风格库…」打开大弹层，点击卡片可<strong>套用</strong>到「风格定义」节点（中文锚定词 + 参考图）。
+          </li>
+          <li>
+            预览图须先放入 <code className="text-cyan-200/90">canvas-web/assets/style-library-source/</code> 后，在 <code className="text-cyan-200/90">book-mall</code> 执行 <code className="text-cyan-200/90">pnpm canvas:upload-style-library</code> 上传 OSS。
+          </li>
+          <li>
+            套用后若需长期复用，仍在风格节点点击「保存到项目资产（全局风格）」。
           </li>
         </ul>
       </GuideSection>

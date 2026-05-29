@@ -36,7 +36,8 @@ function idsEqual(a: string[], b: string[]): boolean {
   return sa === sb;
 }
 
-function StoryRowTitleBadge({ title }: { title: string }) {
+/** 镜号角标：叠在预览图/视频左上角（与分镜脚本列一致） */
+export function StoryRowTitleBadge({ title }: { title: string }) {
   return (
     <span
       className="pointer-events-none absolute left-2 top-0 z-10 max-w-[min(12rem,calc(100%-1rem))] -translate-y-1/2 truncate rounded border border-emerald-400/25 bg-[#0c1424] px-1.5 py-px text-[10px] font-semibold leading-tight text-emerald-200/95 shadow-sm"

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBookMallOrigin } from "@/lib/book-mall-base-url";
+import { bookMallFetchErrorMessage, fetchBookMall } from "@/lib/fetch-book-mall";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +28,10 @@ async function proxyToBookMallGw(request: NextRequest, pathSegments: string[]) {
       : await request.arrayBuffer();
 
   try {
-    const r = await fetch(upstream, {
+    const r = await fetchBookMall(upstream, {
       method: request.method,
       headers,
       body,
-      cache: "no-store",
     });
     const respBuf = await r.arrayBuffer();
     return new NextResponse(respBuf, {
@@ -44,7 +44,7 @@ async function proxyToBookMallGw(request: NextRequest, pathSegments: string[]) {
     return NextResponse.json(
       {
         error: "gw_proxy_failed",
-        message: e instanceof Error ? e.message : String(e),
+        message: bookMallFetchErrorMessage(e),
       },
       { status: 502 },
     );

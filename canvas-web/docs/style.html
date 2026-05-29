@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<!-- 数据真源已迁移至 canvas-web/lib/canvas/style-library/catalog.ts；预览图须走 OSS，勿使用外网 picsum。 -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>风格定型数据集</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+
+        body {
+            background: #121212;
+            color: #fff;
+            padding: 25px;
+        }
+
+        .container {
+            max-width: 1700px;
+            margin: 0 auto;
+        }
+
+        /* 分类导航 */
+        .category-nav {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 12px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #333;
+        }
+
+        .category-nav::-webkit-scrollbar { height: 6px; }
+        .category-nav::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+        .category-btn {
+            padding: 8px 16px;
+            background: #1e1e1e;
+            border: none;
+            color: #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: 0.2s;
+        }
+
+        .category-btn:hover,
+        .category-btn.active {
+            background: #007aff;
+            color: #fff;
+        }
+
+        /* 卡片网格 */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: #1a1a1a;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+
+        .card img {
+            width: 100%;
+            height: 260px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .card-info {
+            padding: 12px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            color: #eee;
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+
+        .card-category {
+            font-size: 12px;
+            color: #888;
+        }
+
+        /* 悬浮提示词 */
+        .card-tooltip {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            padding: 10px;
+            font-size: 12px;
+            line-height: 1.5;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            max-height: 70%;
+            overflow-y: auto;
+        }
+
+        .card:hover .card-tooltip {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="category-nav" id="nav"></div>
+        <div class="card-grid" id="grid"></div>
+    </div>
+
+    <script>
+        // ===================== 全部分类 15 条数据 =====================
+        const dataset = [
+            // 摄影写真（15）
+            {category:"摄影写真",name:"日系清新人像",image:"https://picsum.photos/id/91/400/550",prompt:"日系清新、自然光、柔和肤色、浅色系、干净背景、文艺氛围、高曝光质感"},
+            {category:"摄影写真",name:"港风复古写真",image:"https://picsum.photos/id/65/400/550",prompt:"港风、复古滤镜、胶片颗粒、暗调、暖黄灯光、氛围感、80年代"},
+            {category:"摄影写真",name:"法式温柔人像",image:"https://picsum.photos/id/64/400/550",prompt:"法式、温柔、复古、蕾丝、柔光、浅景深、优雅姿态、暖调"},
+            {category:"摄影写真",name:"暗调情绪写真",image:"https://picsum.photos/id/1005/400/550",prompt:"暗调、情绪、光影对比、低饱和、故事感、高级灰、艺术氛围"},
+            {category:"摄影写真",name:"森系治愈写真",image:"https://picsum.photos/id/1295/400/550",prompt:"森系、森林、绿植、逆光、清新、治愈、柔和、自然光影"},
+            {category:"摄影写真",name:"杂志高级感写真",image:"https://picsum.photos/id/1003/400/550",prompt:"杂志风、高级感、冷调、简洁背景、质感皮肤、时尚构图"},
+            {category:"摄影写真",name:"胶片复古写真",image:"https://picsum.photos/id/1062/400/550",prompt:"胶片、复古、颗粒感、褪色、暖调、文艺、怀旧感"},
+            {category:"摄影写真",name:"清新校园写真",image:"https://picsum.photos/id/1059/400/550",prompt:"校园、青春、清新、明亮、校服、阳光、干净、少年感"},
+            {category:"摄影写真",name:"古风汉服写真",image:"https://picsum.photos/id/1058/400/550",prompt:"汉服、古风、古典、园林、柔光、温婉、传统服饰、意境"},
+            {category:"摄影写真",name:"夜景氛围写真",image:"https://picsum.photos/id/1015/400/550",prompt:"夜景、城市灯光、光斑、氛围感、暗调、情绪、街拍"},
+            {category:"摄影写真",name:"清新海边写真",image:"https://picsum.photos/id/1043/400/550",prompt:"海边、清新、蓝天、沙滩、逆光、治愈、夏日感"},
+            {category:"摄影写真",name:"工笔写意人像",image:"https://picsum.photos/id/1069/400/550",prompt:"工笔画、写意、国风、柔和、古典、素雅、意境风"},
+            {category:"摄影写真",name:"高定时尚写真",image:"https://picsum.photos/id/1074/400/550",prompt:"高定、时尚、大牌、冷调、高级感、精致妆容、杂志大片"},
+            {category:"摄影写真",name:"温柔光影写真",image:"https://picsum.photos/id/177/400/550",prompt:"光影、温柔、侧光、柔和、治愈、干净、简约背景"},
+            {category:"摄影写真",name:"纪实风生活写真",image:"https://picsum.photos/id/250/400/550",prompt:"纪实、生活感、自然、抓拍、清新、日常、真实情绪"},
+
+            // 电商营销（15）
+            {category:"电商营销",name:"美妆产品主图",image:"https://picsum.photos/id/21/400/550",prompt:"高清产品、干净背景、明亮打光、质感、精致、高对比、商业主图"},
+            {category:"电商营销",name:"服装详情展示",image:"https://picsum.photos/id/26/400/550",prompt:"服装展示、干净背景、版型清晰、明亮、简约、商业质感"},
+            {category:"电商营销",name:"美食带货海报",image:"https://picsum.photos/id/292/400/550",prompt:"美食、高清、诱人、暖调、食欲感、细节清晰、带货风格"},
+            {category:"电商营销",name:"数码产品主图",image:"https://picsum.photos/id/324/400/550",prompt:"数码产品、科技感、冷调、高清、简洁背景、高级质感"},
+            {category:"电商营销",name:"家居好物展示",image:"https://picsum.photos/id/336/400/550",prompt:"家居、温馨、明亮、简约、质感、生活化、干净场景"},
+            {category:"电商营销",name:"国潮风电商海报",image:"https://picsum.photos/id/349/400/550",prompt:"国潮、中国风、红色、喜庆、传统元素、商业海报"},
+            {category:"电商营销",name:"清新风美妆场景",image:"https://picsum.photos/id/364/400/550",prompt:"清新、明亮、浅色系、美妆、柔和、干净、少女感"},
+            {category:"电商营销",name:"轻奢风饰品展示",image:"https://picsum.photos/id/365/400/550",prompt:"轻奢、高级、质感、冷调、精致、简约背景、珠宝展示"},
+            {category:"电商营销",name:"母婴温馨风格图",image:"https://picsum.photos/id/388/400/550",prompt:"母婴、温馨、明亮、柔和、浅色系、治愈、可爱"},
+            {category:"电商营销",name:"运动健身产品图",image:"https://picsum.photos/id/401/400/550",prompt:"运动、活力、力量感、冷调、科技感、健身场景"},
+            {category:"电商营销",name:"茶饮饮品主图",image:"https://picsum.photos/id/431/400/550",prompt:"饮品、清新、明亮、高饱和、食欲感、冰爽、质感"},
+            {category:"电商营销",name:"护肤产品场景图",image:"https://picsum.photos/id/447/400/550",prompt:"护肤、高级、水润、质感、干净背景、柔和光线、精致"},
+            {category:"电商营销",name:"零食小吃主图",image:"https://picsum.photos/id/493/400/550",prompt:"零食、诱人、高饱和、暖调、食欲、生活化、细节清晰"},
+            {category:"电商营销",name:"箱包产品展示图",image:"https://picsum.photos/id/572/400/550",prompt:"箱包、质感、冷调、简约背景、高级、商业展示、清晰纹理"},
+            {category:"电商营销",name:"节日促销海报",image:"https://picsum.photos/id/654/400/550",prompt:"促销、喜庆、红色、活动氛围、大字报、商业营销风格"},
+
+            // 动漫游戏（15）
+            {category:"动漫游戏",name:"二次元少女立绘",image:"https://picsum.photos/id/237/400/550",prompt:"二次元、少女、大眼睛、日系、精致五官、清新配色、动漫风格"},
+            {category:"动漫游戏",name:"游戏CG角色",image:"https://picsum.photos/id/155/400/550",prompt:"游戏CG、写实渲染、高精度、光影、3D质感、角色建模"},
+            {category:"动漫游戏",name:"Q版卡通角色",image:"https://picsum.photos/id/169/400/550",prompt:"Q版、卡通、可爱、大头小身、圆润、萌系、简约配色"},
+            {category:"动漫游戏",name:"国风仙侠角色",image:"https://picsum.photos/id/188/400/550",prompt:"仙侠、国风、古风、飘逸、仙气、华丽服饰、玄幻氛围"},
+            {category:"动漫游戏",name:"赛博朋克角色",image:"https://picsum.photos/id/160/400/550",prompt:"赛博朋克、科技、霓虹、未来风、金属、冷色调、科幻"},
+            {category:"动漫游戏",name:"日式和风角色",image:"https://picsum.photos/id/229/400/550",prompt:"和风、日式、传统、和服、复古、动漫风格、柔和配色"},
+            {category:"动漫游戏",name:"暗黑魔幻角色",image:"https://picsum.photos/id/114/400/550",prompt:"暗黑、魔幻、神秘、冷调、高对比、玄幻、恶魔风格"},
+            {category:"动漫游戏",name:"治愈系动漫插画",image:"https://picsum.photos/id/110/400/550",prompt:"治愈、清新、柔和、浅色系、动漫插画、温暖氛围"},
+            {category:"动漫游戏",name:"机甲科幻角色",image:"https://picsum.photos/id/113/400/550",prompt:"机甲、科幻、金属、未来、机械感、冷调、高质感"},
+            {category:"动漫游戏",name:"古风武侠角色",image:"https://picsum.photos/id/122/400/550",prompt:"武侠、古风、江湖、帅气、飘逸、国风、玄幻角色"},
+            {category:"动漫游戏",name:"少女漫画风格",image:"https://picsum.photos/id/128/400/550",prompt:"少女漫画、甜美、柔和、粉色系、大眼睛、清新、梦幻"},
+            {category:"动漫游戏",name:"像素风游戏角色",image:"https://picsum.photos/id/131/400/550",prompt:"像素风、复古、8bit、游戏、怀旧、简约配色、经典风格"},
+            {category:"动漫游戏",name:"幻想童话角色",image:"https://picsum.photos/id/132/400/550",prompt:"童话、幻想、梦幻、柔和、治愈、精致、唯美"},
+            {category:"动漫游戏",name:"战斗风游戏插画",image:"https://picsum.photos/id/143/400/550",prompt:"战斗、热血、高对比、炫光、动作感、游戏宣传、张力"},
+            {category:"动漫游戏",name:"唯美场景插画",image:"https://picsum.photos/id/152/400/550",prompt:"唯美、场景、动漫、治愈、光影、柔和、幻想世界"},
+
+            // 风格插画（15）
+            {category:"风格插画",name:"国潮国风插画",image:"https://picsum.photos/id/175/400/550",prompt:"国潮、国风、传统元素、高饱和、红色、现代国潮、平面插画"},
+            {category:"风格插画",name:"治愈扁平插画",image:"https://picsum.photos/id/119/400/550",prompt:"扁平风、简约、治愈、柔和、干净、几何、清新配色"},
+            {category:"风格插画",name:"水彩手绘插画",image:"https://picsum.photos/id/187/400/550",prompt:"水彩、手绘、晕染、柔和、清新、艺术、透气质感"},
+            {category:"风格插画",name:"肌理质感插画",image:"https://picsum.photos/id/192/400/550",prompt:"肌理、质感、颗粒、艺术、复古、手绘、层次"},
+            {category:"风格插画",name:"极简线条插画",image:"https://picsum.photos/id/196/400/550",prompt:"极简、线条、简约、黑白、艺术、干净、抽象"},
+            {category:"风格插画",name:"复古肌理插画",image:"https://picsum.photos/id/200/400/550",prompt:"复古、肌理、做旧、暖调、艺术、手绘质感"},
+            {category:"风格插画",name:"梦幻渐变插画",image:"https://picsum.photos/id/202/400/550",prompt:"渐变、梦幻、柔和、马卡龙、清新、治愈、唯美"},
+            {category:"风格插画",name:"商业矢量插画",image:"https://picsum.photos/id/206/400/550",prompt:"矢量、商业、扁平、简洁、清晰、品牌、推广插画"},
+            {category:"风格插画",name:"暗黑艺术插画",image:"https://picsum.photos/id/210/400/550",prompt:"暗黑、艺术、冷调、高对比、神秘、抽象、张力"},
+            {category:"风格插画",name:"日系治愈插画",image:"https://picsum.photos/id/212/400/550",prompt:"日系、治愈、清新、柔和、浅色系、温暖、生活感"},
+            {category:"风格插画",name:"文艺青年插画",image:"https://picsum.photos/id/215/400/550",prompt:"文艺、清新、简约、柔和、生活感、温暖、安静"},
+            {category:"风格插画",name:"儿童绘本插画",image:"https://picsum.photos/id/219/400/550",prompt:"儿童、可爱、明亮、柔和、卡通、治愈、绘本风"},
+            {category:"风格插画",name:"抽象艺术插画",image:"https://picsum.photos/id/220/400/550",prompt:"抽象、艺术、色彩、构成、现代、个性、创意"},
+            {category:"风格插画",name:"城市风景插画",image:"https://picsum.photos/id/222/400/550",prompt:"城市、风景、扁平、简约、清新、治愈、建筑"},
+            {category:"风格插画",name:"自然植物插画",image:"https://picsum.photos/id/224/400/550",prompt:"植物、自然、清新、治愈、扁平、手绘、柔和"},
+
+            // 平面设计（15）
+            {category:"平面设计",name:"极简海报设计",image:"https://picsum.photos/id/180/400/550",prompt:"极简、留白、高级、冷调、文字排版、简约海报"},
+            {category:"平面设计",name:"国潮品牌视觉",image:"https://picsum.photos/id/348/400/550",prompt:"国潮、品牌、红色、传统元素、现代视觉、大气"},
+            {category:"平面设计",name:"文艺画册版式",image:"https://picsum.photos/id/366/400/550",prompt:"文艺、版式、清新、柔和、画册、干净、高级"},
+            {category:"平面设计",name:"科技风视觉",image:"https://picsum.photos/id/372/400/550",prompt:"科技、未来、线条、冷调、光效、现代、视觉冲击"},
+            {category:"平面设计",name:"复古海报设计",image:"https://picsum.photos/id/375/400/550",prompt:"复古、做旧、暖调、肌理、大字报、艺术、怀旧"},
+            {category:"平面设计",name:"清新文创视觉",image:"https://picsum.photos/id/378/400/550",prompt:"清新、文创、柔和、治愈、简约、文艺、干净"},
+            {category:"平面设计",name:"轻奢品牌设计",image:"https://picsum.photos/id/380/400/550",prompt:"轻奢、高级、冷金、质感、简约、品牌、精致"},
+            {category:"平面设计",name:"潮流街头视觉",image:"https://picsum.photos/id/383/400/550",prompt:"街头、潮流、高饱和、个性、年轻、涂鸦、现代"},
+            {category:"平面设计",name:"日式简约排版",image:"https://picsum.photos/id/385/400/550",prompt:"日式、简约、留白、文字排版、清新、高级、安静"},
+            {category:"平面设计",name:"商务办公视觉",image:"https://picsum.photos/id/386/400/550",prompt:"商务、简约、蓝色、专业、干净、办公、品牌"},
+            {category:"平面设计",name:"艺术展览海报",image:"https://picsum.photos/id/390/400/550",prompt:"艺术、展览、抽象、高级、排版、创意、视觉"},
+            {category:"平面设计",name:"节日活动视觉",image:"https://picsum.photos/id/392/400/550",prompt:"节日、活动、喜庆、红色、氛围、商业、宣传"},
+            {category:"平面设计",name:"餐饮品牌视觉",image:"https://picsum.photos/id/395/400/550",prompt:"餐饮、美食、暖调、食欲、品牌、简约、质感"},
+            {category:"平面设计",name:"美妆品牌视觉",image:"https://picsum.photos/id/398/400/550",prompt:"美妆、高级、清新、质感、精致、品牌、柔和"},
+            {category:"平面设计",name:"城市文创设计",image:"https://picsum.photos/id/400/400/550",prompt:"城市、文创、国风、简约、质感、纪念、艺术"},
+
+            // 建筑及室内设计（15）
+            {category:"建筑及室内设计",name:"现代简约客厅",image:"https://picsum.photos/id/1048/400/550",prompt:"现代简约、客厅、明亮、原木、白灰、高级、干净"},
+            {category:"建筑及室内设计",name:"北欧风卧室",image:"https://picsum.photos/id/1060/400/550",prompt:"北欧、卧室、清新、浅色系、温馨、原木、简约"},
+            {category:"建筑及室内设计",name:"新中式茶室",image:"https://picsum.photos/id/1066/400/550",prompt:"新中式、茶室、国风、原木、禅意、安静、典雅"},
+            {category:"建筑及室内设计",name:"轻奢风餐厅",image:"https://picsum.photos/id/1070/400/550",prompt:"轻奢、餐厅、金属、质感、暖光、高级、精致"},
+            {category:"建筑及室内设计",name:"工业风空间",image:"https://picsum.photos/id/1071/400/550",prompt:"工业风、水泥、冷调、复古、金属、粗犷、个性"},
+            {category:"建筑及室内设计",name:"日式禅意空间",image:"https://picsum.photos/id/1076/400/550",prompt:"日式、禅意、原木、榻榻米、简约、安静、治愈"},
+            {category:"建筑及室内设计",name:"现代办公空间",image:"https://picsum.photos/id/1080/400/550",prompt:"办公、现代、简约、明亮、专业、干净、大气"},
+            {category:"建筑及室内设计",name:"法式复古空间",image:"https://picsum.photos/id/1084/400/550",prompt:"法式、复古、线条、暖调、优雅、精致、温馨"},
+            {category:"建筑及室内设计",name:"极简卫生间",image:"https://picsum.photos/id/1088/400/550",prompt:"极简、卫生间、白灰、质感、干净、高级、明亮"},
+            {category:"建筑及室内设计",name:"侘寂风空间",image:"https://picsum.photos/id/1091/400/550",prompt:"侘寂、水泥、肌理、质朴、自然、禅意、艺术"},
+            {category:"建筑及室内设计",name:"现代儿童房",image:"https://picsum.photos/id/1093/400/550",prompt:"儿童房、明亮、清新、温馨、简约、安全、可爱"},
+            {category:"建筑及室内设计",name:"高端酒店大堂",image:"https://picsum.photos/id/1096/400/550",prompt:"酒店、高端、大气、轻奢、明亮、高级、质感"},
+            {category:"建筑及室内设计",name:"现代别墅外观",image:"https://picsum.photos/id/1100/400/550",prompt:"别墅、现代、外观、大气、简约、线条、高级"},
+            {category:"建筑及室内设计",name:"暖色系居家空间",image:"https://picsum.photos/id/1105/400/550",prompt:"暖色系、居家、温馨、治愈、明亮、简约、舒适"},
+            {category:"建筑及室内设计",name:"商业店铺空间",image:"https://picsum.photos/id/1110/400/550",prompt:"商业、店铺、现代、明亮、简约、高级、质感"},
+
+            // 创意玩法（15）
+            {category:"创意玩法",name:"赛博朋克合成",image:"https://picsum.photos/id/160/400/550",prompt:"赛博朋克、霓虹、科幻、未来、冷调、光影、创意合成"},
+            {category:"创意玩法",name:"双重曝光艺术",image:"https://picsum.photos/id/1040/400/550",prompt:"双重曝光、人像、风景、融合、艺术、意境、创意"},
+            {category:"创意玩法",name:"蒸汽波风格",image:"https://picsum.photos/id/1041/400/550",prompt:"蒸汽波、复古、粉紫、高饱和、迷幻、怀旧、创意"},
+            {category:"创意玩法",name:"故障艺术风",image:"https://picsum.photos/id/1042/400/550",prompt:"故障风、失真、条纹、科技、未来、个性、视觉冲击"},
+            {category:"创意玩法",name:"光影涂鸦效果",image:"https://picsum.photos/id/142/400/550",prompt:"光影、涂鸦、光绘、夜景、创意、艺术、氛围"},
+            {category:"创意玩法",name:"拼贴艺术风格",image:"https://picsum.photos/id/1044/400/550",prompt:"拼贴、复古、艺术、个性、混搭、创意、视觉"},
+            {category:"创意玩法",name:"梦幻虚化光影",image:"https://picsum.photos/id/1045/400/550",prompt:"梦幻、虚化、光斑、柔光、治愈、清新、创意"},
+            {category:"创意玩法",name:"水墨融结合成",image:"https://picsum.photos/id/1046/400/550",prompt:"水墨、国风、融合、意境、艺术、创意、古典"},
+            {category:"创意玩法",name:"未来科技合成",image:"https://picsum.photos/id/1047/400/550",prompt:"科技、未来、光效、冷调、科幻、创意、视觉"},
+            {category:"创意玩法",name:"复古胶片特效",image:"https://picsum.photos/id/1049/400/550",prompt:"胶片、复古、颗粒、做旧、暖调、文艺、创意"},
+            {category:"创意玩法",name:"手绘涂鸦风格",image:"https://picsum.photos/id/1050/400/550",prompt:"涂鸦、手绘、街头、个性、高饱和、创意、艺术"},
+            {category:"创意玩法",name:"极简负感效果",image:"https://picsum.photos/id/1051/400/550",prompt:"负感、极简、黑白、艺术、创意、视觉、高级"},
+            {category:"创意玩法",name:"自然融结合成",image:"https://picsum.photos/id/1052/400/550",prompt:"自然、融合、人像、风景、治愈、创意、意境"},
+            {category:"创意玩法",name:"霓虹光效人像",image:"https://picsum.photos/id/1053/400/550",prompt:"霓虹、光效、人像、夜景、赛博、创意、氛围"},
+            {category:"创意玩法",name:"抽象色彩艺术",image:"https://picsum.photos/id/1054/400/550",prompt:"抽象、色彩、艺术、创意、视觉、个性、构成"},
+
+            // 文创周边（15）
+            {category:"文创周边",name:"古风书签设计",image:"https://picsum.photos/id/325/400/550",prompt:"古风、书签、国风、典雅、简约、质感、文创"},
+            {category:"文创周边",name:"可爱手账贴纸",image:"https://picsum.photos/id/326/400/550",prompt:"可爱、手账、贴纸、清新、治愈、卡通、文创"},
+            {category:"文创周边",name:"国潮帆布包",image:"https://picsum.photos/id/328/400/550",prompt:"国潮、帆布包、国风、红色、质感、文创、潮流"},
+            {category:"文创周边",name:"文艺笔记本",image:"https://picsum.photos/id/330/400/550",prompt:"文艺、笔记本、清新、简约、质感、文创、治愈"},
+            {category:"文创周边",name:"古风团扇设计",image:"https://picsum.photos/id/332/400/550",prompt:"古风、团扇、国风、典雅、意境、文创、艺术"},
+            {category:"文创周边",name:"卡通徽章设计",image:"https://picsum.photos/id/334/400/550",prompt:"卡通、徽章、可爱、清新、文创、质感、小巧"},
+            {category:"文创周边",name:"城市纪念明信片",image:"https://picsum.photos/id/335/400/550",prompt:"城市、明信片、纪念、国风、简约、文创、艺术"},
+            {category:"文创周边",name:"治愈系手机壳",image:"https://picsum.photos/id/337/400/550",prompt:"治愈、手机壳、清新、简约、文创、质感、可爱"},
+            {category:"文创周边",name:"禅意茶具文创",image:"https://picsum.photos/id/339/400/550",prompt:"禅意、茶具、国风、质朴、质感、文创、典雅"},
+            {category:"文创周边",name:"文艺帆布袋",image:"https://picsum.photos/id/341/400/550",prompt:"文艺、帆布袋、清新、简约、质感、文创、日常"},
+            {category:"文创周边",name:"古风发簪设计",image:"https://picsum.photos/id/343/400/550",prompt:"古风、发簪、国风、典雅、精致、文创、传统"},
+            {category:"文创周边",name:"可爱玩偶文创",image:"https://picsum.photos/id/345/400/550",prompt:"可爱、玩偶、治愈、清新、文创、质感、萌系"},
+            {category:"文创周边",name:"简约香薰包装",image:"https://picsum.photos/id/346/400/550",prompt:"简约、香薰、包装、清新、质感、文创、高级"},
+            {category:"文创周边",name:"国风纸胶带",image:"https://picsum.photos/id/347/400/550",prompt:"国风、纸胶带、复古、文艺、文创、手账、质感"},
+            {category:"文创周边",name:"艺术装饰版画",image:"https://picsum.photos/id/350/400/550",prompt:"艺术、版画、装饰、简约、文艺、文创、高级"},
+
+            // 小说推文（15）
+            {category:"小说推文",name:"古风言情推文",image:"https://picsum.photos/id/240/400/550",prompt:"古风、言情、唯美、意境、古典、温柔、小说推文"},
+            {category:"小说推文",name:"都市甜宠推文",image:"https://picsum.photos/id/318/400/550",prompt:"都市、甜宠、清新、明亮、治愈、温暖、小说推文"},
+            {category:"小说推文",name:"玄幻修仙推文",image:"https://picsum.photos/id/1001/400/550",prompt:"玄幻、修仙、霸气、光影、国风、小说推文、张力"},
+            {category:"小说推文",name:"悬疑推理推文",image:"https://picsum.photos/id/1002/400/550",prompt:"悬疑、推理、暗调、神秘、冷调、小说推文、氛围"},
+            {category:"小说推文",name:"校园青春推文",image:"https://picsum.photos/id/1004/400/550",prompt:"校园、青春、清新、明亮、治愈、少年感、小说推文"},
+            {category:"小说推文",name:"霸道总裁推文",image:"https://picsum.photos/id/1006/400/550",prompt:"总裁、都市、冷调、高级、质感、小说推文、霸气"},
+            {category:"小说推文",name:"穿越重生推文",image:"https://picsum.photos/id/1008/400/550",prompt:"穿越、重生、古风、玄幻、意境、小说推文、视觉"},
+            {category:"小说推文",name:"耽美纯爱推文",image:"https://picsum.photos/id/1011/400/550",prompt:"纯爱、文艺、清新、柔和、治愈、小说推文、氛围"},
+            {category:"小说推文",name:"末世科幻推文",image:"https://picsum.photos/id/1012/400/550",prompt:"末世、科幻、废土、冷调、未来、小说推文、视觉"},
+            {category:"小说推文",name:"古代权谋推文",image:"https://picsum.photos/id/1014/400/550",prompt:"权谋、古风、大气、暗调、意境、小说推文、张力"},
+            {category:"小说推文",name:"轻松搞笑推文",image:"https://picsum.photos/id/1016/400/550",prompt:"搞笑、轻松、明亮、清新、治愈、小说推文、可爱"},
+            {category:"小说推文",name:"电竞甜文推文",image:"https://picsum.photos/id/1018/400/550",prompt:"电竞、都市、青春、冷调、科技、小说推文、活力"},
+            {category:"小说推文",name:"仙侠虐恋推文",image:"https://picsum.photos/id/1019/400/550",prompt:"仙侠、虐恋、古风、唯美、意境、小说推文、悲伤"},
+            {category:"小说推文",name:"历史正剧推文",image:"https://picsum.photos/id/1022/400/550",prompt:"历史、正剧、古风、大气、典雅、小说推文、质感"},
+            {category:"小说推文",name:"娱乐圈文推文",image:"https://picsum.photos/id/1025/400/550",prompt:"娱乐圈、都市、时尚、明亮、高级、小说推文、氛围"}
+        ];
+
+        // 自动生成分类按钮
+        const nav = document.getElementById('nav');
+        const grid = document.getElementById('grid');
+        const categoryList = [...new Set(dataset.map(item => item.category))];
+
+        // 渲染分类
+        function renderNav() {
+            const allBtn = document.createElement('button');
+            allBtn.className = 'category-btn active';
+            allBtn.textContent = '全部';
+            allBtn.onclick = () => filter('all');
+            nav.appendChild(allBtn);
+
+            categoryList.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = 'category-btn';
+                btn.textContent = cat;
+                btn.onclick = () => filter(cat);
+                nav.appendChild(btn);
+            });
+        }
+
+        // 筛选渲染
+        function filter(cate) {
+            document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            event?.target.classList.add('active');
+            const data = cate === 'all' ? dataset : dataset.filter(i => i.category === cate);
+            renderCards(data);
+        }
+
+        // 渲染卡片
+        function renderCards(data) {
+            grid.innerHTML = '';
+            data.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <img src="${item.image}" alt="${item.name}">
+                    <div class="card-tooltip">${item.prompt}</div>
+                    <div class="card-info">
+                        <div class="card-title">${item.name}</div>
+                        <div class="card-category">${item.category}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // 初始化
+        renderNav();
+        renderCards(dataset);
+    </script>
+</body>
+</html>

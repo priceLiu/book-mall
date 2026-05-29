@@ -3,8 +3,19 @@ import type {
   StoryFrameRow,
   StoryVideoRow,
 } from "./story-workspace-types";
-import type { CanvasFlowNode } from "./types";
+import {
+  authoritativeFrameRowsForVideoColumn,
+  frameRowsForVideoColumn,
+} from "./story-column-display";
+import { patchVideoRowsFromFrameRows } from "./story-column-sync";
+import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { NODE_DEFAULT_SIZE } from "./types";
+
+/** 分镜视频列 · 列头横排模型条高度 */
+export const STORY_VIDEO_ENGINE_BAR_H = 76;
+
+/** 分镜脚本列 · 列头横排（风格 / @ / IMAGE） */
+export const STORY_FRAME_ENGINE_BAR_H = 76;
 
 /** 节点壳：标题栏 + 内边距（与 NodeShell 实测近似） */
 const SHELL_CHROME = 52;
@@ -44,20 +55,16 @@ export const STORY_FRAME_ROW_BELOW_PROMPT_H = 56;
 export const STORY_PRO_FRAME_ROW_BLOCK_H =
   STORY_FRAME_ROW_STRIP_H + STORY_FRAME_ROW_BELOW_PROMPT_H + 24;
 
-/** 分镜视频列 · 单镜块（与 story-video-row-slot 同步） */
+/** 分镜视频列 · 单镜预览区（镜号叠在预览左上角，无底部文案条） */
 export const STORY_VIDEO_SLOT = {
-  labelHeight: 24,
-  labelThumbGap: 10,
   thumbHeight: 248,
+  /** @deprecated 镜号已叠在预览上，保留 0 以免旧高度公式多算一节 */
+  footerHeight: 0,
   slotGap: 18,
 } as const;
 
 export function storyVideoSlotBlockHeight(): number {
-  return (
-    STORY_VIDEO_SLOT.labelHeight +
-    STORY_VIDEO_SLOT.labelThumbGap +
-    STORY_VIDEO_SLOT.thumbHeight
-  );
+  return STORY_VIDEO_SLOT.thumbHeight + STORY_VIDEO_SLOT.footerHeight;
 }
 
 /** 分镜视频列 · 每镜 TTS 配音槽 */
@@ -147,22 +154,39 @@ export const STORY_FRAME_VIDEO_ENGINE_PANEL_H = STORY_VIDEO_ENGINE_PANEL_H;
 /** 分镜脚本列 · 动态高度估算后再加，避免 body 内滚动条 */
 export const STORY_FRAME_COLUMN_EXTRA_H = 200;
 
-/** 分镜脚本列 · 列头区高 */
+/** 分镜脚本列 · 列头区高（横排引擎条 + 镜列表） */
 export function storyFrameScriptHeaderH(_opts?: { pro?: boolean }): number {
+  return STORY_COLUMN_SHELL_H + STORY_FRAME_ENGINE_BAR_H + 8;
+}
+
+/** @deprecated 纵向三行引擎区 */
+export function storyFrameScriptHeaderHLegacy(_opts?: { pro?: boolean }): number {
   return STORY_COLUMN_SHELL_H + STORY_FRAME_SCRIPT_ENGINE_PANEL_H;
 }
 
-/** 分镜视频列 · 列头区高 */
+/** 分镜视频列 · 列头区高（双模型横排 + 镜列表） */
 export function storyFrameVideoHeaderH(_opts?: { pro?: boolean }): number {
+  return STORY_COLUMN_SHELL_H + STORY_VIDEO_ENGINE_BAR_H + 8;
+}
+
+/** @deprecated 纵向双行引擎区；视频列已改横排 {@link STORY_VIDEO_ENGINE_BAR_H} */
+export function storyFrameVideoHeaderHLegacy(_opts?: { pro?: boolean }): number {
   return STORY_COLUMN_SHELL_H + STORY_VIDEO_ENGINE_PANEL_H;
 }
 
-/** 分镜脚本行 + 分镜视频行 · 单镜块统一高 */
-export function storyFrameVideoRowBlockH(opts?: { pro?: boolean }): number {
-  const frameBlock = opts?.pro
+/** 分镜脚本 · 单格块高 */
+export function storyFrameRowBlockHeight(opts?: { pro?: boolean }): number {
+  return opts?.pro
     ? STORY_PRO_FRAME_ROW_BLOCK_H
     : STORY_COMIC_FRAME_ROW_BLOCK_H;
-  return Math.max(frameBlock, storyVideoRowBlockHeight());
+}
+
+/** 分镜脚本行 + 分镜视频行 · 纵向对齐用（取较大值） */
+export function storyFrameVideoRowBlockH(opts?: { pro?: boolean }): number {
+  return Math.max(
+    storyFrameRowBlockHeight(opts),
+    storyVideoRowBlockHeight(),
+  );
 }
 
 /** @deprecated 使用 STORY_VIDEO_ENGINE_PANEL_H */
@@ -206,17 +230,15 @@ export function storyFrameColumnSize(
   rows: StoryFrameRow[],
   opts?: { pro?: boolean },
 ) {
-  const def = NODE_DEFAULT_SIZE["story-frame-column"];
-  const calculated = storyColumnHeightFromRows(
-    storyFrameScriptHeaderH(opts),
-    storyFrameVideoRowBlockH(opts),
-    rows.length,
-  );
+  const count = rows.length;
+  const isPro = opts?.pro === true;
+  const def = NODE_DEFAULT_SIZE[isPro ? "story-pro-frame" : "story-frame-column"];
   return {
     width: def.width,
-    height: Math.max(
-      STORY_COLUMN_MIN_H,
-      calculated + STORY_FRAME_COLUMN_EXTRA_H,
+    height: storyColumnHeightFromRows(
+      storyFrameScriptHeaderH(opts),
+      storyFrameRowBlockHeight(opts),
+      count,
     ),
   };
 }
@@ -227,13 +249,14 @@ export function storyVideoColumnSize(
   frameRowCount?: number,
   opts?: { pro?: boolean },
 ) {
-  const def = NODE_DEFAULT_SIZE["story-video-column"];
   const count = Math.max(rows.length, frameRowCount ?? 0);
+  const isPro = opts?.pro === true;
+  const def = NODE_DEFAULT_SIZE[isPro ? "story-pro-video" : "story-video-column"];
   return {
     width: def.width,
     height: storyColumnHeightFromRows(
       storyFrameVideoHeaderH(opts),
-      storyFrameVideoRowBlockH(opts),
+      storyVideoRowBlockHeight(),
       count,
     ),
   };
@@ -244,6 +267,9 @@ function applyNodeSize(
   size: { width: number; height: number },
   minWidth?: number,
 ): CanvasFlowNode {
+  if (Boolean((n.data as { manualSize?: boolean }).manualSize)) {
+    return n;
+  }
   const width = Math.max(size.width, minWidth ?? 0);
   const height = size.height;
   return {
@@ -254,68 +280,111 @@ function applyNodeSize(
   } as CanvasFlowNode;
 }
 
+/** 分镜视频列宽固定 540；高度仍可按 manualSize 保留用户拖拽 */
+function applyStoryVideoNodeSize(
+  n: CanvasFlowNode,
+  size: { width: number; height: number },
+  minWidth: number,
+  dataPatch?: Record<string, unknown>,
+): CanvasFlowNode {
+  const width = Math.max(size.width, minWidth);
+  const manual = Boolean((n.data as { manualSize?: boolean }).manualSize);
+  const height = manual
+    ? Number(n.style?.height ?? n.height ?? size.height) || size.height
+    : size.height;
+  return {
+    ...n,
+    data: dataPatch ? { ...n.data, ...dataPatch } : n.data,
+    width,
+    height,
+    style: { ...n.style, width, height },
+  } as CanvasFlowNode;
+}
+
 function applyStoryComicColumnHeights(
   nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[] = [],
 ): CanvasFlowNode[] {
-  const char = nodes.find((n) => n.type === "story-character-column");
-  const frame = nodes.find((n) => n.type === "story-frame-column");
-  const video = nodes.find((n) => n.type === "story-video-column");
-
-  const charRows =
-    ((char?.data as { rows?: StoryCharacterRow[] })?.rows as StoryCharacterRow[]) ??
-    [];
-  const frameRows =
-    ((frame?.data as { rows?: StoryFrameRow[] })?.rows as StoryFrameRow[]) ?? [];
-  const videoRows =
-    ((video?.data as { rows?: StoryVideoRow[] })?.rows as StoryVideoRow[]) ?? [];
-
-  const charSize = char ? storyCharacterColumnSize(charRows, { pro: false }) : null;
-  const frameSize = frame ? storyFrameColumnSize(frameRows, { pro: false }) : null;
-  const videoSize = video
-    ? storyVideoColumnSize(videoRows, frameRows.length, { pro: false })
-    : null;
-
   const charDef = NODE_DEFAULT_SIZE["story-character-column"].width;
   const frameDef = NODE_DEFAULT_SIZE["story-frame-column"].width;
   const videoDef = NODE_DEFAULT_SIZE["story-video-column"].width;
 
   return nodes.map((n) => {
-    if (n.id === char?.id && charSize) return applyNodeSize(n, charSize, charDef);
-    if (n.id === frame?.id && frameSize) return applyNodeSize(n, frameSize, frameDef);
-    if (n.id === video?.id && videoSize) return applyNodeSize(n, videoSize, videoDef);
+    if (n.type === "story-character-column") {
+      const charRows =
+        ((n.data as { rows?: StoryCharacterRow[] })?.rows as StoryCharacterRow[]) ??
+        [];
+      const charSize = storyCharacterColumnSize(charRows, { pro: false });
+      return applyNodeSize(n, charSize, charDef);
+    }
+    if (n.type === "story-frame-column") {
+      const frameRows = authoritativeFrameRowsForVideoColumn(nodes, n.id, edges);
+      const frameSize = storyFrameColumnSize(frameRows, { pro: false });
+      return applyNodeSize(n, frameSize, frameDef);
+    }
+    if (n.type === "story-video-column") {
+      const { frameColumnId, frameRows } = frameRowsForVideoColumn(
+        nodes,
+        edges,
+        n.id,
+      );
+      const videoStored =
+        ((n.data as { rows?: StoryVideoRow[] })?.rows as StoryVideoRow[]) ?? [];
+      const videoRows = frameRows.length
+        ? patchVideoRowsFromFrameRows(videoStored, frameRows)
+        : videoStored;
+      const videoSize = storyVideoColumnSize(videoRows, frameRows.length, {
+        pro: false,
+      });
+      return applyStoryVideoNodeSize(n, videoSize, videoDef, {
+        rows: videoRows,
+        frameColumnId,
+      });
+    }
     return n;
   });
 }
 
 function applyStoryProColumnHeights(
   nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[] = [],
 ): CanvasFlowNode[] {
-  const char = nodes.find((n) => n.type === "story-pro-character");
-  const frame = nodes.find((n) => n.type === "story-pro-frame");
-  const video = nodes.find((n) => n.type === "story-pro-video");
-
-  const charRows =
-    ((char?.data as { rows?: StoryCharacterRow[] })?.rows as StoryCharacterRow[]) ??
-    [];
-  const frameRows =
-    ((frame?.data as { rows?: StoryFrameRow[] })?.rows as StoryFrameRow[]) ?? [];
-  const videoRows =
-    ((video?.data as { rows?: StoryVideoRow[] })?.rows as StoryVideoRow[]) ?? [];
-
-  const charSize = char ? storyCharacterColumnSize(charRows, { pro: true }) : null;
-  const frameSize = frame ? storyFrameColumnSize(frameRows, { pro: true }) : null;
-  const videoSize = video
-    ? storyVideoColumnSize(videoRows, frameRows.length, { pro: true })
-    : null;
-
   const charDef = NODE_DEFAULT_SIZE["story-pro-character"].width;
   const frameDef = NODE_DEFAULT_SIZE["story-pro-frame"].width;
   const videoDef = NODE_DEFAULT_SIZE["story-pro-video"].width;
 
   return nodes.map((n) => {
-    if (n.id === char?.id && charSize) return applyNodeSize(n, charSize, charDef);
-    if (n.id === frame?.id && frameSize) return applyNodeSize(n, frameSize, frameDef);
-    if (n.id === video?.id && videoSize) return applyNodeSize(n, videoSize, videoDef);
+    if (n.type === "story-pro-character") {
+      const charRows =
+        ((n.data as { rows?: StoryCharacterRow[] })?.rows as StoryCharacterRow[]) ??
+        [];
+      const charSize = storyCharacterColumnSize(charRows, { pro: true });
+      return applyNodeSize(n, charSize, charDef);
+    }
+    if (n.type === "story-pro-frame") {
+      const frameRows = authoritativeFrameRowsForVideoColumn(nodes, n.id, edges);
+      const frameSize = storyFrameColumnSize(frameRows, { pro: true });
+      return applyNodeSize(n, frameSize, frameDef);
+    }
+    if (n.type === "story-pro-video") {
+      const { frameColumnId, frameRows } = frameRowsForVideoColumn(
+        nodes,
+        edges,
+        n.id,
+      );
+      const videoStored =
+        ((n.data as { rows?: StoryVideoRow[] })?.rows as StoryVideoRow[]) ?? [];
+      const videoRows = frameRows.length
+        ? patchVideoRowsFromFrameRows(videoStored, frameRows)
+        : videoStored;
+      const videoSize = storyVideoColumnSize(videoRows, frameRows.length, {
+        pro: true,
+      });
+      return applyStoryVideoNodeSize(n, videoSize, videoDef, {
+        rows: videoRows,
+        frameColumnId,
+      });
+    }
     return n;
   });
 }
@@ -323,6 +392,7 @@ function applyStoryProColumnHeights(
 /** 按 rows 数量估算列高（快手 / 专业版分别计算，互不混用） */
 export function applyStoryColumnHeights(
   nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[] = [],
 ): CanvasFlowNode[] {
   let next = nodes;
   const hasComicMedia = nodes.some(
@@ -337,8 +407,8 @@ export function applyStoryColumnHeights(
       n.type === "story-pro-frame" ||
       n.type === "story-pro-video",
   );
-  if (hasComicMedia) next = applyStoryComicColumnHeights(next);
-  if (hasProMedia) next = applyStoryProColumnHeights(next);
+  if (hasComicMedia) next = applyStoryComicColumnHeights(next, edges);
+  if (hasProMedia) next = applyStoryProColumnHeights(next, edges);
   return next;
 }
 

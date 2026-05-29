@@ -2,6 +2,10 @@ import type { CanvasFlowNode, CanvasNodeType, CanvasFlowEdge } from "./types";
 import { isGroupNode, NODE_DEFAULT_SIZE } from "./types";
 import { STORY_CONTROL_NODE_HEIGHT, STORY_CONTROL_NODE_WIDTH } from "./story-node-chrome";
 import { migrateStoryOutlineLlmParamsAll } from "./story-llm-params-migrate";
+import {
+  repairStoryVideoFrameEdges,
+  reconcileStoryVideoColumnRows,
+} from "./story-column-display";
 import { applyStoryColumnHeights, isStoryMediaColumnType } from "./story-column-layout";
 
 const GROUP_PADDING = 28;
@@ -711,9 +715,12 @@ function normalizeThreeViewNodeSizes(
 /** 角色列 / 分镜列 / 视频列：按行数估算高度（内容超出时 bodyScroll 内滚） */
 function normalizeStoryMediaColumnSizes(
   nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[] = [],
 ): CanvasFlowNode[] {
   if (!nodes.some((n) => isStoryMediaColumnType(n.type))) return nodes;
-  return applyStoryColumnHeights(nodes);
+  const repairedEdges = repairStoryVideoFrameEdges(nodes, edges);
+  const synced = reconcileStoryVideoColumnRows(nodes, repairedEdges);
+  return applyStoryColumnHeights(synced, repairedEdges);
 }
 
 /** 故事主题 / 故事大纲：纠正异常偏小的持久化尺寸；保留用户加长后的高度 */
@@ -786,6 +793,7 @@ export function normalizeCanvasNodes(
   const sized = normalizeStoryControlNodeSizes(
     normalizeStoryMediaColumnSizes(
       normalizeRefVideoWorkflowNodeSizes(normalizeThreeViewNodeSizes(withLlmParams)),
+      edges ?? [],
     ),
   );
   if (!hasStoryTemplateGroups(sized)) {

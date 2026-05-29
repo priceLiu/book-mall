@@ -22,7 +22,7 @@ import {
   registerCanvasViewportPlacement,
   unregisterCanvasViewportPlacement,
 } from "@/lib/canvas/viewport-placement";
-import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
+import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
 import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 import { ImageNode } from "./nodes/image-node";
 import { TextNode } from "./nodes/text-node";
@@ -513,10 +513,10 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
   return (
     <div
       ref={wrapRef}
-      className={`relative z-0 h-full w-full ${connectingFromNodeId ? "canvas-connecting" : ""}`}
+      className={`canvas-flow-wrap relative z-0 h-full w-full overscroll-none ${connectingFromNodeId ? "canvas-connecting" : ""}`}
       onDrop={onDrop}
       onDragOver={onDragOver}
-      onWheelCapture={onCanvasFormWheel}
+      onWheelCapture={onCanvasWheelCapture}
     >
       <ReactFlow
         key={projectId}

@@ -6,7 +6,7 @@ import { LayoutTemplate, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { blockCanvasFormWheelScroll } from "@/lib/canvas/canvas-form-wheel";
+import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { ScriptWritingAssistantPanel } from "@/components/canvas/script-writing-assistant-panel";
@@ -15,6 +15,7 @@ import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
 import { MySavedScriptsPanel } from "@/components/canvas/my-saved-scripts-panel";
 import { MyVideoLibraryPanel } from "@/components/canvas/my-video-library-panel";
 import { MyProjectCharacterAssetsPanel } from "@/components/canvas/my-project-character-assets-panel";
+import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -123,13 +124,20 @@ function Inner({ projectId }: { projectId: string }) {
   const [videoLibraryRefreshKey, setVideoLibraryRefreshKey] = useState(0);
   const [myProjectCharacterAssetsOpen, setMyProjectCharacterAssetsOpen] =
     useState(false);
+  const [styleLibraryOpen, setStyleLibraryOpen] = useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
 
   useEffect(() => {
-    const onWheel = (e: WheelEvent) => blockCanvasFormWheelScroll(e);
+    const onWheel = (e: WheelEvent) => handleCanvasWheel(e);
     document.addEventListener("wheel", onWheel, { capture: true, passive: false });
     return () =>
       document.removeEventListener("wheel", onWheel, { capture: true });
+  }, []);
+
+  useEffect(() => {
+    const open = () => setStyleLibraryOpen(true);
+    window.addEventListener("canvas:open-style-library", open);
+    return () => window.removeEventListener("canvas:open-style-library", open);
   }, []);
 
   /** 加载完成时的节点数；用于阻止误把「有内容的画布」自动保存成空。 */
@@ -487,6 +495,9 @@ function Inner({ projectId }: { projectId: string }) {
               isStoryProCanvas ? () => setMySavedScriptsOpen(true) : undefined
             }
             onOpenProjectCharacterAssets={() => setMyProjectCharacterAssetsOpen(true)}
+            onOpenStyleLibrary={
+              isStoryProCanvas ? () => setStyleLibraryOpen(true) : undefined
+            }
             onReflowStoryLayout={
               isStoryComicCanvas ? () => reflowStoryComicLayout() : undefined
             }
@@ -520,6 +531,12 @@ function Inner({ projectId }: { projectId: string }) {
         open={myProjectCharacterAssetsOpen}
         onClose={() => setMyProjectCharacterAssetsOpen(false)}
       />
+      {isStoryProCanvas ? (
+        <StyleLibraryModal
+          open={styleLibraryOpen}
+          onClose={() => setStyleLibraryOpen(false)}
+        />
+      ) : null}
       <div className="relative z-0 flex min-h-0 flex-1 overflow-hidden isolate">
         {isStoryProCanvas && project ? (
           <ScriptWritingAssistantPanel

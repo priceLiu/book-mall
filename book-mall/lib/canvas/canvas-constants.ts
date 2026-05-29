@@ -58,7 +58,15 @@ export type CanvasOssKind =
   | "node-video"
   | "node-audio"
   | "node-output"
-  | "user-upload";
+  | "user-upload"
+  | "style-library";
+
+/** 平台内置风格库预览图（固定 key，便于增量覆盖上传） */
+export function buildStyleLibraryOssKey(id: string, ext: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeExt = ext.replace(/^\./, "").toLowerCase() || "webp";
+  return `canvas/style-library/${safeId}.${safeExt}`;
+}
 
 export function buildCanvasOssKey(
   kind: CanvasOssKind,
