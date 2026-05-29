@@ -105,11 +105,12 @@ export function CanvasPromptVideoSplit({
     if (!dragging) return;
 
     const onMove = (e: PointerEvent) => {
-      if (!dragRef.current || !containerRef.current) return;
+      if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       if (rect.height < 1) return;
-      const dy = e.clientY - dragRef.current.startY;
-      applyRatio(dragRef.current.startRatio + dy / rect.height);
+      // 视频在下方：指针越低，预览区越大（按 Y 位置算比例，避免增量方向反了）
+      const videoRatio = (rect.bottom - e.clientY) / rect.height;
+      applyRatio(videoRatio);
     };
 
     const onEnd = () => finishDrag();
