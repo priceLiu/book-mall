@@ -185,8 +185,11 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 
 #### 3.6.3 节点面板 · 收到右侧（可选）
 
-- `fixed right-3 top-1/2` 竖条：`bg-[var(--canvas-surface)]/85` + `backdrop-blur-md`（**禁止** `bg-black/75` 大块纯黑）
-- 展开回顶部：仅保留右侧浮条上的收起钮；**禁止**顶栏再出现全宽「节点面板在右侧」提示条
+- `fixed right-2 top-1/2` 竖向组合：`bg-[var(--canvas-surface)]/90` + `backdrop-blur-md`（**禁止** `bg-black/75` 大块纯黑）
+- **结构（硬性）**：**「移到顶部」钮在节点列表卡片左侧**，与整列工具条 **垂直居中**（`flex-row items-center`），不参与列表布局；翡翠描边 `size-10`；底部固定帮助钮
+- **尺寸**（右侧 dock）：节点钮 **22px**（`size-[22px]`）、图标 **12px**（`size-3`）；分组徽标同 **22px**；帮助钮同节点钮；「移到顶部」仍 `size-10`
+- **禁止** 右侧列表区 `overflow-y-auto` / 内嵌滚动条；列表随内容自然撑高（整列居中 `top-1/2`）
+- 展开回顶部：仅右侧组合顶部的收起钮；**禁止**顶栏再出现全宽「节点面板在右侧」提示条
 
 #### 3.6.4 项目顶栏按钮（CanvasToolbar）
 
@@ -621,7 +624,14 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 
 **禁止**：专业版节点/弹层主操作使用橙色 `#fb923c`（仅快手版）；提示语勿用 `var(--canvas-muted)` 代替金黄（§8.1）。
 
-### 14.2 节点壳与底栏
+### 14.2 节点面板（顶栏浮层）
+
+- 布局与 §3.6 相同（画布内浮层、`w-fit`、禁止整行黑条）
+- 仅 **一组** pill：`PALETTE_GROUPS.pro` · 徽标 `Sparkles` · 文案「影视专业版」
+- pill 容器：`border-cyan-400/25 bg-[var(--canvas-surface)]/80`（`proTheme`）；徽标色 `PRO_PALETTE_BADGE_CLASS`（`text-cyan-300`）
+- 节点钮 hover：`hover:bg-cyan-500/20`
+
+### 14.3 节点壳与底栏
 
 | 项 | 规范 |
 |----|------|
@@ -634,7 +644,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 
 控制节点尺寸：`STORY_PRO_CONTROL_NODE_WIDTH` × `STORY_PRO_CONTROL_NODE_HEIGHT`（1020×1200，与漫剧控制行对齐）。
 
-### 14.3 行内资产槽（人物四槽 / 场景三槽）
+### 14.4 行内资产槽（人物四槽 / 场景三槽）
 
 | 项 | 常量 |
 |----|------|
@@ -649,7 +659,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 
 上传：§13 三入口；空槽文案含「拖入 / 粘贴」。
 
-### 14.4 媒体列（与快手共用组件）
+### 14.5 媒体列（与快手共用组件）
 
 `story-column-media-panel` · `story-video-row-slot` · `story-row-prompt-field` 传入 `edition="pro"` 时：
 
@@ -664,7 +674,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 | 宫格悬停预览 | **Eye**（§15.2） |
 | 模型区标签 | `PRO_HINT_LABEL_CLASS`（pro）/ `STORY_HINT_LABEL_CLASS`（comic） |
 
-### 14.5 弹层
+### 14.6 弹层
 
 | 弹层 | 顶栏 / Tab |
 |------|------------|
@@ -676,7 +686,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 
 Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtnClass` · `storyEditionModalOutlineBtnClass`。
 
-### 14.6 项目资产侧栏 / `/assets`
+### 14.7 项目资产侧栏 / `/assets`
 
 | 项 | 常量 |
 |----|------|
@@ -685,7 +695,7 @@ Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtn
 | Tab 选中 | `PRO_ASSETS_TAB_ACTIVE_CLASS`（青，非翡翠） |
 | 标题图标 | `StoryProAssetImportIcon` · `ProjectAssetsPanelIcon` |
 
-### 14.7 组件核查清单（改 UI 时对照）
+### 14.8 组件核查清单（改 UI 时对照）
 
 | 组件 | 状态 | 要点 |
 |------|------|------|
@@ -713,7 +723,7 @@ Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtn
 | `story-column-batch-footer.tsx` | ✅ | `storyEditionBatchBtnClass` |
 | `jianying-export-pro-node.tsx` | — | 沿用 pro 节点壳 |
 
-### 14.8 新增专业版 UI 自检
+### 14.9 新增专业版 UI 自检
 
 - [ ] 是否从 `story-pro-node-chrome.ts` / `story-edition-chrome.ts` 取类名，而非手写 `border-cyan-*`？
 - [ ] 共用弹层是否传入 `edition="pro"` 或 `proDirectorPack`？

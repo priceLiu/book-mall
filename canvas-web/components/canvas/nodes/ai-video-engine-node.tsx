@@ -60,7 +60,7 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
   const edges = useCanvasStore((s) => s.edges);
   const { providers } = useUserProviders();
   const d = data as unknown as AiVideoEngineNodeData;
-  const { history, succeeded } = useNodeTaskHistory(id);
+  const { history, succeeded, refreshHistory } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [runPending, setRunPending] = useState(false);
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
@@ -130,12 +130,29 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
     if (!isGenerating) setRunPending(false);
   }, [isGenerating]);
 
-  /** 已有成片但 runtime 仍停在 pending/running 且无在途任务 → 解除「重新生成」禁用 */
+  /** 点击生成后、任务写入历史前：轮询任务列表并同步 pending/running */
   useEffect(() => {
-    if (!isGenerating || inflightTask || !hasGenerated) return;
+    if (!runPending && !isGenerating) return;
+    void refreshHistory();
+    const timer = window.setInterval(() => void refreshHistory(), 2000);
+    return () => window.clearInterval(timer);
+  }, [runPending, isGenerating, refreshHistory]);
+
+  useEffect(() => {
+    if (!inflightTask) return;
+    const patch = runtimePatchFromCanvasTask(inflightTask);
+    if (patch?.status === "pending" || patch?.status === "running") {
+      setNodeRuntime(id, patch);
+    }
+  }, [inflightTask, id, setNodeRuntime]);
+
+  /** 已有成片但 runtime 仍停在 pending/running 且无在途任务 → 对齐为 done（排除重新生成中） */
+  useEffect(() => {
+    if (runPending || inflightTask || !isGenerating || !hasGenerated) return;
     setNodeRuntime(id, { status: "done" });
     setRunPending(false);
   }, [
+    runPending,
     isGenerating,
     inflightTask,
     hasGenerated,
@@ -145,6 +162,7 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
 
   /** 任务已在服务端成功但 runtime 未同步时（刷新 / 轮询竞态）立即对齐 */
   useEffect(() => {
+    if (runPending || inflightTask) return;
     if (!isGenerating && !runPending) return;
     const latest = succeeded[succeeded.length - 1];
     if (!latest || latest.status !== "SUCCEEDED") return;
@@ -152,10 +170,23 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
     if (!patch || patch.status !== "done") return;
     setNodeRuntime(id, patch);
     setRunPending(false);
-  }, [succeeded, isGenerating, runPending, id, setNodeRuntime]);
+  }, [
+    succeeded,
+    isGenerating,
+    runPending,
+    inflightTask,
+    id,
+    setNodeRuntime,
+  ]);
 
   const onRun = (forceFresh: boolean) => {
     setRunPending(true);
+    setNodeRuntime(id, {
+      status: "pending",
+      taskId: undefined,
+      failCode: undefined,
+      failMessage: undefined,
+    });
     window.dispatchEvent(
       new CustomEvent("canvas:run-node", { detail: { nodeId: id, forceFresh } }),
     );
