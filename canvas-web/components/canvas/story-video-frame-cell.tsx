@@ -2,7 +2,7 @@
 
 import {
   STORY_VIDEO_INTRA_ROW_GAP,
-  storyFrameVideoRowBlockH,
+  storyMediaAlignedRowHeight,
 } from "@/lib/canvas/story-column-layout";
 import { StoryTtsRowSlot } from "./story-tts-row-slot";
 import { StoryVideoRowSlot } from "./story-video-row-slot";
@@ -49,11 +49,14 @@ export function StoryVideoFrameCell({
   onGenerateTts: () => void;
   onPreviewTts?: () => void;
 }) {
+  const rowH = storyMediaAlignedRowHeight({ pro: edition === "pro" });
+
   return (
     <div
-      className="flex w-full shrink-0 flex-col"
+      className="box-border flex w-full shrink-0 flex-col overflow-hidden"
       style={{
-        minHeight: storyFrameVideoRowBlockH({ pro: edition === "pro" }),
+        height: rowH,
+        minHeight: rowH,
         gap: STORY_VIDEO_INTRA_ROW_GAP,
       }}
     >

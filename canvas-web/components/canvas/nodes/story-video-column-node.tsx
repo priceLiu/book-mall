@@ -46,8 +46,8 @@ import type {
   StoryVideoColumnNodeData,
 } from "@/lib/canvas/story-workspace-types";
 import {
+  storyMediaAlignedRowHeight,
   storyVideoColumnSize,
-  storyVideoRowBlockHeight,
 } from "@/lib/canvas/story-column-layout";
 import { storyMediaListLabel } from "@/lib/canvas/story-media-grid-layout";
 import { StoryEnginePickerStack } from "../story-engine-picker-stack";
@@ -145,6 +145,11 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
 
   const listRowCount = rowsToRender.length;
+
+  const alignedRowH = useMemo(
+    () => storyMediaAlignedRowHeight({ pro: edition === "pro" }),
+    [edition],
+  );
 
   const targetSize = useMemo(
     () =>
@@ -504,8 +509,12 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
                 const ttsBlockReason = storyTtsGenerateBlockReason(row);
 
                 return (
-                  <StoryVideoFrameCell
+                  <div
                     key={row.key}
+                    className="box-border w-full shrink-0"
+                    style={{ height: alignedRowH, minHeight: alignedRowH }}
+                  >
+                  <StoryVideoFrameCell
                     edition={edition}
                     frameIndex={row.frameIndex}
                     videoUrl={vid}
@@ -551,6 +560,7 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
                         : undefined
                     }
                   />
+                  </div>
                 );
               })}
           </div>

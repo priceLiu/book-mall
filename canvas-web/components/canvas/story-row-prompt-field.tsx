@@ -36,11 +36,23 @@ function idsEqual(a: string[], b: string[]): boolean {
   return sa === sb;
 }
 
-/** 镜号角标：叠在预览图/视频左上角（与分镜脚本列一致） */
-export function StoryRowTitleBadge({ title }: { title: string }) {
+/** 镜号角标：叠在预览图/视频左上角 */
+export function StoryRowTitleBadge({
+  title,
+  placement = "card-edge",
+}: {
+  title: string;
+  /** card-edge：挂在行卡片上沿；media-inset：预览区内左上角（不被 overflow 裁切） */
+  placement?: "card-edge" | "media-inset";
+}) {
   return (
     <span
-      className="pointer-events-none absolute left-2 top-0 z-10 max-w-[min(12rem,calc(100%-1rem))] -translate-y-1/2 truncate rounded border border-emerald-400/25 bg-[#0c1424] px-1.5 py-px text-[10px] font-semibold leading-tight text-emerald-200/95 shadow-sm"
+      className={cn(
+        "pointer-events-none absolute z-30 max-w-[min(12rem,calc(100%-1rem))] truncate rounded border border-emerald-400/25 bg-[#0c1424]/95 px-1.5 py-0.5 text-[10px] font-semibold leading-tight text-emerald-200/95 shadow-sm",
+        placement === "media-inset"
+          ? "left-2 top-2"
+          : "left-2 top-0 -translate-y-1/2",
+      )}
       title={title}
     >
       {title}
@@ -462,23 +474,29 @@ export function StoryColumnRowCard({
 
   return (
     <div
-      className="relative rounded-lg border border-white/10 bg-black/25 px-2 py-2"
+      className={cn(
+        "relative rounded-lg border border-white/10 bg-black/25 px-2 py-2",
+        rowBlockMinHeight != null && "flex h-full min-h-0 flex-col",
+      )}
       style={
         {
           ["--row-media-min" as string]: `${promptMinH}px`,
           ...(rowBlockMinHeight != null
-            ? { minHeight: rowBlockMinHeight }
+            ? { minHeight: rowBlockMinHeight, height: rowBlockMinHeight }
             : {}),
         } as React.CSSProperties
       }
     >
-      <StoryRowTitleBadge title={rowTitle} />
+      {!compactFrameLayout ? (
+        <StoryRowTitleBadge title={rowTitle} placement="card-edge" />
+      ) : null}
       {compactFrameLayout ? (
         <div className="flex h-full min-h-0 flex-1 flex-col gap-1.5">
           <div
-            className="flex shrink-0 items-stretch gap-2"
+            className="relative flex shrink-0 items-stretch gap-2"
             style={{ height: STORY_FRAME_ROW_STRIP_H }}
           >
+            <StoryRowTitleBadge title={rowTitle} placement="media-inset" />
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               {promptField}
             </div>

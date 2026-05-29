@@ -76,9 +76,10 @@ export function StoryVideoRowSlot({
         )}
         style={{ height: STORY_VIDEO_SLOT.thumbHeight }}
       >
-        <div className="relative z-30">
-          <StoryRowTitleBadge title={`镜 ${frameIndex}`} />
-        </div>
+        <StoryRowTitleBadge
+          title={`镜 ${frameIndex}`}
+          placement="media-inset"
+        />
 
         {hasVideo ? (
           <video
