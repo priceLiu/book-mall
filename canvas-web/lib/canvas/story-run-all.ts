@@ -6,6 +6,8 @@ import {
   findStoryWorkspaceForStarter,
   STORY_HUB_SECTION_ORDER,
 } from "./spawn-story-workspace";
+import { findStoryProWorkspaceForStarter } from "./spawn-story-pro-workspace";
+import type { StoryProWorkspaceIds } from "./story-pro-workspace-types";
 import type {
   StoryCharacterColumnNodeData,
   StoryFrameColumnNodeData,
@@ -98,6 +100,29 @@ function collectJobsForWorkspace(
   return jobs;
 }
 
+function collectProSceneJobs(
+  nodes: CanvasFlowNode[],
+  ws: StoryProWorkspaceIds,
+): CanvasStoryRunJob[] {
+  const jobs: CanvasStoryRunJob[] = [];
+  const sceneCol = ws.sceneColumnId
+    ? nodes.find((n) => n.id === ws.sceneColumnId)
+    : undefined;
+  if (!sceneCol || sceneCol.type !== "story-pro-scene") return jobs;
+  const d = sceneCol.data as { batchImage?: { providerId?: string }; rows?: { key: string; runtime?: { status?: string; ossUrl?: string; ephemeralUrl?: string } }[] };
+  if (!d.batchImage?.providerId) return jobs;
+  for (const r of d.rows ?? []) {
+    if (rowNeedsMedia(r.runtime)) {
+      jobs.push({
+        nodeId: sceneCol.id,
+        rowKey: r.key,
+        mediaKind: "sceneRef",
+      });
+    }
+  }
+  return jobs;
+}
+
 /** 四节点工作区 · 收集「全部运行」任务（hub 段 + 列行，按拓扑顺序）。 */
 export function collectStoryWorkspaceRunJobs(
   nodes: CanvasFlowNode[],
@@ -118,6 +143,21 @@ export function collectStoryWorkspaceRunJobs(
     if (!ws?.scriptHubId || seenHub.has(ws.scriptHubId)) continue;
     seenHub.add(ws.scriptHubId);
     jobs.push(...collectJobsForWorkspace(nodes, ws));
+  }
+
+  for (const starter of nodes.filter((n) => n.type === "story-pro-starter")) {
+    const stored = (starter.data as { workspaceIds?: StoryProWorkspaceIds })
+      .workspaceIds;
+    const ws = findStoryProWorkspaceForStarter(
+      nodes,
+      edges,
+      starter.id,
+      stored,
+    );
+    if (!ws?.scriptHubId || seenHub.has(ws.scriptHubId)) continue;
+    seenHub.add(ws.scriptHubId);
+    jobs.push(...collectJobsForWorkspace(nodes, ws));
+    jobs.push(...collectProSceneJobs(nodes, ws));
   }
 
   return jobs;

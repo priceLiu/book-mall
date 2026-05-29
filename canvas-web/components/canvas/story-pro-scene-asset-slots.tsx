@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Eye, Trash2, Upload } from "lucide-react";
 
 import { StoryProAssetImportIcon } from "@/components/canvas/story-pro-asset-import-icon";
@@ -16,6 +16,7 @@ import {
 import {
   latestSceneRefForKind,
   normalizeStoryProSceneKey,
+  storyProSceneRowKey,
   STORY_PRO_SCENE_REF_KIND_LABELS,
   STORY_PRO_SCENE_REF_KINDS,
   type StoryProSceneRefKind,
@@ -23,7 +24,6 @@ import {
 import { notifyStoryProSceneAssetsChanged } from "@/lib/canvas/use-story-pro-scene-assets";
 import {
   STORY_ROW_SECTION_CLASS,
-  STORY_ROW_SUBLABEL_CLASS,
 } from "@/lib/canvas/story-column-sync";
 import {
   PRO_ASSET_PANEL_CLASS,
@@ -56,16 +56,19 @@ export function StoryProSceneAssetSlots({
   row,
   asset,
   projectId,
+  scriptHubId,
   onPreview,
 }: {
   row: RowLike;
   asset: StoryProSceneAssetRecord | undefined;
   projectId: string | null | undefined;
+  scriptHubId?: string | null;
   onPreview?: (url: string, title: string) => void;
 }) {
   const base = useBookMallBaseUrl();
   const { doubleConfirm } = useDialogs();
   const fileRef = useRef<HTMLInputElement>(null);
+  const pasteLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useImagePasteRouter();
   const [pendingKind, setPendingKind] = useState<StoryProSceneRefKind | null>(
     null,
@@ -77,8 +80,31 @@ export function StoryProSceneAssetSlots({
     null,
   );
   const [busy, setBusy] = useState(false);
+  const [localAsset, setLocalAsset] = useState<
+    StoryProSceneAssetRecord | undefined
+  >();
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const assetLocked = asset?.locked === true;
   const canUpload = !assetLocked && !busy && Boolean(base?.trim());
+  const effectiveAsset = localAsset ?? asset;
+
+  useEffect(() => {
+    if (!localAsset || !asset) return;
+    if (
+      asset.id === localAsset.id &&
+      asset.updatedAt >= localAsset.updatedAt
+    ) {
+      setLocalAsset(undefined);
+    }
+  }, [asset, localAsset]);
+
+  const resolveSceneKey = () =>
+    scriptHubId?.trim()
+      ? storyProSceneRowKey(scriptHubId, row.name)
+      : normalizeStoryProSceneKey(row.key);
+
+  const pasteTargetId = (kind: StoryProSceneRefKind) =>
+    `scene-asset:${scriptHubId?.trim() ?? "hub"}:${normalizeStoryProSceneKey(row.key)}:${kind}`;
 
   const saveRef = async (
     kind: StoryProSceneRefKind,
@@ -88,9 +114,11 @@ export function StoryProSceneAssetSlots({
   ) => {
     if (!base?.trim()) return;
     setBusy(true);
+    setUploadError(null);
     try {
-      await saveStoryProSceneAssetRef(base, {
-        sceneKey: normalizeStoryProSceneKey(row.key),
+      const sceneKey = resolveSceneKey();
+      const saved = await saveStoryProSceneAssetRef(base, {
+        sceneKey,
         displayName: row.name,
         projectId: projectId ?? null,
         kind,
@@ -98,6 +126,7 @@ export function StoryProSceneAssetSlots({
         label,
         sourceTaskId: sourceTaskId ?? null,
       });
+      setLocalAsset(saved);
       notifyStoryProSceneAssetsChanged();
     } finally {
       setBusy(false);
@@ -106,14 +135,18 @@ export function StoryProSceneAssetSlots({
 
   const uploadFileToKind = useCallback(
     async (kind: StoryProSceneRefKind, file: File) => {
-      if (!canUpload) return;
-      if (!file.type.startsWith("image/")) return;
+      if (!base?.trim() || assetLocked) return;
+      if (!file.type.startsWith("image/") && !/\.(png|jpe?g|webp|gif)$/i.test(file.name)) {
+        return;
+      }
       setActiveKind(kind);
       setBusy(true);
+      setUploadError(null);
       try {
-        const url = await uploadCanvasImage(base!, file);
-        await saveStoryProSceneAssetRef(base!, {
-          sceneKey: normalizeStoryProSceneKey(row.key),
+        const url = await uploadCanvasImage(base, file);
+        const sceneKey = resolveSceneKey();
+        const saved = await saveStoryProSceneAssetRef(base, {
+          sceneKey,
           displayName: row.name,
           projectId: projectId ?? null,
           kind,
@@ -121,38 +154,56 @@ export function StoryProSceneAssetSlots({
           label: `${row.name} · ${STORY_PRO_SCENE_REF_KIND_LABELS[kind]}`,
           sourceTaskId: null,
         });
+        setLocalAsset(saved);
         notifyStoryProSceneAssetsChanged();
+      } catch (e) {
+        setUploadError(e instanceof Error ? e.message : String(e));
       } finally {
         setBusy(false);
       }
     },
-    [base, canUpload, projectId, row.key, row.name],
+    [assetLocked, base, projectId, scriptHubId, row.key, row.name],
   );
 
-  const pasteTargetId = (kind: StoryProSceneRefKind) =>
-    `scene-asset:${normalizeStoryProSceneKey(row.key)}:${kind}`;
+  useEffect(() => {
+    return () => {
+      if (pasteLeaveTimerRef.current) {
+        clearTimeout(pasteLeaveTimerRef.current);
+      }
+      for (const kind of STORY_PRO_SCENE_REF_KINDS) {
+        deactivateImagePasteTarget(pasteTargetId(kind));
+      }
+    };
+  }, [row.key, scriptHubId]);
+
+  const armPasteTarget = (kind: StoryProSceneRefKind) => {
+    if (!canUpload) return;
+    if (pasteLeaveTimerRef.current) {
+      clearTimeout(pasteLeaveTimerRef.current);
+      pasteLeaveTimerRef.current = null;
+    }
+    setActiveKind(kind);
+    activateImagePasteTarget(pasteTargetId(kind), (file) => {
+      void uploadFileToKind(kind, file);
+    });
+  };
 
   const bindSlotPaste = (kind: StoryProSceneRefKind) => ({
-    onMouseEnter: () => {
-      if (!canUpload) return;
-      setActiveKind(kind);
-      activateImagePasteTarget(pasteTargetId(kind), (file) => {
-        void uploadFileToKind(kind, file);
-      });
-    },
+    onMouseEnter: () => armPasteTarget(kind),
     onMouseLeave: () => {
-      deactivateImagePasteTarget(pasteTargetId(kind));
-      setActiveKind((prev) => (prev === kind ? null : prev));
-      setDragOverKind((prev) => (prev === kind ? null : prev));
+      const id = pasteTargetId(kind);
+      pasteLeaveTimerRef.current = setTimeout(() => {
+        deactivateImagePasteTarget(id);
+        setActiveKind((prev) => (prev === kind ? null : prev));
+        setDragOverKind((prev) => (prev === kind ? null : prev));
+        pasteLeaveTimerRef.current = null;
+      }, 1500);
     },
   });
 
   const onUploadClick = (kind: StoryProSceneRefKind) => {
     if (!canUpload) return;
-    setActiveKind(kind);
-    activateImagePasteTarget(pasteTargetId(kind), (file) => {
-      void uploadFileToKind(kind, file);
-    });
+    armPasteTarget(kind);
     setPendingKind(kind);
     fileRef.current?.click();
   };
@@ -207,7 +258,15 @@ export function StoryProSceneAssetSlots({
   };
 
   return (
-    <div className={PRO_ASSET_PANEL_CLASS}>
+    <div
+      className={PRO_ASSET_PANEL_CLASS}
+      onMouseLeave={() => {
+        pasteLeaveTimerRef.current = setTimeout(() => {
+          setActiveKind(null);
+          pasteLeaveTimerRef.current = null;
+        }, 2000);
+      }}
+    >
       <input
         ref={fileRef}
         type="file"
@@ -218,10 +277,16 @@ export function StoryProSceneAssetSlots({
       <p className={`mb-1.5 ${STORY_ROW_SECTION_CLASS}`}>
         场景资产 · 三槽参考（点击 / 拖入 / 悬停后粘贴）
         {assetLocked ? <span className="ml-1">· 已锁定</span> : null}
+        {busy ? <span className="ml-1">· 上传中…</span> : null}
+        {uploadError ? (
+          <span className="ml-1 text-red-400/90" title={uploadError}>
+            · 上传失败
+          </span>
+        ) : null}
       </p>
       <div className="grid grid-cols-3 gap-2">
         {STORY_PRO_SCENE_REF_KINDS.map((kind) => {
-          const ref = latestSceneRefForKind(asset, kind);
+          const ref = latestSceneRefForKind(effectiveAsset, kind);
           const url = ref?.ossUrl;
           const kindLabel = STORY_PRO_SCENE_REF_KIND_LABELS[kind];
           return (
@@ -236,6 +301,7 @@ export function StoryProSceneAssetSlots({
             >
               <button
                 type="button"
+                tabIndex={canUpload ? 0 : -1}
                 className={cn(
                   "nodrag relative w-full overflow-hidden",
                   STYLE_LIBRARY_MEDIA_FRAME,
@@ -254,6 +320,7 @@ export function StoryProSceneAssetSlots({
                   if (canUpload) onUploadClick(kind);
                 }}
                 title={canUpload ? "点击 / 拖入 / 悬停后粘贴" : undefined}
+                onFocus={() => armPasteTarget(kind)}
                 {...bindImageDragDropHandlers(
                   (file) => void uploadFileToKind(kind, file),
                   { disabled: !canUpload },
@@ -297,7 +364,13 @@ export function StoryProSceneAssetSlots({
                   </span>
                 )}
                 {ref?.label ? (
-                  <div className={STYLE_LIBRARY_HOVER_PROMPT_OVERLAY} aria-hidden>
+                  <div
+                    className={cn(
+                      STYLE_LIBRARY_HOVER_PROMPT_OVERLAY,
+                      "opacity-0 group-hover/asset-slot:opacity-100",
+                    )}
+                    aria-hidden
+                  >
                     {ref.label}
                   </div>
                 ) : null}

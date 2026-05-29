@@ -83,6 +83,7 @@ export function StoryProCharacterAssetSlots({
   const base = useBookMallBaseUrl();
   const { doubleConfirm } = useDialogs();
   const fileRef = useRef<HTMLInputElement>(null);
+  const pasteLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useImagePasteRouter();
   const [pendingKind, setPendingKind] = useState<StoryProAssetRefKind | null>(
     null,
@@ -203,27 +204,34 @@ export function StoryProCharacterAssetSlots({
   const pasteTargetId = (kind: StoryProAssetRefKind) =>
     `char-asset:${normalizeStoryProCharacterKey(row.key)}:${kind}`;
 
+  const armPasteTarget = (kind: StoryProAssetRefKind) => {
+    if (!canUpload) return;
+    if (pasteLeaveTimerRef.current) {
+      clearTimeout(pasteLeaveTimerRef.current);
+      pasteLeaveTimerRef.current = null;
+    }
+    setActiveKind(kind);
+    activateImagePasteTarget(pasteTargetId(kind), (file) => {
+      void uploadFileToKind(kind, file);
+    });
+  };
+
   const bindSlotPaste = (kind: StoryProAssetRefKind) => ({
-    onMouseEnter: () => {
-      if (!canUpload) return;
-      setActiveKind(kind);
-      activateImagePasteTarget(pasteTargetId(kind), (file) => {
-        void uploadFileToKind(kind, file);
-      });
-    },
+    onMouseEnter: () => armPasteTarget(kind),
     onMouseLeave: () => {
-      deactivateImagePasteTarget(pasteTargetId(kind));
-      setActiveKind((prev) => (prev === kind ? null : prev));
-      setDragOverKind((prev) => (prev === kind ? null : prev));
+      const id = pasteTargetId(kind);
+      pasteLeaveTimerRef.current = setTimeout(() => {
+        deactivateImagePasteTarget(id);
+        setActiveKind((prev) => (prev === kind ? null : prev));
+        setDragOverKind((prev) => (prev === kind ? null : prev));
+        pasteLeaveTimerRef.current = null;
+      }, 1500);
     },
   });
 
   const onUploadClick = (kind: StoryProAssetRefKind) => {
     if (!canUpload) return;
-    setActiveKind(kind);
-    activateImagePasteTarget(pasteTargetId(kind), (file) => {
-      void uploadFileToKind(kind, file);
-    });
+    armPasteTarget(kind);
     setPendingKind(kind);
     fileRef.current?.click();
   };

@@ -53,6 +53,11 @@ import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
 import { canAddStoryNodeType } from "@/lib/canvas/story-edition-isolation";
 import { storyProStarterHasScriptSource } from "@/lib/canvas/story-pro-starter-sync";
+import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
+import { resolveStoryProAssistantImport } from "@/lib/canvas/story-pro-script-assistant";
+import { STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT } from "@/lib/canvas/story-pro-theme-templates";
+import { spawnStoryProScriptHub } from "@/lib/canvas/spawn-story-pro-workspace";
+import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout";
 import type {
   StoryProScriptHubNodeData,
   StoryProStarterNodeData,
@@ -75,6 +80,8 @@ function Inner({ projectId }: { projectId: string }) {
   const hydrate = useCanvasStore((s) => s.hydrate);
   const toGraph = useCanvasStore((s) => s.toGraph);
   const addNode = useCanvasStore((s) => s.addNode);
+  const setNodes = useCanvasStore((s) => s.setNodes);
+  const setEdges = useCanvasStore((s) => s.setEdges);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const viewport = useCanvasStore((s) => s.viewport);
@@ -98,16 +105,69 @@ function Inner({ projectId }: { projectId: string }) {
     return { scriptFinalized, hasScript, starterId: starter?.id };
   }, [nodes]);
 
+  const assistantImportPlan = useMemo(
+    () => resolveStoryProAssistantImport(nodes, edges),
+    [nodes, edges],
+  );
+  const assistantCanImport = assistantImportPlan.allowed;
+
   const onImportScriptFromAssistant = useCallback(
     (md: string) => {
-      const sid = storyProScriptState.starterId;
-      if (!sid) return;
-      updateNodeData(sid, {
+      const state = useCanvasStore.getState();
+      const plan = resolveStoryProAssistantImport(state.nodes, state.edges);
+      if (!plan.allowed) return;
+
+      const seedStarter = state.nodes.find(
+        (n) => n.type === "story-pro-starter",
+      );
+      const seedData = (seedStarter?.data ?? {}) as StoryProStarterNodeData;
+      const llmSeed = {
+        providerId: seedData.providerId ?? "",
+        modelKey: seedData.modelKey ?? "",
+        params: { ...STORY_PRO_LLM_PARAMS_DEFAULT, ...(seedData.params ?? {}) },
+        systemPrompt:
+          seedData.systemPrompt?.trim() ||
+          STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
+      };
+
+      if (plan.spawnNew) {
+        const starterId = addNode("story-pro-starter", plan.position, {
+          starterMode: "upload",
+          uploadedScriptMd: md,
+          systemPrompt: llmSeed.systemPrompt,
+          systemPromptTemplateId: seedData.systemPromptTemplateId ?? "director-from-script",
+          providerId: llmSeed.providerId,
+          modelKey: llmSeed.modelKey,
+          params: llmSeed.params,
+          pipelineStage: "idle",
+        });
+        if (!starterId) return;
+        const afterStarter = useCanvasStore.getState();
+        spawnStoryProScriptHub({
+          starterNodeId: starterId,
+          systemPrompt: llmSeed.systemPrompt,
+          providerId: llmSeed.providerId,
+          modelKey: llmSeed.modelKey,
+          params: llmSeed.params,
+          nodes: afterStarter.nodes,
+          edges: afterStarter.edges,
+          addNode: (type, position, data) => addNode(type, position, data),
+          setEdges,
+          updateNodeData,
+        });
+        const laid = useCanvasStore.getState();
+        setNodes(() =>
+          reflowStoryProWorkspace(laid.nodes, laid.edges),
+        );
+        return;
+      }
+
+      updateNodeData(plan.starterId, {
         uploadedScriptMd: md,
         starterMode: "upload",
       });
     },
-    [storyProScriptState.starterId, updateNodeData],
+    [addNode, setEdges, setNodes, updateNodeData],
   );
 
   const [project, setProject] = useState<CanvasProjectDetail | null>(null);
@@ -541,7 +601,9 @@ function Inner({ projectId }: { projectId: string }) {
         {isStoryProCanvas && project ? (
           <ScriptWritingAssistantPanel
             projectId={projectId}
-            scriptFinalized={storyProScriptState.scriptFinalized}
+            scriptFinalized={
+              storyProScriptState.scriptFinalized && !assistantCanImport
+            }
             hasScript={storyProScriptState.hasScript}
             onImportScript={onImportScriptFromAssistant}
           />

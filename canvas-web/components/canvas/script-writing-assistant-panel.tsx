@@ -32,7 +32,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import {
   SCRIPT_ASSISTANT_OUTPUT_MODES,
   SCRIPT_ASSISTANT_WELCOME_MESSAGE,
-  storyProAssistantImportGate,
+  resolveStoryProAssistantImport,
   type ScriptAssistantOutputMode,
 } from "@/lib/canvas/story-pro-script-assistant";
 import { cn } from "@/lib/utils";
@@ -426,7 +426,19 @@ export function ScriptWritingAssistantPanel({
   const { confirm } = useDialogs();
 
   const nodes = useCanvasStore((s) => s.nodes);
-  const importGate = useMemo(() => storyProAssistantImportGate(nodes), [nodes]);
+  const edges = useCanvasStore((s) => s.edges);
+  const importPlan = useMemo(
+    () => resolveStoryProAssistantImport(nodes, edges),
+    [nodes, edges],
+  );
+  const importGate = useMemo(
+    () => ({
+      allowed: importPlan.allowed,
+      reason: importPlan.allowed ? importPlan.hint : importPlan.reason,
+      spawnNew: importPlan.allowed && importPlan.spawnNew,
+    }),
+    [importPlan],
+  );
 
   const immersive = layoutMode === "immersive" && open;
   const showPackPreview = outputMode === "pack";
@@ -615,8 +627,9 @@ export function ScriptWritingAssistantPanel({
     if (
       !(await confirm({
         title: "确定导入并开始制作",
-        message:
-          "将把当前制作包写入故事启动节点，并作为全新工作流起点。导入后请在启动页运行导演向生成，再在 Hub 定稿并生成下游列。",
+        message: importGate.spawnNew
+          ? "将在本画布新建一套独立工作流（故事启动 + 故事剧本），并写入当前制作包。导入后请在新的启动页运行导演向生成，再在对应 Hub 定稿并生成下游列；既有工作流不受影响。"
+          : "将把当前制作包写入可用的故事启动节点。导入后请在启动页运行导演向生成，再在 Hub 定稿并生成下游列。",
         confirmLabel: "确定导入",
         cancelLabel: "再改改",
       }))
@@ -626,7 +639,8 @@ export function ScriptWritingAssistantPanel({
     onImportScript(text);
     setPreviewOpen(false);
     setLayoutMode("dock");
-  }, [confirm, importGate.allowed, onImportScript, previewMd]);
+    setOpen(false);
+  }, [confirm, importGate.allowed, importGate.spawnNew, onImportScript, previewMd]);
 
   const collapse = () => {
     setOpen(false);

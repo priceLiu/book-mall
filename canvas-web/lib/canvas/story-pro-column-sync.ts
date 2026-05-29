@@ -4,7 +4,11 @@ import { compactGfmTables, parseMdTable, parseStoryboardRows } from "./parse-md-
 import {
   buildCharacterRowsFromHub,
   buildDefaultFrameRowPrompt,
+  buildDefaultSceneRowPrompt,
+  buildSceneRowsFromHub,
   buildVideoRowsFromFrames,
+  isFrameScriptPrompt,
+  isShotSizeSceneLabel,
   patchVideoRowsFromFrameRows,
   sanitizeLegacyFramePrompt,
   syncFrameRowCharacterRefs,
@@ -18,6 +22,12 @@ import type {
   StoryProVideoRow,
 } from "./story-pro-workspace-types";
 import type { StoryCharacterRow, StoryFrameRow } from "./story-workspace-types";
+import {
+  migrateSceneRowToHubKey,
+  sceneRowHubIdFromKey,
+  sceneRowKeysEquivalent,
+  storyProSceneRowKey,
+} from "./story-pro-scene-asset-catalog";
 
 function normHeader(h: string): string {
   return h.trim().toLowerCase().replace(/\s+/g, " ");
@@ -46,36 +56,121 @@ function toProCharacterRows(rows: StoryCharacterRow[]): StoryProCharacterRow[] {
   }));
 }
 
-function buildSceneRowsFromStoryboard(
+function findPrevSceneRow(
+  existing: StoryProSceneRow[],
+  built: StoryProSceneRow,
+  scriptHubId: string,
+): StoryProSceneRow | undefined {
+  const hub = scriptHubId.trim();
+  return existing.find((r) => {
+    if (sceneRowKeysEquivalent(r.key, built.key)) return true;
+    if (hub) {
+      const prevHub = sceneRowHubIdFromKey(r.key);
+      if (
+        prevHub &&
+        prevHub.toLowerCase() !== hub.toLowerCase()
+      ) {
+        return false;
+      }
+      if (
+        sceneRowKeysEquivalent(migrateSceneRowToHubKey(r, hub), built.key)
+      ) {
+        return true;
+      }
+    }
+    if (r.name === built.name && !sceneRowHubIdFromKey(r.key)) return true;
+    return false;
+  });
+}
+
+function migrateExistingSceneRows(
+  existing: StoryProSceneRow[],
+  scriptHubId: string,
+): StoryProSceneRow[] {
+  const hub = scriptHubId.trim();
+  if (!hub) return existing;
+  return existing.map((r) => ({
+    ...r,
+    key: migrateSceneRowToHubKey(r, hub),
+  }));
+}
+
+/** 无场景辞典时：仅当分镜表「场景」列为真实场景名（非景别）才回落 */
+function buildSceneRowsFromStoryboardFallback(
   storyboardMd: string,
-  existing?: StoryProSceneRow[],
+  scriptHubId: string,
 ): StoryProSceneRow[] {
   const frames = parseStoryboardRows(compactGfmTables(storyboardMd));
   const byName = new Map<string, StoryProSceneRow>();
   for (const f of frames) {
-    const name = f.scene?.trim() || `场景 ${byName.size + 1}`;
+    const name = f.scene?.trim();
+    if (!name || isShotSizeSceneLabel(name)) continue;
     if (byName.has(name)) continue;
     byName.set(name, {
-      key: name,
+      key: storyProSceneRowKey(scriptHubId, name),
       name,
       description: f.description?.trim() || "",
-      prompt: [`场景：${name}`, f.description?.trim()].filter(Boolean).join("\n"),
+      prompt: buildDefaultSceneRowPrompt({
+        name,
+        environment: "",
+        time: "",
+        mood: "",
+        imageKeywords: "",
+        description: f.description?.trim() || "",
+      }),
     });
   }
-  const built = Array.from(byName.values());
-  if (!existing?.length) return built;
-  return built.map((row) => {
-    const prev = existing.find((r) => r.key === row.key || r.name === row.name);
+  return Array.from(byName.values());
+}
+
+function isStaleSceneRow(row: StoryProSceneRow): boolean {
+  const name = row.name.trim();
+  if (!name) return true;
+  if (isFrameScriptPrompt(row.prompt ?? "")) return true;
+  if (/^镜\s*\d+$/.test(name)) return true;
+  if (/^场景\s*\d+$/.test(name)) return true;
+  if (isShotSizeSceneLabel(name)) return true;
+  return false;
+}
+
+function mergeProSceneRows(
+  built: StoryProSceneRow[],
+  existing?: StoryProSceneRow[],
+  scriptHubId = "",
+  fromDictionary = false,
+): StoryProSceneRow[] {
+  const prior = existing?.length
+    ? migrateExistingSceneRows(existing, scriptHubId).filter(
+        (r) => !isStaleSceneRow(r),
+      )
+    : [];
+  if (!prior.length) return built;
+  if (!built.length) return prior;
+  const merged = built.map((row) => {
+    const prev = findPrevSceneRow(prior, row, scriptHubId);
     if (!prev) return row;
     return {
       ...row,
       description: prev.description?.trim() ? prev.description : row.description,
-      prompt: prev.prompt?.trim() ? prev.prompt : row.prompt,
+      prompt:
+        prev.prompt?.trim() && !isFrameScriptPrompt(prev.prompt)
+          ? prev.prompt
+          : row.prompt,
       promptHistory: prev.promptHistory,
       refImages: prev.refImages,
       runtime: prev.runtime,
     };
   });
+  if (fromDictionary) return merged;
+  const mergedNames = new Set(merged.map((r) => r.name));
+  const mergedKeys = new Set(merged.map((r) => r.key));
+  const extras = prior.filter(
+    (r) =>
+      !mergedNames.has(r.name) &&
+      !mergedKeys.has(r.key) &&
+      !isStaleSceneRow(r),
+  );
+  return extras.length ? [...merged, ...extras] : merged;
 }
 
 function buildProFrameRowsFromMd(
@@ -100,6 +195,7 @@ function buildProFrameRowsFromMd(
         frameIndex: b.frameIndex,
         key: String(b.frameIndex),
         scene: b.scene,
+        shotSize: b.shotSize || shotSize || undefined,
         description: b.description,
         dialogue: b.dialogue,
         videoPrompt: b.videoPrompt,
@@ -110,7 +206,7 @@ function buildProFrameRowsFromMd(
     return {
       ...base,
       shotNo,
-      shotSize: shotSize || undefined,
+      shotSize: shotSize || base.shotSize || undefined,
       cameraMove: cameraMove || undefined,
       durationSec: Number.isFinite(durationSec) ? durationSec : undefined,
       aiDifficulty: Number.isFinite(aiDifficulty) ? aiDifficulty : undefined,
@@ -218,6 +314,7 @@ export type StoryProColumnSyncExisting = Partial<{
 export function syncStoryProColumnRows(
   hubData: StoryProScriptHubNodeData,
   existing?: StoryProColumnSyncExisting,
+  scriptHubId?: string,
 ): {
   characterRows: StoryProCharacterRow[];
   sceneRows: StoryProSceneRow[];
@@ -234,9 +331,17 @@ export function syncStoryProColumnRows(
   const storyboardMd = resolveHubStoryboardMd(
     synced as Parameters<typeof resolveHubStoryboardMd>[0],
   );
-  const sceneRows = buildSceneRowsFromStoryboard(
-    storyboardMd,
+  const hubId = scriptHubId?.trim() ?? "";
+  const fromDictionary = buildSceneRowsFromHub(synced, hubId);
+  const sceneBuilt =
+    fromDictionary.length > 0
+      ? fromDictionary
+      : buildSceneRowsFromStoryboardFallback(storyboardMd, hubId);
+  const sceneRows = mergeProSceneRows(
+    sceneBuilt,
     existing?.sceneRows,
+    hubId,
+    fromDictionary.length > 0,
   );
   const frameRows = mergeProFrameRows(
     buildProFrameRowsFromMd(storyboardMd, characterRows),

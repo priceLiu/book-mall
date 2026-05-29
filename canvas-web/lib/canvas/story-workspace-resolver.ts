@@ -77,6 +77,7 @@ export function findProScriptHubForStyle(
 export function findStarterByHubId(
   nodes: CanvasFlowNode[],
   hubNodeId: string,
+  edges: CanvasFlowEdge[] = [],
 ): CanvasFlowNode | undefined {
   for (const n of nodes) {
     if (n.type !== "story-comic-starter" && n.type !== "story-pro-starter") {
@@ -87,7 +88,7 @@ export function findStarterByHubId(
     ).workspaceIds;
     if (ws?.scriptHubId === hubNodeId) return n;
   }
-  return resolveStarterForHub(nodes, [], hubNodeId);
+  return resolveStarterForHub(nodes, edges, hubNodeId);
 }
 
 export function isAnyStoryScriptHubType(t: string): boolean {

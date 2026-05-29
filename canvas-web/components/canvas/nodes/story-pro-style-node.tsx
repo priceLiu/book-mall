@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { GitBranch, Loader2, Palette, Sparkles, Upload, X } from "lucide-react";
+import {
+  GitBranch,
+  LayoutGrid,
+  Loader2,
+  Palette,
+  Sparkles,
+  Upload,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -21,25 +29,15 @@ import {
 } from "@/lib/canvas/spawn-story-pro-workspace";
 import { syncStoryProColumnRows } from "@/lib/canvas/story-pro-column-sync";
 import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout";
+import { applyDefaultStoryProColumnEngines } from "@/lib/canvas/story-workspace-output";
 import {
   findProScriptHubForStyle,
   resolveStarterForHub,
 } from "@/lib/canvas/story-workspace-resolver";
 import type {
-  StoryProColorTone,
-  StoryProMainStyle,
-  StoryProRenderQuality,
   StoryProScriptHubNodeData,
   StoryProStyleNodeData,
 } from "@/lib/canvas/story-pro-workspace-types";
-import {
-  STORY_PRO_COLOR_TONE_OPTIONS,
-  STORY_PRO_MAIN_STYLE_OPTIONS,
-  STORY_PRO_RENDER_QUALITY_OPTIONS,
-  STORY_PRO_STYLE_ANCHOR_TEMPLATES,
-  buildStyleAnchorFallbackFromPickers,
-  type StoryProStyleAnchorTemplate,
-} from "@/lib/canvas/story-pro-style-templates";
 import {
   STORY_PRO_CONTROL_NODE_HEIGHT,
   STORY_PRO_CONTROL_NODE_WIDTH,
@@ -49,8 +47,6 @@ import {
   PRO_SAVE_TO_ASSETS_BTN_CLASS,
   PRO_UPLOAD_DROPZONE_CLASS,
   PRO_NODE_ACTION_BTN_SPLIT_CLASS,
-  PRO_SELECT_CLASS,
-  PRO_TEMPLATE_CHIP_CLASS,
   PRO_TEXTAREA_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
@@ -77,7 +73,7 @@ function selectStyleData(
 
 export function StoryProStyleNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
-  const { alert, confirm, doubleConfirm } = useDialogs();
+  const { alert, doubleConfirm } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -203,31 +199,9 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
     busEnqueueStoryRun({ nodeId: id, forceFresh: true });
   };
 
-  const applyStyleTemplate = async (tpl: StoryProStyleAnchorTemplate) => {
-    if (styleFinalized || !scriptFinalized) return;
-    const hasContent =
-      Boolean(d.styleAnchorZh?.trim()) ||
-      Boolean(d.styleAnchorEn?.trim()) ||
-      Boolean(d.negativePrompt?.trim());
-    if (
-      hasContent &&
-      !(await confirm({
-        title: "套用风格模板",
-        message: `套用「${tpl.label}」将替换当前锚定词，是否继续？`,
-        confirmLabel: "继续套用",
-        cancelLabel: "取消",
-      }))
-    ) {
-      return;
-    }
-    updateNodeData(id, {
-      mainStyle: tpl.mainStyle,
-      colorTone: tpl.colorTone,
-      renderQuality: tpl.renderQuality,
-      styleAnchorZh: tpl.styleAnchorZh,
-      styleAnchorEn: tpl.styleAnchorEn,
-      negativePrompt: tpl.negativePrompt,
-    });
+  const openStyleLibrary = () => {
+    if (fieldsLocked) return;
+    window.dispatchEvent(new CustomEvent("canvas:open-style-library"));
   };
 
   const onFinalizeStyle = async () => {
@@ -236,17 +210,19 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
       ? resolveStarterForHub(nodes, edges, hubNodeId)
       : undefined;
     if (!starter || !hubNodeId) return;
+
+    if (!d.styleAnchorZh?.trim() && !d.styleAnchorEn?.trim()) {
+      await alert({
+        title: "请先选择风格",
+        message:
+          "请从「风格库」套用条目，或手动填写中文/英文锚定词后再点击「风格定稿」。",
+        variant: "warning",
+      });
+      return;
+    }
+
     setOutputBusy(true);
     try {
-      const anchorPatch = buildStyleAnchorFallbackFromPickers(d);
-      if (
-        anchorPatch.styleAnchorZh ||
-        anchorPatch.styleAnchorEn ||
-        anchorPatch.negativePrompt
-      ) {
-        updateNodeData(id, anchorPatch);
-      }
-
       const state = useCanvasStore.getState();
       const ids = spawnStoryProMediaColumns({
         starterNodeId: starter.id,
@@ -267,7 +243,9 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
       const afterSpawn = useCanvasStore.getState().nodes;
       const hubNode = afterSpawn.find((n) => n.id === hubNodeId);
       const hubPayload = (hubNode?.data ?? hubData) as StoryProScriptHubNodeData;
-      const synced = syncStoryProColumnRows(hubPayload, {
+      const synced = syncStoryProColumnRows(
+        hubPayload,
+        {
         characterRows: (
           afterSpawn.find((n) => n.id === ids.characterColumnId)?.data as {
             rows?: unknown[];
@@ -288,7 +266,9 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
             rows?: unknown[];
           }
         )?.rows as import("@/lib/canvas/story-pro-workspace-types").StoryProVideoRow[],
-      });
+        },
+        hubNodeId,
+      );
 
       if (ids.characterColumnId) {
         updateNodeData(ids.characterColumnId, {
@@ -315,6 +295,14 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
           frameColumnId: ids.frameColumnId,
         });
       }
+
+      const afterEngines = useCanvasStore.getState().nodes;
+      applyDefaultStoryProColumnEngines(
+        updateNodeData,
+        afterEngines,
+        ids,
+        providers,
+      );
 
       updateNodeData(id, { styleFinalized: true });
       updateNodeData(starter.id, { pipelineStage: "style_finalized" });
@@ -432,7 +420,7 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
   const styleSubtitle = styleFinalized
     ? "风格已定稿 · 工作流已生成"
     : scriptFinalized
-      ? "选好下拉或模板后可直接「风格定稿」；锚定词与参考图可选"
+      ? "从风格库套用或填写锚定词后可「风格定稿」；参考图可选"
       : "请先在「故事剧本」确认定稿以解锁";
 
   const proCompletedStages = scriptFinalized ? (["story"] as const) : [];
@@ -470,7 +458,7 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
             <span>
               参考图 {refCount} 张（可选）
               {!d.styleAnchorZh?.trim() && !d.styleAnchorEn?.trim()
-                ? " · 未填锚定词时将按下拉选项自动补全"
+                ? " · 定稿前请从风格库套用或填写锚定词"
                 : ""}
             </span>
           }
@@ -503,98 +491,22 @@ export function StoryProStyleNode({ id, data, selected }: NodeProps) {
       }
     >
       <div className="nodrag flex h-full min-h-0 flex-col gap-2.5 overflow-y-auto">
-        <div className="grid grid-cols-3 gap-2">
-          <label className="space-y-1">
-            <span className={PRO_HINT_LABEL_CLASS}>主风格</span>
-            <select
-              className={PRO_SELECT_CLASS}
-              value={d.mainStyle ?? ""}
-              disabled={fieldsLocked}
-              onChange={(e) =>
-                updateNodeData(id, {
-                  mainStyle: (e.target.value || undefined) as StoryProMainStyle,
-                })
-              }
-            >
-              <option value="">选择…</option>
-              {STORY_PRO_MAIN_STYLE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1">
-            <span className={PRO_HINT_LABEL_CLASS}>色调</span>
-            <select
-              className={PRO_SELECT_CLASS}
-              value={d.colorTone ?? ""}
-              disabled={fieldsLocked}
-              onChange={(e) =>
-                updateNodeData(id, {
-                  colorTone: (e.target.value || undefined) as StoryProColorTone,
-                })
-              }
-            >
-              <option value="">选择…</option>
-              {STORY_PRO_COLOR_TONE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1">
-            <span className={PRO_HINT_LABEL_CLASS}>质感</span>
-            <select
-              className={PRO_SELECT_CLASS}
-              value={d.renderQuality ?? ""}
-              disabled={fieldsLocked}
-              onChange={(e) =>
-                updateNodeData(id, {
-                  renderQuality: (e.target.value ||
-                    undefined) as StoryProRenderQuality,
-                })
-              }
-            >
-              <option value="">选择…</option>
-              {STORY_PRO_RENDER_QUALITY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="space-y-1">
+        <div className="rounded-lg border border-cyan-400/25 bg-cyan-500/8 px-3 py-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className={PRO_HINT_LABEL_CLASS}>风格模板 · 一键填入锚定词</span>
+            <span className={PRO_HINT_LABEL_CLASS}>风格库 · 推荐</span>
             <button
               type="button"
               disabled={fieldsLocked}
-              className="nodrag text-[10px] text-cyan-300/90 underline-offset-2 hover:text-cyan-200 hover:underline disabled:cursor-not-allowed disabled:opacity-40"
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent("canvas:open-style-library"));
-              }}
+              className="nodrag inline-flex items-center gap-1.5 rounded-md border border-cyan-400/45 bg-cyan-500/20 px-2.5 py-1 text-[11px] font-medium text-cyan-50 hover:bg-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={openStyleLibrary}
             >
-              浏览风格库…
+              <LayoutGrid className="size-3.5 shrink-0" />
+              打开风格库…
             </button>
           </div>
-          <div className="flex flex-wrap gap-1">
-            {STORY_PRO_STYLE_ANCHOR_TEMPLATES.map((tpl) => (
-              <button
-                key={tpl.id}
-                type="button"
-                disabled={fieldsLocked}
-                title={tpl.hint}
-                className={PRO_TEMPLATE_CHIP_CLASS}
-                onClick={() => applyStyleTemplate(tpl)}
-              >
-                {tpl.label}
-              </button>
-            ))}
-          </div>
+          <p className="mt-1.5 text-[10px] leading-snug text-white/50">
+            平台内置 135+ 风格预设，按分类浏览；套用后自动写入中文锚定词与参考图，可再手动微调。
+          </p>
         </div>
 
         <label className="block space-y-1">

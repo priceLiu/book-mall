@@ -12,6 +12,8 @@ import type {
   StoryVideoColumnNodeData,
   StoryWorkspaceIds,
 } from "./story-workspace-types";
+import type { StoryProSceneColumnNodeData } from "./story-pro-workspace-types";
+import type { StoryProWorkspaceIds } from "./story-pro-workspace-types";
 import type { CanvasEnginePick, CanvasFlowNode } from "./types";
 
 const DEFAULT_IMAGE_PARAMS = {
@@ -64,6 +66,33 @@ export function applyDefaultStoryColumnEngines(
     const d = video.data as unknown as StoryVideoColumnNodeData;
     if (!d.batchVideo?.providerId?.trim()) {
       updateNodeData(video.id, { batchVideo: videoBatch });
+    }
+  }
+}
+
+/** 影视专业版 · 风格定稿 spawn 后为各媒体列写入默认 IMAGE / VIDEO（含场景列） */
+export function applyDefaultStoryProColumnEngines(
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+  nodes: CanvasFlowNode[],
+  ids: StoryProWorkspaceIds,
+  providers: CanvasProviderDto[],
+): void {
+  applyDefaultStoryColumnEngines(updateNodeData, nodes, ids, providers);
+
+  const imagePick = pickDefaultStoryImageEngine(providers);
+  const imageBatch: CanvasEnginePick | undefined = imagePick
+    ? {
+        providerId: imagePick.providerId,
+        modelKey: imagePick.modelKey,
+        params: DEFAULT_IMAGE_PARAMS,
+      }
+    : undefined;
+
+  if (ids.sceneColumnId && imageBatch) {
+    const scene = nodes.find((n) => n.id === ids.sceneColumnId);
+    const d = scene?.data as unknown as StoryProSceneColumnNodeData | undefined;
+    if (scene && !d?.batchImage?.providerId?.trim()) {
+      updateNodeData(scene.id, { batchImage: imageBatch });
     }
   }
 }

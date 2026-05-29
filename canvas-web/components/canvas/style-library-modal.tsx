@@ -77,7 +77,7 @@ export function StyleLibraryModal({
               风格库
             </p>
             <p className="mt-0.5 text-[12px] text-white/55">
-              悬停卡片查看风格提示词；点击条目将写入当前画布的「风格定义」节点（中文锚定词 + 参考图）。
+              悬停卡片查看风格提示词；点击条目将写入可编辑的「风格定义」节点（多工作流时优先当前选中或故事已定稿且风格未定稿的一套）。
             </p>
             {hint ? (
               <p className="mt-1 text-[11px] text-emerald-300/90">{hint}</p>

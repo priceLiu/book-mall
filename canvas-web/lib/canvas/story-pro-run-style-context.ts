@@ -12,10 +12,21 @@ export type StoryProRunStylePayload = {
 
 function resolveScriptHubIdForProNode(
   nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
   node: CanvasFlowNode,
 ): string | undefined {
   const fromData = (node.data as { hubNodeId?: string }).hubNodeId?.trim();
   if (fromData) return fromData;
+
+  for (const e of edges) {
+    if (e.target !== node.id) continue;
+    const src = nodes.find((n) => n.id === e.source);
+    if (src?.type === "story-pro-script-hub") return src.id;
+    if (src?.type === "story-pro-style") {
+      const hubId = (src.data as { hubNodeId?: string }).hubNodeId;
+      if (hubId) return hubId;
+    }
+  }
 
   for (const n of nodes) {
     if (n.type !== "story-pro-starter") continue;
@@ -39,7 +50,7 @@ export function resolveStoryProRunStylePayload(
     return {};
   }
 
-  const hubId = resolveScriptHubIdForProNode(nodes, node);
+  const hubId = resolveScriptHubIdForProNode(nodes, edges, node);
   if (!hubId) return {};
 
   const styleNode = findProStyleForHub(nodes, edges, hubId);

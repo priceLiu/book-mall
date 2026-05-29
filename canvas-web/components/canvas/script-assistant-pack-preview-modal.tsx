@@ -32,7 +32,7 @@ export function ScriptAssistantPackPreviewModal({
   open: boolean;
   onClose: () => void;
   md: string;
-  /** 仅全新工作流可导入（见 storyProAssistantImportGate） */
+  /** 是否允许导入（见 resolveStoryProAssistantImport） */
   importAllowed: boolean;
   importBlockReason: string;
   onConfirmImport?: () => void;
@@ -120,7 +120,7 @@ export function ScriptAssistantPackPreviewModal({
             !hasContent
               ? "暂无制作包正文"
               : importAllowed
-                ? "写入启动节点并开始全新制作工作流"
+                ? "写入故事启动节点并开始制作"
                 : importBlockReason
           }
           className={cn(
@@ -139,6 +139,11 @@ export function ScriptAssistantPackPreviewModal({
         </button>
         {hasContent && !importAllowed && importBlockReason ? (
           <p className="max-w-md px-2 text-center text-[11px] leading-snug text-amber-300/90">
+            {importBlockReason}
+          </p>
+        ) : null}
+        {hasContent && importAllowed && importBlockReason ? (
+          <p className="max-w-md px-2 text-center text-[11px] leading-snug text-cyan-200/85">
             {importBlockReason}
           </p>
         ) : null}

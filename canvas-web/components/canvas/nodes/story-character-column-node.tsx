@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Users } from "lucide-react";
 
@@ -44,6 +44,8 @@ import { NodeShell } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 import { StoryProCharacterAssetSlots } from "../story-pro-character-asset-slots";
 import { StoryProCharacterAudioSlot } from "../story-pro-character-audio-slot";
+import { useUserProviders } from "@/lib/canvas/use-user-providers";
+import { ensureStoryColumnImageEngineDefault } from "@/lib/canvas/story-column-engine-defaults";
 
 export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps) {
   const base = useBookMallBaseUrl();
@@ -51,7 +53,9 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   const { alert } = useDialogs();
   const edition = storyEditionFromNodeType(type);
   const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const { providers } = useUserProviders();
   const d = data as unknown as StoryCharacterColumnNodeData;
   const stored = d.rows ?? [];
   const { assets: characterAssets } = useStoryProCharacterAssets(
@@ -66,9 +70,27 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   } | null>(null);
 
   const displayRows = useMemo(
-    () => displayCharacterRows(nodes, id, stored),
-    [nodes, id, stored],
+    () => displayCharacterRows(nodes, id, stored, edges),
+    [nodes, edges, id, stored],
   );
+
+  useEffect(() => {
+    ensureStoryColumnImageEngineDefault({
+      nodes,
+      edges,
+      columnId: id,
+      updateNodeData,
+      providers,
+    });
+  }, [
+    nodes,
+    edges,
+    id,
+    updateNodeData,
+    providers,
+    d.batchImage?.providerId,
+    d.batchImage?.modelKey,
+  ]);
 
   const nodeRuntime = useMemo(
     () => aggregateStoryColumnRuntime(displayRows),

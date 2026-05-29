@@ -81,7 +81,7 @@ export default function ProjectAssetsGuidePage() {
             <strong>故事定稿前</strong>对话历史自动保存；<strong>定稿后</strong>仍可咨询，但不再持久化（刷新后清空）。
           </li>
           <li>
-            助手支持 <strong>闲聊 / 润色</strong> 与 <strong>创作并导入故事剧本</strong> 两种模式；「确定导入」<strong>仅用于全新工作流</strong>（未定稿、Hub 无大纲/下游列）。进行中或已定稿项目可对话与预览，不可导入以免打乱进度。
+            助手支持 <strong>闲聊 / 润色</strong> 与 <strong>创作并导入故事剧本</strong> 两种模式。「确定导入」会写入<strong>未占用的启动节点</strong>；若画布上工作流均已定稿或进行中，则<strong>在同画布新建一套独立工作流</strong>再导入，与既有流程互不影响。
           </li>
         </ul>
       </GuideSection>

@@ -79,7 +79,17 @@ function toAssetRecord(row: {
 }
 
 export function normalizeStoryProSceneKey(key: string): string {
-  return key.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 80);
+  const trimmed = key.trim();
+  if (!trimmed) return "";
+  const sep = "::";
+  const i = trimmed.indexOf(sep);
+  if (i > 0) {
+    const hub = trimmed.slice(0, i).trim().toLowerCase();
+    const namePart = trimmed.slice(i + sep.length).trim();
+    const name = namePart.toLowerCase().replace(/\s+/g, "-").slice(0, 80);
+    return name ? `${hub}${sep}${name}` : hub;
+  }
+  return trimmed.toLowerCase().replace(/\s+/g, "-").slice(0, 80);
 }
 
 export async function listStoryProSceneAssets(

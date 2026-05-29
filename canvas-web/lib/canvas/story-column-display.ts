@@ -16,6 +16,7 @@ import type {
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
+  StoryProSceneRow,
   StoryProScriptHubNodeData,
   StoryProVideoRow,
 } from "./story-pro-workspace-types";
@@ -36,9 +37,20 @@ export function findWorkspaceForColumnId(
   if (hubNodeId) {
     const hub = nodes.find((n) => n.id === hubNodeId);
     if (hub?.type === "story-pro-script-hub") {
-      return findStoryProWorkspaceFromHub(nodes, edges, hubNodeId) as
-        | StoryWorkspaceIds
-        | null;
+      const pro = findStoryProWorkspaceFromHub(nodes, edges, hubNodeId);
+      if (!pro) return null;
+      return {
+        scriptHubId: pro.scriptHubId,
+        characterColumnId: pro.characterColumnId,
+        frameColumnId: pro.frameColumnId,
+        videoColumnId: pro.videoColumnId,
+        jianyingExportId: pro.jianyingExportId,
+        sceneColumnId: pro.sceneColumnId,
+        styleNodeId: pro.styleNodeId,
+      } as StoryWorkspaceIds & {
+        sceneColumnId?: string;
+        styleNodeId?: string;
+      };
     }
     return findWorkspaceForScriptHub(nodes, edges, hubNodeId);
   }
@@ -259,16 +271,21 @@ function siblingColumnsForHub(
   edges: CanvasFlowEdge[] = [],
 ): {
   characterColumnId?: string;
+  sceneColumnId?: string;
   frameColumnId?: string;
   videoColumnId?: string;
 } {
   const characters: CanvasFlowNode[] = [];
+  const scenes: CanvasFlowNode[] = [];
   const frames: CanvasFlowNode[] = [];
   const videos: CanvasFlowNode[] = [];
   for (const n of nodes) {
     if (columnHubNodeId(n) !== hubNodeId) continue;
     if (n.type === "story-character-column" || n.type === "story-pro-character") {
       characters.push(n);
+    }
+    if (n.type === "story-pro-scene") {
+      scenes.push(n);
     }
     if (n.type === "story-frame-column" || n.type === "story-pro-frame") {
       frames.push(n);
@@ -277,6 +294,35 @@ function siblingColumnsForHub(
       videos.push(n);
     }
   }
+  const hub = nodes.find((n) => n.id === hubNodeId);
+  if (hub?.type === "story-pro-script-hub") {
+    const ws = findStoryProWorkspaceFromHub(nodes, edges, hubNodeId);
+    if (ws) {
+      const frameColumnId =
+        ws.frameColumnId ?? pickFrameAmongCandidates(nodes, frames, edges);
+      let videoColumnId = ws.videoColumnId;
+      if (!videoColumnId && frameColumnId && videos.length > 0) {
+        const linked = videos.filter((v) =>
+          edges.some((e) => e.source === frameColumnId && e.target === v.id),
+        );
+        const pool = linked.length > 0 ? linked : videos;
+        videoColumnId =
+          pool.length === 1
+            ? pool[0]!.id
+            : [...pool].sort(
+                (a, b) =>
+                  storyColumnRowCount(b) - storyColumnRowCount(a),
+              )[0]?.id;
+      }
+      return {
+        characterColumnId: ws.characterColumnId ?? characters[0]?.id,
+        sceneColumnId: ws.sceneColumnId ?? scenes[0]?.id,
+        frameColumnId,
+        videoColumnId,
+      };
+    }
+  }
+
   const frameColumnId = pickFrameAmongCandidates(nodes, frames, edges);
   let videoColumnId: string | undefined;
   if (frameColumnId && videos.length > 0) {
@@ -299,9 +345,36 @@ function siblingColumnsForHub(
   }
   return {
     characterColumnId: characters[0]?.id,
+    sceneColumnId: scenes[0]?.id,
     frameColumnId,
     videoColumnId,
   };
+}
+
+/** 始终以所属故事剧本 hub 拆分场景行（多工作流同名场景不串资产 / runtime） */
+export function displaySceneRows(
+  nodes: CanvasFlowNode[],
+  columnId: string,
+  stored: StoryProSceneRow[],
+  edges: CanvasFlowEdge[] = [],
+): StoryProSceneRow[] {
+  const col = nodes.find((n) => n.id === columnId);
+  const hubNodeId = columnHubNodeId(col);
+  if (!hubNodeId || col?.type !== "story-pro-scene") return stored;
+  const siblings = siblingColumnsForHub(nodes, hubNodeId, edges);
+  if (!siblings.sceneColumnId || siblings.sceneColumnId !== columnId) {
+    return stored;
+  }
+  const hub = nodes.find((n) => n.id === hubNodeId);
+  if (hub?.type !== "story-pro-script-hub") return stored;
+  const synced = syncStoryProColumnRows(
+    hubDataForColumnSync(
+      hub.data as StoryProScriptHubNodeData,
+    ) as StoryProScriptHubNodeData,
+    { sceneRows: stored },
+    hubNodeId,
+  );
+  return synced.sceneRows;
 }
 
 /** 始终以故事大纲为准合并行数据（保留已生成 runtime / 用户已保存的 prompt） */
@@ -309,11 +382,12 @@ export function displayCharacterRows(
   nodes: CanvasFlowNode[],
   columnId: string,
   stored: StoryCharacterRow[],
+  edges: CanvasFlowEdge[] = [],
 ): StoryCharacterRow[] {
   const col = nodes.find((n) => n.id === columnId);
   const hubNodeId = columnHubNodeId(col);
   if (!hubNodeId) return stored;
-  const siblings = siblingColumnsForHub(nodes, hubNodeId, []);
+  const siblings = siblingColumnsForHub(nodes, hubNodeId, edges);
   if (
     !siblings.characterColumnId ||
     siblings.characterColumnId !== columnId ||
@@ -329,6 +403,7 @@ export function displayCharacterRows(
         hub.data as StoryProScriptHubNodeData,
       ) as StoryProScriptHubNodeData,
       storyProColumnSyncInput(nodes, siblings),
+      hubNodeId,
     );
     return synced.characterRows;
   }
@@ -355,12 +430,16 @@ function storyProColumnSyncInput(
   nodes: CanvasFlowNode[],
   siblings: {
     characterColumnId?: string;
+    sceneColumnId?: string;
     frameColumnId?: string;
     videoColumnId?: string;
   },
 ) {
   const charNode = siblings.characterColumnId
     ? nodes.find((n) => n.id === siblings.characterColumnId)
+    : undefined;
+  const sceneNode = siblings.sceneColumnId
+    ? nodes.find((n) => n.id === siblings.sceneColumnId)
     : undefined;
   const frameNode = siblings.frameColumnId
     ? nodes.find((n) => n.id === siblings.frameColumnId)
@@ -370,6 +449,7 @@ function storyProColumnSyncInput(
     : undefined;
   return {
     characterRows: (charNode?.data as { rows?: StoryProCharacterRow[] })?.rows,
+    sceneRows: (sceneNode?.data as { rows?: StoryProSceneRow[] })?.rows,
     frameRows: (frameNode?.data as { rows?: StoryProFrameRow[] })?.rows,
     videoRows: (videoNode?.data as { rows?: StoryProVideoRow[] })?.rows,
   };
@@ -431,6 +511,7 @@ export function effectiveFrameRowsForColumn(
         hub.data as StoryProScriptHubNodeData,
       ) as StoryProScriptHubNodeData,
       storyProColumnSyncInput(nodes, siblingsForColumn),
+      hubNodeId,
     );
     return mergeHubFrameRowsWithStored(
       synced.frameRows as StoryFrameRow[],
@@ -550,6 +631,7 @@ export function displayVideoRows(
         hub.data as StoryProScriptHubNodeData,
       ) as StoryProScriptHubNodeData,
       storyProColumnSyncInput(nodes, siblings),
+      hubNodeId,
     );
     const syncedRows = synced.videoRows as StoryVideoRow[];
     const storedByKey = new Map(stored.map((r) => [r.key, r]));
