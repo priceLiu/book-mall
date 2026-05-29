@@ -12,6 +12,7 @@ import { ScriptWritingAssistantPanel } from "@/components/canvas/script-writing-
 import { MyTemplatesPanel } from "@/components/canvas/my-templates-panel";
 import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
 import { MySavedScriptsPanel } from "@/components/canvas/my-saved-scripts-panel";
+import { MyVideoLibraryPanel } from "@/components/canvas/my-video-library-panel";
 import { MyProjectCharacterAssetsPanel } from "@/components/canvas/my-project-character-assets-panel";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
@@ -74,6 +75,7 @@ function Inner({ projectId }: { projectId: string }) {
   const addNode = useCanvasStore((s) => s.addNode);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const viewport = useCanvasStore((s) => s.viewport);
   const reflowStoryComicLayout = useCanvasStore(
     (s) => s.reflowStoryComicLayout,
   );
@@ -116,6 +118,8 @@ function Inner({ projectId }: { projectId: string }) {
   const [myTemplatesOpen, setMyTemplatesOpen] = useState(false);
   const [myCharactersOpen, setMyCharactersOpen] = useState(false);
   const [mySavedScriptsOpen, setMySavedScriptsOpen] = useState(false);
+  const [myVideoLibraryOpen, setMyVideoLibraryOpen] = useState(false);
+  const [videoLibraryRefreshKey, setVideoLibraryRefreshKey] = useState(0);
   const [myProjectCharacterAssetsOpen, setMyProjectCharacterAssetsOpen] =
     useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
@@ -148,6 +152,13 @@ function Inner({ projectId }: { projectId: string }) {
     return () => registerCanvasNotifier(null);
   }, [dialogs]);
 
+  useEffect(() => {
+    const onChanged = () => setVideoLibraryRefreshKey((k) => k + 1);
+    window.addEventListener("canvas:video-library-changed", onChanged);
+    return () =>
+      window.removeEventListener("canvas:video-library-changed", onChanged);
+  }, []);
+
   // Load project
   useEffect(() => {
     if (!base) return;
@@ -165,10 +176,6 @@ function Inner({ projectId }: { projectId: string }) {
           : 0;
         useCanvasStore.temporal.getState().pause();
         hydrate(projectId, p.canvas as never);
-        const laid = useCanvasStore.getState().nodes;
-        if (hasStoryComicPipeline(laid) || hasStoryProPipeline(laid)) {
-          useCanvasStore.getState().reflowStoryComicLayout();
-        }
         useCanvasStore.temporal.getState().clear();
         useCanvasStore.temporal.getState().resume();
         setProject(p);
@@ -242,7 +249,7 @@ function Inner({ projectId }: { projectId: string }) {
         window.clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [nodes, edges, project, base, projectId, toGraph, loading]);
+  }, [nodes, edges, viewport, project, base, projectId, toGraph, loading]);
 
   const undo = useCallback(() => {
     const tStore = useCanvasStore.temporal.getState();
@@ -467,6 +474,7 @@ function Inner({ projectId }: { projectId: string }) {
             onRunAll={runAll}
             onOpenMyTemplates={() => setMyTemplatesOpen(true)}
             onOpenMyCharacters={() => setMyCharactersOpen(true)}
+            onOpenMyVideoLibrary={() => setMyVideoLibraryOpen(true)}
             onOpenMySavedScripts={
               isStoryProCanvas ? () => setMySavedScriptsOpen(true) : undefined
             }
@@ -480,7 +488,6 @@ function Inner({ projectId }: { projectId: string }) {
             runAllDisabled={gatewayLinkBlocked}
           />
           <GatewayLinkBanner />
-          <NodePalette onAdd={onAddViaPalette} />
         </div>
       <MyTemplatesPanel
         open={myTemplatesOpen}
@@ -496,6 +503,11 @@ function Inner({ projectId }: { projectId: string }) {
         open={mySavedScriptsOpen}
         onClose={() => setMySavedScriptsOpen(false)}
       />
+      <MyVideoLibraryPanel
+        open={myVideoLibraryOpen}
+        onClose={() => setMyVideoLibraryOpen(false)}
+        refreshKey={videoLibraryRefreshKey}
+      />
       <MyProjectCharacterAssetsPanel
         open={myProjectCharacterAssetsOpen}
         onClose={() => setMyProjectCharacterAssetsOpen(false)}
@@ -510,7 +522,10 @@ function Inner({ projectId }: { projectId: string }) {
           />
         ) : null}
         <div className="relative min-h-0 flex-1 overflow-hidden">
-        <FlowCanvas onUndo={undo} onRedo={redo} />
+        <FlowCanvas projectId={projectId} onUndo={undo} onRedo={redo} />
+        <div className="pointer-events-none absolute inset-x-0 top-2 z-[60] flex justify-center px-2">
+          <NodePalette onAdd={onAddViaPalette} />
+        </div>
         {isStoryComicCanvas && nodes.length > 0 ? (
           <button
             type="button"

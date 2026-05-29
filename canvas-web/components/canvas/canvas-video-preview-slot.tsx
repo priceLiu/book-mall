@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import { Download, Play, RefreshCw } from "lucide-react";
 
+import { SaveVideoToLibraryButton } from "@/components/canvas/save-video-to-library-button";
+import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library";
 import { cn } from "@/lib/utils";
 
 const SLOT_DOWNLOAD_BTN =
@@ -19,6 +21,7 @@ export function CanvasVideoPreviewSlot({
   className,
   emptyIcon,
   emptyMessage,
+  saveToLibrary,
 }: {
   videoUrl?: string;
   generating?: boolean;
@@ -29,6 +32,8 @@ export function CanvasVideoPreviewSlot({
   className?: string;
   emptyIcon?: ReactNode;
   emptyMessage?: string;
+  /** 画布视频节点 · 保存到我的视频库 */
+  saveToLibrary?: Omit<SaveVideoToLibraryInput, "sourceUrl"> | null;
 }) {
   const hasVideo = Boolean(videoUrl);
 
@@ -68,6 +73,13 @@ export function CanvasVideoPreviewSlot({
             {generatingLabel}
           </span>
         </div>
+      ) : null}
+
+      {hasVideo && !generating && saveToLibrary ? (
+        <SaveVideoToLibraryButton
+          videoUrl={videoUrl}
+          saveInput={saveToLibrary}
+        />
       ) : null}
 
       {hasVideo && !generating && downloadHref ? (

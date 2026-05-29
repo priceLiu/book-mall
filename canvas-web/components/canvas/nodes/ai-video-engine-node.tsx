@@ -19,8 +19,16 @@ import { runtimePatchFromCanvasTask } from "@/lib/canvas/task-pick";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
+import {
+  refVideoDurationFromParams,
+  refVideoResolutionFromParams,
+} from "@/lib/canvas-video-library";
 import { NodeShell } from "../node-shell";
 import { CanvasPromptTextarea } from "../canvas-prompt-textarea";
+import {
+  CanvasPromptVideoSplit,
+  resolveRefVideoPreviewRatio,
+} from "../canvas-prompt-video-split";
 import { CanvasVideoPreviewSlot } from "../canvas-video-preview-slot";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { EnginePicker } from "../engine-picker";
@@ -31,7 +39,8 @@ import {
   NodeEngineShellFooter,
 } from "../node-ui";
 
-const REF_VIDEO_PROMPT_CLASS = `${RF_NODE_SCROLL} min-h-[128px] max-h-[240px] w-full shrink-0 resize-y rounded-md border border-white/10 bg-black/30 p-2.5 font-mono text-[12px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
+const REF_VIDEO_PROMPT_CLASS = `${RF_NODE_SCROLL} h-full min-h-0 w-full flex-1 resize-none rounded-md border border-white/10 bg-black/30 p-2.5 font-mono text-[12px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
+const REF_VIDEO_PREVIEW_CLASS = "h-full min-h-0 w-full";
 
 function useElapsedMinutes(sinceIso: string | null | undefined): number | null {
   const [now, setNow] = useState(() => Date.now());
@@ -121,6 +130,19 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
     if (!isGenerating) setRunPending(false);
   }, [isGenerating]);
 
+  /** 已有成片但 runtime 仍停在 pending/running 且无在途任务 → 解除「重新生成」禁用 */
+  useEffect(() => {
+    if (!isGenerating || inflightTask || !hasGenerated) return;
+    setNodeRuntime(id, { status: "done" });
+    setRunPending(false);
+  }, [
+    isGenerating,
+    inflightTask,
+    hasGenerated,
+    id,
+    setNodeRuntime,
+  ]);
+
   /** 任务已在服务端成功但 runtime 未同步时（刷新 / 轮询竞态）立即对齐 */
   useEffect(() => {
     if (!isGenerating && !runPending) return;
@@ -198,27 +220,49 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
             </p>
           )}
 
-          <CanvasPromptTextarea
-            value={d.prompt ?? ""}
-            onChange={(prompt) => updateNodeData(id, { prompt })}
-            placeholder="描述镜头与动作；可用 [Image 1]、[Image 2] 引用参考格"
-            rows={6}
-            className={REF_VIDEO_PROMPT_CLASS}
-          />
-
-          <CanvasVideoPreviewSlot
-            className="min-h-0 flex-1 basis-0"
-            videoUrl={videoUrl ?? undefined}
-            downloadHref={videoUrl ?? undefined}
-            downloadFileName="ref-video.mp4"
-            generating={showGenerating}
-            onPreview={videoUrl && !showGenerating ? openPreview : undefined}
-            emptyIcon={<Video className="size-6 opacity-30" />}
-            emptyMessage={
-              showGenerating ? undefined : "生成结果将显示在此"
+          <CanvasPromptVideoSplit
+            previewRatio={resolveRefVideoPreviewRatio(d)}
+            onPreviewRatioChange={(videoPreviewRatio) =>
+              updateNodeData(id, { videoPreviewRatio })
             }
-            generatingLabel={
-              d.runtime?.status === "pending" ? "排队中…" : "视频生成中…"
+            prompt={
+              <CanvasPromptTextarea
+                value={d.prompt ?? ""}
+                onChange={(prompt) => updateNodeData(id, { prompt })}
+                placeholder="描述镜头与动作；可用 [Image 1]、[Image 2] 引用参考格"
+                rows={10}
+                className={REF_VIDEO_PROMPT_CLASS}
+              />
+            }
+            video={
+              <CanvasVideoPreviewSlot
+                className={REF_VIDEO_PREVIEW_CLASS}
+                videoUrl={videoUrl ?? undefined}
+                downloadHref={videoUrl ?? undefined}
+                downloadFileName="ref-video.mp4"
+                generating={showGenerating}
+                onPreview={
+                  videoUrl && !showGenerating ? openPreview : undefined
+                }
+                emptyIcon={<Video className="size-6 opacity-30" />}
+                emptyMessage={
+                  showGenerating ? undefined : "生成结果将显示在此"
+                }
+                generatingLabel={
+                  d.runtime?.status === "pending" ? "排队中…" : "视频生成中…"
+                }
+                saveToLibrary={
+                  videoUrl && !showGenerating
+                    ? {
+                        mode: "ref",
+                        prompt: d.prompt,
+                        modelLabel: d.modelKey,
+                        resolution: refVideoResolutionFromParams(d.params),
+                        durationSec: refVideoDurationFromParams(d.params),
+                      }
+                    : null
+                }
+              />
             }
           />
 
@@ -256,7 +300,7 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
               !d.providerId ||
               !d.modelKey ||
               !d.prompt?.trim() ||
-              refUrls.length < 1
+              (refUrls.length < 1 && !hasGenerated)
             }
             onRun={() => onRun(hasGenerated)}
           />

@@ -962,6 +962,36 @@ export async function runCanvasPollWorker(opts?: {
       !fresh?.kieTaskId
     ) {
       if (!shouldPollNow(task)) continue;
+      if (shouldDeferPollSyncGatewaySubmit(task)) continue;
+
+      const existingLogId =
+        typeof payload.gatewayLogId === "string"
+          ? payload.gatewayLogId.trim()
+          : "";
+      if (existingLogId) {
+        const log = await prisma.gatewayRequestLog.findUnique({
+          where: { id: existingLogId },
+          select: { externalTaskId: true, status: true },
+        });
+        if (log?.externalTaskId) {
+          await prisma.canvasGenerationTask.update({
+            where: { id: task.id },
+            data: {
+              status: "SUBMITTED",
+              kieTaskId: log.externalTaskId,
+              submittedAt: new Date(),
+              lastPolledAt: new Date(),
+            },
+          });
+          result.retried++;
+          continue;
+        }
+        if (log?.status === "RUNNING") continue;
+      }
+
+      const claim = await claimCanvasTaskKieSubmit(task.id);
+      if (!claim.claimed) continue;
+
       const refs = Array.isArray(payload.referenceImageUrls)
         ? payload.referenceImageUrls.filter(
             (u): u is string =>
@@ -1006,6 +1036,8 @@ export async function runCanvasPollWorker(opts?: {
             inputPayload: {
               ...payload,
               gatewayLogId: job.logId,
+              gatewayKieSubmitClaimed: true,
+              syncGatewaySubmit: true,
             } as Prisma.InputJsonValue,
           },
         });

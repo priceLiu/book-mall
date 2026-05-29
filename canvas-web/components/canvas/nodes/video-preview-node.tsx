@@ -11,6 +11,7 @@ import { NodeShell } from "../node-shell";
 import { CanvasVideoPlayer } from "../canvas-video-player";
 import { MediaPreviewLightbox } from "../media-hover-box";
 import { PreviewNodeHeader } from "../preview-node-header";
+import { SaveVideoToLibraryButton } from "../save-video-to-library-button";
 import {
   NODE_BTN_GHOST,
   NODE_MEDIA_MIN_WIDTH,
@@ -45,15 +46,21 @@ export function VideoPreviewNode({ id, data, selected }: NodeProps) {
     [nodes, edges, id],
   );
 
-  const upstreamRuntime = useMemo(() => {
+  const upstreamEngine = useMemo(() => {
     for (const pid of directPredecessors(edges, id)) {
       const p = nodes.find((n) => n.id === pid);
       if (p?.type === "video-engine") {
-        return (p.data as VideoEngineNodeData).runtime;
+        return p;
       }
     }
     return undefined;
   }, [nodes, edges, id]);
+
+  const upstreamRuntime = (
+    upstreamEngine?.data as VideoEngineNodeData | undefined
+  )?.runtime;
+
+  const upstreamData = upstreamEngine?.data as VideoEngineNodeData | undefined;
 
   const title = d.label ?? (d.frameIndex ? `视频 · 镜${d.frameIndex}` : "视频预览");
 
@@ -88,7 +95,7 @@ export function VideoPreviewNode({ id, data, selected }: NodeProps) {
                 className="h-full w-full rounded-none border-0"
               />
             </NodeMediaStage>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 className={NODE_BTN_GHOST}
@@ -96,6 +103,15 @@ export function VideoPreviewNode({ id, data, selected }: NodeProps) {
               >
                 <Maximize2 className="size-3" /> 全屏播放
               </button>
+              <SaveVideoToLibraryButton
+                variant="inline"
+                videoUrl={url}
+                saveInput={{
+                  mode: "i2v",
+                  prompt: upstreamData?.prompt,
+                  modelLabel: upstreamData?.modelKey,
+                }}
+              />
               <a
                 href={url}
                 target="_blank"

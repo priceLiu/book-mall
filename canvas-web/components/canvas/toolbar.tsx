@@ -6,6 +6,7 @@ import {
   Bookmark,
   BookmarkPlus,
   BookOpen,
+  Film,
   LayoutTemplate,
   Loader2,
   Play,
@@ -30,6 +31,7 @@ export function CanvasToolbar({
   onOpenMyTemplates,
   onOpenMyCharacters,
   onOpenMySavedScripts,
+  onOpenMyVideoLibrary,
   onOpenProjectCharacterAssets,
   onReflowStoryLayout,
   running,
@@ -50,6 +52,7 @@ export function CanvasToolbar({
   onOpenMyTemplates?: () => void;
   onOpenMyCharacters?: () => void;
   onOpenMySavedScripts?: () => void;
+  onOpenMyVideoLibrary?: () => void;
   onOpenProjectCharacterAssets?: () => void;
   onReflowStoryLayout?: () => void;
   running: boolean;
@@ -152,6 +155,17 @@ export function CanvasToolbar({
           >
             <BookOpen className="size-3" />
             我保存的剧本
+          </button>
+        ) : null}
+        {onOpenMyVideoLibrary ? (
+          <button
+            type="button"
+            onClick={onOpenMyVideoLibrary}
+            className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-white/30 hover:text-white"
+            title="查看从画布保存到云端的视频"
+          >
+            <Film className="size-3" />
+            我的视频库
           </button>
         ) : null}
         {onOpenProjectCharacterAssets ? (

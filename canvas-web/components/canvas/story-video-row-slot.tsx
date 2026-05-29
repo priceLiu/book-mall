@@ -14,6 +14,8 @@ import { Lock } from "lucide-react";
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import { STORY_HINT_GOLD_CLASS } from "@/lib/canvas/story-column-sync";
 import { StoryVideoPromptPopover } from "./story-video-prompt-popover";
+import { SaveVideoToLibraryButton } from "@/components/canvas/save-video-to-library-button";
+import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library";
 
 const SLOT_CORNER_BTN =
   "nodrag absolute z-20 inline-flex size-8 items-center justify-center rounded-full border shadow-md backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100";
@@ -33,6 +35,7 @@ export function StoryVideoRowSlot({
   onPreview,
   edition = "comic",
   videoBlockReason,
+  saveToLibrary,
 }: {
   frameIndex: number;
   videoUrl?: string;
@@ -46,6 +49,7 @@ export function StoryVideoRowSlot({
   edition?: StoryEdition;
   /** 静帧/过审未满足时的提示 */
   videoBlockReason?: string | null;
+  saveToLibrary?: Omit<SaveVideoToLibraryInput, "sourceUrl"> | null;
 }) {
   const hasVideo = Boolean(videoUrl);
   const promptText = (videoPrompt ?? "").trim();
@@ -123,6 +127,13 @@ export function StoryVideoRowSlot({
                 <Play className="ml-0.5 size-5 fill-white text-white" />
               </span>
             </button>
+          ) : null}
+
+          {hasVideo && !generating && saveToLibrary ? (
+            <SaveVideoToLibraryButton
+              videoUrl={videoUrl}
+              saveInput={saveToLibrary}
+            />
           ) : null}
 
           {hasVideo && !generating ? (

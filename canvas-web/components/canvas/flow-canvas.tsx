@@ -8,6 +8,7 @@ import {
   ReactFlowProvider,
   SelectionMode,
   useReactFlow,
+  type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -107,12 +108,15 @@ type NodeClipboard = {
   origin: { x: number; y: number };
 };
 
-function FlowCanvasInner() {
+function FlowCanvasInner({ projectId }: { projectId: string }) {
   const base = useBookMallBaseUrl();
   const wrapRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
+  const initialFitDoneRef = useRef(false);
 
   const nodes = useCanvasStore((s) => s.nodes);
+  const viewport = useCanvasStore((s) => s.viewport);
+  const setViewport = useCanvasStore((s) => s.setViewport);
   const edges = useCanvasStore((s) => s.edges);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
   const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
@@ -127,9 +131,33 @@ function FlowCanvasInner() {
   const reparentNode = useCanvasStore((s) => s.reparentNode);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const fitViewNonce = useCanvasStore((s) => s.fitViewNonce);
-  const runningFocusNodeId = useCanvasStore((s) => s.runningFocusNodeId);
-  const runningFocusNonce = useCanvasStore((s) => s.runningFocusNonce);
-  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    initialFitDoneRef.current = false;
+  }, [projectId]);
+
+  /** 勿用受控 viewport：节点轮询会频繁重渲染，store 里的旧视口会把滚轮缩放拉回 */
+  const onMoveEnd = useCallback(
+    (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
+      setViewport(vp);
+    },
+    [setViewport],
+  );
+
+  const onInit = useCallback(() => {
+    if (initialFitDoneRef.current) return;
+    initialFitDoneRef.current = true;
+    const vp = useCanvasStore.getState().viewport;
+    const laid = useCanvasStore.getState().nodes;
+    if (laid.length === 0) return;
+    const noSavedViewport =
+      Math.abs(vp.x) < 1 &&
+      Math.abs(vp.y) < 1 &&
+      Math.abs(vp.zoom - 1) < 0.01;
+    if (noSavedViewport) {
+      void fitView({ padding: 0.12, duration: 0 });
+    }
+  }, [fitView]);
 
   useEffect(() => {
     registerCanvasViewportPlacement({
@@ -146,21 +174,6 @@ function FlowCanvasInner() {
     });
     return () => window.cancelAnimationFrame(t);
   }, [fitViewNonce, fitView]);
-
-  /** 某节点开始生成时，仅在视口内微调平移，避免 fitView 把大列节点顶到顶栏下方造成「菜单被盖住」的错觉 */
-  useEffect(() => {
-    if (runningFocusNonce <= 0 || !runningFocusNodeId) return;
-    const nodeId = runningFocusNodeId;
-    const t = window.requestAnimationFrame(() => {
-      void fitView({
-        nodes: [{ id: nodeId }],
-        padding: { top: 140, right: 72, bottom: 72, left: 72 },
-        duration: 280,
-        maxZoom: 0.92,
-      });
-    });
-    return () => window.cancelAnimationFrame(t);
-  }, [runningFocusNonce, runningFocusNodeId, fitView]);
 
   /** 上传一个图片 File，并在指定位置创建 image 节点。返回新节点 id。 */
   const ingestImageFile = useCallback(
@@ -503,6 +516,7 @@ function FlowCanvasInner() {
       onDragOver={onDragOver}
     >
       <ReactFlow
+        key={projectId}
         nodes={decoratedNodes}
         edges={edges}
         nodeTypes={memoNodeTypes}
@@ -514,7 +528,9 @@ function FlowCanvasInner() {
         onConnectEnd={onConnectEnd}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
-        fitView
+        defaultViewport={viewport}
+        onMoveEnd={onMoveEnd}
+        onInit={onInit}
         proOptions={{ hideAttribution: true }}
         className="bg-[var(--canvas-bg)]"
         // 框选：拖空白即可框选；按住 Space 或 中键/右键 拖动来平移
@@ -577,16 +593,18 @@ function HotkeyBridge({
 }
 
 export function FlowCanvas({
+  projectId,
   onUndo,
   onRedo,
 }: {
+  projectId: string;
   onUndo: () => void;
   onRedo: () => void;
 }) {
   return (
     <ReactFlowProvider>
       <HotkeyBridge onUndo={onUndo} onRedo={onRedo} />
-      <FlowCanvasInner />
+      <FlowCanvasInner projectId={projectId} />
     </ReactFlowProvider>
   );
 }

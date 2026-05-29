@@ -135,6 +135,77 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 - 白纸预览 hover：`onLight` — 白底橙字
 - 预览纸 hover  overlay：居中 44×44 圆 + Search 图标
 
+### 3.6 标准版画布 · 顶部工具区
+
+**适用范围**：普通画布（海报 / 故事 / 参考生视频三组节点面板并存时）。**真源**：`components/canvas/toolbar.tsx` · `components/canvas/node-palette.tsx` · `app/canvas/[id]/canvas-page-client.tsx`。
+
+影视专业版节点面板配色见 **§14**；布局与「不占整行、无大块黑底」规则与本节相同。
+
+#### 3.6.1 两层结构（禁止合并为一行黑条）
+
+```text
+┌─ sticky 顶栏（仅项目操作）──────────────────────────────┐
+│ CanvasToolbar：返回 · 项目名 · 保存/撤销/运行 · 库入口…  │
+│ GatewayLinkBanner（若有）                               │
+└────────────────────────────────────────────────────────┘
+┌─ 画布区域（FlowCanvas）────────────────────────────────┐
+│   ┌ 浮层节点面板（NodePalette）────────────────┐      │
+│   │  居中 · w-fit · 不铺满视口宽度              │      │
+│   └────────────────────────────────────────────┘      │
+│   …节点…                                              │
+└──────────────────────────────────────────────────────┘
+```
+
+- **项目顶栏**（`CanvasToolbar`）：`header` 全宽、`bg-[var(--canvas-surface)]`、`border-b border-white/10` — 仅此一行承担「顶栏」职责。
+- **节点面板**（`NodePalette`）：**不得**再占 `sticky` 顶栏下的第二行；须挂在画布容器内 `absolute inset-x-0 top-2 z-[60]`，外层 `pointer-events-none`，内层 `pointer-events-auto`。
+- **禁止**：节点面板外包一层全宽 `bg-black/*` 或 `bg-[var(--canvas-surface)]` 条带；禁止 `justify-center` 的块级父级撑满整行造成「空黑边」。
+
+#### 3.6.2 节点面板 · 分组 pill（标准版）
+
+| 项 | 规范 |
+|----|------|
+| 宽度 | `inline-flex` + `w-fit`；组间距 `gap-1.5`；**仅包住图标与节点按钮** |
+| 容器 | `rounded-full border border-white/12 bg-[var(--canvas-surface)]/75 px-1 py-0.5 shadow-md backdrop-blur-sm` |
+| 分组标签 | **禁止**橙字「海报创作 / 故事创作 / 参考生视频」；用 **分组徽标**（`PaletteGroupBadge`） |
+| 徽标尺寸 | 展开 `size-9`；收到右侧竖排时 `size-8` |
+| 徽标样式 | `border-white/15 bg-white/[0.06]` + 图标色 `text-[#fb923c]`（`PALETTE_BADGE_CLASS`） |
+| 徽标图标 | 海报 `Palette` · 故事 `Clapperboard` · 参考生视频 `Video`（常量 `PALETTE_GROUPS`） |
+| 悬停说明 | 徽标 `title` + tooltip 显示中文分组名（无障碍 `aria-label` 同文案） |
+| 节点按钮 | `size-9` 圆钮；`hover:bg-[var(--canvas-accent)]/20`；tooltip 在钮下方 |
+| 组内分隔 | 竖线 `\|`：`PaletteDivider`（非竖排时） |
+| 尾部操作 | 帮助 `HelpCircle`、收到右侧 `ChevronRight` 接在**最后一组 pill 右侧**（勿只挂在第一组） |
+
+**标准版三组内容**（`node-palette.tsx`）：
+
+| 徽标 | 数组常量 | 典型节点 |
+|------|----------|----------|
+| 海报 | `CANVAS_PALETTE` | 图片、文本、AI/生图引擎、输出、剪映 |
+| 故事 | `STORY_PALETTE` | 故事主题、大纲、角色列、分镜列、视频列… |
+| 参考生视频 | `REF_VIDEO_PALETTE` | 四/六/九宫格、AI 视频引擎、视频生成 |
+
+#### 3.6.3 节点面板 · 收到右侧（可选）
+
+- `fixed right-3 top-1/2` 竖条：`bg-[var(--canvas-surface)]/85` + `backdrop-blur-md`（**禁止** `bg-black/75` 大块纯黑）
+- 展开回顶部：仅保留右侧浮条上的收起钮；**禁止**顶栏再出现全宽「节点面板在右侧」提示条
+
+#### 3.6.4 项目顶栏按钮（CanvasToolbar）
+
+| 类型 | 样式 |
+|------|------|
+| 默认次要 | `border-white/10` · `text-[var(--canvas-muted)]` · 11px |
+| 强调（我保存的剧本 / 项目资产） | `border-emerald-400/25 bg-emerald-500/8 text-emerald-100/90` |
+| 运行 | 实心强调（见 `toolbar.tsx` 运行钮） |
+| 项目名 | `text-emerald-200` · 透明底 · focus 时浅底 |
+
+#### 3.6.5 硬性禁止（Code Review）
+
+- 节点面板占 **整行** 或铺满视口宽的黑/灰底条
+- 分组用 **文字标签** 代替徽标（专业版可用青色系徽标 + `Sparkles`，见 §14）
+- pill 使用 `bg-black/70`、`bg-black/75` 作为主背景
+- 将 `NodePalette` 与 `CanvasToolbar` 放在同一 `sticky` 块内且让面板独占一行
+
+新增/改版顶部 UI 时须对照本节；常量与类名优先收口到 `node-palette.tsx`，避免在页面层重复写布局。
+
 ---
 
 ## 4. 弹出层
@@ -419,6 +490,7 @@ Cursor 规则：`.cursor/rules/no-native-dialogs.mdc`
 | 尺寸迁移 | `normalizeCanvasNodes`、`migrateGraphV1ToV2` |
 | 图片上传（点击/拖入/粘贴） | §13 · `image-upload-handlers.ts` · `MediaHoverBox` |
 | 列内生成中动效 / 预览图标 | §15 · `story-edition-chrome.ts` · `globals.css` |
+| 标准版 · 顶部工具区 / 节点面板 | §3.6 · `toolbar.tsx` · `node-palette.tsx` · `canvas-page-client.tsx` |
 
 ---
 

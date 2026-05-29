@@ -449,28 +449,7 @@ export async function canvasGwRecordInfo(
       credentialId,
       taskId: opts.taskId,
     });
-    if (opts.gatewayLogId) {
-      const status = output.task_status?.toUpperCase() ?? "";
-      if (status === "SUCCEEDED" || status === "SUCCESS") {
-        await finalizeRequestLog(opts.gatewayLogId, {
-          status: "SUCCEEDED",
-          durationMs: 0,
-          resultSummary: output,
-          externalTaskId: opts.taskId,
-        });
-      } else if (
-        status === "FAILED" ||
-        status === "CANCELED" ||
-        status === "UNKNOWN"
-      ) {
-        await finalizeRequestLog(opts.gatewayLogId, {
-          status: "FAILED",
-          durationMs: 0,
-          failMessage: output.message ?? output.code ?? "failed",
-          externalTaskId: opts.taskId,
-        });
-      }
-    }
+    // 百炼终态由 gateway poll worker 统一 finalize（避免 canvas poll 写 durationMs=0 且与 worker 竞态）
     return { providerKind: "BAILIAN", output };
   }
 
@@ -531,28 +510,7 @@ export async function canvasGwRecordInfo(
     credentialId,
     taskId: opts.taskId,
   });
-  if (opts.gatewayLogId) {
-    const { isKieRecordSuccess, isKieRecordFail } = await import(
-      "@/lib/story/kie-client"
-    );
-    if (isKieRecordSuccess(record.state)) {
-      await finalizeRequestLog(opts.gatewayLogId, {
-        status: "SUCCEEDED",
-        durationMs: 0,
-        resultSummary: { state: record.state, resultJson: record.resultJson },
-        externalTaskId: record.taskId,
-        model: record.model,
-      });
-    } else if (isKieRecordFail(record.state)) {
-      await finalizeRequestLog(opts.gatewayLogId, {
-        status: "FAILED",
-        durationMs: 0,
-        failMessage: record.failMsg ?? record.failCode ?? "failed",
-        externalTaskId: record.taskId,
-        model: record.model,
-      });
-    }
-  }
+  // KIE 终态由 gateway poll worker 统一 finalize
   return { providerKind: "KIE", record };
 }
 
