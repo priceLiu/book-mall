@@ -27,6 +27,14 @@ alwaysApply: false
 - **错误**：`StoryErrorLine` · 单行 `truncate` + `title` 悬停全文
 - 规则详情：`.cursor/rules/canvas-story-typography.mdc`
 
+## 标准版 · 顶部工具区
+
+- 全文 `design.md` **§3.6**（真源 `toolbar.tsx` · `node-palette.tsx` · `canvas-page-client.tsx`）
+- **两层**：`CanvasToolbar` 独占 sticky 顶栏；`NodePalette` 浮在画布 `top-2` 居中，`w-fit`
+- 分组用徽标（`Palette` / `Clapperboard` / `Video`），禁止橙字分组标题与整行黑底
+- pill：`bg-[var(--canvas-surface)]/75` + 细边框；**禁止** `bg-black/70` 铺满视口
+- 收到右侧：节点钮 **22px**；**「移到顶部」在工具条左侧垂直居中**；**禁止**内嵌滚动条（§3.6.3）
+
 ## 按钮
 
 - **快手漫剧**主操作：`STORY_ORANGE_BTN_CLASS` / `STORY_NODE_ACTION_BTN_CLASS`，**h-9**
@@ -38,6 +46,7 @@ alwaysApply: false
 ## 影视专业版（Story Pro）
 
 - 真源：`story-pro-node-chrome.ts` + `story-edition-chrome.ts` · 全文 `design.md` **§14**
+- 节点面板：单组 `Sparkles` 徽标 · 布局同 §3.6 · 青色 pill（§14.2）
 - 节点 `story-pro-*` · 共用列传 `edition="pro"`
 - 审阅弹层：`StoryScriptHubModal edition="pro"`；导演提示词：`proDirectorPack`
 - 入库：`StoryProAssetImportIcon`（禁止「入库」二字）

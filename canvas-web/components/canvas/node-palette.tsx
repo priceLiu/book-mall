@@ -269,6 +269,8 @@ function PaletteIconButton({
   onAdd: (type: CanvasContentNodeType, presetId?: string) => void;
   proTheme?: boolean;
 }) {
+  const btnSize = collapsed ? PALETTE_DOCK_NODE_BTN : "size-9";
+  const iconScale = collapsed ? PALETTE_DOCK_NODE_ICON : "[&_svg]:!size-[18px]";
   return (
     <button
       type="button"
@@ -278,8 +280,8 @@ function PaletteIconButton({
       aria-label={`${p.label} — ${p.hint}`}
       className={
         proTheme
-          ? "group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full text-cyan-100/80 transition hover:bg-cyan-500/20 hover:text-cyan-50"
-          : "group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+          ? `group/palette relative flex ${btnSize} shrink-0 items-center justify-center rounded-full text-cyan-100/80 transition hover:bg-cyan-500/20 hover:text-cyan-50 ${iconScale}`
+          : `group/palette relative flex ${btnSize} shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white ${iconScale}`
       }
     >
       {p.icon}
@@ -298,11 +300,19 @@ function PaletteIconButton({
   );
 }
 
-function PaletteDivider({ vertical = false }: { vertical?: boolean }) {
+function PaletteDivider({
+  vertical = false,
+  compact = false,
+}: {
+  vertical?: boolean;
+  compact?: boolean;
+}) {
   if (vertical) {
     return (
       <span
-        className="my-0.5 block h-px w-6 shrink-0 bg-white/20"
+        className={`my-0.5 block h-px shrink-0 bg-white/20 ${
+          compact ? "w-5" : "w-6"
+        }`}
         aria-hidden
       />
     );
@@ -338,7 +348,9 @@ function PaletteItemsRow({
     <>
       {items.map((p) => (
         <Fragment key={`${p.type}/${p.presetId ?? "_"}`}>
-          {p.dividerBefore ? <PaletteDivider vertical={collapsed} /> : null}
+          {p.dividerBefore ? (
+            <PaletteDivider vertical={collapsed} compact={collapsed} />
+          ) : null}
           <PaletteIconButton
             p={p}
             collapsed={collapsed}
@@ -346,12 +358,19 @@ function PaletteItemsRow({
             onAdd={onAdd}
             proTheme={proTheme}
           />
-          {p.dividerAfter ? <PaletteDivider vertical={collapsed} /> : null}
+          {p.dividerAfter ? (
+            <PaletteDivider vertical={collapsed} compact={collapsed} />
+          ) : null}
         </Fragment>
       ))}
     </>
   );
 }
+
+/** 标准版顶部节点面板 · 视觉与布局见 `docs/design.md` §3.6 */
+/** 右侧 dock · 节点拖入钮 22px */
+const PALETTE_DOCK_NODE_BTN = "size-[22px]";
+const PALETTE_DOCK_NODE_ICON = "[&_svg]:!size-3";
 
 const PALETTE_BADGE_CLASS = "text-[#fb923c]";
 const PRO_PALETTE_BADGE_CLASS = "text-cyan-300";
@@ -388,11 +407,12 @@ function PaletteGroupBadge({
   proTheme?: boolean;
 }) {
   const colorClass = proTheme ? PRO_PALETTE_BADGE_CLASS : PALETTE_BADGE_CLASS;
+  const iconScale = collapsed ? "[&_svg]:!size-3.5" : "[&_svg]:!size-[18px]";
   return (
     <span
       className={`group/badge relative inline-flex shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] ${
-        collapsed ? "mb-1 size-8" : "size-9"
-      } ${colorClass}`}
+        collapsed ? `mb-1 ${PALETTE_DOCK_NODE_BTN}` : "size-9"
+      } ${colorClass} ${iconScale}`}
       title={label}
       aria-label={label}
     >
@@ -604,19 +624,26 @@ export function NodePalette({
     [],
   );
 
+  const dockChromeBtn = `${PALETTE_DOCK_NODE_BTN} ${PALETTE_DOCK_NODE_ICON}`;
+  const topChromeBtn = "size-9 [&_svg]:!size-[18px]";
+  const dockExpandBtn =
+    "size-10 border border-emerald-400/35 bg-emerald-500/15 text-emerald-100 shadow-md hover:border-emerald-400/55 hover:bg-emerald-500/25 [&_svg]:!size-[18px]";
+
   const helpButton = (
     <button
       type="button"
       onClick={() => setHelpOpen((v) => !v)}
       aria-label="操作方式 / 快捷键"
       aria-expanded={helpOpen}
-      className={`group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full transition ${
+      className={`group/palette relative flex shrink-0 items-center justify-center rounded-full transition ${
+        collapsed ? dockChromeBtn : topChromeBtn
+      } ${
         helpOpen
           ? "bg-[var(--canvas-accent)]/30 text-white"
           : "text-white/80 hover:bg-[var(--canvas-accent)]/20 hover:text-white"
       }`}
     >
-      <HelpCircle className="size-[18px]" />
+      <HelpCircle className="size-[18px]" aria-hidden />
       <span
         className={`pointer-events-none absolute z-50 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100 ${
           collapsed
@@ -637,12 +664,16 @@ export function NodePalette({
       onClick={toggleDock}
       aria-label={collapsed ? "移到顶部" : "收到右侧"}
       title={collapsed ? "移到顶部" : "收到右侧"}
-      className="group/palette relative flex size-9 shrink-0 items-center justify-center rounded-full text-white/80 transition hover:bg-[var(--canvas-accent)]/20 hover:text-white"
+      className={`group/palette relative flex shrink-0 items-center justify-center rounded-full transition ${
+        collapsed
+          ? dockExpandBtn
+          : `text-white/80 hover:bg-[var(--canvas-accent)]/20 hover:text-white ${topChromeBtn}`
+      }`}
     >
       {collapsed ? (
-        <ChevronLeft className="size-[18px]" />
+        <ChevronLeft className="size-[18px]" aria-hidden />
       ) : (
-        <ChevronRight className="size-[18px]" />
+        <ChevronRight className="size-[18px]" aria-hidden />
       )}
       <span
         className={`pointer-events-none absolute z-50 whitespace-nowrap rounded-md border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white opacity-0 shadow-lg transition group-hover/palette:opacity-100 ${
@@ -671,55 +702,60 @@ export function NodePalette({
       {collapsed ? (
         <>
         <div
-          className="pointer-events-none fixed right-3 top-1/2 z-[100] -translate-y-1/2"
+          className="pointer-events-none fixed right-2 top-1/2 z-[100] flex -translate-y-1/2 flex-row items-center gap-1"
           role="toolbar"
           aria-label={proOnly ? "影视专业版节点面板（右侧）" : "节点面板（右侧）"}
         >
-          <div className="pointer-events-auto flex flex-col items-center gap-1 rounded-2xl border border-white/12 bg-[var(--canvas-surface)]/85 py-2 pl-1.5 pr-1 shadow-lg backdrop-blur-md">
+          {/* 移到顶部：工具条左侧、与整列垂直居中 */}
+          <div className="pointer-events-auto shrink-0 self-center rounded-full bg-[var(--canvas-surface)]/95 p-0.5 shadow-md backdrop-blur-sm">
             {collapseButton}
-            <PaletteDivider vertical />
-            {proOnly ? (
-              <PalettePill
-                groupLabel={PALETTE_GROUPS.pro.label}
-                groupIcon={PALETTE_GROUPS.pro.icon}
-                items={proPaletteItems}
-                collapsed
-                proTheme
-                onDragStart={onDragStart}
-                onAdd={onAdd}
-              />
-            ) : (
-              <>
-                <PalettePill
-                  groupLabel={PALETTE_GROUPS.poster.label}
-                  groupIcon={PALETTE_GROUPS.poster.icon}
-                  items={CANVAS_PALETTE}
-                  collapsed
-                  onDragStart={onDragStart}
-                  onAdd={onAdd}
-                />
-                <PaletteDivider vertical />
-                <PalettePill
-                  groupLabel={PALETTE_GROUPS.story.label}
-                  groupIcon={PALETTE_GROUPS.story.icon}
-                  items={STORY_PALETTE}
-                  collapsed
-                  onDragStart={onDragStart}
-                  onAdd={onAdd}
-                />
-                <PaletteDivider vertical />
-                <PalettePill
-                  groupLabel={PALETTE_GROUPS.refVideo.label}
-                  groupIcon={PALETTE_GROUPS.refVideo.icon}
-                  items={REF_VIDEO_PALETTE}
-                  collapsed
-                  onDragStart={onDragStart}
-                  onAdd={onAdd}
-                />
-              </>
-            )}
-            <PaletteDivider vertical />
-            {helpButton}
+          </div>
+          <div className="pointer-events-auto flex flex-col rounded-xl border border-white/12 bg-[var(--canvas-surface)]/90 shadow-md backdrop-blur-md">
+            <div className="nodrag flex flex-col items-center gap-1 py-1.5 pl-1 pr-1">
+                {proOnly ? (
+                  <PalettePill
+                    groupLabel={PALETTE_GROUPS.pro.label}
+                    groupIcon={PALETTE_GROUPS.pro.icon}
+                    items={proPaletteItems}
+                    collapsed
+                    proTheme
+                    onDragStart={onDragStart}
+                    onAdd={onAdd}
+                  />
+                ) : (
+                  <>
+                    <PalettePill
+                      groupLabel={PALETTE_GROUPS.poster.label}
+                      groupIcon={PALETTE_GROUPS.poster.icon}
+                      items={CANVAS_PALETTE}
+                      collapsed
+                      onDragStart={onDragStart}
+                      onAdd={onAdd}
+                    />
+                    <PaletteDivider vertical compact />
+                    <PalettePill
+                      groupLabel={PALETTE_GROUPS.story.label}
+                      groupIcon={PALETTE_GROUPS.story.icon}
+                      items={STORY_PALETTE}
+                      collapsed
+                      onDragStart={onDragStart}
+                      onAdd={onAdd}
+                    />
+                    <PaletteDivider vertical compact />
+                    <PalettePill
+                      groupLabel={PALETTE_GROUPS.refVideo.label}
+                      groupIcon={PALETTE_GROUPS.refVideo.icon}
+                      items={REF_VIDEO_PALETTE}
+                      collapsed
+                      onDragStart={onDragStart}
+                      onAdd={onAdd}
+                    />
+                  </>
+                )}
+            </div>
+            <div className="nodrag flex shrink-0 flex-col items-center border-t border-white/10 py-1.5">
+              {helpButton}
+            </div>
           </div>
         </div>
         </>
