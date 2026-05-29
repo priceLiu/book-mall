@@ -76,7 +76,10 @@ import {
   PRO_NODE_SHELL_FOOTER_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
 import { STORY_HINT_LABEL_CLASS, STORY_HINT_BODY_CLASS, FRAME_ROW_AT_HINT, stripFrameRowAtHint, sanitizeLegacyFramePrompt, patchVideoRowsFromFrameRows } from "@/lib/canvas/story-column-sync";
-import { storyFrameColumnSize } from "@/lib/canvas/story-column-layout";
+import {
+  storyFrameColumnSize,
+  storyMediaAlignedRowHeight,
+} from "@/lib/canvas/story-column-layout";
 import { storyMediaListLabel } from "@/lib/canvas/story-media-grid-layout";
 import { StoryEnginePickerStack } from "../story-engine-picker-stack";
 import { StoryFrameScriptEngineBar } from "../story-frame-script-engine-bar";
@@ -265,6 +268,11 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     [displayRows],
   );
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
+
+  const alignedRowH = useMemo(
+    () => storyMediaAlignedRowHeight({ pro: edition === "pro" }),
+    [edition],
+  );
 
   const targetSize = useMemo(
     () => storyFrameColumnSize(displayRows, { pro: edition === "pro" }),
@@ -676,10 +684,15 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                 frameRowStaleSnapshot(row, projectCharacterAssets, projectId);
               const videoBlockReason = storyVideoGenerateBlockReason(row);
               return (
-                <div key={row.key} className="w-full shrink-0">
+                <div
+                  key={row.key}
+                  className="box-border w-full shrink-0"
+                  style={{ height: alignedRowH, minHeight: alignedRowH }}
+                >
                 <StoryColumnRowCard
                   edition={edition}
                   rowTitle={`镜 ${row.frameIndex}`}
+                  rowBlockMinHeight={alignedRowH}
                   promptValue={stripFrameRowAtHint(row.prompt)}
                   compactFrameLayout
                   belowPrompt={

@@ -189,6 +189,16 @@ export function storyFrameVideoRowBlockH(opts?: { pro?: boolean }): number {
   );
 }
 
+/** 分镜脚本列与分镜视频列 · 同一镜号共用固定行高（保证左右水平对齐） */
+export function storyMediaAlignedRowHeight(opts?: { pro?: boolean }): number {
+  return storyFrameVideoRowBlockH(opts);
+}
+
+/** 两列列表区引擎条以上结构一致，便于首行顶对齐 */
+export function storyMediaColumnListHeaderH(_opts?: { pro?: boolean }): number {
+  return storyFrameScriptHeaderH(_opts);
+}
+
 /** @deprecated 使用 STORY_VIDEO_ENGINE_PANEL_H */
 export function storyFrameVideoEngineBodyMinH(_opts?: {
   pro?: boolean;
@@ -236,8 +246,8 @@ export function storyFrameColumnSize(
   return {
     width: def.width,
     height: storyColumnHeightFromRows(
-      storyFrameScriptHeaderH(opts),
-      storyFrameRowBlockHeight(opts),
+      storyMediaColumnListHeaderH(opts),
+      storyMediaAlignedRowHeight(opts),
       count,
     ),
   };
@@ -255,8 +265,8 @@ export function storyVideoColumnSize(
   return {
     width: def.width,
     height: storyColumnHeightFromRows(
-      storyFrameVideoHeaderH(opts),
-      storyVideoRowBlockHeight(),
+      storyMediaColumnListHeaderH(opts),
+      storyMediaAlignedRowHeight(opts),
       count,
     ),
   };
