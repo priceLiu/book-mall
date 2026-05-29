@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useStoryColumnAutoSize } from "@/lib/canvas/use-story-column-auto-size";
 import type { NodeProps } from "@xyflow/react";
 import { ImageIcon } from "lucide-react";
 
@@ -75,14 +76,10 @@ import {
   PRO_NODE_SHELL_FOOTER_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
 import { STORY_HINT_LABEL_CLASS, STORY_HINT_BODY_CLASS, FRAME_ROW_AT_HINT, stripFrameRowAtHint, sanitizeLegacyFramePrompt, patchVideoRowsFromFrameRows } from "@/lib/canvas/story-column-sync";
-import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
-import {
-  storyFrameColumnSize,
-  storyFrameVideoRowBlockH,
-  STORY_MEDIA_ROW_GAP,
-} from "@/lib/canvas/story-column-layout";
+import { storyFrameColumnSize } from "@/lib/canvas/story-column-layout";
+import { storyMediaListLabel } from "@/lib/canvas/story-media-grid-layout";
 import { StoryEnginePickerStack } from "../story-engine-picker-stack";
-import { StoryFrameVideoEnginePanel } from "../story-frame-video-engine-panel";
+import { StoryFrameScriptEngineBar } from "../story-frame-script-engine-bar";
 import { StoryColumnBatchFooter } from "../story-column-batch-footer";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { StoryColumnRowCard } from "../story-row-prompt-field";
@@ -104,7 +101,6 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const resizeNode = useCanvasStore((s) => s.resizeNode);
   const d = data as unknown as StoryFrameColumnNodeData;
   const stored = d.rows ?? [];
   const batchImage = d.batchImage;
@@ -252,8 +248,8 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   }, [edition, frameRefCatalog, characterRows]);
 
   const displayRows = useMemo(
-    () => displayFrameRows(nodes, id, stored),
-    [nodes, id, stored],
+    () => displayFrameRows(nodes, id, stored, edges),
+    [nodes, edges, id, stored],
   );
 
   const videoRows = useMemo(() => {
@@ -261,8 +257,8 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     const videoNode = nodes.find((n) => n.id === videoColumnId);
     const videoStored =
       (videoNode?.data as StoryVideoColumnNodeData)?.rows ?? [];
-    return displayVideoRows(nodes, videoColumnId, videoStored);
-  }, [nodes, videoColumnId]);
+    return displayVideoRows(nodes, videoColumnId, videoStored, edges);
+  }, [nodes, edges, videoColumnId]);
 
   const nodeRuntime = useMemo(
     () => aggregateStoryColumnRuntime(displayRows),
@@ -275,18 +271,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     [displayRows, edition],
   );
 
-  useEffect(() => {
-    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
-    if (!node) return;
-    const { w, h } = nodeMeasuredSize(node);
-    if (
-      Math.abs(h - targetSize.height) < 4 &&
-      Math.abs(w - targetSize.width) < 4
-    ) {
-      return;
-    }
-    resizeNode(id, { width: targetSize.width, height: targetSize.height });
-  }, [id, resizeNode, targetSize]);
+  useStoryColumnAutoSize(id, targetSize, displayRows.length);
 
   /** 旧画布可能只配了 VIDEO；自动继承角色列 IMAGE 或系统默认 */
   useEffect(() => {
@@ -534,10 +519,10 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
       title="分镜脚本"
       subtitle={
         columnGenerating
-          ? "分镜图生成中…"
+          ? `${storyMediaListLabel(displayRows.length)} · 生成中…`
           : nodeRuntime.status === "error"
-            ? "部分生成失败"
-            : "场景 · 镜头描述 · @ 角色 · 手动生成视频"
+            ? `${storyMediaListLabel(displayRows.length)} · 部分失败`
+            : `${storyMediaListLabel(displayRows.length)} · @ 角色 · 手动出图/视频`
       }
       selected={selected}
       engine
@@ -581,12 +566,9 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
         </StoryNodeFooterShell>
       }
     >
-      <div
-        className="flex w-full flex-col"
-        style={{ gap: STORY_MEDIA_ROW_GAP }}
-      >
-        <StoryFrameVideoEnginePanel
-          row1={
+      <div className="flex w-full flex-col gap-3">
+        <StoryFrameScriptEngineBar
+          styleRow={
             edition === "pro" ? (
               <label className="nodrag flex h-full cursor-pointer items-center gap-2 text-[11px] leading-tight text-cyan-200/80">
                 <input
@@ -597,18 +579,18 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                     updateNodeData(id, { injectStyleRefs: e.target.checked })
                   }
                 />
-                静帧生成时注入风格参考图（最多 2 张）
+                注入风格参考
               </label>
             ) : (
-              <p className="flex h-full items-center text-[10px] leading-tight text-white/25">
+              <p className="flex h-full items-center text-[10px] text-white/25">
                 分镜静帧
               </p>
             )
           }
-          row2={
+          hintRow={
             edition === "pro" ? (
               <p
-                className={`flex h-full items-center leading-tight ${STORY_HINT_BODY_CLASS}`}
+                className={`flex h-full items-center text-[10px] leading-tight ${STORY_HINT_BODY_CLASS}`}
               >
                 {FRAME_ROW_AT_HINT}
               </p>
@@ -618,14 +600,14 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
               </p>
             )
           }
-          row3={
+          imagePicker={
             <StoryEnginePickerStack
               label={
                 <>
-                  分镜图 · IMAGE
+                  IMAGE · 分镜图
                   {!canGenerateFrame ? (
                     <span className="ml-1 normal-case text-amber-300/90">
-                      · 请先选择生图模型
+                      · 选模型
                     </span>
                   ) : null}
                 </>
@@ -652,16 +634,13 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
             </StoryEnginePickerStack>
           }
         />
-        <div
-          className="flex w-full flex-col"
-          style={{ gap: STORY_MEDIA_ROW_GAP }}
-        >
-          {!displayRows.length ? (
-            <p className={STORY_HINT_BODY_CLASS}>
-              完成分镜脚本后，在此编辑场景、镜头描述与运镜；@ 角色三视图后生成分镜图，再手动触发生成视频。
-            </p>
-          ) : (
-            displayRows.map((row) => {
+        {!displayRows.length ? (
+          <p className={STORY_HINT_BODY_CLASS}>
+            完成分镜脚本后，在本列编辑镜头、@ 角色并生成分镜图。
+          </p>
+        ) : (
+          <div className="flex w-full flex-col gap-3">
+            {displayRows.map((row) => {
               const frameUrl =
                 row.runtime?.ossUrl ?? row.runtime?.ephemeralUrl;
               const fst = row.runtime?.status ?? "idle";
@@ -697,15 +676,12 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                 frameRowStaleSnapshot(row, projectCharacterAssets, projectId);
               const videoBlockReason = storyVideoGenerateBlockReason(row);
               return (
+                <div key={row.key} className="w-full shrink-0">
                 <StoryColumnRowCard
-                  key={row.key}
                   edition={edition}
                   rowTitle={`镜 ${row.frameIndex}`}
                   promptValue={stripFrameRowAtHint(row.prompt)}
                   compactFrameLayout
-                  rowBlockMinHeight={storyFrameVideoRowBlockH({
-                    pro: edition === "pro",
-                  })}
                   belowPrompt={
                     edition === "pro" ? (
                       <div className="space-y-1">
@@ -760,10 +736,11 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                   }
                   onPreviewRef={(url, title) => setPreview({ url, title })}
                 />
+                </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
       {preview ? (
         <StoryMediaPreviewModal

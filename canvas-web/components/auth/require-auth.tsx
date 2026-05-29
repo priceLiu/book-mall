@@ -14,9 +14,12 @@ import {
   shouldAttemptSilentSso,
 } from "@/lib/tools-silent-sso";
 
-const SESSION_FETCH_TIMEOUT_MS = 15_000;
+const SESSION_FETCH_TIMEOUT_MS = 12_000;
+const SESSION_FETCH_RETRY_DELAY_MS = 400;
 
-async function fetchToolsSessionClient(): Promise<ReturnType<typeof parseToolsSessionPayload>> {
+async function fetchToolsSessionClient(): Promise<
+  ReturnType<typeof parseToolsSessionPayload>
+> {
   const ac = new AbortController();
   const timer = window.setTimeout(() => ac.abort(), SESSION_FETCH_TIMEOUT_MS);
   try {
@@ -41,6 +44,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const [hasTokenCookie, setHasTokenCookie] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
   const silentAttemptedRef = useRef(false);
+  const loadGenRef = useRef(0);
 
   const redirectToSso = useCallback(() => {
     const path =
@@ -62,11 +66,20 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     return false;
   }, [mainOrigin]);
 
-  const loadSession = useCallback(async () => {
-    setLoading(true);
+  const loadSession = useCallback(async (opts?: { retry?: boolean }) => {
+    const gen = ++loadGenRef.current;
+    if (!ready || opts?.retry) {
+      setLoading(true);
+    }
     setError(null);
     try {
-      const data = await fetchToolsSessionClient();
+      let data = await fetchToolsSessionClient();
+      if (!data.active && opts?.retry !== false) {
+        await new Promise((r) => setTimeout(r, SESSION_FETCH_RETRY_DELAY_MS));
+        if (gen !== loadGenRef.current) return;
+        data = await fetchToolsSessionClient();
+      }
+      if (gen !== loadGenRef.current) return;
       setHasTokenCookie(Boolean(data.hasCookie));
       setSessionActive(Boolean(data.active));
       if (data.active) {
@@ -75,6 +88,27 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       }
       setReady(false);
     } catch (e) {
+      if (gen !== loadGenRef.current) return;
+      if (opts?.retry !== false) {
+        try {
+          await new Promise((r) =>
+            setTimeout(r, SESSION_FETCH_RETRY_DELAY_MS),
+          );
+          if (gen !== loadGenRef.current) return;
+          const retryData = await fetchToolsSessionClient();
+          if (gen !== loadGenRef.current) return;
+          setHasTokenCookie(Boolean(retryData.hasCookie));
+          setSessionActive(Boolean(retryData.active));
+          if (retryData.active) {
+            setReady(true);
+            return;
+          }
+          setReady(false);
+        } catch {
+          // 二次失败，展示下方错误
+        }
+      }
+      if (gen !== loadGenRef.current) return;
       setHasTokenCookie(false);
       setSessionActive(false);
       setReady(false);
@@ -87,9 +121,11 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           : "无法校验登录状态，请检查网络或主站是否可访问。",
       );
     } finally {
-      setLoading(false);
+      if (gen === loadGenRef.current) {
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [ready]);
 
   useEffect(() => {
     void loadSession();
@@ -129,7 +165,9 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           <Loader2 className="mr-2 size-5 animate-spin" />
           连接 Book 账号…
         </div>
-        <p className="text-xs text-zinc-500">正在校验工具站令牌（最多约 15 秒）</p>
+        <p className="text-xs text-zinc-500">
+          正在校验工具站令牌（约 12 秒，失败会自动重试一次）
+        </p>
       </div>
     );
   }
@@ -148,7 +186,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/15"
           onClick={() => {
             silentAttemptedRef.current = false;
-            void loadSession();
+            void loadSession({ retry: true });
           }}
         >
           重新连接

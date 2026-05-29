@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Users } from "lucide-react";
 
@@ -25,7 +25,7 @@ import { formatAutoFillSlotsMessage } from "@/lib/canvas/story-pro-character-ass
 import { findAssetForCharacterRow, findAudioAssetForCharacterRow } from "@/lib/canvas/story-pro-character-asset-catalog";
 import { useStoryProCharacterAssets, notifyStoryProCharacterAssetsChanged } from "@/lib/canvas/use-story-pro-character-assets";
 import { useStoryProCharacterAudioAssets } from "@/lib/canvas/use-story-pro-audio-assets";
-import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
+import { useStoryColumnAutoSize } from "@/lib/canvas/use-story-column-auto-size";
 import { storyCharacterColumnSize } from "@/lib/canvas/story-column-layout";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
@@ -52,7 +52,6 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   const edition = storyEditionFromNodeType(type);
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const resizeNode = useCanvasStore((s) => s.resizeNode);
   const d = data as unknown as StoryCharacterColumnNodeData;
   const stored = d.rows ?? [];
   const { assets: characterAssets } = useStoryProCharacterAssets(
@@ -85,18 +84,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
     [displayRows, edition],
   );
 
-  useEffect(() => {
-    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
-    if (!node) return;
-    const { w, h } = nodeMeasuredSize(node);
-    if (
-      Math.abs(h - targetSize.height) < 4 &&
-      Math.abs(w - targetSize.width) < 4
-    ) {
-      return;
-    }
-    resizeNode(id, { width: targetSize.width, height: targetSize.height });
-  }, [id, resizeNode, targetSize]);
+  useStoryColumnAutoSize(id, targetSize, displayRows.length);
 
   const updateRows = (next: typeof displayRows) => {
     updateNodeData(id, { rows: next });

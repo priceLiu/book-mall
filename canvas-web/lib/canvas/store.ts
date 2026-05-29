@@ -39,6 +39,10 @@ import {
 } from "./normalize-graph-nodes";
 import { reflowStoryComicFlat } from "./story-comic-layout";
 import { reflowStoryComicColumns } from "./story-comic-columns-layout";
+import {
+  finalizeStoryMediaGraph,
+  reconcileStoryVideoColumnRows,
+} from "./story-column-display";
 import { applyStoryColumnHeights, isStoryMediaColumnType } from "./story-column-layout";
 import { canAddStoryNodeType } from "./story-edition-isolation";
 import { hasStoryComicPipeline } from "./story-comic-layout";
@@ -186,17 +190,20 @@ export const useCanvasStore = create<CanvasState>()(
       hydrate: (projectId, graph) => {
         const raw = graph && Array.isArray(graph.nodes) ? graph : emptyGraph();
         const g = migrateGraphV1ToV2(raw);
+        let edges = g.edges as CanvasFlowEdge[];
         let nodes = reconcileStoryProWorkspace(
           normalizeCanvasNodes(
             g.nodes as CanvasFlowNode[],
-            g.edges as CanvasFlowEdge[],
+            edges,
           ),
         );
-        let edges = g.edges as CanvasFlowEdge[];
         const stripped = stripStoryPreviewNodes(nodes, edges);
         nodes = stripped.nodes;
         edges = stripped.edges;
         edges = repairStoryPreviewEdges(nodes, edges);
+        const finalized = finalizeStoryMediaGraph(nodes, edges);
+        nodes = applyStoryColumnHeights(finalized.nodes, finalized.edges);
+        edges = finalized.edges;
         set({
           projectId,
           nodes,
@@ -379,7 +386,11 @@ export const useCanvasStore = create<CanvasState>()(
         if (patch.rows !== undefined) {
           const t = nodes.find((n) => n.id === id)?.type;
           if (isStoryMediaColumnType(t)) {
-            nodes = applyStoryColumnHeights(nodes);
+            const edges = get().edges;
+            nodes = applyStoryColumnHeights(
+              reconcileStoryVideoColumnRows(nodes, edges),
+              edges,
+            );
           }
         }
         set({ nodes });

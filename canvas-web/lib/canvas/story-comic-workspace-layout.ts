@@ -1,6 +1,7 @@
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
 import { NODE_DEFAULT_SIZE } from "./types";
 import { nodeMeasuredSize, sortNodesForReactFlow } from "./normalize-graph-nodes";
+import { reconcileStoryVideoColumnRows } from "./story-column-display";
 import { applyStoryColumnHeights } from "./story-column-layout";
 import { hasStoryComicPipeline } from "./story-comic-layout";
 import {
@@ -156,7 +157,7 @@ export function reflowStoryComicWorkspace(
 
   let next = reconcileStoryStarterWorkspaces(nodes, edges);
   next = reconcileStoryHubFinalized(next, edges);
-  next = applyStoryColumnHeights(next);
+  next = applyStoryColumnHeights(reconcileStoryVideoColumnRows(next, edges), edges);
   next = applyStoryControlRowHeights(next);
 
   const starters = next.filter((n) => n.type === "story-comic-starter");

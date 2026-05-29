@@ -2,6 +2,7 @@
 
 import {
   buildDefaultFrameRowPrompt,
+  patchVideoRowsFromFrameRows,
   sanitizeLegacyFramePrompt,
   syncColumnsFromHub,
 } from "./story-column-sync";
@@ -20,6 +21,7 @@ import type {
 } from "./story-pro-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { isCanvasInflightStatus } from "./story-column-runtime";
+import { findStoryProWorkspaceFromHub } from "./spawn-story-pro-workspace";
 import { findWorkspaceForScriptHub } from "./spawn-story-workspace";
 import { hubDataForColumnSync } from "./story-hub-runtime";
 
@@ -32,6 +34,12 @@ export function findWorkspaceForColumnId(
   if (!col) return null;
   const hubNodeId = (col.data as { hubNodeId?: string }).hubNodeId;
   if (hubNodeId) {
+    const hub = nodes.find((n) => n.id === hubNodeId);
+    if (hub?.type === "story-pro-script-hub") {
+      return findStoryProWorkspaceFromHub(nodes, edges, hubNodeId) as
+        | StoryWorkspaceIds
+        | null;
+    }
     return findWorkspaceForScriptHub(nodes, edges, hubNodeId);
   }
   for (const n of nodes) {
@@ -49,6 +57,130 @@ export function findWorkspaceForColumnId(
   return null;
 }
 
+function isStoryFrameColumnType(type: string | undefined): boolean {
+  return type === "story-frame-column" || type === "story-pro-frame";
+}
+
+function storyColumnRowCount(node: CanvasFlowNode | undefined): number {
+  return ((node?.data as { rows?: unknown[] })?.rows?.length ?? 0) as number;
+}
+
+function pickFrameAmongCandidates(
+  nodes: CanvasFlowNode[],
+  candidates: CanvasFlowNode[],
+  edges: CanvasFlowEdge[] = [],
+): string | undefined {
+  if (candidates.length === 0) return undefined;
+  if (candidates.length === 1) return candidates[0]!.id;
+  return [...candidates].sort((a, b) => {
+    const na = effectiveFrameRowsForColumn(nodes, a.id, edges).length;
+    const nb = effectiveFrameRowsForColumn(nodes, b.id, edges).length;
+    return nb - na;
+  })[0]!.id;
+}
+
+/**
+ * 视频列应对齐的分镜脚本列。
+ * 在同 hub 下汇总连线 / 兄弟列 / workspace / data 中的候选，取镜位最多的一列（避免旧边连到短列）。
+ */
+export function pickFrameColumnIdForVideoNode(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  videoColumnId: string,
+  ws?: StoryWorkspaceIds | null,
+): string | undefined {
+  const video = nodes.find((n) => n.id === videoColumnId);
+  if (!video) return undefined;
+
+  const hubNodeId = columnHubNodeId(video);
+  const candidates: CanvasFlowNode[] = [];
+
+  const pushCandidate = (
+    node: CanvasFlowNode | undefined,
+    opts?: { ignoreHub?: boolean },
+  ) => {
+    if (!node || !isStoryFrameColumnType(node.type)) return;
+    if (
+      hubNodeId &&
+      !opts?.ignoreHub &&
+      columnHubNodeId(node) !== hubNodeId
+    ) {
+      return;
+    }
+    if (!candidates.some((c) => c.id === node.id)) candidates.push(node);
+  };
+
+  for (const e of edges) {
+    if (e.target !== videoColumnId) continue;
+    /** 画布连线优先：允许跨 hub（旧图可能 frame/video 的 hubNodeId 不一致） */
+    pushCandidate(nodes.find((n) => n.id === e.source), { ignoreHub: true });
+  }
+
+  if (hubNodeId) {
+    for (const n of nodes) {
+      if (
+        isStoryFrameColumnType(n.type) &&
+        columnHubNodeId(n) === hubNodeId
+      ) {
+        pushCandidate(n);
+      }
+    }
+  }
+
+  const fromWs = ws?.frameColumnId;
+  if (fromWs) pushCandidate(nodes.find((n) => n.id === fromWs));
+
+  const fromData = (video.data as { frameColumnId?: string }).frameColumnId;
+  if (fromData) pushCandidate(nodes.find((n) => n.id === fromData));
+
+  let pick = pickFrameAmongCandidates(nodes, candidates, edges);
+  if (!pick && hubNodeId) {
+    const hubFrames = nodes.filter(
+      (n) =>
+        isStoryFrameColumnType(n.type) && columnHubNodeId(n) === hubNodeId,
+    );
+    pick = pickFrameAmongCandidates(nodes, hubFrames, edges);
+  }
+  if (!pick) {
+    const allFrames = nodes.filter((n) => isStoryFrameColumnType(n.type));
+    pick = pickFrameAmongCandidates(nodes, allFrames, edges);
+  }
+  return pick;
+}
+
+/** 视频列应对齐的分镜脚本镜位（与分镜脚本列 UI 一致） */
+export function frameRowsForVideoColumn(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  videoColumnId: string,
+  ws?: StoryWorkspaceIds | null,
+): { frameColumnId?: string; frameRows: StoryFrameRow[] } {
+  const frameColumnId = pickFrameColumnIdForVideoNode(
+    nodes,
+    edges,
+    videoColumnId,
+    ws,
+  );
+  if (!frameColumnId) return { frameRows: [] };
+  const frameNode = nodes.find((n) => n.id === frameColumnId);
+  const stored =
+    (frameNode?.data as { rows?: StoryFrameRow[] })?.rows ?? [];
+  return {
+    frameColumnId,
+    frameRows: effectiveFrameRowsForColumn(nodes, frameColumnId, edges),
+  };
+}
+
+/** @deprecated 使用 {@link pickFrameColumnIdForVideoNode} */
+export function resolveStoryFrameColumnId(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  videoColumnId: string,
+  ws?: StoryWorkspaceIds | null,
+): string | undefined {
+  return pickFrameColumnIdForVideoNode(nodes, edges, videoColumnId, ws);
+}
+
 /** 分镜列 → 视频列：优先 workspaceIds，其次边连接，最后全局查找 */
 export function resolveStoryVideoColumnId(
   nodes: CanvasFlowNode[],
@@ -59,14 +191,19 @@ export function resolveStoryVideoColumnId(
   const fromWs = ws?.videoColumnId;
   if (fromWs) {
     const hit = nodes.find(
-      (n) => n.id === fromWs && n.type === "story-video-column",
+      (n) =>
+        n.id === fromWs &&
+        (n.type === "story-video-column" || n.type === "story-pro-video"),
     );
     if (hit) return hit.id;
   }
   const fromEdge = edges
     .filter((e) => e.source === frameColumnId)
     .map((e) => nodes.find((n) => n.id === e.target))
-    .find((n) => n?.type === "story-video-column");
+    .find(
+      (n) =>
+        n?.type === "story-video-column" || n?.type === "story-pro-video",
+    );
   if (fromEdge) return fromEdge.id;
   return undefined;
 }
@@ -119,29 +256,52 @@ function columnHubNodeId(col: CanvasFlowNode | undefined): string | undefined {
 function siblingColumnsForHub(
   nodes: CanvasFlowNode[],
   hubNodeId: string,
+  edges: CanvasFlowEdge[] = [],
 ): {
   characterColumnId?: string;
   frameColumnId?: string;
   videoColumnId?: string;
 } {
-  const out: {
-    characterColumnId?: string;
-    frameColumnId?: string;
-    videoColumnId?: string;
-  } = {};
+  const characters: CanvasFlowNode[] = [];
+  const frames: CanvasFlowNode[] = [];
+  const videos: CanvasFlowNode[] = [];
   for (const n of nodes) {
     if (columnHubNodeId(n) !== hubNodeId) continue;
     if (n.type === "story-character-column" || n.type === "story-pro-character") {
-      out.characterColumnId = n.id;
+      characters.push(n);
     }
     if (n.type === "story-frame-column" || n.type === "story-pro-frame") {
-      out.frameColumnId = n.id;
+      frames.push(n);
     }
     if (n.type === "story-video-column" || n.type === "story-pro-video") {
-      out.videoColumnId = n.id;
+      videos.push(n);
     }
   }
-  return out;
+  const frameColumnId = pickFrameAmongCandidates(nodes, frames, edges);
+  let videoColumnId: string | undefined;
+  if (frameColumnId && videos.length > 0) {
+    const linked = videos.filter((v) =>
+      edges.some((e) => e.source === frameColumnId && e.target === v.id),
+    );
+    const pool = linked.length > 0 ? linked : videos;
+    videoColumnId =
+      pool.length === 1
+        ? pool[0]!.id
+        : [...pool].sort((a, b) => {
+            const sa =
+              (a.data as { rows?: StoryVideoRow[] })?.rows?.length ?? 0;
+            const sb =
+              (b.data as { rows?: StoryVideoRow[] })?.rows?.length ?? 0;
+            return sb - sa;
+          })[0]?.id;
+  } else {
+    videoColumnId = videos[0]?.id;
+  }
+  return {
+    characterColumnId: characters[0]?.id,
+    frameColumnId,
+    videoColumnId,
+  };
 }
 
 /** 始终以故事大纲为准合并行数据（保留已生成 runtime / 用户已保存的 prompt） */
@@ -153,7 +313,7 @@ export function displayCharacterRows(
   const col = nodes.find((n) => n.id === columnId);
   const hubNodeId = columnHubNodeId(col);
   if (!hubNodeId) return stored;
-  const siblings = siblingColumnsForHub(nodes, hubNodeId);
+  const siblings = siblingColumnsForHub(nodes, hubNodeId, []);
   if (
     !siblings.characterColumnId ||
     siblings.characterColumnId !== columnId ||
@@ -164,19 +324,11 @@ export function displayCharacterRows(
   }
   const hub = nodes.find((n) => n.id === hubNodeId);
   if (hub?.type === "story-pro-script-hub") {
-    const charNode = nodes.find((n) => n.id === siblings.characterColumnId);
-    const frameNode = nodes.find((n) => n.id === siblings.frameColumnId);
-    const videoNode = nodes.find((n) => n.id === siblings.videoColumnId);
     const synced = syncStoryProColumnRows(
       hubDataForColumnSync(
         hub.data as StoryProScriptHubNodeData,
       ) as StoryProScriptHubNodeData,
-      {
-        characterRows: (charNode?.data as { rows?: StoryProCharacterRow[] })
-          ?.rows,
-        frameRows: (frameNode?.data as { rows?: StoryProFrameRow[] })?.rows,
-        videoRows: (videoNode?.data as { rows?: StoryProVideoRow[] })?.rows,
-      },
+      storyProColumnSyncInput(nodes, siblings),
     );
     return synced.characterRows;
   }
@@ -199,43 +351,36 @@ export function displayCharacterRows(
   return synced?.characterPatch.rows ?? stored;
 }
 
-export function displayFrameRows(
+function storyProColumnSyncInput(
   nodes: CanvasFlowNode[],
-  columnId: string,
+  siblings: {
+    characterColumnId?: string;
+    frameColumnId?: string;
+    videoColumnId?: string;
+  },
+) {
+  const charNode = siblings.characterColumnId
+    ? nodes.find((n) => n.id === siblings.characterColumnId)
+    : undefined;
+  const frameNode = siblings.frameColumnId
+    ? nodes.find((n) => n.id === siblings.frameColumnId)
+    : undefined;
+  const videoNode = siblings.videoColumnId
+    ? nodes.find((n) => n.id === siblings.videoColumnId)
+    : undefined;
+  return {
+    characterRows: (charNode?.data as { rows?: StoryProCharacterRow[] })?.rows,
+    frameRows: (frameNode?.data as { rows?: StoryProFrameRow[] })?.rows,
+    videoRows: (videoNode?.data as { rows?: StoryProVideoRow[] })?.rows,
+  };
+}
+
+function mergeHubFrameRowsWithStored(
+  syncedRows: StoryFrameRow[],
   stored: StoryFrameRow[],
 ): StoryFrameRow[] {
-  const col = nodes.find((n) => n.id === columnId);
-  const hubNodeId = columnHubNodeId(col);
-  if (!hubNodeId) return stored;
-  const siblings = siblingColumnsForHub(nodes, hubNodeId);
-  if (
-    !siblings.frameColumnId ||
-    siblings.frameColumnId !== columnId ||
-    !siblings.characterColumnId ||
-    !siblings.videoColumnId
-  ) {
-    return stored;
-  }
-  const hub = nodes.find((n) => n.id === hubNodeId);
-  const hubData = hub?.data as import("./story-workspace-types").StoryScriptHubNodeData | undefined;
-  const nodesForSync =
-    hub && hubData
-      ? nodes.map((n) =>
-          n.id === hubNodeId
-            ? { ...n, data: hubDataForColumnSync(hubData) }
-            : n,
-        )
-      : nodes;
-  const synced = syncColumnsFromHub(
-    nodesForSync,
-    hubNodeId,
-    siblings.characterColumnId,
-    siblings.frameColumnId,
-    siblings.videoColumnId,
-  );
-  const rows = synced?.framePatch.rows ?? stored;
   const storedByKey = new Map(stored.map((r) => [r.key, r]));
-  return rows.map((row) => {
+  const mapped = syncedRows.map((row) => {
     const prev = storedByKey.get(row.key);
     const cleaned = row.prompt?.trim()
       ? sanitizeLegacyFramePrompt(row.prompt)
@@ -250,6 +395,88 @@ export function displayFrameRows(
     }
     return next;
   });
+  const mappedKeys = new Set(mapped.map((r) => r.key));
+  const mappedIndexes = new Set(mapped.map((r) => r.frameIndex));
+  const extras = stored.filter(
+    (r) => !mappedKeys.has(r.key) && !mappedIndexes.has(r.frameIndex),
+  );
+  return extras.length ? [...mapped, ...extras] : mapped;
+}
+
+/**
+ * 指定分镜脚本列的完整镜位（强制以该列 stored 为准做 hub 合并，不受「主列」sibling 限制）。
+ * 视频列对齐必须用此函数，否则会与分镜列标题镜数不一致。
+ */
+export function effectiveFrameRowsForColumn(
+  nodes: CanvasFlowNode[],
+  columnId: string,
+  edges: CanvasFlowEdge[] = [],
+): StoryFrameRow[] {
+  const col = nodes.find((n) => n.id === columnId);
+  if (!col) return [];
+  const stored = (col.data as { rows?: StoryFrameRow[] })?.rows ?? [];
+  const hubNodeId = columnHubNodeId(col);
+  if (!hubNodeId) return stored;
+
+  const siblings = siblingColumnsForHub(nodes, hubNodeId, edges);
+  const siblingsForColumn = { ...siblings, frameColumnId: columnId };
+  if (!siblingsForColumn.characterColumnId || !siblingsForColumn.videoColumnId) {
+    return stored;
+  }
+
+  const hub = nodes.find((n) => n.id === hubNodeId);
+  if (hub?.type === "story-pro-script-hub") {
+    const synced = syncStoryProColumnRows(
+      hubDataForColumnSync(
+        hub.data as StoryProScriptHubNodeData,
+      ) as StoryProScriptHubNodeData,
+      storyProColumnSyncInput(nodes, siblingsForColumn),
+    );
+    return mergeHubFrameRowsWithStored(
+      synced.frameRows as StoryFrameRow[],
+      stored,
+    );
+  }
+
+  const hubData = hub?.data as import("./story-workspace-types").StoryScriptHubNodeData | undefined;
+  const nodesForSync =
+    hub && hubData
+      ? nodes.map((n) =>
+          n.id === hubNodeId
+            ? { ...n, data: hubDataForColumnSync(hubData) }
+            : n,
+        )
+      : nodes;
+  const synced = syncColumnsFromHub(
+    nodesForSync,
+    hubNodeId,
+    siblingsForColumn.characterColumnId,
+    siblingsForColumn.frameColumnId!,
+    siblingsForColumn.videoColumnId,
+  );
+  const rows = synced?.framePatch.rows ?? stored;
+  return mergeHubFrameRowsWithStored(rows, stored);
+}
+
+export function displayFrameRows(
+  nodes: CanvasFlowNode[],
+  columnId: string,
+  stored: StoryFrameRow[],
+  edges: CanvasFlowEdge[] = [],
+): StoryFrameRow[] {
+  const col = nodes.find((n) => n.id === columnId);
+  const hubNodeId = columnHubNodeId(col);
+  if (!hubNodeId) return stored;
+  const siblings = siblingColumnsForHub(nodes, hubNodeId, edges);
+  if (
+    !siblings.frameColumnId ||
+    siblings.frameColumnId !== columnId ||
+    !siblings.characterColumnId ||
+    !siblings.videoColumnId
+  ) {
+    return stored;
+  }
+  return effectiveFrameRowsForColumn(nodes, columnId, edges);
 }
 
 /** 分镜列 stored + hub 合并，保留已生成分镜图 runtime（供视频生成同步） */
@@ -257,8 +484,13 @@ export function frameRowsForVideoSync(
   nodes: CanvasFlowNode[],
   frameColumnId: string,
   storedFrameRows: StoryFrameRow[],
+  edges: CanvasFlowEdge[] = [],
 ): StoryFrameRow[] {
-  const displayed = displayFrameRows(nodes, frameColumnId, storedFrameRows);
+  const displayed = effectiveFrameRowsForColumn(
+    nodes,
+    frameColumnId,
+    edges,
+  );
   const storedByKey = new Map(storedFrameRows.map((r) => [r.key, r]));
   return displayed.map((row) => {
     const prev = storedByKey.get(row.key);
@@ -288,20 +520,53 @@ export function displayVideoRows(
   nodes: CanvasFlowNode[],
   columnId: string,
   stored: StoryVideoRow[],
+  edges: CanvasFlowEdge[] = [],
 ): StoryVideoRow[] {
   const col = nodes.find((n) => n.id === columnId);
   const hubNodeId = columnHubNodeId(col);
   if (!hubNodeId) return stored;
-  const siblings = siblingColumnsForHub(nodes, hubNodeId);
+  const siblings = siblingColumnsForHub(nodes, hubNodeId, edges);
   if (
     !siblings.videoColumnId ||
     siblings.videoColumnId !== columnId ||
     !siblings.characterColumnId ||
     !siblings.frameColumnId
   ) {
+    const frameId = pickFrameColumnIdForVideoNode(
+      nodes,
+      edges,
+      columnId,
+      findWorkspaceForColumnId(nodes, edges, columnId),
+    );
+    if (frameId) {
+      return displayVideoRowsForFrameColumn(nodes, columnId, stored, frameId);
+    }
     return stored;
   }
   const hub = nodes.find((n) => n.id === hubNodeId);
+  if (hub?.type === "story-pro-script-hub") {
+    const synced = syncStoryProColumnRows(
+      hubDataForColumnSync(
+        hub.data as StoryProScriptHubNodeData,
+      ) as StoryProScriptHubNodeData,
+      storyProColumnSyncInput(nodes, siblings),
+    );
+    const syncedRows = synced.videoRows as StoryVideoRow[];
+    const storedByKey = new Map(stored.map((r) => [r.key, r]));
+    return syncedRows.map((row) => {
+      const prev = storedByKey.get(row.key);
+      if (!prev) return row;
+      return {
+        ...row,
+        videoRuntime: pickRowRuntime(prev.videoRuntime, row.videoRuntime),
+        ttsRuntime: pickRowRuntime(prev.ttsRuntime, row.ttsRuntime),
+        videoPrompt: prev.videoPrompt?.trim() ? prev.videoPrompt : row.videoPrompt,
+        ttsPrompt: prev.ttsPrompt?.trim() ? prev.ttsPrompt : row.ttsPrompt,
+        videoPromptHistory: prev.videoPromptHistory ?? row.videoPromptHistory,
+        ttsPromptHistory: prev.ttsPromptHistory ?? row.ttsPromptHistory,
+      };
+    });
+  }
   const hubData = hub?.data as import("./story-workspace-types").StoryScriptHubNodeData | undefined;
   const nodesForSync =
     hub && hubData
@@ -333,6 +598,119 @@ export function displayVideoRows(
       ttsPromptHistory: prev.ttsPromptHistory ?? row.ttsPromptHistory,
     };
   });
+}
+
+/**
+ * 与分镜脚本列对齐的镜位列表（stored 行数多于 hub 合并结果时保留 stored，避免视频列变少）。
+ */
+export function authoritativeFrameRowsForVideoColumn(
+  nodes: CanvasFlowNode[],
+  frameColumnId: string,
+  edges: CanvasFlowEdge[] = [],
+): StoryFrameRow[] {
+  return effectiveFrameRowsForColumn(nodes, frameColumnId, edges);
+}
+
+/**
+ * 分镜视频列展示：与分镜脚本列镜数对齐（补齐缺失镜位，保留已生成视频/TTS）。
+ */
+export function displayVideoRowsForFrameColumn(
+  nodes: CanvasFlowNode[],
+  videoColumnId: string,
+  storedVideo: StoryVideoRow[],
+  frameColumnId?: string,
+  edges: CanvasFlowEdge[] = [],
+): StoryVideoRow[] {
+  const video = displayVideoRows(nodes, videoColumnId, storedVideo, edges);
+  if (!frameColumnId) return video;
+  const frameRows = authoritativeFrameRowsForVideoColumn(
+    nodes,
+    frameColumnId,
+    edges,
+  );
+  if (!frameRows.length) return video;
+  return patchVideoRowsFromFrameRows(video, frameRows);
+}
+
+/** 补全「分镜脚本列 → 分镜视频列」连线，便于 pickFrame 与引擎解析 */
+export function repairStoryVideoFrameEdges(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): CanvasFlowEdge[] {
+  const next = [...edges];
+  for (const video of nodes) {
+    if (video.type !== "story-video-column" && video.type !== "story-pro-video") {
+      continue;
+    }
+    const frameId = pickFrameColumnIdForVideoNode(
+      nodes,
+      next,
+      video.id,
+      findWorkspaceForColumnId(nodes, next, video.id),
+    );
+    if (!frameId) continue;
+    const hasEdge = next.some(
+      (e) => e.source === frameId && e.target === video.id,
+    );
+    if (hasEdge) continue;
+    next.push({
+      id: `e-repair-frame-${frameId}-${video.id}`,
+      source: frameId,
+      target: video.id,
+    });
+  }
+  return next;
+}
+
+/** 加载/规范化：把所有分镜视频列 rows 与对齐的分镜脚本列写回 node.data */
+export function reconcileStoryVideoColumnRows(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): CanvasFlowNode[] {
+  return nodes.map((n) => {
+    if (n.type !== "story-video-column" && n.type !== "story-pro-video") {
+      return n;
+    }
+    const { frameColumnId, frameRows } = frameRowsForVideoColumn(
+      nodes,
+      edges,
+      n.id,
+    );
+    if (!frameColumnId || !frameRows.length) return n;
+    const stored = (n.data as { rows?: StoryVideoRow[] })?.rows ?? [];
+    const patched = patchVideoRowsFromFrameRows(stored, frameRows);
+    const sameLen = patched.length === stored.length;
+    const sameKeys =
+      sameLen && patched.every((r, i) => r.key === stored[i]?.key);
+    const sameFrame = (n.data as { frameColumnId?: string }).frameColumnId === frameColumnId;
+    if (sameLen && sameKeys && sameFrame) return n;
+    return {
+      ...n,
+      data: {
+        ...n.data,
+        rows: patched,
+        frameColumnId,
+        /** 镜数变多时须重新按行数撑高，否则壳内 overflow:hidden 只露出前几镜 */
+        manualSize: false,
+      },
+    };
+  });
+}
+
+/** hydrate / strip 之后：修边 + 补齐视频行 + 列高 */
+export function finalizeStoryMediaGraph(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): { nodes: CanvasFlowNode[]; edges: CanvasFlowEdge[] } {
+  const repairedEdges = repairStoryVideoFrameEdges(nodes, edges);
+  let synced = reconcileStoryVideoColumnRows(nodes, repairedEdges);
+  synced = synced.map((n) => {
+    if (n.type !== "story-video-column" && n.type !== "story-pro-video") {
+      return n;
+    }
+    return { ...n, data: { ...n.data, manualSize: false } };
+  });
+  return { nodes: synced, edges: repairedEdges };
 }
 
 export function resyncStoryMediaColumnsToStore(

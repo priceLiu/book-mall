@@ -5,6 +5,7 @@ import {
   getGatewayPublicOrigin,
 } from "@/lib/book-mall-base-url";
 import { setGatewayToken } from "@/lib/gateway-auth";
+import { fetchBookMall } from "@/lib/fetch-book-mall";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +26,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`/login?${q}`, base));
   }
 
-  const res = await fetch(`${origin}/api/sso/gateway/exchange`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ code }),
-  });
+  let res: Response;
+  try {
+    res = await fetchBookMall(`${origin}/api/sso/gateway/exchange`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ code }),
+    });
+  } catch {
+    const q = new URLSearchParams({ reason: "book_mall_unreachable" });
+    return NextResponse.redirect(new URL(`/login?${q}`, base));
+  }
 
   if (!res.ok) {
     const q = new URLSearchParams({ reason: `exchange_${res.status}` });

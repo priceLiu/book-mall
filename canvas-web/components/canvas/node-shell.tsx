@@ -106,7 +106,8 @@ export function NodeShell({
 
       <header
         className={cn(
-          "shrink-0 flex items-center justify-between gap-2 rounded-t-xl border-b px-2 py-2",
+          RF_NODE_DRAG_HANDLE,
+          "shrink-0 flex cursor-grab items-center justify-between gap-2 rounded-t-xl border-b px-2 py-2 active:cursor-grabbing",
           engine ? "" : "border-white/10 bg-white/[0.04]",
         )}
         style={
@@ -117,14 +118,9 @@ export function NodeShell({
               }
             : undefined
         }
+        title="拖动标题栏移动节点"
       >
-        <div
-          className={cn(
-            RF_NODE_DRAG_HANDLE,
-            "flex min-w-0 flex-1 cursor-grab items-center gap-1.5 active:cursor-grabbing",
-          )}
-          title="拖动标题栏移动节点"
-        >
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <GripVertical className="size-3.5 shrink-0 text-white/35" aria-hidden />
           <div className="min-w-0 flex-1">
             <p
@@ -141,9 +137,11 @@ export function NodeShell({
             ) : null}
           </div>
         </div>
-        {headerRight ?? (
-          <NodeStatusBadge status={status} message={runtime?.failMessage ?? null} />
-        )}
+        <div className="nodrag shrink-0">
+          {headerRight ?? (
+            <NodeStatusBadge status={status} message={runtime?.failMessage ?? null} />
+          )}
+        </div>
       </header>
 
       <div

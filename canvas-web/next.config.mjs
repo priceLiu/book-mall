@@ -19,6 +19,11 @@ const nextConfig = {
       { protocol: "https", hostname: "picsum.photos", pathname: "/**" },
       { protocol: "https", hostname: "fastly.picsum.photos", pathname: "/**" },
       { protocol: "https", hostname: "*.aliyuncs.com", pathname: "/**" },
+      {
+        protocol: "https",
+        hostname: "tool-mall.oss-cn-guangzhou.aliyuncs.com",
+        pathname: "/**",
+      },
       ...ossHostPatterns(),
     ],
   },

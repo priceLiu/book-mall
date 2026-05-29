@@ -144,6 +144,42 @@ export function findStoryProWorkspaceForStarter(
   return ids;
 }
 
+/** 从 story-pro-script-hub 解析工作区列 ID（不依赖 story-pro-starter） */
+export function findStoryProWorkspaceFromHub(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  scriptHubId: string,
+): StoryProWorkspaceIds | null {
+  const hub = nodes.find((n) => n.id === scriptHubId);
+  if (!hub || hub.type !== "story-pro-script-hub") return null;
+
+  const walk = (fromId: string, expectedType: CanvasFlowNode["type"]) =>
+    edges
+      .filter((e) => e.source === fromId)
+      .map((e) => nodes.find((n) => n.id === e.target))
+      .find((n) => n?.type === expectedType);
+
+  const style = walk(hub.id, "story-pro-style");
+  const charCol = style
+    ? walk(style.id, "story-pro-character")
+    : walk(hub.id, "story-pro-character");
+  const sceneCol = charCol ? walk(charCol.id, "story-pro-scene") : undefined;
+  const frameCol = sceneCol
+    ? walk(sceneCol.id, "story-pro-frame")
+    : charCol
+      ? walk(charCol.id, "story-pro-frame")
+      : undefined;
+  const videoCol = frameCol ? walk(frameCol.id, "story-pro-video") : undefined;
+
+  const ids: StoryProWorkspaceIds = { scriptHubId };
+  if (style) ids.styleNodeId = style.id;
+  if (charCol) ids.characterColumnId = charCol.id;
+  if (sceneCol) ids.sceneColumnId = sceneCol.id;
+  if (frameCol) ids.frameColumnId = frameCol.id;
+  if (videoCol) ids.videoColumnId = videoCol.id;
+  return ids;
+}
+
 const LLM_PARAMS = STORY_PRO_LLM_PARAMS_DEFAULT;
 
 type SpawnProHubArgs = {

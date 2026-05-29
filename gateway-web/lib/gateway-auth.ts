@@ -3,6 +3,7 @@ import {
   GATEWAY_TOKEN_COOKIE,
   getBookMallOrigin,
 } from "@/lib/book-mall-base-url";
+import { bookMallFetchErrorMessage, fetchBookMall } from "@/lib/fetch-book-mall";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +38,22 @@ export async function proxyBookMallAuth(
   }
 
   const body = await request.text();
-  const upstream = await fetch(`${base}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-    cache: "no-store",
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetchBookMall(`${base}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      {
+        error: "book_mall_unreachable",
+        message: bookMallFetchErrorMessage(e),
+      },
+      { status: 503 },
+    );
+  }
 
   const data = (await upstream.json().catch(() => null)) as {
     access_token?: string;

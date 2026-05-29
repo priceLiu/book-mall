@@ -168,7 +168,12 @@ async function commitStoryVideoRowRunOnce(
         rows?: StoryFrameRow[];
       }
     )?.rows ?? [];
-  const frameRows = frameRowsForVideoSync(state.nodes, frameColumnId, frameStored);
+  const frameRows = frameRowsForVideoSync(
+    state.nodes,
+    frameColumnId,
+    frameStored,
+    state.edges,
+  );
   const frameRow = frameRows.find((r) => r.key === rowKey);
   const blockReason = storyVideoGenerateBlockReason(frameRow);
   if (blockReason) {

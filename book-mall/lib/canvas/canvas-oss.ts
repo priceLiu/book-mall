@@ -7,7 +7,11 @@ import {
   readOssEnv,
   type OssEnvConfig,
 } from "@/lib/oss-client";
-import { buildCanvasOssKey, type CanvasOssKind } from "./canvas-constants";
+import {
+  buildCanvasOssKey,
+  buildStyleLibraryOssKey,
+  type CanvasOssKind,
+} from "./canvas-constants";
 
 const MAX_IMAGE_BYTES = 30 * 1024 * 1024; // 30MB
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB
@@ -183,6 +187,26 @@ export async function persistCanvasBufferToOss(args: {
     userId: args.userId,
     ext: args.ext,
   });
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
+/** 平台风格库预览图（固定 OSS key）。 */
+export async function uploadStyleLibraryPreview(args: {
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildStyleLibraryOssKey(args.id, args.ext);
   return uploadBufferToOss({
     cfg: cfgRaw,
     key,

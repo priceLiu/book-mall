@@ -2,15 +2,26 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { BookOpen, Lock, LockOpen, MapPin, Mic, Palette, Users } from "lucide-react";
+import {
+  BookOpen,
+  LayoutGrid,
+  Lock,
+  LockOpen,
+  MapPin,
+  Mic,
+  Palette,
+  Users,
+} from "lucide-react";
 
 import { StoryProAssetImportIcon } from "@/components/canvas/story-pro-asset-import-icon";
 import {
-  PRO_ASSETS_CARD_CLASS,
   PRO_ASSETS_LINK_CLASS,
   PRO_ASSETS_TAB_ACTIVE_CLASS,
   PRO_ASSETS_TAB_IDLE_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
+import { styleLibraryGridClass } from "@/lib/canvas/style-library-card-chrome";
+import type { StoryProAssetRefKind } from "@/lib/canvas/story-pro-character-asset-catalog";
+import { ProjectAssetMediaCard } from "./project-asset-media-card";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -43,8 +54,14 @@ import {
   useStoryProStyleProfiles,
 } from "@/lib/canvas/use-story-pro-style-profiles";
 import { StoryMediaPreviewModal } from "./story-column-media-panel";
+import { StyleLibraryGrid } from "./style-library-grid";
 
-export type ProjectAssetTab = "character" | "audio" | "scene" | "style";
+export type ProjectAssetTab =
+  | "character"
+  | "audio"
+  | "scene"
+  | "style"
+  | "style-library";
 
 export function ProjectAssetsView({
   projectId,
@@ -240,12 +257,78 @@ export function ProjectAssetsView({
           : audioLoading;
   const emptyProjectHint = !projectId?.trim();
 
+  const pickCharacterHeroUrl = (asset: StoryProCharacterAssetRecord) => {
+    const three = asset.refs.find((r) => r.kind === "three_view");
+    const hero = three ?? asset.refs[0];
+    return hero?.ossUrl?.trim() || undefined;
+  };
+
+  const characterHoverText = (asset: StoryProCharacterAssetRecord) => {
+    if (!asset.refs.length) return asset.characterKey;
+    return asset.refs
+      .map(
+        (r) =>
+          `${STORY_PRO_ASSET_REF_KIND_LABELS[r.kind as StoryProAssetRefKind]}：${r.label ?? r.kind}`,
+      )
+      .join("\n");
+  };
+
+  const pickSceneHeroUrl = (asset: StoryProSceneAssetRecord) => {
+    const wide = asset.refs.find((r) => r.kind === "establishing");
+    const hero = wide ?? asset.refs[0];
+    return hero?.ossUrl?.trim() || undefined;
+  };
+
+  const sceneHoverText = (asset: StoryProSceneAssetRecord) => {
+    if (!asset.refs.length) return asset.sceneKey;
+    return asset.refs
+      .map(
+        (r) =>
+          `${STORY_PRO_SCENE_REF_KIND_LABELS[r.kind]}：${r.label ?? r.kind}`,
+      )
+      .join("\n");
+  };
+
+  const assetRefThumbGrid = (
+    refs: { id: string; ossUrl: string; kind: string; label?: string | null }[],
+    labels: Record<string, string>,
+    displayName: string,
+  ) =>
+    refs.length ? (
+      <div className="mt-2 grid grid-cols-4 gap-1">
+        {refs.map((ref) => (
+          <button
+            key={ref.id}
+            type="button"
+            className="nodrag relative aspect-[3/4] overflow-hidden rounded-md border border-white/10 bg-black/40 transition hover:ring-1 hover:ring-white/20"
+            title={ref.label ?? labels[ref.kind]}
+            onClick={() =>
+              setPreview({
+                url: ref.ossUrl,
+                title: ref.label ?? `${displayName} · ${labels[ref.kind]}`,
+              })
+            }
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={ref.ossUrl}
+              alt=""
+              className="size-full object-cover"
+            />
+            <span className="absolute inset-x-0 bottom-0 bg-black/70 px-0.5 py-0.5 text-center text-[7px] text-white/85">
+              {labels[ref.kind]}
+            </span>
+          </button>
+        ))}
+      </div>
+    ) : null;
+
   return (
     <>
       <div className={compact ? "space-y-2" : "space-y-4"}>
         {!compact ? (
           <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
-            四类项目资产：角色视觉 / 角色音频 / 场景·道具 / 全局风格。单槽或整包入库，与画布内面板同步。
+            项目资产：角色视觉 / 角色音频 / 场景·道具 / 全局风格 / 平台风格库。单槽或整包入库，与画布内面板同步。
             <Link
               href="/guides/project-assets"
               className="ml-1 text-emerald-300/90 underline-offset-2 hover:underline"
@@ -305,6 +388,20 @@ export function ProjectAssetsView({
             全局风格
           </button>
           {!compact ? (
+            <button
+              type="button"
+              className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
+                tab === "style-library"
+                  ? PRO_ASSETS_TAB_ACTIVE_CLASS
+                  : PRO_ASSETS_TAB_IDLE_CLASS
+              }`}
+              onClick={() => setTab("style-library")}
+            >
+              <LayoutGrid className="size-3" />
+              风格库
+            </button>
+          ) : null}
+          {!compact ? (
             <Link
               href="/guides/project-assets"
               className={`ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${PRO_ASSETS_LINK_CLASS}`}
@@ -327,76 +424,36 @@ export function ProjectAssetsView({
               还没有角色资产。在画布「人物设计」列生成三视图后，可通过四槽面板上传脸 / 全身 / 服装 / 三视图。
             </p>
           ) : (
-            <ul className="space-y-3">
+            <div className={styleLibraryGridClass(compact)}>
               {sortedCharacters.map((asset) => (
-                <li
+                <ProjectAssetMediaCard
                   key={asset.id}
-                  className={PRO_ASSETS_CARD_CLASS}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-medium text-cyan-50">
-                        {asset.displayName}
-                      </p>
-                      <p className="text-[10px] text-cyan-200/50">
-                        key: {asset.characterKey}
-                        {asset.projectId ? " · 本项目" : " · 全局"}
-                        {" · v"}
-                        {asset.version ?? 1}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${
-                        asset.locked
-                          ? "border-amber-400/40 text-amber-200"
-                          : "border-white/15 text-white/60 hover:border-cyan-400/30"
-                      }`}
-                      disabled={busyId === asset.id}
-                      onClick={() => void toggleCharacterLock(asset)}
-                    >
-                      {asset.locked ? (
-                        <Lock className="inline size-3" />
-                      ) : (
-                        <LockOpen className="inline size-3" />
-                      )}{" "}
-                      {asset.locked ? "已锁" : "锁定"}
-                    </button>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {asset.refs.map((ref) => (
-                      <button
-                        key={ref.id}
-                        type="button"
-                        className="group relative size-14 overflow-hidden rounded border border-white/10 bg-black/30"
-                        title={
-                          ref.label ??
-                          STORY_PRO_ASSET_REF_KIND_LABELS[ref.kind]
-                        }
-                        onClick={() =>
+                  compact={compact}
+                  title={asset.displayName}
+                  subtitle={`${asset.characterKey}${asset.projectId ? " · 本项目" : " · 全局"} · v${asset.version ?? 1}`}
+                  hoverText={characterHoverText(asset)}
+                  imageUrl={pickCharacterHeroUrl(asset)}
+                  imageAlt={asset.displayName}
+                  locked={asset.locked}
+                  busy={busyId === asset.id}
+                  onToggleLock={() => void toggleCharacterLock(asset)}
+                  onPreviewHero={
+                    pickCharacterHeroUrl(asset)
+                      ? () =>
                           setPreview({
-                            url: ref.ossUrl,
-                            title:
-                              ref.label ??
-                              `${asset.displayName} · ${STORY_PRO_ASSET_REF_KIND_LABELS[ref.kind]}`,
+                            url: pickCharacterHeroUrl(asset)!,
+                            title: asset.displayName,
                           })
-                        }
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={ref.ossUrl}
-                          alt=""
-                          className="size-full object-contain"
-                        />
-                        <span className="absolute inset-x-0 bottom-0 bg-black/65 px-0.5 py-0.5 text-[8px] text-white/90">
-                          {STORY_PRO_ASSET_REF_KIND_LABELS[ref.kind]}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </li>
+                      : undefined
+                  }
+                  footer={assetRefThumbGrid(
+                    asset.refs,
+                    STORY_PRO_ASSET_REF_KIND_LABELS,
+                    asset.displayName,
+                  )}
+                />
               ))}
-            </ul>
+            </div>
           )
         ) : tab === "scene" ? (
           sortedScenes.length === 0 ? (
@@ -404,76 +461,36 @@ export function ProjectAssetsView({
             还没有场景资产。在画布「场景设计」列生成参考图后，可通过三槽面板保存全景 / 细节 / 氛围。
           </p>
         ) : (
-          <ul className="space-y-3">
+          <div className={styleLibraryGridClass(compact)}>
             {sortedScenes.map((asset) => (
-              <li
+              <ProjectAssetMediaCard
                 key={asset.id}
-                className={PRO_ASSETS_CARD_CLASS}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-medium text-cyan-50">
-                      {asset.displayName}
-                    </p>
-                    <p className="text-[10px] text-cyan-200/50">
-                      key: {asset.sceneKey}
-                      {asset.projectId ? " · 本项目" : " · 全局"}
-                      {" · v"}
-                      {asset.version ?? 1}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${
-                      asset.locked
-                        ? "border-amber-400/40 text-amber-200"
-                        : "border-white/15 text-white/60 hover:border-cyan-400/30"
-                    }`}
-                    disabled={busyId === asset.id}
-                    onClick={() => void toggleSceneLock(asset)}
-                  >
-                    {asset.locked ? (
-                      <Lock className="inline size-3" />
-                    ) : (
-                      <LockOpen className="inline size-3" />
-                    )}{" "}
-                    {asset.locked ? "已锁" : "锁定"}
-                  </button>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {asset.refs.map((ref) => (
-                    <button
-                      key={ref.id}
-                      type="button"
-                      className="group relative size-14 overflow-hidden rounded border border-white/10 bg-black/30"
-                      title={
-                        ref.label ??
-                        STORY_PRO_SCENE_REF_KIND_LABELS[ref.kind]
-                      }
-                      onClick={() =>
+                compact={compact}
+                title={asset.displayName}
+                subtitle={`${asset.sceneKey}${asset.projectId ? " · 本项目" : " · 全局"} · v${asset.version ?? 1}`}
+                hoverText={sceneHoverText(asset)}
+                imageUrl={pickSceneHeroUrl(asset)}
+                imageAlt={asset.displayName}
+                locked={asset.locked}
+                busy={busyId === asset.id}
+                onToggleLock={() => void toggleSceneLock(asset)}
+                onPreviewHero={
+                  pickSceneHeroUrl(asset)
+                    ? () =>
                         setPreview({
-                          url: ref.ossUrl,
-                          title:
-                            ref.label ??
-                            `${asset.displayName} · ${STORY_PRO_SCENE_REF_KIND_LABELS[ref.kind]}`,
+                          url: pickSceneHeroUrl(asset)!,
+                          title: asset.displayName,
                         })
-                      }
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={ref.ossUrl}
-                        alt=""
-                        className="size-full object-contain"
-                      />
-                      <span className="absolute inset-x-0 bottom-0 bg-black/65 px-0.5 py-0.5 text-[8px] text-white/90">
-                        {STORY_PRO_SCENE_REF_KIND_LABELS[ref.kind]}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </li>
+                    : undefined
+                }
+                footer={assetRefThumbGrid(
+                  asset.refs,
+                  STORY_PRO_SCENE_REF_KIND_LABELS,
+                  asset.displayName,
+                )}
+              />
             ))}
-          </ul>
+          </div>
         )
         ) : tab === "audio" ? (
           sortedAudio.length === 0 ? (
@@ -526,6 +543,19 @@ export function ProjectAssetsView({
               ))}
             </ul>
           )
+        ) : tab === "style-library" ? (
+          <div className="space-y-3">
+            <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
+              平台内置风格预设（135 条）。悬停查看提示词；在影视专业版画布中打开「风格库」弹层可一键套用到「风格定义」节点。
+            </p>
+            <StyleLibraryGrid
+              onPreview={(p) => {
+                if (p.imageUrl) {
+                  setPreview({ url: p.imageUrl, title: p.name });
+                }
+              }}
+            />
+          </div>
         ) : tab === "style" ? (
           sortedStyles.length === 0 ? (
             <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">

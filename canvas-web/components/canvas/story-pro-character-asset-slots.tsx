@@ -51,6 +51,13 @@ import {
 import { normalizeStoryProCharacterKey } from "@/lib/canvas/story-pro-character-key";
 import { notifyStoryProCharacterAssetsChanged } from "@/lib/canvas/use-story-pro-character-assets";
 import { cn } from "@/lib/utils";
+import {
+  STYLE_LIBRARY_CARD_FOOTER,
+  STYLE_LIBRARY_CARD_SHELL,
+  STYLE_LIBRARY_CARD_TITLE,
+  STYLE_LIBRARY_HOVER_PROMPT_OVERLAY,
+  STYLE_LIBRARY_MEDIA_FRAME,
+} from "@/lib/canvas/style-library-card-chrome";
 
 type RowLike = {
   key: string;
@@ -401,31 +408,34 @@ export function StoryProCharacterAssetSlots({
           <StoryStatusLine message={statusHint.text} className="mb-2" />
         )
       ) : null}
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {STORY_PRO_ASSET_REF_KINDS.map((kind) => {
           const ref = latestRefForKind(asset, kind);
           const url = ref?.ossUrl;
           const isLocked = ref ? lockedSet.has(ref.id) : false;
+          const kindLabel = STORY_PRO_ASSET_REF_KIND_LABELS[kind];
           return (
-            <div
+            <article
               key={kind}
-              className="flex flex-col gap-1 rounded border border-white/8 bg-black/25 p-1"
+              className={cn(
+                "group/asset-slot nodrag",
+                STYLE_LIBRARY_CARD_SHELL,
+                dragOverKind === kind && "ring-1 ring-white/30",
+              )}
               {...bindSlotPaste(kind)}
             >
-              <p className={`truncate text-center ${STORY_ROW_SUBLABEL_CLASS}`}>
-                {STORY_PRO_ASSET_REF_KIND_LABELS[kind]}
-              </p>
               <button
                 type="button"
                 className={cn(
-                  "group/asset-slot nodrag relative aspect-[3/4] w-full overflow-hidden rounded hover:ring-1 hover:ring-white/15",
+                  "nodrag relative w-full overflow-hidden",
+                  STYLE_LIBRARY_MEDIA_FRAME,
+                  "h-[120px]",
                   kind === "outfit" && url
                     ? "bg-white"
                     : url
                       ? "bg-black/50"
                       : "bg-black/40",
-                  dragOverKind === kind && "ring-1 ring-white/40",
-                  activeKind === kind && canUpload && "ring-1 ring-white/20",
+                  activeKind === kind && canUpload && "ring-1 ring-inset ring-white/20",
                 )}
                 onClick={() => {
                   if (url) {
@@ -460,8 +470,8 @@ export function StoryProCharacterAssetSlots({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={url}
-                      alt={STORY_PRO_ASSET_REF_KIND_LABELS[kind]}
-                      className="size-full object-contain"
+                      alt={kindLabel}
+                      className="absolute inset-0 size-full object-cover"
                     />
                     {onPreview ? (
                       <span
@@ -480,8 +490,17 @@ export function StoryProCharacterAssetSlots({
                     ) : null}
                   </span>
                 )}
+                {ref?.label ? (
+                  <div className={STYLE_LIBRARY_HOVER_PROMPT_OVERLAY} aria-hidden>
+                    {ref.label}
+                  </div>
+                ) : null}
               </button>
-              <div className="flex flex-wrap justify-center gap-0.5">
+              <div className={cn(STYLE_LIBRARY_CARD_FOOTER, "px-2 py-2")}>
+                <p className={cn(STYLE_LIBRARY_CARD_TITLE, "text-[12px]")}>
+                  {kindLabel}
+                </p>
+                <div className="mt-1 flex flex-wrap justify-center gap-0.5">
                 {kind === "full_body" && url && !assetLocked ? (
                   <button
                     type="button"
@@ -548,8 +567,9 @@ export function StoryProCharacterAssetSlots({
                     ) : null}
                   </>
                 ) : null}
+                </div>
               </div>
-            </div>
+            </article>
           );
         })}
       </div>

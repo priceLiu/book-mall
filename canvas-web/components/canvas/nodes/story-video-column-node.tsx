@@ -15,11 +15,15 @@ import {
 } from "@/lib/canvas/system-providers";
 import { STORY_PRO_VIDEO_MODEL_KEYS, STORY_TTS_MODEL_KEYS } from "@/lib/canvas/types";
 import {
-  displayFrameRows,
-  displayVideoRows,
+  authoritativeFrameRowsForVideoColumn,
+  displayVideoRowsForFrameColumn,
   findWorkspaceForColumnId,
+  frameRowsForVideoColumn,
 } from "@/lib/canvas/story-column-display";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
+import { NODE_DEFAULT_SIZE } from "@/lib/canvas/types";
+import { patchVideoRowsFromFrameRows } from "@/lib/canvas/story-column-sync";
+import { useStoryColumnAutoSize } from "@/lib/canvas/use-story-column-auto-size";
 import {
   PRO_HINT_LABEL_CLASS,
   PRO_NODE_SHELL_FOOTER_CLASS,
@@ -42,19 +46,17 @@ import type {
   StoryVideoColumnNodeData,
 } from "@/lib/canvas/story-workspace-types";
 import {
-  STORY_MEDIA_ROW_GAP,
-  STORY_VIDEO_INTRA_ROW_GAP,
-  storyFrameVideoRowBlockH,
   storyVideoColumnSize,
+  storyVideoRowBlockHeight,
 } from "@/lib/canvas/story-column-layout";
+import { storyMediaListLabel } from "@/lib/canvas/story-media-grid-layout";
 import { StoryEnginePickerStack } from "../story-engine-picker-stack";
-import { StoryFrameVideoEnginePanel } from "../story-frame-video-engine-panel";
+import { StoryVideoColumnEngineBar } from "../story-video-column-engine-bar";
+import { StoryVideoFrameCell } from "../story-video-frame-cell";
 import {
   aggregateStoryColumnRuntime,
   storyColumnIsGenerating,
 } from "@/lib/canvas/story-column-runtime";
-import { StoryVideoRowSlot } from "../story-video-row-slot";
-import { StoryTtsRowSlot } from "../story-tts-row-slot";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { AudioFullscreenLightbox } from "../audio-fullscreen-lightbox";
 import { EnginePicker } from "../engine-picker";
@@ -67,7 +69,6 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const resizeNode = useCanvasStore((s) => s.resizeNode);
   const { providers } = useUserProviders();
   const hintLabelClass =
     edition === "pro" ? PRO_HINT_LABEL_CLASS : STORY_HINT_LABEL_CLASS;
@@ -90,58 +91,105 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
     () => findWorkspaceForColumnId(nodes, edges, id),
     [nodes, edges, id],
   );
-  const frameColumnId = d.frameColumnId ?? ws?.frameColumnId;
-
-  const frameRows = useMemo(() => {
-    const colFrameId = frameColumnId ?? ws?.frameColumnId;
-    if (!colFrameId) return [];
-    const frameNode = nodes.find((n) => n.id === colFrameId);
-    const frameStored =
-      (frameNode?.data as StoryFrameColumnNodeData | undefined)?.rows ?? [];
-    return displayFrameRows(nodes, colFrameId, frameStored);
-  }, [nodes, frameColumnId, ws?.frameColumnId]);
-
-  const displayRows = useMemo(
-    () => displayVideoRows(nodes, id, stored),
-    [nodes, id, stored],
+  const { frameColumnId: linkedFrameColumnId, frameRows } = useMemo(
+    () => frameRowsForVideoColumn(nodes, edges, id, ws),
+    [nodes, edges, id, ws],
   );
 
+  const displayRows = useMemo(
+    () =>
+      displayVideoRowsForFrameColumn(
+        nodes,
+        id,
+        stored,
+        linkedFrameColumnId,
+        edges,
+      ),
+    [nodes, edges, id, stored, linkedFrameColumnId],
+  );
+
+  /** 始终以分镜脚本列镜位为准渲染（不依赖 stored 是否已写回） */
+  const rowsToRender = useMemo(() => {
+    if (!frameRows.length) return displayRows;
+    return patchVideoRowsFromFrameRows(displayRows, frameRows);
+  }, [displayRows, frameRows]);
+
+  /** 分镜脚本镜数多于视频列 stored 时，自动补齐行（避免「分镜视频少了」） */
+  useEffect(() => {
+    if (!linkedFrameColumnId || !frameRows.length) return;
+    const patched = patchVideoRowsFromFrameRows(stored, frameRows);
+    const storedKeys = new Set(stored.map((r) => r.key));
+    const needsPatch =
+      patched.length !== stored.length ||
+      patched.length !== frameRows.length ||
+      patched.some((r) => !storedKeys.has(r.key)) ||
+      d.frameColumnId !== linkedFrameColumnId;
+    if (!needsPatch) return;
+    updateNodeData(id, {
+      rows: patched,
+      frameColumnId: linkedFrameColumnId,
+      manualSize: false,
+    });
+  }, [
+    frameRows,
+    id,
+    linkedFrameColumnId,
+    stored,
+    updateNodeData,
+  ]);
+
   const nodeRuntime = useMemo(
-    () => aggregateStoryColumnRuntime(displayRows),
-    [displayRows],
+    () => aggregateStoryColumnRuntime(rowsToRender),
+    [rowsToRender],
   );
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
 
+  const listRowCount = rowsToRender.length;
+
   const targetSize = useMemo(
     () =>
-      storyVideoColumnSize(displayRows, frameRows.length, {
+      storyVideoColumnSize(displayRows, listRowCount, {
         pro: edition === "pro",
       }),
-    [displayRows, frameRows.length, edition],
+    [displayRows, listRowCount, edition],
   );
 
+  useStoryColumnAutoSize(id, targetSize, listRowCount);
+
+  /** 宫格改版后可能残留过宽节点；非手动尺寸时收回到默认列宽 540 */
+  const videoDefaultWidth = useMemo(
+    () =>
+      NODE_DEFAULT_SIZE[
+        edition === "pro" ? "story-pro-video" : "story-video-column"
+      ].width,
+    [edition],
+  );
   useEffect(() => {
     const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
     if (!node) return;
     const { w, h } = nodeMeasuredSize(node);
+    const nextH = Math.max(h, targetSize.height);
     if (
-      Math.abs(h - targetSize.height) < 4 &&
-      Math.abs(w - targetSize.width) < 4
+      Math.abs(w - videoDefaultWidth) < 4 &&
+      Math.abs(h - nextH) < 4
     ) {
       return;
     }
-    resizeNode(id, { width: targetSize.width, height: targetSize.height });
-  }, [id, resizeNode, targetSize]);
+    useCanvasStore.getState().resizeNode(id, {
+      width: videoDefaultWidth,
+      height: nextH,
+    });
+  }, [id, videoDefaultWidth, targetSize.height, nodes]);
 
   const batchVideo = useMemo((): CanvasEnginePick | undefined => {
     if (d.batchVideo?.providerId) return d.batchVideo;
-    if (!frameColumnId) return d.batchVideo;
-    const frame = nodes.find((n) => n.id === frameColumnId)?.data as
+    if (!linkedFrameColumnId) return d.batchVideo;
+    const frame = nodes.find((n) => n.id === linkedFrameColumnId)?.data as
       | StoryFrameColumnNodeData
       | undefined;
     const fromFrame = frame?.batchVideo ?? frame?.batchImage;
     return fromFrame?.providerId ? fromFrame : d.batchVideo;
-  }, [d.batchVideo, frameColumnId, nodes]);
+  }, [d.batchVideo, linkedFrameColumnId, nodes]);
 
   const batchTts = d.batchTts;
 
@@ -166,8 +214,8 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
     if (d.batchVideo?.providerId?.trim() && d.batchVideo?.modelKey?.trim()) {
       return;
     }
-    if (frameColumnId) {
-      const frame = nodes.find((n) => n.id === frameColumnId)?.data as
+    if (linkedFrameColumnId) {
+      const frame = nodes.find((n) => n.id === linkedFrameColumnId)?.data as
         | StoryFrameColumnNodeData
         | undefined;
       const legacy = frame?.batchVideo ?? frame?.batchImage;
@@ -195,7 +243,7 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
     d.batchVideo?.modelKey,
     d.batchVideo?.params,
     d.batchVideo?.providerId,
-    frameColumnId,
+    linkedFrameColumnId,
     id,
     nodes,
     providers,
@@ -218,13 +266,13 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
           language_type: "Chinese",
         },
       },
-      frameColumnId,
+      frameColumnId: linkedFrameColumnId,
     });
   }, [
     d.batchTts?.modelKey,
     d.batchTts?.params,
     d.batchTts?.providerId,
-    frameColumnId,
+    linkedFrameColumnId,
     id,
     providers,
     updateNodeData,
@@ -232,15 +280,15 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
 
   const runRowVideo = async (key: string) => {
     if (!batchVideo?.providerId?.trim() || !batchVideo?.modelKey?.trim()) return;
-    const colFrameId = frameColumnId ?? ws?.frameColumnId;
-    if (!colFrameId) return;
+    if (!linkedFrameColumnId) return;
 
     setVideoInflightKeys((prev) => new Set(prev).add(key));
 
-    const frameNode = nodes.find((n) => n.id === colFrameId);
-    const frameStored =
-      (frameNode?.data as StoryFrameColumnNodeData | undefined)?.rows ?? [];
-    const frameRows = displayFrameRows(nodes, colFrameId, frameStored);
+    const frameRows = authoritativeFrameRowsForVideoColumn(
+      nodes,
+      linkedFrameColumnId,
+      edges,
+    );
     const frameRow = frameRows.find((r) => r.key === key);
     const frameImageUrl =
       frameRow?.runtime?.ossUrl ?? frameRow?.runtime?.ephemeralUrl;
@@ -250,7 +298,7 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
         base,
         projectId,
         videoColumnId: id,
-        frameColumnId: colFrameId,
+        frameColumnId: linkedFrameColumnId,
         rowKey: key,
         frameImageUrl,
         batchVideo: {
@@ -326,10 +374,10 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
       title="分镜视频"
       subtitle={
         columnGenerating
-          ? "媒体生成中…"
+          ? `${storyMediaListLabel(listRowCount)} · 生成中…`
           : nodeRuntime.status === "error"
-            ? "部分生成失败"
-            : "各镜视频 + 配音 · 点击生成"
+            ? `${storyMediaListLabel(listRowCount)} · 部分失败`
+            : `${storyMediaListLabel(listRowCount)} · 点击各镜生成`
       }
       selected={selected}
       engine
@@ -345,19 +393,16 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
         edition === "pro" ? PRO_NODE_SHELL_FOOTER_CLASS : undefined
       }
     >
-      <div
-        className="flex w-full flex-col"
-        style={{ gap: STORY_MEDIA_ROW_GAP }}
-      >
-        <StoryFrameVideoEnginePanel
-          row1={
+      <div className="flex w-full flex-col gap-3">
+        <StoryVideoColumnEngineBar
+          videoPicker={
             <StoryEnginePickerStack
               label={
                 <>
-                  分镜视频 · VIDEO（点击生成，不自动跑）
+                  VIDEO · 图生视频
                   {!canGenerateVideo ? (
                     <span className="ml-1 normal-case text-amber-300/90">
-                      · 请先选择视频模型
+                      · 选模型
                     </span>
                   ) : null}
                 </>
@@ -378,20 +423,20 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
                       modelKey: next.modelKey,
                       params: next.params,
                     },
-                    frameColumnId,
+                    frameColumnId: linkedFrameColumnId,
                   });
                 }}
               />
             </StoryEnginePickerStack>
           }
-          row2={
+          ttsPicker={
             <StoryEnginePickerStack
               label={
                 <>
-                  分镜配音 · TTS（剪映导出 audio 轨，经 Gateway）
+                  TTS · 剪映配音轨
                   {!canGenerateTts ? (
                     <span className="ml-1 normal-case text-amber-300/90">
-                      · 请先选择 TTS 模型
+                      · 选模型
                     </span>
                   ) : null}
                 </>
@@ -412,118 +457,104 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
                       modelKey: next.modelKey,
                       params: next.params,
                     },
-                    frameColumnId,
+                    frameColumnId: linkedFrameColumnId,
                   });
                 }}
               />
             </StoryEnginePickerStack>
           }
         />
-        <div
-          className="flex w-full flex-col"
-          style={{ gap: STORY_MEDIA_ROW_GAP }}
-        >
-        {!displayRows.length ? (
+        {!listRowCount ? (
           <p className="text-[11px] text-[var(--canvas-muted)]">
-            在「分镜脚本」列生成分镜图后，点击此处或分镜图上的视频图标生成成片。
+            在「分镜脚本」列生成分镜图后，在本列点击各镜生成视频与配音。
           </p>
         ) : (
-          displayRows.map((row) => {
-            const vid =
-              row.videoRuntime?.ossUrl ?? row.videoRuntime?.ephemeralUrl;
-            const st = row.videoRuntime?.status ?? "idle";
-            const running =
-              st === "running" ||
-              st === "pending" ||
-              videoInflightKeys.has(row.key);
-            const videoError =
-              st === "error" ? row.videoRuntime?.failMessage : undefined;
-            const frameRow = frameRows.find((f) => f.key === row.key);
-            const videoBlockReason = storyVideoGenerateBlockReason(frameRow);
-            const videoPrompt =
-              frameRow?.prompt?.trim() ||
-              (row.videoPrompt ?? "").trim() ||
-              (row.dialogue ?? "").trim();
-            const videoRefLabels = (
-              row.refImages?.length ? row.refImages : frameRow?.refImages ?? []
-            )
-              .filter((r) => r.id.startsWith("ref-char-"))
-              .map((r) => r.label);
-            const aud =
-              row.ttsRuntime?.ossUrl ?? row.ttsRuntime?.ephemeralUrl;
-            const ttsSt = row.ttsRuntime?.status ?? "idle";
-            const ttsRunning =
-              ttsSt === "running" ||
-              ttsSt === "pending" ||
-              ttsInflightKeys.has(row.key);
-            const ttsError =
-              ttsSt === "error" ? row.ttsRuntime?.failMessage : undefined;
-            const ttsBlockReason = storyTtsGenerateBlockReason(row);
+          <div className="flex w-full flex-col gap-3">
+              {rowsToRender.map((row) => {
+                const vid =
+                  row.videoRuntime?.ossUrl ?? row.videoRuntime?.ephemeralUrl;
+                const st = row.videoRuntime?.status ?? "idle";
+                const running =
+                  st === "running" ||
+                  st === "pending" ||
+                  videoInflightKeys.has(row.key);
+                const videoError =
+                  st === "error" ? row.videoRuntime?.failMessage : undefined;
+                const frameRow = frameRows.find((f) => f.key === row.key);
+                const videoBlockReason =
+                  storyVideoGenerateBlockReason(frameRow);
+                const videoPrompt =
+                  frameRow?.prompt?.trim() ||
+                  (row.videoPrompt ?? "").trim() ||
+                  (row.dialogue ?? "").trim();
+                const videoRefLabels = (
+                  row.refImages?.length ? row.refImages : frameRow?.refImages ?? []
+                )
+                  .filter((r) => r.id.startsWith("ref-char-"))
+                  .map((r) => r.label);
+                const aud =
+                  row.ttsRuntime?.ossUrl ?? row.ttsRuntime?.ephemeralUrl;
+                const ttsSt = row.ttsRuntime?.status ?? "idle";
+                const ttsRunning =
+                  ttsSt === "running" ||
+                  ttsSt === "pending" ||
+                  ttsInflightKeys.has(row.key);
+                const ttsError =
+                  ttsSt === "error" ? row.ttsRuntime?.failMessage : undefined;
+                const ttsBlockReason = storyTtsGenerateBlockReason(row);
 
-            return (
-              <div
-                key={row.key}
-                className="flex w-full flex-col"
-                style={{
-                  minHeight: storyFrameVideoRowBlockH({ pro: edition === "pro" }),
-                  gap: STORY_VIDEO_INTRA_ROW_GAP,
-                }}
-              >
-                <StoryVideoRowSlot
-                  edition={edition}
-                  frameIndex={row.frameIndex}
-                  videoUrl={vid}
-                  videoPrompt={videoPrompt}
-                  videoRefLabels={videoRefLabels}
-                  generating={running}
-                  errorMessage={videoError}
-                  videoBlockReason={videoBlockReason}
-                  onGenerate={() => void runRowVideo(row.key)}
-                  saveToLibrary={
-                    vid
-                      ? {
-                          mode: "i2v",
-                          prompt: videoPrompt,
-                          modelLabel: batchVideo?.modelKey,
-                        }
-                      : null
-                  }
-                  onPreview={
-                    vid
-                      ? () =>
-                          setPreview({
-                            url: vid,
-                            title: `镜 ${row.frameIndex} · 视频`,
-                            kind: "video",
-                          })
-                      : undefined
-                  }
-                />
-                <StoryTtsRowSlot
-                  edition={edition}
-                  frameIndex={row.frameIndex}
-                  audioUrl={aud}
-                  dialoguePreview={storyTtsDialogueText(row)}
-                  generating={ttsRunning}
-                  errorMessage={ttsError}
-                  blockReason={ttsBlockReason}
-                  onGenerate={() => void runRowTts(row.key)}
-                  onPreview={
-                    aud
-                      ? () =>
-                          setPreview({
-                            url: aud,
-                            title: `镜 ${row.frameIndex} · 配音`,
-                            kind: "audio",
-                          })
-                      : undefined
-                  }
-                />
-              </div>
-            );
-          })
+                return (
+                  <StoryVideoFrameCell
+                    key={row.key}
+                    edition={edition}
+                    frameIndex={row.frameIndex}
+                    videoUrl={vid}
+                    videoPrompt={videoPrompt}
+                    videoRefLabels={videoRefLabels}
+                    videoGenerating={running}
+                    videoError={videoError}
+                    videoBlockReason={videoBlockReason}
+                    onGenerateVideo={() => void runRowVideo(row.key)}
+                    saveToLibrary={
+                      vid
+                        ? {
+                            mode: "i2v",
+                            prompt: videoPrompt,
+                            modelLabel: batchVideo?.modelKey,
+                          }
+                        : null
+                    }
+                    onPreviewVideo={
+                      vid
+                        ? () =>
+                            setPreview({
+                              url: vid,
+                              title: `镜 ${row.frameIndex} · 视频`,
+                              kind: "video",
+                            })
+                        : undefined
+                    }
+                    audioUrl={aud}
+                    dialoguePreview={storyTtsDialogueText(row)}
+                    ttsGenerating={ttsRunning}
+                    ttsError={ttsError}
+                    ttsBlockReason={ttsBlockReason}
+                    onGenerateTts={() => void runRowTts(row.key)}
+                    onPreviewTts={
+                      aud
+                        ? () =>
+                            setPreview({
+                              url: aud,
+                              title: `镜 ${row.frameIndex} · 配音`,
+                              kind: "audio",
+                            })
+                        : undefined
+                    }
+                  />
+                );
+              })}
+          </div>
         )}
-        </div>
       </div>
       {preview?.kind === "video" ? (
         <StoryMediaPreviewModal

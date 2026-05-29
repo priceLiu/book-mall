@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { getBookMallOrigin } from "./book-mall-base-url";
+import { bookMallFetchErrorMessage, fetchBookMall } from "./fetch-book-mall";
 
 export async function gatewayFetch(
   path: string,
@@ -28,16 +29,12 @@ export async function gatewayFetch(
   const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
 
   try {
-    return await fetch(url, {
-      ...init,
-      headers,
-      cache: "no-store",
-    });
+    return await fetchBookMall(url, { ...init, headers });
   } catch (e: unknown) {
     return new Response(
       JSON.stringify({
         error: "book_mall_fetch_failed",
-        message: e instanceof Error ? e.message : String(e),
+        message: bookMallFetchErrorMessage(e),
       }),
       { status: 502, headers: { "Content-Type": "application/json" } },
     );

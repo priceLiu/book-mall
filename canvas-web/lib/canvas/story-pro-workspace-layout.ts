@@ -4,6 +4,7 @@
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
 import { NODE_DEFAULT_SIZE } from "./types";
 import { nodeMeasuredSize, sortNodesForReactFlow } from "./normalize-graph-nodes";
+import { reconcileStoryVideoColumnRows } from "./story-column-display";
 import { applyStoryColumnHeights } from "./story-column-layout";
 import {
   findStoryProScriptHubForStarter,
@@ -175,6 +176,6 @@ export function reflowStoryProWorkspace(
     place(ws.jianyingExportId, exportX, "jianying-export-pro");
   }
 
-  next = applyStoryColumnHeights(next);
+  next = applyStoryColumnHeights(reconcileStoryVideoColumnRows(next, edges), edges);
   return sortNodesForReactFlow(next);
 }
