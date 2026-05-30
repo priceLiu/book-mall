@@ -98,6 +98,16 @@ export const TOOL_NAV_ENTRIES: ToolNavEntry[] = [
     ],
   },
   {
+    label: "提示词优化器",
+    navKey: "prompt-optimizer",
+    defaultOpen: true,
+    children: [
+      { href: "/prompt-optimizer", label: "首页" },
+      { href: "/prompt-optimizer/studio", label: "优化工作台" },
+      { href: "/prompt-optimizer/implementation", label: "实现逻辑" },
+    ],
+  },
+  {
     label: "AI智能客服",
     navKey: "smart-support",
     defaultOpen: true,

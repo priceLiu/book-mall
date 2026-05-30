@@ -5,6 +5,7 @@ import { getEnvVar } from '../../utils/environment';
 import { normalizeCustomRequestHeaders, validateCustomRequestHeaders } from '../../utils/custom-request-headers';
 import { generateDynamicModels } from './model-utils';
 import { CHROME_BUILT_IN_PROVIDER_ID } from '../llm/chrome-built-in';
+import { isPlatformGatewayMode, PLATFORM_GATEWAY_PROVIDER_ID } from '../../utils/platform-gateway';
 
 /**
  * Provider ID -> 环境变量 key 映射
@@ -196,6 +197,33 @@ export function getDefaultTextModels(registry?: ITextAdapterRegistry): Record<st
     paramOverrides: { ...(chromeBuiltInModel.defaultParameterValues || {}) },
     customParamOverrides: {}
   };
+
+  if (isPlatformGatewayMode()) {
+    const pgAdapter = adapterRegistry.getAdapter(PLATFORM_GATEWAY_PROVIDER_ID);
+    const pgProvider = pgAdapter.getProvider();
+    const pgModel =
+      pgAdapter.getModels()[0] || pgAdapter.buildDefaultModel("deepseek-chat");
+    const configId = `${PLATFORM_GATEWAY_PROVIDER_ID}/default`;
+
+    for (const key of Object.keys(result)) {
+      if (key !== configId) {
+        result[key] = { ...result[key], enabled: false };
+      }
+    }
+
+    result[configId] = {
+      id: configId,
+      name: pgProvider.name,
+      enabled: true,
+      providerId: pgProvider.id,
+      modelId: pgModel.id,
+      providerMeta: pgProvider,
+      modelMeta: pgModel,
+      connectionConfig: {},
+      paramOverrides: { ...(pgModel.defaultParameterValues || {}) },
+      customParamOverrides: {},
+    };
+  }
 
   return result;
 }

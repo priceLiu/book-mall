@@ -1,6 +1,11 @@
 const messages = {
   "modelManager": {
     "title": "Model Manager",
+    "platformGateway": {
+      "title": "Platform Gateway mode",
+      "hint": "Vendor API keys and enabled models are managed in Gateway; you cannot enter keys here.",
+      "openGateway": "Open Gateway Model Manager"
+    },
     "textModels": "Text Models",
     "imageModels": "Image Models",
     "functionModels": "Function Models",

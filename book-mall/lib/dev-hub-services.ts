@@ -78,6 +78,18 @@ export function getDevHubServices(): DevHubService[] {
       port: 3004,
       openable: true,
     },
+    {
+      id: "prompt-optimizer",
+      label: "prompt-optimizer-platform",
+      description: "提示词优化器 · 上游 Vue + Gateway 断直连",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_PROMPT_OPTIMIZER_ORIGIN ??
+          process.env.PROMPT_OPTIMIZER_PUBLIC_ORIGIN,
+        "http://localhost:3006",
+      ),
+      port: 3006,
+      openable: true,
+    },
   ];
 }
 

@@ -51,6 +51,13 @@ export type {
 } from './services/llm/types'
 export { LLMService, createLLMService } from './services/llm/service'
 export { TextAdapterRegistry, createTextAdapterRegistry } from './services/llm/adapters/registry'
+export { PlatformGatewayAdapter } from './services/llm/adapters/platform-gateway-adapter'
+export {
+  isPlatformGatewayMode,
+  PLATFORM_GATEWAY_PROVIDER_ID,
+  getPlatformGatewayChatPath,
+  getPlatformGatewayClientPage,
+} from './utils/platform-gateway'
 export {
   CHROME_BUILT_IN_MODEL_ID,
   CHROME_BUILT_IN_AUTO_ENABLE_SOURCE,

@@ -22,6 +22,7 @@
 | [**10-multimodal-studio-and-finance-master-plan.md**](./product/10-multimodal-studio-and-finance-master-plan.md) | **全模态工作室 + 财务重构 — 整体方案（通俗版）**：`m.ai-code8.com` 与 `book`/`tool` 分工、用户/后台/核算、落地顺序 |
 | [**12-platform-app-federation.md**](./product/12-platform-app-federation.md) | **平台联邦架构**（独立部署、门户、Book SSO、Gateway、第三方接入） |
 | [**13-tool-service-fee-and-wallet.md**](./product/13-tool-service-fee-and-wallet.md) | **工具技术服务费与钱包**（月费 + Gateway BYOK，退役按次扣点） |
+| [**prompt-optimizer-platform.md**](./product/prompt-optimizer-platform.md) | **提示词优化器**（上游 Vue 接入、Gateway 断直连、工具月费） |
 
 协作需求草案：[**v1.1**](./v1.1)（独立 AI 工具集成 · 试衣间等）。
 
@@ -53,6 +54,7 @@
 | [development-constraints.md](./process/development-constraints.md) | 开发前读文档、计划勾选、归类写入 |
 | [**2026-platform-unification-rollout.md**](./plans/2026-platform-unification-rollout.md) | **平台统一改造实施计划**（SSO、Gateway 财务、Canvas/Story 迁移） |
 | [**2026-platform-prelaunch-checklist.md**](./plans/2026-platform-prelaunch-checklist.md) | **上线前验收清单**（按 book / tool / canvas / story / gateway 分项） |
+| [**2026-prompt-optimizer-platform-rollout.md**](./plans/2026-prompt-optimizer-platform-rollout.md) | **提示词优化器平台接入**（vendor + Gateway + 薄壳） |
 | [**2026-phase-d-service-fee-billing.md**](./plans/2026-phase-d-service-fee-billing.md) | **Phase D 技术服务费**（任务勾选与验收） |
 | [mock-payment-checkout.md](./process/mock-payment-checkout.md) | 模拟收银（过渡）：订阅 + 钱包充值、假二维码、`ALLOW_MOCK_PAYMENT` 与安全说明 |
 | [real-payment-integration.md](./process/real-payment-integration.md) | **正式接入支付**（支付宝扫码等）：异步通知、幂等、合规要点 |

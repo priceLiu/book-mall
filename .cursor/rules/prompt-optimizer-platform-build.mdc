@@ -1,0 +1,67 @@
+---
+description: 提示词优化器 · vendor 构建与 CloudBase 部署约束
+globs: prompt-optimizer-platform/**/*,docs/dev.md,docs/prompt-optimizer.md,deploy/tencent/prompt-optimizer-platform.env.example
+alwaysApply: false
+---
+
+# 提示词优化器 · 构建与部署
+
+## 目录结构
+
+- **平台壳**：`prompt-optimizer-platform/`（Next.js :3006，Book SSO + Gateway BFF）
+- **上游 vendor**：`prompt-optimizer-platform/prompt-optimizer/`（git subtree，**须在平台目录内**，供 CloudBase 子目录构建）
+
+禁止把 vendor 放回仓库根 `prompt-optimizer/`；CloudBase 目标目录为 `prompt-optimizer-platform` 时无法访问同级目录。
+
+## 禁止
+
+1. 提交 `prompt-optimizer-platform/public/assets`、`index.html` 等 **Vue 构建产物**（已在 `.gitignore`）。
+2. 恢复 `prompt-optimizer-platform/app/page.tsx` 占位页（须由 `public/` SPA + rewrite 提供 UI）。
+3. 浏览器或 vendor 内直连厂商 API；平台版须 `VITE_PLATFORM_GATEWAY=1`，经同域 `/api/gateway/chat`。
+4. 生产 vendor 构建使用 `localhost` 的 `VITE_GATEWAY_WEB_ORIGIN`（须为 `https://gateway.ai-code8.com`）。
+
+## 本地开发
+
+```bash
+pnpm dev:all   # 含 :3006
+```
+
+首次或 vendor 变更后，本地要看 Vue UI（非占位）：
+
+```bash
+# vendor 要求 Node ^22
+export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
+cd prompt-optimizer-platform/prompt-optimizer && pnpm install
+cd ../.. && pnpm build:prompt-vendor
+```
+
+或仅拷贝已有 dist：`pnpm build:prompt-vendor:copy`
+
+## 生产 / CloudBase（与 canvas-web 相同）
+
+| 项 | 值 |
+|----|-----|
+| 目标目录 | `prompt-optimizer-platform` |
+| 端口 | **3006** |
+| 构建 | `Dockerfile` 多阶段：vendor（core→ui→web）→ Next standalone |
+| 域名 | `prompt.ai-code8.com` |
+
+`git push` 触发构建；**无需**手动提交 `public/`。
+
+环境变量模板：`deploy/tencent/prompt-optimizer-platform.env.example`  
+`TOOLS_SSO_*` 须与 book-mall / canvas-web **完全一致**。
+
+## 修改 vendor 后
+
+1. 检查 `README.platform.md` 补丁是否仍适用  
+2. 本地 `pnpm build:prompt-vendor` 验证  
+3. 推送后 CloudBase 自动重建
+
+同步上游 subtree：
+
+```bash
+git subtree pull --prefix=prompt-optimizer-platform/prompt-optimizer \
+  https://github.com/linshenkx/prompt-optimizer.git develop --squash
+```
+
+合并后重新检查 platform-gateway 补丁文件。

@@ -20,6 +20,7 @@ import {
   validateCustomRequestHeaders
 } from '@prompt-optimizer/core'
 import { formatErrorSummary, getI18nErrorMessage } from '../../utils/error'
+import { isPlatformGatewayMode } from '../../utils/platform-gateway'
 import { useModelAdvancedParameters } from './useModelAdvancedParameters'
 import { computeConnectionConfig } from './useConnectionConfig'
 import type { AppServices } from '../../types/services'
@@ -198,6 +199,10 @@ export function useTextModelManager() {
 
     for (const fieldName of schema.optional) {
       fields.push(buildField(fieldName, false))
+    }
+
+    if (isPlatformGatewayMode()) {
+      return fields.filter((field) => field.name !== 'apiKey' && field.name !== 'baseURL')
     }
 
     return fields

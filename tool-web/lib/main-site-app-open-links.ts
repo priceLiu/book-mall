@@ -31,3 +31,9 @@ export function mainSiteCanvasOpenHref(path = "/"): string {
   const p = sanitizePath(path, "/");
   return `${base}/canvas-open?path=${encodeURIComponent(p)}`;
 }
+
+export function mainSitePromptOptimizerOpenHref(path = "/"): string {
+  const base = getMainSiteOriginForBrowser();
+  const p = sanitizePath(path, "/");
+  return `${base}/prompt-optimizer-open?path=${encodeURIComponent(p)}`;
+}

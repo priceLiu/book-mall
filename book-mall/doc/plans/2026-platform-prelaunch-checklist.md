@@ -10,7 +10,7 @@
 
 | # | 检查项 | 通过 |
 |---|--------|------|
-| 0.1 | `book-mall` `:3000`、`tool-web` `:3001`、`story-web` `:3003`、`canvas-web` `:3004`、`gateway-web` `:3005` 均可访问 | [ ] |
+| 0.1 | `book-mall` `:3000`、`tool-web` `:3001`、`story-web` `:3003`、`canvas-web` `:3004`、`gateway-web` `:3005`、**prompt-optimizer-platform** `:3006` 均可访问 | [ ] |
 | 0.2 | `book-mall/.env.local`：数据库、`TOOLS_SSO_*`、`OSS_*`、Gateway 相关已配置 | [ ] |
 | 0.3 | 各子站 `MAIN_SITE_ORIGIN` / `NEXT_PUBLIC_BOOK_MALL_URL` 指向主站 | [ ] |
 | 0.4 | `prisma migrate status` 无 pending（book-mall） | [ ] |
@@ -75,6 +75,20 @@
 | 5.2 | 百炼凭证 Base URL：留空或 `…/compatible-mode/v1`（勿仅填根域名） | [ ] |
 | 5.3 | Logs：Params / Result / **failed** 悬停均有内容 | [ ] |
 | 5.4 | 新失败记录含 `failCode` + `failMessage`（非空） | [ ] |
+| 5.5 | **模型管理**：Tab（文本/图像/功能）、Test / Edit / Enable / Disable / Clone | [ ] |
+
+---
+
+## 5b. prompt-optimizer-platform（提示词优化器 · :3006）
+
+| # | 检查项 | 通过 |
+|---|--------|------|
+| 5b.1 | Book SSO（`app=prompt-optimizer`）无感进入 `:3006` | [ ] |
+| 5b.2 | 工具月费 `prompt-optimizer` 未开通时有可读阻断 | [ ] |
+| 5b.3 | 未关联 Gateway Key 时有引导（非误报未登录） | [ ] |
+| 5b.4 | DevTools Network **无** `api.openai.com` / `dashscope` 等厂商直连；仅同域 `/api/gateway/chat` | [ ] |
+| 5b.5 | Model Manager 内 **无** 自填 API Key；有跳转 Gateway 链接 | [ ] |
+| 5b.6 | CloudBase：目标目录 `prompt-optimizer-platform`，`PORT=3006` | [ ] |
 
 ---
 
