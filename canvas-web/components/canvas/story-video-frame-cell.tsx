@@ -7,7 +7,7 @@ import {
 import { StoryTtsRowSlot } from "./story-tts-row-slot";
 import { StoryVideoRowSlot } from "./story-video-row-slot";
 import type { StoryEdition } from "@/lib/canvas/story-edition-chrome";
-import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library";
+import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library-types";
 
 /** 单列单镜：上视频卡 + 下 TTS */
 export function StoryVideoFrameCell({
