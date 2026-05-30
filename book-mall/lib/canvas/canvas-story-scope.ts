@@ -108,7 +108,7 @@ export async function createStoryScopedCanvasTask(
     storyScope?: CanvasTaskStoryScope;
     initialStatus?: "PENDING" | "SUBMITTED";
     data: Omit<
-      Prisma.CanvasGenerationTaskCreateInput,
+      Prisma.CanvasGenerationTaskUncheckedCreateInput,
       "projectId" | "nodeId" | "status"
     >;
   },
