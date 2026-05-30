@@ -7,6 +7,7 @@ import {
   reconcileStoryVideoColumnRows,
 } from "./story-column-display";
 import { applyStoryColumnHeights, isStoryMediaColumnType } from "./story-column-layout";
+import { RF_NODE_DRAG_HANDLE_SELECTOR } from "./react-flow-classes";
 
 const GROUP_PADDING = 28;
 const GROUP_HEADER = 40;
@@ -797,9 +798,24 @@ export function normalizeCanvasNodes(
     ),
   );
   if (!hasStoryTemplateGroups(sized)) {
-    return sortNodesForReactFlow(repairOrphanParentIds(sized));
+    return ensureNodeDragHandles(
+      sortNodesForReactFlow(repairOrphanParentIds(sized)),
+    );
   }
-  return applyStoryLayout(sized, edges);
+  return ensureNodeDragHandles(applyStoryLayout(sized, edges));
+}
+
+/** 为节点补上 dragHandle，避免 flow-canvas 每帧克隆全图 nodes */
+export function ensureNodeDragHandles(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  let changed = false;
+  const next = nodes.map((n) => {
+    if (n.dragHandle === RF_NODE_DRAG_HANDLE_SELECTOR) return n;
+    changed = true;
+    return { ...n, dragHandle: RF_NODE_DRAG_HANDLE_SELECTOR };
+  });
+  return changed ? next : nodes;
 }
 
 export function reflowStoryTemplateGroups(

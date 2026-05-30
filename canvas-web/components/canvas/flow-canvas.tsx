@@ -24,7 +24,6 @@ import {
 } from "@/lib/canvas/viewport-placement";
 import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
 import { routeClipboardImageToActivePasteSlot } from "@/lib/canvas/image-upload-handlers";
-import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 import { ImageNode } from "./nodes/image-node";
 import { TextNode } from "./nodes/text-node";
 import { AiEngineNode } from "./nodes/ai-engine-node";
@@ -116,6 +115,9 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
   const initialFitDoneRef = useRef(false);
+  const viewportTimerRef = useRef<number | null>(null);
+  const dragHoverRafRef = useRef<number | null>(null);
+  const dragUndoPausedRef = useRef(false);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const viewport = useCanvasStore((s) => s.viewport);
@@ -142,9 +144,27 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
   /** 勿用受控 viewport：节点轮询会频繁重渲染，store 里的旧视口会把滚轮缩放拉回 */
   const onMoveEnd = useCallback(
     (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
-      setViewport(vp);
+      if (viewportTimerRef.current !== null) {
+        window.clearTimeout(viewportTimerRef.current);
+      }
+      viewportTimerRef.current = window.setTimeout(() => {
+        setViewport(vp);
+        viewportTimerRef.current = null;
+      }, 350);
     },
     [setViewport],
+  );
+
+  useEffect(
+    () => () => {
+      if (viewportTimerRef.current !== null) {
+        window.clearTimeout(viewportTimerRef.current);
+      }
+      if (dragHoverRafRef.current !== null) {
+        window.cancelAnimationFrame(dragHoverRafRef.current);
+      }
+    },
+    [],
   );
 
   const onInit = useCallback(() => {
@@ -233,18 +253,34 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
     [screenToFlowPosition],
   );
 
+  const onNodeDragStart = useCallback(() => {
+    if (dragUndoPausedRef.current) return;
+    useCanvasStore.temporal.getState().pause();
+    dragUndoPausedRef.current = true;
+  }, []);
+
   const onNodeDrag = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string }) => {
       if (node.type === "group") return;
-      const gid = findGroupAtPoint(event.clientX, event.clientY);
-      const cur = useCanvasStore.getState().dragHoverGroupId;
-      if (gid !== cur) setDragHoverGroup(gid);
+      const clientX = event.clientX;
+      const clientY = event.clientY;
+      if (dragHoverRafRef.current !== null) return;
+      dragHoverRafRef.current = window.requestAnimationFrame(() => {
+        dragHoverRafRef.current = null;
+        const gid = findGroupAtPoint(clientX, clientY);
+        const cur = useCanvasStore.getState().dragHoverGroupId;
+        if (gid !== cur) setDragHoverGroup(gid);
+      });
     },
     [findGroupAtPoint, setDragHoverGroup],
   );
 
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string; parentId?: string }) => {
+      if (dragUndoPausedRef.current) {
+        useCanvasStore.temporal.getState().resume();
+        dragUndoPausedRef.current = false;
+      }
       if (node.type === "group") {
         setDragHoverGroup(null);
         return;
@@ -269,21 +305,21 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
     setConnectingFrom(null);
   }, [setConnectingFrom]);
 
-  // 把 dragHoverGroupId 注入对应 group 节点的 className；统一 dragHandle（v12 无全局 nodeDragHandle）
+  // 分组拖入高亮：仅 patch 目标 group，避免每帧克隆全图 nodes
   const decoratedNodes = useMemo(() => {
-    const dragHandle = `.${RF_NODE_DRAG_HANDLE}`;
-    return nodes.map((n) => {
-      let next = n;
-      if (dragHoverGroupId && n.id === dragHoverGroupId) {
-        next = {
-          ...next,
-          className: `${next.className ?? ""} is-drop-target`.trim(),
-        };
-      }
-      if (next.dragHandle) return next;
-      return { ...next, dragHandle };
-    });
+    if (!dragHoverGroupId) return nodes;
+    return nodes.map((n) =>
+      n.id === dragHoverGroupId
+        ? {
+            ...n,
+            className: `${n.className ?? ""} is-drop-target`.trim(),
+          }
+        : n,
+    );
   }, [nodes, dragHoverGroupId]);
+
+  const onlyRenderVisible = nodes.length >= 12;
+  const showMiniMap = nodes.length <= 48;
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -540,11 +576,13 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
+        onNodeDragStart={onNodeDragStart}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         defaultViewport={viewport}
         onMoveEnd={onMoveEnd}
         onInit={onInit}
+        onlyRenderVisibleElements={onlyRenderVisible}
         proOptions={{ hideAttribution: true }}
         className="bg-[var(--canvas-bg)]"
         // 框选：拖空白即可框选；按住 Space 或 中键/右键 拖动来平移
@@ -566,13 +604,15 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
         maxZoom={2.5}
       >
         <Background gap={24} size={1} color="rgba(255,255,255,0.06)" />
-        <MiniMap
-          pannable
-          zoomable
-          nodeColor={() => "rgba(167,139,250,0.6)"}
-          maskColor="rgba(11,11,20,0.8)"
-          className="!bg-[var(--canvas-surface)] !border !border-white/10 !rounded-md"
-        />
+        {showMiniMap ? (
+          <MiniMap
+            pannable
+            zoomable
+            nodeColor={() => "rgba(167,139,250,0.6)"}
+            maskColor="rgba(11,11,20,0.8)"
+            className="!bg-[var(--canvas-surface)] !border !border-white/10 !rounded-md"
+          />
+        ) : null}
       </ReactFlow>
       <SelectionToolbar />
     </div>
