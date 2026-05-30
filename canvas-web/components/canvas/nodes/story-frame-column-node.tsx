@@ -9,6 +9,10 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
+  useCanvasGraphSnapshot,
+  useCanvasStoreActions,
+} from "@/lib/canvas/canvas-store-hooks";
+import {
   THREE_VIEW_ENGINE_MODEL_KEYS,
   STORY_PRO_FRAME_IMAGE_MODEL_KEYS,
   STORY_PRO_FRAME_IMAGE_SINGLE_REF_MODEL_KEYS,
@@ -88,6 +92,7 @@ import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { StoryColumnRowCard } from "../story-row-prompt-field";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { NodeShell } from "../node-shell";
+import { ColumnRowsList } from "../virtual-column-rows";
 import { EnginePicker } from "../engine-picker";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
@@ -100,9 +105,8 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
     edition === "pro" ? PRO_HINT_LABEL_CLASS : STORY_HINT_LABEL_CLASS;
   const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId);
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const { nodes, edges } = useCanvasGraphSnapshot();
+  const { updateNodeData } = useCanvasStoreActions();
   const d = data as unknown as StoryFrameColumnNodeData;
   const stored = d.rows ?? [];
   const batchImage = d.batchImage;
@@ -623,8 +627,11 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
             完成分镜脚本后，在本列编辑镜头、@ 角色并生成分镜图。
           </p>
         ) : (
-          <div className="flex w-full flex-col gap-3">
-            {displayRows.map((row) => {
+          <ColumnRowsList
+            items={displayRows}
+            rowHeight={alignedRowH}
+            getKey={(row) => row.key}
+            renderRow={(row) => {
               const frameUrl =
                 row.runtime?.ossUrl ?? row.runtime?.ephemeralUrl;
               const fst = row.runtime?.status ?? "idle";
@@ -660,11 +667,6 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                 frameRowStaleSnapshot(row, projectCharacterAssets, projectId);
               const videoBlockReason = storyVideoGenerateBlockReason(row);
               return (
-                <div
-                  key={row.key}
-                  className="box-border w-full shrink-0"
-                  style={{ height: alignedRowH, minHeight: alignedRowH }}
-                >
                 <StoryColumnRowCard
                   edition={edition}
                   rowTitle={`镜 ${row.frameIndex}`}
@@ -725,10 +727,9 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                   }
                   onPreviewRef={(url, title) => setPreview({ url, title })}
                 />
-                </div>
               );
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
       {preview ? (

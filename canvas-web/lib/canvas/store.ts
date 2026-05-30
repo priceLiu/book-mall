@@ -59,6 +59,23 @@ import { canvasNotify } from "./canvas-notify";
 const DEFER_HYDRATE_LAYOUT_NODE_COUNT = 24;
 
 /** 拖动/缩放尺寸过程中跳过 normalize + undo，避免每帧重算整图 */
+function isSelectionOnlyChange(changes: NodeChange[]): boolean {
+  return (
+    changes.length > 0 && changes.every((c) => c.type === "select")
+  );
+}
+
+function bumpGraphRevision(state: { graphRevision: number }): number {
+  return state.graphRevision + 1;
+}
+
+function withGraphRevision<T extends Record<string, unknown>>(
+  state: { graphRevision: number },
+  patch: T,
+): T & { graphRevision: number } {
+  return { ...patch, graphRevision: bumpGraphRevision(state) };
+}
+
 function isInteractiveGeometryInProgress(changes: NodeChange[]): boolean {
   if (changes.length === 0) return false;
   return changes.every((c) => {
@@ -112,6 +129,8 @@ type CanvasState = {
   /** 生成中聚焦某节点（选中 + 平移，不写 undo 栈） */
   runningFocusNodeId: string | null;
   runningFocusNonce: number;
+  /** 递增表示 nodes/edges 业务数据变更（不含纯拖动坐标、纯选中） */
+  graphRevision: number;
 
   /**
    * 瞬时态（不进 undo 栈、不进图保存）：
@@ -212,6 +231,7 @@ export const useCanvasStore = create<CanvasState>()(
       fitViewNonce: 0,
       runningFocusNodeId: null,
       runningFocusNonce: 0,
+      graphRevision: 0,
       connectingFromNodeId: null,
       dragHoverGroupId: null,
       setConnectingFrom: (id) => set({ connectingFromNodeId: id }),
@@ -237,29 +257,38 @@ export const useCanvasStore = create<CanvasState>()(
         const applyDeferredLayout = () => {
           const current = get();
           const laid = finalizeHydratedGraph(current.nodes, current.edges);
-          set({ nodes: laid.nodes, edges: laid.edges });
+          set((state) =>
+            withGraphRevision(state, {
+              nodes: laid.nodes,
+              edges: laid.edges,
+            }),
+          );
         };
 
         if (nodes.length >= DEFER_HYDRATE_LAYOUT_NODE_COUNT) {
-          set({
-            projectId,
-            nodes: ensureNodeDragHandles(nodes),
-            edges,
-            viewport,
-            storyHubReview: null,
-          });
+          set((state) =>
+            withGraphRevision(state, {
+              projectId,
+              nodes: ensureNodeDragHandles(nodes),
+              edges,
+              viewport,
+              storyHubReview: null,
+            }),
+          );
           queueMicrotask(applyDeferredLayout);
           return;
         }
 
         const laid = finalizeHydratedGraph(nodes, edges);
-        set({
-          projectId,
-          nodes: laid.nodes,
-          edges: laid.edges,
-          viewport,
-          storyHubReview: null,
-        });
+        set((state) =>
+          withGraphRevision(state, {
+            projectId,
+            nodes: laid.nodes,
+            edges: laid.edges,
+            viewport,
+            storyHubReview: null,
+          }),
+        );
       },
 
       toGraph: () => {
@@ -273,12 +302,17 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       setNodes: (updater) => {
-        const edges = get().edges;
-        set({
-          nodes: normalizeCanvasNodes(updater(get().nodes), edges),
+        set((state) => {
+          const edges = state.edges;
+          return withGraphRevision(state, {
+            nodes: normalizeCanvasNodes(updater(state.nodes), edges),
+          });
         });
       },
-      setEdges: (updater) => set({ edges: updater(get().edges) }),
+      setEdges: (updater) =>
+        set((state) =>
+          withGraphRevision(state, { edges: updater(state.edges) }),
+        ),
       setViewport: (v) => set({ viewport: v }),
 
       onNodesChange: (changes) => {
@@ -327,6 +361,10 @@ export const useCanvasStore = create<CanvasState>()(
           }
         }
         let next = applyNodeChanges(filteredChanges, prev) as CanvasFlowNode[];
+        if (isSelectionOnlyChange(filteredChanges)) {
+          set({ nodes: next });
+          return;
+        }
         if (isInteractiveGeometryInProgress(filteredChanges)) {
           set({ nodes: next });
           return;
@@ -345,10 +383,14 @@ export const useCanvasStore = create<CanvasState>()(
               : n,
           );
         }
-        set({ nodes: next });
+        set((state) => withGraphRevision(state, { nodes: next }));
       },
       onEdgesChange: (changes) =>
-        set({ edges: applyEdgeChanges(changes, get().edges) }),
+        set((state) =>
+          withGraphRevision(state, {
+            edges: applyEdgeChanges(changes, state.edges),
+          }),
+        ),
       onConnect: (connection) => {
         if (!connection.source || !connection.target) return;
         const state = get();
@@ -382,7 +424,7 @@ export const useCanvasStore = create<CanvasState>()(
           nodes: state.nodes,
           updateNodeData: (nodeId, patch) => get().updateNodeData(nodeId, patch),
         });
-        set({ edges });
+        set((state) => withGraphRevision(state, { edges }));
       },
 
       addNode: (type, position, data) => {
@@ -406,7 +448,9 @@ export const useCanvasStore = create<CanvasState>()(
           // 给 NodeResizer 提供初始 width / height；用户拖角调整后会被 React Flow 覆盖
           style: { width: size.width, height: size.height },
         };
-        set({ nodes: [...get().nodes, node] });
+        set((state) =>
+          withGraphRevision(state, { nodes: [...state.nodes, node] }),
+        );
         return id;
       },
 
@@ -432,7 +476,11 @@ export const useCanvasStore = create<CanvasState>()(
           data: initialData,
           style: { width: size.width, height: size.height },
         };
-        set({ nodes: sortNodesForReactFlow([...all, node]) });
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: sortNodesForReactFlow([...all, node]),
+          }),
+        );
         return id;
       },
 
@@ -450,7 +498,7 @@ export const useCanvasStore = create<CanvasState>()(
             );
           }
         }
-        set({ nodes });
+        set((state) => withGraphRevision(state, { nodes }));
       },
 
       setNodeRuntime: (id, runtime) => {
@@ -536,24 +584,26 @@ export const useCanvasStore = create<CanvasState>()(
         const nodes = reconcileStoryProWorkspace(
           get().nodes.filter((n) => n.id !== id),
         );
-        set({ nodes, edges });
+        set((state) => withGraphRevision(state, { nodes, edges }));
       },
 
       duplicateNode: (id) => {
         const src = get().nodes.find((n) => n.id === id);
         if (!src) return null;
         const newId = `n_${nanoid(8)}`;
-        set({
-          nodes: [
-            ...get().nodes,
-            {
-              ...src,
-              id: newId,
-              position: { x: src.position.x + 40, y: src.position.y + 40 },
-              data: { ...src.data, runtime: undefined },
-            },
-          ],
-        });
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: [
+              ...state.nodes,
+              {
+                ...src,
+                id: newId,
+                position: { x: src.position.x + 40, y: src.position.y + 40 },
+                data: { ...src.data, runtime: undefined },
+              },
+            ],
+          }),
+        );
         return newId;
       },
 
@@ -634,7 +684,11 @@ export const useCanvasStore = create<CanvasState>()(
             newNodes.push(n);
           }
         }
-        set({ nodes: normalizeCanvasNodes(newNodes, get().edges) });
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: normalizeCanvasNodes(newNodes, state.edges),
+          }),
+        );
         return groupId;
       },
 
@@ -659,7 +713,11 @@ export const useCanvasStore = create<CanvasState>()(
             next.push(n);
           }
         }
-        set({ nodes: normalizeCanvasNodes(next, get().edges) });
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: normalizeCanvasNodes(next, state.edges),
+          }),
+        );
       },
 
       autoLayoutNodes: (nodeIds) => {
@@ -826,9 +884,11 @@ export const useCanvasStore = create<CanvasState>()(
 
       reflowStoryTemplateGroups: () => {
         const { nodes, edges } = get();
-        set({
-          nodes: reflowStoryTemplateGroupsOnNodes(nodes, edges),
-        });
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: reflowStoryTemplateGroupsOnNodes(nodes, edges),
+          }),
+        );
       },
 
       reflowStoryComicLayout: () => {
@@ -849,11 +909,13 @@ export const useCanvasStore = create<CanvasState>()(
         if (hasStoryProPipeline(laid)) {
           laid = reflowStoryProWorkspace(laid, repaired);
         }
-        set({
-          nodes: laid,
-          edges: repaired,
-          fitViewNonce: get().fitViewNonce + 1,
-        });
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: laid,
+            edges: repaired,
+            fitViewNonce: state.fitViewNonce + 1,
+          }),
+        );
       },
     }),
     {

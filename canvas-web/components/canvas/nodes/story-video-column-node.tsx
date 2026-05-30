@@ -8,6 +8,10 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useCanvasStore } from "@/lib/canvas/store";
+import {
+  useCanvasGraphSnapshot,
+  useCanvasStoreActions,
+} from "@/lib/canvas/canvas-store-hooks";
 import { filterStoryProVideoModelKeys } from "@/lib/canvas/story-frame-gate";
 import {
   pickDefaultStoryTtsEngine,
@@ -61,14 +65,14 @@ import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { AudioFullscreenLightbox } from "../audio-fullscreen-lightbox";
 import { EnginePicker } from "../engine-picker";
 import { NodeShell } from "../node-shell";
+import { ColumnRowsList } from "../virtual-column-rows";
 
 export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const edition = storyEditionFromNodeType(type);
   const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId);
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const { nodes, edges } = useCanvasGraphSnapshot();
+  const { updateNodeData } = useCanvasStoreActions();
   const { providers } = useUserProviders();
   const hintLabelClass =
     edition === "pro" ? PRO_HINT_LABEL_CLASS : STORY_HINT_LABEL_CLASS;
@@ -474,96 +478,93 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
             在「分镜脚本」列生成分镜图后，在本列点击各镜生成视频与配音。
           </p>
         ) : (
-          <div className="flex w-full flex-col gap-3">
-              {rowsToRender.map((row) => {
-                const vid =
-                  row.videoRuntime?.ossUrl ?? row.videoRuntime?.ephemeralUrl;
-                const st = row.videoRuntime?.status ?? "idle";
-                const running =
-                  st === "running" ||
-                  st === "pending" ||
-                  videoInflightKeys.has(row.key);
-                const videoError =
-                  st === "error" ? row.videoRuntime?.failMessage : undefined;
-                const frameRow = frameRows.find((f) => f.key === row.key);
-                const videoBlockReason =
-                  storyVideoGenerateBlockReason(frameRow);
-                const videoPrompt =
-                  frameRow?.prompt?.trim() ||
-                  (row.videoPrompt ?? "").trim() ||
-                  (row.dialogue ?? "").trim();
-                const videoRefLabels = (
-                  row.refImages?.length ? row.refImages : frameRow?.refImages ?? []
-                )
-                  .filter((r) => r.id.startsWith("ref-char-"))
-                  .map((r) => r.label);
-                const aud =
-                  row.ttsRuntime?.ossUrl ?? row.ttsRuntime?.ephemeralUrl;
-                const ttsSt = row.ttsRuntime?.status ?? "idle";
-                const ttsRunning =
-                  ttsSt === "running" ||
-                  ttsSt === "pending" ||
-                  ttsInflightKeys.has(row.key);
-                const ttsError =
-                  ttsSt === "error" ? row.ttsRuntime?.failMessage : undefined;
-                const ttsBlockReason = storyTtsGenerateBlockReason(row);
+          <ColumnRowsList
+            items={rowsToRender}
+            rowHeight={alignedRowH}
+            getKey={(row) => row.key}
+            renderRow={(row) => {
+              const vid =
+                row.videoRuntime?.ossUrl ?? row.videoRuntime?.ephemeralUrl;
+              const st = row.videoRuntime?.status ?? "idle";
+              const running =
+                st === "running" ||
+                st === "pending" ||
+                videoInflightKeys.has(row.key);
+              const videoError =
+                st === "error" ? row.videoRuntime?.failMessage : undefined;
+              const frameRow = frameRows.find((f) => f.key === row.key);
+              const videoBlockReason =
+                storyVideoGenerateBlockReason(frameRow);
+              const videoPrompt =
+                frameRow?.prompt?.trim() ||
+                (row.videoPrompt ?? "").trim() ||
+                (row.dialogue ?? "").trim();
+              const videoRefLabels = (
+                row.refImages?.length ? row.refImages : frameRow?.refImages ?? []
+              )
+                .filter((r) => r.id.startsWith("ref-char-"))
+                .map((r) => r.label);
+              const aud =
+                row.ttsRuntime?.ossUrl ?? row.ttsRuntime?.ephemeralUrl;
+              const ttsSt = row.ttsRuntime?.status ?? "idle";
+              const ttsRunning =
+                ttsSt === "running" ||
+                ttsSt === "pending" ||
+                ttsInflightKeys.has(row.key);
+              const ttsError =
+                ttsSt === "error" ? row.ttsRuntime?.failMessage : undefined;
+              const ttsBlockReason = storyTtsGenerateBlockReason(row);
 
-                return (
-                  <div
-                    key={row.key}
-                    className="box-border w-full shrink-0"
-                    style={{ height: alignedRowH, minHeight: alignedRowH }}
-                  >
-                  <StoryVideoFrameCell
-                    edition={edition}
-                    frameIndex={row.frameIndex}
-                    videoUrl={vid}
-                    videoPrompt={videoPrompt}
-                    videoRefLabels={videoRefLabels}
-                    videoGenerating={running}
-                    videoError={videoError}
-                    videoBlockReason={videoBlockReason}
-                    onGenerateVideo={() => void runRowVideo(row.key)}
-                    saveToLibrary={
-                      vid
-                        ? {
-                            mode: "i2v",
-                            prompt: videoPrompt,
-                            modelLabel: batchVideo?.modelKey,
-                          }
-                        : null
-                    }
-                    onPreviewVideo={
-                      vid
-                        ? () =>
-                            setPreview({
-                              url: vid,
-                              title: `镜 ${row.frameIndex} · 视频`,
-                              kind: "video",
-                            })
-                        : undefined
-                    }
-                    audioUrl={aud}
-                    dialoguePreview={storyTtsDialogueText(row)}
-                    ttsGenerating={ttsRunning}
-                    ttsError={ttsError}
-                    ttsBlockReason={ttsBlockReason}
-                    onGenerateTts={() => void runRowTts(row.key)}
-                    onPreviewTts={
-                      aud
-                        ? () =>
-                            setPreview({
-                              url: aud,
-                              title: `镜 ${row.frameIndex} · 配音`,
-                              kind: "audio",
-                            })
-                        : undefined
-                    }
-                  />
-                  </div>
-                );
-              })}
-          </div>
+              return (
+                <StoryVideoFrameCell
+                  edition={edition}
+                  frameIndex={row.frameIndex}
+                  videoUrl={vid}
+                  videoPrompt={videoPrompt}
+                  videoRefLabels={videoRefLabels}
+                  videoGenerating={running}
+                  videoError={videoError}
+                  videoBlockReason={videoBlockReason}
+                  onGenerateVideo={() => void runRowVideo(row.key)}
+                  saveToLibrary={
+                    vid
+                      ? {
+                          mode: "i2v",
+                          prompt: videoPrompt,
+                          modelLabel: batchVideo?.modelKey,
+                        }
+                      : null
+                  }
+                  onPreviewVideo={
+                    vid
+                      ? () =>
+                          setPreview({
+                            url: vid,
+                            title: `镜 ${row.frameIndex} · 视频`,
+                            kind: "video",
+                          })
+                      : undefined
+                  }
+                  audioUrl={aud}
+                  dialoguePreview={storyTtsDialogueText(row)}
+                  ttsGenerating={ttsRunning}
+                  ttsError={ttsError}
+                  ttsBlockReason={ttsBlockReason}
+                  onGenerateTts={() => void runRowTts(row.key)}
+                  onPreviewTts={
+                    aud
+                      ? () =>
+                          setPreview({
+                            url: aud,
+                            title: `镜 ${row.frameIndex} · 配音`,
+                            kind: "audio",
+                          })
+                      : undefined
+                  }
+                />
+              );
+            }}
+          />
         )}
       </div>
       {preview?.kind === "video" ? (

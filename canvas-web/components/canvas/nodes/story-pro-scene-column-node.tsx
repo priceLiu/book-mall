@@ -5,6 +5,10 @@ import type { NodeProps } from "@xyflow/react";
 import { MapPin } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
+import {
+  useCanvasGraphSnapshot,
+  useCanvasStoreActions,
+} from "@/lib/canvas/canvas-store-hooks";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { ensureStoryColumnImageEngineDefault } from "@/lib/canvas/story-column-engine-defaults";
 import { storyEditionAccent } from "@/lib/canvas/story-edition-chrome";
@@ -36,10 +40,8 @@ import { NodeShell } from "../node-shell";
 import { EnginePicker } from "../engine-picker";
 
 export function StoryProSceneColumnNode({ id, data, selected }: NodeProps) {
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const resizeNode = useCanvasStore((s) => s.resizeNode);
+  const { nodes, edges } = useCanvasGraphSnapshot();
+  const { updateNodeData, resizeNode } = useCanvasStoreActions();
   const projectId = useCanvasStore((s) => s.projectId);
   const { providers } = useUserProviders();
   const { assets: sceneAssets } = useStoryProSceneAssets(projectId);
