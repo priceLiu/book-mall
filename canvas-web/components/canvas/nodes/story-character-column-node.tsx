@@ -8,6 +8,10 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
+  useCanvasGraphSnapshot,
+  useCanvasStoreActions,
+} from "@/lib/canvas/canvas-store-hooks";
+import {
   storyEditionAccent,
   storyEditionFromNodeType,
 } from "@/lib/canvas/story-edition-chrome";
@@ -52,9 +56,8 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   const projectId = useCanvasStore((s) => s.projectId);
   const { alert } = useDialogs();
   const edition = storyEditionFromNodeType(type);
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const { nodes, edges } = useCanvasGraphSnapshot();
+  const { updateNodeData } = useCanvasStoreActions();
   const { providers } = useUserProviders();
   const d = data as unknown as StoryCharacterColumnNodeData;
   const stored = d.rows ?? [];

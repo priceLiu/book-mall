@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { nodeMeasuredSize } from "./normalize-graph-nodes";
+import { useCanvasGraphRevision } from "./canvas-store-hooks";
 import { useCanvasStore } from "./store";
 
 /**
@@ -16,10 +17,11 @@ export function useStoryColumnAutoSize(
   rowCount: number,
 ) {
   const resizeNode = useCanvasStore((s) => s.resizeNode);
-  const manualSize = useCanvasStore((s) => {
-    const n = s.nodes.find((x) => x.id === nodeId);
+  const graphRevision = useCanvasGraphRevision();
+  const manualSize = useMemo(() => {
+    const n = useCanvasStore.getState().nodes.find((x) => x.id === nodeId);
     return Boolean((n?.data as { manualSize?: boolean }).manualSize);
-  });
+  }, [graphRevision, nodeId]);
   const lastRowCountRef = useRef<number | null>(null);
 
   useEffect(() => {

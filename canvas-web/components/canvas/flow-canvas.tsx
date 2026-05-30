@@ -24,78 +24,15 @@ import {
 } from "@/lib/canvas/viewport-placement";
 import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
 import { routeClipboardImageToActivePasteSlot } from "@/lib/canvas/image-upload-handlers";
-import { ImageNode } from "./nodes/image-node";
-import { TextNode } from "./nodes/text-node";
-import { AiEngineNode } from "./nodes/ai-engine-node";
-import { ImageEngineNode } from "./nodes/image-engine-node";
-import { ThreeViewEngineNode } from "./nodes/three-view-engine-node";
-import { StoryComicStarterNode } from "./nodes/story-comic-starter-node";
-import { StoryScriptHubNode } from "./nodes/story-script-hub-node";
-import { StoryCharacterColumnNode } from "./nodes/story-character-column-node";
-import { StoryFrameColumnNode } from "./nodes/story-frame-column-node";
-import { StoryVideoColumnNode } from "./nodes/story-video-column-node";
-import { MdPreviewNode } from "./nodes/md-preview-node";
-import { VideoEngineNode } from "./nodes/video-engine-node";
-import { TtsEngineNode } from "./nodes/tts-engine-node";
-import { AudioPreviewNode } from "./nodes/audio-preview-node";
-import { ImagePreviewNode } from "./nodes/image-preview-node";
-import { VideoPreviewNode } from "./nodes/video-preview-node";
-import { JianyingExportNode } from "./nodes/jianying-export-node";
-import { StoryProStarterNode } from "./nodes/story-pro-starter-node";
-import { StoryProScriptHubNode } from "./nodes/story-pro-script-hub-node";
-import { StoryProStyleNode } from "./nodes/story-pro-style-node";
-import { StoryProSceneColumnNode } from "./nodes/story-pro-scene-column-node";
-import { JianyingExportProNode } from "./nodes/jianying-export-pro-node";
-import { RefImageGridNode } from "./nodes/ref-image-grid-node";
-import { AiVideoEngineNode } from "./nodes/ai-video-engine-node";
-import { VideoGenerateNode } from "./nodes/video-generate-node";
-import { OutputNode } from "./nodes/output-node";
-import { GroupNode } from "./nodes/group-node";
+import { memoizedNodeTypes } from "./memoized-node-types";
 import { SelectionToolbar } from "./selection-toolbar";
 import { DeletableEdge } from "./edges/deletable-edge";
-
-// v2 节点：v1 (`ai-text` / `image-gen` / `product-params`) 已被 `migrateGraphV1ToV2`
-// 在 store hydrate 时改写为 v2 type，所以 React Flow 这里只需要注册新的 type。
-const nodeTypes = {
-  image: ImageNode,
-  text: TextNode,
-  "story-comic-starter": StoryComicStarterNode,
-  "ai-engine": AiEngineNode,
-  "image-engine": ImageEngineNode,
-  "three-view-engine": ThreeViewEngineNode,
-  "story-script-hub": StoryScriptHubNode,
-  "story-character-column": StoryCharacterColumnNode,
-  "story-frame-column": StoryFrameColumnNode,
-  "story-video-column": StoryVideoColumnNode,
-  "video-engine": VideoEngineNode,
-  "ref-grid-4": RefImageGridNode,
-  "ref-grid-6": RefImageGridNode,
-  "ref-grid-9": RefImageGridNode,
-  "ai-video-engine": AiVideoEngineNode,
-  "video-generate": VideoGenerateNode,
-  "tts-engine": TtsEngineNode,
-  "md-preview": MdPreviewNode,
-  "audio-preview": AudioPreviewNode,
-  "video-preview": VideoPreviewNode,
-  "image-preview": ImagePreviewNode,
-  "jianying-export": JianyingExportNode,
-  "story-pro-starter": StoryProStarterNode,
-  "story-pro-script-hub": StoryProScriptHubNode,
-  "story-pro-style": StoryProStyleNode,
-  "story-pro-scene": StoryProSceneColumnNode,
-  "story-pro-character": StoryCharacterColumnNode,
-  "story-pro-frame": StoryFrameColumnNode,
-  "story-pro-video": StoryVideoColumnNode,
-  "jianying-export-pro": JianyingExportProNode,
-  output: OutputNode,
-  group: GroupNode,
-} as const;
 
 const edgeTypes = {
   default: DeletableEdge,
 } as const;
 
-export const canvasFlowNodeTypes = nodeTypes;
+export const canvasFlowNodeTypes = memoizedNodeTypes;
 export const canvasFlowEdgeTypes = edgeTypes;
 
 /**
@@ -554,7 +491,7 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [copySelectedToClipboard]);
 
-  const memoNodeTypes = useMemo(() => nodeTypes, []);
+  const memoNodeTypes = useMemo(() => memoizedNodeTypes, []);
   const memoEdgeTypes = useMemo(() => edgeTypes, []);
 
   return (
