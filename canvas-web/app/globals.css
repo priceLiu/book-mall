@@ -159,8 +159,10 @@ body {
 .react-flow,
 .react-flow__pane,
 .react-flow__viewport,
-.canvas-flow-wrap {
+.canvas-flow-wrap,
+[data-canvas-editor] {
   overscroll-behavior: none;
+  overscroll-behavior-x: none;
 }
 
 .react-flow__node-group {

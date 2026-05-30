@@ -62,7 +62,7 @@ export function findStoryProScriptHubForStarter(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
   starterNodeId: string,
-  stored?: StoryProWorkspaceIds | null,
+  stored?: { scriptHubId?: string } | StoryProWorkspaceIds | null,
 ): { scriptHubId: string } | null {
   if (stored?.scriptHubId) {
     const hub = nodes.find((n) => n.id === stored.scriptHubId);

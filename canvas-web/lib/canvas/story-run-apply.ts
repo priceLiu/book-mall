@@ -57,11 +57,8 @@ function hubSectionPatchChanged(
   return false;
 }
 
-const STORY_ROW_PENDING_RUNTIME: Partial<CanvasNodeRuntime> = {
+const STORY_ROW_PENDING_RUNTIME: CanvasNodeRuntime = {
   status: "pending",
-  taskId: undefined,
-  failCode: undefined,
-  failMessage: undefined,
 };
 
 export function storyRunPendingPatch(

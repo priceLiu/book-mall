@@ -269,14 +269,20 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
     setConnectingFrom(null);
   }, [setConnectingFrom]);
 
-  // 把 dragHoverGroupId 注入对应 group 节点的 className（不改 store nodes）
+  // 把 dragHoverGroupId 注入对应 group 节点的 className；统一 dragHandle（v12 无全局 nodeDragHandle）
   const decoratedNodes = useMemo(() => {
-    if (!dragHoverGroupId) return nodes;
-    return nodes.map((n) =>
-      n.id === dragHoverGroupId
-        ? { ...n, className: `${n.className ?? ""} is-drop-target`.trim() }
-        : n,
-    );
+    const dragHandle = `.${RF_NODE_DRAG_HANDLE}`;
+    return nodes.map((n) => {
+      let next = n;
+      if (dragHoverGroupId && n.id === dragHoverGroupId) {
+        next = {
+          ...next,
+          className: `${next.className ?? ""} is-drop-target`.trim(),
+        };
+      }
+      if (next.dragHandle) return next;
+      return { ...next, dragHandle };
+    });
   }, [nodes, dragHoverGroupId]);
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
@@ -545,7 +551,6 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
         selectionOnDrag
         panOnDrag={[1, 2]}
         panActivationKeyCode="Space"
-        nodeDragHandle={`.${RF_NODE_DRAG_HANDLE}`}
         selectionMode={SelectionMode.Partial}
         multiSelectionKeyCode={["Meta", "Shift", "Control"]}
         // 删除键：选中 edge / node 后可删除（Mac 用 Backspace 也支持）

@@ -322,6 +322,7 @@ async function commitStoryVideoRowRunOnce(
         failMessage: msg,
         submittedAt: null,
         completedAt: null,
+        kieTaskId: null,
         createdAt: "",
         updatedAt: "",
       },

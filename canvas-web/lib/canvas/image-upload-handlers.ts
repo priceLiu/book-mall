@@ -103,7 +103,7 @@ let imagePasteRouterInstalled = false;
 
 function pickImagePasteTarget(): ImagePasteTarget | null {
   let best: ImagePasteTarget | null = null;
-  for (const entry of imagePasteTargets.values()) {
+  for (const entry of Array.from(imagePasteTargets.values())) {
     if (!best || entry.gen > best.gen) best = entry;
   }
   return best;

@@ -80,10 +80,10 @@ export function hubCharacterCastOutOfSync(d: StoryScriptHubNodeData): boolean {
 }
 
 /** 分镜脚本（场景/画面/对白）文本中出现过的角色 */
-export function charactersInFrameScript(
+export function charactersInFrameScript<T extends { key: string; name: string }>(
   frame: { scene: string; description: string; dialogue: string },
-  characterRows: StoryCharacterRow[],
-): StoryCharacterRow[] {
+  characterRows: T[],
+): T[] {
   const blob = `${frame.scene} ${frame.description} ${frame.dialogue}`;
   return characterRows.filter((c) => c.name.trim() && blob.includes(c.name));
 }

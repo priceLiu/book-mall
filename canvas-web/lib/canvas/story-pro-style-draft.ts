@@ -138,8 +138,8 @@ export function buildStoryProStyleDraftApplyPatch(
         failCode: "STYLE_DRAFT_PARSE_FAILED",
         failMessage:
           "AI 返回内容无法解析为风格 JSON，请重试或手动填写锚定词",
+        textOutput: task.textOutput ?? undefined,
       },
-      textOutput: task.textOutput,
     };
   }
   return {
