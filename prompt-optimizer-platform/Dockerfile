@@ -28,6 +28,8 @@ COPY --from=deps /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY . .
 COPY --from=vendor-build /app/vendor/packages/web/dist ./public
+# vendor 源码仅供 vendor-build 阶段；Next 构建勿纳入类型检查
+RUN rm -rf ./prompt-optimizer
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
   && pnpm run build:docker
