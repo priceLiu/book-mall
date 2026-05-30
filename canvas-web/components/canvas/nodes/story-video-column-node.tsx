@@ -417,7 +417,7 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
               <EnginePicker
                 role="VIDEO"
                 allowedModelKeys={storyVideoModelKeys}
-                capabilityHint="经 Gateway · KIE：Kling 2.6 / Seedance 2（可选生成配音）/ Wan / HappyHorse；经 Gateway · 百炼：万相 / HappyHorse R2V"
+                capabilityHint="Kling / Wan / HappyHorse：API 仅 1 张首帧（image_urls）；多 @ 参考进 prompt 附加段。多图 API 请选 Seedance 2（reference_image_urls 最多 8 张）或百炼 R2V"
                 providerId={batchVideo?.providerId ?? ""}
                 modelKey={batchVideo?.modelKey ?? ""}
                 params={batchVideo?.params ?? {}}

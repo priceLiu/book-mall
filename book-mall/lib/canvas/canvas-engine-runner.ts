@@ -53,6 +53,7 @@ import {
 import { buildKieImageCreateArgs } from "./providers/kie";
 import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
 import { BAILIAN_R2V_MODEL_IDS } from "./providers/bailian-r2v";
+import { modelHasStoryCapabilities } from "./story-model-capabilities";
 import { storyEngineSystemFallback } from "./story-engine-prompts";
 
 const MAX_PROMPT_LEN = 16000;
@@ -651,6 +652,24 @@ function expandMentionsText(prompt: string, node: CanvasRunNodeInput): string {
   return segs.join("\n");
 }
 
+/** 分镜视频：首帧走 image_urls / reference_image_urls API 字段，@ 附加参考只进 prompt */
+function expandVideoPrompt(
+  prompt: string,
+  referenceImageUrls: string[],
+): string {
+  const segs: string[] = [prompt.trim()].filter(Boolean);
+  const refs = referenceImageUrls
+    .map((u) => u.trim())
+    .filter((u) => /^https?:\/\//.test(u));
+  if (refs.length > 0) {
+    segs.push(
+      "\n\n[附加参考图]",
+      ...refs.map((u, i) => `图${i + 1}: ${u}`),
+    );
+  }
+  return segs.join("\n\n");
+}
+
 type StoryLlmKind =
   | "story-outline-engine"
   | "character-engine"
@@ -831,13 +850,9 @@ export async function runVideoEngineNode(
     throw new CanvasProjectError("INVALID_INPUT", "video-engine 缺少 modelKey");
 
   const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());
-  const expandedPrompt = expandMentions(
-    [promptRaw.trim(), ...upstreamText].filter(Boolean).join("\n\n"),
-    node,
-  );
-  if (!expandedPrompt.trim()) {
-    throw new CanvasProjectError("EMPTY_PROMPT", "video-engine prompt 为空");
-  }
+  const promptBase = [promptRaw.trim(), ...upstreamText]
+    .filter(Boolean)
+    .join("\n\n");
 
   const imageInputs = (node.imageInputs ?? []).filter(
     (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
@@ -853,6 +868,11 @@ export async function runVideoEngineNode(
           u !== mainFrameImageUrl,
       )
     : imageInputs.slice(1);
+  const expandedPrompt = expandVideoPrompt(promptBase, referenceImageUrls);
+  if (!expandedPrompt.trim()) {
+    throw new CanvasProjectError("EMPTY_PROMPT", "video-engine prompt 为空");
+  }
+
   if (!mainFrameImageUrl) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
@@ -863,6 +883,21 @@ export async function runVideoEngineNode(
   const isBailianR2v = (BAILIAN_R2V_MODEL_IDS as readonly string[]).includes(
     modelKey,
   );
+
+  const VIDEO_MULTI_REF_MODEL = "bytedance/seedance-2";
+  let effectiveModelKey = modelKey;
+  if (
+    referenceImageUrls.length > 0 &&
+    !isBailianR2v &&
+    !modelHasStoryCapabilities(modelKey, ["video_multi_ref"])
+  ) {
+    effectiveModelKey = VIDEO_MULTI_REF_MODEL;
+  }
+
+  const allSubmittedImageUrls = [
+    mainFrameImageUrl,
+    ...referenceImageUrls,
+  ].filter((u, i, arr) => arr.indexOf(u) === i);
   if (isBailianR2v) {
     const referenceImageUrlsForR2v = [
       mainFrameImageUrl,
@@ -885,21 +920,19 @@ export async function runVideoEngineNode(
     });
   }
 
-  if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(modelKey)) {
+  if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(effectiveModelKey)) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
-      `video-engine 不支持模型 ${modelKey}`,
+      `video-engine 不支持模型 ${effectiveModelKey}`,
     );
   }
 
-  const imageUrls = [mainFrameImageUrl];
-
-  await shouldCanvasUseGateway(userId, providerId, modelKey);
+  await shouldCanvasUseGateway(userId, providerId, effectiveModelKey);
 
   const inputHash = computeInputHash({
-    modelKey,
+    modelKey: effectiveModelKey,
     prompt: expandedPrompt,
-    imageUrls,
+    imageUrls: allSubmittedImageUrls,
     params,
     providerId,
   });
@@ -921,7 +954,7 @@ export async function runVideoEngineNode(
   await ensureUserInflightCapacity(userId);
 
   const { model, input } = buildCanvasVideoKieInput({
-    modelKey,
+    modelKey: effectiveModelKey,
     prompt: expandedPrompt,
     imageUrl: mainFrameImageUrl,
     referenceImageUrls,
@@ -941,7 +974,7 @@ export async function runVideoEngineNode(
     storyScope: args.storyScope,
     data: {
       kind: "IMAGE",
-      model: modelKey,
+      model: effectiveModelKey,
       providerId: null,
       inputHash,
       inputPayload: {
@@ -949,8 +982,9 @@ export async function runVideoEngineNode(
         prompt: clipPrompt(expandedPrompt),
         params,
         providerId,
-        modelKey,
-        imageUrls,
+        modelKey: effectiveModelKey,
+        modelKeyRequested: modelKey !== effectiveModelKey ? modelKey : undefined,
+        imageUrls: allSubmittedImageUrls,
         mainFrameImageUrl,
         referenceImageUrls,
         kieModel: model,
@@ -968,8 +1002,9 @@ export async function runVideoEngineNode(
     prompt: clipPrompt(expandedPrompt),
     params,
     providerId,
-    modelKey,
-    imageUrls,
+    modelKey: effectiveModelKey,
+    modelKeyRequested: modelKey !== effectiveModelKey ? modelKey : undefined,
+    imageUrls: allSubmittedImageUrls,
     mainFrameImageUrl,
     referenceImageUrls,
     syncGatewaySubmit: true,

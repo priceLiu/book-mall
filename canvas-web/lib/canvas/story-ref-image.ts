@@ -98,6 +98,20 @@ export function storyRefUrlsForPrompt(
   return Array.from(byId.values());
 }
 
+/** 用最新资产目录补全 refImages 中缺失的 URL（视频 run 前同步） */
+export function refreshStoryRefImagesFromCatalog(
+  refImages: StoryRefImage[],
+  catalog: StoryRefImage[],
+): StoryRefImage[] {
+  if (!refImages.length || !catalog.length) return refImages;
+  const byId = new Map(catalog.map((r) => [r.id, r]));
+  return refImages.map((r) => {
+    const hit = byId.get(r.id);
+    if (!hit?.url || !/^https?:\/\//.test(hit.url)) return r;
+    return { ...r, url: hit.url, label: hit.label || r.label };
+  });
+}
+
 export const STORY_ROW_LABEL_COL_WIDTH = 56;
 /** 分镜列 · 上游参考图列宽 */
 export const STORY_UPSTREAM_COL_WIDTH = 220;

@@ -13,6 +13,7 @@ import {
 } from "./canvas-engine-runner";
 import { assertStoryVideoFrameGate } from "./story-frame-gate";
 import { resolveStoryRowRefUrls } from "./story-row-ref-urls";
+import { resolveStoryProVideoRefUrls } from "./story-pro-video-ref-resolve";
 
 type StoryLlmSection = "outline" | "character" | "storyboard";
 
@@ -179,9 +180,20 @@ export async function runStoryVideoColumnVideoRow(
   const providerId = String(batch.providerId ?? "");
   const modelKey = String(batch.modelKey ?? "");
   const params = (batch.params as Record<string, unknown>) ?? {};
-  const refUrls = resolveStoryRowRefUrls(row, "videoPrompt");
-  const { frameImageUrl, referenceImageUrls } = collectStoryVideoImageInputs(row);
-  assertStoryVideoFrameGate(row);
+  const refUrls = await resolveStoryProVideoRefUrls(
+    args.userId,
+    args.projectId,
+    row,
+    "videoPrompt",
+  );
+  const frameImageUrl = assertStoryVideoFrameGate(row);
+  const referenceImageUrls: string[] = [];
+  for (const u of refUrls) {
+    if (!/^https?:\/\//.test(u)) continue;
+    if (u === frameImageUrl) continue;
+    if (!referenceImageUrls.includes(u)) referenceImageUrls.push(u);
+  }
+  referenceImageUrls.splice(7);
   const promptBase = String(row.videoPrompt ?? "").trim() || "分镜视频";
   const prompt =
     referenceImageUrls.length && refUrls.length

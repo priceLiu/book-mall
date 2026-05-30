@@ -13,6 +13,7 @@ import {
 import { prependStoryProStyleAnchor } from "./story-pro-style-anchor";
 import { assertStoryVideoFrameGate } from "./story-frame-gate";
 import { resolveStoryRowRefUrls } from "./story-row-ref-urls";
+import { resolveStoryProVideoRefUrls } from "./story-pro-video-ref-resolve";
 import { resolveCharacterRowAssetRefUrls } from "./story-pro-character-ref-resolve";
 import { buildStoryProFrameImageInputs } from "./story-pro-frame-image-inputs";
 
@@ -223,7 +224,12 @@ export async function runStoryProVideoRow(
   const rows = (args.node.data?.rows as StoryRow[]) ?? [];
   const row = pickRow(rows, args.rowKey);
   const frameImageUrl = assertStoryVideoFrameGate(row);
-  const refUrls = resolveStoryRowRefUrls(row, "videoPrompt");
+  const refUrls = await resolveStoryProVideoRefUrls(
+    args.userId,
+    args.projectId,
+    row,
+    "videoPrompt",
+  );
   const referenceImageUrls = refUrls
     .filter((u) => u !== frameImageUrl)
     .slice(0, 7);

@@ -7,7 +7,8 @@ export type StoryModelCapability =
   | "image_multi_ref"
   | "video_i2v"
   | "video_r2v"
-  | "video_t2v";
+  | "video_t2v"
+  | "video_multi_ref";
 
 const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "nano-banana-pro": ["image_t2i", "image_multi_ref"],
@@ -25,13 +26,13 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "qwen-text-to-image": ["image_t2i"],
   /** 与 book-mall/lib/canvas/story-model-capabilities.ts 对齐；勿仅靠 infer（seedance 会被误判为 t2v） */
   "kling-2.6/image-to-video": ["video_i2v"],
-  "bytedance/seedance-2": ["video_i2v", "video_r2v"],
+  "bytedance/seedance-2": ["video_i2v", "video_r2v", "video_multi_ref"],
   "wan/2-7-image-to-video": ["video_i2v"],
   "happyhorse/image-to-video": ["video_i2v"],
-  "happyhorse-1.0-r2v": ["video_r2v"],
-  "wan2.6-r2v": ["video_r2v"],
-  "wan2.6-r2v-flash": ["video_r2v"],
-  "wan2.7-r2v": ["video_r2v"],
+  "happyhorse-1.0-r2v": ["video_r2v", "video_multi_ref"],
+  "wan2.6-r2v": ["video_r2v", "video_multi_ref"],
+  "wan2.6-r2v-flash": ["video_r2v", "video_multi_ref"],
+  "wan2.7-r2v": ["video_r2v", "video_multi_ref"],
 };
 
 function inferCapabilities(modelKey: string): StoryModelCapability[] {
@@ -122,6 +123,7 @@ export function storyCapabilityHint(
     video_i2v: "图生视频",
     video_r2v: "参考生视频",
     video_t2v: "文生视频",
+    video_multi_ref: "多参考图 API",
   };
   return required.map((c) => labels[c]).join(" · ");
 }
