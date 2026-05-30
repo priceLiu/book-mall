@@ -72,7 +72,7 @@ export const STORY_VIDEO_MODELS: Record<
   "kling-2.6/image-to-video": {
     id: "kling-2.6/image-to-video",
     label: "Kling 2.6",
-    description: "快手可灵 · 图生视频，分镜图驱动，可选配音。",
+    description: "快手可灵 · 图生视频；API image_urls 仅 1 张（分镜首帧），多 @ 参考进 prompt。",
     requiresImage: true,
     resolutions: ["720p"] as const,
     defaults: { resolution: "720p", duration: 5, generateAudio: false },
@@ -82,7 +82,7 @@ export const STORY_VIDEO_MODELS: Record<
   "bytedance/seedance-2": {
     id: "bytedance/seedance-2",
     label: "Seedance 2",
-    description: "字节豆包 · 图生视频，参考分镜图直接出片，画风一致性最好。",
+    description: "字节豆包 · 多参考图生视频（reference_image_urls 最多 8 张，含分镜首帧）。",
     requiresImage: true,
     resolutions: ["480p", "720p", "1080p"] as const,
     defaults: { resolution: "1080p", duration: 5, generateAudio: false },

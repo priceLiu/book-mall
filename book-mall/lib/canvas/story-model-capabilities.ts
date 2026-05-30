@@ -7,7 +7,8 @@ export type StoryModelCapability =
   | "image_multi_ref"
   | "video_i2v"
   | "video_r2v"
-  | "video_t2v";
+  | "video_t2v"
+  | "video_multi_ref";
 
 export class StoryModelCapabilityError extends Error {
   readonly code = "MODEL_CAPABILITY_MISMATCH" as const;
@@ -33,11 +34,11 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "flux-kontext-pro": ["image_t2i", "image_multi_ref"],
   "flux-kontext-max": ["image_t2i", "image_multi_ref"],
   "qwen-text-to-image": ["image_t2i"],
-  "bytedance/seedance-2": ["video_i2v", "video_r2v"],
-  "happyhorse-1.0-r2v": ["video_r2v"],
-  "wan2.6-r2v": ["video_r2v"],
-  "wan2.6-r2v-flash": ["video_r2v"],
-  "wan2.7-r2v": ["video_r2v"],
+  "bytedance/seedance-2": ["video_i2v", "video_r2v", "video_multi_ref"],
+  "happyhorse-1.0-r2v": ["video_r2v", "video_multi_ref"],
+  "wan2.6-r2v": ["video_r2v", "video_multi_ref"],
+  "wan2.6-r2v-flash": ["video_r2v", "video_multi_ref"],
+  "wan2.7-r2v": ["video_r2v", "video_multi_ref"],
 };
 
 function inferCapabilities(modelKey: string): StoryModelCapability[] {
