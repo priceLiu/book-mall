@@ -238,3 +238,4 @@ Canvas **影视专业版**与 **基础快手版** 为两套独立工作流；AI 
 
 - 技术说明：[gateway-web/README.md](../../../gateway-web/README.md)
 - 试点脚本（本地）：`book-mall/scripts/seed-pilot-gateway.ts`
+- **全站架构、各子站端口、Gateway 与子站关系**：[docs/全站架构图与配置表.md](../../../docs/全站架构图与配置表.md) §3

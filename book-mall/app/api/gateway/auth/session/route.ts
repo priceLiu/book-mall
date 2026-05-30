@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { resolveGatewayBookRole } from "@/lib/gateway/book-role";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,7 @@ export async function GET(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ user: null }, { status: 401 });
   }
+  const bookRole = await resolveGatewayBookRole(user);
   return NextResponse.json({
     user: {
       id: user.id,
@@ -15,6 +17,7 @@ export async function GET(request: NextRequest) {
       name: user.name,
       source: user.source,
       bookUserId: user.bookUserId,
+      bookRole,
     },
   });
 }

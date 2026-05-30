@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import type { CredentialRow } from "./types";
 import { formatProviderKindLabel } from "@/lib/gateway-model-display";
+import { ProviderApplyLink } from "@/lib/provider-apply-urls";
 
 const PROVIDERS = [
   "KIE",
@@ -159,6 +160,10 @@ export function CredentialEditModal({
                   </button>
                 ))}
               </div>
+              <p className="mt-2 text-xs text-zinc-500">
+                尚无厂商 Key？{" "}
+                <ProviderApplyLink providerKind={providerKind} />
+              </p>
             </div>
           ) : (
             <p className="text-sm text-zinc-500">

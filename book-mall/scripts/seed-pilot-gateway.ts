@@ -1,5 +1,5 @@
 /**
- * 试点账号：从 .env.local 导入 Gateway 五类厂商凭证 → 绑定 sk-gw → Book 关联。
+ * 试点账号：从 .env.local 导入 Gateway 五类厂商凭证 → Platform Admin + Personal sk-gw → Book 关联 Personal。
  *
  *   cd book-mall && pnpm exec dotenv -e .env.local -- tsx scripts/seed-pilot-gateway.ts
  *
@@ -13,6 +13,11 @@ import {
 } from "../lib/gateway/book-gateway-link";
 import { createGatewayApiKey } from "../lib/gateway/api-key-service";
 import { createGatewayCredential } from "../lib/gateway/credential-service";
+import {
+  isLegacyPlatformKeyName,
+  PERSONAL_KEY_DEFAULT_NAME,
+  PLATFORM_ADMIN_KEY_NAME,
+} from "../lib/gateway/key-scope";
 import { prisma } from "../lib/prisma";
 import {
   findGatewayUserByBookUserId,
@@ -84,43 +89,103 @@ async function ensureCredential(
   return row.id;
 }
 
-async function syncApiKeyBindings(
+async function ensurePlatformAdminKey(
   gatewayUserId: string,
   credentialIds: string[],
 ): Promise<{ apiKeyId: string; rawKey: string | null }> {
-  let apiKey = await prisma.gatewayApiKey.findFirst({
-    where: { userId: gatewayUserId, revokedAt: null },
+  let platformKey = await prisma.gatewayApiKey.findFirst({
+    where: { userId: gatewayUserId, scope: "PLATFORM", revokedAt: null },
     orderBy: { createdAt: "desc" },
   });
 
+  if (!platformKey) {
+    const legacy = await prisma.gatewayApiKey.findFirst({
+      where: { userId: gatewayUserId, revokedAt: null },
+      orderBy: { createdAt: "asc" },
+    });
+    if (legacy && isLegacyPlatformKeyName(legacy.name)) {
+      platformKey = await prisma.gatewayApiKey.update({
+        where: { id: legacy.id },
+        data: { name: PLATFORM_ADMIN_KEY_NAME, scope: "PLATFORM" },
+      });
+      console.log("[ok] 已将历史 Key 升级为 Platform Admin");
+    }
+  } else if (platformKey.name !== PLATFORM_ADMIN_KEY_NAME) {
+    platformKey = await prisma.gatewayApiKey.update({
+      where: { id: platformKey.id },
+      data: { name: PLATFORM_ADMIN_KEY_NAME },
+    });
+  }
+
   let rawKey: string | null = null;
 
-  if (!apiKey) {
+  if (!platformKey) {
     const created = await createGatewayApiKey({
       userId: gatewayUserId,
-      name: "全站 Gateway",
+      name: PLATFORM_ADMIN_KEY_NAME,
+      scope: "PLATFORM",
       credentialIds,
     });
-    apiKey = created.apiKey;
+    platformKey = created.apiKey;
     rawKey = created.rawKey;
-    console.log("[ok] 新建 Gateway API Key");
+    console.log("[ok] 新建 Platform Admin API Key");
   } else {
     await prisma.gatewayApiKeyCredential.deleteMany({
-      where: { apiKeyId: apiKey.id },
+      where: { apiKeyId: platformKey.id },
     });
     if (credentialIds.length > 0) {
       await prisma.gatewayApiKeyCredential.createMany({
         data: credentialIds.map((credentialId) => ({
-          apiKeyId: apiKey!.id,
+          apiKeyId: platformKey!.id,
           credentialId,
         })),
         skipDuplicates: true,
       });
     }
-    console.log(`[ok] 已同步 ${credentialIds.length} 条凭证到现有 API Key`);
+    console.log(`[ok] Platform Admin 已绑定 ${credentialIds.length} 条凭证`);
   }
 
-  return { apiKeyId: apiKey.id, rawKey };
+  return { apiKeyId: platformKey.id, rawKey };
+}
+
+async function ensurePersonalKey(
+  gatewayUserId: string,
+  credentialIds: string[],
+): Promise<{ apiKeyId: string; rawKey: string | null }> {
+  let personalKey = await prisma.gatewayApiKey.findFirst({
+    where: { userId: gatewayUserId, scope: "PERSONAL", revokedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
+
+  let rawKey: string | null = null;
+
+  if (!personalKey) {
+    const created = await createGatewayApiKey({
+      userId: gatewayUserId,
+      name: PERSONAL_KEY_DEFAULT_NAME,
+      scope: "PERSONAL",
+      credentialIds,
+    });
+    personalKey = created.apiKey;
+    rawKey = created.rawKey;
+    console.log("[ok] 新建 Personal Key（Book 关联用）");
+  } else {
+    await prisma.gatewayApiKeyCredential.deleteMany({
+      where: { apiKeyId: personalKey.id },
+    });
+    if (credentialIds.length > 0) {
+      await prisma.gatewayApiKeyCredential.createMany({
+        data: credentialIds.map((credentialId) => ({
+          apiKeyId: personalKey!.id,
+          credentialId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+    console.log(`[ok] Personal Key 已绑定 ${credentialIds.length} 条凭证`);
+  }
+
+  return { apiKeyId: personalKey.id, rawKey };
 }
 
 async function main() {
@@ -132,7 +197,7 @@ async function main() {
   }
 
   await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
-  console.log(`[ok] ${email} → ADMIN`);
+  console.log(`[ok] ${email} → ADMIN（Book 管理员，Gateway 可同时持有 Platform + Personal Key）`);
 
   await syncGatewayUserFromBookUser({
     bookUserId: user.id,
@@ -156,17 +221,30 @@ async function main() {
     process.exit(1);
   }
 
-  const { rawKey } = await syncApiKeyBindings(gwUser.id, credentialIds);
+  const platform = await ensurePlatformAdminKey(gwUser.id, credentialIds);
+  const personal = await ensurePersonalKey(gwUser.id, credentialIds);
 
   const statusBefore = await getGatewayLinkStatusForUser(user.id);
-  if (!statusBefore.linked && rawKey) {
-    await linkGatewayApiKeyForUser(user.id, rawKey);
-    console.log("[ok] Book 用户已关联 Gateway API Key");
+  const shouldLinkPersonal =
+    !statusBefore.linked ||
+    statusBefore.gatewayApiKeyId === platform.apiKeyId ||
+    isLegacyPlatformKeyName(statusBefore.keyName ?? "");
+
+  if (shouldLinkPersonal && personal.rawKey) {
+    await linkGatewayApiKeyForUser(user.id, personal.rawKey);
+    console.log("[ok] Book 用户已关联 Personal Key");
+  } else if (statusBefore.linked && statusBefore.gatewayApiKeyId === personal.apiKeyId) {
+    console.log("[ok] Book 用户已关联 Personal Key（保留现有关联）");
   } else if (statusBefore.linked) {
-    console.log("[ok] Book 用户已关联 Gateway API Key（保留现有关联）");
+    console.log(
+      "[ok] Book 用户已关联其他 Personal Key（保留现有关联）",
+    );
+  } else if (personal.rawKey) {
+    await linkGatewayApiKeyForUser(user.id, personal.rawKey);
+    console.log("[ok] Book 用户已关联 Personal Key");
   } else {
     console.warn(
-      "[warn] 无法自动关联：已有 API Key 但 Book 未关联，请在个人中心粘贴 sk-gw",
+      "[warn] Personal Key 已存在但无法自动关联，请在 Book 个人中心粘贴 Personal sk-gw",
     );
   }
 
@@ -175,10 +253,14 @@ async function main() {
     JSON.stringify(
       {
         linked: status.linked,
+        keyName: status.keyName,
         keyPrefix: status.keyPrefix,
         boundKinds: status.boundKinds,
+        platformAdminKeyId: platform.apiKeyId,
+        personalKeyId: personal.apiKeyId,
         credentialCount: credentialIds.length,
-        ...(rawKey ? { skGw: rawKey } : {}),
+        ...(personal.rawKey ? { personalSkGw: personal.rawKey } : {}),
+        ...(platform.rawKey ? { platformAdminSkGw: platform.rawKey } : {}),
       },
       null,
       2,

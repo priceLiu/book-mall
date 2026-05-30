@@ -11,7 +11,9 @@ pnpm dev:all          # 同时启动 3000–3006
 
 **http://localhost:3000/dev**
 
-可查看四个子站的链接与在线状态（绿点 = 已响应），并说明 `story:poll-loop` 后台进程。该页面仅在 `NODE_ENV=development` 时存在。
+可查看各子站的链接与在线状态（绿点 = 已响应），并说明 `story:poll-loop` 后台进程。该页面仅在 `NODE_ENV=development` 时存在。
+
+**全站架构、端口、Gateway 密钥逻辑**：见 [全站架构图与配置表.md](./全站架构图与配置表.md)。
 
 ## 端口与服务
 

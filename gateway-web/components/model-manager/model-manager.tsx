@@ -6,6 +6,7 @@ import { CredentialEditModal } from "./credential-edit-modal";
 import { ConfirmModal } from "./confirm-modal";
 import type { CatalogGroup, CredentialRow, ModelTab } from "./types";
 import { formatProviderKindLabel } from "@/lib/gateway-model-display";
+import { ProviderApplyLink } from "@/lib/provider-apply-urls";
 
 const TAB_LABELS: Record<ModelTab, string> = {
   text: "Text Models",
@@ -198,6 +199,10 @@ export function ModelManager({
                 <div className="min-w-0 flex-1 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-lg font-semibold text-white">{g.label}</h2>
+                    <ProviderApplyLink
+                      providerKind={g.providerKind}
+                      className="text-xs text-[var(--gw-accent)] hover:underline"
+                    />
                     {disabled || !primary ? (
                       <span
                         className={`rounded-full border px-2 py-0.5 text-xs ${tagClass("warn")}`}

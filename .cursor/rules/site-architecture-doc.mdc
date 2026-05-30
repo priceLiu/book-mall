@@ -1,0 +1,33 @@
+---
+description: 新增/变更可部署子应用时须同步更新 docs/全站架构图与配置表.md
+globs: docs/全站架构图与配置表.md,**/Dockerfile,package.json,deploy/**/*
+alwaysApply: true
+---
+
+# 全站架构文档维护
+
+权威文档：**`docs/全站架构图与配置表.md`**
+
+## 何时必须更新
+
+完成以下任一工作后，**在同一 PR/提交中**更新该文档（§2 端口表、§5 环境变量、§6 部署、§7 变更记录）：
+
+1. **新建**可独立部署的子应用（新目录 + Dockerfile + CloudBase 服务）
+2. **变更**本地/容器端口、`EXPOSE`/`PORT`、生产域名
+3. **变更**Book SSO `app=` 登记、工具月费 `navKey`、Gateway 代理路径
+4. **变更**Monorepo `dev:all` / `dev-preflight` 进程列表
+
+## 不必单独建 Gateway Key 的子站
+
+Canvas、Story、Tool、Prompt-Optimizer **共用** Book 用户关联的 **一把** `sk-gw`（`User.gatewayApiKeyId`）。  
+新建子应用 **不要** 设计「每应用一把 sk-gw」；应走 Book SSO + `/api/sso/tools/gateway/*`。  
+用户流程见 `book-mall/doc/product/gateway-user-guide.md`；架构说明见全站文档 §3。
+
+## 检查清单（新子站上线前）
+
+- [ ] `docs/全站架构图与配置表.md` 已更新
+- [ ] `deploy/tencent/README.md` 服务表已更新（若适用）
+- [ ] `deploy/tencent/*.env.example` 已补充
+- [ ] `docs/dev.md` 端口表已更新
+- [ ] `book-mall` 已登记 `navKey` / `getXxxOrigin()` / SSO `app=`
+- [ ] CloudBase **容器端口** 与 Dockerfile `PORT` 一致（非 80）
