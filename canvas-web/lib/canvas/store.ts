@@ -54,16 +54,13 @@ import {
 } from "./story-pro-workspace-layout";
 import { reconcileStoryProWorkspace } from "./spawn-story-pro-workspace";
 import { canvasNotify } from "./canvas-notify";
+import {
+  isCanvasInteractiveGeometryInProgress,
+  isCanvasSelectionOnlyChange,
+} from "./canvas-node-changes";
 
 /** 大图 hydrate：列高/媒体同步延后一帧，先出画布 */
 const DEFER_HYDRATE_LAYOUT_NODE_COUNT = 24;
-
-/** 拖动/缩放尺寸过程中跳过 normalize + undo，避免每帧重算整图 */
-function isSelectionOnlyChange(changes: NodeChange[]): boolean {
-  return (
-    changes.length > 0 && changes.every((c) => c.type === "select")
-  );
-}
 
 function bumpGraphRevision(state: { graphRevision: number }): number {
   return state.graphRevision + 1;
@@ -74,19 +71,6 @@ function withGraphRevision<T extends Record<string, unknown>>(
   patch: T,
 ): T & { graphRevision: number } {
   return { ...patch, graphRevision: bumpGraphRevision(state) };
-}
-
-function isInteractiveGeometryInProgress(changes: NodeChange[]): boolean {
-  if (changes.length === 0) return false;
-  return changes.every((c) => {
-    if (c.type === "position" && "dragging" in c) {
-      return c.dragging === true;
-    }
-    if (c.type === "dimensions" && "resizing" in c) {
-      return c.resizing === true;
-    }
-    return false;
-  });
 }
 
 function finalizeHydratedGraph(
@@ -361,12 +345,11 @@ export const useCanvasStore = create<CanvasState>()(
           }
         }
         let next = applyNodeChanges(filteredChanges, prev) as CanvasFlowNode[];
-        if (isSelectionOnlyChange(filteredChanges)) {
+        if (isCanvasSelectionOnlyChange(filteredChanges)) {
           set({ nodes: next });
           return;
         }
-        if (isInteractiveGeometryInProgress(filteredChanges)) {
-          set({ nodes: next });
+        if (isCanvasInteractiveGeometryInProgress(filteredChanges)) {
           return;
         }
         next = detachChildrenOfRemovedGroups(prev, next);
