@@ -307,7 +307,7 @@ function Inner() {
   );
 
   return (
-    <div className="canvas-container py-10">
+    <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="twenty-eyebrow">canvas-web · settings</p>

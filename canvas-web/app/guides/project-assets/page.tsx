@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function ProjectAssetsGuidePage() {
   return (
-    <div className="canvas-container max-w-3xl py-10 pb-16">
+    <div className="canvas-page canvas-page-fill max-w-3xl py-8 pb-16 sm:py-10">
       <header className="mb-10">
         <p className="twenty-eyebrow">canvas-web · story-pro · 用户指南</p>
         <h1 className="canvas-serif mt-3 text-3xl text-white">项目资产 · 使用说明</h1>

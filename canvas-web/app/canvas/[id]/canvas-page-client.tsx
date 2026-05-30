@@ -525,14 +525,14 @@ function Inner({ projectId }: { projectId: string }) {
   let body: React.ReactNode;
   if (loading) {
     body = (
-      <div className="flex h-screen items-center justify-center bg-[var(--canvas-bg)] text-[var(--canvas-muted)]">
+      <div className="fixed inset-0 z-[200] flex h-[100dvh] items-center justify-center bg-[var(--canvas-bg)] text-[var(--canvas-muted)]">
         <Loader2 className="mr-2 size-5 animate-spin" />
         加载画布…
       </div>
     );
   } else if (loadError || !project) {
     body = (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-[var(--canvas-bg)] text-sm text-red-200">
+      <div className="fixed inset-0 z-[200] flex h-[100dvh] flex-col items-center justify-center gap-3 bg-[var(--canvas-bg)] text-sm text-red-200">
         <p>无法加载画布：{loadError ?? "未知错误"}</p>
         <a href="/projects" className="underline">
           返回我的画布
@@ -542,7 +542,7 @@ function Inner({ projectId }: { projectId: string }) {
   } else {
     body = (
       <div
-        className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--canvas-bg)]"
+        className="fixed inset-0 z-[200] flex h-[100dvh] w-screen flex-col overflow-hidden bg-[var(--canvas-bg)]"
         data-canvas-editor
       >
         <div className="sticky top-0 z-[300] shrink-0 bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)]">

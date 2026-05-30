@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function ImplementationPage() {
   return (
-    <div className="canvas-container py-12">
+    <div className="canvas-page canvas-page-fill py-8 sm:py-10 lg:py-12">
       <header>
         <p className="twenty-eyebrow">canvas-web · implementation</p>
         <h1 className="canvas-serif mt-3 text-4xl text-white">实现逻辑</h1>
