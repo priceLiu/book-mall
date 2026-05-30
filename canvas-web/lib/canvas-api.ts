@@ -8,6 +8,7 @@ export type CanvasProjectSummary = {
   name: string;
   description: string;
   thumbnailUrl: string;
+  edition: "pro" | "standard";
   createdAt: string;
   updatedAt: string;
 };

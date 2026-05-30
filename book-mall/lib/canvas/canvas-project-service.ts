@@ -3,6 +3,10 @@
  */
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  canvasProjectEditionFromGraph,
+  type CanvasProjectEdition,
+} from "@/lib/canvas/canvas-story-edition";
 
 export class CanvasProjectError extends Error {
   constructor(
@@ -37,6 +41,7 @@ export type CanvasProjectSummary = {
   name: string;
   description: string;
   thumbnailUrl: string;
+  edition: CanvasProjectEdition;
   createdAt: string;
   updatedAt: string;
 };
@@ -50,6 +55,7 @@ function toSummary(p: {
   name: string;
   description: string;
   thumbnailUrl: string;
+  canvas: unknown;
   createdAt: Date;
   updatedAt: Date;
 }): CanvasProjectSummary {
@@ -58,6 +64,7 @@ function toSummary(p: {
     name: p.name,
     description: p.description,
     thumbnailUrl: p.thumbnailUrl,
+    edition: canvasProjectEditionFromGraph(p.canvas),
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   };
@@ -75,6 +82,7 @@ export async function listCanvasProjectsForUser(
       name: true,
       description: true,
       thumbnailUrl: true,
+      canvas: true,
       createdAt: true,
       updatedAt: true,
     },

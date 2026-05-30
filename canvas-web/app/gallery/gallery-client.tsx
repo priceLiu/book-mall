@@ -45,7 +45,7 @@ function Inner() {
   const empty = !loading && characters.length === 0 && works.length === 0;
 
   return (
-    <div className="canvas-container py-10">
+    <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
       <header className="mb-8">
         <p className="twenty-eyebrow">canvas-web · gallery</p>
         <h1 className="canvas-serif mt-2 text-3xl text-white">画作</h1>
@@ -81,7 +81,7 @@ function Inner() {
               <p className="mb-4 text-[12px] text-[var(--canvas-muted)]">
                 从三视图节点保存的角色，可在画布「我的角色」中快速插入图片节点。
               </p>
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {characters.map((c) => (
                   <li key={c.id}>
                     <GalleryMediaCard
@@ -107,7 +107,7 @@ function Inner() {
               <p className="mb-4 text-[12px] text-[var(--canvas-muted)]">
                 所有画布运行成功的图像生成结果，按时间倒序展示。
               </p>
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {works.map((w) => (
                   <li key={w.id}>
                     <GalleryMediaCard

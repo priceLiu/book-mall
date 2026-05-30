@@ -40,7 +40,7 @@ function Inner() {
   const selected = projects.find((p) => p.id === projectId);
 
   return (
-    <div className="canvas-container py-10">
+    <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
       <header className="mb-8">
         <p className="twenty-eyebrow">canvas-web · story-pro</p>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">

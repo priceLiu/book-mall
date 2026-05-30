@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { BookMallBaseUrlProvider } from "@/components/book-mall-base-url-provider";
 import { CanvasShell } from "@/components/layout/canvas-shell";
-import { CanvasAuthBar } from "@/components/canvas-auth-bar";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
 import "./globals.css";
@@ -42,7 +41,6 @@ export default function RootLayout({
       <body className="canvas-sans">
         <BookMallBaseUrlProvider baseUrl={bookMallBaseUrl}>
           <DialogProvider>
-            <CanvasAuthBar />
             <CanvasShell>{children}</CanvasShell>
           </DialogProvider>
         </BookMallBaseUrlProvider>

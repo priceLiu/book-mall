@@ -4,30 +4,36 @@ import { ArrowRight, Sparkles, Wand2, Layers, Rocket } from "lucide-react";
 export default function HomePage() {
   return (
     <div className="bg-[var(--canvas-bg)]">
-      <section className="canvas-container pb-12 pt-16 sm:pb-16 sm:pt-24">
-        <p className="twenty-eyebrow text-center">
-          canvas-web · AI 海报画布 · 无限节点工作流
-        </p>
-        <h1 className="twenty-headline mx-auto mt-8 max-w-4xl text-center">
-          拖拽节点，让 AI 把灵感拼成海报。
-        </h1>
-        <p className="twenty-body mx-auto mt-8 max-w-2xl text-center text-base sm:text-lg">
-          ComfyUI 风格的可视化画布：导入参考图、写一句产品介绍、连一根线，AI
-          就能融合风格与产品，产出一张你想要的设计稿。
-        </p>
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/projects" className="twenty-btn-accent">
-            进入我的画布
-            <ArrowRight className="ml-2 size-4" />
-          </Link>
-          <Link href="/gallery" className="twenty-btn-ghost">
-            浏览画作
-          </Link>
+      <section className="canvas-hero-fill relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(167,139,250,0.18),transparent)]"
+          aria-hidden
+        />
+        <div className="relative w-full max-w-5xl text-center">
+          <p className="twenty-eyebrow">
+            canvas-web · AI 海报画布 · 无限节点工作流
+          </p>
+          <h1 className="twenty-headline mx-auto mt-6 max-w-4xl sm:mt-8">
+            拖拽节点，让 AI 把灵感拼成海报。
+          </h1>
+          <p className="twenty-body mx-auto mt-6 max-w-2xl text-base sm:mt-8 sm:text-lg">
+            ComfyUI 风格的可视化画布：导入参考图、写一句产品介绍、连一根线，AI
+            就能融合风格与产品，产出一张你想要的设计稿。
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:mt-10">
+            <Link href="/projects" className="twenty-btn-accent">
+              进入我的画布
+              <ArrowRight className="ml-2 size-4" />
+            </Link>
+            <Link href="/gallery" className="twenty-btn-ghost">
+              浏览画作
+            </Link>
+          </div>
         </div>
       </section>
 
-      <section className="canvas-container pb-20">
-        <div className="grid gap-4 md:grid-cols-3">
+      <section className="canvas-page pb-16 pt-4 sm:pb-20 lg:pb-24">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3">
           <FeatureCard
             icon={<Layers className="size-5 text-[var(--canvas-accent)]" />}
             title="可视化节点"
