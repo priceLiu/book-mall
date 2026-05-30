@@ -20,14 +20,19 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await gatewayJson<{ user: { email: string; name: string | null } | null }>(
-    "/api/gateway/auth/session",
-  );
+  const session = await gatewayJson<{
+    user: {
+      email: string;
+      name: string | null;
+      bookRole?: "ADMIN" | "USER";
+    } | null;
+  }>("/api/gateway/auth/session");
   if (!session.ok || !session.data?.user) {
     redirect("/login");
   }
 
   const user = session.data.user;
+  const isAdmin = user.bookRole === "ADMIN";
 
   return (
     <div className="flex min-h-screen">
@@ -36,6 +41,17 @@ export default async function DashboardLayout({
           <div className="text-sm font-semibold text-white">Gateway 控制台</div>
           <div className="mt-1 truncate text-xs text-[var(--gw-muted)]">
             {user.name || user.email}
+          </div>
+          <div className="mt-2">
+            <span
+              className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
+                isAdmin
+                  ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
+                  : "border-white/15 bg-white/5 text-zinc-400"
+              }`}
+            >
+              {isAdmin ? "Admin" : "User"}
+            </span>
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-3">

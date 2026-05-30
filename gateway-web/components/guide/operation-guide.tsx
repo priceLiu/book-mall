@@ -10,6 +10,7 @@ const PROVIDER_ROWS = [
     kind: "KIE",
     label: "KIE",
     registerHint: "kie.ai 注册并创建 API Key",
+    applyUrl: "https://kie.ai/api-key",
     models: "Gemini、Nano Banana、Seedance、Flux、Kling 等",
     products: "Canvas · Story",
   },
@@ -24,6 +25,8 @@ const PROVIDER_ROWS = [
     kind: "BAILIAN",
     label: "百炼",
     registerHint: "阿里云百炼 / DashScope 控制台",
+    applyUrl:
+      "https://bailian.console.aliyun.com/cn-beijing?spm=5176.42028462.overview_recent.5.2124154amlfGdb&tab=model#/api-key",
     models: "wan2.6-r2v、wan2.7-r2v、happyhorse-1.0-r2v 等 R2V",
     products: "Canvas 参考生视频",
   },
@@ -212,7 +215,22 @@ export function OperationGuideContent() {
                       {row.kind}
                     </div>
                   </td>
-                  <td className="text-xs">{row.registerHint}</td>
+                  <td className="text-xs">
+                    {row.registerHint}
+                    {"applyUrl" in row && row.applyUrl ? (
+                      <>
+                        {" · "}
+                        <a
+                          href={row.applyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[var(--gw-accent)] hover:underline"
+                        >
+                          申请 API Key ↗
+                        </a>
+                      </>
+                    ) : null}
+                  </td>
                   <td className="text-xs">{row.models}</td>
                   <td className="text-xs">{row.products}</td>
                 </tr>

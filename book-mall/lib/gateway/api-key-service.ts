@@ -1,5 +1,10 @@
 import { createHash, randomBytes } from "crypto";
-import type { GatewayApiKey, GatewayProviderKind, GatewayUser } from "@prisma/client";
+import type {
+  GatewayApiKey,
+  GatewayApiKeyScope,
+  GatewayProviderKind,
+  GatewayUser,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const KEY_PREFIX = "sk-gw-";
@@ -22,6 +27,7 @@ export function generateGatewayApiKeyMaterial(): {
 export async function createGatewayApiKey(opts: {
   userId: string;
   name: string;
+  scope?: GatewayApiKeyScope;
   credentialIds?: string[];
   ipWhitelist?: string[];
   spendLimitUsd?: number | null;
@@ -32,6 +38,7 @@ export async function createGatewayApiKey(opts: {
       data: {
         userId: opts.userId,
         name: opts.name.trim() || "默认",
+        scope: opts.scope ?? "PERSONAL",
         keyPrefix: prefix,
         keyHash: hash,
         ipWhitelist: opts.ipWhitelist?.length ? opts.ipWhitelist : undefined,
