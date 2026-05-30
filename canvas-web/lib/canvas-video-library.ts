@@ -5,6 +5,12 @@ import type {
   VideoLibraryQuota,
 } from "@/lib/canvas-video-library-types";
 
+export type {
+  SaveVideoToLibraryInput,
+  VideoLibraryItem,
+  VideoLibraryQuota,
+} from "@/lib/canvas-video-library-types";
+
 const LIBRARY_PATH = "/api/sso/tools/image-to-video/library";
 const PERSIST_PATH = "/api/sso/tools/image-to-video/library/persist-from-url";
 
