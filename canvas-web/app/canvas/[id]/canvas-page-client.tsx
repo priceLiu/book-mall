@@ -19,6 +19,7 @@ import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useCanvasGraphSnapshot } from "@/lib/canvas/canvas-store-hooks";
 import {
   busEnqueueNodesSequential,
   busEnqueueStoryRunsSequential,
@@ -82,8 +83,7 @@ function Inner({ projectId }: { projectId: string }) {
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
+  const { nodes, edges } = useCanvasGraphSnapshot();
   const reflowStoryComicLayout = useCanvasStore(
     (s) => s.reflowStoryComicLayout,
   );

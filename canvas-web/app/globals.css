@@ -204,6 +204,16 @@ body {
   box-shadow: none !important;
 }
 
+/* 拖动时用 GPU 合成层，减轻拖影/滞后感 */
+.react-flow__node.dragging {
+  will-change: transform;
+  z-index: 1000 !important;
+}
+
+.react-flow__node.dragging .canvas-node-shell {
+  pointer-events: none;
+}
+
 /* ----------------------------------------
  * 可删除的连线 ✕ 按钮：
  *   - hover 整条 edge 时 也显示

@@ -8,13 +8,21 @@ import {
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
+  useNodesState,
+  useEdgesState,
   useReactFlow,
+  type NodeChange,
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import type { CanvasNodeType } from "@/lib/canvas/types";
+import { isCanvasInteractiveGeometryInProgress } from "@/lib/canvas/canvas-node-changes";
+import type {
+  CanvasFlowEdge,
+  CanvasFlowNode,
+  CanvasNodeType,
+} from "@/lib/canvas/types";
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { uploadCanvasImage } from "@/lib/canvas-api";
@@ -55,13 +63,19 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
   const viewportTimerRef = useRef<number | null>(null);
   const dragHoverRafRef = useRef<number | null>(null);
   const dragUndoPausedRef = useRef(false);
+  const deferStoreGraphSyncRef = useRef(false);
 
-  const nodes = useCanvasStore((s) => s.nodes);
+  const storeOnNodesChange = useCanvasStore((s) => s.onNodesChange);
+  const storeOnEdgesChange = useCanvasStore((s) => s.onEdgesChange);
+  const [rfNodes, setRfNodes, onRfNodesChange] = useNodesState<CanvasFlowNode>(
+    [],
+  );
+  const [rfEdges, setRfEdges, onRfEdgesChange] = useEdgesState<CanvasFlowEdge>(
+    [],
+  );
+
   const viewport = useCanvasStore((s) => s.viewport);
   const setViewport = useCanvasStore((s) => s.setViewport);
-  const edges = useCanvasStore((s) => s.edges);
-  const onNodesChange = useCanvasStore((s) => s.onNodesChange);
-  const onEdgesChange = useCanvasStore((s) => s.onEdgesChange);
   const onConnect = useCanvasStore((s) => s.onConnect);
   const addNode = useCanvasStore((s) => s.addNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -76,7 +90,45 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     initialFitDoneRef.current = false;
-  }, [projectId]);
+    const s = useCanvasStore.getState();
+    setRfNodes(s.nodes);
+    setRfEdges(s.edges);
+  }, [projectId, setRfNodes, setRfEdges]);
+
+  /** Zustand → RF 本地：hydrate / undo / 拖放结束等；拖动过程中跳过避免双写 */
+  useEffect(() => {
+    const unsub = useCanvasStore.subscribe((state, prev) => {
+      if (deferStoreGraphSyncRef.current) return;
+      if (state.nodes !== prev.nodes) {
+        setRfNodes(state.nodes);
+      }
+      if (state.edges !== prev.edges) {
+        setRfEdges(state.edges);
+      }
+    });
+    return unsub;
+  }, [setRfNodes, setRfEdges]);
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<CanvasFlowNode>[]) => {
+      onRfNodesChange(changes);
+      if (isCanvasInteractiveGeometryInProgress(changes)) {
+        deferStoreGraphSyncRef.current = true;
+        return;
+      }
+      deferStoreGraphSyncRef.current = false;
+      storeOnNodesChange(changes);
+    },
+    [onRfNodesChange, storeOnNodesChange],
+  );
+
+  const handleEdgesChange = useCallback(
+    (changes: Parameters<typeof storeOnEdgesChange>[0]) => {
+      onRfEdgesChange(changes);
+      storeOnEdgesChange(changes);
+    },
+    [onRfEdgesChange, storeOnEdgesChange],
+  );
 
   /** 勿用受控 viewport：节点轮询会频繁重渲染，store 里的旧视口会把滚轮缩放拉回 */
   const onMoveEnd = useCallback(
@@ -214,6 +266,7 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
 
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string; parentId?: string }) => {
+      deferStoreGraphSyncRef.current = false;
       if (dragUndoPausedRef.current) {
         useCanvasStore.temporal.getState().resume();
         dragUndoPausedRef.current = false;
@@ -244,8 +297,8 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
 
   // 分组拖入高亮：仅 patch 目标 group，避免每帧克隆全图 nodes
   const decoratedNodes = useMemo(() => {
-    if (!dragHoverGroupId) return nodes;
-    return nodes.map((n) =>
+    if (!dragHoverGroupId) return rfNodes;
+    return rfNodes.map((n) =>
       n.id === dragHoverGroupId
         ? {
             ...n,
@@ -253,10 +306,10 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
           }
         : n,
     );
-  }, [nodes, dragHoverGroupId]);
+  }, [rfNodes, dragHoverGroupId]);
 
-  const onlyRenderVisible = nodes.length >= 12;
-  const showMiniMap = nodes.length <= 48;
+  const onlyRenderVisible = rfNodes.length >= 12;
+  const showMiniMap = rfNodes.length <= 48;
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -505,11 +558,11 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
       <ReactFlow
         key={projectId}
         nodes={decoratedNodes}
-        edges={edges}
+        edges={rfEdges}
         nodeTypes={memoNodeTypes}
         edgeTypes={memoEdgeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
@@ -520,6 +573,9 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
         onMoveEnd={onMoveEnd}
         onInit={onInit}
         onlyRenderVisibleElements={onlyRenderVisible}
+        selectNodesOnDrag={false}
+        elevateNodesOnSelect={false}
+        autoPanOnNodeDrag={false}
         proOptions={{ hideAttribution: true }}
         className="bg-[var(--canvas-bg)]"
         // 框选：拖空白即可框选；按住 Space 或 中键/右键 拖动来平移
