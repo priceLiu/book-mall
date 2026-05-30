@@ -20,7 +20,7 @@ import { Lock } from "lucide-react";
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import { STORY_HINT_GOLD_CLASS } from "@/lib/canvas/story-column-sync";
 import { SaveVideoToLibraryButton } from "@/components/canvas/save-video-to-library-button";
-import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library";
+import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library-types";
 
 const SLOT_CORNER_BTN =
   "nodrag absolute z-20 inline-flex size-8 items-center justify-center rounded-full border shadow-md backdrop-blur-sm opacity-0 transition-opacity group-hover/card:opacity-100";

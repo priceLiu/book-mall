@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Download, Play, RefreshCw } from "lucide-react";
 
 import { SaveVideoToLibraryButton } from "@/components/canvas/save-video-to-library-button";
-import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library";
+import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library-types";
 import { cn } from "@/lib/utils";
 
 const SLOT_DOWNLOAD_BTN =

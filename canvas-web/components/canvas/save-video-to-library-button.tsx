@@ -5,10 +5,8 @@ import { BookmarkPlus, Loader2 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import {
-  saveVideoToLibrary,
-  type SaveVideoToLibraryInput,
-} from "@/lib/canvas-video-library";
+import { saveVideoToLibrary } from "@/lib/canvas-video-library";
+import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library-types";
 import { cn } from "@/lib/utils";
 
 const SLOT_BTN =
