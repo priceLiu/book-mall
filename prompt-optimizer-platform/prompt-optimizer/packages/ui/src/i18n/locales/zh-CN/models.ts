@@ -1,6 +1,11 @@
 const messages = {
   "modelManager": {
     "title": "模型管理",
+    "platformGateway": {
+      "title": "平台 Gateway 模式",
+      "hint": "厂商 API Key 与模型启用状态请在 Gateway 管理；此处不可填写密钥。",
+      "openGateway": "前往 Gateway 模型管理"
+    },
     "textModels": "文本模型",
     "imageModels": "图像模型",
     "functionModels": "功能模型",

@@ -13,7 +13,7 @@
     >
       <template #header-extra>
         <NButton
-          v-if="activeTab === 'text'"
+          v-if="activeTab === 'text' && !platformGatewayMode"
           type="primary"
           @click="openAddForActiveTab"
           ghost
@@ -38,7 +38,7 @@
           {{ t('modelManager.addModel') }}
         </NButton>
         <NButton
-          v-else-if="activeTab === 'image'"
+          v-else-if="activeTab === 'image' && !platformGatewayMode"
           type="primary"
           @click="handleAddImageModel"
           ghost
@@ -65,6 +65,27 @@
       </template>
 
       <div class="model-manager-content">
+        <NAlert
+          v-if="platformGatewayMode"
+          type="info"
+          :title="t('modelManager.platformGateway.title')"
+          :show-icon="true"
+          style="margin: 12px 16px 0"
+        >
+          {{ t('modelManager.platformGateway.hint') }}
+          <NButton
+            tag="a"
+            :href="platformGatewayUrl + '/dashboard/models'"
+            target="_blank"
+            rel="noopener noreferrer"
+            type="primary"
+            size="small"
+            style="margin-top: 8px"
+          >
+            {{ t('modelManager.platformGateway.openGateway') }}
+          </NButton>
+        </NAlert>
+
         <NTabs v-model:value="activeTab" type="segment" size="small" animated class="model-manager-tabs">
           <NTabPane name="text" :tab="t('modelManager.textModels')" />
           <NTabPane name="image" :tab="t('modelManager.imageModels')" />
@@ -116,8 +137,12 @@
 import { inject, onMounted, onUnmounted, provide, ref, type Ref } from 'vue'
 
 import { useI18n } from 'vue-i18n'
-import { NButton, NCard, NModal, NTabs, NTabPane } from 'naive-ui'
+import { NButton, NCard, NModal, NTabs, NTabPane, NAlert } from 'naive-ui'
 import type { ImageModelConfig } from '@prompt-optimizer/core'
+import {
+  getPlatformGatewayManageUrl,
+  isPlatformGatewayMode,
+} from '../utils/platform-gateway'
 import ImageModelEditModal from './ImageModelEditModal.vue'
 import ImageModelManager from './ImageModelManager.vue'
 import TextModelManager from './TextModelManager.vue'
@@ -135,6 +160,9 @@ defineProps({
 const emit = defineEmits(['modelsUpdated', 'close', 'select', 'update:show'])
 
 const { t } = useI18n()
+
+const platformGatewayMode = isPlatformGatewayMode()
+const platformGatewayUrl = getPlatformGatewayManageUrl()
 
 const activeTab = ref<'text' | 'image' | 'function'>('text')
 const textManagerRef = ref<InstanceType<typeof TextModelManager> | null>(null)

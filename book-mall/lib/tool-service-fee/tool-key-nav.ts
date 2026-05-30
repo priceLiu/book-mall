@@ -16,5 +16,8 @@ export function clientPageToServiceNavKey(clientPage: string): ToolSuiteNavKey |
   const p = clientPage.trim().toLowerCase();
   if (p.startsWith("canvas") || p.includes("ai-poster")) return "ai-poster-canvas";
   if (p.startsWith("story") || p.includes("story-theater")) return "story-theater";
+  if (p.startsWith("prompt-optimizer") || p.includes("prompt-optimizer")) {
+    return "prompt-optimizer";
+  }
   return toolKeyToServiceNavKey(p);
 }

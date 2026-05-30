@@ -239,7 +239,9 @@ export function DevHubClient({
                         ? `${services.find((x) => x.id === "mall")?.url ?? ""}/story-open?path=${encodeURIComponent("/")}`
                         : s.id === "canvas"
                           ? `${services.find((x) => x.id === "mall")?.url ?? ""}/canvas-open?path=${encodeURIComponent("/projects")}`
-                          : s.url
+                          : s.id === "prompt-optimizer"
+                            ? `${services.find((x) => x.id === "mall")?.url ?? ""}/prompt-optimizer-open?path=${encodeURIComponent("/")}`
+                            : s.url
                     }
                     target="_blank"
                     rel="noopener noreferrer"

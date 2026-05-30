@@ -1,0 +1,59 @@
+import type { GatewayProviderKind } from "@prisma/client";
+import type { CanvasProviderKind } from "@prisma/client";
+
+import { getGatewayForKind } from "@/lib/canvas/providers";
+import type { CanvasProviderConfig } from "@/lib/canvas/providers/types";
+import { decryptApiKey } from "@/lib/canvas/secret";
+import { defaultBaseUrl, resolveOpenAiCompatibleBaseUrl } from "@/lib/gateway/model-router";
+
+function toCanvasKind(kind: GatewayProviderKind): CanvasProviderKind {
+  switch (kind) {
+    case "KIE":
+      return "KIE";
+    case "BAILIAN":
+      return "ALI_BAILIAN";
+    case "DEEPSEEK":
+    case "DASHSCOPE":
+      return "OPENAI_COMPAT";
+    case "HUNYUAN":
+      return "HUNYUAN_3D";
+    default:
+      return "OPENAI_COMPAT";
+  }
+}
+
+function buildTestConfig(row: {
+  id: string;
+  alias: string;
+  providerKind: GatewayProviderKind;
+  apiKeyEncrypted: string;
+  baseUrl: string | null;
+}): CanvasProviderConfig {
+  const base =
+    row.providerKind === "BAILIAN" || row.providerKind === "DASHSCOPE"
+      ? resolveOpenAiCompatibleBaseUrl(row.providerKind, row.baseUrl)
+      : (row.baseUrl?.trim() || defaultBaseUrl(row.providerKind)).replace(/\/$/, "");
+  return {
+    id: row.id,
+    alias: row.alias,
+    kind: toCanvasKind(row.providerKind),
+    apiKey: decryptApiKey(row.apiKeyEncrypted),
+    baseUrl: base,
+  };
+}
+
+export async function testGatewayCredentialConnection(row: {
+  id: string;
+  alias: string;
+  providerKind: GatewayProviderKind;
+  apiKeyEncrypted: string;
+  baseUrl: string | null;
+}): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const config = buildTestConfig(row);
+    const gateway = getGatewayForKind(config.kind, config);
+    return await gateway.testConnection();
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}

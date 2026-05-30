@@ -1,6 +1,6 @@
 # 腾讯云部署说明
 
-本仓库已带好 **`book-mall/Dockerfile`**、**`tool-web/Dockerfile`**、**`finance-web/Dockerfile`**、**`story-web/Dockerfile`**（Next.js `standalone` 镜像）。  
+本仓库已带好 **`book-mall/Dockerfile`**、**`tool-web/Dockerfile`**、**`finance-web/Dockerfile`**、**`story-web/Dockerfile`**、**`canvas-web/Dockerfile`**、**`gateway-web/Dockerfile`**、**`prompt-optimizer-platform/Dockerfile`**（Next.js `standalone` 镜像；prompt 含上游 Vue vendor 多阶段构建）。  
 在腾讯云 **自动构建、自动部署** 的场景下，你 **不必** 在自己电脑上执行 `docker compose`，也不必 SSH 上服务器敲命令——流水线会在每次推送后构建镜像并发布。
 
 > **第一次开服务 / 重建服务**：直接看 **[`cloudbase-build-guide.md`](./cloudbase-build-guide.md)**（控制台逐步流程、字段对照、环境变量、验收清单、故障排查）。本文档保留为概览。
@@ -20,7 +20,10 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 ├── book-mall/      ← 主站：目标目录填 book-mall
 ├── tool-web/       ← 工具站：目标目录填 tool-web（与主站同仓库）
 ├── finance-web/    ← 财务：目标目录填 finance-web（与主站同仓库，无需新仓库）
-└── story-web/      ← 漫剧空间：目标目录填 story-web
+├── story-web/      ← 漫剧空间：目标目录填 story-web
+├── canvas-web/     ← AI 海报画布：目标目录填 canvas-web
+├── gateway-web/    ← Gateway BYOK：目标目录填 gateway-web
+└── prompt-optimizer-platform/  ← 提示词优化器：目标目录填 prompt-optimizer-platform
 ```
 
 | 你 IDE 里的文件夹 | 是否要在 Git 下拉里单独出现一行 | 云构建正确做法 |
@@ -29,6 +32,9 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 | `tool-web/` | 否；同上 | 目标目录 **`tool-web`** |
 | `finance-web/` | 否；同上 | 目标目录 **`finance-web`** |
 | `story-web/` | 否；同上 | 目标目录 **`story-web`** |
+| `canvas-web/` | 否；同上 | 目标目录 **`canvas-web`** |
+| `gateway-web/` | 否；同上 | 目标目录 **`gateway-web`** |
+| `prompt-optimizer-platform/` | 否；同上 | 目标目录 **`prompt-optimizer-platform`**（Dockerfile 内含 vendor 构建） |
 
 **财务 / story-web 不需要、也不应该单独建独立 Git 仓库**，做法与 `tool-web` 在 Monorepo 里一致。
 
@@ -40,20 +46,21 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 
 若你用的是腾讯云 **云托管 CloudBase Run**（控制台「新版云托管」），字段名称与官方文档 **[云托管服务设置](https://cloud.tencent.com/document/product/1243/77197)** 一致。同一 Git 仓库请创建 **四个服务**；从 Git 自动构建可参考 **[通过 Git 仓库部署](https://docs.cloudbase.net/run/deploy/deploy/deploying-git)**。
 
-| 控制台配置项 | 主站 | 工具站 | **财务控制台** | **漫剧空间 story-web** |
-|-------------|------|--------|----------------|------------------------|
-| **Git 仓库** | `priceLiu/book-mall` | 同上 | 同上 | 同上 |
-| **分支** | `main`（或你的发布分支） | 同上 | 同上 | 同上 |
-| **目标目录**（Monorepo 子目录） | `book-mall` | `tool-web` | **`finance-web`** | **`story-web`** |
-| **Dockerfile** | 默认 `Dockerfile`（在该目标目录下） | 同上 | 同上 | 同上 |
-| **容器监听端口** | **3000** | **3001** | **3002** | **3003** |
-| **自定义域（示例）** | `book.ai-code8.com` | `tool.ai-code8.com` | **`f.ai-code8.com`** | **`story.ai-code8.com`** |
+| 控制台配置项 | 主站 | 工具站 | **财务控制台** | **漫剧 story-web** | **canvas-web** | **gateway-web** | **提示词优化器** |
+|-------------|------|--------|----------------|-------------------|----------------|-----------------|------------------|
+| **Git 仓库** | `priceLiu/book-mall` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| **分支** | `main` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| **目标目录** | `book-mall` | `tool-web` | `finance-web` | `story-web` | `canvas-web` | `gateway-web` | **`prompt-optimizer-platform`** |
+| **Dockerfile** | 默认 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| **容器监听端口** | **3000** | **3001** | **3002** | **3003** | **3004** | **3005** | **3006** |
+| **自定义域（示例）** | `book.ai-code8.com` | `tool.ai-code8.com` | `f.ai-code8.com` | `story.ai-code8.com` | `canvas.ai-code8.com` | `gateway.ai-code8.com` | **`prompt.ai-code8.com`** |
 
 要点：
 
 - **不要把仓库最外层**（含 `book-mall/`、`finance-web/` 的父目录）设为目标目录，否则 `Dockerfile` 找不到、构建失败。
 - **财务服务**与工具站一样，容器内 Next 监听 **3002**（与本地 `pnpm dev` 端口一致）。
 - **story-web** 容器内 Next 监听 **3003**。
+- **canvas-web** 监听 **3004**；**gateway-web** **3005**；**prompt-optimizer-platform** **3006**（镜像内多阶段构建上游 Vue + Next 壳）。
 - 每个服务绑定各自域名；TLS 在「访问设置」里绑定。
 
 ### 新建 story-web 服务（逐步）
@@ -65,6 +72,17 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 5. **构建设置 → 目标目录**：**`story-web`**。
 6. **端口**：**3003**。
 7. 环境变量见下表 → 绑定 **`story.ai-code8.com`**。
+
+### 新建 prompt-optimizer-platform 服务（逐步）
+
+1. 云托管 → **新建 Git 平台部署**。
+2. **Git 仓库**：选 **`priceLiu/book-mall`**。
+3. **分支**：`main`。
+4. **服务名称**：例如 `prompt-optimizer-platform`。
+5. **构建设置 → 目标目录**：**`prompt-optimizer-platform`**（vendor 源码在同目录 `prompt-optimizer/` 子树内，无需单独提交构建产物）。
+6. **端口**：**3006**。
+7. 环境变量见 **`deploy/tencent/prompt-optimizer-platform.env.example`** → 绑定 **`prompt.ai-code8.com`**。
+8. **book-mall** 须已配置 `NEXT_PUBLIC_PROMPT_OPTIMIZER_ORIGIN` / `PROMPT_OPTIMIZER_PUBLIC_ORIGIN`，并已跑过 `prompt-optimizer` 工具 nav 迁移。
 
 ### 新建 finance-web 服务（逐步）
 
@@ -118,7 +136,14 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 - `NEXT_PUBLIC_STORY_WEB_ORIGIN=https://story.ai-code8.com`
 - `NEXT_PUBLIC_BOOK_MALL_URL=https://book.ai-code8.com`（未来 SSO / 发布互通）
 
-对照文件：`deploy/tencent/book-mall.env.example`、`tool-web.env.example`、**`finance-web.env.example`**、**`story-web.env.example`**。  
+**提示词优化器 `prompt-optimizer-platform`**（至少）：
+
+- `MAIN_SITE_ORIGIN=https://book.ai-code8.com`
+- `TOOLS_SSO_SERVER_SECRET` / `TOOLS_SSO_JWT_SECRET`（与主站一致）
+- `PROMPT_OPTIMIZER_PUBLIC_ORIGIN=https://prompt.ai-code8.com`
+- `NEXT_PUBLIC_GATEWAY_WEB_ORIGIN=https://gateway.ai-code8.com`
+
+对照文件：`deploy/tencent/book-mall.env.example`、`tool-web.env.example`、**`finance-web.env.example`**、**`story-web.env.example`**、**`prompt-optimizer-platform.env.example`**。  
 更全说明见仓库根目录 [`DEPLOY.md`](../../DEPLOY.md)。
 
 ### 3. SSO / 域名要点
@@ -159,7 +184,7 @@ docker compose up -d --build
 | 列表里没有 finance-web 仓库 | 正常；选 **`priceLiu/book-mall`** + 目标目录 **`finance-web`** |
 | 财务页 403 / 拉不到用户 | 先在 **book.ai-code8.com** 管理员登录；`FINANCE_WEB_ORIGINS` 是否含财务域 |
 | SSO / 跳转异常 | 各 `*_ORIGIN` 是否与线上一致 |
-| 502 | 容器端口：主站 **3000**，工具站 **3001**，财务 **3002**，story-web **3003** |
+| 502 | 容器端口：主站 **3000**，工具站 **3001**，财务 **3002**，story-web **3003**，canvas **3004**，gateway **3005**，prompt **3006** |
 
 ---
 

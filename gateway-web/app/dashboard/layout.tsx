@@ -9,10 +9,9 @@ const NAV = [
   { href: "/dashboard/guide", label: "操作指引" },
   { href: "/dashboard", label: "用量" },
   { href: "/dashboard/logs", label: "日志" },
-  { href: "/dashboard/models", label: "接入模型" },
+  { href: "/dashboard/models", label: "模型管理" },
   { href: "/dashboard/keys", label: "API密钥" },
   { href: "/dashboard/playground", label: "API调试" },
-  { href: "/dashboard/credentials", label: "厂商凭证" },
   { href: "/dashboard/docs", label: "接入文档" },
 ];
 

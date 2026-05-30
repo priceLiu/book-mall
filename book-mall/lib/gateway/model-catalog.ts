@@ -27,6 +27,8 @@ export type GatewayCatalogModel = {
   role: CanvasGatewayListedModel["role"] | "TTS" | "TRYON";
   description: string | null;
   products: string[];
+  /** UI 能力标签：Tool Calling / Reasoning 等 */
+  capabilities: string[];
 };
 
 export type GatewayCatalogGroup = {
@@ -40,7 +42,34 @@ export type GatewayModelCatalog = {
   groups: GatewayCatalogGroup[];
   totalCount: number;
   boundKinds: GatewayProviderKind[];
+  /** Model Manager Tab 分组 */
+  tabs: {
+    text: GatewayCatalogGroup[];
+    image: GatewayCatalogGroup[];
+    function: GatewayCatalogGroup[];
+  };
 };
+
+function inferCapabilities(
+  modelKey: string,
+  role: CanvasGatewayListedModel["role"] | "TTS" | "TRYON",
+): string[] {
+  const m = modelKey.toLowerCase();
+  const caps: string[] = [];
+  if (role === "LLM" || m.includes("chat") || m.includes("gpt") || m.includes("deepseek")) {
+    caps.push("Tool Calling");
+  }
+  if (
+    m.includes("reasoner") ||
+    m.includes("thinking") ||
+    m.includes("r1") ||
+    m.includes("o1") ||
+    m.includes("o3")
+  ) {
+    caps.push("Reasoning");
+  }
+  return caps;
+}
 
 const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
   KIE: "KIE",
@@ -194,6 +223,7 @@ const DASHSCOPE_TOOL_OTHER: GatewayCatalogModel[] = [
     role: "IMAGE",
     description: "工具站文生图",
     products: ["工具站"],
+    capabilities: [],
   },
   {
     modelKey: "aitryon",
@@ -202,6 +232,7 @@ const DASHSCOPE_TOOL_OTHER: GatewayCatalogModel[] = [
     role: "TRYON",
     description: "工具站试衣间",
     products: ["工具站"],
+    capabilities: [],
   },
   {
     modelKey: "aitryon-plus",
@@ -210,6 +241,7 @@ const DASHSCOPE_TOOL_OTHER: GatewayCatalogModel[] = [
     role: "TRYON",
     description: "工具站试衣间",
     products: ["工具站"],
+    capabilities: [],
   },
   {
     modelKey: "aitryon-parsing-v1",
@@ -218,6 +250,7 @@ const DASHSCOPE_TOOL_OTHER: GatewayCatalogModel[] = [
     role: "TRYON",
     description: "试衣预处理",
     products: ["工具站"],
+    capabilities: [],
   },
   {
     modelKey: "aitryon-refiner",
@@ -226,6 +259,7 @@ const DASHSCOPE_TOOL_OTHER: GatewayCatalogModel[] = [
     role: "TRYON",
     description: "试衣精修（阶梯计费）",
     products: ["工具站"],
+    capabilities: [],
   },
   {
     modelKey: "qwen3-tts",
@@ -234,6 +268,7 @@ const DASHSCOPE_TOOL_OTHER: GatewayCatalogModel[] = [
     role: "TTS",
     description: "Story / Canvas 语音合成",
     products: ["Canvas", "Story"],
+    capabilities: [],
   },
 ];
 
@@ -264,7 +299,29 @@ function fromListed(
     role: m.role,
     description: m.description ?? null,
     products,
+    capabilities: inferCapabilities(m.modelKey, m.role),
   };
+}
+
+function filterGroupModels(
+  groups: GatewayCatalogGroup[],
+  predicate: (m: GatewayCatalogModel) => boolean,
+): GatewayCatalogGroup[] {
+  return groups
+    .map((g) => ({ ...g, models: g.models.filter(predicate) }))
+    .filter((g) => g.models.length > 0);
+}
+
+function isTextModel(m: GatewayCatalogModel): boolean {
+  return m.requestKind === "CHAT";
+}
+
+function isImageModel(m: GatewayCatalogModel): boolean {
+  return m.requestKind === "IMAGE";
+}
+
+function isFunctionModel(m: GatewayCatalogModel): boolean {
+  return !isTextModel(m) && !isImageModel(m);
 }
 
 function sortModels(models: GatewayCatalogModel[]): GatewayCatalogModel[] {
@@ -330,6 +387,7 @@ export function buildGatewayModelCatalog(
         role: "VIDEO" as const,
         description: m.description,
         products: m.products,
+        capabilities: [] as string[],
       })),
     ]),
   );
@@ -351,5 +409,14 @@ export function buildGatewayModelCatalog(
 
   const totalCount = groups.reduce((n, g) => n + g.models.length, 0);
 
-  return { groups, totalCount, boundKinds };
+  return {
+    groups,
+    totalCount,
+    boundKinds,
+    tabs: {
+      text: filterGroupModels(groups, isTextModel),
+      image: filterGroupModels(groups, isImageModel),
+      function: filterGroupModels(groups, isFunctionModel),
+    },
+  };
 }

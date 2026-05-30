@@ -1,0 +1,206 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+
+import type { CredentialRow } from "./types";
+import { formatProviderKindLabel } from "@/lib/gateway-model-display";
+
+const PROVIDERS = [
+  "KIE",
+  "BAILIAN",
+  "DEEPSEEK",
+  "DASHSCOPE",
+  "HUNYUAN",
+] as const;
+
+export function CredentialEditModal({
+  open,
+  credential,
+  defaultProviderKind,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  credential: CredentialRow | null;
+  defaultProviderKind: string;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const isEdit = Boolean(credential);
+  const [alias, setAlias] = useState("");
+  const [providerKind, setProviderKind] =
+    useState<(typeof PROVIDERS)[number]>("DEEPSEEK");
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [active, setActive] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setAlias(credential?.alias ?? formatProviderKindLabel(defaultProviderKind));
+    setProviderKind(
+      (PROVIDERS.includes(defaultProviderKind as (typeof PROVIDERS)[number])
+        ? defaultProviderKind
+        : "DEEPSEEK") as (typeof PROVIDERS)[number],
+    );
+    setApiKey("");
+    setBaseUrl(credential?.baseUrl ?? "");
+    setActive(credential?.active ?? true);
+    setError("");
+  }, [open, credential, defaultProviderKind]);
+
+  if (!open) return null;
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (isEdit && credential) {
+        const res = await fetch("/api/book-mall/api/gateway/credentials", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: credential.id,
+            alias,
+            baseUrl: baseUrl.trim() || null,
+            active,
+            ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+          }),
+        });
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        if (!res.ok) {
+          setError(data?.error ?? "保存失败");
+          return;
+        }
+      } else {
+        if (!apiKey.trim()) {
+          setError("请填写 API Key");
+          return;
+        }
+        const res = await fetch("/api/book-mall/api/gateway/credentials", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            alias,
+            providerKind,
+            apiKey: apiKey.trim(),
+            baseUrl: baseUrl.trim() || null,
+          }),
+        });
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        if (!res.ok) {
+          setError(data?.error ?? "添加失败");
+          return;
+        }
+      }
+      await onSaved();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <form
+        className="gw-card max-h-[90vh] w-full max-w-lg overflow-y-auto gw-scrollbar-thin shadow-2xl"
+        onSubmit={(e) => void onSubmit(e)}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEdit ? "编辑凭证" : "添加凭证"}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold text-white">
+            {isEdit ? "Edit" : "添加凭证"}
+          </h3>
+          <button type="button" className="text-zinc-500 hover:text-white" onClick={onClose}>
+            ×
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          <label className="block">
+            <span className="mb-1 block text-sm text-zinc-400">Display Name</span>
+            <input
+              className="gw-input"
+              required
+              maxLength={60}
+              value={alias}
+              onChange={(e) => setAlias(e.target.value)}
+            />
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+            />
+            Enable Status
+          </label>
+
+          {!isEdit ? (
+            <div>
+              <span className="mb-2 block text-sm text-zinc-400">Provider</span>
+              <div className="flex flex-wrap gap-2">
+                {PROVIDERS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setProviderKind(p)}
+                    className={`rounded-full border px-3 py-1 text-xs transition ${
+                      providerKind === p
+                        ? "border-white bg-white/15 text-white"
+                        : "border-white/15 text-zinc-400 hover:border-white/30"
+                    }`}
+                  >
+                    {formatProviderKindLabel(p)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-500">
+              Provider：{formatProviderKindLabel(credential!.providerKind)}
+            </p>
+          )}
+
+          <label className="block">
+            <span className="mb-1 block text-sm text-zinc-400">API Key</span>
+            <input
+              className="gw-input font-mono"
+              type="password"
+              minLength={isEdit ? 0 : 8}
+              required={!isEdit}
+              placeholder={isEdit ? "留空则不修改" : ""}
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm text-zinc-400">API URL（可选）</span>
+            <input
+              className="gw-input font-mono text-xs"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="留空使用默认端点"
+            />
+          </label>
+
+          {error ? <p className="text-sm text-red-400">{error}</p> : null}
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" className="gw-btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="gw-btn" disabled={loading}>
+            {loading ? "保存中…" : "Save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

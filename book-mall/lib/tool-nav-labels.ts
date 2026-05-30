@@ -6,6 +6,7 @@ export const TOOL_NAV_LABEL: Record<string, string> = {
   "visual-lab": "视觉实验室",
   "story-theater": "漫剧剧场",
   "ai-poster-canvas": "AI 海报画布",
+  "prompt-optimizer": "提示词优化器",
   "smart-support": "AI智能客服",
   "app-history": "费用与计费说明",
 };

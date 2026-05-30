@@ -119,3 +119,75 @@ model: model-name
 - [ ] 新滚动区域使用 `.gw-scrollbar-thin`
 - [ ] Status 圆点用 inline `backgroundColor`
 - [ ] 改常量后更新本文 §3.1 表格
+
+---
+
+## 6. 模型管理（Model Manager）
+
+真源：`components/model-manager/*` · `/dashboard/models` · `book-mall/app/api/gateway/credentials/*`
+
+交互参考上游 prompt-optimizer Model Manager；**视觉沿用 Gateway 色板**（§1），不引入 Naive UI。
+
+### 6.1 页面结构
+
+```text
+┌─ Tab: Text Models | Image Models | Function Models ─────────┐
+├─ 厂商卡片 ────────────────────────────────────────────────────┤
+│  DeepSeek                    [Disabled]                     │
+│  [DeepSeek] [DeepSeek V4 Flash] [Tool Calling] [Reasoning]    │
+│                    Test · Edit · Clone · Enable/Disable     │
+└───────────────────────────────────────────────────────────────┘
+```
+
+| Tab | catalog `requestKind` |
+|-----|------------------------|
+| Text Models | `CHAT` |
+| Image Models | `IMAGE` |
+| Function Models | `OTHER`、`TTS`、`VIDEO`、`TRYON`（或带 tool 能力 tag） |
+
+### 6.2 厂商卡片
+
+| 元素 | 类 / 约定 |
+|------|-----------|
+| 卡片容器 | `.gw-card` · `border-white/10` · `bg-white/[0.02]` |
+| 厂商名 | `text-lg font-semibold text-white` |
+| Disabled 徽章 | `text-amber-400/90` · 小 pill · 无 active 凭证或未 Enable |
+| 模型 tag | 蓝 pill：模型 displayName；灰：providerKind |
+| 能力 tag | 绿：`Tool Calling`；棕：`Reasoning`；红：`CORS Restricted`（若适用） |
+| 行操作 | 文字链 + 图标；Disable 用 `--gw-accent` 或 amber |
+
+### 6.3 编辑弹窗（Edit）
+
+| 字段 | 说明 |
+|------|------|
+| Display Name | 凭证 alias |
+| Enable Status | checkbox → `active` |
+| Provider | pill 选择 `GatewayProviderKind` |
+| API Key | password；编辑时空则不改 |
+| API URL | 可选 baseUrl |
+| Select model | 下拉 + 刷新（catalog）；只读展示默认模型可选 |
+| Advanced Parameters | 折叠区；首版可占位 |
+
+弹窗：`.gw-card` 居中 · 遮罩 `bg-black/70` · 主按钮 `--gw-accent` · Cancel ghost。
+
+### 6.4 操作
+
+| 操作 | API |
+|------|-----|
+| Test Connection | `POST /api/gateway/credentials/test` |
+| Edit | `PATCH /api/gateway/credentials` |
+| Clone | `POST /api/gateway/credentials/clone` |
+| Enable / Disable | `PATCH` `{ active: true/false }` |
+| Delete | `DELETE` + **二次确认 Modal**（禁止 `window.confirm`） |
+
+### 6.5 导航
+
+- 侧栏：**模型管理** → `/dashboard/models`
+- 原 **厂商凭证** `/dashboard/credentials` → 重定向至 `/dashboard/models`
+
+### 6.6 变更检查清单
+
+- [ ] Tab 切换不丢筛选状态
+- [ ] 未绑凭证的 provider 显示 Disabled + Edit 引导
+- [ ] 删除凭证二次确认 Modal
+- [ ] 改交互后更新本文 §6

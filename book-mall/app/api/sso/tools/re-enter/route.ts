@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  *
  * Query：
  * - `redirect` — 子应用内路径，默认 `/fitting-room`
- * - `app` — tool | canvas | story（默认 tool）
+ * - `app` — tool | canvas | story | prompt-optimizer（默认 tool）
  * - `client_id` + `redirect_uri` — Phase F 第三方注册客户端
  */
 export async function GET(req: NextRequest) {

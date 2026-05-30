@@ -40,6 +40,30 @@ if [ "$NODE_ENV" = "production" ] && [ "${ALLOW_CLOUDBASE_DEFAULT_ORIGINS:-}" !=
       echo "[book-mall] STORY_WEB_ORIGINS -> ${STORY_WEB_ORIGINS}"
       ;;
   esac
+  case "${NEXT_PUBLIC_CANVAS_WEB_ORIGIN:-}" in
+    ""|*"sh.run.tcloudbase.com"*)
+      export NEXT_PUBLIC_CANVAS_WEB_ORIGIN="https://canvas.ai-code8.com"
+      echo "[book-mall] NEXT_PUBLIC_CANVAS_WEB_ORIGIN -> ${NEXT_PUBLIC_CANVAS_WEB_ORIGIN}"
+      ;;
+  esac
+  case "${CANVAS_WEB_ORIGINS:-}" in
+    ""|*"sh.run.tcloudbase.com"*)
+      export CANVAS_WEB_ORIGINS="https://canvas.ai-code8.com"
+      echo "[book-mall] CANVAS_WEB_ORIGINS -> ${CANVAS_WEB_ORIGINS}"
+      ;;
+  esac
+  case "${NEXT_PUBLIC_PROMPT_OPTIMIZER_ORIGIN:-}" in
+    ""|*"sh.run.tcloudbase.com"*)
+      export NEXT_PUBLIC_PROMPT_OPTIMIZER_ORIGIN="https://prompt.ai-code8.com"
+      echo "[book-mall] NEXT_PUBLIC_PROMPT_OPTIMIZER_ORIGIN -> ${NEXT_PUBLIC_PROMPT_OPTIMIZER_ORIGIN}"
+      ;;
+  esac
+  case "${PROMPT_OPTIMIZER_PUBLIC_ORIGIN:-}" in
+    ""|*"sh.run.tcloudbase.com"*)
+      export PROMPT_OPTIMIZER_PUBLIC_ORIGIN="https://prompt.ai-code8.com"
+      echo "[book-mall] PROMPT_OPTIMIZER_PUBLIC_ORIGIN -> ${PROMPT_OPTIMIZER_PUBLIC_ORIGIN}"
+      ;;
+  esac
   case "${NEXTAUTH_COOKIE_DOMAIN:-}" in
     "")
       export NEXTAUTH_COOKIE_DOMAIN=".ai-code8.com"

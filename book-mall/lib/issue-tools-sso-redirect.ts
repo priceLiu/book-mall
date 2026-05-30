@@ -49,7 +49,7 @@ function redirectMatchesRegisteredUri(redirectUri: string, allowed: string[]): b
 export async function issueToolsSsoRedirect(opts: {
   userId: string;
   redirectPath?: string;
-  /** 内置子应用：tool / canvas / story */
+  /** 内置子应用：tool / canvas / story / prompt-optimizer */
   app?: PlatformSsoApp;
   /** Phase F：注册第三方 client；redirectUri 须在其 redirectUris 白名单内 */
   clientId?: string;

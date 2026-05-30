@@ -1,13 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import {
+  cloneGatewayCredential,
   createGatewayCredential,
   deleteGatewayCredential,
+  GATEWAY_PROVIDER_KINDS,
   listGatewayCredentials,
+  testGatewayCredential,
+  updateGatewayCredential,
 } from "@/lib/gateway/credential-service";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 
 export const dynamic = "force-dynamic";
+
+const providerKindSchema = z.enum(GATEWAY_PROVIDER_KINDS);
 
 export async function GET(request: NextRequest) {
   const user = await requireGatewaySessionUser(request);
@@ -18,7 +24,7 @@ export async function GET(request: NextRequest) {
 
 const createSchema = z.object({
   alias: z.string().min(1).max(60),
-  providerKind: z.enum(["KIE", "BAILIAN", "DEEPSEEK"]),
+  providerKind: providerKindSchema,
   apiKey: z.string().min(8),
   baseUrl: z.string().url().optional().nullable(),
 });
@@ -45,6 +51,33 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 400 });
   }
+}
+
+const patchSchema = z.object({
+  id: z.string().min(1),
+  alias: z.string().min(1).max(60).optional(),
+  baseUrl: z.string().url().nullable().optional(),
+  active: z.boolean().optional(),
+  apiKey: z.string().min(8).optional(),
+});
+
+export async function PATCH(request: NextRequest) {
+  const user = await requireGatewaySessionUser(request);
+  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  let json: unknown;
+  try {
+    json = await request.json();
+  } catch {
+    return NextResponse.json({ error: "无效 JSON" }, { status: 400 });
+  }
+  const parsed = patchSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "参数无效" }, { status: 400 });
+  }
+  const { id, ...patch } = parsed.data;
+  const row = await updateGatewayCredential(user.id, id, patch);
+  if (!row) return NextResponse.json({ error: "未找到" }, { status: 404 });
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(request: NextRequest) {

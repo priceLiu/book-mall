@@ -8,6 +8,7 @@ export const TOOL_SUITE_NAV_KEYS = [
   "visual-lab",
   "story-theater",
   "ai-poster-canvas",
+  "prompt-optimizer",
   "smart-support",
   "app-history",
 ] as const;

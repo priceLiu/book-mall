@@ -20,7 +20,7 @@
 | Query | 说明 |
 |-------|------|
 | `redirect` | 子应用内路径，默认 `/fitting-room` |
-| `app` | `tool` \| `canvas` \| `story` |
+| `app` | `tool` \| `canvas` \| `story` \| `prompt-optimizer` |
 | `client_id` | Phase F 注册客户端 ID |
 | `redirect_uri` | 第三方回调（须在 client 白名单） |
 
