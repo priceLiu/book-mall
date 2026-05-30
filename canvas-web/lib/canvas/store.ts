@@ -33,6 +33,7 @@ import {
 import { migrateGraphV1ToV2 } from "./migrate";
 import {
   detachChildrenOfRemovedGroups,
+  ensureNodeDragHandles,
   normalizeCanvasNodes,
   reflowStoryTemplateGroups as reflowStoryTemplateGroupsOnNodes,
   sortNodesForReactFlow,
@@ -53,6 +54,40 @@ import {
 } from "./story-pro-workspace-layout";
 import { reconcileStoryProWorkspace } from "./spawn-story-pro-workspace";
 import { canvasNotify } from "./canvas-notify";
+
+/** 大图 hydrate：列高/媒体同步延后一帧，先出画布 */
+const DEFER_HYDRATE_LAYOUT_NODE_COUNT = 24;
+
+/** 拖动/缩放尺寸过程中跳过 normalize + undo，避免每帧重算整图 */
+function isInteractiveGeometryInProgress(changes: NodeChange[]): boolean {
+  if (changes.length === 0) return false;
+  return changes.every((c) => {
+    if (c.type === "position" && "dragging" in c) {
+      return c.dragging === true;
+    }
+    if (c.type === "dimensions" && "resizing" in c) {
+      return c.resizing === true;
+    }
+    return false;
+  });
+}
+
+function finalizeHydratedGraph(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): { nodes: CanvasFlowNode[]; edges: CanvasFlowEdge[] } {
+  const stripped = stripStoryPreviewNodes(nodes, edges);
+  let nextNodes = stripped.nodes;
+  let nextEdges = stripped.edges;
+  nextEdges = repairStoryPreviewEdges(nextNodes, nextEdges);
+  const finalized = finalizeStoryMediaGraph(nextNodes, nextEdges);
+  nextNodes = applyStoryColumnHeights(finalized.nodes, finalized.edges);
+  nextEdges = finalized.edges;
+  return {
+    nodes: ensureNodeDragHandles(nextNodes),
+    edges: nextEdges,
+  };
+}
 import { validateStoryPipelineDeletion } from "./story-pipeline-delete-guard";
 import { reconcileStoryWorkspaceEdges } from "./spawn-story-workspace";
 import { hasStoryComicColumnGroups } from "./story-comic-groups";
@@ -197,18 +232,32 @@ export const useCanvasStore = create<CanvasState>()(
             edges,
           ),
         );
-        const stripped = stripStoryPreviewNodes(nodes, edges);
-        nodes = stripped.nodes;
-        edges = stripped.edges;
-        edges = repairStoryPreviewEdges(nodes, edges);
-        const finalized = finalizeStoryMediaGraph(nodes, edges);
-        nodes = applyStoryColumnHeights(finalized.nodes, finalized.edges);
-        edges = finalized.edges;
+        const viewport = g.viewport ?? { x: 0, y: 0, zoom: 1 };
+
+        const applyDeferredLayout = () => {
+          const current = get();
+          const laid = finalizeHydratedGraph(current.nodes, current.edges);
+          set({ nodes: laid.nodes, edges: laid.edges });
+        };
+
+        if (nodes.length >= DEFER_HYDRATE_LAYOUT_NODE_COUNT) {
+          set({
+            projectId,
+            nodes: ensureNodeDragHandles(nodes),
+            edges,
+            viewport,
+            storyHubReview: null,
+          });
+          queueMicrotask(applyDeferredLayout);
+          return;
+        }
+
+        const laid = finalizeHydratedGraph(nodes, edges);
         set({
           projectId,
-          nodes,
-          edges,
-          viewport: g.viewport ?? { x: 0, y: 0, zoom: 1 },
+          nodes: laid.nodes,
+          edges: laid.edges,
+          viewport,
           storyHubReview: null,
         });
       },
@@ -278,6 +327,10 @@ export const useCanvasStore = create<CanvasState>()(
           }
         }
         let next = applyNodeChanges(filteredChanges, prev) as CanvasFlowNode[];
+        if (isInteractiveGeometryInProgress(filteredChanges)) {
+          set({ nodes: next });
+          return;
+        }
         next = detachChildrenOfRemovedGroups(prev, next);
         next = normalizeCanvasNodes(next, get().edges);
         if (

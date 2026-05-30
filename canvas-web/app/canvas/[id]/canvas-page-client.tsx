@@ -84,7 +84,6 @@ function Inner({ projectId }: { projectId: string }) {
   const setEdges = useCanvasStore((s) => s.setEdges);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
-  const viewport = useCanvasStore((s) => s.viewport);
   const reflowStoryComicLayout = useCanvasStore(
     (s) => s.reflowStoryComicLayout,
   );
@@ -277,61 +276,89 @@ function Inner({ projectId }: { projectId: string }) {
     };
   }, [base, projectId, hydrate]);
 
-  // Autosave on changes (debounced)
+  // Autosave on changes (debounced) — store 订阅，避免 nodes 变化触发整页重渲染
   const autosaveTimerRef = useRef<number | null>(null);
+  const autosaveProjectRef = useRef(project);
+  const autosaveBaseRef = useRef(base);
+  autosaveProjectRef.current = project;
+  autosaveBaseRef.current = base;
+
   useEffect(() => {
-    if (!project || !base || loading || !canvasReadyRef.current) return;
-    if (
-      nodes.length === 0 &&
-      loadedNodeCountRef.current > 0 &&
-      edges.length === 0
-    ) {
-      setSaveError("检测到画布被清空，已阻止自动保存。请刷新或点「恢复漫剧模板」。");
-      return;
-    }
-    if (autosaveTimerRef.current !== null) {
-      window.clearTimeout(autosaveTimerRef.current);
-    }
-    autosaveTimerRef.current = window.setTimeout(async () => {
-      setSaving(true);
-      try {
-        const graph = stripStoryProUploadedScriptMdForPersist(toGraph());
-        if (
-          graph.nodes.length === 0 &&
-          loadedNodeCountRef.current > 0
-        ) {
-          setSaveError("检测到画布被清空，已阻止自动保存。");
-          return;
-        }
-        const thumb = pickProjectThumbnailUrl(graph);
-        const patch: {
-          canvas: typeof graph;
-          thumbnailUrl?: string;
-        } = { canvas: graph };
-        if (thumb && thumb !== project.thumbnailUrl) {
-          patch.thumbnailUrl = thumb;
-        }
-        await patchCanvasProject(base, projectId, patch);
-        loadedNodeCountRef.current = graph.nodes.length;
-        if (patch.thumbnailUrl) {
-          setProject((p) =>
-            p ? { ...p, thumbnailUrl: patch.thumbnailUrl! } : p,
-          );
-        }
-        setLastSavedAt(new Date());
-        setSaveError(null);
-      } catch (e) {
-        setSaveError(e instanceof Error ? e.message : "保存失败");
-      } finally {
-        setSaving(false);
+    if (!project || !base || loading) return;
+
+    const scheduleAutosave = () => {
+      if (!canvasReadyRef.current) return;
+      const state = useCanvasStore.getState();
+      if (
+        state.nodes.length === 0 &&
+        loadedNodeCountRef.current > 0 &&
+        state.edges.length === 0
+      ) {
+        setSaveError("检测到画布被清空，已阻止自动保存。请刷新或点「恢复漫剧模板」。");
+        return;
       }
-    }, AUTOSAVE_DEBOUNCE_MS);
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+      }
+      autosaveTimerRef.current = window.setTimeout(async () => {
+        const proj = autosaveProjectRef.current;
+        const bookBase = autosaveBaseRef.current;
+        if (!proj || !bookBase) return;
+        setSaving(true);
+        try {
+          const graph = stripStoryProUploadedScriptMdForPersist(
+            useCanvasStore.getState().toGraph(),
+          );
+          if (
+            graph.nodes.length === 0 &&
+            loadedNodeCountRef.current > 0
+          ) {
+            setSaveError("检测到画布被清空，已阻止自动保存。");
+            return;
+          }
+          const thumb = pickProjectThumbnailUrl(graph);
+          const patch: {
+            canvas: typeof graph;
+            thumbnailUrl?: string;
+          } = { canvas: graph };
+          if (thumb && thumb !== proj.thumbnailUrl) {
+            patch.thumbnailUrl = thumb;
+          }
+          await patchCanvasProject(bookBase, projectId, patch);
+          loadedNodeCountRef.current = graph.nodes.length;
+          if (patch.thumbnailUrl) {
+            setProject((p) =>
+              p ? { ...p, thumbnailUrl: patch.thumbnailUrl! } : p,
+            );
+          }
+          setLastSavedAt(new Date());
+          setSaveError(null);
+        } catch (e) {
+          setSaveError(e instanceof Error ? e.message : "保存失败");
+        } finally {
+          setSaving(false);
+        }
+      }, AUTOSAVE_DEBOUNCE_MS);
+    };
+
+    const unsub = useCanvasStore.subscribe((state, prev) => {
+      if (
+        state.nodes === prev.nodes &&
+        state.edges === prev.edges &&
+        state.viewport === prev.viewport
+      ) {
+        return;
+      }
+      scheduleAutosave();
+    });
+
     return () => {
+      unsub();
       if (autosaveTimerRef.current !== null) {
         window.clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [nodes, edges, viewport, project, base, projectId, toGraph, loading]);
+  }, [project, base, projectId, loading]);
 
   const undo = useCallback(() => {
     const tStore = useCanvasStore.temporal.getState();
