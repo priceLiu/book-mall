@@ -207,13 +207,19 @@ function Inner({ projectId }: { projectId: string }) {
   const inflightTaskCount = useCanvasInflightTaskCount();
 
   useEffect(() => {
-    const prevHtml = document.documentElement.style.overflow;
-    const prevBody = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverscrollX = document.documentElement.style.overscrollBehaviorX;
+    const prevBodyOverscrollX = document.body.style.overscrollBehaviorX;
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overscrollBehaviorX = "none";
+    document.body.style.overscrollBehaviorX = "none";
     return () => {
-      document.documentElement.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overscrollBehaviorX = prevHtmlOverscrollX;
+      document.body.style.overscrollBehaviorX = prevBodyOverscrollX;
     };
   }, []);
 
@@ -535,7 +541,10 @@ function Inner({ projectId }: { projectId: string }) {
     );
   } else {
     body = (
-      <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--canvas-bg)]">
+      <div
+        className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--canvas-bg)]"
+        data-canvas-editor
+      >
         <div className="sticky top-0 z-[300] shrink-0 bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)]">
           <CanvasToolbar
             projectName={nameDraft}

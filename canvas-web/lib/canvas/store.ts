@@ -247,7 +247,11 @@ export const useCanvasStore = create<CanvasState>()(
             prev,
             edges,
           );
-          const allowed = new Set(validation.allowedIds);
+          const allowed = new Set(
+            validation.ok
+              ? validation.allowedIds
+              : removeIds.filter((id) => !validation.blockedIds.includes(id)),
+          );
           if (!validation.ok) {
             canvasNotify({
               title: "无法删除该节点",
@@ -464,12 +468,15 @@ export const useCanvasStore = create<CanvasState>()(
           get().nodes,
           get().edges,
         );
-        if (!validation.ok || !validation.allowedIds.includes(id)) {
+        if (!validation.ok) {
           canvasNotify({
             title: "无法删除该节点",
             message: validation.message,
             variant: "error",
           });
+          return;
+        }
+        if (!validation.allowedIds.includes(id)) {
           return;
         }
         const edges = get().edges.filter((e) => e.source !== id && e.target !== id);

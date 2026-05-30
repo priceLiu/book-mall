@@ -168,7 +168,7 @@ export function StoryProCharacterAudioSlot({
       {statusHint?.kind === "error" ? (
         <StoryErrorLine message={statusHint.text} className="mt-1" />
       ) : statusHint ? (
-        <StoryHintLine className="mt-1">{statusHint.text}</StoryHintLine>
+        <StoryHintLine message={statusHint.text} className="mt-1" />
       ) : null}
     </div>
   );

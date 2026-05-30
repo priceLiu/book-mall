@@ -206,7 +206,7 @@ type AssistantPanelBodyProps = {
   input: string;
   setInput: (v: string) => void;
   onSend: () => void;
-  listRef: React.RefObject<HTMLDivElement | null>;
+  listRef: React.Ref<HTMLDivElement>;
   lastAssistant?: ChatMessage;
   onCopyLast: () => void;
   onDownloadLast: () => void;

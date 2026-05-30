@@ -342,6 +342,7 @@ export function useCanvasRunner(
               failMessage: message,
               submittedAt: null,
               completedAt: null,
+              kieTaskId: null,
               createdAt: "",
               updatedAt: "",
             },
@@ -630,6 +631,7 @@ export function useCanvasRunner(
               const nodeNow =
                 useCanvasStore.getState().nodes.find((n) => n.id === nodeId) ??
                 errNode;
+              if (!nodeNow) return;
               if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
                 storyApplyTaskResult(
                   nodeNow,
@@ -688,6 +690,7 @@ export function useCanvasRunner(
               failMessage: msg,
               submittedAt: null,
               completedAt: null,
+              kieTaskId: null,
               createdAt: "",
               updatedAt: "",
             },
@@ -712,7 +715,7 @@ export function useCanvasRunner(
         if (seq?.activeKey === key) {
           const node = nodeAfter;
           let done = false;
-          if (isAnyStoryScriptHubType(node?.type ?? "") && job.llmSection) {
+          if (node && isAnyStoryScriptHubType(node.type ?? "") && job.llmSection) {
             done = hubSectionIsComplete(node, job.llmSection);
           } else if (node && isStoryLlmNodeType(node.type ?? "")) {
             done =

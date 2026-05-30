@@ -36,7 +36,7 @@ export function syncStoryProHubFromStarter(args: {
 export function storyProStarterHasScriptSource(
   d: Pick<
     StoryProStarterNodeData,
-    "starterMode" | "uploadedScriptMd" | "systemPrompt"
+    "starterMode" | "uploadedScriptMd" | "uploadedScriptOssUrl" | "systemPrompt"
   >,
   upstreamScript?: string | null,
 ): boolean {

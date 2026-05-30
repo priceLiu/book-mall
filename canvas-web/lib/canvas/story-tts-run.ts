@@ -181,6 +181,7 @@ async function commitStoryTtsRowRunOnce(
         failMessage: msg,
         submittedAt: null,
         completedAt: null,
+        kieTaskId: null,
         createdAt: "",
         updatedAt: "",
       },

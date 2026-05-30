@@ -201,7 +201,7 @@ export function validateStoryPipelineDeletion(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
 ): StoryPipelineDeleteValidation {
-  const unique = [...new Set(candidateIds.filter(Boolean))];
+  const unique = Array.from(new Set(candidateIds.filter(Boolean)));
   if (!unique.length) return { ok: true, allowedIds: [] };
 
   const allowed = new Set<string>();

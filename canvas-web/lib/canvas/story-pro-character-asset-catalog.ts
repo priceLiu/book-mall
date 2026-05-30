@@ -73,7 +73,7 @@ function pickAssetForKey(
 /** 每角色一行 → 资产库多 ref（供分镜 @ 目录） */
 export function buildAssetRefsByCharacterKey(
   assets: StoryProCharacterAssetRecord[],
-  rows: { key: string; name?: string; lockedRefIds?: string[] }[],
+  rows: { key: string; name?: string; assetId?: string; lockedRefIds?: string[] }[],
   projectId?: string | null,
 ): Record<string, StoryRefImage[]> {
   const out: Record<string, StoryRefImage[]> = {};

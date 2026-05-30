@@ -18,6 +18,9 @@ export type StoryCharacterRow = {
   prompt: string;
   promptHistory?: StoryTextRevision[];
   runtime?: CanvasNodeRuntime;
+  /** 影视专业版 · 已绑定人物资产库 */
+  assetId?: string;
+  lockedRefIds?: string[];
 };
 
 export type StoryFrameRow = {
