@@ -4,7 +4,11 @@ import type { CanvasProviderKind } from "@prisma/client";
 import { getGatewayForKind } from "@/lib/canvas/providers";
 import type { CanvasProviderConfig } from "@/lib/canvas/providers/types";
 import { decryptApiKey } from "@/lib/canvas/secret";
-import { defaultBaseUrl, resolveOpenAiCompatibleBaseUrl } from "@/lib/gateway/model-router";
+import {
+  defaultBaseUrl,
+  resolveDeepSeekBaseUrl,
+  resolveOpenAiCompatibleBaseUrl,
+} from "@/lib/gateway/model-router";
 
 function toCanvasKind(kind: GatewayProviderKind): CanvasProviderKind {
   switch (kind) {
@@ -32,7 +36,12 @@ function buildTestConfig(row: {
   const base =
     row.providerKind === "BAILIAN" || row.providerKind === "DASHSCOPE"
       ? resolveOpenAiCompatibleBaseUrl(row.providerKind, row.baseUrl)
-      : (row.baseUrl?.trim() || defaultBaseUrl(row.providerKind)).replace(/\/$/, "");
+      : row.providerKind === "DEEPSEEK"
+        ? resolveDeepSeekBaseUrl(row.baseUrl)
+        : (row.baseUrl?.trim() || defaultBaseUrl(row.providerKind)).replace(
+            /\/$/,
+            "",
+          );
   return {
     id: row.id,
     alias: row.alias,

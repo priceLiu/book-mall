@@ -55,6 +55,7 @@ export { PlatformGatewayAdapter } from './services/llm/adapters/platform-gateway
 export {
   isPlatformGatewayMode,
   PLATFORM_GATEWAY_PROVIDER_ID,
+  PLATFORM_GATEWAY_CONFIG_ID,
   getPlatformGatewayChatPath,
   getPlatformGatewayClientPage,
 } from './utils/platform-gateway'

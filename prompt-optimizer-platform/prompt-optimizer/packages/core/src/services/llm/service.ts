@@ -16,6 +16,10 @@ import { isRunningInElectron } from '../../utils/environment';
 import { ElectronLLMProxy } from './electron-proxy';
 import { TextAdapterRegistry } from './adapters/registry';
 import { mergeOverrides, splitOverridesBySchema } from '../model/parameter-utils';
+import {
+  isPlatformGatewayMode,
+  PLATFORM_GATEWAY_PROVIDER_ID,
+} from '../../utils/platform-gateway';
 
 /**
  * LLM服务实现 - 基于 Adapter 架构
@@ -206,6 +210,15 @@ export class LLMService implements ILLMService {
       // Align with image model connection testing: allow testing even if the model is disabled.
       this.validateModelConfig(modelConfig, { allowDisabled: true });
 
+      if (
+        isPlatformGatewayMode() &&
+        modelConfig.providerMeta.id !== PLATFORM_GATEWAY_PROVIDER_ID
+      ) {
+        throw new RequestConfigError(
+          '平台版请使用 Book Gateway 模型；Qwen/DeepSeek 等厂商凭证在 gateway-web 配置，无需在此填写 DashScope Key。',
+        );
+      }
+
       // 发送一个简单的测试消息
       const testMessages: Message[] = [
         {
@@ -216,6 +229,11 @@ export class LLMService implements ILLMService {
 
       this.validateMessages(testMessages);
 
+      if (modelConfig.providerMeta.id === PLATFORM_GATEWAY_PROVIDER_ID) {
+        await this.testPlatformGatewayConnection(modelConfig);
+        return;
+      }
+
       // Send directly through the adapter to avoid the normal "enabled" constraint.
       const adapter = this.registry.getAdapter(modelConfig.providerMeta.id);
       const runtimeConfig = this.prepareRuntimeConfig(modelConfig);
@@ -225,8 +243,48 @@ export class LLMService implements ILLMService {
       if (error instanceof RequestConfigError || error instanceof APIError) {
         throw error;
       }
-      throw new APIError(`Connection test failed: ${error.message}`);
+      throw new APIError(this.formatConnectionTestError(error));
     }
+  }
+
+  private async testPlatformGatewayConnection(
+    modelConfig: TextModelConfig,
+  ): Promise<void> {
+    const adapter = this.registry.getAdapter(modelConfig.providerMeta.id);
+    const runtimeConfig = this.prepareRuntimeConfig(modelConfig);
+    const testMessages: Message[] = [
+      { role: 'user', content: 'Please reply ok' },
+    ];
+
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        if (error) reject(error);
+        else resolve();
+      };
+
+      adapter
+        .sendMessageStream(testMessages, runtimeConfig, {
+          onToken: () => finish(),
+          onComplete: () => finish(),
+          onError: (err) => finish(err),
+        })
+        .catch((err) => finish(err instanceof Error ? err : new Error(String(err))));
+    });
+  }
+
+  private formatConnectionTestError(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/governor/i.test(message)) {
+      return (
+        `Connection test failed: ${message}. ` +
+        'This looks like a Bailian/DashScope endpoint — DeepSeek should use https://api.deepseek.com/v1 ' +
+        'with a DeepSeek API key, or switch to Book Gateway in platform mode.'
+      );
+    }
+    return `Connection test failed: ${message}`;
   }
 
   /**

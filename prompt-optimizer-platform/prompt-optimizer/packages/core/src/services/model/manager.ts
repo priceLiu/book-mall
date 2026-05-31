@@ -21,6 +21,11 @@ import {
   hasTextModelMetadataIdentityMismatch,
   resolveTextModelMetadata
 } from './metadata-resolver';
+import {
+  isPlatformGatewayMode,
+  PLATFORM_GATEWAY_CONFIG_ID,
+  PLATFORM_GATEWAY_PROVIDER_ID,
+} from '../../utils/platform-gateway';
 
 /**
  * 模型管理器实现
@@ -212,6 +217,16 @@ export class ModelManager implements IModelManager {
                 console.log(`[ModelManager] Replaced unknown format with default: ${key}`);
               }
             }
+          }
+
+          await this.getRegistry();
+          const platformPolicy = this.applyPlatformGatewayStoragePolicy(
+            updatedModels,
+            defaults,
+          );
+          if (platformPolicy.hasUpdates) {
+            Object.assign(updatedModels, platformPolicy.models);
+            hasUpdates = true;
           }
 
           // 如果有更新，保存到存储
@@ -629,6 +644,81 @@ export class ModelManager implements IModelManager {
     }
   }
 
+  private applyPlatformGatewayStoragePolicy(
+    storedModels: Record<string, TextModelConfig>,
+    defaults: Record<string, TextModelConfig>,
+  ): { models: Record<string, TextModelConfig>; hasUpdates: boolean } {
+    if (!isPlatformGatewayMode()) {
+      return { models: storedModels, hasUpdates: false };
+    }
+
+    const platformDefault = defaults[PLATFORM_GATEWAY_CONFIG_ID];
+    if (!platformDefault) {
+      return { models: storedModels, hasUpdates: false };
+    }
+
+    let hasUpdates = false;
+    const next: Record<string, TextModelConfig> = { ...storedModels };
+
+    const existingPg = next[PLATFORM_GATEWAY_CONFIG_ID];
+    const selectedModelId =
+      existingPg && isTextModelConfig(existingPg) && existingPg.modelId?.trim()
+        ? existingPg.modelId.trim()
+        : platformDefault.modelId;
+
+    let platformConfig: TextModelConfig = {
+      ...platformDefault,
+      ...(existingPg && isTextModelConfig(existingPg) ? existingPg : {}),
+      enabled: true,
+      providerId: PLATFORM_GATEWAY_PROVIDER_ID,
+      modelId: selectedModelId,
+      connectionConfig: {},
+      providerMeta: platformDefault.providerMeta,
+      modelMeta: platformDefault.modelMeta,
+      paramOverrides: {
+        ...(platformDefault.paramOverrides || {}),
+        ...(existingPg && isTextModelConfig(existingPg)
+          ? existingPg.paramOverrides || {}
+          : {}),
+      },
+    };
+
+    try {
+      const adapter = this.registry?.getAdapter(PLATFORM_GATEWAY_PROVIDER_ID);
+      const modelIdForLookup =
+        selectedModelId || platformDefault.modelId || 'deepseek-v4-flash';
+      const matched =
+        adapter?.getModels().find((model) => model.id === modelIdForLookup) ||
+        adapter?.buildDefaultModel(modelIdForLookup);
+      if (matched) {
+        platformConfig = { ...platformConfig, modelMeta: matched };
+      }
+    } catch {
+      // Keep default model metadata snapshot.
+    }
+
+    if (
+      !existingPg ||
+      !isTextModelConfig(existingPg) ||
+      JSON.stringify(existingPg) !== JSON.stringify(platformConfig)
+    ) {
+      next[PLATFORM_GATEWAY_CONFIG_ID] = platformConfig;
+      hasUpdates = true;
+      console.log('[ModelManager] Applied platform Gateway default model config');
+    }
+
+    for (const [key, config] of Object.entries(next)) {
+      if (key === PLATFORM_GATEWAY_CONFIG_ID) continue;
+      if (isTextModelConfig(config) && config.enabled) {
+        next[key] = { ...config, enabled: false };
+        hasUpdates = true;
+        console.log(`[ModelManager] Disabled non-Gateway model in platform mode: ${key}`);
+      }
+    }
+
+    return { models: next, hasUpdates };
+  }
+
   private isDeepseekConfig(config: TextModelConfig): boolean {
     const providerId = (
       config.providerId ||
@@ -647,6 +737,8 @@ export class ModelManager implements IModelManager {
     if (!this.isDeepseekConfig(config)) {
       return config
     }
+
+    config = this.patchDeepseekConnectionBaseUrl(config, defaultConfig)
 
     const isBuiltinDeepseek = config.id === 'deepseek'
     const currentModelId = config.modelMeta?.id
@@ -709,6 +801,38 @@ export class ModelManager implements IModelManager {
     }
 
     return modelId
+  }
+
+  private patchDeepseekConnectionBaseUrl(
+    config: TextModelConfig,
+    defaultConfig?: TextModelConfig,
+  ): TextModelConfig {
+    const raw = String(config.connectionConfig?.baseURL ?? '').trim().toLowerCase()
+    if (!raw) {
+      return config
+    }
+
+    const looksLikeBailian =
+      raw.includes('dashscope.aliyuncs.com') ||
+      raw.includes('compatible-mode') ||
+      raw.includes('aliyuncs.com')
+    if (!looksLikeBailian) {
+      return config
+    }
+
+    const fallback =
+      String(defaultConfig?.connectionConfig?.baseURL ?? '').trim() ||
+      'https://api.deepseek.com/v1'
+    console.warn(
+      `[ModelManager] Reset DeepSeek baseURL (was misconfigured as Bailian/DashScope): ${config.id}`,
+    )
+    return {
+      ...config,
+      connectionConfig: {
+        ...(config.connectionConfig || {}),
+        baseURL: fallback,
+      },
+    }
   }
 
   private getDeepseekModelMeta(
@@ -786,9 +910,23 @@ export class ModelManager implements IModelManager {
     const models = await this.getModelsFromStorage();
     const registry = await this.getRegistry()
 
-    return Object.entries(models).map(([key, config]) =>
+    const all = Object.entries(models).map(([key, config]) =>
       this.normalizeStoredTextModelConfig(key, config, registry)
-    )
+    );
+    return this.filterPlatformGatewayModels(all);
+  }
+
+  private filterPlatformGatewayModels(
+    models: TextModelConfig[],
+  ): TextModelConfig[] {
+    if (!isPlatformGatewayMode()) {
+      return models;
+    }
+    return models.filter(
+      (model) =>
+        model.providerId === PLATFORM_GATEWAY_PROVIDER_ID ||
+        model.id === PLATFORM_GATEWAY_CONFIG_ID,
+    );
   }
 
   /**
@@ -796,6 +934,13 @@ export class ModelManager implements IModelManager {
    */
   async getModel(key: string): Promise<TextModelConfig | undefined> {
     await this.ensureInitialized();
+    if (
+      isPlatformGatewayMode() &&
+      key !== PLATFORM_GATEWAY_CONFIG_ID &&
+      !key.startsWith(`${PLATFORM_GATEWAY_PROVIDER_ID}/`)
+    ) {
+      return undefined;
+    }
     const models = await this.getModelsFromStorage();
     const config = models[key];
 

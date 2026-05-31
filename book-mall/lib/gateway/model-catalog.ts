@@ -5,6 +5,7 @@
 import type { GatewayProviderKind } from "@prisma/client";
 
 import { BAILIAN_R2V_KNOWN_MODELS } from "@/lib/canvas/providers/bailian-r2v";
+import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
 import { DEEPSEEK_KNOWN_MODELS } from "@/lib/canvas/providers/deepseek-system";
 import { listHunyuanKnownModels } from "@/lib/canvas/providers/hunyuan-3d";
 import { KIE_KNOWN_MODELS } from "@/lib/canvas/providers/kie";
@@ -355,20 +356,31 @@ export function buildGatewayModelCatalog(
 
   const kieModels = sortModels(
     KIE_KNOWN_MODELS.map((m) =>
-      fromListed(m, "KIE", ["Canvas", "Story"]),
+      fromListed(
+        m,
+        "KIE",
+        m.role === "LLM" && m.modelKey.toLowerCase().includes("gemini")
+          ? ["Canvas", "Story", "提示词优化器"]
+          : ["Canvas", "Story"],
+      ),
     ),
   );
 
   const deepseekModels = sortModels(
     DEEPSEEK_KNOWN_MODELS.map((m) =>
-      fromListed(m, "DEEPSEEK", ["Canvas", "Story", "工具站"]),
+      fromListed(m, "DEEPSEEK", ["Canvas", "Story", "工具站", "提示词优化器"]),
     ),
   );
 
   const bailianModels = sortModels(
-    BAILIAN_R2V_KNOWN_MODELS.map((m) =>
-      fromListed(m, "BAILIAN", ["Canvas"]),
-    ),
+    dedupeByKey([
+      ...BAILIAN_CHAT_KNOWN_MODELS.map((m) =>
+        fromListed(m, "BAILIAN", ["Canvas", "Story", "工具站", "提示词优化器"]),
+      ),
+      ...BAILIAN_R2V_KNOWN_MODELS.map((m) =>
+        fromListed(m, "BAILIAN", ["Canvas"]),
+      ),
+    ]),
   );
 
   const hunyuanModels = sortModels(

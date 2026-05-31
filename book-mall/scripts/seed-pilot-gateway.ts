@@ -65,10 +65,19 @@ async function ensureCredential(
 ): Promise<string | null> {
   const existing = await prisma.gatewayVendorCredential.findFirst({
     where: { userId: gatewayUserId, providerKind: spec.kind, alias: spec.alias },
-    select: { id: true },
+    select: { id: true, baseUrl: true },
   });
   if (existing) {
-    console.log(`[skip] ${spec.alias} (${spec.kind}) 凭证已存在`);
+    const targetBase = spec.baseUrl?.trim() || null;
+    if (targetBase && existing.baseUrl !== targetBase) {
+      await prisma.gatewayVendorCredential.update({
+        where: { id: existing.id },
+        data: { baseUrl: targetBase },
+      });
+      console.log(`[patch] ${spec.alias} baseUrl → ${targetBase}`);
+    } else {
+      console.log(`[skip] ${spec.alias} (${spec.kind}) 凭证已存在`);
+    }
     return existing.id;
   }
 

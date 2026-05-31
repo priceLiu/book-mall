@@ -65,19 +65,19 @@
                             <!-- 模型和模板选择行 -->
                             <NFlex :size="12" :wrap="false">
                                 <!-- 优化模型选择 -->
-                                <NFlex vertical :size="4" style="flex: 1">
-                                    <NFlex align="center" :size="6" :wrap="false">
-                                        <NText :depth="3" style="font-size: 12px; flex-shrink: 0;">
-                                            {{ $t('promptOptimizer.optimizeModel') }}
-                                        </NText>
-                                        <TextModelQuickSwitch
-                                            :model-key="selectedOptimizeModelKeyModel"
-                                            :options="modelSelection.textModelOptions.value"
-                                            :refresh-models="modelSelection.refreshTextModels"
-                                            :disabled="conversationOptimization.isOptimizing.value"
-                                        />
-                                    </NFlex>
+                                <NFlex vertical :size="6" style="flex: 1">
+                                    <NText :depth="2" style="font-size: 14px; font-weight: 500;">
+                                        {{ $t('promptOptimizer.optimizeModel') }}
+                                    </NText>
+                                    <TextModelQuickSwitch
+                                        :model-key="selectedOptimizeModelKeyModel"
+                                        :options="modelSelection.textModelOptions.value"
+                                        :refresh-models="modelSelection.refreshTextModels"
+                                        :disabled="conversationOptimization.isOptimizing.value"
+                                        :show-provider-hint="platformGatewayMode"
+                                    />
                                     <SelectWithConfig
+                                        v-if="!platformGatewayMode"
                                         v-model="selectedOptimizeModelKeyModel"
                                         :options="modelSelection.textModelOptions.value"
                                         :getPrimary="OptionAccessors.getPrimary"
@@ -305,6 +305,7 @@
                                             :options="modelSelection.textModelOptions.value"
                                             :refresh-models="modelSelection.refreshTextModels"
                                             :disabled="variantRunning[id] || isAnyVariantRunning"
+                                            :block="false"
                                         />
                                     </div>
 
@@ -316,7 +317,7 @@
                                             :test-id="getVariantVersionTestId(id)"
                                             @update:value="(value) => handleVariantVersionChange(id, value)"
                                         />
-                                        <div class="variant-cell__model">
+                                        <div v-if="!platformGatewayMode" class="variant-cell__model">
                                             <SelectWithConfig
                                                 :data-testid="getVariantModelTestId(id)"
                                                 :model-value="variantModelKeyModels[id].value"
@@ -532,6 +533,7 @@ import OutputDisplay from "../OutputDisplay.vue";
 import SaveTestResultExampleButton from '../SaveTestResultExampleButton.vue'
 import SelectWithConfig from "../SelectWithConfig.vue";
 import TextModelQuickSwitch from "../TextModelQuickSwitch.vue";
+import { isPlatformGatewayMode } from "../../utils/platform-gateway";
 import TestPanelVersionSelect from '../TestPanelVersionSelect.vue'
 import TestSourceLinkedCard from '../TestSourceLinkedCard.vue'
 import TestVariantSourceTag from '../TestVariantSourceTag.vue'
@@ -693,6 +695,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const toast = useToast();
+const platformGatewayMode = isPlatformGatewayMode();
 
 // 注入服务和变量管理器
 const injectedServices = inject<Ref<AppServices | null>>('services')

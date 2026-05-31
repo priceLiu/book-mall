@@ -28,36 +28,15 @@ vi.mock('vue-i18n', async (importOriginal) => {
   }
 })
 
-const NPopoverStub = defineComponent({
-  name: 'NPopover',
-  props: {
-    show: { type: Boolean, default: false },
-  },
-  emits: ['update:show'],
-  setup(_, { slots, emit }) {
-    return () =>
-      h('div', { class: 'n-popover-stub' }, [
-        h(
-          'button',
-          {
-            type: 'button',
-            'data-testid': 'quick-switch-trigger',
-            onClick: () => emit('update:show', true),
-          },
-          slots.trigger?.(),
-        ),
-        h('div', { class: 'n-popover-content' }, slots.default?.()),
-      ])
-  },
-})
-
 const NSelectStub = defineComponent({
   name: 'NSelect',
   props: {
     value: { type: [String, Number], default: '' },
     options: { type: Array, default: () => [] },
+    title: { type: String, default: '' },
+    ariaLabel: { type: String, default: '' },
   },
-  emits: ['update:value'],
+  emits: ['update:value', 'update:show', 'focus'],
   setup(props, { emit }) {
     return () =>
       h(
@@ -65,6 +44,9 @@ const NSelectStub = defineComponent({
         {
           'data-testid': 'quick-switch-select',
           value: props.value,
+          title: props.title,
+          'aria-label': props.ariaLabel,
+          onFocus: () => emit('focus'),
           onChange: (event: Event) => {
             emit('update:value', (event.target as HTMLSelectElement).value)
           },
@@ -120,7 +102,7 @@ const createOption = (config: TextModelConfig): ModelSelectOption => ({
   raw: config,
 })
 
-const mountComponent = (config = createConfig()) => {
+const mountComponent = (config = createConfig(), extraProps: Record<string, unknown> = {}) => {
   const updateModel = vi.fn().mockResolvedValue(undefined)
   const fetchModelList = vi.fn().mockResolvedValue([
     { value: 'model-b', label: 'Model B' },
@@ -157,21 +139,16 @@ const mountComponent = (config = createConfig()) => {
       modelKey: config.id,
       options: [createOption(config)],
       refreshModels,
+      ...extraProps,
     },
     global: {
       provide: {
         services,
       },
       stubs: {
-        NPopover: NPopoverStub,
-        'n-popover': NPopoverStub,
-        Popover: NPopoverStub,
         NSelect: NSelectStub,
         'n-select': NSelectStub,
         Select: NSelectStub,
-        NSpace: simpleStub('NSpace'),
-        'n-space': simpleStub('NSpace'),
-        Space: simpleStub('NSpace'),
         NTag: simpleStub('NTag', 'span'),
         'n-tag': simpleStub('NTag', 'span'),
         Tag: simpleStub('NTag', 'span'),
@@ -192,20 +169,32 @@ const mountComponent = (config = createConfig()) => {
 }
 
 describe('TextModelQuickSwitch', () => {
-  it('shows a compact model tag for the selected text model config', () => {
+  it('renders a full-width select with the current model and accessible title', async () => {
     const { wrapper } = mountComponent()
 
-    expect(wrapper.text()).toContain('Model A')
-    expect(wrapper.text()).not.toContain('Custom API')
-    expect(wrapper.get('.text-model-quick-switch__model').attributes('title')).toBe(
+    await flushPromises()
+
+    const select = wrapper.get('[data-testid="quick-switch-select"]')
+    expect(select.element.value).toBe('model-a')
+    expect(select.attributes('title')).toBe('Custom API / Model A')
+    expect(select.attributes('aria-label')).toBe(
       'model.quickSwitch.modelTagTitle - Custom API / Model A',
     )
+    expect(wrapper.find('.text-model-quick-switch--block').exists()).toBe(true)
   })
 
-  it('fetches available models and updates model identity on the selected config', async () => {
+  it('shows provider hint when showProviderHint is enabled', async () => {
+    const { wrapper } = mountComponent(createConfig(), { showProviderHint: true })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Custom API')
+    expect(wrapper.find('.text-model-quick-switch__provider').exists()).toBe(true)
+  })
+
+  it('loads models on mount and updates model identity when selection changes', async () => {
     const { wrapper, updateModel, fetchModelList, refreshModels, config } = mountComponent()
 
-    await wrapper.get('[data-testid="quick-switch-trigger"]').trigger('click')
     await flushPromises()
 
     expect(fetchModelList).toHaveBeenCalledWith('custom', expect.objectContaining({

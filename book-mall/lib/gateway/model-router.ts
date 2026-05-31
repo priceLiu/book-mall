@@ -6,7 +6,14 @@ const DEEPSEEK_MODELS = new Set([
   "deepseek-coder",
 ]);
 
-const KIE_CHAT_MODELS = new Set(["gemini-3-flash", "google/gemini-3-flash"]);
+const KIE_CHAT_MODELS = new Set([
+  "gemini-3-flash",
+  "google/gemini-3-flash",
+  "google/gemini-3-flash-preview",
+  "gemini-2.5-flash",
+  "google/gemini-2.5-flash",
+  "google/gemini-2.5-flash-preview",
+]);
 
 const KIE_JOB_PREFIXES = [
   "bytedance/",
@@ -84,6 +91,13 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "KIE", requestKind: "CHAT" };
   }
 
+  if (
+    /^gemini-\d+\.\d-flash(-preview)?$/i.test(m) ||
+    /^google\/gemini-\d+\.\d-flash(-preview)?$/i.test(m)
+  ) {
+    return { providerKind: "KIE", requestKind: "CHAT" };
+  }
+
   if (KIE_JOB_PREFIXES.some((p) => m.includes(p))) {
     const isVideo =
       m.includes("video") ||
@@ -97,7 +111,7 @@ export function routeGatewayModel(model: string): RoutedModel {
     };
   }
 
-  if (m.includes("qwen") || m.includes("bailian")) {
+  if (m.includes("qwen") || m.includes("bailian") || m.includes("minimax")) {
     return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
 
@@ -124,6 +138,21 @@ export function defaultBaseUrl(kind: GatewayProviderKind): string {
 }
 
 const DASHSCOPE_HOST_RE = /^https?:\/\/dashscope\.aliyuncs\.com\/?$/i;
+const DEEPSEEK_HOST_RE = /^https?:\/\/api\.deepseek\.com\/?$/i;
+
+/** DeepSeek OpenAI 兼容端点须带 /v1，避免裸域名路径不一致。 */
+export function resolveDeepSeekBaseUrl(
+  baseUrl: string | null | undefined,
+): string {
+  const fallback = defaultBaseUrl("DEEPSEEK").replace(/\/$/, "");
+  const raw = (baseUrl?.trim() || fallback).replace(/\/$/, "");
+  if (!raw) return fallback;
+  if (DEEPSEEK_HOST_RE.test(raw)) return `${raw}/v1`;
+  if (/api\.deepseek\.com/i.test(raw) && !/\/v\d+$/i.test(raw)) {
+    return `${raw}/v1`;
+  }
+  return raw;
+}
 
 /**
  * 将用户填写的 DashScope 根域名规范为 compatible-mode/v1，避免请求 /chat/completions 404。
@@ -148,6 +177,24 @@ export function resolveOpenAiCompatibleBaseUrl(
   if (DASHSCOPE_HOST_RE.test(raw)) return `${raw}/compatible-mode/v1`;
 
   return raw;
+}
+
+/** KIE Gemini Chat 端点路径段（OpenAI 兼容 /{segment}/v1/chat/completions） */
+export function resolveKieGeminiChatPath(modelKey: string): string {
+  const m = modelKey.trim().toLowerCase();
+  if (m.includes("2.5") && m.includes("flash")) {
+    return "gemini-2.5-flash";
+  }
+  return "gemini-3-flash";
+}
+
+/** 百炼 compatible-mode 上游 model 字段（MiniMax 官方 ID 带 MiniMax/ 前缀） */
+export function resolveBailianChatModelKey(modelKey: string): string {
+  const raw = modelKey.trim();
+  const aliases: Record<string, string> = {
+    "MiniMax-M2.7": "MiniMax/MiniMax-M2.7",
+  };
+  return aliases[raw] ?? raw;
 }
 
 export {

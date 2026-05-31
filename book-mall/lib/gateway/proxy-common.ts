@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getDecryptedCredentialApiKey } from "./credential-service";
 import {
   defaultBaseUrl,
+  resolveBailianChatModelKey,
+  resolveKieGeminiChatPath,
   resolveOpenAiCompatibleBaseUrl,
   routeGatewayModel,
 } from "./model-router";
@@ -142,8 +144,18 @@ export async function forwardChatCompletions(opts: {
   let url = `${base}/chat/completions`;
 
   if (cred.providerKind === "KIE") {
-    url = `${base}/gemini-3-flash/v1/chat/completions`;
+    const modelKey =
+      typeof opts.body.model === "string" ? opts.body.model : "gemini-3-flash";
+    url = `${base}/${resolveKieGeminiChatPath(modelKey)}/v1/chat/completions`;
   }
+
+  const requestBody =
+    cred.providerKind === "BAILIAN" && typeof opts.body.model === "string"
+      ? {
+          ...opts.body,
+          model: resolveBailianChatModelKey(opts.body.model),
+        }
+      : opts.body;
 
   const started = Date.now();
   const r = await fetch(url, {
@@ -152,7 +164,7 @@ export async function forwardChatCompletions(opts: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${cred.apiKey}`,
     },
-    body: JSON.stringify(opts.body),
+    body: JSON.stringify(requestBody),
   });
   const text = await r.text();
   return { status: r.status, text, durationMs: Date.now() - started };
@@ -174,8 +186,18 @@ export async function forwardChatCompletionsStream(opts: {
   let url = `${base}/chat/completions`;
 
   if (cred.providerKind === "KIE") {
-    url = `${base}/gemini-3-flash/v1/chat/completions`;
+    const modelKey =
+      typeof opts.body.model === "string" ? opts.body.model : "gemini-3-flash";
+    url = `${base}/${resolveKieGeminiChatPath(modelKey)}/v1/chat/completions`;
   }
+
+  const requestBody =
+    cred.providerKind === "BAILIAN" && typeof opts.body.model === "string"
+      ? {
+          ...opts.body,
+          model: resolveBailianChatModelKey(opts.body.model),
+        }
+      : opts.body;
 
   const started = Date.now();
   const r = await fetch(url, {
@@ -184,7 +206,7 @@ export async function forwardChatCompletionsStream(opts: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${cred.apiKey}`,
     },
-    body: JSON.stringify({ ...opts.body, stream: true }),
+    body: JSON.stringify({ ...requestBody, stream: true }),
   });
   return {
     status: r.status,

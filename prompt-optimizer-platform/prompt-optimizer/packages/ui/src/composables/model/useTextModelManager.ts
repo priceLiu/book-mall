@@ -20,7 +20,8 @@ import {
   validateCustomRequestHeaders
 } from '@prompt-optimizer/core'
 import { formatErrorSummary, getI18nErrorMessage } from '../../utils/error'
-import { isPlatformGatewayMode } from '../../utils/platform-gateway'
+import { isPlatformGatewayMode, PLATFORM_GATEWAY_CONFIG_ID } from '../../utils/platform-gateway'
+import { PLATFORM_GATEWAY_PROVIDER_ID } from '@prompt-optimizer/core'
 import { useModelAdvancedParameters } from './useModelAdvancedParameters'
 import { computeConnectionConfig } from './useConnectionConfig'
 import type { AppServices } from '../../types/services'
@@ -414,7 +415,14 @@ export function useTextModelManager() {
     loadingModels.value = true
     try {
       const all = await modelManager.getAllModels()
-      models.value = all
+      const visible = isPlatformGatewayMode()
+        ? all.filter(
+            (model: TextModelConfig) =>
+              model.providerId === PLATFORM_GATEWAY_PROVIDER_ID ||
+              model.id === PLATFORM_GATEWAY_CONFIG_ID,
+          )
+        : all
+      models.value = visible
         .map((model: TextModelConfig) => ({ ...model }))
         .sort((a: TextModelConfig, b: TextModelConfig) => {
           if (a.enabled !== b.enabled) {
