@@ -168,22 +168,30 @@
         <!-- 控制面板 -->
         <NGrid :cols="24" :x-gap="8" responsive="screen">
             <!-- 模型选择 -->
-            <NGridItem :span="6" :xs="24" :sm="6">
-                <NSpace vertical :size="8">
-                    <NFlex align="center" :size="6" :wrap="false" class="input-panel-label-row">
-                        <NText
-                            :depth="2"
-                            style="font-size: 14px; font-weight: 500; flex-shrink: 0;"
-                            >{{ modelLabel }}</NText
-                        >
+            <NGridItem :span="8" :xs="24" :sm="8">
+                <NSpace vertical :size="6" class="input-panel-model-field">
+                    <NText
+                        :depth="2"
+                        style="font-size: 14px; font-weight: 500"
+                        >{{ modelLabel }}</NText
+                    >
+                    <div
+                        v-if="$slots['model-label-extra']"
+                        class="input-panel-model-variant"
+                    >
                         <slot name="model-label-extra"></slot>
-                    </NFlex>
-                    <slot name="model-select"></slot>
+                    </div>
+                    <div
+                        v-if="$slots['model-select']"
+                        class="input-panel-model-provider"
+                    >
+                        <slot name="model-select"></slot>
+                    </div>
                 </NSpace>
             </NGridItem>
 
             <!-- 提示词模板选择 -->
-            <NGridItem v-if="templateLabel" :span="11" :xs="24" :sm="11">
+            <NGridItem v-if="templateLabel" :span="9" :xs="24" :sm="9">
                 <NSpace vertical :size="8">
                     <NText
                         :depth="2"
@@ -196,9 +204,9 @@
 
             <!-- 控制按钮组 -->
             <NGridItem
-                :span="templateLabel ? 2 : 13"
+                :span="templateLabel ? 2 : 11"
                 :xs="24"
-                :sm="templateLabel ? 2 : 13"
+                :sm="templateLabel ? 2 : 11"
             >
                 <NSpace vertical :size="8" align="end">
                     <slot name="control-buttons"></slot>
@@ -395,3 +403,20 @@ const handleAddMissingVariable = (varName: string) => {
     emit("add-missing-variable", varName);
 };
 </script>
+
+<style scoped>
+.input-panel-model-field {
+    width: 100%;
+    min-width: 0;
+}
+
+.input-panel-model-variant,
+.input-panel-model-provider {
+    width: 100%;
+    min-width: 0;
+}
+
+.input-panel-model-provider :deep(.n-base-selection) {
+    font-size: 13px;
+}
+</style>

@@ -58,6 +58,22 @@ Book 注册 / 登录
 - **Gateway** 提供统一的模型管理 UI（见 gateway-web § Model Manager）
 - **prompt-optimizer** 仅消费已启用模型列表；未配置时引导至 Gateway
 
+### 5.1 推荐 Chat 模型（Gateway 配置后可用）
+
+| 模型 Key | Gateway 厂商 | 说明 |
+|----------|--------------|------|
+| `deepseek-v4-flash` | DEEPSEEK | 默认 · 快速经济 |
+| `deepseek-v4-pro` | DEEPSEEK | 更强推理 |
+| `qwen3.5-27b` | 百炼 BAILIAN | 百炼 OpenAI 兼容 |
+| `MiniMax/MiniMax-M2.7` | 百炼 BAILIAN | MiniMax 旗舰（须在百炼控制台开通 MiniMax 服务） |
+| `gemini-2.5-flash` | KIE | Google Gemini 2.5 Flash（百炼无 Gemini 价目） |
+| `gemini-3-flash` | KIE | Gemini 3 Flash · Story 同款 |
+
+DeepSeek 凭证：`DEEPSEEK_API_KEY` → `https://api.deepseek.com/v1`  
+百炼凭证：`DASHSCOPE_API_KEY` → `https://dashscope.aliyuncs.com/compatible-mode/v1`
+
+试点账号本地 seed：`cd book-mall && pnpm exec dotenv -e .env.local -- tsx scripts/seed-pilot-gateway.ts`
+
 ---
 
 ## 6. 环境变量

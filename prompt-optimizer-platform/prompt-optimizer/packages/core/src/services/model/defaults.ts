@@ -5,7 +5,11 @@ import { getEnvVar } from '../../utils/environment';
 import { normalizeCustomRequestHeaders, validateCustomRequestHeaders } from '../../utils/custom-request-headers';
 import { generateDynamicModels } from './model-utils';
 import { CHROME_BUILT_IN_PROVIDER_ID } from '../llm/chrome-built-in';
-import { isPlatformGatewayMode, PLATFORM_GATEWAY_PROVIDER_ID } from '../../utils/platform-gateway';
+import {
+  isPlatformGatewayMode,
+  PLATFORM_GATEWAY_CONFIG_ID,
+  PLATFORM_GATEWAY_PROVIDER_ID,
+} from '../../utils/platform-gateway';
 
 /**
  * Provider ID -> 环境变量 key 映射
@@ -202,8 +206,10 @@ export function getDefaultTextModels(registry?: ITextAdapterRegistry): Record<st
     const pgAdapter = adapterRegistry.getAdapter(PLATFORM_GATEWAY_PROVIDER_ID);
     const pgProvider = pgAdapter.getProvider();
     const pgModel =
-      pgAdapter.getModels()[0] || pgAdapter.buildDefaultModel("deepseek-chat");
-    const configId = `${PLATFORM_GATEWAY_PROVIDER_ID}/default`;
+      pgAdapter.getModels().find((m) => m.id === "deepseek-v4-flash") ||
+      pgAdapter.getModels()[0] ||
+      pgAdapter.buildDefaultModel("deepseek-v4-flash");
+    const configId = PLATFORM_GATEWAY_CONFIG_ID;
 
     for (const key of Object.keys(result)) {
       if (key !== configId) {

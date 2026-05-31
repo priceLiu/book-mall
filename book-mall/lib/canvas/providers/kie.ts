@@ -14,6 +14,8 @@ import {
   type KieImageInput,
 } from "@/lib/story/kie-client";
 
+import { resolveKieGeminiChatPath } from "@/lib/gateway/model-router";
+
 import {
   CanvasGatewayError,
   getDefaultProviderBaseUrl,
@@ -242,6 +244,15 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
     role: "LLM",
     description:
       "多模态视觉理解 + 文本生成。上游连接产品图 / 风格图 / 参数即可直接出设计方案。",
+    paramsSchema: GEMINI_3_FLASH_LLM_PARAMS,
+    defaultParams: GEMINI_3_FLASH_LLM_DEFAULTS,
+  },
+  {
+    modelKey: "gemini-2.5-flash",
+    displayName: "Gemini 2.5 Flash (KIE)",
+    role: "LLM",
+    description:
+      "Google Gemini 2.5 Flash · 快速多模态 · 提示词优化 / Story 文案推荐。",
     paramsSchema: GEMINI_3_FLASH_LLM_PARAMS,
     defaultParams: GEMINI_3_FLASH_LLM_DEFAULTS,
   },
@@ -717,8 +728,8 @@ export class KieGateway implements CanvasProviderGateway {
   }
 
   async chat(req: CanvasGatewayChatRequest): Promise<CanvasGatewayChatResponse> {
-    // KIE 当前 LLM 接入只有 gemini-3-flash 一条路径
-    const url = `${this.baseUrl}/gemini-3-flash/v1/chat/completions`;
+    const geminiPath = resolveKieGeminiChatPath(req.modelKey);
+    const url = `${this.baseUrl}/${geminiPath}/v1/chat/completions`;
 
     const callOnce = async (
       includeThoughts: boolean,

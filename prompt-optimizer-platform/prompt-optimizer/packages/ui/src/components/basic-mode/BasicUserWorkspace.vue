@@ -88,18 +88,19 @@
                         @analyze="handleAnalyze"
                         @configModel="handleOpenModelManager"
                     >
-                        <!-- 模型选择 -->
                         <template #model-label-extra>
                             <TextModelQuickSwitch
                                 :model-key="selectedOptimizeModelKeyModel"
                                 :options="modelSelection.textModelOptions.value"
                                 :refresh-models="modelSelection.refreshTextModels"
                                 :disabled="unwrappedLogicProps.isOptimizing"
+                                :show-provider-hint="platformGatewayMode"
                             />
                         </template>
 
                         <template #model-select>
                             <SelectWithConfig
+                                v-if="!platformGatewayMode"
                                 v-model="selectedOptimizeModelKeyModel"
                                 :options="modelSelection.textModelOptions"
                                 :getPrimary="OptionAccessors.getPrimary"
@@ -307,6 +308,7 @@
                                             :options="modelSelection.textModelOptions.value"
                                             :refresh-models="modelSelection.refreshTextModels"
                                             :disabled="variantRunning[id] || isAnyVariantRunning"
+                                            :block="false"
                                         />
                                     </div>
 
@@ -318,7 +320,7 @@
                                             :test-id="getVariantVersionTestId(id)"
                                             @update:value="(value) => handleVariantVersionChange(id, value)"
                                         />
-                                        <div class="variant-cell__model">
+                                        <div v-if="!platformGatewayMode" class="variant-cell__model">
                                             <SelectWithConfig
                                                 :data-testid="getVariantModelTestId(id)"
                                                 :model-value="variantModelKeyModels[id].value"
@@ -528,6 +530,7 @@ import {
 import { buildCompareToolbarStatus } from '../evaluation/compare-ui'
 import SelectWithConfig from '../SelectWithConfig.vue'
 import TextModelQuickSwitch from '../TextModelQuickSwitch.vue'
+import { isPlatformGatewayMode } from '../../utils/platform-gateway'
 import TestPanelVersionSelect from '../TestPanelVersionSelect.vue'
 import TestSourceLinkedCard from '../TestSourceLinkedCard.vue'
 import TestVariantSourceTag from '../TestVariantSourceTag.vue'
@@ -548,6 +551,7 @@ import { runTasksWithExecutionMode } from '../../utils/runTasksSequentially'
 
 const { t } = useI18n()
 const toast = useToast()
+const platformGatewayMode = isPlatformGatewayMode()
 
 // 服务注入
 const injectedServices = inject<Ref<AppServices | null>>('services')

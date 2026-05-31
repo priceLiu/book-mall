@@ -1,64 +1,51 @@
 <template>
-  <div v-if="selectedConfig" class="text-model-quick-switch" data-testid="text-model-quick-switch">
+  <div
+    v-if="selectedConfig"
+    class="text-model-quick-switch"
+    :class="{ 'text-model-quick-switch--block': block }"
+    data-testid="text-model-quick-switch"
+  >
+    <NSelect
+      v-if="!disabled"
+      :value="selectedModelId"
+      :options="modelOptions"
+      :loading="loading"
+      filterable
+      size="small"
+      :placeholder="t('model.quickSwitch.placeholder')"
+      :title="fullModelTitle"
+      :aria-label="interactiveModelTitle"
+      class="text-model-quick-switch__select"
+      @focus="loadModelOptionsIfNeeded"
+      @update:show="handleSelectMenuVisibility"
+      @update:value="handleModelSelect"
+    />
     <NTag
-      v-if="disabled"
+      v-else
       size="small"
       :bordered="false"
-      class="text-model-quick-switch__model"
+      class="text-model-quick-switch__model text-model-quick-switch__model--readonly"
       :title="fullModelTitle"
     >
       {{ modelLabel }}
     </NTag>
-
-    <NPopover
-      v-else
-      v-model:show="popoverVisible"
-      trigger="click"
-      placement="bottom-start"
-      :show-arrow="false"
-      @update:show="handlePopoverVisibility"
+    <NText
+      v-if="showProviderHint && providerLabel"
+      depth="3"
+      class="text-model-quick-switch__provider"
     >
-      <template #trigger>
-        <NTag
-          size="small"
-          :bordered="false"
-          class="text-model-quick-switch__model text-model-quick-switch__model--clickable"
-          :title="interactiveModelTitle"
-          :aria-label="interactiveModelTitle"
-          role="button"
-          tabindex="0"
-        >
-          {{ modelLabel }}
-        </NTag>
-      </template>
-
-      <div class="text-model-quick-switch__popover">
-        <NSpace vertical :size="8">
-          <NText depth="2" class="text-model-quick-switch__title">
-            {{ t('model.quickSwitch.title') }}
-          </NText>
-          <NSelect
-            :value="selectedModelId"
-            :options="modelOptions"
-            :loading="loading"
-            filterable
-            size="small"
-            :placeholder="t('model.quickSwitch.placeholder')"
-            @update:value="handleModelSelect"
-          />
-          <NText v-if="fetchError" type="warning" depth="3" class="text-model-quick-switch__hint">
-            {{ t('model.quickSwitch.fetchFailed', { error: fetchError }) }}
-          </NText>
-        </NSpace>
-      </div>
-    </NPopover>
+      {{ providerLabel }}
+    </NText>
+    <NText v-if="fetchError" type="warning" depth="3" class="text-model-quick-switch__hint">
+      {{ t('model.quickSwitch.fetchFailed', { error: fetchError }) }}
+    </NText>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, watch, type Ref } from 'vue'
+import { computed, inject, onMounted, ref, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NPopover, NSelect, NSpace, NTag, NText, type SelectOption } from 'naive-ui'
+import { NSelect, NTag, NText, type SelectOption } from 'naive-ui'
 import {
   resolveTextModelMetadata,
   type ITextAdapterRegistry,
@@ -77,22 +64,28 @@ interface Props {
   options: ModelSelectOption[]
   disabled?: boolean
   refreshModels?: () => Promise<void>
+  /** 占满父容器宽度（工作区主模型选择推荐开启） */
+  block?: boolean
+  /** 在下方展示 Provider 名称（平台 Gateway 单配置场景） */
+  showProviderHint?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   options: () => [],
   disabled: false,
   refreshModels: undefined,
+  block: true,
+  showProviderHint: false,
 })
 
 const { t } = useI18n()
 const toast = useToast()
 const injectedServices = inject<Ref<AppServices | null>>('services', ref<AppServices | null>(null))
 
-const popoverVisible = ref(false)
 const loading = ref(false)
 const modelOptions = ref<SelectOption[]>([])
 const fetchError = ref('')
+const optionsLoaded = ref(false)
 
 const selectedConfig = computed(() =>
   props.options.find((option) => option.value === props.modelKey)?.raw ?? null
@@ -173,15 +166,23 @@ const loadModelOptions = async () => {
     const dynamicOptions = normalizeOptions(fetched)
     const staticOptions = getStaticOptions(services.textAdapterRegistry)
     modelOptions.value = ensureCurrentOption(dynamicOptions.length ? dynamicOptions : staticOptions)
+    optionsLoaded.value = true
   } catch (error) {
     fetchError.value = error instanceof Error ? error.message : String(error)
     modelOptions.value = ensureCurrentOption(getStaticOptions(services.textAdapterRegistry))
+    optionsLoaded.value = true
   } finally {
     loading.value = false
   }
 }
 
-const handlePopoverVisibility = (show: boolean) => {
+const loadModelOptionsIfNeeded = () => {
+  if (!optionsLoaded.value && !loading.value) {
+    void loadModelOptions()
+  }
+}
+
+const handleSelectMenuVisibility = (show: boolean) => {
   if (show) {
     void loadModelOptions()
   }
@@ -229,7 +230,6 @@ const handleModelSelect = async (value: string | number | Array<string | number>
     const modelMeta = resolveModelMeta(modelId, current)
     await services.modelManager.updateModel(current.id, { modelId, modelMeta })
     await props.refreshModels?.()
-    popoverVisible.value = false
     toast.success(t('model.quickSwitch.updateSuccess', { model: modelMeta.name || modelMeta.id }))
   } catch (error) {
     toast.error(t('model.quickSwitch.updateFailed', {
@@ -243,57 +243,52 @@ watch(
   () => {
     modelOptions.value = []
     fetchError.value = ''
+    optionsLoaded.value = false
+    void loadModelOptions()
   }
 )
+
+onMounted(() => {
+  void loadModelOptions()
+})
 </script>
 
 <style scoped>
 .text-model-quick-switch {
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
   min-width: 0;
   max-width: 100%;
   vertical-align: middle;
 }
 
+.text-model-quick-switch--block {
+  display: flex;
+  width: 100%;
+}
+
+.text-model-quick-switch__select {
+  width: 100%;
+}
+
 .text-model-quick-switch__model {
-  max-width: min(180px, 100%);
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   background: var(--n-tag-color, var(--n-color-embedded));
   color: var(--n-text-color-2);
-  transition:
-    background-color 0.15s ease,
-    box-shadow 0.15s ease,
-    color 0.15s ease;
 }
 
-.text-model-quick-switch__model :deep(.n-tag__content) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.text-model-quick-switch__model--readonly {
+  align-self: flex-start;
 }
 
-.text-model-quick-switch__model--clickable {
-  cursor: pointer;
-}
-
-.text-model-quick-switch__model--clickable:hover,
-.text-model-quick-switch__model--clickable:focus-visible {
-  background: var(--n-hover-color);
-  color: var(--n-text-color);
-  box-shadow: inset 0 0 0 1px var(--n-border-color);
-}
-
-.text-model-quick-switch__popover {
-  width: 260px;
-}
-
-.text-model-quick-switch__title {
+.text-model-quick-switch__provider {
   font-size: 12px;
-  font-weight: 500;
+  line-height: 1.35;
 }
 
 .text-model-quick-switch__hint {

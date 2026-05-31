@@ -105,18 +105,19 @@
                     @variable-extracted="handleVariableExtracted"
                     @add-missing-variable="handleAddMissingVariable"
                 >
-                    <!-- 模型选择插槽 -->
                     <template #model-label-extra>
                         <TextModelQuickSwitch
                             :model-key="selectedOptimizeModelKeyModel"
                             :options="modelSelection.textModelOptions.value"
                             :refresh-models="modelSelection.refreshTextModels"
                             :disabled="contextUserOptimization.isOptimizing"
+                            :show-provider-hint="platformGatewayMode"
                         />
                     </template>
 
                     <template #model-select>
                         <SelectWithConfig
+                            v-if="!platformGatewayMode"
                             v-model="selectedOptimizeModelKeyModel"
                             :options="modelSelection.textModelOptions.value"
                             :getPrimary="OptionAccessors.getPrimary"
@@ -355,6 +356,7 @@
                                             :options="modelSelection.textModelOptions.value"
                                             :refresh-models="modelSelection.refreshTextModels"
                                             :disabled="variantRunning[id] || isAnyVariantRunning"
+                                            :block="false"
                                         />
                                     </div>
 
@@ -366,7 +368,7 @@
                                             :test-id="getVariantVersionTestId(id)"
                                             @update:value="(value) => handleVariantVersionChange(id, value)"
                                         />
-                                        <div class="variant-cell__model">
+                                        <div v-if="!platformGatewayMode" class="variant-cell__model">
                                             <SelectWithConfig
                                                 :data-testid="getVariantModelTestId(id)"
                                                 :model-value="variantModelKeyModels[id].value"
@@ -570,6 +572,7 @@ import OutputDisplay from "../OutputDisplay.vue";
 import SaveTestResultExampleButton from '../SaveTestResultExampleButton.vue'
 import SelectWithConfig from "../SelectWithConfig.vue";
 import TextModelQuickSwitch from "../TextModelQuickSwitch.vue";
+import { isPlatformGatewayMode } from "../../utils/platform-gateway";
 import TestPanelVersionSelect from '../TestPanelVersionSelect.vue'
 import TestSourceLinkedCard from '../TestSourceLinkedCard.vue'
 import TestVariantSourceTag from '../TestVariantSourceTag.vue'
@@ -733,6 +736,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const toast = useToast();
+const platformGatewayMode = isPlatformGatewayMode();
 
 // ========================
 // 内部常量

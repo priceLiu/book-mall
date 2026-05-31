@@ -57,7 +57,7 @@ export class DeepseekAdapter extends OpenAIAdapter {
       name: 'DeepSeek',
       description: 'DeepSeek OpenAI-compatible models',
       requiresApiKey: true,
-      defaultBaseURL: 'https://api.deepseek.com',
+      defaultBaseURL: 'https://api.deepseek.com/v1',
       supportsDynamicModels: true,
       apiKeyUrl: 'https://platform.deepseek.com/api_keys',
       connectionSchema: {
