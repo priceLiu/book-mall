@@ -1,10 +1,15 @@
 /** 各厂商 API Key 申请入口（Gateway 控制台展示） */
 export const PROVIDER_APPLY_URLS: Partial<
-  Record<"KIE" | "BAILIAN" | "DEEPSEEK" | "DASHSCOPE" | "HUNYUAN", string>
+  Record<
+    "KIE" | "BAILIAN" | "DEEPSEEK" | "DASHSCOPE" | "HUNYUAN" | "VOLCENGINE",
+    string
+  >
 > = {
   KIE: "https://kie.ai/api-key",
   BAILIAN:
     "https://bailian.console.aliyun.com/cn-beijing?spm=5176.42028462.overview_recent.5.2124154amlfGdb&tab=model#/api-key",
+  VOLCENGINE:
+    "https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey",
 };
 
 export function providerApplyUrl(

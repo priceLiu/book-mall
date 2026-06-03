@@ -93,17 +93,19 @@ export function StyleLibraryModal({
           </button>
         </header>
 
-        <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-5 py-4">
-          <StyleLibraryGrid
-            onSelect={(p) => void handleApply(p)}
-            onPreview={(p) => {
-              if (p.imageUrl) {
-                setPreview({ url: p.imageUrl, title: p.name });
-              }
-            }}
-            selectLabel="套用"
-          />
-        </div>
+        <StyleLibraryGrid
+          fixedFilter
+          className="min-h-0 w-full min-w-0 flex-1"
+          filterClassName="px-5 pt-2"
+          contentClassName="px-5 py-4"
+          onSelect={(p) => void handleApply(p)}
+          onPreview={(p) => {
+            if (p.imageUrl) {
+              setPreview({ url: p.imageUrl, title: p.name });
+            }
+          }}
+          selectLabel="套用"
+        />
 
         <footer className="shrink-0 border-t border-white/5 px-5 py-3 text-[11px] text-white/45">
           不会自动保存到「全局风格」；定稿后请在风格节点点击「保存到项目资产」。

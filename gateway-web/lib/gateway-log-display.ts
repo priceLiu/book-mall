@@ -60,6 +60,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   DEEPSEEK: "DeepSeek",
   DASHSCOPE: "DashScope",
   HUNYUAN: "混元 3D",
+  VOLCENGINE: "火山方舟",
 };
 
 /** 日志页厂商筛选 · 展示顺序 */
@@ -69,6 +70,7 @@ export const LOG_PROVIDER_KIND_ORDER = [
   "DEEPSEEK",
   "DASHSCOPE",
   "HUNYUAN",
+  "VOLCENGINE",
 ] as const;
 
 export function sortLogProviderKinds(kinds: Iterable<string>): string[] {

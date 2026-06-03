@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   STYLE_LIBRARY_CARD_FOOTER,
@@ -25,6 +25,10 @@ type StyleLibraryGridProps = {
   onPreview?: (preset: StyleLibraryPreset) => void;
   selectLabel?: string;
   className?: string;
+  /** 弹层等容器：筛选头固定，仅下方网格滚动 */
+  fixedFilter?: boolean;
+  filterClassName?: string;
+  contentClassName?: string;
 };
 
 export function StyleLibraryGrid({
@@ -32,52 +36,94 @@ export function StyleLibraryGrid({
   onPreview,
   selectLabel = "套用",
   className,
+  fixedFilter = false,
+  filterClassName,
+  contentClassName,
 }: StyleLibraryGridProps) {
   const [category, setCategory] = useState<string>(ALL_CATEGORY);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const skipScrollOnMount = useRef(true);
 
   const filtered = useMemo(() => {
     if (category === ALL_CATEGORY) return STYLE_LIBRARY_PRESETS;
     return STYLE_LIBRARY_PRESETS.filter((p) => p.category === category);
   }, [category]);
 
-  return (
-    <div className={cn("flex min-h-0 flex-col gap-4", className)}>
-      <nav
-        className="nodrag flex gap-2 overflow-x-auto border-b border-white/10 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        aria-label="风格分类"
-      >
-        <CategoryPill
-          active={category === ALL_CATEGORY}
-          onClick={() => setCategory(ALL_CATEGORY)}
-        >
-          {ALL_CATEGORY}
-        </CategoryPill>
-        {STYLE_LIBRARY_CATEGORIES.map((cat) => (
-          <CategoryPill
-            key={cat}
-            active={category === cat}
-            onClick={() => setCategory(cat)}
-          >
-            {cat}
-          </CategoryPill>
-        ))}
-      </nav>
+  useEffect(() => {
+    if (skipScrollOnMount.current) {
+      skipScrollOnMount.current = false;
+      return;
+    }
+    if (fixedFilter) {
+      contentRef.current?.scrollTo({ top: 0 });
+      return;
+    }
+    rootRef.current?.scrollIntoView({ block: "start" });
+  }, [category, fixedFilter]);
 
-      {filtered.length === 0 ? (
-        <p className="text-[12px] text-[var(--canvas-muted)]">该分类暂无条目。</p>
-      ) : (
-        <div className={cn(STYLE_LIBRARY_GRID_CLASS, "w-full min-w-0")}>
-          {filtered.map((preset) => (
-            <StyleLibraryCard
-              key={preset.id}
-              preset={preset}
-              selectLabel={selectLabel}
-              onSelect={onSelect}
-              onPreview={onPreview}
-            />
-          ))}
-        </div>
+  const filterNav = (
+    <nav
+      className={cn(
+        "nodrag flex shrink-0 gap-2 overflow-x-auto border-b border-white/10 bg-[var(--canvas-surface,#161427)] pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        !fixedFilter && "sticky top-0 z-10",
+        filterClassName,
       )}
+      aria-label="风格分类"
+    >
+      <CategoryPill
+        active={category === ALL_CATEGORY}
+        onClick={() => setCategory(ALL_CATEGORY)}
+      >
+        {ALL_CATEGORY}
+      </CategoryPill>
+      {STYLE_LIBRARY_CATEGORIES.map((cat) => (
+        <CategoryPill
+          key={cat}
+          active={category === cat}
+          onClick={() => setCategory(cat)}
+        >
+          {cat}
+        </CategoryPill>
+      ))}
+    </nav>
+  );
+
+  const gridBody =
+    filtered.length === 0 ? (
+      <p className="text-[12px] text-[var(--canvas-muted)]">该分类暂无条目。</p>
+    ) : (
+      <div className={cn(STYLE_LIBRARY_GRID_CLASS, "w-full min-w-0")}>
+        {filtered.map((preset) => (
+          <StyleLibraryCard
+            key={preset.id}
+            preset={preset}
+            selectLabel={selectLabel}
+            onSelect={onSelect}
+            onPreview={onPreview}
+          />
+        ))}
+      </div>
+    );
+
+  if (fixedFilter) {
+    return (
+      <div className={cn("flex min-h-0 flex-col", className)}>
+        {filterNav}
+        <div
+          ref={contentRef}
+          className={cn("min-h-0 flex-1 overflow-y-auto", contentClassName)}
+        >
+          {gridBody}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={rootRef} className={cn("flex min-h-0 flex-col gap-4", className)}>
+      {filterNav}
+      {gridBody}
     </div>
   );
 }

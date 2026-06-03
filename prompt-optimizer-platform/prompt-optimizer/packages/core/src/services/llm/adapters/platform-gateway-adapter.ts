@@ -62,6 +62,26 @@ const PLATFORM_GATEWAY_MODELS: Array<{
     name: "Gemini 3 Flash",
     description: "Gateway · KIE · 多模态 · Story 同款",
   },
+  {
+    id: "doubao-seed-2.0-lite",
+    name: "Doubao-Seed-2.0-lite",
+    description: "Gateway · 火山方舟 · 均衡性价比",
+  },
+  {
+    id: "doubao-seed-2.0-mini",
+    name: "Doubao-Seed-2.0-mini",
+    description: "Gateway · 火山方舟 · 轻量快速",
+  },
+  {
+    id: "doubao-lite-32k",
+    name: "Doubao-lite-32k",
+    description: "Gateway · 火山方舟 · 32k（须在控制台开通）",
+  },
+  {
+    id: "doubao-seedance-1.5-pro",
+    name: "Doubao-Seedance-1.5-pro",
+    description: "Gateway · 火山方舟 · 视频生成（异步，非对话）",
+  },
 ];
 
 export const PLATFORM_GATEWAY_DEFAULT_MODEL_ID = "deepseek-v4-flash";

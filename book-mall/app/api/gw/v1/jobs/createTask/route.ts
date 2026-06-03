@@ -15,6 +15,7 @@ import {
   submitHunyuanJobForLog,
   submitKieJobForLog,
 } from "@/lib/gateway/poll-service";
+import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -199,6 +200,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         code: 200,
         data: { taskId, logId: log.id, providerKind: "DASHSCOPE" },
+      });
+    }
+
+    if (route.providerKind === "VOLCENGINE" && route.requestKind === "VIDEO") {
+      const volcBody = (body.input ?? {}) as Record<string, unknown>;
+      const taskId = await submitVolcengineVideoJobForLog({
+        logId: log.id,
+        credentialId,
+        model,
+        body: volcBody,
+      });
+      return NextResponse.json({
+        code: 200,
+        data: { taskId, logId: log.id, providerKind: "VOLCENGINE" },
       });
     }
 

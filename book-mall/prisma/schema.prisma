@@ -1762,6 +1762,7 @@ enum GatewayProviderKind {
   DEEPSEEK
   HUNYUAN
   DASHSCOPE
+  VOLCENGINE
 }
 
 enum GatewayRequestStatus {

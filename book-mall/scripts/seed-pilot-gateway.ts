@@ -1,5 +1,5 @@
 /**
- * 试点账号：从 .env.local 导入 Gateway 五类厂商凭证 → Platform Admin + Personal sk-gw → Book 关联 Personal。
+ * 试点账号：从 .env.local 导入 Gateway 厂商凭证（含火山方舟 VOLCENGINE）→ Platform Admin + Personal sk-gw → Book 关联 Personal。
  *
  *   cd book-mall && pnpm exec dotenv -e .env.local -- tsx scripts/seed-pilot-gateway.ts
  *
@@ -56,6 +56,12 @@ const CREDENTIALS: Array<{
     alias: "混元 3D",
     env: "HUNYUAN_3D_API_KEY",
     baseUrl: "https://api.ai3d.cloud.tencent.com",
+  },
+  {
+    kind: "VOLCENGINE",
+    alias: "火山方舟",
+    env: "VOLCENGINE_API_KEY",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
   },
 ];
 
