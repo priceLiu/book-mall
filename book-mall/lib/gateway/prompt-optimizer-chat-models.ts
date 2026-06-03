@@ -7,6 +7,9 @@ import type { GatewayProviderKind } from "@prisma/client";
 import { DEEPSEEK_KNOWN_MODELS } from "@/lib/canvas/providers/deepseek-system";
 import { KIE_KNOWN_MODELS } from "@/lib/canvas/providers/kie";
 import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
+import {
+  VOLCENGINE_ALL_KNOWN_MODELS,
+} from "@/lib/gateway/volcengine-chat-models";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 
 export type PromptOptimizerGatewayModel = {
@@ -30,6 +33,10 @@ const PROMPT_OPTIMIZER_MODEL_KEYS: string[] = [
   "MiniMax/MiniMax-M2.5",
   "gemini-2.5-flash",
   "gemini-3-flash",
+  "doubao-seed-2.0-lite",
+  "doubao-seed-2.0-mini",
+  "doubao-lite-32k",
+  "doubao-seedance-1.5-pro",
 ];
 
 const KNOWN_BY_KEY = new Map<string, { displayName: string; description: string }>();
@@ -48,6 +55,12 @@ for (const m of BAILIAN_CHAT_KNOWN_MODELS) {
 }
 for (const m of KIE_KNOWN_MODELS) {
   if (m.role !== "LLM" || !m.modelKey.toLowerCase().includes("gemini")) continue;
+  KNOWN_BY_KEY.set(m.modelKey, {
+    displayName: m.displayName,
+    description: m.description ?? "",
+  });
+}
+for (const m of VOLCENGINE_ALL_KNOWN_MODELS) {
   KNOWN_BY_KEY.set(m.modelKey, {
     displayName: m.displayName,
     description: m.description ?? "",
@@ -87,7 +100,9 @@ export function promptOptimizerGatewayModelDefinitions(): Array<{
         ? "DeepSeek"
         : m.providerKind === "KIE"
           ? "KIE"
-          : "百炼"
+          : m.providerKind === "VOLCENGINE"
+            ? "火山方舟"
+            : "百炼"
     }`,
   }));
 }

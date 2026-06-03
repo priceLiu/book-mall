@@ -10,6 +10,7 @@ export const GATEWAY_PROVIDER_KINDS = [
   "DEEPSEEK",
   "DASHSCOPE",
   "HUNYUAN",
+  "VOLCENGINE",
 ] as const satisfies readonly GatewayProviderKind[];
 
 export async function listGatewayCredentials(userId: string) {

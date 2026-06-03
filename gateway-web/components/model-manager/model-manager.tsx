@@ -48,7 +48,14 @@ export function ModelManager({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const groups = tabGroups[tab] ?? [];
+  const groups = useMemo(() => {
+    const base = tabGroups[tab] ?? [];
+    const volcFull = initialGroups.find((g) => g.providerKind === "VOLCENGINE");
+    if (!volcFull) return base;
+    return base.map((g) =>
+      g.providerKind === "VOLCENGINE" ? volcFull : g,
+    );
+  }, [tab, tabGroups, initialGroups]);
 
   const credsByKind = useMemo(() => {
     const map = new Map<string, CredentialRow[]>();

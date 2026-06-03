@@ -19,6 +19,7 @@ import {
   isDashscopeTaskSuccess,
 } from "./dashscope-client";
 import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
+import { pollVolcengineVideoTaskForLog } from "./volcengine-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
 import { finalizeRequestLog } from "./proxy-common";
 
@@ -96,7 +97,9 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
     where: {
       status: "RUNNING",
       externalTaskId: { not: null },
-      providerKind: { in: ["KIE", "BAILIAN", "DASHSCOPE", "HUNYUAN"] },
+      providerKind: {
+        in: ["KIE", "BAILIAN", "DASHSCOPE", "HUNYUAN", "VOLCENGINE"],
+      },
     },
     orderBy: { submittedAt: "asc" },
     take: limit,
@@ -185,6 +188,25 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
           });
           updated++;
         }
+        continue;
+      }
+
+      if (row.providerKind === "VOLCENGINE") {
+        const startedAt = row.submittedAt?.getTime() ?? Date.now();
+        const done = await pollVolcengineVideoTaskForLog({
+          logId: row.id,
+          credentialId: row.credentialId,
+          taskId: row.externalTaskId,
+          startedAt,
+        });
+        await prisma.gatewayRequestLog.update({
+          where: { id: row.id },
+          data: {
+            lastPolledAt: new Date(),
+            pollCount: { increment: 1 },
+          },
+        });
+        if (done === "done") updated++;
         continue;
       }
 

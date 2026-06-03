@@ -1,5 +1,13 @@
 import type { GatewayProviderKind } from "@prisma/client";
 
+import {
+  VOLCENGINE_CHAT_MODEL_KEYS,
+  VOLCENGINE_VIDEO_MODEL_KEYS,
+  resolveVolcengineModelKey,
+} from "@/lib/gateway/volcengine-chat-models";
+
+export { resolveVolcengineModelKey };
+
 const DEEPSEEK_MODELS = new Set([
   "deepseek-chat",
   "deepseek-reasoner",
@@ -87,6 +95,26 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "DEEPSEEK", requestKind: "CHAT" };
   }
 
+  if (
+    VOLCENGINE_VIDEO_MODEL_KEYS.has(m) ||
+    m.includes("doubao-seedance") ||
+    (m.includes("seedance") && m.includes("doubao"))
+  ) {
+    return { providerKind: "VOLCENGINE", requestKind: "VIDEO" };
+  }
+
+  if (
+    VOLCENGINE_CHAT_MODEL_KEYS.has(m) ||
+    m.startsWith("doubao-seed-2") ||
+    m.startsWith("doubao-lite") ||
+    (m.startsWith("doubao") &&
+      !m.includes("seedream") &&
+      !m.includes("seedance") &&
+      !m.includes("bytedance/"))
+  ) {
+    return { providerKind: "VOLCENGINE", requestKind: "CHAT" };
+  }
+
   if (KIE_CHAT_MODELS.has(m)) {
     return { providerKind: "KIE", requestKind: "CHAT" };
   }
@@ -128,6 +156,8 @@ export function defaultBaseUrl(kind: GatewayProviderKind): string {
       return "https://dashscope.aliyuncs.com/compatible-mode/v1";
     case "HUNYUAN":
       return "https://api.ai3d.cloud.tencent.com";
+    case "VOLCENGINE":
+      return "https://ark.cn-beijing.volces.com/api/v3";
     case "KIE":
     default:
       return (
@@ -164,6 +194,10 @@ export function resolveOpenAiCompatibleBaseUrl(
   const fallback = defaultBaseUrl(
     kind === "DASHSCOPE" ? "BAILIAN" : kind,
   ).replace(/\/$/, "");
+
+  if (kind === "VOLCENGINE") {
+    return (baseUrl?.trim() || fallback).replace(/\/$/, "");
+  }
 
   if (kind !== "BAILIAN" && kind !== "DASHSCOPE") {
     return (baseUrl?.trim() || fallback).replace(/\/$/, "");

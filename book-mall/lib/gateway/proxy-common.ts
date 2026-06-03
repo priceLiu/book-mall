@@ -6,6 +6,7 @@ import {
   resolveBailianChatModelKey,
   resolveKieGeminiChatPath,
   resolveOpenAiCompatibleBaseUrl,
+  resolveVolcengineModelKey,
   routeGatewayModel,
 } from "./model-router";
 import { forwardQwenTtsSpeech, isQwenTtsModel } from "./qwen-tts-proxy";
@@ -155,7 +156,12 @@ export async function forwardChatCompletions(opts: {
           ...opts.body,
           model: resolveBailianChatModelKey(opts.body.model),
         }
-      : opts.body;
+      : cred.providerKind === "VOLCENGINE" && typeof opts.body.model === "string"
+        ? {
+            ...opts.body,
+            model: resolveVolcengineModelKey(opts.body.model),
+          }
+        : opts.body;
 
   const started = Date.now();
   const r = await fetch(url, {
@@ -197,7 +203,12 @@ export async function forwardChatCompletionsStream(opts: {
           ...opts.body,
           model: resolveBailianChatModelKey(opts.body.model),
         }
-      : opts.body;
+      : cred.providerKind === "VOLCENGINE" && typeof opts.body.model === "string"
+        ? {
+            ...opts.body,
+            model: resolveVolcengineModelKey(opts.body.model),
+          }
+        : opts.body;
 
   const started = Date.now();
   const r = await fetch(url, {

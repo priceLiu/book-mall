@@ -4,6 +4,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   DEEPSEEK: "DeepSeek",
   DASHSCOPE: "DashScope",
   HUNYUAN: "混元 3D",
+  VOLCENGINE: "火山方舟",
 };
 
 const REQUEST_KIND_LABEL: Record<string, string> = {

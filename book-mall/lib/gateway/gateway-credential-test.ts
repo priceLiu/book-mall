@@ -18,6 +18,7 @@ function toCanvasKind(kind: GatewayProviderKind): CanvasProviderKind {
       return "ALI_BAILIAN";
     case "DEEPSEEK":
     case "DASHSCOPE":
+    case "VOLCENGINE":
       return "OPENAI_COMPAT";
     case "HUNYUAN":
       return "HUNYUAN_3D";
@@ -38,7 +39,12 @@ function buildTestConfig(row: {
       ? resolveOpenAiCompatibleBaseUrl(row.providerKind, row.baseUrl)
       : row.providerKind === "DEEPSEEK"
         ? resolveDeepSeekBaseUrl(row.baseUrl)
-        : (row.baseUrl?.trim() || defaultBaseUrl(row.providerKind)).replace(
+        : row.providerKind === "VOLCENGINE"
+          ? (row.baseUrl?.trim() || defaultBaseUrl("VOLCENGINE")).replace(
+              /\/$/,
+              "",
+            )
+          : (row.baseUrl?.trim() || defaultBaseUrl(row.providerKind)).replace(
             /\/$/,
             "",
           );

@@ -6,6 +6,10 @@ import type { GatewayProviderKind } from "@prisma/client";
 
 import { BAILIAN_R2V_KNOWN_MODELS } from "@/lib/canvas/providers/bailian-r2v";
 import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
+import {
+  VOLCENGINE_CHAT_KNOWN_MODELS,
+  VOLCENGINE_VIDEO_KNOWN_MODELS,
+} from "@/lib/gateway/volcengine-chat-models";
 import { DEEPSEEK_KNOWN_MODELS } from "@/lib/canvas/providers/deepseek-system";
 import { listHunyuanKnownModels } from "@/lib/canvas/providers/hunyuan-3d";
 import { KIE_KNOWN_MODELS } from "@/lib/canvas/providers/kie";
@@ -78,6 +82,7 @@ const PROVIDER_LABEL: Record<GatewayProviderKind, string> = {
   DEEPSEEK: "DeepSeek",
   DASHSCOPE: "DashScope 原生",
   HUNYUAN: "混元 3D",
+  VOLCENGINE: "火山方舟 / 豆包",
 };
 
 /** 与 tool-web/config/lab-video-models.json 保持同步 */
@@ -404,6 +409,17 @@ export function buildGatewayModelCatalog(
     ]),
   );
 
+  const volcengineModels = sortModels(
+    dedupeByKey([
+      ...VOLCENGINE_CHAT_KNOWN_MODELS.map((m) =>
+        fromListed(m, "VOLCENGINE", ["Canvas", "Story", "工具站", "提示词优化器"]),
+      ),
+      ...VOLCENGINE_VIDEO_KNOWN_MODELS.map((m) =>
+        fromListed(m, "VOLCENGINE", ["Canvas", "Story", "工具站"]),
+      ),
+    ]),
+  );
+
   const groups: GatewayCatalogGroup[] = (
     [
       ["KIE", kieModels],
@@ -411,6 +427,7 @@ export function buildGatewayModelCatalog(
       ["BAILIAN", bailianModels],
       ["DASHSCOPE", dashscopeModels],
       ["HUNYUAN", hunyuanModels],
+      ["VOLCENGINE", volcengineModels],
     ] as const
   ).map(([providerKind, models]) => ({
     providerKind,
