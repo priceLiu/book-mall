@@ -6,7 +6,7 @@ import {
   STORY_FRAME_IMAGE_PROMPT_DEFAULT,
   STORY_VIDEO_ENGINE_PROMPT_DEFAULT,
 } from "./story-prompts";
-import { THREE_VIEW_ENGINE_PROMPT_DEFAULT } from "./builtin-prompt-templates";
+import { formatBatchThreeViewPrompt } from "./three-view-prompt-rules";
 import { parseCharacterRows, parseStoryboardRows } from "./parse-md-tables";
 import { directPredecessors } from "./topo";
 import {
@@ -481,7 +481,7 @@ export function batchCreateThreeView(args: BatchArgs) {
     if (hasCharacterThreeView(liveNodes(args), c.name)) return;
 
     const descText = `[${c.name}] ${c.appearance}`;
-    const tvPrompt = `${THREE_VIEW_ENGINE_PROMPT_DEFAULT}\n\n【角色】${c.name}（${c.role}）\n【外观】${c.appearance}`;
+    const tvPrompt = formatBatchThreeViewPrompt(c);
     const tvData = {
       prompt: tvPrompt,
       characterName: c.name,

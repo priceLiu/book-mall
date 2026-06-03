@@ -17,6 +17,10 @@ import {
   getProjectDetail,
 } from "./story-project-service";
 import { submitInitialMediaTasks } from "./story-task-service";
+import {
+  THREE_VIEW_APPEARANCE_LLM_RULE_ZH,
+  buildCharacterImagePrompt,
+} from "@/lib/canvas/three-view-prompt-rules";
 
 const OutlineSchema = z.object({
   outline: z.string().min(20),
@@ -35,15 +39,6 @@ const CharactersSchema = z.object({
     .min(1)
     .max(12),
 });
-
-function buildCharacterImagePrompt(appearance: string): string {
-  return [
-    `[CHARACTER] ${appearance}`,
-    "[COMPOSITION] full body / half body portrait, neutral pose, looking at viewer",
-    "[BACKGROUND] pure white background, no scene, no props, no text",
-    "[QUALITY] high detail, crisp lines, consistent character design for series use",
-  ].join("\n");
-}
 
 async function generateOutline(args: {
   userId: string;
@@ -109,7 +104,7 @@ async function generateCharacters(args: {
       '{"characters":[{"name":"中文姓名","role":"主角/配角/NPC","description":"<=150 字剧情向背景","appearance":"用于画像的纯外观描述：发型、瞳色、服饰、神态、年龄段、性别"}]}',
       "约束：",
       `1. characters 长度严格等于 ${args.count}，按重要性排序；如大纲角色不足，请合理补充配角/反派/NPC 凑齐；`,
-      "2. appearance 必须是英文/中文混排的视觉描述，不含场景与道具，便于后续作为白底立绘的 prompt；",
+      `2. appearance 必须是英文/中文混排的视觉描述，${THREE_VIEW_APPEARANCE_LLM_RULE_ZH}；`,
       "3. 不要在 appearance 里描述风格（风格由后端按 styleId 拼接）；",
       "4. role 控制在 8 字以内；description 控制在 150 字以内。",
     ].join("\n"),
