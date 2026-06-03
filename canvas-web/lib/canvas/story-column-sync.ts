@@ -1,6 +1,6 @@
 "use client";
 
-import { THREE_VIEW_ENGINE_PROMPT_DEFAULT } from "./types";
+import { formatCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
 import { hubDataForColumnSync, resolveHubStoryboardMd } from "./story-hub-runtime";
 import {
   outlineCharacterNamesAlign,
@@ -37,8 +37,7 @@ function characterRowFromParts(
     role: c.role,
     appearance: c.appearance,
     prompt:
-      promptOverride?.trim() ||
-      `${THREE_VIEW_ENGINE_PROMPT_DEFAULT}\n\n角色：${c.name}\n定位：${c.role}\n外观：${c.appearance}`,
+      promptOverride?.trim() || formatCharacterRowThreeViewPrompt(c),
   };
 }
 

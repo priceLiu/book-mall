@@ -32,11 +32,11 @@ export const AI_ENGINE_PROMPT_TEMPLATE_V2 = `我将上传两张图片：
 
 export const IMAGE_ENGINE_PROMPT_TEMPLATE_DEFAULT = `Professional e-commerce product poster, hero product centered, clean composition, brand-consistent color palette, soft studio lighting, high-end commercial photography, ultra detailed, 8k, sharp focus, minimal background, space for headline text at top`;
 
-/** 三视图引擎默认提示词（用户可在节点内编辑） */
-export const THREE_VIEW_ENGINE_PROMPT_DEFAULT = `生成角色标准三视图 turnaround sheet：同一张图内并排展示正面、侧面、背面三个视角，清晰人设原画稿，角色比例一致
-风格：二次元、写实、卡通、赛博、古风（择一或融合）
-体型、服饰、发型、配色、立绘规格
-画面横向构图，三视图等距排列，白底或浅灰底，无多余装饰`;
+export {
+  THREE_VIEW_ENGINE_PROMPT_DEFAULT,
+  formatBatchThreeViewPrompt,
+  formatCharacterRowThreeViewPrompt,
+} from "./three-view-prompt-rules";
 
 /** 三视图引擎可选模型（EnginePicker 白名单） */
 export const THREE_VIEW_ENGINE_MODEL_KEYS = [

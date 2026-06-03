@@ -2,6 +2,7 @@
  * 影视专业版 · 故事剧本制作包 prompt 真源（上传剧本不改 · LLM 输出结构固定 · 定稿拆分依赖）
  * book-mall/lib/canvas/story-pro-script-pack.ts 须与本文件 STRUCTURE / RULES 保持同步（剧本创作助手 API 使用）
  */
+import { THREE_VIEW_APPEARANCE_LLM_RULE_ZH } from "./three-view-prompt-rules";
 
 /** 加载画布时低于此版本则刷新「导演·上传剧本」与 hub 段 prompt */
 export const STORY_PRO_PACK_PROMPT_VERSION = 1;
@@ -104,7 +105,7 @@ ${STORY_PRO_PACK_OUTPUT_RULES}
 |------|------|----------------------|------|
 
 - **必须**输出上表；每行一个主要角色（3~8 行）
-- 外貌列供 AI 生图一致性
+- 外貌列供 AI 三视图生图一致性：${THREE_VIEW_APPEARANCE_LLM_RULE_ZH}
 - 若剧本/大纲中已有角色表，须 **完整迁移并扩写**，不得删行
 - 只输出「## 角色视觉辞典」+ 一张表，不要 JSON`;
 
