@@ -1,7 +1,7 @@
 电商平台工具箱
 要求:
 1. 全屏显示
-2. 设计相关的规范, 请根据本项目 design 文件夹: DESIGN.md（token）、BUTTON.md（主按钮胶囊）、README.md
+2. 设计相关的规范, 请根据 design 文件夹: COLORS.md（黑白蓝）、DESIGN.md、BUTTON.md、DIALOG.md（弹出层）、VIDEO.md（原生视频）、README.md
 3. 功能描述:
 电商主图制作
 电商详情页制作

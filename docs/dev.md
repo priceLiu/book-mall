@@ -3,9 +3,13 @@
 在仓库**根目录**执行（需先在各子工程完成过 `pnpm install`，并配置好 `book-mall/.env.local` 等）：
 
 ```bash
-pnpm install          # 仅首次：安装根目录 concurrently
-pnpm dev:all          # 同时启动 3000–3007
+pnpm install                        # 根目录 concurrently
+pnpm --dir e-commerce-toolkit install   # 首次：电商工具箱依赖（dev:all 会起 :3007）
+pnpm --dir book-mall install            # 主站与其它子站按需在各自目录 install
+pnpm dev:all                        # 同时启动 3000–3007（含 e-commerce-toolkit）
 ```
+
+`dev:all` 进程表见仓库根 `scripts/dev-all.mjs`；终端里电商工具箱日志前缀为 `[ecom]`。
 
 启动后在浏览器打开 **开发导航页**（需 book-mall 已起来）：
 
@@ -36,7 +40,7 @@ pnpm dev:all          # 同时启动 3000–3007
 pnpm dev:all:story
 ```
 
-等价于同时跑四个 `pnpm dev` + `book-mall` 的 `pnpm story:poll-loop`。
+等价于 8 个子站 `pnpm dev`（含 **e-commerce-toolkit :3007**）+ `story` / `canvas` / `gateway` 三条 poll-loop。
 
 ## 说明
 

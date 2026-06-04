@@ -2,7 +2,10 @@
 
 | 文档 | 说明 |
 |------|------|
+| [COLORS.md](./COLORS.md) | **黑白蓝** 主色 |
 | [DESIGN.md](./DESIGN.md) | Apple 风格 token（色、字、圆角、间距） |
-| [BUTTON.md](./BUTTON.md) | **主按钮 / 翻转胶囊** 权威规范与用法 |
+| [BUTTON.md](./BUTTON.md) | 门户胶囊主按钮 |
+| [DIALOG.md](./DIALOG.md) | Radix 弹出层 |
+| [VIDEO.md](./VIDEO.md) | 原生视频播放（对齐 Canvas） |
 
-实现：`components/ui/ecom-button.tsx`；尺寸三档见 `lib/ecom-button-sizes.ts`。
+实现：按钮 `ecom-button.tsx`；弹层 `ui/dialog.tsx` + `useDialogs`；视频 `media/ecom-video-player.tsx`。

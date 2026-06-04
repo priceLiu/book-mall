@@ -149,6 +149,14 @@ buttonSpec:
   sizes: sm | md | lg
   pageRule: 同一页主按钮最多两档；sm 最小宽度容纳五汉字
   note: 主操作须 EcomButtonPrimary / EcomFlipButton，禁止页面内自写主色胶囊按钮或第四档尺寸
+dialogSpec:
+  doc: DIALOG.md
+  implementation: components/ui/dialog.tsx
+  colors: 黑白蓝；主按钮 --ecom-primary
+videoSpec:
+  doc: VIDEO.md
+  implementation: components/media/ecom-video-player.tsx
+  aligns: canvas-web CanvasVideoPlayer
 
 components:
   button-primary:

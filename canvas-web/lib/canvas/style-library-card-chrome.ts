@@ -7,14 +7,21 @@ export const STYLE_LIBRARY_CARD_SHELL =
 export const STYLE_LIBRARY_MEDIA_FRAME =
   "relative w-full shrink-0 overflow-hidden bg-black/50";
 
+/** 与 OSS 预览源图一致（400×550，见 book-mall generate-style-library-placeholders） */
+export const STYLE_LIBRARY_PREVIEW_ASPECT = "aspect-[400/550]";
+
+/** 预览图：由 img 自身 aspect 撑开高度（避免 absolute + 父级 aspect 在侧栏网格内塌陷） */
+export const STYLE_LIBRARY_PREVIEW_IMG_CLASS =
+  "block w-full aspect-[400/550] object-cover bg-black/40";
+
 export function styleLibraryMediaHeightClass(opts?: {
   /** 画布分镜行与分镜列对齐（248px） */
   canvasRow?: boolean;
   compact?: boolean;
 }): string {
   if (opts?.canvasRow) return "h-[248px]";
-  if (opts?.compact) return "h-[200px]";
-  return "h-[260px]";
+  /** 高度由 `STYLE_LIBRARY_PREVIEW_IMG_CLASS` 的 aspect 决定 */
+  return "";
 }
 
 export const STYLE_LIBRARY_HOVER_PROMPT_OVERLAY =

@@ -4,12 +4,17 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
+import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import { deleteAsset, listAssets, type EcomAsset } from "@/lib/ecom-api";
 
 export default function LibraryPage() {
   const { confirm, doubleConfirm, alert } = useDialogs();
   const [assets, setAssets] = useState<EcomAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     listAssets()
@@ -78,7 +83,12 @@ export default function LibraryPage() {
                     unoptimized
                   />
                 ) : (
-                  <video src={a.ossUrl} controls className="h-full w-full object-cover" />
+                  <EcomVideoThumb
+                    src={a.ossUrl}
+                    onClick={() =>
+                      setPreviewVideo({ src: a.ossUrl, title: a.title ?? a.module })
+                    }
+                  />
                 )}
               </div>
               <div className="flex justify-between p-3 text-sm">
@@ -95,6 +105,16 @@ export default function LibraryPage() {
           ))}
         </ul>
       )}
+      {previewVideo ? (
+        <EcomVideoPreviewDialog
+          src={previewVideo.src}
+          title={previewVideo.title}
+          open
+          onOpenChange={(open) => {
+            if (!open) setPreviewVideo(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

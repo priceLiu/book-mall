@@ -7,9 +7,16 @@ import {
   useMemo,
   useState,
 } from "react";
-import { ModalPortal } from "@/components/common/modal-portal";
-import { ButtonPrimaryPill } from "@/components/ui/button-primary";
-import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  EcomDialogCancelButton,
+  EcomDialogPrimaryButton,
+} from "@/components/ui/dialog";
 
 type ConfirmOpts = {
   title: string;
@@ -123,99 +130,100 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   return (
     <DialogContext.Provider value={value}>
       {children}
-      {modal?.kind === "confirm" ? (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-md rounded-[18px] bg-white p-6 shadow-none">
-              <h3 className="text-lg font-semibold">{modal.opts.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--ecom-muted)]">
-                {modal.opts.message}
-              </p>
-              <div className="mt-6 flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="rounded-full px-4 py-2 text-sm"
-                  onClick={() => closeConfirm(false)}
-                >
-                  {modal.opts.cancelLabel ?? "取消"}
-                </button>
-                <ButtonPrimaryPill
-                  size="sm"
-                  className={cn(
-                    modal.opts.variant === "destructive" && "bg-red-600",
-                  )}
-                  onClick={() => closeConfirm(true)}
-                >
-                  {modal.opts.confirmLabel ?? "确认"}
-                </ButtonPrimaryPill>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      ) : null}
-      {modal?.kind === "alert" ? (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-md rounded-[18px] bg-white p-6">
-              <h3 className="text-lg font-semibold">{modal.opts.title}</h3>
-              <p className="mt-2 text-sm text-[var(--ecom-muted)]">{modal.opts.message}</p>
-              <div className="mt-6 flex justify-end">
-                <ButtonPrimaryPill size="sm" onClick={closeAlert}>
-                  知道了
-                </ButtonPrimaryPill>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      ) : null}
-      {modal?.kind === "double" ? (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-md rounded-[18px] bg-white p-6">
-              {modal.step === 1 ? (
-                <>
-                  <h3 className="text-lg font-semibold">{modal.opts.title}</h3>
-                  <p className="mt-2 text-sm text-[var(--ecom-muted)]">
-                    {modal.opts.message}
-                  </p>
-                  <div className="mt-6 flex justify-end gap-2">
-                    <button type="button" onClick={() => closeDouble(false)}>
-                      取消
-                    </button>
-                    <ButtonPrimaryPill
-                      size="sm"
-                      onClick={() =>
-                        setModal({ ...modal, step: 2 })
-                      }
-                    >
-                      下一步
-                    </ButtonPrimaryPill>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-lg font-semibold">{modal.opts.secondTitle}</h3>
-                  <p className="mt-2 text-sm text-[var(--ecom-muted)]">
-                    {modal.opts.secondMessage}
-                  </p>
-                  <div className="mt-6 flex justify-end gap-2">
-                    <button type="button" onClick={() => closeDouble(false)}>
-                      取消
-                    </button>
-                    <ButtonPrimaryPill
-                      size="sm"
-                      className="bg-red-600"
-                      onClick={() => closeDouble(true)}
-                    >
-                      {modal.opts.confirmLabel ?? "确认删除"}
-                    </ButtonPrimaryPill>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </ModalPortal>
-      ) : null}
+
+      <Dialog
+        open={modal?.kind === "confirm"}
+        onOpenChange={(open) => {
+          if (!open) closeConfirm(false);
+        }}
+      >
+        {modal?.kind === "confirm" ? (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{modal.opts.title}</DialogTitle>
+              <DialogDescription>{modal.opts.message}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <EcomDialogCancelButton onClick={() => closeConfirm(false)}>
+                {modal.opts.cancelLabel ?? "取消"}
+              </EcomDialogCancelButton>
+              <EcomDialogPrimaryButton
+                destructive={modal.opts.variant === "destructive"}
+                onClick={() => closeConfirm(true)}
+              >
+                {modal.opts.confirmLabel ?? "确认"}
+              </EcomDialogPrimaryButton>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={modal?.kind === "alert"}
+        onOpenChange={(open) => {
+          if (!open) closeAlert();
+        }}
+      >
+        {modal?.kind === "alert" ? (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{modal.opts.title}</DialogTitle>
+              <DialogDescription>{modal.opts.message}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <EcomDialogPrimaryButton onClick={closeAlert}>知道了</EcomDialogPrimaryButton>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={modal?.kind === "double"}
+        onOpenChange={(open) => {
+          if (!open) closeDouble(false);
+        }}
+      >
+        {modal?.kind === "double" ? (
+          <DialogContent>
+            {modal.step === 1 ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{modal.opts.title}</DialogTitle>
+                  <DialogDescription>{modal.opts.message}</DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <EcomDialogCancelButton onClick={() => closeDouble(false)}>
+                    取消
+                  </EcomDialogCancelButton>
+                  <EcomDialogPrimaryButton
+                    onClick={() => setModal({ ...modal, step: 2 })}
+                  >
+                    下一步
+                  </EcomDialogPrimaryButton>
+                </DialogFooter>
+              </>
+            ) : (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{modal.opts.secondTitle}</DialogTitle>
+                  <DialogDescription>{modal.opts.secondMessage}</DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <EcomDialogCancelButton onClick={() => closeDouble(false)}>
+                    取消
+                  </EcomDialogCancelButton>
+                  <EcomDialogPrimaryButton
+                    destructive
+                    onClick={() => closeDouble(true)}
+                  >
+                    {modal.opts.confirmLabel ?? "确认删除"}
+                  </EcomDialogPrimaryButton>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </DialogContext.Provider>
   );
 }

@@ -10,6 +10,7 @@ import {
   STYLE_LIBRARY_CARD_TITLE,
   STYLE_LIBRARY_HOVER_PROMPT_OVERLAY,
   STYLE_LIBRARY_MEDIA_FRAME,
+  STYLE_LIBRARY_PREVIEW_ASPECT,
   styleLibraryMediaHeightClass,
 } from "@/lib/canvas/style-library-card-chrome";
 
@@ -46,6 +47,7 @@ export function ProjectAssetMediaCard({
       <div
         className={cn(
           STYLE_LIBRARY_MEDIA_FRAME,
+          STYLE_LIBRARY_PREVIEW_ASPECT,
           styleLibraryMediaHeightClass({ compact }),
           onPreviewHero && hasImage && "cursor-pointer",
         )}

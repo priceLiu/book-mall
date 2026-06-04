@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
+import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import type { EcomModuleDef } from "@/lib/modules/registry";
 import {
@@ -26,6 +28,9 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
   const [assets, setAssets] = useState<EcomAsset[]>([]);
   const [billingMode, setBillingMode] = useState<EcomBillingMode | null>(null);
   const [estimatePts, setEstimatePts] = useState<number | null>(null);
+  const [previewVideo, setPreviewVideo] = useState<{ src: string; title?: string } | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     const [items, mode] = await Promise.all([
@@ -180,10 +185,11 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
                       unoptimized
                     />
                   ) : (
-                    <video
+                    <EcomVideoThumb
                       src={a.ossUrl}
-                      controls
-                      className="h-full w-full object-cover"
+                      onClick={() =>
+                        setPreviewVideo({ src: a.ossUrl, title: a.title ?? undefined })
+                      }
                     />
                   )}
                 </div>
@@ -202,6 +208,16 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
           </ul>
         )}
       </section>
+      {previewVideo ? (
+        <EcomVideoPreviewDialog
+          src={previewVideo.src}
+          title={previewVideo.title}
+          open
+          onOpenChange={(open) => {
+            if (!open) setPreviewVideo(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

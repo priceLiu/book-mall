@@ -10,6 +10,8 @@ import {
   STYLE_LIBRARY_GRID_CLASS,
   STYLE_LIBRARY_HOVER_PROMPT_OVERLAY,
   STYLE_LIBRARY_MEDIA_FRAME,
+  STYLE_LIBRARY_PREVIEW_ASPECT,
+  STYLE_LIBRARY_PREVIEW_IMG_CLASS,
   styleLibraryMediaHeightClass,
 } from "@/lib/canvas/style-library-card-chrome";
 import {
@@ -180,13 +182,19 @@ function StyleLibraryCard({
       role={onSelect ? "button" : undefined}
       tabIndex={onSelect ? 0 : undefined}
     >
-      <div className={cn(STYLE_LIBRARY_MEDIA_FRAME, styleLibraryMediaHeightClass())}>
+      <div
+        className={cn(
+          STYLE_LIBRARY_MEDIA_FRAME,
+          styleLibraryMediaHeightClass(),
+          !hasImage && STYLE_LIBRARY_PREVIEW_ASPECT,
+        )}
+      >
         {hasImage ? (
           // eslint-disable-next-line @next/next/no-img-element -- OSS 外链预览
           <img
             src={preset.imageUrl}
             alt={preset.name}
-            className="block h-[260px] w-full object-cover"
+            className={STYLE_LIBRARY_PREVIEW_IMG_CLASS}
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
