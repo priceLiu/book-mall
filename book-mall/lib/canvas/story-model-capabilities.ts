@@ -35,6 +35,8 @@ const EXPLICIT: Record<string, StoryModelCapability[]> = {
   "flux-kontext-max": ["image_t2i", "image_multi_ref"],
   "qwen-text-to-image": ["image_t2i"],
   "bytedance/seedance-2": ["video_i2v", "video_r2v", "video_multi_ref"],
+  "doubao-seedance-2.0": ["video_i2v", "video_multi_ref"],
+  "doubao-seedance-1.5-pro": ["video_i2v"],
   "happyhorse-1.0-r2v": ["video_r2v", "video_multi_ref"],
   "wan2.6-r2v": ["video_r2v", "video_multi_ref"],
   "wan2.6-r2v-flash": ["video_r2v", "video_multi_ref"],

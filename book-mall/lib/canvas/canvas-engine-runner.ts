@@ -41,8 +41,10 @@ import {
   canvasGwCreateBailianR2vJob,
   canvasGwCreateHunyuanJob,
   canvasGwCreateKieJob,
+  canvasGwCreateVolcengineVideoJob,
   canvasGwTts,
 } from "./canvas-gateway-client";
+import { GATEWAY_VOLCENGINE_PROVIDER_ID } from "./canvas-gateway-providers";
 import { shouldCanvasUseGateway } from "./canvas-gateway-run";
 import { persistCanvasBufferToOss } from "./canvas-oss";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
@@ -50,6 +52,11 @@ import {
   buildCanvasRefVideoKieInput,
   buildCanvasVideoKieInput,
 } from "./canvas-video-kie";
+import {
+  buildCanvasVideoVolcengineInput,
+  isVolcengineStoryVideoModelKey,
+  VOLCENGINE_VIDEO_MULTI_REF_MODEL,
+} from "./canvas-video-volcengine";
 import { buildKieImageCreateArgs } from "./providers/kie";
 import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
 import { BAILIAN_R2V_MODEL_IDS } from "./providers/bailian-r2v";
@@ -886,12 +893,18 @@ export async function runVideoEngineNode(
 
   const VIDEO_MULTI_REF_MODEL = "bytedance/seedance-2";
   let effectiveModelKey = modelKey;
+  const providerIsVolcengine =
+    providerId === GATEWAY_VOLCENGINE_PROVIDER_ID ||
+    providerId.toLowerCase().includes("volcengine");
   if (
     referenceImageUrls.length > 0 &&
     !isBailianR2v &&
     !modelHasStoryCapabilities(modelKey, ["video_multi_ref"])
   ) {
-    effectiveModelKey = VIDEO_MULTI_REF_MODEL;
+    effectiveModelKey =
+      providerIsVolcengine || isVolcengineStoryVideoModelKey(modelKey)
+        ? VOLCENGINE_VIDEO_MULTI_REF_MODEL
+        : VIDEO_MULTI_REF_MODEL;
   }
 
   const allSubmittedImageUrls = [
@@ -921,13 +934,17 @@ export async function runVideoEngineNode(
   }
 
   if (!(STORY_VIDEO_MODEL_IDS as readonly string[]).includes(effectiveModelKey)) {
-    throw new CanvasProjectError(
-      "INVALID_INPUT",
-      `video-engine 不支持模型 ${effectiveModelKey}`,
-    );
+    if (!isVolcengineStoryVideoModelKey(effectiveModelKey)) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        `video-engine 不支持模型 ${effectiveModelKey}`,
+      );
+    }
   }
 
   await shouldCanvasUseGateway(userId, providerId, effectiveModelKey);
+
+  const isVolcengineVideo = isVolcengineStoryVideoModelKey(effectiveModelKey);
 
   const inputHash = computeInputHash({
     modelKey: effectiveModelKey,
@@ -953,20 +970,37 @@ export async function runVideoEngineNode(
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
-  const { model, input } = buildCanvasVideoKieInput({
-    modelKey: effectiveModelKey,
-    prompt: expandedPrompt,
-    imageUrl: mainFrameImageUrl,
-    referenceImageUrls,
-    options: {
-      resolution: String(params.resolution ?? "1080p"),
-      duration: Number(params.duration ?? 5),
-      generateAudio: params.generateAudio === true,
-      promptExtend: params.promptExtend !== false,
-      watermark: params.watermark === true,
-    },
-    aspectRatio: params.aspect_ratio === "9:16" ? "9:16" : "16:9",
-  });
+  const { model, input } = isVolcengineVideo
+    ? (() => {
+        const built = buildCanvasVideoVolcengineInput({
+          modelKey: effectiveModelKey,
+          prompt: expandedPrompt,
+          imageUrl: mainFrameImageUrl,
+          referenceImageUrls,
+          options: {
+            resolution: String(params.resolution ?? "1080p"),
+            duration: Number(params.duration ?? 5),
+            generateAudio: params.generate_audio === true || params.generateAudio === true,
+            watermark: params.watermark === true,
+          },
+          aspectRatio: params.aspect_ratio === "9:16" ? "9:16" : "16:9",
+        });
+        return { model: built.model, input: built.body };
+      })()
+    : buildCanvasVideoKieInput({
+        modelKey: effectiveModelKey,
+        prompt: expandedPrompt,
+        imageUrl: mainFrameImageUrl,
+        referenceImageUrls,
+        options: {
+          resolution: String(params.resolution ?? "1080p"),
+          duration: Number(params.duration ?? 5),
+          generateAudio: params.generateAudio === true,
+          promptExtend: params.promptExtend !== false,
+          watermark: params.watermark === true,
+        },
+        aspectRatio: params.aspect_ratio === "9:16" ? "9:16" : "16:9",
+      });
 
   const created = await createStoryScopedCanvasTask({
     projectId,
@@ -987,8 +1021,10 @@ export async function runVideoEngineNode(
         imageUrls: allSubmittedImageUrls,
         mainFrameImageUrl,
         referenceImageUrls,
-        kieModel: model,
-        kieInput: input,
+        providerKind: isVolcengineVideo ? "VOLCENGINE" : "KIE",
+        ...(isVolcengineVideo
+          ? { volcengineModel: model, volcengineBody: input }
+          : { kieModel: model, kieInput: input }),
         syncGatewaySubmit: true,
         ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
@@ -1008,9 +1044,10 @@ export async function runVideoEngineNode(
     mainFrameImageUrl,
     referenceImageUrls,
     syncGatewaySubmit: true,
-    providerKind: "KIE" as const,
-    kieModel: model,
-    kieInput: input,
+    providerKind: isVolcengineVideo ? ("VOLCENGINE" as const) : ("KIE" as const),
+    ...(isVolcengineVideo
+      ? { volcengineModel: model, volcengineBody: input }
+      : { kieModel: model, kieInput: input }),
     ...(args.storyScope ? { storyScope: args.storyScope } : {}),
   };
 
@@ -1032,12 +1069,18 @@ export async function runVideoEngineNode(
       );
     }
 
-    const job = await canvasGwCreateKieJob(userId, {
-      model,
-      input: input as Record<string, unknown>,
-      callBackUrl,
-      clientPage: gwClientPage,
-    });
+    const job = isVolcengineVideo
+      ? await canvasGwCreateVolcengineVideoJob(userId, {
+          model,
+          body: input as Record<string, unknown>,
+          clientPage: gwClientPage,
+        })
+      : await canvasGwCreateKieJob(userId, {
+          model,
+          input: input as Record<string, unknown>,
+          callBackUrl,
+          clientPage: gwClientPage,
+        });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: claimedTask.id },
       data: {

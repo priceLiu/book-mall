@@ -17,6 +17,12 @@ import {
   isDashscopeTaskFailed,
   isDashscopeTaskSuccess,
 } from "@/lib/gateway/dashscope-client";
+import {
+  isVolcengineVideoTaskFailed,
+  isVolcengineVideoTaskSuccess,
+  volcengineGetVideoTask,
+  volcengineVideoTaskFailMessage,
+} from "@/lib/gateway/volcengine-client";
 
 export const dynamic = "force-dynamic";
 
@@ -150,6 +156,45 @@ export async function GET(request: NextRequest) {
         }
       }
       return NextResponse.json({ code: 200, data: output, providerKind: "BAILIAN" });
+    }
+
+    if (providerKind === "VOLCENGINE") {
+      const cred = await getDecryptedCredentialApiKey(credentialId);
+      if (!cred) {
+        return NextResponse.json({ error: "Credential unavailable" }, { status: 400 });
+      }
+      const row = await volcengineGetVideoTask({
+        apiKey: cred.apiKey,
+        baseUrl: cred.baseUrl,
+        taskId,
+      });
+      if (log) {
+        if (isVolcengineVideoTaskSuccess(row)) {
+          await finalizeRequestLog(log.id, {
+            status: "SUCCEEDED",
+            durationMs: log.submittedAt
+              ? Date.now() - log.submittedAt.getTime()
+              : 0,
+            resultSummary: row.content?.video_url
+              ? { videoUrl: row.content.video_url }
+              : { status: row.status },
+            externalTaskId: taskId,
+            model: log.model,
+          });
+        } else if (isVolcengineVideoTaskFailed(row)) {
+          await finalizeRequestLog(log.id, {
+            status: "FAILED",
+            durationMs: log.submittedAt
+              ? Date.now() - log.submittedAt.getTime()
+              : 0,
+            failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
+            failCode: "VOLCENGINE_TASK_FAILED",
+            externalTaskId: taskId,
+            model: log.model,
+          });
+        }
+      }
+      return NextResponse.json({ code: 200, data: row, providerKind: "VOLCENGINE" });
     }
 
     const cred = await getDecryptedCredentialApiKey(credentialId);

@@ -37,6 +37,7 @@ const PROMPT_OPTIMIZER_MODEL_KEYS: string[] = [
   "doubao-seed-2.0-mini",
   "doubao-lite-32k",
   "doubao-seedance-1.5-pro",
+  "doubao-seedance-2.0",
 ];
 
 const KNOWN_BY_KEY = new Map<string, { displayName: string; description: string }>();

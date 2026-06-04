@@ -44,6 +44,13 @@ import {
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
+import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
+import {
+  isVolcengineVideoTaskFailed,
+  isVolcengineVideoTaskSuccess,
+  volcengineGetVideoTask,
+  type VolcengineVideoTaskResult,
+} from "@/lib/gateway/volcengine-client";
 
 const CLIENT_SOURCE = "CANVAS" as const;
 
@@ -221,6 +228,55 @@ export async function canvasGwCreateKieJob(
   });
 
   return { taskId, logId: log.id, providerKind: "KIE" };
+}
+
+export async function canvasGwCreateVolcengineVideoJob(
+  userId: string,
+  opts: {
+    model: string;
+    body: Record<string, unknown>;
+    clientPage?: string;
+  },
+): Promise<CanvasGwJobResult> {
+  const auth = await requireGatewayAuth(userId);
+  const route = routeGatewayModel(opts.model);
+  if (route.providerKind !== "VOLCENGINE" || route.requestKind !== "VIDEO") {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      `模型 ${opts.model} 非火山方舟视频`,
+      400,
+    );
+  }
+  const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
+  if (!credentialId) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定火山方舟凭证",
+      503,
+    );
+  }
+
+  const log = await createRequestLog({
+    userId: auth.userId,
+    apiKeyId: auth.id,
+    credentialId,
+    model: opts.model,
+    endpoint: "/v1/jobs/createTask",
+    providerKind: "VOLCENGINE",
+    requestKind: "VIDEO",
+    clientSource: CLIENT_SOURCE,
+    clientPage: opts.clientPage,
+    inputSummary: buildGatewayInputSummary(opts.model, opts.body),
+  });
+
+  const taskId = await submitVolcengineVideoJobForLog({
+    logId: log.id,
+    credentialId,
+    model: opts.model,
+    body: opts.body,
+  });
+
+  return { taskId, logId: log.id, providerKind: "VOLCENGINE" };
 }
 
 export async function canvasGwCreateBailianR2vJob(
@@ -421,7 +477,8 @@ export type CanvasGwPollResult =
   | { providerKind: "KIE"; record: KieRecordResponse }
   | { providerKind: "BAILIAN"; output: BailianR2vTaskOutput }
   | { providerKind: "HUNYUAN"; polled: CanvasGatewayPollResult }
-  | { providerKind: "DASHSCOPE"; output: DashscopeTaskOutput };
+  | { providerKind: "DASHSCOPE"; output: DashscopeTaskOutput }
+  | { providerKind: "VOLCENGINE"; task: VolcengineVideoTaskResult };
 
 export async function canvasGwRecordInfo(
   userId: string,
@@ -503,6 +560,46 @@ export async function canvasGwRecordInfo(
       }
     }
     return { providerKind: "HUNYUAN", polled };
+  }
+
+  if (opts.providerKind === "VOLCENGINE") {
+    const cred = await getDecryptedCredentialApiKey(credentialId);
+    if (!cred) {
+      throw new CanvasProjectError(
+        "MODEL_NOT_AVAILABLE",
+        "火山方舟凭证不可用",
+        503,
+      );
+    }
+    const row = await volcengineGetVideoTask({
+      apiKey: cred.apiKey,
+      baseUrl: cred.baseUrl,
+      taskId: opts.taskId,
+    });
+    if (opts.gatewayLogId) {
+      if (isVolcengineVideoTaskSuccess(row)) {
+        await finalizeRequestLog(opts.gatewayLogId, {
+          status: "SUCCEEDED",
+          durationMs: 0,
+          resultSummary: row.content?.video_url
+            ? { videoUrl: row.content.video_url }
+            : { status: row.status },
+          externalTaskId: opts.taskId,
+        });
+      } else if (isVolcengineVideoTaskFailed(row)) {
+        await finalizeRequestLog(opts.gatewayLogId, {
+          status: "FAILED",
+          durationMs: 0,
+          failMessage:
+            typeof row.error === "string"
+              ? row.error
+              : (row.error?.message ?? `status=${row.status}`),
+          failCode: "VOLCENGINE_TASK_FAILED",
+          externalTaskId: opts.taskId,
+        });
+      }
+    }
+    return { providerKind: "VOLCENGINE", task: row };
   }
 
   const record = await pollKieTaskForLog({

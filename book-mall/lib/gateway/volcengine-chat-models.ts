@@ -4,6 +4,7 @@
  */
 
 import type { CanvasGatewayListedModel } from "@/lib/canvas/providers/types";
+import type { CanvasParamSchema } from "@/lib/canvas/providers/types";
 
 const LLM_TEMP_SCHEMA = [
   {
@@ -37,6 +38,8 @@ export const VOLCENGINE_MODEL_UPSTREAM: Record<string, string> = {
   "Doubao-lite-32k": "doubao-1-5-lite-32k-250115",
   "doubao-seedance-1.5-pro": "doubao-seedance-1-5-pro-251215",
   "Doubao-Seedance-1.5-pro": "doubao-seedance-1-5-pro-251215",
+  "doubao-seedance-2.0": "doubao-seedance-2-0-260128",
+  "Doubao-Seedance-2.0": "doubao-seedance-2-0-260128",
 };
 
 export const VOLCENGINE_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
@@ -66,14 +69,66 @@ export const VOLCENGINE_CHAT_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
 ];
 
+const VIDEO_PARAM_SCHEMA = [
+  {
+    key: "resolution",
+    label: "分辨率",
+    type: "select" as const,
+    options: [
+      { value: "720p", label: "720p" },
+      { value: "1080p", label: "1080p" },
+    ],
+    defaultValue: "1080p",
+  },
+  {
+    key: "duration",
+    label: "时长（秒）",
+    type: "number" as const,
+    min: 4,
+    max: 15,
+    step: 1,
+    defaultValue: 5,
+  },
+  {
+    key: "generate_audio",
+    label: "生成音频",
+    type: "boolean" as const,
+    defaultValue: false,
+  },
+  {
+    key: "watermark",
+    label: "水印",
+    type: "boolean" as const,
+    defaultValue: false,
+  },
+] satisfies CanvasParamSchema;
+
 export const VOLCENGINE_VIDEO_KNOWN_MODELS: CanvasGatewayListedModel[] = [
+  {
+    modelKey: "doubao-seedance-2.0",
+    displayName: "Doubao-Seedance-2.0",
+    role: "VIDEO",
+    description: "火山方舟 · 图/文生视频 · 多图参考 · 有声 · 异步任务",
+    paramsSchema: [...VIDEO_PARAM_SCHEMA],
+    defaultParams: {
+      resolution: "1080p",
+      duration: 5,
+      generate_audio: false,
+      watermark: false,
+    },
+  },
   {
     modelKey: "doubao-seedance-1.5-pro",
     displayName: "Doubao-Seedance-1.5-pro",
     role: "VIDEO",
     description: "火山方舟 · 文/图生视频 · 有声 · 异步任务",
-    paramsSchema: [],
-    defaultParams: {},
+    paramsSchema: [...VIDEO_PARAM_SCHEMA],
+    defaultParams: {
+      resolution: "1080p",
+      duration: 5,
+      generate_audio: false,
+      watermark: false,
+    },
   },
 ];
 
