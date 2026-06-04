@@ -9,6 +9,7 @@ import {
 import {
   STORY_LLM_MODEL_KEYS,
   STORY_PRO_VIDEO_MODEL_KEYS,
+  STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS,
   STORY_TTS_MODEL_KEYS,
 } from "./types";
 
@@ -19,6 +20,7 @@ export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
 export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
 export const GATEWAY_BAILIAN_PROVIDER_ID = "gateway:bailian";
 export const GATEWAY_HUNYUAN_PROVIDER_ID = "gateway:hunyuan";
+export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";
 /** 与 story-web 初始化大纲一致，走 KIE gemini-3-flash 端点 */
 export const STORY_LLM_PREFERRED_MODEL_KEY = "google/gemini-3-flash-preview";
 
@@ -186,10 +188,20 @@ function findVideoOnProvider(
   return { providerId: provider.id, modelKey: m.modelKey };
 }
 
-/** 漫剧分镜视频 · 默认 Gateway / 用户 KIE VIDEO 模型 */
+/** 漫剧分镜视频 · 默认 Gateway · 火山方舟 Seedance 2.0，其次 KIE */
 export function pickDefaultStoryVideoEngine(
   providers: CanvasProviderDto[],
 ): { providerId: string; modelKey: string } | null {
+  const volc = activeCanvasProviders(providers).find(
+    (p) => p.id === GATEWAY_VOLCENGINE_PROVIDER_ID,
+  );
+  if (volc) {
+    for (const key of STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS) {
+      const hit = findVideoOnProvider(volc, key);
+      if (hit) return hit;
+    }
+  }
+
   const kie = findProviderByKind(providers, "KIE");
   if (kie) {
     for (const key of STORY_PRO_VIDEO_MODEL_KEYS) {

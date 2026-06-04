@@ -265,8 +265,14 @@ export const STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS = [
   "wan2.6-r2v-flash",
 ] as const;
 
-/** 影视专业版分镜视频 · KIE 图生/多参考 + 百炼 R2V */
+/** 影视专业版 · 火山方舟 Seedance 图生视频（Gateway · VOLCENGINE） */
+export const STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS = [
+  "doubao-seedance-2.0",
+] as const;
+
+/** 影视专业版分镜视频 · 方舟 Seedance + KIE 图生/多参考 + 百炼 R2V */
 export const STORY_PRO_VIDEO_MODEL_KEYS = [
+  ...STORY_PRO_VIDEO_VOLCENGINE_MODEL_KEYS,
   ...STORY_VIDEO_MODEL_KEYS,
   ...STORY_PRO_VIDEO_BAILIAN_MODEL_KEYS,
 ] as const;

@@ -111,27 +111,37 @@ function PanelField({
     const val = String(cur ?? item.defaultValue ?? item.options[0]?.value ?? "");
     const spanFull = item.options.length > 4;
     return (
-      <div className={spanFull ? "sm:col-span-2" : undefined}>
-        <label className="block text-[12px] text-white/60">{item.label}</label>
-        <div className="mt-2 inline-flex max-w-full flex-wrap overflow-hidden rounded-lg border border-white/15">
-          {item.options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => onPatch(o.value)}
-              className={[
-                "px-3 py-1.5 text-[13px] transition",
-                val === o.value
-                  ? "bg-white text-black"
-                  : "text-white/85 hover:bg-white/5",
-              ].join(" ")}
-            >
-              {o.label}
-            </button>
-          ))}
+      <div className={spanFull ? "sm:col-span-2" : "sm:col-span-2"}>
+        <label className="block text-[12px] font-medium text-white/85">
+          {item.label}
+        </label>
+        <div
+          className="mt-2 flex w-full gap-1 rounded-lg border border-white/20 bg-black/50 p-1"
+          role="group"
+          aria-label={item.label}
+        >
+          {item.options.map((o) => {
+            const active = val === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onPatch(o.value)}
+                className={[
+                  "min-h-[36px] flex-1 rounded-md px-3 py-2 text-[13px] font-semibold tracking-wide transition",
+                  active
+                    ? "bg-[var(--canvas-accent,#a78bfa)] text-white shadow-sm ring-1 ring-white/20"
+                    : "text-white/80 hover:bg-white/10 hover:text-white",
+                ].join(" ")}
+              >
+                {o.label}
+              </button>
+            );
+          })}
         </div>
         {item.help ? (
-          <p className="mt-1 text-[10px] text-white/45">{item.help}</p>
+          <p className="mt-1.5 text-[10px] text-white/50">{item.help}</p>
         ) : null}
       </div>
     );
@@ -270,19 +280,54 @@ function CompactField({
   onPatch: (v: unknown) => void;
 }) {
   if (item.type === "select") {
+    const val = String(cur ?? item.defaultValue ?? item.options[0]?.value ?? "");
+    if (item.options.length <= 4) {
+      return (
+        <label className="col-span-2 block">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-white/70">
+            {item.label}
+          </span>
+          <div
+            className="mt-1 flex w-full gap-0.5 rounded-md border border-white/15 bg-black/40 p-0.5"
+            role="group"
+            aria-label={item.label}
+          >
+            {item.options.map((o) => {
+              const active = val === o.value;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onPatch(o.value)}
+                  className={[
+                    "min-h-[28px] flex-1 rounded px-2 py-1 text-[11px] font-semibold transition",
+                    active
+                      ? "bg-[var(--canvas-accent,#a78bfa)] text-white"
+                      : "text-white/75 hover:bg-white/10",
+                  ].join(" ")}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </label>
+      );
+    }
     return (
       <label className="block">
-        <span className="text-[10px] uppercase tracking-wider text-[var(--canvas-muted)]">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-white/70">
           {item.label}
         </span>
         <select
-          value={String(cur ?? item.defaultValue ?? "")}
+          value={val}
           onChange={(e) => onPatch(e.target.value)}
           onWheel={onCanvasFormWheel}
-          className={`${RF_FORM_CONTROL} mt-0.5 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+          className={`${RF_FORM_CONTROL} mt-0.5 w-full rounded-md border border-white/15 bg-black/50 px-2 py-1.5 text-[11px] font-medium text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
         >
           {item.options.map((o) => (
-            <option key={o.value} value={o.value}>
+            <option key={o.value} value={o.value} className="bg-[#1a1a24] text-white">
               {o.label}
             </option>
           ))}

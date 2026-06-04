@@ -46,6 +46,10 @@ import {
   canvasGwCreateKieJob,
   canvasGwRecordInfo,
 } from "./canvas-gateway-client";
+import {
+  isVolcengineVideoTaskFailed,
+  isVolcengineVideoTaskSuccess,
+} from "@/lib/gateway/volcengine-client";
 import { isGatewayVirtualProviderId } from "./canvas-gateway-providers";
 import { shouldCanvasUseGateway } from "./canvas-gateway-run";
 import {
@@ -118,6 +122,7 @@ function gatewayProviderKindFromPayload(
   payload: Record<string, unknown>,
 ): GatewayProviderKind {
   const pk = payload.providerKind;
+  if (pk === "VOLCENGINE") return "VOLCENGINE";
   if (pk === "BAILIAN_R2V" || pk === "BAILIAN") return "BAILIAN";
   if (pk === "HUNYUAN" || pk === "HUNYUAN_3D") return "HUNYUAN";
   return "KIE";
@@ -515,6 +520,71 @@ export async function applyCanvasBailianR2vPollResult(
       ossUrl,
       ephemeralUrl,
       resultPayload: polled.raw as Prisma.InputJsonValue,
+      completedAt: new Date(),
+    },
+  });
+}
+
+export async function applyCanvasVolcengineVideoResult(
+  taskId: string,
+  videoUrl: string | null | undefined,
+): Promise<void> {
+  const task = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    include: { project: true },
+  });
+  if (!task) return;
+  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+  if (!(await claimCanvasTaskForResultApply(taskId))) return;
+
+  const ephemeralUrl = videoUrl?.trim();
+  if (!ephemeralUrl || !/^https?:\/\//.test(ephemeralUrl)) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "VOLCENGINE_NO_RESULT_URL",
+        failMessage: "火山方舟任务成功但未返回 video_url",
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  let ossUrl: string | null = null;
+  let ossError: string | null = null;
+  try {
+    ossUrl = await persistCanvasKieResultToOss({
+      ephemeralUrl,
+      kind: "node-video",
+      projectId: task.projectId,
+    });
+  } catch (e) {
+    ossError = e instanceof Error ? e.message : String(e);
+  }
+  if (!ossUrl) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "OSS_UPLOAD_FAILED",
+        failMessage: ossError ?? "OSS upload failed",
+        ephemeralUrl,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  await prisma.canvasGenerationTask.updateMany({
+    where: {
+      id: taskId,
+      status: { in: ["PENDING", "SUBMITTED"] },
+    },
+    data: {
+      status: "SUCCEEDED",
+      ossUrl,
+      ephemeralUrl,
       completedAt: new Date(),
     },
   });
@@ -1260,6 +1330,27 @@ export async function runCanvasPollWorker(opts?: {
         });
       } else if (gw.providerKind === "KIE") {
         await applyCanvasKieTaskResult(task.id, gw.record);
+      } else if (gw.providerKind === "VOLCENGINE") {
+        const row = gw.task;
+        if (isVolcengineVideoTaskSuccess(row)) {
+          await applyCanvasVolcengineVideoResult(
+            task.id,
+            row.content?.video_url,
+          );
+        } else if (isVolcengineVideoTaskFailed(row)) {
+          await prisma.canvasGenerationTask.update({
+            where: { id: task.id },
+            data: {
+              status: "FAILED",
+              failCode: "VOLCENGINE_TASK_FAILED",
+              failMessage:
+                typeof row.error === "string"
+                  ? row.error
+                  : (row.error?.message ?? `status=${row.status}`),
+              completedAt: new Date(),
+            },
+          });
+        }
       } else if (gw.providerKind === "HUNYUAN") {
         const polled = gw.polled;
         if (polled.state === "succeeded" && polled.resultUrls?.[0]) {
