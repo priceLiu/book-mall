@@ -116,7 +116,7 @@ export function GatewayApiKeyForm() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" variant="default" asChild>
+        <Button type="button" size="sm" variant="subscription" asChild>
           <a
             href={`/api/sso/gateway/issue?redirect=${encodeURIComponent("/dashboard/credentials")}`}
             target="_blank"
@@ -256,6 +256,7 @@ export function GatewayApiKeyForm() {
       <Button
         type="button"
         size="sm"
+        variant="subscription"
         disabled={saving || !apiKey.trim()}
         onClick={() => void linkKey()}
       >

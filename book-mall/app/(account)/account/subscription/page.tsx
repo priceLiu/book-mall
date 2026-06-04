@@ -12,6 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AccountSectionHeader } from "@/components/account/account-section-header";
+import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
 import { subscribeProductMock, cancelProductSubscriptionMock } from "@/app/actions/subscribe-product";
 
 export const metadata = {
@@ -72,23 +74,20 @@ export default async function AccountSubscriptionPage() {
   );
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 md:py-10 space-y-10">
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">
-          <Link href="/account" className="text-primary underline">
-            ← 返回个人中心
-          </Link>
-        </p>
-        <h1 className="text-2xl md:text-3xl font-bold">订阅中心</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
-          <strong className="text-foreground">课程会员计划</strong>仅覆盖 AI 学堂，不含工具使用权。
-          工具须单独在{" "}
-          <Link href="/account/tool-service-fee" className="text-primary underline">
-            工具技术服务费
-          </Link>
-          页按月开通；单次 AI 生成走 Gateway BYOK，不另扣钱包点数。
-        </p>
-      </div>
+    <div className="space-y-10">
+      <AccountSectionHeader
+        title="订阅中心"
+        description={
+          <>
+            <strong className="text-foreground">课程会员计划</strong>仅覆盖 AI 学堂，不含工具使用权。
+            工具须单独在{" "}
+            <Link href="/account/tool-service-fee" className={accountInlineLinkClass()}>
+              工具技术服务费
+            </Link>
+            页按月开通；单次 AI 生成走 Gateway BYOK，不另扣钱包点数。
+          </>
+        }
+      />
 
       {/* 第一版块：会员订阅 */}
       <section className="space-y-3">
@@ -126,7 +125,7 @@ export default async function AccountSubscriptionPage() {
                 <Link href="/subscribe">前往订阅与支付</Link>
               </Button>
               {process.env.NODE_ENV === "development" ? (
-                <Button asChild size="sm" variant="outline" className="border-orange-500/60 text-orange-700 hover:bg-orange-500/10 dark:text-orange-300">
+                <Button asChild size="sm" variant="subscription">
                   <Link href="/pay/mock-subscribe">模拟开通会员（开发）</Link>
                 </Button>
               ) : null}
@@ -201,7 +200,7 @@ export default async function AccountSubscriptionPage() {
                         </td>
                         <td className="py-3">
                           <div className="flex flex-col gap-2 items-start">
-                            <Button asChild size="sm" variant="outline" className="whitespace-nowrap">
+                            <Button asChild size="sm" variant="subscription" className="whitespace-nowrap">
                               <Link href={`/courses/${p.slug}`}>查看课程</Link>
                             </Button>
                             {sub ? (
@@ -237,10 +236,10 @@ export default async function AccountSubscriptionPage() {
 
       <section className="py-2">
         <div className="mx-auto flex max-w-2xl flex-row flex-wrap items-center justify-center gap-4 px-4">
-          <Button asChild variant="subscription" className="h-11 min-h-11 min-w-[14rem] max-w-xs shrink-0">
-            <Link href="/courses">AI 课程</Link>
+          <Button asChild variant="subscription" size="md" className="max-w-xs shrink-0">
+            <Link href="/account/courses">AI 学堂</Link>
           </Button>
-          <Button asChild variant="subscription" className="h-11 min-h-11 min-w-[14rem] max-w-xs shrink-0">
+          <Button asChild variant="subscription" size="md" className="max-w-xs shrink-0">
             <Link href="/products/ai-apps">AI 应用</Link>
           </Button>
         </div>
@@ -279,6 +278,6 @@ export default async function AccountSubscriptionPage() {
           </CardContent>
         </Card>
       </section>
-    </main>
+    </div>
   );
 }

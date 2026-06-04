@@ -1,48 +1,70 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { AccountHeaderActions } from "@/components/account/account-header-actions";
+import Link from "next/link";
+import { AccountNavMenu } from "@/components/account/account-nav-menu";
+import { AccountMobileNavSlot } from "@/components/account/account-mobile-nav-slot";
+import { ToggleTheme } from "@/components/layout/toogle-theme";
 
 export function AccountShell({
   profile,
   isAdmin,
-  showCoursesCta,
   showToolsCta,
   canLaunchTools,
+  canLaunchCanvas,
+  canvasOriginConfigured,
+  gatewayLinked,
+  canLaunchEcommerce,
+  ecomOriginConfigured,
   children,
 }: {
   profile: { image: string | null; name: string | null; email: string | null };
   isAdmin: boolean;
-  showCoursesCta: boolean;
   showToolsCta: boolean;
   canLaunchTools: boolean;
+  canLaunchCanvas: boolean;
+  canvasOriginConfigured: boolean;
+  gatewayLinked: boolean;
+  canLaunchEcommerce: boolean;
+  ecomOriginConfigured: boolean;
   children: React.ReactNode;
 }) {
-  const initial = (profile.name?.[0] || profile.email?.[0] || "?").toUpperCase();
+  const menuProps = {
+    profile,
+    isAdmin,
+    showToolsCta,
+    canLaunchTools,
+    canLaunchCanvas,
+    canvasOriginConfigured,
+    gatewayLinked,
+    canLaunchEcommerce,
+    ecomOriginConfigured,
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/85">
-        <div className="container mx-auto flex max-w-screen-xl min-h-14 flex-wrap items-center gap-3 px-4 py-2">
-          <Avatar className="h-9 w-9 shrink-0 border border-border">
-            {profile.image ? (
-              <AvatarImage src={profile.image} alt="" referrerPolicy="no-referrer" />
-            ) : null}
-            <AvatarFallback className="text-sm font-medium">{initial}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold leading-tight">个人中心</p>
-            {profile.email ? (
-              <p className="truncate text-xs text-muted-foreground">{profile.email}</p>
-            ) : null}
-          </div>
-          <AccountHeaderActions
-            isAdmin={isAdmin}
-            showCoursesCta={showCoursesCta}
-            showToolsCta={showToolsCta}
-            canLaunchTools={canLaunchTools}
-          />
+    <div className="flex min-h-screen bg-background">
+      <aside className="hidden w-[15.5rem] shrink-0 flex-col overflow-hidden border-r border-border bg-card/30 md:flex">
+        <div className="min-w-0 overflow-y-auto px-3 py-4">
+          <AccountNavMenu {...menuProps} placement="sidebar" />
         </div>
-      </header>
-      <div className="container w-full max-w-screen-xl px-4 mx-auto">{children}</div>
+      </aside>
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border px-4 md:px-6">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <p className="truncate text-sm font-medium text-muted-foreground md:hidden">
+              <Link href="/account" className="hover:text-foreground">
+                个人中心
+              </Link>
+            </p>
+            <p className="hidden truncate text-sm font-medium text-muted-foreground md:block">
+              个人中心
+            </p>
+            <AccountMobileNavSlot {...menuProps} />
+          </div>
+          <ToggleTheme iconOnly className="shrink-0" />
+        </header>
+        <main className="account-center min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
+          <div className="mx-auto w-full max-w-5xl">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

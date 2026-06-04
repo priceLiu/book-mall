@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ComponentProps } from "react";
 import { Button } from "@/components/ui/button";
+import { accountNavActionClass } from "@/components/account/account-nav-styles";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_REDIRECT = "/fitting-room";
@@ -13,7 +14,7 @@ export function LaunchToolsAppButton({
   redirectPath = DEFAULT_REDIRECT,
   label,
   busyLabel = "正在跳转…",
-  variant = "default",
+  variant = "subscription",
   className,
   title,
   /**
@@ -22,7 +23,7 @@ export function LaunchToolsAppButton({
    */
   layout = "default",
   /** 为 true 时在通过校验后 `window.open` 过渡页，否则当前页跳转 */
-  openInNewTab = false,
+  openInNewTab = true,
 }: {
   enabled: boolean;
   /** 未启用时在按钮下方展示 */
@@ -35,13 +36,14 @@ export function LaunchToolsAppButton({
   variant?: ComponentProps<typeof Button>["variant"];
   className?: string;
   title?: string;
-  layout?: "default" | "inlineNav";
+  layout?: "default" | "inlineNav" | "nav";
   openInNewTab?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const isInlineNav = layout === "inlineNav";
+  const isNav = layout === "nav";
 
   async function handleLaunch() {
     if (!enabled || busy) return;
@@ -103,29 +105,45 @@ export function LaunchToolsAppButton({
     }
   }
 
+  const labelText = label ?? "打开试衣间（工具站）";
+
   return (
     <div
       className={cn(
         isInlineNav
           ? "inline-flex shrink-0 flex-col items-start gap-0 self-center"
-          : "space-y-2",
+          : isNav
+            ? "w-full"
+            : "space-y-2",
       )}
     >
-      <Button
-        type="button"
-        variant={variant}
-        size="sm"
-        title={title}
-        className={cn(
-          !isInlineNav && "w-full sm:w-auto",
-          isInlineNav && "h-9 shrink-0",
-          className,
-        )}
-        disabled={!enabled || busy}
-        onClick={() => void handleLaunch()}
-      >
-        {busy ? busyLabel : label ?? "打开试衣间（工具站）"}
-      </Button>
+      {isNav ? (
+        <button
+          type="button"
+          title={title}
+          className={cn(accountNavActionClass(!enabled || busy), className)}
+          disabled={!enabled || busy}
+          onClick={() => void handleLaunch()}
+        >
+          {busy ? busyLabel : labelText}
+        </button>
+      ) : (
+        <Button
+          type="button"
+          variant={variant}
+          size="sm"
+          title={title}
+          className={cn(
+            !isInlineNav && "w-full sm:w-auto",
+            isInlineNav && "h-9 shrink-0",
+            className,
+          )}
+          disabled={!enabled || busy}
+          onClick={() => void handleLaunch()}
+        >
+          {busy ? busyLabel : labelText}
+        </Button>
+      )}
       {helperText ? (
         <p className="text-xs text-muted-foreground leading-relaxed">{helperText}</p>
       ) : null}

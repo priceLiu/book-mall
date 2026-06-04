@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
 import { LaunchCanvasAppButton } from "@/components/account/launch-canvas-app";
 import { cn } from "@/lib/utils";
 
@@ -86,7 +86,7 @@ export function AccountCanvasCard({
           <ChecklistRow ok={gatewayLinked}>
             Gateway API Key 已关联{" "}
             {!gatewayLinked ? (
-              <Link href="#gateway-api-key" className="text-primary underline">
+              <Link href="#gateway-api-key" className={accountInlineLinkClass()}>
                 去关联
               </Link>
             ) : null}
@@ -96,7 +96,7 @@ export function AccountCanvasCard({
             {!canLaunchCanvas ? (
               <>
                 {" · "}
-                <Link href="/account/tool-service-fee" className="text-primary underline">
+                <Link href="/account/tool-service-fee" className={accountInlineLinkClass()}>
                   去开通
                 </Link>
               </>
@@ -106,44 +106,39 @@ export function AccountCanvasCard({
             画布站点地址已配置（CANVAS_WEB_ORIGIN）
           </ChecklistRow>
         </ul>
-        <div className="mt-auto flex flex-wrap gap-2 pt-1">
-          <div className="min-w-[8rem] flex-1">
-            <LaunchCanvasAppButton
-              enabled={ready && canvasOriginConfigured}
-              variant="subscription"
-              className="w-full"
-              openInNewTab
-              title={
-                !gatewayLinked
-                  ? "请先关联 Gateway API Key"
-                  : !canLaunchCanvas
-                    ? "请先开通工具技术服务费"
-                    : undefined
-              }
-              helperText={
-                !ready
-                  ? "完成上方 checklist 后即可打开画布"
+        <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
+          <LaunchCanvasAppButton
+            enabled={ready && canvasOriginConfigured}
+            label="打开画布"
+            layout="nav"
+            openInNewTab
+            title={
+              !gatewayLinked
+                ? "请先关联 Gateway API Key"
+                : !canLaunchCanvas
+                  ? "请先开通工具技术服务费"
                   : undefined
-              }
-            />
-          </div>
+            }
+            helperText={
+              !ready ? "完成上方 checklist 后即可打开画布" : undefined
+            }
+          />
           {!gatewayLinked ? (
-            <Button asChild variant="outline" size="sm" className="flex-1">
-              <Link href="#gateway-api-key">关联 Gateway</Link>
-            </Button>
+            <Link href="#gateway-api-key" className={accountInlineLinkClass()}>
+              关联 Gateway
+            </Link>
           ) : (
-            <Button asChild variant="outline" size="sm" className="flex-1">
-              <a
-                href={
-                  process.env.NEXT_PUBLIC_GATEWAY_ORIGIN?.trim() ||
-                  "http://localhost:3005"
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                打开 Gateway
-              </a>
-            </Button>
+            <a
+              href={
+                process.env.NEXT_PUBLIC_GATEWAY_ORIGIN?.trim() ||
+                "http://localhost:3005"
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className={accountInlineLinkClass()}
+            >
+              打开 Gateway
+            </a>
           )}
         </div>
       </CardContent>

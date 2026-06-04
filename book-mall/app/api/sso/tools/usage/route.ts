@@ -8,6 +8,8 @@ import { toolKeyToLabel } from "@/lib/tool-key-label";
 import { recordToolUsageAndConsumeWallet } from "@/lib/wallet-record-tool-usage-consume";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 import { reserveWalletHold, releaseWalletHold } from "@/lib/wallet-holds";
+import { isEcomToolkitToolKey } from "@/lib/ecom/ecom-tool-keys";
+import { shouldMeterEcomToolkitUsage } from "@/lib/ecom/ecom-billing-mode";
 import { isServiceFeeMeteredToolKey } from "@/lib/tool-service-fee/config";
 
 export const dynamic = "force-dynamic";
@@ -227,6 +229,21 @@ async function handleReserve(_req: Request, userId: string, body: Record<string,
   if (!toolKey) {
     return NextResponse.json({ error: "reserve: toolKey 必填" }, { status: 400 });
   }
+  if (
+    isEcomToolkitToolKey(toolKey) &&
+    !(await shouldMeterEcomToolkitUsage(userId, toolKey))
+  ) {
+    return NextResponse.json(
+      {
+        ok: true,
+        holdId: null,
+        reservedPoints: 0,
+        reused: false,
+        serviceFeeMode: true,
+      },
+      { status: 201 },
+    );
+  }
   if (isServiceFeeMeteredToolKey(toolKey)) {
     return NextResponse.json(
       {
@@ -394,6 +411,16 @@ export async function POST(req: Request) {
     toolKeyRaw.length > 0 ? toolKeyRaw.slice(0, MAX_TOOL_KEY) : "";
   if (!rawToolKey) {
     return NextResponse.json({ error: "toolKey 必填" }, { status: 400 });
+  }
+  if (
+    isEcomToolkitToolKey(rawToolKey) &&
+    !(await shouldMeterEcomToolkitUsage(verified.sub, rawToolKey))
+  ) {
+    return NextResponse.json({
+      ok: true,
+      recorded: false,
+      serviceFeeMode: true,
+    });
   }
   if (isServiceFeeMeteredToolKey(rawToolKey)) {
     return NextResponse.json({

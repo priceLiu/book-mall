@@ -95,6 +95,10 @@ model User {
   canvasProviders              CanvasProvider[]
   canvasPromptTemplates        CanvasPromptTemplate[]
   toolServicePeriods           UserToolServicePeriod[]
+  ecomAssets                   EcomAsset[]
+
+  /// 电商工具箱计费：默认 BYOK 月费；PLATFORM_METERED 为代付按次扣点
+  ecomBillingMode EcomBillingMode @default(BYOK_SERVICE_FEE)
 
   /// Canvas 经 Gateway 代理：关联的 sk-gw API Key（验证后仅存 id，不存明文）
   gatewayApiKeyId       String?   @unique
@@ -388,6 +392,25 @@ model UserToolServicePeriod {
   @@index([userId, toolNavKey, status])
   @@index([userId, periodEnd])
   @@index([toolNavKey, periodEnd])
+}
+
+/// 电商工具箱用户资产（OSS URL + 元数据）
+model EcomAsset {
+  id           String   @id @default(cuid())
+  userId       String
+  module       String
+  kind         String
+  title        String?
+  prompt       String?  @db.Text
+  ossUrl       String
+  thumbnailUrl String?
+  meta         Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, createdAt])
 }
 
 /// 工具站左侧菜单项是否在导航中展示（由主站后台维护）；navKey 与 tool-web `config/nav-tools` 约定一致。
@@ -1788,11 +1811,17 @@ enum GatewayMetricsSource {
   UNAVAILABLE
 }
 
+enum EcomBillingMode {
+  BYOK_SERVICE_FEE
+  PLATFORM_METERED
+}
+
 enum GatewayClientSource {
   GATEWAY_CONSOLE
   CANVAS
   STORY
   TOOL
+  E_COMMERCE
   EXTERNAL
 }
 

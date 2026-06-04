@@ -31,6 +31,8 @@ export function signToolsAccessToken(opts: {
   tier?: "gold" | "admin";
   /** 工具站分组 navKey，不含套件外的自定义字符串（长度裁剪）。 */
   toolsNavKeys?: readonly string[];
+  /** 电商工具箱计费模式 */
+  ecomBillingMode?: "BYOK_SERVICE_FEE" | "PLATFORM_METERED";
   /** 写入 JWT，供工具站壳层本地验签展示（字段受限以防 Cookie 过大） */
   profile?: {
     email?: string | null;
@@ -57,6 +59,12 @@ export function signToolsAccessToken(opts: {
     }) ?? [];
   if (keys.length > 0) {
     payloadObj.tools_nav_keys = keys.slice(0, 24);
+  }
+  if (
+    opts.ecomBillingMode === "BYOK_SERVICE_FEE" ||
+    opts.ecomBillingMode === "PLATFORM_METERED"
+  ) {
+    payloadObj.ecom_billing_mode = opts.ecomBillingMode;
   }
   const email = trimClaim(opts.profile?.email, 320);
   const name = trimClaim(opts.profile?.name, 120);
@@ -89,6 +97,7 @@ export type VerifiedToolsToken = {
   image?: string;
   /** 可能为空数组或省略（旧 JWT）；工具站应回落 introspect。 */
   tools_nav_keys?: string[];
+  ecom_billing_mode?: "BYOK_SERVICE_FEE" | "PLATFORM_METERED";
 };
 
 function pickTier(raw: unknown): "gold" | "admin" | null {
@@ -171,6 +180,11 @@ export function verifyToolsAccessToken(
 
   const tnk = pickToolsNavKeys(payloadRaw.tools_nav_keys);
   if (tnk) out.tools_nav_keys = tnk;
+
+  const ebm = payloadRaw.ecom_billing_mode;
+  if (ebm === "BYOK_SERVICE_FEE" || ebm === "PLATFORM_METERED") {
+    out.ecom_billing_mode = ebm;
+  }
 
   return out;
 }

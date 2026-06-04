@@ -95,7 +95,7 @@ export function ChangePasswordForm({ enabled }: { enabled: boolean }) {
           {success}
         </p>
       ) : null}
-      <Button type="submit" size="sm" disabled={loading}>
+      <Button type="submit" size="sm" variant="subscription" disabled={loading}>
         {loading ? "提交中…" : "保存新密码"}
       </Button>
     </form>

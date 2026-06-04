@@ -90,6 +90,30 @@ export function getDevHubServices(): DevHubService[] {
       port: 3006,
       openable: true,
     },
+    {
+      id: "gateway",
+      label: "gateway-web",
+      description: "Gateway BYOK · 厂商 Key / 请求日志 / 调试",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_GATEWAY_WEB_ORIGIN ??
+          process.env.GATEWAY_PUBLIC_ORIGIN,
+        "http://localhost:3005",
+      ),
+      port: 3005,
+      openable: true,
+    },
+    {
+      id: "ecom",
+      label: "e-commerce-toolkit",
+      description: "电商工具箱 · 主图/详情/带货视频 · 双计费经 Gateway",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN ??
+          process.env.ECOMMERCE_PUBLIC_ORIGIN,
+        "http://localhost:3007",
+      ),
+      port: 3007,
+      openable: true,
+    },
   ];
 }
 

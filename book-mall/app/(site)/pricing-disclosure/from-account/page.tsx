@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
-import { hrefPricingDisclosureFromAccount } from "@/lib/pricing-disclosure-view";
 
 export const dynamic = "force-dynamic";
 
-/** 个人中心专用入口：整页跳转，避免软导航复用无 query 的缓存快照 */
+/** 旧个人中心入口：统一到 `/account/pricing` */
 export default function PricingDisclosureFromAccountPage() {
-  redirect(hrefPricingDisclosureFromAccount());
+  redirect("/account/pricing");
 }

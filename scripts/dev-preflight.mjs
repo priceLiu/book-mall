@@ -21,6 +21,7 @@ const PORTS = [
   { port: 3004, label: "canvas-web" },
   { port: 3005, label: "gateway-web" },
   { port: 3006, label: "prompt-optimizer-platform" },
+  { port: 3007, label: "e-commerce-toolkit" },
 ];
 
 function listListenersOnPort(port) {

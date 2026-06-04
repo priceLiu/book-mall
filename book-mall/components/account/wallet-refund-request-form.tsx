@@ -58,7 +58,7 @@ export function WalletRefundRequestForm() {
         <Textarea id="userNote" name="userNote" rows={2} maxLength={2000} />
       </div>
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
-      <Button type="submit" size="sm" disabled={loading}>
+      <Button type="submit" size="sm" variant="subscription" disabled={loading}>
         {loading ? "提交中…" : "提交余额提现申请"}
       </Button>
     </form>

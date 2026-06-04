@@ -8,6 +8,11 @@ import {
 } from "@/lib/sso-tools-env";
 import { signToolsAccessToken } from "@/lib/tools-sso-token";
 import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
+import {
+  mergeEcomToolkitNavKeys,
+  userCanAccessEcommerceToolkit,
+} from "@/lib/ecom/ecom-access";
+import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 import {
   intersectNavKeysWithSsoClient,
@@ -46,7 +51,8 @@ export async function POST(req: Request) {
   }
 
   const elig = await getToolsSsoEligibility(row.userId);
-  if (!elig.ok) {
+  const ecomOk = await userCanAccessEcommerceToolkit(row.userId);
+  if (!elig.ok && !ecomOk) {
     await prisma.ssoAuthorizationCode.update({
       where: { id: row.id },
       data: { consumedAt: now },
@@ -64,6 +70,11 @@ export async function POST(req: Request) {
   let toolsNavKeys = elig.isAdmin
     ? [...TOOL_SUITE_NAV_KEYS]
     : resolvedNav.keys;
+  toolsNavKeys = await mergeEcomToolkitNavKeys(
+    row.userId,
+    toolsNavKeys,
+    elig.isAdmin,
+  );
 
   if (row.clientId?.trim()) {
     const client = await loadActiveSsoClient(row.clientId);
@@ -85,7 +96,7 @@ export async function POST(req: Request) {
     }
   }
 
-  if (!elig.isAdmin && toolsNavKeys.length === 0) {
+  if (!elig.isAdmin && toolsNavKeys.length === 0 && !ecomOk) {
     await prisma.ssoAuthorizationCode.update({
       where: { id: row.id },
       data: { consumedAt: now },
@@ -112,12 +123,14 @@ export async function POST(req: Request) {
   }
 
   const expiresIn = getToolsJwtTtlSec();
+  const ecomBillingMode = await getUserEcomBillingMode(row.userId);
   const accessToken = signToolsAccessToken({
     userId: row.userId,
     secret: jwtSecret,
     expiresInSec: expiresIn,
     tier: elig.isAdmin ? "admin" : "gold",
     toolsNavKeys,
+    ecomBillingMode,
     profile: {
       email: elig.email,
       name: elig.name,
