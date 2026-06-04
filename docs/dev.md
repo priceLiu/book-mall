@@ -4,7 +4,7 @@
 
 ```bash
 pnpm install          # 仅首次：安装根目录 concurrently
-pnpm dev:all          # 同时启动 3000–3006
+pnpm dev:all          # 同时启动 3000–3007
 ```
 
 启动后在浏览器打开 **开发导航页**（需 book-mall 已起来）：
@@ -26,6 +26,7 @@ pnpm dev:all          # 同时启动 3000–3006
 | canvas-web（画布） | 3004 | http://localhost:3004 |
 | gateway-web（Gateway BYOK） | 3005 | http://localhost:3005 |
 | prompt-optimizer-platform（提示词优化器） | 3006 | http://localhost:3006 |
+| e-commerce-toolkit（电商工具箱） | 3007 | http://localhost:3007 |
 
 ## 漫剧：带上 KIE 轮询
 

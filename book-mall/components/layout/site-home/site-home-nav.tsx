@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   SITE_HOME_PRODUCT_OPTIONS,
   SiteHomeProductNav,
@@ -31,7 +32,13 @@ const anchorNavLinks: NavItem[] = [
   { label: "价格", href: "#pricing" },
 ];
 
-export function SiteHomeNav({ children }: { children: React.ReactNode }) {
+export function SiteHomeNav({
+  children,
+  isLoggedIn,
+}: {
+  children: React.ReactNode;
+  isLoggedIn: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -85,55 +92,62 @@ export function SiteHomeNav({ children }: { children: React.ReactNode }) {
             className="site-home-nav-icon-btn hidden h-9 w-9 text-[hsl(215,16%,65%)] hover:bg-transparent hover:text-foreground sm:inline-flex [&_svg]:size-5"
           />
 
-          <div className="site-home-nav-auth hidden flex-wrap items-center justify-end gap-2 sm:flex">
+          <div
+            className={cn(
+              "site-home-nav-auth flex flex-wrap items-center justify-end gap-2",
+              !isLoggedIn && "hidden sm:flex",
+            )}
+          >
             {children}
           </div>
 
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild className="lg:hidden">
-              <Button variant="ghost" size="icon" className="site-home-nav-icon-btn" aria-label="打开菜单">
-                <Menu className="size-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="bg-[#0a0b0f] border-border">
-              <SheetHeader>
-                <SheetTitle>菜单</SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 flex flex-col gap-1">
-                <p className="px-3 text-xs font-medium text-muted-foreground">产品</p>
-                {SITE_HOME_PRODUCT_OPTIONS.map((item) => (
-                  <button
-                    key={item.href}
-                    type="button"
-                    className="flex flex-col gap-0.5 rounded-md px-3 py-2.5 text-left hover:bg-white/5"
-                    onClick={() => navigate(item.href)}
+          {!isLoggedIn && (
+            <Sheet open={open} onOpenChange={setOpen}>
+              <SheetTrigger asChild className="lg:hidden">
+                <Button variant="ghost" size="icon" className="site-home-nav-icon-btn" aria-label="打开菜单">
+                  <Menu className="size-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="bg-[#0a0b0f] border-border">
+                <SheetHeader>
+                  <SheetTitle>菜单</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 flex flex-col gap-1">
+                  <p className="px-3 text-xs font-medium text-muted-foreground">产品</p>
+                  {SITE_HOME_PRODUCT_OPTIONS.map((item) => (
+                    <button
+                      key={item.href}
+                      type="button"
+                      className="flex flex-col gap-0.5 rounded-md px-3 py-2.5 text-left hover:bg-white/5"
+                      onClick={() => navigate(item.href)}
+                    >
+                      <span className="text-sm font-semibold">{item.label}</span>
+                      <span className="text-xs text-muted-foreground">{item.description}</span>
+                    </button>
+                  ))}
+                  <div className="my-2 border-t border-border/60" />
+                  {anchorNavLinks.map((item) => (
+                    <button
+                      key={item.label}
+                      type="button"
+                      className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm font-semibold hover:bg-white/5"
+                      onClick={() => navigate(item.href)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                  <div className="mt-4 flex flex-col gap-2 border-t border-border/60 pt-4">{children}</div>
+                  <Link
+                    href="/login"
+                    className="site-home-nav-login mt-2 justify-center"
+                    onClick={() => setOpen(false)}
                   >
-                    <span className="text-sm font-semibold">{item.label}</span>
-                    <span className="text-xs text-muted-foreground">{item.description}</span>
-                  </button>
-                ))}
-                <div className="my-2 border-t border-border/60" />
-                {anchorNavLinks.map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm font-semibold hover:bg-white/5"
-                    onClick={() => navigate(item.href)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-                <div className="mt-4 flex flex-col gap-2 border-t border-border/60 pt-4">{children}</div>
-                <Link
-                  href="/login"
-                  className="site-home-nav-login mt-2 justify-center"
-                  onClick={() => setOpen(false)}
-                >
-                  登录
-                </Link>
-              </div>
-            </SheetContent>
-          </Sheet>
+                    登录
+                  </Link>
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       </div>
     </header>

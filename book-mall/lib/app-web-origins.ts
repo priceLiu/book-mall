@@ -21,6 +21,16 @@ export function getCanvasWebOrigin(): string {
   );
 }
 
+export function getEcommerceWebOrigin(): string {
+  return trimOrigin(
+    process.env.NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN ??
+      process.env.ECOMMERCE_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://ecom.ai-code8.com"
+      : "http://localhost:3007",
+  );
+}
+
 export function getPromptOptimizerOrigin(): string {
   return trimOrigin(
     process.env.NEXT_PUBLIC_PROMPT_OPTIMIZER_ORIGIN ??

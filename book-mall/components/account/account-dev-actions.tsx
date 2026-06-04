@@ -29,12 +29,12 @@ export function AccountDevActions() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={() => push("/pay/mock-topup")}>
+        <Button type="button" variant="subscription" size="sm" onClick={() => push("/pay/mock-topup")}>
           模拟充值页
         </Button>
         <Button
           type="button"
-          variant="secondary"
+          variant="subscription"
           size="sm"
           onClick={() => push("/pay/mock-subscribe?plan=monthly")}
         >
@@ -42,7 +42,7 @@ export function AccountDevActions() {
         </Button>
         <Button
           type="button"
-          variant="secondary"
+          variant="subscription"
           size="sm"
           onClick={() => push("/pay/mock-subscribe?plan=yearly")}
         >

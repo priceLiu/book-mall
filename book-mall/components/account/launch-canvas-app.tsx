@@ -3,6 +3,7 @@
 import type { ComponentProps } from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { accountNavActionClass } from "@/components/account/account-nav-styles";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_REDIRECT = "/projects";
@@ -13,10 +14,11 @@ export function LaunchCanvasAppButton({
   redirectPath = DEFAULT_REDIRECT,
   label = "打开 AI 画布",
   busyLabel = "正在跳转…",
-  variant = "default",
+  variant = "subscription",
   className,
   title,
-  openInNewTab = false,
+  openInNewTab = true,
+  layout = "default",
 }: {
   enabled: boolean;
   helperText?: string;
@@ -27,6 +29,7 @@ export function LaunchCanvasAppButton({
   className?: string;
   title?: string;
   openInNewTab?: boolean;
+  layout?: "default" | "nav";
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -43,19 +46,33 @@ export function LaunchCanvasAppButton({
     window.location.assign(href);
   }
 
+  const isNav = layout === "nav";
+
   return (
-    <div className="space-y-2">
-      <Button
-        type="button"
-        variant={variant}
-        size="sm"
-        title={title}
-        className={cn("w-full sm:w-auto", className)}
-        disabled={!enabled || busy}
-        onClick={handleLaunch}
-      >
-        {busy ? busyLabel : label}
-      </Button>
+    <div className={cn(isNav ? "w-full" : "space-y-2")}>
+      {isNav ? (
+        <button
+          type="button"
+          title={title}
+          className={cn(accountNavActionClass(!enabled || busy), className)}
+          disabled={!enabled || busy}
+          onClick={handleLaunch}
+        >
+          {busy ? busyLabel : label}
+        </button>
+      ) : (
+        <Button
+          type="button"
+          variant={variant}
+          size="sm"
+          title={title}
+          className={cn("w-full sm:w-auto", className)}
+          disabled={!enabled || busy}
+          onClick={handleLaunch}
+        >
+          {busy ? busyLabel : label}
+        </Button>
+      )}
       {helperText ? (
         <p className="text-xs leading-relaxed text-muted-foreground">{helperText}</p>
       ) : null}

@@ -1,5 +1,6 @@
 import {
   getCanvasWebOrigin,
+  getEcommerceWebOrigin,
   getPromptOptimizerOrigin,
   getStoryWebOrigin,
 } from "@/lib/app-web-origins";
@@ -9,7 +10,8 @@ export type PlatformSsoApp =
   | "tool"
   | "canvas"
   | "story"
-  | "prompt-optimizer";
+  | "prompt-optimizer"
+  | "e-commerce";
 
 /** 子应用公网 Origin（SSO callback 重定向目标）。 */
 export function getPlatformAppPublicOrigin(app: PlatformSsoApp): string | null {
@@ -22,6 +24,8 @@ export function getPlatformAppPublicOrigin(app: PlatformSsoApp): string | null {
       return getStoryWebOrigin().replace(/\/$/, "") || null;
     case "prompt-optimizer":
       return getPromptOptimizerOrigin().replace(/\/$/, "") || null;
+    case "e-commerce":
+      return getEcommerceWebOrigin().replace(/\/$/, "") || null;
     default:
       return null;
   }
@@ -33,6 +37,9 @@ export function parsePlatformSsoApp(raw: string | null | undefined): PlatformSso
   if (v === "story") return "story";
   if (v === "prompt-optimizer" || v === "prompt_optimizer") {
     return "prompt-optimizer";
+  }
+  if (v === "e-commerce" || v === "ecommerce") {
+    return "e-commerce";
   }
   return "tool";
 }

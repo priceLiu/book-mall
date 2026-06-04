@@ -12,6 +12,7 @@ import {
   requireToolsSsoServerSecret,
 } from "@/lib/sso-tools-env";
 import { sanitizeToolsRedirectPath } from "@/lib/sanitize-tools-redirect-path";
+import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 import {
   loadActiveSsoClient,
@@ -107,7 +108,19 @@ export async function issueToolsSsoRedirect(opts: {
   }
 
   const elig = await getToolsSsoEligibility(opts.userId);
-  if (!elig.ok) {
+  const ecomApp = app === "e-commerce";
+  const ecomOk = ecomApp ? await userCanAccessEcommerceToolkit(opts.userId) : false;
+  if (ecomApp) {
+    if (!elig.isAdmin && !ecomOk) {
+      return {
+        ok: false,
+        status: 403,
+        error:
+          "当前无法使用电商工具箱：请开通「电商工具箱」月费，或在个人中心切换为「代付按次」模式并保证钱包余额充足",
+        code: "TOOLS_ACCESS_DENIED",
+      };
+    }
+  } else if (!elig.ok) {
     return {
       ok: false,
       status: 403,

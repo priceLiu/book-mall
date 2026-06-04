@@ -12,6 +12,7 @@ export const TOOL_SUITE_NAV_KEYS = [
   "prompt-optimizer",
   "smart-support",
   "app-history",
+  "e-commerce-toolkit",
 ] as const;
 
 export type ToolSuiteNavKey = (typeof TOOL_SUITE_NAV_KEYS)[number];

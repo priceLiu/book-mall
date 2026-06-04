@@ -5,6 +5,8 @@ import { toolsRouteDiagnosticsEnabled } from "@/lib/tools-route-diagnostics";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
+import { mergeEcomToolkitNavKeys } from "@/lib/ecom/ecom-access";
+import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 import { getActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
 
@@ -129,9 +131,17 @@ export async function GET(req: Request) {
         lastChargedPoints: p.lastChargedPoints,
       }));
 
-  const tools_nav_keys = elig.isAdmin
+  let tools_nav_keys = elig.isAdmin
     ? [...TOOL_SUITE_NAV_KEYS]
     : resolvedNav.keys;
+  tools_nav_keys = await mergeEcomToolkitNavKeys(
+    verified.sub,
+    tools_nav_keys,
+    elig.isAdmin,
+  );
+
+  const ecom_billing_mode =
+    verified.ecom_billing_mode ?? (await getUserEcomBillingMode(verified.sub));
 
   const payload = {
     active: true,
@@ -147,6 +157,7 @@ export async function GET(req: Request) {
     has_course_subscription: elig.hasMembershipSubscription,
     tool_service_periods: servicePeriods,
     tools_nav_keys,
+    ecom_billing_mode,
     email: elig.email,
     name: elig.name,
     image: elig.image,

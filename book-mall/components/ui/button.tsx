@@ -2,6 +2,7 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 
+import { BUTTON_SM_MIN_CLASS } from "@/lib/button-sizes"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -23,15 +24,18 @@ const buttonVariants = cva(
           "bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        /** 小：个人中心卡片链、表格内操作 */
+        sm: cn("h-8 rounded-md px-3 text-sm", BUTTON_SM_MIN_CLASS),
+        /** 中：默认主按钮 */
+        md: "h-9 rounded-md px-4 text-sm",
+        /** 大：页级主 CTA */
+        lg: "h-11 rounded-md px-6 text-base",
+        icon: "h-9 w-9 shrink-0 rounded-md p-0",
       },
     },
     defaultVariants: {
       variant: "default",
-      size: "default",
+      size: "md",
     },
   }
 )

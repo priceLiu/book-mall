@@ -55,6 +55,7 @@
     "gateway:poll-loop": "dotenv -e .env.local -- tsx scripts/gateway-poll-loop.ts"
   },
   "dependencies": {
+    "@ark-ui/react": "^5.37.0",
     "@devnomic/marquee": "^1.0.2",
     "@hookform/resolvers": "^3.9.0",
     "@next-auth/prisma-adapter": "^1.0.7",

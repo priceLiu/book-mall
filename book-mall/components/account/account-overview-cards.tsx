@@ -7,12 +7,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
+import { cn } from "@/lib/utils";
 import { LaunchToolsAppButton } from "@/components/account/launch-tools-app";
 import { AccountCanvasCard } from "@/components/account/account-canvas-card";
 import { formatPointsAsYuan } from "@/lib/currency";
 import { PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS } from "@/lib/pricing-disclosure-view";
-import { cn } from "@/lib/utils";
 
 type Props = {
   balancePoints: number;
@@ -124,13 +124,13 @@ export function AccountOverviewCards({
               </span>
             </p>
           </div>
-          <div className="mt-auto flex gap-2 pt-1">
-            <Button asChild variant="subscription" size="sm" className="flex-1">
-              <Link href="/pay/mock-topup">充值</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="flex-1">
-              <Link href="/account/recharge-promos">优惠券</Link>
-            </Button>
+          <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-1">
+            <Link href="/pay/mock-topup" className={accountInlineLinkClass()}>
+              充值
+            </Link>
+            <Link href="/account/recharge-promos" className={accountInlineLinkClass()}>
+              优惠券
+            </Link>
           </div>
         </CardContent>
       </Card>
@@ -165,17 +165,17 @@ export function AccountOverviewCards({
           </div>
           <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             工具技术服务费：
-            <Link href="/account/tool-service-fee" className="ml-1 font-medium text-primary underline">
+            <Link href="/account/tool-service-fee" className={cn("ml-1", accountInlineLinkClass())}>
               {hasActiveToolService ? "已开通" : "未开通"}
             </Link>
           </div>
-          <div className="mt-auto flex gap-2 pt-1">
-            <Button asChild variant="subscription" size="sm" className="flex-1">
-              <Link href="/account/subscription">订阅中心</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="flex-1">
-              <Link href="/account/tool-service-fee">工具月费</Link>
-            </Button>
+          <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-1">
+            <Link href="/account/subscription" className={accountInlineLinkClass()}>
+              订阅中心
+            </Link>
+            <Link href="/account/tool-service-fee" className={accountInlineLinkClass()}>
+              工具月费
+            </Link>
           </div>
         </CardContent>
       </Card>
@@ -207,31 +207,21 @@ export function AccountOverviewCards({
             <ChecklistRow ok={hasActiveToolService}>有效工具技术服务费</ChecklistRow>
             <ChecklistRow ok={balancePoints > 0}>钱包有余额（开通/续订时扣费）</ChecklistRow>
           </ul>
-          <div className="mt-auto flex gap-2 pt-1">
+          <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
             {showToolsCta ? (
-              <div className="flex-1">
-                <LaunchToolsAppButton
-                  enabled={canLaunchTools}
-                  variant="subscription"
-                  label="打开工具站"
-                  openInNewTab
-                  className="w-full"
-                />
-              </div>
-            ) : (
-              <Button
+              <LaunchToolsAppButton
+                enabled={canLaunchTools}
+                label="打开工具站"
                 variant="subscription"
-                size="sm"
-                className="flex-1"
-                disabled
-                title="未达准入门槛"
-              >
-                打开工具站
-              </Button>
+                openInNewTab
+                layout="nav"
+              />
+            ) : (
+              <span className="text-sm text-muted-foreground">工具站 SSO 未配置</span>
             )}
-            <Button asChild variant="outline" size="sm" className="flex-1">
-              <a href={PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS}>价目表</a>
-            </Button>
+            <a href={PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS} className={accountInlineLinkClass()}>
+              价目表
+            </a>
           </div>
         </CardContent>
       </Card>

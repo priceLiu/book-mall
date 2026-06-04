@@ -180,6 +180,18 @@
 - **应用**：`pnpm run db:deploy`
 - **文档**：`doc/tech/platform-api-v1.md`
 
+---
+
+## 2026-06-04 — 电商工具箱（e-commerce-toolkit）
+
+- **迁移目录**：`prisma/migrations/20260604120000_ecommerce_toolkit/`
+- **User**：`ecomBillingMode`（`BYOK_SERVICE_FEE` | `PLATFORM_METERED`，默认 BYOK）
+- **新表**：`EcomAsset`（用户电商资产 OSS URL）
+- **枚举**：`GatewayClientSource` 增加 `E_COMMERCE`
+- **种子**：`ToolServiceFeePlan`（`e-commerce-toolkit`）、`ToolBillablePrice`（`ecom-toolkit__*`）
+- **应用**：`pnpm run db:deploy`
+- **文档**：`doc/product/e-commerce-toolkit.md`
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

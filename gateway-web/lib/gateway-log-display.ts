@@ -17,6 +17,7 @@ export const LOG_APP_FILTER_OPTIONS: {
   { value: "CANVAS", label: "画布" },
   { value: "TOOL", label: "工具站" },
   { value: "STORY", label: "漫剧" },
+  { value: "E_COMMERCE", label: "电商工具箱" },
   { value: "GATEWAY_CONSOLE", label: "控制台" },
   { value: "EXTERNAL", label: "外部 API" },
 ];
@@ -41,6 +42,7 @@ export type LogRequestStatus =
 const CLIENT_SOURCE_LABEL: Record<string, string> = {
   CANVAS: "Canvas 画布",
   STORY: "Story 漫剧",
+  E_COMMERCE: "电商工具箱",
   GATEWAY_CONSOLE: "控制台调试",
   EXTERNAL: "外部 API",
 };
@@ -50,6 +52,7 @@ const CLIENT_SOURCE_SHORT: Record<string, string> = {
   CANVAS: "画布",
   STORY: "漫剧",
   TOOL: "工具站",
+  E_COMMERCE: "电商",
   GATEWAY_CONSOLE: "控制台",
   EXTERNAL: "外部 API",
 };

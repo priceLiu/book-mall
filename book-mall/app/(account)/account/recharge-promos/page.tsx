@@ -8,6 +8,7 @@ import {
   listUserRechargeCouponHistory,
 } from "@/lib/recharge-coupon";
 import { ClaimRechargePromoButton } from "@/components/account/claim-recharge-promo-button";
+import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
 import {
   Card,
   CardContent,
@@ -15,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { AccountSectionHeader } from "@/components/account/account-section-header";
 
 export const metadata = {
   title: "充值优惠 — 个人中心",
@@ -37,18 +38,11 @@ export default async function RechargePromosPage() {
   ]);
 
   return (
-    <main className="py-10 md:py-14 max-w-3xl mx-auto px-4 space-y-10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">充值优惠券</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            领取后在模拟收银或正式支付时选择核销；未领取或未核销则仅有实付到账。
-          </p>
-        </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/account">返回个人中心</Link>
-        </Button>
-      </div>
+    <div className="space-y-10">
+      <AccountSectionHeader
+        title="充值优惠"
+        description="领取后在模拟收银或正式支付时选择核销；未领取或未核销则仅有实付到账。"
+      />
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">可领取活动</h2>
@@ -131,10 +125,10 @@ export default async function RechargePromosPage() {
 
       <p className="text-sm text-muted-foreground">
         模拟充值入口：{" "}
-        <Link href="/pay/mock-topup" className="text-primary underline">
+        <Link href="/pay/mock-topup" className={accountInlineLinkClass()}>
           前往收银台
         </Link>
       </p>
-    </main>
+    </div>
   );
 }

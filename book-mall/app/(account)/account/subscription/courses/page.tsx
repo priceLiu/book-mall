@@ -9,6 +9,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
 
 export const metadata = {
   title: "AI 课程订阅 — AI Mall",
@@ -41,7 +42,7 @@ export default async function AccountSubscriptionCoursesPage() {
     <main className="mx-auto max-w-5xl px-4 py-8 md:py-10 space-y-8">
       <div className="space-y-2 max-w-3xl">
         <p className="text-sm text-muted-foreground">
-          <Link href="/account/subscription" className="text-primary underline">
+          <Link href="/account/subscription" className={accountInlineLinkClass()}>
             ← 订阅中心
           </Link>
         </p>
@@ -106,7 +107,7 @@ export default async function AccountSubscriptionCoursesPage() {
                       </td>
                       <td className="py-3">
                         <div className="flex flex-col gap-2 items-start">
-                          <Button asChild size="sm" variant="outline" className="whitespace-nowrap">
+                          <Button asChild size="sm" variant="subscription" className="whitespace-nowrap">
                             <Link href={`/courses/${p.slug}`}>查看课程</Link>
                           </Button>
                           {sub ? (

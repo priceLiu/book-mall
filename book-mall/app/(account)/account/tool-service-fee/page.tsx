@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
+import { AccountSectionHeader } from "@/components/account/account-section-header";
+import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { formatPointsAsYuan } from "@/lib/currency";
@@ -35,29 +37,23 @@ export default async function AccountToolServiceFeePage() {
   const periodByNav = new Map(periods.map((p) => [p.toolNavKey, p] as const));
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-4 py-8 md:py-10">
-      <div className="max-w-3xl space-y-2">
-        <p className="text-sm text-muted-foreground">
-          <Link href="/account/subscription" className="text-primary underline">
-            ← 订阅中心
-          </Link>
-        </p>
-        <h1 className="text-2xl font-bold md:text-3xl">工具技术服务费</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          课程会员订阅<strong className="text-foreground">仅覆盖 AI 学堂</strong>，不含工具使用权。
-          使用 AI 工具须开通对应分组的<strong className="text-foreground">按月技术服务费</strong>
-          （从钱包扣固定点数，每周期 30 天）；单次生成走 Gateway BYOK，Book 不对每次生成扣点。
-        </p>
-        <p className="text-sm text-muted-foreground">
-          钱包余额：<span className="font-medium tabular-nums text-foreground">
-            {gold.balancePoints.toLocaleString("zh-CN")} 点
-          </span>
-          （≈ ¥{formatPointsAsYuan(gold.balancePoints)}）·{" "}
-          <Link href="/pay/mock-topup" className="text-primary underline">
-            充值
-          </Link>
-        </p>
-      </div>
+    <div className="space-y-8">
+      <AccountSectionHeader
+        title="工具技术服务费"
+        description={
+          <>
+            课程会员<strong className="text-foreground">不含</strong>工具使用权。按月从钱包扣固定点数（30
+            天/周期）；单次生成走 Gateway BYOK。钱包余额：{" "}
+            <span className="font-medium tabular-nums text-foreground">
+              {gold.balancePoints.toLocaleString("zh-CN")} 点
+            </span>
+            （≈ ¥{formatPointsAsYuan(gold.balancePoints)}）·{" "}
+            <Link href="/pay/mock-topup" className={accountInlineLinkClass()}>
+              充值
+            </Link>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>
@@ -125,6 +121,6 @@ export default async function AccountToolServiceFeePage() {
           </table>
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }
