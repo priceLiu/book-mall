@@ -722,7 +722,7 @@ Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtn
 | 数据真源 | `lib/canvas/style-library/catalog.ts`（由 `docs/style.html` 生成，135 条） |
 | 预览图 | OSS `canvas/style-library/{id}.webp`；上传 `book-mall`：`pnpm canvas:upload-style-library` |
 | 本地图源 | `canvas-web/assets/style-library-source/{id}.webp` |
-| UI | `StyleLibraryGrid`：分类 pill + `minmax(190px,1fr)` 网格；hover 底部 overlay 显示 `prompt` |
+| UI | `StyleLibraryGrid`：分类 pill + 网格；预览区 **`aspect-[400/550]`** + `object-contain`（与源图 400×550 一致）；hover 底部 overlay 显示 `prompt` |
 | 画布入口 | 工具栏「风格库」→ `StyleLibraryModal`（`max-w-6xl`）；风格节点「浏览风格库…」 |
 | 套用 | `useApplyStyleLibraryPreset` → 写入 `story-pro-style`：`styleAnchorZh` + 可选 `refImages`（分类→内部元数据，无下拉 UI） |
 | 禁止 | 外网预览 URL；不自动写入全局风格 Profile |

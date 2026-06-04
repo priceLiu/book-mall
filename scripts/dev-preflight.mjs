@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * dev:all 启动前的端口预检：
- *   - 检查 3000-3006 是否被占
+ *   - 检查 3000-3007 是否被占
  *   - 如果有占用：打印占用 PID + 命令名，并给出处置建议（kill 命令），随后退出 1
  *   - 全空闲：静默通过
  *
- * 设计目标：避免 concurrently -k 在某个端口冲突时把其它 6 个进程一起 SIGTERM 拉死，
+ * 设计目标：避免 concurrently -k 在某个端口冲突时把其它子进程一起 SIGTERM 拉死，
  * 让用户能一眼看到症结。
  *
  * 用法：node scripts/dev-preflight.mjs

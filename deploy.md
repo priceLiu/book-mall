@@ -14,7 +14,7 @@
 
 ## 1. 本机开发
 
-**一键启动（推荐）**：在仓库根目录 `pnpm install` 后执行 `pnpm dev:all`（同时起 3000–3003）；漫剧开发用 `pnpm dev:all:story`（额外带 `story:poll-loop`）。启动后打开开发导航页 http://localhost:3000/dev 。详见 [`docs/dev.md`](docs/dev.md)。
+**一键启动（推荐）**：在仓库根目录 `pnpm install` 后执行 `pnpm dev:all`（同时起 **3000–3007**，含电商工具箱）；漫剧/画布本地轮询已默认包含在 `dev:all` 中。启动后打开开发导航页 http://localhost:3000/dev 。详见 [`docs/dev.md`](docs/dev.md)。
 
 ```bash
 # 或分别启动
