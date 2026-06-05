@@ -27,7 +27,7 @@ export const ecomFlipVariants = {
 } as const;
 
 const pillShellClass =
-  "relative w-full cursor-pointer font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ecom-primary-focus)] disabled:cursor-not-allowed disabled:opacity-50";
+  "relative inline-flex w-full cursor-pointer items-center justify-center gap-2 whitespace-nowrap font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ecom-primary-focus)] disabled:cursor-not-allowed disabled:opacity-50";
 
 function pillSizeClass(size: EcomButtonSize) {
   return cn(pillShellClass, ecomButtonSizeClass(size));
@@ -180,6 +180,42 @@ type SecondaryProps = {
   size?: EcomButtonSize;
 } & React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
+type SecondaryButtonProps = {
+  children: React.ReactNode;
+  className?: string;
+  dark?: boolean;
+  size?: EcomButtonSize;
+} & Omit<HTMLMotionProps<"button">, "children">;
+
+/** 描边胶囊次要按钮 */
+export function EcomButtonSecondary({
+  children,
+  className,
+  dark = false,
+  size = "md",
+  disabled,
+  type = "button",
+  ...rest
+}: SecondaryButtonProps) {
+  return (
+    <motion.button
+      type={type}
+      disabled={disabled}
+      className={cn(
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[var(--ecom-primary)] font-medium transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50",
+        ecomButtonSizeClass(size, "secondary"),
+        dark ? "text-[var(--ecom-primary-on-dark,#2997ff)]" : "text-[var(--ecom-primary)]",
+        className,
+      )}
+      whileTap={disabled ? undefined : { scale: 0.95 }}
+      whileHover={disabled ? undefined : { scale: 1.05 }}
+      {...rest}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
 /** 描边胶囊次要按钮（Link） */
 export function EcomButtonSecondaryLink({
   children,
@@ -191,7 +227,7 @@ export function EcomButtonSecondaryLink({
   return (
     <a
       className={cn(
-        "inline-flex items-center justify-center rounded-full border border-[var(--ecom-primary)] font-medium transition-transform hover:scale-105 active:scale-95",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[var(--ecom-primary)] font-medium transition-transform hover:scale-105 active:scale-95",
         ecomButtonSizeClass(size, "secondary"),
         dark ? "text-[var(--ecom-primary-on-dark,#2997ff)]" : "text-[var(--ecom-primary)]",
         className,

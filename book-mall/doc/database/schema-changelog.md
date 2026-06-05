@@ -192,6 +192,13 @@
 - **应用**：`pnpm run db:deploy`
 - **文档**：`doc/product/e-commerce-toolkit.md`
 
+## 2026-06-05 — 电商工具箱 · 微剧情分镜故事版（M5）
+
+- **迁移目录**：`prisma/migrations/20260605120000_ecom_storyboard/`
+- **新表**：`EcomStoryboardProject`（聊天、分镜 JSON、PNG/HTML URL、视频资产关联）
+- **种子**：`ToolBillablePrice`（`ecom-toolkit__storyboard` chat / video）
+- **应用**：`pnpm run db:deploy`
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

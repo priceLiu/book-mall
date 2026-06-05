@@ -1,0 +1,46 @@
+---
+description: 微剧故事版助手区聊天气泡内快捷选择按钮样式（胶囊浅灰，禁止深色主按钮）
+globs: e-commerce-toolkit/components/storyboard/storyboard-assistant*.tsx,e-commerce-toolkit/components/storyboard/*assistant*
+alwaysApply: false
+---
+
+# 微剧故事版 · 助手聊天气泡内快捷按钮
+
+> 全站聊天规范：`e-commerce-toolkit/design/CHAT.md` · 按钮五层：`design/SYSTEM.md` §5.4
+
+## 适用范围
+
+`e-commerce-toolkit` **创作助手**左侧栏中，嵌在 **助手消息气泡底部** 的「请选择（无需输入）」快捷按钮（`StoryboardAssistantChoices` 及同类实现）。
+
+**不包含**：输入区底部的「发送」「清空」（仍用 `EcomButtonPrimary` / `EcomButtonSecondary`）。
+
+## 统一视觉（图 1 基准）
+
+所有快捷选项 **同一套** 胶囊浅灰样式，**禁止** 按「策划方式 / 生成类」再分深色主按钮或加粗区分。
+
+```tsx
+const STORYBOARD_ASSISTANT_CHOICE_CLASS =
+  "rounded-full border border-[#d2d2d7] bg-[#f5f5f7] px-3 py-1.5 text-xs font-medium text-[#1d1d1f] transition-colors hover:border-[#86868b] hover:bg-[#ebebed] disabled:opacity-50";
+```
+
+- 形状：`rounded-full` 胶囊
+- 背景：`bg-[#f5f5f7]`，描边 `border-[#d2d2d7]`
+- 文字：`text-xs font-medium text-[#1d1d1f]`（**不要** `font-semibold` 例外）
+- 间距：按钮组 `flex flex-wrap gap-2`；区块上方提示 `text-[11px] text-[#6e6e73]`「请选择（无需输入）：」
+- 气泡内嵌：`mt-3 border-t border-[#e8e8ed] pt-3`（`compact` 模式）
+
+## 禁止
+
+- 深色填充主按钮（如 `bg-[#1d1d1f] text-white`）用于「按默认方案A」「自定义参数」等
+- 在助手快捷按钮上使用 `window.alert` / `window.confirm`（见 `no-native-dialogs.mdc`）
+- 在助手消息外 **重复** 渲染同一组 `inferAssistantChoices` 按钮（仅最后一条助手消息底部一份）
+
+## 权威实现
+
+`e-commerce-toolkit/components/storyboard/storyboard-assistant-choices.tsx`
+
+新增或修改助手快捷选项时，只改文案与 `inferAssistantChoices` 逻辑，**不要** 另起一套按钮 class。
+
+## Code Review
+
+助手相关 PR 若出现聊天气泡内第二套按钮样式或深色策划按钮，应改回上述统一样式后再合并。

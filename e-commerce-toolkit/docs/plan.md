@@ -7,20 +7,29 @@
 | 项 | 结论 |
 |----|------|
 | 计费 | 6a 代付按次 + 6b 月费 BYOK，用户可在 Book 个人中心切换 |
-| 首期能力 | readme 全目录（图类 + 8 类视频 preset + 品牌长片） |
+| 首期能力 | readme 全目录（图类 + 8 类视频 preset + 品牌长片 + **微剧情分镜故事版**） |
 | 端口 / 域名 | 本地 `:3007`；生产 `ecom.ai-code8.com` |
 | navKey | `e-commerce-toolkit` |
-| toolKey 前缀 | `ecom-toolkit__{module}__{action}` |
+| toolKey 前缀 | `ecom-toolkit__{module}` + `action` |
 
 ## 里程碑
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| M0 | Next 脚手架、设计 Token、全屏门户、SSO | 进行中 |
-| M1 | 双计费、价目 B 层、Gateway E_COMMERCE | 进行中 |
-| M2 | 图类 6 模块闭环 + 资产库 | 待办 |
-| M3 | 视频 8 preset + reserve/settle | 待办 |
-| M4 | 宣传片/广告、CloudBase、架构文档 | 待办 |
+| M0 | Next 脚手架、设计 Token、全屏门户、SSO | 完成 |
+| M1 | 双计费、价目 B 层、Gateway E_COMMERCE | 完成 |
+| M2 | 图类 6 模块闭环 + 资产库 | 完成 |
+| M3 | 视频 8 preset + reserve/settle | 完成 |
+| M4 | 宣传片/广告、CloudBase、架构文档 | 完成 |
+| M5 | 微剧情分镜故事版（HTML+PNG+Seedance 整片视频） | 完成 |
+
+## M5 故事版要点
+
+- 路由：`/ecom/storyboard/micro-drama`
+- 助手：DeepSeek / Gemini 经 Gateway 流式 Chat
+- 输出：可变镜数 HTML 故事版 + html2canvas PNG → OSS
+- 视频：`doubao-seedance-2.0`（多图参考），4–15s 用户自定，单条成片
+- 数据：`EcomStoryboardProject` + BFF `/api/sso/tools/ecom/storyboard/*`
 
 ## 依赖
 
@@ -34,3 +43,4 @@
 2. M2 图类（复用 Gateway 生图）
 3. M3 视频（异步任务 + 按秒 settle）
 4. M4 部署与个人中心入口
+5. M5 故事版工作室（Prisma → Gateway → BFF → UI）

@@ -74,6 +74,23 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "DASHSCOPE", requestKind: "TRYON" };
   }
 
+  if (m.startsWith("wan2.7-image") || m.startsWith("wan2.7_image")) {
+    return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
+  }
+
+  if (m === "wan2.6-t2i" || m === "wan2.6-image" || m.includes("wan2.6-image")) {
+    return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
+  }
+
+  if (
+    m.startsWith("kling/kling-v3") ||
+    m === "kling-3.0-image" ||
+    m.includes("kling-v3-omni-image") ||
+    m.includes("kling-v3-image-generation")
+  ) {
+    return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
+  }
+
   if (m.startsWith("wanx") || m.includes("wanx")) {
     return { providerKind: "DASHSCOPE", requestKind: "IMAGE" };
   }

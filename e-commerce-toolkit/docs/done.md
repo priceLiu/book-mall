@@ -10,6 +10,7 @@
 - [x] M2 图类全模块
 - [x] M3 视频族全 preset
 - [x] M4 品牌长片与部署
+- [x] M5 微剧情分镜故事版
 
 ## M0 骨架与 SSO
 
@@ -46,9 +47,17 @@
 - [x] Dockerfile + `deploy/tencent/e-commerce-toolkit.env.example`
 - [x] [docs/全站架构图与配置表.md](../../docs/全站架构图与配置表.md) 更新
 
+## M5 故事版
+
+- [x] `EcomStoryboardProject` 迁移 + `ecom-toolkit__storyboard` 价目
+- [x] Gateway：`ecomGwChatStream`、Volcengine 视频任务
+- [x] BFF：`/api/sso/tools/ecom/storyboard/*`
+- [x] UI：助手 30% + 故事版 70%、HTML/PNG 导出、Seedance 整片视频
+- [x] 侧栏「微剧情分镜」入口
+
 ## 本地启动前
 
-1. `book-mall` 执行 `pnpm db:deploy`（迁移 `20260604120000_ecommerce_toolkit`）
+1. `book-mall` 执行 `pnpm db:deploy`（含 `20260605120000_ecom_storyboard`）
 2. `.env.local` 配置 `TOOLS_SSO_*`、`NEXT_PUBLIC_ECOMMERCE_WEB_ORIGIN=http://localhost:3007`
 3. 6a 代付：配置 `ECOM_PLATFORM_GATEWAY_API_KEY_ID`（PLATFORM sk-gw）
 4. `cd e-commerce-toolkit && pnpm install && pnpm dev`

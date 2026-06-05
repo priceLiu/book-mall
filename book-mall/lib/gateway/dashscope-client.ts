@@ -4,11 +4,19 @@
  */
 
 export const WANX_TEXT2IMAGE_PLUS_MODEL = "wanx2.1-t2i-plus";
+/** 支持 content 多图 + text 参考生成（分镜垫图） */
+export const WAN27_IMAGE_MODEL = "wan2.7-image";
+/** 万相 2.6 图像编辑 / 多图参考（非 t2i） */
+export const WAN26_IMAGE_MODEL = "wan2.6-image";
+/** 可灵 3.0 Omni · 多图参考生分镜（百炼 DashScope） */
+export const KLING_V3_OMNI_IMAGE_MODEL = "kling/kling-v3-omni-image-generation";
 
 const TRYON_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/image-synthesis/";
 const WANX_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis";
+const WAN27_IMAGE_CREATE_URL =
+  "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation";
 const VIDEO_CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
 const IMAGE_PROCESS_URL =
@@ -75,6 +83,23 @@ export function dashscopeExtractTaskImageUrl(
 
   const oiu = pick(output.output_image_url);
   if (oiu) return upgradeAliyunHttpToHttps(oiu);
+
+  const choices = output.choices;
+  if (Array.isArray(choices)) {
+    for (const choice of choices) {
+      if (!choice || typeof choice !== "object") continue;
+      const msg = (choice as Record<string, unknown>).message;
+      if (!msg || typeof msg !== "object") continue;
+      const content = (msg as Record<string, unknown>).content;
+      if (!Array.isArray(content)) continue;
+      for (const item of content) {
+        if (!item || typeof item !== "object") continue;
+        const img = pick((item as Record<string, unknown>).image);
+        if (img) return upgradeAliyunHttpToHttps(img);
+      }
+    }
+  }
+
   return undefined;
 }
 
@@ -172,6 +197,11 @@ export async function dashscopeCreateWanxTask(opts: {
   negativePrompt?: string;
   n: number;
   model?: string;
+  size?: string;
+  /** 垫图 URL（产品图等） */
+  refImg?: string;
+  refMode?: "repaint" | "refonly";
+  refStrength?: number;
 }): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
   const prompt = opts.prompt.trim();
   if (!prompt) return { ok: false, error: "prompt 不能为空" };
@@ -192,12 +222,198 @@ export async function dashscopeCreateWanxTask(opts: {
         ...(opts.negativePrompt?.trim()
           ? { negative_prompt: opts.negativePrompt.trim().slice(0, 500) }
           : {}),
+        ...(opts.refImg?.trim() && /^https?:\/\//.test(opts.refImg.trim())
+          ? { ref_img: opts.refImg.trim() }
+          : {}),
       },
       parameters: {
-        size: "1024*1024",
+        size: opts.size?.trim() || "1024*1024",
         n,
         prompt_extend: true,
         watermark: false,
+        ...(opts.refImg?.trim()
+          ? {
+              ref_mode: opts.refMode ?? "repaint",
+              ref_strength:
+                typeof opts.refStrength === "number"
+                  ? Math.max(0, Math.min(1, opts.refStrength))
+                  : 0.85,
+            }
+          : {}),
+      },
+    }),
+  });
+
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok) {
+    return {
+      ok: false,
+      error:
+        typeof json.message === "string"
+          ? json.message
+          : `创建任务失败（HTTP ${res.status}）`,
+    };
+  }
+  const output = json.output as { task_id?: string } | undefined;
+  const taskId = output?.task_id?.trim();
+  if (!taskId) {
+    return {
+      ok: false,
+      error:
+        typeof json.message === "string" ? json.message : "接口未返回 task_id",
+    };
+  }
+  return { ok: true, taskId };
+}
+
+export type Wan27ImageContentItem = { text: string } | { image: string };
+
+function orderWanImageContent(
+  items: Wan27ImageContentItem[],
+  order: "text-first" | "images-first",
+): Wan27ImageContentItem[] {
+  const texts = items.filter((c) => "text" in c && c.text.trim());
+  const images = items.filter(
+    (c) => "image" in c && /^https?:\/\//.test(c.image.trim()),
+  );
+  return order === "text-first" ? [...texts, ...images] : [...images, ...texts];
+}
+
+/** 万相 2.7 / 2.6-image 多图参考（messages 协议） */
+export async function dashscopeCreateWan27ImageTask(opts: {
+  apiKey: string;
+  model?: string;
+  content: Wan27ImageContentItem[];
+  size?: string;
+  n?: number;
+  /** wan2.6-image 要求 text 在前；wan2.7 为 images 在前 */
+  contentOrder?: "text-first" | "images-first";
+}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  const items = opts.content.filter(
+    (c) =>
+      ("text" in c && c.text.trim()) ||
+      ("image" in c && /^https?:\/\//.test(c.image.trim())),
+  );
+  const hasText = items.some((c) => "text" in c);
+  if (!hasText) return { ok: false, error: "缺少 text 提示词" };
+
+  const model = opts.model?.trim() || WAN27_IMAGE_MODEL;
+  const isWan26Image = model.toLowerCase().includes("wan2.6-image");
+  if (!isWan26Image && items.length < 2) {
+    return { ok: false, error: "缺少有效输入" };
+  }
+
+  const contentOrder =
+    opts.contentOrder ?? (isWan26Image ? "text-first" : "images-first");
+  const ordered = orderWanImageContent(items, contentOrder);
+  const n = Math.min(isWan26Image ? 9 : 4, Math.max(1, Math.floor(opts.n ?? 1)));
+
+  const parameters: Record<string, unknown> = isWan26Image
+    ? {
+        prompt_extend: true,
+        watermark: false,
+        n,
+        enable_interleave: false,
+        size: opts.size?.trim() || "2K",
+      }
+    : {
+        size: opts.size?.trim() || "2K",
+        n,
+        watermark: false,
+      };
+
+  const res = await fetch(WAN27_IMAGE_CREATE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiKey}`,
+      "X-DashScope-Async": "enable",
+    },
+    body: JSON.stringify({
+      model,
+      input: {
+        messages: [
+          {
+            role: "user",
+            content: ordered.map((c) =>
+              "text" in c ? { text: c.text.trim() } : { image: c.image.trim() },
+            ),
+          },
+        ],
+      },
+      parameters,
+    }),
+  });
+
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok) {
+    return {
+      ok: false,
+      error:
+        typeof json.message === "string"
+          ? json.message
+          : `创建任务失败（HTTP ${res.status}）`,
+    };
+  }
+  const output = json.output as { task_id?: string } | undefined;
+  const taskId = output?.task_id?.trim();
+  if (!taskId) {
+    return {
+      ok: false,
+      error:
+        typeof json.message === "string" ? json.message : "接口未返回 task_id",
+    };
+  }
+  return { ok: true, taskId };
+}
+
+/** 可灵 3.0 图像生成（messages 多图 + text，与万相 2.7 同端点） */
+export async function dashscopeCreateKlingV3ImageTask(opts: {
+  apiKey: string;
+  model?: string;
+  content: Wan27ImageContentItem[];
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+  resolution?: "1k" | "2k" | "4k";
+  n?: number;
+}): Promise<{ ok: true; taskId: string } | { ok: false; error: string }> {
+  const items = opts.content.filter(
+    (c) =>
+      ("text" in c && c.text.trim()) ||
+      ("image" in c && /^https?:\/\//.test(c.image.trim())),
+  );
+  const hasText = items.some((c) => "text" in c);
+  if (!hasText) return { ok: false, error: "缺少 text 提示词" };
+  if (items.length < 1) return { ok: false, error: "缺少有效输入" };
+
+  const model = opts.model?.trim() || KLING_V3_OMNI_IMAGE_MODEL;
+  const n = Math.min(9, Math.max(1, Math.floor(opts.n ?? 1)));
+  const resolution = opts.resolution ?? "2k";
+
+  const res = await fetch(WAN27_IMAGE_CREATE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiKey}`,
+      "X-DashScope-Async": "enable",
+    },
+    body: JSON.stringify({
+      model,
+      input: {
+        messages: [
+          {
+            role: "user",
+            content: items.map((c) =>
+              "text" in c ? { text: c.text.trim() } : { image: c.image.trim() },
+            ),
+          },
+        ],
+      },
+      parameters: {
+        n,
+        aspect_ratio: opts.aspectRatio ?? "9:16",
+        resolution,
+        watermark: false,
+        result_type: "single",
       },
     }),
   });

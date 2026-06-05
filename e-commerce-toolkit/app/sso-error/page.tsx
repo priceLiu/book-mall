@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { buildEcomLoginUrl } from "@/lib/ecom-auth";
+
 function hintForReason(reason: string): string {
   if (reason === "missing_exchange_secret") {
     return "子站未配置 TOOLS_SSO_SERVER_SECRET（≥16 字符）。本地开发请确保 book-mall/.env.local 已配置，并用 pnpm dev（会自动从主站继承）；或复制到 e-commerce-toolkit/.env.local。";
@@ -31,9 +33,17 @@ export default function SsoErrorPage({
       <p className="mt-3 text-sm leading-relaxed text-[var(--ecom-muted)]">
         {hintForReason(reason)}
       </p>
-      <Link href="/" className="mt-8 inline-block text-[var(--ecom-primary)] hover:underline">
-        返回首页
-      </Link>
+      <div className="mt-8 flex flex-col items-center gap-3">
+        <a
+          href={buildEcomLoginUrl("/")}
+          className="inline-flex rounded-full bg-[#1d1d1f] px-6 py-2.5 text-sm font-medium text-white hover:bg-black"
+        >
+          重新登录
+        </a>
+        <Link href="/" className="text-sm text-[var(--ecom-primary)] hover:underline">
+          返回首页
+        </Link>
+      </div>
     </div>
   );
 }

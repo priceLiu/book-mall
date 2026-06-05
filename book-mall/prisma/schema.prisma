@@ -96,6 +96,7 @@ model User {
   canvasPromptTemplates        CanvasPromptTemplate[]
   toolServicePeriods           UserToolServicePeriod[]
   ecomAssets                   EcomAsset[]
+  ecomStoryboardProjects       EcomStoryboardProject[]
 
   /// 电商工具箱计费：默认 BYOK 月费；PLATFORM_METERED 为代付按次扣点
   ecomBillingMode EcomBillingMode @default(BYOK_SERVICE_FEE)
@@ -411,6 +412,30 @@ model EcomAsset {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, module, createdAt])
+}
+
+/// 电商工具箱 · 微剧情分镜故事版项目（聊天、HTML/PNG、视频）
+model EcomStoryboardProject {
+  id           String   @id @default(cuid())
+  userId       String
+  title        String?
+  module       String   @default("storyboard-micro-drama")
+  status       String   @default("draft")
+  brief        Json?
+  settings     Json?
+  references   Json?
+  chatHistory  Json?
+  sheet        Json?
+  sheetPngUrl  String?
+  sheetHtmlUrl String?
+  videoAssetId String?
+  meta         Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module, updatedAt])
 }
 
 /// 工具站左侧菜单项是否在导航中展示（由主站后台维护）；navKey 与 tool-web `config/nav-tools` 约定一致。

@@ -1,4 +1,7 @@
-# 电商工具箱 · 按钮规范
+# 电商工具箱 · 按钮规范（Tier 1–2）
+
+> 全站按钮 **五层体系** 见 [SYSTEM.md](./SYSTEM.md) §5。本文仅覆盖 **主胶囊** 与 **次胶囊**（Tier 1–2）。  
+> 页面工具条、助手 Choice Chip、图标按钮见 SYSTEM / [CHAT.md](./CHAT.md) / [MEDIA.md](./MEDIA.md)。
 
 > 全站主操作、对话框确认、门户 CTA **必须**使用本规范组件，禁止散落自定义 `bg-blue-*` / `rounded-md` 主按钮。
 

@@ -13,6 +13,8 @@ import {
 import {
   dashscopeCreateTryOnTask,
   dashscopeCreateVideoTask,
+  dashscopeCreateKlingV3ImageTask,
+  dashscopeCreateWan27ImageTask,
   dashscopeCreateWanxTask,
   dashscopeGetTask,
   isDashscopeTaskFailed,
@@ -402,6 +404,60 @@ export async function submitDashscopeTryOnJobForLog(opts: {
   return created.taskId;
 }
 
+export async function submitDashscopeWan27ImageJobForLog(opts: {
+  logId: string;
+  credentialId: string;
+  model: string;
+  content: Array<{ text: string } | { image: string }>;
+  size?: string;
+  n?: number;
+  contentOrder?: "text-first" | "images-first";
+}) {
+  const cred = await getDecryptedCredentialApiKey(opts.credentialId);
+  if (!cred) throw new Error("凭证不可用");
+  const created = await dashscopeCreateWan27ImageTask({
+    apiKey: cred.apiKey,
+    model: opts.model,
+    content: opts.content,
+    size: opts.size,
+    n: opts.n,
+    contentOrder: opts.contentOrder,
+  });
+  if (!created.ok) throw new Error(created.error);
+  await prisma.gatewayRequestLog.update({
+    where: { id: opts.logId },
+    data: { externalTaskId: created.taskId, status: "RUNNING" },
+  });
+  return created.taskId;
+}
+
+export async function submitDashscopeKlingV3ImageJobForLog(opts: {
+  logId: string;
+  credentialId: string;
+  model: string;
+  content: Array<{ text: string } | { image: string }>;
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+  resolution?: "1k" | "2k" | "4k";
+  n?: number;
+}) {
+  const cred = await getDecryptedCredentialApiKey(opts.credentialId);
+  if (!cred) throw new Error("凭证不可用");
+  const created = await dashscopeCreateKlingV3ImageTask({
+    apiKey: cred.apiKey,
+    model: opts.model,
+    content: opts.content,
+    aspectRatio: opts.aspectRatio,
+    resolution: opts.resolution,
+    n: opts.n,
+  });
+  if (!created.ok) throw new Error(created.error);
+  await prisma.gatewayRequestLog.update({
+    where: { id: opts.logId },
+    data: { externalTaskId: created.taskId, status: "RUNNING" },
+  });
+  return created.taskId;
+}
+
 export async function submitDashscopeWanxJobForLog(opts: {
   logId: string;
   credentialId: string;
@@ -409,6 +465,10 @@ export async function submitDashscopeWanxJobForLog(opts: {
   prompt: string;
   negativePrompt?: string;
   n: number;
+  size?: string;
+  refImg?: string;
+  refMode?: "repaint" | "refonly";
+  refStrength?: number;
 }) {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
@@ -418,6 +478,10 @@ export async function submitDashscopeWanxJobForLog(opts: {
     prompt: opts.prompt,
     negativePrompt: opts.negativePrompt,
     n: opts.n,
+    size: opts.size,
+    refImg: opts.refImg,
+    refMode: opts.refMode,
+    refStrength: opts.refStrength,
   });
   if (!created.ok) throw new Error(created.error);
   await prisma.gatewayRequestLog.update({

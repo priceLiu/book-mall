@@ -42,6 +42,13 @@ parentBaseline: tool-web/doc/price_0518.md
 | ecom-toolkit__video | voiceover | doubao-seedance-1.5-pro | 1080P | 0.9 | 900 |
 | ecom-toolkit__video | digital-human | doubao-seedance-1.5-pro | 1080P | 0.9 | 900 |
 
+## 故事版（M5）
+
+| toolKey | action | schemeARefModelKey | 说明 | 扣点 |
+|---------|--------|-------------------|------|------|
+| ecom-toolkit__storyboard | chat | deepseek-v4-flash | 助手对话/分镜 JSON | 40 |
+| ecom-toolkit__storyboard | video | doubao-seedance-2.0 | 整片视频 1080P 元/秒 | 10s≈1800 |
+
 ## LLM（TOKEN_IN_OUT，每次固定）
 
 | toolKey | action | schemeARefModelKey | 折中 cost 说明 | 扣点 |
