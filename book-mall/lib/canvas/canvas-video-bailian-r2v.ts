@@ -1,6 +1,8 @@
 /**
  * Canvas 参考生视频 · 百炼 DashScope R2V（华北2 北京）
  */
+import { buildBailianR2vRequestBody } from "@/lib/canvas/bailian-r2v-body";
+
 const CREATE_URL =
   "https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis";
 const TASK_URL_BASE = "https://dashscope.aliyuncs.com/api/v1/tasks";
@@ -25,16 +27,6 @@ export type BailianR2vTaskOutput = {
   message?: string;
 };
 
-function parseSeed(raw: string | undefined): number | undefined {
-  if (raw == null) return undefined;
-  const t = String(raw).trim();
-  if (!t) return undefined;
-  const n = Number(t);
-  if (!Number.isFinite(n) || !Number.isInteger(n)) return undefined;
-  if (n < 0 || n > 2147483647) return undefined;
-  return n;
-}
-
 export async function bailianR2vCreateTask(opts: {
   apiKey: string;
   model: string;
@@ -54,29 +46,19 @@ export async function bailianR2vCreateTask(opts: {
     return { ok: false, error: "参考图数量须为 1～9 张" };
   }
 
-  const duration = Math.min(15, Math.max(3, Math.floor(opts.duration)));
-  const seed = parseSeed(opts.seedStr);
-  const ratio = opts.ratio.trim() || "16:9";
   const model = opts.model.trim();
   if (!model) return { ok: false, error: "缺少模型名称" };
 
-  const parameters: Record<string, unknown> = {
-    ...(opts.parameterExtras ?? {}),
-    resolution: opts.resolution,
-    ratio,
-    duration,
-    watermark: false,
-  };
-  if (seed != null) parameters.seed = seed;
-
-  const body = {
+  const body = buildBailianR2vRequestBody({
     model,
-    input: {
-      prompt,
-      media: urls.map((url) => ({ type: "reference_image", url })),
-    },
-    parameters,
-  };
+    prompt,
+    referenceImageUrls: urls,
+    resolution: opts.resolution,
+    ratio: opts.ratio,
+    duration: opts.duration,
+    seedStr: opts.seedStr,
+    parameterExtras: opts.parameterExtras,
+  });
 
   const res = await fetch(CREATE_URL, {
     method: "POST",

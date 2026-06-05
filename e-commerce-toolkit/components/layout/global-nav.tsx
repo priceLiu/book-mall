@@ -24,7 +24,7 @@ export function GlobalNav() {
           个人中心
         </a>
         <a
-          href={`${book}/api/sso/tools/re-enter?app=e-commerce&redirect=${encodeURIComponent("/")}`}
+          href={`${book}/ecom-open?path=${encodeURIComponent("/")}`}
           className="rounded-lg bg-[var(--ecom-ink)] px-[15px] py-2 text-sm text-white"
         >
           登录

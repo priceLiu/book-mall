@@ -1,11 +1,35 @@
 # 电商工具箱 · 设计文档
 
+> **全站统一入口**：[SYSTEM.md](./SYSTEM.md)（基本样式规划、按钮五层、禁止清单、组件映射）
+
+## 文档地图
+
 | 文档 | 说明 |
 |------|------|
-| [COLORS.md](./COLORS.md) | **黑白蓝** 主色 |
+| **[SYSTEM.md](./SYSTEM.md)** | **母规范**：色彩、排版、按钮体系、聊天/表/图总览 |
+| [COLORS.md](./COLORS.md) | 黑白蓝语义色 |
 | [DESIGN.md](./DESIGN.md) | Apple 风格 token（色、字、圆角、间距） |
-| [BUTTON.md](./BUTTON.md) | 门户胶囊主按钮 |
-| [DIALOG.md](./DIALOG.md) | Radix 弹出层 |
-| [VIDEO.md](./VIDEO.md) | 原生视频播放（对齐 Canvas） |
+| [LAYOUT.md](./LAYOUT.md) | AppShell、双栏工作台、StepSection |
+| [BUTTON.md](./BUTTON.md) | 胶囊主按钮 / 次按钮（Tier 1–2） |
+| [CHAT.md](./CHAT.md) | 创作助手：气泡、输入、Choice Chip |
+| [TABLE.md](./TABLE.md) | 数据表、字段行、导出版表格 |
+| [MEDIA.md](./MEDIA.md) | 缩略图、上传、预览、浮层图标 |
+| [DIALOG.md](./DIALOG.md) | Radix 弹出层、`useDialogs` |
+| [VIDEO.md](./VIDEO.md) | 原生视频播放 |
 
-实现：按钮 `ecom-button.tsx`；弹层 `ui/dialog.tsx` + `useDialogs`；视频 `media/ecom-video-player.tsx`。
+## 实现对照
+
+| 能力 | 代码位置 |
+|------|----------|
+| 主/次按钮 | `components/ui/ecom-button.tsx` |
+| 弹出层 | `components/ui/dialog.tsx` + `components/dialogs/dialog-provider.tsx` |
+| 工作台布局 | `components/layout/ecom-workspace-layout.tsx` |
+| 助手 Choice | `components/storyboard/storyboard-assistant-choices.tsx` |
+| 参考上传 | `components/storyboard/storyboard-ref-uploader.tsx` |
+| 图片预览 | `components/media/ecom-image-preview-dialog.tsx` |
+| 视频 | `components/media/ecom-video-player.tsx` |
+| CSS 变量 | `app/globals.css` |
+
+## Cursor 规则
+
+仓库根目录 `.cursor/rules/ecom-design-system.mdc` — 编辑 `e-commerce-toolkit` 时自动引用母规范。

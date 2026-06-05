@@ -6,7 +6,15 @@
 
 ## 1. 产品定位
 
-面向电商卖家的 **全屏 AI 工具箱**：主图、详情、模特图、带货视频、IP/海报/VI、宣传片与广告短片。独立域名部署，账号经 Book SSO 互通。
+面向电商卖家的 **全屏 AI 工具箱**：主图、详情、模特图、带货视频、**微剧情分镜故事版**、IP/海报/VI、宣传片与广告短片。独立域名部署，账号经 Book SSO 互通。
+
+### 微剧情分镜（M5）
+
+- 入口：`/ecom/storyboard/micro-drama`
+- 左栏创作助手（DeepSeek / Gemini，Gateway 流式）+ 可选多参考图
+- 右栏可变镜数 HTML 分镜表；可导出 HTML / PNG（PNG 作为视频模型主参考图）
+- 整片视频：`doubao-seedance-2.0`，时长 4–15s 用户自定，全部经 Gateway
+- toolKey：`ecom-toolkit__storyboard`（`chat` / `video`）
 
 ## 2. 计费双轨（readme §6）
 

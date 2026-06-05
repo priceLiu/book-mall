@@ -57,6 +57,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     action: "tryon",
     tile: "dark",
   },
+  {
+    id: "storyboard-micro-drama",
+    title: "微剧故事版",
+    tagline: "带货微剧故事版与整片视频",
+    href: "/ecom/storyboard/micro-drama",
+    kind: "video",
+    toolKey: "ecom-toolkit__storyboard",
+    action: "video",
+    tile: "parchment",
+  },
   ...VIDEO_PRESETS.map((p, i) => ({
     id: `video-${p.slug}`,
     title: p.title,

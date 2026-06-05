@@ -1,0 +1,29 @@
+---
+description: 电商工具箱全站 UI 基本样式（按钮五层、聊天、表格、图片上传预览、布局）
+globs: e-commerce-toolkit/**/*
+alwaysApply: false
+---
+
+# 电商工具箱 · 设计系统
+
+权威文档：**`e-commerce-toolkit/design/SYSTEM.md`**
+
+编辑 `e-commerce-toolkit` 内 UI 前须对齐母规范；分册：`design/CHAT.md`、`TABLE.md`、`MEDIA.md`、`LAYOUT.md`、`BUTTON.md`、`DIALOG.md`。
+
+## 必守要点
+
+1. **色彩**：仅黑白蓝 + 功能红（`COLORS.md`）；焦点/链接强调 `#0071e3`，主按钮填充 `#0066cc`。
+2. **主/次按钮**：`EcomButtonPrimary` / `EcomButtonSecondary` 胶囊（`BUTTON.md`）；Dialog 内主按钮 `rounded-md`（`DIALOG.md`）。
+3. **工具条按钮**：卡片/表内用 `rounded-lg` 灰描边（SYSTEM §5.3），**不要**滥用主胶囊。
+4. **助手聊天**：气泡样式与 Choice Chip 见 `CHAT.md`；快捷按钮统一 `STORYBOARD_ASSISTANT_CHOICE_CLASS`，禁止深色策划按钮。
+5. **表格**：数据表深色表头 `#1d1d1f` + `align-top`（`TABLE.md`）。
+6. **图片**：缩略 `object-cover`/`object-contain` 分明；预览 `EcomImagePreviewDialog`；上传 `Plus` + 分类块（`MEDIA.md`）。
+7. **弹窗**：`useDialogs()`；禁止 `window.alert/confirm`。
+8. **视频**：`EcomVideoPlayer`（`VIDEO.md`）。
+
+## Code Review
+
+- 新主 CTA 未走 `EcomButtonPrimary` → 改
+- 助手气泡内第二套 choice 栏 → 删
+- 表头品牌蓝或单元格未顶对齐 → 改
+- 裸 `<video controls>` / 手写 fixed 弹层 → 改

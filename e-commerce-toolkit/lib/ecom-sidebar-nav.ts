@@ -62,7 +62,8 @@ export function buildEcomSidebarNavItems(bookOrigin: string): EcomSidebarNavItem
 
   rows.push(sep());
   for (const m of videoMods) {
-    rows.push(item(m.title, m.href, Film));
+    const icon = m.id === "storyboard-micro-drama" ? Clapperboard : Film;
+    rows.push(item(m.title, m.href, icon));
   }
 
   rows.push(sep());

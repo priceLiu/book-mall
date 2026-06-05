@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { EcomHomeAssistant } from "@/components/layout/ecom-home-assistant";
+import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomVideoPreviewDialog } from "@/components/media/ecom-video-preview-dialog";
 import { EcomVideoThumb } from "@/components/media/ecom-video-player";
 import { deleteAsset, listAssets, type EcomAsset } from "@/lib/ecom-api";
@@ -57,54 +59,73 @@ export default function LibraryPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-12">
-      <h1 className="text-[40px] font-semibold">我的资产</h1>
-      <p className="mt-2 text-[var(--ecom-muted)]">全站生成的图片与视频</p>
-      {loading ? (
-        <p className="mt-8 text-sm">加载中…</p>
-      ) : assets.length === 0 ? (
-        <p className="mt-8 text-sm text-[var(--ecom-muted)]">
-          暂无资产。<Link href="/" className="text-[var(--ecom-primary)]">去首页</Link> 开始创作。
-        </p>
-      ) : (
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {assets.map((a) => (
-            <li
-              key={a.id}
-              className="overflow-hidden rounded-[18px] border border-[var(--ecom-hairline)] bg-white"
-            >
-              <div className="relative aspect-square">
-                {a.kind === "image" ? (
-                  <Image
-                    src={a.thumbnailUrl ?? a.ossUrl}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                ) : (
-                  <EcomVideoThumb
-                    src={a.ossUrl}
-                    onClick={() =>
-                      setPreviewVideo({ src: a.ossUrl, title: a.title ?? a.module })
-                    }
-                  />
-                )}
-              </div>
-              <div className="flex justify-between p-3 text-sm">
-                <span>{a.title ?? a.module}</span>
-                <button
-                  type="button"
-                  className="text-red-600"
-                  onClick={() => onDelete(a)}
+    <>
+      <EcomWorkspaceLayout
+        assistantHeader={
+          <>
+            <h1 className="text-lg font-semibold text-[#1d1d1f]">我的资产</h1>
+            <p className="text-xs text-[#6e6e73]">
+              {loading ? "加载中…" : `共 ${assets.length} 条`}
+            </p>
+          </>
+        }
+        assistant={<EcomHomeAssistant variant="library" />}
+      >
+        <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          {loading ? (
+            <p className="text-sm text-[#6e6e73]">加载中…</p>
+          ) : assets.length === 0 ? (
+            <p className="text-sm text-[#6e6e73]">暂无资产，去各模块生成后会出现在这里。</p>
+          ) : (
+            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {assets.map((a) => (
+                <li
+                  key={a.id}
+                  className="overflow-hidden rounded-[18px] border border-[#e8e8ed] bg-white"
                 >
-                  删除
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                  <div className="relative aspect-square bg-[#f5f5f7]">
+                    {a.kind === "image" ? (
+                      <Image
+                        src={a.thumbnailUrl ?? a.ossUrl}
+                        alt={a.title ?? ""}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <EcomVideoThumb
+                        src={a.ossUrl}
+                        onClick={() =>
+                          setPreviewVideo({
+                            src: a.ossUrl,
+                            title: a.title ?? a.module,
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 p-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {a.title ?? "未命名"}
+                      </p>
+                      <p className="truncate text-xs text-[#6e6e73]">{a.module}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="shrink-0 text-sm text-red-600"
+                      onClick={() => onDelete(a)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </EcomWorkspaceLayout>
+
       {previewVideo ? (
         <EcomVideoPreviewDialog
           src={previewVideo.src}
@@ -115,6 +136,6 @@ export default function LibraryPage() {
           }}
         />
       ) : null}
-    </div>
+    </>
   );
 }

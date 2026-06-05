@@ -12,6 +12,12 @@ export function isVolcengineStoryVideoModelKey(modelKey: string): boolean {
 /** 影视专业版 · 多 @ 参考时默认升级的方舟 Seedance 模型 */
 export const VOLCENGINE_VIDEO_MULTI_REF_MODEL = "doubao-seedance-2.0";
 
+/** Seedance 2.0 支持 reference_image；1.5 Pro 仅首帧/尾帧，不可与参考图混用 */
+export function volcengineVideoSupportsMultiRef(modelKey: string): boolean {
+  const k = modelKey.trim().toLowerCase();
+  return k === "doubao-seedance-2.0" || k.includes("seedance-2.0");
+}
+
 export function buildCanvasVideoVolcengineInput(args: {
   modelKey: string;
   prompt: string;
@@ -30,17 +36,29 @@ export function buildCanvasVideoVolcengineInput(args: {
   }
 
   const mainUrl = args.imageUrl.trim();
-  const extraRefs = (args.referenceImageUrls ?? [])
-    .map((u) => u.trim())
-    .filter((u) => /^https?:\/\//.test(u) && u !== mainUrl);
-
-  const imageUrls = [mainUrl, ...extraRefs].slice(0, 9);
+  const allowMultiRef = volcengineVideoSupportsMultiRef(args.modelKey);
+  const extraRefs = allowMultiRef
+    ? (args.referenceImageUrls ?? [])
+        .map((u) => u.trim())
+        .filter((u) => /^https?:\/\//.test(u) && u !== mainUrl)
+    : [];
 
   const content: Array<Record<string, unknown>> = [
     { type: "text", text: args.prompt },
   ];
-  for (const url of imageUrls) {
-    content.push({ type: "image_url", image_url: { url } });
+  if (mainUrl) {
+    content.push({
+      type: "image_url",
+      image_url: { url: mainUrl },
+      role: "first_frame",
+    });
+  }
+  for (const url of extraRefs.slice(0, 8)) {
+    content.push({
+      type: "image_url",
+      image_url: { url },
+      role: "reference_image",
+    });
   }
 
   const resolution = String(args.options?.resolution ?? "1080p").toLowerCase();
