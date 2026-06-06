@@ -40,10 +40,12 @@ import {
   buildEcomStoryboardVideoPrompt,
 } from "@/lib/ecom/ecom-storyboard-video-prompt";
 import {
+  ensureStoryboardBailianR2vRefImage,
   ensureStoryboardRefImageForWan27,
   ensureStoryboardVideoRefImage,
   ensureStoryboardVideoRefImages,
 } from "@/lib/ecom/ecom-storyboard-ref-image";
+import { composeStoryboardPanelGridPng } from "@/lib/ecom/ecom-storyboard-panel-grid";
 import { normalizeImageForVolcengineVideo } from "@/lib/ecom/ecom-storyboard-video-image";
 import {
   bailianResolutionFromEcom,
@@ -53,11 +55,11 @@ import {
 } from "@/lib/ecom/ecom-storyboard-gen-params";
 import { persistStoryboardDeliverableSnapshot } from "@/lib/ecom/ecom-storyboard-snapshot";
 import { updateEcomStoryboardProject } from "@/lib/ecom/ecom-storyboard-service";
+import { requireStoryboardProductRef } from "@/lib/ecom/ecom-storyboard-refs";
 import {
-  requireStoryboardProductRef,
-  resolveStoryboardFullVideoRefs,
-  resolveStoryboardModelRefUrls,
-} from "@/lib/ecom/ecom-storyboard-refs";
+  resolveStoryboardPanelVideoRefPlan,
+  resolveStoryboardVideoRefPlan,
+} from "@/lib/ecom/ecom-storyboard-video-ref-rules";
 import { buildEcomStoryboardKling30VideoInput } from "@/lib/ecom/ecom-storyboard-video-kie";
 import {
   isStoryboardBailianR2vVideoModel,
@@ -283,7 +285,8 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   userId: string;
   projectId: string;
   sheet: StoryboardSheet;
-  sheetPngUrl: string;
+  /** 已废弃：成片故事板由服务端从 panel.imageUrl 实时拼接宫格 */
+  sheetPngUrl?: string;
   references: StoryboardReference[];
   durationSec?: number;
   aspectRatio?: "16:9" | "9:16" | "1:1";
@@ -298,10 +301,23 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   await assertEcomToolkitGatewayAccess(opts.userId);
   requireStoryboardProductRef(opts.references);
   const sheet = storyboardSheetSchema.parse(opts.sheet);
-  const sheetPngUrl = opts.sheetPngUrl.trim();
-  if (!/^https?:\/\//.test(sheetPngUrl)) {
-    throw new Error("请先生成故事版 PNG");
+  const sortedPanels = sheet.panels.slice().sort((a, b) => a.index - b.index);
+  const panelImages = sortedPanels.flatMap((p) => {
+    const url = p.imageUrl?.trim();
+    if (!url || !/^https?:\/\//.test(url)) return [];
+    return [{ index: p.index, url }];
+  });
+  if (panelImages.length < sortedPanels.length) {
+    throw new Error("请先生成全部分镜图");
   }
+
+  const videoAspect: "16:9" | "9:16" =
+    opts.aspectRatio === "16:9" ? "16:9" : "9:16";
+  const panelGridUrl = await composeStoryboardPanelGridPng({
+    userId: opts.userId,
+    panelUrls: panelImages.map((p) => p.url),
+    aspectRatio: videoAspect,
+  });
 
   const existing = await prisma.ecomStoryboardProject.findFirst({
     where: { id: opts.projectId, userId: opts.userId },
@@ -324,46 +340,63 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   const workspaceId = randomUUID().slice(0, 8);
   const modelKey = resolveStoryboardVideoModel(opts.modelKey);
   const provider = resolveStoryboardVideoProvider(modelKey);
+  const refPlan = resolveStoryboardVideoRefPlan({
+    modelKey,
+    references: opts.references,
+    sheetPngUrl: panelGridUrl,
+    panelImages,
+  });
+
   const durationMin = provider === "bailian" ? 3 : 4;
+  const durationCap = refPlan.rules.apiMaxDurationSec ?? 15;
   const durationSec = Math.max(
     durationMin,
-    Math.min(15, Math.round(opts.durationSec ?? 10)),
+    Math.min(durationCap, Math.round(opts.durationSec ?? 10)),
   );
   const resolution = resolveVideoResolution(opts.resolution);
   const videoSr = videoSrFromResolution(resolution);
   const taskKey = `ecom-sb-vid:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
 
-  const panelImageUrls = sheet.panels
-    .map((p) => p.imageUrl?.trim())
-    .filter((u): u is string => Boolean(u && /^https?:\/\//.test(u)));
-  const { firstFrameUrl, referenceImageUrls, allUrls } = resolveStoryboardFullVideoRefs({
-    references: opts.references,
-    sheetPngUrl,
-    panelImageUrls,
-  });
-  const prompt = buildEcomStoryboardVideoPrompt(sheet, opts.brief, opts.references, {
-    bailianModelKey: provider === "bailian" ? modelKey : undefined,
-    bailianRefCount: provider === "bailian" ? allUrls.length : undefined,
-  });
+  const uniqueUrls = [...new Set(refPlan.slots.map((s) => s.url))];
+  const normalizedMap = new Map<string, string>();
+  const slotByUrl = new Map(refPlan.slots.map((s) => [s.url, s]));
+  for (const raw of uniqueUrls) {
+    const role = slotByUrl.get(raw)?.role;
+    const needsAspectNorm = role === "full_sheet";
+    let aspectUrl = raw;
+    if (needsAspectNorm) {
+      ({ url: aspectUrl } = await normalizeImageForVolcengineVideo({
+        userId: opts.userId,
+        imageUrl: raw,
+      }));
+    }
+    const { url: sizedUrl } =
+      provider === "bailian"
+        ? await ensureStoryboardBailianR2vRefImage({
+            userId: opts.userId,
+            imageUrl: aspectUrl,
+            modelKey,
+          })
+        : await ensureStoryboardVideoRefImage({
+            userId: opts.userId,
+            imageUrl: aspectUrl,
+          });
+    normalizedMap.set(raw, sizedUrl);
+  }
+  const norm = (u: string) => normalizedMap.get(u) ?? u;
 
-  const { url: aspectFirstFrame } = await normalizeImageForVolcengineVideo({
-    userId: opts.userId,
-    imageUrl: firstFrameUrl,
+  const firstFrameUrl = norm(refPlan.firstFrameUrl);
+  const normalizedReferenceImageUrls = refPlan.referenceImageUrls.map(norm);
+  const normalizedAllUrls = refPlan.bailianAllUrls
+    .map(norm)
+    .slice(0, refPlan.rules.maxTotalImages);
+  const videoImageUrl = firstFrameUrl;
+
+  const prompt = buildEcomStoryboardVideoPrompt(sheet, opts.brief, undefined, {
+    refSlots: refPlan.slots,
+    refRules: refPlan.rules,
   });
-  const { url: sizedFirstFrame } = await ensureStoryboardVideoRefImage({
-    userId: opts.userId,
-    imageUrl: aspectFirstFrame,
-  });
-  const normalizedReferenceImageUrls = await ensureStoryboardVideoRefImages({
-    userId: opts.userId,
-    urls: referenceImageUrls,
-  });
-  const videoImageUrl = sizedFirstFrame;
-  const normalizedAllUrls = [
-    sizedFirstFrame,
-    ...normalizedReferenceImageUrls.filter((u) => u !== sizedFirstFrame),
-  ].slice(0, 9);
   const ratio =
     opts.ratio?.trim() || opts.aspectRatio?.trim() || "9:16";
 
@@ -395,8 +428,6 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
 
   let taskId: string;
   let logId: string;
-  const videoAspect: "16:9" | "9:16" =
-    opts.aspectRatio === "16:9" ? "16:9" : "9:16";
 
   if (provider === "kie") {
     const aspect = opts.aspectRatio ?? "9:16";
@@ -448,7 +479,11 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   } else if (provider === "bailian") {
     const parameterExtras: Record<string, unknown> = {};
     if (modelKey.startsWith("wan2.7")) {
-      parameterExtras.prompt_extend = opts.promptExtend !== false;
+      const gridStoryboard =
+        refPlan.rules.strategy === "bailian_storyboard_grid";
+      parameterExtras.prompt_extend = gridStoryboard
+        ? opts.promptExtend === true
+        : opts.promptExtend !== false;
     }
     if (isWan26BailianR2vModel(modelKey)) {
       delete parameterExtras.prompt_extend;
@@ -734,15 +769,34 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
       ),
     ),
   );
-  const prompt = buildEcomStoryboardPanelVideoPrompt(panel, sheet, opts.brief);
-  const { allUrls: refUrls } = resolveStoryboardModelRefUrls(opts.references);
+  const panelRefPlan = resolveStoryboardPanelVideoRefPlan({
+    modelKey,
+    references: opts.references,
+    panelImageUrl: imageUrl,
+  });
+  const uniqueUrls = [...new Set(panelRefPlan.slots.map((s) => s.url))];
+  const normalizedMap = new Map<string, string>();
+  for (const raw of uniqueUrls) {
+    const { url: sizedUrl } = await ensureStoryboardVideoRefImage({
+      userId: opts.userId,
+      imageUrl: raw,
+    });
+    normalizedMap.set(raw, sizedUrl);
+  }
+  const norm = (u: string) => normalizedMap.get(u) ?? u;
+  const prompt = buildEcomStoryboardPanelVideoPrompt(panel, sheet, opts.brief, {
+    refSlots: panelRefPlan.slots,
+    refRules: panelRefPlan.rules,
+  });
+  const refUrls = panelRefPlan.referenceImageUrls.map(norm);
+  const panelFirstFrame = norm(panelRefPlan.firstFrameUrl);
 
   const { ossUrl, taskId, chargePoints } = await runVolcengineVideoJob({
     userId: opts.userId,
     projectId: opts.projectId,
     modelKey,
     prompt,
-    imageUrl,
+    imageUrl: panelFirstFrame,
     referenceImageUrls: refUrls,
     durationSec,
     aspectRatio: opts.aspectRatio ?? "9:16",

@@ -69,6 +69,7 @@ type QwenTtsGenerationResponse = {
     audio?: { url?: string; data?: string };
     finish_reason?: string;
   };
+  usage?: Record<string, unknown>;
   code?: string;
   message?: string;
 };
@@ -102,6 +103,7 @@ export async function forwardQwenTtsSpeech(opts: {
   durationMs: number;
   contentType: string;
   ext: string;
+  vendorJson?: unknown;
 }> {
   const cred = await getDecryptedCredentialApiKey(opts.credentialId);
   if (!cred) throw new Error("凭证不可用");
@@ -213,5 +215,6 @@ export async function forwardQwenTtsSpeech(opts: {
     durationMs: Date.now() - started,
     contentType: meta.contentType,
     ext: meta.ext,
+    vendorJson: json,
   };
 }

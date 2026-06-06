@@ -43,7 +43,7 @@ export function StoryboardStudio() {
   const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
   const [videoModels, setVideoModels] = useState<StoryboardGatewayModel[]>([]);
-  const [durationSec, setDurationSec] = useState(10);
+  const [durationSec, setDurationSec] = useState(15);
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("9:16");
   const [videoAspectRatio, setVideoAspectRatio] = useState<
     "16:9" | "9:16" | "1:1"
@@ -62,7 +62,7 @@ export function StoryboardStudio() {
     aspectRatio: "9:16",
     imageSize: "720*1280",
     videoResolution: "1080p",
-    durationSec: 10,
+    durationSec: 15,
     dialogueLang: "zh",
     videoR2vRatio: "9:16",
     videoSeed: "",
@@ -83,7 +83,7 @@ export function StoryboardStudio() {
       sessionStorage.setItem(PROJECT_STORAGE_KEY, id);
     }
     const d =
-      typeof p.settings?.durationSec === "number" ? p.settings.durationSec : 10;
+      typeof p.settings?.durationSec === "number" ? p.settings.durationSec : 15;
     setDurationSec(Math.max(4, Math.min(15, d)));
     if (p.settings?.aspectRatio === "16:9" || p.settings?.aspectRatio === "9:16") {
       setAspectRatio(p.settings.aspectRatio);

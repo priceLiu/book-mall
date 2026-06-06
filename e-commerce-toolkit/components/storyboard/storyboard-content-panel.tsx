@@ -598,7 +598,10 @@ export function StoryboardContentPanel({
 
   async function handleGenerateFullVideo() {
     if (vidBusy) return;
-    if (!(await ensureSheetPngForVideo())) return;
+    if (!hasAllPanelImages(project) || !project.sheet) {
+      await onAlert({ title: "提示", message: "请先生成全部分镜图。" });
+      return;
+    }
     setVidBusy(true);
     setVideoPollCount(0);
     try {

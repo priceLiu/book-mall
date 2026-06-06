@@ -70,12 +70,14 @@ export function resolveStoryboardModelRefUrls(refs: StoryboardReference[]): {
 }
 
 /**
- * 整图成片：完整分镜 PNG 作首帧；产品/角色/场景 + 各镜头分镜图作 reference_image。
+ * @deprecated 使用 resolveStoryboardVideoRefPlan（ecom-storyboard-video-ref-rules.ts），按模型自动组参考图。
  */
 export function resolveStoryboardFullVideoRefs(opts: {
   references: StoryboardReference[];
   sheetPngUrl: string;
   panelImageUrls?: string[];
+  /** 除首帧外最多几张参考图（百炼 R2V 等厂商有上限） */
+  maxReferenceImages?: number;
 }): {
   firstFrameUrl: string;
   referenceImageUrls: string[];
@@ -83,16 +85,15 @@ export function resolveStoryboardFullVideoRefs(opts: {
 } {
   const firstFrameUrl = opts.sheetPngUrl.trim();
   const { allUrls: assetRefs } = resolveStoryboardModelRefUrls(opts.references);
-  const panelUrls = (opts.panelImageUrls ?? [])
-    .map((u) => u.trim())
-    .filter((u) => /^https?:\/\//.test(u) && u !== firstFrameUrl);
+  const maxRefs = opts.maxReferenceImages ?? 8;
 
   const seen = new Set<string>();
   const referenceImageUrls: string[] = [];
-  for (const u of [...assetRefs, ...panelUrls]) {
+  for (const u of assetRefs) {
     if (u === firstFrameUrl || seen.has(u)) continue;
     seen.add(u);
     referenceImageUrls.push(u);
+    if (referenceImageUrls.length >= maxRefs) break;
   }
 
   const allUrls = [firstFrameUrl, ...referenceImageUrls];

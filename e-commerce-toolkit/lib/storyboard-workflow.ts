@@ -1,3 +1,10 @@
+import {
+  getChoicesForStep,
+  isParamCollecting,
+  PARAM_STEPS,
+  resetParamCollectPatch,
+  startCustomParamCollectPatch,
+} from "@/lib/storyboard-param-collect";
 import type { StoryboardProject, StoryboardReference } from "@/lib/storyboard-types";
 
 export type StoryboardUploadRole = "product" | "character" | "scene";
@@ -14,8 +21,19 @@ export function hasStoryboardProductRef(project: StoryboardProject): boolean {
   return project.references.some((r) => r.role === "product");
 }
 
+export function isCustomParamsComplete(project: StoryboardProject): boolean {
+  const wf = project.meta?.workflow ?? {};
+  if (wf.planMode !== "custom" || wf.paramCollecting) return false;
+  const collected = wf.collectedParams ?? {};
+  return PARAM_STEPS.every((s) => Boolean(collected[s.key]));
+}
+
 export function planModeChosen(project: StoryboardProject): boolean {
-  return userSaid(project, ["按默认方案A", "自定义参数"]);
+  const wf = project.meta?.workflow ?? {};
+  if (wf.paramCollecting) return false;
+  if (wf.planMode === "default_a") return true;
+  if (wf.planMode === "custom" && isCustomParamsComplete(project)) return true;
+  return userSaid(project, ["按默认方案A"]);
 }
 
 export function productRefStepDone(project: StoryboardProject): boolean {
@@ -73,6 +91,10 @@ export function panelVideoCount(project: StoryboardProject): number {
 
 export function inferAssistantChoices(project: StoryboardProject): string[] {
   if (project.meta?.workflow?.replanning) return [];
+
+  if (isParamCollecting(project)) {
+    return getChoicesForStep(project);
+  }
 
   const hasSheet = Boolean(project.sheet);
   const hasAnalysis = Boolean(project.meta?.deliverable?.analysis);
@@ -133,6 +155,15 @@ export function workflowPatchForChoice(
     if (!sceneRefStepDone(project)) return { skippedRefs: true };
   }
   if (text === "是，自动生成角色") return { autoGenCharacter: true };
+  if (text === "自定义参数") return startCustomParamCollectPatch();
+  if (text === "按默认方案A") return { planMode: "default_a" };
+  if (text === "重新定方案") {
+    return {
+      phase: "planning",
+      replanning: true,
+      ...resetParamCollectPatch(),
+    };
+  }
   if (text === "定稿" || text === "无需微调") return { replanning: false, phase: "refs" };
   if (text === "wan2.7-image" || text === "通义万相 2.7") return { imageModelKey: "wan2.7-image" };
   if (text === "wan2.7-image-pro" || text === "通义万相 2.7 Pro")

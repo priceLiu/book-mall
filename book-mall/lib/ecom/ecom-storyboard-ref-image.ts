@@ -10,6 +10,19 @@ const KLING_REF_MAX_SIDE = 4096;
 const VIDEO_REF_MIN_SIDE = 240;
 const VIDEO_REF_MAX_SIDE = 8000;
 
+/** 百炼 wan2.6 / wan2.7 R2V：宽高均须 ≥300（API 校验） */
+const BAILIAN_R2V_WAN_MIN_SIDE = 300;
+
+/** 百炼 HappyHorse R2V：短边 ≥400（官方文档） */
+const BAILIAN_R2V_HAPPYHORSE_MIN_SIDE = 400;
+
+export function bailianR2vRefMinSide(modelKey: string): number {
+  if (modelKey.trim() === "happyhorse-1.0-r2v") {
+    return BAILIAN_R2V_HAPPYHORSE_MIN_SIDE;
+  }
+  return BAILIAN_R2V_WAN_MIN_SIDE;
+}
+
 async function ensureRefImageInBounds(opts: {
   userId: string;
   imageUrl: string;
@@ -80,7 +93,7 @@ export async function ensureStoryboardRefImageForWan27(opts: {
   });
 }
 
-/** 整图成片 / Seedance / 百炼 R2V：参考图 240～8000px */
+/** 整图成片 / Seedance 等：参考图 240～8000px */
 export async function ensureStoryboardVideoRefImage(opts: {
   userId: string;
   imageUrl: string;
@@ -89,6 +102,20 @@ export async function ensureStoryboardVideoRefImage(opts: {
     userId: opts.userId,
     imageUrl: opts.imageUrl,
     minSide: VIDEO_REF_MIN_SIDE,
+    maxSide: VIDEO_REF_MAX_SIDE,
+  });
+}
+
+/** 百炼 R2V 成片：按模型满足最小边（wan 300px / HappyHorse 400px） */
+export async function ensureStoryboardBailianR2vRefImage(opts: {
+  userId: string;
+  imageUrl: string;
+  modelKey: string;
+}): Promise<{ url: string; normalized: boolean }> {
+  return ensureRefImageInBounds({
+    userId: opts.userId,
+    imageUrl: opts.imageUrl,
+    minSide: bailianR2vRefMinSide(opts.modelKey),
     maxSide: VIDEO_REF_MAX_SIDE,
   });
 }

@@ -28,8 +28,10 @@
 | 参考上传 | `components/storyboard/storyboard-ref-uploader.tsx` |
 | 图片预览 | `components/media/ecom-image-preview-dialog.tsx` |
 | 视频 | `components/media/ecom-video-player.tsx` |
+| 生图/生视频模型选择 | `components/storyboard/storyboard-model-picker-dialog.tsx` |
 | CSS 变量 | `app/globals.css` |
 
 ## Cursor 规则
 
-仓库根目录 `.cursor/rules/ecom-design-system.mdc` — 编辑 `e-commerce-toolkit` 时自动引用母规范。
+- `.cursor/rules/ecom-design-system.mdc` — UI 母规范
+- `.cursor/rules/ecom-model-picker.mdc` — **模型选择器唯一实现**（生图/生视频弹层，禁止另写）

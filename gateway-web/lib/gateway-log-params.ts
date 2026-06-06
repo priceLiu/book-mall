@@ -10,6 +10,14 @@ export type LogParamsView = {
   copyText: string;
 };
 
+export type LogInputImageItem = {
+  /** 如 Image 1、first_frame */
+  label: string;
+  url: string;
+  /** 厂商角色：reference_image / first_frame / reference 等 */
+  role?: string;
+};
+
 const PREVIEW_MAX_CHARS = 220;
 
 function truncateDeep(value: unknown, depth = 0): unknown {
@@ -52,6 +60,117 @@ function parseInputSummary(inputSummary: unknown): {
       ? (input as Record<string, unknown>)
       : { value: input };
   return { model, input: inputObj };
+}
+
+function isHttpUrl(value: unknown): value is string {
+  return typeof value === "string" && /^https?:\/\//.test(value.trim());
+}
+
+function imageLabel(index: number, role?: string): string {
+  const base = `Image ${index}`;
+  if (role === "first_frame") return `${base} · first_frame`;
+  if (role === "reference_image") return `${base} · ref`;
+  if (role && role !== "reference") return `${base} · ${role}`;
+  return base;
+}
+
+/** 从 Params inputSummary 提取请求侧参考图（顺序与 API 数组一致） */
+export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[] {
+  const { input } = parseInputSummary(inputSummary);
+  const items: LogInputImageItem[] = [];
+  const seen = new Set<string>();
+
+  const push = (url: string, label: string, role?: string) => {
+    const u = url.trim();
+    if (!isHttpUrl(u) || seen.has(u)) return;
+    seen.add(u);
+    items.push({ label, url: u, role });
+  };
+
+  if (Array.isArray(input.referenceImageUrls)) {
+    let idx = 1;
+    for (const u of input.referenceImageUrls) {
+      if (isHttpUrl(u)) {
+        push(u, imageLabel(idx, "reference"), "reference");
+        idx += 1;
+      }
+    }
+  }
+
+  if (Array.isArray(input.reference_urls)) {
+    let idx = items.length + 1;
+    for (const u of input.reference_urls) {
+      if (isHttpUrl(u)) {
+        push(u, imageLabel(idx, "reference"), "reference");
+        idx += 1;
+      }
+    }
+  }
+
+  if (isHttpUrl(input.imageUrl)) {
+    push(input.imageUrl, imageLabel(1, "image"), "image");
+  }
+  if (isHttpUrl(input.image_url)) {
+    push(input.image_url, imageLabel(items.length || 1, "image"), "image");
+  }
+
+  if (Array.isArray(input.image_urls)) {
+    let idx = items.length + 1;
+    for (const u of input.image_urls) {
+      if (isHttpUrl(u)) {
+        push(u, imageLabel(idx), "image");
+        idx += 1;
+      }
+    }
+  }
+
+  if (Array.isArray(input.media)) {
+    let idx = items.length + 1;
+    for (const row of input.media) {
+      if (!row || typeof row !== "object") continue;
+      const url = (row as Record<string, unknown>).url;
+      const type = (row as Record<string, unknown>).type;
+      if (isHttpUrl(url)) {
+        const role = typeof type === "string" ? type : "media";
+        push(url, imageLabel(idx, role), role);
+        idx += 1;
+      }
+    }
+  }
+
+  if (Array.isArray(input.content)) {
+    let imgIdx = 0;
+    for (const block of input.content) {
+      if (!block || typeof block !== "object") continue;
+      const b = block as Record<string, unknown>;
+      if (b.type !== "image_url") continue;
+      const imageUrl = b.image_url;
+      const url =
+        imageUrl && typeof imageUrl === "object"
+          ? (imageUrl as Record<string, unknown>).url
+          : undefined;
+      if (!isHttpUrl(url)) continue;
+      imgIdx += 1;
+      const role = typeof b.role === "string" ? b.role : undefined;
+      push(url, imageLabel(imgIdx, role), role);
+    }
+  }
+
+  const nestedInput = input.input;
+  if (nestedInput && typeof nestedInput === "object" && !Array.isArray(nestedInput)) {
+    const nested = extractLogInputImages({
+      model: "",
+      input: nestedInput as Record<string, unknown>,
+    });
+    let idx = items.length + 1;
+    for (const row of nested) {
+      if (seen.has(row.url)) continue;
+      push(row.url, imageLabel(idx, row.role), row.role);
+      idx += 1;
+    }
+  }
+
+  return items;
 }
 
 export function formatLogParamsView(inputSummary: unknown): LogParamsView {
@@ -138,11 +257,9 @@ export type CreditsDisplay = {
   title: string;
 };
 
-export function formatCreditsDisplay(
+/** Usage 列：仅展示挂牌参考费用（元），供后续费用统计 */
+export function formatUsageYuanDisplay(
   estimatedVendorCostYuan: string | null,
-  totalTokens: number | null,
-  promptTokens: number | null,
-  completionTokens: number | null,
 ): CreditsDisplay {
   if (estimatedVendorCostYuan != null && estimatedVendorCostYuan !== "") {
     const n = Number(estimatedVendorCostYuan);
@@ -150,21 +267,57 @@ export function formatCreditsDisplay(
       return {
         value: n < 1 ? n.toFixed(4) : n.toFixed(2),
         title:
-          "挂牌参考用量（元，非钱包扣点）· 来自 B 表定价估算，非平台计费",
+          "挂牌参考费用（元，非钱包扣点）· 来自 B 表定价估算，供费用统计",
       };
     }
   }
+  return { value: "—", title: "暂无费用估算（非扣费失败）" };
+}
+
+export type TokenDisplay = {
+  value: string;
+  title: string;
+};
+
+/** Token 列：厂商回传优先，否则平台按 prompt/输出文本估算 */
+export function formatTokenDisplay(
+  totalTokens: number | null,
+  promptTokens: number | null,
+  completionTokens: number | null,
+  metricsSource?: string | null,
+): TokenDisplay {
   if (totalTokens != null && totalTokens > 0) {
+    const sourceLabel =
+      metricsSource === "VENDOR"
+        ? "厂商回传"
+        : metricsSource === "PLATFORM"
+          ? "平台估算（CJK 1字≈1tok，其余≈4字/tok）"
+          : "Token 计量";
     const detail =
       promptTokens != null && completionTokens != null
-        ? `Token 用量：输入 ${promptTokens} + 输出 ${completionTokens}`
-        : "LLM Token 总用量（非钱包扣点）";
-    return {
-      value: `${totalTokens} tok`,
-      title: detail,
-    };
+        ? `${sourceLabel} · 输入 ${promptTokens} + 输出 ${completionTokens} = ${totalTokens} tok`
+        : promptTokens != null
+          ? `${sourceLabel} · 输入 ${promptTokens} tok`
+          : `${sourceLabel} · 合计 ${totalTokens} tok`;
+    return { value: `${totalTokens} tok`, title: detail };
   }
-  return { value: "0", title: "暂无用量记录（非扣费失败）" };
+  return { value: "—", title: "暂无 Token 记录" };
+}
+
+/** @deprecated 使用 formatUsageYuanDisplay + formatTokenDisplay */
+export function formatCreditsDisplay(
+  estimatedVendorCostYuan: string | null,
+  totalTokens: number | null,
+  promptTokens: number | null,
+  completionTokens: number | null,
+): CreditsDisplay {
+  const usage = formatUsageYuanDisplay(estimatedVendorCostYuan);
+  if (usage.value !== "—") return usage;
+  return formatTokenDisplay(
+    totalTokens,
+    promptTokens,
+    completionTokens,
+  ) as CreditsDisplay;
 }
 
 export function isImageResultUrl(url: string): boolean {
@@ -192,13 +345,13 @@ export function formatDurationSeconds(durationMs: number | null): string {
   return `${Math.round(durationMs / 1000)}s`;
 }
 
-/** 优先用 durationMs；否则用 completedAt - submittedAt 推算 */
+/** 优先用 durationMs（>0）；0 视为未写入，回退 completedAt - submittedAt */
 export function resolveLogDurationMs(
   durationMs: number | null,
   submittedAt: string,
   completedAt: string | null,
 ): number | null {
-  if (durationMs != null && durationMs >= 0) return durationMs;
+  if (durationMs != null && durationMs > 0) return durationMs;
   if (!completedAt) return null;
   const ms = new Date(completedAt).getTime() - new Date(submittedAt).getTime();
   return ms >= 0 ? ms : null;
@@ -208,12 +361,9 @@ export function formatCreditsConsumed(
   estimatedVendorCostYuan: string | null,
   totalTokens: number | null,
 ): string {
-  return formatCreditsDisplay(
-    estimatedVendorCostYuan,
-    totalTokens,
-    null,
-    null,
-  ).value;
+  const usage = formatUsageYuanDisplay(estimatedVendorCostYuan);
+  if (usage.value !== "—") return usage.value;
+  return formatTokenDisplay(totalTokens, null, null).value;
 }
 
 const LOG_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;

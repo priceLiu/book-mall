@@ -20,6 +20,7 @@ alwaysApply: false
 6. **图片**：缩略 `object-cover`/`object-contain` 分明；预览 `EcomImagePreviewDialog`；上传 `Plus` + 分类块（`MEDIA.md`）。
 7. **弹窗**：`useDialogs()`；禁止 `window.alert/confirm`。
 8. **视频**：`EcomVideoPlayer`（`VIDEO.md`）。
+9. **生图/生视频模型选择**：唯一弹层 `StoryboardModelPickerDialog`（见 `ecom-model-picker.mdc`），禁止另写选择器。
 
 ## Code Review
 

@@ -4,7 +4,21 @@ import { Loader2, Send, Settings2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { StoryboardAssistantChoices } from "@/components/storyboard/storyboard-assistant-choices";
-import { inferAssistantChoices } from "@/lib/storyboard-workflow";
+import {
+  advanceParamStep,
+  canTextInputDuringParamCollect,
+  completeSellpointInput,
+  getStepPrompt,
+  isAwaitingSellpointInput,
+  isParamCollectChoice,
+  isParamCollecting,
+  startCustomParamCollectPatch,
+} from "@/lib/storyboard-param-collect";
+import {
+  inferAssistantChoices,
+  planModeChosen,
+  workflowPatchForChoice,
+} from "@/lib/storyboard-workflow";
 import type { StoryboardSettingsValue } from "@/components/storyboard/storyboard-settings-dialog";
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -17,7 +31,6 @@ import {
   isGenerateAllImagesChoice,
   isGenerateFullVideoChoice,
   isMergePanelVideosChoice,
-  workflowPatchForChoice,
 } from "@/lib/storyboard-workflow";
 import { stripStoryboardDeliverableFence } from "@/lib/storyboard-display";
 import type {
@@ -30,11 +43,17 @@ import { cn } from "@/lib/utils";
 const WELCOME: StoryboardChatMessage = {
   id: "welcome",
   role: "assistant",
-  content: `你好，我是【厨卫清洁好物 10秒短视频分镜策划师】。
+  content: `你好，我是【电商全品类带货短视频分镜策划师】。
 
-请先选择下方按钮，或输入产品名开始。`,
+请先输入产品名（如「蓝牙耳机」「保湿面霜」），再选择策划方式。`,
   createdAt: new Date().toISOString(),
 };
+
+function hasStoryboardDeliverable(project: StoryboardProject): boolean {
+  return Boolean(
+    project.meta?.deliverable?.analysis || project.meta?.deliverable?.schemes?.length,
+  );
+}
 
 type Props = {
   project: StoryboardProject;
@@ -88,6 +107,14 @@ export function StoryboardAssistantPanel({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamText, streaming]);
 
+  const persistLocalMessages = useCallback(
+    async (next: StoryboardChatMessage[]) => {
+      setMessages(next);
+      await updateStoryboardProject(projectId, { chatHistory: next });
+    },
+    [projectId],
+  );
+
   const sendText = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
@@ -99,47 +126,107 @@ export function StoryboardAssistantPanel({
         content: trimmed,
         createdAt: new Date().toISOString(),
       };
-      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg];
-      setMessages(next);
+      const base = [...messages.filter((m) => m.id !== "welcome"), userMsg];
       setInput("");
+
+      if (isAwaitingSellpointInput(project)) {
+        const result = completeSellpointInput(project, trimmed);
+        if (!result) return;
+        const assistantMsg: StoryboardChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: result.assistantReply,
+          createdAt: new Date().toISOString(),
+        };
+        const next = [...base, assistantMsg];
+        await updateStoryboardProject(projectId, {
+          chatHistory: next,
+          meta: {
+            ...project.meta,
+            workflow: {
+              ...project.meta?.workflow,
+              ...result.workflowPatch,
+            },
+          },
+        });
+        setMessages(next);
+        onDeliverableReady?.();
+        if (result.completed && result.llmUserMessage) {
+          await sendText(result.llmUserMessage);
+        }
+        return;
+      }
+
+      const isPlanLlmTrigger =
+        trimmed === "按默认方案A" || trimmed.startsWith("参数已确认");
+      const deferLlm =
+        !isPlanLlmTrigger &&
+        !planModeChosen(project) &&
+        !hasStoryboardDeliverable(project) &&
+        !isParamCollecting(project);
+
+      if (deferLlm) {
+        const assistantMsg: StoryboardChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: `已收到产品「${trimmed}」。\n请选择策划方式：`,
+          createdAt: new Date().toISOString(),
+        };
+        await persistLocalMessages([...base, assistantMsg]);
+        return;
+      }
+
+      setMessages(base);
       setStreaming(true);
       setStreamText("");
 
       try {
         const full = await streamStoryboardChat({
           projectId,
-          messages: next,
+          messages: base,
           modelKey: settings.chatModelKey,
           onChunk: setStreamText,
         });
-        setMessages((prev) => [
-          ...prev,
+        const withReply = [
+          ...base,
           {
             id: `assistant-${Date.now()}`,
-            role: "assistant",
+            role: "assistant" as const,
             content: full,
             createdAt: new Date().toISOString(),
           },
-        ]);
+        ];
+        setMessages(withReply);
+        await updateStoryboardProject(projectId, { chatHistory: withReply });
         setStreamText("");
         onDeliverableReady?.();
       } catch (e) {
         const err = e instanceof Error ? e.message : "发送失败";
-        setMessages((prev) => [
-          ...prev,
+        const withErr = [
+          ...base,
           {
             id: `err-${Date.now()}`,
-            role: "assistant",
+            role: "assistant" as const,
             content: `请求失败：${err}`,
             createdAt: new Date().toISOString(),
           },
-        ]);
+        ];
+        setMessages(withErr);
+        await updateStoryboardProject(projectId, { chatHistory: withErr });
         setStreamText("");
       } finally {
         setStreaming(false);
       }
     },
-    [streaming, messages, projectId, settings.chatModelKey, onDeliverableReady],
+    [
+      streaming,
+      messages,
+      project,
+      projectId,
+      settings.chatModelKey,
+      onDeliverableReady,
+      persistLocalMessages,
+    ],
   );
 
   const send = useCallback(() => sendText(input), [input, sendText]);
@@ -172,23 +259,107 @@ export function StoryboardAssistantPanel({
       onRequestMergePanelVideos?.();
       return;
     }
+
     if (t === "重新定方案") {
+      const userMsg: StoryboardChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: t,
+        createdAt: new Date().toISOString(),
+      };
+      const assistantMsg: StoryboardChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: `好的，我们重新收集参数。\n${getStepPrompt(0)}`,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg, assistantMsg];
       await updateStoryboardProject(projectId, {
         sheet: null,
         sheetPngUrl: null,
+        chatHistory: next,
+        meta: {
+          ...project.meta,
+          deliverable: undefined,
+          workflow: {
+            ...project.meta?.workflow,
+            phase: "planning",
+            replanning: false,
+            ...startCustomParamCollectPatch(),
+          },
+        },
+      });
+      setMessages(next);
+      onDeliverableReady?.();
+      return;
+    }
+
+    if (t === "自定义参数") {
+      const userMsg: StoryboardChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: t,
+        createdAt: new Date().toISOString(),
+      };
+      const assistantMsg: StoryboardChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: `好的，我们逐项确认参数。\n${getStepPrompt(0)}`,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg, assistantMsg];
+      await updateStoryboardProject(projectId, {
+        chatHistory: next,
         meta: {
           ...project.meta,
           workflow: {
             ...project.meta?.workflow,
-            phase: "planning",
-            replanning: true,
+            ...startCustomParamCollectPatch(),
           },
         },
       });
+      setMessages(next);
       onDeliverableReady?.();
-      await sendText("自定义参数");
       return;
     }
+
+    if (isParamCollectChoice(project, t)) {
+      const result = advanceParamStep(project, t);
+      if (!result) return;
+
+      const userMsg: StoryboardChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: t,
+        createdAt: new Date().toISOString(),
+      };
+      const assistantMsg: StoryboardChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: result.assistantReply,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg, assistantMsg];
+
+      await updateStoryboardProject(projectId, {
+        chatHistory: next,
+        meta: {
+          ...project.meta,
+          workflow: {
+            ...project.meta?.workflow,
+            ...result.workflowPatch,
+          },
+        },
+      });
+      setMessages(next);
+      onDeliverableReady?.();
+
+      if (result.completed && result.llmUserMessage) {
+        await sendText(result.llmUserMessage);
+      }
+      return;
+    }
+
     const patch = workflowPatchForChoice(project, t);
     if (patch) {
       await updateStoryboardProject(projectId, {
@@ -209,6 +380,10 @@ export function StoryboardAssistantPanel({
     }
     await sendText(t);
   };
+
+  const paramCollecting = isParamCollecting(project);
+  const awaitingSellpoint = isAwaitingSellpointInput(project);
+  const paramInputEnabled = canTextInputDuringParamCollect(project);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#fafafa]">
@@ -272,12 +447,18 @@ export function StoryboardAssistantPanel({
 
       <div className="border-t border-[#e8e8ed] p-4">
         <textarea
-          className="mb-3 w-full resize-none rounded-xl border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#0071e3]"
+          className="mb-3 w-full resize-none rounded-xl border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#0071e3] disabled:bg-[#f5f5f7] disabled:text-[#86868b]"
           rows={2}
-          placeholder="补充说明（可选）…"
+          placeholder={
+            awaitingSellpoint
+              ? "请输入产品卖点（品牌、价格、核心卖点等）…"
+              : paramCollecting
+                ? "请点击上方按钮选择参数…"
+                : "输入产品名，或补充说明（可选）…"
+          }
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={streaming}
+          disabled={streaming || (paramCollecting && !paramInputEnabled)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -290,7 +471,9 @@ export function StoryboardAssistantPanel({
             size="sm"
             type="button"
             className="flex-1"
-            disabled={streaming || !input.trim()}
+            disabled={
+              streaming || (paramCollecting && !paramInputEnabled) || !input.trim()
+            }
             onClick={send}
           >
             {streaming ? (

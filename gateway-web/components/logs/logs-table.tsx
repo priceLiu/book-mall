@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { LogImagesCell } from "./log-images-cell";
 import { LogParamsCell } from "./log-params-cell";
 import { LogResultCell } from "./log-result-cell";
 import { LogStatusBadge } from "./log-status-badge";
 import {
-  formatCreditsDisplay,
   formatDurationSeconds,
+  formatTokenDisplay,
+  formatUsageYuanDisplay,
   formatLogTimestamp,
   isLogDateRangeInvalid,
   logSubmittedInUtcDateRange,
@@ -34,6 +36,7 @@ export type GatewayLogRow = {
   totalTokens: number | null;
   promptTokens: number | null;
   completionTokens: number | null;
+  metricsSource?: string | null;
   durationMs: number | null;
   estimatedVendorCostYuan: string | null;
   failCode: string | null;
@@ -343,7 +346,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
-        <table className="gw-logs-table min-w-[1780px]">
+        <table className="gw-logs-table min-w-[2100px]">
           <thead>
             <tr>
               <th className="w-11">
@@ -358,15 +361,22 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               <th className="w-[88px]">Source</th>
               <th className="min-w-[168px]">Model</th>
               <th className="min-w-[480px]">Params</th>
+              <th className="min-w-[280px]">Images</th>
               <th className="w-[120px]">Status</th>
               <th className="w-[88px]">Duration</th>
               <th className="min-w-[168px]">Submitted</th>
               <th className="min-w-[168px]">Completed</th>
               <th
-                className="w-[120px]"
-                title="用量观测：LLM 为 Token（tok）；部分任务为挂牌参考（元）。非钱包 Credits、非平台扣费。"
+                className="w-[100px]"
+                title="挂牌参考费用（元），供后续费用统计；非钱包扣点。"
               >
                 Usage
+              </th>
+              <th
+                className="w-[110px]"
+                title="Token 计量：厂商回传优先；异步任务按 prompt 文本平台估算。"
+              >
+                Token
               </th>
               <th className="min-w-[240px]">Task ID</th>
               <th className="w-[150px]">Results</th>
@@ -381,11 +391,12 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                 l.completedAt,
               );
               const duration = formatDurationSeconds(durationMs);
-              const credits = formatCreditsDisplay(
-                l.estimatedVendorCostYuan,
+              const usage = formatUsageYuanDisplay(l.estimatedVendorCostYuan);
+              const tokens = formatTokenDisplay(
                 l.totalTokens,
                 l.promptTokens,
                 l.completionTokens,
+                l.metricsSource,
               );
               const taskId = l.externalTaskId ?? l.id;
               const isInProgress =
@@ -424,6 +435,9 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   <td className="align-top">
                     <LogParamsCell inputSummary={l.inputSummary} />
                   </td>
+                  <td className="align-top">
+                    <LogImagesCell inputSummary={l.inputSummary} />
+                  </td>
                   <td className="align-middle">
                     <LogStatusBadge
                       status={l.status}
@@ -434,11 +448,13 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   <td
                     className="align-middle font-mono text-sm text-zinc-300"
                     title={
-                      durationMs != null
+                      durationMs != null && durationMs > 0
                         ? `${durationMs} ms`
                         : isInProgress
                           ? "任务进行中"
-                          : undefined
+                          : durationMs != null
+                            ? `${durationMs} ms（由完成时间推算）`
+                            : undefined
                     }
                   >
                     {duration}
@@ -471,10 +487,18 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   <td
                     className="align-middle font-mono text-sm text-zinc-300"
                     title={
-                      isInProgress ? "任务进行中，完成后写入预估成本" : credits.title
+                      isInProgress ? "任务进行中，完成后写入费用估算" : usage.title
                     }
                   >
-                    {isInProgress ? "—" : credits.value}
+                    {isInProgress ? "—" : usage.value}
+                  </td>
+                  <td
+                    className="align-middle font-mono text-sm text-zinc-300"
+                    title={
+                      isInProgress ? "任务进行中，完成后写入 Token" : tokens.title
+                    }
+                  >
+                    {isInProgress ? "—" : tokens.value}
                   </td>
                   <td className="align-middle">
                     <span
@@ -499,7 +523,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             {!filtered.length ? (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={14}
                   className="py-16 text-center text-sm text-zinc-500"
                 >
                   {logs.length

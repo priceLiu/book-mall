@@ -1,0 +1,40 @@
+---
+description: 电商工具箱 · 生图/生视频模型选择器统一规范（禁止另写弹层）
+globs: e-commerce-toolkit/**/*
+alwaysApply: true
+---
+
+# 电商工具箱 · 模型选择器（生图 / 生视频）
+
+## 唯一实现
+
+分镜工作台及电商工具箱内，**所有**「点击后弹出选择 AI 模型 + 可调参数」的交互，**必须**复用：
+
+- **组件**：`e-commerce-toolkit/components/storyboard/storyboard-model-picker-dialog.tsx`（`StoryboardModelPickerDialog`）
+- **入口模式**：`mode: "image" | "video"`；视频区分 `videoTarget: "panel" | "fullSheet"` 与可选 `panelIndex`
+- **数据**：`StoryboardGatewayModel[]`（来自 `/api/.../storyboard/models` 或同等 Gateway 列表），**禁止**前端硬编码模型卡片列表
+
+## 禁止
+
+- 新建第二套模型选择 Dialog / Modal / Drawer（含 `<select>` 裸下拉替代卡片网格）
+- 在业务页复制 `ModelCard` 网格或重写浅色卡片 + ROLE 角标 +「N 项可调参数」布局
+- 仅在助手文案里列模型名、却不走统一弹层（助手可引导用户点按钮，实际生成仍经 `StoryboardModelPickerDialog`）
+
+## 新增模型时
+
+1. **后端**：在 `book-mall` Gateway 模型清单 / `BAILIAN_R2V_KNOWN_MODELS` 等注册 `modelKey`、`displayName`、`description`（含能力说明，如「1～9 张参考图」）
+2. **参考图调入**：在 `book-mall/lib/ecom/ecom-storyboard-video-ref-rules.ts` 补充或复用 `getStoryboardVideoInvokeRules` 规则（用户只选模型，传入逻辑由系统决定）
+3. **前端**：只扩展 `StoryboardModelPickerDialog` 内**参数区**（如新模型需 R2V 比例/种子/智能扩写），**不**新建选择器组件
+4. **可调参数计数**：更新同文件 `countAdjustableParams`，保证卡片脚注「N 项可调参数」准确
+
+## 视觉（与现网弹层一致）
+
+- Provider 分组标题（通义万相 / 百炼 / KIE / 火山方舟…）
+- 卡片：`rounded-xl`、选中蓝框 `#f0f6ff`、`role` 角标（IMAGE 橙 / VIDEO 蓝）
+- 标题 + `modelKey` 副行 + `description` 两行 + 底部参数项数
+- 确认：`EcomButtonPrimary` / `EcomButtonSecondary`（见 `ecom-design-system.mdc`）
+
+## Code Review
+
+- PR 出现新的模型选择 UI → **驳回**，改为挂载 `StoryboardModelPickerDialog`
+- 百炼 R2V 参考图上限以 `bailianR2vMaxRefs` 为准（**HappyHorse 9**；**万相 2.7 media 5**（API 实测）；**万相 2.6 5**）；勿与 HappyHorse 的 1～9 混用

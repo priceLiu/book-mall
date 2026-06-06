@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveGatewayApiKeyFromBearer } from "@/lib/gateway/api-key-service";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
+import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { prisma } from "@/lib/prisma";
 import {
@@ -62,7 +63,8 @@ export async function GET(request: NextRequest) {
 
   try {
     if (providerKind === "DASHSCOPE") {
-      const output = await pollDashscopeTaskForLog({ credentialId, taskId });
+      const polled = await pollDashscopeTaskForLog({ credentialId, taskId });
+      const { output, raw } = polled;
       if (log) {
         const status = output.task_status;
         if (isDashscopeTaskSuccess(status)) {
@@ -71,7 +73,7 @@ export async function GET(request: NextRequest) {
             durationMs: log.submittedAt
               ? Date.now() - log.submittedAt.getTime()
               : 0,
-            resultSummary: output,
+            resultSummary: buildGatewayTaskResultSummary(raw, output),
             externalTaskId: taskId,
             model: log.model,
           });
@@ -123,10 +125,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (providerKind === "BAILIAN") {
-      const output = await pollBailianR2vTaskForLog({
+      const polled = await pollBailianR2vTaskForLog({
         credentialId,
         taskId,
       });
+      const { output, raw } = polled;
       if (log) {
         const status = output.task_status?.toUpperCase() ?? "";
         if (status === "SUCCEEDED" || status === "SUCCESS") {
@@ -135,7 +138,7 @@ export async function GET(request: NextRequest) {
             durationMs: log.submittedAt
               ? Date.now() - log.submittedAt.getTime()
               : 0,
-            resultSummary: output,
+            resultSummary: buildGatewayTaskResultSummary(raw, output),
             externalTaskId: taskId,
             model: log.model,
           });
@@ -163,11 +166,12 @@ export async function GET(request: NextRequest) {
       if (!cred) {
         return NextResponse.json({ error: "Credential unavailable" }, { status: 400 });
       }
-      const row = await volcengineGetVideoTask({
+      const polled = await volcengineGetVideoTask({
         apiKey: cred.apiKey,
         baseUrl: cred.baseUrl,
         taskId,
       });
+      const row = polled.output;
       if (log) {
         if (isVolcengineVideoTaskSuccess(row)) {
           await finalizeRequestLog(log.id, {
@@ -175,9 +179,12 @@ export async function GET(request: NextRequest) {
             durationMs: log.submittedAt
               ? Date.now() - log.submittedAt.getTime()
               : 0,
-            resultSummary: row.content?.video_url
-              ? { videoUrl: row.content.video_url }
-              : { status: row.status },
+            resultSummary: buildGatewayTaskResultSummary(
+              polled.raw,
+              row.content?.video_url
+                ? { videoUrl: row.content.video_url }
+                : { status: row.status },
+            ),
             externalTaskId: taskId,
             model: log.model,
           });
@@ -194,7 +201,11 @@ export async function GET(request: NextRequest) {
           });
         }
       }
-      return NextResponse.json({ code: 200, data: row, providerKind: "VOLCENGINE" });
+      return NextResponse.json({
+        code: 200,
+        data: row,
+        providerKind: "VOLCENGINE",
+      });
     }
 
     const cred = await getDecryptedCredentialApiKey(credentialId);
