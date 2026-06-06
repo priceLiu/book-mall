@@ -10,24 +10,19 @@ import {
   routeGatewayModel,
 } from "./model-router";
 import { forwardQwenTtsSpeech, isQwenTtsModel } from "./qwen-tts-proxy";
+import {
+  parseUsageFromUnknown,
+  resolveGatewayTokenMetrics,
+  type UsageFromResponse,
+} from "./gateway-token-metrics";
+import { parseVideoPricingHints } from "./log-pricing-hints";
 import { estimateVendorCost } from "./pricing-estimate";
 
-export type UsageFromResponse = {
-  promptTokens?: number;
-  completionTokens?: number;
-  totalTokens?: number;
-};
+export type { UsageFromResponse };
 
+/** 从厂商 JSON 解析 usage（含 prompt_tokens / input_tokens 等别名） */
 export function parseOpenAiUsage(json: unknown): UsageFromResponse {
-  const u = (json as { usage?: Record<string, unknown> })?.usage;
-  if (!u) return {};
-  return {
-    promptTokens:
-      typeof u.prompt_tokens === "number" ? u.prompt_tokens : undefined,
-    completionTokens:
-      typeof u.completion_tokens === "number" ? u.completion_tokens : undefined,
-    totalTokens: typeof u.total_tokens === "number" ? u.total_tokens : undefined,
-  };
+  return parseUsageFromUnknown(json);
 }
 
 export function pickCredentialForKind(
@@ -88,19 +83,32 @@ export async function finalizeRequestLog(
     pricingTierRaw?: string;
   },
 ) {
-  const hasToken =
-    patch.usage?.totalTokens != null ||
-    patch.usage?.promptTokens != null ||
-    patch.usage?.completionTokens != null;
-
   const log = await prisma.gatewayRequestLog.findUnique({ where: { id: logId } });
   if (!log) return;
 
+  let durationMs = patch.durationMs;
+  if (durationMs <= 0 && log.submittedAt) {
+    durationMs = Math.max(0, Date.now() - log.submittedAt.getTime());
+  }
+
+  const tokenMetrics = resolveGatewayTokenMetrics({
+    usage: patch.usage,
+    inputSummary: log.inputSummary,
+    resultSummary: patch.resultSummary,
+    requestKind: log.requestKind,
+  });
+
+  const videoHints =
+    log.requestKind === "VIDEO"
+      ? parseVideoPricingHints(log.inputSummary)
+      : {};
+
   const estimate = await estimateVendorCost({
     modelKey: patch.model ?? log.model,
-    promptTokens: patch.usage?.promptTokens,
-    completionTokens: patch.usage?.completionTokens,
-    tierRaw: patch.pricingTierRaw,
+    promptTokens: tokenMetrics.promptTokens ?? undefined,
+    completionTokens: tokenMetrics.completionTokens ?? undefined,
+    tierRaw: patch.pricingTierRaw ?? videoHints.tierRaw,
+    durationSec: videoHints.durationSec,
     requestKind: log.requestKind,
   });
 
@@ -108,13 +116,13 @@ export async function finalizeRequestLog(
     where: { id: logId },
     data: {
       status: patch.status,
-      durationMs: patch.durationMs,
+      durationMs,
       vendorDurationMs: patch.vendorDurationMs,
-      promptTokens: patch.usage?.promptTokens ?? null,
-      completionTokens: patch.usage?.completionTokens ?? null,
-      totalTokens: patch.usage?.totalTokens ?? null,
-      hasTokenUsage: hasToken,
-      metricsSource: hasToken ? "VENDOR" : "UNAVAILABLE",
+      promptTokens: tokenMetrics.promptTokens,
+      completionTokens: tokenMetrics.completionTokens,
+      totalTokens: tokenMetrics.totalTokens,
+      hasTokenUsage: tokenMetrics.hasTokenUsage,
+      metricsSource: tokenMetrics.metricsSource,
       resultSummary: patch.resultSummary ?? undefined,
       failMessage: patch.failMessage,
       failCode: patch.failCode,
@@ -237,6 +245,7 @@ export async function forwardAudioSpeech(opts: {
   durationMs: number;
   contentType?: string;
   ext?: string;
+  vendorJson?: unknown;
 }> {
   const model = String(opts.body.model ?? "").trim();
   if (isQwenTtsModel(model)) {

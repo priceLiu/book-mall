@@ -7,6 +7,7 @@ import {
   volcengineGetVideoTask,
   volcengineVideoTaskFailMessage,
 } from "@/lib/gateway/volcengine-client";
+import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 
 export async function submitVolcengineVideoJobForLog(opts: {
@@ -65,18 +66,22 @@ export async function pollVolcengineVideoTaskForLog(opts: {
     return "done";
   }
 
-  const row = await volcengineGetVideoTask({
+  const polled = await volcengineGetVideoTask({
     apiKey: cred.apiKey,
     baseUrl: cred.baseUrl,
     taskId: opts.taskId,
   });
+  const row = polled.output;
 
   if (isVolcengineVideoTaskSuccess(row)) {
     const videoUrl = row.content?.video_url;
     await finalizeRequestLog(opts.logId, {
       status: "SUCCEEDED",
       durationMs: Date.now() - opts.startedAt,
-      resultSummary: videoUrl ? { videoUrl } : { status: row.status },
+      resultSummary: buildGatewayTaskResultSummary(
+        polled.raw,
+        videoUrl ? { videoUrl } : { status: row.status },
+      ),
       externalTaskId: opts.taskId,
     });
     return "done";

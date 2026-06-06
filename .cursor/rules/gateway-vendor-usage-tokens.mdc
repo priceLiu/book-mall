@@ -1,0 +1,72 @@
+---
+description: Gateway 新厂商/新模型接入 — 厂商 usage/token 必须落库
+globs: book-mall/lib/gateway/**,book-mall/lib/canvas/canvas-gateway-client.ts,book-mall/lib/story/story-gateway-client.ts,book-mall/lib/ecom/*gateway*,book-mall/app/api/gw/**,book-mall/app/api/gateway/**
+alwaysApply: false
+---
+
+# Gateway 厂商 usage / token 接入（强制）
+
+凡经 **Gateway** 转发的厂商 API，若响应体含 **usage / token 计量**（含 `prompt_tokens`、`input_tokens`、`completion_tokens`、`output_tokens`、`total_tokens` 及厂商别名），**必须**解析并写入 `GatewayRequestLog`，禁止静默丢弃。
+
+## 统一解析（勿重复造轮子）
+
+| 工具 | 路径 | 用途 |
+|------|------|------|
+| `parseOpenAiUsage` / `parseUsageFromUnknown` | `book-mall/lib/gateway/gateway-token-metrics.ts` | 从厂商 JSON 解析 token（支持 OpenAI 与 DashScope `input_tokens` 等别名） |
+| `resolveGatewayTokenMetrics` | 同上 | 落库前统一计量：厂商回传 → `VENDOR`；无则平台估算 → `PLATFORM` |
+| `finalizeRequestLog` | `book-mall/lib/gateway/proxy-common.ts` | **唯一**写 `promptTokens` / `completionTokens` / `totalTokens` / `metricsSource` 的入口 |
+| `buildGatewayChatResultSummary` | `book-mall/lib/gateway/log-result-summary.ts` | Chat 非流式：`resultSummary` 附带 `usage` |
+| `buildGatewayStreamChatResultSummary` | 同上 | Chat 流式终态 |
+| `buildGatewayTaskResultSummary` | 同上 | 异步任务：**优先存厂商 `raw` 全量 JSON** |
+
+## 按请求类型
+
+### Chat（非流式）
+
+```ts
+const usage = parseOpenAiUsage(parsed);
+await finalizeRequestLog(logId, {
+  status: "SUCCEEDED",
+  usage,
+  resultSummary: buildGatewayChatResultSummary(parsed) ?? undefined,
+  ...
+});
+```
+
+### Chat（流式）
+
+- 请求体须带 `stream_options: { include_usage: true }`（若厂商支持）。
+- 末包（或任一带 usage 的 chunk）用 `parseOpenAiUsage` 解析；`totalTokens` **或** `promptTokens` **或** `completionTokens` 任一非空即更新 `lastUsage`。
+- `finalizeRequestLog` 同时传 `usage: lastUsage` 与 `resultSummary: buildGatewayStreamChatResultSummary(lastUsage)`。
+
+### 异步任务（生图 / 视频 / 轮询）
+
+- 任务查询 API 返回的 **完整 raw JSON** 写入 `resultSummary`（`buildGatewayTaskResultSummary(raw, slimFallback)`）。
+- **禁止**仅写 `{ videoUrl }` 等瘦身对象而丢掉 raw（否则无法读时解析厂商 usage）。
+- `finalizeRequestLog` 不传 `usage` 时，`resolveGatewayTokenMetrics` 会从 `resultSummary` 递归找 `usage`；仍无则按 `inputSummary` 文本 **PLATFORM** 估算。
+
+### TTS / 多模态
+
+- 若厂商 JSON 含 `usage`（如 Qwen TTS `multimodal-generation`），解析后传入 `finalizeRequestLog({ usage, resultSummary: buildGatewayTaskResultSummary(vendorJson, …) })`。
+
+## 新模型 checklist
+
+接入 `model-router.ts` 或新增 Gateway 客户端路径时：
+
+- [ ] 查阅厂商文档：响应是否含 usage/token？
+- [ ] 若有：所有成功/失败 finalize 路径是否调用 `parseOpenAiUsage` / `parseUsageFromUnknown` 并传入 `finalizeRequestLog`？
+- [ ] 异步轮询是否存 **raw** 响应？
+- [ ] Logs API（`app/api/gateway/logs/route.ts`）无需改字段即可展示 Token；`metricsSource` 应为 `VENDOR`（有厂商回传时）
+- [ ] 禁止在业务层自行估算 token 写库；统一走 `finalizeRequestLog`
+
+## 与 Usage 列（元）的关系
+
+- **Token 列**：`promptTokens` / `completionTokens` / `totalTokens`（观测计量）
+- **Usage 列**：`estimatedVendorCostYuan`（B 表挂牌参考，元）
+- 二者独立；有 token 不等于有费用行，反之亦然。
+
+## 涉及文件（改动的常见入口）
+
+- `proxy-common.ts`、`gateway-token-metrics.ts`、`log-result-summary.ts`
+- `poll-service.ts`、`tool-gateway-client.ts`、`canvas-gateway-client.ts`、`ecom-tool-gateway-client.ts`
+- `app/api/gw/v1/chat/completions/route.ts`、`app/api/gw/v1/jobs/recordInfo/route.ts`

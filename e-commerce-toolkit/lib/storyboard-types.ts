@@ -98,6 +98,15 @@ export type StoryboardProject = {
     workflow?: {
       phase?: "planning" | "finalized" | "refs" | "image" | "video" | "done";
       replanning?: boolean;
+      /** 自定义参数胶囊收集中 */
+      paramCollecting?: boolean;
+      /** 第 11 项选「输入卖点」后等待用户打字 */
+      paramAwaitingSellpoint?: boolean;
+      /** 0=品类，1–11=参数项 */
+      paramStep?: number;
+      collectedParams?: Record<string, string>;
+      productCategory?: string;
+      planMode?: "default_a" | "custom";
       imageModelKey?: string;
       videoModelKey?: string;
       imageSize?: string;

@@ -32,15 +32,26 @@ export async function estimateVendorCost(opts: {
   if (!version) return empty;
 
   const modelKey = opts.modelKey.trim();
-  const line = await prisma.pricingSourceLine.findFirst({
-    where: {
-      versionId: version.id,
-      OR: [
-        { modelKey: { equals: modelKey, mode: "insensitive" } },
-        { modelLabelRaw: { contains: modelKey, mode: "insensitive" } },
-      ],
-    },
-  });
+  const tierRaw = opts.tierRaw?.trim();
+  const modelMatch = [
+    { modelKey: { equals: modelKey, mode: "insensitive" as const } },
+    { modelLabelRaw: { contains: modelKey, mode: "insensitive" as const } },
+  ];
+  let line =
+    tierRaw != null && tierRaw !== ""
+      ? await prisma.pricingSourceLine.findFirst({
+          where: {
+            versionId: version.id,
+            tierRaw,
+            OR: modelMatch,
+          },
+        })
+      : null;
+  if (!line) {
+    line = await prisma.pricingSourceLine.findFirst({
+      where: { versionId: version.id, OR: modelMatch },
+    });
+  }
   if (!line) return { ...empty, pricingModelKey: modelKey };
 
   const billingKind = line.billingKind;

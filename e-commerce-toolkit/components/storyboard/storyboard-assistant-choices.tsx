@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  getParamStep,
+  getStepPrompt,
+  isAwaitingSellpointInput,
+  isParamCollecting,
+  PARAM_COLLECT_TOTAL_STEPS,
+} from "@/lib/storyboard-param-collect";
 import { inferAssistantChoices } from "@/lib/storyboard-workflow";
 import type { StoryboardProject } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
@@ -26,15 +33,23 @@ export function StoryboardAssistantChoices({
   if (!choices.length) return null;
 
   const isPlanChoice = choices.includes("按默认方案A");
+  const collecting = isParamCollecting(project);
+  const awaitingSellpoint = isAwaitingSellpointInput(project);
+  const step = getParamStep(project);
+  const stepLabel = awaitingSellpoint
+    ? "请在下方输入产品卖点（一行即可）"
+    : collecting
+    ? `第 ${step + 1}/${PARAM_COLLECT_TOTAL_STEPS} 步：${getStepPrompt(step)}`
+    : isPlanChoice
+      ? "请选择策划方式（无需输入）："
+      : "请选择（无需输入）：";
 
   return (
     <div className={cn(compact ? "mt-3 border-t border-[#e8e8ed] pt-3" : "px-4 pb-2")}>
       {!compact ? (
-        <p className="mb-2 px-0 text-xs text-[#6e6e73]">
-          {isPlanChoice ? "请选择策划方式（无需输入）：" : "请选择（无需输入）："}
-        </p>
+        <p className="mb-2 px-0 text-xs text-[#6e6e73]">{stepLabel}</p>
       ) : (
-        <p className="mb-2 text-[11px] text-[#6e6e73]">请选择（无需输入）：</p>
+        <p className="mb-2 text-[11px] text-[#6e6e73]">{stepLabel}</p>
       )}
       <div className="flex flex-wrap gap-2">
         {choices.map((c) => (

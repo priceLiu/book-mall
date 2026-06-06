@@ -73,7 +73,7 @@ export async function volcengineGetVideoTask(opts: {
   apiKey: string;
   baseUrl?: string | null;
   taskId: string;
-}): Promise<VolcengineVideoTaskResult> {
+}): Promise<{ output: VolcengineVideoTaskResult; raw: unknown }> {
   const base = arkBase(opts.baseUrl);
   const r = await fetch(
     `${base}/contents/generations/tasks/${encodeURIComponent(opts.taskId)}`,
@@ -97,11 +97,14 @@ export async function volcengineGetVideoTask(opts: {
   }
   const status = String(json.status ?? "").toLowerCase();
   return {
-    id: String(json.id ?? opts.taskId),
-    status,
-    model: typeof json.model === "string" ? json.model : undefined,
-    error: json.error,
-    content: json.content,
+    output: {
+      id: String(json.id ?? opts.taskId),
+      status,
+      model: typeof json.model === "string" ? json.model : undefined,
+      error: json.error,
+      content: json.content,
+    },
+    raw: json,
   };
 }
 

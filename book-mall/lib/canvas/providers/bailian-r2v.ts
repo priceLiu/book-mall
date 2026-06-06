@@ -62,7 +62,7 @@ export const BAILIAN_R2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     modelKey: "happyhorse-1.0-r2v",
     displayName: "HappyHorse-1.0-R2V",
     role: "VIDEO",
-    description: "百炼参考生视频 · 多图角色/道具一致性（1～9 张）",
+    description: "百炼 HappyHorse · 产品/角色/场景优先 + 故事板构图（1～9 张）",
     paramsSchema: R2V_PARAMS_SCHEMA,
     defaultParams: {
       ratio: "16:9",
@@ -75,7 +75,7 @@ export const BAILIAN_R2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     modelKey: "wan2.6-r2v",
     displayName: "万相 2.6 · 参考生视频",
     role: "VIDEO",
-    description: "百炼 wan2.6-r2v · 多图参考（1～9 张）",
+    description: "百炼 wan2.6-r2v · 多图参考（最多 5 张 · multi-shot）",
     paramsSchema: [...R2V_PARAMS_SCHEMA, ...WAN_EXTRA_SCHEMA],
     defaultParams: {
       ratio: "16:9",
@@ -103,7 +103,7 @@ export const BAILIAN_R2V_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     modelKey: "wan2.7-r2v",
     displayName: "万相 2.7 · 参考生视频",
     role: "VIDEO",
-    description: "百炼 wan2.7-r2v · 多图参考（1～9 张）",
+    description: "百炼 wan2.7-r2v · 多宫格故事板 + 附加参考（最多 5 张 media）",
     paramsSchema: [...R2V_PARAMS_SCHEMA, ...WAN_EXTRA_SCHEMA],
     defaultParams: {
       ratio: "16:9",

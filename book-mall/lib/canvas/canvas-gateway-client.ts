@@ -20,7 +20,11 @@ import { summarizeUpstreamFailMessage } from "@/lib/gateway/book-gateway-link";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { isQwenTtsModel } from "@/lib/gateway/qwen-tts-proxy";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
-import { buildGatewayChatResultSummary } from "@/lib/gateway/log-result-summary";
+import {
+  buildGatewayChatResultSummary,
+  buildGatewayStreamChatResultSummary,
+  buildGatewayTaskResultSummary,
+} from "@/lib/gateway/log-result-summary";
 import {
   pollBailianR2vTaskForLog,
   pollDashscopeTaskForLog,
@@ -444,11 +448,16 @@ export async function canvasGwTts(
     body: payload,
   });
   const ok = result.status >= 200 && result.status < 300;
+  const usage = result.vendorJson ? parseOpenAiUsage(result.vendorJson) : undefined;
   await finalizeRequestLog(log.id, {
     status: ok ? "SUCCEEDED" : "FAILED",
     durationMs: result.durationMs,
+    usage,
     resultSummary: ok
-      ? { contentType: "audio/mpeg", byteLength: result.buffer.length }
+      ? buildGatewayTaskResultSummary(result.vendorJson, {
+          contentType: "audio/mpeg",
+          byteLength: result.buffer.length,
+        })
       : undefined,
     failMessage: ok
       ? undefined
@@ -502,26 +511,27 @@ export async function canvasGwRecordInfo(
   }
 
   if (opts.providerKind === "BAILIAN") {
-    const output = await pollBailianR2vTaskForLog({
+    const polled = await pollBailianR2vTaskForLog({
       credentialId,
       taskId: opts.taskId,
     });
     // 百炼终态由 gateway poll worker 统一 finalize（避免 canvas poll 写 durationMs=0 且与 worker 竞态）
-    return { providerKind: "BAILIAN", output };
+    return { providerKind: "BAILIAN", output: polled.output };
   }
 
   if (opts.providerKind === "DASHSCOPE") {
-    const output = await pollDashscopeTaskForLog({
+    const polled = await pollDashscopeTaskForLog({
       credentialId,
       taskId: opts.taskId,
     });
+    const { output, raw } = polled;
     if (opts.gatewayLogId) {
       const status = output.task_status;
       if (isDashscopeTaskSuccess(status)) {
         await finalizeRequestLog(opts.gatewayLogId, {
           status: "SUCCEEDED",
           durationMs: 0,
-          resultSummary: output,
+          resultSummary: buildGatewayTaskResultSummary(raw, output),
           externalTaskId: opts.taskId,
         });
       } else if (isDashscopeTaskFailed(status)) {
@@ -571,19 +581,23 @@ export async function canvasGwRecordInfo(
         503,
       );
     }
-    const row = await volcengineGetVideoTask({
+    const polled = await volcengineGetVideoTask({
       apiKey: cred.apiKey,
       baseUrl: cred.baseUrl,
       taskId: opts.taskId,
     });
+    const row = polled.output;
     if (opts.gatewayLogId) {
       if (isVolcengineVideoTaskSuccess(row)) {
         await finalizeRequestLog(opts.gatewayLogId, {
           status: "SUCCEEDED",
           durationMs: 0,
-          resultSummary: row.content?.video_url
-            ? { videoUrl: row.content.video_url }
-            : { status: row.status },
+          resultSummary: buildGatewayTaskResultSummary(
+            polled.raw,
+            row.content?.video_url
+              ? { videoUrl: row.content.video_url }
+              : { status: row.status },
+          ),
           externalTaskId: opts.taskId,
         });
       } else if (isVolcengineVideoTaskFailed(row)) {
@@ -741,7 +755,13 @@ function wrapCanvasChatStreamWithLogFinalize(
             try {
               const json = JSON.parse(payload) as Record<string, unknown>;
               const u = parseOpenAiUsage(json);
-              if (u.totalTokens != null) lastUsage = u;
+              if (
+                u.totalTokens != null ||
+                u.promptTokens != null ||
+                u.completionTokens != null
+              ) {
+                lastUsage = u;
+              }
               const err = json.error as { message?: string } | undefined;
               if (typeof err?.message === "string") failMessage = err.message;
             } catch {
@@ -753,6 +773,9 @@ function wrapCanvasChatStreamWithLogFinalize(
           status: failMessage ? "FAILED" : "SUCCEEDED",
           durationMs: ctx.startedMs,
           usage: lastUsage,
+          resultSummary: lastUsage
+            ? buildGatewayStreamChatResultSummary(lastUsage)
+            : undefined,
           failCode: failMessage ? "STREAM_VENDOR_ERROR" : undefined,
           failMessage,
           model: ctx.model,

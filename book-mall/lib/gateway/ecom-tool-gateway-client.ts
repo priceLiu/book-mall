@@ -18,6 +18,10 @@ import {
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import {
+  buildGatewayStreamChatResultSummary,
+  buildGatewayTaskResultSummary,
+} from "@/lib/gateway/log-result-summary";
+import {
   pollBailianR2vTaskForLog,
   pollDashscopeTaskForLog,
   pollKieTaskForLog,
@@ -199,10 +203,11 @@ export async function ecomGwPollDashscope(
     throw new GatewayRequiredError("Gateway Key 未绑定 DashScope 凭证");
   }
 
-  const output = await pollDashscopeTaskForLog({
+  const polled = await pollDashscopeTaskForLog({
     credentialId,
     taskId: opts.taskId,
   });
+  const { output, raw } = polled;
 
   const status = output.task_status ?? "UNKNOWN";
   if (isDashscopeTaskSuccess(status)) {
@@ -210,7 +215,7 @@ export async function ecomGwPollDashscope(
     await finalizeRequestLog(opts.gatewayLogId, {
       status: "SUCCEEDED",
       durationMs: 0,
-      resultSummary: output,
+      resultSummary: buildGatewayTaskResultSummary(raw, output),
       externalTaskId: opts.taskId,
     });
     return { status: "SUCCEEDED", outputUrl: outputUrl ?? undefined };
@@ -256,7 +261,13 @@ function wrapEcomChatStreamWithLogFinalize(
             try {
               const json = JSON.parse(payload) as Record<string, unknown>;
               const u = parseOpenAiUsage(json);
-              if (u.totalTokens != null) lastUsage = u;
+              if (
+                u.totalTokens != null ||
+                u.promptTokens != null ||
+                u.completionTokens != null
+              ) {
+                lastUsage = u;
+              }
               const err = json.error as { message?: string } | undefined;
               if (typeof err?.message === "string") failMessage = err.message;
             } catch {
@@ -268,6 +279,9 @@ function wrapEcomChatStreamWithLogFinalize(
           status: failMessage ? "FAILED" : "SUCCEEDED",
           durationMs: ctx.startedMs,
           usage: lastUsage,
+          resultSummary: lastUsage
+            ? buildGatewayStreamChatResultSummary(lastUsage)
+            : undefined,
           failCode: failMessage ? "STREAM_VENDOR_ERROR" : undefined,
           failMessage,
           model: ctx.model,
@@ -420,18 +434,22 @@ export async function ecomGwPollVolcengine(
     throw new GatewayRequiredError("火山方舟凭证不可用");
   }
 
-  const row = await volcengineGetVideoTask({
+  const polled = await volcengineGetVideoTask({
     apiKey: cred.apiKey,
     baseUrl: cred.baseUrl,
     taskId: opts.taskId,
   });
+  const row = polled.output;
 
   if (isVolcengineVideoTaskSuccess(row)) {
     const outputUrl = row.content?.video_url?.trim();
     await finalizeRequestLog(opts.gatewayLogId, {
       status: "SUCCEEDED",
       durationMs: 0,
-      resultSummary: outputUrl ? { videoUrl: outputUrl } : { status: row.status },
+      resultSummary: buildGatewayTaskResultSummary(
+        polled.raw,
+        outputUrl ? { videoUrl: outputUrl } : { status: row.status },
+      ),
       externalTaskId: opts.taskId,
     });
     return { status: "SUCCEEDED", outputUrl: outputUrl ?? undefined };
@@ -604,17 +622,21 @@ export async function ecomGwPollBailianR2v(
     throw new GatewayRequiredError("Gateway Key 未绑定百炼凭证");
   }
 
-  const output = await pollBailianR2vTaskForLog({
+  const polled = await pollBailianR2vTaskForLog({
     credentialId,
     taskId: opts.taskId,
   });
+  const { output, raw } = polled;
 
   if (isBailianR2vSucceeded(output)) {
     const outputUrl = output.video_url?.trim() ?? undefined;
     await finalizeRequestLog(opts.gatewayLogId, {
       status: "SUCCEEDED",
       durationMs: 0,
-      resultSummary: outputUrl ? { videoUrl: outputUrl } : { status: output.task_status },
+      resultSummary: buildGatewayTaskResultSummary(
+        raw,
+        outputUrl ? { videoUrl: outputUrl } : { status: output.task_status },
+      ),
       externalTaskId: opts.taskId,
     });
     return { status: "SUCCEEDED", outputUrl };

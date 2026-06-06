@@ -23,6 +23,7 @@ import {
 import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
 import { pollVolcengineVideoTaskForLog } from "./volcengine-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
+import { buildGatewayTaskResultSummary } from "./log-result-summary";
 import { finalizeRequestLog } from "./proxy-common";
 
 const STALE_RUNNING_NO_TASK_MS = 15 * 60 * 1000;
@@ -134,7 +135,10 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
             durationMs: row.submittedAt
               ? Date.now() - row.submittedAt.getTime()
               : 0,
-            resultSummary: polled.output,
+            resultSummary: buildGatewayTaskResultSummary(
+              polled.raw,
+              polled.output,
+            ),
             externalTaskId: row.externalTaskId,
             model: row.model,
           });
@@ -233,7 +237,10 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
             durationMs: row.submittedAt
               ? Date.now() - row.submittedAt.getTime()
               : 0,
-            resultSummary: polled.output,
+            resultSummary: buildGatewayTaskResultSummary(
+              polled.raw,
+              polled.output,
+            ),
             externalTaskId: row.externalTaskId,
             model: row.model,
           });
@@ -376,7 +383,7 @@ export async function pollBailianR2vTaskForLog(opts: {
     taskId: opts.taskId,
   });
   if (!polled.ok) throw new Error(polled.error);
-  return polled.output;
+  return { output: polled.output, raw: polled.raw };
 }
 
 export async function submitDashscopeTryOnJobForLog(opts: {
@@ -523,7 +530,7 @@ export async function pollDashscopeTaskForLog(opts: {
     taskId: opts.taskId,
   });
   if (!polled.ok) throw new Error(polled.error);
-  return polled.output;
+  return { output: polled.output, raw: polled.raw };
 }
 
 export { submitHunyuanJobForLog, pollHunyuanTaskForLog };

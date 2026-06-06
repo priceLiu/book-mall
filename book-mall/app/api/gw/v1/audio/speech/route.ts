@@ -4,8 +4,10 @@ import {
   createRequestLog,
   finalizeRequestLog,
   forwardAudioSpeech,
+  parseOpenAiUsage,
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
+import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
@@ -77,11 +79,16 @@ export async function POST(request: NextRequest) {
       body: payload,
     });
     const ok = result.status >= 200 && result.status < 300;
+    const usage = result.vendorJson ? parseOpenAiUsage(result.vendorJson) : undefined;
     await finalizeRequestLog(log.id, {
       status: ok ? "SUCCEEDED" : "FAILED",
       durationMs: result.durationMs,
+      usage,
       resultSummary: ok
-        ? { contentType: "audio/mpeg", byteLength: result.buffer.length }
+        ? buildGatewayTaskResultSummary(result.vendorJson, {
+            contentType: "audio/mpeg",
+            byteLength: result.buffer.length,
+          })
         : undefined,
       failMessage: ok
         ? undefined

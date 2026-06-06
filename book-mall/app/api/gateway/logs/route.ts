@@ -8,6 +8,9 @@ import {
   parseLogSubmittedFromParam,
   parseLogSubmittedToParam,
 } from "@/lib/gateway/log-query-params";
+import { resolveGatewayTokenMetrics } from "@/lib/gateway/gateway-token-metrics";
+import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
+import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -56,28 +59,74 @@ export async function GET(request: NextRequest) {
     take: limit,
   });
 
-  return NextResponse.json({
-    logs: logs.map((l) => ({
-      id: l.id,
-      model: l.model,
-      endpoint: l.endpoint,
-      status: l.status,
-      requestKind: l.requestKind,
-      providerKind: l.providerKind,
-      clientSource: l.clientSource,
-      clientPage: l.clientPage,
-      externalTaskId: l.externalTaskId,
-      promptTokens: l.promptTokens,
-      completionTokens: l.completionTokens,
-      totalTokens: l.totalTokens,
-      durationMs: l.durationMs,
-      estimatedVendorCostYuan: l.estimatedVendorCostYuan?.toString() ?? null,
-      failCode: l.failCode,
-      failMessage: l.failMessage,
-      inputSummary: l.inputSummary,
-      resultSummary: l.resultSummary,
-      submittedAt: l.submittedAt.toISOString(),
-      completedAt: l.completedAt?.toISOString() ?? null,
-    })),
-  });
+  const rows = await Promise.all(
+    logs.map(async (l) => {
+      let estimatedVendorCostYuan = l.estimatedVendorCostYuan?.toString() ?? null;
+      if (
+        l.status === "SUCCEEDED" &&
+        l.requestKind === "VIDEO" &&
+        (estimatedVendorCostYuan == null ||
+          estimatedVendorCostYuan === "" ||
+          Number(estimatedVendorCostYuan) <= 0)
+      ) {
+        const hints = parseVideoPricingHints(l.inputSummary);
+        const est = await estimateVendorCost({
+          modelKey: l.model,
+          durationSec: hints.durationSec,
+          tierRaw: hints.tierRaw,
+          requestKind: l.requestKind,
+        });
+        if (est.estimatedVendorCostYuan != null && est.estimatedVendorCostYuan > 0) {
+          estimatedVendorCostYuan = String(est.estimatedVendorCostYuan);
+        }
+      }
+
+      let promptTokens = l.promptTokens;
+      let completionTokens = l.completionTokens;
+      let totalTokens = l.totalTokens;
+      let metricsSource = l.metricsSource;
+      if (
+        l.status === "SUCCEEDED" &&
+        (!l.hasTokenUsage || !totalTokens || totalTokens <= 0)
+      ) {
+        const tm = resolveGatewayTokenMetrics({
+          inputSummary: l.inputSummary,
+          resultSummary: l.resultSummary,
+          requestKind: l.requestKind,
+        });
+        if (tm.hasTokenUsage) {
+          promptTokens = tm.promptTokens;
+          completionTokens = tm.completionTokens;
+          totalTokens = tm.totalTokens;
+          metricsSource = tm.metricsSource;
+        }
+      }
+
+      return {
+        id: l.id,
+        model: l.model,
+        endpoint: l.endpoint,
+        status: l.status,
+        requestKind: l.requestKind,
+        providerKind: l.providerKind,
+        clientSource: l.clientSource,
+        clientPage: l.clientPage,
+        externalTaskId: l.externalTaskId,
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        metricsSource,
+        durationMs: l.durationMs,
+        estimatedVendorCostYuan,
+        failCode: l.failCode,
+        failMessage: l.failMessage,
+        inputSummary: l.inputSummary,
+        resultSummary: l.resultSummary,
+        submittedAt: l.submittedAt.toISOString(),
+        completedAt: l.completedAt?.toISOString() ?? null,
+      };
+    }),
+  );
+
+  return NextResponse.json({ logs: rows });
 }

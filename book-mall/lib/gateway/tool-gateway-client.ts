@@ -21,7 +21,11 @@ import {
 } from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
-import { buildGatewayChatResultSummary } from "@/lib/gateway/log-result-summary";
+import {
+  buildGatewayChatResultSummary,
+  buildGatewayStreamChatResultSummary,
+  buildGatewayTaskResultSummary,
+} from "@/lib/gateway/log-result-summary";
 import {
   pollDashscopeTaskForLog,
   submitDashscopeTryOnJobForLog,
@@ -151,10 +155,11 @@ export async function toolGwPollDashscope(
     throw new GatewayRequiredError("Gateway Key 未绑定 DashScope 凭证");
   }
 
-  const output = await pollDashscopeTaskForLog({
+  const polled = await pollDashscopeTaskForLog({
     credentialId,
     taskId: opts.taskId,
   });
+  const { output, raw } = polled;
 
   if (opts.gatewayLogId) {
     const status = output.task_status;
@@ -162,7 +167,7 @@ export async function toolGwPollDashscope(
       await finalizeRequestLog(opts.gatewayLogId, {
         status: "SUCCEEDED",
         durationMs: 0,
-        resultSummary: output,
+        resultSummary: buildGatewayTaskResultSummary(raw, output),
         externalTaskId: opts.taskId,
       });
     } else if (isDashscopeTaskFailed(status)) {
@@ -283,7 +288,13 @@ function wrapChatStreamWithLogFinalize(
             try {
               const json = JSON.parse(payload) as Record<string, unknown>;
               const u = parseOpenAiUsage(json);
-              if (u.totalTokens != null) lastUsage = u;
+              if (
+                u.totalTokens != null ||
+                u.promptTokens != null ||
+                u.completionTokens != null
+              ) {
+                lastUsage = u;
+              }
               const err = json.error as { message?: string } | undefined;
               if (typeof err?.message === "string") failMessage = err.message;
             } catch {
@@ -295,6 +306,9 @@ function wrapChatStreamWithLogFinalize(
           status: failMessage ? "FAILED" : "SUCCEEDED",
           durationMs: ctx.startedMs,
           usage: lastUsage,
+          resultSummary: lastUsage
+            ? buildGatewayStreamChatResultSummary(lastUsage)
+            : undefined,
           failCode: failMessage ? "STREAM_VENDOR_ERROR" : undefined,
           failMessage,
           model: ctx.model,

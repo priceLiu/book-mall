@@ -29,8 +29,12 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!project?.sheet) {
     return NextResponse.json({ error: "请先生成分镜故事版" }, { status: 400 });
   }
-  if (!project.sheetPngUrl) {
-    return NextResponse.json({ error: "请先生成故事版 PNG" }, { status: 400 });
+  const panels = project.sheet.panels ?? [];
+  const readyPanels = panels.filter(
+    (p) => p.imageUrl?.trim() && /^https?:\/\//.test(p.imageUrl.trim()),
+  );
+  if (readyPanels.length < panels.length) {
+    return NextResponse.json({ error: "请先生成全部分镜图" }, { status: 400 });
   }
 
   const durationSec =
@@ -65,7 +69,7 @@ export async function POST(req: Request, ctx: Ctx) {
       userId: auth.userId,
       projectId,
       sheet: project.sheet,
-      sheetPngUrl: project.sheetPngUrl,
+      sheetPngUrl: project.sheetPngUrl ?? undefined,
       references: project.references,
       durationSec,
       aspectRatio,
