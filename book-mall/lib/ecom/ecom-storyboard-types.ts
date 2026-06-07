@@ -31,6 +31,8 @@ export const storyboardSheetSchema = z.object({
         name: z.string().min(1),
         role: z.string().min(1),
         refId: z.string().optional(),
+        /** 外貌/穿搭/年龄等视觉设定，供分镜图人物一致 */
+        appearance: z.string().optional(),
       }),
     )
     .default([]),
@@ -57,6 +59,31 @@ export const storyboardSheetSchema = z.object({
 
 export type StoryboardSheet = z.infer<typeof storyboardSheetSchema>;
 
+/** 合并解析错误时同一镜号重复出现（如三套方案被合成一条），保留每个镜号首次出现 */
+export function dedupeStoryboardPanelsByIndex<
+  T extends { index: number },
+>(panels: T[]): T[] {
+  const seen = new Set<number>();
+  const out: T[] = [];
+  for (const p of panels) {
+    if (seen.has(p.index)) continue;
+    seen.add(p.index);
+    out.push(p);
+  }
+  return out.sort((a, b) => a.index - b.index);
+}
+
+export function storyboardPanelsHaveDuplicateIndex(
+  panels: { index: number }[],
+): boolean {
+  const seen = new Set<number>();
+  for (const p of panels) {
+    if (seen.has(p.index)) return true;
+    seen.add(p.index);
+  }
+  return false;
+}
+
 /** 补齐必填字段，避免编辑时清空触发 Zod 校验失败 */
 export function normalizeStoryboardSheet(raw: StoryboardSheet): StoryboardSheet {
   return {
@@ -68,7 +95,7 @@ export function normalizeStoryboardSheet(raw: StoryboardSheet): StoryboardSheet 
       productHighlight: raw.overview.productHighlight?.trim() || undefined,
     },
     cast: raw.cast ?? [],
-    panels: raw.panels.map((p) => {
+    panels: dedupeStoryboardPanelsByIndex(raw.panels).map((p) => {
       const scene = p.scene?.trim() || "—";
       const action = p.action?.trim() || scene;
       return {

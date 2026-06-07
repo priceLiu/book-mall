@@ -13,6 +13,7 @@ export function AccountShell({
   gatewayLinked,
   canLaunchEcommerce,
   ecomOriginConfigured,
+  appsMenuHint,
   children,
 }: {
   profile: { image: string | null; name: string | null; email: string | null };
@@ -24,6 +25,7 @@ export function AccountShell({
   gatewayLinked: boolean;
   canLaunchEcommerce: boolean;
   ecomOriginConfigured: boolean;
+  appsMenuHint: string | null;
   children: React.ReactNode;
 }) {
   const menuProps = {
@@ -36,6 +38,7 @@ export function AccountShell({
     gatewayLinked,
     canLaunchEcommerce,
     ecomOriginConfigured,
+    appsMenuHint,
   };
 
   return (

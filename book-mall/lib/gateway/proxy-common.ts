@@ -1,6 +1,7 @@
 import type { GatewayClientSource, GatewayProviderKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDecryptedCredentialApiKey } from "./credential-service";
+import { pickCredentialIdForProvider } from "./gateway-credential-match";
 import {
   defaultBaseUrl,
   resolveBailianChatModelKey,
@@ -29,8 +30,7 @@ export function pickCredentialForKind(
   credentials: { id: string; providerKind: GatewayProviderKind }[],
   kind: GatewayProviderKind,
 ): string | null {
-  const hit = credentials.find((c) => c.providerKind === kind);
-  return hit?.id ?? credentials[0]?.id ?? null;
+  return pickCredentialIdForProvider(credentials, kind);
 }
 
 export async function createRequestLog(opts: {

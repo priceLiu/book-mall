@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import { resolvePlatformUser } from "@/lib/platform-auth";
 import { canvasCorsHeaders } from "./cors";
@@ -60,6 +61,21 @@ export function isAdmin(user: AuthorizedSessionUser): boolean {
   return user.role === "admin";
 }
 
+function isDatabaseUnavailable(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientInitializationError) return true;
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    return err.code === "P1001" || err.code === "P1017";
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  return /can't reach database|database server/i.test(msg);
+}
+
+/** schema 已含 VOLCENGINE 等枚举，但运行中 Prisma Client 未 regenerate */
+function isPrismaEnumStale(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /not found in enum/i.test(msg) && /GatewayProviderKind/i.test(msg);
+}
+
 export function canvasErrorToResponse(
   request: NextRequest,
   err: unknown,
@@ -100,9 +116,34 @@ export function canvasErrorToResponse(
       { status: err.httpStatus, headers: jsonHeaders(request) },
     );
   }
+  if (isPrismaEnumStale(err)) {
+    console.error("[canvas-api] stale prisma client (GatewayProviderKind)", err);
+    return NextResponse.json(
+      {
+        error: "PRISMA_CLIENT_STALE",
+        message:
+          "Prisma Client 与数据库不同步（缺少 VOLCENGINE 等 Gateway 枚举）。请在 book-mall 执行 pnpm db:generate 后重启 pnpm dev:all。",
+      },
+      { status: 503, headers: jsonHeaders(request) },
+    );
+  }
+  if (isDatabaseUnavailable(err)) {
+    console.error("[canvas-api] database unavailable", err);
+    return NextResponse.json(
+      {
+        error: "DATABASE_UNAVAILABLE",
+        message: "数据库暂不可用，请检查网络或 book-mall 的 DATABASE_URL 连接",
+      },
+      { status: 503, headers: jsonHeaders(request) },
+    );
+  }
   console.error("[canvas-api] unexpected error", err);
+  const message =
+    err instanceof Error && err.message.trim()
+      ? err.message.slice(0, 240)
+      : undefined;
   return NextResponse.json(
-    { error: "INTERNAL_ERROR" },
+    { error: "INTERNAL_ERROR", message },
     { status: 500, headers: jsonHeaders(request) },
   );
 }

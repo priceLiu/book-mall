@@ -36,6 +36,8 @@ import {
 } from "@/lib/ecom/ecom-storyboard-gen-params";
 import {
   buildCharacterRefPrompt,
+  buildStoryboardImagePromptContext,
+  resolveCharacterAppearance,
   buildStoryboardPanelImagePrompt,
   buildStoryboardPanelRefGuide,
 } from "@/lib/ecom/ecom-storyboard-image-prompt";
@@ -76,6 +78,16 @@ function snapToPricing(
   };
 }
 
+function isTransientPollError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg === "fetch failed" ||
+    msg.includes("网络异常") ||
+    msg.includes("ECONNRESET") ||
+    msg.includes("ETIMEDOUT")
+  );
+}
+
 async function pollWanxImage(
   userId: string,
   taskId: string,
@@ -83,7 +95,13 @@ async function pollWanxImage(
 ): Promise<string> {
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 2000));
-    const polled = await ecomGwPollDashscope(userId, { taskId, gatewayLogId: logId });
+    let polled: Awaited<ReturnType<typeof ecomGwPollDashscope>>;
+    try {
+      polled = await ecomGwPollDashscope(userId, { taskId, gatewayLogId: logId });
+    } catch (e) {
+      if (isTransientPollError(e) && i < 59) continue;
+      throw e instanceof Error ? e : new Error(String(e));
+    }
     if (polled.status === "SUCCEEDED" && polled.outputUrl) {
       return polled.outputUrl;
     }
@@ -117,7 +135,17 @@ async function downloadAndUpload(
   imageUrl: string,
   ext = "png",
 ): Promise<string> {
-  const res = await fetch(imageUrl);
+  let res: Response;
+  try {
+    res = await fetch(imageUrl);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      msg === "fetch failed"
+        ? "下载生成图失败：网络中断，请重试"
+        : `下载生成图失败：${msg}`,
+    );
+  }
   if (!res.ok) throw new Error(`下载生成图失败 HTTP ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   return uploadCanvasUserBuffer({
@@ -689,7 +717,21 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
 }> {
   await assertEcomToolkitGatewayAccess(opts.userId);
   requireStoryboardProductRef(opts.references);
+  const projectRow = await getEcomStoryboardProject(opts.userId, opts.projectId);
+  if (!projectRow) throw new Error("项目不存在");
+  const wf = projectRow.meta?.workflow ?? {};
   const sheet = storyboardSheetSchema.parse(opts.sheet);
+  const basePromptCtx = buildStoryboardImagePromptContext(projectRow);
+  const promptCtx = {
+    ...basePromptCtx,
+    aspectRatio: opts.aspectRatio ?? "9:16",
+    characterAppearance:
+      basePromptCtx.characterAppearance ||
+      resolveCharacterAppearance(sheet, basePromptCtx, {
+        characterPresetKey: wf.characterPresetKey,
+        collectedParams: wf.collectedParams,
+      }),
+  };
   const modelKey = opts.modelKey?.trim() || ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL;
   const aspectRatio = opts.aspectRatio ?? "9:16";
   const imageSize = resolveWanxImageSize({ aspectRatio, imageSize: opts.imageSize });
@@ -701,8 +743,14 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
   let totalCharge = 0;
 
   const hasCharacterRef = references.some((r) => r.role === "character");
-  if (opts.autoGenCharacter && !hasCharacterRef) {
-    const charPrompt = buildCharacterRefPrompt(sheet);
+  const shouldAutoGenCharacter =
+    !hasCharacterRef &&
+    !wf.skippedCharacter &&
+    (opts.autoGenCharacter ||
+      Boolean(wf.autoGenCharacter) ||
+      Boolean(wf.characterPresetKey));
+  if (shouldAutoGenCharacter) {
+    const charPrompt = buildCharacterRefPrompt(sheet, promptCtx);
     const charResult = await generateOneImage({
       userId: opts.userId,
       projectId: opts.projectId,
@@ -734,10 +782,10 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
   }
 
   let updatedPanels = [...sheet.panels];
-  const refGuide = buildStoryboardPanelRefGuide(references);
+  const refGuide = buildStoryboardPanelRefGuide(references, promptCtx);
 
   for (const panel of panelsToGen) {
-    const prompt = buildStoryboardPanelImagePrompt(panel, sheet, references);
+    const prompt = buildStoryboardPanelImagePrompt(panel, sheet, references, promptCtx);
     const imgResult = isStoryboardKieImageModel(modelKey)
       ? await generatePanelImageWithKie({
           userId: opts.userId,

@@ -69,30 +69,23 @@ export async function getGatewayLinkStatusForUser(
           name: true,
           keyPrefix: true,
           revokedAt: true,
-          bindings: {
-            include: {
-              credential: {
-                select: { providerKind: true, active: true },
-              },
-            },
-          },
         },
       },
     },
   });
 
   const key = user?.linkedGatewayApiKey;
-  const boundKinds = [
-    ...new Set(
-      (key?.bindings ?? [])
-        .map((b) => b.credential)
-        .filter((c) => c.active)
-        .map((c) => c.providerKind),
-    ),
-  ];
+  const linked = Boolean(user?.gatewayApiKeyId && key && !key.revokedAt);
+  let boundKinds: GatewayProviderKind[] = [];
+  if (linked && user?.gatewayApiKeyId) {
+    const auth = await resolveGatewayApiKeyById(user.gatewayApiKeyId);
+    boundKinds = [
+      ...new Set(auth?.credentials.map((c) => c.providerKind) ?? []),
+    ];
+  }
 
   return {
-    linked: Boolean(user?.gatewayApiKeyId && key && !key.revokedAt),
+    linked,
     gatewayApiKeyId: user?.gatewayApiKeyId ?? null,
     keyPrefix: key ? maskGatewayApiKey(key.keyPrefix) : null,
     keyName: key?.name ?? null,

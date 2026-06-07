@@ -4,6 +4,10 @@ import {
   TOOL_VIDEO_LIBRARY_DEFAULT_MAX,
 } from "@/lib/tool-library-quota";
 import { prismaErrorCode } from "@/lib/ai-fit-db-error";
+import {
+  isPrismaConnectionUnavailable,
+  prismaConnectionUnavailableMessage,
+} from "@/lib/db-unavailable";
 import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
 import { prisma } from "@/lib/prisma";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
@@ -96,6 +100,13 @@ export async function GET(req: Request) {
     if (code === "P2021") {
       return NextResponse.json(
         { items: [], error: "数据库尚未迁移，请联系管理员执行 prisma migrate deploy。" },
+        { status: 503 },
+      );
+    }
+    if (isPrismaConnectionUnavailable(e)) {
+      console.error("[image-to-video/library] GET connection issue", e);
+      return NextResponse.json(
+        { items: [], error: prismaConnectionUnavailableMessage(e) },
         { status: 503 },
       );
     }

@@ -10,6 +10,7 @@ import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
 import {
   VOLCENGINE_ALL_KNOWN_MODELS,
 } from "@/lib/gateway/volcengine-chat-models";
+import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 
 export type PromptOptimizerGatewayModel = {
@@ -73,7 +74,6 @@ export const PROMPT_OPTIMIZER_DEFAULT_MODEL_KEY = "deepseek-v4-flash";
 export function listPromptOptimizerGatewayModels(
   boundKinds: GatewayProviderKind[],
 ): PromptOptimizerGatewayModel[] {
-  const bound = new Set(boundKinds);
   return PROMPT_OPTIMIZER_MODEL_KEYS.map((modelKey) => {
     const meta = KNOWN_BY_KEY.get(modelKey);
     const routed = routeGatewayModel(modelKey);
@@ -82,7 +82,7 @@ export function listPromptOptimizerGatewayModels(
       displayName: meta?.displayName ?? modelKey,
       description: meta?.description ?? "",
       providerKind: routed.providerKind,
-      credentialBound: bound.has(routed.providerKind),
+      credentialBound: isGatewayProviderBound(boundKinds, routed.providerKind),
     };
   });
 }

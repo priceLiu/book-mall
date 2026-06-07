@@ -9,6 +9,10 @@ import {
 } from "@/components/ui/dialog";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import {
+  hasBoundStoryboardModel,
+  storyboardProviderLabel,
+} from "@/lib/storyboard-model-pick";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -68,17 +72,41 @@ export function StoryboardSettingsDialog({
           {chatModels.length > 0 ? (
             <div>
               <p className="mb-2 text-sm font-bold text-[#1d1d1f]">助手模型</p>
-              <select
-                className="w-full rounded-lg border border-[#d2d2d7] bg-white px-2 py-2 text-sm"
-                value={value.chatModelKey}
-                onChange={(e) => onChange({ chatModelKey: e.target.value })}
-              >
-                {chatModels.map((m) => (
-                  <option key={m.modelKey} value={m.modelKey} disabled={!m.credentialBound}>
-                    {m.displayName}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                {chatModels.map((m) => {
+                  const active = value.chatModelKey === m.modelKey;
+                  const disabled = !m.credentialBound;
+                  return (
+                    <button
+                      key={m.modelKey}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => onChange({ chatModelKey: m.modelKey })}
+                      className={cn(
+                        "w-full rounded-lg border-2 px-3 py-2.5 text-left text-sm transition-colors",
+                        active
+                          ? "border-[#1d1d1f] bg-[#f5f5f7]"
+                          : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
+                        disabled &&
+                          "cursor-not-allowed opacity-45 hover:border-[#e8e8ed]",
+                      )}
+                    >
+                      <span className="font-medium text-[#1d1d1f]">{m.displayName}</span>
+                      {disabled ? (
+                        <span className="mt-0.5 block text-xs text-[#86868b]">
+                          未绑定 {storyboardProviderLabel(m.providerKind)} 凭证
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              {!hasBoundStoryboardModel(chatModels) ? (
+                <p className="mt-2 text-xs leading-relaxed text-amber-700">
+                  当前 Gateway Key 未绑定任何助手可用厂商。请在 Gateway 控制台「厂商凭证」添加
+                  百炼 / DeepSeek / KIE，并确保 sk-gw 已勾选对应凭证后在 Book 个人中心关联。
+                </p>
+              ) : null}
             </div>
           ) : null}
 

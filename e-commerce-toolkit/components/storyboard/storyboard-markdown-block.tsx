@@ -7,37 +7,84 @@ export function StoryboardMarkdownBlock({ markdown }: { markdown: string }) {
   let tableRows: string[][] = [];
   let key = 0;
 
+  function stripCellBold(text: string): string {
+    const t = text.trim();
+    if (t.startsWith("**") && t.endsWith("**")) return t.slice(2, -2).trim();
+    return t;
+  }
+
+  function isSeparatorRow(row: string[]): boolean {
+    return row.every((c) => /^:?-+:?$/.test(c.trim()));
+  }
+
   function flushTable() {
     if (tableRows.length === 0) return;
-    const [head, ...body] = tableRows;
+
+    const dataRows = tableRows.filter((row) => !isSeparatorRow(row));
+    if (dataRows.length === 0) {
+      tableRows = [];
+      return;
+    }
+
+    const colCount = Math.max(...dataRows.map((r) => r.length), 1);
+    const padRow = (row: string[]) => {
+      const cells = [...row];
+      while (cells.length < colCount) cells.push("");
+      return cells.map((c) => stripCellBold(c));
+    };
+
+    let titleRow: string | null = null;
+    let head: string[] | null = null;
+    let body: string[][] = [];
+
+    let start = 0;
+    if (dataRows[0]?.length === 1 && dataRows[0][0]?.trim()) {
+      titleRow = stripCellBold(dataRows[0][0]!);
+      start = 1;
+    }
+
+    const rest = dataRows.slice(start).map(padRow);
+    if (rest.length > 0) {
+      head = rest[0]!;
+      body = rest.slice(1);
+    }
+
     elements.push(
-      <div key={key++} className="my-3 overflow-x-auto rounded-lg border border-[#e8e8ed]">
-        <table className="w-full min-w-[480px] border-collapse text-left text-xs">
-          {head ? (
-            <thead>
-              <tr className="bg-[#1d1d1f] text-white">
-                {head.map((c, i) => (
-                  <th key={i} className="px-3 py-2 font-medium">
-                    {c.trim()}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-          ) : null}
-          <tbody>
-            {body
-              .filter((row) => !row.every((c) => /^-+$/.test(c.trim())))
-              .map((row, ri) => (
+      <div key={key++} className="my-3">
+        {titleRow ? (
+          <p className="mb-2 text-sm font-semibold text-[#1d1d1f]">{titleRow}</p>
+        ) : null}
+        <div className="overflow-x-auto rounded-lg border border-[#e8e8ed]">
+          <table className="w-full min-w-[480px] table-fixed border-collapse text-left text-xs">
+            <colgroup>
+              {Array.from({ length: colCount }, (_, i) => (
+                <col key={i} style={{ width: `${100 / colCount}%` }} />
+              ))}
+            </colgroup>
+            {head ? (
+              <thead>
+                <tr className="bg-[#1d1d1f] text-white">
+                  {head.map((c, i) => (
+                    <th key={i} className="px-3 py-2 font-medium">
+                      {c}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            ) : null}
+            <tbody>
+              {body.map((row, ri) => (
                 <tr key={ri} className="border-t border-[#e8e8ed]">
                   {row.map((c, ci) => (
                     <td key={ci} className="px-3 py-2 align-top text-[#1d1d1f]">
-                      {c.trim()}
+                      {c}
                     </td>
                   ))}
                 </tr>
               ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       </div>,
     );
     tableRows = [];

@@ -3,12 +3,17 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { buildStoryboardStandaloneHtml } from "@/lib/ecom/ecom-storyboard-html";
-import type { StoryboardDeliverable } from "@/lib/ecom/ecom-storyboard-deliverable";
+import {
+  schemeToSheet,
+  type StoryboardDeliverable,
+} from "@/lib/ecom/ecom-storyboard-deliverable";
+import { parseStoryboardSchemesFromMarkdown } from "@/lib/ecom/ecom-storyboard-markdown-parse";
 import {
   ECOM_STORYBOARD_MODULE,
   sanitizeStoryboardChatMessages,
   sanitizeStoryboardReferences,
   parseStoryboardSheet,
+  storyboardPanelsHaveDuplicateIndex,
   storyboardSheetSchema,
   type StoryboardChatMessage,
   type StoryboardReference,
@@ -38,11 +43,63 @@ export type EcomStoryboardProjectDto = {
       imageModelKey?: string;
       videoModelKey?: string;
       autoGenCharacter?: boolean;
+      characterPresetKey?: string;
+      skippedCharacter?: boolean;
+      productCategory?: string;
+      collectedParams?: Record<string, string>;
+      planMode?: "quick" | "custom" | "default_a";
+      scenePreset?: string;
+      scenePresetCustom?: string;
     };
   } | null;
   createdAt: string;
   updatedAt: string;
 };
+
+function repairStoryboardMetaAndSheet(
+  meta: EcomStoryboardProjectDto["meta"],
+  sheet: StoryboardSheet | null,
+): { meta: EcomStoryboardProjectDto["meta"]; sheet: StoryboardSheet | null; dirty: boolean } {
+  const markdown = meta?.deliverableMarkdown?.trim() ?? "";
+  let nextMeta = meta;
+  let nextSheet = sheet;
+  let dirty = false;
+
+  const schemes = meta?.deliverable?.schemes ?? [];
+  const mergedSchemes =
+    markdown.length > 200 &&
+    schemes.length === 1 &&
+    schemes[0]?.panels?.length > 0 &&
+    storyboardPanelsHaveDuplicateIndex(schemes[0].panels);
+
+  if (mergedSchemes) {
+    const reparsed = parseStoryboardSchemesFromMarkdown(markdown);
+    const looksFixed =
+      reparsed.length > 1 ||
+      (reparsed[0] != null && !storyboardPanelsHaveDuplicateIndex(reparsed[0].panels));
+    if (looksFixed) {
+      const deliverable: StoryboardDeliverable = {
+        ...(meta?.deliverable ?? {}),
+        schemes: reparsed,
+      };
+      nextMeta = { ...meta, deliverable };
+      dirty = true;
+      const selectedIndex = meta?.selectedSchemeIndex ?? 0;
+      const scheme = reparsed[selectedIndex] ?? reparsed[0];
+      if (scheme) {
+        nextSheet = schemeToSheet(scheme, deliverable);
+        dirty = true;
+      }
+    }
+  }
+
+  if (nextSheet && storyboardPanelsHaveDuplicateIndex(nextSheet.panels)) {
+    nextSheet = parseStoryboardSheet(nextSheet);
+    dirty = true;
+  }
+
+  return { meta: nextMeta, sheet: nextSheet, dirty };
+}
 
 function rowToDto(
   row: {
@@ -66,7 +123,9 @@ function rowToDto(
 ): EcomStoryboardProjectDto {
   let sheet: StoryboardSheet | null = null;
   const parsed = storyboardSheetSchema.safeParse(row.sheet);
-  if (parsed.success) sheet = parsed.data;
+  if (parsed.success) sheet = parseStoryboardSheet(parsed.data);
+
+  const meta = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
 
   return {
     id: row.id,
@@ -82,7 +141,7 @@ function rowToDto(
     sheetHtmlUrl: row.sheetHtmlUrl,
     videoAssetId: row.videoAssetId,
     videoOssUrl: videoOssUrl ?? null,
-    meta: (row.meta as EcomStoryboardProjectDto["meta"]) ?? null,
+    meta,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -141,10 +200,28 @@ export async function getEcomStoryboardProject(
   userId: string,
   projectId: string,
 ): Promise<EcomStoryboardProjectDto | null> {
-  const row = await prisma.ecomStoryboardProject.findFirst({
+  let row = await prisma.ecomStoryboardProject.findFirst({
     where: { id: projectId, userId },
   });
   if (!row) return null;
+
+  let meta = (row.meta as EcomStoryboardProjectDto["meta"]) ?? null;
+  let sheet: StoryboardSheet | null = null;
+  const parsed = storyboardSheetSchema.safeParse(row.sheet);
+  if (parsed.success) sheet = parseStoryboardSheet(parsed.data);
+
+  const repaired = repairStoryboardMetaAndSheet(meta, sheet);
+  if (repaired.dirty) {
+    const updated = await prisma.ecomStoryboardProject.update({
+      where: { id: projectId },
+      data: {
+        ...(repaired.sheet ? { sheet: repaired.sheet as Prisma.InputJsonValue } : {}),
+        ...(repaired.meta ? { meta: repaired.meta as Prisma.InputJsonValue } : {}),
+      },
+    });
+    row = updated;
+  }
+
   const videoMap = await loadVideoOssUrlMap(userId, [row.videoAssetId]);
   return rowToDto(row, row.videoAssetId ? videoMap.get(row.videoAssetId) ?? null : null);
 }

@@ -102,7 +102,8 @@ function AccountSidebarNav({
   canvasReady,
   ecomReady,
   onAction,
-}: NavRuntimeProps) {
+  appsMenuHint,
+}: NavRuntimeProps & { appsMenuHint: string | null }) {
   function renderLink(item: AccountNavLinkItem) {
     const active = isAccountNavLinkActive(pathname, item.href, item.exact);
     const Icon = item.icon;
@@ -166,6 +167,8 @@ function AccountSidebarNav({
     );
   }
 
+  const hasAppsGroup = groups.some((g) => g.id === "apps");
+
   return (
     <nav className="mt-2 min-w-0 w-full" aria-label="个人中心导航">
       {groups.map((group, index) => (
@@ -177,6 +180,11 @@ function AccountSidebarNav({
           {index < groups.length - 1 ? <div className={separatorClass} role="separator" /> : null}
         </div>
       ))}
+      {!hasAppsGroup && appsMenuHint ? (
+        <p className="mt-3 px-3 text-[11px] leading-relaxed text-muted-foreground">
+          {appsMenuHint}
+        </p>
+      ) : null}
     </nav>
   );
 }
@@ -271,6 +279,7 @@ export function AccountNavMenu({
   gatewayLinked,
   canLaunchEcommerce,
   ecomOriginConfigured,
+  appsMenuHint,
   placement = "sidebar",
 }: {
   profile: Profile;
@@ -282,6 +291,7 @@ export function AccountNavMenu({
   gatewayLinked: boolean;
   canLaunchEcommerce: boolean;
   ecomOriginConfigured: boolean;
+  appsMenuHint: string | null;
   placement?: "sidebar" | "header";
 }) {
   const pathname = usePathname();
@@ -328,13 +338,14 @@ export function AccountNavMenu({
     }
   }
 
-  const navProps: NavRuntimeProps = {
+  const navProps: NavRuntimeProps & { appsMenuHint: string | null } = {
     groups,
     pathname,
     canLaunchTools,
     canvasReady,
     ecomReady,
     onAction: (id) => void runAction(id),
+    appsMenuHint,
   };
 
   if (isSidebar) {

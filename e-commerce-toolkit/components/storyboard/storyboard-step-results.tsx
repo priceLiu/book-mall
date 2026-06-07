@@ -5,6 +5,8 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
+import { characterPresetLabelFromKey } from "@/lib/storyboard-character-presets";
+import { resolveScenePresetByKey } from "@/lib/storyboard-scene-presets";
 import type {
   StoryboardPanel,
   StoryboardProject,
@@ -103,8 +105,8 @@ function ScriptPanelsTable({
           </tr>
         </thead>
         <tbody>
-          {panels.map((p) => (
-            <tr key={p.index} className="border-t border-[#e8e8ed] align-top">
+          {panels.map((p, i) => (
+            <tr key={`panel-${p.index}-${i}`} className="border-t border-[#e8e8ed] align-top">
               <td className="px-3 py-2 font-medium">{p.index}</td>
               <td className="px-3 py-2 text-[#6e6e73]">{p.timeline?.trim() || "--"}</td>
               <td className="px-3 py-2">{p.shotType?.trim() || "--"}</td>
@@ -195,8 +197,10 @@ export function StoryboardStepResults({
     (typeof params["核心卖点"] === "string" ? params["核心卖点"] : undefined);
 
   const characterDisplay =
-    characterRefs.length > 0 ? null : wf.autoGenCharacter ? (
-      <span className="text-sm text-[#1d1d1f]">自动生成角色（已定稿）</span>
+    characterRefs.length > 0 ? null : wf.characterPresetKey || wf.autoGenCharacter ? (
+      <span className="text-sm text-[#1d1d1f]">
+        {characterPresetLabelFromKey(wf.characterPresetKey) ?? "自动生成角色"}（生图前将生成角色参考图）
+      </span>
     ) : wf.skippedCharacter ? (
       <span className="text-sm text-[#86868b]">已跳过</span>
     ) : null;
@@ -291,12 +295,33 @@ export function StoryboardStepResults({
       </StepSection>
 
       <StepSection title="场景图">
-        <RefImagesBlock
-          title="场景参考图"
-          refs={otherRefs}
-          skipped={Boolean(wf.skippedRefs) && otherRefs.length === 0}
-          onPreview={onPreviewImage}
-        />
+        {(wf.scenePreset || wf.scenePresetCustom) && otherRefs.length === 0 ? (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">场景参考</h3>
+            {wf.scenePreset === "custom" && wf.scenePresetCustom ? (
+              <>
+                <p className="text-sm text-[#1d1d1f]">自定义场景：{wf.scenePresetCustom}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-[#1d1d1f]">
+                  预设场景：
+                  {resolveScenePresetByKey(wf.scenePreset)?.label ?? wf.scenePreset}
+                </p>
+                <p className="mt-1 text-xs text-[#86868b]">
+                  {resolveScenePresetByKey(wf.scenePreset)?.scriptHint}
+                </p>
+              </>
+            )}
+          </div>
+        ) : (
+          <RefImagesBlock
+            title="场景参考图"
+            refs={otherRefs}
+            skipped={Boolean(wf.skippedRefs) && otherRefs.length === 0}
+            onPreview={onPreviewImage}
+          />
+        )}
       </StepSection>
 
       <StepSection title="分镜脚本">

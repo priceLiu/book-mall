@@ -7,6 +7,7 @@ import { isToolsSsoConfigured } from "@/lib/sso-tools-env";
 import { getGatewayLinkStatusForUser } from "@/lib/canvas/book-gateway-link";
 import { getCanvasWebOrigin, getEcommerceWebOrigin } from "@/lib/app-web-origins";
 import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
+import { buildAccountAppsMenuHint } from "@/lib/account-apps-menu-hint";
 import { AccountShell } from "@/components/account/account-shell";
 
 /** Layout 内查询 Prisma；构建阶段 CI 往往无 DATABASE_URL */
@@ -40,6 +41,15 @@ export default async function AccountGroupLayout({
   const canLaunchEcommerce = toolsSsoReady && (isAdminUser || ecomAccess);
 
   const showToolsCta = toolsSsoReady;
+  const appsMenuHint = buildAccountAppsMenuHint({
+    toolsSsoReady,
+    hasToolService,
+    gatewayLinked: gatewayStatus.linked,
+    canvasOriginConfigured,
+    ecomAccess,
+    ecomOriginConfigured,
+    isAdmin: isAdminUser,
+  });
 
   return (
     <AccountShell
@@ -56,6 +66,7 @@ export default async function AccountGroupLayout({
       gatewayLinked={gatewayStatus.linked}
       canLaunchEcommerce={canLaunchEcommerce}
       ecomOriginConfigured={ecomOriginConfigured}
+      appsMenuHint={appsMenuHint}
     >
       {children}
     </AccountShell>

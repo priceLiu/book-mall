@@ -1,6 +1,7 @@
 import type { GatewayProviderKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encryptApiKey, maskApiKey } from "@/lib/canvas/secret";
+import { syncPersonalGatewayApiKeyBindings } from "@/lib/gateway/api-key-service";
 import { resolveOpenAiCompatibleBaseUrl } from "@/lib/gateway/model-router";
 import { testGatewayCredentialConnection } from "@/lib/gateway/gateway-credential-test";
 
@@ -46,7 +47,7 @@ export async function createGatewayCredential(opts: {
     (opts.providerKind === "BAILIAN" || opts.providerKind === "DASHSCOPE")
       ? resolveOpenAiCompatibleBaseUrl(opts.providerKind, rawBase)
       : rawBase;
-  return prisma.gatewayVendorCredential.create({
+  const row = await prisma.gatewayVendorCredential.create({
     data: {
       userId: opts.userId,
       alias: opts.alias.trim() || opts.providerKind,
@@ -55,6 +56,8 @@ export async function createGatewayCredential(opts: {
       baseUrl,
     },
   });
+  await syncPersonalGatewayApiKeyBindings(opts.userId);
+  return row;
 }
 
 export async function deleteGatewayCredential(userId: string, id: string) {
@@ -63,6 +66,7 @@ export async function deleteGatewayCredential(userId: string, id: string) {
   });
   if (!row) return false;
   await prisma.gatewayVendorCredential.delete({ where: { id } });
+  await syncPersonalGatewayApiKeyBindings(userId);
   return true;
 }
 
@@ -91,7 +95,7 @@ export async function updateGatewayCredential(
         : raw;
   }
 
-  return prisma.gatewayVendorCredential.update({
+  const updated = await prisma.gatewayVendorCredential.update({
     where: { id },
     data: {
       ...(patch.alias !== undefined ? { alias: patch.alias.trim() || row.providerKind } : {}),
@@ -102,6 +106,10 @@ export async function updateGatewayCredential(
         : {}),
     },
   });
+  if (patch.active !== undefined) {
+    await syncPersonalGatewayApiKeyBindings(userId);
+  }
+  return updated;
 }
 
 export async function cloneGatewayCredential(
@@ -113,7 +121,7 @@ export async function cloneGatewayCredential(
     where: { id, userId },
   });
   if (!row) return null;
-  return prisma.gatewayVendorCredential.create({
+  const cloned = await prisma.gatewayVendorCredential.create({
     data: {
       userId,
       alias: alias.trim() || `${row.alias} 副本`,
@@ -123,6 +131,10 @@ export async function cloneGatewayCredential(
       active: row.active,
     },
   });
+  if (cloned.active) {
+    await syncPersonalGatewayApiKeyBindings(userId);
+  }
+  return cloned;
 }
 
 export async function testGatewayCredential(userId: string, id: string) {

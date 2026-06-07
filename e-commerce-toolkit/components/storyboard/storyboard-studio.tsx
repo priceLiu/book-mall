@@ -28,6 +28,7 @@ import {
   updateStoryboardProject,
   uploadStoryboardRef,
 } from "@/lib/ecom-storyboard-api";
+import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import { inferCollectUploadRole, type StoryboardUploadRole } from "@/lib/storyboard-workflow";
 import type { StoryboardReference } from "@/lib/storyboard-types";
 import type {
@@ -56,7 +57,7 @@ export function StoryboardStudio() {
   const [refBusy, setRefBusy] = useState(false);
   const [assistantStreaming, setAssistantStreaming] = useState(false);
   const [settings, setSettings] = useState<StoryboardSettingsValue>({
-    chatModelKey: "deepseek-v4-flash",
+    chatModelKey: "qwen3.5-flash",
     imageModelKey: "wan2.7-image",
     videoModelKey: "doubao-seedance-2.0",
     aspectRatio: "9:16",
@@ -155,6 +156,21 @@ export function StoryboardStudio() {
         setChatModels(models.chatModels);
         setImageModels(models.imageModels);
         setVideoModels(models.videoModels);
+        setSettings((prev) => ({
+          ...prev,
+          chatModelKey: pickBoundStoryboardModelKey(
+            models.chatModels,
+            prev.chatModelKey,
+          ),
+          imageModelKey: pickBoundStoryboardModelKey(
+            models.imageModels,
+            prev.imageModelKey,
+          ),
+          videoModelKey: pickBoundStoryboardModelKey(
+            models.videoModels,
+            prev.videoModelKey,
+          ),
+        }));
 
         const savedId =
           typeof window !== "undefined"
@@ -371,7 +387,9 @@ export function StoryboardStudio() {
             settings={settings}
             onStreamingChange={setAssistantStreaming}
             onOpenSettings={() => setSettingsOpen(true)}
-            onDeliverableReady={() => reload(project.id)}
+            onDeliverableReady={async () => {
+              await reload(project.id);
+            }}
             onRequestGenerateAllImages={() =>
               setGenerateAllImagesToken((t) => t + 1)
             }

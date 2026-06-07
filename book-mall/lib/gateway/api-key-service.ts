@@ -24,6 +24,99 @@ export function generateGatewayApiKeyMaterial(): {
   return { raw, prefix, hash: hashKey(raw) };
 }
 
+/**
+ * PERSONAL sk-gw 创建时会绑定当时全部 active 凭证；之后新增的厂商凭证需同步到已有 Key。
+ * PLATFORM 密钥保持显式绑定，不参与自动同步。
+ */
+export async function syncPersonalGatewayApiKeyBindings(
+  gatewayUserId: string,
+): Promise<void> {
+  const [activeCreds, personalKeys] = await Promise.all([
+    prisma.gatewayVendorCredential.findMany({
+      where: { userId: gatewayUserId, active: true },
+      select: { id: true },
+    }),
+    prisma.gatewayApiKey.findMany({
+      where: { userId: gatewayUserId, scope: "PERSONAL", revokedAt: null },
+      select: { id: true },
+    }),
+  ]);
+  if (personalKeys.length === 0) return;
+
+  const activeIds = activeCreds.map((c) => c.id);
+  await prisma.$transaction(async (tx) => {
+    for (const key of personalKeys) {
+      await tx.gatewayApiKeyCredential.deleteMany({ where: { apiKeyId: key.id } });
+      if (activeIds.length > 0) {
+        await tx.gatewayApiKeyCredential.createMany({
+          data: activeIds.map((credentialId) => ({
+            apiKeyId: key.id,
+            credentialId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+  });
+}
+
+async function personalBindingsNeedSync(
+  gatewayUserId: string,
+  apiKeyId: string,
+): Promise<boolean> {
+  const [activeCreds, boundCreds] = await Promise.all([
+    prisma.gatewayVendorCredential.findMany({
+      where: { userId: gatewayUserId, active: true },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    }),
+    prisma.gatewayApiKeyCredential.findMany({
+      where: { apiKeyId, credential: { active: true } },
+      select: { credentialId: true },
+      orderBy: { credentialId: "asc" },
+    }),
+  ]);
+  const activeIds = activeCreds.map((c) => c.id).join(",");
+  const boundIds = boundCreds.map((b) => b.credentialId).join(",");
+  return activeIds !== boundIds;
+}
+
+async function ensurePersonalApiKeyBindingsSynced(
+  apiKeyId: string,
+  scope: GatewayApiKeyScope,
+  gatewayUserId: string,
+): Promise<void> {
+  if (scope !== "PERSONAL") return;
+  if (!(await personalBindingsNeedSync(gatewayUserId, apiKeyId))) return;
+  await syncPersonalGatewayApiKeyBindings(gatewayUserId);
+}
+
+export type ResolvedGatewayApiKeyAuth = GatewayApiKey & {
+  user: GatewayUser;
+  credentials: { id: string; providerKind: GatewayProviderKind; alias: string }[];
+};
+
+function mapResolvedGatewayApiKeyAuth(
+  row: GatewayApiKey & {
+    user: GatewayUser;
+    bindings: {
+      credential: {
+        id: string;
+        providerKind: GatewayProviderKind;
+        alias: string;
+        active: boolean;
+      };
+    }[];
+  },
+): ResolvedGatewayApiKeyAuth {
+  return {
+    ...row,
+    credentials: row.bindings
+      .map((b) => b.credential)
+      .filter((c) => c.active),
+  };
+}
+
 export async function createGatewayApiKey(opts: {
   userId: string;
   name: string;
@@ -85,7 +178,7 @@ export async function resolveGatewayApiKeyFromBearer(
   if (!raw.startsWith(KEY_PREFIX)) return null;
   const prefix = raw.slice(0, KEY_PREFIX.length + 8);
   const hash = hashKey(raw);
-  return prisma.gatewayApiKey.findFirst({
+  const row = await prisma.gatewayApiKey.findFirst({
     where: {
       keyPrefix: prefix,
       keyHash: hash,
@@ -106,25 +199,37 @@ export async function resolveGatewayApiKeyFromBearer(
         },
       },
     },
-  }).then((row) => {
-    if (!row) return null;
-    return {
-      ...row,
-      credentials: row.bindings
-        .map((b) => b.credential)
-        .filter((c) => c.active),
-    };
   });
+  if (!row) return null;
+  await ensurePersonalApiKeyBindingsSynced(row.id, row.scope, row.userId);
+  if (row.scope === "PERSONAL") {
+    const refreshed = await prisma.gatewayApiKey.findFirst({
+      where: { id: row.id },
+      include: {
+        user: true,
+        bindings: {
+          include: {
+            credential: {
+              select: {
+                id: true,
+                providerKind: true,
+                alias: true,
+                active: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!refreshed) return null;
+    return mapResolvedGatewayApiKeyAuth(refreshed);
+  }
+  return mapResolvedGatewayApiKeyAuth(row);
 }
 
 export function maskGatewayApiKey(prefix: string): string {
   return `${prefix}****`;
 }
-
-export type ResolvedGatewayApiKeyAuth = GatewayApiKey & {
-  user: GatewayUser;
-  credentials: { id: string; providerKind: GatewayProviderKind; alias: string }[];
-};
 
 /** 服务端 Canvas 用：按 GatewayApiKey id 解析（等同 sk-gw 鉴权结果） */
 export async function resolveGatewayApiKeyById(
@@ -149,10 +254,28 @@ export async function resolveGatewayApiKeyById(
     },
   });
   if (!row) return null;
-  return {
-    ...row,
-    credentials: row.bindings
-      .map((b) => b.credential)
-      .filter((c) => c.active),
-  };
+  await ensurePersonalApiKeyBindingsSynced(row.id, row.scope, row.userId);
+  if (row.scope === "PERSONAL") {
+    const refreshed = await prisma.gatewayApiKey.findFirst({
+      where: { id: row.id },
+      include: {
+        user: true,
+        bindings: {
+          include: {
+            credential: {
+              select: {
+                id: true,
+                providerKind: true,
+                alias: true,
+                active: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!refreshed) return null;
+    return mapResolvedGatewayApiKeyAuth(refreshed);
+  }
+  return mapResolvedGatewayApiKeyAuth(row);
 }

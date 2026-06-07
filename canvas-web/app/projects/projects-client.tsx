@@ -9,6 +9,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   createCanvasProject,
   deleteCanvasProject,
+  formatCanvasApiError,
   listCanvasTemplates,
   listMyCanvasProjects,
   patchCanvasProject,
@@ -55,8 +56,13 @@ function Inner() {
   const [name, setName] = useState("");
 
   const load = useCallback(async () => {
-    if (!base) return;
+    if (!base) {
+      setLoading(false);
+      setError("未配置主站地址（NEXT_PUBLIC_BOOK_MALL_URL），无法加载画布列表。");
+      return;
+    }
     setLoading(true);
+    setError(null);
     try {
       const [list, tpl] = await Promise.all([
         listMyCanvasProjects(base),
@@ -66,7 +72,8 @@ function Inner() {
       setUserTemplates(tpl.filter((t) => !t.builtin));
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "加载失败");
+      const raw = e instanceof Error ? e.message : "加载失败";
+      setError(formatCanvasApiError(raw));
     } finally {
       setLoading(false);
     }
@@ -246,8 +253,15 @@ function Inner() {
       </header>
 
       {error ? (
-        <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">
-          {error}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <span>{error}</span>
+          <button
+            type="button"
+            className="rounded-lg border border-red-400/40 px-3 py-1 text-xs text-red-100 hover:bg-red-500/15"
+            onClick={() => void load()}
+          >
+            重试
+          </button>
         </div>
       ) : null}
 

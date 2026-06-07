@@ -324,6 +324,7 @@ export function StoryboardContentPanel({
         });
         return;
       }
+      const wf = project.meta?.workflow ?? {};
       const { sheet: nextSheet, references: nextRefs } = await generateStoryboardSheetImage(
         project.id,
         {
@@ -331,6 +332,8 @@ export function StoryboardContentPanel({
           aspectRatio,
           imageSize,
           panelIndex,
+          autoGenCharacter:
+            Boolean(wf.autoGenCharacter) || Boolean(wf.characterPresetKey),
         },
       );
       const allReady = nextSheet.panels.every((p) => Boolean(p.imageUrl));
@@ -808,9 +811,9 @@ export function StoryboardContentPanel({
                   </EcomButtonSecondary>
                 </div>
                 <div className="flex flex-wrap gap-4">
-                  {project.sheet.panels.map((panel) => (
+                  {project.sheet.panels.map((panel, i) => (
                     <StoryboardPanelCard
-                      key={panel.index}
+                      key={`panel-${panel.index}-${i}`}
                       panel={panel}
                       aspectRatio={aspectRatio}
                       imageUrl={panel.imageUrl}

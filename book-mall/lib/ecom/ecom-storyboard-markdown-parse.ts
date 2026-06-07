@@ -1,8 +1,9 @@
 import type { StoryboardScheme } from "@/lib/ecom/ecom-storyboard-deliverable";
 import { storyboardPanelSchema } from "@/lib/ecom/ecom-storyboard-deliverable";
 
+/** 支持 #### 方案一：… 等 Markdown 标题（原 #{1,3} 无法匹配四级标题导致多套方案合并） */
 const SCHEME_HEADER_RE =
-  /(?:^|\n)\s*(?:#{1,3}\s*)?(方案[一二三123]|方案\s*[一二三123]|Plan\s*[123])[^\n]*/gi;
+  /(?:^|\n)\s*(?:#+\s*)?(方案\s*[一二三123]|方案[一二三123]|Plan\s*[123])[^\n]*/gi;
 
 const PANEL_BLOCK_SPLIT_RE =
   /(?=(?:^|\n)\s*(?:#{1,4}\s*)?(?:\*\*)?(?:镜头|镜号)\s*(\d+))/g;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { ConfirmModal } from "@/components/model-manager/confirm-modal";
+import { copyTextToClipboard } from "@/lib/clipboard";
 
 const PLAYGROUND_KEY = "gateway_playground_api_key";
 
@@ -33,6 +34,20 @@ export default function DashboardKeysPage() {
   const [error, setError] = useState("");
   const [revokeTarget, setRevokeTarget] = useState<ApiKeyRow | null>(null);
   const [revokeStep, setRevokeStep] = useState<0 | 1>(0);
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [rawKeyCopied, setRawKeyCopied] = useState(false);
+
+  async function copyKeyText(text: string, keyId?: string) {
+    const ok = await copyTextToClipboard(text);
+    if (!ok) return;
+    if (keyId) {
+      setCopiedKeyId(keyId);
+      window.setTimeout(() => setCopiedKeyId(null), 2000);
+    } else {
+      setRawKeyCopied(true);
+      window.setTimeout(() => setRawKeyCopied(false), 2000);
+    }
+  }
 
   const hasPlatformKey = keys.some((k) => k.scope === "PLATFORM");
 
@@ -137,19 +152,40 @@ export default function DashboardKeysPage() {
           <p className="text-sm font-medium text-[var(--gw-accent)]">
             请立即复制保存，此密钥仅显示一次：
           </p>
-          <code className="mt-2 block break-all rounded bg-black/40 p-3 text-sm text-white">
-            {rawKey}
-          </code>
-          <button
-            type="button"
-            className="gw-btn-ghost mt-3 text-sm"
-            onClick={() => setRawKey(null)}
-          >
-            我已保存
-          </button>
-          <Link href="/dashboard/playground" className="gw-btn mt-3 ml-2 inline-block text-sm">
-            去 API 调试
-          </Link>
+          <div className="mt-2 flex items-start gap-2">
+            <code className="min-w-0 flex-1 break-all rounded bg-black/40 p-3 text-sm text-white">
+              {rawKey}
+            </code>
+            <button
+              type="button"
+              className="gw-btn shrink-0 text-sm"
+              onClick={() => void copyKeyText(rawKey)}
+            >
+              {rawKeyCopied ? "已复制" : "复制"}
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="gw-btn text-sm"
+              onClick={async () => {
+                await copyKeyText(rawKey);
+                setRawKey(null);
+              }}
+            >
+              复制并关闭
+            </button>
+            <button
+              type="button"
+              className="gw-btn-ghost text-sm"
+              onClick={() => setRawKey(null)}
+            >
+              我已保存
+            </button>
+            <Link href="/dashboard/playground" className="gw-btn-ghost inline-block text-sm">
+              去 API 调试
+            </Link>
+          </div>
         </div>
       ) : null}
 
@@ -213,7 +249,19 @@ export default function DashboardKeysPage() {
                     {SCOPE_LABEL[k.scope]}
                   </span>
                 </td>
-                <td className="font-mono text-xs">{k.keyMasked}</td>
+                <td>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs">{k.keyMasked}</span>
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs text-[var(--gw-accent)] hover:underline"
+                      title="复制密钥前缀（完整密钥仅在创建时显示一次）"
+                      onClick={() => void copyKeyText(k.keyMasked, k.id)}
+                    >
+                      {copiedKeyId === k.id ? "已复制" : "复制"}
+                    </button>
+                  </div>
+                </td>
                 <td className="text-xs">
                   {new Date(k.createdAt).toLocaleString("zh-CN")}
                 </td>

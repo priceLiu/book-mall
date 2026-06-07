@@ -38,7 +38,8 @@ function resolveStepState(
   const hasProduct = project.references.some((r) => r.role === "product");
   const hasCharacter =
     project.references.some((r) => r.role === "character") ||
-    Boolean(wf.autoGenCharacter);
+    Boolean(wf.autoGenCharacter) ||
+    Boolean(wf.characterPresetKey);
   const hasOtherRef = project.references.some(
     (r) => r.role === "scene" || r.role === "other",
   );
@@ -49,7 +50,11 @@ function resolveStepState(
 
   const productDone = hasProduct;
   const characterDone = hasCharacter || Boolean(wf.skippedCharacter);
-  const refsDone = hasOtherRef || Boolean(wf.skippedRefs);
+  const refsDone =
+    hasOtherRef ||
+    Boolean(wf.scenePreset) ||
+    Boolean(wf.scenePresetCustom) ||
+    Boolean(wf.skippedRefs);
 
   let active: StoryboardStepId = "plan";
   if (hasVideo) active = "video";
@@ -76,7 +81,8 @@ function resolveStepState(
     plan: false,
     product: false,
     character: Boolean(wf.skippedCharacter) && !hasCharacter,
-    refs: Boolean(wf.skippedRefs) && !hasOtherRef,
+    refs:
+      Boolean(wf.skippedRefs) && !hasOtherRef && !wf.scenePreset && !wf.scenePresetCustom,
     script: false,
     images: false,
     video: false,
