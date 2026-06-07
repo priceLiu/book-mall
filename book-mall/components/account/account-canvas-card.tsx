@@ -84,12 +84,16 @@ export function AccountCanvasCard({
         </div>
         <ul className="space-y-1 rounded-md bg-muted/40 px-3 py-2">
           <ChecklistRow ok={gatewayLinked}>
-            Gateway API Key 已关联{" "}
-            {!gatewayLinked ? (
-              <Link href="#gateway-api-key" className={accountInlineLinkClass()}>
-                去关联
-              </Link>
-            ) : null}
+            {gatewayLinked ? (
+              "Gateway API Key 已关联"
+            ) : (
+              <>
+                Gateway API Key 未关联{" "}
+                <Link href="/account/gateway" className={accountInlineLinkClass()}>
+                  去关联
+                </Link>
+              </>
+            )}
           </ChecklistRow>
           <ChecklistRow ok={canLaunchCanvas}>
             有效工具技术服务费（与工具站相同 SSO 准入）
@@ -124,7 +128,7 @@ export function AccountCanvasCard({
             }
           />
           {!gatewayLinked ? (
-            <Link href="#gateway-api-key" className={accountInlineLinkClass()}>
+            <Link href="/account/gateway" className={accountInlineLinkClass()}>
               关联 Gateway
             </Link>
           ) : (

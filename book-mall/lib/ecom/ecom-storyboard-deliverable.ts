@@ -26,9 +26,17 @@ export const storyboardSchemeSchema = z.object({
   totalDurationHintSec: z.number().positive().optional(),
 });
 
+const storyboardCastMemberSchema = z.object({
+  name: z.string().min(1),
+  role: z.string().min(1),
+  appearance: z.string().optional(),
+});
+
 export const storyboardDeliverableSchema = z.object({
   productName: z.string().optional(),
   params: z.record(z.string()).optional(),
+  /** 全片主角外貌设定（无上传角色图时供生图保持一致） */
+  cast: z.array(storyboardCastMemberSchema).optional(),
   analysis: z
     .object({
       audienceMarkdown: z.string(),
@@ -83,16 +91,23 @@ function pickProductHighlight(
 ): string | undefined {
   const params = deliverable?.params ?? {};
   const fromParams =
+    (typeof params.产品信息 === "string" &&
+      params.产品信息.trim() &&
+      !params.产品信息.startsWith("参数已确认") &&
+      params.产品信息.length < 200
+      ? params.产品信息.trim()
+      : undefined) ||
     (typeof params.卖点 === "string" && params.卖点.trim()) ||
     (typeof params["核心卖点"] === "string" && params["核心卖点"].trim()) ||
     (typeof params.productHighlight === "string" && params.productHighlight.trim()) ||
     (typeof params.sellingPoint === "string" && params.sellingPoint.trim());
   if (fromParams) return fromParams;
-  const fromStrategy = scheme.strategy?.trim();
-  if (fromStrategy && fromStrategy.length <= 120) return fromStrategy;
+  const productName = deliverable?.productName?.trim();
+  if (productName && !productName.startsWith("方案")) return productName;
   const fromSummary = scheme.summary?.trim();
-  if (fromSummary && fromSummary.length <= 120) return fromSummary;
-  return deliverable?.productName?.trim() || undefined;
+  if (fromSummary && fromSummary.length <= 120 && !fromSummary.startsWith("方案"))
+    return fromSummary;
+  return undefined;
 }
 
 export function schemeToSheet(
@@ -109,7 +124,11 @@ export function schemeToSheet(
         "微剧情分镜",
       productHighlight: pickProductHighlight(scheme, deliverable),
     },
-    cast: [],
+    cast: (deliverable?.cast ?? []).map((c) => ({
+      name: c.name,
+      role: c.role,
+      appearance: c.appearance?.trim() || undefined,
+    })),
     panels: scheme.panels.map((p) => ({
       index: p.index,
       timeline: p.timeline,

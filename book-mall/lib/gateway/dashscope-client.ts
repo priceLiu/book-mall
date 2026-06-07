@@ -128,10 +128,22 @@ export async function dashscopeGetTask(opts: {
   const taskId = opts.taskId.trim();
   if (!taskId) return { ok: false, error: "缺少 task_id" };
 
-  const res = await fetch(`${TASK_URL_BASE}/${encodeURIComponent(taskId)}`, {
-    headers: { Authorization: `Bearer ${opts.apiKey}` },
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${TASK_URL_BASE}/${encodeURIComponent(taskId)}`, {
+      headers: { Authorization: `Bearer ${opts.apiKey}` },
+      cache: "no-store",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      error:
+        msg === "fetch failed"
+          ? "DashScope 任务查询网络异常，请稍后重试"
+          : `DashScope 任务查询失败：${msg}`,
+    };
+  }
   const raw = await res.json().catch(() => null);
   const top = raw as Record<string, unknown> | null;
   const output = top?.output as DashscopeTaskOutput | undefined;
@@ -322,28 +334,40 @@ export async function dashscopeCreateWan27ImageTask(opts: {
         watermark: false,
       };
 
-  const res = await fetch(WAN27_IMAGE_CREATE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${opts.apiKey}`,
-      "X-DashScope-Async": "enable",
-    },
-    body: JSON.stringify({
-      model,
-      input: {
-        messages: [
-          {
-            role: "user",
-            content: ordered.map((c) =>
-              "text" in c ? { text: c.text.trim() } : { image: c.image.trim() },
-            ),
-          },
-        ],
+  let res: Response;
+  try {
+    res = await fetch(WAN27_IMAGE_CREATE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${opts.apiKey}`,
+        "X-DashScope-Async": "enable",
       },
-      parameters,
-    }),
-  });
+      body: JSON.stringify({
+        model,
+        input: {
+          messages: [
+            {
+              role: "user",
+              content: ordered.map((c) =>
+                "text" in c ? { text: c.text.trim() } : { image: c.image.trim() },
+              ),
+            },
+          ],
+        },
+        parameters,
+      }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      error:
+        msg === "fetch failed"
+          ? "DashScope 生图请求网络异常，请检查网络后重试"
+          : `DashScope 生图请求失败：${msg}`,
+    };
+  }
 
   const json = (await res.json()) as Record<string, unknown>;
   if (!res.ok) {

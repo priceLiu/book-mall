@@ -5,8 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFittingRoomLocale } from "@/components/fitting-room-locale-context";
 import type { Outfit } from "@/lib/fitting-room-types";
 import { fittingRoomImageSrc } from "@/lib/fitting-room-image-url";
-import { FITTING_ROOM_IMG_FALLBACK } from "@/lib/fitting-room-fallback-image";
-import { fittingRoomRemotePlaceholderSrc } from "@/lib/fitting-room-remote-placeholder";
+import { handleFittingRoomImgError } from "@/lib/fitting-room-img-error";
 import { ToolShellCloseButton } from "@/components/ui/tool-shell-close-button";
 import styles from "./fitting-room.module.css";
 
@@ -107,19 +106,9 @@ export function FittingRoomModal({
                         loading={slideIdx === 0 ? "eager" : "lazy"}
                         decoding="async"
                         referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          const el = e.currentTarget;
-                          const step = el.dataset.frbStep ?? "";
-                          if (step === "") {
-                            el.dataset.frbStep = "remote";
-                            el.src = fittingRoomRemotePlaceholderSrc(slide.id);
-                            return;
-                          }
-                          if (step === "remote") {
-                            el.dataset.frbStep = "svg";
-                            el.src = FITTING_ROOM_IMG_FALLBACK;
-                          }
-                        }}
+                        onError={(e) =>
+                          handleFittingRoomImgError(e.currentTarget, slide.url)
+                        }
                       />
                     </div>
                   ))}

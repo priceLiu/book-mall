@@ -37,6 +37,7 @@ export type StoryboardSheet = {
     name: string;
     role: string;
     refId?: string;
+    appearance?: string;
   }>;
   panels: StoryboardPanel[];
   totalDurationHintSec?: number;
@@ -106,15 +107,25 @@ export type StoryboardProject = {
       paramStep?: number;
       collectedParams?: Record<string, string>;
       productCategory?: string;
-      planMode?: "default_a" | "custom";
+      /** 品类由产品名关键词自动推断 */
+      categoryAutoMatched?: boolean;
+      planMode?: "quick" | "custom" | "default_a";
       imageModelKey?: string;
       videoModelKey?: string;
       imageSize?: string;
       videoResolution?: string;
       autoGenCharacter?: boolean;
+      /** 无上传角色图时：female_ugc | male_ugc */
+      characterPresetKey?: string;
       skippedProduct?: boolean;
       skippedCharacter?: boolean;
       skippedRefs?: boolean;
+      /** 无场景图时用户选的预设环境 key（见 storyboard-scene-presets）；custom=自定义 */
+      scenePreset?: string;
+      /** 自定义场景描述（scenePreset=custom 时） */
+      scenePresetCustom?: string;
+      /** 场景步骤选「自定义场景」后等待用户输入 */
+      awaitingCustomSceneInput?: boolean;
       videoMode?: "full_sheet" | "merged_panels";
       pendingFullVideoJob?: {
         taskId: string;

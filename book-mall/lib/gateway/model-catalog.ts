@@ -15,6 +15,7 @@ import { listHunyuanKnownModels } from "@/lib/canvas/providers/hunyuan-3d";
 import { KIE_KNOWN_MODELS } from "@/lib/canvas/providers/kie";
 import type { CanvasGatewayListedModel } from "@/lib/canvas/providers/types";
 import { WANX_TEXT2IMAGE_PLUS_MODEL } from "@/lib/gateway/dashscope-client";
+import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 
 export type GatewayCatalogRequestKind =
@@ -432,7 +433,7 @@ export function buildGatewayModelCatalog(
   ).map(([providerKind, models]) => ({
     providerKind,
     label: PROVIDER_LABEL[providerKind],
-    credentialBound: bound.has(providerKind),
+    credentialBound: isGatewayProviderBound(boundKinds, providerKind),
     models,
   }));
 

@@ -4,6 +4,7 @@
 
 import type { GatewayProviderKind } from "@prisma/client";
 
+import { BAILIAN_CHAT_KNOWN_MODELS } from "@/lib/gateway/bailian-chat-models";
 import { DEEPSEEK_KNOWN_MODELS } from "@/lib/canvas/providers/deepseek-system";
 import { KIE_KNOWN_MODELS } from "@/lib/canvas/providers/kie";
 import {
@@ -11,6 +12,7 @@ import {
   BAILIAN_R2V_MODEL_IDS,
 } from "@/lib/canvas/providers/bailian-r2v";
 import { VOLCENGINE_VIDEO_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
+import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 
 export type EcomStoryboardGatewayModel = {
@@ -22,7 +24,12 @@ export type EcomStoryboardGatewayModel = {
   credentialBound: boolean;
 };
 
-const CHAT_MODEL_KEYS = ["deepseek-v4-flash", "gemini-2.5-flash"] as const;
+/** 助手 Chat：百炼 Qwen 供仅绑 BAILIAN 的用户；DeepSeek / KIE Gemini 需对应厂商凭证 */
+const CHAT_MODEL_KEYS = [
+  "qwen3.5-flash",
+  "deepseek-v4-flash",
+  "gemini-2.5-flash",
+] as const;
 const IMAGE_MODEL_KEYS = [
   "wan2.7-image",
   "wan2.7-image-pro",
@@ -37,12 +44,20 @@ const VIDEO_MODEL_KEYS = [
   ...BAILIAN_R2V_MODEL_IDS,
 ] as const;
 
-export const ECOM_STORYBOARD_DEFAULT_CHAT_MODEL = "deepseek-v4-flash";
+export const ECOM_STORYBOARD_DEFAULT_CHAT_MODEL = "qwen3.5-flash";
 export const ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL = "wan2.7-image";
 export const ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL = "doubao-seedance-2.0";
 
 const KNOWN_BY_KEY = new Map<string, { displayName: string; description: string }>();
 
+for (const m of BAILIAN_CHAT_KNOWN_MODELS) {
+  if (m.role === "LLM") {
+    KNOWN_BY_KEY.set(m.modelKey, {
+      displayName: m.displayName,
+      description: m.description ?? "",
+    });
+  }
+}
 for (const m of DEEPSEEK_KNOWN_MODELS) {
   KNOWN_BY_KEY.set(m.modelKey, {
     displayName: m.displayName,
@@ -111,14 +126,13 @@ function mapModel(
 ): EcomStoryboardGatewayModel {
   const meta = KNOWN_BY_KEY.get(modelKey);
   const routed = routeGatewayModel(modelKey);
-  const bound = new Set(boundKinds);
   return {
     modelKey,
     displayName: meta?.displayName ?? modelKey,
     description: meta?.description ?? "",
     role,
     providerKind: routed.providerKind,
-    credentialBound: bound.has(routed.providerKind),
+    credentialBound: isGatewayProviderBound(boundKinds, routed.providerKind),
   };
 }
 
@@ -126,6 +140,17 @@ export function listEcomStoryboardChatModels(
   boundKinds: GatewayProviderKind[],
 ): EcomStoryboardGatewayModel[] {
   return CHAT_MODEL_KEYS.map((k) => mapModel(k, "LLM", boundKinds));
+}
+
+/** 优先已绑定厂商的助手模型 */
+export function pickEcomStoryboardChatModelKey(
+  boundKinds: GatewayProviderKind[],
+  preferred = ECOM_STORYBOARD_DEFAULT_CHAT_MODEL,
+): string {
+  const models = listEcomStoryboardChatModels(boundKinds);
+  const hit = models.find((m) => m.modelKey === preferred && m.credentialBound);
+  if (hit) return hit.modelKey;
+  return models.find((m) => m.credentialBound)?.modelKey ?? preferred;
 }
 
 export function listEcomStoryboardImageModels(

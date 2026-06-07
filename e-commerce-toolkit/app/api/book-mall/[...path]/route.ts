@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
 
 export const dynamic = "force-dynamic";
+/** 分镜图/视频生成经 book-mall 同步轮询，须长于默认 60s */
+export const maxDuration = 300;
 
 /** SSE / 纯文本流式接口须透传 body，不可 buffer 成一次性响应 */
 function shouldStreamProxyResponse(contentType: string, path: string): boolean {

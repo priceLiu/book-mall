@@ -5,6 +5,7 @@ import { CheckCircle2, ExternalLink, Loader2, Unlink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
+import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
 
 type GatewayLinkStatus = {
   linked: boolean;
@@ -18,6 +19,8 @@ type GatewayLinkStatus = {
 
 const GATEWAY_ORIGIN =
   process.env.NEXT_PUBLIC_GATEWAY_ORIGIN?.trim() || "http://localhost:3005";
+
+const GATEWAY_SSO_URL = `/api/sso/gateway/issue?redirect=${encodeURIComponent("/dashboard/credentials")}`;
 
 export function GatewayApiKeyForm() {
   const [loading, setLoading] = useState(true);
@@ -72,7 +75,7 @@ export function GatewayApiKeyForm() {
         return;
       }
       setApiKey("");
-      setSuccess("Gateway API Key 已关联，Canvas / Story / 工具站将经 Gateway 代理调用 AI。");
+      setSuccess("已关联。Canvas / Story / 工具站将经 Gateway 调用 AI。");
       await reload();
     } finally {
       setSaving(false);
@@ -114,99 +117,70 @@ export function GatewayApiKeyForm() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Button type="button" size="sm" variant="subscription" asChild>
           <a
-            href={`/api/sso/gateway/issue?redirect=${encodeURIComponent("/dashboard/credentials")}`}
+            href={GATEWAY_SSO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1"
+            className="inline-flex items-center gap-1.5"
           >
-            用 Book 账号打开 Gateway
-            <ExternalLink className="h-3 w-3" aria-hidden />
+            打开 Gateway 控制台
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden />
           </a>
         </Button>
-        <Button type="button" size="sm" variant="outline" asChild>
-          <a
-            href={`${GATEWAY_ORIGIN}/guide`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1"
-          >
-            用户需知
-            <ExternalLink className="h-3 w-3" aria-hidden />
-          </a>
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        首次使用：先点上方按钮登录 Gateway → 绑定厂商凭证 → 创建 sk-gw → 回到本页粘贴关联。
-        也可在 Gateway 登录页点「使用 Book 账号登录」（需已登录 Book）。
-      </p>
-
-      <p className="text-sm text-muted-foreground leading-relaxed">
-        请先在{" "}
-        <a
-          href={`${GATEWAY_ORIGIN}/dashboard/credentials`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-0.5 text-primary underline"
-        >
-          Gateway 控制台
-          <ExternalLink className="h-3 w-3" aria-hidden />
-        </a>{" "}
-        绑定 KIE / 百炼 / DeepSeek 厂商凭证，并创建{" "}
-        <code className="text-xs">sk-gw-...</code> API Key，再粘贴到下方。Canvas、Story
-        创作幻想家、AI 试衣、文生图、视频实验室、视觉分析室等均共用此关联。
-        全部经 Gateway 代理，不在 Book 保存厂商 Key。{" "}
         <a
           href={`${GATEWAY_ORIGIN}/guide`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-0.5 text-primary underline"
+          className={accountInlineLinkClass()}
         >
-          用户需知与用量说明
-          <ExternalLink className="h-3 w-3" aria-hidden />
+          配置说明
         </a>
-      </p>
+      </div>
+
+      <ol className="list-decimal space-y-1 pl-4 text-xs leading-relaxed text-muted-foreground">
+        <li>在 Gateway 绑定厂商凭证，创建 Personal 类型的 sk-gw（明文仅显示一次，请复制保存）。</li>
+        <li>将 sk-gw 粘贴到下方输入框，完成 Book 账号关联。</li>
+        <li>
+          Canvas、Story、工具站、电商工具箱共用此关联；用量见 Gateway{" "}
+          <a
+            href={`${GATEWAY_ORIGIN}/dashboard`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={accountInlineLinkClass()}
+          >
+            概览
+          </a>
+          与
+          <a
+            href={`${GATEWAY_ORIGIN}/dashboard/logs`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={accountInlineLinkClass()}
+          >
+            请求日志
+          </a>
+          。
+        </li>
+      </ol>
 
       {status?.linked ? (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
-          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-            <CheckCircle2 className="h-4 w-4" aria-hidden />
-            已关联 Gateway API Key
+        <div className="space-y-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+            已关联
           </p>
-          <p className="text-xs text-muted-foreground font-mono">
-            {status.keyName ? `${status.keyName} · ` : ""}
-            {status.keyPrefix}
-          </p>
-          {status.boundKinds.length > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              已绑定厂商：{status.boundKinds.join("、")}
-            </p>
-          ) : null}
-          <p className="text-xs text-muted-foreground">
-            用量与请求明细请在{" "}
-            <a
-              href={`${GATEWAY_ORIGIN}/dashboard`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary underline inline-flex items-center gap-0.5"
-            >
-              Gateway 用量
-              <ExternalLink className="h-3 w-3" aria-hidden />
-            </a>
-            、
-            <a
-              href={`${GATEWAY_ORIGIN}/dashboard/logs`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary underline"
-            >
-              请求日志
-            </a>
-            查看。
-          </p>
+          <dl className="space-y-1 text-xs text-muted-foreground">
+            <div className="font-mono">
+              {status.keyName ? `${status.keyName} · ` : ""}
+              {status.keyPrefix}
+            </div>
+            {status.boundKinds.length > 0 ? (
+              <div>厂商：{status.boundKinds.join("、")}</div>
+            ) : null}
+          </dl>
           <Button
             type="button"
             size="sm"
@@ -228,13 +202,13 @@ export function GatewayApiKeyForm() {
         </p>
       ) : (
         <p className="text-sm text-amber-700 dark:text-amber-500">
-          尚未关联 Gateway API Key，Canvas / Story / 工具站无法使用 AI 生成。
+          尚未关联。完成上方步骤后，工具站与画布才能使用 AI 生成。
         </p>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 border-t border-border/60 pt-4">
         <Label htmlFor="gateway-api-key">
-          {status?.linked ? "更换 Gateway API Key" : "Gateway API Key（sk-gw-...）"}
+          {status?.linked ? "更换密钥" : "粘贴 sk-gw 密钥"}
         </Label>
         <PasswordInput
           id="gateway-api-key"
@@ -246,25 +220,23 @@ export function GatewayApiKeyForm() {
             setError(null);
           }}
         />
-      </div>
-
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      {success ? (
-        <p className="text-xs text-emerald-600 dark:text-emerald-500">{success}</p>
-      ) : null}
-
-      <Button
-        type="button"
-        size="sm"
-        variant="subscription"
-        disabled={saving || !apiKey.trim()}
-        onClick={() => void linkKey()}
-      >
-        {saving ? (
-          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />
+        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        {success ? (
+          <p className="text-xs text-emerald-600 dark:text-emerald-500">{success}</p>
         ) : null}
-        {status?.linked ? "更换并关联" : "验证并关联"}
-      </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="subscription"
+          disabled={saving || !apiKey.trim()}
+          onClick={() => void linkKey()}
+        >
+          {saving ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden />
+          ) : null}
+          {status?.linked ? "更换并关联" : "验证并关联"}
+        </Button>
+      </div>
     </div>
   );
 }

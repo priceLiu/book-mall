@@ -1,22 +1,36 @@
 "use client";
 
 import { Loader2, Send, Settings2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { StoryboardAssistantChoices } from "@/components/storyboard/storyboard-assistant-choices";
 import {
   advanceParamStep,
-  canTextInputDuringParamCollect,
+  completeAutoMatchCategory,
+  completeQuickGenerate,
   completeSellpointInput,
+  CUSTOM_PARAMS_CHOICE,
   getStepPrompt,
+  isAutoMatchCategoryChoice,
+  isAwaitingCategory,
   isAwaitingSellpointInput,
+  isCategoryChoiceLabel,
   isParamCollectChoice,
   isParamCollecting,
+  QUICK_GENERATE_CHOICE,
+  selectProductCategory,
   startCustomParamCollectPatch,
 } from "@/lib/storyboard-param-collect";
+import { CUSTOM_SCENE_INPUT_CHOICE } from "@/lib/storyboard-scene-presets";
 import {
+  completeCustomSceneInput,
+  completeScenePresetChoice,
   inferAssistantChoices,
+  isAwaitingCustomSceneInput,
+  isAwaitingPlanMode,
   planModeChosen,
+  sceneRefStepDone,
+  startCustomSceneInput,
   workflowPatchForChoice,
 } from "@/lib/storyboard-workflow";
 import type { StoryboardSettingsValue } from "@/components/storyboard/storyboard-settings-dialog";
@@ -45,7 +59,7 @@ const WELCOME: StoryboardChatMessage = {
   role: "assistant",
   content: `你好，我是【电商全品类带货短视频分镜策划师】。
 
-请先输入产品名（如「蓝牙耳机」「保湿面霜」），再选择策划方式。`,
+请先输入产品名（如「蓝牙耳机」「保湿面霜」），再选择品类与生成方式。`,
   createdAt: new Date().toISOString(),
 };
 
@@ -63,7 +77,7 @@ type Props = {
   settings: StoryboardSettingsValue;
   onOpenSettings?: () => void;
   onStreamingChange?: (streaming: boolean) => void;
-  onDeliverableReady?: () => void;
+  onDeliverableReady?: () => void | Promise<void>;
   onRequestGenerateAllImages?: () => void;
   onRequestGenerateFullVideo?: () => void;
   onRequestMergePanelVideos?: () => void;
@@ -92,7 +106,8 @@ export function StoryboardAssistantPanel({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
 
   useEffect(() => {
     if (streaming) return;
@@ -104,8 +119,37 @@ export function StoryboardAssistantPanel({
   }, [streaming, onStreamingChange]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamText, streaming]);
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+      stickToBottomRef.current = dist < 96;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  /** 胶囊推断须用本地 messages，避免父级 project.chatHistory 滞后导致无选项 */
+  const effectiveProject = useMemo<StoryboardProject>(
+    () => ({
+      ...project,
+      chatHistory: messages.filter(
+        (m) => m.id !== "welcome" && m.id !== "streaming" && !m.id.startsWith("err-"),
+      ),
+    }),
+    [project, messages],
+  );
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior) => {
+    const el = scrollRef.current;
+    if (!el || !stickToBottomRef.current) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom(streaming ? "auto" : "smooth");
+  }, [messages, streamText, streaming, scrollToBottom]);
 
   const persistLocalMessages = useCallback(
     async (next: StoryboardChatMessage[]) => {
@@ -116,7 +160,7 @@ export function StoryboardAssistantPanel({
   );
 
   const sendText = useCallback(
-    async (text: string) => {
+    async (text: string, historyBase?: StoryboardChatMessage[]) => {
       const trimmed = text.trim();
       if (!trimmed || streaming) return;
 
@@ -126,11 +170,12 @@ export function StoryboardAssistantPanel({
         content: trimmed,
         createdAt: new Date().toISOString(),
       };
-      const base = [...messages.filter((m) => m.id !== "welcome"), userMsg];
+      const prior = historyBase ?? messages;
+      const base = [...prior.filter((m) => m.id !== "welcome"), userMsg];
       setInput("");
 
-      if (isAwaitingSellpointInput(project)) {
-        const result = completeSellpointInput(project, trimmed);
+      if (isAwaitingCustomSceneInput(effectiveProject)) {
+        const result = completeCustomSceneInput(effectiveProject, trimmed);
         if (!result) return;
         const assistantMsg: StoryboardChatMessage = {
           id: `assistant-${Date.now()}`,
@@ -150,26 +195,61 @@ export function StoryboardAssistantPanel({
           },
         });
         setMessages(next);
-        onDeliverableReady?.();
+        if (onDeliverableReady) await onDeliverableReady();
+        await sendText(result.llmUserMessage, next);
+        return;
+      }
+
+      if (isAwaitingSellpointInput(effectiveProject)) {
+        const result = completeSellpointInput(effectiveProject, trimmed);
+        if (!result) return;
+        const assistantMsg: StoryboardChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: result.assistantReply,
+          createdAt: new Date().toISOString(),
+        };
+        const next = [...base, assistantMsg];
+        await updateStoryboardProject(projectId, {
+          chatHistory: next,
+          meta: {
+            ...project.meta,
+            workflow: {
+              ...project.meta?.workflow,
+              ...result.workflowPatch,
+            },
+          },
+        });
+        setMessages(next);
+        if (onDeliverableReady) await onDeliverableReady();
         if (result.completed && result.llmUserMessage) {
-          await sendText(result.llmUserMessage);
+          await sendText(result.llmUserMessage, next);
         }
         return;
       }
 
       const isPlanLlmTrigger =
-        trimmed === "按默认方案A" || trimmed.startsWith("参数已确认");
+        trimmed.startsWith("参数已确认") || trimmed.startsWith("场景参考已确认 |");
+      const projWithBase: StoryboardProject = { ...project, chatHistory: base };
       const deferLlm =
         !isPlanLlmTrigger &&
-        !planModeChosen(project) &&
-        !hasStoryboardDeliverable(project) &&
-        !isParamCollecting(project);
+        !planModeChosen(projWithBase) &&
+        !hasStoryboardDeliverable(projWithBase) &&
+        !isParamCollecting(projWithBase);
 
       if (deferLlm) {
+        let reply: string;
+        if (isAwaitingPlanMode(projWithBase)) {
+          reply = "请点击上方按钮选择「快速生成」或「自定义参数」。";
+        } else if (!projWithBase.meta?.workflow?.productCategory) {
+          reply = `已收到产品「${trimmed}」。\n请先选择产品品类：`;
+        } else {
+          reply = "请点击上方按钮继续操作。";
+        }
         const assistantMsg: StoryboardChatMessage = {
           id: `assistant-${Date.now()}`,
           role: "assistant",
-          content: `已收到产品「${trimmed}」。\n请选择策划方式：`,
+          content: reply,
           createdAt: new Date().toISOString(),
         };
         await persistLocalMessages([...base, assistantMsg]);
@@ -177,6 +257,7 @@ export function StoryboardAssistantPanel({
       }
 
       setMessages(base);
+      stickToBottomRef.current = true;
       setStreaming(true);
       setStreamText("");
 
@@ -222,6 +303,7 @@ export function StoryboardAssistantPanel({
       streaming,
       messages,
       project,
+      effectiveProject,
       projectId,
       settings.chatModelKey,
       onDeliverableReady,
@@ -244,7 +326,8 @@ export function StoryboardAssistantPanel({
     : messages;
 
   const lastAssistantId = [...displayMessages].reverse().find((m) => m.role === "assistant")?.id;
-  const showChoices = !streaming && inferAssistantChoices(project).length > 0;
+  const showChoices =
+    !streaming && inferAssistantChoices(effectiveProject).length > 0;
 
   const handleChoice = async (t: string) => {
     if (isGenerateAllImagesChoice(t)) {
@@ -294,7 +377,10 @@ export function StoryboardAssistantPanel({
       return;
     }
 
-    if (t === "自定义参数") {
+    if (isAwaitingCategory(effectiveProject) && isAutoMatchCategoryChoice(t)) {
+      const result = completeAutoMatchCategory(effectiveProject);
+      if (!result) return;
+
       const userMsg: StoryboardChatMessage = {
         id: `user-${Date.now()}`,
         role: "user",
@@ -304,7 +390,7 @@ export function StoryboardAssistantPanel({
       const assistantMsg: StoryboardChatMessage = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        content: `好的，我们逐项确认参数。\n${getStepPrompt(0)}`,
+        content: result.assistantReply,
         createdAt: new Date().toISOString(),
       };
       const next = [...messages.filter((m) => m.id !== "welcome"), userMsg, assistantMsg];
@@ -314,7 +400,7 @@ export function StoryboardAssistantPanel({
           ...project.meta,
           workflow: {
             ...project.meta?.workflow,
-            ...startCustomParamCollectPatch(),
+            ...result.workflowPatch,
           },
         },
       });
@@ -323,8 +409,165 @@ export function StoryboardAssistantPanel({
       return;
     }
 
-    if (isParamCollectChoice(project, t)) {
-      const result = advanceParamStep(project, t);
+    if (isAwaitingCategory(effectiveProject) && isCategoryChoiceLabel(t)) {
+      const result = selectProductCategory(effectiveProject, t);
+      if (!result) return;
+
+      const userMsg: StoryboardChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: t,
+        createdAt: new Date().toISOString(),
+      };
+      const assistantMsg: StoryboardChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: result.assistantReply,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg, assistantMsg];
+      await updateStoryboardProject(projectId, {
+        chatHistory: next,
+        meta: {
+          ...project.meta,
+          workflow: {
+            ...project.meta?.workflow,
+            ...result.workflowPatch,
+          },
+        },
+      });
+      setMessages(next);
+      onDeliverableReady?.();
+      return;
+    }
+
+    if (t === CUSTOM_SCENE_INPUT_CHOICE && !sceneRefStepDone(effectiveProject)) {
+      const { workflowPatch, assistantReply } = startCustomSceneInput();
+      const userMsg: StoryboardChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: t,
+        createdAt: new Date().toISOString(),
+      };
+      const assistantMsg: StoryboardChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: assistantReply,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg, assistantMsg];
+      await updateStoryboardProject(projectId, {
+        chatHistory: next,
+        meta: {
+          ...project.meta,
+          workflow: {
+            ...project.meta?.workflow,
+            ...workflowPatch,
+          },
+        },
+      });
+      setMessages(next);
+      onDeliverableReady?.();
+      return;
+    }
+
+    const scenePresetResult = completeScenePresetChoice(effectiveProject, t);
+    if (scenePresetResult) {
+      const userMsg: StoryboardChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: t,
+        createdAt: new Date().toISOString(),
+      };
+      const assistantMsg: StoryboardChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: scenePresetResult.assistantReply,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg, assistantMsg];
+      await updateStoryboardProject(projectId, {
+        chatHistory: next,
+        meta: {
+          ...project.meta,
+          workflow: {
+            ...project.meta?.workflow,
+            ...scenePresetResult.workflowPatch,
+          },
+        },
+      });
+      setMessages(next);
+      if (onDeliverableReady) await onDeliverableReady();
+      await sendText(scenePresetResult.llmUserMessage, next);
+      return;
+    }
+
+    if (t === QUICK_GENERATE_CHOICE) {
+      const result = completeQuickGenerate(effectiveProject, settings.durationSec);
+      const userMsg: StoryboardChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: t,
+        createdAt: new Date().toISOString(),
+      };
+      const assistantMsg: StoryboardChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: result.assistantReply,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg, assistantMsg];
+      await updateStoryboardProject(projectId, {
+        chatHistory: next,
+        meta: {
+          ...project.meta,
+          workflow: {
+            ...project.meta?.workflow,
+            ...result.workflowPatch,
+          },
+        },
+      });
+      setMessages(next);
+      if (onDeliverableReady) await onDeliverableReady();
+      if (result.llmUserMessage) {
+        await sendText(result.llmUserMessage, next);
+      }
+      return;
+    }
+
+    if (t === CUSTOM_PARAMS_CHOICE) {
+      const patch = startCustomParamCollectPatch(effectiveProject);
+      const startStep = typeof patch.paramStep === "number" ? patch.paramStep : 0;
+      const userMsg: StoryboardChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: t,
+        createdAt: new Date().toISOString(),
+      };
+      const assistantMsg: StoryboardChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: `好的，我们逐项确认参数。\n${getStepPrompt(startStep)}`,
+        createdAt: new Date().toISOString(),
+      };
+      const next = [...messages.filter((m) => m.id !== "welcome"), userMsg, assistantMsg];
+      await updateStoryboardProject(projectId, {
+        chatHistory: next,
+        meta: {
+          ...project.meta,
+          workflow: {
+            ...project.meta?.workflow,
+            ...patch,
+          },
+        },
+      });
+      setMessages(next);
+      onDeliverableReady?.();
+      return;
+    }
+
+    if (isParamCollectChoice(effectiveProject, t)) {
+      const result = advanceParamStep(effectiveProject, t);
       if (!result) return;
 
       const userMsg: StoryboardChatMessage = {
@@ -352,10 +595,9 @@ export function StoryboardAssistantPanel({
         },
       });
       setMessages(next);
-      onDeliverableReady?.();
-
+      if (onDeliverableReady) await onDeliverableReady();
       if (result.completed && result.llmUserMessage) {
-        await sendText(result.llmUserMessage);
+        await sendText(result.llmUserMessage, next);
       }
       return;
     }
@@ -381,9 +623,10 @@ export function StoryboardAssistantPanel({
     await sendText(t);
   };
 
-  const paramCollecting = isParamCollecting(project);
-  const awaitingSellpoint = isAwaitingSellpointInput(project);
-  const paramInputEnabled = canTextInputDuringParamCollect(project);
+  const paramCollecting = isParamCollecting(effectiveProject);
+  const awaitingSellpoint = isAwaitingSellpointInput(effectiveProject);
+  const awaitingCustomScene = isAwaitingCustomSceneInput(effectiveProject);
+  const freeTextEnabled = awaitingSellpoint || awaitingCustomScene;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#fafafa]">
@@ -411,7 +654,10 @@ export function StoryboardAssistantPanel({
         detail="助手正在流式输出策划内容，完成后将同步到右侧分镜区…"
       />
 
-      <div className="ecom-scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div
+        ref={scrollRef}
+        className="ecom-scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
+      >
         {displayMessages.map((m) => {
           const body =
             m.id === "streaming"
@@ -433,7 +679,7 @@ export function StoryboardAssistantPanel({
               <pre className="whitespace-pre-wrap font-sans">{body}</pre>
               {isLastAssistant && showChoices ? (
                 <StoryboardAssistantChoices
-                  project={project}
+                  project={effectiveProject}
                   disabled={streaming}
                   compact
                   onChoose={(t) => void handleChoice(t)}
@@ -442,7 +688,6 @@ export function StoryboardAssistantPanel({
             </div>
           );
         })}
-        <div ref={bottomRef} />
       </div>
 
       <div className="border-t border-[#e8e8ed] p-4">
@@ -450,15 +695,17 @@ export function StoryboardAssistantPanel({
           className="mb-3 w-full resize-none rounded-xl border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#0071e3] disabled:bg-[#f5f5f7] disabled:text-[#86868b]"
           rows={2}
           placeholder={
-            awaitingSellpoint
-              ? "请输入产品卖点（品牌、价格、核心卖点等）…"
-              : paramCollecting
-                ? "请点击上方按钮选择参数…"
-                : "输入产品名，或补充说明（可选）…"
+            awaitingCustomScene
+              ? "请描述拍摄场景（环境、光线、道具等）…"
+              : awaitingSellpoint
+                ? "请输入产品卖点（品牌、价格、核心卖点等）…"
+                : paramCollecting
+                  ? "请点击上方按钮选择参数…"
+                  : "输入产品名，或补充说明（可选）…"
           }
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          disabled={streaming || (paramCollecting && !paramInputEnabled)}
+          disabled={streaming || (paramCollecting && !freeTextEnabled)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -472,7 +719,7 @@ export function StoryboardAssistantPanel({
             type="button"
             className="flex-1"
             disabled={
-              streaming || (paramCollecting && !paramInputEnabled) || !input.trim()
+              streaming || (paramCollecting && !freeTextEnabled) || !input.trim()
             }
             onClick={send}
           >

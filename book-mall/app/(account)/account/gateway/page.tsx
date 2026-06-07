@@ -25,7 +25,7 @@ export default async function AccountGatewayPage() {
         title="Gateway API Key"
         description="Canvas / Story / 工具站 / 电商工具箱经 Gateway 调用厂商；须先绑定凭证并关联 sk-gw。"
       />
-      <Card>
+      <Card id="gateway-api-key">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">关联 Gateway Key</CardTitle>
           <CardDescription className="text-xs leading-relaxed">

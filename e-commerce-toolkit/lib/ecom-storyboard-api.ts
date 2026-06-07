@@ -210,15 +210,25 @@ export async function generateStoryboardSheetImage(
   references?: StoryboardReference[];
   chargePoints?: number;
 }> {
-  const res = await fetch(
-    `/api/book-mall/api/sso/tools/ecom/storyboard/projects/${projectId}/sheet/image/generate`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(opts),
-    },
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `/api/book-mall/api/sso/tools/ecom/storyboard/projects/${projectId}/sheet/image/generate`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
+      },
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      msg === "fetch failed"
+        ? "与服务器连接中断（全部分镜图生成约需 1–2 分钟）。请刷新页面查看是否已部分生成，或改为单镜重试。"
+        : msg,
+    );
+  }
   const text = await res.text();
   let data: Record<string, unknown> = {};
   try {

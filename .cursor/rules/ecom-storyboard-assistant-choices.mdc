@@ -31,7 +31,7 @@ const STORYBOARD_ASSISTANT_CHOICE_CLASS =
 
 ## 禁止
 
-- 深色填充主按钮（如 `bg-[#1d1d1f] text-white`）用于「按默认方案A」「自定义参数」等
+- 深色填充主按钮（如 `bg-[#1d1d1f] text-white`）用于「快速生成」「自定义参数」等
 - 在助手快捷按钮上使用 `window.alert` / `window.confirm`（见 `no-native-dialogs.mdc`）
 - 在助手消息外 **重复** 渲染同一组 `inferAssistantChoices` 按钮（仅最后一条助手消息底部一份）
 

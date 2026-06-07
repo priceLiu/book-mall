@@ -77,6 +77,25 @@ export type CanvasTaskRecord = {
   storyScope?: CanvasTaskStoryScope;
 };
 
+/** 将 API 错误码转为界面可读文案 */
+export function formatCanvasApiError(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "加载失败，请稍后重试";
+  if (t.includes("DATABASE_UNAVAILABLE") || t.includes("503")) {
+    return "数据库暂不可用。请确认本机能访问 book-mall 配置的 PostgreSQL，或稍后重试。";
+  }
+  if (t.includes("401") || t.includes("UNAUTHORIZED")) {
+    return "登录已失效，请重新连接主站账号。";
+  }
+  if (t.includes("INTERNAL_ERROR")) {
+    return "服务器处理失败，请稍后重试；若持续出现请查看 book-mall 终端日志。";
+  }
+  if (t.includes("book_mall_url_missing") || t.includes("503")) {
+    return "未配置主站地址（NEXT_PUBLIC_BOOK_MALL_URL），无法加载画布列表。";
+  }
+  return t;
+}
+
 async function call<T>(
   base: string,
   apiPath: string,

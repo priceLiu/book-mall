@@ -55,7 +55,11 @@ export async function POST(req: Request, ctx: Ctx) {
       : project.settings?.aspectRatio === "16:9"
         ? "16:9"
         : "9:16";
-  const autoGenCharacter = body.autoGenCharacter === true;
+  const wf = project.meta?.workflow ?? {};
+  const autoGenCharacter =
+    body.autoGenCharacter === true ||
+    wf.autoGenCharacter === true ||
+    Boolean(wf.characterPresetKey);
   const panelIndex =
     typeof body.panelIndex === "number" && Number.isFinite(body.panelIndex)
       ? Math.trunc(body.panelIndex)
