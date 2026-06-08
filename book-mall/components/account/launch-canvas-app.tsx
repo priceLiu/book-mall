@@ -3,7 +3,10 @@
 import type { ComponentProps } from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { accountNavActionClass } from "@/components/account/account-nav-styles";
+import {
+  accountInlineLinkClass,
+  accountNavActionClass,
+} from "@/components/account/account-nav-styles";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_REDIRECT = "/projects";
@@ -29,7 +32,7 @@ export function LaunchCanvasAppButton({
   className?: string;
   title?: string;
   openInNewTab?: boolean;
-  layout?: "default" | "nav";
+  layout?: "default" | "nav" | "chip";
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -47,10 +50,21 @@ export function LaunchCanvasAppButton({
   }
 
   const isNav = layout === "nav";
+  const isChip = layout === "chip";
 
   return (
-    <div className={cn(isNav ? "w-full" : "space-y-2")}>
-      {isNav ? (
+    <div className={cn(isNav ? "w-full" : isChip ? "inline-flex shrink-0" : "space-y-2")}>
+      {isChip ? (
+        <button
+          type="button"
+          title={title}
+          className={cn(accountInlineLinkClass(), className)}
+          disabled={!enabled || busy}
+          onClick={handleLaunch}
+        >
+          {busy ? busyLabel : label}
+        </button>
+      ) : isNav ? (
         <button
           type="button"
           title={title}

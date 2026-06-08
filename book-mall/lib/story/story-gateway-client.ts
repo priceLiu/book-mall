@@ -1,8 +1,8 @@
 /**
- * Story → Gateway 内部客户端
+ * Story → Gateway 客户端（仅经 /api/gw/v1 + 用户关联的 Gateway API Key）
  */
 
-import type { GatewayClientSource, GatewayProviderKind } from "@prisma/client";
+import type { GatewayProviderKind } from "@prisma/client";
 
 import { StoryProjectError } from "./story-project-service";
 import {
@@ -10,36 +10,25 @@ import {
   resolveGatewayAuthForBookUser,
 } from "@/lib/gateway/book-gateway-link";
 import { assertPlatformGatewayEntitlement } from "@/lib/platform-gateway-entitlement";
-import {
-  createRequestLog,
-  finalizeRequestLog,
-  forwardChatCompletions,
-  parseOpenAiUsage,
-  pickCredentialForKind,
-} from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
-import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
-import { buildGatewayChatResultSummary } from "@/lib/gateway/log-result-summary";
+import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import {
-  pollKieTaskForLog,
-  submitKieJobForLog,
-} from "@/lib/gateway/poll-service";
-import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
-import {
-  isVolcengineVideoTaskFailed,
-  isVolcengineVideoTaskSuccess,
-  volcengineGetVideoTask,
-  volcengineVideoTaskFailMessage,
-} from "@/lib/gateway/volcengine-client";
-import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
+  gatewayV1ChatCompletions,
+  gatewayV1ClientMeta,
+  gatewayV1CreateTask,
+  gatewayV1RecordInfo,
+} from "@/lib/gateway/gateway-v1-http-client";
 import {
   extractKieResultUrl,
   isKieRecordFail,
   isKieRecordSuccess,
   type KieRecordResponse,
 } from "./kie-client";
-
-const CLIENT_SOURCE: GatewayClientSource = "STORY";
+import {
+  isVolcengineVideoTaskFailed,
+  isVolcengineVideoTaskSuccess,
+  volcengineVideoTaskFailMessage,
+} from "@/lib/gateway/volcengine-client";
 
 async function requireGatewayAuth(userId: string) {
   await assertPlatformGatewayEntitlement(userId, { navKey: "story-theater" });
@@ -62,6 +51,20 @@ async function requireGatewayAuth(userId: string) {
   return auth;
 }
 
+function storyMeta(opts: {
+  storyProjectId?: string;
+  storyTaskId?: string;
+  clientPage?: string;
+}) {
+  return gatewayV1ClientMeta("STORY", {
+    storyProjectId: opts.storyProjectId,
+    storyTaskId: opts.storyTaskId,
+    clientPage:
+      opts.clientPage ??
+      (opts.storyProjectId ? `project/${opts.storyProjectId}` : undefined),
+  });
+}
+
 export async function storyGwChat(
   userId: string,
   opts: {
@@ -75,8 +78,7 @@ export async function storyGwChat(
   const auth = await requireGatewayAuth(userId);
   const model = opts.modelKey.trim();
   const route = routeGatewayModel(model);
-  const credentialId = pickCredentialForKind(auth.credentials, route.providerKind);
-  if (!credentialId) {
+  if (!pickCredentialForKind(auth.credentials, route.providerKind)) {
     throw new StoryProjectError(
       "MODEL_NOT_AVAILABLE",
       `Gateway Key 未绑定 ${route.providerKind} 凭证`,
@@ -91,68 +93,37 @@ export async function storyGwChat(
     ...(opts.params ?? {}),
   };
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const result = await gatewayV1ChatCompletions({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/chat/completions",
-    providerKind: route.providerKind,
-    requestKind: "CHAT",
-    clientSource: CLIENT_SOURCE,
-    storyProjectId: opts.storyProjectId,
-    clientPage:
-      opts.clientPage ??
-      (opts.storyProjectId ? `project/${opts.storyProjectId}` : undefined),
-    inputSummary: buildGatewayInputSummary(model, body),
+    body,
+    meta: storyMeta(opts),
   });
 
+  let parsed: unknown = null;
   try {
-    const result = await forwardChatCompletions({
-      credentialId,
-      providerKind: route.providerKind,
-      body,
-    });
-    let parsed: unknown = null;
-    try {
-      parsed = result.text ? JSON.parse(result.text) : null;
-    } catch {
-      parsed = null;
-    }
-    const usage = parseOpenAiUsage(parsed);
-    const ok = result.status >= 200 && result.status < 300;
-    await finalizeRequestLog(log.id, {
-      status: ok ? "SUCCEEDED" : "FAILED",
-      durationMs: result.durationMs,
-      usage,
-      resultSummary: buildGatewayChatResultSummary(parsed) ?? undefined,
-      failMessage: ok ? undefined : result.text.slice(0, 500),
-      model,
-    });
-    if (!ok) {
-      throw new StoryProjectError(
-        "LLM_HTTP_ERROR",
-        result.text.slice(0, 500) || `HTTP ${result.status}`,
-        502,
-      );
-    }
-    const choice = (parsed as { choices?: { message?: { content?: string } }[] })
-      ?.choices?.[0];
-    const text =
-      typeof choice?.message?.content === "string"
-        ? choice.message.content
-        : result.text;
-    return { text, rawPayload: parsed, logId: log.id };
-  } catch (e) {
-    if (e instanceof StoryProjectError) throw e;
-    await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: (e as Error).message,
-      model,
-    });
-    throw e;
+    parsed = result.text ? JSON.parse(result.text) : null;
+  } catch {
+    parsed = null;
   }
+  const ok = result.status >= 200 && result.status < 300;
+  if (!ok) {
+    throw new StoryProjectError(
+      "LLM_HTTP_ERROR",
+      result.text.slice(0, 500) || `HTTP ${result.status}`,
+      502,
+    );
+  }
+  const choice = (parsed as { choices?: { message?: { content?: string } }[] })
+    ?.choices?.[0];
+  const text =
+    typeof choice?.message?.content === "string"
+      ? choice.message.content
+      : result.text;
+  return {
+    text,
+    rawPayload: parsed,
+    logId: result.logId ?? "",
+  };
 }
 
 export async function storyGwCreateKieJob(
@@ -167,9 +138,7 @@ export async function storyGwCreateKieJob(
   },
 ): Promise<{ taskId: string; logId: string; providerKind: GatewayProviderKind }> {
   const auth = await requireGatewayAuth(userId);
-  const route = routeGatewayModel(opts.model);
-  const credentialId = pickCredentialForKind(auth.credentials, "KIE");
-  if (!credentialId) {
+  if (!pickCredentialForKind(auth.credentials, "KIE")) {
     throw new StoryProjectError(
       "MODEL_NOT_AVAILABLE",
       "Gateway Key 未绑定 KIE 凭证",
@@ -177,32 +146,21 @@ export async function storyGwCreateKieJob(
     );
   }
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model: opts.model,
-    endpoint: "/v1/jobs/createTask",
+    body: {
+      model: opts.model,
+      input: opts.input,
+      callBackUrl: opts.callBackUrl ?? null,
+    },
+    meta: storyMeta(opts),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
     providerKind: "KIE",
-    requestKind: route.requestKind,
-    clientSource: CLIENT_SOURCE,
-    storyProjectId: opts.storyProjectId,
-    storyTaskId: opts.storyTaskId,
-    clientPage:
-      opts.clientPage ??
-      (opts.storyProjectId ? `project/${opts.storyProjectId}` : undefined),
-    inputSummary: buildGatewayInputSummary(opts.model, opts.input),
-  });
-
-  const taskId = await submitKieJobForLog({
-    logId: log.id,
-    credentialId,
-    model: opts.model,
-    input: opts.input,
-    callBackUrl: opts.callBackUrl ?? null,
-  });
-
-  return { taskId, logId: log.id, providerKind: "KIE" };
+  };
 }
 
 export async function storyGwRecordInfo(
@@ -213,8 +171,7 @@ export async function storyGwRecordInfo(
   },
 ): Promise<KieRecordResponse> {
   const auth = await requireGatewayAuth(userId);
-  const credentialId = pickCredentialForKind(auth.credentials, "KIE");
-  if (!credentialId) {
+  if (!pickCredentialForKind(auth.credentials, "KIE")) {
     throw new StoryProjectError(
       "MODEL_NOT_AVAILABLE",
       "Gateway Key 未绑定 KIE 凭证",
@@ -222,33 +179,13 @@ export async function storyGwRecordInfo(
     );
   }
 
-  const record = await pollKieTaskForLog({
-    logId: opts.gatewayLogId ?? "",
-    credentialId,
+  const polled = await gatewayV1RecordInfo({
+    apiKeyId: auth.id,
     taskId: opts.taskId,
+    meta: gatewayV1ClientMeta("STORY"),
   });
 
-  if (opts.gatewayLogId) {
-    if (isKieRecordSuccess(record.state)) {
-      await finalizeRequestLog(opts.gatewayLogId, {
-        status: "SUCCEEDED",
-        durationMs: 0,
-        resultSummary: { state: record.state, resultJson: record.resultJson },
-        externalTaskId: record.taskId,
-        model: record.model,
-      });
-    } else if (isKieRecordFail(record.state)) {
-      await finalizeRequestLog(opts.gatewayLogId, {
-        status: "FAILED",
-        durationMs: 0,
-        failMessage: record.failMsg ?? record.failCode ?? "failed",
-        externalTaskId: record.taskId,
-        model: record.model,
-      });
-    }
-  }
-
-  return record;
+  return polled.data as KieRecordResponse;
 }
 
 export function storyGwExtractKieResultUrl(record: KieRecordResponse): string | null {
@@ -274,8 +211,7 @@ export async function storyGwCreateVolcengineVideoJob(
       400,
     );
   }
-  const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
-  if (!credentialId) {
+  if (!pickCredentialForKind(auth.credentials, "VOLCENGINE")) {
     throw new StoryProjectError(
       "MODEL_NOT_AVAILABLE",
       "Gateway Key 未绑定火山方舟凭证",
@@ -283,31 +219,20 @@ export async function storyGwCreateVolcengineVideoJob(
     );
   }
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model: opts.model,
-    endpoint: "/v1/jobs/createTask",
+    body: {
+      model: opts.model,
+      input: opts.body,
+    },
+    meta: storyMeta(opts),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
     providerKind: "VOLCENGINE",
-    requestKind: "VIDEO",
-    clientSource: CLIENT_SOURCE,
-    storyProjectId: opts.storyProjectId,
-    storyTaskId: opts.storyTaskId,
-    clientPage:
-      opts.clientPage ??
-      (opts.storyProjectId ? `project/${opts.storyProjectId}` : undefined),
-    inputSummary: buildGatewayInputSummary(opts.model, opts.body),
-  });
-
-  const taskId = await submitVolcengineVideoJobForLog({
-    logId: log.id,
-    credentialId,
-    model: opts.model,
-    body: opts.body,
-  });
-
-  return { taskId, logId: log.id, providerKind: "VOLCENGINE" };
+  };
 }
 
 export type StoryVolcenginePollResult = {
@@ -326,8 +251,7 @@ export async function storyGwPollVolcengineVideo(
   },
 ): Promise<StoryVolcenginePollResult> {
   const auth = await requireGatewayAuth(userId);
-  const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
-  if (!credentialId) {
+  if (!pickCredentialForKind(auth.credentials, "VOLCENGINE")) {
     throw new StoryProjectError(
       "MODEL_NOT_AVAILABLE",
       "Gateway Key 未绑定火山方舟凭证",
@@ -335,58 +259,27 @@ export async function storyGwPollVolcengineVideo(
     );
   }
 
-  const cred = await getDecryptedCredentialApiKey(credentialId);
-  if (!cred) {
-    throw new StoryProjectError(
-      "MODEL_NOT_AVAILABLE",
-      "火山方舟凭证不可用",
-      503,
-    );
-  }
-
-  const polled = await volcengineGetVideoTask({
-    apiKey: cred.apiKey,
-    baseUrl: cred.baseUrl,
+  const polled = await gatewayV1RecordInfo({
+    apiKeyId: auth.id,
     taskId: opts.taskId,
+    meta: gatewayV1ClientMeta("STORY"),
   });
-  const row = polled.output;
 
-  if (opts.gatewayLogId) {
-    if (isVolcengineVideoTaskSuccess(row)) {
-      await finalizeRequestLog(opts.gatewayLogId, {
-        status: "SUCCEEDED",
-        durationMs: 0,
-        resultSummary: {
-          status: row.status,
-          videoUrl: row.content?.video_url,
-        },
-        externalTaskId: opts.taskId,
-        model: opts.model,
-      });
-    } else if (isVolcengineVideoTaskFailed(row)) {
-      await finalizeRequestLog(opts.gatewayLogId, {
-        status: "FAILED",
-        durationMs: 0,
-        failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
-        externalTaskId: opts.taskId,
-        model: opts.model,
-      });
-    }
-  }
+  const row = polled.data as import("@/lib/gateway/volcengine-client").VolcengineVideoTaskResult;
 
   if (isVolcengineVideoTaskSuccess(row)) {
     return {
       state: "success",
       videoUrl: row.content?.video_url,
-      raw: polled.raw,
+      raw: polled.data,
     };
   }
   if (isVolcengineVideoTaskFailed(row)) {
     return {
       state: "fail",
       failMessage: volcengineVideoTaskFailMessage(row),
-      raw: polled.raw,
+      raw: polled.data,
     };
   }
-  return { state: "pending", raw: polled.raw };
+  return { state: "pending", raw: polled.data };
 }

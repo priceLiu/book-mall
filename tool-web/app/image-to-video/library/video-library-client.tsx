@@ -79,6 +79,8 @@ export function ImageToVideoLibraryClient() {
   const [mounted, setMounted] = useState(false);
   const [promptTip, setPromptTip] = useState<PromptTooltipState | null>(null);
 
+  const [space, setSpace] = useState<"PERSONAL" | "TEAM">("PERSONAL");
+
   const refresh = useCallback(async () => {
     setError(null);
     try {
@@ -86,6 +88,7 @@ export function ImageToVideoLibraryClient() {
       const data = (await r.json()) as {
         items?: ImageToVideoLibraryItem[];
         quota?: ToolLibraryQuota;
+        space?: "PERSONAL" | "TEAM";
         error?: string;
       };
       if (!r.ok) {
@@ -94,6 +97,7 @@ export function ImageToVideoLibraryClient() {
         setQuota(null);
         return;
       }
+      setSpace(data.space === "TEAM" ? "TEAM" : "PERSONAL");
       setItems(Array.isArray(data.items) ? data.items : []);
       setQuota(
         data.quota && typeof data.quota.used === "number" && typeof data.quota.max === "number"
@@ -166,6 +170,33 @@ export function ImageToVideoLibraryClient() {
         );
       } catch {
         setError("删除失败");
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [],
+  );
+
+  const handleToggleVisibility = useCallback(
+    async (item: ImageToVideoLibraryItem) => {
+      const next = item.visibility === "TEAM_PUBLIC" ? "PRIVATE" : "TEAM_PUBLIC";
+      setBusyId(item.id);
+      try {
+        const r = await fetch("/api/image-to-video/library", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: item.id, visibility: next }),
+        });
+        if (!r.ok) {
+          const d = (await r.json().catch(() => ({}))) as { error?: string };
+          setError(d.error ?? "切换可见域失败");
+          return;
+        }
+        setItems((prev) =>
+          prev.map((x) => (x.id === item.id ? { ...x, visibility: next } : x)),
+        );
+      } catch {
+        setError("切换可见域失败");
       } finally {
         setBusyId(null);
       }
@@ -269,7 +300,14 @@ export function ImageToVideoLibraryClient() {
     <div className={cn(styles.workspace, "image-to-video-library")}>
       <header className={styles.pageHead}>
         <div>
-          <h1 className={styles.title}>我的视频库</h1>
+          <h1 className={styles.title}>
+            我的视频库
+            {space === "TEAM" ? (
+              <span className="ml-2 align-middle text-xs font-normal text-blue-600 dark:text-blue-300">
+                团队空间 · 含公共库
+              </span>
+            ) : null}
+          </h1>
           <p className={styles.subtitle}>
             所有内容均由人工智能模型生成。保存入库的视频会转存到自有 OSS；模型原始链接约 24 小时有效。
             建议保留约 {RETENTION_DAYS} 天，管理员可按存储策略删除库中文件。
@@ -326,6 +364,11 @@ export function ImageToVideoLibraryClient() {
                     <span className="text-[0.68rem] text-muted-foreground">
                       {modeZh(item.mode)}
                       {item.modelLabel ? ` · ${item.modelLabel}` : ""}
+                      {item.visibility === "TEAM_PUBLIC" ? (
+                        <span className="ml-1 rounded bg-blue-500/15 px-1 py-0.5 text-[0.6rem] font-medium text-blue-700 dark:text-blue-300">
+                          团队公共
+                        </span>
+                      ) : null}
                     </span>
                     <span
                       className={styles.cardPromptLibrary}
@@ -372,6 +415,16 @@ export function ImageToVideoLibraryClient() {
                     >
                       下载
                     </a>
+                    {item.canToggle ? (
+                      <button
+                        type="button"
+                        className={styles.btnPreview}
+                        onClick={() => void handleToggleVisibility(item)}
+                        disabled={busyId === item.id}
+                      >
+                        {item.visibility === "TEAM_PUBLIC" ? "收回私有" : "设为公共"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className={styles.btnDelete}

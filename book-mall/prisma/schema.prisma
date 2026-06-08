@@ -98,6 +98,15 @@ model User {
   ecomAssets                   EcomAsset[]
   ecomStoryboardProjects       EcomStoryboardProject[]
 
+  /// 多租户：主空间（个人租户）。回填脚本为每个用户建 PERSONAL 租户后写入。
+  primaryTenantId String?
+  ownedTenants    Tenant[]       @relation("TenantOwner")
+  tenantMemberships TenantMember[]
+  tenantInvitesCreated TenantInvite[] @relation("TenantInviteCreator")
+
+  /// 单会话挤下线：每次成功登录自增；JWT 内 ver 与此不一致即失效（里程碑 7 启用）
+  sessionVersion Int @default(0)
+
   /// 电商工具箱计费：默认 BYOK 月费；PLATFORM_METERED 为代付按次扣点
   ecomBillingMode EcomBillingMode @default(BYOK_SERVICE_FEE)
 
@@ -232,11 +241,17 @@ model TextToImageLibraryItem {
   /// 生成时的提示词摘要（可选）
   prompt   String? @db.VarChar(2000)
 
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+  @@index([tenantId, visibility, createdAt])
 }
 
 /// 图生/参考/文生视频：用户「我的视频库」收藏的成片（OSS 长期链 + 建议保留期限）
@@ -256,12 +271,18 @@ model ImageToVideoLibraryItem {
   /// 建议清理时间不早于该时刻（默认创建 +7 天）；管理员可提前删除
   retainUntil DateTime
 
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([retainUntil])
+  @@index([tenantId, visibility, createdAt])
 }
 
 /// 工具站访问 / 调用打点（审计与后续扣费扩展）；写入方为主站 API，身份以工具 JWT 的 sub 为准。
@@ -406,12 +427,19 @@ model EcomAsset {
   ossUrl       String
   thumbnailUrl String?
   meta         Json?
+
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, module, createdAt])
+  @@index([tenantId, visibility, createdAt])
 }
 
 /// 电商工具箱 · 微剧情分镜故事版项目（聊天、HTML/PNG、视频）
@@ -430,12 +458,19 @@ model EcomStoryboardProject {
   sheetHtmlUrl String?
   videoAssetId String?
   meta         Json?
+
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, module, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
 }
 
 /// 工具站左侧菜单项是否在导航中展示（由主站后台维护）；navKey 与 tool-web `config/nav-tools` 约定一致。
@@ -1262,6 +1297,11 @@ model StoryProject {
   /// 软删时间；查询默认过滤
   deletedAt      DateTime?
 
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId       String?
+  ownerUserId    String?
+  visibility     AssetVisibility     @default(PRIVATE)
+
   characters     StoryCharacter[]
   frames         StoryStoryboardFrame[]
   tasks          StoryGenerationTask[]
@@ -1272,6 +1312,7 @@ model StoryProject {
 
   @@index([userId, deletedAt, updatedAt])
   @@index([status])
+  @@index([tenantId, visibility, updatedAt])
 }
 
 /// 项目角色
@@ -1467,6 +1508,11 @@ model CanvasProject {
 
   deletedAt     DateTime?
 
+  /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
+  tenantId      String?
+  ownerUserId   String?
+  visibility    AssetVisibility @default(PRIVATE)
+
   tasks         CanvasGenerationTask[]
   cleanupItems  CanvasOssCleanupQueue[]
 
@@ -1474,6 +1520,7 @@ model CanvasProject {
   updatedAt     DateTime @updatedAt
 
   @@index([userId, deletedAt, updatedAt])
+  @@index([tenantId, visibility, updatedAt])
 }
 
 /// 画布模板：系统模板（builtin=true 且 ownerUserId=null）+ 用户私有模板
@@ -1889,6 +1936,18 @@ model GatewayVendorCredential {
   lastTestedAt    DateTime?
   lastTestStatus  String?
 
+  // —— 多 Key 路由（gateway-multi-credential）——
+  /// 归属范围：个人凭证(USER) 或 团队凭证(TENANT)
+  ownerScope           CredentialOwnerScope @default(USER)
+  /// 归属对象 id：USER→bookUserId；TENANT→tenantId。回填脚本写入。
+  ownerId              String?
+  /// 渠道名（用户自定义，如「官方自有」「某代理」），用于路由展示与对账分组
+  channel              String?
+  /// 同厂商多凭证排序（升序优先）
+  sortOrder            Int                  @default(0)
+  /// 是否该厂商的默认凭证（同一 ownerScope+ownerId+providerKind 至多一个 true）
+  isDefaultForProvider Boolean              @default(false)
+
   apiKeyBindings GatewayApiKeyCredential[]
   requestLogs    GatewayRequestLog[]
 
@@ -1896,6 +1955,7 @@ model GatewayVendorCredential {
   updatedAt DateTime @updatedAt
 
   @@index([userId, active])
+  @@index([ownerScope, ownerId, providerKind])
 }
 
 model GatewayApiKey {
@@ -1964,6 +2024,20 @@ model GatewayRequestLog {
   vendorListUnitCostYuan    Decimal? @db.Decimal(16, 8)
   estimatedVendorCostYuan   Decimal? @db.Decimal(16, 6)
 
+  // —— 统一积分计费快照（unified-credit-billing）——
+  billingMode        CreditBillingMode? // PLATFORM_CREDIT | BYOK
+  canonicalModelKey  String?            // 归口模型键（ModelCatalog.canonicalKey）
+  creditsCharged     Int?               // 本次实际扣减积分（模式 A）
+  costSnapshotYuan   Decimal? @db.Decimal(16, 6) // 写日志时的渠道净成本快照
+  marginSnapshot     Decimal? @db.Decimal(6, 4)  // 写日志时的毛利率快照（0~1）
+  seatId             String?            // 团队席位（占用人）
+
+  // —— 多租户 + 多 Key 对账快照（gateway-multi-credential-and-tenant）——
+  tenantId                 String?  // 计费归属租户（个人空间=个人租户）
+  actorBookUserId          String?  // 实际操作的 Book 用户（团队下区分成员）
+  credentialAliasSnapshot  String?  // 实际使用凭证别名快照（对账用）
+  channelSnapshot          String?  // 实际使用凭证渠道快照（按渠道对账）
+
   inputSummary  Json?
   resultSummary Json?
   failCode      String?
@@ -1982,4 +2056,356 @@ model GatewayRequestLog {
   @@index([externalTaskId])
   @@index([status])
   @@index([clientSource, submittedAt])
+  @@index([tenantId, submittedAt])
+  @@index([channelSnapshot])
+}
+
+// ============================================================
+// 统一积分计费体系（unified-credit-billing）
+// 规则：挂牌价 P = 渠道净成本 C × M；积分/次 U = round(P ÷ creditAnchorYuan)
+// 用户只见挂牌价/积分；成本与折扣仅后台财务可见。
+// ============================================================
+
+enum CreditChannel {
+  OWN // 厂商自有/官方价
+  CHANNEL // 渠道折扣
+  RESELLER // 代理转售
+}
+
+enum CreditCostUnit {
+  PER_SEC // 视频按秒
+  PER_IMAGE // 图片按张
+  PER_KTOKEN // LLM 按千 token
+}
+
+enum MembershipFamily {
+  PERSONAL // 创作会员（个人）
+  TEAM // 团队版会员
+}
+
+enum MembershipInterval {
+  MONTH
+  YEAR
+}
+
+enum CreditOwnerType {
+  USER
+  TENANT
+}
+
+enum CreditLedgerType {
+  GRANT // 套餐发放
+  CONSUME // 生成扣减
+  REFUND // 失败/取消返还
+  EXPIRE // 周期过期清零
+  TOPUP // 额外积分包充值
+  ADJUST // 人工校正
+}
+
+enum CreditBillingMode {
+  PLATFORM_CREDIT // 平台 Key + 会员积分
+  BYOK // 自带 Key，仅技术服务费 + 资源费
+}
+
+enum ResourceMeterType {
+  OSS_GB_MONTH // 对象存储 GB·月
+  EGRESS_GB // 出网流量 GB
+  TASK_COUNT // 任务调度次数
+}
+
+/// 全局计费参数（单例 id="default"）
+model PlatformPricingConfig {
+  id               String   @id @default("default")
+  creditAnchorYuan Decimal  @default("0.04") @db.Decimal(10, 4) // 1 积分 = ¥0.04 挂牌锚定
+  defaultMarginM   Decimal  @default("2.5") @db.Decimal(6, 3) // 默认系数 M（2.5 → 毛利 60%）
+  minMarginGuard   Decimal  @default("0.30") @db.Decimal(6, 4) // 发布/扣费毛利护栏（低于则阻断）
+  defaultVideoSec  Int      @default(5) // 视频默认计费秒数
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+}
+
+/// 渠道/厂商成本与折扣（成本与折扣的唯一来源，仅后台可见）
+model ModelCostProfile {
+  id                String         @id @default(cuid())
+  vendor            String // aliyun / kie / volcengine ...
+  canonicalModelKey String // 归口模型键（ModelCatalog.canonicalKey）
+  channel           CreditChannel  @default(CHANNEL)
+  credentialId      String? // 可选：绑定具体凭证（多 Key）
+  unit              CreditCostUnit
+  tierRaw           String? // 720P / 1080P / 1K 等
+  listCostYuan      Decimal        @db.Decimal(16, 8) // 厂商挂牌成本
+  discountRate      Decimal        @default("0") @db.Decimal(6, 4) // 渠道折扣 0~1（0.6=六折省）
+  netCostYuan       Decimal        @db.Decimal(16, 8) // 派生：listCostYuan × (1 - discountRate)
+  effectiveFrom     DateTime       @default(now())
+  effectiveTo       DateTime?
+  active            Boolean        @default(true)
+  note              String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([canonicalModelKey, active])
+  @@index([vendor, channel])
+}
+
+/// 已发布的模型积分报价（派生自 ModelCostProfile，对外报价页读它）
+model ModelCreditPrice {
+  id                String         @id @default(cuid())
+  canonicalModelKey String         @unique
+  displayName       String
+  vendor            String
+  unit              CreditCostUnit
+  tierRaw           String?
+  netCostYuan       Decimal        @db.Decimal(16, 8) // 取价时的净成本快照
+  marginM           Decimal        @db.Decimal(6, 3) // 取价时的系数 M
+  listPriceYuan     Decimal        @db.Decimal(16, 6) // 挂牌价 = netCost × M
+  creditsPerUnit    Int // 积分/次（或 /秒、/张、/千token）
+  baseMarginRate    Decimal        @db.Decimal(6, 4) // 标准锚定下毛利率
+  formulaSnapshot   Json // 公式与中间值快照，供后台查阅
+  active            Boolean        @default(true)
+  publishedAt       DateTime       @default(now())
+  publishedBy       String?
+
+  @@index([active])
+}
+
+/// 会员套餐（个人/团队 × 月/年 × 五档）
+model MembershipPlan {
+  id            String             @id @default(cuid())
+  family        MembershipFamily
+  interval      MembershipInterval
+  tier          String // 标准版/进阶版/高级版/豪华版/至尊版
+  sortOrder     Int                @default(0)
+  priceYuan     Decimal            @db.Decimal(12, 2) // 套餐价（团队=基础含席位价）
+  originalYuan  Decimal?           @db.Decimal(12, 2) // 划线原价
+  promoLabel    String? // 限时67折等
+  monthlyCredits Int // 月积分（团队=每席位）
+  includedSeats Int                @default(1) // 套餐含席位数
+  active        Boolean            @default(true)
+  seatTiers     TeamSeatTier[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([family, interval, tier])
+  @@index([active, sortOrder])
+}
+
+/// 团队席位带（图1/2：紫色按席位变化）
+model TeamSeatTier {
+  id               String         @id @default(cuid())
+  planId           String
+  plan             MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  seatMin          Int
+  seatMax          Int? // null = 不封顶（10人以上）
+  perSeatPriceYuan Decimal        @db.Decimal(12, 2)
+  perSeatCredits   Int
+  sortOrder        Int            @default(0)
+
+  @@index([planId, sortOrder])
+}
+
+/// 积分账户（个人或租户）
+model CreditAccount {
+  id                 String          @id @default(cuid())
+  ownerType          CreditOwnerType
+  ownerId            String // userId 或 tenantId
+  balanceCredits     Int             @default(0)
+  monthlyGrantCredits Int            @default(0) // 当前套餐月发放额
+  perSeatCapCredits  Int? // 子账号人均上限（可选）
+  planId             String?
+  currentPeriodEnd   DateTime?
+  entries            CreditLedger[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([ownerType, ownerId])
+}
+
+/// 积分流水
+model CreditLedger {
+  id               String           @id @default(cuid())
+  accountId        String
+  account          CreditAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type             CreditLedgerType
+  credits          Int // 入正出负
+  balanceAfter     Int
+  actorUserId      String? // 团队中实际操作人
+  refType          String? // gateway_log / plan_grant / topup_order ...
+  refId            String?
+  costSnapshotYuan Decimal?         @db.Decimal(16, 6)
+  idempotencyKey   String?          @unique
+  description      String?
+  createdAt        DateTime         @default(now())
+
+  @@index([accountId, createdAt])
+}
+
+/// BYOK 技术服务费配置（按档/席位）
+model ByokServiceConfig {
+  id                 String   @id @default(cuid())
+  scopeKey           String   @unique // 档位或席位规格键，如 personal-standard / team-seat
+  label              String
+  techServiceFeeYuan Decimal  @db.Decimal(12, 2)
+  interval           MembershipInterval @default(MONTH)
+  active             Boolean  @default(true)
+  note               String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+/// BYOK 资源计量单价（用量 × 系数）
+model ResourceMeterRate {
+  id              String            @id @default(cuid())
+  resourceType    ResourceMeterType @unique
+  coefficientYuan Decimal           @db.Decimal(16, 8) // 每单位资源单价
+  unitLabel       String // GB·月 / GB / 次
+  active          Boolean           @default(true)
+  updatedAt       DateTime          @updatedAt
+}
+
+/// BYOK 资源用量事件
+model ResourceMeterEvent {
+  id           String            @id @default(cuid())
+  ownerType    CreditOwnerType
+  ownerId      String
+  resourceType ResourceMeterType
+  quantity     Decimal           @db.Decimal(16, 6)
+  costYuan     Decimal           @db.Decimal(16, 6) // quantity × coefficient 快照
+  refType      String?
+  refId        String?
+  periodKey    String // YYYY-MM 结算桶
+  createdAt    DateTime          @default(now())
+
+  @@index([ownerType, ownerId, periodKey])
+}
+
+// ============================================================
+// 多租户 / 团队体系（gateway-multi-credential-and-tenant）
+// 每个用户至少属于一个 PERSONAL 租户（个人空间）；团队/公司为 TEAM 租户。
+// 计费账户经 CreditAccount(ownerType=TENANT, ownerId=tenantId) 共享积分池。
+// ============================================================
+
+enum CredentialOwnerScope {
+  USER // 个人凭证
+  TENANT // 团队/公司凭证（成员共享）
+}
+
+enum TenantType {
+  PERSONAL // 个人空间（每个用户自动拥有一个）
+  TEAM // 团队 / 工作室 / 公司
+}
+
+enum TenantRole {
+  OWNER // 主账号：计费、Key、团队配置、转移所有权
+  ADMIN // 管理员：成员/席位/资产管理，不可计费充值
+  MEMBER // 普通成员：仅使用 + 自有私有资产
+}
+
+enum TenantMemberStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  REMOVED
+}
+
+enum SeatStatus {
+  ACTIVE // 已分配占用
+  IDLE // 空闲可分配
+  DISABLED // 停用
+}
+
+enum TenantInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+/// 资产可见域（跨工具统一）：个人私有 / 团队公共库
+enum AssetVisibility {
+  PRIVATE // 仅本人可见（个人空间或团队内成员私有库）
+  TEAM_PUBLIC // 团队公共库：成员可见可用，仅 OWNER/ADMIN 可删/改归属
+}
+
+/// 租户（个人空间 / 团队 / 公司）
+model Tenant {
+  id               String      @id @default(cuid())
+  type             TenantType  @default(PERSONAL)
+  name             String
+  ownerUserId      String
+  owner            User        @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  /// 关联会员套餐（团队套餐）；个人租户可为空（走个人会员）
+  planId           String?
+  packageLevel     String? // 标准版/进阶版/... 快照
+  interval         MembershipInterval?
+  seatLimit        Int         @default(1) // 席位总数（含套餐内 + 加购）
+  maxConcurrency   Int         @default(2) // 并发任务上限（里程碑 7 Redis 启用）
+  perSeatCapCredits Int? // 子账号人均月积分上限（可选）
+  currentPeriodEnd DateTime?
+  status           String      @default("ACTIVE") // ACTIVE / SUSPENDED
+
+  members TenantMember[]
+  seats   Seat[]
+  invites TenantInvite[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId])
+  @@index([type, status])
+}
+
+/// 租户成员
+model TenantMember {
+  id               String             @id @default(cuid())
+  tenantId         String
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role             TenantRole         @default(MEMBER)
+  status           TenantMemberStatus @default(ACTIVE)
+  seatId           String?            @unique
+  seat             Seat?              @relation(fields: [seatId], references: [id], onDelete: SetNull)
+  /// 成员个人月积分上限（覆盖租户 perSeatCapCredits）
+  monthlyCapCredits Int?
+  joinedAt         DateTime           @default(now())
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, status])
+  @@index([userId])
+}
+
+/// 团队席位
+model Seat {
+  id        String        @id @default(cuid())
+  tenantId  String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  label     String? // 席位标签
+  status    SeatStatus    @default(IDLE)
+  member    TenantMember?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([tenantId, status])
+}
+
+/// 团队邀请
+model TenantInvite {
+  id        String             @id @default(cuid())
+  tenantId  String
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email     String
+  token     String             @unique
+  role      TenantRole         @default(MEMBER)
+  status    TenantInviteStatus @default(PENDING)
+  expiresAt DateTime
+  acceptedAt DateTime?
+  createdById String?
+  createdBy  User?             @relation("TenantInviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([tenantId, status])
+  @@index([email])
 }

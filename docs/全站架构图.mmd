@@ -1,0 +1,45 @@
+flowchart TB
+  subgraph users ["User Browser"]
+    U[User]
+  end
+
+  subgraph platform ["Platform book-mall :3000"]
+    BM["book-mall<br/>NextAuth / Wallet / Credits / Platform API / Prisma"]
+    GWAPI["/api/gw/v1/* Gateway API<br/>ONLY vendor HTTP boundary"]
+    DB[(PostgreSQL)]
+    OSS[(Aliyun OSS)]
+    BM --> GWAPI
+    BM --> DB
+    BM --> OSS
+  end
+
+  subgraph tools ["Tool Apps - separate CloudBase"]
+    TW["tool-web :3001"]
+    FW["finance-web :3002"]
+    SW["story-web :3003"]
+    CW["canvas-web :3004"]
+    GWC["gateway-web :3005 BYOK Console"]
+    PO["prompt-optimizer :3006"]
+    EC["e-commerce-toolkit :3007"]
+  end
+
+  subgraph bg ["Async / Background"]
+    SCF["Prod: SCF gateway-poll"]
+    POLL["Local: gateway-poll-loop"]
+  end
+
+  VEND["Vendor APIs<br/>Bailian / DashScope / KIE / Volcengine / DeepSeek / Hunyuan"]
+
+  U --> BM
+  U --> TW & FW & SW & CW & GWC & PO & EC
+
+  TW & CW & SW & PO & EC -->|"Book SSO tools_token"| BM
+  TW & CW & SW & PO & EC -->|"introspect / gateway proxy"| BM
+  BM -->|"gateway-v1-http-client"| GWAPI
+  GWAPI -->|"BYOK vendor credentials"| VEND
+
+  FW -->|"billing API"| BM
+  GWC -->|"Gateway SSO manage sk-gw"| BM
+
+  SCF -->|"POST /api/gw/v1/jobs/recordInfo"| GWAPI
+  POLL -->|"runGatewayPollWorker"| GWAPI

@@ -63,7 +63,7 @@ const PROVIDER_LABEL: Record<string, string> = {
   DEEPSEEK: "DeepSeek",
   DASHSCOPE: "DashScope",
   HUNYUAN: "混元 3D",
-  VOLCENGINE: "火山方舟",
+  VOLCENGINE: "火山",
 };
 
 /** 日志页厂商筛选 · 展示顺序 */
@@ -112,6 +112,43 @@ export function collectLogModels(
     if (l.model?.trim()) models.add(l.model);
   }
   return [...models].sort((a, b) => a.localeCompare(b));
+}
+
+/** 日志表 · 渠道 Key 脱敏（前 4 + ***** + 后 4） */
+export function formatLogCredentialKeyMasked(raw: string | null | undefined): string {
+  const value = raw?.trim();
+  if (!value) return "—";
+  const alreadyMasked = value.match(/^(.{4})\*+(.{4})$/);
+  if (alreadyMasked) {
+    return `${alreadyMasked[1]}*****${alreadyMasked[2]}`;
+  }
+  if (value.length <= 8) return "*".repeat(value.length);
+  return `${value.slice(0, 4)}*****${value.slice(-4)}`;
+}
+
+/** 从当前日志批次提取渠道 Key（可按厂商收窄） */
+export function collectLogCredentialKeys(
+  logs: { credentialKeyMasked: string | null; providerKind: string | null }[],
+  providerKind?: string,
+): string[] {
+  const keys = new Set<string>();
+  for (const l of logs) {
+    if (providerKind && l.providerKind !== providerKind) continue;
+    const masked = l.credentialKeyMasked?.trim();
+    if (masked) keys.add(masked);
+  }
+  return [...keys].sort((a, b) => a.localeCompare(b));
+}
+
+/** 日志页厂商筛选 · 固定展示（含当前批次无记录的厂商） */
+export function logProviderFilterOptions(
+  kindsInBatch: Iterable<string>,
+): string[] {
+  const seen = new Set<string>(LOG_PROVIDER_KIND_ORDER);
+  for (const k of kindsInBatch) {
+    if (k) seen.add(k);
+  }
+  return sortLogProviderKinds(seen);
 }
 
 const STATUS_LABEL: Record<string, string> = {

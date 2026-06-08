@@ -30,6 +30,7 @@ const anchorNavLinks: NavItem[] = [
   { label: "主屏", href: "#hero-video" },
   { label: "客户评价", href: "#testimonials" },
   { label: "价格", href: "#pricing" },
+  { label: "报价", href: "/pricing", badge: "积分" },
 ];
 
 export function SiteHomeNav({

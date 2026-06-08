@@ -127,6 +127,26 @@ export function AdminNav({
             <DropdownMenuItem asChild>
               <Link href="/admin/finance/pricing-templates">计费模板与公式</Link>
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>积分计费（统一）</DropdownMenuLabel>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/model-cost">模型成本与折扣</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/credit-pricing">积分报价计算器</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/membership-plans">会员套餐与席位</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/finance/byok">BYOK 服务费与资源</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/pricing" target="_blank" rel="noopener noreferrer">
+                对外报价页（积分）
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/pricing-disclosure" target="_blank" rel="noopener noreferrer">
                 平台价目表（前台公示）

@@ -130,6 +130,21 @@ export function ModelManager({
     }
   };
 
+  const onSetDefault = async (row: CredentialRow) => {
+    setBusyId(row.id);
+    try {
+      await fetch("/api/book-mall/api/gateway/credentials", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: row.id, action: "setDefault" }),
+      });
+      await reloadCredentials();
+      showToast(`已将「${row.alias}」设为默认凭证`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const onClone = async (row: CredentialRow) => {
     const alias = `${row.alias} 副本`;
     setBusyId(row.id);
@@ -197,7 +212,10 @@ export function ModelManager({
       <div className="space-y-3">
         {groups.map((g) => {
           const creds = credsByKind.get(g.providerKind) ?? [];
-          const primary = creds.find((c) => c.active) ?? creds[0];
+          const primary =
+            creds.find((c) => c.isDefaultForProvider && c.active) ??
+            creds.find((c) => c.active) ??
+            creds[0];
           const disabled = !primary?.active;
 
           return (
@@ -252,7 +270,9 @@ export function ModelManager({
                   </div>
                   {primary ? (
                     <p className="text-xs text-zinc-500">
-                      凭证：{primary.alias} · {primary.apiKeyMasked}
+                      默认凭证：{primary.alias}
+                      {primary.channel ? `（${primary.channel}）` : ""} ·{" "}
+                      {primary.apiKeyMasked}
                       {primary.lastTestStatus
                         ? ` · 最近测试 ${primary.lastTestStatus}`
                         : ""}
@@ -319,14 +339,65 @@ export function ModelManager({
                 </div>
               </div>
 
-              {creds.length > 1 ? (
-                <div className="mt-4 border-t border-white/5 pt-3 text-xs text-zinc-500">
-                  另有 {creds.length - 1} 条同厂商凭证（
-                  {creds
-                    .filter((c) => c.id !== primary?.id)
-                    .map((c) => c.alias)
-                    .join("、")}
-                  ）
+              {creds.length > 0 ? (
+                <div className="mt-4 space-y-2 border-t border-white/5 pt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-zinc-400">
+                      同厂商凭证（{creds.length}）· 按渠道区分，生成默认走「默认凭证」
+                    </span>
+                    <button
+                      type="button"
+                      className="gw-btn-secondary text-xs"
+                      onClick={() => openCreate(g.providerKind)}
+                    >
+                      + 添加凭证
+                    </button>
+                  </div>
+                  {creds.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/5 px-3 py-2 text-xs"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-zinc-200">{c.alias}</span>
+                        {c.channel ? (
+                          <span className={`rounded-full border px-2 py-0.5 ${tagClass("provider")}`}>
+                            {c.channel}
+                          </span>
+                        ) : null}
+                        {c.isDefaultForProvider ? (
+                          <span className={`rounded-full border px-2 py-0.5 ${tagClass("warn")}`}>
+                            默认
+                          </span>
+                        ) : null}
+                        {!c.active ? (
+                          <span className="rounded-full border border-white/10 px-2 py-0.5 text-zinc-500">
+                            停用
+                          </span>
+                        ) : null}
+                        <span className="text-zinc-500">{c.apiKeyMasked}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {!c.isDefaultForProvider && c.active ? (
+                          <button
+                            type="button"
+                            disabled={busyId === c.id}
+                            className="text-[var(--gw-accent)] hover:underline disabled:opacity-50"
+                            onClick={() => void onSetDefault(c)}
+                          >
+                            设为默认
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="text-zinc-400 hover:text-white"
+                          onClick={() => openEdit(c)}
+                        >
+                          编辑
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : null}
             </div>

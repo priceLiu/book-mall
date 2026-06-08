@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import {
   TOOL_LIBRARY_RETENTION_DAYS,
   TOOL_VIDEO_LIBRARY_DEFAULT_MAX,
@@ -11,7 +12,18 @@ import {
 import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
 import { prisma } from "@/lib/prisma";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
-import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
+import { verifyToolsAccessToken, type VerifiedToolsToken } from "@/lib/tools-sso-token";
+import {
+  resolveTenantContextForUser,
+  tenantContextFromClaims,
+  type TenantContext,
+} from "@/lib/tenant/context";
+import {
+  buildVisibleAssetWhere,
+  setAssetVisibility,
+  AssetAccessError,
+} from "@/lib/tenant/asset-sharing-service";
+import { TenantPermissionError } from "@/lib/tenant/permission";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +33,7 @@ const MAX_PROMPT_LEN = 8000;
 const LAB_MODES = new Set(["i2v", "t2v", "ref"]);
 
 function verifyBearer(req: Request):
-  | { ok: true; userId: string }
+  | { ok: true; userId: string; token: VerifiedToolsToken }
   | { ok: false; res: NextResponse } {
   let jwtSecret: string;
   try {
@@ -48,7 +60,14 @@ function verifyBearer(req: Request):
       res: NextResponse.json({ error: "无效或过期的工具令牌" }, { status: 401 }),
     };
   }
-  return { ok: true, userId: verified.sub };
+  return { ok: true, userId: verified.sub, token: verified };
+}
+
+async function resolveCtx(token: VerifiedToolsToken): Promise<TenantContext | null> {
+  return (
+    tenantContextFromClaims(token) ??
+    (await resolveTenantContextForUser(token.sub))
+  );
 }
 
 function coerceHttpsAliyun(raw: string): string {
@@ -84,16 +103,24 @@ export async function GET(req: Request) {
   const v = verifyBearer(req);
   if (!v.ok) return v.res;
 
+  const ctx = await resolveCtx(v.token);
+  const isTeam = ctx?.tenantType === "TEAM";
+  const where: Prisma.ImageToVideoLibraryItemWhereInput =
+    isTeam && ctx
+      ? buildVisibleAssetWhere<Prisma.ImageToVideoLibraryItemWhereInput>(ctx)
+      : { userId: v.userId };
+  const canManagePublic = ctx?.role === "OWNER" || ctx?.role === "ADMIN";
+
   let rows: Awaited<ReturnType<typeof prisma.imageToVideoLibraryItem.findMany>>;
   let countAll: number;
   try {
     [rows, countAll] = await Promise.all([
       prisma.imageToVideoLibraryItem.findMany({
-        where: { userId: v.userId },
+        where,
         orderBy: { createdAt: "desc" },
         take: Math.max(TOOL_VIDEO_LIBRARY_DEFAULT_MAX * 4, 50),
       }),
-      prisma.imageToVideoLibraryItem.count({ where: { userId: v.userId } }),
+      prisma.imageToVideoLibraryItem.count({ where }),
     ]);
   } catch (e) {
     const code = prismaErrorCode(e);
@@ -119,18 +146,26 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({
-    items: rows.map((r) => ({
-      id: r.id,
-      videoUrl: r.videoUrl,
-      prompt: r.prompt ?? null,
-      mode: r.mode,
-      resolution: r.resolution,
-      durationSec: r.durationSec,
-      seed: r.seed ?? null,
-      modelLabel: r.modelLabel ?? null,
-      retainUntil: r.retainUntil.toISOString(),
-      createdAt: r.createdAt.toISOString(),
-    })),
+    space: isTeam ? "TEAM" : "PERSONAL",
+    canManagePublic,
+    items: rows.map((r) => {
+      const mine = (r.ownerUserId ?? r.userId) === v.userId;
+      return {
+        id: r.id,
+        videoUrl: r.videoUrl,
+        prompt: r.prompt ?? null,
+        mode: r.mode,
+        resolution: r.resolution,
+        durationSec: r.durationSec,
+        seed: r.seed ?? null,
+        modelLabel: r.modelLabel ?? null,
+        retainUntil: r.retainUntil.toISOString(),
+        createdAt: r.createdAt.toISOString(),
+        visibility: r.visibility,
+        mine,
+        canToggle: isTeam && (mine || canManagePublic),
+      };
+    }),
     quota: { max: TOOL_VIDEO_LIBRARY_DEFAULT_MAX, used: countAll },
   });
 }
@@ -211,6 +246,7 @@ export async function POST(req: Request) {
       );
     }
 
+    const ctx = await resolveCtx(v.token);
     const row = await prisma.imageToVideoLibraryItem.create({
       data: {
         userId: v.userId,
@@ -222,6 +258,9 @@ export async function POST(req: Request) {
         seed,
         modelLabel,
         retainUntil: retainUntilFromNow(),
+        tenantId: ctx?.tenantId ?? null,
+        ownerUserId: v.userId,
+        visibility: "PRIVATE",
       },
     });
 
@@ -271,10 +310,27 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    const row = await prisma.imageToVideoLibraryItem.findFirst({
-      where: { id, userId: v.userId },
-      select: { id: true, videoUrl: true },
+    const ctx = await resolveCtx(v.token);
+    const canManagePublic = ctx?.role === "OWNER" || ctx?.role === "ADMIN";
+    const found = await prisma.imageToVideoLibraryItem.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        videoUrl: true,
+        userId: true,
+        ownerUserId: true,
+        tenantId: true,
+        visibility: true,
+      },
     });
+    const mine = found && (found.ownerUserId ?? found.userId) === v.userId;
+    const teamManageable =
+      found &&
+      ctx?.tenantType === "TEAM" &&
+      found.tenantId === ctx.tenantId &&
+      found.visibility === "TEAM_PUBLIC" &&
+      canManagePublic;
+    const row = found && (mine || teamManageable) ? found : null;
     if (!row) {
       return NextResponse.json({ error: "不存在或无权删除" }, { status: 404 });
     }
@@ -300,5 +356,45 @@ export async function DELETE(req: Request) {
         ? (e as Error).message
         : "删除失败";
     return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+/** 切换条目可见域（设为团队公共 / 收回私有）；仅团队空间可用。 */
+export async function PATCH(req: Request) {
+  const v = verifyBearer(req);
+  if (!v.ok) return v.res;
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "请求体须为 JSON" }, { status: 400 });
+  }
+  const id = typeof body.id === "string" ? body.id.trim() : "";
+  const visibility = body.visibility === "TEAM_PUBLIC" ? "TEAM_PUBLIC" : "PRIVATE";
+  if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 });
+
+  const ctx = await resolveCtx(v.token);
+  if (!ctx || ctx.tenantType !== "TEAM") {
+    return NextResponse.json({ error: "个人空间无团队公共库" }, { status: 400 });
+  }
+
+  try {
+    await setAssetVisibility({
+      ctx,
+      model: "imageToVideoLibraryItem",
+      assetId: id,
+      visibility,
+    });
+    return NextResponse.json({ ok: true, visibility });
+  } catch (e) {
+    if (e instanceof TenantPermissionError) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
+    }
+    if (e instanceof AssetAccessError) {
+      return NextResponse.json({ error: e.message }, { status: 404 });
+    }
+    console.error("[image-to-video/library] PATCH visibility failed", e);
+    return NextResponse.json({ error: "切换可见域失败" }, { status: 500 });
   }
 }

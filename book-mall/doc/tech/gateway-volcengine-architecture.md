@@ -72,14 +72,20 @@ Gateway 对外：
 
 ## 4. Seedance 2.0 多模态 body
 
-`buildCanvasVideoVolcengineInput` 组装 `content[]`：
+`buildCanvasVideoVolcengineInput` 组装 `content[]`（**首/尾帧与参考媒体互斥**，不可同请求混用）：
+
+**纯图生视频（无 @ 参考）**
 
 1. `text` — 提示词  
 2. `image_url` + `role: first_frame` — 主分镜图  
-3. `image_url` + `role: reference_image` — 额外参考图（最多 8）  
-4. `video_url` + `role: reference_video` — 参考视频  
-5. `audio_url` + `role: reference_audio` — 参考音频  
-6. `asset://asset-xxx` — 人像库资产 URI（见 §5）
+
+**多模态参考（有 @ 参考图/视频/音频或 asset）**
+
+1. `text` — 提示词  
+2. `image_url` + `role: reference_image` — 主分镜图 + 额外参考图（最多 9）  
+3. `video_url` + `role: reference_video` — 参考视频  
+4. `audio_url` + `role: reference_audio` — 参考音频  
+5. `asset://asset-xxx` — 人像库资产 URI（见 §5）
 
 ## 5. 人像库与 asset://
 

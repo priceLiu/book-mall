@@ -15,11 +15,14 @@ import {
   resolveLogDurationMs,
 } from "@/lib/gateway-log-params";
 import {
+  collectLogCredentialKeys,
   collectLogModels,
   collectLogProviderKinds,
+  formatLogCredentialKeyMasked,
   formatLogPageLabel,
   formatLogSourceTooltip,
   formatProviderKindLabel,
+  logProviderFilterOptions,
   LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
 
@@ -30,6 +33,7 @@ export type GatewayLogRow = {
   status: string;
   requestKind: string;
   providerKind: string | null;
+  credentialKeyMasked: string | null;
   clientSource: string;
   clientPage: string | null;
   externalTaskId: string | null;
@@ -71,6 +75,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
   const [sourceFilter, setSourceFilter] = useState("");
   const [providerFilter, setProviderFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
+  const [credentialKeyFilter, setCredentialKeyFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -81,9 +86,49 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
   const dateRangeInvalid = isLogDateRangeInvalid(fromDate, toDate);
   const hasDateFilter = !!(fromDate || toDate);
 
+  const hasInFlightLogs = useMemo(
+    () => logs.some((l) => l.status === "RUNNING" || l.status === "PENDING"),
+    [logs],
+  );
+
   useEffect(() => {
     setLogs(initialLogs);
   }, [initialLogs]);
+
+  /** 有进行中任务时定时拉取日志（服务端会 opportunistic 轮询厂商任务） */
+  useEffect(() => {
+    if (!hasInFlightLogs) return;
+
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const params = new URLSearchParams({
+          limit: hasDateFilter ? "100" : "50",
+        });
+        if (fromDate) params.set("from", fromDate);
+        if (toDate) params.set("to", toDate);
+        const res = await fetch(
+          `/api/book-mall/api/gateway/logs?${params.toString()}`,
+        );
+        const data = (await res.json().catch(() => null)) as {
+          logs?: GatewayLogRow[];
+        } | null;
+        if (cancelled || !res.ok) return;
+        setLogs(data?.logs ?? []);
+      } catch {
+        /* 静默；用户可手动刷新页面 */
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 10_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [hasInFlightLogs, hasDateFilter, fromDate, toDate]);
 
   useEffect(() => {
     if (!hasDateFilter) {
@@ -130,10 +175,18 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
     };
   }, [fromDate, toDate, hasDateFilter, dateRangeInvalid, initialLogs]);
 
-  const providerKinds = useMemo(() => collectLogProviderKinds(logs), [logs]);
+  const providerKinds = useMemo(
+    () => logProviderFilterOptions(collectLogProviderKinds(logs)),
+    [logs],
+  );
 
   const modelOptions = useMemo(
     () => collectLogModels(logs, providerFilter || undefined),
+    [logs, providerFilter],
+  );
+
+  const credentialKeyOptions = useMemo(
+    () => collectLogCredentialKeys(logs, providerFilter || undefined),
     [logs, providerFilter],
   );
 
@@ -149,6 +202,12 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
       if (sourceFilter && l.clientSource !== sourceFilter) return false;
       if (providerFilter && l.providerKind !== providerFilter) return false;
       if (modelFilter && l.model !== modelFilter) return false;
+      if (
+        credentialKeyFilter &&
+        l.credentialKeyMasked !== credentialKeyFilter
+      ) {
+        return false;
+      }
       if (statusFilter && l.status !== statusFilter) return false;
       return true;
     });
@@ -161,6 +220,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
     sourceFilter,
     providerFilter,
     modelFilter,
+    credentialKeyFilter,
     statusFilter,
   ]);
 
@@ -211,6 +271,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                 ? "加载中…"
                 : `${filtered.length} / ${logs.length} 条`}
               {hasDateFilter && !loading ? " · 按日期" : ""}
+              {hasInFlightLogs ? " · 进行中任务每 10s 刷新" : ""}
             </span>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
@@ -294,6 +355,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             onClick={() => {
               setProviderFilter("");
               setModelFilter("");
+              setCredentialKeyFilter("");
               clearSelectionOnFilter(setSelected);
             }}
           >
@@ -307,15 +369,13 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               onClick={() => {
                 setProviderFilter(kind);
                 setModelFilter("");
+                setCredentialKeyFilter("");
                 clearSelectionOnFilter(setSelected);
               }}
             >
               {formatProviderKindLabel(kind)}
             </button>
           ))}
-          {!providerKinds.length ? (
-            <span className="text-[11px] text-zinc-600">当前批次无厂商标记</span>
-          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
@@ -343,6 +403,32 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             </span>
           ) : null}
         </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
+          <span className="shrink-0 text-xs text-zinc-500">渠道 Key</span>
+          <select
+            value={credentialKeyFilter}
+            onChange={(e) => {
+              setCredentialKeyFilter(e.target.value);
+              clearSelectionOnFilter(setSelected);
+            }}
+            disabled={!credentialKeyOptions.length}
+            className="min-w-[min(100%,280px)] max-w-md flex-1 rounded-lg border border-white/10 bg-[#141419] px-3 py-2 font-mono text-xs text-zinc-300 outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="按渠道 Key 筛选"
+          >
+            <option value="">全部 Key</option>
+            {credentialKeyOptions.map((key) => (
+              <option key={key} value={key}>
+                {formatLogCredentialKeyMasked(key)}
+              </option>
+            ))}
+          </select>
+          {!credentialKeyOptions.length ? (
+            <span className="shrink-0 text-[11px] text-zinc-600">
+              当前批次无渠道 Key 记录
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
@@ -360,6 +446,12 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               </th>
               <th className="w-[88px]">Source</th>
               <th className="min-w-[168px]">Model</th>
+              <th
+                className="min-w-[140px]"
+                title="实际路由的厂商凭证 Key（脱敏）"
+              >
+                Key
+              </th>
               <th className="min-w-[480px]">Params</th>
               <th className="min-w-[280px]">Images</th>
               <th className="w-[120px]">Status</th>
@@ -430,6 +522,14 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   <td className="align-top">
                     <span className="inline-flex rounded-md bg-sky-600 px-2 py-0.5 font-mono text-[11px] font-medium text-white">
                       {l.model}
+                    </span>
+                  </td>
+                  <td className="align-middle">
+                    <span
+                      className="font-mono text-[11px] text-zinc-400"
+                      title={l.credentialKeyMasked ?? undefined}
+                    >
+                      {formatLogCredentialKeyMasked(l.credentialKeyMasked)}
                     </span>
                   </td>
                   <td className="align-top">
@@ -523,7 +623,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             {!filtered.length ? (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={15}
                   className="py-16 text-center text-sm text-zinc-500"
                 >
                   {logs.length

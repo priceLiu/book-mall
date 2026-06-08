@@ -1,11 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { GatewayClientSource } from "@prisma/client";
-import {
-  createKieTaskWithKey,
-  getKieTaskWithKey,
-  isKieRecordFail,
-  isKieRecordSuccess,
-} from "@/lib/story/kie-client";
+import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
+import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
 import {
   bailianR2vCreateTask,
   bailianR2vGetTask,
@@ -21,13 +17,12 @@ import {
   isDashscopeTaskSuccess,
 } from "./dashscope-client";
 import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
-import { pollVolcengineVideoTaskForLog } from "./volcengine-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
-import { buildGatewayTaskResultSummary } from "./log-result-summary";
-import { finalizeRequestLog } from "./proxy-common";
 
 const STALE_RUNNING_NO_TASK_MS = 15 * 60 * 1000;
 const STALE_RUNNING_WITH_TASK_MS = 6 * 60 * 60 * 1000;
+/** 火山视频任务：过长仍 RUNNING 则自动收口（避免日志页一直 running） */
+const STALE_VOLCENGINE_VIDEO_MS = 90 * 60 * 1000;
 
 /** 清理无 taskId 或超时仍 RUNNING 的日志，避免界面一直 running */
 export async function expireStaleGatewayLogs(): Promise<number> {
@@ -70,6 +65,10 @@ export async function expireStaleGatewayLogs(): Promise<number> {
       status: "RUNNING",
       externalTaskId: { not: null },
       submittedAt: { lt: withTaskCutoff },
+      OR: [
+        { providerKind: { not: "VOLCENGINE" } },
+        { requestKind: { not: "VIDEO" } },
+      ],
     },
     data: {
       status: "FAILED",
@@ -79,7 +78,24 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     },
   });
 
-  return r0.count + r1.count + r2.count;
+  const volcengineVideoCutoff = new Date(now - STALE_VOLCENGINE_VIDEO_MS);
+  const r3 = await prisma.gatewayRequestLog.updateMany({
+    where: {
+      status: "RUNNING",
+      providerKind: "VOLCENGINE",
+      requestKind: "VIDEO",
+      externalTaskId: { not: null },
+      submittedAt: { lt: volcengineVideoCutoff },
+    },
+    data: {
+      status: "FAILED",
+      failCode: "STALE_TIMEOUT",
+      failMessage: "火山视频任务轮询超时（超过 90 分钟），请在厂商控制台核对任务状态",
+      completedAt: new Date(),
+    },
+  });
+
+  return r0.count + r1.count + r2.count + r3.count;
 }
 
 export function parseGatewayClientSource(
@@ -105,167 +121,19 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
         in: ["KIE", "BAILIAN", "DASHSCOPE", "HUNYUAN", "VOLCENGINE"],
       },
     },
-    orderBy: { submittedAt: "asc" },
+    orderBy: [{ submittedAt: "desc" }, { pollCount: "asc" }],
     take: limit,
   });
 
   let updated = 0;
   for (const row of rows) {
-    if (!row.externalTaskId || !row.credentialId) continue;
-    const cred = await getDecryptedCredentialApiKey(row.credentialId);
-    if (!cred) continue;
+    if (!row.externalTaskId || !row.apiKeyId) continue;
+    const beforeStatus = row.status;
     try {
-      if (row.providerKind === "DASHSCOPE") {
-        const polled = await dashscopeGetTask({
-          apiKey: cred.apiKey,
-          taskId: row.externalTaskId,
-        });
-        await prisma.gatewayRequestLog.update({
-          where: { id: row.id },
-          data: {
-            lastPolledAt: new Date(),
-            pollCount: { increment: 1 },
-          },
-        });
-        if (!polled.ok) continue;
-        const status = polled.output.task_status;
-        if (isDashscopeTaskSuccess(status)) {
-          await finalizeRequestLog(row.id, {
-            status: "SUCCEEDED",
-            durationMs: row.submittedAt
-              ? Date.now() - row.submittedAt.getTime()
-              : 0,
-            resultSummary: buildGatewayTaskResultSummary(
-              polled.raw,
-              polled.output,
-            ),
-            externalTaskId: row.externalTaskId,
-            model: row.model,
-          });
-          updated++;
-        } else if (isDashscopeTaskFailed(status)) {
-          await finalizeRequestLog(row.id, {
-            status: "FAILED",
-            durationMs: row.submittedAt
-              ? Date.now() - row.submittedAt.getTime()
-              : 0,
-            failMessage:
-              polled.output.message ?? polled.output.code ?? "DashScope task failed",
-            externalTaskId: row.externalTaskId,
-            model: row.model,
-          });
-          updated++;
-        }
-        continue;
-      }
-
-      if (row.providerKind === "HUNYUAN") {
-        const polled = await pollHunyuanTaskForLog({
-          credentialId: row.credentialId,
-          taskId: row.externalTaskId,
-          model: row.model,
-        });
-        await prisma.gatewayRequestLog.update({
-          where: { id: row.id },
-          data: {
-            lastPolledAt: new Date(),
-            pollCount: { increment: 1 },
-          },
-        });
-        if (polled.state === "succeeded") {
-          await finalizeRequestLog(row.id, {
-            status: "SUCCEEDED",
-            durationMs: row.submittedAt
-              ? Date.now() - row.submittedAt.getTime()
-              : 0,
-            resultSummary: polled,
-            externalTaskId: row.externalTaskId,
-            model: row.model,
-          });
-          updated++;
-        } else if (polled.state === "failed") {
-          await finalizeRequestLog(row.id, {
-            status: "FAILED",
-            durationMs: row.submittedAt
-              ? Date.now() - row.submittedAt.getTime()
-              : 0,
-            failMessage: polled.errorMessage ?? "Hunyuan 3D failed",
-            externalTaskId: row.externalTaskId,
-            model: row.model,
-          });
-          updated++;
-        }
-        continue;
-      }
-
-      if (row.providerKind === "VOLCENGINE") {
-        const startedAt = row.submittedAt?.getTime() ?? Date.now();
-        const done = await pollVolcengineVideoTaskForLog({
-          logId: row.id,
-          credentialId: row.credentialId,
-          taskId: row.externalTaskId,
-          startedAt,
-        });
-        await prisma.gatewayRequestLog.update({
-          where: { id: row.id },
-          data: {
-            lastPolledAt: new Date(),
-            pollCount: { increment: 1 },
-          },
-        });
-        if (done === "done") updated++;
-        continue;
-      }
-
-      if (row.providerKind === "BAILIAN") {
-        const polled = await bailianR2vGetTask({
-          apiKey: cred.apiKey,
-          taskId: row.externalTaskId,
-        });
-        await prisma.gatewayRequestLog.update({
-          where: { id: row.id },
-          data: {
-            lastPolledAt: new Date(),
-            pollCount: { increment: 1 },
-          },
-        });
-        if (!polled.ok) continue;
-        const status = polled.output.task_status?.toUpperCase() ?? "";
-        if (status === "SUCCEEDED" || status === "SUCCESS") {
-          await finalizeRequestLog(row.id, {
-            status: "SUCCEEDED",
-            durationMs: row.submittedAt
-              ? Date.now() - row.submittedAt.getTime()
-              : 0,
-            resultSummary: buildGatewayTaskResultSummary(
-              polled.raw,
-              polled.output,
-            ),
-            externalTaskId: row.externalTaskId,
-            model: row.model,
-          });
-          updated++;
-        } else if (
-          status === "FAILED" ||
-          status === "CANCELED" ||
-          status === "UNKNOWN"
-        ) {
-          await finalizeRequestLog(row.id, {
-            status: "FAILED",
-            durationMs: row.submittedAt
-              ? Date.now() - row.submittedAt.getTime()
-              : 0,
-            failMessage:
-              polled.output.message ?? polled.output.code ?? "Bailian R2V failed",
-            externalTaskId: row.externalTaskId,
-            model: row.model,
-          });
-          updated++;
-        }
-        continue;
-      }
-
-      const rec = await getKieTaskWithKey(cred.apiKey, row.externalTaskId);
+      await gatewayV1RecordInfo({
+        apiKeyId: row.apiKeyId,
+        taskId: row.externalTaskId,
+      });
       await prisma.gatewayRequestLog.update({
         where: { id: row.id },
         data: {
@@ -273,36 +141,21 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
           pollCount: { increment: 1 },
         },
       });
-      if (isKieRecordSuccess(rec.state)) {
-        const durationMs = row.submittedAt
-          ? Date.now() - row.submittedAt.getTime()
-          : undefined;
-        await finalizeRequestLog(row.id, {
-          status: "SUCCEEDED",
-          durationMs: durationMs ?? 0,
-          vendorDurationMs:
-            typeof rec.costTime === "number"
-              ? Math.round(rec.costTime * 1000)
-              : undefined,
-          resultSummary: { state: rec.state, resultJson: rec.resultJson },
-          externalTaskId: rec.taskId,
-          model: rec.model || row.model,
-        });
-        updated++;
-      } else if (isKieRecordFail(rec.state)) {
-        await finalizeRequestLog(row.id, {
-          status: "FAILED",
-          durationMs: row.submittedAt
-            ? Date.now() - row.submittedAt.getTime()
-            : 0,
-          failMessage: rec.failMsg ?? rec.failCode ?? "KIE task failed",
-          externalTaskId: rec.taskId,
-          model: rec.model || row.model,
-        });
+      const after = await prisma.gatewayRequestLog.findUnique({
+        where: { id: row.id },
+        select: { status: true },
+      });
+      if (beforeStatus === "RUNNING" && after?.status !== "RUNNING") {
         updated++;
       }
-    } catch (e) {
-      console.warn("[gateway-poll]", row.id, (e as Error).message);
+    } catch {
+      await prisma.gatewayRequestLog.update({
+        where: { id: row.id },
+        data: {
+          lastPolledAt: new Date(),
+          pollCount: { increment: 1 },
+        },
+      });
     }
   }
   return { scanned: rows.length, updated };

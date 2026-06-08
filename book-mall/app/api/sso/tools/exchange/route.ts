@@ -7,6 +7,7 @@ import {
   toolsExchangeAuthorized,
 } from "@/lib/sso-tools-env";
 import { signToolsAccessToken } from "@/lib/tools-sso-token";
+import { resolveTenantContextForUser } from "@/lib/tenant/context";
 import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 import {
   mergeEcomToolkitNavKeys,
@@ -124,6 +125,7 @@ export async function POST(req: Request) {
 
   const expiresIn = getToolsJwtTtlSec();
   const ecomBillingMode = await getUserEcomBillingMode(row.userId);
+  const tenantCtx = await resolveTenantContextForUser(row.userId);
   const accessToken = signToolsAccessToken({
     userId: row.userId,
     secret: jwtSecret,
@@ -131,6 +133,14 @@ export async function POST(req: Request) {
     tier: elig.isAdmin ? "admin" : "gold",
     toolsNavKeys,
     ecomBillingMode,
+    tenant: tenantCtx
+      ? {
+          tenantId: tenantCtx.tenantId,
+          tenantType: tenantCtx.tenantType,
+          roleType: tenantCtx.role,
+          seatId: tenantCtx.seatId,
+        }
+      : undefined,
     profile: {
       email: elig.email,
       name: elig.name,

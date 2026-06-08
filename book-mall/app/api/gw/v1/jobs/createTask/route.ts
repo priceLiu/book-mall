@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { resolveGatewayApiKeyFromBearer } from "@/lib/gateway/api-key-service";
+import {
+  isGatewayAuthResponse,
+  requireGatewayV1Auth,
+} from "@/lib/gateway/gateway-v1-route-auth";
+import { parseGatewayV1LogMeta } from "@/lib/gateway/gateway-v1-log-meta";
 import {
   createRequestLog,
   pickCredentialForKind,
@@ -12,8 +16,10 @@ import {
 import {
   parseGatewayClientSource,
   submitBailianR2vJobForLog,
+  submitDashscopeKlingV3ImageJobForLog,
   submitDashscopeTryOnJobForLog,
   submitDashscopeVideoJobForLog,
+  submitDashscopeWan27ImageJobForLog,
   submitDashscopeWanxJobForLog,
   submitHunyuanJobForLog,
   submitKieJobForLog,
@@ -30,12 +36,10 @@ const BAILIAN_R2V = new Set([
 ]);
 
 export async function POST(request: NextRequest) {
-  const auth = await resolveGatewayApiKeyFromBearer(
-    request.headers.get("authorization"),
-  );
-  if (!auth) {
-    return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
-  }
+  const authOrResp = await requireGatewayV1Auth(request);
+  if (isGatewayAuthResponse(authOrResp)) return authOrResp;
+  const auth = authOrResp;
+  const logMeta = parseGatewayV1LogMeta(request);
 
   let body: {
     model?: string;
@@ -51,14 +55,22 @@ export async function POST(request: NextRequest) {
       parameterExtras?: Record<string, unknown>;
     };
     dashscope?: {
-      jobKind?: "tryon" | "wanx" | "video";
+      jobKind?: "tryon" | "wanx" | "video" | "wan27-image" | "kling-v3-image";
       personImageUrl?: string;
       topGarmentUrl?: string;
       bottomGarmentUrl?: string;
       prompt?: string;
       negativePrompt?: string;
       n?: number;
+      size?: string;
+      refImg?: string;
+      refMode?: "repaint" | "refonly";
+      refStrength?: number;
       videoBody?: Record<string, unknown>;
+      content?: Array<{ text: string } | { image: string }>;
+      contentOrder?: "text-first" | "images-first";
+      aspectRatio?: "16:9" | "9:16" | "1:1";
+      resolution?: "1k" | "2k" | "4k";
     };
     hunyuan?: {
       prompt?: string;
@@ -95,7 +107,7 @@ export async function POST(request: NextRequest) {
   }
 
   const clientSource = parseGatewayClientSource(
-    request.headers.get("x-gateway-client"),
+    logMeta.clientSource ?? request.headers.get("x-gateway-client"),
   );
 
   const isBailianR2v =
@@ -124,6 +136,9 @@ export async function POST(request: NextRequest) {
     providerKind: route.providerKind,
     requestKind: route.requestKind,
     clientSource,
+    clientPage: logMeta.clientPage,
+    storyProjectId: logMeta.storyProjectId,
+    storyTaskId: logMeta.storyTaskId,
     inputSummary: buildGatewayInputSummary(model, inputForLog),
   });
 
@@ -195,6 +210,40 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      if (jobKind === "wan27-image") {
+        const content = Array.isArray(ds.content) ? ds.content : [];
+        const taskId = await submitDashscopeWan27ImageJobForLog({
+          logId: log.id,
+          credentialId,
+          model,
+          content,
+          size: typeof ds.size === "string" ? ds.size : undefined,
+          n: Number(ds.n ?? 1),
+          contentOrder: ds.contentOrder,
+        });
+        return NextResponse.json({
+          code: 200,
+          data: { taskId, logId: log.id, providerKind: "DASHSCOPE" },
+        });
+      }
+
+      if (jobKind === "kling-v3-image") {
+        const content = Array.isArray(ds.content) ? ds.content : [];
+        const taskId = await submitDashscopeKlingV3ImageJobForLog({
+          logId: log.id,
+          credentialId,
+          model,
+          content,
+          aspectRatio: ds.aspectRatio,
+          resolution: ds.resolution,
+          n: Number(ds.n ?? 1),
+        });
+        return NextResponse.json({
+          code: 200,
+          data: { taskId, logId: log.id, providerKind: "DASHSCOPE" },
+        });
+      }
+
       const prompt = String(ds.prompt ?? body.input?.prompt ?? "").trim();
       if (!prompt) {
         return NextResponse.json({ error: "prompt required" }, { status: 400 });
@@ -207,6 +256,11 @@ export async function POST(request: NextRequest) {
         negativePrompt:
           typeof ds.negativePrompt === "string" ? ds.negativePrompt : undefined,
         n: Number(ds.n ?? body.input?.n ?? 1),
+        size: typeof ds.size === "string" ? ds.size : undefined,
+        refImg: typeof ds.refImg === "string" ? ds.refImg : undefined,
+        refMode: ds.refMode,
+        refStrength:
+          typeof ds.refStrength === "number" ? ds.refStrength : undefined,
       });
       return NextResponse.json({
         code: 200,

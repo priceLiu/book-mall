@@ -11,6 +11,7 @@ import {
 import { resolveGatewayTokenMetrics } from "@/lib/gateway/gateway-token-metrics";
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
+import { maskApiKey } from "@/lib/canvas/secret";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   try {
-    await runGatewayPollWorker({ limit: 15 });
+    await runGatewayPollWorker({ limit: 30 });
   } catch {
     /* 列表页 opportunistic 轮询 */
   }
@@ -58,6 +59,22 @@ export async function GET(request: NextRequest) {
     orderBy: { submittedAt: "desc" },
     take: limit,
   });
+
+  const credentialIds = [
+    ...new Set(
+      logs.map((l) => l.credentialId).filter((id): id is string => !!id),
+    ),
+  ];
+  const credentialRows =
+    credentialIds.length > 0
+      ? await prisma.gatewayVendorCredential.findMany({
+          where: { id: { in: credentialIds } },
+          select: { id: true, apiKeyEncrypted: true },
+        })
+      : [];
+  const credentialKeyById = new Map(
+    credentialRows.map((c) => [c.id, maskApiKey(c.apiKeyEncrypted)]),
+  );
 
   const rows = await Promise.all(
     logs.map(async (l) => {
@@ -109,6 +126,9 @@ export async function GET(request: NextRequest) {
         status: l.status,
         requestKind: l.requestKind,
         providerKind: l.providerKind,
+        credentialKeyMasked: l.credentialId
+          ? (credentialKeyById.get(l.credentialId) ?? null)
+          : null,
         clientSource: l.clientSource,
         clientPage: l.clientPage,
         externalTaskId: l.externalTaskId,

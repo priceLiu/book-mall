@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { resolveGatewayApiKeyFromBearer } from "@/lib/gateway/api-key-service";
+
+import {
+  isGatewayAuthResponse,
+  requireGatewayV1Auth,
+} from "@/lib/gateway/gateway-v1-route-auth";
+import { parseGatewayV1LogMeta } from "@/lib/gateway/gateway-v1-log-meta";
 import {
   createRequestLog,
   finalizeRequestLog,
@@ -11,22 +16,22 @@ import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary"
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
+import { isQwenTtsModel } from "@/lib/gateway/qwen-tts-proxy";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const auth = await resolveGatewayApiKeyFromBearer(
-    request.headers.get("authorization"),
-  );
-  if (!auth) {
-    return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
-  }
+  const authOrResp = await requireGatewayV1Auth(request);
+  if (isGatewayAuthResponse(authOrResp)) return authOrResp;
+  const auth = authOrResp;
+  const logMeta = parseGatewayV1LogMeta(request);
 
   let body: {
     model?: string;
     input?: string;
     voice?: string;
     response_format?: string;
+    language_type?: string;
   };
   try {
     body = await request.json();
@@ -50,14 +55,17 @@ export async function POST(request: NextRequest) {
   }
 
   const clientSource = parseGatewayClientSource(
-    request.headers.get("x-gateway-client"),
+    logMeta.clientSource ?? request.headers.get("x-gateway-client"),
   );
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     model,
     input: input.slice(0, 4096),
     voice: body.voice ?? "alloy",
     response_format: body.response_format ?? "mp3",
+    ...(body.language_type?.trim()
+      ? { language_type: body.language_type.trim() }
+      : {}),
   };
 
   const log = await createRequestLog({
@@ -65,10 +73,15 @@ export async function POST(request: NextRequest) {
     apiKeyId: auth.id,
     credentialId,
     model,
-    endpoint: "/v1/audio/speech",
+    endpoint: isQwenTtsModel(model)
+      ? "/services/aigc/multimodal-generation/generation"
+      : "/v1/audio/speech",
     providerKind: route.providerKind,
     requestKind: "TTS",
     clientSource,
+    clientPage: logMeta.clientPage,
+    storyProjectId: logMeta.storyProjectId,
+    storyTaskId: logMeta.storyTaskId,
     inputSummary: buildGatewayInputSummary(model, payload),
   });
 
@@ -86,7 +99,7 @@ export async function POST(request: NextRequest) {
       usage,
       resultSummary: ok
         ? buildGatewayTaskResultSummary(result.vendorJson, {
-            contentType: "audio/mpeg",
+            contentType: result.contentType ?? "audio/mpeg",
             byteLength: result.buffer.length,
           })
         : undefined,
@@ -104,8 +117,9 @@ export async function POST(request: NextRequest) {
     return new NextResponse(new Uint8Array(result.buffer), {
       status: 200,
       headers: {
-        "Content-Type": "audio/mpeg",
+        "Content-Type": result.contentType ?? "audio/mpeg",
         "X-Gateway-Log-Id": log.id,
+        "X-Gateway-Audio-Ext": result.ext ?? "mp3",
       },
     });
   } catch (e) {

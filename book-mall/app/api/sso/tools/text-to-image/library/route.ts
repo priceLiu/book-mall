@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { TOOL_IMAGE_LIBRARY_DEFAULT_MAX } from "@/lib/tool-library-quota";
 import { prismaErrorCode } from "@/lib/ai-fit-db-error";
 import { deleteManagedOssObjectByUrl } from "@/lib/oss-delete-object";
 import { prisma } from "@/lib/prisma";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
-import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
+import { verifyToolsAccessToken, type VerifiedToolsToken } from "@/lib/tools-sso-token";
+import {
+  resolveTenantContextForUser,
+  tenantContextFromClaims,
+  type TenantContext,
+} from "@/lib/tenant/context";
+import {
+  buildVisibleAssetWhere,
+  setAssetVisibility,
+  AssetAccessError,
+} from "@/lib/tenant/asset-sharing-service";
+import { TenantPermissionError } from "@/lib/tenant/permission";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,7 +25,7 @@ const MAX_URL_LEN = 8192;
 const MAX_PROMPT_LEN = 2000;
 
 function verifyBearer(req: Request):
-  | { ok: true; userId: string }
+  | { ok: true; userId: string; token: VerifiedToolsToken }
   | { ok: false; res: NextResponse } {
   let jwtSecret: string;
   try {
@@ -40,7 +52,15 @@ function verifyBearer(req: Request):
       res: NextResponse.json({ error: "无效或过期的工具令牌" }, { status: 401 }),
     };
   }
-  return { ok: true, userId: verified.sub };
+  return { ok: true, userId: verified.sub, token: verified };
+}
+
+/** 由 JWT 声明构造租户上下文，旧 token 回落 DB 解析。 */
+async function resolveCtx(token: VerifiedToolsToken): Promise<TenantContext | null> {
+  return (
+    tenantContextFromClaims(token) ??
+    (await resolveTenantContextForUser(token.sub))
+  );
 }
 
 function coerceHttpsAliyun(raw: string): string {
@@ -71,22 +91,38 @@ export async function GET(req: Request) {
   if (!v.ok) return v.res;
 
   try {
+    const ctx = await resolveCtx(v.token);
+    const isTeam = ctx?.tenantType === "TEAM";
+    const where: Prisma.TextToImageLibraryItemWhereInput =
+      isTeam && ctx
+        ? buildVisibleAssetWhere<Prisma.TextToImageLibraryItemWhereInput>(ctx)
+        : { userId: v.userId };
+    const canManagePublic = ctx?.role === "OWNER" || ctx?.role === "ADMIN";
+
     const [rows, countAll] = await Promise.all([
       prisma.textToImageLibraryItem.findMany({
-        where: { userId: v.userId },
+        where,
         orderBy: { createdAt: "desc" },
         take: 200,
       }),
-      prisma.textToImageLibraryItem.count({ where: { userId: v.userId } }),
+      prisma.textToImageLibraryItem.count({ where }),
     ]);
 
     return NextResponse.json({
-      items: rows.map((r) => ({
-        id: r.id,
-        imageUrl: r.imageUrl,
-        prompt: r.prompt ?? null,
-        createdAt: r.createdAt.toISOString(),
-      })),
+      space: isTeam ? "TEAM" : "PERSONAL",
+      canManagePublic,
+      items: rows.map((r) => {
+        const mine = (r.ownerUserId ?? r.userId) === v.userId;
+        return {
+          id: r.id,
+          imageUrl: r.imageUrl,
+          prompt: r.prompt ?? null,
+          createdAt: r.createdAt.toISOString(),
+          visibility: r.visibility,
+          mine,
+          canToggle: isTeam && (mine || canManagePublic),
+        };
+      }),
       quota: { max: TOOL_IMAGE_LIBRARY_DEFAULT_MAX, used: countAll },
     });
   } catch (e) {
@@ -149,11 +185,15 @@ export async function POST(req: Request) {
       );
     }
 
+    const ctx = await resolveCtx(v.token);
     const row = await prisma.textToImageLibraryItem.create({
       data: {
         userId: v.userId,
         imageUrl,
         prompt,
+        tenantId: ctx?.tenantId ?? null,
+        ownerUserId: v.userId,
+        visibility: "PRIVATE",
       },
     });
     return NextResponse.json({
@@ -162,6 +202,7 @@ export async function POST(req: Request) {
         imageUrl: row.imageUrl,
         prompt: row.prompt ?? null,
         createdAt: row.createdAt.toISOString(),
+        visibility: row.visibility,
       },
       quota: { max: TOOL_IMAGE_LIBRARY_DEFAULT_MAX, used: used + 1 },
     });
@@ -197,10 +238,27 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    const row = await prisma.textToImageLibraryItem.findFirst({
-      where: { id, userId: v.userId },
-      select: { id: true, imageUrl: true },
+    const ctx = await resolveCtx(v.token);
+    const canManagePublic = ctx?.role === "OWNER" || ctx?.role === "ADMIN";
+    const found = await prisma.textToImageLibraryItem.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        imageUrl: true,
+        userId: true,
+        ownerUserId: true,
+        tenantId: true,
+        visibility: true,
+      },
     });
+    const mine = found && (found.ownerUserId ?? found.userId) === v.userId;
+    const teamManageable =
+      found &&
+      ctx?.tenantType === "TEAM" &&
+      found.tenantId === ctx.tenantId &&
+      found.visibility === "TEAM_PUBLIC" &&
+      canManagePublic;
+    const row = found && (mine || teamManageable) ? found : null;
     if (!row) {
       return NextResponse.json({ error: "不存在或无权删除" }, { status: 404 });
     }
@@ -226,5 +284,45 @@ export async function DELETE(req: Request) {
         ? (e as Error).message
         : "删除失败";
     return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+/** 切换条目可见域（设为团队公共 / 收回私有）；仅团队空间可用。 */
+export async function PATCH(req: Request) {
+  const v = verifyBearer(req);
+  if (!v.ok) return v.res;
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "请求体须为 JSON" }, { status: 400 });
+  }
+  const id = typeof body.id === "string" ? body.id.trim() : "";
+  const visibility = body.visibility === "TEAM_PUBLIC" ? "TEAM_PUBLIC" : "PRIVATE";
+  if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 });
+
+  const ctx = await resolveCtx(v.token);
+  if (!ctx || ctx.tenantType !== "TEAM") {
+    return NextResponse.json({ error: "个人空间无团队公共库" }, { status: 400 });
+  }
+
+  try {
+    await setAssetVisibility({
+      ctx,
+      model: "textToImageLibraryItem",
+      assetId: id,
+      visibility,
+    });
+    return NextResponse.json({ ok: true, visibility });
+  } catch (e) {
+    if (e instanceof TenantPermissionError) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
+    }
+    if (e instanceof AssetAccessError) {
+      return NextResponse.json({ error: e.message }, { status: 404 });
+    }
+    console.error("[text-to-image/library] PATCH visibility failed", e);
+    return NextResponse.json({ error: "切换可见域失败" }, { status: 500 });
   }
 }

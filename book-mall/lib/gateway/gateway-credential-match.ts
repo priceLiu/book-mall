@@ -21,13 +21,52 @@ export function isGatewayProviderBound(
   return gatewayCredentialSubstitutes(required).some((k) => bound.has(k));
 }
 
+export interface RoutableCredential {
+  id: string;
+  providerKind: GatewayProviderKind;
+  alias?: string;
+  channel?: string | null;
+  sortOrder?: number;
+  isDefaultForProvider?: boolean;
+}
+
+/**
+ * 多 Key 路由（gateway-multi-credential · 轨道 A）：
+ * 同一厂商存在多条凭证时，按优先级选用：
+ *   1. 显式指定的 preferredCredentialId（须命中且 providerKind 可代）
+ *   2. isDefaultForProvider = true（每厂商默认凭证）
+ *   3. sortOrder 升序最小
+ *   4. 兜底：绑定列表第一条
+ */
 export function pickCredentialIdForProvider(
-  credentials: { id: string; providerKind: GatewayProviderKind }[],
+  credentials: RoutableCredential[],
   required: GatewayProviderKind,
+  preferredCredentialId?: string | null,
 ): string | null {
-  for (const kind of gatewayCredentialSubstitutes(required)) {
-    const hit = credentials.find((c) => c.providerKind === kind);
-    if (hit) return hit.id;
+  const kinds = gatewayCredentialSubstitutes(required);
+  const matches = credentials.filter((c) => kinds.includes(c.providerKind));
+  if (matches.length === 0) return null;
+
+  if (preferredCredentialId) {
+    const explicit = matches.find((c) => c.id === preferredCredentialId);
+    if (explicit) return explicit.id;
   }
-  return null;
+
+  const byKindOrder = (c: RoutableCredential) => {
+    const idx = kinds.indexOf(c.providerKind);
+    return idx < 0 ? kinds.length : idx;
+  };
+  const sorted = [...matches].sort((a, b) => {
+    // 默认凭证优先
+    const da = a.isDefaultForProvider ? 0 : 1;
+    const db = b.isDefaultForProvider ? 0 : 1;
+    if (da !== db) return da - db;
+    // 同厂商替代顺序（required 优先于 substitute）
+    const ka = byKindOrder(a);
+    const kb = byKindOrder(b);
+    if (ka !== kb) return ka - kb;
+    // sortOrder 升序
+    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+  });
+  return sorted[0]?.id ?? null;
 }

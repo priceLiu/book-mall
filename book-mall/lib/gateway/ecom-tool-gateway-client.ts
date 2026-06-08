@@ -8,34 +8,24 @@ import {
   summarizeUpstreamFailMessage,
 } from "@/lib/gateway/book-gateway-link";
 import {
-  createRequestLog,
   finalizeRequestLog,
-  forwardChatCompletionsStream,
   parseOpenAiUsage,
   pickCredentialForKind,
   type UsageFromResponse,
 } from "@/lib/gateway/proxy-common";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
-import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
+import { buildGatewayStreamChatResultSummary } from "@/lib/gateway/log-result-summary";
 import {
-  buildGatewayStreamChatResultSummary,
-  buildGatewayTaskResultSummary,
-} from "@/lib/gateway/log-result-summary";
-import {
-  pollBailianR2vTaskForLog,
-  pollDashscopeTaskForLog,
-  pollKieTaskForLog,
-  submitBailianR2vJobForLog,
-  submitDashscopeVideoJobForLog,
-  submitDashscopeKlingV3ImageJobForLog,
-  submitDashscopeWan27ImageJobForLog,
-  submitDashscopeWanxJobForLog,
-  submitKieJobForLog,
-} from "@/lib/gateway/poll-service";
+  gatewayV1ChatCompletionsStream,
+  gatewayV1ClientMeta,
+  gatewayV1CreateTask,
+  gatewayV1RecordInfo,
+} from "@/lib/gateway/gateway-v1-http-client";
 import {
   isBailianR2vFailed,
   isBailianR2vSucceeded,
 } from "@/lib/canvas/canvas-gateway-client";
+import type { BailianR2vTaskOutput } from "@/lib/canvas/canvas-video-bailian-r2v";
 import {
   extractKieResultUrl,
   isKieRecordFail,
@@ -48,13 +38,10 @@ import {
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
 import { resolveEcomGatewayAuthForUser } from "@/lib/ecom/ecom-gateway-auth";
-import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
 import {
   isVolcengineVideoTaskFailed,
   isVolcengineVideoTaskSuccess,
-  volcengineGetVideoTask,
 } from "@/lib/gateway/volcengine-client";
-import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import type { CanvasChatMessage } from "@/lib/canvas/providers/types";
 
 const CLIENT_SOURCE: GatewayClientSource = "E_COMMERCE";
@@ -117,74 +104,60 @@ export async function ecomGwCreateDashscopeJob(
   }
 
   const model = opts.model.trim();
-  const route = routeGatewayModel(model);
-  const inputSummary =
-    opts.kind === "wanx"
-      ? buildGatewayInputSummary(model, { prompt: opts.prompt, n: opts.n })
-      : opts.kind === "wan27-image" || opts.kind === "kling-v3-image"
-        ? buildGatewayInputSummary(model, {
-            refCount: opts.content.filter((c) => "image" in c).length,
-            n: opts.n ?? 1,
-          })
-        : buildGatewayInputSummary(model, opts.body);
+  routeGatewayModel(model);
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const body =
+    opts.kind === "wanx"
+      ? {
+          model,
+          dashscope: {
+            jobKind: "wanx" as const,
+            prompt: opts.prompt,
+            negativePrompt: opts.negativePrompt,
+            n: opts.n,
+            size: opts.size,
+            refImg: opts.refImg,
+            refMode: opts.refMode,
+            refStrength: opts.refStrength,
+          },
+        }
+      : opts.kind === "wan27-image"
+        ? {
+            model,
+            dashscope: {
+              jobKind: "wan27-image" as const,
+              content: opts.content,
+              size: opts.size,
+              n: opts.n,
+              contentOrder: opts.contentOrder,
+            },
+          }
+        : opts.kind === "kling-v3-image"
+          ? {
+              model,
+              dashscope: {
+                jobKind: "kling-v3-image" as const,
+                content: opts.content,
+                aspectRatio: opts.aspectRatio,
+                resolution: opts.resolution,
+                n: opts.n,
+              },
+            }
+          : {
+              model,
+              dashscope: {
+                jobKind: "video" as const,
+                videoBody: opts.body,
+              },
+            };
+
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/jobs/createTask",
-    providerKind: "DASHSCOPE",
-    requestKind: route.requestKind,
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary,
+    body,
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
   });
 
-  let taskId: string;
-  if (opts.kind === "wanx") {
-    taskId = await submitDashscopeWanxJobForLog({
-      logId: log.id,
-      credentialId,
-      model,
-      prompt: opts.prompt,
-      negativePrompt: opts.negativePrompt,
-      n: opts.n,
-      size: opts.size,
-      refImg: opts.refImg,
-      refMode: opts.refMode,
-      refStrength: opts.refStrength,
-    });
-  } else if (opts.kind === "wan27-image") {
-    taskId = await submitDashscopeWan27ImageJobForLog({
-      logId: log.id,
-      credentialId,
-      model,
-      content: opts.content,
-      size: opts.size,
-      n: opts.n,
-      contentOrder: opts.contentOrder,
-    });
-  } else if (opts.kind === "kling-v3-image") {
-    taskId = await submitDashscopeKlingV3ImageJobForLog({
-      logId: log.id,
-      credentialId,
-      model,
-      content: opts.content,
-      aspectRatio: opts.aspectRatio,
-      resolution: opts.resolution,
-      n: opts.n,
-    });
-  } else {
-    taskId = await submitDashscopeVideoJobForLog({
-      logId: log.id,
-      credentialId,
-      model,
-      body: opts.body,
-    });
-  }
-
-  return { taskId, logId: log.id };
+  return { taskId: created.taskId, logId: created.logId };
 }
 
 export function ecomExtractMediaUrl(output: DashscopeTaskOutput): string | null {
@@ -203,31 +176,20 @@ export async function ecomGwPollDashscope(
     throw new GatewayRequiredError("Gateway Key 未绑定 DashScope 凭证");
   }
 
-  const polled = await pollDashscopeTaskForLog({
-    credentialId,
+  const polled = await gatewayV1RecordInfo({
+    apiKeyId: auth.id,
     taskId: opts.taskId,
+    meta: gatewayV1ClientMeta("E_COMMERCE"),
   });
-  const { output, raw } = polled;
+  const output = polled.data as DashscopeTaskOutput;
 
   const status = output.task_status ?? "UNKNOWN";
   if (isDashscopeTaskSuccess(status)) {
     const outputUrl = ecomExtractMediaUrl(output);
-    await finalizeRequestLog(opts.gatewayLogId, {
-      status: "SUCCEEDED",
-      durationMs: 0,
-      resultSummary: buildGatewayTaskResultSummary(raw, output),
-      externalTaskId: opts.taskId,
-    });
     return { status: "SUCCEEDED", outputUrl: outputUrl ?? undefined };
   }
   if (isDashscopeTaskFailed(status)) {
     const failMessage = output.message ?? output.code ?? "failed";
-    await finalizeRequestLog(opts.gatewayLogId, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: summarizeUpstreamFailMessage(failMessage, 500),
-      externalTaskId: opts.taskId,
-    });
     return { status: "FAILED", failMessage };
   }
   return { status };
@@ -331,48 +293,31 @@ export async function ecomGwChatStream(
     ...(opts.params ?? {}),
   };
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const result = await gatewayV1ChatCompletionsStream({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/chat/completions",
-    providerKind: route.providerKind,
-    requestKind: "CHAT",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, body),
-  });
-
-  const started = Date.now();
-  const result = await forwardChatCompletionsStream({
-    credentialId,
-    providerKind: route.providerKind,
     body,
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
   });
 
-  if (!result.body || result.status >= 300) {
-    const errText = result.body
-      ? await new Response(result.body).text()
+  const logId = result.headers.get("x-gateway-log-id") ?? "";
+  const bodyStream = result.body;
+
+  if (!bodyStream || result.status >= 300) {
+    const errText = bodyStream
+      ? await new Response(bodyStream).text()
       : `HTTP ${result.status}`;
-    const failMessage = summarizeUpstreamFailMessage(errText, result.status);
-    await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: Date.now() - started,
-      failCode: `UPSTREAM_HTTP_${result.status}`,
-      failMessage,
-      model,
-    });
-    throw new GatewayRequiredError(failMessage);
+    throw new GatewayRequiredError(
+      summarizeUpstreamFailMessage(errText, result.status),
+    );
   }
 
   return {
-    logId: log.id,
+    logId,
     status: result.status,
-    body: wrapEcomChatStreamWithLogFinalize(result.body, {
-      logId: log.id,
+    body: wrapEcomChatStreamWithLogFinalize(bodyStream, {
+      logId,
       model,
-      startedMs: Date.now() - started,
+      startedMs: 0,
     }),
   };
 }
@@ -396,27 +341,13 @@ export async function ecomGwCreateVolcengineVideoJob(
   }
 
   const model = opts.model.trim();
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/jobs/createTask",
-    providerKind: "VOLCENGINE",
-    requestKind: "VIDEO",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, opts.body),
+    body: { model, input: opts.body },
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
   });
 
-  const taskId = await submitVolcengineVideoJobForLog({
-    logId: log.id,
-    credentialId,
-    model,
-    body: opts.body,
-  });
-
-  return { taskId, logId: log.id };
+  return { taskId: created.taskId, logId: created.logId };
 }
 
 export async function ecomGwPollVolcengine(
@@ -429,29 +360,15 @@ export async function ecomGwPollVolcengine(
     throw new GatewayRequiredError("Gateway Key 未绑定火山方舟凭证");
   }
 
-  const cred = await getDecryptedCredentialApiKey(credentialId);
-  if (!cred) {
-    throw new GatewayRequiredError("火山方舟凭证不可用");
-  }
-
-  const polled = await volcengineGetVideoTask({
-    apiKey: cred.apiKey,
-    baseUrl: cred.baseUrl,
+  const polled = await gatewayV1RecordInfo({
+    apiKeyId: auth.id,
     taskId: opts.taskId,
+    meta: gatewayV1ClientMeta("E_COMMERCE"),
   });
-  const row = polled.output;
+  const row = polled.data as import("@/lib/gateway/volcengine-client").VolcengineVideoTaskResult;
 
   if (isVolcengineVideoTaskSuccess(row)) {
     const outputUrl = row.content?.video_url?.trim();
-    await finalizeRequestLog(opts.gatewayLogId, {
-      status: "SUCCEEDED",
-      durationMs: 0,
-      resultSummary: buildGatewayTaskResultSummary(
-        polled.raw,
-        outputUrl ? { videoUrl: outputUrl } : { status: row.status },
-      ),
-      externalTaskId: opts.taskId,
-    });
     return { status: "SUCCEEDED", outputUrl: outputUrl ?? undefined };
   }
 
@@ -460,12 +377,6 @@ export async function ecomGwPollVolcengine(
       typeof row.error === "string"
         ? row.error
         : (row.error?.message ?? `status=${row.status}`);
-    await finalizeRequestLog(opts.gatewayLogId, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: summarizeUpstreamFailMessage(failMessage, 500),
-      externalTaskId: opts.taskId,
-    });
     return { status: "FAILED", failMessage };
   }
 
@@ -488,28 +399,13 @@ export async function ecomGwCreateKieJob(
   }
 
   const model = opts.model.trim();
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/jobs/createTask",
-    providerKind: "KIE",
-    requestKind: route.requestKind,
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, opts.input),
+    body: { model, input: opts.input, callBackUrl: null },
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
   });
 
-  const taskId = await submitKieJobForLog({
-    logId: log.id,
-    credentialId,
-    model,
-    input: opts.input,
-    callBackUrl: null,
-  });
-
-  return { taskId, logId: log.id };
+  return { taskId: created.taskId, logId: created.logId };
 }
 
 export async function ecomGwPollKie(
@@ -522,33 +418,20 @@ export async function ecomGwPollKie(
     throw new GatewayRequiredError("Gateway Key 未绑定 KIE 凭证");
   }
 
-  const record = await pollKieTaskForLog({
-    logId: opts.gatewayLogId,
-    credentialId,
+  const polled = await gatewayV1RecordInfo({
+    apiKeyId: auth.id,
     taskId: opts.taskId,
+    meta: gatewayV1ClientMeta("E_COMMERCE"),
   });
+  const record = polled.data as import("@/lib/story/kie-client").KieRecordResponse;
 
   const state = record.state ?? "UNKNOWN";
   if (isKieRecordSuccess(state)) {
     const outputUrl = extractKieResultUrl(record) ?? undefined;
-    await finalizeRequestLog(opts.gatewayLogId, {
-      status: "SUCCEEDED",
-      durationMs: 0,
-      resultSummary: { state, resultJson: record.resultJson },
-      externalTaskId: record.taskId,
-      model: record.model,
-    });
     return { status: "SUCCEEDED", outputUrl };
   }
   if (isKieRecordFail(state)) {
     const failMessage = record.failMsg ?? record.failCode ?? "failed";
-    await finalizeRequestLog(opts.gatewayLogId, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: summarizeUpstreamFailMessage(failMessage, 500),
-      externalTaskId: record.taskId,
-      model: record.model,
-    });
     return { status: "FAILED", failMessage };
   }
   return { status: state };
@@ -575,41 +458,24 @@ export async function ecomGwCreateBailianR2vJob(
   }
 
   const model = opts.model.trim();
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/jobs/createTask",
-    providerKind: "BAILIAN",
-    requestKind: "VIDEO",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, {
-      prompt: opts.prompt,
-      referenceImageUrls: opts.referenceImageUrls,
-      resolution: opts.resolution,
-      ratio: opts.ratio,
-      duration: opts.duration,
-      ...(opts.seedStr ? { seed: opts.seedStr } : {}),
-      ...(opts.parameterExtras ?? {}),
-    }),
+    body: {
+      model,
+      bailian: {
+        prompt: opts.prompt,
+        referenceImageUrls: opts.referenceImageUrls,
+        resolution: opts.resolution,
+        ratio: opts.ratio,
+        duration: opts.duration,
+        seedStr: opts.seedStr,
+        parameterExtras: opts.parameterExtras,
+      },
+    },
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
   });
 
-  const taskId = await submitBailianR2vJobForLog({
-    logId: log.id,
-    credentialId,
-    model,
-    prompt: opts.prompt,
-    referenceImageUrls: opts.referenceImageUrls,
-    resolution: opts.resolution,
-    ratio: opts.ratio,
-    duration: opts.duration,
-    seedStr: opts.seedStr,
-    parameterExtras: opts.parameterExtras,
-  });
-
-  return { taskId, logId: log.id };
+  return { taskId: created.taskId, logId: created.logId };
 }
 
 export async function ecomGwPollBailianR2v(
@@ -622,35 +488,21 @@ export async function ecomGwPollBailianR2v(
     throw new GatewayRequiredError("Gateway Key 未绑定百炼凭证");
   }
 
-  const polled = await pollBailianR2vTaskForLog({
-    credentialId,
+  const polled = await gatewayV1RecordInfo({
+    apiKeyId: auth.id,
     taskId: opts.taskId,
+    meta: gatewayV1ClientMeta("E_COMMERCE"),
   });
-  const { output, raw } = polled;
+  const output = polled.data as BailianR2vTaskOutput;
 
   if (isBailianR2vSucceeded(output)) {
     const outputUrl = output.video_url?.trim() ?? undefined;
-    await finalizeRequestLog(opts.gatewayLogId, {
-      status: "SUCCEEDED",
-      durationMs: 0,
-      resultSummary: buildGatewayTaskResultSummary(
-        raw,
-        outputUrl ? { videoUrl: outputUrl } : { status: output.task_status },
-      ),
-      externalTaskId: opts.taskId,
-    });
     return { status: "SUCCEEDED", outputUrl };
   }
 
   if (isBailianR2vFailed(output)) {
     const failMessage =
       output.message ?? output.code ?? `status=${output.task_status ?? "FAILED"}`;
-    await finalizeRequestLog(opts.gatewayLogId, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: summarizeUpstreamFailMessage(failMessage, 500),
-      externalTaskId: opts.taskId,
-    });
     return { status: "FAILED", failMessage };
   }
 

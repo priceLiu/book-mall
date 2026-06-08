@@ -1,5 +1,6 @@
 import type { EcomBillingMode } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isUnifiedCreditBillingActive } from "@/lib/billing/unified-credit-flag";
 
 export async function getUserEcomBillingMode(
   userId: string,
@@ -29,6 +30,8 @@ export async function shouldMeterEcomToolkitUsage(
   toolKey: string,
 ): Promise<boolean> {
   if (!toolKey.trim().startsWith("ecom-toolkit")) return false;
+  // 统一积分计费激活：电商代付按次扣点收敛（互斥），改由 Gateway 按积分结算
+  if (isUnifiedCreditBillingActive()) return false;
   const mode = await getUserEcomBillingMode(userId);
   return mode === "PLATFORM_METERED";
 }

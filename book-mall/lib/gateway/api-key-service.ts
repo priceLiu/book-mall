@@ -91,10 +91,30 @@ async function ensurePersonalApiKeyBindingsSynced(
   await syncPersonalGatewayApiKeyBindings(gatewayUserId);
 }
 
+export type ResolvedCredential = {
+  id: string;
+  providerKind: GatewayProviderKind;
+  alias: string;
+  channel: string | null;
+  sortOrder: number;
+  isDefaultForProvider: boolean;
+};
+
 export type ResolvedGatewayApiKeyAuth = GatewayApiKey & {
   user: GatewayUser;
-  credentials: { id: string; providerKind: GatewayProviderKind; alias: string }[];
+  credentials: ResolvedCredential[];
 };
+
+/** 解析凭证时统一 select（含多 Key 路由字段）。 */
+const CREDENTIAL_SELECT = {
+  id: true,
+  providerKind: true,
+  alias: true,
+  channel: true,
+  sortOrder: true,
+  isDefaultForProvider: true,
+  active: true,
+} as const;
 
 function mapResolvedGatewayApiKeyAuth(
   row: GatewayApiKey & {
@@ -104,6 +124,9 @@ function mapResolvedGatewayApiKeyAuth(
         id: string;
         providerKind: GatewayProviderKind;
         alias: string;
+        channel: string | null;
+        sortOrder: number;
+        isDefaultForProvider: boolean;
         active: boolean;
       };
     }[];
@@ -113,7 +136,15 @@ function mapResolvedGatewayApiKeyAuth(
     ...row,
     credentials: row.bindings
       .map((b) => b.credential)
-      .filter((c) => c.active),
+      .filter((c) => c.active)
+      .map((c) => ({
+        id: c.id,
+        providerKind: c.providerKind,
+        alias: c.alias,
+        channel: c.channel,
+        sortOrder: c.sortOrder,
+        isDefaultForProvider: c.isDefaultForProvider,
+      })),
   };
 }
 
@@ -166,13 +197,7 @@ export async function createGatewayApiKey(opts: {
 
 export async function resolveGatewayApiKeyFromBearer(
   authorization: string | null,
-): Promise<
-  | (GatewayApiKey & {
-      user: GatewayUser;
-      credentials: { id: string; providerKind: GatewayProviderKind; alias: string }[];
-    })
-  | null
-> {
+): Promise<ResolvedGatewayApiKeyAuth | null> {
   if (!authorization?.toLowerCase().startsWith("bearer ")) return null;
   const raw = authorization.slice(7).trim();
   if (!raw.startsWith(KEY_PREFIX)) return null;
@@ -189,12 +214,7 @@ export async function resolveGatewayApiKeyFromBearer(
       bindings: {
         include: {
           credential: {
-            select: {
-              id: true,
-              providerKind: true,
-              alias: true,
-              active: true,
-            },
+            select: CREDENTIAL_SELECT,
           },
         },
       },
@@ -210,12 +230,7 @@ export async function resolveGatewayApiKeyFromBearer(
         bindings: {
           include: {
             credential: {
-              select: {
-                id: true,
-                providerKind: true,
-                alias: true,
-                active: true,
-              },
+              select: CREDENTIAL_SELECT,
             },
           },
         },
@@ -242,12 +257,7 @@ export async function resolveGatewayApiKeyById(
       bindings: {
         include: {
           credential: {
-            select: {
-              id: true,
-              providerKind: true,
-              alias: true,
-              active: true,
-            },
+            select: CREDENTIAL_SELECT,
           },
         },
       },
@@ -263,12 +273,7 @@ export async function resolveGatewayApiKeyById(
         bindings: {
           include: {
             credential: {
-              select: {
-                id: true,
-                providerKind: true,
-                alias: true,
-                active: true,
-              },
+              select: CREDENTIAL_SELECT,
             },
           },
         },
