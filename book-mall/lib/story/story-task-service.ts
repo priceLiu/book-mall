@@ -38,6 +38,7 @@ import {
   extractKieResultUrl,
   isKieRecordFail,
   isKieRecordSuccess,
+  formatKieTaskFailMessage,
   KieError,
   logKieEvent,
   type KieRecordResponse,
@@ -365,6 +366,7 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const code = e instanceof KieError ? e.code : "KIE_HTTP_ERROR";
+    const friendly = formatKieTaskFailMessage(code, msg);
     logKieEvent("warn", `createTask failed (will retry via poll worker)`, {
       taskId: task.id,
       code,
@@ -374,7 +376,7 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
       where: { id: task.id },
       data: {
         failCode: code,
-        failMessage: msg.slice(0, 500),
+        failMessage: friendly.slice(0, 500),
       },
     });
     // 故意不 throw —— 任务保留 PENDING，poll worker 后续会重试
@@ -1029,24 +1031,26 @@ export async function runPollWorker(opts?: {
       result.retried++;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      const errCode = e instanceof KieError ? e.code : "KIE_HTTP_ERROR";
       const nextCount = task.pollCount + 1;
-      const failed = nextCount >= RETRY_PENDING_LIMIT;
+      const exhausted = nextCount >= RETRY_PENDING_LIMIT;
+      const friendly = formatKieTaskFailMessage(errCode, msg);
       await prisma.storyGenerationTask.update({
         where: { id: task.id },
         data: {
           lastPolledAt: new Date(),
           pollCount: nextCount,
-          ...(failed
+          ...(exhausted
             ? {
                 status: "FAILED" as StoryGenerationStatus,
-                failCode: "KIE_CREATE_RETRIES_EXHAUSTED",
-                failMessage: msg.slice(0, 500),
+                failCode: errCode,
+                failMessage: friendly.slice(0, 500),
                 completedAt: new Date(),
               }
-            : { failMessage: msg.slice(0, 500) }),
+            : { failMessage: friendly.slice(0, 500) }),
         },
       });
-      if (failed) result.failed++;
+      if (exhausted) result.failed++;
     }
   }
 

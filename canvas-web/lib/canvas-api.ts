@@ -822,13 +822,32 @@ export type ScriptAssistantMessage = {
   createdAt: string;
 };
 
+export type ScriptAssistantHistoryThread = {
+  workflowKey: string;
+  theme: string | null;
+  messageCount: number;
+  updatedAt: string;
+};
+
+export async function listScriptAssistantHistoryThreads(
+  base: string,
+  projectId: string,
+): Promise<ScriptAssistantHistoryThread[]> {
+  const j = await call<{ threads: ScriptAssistantHistoryThread[] }>(
+    base,
+    `/api/canvas/story-pro/script-assistant/history?projectId=${encodeURIComponent(projectId)}&listThreads=1`,
+  );
+  return j.threads ?? [];
+}
+
 export async function getScriptAssistantHistory(
   base: string,
   projectId: string,
+  workflowKey: string,
 ): Promise<ScriptAssistantMessage[]> {
   const j = await call<{ messages: ScriptAssistantMessage[] }>(
     base,
-    `/api/canvas/story-pro/script-assistant/history?projectId=${encodeURIComponent(projectId)}`,
+    `/api/canvas/story-pro/script-assistant/history?projectId=${encodeURIComponent(projectId)}&workflowKey=${encodeURIComponent(workflowKey)}`,
   );
   return j.messages;
 }
@@ -836,7 +855,9 @@ export async function getScriptAssistantHistory(
 export async function saveScriptAssistantHistory(
   base: string,
   projectId: string,
+  workflowKey: string,
   messages: ScriptAssistantMessage[],
+  theme?: string,
 ): Promise<ScriptAssistantMessage[]> {
   const j = await call<{ messages: ScriptAssistantMessage[] }>(
     base,
@@ -844,7 +865,7 @@ export async function saveScriptAssistantHistory(
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, messages }),
+      body: JSON.stringify({ projectId, workflowKey, theme, messages }),
     },
   );
   return j.messages;
@@ -853,10 +874,11 @@ export async function saveScriptAssistantHistory(
 export async function clearScriptAssistantHistory(
   base: string,
   projectId: string,
+  workflowKey: string,
 ): Promise<void> {
   await call<{ ok: boolean }>(
     base,
-    `/api/canvas/story-pro/script-assistant/history?projectId=${encodeURIComponent(projectId)}`,
+    `/api/canvas/story-pro/script-assistant/history?projectId=${encodeURIComponent(projectId)}&workflowKey=${encodeURIComponent(workflowKey)}`,
     { method: "DELETE" },
   );
 }

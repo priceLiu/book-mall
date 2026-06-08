@@ -52,6 +52,7 @@ export class KieError extends Error {
     public code:
       | "KIE_NOT_CONFIGURED"
       | "KIE_HTTP_ERROR"
+      | "KIE_QUOTA_EXCEEDED"
       | "KIE_TASK_NOT_FOUND"
       | "KIE_INVALID_RESPONSE",
     message: string,
@@ -61,6 +62,30 @@ export class KieError extends Error {
     super(message);
     this.name = "KieError";
   }
+}
+
+function kieQuotaExceededMessage(_raw?: string): string {
+  return "KIE 余额不足，请登录 kie.ai 充值后重试";
+}
+
+/** 写入任务 failMessage 前统一友好化（story / canvas 共用） */
+export function formatKieTaskFailMessage(
+  failCode?: string | null,
+  failMessage?: string | null,
+): string {
+  const msg = (failMessage ?? "").trim();
+  const code = (failCode ?? "").trim();
+  const blob = `${code} ${msg}`.toLowerCase();
+  if (
+    code === "KIE_QUOTA_EXCEEDED" ||
+    blob.includes("code=402") ||
+    blob.includes("credits insufficient") ||
+    blob.includes("insufficient credit") ||
+    blob.includes("余额不足")
+  ) {
+    return kieQuotaExceededMessage(msg);
+  }
+  return msg || code || "生成失败";
 }
 
 function getApiKey(): string {
@@ -107,19 +132,36 @@ async function createKieTaskWithApiKey(
     /* not JSON */
   }
   if (!r.ok) {
+    if (r.status === 402 || /quota|insufficient|credit|balance/i.test(text)) {
+      throw new KieError(
+        "KIE_QUOTA_EXCEEDED",
+        kieQuotaExceededMessage(text),
+        402,
+        false,
+      );
+    }
     throw new KieError(
       "KIE_HTTP_ERROR",
       `createTask HTTP ${r.status}: ${text.slice(0, 400)}`,
-      502,
+      r.status >= 400 && r.status < 600 ? r.status : 502,
     );
   }
   const code = (json as { code?: number })?.code;
   if (code !== 200) {
-    const msg = (json as { msg?: string })?.msg ?? text;
+    const msg = String((json as { msg?: string })?.msg ?? text);
+    if (code === 402 || /quota|insufficient|credit|balance/i.test(msg)) {
+      throw new KieError(
+        "KIE_QUOTA_EXCEEDED",
+        kieQuotaExceededMessage(msg),
+        402,
+        false,
+      );
+    }
     throw new KieError(
       "KIE_HTTP_ERROR",
       `createTask code=${code} msg=${msg}`,
-      502,
+      code >= 400 && code < 600 ? code : 502,
+      code !== 402,
     );
   }
   const taskId = (json as { data?: { taskId?: string } })?.data?.taskId;

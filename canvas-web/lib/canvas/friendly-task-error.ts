@@ -16,12 +16,15 @@ export function formatCanvasTaskError(
     return "API 调用频率过高（429），请稍等 1～2 分钟后重试；批量任务会排队依次执行。";
   }
   if (
+    blob.includes("kie_quota_exceeded") ||
     blob.includes("provider_quota_exceeded") ||
+    blob.includes("code=402") ||
     blob.includes("余额不足") ||
     blob.includes("credits insufficient") ||
+    blob.includes("insufficient credit") ||
     blob.includes("配额不足")
   ) {
-    return "KIE 余额不足，请登录 kie.ai 充值后再试；或在「操作…」里换用 deepseek-chat 等非 KIE 模型。";
+    return "KIE 账户余额不足。请在 kie.ai 为 Gateway 绑定的 KIE API Key 充值后重试；分镜视频可改用百炼 Wan R2V、Seedance 等其它模型。";
   }
   if (blob.includes("kie chat empty content")) {
     return "KIE Gemini 返回空内容（可能被安全策略拦截或 reasoning 未输出正文）。请稍后重试，或换 deepseek-chat 等模型。";

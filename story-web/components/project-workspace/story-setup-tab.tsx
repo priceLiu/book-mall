@@ -10,6 +10,7 @@ import { MediaPlaceholder } from "@/components/project-workspace/media-placehold
 import { MediaHoverActions } from "@/components/project-workspace/media-hover-actions";
 import { MediaLightbox } from "@/components/project-workspace/media-lightbox";
 import { CharacterEditModal } from "@/components/project-workspace/character-edit-modal";
+import { formatStoryTaskError } from "@/lib/friendly-task-error";
 import {
   apiDeleteCharacter,
   apiInitializeProject,
@@ -306,7 +307,10 @@ export function StorySetupTab({ project, onProjectChange, reload }: Props) {
                       : "empty"
                 }
                 loadingLabel="封面生成中…"
-                failedReason={coverFailMessage}
+                failedReason={formatStoryTaskError(
+                  project.coverTaskFailCode,
+                  coverFailMessage,
+                )}
                 failedCode={project.coverTaskFailCode ?? null}
               />
             )}
@@ -460,7 +464,10 @@ export function StorySetupTab({ project, onProjectChange, reload }: Props) {
                             : "empty"
                       }
                       loadingLabel="头像生成中"
-                      failedReason={avatarFailMessage(character.id, character)}
+                      failedReason={formatStoryTaskError(
+                        character.avatarTaskFailCode,
+                        avatarFailMessage(character.id, character),
+                      )}
                       failedCode={
                         character.avatarTaskFailCode ??
                         project.pendingTasks.find(

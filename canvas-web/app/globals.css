@@ -183,7 +183,8 @@ body {
 .react-flow__pane,
 .react-flow__viewport,
 .canvas-flow-wrap,
-[data-canvas-editor] {
+[data-canvas-editor],
+[data-canvas-block-nav-gesture] {
   overscroll-behavior: none;
   overscroll-behavior-x: none;
 }
