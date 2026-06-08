@@ -9,6 +9,8 @@ import { mergeEcomToolkitNavKeys } from "@/lib/ecom/ecom-access";
 import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 import { getActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
+import { resolveTenantContextForUser } from "@/lib/tenant/context";
+import { getCreditBalance } from "@/lib/billing/credit-account-service";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +145,18 @@ export async function GET(req: Request) {
   const ecom_billing_mode =
     verified.ecom_billing_mode ?? (await getUserEcomBillingMode(verified.sub));
 
+  // 多租户上下文 + 当前空间积分余额（团队取共享池，个人取个人账户）
+  const tenantCtx = await resolveTenantContextForUser(
+    verified.sub,
+    verified.tenant_id ?? null,
+  );
+  let creditBalance: number | null = null;
+  if (tenantCtx) {
+    creditBalance = await getCreditBalance(tenantCtx.billingOwnerRef).catch(
+      () => null,
+    );
+  }
+
   const payload = {
     active: true,
     sub: verified.sub,
@@ -158,6 +172,11 @@ export async function GET(req: Request) {
     tool_service_periods: servicePeriods,
     tools_nav_keys,
     ecom_billing_mode,
+    tenant_id: tenantCtx?.tenantId ?? null,
+    tenant_type: tenantCtx?.tenantType ?? null,
+    role_type: tenantCtx?.role ?? null,
+    seat_id: tenantCtx?.seatId ?? null,
+    credit_balance: creditBalance,
     email: elig.email,
     name: elig.name,
     image: elig.image,

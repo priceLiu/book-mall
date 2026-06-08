@@ -6,6 +6,7 @@ import {
   deleteGatewayCredential,
   GATEWAY_PROVIDER_KINDS,
   listGatewayCredentials,
+  setDefaultGatewayCredential,
   testGatewayCredential,
   updateGatewayCredential,
 } from "@/lib/gateway/credential-service";
@@ -27,6 +28,9 @@ const createSchema = z.object({
   providerKind: providerKindSchema,
   apiKey: z.string().min(8),
   baseUrl: z.string().url().optional().nullable(),
+  channel: z.string().max(60).optional().nullable(),
+  sortOrder: z.number().int().optional(),
+  isDefaultForProvider: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -59,6 +63,11 @@ const patchSchema = z.object({
   baseUrl: z.string().url().nullable().optional(),
   active: z.boolean().optional(),
   apiKey: z.string().min(8).optional(),
+  channel: z.string().max(60).nullable().optional(),
+  sortOrder: z.number().int().optional(),
+  isDefaultForProvider: z.boolean().optional(),
+  /** action=setDefault：设为该厂商默认凭证 */
+  action: z.literal("setDefault").optional(),
 });
 
 export async function PATCH(request: NextRequest) {
@@ -74,7 +83,12 @@ export async function PATCH(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "参数无效" }, { status: 400 });
   }
-  const { id, ...patch } = parsed.data;
+  const { id, action, ...patch } = parsed.data;
+  if (action === "setDefault") {
+    const ok = await setDefaultGatewayCredential(user.id, id);
+    if (!ok) return NextResponse.json({ error: "未找到" }, { status: 404 });
+    return NextResponse.json({ ok: true });
+  }
   const row = await updateGatewayCredential(user.id, id, patch);
   if (!row) return NextResponse.json({ error: "未找到" }, { status: 404 });
   return NextResponse.json({ ok: true });

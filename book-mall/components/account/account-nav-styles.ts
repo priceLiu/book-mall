@@ -15,6 +15,24 @@ export function accountInlineLinkClass(size: AccountButtonSize = "sm") {
   );
 }
 
+/** 段落内纯文字链（非按钮），用于「公示」等说明性跳转 */
+export function accountBodyTextLinkClass() {
+  return cn(
+    "font-medium text-orange-600 underline underline-offset-2",
+    "hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300",
+  );
+}
+
+/** 四宫格卡片主体区：占满剩余高度，把操作区顶到底部 */
+export function accountOverviewCardBodyClass() {
+  return "flex flex-1 flex-col gap-3";
+}
+
+/** 四宫格卡片底部操作区：统一贴底对齐 */
+export function accountOverviewCardFooterClass() {
+  return "mt-auto flex min-h-9 shrink-0 flex-wrap items-center gap-2 border-t border-transparent pt-3";
+}
+
 /** 个人中心侧栏 / 页内导航链接（非 Button） */
 export function accountNavLinkClass(active: boolean) {
   return cn(

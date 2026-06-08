@@ -7,7 +7,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
+import {
+  accountInlineLinkClass,
+  accountOverviewCardBodyClass,
+  accountOverviewCardFooterClass,
+} from "@/components/account/account-nav-styles";
 import { cn } from "@/lib/utils";
 import { LaunchToolsAppButton } from "@/components/account/launch-tools-app";
 import { AccountCanvasCard } from "@/components/account/account-canvas-card";
@@ -85,9 +89,9 @@ export function AccountOverviewCards({
   const minBalanceYuan = formatPointsAsYuan(minBalanceLinePoints);
 
   return (
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
       {/* 钱包余额 */}
-      <Card className="flex flex-col">
+      <Card className="flex h-full flex-col">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">钱包余额</CardTitle>
@@ -97,7 +101,8 @@ export function AccountOverviewCards({
             100 点 = 1 元 · 主要用于支付工具技术服务费
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-1 flex-col space-y-3">
+        <CardContent className="flex flex-1 flex-col">
+          <div className={accountOverviewCardBodyClass()}>
           <div>
             <p className="text-3xl font-semibold tabular-nums tracking-tight">
               {balancePoints.toLocaleString("zh-CN")}{" "}
@@ -124,7 +129,8 @@ export function AccountOverviewCards({
               </span>
             </p>
           </div>
-          <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-1">
+          </div>
+          <div className={accountOverviewCardFooterClass()}>
             <Link href="/pay/mock-topup" className={accountInlineLinkClass()}>
               充值
             </Link>
@@ -136,7 +142,7 @@ export function AccountOverviewCards({
       </Card>
 
       {/* 订阅状态 */}
-      <Card className="flex flex-col">
+      <Card className="flex h-full flex-col">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">订阅状态</CardTitle>
@@ -146,7 +152,8 @@ export function AccountOverviewCards({
             会员计划 · AI 学堂（不含工具使用权）
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-1 flex-col space-y-3">
+        <CardContent className="flex flex-1 flex-col">
+          <div className={accountOverviewCardBodyClass()}>
           <div>
             <div className="flex items-center gap-2">
               <StatusDot ok={hasActiveSubscription} />
@@ -165,11 +172,19 @@ export function AccountOverviewCards({
           </div>
           <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             工具技术服务费：
-            <Link href="/account/tool-service-fee" className={cn("ml-1", accountInlineLinkClass())}>
+            <span
+              className={cn(
+                "ml-1 font-medium",
+                hasActiveToolService
+                  ? "text-emerald-600 dark:text-emerald-500"
+                  : "text-muted-foreground",
+              )}
+            >
               {hasActiveToolService ? "已开通" : "未开通"}
-            </Link>
+            </span>
           </div>
-          <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-1">
+          </div>
+          <div className={accountOverviewCardFooterClass()}>
             <Link href="/account/subscription" className={accountInlineLinkClass()}>
               订阅中心
             </Link>
@@ -181,7 +196,7 @@ export function AccountOverviewCards({
       </Card>
 
       {/* AI 工具站 */}
-      <Card className="flex flex-col md:col-span-2 xl:col-span-1">
+      <Card className="flex h-full flex-col md:col-span-2 xl:col-span-1">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">AI 工具站</CardTitle>
@@ -191,7 +206,8 @@ export function AccountOverviewCards({
             有效工具技术服务费 + Gateway BYOK
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-1 flex-col space-y-3">
+        <CardContent className="flex flex-1 flex-col">
+          <div className={accountOverviewCardBodyClass()}>
           <div>
             <div className="flex items-center gap-2">
               <StatusDot ok={hasActiveToolService} />
@@ -207,14 +223,15 @@ export function AccountOverviewCards({
             <ChecklistRow ok={hasActiveToolService}>有效工具技术服务费</ChecklistRow>
             <ChecklistRow ok={balancePoints > 0}>钱包有余额（开通/续订时扣费）</ChecklistRow>
           </ul>
-          <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
+          </div>
+          <div className={accountOverviewCardFooterClass()}>
             {showToolsCta ? (
               <LaunchToolsAppButton
                 enabled={canLaunchTools}
                 label="打开工具站"
                 variant="subscription"
                 openInNewTab
-                layout="nav"
+                layout="chip"
               />
             ) : (
               <span className="text-sm text-muted-foreground">工具站 SSO 未配置</span>

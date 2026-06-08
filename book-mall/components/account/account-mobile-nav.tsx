@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 const LINKS = [
   { href: "/account", label: "概览", exact: true },
   { href: "/account/subscription", label: "订阅" },
+  { href: "/account/usage", label: "用量" },
+  { href: "/account/team", label: "团队" },
+  { href: "/account/team/billing", label: "团队账单" },
   { href: "/account/courses", label: "学堂" },
   { href: "/account/pricing", label: "价目" },
   { href: "/account/tool-service-fee", label: "工具月费" },

@@ -3,7 +3,10 @@
 import { useState } from "react";
 import type { ComponentProps } from "react";
 import { Button } from "@/components/ui/button";
-import { accountNavActionClass } from "@/components/account/account-nav-styles";
+import {
+  accountInlineLinkClass,
+  accountNavActionClass,
+} from "@/components/account/account-nav-styles";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_REDIRECT = "/fitting-room";
@@ -36,7 +39,7 @@ export function LaunchToolsAppButton({
   variant?: ComponentProps<typeof Button>["variant"];
   className?: string;
   title?: string;
-  layout?: "default" | "inlineNav" | "nav";
+  layout?: "default" | "inlineNav" | "nav" | "chip";
   openInNewTab?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
@@ -44,6 +47,7 @@ export function LaunchToolsAppButton({
 
   const isInlineNav = layout === "inlineNav";
   const isNav = layout === "nav";
+  const isChip = layout === "chip";
 
   async function handleLaunch() {
     if (!enabled || busy) return;
@@ -114,10 +118,22 @@ export function LaunchToolsAppButton({
           ? "inline-flex shrink-0 flex-col items-start gap-0 self-center"
           : isNav
             ? "w-full"
-            : "space-y-2",
+            : isChip
+              ? "inline-flex shrink-0"
+              : "space-y-2",
       )}
     >
-      {isNav ? (
+      {isChip ? (
+        <button
+          type="button"
+          title={title}
+          className={cn(accountInlineLinkClass(), className)}
+          disabled={!enabled || busy}
+          onClick={() => void handleLaunch()}
+        >
+          {busy ? busyLabel : labelText}
+        </button>
+      ) : isNav ? (
         <button
           type="button"
           title={title}

@@ -22,6 +22,7 @@ const footerNav = [
     title: "帮助",
     links: [
       { text: "联系我们", href: "#" },
+      { text: "积分报价", href: "/pricing" },
       { text: "计费与提现", href: "/pricing-disclosure#billing-policy" },
       { text: "价格公示", href: "/pricing-disclosure" },
       { text: "意见反馈", href: "#" },

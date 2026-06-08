@@ -11,7 +11,7 @@ import { getCanvasWebOrigin } from "@/lib/app-web-origins";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
 import { AccountOverviewCards } from "@/components/account/account-overview-cards";
 import { AccountDevActions } from "@/components/account/account-dev-actions";
-import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
+import { accountBodyTextLinkClass } from "@/components/account/account-nav-styles";
 import { hrefPricingDisclosureFromAccount } from "@/lib/pricing-disclosure-view";
 
 export const metadata = {
@@ -97,7 +97,7 @@ export default async function AccountPage({
             钱包、订阅与工具准入一览。计费细则与提现说明见{" "}
             <a
               href={hrefPricingDisclosureFromAccount({ hash: "billing-policy" })}
-              className={accountInlineLinkClass()}
+              className={accountBodyTextLinkClass()}
             >
               公示
             </a>

@@ -88,14 +88,6 @@ export function formatKieTaskFailMessage(
   return msg || code || "生成失败";
 }
 
-function getApiKey(): string {
-  const v = process.env.KIE_API_KEY?.trim();
-  if (!v) {
-    throw new KieError("KIE_NOT_CONFIGURED", "KIE_API_KEY missing", 503, false);
-  }
-  return v;
-}
-
 function getBase(): string {
   return (process.env.KIE_API_BASE?.trim() || "https://api.kie.ai").replace(/\/$/, "");
 }
@@ -187,12 +179,6 @@ export async function createKieTaskWithKey(
   return createKieTaskWithApiKey(apiKey, base, args);
 }
 
-/** @deprecated Story 主路径请使用 story-gateway-client；保留供 KIE callback / 兼容 */
-/** @deprecated Phase D：Story 已走 Gateway；createKieTask 无运行时调用，保留供迁移参考。 */
-export async function createKieTask(args: CreateKieTaskArgs): Promise<{ taskId: string }> {
-  return createKieTaskWithApiKey(getApiKey(), getBase(), args);
-}
-
 async function getKieTaskWithApiKey(
   apiKey: string,
   base: string,
@@ -253,10 +239,6 @@ export async function getKieTaskWithKey(
 ): Promise<KieRecordResponse> {
   const base = baseUrl?.trim() || getBase();
   return getKieTaskWithApiKey(apiKey, base, taskId);
-}
-
-export async function getKieTask(taskId: string): Promise<KieRecordResponse> {
-  return getKieTaskWithKey(getApiKey(), taskId);
 }
 
 /**

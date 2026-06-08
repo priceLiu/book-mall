@@ -11,14 +11,18 @@ import {
   summarizeUpstreamFailMessage,
 } from "@/lib/gateway/book-gateway-link";
 import {
-  createRequestLog,
   finalizeRequestLog,
-  forwardChatCompletions,
-  forwardChatCompletionsStream,
   parseOpenAiUsage,
   pickCredentialForKind,
   type UsageFromResponse,
 } from "@/lib/gateway/proxy-common";
+import {
+  gatewayV1ChatCompletions,
+  gatewayV1ChatCompletionsStream,
+  gatewayV1ClientMeta,
+  gatewayV1CreateTask,
+  gatewayV1RecordInfo,
+} from "@/lib/gateway/gateway-v1-http-client";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import {
@@ -26,17 +30,7 @@ import {
   buildGatewayStreamChatResultSummary,
   buildGatewayTaskResultSummary,
 } from "@/lib/gateway/log-result-summary";
-import {
-  pollDashscopeTaskForLog,
-  submitDashscopeTryOnJobForLog,
-  submitDashscopeVideoJobForLog,
-  submitDashscopeWanxJobForLog,
-} from "@/lib/gateway/poll-service";
-import {
-  isDashscopeTaskFailed,
-  isDashscopeTaskSuccess,
-  type DashscopeTaskOutput,
-} from "@/lib/gateway/dashscope-client";
+import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
 
 const CLIENT_SOURCE: GatewayClientSource = "TOOL";
 
@@ -86,63 +80,48 @@ export async function toolGwCreateDashscopeJob(
   }
 
   const model = opts.model.trim();
-  const route = routeGatewayModel(model);
-  const inputSummary =
-    opts.kind === "tryon"
-      ? buildGatewayInputSummary(model, {
-          personImageUrl: opts.personImageUrl,
-          topGarmentUrl: opts.topGarmentUrl,
-          bottomGarmentUrl: opts.bottomGarmentUrl,
-        })
-      : opts.kind === "wanx"
-        ? buildGatewayInputSummary(model, {
-            prompt: opts.prompt,
-            n: opts.n,
-          })
-        : buildGatewayInputSummary(model, opts.body);
+  routeGatewayModel(model);
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const body =
+    opts.kind === "tryon"
+      ? {
+          model,
+          dashscope: {
+            jobKind: "tryon" as const,
+            personImageUrl: opts.personImageUrl,
+            topGarmentUrl: opts.topGarmentUrl,
+            bottomGarmentUrl: opts.bottomGarmentUrl,
+          },
+        }
+      : opts.kind === "wanx"
+        ? {
+            model,
+            dashscope: {
+              jobKind: "wanx" as const,
+              prompt: opts.prompt,
+              negativePrompt: opts.negativePrompt,
+              n: opts.n,
+            },
+          }
+        : {
+            model,
+            dashscope: {
+              jobKind: "video" as const,
+              videoBody: opts.body,
+            },
+          };
+
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/jobs/createTask",
-    providerKind: "DASHSCOPE",
-    requestKind: route.requestKind,
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary,
+    body,
+    meta: gatewayV1ClientMeta("TOOL", { clientPage: opts.clientPage }),
   });
 
-  let taskId: string;
-  if (opts.kind === "tryon") {
-    taskId = await submitDashscopeTryOnJobForLog({
-      logId: log.id,
-      credentialId,
-      model,
-      personImageUrl: opts.personImageUrl,
-      topGarmentUrl: opts.topGarmentUrl,
-      bottomGarmentUrl: opts.bottomGarmentUrl,
-    });
-  } else if (opts.kind === "wanx") {
-    taskId = await submitDashscopeWanxJobForLog({
-      logId: log.id,
-      credentialId,
-      model,
-      prompt: opts.prompt,
-      negativePrompt: opts.negativePrompt,
-      n: opts.n,
-    });
-  } else {
-    taskId = await submitDashscopeVideoJobForLog({
-      logId: log.id,
-      credentialId,
-      model,
-      body: opts.body,
-    });
-  }
-
-  return { taskId, logId: log.id, providerKind: "DASHSCOPE" };
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "DASHSCOPE",
+  };
 }
 
 export async function toolGwPollDashscope(
@@ -155,32 +134,13 @@ export async function toolGwPollDashscope(
     throw new GatewayRequiredError("Gateway Key 未绑定 DashScope 凭证");
   }
 
-  const polled = await pollDashscopeTaskForLog({
-    credentialId,
+  const polled = await gatewayV1RecordInfo({
+    apiKeyId: auth.id,
     taskId: opts.taskId,
+    meta: gatewayV1ClientMeta("TOOL"),
   });
-  const { output, raw } = polled;
 
-  if (opts.gatewayLogId) {
-    const status = output.task_status;
-    if (isDashscopeTaskSuccess(status)) {
-      await finalizeRequestLog(opts.gatewayLogId, {
-        status: "SUCCEEDED",
-        durationMs: 0,
-        resultSummary: buildGatewayTaskResultSummary(raw, output),
-        externalTaskId: opts.taskId,
-      });
-    } else if (isDashscopeTaskFailed(status)) {
-      await finalizeRequestLog(opts.gatewayLogId, {
-        status: "FAILED",
-        durationMs: 0,
-        failMessage: output.message ?? output.code ?? "failed",
-        externalTaskId: opts.taskId,
-      });
-    }
-  }
-
-  return output;
+  return polled.data as DashscopeTaskOutput;
 }
 
 export async function toolGwChat(
@@ -207,23 +167,10 @@ export async function toolGwChat(
     ...(opts.params ?? {}),
   };
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const result = await gatewayV1ChatCompletions({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/chat/completions",
-    providerKind: route.providerKind,
-    requestKind: "CHAT",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, body),
-  });
-
-  const result = await forwardChatCompletions({
-    credentialId,
-    providerKind: route.providerKind,
     body,
+    meta: gatewayV1ClientMeta("TOOL", { clientPage: opts.clientPage }),
   });
   let parsed: unknown = null;
   try {
@@ -233,17 +180,6 @@ export async function toolGwChat(
   }
   const usage = parseOpenAiUsage(parsed);
   const ok = result.status >= 200 && result.status < 300;
-  await finalizeRequestLog(log.id, {
-    status: ok ? "SUCCEEDED" : "FAILED",
-    durationMs: result.durationMs,
-    usage,
-    resultSummary: buildGatewayChatResultSummary(parsed) ?? undefined,
-    failCode: ok ? undefined : `UPSTREAM_HTTP_${result.status}`,
-    failMessage: ok
-      ? undefined
-      : summarizeUpstreamFailMessage(result.text, result.status),
-    model,
-  });
   if (!ok) {
     throw new GatewayRequiredError(
       summarizeUpstreamFailMessage(result.text, result.status),
@@ -257,7 +193,7 @@ export async function toolGwChat(
     typeof choice?.message?.content === "string"
       ? choice.message.content
       : result.text;
-  return { text, rawPayload: parsed, logId: log.id };
+  return { text, rawPayload: parsed, logId: result.logId ?? "" };
 }
 
 function wrapChatStreamWithLogFinalize(
@@ -355,37 +291,19 @@ export async function toolGwChatStream(
     ...(opts.params ?? {}),
   };
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const result = await gatewayV1ChatCompletionsStream({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/chat/completions",
-    providerKind: route.providerKind,
-    requestKind: "CHAT",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, body),
-  });
-
-  const result = await forwardChatCompletionsStream({
-    credentialId,
-    providerKind: route.providerKind,
     body,
+    meta: gatewayV1ClientMeta("TOOL", { clientPage: opts.clientPage }),
   });
 
-  if (!result.body || result.status >= 300) {
-    const errText = result.body
-      ? await new Response(result.body).text()
+  const logId = result.headers.get("x-gateway-log-id") ?? "";
+  const bodyStream = result.body;
+
+  if (!bodyStream || result.status >= 300) {
+    const errText = bodyStream
+      ? await new Response(bodyStream).text()
       : `HTTP ${result.status}`;
-    const failMessage = summarizeUpstreamFailMessage(errText, result.status);
-    await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: result.durationMs,
-      failCode: `UPSTREAM_HTTP_${result.status}`,
-      failMessage,
-      model,
-    });
     throw new GatewayRequiredError(
       summarizeUpstreamFailMessage(errText, result.status),
       "UPSTREAM_ERROR",
@@ -394,12 +312,12 @@ export async function toolGwChatStream(
   }
 
   return {
-    logId: log.id,
+    logId,
     status: result.status,
-    body: wrapChatStreamWithLogFinalize(result.body, {
-      logId: log.id,
+    body: wrapChatStreamWithLogFinalize(bodyStream, {
+      logId,
       model,
-      startedMs: result.durationMs,
+      startedMs: 0,
     }),
   };
 }

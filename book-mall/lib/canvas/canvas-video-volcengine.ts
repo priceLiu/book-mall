@@ -35,6 +35,10 @@ function normalizeMediaUrl(u: string): string | null {
   return null;
 }
 
+function isFrameContentRole(role: string | undefined): boolean {
+  return role === "first_frame" || role === "last_frame";
+}
+
 export function buildCanvasVideoVolcengineInput(args: {
   modelKey: string;
   prompt: string;
@@ -58,62 +62,102 @@ export function buildCanvasVideoVolcengineInput(args: {
 
   const mainUrl = normalizeMediaUrl(args.imageUrl) ?? "";
   const allowMultiRef = volcengineVideoSupportsMultiRef(args.modelKey);
-  const extraRefs = allowMultiRef
+  const extraRefImages = allowMultiRef
     ? (args.referenceImageUrls ?? [])
         .map((u) => normalizeMediaUrl(u))
         .filter((u): u is string => Boolean(u) && u !== mainUrl)
     : [];
 
+  const refVideos = allowMultiRef
+    ? (args.referenceVideoUrls ?? [])
+        .map((u) => normalizeMediaUrl(u))
+        .filter((u): u is string => u != null && isHttpUrl(u))
+        .slice(0, 4)
+    : [];
+
+  const refAudios = allowMultiRef
+    ? (args.referenceAudioUrls ?? [])
+        .map((u) => normalizeMediaUrl(u))
+        .filter((u): u is string => u != null && isHttpUrl(u))
+        .slice(0, 4)
+    : [];
+
+  const assetRefs = (args.assetRefs ?? [])
+    .map((ref) => {
+      const url = normalizeMediaUrl(ref.url);
+      if (!url || !isAssetRef(url)) return null;
+      return { url, role: ref.role ?? "reference_image" };
+    })
+    .filter((r): r is { url: string; role: "reference_image" | "first_frame" } => r != null);
+
+  const frameAssets = assetRefs.filter((r) => isFrameContentRole(r.role));
+  const referenceAssets = assetRefs.filter((r) => !isFrameContentRole(r.role));
+
+  // 方舟 API：first/last frame 与 reference_image/video/audio 互斥，不可同请求混用。
+  const useReferenceMode =
+    allowMultiRef &&
+    (extraRefImages.length > 0 ||
+      refVideos.length > 0 ||
+      refAudios.length > 0 ||
+      referenceAssets.length > 0);
+
   const content: Array<Record<string, unknown>> = [
     { type: "text", text: args.prompt },
   ];
 
-  if (mainUrl) {
-    content.push({
-      type: "image_url",
-      image_url: { url: mainUrl },
-      role: "first_frame",
-    });
-  }
+  if (useReferenceMode) {
+    const refImages = [
+      ...(mainUrl ? [mainUrl] : []),
+      ...extraRefImages,
+    ].filter((u, i, arr) => arr.indexOf(u) === i);
 
-  for (const url of extraRefs.slice(0, 8)) {
-    content.push({
-      type: "image_url",
-      image_url: { url },
-      role: "reference_image",
-    });
-  }
+    for (const url of refImages.slice(0, 9)) {
+      content.push({
+        type: "image_url",
+        image_url: { url },
+        role: "reference_image",
+      });
+    }
 
-  for (const ref of args.assetRefs ?? []) {
-    const url = normalizeMediaUrl(ref.url);
-    if (!url || !isAssetRef(url)) continue;
-    content.push({
-      type: "image_url",
-      image_url: { url },
-      role: ref.role ?? "reference_image",
-    });
-  }
+    for (const ref of referenceAssets.slice(0, 8)) {
+      content.push({
+        type: "image_url",
+        image_url: { url: ref.url },
+        role: "reference_image",
+      });
+    }
 
-  for (const url of (args.referenceVideoUrls ?? [])
-    .map((u) => normalizeMediaUrl(u))
-    .filter((u): u is string => u != null && isHttpUrl(u))
-    .slice(0, 4)) {
-    content.push({
-      type: "video_url",
-      video_url: { url },
-      role: "reference_video",
-    });
-  }
+    for (const url of refVideos) {
+      content.push({
+        type: "video_url",
+        video_url: { url },
+        role: "reference_video",
+      });
+    }
 
-  for (const url of (args.referenceAudioUrls ?? [])
-    .map((u) => normalizeMediaUrl(u))
-    .filter((u): u is string => u != null && isHttpUrl(u))
-    .slice(0, 4)) {
-    content.push({
-      type: "audio_url",
-      audio_url: { url },
-      role: "reference_audio",
-    });
+    for (const url of refAudios) {
+      content.push({
+        type: "audio_url",
+        audio_url: { url },
+        role: "reference_audio",
+      });
+    }
+  } else {
+    if (mainUrl) {
+      content.push({
+        type: "image_url",
+        image_url: { url: mainUrl },
+        role: "first_frame",
+      });
+    }
+
+    for (const ref of frameAssets.slice(0, 1)) {
+      content.push({
+        type: "image_url",
+        image_url: { url: ref.url },
+        role: ref.role,
+      });
+    }
   }
 
   const resolution = String(args.options?.resolution ?? "1080p").toLowerCase();

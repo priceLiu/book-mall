@@ -7,6 +7,9 @@ export type CredentialRow = {
   apiKeyMasked: string;
   baseUrl: string | null;
   active: boolean;
+  channel: string | null;
+  sortOrder: number;
+  isDefaultForProvider: boolean;
   lastTestedAt: string | null;
   lastTestStatus: string | null;
   createdAt: string;

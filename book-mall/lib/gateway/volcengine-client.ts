@@ -95,29 +95,85 @@ export async function volcengineGetVideoTask(opts: {
       text.slice(0, 400);
     throw new Error(`火山方舟任务查询失败 (${r.status}): ${msg}`);
   }
-  const status = String(json.status ?? "").toLowerCase();
+  const output = parseVolcengineVideoTaskJson(json, opts.taskId);
+  return { output, raw: json };
+}
+
+function normalizeVolcengineTaskStatus(raw: unknown): string {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+/** 兼容 Ark 直出与部分代理嵌套 data / result_url 形态 */
+function parseVolcengineVideoTaskJson(
+  json: Record<string, unknown>,
+  taskId: string,
+): VolcengineVideoTaskResult {
+  const nested =
+    json.data && typeof json.data === "object" && !Array.isArray(json.data)
+      ? (json.data as Record<string, unknown>)
+      : null;
+  const root = nested ?? json;
+
+  const status = normalizeVolcengineTaskStatus(root.status ?? json.status);
+  const contentRaw = root.content ?? json.content;
+  const content =
+    contentRaw && typeof contentRaw === "object" && !Array.isArray(contentRaw)
+      ? (contentRaw as VolcengineVideoTaskResult["content"])
+      : undefined;
+
+  const videoUrl =
+    (typeof content?.video_url === "string" ? content.video_url : undefined) ??
+    (typeof root.result_url === "string" ? root.result_url : undefined) ??
+    (typeof json.result_url === "string" ? json.result_url : undefined);
+
+  const normalizedContent =
+    videoUrl || content?.last_frame_url
+      ? {
+          video_url: videoUrl ?? content?.video_url,
+          last_frame_url: content?.last_frame_url,
+        }
+      : content;
+
   return {
-    output: {
-      id: String(json.id ?? opts.taskId),
-      status,
-      model: typeof json.model === "string" ? json.model : undefined,
-      error: json.error,
-      content: json.content,
-    },
-    raw: json,
+    id: String(root.id ?? json.id ?? taskId),
+    status,
+    model:
+      typeof root.model === "string"
+        ? root.model
+        : typeof json.model === "string"
+          ? json.model
+          : undefined,
+    error: (root.error ?? json.error) as VolcengineVideoTaskResult["error"],
+    content: normalizedContent,
   };
 }
 
 export function isVolcengineVideoTaskSuccess(
   row: VolcengineVideoTaskResult,
 ): boolean {
-  return row.status === "succeeded";
+  const s = normalizeVolcengineTaskStatus(row.status);
+  return s === "succeeded" || s === "completed" || s === "success";
 }
 
 export function isVolcengineVideoTaskFailed(
   row: VolcengineVideoTaskResult,
 ): boolean {
-  return row.status === "failed" || row.status === "cancelled";
+  const s = normalizeVolcengineTaskStatus(row.status);
+  return (
+    s === "failed" ||
+    s === "cancelled" ||
+    s === "canceled" ||
+    s === "expired"
+  );
+}
+
+export function isVolcengineVideoTaskInProgress(
+  row: VolcengineVideoTaskResult,
+): boolean {
+  const s = normalizeVolcengineTaskStatus(row.status);
+  return s === "queued" || s === "running" || s === "pending" || s === "processing";
 }
 
 export function volcengineVideoTaskFailMessage(

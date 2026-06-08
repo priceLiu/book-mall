@@ -14,6 +14,7 @@ import {
   ShoppingBag,
   Sparkles,
   User,
+  Users,
   Zap,
 } from "lucide-react";
 import {
@@ -39,6 +40,9 @@ import {
 const NAV_LINKS = [
   { href: "/account", label: "概览", icon: User, exact: true },
   { href: "/account/subscription", label: "订阅中心", icon: CreditCard },
+  { href: "/account/usage", label: "积分用量中心", icon: Zap },
+  { href: "/account/team", label: "团队空间", icon: Users },
+  { href: "/account/team/billing", label: "团队账单", icon: Receipt },
   { href: "/account/tool-service-fee", label: "工具技术服务费", icon: Receipt },
   { href: "/account/recharge-promos", label: "充值优惠", icon: Sparkles },
   { href: "/account/courses", label: "AI 学堂", icon: Sparkles },

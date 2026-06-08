@@ -7,7 +7,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
+import {
+  accountInlineLinkClass,
+  accountOverviewCardBodyClass,
+  accountOverviewCardFooterClass,
+} from "@/components/account/account-nav-styles";
 import { LaunchCanvasAppButton } from "@/components/account/launch-canvas-app";
 import { cn } from "@/lib/utils";
 
@@ -58,7 +62,7 @@ export function AccountCanvasCard({
   const ready = gatewayLinked && canLaunchCanvas;
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex h-full flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">AI 画布</CardTitle>
@@ -68,7 +72,8 @@ export function AccountCanvasCard({
           影视专业版漫剧工作流 · 经 Gateway 调用 AI 模型
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col space-y-3">
+      <CardContent className="flex flex-1 flex-col">
+        <div className={accountOverviewCardBodyClass()}>
         <div>
           <div className="flex items-center gap-2">
             <StatusDot ok={ready} />
@@ -79,6 +84,11 @@ export function AccountCanvasCard({
           {!gatewayLinked ? (
             <p className="mt-2 text-xs leading-relaxed text-amber-700 dark:text-amber-500">
               新用户请先关联 Gateway API Key，再在 Gateway 控制台绑定百炼 / DeepSeek 等厂商凭证。
+            </p>
+          ) : null}
+          {!ready ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              完成下方 checklist 后即可打开画布
             </p>
           ) : null}
         </div>
@@ -110,11 +120,12 @@ export function AccountCanvasCard({
             画布站点地址已配置（CANVAS_WEB_ORIGIN）
           </ChecklistRow>
         </ul>
-        <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-1">
+        </div>
+        <div className={accountOverviewCardFooterClass()}>
           <LaunchCanvasAppButton
             enabled={ready && canvasOriginConfigured}
             label="打开画布"
-            layout="nav"
+            layout="chip"
             openInNewTab
             title={
               !gatewayLinked
@@ -122,9 +133,6 @@ export function AccountCanvasCard({
                 : !canLaunchCanvas
                   ? "请先开通工具技术服务费"
                   : undefined
-            }
-            helperText={
-              !ready ? "完成上方 checklist 后即可打开画布" : undefined
             }
           />
           {!gatewayLinked ? (

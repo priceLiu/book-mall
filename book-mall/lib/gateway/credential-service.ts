@@ -17,7 +17,12 @@ export const GATEWAY_PROVIDER_KINDS = [
 export async function listGatewayCredentials(userId: string) {
   const rows = await prisma.gatewayVendorCredential.findMany({
     where: { userId },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [
+      { providerKind: "asc" },
+      { isDefaultForProvider: "desc" },
+      { sortOrder: "asc" },
+      { updatedAt: "desc" },
+    ],
   });
   return rows.map((r) => ({
     id: r.id,
@@ -25,6 +30,9 @@ export async function listGatewayCredentials(userId: string) {
     providerKind: r.providerKind,
     baseUrl: r.baseUrl,
     active: r.active,
+    channel: r.channel,
+    sortOrder: r.sortOrder,
+    isDefaultForProvider: r.isDefaultForProvider,
     apiKeyMasked: maskApiKey(r.apiKeyEncrypted),
     lastTestedAt: r.lastTestedAt?.toISOString() ?? null,
     lastTestStatus: r.lastTestStatus,
@@ -39,6 +47,9 @@ export async function createGatewayCredential(opts: {
   providerKind: GatewayProviderKind;
   apiKey: string;
   baseUrl?: string | null;
+  channel?: string | null;
+  sortOrder?: number;
+  isDefaultForProvider?: boolean;
 }) {
   const blob = encryptApiKey(opts.apiKey.trim());
   const rawBase = opts.baseUrl?.trim() || null;
@@ -47,6 +58,11 @@ export async function createGatewayCredential(opts: {
     (opts.providerKind === "BAILIAN" || opts.providerKind === "DASHSCOPE")
       ? resolveOpenAiCompatibleBaseUrl(opts.providerKind, rawBase)
       : rawBase;
+  // 同厂商首条凭证自动设为默认；否则按入参
+  const existingCount = await prisma.gatewayVendorCredential.count({
+    where: { userId: opts.userId, providerKind: opts.providerKind },
+  });
+  const isDefault = opts.isDefaultForProvider ?? existingCount === 0;
   const row = await prisma.gatewayVendorCredential.create({
     data: {
       userId: opts.userId,
@@ -54,10 +70,49 @@ export async function createGatewayCredential(opts: {
       providerKind: opts.providerKind,
       apiKeyEncrypted: blob,
       baseUrl,
+      ownerScope: "USER",
+      ownerId: opts.userId,
+      channel: opts.channel?.trim() || null,
+      sortOrder: opts.sortOrder ?? 0,
+      isDefaultForProvider: isDefault,
     },
   });
+  if (isDefault) {
+    await unsetOtherDefaults(opts.userId, opts.providerKind, row.id);
+  }
   await syncPersonalGatewayApiKeyBindings(opts.userId);
   return row;
+}
+
+/** 同一 userId+providerKind 仅保留一个默认凭证（取消其它默认）。 */
+async function unsetOtherDefaults(
+  userId: string,
+  providerKind: GatewayProviderKind,
+  keepId: string,
+) {
+  await prisma.gatewayVendorCredential.updateMany({
+    where: {
+      userId,
+      providerKind,
+      isDefaultForProvider: true,
+      id: { not: keepId },
+    },
+    data: { isDefaultForProvider: false },
+  });
+}
+
+/** 设某凭证为该厂商默认凭证（路由优先）。 */
+export async function setDefaultGatewayCredential(userId: string, id: string) {
+  const row = await prisma.gatewayVendorCredential.findFirst({
+    where: { id, userId },
+  });
+  if (!row) return false;
+  await prisma.gatewayVendorCredential.update({
+    where: { id },
+    data: { isDefaultForProvider: true },
+  });
+  await unsetOtherDefaults(userId, row.providerKind, id);
+  return true;
 }
 
 export async function deleteGatewayCredential(userId: string, id: string) {
@@ -78,6 +133,9 @@ export async function updateGatewayCredential(
     baseUrl?: string | null;
     active?: boolean;
     apiKey?: string;
+    channel?: string | null;
+    sortOrder?: number;
+    isDefaultForProvider?: boolean;
   },
 ) {
   const row = await prisma.gatewayVendorCredential.findFirst({
@@ -101,11 +159,19 @@ export async function updateGatewayCredential(
       ...(patch.alias !== undefined ? { alias: patch.alias.trim() || row.providerKind } : {}),
       ...(patch.active !== undefined ? { active: patch.active } : {}),
       ...(patch.baseUrl !== undefined ? { baseUrl } : {}),
+      ...(patch.channel !== undefined ? { channel: patch.channel?.trim() || null } : {}),
+      ...(patch.sortOrder !== undefined ? { sortOrder: patch.sortOrder } : {}),
+      ...(patch.isDefaultForProvider !== undefined
+        ? { isDefaultForProvider: patch.isDefaultForProvider }
+        : {}),
       ...(patch.apiKey?.trim()
         ? { apiKeyEncrypted: encryptApiKey(patch.apiKey.trim()) }
         : {}),
     },
   });
+  if (patch.isDefaultForProvider) {
+    await unsetOtherDefaults(userId, row.providerKind, id);
+  }
   if (patch.active !== undefined) {
     await syncPersonalGatewayApiKeyBindings(userId);
   }

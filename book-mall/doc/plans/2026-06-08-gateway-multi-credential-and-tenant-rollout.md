@@ -1,7 +1,9 @@
 # Gateway 多凭证 + 租户体系 — 实施计划（待开发）
 
-> **状态**：待开发  
+> **状态**：Sprint 0 ✅ · 轨道 A ✅ · 轨道 B ✅ · 轨道 C（积分）✅ · 轨道 E（资产共享后端+图/视频库 UI）✅ · 轨道 D（Redis 并发）✅ 代码就绪（默认无 Redis 放行，配置 `REDIS_URL` 即启用）· 单会话 ✅（`SINGLE_SESSION_ENFORCE=1` 启用）  
 > **创建**：2026-06-08  
+> **更新**：2026-06-08 全量实现落地（见 `docs/全站架构图与配置表.md` §7 / 迁移 `20260714120000_tenant_system`、`20260715090000_asset_sharing`）  
+> **待跟进**：Canvas/Story/电商「项目库」公共/私有 UI 切换（后端 schema/服务已就绪，按子站逐个接 UI）  
 > **关联产品草案**：`docs/imgs/AI工具平台 租户体系, 子帐号, 资产共享等, 需要设计.docx`  
 > **平台约束**：[12-platform-app-federation.md](../product/12-platform-app-federation.md)、[gateway-user-guide.md](../product/gateway-user-guide.md)
 
@@ -191,6 +193,23 @@ tenant_id, token_balance, cash_balance (通道费), ...
 多 Key 日志按 `credentialId/channel` 拆分，供渠道对账与平台算力差价核算。
 
 **personal（套餐 A）**：维持现有 **月费 + BYOK**，不强制 Token 池。
+
+### 5.4 已落地（unified-credit-billing，2026-06-08）
+
+轨道 C 的「Token 池」已统一为 **积分（Credit）** 体系并实现，替换旧扣点（`点`），AI 课程除外。详见独立计划 `.cursor/plans/unified-credit-billing_*.plan.md`。
+
+- **数据模型**（`prisma/schema.prisma`）：`PlatformPricingConfig`、`ModelCostProfile`、`ModelCreditPrice`、`MembershipPlan`、`TeamSeatTier`、`CreditAccount`、`CreditLedger`、`ByokServiceConfig`、`ResourceMeterRate`、`ResourceMeterEvent`；`GatewayRequestLog` 增计费快照（`billingMode/canonicalModelKey/creditsCharged/costSnapshotYuan/marginSnapshot/seatId`）。迁移 `20260713120000_unified_credit_billing`。
+- **计算引擎**：`lib/pricing/credit-pricing-formulas.ts`（纯公式，客户端可用）+ `lib/pricing/credit-pricing-engine.ts`（发布/毛利护栏）。公式：`C=成本×(1−折扣) · P=C×M · U=round(P÷0.04) · g=1−C÷(U×售价)`。
+- **账户/流水**：`lib/billing/credit-account-service.ts`（GRANT/CONSUME/REFUND/TOPUP + 幂等键 + balanceAfter；BYOK 资源计量 `ResourceMeterEvent`）。
+- **席位/BYOK**：`lib/billing/seat-billing-service.ts`（团队共享池 = 基础 + 席位带；人均上限；BYOK 月结）。
+- **对帐**：`lib/billing/credit-reconciliation.ts`（厂商账单按 `canonicalKey` 归口 vs `GatewayRequestLog` 成本快照；用户积分账单 + BYOK 账单）。
+- **防护**：`lib/gateway/credit-billing-guard.ts`（凭证厂商=模型厂商校验、成本档存在校验、成本快照审计；接入 `finalizeRequestLog`）。
+- **后台**：`/admin/finance/{model-cost,credit-pricing,membership-plans,byok}`（成本/折扣、报价计算器+CSV、套餐+席位带、技术服务费+资源系数）。
+- **对外报价页**：`app/(site)/pricing`（个人/团队×月/年、五档、席位紫黑、生成次数表、公开公式、BYOK 说明）；导航/页脚入口。
+- **用量中心**：`app/(account)/account/usage`（余额、按模型聚合、细颗粒记录）。
+- **种子**：`lib/billing/seed-credit-billing.ts` + `scripts/seed-credit-billing.ts`（五档套餐 + 示例成本档 + 首版报价快照，幂等）。
+
+> **后续**：积分扣费接入各工具生成链路（Canvas/Story/电商/工具站/提示词）、租户上下文（Sprint 0）、按月套餐积分自动重置定时任务。
 
 ---
 

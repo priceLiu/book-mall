@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { resolveGatewayApiKeyFromBearer } from "@/lib/gateway/api-key-service";
+import {
+  isGatewayAuthResponse,
+  requireGatewayV1Auth,
+} from "@/lib/gateway/gateway-v1-route-auth";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
@@ -28,12 +31,9 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const auth = await resolveGatewayApiKeyFromBearer(
-    request.headers.get("authorization"),
-  );
-  if (!auth) {
-    return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
-  }
+  const authOrResp = await requireGatewayV1Auth(request);
+  if (isGatewayAuthResponse(authOrResp)) return authOrResp;
+  const auth = authOrResp;
 
   const taskId =
     request.nextUrl.searchParams.get("taskId")?.trim() ??

@@ -1,9 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { resolveGatewayApiKeyFromBearer } from "@/lib/gateway/api-key-service";
+import {
+  isGatewayAuthResponse,
+  requireGatewayV1Auth,
+} from "@/lib/gateway/gateway-v1-route-auth";
+import { parseGatewayV1LogMeta } from "@/lib/gateway/gateway-v1-log-meta";
+import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 import {
   createRequestLog,
   finalizeRequestLog,
   forwardChatCompletions,
+  forwardChatCompletionsStream,
   parseOpenAiUsage,
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
@@ -24,12 +30,10 @@ export async function POST(request: NextRequest) {
     /* opportunistic */
   }
 
-  const auth = await resolveGatewayApiKeyFromBearer(
-    request.headers.get("authorization"),
-  );
-  if (!auth) {
-    return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
-  }
+  const authOrResp = await requireGatewayV1Auth(request);
+  if (isGatewayAuthResponse(authOrResp)) return authOrResp;
+  const auth = authOrResp;
+  const logMeta = parseGatewayV1LogMeta(request);
 
   let body: Record<string, unknown>;
   try {
@@ -60,12 +64,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const clientSource =
-    request.headers.get("x-gateway-client")?.toUpperCase() === "STORY"
-      ? "STORY"
-      : request.headers.get("x-gateway-client")?.toUpperCase() === "CANVAS"
-        ? "CANVAS"
-        : "EXTERNAL";
+  const clientSource = parseGatewayClientSource(
+    logMeta.clientSource ?? request.headers.get("x-gateway-client"),
+  );
 
   const { model: _modelField, ...restBody } = body;
   const log = await createRequestLog({
@@ -74,11 +75,31 @@ export async function POST(request: NextRequest) {
     credentialId,
     model,
     endpoint: "/v1/chat/completions",
-    clientSource: clientSource as "EXTERNAL" | "STORY" | "CANVAS",
+    clientSource,
+    clientPage: logMeta.clientPage,
+    storyProjectId: logMeta.storyProjectId,
+    storyTaskId: logMeta.storyTaskId,
     inputSummary: buildGatewayInputSummary(model, restBody),
   });
 
+  const stream = body.stream === true;
+
   try {
+    if (stream) {
+      const result = await forwardChatCompletionsStream({
+        credentialId,
+        providerKind: route.providerKind,
+        body,
+      });
+      return new NextResponse(result.body, {
+        status: result.status,
+        headers: {
+          "Content-Type": "text/event-stream",
+          "x-gateway-log-id": log.id,
+        },
+      });
+    }
+
     const result = await forwardChatCompletions({
       credentialId,
       providerKind: route.providerKind,
@@ -101,7 +122,10 @@ export async function POST(request: NextRequest) {
     });
     return new NextResponse(result.text, {
       status: result.status,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-gateway-log-id": log.id,
+      },
     });
   } catch (e) {
     await finalizeRequestLog(log.id, {

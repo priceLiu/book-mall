@@ -11,6 +11,7 @@ import { reserveWalletHold, releaseWalletHold } from "@/lib/wallet-holds";
 import { isEcomToolkitToolKey } from "@/lib/ecom/ecom-tool-keys";
 import { shouldMeterEcomToolkitUsage } from "@/lib/ecom/ecom-billing-mode";
 import { isServiceFeeMeteredToolKey } from "@/lib/tool-service-fee/config";
+import { isUnifiedCreditBillingActive } from "@/lib/billing/unified-credit-flag";
 
 export const dynamic = "force-dynamic";
 
@@ -397,6 +398,21 @@ export async function POST(req: Request) {
     (typeof body.phase === "string" ? body.phase.trim() : "") ||
     (url.searchParams.get("phase") ?? "").trim();
   const phase = phaseRaw || "auto";
+
+  // 统一积分计费激活：旧钱包扣点收敛为 no-op（互斥避免双扣）。
+  // 实际扣费在 Gateway finalize 按积分结算；此处仅放行工具站调用链。
+  if (isUnifiedCreditBillingActive()) {
+    if (phase === "reserve") {
+      return NextResponse.json(
+        { ok: true, holdId: null, reservedPoints: 0, reused: false, creditBilling: true },
+        { status: 201 },
+      );
+    }
+    if (phase === "release") {
+      return NextResponse.json({ ok: true, creditBilling: true });
+    }
+    return NextResponse.json({ ok: true, recorded: false, creditBilling: true });
+  }
 
   // reserve / release 不要求 toolKey 之外的字段，单独走分支处理。
   if (phase === "reserve") {

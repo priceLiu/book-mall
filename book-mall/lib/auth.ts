@@ -8,6 +8,11 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import {
+  bumpSessionVersion,
+  isSingleSessionEnforced,
+  isTokenSessionValid,
+} from "@/lib/auth-session-version";
 
 /** 生产跨子域（book / f / tool）共享会话；本地不设 domain，保持 host-only Cookie。 */
 function nextAuthSharedCookieDomain(): string | undefined {
@@ -110,6 +115,40 @@ export const authOptions: NextAuthOptions = {
         token.role = (user as { role?: string }).role ?? "USER";
         token.name = user.name ?? undefined;
         token.picture = user.image ?? undefined;
+        // 多租户：登录时缓存主空间（个人租户）id
+        try {
+          const u = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { primaryTenantId: true },
+          });
+          token.primaryTenantId = u?.primaryTenantId ?? null;
+        } catch {
+          token.primaryTenantId = null;
+        }
+        // 单会话：登录自增 sessionVersion 并写入新 JWT（挤掉旧会话）
+        if (isSingleSessionEnforced()) {
+          try {
+            token.sv = await bumpSessionVersion(user.id);
+            token.svAt = Math.floor(Date.now() / 1000);
+          } catch {
+            // 忽略：不阻断登录
+          }
+        }
+        return token;
+      }
+
+      // 后续请求：单会话核对（限频）；不一致即失效该会话
+      if (isSingleSessionEnforced() && token.sub) {
+        const res = await isTokenSessionValid({
+          userId: token.sub,
+          tokenVersion: token.sv as number | undefined,
+          lastCheckedAt: token.svAt as number | undefined,
+        });
+        if (!res.valid) {
+          // 返回空 token → session 回调无 user.id → 视为已登出（被挤下线）
+          return {};
+        }
+        token.svAt = res.checkedAt;
       }
       return token;
     },
@@ -120,6 +159,8 @@ export const authOptions: NextAuthOptions = {
         session.user.name = (token.name as string | null | undefined) ?? session.user.name;
         session.user.image =
           (token.picture as string | null | undefined) ?? session.user.image;
+        session.user.primaryTenantId =
+          (token.primaryTenantId as string | null | undefined) ?? null;
       }
       return session;
     },

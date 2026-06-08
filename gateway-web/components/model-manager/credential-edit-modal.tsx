@@ -35,6 +35,8 @@ export function CredentialEditModal({
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [active, setActive] = useState(true);
+  const [channel, setChannel] = useState("");
+  const [isDefault, setIsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -49,6 +51,8 @@ export function CredentialEditModal({
     setApiKey("");
     setBaseUrl(credential?.baseUrl ?? "");
     setActive(credential?.active ?? true);
+    setChannel(credential?.channel ?? "");
+    setIsDefault(credential?.isDefaultForProvider ?? false);
     setError("");
   }, [open, credential, defaultProviderKind]);
 
@@ -68,6 +72,8 @@ export function CredentialEditModal({
             alias,
             baseUrl: baseUrl.trim() || null,
             active,
+            channel: channel.trim() || null,
+            isDefaultForProvider: isDefault,
             ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
           }),
         });
@@ -89,6 +95,8 @@ export function CredentialEditModal({
             providerKind,
             apiKey: apiKey.trim(),
             baseUrl: baseUrl.trim() || null,
+            channel: channel.trim() || null,
+            isDefaultForProvider: isDefault,
           }),
         });
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -133,6 +141,19 @@ export function CredentialEditModal({
             />
           </label>
 
+          <label className="block">
+            <span className="mb-1 block text-sm text-zinc-400">
+              渠道（可选）— 区分同厂商不同来源的 Key，如「官方自有」「某代理」
+            </span>
+            <input
+              className="gw-input"
+              maxLength={60}
+              value={channel}
+              onChange={(e) => setChannel(e.target.value)}
+              placeholder="官方自有 / 渠道折扣 / 代理…"
+            />
+          </label>
+
           <label className="flex items-center gap-2 text-sm text-zinc-300">
             <input
               type="checkbox"
@@ -140,6 +161,15 @@ export function CredentialEditModal({
               onChange={(e) => setActive(e.target.checked)}
             />
             Enable Status
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <input
+              type="checkbox"
+              checked={isDefault}
+              onChange={(e) => setIsDefault(e.target.checked)}
+            />
+            设为该厂商默认凭证（生成默认走此 Key）
           </label>
 
           {!isEdit ? (

@@ -1,5 +1,5 @@
 /**
- * Canvas → Gateway 内部客户端（不经 HTTP，等同 sk-gw 代理语义）
+ * Canvas → Gateway 客户端（仅经 /api/gw/v1 + 用户关联的 Gateway API Key）
  */
 
 import type { GatewayProviderKind } from "@prisma/client";
@@ -7,54 +7,37 @@ import type { GatewayProviderKind } from "@prisma/client";
 import { CanvasProjectError } from "./canvas-project-service";
 import { resolveGatewayAuthForBookUser } from "@/lib/gateway/book-gateway-link";
 import {
-  createRequestLog,
   finalizeRequestLog,
-  forwardAudioSpeech,
-  forwardChatCompletions,
-  forwardChatCompletionsStream,
   parseOpenAiUsage,
   pickCredentialForKind,
   type UsageFromResponse,
 } from "@/lib/gateway/proxy-common";
 import { summarizeUpstreamFailMessage } from "@/lib/gateway/book-gateway-link";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
-import { isQwenTtsModel } from "@/lib/gateway/qwen-tts-proxy";
-import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import {
   buildGatewayChatResultSummary,
   buildGatewayStreamChatResultSummary,
-  buildGatewayTaskResultSummary,
 } from "@/lib/gateway/log-result-summary";
 import {
-  pollBailianR2vTaskForLog,
-  pollDashscopeTaskForLog,
-  pollHunyuanTaskForLog,
-  pollKieTaskForLog,
-  submitBailianR2vJobForLog,
-  submitHunyuanJobForLog,
-  submitKieJobForLog,
-} from "@/lib/gateway/poll-service";
+  gatewayV1AudioSpeech,
+  gatewayV1ChatCompletions,
+  gatewayV1ChatCompletionsStream,
+  gatewayV1ClientMeta,
+  gatewayV1CreateTask,
+  gatewayV1ImageParsing,
+  gatewayV1RecordInfo,
+} from "@/lib/gateway/gateway-v1-http-client";
 import type { CanvasChatMessage } from "./providers/types";
 import { extractKieResultUrl, type KieRecordResponse } from "@/lib/story/kie-client";
 import type { BailianR2vTaskOutput } from "./canvas-video-bailian-r2v";
 import type { CanvasGatewayPollResult } from "./providers/types";
 import {
   AITRYON_PARSING_MODEL,
-  dashscopeImageParsing,
-  isDashscopeTaskFailed,
-  isDashscopeTaskSuccess,
   type DashscopeClothesType,
   type DashscopeParsingOutput,
   type DashscopeTaskOutput,
 } from "@/lib/gateway/dashscope-client";
-import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
-import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
-import {
-  isVolcengineVideoTaskFailed,
-  isVolcengineVideoTaskSuccess,
-  volcengineGetVideoTask,
-  type VolcengineVideoTaskResult,
-} from "@/lib/gateway/volcengine-client";
+import type { VolcengineVideoTaskResult } from "@/lib/gateway/volcengine-client";
 
 const CLIENT_SOURCE = "CANVAS" as const;
 
@@ -116,72 +99,41 @@ export async function canvasGwChat(
     ...(opts.params ?? {}),
   };
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const result = await gatewayV1ChatCompletions({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/chat/completions",
-    providerKind: route.providerKind,
-    requestKind: "CHAT",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, body),
+    body,
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
   });
 
+  let parsed: unknown = null;
   try {
-    const result = await forwardChatCompletions({
-      credentialId,
-      providerKind: route.providerKind,
-      body,
-    });
-    let parsed: unknown = null;
-    try {
-      parsed = result.text ? JSON.parse(result.text) : null;
-    } catch {
-      parsed = null;
-    }
-    const usage = parseOpenAiUsage(parsed);
-    const ok = result.status >= 200 && result.status < 300;
-    await finalizeRequestLog(log.id, {
-      status: ok ? "SUCCEEDED" : "FAILED",
-      durationMs: result.durationMs,
-      usage,
-      resultSummary: buildGatewayChatResultSummary(parsed) ?? undefined,
-      failMessage: ok ? undefined : result.text.slice(0, 500),
-      model,
-    });
-    if (!ok) {
-      throw new CanvasProjectError(
-        "MODEL_NOT_AVAILABLE",
-        result.text.slice(0, 500) || `HTTP ${result.status}`,
-        502,
-      );
-    }
-
-    const choice = (parsed as { choices?: { message?: { content?: string } }[] })
-      ?.choices?.[0];
-    const text =
-      typeof choice?.message?.content === "string"
-        ? choice.message.content
-        : result.text;
-
-    return {
-      text,
-      rawPayload: parsed,
-      usage,
-      logId: log.id,
-    };
-  } catch (e) {
-    if (e instanceof CanvasProjectError) throw e;
-    await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: (e as Error).message,
-      model,
-    });
-    throw e;
+    parsed = result.text ? JSON.parse(result.text) : null;
+  } catch {
+    parsed = null;
   }
+  const usage = parseOpenAiUsage(parsed);
+  const ok = result.status >= 200 && result.status < 300;
+  if (!ok) {
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      result.text.slice(0, 500) || `HTTP ${result.status}`,
+      502,
+    );
+  }
+
+  const choice = (parsed as { choices?: { message?: { content?: string } }[] })
+    ?.choices?.[0];
+  const text =
+    typeof choice?.message?.content === "string"
+      ? choice.message.content
+      : result.text;
+
+  return {
+    text,
+    rawPayload: parsed,
+    usage,
+    logId: result.logId ?? "",
+  };
 }
 
 export type CanvasGwJobResult = {
@@ -210,28 +162,21 @@ export async function canvasGwCreateKieJob(
     );
   }
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model: opts.model,
-    endpoint: "/v1/jobs/createTask",
+    body: {
+      model: opts.model,
+      input: opts.input,
+      callBackUrl: opts.callBackUrl ?? null,
+    },
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
     providerKind: "KIE",
-    requestKind: route.requestKind,
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(opts.model, opts.input),
-  });
-
-  const taskId = await submitKieJobForLog({
-    logId: log.id,
-    credentialId,
-    model: opts.model,
-    input: opts.input,
-    callBackUrl: opts.callBackUrl ?? null,
-  });
-
-  return { taskId, logId: log.id, providerKind: "KIE" };
+  };
 }
 
 export async function canvasGwCreateVolcengineVideoJob(
@@ -260,27 +205,17 @@ export async function canvasGwCreateVolcengineVideoJob(
     );
   }
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model: opts.model,
-    endpoint: "/v1/jobs/createTask",
+    body: { model: opts.model, input: opts.body },
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
     providerKind: "VOLCENGINE",
-    requestKind: "VIDEO",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(opts.model, opts.body),
-  });
-
-  const taskId = await submitVolcengineVideoJobForLog({
-    logId: log.id,
-    credentialId,
-    model: opts.model,
-    body: opts.body,
-  });
-
-  return { taskId, logId: log.id, providerKind: "VOLCENGINE" };
+  };
 }
 
 export async function canvasGwCreateBailianR2vJob(
@@ -307,41 +242,28 @@ export async function canvasGwCreateBailianR2vJob(
     );
   }
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model: opts.model,
-    endpoint: "/v1/jobs/createTask",
+    body: {
+      model: opts.model,
+      bailian: {
+        prompt: opts.prompt,
+        referenceImageUrls: opts.referenceImageUrls,
+        resolution: opts.resolution,
+        ratio: opts.ratio,
+        duration: opts.duration,
+        seedStr: opts.seedStr,
+        parameterExtras: opts.parameterExtras,
+      },
+    },
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+  });
+
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
     providerKind: "BAILIAN",
-    requestKind: "VIDEO",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(opts.model, {
-      prompt: opts.prompt,
-      referenceImageUrls: opts.referenceImageUrls,
-      resolution: opts.resolution,
-      ratio: opts.ratio,
-      duration: opts.duration,
-      ...(opts.seedStr ? { seed: opts.seedStr } : {}),
-      ...(opts.parameterExtras ?? {}),
-    }),
-  });
-
-  const taskId = await submitBailianR2vJobForLog({
-    logId: log.id,
-    credentialId,
-    model: opts.model,
-    prompt: opts.prompt,
-    referenceImageUrls: opts.referenceImageUrls,
-    resolution: opts.resolution,
-    ratio: opts.ratio,
-    duration: opts.duration,
-    seedStr: opts.seedStr,
-    parameterExtras: opts.parameterExtras,
-  });
-
-  return { taskId, logId: log.id, providerKind: "BAILIAN" };
+  };
 }
 
 export async function canvasGwCreateHunyuanJob(
@@ -364,35 +286,24 @@ export async function canvasGwCreateHunyuanJob(
     );
   }
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    credentialId,
-    model: opts.model,
-    endpoint: "/v1/jobs/createTask",
-    providerKind: "HUNYUAN",
-    requestKind: "IMAGE",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(opts.model, {
-      prompt: opts.prompt,
-      imageUrls: opts.imageUrls ?? [],
-      params: opts.params ?? {},
-    }),
-  });
-
-  const taskId = await submitHunyuanJobForLog({
-    logId: log.id,
-    credentialId,
-    model: opts.model,
-    input: {
-      prompt: opts.prompt,
-      imageUrls: opts.imageUrls,
-      params: opts.params,
+    body: {
+      model: opts.model,
+      hunyuan: {
+        prompt: opts.prompt,
+        imageUrls: opts.imageUrls,
+        params: opts.params,
+      },
     },
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
   });
 
-  return { taskId, logId: log.id, providerKind: "HUNYUAN" };
+  return {
+    taskId: created.taskId,
+    logId: created.logId,
+    providerKind: "HUNYUAN",
+  };
 }
 
 export async function canvasGwTts(
@@ -417,68 +328,25 @@ export async function canvasGwTts(
     );
   }
 
-  const payload = {
-    model,
-    input: opts.text.slice(0, 4096),
-    voice: opts.voice ?? "alloy",
-    response_format: "mp3",
-    ...(opts.languageType?.trim()
-      ? { language_type: opts.languageType.trim() }
-      : {}),
-  };
-
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const result = await gatewayV1AudioSpeech({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: isQwenTtsModel(model)
-      ? "/services/aigc/multimodal-generation/generation"
-      : "/v1/audio/speech",
-    providerKind: route.providerKind,
-    requestKind: "TTS",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, payload),
+    body: {
+      model,
+      input: opts.text.slice(0, 4096),
+      voice: opts.voice ?? "alloy",
+      response_format: "mp3",
+      ...(opts.languageType?.trim()
+        ? { language_type: opts.languageType.trim() }
+        : {}),
+    },
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
   });
 
-  const result = await forwardAudioSpeech({
-    credentialId,
-    providerKind: route.providerKind,
-    body: payload,
-  });
-  const ok = result.status >= 200 && result.status < 300;
-  const usage = result.vendorJson ? parseOpenAiUsage(result.vendorJson) : undefined;
-  await finalizeRequestLog(log.id, {
-    status: ok ? "SUCCEEDED" : "FAILED",
-    durationMs: result.durationMs,
-    usage,
-    resultSummary: ok
-      ? buildGatewayTaskResultSummary(result.vendorJson, {
-          contentType: "audio/mpeg",
-          byteLength: result.buffer.length,
-        })
-      : undefined,
-    failMessage: ok
-      ? undefined
-      : result.buffer.toString("utf8").slice(0, 500),
-    model,
-  });
-  if (!ok) {
-    const detail = result.buffer.toString("utf8").slice(0, 200).trim();
-    throw new CanvasProjectError(
-      "MODEL_NOT_AVAILABLE",
-      detail
-        ? `TTS HTTP ${result.status}: ${detail}`
-        : `TTS HTTP ${result.status}`,
-      502,
-    );
-  }
   return {
     buffer: result.buffer,
-    logId: log.id,
-    contentType: result.contentType ?? "audio/mpeg",
-    ext: result.ext ?? "mp3",
+    logId: result.logId,
+    contentType: result.contentType,
+    ext: result.ext,
   };
 }
 
@@ -498,11 +366,7 @@ export async function canvasGwRecordInfo(
   },
 ): Promise<CanvasGwPollResult> {
   const auth = await requireGatewayAuth(userId);
-  const credentialId = pickCredentialForKind(
-    auth.credentials,
-    opts.providerKind,
-  );
-  if (!credentialId) {
+  if (!pickCredentialForKind(auth.credentials, opts.providerKind)) {
     throw new CanvasProjectError(
       "MODEL_NOT_AVAILABLE",
       `Gateway Key 未绑定 ${opts.providerKind} 凭证`,
@@ -510,119 +374,41 @@ export async function canvasGwRecordInfo(
     );
   }
 
-  if (opts.providerKind === "BAILIAN") {
-    const polled = await pollBailianR2vTaskForLog({
-      credentialId,
-      taskId: opts.taskId,
-    });
-    // 百炼终态由 gateway poll worker 统一 finalize（避免 canvas poll 写 durationMs=0 且与 worker 竞态）
-    return { providerKind: "BAILIAN", output: polled.output };
-  }
-
-  if (opts.providerKind === "DASHSCOPE") {
-    const polled = await pollDashscopeTaskForLog({
-      credentialId,
-      taskId: opts.taskId,
-    });
-    const { output, raw } = polled;
-    if (opts.gatewayLogId) {
-      const status = output.task_status;
-      if (isDashscopeTaskSuccess(status)) {
-        await finalizeRequestLog(opts.gatewayLogId, {
-          status: "SUCCEEDED",
-          durationMs: 0,
-          resultSummary: buildGatewayTaskResultSummary(raw, output),
-          externalTaskId: opts.taskId,
-        });
-      } else if (isDashscopeTaskFailed(status)) {
-        await finalizeRequestLog(opts.gatewayLogId, {
-          status: "FAILED",
-          durationMs: 0,
-          failMessage: output.message ?? output.code ?? "failed",
-          externalTaskId: opts.taskId,
-        });
-      }
-    }
-    return { providerKind: "DASHSCOPE", output };
-  }
-
-  if (opts.providerKind === "HUNYUAN") {
-    const polled = await pollHunyuanTaskForLog({
-      credentialId,
-      taskId: opts.taskId,
-      model: undefined,
-    });
-    if (opts.gatewayLogId) {
-      if (polled.state === "succeeded") {
-        await finalizeRequestLog(opts.gatewayLogId, {
-          status: "SUCCEEDED",
-          durationMs: 0,
-          resultSummary: polled,
-          externalTaskId: opts.taskId,
-        });
-      } else if (polled.state === "failed") {
-        await finalizeRequestLog(opts.gatewayLogId, {
-          status: "FAILED",
-          durationMs: 0,
-          failMessage: polled.errorMessage ?? "failed",
-          externalTaskId: opts.taskId,
-        });
-      }
-    }
-    return { providerKind: "HUNYUAN", polled };
-  }
-
-  if (opts.providerKind === "VOLCENGINE") {
-    const cred = await getDecryptedCredentialApiKey(credentialId);
-    if (!cred) {
-      throw new CanvasProjectError(
-        "MODEL_NOT_AVAILABLE",
-        "火山方舟凭证不可用",
-        503,
-      );
-    }
-    const polled = await volcengineGetVideoTask({
-      apiKey: cred.apiKey,
-      baseUrl: cred.baseUrl,
-      taskId: opts.taskId,
-    });
-    const row = polled.output;
-    if (opts.gatewayLogId) {
-      if (isVolcengineVideoTaskSuccess(row)) {
-        await finalizeRequestLog(opts.gatewayLogId, {
-          status: "SUCCEEDED",
-          durationMs: 0,
-          resultSummary: buildGatewayTaskResultSummary(
-            polled.raw,
-            row.content?.video_url
-              ? { videoUrl: row.content.video_url }
-              : { status: row.status },
-          ),
-          externalTaskId: opts.taskId,
-        });
-      } else if (isVolcengineVideoTaskFailed(row)) {
-        await finalizeRequestLog(opts.gatewayLogId, {
-          status: "FAILED",
-          durationMs: 0,
-          failMessage:
-            typeof row.error === "string"
-              ? row.error
-              : (row.error?.message ?? `status=${row.status}`),
-          failCode: "VOLCENGINE_TASK_FAILED",
-          externalTaskId: opts.taskId,
-        });
-      }
-    }
-    return { providerKind: "VOLCENGINE", task: row };
-  }
-
-  const record = await pollKieTaskForLog({
-    logId: opts.gatewayLogId ?? "",
-    credentialId,
+  const polled = await gatewayV1RecordInfo({
+    apiKeyId: auth.id,
     taskId: opts.taskId,
+    meta: gatewayV1ClientMeta("CANVAS"),
   });
-  // KIE 终态由 gateway poll worker 统一 finalize
-  return { providerKind: "KIE", record };
+
+  if (polled.providerKind === "BAILIAN") {
+    return {
+      providerKind: "BAILIAN",
+      output: polled.data as BailianR2vTaskOutput,
+    };
+  }
+  if (polled.providerKind === "DASHSCOPE") {
+    return {
+      providerKind: "DASHSCOPE",
+      output: polled.data as DashscopeTaskOutput,
+    };
+  }
+  if (polled.providerKind === "HUNYUAN") {
+    return {
+      providerKind: "HUNYUAN",
+      polled: polled.data as CanvasGatewayPollResult,
+    };
+  }
+  if (polled.providerKind === "VOLCENGINE") {
+    return {
+      providerKind: "VOLCENGINE",
+      task: polled.data as VolcengineVideoTaskResult,
+    };
+  }
+
+  return {
+    providerKind: "KIE",
+    record: polled.data as KieRecordResponse,
+  };
 }
 
 export function extractCanvasGwKieResultUrl(record: KieRecordResponse): string | null {
@@ -663,68 +449,20 @@ export async function canvasGwImageParsing(
     ? opts.clothesType
     : (["upper", "lower"] as DashscopeClothesType[]);
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const result = await gatewayV1ImageParsing({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/image-process/process",
-    providerKind: "DASHSCOPE",
-    requestKind: "TRYON",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, {
+    body: {
       imageUrl: opts.imageUrl,
       clothesType,
-    }),
+      model,
+    },
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
   });
 
-  const started = Date.now();
-  try {
-    const cred = await getDecryptedCredentialApiKey(credentialId);
-    if (!cred) {
-      throw new CanvasProjectError(
-        "MODEL_NOT_AVAILABLE",
-        "DashScope 凭证不可用",
-        503,
-      );
-    }
-    const result = await dashscopeImageParsing({
-      apiKey: cred.apiKey,
-      imageUrl: opts.imageUrl,
-      clothesType,
-      model,
-    });
-    if (!result.ok) {
-      await finalizeRequestLog(log.id, {
-        status: "FAILED",
-        durationMs: Date.now() - started,
-        failMessage: result.error,
-        model,
-      });
-      throw new CanvasProjectError(
-        "MODEL_NOT_AVAILABLE",
-        result.error,
-        502,
-      );
-    }
-    await finalizeRequestLog(log.id, {
-      status: "SUCCEEDED",
-      durationMs: Date.now() - started,
-      resultSummary: result.output,
-      model,
-    });
-    return { output: result.output, logId: log.id };
-  } catch (e) {
-    if (e instanceof CanvasProjectError) throw e;
-    await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: Date.now() - started,
-      failMessage: (e as Error).message,
-      model,
-    });
-    throw e;
-  }
+  return {
+    output: result.output as DashscopeParsingOutput,
+    logId: result.logId,
+  };
 }
 
 function wrapCanvasChatStreamWithLogFinalize(
@@ -827,47 +565,33 @@ export async function canvasGwChatStream(
     ...(opts.params ?? {}),
   };
 
-  const log = await createRequestLog({
-    userId: auth.userId,
+  const result = await gatewayV1ChatCompletionsStream({
     apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/chat/completions",
-    providerKind: route.providerKind,
-    requestKind: "CHAT",
-    clientSource: CLIENT_SOURCE,
-    clientPage: opts.clientPage,
-    inputSummary: buildGatewayInputSummary(model, body),
-  });
-
-  const result = await forwardChatCompletionsStream({
-    credentialId,
-    providerKind: route.providerKind,
     body,
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
   });
 
-  if (!result.body || result.status >= 300) {
-    const errText = result.body
-      ? await new Response(result.body).text()
+  const logId = result.headers.get("x-gateway-log-id") ?? "";
+  const bodyStream = result.body;
+
+  if (!bodyStream || result.status >= 300) {
+    const errText = bodyStream
+      ? await new Response(bodyStream).text()
       : `HTTP ${result.status}`;
-    const failMessage = summarizeUpstreamFailMessage(errText, result.status);
-    await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: result.durationMs,
-      failCode: `UPSTREAM_HTTP_${result.status}`,
-      failMessage,
-      model,
-    });
-    throw new CanvasProjectError("MODEL_NOT_AVAILABLE", failMessage, 502);
+    throw new CanvasProjectError(
+      "MODEL_NOT_AVAILABLE",
+      summarizeUpstreamFailMessage(errText, result.status),
+      502,
+    );
   }
 
   return {
-    logId: log.id,
+    logId,
     status: result.status,
-    body: wrapCanvasChatStreamWithLogFinalize(result.body, {
-      logId: log.id,
+    body: wrapCanvasChatStreamWithLogFinalize(bodyStream, {
+      logId,
       model,
-      startedMs: result.durationMs,
+      startedMs: 0,
     }),
   };
 }

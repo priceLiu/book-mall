@@ -76,6 +76,7 @@ function LibraryView() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [promptTip, setPromptTip] = useState<PromptTooltipState | null>(null);
+  const [space, setSpace] = useState<"PERSONAL" | "TEAM">("PERSONAL");
 
   useEffect(() => {
     setMounted(true);
@@ -89,6 +90,7 @@ function LibraryView() {
         const data = (await r.json()) as {
           items?: TextToImageLibraryItem[];
           quota?: ImageLibraryQuota;
+          space?: "PERSONAL" | "TEAM";
           error?: string;
         };
         if (cancelled) return;
@@ -97,6 +99,7 @@ function LibraryView() {
           setItems([]);
           setQuota(null);
         } else {
+          setSpace(data.space === "TEAM" ? "TEAM" : "PERSONAL");
           setItems(Array.isArray(data.items) ? data.items : []);
           setQuota(
             data.quota &&
@@ -172,6 +175,33 @@ function LibraryView() {
     [t],
   );
 
+  const handleToggleVisibility = useCallback(
+    async (item: TextToImageLibraryItem) => {
+      const next = item.visibility === "TEAM_PUBLIC" ? "PRIVATE" : "TEAM_PUBLIC";
+      setBusyId(item.id);
+      try {
+        const r = await fetch("/api/text-to-image/library", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: item.id, visibility: next }),
+        });
+        if (!r.ok) {
+          const d = (await r.json().catch(() => ({}))) as { error?: string };
+          setError(d.error ?? "切换可见域失败");
+          return;
+        }
+        setItems((prev) =>
+          prev.map((x) => (x.id === item.id ? { ...x, visibility: next } : x)),
+        );
+      } catch {
+        setError("切换可见域失败");
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [],
+  );
+
   const promptTooltipPortal =
     mounted &&
     promptTip &&
@@ -229,7 +259,14 @@ function LibraryView() {
     <div className={styles.workspace}>
       <header className={styles.pageHead}>
         <div>
-          <h1 className={styles.title}>{t("imageLibraryPageTitle")}</h1>
+          <h1 className={styles.title}>
+            {t("imageLibraryPageTitle")}
+            {space === "TEAM" ? (
+              <span className="ml-2 align-middle text-xs font-normal text-blue-600 dark:text-blue-300">
+                团队空间 · 含公共库
+              </span>
+            ) : null}
+          </h1>
           <p className={styles.subtitle}>{t("disclaimer")}</p>
           <ToolImplementationCrossLink href="/text-to-image/implementation" />
         </div>
@@ -327,7 +364,14 @@ function LibraryView() {
                         ? promptEllipsis(item.prompt)
                         : t("imageLibraryPromptNone")}
                     </span>
-                    <span className={styles.cardTime}>{formatDate(item.createdAt)}</span>
+                    <span className={styles.cardTime}>
+                      {formatDate(item.createdAt)}
+                      {item.visibility === "TEAM_PUBLIC" ? (
+                        <span className="ml-1 rounded bg-blue-500/15 px-1 py-0.5 text-[0.6rem] font-medium text-blue-700 dark:text-blue-300">
+                          团队公共
+                        </span>
+                      ) : null}
+                    </span>
                   </div>
                   <div className={styles.cardActionsLibrary}>
                     <button
@@ -346,6 +390,16 @@ function LibraryView() {
                     >
                       {t("closetCardDownload")}
                     </a>
+                    {item.canToggle ? (
+                      <button
+                        type="button"
+                        className={styles.btnPreview}
+                        onClick={() => void handleToggleVisibility(item)}
+                        disabled={busyId === item.id}
+                      >
+                        {item.visibility === "TEAM_PUBLIC" ? "收回私有" : "设为公共"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className={styles.btnDelete}

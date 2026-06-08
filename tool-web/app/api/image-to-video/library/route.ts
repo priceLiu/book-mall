@@ -51,6 +51,31 @@ export async function GET() {
   });
 }
 
+export async function PATCH(req: Request) {
+  const origin = originOrError();
+  if (origin instanceof NextResponse) return origin;
+  const suite = await requireToolSuiteNavAccess("image-to-video");
+  if (!suite.ok) return suite.response;
+  const token = tokenOrError();
+  if (token instanceof NextResponse) return token;
+
+  const body = await req.text();
+  const r = await fetch(`${origin}${UPSTREAM}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body,
+    cache: "no-store",
+  });
+  const text = await r.text();
+  return new NextResponse(text, {
+    status: r.status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export async function DELETE(req: Request) {
   const origin = originOrError();
   if (origin instanceof NextResponse) return origin;

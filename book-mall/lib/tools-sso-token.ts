@@ -33,6 +33,13 @@ export function signToolsAccessToken(opts: {
   toolsNavKeys?: readonly string[];
   /** 电商工具箱计费模式 */
   ecomBillingMode?: "BYOK_SERVICE_FEE" | "PLATFORM_METERED";
+  /** 多租户上下文：当前空间/角色/席位（团队功能） */
+  tenant?: {
+    tenantId?: string | null;
+    tenantType?: "PERSONAL" | "TEAM" | null;
+    roleType?: "OWNER" | "ADMIN" | "MEMBER" | null;
+    seatId?: string | null;
+  };
   /** 写入 JWT，供工具站壳层本地验签展示（字段受限以防 Cookie 过大） */
   profile?: {
     email?: string | null;
@@ -66,6 +73,22 @@ export function signToolsAccessToken(opts: {
   ) {
     payloadObj.ecom_billing_mode = opts.ecomBillingMode;
   }
+  const tenantId = trimClaim(opts.tenant?.tenantId, 64);
+  if (tenantId) {
+    payloadObj.tenant_id = tenantId;
+    if (opts.tenant?.tenantType === "PERSONAL" || opts.tenant?.tenantType === "TEAM") {
+      payloadObj.tenant_type = opts.tenant.tenantType;
+    }
+    if (
+      opts.tenant?.roleType === "OWNER" ||
+      opts.tenant?.roleType === "ADMIN" ||
+      opts.tenant?.roleType === "MEMBER"
+    ) {
+      payloadObj.role_type = opts.tenant.roleType;
+    }
+    const seatId = trimClaim(opts.tenant?.seatId, 64);
+    if (seatId) payloadObj.seat_id = seatId;
+  }
   const email = trimClaim(opts.profile?.email, 320);
   const name = trimClaim(opts.profile?.name, 120);
   let image = trimClaim(opts.profile?.image, 768);
@@ -98,6 +121,11 @@ export type VerifiedToolsToken = {
   /** 可能为空数组或省略（旧 JWT）；工具站应回落 introspect。 */
   tools_nav_keys?: string[];
   ecom_billing_mode?: "BYOK_SERVICE_FEE" | "PLATFORM_METERED";
+  /** 多租户上下文（旧 JWT 可能缺失，回落 introspect） */
+  tenant_id?: string;
+  tenant_type?: "PERSONAL" | "TEAM";
+  role_type?: "OWNER" | "ADMIN" | "MEMBER";
+  seat_id?: string;
 };
 
 function pickTier(raw: unknown): "gold" | "admin" | null {
@@ -184,6 +212,17 @@ export function verifyToolsAccessToken(
   const ebm = payloadRaw.ecom_billing_mode;
   if (ebm === "BYOK_SERVICE_FEE" || ebm === "PLATFORM_METERED") {
     out.ecom_billing_mode = ebm;
+  }
+
+  const tenantId = pickClaim(payloadRaw.tenant_id, 64);
+  if (tenantId) {
+    out.tenant_id = tenantId;
+    const tt = payloadRaw.tenant_type;
+    if (tt === "PERSONAL" || tt === "TEAM") out.tenant_type = tt;
+    const rt = payloadRaw.role_type;
+    if (rt === "OWNER" || rt === "ADMIN" || rt === "MEMBER") out.role_type = rt;
+    const seatId = pickClaim(payloadRaw.seat_id, 64);
+    if (seatId) out.seat_id = seatId;
   }
 
   return out;
