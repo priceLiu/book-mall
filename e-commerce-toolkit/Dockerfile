@@ -12,8 +12,10 @@ COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY . .
+RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable && pnpm run build:docker
+RUN corepack enable && corepack prepare pnpm@11.1.3 --activate \
+  && pnpm run build:docker
 
 FROM base AS runner
 ENV NODE_ENV=production
