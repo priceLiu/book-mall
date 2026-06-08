@@ -425,7 +425,7 @@ export function StoryProScriptHubNode({ id, data, selected }: NodeProps) {
         finalizedScriptHistory: finalizedHistory,
       });
       if (base?.trim() && projectId) {
-        void clearScriptAssistantOnFinalize(base, projectId);
+        void clearScriptAssistantOnFinalize(base, projectId, id, starter.id);
       }
       updateNodeData(starter.id, { pipelineStage: "script_finalized" });
       reflowProLayout();

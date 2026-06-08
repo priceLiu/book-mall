@@ -1638,17 +1638,21 @@ model StoryProCharacterAudioAsset {
 }
 
 /// 剧本创作助手 · 定稿前对话历史（定稿后清空，不再写入）
+/// workflowKey：scriptHubId / starter:{starterId}；空串为旧版项目级会话（兼容保留）
 model StoryProScriptAssistantHistory {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId String
-  messages  Json     @default("[]")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String
+  workflowKey String   @default("")
+  theme       String?
+  messages    Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@unique([userId, projectId])
+  @@unique([userId, projectId, workflowKey])
   @@index([userId, updatedAt])
+  @@index([userId, projectId])
 }
 
 /// 用户自定义提示词模板（LLM / IMAGE 合计最多 8 条活跃；删除软归档保留快照；内置在代码里）

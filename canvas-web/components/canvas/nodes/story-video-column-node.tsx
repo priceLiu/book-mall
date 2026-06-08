@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
@@ -491,7 +492,12 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
                 st === "pending" ||
                 videoInflightKeys.has(row.key);
               const videoError =
-                st === "error" ? row.videoRuntime?.failMessage : undefined;
+                st === "error"
+                  ? formatCanvasTaskError(
+                      row.videoRuntime?.failCode,
+                      row.videoRuntime?.failMessage,
+                    )
+                  : undefined;
               const frameRow = frameRows.find((f) => f.key === row.key);
               const videoBlockReason =
                 storyVideoGenerateBlockReason(frameRow);
@@ -512,7 +518,12 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
                 ttsSt === "pending" ||
                 ttsInflightKeys.has(row.key);
               const ttsError =
-                ttsSt === "error" ? row.ttsRuntime?.failMessage : undefined;
+                ttsSt === "error"
+                  ? formatCanvasTaskError(
+                      row.ttsRuntime?.failCode,
+                      row.ttsRuntime?.failMessage,
+                    )
+                  : undefined;
               const ttsBlockReason = storyTtsGenerateBlockReason(row);
 
               return (

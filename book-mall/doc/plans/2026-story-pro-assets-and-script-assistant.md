@@ -50,15 +50,18 @@
 
 ### 持久化
 
-- 表 `StoryProScriptAssistantHistory`：`{ role, content, id, createdAt }[]`
-- **定稿前**：每次对话回合后 PUT 全量 messages。
-- **定稿瞬间**：DELETE history（`story-pro-script-hub` 点「故事定稿」）。
+- 表 `StoryProScriptAssistantHistory`：`workflowKey`（`scriptHubId` / `starter:{id}`；空串=旧版项目级）+ `theme` + `{ role, content, id, createdAt }[]`
+- **定稿前**：按工作流线程 PUT 全量 messages；侧栏展示各工作流主题与会话条数。
+- **定稿瞬间**：DELETE **当前 hub** 对应 `workflowKey`（及 `starter:{id}`），其它工作流不受影响。
 - **定稿后**：会话仅内存，刷新/关页不保留。
+- **兼容**：旧数据 `workflowKey=""` 保留为「项目会话（旧）」线程，不自动合并。
 
 ### API
 
 - `POST /api/canvas/story-pro/script-assistant/chat` → plain text stream
-- `GET/PUT/DELETE /api/canvas/story-pro/script-assistant/history?projectId=`
+- `GET /api/canvas/story-pro/script-assistant/history?projectId=&workflowKey=` → messages
+- `GET ...&listThreads=1` → `{ threads: [{ workflowKey, theme, messageCount, updatedAt }] }`
+- `PUT/DELETE` 同上，支持 `workflowKey`
 
 ### 导入剧本
 

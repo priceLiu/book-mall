@@ -9,6 +9,10 @@ export const CANVAS_VIEWPORT_WHEEL_ROOT = ".react-flow, .canvas-flow-wrap";
 /** 画布项目页编辑区根（含侧栏助手、工具条下方主区域） */
 export const CANVAS_EDITOR_SELECTOR = "[data-canvas-editor]";
 
+/** 挂到 body 的浮层（剧本助手沉浸式等）也须拦截横向滑动手势 */
+export const CANVAS_BLOCK_NAV_GESTURE_SELECTOR =
+  "[data-canvas-editor], [data-canvas-block-nav-gesture]";
+
 /** 需要保留原生滚动的区域（侧栏、弹层列表等） */
 export const CANVAS_NATIVE_SCROLL_SELECTOR = "[data-canvas-wheel-scroll]";
 
@@ -23,7 +27,7 @@ export function isCanvasFormWheelTarget(target: EventTarget | null): boolean {
 
 export function isCanvasEditorWheelTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
-  return !!target.closest(CANVAS_EDITOR_SELECTOR);
+  return !!target.closest(CANVAS_BLOCK_NAV_GESTURE_SELECTOR);
 }
 
 export function isCanvasViewportWheelTarget(target: EventTarget | null): boolean {

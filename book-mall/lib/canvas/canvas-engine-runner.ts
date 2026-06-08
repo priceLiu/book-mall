@@ -19,6 +19,7 @@ import type {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { formatKieTaskFailMessage } from "@/lib/story/kie-client";
 
 import {
   buildCanvasAiKieCallbackUrl,
@@ -1102,7 +1103,10 @@ export async function runVideoEngineNode(
       data: {
         status: "FAILED",
         failCode: "VIDEO_ENGINE_FAILED",
-        failMessage: msg.slice(0, 500),
+        failMessage: formatKieTaskFailMessage("VIDEO_ENGINE_FAILED", msg).slice(
+          0,
+          500,
+        ),
         completedAt: new Date(),
         inputPayload: {
           ...submitPayloadBase,

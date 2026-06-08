@@ -23,8 +23,10 @@ import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import {
   clearScriptAssistantHistory,
   getScriptAssistantHistory,
+  listScriptAssistantHistoryThreads,
   saveScriptAssistantHistory,
   streamScriptAssistantChat,
+  type ScriptAssistantHistoryThread,
   type ScriptAssistantMessage,
 } from "@/lib/canvas-api";
 import { STORY_CHROME_GREEN_CLASS } from "@/lib/canvas/story-column-sync";
@@ -35,6 +37,12 @@ import {
   resolveStoryProAssistantImport,
   type ScriptAssistantOutputMode,
 } from "@/lib/canvas/story-pro-script-assistant";
+import {
+  listStoryProAssistantWorkflowThreads,
+  pickActiveStoryProAssistantWorkflowKey,
+  storyProAssistantThemeForWorkflowKey,
+  type StoryProAssistantWorkflowThread,
+} from "@/lib/canvas/story-pro-script-assistant-workflows";
 import { cn } from "@/lib/utils";
 
 type ChatMessage = ScriptAssistantMessage;
@@ -155,6 +163,72 @@ function useFloatingDrag(enabled: boolean) {
   return { pos, panelRef, onDragStart, resetCenter };
 }
 
+const LEGACY_ASSISTANT_WORKFLOW_KEY = "";
+
+type AssistantThreadRow = {
+  workflowKey: string;
+  theme: string;
+  workflowLabel: string;
+  scriptFinalized: boolean;
+  hasScript: boolean;
+  messageCount: number;
+};
+
+function AssistantWorkflowPicker({
+  threads,
+  activeKey,
+  onSelect,
+  immersive,
+}: {
+  threads: AssistantThreadRow[];
+  activeKey: string | null;
+  onSelect: (workflowKey: string) => void;
+  immersive: boolean;
+}) {
+  if (threads.length === 0) return null;
+
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 flex-col gap-1.5 border-b border-white/10",
+        PANEL_BODY_SOLID_CLASS,
+        immersive ? "px-5 py-2" : "px-3 py-1.5",
+      )}
+      data-canvas-wheel-scroll
+    >
+      <p className="text-[9px] uppercase tracking-wide text-white/35">
+        工作流会话
+      </p>
+      <div className="flex max-h-28 flex-col gap-1 overflow-y-auto">
+        {threads.map((t) => {
+          const active = t.workflowKey === activeKey;
+          return (
+            <button
+              key={t.workflowKey}
+              type="button"
+              className={cn(
+                "rounded-md border px-2 py-1.5 text-left transition",
+                immersive ? "text-[11px]" : "text-[10px]",
+                active
+                  ? "border-emerald-400/45 bg-emerald-500/15 text-emerald-50"
+                  : "border-white/10 text-white/70 hover:border-white/20 hover:text-white",
+              )}
+              onClick={() => onSelect(t.workflowKey)}
+            >
+              <span className="block truncate font-medium">{t.theme}</span>
+              <span className="mt-0.5 block text-[9px] opacity-70">
+                {t.workflowLabel}
+                {t.messageCount > 0 ? ` · ${t.messageCount} 条` : " · 暂无对话"}
+                {t.scriptFinalized ? " · 已定稿" : ""}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AssistantModeBar({
   mode,
   onModeChange,
@@ -236,6 +310,7 @@ function AssistantPanelBody({
     <>
       <div
         ref={listRef}
+        data-canvas-wheel-scroll
         className={cn(
           "min-h-0 flex-1 select-text space-y-3 overflow-y-auto",
           immersive ? "px-5 py-4" : "space-y-2 px-3 py-2",
@@ -398,19 +473,56 @@ function AssistantPanelBody({
   );
 }
 
+function mergeAssistantThreadRows(
+  workflows: StoryProAssistantWorkflowThread[],
+  stored: ScriptAssistantHistoryThread[],
+  nodes: ReturnType<typeof useCanvasStore.getState>["nodes"],
+  edges: ReturnType<typeof useCanvasStore.getState>["edges"],
+): AssistantThreadRow[] {
+  const storedByKey = new Map(stored.map((s) => [s.workflowKey, s]));
+  const rows: AssistantThreadRow[] = workflows.map((wf) => {
+    const hit = storedByKey.get(wf.workflowKey);
+    return {
+      workflowKey: wf.workflowKey,
+      theme: hit?.theme?.trim() || wf.theme,
+      workflowLabel: wf.workflowLabel,
+      scriptFinalized: wf.scriptFinalized,
+      hasScript: wf.hasScript,
+      messageCount: hit?.messageCount ?? 0,
+    };
+  });
+
+  const legacy = storedByKey.get(LEGACY_ASSISTANT_WORKFLOW_KEY);
+  if (legacy && legacy.messageCount > 0) {
+    const hasLegacyRow = rows.some(
+      (r) => r.workflowKey === LEGACY_ASSISTANT_WORKFLOW_KEY,
+    );
+    if (!hasLegacyRow) {
+      rows.unshift({
+        workflowKey: LEGACY_ASSISTANT_WORKFLOW_KEY,
+        theme:
+          legacy.theme?.trim() ||
+          storyProAssistantThemeForWorkflowKey(nodes, edges, ""),
+        workflowLabel: "项目会话（旧）",
+        scriptFinalized: false,
+        hasScript: false,
+        messageCount: legacy.messageCount,
+      });
+    }
+  }
+
+  return rows;
+}
+
 export function ScriptWritingAssistantPanel({
   projectId,
-  scriptFinalized,
-  hasScript,
   onImportScript,
 }: {
   projectId: string;
-  scriptFinalized: boolean;
-  hasScript: boolean;
   onImportScript: (markdown: string) => void;
 }) {
   const base = useBookMallBaseUrl();
-  const [open, setOpen] = useState(() => !hasScript && !scriptFinalized);
+  const [open, setOpen] = useState(true);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("dock");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -421,12 +533,17 @@ export function ScriptWritingAssistantPanel({
   const [outputMode, setOutputMode] =
     useState<ScriptAssistantOutputMode>("chat");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [activeWorkflowKey, setActiveWorkflowKey] = useState<string | null>(
+    null,
+  );
+  const [threadRows, setThreadRows] = useState<AssistantThreadRow[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const persistRef = useRef(false);
   const { confirm } = useDialogs();
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
+  const graphRevision = useCanvasStore((s) => s.graphRevision);
   const importPlan = useMemo(
     () => resolveStoryProAssistantImport(nodes, edges),
     [nodes, edges],
@@ -444,23 +561,94 @@ export function ScriptWritingAssistantPanel({
   const showPackPreview = outputMode === "pack";
   const { pos, panelRef, onDragStart, resetCenter } = useFloatingDrag(immersive);
 
+  const workflowThreads = useMemo(
+    () => listStoryProAssistantWorkflowThreads(nodes, edges),
+    [nodes, edges, graphRevision],
+  );
+
+  const selectedNodeId = useMemo(() => {
+    const selected = nodes.filter((n) => n.selected);
+    const hit = selected.find(
+      (n) =>
+        n.type === "story-pro-starter" || n.type === "story-pro-script-hub",
+    );
+    return hit?.id ?? selected[0]?.id ?? null;
+  }, [nodes, graphRevision]);
+
+  const activeThread = useMemo(
+    () => threadRows.find((t) => t.workflowKey === activeWorkflowKey) ?? null,
+    [threadRows, activeWorkflowKey],
+  );
+
+  const scriptFinalized = Boolean(activeThread?.scriptFinalized);
+  const hasScript = Boolean(activeThread?.hasScript);
+
   useEffect(() => setPortalMounted(true), []);
 
   useEffect(() => {
-    setOpen(!hasScript && !scriptFinalized);
-  }, [hasScript, scriptFinalized]);
+    if (!base?.trim() || !projectId) {
+      setThreadRows([]);
+      return;
+    }
+    void listScriptAssistantHistoryThreads(base, projectId)
+      .then((stored) => {
+        const merged = mergeAssistantThreadRows(
+          workflowThreads,
+          stored,
+          nodes,
+          edges,
+        );
+        setThreadRows(merged);
+        setActiveWorkflowKey((prev) => {
+          if (prev && merged.some((m) => m.workflowKey === prev)) return prev;
+          return (
+            pickActiveStoryProAssistantWorkflowKey(
+              nodes,
+              edges,
+              selectedNodeId,
+            ) ?? merged[0]?.workflowKey ?? null
+          );
+        });
+      })
+      .catch(() => {
+        const merged = mergeAssistantThreadRows(workflowThreads, [], nodes, edges);
+        setThreadRows(merged);
+        setActiveWorkflowKey(
+          pickActiveStoryProAssistantWorkflowKey(nodes, edges, selectedNodeId) ??
+            merged[0]?.workflowKey ??
+            null,
+        );
+      });
+  }, [
+    base,
+    projectId,
+    workflowThreads,
+    nodes,
+    edges,
+    selectedNodeId,
+    graphRevision,
+  ]);
 
   useEffect(() => {
-    if (!base?.trim() || !projectId || scriptFinalized) {
+    const drafting = workflowThreads.filter(
+      (t) => !t.scriptFinalized && !t.hasScript,
+    );
+    if (drafting.length > 0 && !open) {
+      setOpen(true);
+    }
+  }, [workflowThreads, open]);
+
+  useEffect(() => {
+    if (!base?.trim() || !projectId || !activeWorkflowKey || scriptFinalized) {
       setMessages([]);
       return;
     }
     setLoadingHistory(true);
-    void getScriptAssistantHistory(base, projectId)
+    void getScriptAssistantHistory(base, projectId, activeWorkflowKey)
       .then(setMessages)
       .catch(() => setMessages([]))
       .finally(() => setLoadingHistory(false));
-  }, [base, projectId, scriptFinalized]);
+  }, [base, projectId, activeWorkflowKey, scriptFinalized]);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -473,18 +661,53 @@ export function ScriptWritingAssistantPanel({
 
   const persistIfNeeded = useCallback(
     async (next: ChatMessage[]) => {
-      if (scriptFinalized || !base?.trim() || !projectId) return;
+      if (
+        scriptFinalized ||
+        !base?.trim() ||
+        !projectId ||
+        !activeWorkflowKey
+      ) {
+        return;
+      }
       if (persistRef.current) return;
       persistRef.current = true;
       try {
-        await saveScriptAssistantHistory(base, projectId, next);
+        const theme =
+          activeThread?.theme ||
+          storyProAssistantThemeForWorkflowKey(
+            nodes,
+            edges,
+            activeWorkflowKey,
+          );
+        await saveScriptAssistantHistory(
+          base,
+          projectId,
+          activeWorkflowKey,
+          next,
+          theme,
+        );
+        setThreadRows((prev) =>
+          prev.map((row) =>
+            row.workflowKey === activeWorkflowKey
+              ? { ...row, messageCount: next.length, theme }
+              : row,
+          ),
+        );
       } catch {
         /* ignore */
       } finally {
         persistRef.current = false;
       }
     },
-    [base, projectId, scriptFinalized],
+    [
+      activeThread?.theme,
+      activeWorkflowKey,
+      base,
+      edges,
+      nodes,
+      projectId,
+      scriptFinalized,
+    ],
   );
 
   const dockToLeft = useCallback(() => {
@@ -498,7 +721,7 @@ export function ScriptWritingAssistantPanel({
 
   const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || sending || !base?.trim()) return;
+    if (!text || sending || !base?.trim() || !activeWorkflowKey) return;
 
     if (layoutMode === "dock") {
       setLayoutMode("immersive");
@@ -586,6 +809,7 @@ export function ScriptWritingAssistantPanel({
       setSending(false);
     }
   }, [
+    activeWorkflowKey,
     base,
     input,
     layoutMode,
@@ -647,9 +871,25 @@ export function ScriptWritingAssistantPanel({
     setLayoutMode("dock");
   };
 
-  const headerSubtitle = scriptFinalized
-    ? "定稿后对话不保存"
-    : "定稿前自动保存历史";
+  const headerSubtitle = activeThread
+    ? scriptFinalized
+      ? `${activeThread.theme} · 定稿后对话不保存`
+      : `${activeThread.theme} · 定稿前自动保存`
+    : scriptFinalized
+      ? "定稿后对话不保存"
+      : "定稿前自动保存历史";
+
+  const workflowPicker = (
+    <AssistantWorkflowPicker
+      threads={threadRows}
+      activeKey={activeWorkflowKey}
+      onSelect={(key) => {
+        setActiveWorkflowKey(key);
+        setChatError(null);
+      }}
+      immersive={layoutMode === "immersive"}
+    />
+  );
 
   const previewReady = Boolean(previewMd);
 
@@ -776,6 +1016,7 @@ export function ScriptWritingAssistantPanel({
             />
             <div
               ref={panelRef}
+              data-canvas-block-nav-gesture
               className={cn(
                 "nodrag nowheel fixed flex flex-col overflow-hidden rounded-2xl border border-emerald-400/30 shadow-2xl shadow-black/70 ring-1 ring-white/15",
                 PANEL_SOLID_CLASS,
@@ -791,6 +1032,7 @@ export function ScriptWritingAssistantPanel({
               aria-label="剧本创作助手 · 宽幅对话"
             >
               {immersiveHeader}
+              {workflowPicker}
               {modeBar}
               <div className={cn("flex min-h-0 flex-1 flex-col", PANEL_BODY_SOLID_CLASS)}>
                 <AssistantPanelBody {...bodyProps} immersive />
@@ -818,6 +1060,7 @@ export function ScriptWritingAssistantPanel({
       {immersivePanel}
       {layoutMode === "dock" ? (
         <aside
+          data-canvas-block-nav-gesture
           className={cn(
             "nodrag relative z-30 flex shrink-0 flex-col border-r border-white/10",
             PANEL_SOLID_CLASS,
@@ -826,6 +1069,7 @@ export function ScriptWritingAssistantPanel({
           aria-label="剧本创作助手"
         >
           {dockHeader}
+          {workflowPicker}
           {modeBar}
           <div className={cn("flex min-h-0 flex-1 flex-col", PANEL_BODY_SOLID_CLASS)}>
             <AssistantPanelBody {...bodyProps} immersive={false} />
@@ -840,9 +1084,18 @@ export function ScriptWritingAssistantPanel({
 export async function clearScriptAssistantOnFinalize(
   base: string,
   projectId: string,
+  scriptHubId: string,
+  starterId?: string,
 ): Promise<void> {
   try {
-    await clearScriptAssistantHistory(base, projectId);
+    await clearScriptAssistantHistory(base, projectId, scriptHubId);
+    if (starterId) {
+      await clearScriptAssistantHistory(
+        base,
+        projectId,
+        `starter:${starterId}`,
+      );
+    }
   } catch {
     /* ignore */
   }

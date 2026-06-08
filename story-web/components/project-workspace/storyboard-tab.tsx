@@ -26,6 +26,7 @@ import {
   type StoryVideoOptions,
 } from "@/lib/projects/api";
 import type { ComicProject, StoryboardFrame } from "@/lib/projects/types";
+import { formatStoryTaskError } from "@/lib/friendly-task-error";
 import { storyApiErrorText } from "@/lib/story-api-error-message";
 import { cn } from "@/lib/utils";
 import {
@@ -276,7 +277,10 @@ function FrameCard({
                 <MediaPlaceholder
                   fallbackUrl={project.styleFallbackUrl}
                   state={imgInflight ? "loading" : imgFailed ? "failed" : "empty"}
-                  failedReason={imgFailReason?.failMessage}
+                  failedReason={formatStoryTaskError(
+                    imgFailReason?.failCode,
+                    imgFailReason?.failMessage,
+                  )}
                   failedCode={imgFailReason?.failCode}
                 />
               )}
@@ -356,7 +360,10 @@ function FrameCard({
                   state={vidInflight ? "loading" : vidFailed ? "failed" : "empty"}
                   loadingLabel="视频生成中…"
                   emptyLabel={!frame.imageUrl ? "先生成分镜图" : "尚未生成"}
-                  failedReason={vidFailReason?.failMessage}
+                  failedReason={formatStoryTaskError(
+                    vidFailReason?.failCode,
+                    vidFailReason?.failMessage,
+                  )}
                   failedCode={vidFailReason?.failCode}
                 />
               )}

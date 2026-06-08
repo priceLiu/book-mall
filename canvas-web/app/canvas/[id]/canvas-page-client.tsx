@@ -53,16 +53,12 @@ import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
 import { canAddStoryNodeType } from "@/lib/canvas/story-edition-isolation";
-import { storyProStarterHasScriptSource } from "@/lib/canvas/story-pro-starter-sync";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { resolveStoryProAssistantImport } from "@/lib/canvas/story-pro-script-assistant";
 import { STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT } from "@/lib/canvas/story-pro-theme-templates";
 import { spawnStoryProScriptHub } from "@/lib/canvas/spawn-story-pro-workspace";
 import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout";
-import type {
-  StoryProScriptHubNodeData,
-  StoryProStarterNodeData,
-} from "@/lib/canvas/story-pro-workspace-types";
+import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
 
@@ -90,25 +86,6 @@ function Inner({ projectId }: { projectId: string }) {
   const isStoryComicCanvas = hasStoryComicPipeline(nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const isStoryProCanvas = hasStoryProPipeline(nodes);
-
-  const storyProScriptState = useMemo(() => {
-    const starter = nodes.find((n) => n.type === "story-pro-starter");
-    const hub = nodes.find((n) => n.type === "story-pro-script-hub");
-    const sd = (starter?.data ?? {}) as StoryProStarterNodeData;
-    const hd = (hub?.data ?? {}) as StoryProScriptHubNodeData;
-    const scriptFinalized = Boolean(hd.scriptFinalized);
-    const hasScript =
-      storyProStarterHasScriptSource(sd) ||
-      Boolean(hd.outlineMd?.trim()) ||
-      Boolean(hd.characterMd?.trim());
-    return { scriptFinalized, hasScript, starterId: starter?.id };
-  }, [nodes]);
-
-  const assistantImportPlan = useMemo(
-    () => resolveStoryProAssistantImport(nodes, edges),
-    [nodes, edges],
-  );
-  const assistantCanImport = assistantImportPlan.allowed;
 
   const onImportScriptFromAssistant = useCallback(
     (md: string) => {
@@ -192,6 +169,16 @@ function Inner({ projectId }: { projectId: string }) {
     return () =>
       document.removeEventListener("wheel", onWheel, { capture: true });
   }, []);
+
+  useEffect(() => {
+    const guard = () => {
+      window.history.pushState({ canvasSwipeGuard: true }, "", window.location.href);
+    };
+    guard();
+    const onPopState = () => guard();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [projectId]);
 
   useEffect(() => {
     const open = () => setStyleLibraryOpen(true);
@@ -637,10 +624,6 @@ function Inner({ projectId }: { projectId: string }) {
         {isStoryProCanvas && project ? (
           <ScriptWritingAssistantPanel
             projectId={projectId}
-            scriptFinalized={
-              storyProScriptState.scriptFinalized && !assistantCanImport
-            }
-            hasScript={storyProScriptState.hasScript}
             onImportScript={onImportScriptFromAssistant}
           />
         ) : null}

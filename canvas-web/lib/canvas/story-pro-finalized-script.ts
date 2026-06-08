@@ -1,5 +1,6 @@
 import { promoteEmbeddedPackFromOutline } from "./story-hub-runtime";
 import { extractThemeFromStorySystemPrompt } from "./story-prompts";
+import { resolveStoryProWorkflowDisplayTheme } from "./story-pro-script-assistant-workflows";
 import { resolveStarterForHub } from "./story-workspace-resolver";
 import type { StoryProFinalizedScriptSnapshot } from "./story-pro-workspace-types";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
@@ -154,13 +155,19 @@ export function collectStoryProSavedScriptsFromCanvas(
     if (!d.scriptFinalized) return;
     const view = resolveStoryProFinalizedScriptView(d, systemPrompt);
     if (!view) return;
+    const theme =
+      view.theme && view.theme !== "未命名主题" && starter
+        ? view.theme
+        : starter
+          ? resolveStoryProWorkflowDisplayTheme(starter, hub)
+          : view.theme;
     items.push({
       id: `${hub.id}:current`,
       hubId: hub.id,
       hubLabel,
       snapshot: {
         version: view.version,
-        theme: view.theme,
+        theme,
         finalizedAt: view.finalizedAt,
         outlineMd: d.outlineMd ?? "",
         characterMd: d.characterMd ?? "",
