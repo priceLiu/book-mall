@@ -22,7 +22,7 @@ Book 注册
 |------|--------|--------|
 | ① 注册 Book | Book `/register` | 注册账号；系统自动创建 **GatewayUser**（同邮箱） |
 | ② 进入 Gateway | **Book 个人中心 → Gateway API Key →「用 Book 账号打开 Gateway」**（推荐）；或 Gateway 登录页 **「使用 Book 账号登录」** | SSO 单点登录，**不要**在 Gateway 对同一邮箱再注册 |
-| ③ 绑定厂商凭证 | Gateway → **厂商凭证** | KIE / 百炼 / DeepSeek / DashScope / 混元 3D |
+| ③ 绑定厂商凭证 | Gateway → **厂商凭证** | KIE / **火山方舟** / 百炼 / DeepSeek / DashScope / 混元 3D |
 | ④ 创建 Gateway Key | Gateway → **API 密钥** | 创建 `sk-gw-...` 并绑定凭证；**明文只显示一次** |
 | ⑤ 关联 Book | Book → **个人中心 → Gateway API Key** | 粘贴 sk-gw 验证；Book **只存关联 ID**，不存明文 |
 | ⑥ 使用 Canvas | Canvas | 运行分镜 / 出图 / 视频；请求经 Gateway 转发 |
@@ -122,7 +122,7 @@ Book **不会**把登录密码复制到 Gateway；Gateway 登录框的「邮箱+
 
 | 数据 | 存放位置 |
 |------|----------|
-| 厂商 Key（KIE / 百炼 / DeepSeek） | **Gateway** 厂商凭证 |
+| 厂商 Key（KIE / **火山方舟** / 百炼 / DeepSeek 等） | **Gateway** 厂商凭证 |
 | `sk-gw-...` 明文 | 仅创建时展示；之后 Gateway 只存哈希 |
 | Book 与 Gateway 的关联 | Book `User.gatewayApiKeyId`（关联 ID，非明文） |
 | Canvas 生成请求与 Token | **Gateway 请求日志 / 用量统计** |
@@ -166,7 +166,7 @@ Canvas 触发的生成也会出现在同一列表中。
 
 - 是否已关联
 - Key 前缀（如 `sk-gw-xxxx****`）
-- 已绑定的厂商种类（KIE / BAILIAN / DEEPSEEK）
+- 已绑定的厂商种类（KIE / **VOLCENGINE** / BAILIAN / DEEPSEEK 等）
 
 **不包含** Token 汇总或费用明细；用量请到 Gateway 查看。
 

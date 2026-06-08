@@ -269,6 +269,8 @@ export async function apiSubmitFrameImage(
 
 export type StoryVideoModelId =
   | "bytedance/seedance-2"
+  | "doubao-seedance-2.0"
+  | "doubao-seedance-1.5-pro"
   | "wan/2-7-image-to-video"
   | "happyhorse/image-to-video";
 

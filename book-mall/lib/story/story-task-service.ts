@@ -31,7 +31,13 @@ import {
   type StoryVideoOptions,
 } from "./story-ai-constants";
 import {
+  buildCanvasVideoVolcengineInput,
+  isVolcengineStoryVideoModelKey,
+} from "@/lib/canvas/canvas-video-volcengine";
+import {
   storyGwCreateKieJob,
+  storyGwCreateVolcengineVideoJob,
+  storyGwPollVolcengineVideo,
   storyGwRecordInfo,
 } from "./story-gateway-client";
 import {
@@ -143,6 +149,31 @@ function buildFrameImageKieInput(args: {
  *                                （画幅由首帧图自动决定，KIE 文档未提供 ratio 字段）
  *  - happyhorse/image-to-video   image_urls(单元素数组) + 仅 prompt/resolution/duration
  */
+function buildFrameVideoVolcengineInput(args: {
+  project: StoryProject;
+  frame: StoryStoryboardFrame;
+  modelId: StoryVideoModelId;
+  options: StoryVideoOptions;
+}): { model: string; input: Record<string, unknown> } {
+  const desc = STORY_VIDEO_MODELS[args.modelId];
+  const resolution = args.options.resolution ?? desc.defaults.resolution;
+  const duration = args.options.duration ?? desc.defaults.duration;
+  const built = buildCanvasVideoVolcengineInput({
+    modelKey: args.modelId,
+    prompt: args.frame.videoPrompt,
+    imageUrl: args.frame.imageUrl ?? "",
+    options: {
+      resolution,
+      duration,
+      generateAudio:
+        args.options.generateAudio ?? desc.defaults.generateAudio ?? false,
+      watermark: args.options.watermark ?? false,
+    },
+    aspectRatio: aspectRatioToKie(args.project.aspectRatio),
+  });
+  return { model: built.model, input: built.body };
+}
+
 function buildFrameVideoKieInput(args: {
   project: StoryProject;
   frame: StoryStoryboardFrame;
@@ -347,13 +378,22 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
       throw new StoryProjectError("NOT_FOUND", "project not found", 404);
     }
 
-    const { taskId, logId } = await storyGwCreateKieJob(project.userId, {
-      model: args.model,
-      input: args.input,
-      callBackUrl,
-      storyProjectId: args.projectId,
-      storyTaskId: task.id,
-    });
+    const isVolcengine =
+      args.kind === "FRAME_VIDEO" && isVolcengineStoryVideoModelKey(args.model);
+    const { taskId, logId } = isVolcengine
+      ? await storyGwCreateVolcengineVideoJob(project.userId, {
+          model: args.model,
+          body: args.input,
+          storyProjectId: args.projectId,
+          storyTaskId: task.id,
+        })
+      : await storyGwCreateKieJob(project.userId, {
+          model: args.model,
+          input: args.input,
+          callBackUrl,
+          storyProjectId: args.projectId,
+          storyTaskId: task.id,
+        });
     await prisma.storyGenerationTask.update({
       where: { id: task.id },
       data: {
@@ -393,6 +433,96 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
  *   - state=fail：写 failCode/failMessage → task FAILED
  *   - 其他：无操作（仍保持 SUBMITTED）
  */
+export async function applyVolcengineVideoTaskResult(
+  taskId: string,
+  videoUrl: string | null | undefined,
+  raw?: unknown,
+): Promise<void> {
+  const task = await prisma.storyGenerationTask.findUnique({
+    where: { id: taskId },
+    include: { project: true },
+  });
+  if (!task) return;
+  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+
+  const ephemeralUrl = videoUrl?.trim();
+  if (!ephemeralUrl || !/^https?:\/\//.test(ephemeralUrl)) {
+    await prisma.storyGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "VOLCENGINE_NO_RESULT_URL",
+        failMessage: "火山方舟任务成功但未返回 video_url",
+        resultPayload: raw as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  let ossUrl: string | null = null;
+  let ossError: string | null = null;
+  try {
+    ossUrl = await persistKieResultToOss({
+      ephemeralUrl,
+      kind: ossKindForTaskKind(task.kind),
+      projectId: task.projectId,
+      refId: task.characterId ?? task.frameId ?? undefined,
+    });
+  } catch (e) {
+    ossError = e instanceof Error ? e.message : String(e);
+  }
+
+  if (!ossUrl) {
+    await prisma.storyGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: "OSS_UPLOAD_FAILED",
+        failMessage: ossError ?? "OSS upload failed",
+        ephemeralUrl,
+        resultPayload: raw as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.storyGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "SUCCEEDED",
+        ossUrl,
+        ephemeralUrl,
+        resultPayload: raw as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      },
+    });
+    if (task.kind === "FRAME_VIDEO" && task.frameId) {
+      const cleanupNotBefore = new Date(Date.now() + 5 * 60 * 1000);
+      const frame = await tx.storyStoryboardFrame.findUnique({
+        where: { id: task.frameId },
+        select: { videoUrl: true, projectId: true },
+      });
+      if (frame?.videoUrl && frame.videoUrl !== ossUrl) {
+        await tx.storyOssCleanupQueue.create({
+          data: {
+            source: `regenerate_frame_video:${task.frameId}`,
+            projectId: frame.projectId,
+            ossUrl: frame.videoUrl,
+            notBefore: cleanupNotBefore,
+          },
+        });
+      }
+      await tx.storyStoryboardFrame.update({
+        where: { id: task.frameId },
+        data: { videoUrl: ossUrl, videoTaskId: task.id },
+      });
+    }
+  });
+}
+
 export async function applyKieTaskResult(
   taskId: string,
   record: KieRecordResponse,
@@ -846,12 +976,19 @@ export async function submitFrameVideo(
 
   await assertNoActiveTaskForFrameVideo(frameId);
   await ensureUserInflightCapacity(userId);
-  const { model, input } = buildFrameVideoKieInput({
-    project,
-    frame,
-    modelId,
-    options: normalizedOptions,
-  });
+  const { model, input } = isVolcengineStoryVideoModelKey(modelId)
+    ? buildFrameVideoVolcengineInput({
+        project,
+        frame,
+        modelId,
+        options: normalizedOptions,
+      })
+    : buildFrameVideoKieInput({
+        project,
+        frame,
+        modelId,
+        options: normalizedOptions,
+      });
   return submitGenerationTask({
     projectId: project.id,
     kind: "FRAME_VIDEO",
@@ -1002,14 +1139,25 @@ export async function runPollWorker(opts?: {
       });
       if (!project) continue;
 
+      const isVolcengine =
+        task.kind === "FRAME_VIDEO" &&
+        isVolcengineStoryVideoModelKey(task.model);
+      const submitPromise = isVolcengine
+        ? storyGwCreateVolcengineVideoJob(project.userId, {
+            model: task.model,
+            body: task.inputPayload as Record<string, unknown>,
+            storyProjectId: task.projectId,
+            storyTaskId: task.id,
+          })
+        : storyGwCreateKieJob(project.userId, {
+            model: task.model,
+            input: task.inputPayload as Record<string, unknown>,
+            callBackUrl,
+            storyProjectId: task.projectId,
+            storyTaskId: task.id,
+          });
       const { taskId, logId } = await Promise.race([
-        storyGwCreateKieJob(project.userId, {
-          model: task.model,
-          input: task.inputPayload as Record<string, unknown>,
-          callBackUrl,
-          storyProjectId: task.projectId,
-          storyTaskId: task.id,
-        }),
+        submitPromise,
         new Promise<never>((_, reject) =>
           setTimeout(
             () => reject(new Error("createTask retry timeout")),
@@ -1096,31 +1244,78 @@ export async function runPollWorker(opts?: {
       });
       if (!project) continue;
 
-      const record = await Promise.race([
-        storyGwRecordInfo(project.userId, {
-          taskId: task.kieTaskId,
-          gatewayLogId: task.gatewayLogId,
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("recordInfo timeout")),
-            POLL_INNER_TIMEOUT_MS,
+      const isVolcengine =
+        task.kind === "FRAME_VIDEO" &&
+        isVolcengineStoryVideoModelKey(task.model);
+
+      if (isVolcengine) {
+        const polled = await Promise.race([
+          storyGwPollVolcengineVideo(project.userId, {
+            taskId: task.kieTaskId,
+            gatewayLogId: task.gatewayLogId,
+            model: task.model,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("volcengine poll timeout")),
+              POLL_INNER_TIMEOUT_MS,
+            ),
           ),
-        ),
-      ]);
-      await prisma.storyGenerationTask.update({
-        where: { id: task.id },
-        data: {
-          lastPolledAt: new Date(),
-          pollCount: task.pollCount + 1,
-        },
-      });
-      if (isKieRecordSuccess(record.state)) {
-        await applyKieTaskResult(task.id, record);
-        result.succeeded++;
-      } else if (isKieRecordFail(record.state)) {
-        await applyKieTaskResult(task.id, record);
-        result.failed++;
+        ]);
+        await prisma.storyGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            lastPolledAt: new Date(),
+            pollCount: task.pollCount + 1,
+          },
+        });
+        if (polled.state === "success") {
+          await applyVolcengineVideoTaskResult(
+            task.id,
+            polled.videoUrl,
+            polled.raw,
+          );
+          result.succeeded++;
+        } else if (polled.state === "fail") {
+          await prisma.storyGenerationTask.update({
+            where: { id: task.id },
+            data: {
+              status: "FAILED",
+              failCode: "VOLCENGINE_TASK_FAILED",
+              failMessage: polled.failMessage?.slice(0, 500) ?? "failed",
+              resultPayload: polled.raw as Prisma.InputJsonValue,
+              completedAt: new Date(),
+            },
+          });
+          result.failed++;
+        }
+      } else {
+        const record = await Promise.race([
+          storyGwRecordInfo(project.userId, {
+            taskId: task.kieTaskId,
+            gatewayLogId: task.gatewayLogId,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("recordInfo timeout")),
+              POLL_INNER_TIMEOUT_MS,
+            ),
+          ),
+        ]);
+        await prisma.storyGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            lastPolledAt: new Date(),
+            pollCount: task.pollCount + 1,
+          },
+        });
+        if (isKieRecordSuccess(record.state)) {
+          await applyKieTaskResult(task.id, record);
+          result.succeeded++;
+        } else if (isKieRecordFail(record.state)) {
+          await applyKieTaskResult(task.id, record);
+          result.failed++;
+        }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

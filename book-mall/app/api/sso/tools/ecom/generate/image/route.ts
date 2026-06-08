@@ -18,7 +18,8 @@ export async function POST(req: Request) {
   }
   const toolKey = typeof body.toolKey === "string" ? body.toolKey.trim() : "";
   const action = typeof body.action === "string" ? body.action.trim() : "generate";
-  const module = typeof body.module === "string" ? body.module.trim() : "main-image";
+  const ecomModule =
+    typeof body.module === "string" ? body.module.trim() : "main-image";
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   if (!toolKey.startsWith("ecom-toolkit")) {
     return NextResponse.json({ error: "无效 toolKey" }, { status: 400 });
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
       userId: auth.userId,
       toolKey,
       action,
-      module,
+      module: ecomModule,
       prompt,
       estimatedMaxPoints:
         typeof body.estimatedPoints === "number"

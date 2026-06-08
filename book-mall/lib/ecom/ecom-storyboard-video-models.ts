@@ -2,7 +2,10 @@ import { BAILIAN_R2V_MODEL_IDS } from "@/lib/canvas/providers/bailian-r2v";
 import { isVolcengineStoryVideoModelKey } from "@/lib/canvas/canvas-video-volcengine";
 
 /** 火山方舟 Seedance 多图参考成片 */
-export const STORYBOARD_VOLCENGINE_VIDEO_MODELS = ["doubao-seedance-2.0"] as const;
+export const STORYBOARD_VOLCENGINE_VIDEO_MODELS = [
+  "doubao-seedance-2.0",
+  "doubao-seedance-1.5-pro",
+] as const;
 
 /** KIE 多图参考成片 */
 export const STORYBOARD_KIE_VIDEO_MODELS = [

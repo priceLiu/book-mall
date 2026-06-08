@@ -20,7 +20,13 @@ export function vendorOfModelKey(modelKey: string | null | undefined): string {
   )
     return "阿里云";
   if (k.startsWith("hunyuan") || k.startsWith("tencent")) return "腾讯云";
-  if (k.startsWith("doubao") || k.startsWith("volc") || k.startsWith("ark")) return "火山引擎";
+  if (
+    k.startsWith("ep-") ||
+    k.startsWith("doubao") ||
+    k.startsWith("volc") ||
+    k.startsWith("ark")
+  )
+    return "火山引擎";
   if (k.startsWith("baichuan")) return "百川";
   if (k.startsWith("moonshot") || k.startsWith("kimi")) return "Moonshot";
   if (k.startsWith("deepseek")) return "DeepSeek";

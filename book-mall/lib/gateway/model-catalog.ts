@@ -295,14 +295,19 @@ function fromListed(
   providerKind: GatewayProviderKind,
   products: string[],
 ): GatewayCatalogModel {
-  const routed = routeGatewayModel(m.modelKey);
+  let requestKind = roleToRequestKind(m.role);
+  try {
+    const routed = routeGatewayModel(m.modelKey);
+    if (routed.providerKind === providerKind) {
+      requestKind = routed.requestKind as GatewayCatalogRequestKind;
+    }
+  } catch {
+    /* 目录登记模型以 role 为准；避免未知 modelKey 阻断整页模型列表 */
+  }
   return {
     modelKey: m.modelKey,
     displayName: m.displayName,
-    requestKind:
-      routed.providerKind === providerKind
-        ? (routed.requestKind as GatewayCatalogRequestKind)
-        : roleToRequestKind(m.role),
+    requestKind,
     role: m.role,
     description: m.description ?? null,
     products,

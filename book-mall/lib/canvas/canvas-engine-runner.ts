@@ -973,11 +973,23 @@ export async function runVideoEngineNode(
 
   const { model, input } = isVolcengineVideo
     ? (() => {
+        const refVideos = Array.isArray(params.reference_video_urls)
+          ? params.reference_video_urls.filter(
+              (u): u is string => typeof u === "string",
+            )
+          : undefined;
+        const refAudios = Array.isArray(params.reference_audio_urls)
+          ? params.reference_audio_urls.filter(
+              (u): u is string => typeof u === "string",
+            )
+          : undefined;
         const built = buildCanvasVideoVolcengineInput({
           modelKey: effectiveModelKey,
           prompt: expandedPrompt,
           imageUrl: mainFrameImageUrl,
           referenceImageUrls,
+          referenceVideoUrls: refVideos,
+          referenceAudioUrls: refAudios,
           options: {
             resolution: String(params.resolution ?? "1080p"),
             duration: Number(params.duration ?? 5),

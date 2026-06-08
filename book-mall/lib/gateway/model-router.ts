@@ -59,8 +59,21 @@ export type RoutedModel = {
   requestKind: "CHAT" | "IMAGE" | "VIDEO" | "OTHER" | "TTS" | "TRYON";
 };
 
+/** 未在模型目录登记的 modelKey；禁止默认落 KIE。 */
+export class UnknownGatewayModelError extends Error {
+  constructor(public readonly modelKey: string) {
+    super(`未知 Gateway 模型: ${modelKey}`);
+    this.name = "UnknownGatewayModelError";
+  }
+}
+
 export function routeGatewayModel(model: string): RoutedModel {
-  const m = model.trim().toLowerCase();
+  const raw = model.trim();
+  const m = raw.toLowerCase();
+
+  if (m.startsWith("ep-")) {
+    return { providerKind: "VOLCENGINE", requestKind: "VIDEO" };
+  }
 
   if (HUNYUAN_MODELS.has(m) || m.startsWith("hunyuan-3d")) {
     return { providerKind: "HUNYUAN", requestKind: "IMAGE" };
@@ -132,6 +145,19 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "VOLCENGINE", requestKind: "CHAT" };
   }
 
+  if (
+    m.startsWith("seedream-") ||
+    m.startsWith("gpt-image-") ||
+    m.startsWith("flux-") ||
+    m === "qwen-text-to-image"
+  ) {
+    return { providerKind: "KIE", requestKind: "IMAGE" };
+  }
+
+  if (m.startsWith("happyhorse/")) {
+    return { providerKind: "KIE", requestKind: "VIDEO" };
+  }
+
   if (KIE_CHAT_MODELS.has(m)) {
     return { providerKind: "KIE", requestKind: "CHAT" };
   }
@@ -144,9 +170,12 @@ export function routeGatewayModel(model: string): RoutedModel {
   }
 
   if (KIE_JOB_PREFIXES.some((p) => m.includes(p))) {
+    if (m.includes("doubao") && m.includes("seedance")) {
+      return { providerKind: "VOLCENGINE", requestKind: "VIDEO" };
+    }
     const isVideo =
       m.includes("video") ||
-      m.includes("seedance") ||
+      (m.includes("seedance") && !m.includes("doubao")) ||
       m.includes("wan") ||
       m.includes("kling") ||
       m.includes("veo");
@@ -160,7 +189,7 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "BAILIAN", requestKind: "CHAT" };
   }
 
-  return { providerKind: "KIE", requestKind: "OTHER" };
+  throw new UnknownGatewayModelError(raw || model);
 }
 
 /** OpenAI 兼容 Chat/TTS 的 DashScope 根地址（勿与 api/v1 异步任务根混用） */

@@ -5,7 +5,10 @@ import {
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
-import { routeGatewayModel } from "@/lib/gateway/model-router";
+import {
+  routeGatewayModel,
+  UnknownGatewayModelError,
+} from "@/lib/gateway/model-router";
 import {
   parseGatewayClientSource,
   submitBailianR2vJobForLog,
@@ -74,7 +77,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "model required" }, { status: 400 });
   }
 
-  const route = routeGatewayModel(model);
+  let route;
+  try {
+    route = routeGatewayModel(model);
+  } catch (e) {
+    if (e instanceof UnknownGatewayModelError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    throw e;
+  }
   const credentialId = pickCredentialForKind(auth.credentials, route.providerKind);
   if (!credentialId) {
     return NextResponse.json(

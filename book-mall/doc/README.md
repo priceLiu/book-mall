@@ -38,6 +38,7 @@
 - [**2026-05-16 — 按秒计费（WalletHold）+ 模型校准（ModelCatalog / ModelAlias）**](./releases/2026-05-16-per-second-billing-and-model-calibration.md)
 - [**2026-05-18 — 价格基线重对齐 / 公示统一 / 全用户明细 / 误扣修正**](./releases/2026-05-18-pricing-baseline-realign-and-disclosure.md)
 - [**2026-05-19 — AI 试衣成本计算模板 v1.0.0**](./releases/2026-05-19-ai-tryon-cost-template-v1.0.md)（草稿 · 见 [产品需求](./product/11-ai-tryon-cost-template-v1.0.md)）
+- [**2026-06-06 — 火山方舟 Gateway 全量补齐**](./releases/2026-06-06-volcengine-gateway-full.md)
 
 ## 技术与环境
 
@@ -46,6 +47,8 @@
 | [stack-and-environment.md](./tech/stack-and-environment.md) | Neon、Vercel、支付、SSO 摘要、样式与环境变量约定 |
 | [tools-sso-environment.md](./tech/tools-sso-environment.md) | 独立工具站 SSO：环境变量、`issue` / `exchange` / `introspect` API |
 | [platform-api-v1.md](./tech/platform-api-v1.md) | **Platform API v1**（SSO / Gateway / 错误码 / 第三方接入） |
+| [gateway-volcengine-architecture.md](./tech/gateway-volcengine-architecture.md) | **火山方舟 Gateway**（KIE 隔离、apiFamily、地域/baseUrl、人像库） |
+| [model-api.md](./model-api.md) | 火山 Seedance 2.0 · Gateway 实现对照表 |
 
 若外部协作方只接受单文件入口，可使用根目录 **[product.md](./product.md)**（索引）。
 
@@ -53,6 +56,7 @@
 |------|------|
 | [development-constraints.md](./process/development-constraints.md) | 开发前读文档、计划勾选、归类写入 |
 | [**2026-platform-unification-rollout.md**](./plans/2026-platform-unification-rollout.md) | **平台统一改造实施计划**（SSO、Gateway 财务、Canvas/Story 迁移） |
+| [**2026-06-08-gateway-multi-credential-and-tenant-rollout.md**](./plans/2026-06-08-gateway-multi-credential-and-tenant-rollout.md) | **待开发** · Gateway 多凭证 + 租户/子账号/计费/Redis/资产（Sprint 0 + 五轨道） |
 | [**2026-platform-prelaunch-checklist.md**](./plans/2026-platform-prelaunch-checklist.md) | **上线前验收清单**（按 book / tool / canvas / story / gateway 分项） |
 | [**2026-prompt-optimizer-platform-rollout.md**](./plans/2026-prompt-optimizer-platform-rollout.md) | **提示词优化器平台接入**（vendor + Gateway + 薄壳） |
 | [**2026-phase-d-service-fee-billing.md**](./plans/2026-phase-d-service-fee-billing.md) | **Phase D 技术服务费**（任务勾选与验收） |
