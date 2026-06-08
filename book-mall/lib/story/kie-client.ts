@@ -157,10 +157,12 @@ async function createKieTaskWithApiKey(
         false,
       );
     }
+    const httpStatus =
+      typeof code === "number" && code >= 400 && code < 600 ? code : 502;
     throw new KieError(
       "KIE_HTTP_ERROR",
       `createTask code=${code} msg=${msg}`,
-      code >= 400 && code < 600 ? code : 502,
+      httpStatus,
       code !== 402,
     );
   }

@@ -177,7 +177,6 @@ export function NotchNav({
                   type="button"
                   role="menuitem"
                   aria-current={isActive ? "page" : undefined}
-                  aria-pressed={isActive || undefined}
                   tabIndex={isActive ? 0 : -1}
                   onClick={() => commitChange(item.value)}
                   onKeyDown={(e) => {

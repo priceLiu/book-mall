@@ -18,7 +18,8 @@ export async function POST(req: Request) {
   }
   const toolKey = typeof body.toolKey === "string" ? body.toolKey.trim() : "";
   const action = typeof body.action === "string" ? body.action.trim() : "motion";
-  const module = typeof body.module === "string" ? body.module.trim() : "video";
+  const ecomModule =
+    typeof body.module === "string" ? body.module.trim() : "video";
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   if (!toolKey.startsWith("ecom-toolkit")) {
     return NextResponse.json({ error: "无效 toolKey" }, { status: 400 });
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
       userId: auth.userId,
       toolKey,
       action,
-      module,
+      module: ecomModule,
       prompt,
       durationSec:
         typeof body.durationSec === "number" ? body.durationSec : undefined,

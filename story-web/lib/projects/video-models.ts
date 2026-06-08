@@ -30,11 +30,32 @@ export const STORY_VIDEO_MODELS: Record<
 > = {
   "bytedance/seedance-2": {
     id: "bytedance/seedance-2",
-    label: "Seedance 2",
+    label: "Seedance 2（KIE）",
     description:
-      "字节豆包 · 图生视频，参考分镜图直接出片，画风一致性最好。",
+      "KIE · 字节豆包 · 图生视频，参考分镜图直接出片。",
     requiresImage: true,
     resolutions: ["480p", "720p", "1080p"],
+    defaults: { resolution: "1080p", duration: 5, generateAudio: false },
+    durationRange: [4, 15],
+    supports: { generateAudio: true, promptExtend: false, watermark: false },
+  },
+  "doubao-seedance-2.0": {
+    id: "doubao-seedance-2.0",
+    label: "Seedance 2.0（火山方舟）",
+    description:
+      "火山方舟 · 图/文生视频；需在 Gateway 绑定 VOLCENGINE 凭证。",
+    requiresImage: true,
+    resolutions: ["720p", "1080p"],
+    defaults: { resolution: "1080p", duration: 5, generateAudio: false },
+    durationRange: [4, 15],
+    supports: { generateAudio: true, promptExtend: false, watermark: false },
+  },
+  "doubao-seedance-1.5-pro": {
+    id: "doubao-seedance-1.5-pro",
+    label: "Seedance 1.5 Pro（火山方舟）",
+    description: "火山方舟 · 首帧图生视频。",
+    requiresImage: true,
+    resolutions: ["720p", "1080p"],
     defaults: { resolution: "1080p", duration: 5, generateAudio: false },
     durationRange: [4, 15],
     supports: { generateAudio: true, promptExtend: false, watermark: false },
@@ -69,6 +90,8 @@ export const STORY_VIDEO_MODELS: Record<
 };
 
 export const STORY_VIDEO_MODEL_LIST: StoryVideoModelDescriptor[] = [
+  STORY_VIDEO_MODELS["doubao-seedance-2.0"],
+  STORY_VIDEO_MODELS["doubao-seedance-1.5-pro"],
   STORY_VIDEO_MODELS["bytedance/seedance-2"],
   STORY_VIDEO_MODELS["wan/2-7-image-to-video"],
   STORY_VIDEO_MODELS["happyhorse/image-to-video"],

@@ -24,6 +24,14 @@ import {
   pollKieTaskForLog,
   submitKieJobForLog,
 } from "@/lib/gateway/poll-service";
+import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
+import {
+  isVolcengineVideoTaskFailed,
+  isVolcengineVideoTaskSuccess,
+  volcengineGetVideoTask,
+  volcengineVideoTaskFailMessage,
+} from "@/lib/gateway/volcengine-client";
+import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import {
   extractKieResultUrl,
   isKieRecordFail,
@@ -245,4 +253,140 @@ export async function storyGwRecordInfo(
 
 export function storyGwExtractKieResultUrl(record: KieRecordResponse): string | null {
   return extractKieResultUrl(record);
+}
+
+export async function storyGwCreateVolcengineVideoJob(
+  userId: string,
+  opts: {
+    model: string;
+    body: Record<string, unknown>;
+    storyProjectId?: string;
+    storyTaskId?: string;
+    clientPage?: string;
+  },
+): Promise<{ taskId: string; logId: string; providerKind: GatewayProviderKind }> {
+  const auth = await requireGatewayAuth(userId);
+  const route = routeGatewayModel(opts.model);
+  if (route.providerKind !== "VOLCENGINE" || route.requestKind !== "VIDEO") {
+    throw new StoryProjectError(
+      "MODEL_NOT_AVAILABLE",
+      `模型 ${opts.model} 非火山方舟视频`,
+      400,
+    );
+  }
+  const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
+  if (!credentialId) {
+    throw new StoryProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定火山方舟凭证",
+      503,
+    );
+  }
+
+  const log = await createRequestLog({
+    userId: auth.userId,
+    apiKeyId: auth.id,
+    credentialId,
+    model: opts.model,
+    endpoint: "/v1/jobs/createTask",
+    providerKind: "VOLCENGINE",
+    requestKind: "VIDEO",
+    clientSource: CLIENT_SOURCE,
+    storyProjectId: opts.storyProjectId,
+    storyTaskId: opts.storyTaskId,
+    clientPage:
+      opts.clientPage ??
+      (opts.storyProjectId ? `project/${opts.storyProjectId}` : undefined),
+    inputSummary: buildGatewayInputSummary(opts.model, opts.body),
+  });
+
+  const taskId = await submitVolcengineVideoJobForLog({
+    logId: log.id,
+    credentialId,
+    model: opts.model,
+    body: opts.body,
+  });
+
+  return { taskId, logId: log.id, providerKind: "VOLCENGINE" };
+}
+
+export type StoryVolcenginePollResult = {
+  state: "pending" | "success" | "fail";
+  videoUrl?: string;
+  failMessage?: string;
+  raw?: unknown;
+};
+
+export async function storyGwPollVolcengineVideo(
+  userId: string,
+  opts: {
+    taskId: string;
+    gatewayLogId?: string | null;
+    model?: string;
+  },
+): Promise<StoryVolcenginePollResult> {
+  const auth = await requireGatewayAuth(userId);
+  const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
+  if (!credentialId) {
+    throw new StoryProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "Gateway Key 未绑定火山方舟凭证",
+      503,
+    );
+  }
+
+  const cred = await getDecryptedCredentialApiKey(credentialId);
+  if (!cred) {
+    throw new StoryProjectError(
+      "MODEL_NOT_AVAILABLE",
+      "火山方舟凭证不可用",
+      503,
+    );
+  }
+
+  const polled = await volcengineGetVideoTask({
+    apiKey: cred.apiKey,
+    baseUrl: cred.baseUrl,
+    taskId: opts.taskId,
+  });
+  const row = polled.output;
+
+  if (opts.gatewayLogId) {
+    if (isVolcengineVideoTaskSuccess(row)) {
+      await finalizeRequestLog(opts.gatewayLogId, {
+        status: "SUCCEEDED",
+        durationMs: 0,
+        resultSummary: {
+          status: row.status,
+          videoUrl: row.content?.video_url,
+        },
+        externalTaskId: opts.taskId,
+        model: opts.model,
+      });
+    } else if (isVolcengineVideoTaskFailed(row)) {
+      await finalizeRequestLog(opts.gatewayLogId, {
+        status: "FAILED",
+        durationMs: 0,
+        failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
+        externalTaskId: opts.taskId,
+        model: opts.model,
+      });
+    }
+  }
+
+  if (isVolcengineVideoTaskSuccess(row)) {
+    return {
+      state: "success",
+      videoUrl: row.content?.video_url,
+      raw: polled.raw,
+    };
+  }
+  if (isVolcengineVideoTaskFailed(row)) {
+    return {
+      state: "fail",
+      failMessage: volcengineVideoTaskFailMessage(row),
+      raw: polled.raw,
+    };
+  }
+  return { state: "pending", raw: polled.raw };
 }

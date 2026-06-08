@@ -50,7 +50,8 @@
 ## M5 故事版
 
 - [x] `EcomStoryboardProject` 迁移 + `ecom-toolkit__storyboard` 价目
-- [x] Gateway：`ecomGwChatStream`、Volcengine 视频任务
+- [x] Gateway：`ecomGwChatStream`、Volcengine 视频任务（`ep-*` 路由、多模态 body、`doubao-seedance-1.5-pro`）
+- [x] 火山方舟 Gateway 全量补齐（2026-06-06 release；Story 火山视频、人像库 API 代理）
 - [x] BFF：`/api/sso/tools/ecom/storyboard/*`
 - [x] UI：助手 30% + 故事版 70%、HTML/PNG 导出、Seedance 整片视频
 - [x] 侧栏「微剧情分镜」入口

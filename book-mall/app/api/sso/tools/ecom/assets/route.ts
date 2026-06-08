@@ -11,11 +11,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
   const url = new URL(req.url);
-  const module = url.searchParams.get("module")?.trim();
+  const ecomModule = url.searchParams.get("module")?.trim();
   const items = await prisma.ecomAsset.findMany({
     where: {
       userId: auth.userId,
-      ...(module ? { module } : {}),
+      ...(ecomModule ? { module: ecomModule } : {}),
     },
     orderBy: { createdAt: "desc" },
     take: 100,
