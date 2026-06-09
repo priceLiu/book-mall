@@ -5,7 +5,6 @@ import { FeaturedProductsSection } from "@/components/layout/sections/featured-p
 import { FooterSection } from "@/components/layout/sections/footer";
 import { SiteHomeHeroSection } from "@/components/layout/site-home/site-home-hero";
 import { SiteHomeLogoMarquee } from "@/components/layout/site-home/site-home-logo-marquee";
-import { PricingSection } from "@/components/layout/sections/pricing";
 import { TestimonialSection } from "@/components/layout/sections/testimonial";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +52,6 @@ export default function Home() {
         <FeaturesSection />
         <TestimonialSection />
         <CommunitySection />
-        <PricingSection />
         <FooterSection />
       </div>
     </>

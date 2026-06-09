@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+import { PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS } from "@/lib/pricing-disclosure-view";
 
-/** 旧个人中心入口：统一到 `/account/pricing` */
+/** 旧个人中心入口：统一到公示页 */
 export default function PricingDisclosureFromAccountPage() {
-  redirect("/account/pricing");
+  redirect(PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS);
 }

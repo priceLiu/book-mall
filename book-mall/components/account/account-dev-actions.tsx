@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+/** 开发快捷入口：走正式 Checkout 流程（管理员可一键确认）。 */
 export function AccountDevActions() {
   const router = useRouter();
 
@@ -20,33 +21,21 @@ export function AccountDevActions() {
   return (
     <Card className="border-dashed border-amber-500/50 bg-amber-500/5">
       <CardHeader>
-        <CardTitle>开发：模拟收银入口</CardTitle>
+        <CardTitle>开发：收银快捷入口</CardTitle>
         <CardDescription>
-          与正式入口一致：跳转占位收银页后点「支付成功」落库。开发环境默认可用；Staging 需配置
-          ALLOW_MOCK_PAYMENT=true（切勿用于真实生产）。详见仓库{" "}
-          <code className="text-xs bg-muted px-1 rounded">doc/process/mock-payment-checkout.md</code>
-          。
+          与正式用户相同：微信个人码 + 备注码；平台员工自购可走管理员一键确认。详见{" "}
+          <code className="rounded bg-muted px-1 text-xs">docs/releases/2026-06-wechat-pay-platform-models.md</code>
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
-        <Button type="button" variant="subscription" size="sm" onClick={() => push("/pay/mock-topup")}>
-          模拟充值页
+        <Button type="button" variant="subscription" size="sm" onClick={() => push("/checkout/topup?packId=pack-1k")}>
+          轻量包收银
         </Button>
-        <Button
-          type="button"
-          variant="subscription"
-          size="sm"
-          onClick={() => push("/pay/mock-subscribe?plan=monthly")}
-        >
-          模拟订阅（月度）
+        <Button type="button" variant="subscription" size="sm" onClick={() => push("/pricing")}>
+          会员 / BYOK 定价
         </Button>
-        <Button
-          type="button"
-          variant="subscription"
-          size="sm"
-          onClick={() => push("/pay/mock-subscribe?plan=yearly")}
-        >
-          模拟订阅（年度）
+        <Button type="button" variant="subscription" size="sm" onClick={() => push("/admin/payments")}>
+          支付核对后台
         </Button>
       </CardContent>
     </Card>

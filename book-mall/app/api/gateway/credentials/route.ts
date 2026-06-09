@@ -10,6 +10,7 @@ import {
   testGatewayCredential,
   updateGatewayCredential,
 } from "@/lib/gateway/credential-service";
+import { resolveGatewayCredentialScope } from "@/lib/gateway/platform-credential-delegate";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +20,14 @@ const providerKindSchema = z.enum(GATEWAY_PROVIDER_KINDS);
 export async function GET(request: NextRequest) {
   const user = await requireGatewaySessionUser(request);
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  const credentials = await listGatewayCredentials(user.id);
-  return NextResponse.json({ credentials });
+  const scope = await resolveGatewayCredentialScope(user);
+  const credentials = await listGatewayCredentials(scope.effectiveGatewayUserId);
+  return NextResponse.json({
+    credentials,
+    platformPoolDelegate: scope.isPlatformPoolDelegate
+      ? { canonicalOwnerEmail: scope.canonicalOwnerEmail }
+      : null,
+  });
 }
 
 const createSchema = z.object({
@@ -36,6 +43,7 @@ const createSchema = z.object({
 export async function POST(request: NextRequest) {
   const user = await requireGatewaySessionUser(request);
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const scope = await resolveGatewayCredentialScope(user);
   let json: unknown;
   try {
     json = await request.json();
@@ -48,7 +56,7 @@ export async function POST(request: NextRequest) {
   }
   try {
     const row = await createGatewayCredential({
-      userId: user.id,
+      userId: scope.effectiveGatewayUserId,
       ...parsed.data,
     });
     return NextResponse.json({ credential: { id: row.id, alias: row.alias } });
@@ -73,6 +81,7 @@ const patchSchema = z.object({
 export async function PATCH(request: NextRequest) {
   const user = await requireGatewaySessionUser(request);
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const scope = await resolveGatewayCredentialScope(user);
   let json: unknown;
   try {
     json = await request.json();
@@ -85,11 +94,11 @@ export async function PATCH(request: NextRequest) {
   }
   const { id, action, ...patch } = parsed.data;
   if (action === "setDefault") {
-    const ok = await setDefaultGatewayCredential(user.id, id);
+    const ok = await setDefaultGatewayCredential(scope.effectiveGatewayUserId, id);
     if (!ok) return NextResponse.json({ error: "未找到" }, { status: 404 });
     return NextResponse.json({ ok: true });
   }
-  const row = await updateGatewayCredential(user.id, id, patch);
+  const row = await updateGatewayCredential(scope.effectiveGatewayUserId, id, patch);
   if (!row) return NextResponse.json({ error: "未找到" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }
@@ -97,9 +106,10 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const user = await requireGatewaySessionUser(request);
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const scope = await resolveGatewayCredentialScope(user);
   const id = request.nextUrl.searchParams.get("id")?.trim();
   if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 });
-  const ok = await deleteGatewayCredential(user.id, id);
+  const ok = await deleteGatewayCredential(scope.effectiveGatewayUserId, id);
   if (!ok) return NextResponse.json({ error: "未找到" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

@@ -217,15 +217,22 @@ export function StoryboardModelPickerDialog({
 
   const selectedModel = models.find((m) => m.modelKey === value) ?? null;
 
-  // 按 providerKind 分组，保持原始顺序
+  const platformFlat = models.some((m) => m.platformOffering);
+
+  // BYOK：按 providerKind 分组；平台代付：flat 去重列表
   const groups: { kind: string; models: StoryboardGatewayModel[] }[] = [];
-  for (const m of models) {
-    let g = groups.find((x) => x.kind === m.providerKind);
-    if (!g) {
-      g = { kind: m.providerKind, models: [] };
-      groups.push(g);
+  if (platformFlat) {
+    groups.push({ kind: "platform", models });
+  } else {
+    for (const m of models) {
+      const kind = m.providerKind ?? "UNKNOWN";
+      let g = groups.find((x) => x.kind === kind);
+      if (!g) {
+        g = { kind, models: [] };
+        groups.push(g);
+      }
+      g.models.push(m);
     }
-    g.models.push(m);
   }
 
   const ModeIcon = mode === "image" ? ImageIcon : Video;
@@ -254,14 +261,16 @@ export function StoryboardModelPickerDialog({
             <div className="space-y-5">
               {groups.map((g) => (
                 <section key={g.kind}>
-                  <header className="mb-2 flex items-center gap-2">
-                    <h3 className="text-[12px] font-semibold text-[#1d1d1f]">
-                      Gateway · {providerLabel(g.kind)}
-                    </h3>
-                    <span className="rounded bg-[#eef0f2] px-1.5 py-0.5 text-[10px] text-[#86868b]">
-                      {g.kind}
-                    </span>
-                  </header>
+                  {!platformFlat ? (
+                    <header className="mb-2 flex items-center gap-2">
+                      <h3 className="text-[12px] font-semibold text-[#1d1d1f]">
+                        Gateway · {providerLabel(g.kind)}
+                      </h3>
+                      <span className="rounded bg-[#eef0f2] px-1.5 py-0.5 text-[10px] text-[#86868b]">
+                        {g.kind}
+                      </span>
+                    </header>
+                  ) : null}
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {g.models.map((m) => (
                       <ModelCard

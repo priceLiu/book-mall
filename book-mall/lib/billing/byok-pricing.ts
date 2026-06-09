@@ -295,6 +295,56 @@ export async function buildByokFinanceReport(periodKey: string) {
 
   const standards = buildByokPricingStandards();
 
+  const memberLogs = await prisma.gatewayRequestLog.findMany({
+    where: {
+      billingMode: "BYOK",
+      status: "SUCCEEDED",
+      actorBookUserId: { not: null },
+      submittedAt: { gte: since, lt: until },
+    },
+    select: {
+      actorBookUserId: true,
+      tenantId: true,
+      creditsCharged: true,
+    },
+  });
+  const memberAgg = new Map<
+    string,
+    { actorBookUserId: string; tenantId: string | null; count: number; overageCredits: number }
+  >();
+  for (const log of memberLogs) {
+    if (!log.actorBookUserId) continue;
+    const key = `${log.tenantId ?? "personal"}:${log.actorBookUserId}`;
+    const cur = memberAgg.get(key) ?? {
+      actorBookUserId: log.actorBookUserId,
+      tenantId: log.tenantId,
+      count: 0,
+      overageCredits: 0,
+    };
+    cur.count += 1;
+    cur.overageCredits += log.creditsCharged ?? 0;
+    memberAgg.set(key, cur);
+  }
+  const actorIds = [...new Set([...memberAgg.values()].map((m) => m.actorBookUserId))];
+  const actorUsers =
+    actorIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+  const actorUserMap = new Map(actorUsers.map((u) => [u.id, u]));
+  const memberActorUsage = [...memberAgg.values()]
+    .map((m) => ({
+      actorBookUserId: m.actorBookUserId,
+      tenantId: m.tenantId,
+      userName: actorUserMap.get(m.actorBookUserId)?.name ?? null,
+      userEmail: actorUserMap.get(m.actorBookUserId)?.email ?? null,
+      count: m.count,
+      overageCredits: m.overageCredits,
+    }))
+    .sort((a, b) => b.overageCredits - a.overageCredits);
+
   const simulationScenarios = configs.flatMap((cfg) => {
     const scopeQuotas = quotas
       .filter((q) => q.scopeKey === cfg.scopeKey)
@@ -386,6 +436,7 @@ export async function buildByokFinanceReport(periodKey: string) {
       note: "厂商成本为用户自付观测值；平台收入 = 技术服务费 + 超额轻量包扣分 + 资源计量费",
     },
     ownerUsage,
+    memberActorUsage,
     simulationScenarios,
   };
 }

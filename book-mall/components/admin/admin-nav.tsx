@@ -107,6 +107,9 @@ export function AdminNav({
             <DropdownMenuLabel>计费与资金</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
+              <Link href="/admin/payments">支付核对</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link href="/admin/billing">订阅与充值</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
@@ -281,6 +284,9 @@ export function AdminNav({
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/admin/sso-clients">Platform SSO 客户端</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/gateway/platform">Gateway 平台凭证池</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/admin/tool-service-fee">工具技术服务费</Link>

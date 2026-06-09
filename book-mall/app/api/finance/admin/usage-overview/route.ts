@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
     since: sp.get("since") ?? undefined,
     tool: sp.get("tool") ?? undefined,
     userId: sp.get("userId") ?? undefined,
+    billingPersona: sp.get("billingPersona") ?? undefined,
+    staffFlag: sp.get("staffFlag") ?? undefined,
+    tenantId: sp.get("tenantId") ?? undefined,
   });
   return financeJson(request, data);
 }

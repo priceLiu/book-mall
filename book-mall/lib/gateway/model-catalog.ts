@@ -359,7 +359,9 @@ function dedupeByKey(models: GatewayCatalogModel[]): GatewayCatalogModel[] {
   return [...seen.values()];
 }
 
-/** 平台全量模型目录；boundKinds 来自当前用户已绑定的厂商凭证 */
+/**
+ * @deprecated 优先使用 buildGatewayModelCatalogFromDb。保留供脚本 fallback。
+ */
 export function buildGatewayModelCatalog(
   boundKinds: GatewayProviderKind[],
 ): GatewayModelCatalog {

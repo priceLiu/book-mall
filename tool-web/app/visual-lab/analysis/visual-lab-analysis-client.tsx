@@ -1687,19 +1687,19 @@ export function VisualLabAnalysisClient({
               <div className="vl-outcome-quota-packs">
                 <a
                   className="vl-btn vl-btn-primary vl-btn-sm"
-                  href={`${mainSiteOrigin}/pay/mock-topup?amount=5000`}
+                  href={`${mainSiteOrigin}/checkout/topup?packId=pack-1k`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  5000 点档（¥50）
+                  轻量包（1000 积分）
                 </a>
                 <a
                   className="vl-btn vl-btn-outline vl-btn-sm"
-                  href={`${mainSiteOrigin}/pay/mock-topup?amount=10000`}
+                  href={`${mainSiteOrigin}/checkout/topup?packId=pack-3k`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  10000 点档（¥100）
+                  标准包（3000 积分）
                 </a>
               </div>
             ) : (

@@ -123,8 +123,8 @@ export default function AdminBillingUsersIndexPage() {
       )}
 
       <div className="mt-4 text-xs text-[#8c8c8c]">
-        管理员视角可见全部 31 列 / 7 组（含厂商产品 / 资源 / 定价 / 优惠 / 系数 M / 计费公式）。
-        用户视角仅 16 列 / 3 组。
+        管理员视角可见全部 34 列 / 7 组（Finance 2.0 · 含工具页面 / 状态 / 行来源）。
+        用户视角为过滤后的列 / 3 组。
       </div>
     </div>
   );

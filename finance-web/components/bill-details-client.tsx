@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BILL_COLUMN_GROUPS,
   filterColumnGroupsByRole,
+  K_CREDITS_CONSUMED,
   type BillViewerRole,
 } from "@/lib/bill-config";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 import { getFinanceDevUserId, getFinanceUseDevProxy } from "@/lib/book-mall-billing-url";
-import { mergeFeeTypeOptions } from "@/lib/cloud-bill-fee-types";
 import { BillMultiFilter, type BillMultiFilterMode } from "@/components/bill-multi-filter";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -24,17 +24,20 @@ export type BillDetailsClientProps = {
   viewerRole?: BillViewerRole;
   /**
    * `all-users` 模式（全部用户费用明细汇总）：
-   *   - 调用 `/api/admin/finance/billing-detail-lines-all`（一次拉所有用户）
+   *   - 调用 `/api/finance/admin/billing-details-all`（一次拉所有用户）
    *   - 隐藏「当前账单归属」等与单一登录用户绑定的顶部信息（按图示要求）
-   *   - 不依赖 walletBalance（因没有"单一目标用户"概念），头部"钱包余额/余额减扣点"列折叠掉
+   *   - 不依赖 walletBalance（因没有"单一目标用户"概念），头部「钱包余额 / 余额减积分消耗」折叠
    */
   mode?: "single-user" | "all-users";
 };
 
 type RemotePayload = {
   source: string;
+  tab?: "usage" | "charge";
   user: { id: string; name: string | null; email: string | null };
   balancePoints: number;
+  poolBalances?: { general: number; video: number };
+  totalCalls?: number;
   rows: Record<string, string>[];
   /** 主站 API 返回：是否凭 NextAuth 会话拉取（本地 devUserId / 代理则非 session） */
   viewer?: { authMode: "session" | "dev_user_id" };
@@ -42,11 +45,13 @@ type RemotePayload = {
 
 type AllUsersPayload = {
   source: string;
+  tab?: "usage" | "charge";
   rows: Record<string, string>[];
   total: number;
   returned: number;
   take: number;
   truncated: boolean;
+  totalCalls?: number;
 };
 
 const PAGE_SIZES = [10, 20, 50];
@@ -54,26 +59,9 @@ const PAGE_SIZES = [10, 20, 50];
 // v004：以「平台/*」作为主筛选维度——「平台/产品名称」是 catalog 命中后的 canonical 显示名，
 // 在 TOOL_USAGE_GENERATED 与 CLOUD_CSV_IMPORT 两类行之间天然一致。
 const K_BILL_MONTH = "平台账单/账单月份";
-const K_FEE_TYPE = "平台账单/费用类型";
-const K_PRODUCT = "平台/产品名称";
-const K_COMMODITY = "厂商产品/商品名称";
-const K_PLATFORM_POINTS = "平台/扣点";
-/**
- * v007 Round 5：
- *   - 「厂商费用/目录总价」已删除（admin 心算可得，纯冗余）；
- *   - 「厂商应付/应付金额（含税）」→ 「平台/应付金额」（用户对平台应付，不是云口径）。
- */
-const K_PAYABLE_YUAN = "平台/应付金额";
-const K_USAGE_STEP_BAND = "厂商定价/目录价用量阶梯";
-
-/** v004：阶梯字段「[0,9999999999999]」是"无阶梯占位"，前端折叠为友好文案；其它值原样显示。 */
-function formatUsageStepBand(raw: string): string {
-  if (!raw) return "";
-  const t = raw.trim();
-  if (t === "[0,9999999999999]") return "无阶梯";
-  if (/^\[0,9{10,}\]$/.test(t)) return "无阶梯";
-  return raw;
-}
+const K_FEE_DESC = "平台账单/费用说明";
+const K_MODEL_NAME = "平台/模型名称";
+const K_TOOL_PAGE = "平台/工具页面";
 
 function matchesMulti(
   cell: string,
@@ -108,17 +96,23 @@ export function BillDetailsClient({
     () => new Set(columnGroups.flatMap((g) => g.keys)),
     [columnGroups],
   );
-  const canFilterCommodity = visibleKeys.has(K_COMMODITY);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [loadState, setLoadState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [hint, setHint] = useState<string | null>(null);
   const [remoteUser, setRemoteUser] = useState<RemotePayload["user"] | null>(null);
   const [walletBalancePoints, setWalletBalancePoints] = useState<number | null>(null);
+  const [totalCallsRemote, setTotalCallsRemote] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"usage" | "charge">("usage");
   const [viewerAuthMode, setViewerAuthMode] = useState<
     "session" | "dev_user_id" | undefined
   >(undefined);
 
   useEffect(() => {
+    const search = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const tabParam = search?.get("tab");
+    const tab: "usage" | "charge" = tabParam === "charge" ? "charge" : "usage";
+    setActiveTab(tab);
+
     /**
      * v009：默认浏览器直连 book-mall 接口，使用主站真实 NextAuth 登录态。
      *   - localhost 跨端口（3002↔3000）属同站点，SameSite=Lax 的 session Cookie 会被发送；
@@ -127,7 +121,6 @@ export function BillDetailsClient({
      *
      * 这两个开关都有强烈的红色顶部提示，避免再次出现「登录 A 看到 B 的明细」。
      */
-    const search = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     const explicitProxy = search?.get("useProxy") === "1";
     const explicitAsDev = search?.get("asDev") === "1";
     const useDevProxy = explicitProxy && getFinanceUseDevProxy();
@@ -154,13 +147,14 @@ export function BillDetailsClient({
       fetchInit = { credentials: "same-origin", cache: "no-store" };
     } else {
       let apiPath: string;
+      const tabQs = `tab=${encodeURIComponent(tab)}`;
       if (isAllUsers) {
-        apiPath = "/api/admin/finance/billing-detail-lines-all?take=2000";
+        apiPath = `/api/finance/admin/billing-details-all?take=2000&${tabQs}`;
       } else if (adminTargetUserId) {
-        apiPath = `/api/admin/finance/billing-detail-lines?userId=${encodeURIComponent(adminTargetUserId)}`;
+        apiPath = `/api/finance/admin/billing-details?userId=${encodeURIComponent(adminTargetUserId)}&${tabQs}`;
       } else {
-        const q = devId ? `?devUserId=${encodeURIComponent(devId)}` : "";
-        apiPath = `/api/account/billing-detail-lines${q}`;
+        const extra = devId ? `&devUserId=${encodeURIComponent(devId)}` : "";
+        apiPath = `/api/finance/account/billing-details?${tabQs}${extra}`;
       }
       ({ url, init: fetchInit } = resolveBookMallBrowserRequest(base, apiPath));
     }
@@ -183,6 +177,7 @@ export function BillDetailsClient({
           const ad = data as AllUsersPayload;
           setAllTotal(ad.total);
           setAllTruncated(ad.truncated);
+          setTotalCallsRemote(ad.totalCalls ?? null);
           setRemoteUser(null);
           setWalletBalancePoints(null);
           setViewerAuthMode(undefined);
@@ -190,6 +185,7 @@ export function BillDetailsClient({
           const ud = data as RemotePayload;
           setRemoteUser(ud.user);
           setWalletBalancePoints(ud.balancePoints);
+          setTotalCallsRemote(ud.totalCalls ?? null);
           setViewerAuthMode(
             ud.viewer?.authMode ?? ((useDevProxy || devId) && !adminTargetUserId ? "dev_user_id" : "session"),
           );
@@ -203,6 +199,7 @@ export function BillDetailsClient({
         setLoadState("error");
         setRemoteUser(null);
         setWalletBalancePoints(null);
+        setTotalCallsRemote(null);
         setViewerAuthMode(undefined);
         setAllTotal(null);
         setAllTruncated(false);
@@ -217,15 +214,24 @@ export function BillDetailsClient({
     return () => {
       cancelled = true;
     };
-  }, [adminTargetUserId, isAllUsers, base]);
+  }, [adminTargetUserId, isAllUsers, base, activeTab]);
+
+  function switchTab(next: "usage" | "charge") {
+    setActiveTab(next);
+    setPage(1);
+    if (typeof window !== "undefined") {
+      const u = new URL(window.location.href);
+      u.searchParams.set("tab", next);
+      window.history.replaceState(null, "", u.toString());
+    }
+  }
 
   const [billMonth, setBillMonth] = useState("");
-  const [feeType, setFeeType] = useState("");
+  const [feeDesc, setFeeDesc] = useState("");
+  const [toolPageFilter, setToolPageFilter] = useState("");
   const [productMode, setProductMode] = useState<BillMultiFilterMode>("include");
   const [productSelected, setProductSelected] = useState<Set<string>>(new Set());
-  const [commodityMode, setCommodityMode] = useState<BillMultiFilterMode>("include");
-  const [commoditySelected, setCommoditySelected] = useState<Set<string>>(new Set());
-  const [includeZero, setIncludeZero] = useState(true);
+  const [includeZeroCredits, setIncludeZeroCredits] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -233,71 +239,56 @@ export function BillDetailsClient({
     () => Array.from(new Set(rows.map((r) => r[K_BILL_MONTH]))).filter(Boolean).sort(),
     [rows],
   );
-  const products = useMemo(
-    () => Array.from(new Set(rows.map((r) => r[K_PRODUCT]))).filter(Boolean).sort(),
+  const models = useMemo(
+    () => Array.from(new Set(rows.map((r) => r[K_MODEL_NAME]))).filter(Boolean).sort(),
     [rows],
   );
-  const commodities = useMemo(
-    () => Array.from(new Set(rows.map((r) => r[K_COMMODITY]))).filter(Boolean).sort(),
+  const feeDescOptions = useMemo(
+    () => Array.from(new Set(rows.map((r) => r[K_FEE_DESC]))).filter(Boolean).sort(),
     [rows],
   );
-  const feeTypesFromRows = useMemo(
-    () => Array.from(new Set(rows.map((r) => r[K_FEE_TYPE]))).filter(Boolean).sort(),
+  const toolPages = useMemo(
+    () => Array.from(new Set(rows.map((r) => r[K_TOOL_PAGE]))).filter(Boolean).sort(),
     [rows],
-  );
-  const feeTypeOptions = useMemo(
-    () => mergeFeeTypeOptions(feeTypesFromRows),
-    [feeTypesFromRows],
   );
 
   useEffect(() => {
-    setProductSelected((s) => new Set(Array.from(s).filter((p) => products.includes(p))));
-  }, [products]);
+    setProductSelected((s) => new Set(Array.from(s).filter((p) => models.includes(p))));
+  }, [models]);
 
   useEffect(() => {
-    setCommoditySelected((s) => new Set(Array.from(s).filter((c) => commodities.includes(c))));
-  }, [commodities]);
-
-  useEffect(() => {
-    if (feeType && !feeTypeOptions.includes(feeType)) setFeeType("");
-  }, [feeType, feeTypeOptions]);
+    if (feeDesc && !feeDescOptions.includes(feeDesc)) setFeeDesc("");
+  }, [feeDesc, feeDescOptions]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       if (billMonth && r[K_BILL_MONTH] !== billMonth) return false;
-      if (!matchesMulti(r[K_PRODUCT] ?? "", productSelected, productMode)) return false;
-      if (canFilterCommodity && !matchesMulti(r[K_COMMODITY] ?? "", commoditySelected, commodityMode)) return false;
-      if (feeType && r[K_FEE_TYPE] !== feeType) return false;
-      if (!includeZero) {
-        const payable = parseFloat(r[K_PAYABLE_YUAN] || "0");
-        if (!payable) return false;
+      if (!matchesMulti(r[K_MODEL_NAME] ?? "", productSelected, productMode)) return false;
+      if (toolPageFilter && !(r[K_TOOL_PAGE] ?? "").includes(toolPageFilter)) return false;
+      if (feeDesc && r[K_FEE_DESC] !== feeDesc) return false;
+      if (!includeZeroCredits) {
+        const credits = parseInt(r[K_CREDITS_CONSUMED] || "0", 10);
+        if (!credits) return false;
       }
       return true;
     });
   }, [
     rows,
     billMonth,
-    feeType,
-    includeZero,
+    feeDesc,
+    toolPageFilter,
+    includeZeroCredits,
     productSelected,
     productMode,
-    commoditySelected,
-    commodityMode,
   ]);
 
-  /** v004：用「平台/扣点」做"平台扣点合计"——TOOL_USAGE_GENERATED 行真值，CLOUD_CSV_IMPORT 行为空（不计入）。 */
-  const totalPlatformPoints = useMemo(
-    () => filtered.reduce((s, r) => s + (parseInt(r[K_PLATFORM_POINTS], 10) || 0), 0),
-    [filtered],
-  );
-  /** v007 Round 5：「平台/应付金额」合计——用户对平台应付（= 平台扣点折元）。 */
-  const totalPayableYuan = useMemo(
-    () => filtered.reduce((s, r) => s + (parseFloat(r[K_PAYABLE_YUAN]) || 0), 0),
+  const totalCreditsConsumed = useMemo(
+    () => filtered.reduce((s, r) => s + (parseInt(r[K_CREDITS_CONSUMED], 10) || 0), 0),
     [filtered],
   );
 
   const balanceAfter =
-    walletBalancePoints != null ? walletBalancePoints - totalPlatformPoints : null;
+    walletBalancePoints != null ? walletBalancePoints - totalCreditsConsumed : null;
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageSafe = Math.min(page, pageCount);
@@ -423,6 +414,37 @@ export function BillDetailsClient({
       </div>
 
       <div className="m-4 rounded border border-[#e8e8e8] bg-white p-4">
+        <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[#f0f0f0] pb-3">
+          <button
+            type="button"
+            onClick={() => switchTab("usage")}
+            className={cn(
+              "rounded px-3 py-1.5 text-sm",
+              activeTab === "usage"
+                ? "bg-[#1890ff] text-white"
+                : "border border-[#d9d9d9] bg-white text-[#595959] hover:border-[#1890ff]",
+            )}
+          >
+            全部用量
+          </button>
+          <button
+            type="button"
+            onClick={() => switchTab("charge")}
+            className={cn(
+              "rounded px-3 py-1.5 text-sm",
+              activeTab === "charge"
+                ? "bg-[#1890ff] text-white"
+                : "border border-[#d9d9d9] bg-white text-[#595959] hover:border-[#1890ff]",
+            )}
+          >
+            积分扣费明细
+          </button>
+          <span className="text-xs text-[#8c8c8c]">
+            {activeTab === "usage"
+              ? "含 BYOK 套餐内 0 积分与 AI 试衣等全部成功调用"
+              : "仅实际消耗积分 > 0 的行"}
+          </span>
+        </div>
         <div className="mb-4 flex flex-col gap-4 text-sm">
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             <label className="flex flex-col gap-1">
@@ -444,30 +466,50 @@ export function BillDetailsClient({
               </select>
             </label>
             <label className="flex flex-col gap-1">
-              <span className="text-[#8c8c8c]">费用类型</span>
+              <span className="text-[#8c8c8c]">费用说明</span>
               <select
                 className="rounded border border-[#d9d9d9] px-2 py-1.5"
-                value={feeType}
+                value={feeDesc}
                 onChange={(e) => {
-                  setFeeType(e.target.value);
+                  setFeeDesc(e.target.value);
                   setPage(1);
                 }}
               >
                 <option value="">全部</option>
-                {feeTypeOptions.map((m) => (
+                {feeDescOptions.map((m) => (
                   <option key={m} value={m}>
                     {m}
                   </option>
                 ))}
               </select>
             </label>
+            {visibleKeys.has(K_TOOL_PAGE) ? (
+              <label className="flex flex-col gap-1">
+                <span className="text-[#8c8c8c]">工具页面</span>
+                <select
+                  className="rounded border border-[#d9d9d9] px-2 py-1.5"
+                  value={toolPageFilter}
+                  onChange={(e) => {
+                    setToolPageFilter(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="">全部</option>
+                  {toolPages.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <label className="flex flex-col gap-1">
-              <span className="text-[#8c8c8c]">含应付金额为 0</span>
+              <span className="text-[#8c8c8c]">含消耗积分为 0</span>
               <select
                 className="rounded border border-[#d9d9d9] px-2 py-1.5"
-                value={includeZero ? "yes" : "no"}
+                value={includeZeroCredits ? "yes" : "no"}
                 onChange={(e) => {
-                  setIncludeZero(e.target.value === "yes");
+                  setIncludeZeroCredits(e.target.value === "yes");
                   setPage(1);
                 }}
               >
@@ -476,46 +518,21 @@ export function BillDetailsClient({
               </select>
             </label>
           </div>
-          <div
-            className={
-              canFilterCommodity
-                ? "grid gap-4 lg:grid-cols-2"
-                : "grid gap-4"
-            }
-          >
-            <BillMultiFilter
-              label="产品名称"
-              options={products}
-              mode={productMode}
-              onModeChange={(m) => {
-                setProductMode(m);
-                setPage(1);
-              }}
-              selected={productSelected}
-              onSelectedChange={(next) => {
-                setProductSelected(next);
-                setPage(1);
-              }}
-              disabled={rows.length === 0}
-            />
-            {canFilterCommodity && (
-              <BillMultiFilter
-                label="商品名称"
-                options={commodities}
-                mode={commodityMode}
-                onModeChange={(m) => {
-                  setCommodityMode(m);
-                  setPage(1);
-                }}
-                selected={commoditySelected}
-                onSelectedChange={(next) => {
-                  setCommoditySelected(next);
-                  setPage(1);
-                }}
-                disabled={rows.length === 0}
-              />
-            )}
-          </div>
+          <BillMultiFilter
+            label="模型名称"
+            options={models}
+            mode={productMode}
+            onModeChange={(m) => {
+              setProductMode(m);
+              setPage(1);
+            }}
+            selected={productSelected}
+            onSelectedChange={(next) => {
+              setProductSelected(next);
+              setPage(1);
+            }}
+            disabled={rows.length === 0}
+          />
         </div>
 
         <div className="mb-3 flex flex-wrap items-center gap-6 border-b border-[#f0f0f0] pb-3 text-sm">
@@ -523,18 +540,19 @@ export function BillDetailsClient({
             <span className="text-[#8c8c8c]">筛选条数：</span>
             <span className="font-medium text-[#262626]">{filtered.length}</span>
           </div>
-          {/* v007 Round 5：双栏合计——平台扣点 + 应付金额（用户对平台支付）。云目录总价合计已删除（admin 心算可得） */}
           <div>
-            <span className="text-[#8c8c8c]">平台扣点合计：</span>
-            <span className="font-medium text-[#1d39c4]">{totalPlatformPoints}</span>
+            <span className="text-[#8c8c8c]">积分消耗合计：</span>
+            <span className="font-medium text-[#1d39c4]">{totalCreditsConsumed}</span>
           </div>
-          <div>
-            <span className="text-[#8c8c8c]">应付金额合计：</span>
-            <span className="font-medium text-[#262626]">¥{totalPayableYuan.toFixed(2)}</span>
-          </div>
+          {activeTab === "usage" && totalCallsRemote != null ? (
+            <div>
+              <span className="text-[#8c8c8c]">成功调用总次数：</span>
+              <span className="font-medium text-[#262626]">{totalCallsRemote}</span>
+            </div>
+          ) : null}
           {!isAllUsers ? (
             <div>
-              <span className="text-[#8c8c8c]">钱包余额（点）：</span>
+              <span className="text-[#8c8c8c]">积分余额：</span>
               <span className="font-medium text-[#262626]">
                 {walletBalancePoints != null ? walletBalancePoints : "—"}
               </span>
@@ -543,7 +561,7 @@ export function BillDetailsClient({
           {!isAllUsers ? (
             balanceAfter != null ? (
               <div>
-                <span className="text-[#8c8c8c]">余额 − 平台扣点合计：</span>
+                <span className="text-[#8c8c8c]">余额 − 积分消耗合计：</span>
                 <span
                   className={cn(
                     "font-medium",
@@ -555,7 +573,7 @@ export function BillDetailsClient({
               </div>
             ) : (
               <div>
-                <span className="text-[#8c8c8c]">余额 − 平台扣点：</span>
+                <span className="text-[#8c8c8c]">余额 − 积分消耗：</span>
                 <span className="font-medium text-[#8c8c8c]">登录主站后可算</span>
               </div>
             )
@@ -572,7 +590,7 @@ export function BillDetailsClient({
         </div>
 
         <div className="overflow-x-auto border border-[#e8e8e8]">
-          <table className="min-w-[3200px] border-collapse text-xs">
+          <table className="min-w-[1400px] border-collapse text-xs">
             <thead>
               <tr className="bg-[#fafafa]">
                 {columnGroups.map((g) => (
@@ -603,7 +621,7 @@ export function BillDetailsClient({
                 // v006 Round 4：「平台/用户ID + 平台账单/消费时间 + 平台/计费项Code + 平台用量/用量」拼成稳定 key
                 <tr
                   key={
-                    [row["平台/用户ID"], row["平台账单/消费时间"], row["平台/计费项Code"], row["平台用量/用量"]]
+                    [row["平台/用户ID"], row["平台/Gateway日志ID"], row["平台账单/消费时间"]]
                       .filter(Boolean)
                       .join("|") || String(ri)
                   }
@@ -611,9 +629,7 @@ export function BillDetailsClient({
                 >
                   {columnGroups.flatMap((g) =>
                     g.keys.map((k) => {
-                      const rawV = row[k] ?? "";
-                      // v006 Round 4：「厂商定价/目录价用量阶梯」= [0,9999999999999] 折叠为"无阶梯"
-                      const v = k === K_USAGE_STEP_BAND ? formatUsageStepBand(rawV) : rawV;
+                      const v = row[k] ?? "";
                       const isVerbose = k.includes("详情") || k.includes("公式");
                       const limit = isVerbose ? 200 : 80;
                       const long = v.length > limit;

@@ -22,6 +22,7 @@ const ROLE_LABEL: Record<string, string> = {
 export function ModelsPageClient() {
   const base = useBookMallBaseUrl();
   const [catalog, setCatalog] = useState<StoryEngineModel[]>([]);
+  const [billingPersona, setBillingPersona] = useState<"PLATFORM_CREDIT" | "BYOK" | null>(null);
   const [selections, setSelections] = useState<StoryModelSelection[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,12 +37,13 @@ export function ModelsPageClient() {
     let cancelled = false;
     (async () => {
       try {
-        const [models, config] = await Promise.all([
+        const [engine, config] = await Promise.all([
           fetchEngineModels(base),
           fetchModelConfig(base),
         ]);
         if (cancelled) return;
-        setCatalog(models);
+        setCatalog(engine.models);
+        setBillingPersona(engine.billingPersona);
         setSelections(config.selections);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "加载失败");
@@ -140,9 +142,11 @@ export function ModelsPageClient() {
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-medium text-white">{model.displayName}</h3>
-                          <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[var(--story-muted)]">
-                            {model.vendor}
-                          </span>
+                          {billingPersona !== "PLATFORM_CREDIT" ? (
+                            <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[var(--story-muted)]">
+                              {model.vendor}
+                            </span>
+                          ) : null}
                           {isPrimary ? (
                             <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-300">
                               <Star className="size-3" fill="currentColor" />

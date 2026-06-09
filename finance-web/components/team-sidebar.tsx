@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users } from "lucide-react";
+import { Users, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const nav = [{ href: "/team/billing", label: "团队账单", icon: Users }] as const;
+const nav = [
+  { href: "/team/billing", label: "团队账单", icon: Users },
+  { href: "/team/usage", label: "我的用量", icon: BarChart3 },
+] as const;
 
 export function TeamSidebar() {
   const pathname = usePathname();

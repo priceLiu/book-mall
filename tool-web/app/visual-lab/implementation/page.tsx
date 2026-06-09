@@ -36,7 +36,7 @@ export default function VisualLabImplementationPage() {
             <code>ToolNavVisibility</code> 迁移保持一致；后台「工具管理」可隐藏该分组。
           </p>
           <p>
-            <strong>计费</strong>：当前无服务端推理、无 <code>postToolUsage</code>；占位{" "}
+            <strong>计费</strong>：分析室走 Gateway Chat 流式，流结束 <code>finalizeRequestLog</code> 结算；占位{" "}
             <code>toolKey</code> 建议使用前缀 <code>visual-lab</code>（若将来对「云端分析」打点，与子路径一致即可）。
           </p>
         </ToolImplementationSection>

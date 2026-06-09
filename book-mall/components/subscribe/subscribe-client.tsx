@@ -37,7 +37,7 @@ export function SubscribePlanButton({
       );
       return;
     }
-    router.push(`/pay/mock-subscribe?plan=${planSlug}`);
+    router.push("/pricing");
   }
 
   return (

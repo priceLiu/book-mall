@@ -24,6 +24,7 @@ import {
   settleReserved,
 } from "@/lib/billing/credit-account-service";
 import { computePricePerCredit, computeTierCredits } from "@/lib/pricing/credit-pricing-formulas";
+import { deriveEcomBillingMode } from "@/lib/billing/billing-persona";
 
 const VIDEO_LIST_YUAN = 0.81 * 15 * 4; // 48.6（净 0.81/秒 × 15s × M=4）
 const VIDEO_COST_YUAN = 0.81 * 15; // 12.15
@@ -191,6 +192,19 @@ async function main() {
       _count: { _all: true },
     });
     check("SETTLE 按成员归口：A/B 各 1 条", settleByActor.length === 2 && settleByActor.every((s) => s._count._all === 1), settleByActor);
+
+    console.log("");
+
+    // —————————————— TC-billing-persona 映射 ——————————————
+    console.log("[persona] billingPersona → ecomBillingMode");
+    check(
+      "PLATFORM_CREDIT → PLATFORM_METERED",
+      deriveEcomBillingMode("PLATFORM_CREDIT") === "PLATFORM_METERED",
+    );
+    check(
+      "BYOK → BYOK_SERVICE_FEE",
+      deriveEcomBillingMode("BYOK") === "BYOK_SERVICE_FEE",
+    );
 
     console.log("");
     if (failures === 0) {

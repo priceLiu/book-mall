@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronRight, FileStack, LayoutGrid, Receipt } from "lucide-react";
+import { ChevronDown, ChevronRight, LayoutGrid, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, Suspense, useEffect } from "react";
 import {
@@ -12,12 +12,28 @@ import {
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { fetchBookMallViewerUser, type BookMallViewerUser } from "@/lib/book-mall-viewer-session";
 
-const billingChildren = [
-  { href: "/fees/billing/overview", label: "账单概览" },
-  { href: "/fees/billing/details", label: "账单详情" },
-  { href: "/fees/usage", label: "积分用量" },
-  { href: "/fees/billing/subscriptions", label: "账单订阅" },
-];
+const NAV_GROUPS = [
+  {
+    id: "usage",
+    label: "用量",
+    items: [{ href: "/fees/usage", label: "积分用量" }],
+  },
+  {
+    id: "billing",
+    label: "账单",
+    items: [
+      { href: "/fees/billing/overview", label: "账单概览" },
+      { href: "/fees/billing/details", label: "账单详情" },
+      { href: "/fees/billing/ledger", label: "积分流水" },
+      { href: "/fees/billing/subscriptions", label: "账单订阅" },
+    ],
+  },
+  {
+    id: "byok",
+    label: "BYOK",
+    items: [{ href: "/fees/billing/byok", label: "任务用量" }],
+  },
+] as const;
 
 function FeesSidebarNav() {
   const pathname = usePathname();
@@ -26,7 +42,6 @@ function FeesSidebarNav() {
   const fromAccount = searchParams.get(FEES_FROM_ACCOUNT_QUERY) === FEES_FROM_ACCOUNT_VALUE;
   const querySuffix = fromAccount ? `?${FEES_FROM_ACCOUNT_QUERY}=${FEES_FROM_ACCOUNT_VALUE}` : "";
   const [openFees, setOpenFees] = useState(true);
-  const [openBill, setOpenBill] = useState(true);
   const [viewer, setViewer] = useState<BookMallViewerUser | null | undefined>(undefined);
 
   useEffect(() => {
@@ -39,7 +54,6 @@ function FeesSidebarNav() {
     return () => ac.abort();
   }, [base]);
 
-  /** 普通用户或从个人中心进入：不显示顶部格图标；管理员直连 `/fees` 且已确认为 ADMIN 时保留。加载中（非个人中心入口）暂显示以免高度跳动。 */
   const showTopIconStrip =
     !fromAccount &&
     (viewer === undefined || (viewer !== null && viewer.role === "ADMIN"));
@@ -71,42 +85,32 @@ function FeesSidebarNav() {
           )}
         </button>
         {openFees ? (
-          <div className="mt-0.5 space-y-0.5 border-l border-white/10 ml-2 pl-2">
-            <button
-              type="button"
-              className="mt-1 flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm text-white/80 hover:bg-white/10"
-              onClick={() => setOpenBill((v) => !v)}
-            >
-              <span className="flex items-center gap-2">
-                <FileStack className="h-4 w-4 shrink-0 text-white/50" aria-hidden />
-                账单
-              </span>
-              {openBill ? (
-                <ChevronDown className="h-4 w-4 shrink-0 text-white/45" aria-hidden />
-              ) : (
-                <ChevronRight className="h-4 w-4 shrink-0 text-white/45" aria-hidden />
-              )}
-            </button>
-            {openBill ? (
-              <ul className="mt-0.5 space-y-0.5">
-                {billingChildren.map((item) => {
-                  const active = pathname === item.href;
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={`${item.href}${querySuffix}`}
-                        className={cn(
-                          "block rounded px-2 py-2 pl-3",
-                          active ? "bg-[#1890ff] font-medium text-white" : "text-white/80 hover:bg-white/10",
-                        )}
-                      >
-                        {item.label}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : null}
+          <div className="mt-1 space-y-3 border-l border-white/10 ml-2 pl-2">
+            {NAV_GROUPS.map((group) => (
+              <div key={group.id}>
+                <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white/45">
+                  {group.label}
+                </p>
+                <ul className="mt-0.5 space-y-0.5">
+                  {group.items.map((item) => {
+                    const active = pathname === item.href;
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={`${item.href}${querySuffix}`}
+                          className={cn(
+                            "block rounded px-2 py-2 pl-3",
+                            active ? "bg-[#1890ff] font-medium text-white" : "text-white/80 hover:bg-white/10",
+                          )}
+                        >
+                          {item.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </div>
         ) : null}
       </nav>

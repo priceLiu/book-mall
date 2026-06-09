@@ -51,12 +51,16 @@ async function requireGatewayAuth(userId: string) {
   return auth;
 }
 
-function storyMeta(opts: {
-  storyProjectId?: string;
-  storyTaskId?: string;
-  clientPage?: string;
-}) {
+function storyMeta(
+  userId: string,
+  opts: {
+    storyProjectId?: string;
+    storyTaskId?: string;
+    clientPage?: string;
+  },
+) {
   return gatewayV1ClientMeta("STORY", {
+    bookUserId: userId,
     storyProjectId: opts.storyProjectId,
     storyTaskId: opts.storyTaskId,
     clientPage:
@@ -96,7 +100,7 @@ export async function storyGwChat(
   const result = await gatewayV1ChatCompletions({
     apiKeyId: auth.id,
     body,
-    meta: storyMeta(opts),
+    meta: storyMeta(userId, opts),
   });
 
   let parsed: unknown = null;
@@ -153,7 +157,7 @@ export async function storyGwCreateKieJob(
       input: opts.input,
       callBackUrl: opts.callBackUrl ?? null,
     },
-    meta: storyMeta(opts),
+    meta: storyMeta(userId, opts),
   });
 
   return {
@@ -182,7 +186,7 @@ export async function storyGwRecordInfo(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("STORY"),
+    meta: gatewayV1ClientMeta("STORY", { bookUserId: userId }),
   });
 
   return polled.data as KieRecordResponse;
@@ -225,7 +229,7 @@ export async function storyGwCreateVolcengineVideoJob(
       model: opts.model,
       input: opts.body,
     },
-    meta: storyMeta(opts),
+    meta: storyMeta(userId, opts),
   });
 
   return {
@@ -262,7 +266,7 @@ export async function storyGwPollVolcengineVideo(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("STORY"),
+    meta: gatewayV1ClientMeta("STORY", { bookUserId: userId }),
   });
 
   const row = polled.data as import("@/lib/gateway/volcengine-client").VolcengineVideoTaskResult;

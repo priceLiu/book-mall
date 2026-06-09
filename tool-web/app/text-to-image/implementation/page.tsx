@@ -70,7 +70,7 @@ export default function TextToImageImplementationPage() {
           />
 
           <ToolImplementationCode
-            caption="结算扣费：确认任务成功后再 postToolUsageFromServerWithRetries（app/api/text-to-image/settle/route.ts）"
+            caption="结算：Gateway poll 成功时 finalizeRequestLog 自动扣积分/BYOK 超额（settle 路由仅校验任务状态）"
             code={`/** 文生图单次生成扣费 … 幂等键 meta.taskId = DashScope task_id */
 export async function POST(req: Request) {
   // … 校验 tools_token、拉取任务状态 …
@@ -78,12 +78,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: \`任务未完成…\`, taskStatus: status }, { status: 409 });
   }
 
-  const usage = await postToolUsageFromServerWithRetries({
-    toolKey: "text-to-image",
-    action: "invoke",
-    meta: { taskId: billTaskId },
-  });
-  // …
+  // settle 仅校验 SUCCEEDED；扣分在 Gateway poll finalize
+  return NextResponse.json({ ok: true, creditBilling: true });
 }`}
           />
 

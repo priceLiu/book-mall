@@ -154,7 +154,7 @@ export async function ecomGwCreateDashscopeJob(
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
   });
 
   return { taskId: created.taskId, logId: created.logId };
@@ -179,7 +179,7 @@ export async function ecomGwPollDashscope(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("E_COMMERCE"),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
   });
   const output = polled.data as DashscopeTaskOutput;
 
@@ -296,7 +296,7 @@ export async function ecomGwChatStream(
   const result = await gatewayV1ChatCompletionsStream({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
   });
 
   const logId = result.headers.get("x-gateway-log-id") ?? "";
@@ -344,7 +344,7 @@ export async function ecomGwCreateVolcengineVideoJob(
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
     body: { model, input: opts.body },
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
   });
 
   return { taskId: created.taskId, logId: created.logId };
@@ -363,7 +363,7 @@ export async function ecomGwPollVolcengine(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("E_COMMERCE"),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
   });
   const row = polled.data as import("@/lib/gateway/volcengine-client").VolcengineVideoTaskResult;
 
@@ -402,7 +402,7 @@ export async function ecomGwCreateKieJob(
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
     body: { model, input: opts.input, callBackUrl: null },
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
   });
 
   return { taskId: created.taskId, logId: created.logId };
@@ -421,7 +421,7 @@ export async function ecomGwPollKie(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("E_COMMERCE"),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
   });
   const record = polled.data as import("@/lib/story/kie-client").KieRecordResponse;
 
@@ -472,7 +472,7 @@ export async function ecomGwCreateBailianR2vJob(
         parameterExtras: opts.parameterExtras,
       },
     },
-    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { clientPage: opts.clientPage, bookUserId: bookUserId }),
   });
 
   return { taskId: created.taskId, logId: created.logId };
@@ -491,7 +491,7 @@ export async function ecomGwPollBailianR2v(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("E_COMMERCE"),
+    meta: gatewayV1ClientMeta("E_COMMERCE", { bookUserId: bookUserId }),
   });
   const output = polled.data as BailianR2vTaskOutput;
 

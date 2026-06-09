@@ -11,6 +11,7 @@ import {
   VOLCENGINE_ALL_KNOWN_MODELS,
 } from "@/lib/gateway/volcengine-chat-models";
 import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
+import { listModelsForApp } from "@/lib/gateway/model-registry";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 
 export type PromptOptimizerGatewayModel = {
@@ -85,6 +86,29 @@ export function listPromptOptimizerGatewayModels(
       credentialBound: isGatewayProviderBound(boundKinds, routed.providerKind),
     };
   });
+}
+
+/** 从 Gateway 统一注册表读取（优先）。 */
+export async function listPromptOptimizerGatewayModelsFromRegistry(input: {
+  boundKinds: GatewayProviderKind[];
+  persona: "PLATFORM_CREDIT" | "BYOK";
+}): Promise<PromptOptimizerGatewayModel[]> {
+  const rows = await listModelsForApp({
+    appTag: "prompt-optimizer",
+    role: "LLM",
+    persona: input.persona,
+    boundKinds: input.boundKinds,
+  });
+  if (rows.length === 0) {
+    return listPromptOptimizerGatewayModels(input.boundKinds);
+  }
+  return rows.map((r) => ({
+    modelKey: r.modelKey,
+    displayName: r.displayName,
+    description: r.description,
+    providerKind: r.providerKind,
+    credentialBound: r.credentialBound,
+  }));
 }
 
 /** 供 prompt-optimizer vendor 静态同步（勿与 book-mall 漂移） */

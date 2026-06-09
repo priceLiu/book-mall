@@ -54,10 +54,12 @@ export function AccountCanvasCard({
   gatewayLinked,
   canLaunchCanvas,
   canvasOriginConfigured,
+  hasActiveMembership,
 }: {
   gatewayLinked: boolean;
   canLaunchCanvas: boolean;
   canvasOriginConfigured: boolean;
+  hasActiveMembership: boolean;
 }) {
   const ready = gatewayLinked && canLaunchCanvas;
 
@@ -105,12 +107,12 @@ export function AccountCanvasCard({
               </>
             )}
           </ChecklistRow>
-          <ChecklistRow ok={canLaunchCanvas}>
-            有效工具技术服务费（与工具站相同 SSO 准入）
-            {!canLaunchCanvas ? (
+          <ChecklistRow ok={hasActiveMembership}>
+            有效会员套餐（与工具站相同 SSO 准入）
+            {!hasActiveMembership ? (
               <>
                 {" · "}
-                <Link href="/account/tool-service-fee" className={accountInlineLinkClass()}>
+                <Link href="/pricing" className={accountInlineLinkClass()}>
                   去开通
                 </Link>
               </>
@@ -130,8 +132,8 @@ export function AccountCanvasCard({
             title={
               !gatewayLinked
                 ? "请先关联 Gateway API Key"
-                : !canLaunchCanvas
-                  ? "请先开通工具技术服务费"
+                : !hasActiveMembership
+                  ? "请先开通会员套餐"
                   : undefined
             }
           />

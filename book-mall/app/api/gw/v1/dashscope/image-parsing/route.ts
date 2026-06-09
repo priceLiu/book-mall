@@ -4,7 +4,7 @@ import {
   isGatewayAuthResponse,
   requireGatewayV1Auth,
 } from "@/lib/gateway/gateway-v1-route-auth";
-import { parseGatewayV1LogMeta } from "@/lib/gateway/gateway-v1-log-meta";
+import { parseGatewayV1LogMeta, logMetaToRequestLogFields } from "@/lib/gateway/gateway-v1-log-meta";
 import {
   AITRYON_PARSING_MODEL,
   dashscopeImageParsing,
@@ -65,10 +65,8 @@ export async function POST(request: NextRequest) {
     providerKind: "DASHSCOPE",
     requestKind: "TRYON",
     clientSource,
-    clientPage: logMeta.clientPage,
-    storyProjectId: logMeta.storyProjectId,
-    storyTaskId: logMeta.storyTaskId,
     inputSummary: buildGatewayInputSummary(model, { imageUrl, clothesType }),
+    ...logMetaToRequestLogFields(logMeta),
   });
 
   const started = Date.now();

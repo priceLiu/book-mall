@@ -1,7 +1,13 @@
 import type { ReactElement } from "react";
 
 /** 订阅 / 充值模拟收银页共用的占位二维码（非真实收款码） */
-export function FakeQrPlaceholder({ size = 200 }: { size?: number }) {
+export function FakeQrPlaceholder({
+  size = 200,
+  amountLabel,
+}: {
+  size?: number;
+  amountLabel?: string;
+}) {
   const cells = 15;
   const pattern = (r: number, c: number) =>
     (r * c + r + c) % 3 === 0 ||
@@ -29,14 +35,19 @@ export function FakeQrPlaceholder({ size = 200 }: { size?: number }) {
   }
 
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      className="rounded-lg border border-border bg-muted/40"
-      aria-hidden
-    >
-      {rects}
-    </svg>
+    <div className="flex flex-col items-center gap-2">
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="rounded-lg border border-border bg-muted/40"
+        aria-hidden
+      >
+        {rects}
+      </svg>
+      {amountLabel ? (
+        <p className="text-sm font-medium text-muted-foreground">{amountLabel}</p>
+      ) : null}
+    </div>
   );
 }

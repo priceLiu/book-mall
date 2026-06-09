@@ -22,7 +22,7 @@ import {
   DEFAULT_VIDEO_SEC,
   publishModelCreditPrice,
 } from "@/lib/pricing/credit-pricing-engine";
-import { deriveVideoMonthlyCredits, VIDEO_MODEL_SEEDS } from "@/lib/billing/video-model-seeds";
+import { deriveVideoMonthlyCredits } from "@/lib/billing/video-model-seeds";
 import { seedByokSimplifiedPricing } from "@/lib/billing/byok-pricing";
 
 /** 逐档「每积分单价」= 套餐价 ÷ (含席位数 × 月积分)；个人 includedSeats=1。 */
@@ -127,22 +127,8 @@ interface CostSeed {
   listCostYuan: number;
   discountRate: number; // 渠道折扣（节省比例）
 }
-const IMAGE_COST_SEEDS: CostSeed[] = [
-  { canonicalModelKey: "lib-image", displayName: "通义万相 文生图", vendor: "aliyun", unit: "PER_IMAGE", tierRaw: "1K", listCostYuan: 0.1, discountRate: 0.1 },
-  { canonicalModelKey: "lib-nano-pro", displayName: "Nano Pro 高清生图", vendor: "kie", unit: "PER_IMAGE", tierRaw: "2K", listCostYuan: 0.3, discountRate: 0.05 },
-];
-
-const VIDEO_COST_SEEDS: CostSeed[] = VIDEO_MODEL_SEEDS.map((v) => ({
-  canonicalModelKey: v.canonicalModelKey,
-  displayName: v.displayName,
-  vendor: v.vendor,
-  unit: "PER_SEC" as const,
-  tierRaw: v.tierRaw,
-  listCostYuan: v.listCostYuan,
-  discountRate: v.discountRate,
-}));
-
-const COST_SEEDS: CostSeed[] = [...VIDEO_COST_SEEDS, ...IMAGE_COST_SEEDS];
+// 模型成本档改由 scripts/seed-platform-model-costs.ts + Gateway 注册表维护（不再 seed 遗留 canonical）
+const COST_SEEDS: CostSeed[] = [];
 
 async function seedPlans(
   family: "PERSONAL" | "TEAM",
@@ -293,7 +279,7 @@ export async function seedUnifiedCreditBilling(publishedBy = "seed"): Promise<Se
   return {
     plans: plansCount,
     costProfiles: COST_SEEDS.length,
-    videoModels: VIDEO_COST_SEEDS.length,
+    videoModels: 0,
     published,
     publishErrors,
   };

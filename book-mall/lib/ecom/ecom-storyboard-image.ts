@@ -4,11 +4,6 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
-import { shouldMeterEcomToolkitUsage } from "@/lib/ecom/ecom-billing-mode";
-import { reserveWalletHold } from "@/lib/wallet-holds";
-import { recordToolUsageAndConsumeWallet } from "@/lib/wallet-record-tool-usage-consume";
-import { resolveBillableSnapshot } from "@/lib/tool-billable-price";
-import type { ToolUsagePricingSnapshot } from "@/lib/finance/tool-usage-billing-line";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import {
   ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL,
@@ -59,24 +54,6 @@ import {
   getEcomStoryboardProject,
   updateEcomStoryboardProject,
 } from "@/lib/ecom/ecom-storyboard-service";
-
-function snapToPricing(
-  snap: NonNullable<Awaited<ReturnType<typeof resolveBillableSnapshot>>>,
-): ToolUsagePricingSnapshot {
-  return {
-    unitCostYuan: snap.unitCostYuan,
-    retailMultiplier: snap.retailMultiplier,
-    ourUnitYuan: snap.ourUnitYuan,
-    schemeARefModelKey: snap.schemeARefModelKey,
-    billablePriceId: snap.billablePriceId,
-    cloudBillingKind: snap.billingKind ?? null,
-    billedQty: snap.billedImageCount ?? null,
-    billedUnit:
-      snap.billingKind === "OUTPUT_IMAGE" || snap.billingKind === "COST_PER_IMAGE"
-        ? "张"
-        : null,
-  };
-}
 
 function isTransientPollError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -193,31 +170,6 @@ async function generateOneKlingImage(opts: {
   const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
 
-  let holdId: string | null = null;
-  const metered = await shouldMeterEcomToolkitUsage(opts.userId, ECOM_STORYBOARD_TOOL_KEY);
-  const snap = await resolveBillableSnapshot(ECOM_STORYBOARD_TOOL_KEY, opts.action, {
-    userId: opts.userId,
-    schemeARefModelKey: "kling-3.0-image",
-    actuals: { imageCount: 1 },
-  });
-
-  if (metered && snap && snap.points > 0) {
-    const est = Math.ceil(snap.points * 1.2);
-    const hold = await reserveWalletHold({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: opts.action,
-      estimatedMaxPoints: est,
-      taskKey,
-      meta: opts.meta,
-    });
-    if (!hold.ok) {
-      throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
-      );
-    }
-    holdId = hold.holdId;
-  }
 
   const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
     kind: "kling-v3-image",
@@ -232,25 +184,8 @@ async function generateOneKlingImage(opts: {
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
-  let chargePoints: number | null = null;
-  if (metered && snap && snap.points > 0) {
-    const outcome = await recordToolUsageAndConsumeWallet({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: opts.action,
-      costPoints: snap.points,
-      meta: {
-        ...(opts.meta as Record<string, unknown>),
-        modelId: apiModel,
-        taskKey,
-      } as Prisma.InputJsonValue,
-      pricingSnapshot: snapToPricing(snap),
-      walletHoldId: holdId,
-    });
-    chargePoints = outcome.ok ? snap.points : null;
-  }
 
-  return { ossUrl, chargePoints, taskId };
+  return { ossUrl, chargePoints: null, taskId };
 }
 
 async function generateOneKieImage(opts: {
@@ -267,31 +202,6 @@ async function generateOneKieImage(opts: {
   const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
 
-  let holdId: string | null = null;
-  const metered = await shouldMeterEcomToolkitUsage(opts.userId, ECOM_STORYBOARD_TOOL_KEY);
-  const snap = await resolveBillableSnapshot(ECOM_STORYBOARD_TOOL_KEY, opts.action, {
-    userId: opts.userId,
-    schemeARefModelKey: apiModel,
-    actuals: { imageCount: 1 },
-  });
-
-  if (metered && snap && snap.points > 0) {
-    const est = Math.ceil(snap.points * 1.2);
-    const hold = await reserveWalletHold({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: opts.action,
-      estimatedMaxPoints: est,
-      taskKey,
-      meta: opts.meta,
-    });
-    if (!hold.ok) {
-      throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
-      );
-    }
-    holdId = hold.holdId;
-  }
 
   const { model, input } = buildKieImageCreateArgs({
     modelKey: apiModel,
@@ -312,25 +222,8 @@ async function generateOneKieImage(opts: {
   const vendorUrl = await pollKieImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
-  let chargePoints: number | null = null;
-  if (metered && snap && snap.points > 0) {
-    const outcome = await recordToolUsageAndConsumeWallet({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: opts.action,
-      costPoints: snap.points,
-      meta: {
-        ...(opts.meta as Record<string, unknown>),
-        modelId: apiModel,
-        taskKey,
-      } as Prisma.InputJsonValue,
-      pricingSnapshot: snapToPricing(snap),
-      walletHoldId: holdId,
-    });
-    chargePoints = outcome.ok ? snap.points : null;
-  }
 
-  return { ossUrl, chargePoints, taskId };
+  return { ossUrl, chargePoints: null, taskId };
 }
 
 async function generateOneWanxImage(opts: {
@@ -349,31 +242,6 @@ async function generateOneWanxImage(opts: {
   const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
 
-  let holdId: string | null = null;
-  const metered = await shouldMeterEcomToolkitUsage(opts.userId, ECOM_STORYBOARD_TOOL_KEY);
-  const snap = await resolveBillableSnapshot(ECOM_STORYBOARD_TOOL_KEY, opts.action, {
-    userId: opts.userId,
-    schemeARefModelKey: opts.modelKey,
-    actuals: { imageCount: 1 },
-  });
-
-  if (metered && snap && snap.points > 0) {
-    const est = Math.ceil(snap.points * 1.2);
-    const hold = await reserveWalletHold({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: opts.action,
-      estimatedMaxPoints: est,
-      taskKey,
-      meta: opts.meta,
-    });
-    if (!hold.ok) {
-      throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
-      );
-    }
-    holdId = hold.holdId;
-  }
 
   const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
     kind: "wanx",
@@ -390,25 +258,8 @@ async function generateOneWanxImage(opts: {
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
-  let chargePoints: number | null = null;
-  if (metered && snap && snap.points > 0) {
-    const outcome = await recordToolUsageAndConsumeWallet({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: opts.action,
-      costPoints: snap.points,
-      meta: {
-        ...(opts.meta as Record<string, unknown>),
-        modelId: opts.modelKey,
-        taskKey,
-      } as Prisma.InputJsonValue,
-      pricingSnapshot: snapToPricing(snap),
-      walletHoldId: holdId,
-    });
-    chargePoints = outcome.ok ? snap.points : null;
-  }
 
-  return { ossUrl, chargePoints, taskId };
+  return { ossUrl, chargePoints: null, taskId };
 }
 
 /** 单镜头分镜图：wan2.7 多图参考（产品 + 角色 + 场景一次传入） */
@@ -448,33 +299,6 @@ async function generatePanelImageWithRefs(opts: {
   const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
 
-  let holdId: string | null = null;
-  const metered = await shouldMeterEcomToolkitUsage(opts.userId, ECOM_STORYBOARD_TOOL_KEY);
-  const billModelKey = wan26 ? "wan2.6-image" : apiModel;
-  const snap = await resolveBillableSnapshot(ECOM_STORYBOARD_TOOL_KEY, "image", {
-    userId: opts.userId,
-    schemeARefModelKey: billModelKey,
-    actuals: { imageCount: 1 },
-  });
-
-  if (metered && snap && snap.points > 0) {
-    const est = Math.ceil(snap.points * 1.2);
-    const hold = await reserveWalletHold({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "image",
-      estimatedMaxPoints: est,
-      taskKey,
-      meta: baseMeta as Prisma.InputJsonValue,
-    });
-    if (!hold.ok) {
-      throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
-      );
-    }
-    holdId = hold.holdId;
-  }
-
   const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
     kind: "wan27-image",
     model: apiModel,
@@ -488,25 +312,8 @@ async function generatePanelImageWithRefs(opts: {
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
-  let chargePoints: number | null = null;
-  if (metered && snap && snap.points > 0) {
-    const outcome = await recordToolUsageAndConsumeWallet({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "image",
-      costPoints: snap.points,
-      meta: {
-        ...baseMeta,
-        modelId: apiModel,
-        taskKey,
-      } as Prisma.InputJsonValue,
-      pricingSnapshot: snapToPricing(snap),
-      walletHoldId: holdId,
-    });
-    chargePoints = outcome.ok ? snap.points : null;
-  }
 
-  return { ossUrl, chargePoints };
+  return { ossUrl, chargePoints: null };
 }
 
 /** 单镜头分镜图：可灵 3.0 Omni 多图参考（百炼 messages） */
@@ -545,31 +352,6 @@ async function generatePanelImageWithKling(opts: {
   const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
 
-  let holdId: string | null = null;
-  const metered = await shouldMeterEcomToolkitUsage(opts.userId, ECOM_STORYBOARD_TOOL_KEY);
-  const snap = await resolveBillableSnapshot(ECOM_STORYBOARD_TOOL_KEY, "image", {
-    userId: opts.userId,
-    schemeARefModelKey: "kling-3.0-image",
-    actuals: { imageCount: 1 },
-  });
-
-  if (metered && snap && snap.points > 0) {
-    const est = Math.ceil(snap.points * 1.2);
-    const hold = await reserveWalletHold({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "image",
-      estimatedMaxPoints: est,
-      taskKey,
-      meta: baseMeta as Prisma.InputJsonValue,
-    });
-    if (!hold.ok) {
-      throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
-      );
-    }
-    holdId = hold.holdId;
-  }
 
   const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
     kind: "kling-v3-image",
@@ -584,25 +366,8 @@ async function generatePanelImageWithKling(opts: {
   const vendorUrl = await pollWanxImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
-  let chargePoints: number | null = null;
-  if (metered && snap && snap.points > 0) {
-    const outcome = await recordToolUsageAndConsumeWallet({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "image",
-      costPoints: snap.points,
-      meta: {
-        ...baseMeta,
-        modelId: apiModel,
-        taskKey,
-      } as Prisma.InputJsonValue,
-      pricingSnapshot: snapToPricing(snap),
-      walletHoldId: holdId,
-    });
-    chargePoints = outcome.ok ? snap.points : null;
-  }
 
-  return { ossUrl, chargePoints };
+  return { ossUrl, chargePoints: null };
 }
 
 /** 单镜头分镜图：KIE nano-banana-pro 多图参考（image_input） */
@@ -643,31 +408,6 @@ async function generatePanelImageWithKie(opts: {
   const taskKey = `ecom-sb-img:${opts.projectId}:${workspaceId}`;
   const clientPage = ecomClientPage(opts.userId, workspaceId, ECOM_STORYBOARD_TOOL_KEY);
 
-  let holdId: string | null = null;
-  const metered = await shouldMeterEcomToolkitUsage(opts.userId, ECOM_STORYBOARD_TOOL_KEY);
-  const snap = await resolveBillableSnapshot(ECOM_STORYBOARD_TOOL_KEY, "image", {
-    userId: opts.userId,
-    schemeARefModelKey: apiModel,
-    actuals: { imageCount: 1 },
-  });
-
-  if (metered && snap && snap.points > 0) {
-    const est = Math.ceil(snap.points * 1.2);
-    const hold = await reserveWalletHold({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "image",
-      estimatedMaxPoints: est,
-      taskKey,
-      meta: baseMeta as Prisma.InputJsonValue,
-    });
-    if (!hold.ok) {
-      throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
-      );
-    }
-    holdId = hold.holdId;
-  }
 
   const { taskId, logId } = await ecomGwCreateKieJob(opts.userId, {
     model,
@@ -678,25 +418,8 @@ async function generatePanelImageWithKie(opts: {
   const vendorUrl = await pollKieImage(opts.userId, taskId, logId);
   const ossUrl = await downloadAndUpload(opts.userId, vendorUrl);
 
-  let chargePoints: number | null = null;
-  if (metered && snap && snap.points > 0) {
-    const outcome = await recordToolUsageAndConsumeWallet({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "image",
-      costPoints: snap.points,
-      meta: {
-        ...baseMeta,
-        modelId: apiModel,
-        taskKey,
-      } as Prisma.InputJsonValue,
-      pricingSnapshot: snapToPricing(snap),
-      walletHoldId: holdId,
-    });
-    chargePoints = outcome.ok ? snap.points : null;
-  }
 
-  return { ossUrl, chargePoints };
+  return { ossUrl, chargePoints: null };
 }
 
 export async function ecomGenerateStoryboardSheetImage(opts: {
@@ -761,8 +484,7 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
       aspectRatio,
       meta: { projectId: opts.projectId, kind: "character_ref" } as Prisma.InputJsonValue,
     });
-    if (charResult.chargePoints) totalCharge += charResult.chargePoints;
-
+    
     const bufRes = await fetch(charResult.ossUrl);
     const buf = Buffer.from(await bufRes.arrayBuffer());
     const ref = await addStoryboardReferenceUpload(opts.userId, opts.projectId, {
@@ -818,8 +540,7 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
             panelIndex: panel.index,
             refImageUrls,
           });
-    if (imgResult.chargePoints) totalCharge += imgResult.chargePoints;
-
+    
     updatedPanels = updatedPanels.map((p) =>
       p.index === panel.index ? { ...p, imageUrl: imgResult.ossUrl } : p,
     );
@@ -869,6 +590,6 @@ export async function ecomGenerateStoryboardSheetImage(opts: {
   return {
     references,
     sheet: updatedSheet,
-    chargePoints: totalCharge > 0 ? totalCharge : null,
+    chargePoints: null,
   };
 }

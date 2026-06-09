@@ -4,6 +4,8 @@ import { FileText, ListChecks } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { getToolsPublicOrigin } from "@/lib/sso-tools-env";
 import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
+import { loadPricingConfig } from "@/lib/pricing/credit-pricing-engine";
+import { listUserTenantMemberships } from "@/lib/tenant/context";
 import {
   Card,
   CardContent,
@@ -13,18 +15,28 @@ import {
 } from "@/components/ui/card";
 import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
+import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
 import {
   hrefPricingDisclosureFromAccount,
   PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS,
 } from "@/lib/pricing-disclosure-view";
 
 export const metadata = {
-  title: "费用与明细 — 个人中心",
+  title: "轻量包购买 — 个人中心",
 };
 
 export default async function AccountBillingPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
+
+  const [config, teamTenants] = await Promise.all([
+    loadPricingConfig(),
+    listUserTenantMemberships(session.user.id).then((ms) =>
+      ms
+        .filter((m) => m.tenantType === "TEAM")
+        .map((m) => ({ id: m.tenantId, name: m.tenantName })),
+    ),
+  ]);
 
   const financeWebOrigin = getFinanceWebPublicOrigin();
   const toolsPublicOrigin = getToolsPublicOrigin();
@@ -40,15 +52,22 @@ export default async function AccountBillingPage() {
   return (
     <>
       <AccountSectionHeader
-        title="费用与明细"
-        description="工具站流水、财务账单与平台价目入口。"
+        title="轻量包购买"
+        description="套餐积分用完后可在此加购，档位与价格页一致。会员套餐请前往报价页选购。"
       />
 
-      <Card>
+      <CreditTopupSection
+        anchorYuan={config.creditAnchorYuan}
+        isTeam={false}
+        teamTenants={teamTenants}
+        isLoggedIn
+      />
+
+      <Card className="mt-10">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">明细入口</CardTitle>
+          <CardTitle className="text-base">费用明细</CardTitle>
           <CardDescription className="text-xs leading-relaxed">
-            工具站费用明细为工具站内历史流水；账单详情与云账单对齐，须保持主站已登录。
+            工具站流水、财务账单与平台价目入口。
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -103,15 +122,17 @@ export default async function AccountBillingPage() {
           <a href={PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS} className={accountInlineLinkClass()}>
             平台价目表（价格公示）
           </a>
+          <a href="/pricing" className={accountInlineLinkClass()}>
+            会员套餐报价页
+          </a>
         </CardContent>
       </Card>
 
       <Card className="mt-6 border-dashed bg-muted/20">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">计费与提现政策（摘要）</CardTitle>
+          <CardTitle className="text-sm">计费政策（摘要）</CardTitle>
           <CardDescription className="text-xs leading-relaxed">
-            订阅费不可用余额抵扣；高阶 / 按量依赖余额且须不低于最低可用线；余额提现须先结清应扣未扣。
-            完整说明见{" "}
+            套餐积分按月重置；轻量包即时到账、不随月清零。完整说明见{" "}
             <a
               href={hrefPricingDisclosureFromAccount({ hash: "billing-policy" })}
               className={accountInlineLinkClass()}

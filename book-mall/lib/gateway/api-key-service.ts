@@ -6,6 +6,7 @@ import type {
   GatewayUser,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolvePlatformVendorCredentialIds } from "@/lib/gateway/platform-credential-pool";
 
 const KEY_PREFIX = "sk-gw-";
 
@@ -85,10 +86,36 @@ async function ensurePersonalApiKeyBindingsSynced(
   apiKeyId: string,
   scope: GatewayApiKeyScope,
   gatewayUserId: string,
+  managedByPlatform: boolean,
 ): Promise<void> {
   if (scope !== "PERSONAL") return;
+  if (managedByPlatform) {
+    await ensurePlatformManagedKeyBindingsSynced(apiKeyId);
+    return;
+  }
   if (!(await personalBindingsNeedSync(gatewayUserId, apiKeyId))) return;
   await syncPersonalGatewayApiKeyBindings(gatewayUserId);
+}
+
+/** 平台托管 sk-gw：每次解析时自动对齐 canonical 凭证池（改 Key / 增删厂商均无需手点刷新） */
+async function ensurePlatformManagedKeyBindingsSynced(apiKeyId: string): Promise<void> {
+  const canonicalIds = await resolvePlatformVendorCredentialIds();
+  if (canonicalIds.length === 0) return;
+
+  const bound = await prisma.gatewayApiKeyCredential.findMany({
+    where: { apiKeyId },
+    select: { credentialId: true },
+    orderBy: { credentialId: "asc" },
+  });
+  const boundKey = bound.map((b) => b.credentialId).join(",");
+  const canonicalKey = [...canonicalIds].sort().join(",");
+  if (boundKey === canonicalKey) return;
+
+  await prisma.gatewayApiKeyCredential.deleteMany({ where: { apiKeyId } });
+  await prisma.gatewayApiKeyCredential.createMany({
+    data: canonicalIds.map((credentialId) => ({ apiKeyId, credentialId })),
+    skipDuplicates: true,
+  });
 }
 
 export type ResolvedCredential = {
@@ -221,7 +248,7 @@ export async function resolveGatewayApiKeyFromBearer(
     },
   });
   if (!row) return null;
-  await ensurePersonalApiKeyBindingsSynced(row.id, row.scope, row.userId);
+  await ensurePersonalApiKeyBindingsSynced(row.id, row.scope, row.userId, row.managedByPlatform);
   if (row.scope === "PERSONAL") {
     const refreshed = await prisma.gatewayApiKey.findFirst({
       where: { id: row.id },
@@ -264,7 +291,7 @@ export async function resolveGatewayApiKeyById(
     },
   });
   if (!row) return null;
-  await ensurePersonalApiKeyBindingsSynced(row.id, row.scope, row.userId);
+  await ensurePersonalApiKeyBindingsSynced(row.id, row.scope, row.userId, row.managedByPlatform);
   if (row.scope === "PERSONAL") {
     const refreshed = await prisma.gatewayApiKey.findFirst({
       where: { id: row.id },

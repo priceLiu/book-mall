@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import type { BillingPersona } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { deriveEcomBillingMode } from "@/lib/billing/billing-persona";
 import { syncGatewayUserFromBookUser } from "@/lib/gateway/sync-user";
+import { ensurePlatformManagedKeyForUser } from "@/lib/gateway/platform-managed-key";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +14,7 @@ const registerSchema = z.object({
   email: z.string().email("邮箱格式无效"),
   password: z.string().min(8, "密码至少 8 位"),
   name: z.string().max(64).optional(),
+  billingPersona: z.enum(["PLATFORM_CREDIT", "BYOK"]),
 });
 
 function isDev() {
@@ -29,6 +33,7 @@ export async function POST(request: Request) {
     }
 
     const email = parsed.data.email.trim().toLowerCase();
+    const billingPersona = parsed.data.billingPersona as BillingPersona;
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) {
       return NextResponse.json(
@@ -38,6 +43,7 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+    const lockedAt = new Date();
 
     let createdUserId: string | null = null;
     await prisma.$transaction(async (tx) => {
@@ -46,6 +52,9 @@ export async function POST(request: Request) {
           email,
           passwordHash,
           name: parsed.data.name?.trim() || null,
+          billingPersona,
+          billingPersonaLockedAt: lockedAt,
+          ecomBillingMode: deriveEcomBillingMode(billingPersona),
         },
       });
       createdUserId = user.id;
@@ -61,6 +70,9 @@ export async function POST(request: Request) {
           email,
           name: parsed.data.name,
         });
+        if (billingPersona === "PLATFORM_CREDIT") {
+          await ensurePlatformManagedKeyForUser(createdUserId);
+        }
       } catch (syncErr) {
         console.warn("[register] gateway sync failed", syncErr);
       }
@@ -72,7 +84,7 @@ export async function POST(request: Request) {
       update: {},
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, billingPersona });
   } catch (e) {
     console.error("[register]", e);
 

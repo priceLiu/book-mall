@@ -20,9 +20,6 @@ import {
 } from "@/lib/ecom/ecom-storyboard-types";
 import { ecomGwChatStream } from "@/lib/gateway/ecom-tool-gateway-client";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
-import { shouldMeterEcomToolkitUsage } from "@/lib/ecom/ecom-billing-mode";
-import { resolveBillableSnapshot } from "@/lib/tool-billable-price";
-import { recordToolUsageAndConsumeWallet } from "@/lib/wallet-record-tool-usage-consume";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const runtime = "nodejs";
@@ -170,27 +167,6 @@ export async function POST(req: Request, ctx: Ctx) {
           }
 
           await updateEcomStoryboardProject(auth.userId, projectId, patch);
-
-          const metered = await shouldMeterEcomToolkitUsage(
-            auth.userId,
-            ECOM_STORYBOARD_TOOL_KEY,
-          );
-          if (metered) {
-            const snap = await resolveBillableSnapshot(
-              ECOM_STORYBOARD_TOOL_KEY,
-              "chat",
-              { userId: auth.userId },
-            );
-            if (snap && snap.points > 0) {
-              await recordToolUsageAndConsumeWallet({
-                userId: auth.userId,
-                toolKey: ECOM_STORYBOARD_TOOL_KEY,
-                action: "chat",
-                costPoints: snap.points,
-                meta: { projectId, modelKey },
-              });
-            }
-          }
 
           controller.close();
         } catch (e) {

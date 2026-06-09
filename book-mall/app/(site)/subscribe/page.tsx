@@ -42,7 +42,7 @@ function AiAppsRechargeNotice() {
       <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
         <span className="font-medium text-amber-950 dark:text-amber-50">过渡演示：</span>
         <Button asChild size="sm" variant="secondary">
-          <Link href="/pay/mock-topup">模拟收银充值</Link>
+          <Link href="/pricing">积分加油包 / 会员</Link>
         </Button>
         <span className="text-amber-900/90 dark:text-amber-200/90">
           （例如 5000 / 10000 / 20000 点，对应 ¥50 / ¥100 / ¥200，到账后在个人中心与后台订单可见）

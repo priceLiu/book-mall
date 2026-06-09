@@ -1,6 +1,3 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
 import { isPricingFromAccount } from "@/lib/pricing-disclosure-view";
 import { PricingDisclosureContent } from "@/components/pricing/pricing-disclosure-content";
 
@@ -16,7 +13,6 @@ export const metadata = {
 
 /**
  * 价格公示页（公开访问；营销顶栏等仍走本站布局）。
- * 个人中心请使用 `/account/pricing`（内嵌同一内容，不离开账户壳）。
  */
 export default async function PricingDisclosurePage({
   searchParams,
@@ -24,13 +20,6 @@ export default async function PricingDisclosurePage({
   searchParams: Promise<{ from?: string | string[] }>;
 }) {
   const sp = await searchParams;
-  if (isPricingFromAccount(sp)) {
-    const session = await getServerSession(authOptions);
-    if (session?.user?.id) {
-      redirect("/account/pricing");
-    }
-  }
-
   const fromAccount = isPricingFromAccount(sp);
   return <PricingDisclosureContent fromAccount={fromAccount} />;
 }
