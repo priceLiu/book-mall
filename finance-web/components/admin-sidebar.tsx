@@ -3,33 +3,147 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  Beaker,
+  Calculator,
+  CloudUpload,
+  Coins,
+  FileSpreadsheet,
+  GitPullRequest,
+  HelpCircle,
+  KeyRound,
+  LayoutDashboard,
+  ClipboardList,
+  ListChecks,
+  Tags,
+  UserCircle2,
+  Users,
+  Wrench,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, ListChecks, Tags, UserCircle2, Wrench } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
-import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
+import { fetchFinanceViewer, type FinanceViewerPayload } from "@/lib/finance-viewer";
+import { canViewFinanceCost, canCreateProposal, roleLabel } from "@/lib/permissions";
 
-const nav = [
-  { href: "/admin", label: "概览", icon: LayoutDashboard, exact: true },
-  { href: "/admin/billing/users", label: "用户明细", icon: UserCircle2, prefix: "/admin/billing/users" },
-  { href: "/admin/billing/all", label: "费用明细（全部）", icon: ListChecks, prefix: "/admin/billing/all" },
-  { href: "/admin/pricing-disclosure", label: "价格公示", icon: Tags, prefix: "/admin/pricing-disclosure" },
-  { href: "/admin/models/coefficients", label: "模型系数", icon: Wrench, prefix: "/admin/models" },
-] as const;
-
-type ViewerPayload = {
-  user: {
-    id: string;
-    email: string | null;
-    name: string | null;
-    role: string;
-  } | null;
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  prefix?: string;
+  exact?: boolean;
+  show?: (v: FinanceViewerPayload) => boolean;
 };
+
+const nav: NavItem[] = [
+  { href: "/admin", label: "概览", icon: LayoutDashboard, exact: true },
+  { href: "/admin/help", label: "使用说明", icon: HelpCircle, prefix: "/admin/help" },
+  {
+    href: "/admin/billing/users",
+    label: "用户明细",
+    icon: UserCircle2,
+    prefix: "/admin/billing/users",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/billing/all",
+    label: "费用明细（全部）",
+    icon: ListChecks,
+    prefix: "/admin/billing/all",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/usage-overview",
+    label: "费用概览",
+    icon: FileSpreadsheet,
+    prefix: "/admin/usage-overview",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/pnl-alerts",
+    label: "盈亏预警",
+    icon: AlertTriangle,
+    prefix: "/admin/pnl-alerts",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/plan-change",
+    label: "调价测算与审批",
+    icon: GitPullRequest,
+    prefix: "/admin/plan-change",
+    show: (v) => canCreateProposal(v.user.role),
+  },
+  {
+    href: "/admin/model-cost",
+    label: "模型成本",
+    icon: Coins,
+    prefix: "/admin/model-cost",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/credit-pricing",
+    label: "积分报价",
+    icon: Calculator,
+    prefix: "/admin/credit-pricing",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/test-cases",
+    label: "财务测算",
+    icon: ClipboardList,
+    prefix: "/admin/test-cases",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/scenario-lab",
+    label: "Scenario Lab",
+    icon: Beaker,
+    prefix: "/admin/scenario-lab",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/membership-plans",
+    label: "会员套餐",
+    icon: Users,
+    prefix: "/admin/membership-plans",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/byok",
+    label: "BYOK 定价",
+    icon: KeyRound,
+    prefix: "/admin/byok",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/reconciliation",
+    label: "云账单对账",
+    icon: CloudUpload,
+    prefix: "/admin/reconciliation",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  { href: "/admin/pricing-disclosure", label: "价格公示", icon: Tags, prefix: "/admin/pricing-disclosure" },
+  {
+    href: "/admin/pnl-report",
+    label: "P&L 报表",
+    icon: Calculator,
+    prefix: "/admin/pnl-report",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+  {
+    href: "/admin/video-risk",
+    label: "视频风控",
+    icon: Wrench,
+    prefix: "/admin/video-risk",
+    show: (v) => canViewFinanceCost(v.user.role),
+  },
+];
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const base = useBookMallBaseUrl();
-  const [viewer, setViewer] = useState<ViewerPayload["user"] | undefined>(undefined);
+  const [viewer, setViewer] = useState<FinanceViewerPayload | null | undefined>(undefined);
   const [viewerErr, setViewerErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,14 +155,9 @@ export function AdminSidebar() {
     let cancelled = false;
     setViewerErr(null);
     setViewer(undefined);
-    const { url, init } = resolveBookMallBrowserRequest(base, "/api/finance/viewer-session");
-    fetch(url, init)
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`${res.status}`);
-        return res.json() as Promise<ViewerPayload>;
-      })
-      .then((j) => {
-        if (!cancelled) setViewer(j.user);
+    fetchFinanceViewer(base)
+      .then((v) => {
+        if (!cancelled) setViewer(v);
       })
       .catch(() => {
         if (!cancelled) {
@@ -60,6 +169,8 @@ export function AdminSidebar() {
       cancelled = true;
     };
   }, [base]);
+
+  const visibleNav = viewer ? nav.filter((item) => !item.show || item.show(viewer)) : nav;
 
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-[#e8e8e8] bg-[#001529] text-sm text-white/85">
@@ -94,27 +205,23 @@ export function AdminSidebar() {
             >
               主站登录
             </a>
-            （管理员），再回到本页刷新。
           </p>
         ) : (
           <>
-            <p className="text-base font-semibold text-white">{viewer.name?.trim() || "—"}</p>
-            <p className="mt-1 break-all text-sm text-white/80">{viewer.email?.trim() || "—"}</p>
-            <p className="mt-2 text-sm text-white/75">
-              角色：{viewer.role === "ADMIN" ? "管理员" : viewer.role}
-            </p>
+            <p className="text-base font-semibold text-white">{viewer.user.name?.trim() || "—"}</p>
+            <p className="mt-1 break-all text-sm text-white/80">{viewer.user.email?.trim() || "—"}</p>
+            <p className="mt-2 text-sm text-white/75">角色：{roleLabel(viewer.user.role)}</p>
           </>
         )}
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
-        {nav.map((item) => {
+        {visibleNav.map((item) => {
           const Icon = item.icon;
-          const active =
-            "exact" in item && item.exact
-              ? pathname === item.href
-              : "prefix" in item
-                ? pathname.startsWith(item.prefix)
-                : pathname === item.href;
+          const active = item.exact
+            ? pathname === item.href
+            : item.prefix
+              ? pathname.startsWith(item.prefix)
+              : pathname === item.href;
           return (
             <Link
               key={item.href}

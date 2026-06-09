@@ -12,13 +12,33 @@ import type { CreditCostUnit } from "@prisma/client";
 export const DEFAULT_CREDIT_ANCHOR_YUAN = 0.04;
 export const DEFAULT_MARGIN_M = 2.5;
 export const DEFAULT_MIN_MARGIN_GUARD = 0.3;
-export const DEFAULT_VIDEO_SEC = 5;
+/** 财务 2.0：视频固定 15s 计费封顶 */
+export const DEFAULT_VIDEO_SEC = 15;
+/** 财务 2.0：视频系数 M=4 → 恰好 75% 毛利 */
+export const DEFAULT_VIDEO_MARGIN_M = 4;
+/** 财务 2.0：视频毛利护栏 ≥75% */
+export const DEFAULT_VIDEO_MIN_MARGIN_GUARD = 0.75;
+
+/**
+ * 逐档单价派生 + 积分取整会引入约 ±0.2pct 的毛利误差（见验收标准 §1 容差）。
+ * 护栏判定放宽该误差，避免「真值 75.0% 但取整后 74.9%」被误判不通过。
+ */
+export const MARGIN_GUARD_TOLERANCE = 0.002;
+
+/** 实际毛利是否满足护栏（含容差）。 */
+export function marginPassesGuard(actualMargin: number, minGuard: number): boolean {
+  return actualMargin >= minGuard - MARGIN_GUARD_TOLERANCE;
+}
 
 export interface PricingConfig {
   creditAnchorYuan: number;
   defaultMarginM: number;
   minMarginGuard: number;
   defaultVideoSec: number;
+  /** 视频专项系数 M（默认 4 → 75% 毛利） */
+  videoMarginM: number;
+  /** 视频专项毛利护栏（默认 0.75） */
+  videoMinMarginGuard: number;
 }
 
 export const FALLBACK_PRICING_CONFIG: PricingConfig = {
@@ -26,7 +46,49 @@ export const FALLBACK_PRICING_CONFIG: PricingConfig = {
   defaultMarginM: DEFAULT_MARGIN_M,
   minMarginGuard: DEFAULT_MIN_MARGIN_GUARD,
   defaultVideoSec: DEFAULT_VIDEO_SEC,
+  videoMarginM: DEFAULT_VIDEO_MARGIN_M,
+  videoMinMarginGuard: DEFAULT_VIDEO_MIN_MARGIN_GUARD,
 };
+
+/** 计费单位是否属于「视频」分类（按秒计费）。 */
+export function isVideoBillingUnit(unit: CreditCostUnit | string | null | undefined): boolean {
+  return unit === "PER_SEC";
+}
+
+/**
+ * 财务 2.0 视频计费秒数封顶。
+ *   - 缺省（业务未传时长）→ 取封顶 capSec（视频恒按 15s 计）。
+ *   - 实际时长 > capSec → 封顶；≤ capSec → 据实。
+ */
+export function videoBillableSeconds(
+  durationSec: number | null | undefined,
+  capSec: number = DEFAULT_VIDEO_SEC,
+): number {
+  const cap = Math.max(1, Math.round(capSec || DEFAULT_VIDEO_SEC));
+  if (durationSec == null) return cap;
+  const s = Math.max(1, Math.round(durationSec));
+  return Math.min(s, cap);
+}
+
+/**
+ * 按计费类型取毛利护栏阈值：视频（PER_SEC）用 videoMinMarginGuard，其它用 minMarginGuard。
+ */
+export function marginGuardForUnit(
+  unit: CreditCostUnit | string | null | undefined,
+  guards: { minMarginGuard: number; videoMinMarginGuard: number },
+): number {
+  return isVideoBillingUnit(unit) ? guards.videoMinMarginGuard : guards.minMarginGuard;
+}
+
+/**
+ * 按计费类型取系数 M：视频用 videoMarginM，其它用 defaultMarginM。
+ */
+export function marginMForUnit(
+  unit: CreditCostUnit | string | null | undefined,
+  config: { defaultMarginM: number; videoMarginM: number },
+): number {
+  return isVideoBillingUnit(unit) ? config.videoMarginM : config.defaultMarginM;
+}
 
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -78,6 +140,31 @@ export function computeEffectiveMargin(input: {
   const revenue = input.creditsPerUnit * input.pricePerCreditYuan;
   if (revenue <= 0) return 0;
   return round4(1 - input.netCostYuan / revenue);
+}
+
+/**
+ * 方案 B-refined 逐档积分换算：单一元计价真值 + 按档真实单价派生积分。
+ *
+ *   credits = round(totalListPriceYuan ÷ pricePerCreditYuan)
+ *
+ * 其中：
+ *   - totalListPriceYuan = 单位挂牌价(listPriceYuanPerUnit) × 计费单位数(units)
+ *   - pricePerCreditYuan = 该档套餐价 ÷ 月积分（个人）或 每席价 ÷ 每席积分（团队）
+ *
+ * 这样不同档位用同一挂牌价真值，却换算出不同积分，使每档真实毛利精确恒定。
+ */
+export function computeTierCredits(
+  totalListPriceYuan: number,
+  pricePerCreditYuan: number,
+): number {
+  if (!(pricePerCreditYuan > 0) || !(totalListPriceYuan > 0)) return 0;
+  return Math.max(1, Math.round(totalListPriceYuan / pricePerCreditYuan));
+}
+
+/** 某档「每积分单价」= 套餐价 ÷ 月积分（团队传每席价 ÷ 每席积分）。 */
+export function computePricePerCredit(priceYuan: number, monthlyCredits: number): number {
+  if (!(monthlyCredits > 0)) return 0;
+  return priceYuan / monthlyCredits;
 }
 
 export interface CreditPriceComputation {

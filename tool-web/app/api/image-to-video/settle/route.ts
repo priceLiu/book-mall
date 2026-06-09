@@ -2,20 +2,13 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { serviceFeeSettleJson, TOOL_SERVICE_FEE_MODE } from "@/lib/tool-service-fee-mode";
-import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import { pollDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
 import type { I2vTaskOutput } from "@/lib/image-to-video-dashscope";
 import { formatDashScopeI2vFailureForUser } from "@/lib/image-to-video-task-errors";
-import {
-  extractVideoTaskBillingContext,
-  videoBillingHintFromJsonBody,
-} from "@/lib/image-to-video-task-billing";
-import { computeVideoChargePoints } from "@/lib/tools-scheme-a-pricing";
-import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
 
 export const runtime = "nodejs";
 
-/** 视频工具成功扣费：Phase D 技术服务费模式下不扣点；legacy 仍走方案 A。 */
+/** 视频结算：扣费由 Gateway 积分结算；本路由仅校验任务成功。 */
 export async function POST(req: Request) {
   const suite = await requireToolSuiteNavAccess("image-to-video");
   if (!suite.ok) return suite.response;
@@ -70,79 +63,5 @@ export async function POST(req: Request) {
     return NextResponse.json(serviceFeeSettleJson());
   }
 
-  const billTaskId = output.task_id?.trim() || taskId;
-  const videoUrl =
-    typeof output.video_url === "string"
-      ? output.video_url.trim()
-      : "";
-
-  const hint = videoBillingHintFromJsonBody(body);
-  const vCtx = extractVideoTaskBillingContext({ output }, hint);
-  if (!vCtx) {
-    return NextResponse.json(
-      {
-        error:
-          "无法从任务详情解析计费上下文（缺少模型 id；任务 JSON 无 model 时请在请求体附带 billingHint.apiModel）。",
-      },
-      { status: 503 },
-    );
-  }
-
-  const { multiplier: retailMult } = await getSchemeARetailMultiplierServer({
-    toolKey: "image-to-video",
-    modelKey: vCtx.apiModel,
-  });
-  const costPoints = computeVideoChargePoints(vCtx, retailMult);
-  if (costPoints <= 0) {
-    return NextResponse.json(
-      {
-        error: `视频模型「${vCtx.apiModel}」暂无方案 A 单价配置，请同步 tools-scheme-a-catalog.json`,
-      },
-      { status: 503 },
-    );
-  }
-
-  const holdId =
-    typeof body.holdId === "string" && body.holdId.trim().length > 0
-      ? body.holdId.trim()
-      : undefined;
-
-  let usage;
-  try {
-    usage = await postToolUsageFromServerWithRetries({
-      toolKey: "image-to-video",
-      action: "invoke",
-      meta: {
-        taskId: billTaskId,
-        videoUrl,
-        modelId: vCtx.apiModel,
-        pricingScheme: "tools_scheme_a",
-        videoModel: vCtx.apiModel,
-        videoDurationSec: vCtx.durationSec,
-        videoSr: vCtx.sr,
-        videoAudio: vCtx.audio,
-        retailMultiplier: retailMult,
-      },
-      ...(holdId ? { holdId } : {}),
-    });
-  } catch (e) {
-    console.error("[image-to-video/settle] usage POST failed after retries", e);
-    return NextResponse.json(
-      {
-        error:
-          "计费上报暂时不可用（网络异常）。视频已生成；请稍后在费用明细核对或重试计费。",
-      },
-      { status: 503 },
-    );
-  }
-
-  if (!usage.ok) {
-    const msg =
-      usage.reason === "no_session"
-        ? "请先登录工具站"
-        : "工具站未配置 MAIN_SITE_ORIGIN，无法计费";
-    return NextResponse.json({ error: msg }, { status: 503 });
-  }
-
-  return NextResponse.json(usage.data, { status: usage.status });
+  return NextResponse.json({ ok: true, recorded: false, creditBilling: true });
 }

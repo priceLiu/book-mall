@@ -2,11 +2,17 @@
  * 生成前积分余额门禁（用完即停）。
  */
 import { prisma } from "@/lib/prisma";
-import { getCreditBalance, InsufficientCreditsError } from "./credit-account-service";
+import {
+  getCreditBalance,
+  getPoolBalances,
+  resolveVideoPool,
+  InsufficientCreditsError,
+} from "./credit-account-service";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
-import { resolveCanonicalModelKey } from "@/lib/gateway/credit-billing-guard";
+import { resolveCanonicalModelKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
+import { computeTierCredits, videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
 
-async function resolveBillingRef(input: {
+export async function resolveBillingRef(input: {
   tenantId?: string | null;
   actorBookUserId?: string | null;
   apiKeyId: string;
@@ -38,16 +44,38 @@ export async function assertCreditsBeforeGenerate(input: {
   actorBookUserId?: string | null;
   apiKeyId: string;
   model: string;
+  requestKind?: string | null;
 }): Promise<void> {
   if (!isUnifiedCreditBillingActive()) return;
 
   const ref = await resolveBillingRef(input);
   if (!ref) return;
 
+  const isVideo = input.requestKind === "VIDEO";
+  const canonical = await resolveCanonicalModelKey(input.model).catch(() => null);
+
+  // 视频：走视频池冻结预检（逐档单价 × 15s 封顶）
+  if (isVideo) {
+    const pools = await getPoolBalances(ref);
+    const pool = await resolveVideoPool(ref);
+    const available = pool === "VIDEO" ? pools.video.balance : pools.general.balance;
+    let minNeeded = 1;
+    if (canonical) {
+      const snap = await resolveCostSnapshot(canonical).catch(() => null);
+      const list = snap?.listPriceYuan ?? null;
+      const units = videoBillableSeconds(null);
+      if (pools.pricePerCreditYuan && pools.pricePerCreditYuan > 0 && list && list > 0) {
+        minNeeded = computeTierCredits(list * units, pools.pricePerCreditYuan);
+      } else if (snap?.creditsPerUnit && snap.creditsPerUnit > 0) {
+        minNeeded = Math.round(snap.creditsPerUnit * units);
+      }
+    }
+    if (available < minNeeded) throw new InsufficientCreditsError(available, minNeeded);
+    return;
+  }
+
   const balance = await getCreditBalance(ref);
   let minNeeded = 1;
-
-  const canonical = await resolveCanonicalModelKey(input.model).catch(() => null);
   if (canonical) {
     const price = await prisma.modelCreditPrice.findFirst({
       where: { canonicalModelKey: canonical, active: true },

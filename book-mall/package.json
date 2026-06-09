@@ -7,6 +7,9 @@
   },
   "scripts": {
     "dev": "next dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:finance-integration": "dotenv -e .env.local -- tsx test/integration/finance-2.0-video.integration.ts",
     "build": "dotenv -e .env.local -- prisma migrate deploy && prisma generate && next build",
     "build:docker": "prisma generate && next build",
     "start": "next start",
@@ -109,7 +112,8 @@
     "prisma": "^6.3.1",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

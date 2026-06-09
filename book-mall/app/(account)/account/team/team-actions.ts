@@ -24,6 +24,7 @@ import {
   assertTenantPermission,
   type TenantAction,
 } from "@/lib/tenant/permission";
+import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { grantCredits } from "@/lib/billing/credit-account-service";
 import type { TenantRole } from "@prisma/client";
@@ -109,10 +110,14 @@ export async function createTeamAction(formData: FormData): Promise<ActionResult
   const periodEnd = new Date();
   if (plan.interval === "YEAR") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
   else periodEnd.setMonth(periodEnd.getMonth() + 1);
+  const grants = resolvePlanCreditGrants(plan, quote.totalSeats);
   await grantCredits({
     ref: { ownerType: "TENANT", ownerId: tenant.id },
-    credits: quote.monthlyCreditsPool,
-    monthlyGrantCredits: quote.monthlyCreditsPool,
+    credits: grants.generalCredits,
+    videoCredits: grants.videoCredits,
+    monthlyGrantCredits: grants.monthlyGrantCredits,
+    videoMonthlyGrantCredits: grants.videoMonthlyGrantCredits,
+    pricePerCreditYuan: quote.perSeatCredits > 0 ? quote.totalPriceYuan / quote.monthlyCreditsPool : null,
     planId,
     currentPeriodEnd: periodEnd,
     idempotencyKey: `team_open:${tenant.id}`,

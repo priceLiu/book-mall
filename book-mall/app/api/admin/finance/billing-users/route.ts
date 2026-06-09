@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+
+import { canViewFinanceCost } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
+import {
+  financeForbidden,
+  financeOptions,
+  financeUnauthorized,
+  getFinanceSession,
+} from "@/lib/finance/finance-api";
 import { financeCorsHeaders } from "@/lib/finance/cors";
 
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, { status: 204, headers: financeCorsHeaders(request) });
+  return financeOptions(request);
 }
 
 /**
@@ -16,10 +22,9 @@ export async function OPTIONS(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   const cors = financeCorsHeaders(request);
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "需要管理员" }, { status: 403, headers: cors });
-  }
+  const user = await getFinanceSession();
+  if (!user) return financeUnauthorized(request);
+  if (!canViewFinanceCost(user.role)) return financeForbidden(request, "需要财务/超管权限");
 
   const grouped = await prisma.toolBillingDetailLine.groupBy({
     by: ["userId"],

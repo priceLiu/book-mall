@@ -65,6 +65,14 @@ interface ByokConfig {
   label: string;
   techServiceFeeYuan: number;
   interval: string;
+  minSeats: number | null;
+}
+interface ByokQuota {
+  scopeKey: string;
+  taskKind: string;
+  label: string;
+  monthlyIncluded: number;
+  overageCredits: number;
 }
 interface ResourceRate {
   resourceType: string;
@@ -144,6 +152,7 @@ export function PricingPageClient({
   plans,
   models,
   byok,
+  byokQuotas = [],
   rates,
   isLoggedIn,
   teamTenants,
@@ -152,6 +161,7 @@ export function PricingPageClient({
   plans: Plan[];
   models: ModelPrice[];
   byok: ByokConfig[];
+  byokQuotas?: ByokQuota[];
   rates: ResourceRate[];
   isLoggedIn: boolean;
   teamTenants: { id: string; name: string }[];
@@ -397,17 +407,32 @@ export function PricingPageClient({
                 <KeyRound className="h-5 w-5" /> 自带 Key（BYOK）
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
-                已有厂商 API Key？可绑定自用：模型费用由你与厂商直接结算，平台
-                <b className="text-foreground">不扣积分、不赚差价</b>，仅收技术服务费与资源使用费。
+                已有厂商 API Key？绑定后模型费用由你与厂商直接结算，平台
+                <b className="text-foreground">不扣积分、不赚差价</b>，仅收技术服务费；套餐内含月度任务额度，超出后购买轻量包按次扣积分。
               </p>
               {byok.length > 0 ? (
-                <div className="mt-3 space-y-1 text-sm">
+                <div className="mt-3 space-y-3 text-sm">
                   {byok.map((b) => (
-                    <div key={b.scopeKey} className="flex justify-between">
-                      <span className="text-muted-foreground">{b.label}</span>
-                      <span className="font-semibold">
-                        ¥{b.techServiceFeeYuan}/{b.interval === "YEAR" ? "年" : "月"}
-                      </span>
+                    <div key={b.scopeKey} className="rounded-lg border border-amber-300/40 p-3">
+                      <div className="flex justify-between font-semibold">
+                        <span>{b.label}</span>
+                        <span>
+                          ¥{b.techServiceFeeYuan}/{b.interval === "YEAR" ? "年" : "月"}
+                          {b.scopeKey === "team-seat" && b.minSeats ? ` / 席（${b.minSeats} 席起）` : ""}
+                        </span>
+                      </div>
+                      {byokQuotas.filter((q) => q.scopeKey === b.scopeKey).length > 0 ? (
+                        <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                          {byokQuotas
+                            .filter((q) => q.scopeKey === b.scopeKey)
+                            .map((q) => (
+                              <li key={q.taskKind}>
+                                {q.label}：含 {q.monthlyIncluded} 次/月
+                                {b.scopeKey === "team-seat" ? "/席" : ""}，超额 {q.overageCredits} 积分/次
+                              </li>
+                            ))}
+                        </ul>
+                      ) : null}
                     </div>
                   ))}
                 </div>

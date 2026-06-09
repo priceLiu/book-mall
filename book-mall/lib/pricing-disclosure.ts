@@ -49,110 +49,86 @@ export type EffectiveBillableRow = {
 };
 
 /**
- * 前台公示：当前仍处于生效区间内的按次标价。
- *
- * v005（2026-05-18）变更：
- *  - 不再按 (toolKey, action, schemeARefModelKey) 去重，而是按 (toolKey, action, schemeARefModelKey, cloudTierRaw) 去重，
- *    这样同一模型的 720P / 1080P / audio / silent 等档位在公示表中各占一行，符合云厂商挂牌的颗粒度。
- *  - join ModelCatalog（按 canonicalKey = ToolBillablePrice.cloudModelKey ?? schemeARefModelKey）
- *    把"厂商产品名 / 商品名 / 计费项"等带出去，让用户看到底层成本来源。
+ * 前台公示：财务 2.0 统一积分报价（ModelCreditPrice + ModelCostProfile）。
  */
 export async function getEffectiveBillablePricesForDisclosure(
   now = new Date(),
 ): Promise<EffectiveBillableRow[]> {
-  const rows = await prisma.toolBillablePrice.findMany({
-    where: {
-      active: true,
-      effectiveFrom: { lte: now },
-      OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
-    },
-    orderBy: [
-      { toolKey: "asc" },
-      { action: "asc" },
-      { schemeARefModelKey: "asc" },
-      { cloudTierRaw: "asc" },
-      { effectiveFrom: "desc" },
-      { updatedAt: "desc" },
-    ],
-  });
+  const [prices, profiles, catalogs] = await Promise.all([
+    prisma.modelCreditPrice.findMany({ orderBy: { canonicalModelKey: "asc" } }),
+    prisma.modelCostProfile.findMany({
+      where: {
+        active: true,
+        effectiveFrom: { lte: now },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
+      },
+    }),
+    prisma.modelCatalog.findMany({
+      select: {
+        canonicalKey: true,
+        displayName: true,
+        vendor: true,
+        unitLabel: true,
+        billingKind: true,
+        vendorProductName: true,
+        vendorCommodityName: true,
+        vendorCommodityCode: true,
+        vendorBillableItemName: true,
+        vendorBillableItemCode: true,
+      },
+    }),
+  ]);
 
-  const seen = new Set<string>();
-  const dedup: typeof rows = [];
-  for (const r of rows) {
-    const k = `${r.toolKey}\0${r.action ?? ""}\0${r.schemeARefModelKey ?? ""}\0${r.cloudTierRaw ?? ""}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    dedup.push(r);
+  const profileByKey = new Map<string, (typeof profiles)[number]>();
+  for (const p of profiles) {
+    const k = `${p.canonicalModelKey}\0${p.tierRaw ?? ""}`;
+    const ex = profileByKey.get(k);
+    if (!ex || p.netCostYuan < ex.netCostYuan) profileByKey.set(k, p);
   }
-
-  // 一次性批量查 ModelCatalog
-  const canonicalKeys = Array.from(
-    new Set(
-      dedup
-        .map((r) => r.cloudModelKey ?? r.schemeARefModelKey ?? null)
-        .filter((s): s is string => !!s && s.trim() !== ""),
-    ),
-  );
-  const catalogs =
-    canonicalKeys.length === 0
-      ? []
-      : await prisma.modelCatalog.findMany({
-          where: { canonicalKey: { in: canonicalKeys } },
-          select: {
-            canonicalKey: true,
-            displayName: true,
-            vendor: true,
-            unitLabel: true,
-            vendorProductName: true,
-            vendorCommodityName: true,
-            vendorCommodityCode: true,
-            vendorBillableItemName: true,
-            vendorBillableItemCode: true,
-          },
-        });
   const cataMap = new Map(catalogs.map((c) => [c.canonicalKey, c]));
 
-  const out: EffectiveBillableRow[] = dedup.map((r) => {
-    const catKey = r.cloudModelKey ?? r.schemeARefModelKey ?? "";
-    const c = catKey ? cataMap.get(catKey) : undefined;
-    return {
-      toolKey: r.toolKey,
-      action: r.action,
-      schemeARefModelKey: r.schemeARefModelKey ?? null,
-      pricePoints: r.pricePoints,
-      effectiveFrom: r.effectiveFrom,
-      effectiveTo: r.effectiveTo,
-      note: r.note,
-      cloudTierRaw: r.cloudTierRaw ?? null,
-      cloudBillingKind: r.cloudBillingKind ?? null,
-      cloudModelKey: r.cloudModelKey ?? null,
-      schemeAUnitCostYuan: r.schemeAUnitCostYuan ?? null,
-      retailMultiplier: r.schemeAAdminRetailMultiplier ?? null,
+  const billingKindFromUnit = (unit: string): PricingBillingKind => {
+    if (unit === "PER_SEC") return "VIDEO_MODEL_SPEC";
+    if (unit === "PER_IMAGE") return "OUTPUT_IMAGE";
+    return "TOKEN_IN_OUT";
+  };
+
+  const out: EffectiveBillableRow[] = [];
+  for (const price of prices) {
+    const prof =
+      profileByKey.get(`${price.canonicalModelKey}\0`) ??
+      profiles.find((p) => p.canonicalModelKey === price.canonicalModelKey);
+    const c = cataMap.get(price.canonicalModelKey);
+    const unit = prof?.unit ?? "PER_KTOKEN";
+    const netCost = prof ? Number(prof.netCostYuan) : null;
+    const listPrice = netCost != null && price.baseMarginRate != null
+      ? netCost / (1 - Number(price.baseMarginRate))
+      : null;
+    const m = netCost != null && listPrice != null && netCost > 0 ? listPrice / netCost : null;
+
+    out.push({
+      toolKey: c?.vendor ?? prof?.vendor ?? "platform",
+      action: "invoke",
+      schemeARefModelKey: price.canonicalModelKey,
+      pricePoints: price.creditsPerUnit,
+      effectiveFrom: price.publishedAt,
+      effectiveTo: null,
+      note: "财务2.0 积分报价",
+      cloudTierRaw: prof?.tierRaw ?? null,
+      cloudBillingKind: c?.billingKind ?? billingKindFromUnit(unit),
+      cloudModelKey: price.canonicalModelKey,
+      schemeAUnitCostYuan: netCost,
+      retailMultiplier: m,
       vendorProductName: c?.vendorProductName ?? null,
       vendorCommodityName: c?.vendorCommodityName ?? null,
       vendorCommodityCode: c?.vendorCommodityCode ?? null,
       vendorBillableItemName: c?.vendorBillableItemName ?? null,
       vendorBillableItemCode: c?.vendorBillableItemCode ?? null,
-      modelDisplayName: c?.displayName ?? null,
-      vendor: c?.vendor ?? null,
+      modelDisplayName: c?.displayName ?? price.canonicalModelKey,
+      vendor: c?.vendor ?? prof?.vendor ?? null,
       unitLabel: c?.unitLabel ?? null,
-    };
-  });
-
-  out.sort((a, b) => {
-    const tk = a.toolKey.localeCompare(b.toolKey, "zh-CN");
-    if (tk !== 0) return tk;
-    if (a.action == null && b.action != null) return 1;
-    if (a.action != null && b.action == null) return -1;
-    const ac = (a.action ?? "").localeCompare(b.action ?? "", "zh-CN");
-    if (ac !== 0) return ac;
-    const mk = (a.schemeARefModelKey ?? "").localeCompare(
-      b.schemeARefModelKey ?? "",
-      "zh-CN",
-    );
-    if (mk !== 0) return mk;
-    return (a.cloudTierRaw ?? "").localeCompare(b.cloudTierRaw ?? "", "zh-CN");
-  });
+    });
+  }
 
   return out;
 }

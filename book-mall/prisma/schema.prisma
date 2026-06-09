@@ -11,8 +11,11 @@ datasource db {
 }
 
 enum UserRole {
-  USER
-  ADMIN
+  USER // 普通用户
+  ADMIN // 兼容旧值：等同运营+（历史管理员）
+  OPERATIONS // 运营：套餐/调价提案/用量看板，不看厂商成本
+  FINANCE // 财务：厂商成本、反向验算、毛利、对账、审批
+  SUPER_ADMIN // 超级管理员：全部权限 + 终审
 }
 
 // —— NextAuth 适配模型 ——
@@ -52,56 +55,56 @@ model VerificationToken {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  name           String?
-  email          String?   @unique
-  emailVerified  DateTime?
-  image          String?
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
   /// 邮箱密码注册时使用；OAuth 用户可为空
-  passwordHash   String?
-  role           UserRole  @default(USER)
+  passwordHash  String?
+  role          UserRole  @default(USER)
 
-  accounts                     Account[]
-  sessions                     Session[]
-  wallet                       Wallet?
-  subscriptions                Subscription[]
-  orders                       Order[]
-  walletRefundRequests         WalletRefundRequest[]
-  subscriptionRefundRequests   SubscriptionRefundRequest[]
-  ssoAuthorizationCodes        SsoAuthorizationCode[]
-  toolUsageEvents              ToolUsageEvent[]
-  aiFitCustomModels            AiFitCustomModel[]
-  aiFitGarmentUploads          AiFitGarmentUpload[]
-  aiFitClosetItems             AiFitClosetItem[]
-  textToImageLibraryItems      TextToImageLibraryItem[]
-  imageToVideoLibraryItems     ImageToVideoLibraryItem[]
-  courseLessonProgress         CourseLessonProgress[]
-  userProductSubscriptions     UserProductSubscription[]
-  userRechargeCoupons          UserRechargeCoupon[]
-  toolBillingDetailLines       ToolBillingDetailLine[]
-  cloudAccountBindings         CloudAccountBinding[]
-  walletHolds                  WalletHold[]
-  toolModelUsageCounters       ToolModelUsageCounter[]
-  storySpace                   StorySpace?
-  storyProjects                StoryProject[]
-  canvasProjects               CanvasProject[]
-  canvasTemplates              CanvasTemplate[]
-  canvasCharacters             CanvasCharacter[]
-  storyProCharacterAssets      StoryProCharacterAsset[]
-  storyProSceneAssets          StoryProSceneAsset[]
-  storyProStyleProfiles        StoryProStyleProfile[]
-  storyProCharacterAudioAssets StoryProCharacterAudioAsset[]
+  accounts                         Account[]
+  sessions                         Session[]
+  wallet                           Wallet?
+  subscriptions                    Subscription[]
+  orders                           Order[]
+  walletRefundRequests             WalletRefundRequest[]
+  subscriptionRefundRequests       SubscriptionRefundRequest[]
+  ssoAuthorizationCodes            SsoAuthorizationCode[]
+  toolUsageEvents                  ToolUsageEvent[]
+  aiFitCustomModels                AiFitCustomModel[]
+  aiFitGarmentUploads              AiFitGarmentUpload[]
+  aiFitClosetItems                 AiFitClosetItem[]
+  textToImageLibraryItems          TextToImageLibraryItem[]
+  imageToVideoLibraryItems         ImageToVideoLibraryItem[]
+  courseLessonProgress             CourseLessonProgress[]
+  userProductSubscriptions         UserProductSubscription[]
+  userRechargeCoupons              UserRechargeCoupon[]
+  toolBillingDetailLines           ToolBillingDetailLine[]
+  cloudAccountBindings             CloudAccountBinding[]
+  walletHolds                      WalletHold[]
+  toolModelUsageCounters           ToolModelUsageCounter[]
+  storySpace                       StorySpace?
+  storyProjects                    StoryProject[]
+  canvasProjects                   CanvasProject[]
+  canvasTemplates                  CanvasTemplate[]
+  canvasCharacters                 CanvasCharacter[]
+  storyProCharacterAssets          StoryProCharacterAsset[]
+  storyProSceneAssets              StoryProSceneAsset[]
+  storyProStyleProfiles            StoryProStyleProfile[]
+  storyProCharacterAudioAssets     StoryProCharacterAudioAsset[]
   storyProScriptAssistantHistories StoryProScriptAssistantHistory[]
-  canvasProviders              CanvasProvider[]
-  canvasPromptTemplates        CanvasPromptTemplate[]
-  toolServicePeriods           UserToolServicePeriod[]
-  ecomAssets                   EcomAsset[]
-  ecomStoryboardProjects       EcomStoryboardProject[]
+  canvasProviders                  CanvasProvider[]
+  canvasPromptTemplates            CanvasPromptTemplate[]
+  toolServicePeriods               UserToolServicePeriod[]
+  ecomAssets                       EcomAsset[]
+  ecomStoryboardProjects           EcomStoryboardProject[]
 
   /// 多租户：主空间（个人租户）。回填脚本为每个用户建 PERSONAL 租户后写入。
-  primaryTenantId String?
-  ownedTenants    Tenant[]       @relation("TenantOwner")
-  tenantMemberships TenantMember[]
+  primaryTenantId      String?
+  ownedTenants         Tenant[]       @relation("TenantOwner")
+  tenantMemberships    TenantMember[]
   tenantInvitesCreated TenantInvite[] @relation("TenantInviteCreator")
 
   /// 单会话挤下线：每次成功登录自增；JWT 内 ver 与此不一致即失效（里程碑 7 启用）
@@ -111,7 +114,7 @@ model User {
   ecomBillingMode EcomBillingMode @default(BYOK_SERVICE_FEE)
 
   /// Canvas 经 Gateway 代理：关联的 sk-gw API Key（验证后仅存 id，不存明文）
-  gatewayApiKeyId       String?   @unique
+  gatewayApiKeyId       String?        @unique
   gatewayApiKeyLinkedAt DateTime?
   linkedGatewayApiKey   GatewayApiKey? @relation(fields: [gatewayApiKeyId], references: [id], onDelete: SetNull)
 
@@ -156,18 +159,18 @@ model CourseLessonProgress {
 
 /// AI 试衣：用户自定义模特（全身照等为 Data URL / base64 文本存库）
 model AiFitCustomModel {
-  id    String @id @default(cuid())
-  userId String
-  name  String
-  style String @default("")
-  height String @default("")
-  weight String @default("")
-  body  String @default("")
-  bust  String?
-  waist String?
-  hips  String?
+  id           String  @id @default(cuid())
+  userId       String
+  name         String
+  style        String  @default("")
+  height       String  @default("")
+  weight       String  @default("")
+  body         String  @default("")
+  bust         String?
+  waist        String?
+  hips         String?
   /// data:image/jpeg|png|webp;base64,...
-  imageDataUrl String @db.Text
+  imageDataUrl String  @db.Text
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -185,11 +188,11 @@ enum AiFitGarmentSlot {
 
 /// AI 试衣：用户上传的服装图（base64 Data URL）
 model AiFitGarmentUpload {
-  id     String           @id @default(cuid())
-  userId String
-  slot   AiFitGarmentSlot
+  id           String           @id @default(cuid())
+  userId       String
+  slot         AiFitGarmentSlot
   /// data:image/...;base64,...
-  imageDataUrl String @db.Text
+  imageDataUrl String           @db.Text
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -234,10 +237,10 @@ model AiFitClosetItem {
 
 /// 文生图：用户「我的图片库」收藏的成片（https 公网 URL）
 model TextToImageLibraryItem {
-  id       String @id @default(cuid())
-  userId   String
+  id     String @id @default(cuid())
+  userId String
 
-  imageUrl String @db.Text
+  imageUrl String  @db.Text
   /// 生成时的提示词摘要（可选）
   prompt   String? @db.VarChar(2000)
 
@@ -259,14 +262,14 @@ model ImageToVideoLibraryItem {
   id     String @id @default(cuid())
   userId String
 
-  videoUrl   String  @db.Text
-  prompt     String? @db.Text
+  videoUrl    String  @db.Text
+  prompt      String? @db.Text
   /// i2v | t2v | ref
-  mode       String
-  resolution String
+  mode        String
+  resolution  String
   durationSec Int
-  seed      String?
-  modelLabel String?
+  seed        String?
+  modelLabel  String?
 
   /// 建议清理时间不早于该时刻（默认创建 +7 天）；管理员可提前删除
   retainUntil DateTime
@@ -287,25 +290,25 @@ model ImageToVideoLibraryItem {
 
 /// 工具站访问 / 调用打点（审计与后续扣费扩展）；写入方为主站 API，身份以工具 JWT 的 sub 为准。
 model ToolUsageEvent {
-  id        String   @id @default(cuid())
-  userId    String
+  id             String   @id @default(cuid())
+  userId         String
   /// 业务约定的工具键，如 fitting-room、home
-  toolKey   String
+  toolKey        String
   /// page_view、invoke 等
-  action    String   @default("page_view")
-  meta      Json?
+  action         String   @default("page_view")
+  meta           Json?
   /// 单次消耗点数（1 点 = ¥0.01）；可与 PlatformConfig.toolInvokePerCallPoints 对齐，或由调用方传入
-  costPoints Int?
+  costPoints     Int?
   /// 视频类工具实际计费秒数（向上取整后 + minBilledVideoSec 兜底；用于审计与按秒计费溯源）
   billedVideoSec Int?
   /// 关联的预占用 hold（若使用 reserve→settle 流程上报）
-  walletHoldId String?
-  createdAt DateTime @default(now())
+  walletHoldId   String?
+  createdAt      DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   toolBillingDetailLines ToolBillingDetailLine[]
-  walletHold             WalletHold?            @relation("HoldSettledByEvent", fields: [walletHoldId], references: [id], onDelete: SetNull)
+  walletHold             WalletHold?             @relation("HoldSettledByEvent", fields: [walletHoldId], references: [id], onDelete: SetNull)
 
   @@index([userId, toolKey, createdAt])
   @@index([toolKey, createdAt])
@@ -318,8 +321,8 @@ enum ToolBillingDetailSource {
 }
 
 model ToolBillingDetailLine {
-  id     String @id @default(cuid())
-  userId String
+  id               String  @id @default(cuid())
+  userId           String
   /// 可选：与单次工具扣费事件关联，便于对账
   toolUsageEventId String?
 
@@ -330,7 +333,7 @@ model ToolBillingDetailLine {
   cloudRow Json
 
   /// 对内计价所用模板（多云厂商扩展）；如 aliyun.consumedetail_bill_v2
-  pricingTemplateKey        String    @default("aliyun.consumedetail_bill_v2")
+  pricingTemplateKey String @default("aliyun.consumedetail_bill_v2")
 
   createdAt DateTime @default(now())
 
@@ -339,38 +342,6 @@ model ToolBillingDetailLine {
 
   @@index([userId, createdAt])
   @@index([toolUsageEventId])
-}
-
-/// 工具应用按次计费单价（点，1 点 = ¥0.01）；生效区间内匹配 toolKey + action，优先精确 action，其次 action 为空表示该工具通配。
-model ToolBillablePrice {
-  id            String    @id @default(cuid())
-  toolKey       String
-  /// 例如 try_on、invoke；null 表示未限定 action（慎用）
-  action        String?
-  pricePoints   Int
-  effectiveFrom DateTime
-  effectiveTo   DateTime?
-  active        Boolean   @default(true)
-  note          String?
-  /// 方案 A 展示用：与工具站 catalog 一致的参考模型 id
-  schemeARefModelKey String?
-  /// 方案 A：后台维护的单位成本（元，税前/官网口径与价目库一致）；与 schemeAAdminRetailMultiplier 相乘生成标价
-  schemeAUnitCostYuan          Float?
-  /// 方案 A：后台为该行指定的零售系数 M（生成 pricePoints；工具站 SSO 按 toolKey+schemeARefModelKey 读此行）
-  schemeAAdminRetailMultiplier Float?
-
-  /// v002：回链到 PricingSourceLine.modelKey（云厂商成本真源），便于 pricing:verify 漂移检查
-  cloudModelKey   String?
-  /// v002：回链到 PricingSourceLine.tierRaw（规格/档位，如 "1080P"、"720P"、"-"）
-  cloudTierRaw    String?
-  /// v002：回链到 PricingSourceLine.billingKind（计费维度），用于选 internal.tool_usage_* 模板
-  cloudBillingKind PricingBillingKind?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([toolKey, effectiveFrom])
-  @@index([cloudModelKey, cloudTierRaw, cloudBillingKind])
 }
 
 /// 工具套件按月技术服务费定价（点/月）；与 toolNavKey 一一对应。
@@ -418,12 +389,12 @@ model UserToolServicePeriod {
 
 /// 电商工具箱用户资产（OSS URL + 元数据）
 model EcomAsset {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   userId       String
   module       String
   kind         String
   title        String?
-  prompt       String?  @db.Text
+  prompt       String? @db.Text
   ossUrl       String
   thumbnailUrl String?
   meta         Json?
@@ -433,8 +404,8 @@ model EcomAsset {
   ownerUserId String?
   visibility  AssetVisibility @default(PRIVATE)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -444,11 +415,11 @@ model EcomAsset {
 
 /// 电商工具箱 · 微剧情分镜故事版项目（聊天、HTML/PNG、视频）
 model EcomStoryboardProject {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   userId       String
   title        String?
-  module       String   @default("storyboard-micro-drama")
-  status       String   @default("draft")
+  module       String  @default("storyboard-micro-drama")
+  status       String  @default("draft")
   brief        Json?
   settings     Json?
   references   Json?
@@ -464,8 +435,8 @@ model EcomStoryboardProject {
   ownerUserId String?
   visibility  AssetVisibility @default(PRIVATE)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -484,43 +455,43 @@ model ToolNavVisibility {
 
 // —— 平台配置（单行 default）——
 model PlatformConfig {
-  id                   String   @id @default("default")
+  id                         String   @id @default("default")
   /// 高级/按量服务最低可用余额（点），默认 2000 = ¥20
-  minBalanceLinePoints  Int      @default(2000)
-  balanceWarnHighPoints Int      @default(5000)
-  balanceWarnMidPoints  Int      @default(3000)
+  minBalanceLinePoints       Int      @default(2000)
+  balanceWarnHighPoints      Int      @default(5000)
+  balanceWarnMidPoints       Int      @default(3000)
   /// LLM：每千 token 计价（点），0 表示未启用/占位
-  llmInputPer1kTokensPoints  Int @default(0)
-  llmOutputPer1kTokensPoints Int @default(0)
+  llmInputPer1kTokensPoints  Int      @default(0)
+  llmOutputPer1kTokensPoints Int      @default(0)
   /// 高阶工具：单次调用默认扣费（点）
-  toolInvokePerCallPoints    Int @default(0)
+  toolInvokePerCallPoints    Int      @default(0)
   /// 异常消耗：超过近均值的百分比即告警，如 300=3 倍
-  usageAnomalyRatioPercent  Int @default(300)
+  usageAnomalyRatioPercent   Int      @default(300)
   /// v003：视频按秒计费的最低计费秒数兜底（不足按此秒计；建议 5）
-  minBilledVideoSec        Int  @default(5)
+  minBilledVideoSec          Int      @default(5)
   /// v003：图片按张计费的最低张数兜底
-  minBilledImageCount      Int  @default(1)
+  minBilledImageCount        Int      @default(1)
   /// v003：单次调用的最低扣点（避免 0 元/极低费用）
-  minChargePointsPerInvoke Int  @default(1)
+  minChargePointsPerInvoke   Int      @default(1)
   /// v003：WalletHold（预占用）默认 TTL（分钟）；超时未 settle 由 cron 自动 RELEASED→EXPIRED
   /// v005（2026-05-18）：默认从 30 → 10。视频任务实际生成大多 < 5 分钟；
   /// 留 10 分钟兜底足够，避免长尾未 settle 的 hold 长期占住用户余额。
-  walletHoldDefaultTtlMin  Int  @default(10)
-  updatedAt            DateTime @updatedAt
+  walletHoldDefaultTtlMin    Int      @default(10)
+  updatedAt                  DateTime @updatedAt
 }
 
 /// 价目导入版本（成本唯一源头；current 仅一条 isCurrent=true）。
 model PricingSourceVersion {
-  id               String    @id @default(cuid())
+  id               String   @id @default(cuid())
   kind             String
   sourceSha256     String
-  regionScope      String    @default("china_mainland")
+  regionScope      String   @default("china_mainland")
   label            String?
-  importedAt       DateTime  @default(now())
+  importedAt       DateTime @default(now())
   importedByUserId String?
   parseWarnings    Json?
-  rowCount         Int       @default(0)
-  isCurrent        Boolean   @default(false)
+  rowCount         Int      @default(0)
+  isCurrent        Boolean  @default(false)
 
   lines       PricingSourceLine[]
   changesFrom PricingLineChangeEvent[] @relation("PricingChangeFrom")
@@ -556,7 +527,7 @@ model PricingSourceLine {
   /// v002：有效成本系数（如 0.8 表示 8 折促销）；解析器暂不写，由对账脚本回填
   effectiveDiscount   Float?
   /// v002：促销说明（来源/期限/规则），由对账脚本从 CSV 的 `优惠详情` 推断
-  effectivePromoNote  String? @db.Text
+  effectivePromoNote  String?   @db.Text
   /// v002：促销快照采集时间
   effectiveCapturedAt DateTime?
 
@@ -568,40 +539,40 @@ model PricingSourceLine {
 
 /// v002 P5：云厂商「资源购买账号 ID」与平台 User 的绑定（解决 CSV 上传时归属判定）。
 model CloudAccountBinding {
-  id              String   @id @default(cuid())
+  id               String   @id @default(cuid())
   /// 云厂商账号 ID（如阿里云 `资源购买账号ID = 1068915519298264`）；规范化为大小写不敏感唯一
-  cloudAccountId  String   @unique
+  cloudAccountId   String   @unique
   /// 云厂商账号名（仅展示，如 `viclau620`）
   cloudAccountName String?
   /// 绑定的平台 User.id
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  note            String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([userId])
 }
 
 /// v002 P5：一次「上传 CSV → 自动对账」的批次记录。
 model BillingReconciliationRun {
-  id              String   @id @default(cuid())
+  id               String   @id @default(cuid())
   /// 上传 CSV 的 SHA-256，防重复
-  csvSha256       String
+  csvSha256        String
   /// 原始文件名（便于审计）
-  csvFilename     String
+  csvFilename      String
   /// CSV 内涉及的账单月份（多月情形以逗号分隔）
-  monthsCovered   String
+  monthsCovered    String
   /// 触发此批次的管理员 User.id
   importedByUserId String
   /// 自动统计摘要（JSON）：内/外行数、内/外总金额、差额、verdict、unbound 账号列表等
-  summary         Json
+  summary          Json
   /// 状态：READY（已生成报告）、CLAWED_BACK（已补扣过任意行）、ARCHIVED（管理员归档）
-  status          String   @default("READY")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  status           String   @default("READY")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  lines           BillingReconciliationLine[]
+  lines BillingReconciliationLine[]
 
   @@unique([csvSha256])
   @@index([createdAt])
@@ -610,30 +581,30 @@ model BillingReconciliationRun {
 
 /// v002 P5：一次对账批次下的「单用户 × 单(模型/计费维度)」一行；补扣由本表的 `clawback*` 字段记录。
 model BillingReconciliationLine {
-  id            String   @id @default(cuid())
-  runId         String
-  run           BillingReconciliationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  id               String                   @id @default(cuid())
+  runId            String
+  run              BillingReconciliationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   /// 平台用户 id（CSV 行通过 CloudAccountBinding 映射来）；可为 null 表示未绑定云账号
-  userId        String?
+  userId           String?
   /// 云账号 id（便于显示 unbound 行）
-  cloudAccountId String?
-  modelKey      String
-  billingKind   String
-  internalCount Int      @default(0)
-  internalYuan  Decimal  @default(0) @db.Decimal(18, 4)
-  cloudCount    Int      @default(0)
-  cloudPayableYuan Decimal @default(0) @db.Decimal(18, 4)
-  diffYuan      Decimal  @default(0) @db.Decimal(18, 4)
+  cloudAccountId   String?
+  modelKey         String
+  billingKind      String
+  internalCount    Int                      @default(0)
+  internalYuan     Decimal                  @default(0) @db.Decimal(18, 4)
+  cloudCount       Int                      @default(0)
+  cloudPayableYuan Decimal                  @default(0) @db.Decimal(18, 4)
+  diffYuan         Decimal                  @default(0) @db.Decimal(18, 4)
   /// BOTH / INTERNAL_ONLY / CLOUD_ONLY / UNBOUND
-  matchKind     String
+  matchKind        String
 
   /// 已补扣的金额（点）；null 表示未补扣
-  clawbackPoints Int?
+  clawbackPoints  Int?
   /// 补扣对应的 WalletEntry.id；用于审计
   clawbackEntryId String?
-  clawedAt      DateTime?
+  clawedAt        DateTime?
 
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([runId, userId])
   @@index([runId, matchKind])
@@ -663,8 +634,8 @@ model PricingLineChangeEvent {
 model Wallet {
   id            String @id @default(cuid())
   userId        String @unique
-  balancePoints  Int    @default(0)
-  frozenPoints   Int    @default(0)
+  balancePoints Int    @default(0)
+  frozenPoints  Int    @default(0)
   currency      String @default("CNY")
 
   user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -682,15 +653,15 @@ enum WalletEntryType {
 }
 
 model WalletEntry {
-  id               String          @id @default(cuid())
-  walletId         String
-  type             WalletEntryType
+  id                 String          @id @default(cuid())
+  walletId           String
+  type               WalletEntryType
   /// 入为正、出为负（点）
-  amountPoints      Int
+  amountPoints       Int
   balanceAfterPoints Int
-  idempotencyKey   String?         @unique
-  description      String?
-  orderId          String?
+  idempotencyKey     String?         @unique
+  description        String?
+  orderId            String?
 
   wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
@@ -714,30 +685,30 @@ enum WalletHoldStatus {
 /// v003：钱包预占用记录——按秒计费场景下"先估上限、后按真实用量结算"。
 /// 可用余额 = balancePoints − Σ(WalletHold WHERE status=HELD).reservedPoints。
 model WalletHold {
-  id             String           @id @default(cuid())
-  userId         String
-  toolKey        String
-  action         String?
+  id                  String           @id @default(cuid())
+  userId              String
+  toolKey             String
+  action              String?
   /// 预占点数（1 点 = ¥0.01）；以"最大可能用量 × 系数 × 1.2 安全边际"估算
-  reservedPoints Int
-  status         WalletHoldStatus @default(HELD)
+  reservedPoints      Int
+  status              WalletHoldStatus @default(HELD)
   /// 任务幂等键（典型：云厂商 taskId）；与 (userId) 共同唯一，避免同任务重复 reserve
-  taskKey        String?
+  taskKey             String?
   /// 提示性元信息（estimated durationSec / modelKey / resolution 等）
-  meta           Json?
+  meta                Json?
   /// 自动释放时间（默认 PlatformConfig.walletHoldDefaultTtlMin）
-  expiresAt      DateTime
+  expiresAt           DateTime
   /// SETTLED 时落本次实际扣点；与 ToolUsageEvent.costPoints 一致
   settledChargePoints Int?
   /// SETTLED 时回填，便于审计与流水回查
   settledUsageEventId String?
   /// RELEASED/EXPIRED 时的原因，便于运维查问
-  releaseReason  String?
+  releaseReason       String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   settledUsageEvents ToolUsageEvent[] @relation("HoldSettledByEvent")
 
   @@unique([userId, taskKey])
@@ -748,36 +719,36 @@ model WalletHold {
 /// v003 模型校准：标准模型（canonical）目录。
 /// 一个 canonicalKey 在内部所有列展示与对账中作为"模型"主键；通过 ModelAlias 挂接云厂商/工具站/价目表等各自的字串。
 model ModelCatalog {
-  id              String              @id @default(cuid())
+  id             String             @id @default(cuid())
   /// 标准模型 key（人可读，跨表用作 group 键）；如 `happyhorse-1.0-i2v`
-  canonicalKey    String              @unique
+  canonicalKey   String             @unique
   /// 显示名（含规格/中文）；如 `HappyHorse 图生视频 1.0`
-  displayName     String
+  displayName    String
   /// 厂商（aliyun / tencent / huawei / volcengine / ...）
-  vendor          String
+  vendor         String
   /// 默认档位（1080P/720P/-）；对账可二级聚合
-  defaultTierRaw  String?
+  defaultTierRaw String?
   /// 计费维度（与 PricingSourceLine.billingKind 对齐）
-  billingKind     PricingBillingKind
+  billingKind    PricingBillingKind
   /// 显示单位标签（"元/秒"/"元/张"/"元/百万 tokens"）
-  unitLabel       String
-  active          Boolean             @default(true)
-  note            String?             @db.Text
+  unitLabel      String
+  active         Boolean            @default(true)
+  note           String?            @db.Text
 
   /// v006（2026-05-17）：云厂商账单 5 列的"本 catalog 主映射"——配合费用明细展示。
   /// 一个 canonical 配 1 个 primary vendor 映射；未来若同 canonical 跨多家云需要并存，
   /// 再 split 出独立的 `ModelCatalogVendorBinding(1:N)` 表，把这 5 列迁过去（schema 演进路径已规划）。
   ///
   /// 「厂商产品/产品名称」如 "大模型服务平台百炼"
-  vendorProductName        String?
+  vendorProductName      String?
   /// 「厂商产品/商品Code」如 "sfm_inference_public_cn"
-  vendorCommodityCode      String?
+  vendorCommodityCode    String?
   /// 「厂商产品/商品名称」如 "百炼大模型推理"
-  vendorCommodityName      String?
+  vendorCommodityName    String?
   /// 「厂商产品/计费项Code」如 "image_number"
-  vendorBillableItemCode   String?
+  vendorBillableItemCode String?
   /// 「厂商产品/计费项名称」如 "大模型图片生成量"
-  vendorBillableItemName   String?
+  vendorBillableItemName String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -809,19 +780,19 @@ enum AliasConfidence {
 /// v003 模型校准：单条别名（来自云 CSV / 工具站 toolKey / price.md / 手动）。
 /// 自动建议时 catalogId 可空（pending review）；人工"接受建议"后绑定到具体 ModelCatalog。
 model ModelAlias {
-  id           String           @id @default(cuid())
-  catalogId    String?
-  catalog      ModelCatalog?    @relation(fields: [catalogId], references: [id], onDelete: SetNull)
+  id        String        @id @default(cuid())
+  catalogId String?
+  catalog   ModelCatalog? @relation(fields: [catalogId], references: [id], onDelete: SetNull)
 
-  source       ModelAliasSource
-  aliasValue   String
-  tierRawHint  String?
-  confidence   AliasConfidence  @default(LOW)
+  source      ModelAliasSource
+  aliasValue  String
+  tierRawHint String?
+  confidence  AliasConfidence  @default(LOW)
   /// 自动匹配算法名（exact/prefix/fuzzy/manual）
-  matchedBy    String?
+  matchedBy   String?
   /// 评估证据样本（如来自哪行 CSV、命中哪几条规则）
-  evidence     Json?
-  active       Boolean          @default(true)
+  evidence    Json?
+  active      Boolean          @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -838,14 +809,14 @@ enum SubscriptionInterval {
 }
 
 model SubscriptionPlan {
-  id         String               @id @default(cuid())
-  slug       String               @unique
-  name       String
-  interval   SubscriptionInterval
-  pricePoints Int
-  active     Boolean              @default(true)
+  id                String               @id @default(cuid())
+  slug              String               @unique
+  name              String
+  interval          SubscriptionInterval
+  pricePoints       Int
+  active            Boolean              @default(true)
   /// 工具站侧栏分组 navKey 白名单；空数组表示订阅期内可使用「当前套件」内全部工具分组。
-  toolsNavAllowlist String[] @default([])
+  toolsNavAllowlist String[]             @default([])
 
   /// 价格不可直接修改：发布新版本时旧 plan 归档（archivedAt + active=false），
   /// 主 slug 让位给新 plan，旧 slug 改为 `${slug}__v${ts}`；老 Subscription.planId
@@ -899,18 +870,18 @@ enum OrderStatus {
 }
 
 model Order {
-  id          String      @id @default(cuid())
-  userId      String
-  type        OrderType
-  status      OrderStatus @default(PENDING)
+  id           String      @id @default(cuid())
+  userId       String
+  type         OrderType
+  status       OrderStatus @default(PENDING)
   amountPoints Int
-  currency    String      @default("CNY")
+  currency     String      @default("CNY")
   /// 订阅目标 planSlug、充值档位等
-  meta        Json?
+  meta         Json?
   /// 订阅类订单完成提现处理后标记
-  refundedAt  DateTime?
+  refundedAt   DateTime?
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   paidAt DateTime?
 
   rechargeCouponRedemption UserRechargeCoupon?
@@ -929,20 +900,20 @@ enum RechargeCouponStatus {
 }
 
 model RechargePromoTemplate {
-  id    String @id @default(cuid())
-  slug  String @unique
-  title String
+  id                  String   @id @default(cuid())
+  slug                String   @unique
+  title               String
   /// 核销时要求实付点与此完全一致（如 10000 = ¥100 档）
-  paidAmountPoints Int
-  bonusPoints      Int
-  active           Boolean  @default(true)
-  claimableFrom    DateTime
-  claimableTo      DateTime
+  paidAmountPoints    Int
+  bonusPoints         Int
+  active              Boolean  @default(true)
+  claimableFrom       DateTime
+  claimableTo         DateTime
   /// 领取后多少天内有效，逾期 UNUSED → EXPIRED
-  validDaysAfterClaim Int @default(7)
-  maxClaimsPerUser    Int @default(1)
-  sortOrder           Int @default(0)
-  note                String? @db.Text
+  validDaysAfterClaim Int      @default(7)
+  maxClaimsPerUser    Int      @default(1)
+  sortOrder           Int      @default(0)
+  note                String?  @db.Text
 
   coupons UserRechargeCoupon[]
 
@@ -951,10 +922,10 @@ model RechargePromoTemplate {
 }
 
 model UserRechargeCoupon {
-  id         String               @id @default(cuid())
-  userId     String
-  templateId String
-  status     RechargeCouponStatus @default(UNUSED)
+  id                   String               @id @default(cuid())
+  userId               String
+  templateId           String
+  status               RechargeCouponStatus @default(UNUSED)
   /// 领取时快照，避免改模板影响已发票
   paidAmountPointsSnap Int
   bonusPointsSnap      Int
@@ -963,7 +934,7 @@ model UserRechargeCoupon {
   claimedAt            DateTime
   expiresAt            DateTime
   redeemedAt           DateTime?
-  orderId              String? @unique
+  orderId              String?              @unique
 
   user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   template RechargePromoTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
@@ -983,18 +954,18 @@ enum RefundRequestStatus {
 
 /// 余额提现：用户申请 → 后台核算应扣未扣 → 扣减后入账（流水记提现）
 model WalletRefundRequest {
-  id        String @id @default(cuid())
-  userId    String
-  status    RefundRequestStatus @default(PENDING)
+  id                      String              @id @default(cuid())
+  userId                  String
+  status                  RefundRequestStatus @default(PENDING)
   /// 申请提现金额（点），null 表示按「可提现余额」由后台核算
-  requestedAmountPoints Int?
+  requestedAmountPoints   Int?
   /// 应扣未扣（点），管理员核准
-  pendingSettlementPoints Int @default(0)
+  pendingSettlementPoints Int                 @default(0)
   /// 实际从钱包扣减并记为提现的金额（点）
   refundAmountPoints      Int?
-  userNote               String?
-  adminNote              String?
-  decidedAt              DateTime?
+  userNote                String?
+  adminNote               String?
+  decidedAt               DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1006,14 +977,14 @@ model WalletRefundRequest {
 
 /// 订阅订单提现审核（政策独立于余额提现）
 model SubscriptionRefundRequest {
-  id         String @id @default(cuid())
-  userId     String
-  orderId    String?
+  id             String              @id @default(cuid())
+  userId         String
+  orderId        String?
   subscriptionId String?
-  status     RefundRequestStatus @default(PENDING)
-  userReason String?
-  adminNote  String?
-  decidedAt  DateTime?
+  status         RefundRequestStatus @default(PENDING)
+  userReason     String?
+  adminNote      String?
+  decidedAt      DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1071,15 +1042,15 @@ model UserProductSubscription {
 
 /// 分类：两大品类下支持子分类（parentId 为空为顶级）
 model ProductCategory {
-  id        String   @id @default(cuid())
+  id        String            @id @default(cuid())
   name      String
-  slug      String   @unique
+  slug      String            @unique
   kind      ProductKind
   parentId  String?
   parent    ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children  ProductCategory[] @relation("CategoryHierarchy")
   products  Product[]
-  sortOrder Int      @default(0)
+  sortOrder Int               @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1088,37 +1059,37 @@ model ProductCategory {
 }
 
 model Product {
-  id              String        @id @default(cuid())
-  title           String
-  slug            String        @unique
+  id                 String                   @id @default(cuid())
+  title              String
+  slug               String                   @unique
   /// 一句话概述（首页推荐/列表）
-  summary         String
+  summary            String
   /// 详情
-  description     String        @db.Text
+  description        String                   @db.Text
   /// 详情展示：纯文本（保留换行）或 Markdown
-  descriptionFormat ProductDescriptionFormat @default(PLAIN)
+  descriptionFormat  ProductDescriptionFormat @default(PLAIN)
   /// 知识型：课程内容等（富文本简化存文本）
-  courseContent   String?       @db.Text
-  kind            ProductKind
-  tier            ProductTier
-  coverImageUrl   String
-  status          ProductStatus @default(DRAFT)
+  courseContent      String?                  @db.Text
+  kind               ProductKind
+  tier               ProductTier
+  coverImageUrl      String
+  status             ProductStatus            @default(DRAFT)
   /// 仍上架展示，但前台不可新订（已订用户保留权益）；不等同于归档下架
-  catalogUnavailable Boolean    @default(false)
+  catalogUnavailable Boolean                  @default(false)
   /// 工具型：对应工具站套件 navKey（如 fitting-room）；用于单品工具订阅授权
-  toolNavKey      String?
+  toolNavKey         String?
   /// 首页推荐
-  featuredHome    Boolean       @default(false)
-  featuredSort    Int           @default(0)
+  featuredHome       Boolean                  @default(false)
+  featuredSort       Int                      @default(0)
   /// 工具型：权限说明、大模型计费说明
-  toolPermissions String?       @db.Text
-  meteringNote    String?       @db.Text
+  toolPermissions    String?                  @db.Text
+  meteringNote       String?                  @db.Text
 
   categoryId String?
   category   ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   userProductSubscriptions UserProductSubscription[]
-  storySpaceAsPublished    StorySpace? @relation("StorySpacePublishedProduct")
+  storySpaceAsPublished    StorySpace?               @relation("StorySpacePublishedProduct")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1147,17 +1118,17 @@ model SsoAuthorizationCode {
 
 /// Phase F：第三方 Platform SSO 客户端注册
 model SsoClient {
-  id               String   @id @default(cuid())
-  clientId         String   @unique
-  name             String
+  id             String   @id @default(cuid())
+  clientId       String   @unique
+  name           String
   /// 注册回调 URI 白名单（完整 URL，不含 query）
-  redirectUris     String[]
+  redirectUris   String[]
   /// 允许访问的工具 navKey 子集；空 = 不额外限制（仍须用户自身服务期）
-  allowedNavKeys   String[] @default([])
-  active           Boolean  @default(true)
-  note             String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  allowedNavKeys String[] @default([])
+  active         Boolean  @default(true)
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 // —— story-web 漫剧个人空间 ——
@@ -1199,23 +1170,23 @@ model StoryEngineModel {
 
 /// 用户漫剧个人空间（一人一条；slug 对外访问）
 model StorySpace {
-  id                       String                  @id @default(cuid())
-  userId                   String                  @unique
-  user                     User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  slug                     String                  @unique
-  templateKey              StorySpaceTemplateKey   @default(CLASSIC_V1)
-  title                    String
-  tagline                  String
-  subtitle                 String                  @db.Text
-  ownerDisplayName         String?
-  featuredWorkTitle        String
-  featuredWorkDescription  String?
-  featuredVideoUrl         String
-  featuredVideoPosterUrl   String?
-  publishStatus            StorySpacePublishStatus @default(DRAFT)
-  publishedAt              DateTime?
-  publishedProductId       String?                 @unique
-  publishedProduct         Product?                @relation("StorySpacePublishedProduct", fields: [publishedProductId], references: [id], onDelete: SetNull)
+  id                      String                  @id @default(cuid())
+  userId                  String                  @unique
+  user                    User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug                    String                  @unique
+  templateKey             StorySpaceTemplateKey   @default(CLASSIC_V1)
+  title                   String
+  tagline                 String
+  subtitle                String                  @db.Text
+  ownerDisplayName        String?
+  featuredWorkTitle       String
+  featuredWorkDescription String?
+  featuredVideoUrl        String
+  featuredVideoPosterUrl  String?
+  publishStatus           StorySpacePublishStatus @default(DRAFT)
+  publishedAt             DateTime?
+  publishedProductId      String?                 @unique
+  publishedProduct        Product?                @relation("StorySpacePublishedProduct", fields: [publishedProductId], references: [id], onDelete: SetNull)
 
   modelSelections StorySpaceModelSelection[]
 
@@ -1275,40 +1246,40 @@ enum StoryGenerationStatus {
 
 /// 漫剧项目主表
 model StoryProject {
-  id             String              @id @default(cuid())
-  userId         String
-  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name           String
-  description    String              @db.Text
-  aspectRatio    StoryProjectAspect
+  name        String
+  description String             @db.Text
+  aspectRatio StoryProjectAspect
   /// 关联 story-web/src/shared/styles/index.json 的 id
-  styleId        Int
+  styleId     Int
 
   /// AI 一键初始化产出，初始为空字符串
-  storyOutline   String              @default("") @db.Text
+  storyOutline String @default("") @db.Text
 
   /// 封面图 OSS 公网 URL；初始空
-  coverImageUrl  String              @default("")
+  coverImageUrl String  @default("")
   /// 当前封面任务 id（用于前端轮询/进度显示），仅引用不做 FK
-  coverTaskId    String?
+  coverTaskId   String?
 
-  status         StoryProjectStatus  @default(DRAFT)
+  status    StoryProjectStatus @default(DRAFT)
   /// 软删时间；查询默认过滤
-  deletedAt      DateTime?
+  deletedAt DateTime?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
-  tenantId       String?
-  ownerUserId    String?
-  visibility     AssetVisibility     @default(PRIVATE)
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
 
-  characters     StoryCharacter[]
-  frames         StoryStoryboardFrame[]
-  tasks          StoryGenerationTask[]
-  cleanupItems   StoryOssCleanupQueue[]
+  characters   StoryCharacter[]
+  frames       StoryStoryboardFrame[]
+  tasks        StoryGenerationTask[]
+  cleanupItems StoryOssCleanupQueue[]
 
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, deletedAt, updatedAt])
   @@index([status])
@@ -1317,57 +1288,57 @@ model StoryProject {
 
 /// 项目角色
 model StoryCharacter {
-  id             String              @id @default(cuid())
-  projectId      String
-  project        StoryProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String       @id @default(cuid())
+  projectId String
+  project   StoryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  name           String
-  role           String              @default("")
-  description    String              @default("") @db.Text
+  name         String
+  role         String  @default("")
+  description  String  @default("") @db.Text
   /// 角色外观提示词（仅外观/构图/白底，不含风格段；调用 KIE 时由后端按 styleId 实时拼接 [STYLE]）
-  imagePrompt    String              @db.Text
+  imagePrompt  String  @db.Text
   /// 角色头像 OSS 公网 URL；初始空
-  avatarUrl      String              @default("")
+  avatarUrl    String  @default("")
   /// 当前头像任务 id；仅引用不做 FK
-  avatarTaskId   String?
+  avatarTaskId String?
 
   /// 同项目下排序
-  sortOrder      Int                 @default(0)
+  sortOrder Int @default(0)
 
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([projectId, sortOrder])
 }
 
 /// 分镜
 model StoryStoryboardFrame {
-  id                String         @id @default(cuid())
-  projectId         String
-  project           StoryProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String       @id @default(cuid())
+  projectId String
+  project   StoryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   /// 第几格（1-based）
-  index             Int
-  sceneText         String         @default("")
-  sceneDescription  String         @default("") @db.Text
+  index            Int
+  sceneText        String   @default("")
+  sceneDescription String   @default("") @db.Text
   /// 该分镜涉及的角色 id 列表（StoryCharacter.id），按出场先后；删除角色时由服务层 array_remove
-  characterIds      String[]       @default([])
+  characterIds     String[] @default([])
 
   /// 分镜图 prompt：角色描述 + 场景描述（不含风格，调用时拼装）
-  imagePrompt       String         @db.Text
+  imagePrompt String @db.Text
   /// 运镜 prompt（不含风格）
-  videoPrompt       String         @db.Text
+  videoPrompt String @db.Text
 
   /// 分镜图 OSS 公网 URL（初始空）
-  imageUrl          String         @default("")
-  imageTaskId       String?
+  imageUrl    String  @default("")
+  imageTaskId String?
 
   /// 分镜视频 OSS 公网 URL（初始空）
-  videoUrl          String         @default("")
-  videoTaskId       String?
+  videoUrl    String  @default("")
+  videoTaskId String?
 
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([projectId, index])
   @@index([projectId])
@@ -1375,41 +1346,41 @@ model StoryStoryboardFrame {
 
 /// 统一的 KIE/AI 生成任务表（覆盖封面/角色/分镜图/分镜视频四类）
 model StoryGenerationTask {
-  id              String                 @id @default(cuid())
-  projectId       String
-  project         StoryProject           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id          String       @id @default(cuid())
+  projectId   String
+  project     StoryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// 关联的目标实体（按 kind 二选一）
-  characterId     String?
-  frameId         String?
+  characterId String?
+  frameId     String?
 
-  kind            StoryGenerationKind
-  status          StoryGenerationStatus  @default(PENDING)
+  kind   StoryGenerationKind
+  status StoryGenerationStatus @default(PENDING)
 
   /// KIE 模型名：nano-banana-pro / wan/2-7-image-pro
-  model           String
+  model         String
   /// KIE 返回的 taskId（提交后填入，用于回调/轮询匹配）
-  kieTaskId       String?                @unique
+  kieTaskId     String? @unique
   /// Gateway 请求日志 id（经 Gateway 代理时写入）
-  gatewayLogId    String?
+  gatewayLogId  String?
   /// 提交给 KIE 的完整 input（便于排查与重放，含已拼接的风格段）
-  inputPayload    Json
+  inputPayload  Json
   /// KIE 回调或 recordInfo 原始响应（最近一次）
-  resultPayload   Json?
+  resultPayload Json?
   /// KIE 返回的临时 URL（OSS 上传失败时保留作为人工补救入口）
-  ephemeralUrl    String?
+  ephemeralUrl  String?
   /// 落 OSS 后的稳定 URL（成功时回写到目标实体相同字段）
-  ossUrl          String?
+  ossUrl        String?
 
-  failCode        String?
-  failMessage     String?
+  failCode    String?
+  failMessage String?
 
-  submittedAt     DateTime?
-  completedAt     DateTime?
-  lastPolledAt    DateTime?
-  pollCount       Int                    @default(0)
+  submittedAt  DateTime?
+  completedAt  DateTime?
+  lastPolledAt DateTime?
+  pollCount    Int       @default(0)
 
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status, submittedAt])
   @@index([projectId, kind])
@@ -1419,7 +1390,7 @@ model StoryGenerationTask {
 
 /// OSS 异步清理队列：删除 / 重新生成时旧的稳定 URL 入队，由 cron worker 调 deleteManagedOssObjectByUrl 清理
 model StoryOssCleanupQueue {
-  id          String       @id @default(cuid())
+  id          String        @id @default(cuid())
   /// 来源上下文（仅排查用，例 "project_delete:cuid_xxx" / "regenerate_cover:cuid"）
   source      String?
   /// 关联项目（项目硬删后允许保留为 null）
@@ -1428,16 +1399,16 @@ model StoryOssCleanupQueue {
   /// 待清理的 OSS 公网 URL
   ossUrl      String
   /// 不要在该时间之前清理（用于"先生成新图再删旧图"的窗口期）
-  notBefore   DateTime     @default(now())
+  notBefore   DateTime      @default(now())
   /// 已尝试次数；>=3 视为失败，等人工排查
-  attempts    Int          @default(0)
+  attempts    Int           @default(0)
   lastTriedAt DateTime?
   lastError   String?
   /// 完成时间；非空即视为已清理（保留作为审计）
   doneAt      DateTime?
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([doneAt, notBefore])
   @@index([projectId])
@@ -1494,30 +1465,30 @@ model CanvasEngineModel {
 
 /// 画布项目（一份完整的节点工作流 + 视图）
 model CanvasProject {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name          String
-  description   String   @default("") @db.Text
+  name        String
+  description String @default("") @db.Text
 
   /// 整张画布 JSON：{ schemaVersion, nodes[], edges[], viewport }
-  canvas        Json
+  canvas       Json
   /// 缩略图（最近一张 OutputNode 输出）
-  thumbnailUrl  String   @default("")
+  thumbnailUrl String @default("")
 
-  deletedAt     DateTime?
+  deletedAt DateTime?
 
   /// 资产共享（租户体系）：归属租户 / 创建成员 / 可见域
-  tenantId      String?
-  ownerUserId   String?
-  visibility    AssetVisibility @default(PRIVATE)
+  tenantId    String?
+  ownerUserId String?
+  visibility  AssetVisibility @default(PRIVATE)
 
-  tasks         CanvasGenerationTask[]
-  cleanupItems  CanvasOssCleanupQueue[]
+  tasks        CanvasGenerationTask[]
+  cleanupItems CanvasOssCleanupQueue[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, deletedAt, updatedAt])
   @@index([tenantId, visibility, updatedAt])
@@ -1525,20 +1496,20 @@ model CanvasProject {
 
 /// 画布模板：系统模板（builtin=true 且 ownerUserId=null）+ 用户私有模板
 model CanvasTemplate {
-  id            String   @id @default(cuid())
-  ownerUserId   String?
-  owner         User?    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  id          String  @id @default(cuid())
+  ownerUserId String?
+  owner       User?   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 
-  category      String
-  name          String
-  thumbnail     String   @default("")
+  category  String
+  name      String
+  thumbnail String  @default("")
   /// 同 CanvasProject.canvas 结构
-  canvas        Json
-  builtin       Boolean  @default(false)
-  sortOrder     Int      @default(0)
+  canvas    Json
+  builtin   Boolean @default(false)
+  sortOrder Int     @default(0)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([ownerUserId, sortOrder])
   @@index([builtin, sortOrder])
@@ -1546,9 +1517,9 @@ model CanvasTemplate {
 
 /// 用户保存的三视图角色（从三视图引擎生成后入库，可在画布快速插入图片节点）
 model CanvasCharacter {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   name            String
   imageUrl        String
@@ -1556,8 +1527,8 @@ model CanvasCharacter {
   sourceTaskId    String?
   sourceProjectId String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, updatedAt])
 }
@@ -1571,17 +1542,17 @@ enum StoryProCharacterAssetRefKind {
 
 /// 影视专业版 · 角色资产库（characterKey → 多图 ref）
 model StoryProCharacterAsset {
-  id           String   @id @default(cuid())
+  id           String                      @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
   characterKey String
   displayName  String
   projectId    String?
-  locked       Boolean  @default(false)
-  version      Int      @default(1)
+  locked       Boolean                     @default(false)
+  version      Int                         @default(1)
   refs         StoryProCharacterAssetRef[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
 
   @@unique([userId, characterKey, projectId])
   @@index([userId, updatedAt])
@@ -1609,17 +1580,17 @@ enum StoryProSceneAssetRefKind {
 
 /// 影视专业版 · 场景资产库（sceneKey → 多图 ref）
 model StoryProSceneAsset {
-  id          String   @id @default(cuid())
+  id          String                  @id @default(cuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   sceneKey    String
   displayName String
   projectId   String?
-  locked      Boolean  @default(false)
-  version     Int      @default(1)
+  locked      Boolean                 @default(false)
+  version     Int                     @default(1)
   refs        StoryProSceneAssetRef[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
 
   @@unique([userId, sceneKey, projectId])
   @@index([userId, updatedAt])
@@ -1713,8 +1684,8 @@ model CanvasPromptTemplate {
   sortOrder Int                    @default(0)
   deletedAt DateTime?
 
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, engine, sortOrder])
   @@index([userId, deletedAt])
@@ -1727,46 +1698,46 @@ enum CanvasPromptEngineKind {
 
 /// 画布节点级 KIE 任务表（mirror StoryGenerationTask，加 nodeId / inputHash 实现节点缓存）
 model CanvasGenerationTask {
-  id              String                 @id @default(cuid())
-  projectId       String
-  project         CanvasProject          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String        @id @default(cuid())
+  projectId String
+  project   CanvasProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// 画布内节点 id（与 canvas.nodes[].id 一致）
-  nodeId          String
+  nodeId    String
 
-  kind            CanvasGenerationKind
-  status          CanvasGenerationStatus @default(PENDING)
+  kind   CanvasGenerationKind
+  status CanvasGenerationStatus @default(PENDING)
 
   /// KIE 模型键（如 nano-banana-pro / gpt-image-1 / kling-image）
-  model           String
-  kieTaskId       String?                @unique
-  inputPayload    Json
-  resultPayload   Json?
+  model         String
+  kieTaskId     String? @unique
+  inputPayload  Json
+  resultPayload Json?
   /// 节点输入 + 参数的 sha256，用于缓存命中
-  inputHash       String
+  inputHash     String
 
-  ephemeralUrl    String?
-  ossUrl          String?
+  ephemeralUrl String?
+  ossUrl       String?
 
   /// 文本类节点结果（kind=TEXT 时使用）
-  textOutput      String?                @db.Text
+  textOutput String? @db.Text
 
-  failCode        String?
-  failMessage     String?
+  failCode    String?
+  failMessage String?
 
   /// canvas v2: 关联到调用的用户 Provider；系统/兜底调用为 null
-  providerId      String?
-  provider        CanvasProvider?        @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  providerId String?
+  provider   CanvasProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
 
   /// canvas v2: 软删；用于「删除单次结果」（OSS 清理由 cleanup queue 异步处理）
-  deletedAt       DateTime?
+  deletedAt DateTime?
 
-  submittedAt     DateTime?
-  completedAt     DateTime?
-  lastPolledAt    DateTime?
-  pollCount       Int                    @default(0)
+  submittedAt  DateTime?
+  completedAt  DateTime?
+  lastPolledAt DateTime?
+  pollCount    Int       @default(0)
 
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status, submittedAt])
   @@index([projectId, nodeId])
@@ -1788,8 +1759,8 @@ model CanvasOssCleanupQueue {
   lastError   String?
   doneAt      DateTime?
 
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([doneAt, notBefore])
   @@index([projectId])
@@ -1797,51 +1768,51 @@ model CanvasOssCleanupQueue {
 
 /// canvas v2 · 用户级 AI/生图 Provider 凭据
 model CanvasProvider {
-  id              String                @id @default(cuid())
-  userId          String
-  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// 用户起的别名，例如 "我的 KIE 账号"
   alias           String
   kind            CanvasProviderKind
   /// AES-256-GCM 加密后的 API Key（格式：`v1.<iv>.<cipher>.<authTag>`，base64）
-  apiKeyEncrypted String                @db.Text
+  apiKeyEncrypted String             @db.Text
   /// OPENAI_COMPAT 必填；其余 kind 走默认 baseUrl
   baseUrl         String?
-  active          Boolean               @default(true)
+  active          Boolean            @default(true)
 
-  lastTestedAt    DateTime?
+  lastTestedAt   DateTime?
   /// "ok" / "error:reason"
-  lastTestStatus  String?
+  lastTestStatus String?
 
-  models          CanvasProviderModel[]
-  tasks           CanvasGenerationTask[]
+  models CanvasProviderModel[]
+  tasks  CanvasGenerationTask[]
 
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, active])
 }
 
 /// canvas v2 · Provider 下的具体模型
 model CanvasProviderModel {
-  id              String                @id @default(cuid())
-  providerId      String
-  provider        CanvasProvider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  id         String         @id @default(cuid())
+  providerId String
+  provider   CanvasProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   /// provider 端的模型 id
-  modelKey        String
-  displayName     String
-  role            CanvasModelRole
-  description     String?               @db.Text
+  modelKey      String
+  displayName   String
+  role          CanvasModelRole
+  description   String?         @db.Text
   /// 节点 UI 渲染参数（JSON Schema-like）
-  paramsSchema    Json?
-  defaultParams   Json?
-  enabled         Boolean               @default(true)
-  sortOrder       Int                   @default(0)
+  paramsSchema  Json?
+  defaultParams Json?
+  enabled       Boolean         @default(true)
+  sortOrder     Int             @default(0)
 
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([providerId, modelKey])
   @@index([providerId, enabled, sortOrder])
@@ -1901,7 +1872,9 @@ enum GatewayClientSource {
   EXTERNAL
 }
 
-/** sk-gw 用途：PLATFORM=全站管理员密钥；PERSONAL=个人/Book 关联用 */
+/**
+ * sk-gw 用途：PLATFORM=全站管理员密钥；PERSONAL=个人/Book 关联用
+ */
 enum GatewayApiKeyScope {
   PLATFORM
   PERSONAL
@@ -1959,19 +1932,19 @@ model GatewayVendorCredential {
 }
 
 model GatewayApiKey {
-  id             String    @id @default(cuid())
-  userId         String
-  user           GatewayUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name           String
-  scope          GatewayApiKeyScope @default(PERSONAL)
-  keyPrefix      String
-  keyHash        String
-  ipWhitelist    Json?
-  spendLimitUsd  Decimal?  @db.Decimal(12, 4)
-  revokedAt      DateTime?
+  id            String             @id @default(cuid())
+  userId        String
+  user          GatewayUser        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  scope         GatewayApiKeyScope @default(PERSONAL)
+  keyPrefix     String
+  keyHash       String
+  ipWhitelist   Json?
+  spendLimitUsd Decimal?           @db.Decimal(12, 4)
+  revokedAt     DateTime?
 
-  bindings    GatewayApiKeyCredential[]
-  requestLogs GatewayRequestLog[]
+  bindings       GatewayApiKeyCredential[]
+  requestLogs    GatewayRequestLog[]
   linkedBookUser User?
 
   createdAt DateTime @default(now())
@@ -1991,24 +1964,24 @@ model GatewayApiKeyCredential {
 }
 
 model GatewayRequestLog {
-  id              String               @id @default(cuid())
-  userId          String
-  user            GatewayUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  apiKeyId        String
-  apiKey          GatewayApiKey        @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
-  credentialId    String?
-  credential      GatewayVendorCredential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  id           String                   @id @default(cuid())
+  userId       String
+  user         GatewayUser              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKeyId     String
+  apiKey       GatewayApiKey            @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  credentialId String?
+  credential   GatewayVendorCredential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
 
-  providerKind    GatewayProviderKind?
-  model           String
-  endpoint        String
-  requestKind     GatewayRequestKind     @default(OTHER)
-  status          GatewayRequestStatus   @default(PENDING)
-  externalTaskId  String?
-  clientSource    GatewayClientSource    @default(EXTERNAL)
-  clientPage      String?
-  storyProjectId  String?
-  storyTaskId     String?
+  providerKind   GatewayProviderKind?
+  model          String
+  endpoint       String
+  requestKind    GatewayRequestKind   @default(OTHER)
+  status         GatewayRequestStatus @default(PENDING)
+  externalTaskId String?
+  clientSource   GatewayClientSource  @default(EXTERNAL)
+  clientPage     String?
+  storyProjectId String?
+  storyTaskId    String?
 
   promptTokens     Int?
   completionTokens Int?
@@ -2018,35 +1991,35 @@ model GatewayRequestLog {
   durationMs       Int?
   vendorDurationMs Int?
 
-  pricingModelKey           String?
-  pricingTierRaw            String?
-  billingKind               String?
-  vendorListUnitCostYuan    Decimal? @db.Decimal(16, 8)
-  estimatedVendorCostYuan   Decimal? @db.Decimal(16, 6)
+  pricingModelKey         String?
+  pricingTierRaw          String?
+  billingKind             String?
+  vendorListUnitCostYuan  Decimal? @db.Decimal(16, 8)
+  estimatedVendorCostYuan Decimal? @db.Decimal(16, 6)
 
   // —— 统一积分计费快照（unified-credit-billing）——
-  billingMode        CreditBillingMode? // PLATFORM_CREDIT | BYOK
-  canonicalModelKey  String?            // 归口模型键（ModelCatalog.canonicalKey）
-  creditsCharged     Int?               // 本次实际扣减积分（模式 A）
-  costSnapshotYuan   Decimal? @db.Decimal(16, 6) // 写日志时的渠道净成本快照
-  marginSnapshot     Decimal? @db.Decimal(6, 4)  // 写日志时的毛利率快照（0~1）
-  seatId             String?            // 团队席位（占用人）
+  billingMode       CreditBillingMode? // PLATFORM_CREDIT | BYOK
+  canonicalModelKey String? // 归口模型键（ModelCatalog.canonicalKey）
+  creditsCharged    Int? // 本次实际扣减积分（模式 A）
+  costSnapshotYuan  Decimal?           @db.Decimal(16, 6) // 写日志时的渠道净成本快照
+  marginSnapshot    Decimal?           @db.Decimal(6, 4) // 写日志时的毛利率快照（0~1）
+  seatId            String? // 团队席位（占用人）
 
   // —— 多租户 + 多 Key 对账快照（gateway-multi-credential-and-tenant）——
-  tenantId                 String?  // 计费归属租户（个人空间=个人租户）
-  actorBookUserId          String?  // 实际操作的 Book 用户（团队下区分成员）
-  credentialAliasSnapshot  String?  // 实际使用凭证别名快照（对账用）
-  channelSnapshot          String?  // 实际使用凭证渠道快照（按渠道对账）
+  tenantId                String? // 计费归属租户（个人空间=个人租户）
+  actorBookUserId         String? // 实际操作的 Book 用户（团队下区分成员）
+  credentialAliasSnapshot String? // 实际使用凭证别名快照（对账用）
+  channelSnapshot         String? // 实际使用凭证渠道快照（按渠道对账）
 
   inputSummary  Json?
   resultSummary Json?
   failCode      String?
   failMessage   String? @db.Text
 
-  submittedAt   DateTime  @default(now())
-  completedAt   DateTime?
-  lastPolledAt  DateTime?
-  pollCount     Int       @default(0)
+  submittedAt  DateTime  @default(now())
+  completedAt  DateTime?
+  lastPolledAt DateTime?
+  pollCount    Int       @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2100,6 +2073,9 @@ enum CreditLedgerType {
   EXPIRE // 周期过期清零
   TOPUP // 额外积分包充值
   ADJUST // 人工校正
+  RESERVE // 冻结预扣（视频先冻结后渲染）
+  SETTLE // 冻结转实扣（视频渲染成功结算）
+  RELEASE // 解冻返还（厂商全失败）
 }
 
 enum CreditBillingMode {
@@ -2115,13 +2091,15 @@ enum ResourceMeterType {
 
 /// 全局计费参数（单例 id="default"）
 model PlatformPricingConfig {
-  id               String   @id @default("default")
-  creditAnchorYuan Decimal  @default("0.04") @db.Decimal(10, 4) // 1 积分 = ¥0.04 挂牌锚定
-  defaultMarginM   Decimal  @default("2.5") @db.Decimal(6, 3) // 默认系数 M（2.5 → 毛利 60%）
-  minMarginGuard   Decimal  @default("0.30") @db.Decimal(6, 4) // 发布/扣费毛利护栏（低于则阻断）
-  defaultVideoSec  Int      @default(5) // 视频默认计费秒数
-  updatedAt        DateTime @updatedAt
-  createdAt        DateTime @default(now())
+  id                  String   @id @default("default")
+  creditAnchorYuan    Decimal  @default("0.04") @db.Decimal(10, 4) // 1 积分 = ¥0.04 挂牌锚定
+  defaultMarginM      Decimal  @default("2.5") @db.Decimal(6, 3) // 默认系数 M（2.5 → 毛利 60%）
+  minMarginGuard      Decimal  @default("0.30") @db.Decimal(6, 4) // 文本/图像毛利护栏（低于则阻断）
+  defaultVideoSec     Int      @default(15) // 视频默认/封顶计费秒数（财务 2.0：15s）
+  videoMarginM        Decimal  @default("4") @db.Decimal(6, 3) // 视频专项系数 M（4 → 75% 毛利）
+  videoMinMarginGuard Decimal  @default("0.75") @db.Decimal(6, 4) // 视频专项毛利护栏 ≥75%
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
 }
 
 /// 渠道/厂商成本与折扣（成本与折扣的唯一来源，仅后台可见）
@@ -2170,20 +2148,22 @@ model ModelCreditPrice {
 
 /// 会员套餐（个人/团队 × 月/年 × 五档）
 model MembershipPlan {
-  id            String             @id @default(cuid())
-  family        MembershipFamily
-  interval      MembershipInterval
-  tier          String // 标准版/进阶版/高级版/豪华版/至尊版
-  sortOrder     Int                @default(0)
-  priceYuan     Decimal            @db.Decimal(12, 2) // 套餐价（团队=基础含席位价）
-  originalYuan  Decimal?           @db.Decimal(12, 2) // 划线原价
-  promoLabel    String? // 限时67折等
-  monthlyCredits Int // 月积分（团队=每席位）
-  includedSeats Int                @default(1) // 套餐含席位数
-  active        Boolean            @default(true)
-  seatTiers     TeamSeatTier[]
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  family              MembershipFamily
+  interval            MembershipInterval
+  tier                String // 标准版/进阶版/高级版/豪华版/至尊版
+  sortOrder           Int                @default(0)
+  priceYuan           Decimal            @db.Decimal(12, 2) // 套餐价（团队=基础含席位价）
+  originalYuan        Decimal?           @db.Decimal(12, 2) // 划线原价
+  promoLabel          String? // 限时67折等
+  monthlyCredits      Int // 月积分（团队=每席位）
+  videoMonthlyCredits Int                @default(0) // 视频专项池月额度（0 = 不单独分池，复用通用池）
+  pricePerCreditYuan  Decimal?           @db.Decimal(12, 6) // 派生快照：priceYuan ÷ monthlyCredits（逐档积分换算单价）
+  includedSeats       Int                @default(1) // 套餐含席位数
+  active              Boolean            @default(true)
+  seatTiers           TeamSeatTier[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   @@unique([family, interval, tier])
   @@index([active, sortOrder])
@@ -2191,31 +2171,37 @@ model MembershipPlan {
 
 /// 团队席位带（图1/2：紫色按席位变化）
 model TeamSeatTier {
-  id               String         @id @default(cuid())
-  planId           String
-  plan             MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  seatMin          Int
-  seatMax          Int? // null = 不封顶（10人以上）
-  perSeatPriceYuan Decimal        @db.Decimal(12, 2)
-  perSeatCredits   Int
-  sortOrder        Int            @default(0)
+  id                  String         @id @default(cuid())
+  planId              String
+  plan                MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  seatMin             Int
+  seatMax             Int? // null = 不封顶（10人以上）
+  perSeatPriceYuan    Decimal        @db.Decimal(12, 2)
+  perSeatCredits      Int
+  perSeatVideoCredits Int            @default(0) // 每席视频专项池额度（0 = 复用通用池）
+  sortOrder           Int            @default(0)
 
   @@index([planId, sortOrder])
 }
 
 /// 积分账户（个人或租户）
 model CreditAccount {
-  id                 String          @id @default(cuid())
-  ownerType          CreditOwnerType
-  ownerId            String // userId 或 tenantId
-  balanceCredits     Int             @default(0)
-  monthlyGrantCredits Int            @default(0) // 当前套餐月发放额
-  perSeatCapCredits  Int? // 子账号人均上限（可选）
-  planId             String?
-  currentPeriodEnd   DateTime?
-  entries            CreditLedger[]
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  id                   String          @id @default(cuid())
+  ownerType            CreditOwnerType
+  ownerId              String // userId 或 tenantId
+  balanceCredits       Int             @default(0) // 通用池可用余额
+  monthlyGrantCredits  Int             @default(0) // 当前套餐月发放额
+  reservedCredits      Int             @default(0) // 通用池冻结中（已 RESERVE 未 SETTLE/RELEASE）
+  videoBalanceCredits  Int             @default(0) // 视频专项池可用余额
+  videoMonthlyGrant    Int             @default(0) // 视频专项池月发放额
+  videoReservedCredits Int             @default(0) // 视频专项池冻结中
+  pricePerCreditYuan   Decimal?        @db.Decimal(12, 6) // 该账户档位「每积分单价」快照（逐档积分换算）
+  perSeatCapCredits    Int? // 子账号人均上限（可选）
+  planId               String?
+  currentPeriodEnd     DateTime?
+  entries              CreditLedger[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
   @@unique([ownerType, ownerId])
 }
@@ -2232,6 +2218,7 @@ model CreditLedger {
   refType          String? // gateway_log / plan_grant / topup_order ...
   refId            String?
   costSnapshotYuan Decimal?         @db.Decimal(16, 6)
+  pool             CreditPool       @default(GENERAL) // 通用池 / 视频专项池
   idempotencyKey   String?          @unique
   description      String?
   createdAt        DateTime         @default(now())
@@ -2239,17 +2226,116 @@ model CreditLedger {
   @@index([accountId, createdAt])
 }
 
-/// BYOK 技术服务费配置（按档/席位）
+enum CreditPool {
+  GENERAL // 通用积分池（文本/图像/其它）
+  VIDEO // 视频专项池
+}
+
+/// 调价提案审批流（运营提交 → 财务复核 → 超管终审 → 生效）
+enum PlanChangeStatus {
+  DRAFT // 草稿
+  SIMULATED // 已测算
+  FINANCE_REVIEW // 财务复核中
+  APPROVED // 超管终审通过（待生效）
+  REJECTED // 驳回
+  EFFECTIVE // 已生效
+  CANCELLED // 已撤销
+}
+
+/// 调价提案 + 六维测算 + 反向验算快照（全程留痕）
+model PlanChangeProposal {
+  id                String           @id @default(cuid())
+  title             String
+  status            PlanChangeStatus @default(DRAFT)
+  /// 变更目标（套餐/视频 M/护栏等）的结构化补丁
+  payload           Json
+  /// 六维测算报告快照（基础成本/扣费变动/毛利校验/月度成本上限/营收模拟/用户影响）
+  simulation        Json?
+  /// 财务反向验算快照（模式 A/B）
+  reverseCheck      Json?
+  /// 测算/校验是否全部通过（任一档毛利<阈值则 false）
+  marginPassed      Boolean          @default(false)
+  createdBy         String
+  financeReviewedBy String?
+  approvedBy        String?
+  rejectedReason    String?
+  effectiveAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  events PlanChangeEvent[]
+
+  @@index([status, createdAt])
+}
+
+/// 提案状态流转留痕
+model PlanChangeEvent {
+  id         String             @id @default(cuid())
+  proposalId String
+  proposal   PlanChangeProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  fromStatus PlanChangeStatus?
+  toStatus   PlanChangeStatus
+  actorId    String
+  actorRole  String?
+  note       String?
+  createdAt  DateTime           @default(now())
+
+  @@index([proposalId, createdAt])
+}
+
+/// BYOK 技术服务费配置（个人 / 团队两档）
 model ByokServiceConfig {
-  id                 String   @id @default(cuid())
-  scopeKey           String   @unique // 档位或席位规格键，如 personal-standard / team-seat
+  id                 String             @id @default(cuid())
+  scopeKey           String             @unique // personal | team-seat
   label              String
-  techServiceFeeYuan Decimal  @db.Decimal(12, 2)
+  techServiceFeeYuan Decimal            @db.Decimal(12, 2)
   interval           MembershipInterval @default(MONTH)
-  active             Boolean  @default(true)
+  minSeats           Int? // 团队最低席位数（仅 team-seat）
+  active             Boolean            @default(true)
   note               String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+/// BYOK 任务类型（套餐内额度 + 超额轻量包扣分）
+enum ByokTaskKind {
+  TEXT_TO_IMAGE
+  IMAGE_TO_VIDEO
+  VIDEO_TO_VIDEO
+}
+
+/// BYOK 套餐内月度额度与超额扣分（从轻量包/general 池扣）
+model ByokTaskQuota {
+  id              String       @id @default(cuid())
+  scopeKey        String // personal | team-seat
+  taskKind        ByokTaskKind
+  label           String
+  monthlyIncluded Int
+  overageCredits  Int
+  active          Boolean      @default(true)
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([scopeKey, taskKind])
+  @@index([scopeKey])
+}
+
+/// BYOK 月度任务用量（套餐内 + 超额）
+model ByokUsageMonthly {
+  id              String          @id @default(cuid())
+  ownerType       CreditOwnerType
+  ownerId         String
+  scopeKey        String // personal | team-seat
+  periodKey       String // YYYY-MM
+  taskKind        ByokTaskKind
+  seatsSnapshot   Int             @default(1)
+  includedUsed    Int             @default(0)
+  overageUsed     Int             @default(0)
+  overageCredits  Int             @default(0)
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([ownerType, ownerId, periodKey, taskKind])
+  @@index([periodKey, scopeKey])
+  @@index([ownerType, ownerId, periodKey])
 }
 
 /// BYOK 资源计量单价（用量 × 系数）
@@ -2328,20 +2414,20 @@ enum AssetVisibility {
 
 /// 租户（个人空间 / 团队 / 公司）
 model Tenant {
-  id               String      @id @default(cuid())
-  type             TenantType  @default(PERSONAL)
-  name             String
-  ownerUserId      String
-  owner            User        @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  id                String              @id @default(cuid())
+  type              TenantType          @default(PERSONAL)
+  name              String
+  ownerUserId       String
+  owner             User                @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   /// 关联会员套餐（团队套餐）；个人租户可为空（走个人会员）
-  planId           String?
-  packageLevel     String? // 标准版/进阶版/... 快照
-  interval         MembershipInterval?
-  seatLimit        Int         @default(1) // 席位总数（含套餐内 + 加购）
-  maxConcurrency   Int         @default(2) // 并发任务上限（里程碑 7 Redis 启用）
+  planId            String?
+  packageLevel      String? // 标准版/进阶版/... 快照
+  interval          MembershipInterval?
+  seatLimit         Int                 @default(1) // 席位总数（含套餐内 + 加购）
+  maxConcurrency    Int                 @default(2) // 并发任务上限（里程碑 7 Redis 启用）
   perSeatCapCredits Int? // 子账号人均月积分上限（可选）
-  currentPeriodEnd DateTime?
-  status           String      @default("ACTIVE") // ACTIVE / SUSPENDED
+  currentPeriodEnd  DateTime?
+  status            String              @default("ACTIVE") // ACTIVE / SUSPENDED
 
   members TenantMember[]
   seats   Seat[]
@@ -2356,20 +2442,20 @@ model Tenant {
 
 /// 租户成员
 model TenantMember {
-  id               String             @id @default(cuid())
-  tenantId         String
-  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userId           String
-  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role             TenantRole         @default(MEMBER)
-  status           TenantMemberStatus @default(ACTIVE)
-  seatId           String?            @unique
-  seat             Seat?              @relation(fields: [seatId], references: [id], onDelete: SetNull)
+  id                String             @id @default(cuid())
+  tenantId          String
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role              TenantRole         @default(MEMBER)
+  status            TenantMemberStatus @default(ACTIVE)
+  seatId            String?            @unique
+  seat              Seat?              @relation(fields: [seatId], references: [id], onDelete: SetNull)
   /// 成员个人月积分上限（覆盖租户 perSeatCapCredits）
   monthlyCapCredits Int?
-  joinedAt         DateTime           @default(now())
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  joinedAt          DateTime           @default(now())
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@unique([tenantId, userId])
   @@index([tenantId, status])
@@ -2392,19 +2478,19 @@ model Seat {
 
 /// 团队邀请
 model TenantInvite {
-  id        String             @id @default(cuid())
-  tenantId  String
-  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email     String
-  token     String             @unique
-  role      TenantRole         @default(MEMBER)
-  status    TenantInviteStatus @default(PENDING)
-  expiresAt DateTime
-  acceptedAt DateTime?
+  id          String             @id @default(cuid())
+  tenantId    String
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email       String
+  token       String             @unique
+  role        TenantRole         @default(MEMBER)
+  status      TenantInviteStatus @default(PENDING)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
   createdById String?
-  createdBy  User?             @relation("TenantInviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  createdBy   User?              @relation("TenantInviteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([tenantId, status])
   @@index([email])

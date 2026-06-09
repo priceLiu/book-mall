@@ -13,8 +13,13 @@ import {
   DEFAULT_CREDIT_ANCHOR_YUAN,
   DEFAULT_MARGIN_M,
   DEFAULT_MIN_MARGIN_GUARD,
+  DEFAULT_VIDEO_MARGIN_M,
+  DEFAULT_VIDEO_MIN_MARGIN_GUARD,
   DEFAULT_VIDEO_SEC,
   FALLBACK_PRICING_CONFIG,
+  marginGuardForUnit,
+  marginMForUnit,
+  marginPassesGuard,
   type PricingConfig,
 } from "./credit-pricing-formulas";
 
@@ -35,6 +40,8 @@ export async function loadPricingConfig(): Promise<PricingConfig> {
     defaultMarginM: toNum(row.defaultMarginM, DEFAULT_MARGIN_M),
     minMarginGuard: toNum(row.minMarginGuard, DEFAULT_MIN_MARGIN_GUARD),
     defaultVideoSec: row.defaultVideoSec ?? DEFAULT_VIDEO_SEC,
+    videoMarginM: toNum(row.videoMarginM, DEFAULT_VIDEO_MARGIN_M),
+    videoMinMarginGuard: toNum(row.videoMinMarginGuard, DEFAULT_VIDEO_MIN_MARGIN_GUARD),
   };
 }
 
@@ -93,7 +100,17 @@ export async function publishModelCreditPrice(input: {
     return toNum(a.netCostYuan) - toNum(b.netCostYuan);
   })[0];
 
-  const marginM = input.marginM ?? config.defaultMarginM;
+  // 按计费类型取系数 M 与毛利护栏（视频 PER_SEC → videoMarginM=4 / 护栏 0.75）
+  const marginM =
+    input.marginM ??
+    marginMForUnit(chosen.unit, {
+      defaultMarginM: config.defaultMarginM,
+      videoMarginM: config.videoMarginM,
+    });
+  const minGuard = marginGuardForUnit(chosen.unit, {
+    minMarginGuard: config.minMarginGuard,
+    videoMinMarginGuard: config.videoMinMarginGuard,
+  });
   const comp = computeCreditPrice({
     listCostYuan: toNum(chosen.listCostYuan),
     discountRate: toNum(chosen.discountRate),
@@ -101,8 +118,8 @@ export async function publishModelCreditPrice(input: {
     anchorYuan: config.creditAnchorYuan,
   });
 
-  if (comp.baseMarginRate < config.minMarginGuard) {
-    throw new MarginGuardError(comp.baseMarginRate, config.minMarginGuard, input.canonicalModelKey);
+  if (!marginPassesGuard(comp.baseMarginRate, minGuard)) {
+    throw new MarginGuardError(comp.baseMarginRate, minGuard, input.canonicalModelKey);
   }
 
   const snapshot = { ...comp.formulaSnapshot, publishedAt: new Date().toISOString() };

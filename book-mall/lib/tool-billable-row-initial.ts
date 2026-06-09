@@ -1,4 +1,4 @@
-import type { ToolBillablePrice } from "@prisma/client";
+import type { LegacyBillablePriceRow } from "@/lib/tool-billable-row-payloads";
 
 const FALLBACK_MULT = 2;
 
@@ -7,7 +7,7 @@ function finitePositive(n: number | null | undefined): n is number {
 }
 
 /** 无持久化成本/系数时的回落：由标价与成本或默认 M 反推，供表单预填 */
-export function inferLegacyCostAndMultForBillableRow(row: ToolBillablePrice): {
+export function inferLegacyCostAndMultForBillableRow(row: LegacyBillablePriceRow): {
   costYuan: number;
   mult: number;
 } {
@@ -29,7 +29,7 @@ export function inferLegacyCostAndMultForBillableRow(row: ToolBillablePrice): {
 }
 
 export async function resolveInitialCostMultForBillableRow(
-  row: ToolBillablePrice,
+  row: LegacyBillablePriceRow,
 ): Promise<{ costYuan: number; mult: number }> {
   const hasCost =
     row.schemeAUnitCostYuan != null &&

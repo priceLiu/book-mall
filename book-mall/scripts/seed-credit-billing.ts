@@ -9,7 +9,7 @@ import { prisma } from "../lib/prisma";
 
 async function main() {
   const r = await seedUnifiedCreditBilling("seed-script");
-  console.log("[seed-credit-billing] 套餐档位:", r.plans, "成本档:", r.costProfiles);
+  console.log("[seed-credit-billing] 套餐档位:", r.plans, "成本档:", r.costProfiles, "视频模型:", r.videoModels);
   console.log("[seed-credit-billing] 已发布报价:");
   for (const p of r.published) {
     console.log(`  - ${p.canonicalModelKey}: ${p.creditsPerUnit} 积分/单位, 毛利 ${(p.baseMarginRate * 100).toFixed(1)}%`);

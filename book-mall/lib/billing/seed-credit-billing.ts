@@ -17,9 +17,20 @@ import {
   DEFAULT_CREDIT_ANCHOR_YUAN,
   DEFAULT_MARGIN_M,
   DEFAULT_MIN_MARGIN_GUARD,
+  DEFAULT_VIDEO_MARGIN_M,
+  DEFAULT_VIDEO_MIN_MARGIN_GUARD,
   DEFAULT_VIDEO_SEC,
   publishModelCreditPrice,
 } from "@/lib/pricing/credit-pricing-engine";
+import { deriveVideoMonthlyCredits, VIDEO_MODEL_SEEDS } from "@/lib/billing/video-model-seeds";
+import { seedByokSimplifiedPricing } from "@/lib/billing/byok-pricing";
+
+/** 逐档「每积分单价」= 套餐价 ÷ (含席位数 × 月积分)；个人 includedSeats=1。 */
+function derivePricePerCredit(priceYuan: number, monthlyCredits: number, includedSeats: number): number {
+  const denom = Math.max(1, includedSeats) * monthlyCredits;
+  if (denom <= 0) return 0;
+  return Math.round((priceYuan / denom) * 1e6) / 1e6;
+}
 
 const TIERS = ["标准版", "进阶版", "高级版", "豪华版", "至尊版"] as const;
 
@@ -116,13 +127,22 @@ interface CostSeed {
   listCostYuan: number;
   discountRate: number; // 渠道折扣（节省比例）
 }
-const COST_SEEDS: CostSeed[] = [
-  { canonicalModelKey: "seedance-720p", displayName: "Seedance 视频 720P", vendor: "volcengine", unit: "PER_SEC", tierRaw: "720P", listCostYuan: 0.45, discountRate: 0.1 },
-  { canonicalModelKey: "kling-video", displayName: "可灵 视频", vendor: "kie", unit: "PER_SEC", tierRaw: "标准", listCostYuan: 0.6, discountRate: 0.05 },
-  { canonicalModelKey: "happyhorse-r2v", displayName: "HappyHorse 参考图生视频", vendor: "aliyun", unit: "PER_SEC", tierRaw: "标准", listCostYuan: 0.9, discountRate: 0.1 },
+const IMAGE_COST_SEEDS: CostSeed[] = [
   { canonicalModelKey: "lib-image", displayName: "通义万相 文生图", vendor: "aliyun", unit: "PER_IMAGE", tierRaw: "1K", listCostYuan: 0.1, discountRate: 0.1 },
   { canonicalModelKey: "lib-nano-pro", displayName: "Nano Pro 高清生图", vendor: "kie", unit: "PER_IMAGE", tierRaw: "2K", listCostYuan: 0.3, discountRate: 0.05 },
 ];
+
+const VIDEO_COST_SEEDS: CostSeed[] = VIDEO_MODEL_SEEDS.map((v) => ({
+  canonicalModelKey: v.canonicalModelKey,
+  displayName: v.displayName,
+  vendor: v.vendor,
+  unit: "PER_SEC" as const,
+  tierRaw: v.tierRaw,
+  listCostYuan: v.listCostYuan,
+  discountRate: v.discountRate,
+}));
+
+const COST_SEEDS: CostSeed[] = [...VIDEO_COST_SEEDS, ...IMAGE_COST_SEEDS];
 
 async function seedPlans(
   family: "PERSONAL" | "TEAM",
@@ -131,6 +151,8 @@ async function seedPlans(
   withSeatTiers: boolean,
 ) {
   for (const s of seeds) {
+    const pricePerCreditYuan = derivePricePerCredit(s.priceYuan, s.monthlyCredits, s.includedSeats);
+    const videoMonthlyCredits = deriveVideoMonthlyCredits(s.monthlyCredits);
     const plan = await prisma.membershipPlan.upsert({
       where: { family_interval_tier: { family, interval, tier: s.tier } },
       create: {
@@ -142,6 +164,8 @@ async function seedPlans(
         originalYuan: s.originalYuan ?? null,
         promoLabel: s.promoLabel ?? null,
         monthlyCredits: s.monthlyCredits,
+        videoMonthlyCredits,
+        pricePerCreditYuan,
         includedSeats: s.includedSeats,
         active: true,
       },
@@ -151,6 +175,8 @@ async function seedPlans(
         originalYuan: s.originalYuan ?? null,
         promoLabel: s.promoLabel ?? null,
         monthlyCredits: s.monthlyCredits,
+        videoMonthlyCredits,
+        pricePerCreditYuan,
         includedSeats: s.includedSeats,
         active: true,
       },
@@ -181,6 +207,7 @@ async function seedPlans(
 export interface SeedSummary {
   plans: number;
   costProfiles: number;
+  videoModels: number;
   published: { canonicalModelKey: string; creditsPerUnit: number; baseMarginRate: number }[];
   publishErrors: { canonicalModelKey: string; error: string }[];
 }
@@ -195,8 +222,14 @@ export async function seedUnifiedCreditBilling(publishedBy = "seed"): Promise<Se
       defaultMarginM: DEFAULT_MARGIN_M,
       minMarginGuard: DEFAULT_MIN_MARGIN_GUARD,
       defaultVideoSec: DEFAULT_VIDEO_SEC,
+      videoMarginM: DEFAULT_VIDEO_MARGIN_M,
+      videoMinMarginGuard: DEFAULT_VIDEO_MIN_MARGIN_GUARD,
     },
-    update: {},
+    update: {
+      defaultVideoSec: DEFAULT_VIDEO_SEC,
+      videoMarginM: DEFAULT_VIDEO_MARGIN_M,
+      videoMinMarginGuard: DEFAULT_VIDEO_MIN_MARGIN_GUARD,
+    },
   });
 
   // 2) 套餐 + 席位带
@@ -206,20 +239,8 @@ export async function seedUnifiedCreditBilling(publishedBy = "seed"): Promise<Se
   await seedPlans("TEAM", "YEAR", TEAM_YEAR, true);
   const plansCount = TIERS.length * 4;
 
-  // 3) BYOK 技术服务费（按档占位）+ 资源系数
-  const byokScopes: { scopeKey: string; label: string; fee: number }[] = [
-    { scopeKey: "personal-standard", label: "个人·标准（BYOK 技术服务费）", fee: 19 },
-    { scopeKey: "personal-pro", label: "个人·进阶及以上（BYOK 技术服务费）", fee: 49 },
-    { scopeKey: "team-base", label: "团队·基础（BYOK 技术服务费）", fee: 99 },
-    { scopeKey: "team-seat", label: "团队·每席位（BYOK 技术服务费）", fee: 29 },
-  ];
-  for (const b of byokScopes) {
-    await prisma.byokServiceConfig.upsert({
-      where: { scopeKey: b.scopeKey },
-      create: { scopeKey: b.scopeKey, label: b.label, techServiceFeeYuan: b.fee, interval: "MONTH", active: true },
-      update: { label: b.label, techServiceFeeYuan: b.fee, active: true },
-    });
-  }
+  // 3) BYOK 两档月费 + 任务额度 + 资源系数
+  await seedByokSimplifiedPricing();
 
   const resourceRates: { type: "OSS_GB_MONTH" | "EGRESS_GB" | "TASK_COUNT"; coef: number; unit: string }[] = [
     { type: "OSS_GB_MONTH", coef: 0.12, unit: "GB·月" },
@@ -269,5 +290,11 @@ export async function seedUnifiedCreditBilling(publishedBy = "seed"): Promise<Se
     }
   }
 
-  return { plans: plansCount, costProfiles: COST_SEEDS.length, published, publishErrors };
+  return {
+    plans: plansCount,
+    costProfiles: COST_SEEDS.length,
+    videoModels: VIDEO_COST_SEEDS.length,
+    published,
+    publishErrors,
+  };
 }

@@ -66,6 +66,8 @@ export interface CostSnapshot {
   netCostYuan: number;
   marginRate: number | null;
   creditsPerUnit: number | null;
+  /** 单位挂牌价（元/秒、元/张、元/千token），逐档积分换算用 */
+  listPriceYuan: number | null;
   unit: CreditCostUnit | null;
   vendor: string;
 }
@@ -106,6 +108,7 @@ export async function resolveCostSnapshot(canonicalModelKey: string): Promise<Co
     netCostYuan: num(chosen.netCostYuan),
     marginRate,
     creditsPerUnit,
+    listPriceYuan: price?.listPriceYuan != null ? num(price.listPriceYuan) : null,
     unit: price?.unit ?? chosen.unit ?? null,
     vendor: chosen.vendor,
   };

@@ -1,7 +1,7 @@
 /** 跨域拉 book-mall 失败时的登录指引（生产用主站公网域，本地用 localhost:3000） */
 export function bookMallLoginHint(
   base: string,
-  role: "admin" | "user",
+  role: "admin" | "user" | "fees" | "team",
 ): { loginUrl: string; text: string } {
   const loginUrl = base.trim() ? `${base.replace(/\/$/, "")}/login` : "https://book.ai-code8.com/login";
   const site = base.trim() || "https://book.ai-code8.com";

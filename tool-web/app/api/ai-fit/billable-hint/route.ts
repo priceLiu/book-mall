@@ -4,18 +4,14 @@ import {
   serviceFeeBillableHintJson,
   TOOL_SERVICE_FEE_MODE,
 } from "@/lib/tool-service-fee-mode";
-import {
-  computeAiTryOnChargePoints,
-  resolveAiTryOnBillingModelId,
-} from "@/lib/tools-scheme-a-pricing";
-import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
+import { fetchCreditsPreview } from "@/lib/credits-preview-server";
+import { resolveAiTryOnBillingModelId } from "@/lib/tools-scheme-a-pricing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const AI_FIT_BILLING_TOOL_KEY = "fitting-room__ai-fit";
 
-/** AI 试衣标价提示：Phase D 返回技术服务费说明；legacy 仍返回方案 A 点数。 */
 export async function GET() {
   const token = cookies().get("tools_token")?.value?.trim();
   if (!token) {
@@ -27,23 +23,17 @@ export async function GET() {
   }
 
   const model = resolveAiTryOnBillingModelId();
-  const { multiplier: retailMult, source: multiplierSource } =
-    await getSchemeARetailMultiplierServer({
-      toolKey: AI_FIT_BILLING_TOOL_KEY,
-      modelKey: model,
-    });
-  const pricePoints = computeAiTryOnChargePoints(model, retailMult);
-  if (pricePoints <= 0) {
-    return NextResponse.json({ error: "试衣方案 A 标价未配置或无效" }, { status: 503 });
+  const preview = await fetchCreditsPreview({ modelKey: model, imageCount: 1 });
+  if (!preview) {
+    return NextResponse.json({ error: "试衣积分报价未配置" }, { status: 503 });
   }
 
   return NextResponse.json({
-    pricePoints,
-    yuan: pricePoints / 100,
-    model,
-    scheme: "tools_scheme_a",
-    retailMultiplier: retailMult,
-    retailMultiplierSource: multiplierSource,
+    credits: preview.credits,
+    yuan: preview.estimatedYuan,
+    model: preview.canonicalModelKey,
+    scheme: preview.scheme,
+    pricePerCreditYuan: preview.pricePerCreditYuan,
     toolKey: AI_FIT_BILLING_TOOL_KEY,
   });
 }

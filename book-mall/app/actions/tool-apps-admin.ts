@@ -83,67 +83,13 @@ function computePricePointsStrict(costYuan: number, mult: number): number {
   return v;
 }
 
-export async function createToolBillablePrice(formData: FormData) {
+export async function createToolBillablePrice(_formData: FormData) {
   await assertAdmin();
-  const toolKey = String(formData.get("toolKey") ?? "").trim();
-  const actionRaw = String(formData.get("action") ?? "").trim();
-  const effectiveFromRaw = String(formData.get("effectiveFrom") ?? "").trim();
-  const effectiveToRaw = String(formData.get("effectiveTo") ?? "").trim();
-  const noteRaw = String(formData.get("note") ?? "").trim();
-  const refModelRaw = String(formData.get("schemeARefModelKey") ?? "").trim();
-  const active = formData.get("active") === "on";
-
-  const costYuan = parseNonnegativeCostYuan(formData.get("schemeAUnitCostYuan"));
-  const mult = parsePositiveRetailMultiplier(formData.get("schemeAAdminRetailMultiplier"));
-  const pricePoints = computePricePointsStrict(costYuan, mult);
-
-  if (!toolKey) throw new Error("toolKey 必填");
-
-  const cloudModelKey = parseOptionalString(formData.get("cloudModelKey"));
-  const cloudTierRaw = parseOptionalString(formData.get("cloudTierRaw"));
-  const cloudBillingKind = parseOptionalBillingKind(formData.get("cloudBillingKind"));
-
-  const effectiveFrom = parseCnWallDatetimeLocal(effectiveFromRaw);
-  const effectiveTo = optionalCnWallEnd(effectiveToRaw);
-
-  await prisma.toolBillablePrice.create({
-    data: {
-      toolKey,
-      action: actionRaw.length > 0 ? actionRaw : null,
-      pricePoints,
-      effectiveFrom,
-      effectiveTo,
-      active,
-      note: noteRaw.length > 0 ? noteRaw : null,
-      schemeARefModelKey: refModelRaw.length > 0 ? refModelRaw : null,
-      schemeAUnitCostYuan: costYuan,
-      schemeAAdminRetailMultiplier: mult,
-      cloudModelKey,
-      cloudTierRaw,
-      cloudBillingKind,
-    },
-  });
-  revalidatePath("/admin/tool-apps/manage");
+  throw new Error("ToolBillablePrice 已下线，请在 finance-web「积分定价」维护 ModelCreditPrice");
 }
 
-/** 更新已有定价行：仅允许修改生效止（避免手改成本/M/点数导致与工具站计算不一致）；调价须「新增定价」建新行。 */
-export async function updateToolBillablePrice(formData: FormData) {
+/** @deprecated 财务 2.0：ToolBillablePrice 已退役。 */
+export async function updateToolBillablePrice(_formData: FormData) {
   await assertAdmin();
-  const id = String(formData.get("id") ?? "").trim();
-  if (!id) throw new Error("缺少 id");
-
-  const effectiveToRaw = String(formData.get("effectiveTo") ?? "").trim();
-  const effectiveTo = optionalCnWallEnd(effectiveToRaw);
-
-  const existing = await prisma.toolBillablePrice.findUnique({ where: { id } });
-  if (!existing) throw new Error("记录不存在");
-  if (existing.effectiveTo != null) {
-    throw new Error("该行已设置生效止，不可再改；请使用「新增定价」或联系数据库运维。");
-  }
-
-  await prisma.toolBillablePrice.update({
-    where: { id },
-    data: { effectiveTo },
-  });
-  revalidatePath("/admin/tool-apps/manage");
+  throw new Error("ToolBillablePrice 已下线，请在 finance-web「积分定价」维护 ModelCreditPrice");
 }

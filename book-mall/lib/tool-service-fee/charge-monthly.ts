@@ -1,3 +1,7 @@
+import {
+  consumeCredits,
+  getCreditBalance,
+} from "@/lib/billing/credit-account-service";
 import { prisma } from "@/lib/prisma";
 import {
   TOOL_SUITE_NAV_KEYS,
@@ -29,7 +33,7 @@ export async function listActiveToolServiceFeePlans() {
 }
 
 /**
- * 开通或续订工具技术服务费：从钱包扣 monthlyFeePoints，延长 30 天周期。
+ * 开通或续订工具技术服务费：从积分账户（通用池）扣 monthlyFeePoints 积分，延长 30 天周期。
  */
 export async function activateToolServiceFee(
   userId: string,
@@ -53,47 +57,22 @@ export async function activateToolServiceFee(
 
   const fee = Math.max(0, plan.monthlyFeePoints);
   const now = new Date();
+  const idempotencyKey = `tool-svc-fee:${userId}:${navKey}:${now.toISOString().slice(0, 13)}`;
+
+  if (fee > 0) {
+    const balance = await getCreditBalance({ ownerType: "USER", ownerId: userId });
+    if (balance < fee) {
+      return {
+        ok: false,
+        code: "insufficient_balance",
+        message: `积分不足，开通 ${plan.label} 需 ${fee.toLocaleString("zh-CN")} 积分`,
+        requiredPoints: fee,
+      };
+    }
+  }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      let wallet = await tx.wallet.findUnique({ where: { userId } });
-      if (!wallet) {
-        wallet = await tx.wallet.create({
-          data: { userId, balancePoints: 0 },
-        });
-      }
-
-      if (fee > 0 && wallet.balancePoints < fee) {
-        return {
-          ok: false as const,
-          code: "insufficient_balance" as const,
-          message: `余额不足，开通 ${plan.label} 需 ${fee.toLocaleString("zh-CN")} 点`,
-          requiredPoints: fee,
-        };
-      }
-
-      let walletEntryId: string | null = null;
-      let balanceAfter = wallet.balancePoints;
-
-      if (fee > 0) {
-        balanceAfter = wallet.balancePoints - fee;
-        const entry = await tx.walletEntry.create({
-          data: {
-            walletId: wallet.id,
-            type: "CONSUME",
-            amountPoints: -fee,
-            balanceAfterPoints: balanceAfter,
-            description: `工具技术服务费 · ${plan.label}（${TOOL_SERVICE_FEE_PERIOD_DAYS} 天）`,
-            idempotencyKey: `tool-svc-fee:${userId}:${navKey}:${now.toISOString().slice(0, 13)}`,
-          },
-        });
-        walletEntryId = entry.id;
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: { balancePoints: balanceAfter },
-        });
-      }
-
       const existing = await tx.userToolServicePeriod.findFirst({
         where: {
           userId,
@@ -115,7 +94,7 @@ export async function activateToolServiceFee(
           data: {
             periodEnd,
             lastChargedPoints: fee,
-            ...(walletEntryId ? { walletEntryId } : {}),
+            walletEntryId: null,
             planId: plan.id,
           },
         });
@@ -130,7 +109,7 @@ export async function activateToolServiceFee(
             periodEnd,
             status: "ACTIVE",
             lastChargedPoints: fee,
-            walletEntryId,
+            walletEntryId: null,
           },
         });
         periodId = created.id;
@@ -144,6 +123,16 @@ export async function activateToolServiceFee(
         periodId,
       };
     });
+
+    if (result.ok && fee > 0) {
+      await consumeCredits({
+        ref: { ownerType: "USER", ownerId: userId },
+        credits: fee,
+        pool: "GENERAL",
+        idempotencyKey,
+        description: `工具技术服务费 · ${plan.label}（${TOOL_SERVICE_FEE_PERIOD_DAYS} 天）`,
+      });
+    }
 
     return result;
   } catch (e) {

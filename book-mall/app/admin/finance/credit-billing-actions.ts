@@ -4,13 +4,19 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
+import { canManagePricing } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import {
   computeCreditPrice,
   loadPricingConfig,
   MarginGuardError,
+  marginPassesGuard,
   publishModelCreditPrice,
 } from "@/lib/pricing/credit-pricing-engine";
+import { SCENARIO_LAB_USAGE_SECONDS, SCENARIO_LAB_VIDEO_MARGIN_M } from "@/lib/billing/scenario-lab";
+import { VIDEO_MODEL_SEEDS } from "@/lib/billing/video-model-seeds";
+import { DEFAULT_VIDEO_MIN_MARGIN_GUARD } from "@/lib/pricing/credit-pricing-formulas";
+import { simulatePlanChange } from "@/lib/pricing/pricing-simulation";
 import type {
   CreditChannel,
   CreditCostUnit,
@@ -24,8 +30,8 @@ export type ActionResult<T = undefined> =
 
 async function requireAdmin(): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== "ADMIN") {
-    return { ok: false, error: "需要管理员登录" };
+  if (!session?.user?.id || !canManagePricing(session.user.role)) {
+    return { ok: false, error: "需要财务/超管权限" };
   }
   return { ok: true, userId: session.user.id };
 }
@@ -34,6 +40,12 @@ function num(v: FormDataEntryValue | null, fallback = 0): number {
   if (v == null) return fallback;
   const n = Number(v.toString());
   return Number.isFinite(n) ? n : fallback;
+}
+
+function derivePricePerCredit(priceYuan: number, monthlyCredits: number, includedSeats: number): number {
+  const denom = Math.max(1, includedSeats) * monthlyCredits;
+  if (denom <= 0) return 0;
+  return Math.round((priceYuan / denom) * 1e6) / 1e6;
 }
 
 function str(v: FormDataEntryValue | null): string {
@@ -48,12 +60,22 @@ export async function savePricingConfigAction(formData: FormData): Promise<Actio
   const creditAnchorYuan = num(formData.get("creditAnchorYuan"), 0.04);
   const defaultMarginM = num(formData.get("defaultMarginM"), 2.5);
   const minMarginGuard = num(formData.get("minMarginGuard"), 0.3);
-  const defaultVideoSec = Math.max(1, Math.round(num(formData.get("defaultVideoSec"), 5)));
+  const defaultVideoSec = Math.max(1, Math.round(num(formData.get("defaultVideoSec"), 15)));
+  const videoMarginM = num(formData.get("videoMarginM"), 4);
+  const videoMinMarginGuard = num(formData.get("videoMinMarginGuard"), 0.75);
   if (creditAnchorYuan <= 0) return { ok: false, error: "锚定单价必须大于 0" };
   await prisma.platformPricingConfig.upsert({
     where: { id: "default" },
-    create: { id: "default", creditAnchorYuan, defaultMarginM, minMarginGuard, defaultVideoSec },
-    update: { creditAnchorYuan, defaultMarginM, minMarginGuard, defaultVideoSec },
+    create: {
+      id: "default",
+      creditAnchorYuan,
+      defaultMarginM,
+      minMarginGuard,
+      defaultVideoSec,
+      videoMarginM,
+      videoMinMarginGuard,
+    },
+    update: { creditAnchorYuan, defaultMarginM, minMarginGuard, defaultVideoSec, videoMarginM, videoMinMarginGuard },
   });
   revalidatePath("/admin/finance/credit-pricing");
   return { ok: true };
@@ -147,7 +169,7 @@ export async function previewCreditPriceAction(input: {
       listPriceYuan: comp.listPriceYuan,
       creditsPerUnit: comp.creditsPerUnit,
       baseMarginRate: comp.baseMarginRate,
-      belowGuard: comp.baseMarginRate < config.minMarginGuard,
+      belowGuard: !marginPassesGuard(comp.baseMarginRate, config.minMarginGuard),
       minMarginGuard: config.minMarginGuard,
     },
   };
@@ -201,10 +223,62 @@ export async function upsertMembershipPlanAction(formData: FormData): Promise<Ac
   const originalYuan = originalRaw ? Number(originalRaw) : null;
   const promoLabel = str(formData.get("promoLabel")) || null;
   const monthlyCredits = Math.round(num(formData.get("monthlyCredits")));
+  const videoMonthlyRaw = formData.get("videoMonthlyCredits");
+  const videoMonthlyCredits =
+    videoMonthlyRaw != null && String(videoMonthlyRaw).trim() !== ""
+      ? Math.max(0, Math.round(num(videoMonthlyRaw)))
+      : Math.round(monthlyCredits * 0.2);
   const includedSeats = Math.max(1, Math.round(num(formData.get("includedSeats"), 1)));
   const active = formData.get("active") === "on" || formData.get("active") === "true";
+  const pricePerCreditYuan = derivePricePerCredit(priceYuan, monthlyCredits, includedSeats);
 
   if (!family || !interval || !tier) return { ok: false, error: "类型/周期/档位必填" };
+  if (videoMonthlyCredits > monthlyCredits) return { ok: false, error: "视频池积分不能超过月积分" };
+
+  const existingPlans = await prisma.membershipPlan.findMany({
+    where: { active: true },
+    select: {
+      id: true,
+      tier: true,
+      priceYuan: true,
+      monthlyCredits: true,
+      includedSeats: true,
+      family: true,
+    },
+  });
+  const tierRows = existingPlans
+    .filter((p) => p.id !== id)
+    .map((p) => ({
+      tier: p.tier,
+      priceYuan: Number(p.priceYuan),
+      monthlyCredits: p.monthlyCredits,
+      includedSeats: p.includedSeats,
+    }));
+  tierRows.push({
+    tier,
+    priceYuan,
+    monthlyCredits,
+    includedSeats,
+  });
+  const refModel = VIDEO_MODEL_SEEDS[0];
+  const netCostYuan = refModel.listCostYuan * (1 - refModel.discountRate);
+  const sim = simulatePlanChange({
+    tiers: tierRows,
+    model: {
+      canonicalModelKey: refModel.canonicalModelKey,
+      netCostYuan,
+      units: SCENARIO_LAB_USAGE_SECONDS,
+      listPriceYuan: netCostYuan * SCENARIO_LAB_VIDEO_MARGIN_M,
+    },
+    guard: DEFAULT_VIDEO_MIN_MARGIN_GUARD,
+  });
+  if (!sim.allPassed) {
+    return {
+      ok: false,
+      error: `套餐毛利护栏未通过（最低 ${(sim.worstMargin * 100).toFixed(1)}%，要求 ≥ ${((DEFAULT_VIDEO_MIN_MARGIN_GUARD - 0.002) * 100).toFixed(1)}% 含容差）。请调整价格或积分后再保存。`,
+    };
+  }
+
   const data = {
     family,
     interval,
@@ -214,6 +288,8 @@ export async function upsertMembershipPlanAction(formData: FormData): Promise<Ac
     originalYuan,
     promoLabel,
     monthlyCredits,
+    videoMonthlyCredits,
+    pricePerCreditYuan,
     includedSeats,
     active,
   };
@@ -285,11 +361,13 @@ export async function upsertByokConfigAction(formData: FormData): Promise<Action
   const scopeKey = str(formData.get("scopeKey"));
   const label = str(formData.get("label"));
   const techServiceFeeYuan = num(formData.get("techServiceFeeYuan"));
+  const minSeatsRaw = str(formData.get("minSeats"));
+  const minSeats = minSeatsRaw ? Math.max(1, Math.round(num(formData.get("minSeats")))) : null;
   const interval = (str(formData.get("interval")) as MembershipInterval) || "MONTH";
   const note = str(formData.get("note")) || null;
   const active = formData.get("active") === "on" || formData.get("active") === "true";
   if (!scopeKey || !label) return { ok: false, error: "规格键与名称必填" };
-  const data = { scopeKey, label, techServiceFeeYuan, interval, note, active };
+  const data = { scopeKey, label, techServiceFeeYuan, minSeats, interval, note, active };
   if (id) {
     await prisma.byokServiceConfig.update({ where: { id }, data });
   } else {
@@ -322,6 +400,32 @@ export async function saveResourceRateAction(formData: FormData): Promise<Action
     create: { resourceType, coefficientYuan, unitLabel, active },
     update: { coefficientYuan, unitLabel, active },
   });
+  revalidatePath("/admin/finance/byok");
+  return { ok: true };
+}
+
+export async function saveByokQuotaAction(formData: FormData): Promise<ActionResult> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+  const id = str(formData.get("id"));
+  const scopeKey = str(formData.get("scopeKey"));
+  const taskKind = str(formData.get("taskKind")) as "TEXT_TO_IMAGE" | "IMAGE_TO_VIDEO" | "VIDEO_TO_VIDEO";
+  const label = str(formData.get("label"));
+  const monthlyIncluded = Math.max(0, Math.round(num(formData.get("monthlyIncluded"))));
+  const overageCredits = Math.max(1, Math.round(num(formData.get("overageCredits"))));
+  const active = formData.get("active") === "on" || formData.get("active") === "true";
+  if (!scopeKey || !taskKind || !label) return { ok: false, error: "规格、任务类型与名称必填" };
+
+  const data = { scopeKey, taskKind, label, monthlyIncluded, overageCredits, active };
+  if (id) {
+    await prisma.byokTaskQuota.update({ where: { id }, data });
+  } else {
+    await prisma.byokTaskQuota.upsert({
+      where: { scopeKey_taskKind: { scopeKey, taskKind } },
+      create: data,
+      update: data,
+    });
+  }
   revalidatePath("/admin/finance/byok");
   return { ok: true };
 }

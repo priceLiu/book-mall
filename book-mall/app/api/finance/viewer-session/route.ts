@@ -1,39 +1,40 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { financeCorsHeaders } from "@/lib/finance/cors";
-import { billingPrivateCacheHeaders } from "@/lib/finance/billing-response-headers";
+import { NextRequest } from "next/server";
+
+import { listUserTenantMemberships } from "@/lib/tenant/context";
+import {
+  financeJson,
+  financeOptions,
+  financeUnauthorized,
+  getFinanceSession,
+  permissionsForRole,
+} from "@/lib/finance/finance-api";
 
 /**
- * finance-web 跨源读取「当前浏览器在 book-mall 的登录态」（含 role）。
- * 与 `/api/auth/session` 同源信息，但附带 FINANCE_WEB_ORIGINS CORS。
+ * finance-web 跨源读取「当前浏览器在 book-mall 的登录态」。
+ * 含五级 RBAC 权限快照 + 团队成员关系（供个人/团队/管理三入口路由）。
  */
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 204,
-    headers: { ...billingPrivateCacheHeaders("Cookie"), ...financeCorsHeaders(request) },
-  });
+  return financeOptions(request);
 }
 
 export async function GET(request: NextRequest) {
-  const base = {
-    ...billingPrivateCacheHeaders("Cookie"),
-    ...financeCorsHeaders(request),
-  };
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ user: null as null }, { headers: base });
-  }
-  const { id, email, name, role } = session.user;
-  return NextResponse.json(
-    {
-      user: {
-        id,
-        email: email ?? null,
-        name: name ?? null,
-        role,
-      },
-    },
-    { headers: base },
-  );
+  const user = await getFinanceSession();
+  if (!user) return financeUnauthorized(request);
+
+  const memberships = await listUserTenantMemberships(user.id);
+  const teams = memberships
+    .filter((m) => m.tenantType === "TEAM")
+    .map((m) => ({
+      tenantId: m.tenantId,
+      tenantName: m.tenantName,
+      role: m.role,
+      canViewBilling: m.role === "OWNER" || m.role === "ADMIN",
+    }));
+
+  return financeJson(request, {
+    user,
+    permissions: permissionsForRole(user.role),
+    teams,
+    hasTeam: teams.length > 0,
+  });
 }

@@ -36,6 +36,16 @@ pnpm run dev
    仅在「故意以某个 User.id 模拟」场景下临时把 `FINANCE_ALLOW_DEV_USER_QUERY=1` 打开，并在 finance-web 页面 URL 上带 `?asDev=1`（或 `?useProxy=1`）。  
 4. **使用真实账号**：在同浏览器打开 `http://localhost:3000/login` 登录后回到 `http://localhost:3002/fees/billing/details` 刷新即可。顶部「当前账单归属」应显示你的邮箱与 `authMode = session`。
 
+## 财务 2.0 · 三角色入口（:3002）
+
+| 入口 | 路径 | 角色 |
+|------|------|------|
+| **个人** | `/fees/billing/details`、`/fees/usage` | 所有登录用户 |
+| **团队** | `/team/billing` | 团队 OWNER/ADMIN 可见明细；成员见提示 |
+| **系统管理** | `/admin/*` | 平台员工（运营/财务/超管/legacy ADMIN） |
+
+财务 2.0 核心能力（盈亏预警、调价审批、双池用量、团队分账）在 **finance-web** 展示；数据与规则仍在 **book-mall** API（Single Writer）。
+
 ## 页面
 
 - **费用明细（本人）**：`/fees/billing/details`  
