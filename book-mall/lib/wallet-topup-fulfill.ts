@@ -1,18 +1,12 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
+import { topupCredits } from "@/lib/billing/credit-account-service";
 import { assertReasonableTopupBonus } from "@/lib/wallet-topup-fulfill-shared";
 
 /**
- * 钱包充值入账（唯一推荐入口）：真实支付 notify 与模拟收银均应调用本模块，
- * 避免在多处重复「加余额 + Order + WalletEntry」逻辑。
- *
- * 约定：100 点 = 1 元（1 点 = ¥0.01），与全站 `*Points` 字段一致。
- *
- * 订单：Order.amountPoints = 用户本次「到账点数合计」（本金 + 赠送），与钱包增量一致。
- * 分拆信息：Order.meta.topup = { paidAmountPoints, bonusPoints, creditedTotalPoints, rechargeCouponId?, ... }，
- * 便于财务只统计实收（SUM paid）与赠送成本分析；老订单无 topup 字段时视为 bonus=0。
- *
- * 充送优惠：须用户先在个人中心「领取」优惠券；充值时传入 rechargeCouponId 核销，否则无任何赠送。
+ * 充值入账（财务 2.0）：写入 CreditAccount，不再写 WalletEntry。
+ * 100 点 = 1 元；积分按锚定 ¥0.04/积分换算（1 元 ≈ 25 积分）。
  */
 
 export type WalletTopupMetaTopup = {
@@ -41,6 +35,11 @@ export type FulfillWalletTopupResult = {
   balanceAfterPoints: number;
   creditedTotalPoints: number;
 };
+
+function pointsToCredits(points: number): number {
+  const yuan = points / 100;
+  return Math.max(0, Math.round(yuan / DEFAULT_CREDIT_ANCHOR_YUAN));
+}
 
 function mergeOrderMeta(
   base: Prisma.InputJsonObject | undefined,
@@ -118,16 +117,6 @@ export async function fulfillWalletTopupCredits(
       rechargeCouponId: rechargeCouponIdForMeta,
     };
 
-    const paidYuan = (paid / 100).toFixed(2);
-    const bonusDescr =
-      bonus > 0
-        ? `${promoLabel ?? "活动赠送"} +${bonus.toLocaleString("zh-CN")} 点（¥${(bonus / 100).toFixed(2)}）`
-        : "";
-
-    const wallet = await tx.wallet.findUniqueOrThrow({
-      where: { userId: input.userId },
-    });
-
     const order = await tx.order.create({
       data: {
         userId: input.userId,
@@ -157,62 +146,37 @@ export async function fulfillWalletTopupCredits(
       }
     }
 
-    if (bonus === 0) {
-      const next = wallet.balancePoints + paid;
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { balancePoints: next },
+    const paidCredits = pointsToCredits(paid);
+    const bonusCredits = pointsToCredits(bonus);
+    const totalCredits = paidCredits + bonusCredits;
+
+    if (paidCredits > 0) {
+      await topupCredits({
+        ref: { ownerType: "USER", ownerId: input.userId },
+        credits: paidCredits,
+        refType: "topup_order",
+        refId: order.id,
+        idempotencyKey: `topup:${order.id}:paid`,
       });
-      await tx.walletEntry.create({
-        data: {
-          walletId: wallet.id,
-          type: "RECHARGE",
-          amountPoints: paid,
-          balanceAfterPoints: next,
-          description: `充值入账 ¥${paidYuan}`,
-          orderId: order.id,
-        },
+    }
+    if (bonusCredits > 0) {
+      await topupCredits({
+        ref: { ownerType: "USER", ownerId: input.userId },
+        credits: bonusCredits,
+        refType: "promo_grant",
+        refId: order.id,
+        idempotencyKey: `topup:${order.id}:bonus`,
       });
-      return {
-        orderId: order.id,
-        balanceAfterPoints: next,
-        creditedTotalPoints: total,
-      };
     }
 
-    const mid = wallet.balancePoints + paid;
-    const next = mid + bonus;
-
-    await tx.wallet.update({
-      where: { id: wallet.id },
-      data: { balancePoints: next },
-    });
-
-    await tx.walletEntry.create({
-      data: {
-        walletId: wallet.id,
-        type: "RECHARGE",
-        amountPoints: paid,
-        balanceAfterPoints: mid,
-        description: `充值入账 ¥${paidYuan}`,
-        orderId: order.id,
-      },
-    });
-
-    await tx.walletEntry.create({
-      data: {
-        walletId: wallet.id,
-        type: "RECHARGE",
-        amountPoints: bonus,
-        balanceAfterPoints: next,
-        description: bonusDescr,
-        orderId: order.id,
-      },
+    const account = await tx.creditAccount.findUnique({
+      where: { ownerType_ownerId: { ownerType: "USER", ownerId: input.userId } },
+      select: { balanceCredits: true },
     });
 
     return {
       orderId: order.id,
-      balanceAfterPoints: next,
+      balanceAfterPoints: account?.balanceCredits ?? totalCredits,
       creditedTotalPoints: total,
     };
   });

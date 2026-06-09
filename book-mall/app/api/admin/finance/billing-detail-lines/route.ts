@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { canViewFinanceCost } from "@/lib/auth/permissions";
 import { getAuthFromRequest } from "@/lib/auth-from-request";
 import { prisma } from "@/lib/prisma";
 import { financeCorsHeaders } from "@/lib/finance/cors";
@@ -22,8 +23,8 @@ export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const viewerId = fromReq?.sub ?? session?.user?.id;
   const viewerRole = fromReq?.role ?? session?.user?.role;
-  if (!viewerId || viewerRole !== "ADMIN") {
-    return NextResponse.json({ error: "需要管理员" }, { status: 403, headers });
+  if (!viewerId || !canViewFinanceCost(viewerRole)) {
+    return NextResponse.json({ error: "需要财务/超管权限" }, { status: 403, headers });
   }
 
   const targetUserId = request.nextUrl.searchParams.get("userId");

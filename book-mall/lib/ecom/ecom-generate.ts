@@ -89,7 +89,7 @@ export async function ecomGenerateImage(opts: {
     });
     if (!hold.ok) {
       throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
+        hold.reason === "insufficient_balance" ? "积分不足" : "积分不足",
       );
     }
     holdId = hold.holdId;
@@ -196,7 +196,7 @@ export async function ecomGenerateVideo(opts: {
     });
     if (!hold.ok) {
       throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
+        hold.reason === "insufficient_balance" ? "积分不足" : "积分不足",
       );
     }
     holdId = hold.holdId;

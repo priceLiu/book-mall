@@ -19,7 +19,7 @@ export default async function PricingPage() {
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id;
 
-  const [config, plansRaw, pricesRaw, byok, rates, teamTenants] = await Promise.all([
+  const [config, plansRaw, pricesRaw, byok, byokQuotas, rates, teamTenants] = await Promise.all([
     loadPricingConfig(),
     prisma.membershipPlan.findMany({
       where: { active: true },
@@ -31,6 +31,7 @@ export default async function PricingPage() {
       orderBy: { creditsPerUnit: "asc" },
     }),
     prisma.byokServiceConfig.findMany({ where: { active: true }, orderBy: { techServiceFeeYuan: "asc" } }),
+    prisma.byokTaskQuota.findMany({ where: { active: true }, orderBy: [{ scopeKey: "asc" }, { taskKind: "asc" }] }),
     prisma.resourceMeterRate.findMany({ where: { active: true }, orderBy: { resourceType: "asc" } }),
     userId
       ? listUserTenantMemberships(userId).then((ms) =>
@@ -70,7 +71,20 @@ export default async function PricingPage() {
         unit: m.unit,
         creditsPerUnit: m.creditsPerUnit,
       }))}
-      byok={byok.map((b) => ({ scopeKey: b.scopeKey, label: b.label, techServiceFeeYuan: Number(b.techServiceFeeYuan), interval: b.interval }))}
+      byok={byok.map((b) => ({
+        scopeKey: b.scopeKey,
+        label: b.label,
+        techServiceFeeYuan: Number(b.techServiceFeeYuan),
+        interval: b.interval,
+        minSeats: b.minSeats,
+      }))}
+      byokQuotas={byokQuotas.map((q) => ({
+        scopeKey: q.scopeKey,
+        taskKind: q.taskKind,
+        label: q.label,
+        monthlyIncluded: q.monthlyIncluded,
+        overageCredits: q.overageCredits,
+      }))}
       rates={rates.map((r) => ({ resourceType: r.resourceType, coefficientYuan: Number(r.coefficientYuan), unitLabel: r.unitLabel }))}
     />
   );

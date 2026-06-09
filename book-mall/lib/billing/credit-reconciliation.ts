@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { canonicalKeysByAliases } from "@/lib/model-catalog/resolve";
 
 import { sumResourceFees, type AccountRef } from "./credit-account-service";
+import { diffReconciliation } from "./reconciliation-diff";
 
 function num(v: unknown, fallback = 0): number {
   if (v == null) return fallback;
@@ -148,34 +149,15 @@ export async function reconcileByChannel(input: {
     vendorByCh.set(ch, (vendorByCh.get(ch) ?? 0) + r.amountYuan);
   }
 
-  const allChannels = new Set<string>([...internalByCh.keys(), ...vendorByCh.keys()]);
-  const diffs: ChannelReconciliationDiff[] = [];
-  let totalInternal = 0;
-  let totalVendor = 0;
-  for (const channel of allChannels) {
-    const internalCostYuan = internalByCh.get(channel) ?? 0;
-    const vendorCostYuan = vendorByCh.get(channel) ?? 0;
-    totalInternal += internalCostYuan;
-    totalVendor += vendorCostYuan;
-    const diffYuan = vendorCostYuan - internalCostYuan;
-    const denom = vendorCostYuan || internalCostYuan || 1;
-    const diffRate = diffYuan / denom;
-    let status: ChannelReconciliationDiff["status"];
-    if (internalCostYuan === 0) status = "MISSING_INTERNAL";
-    else if (vendorCostYuan === 0) status = "MISSING_VENDOR";
-    else if (Math.abs(diffRate) <= tolerance) status = "OK";
-    else if (diffYuan > 0) status = "OVER";
-    else status = "UNDER";
-    diffs.push({
-      channel,
-      internalCostYuan: Math.round(internalCostYuan * 1e6) / 1e6,
-      vendorCostYuan: Math.round(vendorCostYuan * 1e6) / 1e6,
-      diffYuan: Math.round(diffYuan * 1e6) / 1e6,
-      diffRate: Math.round(diffRate * 1e4) / 1e4,
-      status,
-    });
-  }
-  diffs.sort((a, b) => Math.abs(b.diffYuan) - Math.abs(a.diffYuan));
+  const { rows, totalInternal, totalVendor } = diffReconciliation(internalByCh, vendorByCh, tolerance);
+  const diffs: ChannelReconciliationDiff[] = rows.map((r) => ({
+    channel: r.key,
+    internalCostYuan: r.internalCostYuan,
+    vendorCostYuan: r.vendorCostYuan,
+    diffYuan: r.diffYuan,
+    diffRate: r.diffRate,
+    status: r.status,
+  }));
   return { diffs, totalInternal, totalVendor };
 }
 
@@ -216,42 +198,52 @@ export async function reconcileVendorBill(input: {
   const internal = await aggregateInternalCostByModel(input.periodKey);
   const internalByKey = new Map(internal.map((i) => [i.canonicalModelKey, i.internalCostYuan]));
 
-  const allKeys = new Set<string>([...internalByKey.keys(), ...vendorByKey.keys()]);
-  const diffs: ReconciliationDiff[] = [];
-  let totalInternal = 0;
-  let totalVendor = 0;
-
-  for (const key of allKeys) {
-    const internalCostYuan = internalByKey.get(key) ?? 0;
-    const vendorCostYuan = vendorByKey.get(key) ?? 0;
-    totalInternal += internalCostYuan;
-    totalVendor += vendorCostYuan;
-    const diffYuan = vendorCostYuan - internalCostYuan;
-    const denom = vendorCostYuan || internalCostYuan || 1;
-    const diffRate = diffYuan / denom;
-
-    let status: ReconciliationDiff["status"];
-    if (internalCostYuan === 0) status = "MISSING_INTERNAL";
-    else if (vendorCostYuan === 0) status = "MISSING_VENDOR";
-    else if (Math.abs(diffRate) <= tolerance) status = "OK";
-    else if (diffYuan > 0) status = "OVER";
-    else status = "UNDER";
-
-    diffs.push({
-      canonicalModelKey: key,
-      internalCostYuan: Math.round(internalCostYuan * 1e6) / 1e6,
-      vendorCostYuan: Math.round(vendorCostYuan * 1e6) / 1e6,
-      diffYuan: Math.round(diffYuan * 1e6) / 1e6,
-      diffRate: Math.round(diffRate * 1e4) / 1e4,
-      status,
-    });
-  }
-
-  diffs.sort((a, b) => Math.abs(b.diffYuan) - Math.abs(a.diffYuan));
+  const { rows, totalInternal, totalVendor } = diffReconciliation(internalByKey, vendorByKey, tolerance);
+  const diffs: ReconciliationDiff[] = rows.map((r) => ({
+    canonicalModelKey: r.key,
+    internalCostYuan: r.internalCostYuan,
+    vendorCostYuan: r.vendorCostYuan,
+    diffYuan: r.diffYuan,
+    diffRate: r.diffRate,
+    status: r.status,
+  }));
   return { diffs, totalInternal, totalVendor };
 }
 
 // ——————————————————— 用户对帐账单 ———————————————————
+
+/**
+ * 视频「先冻结后渲染」的实扣记录来自 SETTLE 流水（credits=0，金额记在 GatewayRequestLog.creditsCharged）。
+ * 这里把 SETTLE 还原为「按成员/按模型」的消耗行，供账单聚合（与 CONSUME 合并统计）。
+ */
+async function settleConsumptionRows(
+  accountId: string,
+  from: Date,
+  to: Date,
+): Promise<{ actorUserId: string | null; canonicalModelKey: string; credits: number }[]> {
+  const rows = await prisma.creditLedger.findMany({
+    where: { accountId, type: "SETTLE", createdAt: { gte: from, lt: to } },
+    select: { actorUserId: true, refId: true },
+  });
+  const ids = rows.map((r) => r.refId).filter((x): x is string => Boolean(x));
+  const logs = ids.length
+    ? await prisma.gatewayRequestLog.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, canonicalModelKey: true, model: true, creditsCharged: true },
+      })
+    : [];
+  const byLog = new Map(logs.map((l) => [l.id, l]));
+  return rows
+    .map((r) => {
+      const log = r.refId ? byLog.get(r.refId) : null;
+      return {
+        actorUserId: r.actorUserId ?? null,
+        canonicalModelKey: log?.canonicalModelKey ?? log?.model ?? "(未归口)",
+        credits: num(log?.creditsCharged, 0),
+      };
+    })
+    .filter((r) => r.credits > 0);
+}
 
 export interface UserCreditBill {
   periodKey: string;
@@ -317,13 +309,25 @@ export async function buildUserCreditBill(input: {
     byModelMap.set(key, cur);
   }
 
+  // 视频冻结结算（SETTLE）并入消耗与按模型统计
+  const settleRows = await settleConsumptionRows(account.id, from, to);
+  let videoConsumed = 0;
+  for (const r of settleRows) {
+    videoConsumed += r.credits;
+    const cur = byModelMap.get(r.canonicalModelKey) ?? { credits: 0, count: 0 };
+    cur.credits += r.credits;
+    cur.count += 1;
+    byModelMap.set(r.canonicalModelKey, cur);
+  }
+  const consumedTotal = consumed + videoConsumed;
+
   return {
     periodKey: input.periodKey,
     granted,
-    consumed,
+    consumed: consumedTotal,
     refunded,
     topup,
-    net: granted + topup + refunded - consumed,
+    net: granted + topup + refunded - consumedTotal,
     byModel: [...byModelMap.entries()]
       .map(([canonicalModelKey, v]) => ({ canonicalModelKey, credits: v.credits, count: v.count }))
       .sort((a, b) => b.credits - a.credits),
@@ -405,6 +409,20 @@ export async function buildTeamCreditBill(input: {
       mk.credits += credits;
       mk.count += 1;
       cur.byModel.set(key, mk);
+      byMember.set(uid, cur);
+    }
+
+    // 视频冻结结算（SETTLE）按成员并入
+    const settleRows = await settleConsumptionRows(account.id, from, to);
+    for (const r of settleRows) {
+      const uid = r.actorUserId ?? "(系统)";
+      const cur = byMember.get(uid) ?? { consumed: 0, count: 0, byModel: new Map() };
+      cur.consumed += r.credits;
+      cur.count += 1;
+      const mk = cur.byModel.get(r.canonicalModelKey) ?? { credits: 0, count: 0 };
+      mk.credits += r.credits;
+      mk.count += 1;
+      cur.byModel.set(r.canonicalModelKey, mk);
       byMember.set(uid, cur);
     }
 

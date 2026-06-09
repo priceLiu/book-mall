@@ -66,7 +66,6 @@ export function buildAccountNavMenuGroups(input: {
         { kind: "link", href: "/account/billing", label: "费用与明细", icon: Receipt, exact: true },
         { kind: "link", href: "/account/tool-service-fee", label: "工具技术服务费", icon: CreditCard },
         { kind: "link", href: "/account/subscription", label: "订阅中心", icon: Wallet },
-        { kind: "link", href: "/account/withdraw", label: "余额提现", icon: Wallet },
       ],
     },
   ];

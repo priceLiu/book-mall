@@ -2,21 +2,12 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { serviceFeeSettleJson, TOOL_SERVICE_FEE_MODE } from "@/lib/tool-service-fee-mode";
-import { postToolUsageFromServerWithRetries } from "@/lib/forward-tools-usage-server";
 import { pollDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
-import {
-  countWanxSucceededImages,
-  type WanxTaskPollOutput,
-} from "@/lib/text-to-image-dashscope";
-import {
-  computeTextToImageChargePoints,
-  getTextToImageSchemeModelId,
-} from "@/lib/tools-scheme-a-pricing";
-import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
+import type { WanxTaskPollOutput } from "@/lib/text-to-image-dashscope";
 
 export const runtime = "nodejs";
 
-/** 文生图单次生成扣费：Phase D 技术服务费模式下不扣点；legacy 仍走方案 A。 */
+/** 文生图结算：扣费由 Gateway 积分结算；本路由仅校验任务成功。 */
 export async function POST(req: Request) {
   const suite = await requireToolSuiteNavAccess("text-to-image");
   if (!suite.ok) return suite.response;
@@ -38,35 +29,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "缺少 taskId" }, { status: 400 });
   }
 
-  if (TOOL_SERVICE_FEE_MODE) {
-    const polled = await pollDashscopeJobFromServer({
-      taskId,
-      gatewayLogId:
-        typeof body.gatewayLogId === "string" && body.gatewayLogId.trim().length > 0
-          ? body.gatewayLogId.trim()
-          : undefined,
-    });
-    if (!polled.ok) {
-      return NextResponse.json({ error: polled.error }, { status: polled.status ?? 502 });
-    }
-    const output = polled.output as WanxTaskPollOutput;
-    const status = output.task_status ?? "";
-    if (status !== "SUCCEEDED") {
-      return NextResponse.json(
-        {
-          error: `任务未完成，当前状态：${status || "UNKNOWN"}`,
-          taskStatus: status,
-        },
-        { status: 409 },
-      );
-    }
-    return NextResponse.json(serviceFeeSettleJson());
-  }
-
-  const holdId =
-    typeof body.holdId === "string" && body.holdId.trim().length > 0
-      ? body.holdId.trim()
-      : undefined;
   const gatewayLogId =
     typeof body.gatewayLogId === "string" && body.gatewayLogId.trim().length > 0
       ? body.gatewayLogId.trim()
@@ -81,62 +43,14 @@ export async function POST(req: Request) {
   const status = output.task_status ?? "";
   if (status !== "SUCCEEDED") {
     return NextResponse.json(
-      {
-        error: `任务未完成，当前状态：${status || "UNKNOWN"}`,
-        taskStatus: status,
-      },
+      { error: `任务未完成，当前状态：${status || "UNKNOWN"}`, taskStatus: status },
       { status: 409 },
     );
   }
 
-  const billTaskId = output.task_id?.trim() || taskId;
-  const imgModel = getTextToImageSchemeModelId();
-  const imageCount = countWanxSucceededImages(output);
-  const { multiplier: retailMult } = await getSchemeARetailMultiplierServer({
-    toolKey: "text-to-image",
-    modelKey: imgModel,
-  });
-  const costPoints = computeTextToImageChargePoints(imageCount, imgModel, retailMult);
-  if (costPoints <= 0) {
-    return NextResponse.json(
-      { error: "文生图方案 A 无法解析扣费点数，请联系管理员检查 tools-scheme-a-catalog" },
-      { status: 503 },
-    );
+  if (TOOL_SERVICE_FEE_MODE) {
+    return NextResponse.json(serviceFeeSettleJson());
   }
 
-  let usage;
-  try {
-    usage = await postToolUsageFromServerWithRetries({
-      toolKey: "text-to-image",
-      action: "invoke",
-      meta: {
-        taskId: billTaskId,
-        modelId: imgModel,
-        pricingScheme: "tools_scheme_a",
-        textToImageModel: imgModel,
-        imageCount,
-        retailMultiplier: retailMult,
-      },
-      ...(holdId ? { holdId } : {}),
-    });
-  } catch (e) {
-    console.error("[text-to-image/settle] usage POST failed after retries", e);
-    return NextResponse.json(
-      {
-        error:
-          "计费上报暂时不可用（网络异常）。图片已生成；请稍后刷新费用明细核对是否记账，或在弹层内点击「重试计费」。",
-      },
-      { status: 503 },
-    );
-  }
-
-  if (!usage.ok) {
-    const msg =
-      usage.reason === "no_session"
-        ? "请先登录工具站"
-        : "工具站未配置 MAIN_SITE_ORIGIN，无法计费";
-    return NextResponse.json({ error: msg }, { status: 503 });
-  }
-
-  return NextResponse.json(usage.data, { status: usage.status });
+  return NextResponse.json({ ok: true, recorded: false, creditBilling: true });
 }

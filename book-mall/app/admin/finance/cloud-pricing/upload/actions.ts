@@ -16,6 +16,7 @@ import {
   loadCurrentPricingDrafts,
   mergeCsvImportIntoCurrent,
 } from "@/lib/pricing/pricing-import-service";
+import { syncModelCostFromPricingSource } from "@/lib/finance/sync-model-cost-from-pricing-source";
 
 export type AnalyzePreview = {
   ok: true;
@@ -111,6 +112,7 @@ export async function importUploadAction(formData: FormData): Promise<
       importedByUserId: session.user.id,
       lines: merged,
     });
+    await syncModelCostFromPricingSource(versionId);
     revalidatePath("/admin/finance/cloud-pricing");
     return { ok: true, versionId, rowCount: merged.length };
   } catch (e) {

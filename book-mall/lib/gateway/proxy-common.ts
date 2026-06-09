@@ -28,9 +28,16 @@ import {
 } from "./credit-billing-guard";
 import {
   refundFailedGatewayLog,
+  reserveVideoCreditsForLog,
   settleSucceededGatewayLog,
 } from "@/lib/billing/gateway-credit-settlement";
 import { assertCreditsBeforeGenerate } from "@/lib/billing/credit-pre-check";
+import {
+  guardVideoGenerate,
+  releaseVideoGenerate,
+  resolveVideoRiskContext,
+} from "@/lib/billing/video-risk-control";
+import { assertByokQuotaBeforeGenerate } from "@/lib/billing/byok-overage-service";
 import { resolveGatewayLogBillingMode } from "@/lib/billing/gateway-billing-mode";
 import {
   acquireTenantSlot,
@@ -84,7 +91,12 @@ export async function createRequestLog(opts: {
   const route = routeGatewayModel(opts.model);
   const billingMode = await resolveGatewayLogBillingMode({
     tenantId: opts.tenantId,
+    credentialId: opts.credentialId,
   });
+
+  const isVideoReq = (opts.requestKind ?? route.requestKind) === "VIDEO";
+  let riskAccountId: string | null = null;
+  let riskPopup: string | undefined;
 
   // 团队共享积分池：余额不足则拒绝发起（用完即停）
   if (billingMode === "PLATFORM_CREDIT") {
@@ -93,10 +105,28 @@ export async function createRequestLog(opts: {
       actorBookUserId: opts.actorBookUserId,
       apiKeyId: opts.apiKeyId,
       model: opts.model,
+      requestKind: opts.requestKind ?? route.requestKind,
+    });
+    // 视频专项风控（并发/队列/单日/批量/冷却/异常阶梯）
+    if (isVideoReq) {
+      const g = await guardVideoGenerate({
+        tenantId: opts.tenantId,
+        actorBookUserId: opts.actorBookUserId,
+        apiKeyId: opts.apiKeyId,
+        batchCount: 1,
+      });
+      riskAccountId = g.accountId;
+      riskPopup = g.riskPopup;
+    }
+  } else if (billingMode === "BYOK") {
+    await assertByokQuotaBeforeGenerate({
+      tenantId: opts.tenantId,
+      actorBookUserId: opts.actorBookUserId,
+      apiKeyId: opts.apiKeyId,
+      requestKind: opts.requestKind ?? route.requestKind,
+      inputSummary: opts.inputSummary,
     });
   }
-
-  // 租户并发限流（仅配置 REDIS_URL 时生效；否则放行）
   if (isConcurrencyEnabled() && opts.tenantId) {
     const tenant = await prisma.tenant.findUnique({
       where: { id: opts.tenantId },
@@ -107,7 +137,7 @@ export async function createRequestLog(opts: {
     if (!slot.ok) throw new ConcurrencyLimitError(slot.max ?? max);
   }
 
-  return prisma.gatewayRequestLog.create({
+  const log = await prisma.gatewayRequestLog.create({
     data: {
       userId: opts.userId,
       apiKeyId: opts.apiKeyId,
@@ -119,7 +149,15 @@ export async function createRequestLog(opts: {
       status: "RUNNING",
       clientSource: opts.clientSource ?? "EXTERNAL",
       clientPage: opts.clientPage ?? undefined,
-      inputSummary: opts.inputSummary ?? undefined,
+      inputSummary:
+        riskPopup != null
+          ? {
+              ...(opts.inputSummary && typeof opts.inputSummary === "object" && !Array.isArray(opts.inputSummary)
+                ? (opts.inputSummary as Record<string, unknown>)
+                : {}),
+              videoRiskPopup: riskPopup,
+            }
+          : (opts.inputSummary ?? undefined),
       storyProjectId: opts.storyProjectId ?? undefined,
       storyTaskId: opts.storyTaskId ?? undefined,
       tenantId: opts.tenantId ?? undefined,
@@ -129,6 +167,27 @@ export async function createRequestLog(opts: {
       submittedAt: new Date(),
     },
   });
+
+  // 视频「先冻结后渲染」：发起前冻结预扣；余额不足回滚并阻断（释放并发槽与风控占用）
+  if (billingMode === "PLATFORM_CREDIT" && log.requestKind === "VIDEO") {
+    try {
+      await reserveVideoCreditsForLog(log);
+    } catch (e) {
+      if (isConcurrencyEnabled() && opts.tenantId) {
+        await releaseTenantSlot(opts.tenantId).catch(() => undefined);
+      }
+      await releaseVideoGenerate(riskAccountId).catch(() => undefined);
+      await prisma.gatewayRequestLog
+        .update({
+          where: { id: log.id },
+          data: { status: "FAILED", failCode: "INSUFFICIENT_CREDITS", failMessage: (e as Error).message, completedAt: new Date() },
+        })
+        .catch(() => undefined);
+      throw e;
+    }
+  }
+
+  return log;
 }
 
 export async function finalizeRequestLog(
@@ -153,6 +212,20 @@ export async function finalizeRequestLog(
   if (isConcurrencyEnabled() && log.tenantId) {
     try {
       await releaseTenantSlot(log.tenantId);
+    } catch {
+      // 释放失败不影响结算（有 TTL 兜底）
+    }
+  }
+
+  // 视频专项风控：任务结束释放并发与队列计数
+  if (isConcurrencyEnabled() && log.requestKind === "VIDEO") {
+    try {
+      const ctx = await resolveVideoRiskContext({
+        tenantId: log.tenantId,
+        actorBookUserId: log.actorBookUserId,
+        apiKeyId: log.apiKeyId,
+      });
+      await releaseVideoGenerate(ctx?.accountId ?? null);
     } catch {
       // 释放失败不影响结算（有 TTL 兜底）
     }

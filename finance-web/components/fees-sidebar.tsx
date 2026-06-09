@@ -15,6 +15,7 @@ import { fetchBookMallViewerUser, type BookMallViewerUser } from "@/lib/book-mal
 const billingChildren = [
   { href: "/fees/billing/overview", label: "账单概览" },
   { href: "/fees/billing/details", label: "账单详情" },
+  { href: "/fees/usage", label: "积分用量" },
   { href: "/fees/billing/subscriptions", label: "账单订阅" },
 ];
 

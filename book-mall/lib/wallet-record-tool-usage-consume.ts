@@ -2,6 +2,12 @@ import type { Prisma } from "@prisma/client";
 import { ModelAliasSource } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
+  consumeCredits,
+  getPoolBalances,
+  type AccountRef,
+} from "@/lib/billing/credit-account-service";
+import { settleCreditHold } from "@/lib/credit-holds";
+import {
   buildToolUsageBillingLineData,
   type ToolUsagePricingSnapshot,
   type ToolUsageCanonicalHint,
@@ -112,14 +118,15 @@ export type RecordToolUsageConsumeResult =
       ok: false;
       reason: "insufficient_balance";
       balancePoints: number;
-      /** v002 P2-3：当因低于水位线被拦截时，返回当前生效的水位线点数（便于 UI 提示） */
-      watermarkPoints?: number;
-      /** 触发原因：纯余额不足 vs 余额减预扣后会破水位线 */
-      gate?: "balance" | "watermark";
+      gate?: "balance";
     };
 
+function accountRef(userId: string): AccountRef {
+  return { ownerType: "USER", ownerId: userId };
+}
+
 /**
- * 记工具扣费流水并同步扣减钱包（同一事务）。
+ * 记工具扣费流水并同步扣减积分（同一事务外顺序：预占结算或实扣）。
  */
 export async function recordToolUsageAndConsumeWallet(opts: {
   userId: string;
@@ -127,21 +134,13 @@ export async function recordToolUsageAndConsumeWallet(opts: {
   action: string;
   costPoints: number;
   meta: Prisma.InputJsonValue | undefined;
-  /**
-   * v002：调用方（`POST /api/sso/tools/usage` 等）解析 `ToolBillablePrice` 后传入的快照，
-   * 写 ToolBillingDetailLine 时一次性固化 internal* 列。未传入则 internal* 列为空（兼容旧路径）。
-   */
   pricingSnapshot?: ToolUsagePricingSnapshot;
-  /** v003：按秒计费时实际计费秒数（已含 minBilledVideoSec 兜底），写入 ToolUsageEvent.billedVideoSec */
   billedVideoSec?: number | null;
-  /** v003：与本次 settle 绑定的 WalletHold.id（若走 reserve→settle 流程） */
+  /** 预占 holdId（taskKey）；财务 2.0 走 credit-holds */
   walletHoldId?: string | null;
 }): Promise<RecordToolUsageConsumeResult> {
-  const key = toolUsageWalletIdempotencyKey(
-    opts.toolKey,
-    opts.action,
-    opts.meta,
-  );
+  const credits = Math.max(0, Math.round(opts.costPoints));
+  const key = toolUsageWalletIdempotencyKey(opts.toolKey, opts.action, opts.meta);
 
   // v003：把 meta 里的"内部模型 id"反查 ModelCatalog（命中则把 canonical 写进 cloudRow）。
   // 事务前查询，单次 SELECT；命中 → 落地，没命中 → 走 toolKeyToLabel 兜底（与旧行为一致）。
@@ -152,188 +151,104 @@ export async function recordToolUsageAndConsumeWallet(opts: {
   const userHint = await resolveUserHint(opts.userId);
 
   try {
-    return await prisma.$transaction(async (tx) => {
-      if (key) {
-        const dup = await tx.walletEntry.findUnique({
-          where: { idempotencyKey: key },
-          select: { id: true },
+    if (key) {
+      const dup = await prisma.creditLedger.findUnique({
+        where: { idempotencyKey: key },
+        select: { id: true },
+      });
+      if (dup) return { ok: false, reason: "duplicate" };
+    }
+
+    const ref = accountRef(opts.userId);
+    const pools = await getPoolBalances(ref);
+    const available = pools.general.balance - pools.general.reserved;
+    if (credits > 0 && available < credits && !opts.walletHoldId) {
+      return {
+        ok: false,
+        reason: "insufficient_balance",
+        balancePoints: pools.general.balance,
+        gate: "balance",
+      };
+    }
+
+    const canonical = await resolveCanonicalFromMeta(opts.meta);
+    const userHint = await resolveUserHint(opts.userId);
+
+    let balanceAfter = pools.general.balance;
+
+    if (credits > 0) {
+      const holdId = opts.walletHoldId?.trim();
+      const settled =
+        holdId != null && holdId.length > 0
+          ? await settleCreditHold({
+              userId: opts.userId,
+              holdId,
+              actualCredits: credits,
+              idempotencyKey: key ?? undefined,
+            })
+          : false;
+
+      if (!settled) {
+        const res = await consumeCredits({
+          ref,
+          credits,
+          pool: "GENERAL",
+          idempotencyKey: key ?? undefined,
+          description: `工具消耗 · ${opts.toolKey} · ${opts.action}`,
         });
-        if (dup) return { ok: false, reason: "duplicate" };
+        balanceAfter = res.balanceAfter;
+      } else {
+        const after = await getPoolBalances(ref);
+        balanceAfter = after.general.balance;
       }
+    }
 
-      await tx.wallet.upsert({
-        where: { userId: opts.userId },
-        create: { userId: opts.userId },
-        update: {},
-      });
+    const ev = await prisma.toolUsageEvent.create({
+      data: {
+        userId: opts.userId,
+        toolKey: opts.toolKey,
+        action: opts.action,
+        costPoints: credits,
+        ...(opts.meta !== undefined ? { meta: opts.meta } : {}),
+        ...(typeof opts.billedVideoSec === "number" && opts.billedVideoSec > 0
+          ? { billedVideoSec: opts.billedVideoSec }
+          : {}),
+      },
+    });
 
-      /**
-       * v002 P2-3 + v003 P5：水位线开跑前硬门禁。
-       *
-       * available = balancePoints
-       *           − frozenPoints
-       *           − Σ(WalletHold WHERE userId AND status=HELD AND id != settlingHoldId)
-       *
-       * 关键修复：必须把"该用户其它仍在 HELD 状态"的预占用一起扣掉，否则可能出现：
-       *   - balance=100，HoldA reserved=60（HELD），现在用 HoldB 来 settle 50
-       *   - 旧逻辑：available=100，50 < 100 + watermark 不报错 → 实际可用余额 -10
-       *   - 新逻辑：available=100 − 60 = 40，50 > 40 → 立即报 watermark 错
-       * 当前 settle 自己绑定的 hold（settlingHoldId）不计入扣减，因为它的"占用额度"即将被本次 settle 释放并替换成真实扣费。
-       */
-      const cfg = await tx.platformConfig.findUnique({
-        where: { id: "default" },
-        select: { minBalanceLinePoints: true },
-      });
-      const watermark =
-        typeof cfg?.minBalanceLinePoints === "number" && cfg.minBalanceLinePoints > 0
-          ? cfg.minBalanceLinePoints
-          : 0;
+    const refModel = schemeARefModelFromMeta(opts.meta);
+    if (refModel === "aitryon-refiner" && credits > 0) {
+      const billed =
+        opts.pricingSnapshot?.billedUnit === "张" &&
+        typeof opts.pricingSnapshot.billedQty === "number" &&
+        opts.pricingSnapshot.billedQty > 0
+          ? opts.pricingSnapshot.billedQty
+          : 1;
+      await incrementModelUsage(prisma, opts.userId, "aitryon-refiner", billed);
+    }
 
-      const walletNow = await tx.wallet.findUniqueOrThrow({
-        where: { userId: opts.userId },
-        select: { balancePoints: true, frozenPoints: true },
-      });
-      const settlingHoldId = opts.walletHoldId ?? null;
-      const otherHeldAgg = await tx.walletHold.aggregate({
-        where: {
-          userId: opts.userId,
-          status: "HELD",
-          ...(settlingHoldId ? { id: { not: settlingHoldId } } : {}),
-        },
-        _sum: { reservedPoints: true },
-      });
-      const otherHeld = otherHeldAgg._sum.reservedPoints ?? 0;
-      const available = walletNow.balancePoints - walletNow.frozenPoints - otherHeld;
-
-      if (available < opts.costPoints) {
-        return {
-          ok: false,
-          reason: "insufficient_balance",
-          balancePoints: walletNow.balancePoints,
-          watermarkPoints: watermark,
-          gate: "balance",
-        };
-      }
-      if (watermark > 0 && available - opts.costPoints < watermark) {
-        return {
-          ok: false,
-          reason: "insufficient_balance",
-          balancePoints: walletNow.balancePoints,
-          watermarkPoints: watermark,
-          gate: "watermark",
-        };
-      }
-
-      const dec = await tx.wallet.updateMany({
-        where: {
-          userId: opts.userId,
-          balancePoints: { gte: opts.costPoints },
-        },
-        data: { balancePoints: { decrement: opts.costPoints } },
-      });
-
-      if (dec.count !== 1) {
-        const w = await tx.wallet.findUniqueOrThrow({
-          where: { userId: opts.userId },
-          select: { balancePoints: true },
-        });
-        return {
-          ok: false,
-          reason: "insufficient_balance",
-          balancePoints: w.balancePoints,
-          watermarkPoints: watermark,
-          gate: "balance",
-        };
-      }
-
-      const wallet = await tx.wallet.findUniqueOrThrow({
-        where: { userId: opts.userId },
-      });
-
-      const ev = await tx.toolUsageEvent.create({
-        data: {
+    if (credits > 0) {
+      await prisma.toolBillingDetailLine.create({
+        data: buildToolUsageBillingLineData({
           userId: opts.userId,
           toolKey: opts.toolKey,
           action: opts.action,
-          costPoints: opts.costPoints,
-          ...(opts.meta !== undefined ? { meta: opts.meta } : {}),
-          ...(typeof opts.billedVideoSec === "number" && opts.billedVideoSec > 0
-            ? { billedVideoSec: opts.billedVideoSec }
-            : {}),
-          ...(opts.walletHoldId ? { walletHoldId: opts.walletHoldId } : {}),
-        },
+          costPoints: credits,
+          meta: opts.meta,
+          usageEventId: ev.id,
+          createdAt: ev.createdAt,
+          snap: opts.pricingSnapshot,
+          canonical,
+          userHint,
+        }),
       });
+    }
 
-      /**
-       * v003：若本次扣费绑定到一个 WalletHold（reserve→settle 流程），同事务把 hold 转 SETTLED；
-       * 状态校验：仅 HELD 可 settle，避免重复结算或对已 RELEASED/EXPIRED 的 hold 误算。
-       */
-      if (opts.walletHoldId) {
-        const settle = await tx.walletHold.updateMany({
-          where: { id: opts.walletHoldId, status: "HELD" },
-          data: {
-            status: "SETTLED",
-            settledChargePoints: opts.costPoints,
-            settledUsageEventId: ev.id,
-          },
-        });
-        if (settle.count !== 1) {
-          throw new Error(`WalletHold ${opts.walletHoldId} 不可结算（已 SETTLED/RELEASED/EXPIRED 或不存在）`);
-        }
-      }
-
-      await tx.walletEntry.create({
-        data: {
-          walletId: wallet.id,
-          type: "CONSUME",
-          amountPoints: -opts.costPoints,
-          balanceAfterPoints: wallet.balancePoints,
-          idempotencyKey: key ?? undefined,
-          description: `工具消耗 · ${opts.toolKey} · ${opts.action} · ¥${(opts.costPoints / 100).toFixed(2)}`,
-        },
-      });
-
-      const refModel = schemeARefModelFromMeta(opts.meta);
-      if (refModel === "aitryon-refiner" && opts.costPoints > 0) {
-        const billed =
-          opts.pricingSnapshot?.billedUnit === "张" &&
-          typeof opts.pricingSnapshot.billedQty === "number" &&
-          opts.pricingSnapshot.billedQty > 0
-            ? opts.pricingSnapshot.billedQty
-            : 1;
-        await incrementModelUsage(tx, opts.userId, "aitryon-refiner", billed);
-      }
-
-      if (opts.costPoints > 0) {
-        await tx.toolBillingDetailLine.create({
-          data: buildToolUsageBillingLineData({
-            userId: opts.userId,
-            toolKey: opts.toolKey,
-            action: opts.action,
-            costPoints: opts.costPoints,
-            meta: opts.meta,
-            usageEventId: ev.id,
-            createdAt: ev.createdAt,
-            snap: opts.pricingSnapshot,
-            canonical,
-            userHint,
-          }),
-        });
-      }
-
-      return {
-        ok: true,
-        balanceAfterPoints: wallet.balancePoints,
-        usageEventId: ev.id,
-      };
-    },
-    // v003 fix：事务内有 8+ 次顺序 DB I/O（platformConfig + wallet + otherHeldAgg
-    // + wallet.updateMany + wallet.findFirst + toolUsageEvent + walletHold.updateMany?
-    // + walletEntry + toolBillingDetailLine）。Prisma 默认 interactive transaction 5s
-    // 在 dev 冷启动 / RTT 抖动时会打穿（P2028）。把 timeout 上调到 30s（同口径于
-    // apply-pending-migrations 的迁移事务），maxWait 给 10s 留排队余地。
-    // 真实生产 settle 一般 < 200ms，30s 仅作上限保护。
-    { maxWait: 10_000, timeout: 30_000 });
+    return {
+      ok: true,
+      balanceAfterPoints: balanceAfter,
+      usageEventId: ev.id,
+    };
   } catch (e) {
     const code =
       e && typeof e === "object" && "code" in e

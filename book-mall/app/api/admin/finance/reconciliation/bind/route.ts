@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { canViewFinanceCost } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { financeCorsHeaders } from "@/lib/finance/cors";
 
@@ -18,8 +19,8 @@ export async function OPTIONS(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const cors = financeCorsHeaders(request);
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "需要管理员" }, { status: 403, headers: cors });
+  if (!session?.user?.id || !canViewFinanceCost(session.user.role)) {
+    return NextResponse.json({ error: "需要财务管理员权限" }, { status: 403, headers: cors });
   }
 
   let body: { cloudAccountId?: string; userId?: string; cloudAccountName?: string; note?: string };
@@ -59,8 +60,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const cors = financeCorsHeaders(request);
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "需要管理员" }, { status: 403, headers: cors });
+  if (!session?.user?.id || !canViewFinanceCost(session.user.role)) {
+    return NextResponse.json({ error: "需要财务管理员权限" }, { status: 403, headers: cors });
   }
   const bindings = await prisma.cloudAccountBinding.findMany({
     orderBy: { createdAt: "desc" },

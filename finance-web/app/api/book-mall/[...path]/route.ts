@@ -21,8 +21,12 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
 
-  const body =
-    request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
+  let body: BodyInit | undefined;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    body = contentType?.includes("multipart/form-data")
+      ? await request.arrayBuffer()
+      : await request.text();
+  }
 
   try {
     const r = await fetch(upstream, {
@@ -54,6 +58,21 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
 }
 
 export async function PATCH(request: NextRequest, ctx: RouteCtx) {
+  const { path } = await ctx.params;
+  return proxyToBookMall(request, path);
+}
+
+export async function POST(request: NextRequest, ctx: RouteCtx) {
+  const { path } = await ctx.params;
+  return proxyToBookMall(request, path);
+}
+
+export async function PUT(request: NextRequest, ctx: RouteCtx) {
+  const { path } = await ctx.params;
+  return proxyToBookMall(request, path);
+}
+
+export async function DELETE(request: NextRequest, ctx: RouteCtx) {
   const { path } = await ctx.params;
   return proxyToBookMall(request, path);
 }

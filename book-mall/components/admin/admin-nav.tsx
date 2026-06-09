@@ -118,29 +118,95 @@ export function AdminNav({
             <DropdownMenuItem asChild>
               <Link href="/admin/refunds">提现审核</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/usage-overview">费用多维度概览</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/reconciliation">云账单对账</Link>
-            </DropdownMenuItem>
+            {financeWebOrigin ? (
+              <DropdownMenuItem asChild>
+                <a href={`${financeWebOrigin}/admin/usage-overview`} target="_blank" rel="noopener noreferrer">
+                  费用多维度概览（财务控制台）
+                </a>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem asChild>
+                <Link href="/admin/finance/usage-overview">费用多维度概览</Link>
+              </DropdownMenuItem>
+            )}
+            {financeWebOrigin ? (
+              <DropdownMenuItem asChild>
+                <a href={`${financeWebOrigin}/admin/reconciliation`} target="_blank" rel="noopener noreferrer">
+                  云账单对账（财务控制台）
+                </a>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem asChild>
+                <Link href="/admin/finance/reconciliation">云账单对账</Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem asChild>
               <Link href="/admin/finance/pricing-templates">计费模板与公式</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>积分计费（统一）</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/model-cost">模型成本与折扣</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/credit-pricing">积分报价计算器</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/membership-plans">会员套餐与席位</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/byok">BYOK 服务费与资源</Link>
-            </DropdownMenuItem>
+            {financeWebOrigin ? (
+              <>
+                <DropdownMenuItem asChild>
+                  <a href={`${financeWebOrigin}/admin/model-cost`} target="_blank" rel="noopener noreferrer">
+                    模型成本与折扣（财务控制台）
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`${financeWebOrigin}/admin/credit-pricing`} target="_blank" rel="noopener noreferrer">
+                    积分报价计算器（财务控制台）
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`${financeWebOrigin}/admin/membership-plans`} target="_blank" rel="noopener noreferrer">
+                    会员套餐与席位（财务控制台）
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`${financeWebOrigin}/admin/byok`} target="_blank" rel="noopener noreferrer">
+                    BYOK 服务费与资源（财务控制台）
+                  </a>
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/finance/model-cost">模型成本与折扣</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/finance/credit-pricing">积分报价计算器</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/finance/membership-plans">会员套餐与席位</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/finance/byok">BYOK 服务费与资源</Link>
+                </DropdownMenuItem>
+              </>
+            )}
+            {financeWebOrigin ? (
+              <>
+                <DropdownMenuItem asChild>
+                  <a href={`${financeWebOrigin}/admin/plan-change`} target="_blank" rel="noopener noreferrer">
+                    调价测算与审批（财务控制台）
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`${financeWebOrigin}/admin/pnl-alerts`} target="_blank" rel="noopener noreferrer">
+                    盈亏预警中心（财务控制台）
+                  </a>
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/finance/plan-change">调价测算与审批</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/finance/pnl-alerts">盈亏预警中心</Link>
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem asChild>
               <Link href="/pricing" target="_blank" rel="noopener noreferrer">
                 对外报价页（积分）

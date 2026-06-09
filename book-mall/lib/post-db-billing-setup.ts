@@ -7,7 +7,7 @@ import { backfillModelCatalogVendorFields } from "@/lib/model-catalog/backfill-v
 
 const BOOK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const MIN_ACTIVE_BILLABLE_ROWS = 50;
+const MIN_ACTIVE_COST_PROFILES = 25;
 
 export type PostDbBillingSetupResult = {
   realignRan: boolean;
@@ -17,7 +17,7 @@ export type PostDbBillingSetupResult = {
   refreshRan: boolean;
   refreshSummary: string | null;
   counts: {
-    activeBillablePrices: number;
+    activeCostProfiles: number;
     modelCatalog: number;
     modelAlias: number;
     catalogWithVendor: number;
@@ -43,19 +43,19 @@ export async function runPostDbBillingSetup(opts?: {
 }): Promise<PostDbBillingSetupResult> {
   console.log("[post-billing] start …");
 
-  const activeBefore = await prisma.toolBillablePrice.count({
+  const costProfilesBefore = await prisma.modelCostProfile.count({
     where: { active: true },
   });
   let realignRan = false;
-  if (activeBefore < MIN_ACTIVE_BILLABLE_ROWS) {
+  if (costProfilesBefore < MIN_ACTIVE_COST_PROFILES) {
     console.log(
-      `[post-billing] ToolBillablePrice active=${activeBefore} < ${MIN_ACTIVE_BILLABLE_ROWS} → pricing:realign-from-md:apply`,
+      `[post-billing] ModelCostProfile active=${costProfilesBefore} < ${MIN_ACTIVE_COST_PROFILES} → seed-credit-billing`,
     );
-    runPnpm("pricing:realign-from-md:apply");
+    runPnpm("exec dotenv -e .env.local -- tsx scripts/seed-credit-billing.ts");
     realignRan = true;
   } else {
     console.log(
-      `[post-billing] skip realign (active ToolBillablePrice=${activeBefore})`,
+      `[post-billing] skip seed-credit-billing (active ModelCostProfile=${costProfilesBefore})`,
     );
   }
 
@@ -100,7 +100,7 @@ export async function runPostDbBillingSetup(opts?: {
   }
 
   const counts = {
-    activeBillablePrices: await prisma.toolBillablePrice.count({
+    activeCostProfiles: await prisma.modelCostProfile.count({
       where: { active: true },
     }),
     modelCatalog: await prisma.modelCatalog.count({ where: { active: true } }),

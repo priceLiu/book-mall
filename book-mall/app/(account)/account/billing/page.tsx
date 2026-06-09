@@ -31,6 +31,8 @@ export default async function AccountBillingPage() {
   const financeBillingDetailsUrl = financeWebOrigin
     ? `${financeWebOrigin}/fees/billing/details?from=account`
     : null;
+  const financeUsageUrl = financeWebOrigin ? `${financeWebOrigin}/fees/usage` : null;
+  const financeTeamBillingUrl = financeWebOrigin ? `${financeWebOrigin}/team/billing` : null;
   const toolsExpenseHistoryUrl = toolsPublicOrigin
     ? `${toolsPublicOrigin}/app-history`
     : null;
@@ -74,6 +76,28 @@ export default async function AccountBillingPage() {
             >
               <ListChecks className="mr-1 inline h-3.5 w-3.5" aria-hidden />
               账单详情（财务控制台）
+            </a>
+          ) : null}
+          {financeUsageUrl ? (
+            <a
+              href={financeUsageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={accountInlineLinkClass()}
+            >
+              <ListChecks className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+              积分用量中心（财务 2.0）
+            </a>
+          ) : null}
+          {financeTeamBillingUrl ? (
+            <a
+              href={financeTeamBillingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={accountInlineLinkClass()}
+            >
+              <ListChecks className="mr-1 inline h-3.5 w-3.5" aria-hidden />
+              团队账单（财务 2.0）
             </a>
           ) : null}
           <a href={PRICING_DISCLOSURE_FROM_ACCOUNT_ALIAS} className={accountInlineLinkClass()}>

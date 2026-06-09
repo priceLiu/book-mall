@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { fetchBookMallViewerUser, type BookMallViewerUser } from "@/lib/book-mall-viewer-session";
+import { isPlatformStaff } from "@/lib/permissions";
 import {
   FEES_FROM_ACCOUNT_QUERY,
   FEES_FROM_ACCOUNT_VALUE,
@@ -34,13 +35,13 @@ function FinanceAppTopBarInner({ scope }: { scope: FinanceAppTopBarScope }) {
     return () => ac.abort();
   }, [base]);
 
-  const isAdmin = viewer?.role === "ADMIN";
-  /** 双证：费用区且从个人中心进入 → 始终按普通用户返程；/admin 链路由角色决定。 */
+  const isStaff = isPlatformStaff(viewer?.role);
+  /** 双证：费用区且从个人中心进入 → 始终按普通用户返程；/admin 链路由平台员工角色决定。 */
   const showUserBack =
-    scope === "admin" ? !isAdmin : fromPersonalCenter || !isAdmin;
+    scope === "admin" ? !isStaff : fromPersonalCenter || !isStaff;
 
   const homeBackHref = base ? (showUserBack ? `${base}/account` : `${base}/admin`) : "#";
-  const homeBackLabel = showUserBack ? "返回个人中心" : "返回主站管理后台";
+  const homeBackLabel = showUserBack ? "返回个人中心" : "返回主站后台";
 
   return (
     <header className="flex h-11 shrink-0 items-center justify-between border-b border-[#e8e8e8] bg-white px-4">

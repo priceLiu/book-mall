@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
+import { canViewFinanceCost } from "@/lib/auth/permissions";
 import { getToolsSsoSetupDiagnostics } from "@/lib/sso-tools-env";
 import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
 
@@ -21,7 +22,10 @@ export default async function AdminLayout({
 }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
-  if (session.user.role !== "ADMIN") redirect("/account");
+  // 后台外壳准入：ADMIN（历史）+ FINANCE + SUPER_ADMIN。各页再按 canViewFinanceCost /
+  // canManagePricing / canCreateProposal 做更细门禁。OPERATIONS 暂不进外壳（多数非财务页
+  // 仅靠本布局兜底，未逐页加权限，避免越权暴露），其提案能力待逐页鉴权后开放。
+  if (!canViewFinanceCost(session.user.role)) redirect("/account");
 
   const toolsSsoDiag = getToolsSsoSetupDiagnostics();
   const financeWebOrigin = getFinanceWebPublicOrigin();

@@ -1,4 +1,22 @@
-import type { PricingBillingKind, ToolBillablePrice } from "@prisma/client";
+import type { PricingBillingKind } from "@prisma/client";
+
+/** @deprecated 财务 2.0 遗留行形态（ToolBillablePrice 表已删除，仅供旧 UI 编译）。 */
+export type LegacyBillablePriceRow = {
+  id: string;
+  toolKey: string;
+  action: string | null;
+  pricePoints: number;
+  schemeARefModelKey: string | null;
+  schemeAUnitCostYuan: number | null;
+  schemeAAdminRetailMultiplier: number | null;
+  cloudModelKey: string | null;
+  cloudTierRaw: string | null;
+  cloudBillingKind: PricingBillingKind | null;
+  effectiveFrom: Date;
+  effectiveTo: Date | null;
+  active: boolean;
+  note: string | null;
+};
 
 /** 行的"生效状态"：从 active + effectiveFrom/To 与当前时间共同判定，便于 UI 提示哪一行是"当前生效"。 */
 export type BillableRowStatus =
@@ -62,23 +80,7 @@ export type CloudCostOverlay = {
   cloudCostDriftPercent: number | null;
 };
 
-export type AdminRowInput = Pick<
-  ToolBillablePrice,
-  | "id"
-  | "toolKey"
-  | "action"
-  | "schemeARefModelKey"
-  | "schemeAUnitCostYuan"
-  | "schemeAAdminRetailMultiplier"
-  | "pricePoints"
-  | "effectiveFrom"
-  | "effectiveTo"
-  | "active"
-  | "note"
-  | "cloudModelKey"
-  | "cloudTierRaw"
-  | "cloudBillingKind"
->;
+export type AdminRowInput = LegacyBillablePriceRow;
 
 export function deriveBillableRowStatus(
   row: AdminRowInput,

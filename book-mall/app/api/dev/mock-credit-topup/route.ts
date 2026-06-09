@@ -7,7 +7,7 @@ import {
   applyMockCreditTopup,
   type CreditTopupTarget,
 } from "@/lib/billing/apply-mock-credit-topup";
-import { CREDIT_TOPUP_PACKS } from "@/lib/billing/credit-topup-packs";
+import { ALL_CREDIT_TOPUP_PACKS } from "@/lib/billing/credit-topup-packs";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  let packId = CREDIT_TOPUP_PACKS[0].id;
+  let packId = ALL_CREDIT_TOPUP_PACKS[0].id;
   let target: CreditTopupTarget = "personal";
   let tenantId: string | null = null;
 
