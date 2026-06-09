@@ -15,10 +15,8 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 /**
- * v007 Round 5：列出"有账单明细的用户"——给 finance-web admin 用户列表页用。
- * - 仅 `ADMIN` 角色可访问；
- * - 返回 `{ users: [{ id, name, email, lineCount, latestAt }] }`，按 latestAt desc 排；
- * - 数据源：`ToolBillingDetailLine`（含 TOOL_USAGE_GENERATED + CLOUD_CSV_IMPORT 两类行）。
+ * 列出「有账单/用量记录的用户」——finance-web admin 用户列表页。
+ * Union：ToolBillingDetailLine + GatewayRequestLog（Finance 2.0）。
  */
 export async function GET(request: NextRequest) {
   const cors = financeCorsHeaders(request);
@@ -26,33 +24,78 @@ export async function GET(request: NextRequest) {
   if (!user) return financeUnauthorized(request);
   if (!canViewFinanceCost(user.role)) return financeForbidden(request, "需要财务/超管权限");
 
-  const grouped = await prisma.toolBillingDetailLine.groupBy({
-    by: ["userId"],
-    _count: { _all: true },
-    _max: { createdAt: true },
-    orderBy: { _max: { createdAt: "desc" } },
-    take: 200,
-  });
+  const [legacyGrouped, gatewayGrouped] = await Promise.all([
+    prisma.toolBillingDetailLine.groupBy({
+      by: ["userId"],
+      _count: { _all: true },
+      _max: { createdAt: true },
+    }),
+    prisma.gatewayRequestLog.groupBy({
+      by: ["actorBookUserId"],
+      where: { actorBookUserId: { not: null }, status: "SUCCEEDED" },
+      _count: { _all: true },
+      _max: { submittedAt: true },
+    }),
+  ]);
 
-  if (grouped.length === 0) {
+  const merged = new Map<
+    string,
+    { lineCount: number; latestAt: Date | null }
+  >();
+
+  for (const g of legacyGrouped) {
+    merged.set(g.userId, {
+      lineCount: g._count._all,
+      latestAt: g._max.createdAt,
+    });
+  }
+
+  for (const g of gatewayGrouped) {
+    const uid = g.actorBookUserId!;
+    const ex = merged.get(uid);
+    const gwLatest = g._max.submittedAt;
+    if (!ex) {
+      merged.set(uid, { lineCount: g._count._all, latestAt: gwLatest });
+    } else {
+      merged.set(uid, {
+        lineCount: ex.lineCount + g._count._all,
+        latestAt:
+          ex.latestAt && gwLatest
+            ? ex.latestAt > gwLatest
+              ? ex.latestAt
+              : gwLatest
+            : (ex.latestAt ?? gwLatest),
+      });
+    }
+  }
+
+  if (merged.size === 0) {
     return NextResponse.json({ users: [] }, { headers: cors });
   }
 
+  const sorted = Array.from(merged.entries())
+    .sort((a, b) => {
+      const ta = a[1].latestAt?.getTime() ?? 0;
+      const tb = b[1].latestAt?.getTime() ?? 0;
+      return tb - ta;
+    })
+    .slice(0, 200);
+
   const users = await prisma.user.findMany({
-    where: { id: { in: grouped.map((g) => g.userId) } },
+    where: { id: { in: sorted.map(([id]) => id) } },
     select: { id: true, name: true, email: true },
   });
   const userMap = new Map(users.map((u) => [u.id, u]));
 
-  const out = grouped
-    .map((g) => {
-      const u = userMap.get(g.userId);
+  const out = sorted
+    .map(([id, stats]) => {
+      const u = userMap.get(id);
       return {
-        id: g.userId,
+        id,
         name: u?.name ?? null,
         email: u?.email ?? null,
-        lineCount: g._count._all,
-        latestAt: g._max.createdAt?.toISOString() ?? null,
+        lineCount: stats.lineCount,
+        latestAt: stats.latestAt?.toISOString() ?? null,
       };
     })
     .filter((u) => u.email || u.name);

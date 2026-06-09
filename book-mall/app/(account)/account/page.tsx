@@ -2,17 +2,19 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { authOptions } from "@/lib/auth";
+import { getUserBillingPersona } from "@/lib/billing/billing-persona";
+import { getActiveByokSubscription } from "@/lib/billing/byok-subscription-service";
 import { getMembershipFlags } from "@/lib/membership";
-import { getGoldMemberAccess } from "@/lib/gold-member";
-import { userHasAnyActiveToolService } from "@/lib/tool-service-fee/periods";
-import { isToolsSsoConfigured } from "@/lib/sso-tools-env";
-import { getGatewayLinkStatusForUser } from "@/lib/canvas/book-gateway-link";
-import { getCanvasWebOrigin } from "@/lib/app-web-origins";
+import { getMembershipToolAccess } from "@/lib/membership-tool-access";
+import { getPoolBalances } from "@/lib/billing/credit-account-service";
+import {
+  getAccountByokTaskSummary,
+  getAccountUsageSummary,
+} from "@/lib/finance/account-usage-summary";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
 import { AccountOverviewCards } from "@/components/account/account-overview-cards";
 import { AccountDevActions } from "@/components/account/account-dev-actions";
-import { accountBodyTextLinkClass } from "@/components/account/account-nav-styles";
-import { hrefPricingDisclosureFromAccount } from "@/lib/pricing-disclosure-view";
+import { prisma } from "@/lib/prisma";
 
 export const metadata = {
   title: "概览 — 个人中心",
@@ -24,7 +26,7 @@ function toolsSsoErrBanner(code: string): { title: string; body: string } | null
       return {
         title: "未能打开 AI 工具站",
         body:
-          "当前账号不满足工具站准入：须为主站管理员，或至少开通一项有效的工具技术服务费。请在侧栏「工具技术服务费」开通。",
+          "当前账号不满足工具站准入：须为主站管理员，或持有有效会员套餐（个人或团队）。请在「会员套餐」页选购。",
       };
     case "SSO_CODE_PERSIST_FAILED":
       return {
@@ -61,19 +63,46 @@ export default async function AccountPage({
   const toolsBanner =
     toolsSsoErr.length > 0 ? toolsSsoErrBanner(toolsSsoErr) : null;
 
-  const [flags, goldAccess, hasToolService, gatewayStatus] = await Promise.all([
+  const billingPersona = await getUserBillingPersona(session.user.id);
+
+  const byokSubPromise =
+    billingPersona === "BYOK"
+      ? getActiveByokSubscription({ ownerType: "USER", ownerId: session.user.id })
+      : Promise.resolve(null);
+
+  const [flags, memberAccess, poolBalances, creditAcc, byokSub, usageSummary] = await Promise.all([
     getMembershipFlags(session.user.id),
-    getGoldMemberAccess(session.user.id),
-    userHasAnyActiveToolService(session.user.id),
-    getGatewayLinkStatusForUser(session.user.id),
+    getMembershipToolAccess(session.user.id),
+    getPoolBalances({ ownerType: "USER", ownerId: session.user.id }),
+    prisma.creditAccount.findUnique({
+      where: {
+        ownerType_ownerId: { ownerType: "USER", ownerId: session.user.id },
+      },
+      select: { currentPeriodEnd: true, planId: true, monthlyGrantCredits: true },
+    }),
+    byokSubPromise,
+    getAccountUsageSummary(session.user.id),
   ]);
 
-  const toolsSsoReady = isToolsSsoConfigured();
+  const byokTaskSummary =
+    billingPersona === "BYOK" && byokSub
+      ? await getAccountByokTaskSummary(session.user.id, byokSub.scopeKey)
+      : [];
+
+  const byokQuotas =
+    byokSub
+      ? await prisma.byokTaskQuota.findMany({
+          where: { scopeKey: byokSub.scopeKey, active: true },
+          orderBy: { taskKind: "asc" },
+        })
+      : [];
+
+  const membershipPeriodEnd =
+    billingPersona === "BYOK" && byokSub
+      ? byokSub.periodEnd
+      : (creditAcc?.currentPeriodEnd ?? null);
+
   const isAdminUser = session.user.role === "ADMIN";
-  const canLaunchTools =
-    toolsSsoReady && (isAdminUser || hasToolService);
-  const canLaunchCanvas = canLaunchTools;
-  const canvasOriginConfigured = Boolean(getCanvasWebOrigin().startsWith("http"));
 
   return (
     <>
@@ -92,37 +121,31 @@ export default async function AccountPage({
 
       <AccountSectionHeader
         title="概览"
-        description={
-          <>
-            钱包、订阅与工具准入一览。计费细则与提现说明见{" "}
-            <a
-              href={hrefPricingDisclosureFromAccount({ hash: "billing-policy" })}
-              className={accountBodyTextLinkClass()}
-            >
-              公示
-            </a>
-            ；其它模块请用左侧菜单切换。
-          </>
-        }
+        description="积分、计费身份与套餐状态一览；其它模块请用左侧菜单切换。"
       />
 
       <AccountOverviewCards
-        balancePoints={flags.balancePoints}
-        minBalanceLinePoints={flags.minBalanceLinePoints}
-        canUsePremiumMetered={flags.canUsePremiumMetered}
-        hasActiveSubscription={flags.hasActiveSubscription}
-        membershipPlanName={flags.membershipPlanName}
-        subscriptionEndsAt={flags.subscriptionEndsAt}
-        hasActiveToolProductSubscription={flags.hasActiveToolProductSubscription}
-        goldIsActive={goldAccess.isGoldMember}
-        goldMinBalanceLinePoints={goldAccess.minBalanceLinePoints}
-        goldHasRechargeHistory={goldAccess.hasRechargeHistory}
-        hasActiveToolService={hasToolService}
-        canLaunchTools={canLaunchTools}
-        showToolsCta={toolsSsoReady}
-        gatewayLinked={gatewayStatus.linked}
-        canLaunchCanvas={canLaunchCanvas}
-        canvasOriginConfigured={canvasOriginConfigured}
+        generalCredits={poolBalances.general.balance}
+        videoCredits={poolBalances.video.balance}
+        billingPersona={billingPersona}
+        membershipPlanName={memberAccess.planName}
+        membershipPeriodEnd={membershipPeriodEnd}
+        hasActiveMembership={memberAccess.ok}
+        hasActiveCourseSubscription={flags.hasActiveCourseProductSubscription || flags.hasActiveSubscription}
+        coursePlanName={flags.membershipPlanName}
+        courseSubscriptionEndsAt={flags.subscriptionEndsAt}
+        byokQuotas={byokQuotas.map((q) => ({
+          label: q.label,
+          monthlyIncluded: q.monthlyIncluded,
+          overageCredits: q.overageCredits,
+        }))}
+        legacyMonthlyGrantCredits={
+          billingPersona === "BYOK" && creditAcc?.monthlyGrantCredits
+            ? creditAcc.monthlyGrantCredits
+            : null
+        }
+        usageSummary={usageSummary}
+        byokTaskSummary={byokTaskSummary}
       />
 
       {process.env.NODE_ENV === "development" ? (

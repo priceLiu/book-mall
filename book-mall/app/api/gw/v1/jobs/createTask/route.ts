@@ -3,7 +3,7 @@ import {
   isGatewayAuthResponse,
   requireGatewayV1Auth,
 } from "@/lib/gateway/gateway-v1-route-auth";
-import { parseGatewayV1LogMeta } from "@/lib/gateway/gateway-v1-log-meta";
+import { parseGatewayV1LogMeta, logMetaToRequestLogFields } from "@/lib/gateway/gateway-v1-log-meta";
 import {
   createRequestLog,
   pickCredentialForKind,
@@ -136,10 +136,8 @@ export async function POST(request: NextRequest) {
     providerKind: route.providerKind,
     requestKind: route.requestKind,
     clientSource,
-    clientPage: logMeta.clientPage,
-    storyProjectId: logMeta.storyProjectId,
-    storyTaskId: logMeta.storyTaskId,
     inputSummary: buildGatewayInputSummary(model, inputForLog),
+    ...logMetaToRequestLogFields(logMeta),
   });
 
   try {

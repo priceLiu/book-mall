@@ -15,72 +15,72 @@ const PLATFORM_GATEWAY_MODELS: Array<{
   {
     id: "deepseek-v4-flash",
     name: "DeepSeek V4 Flash",
-    description: "Gateway · DeepSeek · 快速经济 · 提示词优化默认",
+    description: "快速经济 · 提示词优化默认",
   },
   {
     id: "deepseek-v4-pro",
     name: "DeepSeek V4 Pro",
-    description: "Gateway · DeepSeek · 更强推理",
+    description: "更强推理",
   },
   {
     id: "deepseek-chat",
     name: "DeepSeek Chat（兼容别名）",
-    description: "Gateway · DeepSeek · 等同 V4 Flash",
+    description: "等同 V4 Flash",
   },
   {
     id: "qwen3.5-27b",
     name: "Qwen3.5-27B",
-    description: "Gateway · 百炼 · 均衡性价比",
+    description: "均衡性价比",
   },
   {
     id: "qwen3.5-plus",
     name: "Qwen3.5-Plus",
-    description: "Gateway · 百炼 · 效果优先",
+    description: "效果优先",
   },
   {
     id: "qwen3.5-flash",
     name: "Qwen3.5-Flash",
-    description: "Gateway · 百炼 · 快速经济",
+    description: "快速经济",
   },
   {
     id: "MiniMax/MiniMax-M2.7",
     name: "MiniMax M2.7",
-    description: "Gateway · 百炼 · MiniMax 旗舰 · 编程/摘要",
+    description: "旗舰 · 编程/摘要",
   },
   {
     id: "MiniMax/MiniMax-M2.5",
     name: "MiniMax M2.5",
-    description: "Gateway · 百炼 · MiniMax M2.5（兼容）",
+    description: "兼容版",
   },
   {
     id: "gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
-    description: "Gateway · KIE · Google 快速多模态",
+    description: "Google 快速多模态",
   },
   {
     id: "gemini-3-flash",
     name: "Gemini 3 Flash",
-    description: "Gateway · KIE · 多模态 · Story 同款",
+    description: "多模态 · Story 同款",
   },
   {
     id: "doubao-seed-2.0-lite",
     name: "Doubao-Seed-2.0-lite",
-    description: "Gateway · 火山方舟 · 均衡性价比",
+    description: "均衡性价比",
   },
   {
     id: "doubao-seed-2.0-mini",
     name: "Doubao-Seed-2.0-mini",
-    description: "Gateway · 火山方舟 · 轻量快速",
+    description: "轻量快速",
   },
   {
     id: "doubao-lite-32k",
     name: "Doubao-lite-32k",
-    description: "Gateway · 火山方舟 · 32k（须在控制台开通）",
+    description: "32k 上下文（须在控制台开通）",
   },
   {
     id: "doubao-seedance-1.5-pro",
     name: "Doubao-Seedance-1.5-pro",
-    description: "Gateway · 火山方舟 · 视频生成（异步，非对话）",
+    description: "视频生成（异步，非对话）",
   },
 ];
 

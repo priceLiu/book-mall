@@ -32,7 +32,7 @@ interface RouteProps {
 const routeList: RouteProps[] = [
   { href: "#hero-video", label: "主屏" },
   { href: "#testimonials", label: "客户评价" },
-  { href: "#pricing", label: "价格" },
+  { href: "/pricing", label: "报价" },
 ];
 
 function BrandLogoLink({ onNavigate }: { onNavigate?: () => void }) {

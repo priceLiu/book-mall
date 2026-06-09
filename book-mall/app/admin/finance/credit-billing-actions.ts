@@ -136,6 +136,88 @@ export async function deleteModelCostAction(formData: FormData): Promise<ActionR
   return { ok: true };
 }
 
+export type ModelCostImportRow = {
+  vendor: string;
+  canonicalModelKey: string;
+  channel?: CreditChannel;
+  unit?: CreditCostUnit;
+  tierRaw?: string | null;
+  credentialId?: string | null;
+  listCostYuan: number;
+  discountRate?: number;
+  note?: string | null;
+  active?: boolean;
+};
+
+/** 批量导入/覆盖模型成本档（JSON 数组）。 */
+export async function importModelCostsAction(
+  rows: ModelCostImportRow[],
+): Promise<ActionResult<{ imported: number; skipped: number }>> {
+  const auth = await requireAdmin();
+  if (!auth.ok) return auth;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return { ok: false, error: "导入数据为空" };
+  }
+
+  let imported = 0;
+  let skipped = 0;
+
+  for (const raw of rows) {
+    const vendor = (raw.vendor ?? "").trim();
+    const canonicalModelKey = (raw.canonicalModelKey ?? "").trim();
+    if (!vendor || !canonicalModelKey) {
+      skipped++;
+      continue;
+    }
+    const listCostYuan = Number(raw.listCostYuan);
+    if (!Number.isFinite(listCostYuan) || listCostYuan < 0) {
+      skipped++;
+      continue;
+    }
+    const discountRate = Math.min(Math.max(Number(raw.discountRate ?? 0), 0), 1);
+    const channel = (raw.channel ?? "CHANNEL") as CreditChannel;
+    const unit = (raw.unit ?? "PER_IMAGE") as CreditCostUnit;
+    const tierRaw = raw.tierRaw?.trim() || null;
+    const netCostYuan = listCostYuan * (1 - discountRate);
+    const active = raw.active !== false;
+
+    const existing = await prisma.modelCostProfile.findFirst({
+      where: {
+        vendor,
+        canonicalModelKey,
+        channel,
+        unit,
+        tierRaw,
+      },
+    });
+
+    const data = {
+      vendor,
+      canonicalModelKey,
+      channel,
+      credentialId: raw.credentialId?.trim() || null,
+      unit,
+      tierRaw,
+      listCostYuan,
+      discountRate,
+      netCostYuan,
+      note: raw.note?.trim() || null,
+      active,
+    };
+
+    if (existing) {
+      await prisma.modelCostProfile.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.modelCostProfile.create({ data });
+    }
+    imported++;
+  }
+
+  revalidatePath("/admin/finance/model-cost");
+  revalidatePath("/admin/finance/credit-pricing");
+  return { ok: true, data: { imported, skipped } };
+}
+
 // ——————————————————— 报价计算 + 发布 ———————————————————
 
 export interface CalcPreview {

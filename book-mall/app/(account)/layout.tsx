@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { userHasAnyActiveToolService } from "@/lib/tool-service-fee/periods";
+import { userHasMembershipToolAccess } from "@/lib/membership-tool-access";
 import { isToolsSsoConfigured } from "@/lib/sso-tools-env";
 import { getGatewayLinkStatusForUser } from "@/lib/canvas/book-gateway-link";
 import { getCanvasWebOrigin, getEcommerceWebOrigin } from "@/lib/app-web-origins";
@@ -21,34 +21,44 @@ export default async function AccountGroupLayout({
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
 
-  const [profile, hasToolService, gatewayStatus, ecomAccess] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { image: true, name: true, email: true },
-    }),
-    userHasAnyActiveToolService(session.user.id),
+  const userRecord = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      image: true,
+      name: true,
+      email: true,
+      billingPersona: true,
+      billingPersonaLockedAt: true,
+    },
+  });
+
+  if (!userRecord?.billingPersonaLockedAt) {
+    redirect("/onboarding/billing-persona");
+  }
+
+  const [profile, hasMembership, gatewayStatus, ecomAccess] = await Promise.all([
+    Promise.resolve(userRecord),
+    userHasMembershipToolAccess(session.user.id),
     getGatewayLinkStatusForUser(session.user.id),
     userCanAccessEcommerceToolkit(session.user.id),
   ]);
 
   const toolsSsoReady = isToolsSsoConfigured();
-  const isAdminUser = session.user.role === "ADMIN";
-  const canLaunchTools =
-    toolsSsoReady && (isAdminUser || hasToolService);
+  const canLaunchTools = toolsSsoReady && hasMembership;
   const canLaunchCanvas = canLaunchTools;
   const canvasOriginConfigured = Boolean(getCanvasWebOrigin().startsWith("http"));
   const ecomOriginConfigured = Boolean(getEcommerceWebOrigin().startsWith("http"));
-  const canLaunchEcommerce = toolsSsoReady && (isAdminUser || ecomAccess);
+  const canLaunchEcommerce = toolsSsoReady && ecomAccess;
 
   const showToolsCta = toolsSsoReady;
   const appsMenuHint = buildAccountAppsMenuHint({
     toolsSsoReady,
-    hasToolService,
+    hasToolService: hasMembership,
     gatewayLinked: gatewayStatus.linked,
     canvasOriginConfigured,
     ecomAccess,
     ecomOriginConfigured,
-    isAdmin: isAdminUser,
+    isAdmin: session.user.role === "ADMIN",
   });
 
   return (
@@ -67,6 +77,7 @@ export default async function AccountGroupLayout({
       canLaunchEcommerce={canLaunchEcommerce}
       ecomOriginConfigured={ecomOriginConfigured}
       appsMenuHint={appsMenuHint}
+      billingPersona={userRecord.billingPersona}
     >
       {children}
     </AccountShell>

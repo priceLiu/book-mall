@@ -1,16 +1,25 @@
-import type { GatewayClientSource } from "@prisma/client";
+import type { GatewayClientSource, Prisma } from "@prisma/client";
 
+import { K_CREDITS_CONSUMED } from "@/lib/finance/bill-display-keys";
+import {
+  loadModelDisplayNameMap,
+  projectGatewayLogToBillRow,
+} from "@/lib/finance/gateway-bill-projection";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
+import { clientPageToToolKey } from "@/lib/finance/client-page-tool";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
 
 export type UsageOverviewFilters = {
   since?: string;
   tool?: string;
   userId?: string;
+  billingPersona?: string;
+  staffFlag?: string;
+  tenantId?: string;
 };
 
-export type UsageAgg = { yuan: number; count: number };
+export type UsageAgg = { yuan: number; count: number; credits: number };
 
 export type UsageOverviewExportLine = {
   createdAt: string;
@@ -19,21 +28,24 @@ export type UsageOverviewExportLine = {
   userEmail: string;
   toolKey: string;
   modelKey: string;
-  pricingTemplateKey: string | null;
-  cloudUnitCostYuan: string | null;
-  retailMultiplier: string | null;
-  chargedPoints: number | null;
+  requestKind: string;
+  billingPersona: string;
+  creditsConsumed: number;
+  feeDescription: string;
   yuan: number;
 };
 
 export type UsageOverviewPayload = {
   filters: { since: string; tool: string; userId: string };
   totalYuan: number;
+  totalCredits: number;
   totalCount: number;
-  byMonth: Array<{ k: string; yuan: number; count: number }>;
-  byTool: Array<{ k: string; label: string; yuan: number; count: number }>;
-  byModel: Array<{ k: string; yuan: number; count: number }>;
-  byUser: Array<{ k: string; label: string; yuan: number; count: number }>;
+  /** 全部成功调用次数（含 BYOK 0 积分） */
+  totalCallsAll: number;
+  byMonth: Array<{ k: string; yuan: number; count: number; credits: number }>;
+  byTool: Array<{ k: string; label: string; yuan: number; count: number; credits: number }>;
+  byModel: Array<{ k: string; yuan: number; count: number; credits: number }>;
+  byUser: Array<{ k: string; label: string; yuan: number; count: number; credits: number }>;
   recentLines: Array<{
     id: string;
     createdAt: string;
@@ -42,15 +54,33 @@ export type UsageOverviewPayload = {
     userEmail: string | null;
     toolKey: string;
     modelKey: string;
-    pricingTemplateKey: string | null;
-    cloudUnitCostYuan: number | null;
-    retailMultiplier: number | null;
-    chargedPoints: number;
+    requestKind: string;
+    billingPersona: string;
+    creditsConsumed: number;
+    feeDescription: string;
     yuan: number;
   }>;
   exportRows: UsageOverviewExportLine[];
   exportRangeLabel: string;
 };
+
+const GATEWAY_SELECT = {
+  id: true,
+  actorBookUserId: true,
+  clientSource: true,
+  clientPage: true,
+  canonicalModelKey: true,
+  model: true,
+  requestKind: true,
+  status: true,
+  billingMode: true,
+  billingPersonaSnap: true,
+  creditsCharged: true,
+  costSnapshotYuan: true,
+  marginSnapshot: true,
+  submittedAt: true,
+  completedAt: true,
+} as const;
 
 function ymKey(d: Date | string): string {
   const x = typeof d === "string" ? new Date(d) : d;
@@ -59,27 +89,54 @@ function ymKey(d: Date | string): string {
   return `${y}${String(m).padStart(2, "0")}`;
 }
 
-function clientSourceToToolKey(source: GatewayClientSource | null | undefined): string {
-  if (!source) return "(unknown)";
-  return source.toLowerCase();
+function resolveToolKey(input: {
+  clientPage?: string | null;
+  clientSource?: GatewayClientSource | null;
+}): string {
+  if (input.clientPage?.trim()) {
+    return clientPageToToolKey(input.clientPage);
+  }
+  if (!input.clientSource) return "(unknown)";
+  return input.clientSource.toLowerCase();
 }
 
-function bump(m: Map<string, UsageAgg>, k: string, yuan: number) {
-  const ex = m.get(k) ?? { yuan: 0, count: 0 };
+function bump(m: Map<string, UsageAgg>, k: string, yuan: number, credits: number) {
+  const ex = m.get(k) ?? { yuan: 0, count: 0, credits: 0 };
   ex.yuan += yuan;
   ex.count += 1;
+  ex.credits += credits;
   m.set(k, ex);
 }
 
-function sortDesc(m: Map<string, UsageAgg>): Array<{ k: string; yuan: number; count: number }> {
+function sortDesc(
+  m: Map<string, UsageAgg>,
+): Array<{ k: string; yuan: number; count: number; credits: number }> {
   return Array.from(m.entries())
     .map(([k, v]) => ({ k, ...v }))
-    .sort((a, b) => b.yuan - a.yuan || b.count - a.count);
+    .sort((a, b) => b.count - a.count || b.credits - a.credits || b.yuan - a.yuan);
 }
 
 function creditsToYuan(credits: number): number {
   return Number((Math.abs(credits) * DEFAULT_CREDIT_ANCHOR_YUAN).toFixed(4));
 }
+
+function personaLabel(
+  persona: string | null | undefined,
+  billingMode: string | null | undefined,
+): string {
+  if (persona === "BYOK" || billingMode === "BYOK") return "自带 Key（BYOK）";
+  if (persona === "PLATFORM_CREDIT" || billingMode === "PLATFORM_CREDIT") return "平台代付";
+  return "—";
+}
+
+const REQUEST_KIND_LABEL: Record<string, string> = {
+  CHAT: "对话",
+  IMAGE: "生图",
+  VIDEO: "生视频",
+  TRYON: "AI试衣",
+  TTS: "语音",
+  OTHER: "其他",
+};
 
 export async function buildUsageOverviewData(
   filters: UsageOverviewFilters,
@@ -87,6 +144,9 @@ export async function buildUsageOverviewData(
   const sinceMonth = (filters.since || "").trim();
   const onlyTool = (filters.tool || "").trim().toLowerCase();
   const onlyUserId = (filters.userId || "").trim();
+  const persona = (filters.billingPersona || "").trim();
+  const staffFlag = (filters.staffFlag || "").trim();
+  const tenantId = (filters.tenantId || "").trim();
 
   const now = new Date();
   const defaultSince = new Date(now.getUTCFullYear(), now.getUTCMonth() - 5, 1);
@@ -97,61 +157,38 @@ export async function buildUsageOverviewData(
         )
       : defaultSince;
 
-  const ledgerWhere = {
-    type: "CONSUME" as const,
-    createdAt: { gte: sinceCutoff },
-    account: {
-      ownerType: "USER" as const,
-      ...(onlyUserId ? { ownerId: onlyUserId } : {}),
-    },
+  const gatewayWhere: Prisma.GatewayRequestLogWhereInput = {
+    status: "SUCCEEDED",
+    submittedAt: { gte: sinceCutoff },
+    ...(onlyUserId ? { actorBookUserId: onlyUserId } : {}),
+    ...(tenantId ? { tenantId } : {}),
+    ...(persona === "BYOK" || persona === "PLATFORM_CREDIT"
+      ? { billingMode: persona }
+      : {}),
+    ...(staffFlag === "1" ? { staffFlag: true } : staffFlag === "0" ? { staffFlag: false } : {}),
   };
 
-  const [ledgerRows, gatewayRows] = await Promise.all([
-    prisma.creditLedger.findMany({
-      where: ledgerWhere,
-      select: {
-        id: true,
-        createdAt: true,
-        credits: true,
-        costSnapshotYuan: true,
-        refType: true,
-        refId: true,
-        account: { select: { ownerId: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 5000,
-    }),
-    prisma.gatewayRequestLog.findMany({
-      where: {
-        billingMode: "PLATFORM_CREDIT",
-        creditsCharged: { gt: 0 },
-        submittedAt: { gte: sinceCutoff },
-        ...(onlyUserId ? { actorBookUserId: onlyUserId } : {}),
-      },
-      select: {
-        id: true,
-        actorBookUserId: true,
-        clientSource: true,
-        canonicalModelKey: true,
-        model: true,
-        billingKind: true,
-        creditsCharged: true,
-        costSnapshotYuan: true,
-        marginSnapshot: true,
-        vendorListUnitCostYuan: true,
-        submittedAt: true,
-      },
-      orderBy: { submittedAt: "desc" },
-      take: 5000,
-    }),
-  ]);
+  const gatewayLogs = await prisma.gatewayRequestLog.findMany({
+    where: gatewayWhere,
+    select: GATEWAY_SELECT,
+    orderBy: { submittedAt: "desc" },
+    take: 5000,
+  });
 
-  const gatewayById = new Map(gatewayRows.map((g) => [g.id, g]));
-  const gatewayIdsFromLedger = new Set(
-    ledgerRows
-      .filter((l) => l.refType === "gateway_log" && l.refId)
-      .map((l) => l.refId as string),
-  );
+  const userIds = [
+    ...new Set(gatewayLogs.map((g) => g.actorBookUserId).filter(Boolean)),
+  ] as string[];
+  const users =
+    userIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+  const userMap = new Map(users.map((u) => [u.id, u]));
+
+  const modelKeys = gatewayLogs.map((g) => g.canonicalModelKey ?? g.model ?? "");
+  const displayNames = await loadModelDisplayNameMap(modelKeys, prisma);
 
   type LineRow = {
     id: string;
@@ -159,102 +196,64 @@ export async function buildUsageOverviewData(
     userId: string;
     toolKey: string;
     modelKey: string;
-    pricingTemplateKey: string | null;
-    cloudUnitCostYuan: number | null;
-    retailMultiplier: number | null;
-    chargedCredits: number;
+    requestKind: string;
+    billingPersona: string;
+    creditsConsumed: number;
+    feeDescription: string;
     yuan: number;
   };
 
   const lines: LineRow[] = [];
 
-  for (const l of ledgerRows) {
-    const userId = l.account.ownerId;
-    const credits = Math.abs(l.credits);
-    if (credits <= 0) continue;
-
-    const gw =
-      l.refType === "gateway_log" && l.refId ? gatewayById.get(l.refId) : undefined;
-    const toolKey = clientSourceToToolKey(gw?.clientSource);
-    if (onlyTool && toolKey !== onlyTool) continue;
-
-    const modelKey = gw?.canonicalModelKey ?? gw?.model ?? "(unknown)";
-    const costSnap =
-      l.costSnapshotYuan != null
-        ? Number(l.costSnapshotYuan)
-        : gw?.costSnapshotYuan != null
-          ? Number(gw.costSnapshotYuan)
-          : null;
-    const margin =
-      gw?.marginSnapshot != null ? Number(gw.marginSnapshot) : null;
-    const retailMultiplier =
-      margin != null && margin < 1 ? Number((1 / (1 - margin)).toFixed(2)) : null;
-
-    lines.push({
-      id: l.id,
-      createdAt: l.createdAt,
-      userId,
-      toolKey,
-      modelKey,
-      pricingTemplateKey: gw?.billingKind ?? null,
-      cloudUnitCostYuan: costSnap,
-      retailMultiplier,
-      chargedCredits: credits,
-      yuan: creditsToYuan(credits),
-    });
-  }
-
-  // 补充仅有 GatewayRequestLog、尚无 ledger 关联的历史行
-  for (const g of gatewayRows) {
-    if (gatewayIdsFromLedger.has(g.id)) continue;
+  for (const g of gatewayLogs) {
     const userId = g.actorBookUserId;
     if (!userId) continue;
-    const toolKey = clientSourceToToolKey(g.clientSource);
-    if (onlyTool && toolKey !== onlyTool) continue;
-    const credits = g.creditsCharged ?? 0;
-    if (credits <= 0) continue;
 
-    const margin = g.marginSnapshot != null ? Number(g.marginSnapshot) : null;
+    const toolKey = resolveToolKey({
+      clientPage: g.clientPage,
+      clientSource: g.clientSource,
+    });
+    if (onlyTool && toolKey !== onlyTool) continue;
+
+    const billRow = projectGatewayLogToBillRow(
+      g,
+      userId,
+      userMap.get(userId)?.name ?? userMap.get(userId)?.email ?? userId,
+      displayNames,
+    );
+
+    const creditsConsumed = parseInt(billRow[K_CREDITS_CONSUMED] ?? "0", 10) || 0;
+
     lines.push({
       id: g.id,
       createdAt: g.submittedAt,
       userId,
       toolKey,
       modelKey: g.canonicalModelKey ?? g.model,
-      pricingTemplateKey: g.billingKind ?? null,
-      cloudUnitCostYuan:
-        g.costSnapshotYuan != null
-          ? Number(g.costSnapshotYuan)
-          : g.vendorListUnitCostYuan != null
-            ? Number(g.vendorListUnitCostYuan)
-            : null,
-      retailMultiplier:
-        margin != null && margin < 1 ? Number((1 / (1 - margin)).toFixed(2)) : null,
-      chargedCredits: credits,
-      yuan: creditsToYuan(credits),
+      requestKind: REQUEST_KIND_LABEL[g.requestKind] ?? g.requestKind,
+      billingPersona: billRow["平台/计费身份"] ?? personaLabel(g.billingPersonaSnap, g.billingMode),
+      creditsConsumed,
+      feeDescription: billRow["平台账单/费用说明"] ?? "",
+      yuan: creditsToYuan(creditsConsumed),
     });
   }
-
-  const users = await prisma.user.findMany({
-    where: { id: { in: Array.from(new Set(lines.map((l) => l.userId))) } },
-    select: { id: true, name: true, email: true },
-  });
-  const userMap = new Map(users.map((u) => [u.id, u]));
 
   const byMonth = new Map<string, UsageAgg>();
   const byTool = new Map<string, UsageAgg>();
   const byModel = new Map<string, UsageAgg>();
   const byUser = new Map<string, UsageAgg>();
   let totalYuan = 0;
+  let totalCredits = 0;
   let totalCount = 0;
 
   for (const l of lines) {
     totalYuan += l.yuan;
-    totalCount += 1;
-    bump(byMonth, ymKey(l.createdAt), l.yuan);
-    bump(byTool, l.toolKey, l.yuan);
-    bump(byModel, l.modelKey, l.yuan);
-    bump(byUser, l.userId, l.yuan);
+    totalCredits += l.creditsConsumed;
+    if (l.creditsConsumed > 0) totalCount += 1;
+    bump(byMonth, ymKey(l.createdAt), l.yuan, l.creditsConsumed);
+    bump(byTool, l.toolKey, l.yuan, l.creditsConsumed);
+    bump(byModel, l.modelKey, l.yuan, l.creditsConsumed);
+    bump(byUser, l.userId, l.yuan, l.creditsConsumed);
   }
 
   const exportRows: UsageOverviewExportLine[] = lines.map((l) => {
@@ -266,10 +265,10 @@ export async function buildUsageOverviewData(
       userEmail: u?.email ?? "",
       toolKey: l.toolKey,
       modelKey: l.modelKey,
-      pricingTemplateKey: l.pricingTemplateKey,
-      cloudUnitCostYuan: l.cloudUnitCostYuan != null ? l.cloudUnitCostYuan.toFixed(4) : null,
-      retailMultiplier: l.retailMultiplier != null ? String(l.retailMultiplier) : null,
-      chargedPoints: l.chargedCredits > 0 ? l.chargedCredits : null,
+      requestKind: l.requestKind,
+      billingPersona: l.billingPersona,
+      creditsConsumed: l.creditsConsumed,
+      feeDescription: l.feeDescription,
       yuan: Number(l.yuan.toFixed(2)),
     };
   });
@@ -296,10 +295,10 @@ export async function buildUsageOverviewData(
         userEmail: u?.email ?? null,
         toolKey: l.toolKey,
         modelKey: l.modelKey,
-        pricingTemplateKey: l.pricingTemplateKey,
-        cloudUnitCostYuan: l.cloudUnitCostYuan,
-        retailMultiplier: l.retailMultiplier,
-        chargedPoints: l.chargedCredits,
+        requestKind: l.requestKind,
+        billingPersona: l.billingPersona,
+        creditsConsumed: l.creditsConsumed,
+        feeDescription: l.feeDescription,
         yuan: Number(l.yuan.toFixed(2)),
       };
     });
@@ -307,7 +306,9 @@ export async function buildUsageOverviewData(
   return {
     filters: { since: sinceMonth, tool: onlyTool, userId: onlyUserId },
     totalYuan: Number(totalYuan.toFixed(2)),
+    totalCredits,
     totalCount,
+    totalCallsAll: lines.length,
     byMonth: sortDesc(byMonth).slice(0, 12),
     byTool: sortDesc(byTool)
       .slice(0, 20)

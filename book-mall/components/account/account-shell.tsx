@@ -14,6 +14,7 @@ export function AccountShell({
   canLaunchEcommerce,
   ecomOriginConfigured,
   appsMenuHint,
+  billingPersona,
   children,
 }: {
   profile: { image: string | null; name: string | null; email: string | null };
@@ -26,6 +27,7 @@ export function AccountShell({
   canLaunchEcommerce: boolean;
   ecomOriginConfigured: boolean;
   appsMenuHint: string | null;
+  billingPersona: import("@prisma/client").BillingPersona | null;
   children: React.ReactNode;
 }) {
   const menuProps = {
@@ -39,6 +41,7 @@ export function AccountShell({
     canLaunchEcommerce,
     ecomOriginConfigured,
     appsMenuHint,
+    billingPersona,
   };
 
   return (

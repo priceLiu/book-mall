@@ -147,6 +147,8 @@ export type StoryboardGatewayModel = {
   displayName: string;
   description: string;
   role: "LLM" | "IMAGE" | "VIDEO";
-  providerKind: string;
+  providerKind?: string;
   credentialBound: boolean;
+  platformOffering?: boolean;
+  scenarioKey?: string;
 };

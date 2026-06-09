@@ -73,9 +73,15 @@ export async function publishStorySpace(base: string): Promise<StorySpaceData> {
   return j.space;
 }
 
-export async function fetchEngineModels(base: string): Promise<StoryEngineModel[]> {
-  const j = await storyFetch<{ models: StoryEngineModel[] }>(base, "/api/story/engine-models");
-  return j.models;
+export async function fetchEngineModels(base: string): Promise<{
+  models: StoryEngineModel[];
+  billingPersona: "PLATFORM_CREDIT" | "BYOK" | null;
+}> {
+  const j = await storyFetch<{
+    models: StoryEngineModel[];
+    billingPersona?: "PLATFORM_CREDIT" | "BYOK" | null;
+  }>(base, "/api/story/engine-models");
+  return { models: j.models, billingPersona: j.billingPersona ?? null };
 }
 
 export async function fetchModelConfig(base: string): Promise<{

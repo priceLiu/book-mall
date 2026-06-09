@@ -81,6 +81,14 @@ type Payload = {
       quota: number;
     }>;
   }>;
+  memberActorUsage: Array<{
+    actorBookUserId: string;
+    tenantId: string | null;
+    userName: string | null;
+    userEmail: string | null;
+    count: number;
+    overageCredits: number;
+  }>;
   simulationScenarios: SimulationRow[];
 };
 
@@ -466,6 +474,39 @@ export function ByokClient() {
               </div>
             ))}
           </div>
+        )}
+      </section>
+
+      <section className="rounded border border-[#e8e8e8] bg-white p-4">
+        <h2 className="text-sm font-medium">成员超额钻取（{data.periodKey}）</h2>
+        <p className="mt-1 text-xs text-[#8c8c8c]">
+          按 Book 用户 ID（actorBookUserId）聚合 BYOK 超额扣分与成功请求次数。
+        </p>
+        {data.memberActorUsage.length === 0 ? (
+          <p className="mt-3 text-sm text-[#8c8c8c]">暂无成员维度数据。</p>
+        ) : (
+          <table className="mt-3 w-full text-xs">
+            <thead className="bg-[#fafafa] text-[#8c8c8c]">
+              <tr>
+                <th className="px-2 py-2 text-left">成员</th>
+                <th className="px-2 py-2 text-left">Book 用户 ID</th>
+                <th className="px-2 py-2 text-left">团队 ID</th>
+                <th className="px-2 py-2 text-right">请求次数</th>
+                <th className="px-2 py-2 text-right">超额扣分</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.memberActorUsage.map((m) => (
+                <tr key={`${m.tenantId ?? "p"}:${m.actorBookUserId}`} className="border-t">
+                  <td className="px-2 py-1.5">{m.userName ?? m.userEmail ?? "—"}</td>
+                  <td className="px-2 py-1.5 font-mono">{m.actorBookUserId}</td>
+                  <td className="px-2 py-1.5 font-mono">{m.tenantId ?? "—"}</td>
+                  <td className="px-2 py-1.5 text-right">{m.count}</td>
+                  <td className="px-2 py-1.5 text-right">{m.overageCredits}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </section>
 

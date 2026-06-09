@@ -6,8 +6,9 @@
  *
  * 所有写操作在事务内更新余额 + 落流水（含 balanceAfter 与幂等键）。
  */
-import type { CreditLedgerType, CreditOwnerType, CreditPool, Prisma, ResourceMeterType } from "@prisma/client";
+import type { BillingPersona, CreditLedgerType, CreditOwnerType, CreditPool, Prisma, ResourceMeterType } from "@prisma/client";
 
+import { isStaffRole } from "@/lib/billing/billing-persona";
 import { prisma } from "@/lib/prisma";
 
 export interface AccountRef {
@@ -100,6 +101,34 @@ interface LedgerWriteInput {
   idempotencyKey?: string | null;
   description?: string | null;
   allowNegative?: boolean;
+  staffFlag?: boolean;
+  billingPersonaSnap?: BillingPersona | null;
+}
+
+async function resolveLedgerPersonaFields(input: LedgerWriteInput): Promise<{
+  staffFlag: boolean;
+  billingPersonaSnap: BillingPersona | null;
+}> {
+  if (input.staffFlag !== undefined && input.billingPersonaSnap !== undefined) {
+    return { staffFlag: input.staffFlag, billingPersonaSnap: input.billingPersonaSnap };
+  }
+  const actorId = input.actorUserId;
+  if (!actorId) {
+    return {
+      staffFlag: input.staffFlag ?? false,
+      billingPersonaSnap: input.billingPersonaSnap ?? null,
+    };
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: actorId },
+    select: { role: true, billingPersona: true, billingPersonaLockedAt: true },
+  });
+  return {
+    staffFlag: input.staffFlag ?? isStaffRole(user?.role),
+    billingPersonaSnap:
+      input.billingPersonaSnap ??
+      (user?.billingPersonaLockedAt ? user.billingPersona : null),
+  };
 }
 
 async function writeLedger(input: LedgerWriteInput) {
@@ -136,6 +165,8 @@ async function writeLedger(input: LedgerWriteInput) {
       } as Prisma.CreditAccountUpdateInput,
     });
 
+    const personaFields = await resolveLedgerPersonaFields(input);
+
     const ledger = await tx.creditLedger.create({
       data: {
         accountId: account.id,
@@ -149,6 +180,8 @@ async function writeLedger(input: LedgerWriteInput) {
         costSnapshotYuan: input.costSnapshotYuan ?? null,
         idempotencyKey: input.idempotencyKey ?? null,
         description: input.description ?? null,
+        staffFlag: personaFields.staffFlag,
+        billingPersonaSnap: personaFields.billingPersonaSnap,
       },
     });
 
@@ -544,7 +577,9 @@ export async function sumResourceFees(ref: AccountRef, periodKey = periodKeyOf()
 // ——————————————————— 用量中心查询 ———————————————————
 
 export interface UsageQuery {
-  userId: string;
+  /** Book User.id — 按 actorBookUserId 查询 Gateway 日志 */
+  bookUserId: string;
+  tenantId?: string;
   from?: Date;
   to?: Date;
   model?: string;
@@ -553,15 +588,24 @@ export interface UsageQuery {
   skip?: number;
 }
 
-/** 细颗粒用量记录（按时间倒序），用于「用量中心」。 */
-export async function listUsageRecords(q: UsageQuery) {
-  const where: Prisma.GatewayRequestLogWhereInput = { userId: q.userId };
+function buildUsageWhere(q: UsageQuery): Prisma.GatewayRequestLogWhereInput {
+  const where: Prisma.GatewayRequestLogWhereInput = {
+    actorBookUserId: q.bookUserId,
+  };
+  if (q.tenantId) where.tenantId = q.tenantId;
   if (q.from || q.to) {
     where.submittedAt = {};
     if (q.from) (where.submittedAt as Prisma.DateTimeFilter).gte = q.from;
     if (q.to) (where.submittedAt as Prisma.DateTimeFilter).lte = q.to;
   }
   if (q.model) where.canonicalModelKey = q.model;
+  if (q.clientSource) where.clientSource = q.clientSource as Prisma.EnumGatewayClientSourceFilter;
+  return where;
+}
+
+/** 细颗粒用量记录（按时间倒序），用于「用量中心」。 */
+export async function listUsageRecords(q: UsageQuery) {
+  const where = buildUsageWhere(q);
 
   const [rows, total] = await Promise.all([
     prisma.gatewayRequestLog.findMany({
@@ -578,6 +622,9 @@ export async function listUsageRecords(q: UsageQuery) {
         clientSource: true,
         clientPage: true,
         billingMode: true,
+        billingPersonaSnap: true,
+        staffFlag: true,
+        tenantId: true,
         creditsCharged: true,
         costSnapshotYuan: true,
         marginSnapshot: true,
@@ -592,12 +639,7 @@ export async function listUsageRecords(q: UsageQuery) {
 
 /** 用量按模型聚合（积分与次数）。 */
 export async function aggregateUsageByModel(q: UsageQuery) {
-  const where: Prisma.GatewayRequestLogWhereInput = { userId: q.userId };
-  if (q.from || q.to) {
-    where.submittedAt = {};
-    if (q.from) (where.submittedAt as Prisma.DateTimeFilter).gte = q.from;
-    if (q.to) (where.submittedAt as Prisma.DateTimeFilter).lte = q.to;
-  }
+  const where = buildUsageWhere(q);
   const grouped = await prisma.gatewayRequestLog.groupBy({
     by: ["canonicalModelKey"],
     where,

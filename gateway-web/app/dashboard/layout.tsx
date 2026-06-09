@@ -5,7 +5,7 @@ import { gatewayJson } from "@/lib/gateway-api";
 
 export const dynamic = "force-dynamic";
 
-const NAV = [
+const FULL_NAV = [
   { href: "/dashboard/guide", label: "操作指引" },
   { href: "/dashboard", label: "用量" },
   { href: "/dashboard/logs", label: "日志" },
@@ -13,6 +13,12 @@ const NAV = [
   { href: "/dashboard/keys", label: "API密钥" },
   { href: "/dashboard/playground", label: "API调试" },
   { href: "/dashboard/docs", label: "接入文档" },
+];
+
+const READONLY_NAV = [
+  { href: "/dashboard/guide", label: "操作指引" },
+  { href: "/dashboard", label: "用量" },
+  { href: "/dashboard/logs", label: "日志" },
 ];
 
 export default async function DashboardLayout({
@@ -25,6 +31,8 @@ export default async function DashboardLayout({
       email: string;
       name: string | null;
       bookRole?: "ADMIN" | "USER";
+      billingPersona?: "PLATFORM_CREDIT" | "BYOK" | null;
+      platformPoolDelegate?: { canonicalOwnerEmail: string } | null;
     } | null;
   }>("/api/gateway/auth/session");
   if (!session.ok || !session.data?.user) {
@@ -33,6 +41,12 @@ export default async function DashboardLayout({
 
   const user = session.data.user;
   const isAdmin = user.bookRole === "ADMIN";
+  const isByok = user.billingPersona === "BYOK";
+  const isPlatformPoolDelegate = Boolean(user.platformPoolDelegate);
+  const nav =
+    isByok || isPlatformPoolDelegate
+      ? FULL_NAV
+      : READONLY_NAV;
 
   return (
     <div className="flex min-h-screen">
@@ -42,7 +56,7 @@ export default async function DashboardLayout({
           <div className="mt-1 truncate text-xs text-[var(--gw-muted)]">
             {user.name || user.email}
           </div>
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap gap-1">
             <span
               className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
                 isAdmin
@@ -52,10 +66,18 @@ export default async function DashboardLayout({
             >
               {isAdmin ? "Admin" : "User"}
             </span>
+            <span className="inline-block rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] text-zinc-400">
+              {isByok ? "BYOK" : "平台代付"}
+            </span>
+            {isPlatformPoolDelegate ? (
+              <span className="inline-block rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-200">
+                平台池
+              </span>
+            ) : null}
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-3">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}

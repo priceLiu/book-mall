@@ -79,12 +79,12 @@ export default async function AccountSubscriptionPage() {
         title="订阅中心"
         description={
           <>
-            <strong className="text-foreground">课程会员计划</strong>仅覆盖 AI 学堂，不含工具使用权。
-            工具须单独在{" "}
-            <Link href="/account/tool-service-fee" className={accountInlineLinkClass()}>
-              工具技术服务费
+            <strong className="text-foreground">课程会员计划</strong>仅覆盖 AI 学堂。
+            AI 工具须在{" "}
+            <Link href="/pricing" className={accountInlineLinkClass()}>
+              会员套餐
             </Link>
-            页按月开通；单次 AI 生成走 Gateway BYOK，不另扣钱包点数。
+            页开通（个人或团队）；生成走 Gateway BYOK 或平台积分扣费。
           </>
         }
       />
@@ -126,7 +126,7 @@ export default async function AccountSubscriptionPage() {
               </Button>
               {process.env.NODE_ENV === "development" ? (
                 <Button asChild size="sm" variant="subscription">
-                  <Link href="/pay/mock-subscribe">模拟开通会员（开发）</Link>
+                  <Link href="/pricing">开通会员 / 轻量包</Link>
                 </Button>
               ) : null}
             </div>
@@ -134,17 +134,17 @@ export default async function AccountSubscriptionPage() {
         </Card>
       </section>
 
-      {/* 第二版块：工具技术服务费 */}
+      {/* 第二版块：AI 工具会员 */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">工具技术服务费</h2>
+        <h2 className="text-lg font-semibold">AI 工具会员</h2>
         <Card>
           <CardContent className="space-y-4 pt-6">
             <p className="text-sm leading-relaxed text-muted-foreground">
-              按工具分组（试衣间、文生图、图生视频等）按月从钱包扣固定点数，每周期 30 天。
-              与课程会员订阅独立。
+              开通个人或团队会员套餐后，即可使用全部 AI 工具（试衣间、文生图、图生视频、画布等）。
+              与学堂课程订阅独立。
             </p>
             <Button asChild size="sm" variant="subscription">
-              <Link href="/account/tool-service-fee">开通 / 续订工具月费</Link>
+              <Link href="/pricing">前往选购会员套餐</Link>
             </Button>
           </CardContent>
         </Card>

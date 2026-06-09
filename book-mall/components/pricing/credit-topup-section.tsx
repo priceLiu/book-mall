@@ -102,30 +102,12 @@ export function CreditTopupSection({
       router.push(`/login?callbackUrl=${encodeURIComponent("/pricing")}`);
       return;
     }
-    setLoadingId(pack.id);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/dev/mock-credit-topup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          packId: pack.id,
-          target: isTeam && activeTeam ? "team" : "personal",
-          tenantId: isTeam && activeTeam ? activeTeam.id : undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "充值失败");
-      const poolLabel = pack.pool === "VIDEO" ? "视频池" : "通用池";
-      setMessage(
-        `已到账 ${pack.credits.toLocaleString()} 积分（${poolLabel}），当前余额 ${Number(data.balanceAfter).toLocaleString()} 积分。`,
-      );
-      router.refresh();
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "充值失败");
-    } finally {
-      setLoadingId(null);
+    const params = new URLSearchParams({ packId: pack.id });
+    if (isTeam && activeTeam) {
+      params.set("target", "team");
+      params.set("tenantId", activeTeam.id);
     }
+    router.push(`/checkout/topup?${params.toString()}`);
   }
 
   return (
@@ -189,7 +171,7 @@ export function CreditTopupSection({
       ) : null}
 
       <p className="mt-4 text-center text-xs text-muted-foreground">
-        开发环境为模拟到账；正式支付接入后同档位价格不变。
+        购买后将进入微信扫码收银；转账备注请填写系统生成的 6 位码。
         {!isLoggedIn ? (
           <>
             {" "}

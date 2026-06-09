@@ -34,10 +34,6 @@ export async function POST(req: Request) {
       action,
       module: ecomModule,
       prompt,
-      estimatedMaxPoints:
-        typeof body.estimatedPoints === "number"
-          ? body.estimatedPoints
-          : undefined,
     });
     return NextResponse.json({
       asset: result.asset,

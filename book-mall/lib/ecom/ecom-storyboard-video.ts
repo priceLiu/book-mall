@@ -21,11 +21,6 @@ import {
   ecomGwPollVolcengine,
 } from "@/lib/gateway/ecom-tool-gateway-client";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
-import { shouldMeterEcomToolkitUsage } from "@/lib/ecom/ecom-billing-mode";
-import { reserveWalletHold } from "@/lib/wallet-holds";
-import { recordToolUsageAndConsumeWallet } from "@/lib/wallet-record-tool-usage-consume";
-import { resolveBillableSnapshot } from "@/lib/tool-billable-price";
-import type { ToolUsagePricingSnapshot } from "@/lib/finance/tool-usage-billing-line";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { ECOM_STORYBOARD_DEFAULT_VIDEO_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import {
@@ -70,21 +65,6 @@ import {
 } from "@/lib/ecom/ecom-storyboard-video-models";
 import { isWan26BailianR2vModel } from "@/lib/canvas/bailian-r2v-body";
 
-function snapToPricing(
-  snap: NonNullable<Awaited<ReturnType<typeof resolveBillableSnapshot>>>,
-): ToolUsagePricingSnapshot {
-  return {
-    unitCostYuan: snap.unitCostYuan,
-    retailMultiplier: snap.retailMultiplier,
-    ourUnitYuan: snap.ourUnitYuan,
-    schemeARefModelKey: snap.schemeARefModelKey,
-    billablePriceId: snap.billablePriceId,
-    cloudBillingKind: snap.billingKind ?? null,
-    billedQty: snap.billedVideoSec ?? null,
-    billedUnit: snap.billingKind === "VIDEO_MODEL_SPEC" ? "秒" : null,
-  };
-}
-
 type PendingFullVideoJob = {
   taskId: string;
   logId: string;
@@ -94,11 +74,6 @@ type PendingFullVideoJob = {
   startedAt: string;
   prompt: string;
   taskKey: string;
-  walletHoldId?: string | null;
-  metered: boolean;
-  billPoints?: number;
-  billedVideoSec?: number | null;
-  pricingSnapshot?: ToolUsagePricingSnapshot;
 };
 
 async function pollFullVideoGatewayJob(
@@ -145,12 +120,6 @@ function readPendingFullVideoJob(meta: unknown): PendingFullVideoJob | null {
     startedAt: typeof j.startedAt === "string" ? j.startedAt : new Date().toISOString(),
     prompt: typeof j.prompt === "string" ? j.prompt : "",
     taskKey: typeof j.taskKey === "string" ? j.taskKey : "",
-    walletHoldId: typeof j.walletHoldId === "string" ? j.walletHoldId : null,
-    metered: j.metered === true,
-    billPoints: typeof j.billPoints === "number" ? j.billPoints : undefined,
-    billedVideoSec:
-      typeof j.billedVideoSec === "number" ? j.billedVideoSec : null,
-    pricingSnapshot: j.pricingSnapshot as ToolUsagePricingSnapshot | undefined,
   };
 }
 
@@ -198,29 +167,6 @@ async function finalizeFullVideoFromVendorUrl(opts: {
   });
 
   let chargePoints: number | null = null;
-  if (
-    opts.pending.metered &&
-    opts.pending.billPoints &&
-    opts.pending.billPoints > 0 &&
-    opts.pending.pricingSnapshot
-  ) {
-    const outcome = await recordToolUsageAndConsumeWallet({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "video",
-      costPoints: opts.pending.billPoints,
-      meta: {
-        projectId: opts.projectId,
-        videoDurationSec: opts.pending.durationSec,
-        modelId: opts.pending.modelKey,
-        taskKey: opts.pending.taskKey,
-      } as Prisma.InputJsonValue,
-      pricingSnapshot: opts.pending.pricingSnapshot,
-      billedVideoSec: opts.pending.billedVideoSec,
-      walletHoldId: opts.pending.walletHoldId,
-    });
-    chargePoints = outcome.ok ? opts.pending.billPoints : null;
-  }
 
   const asset = await prisma.ecomAsset.create({
     data: {
@@ -400,31 +346,6 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
   const ratio =
     opts.ratio?.trim() || opts.aspectRatio?.trim() || "9:16";
 
-  let holdId: string | null = null;
-  const metered = await shouldMeterEcomToolkitUsage(opts.userId, ECOM_STORYBOARD_TOOL_KEY);
-  const snap = await resolveBillableSnapshot(ECOM_STORYBOARD_TOOL_KEY, "video", {
-    userId: opts.userId,
-    schemeARefModelKey: modelKey,
-    actuals: { durationSec, videoSr },
-  });
-
-  if (metered && snap && snap.points > 0) {
-    const est = Math.ceil(snap.points * 1.2);
-    const hold = await reserveWalletHold({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "video",
-      estimatedMaxPoints: est,
-      taskKey,
-      meta: { projectId: opts.projectId, durationSec },
-    });
-    if (!hold.ok) {
-      throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
-      );
-    }
-    holdId = hold.holdId;
-  }
 
   let taskId: string;
   let logId: string;
@@ -530,11 +451,6 @@ export async function ecomSubmitStoryboardFullVideoJob(opts: {
     startedAt,
     prompt,
     taskKey,
-    walletHoldId: holdId,
-    metered: Boolean(metered && snap && snap.points > 0),
-    billPoints: snap?.points,
-    billedVideoSec: snap?.billedVideoSec,
-    pricingSnapshot: snap ? snapToPricing(snap) : undefined,
   };
   await savePendingFullVideoJob(opts.projectId, pending);
 
@@ -652,31 +568,6 @@ async function runVolcengineVideoJob(opts: {
     aspectRatio: opts.aspectRatio,
   });
 
-  let holdId: string | null = null;
-  const metered = await shouldMeterEcomToolkitUsage(opts.userId, ECOM_STORYBOARD_TOOL_KEY);
-  const snap = await resolveBillableSnapshot(ECOM_STORYBOARD_TOOL_KEY, "video", {
-    userId: opts.userId,
-    schemeARefModelKey: opts.modelKey,
-    actuals: { durationSec: opts.durationSec, videoSr },
-  });
-
-  if (metered && snap && snap.points > 0) {
-    const est = Math.ceil(snap.points * 1.2);
-    const hold = await reserveWalletHold({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "video",
-      estimatedMaxPoints: est,
-      taskKey,
-      meta: opts.meta as Prisma.InputJsonValue,
-    });
-    if (!hold.ok) {
-      throw new Error(
-        hold.reason === "below_watermark" ? "余额低于水位线" : "余额不足",
-      );
-    }
-    holdId = hold.holdId;
-  }
 
   const { taskId, logId } = await ecomGwCreateVolcengineVideoJob(opts.userId, {
     model: opts.modelKey,
@@ -711,27 +602,8 @@ async function runVolcengineVideoJob(opts: {
     contentType: "video/mp4",
   });
 
-  let chargePoints: number | null = null;
-  if (metered && snap && snap.points > 0) {
-    const outcome = await recordToolUsageAndConsumeWallet({
-      userId: opts.userId,
-      toolKey: ECOM_STORYBOARD_TOOL_KEY,
-      action: "video",
-      costPoints: snap.points,
-      meta: {
-        ...opts.meta,
-        videoDurationSec: opts.durationSec,
-        modelId: opts.modelKey,
-        taskKey,
-      } as Prisma.InputJsonValue,
-      pricingSnapshot: snapToPricing(snap),
-      billedVideoSec: snap.billedVideoSec,
-      walletHoldId: holdId,
-    });
-    chargePoints = outcome.ok ? snap.points : null;
-  }
 
-  return { ossUrl, taskId, chargePoints };
+  return { ossUrl, taskId, chargePoints: null };
 }
 
 export async function ecomGenerateStoryboardPanelVideo(opts: {
@@ -841,7 +713,7 @@ export async function ecomGenerateStoryboardPanelVideo(opts: {
     projectId: opts.projectId,
   }).catch(() => undefined);
 
-  return { videoUrl: ossUrl, panelIndex: panel.index, chargePoints };
+  return { videoUrl: ossUrl, panelIndex: panel.index, chargePoints: null };
 }
 
 export async function ecomMergeStoryboardPanelVideos(opts: {

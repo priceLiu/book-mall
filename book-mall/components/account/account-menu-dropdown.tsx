@@ -43,10 +43,10 @@ const NAV_LINKS = [
   { href: "/account/usage", label: "积分用量中心", icon: Zap },
   { href: "/account/team", label: "团队空间", icon: Users },
   { href: "/account/team/billing", label: "团队账单", icon: Receipt },
-  { href: "/account/tool-service-fee", label: "工具技术服务费", icon: Receipt },
-  { href: "/account/recharge-promos", label: "充值优惠", icon: Sparkles },
+  { href: "/account/billing", label: "轻量包购买", icon: Sparkles },
+  { href: "/account/byok", label: "自带 Key（BYOK）", icon: Zap },
+  { href: "/pricing", label: "会员套餐", icon: Receipt },
   { href: "/account/courses", label: "AI 学堂", icon: Sparkles },
-  { href: "/account/pricing", label: "价目与公示", icon: Settings },
 ] as const;
 
 function isActive(pathname: string, href: string, exact?: boolean) {

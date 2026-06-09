@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveGatewayBookRole } from "@/lib/gateway/book-role";
+import { resolveGatewayCredentialScope } from "@/lib/gateway/platform-credential-delegate";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +12,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ user: null }, { status: 401 });
   }
   const bookRole = await resolveGatewayBookRole(user);
+  const credentialScope = await resolveGatewayCredentialScope(user);
+  let billingPersona: string | null = null;
+  if (user.bookUserId) {
+    const bookUser = await prisma.user.findUnique({
+      where: { id: user.bookUserId },
+      select: { billingPersona: true, billingPersonaLockedAt: true },
+    });
+    if (bookUser?.billingPersonaLockedAt) {
+      billingPersona = bookUser.billingPersona;
+    }
+  }
   return NextResponse.json({
     user: {
       id: user.id,
@@ -18,6 +31,10 @@ export async function GET(request: NextRequest) {
       source: user.source,
       bookUserId: user.bookUserId,
       bookRole,
+      billingPersona,
+      platformPoolDelegate: credentialScope.isPlatformPoolDelegate
+        ? { canonicalOwnerEmail: credentialScope.canonicalOwnerEmail }
+        : null,
     },
   });
 }

@@ -35,17 +35,36 @@ export function FinanceRoleNav({ viewer }: { viewer: FinanceViewerPayload | null
         .map((t) => {
           const active = pathname === t.href || pathname.startsWith(`${t.href}/`);
           const Icon = t.icon;
-          return (
-            <Link
-              key={t.href}
-              href={t.href}
-              className={cn(
-                "flex items-center gap-1.5 rounded px-3 py-1.5 transition-colors",
-                active ? "bg-white font-medium text-[#1890ff] shadow-sm" : "text-[#595959] hover:text-[#262626]",
-              )}
-            >
+          const crossScope =
+            (t.href === "/admin" && !pathname.startsWith("/admin")) ||
+            (t.href === "/fees" && !pathname.startsWith("/fees")) ||
+            (t.href === "/team" && !pathname.startsWith("/team"));
+          const className = cn(
+            "flex items-center gap-1.5 rounded px-3 py-1.5 transition-colors",
+            active ? "bg-white font-medium text-[#1890ff] shadow-sm" : "text-[#595959] hover:text-[#262626]",
+          );
+          const inner = (
+            <>
               <Icon className="h-3.5 w-3.5" />
               {t.label}
+            </>
+          );
+          if (crossScope && !active) {
+            return (
+              <a
+                key={t.href}
+                href={t.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={className}
+              >
+                {inner}
+              </a>
+            );
+          }
+          return (
+            <Link key={t.href} href={t.href} className={className}>
+              {inner}
             </Link>
           );
         })}

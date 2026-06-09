@@ -34,6 +34,7 @@ import {
   type SeatBand,
 } from "@/lib/pricing/credit-pricing-formulas";
 import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
+import { ByokSubscribeButtons } from "@/components/pricing/byok-subscribe-buttons";
 
 interface SeatTier {
   seatMin: number;
@@ -243,7 +244,12 @@ export function PricingPageClient({
         </div>
 
         {/* 套餐卡片：一行五张；外层 overflow-visible 给顶边徽标留空间 */}
-        <div className="mt-10 overflow-visible">
+        <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-relaxed text-muted-foreground">
+          下方五档为<b className="text-foreground">平台代付（积分套餐）</b>：含月度积分发放，按模型扣积分。
+          若注册时选择<b className="text-foreground">自带 Key（BYOK）</b>，请见本页右侧说明——
+          <b className="text-foreground">不含月度积分</b>，含任务次数额度；超额与工具月费从轻量包余额扣。
+        </p>
+        <div className="mt-6 overflow-visible">
           <div className="flex flex-nowrap items-start justify-center gap-6 overflow-x-auto px-2 pb-2 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {visible.map((p, i) => {
             const yearPrice = yearPriceByTier.get(p.tier);
@@ -408,8 +414,33 @@ export function PricingPageClient({
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 已有厂商 API Key？绑定后模型费用由你与厂商直接结算，平台
-                <b className="text-foreground">不扣积分、不赚差价</b>，仅收技术服务费；套餐内含月度任务额度，超出后购买轻量包按次扣积分。
+                <b className="text-foreground">不扣积分、不赚差价</b>，仅收技术服务费。
+                <b className="text-foreground"> BYOK 不含月度积分发放</b>；套餐内含月度任务次数，超出后购买轻量包按次扣积分。
               </p>
+              <div className="mt-3 rounded-lg border border-amber-400/40 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                <p className="font-medium text-foreground">BYOK 怎么扣费？</p>
+                <ul className="mt-1 list-inside list-disc space-y-0.5">
+                  <li>
+                    <b className="text-foreground">月费</b>：技术服务（下方各档 ¥/月）
+                  </li>
+                  <li>
+                    <b className="text-foreground">套餐内</b>：文生图 / 图生视频 / 视频生视频按次数免费（见各档额度）
+                  </li>
+                  <li>
+                    <b className="text-foreground">超额</b>：从轻量包通用积分池按次扣分（锚定 ¥0.04/积分）
+                  </li>
+                  <li>
+                    <b className="text-foreground">工具月费</b>：各 AI 工具 navKey 准入费另计（见
+                    <Link href="/pricing-disclosure#tool-service-fee" className="text-amber-600 underline dark:text-amber-400">
+                      价格公示
+                    </Link>
+                    ）
+                  </li>
+                  <li>
+                    <b className="text-foreground">厂商费</b>：走你的 Gateway Key，Book 不代收
+                  </li>
+                </ul>
+              </div>
               {byok.length > 0 ? (
                 <div className="mt-3 space-y-3 text-sm">
                   {byok.map((b) => (
@@ -433,6 +464,15 @@ export function PricingPageClient({
                             ))}
                         </ul>
                       ) : null}
+                      <ByokSubscribeButtons
+                        scopeKey={b.scopeKey}
+                        label={b.label}
+                        techServiceFeeYuan={b.techServiceFeeYuan}
+                        minSeats={b.minSeats}
+                        isLoggedIn={isLoggedIn}
+                        isTeamScope={b.scopeKey === "team-seat"}
+                        teamTenants={teamTenants}
+                      />
                     </div>
                   ))}
                 </div>
@@ -643,7 +683,7 @@ function PlanCard({
           )}
         >
           <Link
-            href={isTeam ? `/subscribe?plan=${plan.id}&seats=${quote.seats}` : `/subscribe?plan=${plan.id}`}
+            href={isTeam ? `/checkout/membership?planId=${plan.id}&seats=${quote.seats}` : `/checkout/membership?planId=${plan.id}`}
           >
             {isTeam ? "开通团队会员" : "立即开通"}
           </Link>

@@ -109,7 +109,7 @@ function AccountSidebarNav({
     const Icon = item.icon;
     const className = cn(itemClass, active && itemActiveClass);
 
-    if (item.external) {
+    if (item.external || item.openInNewTab) {
       return (
         <a
           key={item.href}
@@ -204,7 +204,7 @@ function AccountDropdownNav(props: NavRuntimeProps) {
       </>
     );
 
-    if (item.external) {
+    if (item.external || item.openInNewTab) {
       return (
         <Menu.Item key={item.href} value={item.href} className={className} closeOnSelect={false} asChild>
           <a href={item.href} target="_blank" rel="noopener noreferrer">
@@ -280,10 +280,12 @@ export function AccountNavMenu({
   canLaunchEcommerce,
   ecomOriginConfigured,
   appsMenuHint,
+  billingPersona,
   placement = "sidebar",
 }: {
   profile: Profile;
   isAdmin: boolean;
+  billingPersona: import("@prisma/client").BillingPersona | null;
   showToolsCta: boolean;
   canLaunchTools: boolean;
   canLaunchCanvas: boolean;
@@ -311,11 +313,12 @@ export function AccountNavMenu({
     () =>
       buildAccountNavMenuGroups({
         isAdmin,
+        billingPersona,
         showToolsLaunch: showToolsCta && canLaunchTools,
         showCanvasLaunch: canvasReady,
         showEcomLaunch: ecomReady,
       }),
-    [isAdmin, showToolsCta, canLaunchTools, canvasReady, ecomReady],
+    [isAdmin, billingPersona, showToolsCta, canLaunchTools, canvasReady, ecomReady],
   );
 
   async function runAction(id: string) {

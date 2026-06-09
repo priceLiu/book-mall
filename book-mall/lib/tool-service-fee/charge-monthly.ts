@@ -7,7 +7,7 @@ import {
   TOOL_SUITE_NAV_KEYS,
   type ToolSuiteNavKey,
 } from "@/lib/tool-suite-nav-keys";
-import { TOOL_SERVICE_FEE_PERIOD_DAYS } from "@/lib/tool-service-fee/config";
+import { TOOL_SERVICE_FEE_MODE, TOOL_SERVICE_FEE_PERIOD_DAYS } from "@/lib/tool-service-fee/config";
 
 export type ActivateToolServiceFeeResult =
   | {
@@ -39,6 +39,13 @@ export async function activateToolServiceFee(
   userId: string,
   toolNavKeyRaw: string,
 ): Promise<ActivateToolServiceFeeResult> {
+  if (!TOOL_SERVICE_FEE_MODE) {
+    return {
+      ok: false,
+      code: "plan_inactive",
+      message: "工具技术服务费已下线，请开通会员套餐后使用全部工具",
+    };
+  }
   const toolNavKey = toolNavKeyRaw.trim();
   if (!TOOL_SUITE_NAV_KEYS.includes(toolNavKey as ToolSuiteNavKey)) {
     return { ok: false, code: "invalid_nav_key", message: "无效的工具分组" };

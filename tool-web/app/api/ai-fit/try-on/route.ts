@@ -12,19 +12,8 @@ import {
   createDashscopeJobFromServer,
   pollDashscopeJobFromServer,
 } from "@/lib/forward-gateway-dashscope-server";
-import {
-  dashscopeExtractTaskImageUrl,
-} from "@/lib/ai-fit-dashscope";
+import { dashscopeExtractTaskImageUrl } from "@/lib/ai-fit-dashscope";
 import { readOssEnv } from "@/lib/oss-client";
-import {
-  postToolUsageFromServerWithRetries,
-} from "@/lib/forward-tools-usage-server";
-import { TOOL_SERVICE_FEE_MODE } from "@/lib/tool-service-fee-mode";
-import {
-  computeAiTryOnChargePoints,
-  resolveAiTryOnBillingModelId,
-} from "@/lib/tools-scheme-a-pricing";
-import { getSchemeARetailMultiplierServer } from "@/lib/scheme-a-retail-multiplier-server";
 
 export const runtime = "nodejs";
 
@@ -34,146 +23,12 @@ const persistedTryOnResultUrlByTask = new Map<
   { url: string; at: number }
 >();
 const PERSISTED_TRY_ON_TTL_MS = 20 * 60 * 1000;
-const recordedTryOnUsageTasks = new Set<string>();
-const recordedTryOnUsageInsufficientTasks = new Set<string>();
-
-/** 成片计费展示：幂等 / 金额（与 taskId 绑定，TTL 与 OSS 缓存一致时清理） */
-type TryOnBillingSnap = { chargedPoints?: number; billingDuplicate?: boolean };
-const tryOnBillingSnapByTaskId = new Map<string, TryOnBillingSnap>();
-
-/**
- * 计费锚定：仅在任务成功且写出结果图 URL 后打点一次 try_on（等价于用户一次「试衣」成功成片），
- * 与台帐单价一致；toolKey 须为 AI智能试衣页 `fitting-room__ai-fit`（与 Beacon 路径规则一致）。
- */
-const AI_FIT_USAGE_TOOL_KEY = "fitting-room__ai-fit";
-
-/**
- * v003：POST 阶段 reserve 后把 holdId 缓存到 (taskId → holdId)，
- * GET 阶段 settle（reportAiFitTryOnUsage）按 taskId 反查并附带给主站完成 hold→SETTLED。
- * 与 `persistedTryOnResultUrlByTask` 同生命周期，TTL 20 分钟。
- */
-const holdIdByTryOnTaskId = new Map<string, { holdId: string; at: number }>();
-function rememberTryOnHoldId(taskId: string, holdId: string): void {
-  holdIdByTryOnTaskId.set(taskId, { holdId, at: Date.now() });
-}
-function readTryOnHoldId(taskId: string): string | undefined {
-  const row = holdIdByTryOnTaskId.get(taskId);
-  if (!row) return undefined;
-  if (Date.now() - row.at > PERSISTED_TRY_ON_TTL_MS) {
-    holdIdByTryOnTaskId.delete(taskId);
-    return undefined;
-  }
-  return row.holdId;
-}
-
-type AiFitTryOnUsagePayload = {
-  recorded: boolean;
-  insufficientBalance?: boolean;
-  error?: string | null;
-  chargedPoints?: number;
-  billingDuplicate?: boolean;
-  serviceFeeMode?: boolean;
-};
-
-async function reportAiFitTryOnUsage(opts: {
-  taskId: string;
-  imageUrl: string;
-  persistedToOwnOss: boolean;
-}): Promise<AiFitTryOnUsagePayload> {
-  if (TOOL_SERVICE_FEE_MODE) {
-    return { recorded: true, serviceFeeMode: true, error: null };
-  }
-  try {
-    const tryOnModelId = resolveAiTryOnBillingModelId();
-    const { multiplier: retailMult } = await getSchemeARetailMultiplierServer({
-      toolKey: AI_FIT_USAGE_TOOL_KEY,
-      modelKey: tryOnModelId,
-    });
-    const billingPoints = computeAiTryOnChargePoints(tryOnModelId, retailMult);
-    if (billingPoints <= 0) {
-      return { recorded: false, error: "试衣方案 A 标价未配置或无效" };
-    }
-    /** v003：若 POST 阶段已 reserve，settle 时附带 holdId 让主站把 hold 转 SETTLED；
-     * 找不到（hold 已 expire / 跨进程冷启动）则走旧 auto 路径，依靠主站 settle 自身的水位线兜底。 */
-    const holdId = readTryOnHoldId(opts.taskId);
-    const usage = await postToolUsageFromServerWithRetries({
-      toolKey: AI_FIT_USAGE_TOOL_KEY,
-      action: "try_on",
-      meta: {
-        taskId: opts.taskId,
-        resultImageUrl: opts.imageUrl,
-        persistedToOwnOss: opts.persistedToOwnOss,
-        modelId: tryOnModelId,
-        imageCount: 1,
-        pricingScheme: "tools_scheme_a",
-        tryOnModel: tryOnModelId,
-        retailMultiplier: retailMult,
-      },
-      ...(holdId ? { holdId } : {}),
-    });
-    if (!usage.ok) {
-      const msg =
-        usage.reason === "no_session"
-          ? "未检测到工具站令牌，无法上报计费"
-          : "工具站未配置 MAIN_SITE_ORIGIN，无法上报计费";
-      return { recorded: false, error: msg };
-    }
-    if (usage.status === 402) {
-      const req = usage.data.requiredPoints;
-      return {
-        recorded: false,
-        insufficientBalance: true,
-        error:
-          typeof req === "number"
-            ? `账户余额不足（约需 ${req / 100} 元）`
-            : "账户余额不足，无法完成本次计费",
-      };
-    }
-    if (usage.status !== 200) {
-      const err =
-        typeof usage.data.error === "string"
-          ? usage.data.error
-          : `计费上报失败（HTTP ${usage.status}）`;
-      return { recorded: false, error: err };
-    }
-    const d = usage.data;
-    const costPoints =
-      typeof d.costPoints === "number" && Number.isFinite(d.costPoints)
-        ? Math.max(0, Math.floor(d.costPoints))
-        : undefined;
-
-    if (d.duplicate === true) {
-      return {
-        recorded: true,
-        billingDuplicate: true,
-        chargedPoints: costPoints,
-      };
-    }
-    if (d.recorded === true) {
-      return {
-        recorded: true,
-        chargedPoints: costPoints,
-      };
-    }
-    return { recorded: true };
-  } catch (e) {
-    console.error("[ai-fit try-on] usage reporting failed after retries", e);
-    return {
-      recorded: false,
-      error: "计费上报失败（网络异常），将自动重试",
-    };
-  }
-}
 
 function cachedPersistedUrl(taskId: string): string | undefined {
   const row = persistedTryOnResultUrlByTask.get(taskId);
   if (!row) return undefined;
   if (Date.now() - row.at > PERSISTED_TRY_ON_TTL_MS) {
     persistedTryOnResultUrlByTask.delete(taskId);
-    recordedTryOnUsageTasks.delete(taskId);
-    recordedTryOnUsageInsufficientTasks.delete(taskId);
-    tryOnBillingSnapByTaskId.delete(taskId);
-    holdIdByTryOnTaskId.delete(taskId);
     return undefined;
   }
   return row.url;
@@ -206,7 +61,6 @@ async function resolveImageRef(
 ): Promise<{ url: string } | { error: string }> {
   const t = ref.trim();
   if (t.startsWith("http://") || t.startsWith("https://")) {
-    /** 已知 TLS/可达性问题的 URL 由服务端中转上传到 OSS，避免百炼拉取失败 */
     if (shouldRehostRemoteUrl(t)) {
       try {
         const url = await rehostRemoteImageToOss(t);
@@ -237,7 +91,7 @@ async function resolveImageRef(
   return { error: "图片须为 https 公网 URL 或上传生成的 Data URL" };
 }
 
-/** 创建百炼 AI 试衣异步任务（aitryon）。 */
+/** 创建百炼 AI 试衣异步任务（aitryon）。扣费见 Gateway finalize。 */
 export async function POST(req: NextRequest) {
   const suite = await requireToolSuiteNavAccess("fitting-room");
   if (!suite.ok) return suite.response;
@@ -363,7 +217,7 @@ export async function POST(req: NextRequest) {
   });
 }
 
-/** 查询百炼试衣任务状态。 */
+/** 查询百炼试衣任务状态。成功时 Gateway poll 已完成积分/BYOK 结算。 */
 export async function GET(req: NextRequest) {
   const suite = await requireToolSuiteNavAccess("fitting-room");
   if (!suite.ok) return suite.response;
@@ -413,52 +267,7 @@ export async function GET(req: NextRequest) {
           rememberPersistedUrl(taskId, stable);
         } catch (e) {
           console.error("[ai-fit try-on] persist result to OSS failed:", e);
-          /** 退回百炼短期 URL，客户端仍可短暂预览 */
         }
-      }
-    }
-
-  }
-
-  let usage:
-    | {
-        recorded: boolean;
-        insufficientBalance?: boolean;
-        error?: string | null;
-        chargedPoints?: number;
-        billingDuplicate?: boolean;
-      }
-    | undefined;
-
-  if (succeeded && imageUrl && taskId) {
-    if (recordedTryOnUsageTasks.has(taskId)) {
-      const snap = tryOnBillingSnapByTaskId.get(taskId);
-      usage = {
-        recorded: true,
-        chargedPoints: snap?.chargedPoints,
-        billingDuplicate: snap?.billingDuplicate,
-      };
-    } else if (recordedTryOnUsageInsufficientTasks.has(taskId)) {
-      usage = {
-        recorded: false,
-        insufficientBalance: true,
-        error: "账户余额不足，无法记入本次试衣扣费；成片仍可预览。",
-      };
-    } else {
-      const reported = await reportAiFitTryOnUsage({
-        taskId,
-        imageUrl,
-        persistedToOwnOss,
-      });
-      usage = reported;
-      if (reported.recorded) {
-        recordedTryOnUsageTasks.add(taskId);
-        tryOnBillingSnapByTaskId.set(taskId, {
-          chargedPoints: reported.chargedPoints,
-          billingDuplicate: reported.billingDuplicate,
-        });
-      } else if (reported.insufficientBalance) {
-        recordedTryOnUsageInsufficientTasks.add(taskId);
       }
     }
   }
@@ -468,6 +277,7 @@ export async function GET(req: NextRequest) {
     imageUrl,
     message: message ?? null,
     code: code ?? null,
-    ...(usage ? { usage } : {}),
+    billing: { creditBilling: true, gatewaySettled: succeeded },
+    persistedToOwnOss,
   });
 }

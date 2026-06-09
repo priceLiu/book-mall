@@ -197,7 +197,12 @@ export async function gatewayV1ImageParsing(
 
 export function gatewayV1ClientMeta(
   clientSource: GatewayClientSource,
-  extra?: Omit<GatewayV1LogMeta, "clientSource">,
+  extra?: Omit<GatewayV1LogMeta, "clientSource"> & { bookUserId?: string },
 ): GatewayV1LogMeta {
-  return { clientSource, ...extra };
+  const { bookUserId, ...rest } = extra ?? {};
+  return {
+    clientSource,
+    ...rest,
+    ...(bookUserId ? { actorBookUserId: bookUserId } : {}),
+  };
 }

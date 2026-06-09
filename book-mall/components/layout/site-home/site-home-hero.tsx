@@ -137,8 +137,8 @@ export function SiteHomeHeroSection() {
             <Link href="/register" className="site-home-btn-primary">
               开始使用
             </Link>
-            <Link href="#pricing" className="site-home-btn-secondary">
-              <span>查看价格</span>
+            <Link href="/pricing" className="site-home-btn-secondary">
+              <span>查看报价</span>
             </Link>
           </div>
 

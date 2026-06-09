@@ -27,6 +27,8 @@ import {
 import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { grantCredits } from "@/lib/billing/credit-account-service";
+import { assertBillingPersona } from "@/lib/billing/billing-persona";
+import { ensurePlatformManagedKeyForTenant } from "@/lib/gateway/platform-managed-key";
 import type { TenantRole } from "@prisma/client";
 
 export const ACTIVE_TENANT_COOKIE = "active_tenant_id";
@@ -84,6 +86,12 @@ export async function createTeamAction(formData: FormData): Promise<ActionResult
   if (!name) return { ok: false, error: "请填写团队名称" };
   if (!planId) return { ok: false, error: "请选择团队套餐" };
 
+  try {
+    await assertBillingPersona(auth.userId, "PLATFORM_CREDIT");
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+
   const plan = await prisma.membershipPlan.findUnique({ where: { id: planId } });
   if (!plan || plan.family !== "TEAM") {
     return { ok: false, error: "无效的团队套餐" };
@@ -123,6 +131,12 @@ export async function createTeamAction(formData: FormData): Promise<ActionResult
     idempotencyKey: `team_open:${tenant.id}`,
     description: `团队开通发放（${plan.tier} × ${quote.totalSeats} 席）`,
   });
+
+  try {
+    await ensurePlatformManagedKeyForTenant(tenant.id);
+  } catch (e) {
+    console.warn("[createTeamAction] platform team key failed", e);
+  }
 
   // 切换到新团队空间
   cookies().set(ACTIVE_TENANT_COOKIE, tenant.id, {

@@ -3,7 +3,7 @@ import {
   TOOL_SUITE_NAV_KEYS,
   type ToolSuiteNavKey,
 } from "@/lib/tool-suite-nav-keys";
-import { navKeysFromActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
+import { getMembershipToolAccess } from "@/lib/membership-tool-access";
 
 const ALLOWED = new Set<string>(TOOL_SUITE_NAV_KEYS);
 
@@ -39,7 +39,7 @@ export async function navKeysFromActiveToolProductSubscriptions(
 }
 
 /**
- * 解析当前用户可用的工具站分组 navKey（Phase D：来自有效工具技术服务费周期）。
+ * 解析当前用户可用的工具站分组 navKey（套餐模式：有效会员解锁全部工具）。
  */
 export async function resolveToolsNavKeysForUser(userId: string): Promise<{
   keys: ToolSuiteNavKey[];
@@ -50,11 +50,11 @@ export async function resolveToolsNavKeysForUser(userId: string): Promise<{
     process.env.NODE_ENV === "development" &&
     process.env.TOOLS_SSO_RELAX_MEMBERSHIP?.trim() === "1";
 
-  const serviceKeys = await navKeysFromActiveToolServicePeriods(userId);
-  if (serviceKeys.length > 0) {
+  const memberAccess = await getMembershipToolAccess(userId);
+  if (memberAccess.ok) {
     return {
-      keys: serviceKeys,
-      planName: "工具技术服务费",
+      keys: [...TOOL_SUITE_NAV_KEYS],
+      planName: memberAccess.planName,
       planSlug: null,
     };
   }

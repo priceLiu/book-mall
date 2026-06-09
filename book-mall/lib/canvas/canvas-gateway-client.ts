@@ -102,7 +102,7 @@ export async function canvasGwChat(
   const result = await gatewayV1ChatCompletions({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
   });
 
   let parsed: unknown = null;
@@ -169,7 +169,7 @@ export async function canvasGwCreateKieJob(
       input: opts.input,
       callBackUrl: opts.callBackUrl ?? null,
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
   });
 
   return {
@@ -208,7 +208,7 @@ export async function canvasGwCreateVolcengineVideoJob(
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
     body: { model: opts.model, input: opts.body },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
   });
 
   return {
@@ -256,7 +256,7 @@ export async function canvasGwCreateBailianR2vJob(
         parameterExtras: opts.parameterExtras,
       },
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
   });
 
   return {
@@ -296,7 +296,7 @@ export async function canvasGwCreateHunyuanJob(
         params: opts.params,
       },
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
   });
 
   return {
@@ -339,7 +339,7 @@ export async function canvasGwTts(
         ? { language_type: opts.languageType.trim() }
         : {}),
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
   });
 
   return {
@@ -377,7 +377,7 @@ export async function canvasGwRecordInfo(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("CANVAS"),
+    meta: gatewayV1ClientMeta("CANVAS", { bookUserId: userId }),
   });
 
   if (polled.providerKind === "BAILIAN") {
@@ -456,7 +456,7 @@ export async function canvasGwImageParsing(
       clothesType,
       model,
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
   });
 
   return {
@@ -568,7 +568,7 @@ export async function canvasGwChatStream(
   const result = await gatewayV1ChatCompletionsStream({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage }),
+    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
   });
 
   const logId = result.headers.get("x-gateway-log-id") ?? "";

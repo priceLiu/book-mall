@@ -2,10 +2,10 @@
 export const TOOL_SERVICE_FEE_MODE = true;
 
 export const SERVICE_FEE_CHARGE_LINE =
-  "已含在工具技术服务费内，单次生成不另扣点";
+  "套餐额度内不另扣积分；超额编排从轻量包扣";
 
 export const SERVICE_FEE_CHARGE_TITLE =
-  "工具使用权按月「技术服务费」从钱包扣点；云厂商调用费用走 Gateway BYOK，Book 不对每次生成扣点。";
+  "工具使用权：按月技术服务费（通用积分池）。生成：厂商费走 Gateway BYOK；平台编排超额（文生图/视频等）按 BYOK 套餐额度，超出后扣通用积分轻量包。";
 
 export function serviceFeeBillableHintJson() {
   return {

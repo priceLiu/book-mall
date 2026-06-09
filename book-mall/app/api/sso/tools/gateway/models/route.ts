@@ -1,19 +1,22 @@
-import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
+import { NextResponse } from "next/server";
+
 import {
   GatewayRequiredError,
   assertGatewayApiKeyLinkedForUser,
   getGatewayLinkStatusForUser,
 } from "@/lib/gateway/book-gateway-link";
+import { listPromptOptimizerGatewayModelsFromRegistry } from "@/lib/gateway/prompt-optimizer-chat-models";
 import {
   assertPlatformGatewayEntitlement,
   PlatformEntitlementError,
 } from "@/lib/platform-gateway-entitlement";
-import { listPromptOptimizerGatewayModels } from "@/lib/gateway/prompt-optimizer-chat-models";
+import { getUserBillingPersona } from "@/lib/billing/billing-persona";
+import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** 提示词优化器等工具 · 可读 Gateway Chat 模型列表（须已关联 sk-gw） */
+/** 提示词优化器等工具 · Gateway Chat 模型列表（须已关联 sk-gw） */
 export async function GET(request: Request) {
   const auth = verifyToolsBearer(request);
   if (!auth.ok) {
@@ -42,7 +45,11 @@ export async function GET(request: Request) {
   }
 
   const link = await getGatewayLinkStatusForUser(auth.userId);
-  const models = listPromptOptimizerGatewayModels(link.boundKinds ?? []);
+  const persona = await getUserBillingPersona(auth.userId);
+  const models = await listPromptOptimizerGatewayModelsFromRegistry({
+    boundKinds: link.boundKinds ?? [],
+    persona: persona === "PLATFORM_CREDIT" ? "PLATFORM_CREDIT" : "BYOK",
+  });
 
   return Response.json({
     defaultModelKey: models.find((m) => m.modelKey === "deepseek-v4-flash")

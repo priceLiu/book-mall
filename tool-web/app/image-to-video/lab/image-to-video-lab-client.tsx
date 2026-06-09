@@ -431,6 +431,9 @@ export function ImageToVideoLabClient({
   const [refRatio, setRefRatio] = useState<string>("16:9");
   const [t2vAspectRatio, setT2vAspectRatio] = useState<T2vAspectRatio>("16:9");
   const [selectedModelId, setSelectedModelId] = useState(DEFAULT_IMAGE_TO_VIDEO_MODEL_ID);
+  const [platformVideoModels, setPlatformVideoModels] = useState<
+    Array<{ modelKey: string; displayName: string; description: string }>
+  >([]);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const [generatingModelLabel, setGeneratingModelLabel] = useState("");
@@ -557,11 +560,50 @@ export function ImageToVideoLabClient({
     };
   }, [selectedModel.apiModel, resolution, billableHintDurationSec]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/platform-models?app=tool&role=VIDEO");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          platformOffering?: boolean;
+          models?: Array<{ modelKey: string; displayName: string; description: string }>;
+        };
+        if (cancelled || !data.platformOffering || !data.models?.length) return;
+        setPlatformVideoModels(data.models);
+        const first = data.models[0]!;
+        const match = IMAGE_TO_VIDEO_MODELS.find((m) => m.apiModel === first.modelKey);
+        if (match) setSelectedModelId(match.id);
+      } catch {
+        /* 非平台代付用户忽略 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const labModelPickerList = useMemo(() => {
+    if (platformVideoModels.length > 0 && modeTab === "i2v") {
+      return platformVideoModels.map((o) => {
+        const hit = IMAGE_TO_VIDEO_MODELS.find((m) => m.apiModel === o.modelKey);
+        if (hit) {
+          return { ...hit, title: o.displayName, description: o.description || hit.description };
+        }
+        return {
+          id: o.modelKey,
+          apiModel: o.modelKey,
+          title: o.displayName,
+          description: o.description,
+          icon: "✦",
+        };
+      });
+    }
     if (modeTab === "t2v") return TEXT_TO_VIDEO_MODELS;
     if (modeTab === "ref") return REFERENCE_TO_VIDEO_MODELS;
     return IMAGE_TO_VIDEO_MODELS;
-  }, [modeTab]);
+  }, [modeTab, platformVideoModels]);
 
   const visibleJobs = useMemo(() => {
     return jobs.filter(
@@ -950,19 +992,6 @@ export function ImageToVideoLabClient({
             st === "FAILED"
               ? formatDashScopeI2vFailureForUser(output, st)
               : st;
-          // v003：生成失败 → 释放 reserve hold（幂等接口，失败不影响业务）
-          if (holdId) {
-            try {
-              await fetch("/api/image-to-video/release-hold", {
-                method: "POST",
-                credentials: "same-origin",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ holdId, reason: `video_${st.toLowerCase()}` }),
-              });
-            } catch {
-              /* ignore — main site cron 会兜底自动 EXPIRED */
-            }
-          }
           throw new Error(`生成失败：${detail}`);
         }
       }

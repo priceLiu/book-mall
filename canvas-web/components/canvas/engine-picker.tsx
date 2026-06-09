@@ -408,19 +408,22 @@ function ProviderGroup({
   onSelectModel: (m: CanvasProviderModelDto) => void;
 }) {
   const isSystem = provider.id.startsWith("system:");
+  const isPlatformOffering = provider.id === "platform:offering";
   return (
     <section>
-      <header className="mb-2 flex items-center gap-2">
-        {isSystem ? (
-          <span className="rounded bg-[var(--canvas-accent,#a78bfa)]/30 px-1.5 py-0.5 text-[10px] text-white">
-            系统
+      {!isPlatformOffering ? (
+        <header className="mb-2 flex items-center gap-2">
+          {isSystem ? (
+            <span className="rounded bg-[var(--canvas-accent,#a78bfa)]/30 px-1.5 py-0.5 text-[10px] text-white">
+              系统
+            </span>
+          ) : null}
+          <h3 className="text-[12px] font-medium text-white">{provider.alias}</h3>
+          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">
+            {provider.kind}
           </span>
-        ) : null}
-        <h3 className="text-[12px] font-medium text-white">{provider.alias}</h3>
-        <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">
-          {provider.kind}
-        </span>
-      </header>
+        </header>
+      ) : null}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {models.map((m) => {
           const selected =
@@ -430,7 +433,7 @@ function ProviderGroup({
             <ModelCard
               key={m.id}
               model={m}
-              providerKind={provider.kind}
+              providerKind={isPlatformOffering ? "" : provider.kind}
               selected={selected}
               onClick={() => onSelectModel(m)}
             />
@@ -483,9 +486,9 @@ function ModelCard({
         <p className="text-[11px] leading-relaxed text-white/55 line-clamp-2">
           {model.description}
         </p>
-      ) : (
+      ) : providerKind ? (
         <p className="text-[11px] text-white/35">{providerKind}</p>
-      )}
+      ) : null}
       {paramCount > 0 ? (
         <p className="text-[10px] text-white/40">{paramCount} 项可调参数</p>
       ) : null}

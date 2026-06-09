@@ -5,6 +5,8 @@
 import type { GatewayProviderKind } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { getUserBillingPersona } from "@/lib/billing/billing-persona";
+import { ensurePlatformManagedKeyForUser } from "@/lib/gateway/platform-managed-key";
 import {
   maskGatewayApiKey,
   resolveGatewayApiKeyById,
@@ -160,14 +162,35 @@ export async function resolveGatewayAuthForBookUser(userId: string) {
   return resolveGatewayApiKeyById(user.gatewayApiKeyId);
 }
 
-/** 须关联 Gateway Key；ADMIN 亦须关联（生产路径） */
+/** Gateway Key 准入：PLATFORM_CREDIT 自动托管 Key；BYOK 须手动关联。 */
 export async function assertGatewayApiKeyLinkedForUser(
   userId: string,
   _opts?: { role?: string | null },
 ): Promise<void> {
-  const status = await getGatewayLinkStatusForUser(userId);
-  if (status.linked) return;
-  if (status.revoked && status.gatewayApiKeyId) {
+  const persona = await getUserBillingPersona(userId);
+
+  if (persona === "PLATFORM_CREDIT") {
+    try {
+      await ensurePlatformManagedKeyForUser(userId);
+    } catch {
+      /* fall through to status check */
+    }
+    const status = await getGatewayLinkStatusForUser(userId);
+    if (status.linked) return;
+    throw new GatewayRequiredError(
+      "平台代付 Gateway Key 初始化失败，请联系客服或稍后重试",
+    );
+  }
+
+  if (persona === null) {
+    const status = await getGatewayLinkStatusForUser(userId);
+    if (status.linked) return;
+    throw new GatewayRequiredError("请先完成计费身份选择并开通相应套餐");
+  }
+
+  const byokStatus = await getGatewayLinkStatusForUser(userId);
+  if (byokStatus.linked) return;
+  if (byokStatus.revoked && byokStatus.gatewayApiKeyId) {
     throw new GatewayRequiredError(
       "Gateway API Key 已吊销，请在 Book 个人中心重新关联，或在 Gateway 控制台创建新密钥",
     );

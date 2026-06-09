@@ -90,8 +90,10 @@ export default function ImageToVideoImplementationPage() {
           />
 
           <ToolImplementationCode
-            caption="结算扣费：确认 SUCCEEDED 后 postToolUsageFromServerWithRetries（app/api/image-to-video/settle/route.ts）"
-            code={`const usage = await postToolUsageFromServerWithRetries({
+            caption="结算：视频 PLATFORM_CREDIT 先冻结；Gateway finalize 成功实扣/失败解冻（settle 路由仅校验）"
+            code={`// 旧钱包已退役；视频 PLATFORM_CREDIT 在 createRequestLog 冻结
+// finalize 成功 settle / 失败 release
+// const usage = { creditBilling: true };
   toolKey: "image-to-video",
   action: "invoke",
   meta: { taskId: billTaskId, videoUrl },

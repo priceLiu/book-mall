@@ -16,7 +16,7 @@ function originOrError(): string | NextResponse {
   return origin.replace(/\/$/, "");
 }
 
-/** 拉取当前登录用户在主站的工具使用明细（Bearer tools_token）。 */
+/** 拉取当前登录用户在主站的历史工具使用明细（Bearer tools_token）。 */
 export async function GET(req: Request) {
   const gate = await requireActiveToolsSession();
   if (!gate.ok) return gate.response;
@@ -45,43 +45,10 @@ export async function GET(req: Request) {
   });
 }
 
-/**
- * 代理主站写入 `ToolUsageEvent`：主站根据 `meta.modelId / apiModel / ...` 自身从 `ToolBillablePrice` 解析
- * 单价；只有解析出正金额时才会入库，否则返回 `{ recorded: false }`。客户端不再发 `costPoints` 字段。
- */
-export async function POST(req: Request) {
+/** 旧钱包按次扣点已退役；扣费见 Gateway 结算。 */
+export async function POST() {
   const gate = await requireActiveToolsSession();
   if (!gate.ok) return gate.response;
 
-  const jar = cookies();
-  const token = jar.get("tools_token")?.value?.trim();
-  if (!token) {
-    return NextResponse.json({ error: "no_session" }, { status: 401 });
-  }
-
-  const base = originOrError();
-  if (base instanceof NextResponse) return base;
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-  }
-
-  const r = await fetch(`${base}${UPSTREAM}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body ?? {}),
-    cache: "no-store",
-  });
-
-  const payload = (await r.json().catch(() => null)) as Record<
-    string,
-    unknown
-  > | null;
-  return NextResponse.json(payload ?? { error: "upstream" }, { status: r.status });
+  return NextResponse.json({ ok: true, recorded: false, creditBilling: true });
 }

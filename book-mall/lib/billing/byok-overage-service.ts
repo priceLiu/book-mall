@@ -7,6 +7,7 @@ import {
   BYOK_TEAM_MIN_SEATS,
   mapLogToByokTaskKind,
 } from "@/lib/billing/byok-pricing";
+import { assertActiveByokSubscription } from "@/lib/billing/byok-subscription-service";
 import {
   consumeCredits,
   getPoolBalances,
@@ -90,6 +91,8 @@ export async function assertByokQuotaBeforeGenerate(input: {
     apiKeyId: input.apiKeyId,
   });
   if (!ref) return;
+
+  await assertActiveByokSubscription(ref);
 
   const { scopeKey, seats } = await resolveByokScope(ref);
   const quota = await loadQuota(scopeKey, taskKind);

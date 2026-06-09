@@ -47,25 +47,10 @@ export default function AiFitImplementationPage() {
 
         <ToolImplementationSection heading="3. 核心代码摘录">
           <ToolImplementationCode
-            caption="计费键与上报封装入口（app/api/ai-fit/try-on/route.ts）"
-            code={`const AI_FIT_USAGE_TOOL_KEY = "fitting-room__ai-fit";
-
-async function reportAiFitTryOnUsage(opts: {
-  taskId: string;
-  imageUrl: string;
-  persistedToOwnOss: boolean;
-}): Promise<AiFitTryOnUsagePayload> {
-  const usage = await postToolUsageFromServerWithRetries({
-    toolKey: AI_FIT_USAGE_TOOL_KEY,
-    action: "try_on",
-    meta: {
-      taskId: opts.taskId,
-      resultImageUrl: opts.imageUrl,
-      persistedToOwnOss: opts.persistedToOwnOss,
-    },
-  });
-  // …402 余额不足、duplicate、recorded 等分支…
-}`}
+            caption="计费：Gateway createTask + poll finalize（app/api/ai-fit/try-on/route.ts）"
+            code={`// POST → createDashscopeJobFromServer → gatewayLogId
+// GET poll 成功 → book-mall jobs/recordInfo → finalizeRequestLog
+// BYOK 额度内免费；超额从通用积分池扣轻量包`}
           />
         </ToolImplementationSection>
 

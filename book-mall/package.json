@@ -56,7 +56,10 @@
     "canvas:fetch-style-library-from-html": "tsx scripts/fetch-style-library-from-html.ts",
     "canvas:sync-style-library": "tsx scripts/fetch-style-library-from-html.ts && dotenv -e .env.local -- tsx scripts/upload-style-library-images.ts",
     "canvas:upload-style-library": "dotenv -e .env.local -- tsx scripts/upload-style-library-images.ts",
-    "gateway:poll-loop": "dotenv -e .env.local -- tsx scripts/gateway-poll-loop.ts"
+    "gateway:poll-loop": "dotenv -e .env.local -- tsx scripts/gateway-poll-loop.ts",
+    "gateway:seed-registry": "dotenv -e .env.local -- tsx scripts/seed-gateway-model-registry.ts --confirm",
+    "gateway:verify-registry": "dotenv -e .env.local -- tsx scripts/verify-gateway-model-registry.ts",
+    "gateway:auto-publish": "dotenv -e .env.local -- tsx scripts/auto-publish-platform-offerings.ts"
   },
   "dependencies": {
     "@ark-ui/react": "^5.37.0",

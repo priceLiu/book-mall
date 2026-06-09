@@ -3,7 +3,7 @@ import {
   isGatewayAuthResponse,
   requireGatewayV1Auth,
 } from "@/lib/gateway/gateway-v1-route-auth";
-import { parseGatewayV1LogMeta } from "@/lib/gateway/gateway-v1-log-meta";
+import { parseGatewayV1LogMeta, logMetaToRequestLogFields } from "@/lib/gateway/gateway-v1-log-meta";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 import {
   createRequestLog,
@@ -76,10 +76,8 @@ export async function POST(request: NextRequest) {
     model,
     endpoint: "/v1/chat/completions",
     clientSource,
-    clientPage: logMeta.clientPage,
-    storyProjectId: logMeta.storyProjectId,
-    storyTaskId: logMeta.storyTaskId,
     inputSummary: buildGatewayInputSummary(model, restBody),
+    ...logMetaToRequestLogFields(logMeta),
   });
 
   const stream = body.stream === true;

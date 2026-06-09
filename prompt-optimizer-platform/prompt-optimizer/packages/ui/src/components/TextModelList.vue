@@ -19,7 +19,13 @@
             </NSpace>
 
             <NSpace :size="6" class="model-card-tags">
-              <NTag size="small" type="default" round :bordered="false">
+              <NTag
+                v-if="!platformGatewayMode"
+                size="small"
+                type="default"
+                round
+                :bordered="false"
+              >
                 {{ providerDisplayName(model) }}
               </NTag>
               <NTag size="small" type="info" round :bordered="false">
@@ -203,6 +209,7 @@ import { useI18n } from 'vue-i18n'
 import { NButton, NCard, NTag, NText, NSpace } from 'naive-ui'
 import { isRunningInElectron, type TextModelConfig } from '@prompt-optimizer/core'
 import { getProviderDisplayName, getTextModelConfigDisplayName } from '../utils/provider-display'
+import { isPlatformGatewayMode } from '../utils/platform-gateway'
 
 const { models, isTestingConnectionFor, isDefaultModel } = defineProps({
   models: {
@@ -222,6 +229,7 @@ const { models, isTestingConnectionFor, isDefaultModel } = defineProps({
 const emit = defineEmits(['test', 'edit', 'clone', 'enable', 'disable', 'delete'])
 
 const { t } = useI18n()
+const platformGatewayMode = isPlatformGatewayMode()
 
 const isElectronEnv = isRunningInElectron()
 const modelDisplayName = (model: TextModelConfig) => getTextModelConfigDisplayName(model, t)

@@ -14,6 +14,14 @@ export const GATEWAY_PROVIDER_KINDS = [
   "VOLCENGINE",
 ] as const satisfies readonly GatewayProviderKind[];
 
+async function afterCredentialMutation(gatewayUserId: string): Promise<void> {
+  await syncPersonalGatewayApiKeyBindings(gatewayUserId);
+  const { syncCanonicalPlatformAdminKeyBindings } = await import(
+    "@/lib/gateway/platform-credential-pool"
+  );
+  await syncCanonicalPlatformAdminKeyBindings(gatewayUserId);
+}
+
 export async function listGatewayCredentials(userId: string) {
   const rows = await prisma.gatewayVendorCredential.findMany({
     where: { userId },
@@ -80,7 +88,7 @@ export async function createGatewayCredential(opts: {
   if (isDefault) {
     await unsetOtherDefaults(opts.userId, opts.providerKind, row.id);
   }
-  await syncPersonalGatewayApiKeyBindings(opts.userId);
+  await afterCredentialMutation(opts.userId);
   return row;
 }
 
@@ -121,7 +129,7 @@ export async function deleteGatewayCredential(userId: string, id: string) {
   });
   if (!row) return false;
   await prisma.gatewayVendorCredential.delete({ where: { id } });
-  await syncPersonalGatewayApiKeyBindings(userId);
+  await afterCredentialMutation(userId);
   return true;
 }
 
@@ -172,8 +180,12 @@ export async function updateGatewayCredential(
   if (patch.isDefaultForProvider) {
     await unsetOtherDefaults(userId, row.providerKind, id);
   }
-  if (patch.active !== undefined) {
-    await syncPersonalGatewayApiKeyBindings(userId);
+  if (
+    patch.active !== undefined ||
+    patch.apiKey !== undefined ||
+    patch.isDefaultForProvider !== undefined
+  ) {
+    await afterCredentialMutation(userId);
   }
   return updated;
 }
@@ -198,7 +210,7 @@ export async function cloneGatewayCredential(
     },
   });
   if (cloned.active) {
-    await syncPersonalGatewayApiKeyBindings(userId);
+    await afterCredentialMutation(userId);
   }
   return cloned;
 }

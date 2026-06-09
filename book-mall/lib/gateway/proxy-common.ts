@@ -1,4 +1,4 @@
-import type { GatewayClientSource, GatewayProviderKind } from "@prisma/client";
+import type { GatewayClientSource, GatewayProviderKind, BillingPersona } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDecryptedCredentialApiKey } from "./credential-service";
 import {
@@ -19,6 +19,7 @@ import {
   resolveGatewayTokenMetrics,
   type UsageFromResponse,
 } from "./gateway-token-metrics";
+import { assertModelRegistered, UnregisteredGatewayModelError } from "./model-registry";
 import { parseVideoPricingHints } from "./log-pricing-hints";
 import { estimateVendorCost } from "./pricing-estimate";
 import {
@@ -39,6 +40,9 @@ import {
 } from "@/lib/billing/video-risk-control";
 import { assertByokQuotaBeforeGenerate } from "@/lib/billing/byok-overage-service";
 import { resolveGatewayLogBillingMode } from "@/lib/billing/gateway-billing-mode";
+import {
+  isStaffRole,
+} from "@/lib/billing/billing-persona";
 import {
   acquireTenantSlot,
   releaseTenantSlot,
@@ -87,11 +91,37 @@ export async function createRequestLog(opts: {
   actorBookUserId?: string | null;
   /** 多租户：占用席位 */
   seatId?: string | null;
+  staffFlag?: boolean;
+  billingPersonaSnap?: BillingPersona | null;
 }) {
+  await assertModelRegistered(opts.model).catch((e) => {
+    if (e instanceof UnregisteredGatewayModelError) throw e;
+    throw e;
+  });
+
   const route = routeGatewayModel(opts.model);
+
+  let staffFlag = opts.staffFlag ?? false;
+  let billingPersonaSnap = opts.billingPersonaSnap ?? null;
+  if (opts.actorBookUserId) {
+    const actor = await prisma.user.findUnique({
+      where: { id: opts.actorBookUserId },
+      select: { role: true, billingPersona: true, billingPersonaLockedAt: true },
+    });
+    if (actor) {
+      staffFlag = isStaffRole(actor.role);
+      if (actor.billingPersonaLockedAt) {
+        billingPersonaSnap = actor.billingPersona;
+      }
+    }
+  } else if (opts.staffFlag == null) {
+    staffFlag = false;
+  }
+
   const billingMode = await resolveGatewayLogBillingMode({
     tenantId: opts.tenantId,
     credentialId: opts.credentialId,
+    actorBookUserId: opts.actorBookUserId,
   });
 
   const isVideoReq = (opts.requestKind ?? route.requestKind) === "VIDEO";
@@ -164,6 +194,8 @@ export async function createRequestLog(opts: {
       actorBookUserId: opts.actorBookUserId ?? undefined,
       seatId: opts.seatId ?? undefined,
       billingMode,
+      staffFlag,
+      billingPersonaSnap: billingPersonaSnap ?? undefined,
       submittedAt: new Date(),
     },
   });

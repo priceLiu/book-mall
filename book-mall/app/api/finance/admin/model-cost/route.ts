@@ -12,8 +12,10 @@ import {
 import { prisma } from "@/lib/prisma";
 import {
   deleteModelCostAction,
+  importModelCostsAction,
   upsertModelCostAction,
 } from "@/app/admin/finance/credit-billing-actions";
+import { autoPublishPlatformOfferings } from "@/lib/platform-model/auto-publish-offerings";
 
 export async function OPTIONS(request: NextRequest) {
   return financeOptions(request);
@@ -63,10 +65,28 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json()) as { action: string } & Record<string, unknown>;
+
+  if (body.action === "import") {
+    const rows = body.rows;
+    if (!Array.isArray(rows)) {
+      return financeJson(request, { ok: false, error: "rows 须为数组" }, { status: 400 });
+    }
+    const result = await importModelCostsAction(rows as Parameters<typeof importModelCostsAction>[0]);
+    if (result.ok) {
+      void autoPublishPlatformOfferings({ publishedBy: user.id }).catch(() => {});
+    }
+    return financeJson(request, result, { status: result.ok ? 200 : 400 });
+  }
+
   const fd = bodyToFormData(body);
   const result =
     body.action === "delete"
       ? await deleteModelCostAction(fd)
       : await upsertModelCostAction(fd);
+
+  if (result.ok && body.action !== "delete") {
+    void autoPublishPlatformOfferings({ publishedBy: user.id }).catch(() => {});
+  }
+
   return financeJson(request, result, { status: result.ok ? 200 : 400 });
 }

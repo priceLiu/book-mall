@@ -17,5 +17,6 @@ export async function claimRechargePromoTemplateAction(templateId: string) {
 
   revalidatePath("/account/recharge-promos");
   revalidatePath("/account");
+  revalidatePath("/checkout/topup");
   revalidatePath("/pay/mock-topup");
 }

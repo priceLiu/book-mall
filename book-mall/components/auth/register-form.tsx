@@ -4,6 +4,7 @@ import { type FormEvent, useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { BillingPersona } from "@prisma/client";
 import { AuthAnimatedScreen } from "@/components/auth/auth-animated-screen";
 import {
   AnimatedAuthFields,
@@ -12,6 +13,24 @@ import {
   BoxReveal,
   GoogleAuthButton,
 } from "@/components/auth/animated-auth-ui";
+import { cn } from "@/lib/utils";
+
+const PERSONA_OPTIONS: {
+  value: BillingPersona;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: "PLATFORM_CREDIT",
+    title: "平台代付（推荐）",
+    description: "购买会员套餐，平台代付 AI 费用，按积分实时扣费，无需自备云厂商 Key。",
+  },
+  {
+    value: "BYOK",
+    title: "自带 Key（BYOK）",
+    description: "自备云厂商 API Key，平台收取技术服务费；云账单在 Gateway 查看。",
+  },
+];
 
 export function RegisterForm() {
   const router = useRouter();
@@ -19,6 +38,7 @@ export function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [billingPersona, setBillingPersona] = useState<BillingPersona>("PLATFORM_CREDIT");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +52,7 @@ export function RegisterForm() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name: name || undefined }),
+        body: JSON.stringify({ email, password, name: name || undefined, billingPersona }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -54,7 +74,7 @@ export function RegisterForm() {
         setError(msg);
         return;
       }
-      router.push("/login");
+      router.push(`/login?registered=1&persona=${billingPersona}`);
       router.refresh();
     } finally {
       setLoading(false);
@@ -72,7 +92,7 @@ export function RegisterForm() {
 
         <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} className="pb-2">
           <p className="max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-            加入智选 AI Mall，开启订阅与工具权益
+            请选择计费方式（注册后不可更改）
           </p>
         </BoxReveal>
 
@@ -80,13 +100,44 @@ export function RegisterForm() {
           <>
             <GoogleAuthButton
               label="使用 Google 注册"
-              onClick={() => void signIn("google", { callbackUrl: "/account" })}
+              onClick={() =>
+                void signIn("google", { callbackUrl: "/onboarding/billing-persona" })
+              }
             />
             <AuthOrDivider />
           </>
         ) : null}
 
         <form onSubmit={onSubmit}>
+          <div className="mb-4 space-y-2">
+            {PERSONA_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition",
+                  billingPersona === opt.value
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/40",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="billingPersona"
+                  value={opt.value}
+                  checked={billingPersona === opt.value}
+                  onChange={() => setBillingPersona(opt.value)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-medium">{opt.title}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {opt.description}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+
           <AnimatedAuthFields
             fields={[
               {

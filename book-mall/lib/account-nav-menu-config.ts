@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { BillingPersona } from "@prisma/client";
 import {
   CreditCard,
   GraduationCap,
@@ -6,13 +7,15 @@ import {
   Key,
   LayoutGrid,
   LogOut,
-  Receipt,
   Settings,
   Shield,
   Sparkles,
   User,
   Wallet,
   Wrench,
+  BarChart3,
+  Receipt,
+  ScrollText,
 } from "lucide-react";
 
 export type AccountNavLinkItem = {
@@ -21,7 +24,10 @@ export type AccountNavLinkItem = {
   label: string;
   icon: LucideIcon;
   exact?: boolean;
+  /** 外链（finance-web 等），新标签打开 */
   external?: boolean;
+  /** 站内跳转也新标签打开（如经 /account/usage 再 302 到 finance-web） */
+  openInNewTab?: boolean;
 };
 
 export type AccountNavActionItem = {
@@ -42,31 +48,66 @@ export type AccountNavMenuGroup = {
 };
 
 const GROUP_LABELS = {
-  billing: "充值与费用",
+  billing: "积分与费用",
   admin: "管理员",
   apps: "应用",
   classroom: "课堂",
-  disclosure: "公示",
   account: "帐户",
 } as const;
+
+import { getFinanceFeesRedirectUrl } from "@/lib/finance-account-redirect";
+
+function financeNavItem(
+  path: string,
+  fallbackHref: string,
+  label: string,
+  icon: LucideIcon,
+): AccountNavLinkItem {
+  const direct = getFinanceFeesRedirectUrl(path);
+  if (direct) {
+    return { kind: "link", href: direct, label, icon, external: true };
+  }
+  return { kind: "link", href: fallbackHref, label, icon, openInNewTab: true };
+}
 
 /** 个人中心 Ark Menu 分组（顺序即展示顺序） */
 export function buildAccountNavMenuGroups(input: {
   isAdmin: boolean;
+  billingPersona: BillingPersona | null;
   showToolsLaunch: boolean;
   showCanvasLaunch: boolean;
   showEcomLaunch: boolean;
 }): AccountNavMenuGroup[] {
+  const isByok = input.billingPersona === "BYOK";
+  const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
+
+  const billingItems: AccountNavMenuItem[] = [
+    { kind: "link", href: "/account/billing", label: "轻量包购买", icon: Sparkles, exact: true },
+    financeNavItem("/fees/usage", "/account/usage", "积分用量", BarChart3),
+    financeNavItem("/fees/billing/details", "/account/fees/details", "费用明细", Receipt),
+    financeNavItem("/fees/billing/ledger", "/account/fees/ledger", "积分流水", ScrollText),
+  ];
+  if (isByok) {
+    billingItems.push(
+      financeNavItem("/fees/billing/byok", "/account/fees/byok", "BYOK 任务用量", Key),
+    );
+    billingItems.push({ kind: "link", href: "/account/byok", label: "自带 Key 管理", icon: Key });
+  }
+  if (isPlatform) {
+    billingItems.push({ kind: "link", href: "/pricing", label: "会员套餐", icon: CreditCard });
+  }
+  billingItems.push({
+    kind: "link",
+    href: "/account/subscription",
+    label: "学堂订阅",
+    icon: Wallet,
+  });
+
   const groups: AccountNavMenuGroup[] = [
     {
       id: "billing",
       label: GROUP_LABELS.billing,
-      items: [
-        { kind: "link", href: "/account/recharge-promos", label: "充值优惠", icon: Sparkles },
-        { kind: "link", href: "/account/billing", label: "费用与明细", icon: Receipt, exact: true },
-        { kind: "link", href: "/account/tool-service-fee", label: "工具技术服务费", icon: CreditCard },
-        { kind: "link", href: "/account/subscription", label: "订阅中心", icon: Wallet },
-      ],
+      items: billingItems,
     },
   ];
 
@@ -95,16 +136,29 @@ export function buildAccountNavMenuGroups(input: {
   }
   if (input.showEcomLaunch) {
     appItems.push({ kind: "action", id: "launch-ecom", label: "打开电商工具箱", icon: LayoutGrid });
-    appItems.push({
-      kind: "link",
-      href: "/account/ecommerce",
-      label: "电商工具箱设置",
-      icon: LayoutGrid,
-    });
   }
   if (appItems.length > 0) {
     groups.push({ id: "apps", label: GROUP_LABELS.apps, items: appItems });
   }
+
+  const accountItems: AccountNavMenuItem[] = [
+    { kind: "link", href: "/account", label: "概览", icon: User, exact: true },
+    { kind: "link", href: "/account/security", label: "账户与安全", icon: Shield, exact: true },
+  ];
+
+  if (isByok) {
+    accountItems.push({
+      kind: "link",
+      href: "/account/gateway",
+      label: "Gateway API Key",
+      icon: Key,
+    });
+  }
+
+  accountItems.push(
+    { kind: "link", href: "/", label: "返回商城首页", icon: Home },
+    { kind: "action", id: "sign-out", label: "退出登录", icon: LogOut, accent: "subscription" },
+  );
 
   groups.push(
     {
@@ -115,22 +169,9 @@ export function buildAccountNavMenuGroups(input: {
       ],
     },
     {
-      id: "disclosure",
-      label: GROUP_LABELS.disclosure,
-      items: [
-        { kind: "link", href: "/account/pricing", label: "价目与公示", icon: Receipt },
-      ],
-    },
-    {
       id: "account",
       label: GROUP_LABELS.account,
-      items: [
-        { kind: "link", href: "/account", label: "概览", icon: User, exact: true },
-        { kind: "link", href: "/account/security", label: "账户与安全", icon: Shield, exact: true },
-        { kind: "link", href: "/account/gateway", label: "Gateway API Key", icon: Key },
-        { kind: "link", href: "/", label: "返回商城首页", icon: Home },
-        { kind: "action", id: "sign-out", label: "退出登录", icon: LogOut, accent: "subscription" },
-      ],
+      items: accountItems,
     },
   );
 

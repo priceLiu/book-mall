@@ -7,6 +7,7 @@
 ### 1.1 不与 KIE 混合
 
 - 平台在模型目录登记 **`modelKey` + `providerKind`**；运行时 `routeGatewayModel(modelKey)` 决定厂商。
+- 统一注册表见 `book-mall/doc/tech/gateway-unified-model-registry.md` 与 `GatewayModelRoute` 表。
 - KIE Seedance（`bytedance/seedance-2`）与火山 Seedance（`doubao-seedance-2.0`、`ep-*`）是 **不同 modelKey**，各自扣对应厂商账户。
 - 用户可同时绑定 KIE 与 VOLCENGINE 凭证到同一 `sk-gw`；前端按 **来源 Provider + 模型** 选择，Gateway 只取匹配 `providerKind` 的凭证。
 

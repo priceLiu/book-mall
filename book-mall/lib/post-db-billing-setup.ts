@@ -7,7 +7,7 @@ import { backfillModelCatalogVendorFields } from "@/lib/model-catalog/backfill-v
 
 const BOOK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const MIN_ACTIVE_COST_PROFILES = 25;
+const MIN_ACTIVE_COST_PROFILES = 13;
 
 export type PostDbBillingSetupResult = {
   realignRan: boolean;
@@ -49,13 +49,13 @@ export async function runPostDbBillingSetup(opts?: {
   let realignRan = false;
   if (costProfilesBefore < MIN_ACTIVE_COST_PROFILES) {
     console.log(
-      `[post-billing] ModelCostProfile active=${costProfilesBefore} < ${MIN_ACTIVE_COST_PROFILES} → seed-credit-billing`,
+      `[post-billing] ModelCostProfile active=${costProfilesBefore} < ${MIN_ACTIVE_COST_PROFILES} → seed-platform-model-costs`,
     );
-    runPnpm("exec dotenv -e .env.local -- tsx scripts/seed-credit-billing.ts");
+    runPnpm("exec dotenv -e .env.local -- tsx scripts/seed-platform-model-costs.ts");
     realignRan = true;
   } else {
     console.log(
-      `[post-billing] skip seed-credit-billing (active ModelCostProfile=${costProfilesBefore})`,
+      `[post-billing] skip seed-platform-model-costs (active ModelCostProfile=${costProfilesBefore})`,
     );
   }
 

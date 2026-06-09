@@ -7,6 +7,11 @@ import {
   listUsageRecords,
 } from "@/lib/billing/credit-account-service";
 import {
+  aggregateUsageByTool,
+  countSucceededUsage,
+} from "@/lib/finance/account-usage-summary";
+import { clientPageToToolLabel } from "@/lib/finance/client-page-tool";
+import {
   financeJson,
   financeOptions,
   financeUnauthorized,
@@ -24,19 +29,26 @@ export async function GET(request: NextRequest) {
 
   const take = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("take") ?? 50)));
 
-  const [balance, pools, byModel, recent] = await Promise.all([
+  const [balance, pools, byModel, byTool, recent, totalCalls] = await Promise.all([
     getCreditBalance({ ownerType: "USER", ownerId: user.id }),
     getPoolBalances({ ownerType: "USER", ownerId: user.id }),
-    aggregateUsageByModel({ userId: user.id }),
-    listUsageRecords({ userId: user.id, take }),
+    aggregateUsageByModel({ bookUserId: user.id }),
+    aggregateUsageByTool(user.id),
+    listUsageRecords({ bookUserId: user.id, take }),
+    countSucceededUsage(user.id),
   ]);
 
   return financeJson(request, {
     balance,
     pools,
     byModel,
-    recent: recent.rows,
+    byTool,
+    recent: recent.rows.map((r) => ({
+      ...r,
+      toolLabel: clientPageToToolLabel(r.clientPage),
+    })),
     total: recent.total,
+    totalCalls,
     totalConsumed: byModel.reduce((s, m) => s + m.creditsCharged, 0),
   });
 }
