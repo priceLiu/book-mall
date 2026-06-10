@@ -1,6 +1,10 @@
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
+import {
+  BYOK_TASK_KIND_LABEL,
+  sortByokQuotasForDisplay,
+} from "@/lib/billing/byok-pricing";
 import { prisma } from "@/lib/prisma";
 import { loadPricingConfig } from "@/lib/pricing/credit-pricing-engine";
 import { listUserTenantMemberships } from "@/lib/tenant/context";
@@ -78,10 +82,10 @@ export default async function PricingPage() {
         interval: b.interval,
         minSeats: b.minSeats,
       }))}
-      byokQuotas={byokQuotas.map((q) => ({
+      byokQuotas={sortByokQuotasForDisplay(byokQuotas).map((q) => ({
         scopeKey: q.scopeKey,
         taskKind: q.taskKind,
-        label: q.label,
+        label: BYOK_TASK_KIND_LABEL[q.taskKind] ?? q.label,
         monthlyIncluded: q.monthlyIncluded,
         overageCredits: q.overageCredits,
       }))}

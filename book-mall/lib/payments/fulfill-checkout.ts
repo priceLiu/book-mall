@@ -16,6 +16,7 @@ import { grantCredits, topupCredits } from "@/lib/billing/credit-account-service
 import { packById } from "@/lib/billing/credit-topup-packs";
 import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
+import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import { ensurePlatformManagedKeyForTenant } from "@/lib/gateway/platform-managed-key";
 import { appendPaymentEvent } from "@/lib/payments/payment-events";
 import { orderTypeForProductKind } from "@/lib/payments/product-labels";
@@ -52,7 +53,10 @@ async function fulfillMembership(
   const idem = idempotencyBase(checkout.id);
 
   if (checkout.productKind === "MEMBERSHIP_TEAM") {
-    const totalSeats = Math.max(1, Math.round(Number(snap.seats) || plan.includedSeats || 1));
+    const totalSeats = Math.max(
+      TEAM_MIN_INCLUDED_SEATS,
+      Math.round(Number(snap.seats) || plan.includedSeats || TEAM_MIN_INCLUDED_SEATS),
+    );
     const quote = await quoteTeamPlan({ planId: plan.id, totalSeats });
     const name =
       typeof snap.teamName === "string" && snap.teamName.trim()

@@ -32,6 +32,8 @@ import {
 } from "./credit-account-service";
 import { consumeTeamCredits } from "./seat-billing-service";
 import { settleByokOverage } from "./byok-overage-service";
+import { classifyBillingCategory } from "./billing-category";
+import { recordBillingSettlement } from "./billing-settlement-service";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 
 export function creditBillingEnabled(): boolean {
@@ -172,11 +174,20 @@ export async function settleSucceededGatewayLog(input: {
     units,
     pricePerCreditYuan: pools.pricePerCreditYuan,
   });
-  if (credits === 0) return 0;
+  if (credits === 0) {
+    await recordBillingSettlement({
+      log: input.log,
+      ref: target.ref,
+      settlementKind: "NONE",
+      creditsCharged: 0,
+      billingCategory: classifyBillingCategory(input.log),
+    }).catch(() => undefined);
+    return 0;
+  }
 
   try {
     if (target.kind === "TEAM") {
-      await consumeTeamCredits({
+      const teamRes = await consumeTeamCredits({
         tenantId: target.ref.ownerId,
         actorUserId: target.actorUserId ?? target.ref.ownerId,
         credits,
@@ -188,8 +199,16 @@ export async function settleSucceededGatewayLog(input: {
         periodStart: monthStartUtc(),
         allowNegative: true,
       });
+      await recordBillingSettlement({
+        log: input.log,
+        ref: target.ref,
+        settlementKind: "PLATFORM_CREDIT",
+        creditsCharged: credits,
+        creditLedgerId: teamRes.ledger.id,
+        billingCategory: classifyBillingCategory(input.log),
+      }).catch(() => undefined);
     } else {
-      await consumeCredits({
+      const consumeRes = await consumeCredits({
         ref: target.ref,
         credits,
         actorUserId: target.actorUserId,
@@ -199,6 +218,14 @@ export async function settleSucceededGatewayLog(input: {
         marginSnapshot: snap.marginRate,
         allowNegative: true,
       });
+      await recordBillingSettlement({
+        log: input.log,
+        ref: target.ref,
+        settlementKind: "PLATFORM_CREDIT",
+        creditsCharged: credits,
+        creditLedgerId: consumeRes.ledger.id,
+        billingCategory: classifyBillingCategory(input.log),
+      }).catch(() => undefined);
     }
     return credits;
   } catch (e) {
@@ -237,6 +264,18 @@ async function settleVideoFromReserve(
         costSnapshotYuan: snap?.netCostYuan ?? null,
         marginSnapshot: snap?.marginRate ?? null,
       });
+      const settleLedger = await prisma.creditLedger.findUnique({
+        where: { idempotencyKey: `settle:${log.id}` },
+        select: { id: true },
+      });
+      await recordBillingSettlement({
+        log,
+        ref: target.ref,
+        settlementKind: "PLATFORM_VIDEO",
+        creditsCharged: frozen,
+        creditLedgerId: settleLedger?.id ?? null,
+        billingCategory: classifyBillingCategory(log),
+      }).catch(() => undefined);
       return frozen;
     } catch (e) {
       console.error("[credit-settlement] video settle 失败", log.id, e);
@@ -255,7 +294,7 @@ async function settleVideoFromReserve(
   if (credits <= 0) return 0;
   const pool: PoolKind = await resolveVideoPool(target.ref);
   try {
-    await consumeCredits({
+    const consumeRes = await consumeCredits({
       ref: target.ref,
       credits,
       pool,
@@ -267,6 +306,14 @@ async function settleVideoFromReserve(
       marginSnapshot: snap.marginRate,
       allowNegative: true,
     });
+    await recordBillingSettlement({
+      log,
+      ref: target.ref,
+      settlementKind: "PLATFORM_VIDEO",
+      creditsCharged: credits,
+      creditLedgerId: consumeRes.ledger.id,
+      billingCategory: classifyBillingCategory(log),
+    }).catch(() => undefined);
     return credits;
   } catch (e) {
     console.error("[credit-settlement] video consume(fallback) 失败", log.id, e);

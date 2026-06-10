@@ -9,6 +9,7 @@ import { getMembershipToolAccess } from "@/lib/membership-tool-access";
 import { getPoolBalances } from "@/lib/billing/credit-account-service";
 import {
   getAccountPackageUsageRows,
+  getAccountPlatformCategoryUsageRows,
   getAccountUsageSummary,
 } from "@/lib/finance/account-usage-summary";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
@@ -84,10 +85,12 @@ export default async function AccountPage({
     getAccountUsageSummary(session.user.id),
   ]);
 
-  const packageUsageRows = await getAccountPackageUsageRows(
-    session.user.id,
-    byokSub?.scopeKey ?? null,
-  );
+  const packageUsageRows =
+    billingPersona === "BYOK"
+      ? await getAccountPackageUsageRows(session.user.id, byokSub?.scopeKey ?? null)
+      : billingPersona === "PLATFORM_CREDIT"
+        ? await getAccountPlatformCategoryUsageRows(session.user.id)
+        : [];
 
   const byokServiceConfig =
     byokSub

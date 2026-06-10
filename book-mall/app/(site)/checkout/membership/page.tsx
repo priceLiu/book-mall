@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
+import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import { MembershipCheckoutClient } from "@/components/checkout/membership-checkout-client";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,8 @@ export default async function CheckoutMembershipPage({
 
   const isTeam = plan.family === "TEAM";
   const seats = Math.max(
-    1,
-    Math.round(Number(searchParams?.seats) || plan.includedSeats || 1),
+    TEAM_MIN_INCLUDED_SEATS,
+    Math.round(Number(searchParams?.seats) || plan.includedSeats || TEAM_MIN_INCLUDED_SEATS),
   );
 
   let priceYuan = Number(plan.priceYuan);

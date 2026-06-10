@@ -15,6 +15,8 @@ import {
   recordResourceMeter,
   type AccountRef,
 } from "@/lib/billing/credit-account-service";
+import { recordBillingSettlement } from "@/lib/billing/billing-settlement-service";
+import { classifyBillingCategory } from "@/lib/billing/billing-category";
 
 function currentPeriodKey(d = new Date()): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -158,6 +160,8 @@ export type ByokOverageResult = {
   creditsCharged: number;
   includedUsed: number;
   overageUsed: number;
+  monthlyIncluded: number;
+  includedRemainingAfter: number;
 };
 
 /**
@@ -166,6 +170,22 @@ export type ByokOverageResult = {
  */
 export async function settleByokOverage(log: GatewayRequestLog): Promise<ByokOverageResult | null> {
   if (log.billingMode !== "BYOK") return null;
+
+  const existingSettlement = await prisma.billingSettlementLine.findUnique({
+    where: { gatewayLogId: log.id },
+  });
+  if (existingSettlement?.byokTaskKind) {
+    return {
+      taskKind: existingSettlement.byokTaskKind,
+      scopeKey: BYOK_SCOPE_PERSONAL,
+      isOverage: existingSettlement.isOverage,
+      creditsCharged: existingSettlement.creditsCharged,
+      includedUsed: existingSettlement.includedUsedAfter ?? 0,
+      overageUsed: 0,
+      monthlyIncluded: existingSettlement.monthlyIncluded ?? 0,
+      includedRemainingAfter: existingSettlement.includedRemainingAfter ?? 0,
+    };
+  }
 
   const taskKind = mapLogToByokTaskKind(log);
   if (!taskKind) {
@@ -178,6 +198,13 @@ export async function settleByokOverage(log: GatewayRequestLog): Promise<ByokOve
         periodKey: currentPeriodKey(),
         refType: "gateway_log",
         refId: log.id,
+      }).catch(() => undefined);
+      await recordBillingSettlement({
+        log,
+        ref: target.ref,
+        settlementKind: "METER_ONLY",
+        creditsCharged: 0,
+        billingCategory: classifyBillingCategory(log),
       }).catch(() => undefined);
     }
     return null;
@@ -244,6 +271,10 @@ export async function settleByokOverage(log: GatewayRequestLog): Promise<ByokOve
       creditsCharged,
       includedUsed: isOverage ? row.includedUsed : row.includedUsed + 1,
       overageUsed: isOverage ? row.overageUsed + 1 : row.overageUsed,
+      monthlyIncluded: limit,
+      includedRemainingAfter: isOverage
+        ? 0
+        : Math.max(0, limit - (row.includedUsed + 1)),
     };
   });
 
@@ -257,7 +288,7 @@ export async function settleByokOverage(log: GatewayRequestLog): Promise<ByokOve
   }).catch(() => undefined);
 
   if (result.creditsCharged > 0) {
-    await consumeCredits({
+    const consumeRes = await consumeCredits({
       ref: target.ref,
       credits: result.creditsCharged,
       pool: "GENERAL",
@@ -272,6 +303,34 @@ export async function settleByokOverage(log: GatewayRequestLog): Promise<ByokOve
       where: { id: log.id },
       data: { creditsCharged: result.creditsCharged },
     });
+    await recordBillingSettlement({
+      log,
+      ref: target.ref,
+      settlementKind: "BYOK_QUOTA_OVERAGE",
+      byokTaskKind: taskKind,
+      billingCategory: taskKind,
+      quotaDelta: 0,
+      monthlyIncluded: quota.monthlyIncluded * (scopeKey === BYOK_SCOPE_TEAM_SEAT ? seats : 1),
+      includedUsedAfter: result.includedUsed,
+      includedRemainingAfter: result.includedRemainingAfter,
+      isOverage: true,
+      creditsCharged: result.creditsCharged,
+      creditLedgerId: consumeRes.ledger.id,
+    }).catch(() => undefined);
+  } else {
+    await recordBillingSettlement({
+      log,
+      ref: target.ref,
+      settlementKind: "BYOK_QUOTA_INCLUDED",
+      byokTaskKind: taskKind,
+      billingCategory: taskKind,
+      quotaDelta: 1,
+      monthlyIncluded: quota.monthlyIncluded * (scopeKey === BYOK_SCOPE_TEAM_SEAT ? seats : 1),
+      includedUsedAfter: result.includedUsed,
+      includedRemainingAfter: result.includedRemainingAfter,
+      isOverage: false,
+      creditsCharged: 0,
+    }).catch(() => undefined);
   }
 
   return result;

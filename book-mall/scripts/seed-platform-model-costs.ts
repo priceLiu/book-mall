@@ -143,6 +143,51 @@ const EXTRA_COSTS: CostSeed[] = [
     listCostYuan: 0.22,
     discountRate: 0.1,
   },
+  // AI 试衣（文生图 taxonomy）
+  {
+    canonicalModelKey: "aitryon",
+    vendor: "aliyun",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.2,
+    discountRate: 0.1,
+  },
+  {
+    canonicalModelKey: "aitryon-plus",
+    vendor: "aliyun",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.5,
+    discountRate: 0.1,
+  },
+  {
+    canonicalModelKey: "aitryon-parsing-v1",
+    vendor: "aliyun",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.004,
+    discountRate: 0.1,
+  },
+  // 视频理解 / 视觉实验室 VL
+  {
+    canonicalModelKey: "qwen3-vl-plus",
+    vendor: "aliyun",
+    unit: "PER_KTOKEN",
+    listCostYuan: 0.005,
+    discountRate: 0.1,
+  },
+  {
+    canonicalModelKey: "qwen3-vl-flash",
+    vendor: "aliyun",
+    unit: "PER_KTOKEN",
+    listCostYuan: 0.0015,
+    discountRate: 0.1,
+  },
+  // TTS / 语音
+  {
+    canonicalModelKey: "qwen3-tts-flash",
+    vendor: "aliyun",
+    unit: "PER_KTOKEN",
+    listCostYuan: 0.008,
+    discountRate: 0.1,
+  },
 ];
 
 function seedId(row: CostSeed): string {

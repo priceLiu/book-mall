@@ -9,6 +9,15 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 import { clientPageToToolKey } from "@/lib/finance/client-page-tool";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
+import type { UserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
+import { fetchUserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
+import { loadBillingSettlementsByLogIds } from "@/lib/billing/billing-settlement-service";
+import {
+  K_INCLUDED_REMAINING,
+  K_QUOTA_DELTA,
+  K_SETTLEMENT_KIND,
+  K_TASK_KIND,
+} from "@/lib/finance/bill-display-keys";
 
 export type UsageOverviewFilters = {
   since?: string;
@@ -32,6 +41,10 @@ export type UsageOverviewExportLine = {
   billingPersona: string;
   creditsConsumed: number;
   feeDescription: string;
+  settlementKind: string;
+  taskKind: string;
+  quotaDelta: string;
+  includedRemaining: string;
   yuan: number;
 };
 
@@ -58,10 +71,16 @@ export type UsageOverviewPayload = {
     billingPersona: string;
     creditsConsumed: number;
     feeDescription: string;
+    settlementKind: string;
+    taskKind: string;
+    quotaDelta: string;
+    includedRemaining: string;
     yuan: number;
   }>;
   exportRows: UsageOverviewExportLine[];
   exportRangeLabel: string;
+  /** 筛选单用户时附带套餐/积分对帐摘要 */
+  packageReconciliation?: UserPackageReconciliation | null;
 };
 
 const GATEWAY_SELECT = {
@@ -80,6 +99,13 @@ const GATEWAY_SELECT = {
   marginSnapshot: true,
   submittedAt: true,
   completedAt: true,
+  settlementKind: true,
+  byokTaskKind: true,
+  billingCategory: true,
+  quotaDelta: true,
+  includedUsedAfter: true,
+  includedRemainingAfter: true,
+  inputSummary: true,
 } as const;
 
 function ymKey(d: Date | string): string {
@@ -188,7 +214,10 @@ export async function buildUsageOverviewData(
   const userMap = new Map(users.map((u) => [u.id, u]));
 
   const modelKeys = gatewayLogs.map((g) => g.canonicalModelKey ?? g.model ?? "");
-  const displayNames = await loadModelDisplayNameMap(modelKeys, prisma);
+  const [displayNames, settlements] = await Promise.all([
+    loadModelDisplayNameMap(modelKeys, prisma),
+    loadBillingSettlementsByLogIds(gatewayLogs.map((g) => g.id)),
+  ]);
 
   type LineRow = {
     id: string;
@@ -200,6 +229,10 @@ export async function buildUsageOverviewData(
     billingPersona: string;
     creditsConsumed: number;
     feeDescription: string;
+    settlementKind: string;
+    taskKind: string;
+    quotaDelta: string;
+    includedRemaining: string;
     yuan: number;
   };
 
@@ -220,6 +253,7 @@ export async function buildUsageOverviewData(
       userId,
       userMap.get(userId)?.name ?? userMap.get(userId)?.email ?? userId,
       displayNames,
+      settlements.get(g.id) ?? null,
     );
 
     const creditsConsumed = parseInt(billRow[K_CREDITS_CONSUMED] ?? "0", 10) || 0;
@@ -234,6 +268,10 @@ export async function buildUsageOverviewData(
       billingPersona: billRow["平台/计费身份"] ?? personaLabel(g.billingPersonaSnap, g.billingMode),
       creditsConsumed,
       feeDescription: billRow["平台账单/费用说明"] ?? "",
+      settlementKind: billRow[K_SETTLEMENT_KIND] ?? "",
+      taskKind: billRow[K_TASK_KIND] ?? "",
+      quotaDelta: billRow[K_QUOTA_DELTA] ?? "",
+      includedRemaining: billRow[K_INCLUDED_REMAINING] ?? "",
       yuan: creditsToYuan(creditsConsumed),
     });
   }
@@ -269,6 +307,10 @@ export async function buildUsageOverviewData(
       billingPersona: l.billingPersona,
       creditsConsumed: l.creditsConsumed,
       feeDescription: l.feeDescription,
+      settlementKind: l.settlementKind,
+      taskKind: l.taskKind,
+      quotaDelta: l.quotaDelta,
+      includedRemaining: l.includedRemaining,
       yuan: Number(l.yuan.toFixed(2)),
     };
   });
@@ -299,9 +341,17 @@ export async function buildUsageOverviewData(
         billingPersona: l.billingPersona,
         creditsConsumed: l.creditsConsumed,
         feeDescription: l.feeDescription,
+        settlementKind: l.settlementKind,
+        taskKind: l.taskKind,
+        quotaDelta: l.quotaDelta,
+        includedRemaining: l.includedRemaining,
         yuan: Number(l.yuan.toFixed(2)),
       };
     });
+
+  const packageReconciliation = onlyUserId
+    ? await fetchUserPackageReconciliation(onlyUserId)
+    : null;
 
   return {
     filters: { since: sinceMonth, tool: onlyTool, userId: onlyUserId },
@@ -329,5 +379,6 @@ export async function buildUsageOverviewData(
     recentLines,
     exportRows,
     exportRangeLabel,
+    packageReconciliation,
   };
 }

@@ -32,6 +32,7 @@ import {
   updateConfigAction,
   updateRoleAction,
 } from "./team-actions";
+import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import type { ActionResult } from "@/lib/server-action-result";
 
 type Role = "OWNER" | "ADMIN" | "MEMBER";
@@ -323,7 +324,9 @@ function CreateTeam({
 }) {
   const [name, setName] = useState("");
   const [planId, setPlanId] = useState(teamPlans[0]?.id ?? "");
-  const [seats, setSeats] = useState(teamPlans[0]?.includedSeats ?? 1);
+  const selectedPlan = teamPlans.find((p) => p.id === planId) ?? teamPlans[0];
+  const minSeats = Math.max(TEAM_MIN_INCLUDED_SEATS, selectedPlan?.includedSeats ?? TEAM_MIN_INCLUDED_SEATS);
+  const [seats, setSeats] = useState(minSeats);
 
   return (
     <Card>
@@ -350,10 +353,11 @@ function CreateTeam({
             <Input
               id="team-seats"
               type="number"
-              min={1}
+              min={minSeats}
               value={seats}
-              onChange={(e) => setSeats(Math.max(1, Number(e.target.value) || 1))}
+              onChange={(e) => setSeats(Math.max(minSeats, Number(e.target.value) || minSeats))}
             />
+            <p className="mt-1 text-xs text-muted-foreground">{minSeats} 席起订</p>
           </div>
         </div>
         {teamPlans.length > 0 ? (
@@ -364,7 +368,7 @@ function CreateTeam({
                 type="button"
                 onClick={() => {
                   setPlanId(p.id);
-                  setSeats((s) => Math.max(s, p.includedSeats));
+                  setSeats((s) => Math.max(TEAM_MIN_INCLUDED_SEATS, p.includedSeats, s));
                 }}
                 className={`rounded-lg border p-3 text-left transition-colors ${
                   planId === p.id
@@ -380,7 +384,7 @@ function CreateTeam({
                 </div>
                 <div className="mt-1 text-2xl font-bold">¥{p.priceYuan}</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  含 {p.includedSeats} 席 · 每席 {p.monthlyCredits.toLocaleString()} 积分/月
+                  起订 {Math.max(TEAM_MIN_INCLUDED_SEATS, p.includedSeats)} 席 · 每席 {p.monthlyCredits.toLocaleString()} 积分/月
                 </div>
               </button>
             ))}

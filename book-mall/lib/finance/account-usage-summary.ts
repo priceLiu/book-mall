@@ -1,11 +1,16 @@
 import { prisma } from "@/lib/prisma";
-import { BYOK_TASK_KIND_LABEL, mapLogToByokTaskKind } from "@/lib/billing/byok-pricing";
+import { BYOK_TASK_KIND_LABEL } from "@/lib/billing/byok-pricing";
+import {
+  BILLING_CATEGORY_LABEL,
+  BILLING_CATEGORY_ORDER,
+  classifyBillingCategory,
+  type BillingCategoryKey,
+} from "@/lib/billing/billing-category";
 import { getPoolBalances } from "@/lib/billing/credit-account-service";
 import {
   clientPageToToolKey,
   clientPageToToolLabel,
 } from "@/lib/finance/client-page-tool";
-import type { ByokTaskKind } from "@prisma/client";
 
 function monthStartUtc(d = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
@@ -23,28 +28,63 @@ export type PackageUsageRow = {
   succeeded: number;
   failed: number;
   remaining: number | null;
+  /** 平台代付：本月扣积分（BYOK 行通常为 null） */
+  creditsConsumed?: number | null;
 };
 
-type UsageCategoryKey = ByokTaskKind | "TEXT" | "TRYON";
+/** 平台代付：本月按七类消耗（次数 + 积分，无含次额度）。 */
+export async function getAccountPlatformCategoryUsageRows(
+  bookUserId: string,
+): Promise<PackageUsageRow[]> {
+  const since = monthStartUtc();
+  const periodKey = currentPeriodKey();
 
-const PACKAGE_USAGE_ROWS: { key: UsageCategoryKey; label: string }[] = [
-  { key: "TEXT_TO_IMAGE", label: "文生图" },
-  { key: "IMAGE_TO_VIDEO", label: "图生视频" },
-  { key: "VIDEO_TO_VIDEO", label: "视频生视频" },
-  { key: "TEXT", label: "文字" },
-  { key: "TRYON", label: "AI试衣" },
-];
+  const [logs, settlements] = await Promise.all([
+    prisma.gatewayRequestLog.findMany({
+      where: {
+        actorBookUserId: bookUserId,
+        submittedAt: { gte: since },
+        status: { in: ["SUCCEEDED", "FAILED"] },
+      },
+      select: { requestKind: true, status: true, inputSummary: true },
+    }),
+    prisma.billingSettlementLine.findMany({
+      where: { actorBookUserId: bookUserId, periodKey },
+      select: { billingCategory: true, creditsCharged: true },
+    }),
+  ]);
 
-function classifyGatewayUsageCategory(log: {
-  requestKind: string;
-  inputSummary?: unknown;
-}): UsageCategoryKey | null {
-  if (log.requestKind === "TRYON") return "TRYON";
-  if (log.requestKind === "CHAT" || log.requestKind === "TTS") return "TEXT";
-  const byok = mapLogToByokTaskKind(log);
-  if (byok) return byok;
-  if (log.requestKind === "IMAGE") return "TEXT_TO_IMAGE";
-  return null;
+  const counts = new Map<BillingCategoryKey, { succeeded: number; failed: number }>();
+  const creditsByCat = new Map<BillingCategoryKey, number>();
+
+  for (const log of logs) {
+    const cat = classifyBillingCategory(log);
+    const row = counts.get(cat) ?? { succeeded: 0, failed: 0 };
+    if (log.status === "SUCCEEDED") row.succeeded += 1;
+    else row.failed += 1;
+    counts.set(cat, row);
+  }
+
+  for (const s of settlements) {
+    if (!s.billingCategory) continue;
+    creditsByCat.set(
+      s.billingCategory,
+      (creditsByCat.get(s.billingCategory) ?? 0) + (s.creditsCharged ?? 0),
+    );
+  }
+
+  return BILLING_CATEGORY_ORDER.map((cat) => {
+    const c = counts.get(cat) ?? { succeeded: 0, failed: 0 };
+    return {
+      key: cat,
+      label: BILLING_CATEGORY_LABEL[cat],
+      total: null,
+      succeeded: c.succeeded,
+      failed: c.failed,
+      remaining: null,
+      creditsConsumed: creditsByCat.get(cat) ?? 0,
+    };
+  });
 }
 
 /** 个人中心概览：本月积分（区分轻量包加购 vs 套餐月发）+ 调用统计。 */
@@ -103,12 +143,10 @@ export async function getAccountUsageSummary(bookUserId: string) {
   const creditsConsumed = Math.abs(consumedAgg._sum.credits ?? 0);
   const creditsRemaining = pools.general.balance + pools.video.balance;
 
-  // BYOK 且无平台 plan：不展示历史 GRANT（切换身份前的月发流水）
   if (user?.billingPersona === "BYOK" && !account?.planId) {
     grantCreditsThisMonth = 0;
   }
 
-  // 轻量包加购：仅统计仍有效的部分（已 EXPIRE 清零的不计入）
   const topupCreditsThisMonth = Math.min(
     topupRaw,
     Math.max(0, creditsRemaining + creditsConsumed),
@@ -161,46 +199,51 @@ export async function getAccountPackageUsageRows(
       : Promise.resolve([]),
   ]);
 
-  const quotaByKind = new Map(quotas.map((q) => [q.taskKind, q]));
   const usageByKind = new Map(usage.map((u) => [u.taskKind, u]));
-
-  const counts = new Map<UsageCategoryKey, { succeeded: number; failed: number }>();
-  for (const key of PACKAGE_USAGE_ROWS.map((r) => r.key)) {
-    counts.set(key, { succeeded: 0, failed: 0 });
-  }
+  const counts = new Map<BillingCategoryKey, { succeeded: number; failed: number }>();
 
   for (const log of logs) {
-    const cat = classifyGatewayUsageCategory(log);
-    if (!cat) continue;
-    const row = counts.get(cat)!;
+    const cat = classifyBillingCategory(log);
+    const row = counts.get(cat) ?? { succeeded: 0, failed: 0 };
     if (log.status === "SUCCEEDED") row.succeeded += 1;
     else row.failed += 1;
+    counts.set(cat, row);
   }
 
-  return PACKAGE_USAGE_ROWS.map(({ key, label }) => {
-    const c = counts.get(key)!;
-    if (key === "TEXT" || key === "TRYON") {
-      return {
-        key,
-        label,
-        total: null,
-        succeeded: c.succeeded,
-        failed: c.failed,
-        remaining: null,
-      };
-    }
-    const quota = quotaByKind.get(key);
-    const used = usageByKind.get(key)?.includedUsed ?? 0;
-    const total = quota?.monthlyIncluded ?? null;
+  const quotaRows: PackageUsageRow[] = quotas.map((q) => {
+    const c = counts.get(q.taskKind) ?? { succeeded: 0, failed: 0 };
+    const used = usageByKind.get(q.taskKind)?.includedUsed ?? 0;
     return {
-      key,
-      label,
-      total,
+      key: q.taskKind,
+      label: BYOK_TASK_KIND_LABEL[q.taskKind] ?? q.label,
+      total: q.monthlyIncluded,
       succeeded: c.succeeded,
       failed: c.failed,
-      remaining: total != null ? Math.max(0, total - used) : null,
+      remaining: Math.max(0, q.monthlyIncluded - used),
     };
   });
+
+  const textCounts = counts.get("TEXT") ?? { succeeded: 0, failed: 0 };
+  const otherCounts = counts.get("OTHER") ?? { succeeded: 0, failed: 0 };
+  return [
+    ...quotaRows,
+    {
+      key: "TEXT",
+      label: BILLING_CATEGORY_LABEL.TEXT,
+      total: null,
+      succeeded: textCounts.succeeded,
+      failed: textCounts.failed,
+      remaining: null,
+    },
+    {
+      key: "OTHER",
+      label: BILLING_CATEGORY_LABEL.OTHER,
+      total: null,
+      succeeded: otherCounts.succeeded,
+      failed: otherCounts.failed,
+      remaining: null,
+    },
+  ];
 }
 
 /** BYOK 本月任务含/已用/剩余（个人中心概览用）。 */

@@ -1,9 +1,29 @@
 /**
  * Finance 2.0：GatewayRequestLog → 账单详情扁平行（v009 列定义）。
  */
-import type { BillingPersona, GatewayRequestLog, GatewayRequestKind, GatewayRequestStatus } from "@prisma/client";
+import type {
+  BillingCategory,
+  BillingPersona,
+  BillingSettlementKind,
+  BillingSettlementLine,
+  GatewayRequestLog,
+  GatewayRequestKind,
+  GatewayRequestStatus,
+} from "@prisma/client";
 
-import { ALL_DISPLAY_KEYS, K_CREDITS_CONSUMED } from "@/lib/finance/bill-display-keys";
+import {
+  billingCategoryLabel,
+  resolveBillingCategory,
+} from "@/lib/billing/billing-category";
+import {
+  ALL_DISPLAY_KEYS,
+  K_CREDITS_CONSUMED,
+  K_INCLUDED_REMAINING,
+  K_INCLUDED_USED,
+  K_QUOTA_DELTA,
+  K_SETTLEMENT_KIND,
+  K_TASK_KIND,
+} from "@/lib/finance/bill-display-keys";
 import { clientPageToToolLabel } from "@/lib/finance/client-page-tool";
 
 export type GatewayLogBillInput = Pick<
@@ -22,6 +42,13 @@ export type GatewayLogBillInput = Pick<
   | "submittedAt"
   | "completedAt"
   | "actorBookUserId"
+  | "settlementKind"
+  | "byokTaskKind"
+  | "billingCategory"
+  | "quotaDelta"
+  | "includedUsedAfter"
+  | "includedRemainingAfter"
+  | "inputSummary"
 >;
 
 const STATUS_LABEL: Record<GatewayRequestStatus, string> = {
@@ -32,13 +59,13 @@ const STATUS_LABEL: Record<GatewayRequestStatus, string> = {
   CANCELLED: "已取消",
 };
 
-const REQUEST_KIND_LABEL: Record<string, string> = {
-  CHAT: "对话",
-  IMAGE: "生图",
-  VIDEO: "生视频",
-  TRYON: "AI试衣",
-  TTS: "语音",
-  OTHER: "其他",
+const SETTLEMENT_KIND_LABEL: Record<BillingSettlementKind, string> = {
+  BYOK_QUOTA_INCLUDED: "BYOK 套餐内扣次",
+  BYOK_QUOTA_OVERAGE: "BYOK 超额扣积分",
+  PLATFORM_CREDIT: "平台代付扣积分",
+  PLATFORM_VIDEO: "平台代付视频",
+  METER_ONLY: "BYOK 仅计量",
+  NONE: "无扣费/扣次",
 };
 
 function ymKeyFromDate(d: Date): string {
@@ -49,18 +76,30 @@ function formatDateTime(d: Date): string {
   return d.toISOString().replace("T", " ").slice(0, 19);
 }
 
-function requestKindUnit(kind: GatewayRequestKind): string {
-  switch (kind) {
-    case "VIDEO":
+function requestKindUnit(kind: GatewayRequestKind, category: BillingCategory): string {
+  switch (category) {
+    case "IMAGE_TO_VIDEO":
+    case "VIDEO_TO_VIDEO":
       return "秒";
-    case "IMAGE":
-    case "TRYON":
+    case "TEXT_TO_IMAGE":
       return "张";
-    case "CHAT":
+    case "VIDEO_UNDERSTANDING":
     case "TTS":
+    case "TEXT":
       return "千Token";
     default:
-      return "次";
+      switch (kind) {
+        case "VIDEO":
+          return "秒";
+        case "IMAGE":
+        case "TRYON":
+          return "张";
+        case "CHAT":
+        case "TTS":
+          return "千Token";
+        default:
+          return "次";
+      }
   }
 }
 
@@ -70,13 +109,18 @@ function personaLabel(persona: BillingPersona | null | undefined): string {
   return "—";
 }
 
-function feeDescription(log: GatewayLogBillInput): string {
+function feeDescription(
+  log: GatewayLogBillInput,
+  settlement?: BillingSettlementLine | null,
+): string {
+  if (settlement?.feeDescription) return settlement.feeDescription;
   const credits = log.creditsCharged ?? 0;
+  const catLabel = billingCategoryLabel(resolveBillingCategory(log, settlement?.billingCategory ?? log.billingCategory));
   if (log.billingPersonaSnap === "BYOK") {
-    return credits > 0 ? "BYOK 超额 · 扣积分" : "BYOK 套餐内（0 积分）";
+    return credits > 0 ? `BYOK 超额 · ${catLabel} · 扣积分` : `BYOK 套餐内 · ${catLabel}`;
   }
   if (log.billingPersonaSnap === "PLATFORM_CREDIT") {
-    return credits > 0 ? "平台代付 · 扣积分" : "平台代付（未扣积分）";
+    return credits > 0 ? `平台代付 · ${catLabel} · 扣 ${credits} 积分` : `平台代付 · ${catLabel}（未扣积分）`;
   }
   if (log.billingMode === "BYOK") {
     return credits > 0 ? "BYOK 超额 · 扣积分" : "BYOK 套餐内";
@@ -95,30 +139,43 @@ function formatMargin(margin: number | null): string {
   return `${(margin * 100).toFixed(1)}%`;
 }
 
+function fmtNum(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return String(n);
+}
+
 /** 单行 Gateway 日志 → v009 扁平展示行。 */
 export function projectGatewayLogToBillRow(
   log: GatewayLogBillInput,
   platformUserId: string,
   platformUserLabel: string,
   modelDisplayNames: ReadonlyMap<string, string>,
+  settlement?: BillingSettlementLine | null,
 ): Record<string, string> {
   const row = emptyRow();
   const modelKey = log.canonicalModelKey ?? log.model ?? "";
   const displayName = modelDisplayNames.get(modelKey) ?? modelKey;
   const toolLabel = clientPageToToolLabel(log.clientPage);
-  const credits = log.creditsCharged ?? 0;
+  const credits = settlement?.creditsCharged ?? log.creditsCharged ?? 0;
   const costYuan = log.costSnapshotYuan != null ? Number(log.costSnapshotYuan) : null;
   const margin = log.marginSnapshot != null ? Number(log.marginSnapshot) : null;
   const submitted = log.submittedAt;
   const modelName =
     toolLabel && toolLabel !== "—" ? `${displayName} · ${toolLabel}` : displayName;
 
+  const settlementKind = settlement?.settlementKind ?? log.settlementKind;
+  const billingCategory = resolveBillingCategory(
+    log,
+    settlement?.billingCategory ?? log.billingCategory,
+  );
+  const categoryLabel = billingCategoryLabel(billingCategory);
+
   row["平台/用户ID"] = platformUserId;
   row["平台/用户名"] = platformUserLabel;
   row["平台/工具页面"] = log.clientPage ?? "—";
   row["平台/模型Code"] = modelKey;
   row["平台/模型名称"] = modelName;
-  row["平台/请求类型"] = REQUEST_KIND_LABEL[log.requestKind] ?? log.requestKind;
+  row["平台/请求类型"] = categoryLabel;
   row[K_CREDITS_CONSUMED] = String(credits);
   row["平台/计费身份"] = personaLabel(log.billingPersonaSnap);
   row["平台/状态"] = STATUS_LABEL[log.status] ?? log.status;
@@ -127,10 +184,20 @@ export function projectGatewayLogToBillRow(
 
   row["平台账单/账单月份"] = ymKeyFromDate(submitted);
   row["平台账单/消费时间"] = formatDateTime(submitted);
-  row["平台账单/费用说明"] = feeDescription(log);
+  row["平台账单/费用说明"] = feeDescription(log, settlement);
+
+  row[K_SETTLEMENT_KIND] = settlementKind
+    ? SETTLEMENT_KIND_LABEL[settlementKind]
+    : "—";
+  row[K_TASK_KIND] = categoryLabel;
+  row[K_QUOTA_DELTA] = fmtNum(settlement?.quotaDelta ?? log.quotaDelta);
+  row[K_INCLUDED_USED] = fmtNum(settlement?.includedUsedAfter ?? log.includedUsedAfter);
+  row[K_INCLUDED_REMAINING] = fmtNum(
+    settlement?.includedRemainingAfter ?? log.includedRemainingAfter,
+  );
 
   row["平台用量/用量"] = "1";
-  row["平台用量/用量单位"] = requestKindUnit(log.requestKind);
+  row["平台用量/用量单位"] = requestKindUnit(log.requestKind, billingCategory);
 
   row["财务核算/净成本(元)"] = costYuan != null ? costYuan.toFixed(6) : "—";
   row["财务核算/毛利率"] = formatMargin(margin);
