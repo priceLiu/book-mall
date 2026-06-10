@@ -16,14 +16,22 @@ import {
   resolveBillingCategory,
 } from "@/lib/billing/billing-category";
 import {
+  BYOK_TASK_KIND_LABEL,
+  normalizeByokFeeDescription,
+  normalizeByokQuotaSettlementSnapshot,
+} from "@/lib/billing/byok-pricing";
+import { resolveBillableImageCountFromLog } from "@/lib/gateway/log-billing-metrics";
+import {
   ALL_DISPLAY_KEYS,
   K_CREDITS_CONSUMED,
   K_INCLUDED_REMAINING,
   K_INCLUDED_USED,
+  K_MODEL_VENDOR,
   K_QUOTA_DELTA,
   K_SETTLEMENT_KIND,
   K_TASK_KIND,
 } from "@/lib/finance/bill-display-keys";
+import { resolveBillingVendorLabel } from "@/lib/finance/billing-vendor-label";
 import { clientPageToToolLabel } from "@/lib/finance/client-page-tool";
 
 export type GatewayLogBillInput = Pick<
@@ -151,6 +159,7 @@ export function projectGatewayLogToBillRow(
   platformUserLabel: string,
   modelDisplayNames: ReadonlyMap<string, string>,
   settlement?: BillingSettlementLine | null,
+  modelVendors?: ReadonlyMap<string, string>,
 ): Record<string, string> {
   const row = emptyRow();
   const modelKey = log.canonicalModelKey ?? log.model ?? "";
@@ -173,6 +182,10 @@ export function projectGatewayLogToBillRow(
   row["平台/用户ID"] = platformUserId;
   row["平台/用户名"] = platformUserLabel;
   row["平台/工具页面"] = log.clientPage ?? "—";
+  row[K_MODEL_VENDOR] = resolveBillingVendorLabel(
+    modelKey,
+    modelVendors?.get(modelKey),
+  );
   row["平台/模型Code"] = modelKey;
   row["平台/模型名称"] = modelName;
   row["平台/请求类型"] = categoryLabel;
@@ -184,19 +197,45 @@ export function projectGatewayLogToBillRow(
 
   row["平台账单/账单月份"] = ymKeyFromDate(submitted);
   row["平台账单/消费时间"] = formatDateTime(submitted);
-  row["平台账单/费用说明"] = feeDescription(log, settlement);
 
   row[K_SETTLEMENT_KIND] = settlementKind
     ? SETTLEMENT_KIND_LABEL[settlementKind]
     : "—";
-  row[K_TASK_KIND] = categoryLabel;
+
+  const byokTaskKind = settlement?.byokTaskKind ?? log.byokTaskKind;
+  row[K_TASK_KIND] =
+    byokTaskKind && byokTaskKind in BYOK_TASK_KIND_LABEL
+      ? BYOK_TASK_KIND_LABEL[byokTaskKind as keyof typeof BYOK_TASK_KIND_LABEL]
+      : categoryLabel;
+
+  const quotaSnap = settlement
+    ? normalizeByokQuotaSettlementSnapshot({
+        byokTaskKind,
+        ownerType: settlement.ownerType,
+        monthlyIncluded: settlement.monthlyIncluded,
+        includedUsedAfter: settlement.includedUsedAfter ?? log.includedUsedAfter,
+        includedRemainingAfter:
+          settlement.includedRemainingAfter ?? log.includedRemainingAfter,
+      })
+    : null;
+
   row[K_QUOTA_DELTA] = fmtNum(settlement?.quotaDelta ?? log.quotaDelta);
-  row[K_INCLUDED_USED] = fmtNum(settlement?.includedUsedAfter ?? log.includedUsedAfter);
+  row[K_INCLUDED_USED] = fmtNum(
+    quotaSnap?.includedUsedAfter ?? settlement?.includedUsedAfter ?? log.includedUsedAfter,
+  );
   row[K_INCLUDED_REMAINING] = fmtNum(
-    settlement?.includedRemainingAfter ?? log.includedRemainingAfter,
+    quotaSnap?.includedRemainingAfter ??
+      settlement?.includedRemainingAfter ??
+      log.includedRemainingAfter,
   );
 
-  row["平台用量/用量"] = "1";
+  const feeText = feeDescription(log, settlement);
+  row["平台账单/费用说明"] = quotaSnap?.corrected
+    ? normalizeByokFeeDescription(feeText, true, quotaSnap.includedRemainingAfter)
+    : feeText;
+
+  const usageUnits = resolveBillableImageCountFromLog(log);
+  row["平台用量/用量"] = String(usageUnits);
   row["平台用量/用量单位"] = requestKindUnit(log.requestKind, billingCategory);
 
   row["财务核算/净成本(元)"] = costYuan != null ? costYuan.toFixed(6) : "—";
@@ -205,23 +244,42 @@ export function projectGatewayLogToBillRow(
   return row;
 }
 
-/** 批量加载 canonicalModelKey → displayName。 */
-export async function loadModelDisplayNameMap(
+/** 批量加载 canonicalModelKey → displayName / vendor。 */
+export async function loadModelCatalogBillMaps(
   keys: string[],
   prisma: {
     modelCatalog: {
       findMany: (args: {
         where: { canonicalKey: { in: string[] } };
-        select: { canonicalKey: true; displayName: true };
-      }) => Promise<{ canonicalKey: string; displayName: string }[]>;
+        select: { canonicalKey: true; displayName: true; vendor: true };
+      }) => Promise<
+        { canonicalKey: string; displayName: string; vendor: string }[]
+      >;
     };
   },
-): Promise<Map<string, string>> {
+): Promise<{
+  displayNames: Map<string, string>;
+  vendors: Map<string, string>;
+}> {
   const uniq = [...new Set(keys.filter(Boolean))];
-  if (uniq.length === 0) return new Map();
+  if (uniq.length === 0) {
+    return { displayNames: new Map(), vendors: new Map() };
+  }
   const rows = await prisma.modelCatalog.findMany({
     where: { canonicalKey: { in: uniq } },
-    select: { canonicalKey: true, displayName: true },
+    select: { canonicalKey: true, displayName: true, vendor: true },
   });
-  return new Map(rows.map((r) => [r.canonicalKey, r.displayName]));
+  return {
+    displayNames: new Map(rows.map((r) => [r.canonicalKey, r.displayName])),
+    vendors: new Map(rows.map((r) => [r.canonicalKey, r.vendor])),
+  };
+}
+
+/** @deprecated 使用 loadModelCatalogBillMaps */
+export async function loadModelDisplayNameMap(
+  keys: string[],
+  prisma: Parameters<typeof loadModelCatalogBillMaps>[1],
+): Promise<Map<string, string>> {
+  const { displayNames } = await loadModelCatalogBillMaps(keys, prisma);
+  return displayNames;
 }

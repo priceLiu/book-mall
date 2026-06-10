@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
 
 type TeamBill = {
@@ -64,33 +65,33 @@ export function TeamBillingFinanceClient() {
     load();
   }, [load]);
 
-  if (error) return <p className="p-6 text-sm text-red-600">{error}</p>;
-  if (!data) return <p className="p-6 text-sm text-[#8c8c8c]">加载中…</p>;
+  if (error) return <FinancePageState variant="error">{error}</FinancePageState>;
+  if (!data) return <FinancePageState>加载中…</FinancePageState>;
 
   if (!data.hasTeam) {
     return (
-      <div className="p-6">
+      <FinancePageShell>
         <h1 className="text-lg font-medium">团队账单</h1>
-        <p className="mt-2 text-sm text-[#8c8c8c]">您尚未加入任何团队空间。</p>
-      </div>
+        <p className="text-sm text-[#8c8c8c]">您尚未加入任何团队空间。</p>
+      </FinancePageShell>
     );
   }
 
   if (!data.canView) {
     return (
-      <div className="p-6">
+      <FinancePageShell>
         <h1 className="text-lg font-medium">团队账单</h1>
-        <p className="mt-2 text-sm text-[#8c8c8c]">
+        <p className="text-sm text-[#8c8c8c]">
           仅团队主账号或管理员可查看共享积分池账单。您当前角色：{data.teams.find((t) => t.tenantId === data.tenantId)?.role}
         </p>
-      </div>
+      </FinancePageShell>
     );
   }
 
   const bill = data.bill;
 
   return (
-    <div className="space-y-4 p-6">
+    <FinancePageShell>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-medium text-[#262626]">团队账单 · {data.tenantName}</h1>
@@ -179,7 +180,7 @@ export function TeamBillingFinanceClient() {
       ) : (
         <p className="text-sm text-[#8c8c8c]">暂无账单数据。</p>
       )}
-    </div>
+    </FinancePageShell>
   );
 }
 

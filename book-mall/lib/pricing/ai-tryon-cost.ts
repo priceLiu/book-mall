@@ -19,6 +19,20 @@ export const AI_TRYON_MODEL_KEYS = [
 
 export type AiTryonModelKey = (typeof AI_TRYON_MODEL_KEYS)[number];
 
+/** 试衣子模型 → 账单/流水可读名 */
+export const AI_TRYON_MODEL_LABEL: Record<AiTryonModelKey, string> = {
+  aitryon: "AI试衣",
+  "aitryon-plus": "AI试衣 Plus",
+  "aitryon-parsing-v1": "AI试衣·图片分割",
+  "aitryon-refiner": "AI试衣·精修",
+};
+
+export function aiTryonModelLabel(key: string | null | undefined): string | null {
+  if (!key?.trim()) return null;
+  if (isAiTryonModelKey(key)) return AI_TRYON_MODEL_LABEL[key];
+  return key.trim();
+}
+
 export function isAiTryonModelKey(key: string | null | undefined): key is AiTryonModelKey {
   if (!key) return false;
   return (AI_TRYON_MODEL_KEYS as readonly string[]).includes(key);

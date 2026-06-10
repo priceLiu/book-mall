@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
 
 type UsageData = {
@@ -62,11 +63,11 @@ export function PersonalUsageClient() {
       .catch(() => setError("加载失败"));
   }, [base]);
 
-  if (error) return <p className="p-6 text-sm text-red-600">{error}</p>;
-  if (!data) return <p className="p-6 text-sm text-[#8c8c8c]">加载中…</p>;
+  if (error) return <FinancePageState variant="error">{error}</FinancePageState>;
+  if (!data) return <FinancePageState>加载中…</FinancePageState>;
 
   return (
-    <div className="space-y-4 p-6">
+    <FinancePageShell>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-lg font-medium text-[#262626]">积分用量中心</h1>
@@ -180,7 +181,7 @@ export function PersonalUsageClient() {
           </tbody>
         </table>
       </section>
-    </div>
+    </FinancePageShell>
   );
 }
 

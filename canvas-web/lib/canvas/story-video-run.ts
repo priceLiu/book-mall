@@ -3,8 +3,15 @@
 import { listCanvasProjectTasks, runCanvasNode } from "@/lib/canvas-api";
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { frameRowsForVideoSync } from "@/lib/canvas/story-column-display";
+import {
+  findStoryWorkspaceIds,
+  frameRowsForVideoSync,
+} from "@/lib/canvas/story-column-display";
 import { patchVideoRowsFromFrameRows } from "@/lib/canvas/story-column-sync";
+import {
+  refreshStoryRefImagesFromCatalog,
+  storyCharacterRefCatalog,
+} from "@/lib/canvas/story-ref-image";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { applyVideoRowRuntime } from "@/lib/canvas/story-row-patch";
 import { storyApplyTaskResult } from "@/lib/canvas/story-run-apply";
@@ -13,6 +20,7 @@ import { storyVideoGenerateBlockReason } from "@/lib/canvas/story-frame-gate";
 import { tasksMatchStoryScope } from "@/lib/canvas/task-pick";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type {
+  StoryCharacterRow,
   StoryFrameRow,
   StoryVideoColumnNodeData,
   StoryVideoRow,
@@ -65,6 +73,7 @@ function patchVideoRowsForRun(
   frameRows: StoryFrameRow[],
   rowKey: string,
   frameImageUrlOverride?: string,
+  characterRefCatalog: ReturnType<typeof storyCharacterRefCatalog> = [],
 ): StoryVideoRow[] | null {
   let patched = patchVideoRowsFromFrameRows(videoStored, frameRows);
   const frameRow = frameRows.find((r) => r.key === rowKey);
@@ -76,15 +85,20 @@ function patchVideoRowsForRun(
   const frameScript = frameRow?.prompt?.trim();
   patched = patched.map((v) => {
     if (v.key !== rowKey) return v;
+    const baseRefImages = frameRow?.refImages?.length
+      ? frameRow.refImages
+      : v.refImages;
+    const refImages =
+      baseRefImages?.length && characterRefCatalog.length
+        ? refreshStoryRefImagesFromCatalog(baseRefImages, characterRefCatalog)
+        : baseRefImages;
     return {
       ...v,
       frameImageUrl: frameUrl,
       ...(frameRow
         ? {
             videoPrompt: frameScript || v.videoPrompt,
-            refImages: frameRow.refImages?.length
-              ? frameRow.refImages
-              : v.refImages,
+            refImages,
             videoReferencedNodeIds:
               frameRow.referencedNodeIds ?? v.videoReferencedNodeIds,
           }
@@ -188,6 +202,17 @@ async function commitStoryVideoRowRunOnce(
     return { ok: false, error: "本镜视频正在生成中，请稍候。" };
   }
 
+  const ws = findStoryWorkspaceIds(state.nodes);
+  const characterRows =
+    (ws?.characterColumnId
+      ? (
+          state.nodes.find((n) => n.id === ws.characterColumnId)?.data as {
+            rows?: StoryCharacterRow[];
+          }
+        )?.rows
+      : undefined) ?? [];
+  const characterRefCatalog = storyCharacterRefCatalog(characterRows);
+
   const videoStored =
     (videoNode.data as StoryVideoColumnNodeData).rows ?? [];
   const patched = patchVideoRowsForRun(
@@ -195,6 +220,7 @@ async function commitStoryVideoRowRunOnce(
     frameRows,
     rowKey,
     frameImageUrl,
+    characterRefCatalog,
   );
   if (!patched?.length) {
     return {

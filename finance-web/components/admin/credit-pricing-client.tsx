@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import {
   computeCreditPrice,
   computeEffectiveMargin,
@@ -149,11 +150,11 @@ export function CreditPricingClient() {
     else reload();
   }
 
-  if (loading) return <p className="p-6 text-sm text-[#8c8c8c]">加载中…</p>;
-  if (error) return <p className="p-6 text-sm text-red-600">{error}</p>;
+  if (loading) return <FinancePageState>加载中…</FinancePageState>;
+  if (error) return <FinancePageState variant="error">{error}</FinancePageState>;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <FinancePageShell>
       <header>
         <h1 className="text-lg font-medium">积分报价计算器</h1>
         <p className="mt-1 text-sm text-[#8c8c8c]">
@@ -278,6 +279,6 @@ export function CreditPricingClient() {
           </tbody>
         </table>
       </section>
-    </div>
+    </FinancePageShell>
   );
 }

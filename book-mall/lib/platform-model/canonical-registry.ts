@@ -161,6 +161,22 @@ export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "aitryon-parsing-v1",
+    displayName: "AI 试衣-图片分割",
+    description: "全身图上下装分割（角色资产服装槽 / 试衣预处理）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "TRYON",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 24,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张（输入）",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "aitryon-parsing-v1", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
     canonicalModelKey: "seedance-2.0",
     displayName: "Seedance 2.0 图生视频",
     description: "图生视频 / 分镜成片",

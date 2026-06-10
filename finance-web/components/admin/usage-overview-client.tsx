@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
 import {
   PackageReconciliationPanel,
@@ -34,6 +35,8 @@ type OverviewData = {
     settlementKind: string;
     taskKind: string;
     quotaDelta: string;
+    includedUsed: string;
+    monthlyIncluded: string;
     includedRemaining: string;
     yuan: number;
   }>;
@@ -154,16 +157,17 @@ export function UsageOverviewClient() {
     load();
   }, [load]);
 
-  if (error) return <p className="p-6 text-sm text-red-600">{error}</p>;
-  if (loading || !data) return <p className="p-6 text-sm text-[#8c8c8c]">加载中…</p>;
+  if (error) return <FinancePageState variant="error">{error}</FinancePageState>;
+  if (loading || !data) return <FinancePageState>加载中…</FinancePageState>;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 p-6">
+    <FinancePageShell>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-lg font-medium">费用多维度概览</h1>
           <p className="mt-1 text-sm text-[#8c8c8c]">
             来源 GatewayRequestLog（财务 2.0）。含 BYOK 0 积分成功调用；扣积分行另计锚定金额。
+            BYOK「套餐剩余」= 该任务类型本月额度内剩余次数（非积分）。
           </p>
         </div>
         <button
@@ -256,14 +260,18 @@ export function UsageOverviewClient() {
               <th className="px-2 py-2 text-left">计费身份</th>
               <th className="px-2 py-2 text-right">消耗积分</th>
               <th className="px-2 py-2 text-left">结算类型</th>
-              <th className="px-2 py-2 text-left">任务/扣次/剩余</th>
+              <th className="px-2 py-2 text-left">任务类型</th>
+              <th className="px-2 py-2 text-right">本次扣次</th>
+              <th className="px-2 py-2 text-right">已用</th>
+              <th className="px-2 py-2 text-right">本月额度</th>
+              <th className="px-2 py-2 text-right">套餐剩余</th>
               <th className="px-2 py-2 text-left">费用说明</th>
             </tr>
           </thead>
           <tbody>
             {data.recentLines.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-2 py-6 text-center text-[#8c8c8c]">
+                <td colSpan={13} className="px-2 py-6 text-center text-[#8c8c8c]">
                   无数据
                 </td>
               </tr>
@@ -282,10 +290,18 @@ export function UsageOverviewClient() {
                 <td className="px-2 py-1.5">{l.billingPersona}</td>
                 <td className="px-2 py-1.5 text-right">{l.creditsConsumed}</td>
                 <td className="px-2 py-1.5">{l.settlementKind || "—"}</td>
-                <td className="px-2 py-1.5 text-[#595959]">
-                  {[l.taskKind, l.quotaDelta !== "—" && l.quotaDelta !== "" ? `-${l.quotaDelta}` : null, l.includedRemaining !== "—" ? `剩${l.includedRemaining}` : null]
-                    .filter(Boolean)
-                    .join(" · ") || "—"}
+                <td className="px-2 py-1.5">{l.taskKind || "—"}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">
+                  {l.quotaDelta !== "—" && l.quotaDelta !== "" ? l.quotaDelta : "—"}
+                </td>
+                <td className="px-2 py-1.5 text-right tabular-nums">
+                  {l.includedUsed !== "—" && l.includedUsed !== "" ? l.includedUsed : "—"}
+                </td>
+                <td className="px-2 py-1.5 text-right tabular-nums">
+                  {l.monthlyIncluded !== "—" && l.monthlyIncluded !== "" ? l.monthlyIncluded : "—"}
+                </td>
+                <td className="px-2 py-1.5 text-right tabular-nums">
+                  {l.includedRemaining !== "—" && l.includedRemaining !== "" ? l.includedRemaining : "—"}
                 </td>
                 <td className="px-2 py-1.5 text-[#595959]">{l.feeDescription}</td>
               </tr>
@@ -293,6 +309,6 @@ export function UsageOverviewClient() {
           </tbody>
         </table>
       </section>
-    </div>
+    </FinancePageShell>
   );
 }

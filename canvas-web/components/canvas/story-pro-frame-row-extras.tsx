@@ -13,6 +13,7 @@ import {
   readinessLabel,
   type FrameRowAssetReadiness,
 } from "@/lib/canvas/story-pro-asset-readiness";
+import { STORY_HINT_GOLD_CLASS } from "@/lib/canvas/story-column-sync";
 import {
   applyFrameRefSuggestionsToPrompt,
   type FrameRefSuggestion,
@@ -53,6 +54,23 @@ export function StoryProFrameRefSuggestBar({
         一键插入 @
       </button>
     </div>
+  );
+}
+
+export function StoryProFrameMissingUpstreamHint({
+  hint,
+  reserveSpace,
+}: {
+  hint?: string | null;
+  reserveSpace?: boolean;
+}) {
+  if (!hint) {
+    return reserveSpace ? (
+      <div className="min-h-[22px]" aria-hidden />
+    ) : null;
+  }
+  return (
+    <p className={`text-[10px] leading-snug ${STORY_HINT_GOLD_CLASS}`}>{hint}</p>
   );
 }
 

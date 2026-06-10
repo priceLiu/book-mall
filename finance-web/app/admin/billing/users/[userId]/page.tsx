@@ -1,10 +1,11 @@
 import { BillDetailsClient } from "@/components/bill-details-client";
+import { FinancePageBleed } from "@/components/finance-page-shell";
 
 type Props = { params: { userId: string } };
 
 export default function AdminUserBillingPage({ params }: Props) {
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <FinancePageBleed>
       <header className="border-b border-[#e8e8e8] bg-white px-6 py-4">
         <h1 className="text-base font-medium text-[#262626]">用户明细 · {params.userId}</h1>
         <p className="mt-1 text-xs text-[#8c8c8c]">
@@ -14,6 +15,6 @@ export default function AdminUserBillingPage({ params }: Props) {
         </p>
       </header>
       <BillDetailsClient adminTargetUserId={params.userId} viewerRole="admin" />
-    </div>
+    </FinancePageBleed>
   );
 }

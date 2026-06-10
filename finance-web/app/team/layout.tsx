@@ -11,7 +11,7 @@ export default function TeamLayout({ children }: { children: React.ReactNode }) 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f0f2f5]">
         <FinanceAppTopBar scope="fees" />
         <FinanceViewerBar scope="team" />
-        <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+        <div className="min-h-0 flex-1 overflow-auto bg-[#f0f2f5]">{children}</div>
       </div>
     </div>
   );

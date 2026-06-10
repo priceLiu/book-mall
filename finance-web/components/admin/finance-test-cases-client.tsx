@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
 
 type UsageSnapshot = {
@@ -250,14 +251,14 @@ export function FinanceTestCasesClient() {
     return data.byCategory.flatMap((g) => g.cases).filter((c) => c.status === "passed").length;
   }, [data]);
 
-  if (loading) return <p className="p-6 text-sm text-[#8c8c8c]">加载测算数据…</p>;
-  if (error) return <p className="p-6 text-sm text-red-600">{error}</p>;
+  if (loading) return <FinancePageState>加载测算数据…</FinancePageState>;
+  if (error) return <FinancePageState variant="error">{error}</FinancePageState>;
   if (!data) return null;
 
   const biz = data.business;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 p-6">
+    <FinancePageShell>
       <header>
         <h1 className="text-lg font-medium text-[#262626]">财务测算 · 个人与团队</h1>
         <p className="mt-1 max-w-3xl text-sm text-[#595959]">{biz.intro}</p>
@@ -429,7 +430,7 @@ export function FinanceTestCasesClient() {
           </div>
         ) : null}
       </section>
-    </div>
+    </FinancePageShell>
   );
 }
 

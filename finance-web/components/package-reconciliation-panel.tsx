@@ -4,6 +4,7 @@ type PackageUsageRow = {
   key: string;
   label: string;
   total: number | null;
+  includedUsed: number | null;
   succeeded: number;
   failed: number;
   remaining: number | null;
@@ -49,7 +50,7 @@ export function PackageReconciliationPanel({ data }: { data: PackageReconciliati
           ) : null}
         </h2>
         <p className="mt-1 text-xs text-[#8c8c8c]">
-          本月权益次数（总数 / 成功 / 失败 / 剩余）与轻量包积分；试衣按模型拆分调用统计。
+          剩余 = 总数 − 套餐已用；Gateway 成功/失败为调用观测，与套餐已用口径可能不同。试衣按模型拆分。
         </p>
       </header>
 
@@ -67,9 +68,10 @@ export function PackageReconciliationPanel({ data }: { data: PackageReconciliati
               <tr>
                 <th className="px-3 py-2 text-left font-medium">任务类型</th>
                 <th className="px-3 py-2 text-right font-medium">套餐总数</th>
-                <th className="px-3 py-2 text-right font-medium">成功</th>
-                <th className="px-3 py-2 text-right font-medium">失败</th>
+                <th className="px-3 py-2 text-right font-medium">套餐已用</th>
                 <th className="px-3 py-2 text-right font-medium">剩余</th>
+                <th className="px-3 py-2 text-right font-medium">Gateway 成功</th>
+                <th className="px-3 py-2 text-right font-medium">失败</th>
               </tr>
             </thead>
             <tbody>
@@ -77,9 +79,10 @@ export function PackageReconciliationPanel({ data }: { data: PackageReconciliati
                 <tr key={row.key} className="border-t border-[#f0f0f0]">
                   <td className="px-3 py-2 font-medium">{row.label}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.total)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.includedUsed)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.remaining)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-[#389e0d]">{row.succeeded}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-[#cf1322]">{row.failed}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.remaining)}</td>
                 </tr>
               ))}
             </tbody>

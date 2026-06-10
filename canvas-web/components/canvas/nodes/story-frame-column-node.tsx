@@ -44,12 +44,14 @@ import {
   assessFrameRowAssetReadiness,
   buildCharacterRefSnapshot,
 } from "@/lib/canvas/story-pro-asset-readiness";
+import { assessFrameUpstreamRefs } from "@/lib/canvas/story-frame-upstream-refs";
 import {
   applyFrameRefSuggestionsToPrompt,
   suggestFrameRefsForRow,
 } from "@/lib/canvas/story-pro-frame-ref-suggest";
 import {
   StoryProFrameAssetReadinessBar,
+  StoryProFrameMissingUpstreamHint,
   StoryProFrameRefSuggestBar,
   frameRowStaleSnapshot,
 } from "../story-pro-frame-row-extras";
@@ -644,10 +646,17 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                 videoInflightKeys.has(row.key);
               const videoError =
                 vst === "error" ? vr?.videoRuntime?.failMessage : undefined;
-              const upstreamImages = storyRefImagesFromPrompt(
-                row.prompt,
-                frameRefCatalog,
-              );
+              const upstreamAssessment = assessFrameUpstreamRefs({
+                prompt: row.prompt,
+                catalog: frameRefCatalog,
+                row,
+                characterRows,
+                assetRefsByKey,
+                sceneRows: edition === "pro" ? sceneRows : undefined,
+                sceneAssetRefsByKey:
+                  edition === "pro" ? sceneAssetRefsByKey : undefined,
+              });
+              const resolvedUpstreamImages = upstreamAssessment.resolved;
               const suggestions =
                 edition === "pro"
                   ? suggestFrameRefsForRow(row, characterRows, assetRefsByKey)
@@ -681,15 +690,23 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                           currentPrompt={stripFrameRowAtHint(row.prompt)}
                           onApply={(p) => saveRowPrompt(row.key, p, [])}
                         />
+                        <StoryProFrameMissingUpstreamHint
+                          hint={upstreamAssessment.hint}
+                          reserveSpace
+                        />
                         <StoryProFrameAssetReadinessBar
                           readiness={readiness}
                           stale={stale}
                         />
                       </div>
+                    ) : upstreamAssessment.hint ? (
+                      <StoryProFrameMissingUpstreamHint
+                        hint={upstreamAssessment.hint}
+                      />
                     ) : undefined
                   }
                   showUpstream
-                  upstreamImages={upstreamImages}
+                  upstreamImages={resolvedUpstreamImages}
                   mentionables={characterMentionables}
                   onSavePrompt={(p, refs) => saveRowPrompt(row.key, p, refs)}
                   mediaMode="frame"
@@ -713,7 +730,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                   }
                   mediaError={videoError}
                   videoPrompt={row.prompt}
-                  videoRefLabels={upstreamImages
+                  videoRefLabels={resolvedUpstreamImages
                     .filter((r) => r.id.startsWith("ref-char-"))
                     .map((r) => r.label)}
                   onPreview={

@@ -11,6 +11,7 @@ export type ColumnGroup = { group: string; keys: string[] };
 
 /** 积分消耗列（汇总/筛选统一引用）。 */
 export const K_CREDITS_CONSUMED = "平台/消耗积分";
+export const K_MODEL_VENDOR = "平台/厂商";
 export const K_SETTLEMENT_KIND = "套餐对帐/结算类型";
 export const K_TASK_KIND = "套餐对帐/任务类型";
 export const K_QUOTA_DELTA = "套餐对帐/扣次";
@@ -24,6 +25,7 @@ export const BILL_COLUMN_GROUPS: ColumnGroup[] = [
       "平台/用户ID",
       "平台/用户名",
       "平台/工具页面",
+      K_MODEL_VENDOR,
       "平台/模型Code",
       "平台/模型名称",
       "平台/请求类型",
@@ -62,6 +64,7 @@ export const ALL_DISPLAY_KEYS = BILL_COLUMN_GROUPS.flatMap((g) => g.keys);
 
 export const ADMIN_ONLY_KEYS: ReadonlySet<string> = new Set([
   "平台/用户ID",
+  K_MODEL_VENDOR,
   "平台/Gateway日志ID",
   "平台/行来源",
 ]);

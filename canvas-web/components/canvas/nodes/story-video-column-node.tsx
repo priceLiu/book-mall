@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { cn } from "@/lib/utils";
+import { Download } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { exportJianyingZip } from "@/lib/canvas-api";
+import { collectJianyingFramesFromColumns } from "@/lib/canvas/jianying-from-workspace";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -63,6 +65,7 @@ import {
   storyColumnIsGenerating,
 } from "@/lib/canvas/story-column-runtime";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
+import { StoryNodeFooterShell } from "../story-node-footer-shell";
 import { AudioFullscreenLightbox } from "../audio-fullscreen-lightbox";
 import { EnginePicker } from "../engine-picker";
 import { NodeShell } from "../node-shell";
@@ -91,6 +94,7 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const [ttsInflightKeys, setTtsInflightKeys] = useState<Set<string>>(
     () => new Set(),
   );
+  const [bundleLoading, setBundleLoading] = useState(false);
 
   const ws = useMemo(
     () => findWorkspaceForColumnId(nodes, edges, id),
@@ -118,6 +122,11 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
     if (!frameRows.length) return displayRows;
     return patchVideoRowsFromFrameRows(displayRows, frameRows);
   }, [displayRows, frameRows]);
+
+  const bundleFrames = useMemo(
+    () => collectJianyingFramesFromColumns(frameRows, rowsToRender),
+    [frameRows, rowsToRender],
+  );
 
   /** 分镜脚本镜数多于视频列 stored 时，自动补齐行（避免「分镜视频少了」） */
   useEffect(() => {
@@ -379,6 +388,43 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
     }
   };
 
+  const onDownloadBundle = async () => {
+    if (!base || !projectId) {
+      void alert({
+        title: "无法下载",
+        message: "未登录或未打开项目。",
+        variant: "error",
+      });
+      return;
+    }
+    if (!bundleFrames.length) {
+      void alert({
+        title: "暂无可打包内容",
+        message: "请先生成各镜分镜视频或 TTS 配音后再下载。",
+        variant: "error",
+      });
+      return;
+    }
+    setBundleLoading(true);
+    try {
+      await exportJianyingZip(base, projectId, {
+        format: "bundle",
+        frames: bundleFrames.map((f) => ({
+          ...f,
+          dialogue: f.dialogue ?? "",
+        })),
+      });
+    } catch (e) {
+      void alert({
+        title: "打包下载失败",
+        message: e instanceof Error ? e.message : String(e),
+        variant: "error",
+      });
+    } finally {
+      setBundleLoading(false);
+    }
+  };
+
   return (
     <NodeShell
       title="分镜视频"
@@ -401,6 +447,24 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
       outputs={[{ id: "text", label: "视频", kind: "image" }]}
       footerClassName={
         edition === "pro" ? PRO_NODE_SHELL_FOOTER_CLASS : undefined
+      }
+      footer={
+        <StoryNodeFooterShell>
+          <button
+            type="button"
+            disabled={bundleLoading || columnGenerating}
+            className="nodrag flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-white/15 text-[11px] text-white/90 hover:bg-white/5 disabled:opacity-40"
+            onClick={() => void onDownloadBundle()}
+          >
+            <Download className="size-3.5" />
+            {bundleLoading ? "打包中…" : "一键下载视频+配音 ZIP"}
+          </button>
+          <p className="text-[9px] leading-snug text-[var(--canvas-muted)]">
+            含 videos/、audio/、全集.srt · 已识别 {bundleFrames.length} 镜（
+            {bundleFrames.filter((f) => f.videoUrl).length} 视频 ·{" "}
+            {bundleFrames.filter((f) => f.audioUrl).length} 配音）
+          </p>
+        </StoryNodeFooterShell>
       }
     >
       <div className="flex w-full flex-col gap-3">

@@ -15,6 +15,7 @@ import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import {
   createRequestLog,
   finalizeRequestLog,
+  mapGatewayPreCreateLogError,
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
@@ -56,18 +57,28 @@ export async function POST(request: NextRequest) {
     logMeta.clientSource ?? request.headers.get("x-gateway-client"),
   );
 
-  const log = await createRequestLog({
-    userId: auth.userId,
-    apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/dashscope/image-parsing",
-    providerKind: "DASHSCOPE",
-    requestKind: "TRYON",
-    clientSource,
-    inputSummary: buildGatewayInputSummary(model, { imageUrl, clothesType }),
-    ...logMetaToRequestLogFields(logMeta),
-  });
+  let log;
+  try {
+    log = await createRequestLog({
+      userId: auth.userId,
+      apiKeyId: auth.id,
+      credentialId,
+      model,
+      endpoint: "/v1/dashscope/image-parsing",
+      providerKind: "DASHSCOPE",
+      requestKind: "TRYON",
+      clientSource,
+      inputSummary: buildGatewayInputSummary(model, {
+      imageUrl,
+      clothesType,
+      imageCount: 1,
+    }),
+      ...logMetaToRequestLogFields(logMeta),
+    });
+  } catch (e) {
+    const mapped = mapGatewayPreCreateLogError(e);
+    return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+  }
 
   const started = Date.now();
   try {

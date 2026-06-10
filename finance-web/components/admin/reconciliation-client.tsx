@@ -187,7 +187,7 @@ export function ReconciliationClient() {
   }, [result]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-6">
+    <div className="flex w-full flex-col gap-4">
       <header>
         <h1 className="text-lg font-medium">云账单对账</h1>
         <p className="mt-1 text-sm text-[#8c8c8c]">仅财务管理员可见。上传阿里云 consumedetailbillv2 CSV 并对账。</p>

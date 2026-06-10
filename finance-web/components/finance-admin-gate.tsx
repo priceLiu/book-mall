@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageState } from "@/components/finance-page-shell";
 import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
 import { fetchFinanceViewer, type FinanceViewerPayload } from "@/lib/finance-viewer";
 import {
@@ -61,11 +62,11 @@ export function FinanceAdminGate({
   }, [base]);
 
   if (viewer === undefined) {
-    return <p className="p-6 text-sm text-[#8c8c8c]">校验权限中…</p>;
+    return <FinancePageState>校验权限中…</FinancePageState>;
   }
   if (!base || !viewer) {
     return (
-      <div className="p-6 text-sm text-red-600">
+      <FinancePageState variant="error">
         未登录或未配置主站地址。请先在{" "}
         {base ? (
           <a
@@ -80,20 +81,22 @@ export function FinanceAdminGate({
           "主站"
         )}{" "}
         后刷新。
-      </div>
+      </FinancePageState>
     );
   }
   if (!checkRequirement(viewer, require)) {
     return (
-      <div className="mx-auto max-w-lg p-6">
-        <div className="rounded border border-[#ffccc7] bg-[#fff1f0] px-4 py-3 text-sm text-[#cf1322]">
-          <p className="font-medium">无权访问</p>
-          <p className="mt-1">{DENY_MSG[require]}</p>
-          <p className="mt-2 text-[#8c8c8c]">
-            当前角色：{viewer.user.role}
-          </p>
+      <FinancePageState>
+        <div className="mx-auto max-w-lg">
+          <div className="rounded border border-[#ffccc7] bg-[#fff1f0] px-4 py-3 text-sm text-[#cf1322]">
+            <p className="font-medium">无权访问</p>
+            <p className="mt-1">{DENY_MSG[require]}</p>
+            <p className="mt-2 text-[#8c8c8c]">
+              当前角色：{viewer.user.role}
+            </p>
+          </div>
         </div>
-      </div>
+      </FinancePageState>
     );
   }
   return <>{children}</>;

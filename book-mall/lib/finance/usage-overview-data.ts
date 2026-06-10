@@ -9,11 +9,16 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
 import { clientPageToToolKey } from "@/lib/finance/client-page-tool";
 import { toolKeyToLabel } from "@/lib/tool-key-label";
+import {
+  normalizeByokFeeDescription,
+  normalizeByokQuotaSettlementSnapshot,
+} from "@/lib/billing/byok-pricing";
 import type { UserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
 import { fetchUserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
 import { loadBillingSettlementsByLogIds } from "@/lib/billing/billing-settlement-service";
 import {
   K_INCLUDED_REMAINING,
+  K_INCLUDED_USED,
   K_QUOTA_DELTA,
   K_SETTLEMENT_KIND,
   K_TASK_KIND,
@@ -44,6 +49,8 @@ export type UsageOverviewExportLine = {
   settlementKind: string;
   taskKind: string;
   quotaDelta: string;
+  includedUsed: string;
+  monthlyIncluded: string;
   includedRemaining: string;
   yuan: number;
 };
@@ -74,6 +81,8 @@ export type UsageOverviewPayload = {
     settlementKind: string;
     taskKind: string;
     quotaDelta: string;
+    includedUsed: string;
+    monthlyIncluded: string;
     includedRemaining: string;
     yuan: number;
   }>;
@@ -159,7 +168,7 @@ const REQUEST_KIND_LABEL: Record<string, string> = {
   CHAT: "对话",
   IMAGE: "生图",
   VIDEO: "生视频",
-  TRYON: "AI试衣",
+  TRYON: "试衣（计文生图额度）",
   TTS: "语音",
   OTHER: "其他",
 };
@@ -232,6 +241,8 @@ export async function buildUsageOverviewData(
     settlementKind: string;
     taskKind: string;
     quotaDelta: string;
+    includedUsed: string;
+    monthlyIncluded: string;
     includedRemaining: string;
     yuan: number;
   };
@@ -248,6 +259,7 @@ export async function buildUsageOverviewData(
     });
     if (onlyTool && toolKey !== onlyTool) continue;
 
+    const settlement = settlements.get(g.id) ?? null;
     const billRow = projectGatewayLogToBillRow(
       g,
       userId,
@@ -258,6 +270,27 @@ export async function buildUsageOverviewData(
 
     const creditsConsumed = parseInt(billRow[K_CREDITS_CONSUMED] ?? "0", 10) || 0;
 
+    const quotaSnap = settlement
+      ? normalizeByokQuotaSettlementSnapshot({
+          byokTaskKind: settlement.byokTaskKind ?? g.byokTaskKind,
+          ownerType: settlement.ownerType,
+          monthlyIncluded: settlement.monthlyIncluded,
+          includedUsedAfter: settlement.includedUsedAfter ?? g.includedUsedAfter,
+          includedRemainingAfter:
+            settlement.includedRemainingAfter ?? g.includedRemainingAfter,
+        })
+      : null;
+
+    const feeDescriptionRaw = billRow["平台账单/费用说明"] ?? "";
+    const feeDescription =
+      quotaSnap?.corrected
+        ? normalizeByokFeeDescription(
+            feeDescriptionRaw,
+            true,
+            quotaSnap.includedRemainingAfter,
+          )
+        : feeDescriptionRaw;
+
     lines.push({
       id: g.id,
       createdAt: g.submittedAt,
@@ -267,11 +300,24 @@ export async function buildUsageOverviewData(
       requestKind: REQUEST_KIND_LABEL[g.requestKind] ?? g.requestKind,
       billingPersona: billRow["平台/计费身份"] ?? personaLabel(g.billingPersonaSnap, g.billingMode),
       creditsConsumed,
-      feeDescription: billRow["平台账单/费用说明"] ?? "",
+      feeDescription,
       settlementKind: billRow[K_SETTLEMENT_KIND] ?? "",
       taskKind: billRow[K_TASK_KIND] ?? "",
       quotaDelta: billRow[K_QUOTA_DELTA] ?? "",
-      includedRemaining: billRow[K_INCLUDED_REMAINING] ?? "",
+      includedUsed:
+        quotaSnap?.includedUsedAfter != null
+          ? String(quotaSnap.includedUsedAfter)
+          : billRow[K_INCLUDED_USED] ?? "",
+      monthlyIncluded:
+        quotaSnap?.monthlyIncluded != null
+          ? String(quotaSnap.monthlyIncluded)
+          : settlement?.monthlyIncluded != null
+            ? String(settlement.monthlyIncluded)
+            : "—",
+      includedRemaining:
+        quotaSnap?.includedRemainingAfter != null
+          ? String(quotaSnap.includedRemainingAfter)
+          : billRow[K_INCLUDED_REMAINING] ?? "",
       yuan: creditsToYuan(creditsConsumed),
     });
   }
@@ -310,6 +356,8 @@ export async function buildUsageOverviewData(
       settlementKind: l.settlementKind,
       taskKind: l.taskKind,
       quotaDelta: l.quotaDelta,
+      includedUsed: l.includedUsed,
+      monthlyIncluded: l.monthlyIncluded,
       includedRemaining: l.includedRemaining,
       yuan: Number(l.yuan.toFixed(2)),
     };
@@ -344,6 +392,8 @@ export async function buildUsageOverviewData(
         settlementKind: l.settlementKind,
         taskKind: l.taskKind,
         quotaDelta: l.quotaDelta,
+        includedUsed: l.includedUsed,
+        monthlyIncluded: l.monthlyIncluded,
         includedRemaining: l.includedRemaining,
         yuan: Number(l.yuan.toFixed(2)),
       };

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiPost } from "@/lib/finance-viewer";
 
 type AbnormalUser = {
@@ -34,7 +35,7 @@ export function VideoRiskClient() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-6">
+    <FinancePageShell>
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-medium">视频风控</h1>
@@ -72,6 +73,6 @@ export function VideoRiskClient() {
           ))}
         </tbody>
       </table>
-    </div>
+    </FinancePageShell>
   );
 }

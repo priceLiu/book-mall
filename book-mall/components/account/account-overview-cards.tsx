@@ -134,7 +134,7 @@ export function AccountOverviewCards({
             </CardTitle>
             <CardDescription className="text-xs">
               {isByok
-                ? "本月各类型任务：套餐内总数、Gateway 成功/失败、剩余额度（纯文字对话无套餐额度；试衣计入文生图，明细按 modelKey 展示）。"
+                ? "剩余 = 总数 − 套餐已用（与 Gateway 成功次数可能不同：仅 BYOK 套餐内扣次计入已用）。试衣计入文生图。"
                 : "积分池按七类统计成功/失败与扣积分（无含次额度；试衣计入文生图，明细按 modelKey 展示）。"}
             </CardDescription>
           </CardHeader>
@@ -147,9 +147,10 @@ export function AccountOverviewCards({
                     {isByok ? (
                       <>
                         <th className="px-3 py-2 text-right font-medium">总数</th>
-                        <th className="px-3 py-2 text-right font-medium">成功</th>
-                        <th className="px-3 py-2 text-right font-medium">失败</th>
+                        <th className="px-3 py-2 text-right font-medium">套餐已用</th>
                         <th className="px-3 py-2 text-right font-medium">剩余</th>
+                        <th className="px-3 py-2 text-right font-medium">Gateway 成功</th>
+                        <th className="px-3 py-2 text-right font-medium">失败</th>
                       </>
                     ) : (
                       <>
@@ -167,13 +168,16 @@ export function AccountOverviewCards({
                       {isByok ? (
                         <>
                           <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.total)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-[#262626]">
+                            {fmtQuota(row.includedUsed)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.remaining)}</td>
                           <td className="px-3 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
                             {row.succeeded}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-destructive">
                             {row.failed}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.remaining)}</td>
                         </>
                       ) : (
                         <>

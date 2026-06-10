@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FinancePageShell } from "@/components/finance-page-shell";
 
 const cards = [
   { href: "/admin/help", title: "财务 2.0 使用说明", desc: "积分换算口径、角色权限、调价流程与模块导航。" },
@@ -19,9 +20,9 @@ const cards = [
 
 export default function AdminHomePage() {
   return (
-    <div className="p-6">
-      <h1 className="mb-4 text-lg font-medium text-[#262626]">财务控制台 · 系统管理</h1>
-      <div className="grid max-w-4xl gap-4 sm:grid-cols-2">
+    <FinancePageShell>
+      <h1 className="text-lg font-medium text-[#262626]">财务控制台 · 系统管理</h1>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {cards.map((c) => (
           <Link
             key={c.href}
@@ -33,6 +34,6 @@ export default function AdminHomePage() {
           </Link>
         ))}
       </div>
-    </div>
+    </FinancePageShell>
   );
 }

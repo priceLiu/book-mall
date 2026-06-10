@@ -1,5 +1,6 @@
 "use client";
 
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import Link from "next/link";
 
 const sectionCls = "rounded border border-[#e8e8e8] bg-white p-5";
@@ -8,7 +9,7 @@ const p = "mt-2 text-sm leading-relaxed text-[#595959]";
 
 export function FinanceHelpClient() {
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-6">
+    <FinancePageShell className="gap-5">
       <header>
         <h1 className="text-lg font-medium text-[#262626]">财务 2.0 使用说明</h1>
         <p className="mt-1 text-sm text-[#8c8c8c]">
@@ -148,6 +149,6 @@ export function FinanceHelpClient() {
           代码公式：<code>book-mall/lib/pricing/credit-pricing-formulas.ts</code>。
         </p>
       </section>
-    </div>
+    </FinancePageShell>
   );
 }

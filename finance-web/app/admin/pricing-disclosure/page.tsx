@@ -23,8 +23,8 @@ export default function AdminPricingDisclosurePage() {
           全站统一价目表（云挂牌价 × M = 平台零售价），唯一页面为 book-mall 价格公示。
         </p>
       </header>
-      <div className="flex-1 overflow-y-auto bg-[#f5f5f5] p-6">
-        <div className="mx-auto max-w-3xl space-y-4">
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="w-full space-y-4">
           <div className="rounded border border-[#e8e8e8] bg-white p-5 shadow-sm">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 border-b border-[#f0f0f0] pb-2">
               <span className="text-base font-medium text-[#262626]">

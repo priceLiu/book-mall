@@ -1,12 +1,13 @@
 import { FeesHeader } from "@/components/fees-header";
+import { FinancePageBleed, FinancePageShell } from "@/components/finance-page-shell";
 
 export default function BillingSubscriptionsPage() {
   return (
-    <>
+    <FinancePageBleed>
       <FeesHeader title="账单订阅" />
-      <div className="flex flex-1 items-center justify-center bg-[#f0f2f5] p-8 text-sm text-[#8c8c8c]">
+      <FinancePageShell className="flex-1 justify-center text-sm text-[#8c8c8c]">
         占位：订阅/资源包与云上「抵扣」维度的说明页。
-      </div>
-    </>
+      </FinancePageShell>
+    </FinancePageBleed>
   );
 }

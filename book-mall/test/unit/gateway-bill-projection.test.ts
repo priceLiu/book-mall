@@ -29,7 +29,12 @@ const baseLog = {
 
 describe("projectGatewayLogToBillRow — 平台代付七类", () => {
   it("TRYON → 文生图（含试衣） on K_TASK_KIND and 平台/请求类型", () => {
-    const row = projectGatewayLogToBillRow(baseLog, "user-1", "Test User", new Map(), {
+    const row = projectGatewayLogToBillRow(
+      baseLog,
+      "user-1",
+      "Test User",
+      new Map([["aitryon", "AI 试衣"]]),
+      {
       id: "settle-1",
       gatewayLogId: "log-1",
       ownerType: "USER",
@@ -53,8 +58,11 @@ describe("projectGatewayLogToBillRow — 平台代付七类", () => {
       feeDescription: "平台代付 · 文生图（含试衣） · 扣 40 积分",
       submittedAt: baseLog.submittedAt,
       createdAt: baseLog.submittedAt,
-    });
+    },
+    new Map([["aitryon", "aliyun"]]),
+    );
 
+    expect(row["平台/厂商"]).toBe("阿里云");
     expect(row[K_TASK_KIND]).toBe("文生图（含试衣）");
     expect(row["平台/请求类型"]).toBe("文生图（含试衣）");
     expect(row["平台账单/费用说明"]).toContain("文生图（含试衣）");
