@@ -56,44 +56,6 @@ type NavRuntimeProps = {
   onAction: (id: string) => void;
 };
 
-function ProfileTrigger({
-  profile,
-  profileLabel,
-  initial,
-  open,
-}: {
-  profile: Profile;
-  profileLabel: string;
-  initial: string;
-  open: boolean;
-}) {
-  return (
-    <>
-      <Avatar className="h-9 w-9 shrink-0 border border-border">
-        {profile.image ? (
-          <AvatarImage src={profile.image} alt="" referrerPolicy="no-referrer" />
-        ) : null}
-        <AvatarFallback className="text-xs font-medium">{initial}</AvatarFallback>
-      </Avatar>
-      <span className="min-w-0 flex-1 text-left">
-        <span className="block truncate font-semibold">{profileLabel}</span>
-        {profile.email ? (
-          <span className="block truncate text-xs font-normal text-muted-foreground">
-            {profile.email}
-          </span>
-        ) : null}
-      </span>
-      <ChevronDown
-        className={cn(
-          "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-          open && "rotate-180",
-        )}
-        aria-hidden
-      />
-    </>
-  );
-}
-
 /** 侧栏常驻导航（不用 Ark Menu，避免 Positioner 撑满视口） */
 function AccountSidebarNav({
   groups,
@@ -298,7 +260,6 @@ export function AccountNavMenu({
 }) {
   const pathname = usePathname();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const initial = (profile.name?.[0] || profile.email?.[0] || "?").toUpperCase();
@@ -353,28 +314,28 @@ export function AccountNavMenu({
 
   if (isSidebar) {
     return (
-      <div className="min-w-0 w-full overflow-hidden">
-        <button
-          type="button"
-          className={triggerClass}
-          aria-expanded={sidebarOpen}
-          aria-controls="account-sidebar-nav"
-          onClick={() => setSidebarOpen((v) => !v)}
-        >
-          <ProfileTrigger
-            profile={profile}
-            profileLabel={profileLabel}
-            initial={initial}
-            open={sidebarOpen}
-          />
-        </button>
-        {sidebarOpen ? (
-          <div id="account-sidebar-nav">
-            <AccountSidebarNav {...navProps} />
-          </div>
-        ) : null}
+      <div className="flex min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden">
+        <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5">
+          <Avatar className="h-9 w-9 shrink-0 border border-border">
+            {profile.image ? (
+              <AvatarImage src={profile.image} alt="" referrerPolicy="no-referrer" />
+            ) : null}
+            <AvatarFallback className="text-xs font-medium">{initial}</AvatarFallback>
+          </Avatar>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold">{profileLabel}</span>
+            {profile.email ? (
+              <span className="block truncate text-xs font-normal text-muted-foreground">
+                {profile.email}
+              </span>
+            ) : null}
+          </span>
+        </div>
+        <nav id="account-sidebar-nav" className="min-w-0 flex-1 overflow-y-auto">
+          <AccountSidebarNav {...navProps} />
+        </nav>
         {actionMsg ? (
-          <p className="mt-2 px-1 text-xs text-destructive leading-relaxed">{actionMsg}</p>
+          <p className="px-1 text-xs leading-relaxed text-destructive">{actionMsg}</p>
         ) : null}
       </div>
     );
@@ -402,7 +363,7 @@ export function AccountNavMenu({
           />
         </Menu.Trigger>
         <Portal>
-          <Menu.Positioner>
+          <Menu.Positioner className="z-[100]">
             <Menu.Content className={dropdownContentClass}>
               <AccountDropdownNav {...navProps} />
             </Menu.Content>

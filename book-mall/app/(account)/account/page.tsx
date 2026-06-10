@@ -8,7 +8,7 @@ import { getMembershipFlags } from "@/lib/membership";
 import { getMembershipToolAccess } from "@/lib/membership-tool-access";
 import { getPoolBalances } from "@/lib/billing/credit-account-service";
 import {
-  getAccountByokTaskSummary,
+  getAccountPackageUsageRows,
   getAccountUsageSummary,
 } from "@/lib/finance/account-usage-summary";
 import { AccountSectionHeader } from "@/components/account/account-section-header";
@@ -84,25 +84,51 @@ export default async function AccountPage({
     getAccountUsageSummary(session.user.id),
   ]);
 
-  const byokTaskSummary =
-    billingPersona === "BYOK" && byokSub
-      ? await getAccountByokTaskSummary(session.user.id, byokSub.scopeKey)
-      : [];
+  const packageUsageRows = await getAccountPackageUsageRows(
+    session.user.id,
+    byokSub?.scopeKey ?? null,
+  );
 
-  const byokQuotas =
+  const byokServiceConfig =
     byokSub
-      ? await prisma.byokTaskQuota.findMany({
-          where: { scopeKey: byokSub.scopeKey, active: true },
-          orderBy: { taskKind: "asc" },
+      ? await prisma.byokServiceConfig.findUnique({
+          where: { scopeKey: byokSub.scopeKey },
+          select: {
+            techServiceFeeYuan: true,
+            interval: true,
+            minSeats: true,
+            label: true,
+          },
         })
-      : [];
+      : null;
+
+  const membershipPlan =
+    billingPersona === "PLATFORM_CREDIT" && creditAcc?.planId
+      ? await prisma.membershipPlan.findUnique({
+          where: { id: creditAcc.planId },
+          select: { priceYuan: true, interval: true, tier: true, family: true },
+        })
+      : null;
+
+  let planPriceLabel: string | null = null;
+  if (byokServiceConfig) {
+    const fee = Number(byokServiceConfig.techServiceFeeYuan);
+    const unit = byokServiceConfig.interval === "YEAR" ? "年" : "月";
+    if (byokServiceConfig.minSeats && byokServiceConfig.minSeats > 1) {
+      planPriceLabel = `¥${fee.toLocaleString("zh-CN")}/席/${unit}（${byokServiceConfig.minSeats} 席起）`;
+    } else {
+      planPriceLabel = `¥${fee.toLocaleString("zh-CN")}/${unit}`;
+    }
+  } else if (membershipPlan) {
+    const fee = Number(membershipPlan.priceYuan);
+    const unit = membershipPlan.interval === "YEAR" ? "年" : "月";
+    planPriceLabel = `¥${fee.toLocaleString("zh-CN")}/${unit}`;
+  }
 
   const membershipPeriodEnd =
     billingPersona === "BYOK" && byokSub
       ? byokSub.periodEnd
       : (creditAcc?.currentPeriodEnd ?? null);
-
-  const isAdminUser = session.user.role === "ADMIN";
 
   return (
     <>
@@ -130,22 +156,18 @@ export default async function AccountPage({
         billingPersona={billingPersona}
         membershipPlanName={memberAccess.planName}
         membershipPeriodEnd={membershipPeriodEnd}
+        planPriceLabel={planPriceLabel}
         hasActiveMembership={memberAccess.ok}
         hasActiveCourseSubscription={flags.hasActiveCourseProductSubscription || flags.hasActiveSubscription}
         coursePlanName={flags.membershipPlanName}
         courseSubscriptionEndsAt={flags.subscriptionEndsAt}
-        byokQuotas={byokQuotas.map((q) => ({
-          label: q.label,
-          monthlyIncluded: q.monthlyIncluded,
-          overageCredits: q.overageCredits,
-        }))}
         legacyMonthlyGrantCredits={
           billingPersona === "BYOK" && creditAcc?.monthlyGrantCredits
             ? creditAcc.monthlyGrantCredits
             : null
         }
         usageSummary={usageSummary}
-        byokTaskSummary={byokTaskSummary}
+        packageUsageRows={packageUsageRows}
       />
 
       {process.env.NODE_ENV === "development" ? (

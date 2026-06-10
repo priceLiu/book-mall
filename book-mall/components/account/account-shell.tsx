@@ -46,8 +46,8 @@ export function AccountShell({
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-[15.5rem] shrink-0 flex-col overflow-hidden border-r border-border bg-card/30 md:flex">
-        <div className="min-w-0 overflow-y-auto px-3 py-4">
+      <aside className="hidden w-[15.5rem] shrink-0 flex-col border-r border-border bg-card/30 md:sticky md:top-0 md:flex md:h-screen md:max-h-screen">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-4">
           <AccountNavMenu {...menuProps} placement="sidebar" />
         </div>
       </aside>
