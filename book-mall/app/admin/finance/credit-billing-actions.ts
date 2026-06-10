@@ -23,10 +23,7 @@ import type {
   MembershipFamily,
   MembershipInterval,
 } from "@prisma/client";
-
-export type ActionResult<T = undefined> =
-  | ({ ok: true } & (T extends undefined ? { data?: undefined } : { data: T }))
-  | { ok: false; error: string };
+import type { ActionResult } from "@/lib/server-action-result";
 
 async function requireAdmin(): Promise<{ ok: true; userId: string } | { ok: false; error: string }> {
   const session = await getServerSession(authOptions);

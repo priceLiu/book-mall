@@ -15,10 +15,7 @@ import {
   transitionProposal,
   type ProposalPayload,
 } from "@/lib/pricing/plan-change-service";
-
-export type ActionResult<T = undefined> =
-  | ({ ok: true } & (T extends undefined ? { data?: undefined } : { data: T }))
-  | { ok: false; error: string };
+import type { ActionResult } from "@/lib/server-action-result";
 
 async function session() {
   const s = await getServerSession(authOptions);

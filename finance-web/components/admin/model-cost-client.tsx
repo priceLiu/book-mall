@@ -101,7 +101,7 @@ export function ModelCostClient() {
   }, [reload]);
 
   const vendorOptions = useMemo(
-    () => [...new Set(profiles.map((p) => p.vendor))].sort(),
+    () => Array.from(new Set(profiles.map((p) => p.vendor))).sort(),
     [profiles],
   );
 

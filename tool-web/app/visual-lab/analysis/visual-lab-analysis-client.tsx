@@ -370,7 +370,7 @@ async function readVisualLabAnalysisStream(
           const isAbort =
             (e instanceof DOMException && e.name === "AbortError") ||
             (e instanceof Error && e.name === "AbortError");
-          if (isAbort) return;
+          if (isAbort) return { reasoning, content };
           throw e;
         }
         const { done, value } = readResult;
