@@ -13,6 +13,7 @@ import {
   type SceneVisualDictionaryRow,
 } from "./parse-md-tables";
 import {
+  refreshStoryRefImagesFromCatalog,
   storyRefIdsFromPrompt,
   storyRefImagesFromPrompt,
   type StoryRefImage,
@@ -98,7 +99,8 @@ function buildFrameRefImagesForCharacters(
 }
 
 /** 分镜列「镜 1」栏展示的 @ 引用说明（不写入每镜 prompt 正文） */
-export const FRAME_ROW_AT_HINT = "（输入 @ 可引用已生成的角色三视图）";
+export const FRAME_ROW_AT_HINT =
+  "（@ 仅列出已出图的角色/场景资产；未出图项在下方提示，不进入参考列）";
 
 /** 图 2 · 锁定 / 前置条件 / @ 说明等提示文案（金黄） */
 export const STORY_HINT_GOLD_CLASS = "text-amber-300/90";
@@ -270,7 +272,10 @@ export function syncFrameRowCharacterRefs(
 ): StoryFrameRow {
   const catalog = buildFrameRefImagesForCharacters(characterRows);
   const prompt = resolveFrameRowPrompt(frame);
-  const refImages = storyRefImagesFromPrompt(prompt, catalog);
+  const refImages = refreshStoryRefImagesFromCatalog(
+    storyRefImagesFromPrompt(prompt, catalog),
+    catalog,
+  );
   const referencedNodeIds = storyRefIdsFromPrompt(prompt);
   const refImageUrls = refImages
     .map((ref) => ref.url)

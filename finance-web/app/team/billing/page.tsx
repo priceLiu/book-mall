@@ -1,11 +1,12 @@
 import { Suspense } from "react";
 import { TeamBillingFinanceClient } from "@/components/team-billing-finance-client";
+import { FinancePageState } from "@/components/finance-page-shell";
 
 export const dynamic = "force-dynamic";
 
 export default function TeamBillingPage() {
   return (
-    <Suspense fallback={<p className="p-6 text-sm text-[#8c8c8c]">加载中…</p>}>
+    <Suspense fallback={<FinancePageState>加载中…</FinancePageState>}>
       <TeamBillingFinanceClient />
     </Suspense>
   );

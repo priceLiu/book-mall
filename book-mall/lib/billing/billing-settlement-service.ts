@@ -13,7 +13,9 @@ import {
   billingCategoryLabel,
   classifyBillingCategory,
 } from "@/lib/billing/billing-category";
-import { extractTryonModelKey } from "@/lib/billing/byok-pricing";
+import { extractTryonModelKey, BYOK_TASK_KIND_LABEL } from "@/lib/billing/byok-pricing";
+import { aiTryonModelLabel } from "@/lib/pricing/ai-tryon-cost";
+import { resolveBillableImageCountFromLog } from "@/lib/gateway/log-billing-metrics";
 import type { AccountRef } from "@/lib/billing/credit-account-service";
 import { prisma } from "@/lib/prisma";
 
@@ -39,26 +41,40 @@ function buildFeeDescription(input: RecordBillingSettlementInput): string {
   const category =
     input.billingCategory ?? classifyBillingCategory(input.log);
   const catLabel = billingCategoryLabel(category);
+  const taskLabel =
+    input.byokTaskKind != null
+      ? BYOK_TASK_KIND_LABEL[input.byokTaskKind]
+      : catLabel;
+  const tryonKey =
+    input.log.requestKind === "TRYON" ? extractTryonModelKey(input.log) : null;
+  const tryonLabel = aiTryonModelLabel(tryonKey);
+  const tryonSuffix = tryonLabel ? ` · ${tryonLabel}` : "";
+  const imageUnits =
+    input.log.requestKind === "TRYON" || input.log.requestKind === "IMAGE"
+      ? resolveBillableImageCountFromLog(input.log)
+      : null;
+  const unitSuffix =
+    imageUnits != null && imageUnits > 0 ? ` · ${imageUnits} 张输入` : "";
   const remaining =
     input.includedRemainingAfter != null
       ? `，套餐剩余 ${input.includedRemainingAfter}`
       : "";
   switch (kind) {
     case "BYOK_QUOTA_INCLUDED":
-      return `BYOK 套餐内 · ${catLabel} -1${remaining}`;
+      return `BYOK 套餐内 · ${taskLabel}${tryonSuffix}${unitSuffix} · 扣次 ${input.quotaDelta ?? 1}${remaining}`;
     case "BYOK_QUOTA_OVERAGE":
-      return `BYOK 超额 · ${catLabel} 扣 ${input.creditsCharged ?? 0} 积分${remaining}`;
+      return `BYOK 超额 · ${taskLabel}${tryonSuffix}${unitSuffix} 扣 ${input.creditsCharged ?? 0} 积分${remaining}`;
     case "PLATFORM_CREDIT":
-      return `平台代付 · ${catLabel} · 扣 ${input.creditsCharged ?? 0} 积分`;
+      return `平台代付 · ${catLabel}${tryonSuffix}${unitSuffix} · 扣 ${input.creditsCharged ?? 0} 积分`;
     case "PLATFORM_VIDEO":
       return `平台代付 · ${catLabel} · 视频扣 ${input.creditsCharged ?? 0} 积分`;
     case "METER_ONLY":
-      return `BYOK 调用 · ${catLabel}（仅计量）`;
+      return `BYOK 调用 · ${taskLabel}${tryonSuffix}${unitSuffix}（仅计量）`;
     case "NONE":
     default:
       return category === "OTHER" || category === "TEXT"
         ? `成功调用 · ${catLabel}（0 积分）`
-        : "成功调用（无扣费/扣次）";
+        : `成功调用 · ${taskLabel}${tryonSuffix}${unitSuffix}（无扣费/扣次）`;
   }
 }
 

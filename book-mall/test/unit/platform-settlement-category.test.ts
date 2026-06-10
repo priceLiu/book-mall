@@ -125,4 +125,28 @@ describe("recordBillingSettlement — platform billingCategory", () => {
 
     expect(line.billingCategory).toBe("TEXT");
   });
+
+  it("writes parsing tryon label and input units for aitryon-parsing-v1", async () => {
+    const log = fakeLog({
+      model: "aitryon-parsing-v1",
+      canonicalModelKey: "aitryon-parsing-v1",
+      clientPage: "canvas/story-pro/parse-outfit",
+      inputSummary: {
+        model: "aitryon-parsing-v1",
+        input: { imageUrl: "https://x/a.jpg", imageCount: 1 },
+      },
+    });
+    const line = await recordBillingSettlement({
+      log,
+      ref: { ownerType: "USER", ownerId: "book-user-1" },
+      settlementKind: "PLATFORM_CREDIT",
+      creditsCharged: 1,
+      creditLedgerId: "ledger-parsing",
+    });
+
+    expect(line.tryonModelKey).toBe("aitryon-parsing-v1");
+    expect(line.feeDescription).toContain("AI试衣·图片分割");
+    expect(line.feeDescription).toContain("1 张输入");
+    expect(line.feeDescription).toContain("1 积分");
+  });
 });

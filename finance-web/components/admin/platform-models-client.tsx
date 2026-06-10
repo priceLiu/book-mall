@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch, financeApiPost } from "@/lib/finance-viewer";
 
 type OfferingRow = {
@@ -149,10 +150,10 @@ export function PlatformModelsClient() {
     setBusyId(null);
   }
 
-  if (loading) return <p className="p-6 text-sm text-muted-foreground">加载平台模型…</p>;
+  if (loading) return <FinancePageState>加载平台模型…</FinancePageState>;
 
   return (
-    <div className="space-y-6 p-6">
+    <FinancePageShell className="gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">Gateway 模型上架</h1>
@@ -358,6 +359,6 @@ export function PlatformModelsClient() {
           </div>
         </section>
       ))}
-    </div>
+    </FinancePageShell>
   );
 }

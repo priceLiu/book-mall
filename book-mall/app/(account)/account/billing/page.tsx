@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { FileText, ListChecks } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { getToolsPublicOrigin } from "@/lib/sso-tools-env";
+import { getFinanceFeesRedirectUrl } from "@/lib/finance-account-redirect";
 import { getFinanceWebPublicOrigin } from "@/lib/finance-web-public-url";
 import { loadPricingConfig } from "@/lib/pricing/credit-pricing-engine";
 import { listUserTenantMemberships } from "@/lib/tenant/context";
@@ -40,10 +41,8 @@ export default async function AccountBillingPage() {
 
   const financeWebOrigin = getFinanceWebPublicOrigin();
   const toolsPublicOrigin = getToolsPublicOrigin();
-  const financeBillingDetailsUrl = financeWebOrigin
-    ? `${financeWebOrigin}/fees/billing/details?from=account`
-    : null;
-  const financeUsageUrl = financeWebOrigin ? `${financeWebOrigin}/fees/usage` : null;
+  const financeBillingDetailsUrl = getFinanceFeesRedirectUrl("/fees/billing/details");
+  const financeUsageUrl = getFinanceFeesRedirectUrl("/fees/usage");
   const financeTeamBillingUrl = financeWebOrigin ? `${financeWebOrigin}/team/billing` : null;
   const toolsExpenseHistoryUrl = toolsPublicOrigin
     ? `${toolsPublicOrigin}/app-history`

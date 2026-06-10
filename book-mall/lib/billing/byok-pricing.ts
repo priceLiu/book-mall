@@ -31,6 +31,94 @@ export const BYOK_TASK_KIND_LABEL: Record<ByokTaskKind, string> = {
   TTS: "TTS / 语音",
 };
 
+/** 迁移前独立 TRYON 额度快照（已并入 TEXT_TO_IMAGE，勿再单独计费）。 */
+export const LEGACY_TRYON_QUOTA_MONTHLY = {
+  personal: 30,
+  teamPerSeat: 20,
+} as const;
+
+/** 修正历史结算行里残留的 TRYON 额度快照（30/20×席 → 文生图标准额度）。 */
+export function normalizeByokQuotaSettlementSnapshot(input: {
+  byokTaskKind: ByokTaskKind | null | undefined;
+  ownerType: "USER" | "TENANT";
+  monthlyIncluded: number | null | undefined;
+  includedUsedAfter: number | null | undefined;
+  includedRemainingAfter: number | null | undefined;
+  seats?: number;
+}): {
+  monthlyIncluded: number | null;
+  includedUsedAfter: number | null;
+  includedRemainingAfter: number | null;
+  corrected: boolean;
+} {
+  const taskKind = input.byokTaskKind;
+  const used = input.includedUsedAfter ?? null;
+  const remaining = input.includedRemainingAfter ?? null;
+  const monthlyIncluded = input.monthlyIncluded ?? null;
+
+  if (taskKind !== "TEXT_TO_IMAGE" || monthlyIncluded == null) {
+    return { monthlyIncluded, includedUsedAfter: used, includedRemainingAfter: remaining, corrected: false };
+  }
+
+  const scopeKey =
+    input.ownerType === "TENANT" ? BYOK_SCOPE_TEAM_SEAT : BYOK_SCOPE_PERSONAL;
+  const quotaDef = DEFAULT_BYOK_QUOTAS.find(
+    (q) => q.scopeKey === scopeKey && q.taskKind === "TEXT_TO_IMAGE",
+  );
+  if (!quotaDef) {
+    return { monthlyIncluded, includedUsedAfter: used, includedRemainingAfter: remaining, corrected: false };
+  }
+
+  const seats =
+    input.ownerType === "TENANT"
+      ? Math.max(BYOK_TEAM_MIN_SEATS, input.seats ?? BYOK_TEAM_MIN_SEATS)
+      : 1;
+  const expectedLimit = quotaDef.monthlyIncluded * seats;
+
+  const isStalePersonal =
+    input.ownerType === "USER" &&
+    monthlyIncluded === LEGACY_TRYON_QUOTA_MONTHLY.personal;
+  const isStaleTeam =
+    input.ownerType === "TENANT" &&
+    (monthlyIncluded === LEGACY_TRYON_QUOTA_MONTHLY.teamPerSeat * seats ||
+      monthlyIncluded === LEGACY_TRYON_QUOTA_MONTHLY.teamPerSeat);
+
+  if (!isStalePersonal && !isStaleTeam && monthlyIncluded === expectedLimit) {
+    return { monthlyIncluded, includedUsedAfter: used, includedRemainingAfter: remaining, corrected: false };
+  }
+  if (!isStalePersonal && !isStaleTeam) {
+    return { monthlyIncluded, includedUsedAfter: used, includedRemainingAfter: remaining, corrected: false };
+  }
+
+  const correctedRemaining =
+    used != null ? Math.max(0, expectedLimit - used) : remaining;
+
+  return {
+    monthlyIncluded: expectedLimit,
+    includedUsedAfter: used,
+    includedRemainingAfter: correctedRemaining,
+    corrected: true,
+  };
+}
+
+export function normalizeByokFeeDescription(
+  feeDescription: string,
+  corrected: boolean,
+  includedRemainingAfter?: number | null,
+): string {
+  if (!feeDescription.trim()) return feeDescription;
+  let out = feeDescription;
+  if (corrected) {
+    out = out
+      .replace(/BYOK 套餐内 · AI试衣/g, "BYOK 套餐内 · 文生图（含试衣）")
+      .replace(/BYOK 超额 · AI试衣/g, "BYOK 超额 · 文生图（含试衣）");
+    if (includedRemainingAfter != null) {
+      out = out.replace(/套餐剩余 \d+/, `套餐剩余 ${includedRemainingAfter}`);
+    }
+  }
+  return out;
+}
+
 /** 从 Gateway 日志解析试衣模型 key（用于明细按模型归类）。 */
 export function extractTryonModelKey(log: {
   model?: string | null;

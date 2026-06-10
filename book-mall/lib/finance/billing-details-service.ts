@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { getPoolBalances } from "@/lib/billing/credit-account-service";
 import { K_CREDITS_CONSUMED } from "@/lib/finance/bill-display-keys";
 import {
-  loadModelDisplayNameMap,
+  loadModelCatalogBillMaps,
   projectGatewayLogToBillRow,
 } from "@/lib/finance/gateway-bill-projection";
 import { fetchUserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
@@ -81,8 +81,8 @@ async function buildGatewayRows(input: {
   const userMap = new Map(users.map((u) => [u.id, u.name ?? u.email ?? u.id]));
 
   const modelKeys = logs.map((l) => l.canonicalModelKey ?? l.model ?? "");
-  const [displayNames, settlements] = await Promise.all([
-    loadModelDisplayNameMap(modelKeys, prisma),
+  const [catalogMaps, settlements] = await Promise.all([
+    loadModelCatalogBillMaps(modelKeys, prisma),
     loadBillingSettlementsByLogIds(logs.map((l) => l.id)),
   ]);
 
@@ -93,8 +93,9 @@ async function buildGatewayRows(input: {
       log,
       uid,
       label,
-      displayNames,
+      catalogMaps.displayNames,
       settlements.get(log.id) ?? null,
+      catalogMaps.vendors,
     );
   });
 

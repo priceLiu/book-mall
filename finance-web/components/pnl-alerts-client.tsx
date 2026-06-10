@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
 
 type Alert = { code: string; level: string; message: string };
@@ -48,11 +49,11 @@ export function PnlAlertsClient() {
     });
   }, [base]);
 
-  if (error) return <p className="p-6 text-sm text-red-600">{error}</p>;
-  if (!metrics) return <p className="p-6 text-sm text-[#8c8c8c]">加载中…</p>;
+  if (error) return <FinancePageState variant="error">{error}</FinancePageState>;
+  if (!metrics) return <FinancePageState>加载中…</FinancePageState>;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-6">
+    <FinancePageShell>
       <header>
         <h1 className="text-lg font-medium text-[#262626]">盈亏预警中心</h1>
         <p className="mt-1 text-sm text-[#8c8c8c]">
@@ -99,7 +100,7 @@ export function PnlAlertsClient() {
           </tbody>
         </table>
       </section>
-    </div>
+    </FinancePageShell>
   );
 }
 

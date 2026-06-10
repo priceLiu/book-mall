@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
 
 type PnlRow = {
@@ -36,7 +37,7 @@ export function PnlReportClient() {
   }, [load]);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-6">
+    <FinancePageShell>
       <header>
         <h1 className="text-lg font-medium">P&amp;L 报表</h1>
         <p className="mt-1 text-sm text-[#8c8c8c]">基于 CreditLedger SETTLE/CONSUME 汇总营收与成本。</p>
@@ -75,6 +76,6 @@ export function PnlReportClient() {
           </tbody>
         </table>
       ) : null}
-    </div>
+    </FinancePageShell>
   );
 }

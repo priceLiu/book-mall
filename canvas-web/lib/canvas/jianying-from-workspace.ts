@@ -1,7 +1,9 @@
 import type { CanvasFlowNode } from "./types";
 import type {
   StoryFrameColumnNodeData,
+  StoryFrameRow,
   StoryVideoColumnNodeData,
+  StoryVideoRow,
   StoryWorkspaceIds,
 } from "./story-workspace-types";
 
@@ -12,20 +14,11 @@ export type JianyingFrameExport = {
   dialogue?: string;
 };
 
-export function collectJianyingFramesFromWorkspace(
-  nodes: CanvasFlowNode[],
-  ws: Pick<StoryWorkspaceIds, "frameColumnId" | "videoColumnId">,
+/** 从分镜脚本行 + 视频列行收集可打包的镜位（至少含视频或配音） */
+export function collectJianyingFramesFromColumns(
+  frameRows: StoryFrameRow[],
+  videoRows: StoryVideoRow[],
 ): JianyingFrameExport[] {
-  const frameCol = ws.frameColumnId
-    ? nodes.find((n) => n.id === ws.frameColumnId)
-    : undefined;
-  const videoCol = ws.videoColumnId
-    ? nodes.find((n) => n.id === ws.videoColumnId)
-    : undefined;
-  if (!frameCol && !videoCol) return [];
-
-  const frameRows = (frameCol?.data as StoryFrameColumnNodeData)?.rows ?? [];
-  const videoRows = (videoCol?.data as StoryVideoColumnNodeData)?.rows ?? [];
   const indices = new Set<number>();
   for (const r of frameRows) indices.add(r.frameIndex);
   for (const r of videoRows) indices.add(r.frameIndex);
@@ -47,4 +40,21 @@ export function collectJianyingFramesFromWorkspace(
       };
     })
     .filter((f) => f.videoUrl || f.audioUrl);
+}
+
+export function collectJianyingFramesFromWorkspace(
+  nodes: CanvasFlowNode[],
+  ws: Pick<StoryWorkspaceIds, "frameColumnId" | "videoColumnId">,
+): JianyingFrameExport[] {
+  const frameCol = ws.frameColumnId
+    ? nodes.find((n) => n.id === ws.frameColumnId)
+    : undefined;
+  const videoCol = ws.videoColumnId
+    ? nodes.find((n) => n.id === ws.videoColumnId)
+    : undefined;
+  if (!frameCol && !videoCol) return [];
+
+  const frameRows = (frameCol?.data as StoryFrameColumnNodeData)?.rows ?? [];
+  const videoRows = (videoCol?.data as StoryVideoColumnNodeData)?.rows ?? [];
+  return collectJianyingFramesFromColumns(frameRows, videoRows);
 }

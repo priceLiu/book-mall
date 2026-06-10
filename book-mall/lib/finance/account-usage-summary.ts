@@ -25,6 +25,8 @@ export type PackageUsageRow = {
   label: string;
   /** 套餐内总额度；文字类无额度时为 null */
   total: number | null;
+  /** BYOK 套餐内已扣次数（与「剩余」同一口径：剩余 = 总数 − 已用） */
+  includedUsed: number | null;
   succeeded: number;
   failed: number;
   remaining: number | null;
@@ -79,6 +81,7 @@ export async function getAccountPlatformCategoryUsageRows(
       key: cat,
       label: BILLING_CATEGORY_LABEL[cat],
       total: null,
+      includedUsed: null,
       succeeded: c.succeeded,
       failed: c.failed,
       remaining: null,
@@ -177,7 +180,7 @@ export async function getAccountPackageUsageRows(
   const since = monthStartUtc();
   const periodKey = currentPeriodKey();
 
-  const [logs, quotas, usage] = await Promise.all([
+  const [logs, quotas, usage, settlementCounts] = await Promise.all([
     prisma.gatewayRequestLog.findMany({
       where: {
         actorBookUserId: bookUserId,
@@ -197,9 +200,25 @@ export async function getAccountPackageUsageRows(
           where: { ownerType: "USER", ownerId: bookUserId, periodKey },
         })
       : Promise.resolve([]),
+    scopeKey
+      ? prisma.billingSettlementLine.groupBy({
+          by: ["byokTaskKind"],
+          where: {
+            ownerType: "USER",
+            ownerId: bookUserId,
+            periodKey,
+            settlementKind: "BYOK_QUOTA_INCLUDED",
+            byokTaskKind: { not: null },
+          },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   const usageByKind = new Map(usage.map((u) => [u.taskKind, u]));
+  const settlementByKind = new Map(
+    settlementCounts.map((s) => [s.byokTaskKind!, s._count._all]),
+  );
   const counts = new Map<BillingCategoryKey, { succeeded: number; failed: number }>();
 
   for (const log of logs) {
@@ -210,18 +229,31 @@ export async function getAccountPackageUsageRows(
     counts.set(cat, row);
   }
 
-  const quotaRows: PackageUsageRow[] = quotas.map((q) => {
-    const c = counts.get(q.taskKind) ?? { succeeded: 0, failed: 0 };
-    const used = usageByKind.get(q.taskKind)?.includedUsed ?? 0;
-    return {
-      key: q.taskKind,
-      label: BYOK_TASK_KIND_LABEL[q.taskKind] ?? q.label,
-      total: q.monthlyIncluded,
-      succeeded: c.succeeded,
-      failed: c.failed,
-      remaining: Math.max(0, q.monthlyIncluded - used),
-    };
-  });
+  const quotaRows: PackageUsageRow[] = await Promise.all(
+    quotas.map(async (q) => {
+      const c = counts.get(q.taskKind) ?? { succeeded: 0, failed: 0 };
+      const usageRow = usageByKind.get(q.taskKind);
+      const settlementUsed = settlementByKind.get(q.taskKind) ?? 0;
+      const used = settlementUsed;
+      if (usageRow && usageRow.includedUsed !== settlementUsed) {
+        await prisma.byokUsageMonthly
+          .update({
+            where: { id: usageRow.id },
+            data: { includedUsed: settlementUsed },
+          })
+          .catch(() => undefined);
+      }
+      return {
+        key: q.taskKind,
+        label: BYOK_TASK_KIND_LABEL[q.taskKind] ?? q.label,
+        total: q.monthlyIncluded,
+        includedUsed: used,
+        succeeded: c.succeeded,
+        failed: c.failed,
+        remaining: Math.max(0, q.monthlyIncluded - used),
+      };
+    }),
+  );
 
   const textCounts = counts.get("TEXT") ?? { succeeded: 0, failed: 0 };
   const otherCounts = counts.get("OTHER") ?? { succeeded: 0, failed: 0 };
@@ -231,6 +263,7 @@ export async function getAccountPackageUsageRows(
       key: "TEXT",
       label: BILLING_CATEGORY_LABEL.TEXT,
       total: null,
+      includedUsed: null,
       succeeded: textCounts.succeeded,
       failed: textCounts.failed,
       remaining: null,
@@ -239,6 +272,7 @@ export async function getAccountPackageUsageRows(
       key: "OTHER",
       label: BILLING_CATEGORY_LABEL.OTHER,
       total: null,
+      includedUsed: null,
       succeeded: otherCounts.succeeded,
       failed: otherCounts.failed,
       remaining: null,
@@ -249,7 +283,7 @@ export async function getAccountPackageUsageRows(
 /** BYOK 本月任务含/已用/剩余（个人中心概览用）。 */
 export async function getAccountByokTaskSummary(bookUserId: string, scopeKey: string) {
   const periodKey = currentPeriodKey();
-  const [quotas, usage] = await Promise.all([
+  const [quotas, usage, settlementCounts] = await Promise.all([
     prisma.byokTaskQuota.findMany({
       where: { scopeKey, active: true },
       orderBy: { taskKind: "asc" },
@@ -257,22 +291,46 @@ export async function getAccountByokTaskSummary(bookUserId: string, scopeKey: st
     prisma.byokUsageMonthly.findMany({
       where: { ownerType: "USER", ownerId: bookUserId, periodKey },
     }),
+    prisma.billingSettlementLine.groupBy({
+      by: ["byokTaskKind"],
+      where: {
+        ownerType: "USER",
+        ownerId: bookUserId,
+        periodKey,
+        settlementKind: "BYOK_QUOTA_INCLUDED",
+        byokTaskKind: { not: null },
+      },
+      _count: { _all: true },
+    }),
   ]);
 
   const usageByKind = new Map(usage.map((u) => [u.taskKind, u]));
-  return quotas.map((q) => {
-    const row = usageByKind.get(q.taskKind);
-    const includedUsed = row?.includedUsed ?? 0;
-    const monthlyIncluded = q.monthlyIncluded;
-    return {
-      taskKind: q.taskKind,
-      label: BYOK_TASK_KIND_LABEL[q.taskKind] ?? q.label,
-      monthlyIncluded,
-      includedUsed,
-      includedRemaining: Math.max(0, monthlyIncluded - includedUsed),
-      overageUsed: row?.overageUsed ?? 0,
-    };
-  });
+  const settlementByKind = new Map(
+    settlementCounts.map((s) => [s.byokTaskKind!, s._count._all]),
+  );
+  return Promise.all(
+    quotas.map(async (q) => {
+      const row = usageByKind.get(q.taskKind);
+      const includedUsed = settlementByKind.get(q.taskKind) ?? row?.includedUsed ?? 0;
+      if (row && row.includedUsed !== includedUsed) {
+        await prisma.byokUsageMonthly
+          .update({
+            where: { id: row.id },
+            data: { includedUsed },
+          })
+          .catch(() => undefined);
+      }
+      const monthlyIncluded = q.monthlyIncluded;
+      return {
+        taskKind: q.taskKind,
+        label: BYOK_TASK_KIND_LABEL[q.taskKind] ?? q.label,
+        monthlyIncluded,
+        includedUsed,
+        includedRemaining: Math.max(0, monthlyIncluded - includedUsed),
+        overageUsed: row?.overageUsed ?? 0,
+      };
+    }),
+  );
 }
 
 /** 按工具聚合 Gateway 成功调用。 */

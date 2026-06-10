@@ -1,12 +1,19 @@
 /**
- * 分镜视频 · @ 参考图 URL 解析（行内 refImages + 资产库兜底）
+ * 分镜视频 · @ 参考图 URL 解析（资产库 / 角色列 runtime 优先，行内 refImages 仅兜底）
  */
+import type { StoryProCharacterAssetRefKind } from "@prisma/client";
+
+import { prisma } from "@/lib/prisma";
 import {
   listStoryProCharacterAssets,
   normalizeStoryProCharacterKey,
+  type StoryProCharacterAssetRecord,
+  type StoryProCharacterAssetRefRecord,
 } from "./story-pro-character-asset-service";
 import { listStoryProSceneAssets } from "./story-pro-scene-asset-service";
 import { resolveStoryRowRefUrls } from "./story-row-ref-urls";
+
+const THREE_VIEW_KIND: StoryProCharacterAssetRefKind = "three_view";
 
 function parseMentionIds(prompt: string): string[] {
   const ids: string[] = [];
@@ -34,42 +41,140 @@ type CharAsset = Awaited<
 >[number];
 type SceneAsset = Awaited<ReturnType<typeof listStoryProSceneAssets>>[number];
 
+function latestRefForKind(
+  refs: StoryProCharacterAssetRefRecord[],
+  kind: StoryProCharacterAssetRefKind,
+): StoryProCharacterAssetRefRecord | undefined {
+  const matches = refs.filter((r) => r.kind === kind);
+  if (!matches.length) return undefined;
+  return matches.sort((a, b) => b.sortOrder - a.sortOrder)[0];
+}
+
+function pickCharAssetForKey(
+  charAssets: StoryProCharacterAssetRecord[],
+  characterKey: string,
+  projectId: string | null,
+): StoryProCharacterAssetRecord | undefined {
+  const k = normalizeStoryProCharacterKey(characterKey);
+  const matches = charAssets.filter(
+    (a) => normalizeStoryProCharacterKey(a.characterKey) === k,
+  );
+  if (!matches.length) return undefined;
+  const candidates = matches.filter(
+    (a) => a.projectId === projectId || !a.projectId,
+  );
+  const pool = candidates.length ? candidates : matches;
+  return [...pool].sort((a, b) => {
+    const aScoped = a.projectId === projectId ? 1 : 0;
+    const bScoped = b.projectId === projectId ? 1 : 0;
+    if (bScoped !== aScoped) return bScoped - aScoped;
+    return b.refs.length - a.refs.length;
+  })[0];
+}
+
+function refUrl(ref: { ossUrl?: string } | undefined): string | null {
+  const u = ref?.ossUrl?.trim();
+  return u && /^https?:\/\//.test(u) ? u : null;
+}
+
+function resolveLatestThreeViewUrl(
+  asset: StoryProCharacterAssetRecord | undefined,
+): string | null {
+  if (!asset?.refs.length) return null;
+  return refUrl(latestRefForKind(asset.refs, THREE_VIEW_KIND));
+}
+
+/** 角色列 runtime · 三视图（重新生成后行内 refImages 可能仍是旧 URL） */
+async function loadCanvasCharacterThreeViews(
+  userId: string,
+  projectId: string | null | undefined,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const pid = projectId?.trim();
+  if (!pid) return out;
+
+  const project = await prisma.canvasProject.findFirst({
+    where: { id: pid, userId, deletedAt: null },
+    select: { canvas: true },
+  });
+  if (!project?.canvas || typeof project.canvas !== "object") return out;
+
+  const canvas = project.canvas as {
+    nodes?: Array<{
+      type?: string;
+      data?: {
+        rows?: Array<{
+          key?: string;
+          runtime?: { ossUrl?: string; ephemeralUrl?: string };
+        }>;
+      };
+    }>;
+  };
+
+  for (const node of canvas.nodes ?? []) {
+    if (
+      node.type !== "story-character-column" &&
+      node.type !== "story-pro-character"
+    ) {
+      continue;
+    }
+    for (const row of node.data?.rows ?? []) {
+      const key = normalizeStoryProCharacterKey(String(row.key ?? ""));
+      if (!key) continue;
+      const u =
+        row.runtime?.ossUrl?.trim() || row.runtime?.ephemeralUrl?.trim();
+      if (u && /^https?:\/\//.test(u)) out.set(key, u);
+    }
+  }
+  return out;
+}
+
 function resolveMentionUrlFromAssets(
   id: string,
   charAssets: CharAsset[],
   sceneAssets: SceneAsset[],
   refImagesById: Map<string, string>,
+  projectId: string | null,
+  canvasThreeViews: Map<string, string>,
 ): string | null {
-  const fromRow = refImagesById.get(id);
-  if (fromRow && /^https?:\/\//.test(fromRow)) return fromRow;
-
   if (id.startsWith("ref-char-")) {
-    const key = normalizeStoryProCharacterKey(id.slice("ref-char-".length));
-    const asset = charAssets.find(
-      (a) => normalizeStoryProCharacterKey(a.characterKey) === key,
-    );
-    const threeView = asset?.refs.find((r) => r.kind === "three_view");
-    const u = threeView?.ossUrl?.trim();
-    return u && /^https?:\/\//.test(u) ? u : null;
+    const key = id.slice("ref-char-".length);
+    const normKey = normalizeStoryProCharacterKey(key);
+    const asset = pickCharAssetForKey(charAssets, key, projectId);
+    const fromAsset = resolveLatestThreeViewUrl(asset);
+    if (fromAsset) return fromAsset;
+    const fromCanvas = canvasThreeViews.get(normKey);
+    if (fromCanvas) return fromCanvas;
+    const fromRow = refImagesById.get(id);
+    return fromRow && /^https?:\/\//.test(fromRow) ? fromRow : null;
   }
 
   const charRef = parsePrefixedAssetRefId("ref-asset-", id);
   if (charRef) {
     const asset = charAssets.find((a) => a.id === charRef.assetId);
     const ref = asset?.refs.find((r) => r.id === charRef.refId);
-    const u = ref?.ossUrl?.trim();
-    return u && /^https?:\/\//.test(u) ? u : null;
+    if (ref?.kind === THREE_VIEW_KIND) {
+      const latest = resolveLatestThreeViewUrl(asset);
+      if (latest) return latest;
+    }
+    const u = refUrl(ref);
+    if (u) return u;
+    const fromRow = refImagesById.get(id);
+    return fromRow && /^https?:\/\//.test(fromRow) ? fromRow : null;
   }
 
   const sceneRef = parsePrefixedAssetRefId("ref-scene-asset-", id);
   if (sceneRef) {
     const asset = sceneAssets.find((a) => a.id === sceneRef.assetId);
     const ref = asset?.refs.find((r) => r.id === sceneRef.refId);
-    const u = ref?.ossUrl?.trim();
-    return u && /^https?:\/\//.test(u) ? u : null;
+    const u = refUrl(ref);
+    if (u) return u;
+    const fromRow = refImagesById.get(id);
+    return fromRow && /^https?:\/\//.test(fromRow) ? fromRow : null;
   }
 
-  return null;
+  const fromRow = refImagesById.get(id);
+  return fromRow && /^https?:\/\//.test(fromRow) ? fromRow : null;
 }
 
 /** 按 videoPrompt 中 @ 顺序解析参考图 URL（最多 8 张） */
@@ -92,17 +197,15 @@ export async function resolveStoryProVideoRefUrls(
 
   if (!mentionIds.length) return fromRow.slice(0, 8);
 
-  const allInRow = mentionIds.every((id) => {
-    const u = refImagesById.get(id);
-    return Boolean(u && /^https?:\/\//.test(u));
-  });
-  if (allInRow && fromRow.length >= mentionIds.length) {
-    return fromRow.slice(0, 8);
-  }
+  const projectIdNorm = projectId?.trim() || null;
+  const needsCanvasFallback = mentionIds.some((id) => id.startsWith("ref-char-"));
 
-  const [charAssets, sceneAssets] = await Promise.all([
+  const [charAssets, sceneAssets, canvasThreeViews] = await Promise.all([
     listStoryProCharacterAssets(userId, { projectId }),
     listStoryProSceneAssets(userId, { projectId }),
+    needsCanvasFallback
+      ? loadCanvasCharacterThreeViews(userId, projectId)
+      : Promise.resolve(new Map<string, string>()),
   ]);
 
   const urls: string[] = [];
@@ -113,6 +216,8 @@ export async function resolveStoryProVideoRefUrls(
       charAssets,
       sceneAssets,
       refImagesById,
+      projectIdNorm,
+      canvasThreeViews,
     );
     if (!u || !/^https?:\/\//.test(u) || seen.has(u)) continue;
     seen.add(u);

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { PlanChangeSimulationPanel } from "@/components/admin/plan-change-simulation-panel";
 import { financeApiFetch } from "@/lib/finance-viewer";
 import { canCreateProposal, canFinalApprove, canFinanceReview } from "@/lib/permissions";
@@ -86,7 +87,7 @@ export function PlanChangeFinanceClient() {
   const canFinal = canFinalApprove(role);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-6">
+    <FinancePageShell>
       <header>
         <h1 className="text-lg font-medium text-[#262626]">调价测算与审批</h1>
         <p className="mt-1 text-sm text-[#8c8c8c]">
@@ -209,7 +210,7 @@ export function PlanChangeFinanceClient() {
           );
         })}
       </ul>
-    </div>
+    </FinancePageShell>
   );
 }
 

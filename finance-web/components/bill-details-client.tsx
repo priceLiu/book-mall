@@ -5,6 +5,8 @@ import {
   BILL_COLUMN_GROUPS,
   filterColumnGroupsByRole,
   K_CREDITS_CONSUMED,
+  K_INCLUDED_REMAINING,
+  K_INCLUDED_USED,
   type BillViewerRole,
 } from "@/lib/bill-config";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -17,7 +19,7 @@ import {
   type PackageReconciliationData,
 } from "@/components/package-reconciliation-panel";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 export type BillDetailsClientProps = {
   /** 指定 book-mall 用户 id（走管理员 API，需在 book-mall 以管理员登录） */
@@ -63,10 +65,47 @@ const PAGE_SIZES = [10, 20, 50];
 
 // v004：以「平台/*」作为主筛选维度——「平台/产品名称」是 catalog 命中后的 canonical 显示名，
 // 在 TOOL_USAGE_GENERATED 与 CLOUD_CSV_IMPORT 两类行之间天然一致。
+const K_USER_ID = "平台/用户ID";
+const K_USER_NAME = "平台/用户名";
+const K_MODEL_CODE = "平台/模型Code";
+const K_MODEL_NAME = "平台/模型名称";
+const K_TASK_KIND = "套餐对帐/任务类型";
+const K_CONSUME_TIME = "平台账单/消费时间";
+const K_GATEWAY_LOG_ID = "平台/Gateway日志ID";
 const K_BILL_MONTH = "平台账单/账单月份";
 const K_FEE_DESC = "平台账单/费用说明";
-const K_MODEL_NAME = "平台/模型名称";
 const K_TOOL_PAGE = "平台/工具页面";
+
+function billColumnHeaderLabel(key: string): string {
+  if (key === K_INCLUDED_USED) return "结算后已用";
+  if (key === K_INCLUDED_REMAINING) return "结算后剩余";
+  if (key.includes("/")) return key.split("/").slice(1).join("/");
+  return key;
+}
+
+function rowSortTime(row: Record<string, string>): number {
+  const t = row[K_CONSUME_TIME]?.trim();
+  if (!t) return 0;
+  const ms = Date.parse(t.replace(" ", "T"));
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function rowStableKey(row: Record<string, string>, ri: number): string {
+  return (
+    [row[K_USER_ID], row[K_GATEWAY_LOG_ID], row[K_CONSUME_TIME]]
+      .filter(Boolean)
+      .join("|") || String(ri)
+  );
+}
+
+type UserBillGroup = {
+  userId: string;
+  userName: string;
+  latestTime: number;
+  latestTimeLabel: string;
+  rows: Record<string, string>[];
+  credits: number;
+};
 
 function matchesMulti(
   cell: string,
@@ -113,6 +152,8 @@ export function BillDetailsClient({
   >(undefined);
   const [packageReconciliation, setPackageReconciliation] =
     useState<PackageReconciliationData | null>(null);
+  const [groupByUser, setGroupByUser] = useState(true);
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const search = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -292,6 +333,48 @@ export function BillDetailsClient({
     productMode,
   ]);
 
+  const filteredSorted = useMemo(
+    () =>
+      [...filtered].sort((a, b) => rowSortTime(b) - rowSortTime(a)),
+    [filtered],
+  );
+
+  const totalColumnCount = useMemo(
+    () => columnGroups.reduce((n, g) => n + g.keys.length, 0),
+    [columnGroups],
+  );
+
+  const userGroups = useMemo((): UserBillGroup[] => {
+    if (!isAllUsers || effectiveRole !== "admin") return [];
+    const map = new Map<string, UserBillGroup>();
+    for (const row of filteredSorted) {
+      const userId = row[K_USER_ID]?.trim() || "—";
+      const t = rowSortTime(row);
+      const prev = map.get(userId);
+      if (!prev) {
+        map.set(userId, {
+          userId,
+          userName: row[K_USER_NAME]?.trim() || userId,
+          latestTime: t,
+          latestTimeLabel: row[K_CONSUME_TIME]?.trim() || "—",
+          rows: [row],
+          credits:
+            parseInt(row[K_CREDITS_CONSUMED] || "0", 10) || 0,
+        });
+        continue;
+      }
+      prev.rows.push(row);
+      prev.credits += parseInt(row[K_CREDITS_CONSUMED] || "0", 10) || 0;
+      if (t >= prev.latestTime) {
+        prev.latestTime = t;
+        prev.latestTimeLabel = row[K_CONSUME_TIME]?.trim() || prev.latestTimeLabel;
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.latestTime - a.latestTime);
+  }, [filteredSorted, isAllUsers, effectiveRole]);
+
+  const useUserGrouping = isAllUsers && effectiveRole === "admin" && groupByUser;
+
   const totalCreditsConsumed = useMemo(
     () => filtered.reduce((s, r) => s + (parseInt(r[K_CREDITS_CONSUMED], 10) || 0), 0),
     [filtered],
@@ -300,15 +383,108 @@ export function BillDetailsClient({
   const balanceAfter =
     walletBalancePoints != null ? walletBalancePoints - totalCreditsConsumed : null;
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const groupedSummary = useMemo(() => {
+    if (!isAllUsers || effectiveRole !== "admin") return [];
+    const map = new Map<
+      string,
+      {
+        userId: string;
+        userName: string;
+        modelCode: string;
+        modelName: string;
+        taskKind: string;
+        count: number;
+        credits: number;
+        latestTime: number;
+      }
+    >();
+    for (const row of filteredSorted) {
+      const userId = row[K_USER_ID] ?? "";
+      const userName = row[K_USER_NAME] ?? "";
+      const modelCode = row[K_MODEL_CODE] ?? "";
+      const modelName = row[K_MODEL_NAME] ?? "";
+      const taskKind = row[K_TASK_KIND] ?? "";
+      const key = [userId, modelCode, taskKind].join("|");
+      const t = rowSortTime(row);
+      const prev = map.get(key) ?? {
+        userId,
+        userName,
+        modelCode,
+        modelName,
+        taskKind,
+        count: 0,
+        credits: 0,
+        latestTime: 0,
+      };
+      prev.count += 1;
+      prev.credits += parseInt(row[K_CREDITS_CONSUMED] || "0", 10) || 0;
+      if (t >= prev.latestTime) prev.latestTime = t;
+      map.set(key, prev);
+    }
+    return Array.from(map.values()).sort(
+      (a, b) =>
+        b.latestTime - a.latestTime ||
+        a.userName.localeCompare(b.userName, "zh-CN") ||
+        a.modelCode.localeCompare(b.modelCode),
+    );
+  }, [filteredSorted, isAllUsers, effectiveRole]);
+
+  const pageCount = useMemo(() => {
+    if (useUserGrouping) return Math.max(1, Math.ceil(userGroups.length / pageSize));
+    return Math.max(1, Math.ceil(filteredSorted.length / pageSize));
+  }, [useUserGrouping, userGroups.length, filteredSorted.length, pageSize]);
   const pageSafe = Math.min(page, pageCount);
-  const paged = filtered.slice((pageSafe - 1) * pageSize, pageSafe * pageSize);
+  const paged = useMemo(
+    () =>
+      filteredSorted.slice((pageSafe - 1) * pageSize, pageSafe * pageSize),
+    [filteredSorted, pageSafe, pageSize],
+  );
+  const pagedUserGroups = useMemo(
+    () => userGroups.slice((pageSafe - 1) * pageSize, pageSafe * pageSize),
+    [userGroups, pageSafe, pageSize],
+  );
+
+  function toggleUserExpanded(userId: string) {
+    setExpandedUsers((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
+  function renderDetailRow(row: Record<string, string>, ri: number) {
+    return (
+      <tr key={rowStableKey(row, ri)} className="bg-white hover:bg-[#fafafa]">
+        {columnGroups.flatMap((g) =>
+          g.keys.map((k) => {
+            const v = row[k] ?? "";
+            const isVerbose = k.includes("详情") || k.includes("公式");
+            const limit = isVerbose ? 200 : 80;
+            const long = v.length > limit;
+            return (
+              <td
+                key={k}
+                className={cn(
+                  "border border-[#e8e8e8] px-2 py-1.5 align-top text-[#262626]",
+                  long && (isVerbose ? "max-w-[min(480px,40vw)]" : "max-w-[240px]"),
+                )}
+                title={long ? v : undefined}
+              >
+                {long ? `${v.slice(0, limit)}…` : v || "—"}
+              </td>
+            );
+          }),
+        )}
+      </tr>
+    );
+  }
 
   const isDevImpersonation = !adminTargetUserId && viewerAuthMode === "dev_user_id";
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto bg-[#f0f2f5]">
-      <div className="mx-4 mt-4 space-y-3">
+    <div className="flex w-full flex-col bg-[#f0f2f5]">
+      <div className="flex w-full flex-col gap-3 p-6">
         {!isAllUsers && isDevImpersonation ? (
           <div className="rounded border-2 border-[#ff4d4f] bg-[#fff1f0] px-4 py-3 text-sm shadow-sm">
             <p className="text-base font-bold text-[#a8071a]">⚠️ 当前并非以你浏览器登录的真实账号在拉账单</p>
@@ -603,6 +779,94 @@ export function BillDetailsClient({
           ) : null}
         </div>
 
+        {isAllUsers && effectiveRole === "admin" ? (
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={groupByUser}
+                onChange={(e) => {
+                  setGroupByUser(e.target.checked);
+                  setPage(1);
+                }}
+              />
+              <span>按用户折叠明细</span>
+            </label>
+            {groupByUser ? (
+              <>
+                <button
+                  type="button"
+                  className="rounded border border-[#d9d9d9] px-2 py-0.5 text-xs hover:border-[#1890ff]"
+                  onClick={() =>
+                    setExpandedUsers(new Set(pagedUserGroups.map((g) => g.userId)))
+                  }
+                >
+                  展开本页用户
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-[#d9d9d9] px-2 py-0.5 text-xs hover:border-[#1890ff]"
+                  onClick={() => setExpandedUsers(new Set())}
+                >
+                  折叠本页用户
+                </button>
+              </>
+            ) : null}
+            <span className="text-xs text-[#8c8c8c]">
+              用户组与明细均按消费时间倒序；组内明细亦倒序。
+            </span>
+          </div>
+        ) : null}
+
+        {isAllUsers && groupedSummary.length > 0 ? (
+          <div className="mb-4 rounded border border-[#e8e8e8] bg-[#fafafa] p-3">
+            <p className="mb-2 text-xs font-medium text-[#262626]">
+              汇总视图（当前筛选 · 按用户 + 模型 + 任务类型）
+            </p>
+            <p className="mb-2 text-[11px] text-[#8c8c8c]">
+              下方明细表中「结算后已用 / 结算后剩余」为<strong>单次调用</strong>写入的快照，不是当月累计；对帐请以套餐面板「套餐已用」或结算流水为准。
+            </p>
+            <div className="max-h-48 overflow-auto rounded border border-[#e8e8e8] bg-white">
+              <table className="w-full min-w-[720px] border-collapse text-xs">
+                <thead>
+                  <tr className="bg-[#fafafa] text-[#8c8c8c]">
+                    <th className="border border-[#e8e8e8] px-2 py-1.5 text-left">用户</th>
+                    <th className="border border-[#e8e8e8] px-2 py-1.5 text-left">模型 Code</th>
+                    <th className="border border-[#e8e8e8] px-2 py-1.5 text-left">任务类型</th>
+                    <th className="border border-[#e8e8e8] px-2 py-1.5 text-right">条数</th>
+                    <th className="border border-[#e8e8e8] px-2 py-1.5 text-right">消耗积分</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedSummary.slice(0, 50).map((g) => (
+                    <tr key={`${g.userId}|${g.modelCode}|${g.taskKind}`}>
+                      <td className="border border-[#e8e8e8] px-2 py-1.5">
+                        <div className="font-medium">{g.userName || "—"}</div>
+                        <div className="font-mono text-[10px] text-[#8c8c8c]">{g.userId}</div>
+                      </td>
+                      <td className="border border-[#e8e8e8] px-2 py-1.5 font-mono text-[11px]">
+                        {g.modelCode || "—"}
+                      </td>
+                      <td className="border border-[#e8e8e8] px-2 py-1.5">{g.taskKind || "—"}</td>
+                      <td className="border border-[#e8e8e8] px-2 py-1.5 text-right tabular-nums">
+                        {g.count}
+                      </td>
+                      <td className="border border-[#e8e8e8] px-2 py-1.5 text-right tabular-nums">
+                        {g.credits}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {groupedSummary.length > 50 ? (
+              <p className="mt-1 text-[11px] text-[#8c8c8c]">
+                仅展示前 50 组，共 {groupedSummary.length} 组。
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="overflow-x-auto border border-[#e8e8e8]">
           <table className="min-w-[1400px] border-collapse text-xs">
             <thead>
@@ -624,52 +888,64 @@ export function BillDetailsClient({
                       key={k}
                       className="whitespace-nowrap border border-[#e8e8e8] px-2 py-2 text-left font-normal text-[#595959]"
                     >
-                      {k.includes("/") ? k.split("/").slice(1).join("/") : k}
+                      {billColumnHeaderLabel(k)}
                     </th>
                   )),
                 )}
               </tr>
             </thead>
             <tbody>
-              {paged.map((row, ri) => (
-                // v006 Round 4：「平台/用户ID + 平台账单/消费时间 + 平台/计费项Code + 平台用量/用量」拼成稳定 key
-                <tr
-                  key={
-                    [row["平台/用户ID"], row["平台/Gateway日志ID"], row["平台账单/消费时间"]]
-                      .filter(Boolean)
-                      .join("|") || String(ri)
-                  }
-                  className="bg-white hover:bg-[#fafafa]"
-                >
-                  {columnGroups.flatMap((g) =>
-                    g.keys.map((k) => {
-                      const v = row[k] ?? "";
-                      const isVerbose = k.includes("详情") || k.includes("公式");
-                      const limit = isVerbose ? 200 : 80;
-                      const long = v.length > limit;
-                      return (
+              {useUserGrouping
+                ? pagedUserGroups.flatMap((group) => {
+                    const expanded = expandedUsers.has(group.userId);
+                    return [
+                      <tr
+                        key={`group-${group.userId}`}
+                        className="cursor-pointer bg-[#f0f7ff] hover:bg-[#e6f4ff]"
+                        onClick={() => toggleUserExpanded(group.userId)}
+                      >
                         <td
-                          key={k}
-                          className={cn(
-                            "border border-[#e8e8e8] px-2 py-1.5 align-top text-[#262626]",
-                            long && (isVerbose ? "max-w-[min(480px,40vw)]" : "max-w-[240px]"),
-                          )}
-                          title={long ? v : undefined}
+                          colSpan={totalColumnCount}
+                          className="border border-[#e8e8e8] px-3 py-2"
                         >
-                          {long ? `${v.slice(0, limit)}…` : v || "—"}
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[#262626]">
+                            <span className="inline-flex items-center gap-1 font-medium">
+                              {expanded ? (
+                                <ChevronDown className="h-4 w-4 shrink-0" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 shrink-0" />
+                              )}
+                              {group.userName}
+                            </span>
+                            <span className="font-mono text-[10px] text-[#8c8c8c]">
+                              {group.userId}
+                            </span>
+                            <span className="text-[#595959]">
+                              {group.rows.length} 条 · 积分 {group.credits}
+                            </span>
+                            <span className="text-[#8c8c8c]">
+                              最新 {group.latestTimeLabel}
+                            </span>
+                          </div>
                         </td>
-                      );
-                    }),
-                  )}
-                </tr>
-              ))}
+                      </tr>,
+                      ...(expanded
+                        ? group.rows.map((row, ri) => renderDetailRow(row, ri))
+                        : []),
+                    ];
+                  })
+                : paged.map((row, ri) => renderDetailRow(row, ri))}
             </tbody>
           </table>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-[#595959]">
           <div>
-            共 <span className="text-[#262626]">{filtered.length}</span> 条 · 每页
+            共{" "}
+            <span className="text-[#262626]">
+              {useUserGrouping ? userGroups.length : filteredSorted.length}
+            </span>{" "}
+            {useUserGrouping ? "位用户" : "条"} · 每页
             <select
               className="mx-1 rounded border border-[#d9d9d9] px-1 py-0.5"
               value={pageSize}

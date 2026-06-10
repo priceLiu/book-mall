@@ -7,6 +7,8 @@ import {
   buildByokIncludedUsageFromQuotas,
   hasVideoAttachmentInChatInput,
   mapLogToByokTaskKind,
+  normalizeByokFeeDescription,
+  normalizeByokQuotaSettlementSnapshot,
   simulateByokMonth,
 } from "@/lib/billing/byok-pricing";
 import { DEFAULT_CREDIT_ANCHOR_YUAN } from "@/lib/pricing/credit-pricing-formulas";
@@ -100,5 +102,31 @@ describe("simulateByokMonth — BYOK 权益测算", () => {
     });
     expect(report.overageCredits).toBeGreaterThan(0);
     expect(report.marginRate).toBeGreaterThan(0);
+  });
+});
+
+describe("normalizeByokQuotaSettlementSnapshot — 试衣并入文生图", () => {
+  it("corrects stale personal TRYON limit 30 → 130", () => {
+    const snap = normalizeByokQuotaSettlementSnapshot({
+      byokTaskKind: "TEXT_TO_IMAGE",
+      ownerType: "USER",
+      monthlyIncluded: 30,
+      includedUsedAfter: 1,
+      includedRemainingAfter: 29,
+    });
+    expect(snap.corrected).toBe(true);
+    expect(snap.monthlyIncluded).toBe(130);
+    expect(snap.includedRemainingAfter).toBe(129);
+  });
+
+  it("rewrites legacy AI试衣 fee description remaining", () => {
+    const text = normalizeByokFeeDescription(
+      "BYOK 套餐内 · AI试衣 -1, 套餐剩余 29",
+      true,
+      129,
+    );
+    expect(text).toContain("文生图（含试衣）");
+    expect(text).toContain("套餐剩余 129");
+    expect(text).not.toContain("AI试衣");
   });
 });

@@ -32,8 +32,14 @@ import {
 } from "./credit-account-service";
 import { consumeTeamCredits } from "./seat-billing-service";
 import { settleByokOverage } from "./byok-overage-service";
-import { classifyBillingCategory } from "./billing-category";
+import {
+  billingCategoryLabel,
+  classifyBillingCategory,
+} from "./billing-category";
 import { recordBillingSettlement } from "./billing-settlement-service";
+import { extractTryonModelKey } from "./byok-pricing";
+import { aiTryonModelLabel } from "@/lib/pricing/ai-tryon-cost";
+import { resolveBillableImageCountFromLog } from "@/lib/gateway/log-billing-metrics";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 
 export function creditBillingEnabled(): boolean {
@@ -110,6 +116,20 @@ export async function resolveLogBillingTarget(
 
 function monthStartUtc(d = new Date()): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+}
+
+function platformConsumeDescription(
+  log: GatewayRequestLog,
+  units: number,
+): string {
+  const catLabel = billingCategoryLabel(classifyBillingCategory(log));
+  const tryonLabel =
+    log.requestKind === "TRYON"
+      ? aiTryonModelLabel(extractTryonModelKey(log))
+      : null;
+  const modelPart = tryonLabel ? ` · ${tryonLabel}` : "";
+  const page = log.clientPage?.trim() ? ` · ${log.clientPage.trim()}` : "";
+  return `${catLabel}${modelPart}${page} × ${units}`;
 }
 
 /** 计费单位数量：视频按秒、图片按张、LLM 按千 token。 */
@@ -216,6 +236,7 @@ export async function settleSucceededGatewayLog(input: {
         canonicalModelKey: snap.canonicalModelKey,
         costSnapshotYuan: snap.netCostYuan,
         marginSnapshot: snap.marginRate,
+        description: platformConsumeDescription(input.log, units),
         allowNegative: true,
       });
       await recordBillingSettlement({

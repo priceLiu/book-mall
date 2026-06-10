@@ -20,6 +20,7 @@ import {
   type UsageFromResponse,
 } from "./gateway-token-metrics";
 import { assertModelRegistered, UnregisteredGatewayModelError } from "./model-registry";
+import { resolveBillableImageCountFromLog } from "./log-billing-metrics";
 import { parseVideoPricingHints } from "./log-pricing-hints";
 import { estimateVendorCost } from "./pricing-estimate";
 import {
@@ -33,6 +34,8 @@ import {
   settleSucceededGatewayLog,
 } from "@/lib/billing/gateway-credit-settlement";
 import { assertCreditsBeforeGenerate } from "@/lib/billing/credit-pre-check";
+import { InsufficientCreditsError } from "@/lib/billing/credit-account-service";
+import { ByokSubscriptionRequiredError } from "@/lib/billing/byok-subscription-service";
 import {
   guardVideoGenerate,
   releaseVideoGenerate,
@@ -57,6 +60,26 @@ export class ConcurrencyLimitError extends Error {
     super(`并发任务已达上限（${max}），请稍后再试`);
     this.name = "ConcurrencyLimitError";
   }
+}
+
+/** createRequestLog 预检失败 → HTTP 状态与可读文案（避免 route 未捕获时变成裸 500）。 */
+export function mapGatewayPreCreateLogError(e: unknown): { status: number; error: string } {
+  if (e instanceof UnregisteredGatewayModelError) {
+    return { status: 400, error: e.message };
+  }
+  if (e instanceof InsufficientCreditsError) {
+    return { status: 402, error: e.message };
+  }
+  if (e instanceof ByokSubscriptionRequiredError) {
+    return { status: 403, error: e.message };
+  }
+  if (e instanceof ConcurrencyLimitError) {
+    return { status: 429, error: e.message };
+  }
+  if (e instanceof Error && e.message.trim()) {
+    return { status: 500, error: e.message };
+  }
+  return { status: 500, error: "Gateway 预检失败" };
 }
 
 /** 从厂商 JSON 解析 usage（含 prompt_tokens / input_tokens 等别名） */
@@ -367,7 +390,7 @@ export async function finalizeRequestLog(
           metrics: {
             durationSec: videoHints.durationSec,
             totalTokens: tokenMetrics.totalTokens ?? undefined,
-            images: null,
+            images: resolveBillableImageCountFromLog(settledLog),
           },
         });
       } else if (patch.status === "FAILED") {

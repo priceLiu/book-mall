@@ -156,7 +156,7 @@ function StoryUpstreamImageColumn({
               </>
             ) : (
               <span className="flex h-full items-center justify-center px-2 text-center text-[10px] text-[var(--canvas-muted)]">
-                待上游
+                —
               </span>
             )}
 

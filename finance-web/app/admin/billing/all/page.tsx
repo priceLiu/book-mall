@@ -1,4 +1,5 @@
 import { BillDetailsClient } from "@/components/bill-details-client";
+import { FinancePageBleed } from "@/components/finance-page-shell";
 
 /**
  * 费用明细汇总（全部用户）。
@@ -10,7 +11,7 @@ import { BillDetailsClient } from "@/components/bill-details-client";
  */
 export default function AdminAllBillingDetailsPage() {
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <FinancePageBleed>
       <header className="border-b border-[#e8e8e8] bg-white px-6 py-4">
         <h1 className="text-base font-medium text-[#262626]">费用明细 · 全部用户</h1>
         <p className="mt-1 text-xs text-[#8c8c8c]">
@@ -20,6 +21,6 @@ export default function AdminAllBillingDetailsPage() {
         </p>
       </header>
       <BillDetailsClient mode="all-users" viewerRole="admin" />
-    </div>
+    </FinancePageBleed>
   );
 }

@@ -17,6 +17,9 @@ export function toolKeyToLabel(toolKey: string): string {
     "story-theater__creator": "漫剧剧场 · 创作幻想家",
     "story-theater__library": "我的剧场",
     "app-history": "费用使用明细",
+    "canvas__story-pro__parse-outfit": "画布·角色资产·服装分割",
+    "canvas__story-pro": "画布·影视专业版",
+    canvas: "画布",
   };
   if (exact[key]) return exact[key];
   if (key.startsWith("fitting-room__ai-fit__closet")) return "我的衣柜";
@@ -28,6 +31,9 @@ export function toolKeyToLabel(toolKey: string): string {
   if (key.startsWith("image-to-video")) return "图生视频";
   if (key.startsWith("visual-lab")) return "视觉实验室";
   if (key.startsWith("story-theater")) return "漫剧剧场";
+  if (key.startsWith("canvas__story-pro__parse-outfit")) return "画布·角色资产·服装分割";
+  if (key.startsWith("canvas__story-pro")) return "画布·影视专业版";
+  if (key.startsWith("canvas")) return "画布";
   if (key.startsWith("app-history")) return "费用使用明细";
   return key;
 }

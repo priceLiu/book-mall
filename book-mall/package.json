@@ -39,6 +39,7 @@
     "credits:grant-monthly": "dotenv -e .env.local -- tsx scripts/grant-monthly-credits.ts",
     "billing:print-dev-user": "dotenv -e .env.local -- tsx scripts/print-dev-user-id.ts",
     "billing:reset-data": "dotenv -e .env.local -- tsx scripts/reset-billing-data.ts",
+    "billing:reconcile-byok-included-used": "dotenv -e .env.local -- tsx scripts/reconcile-byok-included-used.ts",
     "db:apply-pending": "dotenv -e .env.local -- tsx scripts/apply-pending-migrations.ts",
     "pricing:realign-from-md": "dotenv -e .env.local -- tsx scripts/pricing-realign-from-price-md.ts",
     "pricing:realign-from-md:apply": "dotenv -e .env.local -- tsx scripts/pricing-realign-from-price-md.ts --apply",

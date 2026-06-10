@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { FinancePageShell } from "@/components/finance-page-shell";
 import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 
@@ -57,8 +58,8 @@ export default function AdminBillingUsersIndexPage() {
   }, [base]);
 
   return (
-    <div className="p-6">
-      <h1 className="mb-4 text-lg font-medium text-[#262626]">有账单明细的用户</h1>
+    <FinancePageShell>
+      <h1 className="text-lg font-medium text-[#262626]">有账单明细的用户</h1>
 
       {loadState === "loading" && (
         <p className="text-sm text-[#8c8c8c]">正在加载…</p>
@@ -126,6 +127,6 @@ export default function AdminBillingUsersIndexPage() {
         管理员视角可见全部 34 列 / 7 组（Finance 2.0 · 含工具页面 / 状态 / 行来源）。
         用户视角为过滤后的列 / 3 组。
       </div>
-    </div>
+    </FinancePageShell>
   );
 }
