@@ -12,6 +12,9 @@ import { prisma } from "@/lib/prisma";
 
 export type BillingDetailsTab = "usage" | "charge";
 
+/** 「全部用量」Tab：展示已结束的调用（成功 + 失败），不含进行中。 */
+const USAGE_TAB_STATUSES = ["SUCCEEDED", "FAILED"] as const;
+
 const GATEWAY_SELECT = {
   id: true,
   model: true,
@@ -34,6 +37,8 @@ const GATEWAY_SELECT = {
   includedUsedAfter: true,
   includedRemainingAfter: true,
   inputSummary: true,
+  failCode: true,
+  failMessage: true,
 } as const;
 
 function parseCredits(cell: string | undefined): number {
@@ -52,13 +57,15 @@ async function buildGatewayRows(input: {
 }): Promise<{
   rows: Record<string, string>[];
   totalCalls: number;
+  succeededCalls: number;
+  failedCalls: number;
 }> {
   const where: Prisma.GatewayRequestLogWhereInput = {
     ...(input.userId ? { actorBookUserId: input.userId } : {}),
   };
 
   if (input.tab === "usage") {
-    where.status = "SUCCEEDED";
+    where.status = { in: [...USAGE_TAB_STATUSES] };
   } else {
     where.creditsCharged = { gt: 0 };
   }
@@ -99,17 +106,26 @@ async function buildGatewayRows(input: {
     );
   });
 
-  const totalCalls =
-    input.tab === "usage"
-      ? logs.length
-      : await prisma.gatewayRequestLog.count({
-          where: {
-            ...(input.userId ? { actorBookUserId: input.userId } : {}),
-            status: "SUCCEEDED",
-          },
-        });
+  const usageWhere: Prisma.GatewayRequestLogWhereInput = {
+    ...(input.userId ? { actorBookUserId: input.userId } : {}),
+    status: { in: [...USAGE_TAB_STATUSES] },
+  };
 
-  return { rows, totalCalls };
+  const [succeededCalls, failedCalls] =
+    input.tab === "usage"
+      ? await Promise.all([
+          prisma.gatewayRequestLog.count({
+            where: { ...usageWhere, status: "SUCCEEDED" },
+          }),
+          prisma.gatewayRequestLog.count({
+            where: { ...usageWhere, status: "FAILED" },
+          }),
+        ])
+      : [0, 0];
+
+  const totalCalls = input.tab === "usage" ? succeededCalls : logs.length;
+
+  return { rows, totalCalls, succeededCalls, failedCalls };
 }
 
 export async function fetchBillingDetailsForUser(input: {
@@ -144,6 +160,8 @@ export async function fetchBillingDetailsForUser(input: {
       video: pools.video.balance,
     },
     totalCalls: gatewayPart.totalCalls,
+    succeededCalls: gatewayPart.succeededCalls,
+    failedCalls: gatewayPart.failedCalls,
     totalPoints: totalCredits,
     totalCredits,
     rows: gatewayPart.rows,
@@ -160,7 +178,9 @@ export async function fetchBillingDetailsAllUsers(input: {
 
   const totalInDb =
     input.tab === "usage"
-      ? await prisma.gatewayRequestLog.count({ where: { status: "SUCCEEDED" } })
+      ? await prisma.gatewayRequestLog.count({
+          where: { status: { in: [...USAGE_TAB_STATUSES] } },
+        })
       : await prisma.gatewayRequestLog.count({ where: { creditsCharged: { gt: 0 } } });
 
   const totalCredits = sumCredits(gatewayPart.rows);
@@ -174,6 +194,8 @@ export async function fetchBillingDetailsAllUsers(input: {
     take,
     truncated: gatewayPart.rows.length < totalInDb,
     totalCalls: gatewayPart.totalCalls,
+    succeededCalls: gatewayPart.succeededCalls,
+    failedCalls: gatewayPart.failedCalls,
     totalPoints: totalCredits,
     totalCredits,
   };

@@ -8,6 +8,7 @@ import {
   readJsonBody,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
+import { DEEPSEEK_STORY_DEFAULT_MODEL_KEY } from "@/lib/canvas/providers/deepseek-system";
 import { sanitizeClientChatTurns } from "@/lib/canvas/story-pro-script-assistant-service";
 import {
   buildScriptAssistantSystemPrompt,
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const gw = await canvasGwChatStream(guard.user.id, {
-      modelKey: "deepseek-chat",
+      modelKey: DEEPSEEK_STORY_DEFAULT_MODEL_KEY,
       messages: [
         { role: "system", content: systemPrompt },
         ...turns,

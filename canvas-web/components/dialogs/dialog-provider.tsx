@@ -215,7 +215,7 @@ function DialogShell({
 
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}

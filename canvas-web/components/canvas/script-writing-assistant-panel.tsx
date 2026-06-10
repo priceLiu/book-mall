@@ -207,7 +207,7 @@ function AssistantWorkflowPicker({
               key={t.workflowKey}
               type="button"
               className={cn(
-                "rounded-md border px-2 py-1.5 text-left transition",
+                "shrink-0 rounded-md border px-2 py-1.5 text-left transition",
                 immersive ? "text-[11px]" : "text-[10px]",
                 active
                   ? "border-emerald-400/45 bg-emerald-500/15 text-emerald-50"
@@ -215,7 +215,7 @@ function AssistantWorkflowPicker({
               )}
               onClick={() => onSelect(t.workflowKey)}
             >
-              <span className="block truncate font-medium">{t.theme}</span>
+              <span className="block truncate font-medium leading-snug">{t.theme}</span>
               <span className="mt-0.5 block text-[9px] opacity-70">
                 {t.workflowLabel}
                 {t.messageCount > 0 ? ` · ${t.messageCount} 条` : " · 暂无对话"}
@@ -519,10 +519,10 @@ export function ScriptWritingAssistantPanel({
   onImportScript,
 }: {
   projectId: string;
-  onImportScript: (markdown: string) => void;
+  onImportScript: (markdown: string) => void | Promise<void>;
 }) {
   const base = useBookMallBaseUrl();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("dock");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -628,15 +628,6 @@ export function ScriptWritingAssistantPanel({
     selectedNodeId,
     graphRevision,
   ]);
-
-  useEffect(() => {
-    const drafting = workflowThreads.filter(
-      (t) => !t.scriptFinalized && !t.hasScript,
-    );
-    if (drafting.length > 0 && !open) {
-      setOpen(true);
-    }
-  }, [workflowThreads, open]);
 
   useEffect(() => {
     if (!base?.trim() || !projectId || !activeWorkflowKey || scriptFinalized) {
@@ -860,16 +851,16 @@ export function ScriptWritingAssistantPanel({
     ) {
       return;
     }
-    onImportScript(text);
+    await onImportScript(text);
     setPreviewOpen(false);
     setLayoutMode("dock");
     setOpen(false);
   }, [confirm, importGate.allowed, importGate.spawnNew, onImportScript, previewMd]);
 
-  const collapse = () => {
+  const collapse = useCallback(() => {
     setOpen(false);
     setLayoutMode("dock");
-  };
+  }, []);
 
   const headerSubtitle = activeThread
     ? scriptFinalized
@@ -948,7 +939,7 @@ export function ScriptWritingAssistantPanel({
           剧本创作助手
         </p>
         <p className="text-[10px] text-white/40">
-          deepseek-chat · 宽幅对话 · 拖标题栏移动 · {headerSubtitle}
+          deepseek-v4-flash · 宽幅对话 · 拖标题栏移动 · {headerSubtitle}
         </p>
       </div>
       <button
@@ -964,7 +955,10 @@ export function ScriptWritingAssistantPanel({
         type="button"
         className="rounded p-1 text-white/50 hover:bg-white/5 hover:text-white"
         title="折叠"
-        onClick={collapse}
+        onClick={(e) => {
+          e.stopPropagation();
+          collapse();
+        }}
       >
         <ChevronLeft className="size-4" />
       </button>
@@ -978,7 +972,7 @@ export function ScriptWritingAssistantPanel({
           剧本创作助手
         </p>
         <p className="text-[9px] text-white/40">
-          deepseek-chat · {headerSubtitle}
+          deepseek-v4-flash · {headerSubtitle}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
@@ -995,7 +989,10 @@ export function ScriptWritingAssistantPanel({
           type="button"
           className="rounded p-1 text-white/50 hover:bg-white/5 hover:text-white"
           title="折叠"
-          onClick={collapse}
+          onClick={(e) => {
+            e.stopPropagation();
+            collapse();
+          }}
         >
           <ChevronLeft className="size-4" />
         </button>

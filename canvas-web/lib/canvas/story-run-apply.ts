@@ -137,6 +137,8 @@ export function storyApplyTaskResult(
           ossUrl: mediaUrl ?? undefined,
           ephemeralUrl: task.ephemeralUrl ?? undefined,
           textOutput: task.textOutput ?? undefined,
+          failCode: undefined,
+          failMessage: undefined,
         }
       : task.status === "FAILED"
         ? {
@@ -149,8 +151,18 @@ export function storyApplyTaskResult(
             ),
           }
         : task.status === "SUBMITTED"
-          ? { status: "running", taskId: task.id }
-          : { status: "pending", taskId: task.id };
+          ? {
+              status: "running",
+              taskId: task.id,
+              failCode: undefined,
+              failMessage: undefined,
+            }
+          : {
+              status: "pending",
+              taskId: task.id,
+              failCode: undefined,
+              failMessage: undefined,
+            };
 
   if (isAnyStoryScriptHubType(node.type ?? "") && ctx?.llmSection) {
     if (

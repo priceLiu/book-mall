@@ -19,7 +19,9 @@ import {
 import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
 
-const STALE_RUNNING_NO_TASK_MS = 15 * 60 * 1000;
+const STALE_RUNNING_NO_TASK_MS = 3 * 60 * 1000;
+/** 火山视频提交失败但未写入 externalTaskId 时，尽快收口 RUNNING */
+const STALE_VOLCENGINE_NO_TASK_MS = 90 * 1000;
 const STALE_RUNNING_WITH_TASK_MS = 6 * 60 * 60 * 1000;
 /** 火山视频任务：过长仍 RUNNING 则自动收口（避免日志页一直 running） */
 const STALE_VOLCENGINE_VIDEO_MS = 90 * 60 * 1000;
@@ -78,6 +80,23 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     },
   });
 
+  const volcengineNoTaskCutoff = new Date(now - STALE_VOLCENGINE_NO_TASK_MS);
+  const r3a = await prisma.gatewayRequestLog.updateMany({
+    where: {
+      status: "RUNNING",
+      providerKind: "VOLCENGINE",
+      requestKind: "VIDEO",
+      externalTaskId: null,
+      submittedAt: { lt: volcengineNoTaskCutoff },
+    },
+    data: {
+      status: "FAILED",
+      failCode: "UPSTREAM_SUBMIT_FAILED",
+      failMessage: "火山视频任务未成功提交（无厂商 taskId）",
+      completedAt: new Date(),
+    },
+  });
+
   const volcengineVideoCutoff = new Date(now - STALE_VOLCENGINE_VIDEO_MS);
   const r3 = await prisma.gatewayRequestLog.updateMany({
     where: {
@@ -95,7 +114,7 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     },
   });
 
-  return r0.count + r1.count + r2.count + r3.count;
+  return r0.count + r1.count + r2.count + r3a.count + r3.count;
 }
 
 export function parseGatewayClientSource(

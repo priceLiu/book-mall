@@ -68,6 +68,26 @@ describe("projectGatewayLogToBillRow — 平台代付七类", () => {
     expect(row["平台账单/费用说明"]).toContain("文生图（含试衣）");
   });
 
+  it("FAILED logs show 调用失败 in 费用说明", () => {
+    const row = projectGatewayLogToBillRow(
+      {
+        ...baseLog,
+        status: "FAILED",
+        failCode: "VOLCENGINE_TASK_FAILED",
+        failMessage: "火山方舟账户欠费或余额不足",
+        creditsCharged: 0,
+        billingPersonaSnap: "BYOK",
+      },
+      "user-1",
+      "Test User",
+      new Map([["aitryon", "AI 试衣"]]),
+      null,
+    );
+    expect(row["平台/状态"]).toBe("失败");
+    expect(row["平台账单/费用说明"]).toContain("调用失败");
+    expect(row["平台账单/费用说明"]).toContain("欠费");
+  });
+
   it("falls back to classifyBillingCategory when billingCategory null", () => {
     const row = projectGatewayLogToBillRow(
       { ...baseLog, requestKind: "TTS", model: "qwen3-tts-flash", canonicalModelKey: "qwen3-tts-flash" },

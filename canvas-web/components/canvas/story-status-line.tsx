@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
@@ -10,18 +10,32 @@ import {
   STORY_HINT_GOLD_CLASS,
 } from "@/lib/canvas/story-column-sync";
 
+/** 节点内错误条自动收起（与 story-engine-node  toast 一致） */
+export const STORY_ERROR_AUTO_DISMISS_MS = 8000;
+
 /** 错误信息：单行省略，悬停即时展示全文（portal，避免被节点 overflow 裁切） */
 export function StoryErrorLine({
   message,
   className,
+  autoDismissMs = STORY_ERROR_AUTO_DISMISS_MS,
 }: {
   message: string;
   className?: string;
+  /** 默认 8s 后自动隐藏；传 0 则常驻 */
+  autoDismissMs?: number;
 }) {
   const elRef = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(true);
   const [tipPos, setTipPos] = useState<{ left: number; top: number } | null>(
     null,
   );
+
+  useEffect(() => {
+    setVisible(true);
+    if (!message.trim() || autoDismissMs <= 0) return;
+    const timer = window.setTimeout(() => setVisible(false), autoDismissMs);
+    return () => window.clearTimeout(timer);
+  }, [message, autoDismissMs]);
 
   const showTip = useCallback(() => {
     const el = elRef.current;
@@ -31,6 +45,8 @@ export function StoryErrorLine({
   }, []);
 
   const hideTip = useCallback(() => setTipPos(null), []);
+
+  if (!message.trim() || !visible) return null;
 
   return (
     <>

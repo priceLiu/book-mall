@@ -38,6 +38,9 @@
   --canvas-accent-soft: #7c5cff;
   --canvas-accent-glow: rgba(167, 139, 250, 0.35);
   --canvas-header-h: 3.5rem;
+  --canvas-story-video-tip-width: 520px;
+  --canvas-story-video-tip-max-h: 560px;
+  --canvas-story-video-tip-body-max-h: 480px;
 }
 
 html {
@@ -318,4 +321,27 @@ body {
     rgba(34, 211, 238, 0.22) 50%,
     transparent 65%
   );
+}
+
+/* 分镜视频列 · 悬停提示词 Tip（浮在卡片右侧） */
+.canvas-story-video-prompt-tip {
+  position: fixed;
+  z-index: 9999;
+  width: min(var(--canvas-story-video-tip-width), calc(100vw - 32px));
+  max-height: min(var(--canvas-story-video-tip-max-h), calc(100vh - 24px));
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #23232c;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65);
+}
+
+.canvas-story-video-prompt-tip__body {
+  max-height: min(var(--canvas-story-video-tip-body-max-h), calc(100vh - 120px));
+  overflow: auto;
+  padding: 1rem 1rem 0.75rem;
+}
+
+.canvas-story-video-tip__pre {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }

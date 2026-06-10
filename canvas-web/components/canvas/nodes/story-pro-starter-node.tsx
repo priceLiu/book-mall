@@ -30,7 +30,7 @@ import {
   PRO_TEMPLATE_CHIP_SELECTED_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
 import { StoryNodeFooterShell } from "../story-node-footer-shell";
-import { StoryThemePromptPreviewPane } from "../story-theme-prompt-preview-pane";
+import { StoryHubNodePreviewPane } from "../story-hub-node-preview-pane";
 import { StoryThemePromptModal } from "../story-theme-prompt-modal";
 import { StoryProScriptUploadPreviewModal } from "../story-pro-script-upload-preview-modal";
 import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
@@ -654,11 +654,13 @@ export function StoryProStarterNode({ id, data, selected }: NodeProps) {
             <p className={PRO_HINT_LABEL_CLASS}>
               导演提示词 · 输入 @ 引用上传剧本
             </p>
-            <StoryThemePromptPreviewPane
-              displayMd={promptPreviewMd}
+            <StoryHubNodePreviewPane
+              content={promptPreviewMd}
               emptyHint="点击预览区编辑导演提示词"
-              disabled={isGenerating}
-              onOpen={() => setPromptModalOpen(true)}
+              onOpenPreview={() => {
+                if (isGenerating) return;
+                setPromptModalOpen(true);
+              }}
             />
           </div>
         </div>

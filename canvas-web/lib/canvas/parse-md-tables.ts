@@ -592,13 +592,36 @@ function ensureMarkdownBlockSpacing(md: string): string {
   return md.replace(/([^\n|])\n(#{1,6}\s)/g, "$1\n\n$2");
 }
 
+/** 将「| 列1 | 列2 ||---|---|」同一行拆成表头 + 分隔行（LLM/手误常见） */
+function splitMergedGfmTableHeaderSeparator(md: string): string {
+  const out: string[] = [];
+  for (const raw of md.split(/\r?\n/)) {
+    const t = normalizeMdTableLine(raw);
+    if (t.startsWith("|") && t.includes("||")) {
+      const idx = t.indexOf("||");
+      const header = t.slice(0, idx + 1).trimEnd();
+      let sep = t.slice(idx + 2).trim();
+      if (sep && !sep.startsWith("|")) sep = `|${sep}`;
+      if (header.startsWith("|") && sep.startsWith("|")) {
+        out.push(header);
+        out.push(sep);
+        continue;
+      }
+    }
+    out.push(raw);
+  }
+  return out.join("\n");
+}
+
 /** 预览用：合并换行 / 紧凑表格 / 标题与表格间补空行（不转义，交给 remark-gfm 渲染） */
 export function prepareMarkdownForPreview(md: string): string {
   let s = md.replace(/\uFF5C/g, "|").trim();
   s = unescapeOverEscapedMarkdown(s);
   s = splitHeadingEmbeddedTableHeaders(s);
+  s = splitMergedGfmTableHeaderSeparator(s);
   s = joinMultilineGfmTableRows(s);
   s = compactGfmTables(s);
+  s = repairGfmTablesForPreview(s);
   if (!s) return "";
   s = s.replace(/<br\s*\/?>/gi, "  \n");
   s = ensureMarkdownBlockSpacing(s);

@@ -12,7 +12,6 @@ import {
   consumeCredits,
   getPoolBalances,
   InsufficientCreditsError,
-  recordResourceMeter,
   type AccountRef,
 } from "@/lib/billing/credit-account-service";
 import { recordBillingSettlement } from "@/lib/billing/billing-settlement-service";
@@ -216,14 +215,7 @@ export async function settleByokOverage(log: GatewayRequestLog): Promise<ByokOve
   if (!taskKind) {
     const target = await resolveByokBillingRefFromLog(log);
     if (target) {
-      await recordResourceMeter({
-        ref: target.ref,
-        resourceType: "TASK_COUNT",
-        quantity: 1,
-        periodKey: currentPeriodKey(),
-        refType: "gateway_log",
-        refId: log.id,
-      }).catch(() => undefined);
+      // TASK_COUNT 资源计量暂不启用（预充值模式无法后收调度费）
       await recordBillingSettlement({
         log,
         ref: target.ref,
@@ -286,18 +278,7 @@ export async function settleByokOverage(log: GatewayRequestLog): Promise<ByokOve
     return repairResult;
   }
 
-  await recordResourceMeter({
-    ref: target.ref,
-    resourceType: "TASK_COUNT",
-    quantity: 1,
-    periodKey,
-    refType: "gateway_log",
-    refId: log.id,
-  }).catch(async (e) => {
-    const dup = await findByokQuotaMeter(log.id);
-    if (dup) return dup;
-    throw e;
-  });
+  // TASK_COUNT 资源计量暂不启用（预充值模式无法后收调度费）
 
   const result = await prisma.$transaction(async (tx) => {
     const row = await tx.byokUsageMonthly.upsert({

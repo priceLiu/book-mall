@@ -224,7 +224,7 @@ export async function seedUnifiedCreditBilling(publishedBy = "seed"): Promise<Se
   const resourceRates: { type: "OSS_GB_MONTH" | "EGRESS_GB" | "TASK_COUNT"; coef: number; unit: string }[] = [
     { type: "OSS_GB_MONTH", coef: 0.12, unit: "GB·月" },
     { type: "EGRESS_GB", coef: 0.5, unit: "GB" },
-    { type: "TASK_COUNT", coef: 0.01, unit: "次" },
+    { type: "TASK_COUNT", coef: 0, unit: "次" },
   ];
   for (const r of resourceRates) {
     await prisma.resourceMeterRate.upsert({

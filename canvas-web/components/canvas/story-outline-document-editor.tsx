@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 
 import {
   joinMarkdownBlocks,
+  prepareMarkdownForPreview,
   splitMarkdownByGfmTables,
   type MarkdownBlock,
 } from "@/lib/canvas/parse-md-tables";
 import { MarkdownView } from "./markdown-view";
+import type { MentionableItem } from "./mentions/MentionsTextarea";
+import { MentionsTextarea } from "./mentions/MentionsTextarea";
 import {
   canEditGenericMdTable,
   StoryGenericMdTableEditor,
@@ -17,9 +20,10 @@ const DOC_TEXT =
   "w-full resize-none border-0 bg-transparent font-sans text-[17px] leading-[1.85] text-neutral-800 shadow-none focus:outline-none focus:ring-0";
 
 function splitOutlineBlocks(md: string): MarkdownBlock[] {
-  const split = splitMarkdownByGfmTables(md);
+  const normalized = prepareMarkdownForPreview(md);
+  const split = splitMarkdownByGfmTables(normalized);
   if (split.length) return split;
-  if (md.trim()) return [{ kind: "text", value: md.trim() }];
+  if (normalized.trim()) return [{ kind: "text", value: normalized.trim() }];
   return [];
 }
 
@@ -36,10 +40,15 @@ export function StoryOutlineDocumentEditor({
   value,
   onChange,
   readOnly = false,
+  mentionables,
+  editHint,
 }: {
   value: string;
   onChange: (md: string) => void;
   readOnly?: boolean;
+  /** 正文块编辑时启用 @ 引用（如导演提示词引用上传剧本） */
+  mentionables?: MentionableItem[];
+  editHint?: string;
 }) {
   const [blocks, setBlocks] = useState<MarkdownBlock[]>(() =>
     splitOutlineBlocks(value),
@@ -98,8 +107,16 @@ export function StoryOutlineDocumentEditor({
     );
   }
 
-  if (!blocks.length) {
-    return (
+  const emptyEditor =
+    mentionables?.length ? (
+      <MentionsTextarea
+        className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
+        value={value}
+        mentionables={mentionables}
+        onChange={(next) => onChange(next)}
+        placeholder="输入 @ 引用上传剧本…"
+      />
+    ) : (
       <textarea
         className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
         rows={16}
@@ -109,13 +126,18 @@ export function StoryOutlineDocumentEditor({
         spellCheck={false}
       />
     );
+
+  if (!blocks.length) {
+    return emptyEditor;
   }
+
+  const hint =
+    editHint ??
+    "表格可直接点单元格编辑；正文点段落后，上方保持渲染预览、下方编辑 Markdown";
 
   return (
     <div className="nodrag flex min-h-0 w-full flex-1 flex-col gap-6">
-      <p className="text-[12px] text-neutral-500">
-        表格可直接点单元格编辑；正文点段落后，上方保持渲染预览、下方编辑 Markdown
-      </p>
+      <p className="text-[12px] text-neutral-500">{hint}</p>
       {blocks.map((block, index) => {
         if (block.kind === "table" && canEditGenericMdTable(block.value)) {
           return (
@@ -169,15 +191,28 @@ export function StoryOutlineDocumentEditor({
             </div>
             {isEditing ? (
               <div className="mt-3 border-t border-neutral-200/80 pt-3">
-                <textarea
-                  className={`nodrag ${DOC_TEXT} block w-full rounded-md bg-white/80 p-2`}
-                  rows={textareaRows(block.value)}
-                  value={block.value}
-                  autoFocus
-                  spellCheck={false}
-                  onChange={(e) => patchBlock(index, e.target.value)}
-                  onBlur={() => setEditingTextIndex(null)}
-                />
+                {mentionables?.length ? (
+                  <MentionsTextarea
+                    className={`nodrag ${DOC_TEXT} block w-full rounded-md bg-white/80 p-2`}
+                    rows={textareaRows(block.value)}
+                    value={block.value}
+                    mentionables={mentionables}
+                    autoFocus
+                    onChange={(next) => patchBlock(index, next)}
+                    onBlur={() => setEditingTextIndex(null)}
+                    placeholder="输入 @ 引用上传剧本…"
+                  />
+                ) : (
+                  <textarea
+                    className={`nodrag ${DOC_TEXT} block w-full rounded-md bg-white/80 p-2`}
+                    rows={textareaRows(block.value)}
+                    value={block.value}
+                    autoFocus
+                    spellCheck={false}
+                    onChange={(e) => patchBlock(index, e.target.value)}
+                    onBlur={() => setEditingTextIndex(null)}
+                  />
+                )}
               </div>
             ) : null}
           </div>

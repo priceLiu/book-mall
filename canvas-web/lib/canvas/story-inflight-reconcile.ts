@@ -243,9 +243,24 @@ export function reconcileStaleInflightRuntimes(
         for (const mediaKind of ["video", "tts"] as const) {
           const rtKey = mediaKind === "tts" ? "ttsRuntime" : "videoRuntime";
           const rt = row[rtKey];
-          if (!isInflightStatus(rt?.status)) continue;
           const scope = { rowKey: row.key, mediaKind };
           const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
+
+          if (rt?.status === "error" && hasServerInflightForScope(tasks, node.id, scope)) {
+            const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+            if (pick && (pick.status === "PENDING" || pick.status === "SUBMITTED")) {
+              storyApplyTaskResult(
+                node,
+                pick,
+                storyRunContextFromScope(node.id, scope),
+                updateNodeData,
+                nodes,
+              );
+              continue;
+            }
+          }
+
+          if (!isInflightStatus(rt?.status)) continue;
           if (hasServerInflightForScope(tasks, node.id, scope)) continue;
           const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
           if (pick) {

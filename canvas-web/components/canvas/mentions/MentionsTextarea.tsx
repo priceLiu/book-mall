@@ -39,6 +39,8 @@ export type MentionsTextareaProps = {
   ariaLabel?: string;
   /** 在 flex 父级内撑满剩余高度（分镜行文案区） */
   fillHeight?: boolean;
+  onBlur?: () => void;
+  autoFocus?: boolean;
 };
 
 const TOKEN_RE = /@<([^>\s]+)>/g;
@@ -108,6 +110,8 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       disabled,
       ariaLabel,
       fillHeight = false,
+      onBlur,
+      autoFocus,
     },
     ref,
   ) {
@@ -271,6 +275,8 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           value={displayValue}
           onChange={onTextChange}
           onKeyDown={onKeyDown}
+          onBlur={onBlur}
+          autoFocus={autoFocus}
           rows={fillHeight ? 1 : rows}
           placeholder={placeholder}
           disabled={disabled}

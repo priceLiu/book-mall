@@ -88,10 +88,17 @@ function Inner({ projectId }: { projectId: string }) {
   const isStoryProCanvas = hasStoryProPipeline(nodes);
 
   const onImportScriptFromAssistant = useCallback(
-    (md: string) => {
+    async (md: string) => {
       const state = useCanvasStore.getState();
       const plan = resolveStoryProAssistantImport(state.nodes, state.edges);
-      if (!plan.allowed) return;
+      if (!plan.allowed) {
+        await dialogs.alert({
+          title: "无法导入",
+          message: plan.reason,
+          variant: "warning",
+        });
+        return;
+      }
 
       const seedStarter = state.nodes.find(
         (n) => n.type === "story-pro-starter",
@@ -117,7 +124,14 @@ function Inner({ projectId }: { projectId: string }) {
           params: llmSeed.params,
           pipelineStage: "idle",
         });
-        if (!starterId) return;
+        if (!starterId) {
+          await dialogs.alert({
+            title: "导入失败",
+            message: "未能新建故事启动节点，请稍后重试或刷新画布。",
+            variant: "error",
+          });
+          return;
+        }
         const afterStarter = useCanvasStore.getState();
         spawnStoryProScriptHub({
           starterNodeId: starterId,
@@ -143,7 +157,7 @@ function Inner({ projectId }: { projectId: string }) {
         starterMode: "upload",
       });
     },
-    [addNode, setEdges, setNodes, updateNodeData],
+    [addNode, dialogs, setEdges, setNodes, updateNodeData],
   );
 
   const [project, setProject] = useState<CanvasProjectDetail | null>(null);

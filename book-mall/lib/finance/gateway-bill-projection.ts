@@ -57,6 +57,8 @@ export type GatewayLogBillInput = Pick<
   | "includedUsedAfter"
   | "includedRemainingAfter"
   | "inputSummary"
+  | "failCode"
+  | "failMessage"
 >;
 
 const STATUS_LABEL: Record<GatewayRequestStatus, string> = {
@@ -121,9 +123,17 @@ function feeDescription(
   log: GatewayLogBillInput,
   settlement?: BillingSettlementLine | null,
 ): string {
+  const catLabel = billingCategoryLabel(
+    resolveBillingCategory(log, settlement?.billingCategory ?? log.billingCategory),
+  );
+  if (log.status === "FAILED") {
+    const reason = (log.failMessage ?? log.failCode ?? "").trim();
+    return reason
+      ? `调用失败 · ${catLabel} · ${reason.slice(0, 120)}`
+      : `调用失败 · ${catLabel}`;
+  }
   if (settlement?.feeDescription) return settlement.feeDescription;
   const credits = log.creditsCharged ?? 0;
-  const catLabel = billingCategoryLabel(resolveBillingCategory(log, settlement?.billingCategory ?? log.billingCategory));
   if (log.billingPersonaSnap === "BYOK") {
     return credits > 0 ? `BYOK 超额 · ${catLabel} · 扣积分` : `BYOK 套餐内 · ${catLabel}`;
   }

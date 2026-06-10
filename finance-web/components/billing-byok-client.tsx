@@ -144,40 +144,10 @@ export function BillingByokClient() {
         <p className="text-sm text-[#8c8c8c]">{data.message ?? "无有效 BYOK 套餐"}</p>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <StatCard label="技术服务费" yuan={bill.techServiceFeeYuan} />
-            <StatCard label="资源费" yuan={bill.resourceFeeYuan} />
-            <StatCard label="合计" yuan={bill.totalYuan} highlight />
+            <StatCard label="本月应付" yuan={bill.techServiceFeeYuan} highlight />
           </div>
-
-          <section className="rounded border border-[#e8e8e8] bg-white p-4">
-            <h2 className="mb-3 text-sm font-medium">资源费明细</h2>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-[#8c8c8c]">
-                  <th className="py-2">资源类型</th>
-                  <th className="py-2 text-right">用量</th>
-                  <th className="py-2 text-right">费用 (¥)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bill.resourceBreakdown.map((r) => (
-                  <tr key={r.resourceType} className="border-b border-[#f0f0f0]">
-                    <td className="py-2">{r.resourceType}</td>
-                    <td className="py-2 text-right">{r.quantity}</td>
-                    <td className="py-2 text-right">¥{r.costYuan.toFixed(2)}</td>
-                  </tr>
-                ))}
-                {bill.resourceBreakdown.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="py-4 text-center text-[#8c8c8c]">
-                      暂无资源计量
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </section>
         </>
       )}
     </FinancePageShell>
