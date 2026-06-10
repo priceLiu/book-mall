@@ -2,7 +2,7 @@
  * 模拟开通 / 运维对齐 / 历史补录：写入已确认的 PaymentCheckout + Order 审计流水。
  * 不重复开通 BYOK（权益须已由 activateByokSubscription 或 align 脚本写入）。
  */
-import type { PaymentConfirmMode, PaymentProductKind } from "@prisma/client";
+import type { PaymentConfirmMode, PaymentProductKind, Prisma } from "@prisma/client";
 
 import { BYOK_SCOPE_PERSONAL, BYOK_SCOPE_TEAM_SEAT } from "@/lib/billing/byok-pricing";
 import { appendPaymentEvent } from "@/lib/payments/payment-events";
@@ -65,7 +65,7 @@ export async function recordAdminPaidByokCheckout(input: {
       ? Number(cfg.techServiceFeeYuan) * seats
       : Number(cfg.techServiceFeeYuan);
 
-  const productSnapshot: Record<string, unknown> = {
+  const productSnapshot = {
     scopeKey: cfg.scopeKey,
     label: cfg.label,
     source: input.source,
@@ -73,7 +73,7 @@ export async function recordAdminPaidByokCheckout(input: {
       ? { tenantId: input.tenantId ?? null, seats }
       : {}),
     ...(input.subscriptionId ? { byokSubscriptionId: input.subscriptionId } : {}),
-  };
+  } satisfies Prisma.InputJsonObject;
 
   const note =
     input.adminNote?.trim() ||
