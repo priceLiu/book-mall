@@ -71,10 +71,20 @@ export function runtimePatchFromCanvasTask(
     };
   }
   if (task.status === "SUBMITTED") {
-    return { status: "running", taskId: task.id };
+    return {
+      status: "running",
+      taskId: task.id,
+      failCode: undefined,
+      failMessage: undefined,
+    };
   }
   if (task.status === "PENDING") {
-    return { status: "pending", taskId: task.id };
+    return {
+      status: "pending",
+      taskId: task.id,
+      failCode: undefined,
+      failMessage: undefined,
+    };
   }
   return null;
 }

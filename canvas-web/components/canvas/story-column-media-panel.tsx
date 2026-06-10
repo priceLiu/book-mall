@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
 import { Clapperboard, Check, Download, Eye, RefreshCw, X } from "lucide-react";
@@ -18,7 +18,10 @@ import {
 } from "@/lib/canvas/story-edition-chrome";
 import { StoryErrorLine } from "@/components/canvas/story-status-line";
 import { STORY_HINT_GOLD_CLASS } from "@/lib/canvas/story-column-sync";
-import { StoryVideoPromptPopover } from "./story-video-prompt-popover";
+import {
+  StoryVideoPromptTipPortal,
+  useStoryVideoPromptTip,
+} from "./story-video-prompt-popover";
 
 function blockCanvasPointer(e: React.MouseEvent | React.PointerEvent) {
   e.stopPropagation();
@@ -81,6 +84,10 @@ export function StoryColumnMediaPanel({
     frameApproved &&
     !videoBlockReason &&
     !generating;
+  const showVideoPromptPopover =
+    isFrame && hasFrameImage && Boolean(videoPrompt?.trim());
+  const framePromptAnchorRef = useRef<HTMLDivElement>(null);
+  const videoPromptTip = useStoryVideoPromptTip(framePromptAnchorRef);
 
   return (
     <div
@@ -97,11 +104,16 @@ export function StoryColumnMediaPanel({
       }}
     >
       <div
+        ref={framePromptAnchorRef}
         className={cn(
-          "group/frame-prompt relative min-h-0 overflow-hidden rounded-md border border-white/10 bg-black/45",
-          stripLayout ? "h-full" : "",
+          "group/frame-prompt pointer-events-auto relative min-h-0 overflow-hidden rounded-md border border-white/10 bg-black/45",
+          stripLayout ? "h-full overflow-visible" : "",
           !stripLayout && "min-h-[var(--row-media-min,248px)] flex-1",
         )}
+        onPointerEnter={() => {
+          if (showVideoPromptPopover && !generating) videoPromptTip.showTip();
+        }}
+        onPointerLeave={videoPromptTip.scheduleHide}
       >
         <div
           className={cn(
@@ -193,7 +205,7 @@ export function StoryColumnMediaPanel({
           )}
         >
           {generating ? (
-            <div className="relative z-10 flex flex-col items-center gap-1">
+            <div className="relative z-30 flex flex-col items-center gap-1">
               <RefreshCw className={storyEditionSpinClass(edition)} />
             </div>
           ) : isFrame && hasFrameImage ? (
@@ -209,7 +221,7 @@ export function StoryColumnMediaPanel({
                 }
                 className={cn(
                   storyEditionOverlayIconBtnClass(edition),
-                  "nodrag",
+                  "nodrag relative z-30",
                   btnDisabled && "cursor-not-allowed opacity-40",
                 )}
                 onPointerDown={(e) => {
@@ -232,7 +244,7 @@ export function StoryColumnMediaPanel({
                 <button
                   type="button"
                   aria-label="预览分镜图"
-                  className="nodrag inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm hover:bg-black/75"
+                  className="nodrag relative z-30 inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm hover:bg-black/75"
                   onPointerDown={blockCanvasPointer}
                   onMouseDown={blockCanvasPointer}
                   onClick={(e) => {
@@ -311,14 +323,21 @@ export function StoryColumnMediaPanel({
           )}
         </div>
         </div>
-        {isFrame && hasFrameImage && videoPrompt?.trim() ? (
-          <StoryVideoPromptPopover
-            prompt={videoPrompt}
-            refLabels={videoRefLabels}
-            groupHoverClass="group-hover/frame-prompt:block"
-          />
-        ) : null}
       </div>
+      {showVideoPromptPopover && videoPrompt?.trim() ? (
+        <StoryVideoPromptTipPortal
+          open={videoPromptTip.open}
+          pos={videoPromptTip.pos}
+          prompt={videoPrompt}
+          refLabels={videoRefLabels}
+          edition={edition}
+          onEnter={() => {
+            videoPromptTip.clearHideTimer();
+            videoPromptTip.showTip();
+          }}
+          onLeave={videoPromptTip.scheduleHide}
+        />
+      ) : null}
       {audioUrl ? (
         <audio src={audioUrl} controls className="nodrag h-7 w-full shrink-0" />
       ) : null}

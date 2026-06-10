@@ -8,6 +8,7 @@ import {
 import {
   defaultBaseUrl,
   resolveBailianChatModelKey,
+  resolveDeepseekChatModelKey,
   resolveKieGeminiChatPath,
   resolveOpenAiCompatibleBaseUrl,
   resolveVolcengineModelKey,
@@ -402,6 +403,24 @@ export async function finalizeRequestLog(
   }
 }
 
+function resolveChatCompletionsBody(
+  providerKind: GatewayProviderKind,
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const model = typeof body.model === "string" ? body.model : "";
+  if (!model) return body;
+  if (providerKind === "BAILIAN") {
+    return { ...body, model: resolveBailianChatModelKey(model) };
+  }
+  if (providerKind === "VOLCENGINE") {
+    return { ...body, model: resolveVolcengineModelKey(model) };
+  }
+  if (providerKind === "DEEPSEEK") {
+    return { ...body, model: resolveDeepseekChatModelKey(model) };
+  }
+  return body;
+}
+
 export async function forwardChatCompletions(opts: {
   credentialId: string;
   providerKind: GatewayProviderKind;
@@ -423,18 +442,7 @@ export async function forwardChatCompletions(opts: {
     url = `${base}/${resolveKieGeminiChatPath(modelKey)}/v1/chat/completions`;
   }
 
-  const requestBody =
-    cred.providerKind === "BAILIAN" && typeof opts.body.model === "string"
-      ? {
-          ...opts.body,
-          model: resolveBailianChatModelKey(opts.body.model),
-        }
-      : cred.providerKind === "VOLCENGINE" && typeof opts.body.model === "string"
-        ? {
-            ...opts.body,
-            model: resolveVolcengineModelKey(opts.body.model),
-          }
-        : opts.body;
+  const requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
 
   const started = Date.now();
   const r = await fetch(url, {
@@ -470,18 +478,7 @@ export async function forwardChatCompletionsStream(opts: {
     url = `${base}/${resolveKieGeminiChatPath(modelKey)}/v1/chat/completions`;
   }
 
-  const requestBody =
-    cred.providerKind === "BAILIAN" && typeof opts.body.model === "string"
-      ? {
-          ...opts.body,
-          model: resolveBailianChatModelKey(opts.body.model),
-        }
-      : cred.providerKind === "VOLCENGINE" && typeof opts.body.model === "string"
-        ? {
-            ...opts.body,
-            model: resolveVolcengineModelKey(opts.body.model),
-          }
-        : opts.body;
+  const requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
 
   const started = Date.now();
   const r = await fetch(url, {

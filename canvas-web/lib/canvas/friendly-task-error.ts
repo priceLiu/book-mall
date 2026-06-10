@@ -15,17 +15,41 @@ export function formatCanvasTaskError(
   ) {
     return "API 调用频率过高（429），请稍等 1～2 分钟后重试；批量任务会排队依次执行。";
   }
+
+  if (
+    blob.includes("overdue balance") ||
+    blob.includes("火山方舟") ||
+    blob.includes("doubao-seedance") ||
+    blob.includes("volcengine")
+  ) {
+    if (
+      blob.includes("overdue balance") ||
+      blob.includes("403") ||
+      blob.includes("欠费")
+    ) {
+      return "火山方舟账户欠费或余额不足。请在火山引擎控制台为 Gateway 绑定的凭证充值后重试，或改用其它视频模型。";
+    }
+    return msg || "火山方舟视频生成失败";
+  }
+
+  if (blob.includes("积分不足")) {
+    return msg.includes("积分不足")
+      ? `${msg}。请前往主站充值积分后重试。`
+      : "平台积分不足，请充值后重试。";
+  }
+
   if (
     blob.includes("kie_quota_exceeded") ||
-    blob.includes("provider_quota_exceeded") ||
-    blob.includes("code=402") ||
-    blob.includes("余额不足") ||
-    blob.includes("credits insufficient") ||
-    blob.includes("insufficient credit") ||
-    blob.includes("配额不足")
+    code === "KIE_QUOTA_EXCEEDED" ||
+    blob.includes("kie.ai") ||
+    (blob.includes("code=402") && blob.includes("kie")) ||
+    (blob.includes("credits insufficient") && blob.includes("kie")) ||
+    (blob.includes("insufficient credit") && blob.includes("kie")) ||
+    (blob.includes("余额不足") && blob.includes("kie"))
   ) {
     return "KIE 账户余额不足。请在 kie.ai 为 Gateway 绑定的 KIE API Key 充值后重试；分镜视频可改用百炼 Wan R2V、Seedance 等其它模型。";
   }
+
   if (blob.includes("kie chat empty content")) {
     return "KIE Gemini 返回空内容（可能被安全策略拦截或 reasoning 未输出正文）。请稍后重试，或换 deepseek-chat 等模型。";
   }

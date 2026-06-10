@@ -36,7 +36,11 @@ import {
   type CanvasStoryRunJob,
   unregisterCanvasRunBus,
 } from "./canvas-run-bus";
-import { countCanvasInflightWork, collectCanvasInflightNodeIds } from "./story-column-runtime";
+import {
+  countCanvasInflightWork,
+  collectCanvasInflightNodeIds,
+  collectCanvasTaskPollNodeIds,
+} from "./story-column-runtime";
 import { reconcileStaleInflightRuntimes } from "./story-inflight-reconcile";
 import { resolveStoryHubSectionTextInputs } from "./story-hub-text-inputs";
 import { resolveStoryProStarterScriptInput } from "./story-pro-starter-text";
@@ -1211,7 +1215,7 @@ export function useCanvasRunner(
       const fullScan = forceFullScan || periodicFullScan;
 
       const state = useCanvasStore.getState();
-      const localInflightIds = collectCanvasInflightNodeIds(state.nodes);
+      const localInflightIds = collectCanvasTaskPollNodeIds(state.nodes);
       const shouldPoll =
         fullScan ||
         localInflightIds.length > 0 ||

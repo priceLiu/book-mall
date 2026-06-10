@@ -31,12 +31,14 @@ function collectStatuses(row: StoryMediaRow): CanvasNodeRunStatus[] {
   return out;
 }
 
-function firstFailMessage(row: StoryMediaRow): string | undefined {
-  return (
-    row.runtime?.failMessage ??
-    row.videoRuntime?.failMessage ??
-    row.ttsRuntime?.failMessage
-  );
+function firstFailMessageForErrorRows(row: StoryMediaRow): string | undefined {
+  const slices = [row.runtime, row.videoRuntime, row.ttsRuntime];
+  for (const slice of slices) {
+    if (slice?.status === "error" && slice.failMessage?.trim()) {
+      return slice.failMessage;
+    }
+  }
+  return undefined;
 }
 
 /** 聚合列内各行 runtime，供 NodeShell 标题栏状态徽标（与画布顶栏任务态一致） */
@@ -44,19 +46,19 @@ export function aggregateStoryColumnRuntime(
   rows: StoryMediaRow[],
 ): CanvasNodeRuntime {
   const statuses = rows.flatMap(collectStatuses);
-  const failMessage = rows.map(firstFailMessage).find(Boolean);
 
   if (statuses.some((s) => s === "running")) {
-    return { status: "running", failMessage };
+    return { status: "running" };
   }
   if (statuses.some((s) => s === "pending")) {
-    return { status: "pending", failMessage };
+    return { status: "pending" };
   }
   if (statuses.some((s) => s === "error")) {
+    const failMessage = rows.map(firstFailMessageForErrorRows).find(Boolean);
     return { status: "error", failMessage };
   }
   if (statuses.length > 0 && statuses.every((s) => s === "done")) {
-    return { status: "done", failMessage };
+    return { status: "done" };
   }
   return { status: "idle" };
 }
@@ -114,6 +116,30 @@ export function canvasNodeHasInflightWork(node: CanvasFlowNode): boolean {
 /** 仍有进行中生成的节点 id（供任务轮询使用） */
 export function collectCanvasInflightNodeIds(nodes: CanvasFlowNode[]): string[] {
   return nodes.filter(canvasNodeHasInflightWork).map((n) => n.id);
+}
+
+/** 本地 error 但服务端可能已有新 SUBMITTED 任务（重试后前台未同步） */
+function storyVideoColumnHasStaleError(node: CanvasFlowNode): boolean {
+  if (!isAnyStoryVideoColumnType(node.type ?? "")) return false;
+  const rows = (node.data as { rows?: StoryMediaRow[] }).rows ?? [];
+  return rows.some(
+    (r) =>
+      r.videoRuntime?.status === "error" || r.ttsRuntime?.status === "error",
+  );
+}
+
+/**
+ * 任务轮询节点 id：进行中 + 视频列本地失败（便于拉回服务端 SUBMITTED 状态）。
+ * 返回空数组时 run-queue 会走全量扫描。
+ */
+export function collectCanvasTaskPollNodeIds(
+  nodes: CanvasFlowNode[],
+): string[] {
+  const ids = new Set(collectCanvasInflightNodeIds(nodes));
+  for (const node of nodes) {
+    if (storyVideoColumnHasStaleError(node)) ids.add(node.id);
+  }
+  return [...ids];
 }
 
 /** 画布顶栏：进行中的生成任务数（含漫剧列行级 runtime） */

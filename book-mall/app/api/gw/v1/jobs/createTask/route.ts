@@ -6,6 +6,7 @@ import {
 import { parseGatewayV1LogMeta, logMetaToRequestLogFields } from "@/lib/gateway/gateway-v1-log-meta";
 import {
   createRequestLog,
+  finalizeRequestLog,
   pickCredentialForKind,
 } from "@/lib/gateway/proxy-common";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
@@ -326,6 +327,13 @@ export async function POST(request: NextRequest) {
       data: { taskId, logId: log.id, providerKind: "KIE" },
     });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 502 });
+    const msg = (e as Error).message || "createTask failed";
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: 0,
+      failMessage: msg.slice(0, 500),
+      failCode: "UPSTREAM_SUBMIT_FAILED",
+    }).catch(() => undefined);
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

@@ -277,6 +277,21 @@ export function resolveBailianChatModelKey(modelKey: string): string {
   return aliases[raw] ?? raw;
 }
 
+/** DeepSeek 上游 model 字段（legacy deepseek-chat 等 → V4 Flash） */
+export function resolveDeepseekChatModelKey(modelKey: string): string {
+  const raw = modelKey.trim();
+  const m = raw.toLowerCase();
+  if (m === "deepseek-v4-flash" || m === "deepseek-v4-pro") return raw;
+  if (
+    m === "deepseek-chat" ||
+    m === "deepseek-reasoner" ||
+    m === "deepseek-coder"
+  ) {
+    return "deepseek-v4-flash";
+  }
+  return raw;
+}
+
 export {
   assertStoryModelCapabilities,
   getStoryModelCapabilities,

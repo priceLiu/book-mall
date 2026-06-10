@@ -68,24 +68,63 @@ function kieQuotaExceededMessage(_raw?: string): string {
   return "KIE 余额不足，请登录 kie.ai 充值后重试";
 }
 
-/** 写入任务 failMessage 前统一友好化（story / canvas 共用） */
-export function formatKieTaskFailMessage(
+function isVolcengineVendorBlob(blob: string): boolean {
+  return (
+    blob.includes("火山方舟") ||
+    blob.includes("volcengine") ||
+    blob.includes("doubao-seedance") ||
+    blob.includes("overdue balance")
+  );
+}
+
+function volcengineVendorFailMessage(msg: string, blob: string): string {
+  if (
+    blob.includes("overdue balance") ||
+    (blob.includes("403") && blob.includes("火山")) ||
+    blob.includes("欠费")
+  ) {
+    return "火山方舟账户欠费或余额不足。请在火山引擎控制台为 Gateway 绑定的凭证充值后重试。";
+  }
+  return msg || "火山方舟视频生成失败";
+}
+
+/** 视频引擎失败文案（按厂商区分，避免火山任务误显示 KIE） */
+export function formatVideoEngineFailMessage(
   failCode?: string | null,
   failMessage?: string | null,
+  opts?: { providerKind?: "KIE" | "VOLCENGINE" | "BAILIAN" | "DASHSCOPE" },
 ): string {
   const msg = (failMessage ?? "").trim();
   const code = (failCode ?? "").trim();
   const blob = `${code} ${msg}`.toLowerCase();
+
+  if (opts?.providerKind === "VOLCENGINE" || isVolcengineVendorBlob(blob)) {
+    return volcengineVendorFailMessage(msg, blob);
+  }
+  if (blob.includes("积分不足")) {
+    return msg.includes("积分不足")
+      ? `${msg}。请前往主站充值积分后重试。`
+      : "平台积分不足，请充值后重试。";
+  }
   if (
     code === "KIE_QUOTA_EXCEEDED" ||
-    blob.includes("code=402") ||
-    blob.includes("credits insufficient") ||
-    blob.includes("insufficient credit") ||
-    blob.includes("余额不足")
+    blob.includes("kie_quota_exceeded") ||
+    blob.includes("kie.ai") ||
+    (blob.includes("code=402") && !isVolcengineVendorBlob(blob)) ||
+    (blob.includes("credits insufficient") && blob.includes("kie")) ||
+    (blob.includes("insufficient credit") && blob.includes("kie"))
   ) {
     return kieQuotaExceededMessage(msg);
   }
   return msg || code || "生成失败";
+}
+
+/** @deprecated 请用 formatVideoEngineFailMessage；保留 story 旧调用 */
+export function formatKieTaskFailMessage(
+  failCode?: string | null,
+  failMessage?: string | null,
+): string {
+  return formatVideoEngineFailMessage(failCode, failMessage);
 }
 
 function getBase(): string {

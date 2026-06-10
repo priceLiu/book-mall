@@ -44,6 +44,8 @@ type RemotePayload = {
   balancePoints: number;
   poolBalances?: { general: number; video: number };
   totalCalls?: number;
+  succeededCalls?: number;
+  failedCalls?: number;
   rows: Record<string, string>[];
   packageReconciliation?: PackageReconciliationData | null;
   /** 主站 API 返回：是否凭 NextAuth 会话拉取（本地 devUserId / 代理则非 session） */
@@ -59,6 +61,8 @@ type AllUsersPayload = {
   take: number;
   truncated: boolean;
   totalCalls?: number;
+  succeededCalls?: number;
+  failedCalls?: number;
 };
 
 const PAGE_SIZES = [10, 20, 50];
@@ -75,6 +79,7 @@ const K_GATEWAY_LOG_ID = "平台/Gateway日志ID";
 const K_BILL_MONTH = "平台账单/账单月份";
 const K_FEE_DESC = "平台账单/费用说明";
 const K_TOOL_PAGE = "平台/工具页面";
+const K_STATUS = "平台/状态";
 
 function billColumnHeaderLabel(key: string): string {
   if (key === K_INCLUDED_USED) return "结算后已用";
@@ -146,6 +151,8 @@ export function BillDetailsClient({
   const [remoteUser, setRemoteUser] = useState<RemotePayload["user"] | null>(null);
   const [walletBalancePoints, setWalletBalancePoints] = useState<number | null>(null);
   const [totalCallsRemote, setTotalCallsRemote] = useState<number | null>(null);
+  const [succeededCallsRemote, setSucceededCallsRemote] = useState<number | null>(null);
+  const [failedCallsRemote, setFailedCallsRemote] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"usage" | "charge">("usage");
   const [viewerAuthMode, setViewerAuthMode] = useState<
     "session" | "dev_user_id" | undefined
@@ -226,6 +233,8 @@ export function BillDetailsClient({
           setAllTotal(ad.total);
           setAllTruncated(ad.truncated);
           setTotalCallsRemote(ad.totalCalls ?? null);
+          setSucceededCallsRemote(ad.succeededCalls ?? null);
+          setFailedCallsRemote(ad.failedCalls ?? null);
           setRemoteUser(null);
           setWalletBalancePoints(null);
           setViewerAuthMode(undefined);
@@ -235,6 +244,8 @@ export function BillDetailsClient({
           setRemoteUser(ud.user);
           setWalletBalancePoints(ud.balancePoints);
           setTotalCallsRemote(ud.totalCalls ?? null);
+          setSucceededCallsRemote(ud.succeededCalls ?? null);
+          setFailedCallsRemote(ud.failedCalls ?? null);
           setPackageReconciliation(ud.packageReconciliation ?? null);
           setViewerAuthMode(
             ud.viewer?.authMode ?? ((useDevProxy || devId) && !adminTargetUserId ? "dev_user_id" : "session"),
@@ -462,11 +473,13 @@ export function BillDetailsClient({
             const isVerbose = k.includes("详情") || k.includes("公式");
             const limit = isVerbose ? 200 : 80;
             const long = v.length > limit;
+            const isFailedStatus = k === K_STATUS && v === "失败";
             return (
               <td
                 key={k}
                 className={cn(
-                  "border border-[#e8e8e8] px-2 py-1.5 align-top text-[#262626]",
+                  "border border-[#e8e8e8] px-2 py-1.5 align-top",
+                  isFailedStatus ? "font-medium text-[#ff4d4f]" : "text-[#262626]",
                   long && (isVerbose ? "max-w-[min(480px,40vw)]" : "max-w-[240px]"),
                 )}
                 title={long ? v : undefined}
@@ -631,7 +644,7 @@ export function BillDetailsClient({
           </button>
           <span className="text-xs text-[#8c8c8c]">
             {activeTab === "usage"
-              ? "含 BYOK 套餐内 0 积分与 AI 试衣等全部成功调用"
+              ? "含成功与失败调用；BYOK 套餐内 0 积分行亦展示"
               : "仅实际消耗积分 > 0 的行"}
           </span>
         </div>
@@ -734,7 +747,23 @@ export function BillDetailsClient({
             <span className="text-[#8c8c8c]">积分消耗合计：</span>
             <span className="font-medium text-[#1d39c4]">{totalCreditsConsumed}</span>
           </div>
-          {activeTab === "usage" && totalCallsRemote != null ? (
+          {activeTab === "usage" && (succeededCallsRemote != null || failedCallsRemote != null) ? (
+            <div>
+              <span className="text-[#8c8c8c]">成功 / 失败：</span>
+              <span className="font-medium text-[#262626]">
+                {succeededCallsRemote ?? 0}
+              </span>
+              <span className="text-[#8c8c8c]"> / </span>
+              <span
+                className={cn(
+                  "font-medium",
+                  (failedCallsRemote ?? 0) > 0 ? "text-[#ff4d4f]" : "text-[#262626]",
+                )}
+              >
+                {failedCallsRemote ?? 0}
+              </span>
+            </div>
+          ) : activeTab === "usage" && totalCallsRemote != null ? (
             <div>
               <span className="text-[#8c8c8c]">成功调用总次数：</span>
               <span className="font-medium text-[#262626]">{totalCallsRemote}</span>

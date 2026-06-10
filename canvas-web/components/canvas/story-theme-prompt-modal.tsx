@@ -19,6 +19,9 @@ import {
 } from "@/lib/canvas/story-edition-chrome";
 import { isLegacyStoryProDirectorPrompt } from "@/lib/canvas/story-pro-script-pack";
 import { storyProThemeSystemPromptForTemplate } from "@/lib/canvas/story-pro-theme-templates";
+import { prepareMarkdownForPreview } from "@/lib/canvas/parse-md-tables";
+import { StoryHubReadonlyPane } from "./story-hub-readonly-pane";
+import { StoryOutlineDocumentEditor } from "./story-outline-document-editor";
 import { MarkdownView } from "./markdown-view";
 import type { MentionableItem } from "./mentions/MentionsTextarea";
 import { MentionsTextarea } from "./mentions/MentionsTextarea";
@@ -101,7 +104,10 @@ export function StoryThemePromptModal({
   const previewBodyRef = useRef<HTMLDivElement>(null);
   const [previewBodyH, setPreviewBodyH] = useState<number | null>(null);
 
-  const previewMd = useMemo(() => storyThemePromptDisplayMd(draft), [draft]);
+  const previewMd = useMemo(
+    () => prepareMarkdownForPreview(storyThemePromptDisplayMd(draft)),
+    [draft],
+  );
 
   const linkedTemplate = useMemo(
     () =>
@@ -313,7 +319,7 @@ export function StoryThemePromptModal({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="mx-auto grid w-full max-w-[min(96vw,1400px)] grid-cols-2 items-stretch overflow-hidden rounded-sm bg-white shadow-2xl">
-          <div className="flex min-h-full flex-col border-r border-neutral-200">
+          <div className="flex min-h-full min-w-0 flex-col overflow-hidden border-r border-neutral-200">
             <div className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-100 px-4 py-2.5">
               <p className="text-xs font-medium text-neutral-600">编辑</p>
               <p className="text-[10px] text-neutral-500">
@@ -331,6 +337,13 @@ export function StoryThemePromptModal({
                 <pre className="whitespace-pre-wrap font-sans text-[17px] leading-[1.85] text-neutral-800">
                   {draft || "（空）"}
                 </pre>
+              ) : proDirectorPack ? (
+                <StoryOutlineDocumentEditor
+                  value={draft}
+                  onChange={setDraft}
+                  mentionables={mentionables}
+                  editHint="与右侧预览同款排版：表格点格编辑；正文点段落后可改 Markdown（支持 @ 引用上传剧本）"
+                />
               ) : mentionables?.length ? (
                 <MentionsTextarea
                   className={`nodrag ${DOC_TEXT} block min-h-0 w-full flex-1`}
@@ -354,14 +367,19 @@ export function StoryThemePromptModal({
             </div>
           </div>
 
-          <div className="flex min-h-full flex-col bg-neutral-50/80">
-            <div className="sticky top-0 z-10 border-b border-neutral-200 bg-neutral-100/90 px-4 py-2.5">
-              <p className="text-xs font-medium text-neutral-600">预览</p>
-              <p className="text-[10px] text-neutral-500">整页滚动 · 随左侧实时更新</p>
+          <div className="flex min-h-full min-w-0 flex-col overflow-hidden bg-neutral-50/80">
+            <div className="sticky top-0 z-10 shrink-0 border-b border-neutral-200 bg-neutral-100/90 px-4 py-2.5">
+              <p className="text-xs font-medium text-neutral-600">渲染预览</p>
+              <p className="text-[10px] text-neutral-500">
+                GFM 表格与故事剧本审阅一致 · 随左侧实时更新
+              </p>
             </div>
-            <div ref={previewBodyRef} className={DOC_PAD}>
+            <div
+              ref={previewBodyRef}
+              className={`${DOC_PAD} min-w-0 w-full overflow-x-auto`}
+            >
               {previewMd.trim() ? (
-                <MarkdownView content={previewMd} variant="document" />
+                <StoryHubReadonlyPane md={previewMd} />
               ) : (
                 <p className="text-[17px] leading-[1.85] text-neutral-500">
                   （暂无内容）
