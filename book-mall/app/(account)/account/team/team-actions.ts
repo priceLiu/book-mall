@@ -29,13 +29,9 @@ import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { grantCredits } from "@/lib/billing/credit-account-service";
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
 import { ensurePlatformManagedKeyForTenant } from "@/lib/gateway/platform-managed-key";
+import type { ActionResult } from "@/lib/server-action-result";
+import { ACTIVE_TENANT_COOKIE } from "@/lib/tenant/context";
 import type { TenantRole } from "@prisma/client";
-
-export const ACTIVE_TENANT_COOKIE = "active_tenant_id";
-
-export type ActionResult<T = undefined> =
-  | ({ ok: true } & (T extends undefined ? { data?: undefined } : { data: T }))
-  | { ok: false; error: string };
 
 async function requireUser(): Promise<
   { ok: true; userId: string } | { ok: false; error: string }

@@ -62,12 +62,12 @@ export function PlatformModelsClient() {
   }, [reload]);
 
   const mediaOptions = useMemo(
-    () => [...new Set(rows.map((r) => r.mediaKindLabel).filter(Boolean))].sort() as string[],
+    () => Array.from(new Set(rows.map((r) => r.mediaKindLabel).filter(Boolean))).sort() as string[],
     [rows],
   );
 
   const appTagOptions = useMemo(
-    () => [...new Set(rows.flatMap((r) => r.appTags))].sort(),
+    () => Array.from(new Set(rows.flatMap((r) => r.appTags))).sort(),
     [rows],
   );
 
@@ -97,7 +97,7 @@ export function PlatformModelsClient() {
       list.push(row);
       map.set(groupKey, list);
     }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b, "zh"));
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b, "zh"));
   }, [filteredRows]);
 
   async function syncAll() {

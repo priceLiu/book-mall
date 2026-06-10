@@ -189,7 +189,7 @@ async function main() {
     },
   });
 
-  await zeroCreditAccount(target.id, target.email, source.billingPersona);
+  await zeroCreditAccount(target.id, target.email ?? target.id, source.billingPersona);
 
   await prisma.byokSubscription.updateMany({
     where: { ownerType: "USER", ownerId: target.id, status: "ACTIVE" },

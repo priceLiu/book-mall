@@ -31,8 +31,8 @@ import {
   transferOwnershipAction,
   updateConfigAction,
   updateRoleAction,
-  type ActionResult,
 } from "./team-actions";
+import type { ActionResult } from "@/lib/server-action-result";
 
 type Role = "OWNER" | "ADMIN" | "MEMBER";
 

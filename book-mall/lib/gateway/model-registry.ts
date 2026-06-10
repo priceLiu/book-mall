@@ -257,7 +257,14 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     VOLCENGINE: "火山方舟",
   };
 
-  const groups = [...byProvider.entries()].map(([providerKind, models]) => ({
+  type CatalogModel = Omit<GroupModel, "canonicalModelKey">;
+
+  const groups: Array<{
+    providerKind: GatewayProviderKind;
+    label: string;
+    credentialBound: boolean;
+    models: CatalogModel[];
+  }> = [...byProvider.entries()].map(([providerKind, models]) => ({
     providerKind,
     label: PROVIDER_LABEL[providerKind] ?? providerKind,
     credentialBound: isGatewayProviderBound(boundKinds, providerKind),
@@ -266,12 +273,12 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     ).map(({ canonicalModelKey: _c, ...m }) => m),
   }));
 
-  const isText = (m: GroupModel) => m.requestKind === "CHAT" || m.role === "LLM";
-  const isImage = (m: GroupModel) => m.requestKind === "IMAGE" || m.role === "IMAGE";
-  const isFunc = (m: GroupModel) =>
+  const isText = (m: CatalogModel) => m.requestKind === "CHAT" || m.role === "LLM";
+  const isImage = (m: CatalogModel) => m.requestKind === "IMAGE" || m.role === "IMAGE";
+  const isFunc = (m: CatalogModel) =>
     m.requestKind === "TTS" || m.requestKind === "TRYON" || m.requestKind === "OTHER";
 
-  const filterTabs = (pred: (m: GroupModel) => boolean) =>
+  const filterTabs = (pred: (m: CatalogModel) => boolean) =>
     groups
       .map((g) => ({ ...g, models: g.models.filter(pred) }))
       .filter((g) => g.models.length > 0);
