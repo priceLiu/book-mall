@@ -6,6 +6,8 @@ import {
   loadModelDisplayNameMap,
   projectGatewayLogToBillRow,
 } from "@/lib/finance/gateway-bill-projection";
+import { fetchUserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
+import { loadBillingSettlementsByLogIds } from "@/lib/billing/billing-settlement-service";
 import { prisma } from "@/lib/prisma";
 
 export type BillingDetailsTab = "usage" | "charge";
@@ -25,6 +27,13 @@ const GATEWAY_SELECT = {
   submittedAt: true,
   completedAt: true,
   actorBookUserId: true,
+  settlementKind: true,
+  byokTaskKind: true,
+  billingCategory: true,
+  quotaDelta: true,
+  includedUsedAfter: true,
+  includedRemainingAfter: true,
+  inputSummary: true,
 } as const;
 
 function parseCredits(cell: string | undefined): number {
@@ -72,12 +81,21 @@ async function buildGatewayRows(input: {
   const userMap = new Map(users.map((u) => [u.id, u.name ?? u.email ?? u.id]));
 
   const modelKeys = logs.map((l) => l.canonicalModelKey ?? l.model ?? "");
-  const displayNames = await loadModelDisplayNameMap(modelKeys, prisma);
+  const [displayNames, settlements] = await Promise.all([
+    loadModelDisplayNameMap(modelKeys, prisma),
+    loadBillingSettlementsByLogIds(logs.map((l) => l.id)),
+  ]);
 
   const rows = logs.map((log) => {
     const uid = log.actorBookUserId ?? input.userId ?? "";
     const label = userMap.get(uid) ?? uid;
-    return projectGatewayLogToBillRow(log, uid, label, displayNames);
+    return projectGatewayLogToBillRow(
+      log,
+      uid,
+      label,
+      displayNames,
+      settlements.get(log.id) ?? null,
+    );
   });
 
   const totalCalls =
@@ -100,13 +118,14 @@ export async function fetchBillingDetailsForUser(input: {
 }) {
   const take = Math.min(2000, Math.max(1, input.take ?? 500));
 
-  const [user, pools, gatewayPart] = await Promise.all([
+  const [user, pools, gatewayPart, packageReconciliation] = await Promise.all([
     prisma.user.findUnique({
       where: { id: input.userId },
       select: { id: true, name: true, email: true },
     }),
     getPoolBalances({ ownerType: "USER", ownerId: input.userId }),
     buildGatewayRows({ tab: input.tab, userId: input.userId, take }),
+    fetchUserPackageReconciliation(input.userId),
   ]);
 
   if (!user) return null;
@@ -127,6 +146,7 @@ export async function fetchBillingDetailsForUser(input: {
     totalPoints: totalCredits,
     totalCredits,
     rows: gatewayPart.rows,
+    packageReconciliation,
   };
 }
 

@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import {
   computeTeamSeatQuote,
   computeTierGenerations,
@@ -96,10 +97,8 @@ const PERSONAL_DESC = [
   "顶配产能，畅想无限。",
 ];
 const TEAM_DESC = [
-  "小团队起步协作。",
-  "成长团队高频产出。",
   "专业团队首选，协作高效。",
-  "规模团队，量大优惠。",
+  "视频团队，量大优惠。",
   "企业级产能与管控。",
 ];
 
@@ -131,9 +130,9 @@ function buildHighlights(args: {
       { text: `${gen}（每席）`, included: true, hasInfo: true },
       { text: "团队共享资产库 · 多人画布协作", included: true },
       { text: "席位 / 权限 / 用量管控", included: true },
-      { text: "用量报表 · 成员消耗下钻", included: index >= 1 },
-      { text: "会员加速 · 高并发任务", included: index >= 2 },
-      { text: "优先支持 · 专属客户成功", included: index >= 3, hasInfo: true },
+      { text: "用量报表 · 成员消耗下钻", included: index >= 0 },
+      { text: "会员加速 · 高并发任务", included: index >= 1 },
+      { text: "优先支持 · 专属客户成功", included: index >= 2, hasInfo: true },
     ];
   }
   return [
@@ -245,7 +244,12 @@ export function PricingPageClient({
 
         {/* 套餐卡片：一行五张；外层 overflow-visible 给顶边徽标留空间 */}
         <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-relaxed text-muted-foreground">
-          下方五档为<b className="text-foreground">平台代付（积分套餐）</b>：含月度积分发放，按模型扣积分。
+          下方{isTeam ? "三档" : "五档"}为<b className="text-foreground">平台代付（积分套餐）</b>：含月度积分发放，按模型扣积分。
+          {isTeam ? (
+            <>
+              团队套餐<b className="text-foreground"> 3 席起订</b>。
+            </>
+          ) : null}
           若注册时选择<b className="text-foreground">自带 Key（BYOK）</b>，请见本页右侧说明——
           <b className="text-foreground">不含月度积分</b>，含任务次数额度；超额与工具月费从轻量包余额扣。
         </p>
@@ -266,7 +270,7 @@ export function PricingPageClient({
                 interval={interval}
                 periodLabel={periodLabel}
                 anchorYuan={anchorYuan}
-                featured={i === Math.min(2, visible.length - 1)}
+                featured={isTeam ? i === 1 : i === Math.min(2, visible.length - 1)}
                 minImageCpu={minImageCpu}
                 minVideoCpu={minVideoCpu}
                 annualSavingPct={annualSavingPct}
@@ -424,7 +428,7 @@ export function PricingPageClient({
                     <b className="text-foreground">月费</b>：技术服务（下方各档 ¥/月）
                   </li>
                   <li>
-                    <b className="text-foreground">套餐内</b>：文生图 / 图生视频 / 视频生视频按次数免费（见各档额度）
+                    <b className="text-foreground">套餐内</b>：文生图（含试衣）、图生视频、视频生视频、视频理解、TTS 按次数免费（见各档额度）
                   </li>
                   <li>
                     <b className="text-foreground">超额</b>：从轻量包通用积分池按次扣分（锚定 ¥0.04/积分）
@@ -528,7 +532,9 @@ function PlanCard({
   minVideoCpu: number;
   annualSavingPct: number | null;
 }) {
-  const [seats, setSeats] = useState<number>(Math.max(1, plan.includedSeats));
+  const [seats, setSeats] = useState<number>(
+    Math.max(TEAM_MIN_INCLUDED_SEATS, plan.includedSeats),
+  );
 
   const bands: SeatBand[] = plan.seatTiers.map((t) => ({
     seatMin: t.seatMin,
@@ -537,7 +543,7 @@ function PlanCard({
     perSeatCredits: t.perSeatCredits,
   }));
 
-  const minSeats = Math.max(1, plan.includedSeats);
+  const minSeats = Math.max(TEAM_MIN_INCLUDED_SEATS, plan.includedSeats);
   const quote = computeTeamSeatQuote({
     bands,
     minSeats,

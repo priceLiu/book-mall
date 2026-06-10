@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 
 import { prisma } from "../lib/prisma";
 import { BYOK_SCOPE_PERSONAL } from "../lib/billing/byok-pricing";
+import { recordAdminPaidByokCheckout } from "../lib/payments/record-admin-paid-byok-checkout";
 
 function arg(name: string): string | null {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -197,7 +198,7 @@ async function main() {
   });
 
   if (sourceByok) {
-    await prisma.byokSubscription.create({
+    const alignedSub = await prisma.byokSubscription.create({
       data: {
         ownerType: "USER",
         ownerId: target.id,
@@ -209,6 +210,15 @@ async function main() {
         periodEnd: sourceByok.periodEnd,
         lastOrderId: `align_from_${source.id}_${randomUUID().slice(0, 8)}`,
       },
+    });
+    await recordAdminPaidByokCheckout({
+      userId: target.id,
+      scopeKey: sourceByok.scopeKey,
+      confirmedByUserId: source.id,
+      source: "ADMIN_ALIGN",
+      subscriptionId: alignedSub.id,
+      paidAt: sourceByok.periodStart,
+      adminNote: `运维对齐 BYOK（来源 ${source.email ?? source.id}）`,
     });
   }
 

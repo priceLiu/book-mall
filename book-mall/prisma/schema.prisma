@@ -2124,6 +2124,14 @@ model GatewayRequestLog {
   staffFlag               Boolean          @default(false)
   billingPersonaSnap      BillingPersona?
 
+  // —— Book 财务结算快照（Gateway 只记调用；套餐扣次/扣分由 Book 写入）——
+  settlementKind          BillingSettlementKind?
+  byokTaskKind            ByokTaskKind?
+  billingCategory         BillingCategory?
+  quotaDelta              Int? // 套餐内扣次（通常 1）
+  includedUsedAfter       Int?
+  includedRemainingAfter  Int?
+
   inputSummary  Json?
   resultSummary Json?
   failCode      String?
@@ -2147,6 +2155,51 @@ model GatewayRequestLog {
   @@index([channelSnapshot])
   @@index([staffFlag, submittedAt])
   @@index([billingPersonaSnap, submittedAt])
+  @@index([settlementKind, submittedAt])
+  @@index([actorBookUserId, settlementKind])
+  @@index([billingCategory, submittedAt])
+}
+
+/// Book 侧统一结算流水：每笔 Gateway 成功调用的扣积分 / 扣套餐次快照（财务对帐真源）
+enum BillingSettlementKind {
+  BYOK_QUOTA_INCLUDED // BYOK 套餐内扣次（0 积分）
+  BYOK_QUOTA_OVERAGE // BYOK 超额扣轻量包积分
+  PLATFORM_CREDIT // 平台代付扣积分
+  PLATFORM_VIDEO // 平台代付视频（RESERVE/SETTLE）
+  METER_ONLY // BYOK 未映射任务类型，仅计量
+  NONE // 成功但未扣费/扣次
+}
+
+model BillingSettlementLine {
+  id                     String                @id @default(cuid())
+  gatewayLogId           String                @unique
+  ownerType              CreditOwnerType
+  ownerId                String
+  actorBookUserId        String?
+  periodKey              String // YYYY-MM
+  settlementKind         BillingSettlementKind
+  byokTaskKind           ByokTaskKind?
+  billingCategory        BillingCategory?
+  tryonModelKey          String?
+  quotaDelta             Int                   @default(0)
+  monthlyIncluded        Int?
+  includedUsedAfter      Int?
+  includedRemainingAfter Int?
+  isOverage              Boolean               @default(false)
+  creditsCharged         Int                   @default(0)
+  creditLedgerId         String?
+  canonicalModelKey      String?
+  requestKind            GatewayRequestKind?
+  clientPage             String?
+  feeDescription         String?
+  submittedAt            DateTime
+  createdAt              DateTime              @default(now())
+
+  @@index([ownerType, ownerId, periodKey])
+  @@index([actorBookUserId, periodKey])
+  @@index([settlementKind, submittedAt])
+  @@index([byokTaskKind, periodKey])
+  @@index([billingCategory, periodKey])
 }
 
 // ============================================================
@@ -2530,6 +2583,19 @@ enum ByokTaskKind {
   TEXT_TO_IMAGE
   IMAGE_TO_VIDEO
   VIDEO_TO_VIDEO
+  VIDEO_UNDERSTANDING
+  TTS
+}
+
+/// 七类计费 taxonomy（BYOK + 平台代付报表/结算共用；含无含次的 TEXT / OTHER）
+enum BillingCategory {
+  TEXT_TO_IMAGE
+  IMAGE_TO_VIDEO
+  VIDEO_TO_VIDEO
+  VIDEO_UNDERSTANDING
+  TTS
+  TEXT
+  OTHER
 }
 
 /// BYOK 套餐内月度额度与超额扣分（从轻量包/general 池扣）

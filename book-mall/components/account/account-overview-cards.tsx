@@ -129,9 +129,13 @@ export function AccountOverviewCards({
       {packageUsageRows.length > 0 ? (
         <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">套餐使用情况</CardTitle>
+            <CardTitle className="text-base">
+              {isByok ? "套餐使用情况" : "本月按类型消耗"}
+            </CardTitle>
             <CardDescription className="text-xs">
-              本月各类型任务：套餐内总数、Gateway 成功/失败、剩余额度（文字类无套餐额度）。
+              {isByok
+                ? "本月各类型任务：套餐内总数、Gateway 成功/失败、剩余额度（纯文字对话无套餐额度；试衣计入文生图，明细按 modelKey 展示）。"
+                : "积分池按七类统计成功/失败与扣积分（无含次额度；试衣计入文生图，明细按 modelKey 展示）。"}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-3">
@@ -140,24 +144,50 @@ export function AccountOverviewCards({
                 <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium">类型</th>
-                    <th className="px-3 py-2 text-right font-medium">总数</th>
-                    <th className="px-3 py-2 text-right font-medium">成功</th>
-                    <th className="px-3 py-2 text-right font-medium">失败</th>
-                    <th className="px-3 py-2 text-right font-medium">剩余</th>
+                    {isByok ? (
+                      <>
+                        <th className="px-3 py-2 text-right font-medium">总数</th>
+                        <th className="px-3 py-2 text-right font-medium">成功</th>
+                        <th className="px-3 py-2 text-right font-medium">失败</th>
+                        <th className="px-3 py-2 text-right font-medium">剩余</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="px-3 py-2 text-right font-medium">成功</th>
+                        <th className="px-3 py-2 text-right font-medium">失败</th>
+                        <th className="px-3 py-2 text-right font-medium">扣积分</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {packageUsageRows.map((row) => (
                     <tr key={row.key} className="border-t border-border/50">
                       <td className="px-3 py-2 font-medium text-foreground">{row.label}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.total)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                        {row.succeeded}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-destructive">
-                        {row.failed}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.remaining)}</td>
+                      {isByok ? (
+                        <>
+                          <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.total)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                            {row.succeeded}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-destructive">
+                            {row.failed}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">{fmtQuota(row.remaining)}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-3 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                            {row.succeeded}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-destructive">
+                            {row.failed}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {(row.creditsConsumed ?? 0).toLocaleString("zh-CN")}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

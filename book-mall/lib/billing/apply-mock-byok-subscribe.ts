@@ -1,9 +1,6 @@
 /**
  * 开发环境模拟 BYOK 套餐开通/续订。
  */
-import { randomUUID } from "crypto";
-
-import { prisma } from "@/lib/prisma";
 import {
   activateByokSubscription,
   resolveByokSeatsForTenant,
@@ -14,6 +11,8 @@ import {
   BYOK_SCOPE_TEAM_SEAT,
 } from "@/lib/billing/byok-pricing";
 import { canTenant } from "@/lib/tenant/permission";
+import { recordAdminPaidByokCheckout } from "@/lib/payments/record-admin-paid-byok-checkout";
+import { prisma } from "@/lib/prisma";
 
 export type ByokSubscribeTarget = "personal" | "team";
 
@@ -54,7 +53,7 @@ export async function applyMockByokSubscribe(input: {
       : await resolveByokSeatsForTenant(input.tenantId);
   }
 
-  const orderId = `mock_byok_${randomUUID()}`;
+  const orderId = `mock_byok_${crypto.randomUUID()}`;
   const result = await activateByokSubscription({
     ownerType,
     ownerId,
@@ -63,9 +62,22 @@ export async function applyMockByokSubscribe(input: {
     orderId,
   });
 
+  const audit = await recordAdminPaidByokCheckout({
+    userId: input.userId,
+    scopeKey,
+    tenantId: ownerType === "TENANT" ? ownerId : null,
+    seats,
+    confirmedByUserId: input.userId,
+    source: "MOCK",
+    subscriptionId: result.subscriptionId,
+    paidAt: new Date(),
+  });
+
   return {
     ...result,
     ownerType,
     ownerId,
+    paymentCheckoutId: audit.checkoutId,
+    paymentOrderId: audit.orderId,
   };
 }

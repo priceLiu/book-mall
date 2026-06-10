@@ -6,6 +6,7 @@ import { BYOK_SCOPE_TEAM_SEAT } from "@/lib/billing/byok-pricing";
 import { resolveByokSeatsForTenant } from "@/lib/billing/byok-subscription-service";
 import { packById } from "@/lib/billing/credit-topup-packs";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
+import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import { generateOutTradeNo } from "@/lib/payments/out-trade-no";
 import { appendPaymentEvent } from "@/lib/payments/payment-events";
 import { generateUniqueRemarkCode } from "@/lib/payments/remark-code";
@@ -70,7 +71,10 @@ export async function createPaymentCheckout(input: {
       await assertBillingPersona(userId, "PLATFORM_CREDIT");
       const plan = await prisma.membershipPlan.findUnique({ where: { id: payload.planId } });
       if (!plan || !plan.active || plan.family !== "TEAM") throw new Error("无效的团队套餐");
-      const seats = Math.max(1, Math.round(payload.seats ?? plan.includedSeats ?? 1));
+      const seats = Math.max(
+        TEAM_MIN_INCLUDED_SEATS,
+        Math.round(payload.seats ?? plan.includedSeats ?? TEAM_MIN_INCLUDED_SEATS),
+      );
       const quote = await quoteTeamPlan({ planId: plan.id, totalSeats: seats });
       amountYuan = quote.totalPriceYuan;
       productSnapshot = {
@@ -157,6 +161,32 @@ export async function createPaymentCheckout(input: {
   const remarkCode = await generateUniqueRemarkCode();
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + checkoutExpiresHours());
+
+  const dedupeWhere: Prisma.PaymentCheckoutWhereInput = {
+    userId,
+    productKind,
+    status: { in: ["PENDING", "AWAITING_CONFIRM"] },
+    expiresAt: { gt: new Date() },
+  };
+  const existingPending = await prisma.paymentCheckout.findFirst({
+    where: dedupeWhere,
+    orderBy: { createdAt: "desc" },
+  });
+  if (existingPending) {
+    const snap = existingPending.productSnapshot as Record<string, unknown> | null;
+    const sameProduct =
+      productKind === "CREDIT_TOPUP"
+        ? snap?.packId === productSnapshot.packId && snap?.target === productSnapshot.target
+        : productKind.startsWith("BYOK_")
+          ? snap?.scopeKey === productSnapshot.scopeKey &&
+            (productKind !== "BYOK_TEAM" || snap?.tenantId === productSnapshot.tenantId)
+          : productKind.startsWith("MEMBERSHIP_")
+            ? snap?.planId === productSnapshot.planId
+            : false;
+    if (sameProduct) {
+      return existingPending;
+    }
+  }
 
   const checkout = await prisma.paymentCheckout.create({
     data: {

@@ -8,6 +8,7 @@ import { assertBillingPersona } from "@/lib/billing/billing-persona";
 import { grantCredits } from "@/lib/billing/credit-account-service";
 import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
+import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 import { createTeamTenant } from "@/lib/tenant/tenant-service";
 import { ensurePlatformManagedKeyForTenant } from "@/lib/gateway/platform-managed-key";
 import { canTenant } from "@/lib/tenant/permission";
@@ -29,7 +30,10 @@ export async function applyMockMembershipSubscribe(input: {
   else periodEnd.setMonth(periodEnd.getMonth() + 1);
 
   if (plan.family === "TEAM") {
-    const totalSeats = Math.max(1, Math.round(input.seats ?? plan.includedSeats ?? 1));
+    const totalSeats = Math.max(
+      TEAM_MIN_INCLUDED_SEATS,
+      Math.round(input.seats ?? plan.includedSeats ?? TEAM_MIN_INCLUDED_SEATS),
+    );
     const quote = await quoteTeamPlan({ planId: plan.id, totalSeats });
     const name = input.teamName?.trim() || `团队 ${new Date().toISOString().slice(0, 10)}`;
 

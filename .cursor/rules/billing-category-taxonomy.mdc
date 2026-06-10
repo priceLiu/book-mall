@@ -1,0 +1,28 @@
+---
+description: BYOK/财务明细计费类别 taxonomy；Gateway→Book 映射唯一入口
+globs: book-mall/lib/billing/byok-pricing.ts,book-mall/lib/billing/billing-category.ts,book-mall/lib/finance/**,book-mall/lib/billing/byok-overage-service.ts,book-mall/lib/billing/billing-settlement-service.ts,docs/定价与风控.md
+alwaysApply: false
+---
+
+# 计费类别 taxonomy（BYOK / 平台代付 / 财务明细）
+
+权威数字与映射表：**`docs/定价与风控.md` §7、§7.1、§7.2**
+
+## 七类（禁止 UI 单独加「AI 试衣」行）
+
+1. **文生图** — `IMAGE`、`TRYON`（含试衣成片与 `aitryon-parsing-v1`）
+2. **图生视频** — `VIDEO` 无 v2v
+3. **视频生视频** — `VIDEO` + 参考视频 / v2v 信号
+4. **视频理解** — `CHAT` + `video_url` 附件（如视觉实验室分析室）
+5. **TTS / 语音** — `requestKind=TTS`
+6. **文字** — 纯 `CHAT`，**无 BYOK 含次**，仅统计
+7. **其他** — `OTHER` 或无法映射
+
+## 实现约束
+
+- **Single Writer**：归类、扣次、超额只在 Book；Gateway 不写套餐逻辑。
+- **唯一映射函数**：`classifyBillingCategory`（`book-mall/lib/billing/billing-category.ts`）；底层 `mapLogToByokTaskKind` 仅覆盖前 5 类。
+- **持久化**：`BillingSettlementLine.billingCategory` + `GatewayRequestLog.billingCategory`；BYOK 仍写 `byokTaskKind` 供 quota。
+- **平台代付**：权益为 §一 积分池；报表/个人中心用七类统计，**不**拆月积分为含次。
+- **明细**：展示类别 + `modelKey`；试衣仍可通过 `tryonModelKey` 拆分，但不单独占套餐行。
+- 新增能力须落入上表之一；不得新建第 8 类 UI 额度行而不更新 §7.1。

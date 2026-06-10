@@ -12,6 +12,10 @@ import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 import { getFinanceDevUserId, getFinanceUseDevProxy } from "@/lib/book-mall-billing-url";
 import { BillMultiFilter, type BillMultiFilterMode } from "@/components/bill-multi-filter";
+import {
+  PackageReconciliationPanel,
+  type PackageReconciliationData,
+} from "@/components/package-reconciliation-panel";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -39,6 +43,7 @@ type RemotePayload = {
   poolBalances?: { general: number; video: number };
   totalCalls?: number;
   rows: Record<string, string>[];
+  packageReconciliation?: PackageReconciliationData | null;
   /** 主站 API 返回：是否凭 NextAuth 会话拉取（本地 devUserId / 代理则非 session） */
   viewer?: { authMode: "session" | "dev_user_id" };
 };
@@ -106,6 +111,8 @@ export function BillDetailsClient({
   const [viewerAuthMode, setViewerAuthMode] = useState<
     "session" | "dev_user_id" | undefined
   >(undefined);
+  const [packageReconciliation, setPackageReconciliation] =
+    useState<PackageReconciliationData | null>(null);
 
   useEffect(() => {
     const search = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -181,11 +188,13 @@ export function BillDetailsClient({
           setRemoteUser(null);
           setWalletBalancePoints(null);
           setViewerAuthMode(undefined);
+          setPackageReconciliation(null);
         } else {
           const ud = data as RemotePayload;
           setRemoteUser(ud.user);
           setWalletBalancePoints(ud.balancePoints);
           setTotalCallsRemote(ud.totalCalls ?? null);
+          setPackageReconciliation(ud.packageReconciliation ?? null);
           setViewerAuthMode(
             ud.viewer?.authMode ?? ((useDevProxy || devId) && !adminTargetUserId ? "dev_user_id" : "session"),
           );
@@ -203,6 +212,7 @@ export function BillDetailsClient({
         setViewerAuthMode(undefined);
         setAllTotal(null);
         setAllTruncated(false);
+        setPackageReconciliation(null);
         const msg = e instanceof Error ? e.message : String(e);
         const tip = bookMallLoginHint(
           base,
@@ -373,6 +383,10 @@ export function BillDetailsClient({
               </p>
             )}
           </div>
+        ) : null}
+
+        {!isAllUsers && packageReconciliation ? (
+          <PackageReconciliationPanel data={packageReconciliation} />
         ) : null}
 
         {!isAllUsers && (loadState === "loading" || loadState === "error" || (loadState === "idle" && hint)) ? (

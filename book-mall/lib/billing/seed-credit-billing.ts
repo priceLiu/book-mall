@@ -24,6 +24,10 @@ import {
 } from "@/lib/pricing/credit-pricing-engine";
 import { deriveVideoMonthlyCredits } from "@/lib/billing/video-model-seeds";
 import { seedByokSimplifiedPricing } from "@/lib/billing/byok-pricing";
+import {
+  RETIRED_TEAM_TIERS,
+  TEAM_MIN_INCLUDED_SEATS,
+} from "@/lib/billing/team-membership-config";
 
 /** 逐档「每积分单价」= 套餐价 ÷ (含席位数 × 月积分)；个人 includedSeats=1。 */
 function derivePricePerCredit(priceYuan: number, monthlyCredits: number, includedSeats: number): number {
@@ -62,23 +66,18 @@ const PERSONAL_YEAR: PlanSeed[] = [
   { tier: "至尊版", sortOrder: 5, priceYuan: 7990, originalYuan: 14388, promoLabel: "年付立省2个月", monthlyCredits: 360000, includedSeats: 1 },
 ];
 
-// 团队 · 月付（按席计价：起订 2 席，priceYuan = 每席价(首档) × 2，monthlyCredits = 每席积分）
-// 至尊版起步 = ¥858（2 席 / 30,000 积分），不再「基础套餐塞 10 席」；加席走席位带量价递减。
+// 团队 · 月付（按席计价：起订 3 席；仅高级版 / 豪华版 / 至尊版）
 const TEAM_MONTH: PlanSeed[] = [
-  { tier: "标准版", sortOrder: 1, priceYuan: 118, originalYuan: 178, monthlyCredits: 1500, includedSeats: 2 },
-  { tier: "进阶版", sortOrder: 2, priceYuan: 198, originalYuan: 298, monthlyCredits: 3000, includedSeats: 2 },
-  { tier: "高级版", sortOrder: 3, priceYuan: 378, originalYuan: 568, monthlyCredits: 5000, includedSeats: 2 },
-  { tier: "豪华版", sortOrder: 4, priceYuan: 498, originalYuan: 748, monthlyCredits: 8000, includedSeats: 2 },
-  { tier: "至尊版", sortOrder: 5, priceYuan: 858, originalYuan: 1298, monthlyCredits: 15000, includedSeats: 2 },
+  { tier: "高级版", sortOrder: 1, priceYuan: 567, originalYuan: 852, monthlyCredits: 5000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "豪华版", sortOrder: 2, priceYuan: 747, originalYuan: 1122, monthlyCredits: 8000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "至尊版", sortOrder: 3, priceYuan: 1287, originalYuan: 1946, monthlyCredits: 15000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
 ];
 
-// 团队 · 年付（每席价 ×10 个月、每席积分 ×12；priceYuan = 每席年价 × 2）
+// 团队 · 年付（每席价 ×10 个月；priceYuan = 每席年价 × 3）
 const TEAM_YEAR: PlanSeed[] = [
-  { tier: "标准版", sortOrder: 1, priceYuan: 1180, originalYuan: 2136, promoLabel: "年付立省2个月", monthlyCredits: 18000, includedSeats: 2 },
-  { tier: "进阶版", sortOrder: 2, priceYuan: 1980, originalYuan: 3576, promoLabel: "年付立省2个月", monthlyCredits: 36000, includedSeats: 2 },
-  { tier: "高级版", sortOrder: 3, priceYuan: 3780, originalYuan: 6816, promoLabel: "年付立省2个月", monthlyCredits: 60000, includedSeats: 2 },
-  { tier: "豪华版", sortOrder: 4, priceYuan: 4980, originalYuan: 8976, promoLabel: "年付立省2个月", monthlyCredits: 96000, includedSeats: 2 },
-  { tier: "至尊版", sortOrder: 5, priceYuan: 8580, originalYuan: 15576, promoLabel: "年付立省2个月", monthlyCredits: 180000, includedSeats: 2 },
+  { tier: "高级版", sortOrder: 1, priceYuan: 5670, originalYuan: 10224, promoLabel: "年付立省2个月", monthlyCredits: 60000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "豪华版", sortOrder: 2, priceYuan: 7470, originalYuan: 13464, promoLabel: "年付立省2个月", monthlyCredits: 96000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "至尊版", sortOrder: 3, priceYuan: 12870, originalYuan: 23364, promoLabel: "年付立省2个月", monthlyCredits: 180000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
 ];
 
 // 团队席位带（人数越多每席单价越低）— perSeatPrice 取月口径，年付折算 ×10；每席积分恒定（= 该档每席积分）
@@ -90,28 +89,18 @@ interface SeatTierSeed {
   sortOrder: number;
 }
 const SEAT_TIERS_BY_TIER: Record<string, SeatTierSeed[]> = {
-  标准版: [
-    { seatMin: 1, seatMax: 2, perSeatPriceMonthYuan: 59, perSeatCredits: 1500, sortOrder: 1 },
-    { seatMin: 3, seatMax: 5, perSeatPriceMonthYuan: 49, perSeatCredits: 1500, sortOrder: 2 },
-    { seatMin: 6, seatMax: null, perSeatPriceMonthYuan: 39, perSeatCredits: 1500, sortOrder: 3 },
-  ],
-  进阶版: [
-    { seatMin: 1, seatMax: 2, perSeatPriceMonthYuan: 99, perSeatCredits: 3000, sortOrder: 1 },
-    { seatMin: 3, seatMax: 5, perSeatPriceMonthYuan: 89, perSeatCredits: 3000, sortOrder: 2 },
-    { seatMin: 6, seatMax: null, perSeatPriceMonthYuan: 79, perSeatCredits: 3000, sortOrder: 3 },
-  ],
   高级版: [
-    { seatMin: 1, seatMax: 5, perSeatPriceMonthYuan: 189, perSeatCredits: 5000, sortOrder: 1 },
+    { seatMin: 3, seatMax: 5, perSeatPriceMonthYuan: 189, perSeatCredits: 5000, sortOrder: 1 },
     { seatMin: 6, seatMax: 10, perSeatPriceMonthYuan: 169, perSeatCredits: 5000, sortOrder: 2 },
     { seatMin: 11, seatMax: null, perSeatPriceMonthYuan: 149, perSeatCredits: 5000, sortOrder: 3 },
   ],
   豪华版: [
-    { seatMin: 1, seatMax: 10, perSeatPriceMonthYuan: 249, perSeatCredits: 8000, sortOrder: 1 },
+    { seatMin: 3, seatMax: 10, perSeatPriceMonthYuan: 249, perSeatCredits: 8000, sortOrder: 1 },
     { seatMin: 11, seatMax: 20, perSeatPriceMonthYuan: 229, perSeatCredits: 8000, sortOrder: 2 },
     { seatMin: 21, seatMax: null, perSeatPriceMonthYuan: 209, perSeatCredits: 8000, sortOrder: 3 },
   ],
   至尊版: [
-    { seatMin: 1, seatMax: 10, perSeatPriceMonthYuan: 429, perSeatCredits: 15000, sortOrder: 1 },
+    { seatMin: 3, seatMax: 10, perSeatPriceMonthYuan: 429, perSeatCredits: 15000, sortOrder: 1 },
     { seatMin: 11, seatMax: 20, perSeatPriceMonthYuan: 389, perSeatCredits: 15000, sortOrder: 2 },
     { seatMin: 21, seatMax: null, perSeatPriceMonthYuan: 359, perSeatCredits: 15000, sortOrder: 3 },
   ],
@@ -223,7 +212,11 @@ export async function seedUnifiedCreditBilling(publishedBy = "seed"): Promise<Se
   await seedPlans("PERSONAL", "YEAR", PERSONAL_YEAR, false);
   await seedPlans("TEAM", "MONTH", TEAM_MONTH, true);
   await seedPlans("TEAM", "YEAR", TEAM_YEAR, true);
-  const plansCount = TIERS.length * 4;
+  await prisma.membershipPlan.updateMany({
+    where: { family: "TEAM", tier: { in: [...RETIRED_TEAM_TIERS] } },
+    data: { active: false },
+  });
+  const plansCount = PERSONAL_MONTH.length * 2 + TEAM_MONTH.length * 2;
 
   // 3) BYOK 两档月费 + 任务额度 + 资源系数
   await seedByokSimplifiedPricing();

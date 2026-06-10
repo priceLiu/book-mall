@@ -27,12 +27,15 @@ export function PaymentCheckoutsClient() {
   const base = useBookMallBaseUrl();
   const [rows, setRows] = useState<PaymentRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"PAID" | "ALL">("PAID");
 
   const reload = useCallback(async () => {
     if (!base) return;
+    const qs =
+      statusFilter === "PAID" ? "?limit=100&status=PAID" : "?limit=100";
     const r = await financeApiFetch<{ checkouts: PaymentRow[] }>(
       base,
-      "/api/finance/admin/payments?limit=100",
+      `/api/finance/admin/payments${qs}`,
     );
     if (r.ok) {
       setRows(r.data.checkouts);
@@ -40,7 +43,7 @@ export function PaymentCheckoutsClient() {
     } else {
       setError(r.error);
     }
-  }, [base]);
+  }, [base, statusFilter]);
 
   useEffect(() => {
     void reload();
@@ -48,11 +51,21 @@ export function PaymentCheckoutsClient() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">支付明细</h2>
-        <p className="text-sm text-muted-foreground">
-          微信个人收款 Checkout 与 Order 联查（含备注码、核对状态）。
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">支付明细</h2>
+          <p className="text-sm text-muted-foreground">
+            微信个人收款 Checkout 与 Order 联查。默认仅显示已支付（PAID）；未支付的 CANCELLED 不影响已开通的 BYOK 权益。
+          </p>
+        </div>
+        <select
+          className="rounded border px-2 py-1 text-sm"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as "PAID" | "ALL")}
+        >
+          <option value="PAID">仅已支付</option>
+          <option value="ALL">全部状态</option>
+        </select>
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <div className="overflow-x-auto rounded-lg border">

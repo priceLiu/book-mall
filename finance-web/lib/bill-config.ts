@@ -6,6 +6,11 @@ export const RETAIL_MULTIPLIER_DEFAULT = 2;
 export type ColumnGroup = { group: string; keys: string[] };
 
 export const K_CREDITS_CONSUMED = "平台/消耗积分";
+export const K_SETTLEMENT_KIND = "套餐对帐/结算类型";
+export const K_TASK_KIND = "套餐对帐/任务类型";
+export const K_QUOTA_DELTA = "套餐对帐/扣次";
+export const K_INCLUDED_USED = "套餐对帐/已用";
+export const K_INCLUDED_REMAINING = "套餐对帐/剩余";
 
 export const BILL_COLUMN_GROUPS: ColumnGroup[] = [
   {
@@ -27,6 +32,16 @@ export const BILL_COLUMN_GROUPS: ColumnGroup[] = [
   {
     group: "账单时间",
     keys: ["平台账单/账单月份", "平台账单/消费时间", "平台账单/费用说明"],
+  },
+  {
+    group: "套餐对帐",
+    keys: [
+      K_SETTLEMENT_KIND,
+      K_TASK_KIND,
+      K_QUOTA_DELTA,
+      K_INCLUDED_USED,
+      K_INCLUDED_REMAINING,
+    ],
   },
   {
     group: "用量",

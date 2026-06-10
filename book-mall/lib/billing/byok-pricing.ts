@@ -4,10 +4,14 @@
  * 两档月费：个人 ¥39/月；团队 ¥29/席/月（3 席起）。
  * 套餐内含月度任务额度；超出后从轻量包（通用积分池）按次扣固定积分。
  *
+ * 计费类别 taxonomy 见 docs/定价与风控.md §7.1
+ *
  * 超额扣分测算口径（锚定 ¥0.04/积分）：
- * - 文生图 20 积分/次 ≈ ¥0.80 — 覆盖调度(¥0.01)+临时存储+出网，目标平台侧毛利 ≥60%
+ * - 文生图 20 积分/次 ≈ ¥0.80 — 含试衣/解析；调度+存储+出网，平台侧毛利 ≥60%
  * - 图生视频 80 积分/次 ≈ ¥3.20 — 15s 任务编排、预览缓存、队列（不含厂商费）
  * - 视频生视频 100 积分/次 ≈ ¥4.00 — 较图生视频多一轮素材读写与转码
+ * - 视频理解 15 积分/次 ≈ ¥0.60 — VL 视频附件 IO + 编排
+ * - TTS 12 积分/次 ≈ ¥0.48 — 同步音频落 OSS
  */
 import type { ByokTaskKind } from "@prisma/client";
 
@@ -20,25 +24,89 @@ export const BYOK_SCOPE_TEAM_SEAT = "team-seat";
 export const BYOK_TEAM_MIN_SEATS = 3;
 
 export const BYOK_TASK_KIND_LABEL: Record<ByokTaskKind, string> = {
-  TEXT_TO_IMAGE: "文生图",
+  TEXT_TO_IMAGE: "文生图（含试衣）",
   IMAGE_TO_VIDEO: "图生视频",
   VIDEO_TO_VIDEO: "视频生视频",
+  VIDEO_UNDERSTANDING: "视频理解",
+  TTS: "TTS / 语音",
 };
 
-/** 将 Gateway 日志映射为 BYOK 任务类型（报表与结算共用）。 */
+/** 从 Gateway 日志解析试衣模型 key（用于明细按模型归类）。 */
+export function extractTryonModelKey(log: {
+  model?: string | null;
+  canonicalModelKey?: string | null;
+  inputSummary?: unknown;
+}): string {
+  const fromSummary =
+    log.inputSummary && typeof log.inputSummary === "object" && !Array.isArray(log.inputSummary)
+      ? String((log.inputSummary as Record<string, unknown>).model ?? "").trim()
+      : "";
+  return (log.canonicalModelKey ?? log.model ?? fromSummary ?? "aitryon").trim() || "aitryon";
+}
+
+function chatMessagesFromInputSummary(inputSummary: unknown): unknown[] {
+  if (!inputSummary || typeof inputSummary !== "object" || Array.isArray(inputSummary)) return [];
+  const input = (inputSummary as Record<string, unknown>).input;
+  if (!input || typeof input !== "object" || Array.isArray(input)) return [];
+  const messages = (input as Record<string, unknown>).messages;
+  return Array.isArray(messages) ? messages : [];
+}
+
+function messageContentParts(content: unknown): unknown[] {
+  if (Array.isArray(content)) return content;
+  if (content != null && typeof content === "object") return [content];
+  return [];
+}
+
+/** CHAT 请求是否含 video_url 多模态部件（视频理解）。 */
+export function hasVideoAttachmentInChatInput(inputSummary: unknown): boolean {
+  for (const msg of chatMessagesFromInputSummary(inputSummary)) {
+    if (!msg || typeof msg !== "object") continue;
+    for (const part of messageContentParts((msg as Record<string, unknown>).content)) {
+      if (!part || typeof part !== "object") continue;
+      if ((part as Record<string, unknown>).type === "video_url") return true;
+    }
+  }
+  return false;
+}
+
+function isVideoToVideoInput(inputSummary: unknown): boolean {
+  const s =
+    inputSummary && typeof inputSummary === "object" && !Array.isArray(inputSummary)
+      ? (inputSummary as Record<string, unknown>)
+      : null;
+  if (!s) return false;
+  const nested =
+    s.input && typeof s.input === "object" && !Array.isArray(s.input)
+      ? (s.input as Record<string, unknown>)
+      : null;
+  return Boolean(
+    s.sourceVideo ||
+      s.videoUrl ||
+      s.referenceVideo ||
+      s.mode === "v2v" ||
+      s.taskType === "video2video" ||
+      nested?.sourceVideo ||
+      nested?.videoUrl ||
+      nested?.referenceVideo ||
+      nested?.mode === "v2v" ||
+      nested?.taskType === "video2video",
+  );
+}
+
+/** 将 Gateway 日志映射为 BYOK 任务类型（报表与结算共用）。纯 CHAT 文字返回 null。 */
 export function mapLogToByokTaskKind(log: {
   requestKind: string;
   inputSummary?: unknown;
 }): ByokTaskKind | null {
-  if (log.requestKind === "IMAGE" || log.requestKind === "CHAT") return "TEXT_TO_IMAGE";
+  if (log.requestKind === "TTS") return "TTS";
+  if (log.requestKind === "IMAGE" || log.requestKind === "TRYON") return "TEXT_TO_IMAGE";
+  if (log.requestKind === "CHAT") {
+    if (hasVideoAttachmentInChatInput(log.inputSummary)) return "VIDEO_UNDERSTANDING";
+    return null;
+  }
   if (log.requestKind === "VIDEO") {
-    const s =
-      log.inputSummary && typeof log.inputSummary === "object" && !Array.isArray(log.inputSummary)
-        ? (log.inputSummary as Record<string, unknown>)
-        : null;
-    if (s?.sourceVideo || s?.videoUrl || s?.referenceVideo || s?.mode === "v2v" || s?.taskType === "video2video") {
-      return "VIDEO_TO_VIDEO";
-    }
+    if (isVideoToVideoInput(log.inputSummary)) return "VIDEO_TO_VIDEO";
     return "IMAGE_TO_VIDEO";
   }
   return null;
@@ -49,6 +117,8 @@ export const BYOK_PLATFORM_COST_ESTIMATE_YUAN: Record<ByokTaskKind, number> = {
   TEXT_TO_IMAGE: 0.08,
   IMAGE_TO_VIDEO: 0.28,
   VIDEO_TO_VIDEO: 0.36,
+  VIDEO_UNDERSTANDING: 0.12,
+  TTS: 0.06,
 };
 
 export interface ByokQuotaSeed {
@@ -78,15 +148,89 @@ export const DEFAULT_BYOK_CONFIGS = [
 
 /** 个人 / 团队（每席）默认月度额度 */
 export const DEFAULT_BYOK_QUOTAS: ByokQuotaSeed[] = [
-  { scopeKey: BYOK_SCOPE_PERSONAL, taskKind: "TEXT_TO_IMAGE", label: "文生图", monthlyIncluded: 100, overageCredits: 20 },
-  { scopeKey: BYOK_SCOPE_PERSONAL, taskKind: "IMAGE_TO_VIDEO", label: "图生视频", monthlyIncluded: 20, overageCredits: 80 },
-  { scopeKey: BYOK_SCOPE_PERSONAL, taskKind: "VIDEO_TO_VIDEO", label: "视频生视频", monthlyIncluded: 10, overageCredits: 100 },
-  { scopeKey: BYOK_SCOPE_TEAM_SEAT, taskKind: "TEXT_TO_IMAGE", label: "文生图", monthlyIncluded: 80, overageCredits: 20 },
-  { scopeKey: BYOK_SCOPE_TEAM_SEAT, taskKind: "IMAGE_TO_VIDEO", label: "图生视频", monthlyIncluded: 15, overageCredits: 80 },
-  { scopeKey: BYOK_SCOPE_TEAM_SEAT, taskKind: "VIDEO_TO_VIDEO", label: "视频生视频", monthlyIncluded: 8, overageCredits: 100 },
+  {
+    scopeKey: BYOK_SCOPE_PERSONAL,
+    taskKind: "TEXT_TO_IMAGE",
+    label: "文生图（含试衣）",
+    monthlyIncluded: 130,
+    overageCredits: 20,
+  },
+  {
+    scopeKey: BYOK_SCOPE_PERSONAL,
+    taskKind: "IMAGE_TO_VIDEO",
+    label: "图生视频",
+    monthlyIncluded: 20,
+    overageCredits: 80,
+  },
+  {
+    scopeKey: BYOK_SCOPE_PERSONAL,
+    taskKind: "VIDEO_TO_VIDEO",
+    label: "视频生视频",
+    monthlyIncluded: 10,
+    overageCredits: 100,
+  },
+  {
+    scopeKey: BYOK_SCOPE_PERSONAL,
+    taskKind: "VIDEO_UNDERSTANDING",
+    label: "视频理解",
+    monthlyIncluded: 30,
+    overageCredits: 15,
+  },
+  { scopeKey: BYOK_SCOPE_PERSONAL, taskKind: "TTS", label: "TTS / 语音", monthlyIncluded: 40, overageCredits: 12 },
+  {
+    scopeKey: BYOK_SCOPE_TEAM_SEAT,
+    taskKind: "TEXT_TO_IMAGE",
+    label: "文生图（含试衣）",
+    monthlyIncluded: 100,
+    overageCredits: 20,
+  },
+  {
+    scopeKey: BYOK_SCOPE_TEAM_SEAT,
+    taskKind: "IMAGE_TO_VIDEO",
+    label: "图生视频",
+    monthlyIncluded: 15,
+    overageCredits: 80,
+  },
+  {
+    scopeKey: BYOK_SCOPE_TEAM_SEAT,
+    taskKind: "VIDEO_TO_VIDEO",
+    label: "视频生视频",
+    monthlyIncluded: 8,
+    overageCredits: 100,
+  },
+  {
+    scopeKey: BYOK_SCOPE_TEAM_SEAT,
+    taskKind: "VIDEO_UNDERSTANDING",
+    label: "视频理解",
+    monthlyIncluded: 24,
+    overageCredits: 15,
+  },
+  { scopeKey: BYOK_SCOPE_TEAM_SEAT, taskKind: "TTS", label: "TTS / 语音", monthlyIncluded: 32, overageCredits: 12 },
 ];
 
 const LEGACY_BYOK_SCOPES = ["personal-standard", "personal-pro", "team-base"];
+
+const BYOK_QUOTA_TASK_KINDS: ByokTaskKind[] = [
+  "TEXT_TO_IMAGE",
+  "IMAGE_TO_VIDEO",
+  "VIDEO_TO_VIDEO",
+  "VIDEO_UNDERSTANDING",
+  "TTS",
+];
+
+/** 定价页 / 账户权益表展示顺序（不含文字、其他）。 */
+export const BYOK_QUOTA_DISPLAY_ORDER = BYOK_QUOTA_TASK_KINDS;
+
+function quotaSortIndex(taskKind: string): number {
+  const i = BYOK_QUOTA_TASK_KINDS.indexOf(taskKind as ByokTaskKind);
+  return i >= 0 ? i : 999;
+}
+
+export function sortByokQuotasForDisplay<
+  T extends { taskKind: string },
+>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => quotaSortIndex(a.taskKind) - quotaSortIndex(b.taskKind));
+}
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
@@ -149,6 +293,19 @@ export function simulateByokMonth(input: {
   };
 }
 
+/** 套餐内五类任务用满时的 usage 向量（测算用）。 */
+export function buildByokIncludedUsageFromQuotas(
+  scopeQuotas: { taskKind: ByokTaskKind; monthlyIncluded: number }[],
+  seats = 1,
+): Partial<Record<ByokTaskKind, number>> {
+  const usage: Partial<Record<ByokTaskKind, number>> = {};
+  for (const kind of BYOK_QUOTA_TASK_KINDS) {
+    const q = scopeQuotas.find((row) => row.taskKind === kind);
+    if (q) usage[kind] = q.monthlyIncluded * seats;
+  }
+  return usage;
+}
+
 export function buildByokPricingStandards() {
   const lightPack = CREDIT_TOPUP_PACKS[0];
   return {
@@ -164,7 +321,7 @@ export function buildByokPricingStandards() {
         taskKind: "TEXT_TO_IMAGE" as const,
         credits: 20,
         yuan: round2(20 * DEFAULT_CREDIT_ANCHOR_YUAN),
-        note: "调度 + 临时存储 + 出网；厂商生图费用户自理",
+        note: "含试衣/解析；调度 + 临时存储 + 出网；厂商生图费用户自理",
       },
       {
         taskKind: "IMAGE_TO_VIDEO" as const,
@@ -177,6 +334,18 @@ export function buildByokPricingStandards() {
         credits: 100,
         yuan: round2(100 * DEFAULT_CREDIT_ANCHOR_YUAN),
         note: "双视频素材读写与转码；厂商费用户自理",
+      },
+      {
+        taskKind: "VIDEO_UNDERSTANDING" as const,
+        credits: 15,
+        yuan: round2(15 * DEFAULT_CREDIT_ANCHOR_YUAN),
+        note: "视频附件 VL 分析 IO + 编排；厂商 token 费用户自理",
+      },
+      {
+        taskKind: "TTS" as const,
+        credits: 12,
+        yuan: round2(12 * DEFAULT_CREDIT_ANCHOR_YUAN),
+        note: "同步 TTS + OSS；厂商语音费用户自理",
       },
     ],
   };
@@ -230,6 +399,8 @@ export async function buildByokFinanceReport(periodKey: string) {
     TEXT_TO_IMAGE: 0,
     IMAGE_TO_VIDEO: 0,
     VIDEO_TO_VIDEO: 0,
+    VIDEO_UNDERSTANDING: 0,
+    TTS: 0,
     OTHER: 0,
   };
   for (const log of gatewayLogs) {
@@ -361,22 +532,21 @@ export async function buildByokFinanceReport(periodKey: string) {
       techServiceFeeYuan: fee,
       seats,
       quotas: scopeQuotas,
-      usage: {
-        TEXT_TO_IMAGE: scopeQuotas.find((q) => q.taskKind === "TEXT_TO_IMAGE")?.monthlyIncluded ?? 0,
-        IMAGE_TO_VIDEO: scopeQuotas.find((q) => q.taskKind === "IMAGE_TO_VIDEO")?.monthlyIncluded ?? 0,
-        VIDEO_TO_VIDEO: scopeQuotas.find((q) => q.taskKind === "VIDEO_TO_VIDEO")?.monthlyIncluded ?? 0,
-      },
+      usage: buildByokIncludedUsageFromQuotas(scopeQuotas, seats),
     });
 
+    const includedUsage = buildByokIncludedUsageFromQuotas(scopeQuotas, seats);
     const exceed = simulateByokMonth({
       scopeKey: cfg.scopeKey,
       techServiceFeeYuan: fee,
       seats,
       quotas: scopeQuotas,
       usage: {
-        TEXT_TO_IMAGE: (scopeQuotas.find((q) => q.taskKind === "TEXT_TO_IMAGE")?.monthlyIncluded ?? 0) + 30,
-        IMAGE_TO_VIDEO: (scopeQuotas.find((q) => q.taskKind === "IMAGE_TO_VIDEO")?.monthlyIncluded ?? 0) + 10,
-        VIDEO_TO_VIDEO: (scopeQuotas.find((q) => q.taskKind === "VIDEO_TO_VIDEO")?.monthlyIncluded ?? 0) + 5,
+        TEXT_TO_IMAGE: (includedUsage.TEXT_TO_IMAGE ?? 0) + 30,
+        IMAGE_TO_VIDEO: (includedUsage.IMAGE_TO_VIDEO ?? 0) + 10,
+        VIDEO_TO_VIDEO: (includedUsage.VIDEO_TO_VIDEO ?? 0) + 5,
+        VIDEO_UNDERSTANDING: (includedUsage.VIDEO_UNDERSTANDING ?? 0) + 10,
+        TTS: (includedUsage.TTS ?? 0) + 10,
       },
     });
 
@@ -393,7 +563,7 @@ export async function buildByokFinanceReport(periodKey: string) {
         scopeKey: cfg.scopeKey,
         label: cfg.label,
         scenario: "超出额度（需轻量包）",
-        description: "文生图 +30、图生视频 +10、视频生视频 +5 次超额示例",
+        description: "五类任务各 +5～30 次超额示例",
       },
     ];
   });

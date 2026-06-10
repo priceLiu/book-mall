@@ -10,6 +10,7 @@
  *  - 月结 = 技术服务费(按档/席位) + 资源费(用量×系数)。
  */
 import { prisma } from "@/lib/prisma";
+import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
 
 import {
   consumeCredits,
@@ -65,7 +66,7 @@ export async function quoteTeamPlan(input: {
   if (!plan) throw new Error(`套餐不存在：${input.planId}`);
   if (plan.family !== "TEAM") throw new Error("非团队套餐不支持席位计算");
 
-  const minSeats = Math.max(1, plan.includedSeats);
+  const minSeats = Math.max(TEAM_MIN_INCLUDED_SEATS, plan.includedSeats);
   const totalSeats = Math.max(minSeats, Math.round(input.totalSeats));
 
   const tiers = plan.seatTiers.map((t) => ({

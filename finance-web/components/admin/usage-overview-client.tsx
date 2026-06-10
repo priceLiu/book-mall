@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import {
+  PackageReconciliationPanel,
+  type PackageReconciliationData,
+} from "@/components/package-reconciliation-panel";
 
 type OverviewData = {
   filters: { since: string; tool: string; userId: string };
@@ -27,10 +31,15 @@ type OverviewData = {
     billingPersona: string;
     creditsConsumed: number;
     feeDescription: string;
+    settlementKind: string;
+    taskKind: string;
+    quotaDelta: string;
+    includedRemaining: string;
     yuan: number;
   }>;
   exportRows: Array<Record<string, unknown>>;
   exportRangeLabel: string;
+  packageReconciliation?: PackageReconciliationData | null;
 };
 
 const inputCls =
@@ -219,6 +228,10 @@ export function UsageOverviewClient() {
         </div>
       </section>
 
+      {data.packageReconciliation ? (
+        <PackageReconciliationPanel data={data.packageReconciliation} />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
         <AggList title="按月份" rows={data.byMonth} fmtKey={monthLabel} />
         <AggList title="按工具" rows={data.byTool} />
@@ -242,13 +255,15 @@ export function UsageOverviewClient() {
               <th className="px-2 py-2 text-left">请求类型</th>
               <th className="px-2 py-2 text-left">计费身份</th>
               <th className="px-2 py-2 text-right">消耗积分</th>
+              <th className="px-2 py-2 text-left">结算类型</th>
+              <th className="px-2 py-2 text-left">任务/扣次/剩余</th>
               <th className="px-2 py-2 text-left">费用说明</th>
             </tr>
           </thead>
           <tbody>
             {data.recentLines.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-2 py-6 text-center text-[#8c8c8c]">
+                <td colSpan={10} className="px-2 py-6 text-center text-[#8c8c8c]">
                   无数据
                 </td>
               </tr>
@@ -266,6 +281,12 @@ export function UsageOverviewClient() {
                 <td className="px-2 py-1.5">{l.requestKind}</td>
                 <td className="px-2 py-1.5">{l.billingPersona}</td>
                 <td className="px-2 py-1.5 text-right">{l.creditsConsumed}</td>
+                <td className="px-2 py-1.5">{l.settlementKind || "—"}</td>
+                <td className="px-2 py-1.5 text-[#595959]">
+                  {[l.taskKind, l.quotaDelta !== "—" && l.quotaDelta !== "" ? `-${l.quotaDelta}` : null, l.includedRemaining !== "—" ? `剩${l.includedRemaining}` : null]
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </td>
                 <td className="px-2 py-1.5 text-[#595959]">{l.feeDescription}</td>
               </tr>
             ))}
