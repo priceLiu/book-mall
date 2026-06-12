@@ -876,6 +876,8 @@ export async function runVideoEngineNode(
           u !== mainFrameImageUrl,
       )
     : imageInputs.slice(1);
+  const lastFrameImageUrl = String(data.lastFrameImageUrl ?? "").trim();
+  const forceReferenceMode = data.forceReferenceMode === true;
   const expandedPrompt = expandVideoPrompt(promptBase, referenceImageUrls);
   if (!expandedPrompt.trim()) {
     throw new CanvasProjectError("EMPTY_PROMPT", "video-engine prompt 为空");
@@ -990,13 +992,15 @@ export async function runVideoEngineNode(
           referenceImageUrls,
           referenceVideoUrls: refVideos,
           referenceAudioUrls: refAudios,
+          lastFrameUrl: lastFrameImageUrl,
+          forceReferenceMode,
           options: {
             resolution: String(params.resolution ?? "1080p"),
             duration: Number(params.duration ?? 5),
             generateAudio: params.generate_audio === true || params.generateAudio === true,
             watermark: params.watermark === true,
           },
-          aspectRatio: params.aspect_ratio === "9:16" ? "9:16" : "16:9",
+          aspectRatio: String(params.aspect_ratio ?? "16:9"),
         });
         return { model: built.model, input: built.body };
       })()
@@ -1038,6 +1042,9 @@ export async function runVideoEngineNode(
         ...(isVolcengineVideo
           ? { volcengineModel: model, volcengineBody: input }
           : { kieModel: model, kieInput: input }),
+        ...(data.sbv1Billing && typeof data.sbv1Billing === "object"
+          ? { sbv1Billing: data.sbv1Billing }
+          : {}),
         syncGatewaySubmit: true,
         ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
@@ -1061,6 +1068,9 @@ export async function runVideoEngineNode(
     ...(isVolcengineVideo
       ? { volcengineModel: model, volcengineBody: input }
       : { kieModel: model, kieInput: input }),
+    ...(data.sbv1Billing && typeof data.sbv1Billing === "object"
+      ? { sbv1Billing: data.sbv1Billing }
+      : {}),
     ...(args.storyScope ? { storyScope: args.storyScope } : {}),
   };
 

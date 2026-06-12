@@ -7,7 +7,13 @@ export type StoryLlmSection = "outline" | "character" | "storyboard";
 export type StoryRunContext = {
   llmSection?: StoryLlmSection;
   rowKey?: string;
-  mediaKind?: "threeView" | "frameImage" | "video" | "tts" | "sceneRef";
+  mediaKind?:
+    | "threeView"
+    | "frameImage"
+    | "video"
+    | "tts"
+    | "sceneRef"
+    | "themeOutline";
 };
 
 export type StoryCharacterRow = {

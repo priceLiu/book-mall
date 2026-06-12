@@ -9,6 +9,12 @@ import {
 } from "@/lib/canvas-api";
 import { useCanvasStore } from "./store";
 import { directPredecessors } from "./topo";
+import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
+import { dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
+import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
+import { pro2DockMentionRefCatalog } from "./pro2-dock-ref-catalog";
+import { resolveSbv1UpstreamRefLinks } from "./sbv1-upstream-ref-links";
+import type { StoryRefImage } from "./story-ref-image";
 import { collectRefImageUrlsFromGridNode } from "./ref-video-edges";
 import { isRefGridNodeType } from "./ref-video-models";
 import type {
@@ -153,8 +159,8 @@ export function useCanvasInflightTaskCount(): number {
   return useCanvasStore((s) => countCanvasInflightWork(s.nodes));
 }
 
-/** 解析单个生图引擎节点上游的图片 URL 列表（保持顺序去重）。 */
-function resolveImageInputs(
+/** 解析单个生图/视频引擎节点上游的图片 URL 列表（保持顺序去重）。 */
+function resolveImageInputsRaw(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
   nodeId: string,
@@ -165,6 +171,9 @@ function resolveImageInputs(
     if (!p) continue;
     if (p.type === "image") {
       const d = p.data as unknown as ImageNodeData;
+      if (d.ossUrl) out.push(d.ossUrl);
+    } else if (p.type === "sbv1-image") {
+      const d = p.data as { ossUrl?: string; blobUrl?: string };
       if (d.ossUrl) out.push(d.ossUrl);
     } else if (isRefGridNodeType(p.type ?? "")) {
       out.push(...collectRefImageUrlsFromGridNode(p));
@@ -179,6 +188,129 @@ function resolveImageInputs(
     }
   }
   return Array.from(new Set(out));
+}
+
+function promptForDockMentionFilter(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  rowKey?: string,
+): string {
+  const d = node.data as Record<string, unknown>;
+  if (node.type === "sbv1-video-engine") {
+    return String(d.prompt ?? "");
+  }
+  if (node.type === "story-pro2-starter") {
+    return String(d.themeInput ?? "");
+  }
+  if (node.type === "story-pro2-script-hub") {
+    return String(d.dockInput ?? "");
+  }
+  if (
+    node.type === "story-pro2-image" ||
+    node.type === "story-pro2-three-view"
+  ) {
+    return String(d.dockInput ?? "");
+  }
+  if (rowKey && isStoryWorkspaceNodeType(node.type ?? "")) {
+    const rows = (d.rows as { key?: string; prompt?: string }[] | undefined) ?? [];
+    const row = rows.find((r) => r.key === rowKey);
+    if (row?.prompt) return String(row.prompt);
+    const imageNode = nodes.find(
+      (n) =>
+        (n.type === "story-pro2-image" || n.type === "story-pro2-three-view") &&
+        (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
+          .pro2ControllerNodeId === node.id &&
+        (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
+    );
+    if (imageNode) {
+      return String(
+        (imageNode.data as { dockInput?: string }).dockInput ?? "",
+      );
+    }
+  }
+  return "";
+}
+
+function mentionCatalogForNode(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  rowKey?: string,
+): { id: string; url?: string }[] {
+  if (node.type === "sbv1-video-engine") {
+    return resolveSbv1UpstreamRefLinks(node.id, nodes, edges).map((l) => ({
+      id: l.id,
+      url: l.previewUrl,
+    }));
+  }
+
+  if (
+    node.type === "story-pro2-starter" ||
+    node.type === "story-pro2-script-hub" ||
+    node.type === "story-pro2-image" ||
+    node.type === "story-pro2-three-view"
+  ) {
+    const nodeType = node.type ?? "";
+    const dockRefImages = (
+      (node.data as { dockRefImages?: StoryRefImage[] }).dockRefImages ?? []
+    ) as StoryRefImage[];
+    const links = resolvePro2DockUpstreamLinks(
+      node.id,
+      nodeType,
+      nodes,
+      edges,
+    );
+    return pro2DockMentionRefCatalog(links, dockRefImages);
+  }
+
+  if (rowKey && isStoryWorkspaceNodeType(node.type ?? "")) {
+    const imageNode = nodes.find(
+      (n) =>
+        (n.type === "story-pro2-image" || n.type === "story-pro2-three-view") &&
+        (n.data as { pro2ControllerNodeId?: string; pro2RowKey?: string })
+          .pro2ControllerNodeId === node.id &&
+        (n.data as { pro2RowKey?: string }).pro2RowKey === rowKey,
+    );
+    if (imageNode) {
+      const d = imageNode.data as {
+        dockRefImages?: StoryRefImage[];
+      };
+      const links = resolvePro2DockUpstreamLinks(
+        imageNode.id,
+        imageNode.type ?? "",
+        nodes,
+        edges,
+      );
+      return pro2DockMentionRefCatalog(links, d.dockRefImages ?? []);
+    }
+  }
+
+  return [];
+}
+
+function resolveImageInputs(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  nodeId: string,
+  opts?: { prompt?: string; rowKey?: string },
+): string[] {
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node) return [];
+
+  const prompt =
+    opts?.prompt ??
+    promptForDockMentionFilter(node, nodes, edges, opts?.rowKey);
+  const catalog = mentionCatalogForNode(node, nodes, edges, opts?.rowKey);
+
+  if (prompt.trim() && catalog.length > 0) {
+    const mentioned = parseReferencedIds(prompt);
+    if (mentioned.length > 0) {
+      return dockMentionRefUrlsForPrompt(prompt, catalog);
+    }
+  }
+
+  return resolveImageInputsRaw(nodes, edges, nodeId);
 }
 
 /** ai-engine / story LLM 完成时，把 textOutput 写入下游 text / md-preview 依赖的 text 节点 */
@@ -235,10 +367,22 @@ function resolveTextInputs(
       const d = p.data as unknown as StoryComicStarterNodeData;
       const sp = d.systemPrompt?.trim() || d.theme?.trim();
       if (sp) out.push(sp);
+    } else if (p.type === "story-pro2-starter") {
+      const d = p.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
+      const script = resolveStoryProStarterScriptInput(nodes, edges, pid);
+      if (script) out.push(script);
+      if (d.generatedOutlineMd?.trim()) out.push(d.generatedOutlineMd.trim());
+      if (d.themeInput?.trim() && !d.generatedOutlineMd?.trim()) {
+        out.push(d.themeInput.trim());
+      }
     } else if (p.type === "story-pro-starter") {
       const d = p.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
       const script = resolveStoryProStarterScriptInput(nodes, edges, pid);
       if (script) out.push(script);
+      if (d.generatedOutlineMd?.trim()) out.push(d.generatedOutlineMd.trim());
+      if (d.themeInput?.trim() && !d.generatedOutlineMd?.trim()) {
+        out.push(d.themeInput.trim());
+      }
       if (d.systemPrompt?.trim()) {
         out.push(`## 导演提示词\n\n${d.systemPrompt.trim()}`);
       }
@@ -445,7 +589,9 @@ export function useCanvasRunner(
           return;
         }
 
-        const imageInputs = resolveImageInputs(state.nodes, state.edges, nodeId);
+        const imageInputs = resolveImageInputs(state.nodes, state.edges, nodeId, {
+          rowKey: job.rowKey,
+        });
         const textInputs = resolveStoryHubSectionTextInputs(
           node,
           job.llmSection,
@@ -811,7 +957,11 @@ export function useCanvasRunner(
       if (inflightRef.current.has(key)) return;
       if (queueRef.current.some((q) => runKey(q) === key)) return;
       const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
-      if (node?.type === "story-script-hub" && job.llmSection) {
+      if (
+        node &&
+        isAnyStoryScriptHubType(node.type ?? "") &&
+        job.llmSection
+      ) {
         const st = hubSectionRuntime(node, job.llmSection)?.status;
         if (isCanvasInflightStatus(st)) return;
       }
@@ -863,32 +1013,36 @@ export function useCanvasRunner(
   const enqueueStoryRunsSequential = useCallback(
     (jobs: QueueItem[], forceFresh?: boolean) => {
       if (!jobs.length) return;
+
+      const normalized = jobs.map((j) => ({
+        ...j,
+        forceFresh: j.forceFresh ?? forceFresh,
+      }));
+
+      const runnable = normalized.filter((job) => {
+        const key = runKey(job);
+        if (inflightRef.current.has(key)) return false;
+        if (queueRef.current.some((q) => runKey(q) === key)) return false;
+        return true;
+      });
+      if (!runnable.length) return;
+
       const seq = sequentialRef.current;
-      const head = jobs[0];
-      if (head) {
-        const headKey = runKey(head);
-        if (
-          inflightRef.current.has(headKey) ||
-          queueRef.current.some((q) => runKey(q) === headKey)
-        ) {
-          return;
+      if (seq && (seq.activeKey || seq.cursor < seq.jobs.length)) {
+        const existing = new Set([
+          ...(seq.activeKey ? [seq.activeKey] : []),
+          ...seq.jobs.slice(seq.cursor).map(runKey),
+        ]);
+        const toAppend = runnable.filter((j) => !existing.has(runKey(j)));
+        if (toAppend.length) {
+          seq.jobs.push(...toAppend);
+          pumpSequential();
         }
-        if (
-          seq?.activeKey &&
-          (seq.activeKey === headKey ||
-            seq.jobs.some(
-              (j) =>
-                runKey(j) === headKey ||
-                (head.llmSection &&
-                  j.nodeId === head.nodeId &&
-                  j.llmSection === head.llmSection),
-            ))
-        ) {
-          return;
-        }
+        return;
       }
+
       sequentialRef.current = {
-        jobs: jobs.map((j) => ({ ...j, forceFresh: j.forceFresh ?? forceFresh })),
+        jobs: runnable,
         cursor: 0,
         forceFresh,
         activeKey: null,
@@ -1131,11 +1285,15 @@ export function useCanvasRunner(
             (n) =>
               n.type === "story-character-column" ||
               n.type === "story-pro-character" ||
+              n.type === "story-pro2-character" ||
               n.type === "story-pro-scene" ||
+              n.type === "story-pro2-scene" ||
               n.type === "story-frame-column" ||
               n.type === "story-pro-frame" ||
+              n.type === "story-pro2-frame" ||
               n.type === "story-video-column" ||
-              n.type === "story-pro-video",
+              n.type === "story-pro-video" ||
+              n.type === "story-pro2-video",
           )
           .map((n) => n.id),
       );
@@ -1234,11 +1392,22 @@ export function useCanvasRunner(
         if (cancelled) return;
         const nodesNow = useCanvasStore.getState().nodes;
         applyStoryColumnRowTasks(tasks, nodesNow);
+        const skipReconcileNodeIds = new Set<string>();
+        for (const key of inflightRef.current) {
+          skipReconcileNodeIds.add(key.split(":")[0]!);
+        }
+        for (const key of deferredForceFreshRef.current.keys()) {
+          skipReconcileNodeIds.add(key.split(":")[0]!);
+        }
+        for (const job of queueRef.current) {
+          skipReconcileNodeIds.add(job.nodeId);
+        }
         reconcileStaleInflightRuntimes(
           useCanvasStore.getState().nodes,
           tasks,
           updateNodeData,
           setNodeRuntime,
+          { skipNodeIds: skipReconcileNodeIds },
         );
         const columnIds = storyColumnNodeIds();
         const latestByNode = latestTasksByNode(tasks);

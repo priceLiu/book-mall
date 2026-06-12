@@ -14,11 +14,13 @@ import {
 import {
   storyEditionAccent,
   storyEditionFromNodeType,
+  storyEditionUsesProWorkspace,
 } from "@/lib/canvas/story-edition-chrome";
 import {
   PRO_NODE_SHELL_FOOTER_CLASS,
   PRO_ROW_PRIMARY_BTN_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
+import { PRO2_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { THREE_VIEW_ENGINE_MODEL_KEYS } from "@/lib/canvas/types";
 import {
   autoFillStoryProCharacterSlotsFromThreeView,
@@ -62,10 +64,10 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   const d = data as unknown as StoryCharacterColumnNodeData;
   const stored = d.rows ?? [];
   const { assets: characterAssets } = useStoryProCharacterAssets(
-    edition === "pro" ? projectId : null,
+    storyEditionUsesProWorkspace(edition) ? projectId : null,
   );
   const { assets: audioAssets } = useStoryProCharacterAudioAssets(
-    edition === "pro" ? projectId : null,
+    storyEditionUsesProWorkspace(edition) ? projectId : null,
   );
   const [preview, setPreview] = useState<{
     url: string;
@@ -104,7 +106,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   const targetSize = useMemo(
     () =>
       storyCharacterColumnSize(displayRows, {
-        pro: edition === "pro",
+        pro: storyEditionUsesProWorkspace(edition),
       }),
     [displayRows, edition],
   );
@@ -251,7 +253,11 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
       ]}
       outputs={[{ id: "text", label: "三视图", kind: "image" }]}
       footerClassName={
-        edition === "pro" ? PRO_NODE_SHELL_FOOTER_CLASS : undefined
+        edition === "pro2"
+          ? PRO2_NODE_SHELL_FOOTER_CLASS
+          : storyEditionUsesProWorkspace(edition)
+            ? PRO_NODE_SHELL_FOOTER_CLASS
+            : undefined
       }
       footer={
         <StoryNodeFooterShell>
@@ -274,7 +280,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
         <EnginePicker
           role="IMAGE"
           allowedModelKeys={[...THREE_VIEW_ENGINE_MODEL_KEYS]}
-          requiredCapabilities={edition === "pro" ? ["image_multi_ref"] : undefined}
+          requiredCapabilities={storyEditionUsesProWorkspace(edition) ? ["image_multi_ref"] : undefined}
           capabilityHint="角色多参考图生图需支持 multi_ref 的模型（如 nano-banana-pro）"
           providerId={d.batchImage?.providerId ?? ""}
           modelKey={d.batchImage?.modelKey ?? ""}
@@ -292,7 +298,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
               const st = row.runtime?.status ?? "idle";
               const running = st === "running" || st === "pending";
               const rowAsset =
-                edition === "pro"
+                storyEditionUsesProWorkspace(edition)
                   ? findAssetForCharacterRow(
                       characterAssets,
                       row.key,
@@ -302,7 +308,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
                     )
                   : undefined;
               const rowAudioAsset =
-                edition === "pro"
+                storyEditionUsesProWorkspace(edition)
                   ? findAudioAssetForCharacterRow(
                       audioAssets,
                       row.key,
@@ -334,7 +340,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
                         : undefined
                     }
                   />
-                  {edition === "pro" ? (
+                  {storyEditionUsesProWorkspace(edition) ? (
                     <StoryProCharacterAssetSlots
                       row={row}
                       asset={rowAsset}
@@ -345,7 +351,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
                       onPreview={(u, title) => setPreview({ url: u, title })}
                     />
                   ) : null}
-                  {edition === "pro" ? (
+                  {storyEditionUsesProWorkspace(edition) ? (
                     <StoryProCharacterAudioSlot
                       rowKey={row.key}
                       rowName={row.name}
@@ -353,7 +359,7 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
                       audioAsset={rowAudioAsset}
                     />
                   ) : null}
-                  {edition === "pro" && url ? (
+                  {storyEditionUsesProWorkspace(edition) && url ? (
                     <button
                       type="button"
                       className={`nodrag ${PRO_ROW_PRIMARY_BTN_CLASS}`}

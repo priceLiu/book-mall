@@ -177,6 +177,8 @@ docker compose up -d --build
 - 镜像构建使用 **`pnpm run build:docker`** 或 **`npm run build`**（视各工程 `package.json` 而定）。
 - **finance-web** 使用 Node 22 + `NODE_OPTIONS=--experimental-sqlite`（Prisma 相关依赖）。
 - **story-web** 使用 Node 22，结构与 finance-web 相同。
+- **book-mall** 云端自动剪辑（Media Render）与电商分镜合并依赖容器内 **ffmpeg** / **ffprobe**；镜像须预装（与历史 `ecomMergeStoryboardPanelVideos` 相同）。定时清理过期成片：`pnpm media-render:expire`。
+- **Gateway 模型注册表**：`migrate deploy` 后若出现「模型未在 Gateway 注册」500（如试衣 `aitryon`），在 book-mall 执行一次 `pnpm gateway:seed-registry`（脚本内带 `--confirm`）。日常核查：`pnpm gateway:audit-gaps`、`pnpm gateway:verify-registry`。用户操作见 `docs/自动剪辑.md`。
 
 ---
 

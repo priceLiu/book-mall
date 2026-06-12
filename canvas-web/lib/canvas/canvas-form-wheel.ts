@@ -3,6 +3,9 @@ import type { WheelEvent as ReactWheelEvent } from "react";
 /** 画布内禁用滚轮滚动的控件（仅允许拖动滚动条；滚轮交给画布平移） */
 export const CANVAS_FORM_WHEEL_SELECTOR = "textarea, select";
 
+/** Pro2 节点内可滚动预览区：勿加 nowheel，滚轮仍平移画布 */
+export const CANVAS_NODE_SCROLL_SELECTOR = ".pro2-node-scroll";
+
 /** React Flow 根 + 外层 wrap（选区工具条等在 wrap 内、flow 外） */
 export const CANVAS_VIEWPORT_WHEEL_ROOT = ".react-flow, .canvas-flow-wrap";
 
@@ -23,6 +26,18 @@ function isHorizontalDominantWheel(nativeEvent: WheelEvent): boolean {
 export function isCanvasFormWheelTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
   return !!target.closest(CANVAS_FORM_WHEEL_SELECTOR);
+}
+
+export function isCanvasNodeScrollWheelTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest(CANVAS_NODE_SCROLL_SELECTOR);
+}
+
+/** 滚轮不滚内容、交给 React Flow panOnScroll（与 textarea 相同策略） */
+export function isCanvasWheelScrollBlockTarget(target: EventTarget | null): boolean {
+  return (
+    isCanvasFormWheelTarget(target) || isCanvasNodeScrollWheelTarget(target)
+  );
 }
 
 export function isCanvasEditorWheelTarget(target: EventTarget | null): boolean {
@@ -62,7 +77,7 @@ export function shouldBlockCanvasViewportWheel(nativeEvent: WheelEvent): boolean
  * 以便 React Flow `panOnScroll` 仍能平移画布。控件勿加 `nowheel`。
  */
 export function blockCanvasFormWheelScroll(nativeEvent: WheelEvent): void {
-  if (!isCanvasFormWheelTarget(nativeEvent.target)) return;
+  if (!isCanvasWheelScrollBlockTarget(nativeEvent.target)) return;
   nativeEvent.preventDefault();
 }
 

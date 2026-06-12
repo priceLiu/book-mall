@@ -10,7 +10,7 @@ import { DEEPSEEK_KNOWN_MODELS, DEEPSEEK_SYSTEM_BASE_URL } from "./providers/dee
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
 import { STORY_TTS_GATEWAY_MODELS } from "./providers/story-tts";
 import { getGatewayLinkStatusForUser } from "@/lib/gateway/book-gateway-link";
-import { VOLCENGINE_ALL_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
+import { VOLCENGINE_ALL_KNOWN_MODELS, VOLCENGINE_VIDEO_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
 
 export const GATEWAY_KIE_PROVIDER_ID = "gateway:kie";
@@ -18,6 +18,8 @@ export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
 export const GATEWAY_BAILIAN_PROVIDER_ID = "gateway:bailian";
 export const GATEWAY_HUNYUAN_PROVIDER_ID = "gateway:hunyuan";
 export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";
+/** 分镜视频 1.0 画布专用 · 仅 VOLCENGINE VIDEO（走「火山方舟 · 分镜视频1.0」凭证） */
+export const GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID = "gateway:sbv1-volcengine";
 
 export function isGatewayVirtualProviderId(id: string | null | undefined): boolean {
   return !!id && id.startsWith("gateway:");
@@ -91,6 +93,49 @@ function modelsForKind(kind: GatewayProviderKind): CanvasProviderDto["models"] {
   return [];
 }
 
+function extraSbv1VolcengineEpModels(): typeof VOLCENGINE_VIDEO_KNOWN_MODELS {
+  const raw = process.env.SBV1_VOLCENGINE_EP_MODELS?.trim();
+  if (!raw) return [];
+  const keys = raw
+    .split(/[,;\s]+/)
+    .map((k) => k.trim())
+    .filter((k) => k.toLowerCase().startsWith("ep-"));
+  const known = new Set(
+    VOLCENGINE_VIDEO_KNOWN_MODELS.map((m) => m.modelKey.toLowerCase()),
+  );
+  return keys
+    .filter((k) => !known.has(k.toLowerCase()))
+    .map((modelKey) => ({
+      modelKey,
+      displayName: `接入点 ${modelKey}`,
+      role: "VIDEO" as const,
+      description:
+        "火山方舟控制台接入点 · 真人人像须先录入真人人像库并通过审核",
+      paramsSchema: VOLCENGINE_VIDEO_KNOWN_MODELS[0]?.paramsSchema,
+      defaultParams: {
+        resolution: "720p",
+        duration: 5,
+        generate_audio: false,
+        watermark: false,
+      },
+    }));
+}
+
+function modelsForSbv1Volcengine(): CanvasProviderDto["models"] {
+  const pool = [...VOLCENGINE_VIDEO_KNOWN_MODELS, ...extraSbv1VolcengineEpModels()];
+  return pool.map((m, idx) => ({
+    id: `${GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID}::${m.modelKey}`,
+    modelKey: m.modelKey,
+    displayName: m.displayName,
+    role: m.role,
+    description: m.description ?? null,
+    paramsSchema: m.paramsSchema ?? null,
+    defaultParams: (m.defaultParams as Record<string, unknown> | null) ?? null,
+    enabled: true,
+    sortOrder: idx,
+  }));
+}
+
 export async function listGatewayVirtualProvidersForUser(
   userId: string,
 ): Promise<CanvasProviderDto[]> {
@@ -157,6 +202,19 @@ export async function listGatewayVirtualProvidersForUser(
       lastTestedAt: null,
       lastTestStatus: "gateway",
       models: modelsForKind("VOLCENGINE"),
+      createdAt: now,
+      updatedAt: now,
+    });
+    out.push({
+      id: GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+      alias: "分镜视频 1.0 · 火山 Seedance",
+      kind: "OPENAI_COMPAT",
+      baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+      apiKeyMasked: "gateway",
+      active: true,
+      lastTestedAt: null,
+      lastTestStatus: "gateway",
+      models: modelsForSbv1Volcengine(),
       createdAt: now,
       updatedAt: now,
     });

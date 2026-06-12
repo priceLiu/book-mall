@@ -15,9 +15,11 @@ import {
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 
+import { navigateBookMallFullSignOut } from "@/lib/session-kicked-marker";
+
 /** 见 navbar-sign-out-button.tsx 注释：直接走 full-signout 路由。 */
 function navigateToFullSignOut() {
-  window.location.href = "/api/auth/full-signout?callbackUrl=/";
+  navigateBookMallFullSignOut("/");
 }
 
 /** Ghost 顶栏按钮默认不显式前景色时，在深色/磨砂背景下可能被「吃掉」；与 `bg-card` 顶栏对齐为 card 前景色 */

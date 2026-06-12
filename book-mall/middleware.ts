@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 import {
   allowCloudbaseDefaultOrigins,
+  incomingRequestProto,
   PRODUCTION_MAIN_SITE_ORIGIN,
+  shouldEnforceProductionHttps,
 } from "@/lib/production-origin";
 
 function incomingHost(request: NextRequest): string {
@@ -35,6 +37,24 @@ function canonicalBookHostRedirect(request: NextRequest): NextResponse | null {
   return NextResponse.redirect(dest, 308);
 }
 
+/** 公网 HTTP 访问时 Secure Cookie 无法落盘，须先跳转到 HTTPS。 */
+function enforceProductionHttpsRedirect(request: NextRequest): NextResponse | null {
+  const host = incomingHost(request);
+  const proto = incomingRequestProto(
+    request.headers.get("x-forwarded-proto"),
+    request.nextUrl.protocol,
+  );
+  if (!shouldEnforceProductionHttps(host, proto)) return null;
+
+  const dest = new URL(
+    request.nextUrl.pathname + request.nextUrl.search,
+    `https://${host.toLowerCase()}`,
+  );
+  const status =
+    request.method === "GET" || request.method === "HEAD" ? 308 : 307;
+  return NextResponse.redirect(dest, status);
+}
+
 const withAuthMiddleware = withAuth(
   function middleware(req) {
     const path = req.nextUrl.pathname;
@@ -59,6 +79,9 @@ const withAuthMiddleware = withAuth(
 );
 
 export default function middleware(request: NextRequest, event: NextFetchEvent) {
+  const httpsRedirect = enforceProductionHttpsRedirect(request);
+  if (httpsRedirect) return httpsRedirect;
+
   const early = canonicalBookHostRedirect(request);
   if (early) return early;
 

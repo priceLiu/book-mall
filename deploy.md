@@ -175,3 +175,4 @@ pnpm reconciliation:run -- --csv=./path/to/aliyun.csv [--admin-user-id=cmp...]
 - **"Failed to fetch" / CORS**：finance-web 应通过 `/api/.../*` server proxy 调主站，不要直接 fetch 主站 origin；检查 `NEXT_PUBLIC_FINANCE_WEB_ORIGIN` 是否与 `lib/finance/cors.ts` 一致。
 - **工具站 402 余额不足**：响应里附 `watermarkPoints + gate`；用户应充值后重试（水位线见 v002 文档 P2-3）。
 - **对账 0 行**：检查 `ToolBillingDetailLine.cloudRow.账单信息/账单月份` 是否为 `YYYYMM`（不是 `YYYY-MM`）；脚本 `billing-refresh-tool-usage-snapshot` 已经把日期格式归一化。
+- **主站 HTTP 无法登录**：生产 NextAuth Cookie 为 `Secure`，须用 `https://book.ai-code8.com` 访问。`book-mall` middleware 会对 `*.ai-code8.com` 的 HTTP 请求 308/307 跳转到 HTTPS；若仍出现明文页，检查 CloudBase 自定义域是否已绑定 TLS 并开启「强制 HTTPS」。

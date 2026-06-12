@@ -35,10 +35,12 @@ import {
   PRO_HINT_LABEL_CLASS,
   PRO_NODE_SHELL_FOOTER_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
+import { PRO2_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { STORY_HINT_LABEL_CLASS } from "@/lib/canvas/story-column-sync";
 import {
   storyEditionAccent,
   storyEditionFromNodeType,
+  storyEditionUsesProWorkspace,
 } from "@/lib/canvas/story-edition-chrome";
 import { storyVideoGenerateBlockReason } from "@/lib/canvas/story-frame-gate";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
@@ -79,7 +81,7 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const { updateNodeData } = useCanvasStoreActions();
   const { providers } = useUserProviders();
   const hintLabelClass =
-    edition === "pro" ? PRO_HINT_LABEL_CLASS : STORY_HINT_LABEL_CLASS;
+    storyEditionUsesProWorkspace(edition) ? PRO_HINT_LABEL_CLASS : STORY_HINT_LABEL_CLASS;
   const d = data as unknown as StoryVideoColumnNodeData;
   const stored = d.rows ?? [];
   const { alert } = useDialogs();
@@ -161,14 +163,14 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const listRowCount = rowsToRender.length;
 
   const alignedRowH = useMemo(
-    () => storyMediaAlignedRowHeight({ pro: edition === "pro" }),
+    () => storyMediaAlignedRowHeight({ pro: storyEditionUsesProWorkspace(edition) }),
     [edition],
   );
 
   const targetSize = useMemo(
     () =>
       storyVideoColumnSize(displayRows, listRowCount, {
-        pro: edition === "pro",
+        pro: storyEditionUsesProWorkspace(edition),
       }),
     [displayRows, listRowCount, edition],
   );
@@ -179,7 +181,11 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const videoDefaultWidth = useMemo(
     () =>
       NODE_DEFAULT_SIZE[
-        edition === "pro" ? "story-pro-video" : "story-video-column"
+        edition === "pro2"
+          ? "story-pro2-video"
+          : edition === "pro"
+            ? "story-pro-video"
+            : "story-video-column"
       ].width,
     [edition],
   );
@@ -222,7 +228,7 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
 
   const storyVideoModelKeys = useMemo(
     () =>
-      edition === "pro"
+      storyEditionUsesProWorkspace(edition)
         ? filterStoryProVideoModelKeys(STORY_PRO_VIDEO_MODEL_KEYS)
         : [...STORY_PRO_VIDEO_MODEL_KEYS],
     [edition],
@@ -446,7 +452,11 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
       inputs={[{ id: "in_text", label: "分镜", kind: "text" }]}
       outputs={[{ id: "text", label: "视频", kind: "image" }]}
       footerClassName={
-        edition === "pro" ? PRO_NODE_SHELL_FOOTER_CLASS : undefined
+        edition === "pro2"
+          ? PRO2_NODE_SHELL_FOOTER_CLASS
+          : storyEditionUsesProWorkspace(edition)
+            ? PRO_NODE_SHELL_FOOTER_CLASS
+            : undefined
       }
       footer={
         <StoryNodeFooterShell>

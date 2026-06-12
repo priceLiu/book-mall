@@ -9,6 +9,8 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
+import { Pro2CanvasLayout } from "@/components/canvas/pro2/pro2-canvas-layout";
+import { Sbv1CanvasLayout } from "@/components/canvas/sbv1/sbv1-canvas-layout";
 import { ScriptWritingAssistantPanel } from "@/components/canvas/script-writing-assistant-panel";
 import { MyTemplatesPanel } from "@/components/canvas/my-templates-panel";
 import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
@@ -52,15 +54,20 @@ import { GatewayLinkBanner } from "@/components/canvas/gateway-link-banner";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
+import { hasStoryPro2Pipeline } from "@/lib/canvas/story-pro2-pipeline";
+import { hasSbv1Pipeline } from "@/lib/canvas/sbv1-pipeline";
 import { canAddStoryNodeType } from "@/lib/canvas/story-edition-isolation";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { resolveStoryProAssistantImport } from "@/lib/canvas/story-pro-script-assistant";
 import { STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT } from "@/lib/canvas/story-pro-theme-templates";
 import { spawnStoryProScriptHub } from "@/lib/canvas/spawn-story-pro-workspace";
+import { spawnStoryPro2ScriptHub } from "@/lib/canvas/spawn-story-pro2-workspace";
 import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout";
+import { reflowStoryPro2Workspace } from "@/lib/canvas/story-pro2-workspace-layout";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
+import { SBV1_BUILTIN_TEMPLATE_ID } from "@/lib/canvas/project-edition";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
@@ -85,7 +92,6 @@ function Inner({ projectId }: { projectId: string }) {
   );
   const isStoryComicCanvas = hasStoryComicPipeline(nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const isStoryProCanvas = hasStoryProPipeline(nodes);
 
   const onImportScriptFromAssistant = useCallback(
     async (md: string) => {
@@ -100,9 +106,9 @@ function Inner({ projectId }: { projectId: string }) {
         return;
       }
 
-      const seedStarter = state.nodes.find(
-        (n) => n.type === "story-pro-starter",
-      );
+      const isPro2 = plan.edition === "pro2";
+      const starterType = isPro2 ? "story-pro2-starter" : "story-pro-starter";
+      const seedStarter = state.nodes.find((n) => n.type === starterType);
       const seedData = (seedStarter?.data ?? {}) as StoryProStarterNodeData;
       const llmSeed = {
         providerId: seedData.providerId ?? "",
@@ -114,7 +120,7 @@ function Inner({ projectId }: { projectId: string }) {
       };
 
       if (plan.spawnNew) {
-        const starterId = addNode("story-pro-starter", plan.position, {
+        const starterId = addNode(starterType, plan.position, {
           starterMode: "upload",
           uploadedScriptMd: md,
           systemPrompt: llmSeed.systemPrompt,
@@ -133,7 +139,7 @@ function Inner({ projectId }: { projectId: string }) {
           return;
         }
         const afterStarter = useCanvasStore.getState();
-        spawnStoryProScriptHub({
+        const spawnArgs = {
           starterNodeId: starterId,
           systemPrompt: llmSeed.systemPrompt,
           providerId: llmSeed.providerId,
@@ -141,13 +147,21 @@ function Inner({ projectId }: { projectId: string }) {
           params: llmSeed.params,
           nodes: afterStarter.nodes,
           edges: afterStarter.edges,
-          addNode: (type, position, data) => addNode(type, position, data),
+          addNode: (type: CanvasContentNodeType, position: { x: number; y: number }, data?: Record<string, unknown>) =>
+            addNode(type, position, data),
           setEdges,
           updateNodeData,
-        });
+        };
+        if (isPro2) {
+          spawnStoryPro2ScriptHub(spawnArgs);
+        } else {
+          spawnStoryProScriptHub(spawnArgs);
+        }
         const laid = useCanvasStore.getState();
         setNodes(() =>
-          reflowStoryProWorkspace(laid.nodes, laid.edges),
+          isPro2
+            ? reflowStoryPro2Workspace(laid.nodes, laid.edges)
+            : reflowStoryProWorkspace(laid.nodes, laid.edges),
         );
         return;
       }
@@ -161,6 +175,14 @@ function Inner({ projectId }: { projectId: string }) {
   );
 
   const [project, setProject] = useState<CanvasProjectDetail | null>(null);
+
+  const isSbv1Project = project?.edition === "sbv1";
+  const isStoryPro2Project = project?.edition === "pro2";
+  const isSbv1Canvas = isSbv1Project || hasSbv1Pipeline(nodes);
+  const isStoryPro2Canvas =
+    (isStoryPro2Project || hasStoryPro2Pipeline(nodes)) && !isSbv1Canvas;
+  const isStoryProCanvas =
+    hasStoryProPipeline(nodes) && !isStoryPro2Canvas && !isSbv1Canvas;
   const [nameDraft, setNameDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -279,6 +301,8 @@ function Inner({ projectId }: { projectId: string }) {
 
   // Autosave on changes (debounced) — store 订阅，避免 nodes 变化触发整页重渲染
   const autosaveTimerRef = useRef<number | null>(null);
+  const autosaveInFlightRef = useRef(false);
+  const autosavePendingRef = useRef(false);
   const autosaveProjectRef = useRef(project);
   const autosaveBaseRef = useRef(base);
   autosaveProjectRef.current = project;
@@ -286,6 +310,57 @@ function Inner({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     if (!project || !base || loading) return;
+
+    const runAutosave = async () => {
+      if (autosaveInFlightRef.current) {
+        autosavePendingRef.current = true;
+        return;
+      }
+      const proj = autosaveProjectRef.current;
+      const bookBase = autosaveBaseRef.current;
+      if (!proj || !bookBase || !canvasReadyRef.current) return;
+
+      autosaveInFlightRef.current = true;
+      setSaving(true);
+      try {
+        const graph = stripStoryProUploadedScriptMdForPersist(
+          useCanvasStore.getState().toGraph(),
+        );
+        if (
+          graph.nodes.length === 0 &&
+          loadedNodeCountRef.current > 0
+        ) {
+          setSaveError("检测到画布被清空，已阻止自动保存。");
+          return;
+        }
+        const thumb = pickProjectThumbnailUrl(graph);
+        const patch: {
+          canvas: typeof graph;
+          thumbnailUrl?: string;
+        } = { canvas: graph };
+        if (thumb && thumb !== proj.thumbnailUrl) {
+          patch.thumbnailUrl = thumb;
+        }
+        await patchCanvasProject(bookBase, projectId, patch);
+        loadedNodeCountRef.current = graph.nodes.length;
+        if (patch.thumbnailUrl) {
+          setProject((p) =>
+            p ? { ...p, thumbnailUrl: patch.thumbnailUrl! } : p,
+          );
+        }
+        setLastSavedAt(new Date());
+        setSaveError(null);
+      } catch (e) {
+        setSaveError(e instanceof Error ? e.message : "保存失败");
+      } finally {
+        autosaveInFlightRef.current = false;
+        setSaving(false);
+        if (autosavePendingRef.current) {
+          autosavePendingRef.current = false;
+          scheduleAutosave();
+        }
+      }
+    };
 
     const scheduleAutosave = () => {
       if (!canvasReadyRef.current) return;
@@ -301,51 +376,17 @@ function Inner({ projectId }: { projectId: string }) {
       if (autosaveTimerRef.current !== null) {
         window.clearTimeout(autosaveTimerRef.current);
       }
-      autosaveTimerRef.current = window.setTimeout(async () => {
-        const proj = autosaveProjectRef.current;
-        const bookBase = autosaveBaseRef.current;
-        if (!proj || !bookBase) return;
-        setSaving(true);
-        try {
-          const graph = stripStoryProUploadedScriptMdForPersist(
-            useCanvasStore.getState().toGraph(),
-          );
-          if (
-            graph.nodes.length === 0 &&
-            loadedNodeCountRef.current > 0
-          ) {
-            setSaveError("检测到画布被清空，已阻止自动保存。");
-            return;
-          }
-          const thumb = pickProjectThumbnailUrl(graph);
-          const patch: {
-            canvas: typeof graph;
-            thumbnailUrl?: string;
-          } = { canvas: graph };
-          if (thumb && thumb !== proj.thumbnailUrl) {
-            patch.thumbnailUrl = thumb;
-          }
-          await patchCanvasProject(bookBase, projectId, patch);
-          loadedNodeCountRef.current = graph.nodes.length;
-          if (patch.thumbnailUrl) {
-            setProject((p) =>
-              p ? { ...p, thumbnailUrl: patch.thumbnailUrl! } : p,
-            );
-          }
-          setLastSavedAt(new Date());
-          setSaveError(null);
-        } catch (e) {
-          setSaveError(e instanceof Error ? e.message : "保存失败");
-        } finally {
-          setSaving(false);
-        }
+      autosaveTimerRef.current = window.setTimeout(() => {
+        autosaveTimerRef.current = null;
+        void runAutosave();
       }, AUTOSAVE_DEBOUNCE_MS);
     };
 
     const unsub = useCanvasStore.subscribe((state, prev) => {
+      // 仅持久化变更触发保存：graphRevision（结构/数据）或 viewport（缩放平移）
+      // 忽略 setNodeRuntime / 拖放中的几何同步，避免「保存中…」常驻
       if (
-        state.nodes === prev.nodes &&
-        state.edges === prev.edges &&
+        state.graphRevision === prev.graphRevision &&
         state.viewport === prev.viewport
       ) {
         return;
@@ -506,6 +547,24 @@ function Inner({ projectId }: { projectId: string }) {
     await manualSave();
   }, [dialogs, hydrate, manualSave, projectId, reflowStoryComicLayout]);
 
+  const restoreSbv1Template = useCallback(async () => {
+    const tpl = getBuiltinCanvasTemplate(SBV1_BUILTIN_TEMPLATE_ID);
+    if (!tpl) return;
+    const ok = await dialogs.confirm({
+      title: "载入分镜视频 1.0 模板？",
+      message: "将恢复默认视频引擎节点，当前空白画布会被覆盖。",
+      confirmLabel: "载入",
+    });
+    if (!ok) return;
+    useCanvasStore.temporal.getState().pause();
+    hydrate(projectId, tpl);
+    useCanvasStore.temporal.getState().clear();
+    useCanvasStore.temporal.getState().resume();
+    loadedNodeCountRef.current = tpl.nodes.length;
+    setSaveError(null);
+    await manualSave();
+  }, [dialogs, hydrate, manualSave, projectId]);
+
   const runAll = useCallback(() => {
     if (gatewayLinkBlocked) return;
     const workspaceJobs = collectStoryWorkspaceRunJobs(nodes, edges);
@@ -628,7 +687,7 @@ function Inner({ projectId }: { projectId: string }) {
         open={myProjectCharacterAssetsOpen}
         onClose={() => setMyProjectCharacterAssetsOpen(false)}
       />
-      {isStoryProCanvas ? (
+      {isStoryProCanvas || isStoryPro2Canvas ? (
         <StyleLibraryModal
           open={styleLibraryOpen}
           onClose={() => setStyleLibraryOpen(false)}
@@ -639,13 +698,22 @@ function Inner({ projectId }: { projectId: string }) {
           <ScriptWritingAssistantPanel
             projectId={projectId}
             onImportScript={onImportScriptFromAssistant}
+            theme="pro"
           />
         ) : null}
-        <div className="relative min-h-0 flex-1 overflow-hidden">
-        <FlowCanvas projectId={projectId} onUndo={undo} onRedo={redo} />
-        <div className="pointer-events-none absolute inset-x-0 top-2 z-[60] flex justify-center px-2">
-          <NodePalette onAdd={onAddViaPalette} />
-        </div>
+        <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+        {isSbv1Canvas ? (
+          <Sbv1CanvasLayout projectId={projectId} onUndo={undo} onRedo={redo} />
+        ) : isStoryPro2Canvas ? (
+          <Pro2CanvasLayout projectId={projectId} onUndo={undo} onRedo={redo} />
+        ) : (
+          <>
+            <FlowCanvas projectId={projectId} onUndo={undo} onRedo={redo} />
+            <div className="pointer-events-none absolute inset-x-0 top-2 z-[60] flex justify-center px-2">
+              <NodePalette onAdd={onAddViaPalette} />
+            </div>
+          </>
+        )}
         {isStoryComicCanvas && nodes.length > 0 ? (
           <button
             type="button"
@@ -657,7 +725,28 @@ function Inner({ projectId }: { projectId: string }) {
             重排
           </button>
         ) : null}
-        {nodes.length === 0 && !loading && loadedNodeCountRef.current > 0 ? (
+        {nodes.length === 0 && !loading && isSbv1Project ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
+            <div className="pointer-events-auto max-w-sm rounded-xl border border-white/10 bg-[var(--canvas-surface)]/95 px-5 py-4 text-center shadow-xl">
+              <p className="text-sm font-medium text-white">空白画布</p>
+              <p className="mt-2 text-xs leading-relaxed text-[var(--canvas-muted)]">
+                使用底部 Dock 添加图片、视频引擎，或粘贴图片到画布。
+              </p>
+              <button
+                type="button"
+                className="mt-4 rounded-md border border-cyan-400/35 bg-cyan-500/10 px-4 py-2 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
+                onClick={() => void restoreSbv1Template()}
+              >
+                恢复「分镜视频 1.0」模板
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {nodes.length === 0 &&
+        !loading &&
+        loadedNodeCountRef.current > 0 &&
+        !isSbv1Project &&
+        !isStoryPro2Project ? (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
             <div className="pointer-events-auto max-w-md rounded-xl border border-white/10 bg-[var(--canvas-surface)]/95 px-6 py-5 text-center shadow-xl">
               <p className="text-sm font-medium text-white">节点数据丢失</p>
@@ -678,7 +767,10 @@ function Inner({ projectId }: { projectId: string }) {
             </div>
           </div>
         ) : null}
-        {nodes.length === 0 && !loading && loadedNodeCountRef.current === 0 ? (
+        {nodes.length === 0 &&
+        !loading &&
+        loadedNodeCountRef.current === 0 &&
+        !isSbv1Project ? (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
             <div className="pointer-events-auto max-w-sm rounded-xl border border-white/10 bg-black/50 px-5 py-4 text-center">
               <p className="text-xs text-[var(--canvas-muted)]">

@@ -14,6 +14,8 @@ function parseMentionIds(prompt: string): string[] {
   return ids;
 }
 
+export { parseMentionIds };
+
 export function resolveStoryRowRefUrls(
   row: Record<string, unknown>,
   promptField = "prompt",

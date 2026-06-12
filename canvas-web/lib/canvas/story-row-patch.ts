@@ -16,6 +16,7 @@ import {
   mergeOutlineRolesIntoCharacterMd,
   normalizeCharacterTableMd,
   normalizeOutlineSection,
+  normalizeStoryboardSectionMd,
   parseOutlineBriefCharacters,
 } from "./parse-md-tables";
 import { pushStoryRevision } from "./story-revision";
@@ -78,10 +79,11 @@ export function applyHubSectionFromTask(
   } else {
     patch.storyboardRuntime = runtime;
     if (textOutput?.trim()) {
-      patch.storyboardMd = textOutput;
+      const storyboardMd = normalizeStoryboardSectionMd(textOutput);
+      patch.storyboardMd = storyboardMd;
       patch.storyboardHistory = pushStoryRevision(
         data.storyboardHistory,
-        textOutput,
+        storyboardMd,
       );
     }
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   MiniMap,
@@ -18,6 +18,7 @@ import "@xyflow/react/dist/style.css";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { isCanvasInteractiveGeometryInProgress } from "@/lib/canvas/canvas-node-changes";
+import { isPro2StyledGroup } from "@/lib/canvas/pro2-media-group-meta";
 import type {
   CanvasFlowEdge,
   CanvasFlowNode,
@@ -31,9 +32,36 @@ import {
   unregisterCanvasViewportPlacement,
 } from "@/lib/canvas/viewport-placement";
 import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
-import { routeClipboardImageToActivePasteSlot } from "@/lib/canvas/image-upload-handlers";
+import {
+  allImageFilesFromDataTransfer,
+  isEditablePasteTarget,
+  getLastPointerClient,
+  isImagePasteSlotTarget,
+  pickPointerImagePasteHandler,
+  routeClipboardImageToActivePasteSlot,
+} from "@/lib/canvas/image-upload-handlers";
 import { memoizedNodeTypes } from "./memoized-node-types";
 import { SelectionToolbar } from "./selection-toolbar";
+import { Pro2FloatingInspector } from "./pro2/pro2-floating-inspector";
+import { Pro2FrameCellInputDock } from "./pro2/pro2-frame-cell-input-dock";
+import { Pro2MediaGroupToolbar } from "./pro2/pro2-media-group-toolbar";
+import { Pro2SelectionToolbar } from "./pro2/pro2-selection-toolbar";
+import { Pro2StarterInputDock } from "./pro2/pro2-starter-input-dock";
+import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
+import { Pro2ImageInputDock } from "./pro2/pro2-image-input-dock";
+import { Sbv1MediaGroupToolbar } from "./sbv1/sbv1-media-group-toolbar";
+import { Sbv1VideoEngineFloatingDock } from "./sbv1/sbv1-video-engine-floating-dock";
+import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
+import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
+import { Pro2ScriptTableEditorHost } from "./pro2/pro2-script-table-editor-host";
+import type {
+  StoryProScriptHubNodeData,
+  StoryProStarterNodeData,
+} from "@/lib/canvas/story-pro-workspace-types";
+import {
+  pro2HubHasCharacterTable,
+  pro2HubHasScriptTable,
+} from "@/lib/canvas/pro2-script-hub-helpers";
 import { DeletableEdge } from "./edges/deletable-edge";
 
 const edgeTypes = {
@@ -55,14 +83,27 @@ type NodeClipboard = {
   origin: { x: number; y: number };
 };
 
-function FlowCanvasInner({ projectId }: { projectId: string }) {
+function FlowCanvasInner({
+  projectId,
+  forceOnlyRenderVisible = false,
+  pro2FloatingInspector = false,
+  sbv1Canvas = false,
+}: {
+  projectId: string;
+  forceOnlyRenderVisible?: boolean;
+  pro2FloatingInspector?: boolean;
+  sbv1Canvas?: boolean;
+}) {
   const base = useBookMallBaseUrl();
   const wrapRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition, fitView } = useReactFlow();
+  const { screenToFlowPosition, fitView, setViewport: rfSetViewport } =
+    useReactFlow();
   const initialFitDoneRef = useRef(false);
   const viewportTimerRef = useRef<number | null>(null);
   const dragHoverRafRef = useRef<number | null>(null);
   const dragUndoPausedRef = useRef(false);
+  const ignoreNextPaneClickRef = useRef(false);
+  const [isNodeDragging, setIsNodeDragging] = useState(false);
   const deferStoreGraphSyncRef = useRef(false);
 
   const storeOnNodesChange = useCanvasStore((s) => s.onNodesChange);
@@ -81,6 +122,12 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
+  const openPro2TextOutlineEditor = useCanvasStore(
+    (s) => s.openPro2TextOutlineEditor,
+  );
+  const openPro2ScriptTableEditor = useCanvasStore(
+    (s) => s.openPro2ScriptTableEditor,
+  );
   const setConnectingFrom = useCanvasStore((s) => s.setConnectingFrom);
   const dragHoverGroupId = useCanvasStore((s) => s.dragHoverGroupId);
   const setDragHoverGroup = useCanvasStore((s) => s.setDragHoverGroup);
@@ -111,8 +158,11 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<CanvasFlowNode>[]) => {
+      // 始终只更新本地 RF 状态 → 拖动每帧只重绘被拖节点，画面流畅
       onRfNodesChange(changes);
       if (isCanvasInteractiveGeometryInProgress(changes)) {
+        // 拖动 / 缩放过程中不写 zustand：避免每帧触发所有订阅 s.nodes 的节点重渲染
+        // 终态（dragging:false / resizing:false）会在松手那帧落库
         deferStoreGraphSyncRef.current = true;
         return;
       }
@@ -168,8 +218,10 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
       Math.abs(vp.zoom - 1) < 0.01;
     if (noSavedViewport) {
       void fitView({ padding: 0.12, duration: 0 });
+    } else {
+      void rfSetViewport(vp, { duration: 0 });
     }
-  }, [fitView]);
+  }, [fitView, rfSetViewport]);
 
   useEffect(() => {
     registerCanvasViewportPlacement({
@@ -195,7 +247,12 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
       labelOverride?: string,
     ) => {
       const blobUrl = URL.createObjectURL(file);
-      const id = addNode("image", position, {
+      const imageType: CanvasNodeType = sbv1Canvas
+        ? "sbv1-image"
+        : pro2FloatingInspector
+          ? "story-pro2-image"
+          : "image";
+      const id = addNode(imageType, position, {
         blobUrl,
         uploading: true,
         label: labelOverride ?? file.name ?? "粘贴的图片",
@@ -211,7 +268,7 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
       }
       return id;
     },
-    [addNode, base, updateNodeData],
+    [addNode, base, updateNodeData, pro2FloatingInspector, sbv1Canvas],
   );
 
   // ── 拖入分组归属：识别"鼠标当前是否在某个 group bbox 内"
@@ -243,6 +300,7 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
   );
 
   const onNodeDragStart = useCallback(() => {
+    setIsNodeDragging(true);
     if (dragUndoPausedRef.current) return;
     useCanvasStore.temporal.getState().pause();
     dragUndoPausedRef.current = true;
@@ -266,6 +324,7 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
 
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string; parentId?: string }) => {
+      setIsNodeDragging(false);
       deferStoreGraphSyncRef.current = false;
       if (dragUndoPausedRef.current) {
         useCanvasStore.temporal.getState().resume();
@@ -308,7 +367,54 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
     );
   }, [rfNodes, dragHoverGroupId]);
 
-  const onlyRenderVisible = rfNodes.length >= 12;
+  /** 选中单个节点 → 高亮其上游(入)/下游(出)连线并流动，其余淡化（拖动中关闭以保性能） */
+  const focusEdgeIds = useMemo(() => {
+    if (isNodeDragging) return null;
+    const sel = rfNodes.filter((n) => n.selected);
+    if (sel.length !== 1) return null;
+    const node = sel[0];
+    const ids = new Set<string>([node.id]);
+    let parentId = node.parentId;
+    while (parentId) {
+      ids.add(parentId);
+      const parent = rfNodes.find((n) => n.id === parentId);
+      parentId = parent?.parentId;
+    }
+    if (node.type === "group") {
+      for (const c of rfNodes) {
+        if (c.parentId === node.id) ids.add(c.id);
+      }
+    }
+    return ids;
+  }, [rfNodes, isNodeDragging]);
+
+  const decoratedEdges = useMemo(() => {
+    if (!focusEdgeIds) return rfEdges;
+    return rfEdges.map((e) => {
+      if (focusEdgeIds.has(e.target)) {
+        return {
+          ...e,
+          zIndex: 1000,
+          className: `${e.className ?? ""} pro2-edge-active pro2-edge-up`.trim(),
+          style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: 2.5 },
+        };
+      }
+      if (focusEdgeIds.has(e.source)) {
+        return {
+          ...e,
+          zIndex: 1000,
+          className: `${e.className ?? ""} pro2-edge-active pro2-edge-down`.trim(),
+          style: { ...(e.style ?? {}), stroke: "#a78bfa", strokeWidth: 2.5 },
+        };
+      }
+      return {
+        ...e,
+        style: { ...(e.style ?? {}), opacity: 0.18 },
+      };
+    });
+  }, [rfEdges, focusEdgeIds]);
+
+  const onlyRenderVisible = forceOnlyRenderVisible || rfNodes.length >= 12;
   const showMiniMap = rfNodes.length <= 48;
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
@@ -318,8 +424,26 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
 
   const onDrop = useCallback(
     async (event: React.DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
       const palette = event.dataTransfer.getData("application/canvas-node-type");
+      const droppedImages = allImageFilesFromDataTransfer(event.dataTransfer);
+      if (!palette && droppedImages.length > 0) {
+        event.preventDefault();
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        await Promise.all(
+          droppedImages.map((f, i) =>
+            ingestImageFile(
+              f,
+              { x: position.x + i * 28, y: position.y + i * 28 },
+              droppedImages.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
+            ),
+          ),
+        );
+        return;
+      }
+      event.preventDefault();
       const presetId = event.dataTransfer.getData(
         "application/canvas-node-preset",
       );
@@ -339,15 +463,14 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
         return;
       }
 
-      const files = Array.from(event.dataTransfer.files ?? []).filter((f) =>
-        f.type.startsWith("image/"),
-      );
+      const files = allImageFilesFromDataTransfer(event.dataTransfer);
       await Promise.all(
         files.map((f, i) =>
-          ingestImageFile(f, {
-            x: position.x + i * 24,
-            y: position.y + i * 24,
-          }),
+          ingestImageFile(
+            f,
+            { x: position.x + i * 28, y: position.y + i * 28 },
+            files.length === 1 ? "拖入的图片" : `拖入 ${i + 1}`,
+          ),
         ),
       );
     },
@@ -460,49 +583,66 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
   /** 全局 paste：图片优先；其次走节点剪贴板。 */
   useEffect(() => {
     const onPaste = async (event: ClipboardEvent) => {
+      if (event.defaultPrevented) return;
       const t = event.target as HTMLElement | null;
-      if (t && /^(INPUT|TEXTAREA)$/.test(t.tagName)) return;
-      if (t?.isContentEditable) return;
-
-      // 1) 图片：从 clipboardData.files / .items 拿
-      const files: File[] = [];
       const dt = event.clipboardData;
-      if (dt) {
-        if (dt.files && dt.files.length > 0) {
-          for (const f of Array.from(dt.files)) {
-            if (f.type.startsWith("image/")) files.push(f);
-          }
-        }
-        if (files.length === 0 && dt.items) {
-          for (const item of Array.from(dt.items)) {
-            if (item.kind === "file" && item.type.startsWith("image/")) {
-              const f = item.getAsFile();
-              if (f) files.push(f);
-            }
-          }
-        }
+      const imageFiles = allImageFilesFromDataTransfer(dt);
+
+      if (
+        t &&
+        /^(INPUT|TEXTAREA)$/.test(t.tagName) &&
+        !imageFiles.length
+      ) {
+        return;
       }
-      if (files.length > 0) {
-        if (await routeClipboardImageToActivePasteSlot(dt)) {
-          event.preventDefault();
-          return;
+      if (t?.isContentEditable && !imageFiles.length) return;
+
+      if (imageFiles.length > 0) {
+        const inDockZone = isImagePasteSlotTarget(event.target);
+        const inEditable =
+          isEditablePasteTarget(event.target) && !inDockZone;
+        if (!inEditable) {
+          const pointerPaste = pickPointerImagePasteHandler();
+          if (pointerPaste) {
+            pointerPaste(imageFiles[0]!);
+            event.preventDefault();
+            return;
+          }
+          if (await routeClipboardImageToActivePasteSlot(dt, event.target)) {
+            event.preventDefault();
+            return;
+          }
         }
         event.preventDefault();
-        // 视口中心放第一个，后续依次偏移
+        const ptr = getLastPointerClient();
         const wrap = wrapRef.current;
-        const center =
-          wrap && wrap.getBoundingClientRect
-            ? screenToFlowPosition({
-                x: wrap.getBoundingClientRect().left + wrap.clientWidth / 2,
-                y: wrap.getBoundingClientRect().top + wrap.clientHeight / 2,
-              })
-            : { x: 240, y: 160 };
+        const rect = wrap?.getBoundingClientRect?.();
+        const pointerInWrap = Boolean(
+          rect &&
+            ptr.x >= rect.left &&
+            ptr.x <= rect.right &&
+            ptr.y >= rect.top &&
+            ptr.y <= rect.bottom,
+        );
+        const clientX = pointerInWrap
+          ? ptr.x
+          : rect
+            ? rect.left + rect.width / 2
+            : 0;
+        const clientY = pointerInWrap
+          ? ptr.y
+          : rect
+            ? rect.top + rect.height / 2
+            : 0;
+        const center = rect
+          ? screenToFlowPosition({ x: clientX, y: clientY })
+          : { x: 240, y: 160 };
         await Promise.all(
-          files.map((f, i) =>
+          imageFiles.map((f, i) =>
             ingestImageFile(
               f,
-              { x: center.x + i * 24, y: center.y + i * 24 },
-              files.length === 1 ? "粘贴的图片" : `粘贴 ${i + 1}`,
+              { x: center.x + i * 28, y: center.y + i * 28 },
+              imageFiles.length === 1 ? "粘贴的图片" : `粘贴 ${i + 1}`,
             ),
           ),
         );
@@ -550,7 +690,7 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
   return (
     <div
       ref={wrapRef}
-      className={`canvas-flow-wrap relative z-0 h-full w-full overscroll-none ${connectingFromNodeId ? "canvas-connecting" : ""}`}
+      className={`canvas-flow-wrap relative z-0 h-full w-full overscroll-none ${connectingFromNodeId ? "canvas-connecting" : ""}${sbv1Canvas ? " sbv1-canvas" : ""}`}
       onDrop={onDrop}
       onDragOver={onDragOver}
       onWheelCapture={onCanvasWheelCapture}
@@ -558,7 +698,7 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
       <ReactFlow
         key={projectId}
         nodes={decoratedNodes}
-        edges={rfEdges}
+        edges={decoratedEdges}
         nodeTypes={memoNodeTypes}
         edgeTypes={memoEdgeTypes}
         onNodesChange={handleNodesChange}
@@ -572,8 +712,72 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
         defaultViewport={viewport}
         onMoveEnd={onMoveEnd}
         onInit={onInit}
+        onSelectionEnd={
+          pro2FloatingInspector
+            ? () => {
+                // 框选松手后会紧跟一次 onPaneClick；忽略以免清空刚选中的节点
+                ignoreNextPaneClickRef.current = true;
+              }
+            : undefined
+        }
+        onPaneClick={
+          pro2FloatingInspector
+            ? () => {
+                if (ignoreNextPaneClickRef.current) {
+                  ignoreNextPaneClickRef.current = false;
+                  return;
+                }
+                useCanvasStore.getState().setPro2FrameDockFocus(null);
+                setNodes((prev) =>
+                  prev.map((n) => (n.selected ? { ...n, selected: false } : n)),
+                );
+              }
+            : undefined
+        }
         onlyRenderVisibleElements={onlyRenderVisible}
-        selectNodesOnDrag={false}
+        selectNodesOnDrag
+        zoomOnDoubleClick={pro2FloatingInspector ? false : undefined}
+        onNodeClick={
+          pro2FloatingInspector
+            ? (_e, node) => {
+                if (node.type !== "group") return;
+                const all = useCanvasStore.getState().nodes as CanvasFlowNode[];
+                const hit = all.find((n) => n.id === node.id);
+                if (!hit || !isPro2StyledGroup(hit, all)) return;
+                setNodes((prev) =>
+                  prev.map((n) => ({ ...n, selected: n.id === node.id })),
+                );
+              }
+            : undefined
+        }
+        onNodeDoubleClick={
+          pro2FloatingInspector
+            ? (_e, node) => {
+                if (node.type === "story-pro2-starter") {
+                  const d = node.data as StoryProStarterNodeData;
+                  if (!d.generatedOutlineMd?.trim()) return;
+                  if (
+                    d.themeOutlineRuntime?.status === "pending" ||
+                    d.themeOutlineRuntime?.status === "running"
+                  ) {
+                    return;
+                  }
+                  openPro2TextOutlineEditor(node.id);
+                  return;
+                }
+                if (node.type === "story-pro2-script-hub") {
+                  const d = node.data as StoryProScriptHubNodeData;
+                  const hasScript = pro2HubHasScriptTable(d);
+                  const hasCharacter = pro2HubHasCharacterTable(d);
+                  if (!hasScript && !hasCharacter) return;
+                  openPro2ScriptTableEditor(
+                    node.id,
+                    hasScript ? "script" : "character",
+                  );
+                }
+              }
+            : undefined
+        }
         elevateNodesOnSelect={false}
         autoPanOnNodeDrag={false}
         proOptions={{ hideAttribution: true }}
@@ -595,6 +799,8 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
         noDragClassName="nodrag"
         minZoom={0.1}
         maxZoom={2.5}
+        connectionRadius={30}
+        connectOnClick={false}
       >
         <Background gap={24} size={1} color="rgba(255,255,255,0.06)" />
         {showMiniMap ? (
@@ -606,8 +812,28 @@ function FlowCanvasInner({ projectId }: { projectId: string }) {
             className="!bg-[var(--canvas-surface)] !border !border-white/10 !rounded-md"
           />
         ) : null}
+        {pro2FloatingInspector ? (
+          <>
+            <Pro2SelectionToolbar rfNodes={rfNodes} />
+            <Pro2MediaGroupToolbar rfNodes={rfNodes} />
+          </>
+        ) : null}
       </ReactFlow>
-      <SelectionToolbar />
+      {pro2FloatingInspector ? null : <SelectionToolbar />}
+      {sbv1Canvas ? <Sbv1MediaGroupToolbar rfNodes={rfNodes} /> : null}
+      {pro2FloatingInspector ? (
+        <>
+          <Pro2StarterInputDock />
+          <Pro2ScriptInputDock />
+          <Pro2FrameCellInputDock />
+          <Pro2ImageInputDock />
+          <Pro2ThreeViewInputDock />
+          <Pro2FloatingInspector />
+          <Pro2TextNodeOutlineEditorHost />
+          <Pro2ScriptTableEditorHost />
+        </>
+      ) : null}
+      {sbv1Canvas ? <Sbv1VideoEngineFloatingDock /> : null}
     </div>
   );
 }
@@ -645,15 +871,28 @@ export function FlowCanvas({
   projectId,
   onUndo,
   onRedo,
+  forceOnlyRenderVisible = false,
+  pro2FloatingInspector = false,
+  sbv1Canvas = false,
 }: {
   projectId: string;
   onUndo: () => void;
   onRedo: () => void;
+  forceOnlyRenderVisible?: boolean;
+  pro2FloatingInspector?: boolean;
+  sbv1Canvas?: boolean;
 }) {
   return (
-    <ReactFlowProvider>
-      <HotkeyBridge onUndo={onUndo} onRedo={onRedo} />
-      <FlowCanvasInner projectId={projectId} />
-    </ReactFlowProvider>
+    <div className="h-full w-full">
+      <ReactFlowProvider>
+        <HotkeyBridge onUndo={onUndo} onRedo={onRedo} />
+        <FlowCanvasInner
+          projectId={projectId}
+          forceOnlyRenderVisible={forceOnlyRenderVisible}
+          pro2FloatingInspector={pro2FloatingInspector}
+          sbv1Canvas={sbv1Canvas}
+        />
+      </ReactFlowProvider>
+    </div>
   );
 }

@@ -162,56 +162,58 @@ export async function createPaymentCheckout(input: {
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + checkoutExpiresHours());
 
-  const dedupeWhere: Prisma.PaymentCheckoutWhereInput = {
-    userId,
-    productKind,
-    status: { in: ["PENDING", "AWAITING_CONFIRM"] },
-    expiresAt: { gt: new Date() },
-  };
-  const existingPending = await prisma.paymentCheckout.findFirst({
-    where: dedupeWhere,
-    orderBy: { createdAt: "desc" },
-  });
-  if (existingPending) {
-    const snap = existingPending.productSnapshot as Record<string, unknown> | null;
-    const sameProduct =
-      productKind === "CREDIT_TOPUP"
-        ? snap?.packId === productSnapshot.packId && snap?.target === productSnapshot.target
-        : productKind.startsWith("BYOK_")
-          ? snap?.scopeKey === productSnapshot.scopeKey &&
-            (productKind !== "BYOK_TEAM" || snap?.tenantId === productSnapshot.tenantId)
-          : productKind.startsWith("MEMBERSHIP_")
-            ? snap?.planId === productSnapshot.planId
-            : false;
-    if (sameProduct) {
-      return existingPending;
-    }
-  }
-
-  const checkout = await prisma.paymentCheckout.create({
-    data: {
-      outTradeNo: generateOutTradeNo(),
-      remarkCode,
+  return prisma.$transaction(async (tx) => {
+    const dedupeWhere: Prisma.PaymentCheckoutWhereInput = {
       userId,
       productKind,
-      productSnapshot: productSnapshot as Prisma.InputJsonValue,
-      amountYuan,
-      expiresAt,
-      adminNote: input.adminNote?.trim() || null,
-      status: "PENDING",
-    },
-  });
+      status: { in: ["PENDING", "AWAITING_CONFIRM"] },
+      expiresAt: { gt: new Date() },
+    };
+    const existingPending = await tx.paymentCheckout.findFirst({
+      where: dedupeWhere,
+      orderBy: { createdAt: "desc" },
+    });
+    if (existingPending) {
+      const snap = existingPending.productSnapshot as Record<string, unknown> | null;
+      const sameProduct =
+        productKind === "CREDIT_TOPUP"
+          ? snap?.packId === productSnapshot.packId && snap?.target === productSnapshot.target
+          : productKind.startsWith("BYOK_")
+            ? snap?.scopeKey === productSnapshot.scopeKey &&
+              (productKind !== "BYOK_TEAM" || snap?.tenantId === productSnapshot.tenantId)
+            : productKind.startsWith("MEMBERSHIP_")
+              ? snap?.planId === productSnapshot.planId
+              : false;
+      if (sameProduct) {
+        return existingPending;
+      }
+    }
 
-  await appendPaymentEvent({
-    checkoutId: checkout.id,
-    actorUserId: input.createdByAdminId ?? userId,
-    action: "CREATE",
-    payload: {
-      productKind,
-      amountYuan,
-      createdByAdminId: input.createdByAdminId ?? null,
-    },
-  });
+    const checkout = await tx.paymentCheckout.create({
+      data: {
+        outTradeNo: generateOutTradeNo(),
+        remarkCode,
+        userId,
+        productKind,
+        productSnapshot: productSnapshot as Prisma.InputJsonValue,
+        amountYuan,
+        expiresAt,
+        adminNote: input.adminNote?.trim() || null,
+        status: "PENDING",
+      },
+    });
 
-  return checkout;
+    await appendPaymentEvent({
+      checkoutId: checkout.id,
+      actorUserId: input.createdByAdminId ?? userId,
+      action: "CREATE",
+      payload: {
+        productKind,
+        amountYuan,
+        createdByAdminId: input.createdByAdminId ?? null,
+      },
+    });
+
+    return checkout;
+  });
 }

@@ -19,6 +19,8 @@ export type VerifiedToolsJwt = {
   name?: string;
   image?: string;
   toolsNavKeys?: string[];
+  /** 单会话挤下线：须回落主站 introspect 校验 */
+  sv?: number;
 };
 
 function pickTier(raw: unknown): "gold" | "admin" | null {
@@ -97,6 +99,10 @@ export function verifyToolsJwt(token: string, secret: string): VerifiedToolsJwt 
 
   const tnk = pickToolsNavKeys(payloadRaw.tools_nav_keys);
   if (tnk) out.toolsNavKeys = tnk;
+
+  if (typeof payloadRaw.sv === "number" && Number.isFinite(payloadRaw.sv)) {
+    out.sv = Math.trunc(payloadRaw.sv);
+  }
 
   return out;
 }

@@ -21,6 +21,8 @@ export const GATEWAY_DEEPSEEK_PROVIDER_ID = "gateway:deepseek";
 export const GATEWAY_BAILIAN_PROVIDER_ID = "gateway:bailian";
 export const GATEWAY_HUNYUAN_PROVIDER_ID = "gateway:hunyuan";
 export const GATEWAY_VOLCENGINE_PROVIDER_ID = "gateway:volcengine";
+/** 分镜视频 1.0 画布专用 Gateway Provider（仅 VIDEO） */
+export const GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID = "gateway:sbv1-volcengine";
 /** 与 story-web 初始化大纲一致，走 KIE gemini-3-flash 端点 */
 export const STORY_LLM_PREFERRED_MODEL_KEY = "google/gemini-3-flash-preview";
 

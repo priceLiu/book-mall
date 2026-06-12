@@ -12,6 +12,34 @@ export function allowCloudbaseDefaultOrigins(): boolean {
   return process.env.ALLOW_CLOUDBASE_DEFAULT_ORIGINS?.trim() === "1";
 }
 
+export function isProductionAiCode8Host(host: string): boolean {
+  const h = host.toLowerCase();
+  return h === "ai-code8.com" || h.endsWith(".ai-code8.com");
+}
+
+/** 从代理头解析请求协议（CloudBase / CDN 前置 TLS 时常见 x-forwarded-proto）。 */
+export function incomingRequestProto(
+  protoHeader: string | null,
+  fallbackProto: string,
+): "http" | "https" {
+  if (protoHeader) {
+    const first = protoHeader.split(",")[0]?.trim().toLowerCase();
+    if (first === "http" || first === "https") return first;
+  }
+  const p = fallbackProto.replace(":", "").toLowerCase();
+  return p === "https" ? "https" : "http";
+}
+
+/**
+ * 生产自定义域须走 HTTPS：NextAuth 会话 Cookie 为 Secure，HTTP 页无法写入会话（公网登录失败）。
+ */
+export function shouldEnforceProductionHttps(host: string, proto: string): boolean {
+  if (process.env.NODE_ENV !== "production") return false;
+  if (allowCloudbaseDefaultOrigins()) return false;
+  if (!isProductionAiCode8Host(host)) return false;
+  return proto !== "https";
+}
+
 /**
  * 生产环境下将仍为腾讯云默认域或留空的变量纠正为 book / tool 正式域名，
  * 使 NextAuth 登出跳转、SSO 签发与诊断与浏览器自定义域一致。

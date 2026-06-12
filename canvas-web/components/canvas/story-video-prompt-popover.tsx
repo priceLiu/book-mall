@@ -36,7 +36,11 @@ function TipBody({
   edition: StoryEdition;
 }) {
   const accent =
-    edition === "pro" ? "text-cyan-300/95" : "text-[#60a5fa]";
+    edition === "pro2"
+      ? "text-violet-300/95"
+      : edition === "pro"
+        ? "text-cyan-300/95"
+        : "text-[#60a5fa]";
   return (
     <div className="space-y-3 font-mono text-[12px] leading-[1.6]">
       <div>

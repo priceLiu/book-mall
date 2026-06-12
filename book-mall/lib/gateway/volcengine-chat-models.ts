@@ -106,12 +106,13 @@ const VIDEO_PARAM_SCHEMA = [
 export const VOLCENGINE_VIDEO_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
     modelKey: "doubao-seedance-2.0",
-    displayName: "Doubao-Seedance-2.0",
+    displayName: "Seedance 2.0 · 真人",
     role: "VIDEO",
-    description: "火山方舟 · 图/文生视频 · 多图参考 · 有声 · 异步任务",
+    description:
+      "火山方舟 · 图/文/音视频参考 · 真人人像须录入人像库并通过审核（asset://）",
     paramsSchema: [...VIDEO_PARAM_SCHEMA],
     defaultParams: {
-      resolution: "1080p",
+      resolution: "720p",
       duration: 5,
       generate_audio: false,
       watermark: false,
@@ -119,9 +120,10 @@ export const VOLCENGINE_VIDEO_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   },
   {
     modelKey: "doubao-seedance-1.5-pro",
-    displayName: "Doubao-Seedance-1.5-pro",
+    displayName: "Seedance 1.5 Pro · 真人",
     role: "VIDEO",
-    description: "火山方舟 · 文/图生视频 · 有声 · 异步任务",
+    description:
+      "火山方舟 · 首尾帧/有声 · 真人人像库 asset://（须审核通过）",
     paramsSchema: [...VIDEO_PARAM_SCHEMA],
     defaultParams: {
       resolution: "1080p",

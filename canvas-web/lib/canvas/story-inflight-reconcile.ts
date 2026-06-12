@@ -120,7 +120,9 @@ export function reconcileStaleInflightRuntimes(
   tasks: CanvasTaskRecord[],
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
   setNodeRuntime: (id: string, patch: Partial<CanvasNodeRuntime>) => void,
+  opts?: { skipNodeIds?: ReadonlySet<string> },
 ): void {
+  const skipNodeIds = opts?.skipNodeIds;
   for (const node of nodes) {
     if (isAnyStoryScriptHubType(node.type ?? "")) {
       for (const section of ["outline", "character", "storyboard"] as const) {
@@ -288,6 +290,8 @@ export function reconcileStaleInflightRuntimes(
     }
 
     if (isStoryWorkspaceNodeType(node.type ?? "")) continue;
+
+    if (skipNodeIds?.has(node.id)) continue;
 
     const rt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
     if (!isInflightStatus(rt?.status)) continue;

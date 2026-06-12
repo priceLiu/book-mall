@@ -1,5 +1,6 @@
 "use client";
 
+import { navigateBookMallFullSignOut } from "@/lib/session-kicked-marker";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -285,7 +286,7 @@ export function AccountNavMenu({
   async function runAction(id: string) {
     setActionMsg(null);
     if (id === "sign-out") {
-      window.location.href = "/api/auth/full-signout?callbackUrl=/";
+      navigateBookMallFullSignOut("/");
       return;
     }
     if (id === "launch-tools") {

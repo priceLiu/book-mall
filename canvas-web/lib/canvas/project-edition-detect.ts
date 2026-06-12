@@ -1,6 +1,6 @@
-/** 与 book-mall/lib/canvas/canvas-story-edition.ts 保持同步 */
+/** 与 canvas-web/lib/canvas/project-edition-detect.ts 保持同步 */
 
-export type CanvasProjectEdition = "pro" | "standard";
+export type CanvasProjectEdition = "pro" | "pro2" | "sbv1" | "standard";
 
 const STORY_PRO_NODE_TYPES = new Set([
   "story-pro-starter",
@@ -13,8 +13,32 @@ const STORY_PRO_NODE_TYPES = new Set([
   "jianying-export-pro",
 ]);
 
+const STORY_PRO2_NODE_TYPES = new Set([
+  "story-pro2-starter",
+  "story-pro2-script-hub",
+  "story-pro2-style",
+  "story-pro2-style-asset",
+  "story-pro2-image",
+  "story-pro2-three-view",
+  "story-pro2-character",
+  "story-pro2-scene",
+  "story-pro2-frame",
+  "story-pro2-video",
+  "jianying-export-pro2",
+]);
+
+const SBV1_NODE_TYPES = new Set(["sbv1-image", "sbv1-video-engine"]);
+
 export function isStoryProPipelineNodeType(type: string): boolean {
   return STORY_PRO_NODE_TYPES.has(type);
+}
+
+export function isStoryPro2PipelineNodeType(type: string): boolean {
+  return STORY_PRO2_NODE_TYPES.has(type);
+}
+
+export function isSbv1PipelineNodeType(type: string): boolean {
+  return SBV1_NODE_TYPES.has(type);
 }
 
 export function canvasProjectEditionFromGraph(
@@ -26,9 +50,10 @@ export function canvasProjectEditionFromGraph(
   for (const raw of nodes) {
     if (!raw || typeof raw !== "object") continue;
     const type = (raw as { type?: unknown }).type;
-    if (typeof type === "string" && isStoryProPipelineNodeType(type)) {
-      return "pro";
-    }
+    if (typeof type !== "string") continue;
+    if (isSbv1PipelineNodeType(type)) return "sbv1";
+    if (isStoryPro2PipelineNodeType(type)) return "pro2";
+    if (isStoryProPipelineNodeType(type)) return "pro";
   }
   return "standard";
 }

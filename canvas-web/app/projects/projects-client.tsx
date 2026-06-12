@@ -26,8 +26,12 @@ import {
   canvasEditionBadgeClass,
   canvasEditionFromTemplateCanvas,
   canvasEditionLabel,
+  isStoryPro2BuiltinTemplateId,
   isStoryProBuiltinTemplateId,
+  isSbv1BuiltinTemplateId,
+  STORY_PRO2_BUILTIN_TEMPLATE_ID,
   STORY_PRO_BUILTIN_TEMPLATE_ID,
+  SBV1_BUILTIN_TEMPLATE_ID,
   type CanvasProjectEdition,
 } from "@/lib/canvas/project-edition";
 
@@ -39,7 +43,10 @@ type StarterPick =
 function normalizeEdition(
   edition: CanvasProjectSummary["edition"] | undefined,
 ): CanvasProjectEdition {
-  return edition === "pro" ? "pro" : "standard";
+  if (edition === "sbv1") return "sbv1";
+  if (edition === "pro2") return "pro2";
+  if (edition === "pro") return "pro";
+  return "standard";
 }
 
 function Inner() {
@@ -85,7 +92,11 @@ function Inner() {
 
   const onOpenPicker = useCallback((edition: CanvasProjectEdition) => {
     setPickerEdition(edition);
-    if (edition === "pro") {
+    if (edition === "pro2") {
+      setPick({ kind: "builtin", id: STORY_PRO2_BUILTIN_TEMPLATE_ID });
+    } else if (edition === "sbv1") {
+      setPick({ kind: "builtin", id: SBV1_BUILTIN_TEMPLATE_ID });
+    } else if (edition === "pro") {
       setPick({ kind: "builtin", id: STORY_PRO_BUILTIN_TEMPLATE_ID });
     } else {
       setPick({ kind: "blank" });
@@ -94,6 +105,14 @@ function Inner() {
     setPickerOpen(true);
   }, []);
 
+  const pro2Projects = useMemo(
+    () => projects.filter((p) => normalizeEdition(p.edition) === "pro2"),
+    [projects],
+  );
+  const sbv1Projects = useMemo(
+    () => projects.filter((p) => normalizeEdition(p.edition) === "sbv1"),
+    [projects],
+  );
   const proProjects = useMemo(
     () => projects.filter((p) => normalizeEdition(p.edition) === "pro"),
     [projects],
@@ -105,7 +124,12 @@ function Inner() {
 
   const standardBuiltinOptions = useMemo(
     () =>
-      BUILTIN_CANVAS_TEMPLATES.filter((t) => !isStoryProBuiltinTemplateId(t.id)).map(
+      BUILTIN_CANVAS_TEMPLATES.filter(
+        (t) =>
+          !isStoryProBuiltinTemplateId(t.id) &&
+          !isStoryPro2BuiltinTemplateId(t.id) &&
+          !isSbv1BuiltinTemplateId(t.id),
+      ).map(
         (t) => ({
           id: t.id,
           name: t.name,
@@ -127,6 +151,30 @@ function Inner() {
     [],
   );
 
+  const pro2BuiltinOptions = useMemo(
+    () =>
+      BUILTIN_CANVAS_TEMPLATES.filter((t) => isStoryPro2BuiltinTemplateId(t.id)).map(
+        (t) => ({
+          id: t.id,
+          name: t.name,
+          description: t.description,
+        }),
+      ),
+    [],
+  );
+
+  const sbv1BuiltinOptions = useMemo(
+    () =>
+      BUILTIN_CANVAS_TEMPLATES.filter((t) => isSbv1BuiltinTemplateId(t.id)).map(
+        (t) => ({
+          id: t.id,
+          name: t.name,
+          description: t.description,
+        }),
+      ),
+    [],
+  );
+
   const standardUserTemplates = useMemo(
     () =>
       userTemplates.filter(
@@ -139,6 +187,22 @@ function Inner() {
     () =>
       userTemplates.filter(
         (t) => canvasEditionFromTemplateCanvas(t.canvas) === "pro",
+      ),
+    [userTemplates],
+  );
+
+  const pro2UserTemplates = useMemo(
+    () =>
+      userTemplates.filter(
+        (t) => canvasEditionFromTemplateCanvas(t.canvas) === "pro2",
+      ),
+    [userTemplates],
+  );
+
+  const sbv1UserTemplates = useMemo(
+    () =>
+      userTemplates.filter(
+        (t) => canvasEditionFromTemplateCanvas(t.canvas) === "sbv1",
       ),
     [userTemplates],
   );
@@ -218,9 +282,21 @@ function Inner() {
   );
 
   const builtinOptions =
-    pickerEdition === "pro" ? proBuiltinOptions : standardBuiltinOptions;
+    pickerEdition === "sbv1"
+      ? sbv1BuiltinOptions
+      : pickerEdition === "pro2"
+        ? pro2BuiltinOptions
+        : pickerEdition === "pro"
+          ? proBuiltinOptions
+          : standardBuiltinOptions;
   const filteredUserTemplates =
-    pickerEdition === "pro" ? proUserTemplates : standardUserTemplates;
+    pickerEdition === "sbv1"
+      ? sbv1UserTemplates
+      : pickerEdition === "pro2"
+        ? pro2UserTemplates
+        : pickerEdition === "pro"
+          ? proUserTemplates
+          : standardUserTemplates;
 
   return (
     <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
@@ -229,7 +305,7 @@ function Inner() {
           <p className="twenty-eyebrow">canvas-web · projects</p>
           <h1 className="canvas-serif mt-2 text-3xl text-white">我的画布</h1>
           <p className="mt-2 text-sm text-[var(--canvas-muted)]">
-            影视专业版与普通版分开管理；节点类型互斥，请从对应分区新建或打开画布。
+            普通版、影视专业版 1.0/2.0、分镜视频 1.0 分开管理；节点类型互斥，请从对应分区新建或打开画布。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -248,6 +324,22 @@ function Inner() {
           >
             <Plus className="mr-2 size-4" />
             新建影视专业版
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenPicker("sbv1")}
+            className="rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/25"
+          >
+            <Plus className="mr-2 inline size-4" />
+            新建分镜视频 1.0
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenPicker("pro2")}
+            className="rounded-lg border border-fuchsia-400/40 bg-fuchsia-500/15 px-3 py-2 text-sm font-medium text-fuchsia-100 hover:bg-fuchsia-500/25"
+          >
+            <Plus className="mr-2 inline size-4" />
+            新建影视专业版 2.0
           </button>
         </div>
       </header>
@@ -276,6 +368,24 @@ function Inner() {
         </div>
       ) : (
         <div className="space-y-10">
+          <ProjectsSection
+            title="分镜视频 1.0"
+            subtitle="图片 + 视频引擎 · 即梦 Seedance 三种参考模式"
+            edition="sbv1"
+            projects={sbv1Projects}
+            onDelete={onDelete}
+            onRename={onRename}
+            onCreate={() => onOpenPicker("sbv1")}
+          />
+          <ProjectsSection
+            title="影视专业版 2.0"
+            subtitle="LibTV 架构：薄卡片 + 检视面板；新复杂需求入口"
+            edition="pro2"
+            projects={pro2Projects}
+            onDelete={onDelete}
+            onRename={onRename}
+            onCreate={() => onOpenPicker("pro2")}
+          />
           <ProjectsSection
             title="影视专业版"
             subtitle="五阶段 SOP：故事 → 风格 → 设计 → 分镜 → 视频"

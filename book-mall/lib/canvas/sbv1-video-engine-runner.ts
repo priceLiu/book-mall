@@ -1,0 +1,165 @@
+/**
+ * 分镜视频 1.0 · sbv1-video-engine runner
+ */
+import { CanvasProjectError } from "./canvas-project-service";
+import {
+  runVideoEngineNode,
+  type RunEngineNodeArgs,
+  type RunEngineNodeResult,
+} from "./canvas-engine-runner";
+
+type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
+
+function httpsImageUrls(urls: string[]): string[] {
+  return urls.filter((u) => typeof u === "string" && /^https?:\/\//.test(u.trim()));
+}
+
+export async function runSbv1VideoEngineNode(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const data = args.node.data ?? {};
+  const referenceMode = String(data.referenceMode ?? "omni") as Sbv1ReferenceMode;
+  const engine = (data.engine as Record<string, unknown> | undefined) ?? {};
+  const providerId = String(engine.providerId ?? data.providerId ?? "");
+  const modelKey = String(engine.modelKey ?? data.modelKey ?? "");
+  const params = {
+    ...((engine.params as Record<string, unknown> | undefined) ?? {}),
+    ...((data.params as Record<string, unknown> | undefined) ?? {}),
+  };
+
+  const aspectRatio = String(data.aspectRatio ?? params.aspect_ratio ?? "16:9");
+  const durationSec = Number(data.durationSec ?? params.duration ?? 5);
+  const resolution = String(
+    data.resolution ?? params.resolution ?? "1080p",
+  ).toLowerCase();
+
+  const promptRaw = String(data.prompt ?? "").trim();
+  const imageInputs = httpsImageUrls(args.node.imageInputs ?? []);
+
+  if (!providerId || !modelKey) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "sbv1-video-engine 缺少 Volcengine 模型配置",
+    );
+  }
+
+  if (!promptRaw && imageInputs.length === 0) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "请填写 prompt 或连接至少一张参考图",
+    );
+  }
+
+  const prompt = promptRaw || "根据参考图生成视频";
+  let mainFrameImageUrl = "";
+  let referenceImageUrls: string[] = [];
+  let lastFrameImageUrl = "";
+  let forceReferenceMode = false;
+
+  if (referenceMode === "first_last") {
+    mainFrameImageUrl = imageInputs[0] ?? "";
+    lastFrameImageUrl = imageInputs[1] ?? "";
+    if (!mainFrameImageUrl) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "首尾帧模式需要至少一张首帧参考图",
+      );
+    }
+  } else if (referenceMode === "smart_multi") {
+    if (imageInputs.length === 0) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "智能多帧模式需要至少一张参考图",
+      );
+    }
+    mainFrameImageUrl = imageInputs[0]!;
+    referenceImageUrls = imageInputs.slice(1);
+    forceReferenceMode = imageInputs.length > 1;
+    params.resolution = resolution;
+    params.duration = durationSec > 0 ? durationSec : 4;
+  } else {
+    // omni
+    if (imageInputs.length === 0) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "全能参考模式需要至少一张参考图",
+      );
+    }
+    mainFrameImageUrl = imageInputs[0]!;
+    referenceImageUrls = imageInputs.slice(1);
+    forceReferenceMode = referenceImageUrls.length > 0;
+  }
+
+  params.aspect_ratio = aspectRatio;
+  if (referenceMode !== "smart_multi") {
+    params.duration = durationSec;
+  }
+  params.generate_audio =
+    params.generate_audio === true || params.generateAudio === true;
+
+  const variantId = String(
+    data.volcengineVariantId ?? data.jimengModelId ?? "",
+  ).trim();
+  const effectiveDuration =
+    referenceMode === "smart_multi"
+      ? durationSec > 0
+        ? durationSec
+        : 4
+      : durationSec;
+
+  const sbv1Billing = {
+    edition: "sbv1",
+    referenceMode,
+    aspectRatio,
+    durationSec: effectiveDuration,
+    resolution,
+    volcengineVariantId: variantId || undefined,
+    modelKey,
+    providerId,
+    promptLength: prompt.length,
+    imageInputCount: imageInputs.length,
+    referenceImageCount: referenceImageUrls.length,
+    hasLastFrame: Boolean(lastFrameImageUrl),
+    forceReferenceMode,
+    paramsSnapshot: {
+      resolution: params.resolution,
+      duration: params.duration,
+      aspect_ratio: params.aspect_ratio,
+      generate_audio: params.generate_audio === true,
+      tier: params.tier,
+    },
+    pricingReference: {
+      tokenPureVideoYuanPerMillion: 46,
+      tokenWithVideoInputYuanPerMillion: 28,
+      reference15SecTokens: 308880,
+      approxYuanPerSec720p: 0.99,
+      billingDoc: "https://www.volcengine.com/docs/82379/1544106",
+    },
+    realPersonReview:
+      "真人人像作为主体参考须经本人验证或合法授权；先录入真人人像库并通过审核，生成时使用 asset://",
+    portraitApiDoc: "https://www.volcengine.com/docs/82379/2333589",
+  };
+
+  return runVideoEngineNode({
+    ...args,
+    clientPage: args.clientPage ?? `canvas/${args.projectId}/sbv1`,
+    node: {
+      ...args.node,
+      type: "video-engine",
+      modelKey,
+      data: {
+        providerId,
+        modelKey,
+        prompt,
+        params,
+        mainFrameImageUrl,
+        referenceImageUrls,
+        lastFrameImageUrl,
+        forceReferenceMode,
+        sbv1Billing,
+      },
+      imageInputs,
+      textInputs: [],
+    },
+  });
+}

@@ -25,9 +25,38 @@ import {
   STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
 } from "./story-pro-prompts";
 import {
+  STORY_PRO2_CHARACTER_PROMPT,
+  STORY_PRO2_STORYBOARD_PROMPT,
+} from "./story-pro2-theme-outline-prompt";
+import {
   STORY_CONTROL_NODE_HEIGHT,
   STORY_CONTROL_NODE_WIDTH,
 } from "./story-node-chrome";
+import {
+  PRO2_COLUMN_CARD_HEIGHT,
+  PRO2_COLUMN_CARD_WIDTH,
+  PRO2_CONTROL_CARD_HEIGHT,
+  PRO2_CONTROL_CARD_WIDTH,
+  PRO2_TEXT_NODE_HEIGHT,
+  PRO2_TEXT_NODE_WIDTH,
+  PRO2_IMAGE_NODE_HEIGHT,
+  PRO2_CHARACTER_THREE_VIEW_HEIGHT,
+  PRO2_CHARACTER_THREE_VIEW_WIDTH,
+  PRO2_IMAGE_NODE_WIDTH,
+  PRO2_SCRIPT_NODE_HEIGHT,
+  PRO2_SCRIPT_NODE_WIDTH,
+  PRO2_FRAME_BOARD_HEIGHT,
+  PRO2_FRAME_BOARD_WIDTH,
+} from "./story-pro2-node-chrome";
+import {
+  SBV1_DEFAULT_VIDEO_ENGINE_DATA,
+} from "./sbv1-workspace-types";
+import {
+  SBV1_IMAGE_NODE_HEIGHT,
+  SBV1_IMAGE_NODE_WIDTH,
+  SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+  SBV1_VIDEO_ENGINE_WIDTH,
+} from "./sbv1-node-chrome";
 import {
   REF_GRID_NODE_SIZE,
   REF_VIDEO_DEFAULT_MODEL_KEY,
@@ -76,6 +105,19 @@ export type CanvasNodeType =
   | "story-character-column"
   | "story-frame-column"
   | "story-video-column"
+  | "story-pro2-starter"
+  | "story-pro2-image"
+  | "story-pro2-three-view"
+  | "story-pro2-script-hub"
+  | "story-pro2-style"
+  | "story-pro2-style-asset"
+  | "story-pro2-character"
+  | "story-pro2-scene"
+  | "story-pro2-frame"
+  | "story-pro2-video"
+  | "jianying-export-pro2"
+  | "sbv1-image"
+  | "sbv1-video-engine"
   | "story-pro-starter"
   | "story-pro-script-hub"
   | "story-pro-style"
@@ -114,6 +156,19 @@ export type CanvasContentNodeType =
   | "story-character-column"
   | "story-frame-column"
   | "story-video-column"
+  | "story-pro2-starter"
+  | "story-pro2-image"
+  | "story-pro2-three-view"
+  | "story-pro2-script-hub"
+  | "story-pro2-style"
+  | "story-pro2-style-asset"
+  | "story-pro2-character"
+  | "story-pro2-scene"
+  | "story-pro2-frame"
+  | "story-pro2-video"
+  | "jianying-export-pro2"
+  | "sbv1-image"
+  | "sbv1-video-engine"
   | "story-pro-starter"
   | "story-pro-script-hub"
   | "story-pro-style"
@@ -151,6 +206,19 @@ export const CONTENT_NODE_TYPES: CanvasContentNodeType[] = [
   "story-character-column",
   "story-frame-column",
   "story-video-column",
+  "story-pro2-starter",
+  "story-pro2-image",
+  "story-pro2-three-view",
+  "story-pro2-script-hub",
+  "story-pro2-style",
+  "story-pro2-style-asset",
+  "story-pro2-character",
+  "story-pro2-scene",
+  "story-pro2-frame",
+  "story-pro2-video",
+  "jianying-export-pro2",
+  "sbv1-image",
+  "sbv1-video-engine",
   "story-pro-starter",
   "story-pro-script-hub",
   "story-pro-style",
@@ -423,11 +491,19 @@ export type ImagePreviewNodeData = {
   runtime?: CanvasNodeRuntime;
 };
 
+export type JianyingMediaRenderResult = {
+  downloadUrl: string;
+  expiresAt: string;
+  completedAt: string;
+};
+
 export type JianyingExportNodeData = {
   label?: string;
   /** 所属故事大纲 hub，多工作流画布按此隔离帧数据 */
   hubNodeId?: string;
   runtime?: CanvasNodeRuntime;
+  /** 云端自动剪辑成片结果（持久化，避免缩放/重绘后下载链接丢失） */
+  mediaRenderResult?: JianyingMediaRenderResult | null;
 };
 
 export type OutputNodeData = {
@@ -436,11 +512,26 @@ export type OutputNodeData = {
   runtime?: CanvasNodeRuntime;
 };
 
+/** Pro2 媒体组类型（分镜图 / 三视图 / 分镜视频） */
+export type Pro2MediaGroupKind =
+  | "frame-board"
+  | "character-board"
+  | "video-board";
+
 export type GroupNodeData = {
   /** 组名（用户输入） */
   label: string;
   /** 主色（hex），用于边框 / 背景透明度叠加 */
   color: string;
+  /** Pro2 · 媒体组语义 */
+  pro2Kind?: Pro2MediaGroupKind;
+  pro2HubNodeId?: string;
+  /** 批量跑任务的隐藏列节点 id */
+  pro2ControllerNodeId?: string;
+  /** Pro2 · 手动框选打的组：统一走图1 暗色壳（即便不是媒体组） */
+  pro2Styled?: boolean;
+  /** sbv1 · 分镜视频 1.0 媒体组（子节点 sbv1-image） */
+  sbv1Styled?: boolean;
 };
 
 export type CanvasNodeData =
@@ -488,15 +579,21 @@ export type CanvasGraph = {
   nodes: CanvasFlowNode[];
   edges: CanvasFlowEdge[];
   viewport?: Viewport;
+  /** 漫剧轨道标记（pro2 / sbv1 等） */
+  meta?: { edition?: "pro2" | "sbv1" };
 };
 
 /**
  * Schema 版本：
  * - 1 = v1（含 ai-text / image-gen / product-params）
  * - 2 = v2（双引擎）
+ * - 3 = story-pro2（薄卡 + 检视面板）
+ * - 4 = sbv1（分镜视频 1.0）
  * 加载 schemaVersion < 2 的 graph 时由 lib/canvas/migrate.ts 做 in-memory 迁移
  */
 export const CANVAS_SCHEMA_VERSION = 2;
+export const CANVAS_SCHEMA_VERSION_PRO2 = 3;
+export const CANVAS_SCHEMA_VERSION_SBV1 = 4;
 
 export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> = {
   image: {} satisfies ImageNodeData as Record<string, unknown>,
@@ -534,6 +631,73 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     rows: [],
     batchVideo: undefined,
     batchTts: undefined,
+  } as Record<string, unknown>,
+  "story-pro2-starter": {
+    starterMode: "generate",
+    themeInput: "",
+    generatedOutlineMd: "",
+    uploadedScriptMd: "",
+    systemPrompt: "",
+    providerId: "",
+    modelKey: "",
+    params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
+    pipelineStage: "idle",
+  } as Record<string, unknown>,
+  "story-pro2-image": {
+    label: "图片",
+    dockInput: "",
+  } as Record<string, unknown>,
+  "story-pro2-three-view": {
+    label: "角色",
+    dockInput: "",
+  } as Record<string, unknown>,
+  "story-pro2-script-hub": {
+    outlineMd: "",
+    characterMd: "",
+    storyboardMd: "",
+    providerId: "",
+    modelKey: "",
+    params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
+    outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
+    promptOutline: STORY_PRO_OUTLINE_USER_PROMPT,
+    promptCharacter: STORY_PRO2_CHARACTER_PROMPT,
+    promptStoryboard: STORY_PRO2_STORYBOARD_PROMPT,
+    referencedNodeIds: [],
+    dockInput: "",
+    dockRefImages: [],
+  } as Record<string, unknown>,
+  "story-pro2-style": {
+    styleAnchorZh: "",
+    styleAnchorEn: "",
+    negativePrompt: "",
+    refImages: [],
+    styleFinalized: false,
+    providerId: "",
+    modelKey: "",
+  } as Record<string, unknown>,
+  "story-pro2-style-asset": {
+    presetId: "",
+    styleName: "",
+    stylePrompt: "",
+    imageUrl: "",
+    label: "素材-风格",
+    styleAnchorZh: "",
+  } as Record<string, unknown>,
+  "story-pro2-character": { rows: [], batchImage: undefined } as Record<string, unknown>,
+  "story-pro2-scene": { rows: [], batchImage: undefined } as Record<string, unknown>,
+  "story-pro2-frame": { rows: [], batchImage: undefined } as Record<string, unknown>,
+  "story-pro2-video": { rows: [], batchVideo: undefined, batchTts: undefined } as Record<
+    string,
+    unknown
+  >,
+  "jianying-export-pro2": {
+    label: "剪映导出 · 专业版 2.0",
+  } as Record<string, unknown>,
+  "sbv1-image": {
+    label: "图片",
+  } as Record<string, unknown>,
+  "sbv1-video-engine": {
+    ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
   } as Record<string, unknown>,
   "story-pro-starter": {
     starterMode: "upload",
@@ -712,6 +876,58 @@ export const NODE_DEFAULT_SIZE: Record<
   "story-character-column": { width: 560, height: 2100 },
   "story-frame-column": { width: 1080, height: 2100 },
   "story-video-column": { width: 540, height: 2100 },
+  "story-pro2-starter": {
+    width: PRO2_TEXT_NODE_WIDTH,
+    height: PRO2_TEXT_NODE_HEIGHT,
+  },
+  "story-pro2-image": {
+    width: PRO2_IMAGE_NODE_WIDTH,
+    height: PRO2_IMAGE_NODE_HEIGHT,
+  },
+  "story-pro2-three-view": {
+    width: PRO2_CHARACTER_THREE_VIEW_WIDTH,
+    height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
+  },
+  "story-pro2-script-hub": {
+    width: PRO2_SCRIPT_NODE_WIDTH,
+    height: PRO2_SCRIPT_NODE_HEIGHT,
+  },
+  "story-pro2-style": {
+    width: PRO2_CONTROL_CARD_WIDTH,
+    height: PRO2_CONTROL_CARD_HEIGHT,
+  },
+  "story-pro2-style-asset": {
+    width: PRO2_IMAGE_NODE_WIDTH,
+    height: PRO2_IMAGE_NODE_HEIGHT,
+  },
+  "story-pro2-character": {
+    width: PRO2_FRAME_BOARD_WIDTH,
+    height: PRO2_FRAME_BOARD_HEIGHT,
+  },
+  "story-pro2-scene": {
+    width: PRO2_COLUMN_CARD_WIDTH,
+    height: PRO2_COLUMN_CARD_HEIGHT,
+  },
+  "story-pro2-frame": {
+    width: PRO2_FRAME_BOARD_WIDTH,
+    height: PRO2_FRAME_BOARD_HEIGHT,
+  },
+  "story-pro2-video": {
+    width: PRO2_COLUMN_CARD_WIDTH,
+    height: PRO2_COLUMN_CARD_HEIGHT,
+  },
+  "jianying-export-pro2": {
+    width: 400,
+    height: PRO2_COLUMN_CARD_HEIGHT,
+  },
+  "sbv1-image": {
+    width: SBV1_IMAGE_NODE_WIDTH,
+    height: SBV1_IMAGE_NODE_HEIGHT,
+  },
+  "sbv1-video-engine": {
+    width: SBV1_VIDEO_ENGINE_WIDTH,
+    height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+  },
   "story-pro-starter": {
     width: STORY_CONTROL_NODE_WIDTH,
     height: STORY_CONTROL_NODE_HEIGHT,
@@ -728,7 +944,7 @@ export const NODE_DEFAULT_SIZE: Record<
   "story-pro-scene": { width: 480, height: 2100 },
   "story-pro-frame": { width: 1080, height: 2100 },
   "story-pro-video": { width: 540, height: 2100 },
-  "jianying-export-pro": { width: 400, height: 280 },
+  "jianying-export-pro": { width: 400, height: 920 },
   "ai-engine": { width: 480, height: 540 },
   "image-engine": { width: 380, height: 560 },
   "three-view-engine": { width: 670, height: 880 },
@@ -746,7 +962,7 @@ export const NODE_DEFAULT_SIZE: Record<
   "audio-preview": { width: 380, height: 200 },
   "video-preview": { width: 380, height: 320 },
   "image-preview": { width: 380, height: 320 },
-  "jianying-export": { width: 400, height: 280 },
+  "jianying-export": { width: 400, height: 920 },
   output: { width: 380, height: 480 },
   group: { width: 360, height: 240 },
 };
@@ -778,6 +994,19 @@ export const NODE_OUTPUT_KIND: Record<
   "story-character-column": "image",
   "story-frame-column": "image",
   "story-video-column": "video",
+  "story-pro2-starter": "text",
+  "story-pro2-image": "image",
+  "story-pro2-three-view": "image",
+  "story-pro2-script-hub": "text",
+  "story-pro2-style": "text",
+  "story-pro2-style-asset": "image",
+  "story-pro2-character": "image",
+  "story-pro2-scene": "image",
+  "story-pro2-frame": "image",
+  "story-pro2-video": "video",
+  "jianying-export-pro2": "none",
+  "sbv1-image": "image",
+  "sbv1-video-engine": "video",
   "story-pro-starter": "text",
   "story-pro-script-hub": "text",
   "story-pro-style": "text",
@@ -826,6 +1055,7 @@ export function isRunnableNodeType(t: CanvasNodeType): boolean {
     t === "story-pro-frame" ||
     t === "story-pro-video" ||
     t === "video-engine" ||
+    t === "sbv1-video-engine" ||
     t === "ai-video-engine" ||
     t === "tts-engine"
   );
@@ -833,6 +1063,9 @@ export function isRunnableNodeType(t: CanvasNodeType): boolean {
 
 export function isStoryWorkspaceNodeType(t: string): boolean {
   return (
+    t === "story-comic-starter" ||
+    t === "story-pro-starter" ||
+    t === "story-pro2-starter" ||
     t === "story-script-hub" ||
     t === "story-character-column" ||
     t === "story-frame-column" ||
@@ -842,7 +1075,13 @@ export function isStoryWorkspaceNodeType(t: string): boolean {
     t === "story-pro-character" ||
     t === "story-pro-scene" ||
     t === "story-pro-frame" ||
-    t === "story-pro-video"
+    t === "story-pro-video" ||
+    t === "story-pro2-script-hub" ||
+    t === "story-pro2-style" ||
+    t === "story-pro2-character" ||
+    t === "story-pro2-scene" ||
+    t === "story-pro2-frame" ||
+    t === "story-pro2-video"
   );
 }
 

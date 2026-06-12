@@ -2,22 +2,70 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { NodeResizer, useReactFlow, useViewport, type NodeProps } from "@xyflow/react";
-import { LayoutGrid, LayoutTemplate, Palette, Trash2, GripVertical } from "lucide-react";
+import {
+  Handle,
+  NodeResizer,
+  Position,
+  useReactFlow,
+  useViewport,
+  type NodeProps,
+} from "@xyflow/react";
+import {
+  Film,
+  LayoutGrid,
+  LayoutTemplate,
+  Palette,
+  Trash2,
+  GripVertical,
+  Users,
+} from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
+  PRO2_IMAGE_LEFT_ADD_MENU,
+  PRO2_RIGHT_ADD_MENU,
+} from "@/lib/canvas/pro2-add-node-menu";
+import { handlePro2GroupSidePick } from "@/lib/canvas/pro2-group-side-spawn";
+import { SBV1_GROUP_RIGHT_ADD_MENU } from "@/lib/canvas/sbv1-add-node-menu";
+import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
+import { handleSbv1GroupSidePick } from "@/lib/canvas/sbv1-spawn-nodes";
+import { relayoutPro2MediaGroup } from "@/lib/canvas/pro2-media-group-layout";
+import {
+  isPro2MediaChildNode,
+  isPro2StyledGroup,
+  pro2MediaGroupBorderColor,
+} from "@/lib/canvas/pro2-media-group-meta";
+import {
+  PRO2_MEDIA_GROUP_BG,
+  PRO2_MEDIA_GROUP_DOT_GRID,
+  PRO2_MEDIA_GROUP_DOT_SIZE,
+  PRO2_MEDIA_GROUP_SHELL_CLASS,
+  PRO2_NODE_HANDLE_CLASS,
+  PRO2_NODE_RESIZER_COLOR,
+  PRO2_NODE_RESIZER_HANDLE,
+  PRO2_NODE_RESIZER_LINE,
+} from "@/lib/canvas/story-pro2-node-chrome";
+import { SBV1_NODE_HANDLE_CLASS } from "@/lib/canvas/sbv1-node-chrome";
+import {
   GROUP_COLOR_PRESETS,
   type GroupNodeData,
+  type Pro2MediaGroupKind,
 } from "@/lib/canvas/types";
+import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
+import { cn } from "@/lib/utils";
 import {
   CanvasPillToolbar,
   CanvasToolIcon,
   CanvasToolbarBadge,
 } from "../canvas-floating-toolbar";
-import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
-
+import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 const TOOLBAR_GAP = 8;
+
+function pro2MediaGroupIcon(kind?: Pro2MediaGroupKind) {
+  if (kind === "frame-board") return Film;
+  if (kind === "character-board") return Users;
+  return Film;
+}
 /** 分组顶边以上仍算作「在分组上」，便于移向悬浮工具条 */
 const TOOLBAR_HIT_TOP = 64;
 /** 改色面板大致高度，用于扩大可 hover 区域 */
@@ -39,6 +87,11 @@ function pointInRect(x: number, y: number, r: ScreenRect) {
 export function GroupNode({ id, data, selected }: NodeProps) {
   const dialogs = useDialogs();
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodes = useCanvasStore((s) => s.setNodes);
+  const setEdges = useCanvasStore((s) => s.setEdges);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
+  const edges = useCanvasStore((s) => s.edges);
   const ungroup = useCanvasStore((s) => s.ungroup);
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
   const reflowStoryTemplateGroups = useCanvasStore(
@@ -59,7 +112,17 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const editPanelRef = useRef<HTMLDivElement | null>(null);
 
   const d = data as unknown as GroupNodeData;
-  const color = d.color || GROUP_COLOR_PRESETS[0];
+  const color = d.color || GROUP_COLOR_PRESETS[2];
+  const selfNode = useMemo(
+    () => allNodes.find((n) => n.id === id),
+    [allNodes, id],
+  );
+  const isPro2MediaGroup = selfNode
+    ? isPro2StyledGroup(selfNode, allNodes)
+    : Boolean(d.pro2Kind);
+  const isSbv1Group = selfNode
+    ? isSbv1MediaGroup(selfNode, allNodes)
+    : Boolean(d.sbv1Styled);
   const isStoryTemplateGroup =
     id === "sc-group-characters" ||
     id === "sc-group-media" ||
@@ -74,7 +137,12 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     [allNodes, id],
   );
 
-  const showToolbar = selected || editOpen || pointerInside;
+  const showToolbar =
+    !isPro2MediaGroup &&
+    !isSbv1Group &&
+    (selected || editOpen || pointerInside);
+  const showPro2GroupSidePlus = isPro2MediaGroup && selected;
+  const showSbv1GroupSidePlus = isSbv1Group && !isPro2MediaGroup && selected;
 
   const getGroupScreenRect = useCallback((): ScreenRect | null => {
     const internal = getInternalNode(id) as
@@ -185,6 +253,25 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     };
   }, []);
 
+  // 旧媒体组迁移：挂载时按新版宫格 + 大留白重排一次（图片填满、留出可点选组的空白）
+  const relayoutDoneRef = useRef(false);
+  const hasMediaChildren = useMemo(
+    () =>
+      allNodes.some(
+        (n) =>
+          n.parentId === id &&
+          (isPro2MediaChildNode(n) || n.type === "sbv1-image"),
+      ),
+    [allNodes, id],
+  );
+  useEffect(() => {
+    if (!hasMediaChildren) return;
+    if (isSbv1Group) return;
+    if (relayoutDoneRef.current) return;
+    relayoutDoneRef.current = true;
+    relayoutPro2MediaGroup(setNodes, id);
+  }, [hasMediaChildren, isSbv1Group, id, setNodes]);
+
   useEffect(() => {
     updateScreenPos();
   }, [updateScreenPos, viewport.x, viewport.y, viewport.zoom, selected, allNodes]);
@@ -223,44 +310,241 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     scheduleHide,
   ]);
 
+  const Pro2GroupIcon = pro2MediaGroupIcon(d.pro2Kind);
+
+  const selectPro2Group = useCallback(() => {
+    setNodes((prev) => prev.map((n) => ({ ...n, selected: n.id === id })));
+  }, [id, setNodes]);
+
+  const onPro2GroupTitlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.stopPropagation();
+      selectPro2Group();
+    },
+    [selectPro2Group],
+  );
+
+  const onPro2GroupBlankPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      // 阻止冒泡到 pane（pro2 onPaneClick 会清空选中）
+      e.stopPropagation();
+      selectPro2Group();
+    },
+    [selectPro2Group],
+  );
+
+  const onGroupSidePick = useCallback(
+    (side: "left" | "right") => (itemId: string, nodeType?: string) => {
+      void handlePro2GroupSidePick(
+        id,
+        side,
+        itemId,
+        nodeType,
+        dialogs.alert,
+        { nodes: allNodes, addNode, setNodes, setEdges },
+      );
+    },
+    [id, allNodes, addNode, setNodes, setEdges, dialogs.alert],
+  );
+
+  const onSbv1GroupSidePick = useCallback(
+    (_side: "left" | "right") => (itemId: string, nodeType?: string) => {
+      void handleSbv1GroupSidePick(
+        id,
+        itemId,
+        nodeType,
+        dialogs.alert,
+        {
+          nodes: allNodes,
+          edges,
+          addNode,
+          addNodeInGroup,
+          setNodes,
+          setEdges,
+        },
+      );
+    },
+    [id, allNodes, edges, addNode, addNodeInGroup, setNodes, setEdges, dialogs.alert],
+  );
+
   return (
     <div
-      className="canvas-group-node group/gn relative h-full w-full rounded-2xl"
-      style={{
-        background: "transparent",
-        border: `2px ${selected ? "solid" : "dashed"} ${color}`,
-        boxShadow: selected ? `0 0 0 2px ${color}33` : "none",
-      }}
+      className={cn(
+        "canvas-group-node group/gn relative h-full w-full overflow-visible",
+        isPro2MediaGroup
+          ? PRO2_MEDIA_GROUP_SHELL_CLASS
+          : "rounded-2xl",
+      )}
+      data-pro2-media-group={isPro2MediaGroup ? id : undefined}
+      style={
+        isPro2MediaGroup
+          ? {
+              backgroundColor: PRO2_MEDIA_GROUP_BG,
+              backgroundImage: PRO2_MEDIA_GROUP_DOT_GRID,
+              backgroundSize: PRO2_MEDIA_GROUP_DOT_SIZE,
+              border: `1px solid ${pro2MediaGroupBorderColor(color, selected)}`,
+            }
+          : {
+              background: "transparent",
+              border: `2px ${selected ? "solid" : "dashed"} ${color}`,
+              boxShadow: selected ? `0 0 0 2px ${color}33` : "none",
+            }
+      }
     >
+      {isPro2MediaGroup ? (
+        <>
+          {/* 留白区：选中整组 + 从此处拖动（子节点 DOM 叠在上层，仅空白可点） */}
+          <div
+            className={cn(RF_NODE_DRAG_HANDLE, "absolute inset-0 z-0")}
+            aria-hidden
+            onPointerDown={onPro2GroupBlankPointerDown}
+          />
+          <Handle
+            id="in_text"
+            type="target"
+            position={Position.Left}
+            className={cn(
+              PRO2_NODE_HANDLE_CLASS,
+              showPro2GroupSidePlus
+                ? "pointer-events-none opacity-0"
+                : selected
+                  ? "opacity-100"
+                  : "opacity-0 pointer-events-none",
+            )}
+            style={{ top: "50%" }}
+          />
+          {showPro2GroupSidePlus ? (
+            <>
+              <Pro2NodeSidePlus
+                side="left"
+                handleId="plus_left"
+                visible
+                className="z-[100] -left-5"
+                sections={PRO2_IMAGE_LEFT_ADD_MENU}
+                onPick={onGroupSidePick("left")}
+              />
+              <Pro2NodeSidePlus
+                side="right"
+                handleId="out_media"
+                visible
+                className="z-[100] -right-5"
+                sections={PRO2_RIGHT_ADD_MENU}
+                onPick={onGroupSidePick("right")}
+              />
+            </>
+          ) : null}
+        </>
+      ) : null}
+
+      {isSbv1Group && !isPro2MediaGroup ? (
+        <>
+          <div
+            className={cn(RF_NODE_DRAG_HANDLE, "absolute inset-0 z-0")}
+            aria-hidden
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.stopPropagation();
+              setNodes((prev) =>
+                prev.map((n) => ({ ...n, selected: n.id === id })),
+              );
+            }}
+          />
+          <Handle
+            id="out_media"
+            type="source"
+            position={Position.Right}
+            className={cn(
+              SBV1_NODE_HANDLE_CLASS,
+              showSbv1GroupSidePlus
+                ? "pointer-events-none opacity-0"
+                : selected
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0",
+            )}
+            style={{ top: "50%" }}
+            title="连线到视频引擎"
+          />
+          {showSbv1GroupSidePlus ? (
+            <Pro2NodeSidePlus
+              side="right"
+              handleId="out_media"
+              visible
+              className="z-[100] -right-5"
+              sections={SBV1_GROUP_RIGHT_ADD_MENU}
+              onPick={onSbv1GroupSidePick("right")}
+            />
+          ) : null}
+        </>
+      ) : null}
+
       <NodeResizer
-        color={color}
+        color={isPro2MediaGroup ? PRO2_NODE_RESIZER_COLOR : color}
         minWidth={220}
         minHeight={140}
         isVisible={selected}
-        lineStyle={{ borderColor: color }}
-        handleStyle={{ background: color, border: "none", width: 8, height: 8 }}
+        lineStyle={
+          isPro2MediaGroup
+            ? PRO2_NODE_RESIZER_LINE
+            : { borderColor: color }
+        }
+        handleStyle={
+          isPro2MediaGroup
+            ? PRO2_NODE_RESIZER_HANDLE
+            : { background: color, border: "none", width: 8, height: 8 }
+        }
       />
 
-      <div className="flex h-8 items-center gap-1 rounded-t-[14px] px-2 pt-1 text-[12px] font-medium text-white">
-        <div
-          className={`${RF_NODE_DRAG_HANDLE} flex shrink-0 cursor-grab items-center active:cursor-grabbing`}
-          title="拖动移动分组"
-        >
-          <GripVertical className="size-3.5 text-white/35" aria-hidden />
+      {isPro2MediaGroup ? (
+        <div className="relative z-10 flex h-8 shrink-0 items-center gap-1 px-2 pt-2">
+          <div
+            className={cn(
+              RF_NODE_DRAG_HANDLE,
+              "flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-white/35 active:cursor-grabbing",
+            )}
+            title="拖动移动分组"
+          >
+            <GripVertical className="size-3.5" aria-hidden />
+          </div>
+          <button
+            type="button"
+            className={cn(
+              "nodrag flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[11px] text-white/55 transition hover:bg-white/6 hover:text-white/75",
+            )}
+            onPointerDown={onPro2GroupTitlePointerDown}
+            onClick={(e) => {
+              e.stopPropagation();
+              selectPro2Group();
+            }}
+          >
+            <Pro2GroupIcon className="size-3.5 shrink-0 text-white/40" />
+            <span className="truncate font-medium tracking-wide">
+              {d.label?.trim() || "媒体组"}
+            </span>
+          </button>
         </div>
-        <span
-          aria-hidden
-          className="size-2.5 shrink-0 rounded-full"
-          style={{ background: color }}
-        />
-        <input
-          value={d.label ?? ""}
-          onChange={(e) => updateNodeData(id, { label: e.target.value })}
-          placeholder="未命名分组"
-          className="nodrag min-w-0 flex-1 bg-transparent text-white/95 outline-none placeholder:text-white/40"
-          spellCheck={false}
-        />
-      </div>
+      ) : (
+        <div className="flex h-8 items-center gap-1 rounded-t-[14px] px-2 pt-1 text-[12px] font-medium text-white">
+          <div
+            className={`${RF_NODE_DRAG_HANDLE} flex shrink-0 cursor-grab items-center active:cursor-grabbing`}
+            title="拖动移动分组"
+          >
+            <GripVertical className="size-3.5 text-white/35" aria-hidden />
+          </div>
+          <span
+            aria-hidden
+            className="size-2.5 shrink-0 rounded-full"
+            style={{ background: color }}
+          />
+          <input
+            value={d.label ?? ""}
+            onChange={(e) => updateNodeData(id, { label: e.target.value })}
+            placeholder="未命名分组"
+            className="nodrag min-w-0 flex-1 bg-transparent text-white/95 outline-none placeholder:text-white/40"
+            spellCheck={false}
+          />
+        </div>
+      )}
 
       {mounted && showToolbar && screenPos
         ? createPortal(

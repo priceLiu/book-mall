@@ -76,11 +76,13 @@ import { modelHasStoryCapabilities } from "@/lib/canvas/story-model-capabilities
 import {
   storyEditionAccent,
   storyEditionFromNodeType,
+  storyEditionUsesProWorkspace,
 } from "@/lib/canvas/story-edition-chrome";
 import {
   PRO_HINT_LABEL_CLASS,
   PRO_NODE_SHELL_FOOTER_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
+import { PRO2_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { STORY_HINT_LABEL_CLASS, STORY_HINT_BODY_CLASS, FRAME_ROW_AT_HINT, stripFrameRowAtHint, sanitizeLegacyFramePrompt, patchVideoRowsFromFrameRows } from "@/lib/canvas/story-column-sync";
 import {
   storyFrameColumnSize,
@@ -104,7 +106,7 @@ import { ensureStoryColumnImageEngineDefault } from "@/lib/canvas/story-column-e
 export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const edition = storyEditionFromNodeType(type);
   const hintLabelClass =
-    edition === "pro" ? PRO_HINT_LABEL_CLASS : STORY_HINT_LABEL_CLASS;
+    storyEditionUsesProWorkspace(edition) ? PRO_HINT_LABEL_CLASS : STORY_HINT_LABEL_CLASS;
   const base = useBookMallBaseUrl();
   const projectId = useCanvasStore((s) => s.projectId);
   const { nodes, edges } = useCanvasGraphSnapshot();
@@ -116,10 +118,10 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const { providers } = useUserProviders();
   const { alert, confirm } = useDialogs();
   const { assets: projectCharacterAssets } = useStoryProCharacterAssets(
-    edition === "pro" ? projectId : null,
+    storyEditionUsesProWorkspace(edition) ? projectId : null,
   );
   const { assets: projectSceneAssets } = useStoryProSceneAssets(
-    edition === "pro" ? projectId : null,
+    storyEditionUsesProWorkspace(edition) ? projectId : null,
   );
 
   const canGenerateFrame = Boolean(
@@ -194,7 +196,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
 
   const assetRefsByKey = useMemo(
     () =>
-      edition === "pro"
+      storyEditionUsesProWorkspace(edition)
         ? buildAssetRefsByCharacterKey(
             projectCharacterAssets,
             characterRows,
@@ -218,7 +220,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
 
   const sceneAssetRefsByKey = useMemo(
     () =>
-      edition === "pro"
+      storyEditionUsesProWorkspace(edition)
         ? buildAssetRefsBySceneKey(
             projectSceneAssets,
             sceneRows,
@@ -243,7 +245,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   );
 
   const characterMentionables = useMemo(() => {
-    if (edition === "pro" && frameRefCatalog.length) {
+    if (storyEditionUsesProWorkspace(edition) && frameRefCatalog.length) {
       return frameRefCatalog
         .filter((r) => r.url && /^https?:\/\//.test(r.url))
         .map((r) => ({
@@ -276,12 +278,12 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const columnGenerating = storyColumnIsGenerating(nodeRuntime);
 
   const alignedRowH = useMemo(
-    () => storyMediaAlignedRowHeight({ pro: edition === "pro" }),
+    () => storyMediaAlignedRowHeight({ pro: storyEditionUsesProWorkspace(edition) }),
     [edition],
   );
 
   const targetSize = useMemo(
-    () => storyFrameColumnSize(displayRows, { pro: edition === "pro" }),
+    () => storyFrameColumnSize(displayRows, { pro: storyEditionUsesProWorkspace(edition) }),
     [displayRows, edition],
   );
 
@@ -438,7 +440,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
       .map((ref) => ref.url)
       .filter((u): u is string => Boolean(u && /^https?:\/\//.test(u)));
     const snapshot =
-      edition === "pro"
+      storyEditionUsesProWorkspace(edition)
         ? buildCharacterRefSnapshot(
             refImages.map((r) => r.id),
             projectCharacterAssets,
@@ -525,12 +527,16 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
       inputs={[{ id: "in_text", label: "分镜脚本", kind: "text" }]}
       outputs={[{ id: "text", label: "分镜图", kind: "image" }]}
       footerClassName={
-        edition === "pro" ? PRO_NODE_SHELL_FOOTER_CLASS : undefined
+        edition === "pro2"
+          ? PRO2_NODE_SHELL_FOOTER_CLASS
+          : storyEditionUsesProWorkspace(edition)
+            ? PRO_NODE_SHELL_FOOTER_CLASS
+            : undefined
       }
       footer={
         <StoryNodeFooterShell>
           <div className="flex flex-col gap-1.5">
-            {edition === "pro" ? (
+            {storyEditionUsesProWorkspace(edition) ? (
               <button
                 type="button"
                 disabled={columnGenerating || !displayRows.length}
@@ -559,7 +565,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
       <div className="flex w-full flex-col gap-3">
         <StoryFrameScriptEngineBar
           styleRow={
-            edition === "pro" ? (
+            storyEditionUsesProWorkspace(edition) ? (
               <label className="nodrag flex h-full cursor-pointer items-center gap-2 text-[11px] leading-tight text-cyan-200/80">
                 <input
                   type="checkbox"
@@ -578,7 +584,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
             )
           }
           hintRow={
-            edition === "pro" ? (
+            storyEditionUsesProWorkspace(edition) ? (
               <p
                 className={`flex h-full items-center text-[10px] leading-tight ${STORY_HINT_BODY_CLASS}`}
               >
@@ -652,17 +658,17 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                 row,
                 characterRows,
                 assetRefsByKey,
-                sceneRows: edition === "pro" ? sceneRows : undefined,
+                sceneRows: storyEditionUsesProWorkspace(edition) ? sceneRows : undefined,
                 sceneAssetRefsByKey:
-                  edition === "pro" ? sceneAssetRefsByKey : undefined,
+                  storyEditionUsesProWorkspace(edition) ? sceneAssetRefsByKey : undefined,
               });
               const resolvedUpstreamImages = upstreamAssessment.resolved;
               const suggestions =
-                edition === "pro"
+                storyEditionUsesProWorkspace(edition)
                   ? suggestFrameRefsForRow(row, characterRows, assetRefsByKey)
                   : [];
               const readiness =
-                edition === "pro"
+                storyEditionUsesProWorkspace(edition)
                   ? assessFrameRowAssetReadiness(
                       row,
                       characterRows,
@@ -672,7 +678,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                     )
                   : { level: "none" as const, characters: [] };
               const stale =
-                edition === "pro" &&
+                storyEditionUsesProWorkspace(edition) &&
                 frameRowStaleSnapshot(row, projectCharacterAssets, projectId);
               const videoBlockReason = storyVideoGenerateBlockReason(row);
               return (
@@ -683,7 +689,7 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                   promptValue={stripFrameRowAtHint(row.prompt)}
                   compactFrameLayout
                   belowPrompt={
-                    edition === "pro" ? (
+                    storyEditionUsesProWorkspace(edition) ? (
                       <div className="space-y-1">
                         <StoryProFrameRefSuggestBar
                           suggestions={suggestions}

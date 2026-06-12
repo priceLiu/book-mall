@@ -12,10 +12,14 @@ import {
 } from "./canvas-engine-runner";
 import { prependStoryProStyleAnchor } from "./story-pro-style-anchor";
 import { assertStoryVideoFrameGate } from "./story-frame-gate";
-import { resolveStoryRowRefUrls } from "./story-row-ref-urls";
+import { resolveStoryRowRefUrls, parseMentionIds } from "./story-row-ref-urls";
 import { resolveStoryProVideoRefUrls } from "./story-pro-video-ref-resolve";
 import { resolveCharacterRowAssetRefUrls } from "./story-pro-character-ref-resolve";
 import { buildStoryProFrameImageInputs } from "./story-pro-frame-image-inputs";
+import {
+  STORY_PRO2_THEME_OUTLINE_SYSTEM,
+  STORY_PRO2_THEME_OUTLINE_USER_PREFIX,
+} from "./story-pro2-theme-outline-prompt";
 
 function proClientPage(projectId: string): string {
   return `canvas/${projectId}/story-pro`;
@@ -43,6 +47,40 @@ function hashSalt(args: {
   mediaKind?: string;
 }): string {
   return [args.llmSection, args.rowKey, args.mediaKind].filter(Boolean).join(":");
+}
+
+/** 2.0 文本节点 · 主题 → 故事大纲（第一步，不创建脚本节点） */
+export async function runStoryProStarterThemeOutline(
+  args: RunEngineNodeArgs,
+): Promise<RunEngineNodeResult> {
+  const data = args.node.data ?? {};
+  const theme =
+    (typeof data.themeInput === "string" ? data.themeInput : "").trim() ||
+    (args.node.textInputs ?? []).filter(Boolean).join("\n\n").trim();
+  if (!theme) {
+    throw new Error("请先填写故事主题或内容");
+  }
+  const system =
+    (typeof data.themeOutlineSystemPrompt === "string"
+      ? data.themeOutlineSystemPrompt
+      : ""
+    ).trim() || STORY_PRO2_THEME_OUTLINE_SYSTEM;
+  const node: CanvasRunNodeInput = {
+    ...args.node,
+    type: "story-outline-engine",
+    data: {
+      ...data,
+      prompt: `${STORY_PRO2_THEME_OUTLINE_USER_PREFIX}\n\n${theme}`,
+      systemPrompt: system,
+    },
+  };
+  return runStoryLlmEngineNode({
+    ...args,
+    clientPage: proClientPage(args.projectId),
+    storyScope: args.storyScope ?? { mediaKind: "themeOutline" },
+    node,
+    engineKind: "story-outline-engine",
+  });
 }
 
 export async function runStoryProScriptHubSection(
@@ -128,6 +166,13 @@ export async function runStoryProCharacterRow(
     },
     { excludeThreeView: true },
   );
+  const clientUrls = (args.node.imageInputs ?? []).filter(
+    (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
+  );
+  const imageInputs =
+    parseMentionIds(rawPrompt).length > 0 && clientUrls.length > 0
+      ? clientUrls.slice(0, 8)
+      : assetRefUrls;
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "three-view-engine",
@@ -142,7 +187,7 @@ export async function runStoryProCharacterRow(
       params: (args.node.data?.batchImage as { params?: Record<string, unknown> })
         ?.params,
     },
-    imageInputs: assetRefUrls,
+    imageInputs,
   };
   return runImageEngineNode({
     ...args,
@@ -192,6 +237,7 @@ export async function runStoryProFrameRow(
   const { imageInputs, promptSuffix } = buildStoryProFrameImageInputs({
     row,
     nodeData,
+    clientImageInputs: args.node.imageInputs,
   });
   let prompt = prependStoryProStyleAnchor(String(row.prompt ?? ""), args.styleAnchor);
   if (promptSuffix) prompt = `${prompt}\n\n${promptSuffix}`;

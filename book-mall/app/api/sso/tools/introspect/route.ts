@@ -5,6 +5,10 @@ import { toolsRouteDiagnosticsEnabled } from "@/lib/tools-route-diagnostics";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
+import {
+  getSessionVersion,
+  isSingleSessionEnforced,
+} from "@/lib/auth-session-version";
 import { mergeEcomToolkitNavKeys } from "@/lib/ecom/ecom-access";
 import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
@@ -78,6 +82,37 @@ export async function GET(req: Request) {
         })
       : { active: false };
     return NextResponse.json(body, { status: 401, headers });
+  }
+
+  if (isSingleSessionEnforced() && verified.sv != null) {
+    const current = await getSessionVersion(verified.sub);
+    if (current !== verified.sv) {
+      logToolsIntrospectToConsole({
+        phase: "session_revoked",
+        msJwtVerify,
+        msTotal: performance.now() - tRoute,
+      });
+      const revokedHeaders = new Headers();
+      revokedHeaders.set(
+        "Server-Timing",
+        `jwt_verify;dur=${Math.round(msJwtVerify)}, route;dur=${Math.round(performance.now() - tRoute)}`,
+      );
+      revokedHeaders.set("X-Tools-Introspect-Phase", "session_revoked");
+      const payload = {
+        active: false,
+        reason: "session_revoked" as const,
+        sub: verified.sub,
+      };
+      const body = diagEnabled
+        ? mergeDiag(payload, {
+            msJwtVerify,
+            msTotal: performance.now() - tRoute,
+            phase: "session_revoked",
+            userId: verified.sub,
+          })
+        : payload;
+      return NextResponse.json(body, { status: 401, headers: revokedHeaders });
+    }
   }
 
   const tElig0 = performance.now();

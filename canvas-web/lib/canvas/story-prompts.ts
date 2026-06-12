@@ -131,7 +131,7 @@ export function extractThemeFromStorySystemPrompt(prompt: string): string {
   if (bracket?.[1]?.trim()) return bracket[1].trim();
   const colon = t.match(/^主题：\s*(.+)$/m);
   if (colon?.[1]?.trim()) return colon[1].trim();
-  return STORY_THEME_SYSTEM_PROMPT_THEME_PLACEHOLDER;
+  return "";
 }
 
 export function applyThemeToStorySystemPrompt(

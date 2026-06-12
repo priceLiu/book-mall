@@ -54,7 +54,10 @@ export function buildCanvasVideoVolcengineInput(args: {
     generateAudio?: boolean;
     watermark?: boolean;
   };
-  aspectRatio?: "16:9" | "9:16";
+  aspectRatio?: string;
+  lastFrameUrl?: string;
+  /** true = 强制 reference_image 分支（智能多帧 / 全能多图） */
+  forceReferenceMode?: boolean;
 }): { model: string; body: Record<string, unknown> } {
   if (!isVolcengineStoryVideoModelKey(args.modelKey)) {
     throw new Error(`unsupported volcengine video model: ${args.modelKey}`);
@@ -92,14 +95,16 @@ export function buildCanvasVideoVolcengineInput(args: {
 
   const frameAssets = assetRefs.filter((r) => isFrameContentRole(r.role));
   const referenceAssets = assetRefs.filter((r) => !isFrameContentRole(r.role));
+  const lastFrameHttp = normalizeMediaUrl(args.lastFrameUrl ?? "");
 
   // 方舟 API：first/last frame 与 reference_image/video/audio 互斥，不可同请求混用。
   const useReferenceMode =
-    allowMultiRef &&
-    (extraRefImages.length > 0 ||
-      refVideos.length > 0 ||
-      refAudios.length > 0 ||
-      referenceAssets.length > 0);
+    args.forceReferenceMode === true ||
+    (allowMultiRef &&
+      (extraRefImages.length > 0 ||
+        refVideos.length > 0 ||
+        refAudios.length > 0 ||
+        referenceAssets.length > 0));
 
   const content: Array<Record<string, unknown>> = [
     { type: "text", text: args.prompt },
@@ -158,6 +163,14 @@ export function buildCanvasVideoVolcengineInput(args: {
         role: ref.role,
       });
     }
+
+    if (lastFrameHttp && lastFrameHttp !== mainUrl) {
+      content.push({
+        type: "image_url",
+        image_url: { url: lastFrameHttp },
+        role: "last_frame",
+      });
+    }
   }
 
   const resolution = String(args.options?.resolution ?? "1080p").toLowerCase();
@@ -166,12 +179,14 @@ export function buildCanvasVideoVolcengineInput(args: {
     ? Math.min(15, Math.max(4, Math.round(durationRaw)))
     : 5;
 
+  const ratio = (args.aspectRatio ?? "16:9").trim() || "16:9";
+
   return {
     model: args.modelKey,
     body: {
       content,
       resolution,
-      ratio: args.aspectRatio ?? "16:9",
+      ratio,
       duration,
       watermark: args.options?.watermark === true,
       generate_audio: args.options?.generateAudio === true,

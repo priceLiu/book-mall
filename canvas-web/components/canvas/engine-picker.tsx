@@ -41,6 +41,10 @@ export type EnginePickerProps = {
     model: CanvasProviderModelDto | null;
     provider: CanvasProviderDto | null;
   }) => void;
+  /** 内联展示模型卡片与参数区（不渲染触发按钮 / 独立弹层） */
+  embedded?: boolean;
+  /** 仅展示这些 Provider（如 gateway:volcengine） */
+  providerIds?: string[];
 };
 
 /* 须高于 story-engine-actions-modal (1090) 等嵌套宿主 */
@@ -60,6 +64,8 @@ export function EnginePicker({
   modelKey,
   params = {},
   onChange,
+  embedded = false,
+  providerIds,
 }: EnginePickerProps) {
   const { providers, loading } = useUserProviders();
   const [open, setOpen] = useState(false);
@@ -69,10 +75,18 @@ export function EnginePicker({
     [allowedModelKeys],
   );
 
+  const providerIdSet = useMemo(
+    () => (providerIds?.length ? new Set(providerIds) : null),
+    [providerIds],
+  );
+
   const filtered = useMemo(
     () =>
       providers
-        .filter((p) => p.active)
+        .filter(
+          (p) =>
+            p.active && (!providerIdSet || providerIdSet.has(p.id)),
+        )
         .map((p) => ({
           provider: p,
           models: p.models.filter(
@@ -85,7 +99,7 @@ export function EnginePicker({
           ),
         }))
         .filter((g) => g.models.length > 0),
-    [providers, role, allowedSet, requiredCapabilities],
+    [providers, role, allowedSet, providerIdSet, requiredCapabilities],
   );
 
   const capabilityMismatch = useMemo(() => {
@@ -107,6 +121,21 @@ export function EnginePicker({
     }
     return null;
   }, [filtered, providerId, modelKey]);
+
+  if (embedded) {
+    return (
+      <EnginePickerInlinePanel
+        role={role}
+        groups={filtered}
+        loading={loading}
+        providerId={providerId}
+        modelKey={modelKey}
+        params={params}
+        capabilityMismatch={capabilityMismatch}
+        onChange={onChange}
+      />
+    );
+  }
 
   return (
     <>
@@ -156,6 +185,113 @@ export function EnginePicker({
         />
       ) : null}
     </>
+  );
+}
+
+function EnginePickerInlinePanel({
+  role,
+  groups,
+  loading,
+  providerId,
+  modelKey,
+  params,
+  capabilityMismatch,
+  onChange,
+}: {
+  role: "LLM" | "IMAGE" | "VIDEO";
+  groups: Group[];
+  loading: boolean;
+  providerId: string;
+  modelKey: string;
+  params: Record<string, unknown>;
+  capabilityMismatch: string | null;
+  onChange: EnginePickerProps["onChange"];
+}) {
+  const [draft, setDraft] = useState<DraftSelection | null>(() =>
+    resolveInitialDraft(groups, providerId, modelKey, params),
+  );
+
+  useEffect(() => {
+    setDraft(resolveInitialDraft(groups, providerId, modelKey, params));
+  }, [groups, providerId, modelKey, params]);
+
+  const hasParams =
+    !!draft?.model.paramsSchema && draft.model.paramsSchema.length > 0;
+
+  const emitDraft = (next: DraftSelection) => {
+    setDraft(next);
+    onChange({
+      providerId: next.provider.id,
+      modelKey: next.model.modelKey,
+      params: next.params,
+      model: next.model,
+      provider: next.provider,
+    });
+  };
+
+  if (loading) {
+    return (
+      <p className="text-[12px] text-[var(--canvas-muted)]">加载 Providers…</p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {capabilityMismatch ? (
+        <p className="rounded border border-amber-400/25 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-100/90">
+          {capabilityMismatch}
+        </p>
+      ) : null}
+      {groups.length === 0 ? (
+        <EmptyState role={role} />
+      ) : (
+        <>
+          {groups.map(({ provider, models }) => (
+            <ProviderGroup
+              key={provider.id}
+              provider={provider}
+              models={models}
+              draft={draft}
+              onSelectModel={(m) => {
+                const same =
+                  draft?.provider.id === provider.id &&
+                  draft?.model.modelKey === m.modelKey;
+                emitDraft({
+                  provider,
+                  model: m,
+                  params: same
+                    ? (draft?.params ?? buildModelParams(m))
+                    : buildModelParams(m),
+                });
+              }}
+            />
+          ))}
+          {draft && hasParams ? (
+            <section className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <p className="mb-3 text-[12px] font-medium text-white">
+                模型参数
+                <span className="ml-2 font-normal text-white/50">
+                  {draft.model.displayName || draft.model.modelKey}
+                </span>
+              </p>
+              <DynamicParamForm
+                variant="panel"
+                schema={draft.model.paramsSchema}
+                value={draft.params}
+                onChange={(next) => {
+                  if (!draft) return;
+                  emitDraft({ ...draft, params: next });
+                }}
+              />
+            </section>
+          ) : draft && !hasParams ? (
+            <p className="text-[12px] text-white/45">
+              当前模型无可调参数。
+            </p>
+          ) : null}
+        </>
+      )}
+    </div>
   );
 }
 

@@ -275,6 +275,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
 
   const isText = (m: CatalogModel) => m.requestKind === "CHAT" || m.role === "LLM";
   const isImage = (m: CatalogModel) => m.requestKind === "IMAGE" || m.role === "IMAGE";
+  const isVideo = (m: CatalogModel) => m.requestKind === "VIDEO" || m.role === "VIDEO";
   const isFunc = (m: CatalogModel) =>
     m.requestKind === "TTS" || m.requestKind === "TRYON" || m.requestKind === "OTHER";
 
@@ -292,6 +293,7 @@ export async function buildGatewayModelCatalogFromDb(boundKinds: GatewayProvider
     tabs: {
       text: filterTabs(isText),
       image: filterTabs(isImage),
+      video: filterTabs(isVideo),
       function: filterTabs(isFunc),
     },
   };

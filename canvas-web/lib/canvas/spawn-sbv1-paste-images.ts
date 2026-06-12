@@ -1,0 +1,146 @@
+import { uploadCanvasImage } from "@/lib/canvas-api";
+import {
+  SBV1_IMAGE_NODE_HEIGHT,
+  SBV1_IMAGE_NODE_WIDTH,
+} from "./sbv1-node-chrome";
+import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
+
+const ROW_GAP = 28;
+
+function countImagePredecessors(
+  anchorId: string,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): number {
+  return edges.filter((e) => {
+    if (e.target !== anchorId) return false;
+    const src = nodes.find((n) => n.id === e.source);
+    return src?.type === "sbv1-image";
+  }).length;
+}
+
+export type SpawnSbv1PasteImagesArgs = {
+  anchorNodeId: string;
+  files: File[];
+  base: string;
+  nodes: CanvasFlowNode[];
+  edges: CanvasFlowEdge[];
+  addNode: (
+    type: CanvasNodeType,
+    position: { x: number; y: number },
+    data?: Record<string, unknown>,
+  ) => string;
+  setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+  maxCount?: number;
+};
+
+/** 画布 / 引擎 dock 多图粘贴：在锚点左侧生成 sbv1-image 并连线 */
+export async function spawnSbv1PastedImages(
+  args: SpawnSbv1PasteImagesArgs,
+): Promise<string[]> {
+  const anchor = args.nodes.find((n) => n.id === args.anchorNodeId);
+  if (!anchor || !args.base || !args.files.length) return [];
+
+  const images = args.files.filter(
+    (f) =>
+      f.type.startsWith("image/") ||
+      (!f.type && /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)),
+  );
+  if (!images.length) return [];
+
+  const max = args.maxCount ?? 9;
+  const existing = countImagePredecessors(
+    args.anchorNodeId,
+    args.nodes,
+    args.edges,
+  );
+  const room = Math.max(0, max - existing);
+  const batch = images.slice(0, room);
+  if (!batch.length) return [];
+
+  const gap = 48;
+  const imgW = SBV1_IMAGE_NODE_WIDTH;
+  const imgH = SBV1_IMAGE_NODE_HEIGHT;
+  const createdIds: string[] = [];
+
+  for (let i = 0; i < batch.length; i++) {
+    const file = batch[i]!;
+    const yOff = (existing + i) * (imgH + ROW_GAP);
+    const pos = {
+      x: anchor.position.x - imgW - gap,
+      y: anchor.position.y + yOff,
+    };
+    const blobUrl = URL.createObjectURL(file);
+    const id = args.addNode("sbv1-image", pos, {
+      blobUrl,
+      uploading: true,
+      label: file.name.replace(/\.[^.]+$/, "") || `图片 ${existing + i + 1}`,
+    });
+    createdIds.push(id);
+    args.setEdges((es) => [
+      ...es,
+      {
+        id: `e_${id}_${args.anchorNodeId}_${Date.now()}_${i}`,
+        source: id,
+        target: args.anchorNodeId,
+        sourceHandle: "image",
+        targetHandle: "in_ref",
+        animated: false,
+      },
+    ]);
+    void uploadCanvasImage(args.base, file)
+      .then((ossUrl) => {
+        args.updateNodeData(id, { ossUrl, uploading: false });
+      })
+      .catch((e) => {
+        args.updateNodeData(id, {
+          uploading: false,
+          uploadError: e instanceof Error ? e.message : String(e),
+        });
+      });
+  }
+  return createdIds;
+}
+
+/** 画布空白处粘贴多张图片（不连线） */
+export async function spawnSbv1CanvasPastedImages(args: {
+  files: File[];
+  base: string;
+  origin: { x: number; y: number };
+  addNode: SpawnSbv1PasteImagesArgs["addNode"];
+  updateNodeData: SpawnSbv1PasteImagesArgs["updateNodeData"];
+}): Promise<string[]> {
+  if (!args.base || !args.files.length) return [];
+  const images = args.files.filter(
+    (f) =>
+      f.type.startsWith("image/") ||
+      (!f.type && /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)),
+  );
+  const createdIds: string[] = [];
+  for (let i = 0; i < images.length; i++) {
+    const file = images[i]!;
+    const blobUrl = URL.createObjectURL(file);
+    const id = args.addNode(
+      "sbv1-image",
+      { x: args.origin.x + i * 28, y: args.origin.y + i * 28 },
+      {
+        blobUrl,
+        uploading: true,
+        label: file.name.replace(/\.[^.]+$/, "") || `图片 ${i + 1}`,
+      },
+    );
+    createdIds.push(id);
+    void uploadCanvasImage(args.base, file)
+      .then((ossUrl) => {
+        args.updateNodeData(id, { ossUrl, uploading: false });
+      })
+      .catch((e) => {
+        args.updateNodeData(id, {
+          uploading: false,
+          uploadError: e instanceof Error ? e.message : String(e),
+        });
+      });
+  }
+  return createdIds;
+}

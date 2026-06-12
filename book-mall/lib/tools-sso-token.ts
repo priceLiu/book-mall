@@ -46,6 +46,8 @@ export function signToolsAccessToken(opts: {
     name?: string | null;
     image?: string | null;
   };
+  /** 单会话挤下线：与 User.sessionVersion 一致 */
+  sessionVersion?: number;
 }): string {
   const header = base64UrlEncodeJson({ alg: "HS256", typ: "JWT" });
   const now = Math.floor(Date.now() / 1000);
@@ -98,6 +100,12 @@ export function signToolsAccessToken(opts: {
   if (email) payloadObj.email = email;
   if (name) payloadObj.name = name;
   if (image) payloadObj.image = image;
+  if (
+    typeof opts.sessionVersion === "number" &&
+    Number.isFinite(opts.sessionVersion)
+  ) {
+    payloadObj.sv = Math.trunc(opts.sessionVersion);
+  }
 
   const payload = base64UrlEncodeJson(payloadObj);
   const data = `${header}.${payload}`;
@@ -126,6 +134,8 @@ export type VerifiedToolsToken = {
   tenant_type?: "PERSONAL" | "TEAM";
   role_type?: "OWNER" | "ADMIN" | "MEMBER";
   seat_id?: string;
+  /** 单会话挤下线：JWT 字段 sv */
+  sv?: number;
 };
 
 function pickTier(raw: unknown): "gold" | "admin" | null {
@@ -150,6 +160,11 @@ function pickClaim(raw: unknown, maxLen: number): string | undefined {
   const t = raw.trim();
   if (!t || t.length > maxLen) return undefined;
   return t;
+}
+
+function pickSessionVersion(raw: unknown): number | undefined {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return undefined;
+  return Math.trunc(raw);
 }
 
 export function verifyToolsAccessToken(
@@ -224,6 +239,9 @@ export function verifyToolsAccessToken(
     const seatId = pickClaim(payloadRaw.seat_id, 64);
     if (seatId) out.seat_id = seatId;
   }
+
+  const sv = pickSessionVersion(payloadRaw.sv);
+  if (sv != null) out.sv = sv;
 
   return out;
 }

@@ -109,6 +109,12 @@ export function canvasNodeHasInflightWork(node: CanvasFlowNode): boolean {
     const d = node.data as unknown as StoryScriptHubNodeData;
     return hubHasInflightWork(d);
   }
+  if (node.type === "story-pro-starter" || node.type === "story-pro2-starter") {
+    const rt = (
+      node.data as { themeOutlineRuntime?: { status?: string } }
+    ).themeOutlineRuntime?.status;
+    if (isCanvasInflightStatus(rt)) return true;
+  }
   const top = (node.data as { runtime?: { status?: string } }).runtime?.status;
   return isCanvasInflightStatus(top);
 }
@@ -166,6 +172,13 @@ export function countCanvasInflightWork(nodes: CanvasFlowNode[]): number {
     if (isAnyStoryScriptHubType(node.type ?? "")) {
       const d = node.data as unknown as StoryScriptHubNodeData;
       count += hubSectionInflightCount(d);
+      continue;
+    }
+    if (node.type === "story-pro-starter" || node.type === "story-pro2-starter") {
+      const rt = (
+        node.data as { themeOutlineRuntime?: { status?: string } }
+      ).themeOutlineRuntime?.status;
+      if (isCanvasInflightStatus(rt)) count += 1;
       continue;
     }
     const top = (node.data as { runtime?: { status?: string } }).runtime?.status;

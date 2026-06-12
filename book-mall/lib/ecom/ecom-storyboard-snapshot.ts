@@ -16,6 +16,9 @@ export type StoryboardDeliverableSnapshot = {
   videoUrl?: string;
   videoAssetId?: string;
   videoMode?: "full_sheet" | "merged_panels";
+  /** 云端自动剪辑任务 ID（7 天限时下载） */
+  renderJobId?: string;
+  renderExpiresAt?: string;
   panelVideos: Array<{ index: number; videoUrl: string }>;
 };
 
@@ -26,6 +29,8 @@ export function buildStoryboardDeliverableSnapshot(opts: {
   videoUrl?: string | null;
   videoAssetId?: string | null;
   videoMode?: "full_sheet" | "merged_panels";
+  renderJobId?: string | null;
+  renderExpiresAt?: string | null;
   productName?: string;
   productHighlight?: string;
   projectKeywords?: string;
@@ -47,6 +52,8 @@ export function buildStoryboardDeliverableSnapshot(opts: {
     videoUrl: opts.videoUrl?.trim() || undefined,
     videoAssetId: opts.videoAssetId ?? undefined,
     videoMode: opts.videoMode,
+    renderJobId: opts.renderJobId?.trim() || undefined,
+    renderExpiresAt: opts.renderExpiresAt?.trim() || undefined,
     panelVideos,
   };
 }
@@ -113,6 +120,8 @@ export async function persistStoryboardDeliverableSnapshot(opts: {
   videoUrl?: string;
   videoAssetId?: string;
   videoMode?: "full_sheet" | "merged_panels";
+  renderJobId?: string;
+  renderExpiresAt?: string;
 }): Promise<StoryboardDeliverableSnapshot | null> {
   const project = await getEcomStoryboardProject(opts.userId, opts.projectId);
   if (!project?.sheet) return null;
@@ -130,6 +139,8 @@ export async function persistStoryboardDeliverableSnapshot(opts: {
     videoUrl: resolvedVideoUrl,
     videoAssetId,
     videoMode: opts.videoMode,
+    renderJobId: opts.renderJobId,
+    renderExpiresAt: opts.renderExpiresAt,
     productName: deliverable?.productName,
     productHighlight:
       project.sheet.overview.productHighlight ??

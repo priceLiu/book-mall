@@ -46,17 +46,40 @@ import {
 } from "./story-column-display";
 import { applyStoryColumnHeights, isStoryMediaColumnType } from "./story-column-layout";
 import { canAddStoryNodeType } from "./story-edition-isolation";
+import { normalizePro2PlusLeftConnection } from "./pro2-side-plus-connect";
+import {
+  expandSbv1GroupOutMediaConnection,
+  normalizeSbv1PlusLeftConnection,
+} from "./sbv1-side-plus-connect";
+import {
+  inferPro2MediaGroupKind,
+  pro2MediaGroupDefaultLabel,
+} from "./pro2-media-group-meta";
+import {
+  applyPro2MediaGroupRelayout,
+  PRO2_MEDIA_GROUP_HEADER,
+  PRO2_MEDIA_GROUP_PAD,
+  pro2MediaChildSize,
+} from "./pro2-media-group-layout";
+import { applySbv1MediaGroupRelayout } from "./sbv1-media-group-layout";
 import { hasStoryComicPipeline } from "./story-comic-layout";
 import { reflowStoryComicWorkspace } from "./story-comic-workspace-layout";
 import {
   hasStoryProPipeline,
   reflowStoryProWorkspace,
 } from "./story-pro-workspace-layout";
+import {
+  hasStoryPro2Pipeline,
+  reflowStoryPro2Workspace,
+} from "./story-pro2-workspace-layout";
 import { reconcileStoryProWorkspace } from "./spawn-story-pro-workspace";
+import { reconcileStoryPro2Workspace } from "./spawn-story-pro2-workspace";
 import { canvasNotify } from "./canvas-notify";
 import {
   isCanvasInteractiveGeometryInProgress,
   isCanvasSelectionOnlyChange,
+  isCanvasDimensionCommitOnly,
+  syncNodeDimensionsFromChanges,
 } from "./canvas-node-changes";
 
 /** 大图 hydrate：列高/媒体同步延后一帧，先出画布 */
@@ -101,6 +124,7 @@ import {
   applyRefVideoEdgeConnection,
   validateRefVideoConnection,
 } from "./ref-video-edges";
+import { validatePro2StyleAssetConnection } from "./pro2-style-asset-connect";
 import type { HubPreviewSection } from "./story-hub-runtime";
 
 type CanvasState = {
@@ -130,6 +154,33 @@ type CanvasState = {
   storyHubReview: { hubId: string; section: HubPreviewSection } | null;
   openStoryHubReview: (hubId: string, section: HubPreviewSection) => void;
   closeStoryHubReview: () => void;
+
+  /** 2.0 文本节点 · 故事大纲全屏编辑（双击打开） */
+  pro2TextOutlineEditorNodeId: string | null;
+  openPro2TextOutlineEditor: (nodeId: string) => void;
+  closePro2TextOutlineEditor: () => void;
+
+  /** 2.0 脚本节点 · 角色/分镜全屏编辑（双击打开） */
+  pro2ScriptTableEditorNodeId: string | null;
+  pro2ScriptTableEditorTab: import("./pro2-script-hub-view-types").Pro2ScriptHubViewTab;
+  openPro2ScriptTableEditor: (
+    nodeId: string,
+    tab?: import("./pro2-script-hub-view-types").Pro2ScriptHubViewTab,
+  ) => void;
+  setPro2ScriptTableEditorTab: (
+    tab: import("./pro2-script-hub-view-types").Pro2ScriptHubViewTab,
+  ) => void;
+  closePro2ScriptTableEditor: () => void;
+
+  /** 2.0 分镜图板 · 当前聚焦的单格（用于格下输入坞） */
+  pro2FrameDockFocus: { nodeId: string; rowKey: string } | null;
+  setPro2FrameDockFocus: (
+    focus: { nodeId: string; rowKey: string } | null,
+  ) => void;
+
+  /** 风格库弹层 · 为指定图片节点套用风格（null = 仅 spawn 模式） */
+  pro2StyleLibImageNodeId: string | null;
+  setPro2StyleLibImageNodeId: (nodeId: string | null) => void;
 
   hydrate: (projectId: string, graph: CanvasGraph | undefined) => void;
   toGraph: () => CanvasGraph;
@@ -168,6 +219,8 @@ type CanvasState = {
       label: string;
       color: string;
       measuredSizes?: Record<string, { w: number; h: number }>;
+      /** 强制走 Pro2 图1 暗色组壳（手动框选打组） */
+      pro2Styled?: boolean;
     },
   ) => string | null;
   /** 解散指定 group：把它的子节点 parentNode 清空、坐标恢复到画布坐标。 */
@@ -226,16 +279,46 @@ export const useCanvasStore = create<CanvasState>()(
         set({ storyHubReview: { hubId, section } }),
       closeStoryHubReview: () => set({ storyHubReview: null }),
 
+      pro2TextOutlineEditorNodeId: null,
+      openPro2TextOutlineEditor: (nodeId) =>
+        set({ pro2TextOutlineEditorNodeId: nodeId }),
+      closePro2TextOutlineEditor: () =>
+        set({ pro2TextOutlineEditorNodeId: null }),
+
+      pro2ScriptTableEditorNodeId: null,
+      pro2ScriptTableEditorTab: "script",
+      openPro2ScriptTableEditor: (nodeId, tab = "script") =>
+        set({
+          pro2ScriptTableEditorNodeId: nodeId,
+          pro2ScriptTableEditorTab: tab,
+        }),
+      setPro2ScriptTableEditorTab: (tab) =>
+        set({ pro2ScriptTableEditorTab: tab }),
+      closePro2ScriptTableEditor: () =>
+        set({
+          pro2ScriptTableEditorNodeId: null,
+          pro2ScriptTableEditorTab: "script",
+        }),
+
+      pro2FrameDockFocus: null,
+      setPro2FrameDockFocus: (focus) => set({ pro2FrameDockFocus: focus }),
+      pro2StyleLibImageNodeId: null,
+      setPro2StyleLibImageNodeId: (nodeId) =>
+        set({ pro2StyleLibImageNodeId: nodeId }),
+
       hydrate: (projectId, graph) => {
         const raw = graph && Array.isArray(graph.nodes) ? graph : emptyGraph();
         const g = migrateGraphV1ToV2(raw);
         let edges = g.edges as CanvasFlowEdge[];
-        let nodes = reconcileStoryProWorkspace(
-          normalizeCanvasNodes(
-            g.nodes as CanvasFlowNode[],
-            edges,
-          ),
+        let normalized = normalizeCanvasNodes(
+          g.nodes as CanvasFlowNode[],
+          edges,
         );
+        let nodes = normalized.some((n) =>
+          String(n.type ?? "").startsWith("story-pro2-"),
+        )
+          ? reconcileStoryPro2Workspace(normalized)
+          : reconcileStoryProWorkspace(normalized);
         const viewport = g.viewport ?? { x: 0, y: 0, zoom: 1 };
 
         const applyDeferredLayout = () => {
@@ -257,6 +340,8 @@ export const useCanvasStore = create<CanvasState>()(
               edges,
               viewport,
               storyHubReview: null,
+              pro2TextOutlineEditorNodeId: null,
+              pro2ScriptTableEditorNodeId: null,
             }),
           );
           queueMicrotask(applyDeferredLayout);
@@ -271,6 +356,8 @@ export const useCanvasStore = create<CanvasState>()(
             edges: laid.edges,
             viewport,
             storyHubReview: null,
+            pro2TextOutlineEditorNodeId: null,
+            pro2ScriptTableEditorNodeId: null,
           }),
         );
       },
@@ -344,27 +431,89 @@ export const useCanvasStore = create<CanvasState>()(
             manualIds.add(ch.id);
           }
         }
-        let next = applyNodeChanges(filteredChanges, prev) as CanvasFlowNode[];
+        let next = syncNodeDimensionsFromChanges(
+          applyNodeChanges(filteredChanges, prev) as CanvasFlowNode[],
+          filteredChanges,
+        );
         if (isCanvasSelectionOnlyChange(filteredChanges)) {
           set({ nodes: next });
           return;
         }
         if (isCanvasInteractiveGeometryInProgress(filteredChanges)) {
+          // 拖动/缩放过程中只同步几何，不跑 normalize（避免松手后尺寸回弹）
+          set({ nodes: next });
           return;
         }
-        next = detachChildrenOfRemovedGroups(prev, next);
-        next = normalizeCanvasNodes(next, get().edges);
-        if (
-          next.some((n) => String(n.type ?? "").startsWith("story-pro-"))
-        ) {
-          next = reconcileStoryProWorkspace(next);
-        }
+        const manualSized = new Map<string, CanvasFlowNode>();
         if (manualIds.size > 0) {
+          for (const id of manualIds) {
+            const hit = next.find((n) => n.id === id);
+            if (hit) manualSized.set(id, hit);
+          }
           next = next.map((n) =>
             manualIds.has(n.id)
               ? { ...n, data: { ...n.data, manualSize: true } }
               : n,
           );
+        }
+        if (isCanvasDimensionCommitOnly(filteredChanges, manualIds)) {
+          if (manualSized.size > 0) {
+            next = next.map((n) => {
+              const saved = manualSized.get(n.id);
+              if (!saved) return n;
+              const style = saved.style as { width?: number; height?: number } | undefined;
+              const width = Number(saved.width ?? style?.width) || undefined;
+              const height = Number(saved.height ?? style?.height) || undefined;
+              if (!width || !height) return n;
+              return {
+                ...n,
+                width,
+                height,
+                style: {
+                  ...(typeof n.style === "object" && n.style ? n.style : {}),
+                  width,
+                  height,
+                },
+                data: { ...n.data, manualSize: true },
+              } as CanvasFlowNode;
+            });
+          }
+          set((state) => withGraphRevision(state, { nodes: next }));
+          return;
+        }
+        next = detachChildrenOfRemovedGroups(prev, next);
+        next = normalizeCanvasNodes(next, get().edges);
+        if (next.some((n) => String(n.type ?? "").startsWith("story-pro2-"))) {
+          next = reconcileStoryPro2Workspace(next);
+        } else if (
+          next.some(
+            (n) =>
+              String(n.type ?? "").startsWith("story-pro-") &&
+              !String(n.type ?? "").startsWith("story-pro2-"),
+          )
+        ) {
+          next = reconcileStoryProWorkspace(next);
+        }
+        if (manualSized.size > 0) {
+          next = next.map((n) => {
+            const saved = manualSized.get(n.id);
+            if (!saved) return n;
+            const style = saved.style as { width?: number; height?: number } | undefined;
+            const width = Number(saved.width ?? style?.width) || undefined;
+            const height = Number(saved.height ?? style?.height) || undefined;
+            if (!width || !height) return n;
+            return {
+              ...n,
+              width,
+              height,
+              style: {
+                ...(typeof n.style === "object" && n.style ? n.style : {}),
+                width,
+                height,
+              },
+              data: { ...n.data, manualSize: true },
+            } as CanvasFlowNode;
+          });
         }
         set((state) => withGraphRevision(state, { nodes: next }));
       },
@@ -377,33 +526,66 @@ export const useCanvasStore = create<CanvasState>()(
       onConnect: (connection) => {
         if (!connection.source || !connection.target) return;
         const state = get();
-        const validation = validateRefVideoConnection(
-          connection,
+        const normalized = normalizeSbv1PlusLeftConnection(
+          normalizePro2PlusLeftConnection(connection, state.nodes),
+          state.nodes,
+        );
+        const refValidation = validateRefVideoConnection(
+          normalized,
           state.nodes,
           state.edges,
         );
-        if (!validation.ok) {
-          console.warn("[canvas] connection rejected:", validation.reason);
+        if (!refValidation.ok) {
+          console.warn("[canvas] connection rejected:", refValidation.reason);
           return;
         }
-        const id = `e_${connection.source}_${connection.target}_${Date.now()}`;
+        const styleValidation = validatePro2StyleAssetConnection(
+          normalized,
+          state.nodes,
+        );
+        if (!styleValidation.ok) {
+          console.warn("[canvas] connection rejected:", styleValidation.reason);
+          return;
+        }
+
+        const groupImageEdges = expandSbv1GroupOutMediaConnection(
+          normalized,
+          state.nodes,
+          state.edges,
+        );
+        if (groupImageEdges !== null) {
+          if (!groupImageEdges.length) {
+            console.warn(
+              "[canvas] sbv1 group connect skipped: no images in group or already linked",
+            );
+            return;
+          }
+          set((state) =>
+            withGraphRevision(state, {
+              edges: [...state.edges, ...groupImageEdges],
+            }),
+          );
+          return;
+        }
+
+        const id = `e_${normalized.source}_${normalized.target}_${Date.now()}`;
         const newEdge: Edge = {
           id,
-          source: connection.source,
-          target: connection.target,
-          sourceHandle: connection.sourceHandle ?? undefined,
-          targetHandle: connection.targetHandle ?? undefined,
+          source: normalized.source,
+          target: normalized.target,
+          sourceHandle: normalized.sourceHandle ?? undefined,
+          targetHandle: normalized.targetHandle ?? undefined,
           animated: false,
         };
         let edges = [...state.edges, newEdge];
         edges = applyStoryFrameEdgeConnection({
-          connection,
+          connection: normalized,
           nodes: state.nodes,
           edges,
           updateNodeData: (nodeId, patch) => get().updateNodeData(nodeId, patch),
         });
         applyRefVideoEdgeConnection({
-          connection,
+          connection: normalized,
           nodes: state.nodes,
           updateNodeData: (nodeId, patch) => get().updateNodeData(nodeId, patch),
         });
@@ -432,7 +614,9 @@ export const useCanvasStore = create<CanvasState>()(
           style: { width: size.width, height: size.height },
         };
         set((state) =>
-          withGraphRevision(state, { nodes: [...state.nodes, node] }),
+          withGraphRevision(state, {
+            nodes: ensureNodeDragHandles([...state.nodes, node]),
+          }),
         );
         return id;
       },
@@ -564,9 +748,12 @@ export const useCanvasStore = create<CanvasState>()(
           return;
         }
         const edges = get().edges.filter((e) => e.source !== id && e.target !== id);
-        const nodes = reconcileStoryProWorkspace(
-          get().nodes.filter((n) => n.id !== id),
-        );
+        const filtered = get().nodes.filter((n) => n.id !== id);
+        const nodes = filtered.some((n) =>
+          String(n.type ?? "").startsWith("story-pro2-"),
+        )
+          ? reconcileStoryPro2Workspace(filtered)
+          : reconcileStoryProWorkspace(filtered);
         set((state) => withGraphRevision(state, { nodes, edges }));
       },
 
@@ -590,11 +777,16 @@ export const useCanvasStore = create<CanvasState>()(
         return newId;
       },
 
-      createGroupContaining: (childIds, { label, color, measuredSizes }) => {
+      createGroupContaining: (
+        childIds,
+        { label, color, measuredSizes, pro2Styled },
+      ) => {
         const all = get().nodes;
-        const children = all.filter(
-          (n) => childIds.includes(n.id) && !isGroupNode(n.type),
-        );
+        const effectiveChildIds = childIds.filter((id) => {
+          const n = all.find((x) => x.id === id);
+          return n && !isGroupNode(n.type);
+        });
+        const children = all.filter((n) => effectiveChildIds.includes(n.id));
         if (children.length === 0) return null;
 
         // 递归绝对坐标（为后续支持嵌套组留余地）
@@ -606,20 +798,37 @@ export const useCanvasStore = create<CanvasState>()(
           return { x: pa.x + n.position.x, y: pa.y + n.position.y };
         };
 
-        const PADDING = 28;
-        const HEADER = 32;
+        const pro2Kind = inferPro2MediaGroupKind(all, effectiveChildIds);
+        const sbv1OnlyMedia =
+          children.length > 0 &&
+          children.every(
+            (c) => c.type === "sbv1-image" || c.type === "sbv1-video-engine",
+          );
+        const sbv1Styled = sbv1OnlyMedia;
+        const usePro2MediaGrid = Boolean(pro2Kind || pro2Styled || sbv1Styled);
+        const PADDING = usePro2MediaGrid ? PRO2_MEDIA_GROUP_PAD : 28;
+        const HEADER = usePro2MediaGrid ? PRO2_MEDIA_GROUP_HEADER : 32;
         const boxes = children.map((c) => {
           const m = measuredSizes?.[c.id];
-          // 优先信任 RF 实测尺寸；其次 zustand 节点的 measured；最后才用宽松 fallback
+          const cell = usePro2MediaGrid
+            ? pro2MediaChildSize({
+                type: c.type,
+                pro2MediaRole: (c.data as { pro2MediaRole?: string })
+                  .pro2MediaRole,
+              })
+            : null;
+          // 优先信任 RF 实测尺寸；Pro2 媒体组用标准宫格单元尺寸
           const w =
             m?.w ??
             c.measured?.width ??
             (c.width as number | undefined) ??
+            cell?.width ??
             240;
           const h =
             m?.h ??
             c.measured?.height ??
             (c.height as number | undefined) ??
+            cell?.height ??
             200;
           const a = absOf(c);
           return { x: a.x, y: a.y, w, h };
@@ -632,14 +841,35 @@ export const useCanvasStore = create<CanvasState>()(
         const groupId = `g_${nanoid(8)}`;
         const groupX = minX - PADDING;
         const groupY = minY - PADDING - HEADER;
-        const groupW = maxX - minX + PADDING * 2;
-        const groupH = maxY - minY + PADDING * 2 + HEADER;
+        const groupW = usePro2MediaGrid
+          ? 320
+          : maxX - minX + PADDING * 2;
+        const groupH = usePro2MediaGrid
+          ? 240
+          : maxY - minY + PADDING * 2 + HEADER;
+
+        const groupData: Record<string, unknown> = {
+          __t: "group",
+          label: pro2Kind
+            ? pro2MediaGroupDefaultLabel(pro2Kind, label)
+            : label,
+          color,
+        };
+        if (pro2Kind) {
+          groupData.pro2Kind = pro2Kind;
+        }
+        if (pro2Styled) {
+          groupData.pro2Styled = true;
+        }
+        if (sbv1Styled) {
+          groupData.sbv1Styled = true;
+        }
 
         const groupNode: CanvasFlowNode = {
           id: groupId,
           type: "group",
           position: { x: groupX, y: groupY },
-          data: { __t: "group", label, color },
+          data: groupData,
           width: groupW,
           height: groupH,
           style: { width: groupW, height: groupH },
@@ -649,7 +879,7 @@ export const useCanvasStore = create<CanvasState>()(
           zIndex: -1,
         } as CanvasFlowNode;
 
-        const childIdSet = new Set(childIds);
+        const childIdSet = new Set(effectiveChildIds);
         const newNodes: CanvasFlowNode[] = [];
         // 必须 group 在 children 之前；React Flow 要求父节点先于子节点出现
         newNodes.push(groupNode);
@@ -662,14 +892,24 @@ export const useCanvasStore = create<CanvasState>()(
               parentId: groupId,
               extent: "parent",
               position: { x: a.x - groupX, y: a.y - groupY },
+              data: { ...n.data, pro2GroupId: groupId },
             } as CanvasFlowNode);
           } else if (n.id !== groupId) {
             newNodes.push(n);
           }
         }
+        let laidOutNodes = newNodes;
+        if (usePro2MediaGrid) {
+          laidOutNodes = sbv1Styled
+            ? applySbv1MediaGroupRelayout(newNodes, get().edges, groupId)
+            : applyPro2MediaGroupRelayout(newNodes, groupId);
+        }
         set((state) =>
           withGraphRevision(state, {
-            nodes: normalizeCanvasNodes(newNodes, state.edges),
+            nodes: normalizeCanvasNodes(laidOutNodes, state.edges).map((n) => ({
+              ...n,
+              selected: n.id === groupId,
+            })),
           }),
         );
         return groupId;
@@ -889,7 +1129,9 @@ export const useCanvasStore = create<CanvasState>()(
               ? reflowStoryComicColumns(nodes, repaired)
               : reflowStoryComicFlat(nodes, repaired);
         }
-        if (hasStoryProPipeline(laid)) {
+        if (hasStoryPro2Pipeline(laid)) {
+          laid = reflowStoryPro2Workspace(laid, repaired);
+        } else if (hasStoryProPipeline(laid)) {
           laid = reflowStoryProWorkspace(laid, repaired);
         }
         set((state) =>

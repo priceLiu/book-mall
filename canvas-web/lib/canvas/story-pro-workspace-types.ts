@@ -12,7 +12,13 @@ export type { StoryLlmSection };
 export type StoryProRunContext = {
   llmSection?: StoryLlmSection;
   rowKey?: string;
-  mediaKind?: "threeView" | "sceneRef" | "frameImage" | "video" | "tts";
+  mediaKind?:
+    | "threeView"
+    | "sceneRef"
+    | "frameImage"
+    | "video"
+    | "tts"
+    | "themeOutline";
 };
 
 export type StoryProFeasibilityItem = {
@@ -87,6 +93,10 @@ export type StoryProScriptHubNodeData = {
   outlineMd: string;
   characterMd: string;
   storyboardMd: string;
+  /** 2.0 输入坞 · 用户提示词 */
+  dockInput?: string;
+  /** 2.0 输入坞 · 粘贴的角色/场景等参考图 */
+  dockRefImages?: StoryRefImage[];
   outlineRuntime?: CanvasNodeRuntime;
   characterRuntime?: CanvasNodeRuntime;
   storyboardRuntime?: CanvasNodeRuntime;
@@ -212,8 +222,16 @@ export type StoryProUploadedScriptMeta = {
 export type StoryProStarterMode = "upload" | "generate";
 
 export type StoryProStarterNodeData = {
-  /** upload=上传剧本（当前默认）；generate=上游「创作剧本」节点（预留） */
+  /** upload=上传剧本；generate=主题输入生成大纲（2.0 文本节点） */
   starterMode?: StoryProStarterMode;
+  /** 2.0 文本节点 · 用户输入的故事主题 */
+  themeInput?: string;
+  /** 2.0 文本节点 · 主题生成的大纲正文（Markdown） */
+  generatedOutlineMd?: string;
+  /** 2.0 文本节点 · 大纲编辑历史（最多 3 条） */
+  generatedOutlineHistory?: import("./story-revision").StoryTextRevision[];
+  themeOutlineRuntime?: CanvasNodeRuntime;
+  themeOutlineSystemPrompt?: string;
   /** 运行时内存/会话用；autosave 时剥离，以 OSS 为准 */
   uploadedScriptMd?: string;
   /** 剧本正文 OSS URL（持久化） */

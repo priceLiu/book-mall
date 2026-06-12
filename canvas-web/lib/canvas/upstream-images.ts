@@ -16,7 +16,7 @@ export function resolveUpstreamImageUrls(
   for (const pid of directPredecessors(edges, nodeId)) {
     const p = nodes.find((n) => n.id === pid);
     if (!p) continue;
-    if (p.type === "image") {
+    if (p.type === "image" || p.type === "story-pro2-image") {
       const d = p.data as ImageNodeData;
       const url = d.ossUrl || d.blobUrl;
       if (url) out.push(url);
@@ -36,7 +36,7 @@ export function resolveProductMainImage(
 ): { url: string; label: string } | null {
   for (const pid of directPredecessors(edges, nodeId)) {
     const p = nodes.find((n) => n.id === pid);
-    if (!p || p.type !== "image") continue;
+    if (!p || (p.type !== "image" && p.type !== "story-pro2-image")) continue;
     const d = p.data as ImageNodeData;
     const url = d.ossUrl || d.blobUrl;
     if (url) {

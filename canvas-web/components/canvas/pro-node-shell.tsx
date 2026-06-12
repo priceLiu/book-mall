@@ -3,11 +3,13 @@
 import { Handle, NodeResizer, Position } from "@xyflow/react";
 import { GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCanvasNodeEmbedded } from "@/lib/canvas/canvas-node-embedded-context";
 import { RF_NODE_DRAG_HANDLE, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import {
   PRO_NODE_ACCENT,
   PRO_NODE_SHELL_FOOTER_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
+import { PRO2_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { NodeStatusBadge } from "./node-shell";
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { StoryProStageRail } from "./story-pro-stage-rail";
@@ -55,14 +57,17 @@ export function ProNodeShell({
   completedStages,
   guide,
 }: ProNodeShellProps) {
+  const embedded = useCanvasNodeEmbedded();
   const status = runtime?.status ?? "idle";
   const isGenerating = status === "running" || status === "pending";
-  const tint = PRO_NODE_ACCENT;
+  const tint = embedded ? "#a78bfa" : PRO_NODE_ACCENT;
   const borderColor = isGenerating
     ? tint
     : selected
       ? tint
-      : "rgba(34, 211, 238, 0.28)";
+      : embedded
+        ? "rgba(167, 139, 250, 0.28)"
+        : "rgba(34, 211, 238, 0.28)";
 
   return (
     <div
@@ -73,8 +78,9 @@ export function ProNodeShell({
       style={{
         borderColor,
         borderWidth: 2,
-        background:
-          "linear-gradient(165deg, rgba(8, 20, 28, 0.98) 0%, rgba(6, 12, 18, 0.99) 100%)",
+        background: embedded
+          ? "linear-gradient(165deg, rgba(22, 18, 32, 0.98) 0%, rgba(14, 12, 20, 0.99) 100%)"
+          : "linear-gradient(165deg, rgba(8, 20, 28, 0.98) 0%, rgba(6, 12, 18, 0.99) 100%)",
         boxShadow: selected
           ? `0 0 0 2px ${tint}44, 0 0 24px ${tint}18`
           : isGenerating
@@ -92,58 +98,70 @@ export function ProNodeShell({
         aria-hidden
       />
 
-      <NodeResizer
-        isVisible={selected}
-        minWidth={minWidth}
-        minHeight={minHeight}
-        color={tint}
-        lineStyle={{ borderColor: tint, opacity: 0.5 }}
-        handleStyle={{ background: tint, border: "none", width: 8, height: 8 }}
-      />
+      {!embedded ? (
+        <NodeResizer
+          isVisible={selected}
+          minWidth={minWidth}
+          minHeight={minHeight}
+          color={tint}
+          lineStyle={{ borderColor: tint, opacity: 0.5 }}
+          handleStyle={{ background: tint, border: "none", width: 8, height: 8 }}
+        />
+      ) : null}
 
-      <header
-        className="relative z-10 shrink-0 border-b border-cyan-400/15 px-2.5 py-2"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(34, 211, 238, 0.08), transparent)",
-        }}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div
-            className={cn(
-              RF_NODE_DRAG_HANDLE,
-              "flex min-w-0 flex-1 cursor-grab items-start gap-1.5 active:cursor-grabbing",
-            )}
-            title="拖动标题栏移动节点"
+      {!embedded ? (
+        <>
+          <header
+            className="relative z-10 shrink-0 border-b border-cyan-400/15 px-2.5 py-2"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(34, 211, 238, 0.08), transparent)",
+            }}
           >
-            <GripVertical
-              className="mt-0.5 size-3.5 shrink-0 text-cyan-400/35"
-              aria-hidden
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-emerald-300">
-                {title}
-              </p>
-              {subtitle ? (
-                <p className="truncate text-[11px] text-emerald-200/80">{subtitle}</p>
-              ) : null}
+            <div className="flex items-start justify-between gap-2">
+              <div
+                className={cn(
+                  RF_NODE_DRAG_HANDLE,
+                  "flex min-w-0 flex-1 cursor-grab items-start gap-1.5 active:cursor-grabbing",
+                )}
+                title="拖动标题栏移动节点"
+              >
+                <GripVertical
+                  className="mt-0.5 size-3.5 shrink-0 text-cyan-400/35"
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-emerald-300">
+                    {title}
+                  </p>
+                  {subtitle ? (
+                    <p className="truncate text-[11px] text-emerald-200/80">
+                      {subtitle}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              {headerRight ?? (
+                <NodeStatusBadge
+                  status={status}
+                  message={runtime?.failMessage ?? null}
+                />
+              )}
             </div>
-          </div>
-          {headerRight ?? (
-            <NodeStatusBadge status={status} message={runtime?.failMessage ?? null} />
-          )}
-        </div>
-        {activeStage ? (
-          <div className="mt-2">
-            <StoryProStageRail
-              activeStage={activeStage}
-              completedStages={completedStages}
-            />
-          </div>
-        ) : null}
-      </header>
-
-      {guide ? <div className="relative z-10 shrink-0 px-3 pt-2">{guide}</div> : null}
+            {activeStage ? (
+              <div className="mt-2">
+                <StoryProStageRail
+                  activeStage={activeStage}
+                  completedStages={completedStages}
+                />
+              </div>
+            ) : null}
+          </header>
+          {guide ? (
+            <div className="relative z-10 shrink-0 px-3 pt-2">{guide}</div>
+          ) : null}
+        </>
+      ) : null}
 
       <div
         className={cn(
@@ -157,39 +175,48 @@ export function ProNodeShell({
       </div>
 
       {footer ? (
-        <div className={cn("relative z-10", PRO_NODE_SHELL_FOOTER_CLASS)}>
+        <div
+          className={cn(
+            "relative z-10",
+            embedded ? PRO2_NODE_SHELL_FOOTER_CLASS : PRO_NODE_SHELL_FOOTER_CLASS,
+          )}
+        >
           {footer}
         </div>
       ) : null}
 
-      {inputs.map((p, i) => (
-        <Handle
-          key={`in-${p.id}`}
-          id={p.id}
-          type="target"
-          position={Position.Left}
-          className={cn(
-            "!h-3 !w-3 !rounded-full !border-2 !border-[var(--canvas-bg)]",
-            KIND_COLOR[p.kind],
-          )}
-          style={{ top: 24 + (inputs.length === 1 ? 24 : i * 22) }}
-          title={`${p.label} (${p.kind})`}
-        />
-      ))}
-      {outputs.map((p, i) => (
-        <Handle
-          key={`out-${p.id}`}
-          id={p.id}
-          type="source"
-          position={Position.Right}
-          className={cn(
-            "!h-3 !w-3 !rounded-full !border-2 !border-[var(--canvas-bg)]",
-            KIND_COLOR[p.kind],
-          )}
-          style={{ top: 24 + (outputs.length === 1 ? 24 : i * 22) }}
-          title={`${p.label} (${p.kind})`}
-        />
-      ))}
+      {!embedded
+        ? inputs.map((p, i) => (
+            <Handle
+              key={`in-${p.id}`}
+              id={p.id}
+              type="target"
+              position={Position.Left}
+              className={cn(
+                "!h-3 !w-3 !rounded-full !border-2 !border-[var(--canvas-bg)]",
+                KIND_COLOR[p.kind],
+              )}
+              style={{ top: 24 + (inputs.length === 1 ? 24 : i * 22) }}
+              title={`${p.label} (${p.kind})`}
+            />
+          ))
+        : null}
+      {!embedded
+        ? outputs.map((p, i) => (
+            <Handle
+              key={`out-${p.id}`}
+              id={p.id}
+              type="source"
+              position={Position.Right}
+              className={cn(
+                "!h-3 !w-3 !rounded-full !border-2 !border-[var(--canvas-bg)]",
+                KIND_COLOR[p.kind],
+              )}
+              style={{ top: 24 + (outputs.length === 1 ? 24 : i * 22) }}
+              title={`${p.label} (${p.kind})`}
+            />
+          ))
+        : null}
     </div>
   );
 }

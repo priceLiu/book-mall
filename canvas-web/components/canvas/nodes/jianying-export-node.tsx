@@ -14,6 +14,7 @@ import {
   findUpstreamStoryboardId,
 } from "@/lib/canvas/story-batch-spawn";
 import { exportJianyingZip } from "@/lib/canvas-api";
+import { JianyingMediaRenderActions } from "../jianying-media-render-actions";
 import { NodeShell } from "../node-shell";
 
 export function JianyingExportNode({ id, data, selected }: NodeProps) {
@@ -64,7 +65,9 @@ export function JianyingExportNode({ id, data, selected }: NodeProps) {
       title={d.label ?? "剪映导出"}
       selected={selected}
       minWidth={360}
-      minHeight={220}
+      minHeight={820}
+      jianyingResizer
+      bodyNoScroll
       inputs={[
         { id: "in_storyboard", label: "分镜表", kind: "text" },
         { id: "in_video", label: "各镜视频", kind: "image" },
@@ -101,6 +104,13 @@ export function JianyingExportNode({ id, data, selected }: NodeProps) {
             {loading === "draft" ? "生成中…" : "全包导入 · 剪映草稿 ZIP（Mac）"}
           </button>
         </div>
+        <JianyingMediaRenderActions
+          nodeId={id}
+          base={base}
+          projectId={projectId}
+          frames={frames}
+          persisted={d.mediaRenderResult}
+        />
         <p className="text-[10px] leading-relaxed text-[var(--canvas-muted)]">
           草稿包解压至剪映「草稿位置」对应文件夹。剪映 6+ 若无法打开，请用分镜包。
         </p>

@@ -29,7 +29,11 @@ import {
   type ScriptAssistantHistoryThread,
   type ScriptAssistantMessage,
 } from "@/lib/canvas-api";
-import { STORY_CHROME_GREEN_CLASS } from "@/lib/canvas/story-column-sync";
+import {
+  PRO2_ASSISTANT_CHROME,
+  PRO_ASSISTANT_CHROME,
+  type StoryAssistantChrome,
+} from "@/lib/canvas/story-pro2-node-chrome";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   SCRIPT_ASSISTANT_OUTPUT_MODES,
@@ -179,11 +183,13 @@ function AssistantWorkflowPicker({
   activeKey,
   onSelect,
   immersive,
+  chrome,
 }: {
   threads: AssistantThreadRow[];
   activeKey: string | null;
   onSelect: (workflowKey: string) => void;
   immersive: boolean;
+  chrome: StoryAssistantChrome;
 }) {
   if (threads.length === 0) return null;
 
@@ -209,9 +215,7 @@ function AssistantWorkflowPicker({
               className={cn(
                 "shrink-0 rounded-md border px-2 py-1.5 text-left transition",
                 immersive ? "text-[11px]" : "text-[10px]",
-                active
-                  ? "border-emerald-400/45 bg-emerald-500/15 text-emerald-50"
-                  : "border-white/10 text-white/70 hover:border-white/20 hover:text-white",
+                active ? chrome.threadActive : chrome.tabIdle,
               )}
               onClick={() => onSelect(t.workflowKey)}
             >
@@ -233,10 +237,12 @@ function AssistantModeBar({
   mode,
   onModeChange,
   immersive,
+  chrome,
 }: {
   mode: ScriptAssistantOutputMode;
   onModeChange: (m: ScriptAssistantOutputMode) => void;
   immersive: boolean;
+  chrome: StoryAssistantChrome;
 }) {
   return (
     <div
@@ -254,9 +260,7 @@ function AssistantModeBar({
           className={cn(
             "rounded-md border px-2 py-1 text-left transition",
             immersive ? "text-[11px]" : "text-[10px]",
-            mode === opt.id
-              ? "border-emerald-400/45 bg-emerald-500/15 text-emerald-100"
-              : "border-white/10 text-white/55 hover:border-white/20 hover:text-white/80",
+            mode === opt.id ? chrome.tabActive : chrome.tabIdle,
           )}
           onClick={() => onModeChange(opt.id)}
         >
@@ -269,6 +273,7 @@ function AssistantModeBar({
 }
 
 type AssistantPanelBodyProps = {
+  chrome: StoryAssistantChrome;
   immersive: boolean;
   showPackPreview: boolean;
   previewReady: boolean;
@@ -287,6 +292,7 @@ type AssistantPanelBodyProps = {
 };
 
 function AssistantPanelBody({
+  chrome,
   immersive,
   showPackPreview,
   previewReady,
@@ -330,7 +336,7 @@ function AssistantPanelBody({
           >
             {SCRIPT_ASSISTANT_WELCOME_MESSAGE}
             {showPackPreview ? (
-              <p className="mt-3 border-t border-white/10 pt-2 text-[10px] leading-snug text-cyan-200/85">
+              <p className={cn("mt-3 border-t border-white/10 pt-2 text-[10px] leading-snug", chrome.packHint)}>
                 「创作并导入故事剧本」模式生成制作包；预览满意后「确定导入」将启动<strong>全新</strong>工作流（仅 Hub
                 尚无大纲/定稿/下游列时可用）。
               </p>
@@ -345,8 +351,8 @@ function AssistantPanelBody({
                 immersive ? "max-w-3xl" : "",
                 m.role === "user"
                   ? immersive
-                    ? "ml-auto max-w-[85%] bg-emerald-950 text-emerald-50"
-                    : "ml-4 bg-emerald-950/90 text-emerald-50"
+                    ? chrome.userBubble
+                    : chrome.userBubbleDock
                   : immersive
                     ? "mr-auto max-w-[92%] bg-neutral-900 text-white/92"
                     : "mr-2 bg-neutral-900/95 text-white/88",
@@ -355,7 +361,7 @@ function AssistantPanelBody({
               {m.content ||
                 (sending && m.role === "assistant" ? (
                   <span className="inline-flex items-center gap-0.5 text-white/45">
-                    <span className="inline-block size-1.5 animate-pulse rounded-full bg-emerald-400/80" />
+                    <span className={cn("inline-block size-1.5 animate-pulse rounded-full", chrome.pulseDot)} />
                     正在输入…
                   </span>
                 ) : (
@@ -366,7 +372,7 @@ function AssistantPanelBody({
               m.content &&
               m.id === messages[messages.length - 1]?.id ? (
                 <span
-                  className="ml-0.5 inline-block w-0.5 animate-pulse bg-emerald-300/90 align-middle"
+                  className={cn("ml-0.5 inline-block w-0.5 animate-pulse align-middle", chrome.cursorBlink)}
                   style={{ height: "0.85em" }}
                   aria-hidden
                 />
@@ -414,7 +420,7 @@ function AssistantPanelBody({
                   ? "全屏弹层审阅 · 与故事大纲同款"
                   : "需先由助手生成制作包正文"
               }
-              className="inline-flex items-center gap-0.5 rounded border border-cyan-400/30 px-2 py-1 text-[10px] text-cyan-100 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+              className={cn("inline-flex items-center gap-0.5 rounded border px-2 py-1 text-[10px] disabled:cursor-not-allowed disabled:opacity-40", chrome.previewBtn)}
               onClick={onOpenPreview}
             >
               <Eye className="size-3" /> 制作包预览
@@ -439,7 +445,8 @@ function AssistantPanelBody({
                 : "描述剧本需求…"
             }
             className={cn(
-              "flex-1 select-text resize-none rounded-md border border-white/10 bg-neutral-950 px-3 py-2 text-white placeholder:text-white/30 focus:border-emerald-400/40 focus:outline-none",
+              "flex-1 select-text resize-none rounded-md border border-white/10 bg-neutral-950 px-3 py-2 text-white placeholder:text-white/30 focus:outline-none",
+              chrome.inputFocus,
               immersive ? "min-h-[72px] text-[13px]" : "min-h-[52px]",
               inputSize,
             )}
@@ -456,7 +463,8 @@ function AssistantPanelBody({
             type="button"
             disabled={sending || !input.trim()}
             className={cn(
-              "flex shrink-0 items-center justify-center rounded-md bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30 disabled:opacity-40",
+              "flex shrink-0 items-center justify-center rounded-md disabled:opacity-40",
+              chrome.sendBtn,
               immersive ? "size-11" : "size-9",
             )}
             onClick={onSend}
@@ -517,10 +525,14 @@ function mergeAssistantThreadRows(
 export function ScriptWritingAssistantPanel({
   projectId,
   onImportScript,
+  theme = "pro",
 }: {
   projectId: string;
   onImportScript: (markdown: string) => void | Promise<void>;
+  /** pro2 画布使用紫罗兰主题，禁止 green/emerald */
+  theme?: "pro" | "pro2";
 }) {
+  const chrome = theme === "pro2" ? PRO2_ASSISTANT_CHROME : PRO_ASSISTANT_CHROME;
   const base = useBookMallBaseUrl();
   const [open, setOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("dock");
@@ -570,7 +582,10 @@ export function ScriptWritingAssistantPanel({
     const selected = nodes.filter((n) => n.selected);
     const hit = selected.find(
       (n) =>
-        n.type === "story-pro-starter" || n.type === "story-pro-script-hub",
+        n.type === "story-pro-starter" ||
+        n.type === "story-pro-script-hub" ||
+        n.type === "story-pro2-starter" ||
+        n.type === "story-pro2-script-hub",
     );
     return hit?.id ?? selected[0]?.id ?? null;
   }, [nodes, graphRevision]);
@@ -879,12 +894,14 @@ export function ScriptWritingAssistantPanel({
         setChatError(null);
       }}
       immersive={layoutMode === "immersive"}
+      chrome={chrome}
     />
   );
 
   const previewReady = Boolean(previewMd);
 
   const bodyProps: AssistantPanelBodyProps = {
+    chrome,
     immersive: layoutMode === "immersive",
     showPackPreview,
     previewReady,
@@ -905,7 +922,10 @@ export function ScriptWritingAssistantPanel({
   const collapsedTab = (
     <button
       type="button"
-      className="nodrag absolute left-3 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-1 rounded-r-lg border border-l-0 border-emerald-400/30 bg-[var(--canvas-surface)]/95 px-1.5 py-3 text-[10px] text-emerald-200 shadow-lg hover:border-emerald-400/50"
+      className={cn(
+        "nodrag absolute left-3 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-1 rounded-r-lg border border-l-0 bg-[var(--canvas-surface)]/95 px-1.5 py-3 text-[10px] shadow-lg",
+        chrome.collapsedTab,
+      )}
       title="展开剧本创作助手"
       onClick={() => setOpen(true)}
     >
@@ -922,6 +942,7 @@ export function ScriptWritingAssistantPanel({
       mode={outputMode}
       onModeChange={setOutputMode}
       immersive={layoutMode === "immersive"}
+      chrome={chrome}
     />
   );
 
@@ -935,12 +956,14 @@ export function ScriptWritingAssistantPanel({
     >
       <GripHorizontal className="size-4 shrink-0 text-white/35" aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-[13px] font-medium ${STORY_CHROME_GREEN_CLASS}`}>
+        <p className={cn("truncate text-[13px] font-medium", chrome.titleText)}>
           剧本创作助手
         </p>
-        <p className="text-[10px] text-white/40">
-          deepseek-v4-flash · 宽幅对话 · 拖标题栏移动 · {headerSubtitle}
-        </p>
+        {theme === "pro" ? (
+          <p className="text-[10px] text-white/40">
+            deepseek-v4-flash · 宽幅对话 · 拖标题栏移动 · {headerSubtitle}
+          </p>
+        ) : null}
       </div>
       <button
         type="button"
@@ -968,17 +991,19 @@ export function ScriptWritingAssistantPanel({
   const dockHeader = (
     <header className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
       <div className="min-w-0">
-        <p className={`truncate text-[12px] font-medium ${STORY_CHROME_GREEN_CLASS}`}>
+        <p className={cn("truncate text-[12px] font-medium", chrome.titleText)}>
           剧本创作助手
         </p>
-        <p className="text-[9px] text-white/40">
-          deepseek-v4-flash · {headerSubtitle}
-        </p>
+        {theme === "pro" ? (
+          <p className="text-[9px] text-white/40">
+            deepseek-v4-flash · {headerSubtitle}
+          </p>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <button
           type="button"
-          className="inline-flex items-center gap-0.5 rounded border border-emerald-400/30 px-1.5 py-0.5 text-[9px] text-emerald-200 hover:bg-emerald-500/10"
+          className={cn("inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-[9px]", chrome.expandBtn)}
           title="展开到画布中央（宽幅对话）"
           onClick={expandToImmersive}
         >
@@ -1015,7 +1040,8 @@ export function ScriptWritingAssistantPanel({
               ref={panelRef}
               data-canvas-block-nav-gesture
               className={cn(
-                "nodrag nowheel fixed flex flex-col overflow-hidden rounded-2xl border border-emerald-400/30 shadow-2xl shadow-black/70 ring-1 ring-white/15",
+                "nodrag nowheel fixed flex flex-col overflow-hidden rounded-2xl border shadow-2xl shadow-black/70 ring-1 ring-white/15",
+                chrome.panelBorder,
                 PANEL_SOLID_CLASS,
               )}
               style={{

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNodes, useReactFlow } from "@xyflow/react";
 import { LayoutGrid, FolderPlus, Trash2 } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { computePro2MultiSelectionBbox } from "@/lib/canvas/pro2-selection-bbox";
 import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
 import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import { GROUP_COLOR_PRESETS, isGroupNode } from "@/lib/canvas/types";
@@ -30,7 +31,8 @@ export function SelectionToolbar() {
   const createGroupContaining = useCanvasStore((s) => s.createGroupContaining);
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
   const removeNode = useCanvasStore((s) => s.removeNode);
-  const { doubleConfirm } = useDialogs();
+  const allNodes = useCanvasStore((s) => s.nodes);
+  const { doubleConfirm, alert } = useDialogs();
 
   const allRfNodes = useNodes();
   const selectedIds = useMemo(
@@ -52,32 +54,11 @@ export function SelectionToolbar() {
     if (selectedIds.length < 2 && groupOpen) setGroupOpen(false);
   }, [selectedIds, groupOpen]);
 
-  // bbox（绝对画布坐标）— 优先信任 internal.positionAbsolute + measured
-  const bbox = useMemo(() => {
-    if (selectedIds.length < 2) return null;
-    const boxes: Array<{ x: number; y: number; w: number; h: number }> = [];
-    for (const id of selectedIds) {
-      const internal = getInternalNode(id) as
-        | (
-            | { measured?: { width?: number; height?: number };
-                position: { x: number; y: number };
-                internals?: { positionAbsolute?: { x: number; y: number } } }
-          )
-        | undefined;
-      if (!internal) continue;
-      const w = internal.measured?.width ?? 240;
-      const h = internal.measured?.height ?? 200;
-      const pos = internal.internals?.positionAbsolute ?? internal.position;
-      boxes.push({ x: pos.x, y: pos.y, w, h });
-    }
-    if (boxes.length === 0) return null;
-    return {
-      x: Math.min(...boxes.map((b) => b.x)),
-      y: Math.min(...boxes.map((b) => b.y)),
-      x2: Math.max(...boxes.map((b) => b.x + b.w)),
-      y2: Math.max(...boxes.map((b) => b.y + b.h)),
-    };
-  }, [selectedIds, getInternalNode, allRfNodes]);
+  // bbox（绝对画布坐标）— 优先 internal-node + store 节点默认尺寸
+  const bbox = useMemo(
+    () => computePro2MultiSelectionBbox(selectedIds, allNodes, getInternalNode),
+    [selectedIds, allNodes, getInternalNode, allRfNodes],
+  );
 
   // 屏幕坐标 + 上 / 下 placement clamp
   const placement = useMemo(() => {
@@ -210,7 +191,7 @@ export function SelectionToolbar() {
             </button>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 const ids = [...selectedIdsRef.current];
                 if (ids.length < 2) {
                   setGroupOpen(false);
@@ -226,11 +207,19 @@ export function SelectionToolbar() {
                   const h = internal?.measured?.height;
                   if (w && h) measuredSizes[id] = { w, h };
                 }
-                createGroupContaining(ids, {
+                const groupId = createGroupContaining(ids, {
                   label: groupName.trim() || "未命名分组",
                   color,
                   measuredSizes,
                 });
+                if (!groupId) {
+                  await alert({
+                    title: "无法创建分组",
+                    message: "请框选至少 2 个节点后再分组。",
+                    variant: "warning",
+                  });
+                  return;
+                }
                 setGroupOpen(false);
                 setGroupName("");
               }}

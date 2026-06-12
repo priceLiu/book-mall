@@ -30,7 +30,12 @@ export async function POST(req: Request, ctx: Ctx) {
       sheet: project.sheet,
       title: project.sheet.overview.title,
     });
-    return NextResponse.json({ asset: result.asset, ossUrl: result.ossUrl });
+    return NextResponse.json({
+      jobId: result.jobId,
+      ossUrl: result.ossUrl,
+      expiresAt: result.expiresAt,
+      asset: result.asset,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "视频合并失败";
     return NextResponse.json({ error: message }, { status: 500 });

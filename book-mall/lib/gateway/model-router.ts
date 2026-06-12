@@ -204,13 +204,36 @@ export function defaultBaseUrl(kind: GatewayProviderKind): string {
       return "https://api.ai3d.cloud.tencent.com";
     case "VOLCENGINE":
       return "https://ark.cn-beijing.volces.com/api/v3";
-    case "KIE":
     default:
       return (
         process.env.KIE_API_BASE?.trim()?.replace(/\/$/, "") ||
         "https://api.kie.ai"
       );
   }
+}
+
+const VOLCENGINE_ARK_HOST_RE =
+  /^https?:\/\/ark\.[a-z0-9.-]+\.volces\.com$/i;
+
+/**
+ * 火山方舟 OpenAPI 根（…/api/v3），供视频 tasks / 人像 Action API 等使用。
+ * 凭证 baseUrl 若误填 chat/completions 完整路径，在此剥 suffix。
+ */
+export function resolveVolcengineArkApiRoot(
+  baseUrl?: string | null,
+): string {
+  const fallback = defaultBaseUrl("VOLCENGINE").replace(/\/$/, "");
+  let raw = (baseUrl?.trim() || fallback).replace(/\/$/, "");
+  if (!raw) return fallback;
+
+  raw = raw.replace(/\/chat\/completions$/i, "");
+  raw = raw.replace(/\/bots$/i, "");
+  raw = raw.replace(/\/contents\/generations\/tasks$/i, "");
+
+  if (VOLCENGINE_ARK_HOST_RE.test(raw)) {
+    return `${raw}/api/v3`;
+  }
+  return raw;
 }
 
 const DASHSCOPE_HOST_RE = /^https?:\/\/dashscope\.aliyuncs\.com\/?$/i;

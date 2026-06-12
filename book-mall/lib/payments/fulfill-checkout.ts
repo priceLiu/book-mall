@@ -36,6 +36,31 @@ function idempotencyBase(checkoutId: string): string {
   return `payment_checkout:${checkoutId}`;
 }
 
+/** 同一用户、同一个人套餐已有其它支付单完成发放时，跳过重复 grant。 */
+async function personalMembershipGrantAlreadyFulfilled(
+  userId: string,
+  planId: string,
+  excludeCheckoutId: string,
+): Promise<boolean> {
+  const otherPaid = await prisma.paymentCheckout.findFirst({
+    where: {
+      userId,
+      productKind: "MEMBERSHIP_PERSONAL",
+      status: "PAID",
+      id: { not: excludeCheckoutId },
+      productSnapshot: { path: ["planId"], equals: planId },
+    },
+    select: { id: true },
+    orderBy: { paidAt: "asc" },
+  });
+  if (!otherPaid) return false;
+  const grant = await prisma.creditLedger.findUnique({
+    where: { idempotencyKey: idempotencyBase(otherPaid.id) },
+    select: { id: true },
+  });
+  return !!grant;
+}
+
 async function fulfillMembership(
   checkout: PaymentCheckout,
   snap: Record<string, unknown>,
@@ -121,6 +146,14 @@ async function fulfillMembership(
   }
 
   const grants = resolvePlanCreditGrants(plan, 1);
+
+  if (await personalMembershipGrantAlreadyFulfilled(checkout.userId, planId, checkout.id)) {
+    return {
+      amountPoints: 0,
+      meta: { planId: plan.id, family: "PERSONAL", duplicateGrantSkipped: true },
+    };
+  }
+
   await grantCredits({
     ref: { ownerType: "USER", ownerId: checkout.userId },
     credits: grants.generalCredits,
