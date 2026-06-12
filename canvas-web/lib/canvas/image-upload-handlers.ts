@@ -6,6 +6,42 @@ function isClipboardImageFile(file: File): boolean {
   return false;
 }
 
+/** 从剪贴板或拖放 DataTransfer 中取全部图片文件 */
+export function allImageFilesFromDataTransfer(
+  dt: DataTransfer | null | undefined,
+): File[] {
+  if (!dt) return [];
+  const out: File[] = [];
+  const seen = new Set<string>();
+  const push = (f: File | null) => {
+    if (!f || !isClipboardImageFile(f)) return;
+    const key = `${f.size}:${f.lastModified}:${f.type || "unknown"}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(f);
+  };
+  const fromFiles = Array.from(dt.files).filter(isClipboardImageFile);
+  if (fromFiles.length > 0) {
+    for (const f of fromFiles) push(f);
+    return out;
+  }
+  if (dt.items) {
+    for (const item of Array.from(dt.items)) {
+      if (item.kind !== "file") continue;
+      const type = item.type ?? "";
+      if (
+        !type.startsWith("image/") &&
+        type !== "public.png" &&
+        type !== "public.jpeg"
+      ) {
+        continue;
+      }
+      push(item.getAsFile());
+    }
+  }
+  return out;
+}
+
 /** 从剪贴板或拖放 DataTransfer 中取第一张图片文件 */
 export function firstImageFileFromDataTransfer(
   dt: DataTransfer | null | undefined,
@@ -56,6 +92,54 @@ export function isEditablePasteTarget(target: EventTarget | null): boolean {
   );
 }
 
+/** 输入坞参考图/粘贴区；图片节点走 data-image-paste-host + pickPointerImagePasteHandler */
+const IMAGE_PASTE_SLOT_SELECTOR =
+  ".pro2-dock-ref-zone, .pro2-dock-paste-zone";
+
+let lastPointerClient = { x: 0, y: 0 };
+let pointerTrackerInstalled = false;
+
+function ensurePointerTracker() {
+  if (pointerTrackerInstalled) return;
+  pointerTrackerInstalled = true;
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      lastPointerClient = { x: e.clientX, y: e.clientY };
+    },
+    { passive: true },
+  );
+  window.addEventListener(
+    "pointerdown",
+    (e) => {
+      lastPointerClient = { x: e.clientX, y: e.clientY };
+    },
+    { passive: true },
+  );
+}
+
+/** 粘贴落点：视口坐标 → 用于空白画布落节点 */
+export function getLastPointerClient(): { x: number; y: number } {
+  return lastPointerClient;
+}
+
+function elementAtPointer(): Element | null {
+  if (typeof document === "undefined") return null;
+  return document.elementFromPoint(
+    lastPointerClient.x,
+    lastPointerClient.y,
+  );
+}
+
+/** 事件目标或当前鼠标位置是否在资产槽内 */
+export function isImagePasteSlotTarget(target: EventTarget | null): boolean {
+  if (target instanceof HTMLElement) {
+    if (target.closest(IMAGE_PASTE_SLOT_SELECTOR)) return true;
+  }
+  const atPointer = elementAtPointer();
+  return Boolean(atPointer?.closest(IMAGE_PASTE_SLOT_SELECTOR));
+}
+
 /** 图片拖入：阻止冒泡，避免触发画布全局 drop */
 export function bindImageDragDropHandlers(
   onFile: (file: File) => void,
@@ -94,12 +178,50 @@ export function bindImageDragDropHandlers(
 
 type ImagePasteTarget = {
   gen: number;
-  onFile: (file: File) => void;
+  /** 单图（图片节点悬停） */
+  onFile?: (file: File) => void;
+  /** 多图（Dock 等） */
+  onFiles?: (files: File[]) => void;
+  /** global：整页粘贴；zone：须在参考图区域或鼠标在该区域内 */
+  mode: "global" | "zone";
 };
 
 const imagePasteTargets = new Map<string, ImagePasteTarget>();
 let imagePasteGen = 0;
-let imagePasteRouterInstalled = false;
+
+const pointerImagePasteHandlers = new Map<string, (file: File) => void>();
+
+export function registerPointerImagePasteHost(
+  nodeId: string,
+  onFile: (file: File) => void,
+) {
+  ensurePointerTracker();
+  pointerImagePasteHandlers.set(nodeId, onFile);
+}
+
+export function unregisterPointerImagePasteHost(nodeId: string) {
+  pointerImagePasteHandlers.delete(nodeId);
+}
+
+/** 当前鼠标是否在图片节点粘贴宿主上 */
+export function isPointerOverImagePasteHost(): boolean {
+  ensurePointerTracker();
+  return Boolean(
+    elementAtPointer()?.closest("[data-image-paste-host]"),
+  );
+}
+
+/** 鼠标当前位置下的图片节点粘贴处理器（优先于空白画布新建） */
+export function pickPointerImagePasteHandler(): ((file: File) => void) | null {
+  ensurePointerTracker();
+  const host = elementAtPointer()?.closest(
+    "[data-image-paste-host]",
+  ) as HTMLElement | null;
+  if (!host) return null;
+  const nodeId = host.dataset.imagePasteHost;
+  if (!nodeId) return null;
+  return pointerImagePasteHandlers.get(nodeId) ?? null;
+}
 
 function pickImagePasteTarget(): ImagePasteTarget | null {
   let best: ImagePasteTarget | null = null;
@@ -117,83 +239,95 @@ async function resolveClipboardImageFile(
   return imageFileFromClipboardUrl(dt);
 }
 
+function activePasteTargetRequiresZone(target: ImagePasteTarget): boolean {
+  return target.mode === "zone";
+}
+
+function deliverFilesToPasteTarget(
+  target: ImagePasteTarget,
+  files: File[],
+): boolean {
+  if (!files.length) return false;
+  if (target.onFiles) {
+    target.onFiles(files);
+    return true;
+  }
+  if (target.onFile) {
+    target.onFile(files[0]!);
+    return true;
+  }
+  return false;
+}
+
 /** 剪贴板图片是否应写入当前悬停的资产槽（供画布全局 paste 让路） */
 export async function routeClipboardImageToActivePasteSlot(
   dt: DataTransfer | null | undefined,
+  eventTarget?: EventTarget | null,
 ): Promise<boolean> {
+  if (isPointerOverImagePasteHost()) return false;
   const target = pickImagePasteTarget();
   if (!target) return false;
+  if (
+    activePasteTargetRequiresZone(target) &&
+    !isImagePasteSlotTarget(eventTarget ?? null)
+  ) {
+    return false;
+  }
+  const files = allImageFilesFromDataTransfer(dt);
+  if (files.length) {
+    return deliverFilesToPasteTarget(target, files);
+  }
   const file = await resolveClipboardImageFile(dt);
   if (!file) return false;
-  target.onFile(file);
-  return true;
-}
-
-function ensureImagePasteRouter() {
-  if (imagePasteRouterInstalled) return;
-  imagePasteRouterInstalled = true;
-  window.addEventListener(
-    "paste",
-    (e) => {
-      const target = pickImagePasteTarget();
-      if (!target) return;
-      const direct = firstImageFileFromDataTransfer(e.clipboardData);
-      if (direct) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        target.onFile(direct);
-        return;
-      }
-      const html = e.clipboardData?.getData("text/html") ?? "";
-      const plain = e.clipboardData?.getData("text/plain")?.trim() ?? "";
-      const maybeUrl =
-        html.includes("<img") || /^https?:\/\//i.test(plain);
-      if (!maybeUrl) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      void resolveClipboardImageFile(e.clipboardData).then((file) => {
-        if (file) target.onFile(file);
-      });
-    },
-    true,
-  );
+  return deliverFilesToPasteTarget(target, [file]);
 }
 
 /** 悬停槽位时激活粘贴目标；多槽同时激活时以最近一次 activate 为准。 */
 export function activateImagePasteTarget(
   id: string,
-  onFile: (file: File) => void,
+  handlers: {
+    onFile?: (file: File) => void;
+    onFiles?: (files: File[]) => void;
+  },
+  mode: "global" | "zone" = "zone",
 ) {
-  ensureImagePasteRouter();
-  imagePasteTargets.set(id, { gen: ++imagePasteGen, onFile });
+  imagePasteTargets.set(id, {
+    gen: ++imagePasteGen,
+    onFile: handlers.onFile,
+    onFiles: handlers.onFiles,
+    mode,
+  });
 }
 
 export function deactivateImagePasteTarget(id: string) {
   imagePasteTargets.delete(id);
 }
 
-/** 确保全局 paste 路由已安装（资产槽等按需调用一次）。 */
+/** 兼容旧调用：仅确保指针追踪已安装 */
 export function useImagePasteRouter() {
   useEffect(() => {
-    ensureImagePasteRouter();
+    ensurePointerTracker();
   }, []);
 }
 
 /**
- * 当 `active` 为 true 时注册粘贴目标，走全局单例路由，
- * 避免多个槽位各自监听 paste 时互相抢占。
+ * 资产槽（Dock 参考图等）粘贴：须在槽位内或鼠标在槽位上。
  */
 export function useImagePasteWhenActive(
   active: boolean,
-  onFile: (file: File) => void,
+  handlers: {
+    onFile?: (file: File) => void;
+    onFiles?: (files: File[]) => void;
+  },
   enabled = true,
   targetId?: string,
+  mode: "global" | "zone" = "zone",
 ) {
   const autoIdRef = useRef(
     `paste-${Math.random().toString(36).slice(2, 10)}`,
   );
-  const onFileRef = useRef(onFile);
-  onFileRef.current = onFile;
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
   const id = targetId ?? autoIdRef.current;
 
   useEffect(() => {
@@ -201,7 +335,41 @@ export function useImagePasteWhenActive(
       deactivateImagePasteTarget(id);
       return;
     }
-    activateImagePasteTarget(id, (file) => onFileRef.current(file));
+    activateImagePasteTarget(
+      id,
+      {
+        onFile: handlersRef.current.onFile
+          ? (file) => handlersRef.current.onFile?.(file)
+          : undefined,
+        onFiles: handlersRef.current.onFiles
+          ? (files) => handlersRef.current.onFiles?.(files)
+          : undefined,
+      },
+      mode,
+    );
     return () => deactivateImagePasteTarget(id);
-  }, [active, enabled, id]);
+  }, [active, enabled, id, mode]);
+}
+
+/**
+ * 图片节点：鼠标在节点上时 Ctrl+V 写入该节点（由 flow-canvas 统一 paste 调度）。
+ */
+export function usePointerImagePasteHost(
+  active: boolean,
+  nodeId: string,
+  onFile: (file: File) => void,
+) {
+  const onFileRef = useRef(onFile);
+  onFileRef.current = onFile;
+
+  useEffect(() => {
+    if (!active) {
+      unregisterPointerImagePasteHost(nodeId);
+      return;
+    }
+    registerPointerImagePasteHost(nodeId, (file) =>
+      onFileRef.current(file),
+    );
+    return () => unregisterPointerImagePasteHost(nodeId);
+  }, [active, nodeId]);
 }

@@ -7,6 +7,10 @@ import {
 } from "@/lib/gateway/ecom-tool-gateway-client";
 import { ecomClientPage } from "@/lib/ecom/ecom-tool-keys";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import {
+  ecomCreateAndPollVolcengineVideo,
+  resolveEcomVideoGenerationPlan,
+} from "@/lib/ecom/ecom-video-generate-routing";
 
 const DEFAULT_WANX_MODEL = "wanx2.1-t2i-turbo";
 
@@ -81,38 +85,27 @@ export async function ecomGenerateVideo(opts: {
   module: string;
   prompt: string;
   durationSec?: number;
+  referenceImageUrl?: string;
 }) {
   await assertEcomToolkitGatewayAccess(opts.userId);
   const workspaceId = randomUUID().slice(0, 8);
   const durationSec = Math.max(5, Math.min(15, opts.durationSec ?? 5));
   const clientPage = ecomClientPage(opts.userId, workspaceId, opts.toolKey);
-  const videoModel = "wan2.2-i2v-flash";
-
-  const { taskId, logId } = await ecomGwCreateDashscopeJob(opts.userId, {
-    kind: "video",
-    model: videoModel,
-    body: { prompt: opts.prompt, duration: durationSec },
-    clientPage,
+  const plan = resolveEcomVideoGenerationPlan({
+    action: opts.action,
+    referenceImageUrl: opts.referenceImageUrl,
   });
 
-  let videoUrl: string | null = null;
-  for (let i = 0; i < 90; i++) {
-    await new Promise((r) => setTimeout(r, 2000));
-    const polled = await ecomGwPollDashscope(opts.userId, {
-      taskId,
-      gatewayLogId: logId,
-    });
-    if (polled.status === "SUCCEEDED" && polled.outputUrl) {
-      videoUrl = polled.outputUrl;
-      break;
-    }
-    if (polled.status === "FAILED") {
-      throw new Error(polled.failMessage ?? "生视频任务失败");
-    }
-  }
-  if (!videoUrl) {
-    throw new Error("生视频超时，请稍后重试");
-  }
+  const { taskId, logId, videoUrl } = await ecomCreateAndPollVolcengineVideo({
+    userId: opts.userId,
+    modelKey: plan.modelKey,
+    prompt: opts.prompt,
+    durationSec,
+    aspectRatio: plan.aspectRatio,
+    generateAudio: plan.generateAudio,
+    referenceImageUrl: opts.referenceImageUrl,
+    clientPage,
+  });
 
   const res = await fetch(videoUrl);
   if (!res.ok) throw new Error(`下载生成视频失败 HTTP ${res.status}`);
@@ -133,7 +126,14 @@ export async function ecomGenerateVideo(opts: {
       prompt: opts.prompt,
       ossUrl,
       thumbnailUrl: ossUrl,
-      meta: { taskId, logId, model: videoModel, durationSec },
+      meta: {
+        taskId,
+        logId,
+        model: plan.modelKey,
+        durationSec,
+        aspectRatio: plan.aspectRatio,
+        generateAudio: plan.generateAudio,
+      },
     },
   });
 

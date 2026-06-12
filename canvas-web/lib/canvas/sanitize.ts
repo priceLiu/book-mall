@@ -26,7 +26,7 @@ function stripNodeRuntime(n: CanvasFlowNode): CanvasFlowNode {
     delete data[k];
   }
   // image 节点：保留 label，但清空当次的图片
-  if (n.type === "image") {
+  if (n.type === "image" || n.type === "story-pro2-image") {
     delete data.ossUrl;
     delete data.blobUrl;
     delete data.uploading;

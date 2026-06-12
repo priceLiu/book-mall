@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { ImageIcon, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
-import { useImagePasteWhenActive } from "@/lib/canvas/image-upload-handlers";
+import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { ImageNodeData } from "@/lib/canvas/types";
 import { MediaHoverBox } from "../media-hover-box";
@@ -48,11 +48,20 @@ export function ImageNode({ id, data, selected }: NodeProps) {
     [base, id, updateNodeData],
   );
 
-  useImagePasteWhenActive(Boolean(selected), (file) => void onFile(file), true, `image-${id}`);
+  const [hovered, setHovered] = useState(false);
+  usePointerImagePasteHost(hovered || Boolean(selected), id, (file) =>
+    void onFile(file),
+  );
 
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
 
   return (
+    <div
+      className="image-paste-host h-full w-full"
+      data-image-paste-host={id}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+    >
     <NodeShell
       title="图片"
       subtitle={d.label ?? "本地上传 / 拖入"}
@@ -105,5 +114,6 @@ export function ImageNode({ id, data, selected }: NodeProps) {
         }}
       />
     </NodeShell>
+    </div>
   );
 }

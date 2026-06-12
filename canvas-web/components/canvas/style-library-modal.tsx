@@ -15,13 +15,19 @@ export function StyleLibraryModal({
   open,
   onClose,
   onApplied,
+  mode = "apply",
+  onSpawn,
 }: {
   open: boolean;
   onClose: () => void;
   /** 套用成功后回调（可用于 toast 等） */
   onApplied?: (preset: StyleLibraryPreset) => void;
+  /** apply：写入风格定义节点；spawn：在画布生成风格素材卡 */
+  mode?: "apply" | "spawn";
+  onSpawn?: (preset: StyleLibraryPreset) => void;
 }) {
   const applyPreset = useApplyStyleLibraryPreset();
+  const isSpawn = mode === "spawn";
   const [preview, setPreview] = useState<{ url: string; title: string } | null>(
     null,
   );
@@ -42,15 +48,20 @@ export function StyleLibraryModal({
     };
   }, [open, onClose]);
 
-  const handleApply = useCallback(
+  const handleSelect = useCallback(
     async (preset: StyleLibraryPreset) => {
+      if (isSpawn) {
+        onSpawn?.(preset);
+        onClose();
+        return;
+      }
       const ok = await applyPreset(preset);
       if (!ok) return;
       setHint(`已套用：${preset.name}`);
       onApplied?.(preset);
       onClose();
     },
-    [applyPreset, onApplied, onClose],
+    [isSpawn, onSpawn, applyPreset, onApplied, onClose],
   );
 
   if (!open) return null;
@@ -77,7 +88,9 @@ export function StyleLibraryModal({
               风格库
             </p>
             <p className="mt-0.5 text-[12px] text-white/55">
-              悬停卡片查看风格提示词；点击条目将写入可编辑的「风格定义」节点（多工作流时优先当前选中或故事已定稿且风格未定稿的一套）。
+              {isSpawn
+                ? "悬停卡片查看风格提示词；点击条目将在画布生成「素材-风格」节点，并自动吸附附近脚本节点。"
+                : "悬停卡片查看风格提示词；点击条目将写入可编辑的「风格定义」节点（多工作流时优先当前选中或故事已定稿且风格未定稿的一套）。"}
             </p>
             {hint ? (
               <p className="mt-1 text-[11px] text-emerald-300/90">{hint}</p>
@@ -98,18 +111,20 @@ export function StyleLibraryModal({
           className="min-h-0 w-full min-w-0 flex-1"
           filterClassName="px-5 pt-2"
           contentClassName="px-5 py-4"
-          onSelect={(p) => void handleApply(p)}
+          onSelect={(p) => void handleSelect(p)}
           onPreview={(p) => {
             if (p.imageUrl) {
               setPreview({ url: p.imageUrl, title: p.name });
             }
           }}
-          selectLabel="套用"
+          selectLabel={isSpawn ? "添加" : "套用"}
         />
 
-        <footer className="shrink-0 border-t border-white/5 px-5 py-3 text-[11px] text-white/45">
-          不会自动保存到「全局风格」；定稿后请在风格节点点击「保存到项目资产」。
-        </footer>
+        {!isSpawn ? (
+          <footer className="shrink-0 border-t border-white/5 px-5 py-3 text-[11px] text-white/45">
+            不会自动保存到「全局风格」；定稿后请在风格节点点击「保存到项目资产」。
+          </footer>
+        ) : null}
       </div>
     </div>
   );

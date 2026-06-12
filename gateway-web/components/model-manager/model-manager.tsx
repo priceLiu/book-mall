@@ -11,6 +11,7 @@ import { ProviderApplyLink } from "@/lib/provider-apply-urls";
 const TAB_LABELS: Record<ModelTab, string> = {
   text: "Text Models",
   image: "Image Models",
+  video: "Video Models",
   function: "Function Models",
 };
 

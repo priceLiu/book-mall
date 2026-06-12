@@ -21,7 +21,10 @@ import type {
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import { pickTaskResultMediaUrl } from "./task-media-url";
+import { shouldSkipStoryRowTaskApply } from "./task-pick";
 import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
+import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
+import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
 import {
   findStarterByHubId,
   isAnyStoryCharacterColumnType,
@@ -65,6 +68,19 @@ export function storyRunPendingPatch(
   node: CanvasFlowNode,
   ctx?: StoryRunContext,
 ): Record<string, unknown> | null {
+  if (
+    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    ctx?.mediaKind === "themeOutline"
+  ) {
+    return {
+      themeOutlineRuntime: {
+        status: "pending",
+        taskId: undefined,
+        failCode: undefined,
+        failMessage: undefined,
+      } satisfies CanvasNodeRuntime,
+    };
+  }
   if (isAnyStoryScriptHubType(node.type ?? "") && ctx?.llmSection) {
     const rt: CanvasNodeRuntime = {
       status: "pending",
@@ -164,6 +180,24 @@ export function storyApplyTaskResult(
               failMessage: undefined,
             };
 
+  if (
+    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    ctx?.mediaKind === "themeOutline"
+  ) {
+    const prevRt = (
+      node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
+    ).themeOutlineRuntime;
+    if (shouldSkipStoryRowTaskApply(prevRt, task)) return;
+    const patch: Record<string, unknown> = { themeOutlineRuntime: runtime };
+    if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
+      patch.generatedOutlineMd = task.textOutput.trim();
+      patch.pipelineStage = "llm_done";
+      patch.starterMode = "generate";
+    }
+    updateNodeData(node.id, patch);
+    return;
+  }
+
   if (isAnyStoryScriptHubType(node.type ?? "") && ctx?.llmSection) {
     if (
       (task.status === "SUBMITTED" || task.status === "PENDING") &&
@@ -241,6 +275,14 @@ export function storyApplyTaskResult(
       runtime,
     );
     updateNodeData(node.id, { rows: nextRows });
+    syncPro2CharacterImagesFromRows(
+      allNodes.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, rows: nextRows } } : n,
+      ),
+      node.id,
+      nextRows as never,
+      updateNodeData,
+    );
     const starter = findStarterByHubId(allNodes, node.id);
     const ws = (
       starter?.data as {
@@ -286,6 +328,14 @@ export function storyApplyTaskResult(
     const rows = (node.data as { rows: { key: string }[] }).rows ?? [];
     const nextRows = applyFrameRowRuntime(rows as never, ctx.rowKey, runtime);
     updateNodeData(node.id, { rows: nextRows });
+    syncPro2FrameImagesFromRows(
+      allNodes.map((n) =>
+        n.id === node.id ? { ...n, data: { ...n.data, rows: nextRows } } : n,
+      ),
+      node.id,
+      nextRows as never,
+      updateNodeData,
+    );
     const starterFrame = findStarterByHubId(
       allNodes,
       (node.data as { hubNodeId?: string }).hubNodeId ?? "",

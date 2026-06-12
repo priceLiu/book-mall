@@ -103,6 +103,8 @@ model User {
   toolServicePeriods               UserToolServicePeriod[]
   ecomAssets                       EcomAsset[]
   ecomStoryboardProjects           EcomStoryboardProject[]
+  mediaRenderJobs                  MediaRenderJob[]
+  mediaStorageGrants               UserMediaStorageGrant[]
 
   /// 多租户：主空间（个人租户）。回填脚本为每个用户建 PERSONAL 租户后写入。
   primaryTenantId      String?
@@ -449,6 +451,66 @@ model EcomStoryboardProject {
 
   @@index([userId, module, updatedAt])
   @@index([tenantId, visibility, updatedAt])
+}
+
+enum MediaRenderJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+}
+
+enum MediaRenderStorageTier {
+  ephemeral
+  pinned
+}
+
+enum MediaRenderSourceApp {
+  canvas
+  ecom
+  api
+}
+
+/// 云端自动剪辑任务（xfade 成片，默认 7 天 ephemeral）
+model MediaRenderJob {
+  id           String                 @id @default(cuid())
+  userId       String
+  sourceApp    MediaRenderSourceApp
+  sourceRef    Json?
+  timelineJson Json
+  profileJson  Json
+  status        MediaRenderJobStatus   @default(PENDING)
+  progress      Int                    @default(0)
+  progressLabel String?                @db.VarChar(120)
+  resultOssUrl String?
+  errorMessage String?                @db.Text
+  bytesOut     Int?
+  expiresAt    DateTime
+  storageTier  MediaRenderStorageTier @default(ephemeral)
+  pinnedAt     DateTime?
+  createdAt    DateTime               @default(now())
+  completedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+  @@index([expiresAt, storageTier, status])
+}
+
+/// 用户媒体容量包（延期保留成片）
+model UserMediaStorageGrant {
+  id         String   @id @default(cuid())
+  userId     String
+  bytesQuota BigInt
+  bytesUsed  BigInt   @default(0)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }
 
 /// 工具站左侧菜单项是否在导航中展示（由主站后台维护）；navKey 与 tool-web `config/nav-tools` 约定一致。

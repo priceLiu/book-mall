@@ -1,0 +1,41 @@
+---
+description: 影视专业版 2.0 · 模型选择器统一规范（LLM / 生图 / 生视频）
+globs: canvas-web/components/canvas/pro2/**/*
+alwaysApply: true
+---
+
+# 影视专业版 2.0 · 模型选择器
+
+## 唯一实现（canvas-web）
+
+Pro2 画布及 `canvas-web` 内所有「点击后弹出选择 AI 模型 + 可调参数」的交互，**必须**复用：
+
+- **组件**：`canvas-web/components/canvas/engine-picker.tsx`（`EnginePicker`）
+- **弹层**：同文件内 `EngineModelModal`（禁止另写第二套 Dialog / Drawer）
+- **数据**：`useUserProviders()` → Gateway 登记模型；**禁止**前端硬编码模型卡片列表
+
+## 按 role 分流
+
+| 场景 | `EnginePicker` role | 白名单 / 能力 |
+|------|---------------------|---------------|
+| 故事大纲 / 分镜脚本 LLM | `LLM` | `STORY_LLM_MODEL_KEYS` |
+| 三视图 / 分镜图 IMAGE | `IMAGE` | `PRO2_THREE_VIEW_MODEL_KEYS` / `PRO2_FRAME_IMAGE_MODEL_KEYS` 等 |
+| 分镜视频 | `VIDEO` | `STORY_PRO_VIDEO_MODEL_KEYS` 等 + `requiredCapabilities` |
+
+## 禁止
+
+- 裸 `<select>` 或自写模型卡片网格替代 `EnginePicker`
+- 复制 `EngineModelModal` 布局另起弹层
+- 在 Dock / 工具条 / 弹层里写死 `modelKey` 列表而不走 Gateway providers
+- 电商工具箱内改走 `EnginePicker`（电商仍用 `StoryboardModelPickerDialog`，见 `ecom-model-picker.mdc`）
+
+## Pro2 已接入入口（须保持）
+
+- `pro2-starter-input-dock` · `pro2-script-input-dock` → `role="LLM"`
+- `pro2-three-view-input-dock` · `pro2-frame-generate-picker` · `pro2-character-three-view-picker` → `role="IMAGE"`
+- 分镜视频相关弹层 → `role="VIDEO"`
+
+## Code Review
+
+- PR 在 `pro2/**` 出现新的模型选择 UI → **驳回**，改为 `EnginePicker`
+- 新增模型时：后端 Gateway 注册 + 前端扩展 `allowedModelKeys` / 默认 pick 函数，不新建选择器组件

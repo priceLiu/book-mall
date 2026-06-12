@@ -24,7 +24,8 @@ import {
   generateStoryboardSheetImage,
   pollStoryboardFullVideoStatus,
   submitStoryboardFullVideo,
-  mergeStoryboardPanelVideos,
+  renderStoryboardPanelVideos,
+  waitStoryboardMediaRender,
   saveStoryboardDeliverableSnapshot,
   syncStoryboardSheet,
   updateStoryboardProject,
@@ -699,16 +700,36 @@ export function StoryboardContentPanel({
   async function handleMergePanelVideos() {
     setMergeBusy(true);
     try {
-      const { assetId, ossUrl } = await mergeStoryboardPanelVideos(project.id);
+      const submitted = await renderStoryboardPanelVideos(project.id);
+      const job = await waitStoryboardMediaRender(submitted.id);
+      if (job.status !== "SUCCEEDED" || !job.downloadUrl) {
+        throw new Error(job.errorMessage ?? "视频合并失败");
+      }
+      const expiresLabel = new Date(job.expiresAt).toLocaleString("zh-CN", {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
       onProjectChange({
         ...project,
-        videoOssUrl: ossUrl,
-        videoAssetId: assetId,
+        videoOssUrl: job.downloadUrl,
+        videoAssetId: undefined,
+        meta: {
+          ...project.meta,
+          deliverableSnapshot: {
+            ...project.meta?.deliverableSnapshot,
+            videoUrl: job.downloadUrl,
+            renderJobId: job.id,
+            renderExpiresAt: job.expiresAt,
+            videoMode: "merged_panels",
+          },
+        },
       });
       onVideoReady();
       await onAlert({
         title: "合并完成",
-        message: "各镜头视频已拼接为完整成片，并已自动保存交付快照。可点「交付查阅」预览。",
+        message: `各镜头已云端合成（含转场）。成片请在 ${expiresLabel} 前下载，到期将自动清理；购买容量包可延期保留。`,
       });
     } catch (e) {
       await onAlert({
@@ -778,7 +799,7 @@ export function StoryboardContentPanel({
         className="mx-6 mb-2"
         active={mergeBusy}
         title="合并分镜视频中"
-        detail="正在拼接各镜头视频为完整成片…"
+        detail="云端合成各镜头视频（含转场），通常需 1–5 分钟…"
       />
 
       <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-6">

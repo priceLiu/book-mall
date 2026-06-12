@@ -4,15 +4,17 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { GripVertical, X } from "lucide-react";
-import { RF_NODE_DRAG_HANDLE, RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
+import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
 import type { MentionableItem } from "./MentionsTextarea";
 
 const ITEM_W = 200;
 const THUMB_H = 240;
-const GAP = 12;
+const GAP = 8;
 const PICKER_PAD = 16;
 const PICKER_MIN_W = 320;
 const PICKER_MAX_W = 960;
+const PICKER_EST_HEIGHT = 320;
+const MENTION_PICKER_Z = 5000;
 
 function pickerWidthForCount(count: number): number {
   if (count <= 0) return PICKER_MIN_W;
@@ -20,11 +22,37 @@ function pickerWidthForCount(count: number): number {
   return Math.min(PICKER_MAX_W, Math.max(PICKER_MIN_W, content));
 }
 
+type AnchorRect = {
+  left: number;
+  top: number;
+  bottom: number;
+};
+
+function resolvePickerPosition(
+  anchor: AnchorRect,
+  pickerW: number,
+): { left: number; top: number; flip: boolean } {
+  let left = anchor.left;
+  left = Math.min(Math.max(12, left), window.innerWidth - pickerW - 12);
+
+  const spaceBelow = window.innerHeight - anchor.bottom - GAP;
+  const spaceAbove = anchor.top - GAP;
+  const preferBelow =
+    spaceBelow >= PICKER_EST_HEIGHT || spaceBelow >= spaceAbove;
+
+  if (preferBelow) {
+    return { left, top: anchor.bottom + GAP, flip: false };
+  }
+  return { left, top: anchor.top - GAP, flip: true };
+}
+
 export function MentionPickerPortal({
   open,
   anchorEl,
+  getAnchorRect,
   items,
   selectedIndex,
+  headerTitle = "角色 · 拖标题栏移动 · ←→ Enter 插入",
   emptyHint,
   onSelect,
   onHoverIndex,
@@ -32,15 +60,18 @@ export function MentionPickerPortal({
 }: {
   open: boolean;
   anchorEl: HTMLElement | null;
+  /** 优先：光标 / @ 锚点坐标 */
+  getAnchorRect?: () => AnchorRect | null;
   items: MentionableItem[];
   selectedIndex: number;
+  headerTitle?: string;
   emptyHint: string;
   onSelect: (item: MentionableItem) => void;
   onHoverIndex: (index: number) => void;
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
-  const [basePos, setBasePos] = useState({ left: 80, top: 120 });
+  const [basePos, setBasePos] = useState({ left: 12, top: 120, flip: true });
   const [drag, setDrag] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -48,26 +79,34 @@ export function MentionPickerPortal({
   }, []);
 
   const updateAnchor = useCallback(() => {
-    if (!anchorEl) return;
-    const r = anchorEl.getBoundingClientRect();
+    const caret = getAnchorRect?.() ?? null;
+    const fallback = anchorEl?.getBoundingClientRect();
+    const anchor: AnchorRect | null = caret
+      ? caret
+      : fallback
+        ? {
+            left: fallback.left + 12,
+            top: fallback.top + 12,
+            bottom: fallback.bottom - 12,
+          }
+        : null;
+    if (!anchor) return;
+
     const w = pickerWidthForCount(items.length);
-    setBasePos({
-      left: Math.min(Math.max(12, r.left), window.innerWidth - w - 12),
-      top: r.top - GAP,
-    });
-  }, [anchorEl, items.length]);
+    setBasePos(resolvePickerPosition(anchor, w));
+  }, [anchorEl, getAnchorRect, items.length]);
 
   useLayoutEffect(() => {
     if (!open) return;
     setDrag({ x: 0, y: 0 });
     updateAnchor();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅打开时复位位置，避免拖移中被 scroll/resize 重置
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅打开时复位拖拽偏移
   }, [open]);
 
   useLayoutEffect(() => {
     if (!open) return;
     updateAnchor();
-  }, [open, updateAnchor]);
+  }, [open, updateAnchor, items.length, selectedIndex]);
 
   useEffect(() => {
     if (!open) return;
@@ -113,12 +152,13 @@ export function MentionPickerPortal({
 
   return createPortal(
     <div
-      className={`${RF_NO_DRAG} nopan fixed z-[1200] flex flex-col overflow-hidden rounded-xl border border-white/15 bg-[#141414]/98 shadow-2xl backdrop-blur-md`}
+      className={`${RF_NO_DRAG} nopan fixed flex flex-col overflow-hidden rounded-xl border border-white/15 bg-[#141414]/98 shadow-2xl backdrop-blur-md`}
       style={{
         left,
         top,
         width: pickerW,
-        transform: "translateY(-100%)",
+        zIndex: MENTION_PICKER_Z,
+        transform: basePos.flip ? "translateY(-100%)" : undefined,
       }}
       onMouseDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
@@ -129,7 +169,7 @@ export function MentionPickerPortal({
       >
         <GripVertical className="size-3.5 shrink-0 text-white/40" />
         <p className="min-w-0 flex-1 text-[10px] text-[var(--canvas-muted)]">
-          角色 · 拖标题栏移动 · ←→ Enter 插入
+          {headerTitle}
         </p>
         <button
           type="button"

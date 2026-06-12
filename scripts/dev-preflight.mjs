@@ -56,7 +56,27 @@ for (const item of PORTS) {
   }
 }
 
+function checkFfmpegForDev() {
+  try {
+    execFileSync("ffmpeg", ["-version"], { stdio: "ignore", timeout: 5000 });
+    execFileSync("ffprobe", ["-version"], { stdio: "ignore", timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 if (conflicts.length === 0) {
+  if (!checkFfmpegForDev()) {
+    const YEL = "\x1b[33m";
+    const GRN = "\x1b[32m";
+    const RST = "\x1b[0m";
+    console.warn(
+      `\n${YEL}⚠ ffmpeg 未安装 — 云端自动剪辑不可用（终端用户无需安装，仅本机 book-mall 需要）${RST}\n` +
+        `  一键安装：${GRN}cd book-mall && pnpm media-render:setup-ffmpeg${RST}\n` +
+        `  或手动：  ${GRN}brew install ffmpeg${RST} 后重启 dev:all\n`,
+    );
+  }
   process.exit(0);
 }
 

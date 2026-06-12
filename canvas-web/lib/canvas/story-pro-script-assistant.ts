@@ -9,11 +9,19 @@ import {
   storyProHubHasMediaColumns,
   storyProHubHasStyleLayer,
 } from "./spawn-story-pro-workspace";
+import {
+  findStoryPro2ScriptHubForStarter,
+  storyPro2HubHasMediaColumns,
+  storyPro2HubHasStyleLayer,
+} from "./spawn-story-pro2-workspace";
+import { isStoryPro2PipelineNode } from "./story-pro2-pipeline";
 
 export type ScriptAssistantOutputMode = "chat" | "pack";
 
 /** 同画布多套工作流时，新工作流相对已有工作区的纵向间距 */
 export const STORY_PRO_WORKFLOW_STACK_GAP = 240;
+
+export type StoryAssistantEdition = "pro" | "pro2";
 
 export type StoryProAssistantImportPlan =
   | {
@@ -22,21 +30,26 @@ export type StoryProAssistantImportPlan =
       starterId: string;
       scriptHubId?: string;
       hint: string;
+      edition: StoryAssistantEdition;
     }
   | {
       allowed: true;
       spawnNew: true;
       position: { x: number; y: number };
       hint: string;
+      edition: StoryAssistantEdition;
     }
   | { allowed: false; reason: string };
 
 function hubBlocksAssistantImport(
   nodes: CanvasFlowNode[],
   hubId: string,
+  hubType: "story-pro-script-hub" | "story-pro2-script-hub",
+  hasStyle: (nodes: CanvasFlowNode[], hubId: string) => boolean,
+  hasMedia: (nodes: CanvasFlowNode[], hubId: string) => boolean,
 ): string | null {
   const hub = nodes.find((n) => n.id === hubId);
-  if (!hub || hub.type !== "story-pro-script-hub") {
+  if (!hub || hub.type !== hubType) {
     return "未找到故事剧本节点。";
   }
   const hd = hub.data as unknown as StoryProScriptHubNodeData;
@@ -50,10 +63,10 @@ function hubBlocksAssistantImport(
   ) {
     return "该套故事剧本已有大纲/角色/分镜。";
   }
-  if (storyProHubHasStyleLayer(nodes, hubId)) {
+  if (hasStyle(nodes, hubId)) {
     return "该套已连接风格节点。";
   }
-  if (storyProHubHasMediaColumns(nodes, hubId)) {
+  if (hasMedia(nodes, hubId)) {
     return "该套已生成人物/场景/分镜/视频等下游列。";
   }
   return null;
@@ -62,11 +75,16 @@ function hubBlocksAssistantImport(
 /** 新一套工作流 · 启动节点建议坐标（与 reflow 互不覆盖） */
 export function suggestNextStoryProStarterPosition(
   nodes: CanvasFlowNode[],
+  edition: StoryAssistantEdition = "pro",
 ): { x: number; y: number } {
-  const proNodes = nodes.filter((n) =>
-    isStoryProPipelineNode(n.type ?? ""),
-  );
-  if (!proNodes.length) return { x: 80, y: 120 };
+  const starterType =
+    edition === "pro2" ? "story-pro2-starter" : "story-pro-starter";
+  const isEditionNode = (t: string) =>
+    edition === "pro2"
+      ? isStoryPro2PipelineNode(t)
+      : isStoryProPipelineNode(t);
+  const proNodes = nodes.filter((n) => isEditionNode(n.type ?? ""));
+  if (!proNodes.length) return { x: edition === "pro2" ? 120 : 80, y: 120 };
 
   let maxBottom = 120;
   for (const n of proNodes) {
@@ -75,8 +93,73 @@ export function suggestNextStoryProStarterPosition(
     maxBottom = Math.max(maxBottom, y + h);
   }
   const starterX =
-    nodes.find((n) => n.type === "story-pro-starter")?.position?.x ?? 80;
+    nodes.find((n) => n.type === starterType)?.position?.x ??
+    (edition === "pro2" ? 120 : 80);
   return { x: starterX, y: maxBottom + STORY_PRO_WORKFLOW_STACK_GAP };
+}
+
+function resolveEditionAssistantImport(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  edition: StoryAssistantEdition,
+): StoryProAssistantImportPlan | null {
+  const starterType =
+    edition === "pro2" ? "story-pro2-starter" : "story-pro-starter";
+  const hubType =
+    edition === "pro2" ? "story-pro2-script-hub" : "story-pro-script-hub";
+  const findHub =
+    edition === "pro2"
+      ? findStoryPro2ScriptHubForStarter
+      : findStoryProScriptHubForStarter;
+  const hasStyle =
+    edition === "pro2" ? storyPro2HubHasStyleLayer : storyProHubHasStyleLayer;
+  const hasMedia =
+    edition === "pro2" ? storyPro2HubHasMediaColumns : storyProHubHasMediaColumns;
+  const label = edition === "pro2" ? "影视专业版 2.0" : "影视专业版";
+
+  const starters = nodes.filter((n) => n.type === starterType);
+  if (!starters.length) return null;
+
+  for (const starter of starters) {
+    const stored = (
+      starter.data as { workspaceIds?: { scriptHubId?: string } }
+    ).workspaceIds;
+    const hubLink = findHub(nodes, edges, starter.id, stored);
+    if (!hubLink) {
+      return {
+        allowed: true,
+        spawnNew: false,
+        starterId: starter.id,
+        hint: "",
+        edition,
+      };
+    }
+    const block = hubBlocksAssistantImport(
+      nodes,
+      hubLink.scriptHubId,
+      hubType,
+      hasStyle,
+      hasMedia,
+    );
+    if (!block) {
+      return {
+        allowed: true,
+        spawnNew: false,
+        starterId: starter.id,
+        scriptHubId: hubLink.scriptHubId,
+        hint: "",
+        edition,
+      };
+    }
+  }
+
+  return {
+    allowed: true,
+    spawnNew: true,
+    position: suggestNextStoryProStarterPosition(nodes, edition),
+    hint: `当前画布已有进行中的工作流；将新建一套独立工作流（故事启动 + 故事剧本）并导入，与既有流程互不影响。`,
+    edition,
+  };
 }
 
 /**
@@ -87,49 +170,16 @@ export function resolveStoryProAssistantImport(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
 ): StoryProAssistantImportPlan {
-  const starters = nodes.filter((n) => n.type === "story-pro-starter");
-  if (!starters.length) {
-    return {
-      allowed: false,
-      reason: "未找到影视专业版启动节点，无法导入。请使用影视专业版模板打开画布。",
-    };
-  }
+  const pro2Plan = resolveEditionAssistantImport(nodes, edges, "pro2");
+  if (pro2Plan) return pro2Plan;
 
-  for (const starter of starters) {
-    const stored = (
-      starter.data as { workspaceIds?: { scriptHubId?: string } }
-    ).workspaceIds;
-    const hubLink = findStoryProScriptHubForStarter(
-      nodes,
-      edges,
-      starter.id,
-      stored,
-    );
-    if (!hubLink) {
-      return {
-        allowed: true,
-        spawnNew: false,
-        starterId: starter.id,
-        hint: "",
-      };
-    }
-    const block = hubBlocksAssistantImport(nodes, hubLink.scriptHubId);
-    if (!block) {
-      return {
-        allowed: true,
-        spawnNew: false,
-        starterId: starter.id,
-        scriptHubId: hubLink.scriptHubId,
-        hint: "",
-      };
-    }
-  }
+  const proPlan = resolveEditionAssistantImport(nodes, edges, "pro");
+  if (proPlan) return proPlan;
 
   return {
-    allowed: true,
-    spawnNew: true,
-    position: suggestNextStoryProStarterPosition(nodes),
-    hint: "当前画布已有进行中的工作流；将新建一套独立工作流（故事启动 + 故事剧本）并导入，与既有流程互不影响。",
+    allowed: false,
+    reason:
+      "未找到影视专业版启动节点，无法导入。请使用影视专业版或 2.0 模板打开画布。",
   };
 }
 

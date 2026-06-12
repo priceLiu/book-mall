@@ -22,6 +22,18 @@ import { StoryComicStarterNode } from "./nodes/story-comic-starter-node";
 import { StoryFrameColumnNode } from "./nodes/story-frame-column-node";
 import { StoryProSceneColumnNode } from "./nodes/story-pro-scene-column-node";
 import { StoryProScriptHubNode } from "./nodes/story-pro-script-hub-node";
+import { StoryPro2StarterNode } from "./pro2/story-pro2-starter-node";
+import { StoryPro2ImageNode } from "./pro2/story-pro2-image-node";
+import { StoryPro2ThreeViewNode } from "./pro2/story-pro2-three-view-node";
+import { StoryPro2StyleAssetNode } from "./pro2/story-pro2-style-asset-node";
+import { StoryPro2ScriptHubNode } from "./pro2/story-pro2-script-hub-node";
+import { StoryPro2CharacterBoardNode } from "./pro2/story-pro2-character-board-node";
+import { StoryPro2FrameBoardNode } from "./pro2/story-pro2-frame-board-node";
+import {
+  JianyingExportPro2ThinNode,
+  Pro2ColumnThinNode,
+  StoryPro2StyleThinNode,
+} from "./pro2/pro2-thin-nodes";
 import { StoryProStarterNode } from "./nodes/story-pro-starter-node";
 import { StoryProStyleNode } from "./nodes/story-pro-style-node";
 import { StoryScriptHubNode } from "./nodes/story-script-hub-node";
@@ -30,6 +42,8 @@ import { TextNode } from "./nodes/text-node";
 import { ThreeViewEngineNode } from "./nodes/three-view-engine-node";
 import { TtsEngineNode } from "./nodes/tts-engine-node";
 import { VideoEngineNode } from "./nodes/video-engine-node";
+import { Sbv1ImageNode } from "./sbv1/sbv1-image-node";
+import { Sbv1VideoEngineNode } from "./sbv1/sbv1-video-engine-node";
 import { VideoGenerateNode } from "./nodes/video-generate-node";
 import { VideoPreviewNode } from "./nodes/video-preview-node";
 
@@ -56,6 +70,17 @@ export const memoizedNodeTypes = {
   "video-preview": memoFlowNode(VideoPreviewNode),
   "image-preview": memoFlowNode(ImagePreviewNode),
   "jianying-export": memoFlowNode(JianyingExportNode),
+  "story-pro2-starter": memoFlowNode(StoryPro2StarterNode),
+  "story-pro2-image": memoFlowNode(StoryPro2ImageNode),
+  "story-pro2-three-view": memoFlowNode(StoryPro2ThreeViewNode),
+  "story-pro2-style-asset": memoFlowNode(StoryPro2StyleAssetNode),
+  "story-pro2-script-hub": memoFlowNode(StoryPro2ScriptHubNode),
+  "story-pro2-style": memoFlowNode(StoryPro2StyleThinNode),
+  "story-pro2-character": memoFlowNode(StoryPro2CharacterBoardNode),
+  "story-pro2-scene": memoFlowNode(Pro2ColumnThinNode),
+  "story-pro2-frame": memoFlowNode(StoryPro2FrameBoardNode),
+  "story-pro2-video": memoFlowNode(Pro2ColumnThinNode),
+  "jianying-export-pro2": memoFlowNode(JianyingExportPro2ThinNode),
   "story-pro-starter": memoFlowNode(StoryProStarterNode),
   "story-pro-script-hub": memoFlowNode(StoryProScriptHubNode),
   "story-pro-style": memoFlowNode(StoryProStyleNode),
@@ -64,6 +89,8 @@ export const memoizedNodeTypes = {
   "story-pro-frame": memoFlowNode(StoryFrameColumnNode),
   "story-pro-video": memoFlowNode(StoryVideoColumnNode),
   "jianying-export-pro": memoFlowNode(JianyingExportProNode),
+  "sbv1-image": memoFlowNode(Sbv1ImageNode),
+  "sbv1-video-engine": memoFlowNode(Sbv1VideoEngineNode),
   output: memoFlowNode(OutputNode),
   group: memoFlowNode(GroupNode),
   "story-outline-engine": memoFlowNode(StoryOutlineEngineNode),

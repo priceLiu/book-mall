@@ -1,0 +1,1 @@
+ALTER TABLE "MediaRenderJob" ADD COLUMN IF NOT EXISTS "progressLabel" VARCHAR(120);

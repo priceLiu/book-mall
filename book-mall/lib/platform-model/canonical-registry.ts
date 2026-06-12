@@ -51,8 +51,10 @@ function dedupeRoutes(list: CanonicalRouteDef[]): CanonicalRouteDef[] {
   return out;
 }
 
+import { LEGACY_INVOKE_MODEL_REGISTRY } from "@/lib/platform-model/legacy-invoke-registry";
+
 /** Gateway 统一 canonical 注册表（seed + 自动上架数据源）。 */
-export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
+const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   {
     canonicalModelKey: "deepseek-chat",
     displayName: "DeepSeek 快速对话",
@@ -161,6 +163,38 @@ export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "aitryon",
+    displayName: "AI 试衣-基础版",
+    description: "百炼 aitryon 虚拟试衣成片",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "TRYON",
+    appTags: ["tool", ...VISUAL_APPS],
+    sortOrder: 21,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "aitryon", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "aitryon-plus",
+    displayName: "AI 试衣-Plus 版",
+    description: "百炼 aitryon-plus 虚拟试衣成片",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "TRYON",
+    appTags: ["tool", ...VISUAL_APPS],
+    sortOrder: 22,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "aitryon-plus", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
     canonicalModelKey: "aitryon-parsing-v1",
     displayName: "AI 试衣-图片分割",
     description: "全身图上下装分割（角色资产服装槽 / 试衣预处理）",
@@ -174,6 +208,22 @@ export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     unitLabel: "元/张（输入）",
     routes: dedupeRoutes([
       { vendor: "aliyun", modelKey: "aitryon-parsing-v1", providerKind: "DASHSCOPE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "aitryon-refiner",
+    displayName: "AI 试衣-图片精修",
+    description: "百炼 aitryon-refiner 试衣精修（阶梯价）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "TRYON",
+    appTags: ["tool", ...VISUAL_APPS],
+    sortOrder: 25,
+    primaryVendor: "aliyun",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      { vendor: "aliyun", modelKey: "aitryon-refiner", providerKind: "DASHSCOPE" },
     ]),
   },
   {
@@ -268,6 +318,11 @@ export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
       { vendor: "aliyun", modelKey: "wan2.7-r2v", providerKind: "DASHSCOPE" },
     ]),
   },
+];
+
+export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
+  ...CORE_GATEWAY_CANONICAL_REGISTRY,
+  ...LEGACY_INVOKE_MODEL_REGISTRY,
 ];
 
 /** 四媒介槽默认 canonical（无用户选模时 fallback）。 */

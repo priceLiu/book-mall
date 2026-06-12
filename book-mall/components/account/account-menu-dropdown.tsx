@@ -1,5 +1,6 @@
 "use client";
 
+import { navigateBookMallFullSignOut } from "@/lib/session-kicked-marker";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -81,7 +82,7 @@ export function AccountMenuDropdown({
   const ecomReady = canLaunchEcommerce && ecomOriginConfigured;
 
   function signOut() {
-    window.location.href = "/api/auth/full-signout?callbackUrl=/";
+    navigateBookMallFullSignOut("/");
   }
 
   return (

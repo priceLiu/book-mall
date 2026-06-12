@@ -8,7 +8,7 @@ export type CanvasProjectSummary = {
   name: string;
   description: string;
   thumbnailUrl: string;
-  edition: "pro" | "standard";
+  edition: "pro" | "pro2" | "sbv1" | "standard";
   createdAt: string;
   updatedAt: string;
 };
@@ -259,7 +259,13 @@ export async function runCanvasNode(
     forceFresh?: boolean;
     llmSection?: "outline" | "character" | "storyboard";
     rowKey?: string;
-    mediaKind?: "threeView" | "frameImage" | "video" | "tts" | "sceneRef";
+    mediaKind?:
+      | "threeView"
+      | "frameImage"
+      | "video"
+      | "tts"
+      | "sceneRef"
+      | "themeOutline";
     /** 影视专业版 · 风格定稿门禁 */
     styleFinalized?: boolean;
     styleAnchor?: {
@@ -940,4 +946,96 @@ export async function exportJianyingZip(
   a.download = filename;
   a.click();
   URL.revokeObjectURL(href);
+}
+
+// ── 云端自动剪辑 ──
+
+export type MediaRenderJob = {
+  id: string;
+  status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "EXPIRED";
+  progress: number;
+  progressLabel?: string | null;
+  downloadUrl: string | null;
+  expiresAt: string;
+  errorMessage: string | null;
+};
+
+export type MediaRenderProfile = {
+  transition?: { type: "xfade"; durationSec: number } | { type: "none" };
+  subtitle?: { mode: "script" | "none"; burnIn?: boolean };
+};
+
+export async function submitMediaRender(
+  base: string,
+  projectId: string,
+  args: { frames: JianyingExportFrame[]; profile?: MediaRenderProfile },
+): Promise<MediaRenderJob> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    `/api/canvas/projects/${encodeURIComponent(projectId)}/media/render`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ frames: args.frames, profile: args.profile }),
+    },
+  );
+  const r = await fetch(url, init);
+  const data = (await r.json().catch(() => ({}))) as {
+    job?: MediaRenderJob;
+    message?: string;
+    error?: string;
+  };
+  if (!r.ok) {
+    throw new Error(data.message ?? data.error ?? `render failed HTTP ${r.status}`);
+  }
+  if (!data.job) throw new Error("invalid render response");
+  return data.job;
+}
+
+export async function pollMediaRender(
+  base: string,
+  jobId: string,
+): Promise<MediaRenderJob> {
+  const { url, init } = resolveBookMallBrowserRequest(
+    base,
+    `/api/canvas/media/render/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+  const r = await fetch(url, init);
+  const data = (await r.json().catch(() => ({}))) as {
+    job?: MediaRenderJob;
+    message?: string;
+  };
+  if (!r.ok) {
+    throw new Error(data.message ?? `poll failed HTTP ${r.status}`);
+  }
+  if (!data.job) throw new Error("invalid poll response");
+  return data.job;
+}
+
+export async function waitMediaRenderJob(
+  base: string,
+  jobId: string,
+  opts?: {
+    intervalMs?: number;
+    timeoutMs?: number;
+    onPoll?: (job: MediaRenderJob) => void;
+  },
+): Promise<MediaRenderJob> {
+  const intervalMs = opts?.intervalMs ?? 1500;
+  const timeoutMs = opts?.timeoutMs ?? 15 * 60 * 1000;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const job = await pollMediaRender(base, jobId);
+    opts?.onPoll?.(job);
+    if (
+      job.status === "SUCCEEDED" ||
+      job.status === "FAILED" ||
+      job.status === "EXPIRED"
+    ) {
+      return job;
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error("云端剪辑超时，请稍后重试");
 }

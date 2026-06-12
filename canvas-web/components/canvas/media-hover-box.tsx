@@ -33,6 +33,7 @@ export type MediaHoverBoxProps = {
   placeholder?: ReactNode;
   fit?: "cover" | "contain";
   naturalSize?: boolean;
+  /** @deprecated 预览仅通过悬停 Eye 图标触发，不再点击整图/整视频 */
   clickToPreview?: boolean;
   /** 传入后预览弹层内可切换「大图 / 对比」 */
   compareContext?: MediaCompareContext;
@@ -42,9 +43,9 @@ export type MediaHoverBoxProps = {
   initialView?: "single" | "compare";
 };
 
-const ACTION_BTN =
-  "nodrag pointer-events-auto inline-flex min-w-[52px] flex-col items-center gap-1 rounded-xl border border-white/25 bg-black/75 px-3 py-2.5 text-white shadow-xl transition hover:scale-[1.03] hover:border-white/50 hover:bg-black/90";
-const ACTION_ICON = "grid size-11 place-items-center rounded-full bg-white/10";
+/** 悬停 overlay · 仅图标（无黑底药丸、无文案）— 见 design.md §15.2 */
+const OVERLAY_ICON_BTN =
+  "nodrag pointer-events-auto inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm transition hover:bg-black/75 hover:scale-[1.03]";
 
 export function MediaHoverBox({
   src,
@@ -57,7 +58,7 @@ export function MediaHoverBox({
   placeholder,
   fit = "contain",
   naturalSize = false,
-  clickToPreview = false,
+  clickToPreview: _clickToPreview = false,
   compareContext,
   prompt,
   initialView = "single",
@@ -99,23 +100,12 @@ export function MediaHoverBox({
     [onUpload],
   );
 
-  const onSurfaceClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (!clickToPreview || !canPreview) return;
-      openPreview(e);
-    },
-    [clickToPreview, canPreview, openPreview],
-  );
-
   return (
     <>
       <div
         className={`group/media relative overflow-hidden ${
           naturalSize ? "w-full" : "h-full w-full"
-        } ${clickToPreview && canPreview ? "cursor-zoom-in" : ""} ${
-          dragOver ? "ring-2 ring-white/30" : ""
-        } ${className}`}
-        onClick={onSurfaceClick}
+        } ${dragOver ? "ring-2 ring-white/30" : ""} ${className}`}
         {...(dragDrop ?? {})}
         onDragEnter={(e) => {
           dragDrop?.onDragEnter(e);
@@ -165,31 +155,27 @@ export function MediaHoverBox({
         )}
 
         {(showUpload || canPreview) && src ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-3 bg-black/0 opacity-0 transition group-hover/media:bg-black/45 group-hover/media:opacity-100">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 opacity-0 transition group-hover/media:opacity-100">
             {showUpload ? (
               <button
                 type="button"
                 title="上传 / 替换"
+                aria-label="上传 / 替换"
                 onClick={triggerUpload}
-                className={ACTION_BTN}
+                className={OVERLAY_ICON_BTN}
               >
-                <span className={ACTION_ICON}>
-                  <Upload className="size-6" strokeWidth={1.75} />
-                </span>
-                <span className="text-[11px] font-medium text-white/90">上传</span>
+                <Upload className="size-4 pointer-events-none" strokeWidth={1.75} />
               </button>
             ) : null}
             {canPreview ? (
               <button
                 type="button"
                 title="预览大图"
+                aria-label="预览"
                 onClick={openPreview}
-                className={ACTION_BTN}
+                className={OVERLAY_ICON_BTN}
               >
-                <span className={ACTION_ICON}>
-                  <Eye className="size-6" strokeWidth={1.75} />
-                </span>
-                <span className="text-[11px] font-medium text-white/90">预览</span>
+                <Eye className="size-4 pointer-events-none" strokeWidth={1.75} />
               </button>
             ) : null}
           </div>

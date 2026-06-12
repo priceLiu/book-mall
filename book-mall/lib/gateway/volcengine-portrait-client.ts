@@ -3,12 +3,12 @@
  * 文档：https://www.volcengine.com/docs/82379/2333601 · https://www.volcengine.com/docs/82379/2333602
  */
 
-import { defaultBaseUrl } from "@/lib/gateway/model-router";
+import { resolveVolcengineArkApiRoot } from "@/lib/gateway/model-router";
 
 export type VolcenginePortraitLibrary = "virtual" | "real";
 
 function arkBase(baseUrl?: string | null): string {
-  return (baseUrl?.trim() || defaultBaseUrl("VOLCENGINE")).replace(/\/$/, "");
+  return resolveVolcengineArkApiRoot(baseUrl);
 }
 
 /** 上游路径前缀（可按官方文档调整） */

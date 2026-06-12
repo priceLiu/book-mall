@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import type { CanvasContentNodeType } from "@/lib/canvas/types";
 import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
+import { hasStoryPro2Pipeline } from "@/lib/canvas/story-pro2-workspace-layout";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO_NODE_ACCENT } from "@/lib/canvas/story-pro-node-chrome";
@@ -189,6 +190,60 @@ const STORY_PRO_PALETTE: PaletteItem[] = [
     label: "剪映 · 专业版",
     icon: <Download className="size-[18px]" />,
     hint: "导出 ZIP",
+    dividerBefore: true,
+  },
+];
+
+/** 影视专业版 2.0 · LibTV 薄卡工作流 */
+const STORY_PRO2_PALETTE: PaletteItem[] = [
+  {
+    type: "story-pro2-starter",
+    label: "影视专业 2.0 · 启动",
+    icon: <Clapperboard className="size-[18px]" />,
+    hint: "薄卡 + 检视面板",
+    dividerBefore: true,
+  },
+  {
+    type: "story-pro2-script-hub",
+    label: "故事剧本",
+    icon: <ClipboardList className="size-[18px]" />,
+    hint: "大纲 + 可行性",
+  },
+  {
+    type: "story-pro2-style",
+    label: "风格定义",
+    icon: <Palette className="size-[18px]" />,
+    hint: "锚定词 · 参考图",
+  },
+  {
+    type: "story-pro2-character",
+    label: "人物设计",
+    icon: <Users className="size-[18px]" />,
+    hint: "三视图",
+  },
+  {
+    type: "story-pro2-scene",
+    label: "场景设计",
+    icon: <MapPin className="size-[18px]" />,
+    hint: "场景资产",
+  },
+  {
+    type: "story-pro2-frame",
+    label: "分镜脚本",
+    icon: <Film className="size-[18px]" />,
+    hint: "镜号/景别/运镜",
+  },
+  {
+    type: "story-pro2-video",
+    label: "分镜视频",
+    icon: <Video className="size-[18px]" />,
+    hint: "视频 + 配音",
+  },
+  {
+    type: "jianying-export-pro2",
+    label: "剪映 · 专业版 2.0",
+    icon: <Download className="size-[18px]" />,
+    hint: "ZIP + 自动剪辑",
     dividerBefore: true,
   },
 ];
@@ -582,7 +637,9 @@ export function NodePalette({
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [dock, setDock] = useState<PaletteDock>("top");
-  const proOnly = useCanvasStore((s) => hasStoryProPipeline(s.nodes));
+  const pro2Only = useCanvasStore((s) => hasStoryPro2Pipeline(s.nodes));
+  const proOnly =
+    useCanvasStore((s) => hasStoryProPipeline(s.nodes)) && !pro2Only;
   const comicOnly = useCanvasStore((s) => hasStoryComicPipeline(s.nodes));
 
   const collapsed = dock === "right";
@@ -590,6 +647,14 @@ export function NodePalette({
   const proPaletteItems = useMemo(
     () =>
       STORY_PRO_PALETTE.map((item, i) =>
+        i === 0 ? { ...item, dividerBefore: false } : item,
+      ),
+    [],
+  );
+
+  const pro2PaletteItems = useMemo(
+    () =>
+      STORY_PRO2_PALETTE.map((item, i) =>
         i === 0 ? { ...item, dividerBefore: false } : item,
       ),
     [],
@@ -704,7 +769,13 @@ export function NodePalette({
         <div
           className="pointer-events-none fixed right-2 top-1/2 z-[100] flex -translate-y-1/2 flex-row items-center gap-1"
           role="toolbar"
-          aria-label={proOnly ? "影视专业版节点面板（右侧）" : "节点面板（右侧）"}
+          aria-label={
+            pro2Only
+              ? "影视专业版 2.0 节点面板（右侧）"
+              : proOnly
+                ? "影视专业版节点面板（右侧）"
+                : "节点面板（右侧）"
+          }
         >
           {/* 移到顶部：工具条左侧、与整列垂直居中 */}
           <div className="pointer-events-auto shrink-0 self-center rounded-full bg-[var(--canvas-surface)]/95 p-0.5 shadow-md backdrop-blur-sm">
@@ -712,7 +783,17 @@ export function NodePalette({
           </div>
           <div className="pointer-events-auto flex flex-col rounded-xl border border-white/12 bg-[var(--canvas-surface)]/90 shadow-md backdrop-blur-md">
             <div className="nodrag flex flex-col items-center gap-1 py-1.5 pl-1 pr-1">
-                {proOnly ? (
+                {pro2Only ? (
+                  <PalettePill
+                    groupLabel="影视专业 2.0"
+                    groupIcon={PALETTE_GROUPS.pro.icon}
+                    items={pro2PaletteItems}
+                    collapsed
+                    proTheme
+                    onDragStart={onDragStart}
+                    onAdd={onAdd}
+                  />
+                ) : proOnly ? (
                   <PalettePill
                     groupLabel={PALETTE_GROUPS.pro.label}
                     groupIcon={PALETTE_GROUPS.pro.icon}
@@ -763,10 +844,27 @@ export function NodePalette({
         <div
           className="pointer-events-auto relative"
           role="toolbar"
-          aria-label={proOnly ? "影视专业版节点面板" : "节点面板"}
+          aria-label={
+            pro2Only
+              ? "影视专业版 2.0 节点面板"
+              : proOnly
+                ? "影视专业版节点面板"
+                : "节点面板"
+          }
         >
           <div className="inline-flex w-fit max-w-[min(100%,calc(100vw-1.5rem))] flex-wrap items-center justify-center gap-1.5">
-            {proOnly ? (
+            {pro2Only ? (
+              <PalettePill
+                groupLabel="影视专业 2.0"
+                groupIcon={PALETTE_GROUPS.pro.icon}
+                items={pro2PaletteItems}
+                collapsed={false}
+                proTheme
+                trailing={canvasTrailing}
+                onDragStart={onDragStart}
+                onAdd={onAdd}
+              />
+            ) : proOnly ? (
               <PalettePill
                 groupLabel={PALETTE_GROUPS.pro.label}
                 groupIcon={PALETTE_GROUPS.pro.icon}

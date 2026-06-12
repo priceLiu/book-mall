@@ -1,4 +1,5 @@
 import {
+  ensureStoryboardAiVideoPromptsMd,
   stripOutlineCharacterTable,
   stripOutlineEmbeddedPackSections,
   extractCharacterSectionFromOutline,
@@ -51,7 +52,9 @@ export function resolveHubSectionMd(
 }
 
 export function resolveHubStoryboardMd(d: StoryScriptHubNodeData): string {
-  return resolveHubSectionMd(d, "storyboard");
+  return ensureStoryboardAiVideoPromptsMd(
+    resolveHubSectionMd(d, "storyboard"),
+  );
 }
 
 /** 将大纲嵌入段拆入 hub 各字段，供 syncColumnsFromHub 使用 */

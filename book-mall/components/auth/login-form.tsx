@@ -14,12 +14,21 @@ import {
   BoxReveal,
   GoogleAuthButton,
 } from "@/components/auth/animated-auth-ui";
+import { markBookMallSessionActive } from "@/lib/session-kicked-marker";
 
 function safeNextPath(raw: string | null): string {
   if (!raw) return "/account";
   const u = raw.trim();
-  if (!u.startsWith("/") || u.startsWith("//")) return "/account";
-  return u;
+  if (u.startsWith("/") && !u.startsWith("//")) return u;
+  try {
+    const parsed = new URL(u);
+    if (parsed.pathname.startsWith("/")) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return "/account";
 }
 
 export function LoginForm() {
@@ -54,6 +63,7 @@ export function LoginForm() {
         setError("登录请求失败，请清除本站 Cookie 后重试或稍后再试");
         return;
       }
+      markBookMallSessionActive();
       router.push(next);
       router.refresh();
     } catch {

@@ -15,7 +15,8 @@ canvas-web 漫剧工作流的 **固定尺寸、布局、按钮、弹层、文案
 | `NODE_DEFAULT_SIZE["story-video-column"]` | **500 × 2100** | `lib/canvas/types.ts` |
 | `NODE_DEFAULT_SIZE["story-frame-column"]` | **1080 × 2100** | 同上 |
 | `NODE_DEFAULT_SIZE["story-character-column"]` | **560 × 2100** | 同上 |
-| `NODE_DEFAULT_SIZE["jianying-export"]` | **400 × 280** | 同上 |
+| `NODE_DEFAULT_SIZE["jianying-export"]` | **400 × 780** | 同上（含云端自动剪辑区，无内滚） |
+| `NODE_DEFAULT_SIZE["jianying-export-pro"]` | **400 × 780** | 同上 |
 | `NODE_DEFAULT_SIZE["three-view-engine"]` | **670 × 880** | 同上 |
 | `NODE_THREE_VIEW_MIN_*` | 670 × 880 | `components/canvas/node-ui.tsx` |
 | `STORY_ROW_LABEL_COL_WIDTH` | **56** | `lib/canvas/story-ref-image.ts` |
@@ -786,7 +787,7 @@ Tab / 保存 / 生成：`storyEditionModalTabClass` · `storyEditionModalSaveBtn
 
 | 图标 | 场景 | 组件 | 禁止 |
 |------|------|------|------|
-| **Eye** | 悬停预览 overlay（半透明黑底居中） | 分镜 @ 宫格、资产槽、输出图预览钮 | 勿用 Search 替代宫格悬停 |
+| **Eye** | 悬停预览 overlay（**仅** `size-9` 圆形钮，无药丸底、无「预览」文案） | 分镜 @ 宫格、资产槽、输出图、`MediaHoverBox` | 勿用 Search 替代宫格悬停；禁止黑框+文字 |
 | **RefreshCw** | 生成中 **旋转**（`animate-spin`） | 输出图/视频槽中央 overlay | **禁止**用于左侧 @ 参考图列 |
 | **RefreshCw**（静态） | 重新生成钮（非 spin） | `storyEditionOverlayIconBtnClass` | — |
 | **Clapperboard** | 分镜图右下角「生视频」 | `storyEditionVideoOverlayBtnClass` | — |

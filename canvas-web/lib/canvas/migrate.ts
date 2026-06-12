@@ -121,7 +121,22 @@ function backfillNodeSize(n: LooseNode): LooseNode {
     next.height = def.height;
     changed = true;
   }
-  if (t === "story-comic-starter" || t === "story-script-hub" || t.startsWith("story-pro-") || t === "jianying-export-pro") {
+  if (t === "jianying-export" || t === "jianying-export-pro") {
+    const manual = Boolean((n.data as { manualSize?: boolean })?.manualSize);
+    if (!manual) {
+      const w = Number(next.width ?? cur.width) || def.width;
+      const h = Number(next.height ?? cur.height) || def.height;
+      if (w < def.width * 0.85 || h < def.height * 0.85) {
+        next.width = def.width;
+        next.height = def.height;
+        changed = true;
+      }
+    }
+  } else if (
+    t === "story-comic-starter" ||
+    t === "story-script-hub" ||
+    t.startsWith("story-pro-")
+  ) {
     const targetH = STORY_CONTROL_NODE_HEIGHT;
     const targetW = STORY_CONTROL_NODE_WIDTH;
     const w = Number(next.width ?? cur.width) || def.width;

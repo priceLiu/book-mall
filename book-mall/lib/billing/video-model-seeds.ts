@@ -28,9 +28,12 @@ export const VIDEO_MODEL_SEEDS: VideoModelSeed[] = [
   { canonicalModelKey: "wanxiang-video-2.7-1080p", displayName: "通义万相 2.7 视频 1080P", vendor: "aliyun", tierRaw: "1080P", listCostYuan: 0.68, discountRate: 0.1 },
   { canonicalModelKey: "wanxiang-t2v", displayName: "通义万相 文生视频", vendor: "aliyun", tierRaw: "标准", listCostYuan: 0.55, discountRate: 0.1 },
   { canonicalModelKey: "wanxiang-i2v", displayName: "通义万相 图生视频", vendor: "aliyun", tierRaw: "标准", listCostYuan: 0.58, discountRate: 0.1 },
-  // —— 火山方舟 ——
-  { canonicalModelKey: "seedance-720p", displayName: "Seedance 视频 720P", vendor: "volcengine", tierRaw: "720P", listCostYuan: 0.45, discountRate: 0.1 },
-  { canonicalModelKey: "seedance-1080p", displayName: "Seedance 视频 1080P", vendor: "volcengine", tierRaw: "1080P", listCostYuan: 0.58, discountRate: 0.1 },
+  // —— 火山方舟 Seedance 2.0（官方 2026-06：纯生成 46元/百万tokens，约 1元/秒@15s）——
+  { canonicalModelKey: "seedance-2.0-720p-real", displayName: "Seedance 2.0 720P 真人", vendor: "volcengine", tierRaw: "720P", listCostYuan: 0.99, discountRate: 0.1 },
+  { canonicalModelKey: "seedance-2.0-1080p-real", displayName: "Seedance 2.0 1080P 真人", vendor: "volcengine", tierRaw: "1080P", listCostYuan: 1.2, discountRate: 0.1 },
+  { canonicalModelKey: "seedance-2.0-fast-720p-real", displayName: "Seedance 2.0 Fast 720P", vendor: "volcengine", tierRaw: "720P", listCostYuan: 0.8, discountRate: 0.1 },
+  { canonicalModelKey: "seedance-720p", displayName: "Seedance 视频 720P", vendor: "volcengine", tierRaw: "720P", listCostYuan: 0.99, discountRate: 0.1 },
+  { canonicalModelKey: "seedance-1080p", displayName: "Seedance 视频 1080P", vendor: "volcengine", tierRaw: "1080P", listCostYuan: 1.2, discountRate: 0.1 },
   { canonicalModelKey: "seedance-pro-720p", displayName: "Seedance Pro 720P", vendor: "volcengine", tierRaw: "720P", listCostYuan: 0.52, discountRate: 0.1 },
   { canonicalModelKey: "seedance-pro-1080p", displayName: "Seedance Pro 1080P", vendor: "volcengine", tierRaw: "1080P", listCostYuan: 0.65, discountRate: 0.1 },
   { canonicalModelKey: "jimeng-video", displayName: "即梦 视频生成", vendor: "volcengine", tierRaw: "标准", listCostYuan: 0.5, discountRate: 0.08 },

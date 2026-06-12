@@ -1,0 +1,176 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { ImagePlus, X } from "lucide-react";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { uploadCanvasImage } from "@/lib/canvas-api";
+import { useImagePasteWhenActive } from "@/lib/canvas/image-upload-handlers";
+import { spawnPro2DockPastedImages } from "@/lib/canvas/spawn-pro2-dock-paste-images";
+import { useCanvasStore } from "@/lib/canvas/store";
+import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
+import {
+  PRO2_DOCK_ACTIVE_REF_BORDER_CLASS,
+  PRO2_DOCK_REF_IDLE_BORDER_CLASS,
+} from "@/lib/canvas/dock-active-ref-chrome";
+import { cn } from "@/lib/utils";
+
+export type Pro2DockRefImagesProps = {
+  refs: StoryRefImage[];
+  onChange: (next: StoryRefImage[]) => void;
+  disabled?: boolean;
+  pasteActive?: boolean;
+  maxCount?: number;
+  activeIds?: string[];
+  /** 设置后：上传/粘贴会在锚点左侧生成图片节点并连线（多图） */
+  spawnAnchor?: { nodeId: string; nodeType: string };
+};
+
+/** 输入坞 · 参考图 chip 行（粘贴 / 上传） */
+export function Pro2DockRefImages({
+  refs,
+  onChange,
+  disabled,
+  pasteActive = true,
+  maxCount = 6,
+  activeIds = [],
+  spawnAnchor,
+}: Pro2DockRefImagesProps) {
+  const base = useBookMallBaseUrl();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pasteZoneActive, setPasteZoneActive] = useState(false);
+  const addNode = useCanvasStore((s) => s.addNode);
+  const setEdges = useCanvasStore((s) => s.setEdges);
+  const setNodes = useCanvasStore((s) => s.setNodes);
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+
+  const spawnFiles = useCallback(
+    async (files: File[]) => {
+      if (disabled || !base || !spawnAnchor || !files.length) return;
+      const state = useCanvasStore.getState();
+      await spawnPro2DockPastedImages({
+        anchorNodeId: spawnAnchor.nodeId,
+        anchorNodeType: spawnAnchor.nodeType,
+        files,
+        base,
+        nodes: state.nodes,
+        edges: state.edges,
+        addNode,
+        setEdges,
+        updateNodeData,
+        setNodes,
+        maxCount: maxCount,
+      });
+    },
+    [
+      base,
+      disabled,
+      spawnAnchor,
+      addNode,
+      setEdges,
+      setNodes,
+      updateNodeData,
+      maxCount,
+    ],
+  );
+
+  const addRefFiles = useCallback(
+    async (files: File[]) => {
+      if (disabled || !base) return;
+      if (spawnAnchor) {
+        await spawnFiles(files);
+        return;
+      }
+      const images = files.filter((f) => f.type.startsWith("image/"));
+      const room = maxCount - refs.length;
+      if (!images.length || room <= 0) return;
+      const added: StoryRefImage[] = [];
+      for (const file of images.slice(0, room)) {
+        const url = await uploadCanvasImage(base, file);
+        added.push({
+          id: `ref-dock-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          label: file.name.replace(/\.[^.]+$/, "") || "参考图",
+          url,
+        });
+      }
+      onChange([...refs, ...added]);
+    },
+    [base, disabled, spawnAnchor, spawnFiles, maxCount, refs, onChange],
+  );
+
+  useImagePasteWhenActive(
+    Boolean(pasteActive && pasteZoneActive && !disabled && !spawnAnchor),
+    { onFiles: (files) => void addRefFiles(files) },
+    true,
+    "pro2-dock-ref",
+  );
+
+  return (
+    <div
+      className="pro2-dock-ref-zone nodrag flex flex-wrap items-center gap-1.5"
+      onMouseEnter={() => setPasteZoneActive(true)}
+      onMouseLeave={() => setPasteZoneActive(false)}
+      onFocusCapture={() => setPasteZoneActive(true)}
+      onBlurCapture={() => setPasteZoneActive(false)}
+    >
+      {refs.map((ref) => (
+        <div
+          key={ref.id}
+          className={cn(
+            "group relative size-9 overflow-hidden rounded-lg border-2 bg-white/[0.04] transition-shadow",
+            activeIds.includes(ref.id)
+              ? PRO2_DOCK_ACTIVE_REF_BORDER_CLASS
+              : PRO2_DOCK_REF_IDLE_BORDER_CLASS,
+          )}
+          title={ref.label}
+        >
+          {ref.url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={ref.url}
+              alt={ref.label}
+              className="size-full object-cover"
+            />
+          ) : (
+            <div className="flex size-full items-center justify-center text-[9px] text-white/40">
+              图
+            </div>
+          )}
+          <button
+            type="button"
+            className="absolute right-0 top-0 flex size-4 items-center justify-center bg-black/65 text-white/90 opacity-0 transition group-hover:opacity-100"
+            onClick={() => onChange(refs.filter((r) => r.id !== ref.id))}
+            disabled={disabled}
+          >
+            <X className="size-2.5" />
+          </button>
+        </div>
+      ))}
+      {spawnAnchor || refs.length < maxCount ? (
+        <button
+          type="button"
+          className={cn(
+            "flex size-9 items-center justify-center rounded-lg border border-dashed border-white/[0.1] text-white/40 transition hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/70",
+            disabled && "cursor-not-allowed opacity-40",
+          )}
+          title={spawnAnchor ? "上传或粘贴参考图（生成左侧图片节点）" : "上传或粘贴参考图"}
+          disabled={disabled}
+          onClick={() => inputRef.current?.click()}
+        >
+          <ImagePlus className="size-4" />
+        </button>
+      ) : null}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          void addRefFiles(files);
+        }}
+      />
+    </div>
+  );
+}

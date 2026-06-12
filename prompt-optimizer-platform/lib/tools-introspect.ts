@@ -56,7 +56,8 @@ async function fetchToolsSessionCore(bearer: string): Promise<{
       const memberNeedsHttp =
         jwt.tier !== "admin" &&
         (!jwt.toolsNavKeys || jwt.toolsNavKeys.length === 0);
-      if (!memberNeedsHttp) {
+      const needsSessionVersionCheck = jwt.sv != null;
+      if (!memberNeedsHttp && !needsSessionVersionCheck) {
         const tools_nav_keys =
           jwt.tier === "admin" ? suiteKeys : (jwt.toolsNavKeys ?? []);
         return {

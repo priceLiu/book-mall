@@ -29,6 +29,7 @@ export default async function DashboardModelsPage() {
   const tabGroups: Record<ModelTab, CatalogGroup[]> = catalog?.tabs ?? {
     text: catalog?.groups ?? [],
     image: [],
+    video: [],
     function: [],
   };
 

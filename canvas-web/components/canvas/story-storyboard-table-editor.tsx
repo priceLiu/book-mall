@@ -5,8 +5,12 @@ import { Plus, Trash2 } from "lucide-react";
 
 import {
   formatStoryboardTableMarkdown,
+  isProStoryboardTableMd,
   parseStoryboardRows,
+  type StoryboardTableRow as ParsedStoryboardRow,
 } from "@/lib/canvas/parse-md-tables";
+
+export type StoryboardTableRow = ParsedStoryboardRow;
 import {
   storyMdTableWrapperClass,
   storyMdTdClass,
@@ -14,22 +18,8 @@ import {
 } from "@/lib/canvas/story-md-table-chrome";
 import { storyTableTextareaRows } from "@/lib/canvas/story-table-textarea-rows";
 
-export type StoryboardTableRow = {
-  frameIndex: number;
-  scene: string;
-  description: string;
-  dialogue: string;
-  videoPrompt: string;
-};
-
 export function storyboardRowsFromMd(md: string): StoryboardTableRow[] {
-  return parseStoryboardRows(md).map((r) => ({
-    frameIndex: r.frameIndex,
-    scene: r.scene,
-    description: r.description,
-    dialogue: r.dialogue,
-    videoPrompt: r.videoPrompt,
-  }));
+  return parseStoryboardRows(md);
 }
 
 export function canEditStoryboardAsTable(md: string): boolean {
@@ -41,7 +31,7 @@ export function canEditStoryboardAsTable(md: string): boolean {
 const FIELD =
   "block w-full min-h-[2.75rem] resize-y border-0 bg-transparent outline-none ring-0 whitespace-pre-wrap break-words placeholder:text-neutral-400 focus:bg-amber-50/50";
 
-/** 与角色设定表同款的 GFM 分镜编辑表 */
+/** 专业版 8 列分镜编辑表（与 story-pro-script-pack 表头一致） */
 export function StoryStoryboardTableEditor({
   value,
   onChange,
@@ -50,17 +40,40 @@ export function StoryStoryboardTableEditor({
   onChange: (md: string) => void;
 }) {
   const rows = useMemo(() => storyboardRowsFromMd(value), [value]);
+  const useProFormat = useMemo(
+    () => isProStoryboardTableMd(value) || rows.length > 0,
+    [value, rows.length],
+  );
   const variant = "editor" as const;
   const TABLE = storyMdTableWrapperClass(variant);
   const TH = storyMdThClass(variant);
   const TD = `${storyMdTdClass(variant)} p-0`;
 
   const commit = (next: StoryboardTableRow[]) => {
-    onChange(formatStoryboardTableMarkdown(next));
+    onChange(
+      formatStoryboardTableMarkdown(next, {
+        format: useProFormat ? "pro" : "legacy",
+      }),
+    );
   };
 
   const patchRow = (index: number, patch: Partial<StoryboardTableRow>) => {
-    commit(rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+    commit(
+      rows.map((r, i) =>
+        i === index
+          ? {
+              ...r,
+              ...patch,
+              videoPrompt:
+                patch.aiVideoPrompt !== undefined
+                  ? patch.aiVideoPrompt
+                  : patch.videoPrompt !== undefined
+                    ? patch.videoPrompt
+                    : r.videoPrompt,
+            }
+          : r,
+      ),
+    );
   };
 
   const addRow = () => {
@@ -71,8 +84,13 @@ export function StoryStoryboardTableEditor({
       {
         frameIndex: nextIndex,
         scene: "",
+        shotSize: "",
+        cameraMove: "",
         description: "",
         dialogue: "—",
+        duration: "",
+        aiVideoPrompt: "",
+        lipSyncNote: "",
         videoPrompt: "",
       },
     ]);
@@ -91,25 +109,31 @@ export function StoryStoryboardTableEditor({
   return (
     <div className="nodrag flex min-h-0 w-full flex-1 flex-col gap-3">
       <p className="text-[12px] text-neutral-500">
-        点击单元格编辑，版式与右侧原稿一致；可拖曳右下角调整单元格高度。
+        点击单元格编辑；表头与专业版制作包一致，保存不丢列。
       </p>
       <div className="overflow-x-auto overflow-y-visible">
         <table className={TABLE}>
           <colgroup>
-            <col className="w-[56px]" />
-            <col className="min-w-[120px]" />
-            <col className="min-w-[280px]" />
-            <col className="min-w-[160px]" />
+            <col className="w-[52px]" />
+            <col className="min-w-[72px]" />
+            <col className="min-w-[72px]" />
+            <col className="min-w-[220px]" />
             <col className="min-w-[140px]" />
+            <col className="w-[64px]" />
+            <col className="min-w-[180px]" />
+            <col className="min-w-[120px]" />
             <col className="w-9" />
           </colgroup>
           <thead>
             <tr>
               <th className={TH}>镜号</th>
-              <th className={TH}>场景</th>
+              <th className={TH}>景别</th>
+              <th className={TH}>运镜</th>
               <th className={TH}>画面描述</th>
-              <th className={TH}>台词</th>
-              <th className={TH}>视频提示</th>
+              <th className={TH}>对白</th>
+              <th className={TH}>时长(秒)</th>
+              <th className={TH}>AI视频提示词</th>
+              <th className={TH}>口型/配音</th>
               <th className={`${TH} w-9 px-0`} aria-hidden />
             </tr>
           </thead>
@@ -118,7 +142,7 @@ export function StoryStoryboardTableEditor({
               <tr key={`${row.frameIndex}-${index}`}>
                 <td className={TD}>
                   <input
-                    className={`${FIELD} px-3 py-2 text-center text-[15px]`}
+                    className={`${FIELD} px-2 py-2 text-center text-[15px]`}
                     type="number"
                     min={1}
                     value={row.frameIndex}
@@ -131,15 +155,27 @@ export function StoryStoryboardTableEditor({
                 </td>
                 <td className={TD}>
                   <textarea
-                    className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed`}
-                    rows={storyTableTextareaRows(row.scene, 2, 10)}
-                    value={row.scene}
-                    onChange={(e) => patchRow(index, { scene: e.target.value })}
+                    className={`${FIELD} px-3 py-2 text-[14px] leading-relaxed`}
+                    rows={storyTableTextareaRows(row.shotSize, 2, 8)}
+                    value={row.shotSize}
+                    onChange={(e) =>
+                      patchRow(index, { shotSize: e.target.value })
+                    }
                   />
                 </td>
                 <td className={TD}>
                   <textarea
-                    className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed`}
+                    className={`${FIELD} px-3 py-2 text-[14px] leading-relaxed`}
+                    rows={storyTableTextareaRows(row.cameraMove, 2, 8)}
+                    value={row.cameraMove}
+                    onChange={(e) =>
+                      patchRow(index, { cameraMove: e.target.value })
+                    }
+                  />
+                </td>
+                <td className={TD}>
+                  <textarea
+                    className={`${FIELD} px-3 py-2 text-[14px] leading-relaxed`}
                     rows={storyTableTextareaRows(row.description, 5, 18)}
                     value={row.description}
                     onChange={(e) =>
@@ -149,7 +185,7 @@ export function StoryStoryboardTableEditor({
                 </td>
                 <td className={TD}>
                   <textarea
-                    className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed`}
+                    className={`${FIELD} px-3 py-2 text-[14px] leading-relaxed`}
                     rows={storyTableTextareaRows(row.dialogue, 3, 12)}
                     value={row.dialogue}
                     onChange={(e) =>
@@ -158,12 +194,36 @@ export function StoryStoryboardTableEditor({
                   />
                 </td>
                 <td className={TD}>
-                  <textarea
-                    className={`${FIELD} px-4 py-2.5 text-[15px] leading-relaxed`}
-                    rows={storyTableTextareaRows(row.videoPrompt, 2, 10)}
-                    value={row.videoPrompt}
+                  <input
+                    className={`${FIELD} px-2 py-2 text-center text-[14px]`}
+                    type="text"
+                    inputMode="numeric"
+                    value={row.duration}
                     onChange={(e) =>
-                      patchRow(index, { videoPrompt: e.target.value })
+                      patchRow(index, { duration: e.target.value })
+                    }
+                  />
+                </td>
+                <td className={TD}>
+                  <textarea
+                    className={`${FIELD} px-3 py-2 text-[14px] leading-relaxed`}
+                    rows={storyTableTextareaRows(row.aiVideoPrompt, 2, 12)}
+                    value={row.aiVideoPrompt}
+                    onChange={(e) =>
+                      patchRow(index, {
+                        aiVideoPrompt: e.target.value,
+                        videoPrompt: e.target.value,
+                      })
+                    }
+                  />
+                </td>
+                <td className={TD}>
+                  <textarea
+                    className={`${FIELD} px-3 py-2 text-[14px] leading-relaxed`}
+                    rows={storyTableTextareaRows(row.lipSyncNote, 2, 8)}
+                    value={row.lipSyncNote}
+                    onChange={(e) =>
+                      patchRow(index, { lipSyncNote: e.target.value })
                     }
                   />
                 </td>

@@ -32,6 +32,12 @@ import {
   buildSilentReEnterHref,
   shouldAttemptSilentSso,
 } from "@/lib/tools-silent-sso";
+import {
+  introspectSessionRevoked,
+  SESSION_KICKED_MESSAGE,
+} from "@/lib/session-revoked";
+
+const SESSION_POLL_MS = 60_000;
 
 export type { ToolShellSession } from "@/lib/tool-shell-session-types";
 
@@ -311,6 +317,8 @@ export function ToolShellClient({
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<ToolShellSession>(GUEST_TOOL_SHELL_SESSION);
   const [hasTokenCookie, setHasTokenCookie] = useState(false);
+  const [sessionRevokedOpen, setSessionRevokedOpen] = useState(false);
+  const sessionRevokedShownRef = useRef(false);
 
   const entitledNavEntries = useMemo(
     () =>
@@ -346,6 +354,35 @@ export function ToolShellClient({
   useEffect(() => {
     void loadSession();
   }, [loadSession]);
+
+  useEffect(() => {
+    if (!session.active || loading) return;
+    const poll = async () => {
+      if (sessionRevokedShownRef.current) return;
+      try {
+        const r = await fetch("/api/tools-session", {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        const raw = await r.json().catch(() => null);
+        const data = parseToolsSessionPayload(raw);
+        if (data.active) return;
+        if (
+          !introspectSessionRevoked(
+            data.introspect as Record<string, unknown> | null,
+          )
+        ) {
+          return;
+        }
+        sessionRevokedShownRef.current = true;
+        setSessionRevokedOpen(true);
+      } catch {
+        /* ignore */
+      }
+    };
+    const id = window.setInterval(() => void poll(), SESSION_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [session.active, loading]);
 
   /** Phase B：无 token 时自动跳转主站 re-enter（一次）。 */
   const silentAttemptedRef = useRef(false);
@@ -627,6 +664,37 @@ export function ToolShellClient({
           </main>
         </div>
       </div>
+      {sessionRevokedOpen ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="tool-session-revoked-title"
+        >
+          <div className="w-full max-w-md rounded-xl border border-white/10 bg-[hsl(222_40%_14%)] p-6 text-white shadow-lg">
+            <h2 id="tool-session-revoked-title" className="text-lg font-semibold">
+              账号已在别处登录
+            </h2>
+            <p className="mt-3 text-sm text-white/75">{SESSION_KICKED_MESSAGE}</p>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                className="rounded-md bg-white/15 px-4 py-2 text-sm font-medium hover:bg-white/20"
+                onClick={() => {
+                  setSessionRevokedOpen(false);
+                  if (renewHref) {
+                    window.location.href = renewHref;
+                  } else if (mainHref) {
+                    window.location.href = mainHref;
+                  }
+                }}
+              >
+                重新连接
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </ToolsSessionContext.Provider>
   );
 }

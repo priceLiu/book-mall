@@ -380,9 +380,64 @@ export async function saveStoryboardDeliverableSnapshot(
   };
 }
 
+export type MediaRenderJobDto = {
+  id: string;
+  status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "EXPIRED";
+  progress: number;
+  downloadUrl: string | null;
+  expiresAt: string;
+  errorMessage: string | null;
+};
+
+export async function renderStoryboardPanelVideos(
+  projectId: string,
+): Promise<MediaRenderJobDto> {
+  const data = await ecomBookFetch(
+    `api/sso/tools/ecom/storyboard/projects/${projectId}/video/render`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    },
+  );
+  return data.job as MediaRenderJobDto;
+}
+
+export async function pollMediaRenderJob(
+  jobId: string,
+): Promise<MediaRenderJobDto> {
+  const data = await ecomBookFetch(
+    `api/sso/tools/media/render/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+  return data.job as MediaRenderJobDto;
+}
+
+export async function waitStoryboardMediaRender(
+  jobId: string,
+  opts?: { intervalMs?: number; timeoutMs?: number },
+): Promise<MediaRenderJobDto> {
+  const intervalMs = opts?.intervalMs ?? 2000;
+  const timeoutMs = opts?.timeoutMs ?? 15 * 60 * 1000;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const job = await pollMediaRenderJob(jobId);
+    if (
+      job.status === "SUCCEEDED" ||
+      job.status === "FAILED" ||
+      job.status === "EXPIRED"
+    ) {
+      return job;
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error("云端剪辑超时，请稍后重试");
+}
+
+/** @deprecated 请改用 renderStoryboardPanelVideos */
 export async function mergeStoryboardPanelVideos(
   projectId: string,
-): Promise<{ assetId: string; ossUrl: string }> {
+): Promise<{ assetId: string | null; ossUrl: string; expiresAt?: string; jobId?: string }> {
   const data = await ecomBookFetch(
     `api/sso/tools/ecom/storyboard/projects/${projectId}/video/merge`,
     {
@@ -391,6 +446,11 @@ export async function mergeStoryboardPanelVideos(
       body: JSON.stringify({}),
     },
   );
-  const asset = data.asset as { id: string };
-  return { assetId: asset.id, ossUrl: data.ossUrl as string };
+  const asset = data.asset as { id: string } | null;
+  return {
+    assetId: asset?.id ?? null,
+    ossUrl: data.ossUrl as string,
+    expiresAt: data.expiresAt as string | undefined,
+    jobId: data.jobId as string | undefined,
+  };
 }

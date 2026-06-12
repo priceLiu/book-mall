@@ -3,6 +3,7 @@
 import { Handle, NodeResizer, Position } from "@xyflow/react";
 import { AlertTriangle, Check, GripVertical, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCanvasNodeEmbedded } from "@/lib/canvas/canvas-node-embedded-context";
 import { RF_NODE_DRAG_HANDLE, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { STORY_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-node-chrome";
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
@@ -23,6 +24,12 @@ export type NodeShellProps = {
   /** Resizer 尺寸下限 */
   minWidth?: number;
   minHeight?: number;
+  /** 加大拖角（剪映导出等较高节点） */
+  largeResizer?: boolean;
+  /** 剪映导出：更大拖角与热区，避免难抓取 */
+  jianyingResizer?: boolean;
+  /** 内容区不出现内滚（剪映导出等固定高度节点） */
+  bodyNoScroll?: boolean;
   children: React.ReactNode;
   footer?: React.ReactNode;
   /** 传入时替换默认 StatusBadge（用于引擎节点自定义标题栏右侧） */
@@ -56,6 +63,9 @@ export function NodeShell({
   engine,
   minWidth = 240,
   minHeight = 160,
+  largeResizer = false,
+  jianyingResizer = false,
+  bodyNoScroll = false,
   children,
   footer,
   headerRight,
@@ -64,6 +74,7 @@ export function NodeShell({
   footerClassName,
   disableGeneratingChrome = false,
 }: NodeShellProps) {
+  const embedded = useCanvasNodeEmbedded();
   const status = runtime?.status ?? "idle";
   const isGenerating =
     !disableGeneratingChrome &&
@@ -95,19 +106,37 @@ export function NodeShell({
             : undefined,
       }}
     >
-      <NodeResizer
-        isVisible={selected}
-        minWidth={minWidth}
-        minHeight={minHeight}
-        color={tint}
-        lineStyle={{ borderColor: tint, opacity: 0.6 }}
-        handleStyle={{ background: tint, border: "none", width: 8, height: 8 }}
-      />
+      {!embedded ? (
+        <NodeResizer
+          isVisible={selected}
+          minWidth={minWidth}
+          minHeight={minHeight}
+          color={tint}
+          lineStyle={{
+            borderColor: tint,
+            opacity: jianyingResizer ? 0.9 : 0.75,
+            borderWidth: jianyingResizer ? 3 : largeResizer ? 2 : 1,
+          }}
+          handleClassName={jianyingResizer ? "jianying-node-resizer-handle" : undefined}
+          handleStyle={
+            jianyingResizer
+              ? undefined
+              : {
+                  background: tint,
+                  border: "2px solid rgba(0,0,0,0.35)",
+                  width: largeResizer ? 14 : 8,
+                  height: largeResizer ? 14 : 8,
+                  borderRadius: largeResizer ? 3 : 2,
+                }
+          }
+        />
+      ) : null}
 
       <header
         className={cn(
-          RF_NODE_DRAG_HANDLE,
-          "shrink-0 flex cursor-grab items-center justify-between gap-2 rounded-t-xl border-b px-2 py-2 active:cursor-grabbing",
+          !embedded && RF_NODE_DRAG_HANDLE,
+          "shrink-0 flex items-center justify-between gap-2 rounded-t-xl border-b px-2 py-2",
+          !embedded && "cursor-grab active:cursor-grabbing",
           engine ? "" : "border-white/10 bg-white/[0.04]",
         )}
         style={
@@ -153,7 +182,9 @@ export function NodeShell({
               : bodyScroll
                 ? cn("min-h-0 flex-1 overflow-y-auto py-3", RF_NODE_SCROLL)
                 : "min-h-0 flex-1 overflow-hidden py-3"
-            : cn("min-h-0 flex-1 overflow-auto py-3", RF_NODE_SCROLL),
+            : bodyNoScroll
+              ? "min-h-0 flex-1 overflow-visible py-3"
+              : cn("min-h-0 flex-1 overflow-auto py-3", RF_NODE_SCROLL),
         )}
       >
         {children}
@@ -165,34 +196,38 @@ export function NodeShell({
         </div>
       ) : null}
 
-      {inputs.map((p, i) => (
-        <Handle
-          key={`in-${p.id}`}
-          id={p.id}
-          type="target"
-          position={Position.Left}
-          className={cn(
-            "!h-3 !w-3 !rounded-full !border-2 !border-[var(--canvas-bg)]",
-            KIND_COLOR[p.kind],
-          )}
-          style={{ top: 24 + (inputs.length === 1 ? 24 : i * 22) }}
-          title={`${p.label} (${p.kind})`}
-        />
-      ))}
-      {outputs.map((p, i) => (
-        <Handle
-          key={`out-${p.id}`}
-          id={p.id}
-          type="source"
-          position={Position.Right}
-          className={cn(
-            "!h-3 !w-3 !rounded-full !border-2 !border-[var(--canvas-bg)]",
-            KIND_COLOR[p.kind],
-          )}
-          style={{ top: 24 + (outputs.length === 1 ? 24 : i * 22) }}
-          title={`${p.label} (${p.kind})`}
-        />
-      ))}
+      {!embedded
+        ? inputs.map((p, i) => (
+            <Handle
+              key={`in-${p.id}`}
+              id={p.id}
+              type="target"
+              position={Position.Left}
+              className={cn(
+                "!h-3 !w-3 !rounded-full !border-2 !border-[var(--canvas-bg)]",
+                KIND_COLOR[p.kind],
+              )}
+              style={{ top: 24 + (inputs.length === 1 ? 24 : i * 22) }}
+              title={`${p.label} (${p.kind})`}
+            />
+          ))
+        : null}
+      {!embedded
+        ? outputs.map((p, i) => (
+            <Handle
+              key={`out-${p.id}`}
+              id={p.id}
+              type="source"
+              position={Position.Right}
+              className={cn(
+                "!h-3 !w-3 !rounded-full !border-2 !border-[var(--canvas-bg)]",
+                KIND_COLOR[p.kind],
+              )}
+              style={{ top: 24 + (outputs.length === 1 ? 24 : i * 22) }}
+              title={`${p.label} (${p.kind})`}
+            />
+          ))
+        : null}
     </div>
   );
 }

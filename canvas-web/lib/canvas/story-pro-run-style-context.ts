@@ -21,15 +21,17 @@ function resolveScriptHubIdForProNode(
   for (const e of edges) {
     if (e.target !== node.id) continue;
     const src = nodes.find((n) => n.id === e.source);
-    if (src?.type === "story-pro-script-hub") return src.id;
-    if (src?.type === "story-pro-style") {
+    if (src?.type === "story-pro-script-hub" || src?.type === "story-pro2-script-hub") {
+      return src.id;
+    }
+    if (src?.type === "story-pro-style" || src?.type === "story-pro2-style") {
       const hubId = (src.data as { hubNodeId?: string }).hubNodeId;
       if (hubId) return hubId;
     }
   }
 
   for (const n of nodes) {
-    if (n.type !== "story-pro-starter") continue;
+    if (n.type !== "story-pro-starter" && n.type !== "story-pro2-starter") continue;
     const ws = (
       n.data as { workspaceIds?: { scriptHubId?: string } & Record<string, string> }
     ).workspaceIds;
@@ -45,8 +47,18 @@ export function resolveStoryProRunStylePayload(
   edges: CanvasFlowEdge[],
   node: CanvasFlowNode,
 ): StoryProRunStylePayload {
-  if (!node.type?.startsWith("story-pro-")) return {};
-  if (node.type === "story-pro-style" || node.type === "story-pro-script-hub") {
+  if (
+    !node.type?.startsWith("story-pro-") &&
+    !node.type?.startsWith("story-pro2-")
+  ) {
+    return {};
+  }
+  if (
+    node.type === "story-pro-style" ||
+    node.type === "story-pro2-style" ||
+    node.type === "story-pro-script-hub" ||
+    node.type === "story-pro2-script-hub"
+  ) {
     return {};
   }
 

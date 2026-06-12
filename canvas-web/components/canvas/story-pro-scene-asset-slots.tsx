@@ -183,8 +183,10 @@ export function StoryProSceneAssetSlots({
       pasteLeaveTimerRef.current = null;
     }
     setActiveKind(kind);
-    activateImagePasteTarget(pasteTargetId(kind), (file) => {
-      void uploadFileToKind(kind, file);
+    activateImagePasteTarget(pasteTargetId(kind), {
+      onFile: (file) => {
+        void uploadFileToKind(kind, file);
+      },
     });
   };
 

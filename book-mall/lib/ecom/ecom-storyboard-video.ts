@@ -1,12 +1,5 @@
 import { randomUUID } from "crypto";
-import { execFile } from "child_process";
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
-import { promisify } from "util";
 import type { Prisma } from "@prisma/client";
-
-const execFileAsync = promisify(execFile);
 
 import { prisma } from "@/lib/prisma";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
@@ -724,105 +717,38 @@ export async function ecomMergeStoryboardPanelVideos(opts: {
 }) {
   await assertEcomToolkitGatewayAccess(opts.userId);
   const sheet = storyboardSheetSchema.parse(opts.sheet);
-  const urls = sheet.panels
-    .slice()
-    .sort((a, b) => a.index - b.index)
-    .map((p) => p.videoUrl?.trim())
-    .filter((u): u is string => Boolean(u && /^https?:\/\//.test(u)));
+  const { MediaRenderSourceApp } = await import("@prisma/client");
+  const { fromEcomStoryboardSheet } = await import("@/lib/media/timeline-adapters");
+  const {
+    createMediaRenderJob,
+    processMediaRenderJob,
+    waitForMediaRenderJob,
+  } = await import("@/lib/media/media-render-service");
+  const { DEFAULT_RENDER_PROFILE } = await import("@/lib/media/timeline-types");
 
-  if (urls.length < 2) {
+  const timeline = fromEcomStoryboardSheet(sheet);
+  if (timeline.clips.length < 2) {
     throw new Error("请至少为 2 个镜头生成分镜视频后再合并");
   }
 
-  const tmp = await mkdtemp(join(tmpdir(), "ecom-sb-merge-"));
-  try {
-    const partPaths: string[] = [];
-    for (let i = 0; i < urls.length; i++) {
-      const res = await fetch(urls[i]!);
-      if (!res.ok) throw new Error(`下载镜头视频失败 HTTP ${res.status}`);
-      const p = join(tmp, `part-${i}.mp4`);
-      await writeFile(p, Buffer.from(await res.arrayBuffer()));
-      partPaths.push(p);
-    }
+  const job = await createMediaRenderJob({
+    userId: opts.userId,
+    sourceApp: MediaRenderSourceApp.ecom,
+    sourceRef: { projectId: opts.projectId, title: opts.title ?? sheet.overview.title },
+    timeline,
+    profile: DEFAULT_RENDER_PROFILE,
+  });
 
-    const listPath = join(tmp, "concat.txt");
-    const listBody = partPaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n");
-    await writeFile(listPath, listBody);
-    const outPath = join(tmp, "merged.mp4");
-
-    try {
-      await execFileAsync("ffmpeg", [
-        "-y",
-        "-f",
-        "concat",
-        "-safe",
-        "0",
-        "-i",
-        listPath,
-        "-c",
-        "copy",
-        outPath,
-      ]);
-    } catch {
-      throw new Error("合并视频需要服务器安装 ffmpeg，请联系管理员或改用「整图成片」模式");
-    }
-
-    const mergedBuf = await readFile(outPath);
-    const ossUrl = await uploadCanvasUserBuffer({
-      userId: opts.userId,
-      ext: "mp4",
-      buf: mergedBuf,
-      contentType: "video/mp4",
-    });
-
-    const asset = await prisma.ecomAsset.create({
-      data: {
-        userId: opts.userId,
-        module: ECOM_STORYBOARD_MODULE,
-        kind: "video",
-        title: (opts.title ?? sheet.overview.title).slice(0, 80),
-        prompt: "merged panel videos",
-        ossUrl,
-        meta: {
-          projectId: opts.projectId,
-          kind: "merged_panel_video",
-          panelCount: urls.length,
-        },
-      },
-    });
-
-    const existing = await prisma.ecomStoryboardProject.findFirst({
-      where: { id: opts.projectId },
-      select: { meta: true },
-    });
-    const prevMeta = (existing?.meta as Record<string, unknown> | null) ?? {};
-
-    await prisma.ecomStoryboardProject.update({
-      where: { id: opts.projectId },
-      data: {
-        status: "done",
-        videoAssetId: asset.id,
-        meta: {
-          ...prevMeta,
-          workflow: {
-            ...((prevMeta.workflow as Record<string, unknown> | undefined) ?? {}),
-            phase: "done",
-            videoMode: "merged_panels",
-          },
-        } as Prisma.InputJsonValue,
-      },
-    });
-
-    await persistStoryboardDeliverableSnapshot({
-      userId: opts.userId,
-      projectId: opts.projectId,
-      videoUrl: ossUrl,
-      videoAssetId: asset.id,
-      videoMode: "merged_panels",
-    }).catch(() => undefined);
-
-    return { asset, ossUrl };
-  } finally {
-    await rm(tmp, { recursive: true, force: true }).catch(() => undefined);
+  await processMediaRenderJob(job.id);
+  const dto = await waitForMediaRenderJob(job.id);
+  if (dto.status !== "SUCCEEDED" || !dto.downloadUrl) {
+    throw new Error(dto.errorMessage ?? "视频合并失败");
   }
+
+  return {
+    jobId: dto.id,
+    ossUrl: dto.downloadUrl,
+    expiresAt: dto.expiresAt,
+    asset: null as { id: string } | null,
+  };
 }

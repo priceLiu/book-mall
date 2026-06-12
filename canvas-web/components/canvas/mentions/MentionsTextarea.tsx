@@ -10,10 +10,13 @@ import {
   useState,
   type KeyboardEvent,
   type ChangeEvent,
+  type ClipboardEventHandler,
   type CSSProperties,
+  type KeyboardEventHandler,
 } from "react";
 
 import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
+import { getTextareaCaretClientRect } from "@/lib/canvas/textarea-caret-rect";
 import { MentionPickerPortal } from "./mention-picker-portal";
 
 export type MentionableItem = {
@@ -41,6 +44,10 @@ export type MentionsTextareaProps = {
   fillHeight?: boolean;
   onBlur?: () => void;
   autoFocus?: boolean;
+  onPaste?: ClipboardEventHandler<HTMLTextAreaElement>;
+  onKeyDownCapture?: KeyboardEventHandler<HTMLTextAreaElement>;
+  mentionPickerTitle?: string;
+  mentionPickerEmptyHint?: string;
 };
 
 const TOKEN_RE = /@<([^>\s]+)>/g;
@@ -112,6 +119,10 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       fillHeight = false,
       onBlur,
       autoFocus,
+      onPaste,
+      onKeyDownCapture,
+      mentionPickerTitle,
+      mentionPickerEmptyHint = "暂无已生成的角色图，请先在角色列生成。",
     },
     ref,
   ) {
@@ -122,6 +133,18 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [popoverFilter, setPopoverFilter] = useState("");
     const [popoverIndex, setPopoverIndex] = useState(0);
+    const [anchorTick, setAnchorTick] = useState(0);
+
+    const getMentionAnchorRect = useCallback(() => {
+      const el = innerRef.current;
+      if (!el) return null;
+      const pos =
+        mentionAnchorRef.current?.cursor ??
+        el.selectionStart ??
+        el.selectionEnd ??
+        0;
+      return getTextareaCaretClientRect(el, pos);
+    }, [anchorTick]);
 
     const displayValue = useMemo(
       () => promptToDisplay(value, mentionables),
@@ -233,6 +256,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
             setPopoverOpen(true);
             setPopoverFilter(tail);
             setPopoverIndex(0);
+            setAnchorTick((t) => t + 1);
             return;
           }
         }
@@ -240,6 +264,11 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       }
       closePopover();
     };
+
+    useLayoutEffect(() => {
+      if (!popoverOpen) return;
+      setAnchorTick((t) => t + 1);
+    }, [popoverOpen, displayValue, popoverFilter]);
 
     const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (!popoverOpen) return;
@@ -275,6 +304,8 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           value={displayValue}
           onChange={onTextChange}
           onKeyDown={onKeyDown}
+          onKeyDownCapture={onKeyDownCapture}
+          onPaste={onPaste}
           onBlur={onBlur}
           autoFocus={autoFocus}
           rows={fillHeight ? 1 : rows}
@@ -290,9 +321,11 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         <MentionPickerPortal
           open={popoverOpen}
           anchorEl={wrapperRef.current}
+          getAnchorRect={getMentionAnchorRect}
           items={filtered}
           selectedIndex={popoverIndex}
-          emptyHint="暂无已生成的角色图，请先在角色列生成。"
+          headerTitle={mentionPickerTitle}
+          emptyHint={mentionPickerEmptyHint}
           onSelect={insertToken}
           onHoverIndex={setPopoverIndex}
           onClose={closePopover}

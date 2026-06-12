@@ -1,0 +1,307 @@
+"use client";
+
+import { useMemo, useRef, useState } from "react";
+import { useReactFlow, useViewport } from "@xyflow/react";
+import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, Save } from "lucide-react";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { useCanvasStore } from "@/lib/canvas/store";
+import { saveStoryProCharacterAssetRef } from "@/lib/canvas-api";
+import {
+  computePro2MultiSelectionBbox,
+  pro2SelectedNonGroupIds,
+} from "@/lib/canvas/pro2-selection-bbox";
+import { GROUP_COLOR_PRESETS } from "@/lib/canvas/types";
+import type { CanvasFlowNode } from "@/lib/canvas/types";
+import { cn } from "@/lib/utils";
+
+const TOOLBAR_HEIGHT = 44;
+const HEADER_RESERVED = 56;
+const GAP = 8;
+
+const BTN =
+  "nodrag flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/75 transition hover:bg-white/8 hover:text-white/95 disabled:cursor-not-allowed disabled:opacity-40";
+
+function imageUrlOf(node: CanvasFlowNode): string {
+  const d = node.data as { ossUrl?: string; blobUrl?: string };
+  return d.ossUrl ?? d.blobUrl ?? "";
+}
+
+function isPro2ThreeView(node: CanvasFlowNode): boolean {
+  return (
+    node.type === "story-pro2-three-view" ||
+    (node.data as { pro2MediaRole?: string }).pro2MediaRole ===
+      "character-three-view"
+  );
+}
+
+/**
+ * 图 1 · 框选多个散节点（≥2 且非组）→ 顶部浮动工具条：
+ * 保存到资产 / 创建副本 / 打组（样式与组工具条一致）。
+ */
+export function Pro2SelectionToolbar({
+  rfNodes,
+}: {
+  rfNodes: CanvasFlowNode[];
+}) {
+  const base = useBookMallBaseUrl();
+  const { alert } = useDialogs();
+  const { flowToScreenPosition, getInternalNode } = useReactFlow();
+  const viewport = useViewport();
+  const createGroupContaining = useCanvasStore((s) => s.createGroupContaining);
+  const duplicateNode = useCanvasStore((s) => s.duplicateNode);
+  const setNodes = useCanvasStore((s) => s.setNodes);
+  const projectId = useCanvasStore((s) => s.projectId);
+
+  const storeNodes = useCanvasStore((s) => s.nodes);
+  const [saving, setSaving] = useState(false);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [groupName, setGroupName] = useState("未命名分组");
+  const [groupColor, setGroupColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
+
+  const selectedIds = useMemo(() => {
+    const rfIds = pro2SelectedNonGroupIds(rfNodes);
+    if (rfIds.length >= 2) return rfIds;
+    const storeIds = pro2SelectedNonGroupIds(storeNodes);
+    return storeIds.length >= 2 ? storeIds : rfIds;
+  }, [rfNodes, storeNodes]);
+
+  const selectedNodes = useMemo(
+    () => {
+      const idSet = new Set(selectedIds);
+      const pool = rfNodes.length ? rfNodes : storeNodes;
+      return pool.filter((n) => idSet.has(n.id));
+    },
+    [selectedIds, rfNodes, storeNodes],
+  );
+  const selectedIdsRef = useRef<string[]>([]);
+  selectedIdsRef.current = selectedIds;
+
+  const saveableThreeViews = useMemo(
+    () =>
+      selectedNodes
+        .filter((n) => isPro2ThreeView(n) && imageUrlOf(n))
+        .map((n) => {
+          const d = n.data as {
+            pro2RowKey?: string;
+            label?: string;
+          };
+          return {
+            characterKey: d.pro2RowKey || n.id,
+            displayName: d.label?.trim() || "角色三视图",
+            url: imageUrlOf(n),
+          };
+        }),
+    [selectedNodes],
+  );
+  const skippedCount = useMemo(
+    () => selectedNodes.filter((n) => !isPro2ThreeView(n)).length,
+    [selectedNodes],
+  );
+
+  const bbox = useMemo(() => {
+    const pool = rfNodes.length ? rfNodes : storeNodes;
+    return computePro2MultiSelectionBbox(
+      selectedIds,
+      pool as CanvasFlowNode[],
+      getInternalNode,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, getInternalNode, rfNodes, storeNodes, viewport]);
+
+  const placement = useMemo(() => {
+    if (!bbox) return null;
+    const cx = (bbox.x + bbox.x2) / 2;
+    const top = flowToScreenPosition({ x: cx, y: bbox.y });
+    const bottom = flowToScreenPosition({ x: cx, y: bbox.y2 });
+    if (top.y - TOOLBAR_HEIGHT - GAP < HEADER_RESERVED) {
+      return { x: bottom.x, y: bottom.y + GAP, place: "below" as const };
+    }
+    return { x: top.x, y: top.y - GAP, place: "above" as const };
+  }, [bbox, flowToScreenPosition, viewport]);
+
+  if (!placement || selectedIds.length < 2) return null;
+
+  const onSaveToAssets = async () => {
+    if (!saveableThreeViews.length) {
+      await alert({
+        title: "没有可保存的三视图",
+        message:
+          "请框选包含已生成图片的「三视图」节点后再保存到角色资产库（暂仅支持三视图，不裁切）。",
+        variant: "info",
+      });
+      return;
+    }
+    setSaving(true);
+    let ok = 0;
+    let fail = 0;
+    for (const tv of saveableThreeViews) {
+      try {
+        await saveStoryProCharacterAssetRef(base, {
+          characterKey: tv.characterKey,
+          displayName: tv.displayName,
+          projectId: projectId ?? null,
+          kind: "three_view",
+          ossUrl: tv.url,
+          label: tv.displayName,
+        });
+        ok += 1;
+      } catch {
+        fail += 1;
+      }
+    }
+    setSaving(false);
+    await alert({
+      title: "保存完成",
+      message:
+        `已保存 ${ok} 张三视图到角色资产库${fail ? `，${fail} 张失败` : ""}。` +
+        (skippedCount
+          ? `（已跳过 ${skippedCount} 个非三视图节点）`
+          : ""),
+      variant: fail ? "warning" : "info",
+    });
+  };
+
+  const onDuplicate = () => {
+    const ids = [...selectedIdsRef.current];
+    const newIds: string[] = [];
+    for (const id of ids) {
+      const newId = duplicateNode(id);
+      if (newId) newIds.push(newId);
+    }
+    if (newIds.length) {
+      const set = new Set(newIds);
+      setNodes((prev) => prev.map((n) => ({ ...n, selected: set.has(n.id) })));
+    }
+  };
+
+  const onGroup = () => {
+    const ids = [...selectedIdsRef.current];
+    if (ids.length < 2) return;
+    const measuredSizes: Record<string, { w: number; h: number }> = {};
+    for (const id of ids) {
+      const internal = getInternalNode(id);
+      const w = internal?.measured?.width;
+      const h = internal?.measured?.height;
+      if (w && h) measuredSizes[id] = { w, h };
+    }
+    createGroupContaining(ids, {
+      label: groupName.trim() || "未命名分组",
+      color: groupColor,
+      measuredSizes,
+      pro2Styled: true,
+    });
+    setGroupOpen(false);
+  };
+
+  return (
+    <div
+      className="pointer-events-auto fixed z-[100]"
+      style={{
+        left: placement.x,
+        top: placement.y,
+        transform: `translate(-50%, ${placement.place === "above" ? "-100%" : "0%"})`,
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center gap-1 rounded-xl border border-white/12 bg-[#1c1c1e]/95 px-2 py-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+        <LayoutGrid className="ml-0.5 size-3.5 text-white/45" />
+        <span className="mx-0.5 h-4 w-px bg-white/12" />
+        <button
+          type="button"
+          className={cn(BTN)}
+          title="保存选中的三视图到角色资产库（不裁切）"
+          disabled={saving}
+          onClick={() => void onSaveToAssets()}
+        >
+          {saving ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Save className="size-3.5" />
+          )}
+          保存到资产
+        </button>
+        <button
+          type="button"
+          className={cn(BTN)}
+          title="为选中的节点创建副本"
+          onClick={onDuplicate}
+        >
+          <Copy className="size-3.5" />
+          创建副本
+        </button>
+        <div className="relative">
+          <button
+            type="button"
+            className={cn(BTN)}
+            title={`将选中 ${selectedIds.length} 个节点装进分组（设组名 / 边框色）`}
+            onClick={() => setGroupOpen((v) => !v)}
+          >
+            <FolderPlus className="size-3.5" />
+            打组
+            <ChevronDown className="size-3 opacity-60" />
+          </button>
+          {groupOpen ? (
+            <div
+              className="absolute right-0 top-[calc(100%+8px)] z-[1] w-[240px] rounded-xl border border-white/12 bg-[#1c1c1e]/97 p-3 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <p className="mb-1.5 text-[11px] font-medium text-white/55">组名</p>
+              <input
+                autoFocus
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onGroup();
+                  if (e.key === "Escape") setGroupOpen(false);
+                }}
+                placeholder="未命名分组"
+                className="nodrag mb-2.5 w-full rounded-md border border-white/12 bg-black/40 px-2 py-1.5 text-[12px] text-white placeholder:text-white/35 focus:border-violet-400/50 focus:outline-none"
+              />
+              <p className="mb-1.5 text-[11px] font-medium text-white/55">
+                边框颜色
+              </p>
+              <div className="mb-3 flex gap-2">
+                {GROUP_COLOR_PRESETS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-label={`颜色 ${c}`}
+                    onClick={() => setGroupColor(c)}
+                    className="size-6 rounded-full transition"
+                    style={{
+                      background: c,
+                      outline:
+                        groupColor === c
+                          ? `2px solid ${c}`
+                          : "1px solid rgba(255,255,255,0.18)",
+                      boxShadow:
+                        groupColor === c ? `0 0 0 3px ${c}55` : "none",
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded-md px-3 py-1 text-[12px] text-white/60 hover:bg-white/8"
+                  onClick={() => setGroupOpen(false)}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-violet-500/85 px-3 py-1 text-[12px] font-medium text-white hover:bg-violet-500"
+                  onClick={onGroup}
+                >
+                  打组
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}

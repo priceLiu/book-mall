@@ -819,15 +819,130 @@ function normalizeDialogueCell(raw: string, description: string): string {
   return inferDialogueFromDescription(description);
 }
 
-/** 分镜表 → 按镜号排序的行 */
-export function parseStoryboardRows(md: string): Array<{
+/** 专业版分镜表行（8 列真源 · 兼容旧 5 列简表） */
+export type StoryboardTableRow = {
   frameIndex: number;
+  /** 旧版简表「场景」列；专业版分镜表无此列 */
   scene: string;
   shotSize: string;
+  cameraMove: string;
   description: string;
   dialogue: string;
+  duration: string;
+  aiVideoPrompt: string;
+  lipSyncNote: string;
+  /** 与 aiVideoPrompt 同步，供列同步 / 批量任务沿用 */
   videoPrompt: string;
-}> {
+};
+
+export function isEmptyStoryboardCell(text: string | undefined): boolean {
+  const t = (text ?? "").trim();
+  return !t || t === "—" || t === "-" || t === "–" || t === "—";
+}
+
+function parseStoryboardAiVideoPrompt(
+  r: Record<string, string>,
+): string {
+  const raw =
+    pickColumn(r, [
+      "ai视频提示词(英文)",
+      "ai视频提示词",
+      "ai video prompt",
+      "视频提示",
+      "videoprompt",
+      "video prompt",
+    ]) ||
+    r["AI视频提示词(英文)"] ||
+    r["视频提示"] ||
+    "";
+  return isEmptyStoryboardCell(raw) ? "" : raw;
+}
+
+const SHOT_SIZE_EN: Record<string, string> = {
+  远景: "extreme wide shot",
+  大全景: "extreme wide shot",
+  全景: "wide shot",
+  中远景: "medium wide shot",
+  中景: "medium shot",
+  中近景: "medium close-up",
+  近景: "close-up",
+  特写: "extreme close-up",
+  大特写: "extreme close-up",
+  双人近景: "two-shot close-up",
+  过肩: "over-the-shoulder shot",
+};
+
+function shotSizeToEnglish(shotSize: string): string {
+  const t = shotSize.trim();
+  if (!t || isEmptyStoryboardCell(t)) return "";
+  return SHOT_SIZE_EN[t] ?? `${t} shot`;
+}
+
+/** LLM 未填 AI 视频提示词时，从画面描述等列合成英文兜底（供展示 / 生视频） */
+export function buildFallbackAiVideoPrompt(row: {
+  frameIndex: number;
+  shotSize?: string;
+  cameraMove?: string;
+  description?: string;
+  dialogue?: string;
+}): string {
+  const desc = row.description?.trim();
+  if (!desc) return "";
+  const parts = ["Cinematic film still"];
+  const shot = shotSizeToEnglish(row.shotSize ?? "");
+  if (shot) parts.push(shot);
+  const move = row.cameraMove?.trim();
+  if (move && !isEmptyStoryboardCell(move)) {
+    parts.push(`${move} camera movement`);
+  }
+  parts.push(desc);
+  const dialogue = row.dialogue?.trim();
+  if (dialogue && !isEmptyStoryboardCell(dialogue)) {
+    parts.push("with on-screen dialogue");
+  }
+  return parts.join(", ");
+}
+
+export function enrichStoryboardRowsAiVideoPrompts(
+  rows: StoryboardTableRow[],
+): StoryboardTableRow[] {
+  return rows.map((row) => {
+    if (!isEmptyStoryboardCell(row.aiVideoPrompt)) return row;
+    const fallback = buildFallbackAiVideoPrompt(row);
+    if (!fallback) return row;
+    return {
+      ...row,
+      aiVideoPrompt: fallback,
+      videoPrompt: fallback,
+    };
+  });
+}
+
+/** 补全空 AI 视频提示词并规范为 8 列 GFM 表 */
+export function normalizeStoryboardSectionMd(md: string): string {
+  const raw = md.trim();
+  if (!raw) return raw;
+  const rows = parseStoryboardRows(raw);
+  if (!rows.length) return raw;
+  const enriched = enrichStoryboardRowsAiVideoPrompts(rows);
+  const table = formatStoryboardTableMarkdown(enriched);
+  if (/##\s*分镜脚本/i.test(raw)) {
+    return raw.replace(/##\s*分镜脚本[\s\S]*/i, `## 分镜脚本\n\n${table}`);
+  }
+  return `## 分镜脚本\n\n${table}`;
+}
+
+export function ensureStoryboardAiVideoPromptsMd(md: string): string {
+  const raw = (md ?? "").trim();
+  if (!raw) return raw;
+  const rows = parseStoryboardRows(raw);
+  if (!rows.length) return raw;
+  if (!rows.some((r) => isEmptyStoryboardCell(r.aiVideoPrompt))) return raw;
+  return normalizeStoryboardSectionMd(raw);
+}
+
+/** 分镜表 → 按镜号排序的行 */
+export function parseStoryboardRows(md: string): StoryboardTableRow[] {
   const { rows } = parseMdTable(md);
   return rows
     .map((r, i) => {
@@ -846,9 +961,15 @@ export function parseStoryboardRows(md: string): Array<{
         String(i + 1);
       const frameIndex = parseInt(String(rawIdx), 10) || i + 1;
       const shotSize = pickColumn(r, ["景别", "shot size", "framing"]);
+      const cameraMove = pickColumn(r, [
+        "运镜",
+        "camera",
+        "camera move",
+        "镜头运动",
+      ]);
       const scene =
         pickColumn(r, ["场景", "scene", "location"]) || r["场景"] || "";
-      const duration = pickColumn(r, ["时长", "duration", "时长(秒)"]);
+      const duration = pickColumn(r, ["时长(秒)", "时长", "duration"]);
       const description =
         pickColumn(r, ["画面描述", "description", "visual", "画面"]) ||
         r["画面描述"] ||
@@ -867,27 +988,50 @@ export function parseStoryboardRows(md: string): Array<{
         r["台词"] ||
         r["对白/音效"] ||
         "";
+      const aiVideoPrompt = parseStoryboardAiVideoPrompt(r);
+      const lipSyncNote = pickColumn(r, [
+        "口型/配音备注",
+        "口型",
+        "配音",
+        "lip sync",
+        "lipsync",
+      ]);
       return {
         frameIndex,
         scene,
         shotSize,
+        cameraMove,
         description,
         dialogue: normalizeDialogueCell(dialogueRaw, description),
-        videoPrompt:
-          pickColumn(r, [
-            "视频提示",
-            "videoprompt",
-            "video prompt",
-            "运镜",
-            "ai视频提示词",
-            "ai视频提示词(英文)",
-          ]) ||
-          r["视频提示"] ||
-          r["AI视频提示词(英文)"] ||
-          (duration ? `时长 ${duration} 秒` : ""),
+        duration,
+        aiVideoPrompt,
+        lipSyncNote,
+        videoPrompt: aiVideoPrompt,
       };
     })
     .sort((a, b) => a.frameIndex - b.frameIndex);
+}
+
+/** 是否为专业版 8 列分镜表头 */
+export function isProStoryboardTableMd(md: string): boolean {
+  const t = md.trim();
+  if (!t) return true;
+  const header = t
+    .split(/\r?\n/)
+    .find(
+      (l) =>
+        l.trim().startsWith("|") &&
+        l.trim().endsWith("|") &&
+        !/^[\|\s\-:]+$/.test(l.trim()),
+    );
+  if (!header) return false;
+  const nk = normHeader(header);
+  return (
+    nk.includes("运镜") ||
+    nk.includes("aivideoprompt") ||
+    nk.includes("口型") ||
+    nk.includes("时长")
+  );
 }
 
 /** 更新分镜表中某一镜的对白列，写回 GFM 表 Markdown */
@@ -951,19 +1095,37 @@ export function patchStoryboardDialogue(
 export function formatStoryboardTableMarkdown(
   rows: Array<{
     frameIndex: number;
-    scene: string;
+    scene?: string;
+    shotSize?: string;
+    cameraMove?: string;
     description: string;
     dialogue: string;
-    videoPrompt: string;
+    duration?: string;
+    aiVideoPrompt?: string;
+    lipSyncNote?: string;
+    videoPrompt?: string;
   }>,
+  options?: { format?: "pro" | "legacy" },
 ): string {
   if (!rows.length) return "";
+  const usePro = options?.format !== "legacy";
+  if (usePro) {
+    return [
+      "| 镜号 | 景别 | 运镜 | 画面描述 | 对白 | 时长(秒) | AI视频提示词(英文) | 口型/配音备注 |",
+      "|------|------|------|----------|------|----------|---------------------|---------------|",
+      ...rows.map((r) => {
+        const ai =
+          r.aiVideoPrompt?.trim() || r.videoPrompt?.trim() || "";
+        return `| ${r.frameIndex} | ${escapeMdTableCell(r.shotSize ?? "")} | ${escapeMdTableCell(r.cameraMove ?? "")} | ${escapeMdTableCell(r.description)} | ${escapeMdTableCell(r.dialogue)} | ${escapeMdTableCell(r.duration ?? "")} | ${escapeMdTableCell(ai)} | ${escapeMdTableCell(r.lipSyncNote ?? "")} |`;
+      }),
+    ].join("\n");
+  }
   return [
     "| 镜号 | 场景 | 画面描述 | 台词 | 视频提示 |",
     "|------|------|----------|------|----------|",
-    ...rows.map(
-      (r) =>
-        `| ${r.frameIndex} | ${escapeMdTableCell(r.scene)} | ${escapeMdTableCell(r.description)} | ${escapeMdTableCell(r.dialogue)} | ${escapeMdTableCell(r.videoPrompt)} |`,
-    ),
+    ...rows.map((r) => {
+      const vp = r.videoPrompt?.trim() || r.aiVideoPrompt?.trim() || "";
+      return `| ${r.frameIndex} | ${escapeMdTableCell(r.scene ?? "")} | ${escapeMdTableCell(r.description)} | ${escapeMdTableCell(r.dialogue)} | ${escapeMdTableCell(vp)} |`;
+    }),
   ].join("\n");
 }

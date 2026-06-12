@@ -32,11 +32,18 @@ import {
   runStoryProFrameRow,
   runStoryProSceneRow,
   runStoryProScriptHubSection,
+  runStoryProStarterThemeOutline,
   runStoryProStyleDraft,
   runStoryProTtsRow,
   runStoryProVideoRow,
   type StoryProLlmSection,
 } from "@/lib/canvas/story-pro-workspace-runner";
+import {
+  isStoryPro2PipelineNodeType,
+  isSbv1PipelineNodeType,
+  storyPro2ToProRunnerType,
+} from "@/lib/canvas/canvas-story-edition";
+import { runSbv1VideoEngineNode } from "@/lib/canvas/sbv1-video-engine-runner";
 import { storyProStyleGateError } from "@/lib/canvas/story-pro-style-anchor";
 import { resolveCharacterRowAssetRefUrls } from "@/lib/canvas/story-pro-character-ref-resolve";
 import { assertStoryProRunModelCapabilities } from "@/lib/canvas/story-pro-run-guards";
@@ -80,12 +87,20 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     | "video"
     | "tts"
     | "sceneRef"
+    | "themeOutline"
     | undefined;
   const storyScope =
     rowKey || mediaKind || llmSection
       ? { rowKey, mediaKind, llmSection }
       : undefined;
-  const isPro = node.type.startsWith("story-pro-");
+  const isPro2 = isStoryPro2PipelineNodeType(node.type);
+  const isSbv1 = isSbv1PipelineNodeType(node.type);
+  const isPro =
+    !isPro2 &&
+    !isSbv1 &&
+    node.type.startsWith("story-pro-") &&
+    !node.type.startsWith("story-pro2-");
+  const runnerType = isPro2 ? storyPro2ToProRunnerType(node.type) : node.type;
   const styleAnchor = body.body.styleAnchor as
     | {
         styleAnchorZh?: string;
@@ -94,12 +109,19 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       }
     | undefined;
   const styleFinalized = body.body.styleFinalized === true;
-  const proClientPage = `canvas/${projectId}/story-pro`;
+  const proClientPage = isPro2
+    ? `canvas/${projectId}/story-pro2`
+    : `canvas/${projectId}/story-pro`;
+  const sbv1ClientPage = `canvas/${projectId}/sbv1`;
   const baseArgs = {
     userId: guard.user.id,
     projectId,
     nodeId,
-    clientPage: isPro ? proClientPage : `canvas/${projectId}`,
+    clientPage: isSbv1
+      ? sbv1ClientPage
+      : isPro || isPro2
+        ? proClientPage
+        : `canvas/${projectId}`,
     storyScope,
     node: {
       type: node.type,
@@ -123,9 +145,13 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     const requireProStyle = () => {
       if (!styleFinalized) storyProStyleGateError();
     };
-    if (isPro && rowKey && mediaKind) {
+    /** Pro2 LibTV：三视图/分镜图走单格 dock 风格，不强制全局 styleFinalized */
+    const requireProStyleUnlessPro2 = () => {
+      if (!isPro2) requireProStyle();
+    };
+    if ((isPro || isPro2) && rowKey && mediaKind) {
       if (
-        node.type === "story-pro-character" &&
+        runnerType === "story-pro-character" &&
         mediaKind === "threeView"
       ) {
         const rows =
@@ -146,7 +172,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         );
       } else {
         assertStoryProRunModelCapabilities({
-          nodeType: node.type,
+          nodeType: runnerType,
           mediaKind,
           nodeData: baseArgs.node.data,
           rowKey,
@@ -154,20 +180,22 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       }
     }
     let result;
-    if (node.type === "story-pro-script-hub" && llmSection) {
+    if (runnerType === "story-pro-starter" && mediaKind === "themeOutline") {
+      result = await runStoryProStarterThemeOutline({ ...baseArgs, forceFresh });
+    } else if (runnerType === "story-pro-script-hub" && llmSection) {
       result = await runStoryProScriptHubSection({
         ...baseArgs,
         forceFresh,
         llmSection: llmSection as StoryProLlmSection,
       });
-    } else if (node.type === "story-pro-style") {
+    } else if (runnerType === "story-pro-style") {
       result = await runStoryProStyleDraft({ ...baseArgs, forceFresh });
     } else if (
-      node.type === "story-pro-character" &&
+      runnerType === "story-pro-character" &&
       rowKey &&
       mediaKind === "threeView"
     ) {
-      requireProStyle();
+      requireProStyleUnlessPro2();
       result = await runStoryProCharacterRow({
         ...baseArgs,
         forceFresh,
@@ -175,11 +203,11 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         styleAnchor,
       });
     } else if (
-      node.type === "story-pro-scene" &&
+      runnerType === "story-pro-scene" &&
       rowKey &&
       mediaKind === "sceneRef"
     ) {
-      requireProStyle();
+      requireProStyleUnlessPro2();
       result = await runStoryProSceneRow({
         ...baseArgs,
         forceFresh,
@@ -187,11 +215,11 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         styleAnchor,
       });
     } else if (
-      node.type === "story-pro-frame" &&
+      runnerType === "story-pro-frame" &&
       rowKey &&
       mediaKind === "frameImage"
     ) {
-      requireProStyle();
+      requireProStyleUnlessPro2();
       result = await runStoryProFrameRow({
         ...baseArgs,
         forceFresh,
@@ -199,7 +227,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         styleAnchor,
       });
     } else if (
-      node.type === "story-pro-video" &&
+      runnerType === "story-pro-video" &&
       rowKey &&
       mediaKind === "video"
     ) {
@@ -211,7 +239,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         styleAnchor,
       });
     } else if (
-      node.type === "story-pro-video" &&
+      runnerType === "story-pro-video" &&
       rowKey &&
       mediaKind === "tts"
     ) {
@@ -271,6 +299,8 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         forceFresh,
         engineKind: node.type,
       });
+    } else if (node.type === "sbv1-video-engine") {
+      result = await runSbv1VideoEngineNode({ ...baseArgs, forceFresh });
     } else if (node.type === "video-engine") {
       result = await runVideoEngineNode({ ...baseArgs, forceFresh });
     } else if (node.type === "ai-video-engine") {

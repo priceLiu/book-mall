@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { parseToolsSessionPayload } from "@/lib/parse-tools-session-payload";
+import {
+  introspectSessionRevoked,
+  SESSION_KICKED_MESSAGE,
+} from "@/lib/session-revoked";
 import {
   bookMallLoginHref,
   bookMallReEnterHref,
@@ -16,6 +21,7 @@ import {
 
 const SESSION_FETCH_TIMEOUT_MS = 12_000;
 const SESSION_FETCH_RETRY_DELAY_MS = 400;
+const SESSION_POLL_MS = 60_000;
 
 async function fetchToolsSessionClient(): Promise<
   ReturnType<typeof parseToolsSessionPayload>
@@ -33,6 +39,45 @@ async function fetchToolsSessionClient(): Promise<
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+function SessionRevokedPoller({
+  enabled,
+  onRevoked,
+}: {
+  enabled: boolean;
+  onRevoked: () => void;
+}) {
+  const { alert } = useDialogs();
+  const shownRef = useRef(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const poll = async () => {
+      if (shownRef.current) return;
+      try {
+        const data = await fetchToolsSessionClient();
+        if (data.active) return;
+        if (!introspectSessionRevoked(data.introspect as Record<string, unknown> | null)) {
+          return;
+        }
+        shownRef.current = true;
+        await alert({
+          title: "账号已在别处登录",
+          message: SESSION_KICKED_MESSAGE,
+        });
+        onRevoked();
+      } catch {
+        /* 忽略轮询失败 */
+      }
+    };
+
+    const id = window.setInterval(() => void poll(), SESSION_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [enabled, alert, onRevoked]);
+
+  return null;
 }
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -155,7 +200,12 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   }, [loading, hasTokenCookie, sessionActive, mainOrigin, error]);
 
   if (ready) {
-    return <>{children}</>;
+    return (
+      <>
+        <SessionRevokedPoller enabled={ready} onRevoked={redirectToSso} />
+        {children}
+      </>
+    );
   }
 
   if (loading) {

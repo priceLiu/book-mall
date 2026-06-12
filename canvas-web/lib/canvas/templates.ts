@@ -29,8 +29,20 @@ import {
   STORY_PRO_CONTROL_NODE_WIDTH,
 } from "./story-pro-node-chrome";
 import {
+  PRO2_TEXT_NODE_HEIGHT,
+  PRO2_TEXT_NODE_WIDTH,
+} from "./story-pro2-node-chrome";
+import {
+  SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+  SBV1_VIDEO_ENGINE_WIDTH,
+} from "./sbv1-node-chrome";
+import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
+import { STORY_WORKSPACE_COL_H_GAP } from "./story-comic-workspace-layout";
+import {
   AI_ENGINE_PROMPT_TEMPLATE,
   CANVAS_SCHEMA_VERSION,
+  CANVAS_SCHEMA_VERSION_PRO2,
+  CANVAS_SCHEMA_VERSION_SBV1,
   type CanvasGraph,
 } from "./types";
 
@@ -457,6 +469,62 @@ const STORY_PRO_PIPELINE: CanvasGraph = {
   ],
 };
 
+/** 影视专业版 2.0：LibTV 文本节点起步；脚本/媒体列由 + 菜单连接创建 */
+const STORY_PRO2_STARTER_ORIGIN = { x: 120, y: 160 };
+
+const STORY_PRO2_PIPELINE: CanvasGraph = {
+  schemaVersion: CANVAS_SCHEMA_VERSION_PRO2,
+  meta: { edition: "pro2" },
+  viewport: { x: 0, y: 0, zoom: 0.85 },
+  nodes: [
+    {
+      id: "sp2-starter",
+      type: "story-pro2-starter",
+      position: STORY_PRO2_STARTER_ORIGIN,
+      width: PRO2_TEXT_NODE_WIDTH,
+      height: PRO2_TEXT_NODE_HEIGHT,
+      style: {
+        width: PRO2_TEXT_NODE_WIDTH,
+        height: PRO2_TEXT_NODE_HEIGHT,
+      },
+      data: {
+        starterMode: "generate",
+        themeInput: "",
+        generatedOutlineMd: "",
+        uploadedScriptMd: "",
+        systemPrompt: "",
+        providerId: "",
+        modelKey: "",
+        params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
+        pipelineStage: "idle",
+      },
+    },
+  ],
+  edges: [],
+};
+
+/** 分镜视频 1.0：单视频引擎起步 */
+const SBV1_PIPELINE: CanvasGraph = {
+  schemaVersion: CANVAS_SCHEMA_VERSION_SBV1,
+  meta: { edition: "sbv1" },
+  viewport: { x: 0, y: 0, zoom: 0.85 },
+  nodes: [
+    {
+      id: "sbv1-engine",
+      type: "sbv1-video-engine",
+      position: { x: 280, y: 160 },
+      width: SBV1_VIDEO_ENGINE_WIDTH,
+      height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+      style: {
+        width: SBV1_VIDEO_ENGINE_WIDTH,
+        height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+      },
+      data: { ...SBV1_DEFAULT_VIDEO_ENGINE_DATA },
+    },
+  ],
+  edges: [],
+};
+
 export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
   {
     id: "builtin/product-poster",
@@ -495,6 +563,22 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     description:
       "五阶段 SOP：故事定稿 → 风格锚定 → 人物/场景/分镜/视频；与快手版完全隔离。",
     canvas: STORY_PRO_PIPELINE,
+  },
+  {
+    id: "builtin/story-pro2-pipeline",
+    category: "builtin",
+    name: "影视专业版 2.0",
+    description:
+      "LibTV 架构：文本节点 + 底部输入坞 + 侧栏 + 号连接下游；业务规则与 1.0 对齐。",
+    canvas: STORY_PRO2_PIPELINE,
+  },
+  {
+    id: "builtin/storyboard-video-pipeline",
+    category: "builtin",
+    name: "分镜视频 1.0",
+    description:
+      "图片 + 视频引擎：粘贴参考图、连线、即梦 Seedance 三种参考模式生成视频。",
+    canvas: SBV1_PIPELINE,
   },
 ];
 

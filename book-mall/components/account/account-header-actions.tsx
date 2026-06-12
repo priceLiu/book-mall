@@ -2,10 +2,7 @@
 
 import { ToggleTheme } from "@/components/layout/toogle-theme";
 import { accountNavActionClass } from "@/components/account/account-nav-styles";
-
-function navigateToFullSignOut() {
-  window.location.href = "/api/auth/full-signout?callbackUrl=/";
-}
+import { navigateBookMallFullSignOut } from "@/lib/session-kicked-marker";
 
 export function AccountHeaderActions() {
   return (
@@ -13,7 +10,7 @@ export function AccountHeaderActions() {
       <button
         type="button"
         className={accountNavActionClass(false)}
-        onClick={navigateToFullSignOut}
+        onClick={() => navigateBookMallFullSignOut("/")}
       >
         退出登录
       </button>

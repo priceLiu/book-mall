@@ -31,6 +31,7 @@ export function useStoryColumnAutoSize(
 
     const node = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);
     if (!node) return;
+    if (String(node.type ?? "").startsWith("story-pro2-")) return;
     const { w, h } = nodeMeasuredSize(node);
     const needTaller = h + 48 < targetSize.height;
 

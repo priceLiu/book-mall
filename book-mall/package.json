@@ -60,7 +60,11 @@
     "gateway:poll-loop": "dotenv -e .env.local -- tsx scripts/gateway-poll-loop.ts",
     "gateway:seed-registry": "dotenv -e .env.local -- tsx scripts/seed-gateway-model-registry.ts --confirm",
     "gateway:verify-registry": "dotenv -e .env.local -- tsx scripts/verify-gateway-model-registry.ts",
-    "gateway:auto-publish": "dotenv -e .env.local -- tsx scripts/auto-publish-platform-offerings.ts"
+    "gateway:audit-gaps": "dotenv -e .env.local -- tsx scripts/audit-gateway-registry-gaps.ts",
+    "gateway:auto-publish": "dotenv -e .env.local -- tsx scripts/auto-publish-platform-offerings.ts",
+    "media-render:expire": "dotenv -e .env.local -- tsx scripts/media-render-expire.ts",
+    "media-render:check-ffmpeg": "tsx scripts/check-ffmpeg.ts",
+    "media-render:setup-ffmpeg": "tsx scripts/setup-ffmpeg.ts"
   },
   "dependencies": {
     "@ark-ui/react": "^5.37.0",

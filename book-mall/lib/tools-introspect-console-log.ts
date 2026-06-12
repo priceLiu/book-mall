@@ -8,6 +8,7 @@ export type ToolsIntrospectConsolePhase =
   | "misconfigured"
   | "no_token"
   | "jwt_invalid"
+  | "session_revoked"
   | "access_denied"
   | "ok";
 
@@ -24,6 +25,8 @@ function interpretIntrospect(payload: {
       return "缺少 Authorization Bearer；多为客户端误调或上游未转发令牌";
     case "jwt_invalid":
       return "工具 JWT 验签失败或已过期；请在工具站「重新连接」换票";
+    case "session_revoked":
+      return "账号已在其他设备登录，当前工具站会话已失效；请重新连接主站账号";
     case "access_denied":
       return `数据库已查到用户，但不满足工具站准入（非管理员且非黄金会员）；eligibility≈${payload.msEligibility != null ? `${roundMs(payload.msEligibility)}ms` : "?"}`;
     case "ok": {
