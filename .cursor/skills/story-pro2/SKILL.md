@@ -16,7 +16,8 @@ description: >-
 - 用户要求与 2.0 现有弹层 **样式一致**
 - Code Review Pro2 非 `useDialogs` 的自定义 Modal
 
-节点 / Dock / 顶栏 → 见 [libtv-unified-nodes](../libtv-unified-nodes/SKILL.md)。
+节点 / Dock / 顶栏 → 见 [libtv-unified-nodes](../libtv-unified-nodes/SKILL.md)。  
+Dock `@` 悬停预览 → [reference-dock-mentions.md](../libtv-unified-nodes/reference-dock-mentions.md)。
 
 ## 生图 / 生视频 · 生成中扫光（硬性）
 
@@ -123,6 +124,7 @@ Pro2 表单主按钮用 **violet-600**（与节点 ring 同系）；危险操作
 - [ ] 组/多图预览走 `ProjectAssetMediaPreviewGrid`，非单 `<img>`
 - [ ] 轻量确认仍用 `useDialogs`，未用原生弹窗
 - [ ] 未在 Pro2 表单弹层使用 1.0 `cyan` / 助手 `emerald`
+- [ ] Dock `@mention` 悬停预览由 `MentionsTextarea` 统一提供（勿在 Dock 内另写 hover）
 
 ## 权威文档
 

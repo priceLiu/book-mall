@@ -13,10 +13,17 @@ import {
   type ClipboardEventHandler,
   type CSSProperties,
   type KeyboardEventHandler,
+  type MouseEvent,
 } from "react";
 
 import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
-import { getTextareaCaretClientRect } from "@/lib/canvas/textarea-caret-rect";
+import { findMentionRangeAtDisplayIndex } from "@/lib/canvas/mention-at-display-index";
+import {
+  getMentionRangeClientRect,
+  getTextareaCaretClientRect,
+  getTextareaIndexFromClientPoint,
+} from "@/lib/canvas/textarea-caret-rect";
+import { MentionHoverPreviewPortal } from "./mention-hover-preview";
 import { MentionPickerPortal } from "./mention-picker-portal";
 
 export type MentionableItem = {
@@ -48,6 +55,8 @@ export type MentionsTextareaProps = {
   onKeyDownCapture?: KeyboardEventHandler<HTMLTextAreaElement>;
   mentionPickerTitle?: string;
   mentionPickerEmptyHint?: string;
+  /** 鼠标悬停 @mention 时显示缩略预览（Dock 默认开启） */
+  mentionHoverPreview?: boolean;
 };
 
 const TOKEN_RE = /@<([^>\s]+)>/g;
@@ -123,6 +132,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       onKeyDownCapture,
       mentionPickerTitle,
       mentionPickerEmptyHint = "暂无已生成的角色图，请先在角色列生成。",
+      mentionHoverPreview = true,
     },
     ref,
   ) {
@@ -130,10 +140,16 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
     const innerRef = useRef<HTMLTextAreaElement | null>(null);
     const mentionAnchorRef = useRef<MentionAnchor | null>(null);
     const pendingCaretRef = useRef<number | null>(null);
+    const hoverRafRef = useRef<number | null>(null);
+    const hoverIdRef = useRef<string | null>(null);
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [popoverFilter, setPopoverFilter] = useState("");
     const [popoverIndex, setPopoverIndex] = useState(0);
     const [anchorTick, setAnchorTick] = useState(0);
+    const [hoverPreview, setHoverPreview] = useState<{
+      item: MentionableItem;
+      anchorRect: DOMRect;
+    } | null>(null);
 
     const getMentionAnchorRect = useCallback(() => {
       const el = innerRef.current;
@@ -290,6 +306,95 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       }
     };
 
+    const clearHoverPreview = useCallback(() => {
+      hoverIdRef.current = null;
+      setHoverPreview(null);
+    }, []);
+
+    const updateHoverPreview = useCallback(
+      (clientX: number, clientY: number) => {
+        if (!mentionHoverPreview || disabled || popoverOpen) {
+          clearHoverPreview();
+          return;
+        }
+        const el = innerRef.current;
+        if (!el) return;
+
+        const index = getTextareaIndexFromClientPoint(el, clientX, clientY);
+        const hit = findMentionRangeAtDisplayIndex(
+          displayValue,
+          index,
+          mentionables,
+        );
+        if (!hit?.item.previewUrl) {
+          if (hoverIdRef.current) clearHoverPreview();
+          return;
+        }
+
+        const anchorRect = getMentionRangeClientRect(el, hit.start, hit.end);
+        if (!anchorRect) {
+          clearHoverPreview();
+          return;
+        }
+
+        if (hoverIdRef.current === hit.item.id) {
+          setHoverPreview((prev) =>
+            prev?.item.id === hit.item.id && prev.anchorRect === anchorRect
+              ? prev
+              : { item: hit.item, anchorRect },
+          );
+          return;
+        }
+
+        hoverIdRef.current = hit.item.id;
+        setHoverPreview({ item: hit.item, anchorRect });
+      },
+      [
+        mentionHoverPreview,
+        disabled,
+        popoverOpen,
+        displayValue,
+        mentionables,
+        clearHoverPreview,
+      ],
+    );
+
+    const onMouseMove = useCallback(
+      (e: MouseEvent<HTMLTextAreaElement>) => {
+        if (!mentionHoverPreview) return;
+        if (hoverRafRef.current != null) {
+          cancelAnimationFrame(hoverRafRef.current);
+        }
+        const { clientX, clientY } = e;
+        hoverRafRef.current = requestAnimationFrame(() => {
+          hoverRafRef.current = null;
+          updateHoverPreview(clientX, clientY);
+        });
+      },
+      [mentionHoverPreview, updateHoverPreview],
+    );
+
+    const onMouseLeave = useCallback(() => {
+      if (hoverRafRef.current != null) {
+        cancelAnimationFrame(hoverRafRef.current);
+        hoverRafRef.current = null;
+      }
+      clearHoverPreview();
+    }, [clearHoverPreview]);
+
+    useEffect(() => {
+      if (popoverOpen) clearHoverPreview();
+    }, [popoverOpen, clearHoverPreview]);
+
+    useEffect(
+      () => () => {
+        if (hoverRafRef.current != null) {
+          cancelAnimationFrame(hoverRafRef.current);
+        }
+      },
+      [],
+    );
+
     return (
       <div
         ref={wrapperRef}
@@ -307,6 +412,8 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           onKeyDownCapture={onKeyDownCapture}
           onPaste={onPaste}
           onBlur={onBlur}
+          onMouseMove={onMouseMove}
+          onMouseLeave={onMouseLeave}
           autoFocus={autoFocus}
           rows={fillHeight ? 1 : rows}
           placeholder={placeholder}
@@ -329,6 +436,10 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           onSelect={insertToken}
           onHoverIndex={setPopoverIndex}
           onClose={closePopover}
+        />
+        <MentionHoverPreviewPortal
+          item={hoverPreview?.item ?? null}
+          anchorRect={hoverPreview?.anchorRect ?? null}
         />
       </div>
     );

@@ -65,6 +65,8 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
   const isGenerating = isLibtvMediaGenerating(d);
+  const generatingLabel =
+    d.uploading && !d.runtime?.status ? "上传中…" : "图片生成中…";
   const hasError = Boolean(d.uploadError?.trim());
   const showSidePlus = Boolean(selected && !isGenerating);
   const soleSelected = useMemo(
@@ -258,7 +260,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
 
           <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
             {isGenerating ? (
-              <LibtvMediaGeneratingState label="上传中…" variant="cyan">
+              <LibtvMediaGeneratingState label={generatingLabel} variant="cyan">
                 {previewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
