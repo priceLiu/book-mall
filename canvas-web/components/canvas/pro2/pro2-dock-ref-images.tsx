@@ -6,6 +6,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
 import { useImagePasteWhenActive } from "@/lib/canvas/image-upload-handlers";
 import { spawnPro2DockPastedImages } from "@/lib/canvas/spawn-pro2-dock-paste-images";
+import { spawnSbv1ImageDockPastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import {
@@ -47,6 +48,21 @@ export function Pro2DockRefImages({
     async (files: File[]) => {
       if (disabled || !base || !spawnAnchor || !files.length) return;
       const state = useCanvasStore.getState();
+      if (spawnAnchor.nodeType === "sbv1-image") {
+        await spawnSbv1ImageDockPastedImages({
+          anchorNodeId: spawnAnchor.nodeId,
+          files,
+          base,
+          nodes: state.nodes,
+          edges: state.edges,
+          addNode,
+          setEdges,
+          updateNodeData,
+          setNodes,
+          maxCount,
+        });
+        return;
+      }
       await spawnPro2DockPastedImages({
         anchorNodeId: spawnAnchor.nodeId,
         anchorNodeType: spawnAnchor.nodeType,

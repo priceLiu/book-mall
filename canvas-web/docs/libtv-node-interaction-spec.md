@@ -1,0 +1,122 @@
+# LibTV 节点交互规范（分镜视频 1.0 · 影视专业 2.0 共用）
+
+> **权威样板**：`sbv1-video-engine`（用户可见名 **视频合成**）  
+> **壳层 token**：`lib/canvas/libtv-node-chrome.ts`  
+> **拖动登记**：`normalize-graph-nodes.ts` → `PRO2_LIBTV_DRAG_ANYWHERE_TYPES`（源自 `LIBTV_DRAG_ANYWHERE_NODE_TYPES`）  
+> 分镜 1.0 细则见 [`storyboard-video-1.0-node-interaction-spec.md`](./storyboard-video-1.0-node-interaction-spec.md)  
+> 影视 2.0 色彩/薄卡见 [`story-pro2-design-spec.md`](./story-pro2-design-spec.md)
+
+## 1. 共用组件（禁止第二套实现）
+
+| 能力 | 组件 / 模块 | 说明 |
+| --- | --- | --- |
+| 侧栏 `+` | `Pro2NodeSidePlus` | 单击菜单 + 按住拖线 |
+| 顶栏工具条 | `Pro2ImageNodeToolbar` | 有图 + 唯一选中；须 `passNodeDrag` |
+| 空态内嵌 Dock | `Pro2ImageNodeEmbeddedDock` / `Sbv1ImageNodeEmbeddedDock` | 占满卡片 stage，全部 `nodrag`；**三视图节点禁用**（见 §2.3） |
+| 有图浮动 Dock | `Pro2ImageInputDock` / `Sbv1ImageInputDock` | 锚点 `data-pro2-dock-anchor` + `usePro2DockPlacement` |
+| Dock 壳层 | `Pro2InputDockShell` · `Pro2DockPasteZone` · `Pro2DockRefImages` · `Pro2DockUpstreamChips` · `Pro2DockStyleButton` | 模型选择须 `EnginePicker` |
+| 画布底 Dock | `Sbv1Dock` · `LIBTV_CANVAS_DOCK_BAR_CLASS` | 分镜 1.0 / 2.0 底部磁吸栏共用 |
+| 悬停预览 | `MediaHoverBox` | 仅 Eye 小圆钮 `nodrag` |
+| 空态 / 错误 | `Pro2MediaNodeEmptyState` · `Pro2MediaNodeErrorState` | |
+| 角标缩放 | `Pro2NodeResizer` | 组内节点隐藏 |
+| 框选工具条 | `SelectionToolbar` / `Pro2SelectionToolbar` | 打组 / 自动整理 / 保存资产 |
+| 媒体组顶栏 | `Pro2MediaGroupToolbar` · `Pro2MediaGroupToolbarPanel` | 样式 **同** `Pro2ImageNodeToolbar`（`PRO2_IMAGE_NODE_TOOLBAR_*`） |
+
+**edition 差异**仅在于：节点 `type`、spawn 映射（`pro2-spawn-nodes` vs `sbv1-spawn-nodes`）、菜单项（`PRO2_*_ADD_MENU` vs `SBV1_*_ADD_MENU`）。**样式与交互不得分叉。**
+
+## 2. 整卡拖动
+
+| 规则 | 说明 |
+| --- | --- |
+| 登记 type | 见 `LIBTV_DRAG_ANYWHERE_NODE_TYPES` |
+| React Flow | **不得** 设置 `node.dragHandle` |
+| 可拖区域 | 卡片 Header + Stage（预览 / 空态）；`LIBTV_CARD_DRAG_CLASS` |
+| 禁止拖动 | Dock 全部 · `MediaHoverBox` Eye · 侧 `+` 菜单 · 顶栏工具条按钮（工具条空白区可拖：`passNodeDrag`） |
+| 性能 | 拖动中只写 RF 本地；松手写 zustand（`flow-canvas.tsx` `deferStoreGraphSyncRef`） |
+| 持久化 | 松手：`isCanvasPositionCommitOnly` 写 store（不 normalize）；`onNodeDragStop` 从 RF 兜底 `commitFlowNodePositions`；触发 `canvas:flush-autosave` 立即保存；`pagehide` 再 flush 一次 |
+
+### 2.1 壳层结构（所有 LibTV 媒体卡统一）
+
+```
+LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
+  Handle(s)
+  Pro2NodeSidePlus（选中时）
+  Pro2ImageNodeToolbar（有图 + 唯一选中，passNodeDrag）
+  LIBTV_CARD_SHELL_CLASS + LIBTV_CARD_DRAG_CLASS
+    ├─ Header（图标 + 标题 + 状态）
+    └─ Stage（预览 / 空态 / 内嵌 Dock[nodrag]）
+```
+
+**禁止**：Pro2 外置标题 + `RF_NODE_DRAG_HANDLE` + `PRO2_MEDIA_CARD_SHELL`（旧图片节点布局）。
+
+### 2.2 排列持久化（禁止刷新回弹）
+
+| 步骤 | 实现 |
+| --- | --- |
+| 拖动中 | 仅 RF 本地 `rfNodes` 更新（`deferStoreGraphSyncRef`） |
+| 松手 | `handleNodesChange` 坐标提交 **或** `commitFlowNodePositions` 从 `getNodes()` 同步 |
+| 保存 | `graphRevision` bump → `canvas:flush-autosave` **立即** autosave（不等 1.5s debounce） |
+| 刷新 | `hydrate` 读已保存 `position`；**禁止**无用户操作时跑 `reflowStoryPro2Workspace` |
+
+### 2.3 三视图 Dock（Pro2 定型）
+
+| 规则 | 说明 |
+| --- | --- |
+| 禁止内嵌 Dock | `pro2ThreeViewNodeUsesEmbeddedDock` **恒为 false**；卡片 stage 不得被 `nodrag` 表单占满 |
+| 浮动 Dock | 选中唯一 `story-pro2-three-view` → `Pro2ThreeViewInputDock`（锚点 `data-pro2-dock-anchor`） |
+| 对齐对象 | 与 `story-pro2-image` · `pro2MediaRole: character-three-view` 一致：空态仅 `Pro2MediaNodeEmptyState`，整卡可拖 |
+
+## 5. 节点顶栏工具条（`Pro2ImageNodeToolbar`）
+
+> **唯一实现**：`components/canvas/pro2/pro2-image-node-toolbar.tsx`  
+> 常量：`PRO2_IMAGE_NODE_TOOLBAR_*`（同文件导出）  
+> 适用：`story-pro2-image` · `story-pro2-three-view` · `sbv1-image` 等有图媒体节点；**禁止**另写第二套顶栏。
+
+### 5.1 出现条件
+
+| 条件 | 说明 |
+| --- | --- |
+| 有图 | `ossUrl` / `blobUrl` 有效 |
+| 唯一选中 | 当前节点为画布唯一选中项（`soleSelected`） |
+| 非生成中 | 无 `uploading` / running 态 |
+
+### 5.2 布局与样式
+
+| 项 | 规范 |
+| --- | --- |
+| 位置 | 卡片**上方**居中；`absolute left-1/2 -translate-x-1/2` · `style={{ top: -PRO2_IMAGE_NODE_TOOLBAR_OFFSET_TOP_PX }}`（默认 **60px**） |
+| 壳层 | `PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS`：`rounded-xl` · `border-white/10` · `bg-[#1c1c1e]/96` · `backdrop-blur-xl` · 阴影 |
+| 文案钮 | `PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS`：`text-[11px]` · icon + label · 可选 `ChevronDown` / `NEW` 角标 |
+| 图标钮 | `PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS`：`size-8` · 仅 icon（下载 / 放大预览等） |
+| 分隔 | `PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS` · 分组之间插入 |
+| 拖动 | **必须** `passNodeDrag`：壳层 `pointer-events-none`，仅 `button` 可点；空白区仍可拖节点 |
+
+### 5.3 内容分区（图片节点现行）
+
+1. **生成增强**：全景 · 多角度 · 打光  
+2. **布局 / 画质**：九宫格 · 高清 · 宫格切分（带下拉 ChevronDown）  
+3. **操作**：智能编辑 · 下载 · 放大预览（`Maximize2`）
+
+其他 LibTV 节点若需顶栏，**复用同一壳层与按钮 class**，只替换业务项；不得改圆角/底色/字号。
+
+**媒体组顶栏**（三视图 / 分镜图组选中时）：须走 `Pro2MediaGroupToolbarPanel`，壳层与 §5.2 完全一致；`passNodeDrag` 默认开启。
+
+## 6. Store 约束
+
+以下路径 **必须** 调用 `ensureNodeDragHandles`：
+
+- `hydrate` / `finalizeHydratedGraph`
+- `addNode` / `addNodeInGroup` / `duplicateNode`
+- `flow-canvas.tsx` 写入 RF 前
+
+若节点带 `dragHandle: '.canvas-node-drag-handle'` 但 DOM 无该类，则 **整节点无法拖动**。
+
+## 7. Code Review 清单
+
+- [ ] 新 LibTV 节点 type 已加入 `LIBTV_DRAG_ANYWHERE_NODE_TYPES`
+- [ ] 壳层使用 `LIBTV_*` token，未混用外置标题栏 `dragHandle`
+- [ ] Dock / Eye / 侧 + 已 `nodrag`；顶栏 `passNodeDrag`
+- [ ] 空态上传用 `role="button"` div，非整卡 `<button>`
+- [ ] 未新建第二套 Dock / 工具条 / 侧 + 组件
+- [ ] 有图顶栏走 `Pro2ImageNodeToolbar` + `PRO2_IMAGE_NODE_TOOLBAR_*` 常量
+- [ ] 拖动松手后刷新位置不变（`commitFlowNodePositions` + flush autosave）

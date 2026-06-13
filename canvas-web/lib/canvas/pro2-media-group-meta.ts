@@ -110,3 +110,47 @@ export function isPro2StyledGroup(
   if (d.pro2Kind || d.pro2Styled) return true;
   return groupHasPro2MediaChildren(node.id, allNodes);
 }
+
+const PRO2_MEDIA_GROUP_Z_BASE = 10;
+const PRO2_MEDIA_GROUP_Z_SELECTED = 1200;
+
+/** 选中媒体组时整组叠在连线与其它节点之上；组框 z 低于子图以便交互 */
+export function syncPro2MediaGroupZIndex(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  const selectedGroup = nodes.find(
+    (n) =>
+      n.type === "group" &&
+      n.selected &&
+      isPro2StyledGroup(n, nodes),
+  );
+  const selectedId = selectedGroup?.id;
+  const styledGroupIds = new Set(
+    nodes
+      .filter((n) => n.type === "group" && isPro2StyledGroup(n, nodes))
+      .map((n) => n.id),
+  );
+  if (!styledGroupIds.size) return nodes;
+
+  let changed = false;
+  const next = nodes.map((n) => {
+    if (n.type === "group" && styledGroupIds.has(n.id)) {
+      const z =
+        n.id === selectedId ? PRO2_MEDIA_GROUP_Z_SELECTED : PRO2_MEDIA_GROUP_Z_BASE;
+      if (n.zIndex === z) return n;
+      changed = true;
+      return { ...n, zIndex: z };
+    }
+    if (n.parentId && styledGroupIds.has(n.parentId)) {
+      const z =
+        n.parentId === selectedId
+          ? PRO2_MEDIA_GROUP_Z_SELECTED + 1
+          : PRO2_MEDIA_GROUP_Z_BASE + 1;
+      if (n.zIndex === z) return n;
+      changed = true;
+      return { ...n, zIndex: z };
+    }
+    return n;
+  });
+  return changed ? next : nodes;
+}

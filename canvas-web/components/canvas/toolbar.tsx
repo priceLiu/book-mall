@@ -7,6 +7,7 @@ import {
   BookmarkPlus,
   BookOpen,
   Film,
+  History,
   LayoutGrid,
   LayoutTemplate,
   Loader2,
@@ -30,6 +31,7 @@ export function CanvasToolbar({
   onRunAll,
   onSaveTemplate,
   onOpenMyTemplates,
+  onOpenMyHistory,
   onOpenMyCharacters,
   onOpenMySavedScripts,
   onOpenMyVideoLibrary,
@@ -52,6 +54,7 @@ export function CanvasToolbar({
   onRunAll: () => void;
   onSaveTemplate?: () => void;
   onOpenMyTemplates?: () => void;
+  onOpenMyHistory?: () => void;
   onOpenMyCharacters?: () => void;
   onOpenMySavedScripts?: () => void;
   onOpenMyVideoLibrary?: () => void;
@@ -129,6 +132,17 @@ export function CanvasToolbar({
           {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
           手动保存
         </button>
+        {onOpenMyHistory ? (
+          <button
+            type="button"
+            onClick={onOpenMyHistory}
+            className="inline-flex items-center gap-1 rounded-md border border-violet-400/25 bg-violet-500/8 px-2 py-1 text-[11px] text-violet-100/90 hover:border-violet-400/40 hover:bg-violet-500/15 hover:text-violet-50"
+            title="查看自动/手动保存的历史版本（每项目最多 15 条）"
+          >
+            <History className="size-3" />
+            我的历史
+          </button>
+        ) : null}
         {onOpenMyTemplates ? (
           <button
             type="button"

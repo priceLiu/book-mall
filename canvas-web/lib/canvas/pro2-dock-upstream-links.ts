@@ -26,7 +26,8 @@ function imageUrlFromNode(node: CanvasFlowNode): string | undefined {
   if (
     node.type === "image" ||
     node.type === "story-pro2-image" ||
-    node.type === "story-pro2-three-view"
+    node.type === "story-pro2-three-view" ||
+    node.type === "sbv1-image"
   ) {
     const d = node.data as unknown as ImageNodeData;
     return d.ossUrl ?? d.blobUrl;
@@ -125,7 +126,9 @@ function linkFromSource(
 }
 
 function targetInputHandle(nodeType: string): string {
-  if (nodeType === "story-pro2-image") return "in_image";
+  if (nodeType === "story-pro2-image" || nodeType === "sbv1-image") {
+    return "in_image";
+  }
   return "in_text";
 }
 

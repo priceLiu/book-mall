@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Boxes,
   Clock,
@@ -10,13 +10,13 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { handlePro2ToolbarAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import {
   PRO2_ASSET_LIB_SUBMENU,
   PRO2_TOOLBAR_ADD_MENU,
 } from "@/lib/canvas/pro2-add-node-menu";
+import { Sbv1Dock, type Sbv1DockItem } from "@/components/canvas/sbv1/sbv1-dock";
 import { Pro2AddNodePopover } from "./pro2-add-node-popover";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 
@@ -24,6 +24,7 @@ export type Pro2CanvasToolbarProps = {
   onOpenStyleLibrary?: () => void;
 };
 
+/** 2.0 画布底部 Dock · 样式对齐分镜 1.0 `Sbv1Dock`，功能保持 Pro2 菜单逻辑 */
 export function Pro2CanvasToolbar({
   onOpenStyleLibrary,
 }: Pro2CanvasToolbarProps) {
@@ -65,45 +66,64 @@ export function Pro2CanvasToolbar({
     [addNode, setNodes, alert, onOpenStyleLibrary],
   );
 
+  const dockItems = useMemo<Sbv1DockItem[]>(
+    () => [
+      {
+        id: "add-nodes",
+        name: menuOpen ? "关闭菜单" : "添加节点",
+        icon: menuOpen ? (
+          <X strokeWidth={1.75} />
+        ) : (
+          <Plus strokeWidth={1.75} />
+        ),
+        color: "bg-gradient-to-br from-violet-400 to-purple-600",
+        active: menuOpen,
+        onClick: onToggleMenu,
+      },
+      {
+        id: "workflow",
+        name: "节点",
+        icon: <Workflow strokeWidth={1.75} />,
+        color: "bg-gradient-to-br from-zinc-500 to-zinc-700",
+        disabled: true,
+      },
+      {
+        id: "asset-lib",
+        name: "素材库",
+        icon: <Boxes strokeWidth={1.75} />,
+        color: "bg-gradient-to-br from-fuchsia-400 to-violet-600",
+        active: assetMenuOpen,
+        onClick: onToggleAssetMenu,
+      },
+      {
+        id: "history",
+        name: "生成记录",
+        icon: <Clock strokeWidth={1.75} />,
+        color: "bg-gradient-to-br from-zinc-500 to-zinc-700",
+        disabled: true,
+      },
+      {
+        id: "shortcuts",
+        name: "快捷键",
+        icon: <Keyboard strokeWidth={1.75} />,
+        color: "bg-gradient-to-br from-zinc-500 to-zinc-700",
+        disabled: true,
+      },
+      {
+        id: "help",
+        name: "帮助",
+        icon: <HelpCircle strokeWidth={1.75} />,
+        color: "bg-gradient-to-br from-zinc-500 to-zinc-700",
+        disabled: true,
+      },
+    ],
+    [menuOpen, assetMenuOpen, onToggleMenu, onToggleAssetMenu],
+  );
+
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 bottom-6 z-[70] flex justify-center px-4">
-        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/12 bg-[#1c1c1e]/95 px-2 py-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-          <button
-            type="button"
-            className={cn(
-              "flex size-9 items-center justify-center rounded-xl transition",
-              menuOpen
-                ? "bg-white text-black"
-                : "bg-white/10 text-white hover:bg-white/18",
-            )}
-            title={menuOpen ? "关闭" : "添加节点"}
-            onClick={onToggleMenu}
-          >
-            {menuOpen ? <X className="size-4" /> : <Plus className="size-4" />}
-          </button>
-          <div className="mx-1 h-6 w-px bg-white/12" />
-          <ToolbarIcon icon={Workflow} title="节点" disabled />
-          <button
-            type="button"
-            className={cn(
-              "relative flex size-8 items-center justify-center rounded-lg transition",
-              assetMenuOpen
-                ? "bg-white/14 text-white"
-                : "text-white/55 hover:bg-white/8 hover:text-white/85",
-            )}
-            title="素材库"
-            onClick={onToggleAssetMenu}
-          >
-            <Boxes className="size-4" />
-            {assetMenuOpen ? (
-              <span className="absolute -top-0.5 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-sky-400" />
-            ) : null}
-          </button>
-          <ToolbarIcon icon={Clock} title="生成记录" disabled />
-          <ToolbarIcon icon={Keyboard} title="快捷键" disabled />
-          <ToolbarIcon icon={HelpCircle} title="帮助" disabled />
-        </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-5 z-[70] flex justify-center px-4">
+        <Sbv1Dock items={dockItems} />
       </div>
       <Pro2AddNodePopover
         open={menuOpen}
@@ -120,26 +140,5 @@ export function Pro2CanvasToolbar({
         onPick={onPick}
       />
     </>
-  );
-}
-
-function ToolbarIcon({
-  icon: Icon,
-  title,
-  disabled,
-}: {
-  icon: typeof Plus;
-  title: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      title={title}
-      className="flex size-8 items-center justify-center rounded-lg text-white/55 transition hover:bg-white/8 hover:text-white/85 disabled:cursor-not-allowed disabled:opacity-35"
-    >
-      <Icon className="size-4" />
-    </button>
   );
 }

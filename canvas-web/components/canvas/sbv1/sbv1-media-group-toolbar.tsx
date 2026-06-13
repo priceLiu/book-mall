@@ -10,6 +10,7 @@ import {
   relayoutSbv1MediaGroup,
 } from "@/lib/canvas/sbv1-media-group-layout";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
+import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import { CanvasPillToolbar, CanvasToolIcon, CanvasToolbarBadge } from "../canvas-floating-toolbar";
 
 const TOOLBAR_HEIGHT = 44;
@@ -109,14 +110,14 @@ export function Sbv1MediaGroupToolbar({
       >
         <CanvasToolIcon
           label="重排"
-          hint="参考图与视频引擎重新纳入组框"
+          hint={`参考图与${SBV1_VIDEO_COMPOSE_LABEL}重新纳入组框`}
           onClick={() => relayoutSbv1MediaGroup(setNodes, group.id, edges)}
         >
           <LayoutGrid className="size-[18px]" strokeWidth={1.75} />
         </CanvasToolIcon>
         <CanvasToolIcon
           label="解组"
-          hint="保留参考图与视频引擎，移除分组容器"
+          hint={`保留参考图与${SBV1_VIDEO_COMPOSE_LABEL}，移除分组容器`}
           danger
           onClick={() => ungroup(group.id)}
         >

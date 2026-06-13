@@ -29,14 +29,12 @@ import {
 import { Pro2DockStyleButton } from "./pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "./pro2-dock-upstream-chips";
 
+/** 与 `story-pro2-image` · character-three-view 一致：仅用底部浮动 Dock，卡片始终可整卡拖动 */
 export function pro2ThreeViewNodeUsesEmbeddedDock(
-  d: StoryPro2ThreeViewNodeData,
-  opts: { selected: boolean; soleSelected: boolean },
+  _d: StoryPro2ThreeViewNodeData,
+  _opts: { selected: boolean; soleSelected: boolean },
 ): boolean {
-  if (!opts.selected || !opts.soleSelected) return false;
-  if (d.uploading) return false;
-  if (d.ossUrl ?? d.blobUrl) return false;
-  return true;
+  return false;
 }
 
 /** 2.0 三视图节点 · 内嵌输入区（空态时占满卡片） */

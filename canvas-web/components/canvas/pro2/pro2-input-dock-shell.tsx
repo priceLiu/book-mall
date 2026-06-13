@@ -2,9 +2,13 @@
 
 import type { ReactNode } from "react";
 import {
-  PRO2_DOCK_BORDER,
+  LIBTV_INPUT_DOCK_BG,
+  LIBTV_INPUT_DOCK_BORDER,
+  LIBTV_INPUT_DOCK_DIVIDER,
+  LIBTV_INPUT_DOCK_SHELL_CLASS,
+} from "@/lib/canvas/libtv-node-chrome";
+import {
   PRO2_DOCK_HEIGHT,
-  PRO2_DOCK_SHELL_BG,
   PRO2_DOCK_WIDTH,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import { cn } from "@/lib/utils";
@@ -52,13 +56,10 @@ export function Pro2InputDockShell({
       onWheel={(e) => e.stopPropagation()}
     >
       <div
-        className={cn(
-          "flex flex-col overflow-hidden rounded-2xl border shadow-[0_16px_48px_rgba(0,0,0,0.45)] backdrop-blur-xl",
-          className,
-        )}
+        className={cn(LIBTV_INPUT_DOCK_SHELL_CLASS, className)}
         style={{
-          borderColor: PRO2_DOCK_BORDER,
-          background: PRO2_DOCK_SHELL_BG,
+          borderColor: LIBTV_INPUT_DOCK_BORDER,
+          background: LIBTV_INPUT_DOCK_BG,
           height: PRO2_DOCK_HEIGHT,
           maxHeight: PRO2_DOCK_HEIGHT,
         }}
@@ -76,7 +77,7 @@ export function Pro2InputDockShell({
 export function Pro2DockContextBar({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <div className="flex min-h-[44px] shrink-0 flex-wrap items-center gap-1.5 border-b border-white/[0.06] px-3 py-2">
+    <div className={cn("flex min-h-[44px] shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-2", LIBTV_INPUT_DOCK_DIVIDER)}>
       {children}
     </div>
   );
@@ -84,7 +85,7 @@ export function Pro2DockContextBar({ children }: { children: ReactNode }) {
 
 export function Pro2DockToolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="flex shrink-0 items-center justify-between gap-2 border-t border-white/[0.06] px-2 py-1.5">
+    <div className={cn("flex shrink-0 items-center justify-between gap-2 border-t px-2 py-1.5", LIBTV_INPUT_DOCK_DIVIDER)}>
       {children}
     </div>
   );

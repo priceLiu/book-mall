@@ -68,8 +68,9 @@ import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-t
 import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
 import { SBV1_BUILTIN_TEMPLATE_ID } from "@/lib/canvas/project-edition";
-
-const AUTOSAVE_DEBOUNCE_MS = 1500;
+import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
+import { MyCanvasHistoryPanel } from "@/components/canvas/my-canvas-history-panel";
+import { CANVAS_AUTOSAVE_DEBOUNCE_MS, getCanvasAutosaveIntervalMs } from "@/lib/canvas/canvas-autosave-settings";
 const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 
 function Inner({ projectId }: { projectId: string }) {
@@ -197,6 +198,7 @@ function Inner({ projectId }: { projectId: string }) {
   const [myProjectCharacterAssetsOpen, setMyProjectCharacterAssetsOpen] =
     useState(false);
   const [styleLibraryOpen, setStyleLibraryOpen] = useState(false);
+  const [myHistoryOpen, setMyHistoryOpen] = useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -305,6 +307,7 @@ function Inner({ projectId }: { projectId: string }) {
   const autosavePendingRef = useRef(false);
   const autosaveProjectRef = useRef(project);
   const autosaveBaseRef = useRef(base);
+  const runAutosaveRef = useRef<() => Promise<void>>(async () => {});
   autosaveProjectRef.current = project;
   autosaveBaseRef.current = base;
 
@@ -337,11 +340,22 @@ function Inner({ projectId }: { projectId: string }) {
         const patch: {
           canvas: typeof graph;
           thumbnailUrl?: string;
-        } = { canvas: graph };
+          historySnapshot?: { source: "autosave" };
+        } = {
+          canvas: graph,
+          historySnapshot: { source: "autosave" },
+        };
         if (thumb && thumb !== proj.thumbnailUrl) {
           patch.thumbnailUrl = thumb;
         }
-        await patchCanvasProject(bookBase, projectId, patch);
+        const { historyItem } = await patchCanvasProject(
+          bookBase,
+          projectId,
+          patch,
+        );
+        if (historyItem) {
+          window.dispatchEvent(new CustomEvent("canvas:history-updated"));
+        }
         loadedNodeCountRef.current = graph.nodes.length;
         if (patch.thumbnailUrl) {
           setProject((p) =>
@@ -364,6 +378,8 @@ function Inner({ projectId }: { projectId: string }) {
 
     const scheduleAutosave = () => {
       if (!canvasReadyRef.current) return;
+      const intervalMs = getCanvasAutosaveIntervalMs();
+      if (intervalMs === 0) return;
       const state = useCanvasStore.getState();
       if (
         state.nodes.length === 0 &&
@@ -376,10 +392,11 @@ function Inner({ projectId }: { projectId: string }) {
       if (autosaveTimerRef.current !== null) {
         window.clearTimeout(autosaveTimerRef.current);
       }
+      const delay = Math.max(CANVAS_AUTOSAVE_DEBOUNCE_MS, intervalMs);
       autosaveTimerRef.current = window.setTimeout(() => {
         autosaveTimerRef.current = null;
         void runAutosave();
-      }, AUTOSAVE_DEBOUNCE_MS);
+      }, delay);
     };
 
     const unsub = useCanvasStore.subscribe((state, prev) => {
@@ -394,8 +411,24 @@ function Inner({ projectId }: { projectId: string }) {
       scheduleAutosave();
     });
 
+    runAutosaveRef.current = runAutosave;
+
+    const flushAutosaveNow = () => {
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+      void runAutosave();
+    };
+
+    const onFlushAutosave = () => flushAutosaveNow();
+    window.addEventListener("canvas:flush-autosave", onFlushAutosave);
+    window.addEventListener("pagehide", onFlushAutosave);
+
     return () => {
       unsub();
+      window.removeEventListener("canvas:flush-autosave", onFlushAutosave);
+      window.removeEventListener("pagehide", onFlushAutosave);
       if (autosaveTimerRef.current !== null) {
         window.clearTimeout(autosaveTimerRef.current);
       }
@@ -421,11 +454,15 @@ function Inner({ projectId }: { projectId: string }) {
       const patch: {
         canvas: typeof graph;
         thumbnailUrl?: string;
-      } = { canvas: graph };
+        historySnapshot: { source: "manual"; label: string };
+      } = {
+        canvas: graph,
+        historySnapshot: { source: "manual", label: "手动保存" },
+      };
       if (thumb && thumb !== project.thumbnailUrl) {
         patch.thumbnailUrl = thumb;
       }
-      await patchCanvasProject(base, projectId, patch);
+      const { historyItem } = await patchCanvasProject(base, projectId, patch);
       loadedNodeCountRef.current = graph.nodes.length;
       if (patch.thumbnailUrl) {
         setProject((p) =>
@@ -433,13 +470,30 @@ function Inner({ projectId }: { projectId: string }) {
         );
       }
       setLastSavedAt(new Date());
-      setSaveError(null);
+      if (historyItem) {
+        window.dispatchEvent(new CustomEvent("canvas:history-updated"));
+        setSaveError(null);
+      } else {
+        setSaveError("项目已保存，但写入「我的历史」失败，请稍后重试。");
+      }
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "保存失败");
     } finally {
       setSaving(false);
     }
   }, [base, project, projectId, toGraph]);
+
+  const restoreFromHistory = useCallback(
+    async (canvas: unknown) => {
+      useCanvasStore.temporal.getState().pause();
+      hydrate(projectId, canvas as never);
+      useCanvasStore.temporal.getState().clear();
+      useCanvasStore.temporal.getState().resume();
+      setLastSavedAt(new Date());
+      setSaveError(null);
+    },
+    [hydrate, projectId],
+  );
 
   const commitProjectName = useCallback(async () => {
     if (!base || !project) return;
@@ -552,7 +606,7 @@ function Inner({ projectId }: { projectId: string }) {
     if (!tpl) return;
     const ok = await dialogs.confirm({
       title: "载入分镜视频 1.0 模板？",
-      message: "将恢复默认视频引擎节点，当前空白画布会被覆盖。",
+      message: `将恢复默认${SBV1_VIDEO_COMPOSE_LABEL}节点，当前空白画布会被覆盖。`,
       confirmLabel: "载入",
     });
     if (!ok) return;
@@ -645,6 +699,7 @@ function Inner({ projectId }: { projectId: string }) {
             onRedo={redo}
             onRunAll={runAll}
             onOpenMyTemplates={() => setMyTemplatesOpen(true)}
+            onOpenMyHistory={() => setMyHistoryOpen(true)}
             onOpenMyCharacters={() => setMyCharactersOpen(true)}
             onOpenMyVideoLibrary={() => setMyVideoLibraryOpen(true)}
             onOpenMySavedScripts={
@@ -664,6 +719,12 @@ function Inner({ projectId }: { projectId: string }) {
           />
           <GatewayLinkBanner />
         </div>
+      <MyCanvasHistoryPanel
+        open={myHistoryOpen}
+        onClose={() => setMyHistoryOpen(false)}
+        projectId={projectId}
+        onRestore={restoreFromHistory}
+      />
       <MyTemplatesPanel
         open={myTemplatesOpen}
         onClose={() => setMyTemplatesOpen(false)}
@@ -730,7 +791,7 @@ function Inner({ projectId }: { projectId: string }) {
             <div className="pointer-events-auto max-w-sm rounded-xl border border-white/10 bg-[var(--canvas-surface)]/95 px-5 py-4 text-center shadow-xl">
               <p className="text-sm font-medium text-white">空白画布</p>
               <p className="mt-2 text-xs leading-relaxed text-[var(--canvas-muted)]">
-                使用底部 Dock 添加图片、视频引擎，或粘贴图片到画布。
+                使用底部 Dock 添加图片、{SBV1_VIDEO_COMPOSE_LABEL}，或粘贴图片到画布。
               </p>
               <button
                 type="button"

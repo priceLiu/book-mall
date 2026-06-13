@@ -19,9 +19,11 @@ import type {
 import { GROUP_COLOR_PRESETS } from "@/lib/canvas/types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { cn } from "@/lib/utils";
-
-const BTN =
-  "nodrag flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/75 transition hover:bg-white/8 hover:text-white/95 disabled:cursor-not-allowed disabled:opacity-40";
+import {
+  PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS,
+  PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
+  PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS,
+} from "./pro2-image-node-toolbar";
 
 export type Pro2MediaGroupKind = "character-board" | "frame-board";
 
@@ -30,6 +32,8 @@ export type Pro2MediaGroupToolbarPanelProps = {
   kind: Pro2MediaGroupKind | null;
   className?: string;
   style?: React.CSSProperties;
+  /** 与图片节点顶栏一致：空白区可拖组，仅按钮 nodrag */
+  passNodeDrag?: boolean;
   onMouseDown?: (e: React.MouseEvent) => void;
 };
 
@@ -67,6 +71,7 @@ export function Pro2MediaGroupToolbarPanel({
   kind,
   className,
   style,
+  passNodeDrag = true,
   onMouseDown,
 }: Pro2MediaGroupToolbarPanelProps) {
   const nodes = useCanvasStore((s) => s.nodes);
@@ -192,19 +197,31 @@ export function Pro2MediaGroupToolbarPanel({
   return (
     <div className={className} style={style}>
       <div
-        className="pointer-events-auto flex items-center gap-1 rounded-xl border border-white/12 bg-[#1c1c1e]/95 px-2 py-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-        onMouseDown={onMouseDown}
+        className={cn(
+          PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
+          passNodeDrag
+            ? "pointer-events-none [&_button]:pointer-events-auto"
+            : "nodrag pointer-events-auto",
+        )}
+        onMouseDown={
+          passNodeDrag
+            ? undefined
+            : (e) => {
+                onMouseDown?.(e);
+                e.stopPropagation();
+              }
+        }
       >
         <span
           aria-hidden
-          className="ml-1 size-2.5 shrink-0 rounded-full bg-white/90"
+          className="ml-0.5 size-2.5 shrink-0 rounded-full bg-white/90 nodrag pointer-events-none"
         />
-        <LayoutGrid className="size-3.5 text-white/45" />
-        <span className="mx-0.5 h-4 w-px bg-white/12" />
+        <LayoutGrid className="size-3.5 text-white/45 nodrag pointer-events-none" />
+        <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
         {canRegenerate ? (
           <button
             type="button"
-            className={cn(BTN)}
+            className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
             title={
               kind === "character-board"
                 ? "重新生成全部三视图"
@@ -218,7 +235,7 @@ export function Pro2MediaGroupToolbarPanel({
         ) : null}
         <button
           type="button"
-          className={cn(BTN)}
+          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
           title="改名 / 改边框色"
           onClick={openEdit}
         >
@@ -227,7 +244,7 @@ export function Pro2MediaGroupToolbarPanel({
         </button>
         <button
           type="button"
-          className={cn(BTN)}
+          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
           title="批量下载组内图片"
           disabled={!downloadable.length || downloading}
           onClick={() => void onBatchDownload()}
@@ -241,7 +258,7 @@ export function Pro2MediaGroupToolbarPanel({
         </button>
         <button
           type="button"
-          className={cn(BTN)}
+          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
           title="解组"
           onClick={() => ungroup(groupId)}
         >

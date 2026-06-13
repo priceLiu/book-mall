@@ -8,7 +8,12 @@ import {
 } from "./story-column-display";
 import { applyStoryColumnHeights, isStoryMediaColumnType } from "./story-column-layout";
 import { RF_NODE_DRAG_HANDLE_SELECTOR } from "./react-flow-classes";
-import { reconcilePro2MediaGroupMetadata } from "./pro2-media-group-meta";
+import {
+  isPro2StyledGroup,
+  reconcilePro2MediaGroupMetadata,
+  syncPro2MediaGroupZIndex,
+} from "./pro2-media-group-meta";
+import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 
 const GROUP_PADDING = 28;
 const GROUP_HEADER = 40;
@@ -837,19 +842,23 @@ export function normalizeCanvasNodes(
     : sized;
 
   if (!hasStoryTemplateGroups(withPro2Groups)) {
-    return ensureNodeDragHandles(
-      sortNodesForReactFlow(repairOrphanParentIds(withPro2Groups)),
-    );
+    const sorted = sortNodesForReactFlow(repairOrphanParentIds(withPro2Groups));
+    const stacked = withPro2Groups.some((n) =>
+      String(n.type ?? "").startsWith("story-pro2-"),
+    )
+      ? syncPro2MediaGroupZIndex(sorted)
+      : sorted;
+    return ensureNodeDragHandles(stacked);
   }
   return ensureNodeDragHandles(applyStoryLayout(withPro2Groups, edges));
 }
 
+import { LIBTV_DRAG_ANYWHERE_NODE_TYPES } from "./libtv-node-chrome";
+
 /** 整卡可拖节点（无 dragHandle 限制；交互区仍用 nodrag） */
-const PRO2_LIBTV_DRAG_ANYWHERE_TYPES = new Set([
-  "story-pro2-style-asset",
-  "story-pro2-frame",
-  "sbv1-video-engine",
-]);
+const PRO2_LIBTV_DRAG_ANYWHERE_TYPES = new Set<string>(
+  LIBTV_DRAG_ANYWHERE_NODE_TYPES,
+);
 
 /** 为节点补上 dragHandle，避免 flow-canvas 每帧克隆全图 nodes */
 export function ensureNodeDragHandles(
@@ -858,7 +867,11 @@ export function ensureNodeDragHandles(
   let changed = false;
   const next = nodes.map((n) => {
     const t = n.type ?? "";
-    if (PRO2_LIBTV_DRAG_ANYWHERE_TYPES.has(t)) {
+    const dragAnywhere =
+      PRO2_LIBTV_DRAG_ANYWHERE_TYPES.has(t) ||
+      (t === "group" &&
+        (isPro2StyledGroup(n, nodes) || isSbv1MediaGroup(n, nodes)));
+    if (dragAnywhere) {
       if (!n.dragHandle) return n;
       changed = true;
       const { dragHandle: _d, ...rest } = n;

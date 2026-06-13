@@ -16,6 +16,7 @@ import {
   createSbv1PortraitLivenessSession,
   pollSbv1PortraitLivenessResult,
 } from "@/lib/canvas/sbv1-portrait-liveness-api";
+import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 
 const MODAL_Z = 1250;
 const POLL_MS = 2500;
@@ -270,7 +271,7 @@ export function Sbv1PortraitLivenessModal({
                 GroupId: {groupId}
               </p>
               <p className="mt-2 text-[11px] text-white/45">
-                已写入本视频引擎节点；生成视频时可引用 asset:// 人像资产。
+                已写入本{SBV1_VIDEO_COMPOSE_LABEL}节点；生成视频时可引用 asset:// 人像资产。
               </p>
             </div>
           ) : null}

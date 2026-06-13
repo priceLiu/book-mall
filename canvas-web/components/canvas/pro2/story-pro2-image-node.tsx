@@ -26,17 +26,19 @@ import {
   PRO2_RIGHT_ADD_MENU,
 } from "@/lib/canvas/pro2-add-node-menu";
 import {
-  PRO2_MEDIA_CARD_SHELL_CLASS,
-  PRO2_MEDIA_NODE_TITLE_CLASS,
+  LIBTV_CARD_DRAG_CLASS,
+  LIBTV_CARD_SHELL_CLASS,
+  LIBTV_NODE_HANDLE_CLASS,
+  LIBTV_NODE_OUTER_CLASS,
+} from "@/lib/canvas/libtv-node-chrome";
+import {
   PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT,
   PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH,
   PRO2_IMAGE_NODE_MIN_HEIGHT,
   PRO2_IMAGE_NODE_MIN_WIDTH,
   PRO2_IMAGE_NODE_WIDTH,
-  PRO2_NODE_HANDLE_CLASS,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
-import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox } from "../media-hover-box";
 import { Pro2ImageNodeToolbar } from "./pro2-image-node-toolbar";
@@ -64,6 +66,8 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const d = data as unknown as StoryPro2ImageNodeData;
+  const self = nodes.find((n) => n.id === id);
+  const insideGroup = Boolean(self?.parentId);
   const mediaRole = d.pro2MediaRole ?? "generic";
   const isCharacterThreeView = mediaRole === "character-three-view";
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
@@ -135,15 +139,15 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
   const spawnNeighbor = useCallback(
     (side: "left" | "right", nodeType?: string) => {
       if (!nodeType) return;
-      const self = nodes.find((n) => n.id === id);
-      if (!self) return;
+      const selfNode = nodes.find((n) => n.id === id);
+      if (!selfNode) return;
       const gap = 48;
-      const w = self.width ?? PRO2_IMAGE_NODE_WIDTH;
+      const w = selfNode.width ?? PRO2_IMAGE_NODE_WIDTH;
       const x =
         side === "left"
-          ? self.position.x - w - gap
-          : self.position.x + w + gap;
-      const y = self.position.y;
+          ? selfNode.position.x - w - gap
+          : selfNode.position.x + w + gap;
+      const y = selfNode.position.y;
 
       if (nodeType === "story-pro2-starter") {
         const newId = addNode("story-pro2-starter", { x, y }, buildPro2StarterNodeData());
@@ -232,48 +236,10 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
     [spawnNeighbor, alert],
   );
 
-  const characterCardBody = isCharacterThreeView ? (
-    <div
-      className={cn(
-        PRO2_MEDIA_CARD_SHELL_CLASS,
-        "relative min-h-0 flex-1",
-      )}
-    >
-      {isGenerating ? (
-        <div className="flex h-full min-h-[120px] flex-col items-center justify-center gap-2 text-[11px] text-violet-200/70">
-          <Loader2 className="size-6 animate-spin" />
-          <span>生成三视图中…</span>
-        </div>
-      ) : hasImage ? (
-        <MediaHoverBox
-          src={previewUrl}
-          variant="generated"
-          alt={d.label ?? "三视图"}
-          fit="contain"
-          className="h-full min-h-[120px] rounded-xl"
-        />
-      ) : hasError ? (
-        <Pro2MediaNodeErrorState
-          icon={AlertTriangle}
-          title="生成失败"
-          message={d.uploadError}
-        />
-      ) : (
-        <Pro2MediaNodeEmptyState icon={ImageIcon} label="等待生成三视图" />
-      )}
-    </div>
-  ) : null;
-
   return (
-    <div
-      className="image-paste-host relative flex h-full w-full min-h-0 min-w-0 flex-col"
-      data-image-paste-host={id}
-      data-pro2-dock-anchor={id}
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
-    >
+    <>
       <Pro2NodeResizer
-        isVisible={!!selected}
+        isVisible={Boolean(selected && !insideGroup)}
         minWidth={
           isCharacterThreeView
             ? PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH
@@ -285,123 +251,177 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
             : PRO2_IMAGE_NODE_MIN_HEIGHT
         }
       />
-
-      {!isCharacterThreeView ? (
+      <div
+        className={cn(LIBTV_NODE_OUTER_CLASS, "image-paste-host")}
+        data-image-paste-host={id}
+        data-pro2-dock-anchor={id}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+      >
+        {!isCharacterThreeView ? (
+          <Handle
+            id="in_image"
+            type="target"
+            position={Position.Left}
+            className={cn(
+              LIBTV_NODE_HANDLE_CLASS,
+              showSidePlus
+                ? "pointer-events-none opacity-0"
+                : selected
+                  ? "opacity-100"
+                  : "opacity-0 pointer-events-none",
+            )}
+          />
+        ) : null}
         <Handle
-          id="in_image"
-          type="target"
-          position={Position.Left}
+          id="image"
+          type="source"
+          position={Position.Right}
           className={cn(
-            PRO2_NODE_HANDLE_CLASS,
+            LIBTV_NODE_HANDLE_CLASS,
             showSidePlus
               ? "pointer-events-none opacity-0"
               : selected
                 ? "opacity-100"
-                : "opacity-0 pointer-events-none",
+                : "pointer-events-none opacity-0",
           )}
         />
-      ) : null}
-      <Handle
-        id="image"
-        type="source"
-        position={Position.Right}
-        className={cn(
-          PRO2_NODE_HANDLE_CLASS,
-          showSidePlus
-            ? "pointer-events-none opacity-0"
-            : selected
-              ? "opacity-100"
-              : "pointer-events-none opacity-0",
-        )}
-      />
 
-      {showSidePlus ? (
-        <>
-          <Pro2NodeSidePlus
-            side="left"
-            handleId="plus_left"
-            visible
-            sections={PRO2_IMAGE_LEFT_ADD_MENU}
-            onPick={onSidePick("left")}
-          />
-          <Pro2NodeSidePlus
-            side="right"
-            handleId="image"
-            visible
-            sections={PRO2_RIGHT_ADD_MENU}
-            onPick={onSidePick("right")}
-          />
-        </>
-      ) : null}
+        {showSidePlus ? (
+          <>
+            <Pro2NodeSidePlus
+              side="left"
+              handleId="plus_left"
+              visible
+              className="z-[60] -left-5"
+              sections={PRO2_IMAGE_LEFT_ADD_MENU}
+              onPick={onSidePick("left")}
+            />
+            <Pro2NodeSidePlus
+              side="right"
+              handleId="image"
+              visible
+              className="z-[60] -right-5"
+              sections={PRO2_RIGHT_ADD_MENU}
+              onPick={onSidePick("right")}
+            />
+          </>
+        ) : null}
 
-      <p
-        className={cn(RF_NODE_DRAG_HANDLE, PRO2_MEDIA_NODE_TITLE_CLASS)}
-        title="拖动标题栏移动节点"
-      >
-        <ImageIcon className="size-3.5 shrink-0" />
-        {nodeLabel}
-      </p>
-
-      <div className="relative min-h-0 flex-1">
         {showImageTools ? (
           <Pro2ImageNodeToolbar
-            className="-top-[3.75rem] z-40"
+            passNodeDrag
+            className="absolute left-1/2 z-40 -translate-x-1/2"
+            style={{ top: -60 }}
             previewUrl={previewUrl}
             onExpandPreview={() => setPreviewOpen(true)}
           />
         ) : null}
 
-        {characterCardBody ?? (
         <div
           className={cn(
-            PRO2_MEDIA_CARD_SHELL_CLASS,
-            "relative flex h-full min-h-0 flex-col",
+            LIBTV_CARD_SHELL_CLASS,
+            LIBTV_CARD_DRAG_CLASS,
+            "min-h-0 flex-1",
+            selected && "ring-1 ring-violet-400/45",
           )}
         >
-        {d.uploading ? (
-          <div className="nodrag relative flex h-full min-h-[180px] flex-col items-center justify-center gap-2 bg-black/30 px-3">
-            {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="size-3.5 text-violet-300" />
+              <p className="text-xs font-medium text-white">{nodeLabel}</p>
+            </div>
+            {isGenerating ? (
+              <Loader2 className="size-3.5 animate-spin text-violet-300" />
+            ) : null}
+          </div>
+
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
+            {isCharacterThreeView ? (
+              isGenerating ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[11px] text-violet-200/70">
+                  <Loader2 className="size-6 animate-spin" />
+                  <span>生成三视图中…</span>
+                </div>
+              ) : hasImage ? (
+                <MediaHoverBox
+                  src={previewUrl}
+                  variant="generated"
+                  alt={d.label ?? "三视图"}
+                  fit="contain"
+                  className="absolute inset-0"
+                />
+              ) : hasError ? (
+                <Pro2MediaNodeErrorState
+                  icon={AlertTriangle}
+                  title="生成失败"
+                  message={d.uploadError}
+                />
+              ) : (
+                <Pro2MediaNodeEmptyState
+                  icon={ImageIcon}
+                  label="等待生成三视图"
+                />
+              )
+            ) : isGenerating ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/30 px-3">
+                {previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewUrl}
+                    alt=""
+                    className="absolute inset-0 size-full object-contain opacity-40"
+                    draggable={false}
+                  />
+                ) : null}
+                <Loader2 className="relative z-[1] size-6 animate-spin text-violet-200/80" />
+                <span className="relative z-[1] text-[11px] text-violet-100/70">
+                  上传中…
+                </span>
+              </div>
+            ) : hasImage ? (
+              <MediaHoverBox
                 src={previewUrl}
-                alt=""
-                className="absolute inset-0 size-full object-contain opacity-40"
+                variant="generated"
+                alt={d.label ?? "image"}
+                fit="contain"
+                className="absolute inset-0"
               />
+            ) : hasError ? (
+              <div
+                role="button"
+                tabIndex={0}
+                className="absolute inset-0 flex flex-col"
+                onClick={onPick}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onPick();
+                  }
+                }}
+              >
+                <Pro2MediaNodeErrorState
+                  icon={AlertTriangle}
+                  title="上传失败"
+                  message={d.uploadError}
+                />
+              </div>
+            ) : showEmbeddedDock ? (
+              <Pro2ImageNodeEmbeddedDock nodeId={id} onUpload={onPick} />
+            ) : showTryMenu ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4">
+                <Pro2MediaNodeEmptyState
+                  icon={ImageIcon}
+                  label="添加或生成图片"
+                  className="min-h-0 pb-0"
+                />
+                <p className="mt-3 text-[10px] text-white/35">
+                  选中节点以编辑提示词
+                </p>
+              </div>
             ) : null}
-            <Loader2 className="relative z-[1] size-6 animate-spin text-violet-200/80" />
-            <span className="relative z-[1] text-[11px] text-violet-100/70">
-              上传中…
-            </span>
           </div>
-        ) : hasImage ? (
-          <div className="nodrag relative min-h-0 flex-1">
-            <MediaHoverBox
-              src={previewUrl}
-              variant="generated"
-              alt={d.label ?? "image"}
-              fit="contain"
-              className="h-full min-h-[160px] rounded-xl"
-            />
-            {d.uploadError ? (
-              <p className="mt-1 text-center text-[10px] text-red-300">
-                {d.uploadError}
-              </p>
-            ) : null}
-          </div>
-        ) : showEmbeddedDock ? (
-          <Pro2ImageNodeEmbeddedDock nodeId={id} onUpload={onPick} />
-        ) : showTryMenu ? (
-          <div className="nodrag flex h-full min-h-[120px] flex-col items-center justify-center px-3 py-4">
-            <Pro2MediaNodeEmptyState
-              icon={ImageIcon}
-              label="添加或生成图片"
-              className="min-h-0 pb-0"
-            />
-            <p className="mt-3 text-[10px] text-white/35">选中节点以编辑提示词</p>
-          </div>
-        ) : null}
         </div>
-        )}
       </div>
 
       <input
@@ -432,6 +452,6 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
           />
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

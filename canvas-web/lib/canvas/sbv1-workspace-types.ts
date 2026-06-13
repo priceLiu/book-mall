@@ -27,6 +27,14 @@ export type Sbv1ImageNodeData = {
   blobUrl?: string;
   uploading?: boolean;
   uploadError?: string;
+  /** 底部 / 内嵌输入坞 prompt（@ 引用上游） */
+  dockInput?: string;
+  dockStyleRef?: {
+    presetId: string;
+    name: string;
+    prompt: string;
+    imageUrl: string;
+  };
 };
 
 export type Sbv1VideoEngineNodeData = {

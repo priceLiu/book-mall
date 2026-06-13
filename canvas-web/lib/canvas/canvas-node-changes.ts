@@ -52,6 +52,20 @@ export function isCanvasInteractiveGeometryInProgress(
   });
 }
 
+/** 仅拖动坐标提交（松手），无需跑 normalize 以免工作区 reflow 覆盖用户坐标 */
+export function isCanvasPositionCommitOnly(
+  changes: NodeChange[],
+): boolean {
+  if (changes.length === 0) return false;
+  return changes.every((c) => {
+    if (c.type === "select") return true;
+    if (c.type === "position" && "dragging" in c && c.dragging === false) {
+      return true;
+    }
+    return false;
+  });
+}
+
 /** 仅拖角缩放提交（松手），无需跑 normalize 以免节点内容重算/闪动 */
 export function isCanvasDimensionCommitOnly(
   changes: NodeChange[],

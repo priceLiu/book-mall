@@ -31,6 +31,7 @@ import {
   registerCanvasViewportPlacement,
   unregisterCanvasViewportPlacement,
 } from "@/lib/canvas/viewport-placement";
+import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
 import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
 import {
   allImageFilesFromDataTransfer,
@@ -51,6 +52,7 @@ import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
 import { Pro2ImageInputDock } from "./pro2/pro2-image-input-dock";
 import { Sbv1MediaGroupToolbar } from "./sbv1/sbv1-media-group-toolbar";
 import { Sbv1VideoEngineFloatingDock } from "./sbv1/sbv1-video-engine-floating-dock";
+import { Sbv1ImageInputDock } from "./sbv1/sbv1-image-input-dock";
 import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
 import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
 import { Pro2ScriptTableEditorHost } from "./pro2/pro2-script-table-editor-host";
@@ -96,8 +98,12 @@ function FlowCanvasInner({
 }) {
   const base = useBookMallBaseUrl();
   const wrapRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition, fitView, setViewport: rfSetViewport } =
-    useReactFlow();
+  const {
+    screenToFlowPosition,
+    fitView,
+    setViewport: rfSetViewport,
+    getNodes,
+  } = useReactFlow();
   const initialFitDoneRef = useRef(false);
   const viewportTimerRef = useRef<number | null>(null);
   const dragHoverRafRef = useRef<number | null>(null);
@@ -138,7 +144,7 @@ function FlowCanvasInner({
   useEffect(() => {
     initialFitDoneRef.current = false;
     const s = useCanvasStore.getState();
-    setRfNodes(s.nodes);
+    setRfNodes(ensureNodeDragHandles(s.nodes));
     setRfEdges(s.edges);
   }, [projectId, setRfNodes, setRfEdges]);
 
@@ -147,7 +153,7 @@ function FlowCanvasInner({
     const unsub = useCanvasStore.subscribe((state, prev) => {
       if (deferStoreGraphSyncRef.current) return;
       if (state.nodes !== prev.nodes) {
-        setRfNodes(state.nodes);
+        setRfNodes(ensureNodeDragHandles(state.nodes));
       }
       if (state.edges !== prev.edges) {
         setRfEdges(state.edges);
@@ -322,6 +328,28 @@ function FlowCanvasInner({
     [findGroupAtPoint, setDragHoverGroup],
   );
 
+  const flushAutosaveAfterDrag = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
+  }, []);
+
+  const commitFlowPositionsFromRf = useCallback(() => {
+    const rf = getNodes();
+    const storeNodes = useCanvasStore.getState().nodes;
+    const patches = rf
+      .filter((rfN) => {
+        const sn = storeNodes.find((n) => n.id === rfN.id);
+        if (!sn) return false;
+        return (
+          sn.position.x !== rfN.position.x || sn.position.y !== rfN.position.y
+        );
+      })
+      .map((n) => ({ id: n.id, position: n.position }));
+    if (!patches.length) return false;
+    useCanvasStore.getState().commitFlowNodePositions(patches);
+    return true;
+  }, [getNodes]);
+
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string; parentId?: string }) => {
       setIsNodeDragging(false);
@@ -334,14 +362,25 @@ function FlowCanvasInner({
         setDragHoverGroup(null);
         return;
       }
+      const didCommitPositions = commitFlowPositionsFromRf();
       const gid = findGroupAtPoint(event.clientX, event.clientY);
-      if (gid !== (node.parentId ?? null)) {
+      const willReparent = gid !== (node.parentId ?? null);
+      if (willReparent) {
         // 进 / 出 / 换组
         reparentNode(node.id, gid);
       }
       setDragHoverGroup(null);
+      if (didCommitPositions || willReparent) {
+        flushAutosaveAfterDrag();
+      }
     },
-    [findGroupAtPoint, reparentNode, setDragHoverGroup],
+    [
+      commitFlowPositionsFromRf,
+      findGroupAtPoint,
+      flushAutosaveAfterDrag,
+      reparentNode,
+      setDragHoverGroup,
+    ],
   );
 
   const onConnectStart = useCallback(
@@ -797,8 +836,8 @@ function FlowCanvasInner({
         zoomActivationKeyCode="Control"
         noWheelClassName="nowheel"
         noDragClassName="nodrag"
-        minZoom={0.1}
-        maxZoom={2.5}
+        minZoom={0.02}
+        maxZoom={32}
         connectionRadius={30}
         connectOnClick={false}
       >
@@ -833,6 +872,7 @@ function FlowCanvasInner({
           <Pro2ScriptTableEditorHost />
         </>
       ) : null}
+      {sbv1Canvas ? <Sbv1ImageInputDock /> : null}
       {sbv1Canvas ? <Sbv1VideoEngineFloatingDock /> : null}
     </div>
   );

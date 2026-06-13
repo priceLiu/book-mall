@@ -7,14 +7,17 @@
 
 | 节点 type | 说明 |
 |-----------|------|
-| `sbv1-image` | 参考图；支持粘贴多张、连线到视频引擎 |
-| `sbv1-video-engine` | 视频引擎；内嵌底部工具条 + prompt |
+| `sbv1-image` | 参考图；支持粘贴多张、连线到视频合成 |
+| `sbv1-video-engine` | **视频合成**；卡片 + 下方浮动 Dock（prompt / 模型 / 生成） |
 
 禁止同画布出现 `story-pro*` / `story-pro2*` / `story-comic*` 节点。
 
-## 2. 视频引擎 · 内嵌 Dock（图1）
+**节点交互权威规范**（拖动 / 壳层 / Dock / 预览）：[storyboard-video-1.0-node-interaction-spec.md](./storyboard-video-1.0-node-interaction-spec.md)  
+**样板节点**：`sbv1-video-engine`（视频合成）。
 
-选中 `sbv1-video-engine` 时，卡片内展示：
+## 2. 视频合成 · 浮动 Dock（图1）
+
+选中 `sbv1-video-engine` 时，**卡片下方**展示浮动 Dock（非卡片内嵌）：
 
 - **Header**：按参考模式切换的内容区（参考槽 / 首尾帧 / 多帧列表）
 - **ContextBar**：上游图片 chip（图10/11）
@@ -51,9 +54,13 @@
 
 ## 6. 图片节点
 
-- 行为对齐 Pro2 图片：粘贴多图 spawn、上传、缩略图展示
-- 出边 handle `image` → 视频引擎 `in_ref`
-- **无** Pro2 分镜/三视图/风格 dock
+- **交互对齐 Pro2 图片节点**（见 [node-interaction-spec](./storyboard-video-1.0-node-interaction-spec.md) §8）：
+  - 顶栏 `Pro2ImageNodeToolbar`（有图且唯一选中）
+  - 空态内嵌 Dock / 有图底部浮动 `Sbv1ImageInputDock`
+  - 左右 `+` 菜单与 Pro2 相同（`PRO2_IMAGE_LEFT_ADD_MENU` / `PRO2_RIGHT_ADD_MENU`）；可生成项映射为 sbv1 节点（图片 → `sbv1-image`，视频合成 → `sbv1-video-engine`）
+- 整卡拖动：**仅**内嵌/浮动 Dock 与小眼睛例外；顶栏工具条空白区可拖（`passNodeDrag`）
+- 出边 `image` → 视频合成 `in_ref`；图片间 `in_image`
+- **无** Pro2 分镜/三视图列节点
 
 ## 7. 上游 chip（图10/11）
 

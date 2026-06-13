@@ -163,21 +163,92 @@ export async function getCanvasProject(
   return j.project;
 }
 
+export type CanvasProjectHistorySummary = {
+  id: string;
+  projectId: string;
+  label: string;
+  source: string;
+  thumbnailUrl: string;
+  createdAt: string;
+};
+
+export type CanvasProjectHistorySnapshotRequest = {
+  source?: "autosave" | "manual";
+  label?: string;
+};
+
 export async function patchCanvasProject(
   base: string,
   id: string,
-  patch: { name?: string; description?: string; canvas?: unknown; thumbnailUrl?: string },
-): Promise<CanvasProjectDetail> {
-  const j = await call<{ project: CanvasProjectDetail }>(
+  patch: {
+    name?: string;
+    description?: string;
+    canvas?: unknown;
+    thumbnailUrl?: string;
+    historySnapshot?: CanvasProjectHistorySnapshotRequest;
+  },
+): Promise<{
+  project: CanvasProjectDetail;
+  historyItem: CanvasProjectHistorySummary | null;
+}> {
+  const j = await call<{
+    project: CanvasProjectDetail;
+    historyItem?: CanvasProjectHistorySummary | null;
+  }>(base, `/api/canvas/projects/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  return { project: j.project, historyItem: j.historyItem ?? null };
+}
+
+export type CanvasProjectHistoryDetail = CanvasProjectHistorySummary & {
+  canvas: CanvasProjectDetail["canvas"];
+};
+
+export async function listCanvasProjectHistory(
+  base: string,
+  projectId: string,
+): Promise<CanvasProjectHistorySummary[]> {
+  const j = await call<{ items: CanvasProjectHistorySummary[] }>(
     base,
-    `/api/canvas/projects/${id}`,
+    `/api/canvas/projects/${projectId}/history`,
+  );
+  return j.items;
+}
+
+export async function getCanvasProjectHistoryEntry(
+  base: string,
+  projectId: string,
+  historyId: string,
+): Promise<CanvasProjectHistoryDetail> {
+  const j = await call<{ item: CanvasProjectHistoryDetail }>(
+    base,
+    `/api/canvas/projects/${projectId}/history/${historyId}`,
+  );
+  return j.item;
+}
+
+export async function createCanvasProjectHistorySnapshot(
+  base: string,
+  projectId: string,
+  args: {
+    canvas: unknown;
+    thumbnailUrl?: string;
+    source?: "autosave" | "manual";
+    label?: string;
+  },
+): Promise<CanvasProjectHistorySummary> {
+  const j = await call<{ item: CanvasProjectHistorySummary }>(
+    base,
+    `/api/canvas/projects/${projectId}/history`,
     {
-      method: "PATCH",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
+      body: JSON.stringify(args),
     },
   );
-  return j.project;
+  return j.item;
 }
 
 export async function deleteCanvasProject(
