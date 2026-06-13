@@ -42,6 +42,7 @@ import {
 import { Pro2ImageNodeToolbar } from "./pro2-image-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
+import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import {
   Pro2ThreeViewNodeEmbeddedDock,
   pro2ThreeViewNodeUsesEmbeddedDock,
@@ -65,7 +66,8 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const insideGroup = Boolean(self?.parentId);
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
-  const isGenerating = Boolean(d.uploading);
+  const isGenerating = isLibtvMediaGenerating(d);
+  const generatingLabel = d.uploading ? "上传中…" : "生成三视图中…";
   const hasError = Boolean(d.uploadError?.trim());
   const label = d.label?.trim() || "角色";
   const showSidePlus = Boolean(selected && !isGenerating);
@@ -311,10 +313,10 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
 
           <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
             {isGenerating ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[11px] text-violet-200/70">
-                <Loader2 className="size-6 animate-spin" />
-                <span>生成三视图中…</span>
-              </div>
+              <LibtvMediaGeneratingState
+                label={generatingLabel}
+                variant="violet"
+              />
             ) : hasImage ? (
               <MediaHoverBox
                 src={previewUrl}

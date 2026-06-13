@@ -28,6 +28,7 @@ LIBTV_NODE_OUTER_CLASS
 | 侧 + | `canvas-web/components/canvas/pro2/pro2-node-side-plus.tsx` |
 | 模型 | `canvas-web/components/canvas/engine-picker.tsx` |
 | 表单弹层 | `canvas-web/components/canvas/save-project-asset-dialog.tsx` · `.cursor/skills/story-pro2/` |
+| 生成中扫光 | `canvas-web/components/canvas/libtv-media-generating-state.tsx` |
 
 ### Pro2 节点
 

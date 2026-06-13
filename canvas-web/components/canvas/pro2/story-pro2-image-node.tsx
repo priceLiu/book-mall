@@ -49,6 +49,7 @@ import {
 } from "./pro2-media-node-empty";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
+import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import {
   Pro2ImageNodeEmbeddedDock,
   pro2ImageNodeUsesEmbeddedDock,
@@ -74,7 +75,13 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
   const isCharacterThreeView = mediaRole === "character-three-view";
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
-  const isGenerating = Boolean(d.uploading);
+  const isGenerating = isLibtvMediaGenerating(d);
+  const generatingLabel =
+    d.uploading && !d.runtime?.status
+      ? "上传中…"
+      : isCharacterThreeView
+        ? "生成三视图中…"
+        : "图片生成中…";
   const hasError = Boolean(d.uploadError?.trim());
   const showSidePlus = Boolean(selected && !isGenerating);
   const soleSelected = useMemo(
@@ -344,10 +351,10 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
           <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
             {isCharacterThreeView ? (
               isGenerating ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[11px] text-violet-200/70">
-                  <Loader2 className="size-6 animate-spin" />
-                  <span>生成三视图中…</span>
-                </div>
+                <LibtvMediaGeneratingState
+                  label={generatingLabel}
+                  variant="violet"
+                />
               ) : hasImage ? (
                 <MediaHoverBox
                   src={previewUrl}
@@ -370,7 +377,7 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
                 />
               )
             ) : isGenerating ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/30 px-3">
+              <LibtvMediaGeneratingState label={generatingLabel} variant="violet">
                 {previewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -380,11 +387,7 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
                     draggable={false}
                   />
                 ) : null}
-                <Loader2 className="relative z-[1] size-6 animate-spin text-violet-200/80" />
-                <span className="relative z-[1] text-[11px] text-violet-100/70">
-                  上传中…
-                </span>
-              </div>
+              </LibtvMediaGeneratingState>
             ) : hasImage ? (
               <MediaHoverBox
                 src={previewUrl}
