@@ -5,6 +5,11 @@ import { authOptions } from "@/lib/auth";
 import { issueToolsSsoRedirect } from "@/lib/issue-tools-sso-redirect";
 import { parsePlatformSsoApp } from "@/lib/platform-app-sso";
 import { getBookMallOrigin } from "@/lib/gateway/env";
+import {
+  buildBookMallLoginRedirectUrl,
+  PRODUCTION_MAIN_SITE_ORIGIN,
+  productionHttpsRedirectUrlFromHeaders,
+} from "@/lib/production-origin";
 import { sanitizeToolsRedirectPath } from "@/lib/sanitize-tools-redirect-path";
 
 const RE_ENTER_PATH = "/api/sso/tools/re-enter";
@@ -21,6 +26,15 @@ export const dynamic = "force-dynamic";
  * - `client_id` + `redirect_uri` — Phase F 第三方注册客户端
  */
 export async function GET(req: NextRequest) {
+  const httpsTarget = productionHttpsRedirectUrlFromHeaders(
+    req.headers,
+    req.nextUrl.pathname,
+    req.nextUrl.search,
+  );
+  if (httpsTarget) {
+    return NextResponse.redirect(httpsTarget, 308);
+  }
+
   const rp = req.nextUrl.searchParams.get("redirect") ?? undefined;
   const redirectPath = sanitizeToolsRedirectPath(rp);
   const app = parsePlatformSsoApp(req.nextUrl.searchParams.get("app"));
@@ -30,14 +44,15 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
   /** 勿用 req.nextUrl.origin：CloudBase 容器内常为 http://0.0.0.0:3000。 */
-  const bookOrigin = getBookMallOrigin() ?? req.nextUrl.origin;
-  const loginUrl = new URL("/login", bookOrigin);
+  const bookOrigin = getBookMallOrigin() ?? PRODUCTION_MAIN_SITE_ORIGIN;
   const returnParams = new URLSearchParams({ redirect: redirectPath });
   if (app !== "tool") returnParams.set("app", app);
   if (clientId) returnParams.set("client_id", clientId);
   if (redirectUri) returnParams.set("redirect_uri", redirectUri);
-  const returnTo = `${RE_ENTER_PATH}?${returnParams}`;
-  loginUrl.searchParams.set("callbackUrl", returnTo);
+  const loginUrl = buildBookMallLoginRedirectUrl(
+    RE_ENTER_PATH,
+    `?${returnParams}`,
+  );
 
   if (!session?.user?.id) {
     return NextResponse.redirect(loginUrl);

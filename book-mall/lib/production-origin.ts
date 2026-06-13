@@ -21,13 +21,58 @@ export function isProductionAiCode8Host(host: string): boolean {
 export function incomingRequestProto(
   protoHeader: string | null,
   fallbackProto: string,
+  forwardedHeader?: string | null,
 ): "http" | "https" {
+  if (forwardedHeader) {
+    const first = forwardedHeader.split(",")[0] ?? "";
+    const m = first.match(/(?:^|;\s*)proto=(https?)/i);
+    if (m?.[1]?.toLowerCase() === "https") return "https";
+    if (m?.[1]?.toLowerCase() === "http") return "http";
+  }
   if (protoHeader) {
     const first = protoHeader.split(",")[0]?.trim().toLowerCase();
     if (first === "http" || first === "https") return first;
   }
   const p = fallbackProto.replace(":", "").toLowerCase();
   return p === "https" ? "https" : "http";
+}
+
+export function incomingHostFromHeaders(h: Headers): string {
+  const xf = h.get("x-forwarded-host");
+  if (xf) {
+    const first = xf.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return h.get("host") ?? "";
+}
+
+/** 服务端组件 / Route：若当前请求为 HTTP，返回应对应的 HTTPS 绝对 URL。 */
+export function productionHttpsRedirectUrlFromHeaders(
+  h: Headers,
+  pathname: string,
+  search: string,
+): string | null {
+  if (process.env.NODE_ENV !== "production") return null;
+  if (allowCloudbaseDefaultOrigins()) return null;
+  const host = incomingHostFromHeaders(h);
+  const proto = incomingRequestProto(
+    h.get("x-forwarded-proto"),
+    "http:",
+    h.get("forwarded"),
+  );
+  if (!shouldEnforceProductionHttps(host, proto)) return null;
+  return `https://${host.toLowerCase()}${pathname}${search}`;
+}
+
+/** 未登录跳转登录页：始终用 canonical HTTPS，避免 http 页 + Secure Cookie 无法登录。 */
+export function buildBookMallLoginRedirectUrl(
+  callbackPath: string,
+  callbackSearch = "",
+): string {
+  const login = new URL("/login", PRODUCTION_MAIN_SITE_ORIGIN);
+  const cb = callbackPath.startsWith("/") ? callbackPath : `/${callbackPath}`;
+  login.searchParams.set("callbackUrl", `${cb}${callbackSearch}`);
+  return login.toString();
 }
 
 /**

@@ -1,9 +1,11 @@
-import { withAuth } from "next-auth/middleware";
+import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
-import type { NextRequest, NextFetchEvent } from "next/server";
+import type { NextRequest } from "next/server";
 import {
   allowCloudbaseDefaultOrigins,
+  buildBookMallLoginRedirectUrl,
   incomingRequestProto,
+  isProductionAiCode8Host,
   PRODUCTION_MAIN_SITE_ORIGIN,
   shouldEnforceProductionHttps,
 } from "@/lib/production-origin";
@@ -15,6 +17,29 @@ function incomingHost(request: NextRequest): string {
     if (first) return first;
   }
   return request.headers.get("host") ?? "";
+}
+
+function withProductionSecurityHeaders(
+  response: NextResponse,
+  request: NextRequest,
+): NextResponse {
+  if (process.env.NODE_ENV !== "production") return response;
+  const host = incomingHost(request);
+  if (!isProductionAiCode8Host(host)) return response;
+
+  response.headers.set("Content-Security-Policy", "upgrade-insecure-requests");
+  const proto = incomingRequestProto(
+    request.headers.get("x-forwarded-proto"),
+    request.nextUrl.protocol,
+    request.headers.get("forwarded"),
+  );
+  if (proto === "https") {
+    response.headers.set(
+      "Strict-Transport-Security",
+      "max-age=63072000; includeSubDomains",
+    );
+  }
+  return response;
 }
 
 /** 用户仍打开 book-mall-*.sh.run 时引导到正式域（含首页、登出回调路径）。 */
@@ -43,6 +68,7 @@ function enforceProductionHttpsRedirect(request: NextRequest): NextResponse | nu
   const proto = incomingRequestProto(
     request.headers.get("x-forwarded-proto"),
     request.nextUrl.protocol,
+    request.headers.get("forwarded"),
   );
   if (!shouldEnforceProductionHttps(host, proto)) return null;
 
@@ -55,49 +81,51 @@ function enforceProductionHttpsRedirect(request: NextRequest): NextResponse | nu
   return NextResponse.redirect(dest, status);
 }
 
-const withAuthMiddleware = withAuth(
-  function middleware(req) {
-    const path = req.nextUrl.pathname;
-    if (
-      (path === "/admin" || path.startsWith("/admin/")) &&
-      req.nextauth.token?.role !== "ADMIN"
-    ) {
-      return NextResponse.redirect(new URL("/account", req.url));
-    }
-    return NextResponse.next();
-  },
-  {
-    callbacks: {
-      authorized: ({ token, req }) => {
-        const path = req.nextUrl.pathname;
-        if (path === "/account") return !!token;
-        if (path === "/admin" || path.startsWith("/admin/")) return !!token;
-        return true;
-      },
-    },
-  },
-);
-
-export default function middleware(request: NextRequest, event: NextFetchEvent) {
+export default async function middleware(request: NextRequest) {
   const httpsRedirect = enforceProductionHttpsRedirect(request);
-  if (httpsRedirect) return httpsRedirect;
+  if (httpsRedirect) {
+    return withProductionSecurityHeaders(httpsRedirect, request);
+  }
 
   const early = canonicalBookHostRedirect(request);
-  if (early) return early;
+  if (early) return withProductionSecurityHeaders(early, request);
 
   const path = request.nextUrl.pathname;
   const needsAuth =
-    path === "/account" || path === "/admin" || path.startsWith("/admin/");
+    path === "/account" ||
+    path.startsWith("/account/") ||
+    path === "/admin" ||
+    path.startsWith("/admin/");
 
-  if (!needsAuth) {
-    return NextResponse.next();
+  if (needsAuth) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+
+    if (!token?.sub) {
+      const loginUrl = buildBookMallLoginRedirectUrl(
+        path,
+        request.nextUrl.search,
+      );
+      return withProductionSecurityHeaders(
+        NextResponse.redirect(loginUrl, 307),
+        request,
+      );
+    }
+
+    if (
+      (path === "/admin" || path.startsWith("/admin/")) &&
+      token.role !== "ADMIN"
+    ) {
+      return withProductionSecurityHeaders(
+        NextResponse.redirect(new URL("/account", PRODUCTION_MAIN_SITE_ORIGIN)),
+        request,
+      );
+    }
   }
 
-  // withAuth 在中间件内会扩展 request；此处路径已限定为需鉴权路由。
-  return withAuthMiddleware(
-    request as Parameters<typeof withAuthMiddleware>[0],
-    event,
-  );
+  return withProductionSecurityHeaders(NextResponse.next(), request);
 }
 
 export const config = {
