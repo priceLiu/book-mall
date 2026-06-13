@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo } from "react";
 import { useReactFlow, useViewport } from "@xyflow/react";
-import { LayoutGrid, Unlink } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import {
@@ -10,20 +9,18 @@ import {
   relayoutSbv1MediaGroup,
 } from "@/lib/canvas/sbv1-media-group-layout";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
-import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
-import { CanvasPillToolbar, CanvasToolIcon, CanvasToolbarBadge } from "../canvas-floating-toolbar";
+import { Pro2MediaGroupToolbarPanel } from "../pro2/pro2-media-group-toolbar-panel";
 
 const TOOLBAR_HEIGHT = 44;
 const HEADER_RESERVED = 56;
 const GAP = 8;
 
-/** sbv1 参考图分组被选中 → 顶部工具条（解组） */
+/** sbv1 参考图分组被选中 → 顶部工具条（壳层与 Pro2 媒体组一致） */
 export function Sbv1MediaGroupToolbar({
   rfNodes,
 }: {
   rfNodes: CanvasFlowNode[];
 }) {
-  const ungroup = useCanvasStore((s) => s.ungroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const edges = useCanvasStore((s) => s.edges);
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
@@ -40,7 +37,7 @@ export function Sbv1MediaGroupToolbar({
     return selected;
   }, [rfNodes]);
 
-  // 选中组时：若视频引擎在组外但已连线，纳入组内并排布（仅依赖 groupId / edges）
+  // 选中组时：若视频引擎在组外但已连线，纳入组内并排布
   useEffect(() => {
     if (!group) return;
     const nodes = useCanvasStore.getState().nodes;
@@ -78,6 +75,7 @@ export function Sbv1MediaGroupToolbar({
       internal?.internals?.positionAbsolute ??
       internal?.position ??
       group.position;
+    if (!pos) return null;
     const cx = pos.x + w / 2;
     const top = flowToScreenPosition({ x: cx, y: pos.y });
     const bottom = flowToScreenPosition({ x: cx, y: pos.y + h });
@@ -90,40 +88,19 @@ export function Sbv1MediaGroupToolbar({
 
   if (!group || !placement) return null;
 
-  const childCount = rfNodes.filter(
-    (n) => n.parentId === group.id && n.type !== "group",
-  ).length;
-
   return (
-    <div
-      className="pointer-events-auto fixed z-[92]"
+    <Pro2MediaGroupToolbarPanel
+      groupId={group.id}
+      kind={null}
+      edition="sbv1"
+      onRelayout={() => relayoutSbv1MediaGroup(setNodes, group.id, edges)}
+      className="fixed z-[1300]"
       style={{
         left: placement.x,
         top: placement.y,
         transform: `translate(-50%, ${placement.place === "above" ? "-100%" : "0%"})`,
       }}
       onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <CanvasPillToolbar
-        badge={<CanvasToolbarBadge>组内 {childCount}</CanvasToolbarBadge>}
-      >
-        <CanvasToolIcon
-          label="重排"
-          hint={`参考图与${SBV1_VIDEO_COMPOSE_LABEL}重新纳入组框`}
-          onClick={() => relayoutSbv1MediaGroup(setNodes, group.id, edges)}
-        >
-          <LayoutGrid className="size-[18px]" strokeWidth={1.75} />
-        </CanvasToolIcon>
-        <CanvasToolIcon
-          label="解组"
-          hint={`保留参考图与${SBV1_VIDEO_COMPOSE_LABEL}，移除分组容器`}
-          danger
-          onClick={() => ungroup(group.id)}
-        >
-          <Unlink className="size-[18px]" strokeWidth={1.75} />
-        </CanvasToolIcon>
-      </CanvasPillToolbar>
-    </div>
+    />
   );
 }

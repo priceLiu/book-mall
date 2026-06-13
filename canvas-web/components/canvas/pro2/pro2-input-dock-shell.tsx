@@ -77,7 +77,12 @@ export function Pro2InputDockShell({
 export function Pro2DockContextBar({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <div className={cn("flex min-h-[44px] shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-2", LIBTV_INPUT_DOCK_DIVIDER)}>
+    <div
+      className={cn(
+        "nodrag flex min-h-[44px] shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-2",
+        LIBTV_INPUT_DOCK_DIVIDER,
+      )}
+    >
       {children}
     </div>
   );
@@ -85,7 +90,12 @@ export function Pro2DockContextBar({ children }: { children: ReactNode }) {
 
 export function Pro2DockToolbar({ children }: { children: ReactNode }) {
   return (
-    <div className={cn("flex shrink-0 items-center justify-between gap-2 border-t px-2 py-1.5", LIBTV_INPUT_DOCK_DIVIDER)}>
+    <div
+      className={cn(
+        "nodrag flex shrink-0 items-center justify-between gap-2 border-t px-2 py-1.5",
+        LIBTV_INPUT_DOCK_DIVIDER,
+      )}
+    >
       {children}
     </div>
   );
@@ -105,12 +115,7 @@ export function Pro2EmbeddedInputDock({
 }) {
   return (
     <div
-      className={cn(
-        "nodrag flex h-full min-h-0 flex-col overflow-hidden",
-        className,
-      )}
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
+      className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}
     >
       {header}
       <div className="pro2-dock-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">

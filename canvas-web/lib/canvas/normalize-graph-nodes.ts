@@ -843,9 +843,12 @@ export function normalizeCanvasNodes(
 
   if (!hasStoryTemplateGroups(withPro2Groups)) {
     const sorted = sortNodesForReactFlow(repairOrphanParentIds(withPro2Groups));
-    const stacked = withPro2Groups.some((n) =>
-      String(n.type ?? "").startsWith("story-pro2-"),
-    )
+    const needsMediaGroupZ = sorted.some(
+      (n) =>
+        n.type === "group" &&
+        (isPro2StyledGroup(n, sorted) || isSbv1MediaGroup(n, sorted)),
+    );
+    const stacked = needsMediaGroupZ
       ? syncPro2MediaGroupZIndex(sorted)
       : sorted;
     return ensureNodeDragHandles(stacked);

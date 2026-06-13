@@ -5,7 +5,7 @@ import {
   SBV1_VIDEO_ENGINE_MIN_HEIGHT,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
-import { sortNodesForReactFlow } from "./normalize-graph-nodes";
+import { absoluteNodePosition, sortNodesForReactFlow } from "./normalize-graph-nodes";
 import {
   PRO2_MEDIA_GRID_GAP,
   PRO2_MEDIA_GROUP_EXTRA,
@@ -58,6 +58,67 @@ export function findSbv1GroupLinkedVideoEngine(
   return undefined;
 }
 
+function releaseNodeFromGroup(
+  node: CanvasFlowNode,
+  absPosition: { x: number; y: number },
+): CanvasFlowNode {
+  const nextData = { ...(node.data as Record<string, unknown>) };
+  delete nextData.pro2GroupId;
+  return {
+    ...node,
+    parentId: undefined,
+    extent: undefined,
+    position: absPosition,
+    data: nextData,
+  } as CanvasFlowNode;
+}
+
+function pickPrimarySbv1GroupEngine(
+  engines: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  images: CanvasFlowNode[],
+): CanvasFlowNode {
+  if (engines.length <= 1) return engines[0]!;
+  const imageIds = new Set(images.map((i) => i.id));
+  const refCount = (eng: CanvasFlowNode) =>
+    edges.filter(
+      (e) =>
+        e.target === eng.id &&
+        imageIds.has(e.source) &&
+        (!e.targetHandle || e.targetHandle === "in_ref"),
+    ).length;
+  return [...engines].sort((a, b) => refCount(b) - refCount(a))[0]!;
+}
+
+/** 组内只保留一个视频槽；其余移到组框右侧外，避免叠在同一格 */
+function ejectExtraSbv1GroupEngines(
+  nodes: CanvasFlowNode[],
+  groupId: string,
+  keeperId: string,
+  group: CanvasFlowNode,
+): CanvasFlowNode[] {
+  const gw =
+    group.width ??
+    SBV1_VIDEO_ENGINE_WIDTH + SBV1_IMAGE_NODE_WIDTH + PRO2_MEDIA_GROUP_PAD * 2;
+  let outIdx = 0;
+  return nodes.map((n) => {
+    if (
+      n.parentId !== groupId ||
+      n.type !== "sbv1-video-engine" ||
+      n.id === keeperId
+    ) {
+      return n;
+    }
+    const abs = absoluteNodePosition(n, nodes);
+    const released = releaseNodeFromGroup(n, {
+      x: group.position.x + gw + SBV1_VIDEO_GAP,
+      y: abs.y + outIdx * (SBV1_VIDEO_ENGINE_MIN_HEIGHT + PRO2_MEDIA_GRID_GAP),
+    });
+    outIdx += 1;
+    return released;
+  });
+}
+
 function reparentToGroup(
   node: CanvasFlowNode,
   group: CanvasFlowNode,
@@ -94,6 +155,20 @@ export function applySbv1MediaGroupRelayout(
   let next = [...nodes];
   const linkedEngine = findSbv1GroupLinkedVideoEngine(groupId, next, edges);
   if (linkedEngine && linkedEngine.parentId !== groupId && group) {
+    const existingInside = next.find(
+      (n) =>
+        n.parentId === groupId &&
+        n.type === "sbv1-video-engine" &&
+        n.id !== linkedEngine.id,
+    );
+    if (existingInside) {
+      next = ejectExtraSbv1GroupEngines(
+        next,
+        groupId,
+        linkedEngine.id,
+        group,
+      );
+    }
     const reparented = reparentToGroup(linkedEngine, group, next);
     next = next.map((n) => (n.id === reparented.id ? reparented : n));
   }
@@ -104,6 +179,14 @@ export function applySbv1MediaGroupRelayout(
   let engines = next.filter(
     (n) => n.parentId === groupId && n.type === "sbv1-video-engine",
   );
+
+  if (engines.length > 1 && group) {
+    const keeper = pickPrimarySbv1GroupEngine(engines, edges, images);
+    next = ejectExtraSbv1GroupEngines(next, groupId, keeper.id, group);
+    engines = next.filter(
+      (n) => n.parentId === groupId && n.type === "sbv1-video-engine",
+    );
+  }
 
   if (images.length === 0 && engines.length === 0) {
     return sortNodesForReactFlow(next);

@@ -1,5 +1,6 @@
 import type { CanvasFlowNode, GroupNodeData, Pro2MediaGroupKind } from "./types";
 import { GROUP_COLOR_PRESETS } from "./types";
+import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 
 /** Pro2 媒体组子节点（三视图 / 分镜图 / 分镜视频占位） */
 export function isPro2MediaChildNode(n: CanvasFlowNode): boolean {
@@ -114,21 +115,20 @@ export function isPro2StyledGroup(
 const PRO2_MEDIA_GROUP_Z_BASE = 10;
 const PRO2_MEDIA_GROUP_Z_SELECTED = 1200;
 
-/** 选中媒体组时整组叠在连线与其它节点之上；组框 z 低于子图以便交互 */
+/** 选中媒体组时整组叠在连线与其它节点之上；组框 z 低于子图以便交互（Pro2 + sbv1） */
 export function syncPro2MediaGroupZIndex(
   nodes: CanvasFlowNode[],
 ): CanvasFlowNode[] {
+  const isStyledMediaGroup = (n: CanvasFlowNode) =>
+    n.type === "group" &&
+    (isPro2StyledGroup(n, nodes) || isSbv1MediaGroup(n, nodes));
+
   const selectedGroup = nodes.find(
-    (n) =>
-      n.type === "group" &&
-      n.selected &&
-      isPro2StyledGroup(n, nodes),
+    (n) => n.type === "group" && n.selected && isStyledMediaGroup(n),
   );
   const selectedId = selectedGroup?.id;
   const styledGroupIds = new Set(
-    nodes
-      .filter((n) => n.type === "group" && isPro2StyledGroup(n, nodes))
-      .map((n) => n.id),
+    nodes.filter(isStyledMediaGroup).map((n) => n.id),
   );
   if (!styledGroupIds.size) return nodes;
 

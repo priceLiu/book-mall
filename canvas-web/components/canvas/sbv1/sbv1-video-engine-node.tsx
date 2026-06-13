@@ -161,6 +161,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           className={cn(
             SBV1_CARD_SHELL_CLASS,
             SBV1_CARD_DRAG_CLASS,
+            "min-h-0 flex-1",
             selected && "ring-1 ring-cyan-400/50",
           )}
         >
@@ -189,7 +190,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             </div>
           </div>
 
-          <div className="relative w-full shrink-0 overflow-hidden bg-black/40 aspect-[4/3]">
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
             {isGenerating ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 py-10 text-center text-xs text-white/40">
                 <Loader2 className="size-6 animate-spin text-cyan-300/70" />
@@ -205,11 +206,12 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 draggable={false}
               />
             ) : (
-              <div className="absolute inset-0">
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4">
                 <Pro2MediaNodeEmptyState
                   icon={Video}
                   label="选中本节点，在下方编辑 prompt 并生成"
-                  className="h-full min-h-0"
+                  className="min-h-0 pb-0"
+                  passNodeDrag
                 />
               </div>
             )}

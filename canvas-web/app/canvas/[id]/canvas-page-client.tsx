@@ -66,6 +66,8 @@ import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout
 import { reflowStoryPro2Workspace } from "@/lib/canvas/story-pro2-workspace-layout";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
+import { cn } from "@/lib/utils";
+import { useCanvasImmersiveMode } from "@/lib/canvas/use-canvas-immersive-mode";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
 import { SBV1_BUILTIN_TEMPLATE_ID } from "@/lib/canvas/project-edition";
 import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
@@ -184,6 +186,10 @@ function Inner({ projectId }: { projectId: string }) {
     (isStoryPro2Project || hasStoryPro2Pipeline(nodes)) && !isSbv1Canvas;
   const isStoryProCanvas =
     hasStoryProPipeline(nodes) && !isStoryPro2Canvas && !isSbv1Canvas;
+  const showImmersiveChrome = isSbv1Canvas || isStoryPro2Canvas;
+  const canvasEditorRef = useRef<HTMLDivElement>(null);
+  const { immersive, topChromeVisible, toggleImmersive } =
+    useCanvasImmersiveMode(canvasEditorRef);
   const [nameDraft, setNameDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -227,6 +233,13 @@ function Inner({ projectId }: { projectId: string }) {
   /** 加载完成时的节点数；用于阻止误把「有内容的画布」自动保存成空。 */
   const loadedNodeCountRef = useRef(0);
   const canvasReadyRef = useRef(false);
+  /** 上次成功写入服务端的 graphRevision + viewport，用于判断是否需要自动保存 */
+  const lastPersistedSnapshotRef = useRef<{
+    revision: number;
+    viewport: string;
+  } | null>(null);
+  const syncLastPersistedSnapshotRef = useRef<(() => void) | null>(null);
+  const isCanvasDirtyRef = useRef<(() => boolean) | null>(null);
 
   const inflightTaskCount = useCanvasInflightTaskCount();
 
@@ -287,6 +300,11 @@ function Inner({ projectId }: { projectId: string }) {
         setProject(p);
         setNameDraft(p.name);
         canvasReadyRef.current = true;
+        const s = useCanvasStore.getState();
+        lastPersistedSnapshotRef.current = {
+          revision: s.graphRevision,
+          viewport: JSON.stringify(s.viewport),
+        };
         setLoadError(null);
       } catch (e) {
         if (!cancelled) {
@@ -303,18 +321,48 @@ function Inner({ projectId }: { projectId: string }) {
 
   // Autosave on changes (debounced) — store 订阅，避免 nodes 变化触发整页重渲染
   const autosaveTimerRef = useRef<number | null>(null);
+  const autosaveIntervalRef = useRef<number | null>(null);
   const autosaveInFlightRef = useRef(false);
   const autosavePendingRef = useRef(false);
   const autosaveProjectRef = useRef(project);
   const autosaveBaseRef = useRef(base);
-  const runAutosaveRef = useRef<() => Promise<void>>(async () => {});
+  const runAutosaveRef = useRef<(force?: boolean) => Promise<void>>(
+    async () => {},
+  );
   autosaveProjectRef.current = project;
   autosaveBaseRef.current = base;
 
   useEffect(() => {
     if (!project || !base || loading) return;
 
-    const runAutosave = async () => {
+    const syncLastPersistedSnapshot = () => {
+      const s = useCanvasStore.getState();
+      lastPersistedSnapshotRef.current = {
+        revision: s.graphRevision,
+        viewport: JSON.stringify(s.viewport),
+      };
+    };
+    syncLastPersistedSnapshotRef.current = syncLastPersistedSnapshot;
+
+    const isCanvasDirty = () => {
+      const persisted = lastPersistedSnapshotRef.current;
+      if (!persisted) return true;
+      const s = useCanvasStore.getState();
+      return (
+        s.graphRevision !== persisted.revision ||
+        JSON.stringify(s.viewport) !== persisted.viewport
+      );
+    };
+    isCanvasDirtyRef.current = isCanvasDirty;
+
+    const clearAutosaveTimer = () => {
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+
+    const runAutosave = async (force = false) => {
       if (autosaveInFlightRef.current) {
         autosavePendingRef.current = true;
         return;
@@ -322,6 +370,7 @@ function Inner({ projectId }: { projectId: string }) {
       const proj = autosaveProjectRef.current;
       const bookBase = autosaveBaseRef.current;
       if (!proj || !bookBase || !canvasReadyRef.current) return;
+      if (!force && !isCanvasDirty()) return;
 
       autosaveInFlightRef.current = true;
       setSaving(true);
@@ -353,6 +402,7 @@ function Inner({ projectId }: { projectId: string }) {
           projectId,
           patch,
         );
+        syncLastPersistedSnapshot();
         if (historyItem) {
           window.dispatchEvent(new CustomEvent("canvas:history-updated"));
         }
@@ -371,7 +421,7 @@ function Inner({ projectId }: { projectId: string }) {
         setSaving(false);
         if (autosavePendingRef.current) {
           autosavePendingRef.current = false;
-          scheduleAutosave();
+          void runAutosave(force);
         }
       }
     };
@@ -380,6 +430,7 @@ function Inner({ projectId }: { projectId: string }) {
       if (!canvasReadyRef.current) return;
       const intervalMs = getCanvasAutosaveIntervalMs();
       if (intervalMs === 0) return;
+      if (!isCanvasDirty()) return;
       const state = useCanvasStore.getState();
       if (
         state.nodes.length === 0 &&
@@ -389,23 +440,30 @@ function Inner({ projectId }: { projectId: string }) {
         setSaveError("检测到画布被清空，已阻止自动保存。请刷新或点「恢复漫剧模板」。");
         return;
       }
-      if (autosaveTimerRef.current !== null) {
-        window.clearTimeout(autosaveTimerRef.current);
-      }
-      const delay = Math.max(CANVAS_AUTOSAVE_DEBOUNCE_MS, intervalMs);
+      clearAutosaveTimer();
       autosaveTimerRef.current = window.setTimeout(() => {
         autosaveTimerRef.current = null;
-        void runAutosave();
-      }, delay);
+        void runAutosave(false);
+      }, CANVAS_AUTOSAVE_DEBOUNCE_MS);
+    };
+
+    const restartAutosaveInterval = () => {
+      if (autosaveIntervalRef.current !== null) {
+        window.clearInterval(autosaveIntervalRef.current);
+        autosaveIntervalRef.current = null;
+      }
+      const intervalMs = getCanvasAutosaveIntervalMs();
+      if (intervalMs === 0) return;
+      autosaveIntervalRef.current = window.setInterval(() => {
+        if (!canvasReadyRef.current) return;
+        if (!isCanvasDirty()) return;
+        void runAutosave(false);
+      }, intervalMs);
     };
 
     const unsub = useCanvasStore.subscribe((state, prev) => {
-      // 仅持久化变更触发保存：graphRevision（结构/数据）或 viewport（缩放平移）
-      // 忽略 setNodeRuntime / 拖放中的几何同步，避免「保存中…」常驻
-      if (
-        state.graphRevision === prev.graphRevision &&
-        state.viewport === prev.viewport
-      ) {
+      // 仅 graphRevision 变更视为「内容脏」；viewport 平移不重置 debounce 计时
+      if (state.graphRevision === prev.graphRevision) {
         return;
       }
       scheduleAutosave();
@@ -414,23 +472,35 @@ function Inner({ projectId }: { projectId: string }) {
     runAutosaveRef.current = runAutosave;
 
     const flushAutosaveNow = () => {
-      if (autosaveTimerRef.current !== null) {
-        window.clearTimeout(autosaveTimerRef.current);
-        autosaveTimerRef.current = null;
-      }
-      void runAutosave();
+      clearAutosaveTimer();
+      void runAutosave(true);
     };
 
     const onFlushAutosave = () => flushAutosaveNow();
+    const onIntervalChanged = () => {
+      restartAutosaveInterval();
+      scheduleAutosave();
+    };
+
+    restartAutosaveInterval();
     window.addEventListener("canvas:flush-autosave", onFlushAutosave);
     window.addEventListener("pagehide", onFlushAutosave);
+    window.addEventListener("canvas:autosave-interval-changed", onIntervalChanged);
 
     return () => {
       unsub();
+      syncLastPersistedSnapshotRef.current = null;
+      isCanvasDirtyRef.current = null;
       window.removeEventListener("canvas:flush-autosave", onFlushAutosave);
       window.removeEventListener("pagehide", onFlushAutosave);
-      if (autosaveTimerRef.current !== null) {
-        window.clearTimeout(autosaveTimerRef.current);
+      window.removeEventListener(
+        "canvas:autosave-interval-changed",
+        onIntervalChanged,
+      );
+      clearAutosaveTimer();
+      if (autosaveIntervalRef.current !== null) {
+        window.clearInterval(autosaveIntervalRef.current);
+        autosaveIntervalRef.current = null;
       }
     };
   }, [project, base, projectId, loading]);
@@ -470,6 +540,7 @@ function Inner({ projectId }: { projectId: string }) {
         );
       }
       setLastSavedAt(new Date());
+      syncLastPersistedSnapshotRef.current?.();
       if (historyItem) {
         window.dispatchEvent(new CustomEvent("canvas:history-updated"));
         setSaveError(null);
@@ -491,6 +562,7 @@ function Inner({ projectId }: { projectId: string }) {
       useCanvasStore.temporal.getState().resume();
       setLastSavedAt(new Date());
       setSaveError(null);
+      syncLastPersistedSnapshotRef.current?.();
     },
     [hydrate, projectId],
   );
@@ -683,10 +755,21 @@ function Inner({ projectId }: { projectId: string }) {
   } else {
     body = (
       <div
+        ref={canvasEditorRef}
         className="fixed inset-0 z-[200] flex h-[100dvh] w-screen flex-col overflow-hidden bg-[var(--canvas-bg)]"
         data-canvas-editor
       >
-        <div className="sticky top-0 z-[300] shrink-0 bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)]">
+        <div
+          className={cn(
+            "z-[300] shrink-0 bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)] transition-transform duration-300 ease-out",
+            showImmersiveChrome && immersive
+              ? cn(
+                  "fixed left-0 right-0 top-0",
+                  !topChromeVisible && "-translate-y-full",
+                )
+              : "sticky top-0",
+          )}
+        >
           <CanvasToolbar
             projectName={nameDraft}
             onProjectNameChange={setNameDraft}
@@ -716,6 +799,10 @@ function Inner({ projectId }: { projectId: string }) {
             running={inflightTaskCount > 0}
             inflightTaskCount={inflightTaskCount}
             runAllDisabled={gatewayLinkBlocked}
+            immersive={showImmersiveChrome ? immersive : false}
+            onToggleImmersive={
+              showImmersiveChrome ? () => void toggleImmersive() : undefined
+            }
           />
           <GatewayLinkBanner />
         </div>

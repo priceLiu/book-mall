@@ -1,4 +1,5 @@
 import { uploadCanvasImage } from "@/lib/canvas-api";
+import { absoluteNodePosition } from "./normalize-graph-nodes";
 import { selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
 import {
   SBV1_IMAGE_NODE_HEIGHT,
@@ -69,14 +70,15 @@ export async function spawnSbv1PastedImages(
   const gap = 48;
   const imgW = SBV1_IMAGE_NODE_WIDTH;
   const imgH = SBV1_IMAGE_NODE_HEIGHT;
+  const anchorAbs = absoluteNodePosition(anchor, args.nodes);
   const createdIds: string[] = [];
 
   for (let i = 0; i < batch.length; i++) {
     const file = batch[i]!;
     const yOff = (existing + i) * (imgH + ROW_GAP);
     const pos = {
-      x: anchor.position.x - imgW - gap,
-      y: anchor.position.y + yOff,
+      x: anchorAbs.x - imgW - gap,
+      y: anchorAbs.y + yOff,
     };
     const blobUrl = URL.createObjectURL(file);
     const id = args.addNode("sbv1-image", pos, {

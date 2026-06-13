@@ -8,15 +8,19 @@ export function Pro2MediaNodeEmptyState({
   icon: Icon,
   label,
   className,
+  /** LibTV 节点空态：整卡可拖，勿加 nodrag */
+  passNodeDrag = false,
 }: {
   icon: LucideIcon;
   label: string;
   className?: string;
+  passNodeDrag?: boolean;
 }) {
   return (
     <div
       className={cn(
-        "nodrag flex h-full min-h-[120px] flex-col items-center justify-center gap-2 px-4 text-center",
+        "flex h-full min-h-[120px] flex-col items-center justify-center gap-2 px-4 text-center",
+        !passNodeDrag && "nodrag",
         className,
       )}
     >
