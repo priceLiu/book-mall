@@ -38,6 +38,7 @@ import {
 } from "../pro2/pro2-media-node-empty";
 import { Pro2NodeResizer } from "../pro2/pro2-node-resizer";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
+import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import {
   Sbv1ImageNodeEmbeddedDock,
   sbv1ImageNodeUsesEmbeddedDock,
@@ -63,7 +64,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
   const insideGroup = Boolean(self?.parentId);
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
-  const isGenerating = Boolean(d.uploading);
+  const isGenerating = isLibtvMediaGenerating(d);
   const hasError = Boolean(d.uploadError?.trim());
   const showSidePlus = Boolean(selected && !isGenerating);
   const soleSelected = useMemo(
@@ -257,7 +258,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
 
           <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
             {isGenerating ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/30 px-3">
+              <LibtvMediaGeneratingState label="上传中…" variant="cyan">
                 {previewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -267,11 +268,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
                     draggable={false}
                   />
                 ) : null}
-                <Loader2 className="relative z-[1] size-6 animate-spin text-violet-200/80" />
-                <span className="relative z-[1] text-[11px] text-violet-100/70">
-                  上传中…
-                </span>
-              </div>
+              </LibtvMediaGeneratingState>
             ) : hasImage ? (
               <MediaHoverBox
                 src={previewUrl}

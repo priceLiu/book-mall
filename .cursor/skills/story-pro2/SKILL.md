@@ -1,9 +1,9 @@
 ---
 name: story-pro2
 description: >-
-  影视专业版 2.0 (Pro2) UI 规范：表单弹层、项目资产、紫罗兰主题、与 useDialogs 分工。
-  Use when adding Pro2 modals/overlays, 保存为资产, project asset panels, or when the user
-  mentions 2.0 弹层 / 弹出层 / SaveProjectAssetDialog.
+  影视专业版 2.0 (Pro2) UI 规范：表单弹层、项目资产、生图/生视频生成中扫光、紫罗兰主题。
+  Use when adding Pro2 modals, LibTV generating states, 保存为资产, or when the user mentions
+  2.0 弹层 / 扫光 / 生成中动效 / SaveProjectAssetDialog.
 ---
 
 # 影视专业版 2.0 · UI Skill
@@ -12,10 +12,36 @@ description: >-
 
 - 新增/改 Pro2 **表单弹层**（保存、设置、多字段提交）
 - **项目资产**侧栏卡片、保存对话框、预览网格
+- **生图 / 生视频「生成中」** stage 扫光动效
 - 用户要求与 2.0 现有弹层 **样式一致**
 - Code Review Pro2 非 `useDialogs` 的自定义 Modal
 
 节点 / Dock / 顶栏 → 见 [libtv-unified-nodes](../libtv-unified-nodes/SKILL.md)。
+
+## 生图 / 生视频 · 生成中扫光（硬性）
+
+**LibTV 媒体卡 stage 在生图、生视频、上传进行中，必须显示扫光 + 中央旋转图标。**
+
+| 禁止 | 唯一实现 |
+| --- | --- |
+| 仅 `Loader2` 静态 loading | `LibtvMediaGeneratingState` |
+| 自写 shimmer / keyframes | `globals.css` · `canvas-story-media-shimmer` |
+| Pro2 用 cyan 扫光 / sbv1 用 violet | `variant="violet"` · `variant="cyan"` |
+
+**必须接入的场景**
+
+- Pro2：`story-pro2-image`（分镜图/上传）· `story-pro2-three-view`（三视图）
+- sbv1：`sbv1-image`（生图）· `sbv1-video-engine`（生视频）
+- 未来 Pro2 视频节点：同上组件 · `variant="violet"`
+
+细节与 JSX → [reference-generating.md](reference-generating.md)
+
+判定：`isLibtvMediaGenerating(data)` · `uploading || runtime pending/running`
+
+```tsx
+<LibtvMediaGeneratingState label="视频生成中…" variant="cyan" />
+<LibtvMediaGeneratingState label="生成三视图中…" variant="violet" />
+```
 
 ## 两类弹层（禁止混用壳层）
 
@@ -90,6 +116,7 @@ Pro2 表单主按钮用 **violet-600**（与节点 ring 同系）；危险操作
 
 ## Code Review 清单
 
+- [ ] **生图 + 生视频** stage 均用 `LibtvMediaGeneratingState`（非裸 Loader2）
 - [ ] 表单弹层 `createPortal` 到 `document.body`，`z-[9999]`
 - [ ] 卡片 `bg-[#1c1c1e]` · `rounded-2xl` · `border-white/10`（与样板一致）
 - [ ] 输入 focus `border-violet-400/50`；主钮 `bg-violet-600`
@@ -101,6 +128,7 @@ Pro2 表单主按钮用 **violet-600**（与节点 ring 同系）；危险操作
 
 | 文档 | 用途 |
 | --- | --- |
+| [reference-generating.md](reference-generating.md) | 生图/生视频扫光动效 |
 | [reference-modals.md](reference-modals.md) | 弹层 class 与 JSX 骨架 |
 | `canvas-web/docs/story-pro2-design-spec.md` §10 | 设计规范正文 |
 | `canvas-web/docs/design.md` §4.5 | `useDialogs` 系统对话框 |

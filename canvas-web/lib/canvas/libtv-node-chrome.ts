@@ -43,3 +43,11 @@ export const LIBTV_INPUT_DOCK_TOOLBAR_ICON_CLASS =
   "nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40";
 export const LIBTV_INPUT_DOCK_SEND_BTN_CLASS =
   "nodrag flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40";
+
+/** LibTV 媒体 stage 生成中扫光 · sbv1 / Pro1 列（cyan） */
+export const LIBTV_MEDIA_GENERATING_CYAN_CLASS =
+  "canvas-story-media-generating canvas-story-media-generating-pro border-cyan-400/50";
+
+/** LibTV 媒体 stage 生成中扫光 · Pro2（violet） */
+export const LIBTV_MEDIA_GENERATING_VIOLET_CLASS =
+  "canvas-story-media-generating canvas-story-media-generating-pro2 border-violet-400/50";

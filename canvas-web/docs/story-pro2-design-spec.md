@@ -154,6 +154,19 @@
 | `global` | 悬停空图片节点整卡 | 任意位置 Ctrl+V 写入该节点 |
 | `zone` | 悬停 `.pro2-dock-ref-zone` | 仅参考图区域内粘贴进 Dock |
 
+### 7.9 生图 / 生视频 · 生成中扫光
+
+> **Cursor Skill**：`.cursor/skills/story-pro2/reference-generating.md`
+
+| 规则 | 说明 |
+| --- | --- |
+| 适用范围 | LibTV 媒体 stage：**生图**（Pro2 分镜/三视图、sbv1 图片）与 **生视频**（sbv1 视频引擎；未来 Pro2 视频同规） |
+| 唯一组件 | `LibtvMediaGeneratingState` |
+| Pro2 | `variant="violet"` · `LIBTV_MEDIA_GENERATING_VIOLET_CLASS` |
+| sbv1 | `variant="cyan"` · `LIBTV_MEDIA_GENERATING_CYAN_CLASS` |
+| 动效 | 外框光晕 + `::after` 扫光（`canvas-story-media-shimmer`）+ 中央 `RefreshCw` spin |
+| 禁止 | 仅 `Loader2` 无扫光；自写 keyframes；色不对版 |
+
 ---
 
 ## 8. Code Review 清单
@@ -302,6 +315,7 @@
 ## 11. Code Review 清单（节点）
 
 - [ ] 新 Pro2 媒体节点复用 `LIBTV_*` + `Pro2ImageNodeToolbar` / `Pro2NodeSidePlus`  
+- [ ] **生图 / 生视频** 生成中须 `LibtvMediaGeneratingState`（禁止裸 Loader2 stage）
 - [ ] 三视图 **无** 内嵌 Dock；Dock 仅浮动  
 - [ ] 媒体组 relayout 不重置用户拖动的 group position  
 - [ ] 历史保存走 PATCH `historySnapshot`，禁止前端二次 POST 巨大 canvas  

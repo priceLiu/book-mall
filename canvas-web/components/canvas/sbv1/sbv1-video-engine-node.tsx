@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
-import { Loader2, Maximize2, Video } from "lucide-react";
+import { Maximize2, RefreshCw, Video } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
@@ -33,6 +33,7 @@ import { Pro2ImageNodeToolbar } from "../pro2/pro2-image-node-toolbar";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeResizer } from "../pro2/pro2-node-resizer";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
+import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
@@ -55,8 +56,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     pickTaskResultMediaUrl(succeeded[succeeded.length - 1] ?? {}) ??
     succeeded[succeeded.length - 1]?.ossUrl;
 
-  const isGenerating =
-    d.runtime?.status === "running" || d.runtime?.status === "pending";
+  const isGenerating = isLibtvMediaGenerating(d);
   const hasVideo = Boolean(videoUrl);
   const showSidePlus = Boolean(selected && !isGenerating);
 
@@ -206,17 +206,17 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 </button>
               ) : null}
               {isGenerating ? (
-                <Loader2 className="size-3.5 animate-spin text-cyan-300" />
+                <RefreshCw className="size-3.5 animate-spin text-cyan-300" />
               ) : null}
             </div>
           </div>
 
           <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
             {isGenerating ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 py-10 text-center text-xs text-white/40">
-                <Loader2 className="size-6 animate-spin text-cyan-300/70" />
-                <span>视频生成中…</span>
-              </div>
+              <LibtvMediaGeneratingState
+                label="视频生成中…"
+                variant="cyan"
+              />
             ) : hasVideo ? (
               <video
                 src={videoUrl ?? undefined}
