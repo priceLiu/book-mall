@@ -1,4 +1,7 @@
-import { applyToolWebProductionOriginDefaults } from "./production-origin";
+import {
+  applyToolWebProductionOriginDefaults,
+  canonicalizeProductionOrigin,
+} from "./production-origin";
 
 applyToolWebProductionOriginDefaults();
 
@@ -25,7 +28,7 @@ export function getMainSiteOrigin(): string | null {
   if (!raw) return null;
   const u = normalizeHttpOriginUrl(raw);
   if (!u) return null;
-  return u.origin;
+  return canonicalizeProductionOrigin(u.origin) ?? u.origin;
 }
 
 /**
@@ -38,5 +41,5 @@ export function getToolsSitePublicOrigin(): string | null {
   if (!raw) return null;
   const u = normalizeHttpOriginUrl(raw);
   if (!u) return null;
-  return u.origin;
+  return canonicalizeProductionOrigin(u.origin) ?? u.origin;
 }

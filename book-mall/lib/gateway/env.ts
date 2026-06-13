@@ -11,6 +11,8 @@ export function getGatewayPublicOrigin(): string | null {
   }
 }
 
+import { canonicalizeProductionOrigin } from "@/lib/production-origin";
+
 export function getBookMallOrigin(): string | null {
   const raw =
     process.env.NEXTAUTH_URL?.trim() ||
@@ -18,7 +20,8 @@ export function getBookMallOrigin(): string | null {
     (process.env.NODE_ENV === "development" ? "http://localhost:3000" : "");
   if (!raw) return null;
   try {
-    return new URL(raw).origin;
+    const origin = new URL(raw).origin;
+    return canonicalizeProductionOrigin(origin) ?? origin;
   } catch {
     return null;
   }

@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { issueToolsSsoRedirect } from "@/lib/issue-tools-sso-redirect";
 import { parsePlatformSsoApp } from "@/lib/platform-app-sso";
+import { getBookMallOrigin } from "@/lib/gateway/env";
 import { sanitizeToolsRedirectPath } from "@/lib/sanitize-tools-redirect-path";
 
 const RE_ENTER_PATH = "/api/sso/tools/re-enter";
@@ -28,7 +29,9 @@ export async function GET(req: NextRequest) {
 
   const session = await getServerSession(authOptions);
 
-  const loginUrl = new URL("/login", req.nextUrl.origin);
+  /** 勿用 req.nextUrl.origin：CloudBase 容器内常为 http://0.0.0.0:3000。 */
+  const bookOrigin = getBookMallOrigin() ?? req.nextUrl.origin;
+  const loginUrl = new URL("/login", bookOrigin);
   const returnParams = new URLSearchParams({ redirect: redirectPath });
   if (app !== "tool") returnParams.set("app", app);
   if (clientId) returnParams.set("client_id", clientId);
@@ -49,7 +52,7 @@ export async function GET(req: NextRequest) {
   });
 
   if (!result.ok) {
-    const url = new URL("/account", req.nextUrl.origin);
+    const url = new URL("/account", bookOrigin);
     const code =
       result.code ??
       (result.status === 503
