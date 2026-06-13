@@ -83,7 +83,16 @@ export async function copyMediaRenderToPinned(args: {
     throw new Error("无法解析成片 OSS 地址");
   }
   const destKey = buildMediaRenderPinnedKey(args.userId, args.jobId);
-  const client = await createOssClientFrom(cfgRaw);
-  await client.copy(destKey, sourceKey);
-  return publicUrlForKey(cfgRaw, destKey, true);
+  const r = await fetch(args.sourceUrl);
+  if (!r.ok) {
+    throw new Error(`fetch source: HTTP ${r.status}`);
+  }
+  const buf = Buffer.from(await r.arrayBuffer());
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key: destKey,
+    buf,
+    contentType: r.headers.get("content-type") ?? "video/mp4",
+    preferBucketUrl: true,
+  });
 }

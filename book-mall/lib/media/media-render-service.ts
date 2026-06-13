@@ -98,7 +98,7 @@ export async function createMediaRenderJob(
       userId: input.userId,
       sourceApp: input.sourceApp,
       sourceRef:
-        input.sourceRef != null ? prismaJsonValue(input.sourceRef) : null,
+        input.sourceRef != null ? prismaJsonValue(input.sourceRef) : undefined,
       timelineJson: prismaJsonValue(timeline),
       profileJson: prismaJsonValue(profile),
       expiresAt,
