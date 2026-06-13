@@ -714,17 +714,19 @@ export function StoryboardContentPanel({
       onProjectChange({
         ...project,
         videoOssUrl: job.downloadUrl,
-        videoAssetId: undefined,
-        meta: {
-          ...project.meta,
-          deliverableSnapshot: {
-            ...project.meta?.deliverableSnapshot,
-            videoUrl: job.downloadUrl,
-            renderJobId: job.id,
-            renderExpiresAt: job.expiresAt,
-            videoMode: "merged_panels",
-          },
-        },
+        videoAssetId: null,
+        meta: project.meta?.deliverableSnapshot
+          ? {
+              ...project.meta,
+              deliverableSnapshot: {
+                ...project.meta.deliverableSnapshot,
+                videoUrl: job.downloadUrl,
+                renderJobId: job.id,
+                renderExpiresAt: job.expiresAt,
+                videoMode: "merged_panels",
+              },
+            }
+          : project.meta,
       });
       onVideoReady();
       await onAlert({

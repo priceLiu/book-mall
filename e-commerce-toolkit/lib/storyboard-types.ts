@@ -75,6 +75,8 @@ export type StoryboardDeliverableSnapshot = {
   videoUrl?: string;
   videoAssetId?: string;
   videoMode?: "full_sheet" | "merged_panels";
+  renderJobId?: string;
+  renderExpiresAt?: string;
   panelVideos: Array<{ index: number; videoUrl: string }>;
 };
 

@@ -94,7 +94,7 @@ export function StoryboardSettingsDialog({
                       <span className="font-medium text-[#1d1d1f]">{m.displayName}</span>
                       {disabled ? (
                         <span className="mt-0.5 block text-xs text-[#86868b]">
-                          未绑定 {storyboardProviderLabel(m.providerKind)} 凭证
+                          未绑定 {storyboardProviderLabel(m.providerKind ?? "UNKNOWN")} 凭证
                         </span>
                       ) : null}
                     </button>
