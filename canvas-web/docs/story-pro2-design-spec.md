@@ -74,15 +74,18 @@
 
 ## 7. LibTV 节点交互（文本 / 图片 / 脚本）
 
-> 实现：`pro2-node-side-plus.tsx` · `normalize-graph-nodes.ts` `PRO2_LIBTV_DRAG_ANYWHERE_TYPES` · `flow-canvas.tsx` `connectionRadius`
+> **共用规范（与分镜 1.0 一致）**：[`libtv-node-interaction-spec.md`](./libtv-node-interaction-spec.md)  
+> 实现：`pro2-node-side-plus.tsx` · `libtv-node-chrome.ts` · `normalize-graph-nodes.ts` `PRO2_LIBTV_DRAG_ANYWHERE_TYPES` · `flow-canvas.tsx` `connectionRadius`
 
 ### 7.1 整卡拖动
 
 | 规则 | 说明 |
 | --- | --- |
-| 类型 | `story-pro2-starter` / `story-pro2-image` / `story-pro2-script-hub` / `story-pro2-frame` |
-| 拖动 | **不设** `dragHandle`，标题栏与卡片空白区均可拖动画布节点 |
-| 例外 | 按钮、输入、滚动区、预览层标记 `nodrag` / `nowheel`，不触发拖节点 |
+| 类型 | `story-pro2-starter` / `story-pro2-image` / `story-pro2-script-hub` / `story-pro2-three-view` / `story-pro2-frame` / `story-pro2-style-asset`（登记见 `LIBTV_DRAG_ANYWHERE_NODE_TYPES`） |
+| 壳层 | **内嵌标题** + `LIBTV_CARD_SHELL_CLASS` + `LIBTV_CARD_DRAG_CLASS`（与 `sbv1-image` / `sbv1-video-engine` 同结构） |
+| 拖动 | **不设** `dragHandle`；Header 与 Stage 空白区均可拖动 |
+| 例外 | 按钮、输入、Dock、Eye 预览钮标记 `nodrag` / `nowheel` |
+| 排列持久化 | 松手 `commitFlowNodePositions` + 立即 `canvas:flush-autosave`；禁止 refresh 后 reflow 覆盖（见 `libtv-node-interaction-spec.md` §2.2） |
 | `+` 生成 | `addNode` 后须 `ensureNodeDragHandles`；生成后 **选中新节点**（`selectPro2NodeAfterSpawn`） |
 
 ### 7.2 侧栏 `+`（选中时出现）
@@ -106,19 +109,27 @@
 
 | 状态 | 底部输入坞 | 顶栏工具条 | 侧 `+` | 粘贴 |
 | --- | --- | --- | --- | --- |
-| **无图** | 显示 `Pro2ImageInputDock` | 无 | 无 | 鼠标 **悬停本节点** 时 Ctrl+V → 写入本节点；空白画布 → 新建 `story-pro2-image` |
-| **有图且选中** | **隐藏** Dock | `Pro2ImageNodeToolbar`，位于卡片上方 **`-top-[4.5rem]`**，不遮挡画面 | 右侧 `+` | 同全局规则 |
+| **无图** | 内嵌 `Pro2ImageNodeEmbeddedDock`（选中唯一时）或 `Pro2ImageInputDock`（画布级浮动） | 无 | 选中时出现 | 悬停本节点 Ctrl+V |
+| **有图且唯一选中** | **隐藏** Dock | `Pro2ImageNodeToolbar` · `passNodeDrag` · 卡片上方 `-60px` | 左右 `+` | 同全局规则 |
 
-### 7.4 输入坞（Dock）
+壳层与分镜 1.0 图片节点 **100% 同构**（见 `libtv-node-interaction-spec.md` §2.1）；Pro2 选中 ring 为紫罗兰 `ring-violet-400/45`，sbv1 为 `ring-cyan-400/50`。
+
+### 7.4 节点顶栏工具条
+
+有图且唯一选中时，**必须**使用 `Pro2ImageNodeToolbar`（`passNodeDrag`），样式见 [`libtv-node-interaction-spec.md`](./libtv-node-interaction-spec.md) §5。禁止自写顶栏或改壳层色值/圆角。
+
+### 7.5 输入坞（Dock）
 
 | 规则 | 说明 |
 | --- | --- |
 | 尺寸 | 固定 `560 × 240`（`PRO2_DOCK_WIDTH` / `PRO2_DOCK_HEIGHT`） |
+| 壳层 | `Pro2InputDockShell` · token 见 `libtv-node-chrome.ts` `LIBTV_INPUT_DOCK_*`（与分镜 1.0 共用） |
 | 结构 | `header` 图标行固定 · 正文区可滚动 · `footer` 工具栏固定 |
 | 禁止 | Dock 底部说明文案（如「第一步…」「角色提示词…」）；**不再添加** |
 | 模型 | 须 `EnginePicker`（见 `.cursor/rules/pro2-model-picker.mdc`） |
+| 画布底栏 | `Pro2CanvasToolbar` 复用 `Sbv1Dock` + `LIBTV_CANVAS_DOCK_BAR_CLASS`；功能仍为 Pro2 添加节点 / 素材库菜单 |
 
-### 7.5 媒体悬停预览
+### 7.6 媒体悬停预览
 
 | 规则 | 说明 |
 | --- | --- |
@@ -126,15 +137,16 @@
 | 实现 | `MediaHoverBox` · `OVERLAY_ICON_BTN`；全站 `generated` 预览统一 |
 | 禁止 | `Search` 替代列内悬停预览；生成中不显示 Eye |
 
-### 7.6 三视图媒体组
+### 7.7 三视图媒体组
 
 | 规则 | 说明 |
 | --- | --- |
 | 结构 | 脚本 hub「生成角色三视图」→ `group`（`pro2Kind: character-board`）+ 子节点 `story-pro2-three-view` |
-| 顶栏 | 选中组节点 → `Pro2MediaGroupToolbar`（白点 + 网格 + 重新生成 / 解组 / 批量下载，角色组与分镜图组 100% 一致，坐标用 internal-node 绝对坐标）；选中组内/独立单张图片 → 节点**内联** `Pro2ImageNodeToolbar`（仅当该图为唯一选中项，由节点自身 `selected` 驱动，最稳）；框选 ≥2 个散节点 → `Pro2SelectionToolbar`（保存到资产 / 创建副本 / 打组） |
+| 顶栏 | 选中组 → `Pro2MediaGroupToolbarPanel`（样式同 `Pro2ImageNodeToolbar` §5） |
 | 独立节点 | 底部 `+` 菜单可单独添加 `story-pro2-three-view`（无组时无组顶栏） |
+| Dock | **禁止内嵌 Dock**；仅浮动 `Pro2ThreeViewInputDock`（与 character-three-view 图片格一致） |
 
-### 7.7 粘贴路由
+### 7.8 粘贴路由
 
 | 模式 | 激活方式 | 行为 |
 | --- | --- | --- |
@@ -152,4 +164,109 @@
 - [ ] 新常量进 `story-pro2-node-chrome.ts`，勿复制一套色值  
 - [ ] 侧 `+` 走 `Pro2NodeSidePlus`（单击菜单 + 拖线）  
 - [ ] `+` 生成节点可拖且自动选中  
-- [ ] 有图图片节点顶栏抬高、Dock 隐藏  
+- [ ] 有图图片节点顶栏 `passNodeDrag`、Dock 隐藏  
+- [ ] LibTV 壳层走 `LIBTV_*` token，与 sbv1 共用组件（见 `libtv-node-interaction-spec.md`）
+
+---
+
+## 9. 已定稿节点规范（Pro2 · 2.0 画布）
+
+> **状态**：下列节点与交互 **已定型**，新增能力须扩展本表，**禁止**另起第二套壳层 / Dock / 工具条。  
+> **实现索引**：`components/canvas/pro2/story-pro2-*-node.tsx` · `group-node.tsx` · `lib/canvas/libtv-node-chrome.ts`
+
+### 9.1 总览
+
+| 节点 | `type` | 壳层 | 拖动 | 侧 `+` | 输入 Dock | 顶栏工具条 | 主要文件 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **文本** | `story-pro2-starter` | LibTV 薄卡 + 标题栏 | 整卡（无 `dragHandle`） | 左/右 · 选中 | `Pro2StarterInputDock` · 浮动 | 无 | `story-pro2-starter-node.tsx` |
+| **分镜脚本** | `story-pro2-script-hub` | LibTV 薄卡 + 预览区 | 整卡 | 左/右 · 选中 | `Pro2ScriptInputDock` · 浮动 | `Pro2ScriptHubToolbar`（卡片内） | `story-pro2-script-hub-node.tsx` |
+| **图片** | `story-pro2-image` | LibTV 媒体卡 | 整卡 | 左/右 · 选中 | 空态内嵌或 `Pro2ImageInputDock` | 有图 → `Pro2ImageNodeToolbar` | `story-pro2-image-node.tsx` |
+| **三视图** | `story-pro2-three-view` | **同图片** LibTV 媒体卡 | 整卡 | 左/右 · 选中 | **仅** `Pro2ThreeViewInputDock` 浮动 | 有图 → `Pro2ImageNodeToolbar` | `story-pro2-three-view-node.tsx` |
+| **风格** | `story-pro2-style-asset` | LibTV 薄卡 + 缩略图 | 整卡 | 右 · 选中 | **无** | 无 | `story-pro2-style-asset-node.tsx` |
+| **分组** | `group` · `pro2Kind` | Pro2 媒体组框 / 点阵底 | 整卡（`LIBTV_CARD_DRAG_CLASS`） | 左/右 · 选中组 | 无 | `Pro2MediaGroupToolbarPanel` | `group-node.tsx` |
+
+### 9.2 文本节点 · `story-pro2-starter`
+
+| 项 | 规范 |
+| --- | --- |
+| 职责 | 故事大纲 / 主题 / 上传剧本入口；连下游脚本 hub 或图片 |
+| 卡片 | 标题「文本」或用户命名；正文预览 `storyThemePromptDisplayMd`；无副标题 |
+| 空态 Try | 上传剧本 · 文生视频 · 图片反推 · 视频分析（`TRY_ACTIONS`） |
+| Dock | 唯一选中 → 浮动 `Pro2StarterInputDock`；`EnginePicker role="LLM"` |
+| 侧 `+` | 左 `PRO2_STARTER_LEFT_ADD_MENU` · 右 `PRO2_RIGHT_ADD_MENU` |
+| 生成 | `+` spawn 后 `selectPro2NodeAfterSpawn` + `ensureNodeDragHandles` |
+
+### 9.3 分镜脚本节点 · `story-pro2-script-hub`
+
+| 项 | 规范 |
+| --- | --- |
+| 职责 | 分镜表 / 角色表 hub；驱动三视图板、分镜图板生成 |
+| 卡片 | 标题 + 内容预览 `Pro2ScriptHubContentPreview`；Tab 视图在检视 / 工具条切换 |
+| 工具条 | 卡片内 `Pro2ScriptHubToolbar`（生成三视图 / 分镜图 / 打开表编辑器等） |
+| Dock | 唯一选中 → `Pro2ScriptInputDock`；LLM · 表级操作 |
+| 侧 `+` | 同文本节点菜单映射 |
+| 表编辑 | `Pro2ScriptTableModal` / `Pro2ScriptTableEditorHost` · 二次确认破坏性操作 |
+
+### 9.4 图片节点 · `story-pro2-image`
+
+| 项 | 规范 |
+| --- | --- |
+| 职责 | 通用生图 / 分镜图（`pro2MediaRole: frame`）/ 组内占位 |
+| 壳层 | `LIBTV_NODE_OUTER` → Header + Stage；`MediaHoverBox` 有图预览 |
+| 空态 | 非 character-three-view：内嵌或浮动 Dock；可点击 / 拖入 / 粘贴上传 |
+| 有图 | 隐藏 Dock；顶栏 `Pro2ImageNodeToolbar` · `passNodeDrag` |
+| 组内 | `Pro2NodeResizer` 隐藏；位置随媒体组 relayout，**禁止** refresh 覆盖用户排列 |
+| 模型 | `EnginePicker role="IMAGE"` · 白名单见 `PRO2_FRAME_IMAGE_MODEL_KEYS` 等 |
+
+### 9.5 三视图节点 · `story-pro2-three-view`
+
+| 项 | 规范 |
+| --- | --- |
+| 职责 | 单角色三视图单元；可独立存在或在 `character-board` 组内 |
+| 壳层 | **与 §9.4 图片节点 100% 同构**（`LIBTV_*` · `Pro2ImageNodeToolbar` · `MediaHoverBox`） |
+| Dock | **禁止** `Pro2ThreeViewNodeEmbeddedDock`；仅浮动 `Pro2ThreeViewInputDock` |
+| 空态 | `Pro2MediaNodeEmptyState`「等待生成三视图」或组内由角色板批量生成 |
+| 生成 | 角色板 controller · `batchRunStoryRowsSequential` · `EnginePicker` 三视图白名单 |
+| 组 | 脚本 hub 生成 → `group` `pro2Kind: character-board` + 多格 `story-pro2-three-view` |
+
+### 9.6 风格节点 · `story-pro2-style-asset`
+
+| 项 | 规范 |
+| --- | --- |
+| 职责 | 风格库素材引用；供 Dock `@` 风格芯片连接 |
+| 卡片 | 缩略图 + 标题 `素材-风格-{name}`；**无**底部 Dock / 浮动检视 |
+| 侧 `+` | 右 `PRO2_STYLE_ASSET_RIGHT_MENU` → 文本 / 图片 |
+| 拖动 | LibTV 整卡；无顶栏工具条 |
+
+### 9.7 分组 · Pro2 媒体组 · `group`
+
+| 项 | 规范 |
+| --- | --- |
+| 类型 | `pro2Kind`: `character-board`（三视图）· `frame-board`（分镜图）· 视频组（预留） |
+| 外观 | 暗色点阵底 `PRO2_MEDIA_GROUP_*` · 用户选色仅影响边框 |
+| 拖动 | 组框 `LIBTV_CARD_DRAG_CLASS` · 无 `dragHandle`；子节点 zIndex 1201 / 组 1200 |
+| 顶栏 | 组标题按钮选中组；选中组 → `Pro2MediaGroupToolbar` + `Pro2MediaGroupToolbarPanel` |
+| 布局 | `pro2-media-group-layout` · `layoutVersion` 迁移；relayout **保留**组 position |
+| 子节点 | `story-pro2-three-view` · `story-pro2-image`；组内隐藏单格 `Pro2NodeResizer` |
+
+### 9.8 画布级能力（已定稿）
+
+| 能力 | 规范 |
+| --- | --- |
+| **我的历史** | 顶栏「我的历史」→ 侧栏；每项目 **15** 条；间隔 localStorage 可配 |
+| **写入时机** | 自动保存 / 手动保存 → `PATCH /api/canvas/projects/:id` 带 `historySnapshot`（服务端写库） |
+| **列表刷新** | 保存成功后派发 `canvas:history-updated`；侧栏打开时自动 reload |
+| **恢复** | `doubleConfirm` 二次确认 → `hydrate` 覆盖当前画布 |
+| **自动保存** | `canvas-autosave-settings.ts` · debounce 1.5s · 拖动松手 `canvas:flush-autosave` |
+| **Undo/Redo** | 画布工具栏；拖动时 temporal pause |
+| **模型选择** | 全站 `EnginePicker`（见 `.cursor/rules/pro2-model-picker.mdc`） |
+
+---
+
+## 10. Code Review 清单（节点）
+
+- [ ] 新 Pro2 媒体节点复用 `LIBTV_*` + `Pro2ImageNodeToolbar` / `Pro2NodeSidePlus`  
+- [ ] 三视图 **无** 内嵌 Dock；Dock 仅浮动  
+- [ ] 媒体组 relayout 不重置用户拖动的 group position  
+- [ ] 历史保存走 PATCH `historySnapshot`，禁止前端二次 POST 巨大 canvas  
+- [ ] 「我的历史」列表在 `canvas:history-updated` 后刷新

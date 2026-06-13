@@ -6,6 +6,7 @@ import {
   readJsonBody,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
+import { createCanvasProjectHistoryForUser } from "@/lib/canvas/canvas-project-history-service";
 import {
   getCanvasProjectForUser,
   softDeleteCanvasProjectForUser,
@@ -65,7 +66,33 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
           ? body.body.thumbnailUrl
           : undefined,
     });
-    return NextResponse.json({ project }, { headers: jsonHeaders(request) });
+
+    const hs = body.body.historySnapshot;
+    let historyItem: Awaited<
+      ReturnType<typeof createCanvasProjectHistoryForUser>
+    > | null = null;
+    if (
+      hs &&
+      typeof hs === "object" &&
+      body.body.canvas !== undefined
+    ) {
+      const source =
+        (hs as { source?: string }).source === "manual"
+          ? ("manual" as const)
+          : ("autosave" as const);
+      const labelRaw = (hs as { label?: unknown }).label;
+      historyItem = await createCanvasProjectHistoryForUser(guard.user.id, id, {
+        canvas: project.canvas,
+        thumbnailUrl: project.thumbnailUrl,
+        source,
+        label: typeof labelRaw === "string" ? labelRaw : undefined,
+      });
+    }
+
+    return NextResponse.json(
+      { project, historyItem },
+      { headers: jsonHeaders(request) },
+    );
   } catch (err) {
     return canvasErrorToResponse(request, err);
   }

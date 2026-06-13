@@ -15,9 +15,11 @@ import {
   spawnSbv1NeighborFromNode,
 } from "@/lib/canvas/sbv1-spawn-nodes";
 import {
+  SBV1_CARD_DRAG_CLASS,
   SBV1_CARD_SHELL_CLASS,
   SBV1_NODE_HANDLE_CLASS,
   SBV1_NODE_OUTER_CLASS,
+  SBV1_VIDEO_COMPOSE_LABEL,
   SBV1_VIDEO_ENGINE_MIN_HEIGHT,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "@/lib/canvas/sbv1-node-chrome";
@@ -73,7 +75,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           }
           if (
             side === "right" &&
-            (itemId === "video-engine" || nodeType === "sbv1-video-engine")
+            (itemId === "video-engine" ||
+              itemId === "video-compose" ||
+              nodeType === "sbv1-video-engine")
           ) {
             spawnSbv1NeighborFromNode(
               id,
@@ -128,7 +132,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 ? "opacity-100"
                 : "pointer-events-none opacity-0",
           )}
-          title="串联下一视频引擎"
+          title={`串联下一${SBV1_VIDEO_COMPOSE_LABEL}`}
         />
 
         {showSidePlus ? (
@@ -156,14 +160,14 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
         <div
           className={cn(
             SBV1_CARD_SHELL_CLASS,
-            "cursor-grab active:cursor-grabbing",
+            SBV1_CARD_DRAG_CLASS,
             selected && "ring-1 ring-cyan-400/50",
           )}
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
             <div className="flex items-center gap-2">
               <Video className="size-3.5 text-cyan-300" />
-              <p className="text-xs font-medium text-white">视频引擎</p>
+              <p className="text-xs font-medium text-white">{SBV1_VIDEO_COMPOSE_LABEL}</p>
             </div>
             <div className="flex items-center gap-1.5">
               {hasVideo ? (
@@ -222,7 +226,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
         <StoryMediaPreviewModal
           url={videoUrl}
           kind="video"
-          title="视频引擎"
+          title={SBV1_VIDEO_COMPOSE_LABEL}
           onClose={() => setPreviewOpen(false)}
         />
       ) : null}

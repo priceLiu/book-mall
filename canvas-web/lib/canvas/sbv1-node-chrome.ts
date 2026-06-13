@@ -1,15 +1,27 @@
-/** 分镜视频 1.0 节点尺寸与样式 token（对齐 Pro2 dark chrome） */
+export const SBV1_VIDEO_COMPOSE_LABEL = "视频合成";
 
+/** 分镜视频 1.0 节点尺寸与样式 token（壳层与 Pro2 共用 libtv-node-chrome） */
+
+import {
+  LIBTV_CARD_DRAG_CLASS,
+  LIBTV_CARD_SHELL_CLASS,
+  LIBTV_DRAG_ANYWHERE_NODE_TYPES,
+  LIBTV_NODE_HANDLE_CLASS,
+  LIBTV_NODE_OUTER_CLASS,
+} from "./libtv-node-chrome";
 import {
   PRO2_DOCK_BORDER,
   PRO2_DOCK_SHELL_BG,
   PRO2_DOCK_TEXTAREA_CLASS,
+  PRO2_IMAGE_NODE_MIN_HEIGHT,
+  PRO2_IMAGE_NODE_MIN_WIDTH,
+  PRO2_IMAGE_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 
-export const SBV1_IMAGE_NODE_WIDTH = 280;
-export const SBV1_IMAGE_NODE_HEIGHT = 360;
-export const SBV1_IMAGE_NODE_MIN_WIDTH = 200;
-export const SBV1_IMAGE_NODE_MIN_HEIGHT = 260;
+export const SBV1_IMAGE_NODE_WIDTH = PRO2_IMAGE_NODE_WIDTH;
+export const SBV1_IMAGE_NODE_HEIGHT = PRO2_IMAGE_NODE_MIN_HEIGHT + 28;
+export const SBV1_IMAGE_NODE_MIN_WIDTH = PRO2_IMAGE_NODE_MIN_WIDTH;
+export const SBV1_IMAGE_NODE_MIN_HEIGHT = PRO2_IMAGE_NODE_MIN_HEIGHT;
 
 export const SBV1_VIDEO_ENGINE_WIDTH = 960;
 /** 4:3 视频预览区高度（宽 960） */
@@ -17,15 +29,11 @@ export const SBV1_VIDEO_ENGINE_STAGE_HEIGHT = 720;
 /** 标题栏 + 4:3 预览区 */
 export const SBV1_VIDEO_ENGINE_MIN_HEIGHT = 760;
 
-/** 内层卡片（侧栏 + 须挂在外层 overflow-visible 容器上，避免 + 被裁切） */
-export const SBV1_CARD_SHELL_CLASS =
-  "flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141418] shadow-lg";
-
-export const SBV1_NODE_OUTER_CLASS =
-  "relative flex h-full w-full min-h-0 min-w-0 flex-col overflow-visible";
-
-export const SBV1_NODE_HANDLE_CLASS =
-  "!h-2.5 !w-2.5 !border-2 !border-[#141418] !bg-cyan-400";
+export const SBV1_CARD_SHELL_CLASS = LIBTV_CARD_SHELL_CLASS;
+export const SBV1_CARD_DRAG_CLASS = LIBTV_CARD_DRAG_CLASS;
+export const SBV1_DRAG_ANYWHERE_NODE_TYPES = LIBTV_DRAG_ANYWHERE_NODE_TYPES;
+export const SBV1_NODE_OUTER_CLASS = LIBTV_NODE_OUTER_CLASS;
+export const SBV1_NODE_HANDLE_CLASS = LIBTV_NODE_HANDLE_CLASS;
 
 export const SBV1_DOCK_SHELL_BG = "bg-[#1a1a1f]";
 export const SBV1_DOCK_BORDER = "border-white/10";

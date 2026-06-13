@@ -90,7 +90,7 @@ export function Pro2MediaGroupToolbar({
     <Pro2MediaGroupToolbarPanel
       groupId={resolved.group.id}
       kind={resolved.kind}
-      className="fixed z-[92]"
+      className="fixed z-[1300]"
       style={{
         left: placement.x,
         top: placement.y,

@@ -29,7 +29,7 @@ import { handlePro2GroupSidePick } from "@/lib/canvas/pro2-group-side-spawn";
 import { SBV1_GROUP_RIGHT_ADD_MENU } from "@/lib/canvas/sbv1-add-node-menu";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import { handleSbv1GroupSidePick } from "@/lib/canvas/sbv1-spawn-nodes";
-import { relayoutPro2MediaGroup } from "@/lib/canvas/pro2-media-group-layout";
+import { relayoutPro2MediaGroup, PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
 import {
   isPro2MediaChildNode,
   isPro2StyledGroup,
@@ -45,7 +45,8 @@ import {
   PRO2_NODE_RESIZER_HANDLE,
   PRO2_NODE_RESIZER_LINE,
 } from "@/lib/canvas/story-pro2-node-chrome";
-import { SBV1_NODE_HANDLE_CLASS } from "@/lib/canvas/sbv1-node-chrome";
+import { LIBTV_CARD_DRAG_CLASS } from "@/lib/canvas/libtv-node-chrome";
+import { SBV1_NODE_HANDLE_CLASS, SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import {
   GROUP_COLOR_PRESETS,
   type GroupNodeData,
@@ -253,7 +254,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     };
   }, []);
 
-  // 旧媒体组迁移：挂载时按新版宫格 + 大留白重排一次（图片填满、留出可点选组的空白）
+  // 旧媒体组迁移：仅 layout 版本落后时重排一次（禁止每次 mount 覆盖用户坐标）
   const relayoutDoneRef = useRef(false);
   const hasMediaChildren = useMemo(
     () =>
@@ -268,9 +269,17 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     if (!hasMediaChildren) return;
     if (isSbv1Group) return;
     if (relayoutDoneRef.current) return;
+    const version = (d as { pro2LayoutVersion?: number }).pro2LayoutVersion;
+    if (version === PRO2_MEDIA_GROUP_LAYOUT_VERSION) {
+      relayoutDoneRef.current = true;
+      return;
+    }
     relayoutDoneRef.current = true;
     relayoutPro2MediaGroup(setNodes, id);
-  }, [hasMediaChildren, isSbv1Group, id, setNodes]);
+    updateNodeData(id, {
+      pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
+    });
+  }, [hasMediaChildren, isSbv1Group, id, setNodes, updateNodeData, d]);
 
   useEffect(() => {
     updateScreenPos();
@@ -316,24 +325,6 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     setNodes((prev) => prev.map((n) => ({ ...n, selected: n.id === id })));
   }, [id, setNodes]);
 
-  const onPro2GroupTitlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      e.stopPropagation();
-      selectPro2Group();
-    },
-    [selectPro2Group],
-  );
-
-  const onPro2GroupBlankPointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (e.button !== 0) return;
-      // 阻止冒泡到 pane（pro2 onPaneClick 会清空选中）
-      e.stopPropagation();
-      selectPro2Group();
-    },
-    [selectPro2Group],
-  );
-
   const onGroupSidePick = useCallback(
     (side: "left" | "right") => (itemId: string, nodeType?: string) => {
       void handlePro2GroupSidePick(
@@ -373,7 +364,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       className={cn(
         "canvas-group-node group/gn relative h-full w-full overflow-visible",
         isPro2MediaGroup
-          ? PRO2_MEDIA_GROUP_SHELL_CLASS
+          ? cn(PRO2_MEDIA_GROUP_SHELL_CLASS, LIBTV_CARD_DRAG_CLASS)
           : "rounded-2xl",
       )}
       data-pro2-media-group={isPro2MediaGroup ? id : undefined}
@@ -394,12 +385,6 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     >
       {isPro2MediaGroup ? (
         <>
-          {/* 留白区：选中整组 + 从此处拖动（子节点 DOM 叠在上层，仅空白可点） */}
-          <div
-            className={cn(RF_NODE_DRAG_HANDLE, "absolute inset-0 z-0")}
-            aria-hidden
-            onPointerDown={onPro2GroupBlankPointerDown}
-          />
           <Handle
             id="in_text"
             type="target"
@@ -463,7 +448,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
                   : "pointer-events-none opacity-0",
             )}
             style={{ top: "50%" }}
-            title="连线到视频引擎"
+            title={`连线到${SBV1_VIDEO_COMPOSE_LABEL}`}
           />
           {showSbv1GroupSidePlus ? (
             <Pro2NodeSidePlus
@@ -497,21 +482,11 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
       {isPro2MediaGroup ? (
         <div className="relative z-10 flex h-8 shrink-0 items-center gap-1 px-2 pt-2">
-          <div
-            className={cn(
-              RF_NODE_DRAG_HANDLE,
-              "flex size-7 shrink-0 cursor-grab items-center justify-center rounded-md text-white/35 active:cursor-grabbing",
-            )}
-            title="拖动移动分组"
-          >
-            <GripVertical className="size-3.5" aria-hidden />
-          </div>
           <button
             type="button"
             className={cn(
               "nodrag flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[11px] text-white/55 transition hover:bg-white/6 hover:text-white/75",
             )}
-            onPointerDown={onPro2GroupTitlePointerDown}
             onClick={(e) => {
               e.stopPropagation();
               selectPro2Group();

@@ -695,6 +695,7 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
   } as Record<string, unknown>,
   "sbv1-image": {
     label: "图片",
+    dockInput: "",
   } as Record<string, unknown>,
   "sbv1-video-engine": {
     ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,

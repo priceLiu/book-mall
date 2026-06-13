@@ -1,4 +1,5 @@
 import type { Pro2AddMenuSection } from "./pro2-add-node-menu";
+import { SBV1_VIDEO_COMPOSE_LABEL } from "./sbv1-node-chrome";
 import {
   Image as ImageIcon,
   Sparkles,
@@ -30,14 +31,14 @@ export const SBV1_IMAGE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 图片节点右侧 + · 视频引擎 */
+/** 图片节点右侧 + · 视频合成（自动连线 in_ref） */
 export const SBV1_IMAGE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "引用该节点生成",
     items: [
       {
-        id: "video-engine",
-        label: "视频引擎",
+        id: "video-compose",
+        label: SBV1_VIDEO_COMPOSE_LABEL,
         icon: Video,
         enabled: true,
         nodeType: "sbv1-video-engine",
@@ -46,7 +47,7 @@ export const SBV1_IMAGE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 视频引擎左侧 + · 添加上游参考 */
+/** 视频合成左侧 + · 添加上游参考（自动连线 in_ref） */
 export const SBV1_VIDEO_ENGINE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "添加上下文",
@@ -64,14 +65,14 @@ export const SBV1_VIDEO_ENGINE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 视频引擎右侧 + · 串联下一视频引擎（空节点，不连 out_video→in_ref） */
+/** 视频合成右侧 + · 串联下一节点 */
 export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "串联生成",
     items: [
       {
-        id: "video-engine",
-        label: "视频引擎",
+        id: "video-compose",
+        label: SBV1_VIDEO_COMPOSE_LABEL,
         icon: Video,
         enabled: true,
         nodeType: "sbv1-video-engine",
@@ -80,14 +81,14 @@ export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 分组右侧 + · 接入视频引擎 */
+/** 分组右侧 + · 接入视频合成 */
 export const SBV1_GROUP_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "引用组内图片",
     items: [
       {
-        id: "video-engine",
-        label: "视频引擎",
+        id: "video-compose",
+        label: SBV1_VIDEO_COMPOSE_LABEL,
         icon: Video,
         enabled: true,
         nodeType: "sbv1-video-engine",

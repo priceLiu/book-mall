@@ -6,6 +6,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "@/lib/canvas/sbv1-workspace-types";
+import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import { selectSbv1NodeAfterSpawn } from "@/lib/canvas/sbv1-spawn-nodes";
 import { flowPositionAtViewportCenter } from "@/lib/canvas/viewport-placement";
 import { spawnSbv1CanvasPastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
@@ -91,8 +92,8 @@ export function Sbv1CanvasToolbar() {
         }
       } else if (engines.length > 1) {
         await alert({
-          title: "请选择视频引擎",
-          message: "画布上有多个视频引擎，请先选中要绑定 GroupId 的那一个，再点活体认证。",
+          title: `请选择${SBV1_VIDEO_COMPOSE_LABEL}`,
+          message: `画布上有多个${SBV1_VIDEO_COMPOSE_LABEL}节点，请先选中要绑定 GroupId 的那一个，再点活体认证。`,
           variant: "warning",
         });
         return;
@@ -103,7 +104,7 @@ export function Sbv1CanvasToolbar() {
     if (!engine) {
       await alert({
         title: "无法打开活体认证",
-        message: "请先添加视频引擎节点。",
+        message: `请先添加${SBV1_VIDEO_COMPOSE_LABEL}节点。`,
         variant: "warning",
       });
       return;
@@ -138,8 +139,8 @@ export function Sbv1CanvasToolbar() {
         disabled: !base,
       },
       {
-        id: "video-engine",
-        name: "视频引擎",
+        id: "video-compose",
+        name: SBV1_VIDEO_COMPOSE_LABEL,
         icon: <Video strokeWidth={1.75} />,
         color: "bg-gradient-to-br from-rose-400 to-red-600",
         onClick: onAddVideoEngine,

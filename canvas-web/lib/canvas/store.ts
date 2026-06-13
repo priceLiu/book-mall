@@ -54,6 +54,7 @@ import {
 import {
   inferPro2MediaGroupKind,
   pro2MediaGroupDefaultLabel,
+  syncPro2MediaGroupZIndex,
 } from "./pro2-media-group-meta";
 import {
   applyPro2MediaGroupRelayout,
@@ -79,6 +80,7 @@ import {
   isCanvasInteractiveGeometryInProgress,
   isCanvasSelectionOnlyChange,
   isCanvasDimensionCommitOnly,
+  isCanvasPositionCommitOnly,
   syncNodeDimensionsFromChanges,
 } from "./canvas-node-changes";
 
@@ -137,7 +139,7 @@ type CanvasState = {
   /** 生成中聚焦某节点（选中 + 平移，不写 undo 栈） */
   runningFocusNodeId: string | null;
   runningFocusNonce: number;
-  /** 递增表示 nodes/edges 业务数据变更（不含纯拖动坐标、纯选中） */
+  /** 递增表示 nodes/edges 业务数据变更；纯选中不进栈。坐标松手提交会 bump 以触发 autosave */
   graphRevision: number;
 
   /**
@@ -233,6 +235,10 @@ type CanvasState = {
    * 自动换算 position 使屏幕坐标不变；并设置 / 清除 extent='parent'。
    */
   reparentNode: (nodeId: string, newParentGroupId: string | null) => void;
+  /** 从 React Flow 本地 nodes 提交坐标（拖动松手兜底；不跑 normalize） */
+  commitFlowNodePositions: (
+    patches: Array<{ id: string; position: { x: number; y: number } }>,
+  ) => void;
   /** 漫剧模板：重排「角色三视图 / 分镜媒体」分组内节点并放大框体（旧版分组画布）。 */
   reflowStoryTemplateGroups: () => void;
   /** 漫剧全链路 · 扁平画布一键重排。 */
@@ -436,12 +442,17 @@ export const useCanvasStore = create<CanvasState>()(
           filteredChanges,
         );
         if (isCanvasSelectionOnlyChange(filteredChanges)) {
+          next = syncPro2MediaGroupZIndex(next);
           set({ nodes: next });
           return;
         }
         if (isCanvasInteractiveGeometryInProgress(filteredChanges)) {
           // 拖动/缩放过程中只同步几何，不跑 normalize（避免松手后尺寸回弹）
           set({ nodes: next });
+          return;
+        }
+        if (isCanvasPositionCommitOnly(filteredChanges)) {
+          set((state) => withGraphRevision(state, { nodes: next }));
           return;
         }
         const manualSized = new Map<string, CanvasFlowNode>();
@@ -645,7 +656,7 @@ export const useCanvasStore = create<CanvasState>()(
         };
         set((state) =>
           withGraphRevision(state, {
-            nodes: sortNodesForReactFlow([...all, node]),
+            nodes: ensureNodeDragHandles(sortNodesForReactFlow([...all, node])),
           }),
         );
         return id;
@@ -763,7 +774,7 @@ export const useCanvasStore = create<CanvasState>()(
         const newId = `n_${nanoid(8)}`;
         set((state) =>
           withGraphRevision(state, {
-            nodes: [
+            nodes: ensureNodeDragHandles([
               ...state.nodes,
               {
                 ...src,
@@ -771,7 +782,7 @@ export const useCanvasStore = create<CanvasState>()(
                 position: { x: src.position.x + 40, y: src.position.y + 40 },
                 data: { ...src.data, runtime: undefined },
               },
-            ],
+            ]),
           }),
         );
         return newId;
@@ -875,8 +886,6 @@ export const useCanvasStore = create<CanvasState>()(
           style: { width: groupW, height: groupH },
           selectable: true,
           draggable: true,
-          // Group 排在最前面（zIndex 较低）才能让子节点叠在上面渲染
-          zIndex: -1,
         } as CanvasFlowNode;
 
         const childIdSet = new Set(effectiveChildIds);
@@ -1064,6 +1073,23 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
+      commitFlowNodePositions: (patches) => {
+        if (!patches.length) return;
+        const byId = new Map(patches.map((p) => [p.id, p.position]));
+        set((state) => {
+          let changed = false;
+          const next = state.nodes.map((n) => {
+            const pos = byId.get(n.id);
+            if (!pos) return n;
+            if (n.position.x === pos.x && n.position.y === pos.y) return n;
+            changed = true;
+            return { ...n, position: pos };
+          });
+          if (!changed) return state;
+          return withGraphRevision(state, { nodes: next });
+        });
+      },
+
       reparentNode: (nodeId, newParentGroupId) => {
         const all = get().nodes;
         const node = all.find((n) => n.id === nodeId);
@@ -1099,10 +1125,12 @@ export const useCanvasStore = create<CanvasState>()(
             : n,
         );
         // React Flow 要求父节点先于子节点出现：重排，把所有 group 放最前
-        set({
-          nodes: sortNodesForReactFlow(updated),
-          dragHoverGroupId: null,
-        });
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: sortNodesForReactFlow(updated),
+            dragHoverGroupId: null,
+          }),
+        );
       },
 
       reflowStoryTemplateGroups: () => {

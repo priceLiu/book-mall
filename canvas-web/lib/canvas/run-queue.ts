@@ -200,6 +200,9 @@ function promptForDockMentionFilter(
   if (node.type === "sbv1-video-engine") {
     return String(d.prompt ?? "");
   }
+  if (node.type === "sbv1-image") {
+    return String(d.dockInput ?? "");
+  }
   if (node.type === "story-pro2-starter") {
     return String(d.themeInput ?? "");
   }
@@ -243,6 +246,15 @@ function mentionCatalogForNode(
       id: l.id,
       url: l.previewUrl,
     }));
+  }
+  if (node.type === "sbv1-image") {
+    const links = resolvePro2DockUpstreamLinks(
+      node.id,
+      "sbv1-image",
+      nodes,
+      edges,
+    );
+    return pro2DockMentionRefCatalog(links, []);
   }
 
   if (

@@ -7,6 +7,7 @@ import {
   useImagePasteWhenActive,
 } from "@/lib/canvas/image-upload-handlers";
 import { spawnPro2DockPastedImages } from "@/lib/canvas/spawn-pro2-dock-paste-images";
+import { spawnSbv1ImageDockPastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,21 @@ export function Pro2DockPasteZone({
     async (files: File[]) => {
       if (disabled || !base || !files.length) return;
       const state = useCanvasStore.getState();
+      if (anchorNodeType === "sbv1-image") {
+        await spawnSbv1ImageDockPastedImages({
+          anchorNodeId,
+          files,
+          base,
+          nodes: state.nodes,
+          edges: state.edges,
+          addNode,
+          setEdges,
+          updateNodeData,
+          setNodes,
+          maxCount: maxImages,
+        });
+        return;
+      }
       await spawnPro2DockPastedImages({
         anchorNodeId,
         anchorNodeType,

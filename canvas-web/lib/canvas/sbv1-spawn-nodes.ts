@@ -16,6 +16,7 @@ export function buildSbv1ImageNodeData(
 ): Record<string, unknown> {
   return {
     label: "图片",
+    dockInput: "",
     ...overrides,
   };
 }
@@ -92,6 +93,36 @@ export function spawnSbv1NeighborFromNode(
       }),
     );
     if (!newId) return "";
+    if (self.type === "sbv1-video-engine" && side === "left") {
+      setEdges((prev) => [
+        ...prev,
+        {
+          id: `e-${newId}-${anchorId}`,
+          source: newId,
+          target: anchorId,
+          sourceHandle: "image",
+          targetHandle: "in_ref",
+        },
+      ]);
+    } else if (self.type === "sbv1-image") {
+      const edge =
+        side === "left"
+          ? {
+              id: `e-${newId}-${anchorId}`,
+              source: newId,
+              target: anchorId,
+              sourceHandle: "image",
+              targetHandle: "in_image",
+            }
+          : {
+              id: `e-${anchorId}-${newId}`,
+              source: anchorId,
+              target: newId,
+              sourceHandle: "image",
+              targetHandle: "in_image",
+            };
+      setEdges((prev) => [...prev, edge]);
+    }
     selectSbv1NodeAfterSpawn(setNodes, newId);
     return newId;
   }
@@ -168,6 +199,55 @@ export function spawnSbv1VideoEngineFromGroup(
   return engineId;
 }
 
+export async function handleSbv1ImageSideAddNodePick(
+  itemId: string,
+  nodeType: string | undefined,
+  side: "left" | "right",
+  alert: (opts: {
+    title: string;
+    message: string;
+    variant?: "info" | "warning" | "error";
+  }) => Promise<void>,
+  onSpawnImage: () => void,
+  onSpawnVideoCompose?: () => void,
+): Promise<void> {
+  if (
+    itemId === "image" ||
+    nodeType === "story-pro2-image" ||
+    nodeType === "sbv1-image" ||
+    itemId === "txt2img" ||
+    itemId === "img2img"
+  ) {
+    onSpawnImage();
+    return;
+  }
+  if (
+    side === "right" &&
+    (itemId === "video-compose" ||
+      itemId === "video-engine" ||
+      nodeType === "sbv1-video-engine")
+  ) {
+    onSpawnVideoCompose?.();
+    return;
+  }
+  const labels: Record<string, string> = {
+    text: "文本节点",
+    script: "脚本节点",
+    video: "视频节点",
+    "three-view": "三视图",
+    director: "导演台",
+    audio: "音频节点",
+    "ref-node": "参考节点",
+  };
+  await alert({
+    title: "即将推出",
+    message: labels[itemId]
+      ? `「${labels[itemId]}」将在后续版本接入。`
+      : "该能力将在后续版本接入。",
+    variant: "info",
+  });
+}
+
 export async function handleSbv1SideAddNodePick(
   itemId: string,
   nodeType: string | undefined,
@@ -182,6 +262,7 @@ export async function handleSbv1SideAddNodePick(
     itemId === "txt2img" ||
     itemId === "img2img" ||
     itemId === "video-engine" ||
+    itemId === "video-compose" ||
     (itemId === "image" && nodeType === "sbv1-image") ||
     nodeType === "sbv1-video-engine";
 
@@ -215,7 +296,11 @@ export async function handleSbv1GroupSidePick(
   store: SpawnStore,
 ): Promise<void> {
   await handleSbv1SideAddNodePick(itemId, nodeType, alert, () => {
-    if (itemId === "video-engine" || nodeType === "sbv1-video-engine") {
+    if (
+      itemId === "video-engine" ||
+      itemId === "video-compose" ||
+      nodeType === "sbv1-video-engine"
+    ) {
       spawnSbv1VideoEngineFromGroup(groupId, store);
     }
   });

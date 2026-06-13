@@ -217,7 +217,7 @@ export function ensurePro2CharacterImageGroup(
   );
 
   if (groupId) {
-    relayoutPro2MediaGroup(args.setNodes, groupId);
+    relayoutPro2MediaGroup(args.setNodes, groupId, { resetOrigin: true });
     if (args.setEdges) {
       ensurePro2HubToMediaGroupEdge(args.setEdges, args.hubNodeId, groupId);
     }

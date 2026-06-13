@@ -577,7 +577,7 @@ export const BUILTIN_CANVAS_TEMPLATES: BuiltinCanvasTemplate[] = [
     category: "builtin",
     name: "分镜视频 1.0",
     description:
-      "图片 + 视频引擎：粘贴参考图、连线、即梦 Seedance 三种参考模式生成视频。",
+      "图片 + 视频合成：粘贴参考图、连线、即梦 Seedance 三种参考模式生成视频。",
     canvas: SBV1_PIPELINE,
   },
 ];

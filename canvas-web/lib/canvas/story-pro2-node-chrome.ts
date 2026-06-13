@@ -2,6 +2,12 @@
  * 影视专业版 2.0 · 视觉常量（设计规范：docs/story-pro2-design-spec.md）
  */
 
+import {
+  LIBTV_INPUT_DOCK_BG,
+  LIBTV_INPUT_DOCK_BORDER,
+  LIBTV_INPUT_DOCK_DIVIDER,
+} from "./libtv-node-chrome";
+
 export const PRO2_NODE_ACCENT = "#9f8fef";
 export const PRO2_NODE_ACCENT_SOFT = "rgba(159, 143, 239, 0.1)";
 /** 节点卡片描边 · 低对比灰紫（未选中 · 图 4） */
@@ -12,12 +18,11 @@ export const PRO2_NODE_BORDER_SELECTED = "rgba(255, 255, 255, 0.42)";
 export function pro2NodeBorderColor(selected?: boolean): string {
   return selected ? PRO2_NODE_BORDER_SELECTED : PRO2_NODE_BORDER;
 }
-/** 输入坞描边 */
-export const PRO2_DOCK_BORDER = "rgba(255, 255, 255, 0.08)";
-export const PRO2_DOCK_SHELL_BG =
-  "linear-gradient(165deg, rgba(22, 22, 28, 0.96) 0%, rgba(16, 16, 20, 0.98) 100%)";
+/** 输入坞描边 · 与分镜 1.0 共用 LIBTV token */
+export const PRO2_DOCK_BORDER = LIBTV_INPUT_DOCK_BORDER;
+export const PRO2_DOCK_SHELL_BG = LIBTV_INPUT_DOCK_BG;
 /** 输入坞内部分隔线 · 极浅灰 */
-export const PRO2_DOCK_DIVIDER = "border-white/[0.06]";
+export const PRO2_DOCK_DIVIDER = LIBTV_INPUT_DOCK_DIVIDER;
 
 /** 控制类薄卡（列摘要等） */
 export const PRO2_CONTROL_CARD_WIDTH = 360;

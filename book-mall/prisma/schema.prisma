@@ -91,6 +91,7 @@ model User {
   storySpace                       StorySpace?
   storyProjects                    StoryProject[]
   canvasProjects                   CanvasProject[]
+  canvasProjectHistories           CanvasProjectHistory[]
   canvasTemplates                  CanvasTemplate[]
   canvasCharacters                 CanvasCharacter[]
   storyProCharacterAssets          StoryProCharacterAsset[]
@@ -1649,12 +1650,32 @@ model CanvasProject {
 
   tasks        CanvasGenerationTask[]
   cleanupItems CanvasOssCleanupQueue[]
+  histories    CanvasProjectHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, deletedAt, updatedAt])
   @@index([tenantId, visibility, updatedAt])
+}
+
+/// 画布自动/手动保存历史（每项目最多保留 15 条）
+model CanvasProjectHistory {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   CanvasProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  label        String @default("")
+  source       String @default("autosave")
+  canvas       Json
+  thumbnailUrl String @default("")
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, projectId, createdAt])
+  @@index([projectId, createdAt])
 }
 
 /// 画布模板：系统模板（builtin=true 且 ownerUserId=null）+ 用户私有模板

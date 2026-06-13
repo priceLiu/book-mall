@@ -9,6 +9,7 @@ import {
   type MotionValue,
 } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { LIBTV_CANVAS_DOCK_BAR_CLASS } from "@/lib/canvas/libtv-node-chrome";
 
 export type Sbv1DockItem = {
   id: string;
@@ -16,7 +17,8 @@ export type Sbv1DockItem = {
   icon: ReactNode;
   color: string;
   disabled?: boolean;
-  onClick?: () => void;
+  active?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 };
 
 function Sbv1DockIcon({
@@ -56,9 +58,10 @@ function Sbv1DockIcon({
       onMouseLeave={() => setIsHovered(false)}
       onMouseDown={() => setIsClicked(true)}
       onMouseUp={() => setIsClicked(false)}
-      onClick={item.onClick}
+      onClick={(e) => item.onClick?.(e)}
       className={cn(
         "relative flex aspect-square cursor-pointer items-center justify-center disabled:cursor-not-allowed disabled:opacity-40",
+        item.active && "scale-105",
       )}
       whileTap={{ scale: 0.95 }}
     >
@@ -66,6 +69,7 @@ function Sbv1DockIcon({
         className={cn(
           "relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl text-white shadow-lg",
           item.color,
+          item.active && "ring-2 ring-white/35 ring-offset-2 ring-offset-transparent",
         )}
         animate={{
           y: isClicked ? 2 : isHovered ? -8 : 0,
@@ -135,7 +139,7 @@ export function Sbv1Dock({ items }: { items: Sbv1DockItem[] }) {
     <motion.div
       onMouseMove={(e) => mouseX.set(e.clientX)}
       onMouseLeave={() => mouseX.set(Infinity)}
-      className="pointer-events-auto mx-auto flex h-20 items-end gap-3 rounded-3xl border border-white/[0.08] bg-[rgba(38,38,40,0.72)] px-4 pb-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl backdrop-saturate-150"
+      className={LIBTV_CANVAS_DOCK_BAR_CLASS}
       initial={{ y: 48, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{

@@ -146,10 +146,14 @@ function isMediaGroupChildForRelayout(
   return n.type === "story-pro2-image" || n.type === "story-pro2-three-view";
 }
 
+/** 布局版本：hydrate 仅对更低版本做一次网格迁移，不覆盖已保存坐标 */
+export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 2;
+
 /** 纯函数：收拢媒体子节点、宫格重排、组框贴合（与 createGroupContaining / group-node 共用） */
 export function applyPro2MediaGroupRelayout(
   nodes: CanvasFlowNode[],
   groupId: string,
+  opts?: { resetOrigin?: boolean },
 ): CanvasFlowNode[] {
   const group = nodes.find((n) => n.id === groupId && n.type === "group");
   if (!group) return nodes;
@@ -227,9 +231,11 @@ export function applyPro2MediaGroupRelayout(
     layoutCell,
     cols,
   );
-  const origin = hubNodeId
-    ? pro2MediaGroupOrigin(next, hubNodeId)
-    : group.position;
+  const resetOrigin = opts?.resetOrigin === true;
+  const origin =
+    resetOrigin && hubNodeId
+      ? pro2MediaGroupOrigin(next, hubNodeId)
+      : group.position;
 
   next = next.map((n) =>
     n.id === groupId
@@ -239,6 +245,10 @@ export function applyPro2MediaGroupRelayout(
           width,
           height,
           style: { ...(n.style ?? {}), width, height },
+          data: {
+            ...(n.data as Record<string, unknown>),
+            pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
+          },
         }
       : n,
   );
@@ -250,6 +260,7 @@ export function applyPro2MediaGroupRelayout(
 export function relayoutPro2MediaGroup(
   setNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
   groupId: string,
+  opts?: { resetOrigin?: boolean },
 ): void {
-  setNodes((nodes) => applyPro2MediaGroupRelayout(nodes, groupId));
+  setNodes((nodes) => applyPro2MediaGroupRelayout(nodes, groupId, opts));
 }

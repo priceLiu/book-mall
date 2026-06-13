@@ -1,4 +1,5 @@
 import { uploadCanvasImage } from "@/lib/canvas-api";
+import { selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
 import {
   SBV1_IMAGE_NODE_HEIGHT,
   SBV1_IMAGE_NODE_WIDTH,
@@ -32,7 +33,12 @@ export type SpawnSbv1PasteImagesArgs = {
   ) => string;
   setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
   updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+  setNodes?: (
+    fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[],
+  ) => void;
   maxCount?: number;
+  /** 图片 Dock 连 `in_image`；视频合成 Dock 连 `in_ref` */
+  targetHandle?: "in_image" | "in_ref";
 };
 
 /** 画布 / 引擎 dock 多图粘贴：在锚点左侧生成 sbv1-image 并连线 */
@@ -50,6 +56,7 @@ export async function spawnSbv1PastedImages(
   if (!images.length) return [];
 
   const max = args.maxCount ?? 9;
+  const targetHandle = args.targetHandle ?? "in_ref";
   const existing = countImagePredecessors(
     args.anchorNodeId,
     args.nodes,
@@ -75,6 +82,7 @@ export async function spawnSbv1PastedImages(
     const id = args.addNode("sbv1-image", pos, {
       blobUrl,
       uploading: true,
+      dockInput: "",
       label: file.name.replace(/\.[^.]+$/, "") || `图片 ${existing + i + 1}`,
     });
     createdIds.push(id);
@@ -85,7 +93,7 @@ export async function spawnSbv1PastedImages(
         source: id,
         target: args.anchorNodeId,
         sourceHandle: "image",
-        targetHandle: "in_ref",
+        targetHandle,
         animated: false,
       },
     ]);
@@ -100,7 +108,22 @@ export async function spawnSbv1PastedImages(
         });
       });
   }
+  const lastId = createdIds[createdIds.length - 1];
+  if (lastId && args.setNodes) {
+    selectSbv1NodeAfterSpawn(args.setNodes, lastId);
+  }
   return createdIds;
+}
+
+/** 图片节点 Dock · 多图粘贴/上传（连 in_image） */
+export async function spawnSbv1ImageDockPastedImages(
+  args: SpawnSbv1PasteImagesArgs,
+): Promise<string[]> {
+  return spawnSbv1PastedImages({
+    ...args,
+    targetHandle: "in_image",
+    maxCount: args.maxCount ?? 12,
+  });
 }
 
 /** 画布空白处粘贴多张图片（不连线） */

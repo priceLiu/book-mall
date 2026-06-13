@@ -15,17 +15,34 @@ import {
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { cn } from "@/lib/utils";
 
-const TOOL_BTN =
+/** LibTV 节点顶栏工具条 · 壳层（规范见 libtv-node-interaction-spec.md §5） */
+export const PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS =
+  "flex items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/96 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl";
+
+/** 带文案的操作钮 */
+export const PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS =
   "nodrag flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/75 transition hover:bg-white/8 hover:text-white/95 disabled:cursor-not-allowed disabled:opacity-40";
 
-const ICON_BTN =
+/** 仅图标操作钮 */
+export const PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS =
   "nodrag flex size-8 shrink-0 items-center justify-center rounded-lg text-white/60 transition hover:bg-white/8 hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-40";
+
+/** 工具条内分隔线 */
+export const PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS = "mx-0.5 h-5 w-px bg-white/10";
+
+/** 卡片上方居中；节点内联 style={{ top: -60 }} */
+export const PRO2_IMAGE_NODE_TOOLBAR_OFFSET_TOP_PX = 60;
+
+const TOOL_BTN = PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS;
+const ICON_BTN = PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS;
 
 export type Pro2ImageNodeToolbarProps = {
   previewUrl?: string;
   onExpandPreview?: () => void;
   className?: string;
   style?: React.CSSProperties;
+  /** sbv1：工具条空白区仍可拖节点，仅按钮 nodrag */
+  passNodeDrag?: boolean;
 };
 
 /** 有图图片节点 · 顶部浮动工具条（LibTV 图 2） */
@@ -34,6 +51,7 @@ export function Pro2ImageNodeToolbar({
   onExpandPreview,
   className,
   style,
+  passNodeDrag = false,
 }: Pro2ImageNodeToolbarProps) {
   const { alert } = useDialogs();
 
@@ -58,13 +76,20 @@ export function Pro2ImageNodeToolbar({
   return (
     <div
       className={cn(
-        "nodrag pointer-events-auto flex items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/96 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl",
+        PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
+        passNodeDrag
+          ? "pointer-events-none [&_button]:pointer-events-auto"
+          : "nodrag pointer-events-auto",
         !style && "absolute left-1/2 z-30 -translate-x-1/2",
         className,
       )}
       style={style}
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
+      {...(passNodeDrag
+        ? {}
+        : {
+            onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+            onClick: (e: React.MouseEvent) => e.stopPropagation(),
+          })}
     >
       <button
         type="button"
@@ -94,7 +119,7 @@ export function Pro2ImageNodeToolbar({
         <span>打光</span>
       </button>
 
-      <div className="mx-0.5 h-5 w-px bg-white/10" />
+      <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
 
       <button
         type="button"
@@ -124,7 +149,7 @@ export function Pro2ImageNodeToolbar({
         <ChevronDown className="size-3 opacity-50" />
       </button>
 
-      <div className="mx-0.5 h-5 w-px bg-white/10" />
+      <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
 
       <button
         type="button"
