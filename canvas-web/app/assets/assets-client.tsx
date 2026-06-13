@@ -6,7 +6,7 @@ import { ExternalLink, Layers } from "lucide-react";
 
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { ProjectAssetsView } from "@/components/canvas/project-assets-view";
+import { UnifiedProjectAssetsView } from "@/components/canvas/unified-project-assets-view";
 import {
   listMyCanvasProjects,
   type CanvasProjectSummary,
@@ -47,7 +47,7 @@ function Inner() {
           <div>
             <h1 className="canvas-serif text-3xl text-white">我的项目资产</h1>
             <p className="mt-2 max-w-2xl text-sm text-[var(--canvas-muted)]">
-              影视专业版项目资产：角色视觉 / 角色音频 / 场景·道具 / 全局风格 / 平台风格库。在画布内入库后，此处与侧栏同步可见。
+              统一项目资产库（12 类）：角色、场景、道具、大纲、分镜脚本、音频、分镜图、分镜视频、数字人、风格、提示词、组资产。三版画布共用；平台风格预设请见顶部「风格库」。
             </p>
           </div>
           <Link
@@ -95,7 +95,7 @@ function Inner() {
         {loading ? (
           <p className="text-sm text-[var(--canvas-muted)]">加载项目列表…</p>
         ) : (
-          <ProjectAssetsView projectId={projectId || null} />
+          <UnifiedProjectAssetsView projectId={projectId || null} />
         )}
       </div>
     </div>

@@ -9,6 +9,7 @@ export const CANVAS_NAV_ITEMS: CanvasNavItem[] = [
   { href: "/", label: "首页" },
   { href: "/projects", label: "我的画布" },
   { href: "/assets", label: "项目资产" },
+  { href: "/style-library", label: "风格库" },
   { href: "/gallery", label: "画作" },
   { href: "/settings/providers", label: "配置" },
   { href: "/guides/project-assets", label: "资产指南" },

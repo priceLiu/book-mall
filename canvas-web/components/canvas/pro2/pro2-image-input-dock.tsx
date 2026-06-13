@@ -4,7 +4,9 @@ import { useCallback, useMemo } from "react";
 import { ArrowUp, Loader2, MapPin } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useProjectAssets } from "@/lib/canvas/use-project-assets";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
@@ -40,6 +42,12 @@ function framePromptPlaceholder(role?: string): string {
 
 /** 2.0 图片节点 · 底部输入坞（含风格库按钮） */
 export function Pro2ImageInputDock() {
+  const base = useBookMallBaseUrl();
+  const projectId = useCanvasStore((s) => s.projectId);
+  const { assets: libraryAssets } = useProjectAssets(base, {
+    projectId,
+    scope: "library",
+  });
   const rfNodes = useNodes();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -81,8 +89,18 @@ export function Pro2ImageInputDock() {
   }, [storeNode, nodes, edges]);
 
   const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks),
-    [upstreamLinks],
+    () =>
+      buildPro2DockMentionables(
+        upstreamLinks,
+        [],
+        libraryAssets.filter(
+          (a) =>
+            a.kind === "STORYBOARD_IMAGE" ||
+            a.kind === "CHARACTER" ||
+            a.kind === "STYLE",
+        ),
+      ),
+    [upstreamLinks, libraryAssets],
   );
   const activeRefIds = useMemo(
     () => dockActiveRefIdsFromPrompt(dockInput),

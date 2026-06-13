@@ -1110,3 +1110,129 @@ export async function waitMediaRenderJob(
   }
   throw new Error("云端剪辑超时，请稍后重试");
 }
+
+export type {
+  ProjectAssetKind,
+  ProjectAssetRecord,
+  CreateProjectAssetInput,
+  AssetVisibility,
+  InsertMapResult,
+} from "@/lib/canvas/project-asset-types";
+
+export async function listProjectAssets(
+  base: string,
+  opts?: {
+    projectId?: string | null;
+    kind?: import("@/lib/canvas/project-asset-types").ProjectAssetKind;
+    scope?: "all" | "project" | "library";
+    visibility?: import("@/lib/canvas/project-asset-types").AssetVisibility | "all";
+    q?: string;
+  },
+): Promise<import("@/lib/canvas/project-asset-types").ProjectAssetRecord[]> {
+  const sp = new URLSearchParams();
+  if (opts?.projectId) sp.set("projectId", opts.projectId);
+  if (opts?.kind) sp.set("kind", opts.kind);
+  if (opts?.scope) sp.set("scope", opts.scope);
+  if (opts?.visibility) sp.set("visibility", opts.visibility);
+  if (opts?.q) sp.set("q", opts.q);
+  const q = sp.toString();
+  const j = await call<{ assets: import("@/lib/canvas/project-asset-types").ProjectAssetRecord[] }>(
+    base,
+    `/api/canvas/project-assets${q ? `?${q}` : ""}`,
+  );
+  return j.assets ?? [];
+}
+
+export async function createProjectAsset(
+  base: string,
+  input: import("@/lib/canvas/project-asset-types").CreateProjectAssetInput,
+): Promise<import("@/lib/canvas/project-asset-types").ProjectAssetRecord> {
+  const j = await call<{ asset: import("@/lib/canvas/project-asset-types").ProjectAssetRecord }>(
+    base,
+    "/api/canvas/project-assets",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+  return j.asset;
+}
+
+export async function patchProjectAsset(
+  base: string,
+  assetId: string,
+  patch: {
+    displayName?: string;
+    description?: string;
+    visibility?: import("@/lib/canvas/project-asset-types").AssetVisibility;
+    locked?: boolean;
+  },
+): Promise<import("@/lib/canvas/project-asset-types").ProjectAssetRecord> {
+  const j = await call<{ asset: import("@/lib/canvas/project-asset-types").ProjectAssetRecord }>(
+    base,
+    `/api/canvas/project-assets/${encodeURIComponent(assetId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    },
+  );
+  return j.asset;
+}
+
+export async function deleteProjectAsset(
+  base: string,
+  assetId: string,
+): Promise<{ ossUrls: string[] }> {
+  return call<{ ossUrls: string[] }>(
+    base,
+    `/api/canvas/project-assets/${encodeURIComponent(assetId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export async function acquireProjectAssetLease(
+  base: string,
+  assetId: string,
+  opts?: { force?: boolean },
+): Promise<import("@/lib/canvas/project-asset-types").ProjectAssetRecord> {
+  const j = await call<{ asset: import("@/lib/canvas/project-asset-types").ProjectAssetRecord }>(
+    base,
+    `/api/canvas/project-assets/${encodeURIComponent(assetId)}/lease`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "acquire", force: opts?.force }),
+    },
+  );
+  return j.asset;
+}
+
+export async function releaseProjectAssetLease(
+  base: string,
+  assetId: string,
+): Promise<void> {
+  await call(
+    base,
+    `/api/canvas/project-assets/${encodeURIComponent(assetId)}/lease`,
+    { method: "DELETE" },
+  );
+}
+
+export async function mapProjectAssetInsert(
+  base: string,
+  assetId: string,
+  edition: "pro" | "pro2" | "sbv1" | "standard",
+): Promise<import("@/lib/canvas/project-asset-types").InsertMapResult> {
+  const j = await call<{ insert: import("@/lib/canvas/project-asset-types").InsertMapResult }>(
+    base,
+    `/api/canvas/project-assets/${encodeURIComponent(assetId)}/insert-map`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ edition }),
+    },
+  );
+  return j.insert;
+}

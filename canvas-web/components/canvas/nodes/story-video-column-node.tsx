@@ -72,6 +72,9 @@ import { AudioFullscreenLightbox } from "../audio-fullscreen-lightbox";
 import { EnginePicker } from "../engine-picker";
 import { NodeShell } from "../node-shell";
 import { ColumnRowsList } from "../virtual-column-rows";
+import { snapshotVideoColumnRows } from "@/lib/canvas/story-pro-column-asset-export";
+import { useSaveStoryProColumnAsAsset } from "@/lib/canvas/use-save-story-column-as-asset";
+import { StoryColumnSaveAssetButton } from "../story-column-save-asset-button";
 
 export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
   const edition = storyEditionFromNodeType(type);
@@ -124,6 +127,10 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
     if (!frameRows.length) return displayRows;
     return patchVideoRowsFromFrameRows(displayRows, frameRows);
   }, [displayRows, frameRows]);
+  const saveColumn = useSaveStoryProColumnAsAsset(
+    id,
+    type as "story-pro-video",
+  );
 
   const bundleFrames = useMemo(
     () => collectJianyingFramesFromColumns(frameRows, rowsToRender),
@@ -546,6 +553,17 @@ export function StoryVideoColumnNode({ id, data, selected, type }: NodeProps) {
                 }}
               />
             </StoryEnginePickerStack>
+          }
+          actions={
+            edition === "pro" ? (
+              <StoryColumnSaveAssetButton
+                compact
+                disabled={!listRowCount}
+                onClick={() =>
+                  saveColumn(snapshotVideoColumnRows(rowsToRender))
+                }
+              />
+            ) : undefined
           }
         />
         {!listRowCount ? (

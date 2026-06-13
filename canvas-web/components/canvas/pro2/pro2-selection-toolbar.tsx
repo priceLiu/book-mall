@@ -6,7 +6,9 @@ import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, Save } from "lucide
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { saveStoryProCharacterAssetRef } from "@/lib/canvas-api";
+import { createProjectAsset } from "@/lib/canvas-api";
+import { exportNodeToProjectAssetDraft } from "@/lib/canvas/project-asset-export";
+import { notifyProjectAssetsChanged } from "@/lib/canvas/use-project-assets";
 import {
   computePro2MultiSelectionBbox,
   pro2SelectedNonGroupIds,
@@ -132,24 +134,52 @@ export function Pro2SelectionToolbar({
       });
       return;
     }
+    if (!base) {
+      await alert({
+        title: "画布未就绪",
+        message: "请稍后再试。",
+        variant: "error",
+      });
+      return;
+    }
     setSaving(true);
     let ok = 0;
     let fail = 0;
-    for (const tv of saveableThreeViews) {
+    const edition = "pro2" as const;
+    const threeViewNodes = selectedNodes.filter(
+      (n) => isPro2ThreeView(n) && imageUrlOf(n),
+    );
+    for (const node of threeViewNodes) {
+      const live = storeNodes.find((n) => n.id === node.id) ?? node;
       try {
-        await saveStoryProCharacterAssetRef(base, {
-          characterKey: tv.characterKey,
-          displayName: tv.displayName,
-          projectId: projectId ?? null,
-          kind: "three_view",
-          ossUrl: tv.url,
-          label: tv.displayName,
+        const draft = exportNodeToProjectAssetDraft(
+          {
+            projectId: projectId ?? "",
+            edition,
+            nodeId: live.id,
+            nodeType: live.type ?? "story-pro2-three-view",
+            data: (live.data ?? {}) as Record<string, unknown>,
+          },
+          "CHARACTER",
+        );
+        await createProjectAsset(base, {
+          kind: draft.kind,
+          displayName: draft.displayName,
+          description: draft.description,
+          thumbnailUrl: draft.thumbnailUrl,
+          visibility: "PRIVATE",
+          sourceProjectId: projectId ?? null,
+          sourceNodeId: live.id,
+          sourceEdition: edition,
+          payload: draft.payload,
+          refs: draft.refs,
         });
         ok += 1;
       } catch {
         fail += 1;
       }
     }
+    notifyProjectAssetsChanged();
     setSaving(false);
     await alert({
       title: "保存完成",

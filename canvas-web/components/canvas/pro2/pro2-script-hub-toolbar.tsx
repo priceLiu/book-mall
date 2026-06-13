@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, LayoutGrid, RotateCw, Users } from "lucide-react";
+import { Download, LayoutGrid, RotateCw, Users, BookmarkPlus } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
@@ -24,6 +24,7 @@ import {
   resolvePro2ThreeViewBatchImageForHub,
 } from "@/lib/canvas/pro2-three-view-batch-image";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
+import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
@@ -97,6 +98,7 @@ export function Pro2ScriptHubToolbar({
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [framePickerOpen, setFramePickerOpen] = useState(false);
   const [tvPickerOpen, setTvPickerOpen] = useState(false);
+  const saveAsAsset = useSaveNodeAsAsset();
 
   const dockInput = hubData.dockInput ?? "";
   const dockRefImages = (hubData.dockRefImages ?? []) as StoryRefImage[];
@@ -256,6 +258,22 @@ export function Pro2ScriptHubToolbar({
           <span>生成角色三视图</span>
         </button>
         <div className="mx-0.5 h-5 w-px bg-white/10" />
+        <button
+          type="button"
+          className={TOOL_BTN}
+          title="保存为资产"
+          onClick={() =>
+            saveAsAsset(
+              hubId,
+              "story-pro2-script-hub",
+              hubData as unknown as Record<string, unknown>,
+              "STORYBOARD_SCRIPT",
+            )
+          }
+        >
+          <BookmarkPlus className="size-3.5" />
+          <span>保存为资产</span>
+        </button>
         <button
           type="button"
           className={ICON_BTN}

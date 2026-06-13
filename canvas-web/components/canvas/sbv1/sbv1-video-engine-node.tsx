@@ -24,10 +24,12 @@ import {
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "@/lib/canvas/sbv1-node-chrome";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
+import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { cn } from "@/lib/utils";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
+import { Pro2ImageNodeToolbar } from "../pro2/pro2-image-node-toolbar";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeResizer } from "../pro2/pro2-node-resizer";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
@@ -41,6 +43,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const d = data as unknown as Sbv1VideoEngineNodeData;
+  const saveAsAsset = useSaveNodeAsAsset();
   const self = nodes.find((n) => n.id === id);
   const insideGroup = Boolean(self?.parentId);
   const { succeeded } = useNodeTaskHistory(id);
@@ -155,6 +158,24 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               onPick={onSidePick("right")}
             />
           </>
+        ) : null}
+
+        {hasVideo && selected ? (
+          <Pro2ImageNodeToolbar
+            passNodeDrag
+            className="absolute left-1/2 z-40 -translate-x-1/2"
+            style={{ top: -60 }}
+            previewUrl={videoUrl}
+            onExpandPreview={() => setPreviewOpen(true)}
+            onSaveAsAsset={() =>
+              saveAsAsset(
+                id,
+                "sbv1-video-engine",
+                { ...d, videoUrl } as unknown as Record<string, unknown>,
+                "STORYBOARD_VIDEO",
+              )
+            }
+          />
         ) : null}
 
         <div

@@ -24,6 +24,7 @@ import {
   SBV1_NODE_OUTER_CLASS,
 } from "@/lib/canvas/sbv1-node-chrome";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
+import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import {
   PRO2_IMAGE_NODE_MIN_HEIGHT,
   PRO2_IMAGE_NODE_MIN_WIDTH,
@@ -57,6 +58,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const d = data as unknown as Sbv1ImageNodeData;
+  const saveAsAsset = useSaveNodeAsAsset();
   const self = nodes.find((n) => n.id === id);
   const insideGroup = Boolean(self?.parentId);
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
@@ -229,6 +231,9 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
             style={{ top: -60 }}
             previewUrl={previewUrl}
             onExpandPreview={() => setPreviewOpen(true)}
+            onSaveAsAsset={() =>
+              saveAsAsset(id, "sbv1-image", d as unknown as Record<string, unknown>)
+            }
           />
         ) : null}
 

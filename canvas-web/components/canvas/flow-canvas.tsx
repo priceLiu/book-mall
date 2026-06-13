@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LayoutTemplate } from "lucide-react";
 import {
   Background,
   MiniMap,
@@ -31,7 +32,20 @@ import {
   registerCanvasViewportPlacement,
   unregisterCanvasViewportPlacement,
 } from "@/lib/canvas/viewport-placement";
+import {
+  insertProjectAssetViaCanvasBridge,
+  parseProjectAssetDragPayload,
+} from "@/lib/canvas/spawn-project-asset-on-canvas";
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
+import {
+  applyDragSnapToNode,
+  computeDragSnap,
+  filterNearbySnapCandidates,
+  nodeSnapBox,
+  snapGuideKey,
+  type NodeSnapBox,
+  type SnapGuideLine,
+} from "@/lib/canvas/canvas-drag-snap";
 import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
 import {
   allImageFilesFromDataTransfer,
@@ -65,6 +79,11 @@ import {
   pro2HubHasScriptTable,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import { DeletableEdge } from "./edges/deletable-edge";
+import {
+  CanvasPaneContextMenu,
+  type CanvasPaneContextMenuItem,
+} from "./canvas-pane-context-menu";
+import { CanvasSnapGuidesOverlay } from "./canvas-snap-guides-overlay";
 
 const edgeTypes = {
   default: DeletableEdge,
@@ -107,9 +126,13 @@ function FlowCanvasInner({
   const initialFitDoneRef = useRef(false);
   const viewportTimerRef = useRef<number | null>(null);
   const dragHoverRafRef = useRef<number | null>(null);
+  const dragSnapRafRef = useRef<number | null>(null);
+  const snapOthersRef = useRef<NodeSnapBox[]>([]);
+  const lastSnapGuideKeyRef = useRef("");
   const dragUndoPausedRef = useRef(false);
   const ignoreNextPaneClickRef = useRef(false);
   const [isNodeDragging, setIsNodeDragging] = useState(false);
+  const [snapGuides, setSnapGuides] = useState<SnapGuideLine[]>([]);
   const deferStoreGraphSyncRef = useRef(false);
 
   const storeOnNodesChange = useCanvasStore((s) => s.onNodesChange);
@@ -140,6 +163,64 @@ function FlowCanvasInner({
   const reparentNode = useCanvasStore((s) => s.reparentNode);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const fitViewNonce = useCanvasStore((s) => s.fitViewNonce);
+
+  const enablePaneContextMenu = pro2FloatingInspector || sbv1Canvas;
+  const enableDragSnapGuides = pro2FloatingInspector || sbv1Canvas;
+  const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const closePaneMenu = useCallback(() => setPaneMenu(null), []);
+
+  const onPaneContextMenu = useCallback(
+    (e: React.MouseEvent | MouseEvent) => {
+      if (!enablePaneContextMenu) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPaneMenu({ x: e.clientX, y: e.clientY });
+    },
+    [enablePaneContextMenu],
+  );
+
+  /** 兜底：部分环境下 RF onPaneContextMenu 未触发时，仍拦截空白 pane 右键 */
+  useEffect(() => {
+    if (!enablePaneContextMenu) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const onNativeContextMenu = (e: MouseEvent) => {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest(".react-flow__pane")) return;
+      if (target.closest(".react-flow__node")) return;
+      if (target.closest(".react-flow__edge")) return;
+      onPaneContextMenu(e);
+    };
+    wrap.addEventListener("contextmenu", onNativeContextMenu, true);
+    return () =>
+      wrap.removeEventListener("contextmenu", onNativeContextMenu, true);
+  }, [enablePaneContextMenu, onPaneContextMenu]);
+
+  const paneMenuItems = useMemo<CanvasPaneContextMenuItem[]>(() => {
+    const reflowAction = pro2FloatingInspector
+      ? () => useCanvasStore.getState().reflowPro2Canvas()
+      : sbv1Canvas
+        ? () => useCanvasStore.getState().reflowSbv1Canvas()
+        : null;
+    if (!reflowAction) return [];
+    return [
+      {
+        id: "canvas",
+        label: "画布",
+        children: [
+          {
+            id: "reflow",
+            label: "重排",
+            icon: LayoutTemplate,
+            onClick: reflowAction,
+          },
+        ],
+      },
+    ];
+  }, [pro2FloatingInspector, sbv1Canvas]);
 
   useEffect(() => {
     initialFitDoneRef.current = false;
@@ -207,6 +288,9 @@ function FlowCanvasInner({
       }
       if (dragHoverRafRef.current !== null) {
         window.cancelAnimationFrame(dragHoverRafRef.current);
+      }
+      if (dragSnapRafRef.current !== null) {
+        window.cancelAnimationFrame(dragSnapRafRef.current);
       }
     },
     [],
@@ -305,27 +389,61 @@ function FlowCanvasInner({
     [screenToFlowPosition],
   );
 
-  const onNodeDragStart = useCallback(() => {
-    setIsNodeDragging(true);
-    if (dragUndoPausedRef.current) return;
-    useCanvasStore.temporal.getState().pause();
-    dragUndoPausedRef.current = true;
-  }, []);
+  const onNodeDragStart = useCallback(
+    (_event: React.MouseEvent, node: { id: string; type?: string }) => {
+      setIsNodeDragging(true);
+      setSnapGuides([]);
+      lastSnapGuideKeyRef.current = "";
+      if (enableDragSnapGuides && node.type !== "group") {
+        const all = getNodes() as CanvasFlowNode[];
+        snapOthersRef.current = all
+          .filter((n) => n.id !== node.id && n.type !== "group")
+          .map((n) => nodeSnapBox(n, all));
+      } else {
+        snapOthersRef.current = [];
+      }
+      if (dragUndoPausedRef.current) return;
+      useCanvasStore.temporal.getState().pause();
+      dragUndoPausedRef.current = true;
+    },
+    [enableDragSnapGuides, getNodes],
+  );
 
   const onNodeDrag = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string }) => {
-      if (node.type === "group") return;
       const clientX = event.clientX;
       const clientY = event.clientY;
-      if (dragHoverRafRef.current !== null) return;
-      dragHoverRafRef.current = window.requestAnimationFrame(() => {
-        dragHoverRafRef.current = null;
-        const gid = findGroupAtPoint(clientX, clientY);
-        const cur = useCanvasStore.getState().dragHoverGroupId;
-        if (gid !== cur) setDragHoverGroup(gid);
+      if (dragHoverRafRef.current === null) {
+        dragHoverRafRef.current = window.requestAnimationFrame(() => {
+          dragHoverRafRef.current = null;
+          if (node.type === "group") return;
+          const gid = findGroupAtPoint(clientX, clientY);
+          const cur = useCanvasStore.getState().dragHoverGroupId;
+          if (gid !== cur) setDragHoverGroup(gid);
+        });
+      }
+
+      // 拖动中只画参考线，不改节点坐标（避免与 RF 内置拖动打架）
+      if (!enableDragSnapGuides || node.type === "group") return;
+      if (dragSnapRafRef.current !== null) return;
+      dragSnapRafRef.current = window.requestAnimationFrame(() => {
+        dragSnapRafRef.current = null;
+        const all = getNodes() as CanvasFlowNode[];
+        const dragging = all.find((n) => n.id === node.id);
+        if (!dragging) return;
+        const dragBox = nodeSnapBox(dragging, all);
+        const nearby = filterNearbySnapCandidates(
+          dragBox,
+          snapOthersRef.current,
+        );
+        const { guides } = computeDragSnap(dragBox, nearby);
+        const key = snapGuideKey(guides);
+        if (key === lastSnapGuideKeyRef.current) return;
+        lastSnapGuideKeyRef.current = key;
+        setSnapGuides(guides);
       });
     },
-    [findGroupAtPoint, setDragHoverGroup],
+    [enableDragSnapGuides, findGroupAtPoint, getNodes, setDragHoverGroup],
   );
 
   const flushAutosaveAfterDrag = useCallback(() => {
@@ -353,6 +471,7 @@ function FlowCanvasInner({
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string; parentId?: string }) => {
       setIsNodeDragging(false);
+      setSnapGuides([]);
       deferStoreGraphSyncRef.current = false;
       if (dragUndoPausedRef.current) {
         useCanvasStore.temporal.getState().resume();
@@ -361,6 +480,26 @@ function FlowCanvasInner({
       if (node.type === "group") {
         setDragHoverGroup(null);
         return;
+      }
+      if (enableDragSnapGuides) {
+        const all = getNodes() as CanvasFlowNode[];
+        const dragging = all.find((n) => n.id === node.id);
+        if (dragging) {
+          const dragBox = nodeSnapBox(dragging, all);
+          const nearby = filterNearbySnapCandidates(
+            dragBox,
+            snapOthersRef.current,
+          );
+          const { dx, dy } = computeDragSnap(dragBox, nearby);
+          if (dx !== 0 || dy !== 0) {
+            const snapped = applyDragSnapToNode(dragging, all, dx, dy);
+            setRfNodes((prev) =>
+              prev.map((n) =>
+                n.id === node.id ? { ...n, position: snapped.position } : n,
+              ),
+            );
+          }
+        }
       }
       const didCommitPositions = commitFlowPositionsFromRf();
       const gid = findGroupAtPoint(event.clientX, event.clientY);
@@ -376,10 +515,13 @@ function FlowCanvasInner({
     },
     [
       commitFlowPositionsFromRf,
+      enableDragSnapGuides,
       findGroupAtPoint,
       flushAutosaveAfterDrag,
+      getNodes,
       reparentNode,
       setDragHoverGroup,
+      setRfNodes,
     ],
   );
 
@@ -463,6 +605,20 @@ function FlowCanvasInner({
 
   const onDrop = useCallback(
     async (event: React.DragEvent<HTMLDivElement>) => {
+      const assetDrag = parseProjectAssetDragPayload(event.dataTransfer);
+      if (assetDrag) {
+        event.preventDefault();
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        const ok = await insertProjectAssetViaCanvasBridge(
+          assetDrag.assetId,
+          position,
+        );
+        if (ok) return;
+      }
+
       const palette = event.dataTransfer.getData("application/canvas-node-type");
       const droppedImages = allImageFilesFromDataTransfer(event.dataTransfer);
       if (!palette && droppedImages.length > 0) {
@@ -760,8 +916,10 @@ function FlowCanvasInner({
             : undefined
         }
         onPaneClick={
-          pro2FloatingInspector
+          pro2FloatingInspector || sbv1Canvas
             ? () => {
+                closePaneMenu();
+                if (!pro2FloatingInspector) return;
                 if (ignoreNextPaneClickRef.current) {
                   ignoreNextPaneClickRef.current = false;
                   return;
@@ -772,6 +930,9 @@ function FlowCanvasInner({
                 );
               }
             : undefined
+        }
+        onPaneContextMenu={
+          enablePaneContextMenu ? onPaneContextMenu : undefined
         }
         onlyRenderVisibleElements={onlyRenderVisible}
         selectNodesOnDrag
@@ -842,6 +1003,9 @@ function FlowCanvasInner({
         connectOnClick={false}
       >
         <Background gap={24} size={1} color="rgba(255,255,255,0.06)" />
+        {enableDragSnapGuides ? (
+          <CanvasSnapGuidesOverlay guides={snapGuides} />
+        ) : null}
         {showMiniMap ? (
           <MiniMap
             pannable
@@ -874,6 +1038,12 @@ function FlowCanvasInner({
       ) : null}
       {sbv1Canvas ? <Sbv1ImageInputDock /> : null}
       {sbv1Canvas ? <Sbv1VideoEngineFloatingDock /> : null}
+      <CanvasPaneContextMenu
+        open={Boolean(paneMenu)}
+        position={paneMenu ?? { x: 0, y: 0 }}
+        items={paneMenuItems}
+        onClose={closePaneMenu}
+      />
     </div>
   );
 }

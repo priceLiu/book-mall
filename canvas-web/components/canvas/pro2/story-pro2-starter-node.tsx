@@ -47,7 +47,9 @@ import {
   formatCanvasFetchError,
 } from "@/lib/canvas/story-pro-upload-script";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
+import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { cn } from "@/lib/utils";
+import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 
@@ -70,6 +72,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const d = data as unknown as StoryPro2StarterNodeData;
+  const saveAsAsset = useSaveNodeAsAsset();
   const outlineMd = d.generatedOutlineMd?.trim() ?? "";
   const uploadedMd = d.uploadedScriptMd?.trim() ?? "";
   const hasOutline = Boolean(outlineMd);
@@ -356,6 +359,20 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
             onPick={onSidePick("right")}
           />
         </>
+      ) : null}
+
+      {selected ? (
+        <Pro2ThinNodeToolbar
+          style={{ top: -60 }}
+          onSaveAsAsset={() =>
+            saveAsAsset(
+              id,
+              "story-pro2-starter",
+              d as unknown as Record<string, unknown>,
+              "OUTLINE",
+            )
+          }
+        />
       ) : null}
 
       <div

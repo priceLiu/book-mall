@@ -91,6 +91,9 @@ export function Pro2CanvasLayout({
           setPro2StyleLibImageNodeId(null);
           setStyleLibOpen(true);
         }}
+        onOpenMyHistory={() => {
+          window.dispatchEvent(new CustomEvent("canvas:open-my-history"));
+        }}
       />
       <StyleLibraryModal
         open={styleLibOpen}

@@ -1,11 +1,13 @@
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
 import type { Pro2DockUpstreamLink } from "./pro2-dock-upstream-links";
 import type { StoryRefImage } from "./story-ref-image";
+import type { ProjectAssetRecord } from "./project-asset-types";
 
-/** 输入坞 · 上游 chip + 粘贴参考图 → @ 列表 */
+/** 输入坞 · 上游 chip + 粘贴参考图 + 租户库资产 → @ 列表 */
 export function buildPro2DockMentionables(
   upstreamLinks: Pro2DockUpstreamLink[],
   dockRefImages: StoryRefImage[] = [],
+  libraryAssets: ProjectAssetRecord[] = [],
 ): MentionableItem[] {
   const items: MentionableItem[] = [];
   const seen = new Set<string>();
@@ -37,6 +39,18 @@ export function buildPro2DockMentionables(
       label: ref.label || "参考图",
       kind: "image",
       previewUrl: ref.url,
+    });
+  }
+
+  for (const asset of libraryAssets) {
+    const id = `asset:${asset.id}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    items.push({
+      id,
+      label: `[资产] ${asset.displayName}`,
+      kind: "image",
+      previewUrl: asset.thumbnailUrl || asset.refs[0]?.mediaUrl,
     });
   }
 

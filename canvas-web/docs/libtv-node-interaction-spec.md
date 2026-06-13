@@ -1,5 +1,6 @@
 # LibTV 节点交互规范（分镜视频 1.0 · 影视专业 2.0 共用）
 
+> **统一节点目录（样式 + 功能真源）**：[`libtv-unified-node-catalog.md`](./libtv-unified-node-catalog.md)  
 > **权威样板**：`sbv1-video-engine`（用户可见名 **视频合成**）  
 > **壳层 token**：`lib/canvas/libtv-node-chrome.ts`  
 > **拖动登记**：`normalize-graph-nodes.ts` → `PRO2_LIBTV_DRAG_ANYWHERE_TYPES`（源自 `LIBTV_DRAG_ANYWHERE_NODE_TYPES`）  
@@ -12,12 +13,11 @@
 | --- | --- | --- |
 | 侧栏 `+` | `Pro2NodeSidePlus` | 单击菜单 + 按住拖线 |
 | 顶栏工具条 | `Pro2ImageNodeToolbar` | 有图 + 唯一选中；须 `passNodeDrag` |
-| 空态内嵌 Dock | `Pro2ImageNodeEmbeddedDock` / `Sbv1ImageNodeEmbeddedDock` | 占满卡片 stage，全部 `nodrag`；**三视图节点禁用**（见 §2.3） |
-| 有图浮动 Dock | `Pro2ImageInputDock` / `Sbv1ImageInputDock` | 锚点 `data-pro2-dock-anchor` + `usePro2DockPlacement` |
+| 浮动 Dock | `Pro2ImageInputDock` / `Sbv1ImageInputDock` / `Pro2ThreeViewInputDock` / `Sbv1VideoEngineFloatingDock` | 锚点 `data-pro2-dock-anchor` + `usePro2DockPlacement`；**禁止内嵌 Dock 占满 stage** |
 | Dock 壳层 | `Pro2InputDockShell` · `Pro2DockPasteZone` · `Pro2DockRefImages` · `Pro2DockUpstreamChips` · `Pro2DockStyleButton` | 模型选择须 `EnginePicker` |
 | 画布底 Dock | `Sbv1Dock` · `LIBTV_CANVAS_DOCK_BAR_CLASS` | 分镜 1.0 / 2.0 底部磁吸栏共用 |
 | 悬停预览 | `MediaHoverBox` | 仅 Eye 小圆钮 `nodrag` |
-| 空态 / 错误 | `Pro2MediaNodeEmptyState` · `Pro2MediaNodeErrorState` | |
+| 空态 / 错误 | `Pro2MediaNodeEmptyState` · `Pro2MediaNodeErrorState` | 空态 **须** `passNodeDrag`（整卡可拖） |
 | 角标缩放 | `Pro2NodeResizer` | 组内节点隐藏 |
 | 框选工具条 | `SelectionToolbar` / `Pro2SelectionToolbar` | 打组 / 自动整理 / 保存资产 |
 | 媒体组顶栏 | `Pro2MediaGroupToolbar` · `Pro2MediaGroupToolbarPanel` | 样式 **同** `Pro2ImageNodeToolbar`（`PRO2_IMAGE_NODE_TOOLBAR_*`） |
@@ -44,7 +44,7 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
   Pro2ImageNodeToolbar（有图 + 唯一选中，passNodeDrag）
   LIBTV_CARD_SHELL_CLASS + LIBTV_CARD_DRAG_CLASS
     ├─ Header（图标 + 标题 + 状态）
-    └─ Stage（预览 / 空态 / 内嵌 Dock[nodrag]）
+    └─ Stage（预览 / 空态[`passNodeDrag`] · **无内嵌 Dock**）
 ```
 
 **禁止**：Pro2 外置标题 + `RF_NODE_DRAG_HANDLE` + `PRO2_MEDIA_CARD_SHELL`（旧图片节点布局）。
@@ -58,13 +58,14 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 | 保存 | `graphRevision` bump → `canvas:flush-autosave` **立即** autosave（不等 1.5s debounce） |
 | 刷新 | `hydrate` 读已保存 `position`；**禁止**无用户操作时跑 `reflowStoryPro2Workspace` |
 
-### 2.3 三视图 Dock（Pro2 定型）
+### 2.3 媒体节点输入坞（Pro2 + sbv1 统一）
 
 | 规则 | 说明 |
 | --- | --- |
-| 禁止内嵌 Dock | `pro2ThreeViewNodeUsesEmbeddedDock` **恒为 false**；卡片 stage 不得被 `nodrag` 表单占满 |
-| 浮动 Dock | 选中唯一 `story-pro2-three-view` → `Pro2ThreeViewInputDock`（锚点 `data-pro2-dock-anchor`） |
-| 对齐对象 | 与 `story-pro2-image` · `pro2MediaRole: character-three-view` 一致：空态仅 `Pro2MediaNodeEmptyState`，整卡可拖 |
+| 禁止内嵌 Dock | `pro2ImageNodeUsesEmbeddedDock` · `sbv1ImageNodeUsesEmbeddedDock` · `pro2ThreeViewNodeUsesEmbeddedDock` **均恒为 false** |
+| 浮动 Dock | 选中唯一节点 → 节点下方 `Pro2InputDockShell` / 视频 `Sbv1VideoEngineFloatingDock` |
+| 空态整卡可拖 | Stage 使用 `Pro2MediaNodeEmptyState` + **`passNodeDrag`** |
+| 三视图 | 同图片节点；`Pro2ThreeViewInputDock` |
 
 ## 5. 节点顶栏工具条（`Pro2ImageNodeToolbar`）
 
@@ -99,7 +100,7 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 
 其他 LibTV 节点若需顶栏，**复用同一壳层与按钮 class**，只替换业务项；不得改圆角/底色/字号。
 
-**媒体组顶栏**（三视图 / 分镜图组选中时）：须走 `Pro2MediaGroupToolbarPanel`，壳层与 §5.2 完全一致；`passNodeDrag` 默认开启。
+**媒体组顶栏**（Pro2 三视图/分镜图组 · sbv1 参考图组）：须走 `Pro2MediaGroupToolbarPanel`（`edition` pro2/sbv1），壳层与 §5.2 完全一致；`passNodeDrag` 默认开启。
 
 ## 6. Store 约束
 

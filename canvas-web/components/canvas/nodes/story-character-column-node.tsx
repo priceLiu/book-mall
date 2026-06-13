@@ -52,6 +52,9 @@ import { StoryProCharacterAssetSlots } from "../story-pro-character-asset-slots"
 import { StoryProCharacterAudioSlot } from "../story-pro-character-audio-slot";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { ensureStoryColumnImageEngineDefault } from "@/lib/canvas/story-column-engine-defaults";
+import { snapshotCharacterColumnRows } from "@/lib/canvas/story-pro-column-asset-export";
+import { useSaveStoryProColumnAsAsset } from "@/lib/canvas/use-save-story-column-as-asset";
+import { StoryColumnSaveAssetButton } from "../story-column-save-asset-button";
 
 export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps) {
   const base = useBookMallBaseUrl();
@@ -77,6 +80,10 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
   const displayRows = useMemo(
     () => displayCharacterRows(nodes, id, stored, edges),
     [nodes, edges, id, stored],
+  );
+  const saveColumn = useSaveStoryProColumnAsAsset(
+    id,
+    type as "story-pro-character",
   );
 
   useEffect(() => {
@@ -277,16 +284,33 @@ export function StoryCharacterColumnNode({ id, data, selected, type }: NodeProps
       }
     >
       <div className="flex shrink-0 flex-col gap-2">
-        <EnginePicker
-          role="IMAGE"
-          allowedModelKeys={[...THREE_VIEW_ENGINE_MODEL_KEYS]}
-          requiredCapabilities={storyEditionUsesProWorkspace(edition) ? ["image_multi_ref"] : undefined}
-          capabilityHint="角色多参考图生图需支持 multi_ref 的模型（如 nano-banana-pro）"
-          providerId={d.batchImage?.providerId ?? ""}
-          modelKey={d.batchImage?.modelKey ?? ""}
-          params={d.batchImage?.params ?? {}}
-          onChange={onPickImage}
-        />
+        <div className="flex items-stretch gap-2">
+          <div className="min-w-0 flex-1">
+            <EnginePicker
+              role="IMAGE"
+              allowedModelKeys={[...THREE_VIEW_ENGINE_MODEL_KEYS]}
+              requiredCapabilities={
+                storyEditionUsesProWorkspace(edition)
+                  ? ["image_multi_ref"]
+                  : undefined
+              }
+              capabilityHint="角色多参考图生图需支持 multi_ref 的模型（如 nano-banana-pro）"
+              providerId={d.batchImage?.providerId ?? ""}
+              modelKey={d.batchImage?.modelKey ?? ""}
+              params={d.batchImage?.params ?? {}}
+              onChange={onPickImage}
+            />
+          </div>
+          {edition === "pro" ? (
+            <StoryColumnSaveAssetButton
+              compact
+              disabled={!displayRows.length}
+              onClick={() =>
+                saveColumn(snapshotCharacterColumnRows(displayRows))
+              }
+            />
+          ) : null}
+        </div>
         <div className="space-y-2">
           {!displayRows.length ? (
             <p className="text-[11px] text-[var(--canvas-muted)]">
