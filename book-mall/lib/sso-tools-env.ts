@@ -1,3 +1,5 @@
+import { canonicalizeProductionOrigin } from "@/lib/production-origin";
+
 /** 独立工具站 SSO 环境变量（主站与工具站服务端共用密钥时需同步部署配置） */
 
 /**
@@ -33,7 +35,7 @@ export function getToolsPublicOrigin(): string | null {
   const issueOverride = process.env.TOOLS_SSO_ISSUE_ORIGIN?.trim();
   if (issueOverride) {
     const ou = normalizeHttpOriginUrl(issueOverride);
-    if (ou) return ou.origin;
+    if (ou) return canonicalizeProductionOrigin(ou.origin) ?? ou.origin;
   }
 
   const raw = process.env.TOOLS_PUBLIC_ORIGIN?.trim();
@@ -52,7 +54,9 @@ export function getToolsPublicOrigin(): string | null {
       main.hostname.startsWith("book.")
     ) {
       const toolHost = `tool.${main.hostname.slice("book.".length)}`;
-      const derived = `${main.protocol}//${toolHost}`;
+      const derived =
+        canonicalizeProductionOrigin(`${main.protocol}//${toolHost}`) ??
+        `https://${toolHost}`;
       if (process.env.TOOLS_DIAGNOSTICS === "1") {
         console.warn(
           "[sso-tools-env] TOOLS_PUBLIC_ORIGIN is CloudBase default host; deriving tools origin from NEXTAUTH_URL:",
@@ -63,7 +67,7 @@ export function getToolsPublicOrigin(): string | null {
     }
   }
 
-  return u.origin;
+  return canonicalizeProductionOrigin(u.origin) ?? u.origin;
 }
 
 export function requireToolsSsoServerSecret(): string {

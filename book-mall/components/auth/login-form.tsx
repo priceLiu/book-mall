@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -31,6 +31,17 @@ function safeNextPath(raw: string | null): string {
   return "/account";
 }
 
+/** 生产自定义域：用户若仍打开 http://，Secure Cookie 无法落盘，须先切到 https。 */
+function redirectProductionHttpToHttps(): void {
+  if (typeof window === "undefined") return;
+  if (process.env.NODE_ENV !== "production") return;
+  const { protocol, hostname, href } = window.location;
+  if (protocol !== "http:") return;
+  const h = hostname.toLowerCase();
+  if (h !== "ai-code8.com" && !h.endsWith(".ai-code8.com")) return;
+  window.location.replace(href.replace(/^http:/i, "https:"));
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,6 +53,10 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  useEffect(() => {
+    redirectProductionHttpToHttps();
+  }, []);
 
   const showGoogle = process.env.NEXT_PUBLIC_AUTH_GOOGLE === "1";
 

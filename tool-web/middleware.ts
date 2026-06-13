@@ -1,4 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  incomingRequestProto,
+  shouldEnforceProductionHttps,
+} from "@/lib/production-origin";
 import { getToolsSitePublicOrigin } from "@/lib/site-origin";
 
 /**
@@ -21,7 +25,27 @@ function isTencentCloudRunDefaultHost(host: string): boolean {
   return host.toLowerCase().endsWith(".sh.run.tcloudbase.com");
 }
 
+function enforceProductionHttpsRedirect(request: NextRequest): NextResponse | null {
+  const host = incomingHost(request);
+  const proto = incomingRequestProto(
+    request.headers.get("x-forwarded-proto"),
+    request.nextUrl.protocol,
+  );
+  if (!shouldEnforceProductionHttps(host, proto)) return null;
+
+  const dest = new URL(
+    request.nextUrl.pathname + request.nextUrl.search,
+    `https://${host.toLowerCase()}`,
+  );
+  const status =
+    request.method === "GET" || request.method === "HEAD" ? 308 : 307;
+  return NextResponse.redirect(dest, status);
+}
+
 export function middleware(request: NextRequest) {
+  const httpsRedirect = enforceProductionHttpsRedirect(request);
+  if (httpsRedirect) return httpsRedirect;
+
   if (process.env.NODE_ENV !== "production") {
     return NextResponse.next();
   }

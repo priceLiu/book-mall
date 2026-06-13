@@ -40,8 +40,49 @@ export function shouldEnforceProductionHttps(host: string, proto: string): boole
   return proto !== "https";
 }
 
+/** 生产 `*.ai-code8.com` 一律纠正为 https origin（控制台误填 http:// 时）。 */
+export function canonicalizeProductionOrigin(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    const u = new URL(trimmed);
+    if (
+      process.env.NODE_ENV === "production" &&
+      !allowCloudbaseDefaultOrigins() &&
+      isProductionAiCode8Host(u.hostname) &&
+      u.protocol === "http:"
+    ) {
+      u.protocol = "https:";
+    }
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+function patchProductionOriginEnv(key: string, canon: string): void {
+  const raw = process.env[key]?.trim();
+  if (!raw) {
+    process.env[key] = canon;
+    return;
+  }
+  try {
+    const u = new URL(raw);
+    if (isTencentCloudRunDefaultHost(u.hostname)) {
+      process.env[key] = canon;
+      return;
+    }
+    if (isProductionAiCode8Host(u.hostname) && u.protocol === "http:") {
+      u.protocol = "https:";
+      process.env[key] = u.origin;
+    }
+  } catch {
+    /* 保持原样 */
+  }
+}
+
 /**
- * 生产环境下将仍为腾讯云默认域或留空的变量纠正为 book / tool 正式域名，
+ * 生产环境下将仍为腾讯云默认域、留空或误填 http:// 的变量纠正为 book / tool 正式 HTTPS 域名，
  * 使 NextAuth 登出跳转、SSO 签发与诊断与浏览器自定义域一致。
  * `pnpm dev` 下不执行。
  */
@@ -49,22 +90,6 @@ export function applyBookMallProductionOriginDefaults(): void {
   if (process.env.NODE_ENV !== "production") return;
   if (allowCloudbaseDefaultOrigins()) return;
 
-  const patch = (key: string, canon: string) => {
-    const raw = process.env[key]?.trim();
-    if (!raw) {
-      process.env[key] = canon;
-      return;
-    }
-    try {
-      const host = new URL(raw).hostname;
-      if (isTencentCloudRunDefaultHost(host)) {
-        process.env[key] = canon;
-      }
-    } catch {
-      /* 保持原样 */
-    }
-  };
-
-  patch("NEXTAUTH_URL", PRODUCTION_MAIN_SITE_ORIGIN);
-  patch("TOOLS_PUBLIC_ORIGIN", PRODUCTION_TOOL_SITE_ORIGIN);
+  patchProductionOriginEnv("NEXTAUTH_URL", PRODUCTION_MAIN_SITE_ORIGIN);
+  patchProductionOriginEnv("TOOLS_PUBLIC_ORIGIN", PRODUCTION_TOOL_SITE_ORIGIN);
 }
