@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BookmarkPlus,
   Download,
   LayoutGrid,
   Loader2,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { useSaveGroupAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { formatCharacterRowThreeViewPrompt } from "@/lib/canvas/three-view-prompt-rules";
 import type {
@@ -92,6 +94,7 @@ export function Pro2MediaGroupToolbarPanel({
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
   const group = nodes.find((n) => n.id === groupId);
+  const saveGroupAsAsset = useSaveGroupAsAsset();
   const [editOpen, setEditOpen] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
@@ -299,6 +302,20 @@ export function Pro2MediaGroupToolbarPanel({
             <Download className="size-3.5" />
           )}
           批量下载
+        </button>
+        <button
+          type="button"
+          className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
+          title="保存为资产"
+          onClick={() =>
+            saveGroupAsAsset(
+              groupId,
+              (group?.data ?? {}) as Record<string, unknown>,
+            )
+          }
+        >
+          <BookmarkPlus className="size-3.5" />
+          保存为资产
         </button>
         <button
           type="button"

@@ -63,6 +63,8 @@ import {
   pro2MediaChildSize,
 } from "./pro2-media-group-layout";
 import { applySbv1MediaGroupRelayout } from "./sbv1-media-group-layout";
+import { reflowSbv1Canvas as computeSbv1CanvasReflow } from "./sbv1-canvas-layout";
+import { reflowPro2CanvasLayout } from "./pro2-canvas-layout";
 import { hasStoryComicPipeline } from "./story-comic-layout";
 import { reflowStoryComicWorkspace } from "./story-comic-workspace-layout";
 import {
@@ -243,6 +245,10 @@ type CanvasState = {
   reflowStoryTemplateGroups: () => void;
   /** 漫剧全链路 · 扁平画布一键重排。 */
   reflowStoryComicLayout: () => void;
+  /** 影视 2.0 · 工作区节点按模板重排。 */
+  reflowPro2Canvas: () => void;
+  /** 分镜视频 1.0 · 媒体组 + 顶层节点重排。 */
+  reflowSbv1Canvas: () => void;
 };
 
 function emptyGraph(): CanvasGraph {
@@ -1171,6 +1177,42 @@ export const useCanvasStore = create<CanvasState>()(
             fitViewNonce: state.fitViewNonce + 1,
           }),
         );
+      },
+
+      reflowPro2Canvas: () => {
+        const { nodes, edges } = get();
+        const laid = reflowPro2CanvasLayout(nodes, edges);
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: laid,
+            fitViewNonce: state.fitViewNonce + 1,
+          }),
+        );
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
+        }
+        canvasNotify({
+          title: "画布已重排",
+          message: "工作区已归位，媒体组与游离节点已按网格收拢。",
+        });
+      },
+
+      reflowSbv1Canvas: () => {
+        const { nodes, edges } = get();
+        const laid = computeSbv1CanvasReflow(nodes, edges);
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: laid,
+            fitViewNonce: state.fitViewNonce + 1,
+          }),
+        );
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
+        }
+        canvasNotify({
+          title: "画布已重排",
+          message: "媒体组与顶层节点已按网格收拢排列。",
+        });
       },
     }),
     {

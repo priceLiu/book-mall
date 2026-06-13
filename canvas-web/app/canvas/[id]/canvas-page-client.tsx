@@ -72,6 +72,8 @@ import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
 import { SBV1_BUILTIN_TEMPLATE_ID } from "@/lib/canvas/project-edition";
 import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import { MyCanvasHistoryPanel } from "@/components/canvas/my-canvas-history-panel";
+import { SaveProjectAssetDialogHost } from "@/components/canvas/save-project-asset-dialog";
+import { useRegisterProjectAssetCanvasInsert } from "@/lib/canvas/use-register-project-asset-canvas-insert";
 import { CANVAS_AUTOSAVE_DEBOUNCE_MS, getCanvasAutosaveIntervalMs } from "@/lib/canvas/canvas-autosave-settings";
 const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 
@@ -203,6 +205,8 @@ function Inner({ projectId }: { projectId: string }) {
   const [videoLibraryRefreshKey, setVideoLibraryRefreshKey] = useState(0);
   const [myProjectCharacterAssetsOpen, setMyProjectCharacterAssetsOpen] =
     useState(false);
+  const { insertAtViewportCenter: insertProjectAssetAtViewportCenter } =
+    useRegisterProjectAssetCanvasInsert();
   const [styleLibraryOpen, setStyleLibraryOpen] = useState(false);
   const [myHistoryOpen, setMyHistoryOpen] = useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
@@ -228,6 +232,12 @@ function Inner({ projectId }: { projectId: string }) {
     const open = () => setStyleLibraryOpen(true);
     window.addEventListener("canvas:open-style-library", open);
     return () => window.removeEventListener("canvas:open-style-library", open);
+  }, []);
+
+  useEffect(() => {
+    const open = () => setMyHistoryOpen(true);
+    window.addEventListener("canvas:open-my-history", open);
+    return () => window.removeEventListener("canvas:open-my-history", open);
   }, []);
 
   /** 加载完成时的节点数；用于阻止误把「有内容的画布」自动保存成空。 */
@@ -834,6 +844,9 @@ function Inner({ projectId }: { projectId: string }) {
       <MyProjectCharacterAssetsPanel
         open={myProjectCharacterAssetsOpen}
         onClose={() => setMyProjectCharacterAssetsOpen(false)}
+        onInsertToCanvas={(assetId) => {
+          void insertProjectAssetAtViewportCenter(assetId);
+        }}
       />
       {isStoryProCanvas || isStoryPro2Canvas ? (
         <StyleLibraryModal
@@ -955,6 +968,7 @@ function Inner({ projectId }: { projectId: string }) {
 export function CanvasPageClient({ projectId }: { projectId: string }) {
   return (
     <RequireAuth>
+      <SaveProjectAssetDialogHost />
       <Inner projectId={projectId} />
     </RequireAuth>
   );

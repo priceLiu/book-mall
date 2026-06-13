@@ -20,11 +20,13 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 
 export type Pro2CanvasToolbarProps = {
   onOpenStyleLibrary?: () => void;
+  onOpenMyHistory?: () => void;
 };
 
 /** 2.0 画布底部 Dock · 与分镜 1.0 同款四色磁吸图标；功能保持 Pro2 菜单/快捷添加 */
 export function Pro2CanvasToolbar({
   onOpenStyleLibrary,
+  onOpenMyHistory,
 }: Pro2CanvasToolbarProps) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
@@ -33,13 +35,25 @@ export function Pro2CanvasToolbar({
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchor, setAnchor] = useState({ x: 0, y: 0 });
+  const dockBarRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const onToggleMenu = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setAnchor({ x: rect.left + rect.width / 2 - 100, y: rect.top - 8 });
-    setMenuOpen((v) => !v);
+  const anchorMenuAboveDock = useCallback(() => {
+    const rect = dockBarRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setAnchor({
+      x: rect.left + rect.width / 2,
+      y: rect.top - 10,
+    });
   }, []);
+
+  const onToggleMenu = useCallback(() => {
+    setMenuOpen((open) => {
+      if (open) return false;
+      anchorMenuAboveDock();
+      return true;
+    });
+  }, [anchorMenuAboveDock]);
 
   const onPick = useCallback(
     async (itemId: string, nodeType?: string) => {
@@ -49,10 +63,10 @@ export function Pro2CanvasToolbar({
         nodeType,
         { addNode, setNodes },
         { alert },
-        { onOpenStyleLibrary },
+        { onOpenStyleLibrary, onOpenMyHistory },
       );
     },
-    [addNode, setNodes, alert, onOpenStyleLibrary],
+    [addNode, setNodes, alert, onOpenStyleLibrary, onOpenMyHistory],
   );
 
   const onQuickImage = useCallback(() => {
@@ -128,7 +142,7 @@ export function Pro2CanvasToolbar({
   return (
     <>
       <div className="pointer-events-none absolute inset-x-0 bottom-5 z-[70] flex justify-center px-4">
-        <Sbv1Dock items={dockItems} />
+        <Sbv1Dock ref={dockBarRef} items={dockItems} />
       </div>
       <input
         ref={fileRef}
@@ -143,7 +157,8 @@ export function Pro2CanvasToolbar({
       />
       <Pro2AddNodePopover
         open={menuOpen}
-        anchor={{ x: anchor.x, y: anchor.y - 320 }}
+        anchor={anchor}
+        placement="above-center"
         sections={PRO2_TOOLBAR_ADD_MENU}
         onClose={() => setMenuOpen(false)}
         onPick={onPick}

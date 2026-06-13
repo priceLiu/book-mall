@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { forwardRef, useRef, useState, type ReactNode } from "react";
 import {
   motion,
   useMotionValue,
@@ -130,11 +130,13 @@ function Sbv1DockIcon({
   );
 }
 
-export function Sbv1Dock({ items }: { items: Sbv1DockItem[] }) {
+export const Sbv1Dock = forwardRef<HTMLDivElement, { items: Sbv1DockItem[] }>(
+  function Sbv1Dock({ items }, ref) {
   const mouseX = useMotionValue(Infinity);
 
   return (
     <motion.div
+      ref={ref}
       onMouseMove={(e) => mouseX.set(e.clientX)}
       onMouseLeave={() => mouseX.set(Infinity)}
       className={LIBTV_CANVAS_DOCK_BAR_CLASS}
@@ -152,4 +154,4 @@ export function Sbv1Dock({ items }: { items: Sbv1DockItem[] }) {
       ))}
     </motion.div>
   );
-}
+});

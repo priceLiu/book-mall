@@ -34,14 +34,11 @@ function framePromptPlaceholder(role?: string): string {
 }
 
 export function pro2ImageNodeUsesEmbeddedDock(
-  d: StoryPro2ImageNodeData,
-  opts: { selected: boolean; soleSelected: boolean },
+  _d: StoryPro2ImageNodeData,
+  _opts: { selected: boolean; soleSelected: boolean },
 ): boolean {
-  if ((d.pro2MediaRole ?? "generic") === "character-three-view") return false;
-  if (!opts.selected || !opts.soleSelected) return false;
-  if (d.uploading) return false;
-  if (d.ossUrl ?? d.blobUrl) return false;
-  return true;
+  /** 与三视图 / sbv1-image 一致：空态整卡可拖，输入坞仅浮动（见 libtv-unified-node-catalog.md §3） */
+  return false;
 }
 
 /** 2.0 图片节点 · 内嵌输入区（空态时占满卡片，不再浮动在节点下方） */

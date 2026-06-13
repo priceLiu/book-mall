@@ -102,6 +102,9 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import { findStoryProWorkspaceFromHub } from "@/lib/canvas/spawn-story-pro-workspace";
 import { ensureStoryColumnImageEngineDefault } from "@/lib/canvas/story-column-engine-defaults";
+import { snapshotFrameColumnRows } from "@/lib/canvas/story-pro-column-asset-export";
+import { useSaveStoryProColumnAsAsset } from "@/lib/canvas/use-save-story-column-as-asset";
+import { StoryColumnSaveAssetButton } from "../story-column-save-asset-button";
 
 export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const edition = storyEditionFromNodeType(type);
@@ -261,6 +264,10 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
   const displayRows = useMemo(
     () => displayFrameRows(nodes, id, stored, edges),
     [nodes, edges, id, stored],
+  );
+  const saveColumn = useSaveStoryProColumnAsAsset(
+    id,
+    type as "story-pro-frame",
   );
 
   const videoRows = useMemo(() => {
@@ -628,6 +635,17 @@ export function StoryFrameColumnNode({ id, data, selected, type }: NodeProps) {
                 }}
               />
             </StoryEnginePickerStack>
+          }
+          actions={
+            edition === "pro" ? (
+              <StoryColumnSaveAssetButton
+                compact
+                disabled={!displayRows.length}
+                onClick={() =>
+                  saveColumn(snapshotFrameColumnRows(displayRows))
+                }
+              />
+            ) : undefined
           }
         />
         {!displayRows.length ? (

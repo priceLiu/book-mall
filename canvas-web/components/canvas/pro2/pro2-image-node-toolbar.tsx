@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BookmarkPlus,
   ChevronDown,
   Download,
   Grid3x3,
@@ -39,6 +40,7 @@ const ICON_BTN = PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS;
 export type Pro2ImageNodeToolbarProps = {
   previewUrl?: string;
   onExpandPreview?: () => void;
+  onSaveAsAsset?: () => void;
   className?: string;
   style?: React.CSSProperties;
   /** sbv1：工具条空白区仍可拖节点，仅按钮 nodrag */
@@ -49,6 +51,7 @@ export type Pro2ImageNodeToolbarProps = {
 export function Pro2ImageNodeToolbar({
   previewUrl,
   onExpandPreview,
+  onSaveAsAsset,
   className,
   style,
   passNodeDrag = false,
@@ -150,6 +153,13 @@ export function Pro2ImageNodeToolbar({
       </button>
 
       <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
+
+      {onSaveAsAsset ? (
+        <button type="button" className={TOOL_BTN} onClick={onSaveAsAsset}>
+          <BookmarkPlus className="size-3.5" />
+          <span>保存为资产</span>
+        </button>
+      ) : null}
 
       <button
         type="button"

@@ -119,7 +119,7 @@ export function MyCanvasHistoryPanel({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex justify-end bg-black/45"
+      className="fixed inset-0 z-[1450] flex justify-end bg-black/45"
       onClick={onClose}
       role="presentation"
     >

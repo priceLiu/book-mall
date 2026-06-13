@@ -99,6 +99,7 @@ model User {
   storyProStyleProfiles            StoryProStyleProfile[]
   storyProCharacterAudioAssets     StoryProCharacterAudioAsset[]
   storyProScriptAssistantHistories StoryProScriptAssistantHistory[]
+  projectAssets                    ProjectAsset[]
   canvasProviders                  CanvasProvider[]
   canvasPromptTemplates            CanvasPromptTemplate[]
   toolServicePeriods               UserToolServicePeriod[]
@@ -1740,6 +1741,70 @@ model StoryProCharacterAsset {
 
   @@unique([userId, characterKey, projectId])
   @@index([userId, updatedAt])
+}
+
+enum ProjectAssetKind {
+  CHARACTER
+  SCENE
+  PROP
+  OUTLINE
+  STORYBOARD_SCRIPT
+  AUDIO
+  STORYBOARD_IMAGE
+  STORYBOARD_VIDEO
+  DIGITAL_HUMAN
+  STYLE
+  PROMPT
+  GROUP_BUNDLE
+}
+
+/// 统一项目资产（Pro2 · sbv1 · Story-Pro 共用）
+model ProjectAsset {
+  id           String            @id @default(cuid())
+  tenantId     String?
+  ownerUserId  String
+  owner        User              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  visibility   AssetVisibility   @default(PRIVATE)
+
+  kind         ProjectAssetKind
+  displayName  String
+  description  String            @default("") @db.Text
+  thumbnailUrl String            @default("")
+
+  sourceProjectId String?
+  sourceNodeId    String?
+  sourceEdition   String?
+
+  locked            Boolean   @default(false)
+  editLockUserId    String?
+  editLockExpiresAt DateTime?
+
+  version   Int       @default(1)
+  payload   Json      @default("{}")
+  refs      ProjectAssetRef[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([tenantId, kind, visibility, updatedAt])
+  @@index([ownerUserId, updatedAt])
+  @@index([sourceProjectId, kind])
+  @@index([deletedAt])
+}
+
+model ProjectAssetRef {
+  id        String       @id @default(cuid())
+  assetId   String
+  asset     ProjectAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  slotKey   String
+  label     String       @default("")
+  mediaUrl  String
+  mimeType  String?
+  meta      Json?
+  sortOrder Int          @default(0)
+
+  @@index([assetId, sortOrder])
 }
 
 model StoryProCharacterAssetRef {

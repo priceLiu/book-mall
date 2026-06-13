@@ -5,18 +5,19 @@ import { X } from "lucide-react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   ProjectAssetsPanelIcon,
-  ProjectAssetsView,
-  type ProjectAssetTab,
-} from "./project-assets-view";
+} from "./unified-project-assets-view";
+import { UnifiedProjectAssetsView } from "./unified-project-assets-view";
 
 export function MyProjectCharacterAssetsPanel({
   open,
   onClose,
-  initialTab = "character",
+  initialTab = "all" as const,
+  onInsertToCanvas,
 }: {
   open: boolean;
   onClose: () => void;
-  initialTab?: ProjectAssetTab;
+  initialTab?: "all" | "CHARACTER" | "STYLE";
+  onInsertToCanvas?: (assetId: string) => void;
 }) {
   const projectId = useCanvasStore((s) => s.projectId);
 
@@ -52,10 +53,11 @@ export function MyProjectCharacterAssetsPanel({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <ProjectAssetsView
+          <UnifiedProjectAssetsView
             projectId={projectId}
             initialTab={initialTab}
             compact
+            onInsertToCanvas={onInsertToCanvas}
           />
         </div>
       </aside>

@@ -39,6 +39,7 @@ import {
   PRO2_IMAGE_NODE_WIDTH,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
+import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox } from "../media-hover-box";
 import { Pro2ImageNodeToolbar } from "./pro2-image-node-toolbar";
@@ -66,6 +67,7 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const d = data as unknown as StoryPro2ImageNodeData;
+  const saveAsAsset = useSaveNodeAsAsset();
   const self = nodes.find((n) => n.id === id);
   const insideGroup = Boolean(self?.parentId);
   const mediaRole = d.pro2MediaRole ?? "generic";
@@ -315,6 +317,9 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
             style={{ top: -60 }}
             previewUrl={previewUrl}
             onExpandPreview={() => setPreviewOpen(true)}
+            onSaveAsAsset={() =>
+              saveAsAsset(id, "story-pro2-image", d as unknown as Record<string, unknown>)
+            }
           />
         ) : null}
 
@@ -361,6 +366,7 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
                 <Pro2MediaNodeEmptyState
                   icon={ImageIcon}
                   label="等待生成三视图"
+                  passNodeDrag
                 />
               )
             ) : isGenerating ? (
@@ -414,6 +420,7 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
                   icon={ImageIcon}
                   label="添加或生成图片"
                   className="min-h-0 pb-0"
+                  passNodeDrag
                 />
                 <p className="mt-3 text-[10px] text-white/35">
                   选中节点以编辑提示词

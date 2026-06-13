@@ -1,5 +1,6 @@
 # 分镜视频 1.0 · 节点交互规范（v1.0）
 
+> **统一节点目录**：[`libtv-unified-node-catalog.md`](./libtv-unified-node-catalog.md)  
 > **共用规范（与影视 2.0 一致）**：[`libtv-node-interaction-spec.md`](./libtv-node-interaction-spec.md)  
 > **权威样板**：`sbv1-video-engine`（用户可见名 **视频合成**）  
 > 实现：`components/canvas/sbv1/sbv1-video-engine-node.tsx`  
@@ -32,7 +33,7 @@ SBV1_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
   Pro2NodeSidePlus（选中时）
   SBV1_CARD_SHELL_CLASS + SBV1_CARD_DRAG_CLASS
     ├─ Header（图标 + 标题 + 状态）
-    └─ Stage（预览 / 空态 / 内嵌 Dock[nodrag]）
+    └─ Stage（预览 / 空态[`passNodeDrag`] · **无内嵌 Dock**）
 ```
 
 - Token：`lib/canvas/libtv-node-chrome.ts`（`sbv1-node-chrome.ts` 为别名导出）
@@ -62,10 +63,17 @@ SBV1_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 - 壳层：`Sbv1VideoEngineChatInput` · 全部 `nodrag`
 - 与节点卡片 **分离**；拖动节点时不拖 Dock
 
-## 4. 图片 · 预览
+## 4. 图片 · 预览与顶栏
 
 - 有图：`MediaHoverBox` · 悬停仅 **Eye** 小圆钮打开全屏预览
-- 禁止整图点击预览；禁止 sbv1 挂载 Pro2 顶栏工具条
+- 有图且唯一选中：**必须** `Pro2ImageNodeToolbar` · `passNodeDrag`（与 Pro2 图片节点一致）
+- 禁止整图点击预览
+
+## 4.1 图片 · 输入坞
+
+- **禁止** `Sbv1ImageNodeEmbeddedDock`（`sbv1ImageNodeUsesEmbeddedDock` 恒 false）
+- 选中唯一空节点 → 浮动 `Sbv1ImageInputDock`（节点下方）
+- 空态 Stage：`Pro2MediaNodeEmptyState` + `passNodeDrag`
 
 ## 5. 尺寸与缩放
 
@@ -85,21 +93,27 @@ SBV1_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 
 若节点带 `dragHandle: '.canvas-node-drag-handle'` 但 DOM 无该类，则 **整节点无法拖动**（历史 bug 根因）。
 
-## 8. 图片节点 · Pro2 功能对齐
+## 8. 分组 · 参考图组
+
+| 项 | 规范 |
+| --- | --- |
+| 外观 | 与 Pro2 媒体组同构：点阵底 `PRO2_MEDIA_GROUP_*` · 组标题钮 |
+| 顶栏 | `Pro2MediaGroupToolbarPanel` · `edition="sbv1"` · 重排/改名改色/批量下载/解组 |
+| 布局 | 左参考图宫格 + 右单视频合成槽 · `sbv1-media-group-layout.ts` |
+
+## 9. 图片节点 · 与 Pro2 对齐清单
 
 | 能力 | 实现 |
 | --- | --- |
-| 顶栏工具条 | `Pro2ImageNodeToolbar` · 有图 + 唯一选中 |
-| 空态 Dock | `Sbv1ImageNodeEmbeddedDock` · 占满卡片 |
-| 有图 Dock | `Sbv1ImageInputDock` · 节点下方浮动 |
-| 左右 `+` | `PRO2_IMAGE_LEFT_ADD_MENU` / `PRO2_RIGHT_ADD_MENU` · spawn 映射 sbv1 |
+| 顶栏工具条 | `Pro2ImageNodeToolbar` · 有图 + 唯一选中 · `passNodeDrag` |
+| 输入坞 | **仅** `Sbv1ImageInputDock` 浮动（禁止内嵌占满 stage） |
+| 空态 | `Pro2MediaNodeEmptyState` + **`passNodeDrag`** |
+| 左右 `+` | `PRO2_IMAGE_LEFT_ADD_MENU` / `PRO2_RIGHT_ADD_MENU` · spawn → `sbv1-spawn-nodes` |
 | 风格库 | `Pro2DockStyleButton` → `StyleLibraryModal` |
 | 上游 chip | `Pro2DockUpstreamChips` · `in_image` 入边 |
-| 整卡拖动 | 同 §1；**仅** Dock 与小眼睛例外；顶栏工具条 `passNodeDrag` |
+| 整卡拖动 | Header + Stage（**仅** Dock / Eye / 侧 + / 顶栏按钮例外） |
 
-**视频合成**节点仍按 §1–§3（当前实现为权威，不套用 Pro2 图片 Dock）。
-
-## 9. Code Review 清单
+## 10. Code Review 清单
 
 - [ ] sbv1 新节点 type 已加入 `PRO2_LIBTV_DRAG_ANYWHERE_TYPES` 或明确使用标题栏 `dragHandle`
 - [ ] 壳层使用 `SBV1_*` token，未混用 Pro2 标题外置 + `RF_NODE_DRAG_HANDLE`

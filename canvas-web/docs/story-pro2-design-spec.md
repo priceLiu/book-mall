@@ -1,5 +1,6 @@
 # 影视专业版 2.0 · UI 设计规范
 
+> **统一节点目录（与 sbv1 共用）**：[`libtv-unified-node-catalog.md`](./libtv-unified-node-catalog.md)  
 > **真源常量**：`lib/canvas/story-pro2-node-chrome.ts`  
 > **配色分流（列组件）**：`lib/canvas/story-edition-chrome.ts` · `edition: "pro2"`  
 > **关联**：[`plan-2.0.md`](./plan-2.0.md) · [`story-pro2-workflow-canonical.md`](./story-pro2-workflow-canonical.md)
@@ -105,14 +106,14 @@
 
 选中时隐藏同侧默认透明 Handle，避免与 `+` 重叠。
 
-### 7.3 图片节点 · 空态 / 有图
+### 7.3 图片 / 三视图 / sbv1 图片 · 空态 / 有图
 
 | 状态 | 底部输入坞 | 顶栏工具条 | 侧 `+` | 粘贴 |
 | --- | --- | --- | --- | --- |
-| **无图** | 内嵌 `Pro2ImageNodeEmbeddedDock`（选中唯一时）或 `Pro2ImageInputDock`（画布级浮动） | 无 | 选中时出现 | 悬停本节点 Ctrl+V |
-| **有图且唯一选中** | **隐藏** Dock | `Pro2ImageNodeToolbar` · `passNodeDrag` · 卡片上方 `-60px` | 左右 `+` | 同全局规则 |
+| **无图** | **仅浮动** Dock（禁止内嵌占满 stage） | 无 | 选中时出现 | 悬停本节点 Ctrl+V |
+| **有图且唯一选中** | 隐藏 Dock | `Pro2ImageNodeToolbar` · `passNodeDrag` | 左右 `+` | 同全局规则 |
 
-壳层与分镜 1.0 图片节点 **100% 同构**（见 `libtv-node-interaction-spec.md` §2.1）；Pro2 选中 ring 为紫罗兰 `ring-violet-400/45`，sbv1 为 `ring-cyan-400/50`。
+空态 Stage：`Pro2MediaNodeEmptyState` + **`passNodeDrag`**。壳层与 sbv1 图片/视频合成 **同构**（见目录 §2.1）；Pro2 ring 紫罗兰，sbv1 ring  cyan。
 
 ### 7.4 节点顶栏工具条
 
@@ -213,7 +214,7 @@
 | --- | --- |
 | 职责 | 通用生图 / 分镜图（`pro2MediaRole: frame`）/ 组内占位 |
 | 壳层 | `LIBTV_NODE_OUTER` → Header + Stage；`MediaHoverBox` 有图预览 |
-| 空态 | 非 character-three-view：内嵌或浮动 Dock；可点击 / 拖入 / 粘贴上传 |
+| 空态 | 非 character-three-view：浮动 Dock + `passNodeDrag` 空态 |
 | 有图 | 隐藏 Dock；顶栏 `Pro2ImageNodeToolbar` · `passNodeDrag` |
 | 组内 | `Pro2NodeResizer` 隐藏；位置随媒体组 relayout，**禁止** refresh 覆盖用户排列 |
 | 模型 | `EnginePicker role="IMAGE"` · 白名单见 `PRO2_FRAME_IMAGE_MODEL_KEYS` 等 |
@@ -224,8 +225,8 @@
 | --- | --- |
 | 职责 | 单角色三视图单元；可独立存在或在 `character-board` 组内 |
 | 壳层 | **与 §9.4 图片节点 100% 同构**（`LIBTV_*` · `Pro2ImageNodeToolbar` · `MediaHoverBox`） |
-| Dock | **禁止** `Pro2ThreeViewNodeEmbeddedDock`；仅浮动 `Pro2ThreeViewInputDock` |
-| 空态 | `Pro2MediaNodeEmptyState`「等待生成三视图」或组内由角色板批量生成 |
+| Dock | **禁止内嵌**；仅浮动 `Pro2ThreeViewInputDock` |
+| 空态 | `Pro2MediaNodeEmptyState` + **`passNodeDrag`**；组内由角色板批量生成 |
 | 生成 | 角色板 controller · `batchRunStoryRowsSequential` · `EnginePicker` 三视图白名单 |
 | 组 | 脚本 hub 生成 → `group` `pro2Kind: character-board` + 多格 `story-pro2-three-view` |
 
@@ -263,7 +264,42 @@
 
 ---
 
-## 10. Code Review 清单（节点）
+## 9.10 分镜视频 1.0 节点（与 Pro2 对齐）
+
+> 细则见 [`libtv-unified-node-catalog.md`](./libtv-unified-node-catalog.md) §3.6–3.8 · [`storyboard-video-1.0-node-interaction-spec.md`](./storyboard-video-1.0-node-interaction-spec.md)
+
+| 节点 | 与 Pro2 共用 | sbv1 专有 |
+| --- | --- | --- |
+| `sbv1-image` | LibTV 媒体壳 · 侧 `+` · 顶栏 · 浮动 Dock · `passNodeDrag` | cyan ring · 连视频合成 · sbv1 spawn |
+| `sbv1-video-engine` | LibTV 媒体壳 · 侧 `+` · 拖动规则 | 视频合成 Dock · Seedance 生成 |
+| `group` sbv1Styled | 点阵组框 · `Pro2MediaGroupToolbarPanel` | 参考图宫格 + 右视频槽 · 重排 |
+
+---
+
+## 10. 表单弹层（保存为资产等）
+
+> **Cursor Skill**：`.cursor/skills/story-pro2/SKILL.md` · 细节 [reference-modals.md](../../.cursor/skills/story-pro2/reference-modals.md)
+
+与 `useDialogs()`（§design.md 4.5 · z 1000）分工：**多字段 + 预览 + 提交** 走本壳层，**禁止**另起浅色 Modal。
+
+| 规则 | 说明 |
+| --- | --- |
+| 真源 | `SaveProjectAssetDialog` · `save-project-asset-dialog.tsx` |
+| 挂载 | `createPortal(..., document.body)` · **`z-[9999]`** |
+| 遮罩 | `fixed inset-0 bg-black/60 backdrop-blur-sm p-4` |
+| 卡片 | `max-w-md rounded-2xl border border-white/10 bg-[#1c1c1e] p-5 shadow-2xl` |
+| 标题 | `text-base font-semibold text-white` + 副标题 `text-xs text-white/50` |
+| 输入 | `rounded-lg border-white/10 bg-black/30` · focus `border-violet-400/50` |
+| 主按钮 | `bg-violet-600 hover:bg-violet-500`（Pro2 紫罗兰，非 cyan/emerald） |
+| 次按钮 | `text-white/70 hover:bg-white/5` |
+| 组预览 | 正方形 `aspect-square max-w-[240px]` + `ProjectAssetMediaPreviewGrid` |
+| 打开 API | `openSaveProjectAssetDialog` · Host 在 `CanvasPageClient` 根 |
+
+侧栏资产卡片（上标题 / 中正方形 / 下插入）→ `ProjectAssetGridCard` · `UnifiedProjectAssetsView` · 三列网格。
+
+---
+
+## 11. Code Review 清单（节点）
 
 - [ ] 新 Pro2 媒体节点复用 `LIBTV_*` + `Pro2ImageNodeToolbar` / `Pro2NodeSidePlus`  
 - [ ] 三视图 **无** 内嵌 Dock；Dock 仅浮动  

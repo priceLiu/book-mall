@@ -1,10 +1,15 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
+
+const MENU_SHELL_CLASS =
+  "overflow-hidden rounded-xl border border-white/15 bg-[#1c1c1e] py-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.75)] ring-1 ring-black/40";
+
+export type Pro2AddNodePopoverPlacement = "top-left" | "above-center";
 
 export type Pro2AddNodePopoverProps = {
   open: boolean;
@@ -12,6 +17,8 @@ export type Pro2AddNodePopoverProps = {
   sections: Pro2AddMenuSection[];
   onClose: () => void;
   onPick: (itemId: string, nodeType?: string) => void;
+  /** above-center：锚点取菜单底边中点，向上展开（Dock 顶栏用） */
+  placement?: Pro2AddNodePopoverPlacement;
 };
 
 export function Pro2AddNodePopover({
@@ -20,9 +27,27 @@ export function Pro2AddNodePopover({
   sections,
   onClose,
   onPick,
+  placement = "top-left",
 }: Pro2AddNodePopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const mainPanelRef = useRef<HTMLDivElement>(null);
   const [flyoutId, setFlyoutId] = useState<string | null>(null);
+  const [maxMainHeight, setMaxMainHeight] = useState<number | undefined>();
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMaxMainHeight(undefined);
+      return;
+    }
+    const panel = mainPanelRef.current;
+    if (!panel) return;
+    const margin = 16;
+    const available =
+      placement === "above-center"
+        ? anchor.y - margin
+        : window.innerHeight - anchor.y - margin;
+    setMaxMainHeight(Math.max(180, Math.min(520, available)));
+  }, [open, anchor.x, anchor.y, placement, sections]);
 
   useEffect(() => {
     if (!open) {
@@ -53,12 +78,21 @@ export function Pro2AddNodePopover({
   return createPortal(
     <div
       ref={ref}
-      className="pro2-add-menu nodrag fixed z-[200] flex items-start gap-0"
-      style={{ left: anchor.x, top: anchor.y }}
+      className="pro2-add-menu nodrag fixed z-[1400] flex items-end gap-0"
+      style={{
+        left: anchor.x,
+        top: anchor.y,
+        transform:
+          placement === "above-center" ? "translate(-50%, -100%)" : undefined,
+      }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="min-w-[200px] overflow-hidden rounded-xl border border-white/10 bg-[#1c1c1e]/98 py-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+      <div
+        ref={mainPanelRef}
+        className={cn(MENU_SHELL_CLASS, "min-w-[200px]")}
+        style={maxMainHeight ? { maxHeight: maxMainHeight, overflowY: "auto" } : undefined}
+      >
         {sections.map((section, si) => (
           <div key={section.title ?? si}>
             {section.title ? (
@@ -122,7 +156,10 @@ export function Pro2AddNodePopover({
       </div>
 
       {flyoutSections?.length ? (
-        <div className="ml-1 min-w-[168px] overflow-hidden rounded-xl border border-white/10 bg-[#1c1c1e]/98 py-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+        <div
+          className={cn(MENU_SHELL_CLASS, "ml-1 min-w-[168px] self-stretch")}
+          style={maxMainHeight ? { maxHeight: maxMainHeight, overflowY: "auto" } : undefined}
+        >
           {flyoutSections.map((section, si) => (
             <div key={section.title ?? si}>
               {section.title ? (

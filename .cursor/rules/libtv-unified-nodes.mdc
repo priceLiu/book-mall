@@ -1,0 +1,32 @@
+# LibTV 统一节点（Pro2 · 分镜视频 1.0）
+
+## Agent Skill
+
+实现或评审节点 UI 时，先读 **`.cursor/skills/libtv-unified-nodes/SKILL.md`**。
+
+## 权威文档
+
+- **节点目录（样式 + 功能）**：`canvas-web/docs/libtv-unified-node-catalog.md`
+- **交互细则**：`canvas-web/docs/libtv-node-interaction-spec.md`
+- **Pro2 配色**：`canvas-web/docs/story-pro2-design-spec.md`
+- **sbv1 细则**：`canvas-web/docs/storyboard-video-1.0-node-interaction-spec.md`
+
+## 原则
+
+Pro2 与 sbv1 **同一套组件**；仅允许：`type`、spawn 菜单、ring 色（紫 / cyan）、业务白名单差异。
+
+## 禁止
+
+- 第二套 Dock / 顶栏 / 侧 `+` / 媒体壳层 / 组顶栏
+- 内嵌 Dock 占满 stage（`UsesEmbeddedDock` 须恒 false）
+- 媒体空态不用 `passNodeDrag`
+- 裸 `<select>` 模型列表（须 `EnginePicker`）
+- `window.alert` / `confirm` / `prompt`
+
+## 新节点 Checklist
+
+- [ ] `LIBTV_*` 壳层 · `LIBTV_DRAG_ANYWHERE_NODE_TYPES` 登记
+- [ ] `Pro2NodeSidePlus` · spawn 后 `select*AfterSpawn` + `sortNodesForReactFlow`
+- [ ] 媒体：浮动 Dock · 空态 `passNodeDrag` · 有图 `Pro2ImageNodeToolbar` + `passNodeDrag`
+- [ ] 组：`Pro2MediaGroupToolbarPanel` · 点阵底
+- [ ] Code Review 见目录 §5

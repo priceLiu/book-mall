@@ -38,6 +38,7 @@ export type Pro2AddNodePickStore = {
 
 export type Pro2ToolbarAddNodePickOptions = {
   onOpenStyleLibrary?: () => void;
+  onOpenMyHistory?: () => void;
 };
 
 const COMING_SOON: Record<string, string> = {
@@ -47,7 +48,6 @@ const COMING_SOON: Record<string, string> = {
   audio: "音频节点",
   "fx-library": "特效库",
   upload: "从本地上传资源",
-  history: "从生成历史选择",
   "ref-node": "参考节点",
 };
 
@@ -63,6 +63,12 @@ export async function handlePro2ToolbarAddNodePick(
 
   if (itemId === "style-library") {
     options?.onOpenStyleLibrary?.();
+    return;
+  }
+
+  if (itemId === "history") {
+    options?.onOpenMyHistory?.();
+    window.dispatchEvent(new CustomEvent("canvas:open-my-history"));
     return;
   }
 

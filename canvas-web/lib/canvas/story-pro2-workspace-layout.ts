@@ -17,8 +17,11 @@ import {
   PRO2_COLUMN_CARD_HEIGHT,
   PRO2_CONTROL_CARD_HEIGHT,
 } from "./story-pro2-node-chrome";
+import { CANVAS_REFLOW_ORIGIN } from "./canvas-reflow-pack";
 
 export { hasStoryPro2Pipeline };
+
+const PRO2_WORKSPACE_STACK_GAP = 80;
 
 const PRO2_CONTROL_TYPES = new Set([
   "story-pro2-starter",
@@ -74,12 +77,15 @@ function mediaColumnXs(originX: number): number[] {
 export function reflowStoryPro2Workspace(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
+  opts?: { origin?: { x: number; y: number } },
 ): CanvasFlowNode[] {
   let next = reconcileStoryPro2Workspace(nodes);
   const starters = next.filter((n) => n.type === "story-pro2-starter");
   if (!starters.length) return sortNodesForReactFlow(next);
 
+  const baseOrigin = opts?.origin ?? CANVAS_REFLOW_ORIGIN;
   const byId = new Map(next.map((n) => [n.id, n]));
+  let stackY = baseOrigin.y;
 
   for (const starter of starters) {
     const stored = (starter.data as { workspaceIds?: StoryPro2WorkspaceIds })
@@ -99,8 +105,8 @@ export function reflowStoryPro2Workspace(
     );
     if (!ws) continue;
 
-    const originY = starter.position.y ?? 160;
-    const originX = starter.position.x ?? 120;
+    const originX = baseOrigin.x;
+    const originY = stackY;
     const { hubX, styleX } = storyProControlRowX(originX);
     const rowY = mediaRowY(originY);
     const [charX, sceneX, frameX, videoX, exportX] = mediaColumnXs(originX);
@@ -120,6 +126,25 @@ export function reflowStoryPro2Workspace(
     patch(ws.frameColumnId, frameX, rowY, "story-pro2-frame");
     patch(ws.videoColumnId, videoX, rowY, "story-pro2-video");
     patch(ws.jianyingExportId, exportX, rowY, "jianying-export-pro2");
+
+    const workspaceIds = [
+      starter.id,
+      ws.scriptHubId,
+      ws.styleNodeId,
+      ws.characterColumnId,
+      ws.sceneColumnId,
+      ws.frameColumnId,
+      ws.videoColumnId,
+      ws.jianyingExportId,
+    ].filter(Boolean) as string[];
+    let blockBottom = originY;
+    for (const id of workspaceIds) {
+      const node = byId.get(id);
+      if (!node) continue;
+      const { h } = nodeMeasuredSize(node);
+      blockBottom = Math.max(blockBottom, node.position.y + h);
+    }
+    stackY = blockBottom + PRO2_WORKSPACE_STACK_GAP;
   }
 
   return sortNodesForReactFlow(Array.from(byId.values()));
