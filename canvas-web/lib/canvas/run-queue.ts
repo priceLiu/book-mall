@@ -145,6 +145,10 @@ function shouldReleaseStoryRunInflight(
     const st = nodeRuntimeStatus(node);
     return st === "done" || st === "error";
   }
+  if (node) {
+    const st = nodeRuntimeStatus(node);
+    return st === "done" || st === "error";
+  }
   return true;
 }
 
@@ -1375,6 +1379,10 @@ export function useCanvasRunner(
             );
           }
         }
+        if (patch.status === "done" || patch.status === "error") {
+          const job = jobByTaskRef.current.get(t.id);
+          if (job) releaseInflightKey(runKey(job));
+        }
       }
     };
 
@@ -1413,6 +1421,9 @@ export function useCanvasRunner(
         }
         for (const job of queueRef.current) {
           skipReconcileNodeIds.add(job.nodeId);
+        }
+        for (const key of taskByNodeRef.current.keys()) {
+          skipReconcileNodeIds.add(key.split(":")[0]!);
         }
         reconcileStaleInflightRuntimes(
           useCanvasStore.getState().nodes,

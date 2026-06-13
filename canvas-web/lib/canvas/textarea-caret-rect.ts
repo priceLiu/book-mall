@@ -92,3 +92,72 @@ export function getTextareaCaretClientRect(
     height,
   };
 }
+
+/** 视口坐标 → textarea 字符索引（用于 @ 悬停命中） */
+export function getTextareaIndexFromClientPoint(
+  textarea: HTMLTextAreaElement,
+  clientX: number,
+  clientY: number,
+): number {
+  const len = textarea.value.length;
+  if (len === 0) return 0;
+
+  let lo = 0;
+  let hi = len;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const r = getTextareaCaretClientRect(textarea, mid);
+    if (!r) return 0;
+    const midY = r.top + r.height / 2;
+    if (midY < clientY) lo = mid + 1;
+    else hi = mid;
+  }
+
+  const lineRect = getTextareaCaretClientRect(textarea, lo);
+  if (!lineRect) return lo;
+
+  let start = lo;
+  while (start > 0) {
+    const r = getTextareaCaretClientRect(textarea, start - 1);
+    if (!r || r.top < lineRect.top - 1) break;
+    start--;
+  }
+  let end = lo;
+  while (end < len) {
+    const r = getTextareaCaretClientRect(textarea, end + 1);
+    if (!r || r.top > lineRect.bottom + 1) break;
+    end++;
+  }
+
+  let best = start;
+  let bestDist = Infinity;
+  for (let i = start; i <= end; i++) {
+    const r = getTextareaCaretClientRect(textarea, i);
+    if (!r) continue;
+    const dist = Math.abs(r.left - clientX);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** @mention 在 textarea 中的视口矩形（用于悬停预览锚点） */
+export function getMentionRangeClientRect(
+  textarea: HTMLTextAreaElement,
+  start: number,
+  end: number,
+): DOMRect | null {
+  const startR = getTextareaCaretClientRect(textarea, start);
+  const endR = getTextareaCaretClientRect(
+    textarea,
+    Math.min(end, textarea.value.length),
+  );
+  if (!startR || !endR) return null;
+  const top = Math.min(startR.top, endR.top);
+  const bottom = Math.max(startR.bottom, endR.bottom);
+  const left = startR.left;
+  const width = Math.max(endR.left - startR.left, startR.height * 0.5);
+  return new DOMRect(left, top, width, bottom - top);
+}
