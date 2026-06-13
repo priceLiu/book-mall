@@ -30,16 +30,7 @@ export function StoryPro2CharacterBoardNode({ id, data, selected }: NodeProps) {
     hubNodeId?: string;
     pro2VisualGroupId?: string;
   };
-  if (d.pro2VisualGroupId) {
-    return (
-      <div
-        className="pointer-events-none opacity-0"
-        style={{ width: 1, height: 1 }}
-        aria-hidden
-      />
-    );
-  }
-  const rows = d.rows ?? [];
+  const isVisualGroupPlaceholder = Boolean(d.pro2VisualGroupId);
 
   const label = useMemo(() => {
     const hubs = nodes.filter((n) => n.type === "story-pro2-script-hub");
@@ -49,9 +40,19 @@ export function StoryPro2CharacterBoardNode({ id, data, selected }: NodeProps) {
   }, [nodes, d.hubNodeId]);
 
   const sortedRows = useMemo(
-    () => [...rows].sort((a, b) => a.name.localeCompare(b.name, "zh")),
-    [rows],
+    () => [...(d.rows ?? [])].sort((a, b) => a.name.localeCompare(b.name, "zh")),
+    [d.rows],
   );
+
+  if (isVisualGroupPlaceholder) {
+    return (
+      <div
+        className="pointer-events-none opacity-0"
+        style={{ width: 1, height: 1 }}
+        aria-hidden
+      />
+    );
+  }
 
   const anyRunning = sortedRows.some(
     (r) => pro2CharacterCellStatus(r) === "running",

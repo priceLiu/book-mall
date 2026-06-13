@@ -29,16 +29,7 @@ export function StoryPro2FrameBoardNode({ id, data, selected }: NodeProps) {
     hubNodeId?: string;
     pro2VisualGroupId?: string;
   };
-  if (d.pro2VisualGroupId) {
-    return (
-      <div
-        className="pointer-events-none opacity-0"
-        style={{ width: 1, height: 1 }}
-        aria-hidden
-      />
-    );
-  }
-  const rows = d.rows ?? [];
+  const isVisualGroupPlaceholder = Boolean(d.pro2VisualGroupId);
 
   const label = useMemo(() => {
     const hubs = nodes.filter((n) => n.type === "story-pro2-script-hub");
@@ -48,9 +39,19 @@ export function StoryPro2FrameBoardNode({ id, data, selected }: NodeProps) {
   }, [nodes, d.hubNodeId]);
 
   const sortedRows = useMemo(
-    () => [...rows].sort((a, b) => a.frameIndex - b.frameIndex),
-    [rows],
+    () => [...(d.rows ?? [])].sort((a, b) => a.frameIndex - b.frameIndex),
+    [d.rows],
   );
+
+  if (isVisualGroupPlaceholder) {
+    return (
+      <div
+        className="pointer-events-none opacity-0"
+        style={{ width: 1, height: 1 }}
+        aria-hidden
+      />
+    );
+  }
 
   const anyRunning = sortedRows.some((r) => pro2FrameCellStatus(r) === "running");
   const hasAnyImage = sortedRows.some(
