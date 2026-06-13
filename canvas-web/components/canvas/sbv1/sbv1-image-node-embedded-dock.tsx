@@ -22,13 +22,11 @@ import {
 } from "../pro2/pro2-input-dock-shell";
 
 export function sbv1ImageNodeUsesEmbeddedDock(
-  d: Sbv1ImageNodeData,
-  opts: { selected: boolean; soleSelected: boolean },
+  _d: Sbv1ImageNodeData,
+  _opts: { selected: boolean; soleSelected: boolean },
 ): boolean {
-  if (!opts.selected || !opts.soleSelected) return false;
-  if (d.uploading) return false;
-  if (d.ossUrl ?? d.blobUrl) return false;
-  return true;
+  /** 与视频合成一致：空态整卡可拖，输入坞浮动在节点下方（见 libtv §2.3） */
+  return false;
 }
 
 /** 分镜视频 1.0 · 图片节点内嵌输入坞（空态 · 对齐 Pro2） */

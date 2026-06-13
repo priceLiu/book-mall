@@ -10,16 +10,14 @@ export type CanvasAutosaveIntervalOption = {
 
 export const CANVAS_AUTOSAVE_INTERVAL_OPTIONS: CanvasAutosaveIntervalOption[] =
   [
-    { id: "30s", label: "30 秒", ms: 30_000 },
-    { id: "1m", label: "1 分钟", ms: 60_000 },
-    { id: "2m", label: "2 分钟", ms: 120_000 },
     { id: "5m", label: "5 分钟", ms: 300_000 },
-    { id: "10m", label: "10 分钟", ms: 600_000 },
+    { id: "15m", label: "15 分钟", ms: 900_000 },
+    { id: "30m", label: "30 分钟", ms: 1_800_000 },
     { id: "off", label: "关闭自动保存", ms: 0 },
   ];
 
 const STORAGE_KEY = "canvas-autosave-interval-ms";
-const DEFAULT_MS = 60_000;
+const DEFAULT_MS = 300_000;
 
 export function getCanvasAutosaveIntervalMs(): number {
   if (typeof window === "undefined") return DEFAULT_MS;
@@ -47,5 +45,8 @@ export function setCanvasAutosaveIntervalMs(ms: number): void {
 
 export function formatCanvasAutosaveIntervalLabel(ms: number): string {
   const hit = CANVAS_AUTOSAVE_INTERVAL_OPTIONS.find((o) => o.ms === ms);
-  return hit?.label ?? `${Math.round(ms / 1000)} 秒`;
+  if (hit) return hit.label;
+  if (ms <= 0) return "关闭自动保存";
+  if (ms % 60_000 === 0) return `${ms / 60_000} 分钟`;
+  return `${Math.round(ms / 1000)} 秒`;
 }

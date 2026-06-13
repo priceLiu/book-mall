@@ -1,10 +1,16 @@
 "use client";
 
 import {
+  absoluteNodePosition,
+  ensureNodeDragHandles,
+  nodeMeasuredSize,
+  sortNodesForReactFlow,
+} from "./normalize-graph-nodes";
+import {
   SBV1_IMAGE_NODE_WIDTH,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
-import { sbv1ImageChildren } from "./sbv1-media-group-meta";
+import { isSbv1MediaGroup, sbv1ImageChildren } from "./sbv1-media-group-meta";
 import { applySbv1MediaGroupRelayout } from "./sbv1-media-group-layout";
 import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
@@ -27,7 +33,14 @@ export function selectSbv1NodeAfterSpawn(
   ) => void,
   nodeId: string,
 ): void {
-  setNodes((prev) => prev.map((n) => ({ ...n, selected: n.id === nodeId })));
+  if (!nodeId) return;
+  setNodes((prev) =>
+    ensureNodeDragHandles(
+      sortNodesForReactFlow(
+        prev.map((n) => ({ ...n, selected: n.id === nodeId })),
+      ),
+    ),
+  );
 }
 
 type SpawnStore = {
@@ -48,10 +61,41 @@ type SpawnStore = {
   setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
 };
 
-function nodeSize(node: CanvasFlowNode, fallbackW: number) {
+function sbv1GroupForNode(
+  self: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode | undefined {
+  if (!self.parentId) return undefined;
+  const group = nodes.find((n) => n.id === self.parentId);
+  if (!group || !isSbv1MediaGroup(group, nodes)) return undefined;
+  return group;
+}
+
+/** 组内节点 spawn 到画布时使用绝对坐标；串联下一视频合成时落到组框右侧外。 */
+function sbv1NeighborFlowPosition(
+  self: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  side: "left" | "right",
+  newNodeW: number,
+  nodeType: string,
+): { x: number; y: number } {
+  const abs = absoluteNodePosition(self, nodes);
+  const { w: selfW } = nodeMeasuredSize(self);
+  const group = sbv1GroupForNode(self, nodes);
+
+  if (
+    group &&
+    nodeType === "sbv1-video-engine" &&
+    side === "right" &&
+    self.type === "sbv1-video-engine"
+  ) {
+    const gw = group.width ?? SBV1_VIDEO_ENGINE_WIDTH + SBV1_IMAGE_NODE_WIDTH;
+    return { x: group.position.x + gw + GAP, y: group.position.y + 40 };
+  }
+
   return {
-    w: node.width ?? fallbackW,
-    h: node.height ?? 360,
+    x: side === "left" ? abs.x - newNodeW - GAP : abs.x + selfW + GAP,
+    y: abs.y,
   };
 }
 
@@ -67,15 +111,29 @@ export function spawnSbv1NeighborFromNode(
   const self = nodes.find((n) => n.id === anchorId);
   if (!self) return "";
 
-  const fallbackW =
-    self.type === "sbv1-video-engine"
+  if (
+    nodeType === "sbv1-video-engine" &&
+    side === "right" &&
+    self.type === "sbv1-image" &&
+    self.parentId
+  ) {
+    const group = nodes.find((n) => n.id === self.parentId);
+    if (group && isSbv1MediaGroup(group, nodes)) {
+      return spawnSbv1VideoEngineFromGroup(self.parentId, store);
+    }
+  }
+
+  const newNodeW =
+    nodeType === "sbv1-video-engine"
       ? SBV1_VIDEO_ENGINE_WIDTH
       : SBV1_IMAGE_NODE_WIDTH;
-  const { w } = nodeSize(self, fallbackW);
-
-  const x =
-    side === "left" ? self.position.x - w - GAP : self.position.x + w + GAP;
-  const y = self.position.y;
+  const { x, y } = sbv1NeighborFlowPosition(
+    self,
+    nodes,
+    side,
+    newNodeW,
+    nodeType,
+  );
 
   if (nodeType === "sbv1-image") {
     const label =
@@ -194,7 +252,11 @@ export function spawnSbv1VideoEngineFromGroup(
 
   setNodes((prev) => {
     const laid = applySbv1MediaGroupRelayout(prev, mergedEdges, groupId);
-    return laid.map((n) => ({ ...n, selected: n.id === engineId }));
+    return ensureNodeDragHandles(
+      sortNodesForReactFlow(
+        laid.map((n) => ({ ...n, selected: n.id === engineId })),
+      ),
+    );
   });
   return engineId;
 }

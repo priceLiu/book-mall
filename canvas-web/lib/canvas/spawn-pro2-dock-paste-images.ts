@@ -136,3 +136,50 @@ export async function spawnPro2DockPastedImages(
 
   return createdIds;
 }
+
+/** 画布空白处粘贴多张图片（不连线） */
+export async function spawnPro2CanvasPastedImages(args: {
+  files: File[];
+  base: string;
+  origin: { x: number; y: number };
+  addNode: SpawnPro2DockPasteImagesArgs["addNode"];
+  updateNodeData: SpawnPro2DockPasteImagesArgs["updateNodeData"];
+  setNodes: SpawnPro2DockPasteImagesArgs["setNodes"];
+}): Promise<string[]> {
+  if (!args.base || !args.files.length) return [];
+  const images = args.files.filter(
+    (f) =>
+      f.type.startsWith("image/") ||
+      (!f.type && /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)),
+  );
+  const createdIds: string[] = [];
+  for (let i = 0; i < images.length; i++) {
+    const file = images[i]!;
+    const blobUrl = URL.createObjectURL(file);
+    const id = args.addNode(
+      "story-pro2-image",
+      { x: args.origin.x + i * 28, y: args.origin.y + i * 28 },
+      {
+        blobUrl,
+        uploading: true,
+        label: file.name.replace(/\.[^.]+$/, "") || `图片 ${i + 1}`,
+      },
+    );
+    createdIds.push(id);
+    void uploadCanvasImage(args.base, file)
+      .then((ossUrl) => {
+        args.updateNodeData(id, { ossUrl, uploading: false });
+      })
+      .catch((e) => {
+        args.updateNodeData(id, {
+          uploading: false,
+          uploadError: e instanceof Error ? e.message : String(e),
+        });
+      });
+  }
+  const lastId = createdIds[createdIds.length - 1];
+  if (lastId) {
+    selectPro2NodeAfterSpawn(args.setNodes, lastId);
+  }
+  return createdIds;
+}

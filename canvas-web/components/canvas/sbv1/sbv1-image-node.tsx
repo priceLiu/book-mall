@@ -302,10 +302,13 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
                   icon={ImageIcon}
                   label="添加或生成图片"
                   className="min-h-0 pb-0"
+                  passNodeDrag
                 />
-                <p className="mt-3 text-[10px] text-white/35">
-                  选中节点以编辑提示词
-                </p>
+                {!selected ? (
+                  <p className="mt-3 text-[10px] text-white/35">
+                    选中节点以编辑提示词
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>

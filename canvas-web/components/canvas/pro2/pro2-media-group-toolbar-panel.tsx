@@ -30,6 +30,10 @@ export type Pro2MediaGroupKind = "character-board" | "frame-board";
 export type Pro2MediaGroupToolbarPanelProps = {
   groupId: string;
   kind: Pro2MediaGroupKind | null;
+  /** 分镜视频 1.0 媒体组：批量下载 / 重排等行为与 Pro2 壳层一致 */
+  edition?: "pro2" | "sbv1";
+  /** sbv1 · 参考图与视频合成重新纳入组框 */
+  onRelayout?: () => void;
   className?: string;
   style?: React.CSSProperties;
   /** 与图片节点顶栏一致：空白区可拖组，仅按钮 nodrag */
@@ -45,6 +49,13 @@ function readRows<T>(node: { data?: unknown } | undefined): T[] {
 function imageUrlOf(node: CanvasFlowNode): string {
   const d = node.data as { ossUrl?: string; blobUrl?: string };
   return d.ossUrl ?? d.blobUrl ?? "";
+}
+
+function videoUrlOf(node: CanvasFlowNode): string {
+  const d = node.data as {
+    runtime?: { ossUrl?: string; ephemeralUrl?: string };
+  };
+  return d.runtime?.ossUrl ?? d.runtime?.ephemeralUrl ?? "";
 }
 
 async function downloadOne(url: string, filename: string) {
@@ -69,6 +80,8 @@ async function downloadOne(url: string, filename: string) {
 export function Pro2MediaGroupToolbarPanel({
   groupId,
   kind,
+  edition = "pro2",
+  onRelayout,
   className,
   style,
   passNodeDrag = true,
@@ -118,24 +131,44 @@ export function Pro2MediaGroupToolbarPanel({
     return 0;
   }, [controller, kind]);
 
-  const downloadable = useMemo(
-    () =>
-      nodes
-        .filter(
-          (n) =>
-            n.parentId === groupId &&
-            (n.type === "story-pro2-image" ||
-              n.type === "story-pro2-three-view") &&
-            imageUrlOf(n),
-        )
-        .map((n) => ({
-          url: imageUrlOf(n),
-          label: ((n.data as { label?: string }).label ?? "image").trim(),
-        })),
-    [groupId, nodes],
-  );
+  const downloadable = useMemo(() => {
+    if (edition === "sbv1") {
+      const items: { url: string; label: string }[] = [];
+      for (const n of nodes) {
+        if (n.parentId !== groupId) continue;
+        if (n.type === "sbv1-image") {
+          const url = imageUrlOf(n);
+          if (!url) continue;
+          items.push({
+            url,
+            label: ((n.data as { label?: string }).label ?? "image").trim(),
+          });
+        } else if (n.type === "sbv1-video-engine") {
+          const url = videoUrlOf(n);
+          if (!url) continue;
+          items.push({
+            url,
+            label: ((n.data as { label?: string }).label ?? "video").trim(),
+          });
+        }
+      }
+      return items;
+    }
+    return nodes
+      .filter(
+        (n) =>
+          n.parentId === groupId &&
+          (n.type === "story-pro2-image" ||
+            n.type === "story-pro2-three-view") &&
+          imageUrlOf(n),
+      )
+      .map((n) => ({
+        url: imageUrlOf(n),
+        label: ((n.data as { label?: string }).label ?? "image").trim(),
+      }));
+  }, [edition, groupId, nodes]);
 
-  const canRegenerate = Boolean(kind && controller && rowCount);
+  const canRegenerate = edition === "pro2" && Boolean(kind && controller && rowCount);
 
   const onRegenerateAll = () => {
     if (!controller) return;
@@ -233,6 +266,17 @@ export function Pro2MediaGroupToolbarPanel({
             重新生成
           </button>
         ) : null}
+        {onRelayout ? (
+          <button
+            type="button"
+            className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
+            title="参考图与视频合成重新纳入组框"
+            onClick={onRelayout}
+          >
+            <LayoutGrid className="size-3.5" />
+            重排
+          </button>
+        ) : null}
         <button
           type="button"
           className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
@@ -245,7 +289,7 @@ export function Pro2MediaGroupToolbarPanel({
         <button
           type="button"
           className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
-          title="批量下载组内图片"
+          title={edition === "sbv1" ? "批量下载组内图片与视频" : "批量下载组内图片"}
           disabled={!downloadable.length || downloading}
           onClick={() => void onBatchDownload()}
         >

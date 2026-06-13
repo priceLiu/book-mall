@@ -61,7 +61,6 @@ function Sbv1DockIcon({
       onClick={(e) => item.onClick?.(e)}
       className={cn(
         "relative flex aspect-square cursor-pointer items-center justify-center disabled:cursor-not-allowed disabled:opacity-40",
-        item.active && "scale-105",
       )}
       whileTap={{ scale: 0.95 }}
     >
@@ -69,7 +68,6 @@ function Sbv1DockIcon({
         className={cn(
           "relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl text-white shadow-lg",
           item.color,
-          item.active && "ring-2 ring-white/35 ring-offset-2 ring-offset-transparent",
         )}
         animate={{
           y: isClicked ? 2 : isHovered ? -8 : 0,

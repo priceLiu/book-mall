@@ -124,6 +124,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const isSbv1Group = selfNode
     ? isSbv1MediaGroup(selfNode, allNodes)
     : Boolean(d.sbv1Styled);
+  const isLibtvMediaGroup = isPro2MediaGroup || isSbv1Group;
   const isStoryTemplateGroup =
     id === "sc-group-characters" ||
     id === "sc-group-media" ||
@@ -320,8 +321,14 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   ]);
 
   const Pro2GroupIcon = pro2MediaGroupIcon(d.pro2Kind);
+  const GroupHeaderIcon =
+    isSbv1Group && !isPro2MediaGroup ? LayoutGrid : Pro2GroupIcon;
+  const groupHeaderLabel =
+    isSbv1Group && !isPro2MediaGroup
+      ? d.label?.trim() || "参考图组"
+      : d.label?.trim() || "媒体组";
 
-  const selectPro2Group = useCallback(() => {
+  const selectMediaGroup = useCallback(() => {
     setNodes((prev) => prev.map((n) => ({ ...n, selected: n.id === id })));
   }, [id, setNodes]);
 
@@ -363,13 +370,13 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     <div
       className={cn(
         "canvas-group-node group/gn relative h-full w-full overflow-visible",
-        isPro2MediaGroup
+        isLibtvMediaGroup
           ? cn(PRO2_MEDIA_GROUP_SHELL_CLASS, LIBTV_CARD_DRAG_CLASS)
           : "rounded-2xl",
       )}
-      data-pro2-media-group={isPro2MediaGroup ? id : undefined}
+      data-pro2-media-group={isLibtvMediaGroup ? id : undefined}
       style={
-        isPro2MediaGroup
+        isLibtvMediaGroup
           ? {
               backgroundColor: PRO2_MEDIA_GROUP_BG,
               backgroundImage: PRO2_MEDIA_GROUP_DOT_GRID,
@@ -424,17 +431,6 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
       {isSbv1Group && !isPro2MediaGroup ? (
         <>
-          <div
-            className={cn(RF_NODE_DRAG_HANDLE, "absolute inset-0 z-0")}
-            aria-hidden
-            onPointerDown={(e) => {
-              if (e.button !== 0) return;
-              e.stopPropagation();
-              setNodes((prev) =>
-                prev.map((n) => ({ ...n, selected: n.id === id })),
-              );
-            }}
-          />
           <Handle
             id="out_media"
             type="source"
@@ -464,23 +460,23 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       ) : null}
 
       <NodeResizer
-        color={isPro2MediaGroup ? PRO2_NODE_RESIZER_COLOR : color}
+        color={isLibtvMediaGroup ? PRO2_NODE_RESIZER_COLOR : color}
         minWidth={220}
         minHeight={140}
         isVisible={selected}
         lineStyle={
-          isPro2MediaGroup
+          isLibtvMediaGroup
             ? PRO2_NODE_RESIZER_LINE
             : { borderColor: color }
         }
         handleStyle={
-          isPro2MediaGroup
+          isLibtvMediaGroup
             ? PRO2_NODE_RESIZER_HANDLE
             : { background: color, border: "none", width: 8, height: 8 }
         }
       />
 
-      {isPro2MediaGroup ? (
+      {isLibtvMediaGroup ? (
         <div className="relative z-10 flex h-8 shrink-0 items-center gap-1 px-2 pt-2">
           <button
             type="button"
@@ -489,12 +485,12 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             )}
             onClick={(e) => {
               e.stopPropagation();
-              selectPro2Group();
+              selectMediaGroup();
             }}
           >
-            <Pro2GroupIcon className="size-3.5 shrink-0 text-white/40" />
+            <GroupHeaderIcon className="size-3.5 shrink-0 text-white/40" />
             <span className="truncate font-medium tracking-wide">
-              {d.label?.trim() || "媒体组"}
+              {groupHeaderLabel}
             </span>
           </button>
         </div>

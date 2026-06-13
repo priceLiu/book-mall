@@ -11,12 +11,15 @@ import {
   LayoutGrid,
   LayoutTemplate,
   Loader2,
+  Maximize2,
+  Minimize2,
   Play,
   Redo2,
   Save,
   Undo2,
   UserRound,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function CanvasToolbar({
   projectName,
@@ -41,6 +44,8 @@ export function CanvasToolbar({
   running,
   inflightTaskCount = 0,
   runAllDisabled = false,
+  immersive = false,
+  onToggleImmersive,
 }: {
   projectName: string;
   onProjectNameChange: (name: string) => void;
@@ -64,6 +69,9 @@ export function CanvasToolbar({
   running: boolean;
   inflightTaskCount?: number;
   runAllDisabled?: boolean;
+  /** 沉浸全屏模式（Pro2 / 分镜 1.0） */
+  immersive?: boolean;
+  onToggleImmersive?: () => void;
 }) {
   return (
     <header className="relative flex shrink-0 items-center gap-2 border-b border-white/10 bg-[var(--canvas-surface)] px-3 py-2 text-white">
@@ -226,6 +234,26 @@ export function CanvasToolbar({
           >
             <BookmarkPlus className="size-3" />
             存为模板
+          </button>
+        ) : null}
+        {onToggleImmersive ? (
+          <button
+            type="button"
+            onClick={onToggleImmersive}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] transition",
+              immersive
+                ? "border-cyan-400/35 bg-cyan-500/12 text-cyan-100 hover:border-cyan-400/50 hover:bg-cyan-500/20"
+                : "border-white/10 text-[var(--canvas-muted)] hover:border-white/30 hover:text-white",
+            )}
+            title={immersive ? "退出全屏（Esc）" : "全屏编辑：隐藏顶栏，鼠标移到屏幕顶部可唤出"}
+          >
+            {immersive ? (
+              <Minimize2 className="size-3" />
+            ) : (
+              <Maximize2 className="size-3" />
+            )}
+            {immersive ? "退出全屏" : "全屏"}
           </button>
         ) : null}
         <button

@@ -626,7 +626,9 @@ export const useCanvasStore = create<CanvasState>()(
         };
         set((state) =>
           withGraphRevision(state, {
-            nodes: ensureNodeDragHandles([...state.nodes, node]),
+            nodes: ensureNodeDragHandles(
+              sortNodesForReactFlow([...state.nodes, node]),
+            ),
           }),
         );
         return id;
