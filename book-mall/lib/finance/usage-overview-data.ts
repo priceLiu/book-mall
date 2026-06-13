@@ -115,6 +115,8 @@ const GATEWAY_SELECT = {
   includedUsedAfter: true,
   includedRemainingAfter: true,
   inputSummary: true,
+  failCode: true,
+  failMessage: true,
 } as const;
 
 function ymKey(d: Date | string): string {

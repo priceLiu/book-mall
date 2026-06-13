@@ -25,6 +25,8 @@ const baseLog = {
   includedUsedAfter: null,
   includedRemainingAfter: null,
   inputSummary: null,
+  failCode: null,
+  failMessage: null,
 };
 
 describe("projectGatewayLogToBillRow — 平台代付七类", () => {
