@@ -33,10 +33,12 @@ export function LogStatusBadge({
   status,
   failCode,
   failMessage,
+  progressLabel,
 }: {
   status: LogRequestStatus;
   failCode?: string | null;
   failMessage?: string | null;
+  progressLabel?: string | null;
 }) {
   const normalized = normalizeStatus(status);
   const isActive = normalized === "RUNNING" || normalized === "PENDING";
@@ -66,7 +68,7 @@ export function LogStatusBadge({
     <>
       <span
         ref={anchorRef}
-        title={nativeTitle}
+        title={nativeTitle ?? (isActive && progressLabel ? progressLabel : undefined)}
         className={`inline-flex items-center gap-2 ${
           isActive ? "rounded-md bg-[#2a2a32] px-2.5 py-1" : ""
         } ${hasFailTip ? "cursor-help" : ""}`}
@@ -81,6 +83,11 @@ export function LogStatusBadge({
         <span className="text-sm lowercase text-white">
           {formatRequestStatusShortLabel(normalized)}
         </span>
+        {isActive && progressLabel ? (
+          <span className="max-w-[88px] truncate text-[10px] lowercase text-orange-200/75">
+            {progressLabel}
+          </span>
+        ) : null}
       </span>
 
       {hasFailTip && open && pos ? (

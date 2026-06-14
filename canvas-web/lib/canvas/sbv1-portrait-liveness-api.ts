@@ -13,6 +13,12 @@ export type Sbv1PortraitLivenessResultDto = {
   message?: string;
 };
 
+export type Sbv1PortraitLivenessStatusDto = {
+  verified: boolean;
+  groupId?: string;
+  verifiedAt?: string;
+};
+
 async function call<T>(
   base: string,
   path: string,
@@ -32,6 +38,14 @@ async function call<T>(
     throw new Error(msg || r.statusText);
   }
   return raw ? (JSON.parse(raw) as T) : (undefined as unknown as T);
+}
+
+export async function fetchSbv1PortraitLivenessStatus(
+  base: string,
+): Promise<Sbv1PortraitLivenessStatusDto> {
+  return call(base, "/api/canvas/sbv1/portrait/liveness/status", {
+    method: "GET",
+  });
 }
 
 export async function createSbv1PortraitLivenessSession(

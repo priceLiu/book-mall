@@ -1,12 +1,15 @@
 /**
  * 分镜视频 1.0 · 真人人像 H5 活体认证（经用户 Gateway VOLCENGINE 凭证）
+ * GroupId 持久化在 Book User 账号级，与画布节点无关。
  */
 
 import { CanvasProjectError } from "./canvas-project-service";
 import { getBookMallOrigin } from "@/lib/gateway/env";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
+import type { RoutableCredential } from "@/lib/gateway/gateway-credential-match";
 import { resolveGatewayAuthForBookUser } from "@/lib/gateway/book-gateway-link";
+import { prisma } from "@/lib/prisma";
 import {
   createVolcengineVisualValidateSession,
   getVolcengineVisualValidateResult,
@@ -17,6 +20,15 @@ import {
   getSbv1PortraitLivenessCallback,
   saveSbv1PortraitLivenessCallback,
 } from "./sbv1-portrait-liveness-callback-store";
+
+/** 与 setup-sbv1-volcengine-gateway.ts 凭证别名一致 */
+export const SBV1_VOLCENGINE_CREDENTIAL_ALIAS = "火山方舟 · 分镜视频1.0";
+
+export type Sbv1PortraitLivenessStatus = {
+  verified: boolean;
+  groupId?: string;
+  verifiedAt?: string;
+};
 
 function buildCallbackUrl(): string {
   const origin = getBookMallOrigin();
@@ -30,16 +42,27 @@ function buildCallbackUrl(): string {
   return `${origin.replace(/\/$/, "")}/api/canvas/sbv1/portrait/liveness/callback`;
 }
 
+function pickSbv1VolcengineCredentialId(
+  credentials: RoutableCredential[],
+): string | null {
+  const volcengine = credentials.filter((c) => c.providerKind === "VOLCENGINE");
+  const sbv1 = volcengine.find(
+    (c) => c.alias?.trim() === SBV1_VOLCENGINE_CREDENTIAL_ALIAS,
+  );
+  if (sbv1) return sbv1.id;
+  return pickCredentialForKind(credentials, "VOLCENGINE");
+}
+
 async function volcengineCredentialForUser(userId: string) {
   const auth = await resolveGatewayAuthForBookUser(userId);
   if (!auth) {
     throw new CanvasProjectError(
       "GATEWAY_KEY_REQUIRED",
-      "请先在 Book 个人中心关联 Gateway API Key",
+      "请先在 Book 个人中心关联 Gateway API Key（分镜视频 1.0 · Personal）",
       403,
     );
   }
-  const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
+  const credentialId = pickSbv1VolcengineCredentialId(auth.credentials);
   if (!credentialId) {
     throw new CanvasProjectError(
       "GATEWAY_KEY_REQUIRED",
@@ -56,6 +79,39 @@ async function volcengineCredentialForUser(userId: string) {
     );
   }
   return cred;
+}
+
+export async function getSbv1PortraitLivenessStatus(
+  userId: string,
+): Promise<Sbv1PortraitLivenessStatus> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      sbv1PortraitGroupId: true,
+      sbv1PortraitLivenessAt: true,
+    },
+  });
+  const groupId = user?.sbv1PortraitGroupId?.trim() || undefined;
+  return {
+    verified: Boolean(groupId),
+    groupId,
+    verifiedAt: user?.sbv1PortraitLivenessAt?.toISOString(),
+  };
+}
+
+async function saveSbv1PortraitLivenessSuccess(
+  userId: string,
+  groupId: string,
+): Promise<void> {
+  const trimmed = groupId.trim();
+  if (!trimmed) return;
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      sbv1PortraitGroupId: trimmed,
+      sbv1PortraitLivenessAt: new Date(),
+    },
+  });
 }
 
 export async function sbv1CreatePortraitLivenessSession(
@@ -95,11 +151,15 @@ export async function sbv1PollPortraitLivenessResult(
   }
 
   const cred = await volcengineCredentialForUser(userId);
-  return getVolcengineVisualValidateResult({
+  const result = await getVolcengineVisualValidateResult({
     apiKey: cred.apiKey,
     baseUrl: cred.baseUrl,
     bytedToken: token,
   });
+  if (result.status === "succeeded" && result.groupId) {
+    await saveSbv1PortraitLivenessSuccess(userId, result.groupId);
+  }
+  return result;
 }
 
 export function sbv1RecordPortraitLivenessCallback(

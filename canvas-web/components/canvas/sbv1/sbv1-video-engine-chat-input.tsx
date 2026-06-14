@@ -47,6 +47,7 @@ import {
   Sbv1VideoGenerateSettingsModal,
   sbv1VideoSettingsTriggerLabel,
 } from "./sbv1-video-generate-settings-modal";
+import { useSbv1PortraitLivenessStatus } from "@/lib/canvas/use-sbv1-portrait-liveness-status";
 import { Sbv1PortraitLivenessModal } from "./sbv1-portrait-liveness-modal";
 
 function RefPreviewCard({
@@ -125,6 +126,8 @@ export function Sbv1VideoEngineChatInput({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [livenessOpen, setLivenessOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const { groupId, verifiedAt, refresh, isVerified } =
+    useSbv1PortraitLivenessStatus(Boolean(base));
 
   const smartMulti = data.referenceMode === "smart_multi";
   const variantId = migrateSbv1ModelVariantId(
@@ -242,7 +245,7 @@ export function Sbv1VideoEngineChatInput({
           disabled={isGenerating}
           className={cn(
             "nodrag rounded-md p-1.5 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40",
-            data.realPersonGroupId ? "text-cyan-300/90" : "text-white/40",
+            isVerified ? "text-cyan-300/90" : "text-white/40",
           )}
           onClick={() => setLivenessOpen(true)}
         >
@@ -373,13 +376,11 @@ export function Sbv1VideoEngineChatInput({
 
       <Sbv1PortraitLivenessModal
         open={livenessOpen}
-        existingGroupId={data.realPersonGroupId}
+        existingGroupId={groupId}
+        verifiedAt={verifiedAt}
         onClose={() => setLivenessOpen(false)}
-        onSuccess={(groupId) => {
-          onPatch({
-            realPersonGroupId: groupId,
-            realPersonLivenessAt: new Date().toISOString(),
-          });
+        onSuccess={() => {
+          void refresh();
         }}
       />
     </>

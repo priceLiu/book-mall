@@ -3,40 +3,26 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ImageIcon, ScanFace, Upload, Video } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "@/lib/canvas/sbv1-workspace-types";
 import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import { selectSbv1NodeAfterSpawn } from "@/lib/canvas/sbv1-spawn-nodes";
 import { flowPositionAtViewportCenter } from "@/lib/canvas/viewport-placement";
 import { spawnSbv1CanvasPastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
+import { useSbv1PortraitLivenessStatus } from "@/lib/canvas/use-sbv1-portrait-liveness-status";
 import { Sbv1PortraitLivenessModal } from "./sbv1-portrait-liveness-modal";
 import { Sbv1Dock, type Sbv1DockItem } from "./sbv1-dock";
 
 /** 分镜视频 1.0 · 底部 macOS 磁吸 dock */
 export function Sbv1CanvasToolbar() {
   const base = useBookMallBaseUrl();
-  const { alert } = useDialogs();
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const nodes = useCanvasStore((s) => s.nodes);
   const fileRef = useRef<HTMLInputElement>(null);
   const [livenessOpen, setLivenessOpen] = useState(false);
-  const [livenessEngineId, setLivenessEngineId] = useState<string | null>(null);
-
-  const livenessEngine = useMemo(() => {
-    const selected = nodes.filter(
-      (n) => n.selected && n.type === "sbv1-video-engine",
-    );
-    if (selected.length === 1) return selected[0]!;
-    const engines = nodes.filter((n) => n.type === "sbv1-video-engine");
-    if (engines.length === 1) return engines[0]!;
-    if (livenessEngineId) {
-      return nodes.find((n) => n.id === livenessEngineId) ?? null;
-    }
-    return null;
-  }, [nodes, livenessEngineId]);
+  const { groupId, verifiedAt, refresh, isVerified } =
+    useSbv1PortraitLivenessStatus(Boolean(base));
 
   const onAddImage = useCallback(() => {
     const pos = flowPositionAtViewportCenter("sbv1-image");
@@ -73,53 +59,10 @@ export function Sbv1CanvasToolbar() {
     [base, addNode, updateNodeData],
   );
 
-  const onOpenLiveness = useCallback(async () => {
-    let engine = livenessEngine;
-    if (!engine) {
-      const engines = nodes.filter((n) => n.type === "sbv1-video-engine");
-      if (engines.length === 0) {
-        const pos = flowPositionAtViewportCenter("sbv1-video-engine");
-        const id = addNode(
-          "sbv1-video-engine",
-          pos ?? { x: 280, y: 160 },
-          { ...SBV1_DEFAULT_VIDEO_ENGINE_DATA },
-        );
-        if (id) {
-          selectSbv1NodeAfterSpawn(setNodes, id);
-          setLivenessEngineId(id);
-          setLivenessOpen(true);
-          return;
-        }
-      } else if (engines.length > 1) {
-        await alert({
-          title: `请选择${SBV1_VIDEO_COMPOSE_LABEL}`,
-          message: `画布上有多个${SBV1_VIDEO_COMPOSE_LABEL}节点，请先选中要绑定 GroupId 的那一个，再点活体认证。`,
-          variant: "warning",
-        });
-        return;
-      } else {
-        engine = engines[0]!;
-      }
-    }
-    if (!engine) {
-      await alert({
-        title: "无法打开活体认证",
-        message: `请先添加${SBV1_VIDEO_COMPOSE_LABEL}节点。`,
-        variant: "warning",
-      });
-      return;
-    }
-    setLivenessEngineId(engine.id);
-    selectSbv1NodeAfterSpawn(setNodes, engine.id);
+  const onOpenLiveness = useCallback(() => {
+    if (!base) return;
     setLivenessOpen(true);
-  }, [livenessEngine, nodes, addNode, setNodes, alert]);
-
-  const existingGroupId = livenessEngine
-    ? String(
-        (livenessEngine.data as { realPersonGroupId?: string })
-          .realPersonGroupId ?? "",
-      ).trim() || undefined
-    : undefined;
+  }, [base]);
 
   const dockItems = useMemo<Sbv1DockItem[]>(
     () => [
@@ -147,14 +90,16 @@ export function Sbv1CanvasToolbar() {
       },
       {
         id: "liveness",
-        name: "真人人像 · 活体",
+        name: isVerified ? "真人人像 · 已认证" : "真人人像 · 活体",
         icon: <ScanFace strokeWidth={1.75} />,
-        color: "bg-gradient-to-br from-cyan-400 to-teal-600",
-        onClick: () => void onOpenLiveness(),
+        color: isVerified
+          ? "bg-gradient-to-br from-teal-400 to-emerald-600"
+          : "bg-gradient-to-br from-cyan-400 to-teal-600",
+        onClick: onOpenLiveness,
         disabled: !base,
       },
     ],
-    [onAddImage, onPickFiles, onAddVideoEngine, onOpenLiveness, base],
+    [onAddImage, onPickFiles, onAddVideoEngine, onOpenLiveness, base, isVerified],
   );
 
   return (
@@ -175,15 +120,11 @@ export function Sbv1CanvasToolbar() {
       />
       <Sbv1PortraitLivenessModal
         open={livenessOpen}
-        existingGroupId={existingGroupId}
+        existingGroupId={groupId}
+        verifiedAt={verifiedAt}
         onClose={() => setLivenessOpen(false)}
-        onSuccess={(groupId) => {
-          const targetId = livenessEngineId ?? livenessEngine?.id;
-          if (!targetId) return;
-          updateNodeData(targetId, {
-            realPersonGroupId: groupId,
-            realPersonLivenessAt: new Date().toISOString(),
-          });
+        onSuccess={() => {
+          void refresh();
         }}
       />
     </>

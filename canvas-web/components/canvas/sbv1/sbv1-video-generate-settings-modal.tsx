@@ -262,6 +262,15 @@ export function Sbv1VideoGenerateSettingsModal({
                 setProviderId(next.providerId);
                 setModelKey(next.modelKey);
                 setEngineParams(next.params);
+                const d = Number(next.params.duration);
+                if (
+                  !smartMulti &&
+                  Number.isFinite(d) &&
+                  d >= 4 &&
+                  d <= 15
+                ) {
+                  setDurationSec(d);
+                }
               }}
             />
           </section>
@@ -354,6 +363,14 @@ export function sbv1VideoSettingsTriggerLabel(
   data: Sbv1VideoEngineNodeData,
   providers: CanvasProviderDto[],
 ): string {
+  const smartMulti = data.referenceMode === "smart_multi";
+  const durationLabel =
+    !smartMulti && data.durationSec >= 4 && data.durationSec <= 15
+      ? ` · ${data.durationSec}s`
+      : smartMulti
+        ? " · 智能多帧"
+        : "";
+
   const engineKey = data.engine?.modelKey?.trim();
   if (engineKey) {
     const sbv1 = providers.find(
@@ -362,13 +379,13 @@ export function sbv1VideoSettingsTriggerLabel(
     const gw = sbv1?.models.find(
       (m) => m.modelKey.toLowerCase() === engineKey.toLowerCase(),
     );
-    if (gw?.displayName?.trim()) return gw.displayName.trim();
-    return engineKey;
+    const name = gw?.displayName?.trim() || engineKey;
+    return `${name}${durationLabel}`;
   }
   const variantId = migrateSbv1ModelVariantId(
     data.volcengineVariantId ?? data.jimengModelId,
   );
   const model = getSbv1VolcengineModelById(variantId, providers);
-  if (model?.displayName) return model.displayName;
+  if (model?.displayName) return `${model.displayName}${durationLabel}`;
   return "选择模型与参数";
 }

@@ -17,6 +17,8 @@ export const K_TASK_KIND = "套餐对帐/任务类型";
 export const K_QUOTA_DELTA = "套餐对帐/扣次";
 export const K_INCLUDED_USED = "套餐对帐/已用";
 export const K_INCLUDED_REMAINING = "套餐对帐/剩余";
+export const K_GATEWAY_KEY = "平台/Gateway Key";
+export const K_USER_KEY = "平台/User Key";
 
 export const BILL_COLUMN_GROUPS: ColumnGroup[] = [
   {
@@ -26,6 +28,8 @@ export const BILL_COLUMN_GROUPS: ColumnGroup[] = [
       "平台/用户名",
       "平台/工具页面",
       K_MODEL_VENDOR,
+      K_GATEWAY_KEY,
+      K_USER_KEY,
       "平台/模型Code",
       "平台/模型名称",
       "平台/请求类型",

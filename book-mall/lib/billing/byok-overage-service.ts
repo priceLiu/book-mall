@@ -324,17 +324,19 @@ export async function settleByokOverage(log: GatewayRequestLog): Promise<ByokOve
       });
     }
 
+    const fresh = await tx.byokUsageMonthly.findUniqueOrThrow({
+      where: { id: row.id },
+    });
+
     return {
       taskKind,
       scopeKey,
       isOverage,
       creditsCharged,
-      includedUsed: isOverage ? row.includedUsed : row.includedUsed + 1,
-      overageUsed: isOverage ? row.overageUsed + 1 : row.overageUsed,
+      includedUsed: fresh.includedUsed,
+      overageUsed: fresh.overageUsed,
       monthlyIncluded: limit,
-      includedRemainingAfter: isOverage
-        ? 0
-        : Math.max(0, limit - (row.includedUsed + 1)),
+      includedRemainingAfter: Math.max(0, limit - fresh.includedUsed),
     };
   });
 

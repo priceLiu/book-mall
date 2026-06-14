@@ -8,6 +8,11 @@ import {
 } from "@/lib/finance/gateway-bill-projection";
 import { fetchUserPackageReconciliation } from "@/lib/finance/user-package-reconciliation";
 import { loadBillingSettlementsByLogIds } from "@/lib/billing/billing-settlement-service";
+import { computeSequentialByokQuotaSnapshots } from "@/lib/finance/byok-quota-reconcile";
+import {
+  loadGatewayLogKeyLabels,
+  pickGatewayLogKeyLabels,
+} from "@/lib/finance/gateway-bill-key-labels";
 import { prisma } from "@/lib/prisma";
 
 export type BillingDetailsTab = "usage" | "charge";
@@ -36,6 +41,9 @@ const GATEWAY_SELECT = {
   quotaDelta: true,
   includedUsedAfter: true,
   includedRemainingAfter: true,
+  apiKeyId: true,
+  credentialId: true,
+  credentialAliasSnapshot: true,
   inputSummary: true,
   failCode: true,
   failMessage: true,
@@ -50,6 +58,99 @@ function sumCredits(rows: Record<string, string>[]): number {
   return rows.reduce((s, r) => s + parseCredits(r[K_CREDITS_CONSUMED]), 0);
 }
 
+function periodKeyFromDate(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+async function buildGatewayLogScopeWhere(
+  userId?: string,
+): Promise<Prisma.GatewayRequestLogWhereInput> {
+  if (!userId) return {};
+  const [gatewayUser, bookUser] = await Promise.all([
+    prisma.gatewayUser.findUnique({
+      where: { bookUserId: userId },
+      select: { id: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { gatewayApiKeyId: true },
+    }),
+  ]);
+  const or: Prisma.GatewayRequestLogWhereInput[] = [{ actorBookUserId: userId }];
+  if (gatewayUser) {
+    or.push({ userId: gatewayUser.id });
+  }
+  if (bookUser?.gatewayApiKeyId) {
+    or.push({ apiKeyId: bookUser.gatewayApiKeyId });
+  }
+  return { OR: or };
+}
+
+async function loadSettlementLinesForQuotaSnapshots(opts: {
+  userId?: string;
+  settlementsInBatch: {
+    ownerType: "USER" | "TENANT";
+    ownerId: string;
+    settlementKind: string;
+  }[];
+}) {
+  if (opts.userId) {
+    return prisma.billingSettlementLine.findMany({
+      where: {
+        settlementKind: "BYOK_QUOTA_INCLUDED",
+        ownerType: "USER",
+        ownerId: opts.userId,
+        byokTaskKind: { not: null },
+      },
+      select: {
+        gatewayLogId: true,
+        submittedAt: true,
+        ownerType: true,
+        ownerId: true,
+        periodKey: true,
+        byokTaskKind: true,
+        settlementKind: true,
+        quotaDelta: true,
+        monthlyIncluded: true,
+      },
+      orderBy: { submittedAt: "asc" },
+    });
+  }
+
+  const owners = new Map<string, { ownerType: "USER" | "TENANT"; ownerId: string }>();
+  for (const s of opts.settlementsInBatch) {
+    if (s.settlementKind !== "BYOK_QUOTA_INCLUDED") continue;
+    owners.set(`${s.ownerType}:${s.ownerId}`, {
+      ownerType: s.ownerType,
+      ownerId: s.ownerId,
+    });
+  }
+  if (owners.size === 0) return [];
+
+  return prisma.billingSettlementLine.findMany({
+    where: {
+      settlementKind: "BYOK_QUOTA_INCLUDED",
+      byokTaskKind: { not: null },
+      OR: [...owners.values()].map((o) => ({
+        ownerType: o.ownerType,
+        ownerId: o.ownerId,
+      })),
+    },
+    select: {
+      gatewayLogId: true,
+      submittedAt: true,
+      ownerType: true,
+      ownerId: true,
+      periodKey: true,
+      byokTaskKind: true,
+      settlementKind: true,
+      quotaDelta: true,
+      monthlyIncluded: true,
+    },
+    orderBy: { submittedAt: "asc" },
+  });
+}
+
 async function buildGatewayRows(input: {
   tab: BillingDetailsTab;
   userId?: string;
@@ -59,9 +160,11 @@ async function buildGatewayRows(input: {
   totalCalls: number;
   succeededCalls: number;
   failedCalls: number;
+  returned: number;
 }> {
+  const scopeWhere = await buildGatewayLogScopeWhere(input.userId);
   const where: Prisma.GatewayRequestLogWhereInput = {
-    ...(input.userId ? { actorBookUserId: input.userId } : {}),
+    ...scopeWhere,
   };
 
   if (input.tab === "usage") {
@@ -93,21 +196,53 @@ async function buildGatewayRows(input: {
     loadBillingSettlementsByLogIds(logs.map((l) => l.id)),
   ]);
 
+  const settlementLinesForSnapshots = await loadSettlementLinesForQuotaSnapshots({
+    userId: input.userId,
+    settlementsInBatch: [...settlements.values()],
+  });
+  const sequentialSnapshots = computeSequentialByokQuotaSnapshots(
+    settlementLinesForSnapshots.map((line) => ({
+      logId: line.gatewayLogId,
+      submittedAt: line.submittedAt,
+      ownerType: line.ownerType,
+      ownerId: line.ownerId,
+      periodKey: line.periodKey,
+      byokTaskKind: line.byokTaskKind,
+      settlementKind: line.settlementKind,
+      quotaDelta: line.quotaDelta,
+      monthlyIncluded: line.monthlyIncluded,
+    })),
+  );
+
+  const keyLabelMap = await loadGatewayLogKeyLabels(
+    logs.map((log) => ({
+      apiKeyId: log.apiKeyId,
+      credentialId: log.credentialId,
+      credentialAliasSnapshot: log.credentialAliasSnapshot,
+    })),
+  );
+
   const rows = logs.map((log) => {
     const uid = log.actorBookUserId ?? input.userId ?? "";
-    const label = userMap.get(uid) ?? uid;
+    const label = userMap.get(uid) ?? userMap.get(input.userId ?? "") ?? uid;
     return projectGatewayLogToBillRow(
       log,
-      uid,
+      uid || (input.userId ?? ""),
       label,
       catalogMaps.displayNames,
       settlements.get(log.id) ?? null,
       catalogMaps.vendors,
+      sequentialSnapshots.get(log.id) ?? null,
+      pickGatewayLogKeyLabels(keyLabelMap, {
+        apiKeyId: log.apiKeyId,
+        credentialId: log.credentialId,
+        credentialAliasSnapshot: log.credentialAliasSnapshot,
+      }),
     );
   });
 
   const usageWhere: Prisma.GatewayRequestLogWhereInput = {
-    ...(input.userId ? { actorBookUserId: input.userId } : {}),
+    ...scopeWhere,
     status: { in: [...USAGE_TAB_STATUSES] },
   };
 
@@ -123,9 +258,9 @@ async function buildGatewayRows(input: {
         ])
       : [0, 0];
 
-  const totalCalls = input.tab === "usage" ? succeededCalls : logs.length;
+  const totalCalls = input.tab === "usage" ? succeededCalls + failedCalls : logs.length;
 
-  return { rows, totalCalls, succeededCalls, failedCalls };
+  return { rows, totalCalls, succeededCalls, failedCalls, returned: logs.length };
 }
 
 export async function fetchBillingDetailsForUser(input: {
@@ -166,6 +301,9 @@ export async function fetchBillingDetailsForUser(input: {
     totalCredits,
     rows: gatewayPart.rows,
     packageReconciliation,
+    returned: gatewayPart.returned,
+    take,
+    truncated: gatewayPart.returned >= take,
   };
 }
 

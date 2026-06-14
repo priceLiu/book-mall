@@ -456,6 +456,19 @@ export function useCanvasRunner(
     if (job.mediaKind) parts.push(job.mediaKind);
     return parts.join(":");
   };
+
+  /** 新 run 开始前解绑旧 taskId，避免轮询把上一轮成功任务写回 runtime */
+  const detachNodeTaskRefs = useCallback((job: QueueItem) => {
+    const nodeId = job.nodeId;
+    const key = runKey(job);
+    for (const [k, tid] of Array.from(taskByNodeRef.current.entries())) {
+      if (k === key || k === nodeId || k.startsWith(`${nodeId}:`)) {
+        jobByTaskRef.current.delete(tid);
+        taskByNodeRef.current.delete(k);
+      }
+    }
+  }, []);
+
   const drainRef = useRef<() => void>(() => {});
   const pumpSequentialRef = useRef<() => void>(() => {});
 
@@ -572,6 +585,7 @@ export function useCanvasRunner(
     }
 
     seq.activeKey = key;
+    detachNodeTaskRefs(job);
     const pending = storyRunPendingPatch(node, job);
     if (pending) updateNodeData(job.nodeId, pending);
     else {
@@ -583,7 +597,7 @@ export function useCanvasRunner(
     }
     queueRef.current.push({ ...job, forceFresh: seq.forceFresh });
     drainRef.current();
-  }, [abortSequential, setNodeRuntime, updateNodeData]);
+  }, [abortSequential, setNodeRuntime, updateNodeData, detachNodeTaskRefs]);
 
   useEffect(() => {
     pumpSequentialRef.current = pumpSequential;
@@ -988,6 +1002,7 @@ export function useCanvasRunner(
       ) {
         return;
       }
+      detachNodeTaskRefs(job);
       if (node) {
         const pending = storyRunPendingPatch(node, job);
         if (pending) updateNodeData(job.nodeId, pending);
@@ -1002,7 +1017,7 @@ export function useCanvasRunner(
       queueRef.current.push(job);
       drain();
     },
-    [drain, setNodeRuntime, updateNodeData, gatewayLinkAccountUrl, gatewayLinkBlocked],
+    [drain, setNodeRuntime, updateNodeData, gatewayLinkAccountUrl, gatewayLinkBlocked, detachNodeTaskRefs],
   );
 
   const enqueueNode = useCallback(
@@ -1357,6 +1372,10 @@ export function useCanvasRunner(
       boundTaskId ??= taskByNodeRef.current.get(nodeId);
       const isTerminal =
         t.status === "SUCCEEDED" || t.status === "FAILED";
+      // 本地 pending/running 时，列表「最新」可能仍是上一轮终态任务
+      if (isLocalInflightStatus(localSt) && isTerminal) {
+        if (!jobByTaskRef.current.has(t.id)) return;
+      }
       // 仍绑定其它 taskId 时，忽略「非当前任务」的终态，避免旧成功覆盖新提交
       if (
         isLocalInflightStatus(localSt) &&

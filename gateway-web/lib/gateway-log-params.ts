@@ -345,16 +345,50 @@ export function formatDurationSeconds(durationMs: number | null): string {
   return `${Math.round(durationMs / 1000)}s`;
 }
 
-/** 优先用 durationMs（>0）；0 视为未写入，回退 completedAt - submittedAt */
+/** 优先用 durationMs（>0）；0 视为未写入，回退 completedAt - submittedAt；进行中可回退 now - submittedAt */
 export function resolveLogDurationMs(
   durationMs: number | null,
   submittedAt: string,
   completedAt: string | null,
+  opts?: { inProgress?: boolean; nowMs?: number },
 ): number | null {
   if (durationMs != null && durationMs > 0) return durationMs;
+  if (opts?.inProgress && !completedAt) {
+    const ms =
+      (opts.nowMs ?? Date.now()) - new Date(submittedAt).getTime();
+    return ms >= 0 ? ms : null;
+  }
   if (!completedAt) return null;
   const ms = new Date(completedAt).getTime() - new Date(submittedAt).getTime();
   return ms >= 0 ? ms : null;
+}
+
+/** 进行中任务 · 从 resultSummary 解析厂商进度文案 */
+export function pickLogProgressLabel(
+  status: string,
+  resultSummary: unknown,
+): string | null {
+  const normalized = status.toUpperCase();
+  if (normalized !== "RUNNING" && normalized !== "PENDING") return null;
+  if (!resultSummary || typeof resultSummary !== "object") {
+    return normalized === "PENDING" ? "pending" : "running";
+  }
+  const obj = resultSummary as Record<string, unknown>;
+  if (obj.kind === "task_progress") {
+    const vendor = typeof obj.status === "string" ? obj.status.trim() : "";
+    const detail = typeof obj.detail === "string" ? obj.detail.trim() : "";
+    if (vendor && detail) return `${vendor} · ${detail}`;
+    if (vendor) return vendor;
+  }
+  const candidates = [
+    obj.task_status,
+    obj.status,
+    obj.state,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return normalized === "PENDING" ? "pending" : "running";
 }
 
 export function formatCreditsConsumed(

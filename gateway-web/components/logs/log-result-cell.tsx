@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Loader2 } from "lucide-react";
 import {
   copyTextToClipboard,
   extractLogResultUrls,
@@ -9,6 +10,7 @@ import {
   isImageResultUrl,
   isVideoResultUrl,
   pickLogPreviewUrl,
+  pickLogProgressLabel,
   pickLogResultPreviewText,
 } from "@/lib/gateway-log-params";
 
@@ -52,6 +54,10 @@ export function LogResultCell({
   const hasResult =
     status === "SUCCEEDED" &&
     (previewUrl != null || previewText != null || resultText.length > 0);
+  const isInProgress = status === "RUNNING" || status === "PENDING";
+  const progressLabel = isInProgress
+    ? pickLogProgressLabel(status, resultSummary)
+    : null;
 
   const clearHideTimer = useCallback(() => {
     if (hideTimer.current) {
@@ -97,6 +103,18 @@ export function LogResultCell({
     },
     [copyText],
   );
+
+  if (isInProgress) {
+    return (
+      <span
+        className="inline-flex max-w-[140px] items-center gap-1.5 text-[11px] text-orange-200/85"
+        title={progressLabel ?? "任务进行中"}
+      >
+        <Loader2 className="size-3.5 shrink-0 animate-spin text-orange-300/90" />
+        <span className="truncate lowercase">{progressLabel ?? "running"}</span>
+      </span>
+    );
+  }
 
   if (!hasResult) {
     return <span className="text-zinc-600">—</span>;
