@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -162,6 +163,7 @@ export function TeamBillingFinanceClient() {
                 <th className="py-2">成员</th>
                 <th className="py-2 text-right">次数</th>
                 <th className="py-2 text-right">消耗积分</th>
+                <th className="py-2">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -172,6 +174,14 @@ export function TeamBillingFinanceClient() {
                   </td>
                   <td className="py-2 text-right">{m.count}</td>
                   <td className="py-2 text-right">{fmt(m.consumed)}</td>
+                  <td className="py-2">
+                    <Link
+                      href={`/team/members/${m.actorUserId}?tenantId=${data.tenantId}`}
+                      className="text-[#1890ff] hover:underline text-xs"
+                    >
+                      明细 →
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

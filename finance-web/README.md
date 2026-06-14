@@ -18,9 +18,11 @@ pnpm run dev
 # http://localhost:3002 → 「费用 → 账单详情」
 ```
 
-配置示例见 `.env.example`。**默认浏览器直连 book-mall**，使用主站真实 NextAuth 会话拉账单（localhost:3002↔3000 同站点，SameSite=Lax 的 session Cookie 会被发送）。
+配置示例见 `.env.example`。
 
-> ⚠️ **不要默认开** `NEXT_PUBLIC_FINANCE_USE_DEV_PROXY=1`、`NEXT_PUBLIC_FINANCE_DEV_USER_ID=...`。一旦开启，账单接口将以**固定的 dev User.id** 替你拉数据，**与你浏览器实际登录的账号无关**——会出现「登录 A 却看到 B 的明细」。这两个开关现在仅在 URL 显式带 `?useProxy=1` / `?asDev=1` 时生效，并在页面顶部以红色阻断框警示。
+**本地零配置**：根目录 `pnpm dev:all` 后，finance-web 默认主站 `http://localhost:3000`，API 经同源 `/api/book-mall/*` 代理转发登录 Cookie，**不必**在 book-mall 配 `FINANCE_WEB_ORIGINS`，也**不必**创建 `finance-web/.env.local`（除非要改端口或走 dev 模拟用户）。
+
+> ⚠️ **不要默认开** `NEXT_PUBLIC_FINANCE_USE_DEV_PROXY=1`、`FINANCE_DEV_USER_ID=...`（固定 User.id 模拟，与真实登录无关）。仅调试时在 URL 带 `?useProxy=1` / `?asDev=1`。
 
 ## 与 book-mall 联调
 
@@ -32,9 +34,7 @@ pnpm run dev
    BILLING_IMPORT_USER_ID=<User.id> BILLING_IMPORT_REPLACE=1 pnpm billing:import-cloud-csv
    ```
 
-3. book-mall `.env.local` 必填（本地）：`FINANCE_WEB_ORIGINS=http://localhost:3002`（CORS）。  
-   仅在「故意以某个 User.id 模拟」场景下临时把 `FINANCE_ALLOW_DEV_USER_QUERY=1` 打开，并在 finance-web 页面 URL 上带 `?asDev=1`（或 `?useProxy=1`）。  
-4. **使用真实账号**：在同浏览器打开 `http://localhost:3000/login` 登录后回到 `http://localhost:3002/fees/billing/details` 刷新即可。顶部「当前账单归属」应显示你的邮箱与 `authMode = session`。
+3. **使用真实账号**：同浏览器打开 `http://localhost:3000/login` 登录后访问 `http://localhost:3002/fees/billing/details` 或 `/team` 即可（请求经 BFF 代理，无需 book-mall CORS 配置）。
 
 ## 财务 2.0 · 三角色入口（:3002）
 

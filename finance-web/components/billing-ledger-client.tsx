@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
@@ -23,6 +24,8 @@ type LedgerRow = {
 type LedgerResponse = {
   rows: LedgerRow[];
   total: number;
+  tenantId?: string;
+  tenantName?: string;
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -42,23 +45,46 @@ const PERSONA_LABEL: Record<string, string> = {
   BYOK: "自带 Key",
 };
 
-export function BillingLedgerClient() {
+type BillingLedgerClientProps = {
+  scope?: "account" | "team";
+  tenantId?: string;
+  actorUserId?: string;
+};
+
+export function BillingLedgerClient({
+  scope = "account",
+  tenantId,
+  actorUserId,
+}: BillingLedgerClientProps) {
   const base = useBookMallBaseUrl();
+  const searchParams = useSearchParams();
+  const resolvedTenantId = tenantId ?? searchParams.get("tenantId") ?? undefined;
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [total, setTotal] = useState(0);
+  const [tenantName, setTenantName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!base) return;
-    const r = await financeApiFetch<LedgerResponse>(base, "/api/finance/account/ledger?take=100");
+    const qs = new URLSearchParams({ take: "100" });
+    let path: string;
+    if (scope === "team") {
+      if (resolvedTenantId) qs.set("tenantId", resolvedTenantId);
+      if (actorUserId) qs.set("actorUserId", actorUserId);
+      path = `/api/finance/team/ledger?${qs}`;
+    } else {
+      path = `/api/finance/account/ledger?${qs}`;
+    }
+    const r = await financeApiFetch<LedgerResponse>(base, path);
     if (r.ok) {
       setRows(r.data.rows);
       setTotal(r.data.total);
+      setTenantName(r.data.tenantName ?? null);
       setError(null);
     } else {
       setError(r.error);
     }
-  }, [base]);
+  }, [base, scope, resolvedTenantId, actorUserId]);
 
   useEffect(() => {
     load();
@@ -70,7 +96,9 @@ export function BillingLedgerClient() {
   return (
     <FinancePageShell>
       <header>
-        <h1 className="text-lg font-medium text-[#262626]">积分流水</h1>
+        <h1 className="text-lg font-medium text-[#262626]">
+          {scope === "team" ? `团队积分流水${tenantName ? ` · ${tenantName}` : ""}` : "积分流水"}
+        </h1>
         <p className="mt-1 text-sm text-[#8c8c8c]">
           CreditLedger 明细 · 共 {total} 条（展示最近 100 条）
         </p>
@@ -80,47 +108,35 @@ export function BillingLedgerClient() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-[#8c8c8c]">
-              <th className="py-2">时间</th>
-              <th className="py-2">类型</th>
-              <th className="py-2">池</th>
-              <th className="py-2">身份</th>
-              <th className="py-2 text-right">变动</th>
-              <th className="py-2 text-right">余额</th>
+              <th className="py-2 pr-3">时间</th>
+              <th className="py-2 pr-3">类型</th>
+              <th className="py-2 pr-3 text-right">积分</th>
+              <th className="py-2 pr-3 text-right">余额后</th>
+              {scope === "team" ? <th className="py-2 pr-3">操作人</th> : null}
+              <th className="py-2 pr-3">池</th>
               <th className="py-2">说明</th>
-              <th className="py-2">关联</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-b border-[#f0f0f0]">
-                <td className="py-2 text-xs text-[#8c8c8c]">
-                  {new Date(r.createdAt).toLocaleString("zh-CN")}
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-[#f0f0f0]">
+                <td className="py-2 pr-3 text-xs text-[#8c8c8c]">
+                  {new Date(row.createdAt).toLocaleString("zh-CN")}
                 </td>
-                <td className="py-2">{TYPE_LABEL[r.type] ?? r.type}</td>
-                <td className="py-2">{r.pool}</td>
-                <td className="py-2">
-                  {r.billingPersonaSnap
-                    ? (PERSONA_LABEL[r.billingPersonaSnap] ?? r.billingPersonaSnap)
-                    : "—"}
-                  {r.staffFlag ? (
-                    <span className="ml-1 rounded bg-amber-50 px-1 text-xs text-amber-700">员工</span>
-                  ) : null}
-                </td>
-                <td className="py-2 text-right font-medium">
-                  {r.credits > 0 ? "+" : ""}
-                  {r.credits.toLocaleString("zh-CN")}
-                </td>
-                <td className="py-2 text-right">{r.balanceAfter.toLocaleString("zh-CN")}</td>
-                <td className="py-2 text-xs text-[#8c8c8c]">{r.description ?? "—"}</td>
-                <td className="py-2 text-xs text-[#8c8c8c]">
-                  {r.refType ? (
-                    <span title={r.refId ?? undefined}>
-                      {r.refType}
-                      {r.refId ? ` · ${r.refId.slice(0, 8)}…` : ""}
+                <td className="py-2 pr-3">{TYPE_LABEL[row.type] ?? row.type}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{row.credits}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{row.balanceAfter}</td>
+                {scope === "team" ? (
+                  <td className="py-2 pr-3 font-mono text-xs">{row.actorUserId?.slice(0, 8) ?? "—"}</td>
+                ) : null}
+                <td className="py-2 pr-3">{row.pool}</td>
+                <td className="py-2 max-w-xs truncate" title={row.description ?? undefined}>
+                  {row.description ?? "—"}
+                  {row.billingPersonaSnap ? (
+                    <span className="ml-1 text-xs text-[#8c8c8c]">
+                      ({PERSONA_LABEL[row.billingPersonaSnap] ?? row.billingPersonaSnap})
                     </span>
-                  ) : (
-                    "—"
-                  )}
+                  ) : null}
                 </td>
               </tr>
             ))}

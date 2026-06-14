@@ -10,6 +10,12 @@ import type { CreditOwnerType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { canonicalKeysByAliases } from "@/lib/model-catalog/resolve";
+import {
+  BILLING_CATEGORY_ORDER,
+  billingCategoryLabel,
+  resolveBillingCategory,
+} from "@/lib/billing/billing-category";
+import { getTenantOverview } from "@/lib/tenant/tenant-service";
 
 import { sumResourceFees, type AccountRef } from "./credit-account-service";
 import { diffReconciliation } from "./reconciliation-diff";
@@ -479,6 +485,147 @@ export async function buildUserByokBill(input: {
     resourceFeeYuan: resources.totalYuan,
     totalYuan: input.techServiceFeeYuan + resources.totalYuan,
     resourceBreakdown: resources.byType,
+  };
+}
+
+export interface TeamDashboardPayload {
+  periodKey: string;
+  bill: TeamCreditBill;
+  seatUsage: { used: number; limit: number };
+  byCategory: { category: string; label: string; count: number; credits: number }[];
+  dailyTrend: { date: string; credits: number; count: number }[];
+  recentLogs: {
+    id: string;
+    submittedAt: string;
+    actorUserId: string | null;
+    actorName: string | null;
+    canonicalModelKey: string | null;
+    creditsCharged: number | null;
+    status: string;
+    billingMode: string | null;
+  }[];
+  vendorCostYuan?: number;
+  note?: string;
+}
+
+/** 团队财务驾驶舱：聚合账单、七类分布、近 30 日趋势、近期流水。 */
+export async function buildTeamDashboard(input: {
+  tenantId: string;
+  periodKey: string;
+  includeCost?: boolean;
+}): Promise<TeamDashboardPayload> {
+  const { from, to } = periodBounds(input.periodKey);
+  const trendFrom = new Date(to);
+  trendFrom.setUTCDate(trendFrom.getUTCDate() - 30);
+
+  const [bill, overview, logs, recentLogs] = await Promise.all([
+    buildTeamCreditBill({ tenantId: input.tenantId, periodKey: input.periodKey }),
+    getTenantOverview(input.tenantId),
+    prisma.gatewayRequestLog.findMany({
+      where: {
+        tenantId: input.tenantId,
+        submittedAt: { gte: from, lt: to },
+        status: "SUCCEEDED",
+      },
+      select: {
+        billingCategory: true,
+        requestKind: true,
+        inputSummary: true,
+        creditsCharged: true,
+        costSnapshotYuan: true,
+        estimatedVendorCostYuan: true,
+      },
+    }),
+    prisma.gatewayRequestLog.findMany({
+      where: { tenantId: input.tenantId },
+      orderBy: { submittedAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        submittedAt: true,
+        actorBookUserId: true,
+        canonicalModelKey: true,
+        model: true,
+        creditsCharged: true,
+        status: true,
+        billingMode: true,
+      },
+    }),
+  ]);
+
+  const categoryMap = new Map<string, { count: number; credits: number }>();
+  let vendorCostYuan = 0;
+  for (const log of logs) {
+    const cat = resolveBillingCategory(log, log.billingCategory);
+    const label = billingCategoryLabel(cat);
+    const cur = categoryMap.get(cat) ?? { count: 0, credits: 0 };
+    cur.count += 1;
+    cur.credits += num(log.creditsCharged);
+    categoryMap.set(cat, cur);
+    if (input.includeCost) {
+      vendorCostYuan +=
+        log.costSnapshotYuan != null ? num(log.costSnapshotYuan) : num(log.estimatedVendorCostYuan);
+    }
+  }
+
+  const byCategory = BILLING_CATEGORY_ORDER.filter((c) => categoryMap.has(c)).map((c) => {
+    const v = categoryMap.get(c)!;
+    return { category: c, label: billingCategoryLabel(c), count: v.count, credits: v.credits };
+  });
+
+  const trendLogs = await prisma.gatewayRequestLog.findMany({
+    where: {
+      tenantId: input.tenantId,
+      submittedAt: { gte: trendFrom, lt: to },
+      status: "SUCCEEDED",
+    },
+    select: { submittedAt: true, creditsCharged: true },
+  });
+  const dailyMap = new Map<string, { credits: number; count: number }>();
+  for (const log of trendLogs) {
+    const date = log.submittedAt.toISOString().slice(0, 10);
+    const cur = dailyMap.get(date) ?? { credits: 0, count: 0 };
+    cur.credits += num(log.creditsCharged);
+    cur.count += 1;
+    dailyMap.set(date, cur);
+  }
+  const dailyTrend = [...dailyMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, v]) => ({ date, ...v }));
+
+  const actorIds = [
+    ...new Set(recentLogs.map((l) => l.actorBookUserId).filter(Boolean)),
+  ] as string[];
+  const actors =
+    actorIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+  const actorMap = new Map(actors.map((u) => [u.id, u.name ?? u.email ?? u.id]));
+
+  return {
+    periodKey: input.periodKey,
+    bill,
+    seatUsage: {
+      used: overview?.usedSeats ?? 0,
+      limit: overview?.seatLimit ?? 0,
+    },
+    byCategory,
+    dailyTrend,
+    recentLogs: recentLogs.map((l) => ({
+      id: l.id,
+      submittedAt: l.submittedAt.toISOString(),
+      actorUserId: l.actorBookUserId,
+      actorName: l.actorBookUserId ? actorMap.get(l.actorBookUserId) ?? null : null,
+      canonicalModelKey: l.canonicalModelKey ?? l.model,
+      creditsCharged: l.creditsCharged,
+      status: l.status,
+      billingMode: l.billingMode,
+    })),
+    ...(input.includeCost ? { vendorCostYuan } : {}),
+    note: "仅展示含团队 ID 的 Gateway 记录；历史无 tenantId 的调用不在此视图内。",
   };
 }
 

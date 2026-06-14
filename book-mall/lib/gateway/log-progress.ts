@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 
 /** 异步任务轮询中的进度快照（写入 GatewayRequestLog.resultSummary） */
@@ -22,7 +24,7 @@ export async function touchGatewayLogProgress(
   await prisma.gatewayRequestLog.update({
     where: { id: logId },
     data: {
-      resultSummary,
+      resultSummary: resultSummary as Prisma.InputJsonValue,
       lastPolledAt: new Date(),
       pollCount: { increment: 1 },
     },

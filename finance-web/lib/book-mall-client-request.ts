@@ -1,11 +1,9 @@
 /**
- * 生产环境 finance-web 与 book-mall 不同源，浏览器跨域带 Cookie 常被拦。
- * 对非 localhost 且与主站不同 origin 的请求，改走 finance-web 同源 `/api/book-mall/*` 代理。
+ * finance-web 与 book-mall 不同源时，浏览器经同源 `/api/book-mall/*` BFF 代理转发 Cookie。
+ * 本地 :3002↔:3000 端口不同亦视为跨源，与生产行为一致，无需 book-mall 配 FINANCE_WEB_ORIGINS。
  */
 export function shouldUseBookMallBrowserProxy(base: string): boolean {
   if (!base || typeof window === "undefined") return false;
-  const host = window.location.hostname;
-  if (host === "localhost" || host === "127.0.0.1") return false;
   try {
     return new URL(base).origin !== window.location.origin;
   } catch {

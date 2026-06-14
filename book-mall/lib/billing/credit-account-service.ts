@@ -577,8 +577,8 @@ export async function sumResourceFees(ref: AccountRef, periodKey = periodKeyOf()
 // ——————————————————— 用量中心查询 ———————————————————
 
 export interface UsageQuery {
-  /** Book User.id — 按 actorBookUserId 查询 Gateway 日志 */
-  bookUserId: string;
+  /** Book User.id — 按 actorBookUserId 查询；省略则查 tenant 全员（须配合 tenantId） */
+  bookUserId?: string;
   tenantId?: string;
   from?: Date;
   to?: Date;
@@ -589,9 +589,8 @@ export interface UsageQuery {
 }
 
 function buildUsageWhere(q: UsageQuery): Prisma.GatewayRequestLogWhereInput {
-  const where: Prisma.GatewayRequestLogWhereInput = {
-    actorBookUserId: q.bookUserId,
-  };
+  const where: Prisma.GatewayRequestLogWhereInput = {};
+  if (q.bookUserId) where.actorBookUserId = q.bookUserId;
   if (q.tenantId) where.tenantId = q.tenantId;
   if (q.from || q.to) {
     where.submittedAt = {};
@@ -625,6 +624,7 @@ export async function listUsageRecords(q: UsageQuery) {
         billingPersonaSnap: true,
         staffFlag: true,
         tenantId: true,
+        actorBookUserId: true,
         creditsCharged: true,
         costSnapshotYuan: true,
         marginSnapshot: true,
@@ -653,4 +653,34 @@ export async function aggregateUsageByModel(q: UsageQuery) {
       creditsCharged: Number(g._sum.creditsCharged ?? 0),
     }))
     .sort((a, b) => b.creditsCharged - a.creditsCharged);
+}
+
+/** 团队共享池积分流水（CreditAccount ownerType=TENANT）。 */
+export async function listTenantLedger(input: {
+  tenantId: string;
+  actorUserId?: string | null;
+  take?: number;
+  skip?: number;
+}) {
+  const account = await prisma.creditAccount.findUnique({
+    where: { ownerType_ownerId: { ownerType: "TENANT", ownerId: input.tenantId } },
+    select: { id: true },
+  });
+  if (!account) {
+    return { rows: [], total: 0 };
+  }
+
+  const where: Prisma.CreditLedgerWhereInput = { accountId: account.id };
+  if (input.actorUserId) where.actorUserId = input.actorUserId;
+
+  const [rows, total] = await Promise.all([
+    prisma.creditLedger.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: input.take ?? 100,
+      skip: input.skip ?? 0,
+    }),
+    prisma.creditLedger.count({ where }),
+  ]);
+  return { rows, total };
 }

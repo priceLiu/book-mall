@@ -26,6 +26,12 @@ import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 export type BillDetailsClientProps = {
   /** 指定 book-mall 用户 id（走管理员 API，需在 book-mall 以管理员登录） */
   adminTargetUserId?: string;
+  /** 团队费用明细（OWNER/ADMIN） */
+  teamScope?: boolean;
+  teamTenantId?: string;
+  teamActorUserId?: string;
+  /** 平台员工查看某团队明细（含成本列） */
+  adminTeamTenantId?: string;
   /**
    * 视角：默认 `user`（不展示「云成本单价」「零售系数」两列）；传入 `admin` 时展示完整列。
    */
@@ -42,7 +48,10 @@ export type BillDetailsClientProps = {
 type RemotePayload = {
   source: string;
   tab?: "usage" | "charge";
-  user: { id: string; name: string | null; email: string | null };
+  user?: { id: string; name: string | null; email: string | null };
+  tenant?: { id: string; name: string | null };
+  tenantId?: string;
+  tenantName?: string | null;
   balancePoints: number;
   poolBalances?: { general: number; video: number };
   totalCalls?: number;
@@ -131,13 +140,19 @@ function matchesMulti(
 
 export function BillDetailsClient({
   adminTargetUserId,
+  teamScope,
+  teamTenantId,
+  teamActorUserId,
+  adminTeamTenantId,
   viewerRole,
   mode = "single-user",
 }: BillDetailsClientProps) {
   const base = useBookMallBaseUrl();
   const isAllUsers = mode === "all-users";
+  const isTeamScope = Boolean(teamScope || teamTenantId || adminTeamTenantId);
   const effectiveRole: BillViewerRole =
-    viewerRole ?? (adminTargetUserId || isAllUsers ? "admin" : "user");
+    viewerRole ??
+    (adminTargetUserId || isAllUsers || adminTeamTenantId ? "admin" : "user");
   const [allTotal, setAllTotal] = useState<number | null>(null);
   const [allTruncated, setAllTruncated] = useState(false);
   const [rowsTruncated, setRowsTruncated] = useState(false);
@@ -157,6 +172,7 @@ export function BillDetailsClient({
   const [loadState, setLoadState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [hint, setHint] = useState<string | null>(null);
   const [remoteUser, setRemoteUser] = useState<RemotePayload["user"] | null>(null);
+  const [remoteTenantName, setRemoteTenantName] = useState<string | null>(null);
   const [walletBalancePoints, setWalletBalancePoints] = useState<number | null>(null);
   const [totalCallsRemote, setTotalCallsRemote] = useState<number | null>(null);
   const [succeededCallsRemote, setSucceededCallsRemote] = useState<number | null>(null);
@@ -188,7 +204,7 @@ export function BillDetailsClient({
     const explicitAsDev = search?.get("asDev") === "1";
     const useDevProxy = explicitProxy && getFinanceUseDevProxy();
 
-    if (adminTargetUserId || isAllUsers) {
+    if (adminTargetUserId || isAllUsers || isTeamScope) {
       if (!base) {
         setLoadState("idle");
         setHint("未配置 NEXT_PUBLIC_BOOK_MALL_URL，无法请求 book-mall 拉取明细。");
@@ -205,7 +221,7 @@ export function BillDetailsClient({
     const devId = explicitAsDev ? getFinanceDevUserId() : undefined;
     let url: string;
     let fetchInit: RequestInit;
-    if (useDevProxy && !adminTargetUserId && !isAllUsers) {
+    if (useDevProxy && !adminTargetUserId && !isAllUsers && !isTeamScope) {
       url = "/api/dev/book-mall-account-billing";
       fetchInit = { credentials: "same-origin", cache: "no-store" };
     } else {
@@ -213,8 +229,19 @@ export function BillDetailsClient({
       const tabQs = `tab=${encodeURIComponent(tab)}`;
       if (isAllUsers) {
         apiPath = `/api/finance/admin/billing-details-all?take=2000&${tabQs}`;
+      } else if (adminTeamTenantId) {
+        const actorQs = teamActorUserId
+          ? `&actorUserId=${encodeURIComponent(teamActorUserId)}`
+          : "";
+        apiPath = `/api/finance/admin/teams/${encodeURIComponent(adminTeamTenantId)}/billing-details?take=2000&${tabQs}${actorQs}`;
       } else if (adminTargetUserId) {
         apiPath = `/api/finance/admin/billing-details?userId=${encodeURIComponent(adminTargetUserId)}&take=2000&${tabQs}`;
+      } else if (teamScope || teamTenantId) {
+        const actorQs = teamActorUserId
+          ? `&actorUserId=${encodeURIComponent(teamActorUserId)}`
+          : "";
+        const tenantQs = teamTenantId ? `tenantId=${encodeURIComponent(teamTenantId)}&` : "";
+        apiPath = `/api/finance/team/billing-details?${tenantQs}take=2000&${tabQs}${actorQs}`;
       } else {
         const extra = devId ? `&devUserId=${encodeURIComponent(devId)}` : "";
         apiPath = `/api/finance/account/billing-details?take=2000&${tabQs}${extra}`;
@@ -245,12 +272,14 @@ export function BillDetailsClient({
           setSucceededCallsRemote(ad.succeededCalls ?? null);
           setFailedCallsRemote(ad.failedCalls ?? null);
           setRemoteUser(null);
+          setRemoteTenantName(null);
           setWalletBalancePoints(null);
           setViewerAuthMode(undefined);
           setPackageReconciliation(null);
         } else {
           const ud = data as RemotePayload;
-          setRemoteUser(ud.user);
+          setRemoteUser(ud.user ?? null);
+          setRemoteTenantName(ud.tenant?.name ?? ud.tenantName ?? null);
           setWalletBalancePoints(ud.balancePoints);
           setTotalCallsRemote(ud.totalCalls ?? null);
           setSucceededCallsRemote(ud.succeededCalls ?? null);
@@ -269,6 +298,7 @@ export function BillDetailsClient({
         setRows([]);
         setLoadState("error");
         setRemoteUser(null);
+        setRemoteTenantName(null);
         setWalletBalancePoints(null);
         setTotalCallsRemote(null);
         setViewerAuthMode(undefined);
@@ -279,7 +309,7 @@ export function BillDetailsClient({
         const msg = e instanceof Error ? e.message : String(e);
         const tip = bookMallLoginHint(
           base,
-          adminTargetUserId || isAllUsers ? "admin" : "user",
+          adminTargetUserId || isAllUsers || adminTeamTenantId ? "admin" : isTeamScope ? "team" : "user",
         ).text;
         setHint(`未能从 book-mall 拉取明细（${msg}）。${tip}`);
       });
@@ -287,7 +317,7 @@ export function BillDetailsClient({
     return () => {
       cancelled = true;
     };
-  }, [adminTargetUserId, isAllUsers, base, activeTab]);
+  }, [adminTargetUserId, adminTeamTenantId, teamScope, teamTenantId, teamActorUserId, isAllUsers, isTeamScope, base, activeTab]);
 
   function switchTab(next: "usage" | "charge") {
     setActiveTab(next);
@@ -559,6 +589,13 @@ export function BillDetailsClient({
               </li>
               <li>重启 finance-web，刷新本页（带 <code className="rounded bg-white px-1">Cmd/Ctrl + Shift + R</code> 硬刷新）。</li>
             </ol>
+          </div>
+        ) : null}
+
+        {!isAllUsers && isTeamScope && remoteTenantName ? (
+          <div className="rounded border border-[#1890ff] bg-[#f0f7ff] px-4 py-3 text-sm shadow-sm">
+            <div className="mb-2 font-medium text-[#0958d9]">当前团队账单归属</div>
+            <p className="text-[#262626]">{remoteTenantName}</p>
           </div>
         ) : null}
 
