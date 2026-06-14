@@ -304,6 +304,10 @@ export function BillDetailsClient({
   const [toolPageFilter, setToolPageFilter] = useState("");
   const [productMode, setProductMode] = useState<BillMultiFilterMode>("include");
   const [productSelected, setProductSelected] = useState<Set<string>>(new Set());
+  const [gatewayKeyMode, setGatewayKeyMode] = useState<BillMultiFilterMode>("include");
+  const [gatewayKeySelected, setGatewayKeySelected] = useState<Set<string>>(new Set());
+  const [userKeyMode, setUserKeyMode] = useState<BillMultiFilterMode>("include");
+  const [userKeySelected, setUserKeySelected] = useState<Set<string>>(new Set());
   const [includeZeroCredits, setIncludeZeroCredits] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -324,10 +328,26 @@ export function BillDetailsClient({
     () => Array.from(new Set(rows.map((r) => r[K_TOOL_PAGE]))).filter(Boolean).sort(),
     [rows],
   );
+  const gatewayKeys = useMemo(
+    () => Array.from(new Set(rows.map((r) => r[K_GATEWAY_KEY]))).filter(Boolean).sort(),
+    [rows],
+  );
+  const userKeys = useMemo(
+    () => Array.from(new Set(rows.map((r) => r[K_USER_KEY]))).filter(Boolean).sort(),
+    [rows],
+  );
 
   useEffect(() => {
     setProductSelected((s) => new Set(Array.from(s).filter((p) => models.includes(p))));
   }, [models]);
+
+  useEffect(() => {
+    setGatewayKeySelected((s) => new Set(Array.from(s).filter((p) => gatewayKeys.includes(p))));
+  }, [gatewayKeys]);
+
+  useEffect(() => {
+    setUserKeySelected((s) => new Set(Array.from(s).filter((p) => userKeys.includes(p))));
+  }, [userKeys]);
 
   useEffect(() => {
     if (feeDesc && !feeDescOptions.includes(feeDesc)) setFeeDesc("");
@@ -339,6 +359,8 @@ export function BillDetailsClient({
       if (!matchesMulti(r[K_MODEL_NAME] ?? "", productSelected, productMode)) return false;
       if (toolPageFilter && !(r[K_TOOL_PAGE] ?? "").includes(toolPageFilter)) return false;
       if (feeDesc && r[K_FEE_DESC] !== feeDesc) return false;
+      if (!matchesMulti(r[K_GATEWAY_KEY] ?? "", gatewayKeySelected, gatewayKeyMode)) return false;
+      if (!matchesMulti(r[K_USER_KEY] ?? "", userKeySelected, userKeyMode)) return false;
       if (!includeZeroCredits) {
         const credits = parseInt(r[K_CREDITS_CONSUMED] || "0", 10);
         if (!credits) return false;
@@ -353,6 +375,10 @@ export function BillDetailsClient({
     includeZeroCredits,
     productSelected,
     productMode,
+    gatewayKeySelected,
+    gatewayKeyMode,
+    userKeySelected,
+    userKeyMode,
   ]);
 
   const filteredSorted = useMemo(
@@ -747,6 +773,38 @@ export function BillDetailsClient({
             }}
             disabled={rows.length === 0}
           />
+          <div className="grid gap-3 md:grid-cols-2">
+            <BillMultiFilter
+              label="Gateway Key"
+              options={gatewayKeys}
+              mode={gatewayKeyMode}
+              onModeChange={(m) => {
+                setGatewayKeyMode(m);
+                setPage(1);
+              }}
+              selected={gatewayKeySelected}
+              onSelectedChange={(next) => {
+                setGatewayKeySelected(next);
+                setPage(1);
+              }}
+              disabled={rows.length === 0}
+            />
+            <BillMultiFilter
+              label="User Key"
+              options={userKeys}
+              mode={userKeyMode}
+              onModeChange={(m) => {
+                setUserKeyMode(m);
+                setPage(1);
+              }}
+              selected={userKeySelected}
+              onSelectedChange={(next) => {
+                setUserKeySelected(next);
+                setPage(1);
+              }}
+              disabled={rows.length === 0}
+            />
+          </div>
         </div>
 
         <div className="mb-3 flex flex-wrap items-center gap-6 border-b border-[#f0f0f0] pb-3 text-sm">
