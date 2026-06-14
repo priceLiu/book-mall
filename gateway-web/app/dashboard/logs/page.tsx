@@ -13,7 +13,7 @@ export default async function DashboardLogsPage() {
       <div>
         <h1 className="text-xl font-semibold text-white">Logs</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          最近 50 条 · 可按应用 / 厂商 / 模型 / 提交日期筛选 · 悬停 Params / Result 查看详情
+          最近 50 条 · 可按应用 / 厂商 / 模型 / 提交日期筛选 · 有进行中任务时每 10 秒自动刷新进度
         </p>
       </div>
 

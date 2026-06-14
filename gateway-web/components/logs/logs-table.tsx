@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { LogImagesCell } from "./log-images-cell";
 import { LogParamsCell } from "./log-params-cell";
 import { LogResultCell } from "./log-result-cell";
@@ -12,6 +13,7 @@ import {
   formatLogTimestamp,
   isLogDateRangeInvalid,
   logSubmittedInUtcDateRange,
+  pickLogProgressLabel,
   resolveLogDurationMs,
 } from "@/lib/gateway-log-params";
 import {
@@ -60,6 +62,30 @@ const STATUS_OPTIONS = [
   { value: "CANCELLED", label: "cancelled" },
 ];
 
+const AUTO_REFRESH_MS = 10_000;
+const LIVE_CLOCK_MS = 1_000;
+
+async function fetchGatewayLogs(params: {
+  hasDateFilter: boolean;
+  fromDate: string;
+  toDate: string;
+}): Promise<GatewayLogRow[]> {
+  const qs = new URLSearchParams({
+    limit: params.hasDateFilter ? "100" : "50",
+  });
+  if (params.fromDate) qs.set("from", params.fromDate);
+  if (params.toDate) qs.set("to", params.toDate);
+  const res = await fetch(`/api/book-mall/api/gateway/logs?${qs.toString()}`);
+  const data = (await res.json().catch(() => null)) as {
+    logs?: GatewayLogRow[];
+    error?: string;
+  } | null;
+  if (!res.ok) {
+    throw new Error(data?.error ?? "加载日志失败");
+  }
+  return data?.logs ?? [];
+}
+
 function logFilterChipClass(active: boolean): string {
   return active
     ? "rounded-lg border border-sky-500/45 bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-100"
@@ -82,6 +108,10 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [liveClockTick, setLiveClockTick] = useState(0);
 
   const dateRangeInvalid = isLogDateRangeInvalid(fromDate, toDate);
   const hasDateFilter = !!(fromDate || toDate);
@@ -91,48 +121,58 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
     [logs],
   );
 
+  const refreshLogs = useCallback(async () => {
+    setRefreshing(true);
+    setFetchError(null);
+    try {
+      const next = await fetchGatewayLogs({ hasDateFilter, fromDate, toDate });
+      setLogs(next);
+      setLastRefreshedAt(new Date());
+      return next;
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : "加载日志失败");
+      return null;
+    } finally {
+      setRefreshing(false);
+    }
+  }, [hasDateFilter, fromDate, toDate]);
+
   useEffect(() => {
     setLogs(initialLogs);
   }, [initialLogs]);
 
-  /** 有进行中任务时定时拉取日志（服务端会 opportunistic 轮询厂商任务） */
+  /** 进行中任务 · 本地每秒刷新 Duration 列 */
   useEffect(() => {
     if (!hasInFlightLogs) return;
+    const timer = window.setInterval(() => {
+      setLiveClockTick((n) => n + 1);
+    }, LIVE_CLOCK_MS);
+    return () => window.clearInterval(timer);
+  }, [hasInFlightLogs]);
+
+  /** 有进行中任务时每 10s 拉取（服务端 opportunistic 轮询厂商任务） */
+  useEffect(() => {
+    if (!autoRefresh || !hasInFlightLogs) return;
 
     let cancelled = false;
-    const refresh = async () => {
-      try {
-        const params = new URLSearchParams({
-          limit: hasDateFilter ? "100" : "50",
-        });
-        if (fromDate) params.set("from", fromDate);
-        if (toDate) params.set("to", toDate);
-        const res = await fetch(
-          `/api/book-mall/api/gateway/logs?${params.toString()}`,
-        );
-        const data = (await res.json().catch(() => null)) as {
-          logs?: GatewayLogRow[];
-        } | null;
-        if (cancelled || !res.ok) return;
-        setLogs(data?.logs ?? []);
-      } catch {
-        /* 静默；用户可手动刷新页面 */
-      }
+    const run = async () => {
+      if (cancelled) return;
+      await refreshLogs();
     };
 
+    void run();
     const timer = window.setInterval(() => {
-      void refresh();
-    }, 10_000);
+      void run();
+    }, AUTO_REFRESH_MS);
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [hasInFlightLogs, hasDateFilter, fromDate, toDate]);
+  }, [autoRefresh, hasInFlightLogs, refreshLogs]);
 
   useEffect(() => {
     if (!hasDateFilter) {
-      setLogs(initialLogs);
       setFetchError(null);
       setLoading(false);
       return;
@@ -145,24 +185,14 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
         setLoading(true);
         setFetchError(null);
         try {
-          const params = new URLSearchParams({ limit: "100" });
-          if (fromDate) params.set("from", fromDate);
-          if (toDate) params.set("to", toDate);
-          const res = await fetch(
-            `/api/book-mall/api/gateway/logs?${params.toString()}`,
-          );
-          const data = (await res.json().catch(() => null)) as {
-            logs?: GatewayLogRow[];
-            error?: string;
-          } | null;
+          const next = await fetchGatewayLogs({ hasDateFilter, fromDate, toDate });
           if (cancelled) return;
-          if (!res.ok) {
-            setFetchError(data?.error ?? "加载日志失败");
-            return;
+          setLogs(next);
+          setLastRefreshedAt(new Date());
+        } catch (e) {
+          if (!cancelled) {
+            setFetchError(e instanceof Error ? e.message : "加载日志失败");
           }
-          setLogs(data?.logs ?? []);
-        } catch {
-          if (!cancelled) setFetchError("加载日志失败");
         } finally {
           if (!cancelled) setLoading(false);
         }
@@ -173,7 +203,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [fromDate, toDate, hasDateFilter, dateRangeInvalid, initialLogs]);
+  }, [fromDate, toDate, hasDateFilter, dateRangeInvalid]);
 
   const providerKinds = useMemo(
     () => logProviderFilterOptions(collectLogProviderKinds(logs)),
@@ -271,8 +301,40 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                 ? "加载中…"
                 : `${filtered.length} / ${logs.length} 条`}
               {hasDateFilter && !loading ? " · 按日期" : ""}
-              {hasInFlightLogs ? " · 进行中任务每 10s 刷新" : ""}
+              {hasInFlightLogs && autoRefresh
+                ? " · 自动刷新 10s"
+                : hasInFlightLogs
+                  ? " · 有进行中任务"
+                  : ""}
+              {lastRefreshedAt && !loading
+                ? ` · 更新 ${lastRefreshedAt.toLocaleTimeString()}`
+                : ""}
             </span>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <label className="mb-0.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:text-zinc-200">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-white/20 bg-transparent accent-sky-500"
+              />
+              自动刷新
+            </label>
+            <button
+              type="button"
+              disabled={refreshing || loading}
+              className="mb-0.5 inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => void refreshLogs()}
+              title="立即刷新日志（进行中任务会触发服务端轮询）"
+            >
+              {refreshing ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              刷新
+            </button>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <div className="flex flex-wrap items-end justify-end gap-2">
@@ -477,10 +539,14 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
           </thead>
           <tbody>
             {filtered.map((l) => {
+              void liveClockTick;
+              const isInProgress =
+                l.status === "RUNNING" || l.status === "PENDING";
               const durationMs = resolveLogDurationMs(
                 l.durationMs,
                 l.submittedAt,
                 l.completedAt,
+                isInProgress ? { inProgress: true, nowMs: Date.now() } : undefined,
               );
               const duration = formatDurationSeconds(durationMs);
               const usage = formatUsageYuanDisplay(l.estimatedVendorCostYuan);
@@ -491,8 +557,9 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                 l.metricsSource,
               );
               const taskId = l.externalTaskId ?? l.id;
-              const isInProgress =
-                l.status === "RUNNING" || l.status === "PENDING";
+              const progressLabel = isInProgress
+                ? pickLogProgressLabel(l.status, l.resultSummary)
+                : null;
               const sourceLabel = formatLogPageLabel(l.clientSource, l.clientPage);
               const sourceTitle = formatLogSourceTooltip(
                 l.clientSource,
@@ -543,6 +610,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                       status={l.status}
                       failCode={l.failCode}
                       failMessage={l.failMessage}
+                      progressLabel={progressLabel}
                     />
                   </td>
                   <td
@@ -551,7 +619,9 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                       durationMs != null && durationMs > 0
                         ? `${durationMs} ms`
                         : isInProgress
-                          ? "任务进行中"
+                          ? progressLabel
+                            ? `任务进行中 · ${progressLabel}`
+                            : "任务进行中"
                           : durationMs != null
                             ? `${durationMs} ms（由完成时间推算）`
                             : undefined

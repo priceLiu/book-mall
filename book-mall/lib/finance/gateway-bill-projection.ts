@@ -24,14 +24,21 @@ import { resolveBillableImageCountFromLog } from "@/lib/gateway/log-billing-metr
 import {
   ALL_DISPLAY_KEYS,
   K_CREDITS_CONSUMED,
+  K_GATEWAY_KEY,
   K_INCLUDED_REMAINING,
   K_INCLUDED_USED,
   K_MODEL_VENDOR,
   K_QUOTA_DELTA,
   K_SETTLEMENT_KIND,
   K_TASK_KIND,
+  K_USER_KEY,
 } from "@/lib/finance/bill-display-keys";
+import type { GatewayLogKeyLabels } from "@/lib/finance/gateway-bill-key-labels";
 import { resolveBillingVendorLabel } from "@/lib/finance/billing-vendor-label";
+import {
+  billingMonthKeyFromDate,
+  formatBillingDateTime,
+} from "@/lib/finance/billing-datetime";
 import { clientPageToToolLabel } from "@/lib/finance/client-page-tool";
 
 export type GatewayLogBillInput = Pick<
@@ -56,6 +63,9 @@ export type GatewayLogBillInput = Pick<
   | "quotaDelta"
   | "includedUsedAfter"
   | "includedRemainingAfter"
+  | "apiKeyId"
+  | "credentialId"
+  | "credentialAliasSnapshot"
   | "inputSummary"
   | "failCode"
   | "failMessage"
@@ -79,11 +89,11 @@ const SETTLEMENT_KIND_LABEL: Record<BillingSettlementKind, string> = {
 };
 
 function ymKeyFromDate(d: Date): string {
-  return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  return billingMonthKeyFromDate(d);
 }
 
 function formatDateTime(d: Date): string {
-  return d.toISOString().replace("T", " ").slice(0, 19);
+  return formatBillingDateTime(d);
 }
 
 function requestKindUnit(kind: GatewayRequestKind, category: BillingCategory): string {
@@ -170,6 +180,11 @@ export function projectGatewayLogToBillRow(
   modelDisplayNames: ReadonlyMap<string, string>,
   settlement?: BillingSettlementLine | null,
   modelVendors?: ReadonlyMap<string, string>,
+  quotaSnapshotOverride?: {
+    includedUsedAfter: number;
+    includedRemainingAfter: number;
+  } | null,
+  keyLabels?: GatewayLogKeyLabels | null,
 ): Record<string, string> {
   const row = emptyRow();
   const modelKey = log.canonicalModelKey ?? log.model ?? "";
@@ -196,6 +211,8 @@ export function projectGatewayLogToBillRow(
     modelKey,
     modelVendors?.get(modelKey),
   );
+  row[K_GATEWAY_KEY] = keyLabels?.gatewayKey ?? "--";
+  row[K_USER_KEY] = keyLabels?.userKey ?? "--";
   row["平台/模型Code"] = modelKey;
   row["平台/模型名称"] = modelName;
   row["平台/请求类型"] = categoryLabel;
@@ -223,11 +240,23 @@ export function projectGatewayLogToBillRow(
         byokTaskKind,
         ownerType: settlement.ownerType,
         monthlyIncluded: settlement.monthlyIncluded,
-        includedUsedAfter: settlement.includedUsedAfter ?? log.includedUsedAfter,
+        includedUsedAfter:
+          quotaSnapshotOverride?.includedUsedAfter ??
+          settlement.includedUsedAfter ??
+          log.includedUsedAfter,
         includedRemainingAfter:
-          settlement.includedRemainingAfter ?? log.includedRemainingAfter,
+          quotaSnapshotOverride?.includedRemainingAfter ??
+          settlement.includedRemainingAfter ??
+          log.includedRemainingAfter,
       })
-    : null;
+    : quotaSnapshotOverride
+      ? {
+          monthlyIncluded: null,
+          includedUsedAfter: quotaSnapshotOverride.includedUsedAfter,
+          includedRemainingAfter: quotaSnapshotOverride.includedRemainingAfter,
+          corrected: false,
+        }
+      : null;
 
   row[K_QUOTA_DELTA] = fmtNum(settlement?.quotaDelta ?? log.quotaDelta);
   row[K_INCLUDED_USED] = fmtNum(

@@ -7,6 +7,8 @@ import {
   K_CREDITS_CONSUMED,
   K_INCLUDED_REMAINING,
   K_INCLUDED_USED,
+  K_GATEWAY_KEY,
+  K_USER_KEY,
   type BillViewerRole,
 } from "@/lib/bill-config";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -46,6 +48,9 @@ type RemotePayload = {
   totalCalls?: number;
   succeededCalls?: number;
   failedCalls?: number;
+  returned?: number;
+  take?: number;
+  truncated?: boolean;
   rows: Record<string, string>[];
   packageReconciliation?: PackageReconciliationData | null;
   /** 主站 API 返回：是否凭 NextAuth 会话拉取（本地 devUserId / 代理则非 session） */
@@ -84,6 +89,8 @@ const K_STATUS = "平台/状态";
 function billColumnHeaderLabel(key: string): string {
   if (key === K_INCLUDED_USED) return "结算后已用";
   if (key === K_INCLUDED_REMAINING) return "结算后剩余";
+  if (key === K_GATEWAY_KEY) return "Gateway Key";
+  if (key === K_USER_KEY) return "User Key";
   if (key.includes("/")) return key.split("/").slice(1).join("/");
   return key;
 }
@@ -133,6 +140,7 @@ export function BillDetailsClient({
     viewerRole ?? (adminTargetUserId || isAllUsers ? "admin" : "user");
   const [allTotal, setAllTotal] = useState<number | null>(null);
   const [allTruncated, setAllTruncated] = useState(false);
+  const [rowsTruncated, setRowsTruncated] = useState(false);
   const columnGroups = useMemo(
     () => filterColumnGroupsByRole(BILL_COLUMN_GROUPS, effectiveRole),
     [effectiveRole],
@@ -206,10 +214,10 @@ export function BillDetailsClient({
       if (isAllUsers) {
         apiPath = `/api/finance/admin/billing-details-all?take=2000&${tabQs}`;
       } else if (adminTargetUserId) {
-        apiPath = `/api/finance/admin/billing-details?userId=${encodeURIComponent(adminTargetUserId)}&${tabQs}`;
+        apiPath = `/api/finance/admin/billing-details?userId=${encodeURIComponent(adminTargetUserId)}&take=2000&${tabQs}`;
       } else {
         const extra = devId ? `&devUserId=${encodeURIComponent(devId)}` : "";
-        apiPath = `/api/finance/account/billing-details?${tabQs}${extra}`;
+        apiPath = `/api/finance/account/billing-details?take=2000&${tabQs}${extra}`;
       }
       ({ url, init: fetchInit } = resolveBookMallBrowserRequest(base, apiPath));
     }
@@ -232,6 +240,7 @@ export function BillDetailsClient({
           const ad = data as AllUsersPayload;
           setAllTotal(ad.total);
           setAllTruncated(ad.truncated);
+          setRowsTruncated(false);
           setTotalCallsRemote(ad.totalCalls ?? null);
           setSucceededCallsRemote(ad.succeededCalls ?? null);
           setFailedCallsRemote(ad.failedCalls ?? null);
@@ -247,6 +256,7 @@ export function BillDetailsClient({
           setSucceededCallsRemote(ud.succeededCalls ?? null);
           setFailedCallsRemote(ud.failedCalls ?? null);
           setPackageReconciliation(ud.packageReconciliation ?? null);
+          setRowsTruncated(Boolean(ud.truncated));
           setViewerAuthMode(
             ud.viewer?.authMode ?? ((useDevProxy || devId) && !adminTargetUserId ? "dev_user_id" : "session"),
           );
@@ -264,6 +274,7 @@ export function BillDetailsClient({
         setViewerAuthMode(undefined);
         setAllTotal(null);
         setAllTruncated(false);
+        setRowsTruncated(false);
         setPackageReconciliation(null);
         const msg = e instanceof Error ? e.message : String(e);
         const tip = bookMallLoginHint(
@@ -739,6 +750,13 @@ export function BillDetailsClient({
         </div>
 
         <div className="mb-3 flex flex-wrap items-center gap-6 border-b border-[#f0f0f0] pb-3 text-sm">
+          {(rowsTruncated || allTruncated) ? (
+            <div className="w-full rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              仅加载最近 {isAllUsers ? "2000" : "2000"} 条明细
+              {allTotal != null ? `（库内共 ${allTotal} 条）` : ""}
+              。更早记录（例如昨晚生成）可能未出现在本页，请缩小日期筛选或联系管理员导出。
+            </div>
+          ) : null}
           <div>
             <span className="text-[#8c8c8c]">筛选条数：</span>
             <span className="font-medium text-[#262626]">{filtered.length}</span>
@@ -853,7 +871,7 @@ export function BillDetailsClient({
               汇总视图（当前筛选 · 按用户 + 模型 + 任务类型）
             </p>
             <p className="mb-2 text-[11px] text-[#8c8c8c]">
-              下方明细表中「结算后已用 / 结算后剩余」为<strong>单次调用</strong>写入的快照，不是当月累计；对帐请以套餐面板「套餐已用」或结算流水为准。
+              「结算后已用 / 结算后剩余」按<strong>同任务类型 + 账单月</strong>、消费时间顺序累计（每次套餐内扣次 -1）；与「套餐对帐」面板「套餐已用」一致。
             </p>
             <div className="max-h-48 overflow-auto rounded border border-[#e8e8e8] bg-white">
               <table className="w-full min-w-[720px] border-collapse text-xs">

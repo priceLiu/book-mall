@@ -5,6 +5,10 @@ import {
 } from "@/lib/gateway/gateway-v1-route-auth";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
+import {
+  buildGatewayLogProgressSummary,
+  touchGatewayLogProgress,
+} from "@/lib/gateway/log-progress";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { prisma } from "@/lib/prisma";
 import {
@@ -23,6 +27,7 @@ import {
 } from "@/lib/gateway/dashscope-client";
 import {
   isVolcengineVideoTaskFailed,
+  isVolcengineVideoTaskInProgress,
   isVolcengineVideoTaskSuccess,
   volcengineGetVideoTask,
   volcengineVideoTaskFailMessage,
@@ -87,6 +92,14 @@ export async function GET(request: NextRequest) {
             externalTaskId: taskId,
             model: log.model,
           });
+        } else {
+          await touchGatewayLogProgress(
+            log.id,
+            buildGatewayLogProgressSummary({
+              providerKind: "DASHSCOPE",
+              status: String(status ?? "RUNNING"),
+            }),
+          );
         }
       }
       return NextResponse.json({ code: 200, data: output, providerKind: "DASHSCOPE" });
@@ -119,6 +132,14 @@ export async function GET(request: NextRequest) {
             externalTaskId: taskId,
             model: log.model,
           });
+        } else {
+          await touchGatewayLogProgress(
+            log.id,
+            buildGatewayLogProgressSummary({
+              providerKind: "HUNYUAN",
+              status: String(polled.state ?? "RUNNING"),
+            }),
+          );
         }
       }
       return NextResponse.json({ code: 200, data: polled, providerKind: "HUNYUAN" });
@@ -156,6 +177,14 @@ export async function GET(request: NextRequest) {
             externalTaskId: taskId,
             model: log.model,
           });
+        } else {
+          await touchGatewayLogProgress(
+            log.id,
+            buildGatewayLogProgressSummary({
+              providerKind: "BAILIAN",
+              status: status || "RUNNING",
+            }),
+          );
         }
       }
       return NextResponse.json({ code: 200, data: output, providerKind: "BAILIAN" });
@@ -199,6 +228,14 @@ export async function GET(request: NextRequest) {
             externalTaskId: taskId,
             model: log.model,
           });
+        } else if (isVolcengineVideoTaskInProgress(row)) {
+          await touchGatewayLogProgress(
+            log.id,
+            buildGatewayLogProgressSummary({
+              providerKind: "VOLCENGINE",
+              status: String(row.status ?? "running"),
+            }),
+          );
         }
       }
       return NextResponse.json({
@@ -243,6 +280,14 @@ export async function GET(request: NextRequest) {
           externalTaskId: data.taskId,
           model: data.model || log.model,
         });
+      } else {
+        await touchGatewayLogProgress(
+          log.id,
+          buildGatewayLogProgressSummary({
+            providerKind: "KIE",
+            status: String(data.state ?? "running"),
+          }),
+        );
       }
     }
     return NextResponse.json({ code: 200, data, providerKind: "KIE" });

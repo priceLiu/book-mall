@@ -16,23 +16,24 @@ import {
   createSbv1PortraitLivenessSession,
   pollSbv1PortraitLivenessResult,
 } from "@/lib/canvas/sbv1-portrait-liveness-api";
-import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 
 const MODAL_Z = 1250;
 const POLL_MS = 2500;
 
-type Phase = "idle" | "loading" | "scan" | "polling" | "done" | "error";
+type Phase = "idle" | "verified" | "loading" | "scan" | "polling" | "done" | "error";
 
 export function Sbv1PortraitLivenessModal({
   open,
   onClose,
   onSuccess,
   existingGroupId,
+  verifiedAt,
 }: {
   open: boolean;
   onClose: () => void;
-  onSuccess: (groupId: string) => void;
+  onSuccess: () => void;
   existingGroupId?: string;
+  verifiedAt?: string;
 }) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
@@ -63,7 +64,7 @@ export function Sbv1PortraitLivenessModal({
             stopPoll();
             setGroupId(res.groupId);
             setPhase("done");
-            onSuccess(res.groupId);
+            onSuccess();
             return;
           }
           if (res.status === "failed") {
@@ -121,10 +122,15 @@ export function Sbv1PortraitLivenessModal({
       setErrorMsg("");
       return;
     }
+    if (existingGroupId?.trim()) {
+      setGroupId(existingGroupId.trim());
+      setPhase("verified");
+      return;
+    }
     void startSession();
     return () => stopPoll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅 open 变化时重建会话
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅 open / 已有认证变化时重建
+  }, [open, existingGroupId]);
 
   useEffect(() => {
     if (!open) return;
@@ -159,6 +165,8 @@ export function Sbv1PortraitLivenessModal({
 
   if (!mounted || !open) return null;
 
+  const displayGroupId = groupId || existingGroupId;
+
   return createPortal(
     <div
       className="fixed inset-0 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
@@ -180,7 +188,9 @@ export function Sbv1PortraitLivenessModal({
               真人人像 · 活体认证
             </p>
             <p className="mt-1 text-[12px] leading-relaxed text-white/55">
-              按火山
+              账号级一次性认证（经 Gateway「分镜视频 1.0 · Personal」+ 火山
+              VOLCENGINE Key）。待认证者在手机打开 H5 完成本人验证后获得 GroupId，全站
+              sbv1 项目共用。详见
               <a
                 href="https://www.volcengine.com/docs/82379/2333589?lang=zh"
                 target="_blank"
@@ -189,8 +199,7 @@ export function Sbv1PortraitLivenessModal({
               >
                 真人人像库指南
               </a>
-              ：待认证者在手机打开 H5 链接完成本人验证，通过后获得 GroupId，用于
-              asset:// 引用。
+              。
             </p>
           </div>
           <button
@@ -204,13 +213,22 @@ export function Sbv1PortraitLivenessModal({
         </header>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-          {existingGroupId ? (
-            <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-white/50">
-              当前已绑定 GroupId：
-              <span className="ml-1 font-mono text-white/75">
-                {existingGroupId}
-              </span>
-            </p>
+          {phase === "verified" && displayGroupId ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4">
+              <Check className="mb-2 size-7 text-emerald-300" />
+              <p className="text-sm font-medium text-emerald-100">本账号已完成活体认证</p>
+              <p className="mt-2 break-all font-mono text-[11px] text-emerald-100/80">
+                GroupId: {displayGroupId}
+              </p>
+              {verifiedAt ? (
+                <p className="mt-2 text-[11px] text-white/45">
+                  认证时间：{new Date(verifiedAt).toLocaleString()}
+                </p>
+              ) : null}
+              <p className="mt-2 text-[11px] text-white/45">
+                无需重复认证；生成视频时可引用 asset:// 人像资产。
+              </p>
+            </div>
           ) : null}
 
           {phase === "loading" ? (
@@ -263,15 +281,15 @@ export function Sbv1PortraitLivenessModal({
             </div>
           ) : null}
 
-          {phase === "done" && groupId ? (
+          {phase === "done" && displayGroupId ? (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 text-center">
               <Check className="mx-auto mb-2 size-8 text-emerald-300" />
               <p className="text-sm font-medium text-emerald-100">认证成功</p>
               <p className="mt-2 break-all font-mono text-[11px] text-emerald-100/80">
-                GroupId: {groupId}
+                GroupId: {displayGroupId}
               </p>
               <p className="mt-2 text-[11px] text-white/45">
-                已写入本{SBV1_VIDEO_COMPOSE_LABEL}节点；生成视频时可引用 asset:// 人像资产。
+                已写入本账号；所有分镜视频 1.0 项目均可引用 asset:// 人像资产。
               </p>
             </div>
           ) : null}
@@ -301,6 +319,15 @@ export function Sbv1PortraitLivenessModal({
         </div>
 
         <footer className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-3">
+          {phase === "verified" ? (
+            <button
+              type="button"
+              className="rounded-md border border-white/15 px-3 py-1.5 text-[12px] text-white/80 hover:bg-white/5"
+              onClick={() => void startSession()}
+            >
+              重新认证
+            </button>
+          ) : null}
           {phase === "error" ? (
             <button
               type="button"
@@ -315,7 +342,7 @@ export function Sbv1PortraitLivenessModal({
             className="rounded-md bg-white px-3 py-1.5 text-[12px] font-medium text-black hover:bg-white/90"
             onClick={onClose}
           >
-            {phase === "done" ? "完成" : "关闭"}
+            {phase === "done" || phase === "verified" ? "完成" : "关闭"}
           </button>
         </footer>
       </div>

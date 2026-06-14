@@ -129,6 +129,10 @@ model User {
   gatewayApiKeyLinkedAt DateTime?
   linkedGatewayApiKey   GatewayApiKey? @relation(fields: [gatewayApiKeyId], references: [id], onDelete: SetNull)
 
+  /// 分镜视频 1.0 · 真人人像 H5 活体通过后 GroupId（账号级一次认证）
+  sbv1PortraitGroupId     String?
+  sbv1PortraitLivenessAt  DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

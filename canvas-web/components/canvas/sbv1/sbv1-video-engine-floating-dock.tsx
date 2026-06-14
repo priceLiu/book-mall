@@ -7,6 +7,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { buildSbv1DockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
 import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
+import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
 import { useSbv1DockPlacement } from "./use-sbv1-dock-placement";
@@ -91,20 +92,8 @@ export function Sbv1VideoEngineFloatingDock() {
       });
       return;
     }
-    updateNodeData(nodeId, {
-      runtime: {
-        status: "pending",
-        taskId: undefined,
-        failCode: undefined,
-        failMessage: undefined,
-      },
-    });
-    window.dispatchEvent(
-      new CustomEvent("canvas:run-node", {
-        detail: { nodeId, forceFresh: true },
-      }),
-    );
-  }, [d, upstreamLinks, base, alert, nodeId, updateNodeData]);
+    busEnqueueStoryRun({ nodeId, forceFresh: true });
+  }, [d, upstreamLinks, base, alert, nodeId]);
 
   if (!storeNode || !placement) return null;
 

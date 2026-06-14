@@ -146,6 +146,64 @@ function groupSnapshotKey(
   return `${ownerType}:${ownerId}:${periodKey}:${taskKind}`;
 }
 
+export type SequentialQuotaSnapshotInput = {
+  logId: string;
+  submittedAt: Date;
+  ownerType: CreditOwnerType;
+  ownerId: string;
+  periodKey: string;
+  byokTaskKind: ByokTaskKind | null;
+  settlementKind: string | null;
+  quotaDelta: number | null;
+  monthlyIncluded: number | null;
+};
+
+/**
+ * 按 submittedAt 顺序重算 BYOK 套餐内「结算后已用 / 剩余」展示值（读时修正脏快照）。
+ */
+export function computeSequentialByokQuotaSnapshots(
+  items: SequentialQuotaSnapshotInput[],
+): Map<string, { includedUsedAfter: number; includedRemainingAfter: number }> {
+  const groups = new Map<string, SequentialQuotaSnapshotInput[]>();
+
+  for (const item of items) {
+    if (item.settlementKind !== "BYOK_QUOTA_INCLUDED" || !item.byokTaskKind) continue;
+    const key = groupSnapshotKey(
+      item.ownerType,
+      item.ownerId,
+      item.periodKey,
+      item.byokTaskKind,
+    );
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(item);
+    else groups.set(key, [item]);
+  }
+
+  const out = new Map<
+    string,
+    { includedUsedAfter: number; includedRemainingAfter: number }
+  >();
+
+  for (const bucket of groups.values()) {
+    bucket.sort((a, b) => a.submittedAt.getTime() - b.submittedAt.getTime());
+    const limit =
+      bucket.find((b) => b.monthlyIncluded != null && b.monthlyIncluded > 0)
+        ?.monthlyIncluded ?? 0;
+    if (limit <= 0) continue;
+
+    let runningUsed = 0;
+    for (const item of bucket) {
+      runningUsed += item.quotaDelta != null && item.quotaDelta > 0 ? item.quotaDelta : 1;
+      out.set(item.logId, {
+        includedUsedAfter: runningUsed,
+        includedRemainingAfter: Math.max(0, limit - runningUsed),
+      });
+    }
+  }
+
+  return out;
+}
+
 /** 按 submittedAt 顺序重算 BYOK 套餐内结算行的 used/remaining 快照。dryRun=true 时只报告。 */
 export async function reconcileByokSettlementSnapshots(opts?: {
   periodKey?: string;

@@ -10,13 +10,6 @@ type PackageUsageRow = {
   remaining: number | null;
 };
 
-type TryonModelUsageRow = {
-  modelKey: string;
-  label: string;
-  succeeded: number;
-  failed: number;
-};
-
 export type PackageReconciliationData = {
   periodKey: string;
   billingPersona: string | null;
@@ -29,7 +22,6 @@ export type PackageReconciliationData = {
     totalCallsThisMonth: number;
   };
   packageUsageRows: PackageUsageRow[];
-  tryonByModel: TryonModelUsageRow[];
 };
 
 function fmtQuota(n: number | null): string {
@@ -50,7 +42,7 @@ export function PackageReconciliationPanel({ data }: { data: PackageReconciliati
           ) : null}
         </h2>
         <p className="mt-1 text-xs text-[#8c8c8c]">
-          剩余 = 总数 − 套餐已用；Gateway 成功/失败为调用观测，与套餐已用口径可能不同。试衣按模型拆分。
+          剩余 = 总数 − 套餐已用；Gateway 成功/失败为调用观测，与套餐已用口径可能不同。试衣计入「文生图（含试衣）」额度。
         </p>
       </header>
 
@@ -91,32 +83,6 @@ export function PackageReconciliationPanel({ data }: { data: PackageReconciliati
       ) : (
         <p className="text-xs text-[#8c8c8c]">该用户无 BYOK 套餐额度或未开通有效 BYOK。</p>
       )}
-
-      {data.tryonByModel.length > 0 ? (
-        <div>
-          <h3 className="mb-2 text-xs font-medium text-[#595959]">AI 试衣 · 按模型</h3>
-          <div className="overflow-x-auto rounded border border-[#f0f0f0]">
-            <table className="w-full min-w-[360px] text-xs">
-              <thead className="bg-[#fafafa] text-[#8c8c8c]">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">模型</th>
-                  <th className="px-3 py-2 text-right font-medium">成功</th>
-                  <th className="px-3 py-2 text-right font-medium">失败</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.tryonByModel.map((row) => (
-                  <tr key={row.modelKey} className="border-t border-[#f0f0f0]">
-                    <td className="px-3 py-2 font-mono text-[11px]">{row.modelKey}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-[#389e0d]">{row.succeeded}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-[#cf1322]">{row.failed}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

@@ -33,6 +33,7 @@ export function toolKeyToLabel(toolKey: string): string {
   if (key.startsWith("story-theater")) return "漫剧剧场";
   if (key.startsWith("canvas__story-pro__parse-outfit")) return "画布·角色资产·服装分割";
   if (key.startsWith("canvas__story-pro")) return "画布·影视专业版";
+  if (key.endsWith("__sbv1")) return "画布·分镜视频1.0";
   if (key.startsWith("canvas")) return "画布";
   if (key.startsWith("app-history")) return "费用使用明细";
   return key;

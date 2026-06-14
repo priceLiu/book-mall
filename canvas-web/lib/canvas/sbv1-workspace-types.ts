@@ -49,8 +49,9 @@ export type Sbv1VideoEngineNodeData = {
   durationSec: number;
   resolution: "720p" | "1080p";
   refSlots: Sbv1RefSlot[];
-  /** 真人人像库 · H5 活体通过后 GroupId */
+  /** @deprecated 账号级 sbv1PortraitGroupId（User 表）；节点字段仅兼容旧画布 */
   realPersonGroupId?: string;
+  /** @deprecated 见 User.sbv1PortraitLivenessAt */
   realPersonLivenessAt?: string;
   runtime?: CanvasNodeRuntime;
   uploading?: boolean;
