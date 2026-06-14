@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -13,18 +15,14 @@ export async function GET() {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const base = (
-    process.env.BOOK_MALL_URL ||
-    process.env.NEXT_PUBLIC_BOOK_MALL_URL ||
-    ""
-  ).replace(/\/$/, "");
+  const base = getBookMallBaseUrlServer();
   const devUserId = process.env.FINANCE_DEV_USER_ID?.trim();
 
   if (!base) {
     return NextResponse.json(
       {
         error: "book_mall_url_missing",
-        hint: "请设置 BOOK_MALL_URL 或 NEXT_PUBLIC_BOOK_MALL_URL（如 http://localhost:3000）",
+        hint: "请设置 BOOK_MALL_URL 或 NEXT_PUBLIC_BOOK_MALL_URL；开发环境未配置时默认 http://localhost:3000",
       },
       { status: 503 },
     );

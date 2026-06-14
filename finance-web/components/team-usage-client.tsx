@@ -6,25 +6,29 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
 
+type UsageRow = {
+  id: string;
+  canonicalModelKey: string | null;
+  clientSource: string | null;
+  billingMode: string | null;
+  billingPersonaSnap: string | null;
+  staffFlag: boolean;
+  requestKind: string | null;
+  status: string;
+  creditsCharged: number | null;
+  submittedAt: string;
+  actorBookUserId?: string | null;
+};
+
 type TeamUsageResponse = {
   hasTeam: boolean;
+  canViewAll?: boolean;
   tenantId?: string;
   tenantName?: string;
   role?: string;
   teams: { tenantId: string; tenantName: string; role: string }[];
   byModel: { canonicalModelKey: string; count: number; creditsCharged: number }[];
-  recent: {
-    id: string;
-    canonicalModelKey: string | null;
-    clientSource: string | null;
-    billingMode: string | null;
-    billingPersonaSnap: string | null;
-    staffFlag: boolean;
-    requestKind: string | null;
-    status: string;
-    creditsCharged: number | null;
-    submittedAt: string;
-  }[];
+  recent: UsageRow[];
   totalConsumed: number;
 };
 
@@ -41,7 +45,12 @@ const PERSONA_LABEL: Record<string, string> = {
   BYOK: "自带 Key",
 };
 
-export function TeamUsageClient() {
+type TeamUsageClientProps = {
+  /** 成员详情页：仅看该成员 */
+  memberUserId?: string;
+};
+
+export function TeamUsageClient({ memberUserId }: TeamUsageClientProps) {
   const base = useBookMallBaseUrl();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,11 +60,14 @@ export function TeamUsageClient() {
   const load = useCallback(() => {
     if (!base) return;
     const tenantId = searchParams.get("tenantId");
-    const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : "";
-    financeApiFetch<TeamUsageResponse>(base, `/api/finance/team/usage${qs}`).then((r) =>
-      r.ok ? setData(r.data) : setError(r.error),
-    );
-  }, [base, searchParams]);
+    const qs = new URLSearchParams();
+    if (tenantId) qs.set("tenantId", tenantId);
+    if (memberUserId) qs.set("actorUserId", memberUserId);
+    financeApiFetch<TeamUsageResponse>(
+      base,
+      `/api/finance/team/usage${qs.toString() ? `?${qs}` : ""}`,
+    ).then((r) => (r.ok ? setData(r.data) : setError(r.error)));
+  }, [base, searchParams, memberUserId]);
 
   useEffect(() => {
     load();
@@ -67,22 +79,28 @@ export function TeamUsageClient() {
   if (!data.hasTeam) {
     return (
       <FinancePageShell>
-        <h1 className="text-lg font-medium">我的团队用量</h1>
+        <h1 className="text-lg font-medium">团队积分用量</h1>
         <p className="text-sm text-[#8c8c8c]">您尚未加入任何团队空间。</p>
       </FinancePageShell>
     );
   }
 
+  const showActor = data.canViewAll && !memberUserId;
+
   return (
     <FinancePageShell>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-medium text-[#262626]">我的团队用量 · {data.tenantName}</h1>
+          <h1 className="text-lg font-medium text-[#262626]">
+            {memberUserId ? "成员用量" : `团队积分用量 · ${data.tenantName}`}
+          </h1>
           <p className="mt-1 text-sm text-[#8c8c8c]">
-            只读视图 · 您在团队内的 AI 调用与扣分（角色：{data.role}）
+            {data.canViewAll && !memberUserId
+              ? "全员视图 · 团队 OWNER/ADMIN"
+              : `个人视图 · 角色 ${data.role}`}
           </p>
         </div>
-        {data.teams.length > 1 ? (
+        {!memberUserId && data.teams.length > 1 ? (
           <select
             className="rounded border border-[#d9d9d9] px-2 py-1 text-sm"
             value={data.tenantId}
@@ -99,7 +117,7 @@ export function TeamUsageClient() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded border border-[#e8e8e8] bg-white p-4">
-          <p className="text-xs text-[#8c8c8c]">团队内累计消耗</p>
+          <p className="text-xs text-[#8c8c8c]">累计消耗</p>
           <p className="mt-1 text-xl font-semibold">{data.totalConsumed.toLocaleString("zh-CN")}</p>
         </div>
       </div>
@@ -132,6 +150,7 @@ export function TeamUsageClient() {
           <thead>
             <tr className="border-b text-left text-[#8c8c8c]">
               <th className="py-2">时间</th>
+              {showActor ? <th className="py-2">操作人</th> : null}
               <th className="py-2">工具</th>
               <th className="py-2">模型</th>
               <th className="py-2">模式</th>
@@ -145,6 +164,9 @@ export function TeamUsageClient() {
                 <td className="py-2 text-xs text-[#8c8c8c]">
                   {new Date(r.submittedAt).toLocaleString("zh-CN")}
                 </td>
+                {showActor ? (
+                  <td className="py-2 font-mono text-xs">{r.actorBookUserId?.slice(0, 8) ?? "—"}</td>
+                ) : null}
                 <td className="py-2">{r.clientSource ?? "—"}</td>
                 <td className="py-2 font-mono text-xs">{r.canonicalModelKey ?? "—"}</td>
                 <td className="py-2">

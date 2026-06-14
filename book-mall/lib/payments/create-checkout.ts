@@ -203,16 +203,19 @@ export async function createPaymentCheckout(input: {
       },
     });
 
-    await appendPaymentEvent({
-      checkoutId: checkout.id,
-      actorUserId: input.createdByAdminId ?? userId,
-      action: "CREATE",
-      payload: {
-        productKind,
-        amountYuan,
-        createdByAdminId: input.createdByAdminId ?? null,
+    await appendPaymentEvent(
+      {
+        checkoutId: checkout.id,
+        actorUserId: input.createdByAdminId ?? userId,
+        action: "CREATE",
+        payload: {
+          productKind,
+          amountYuan,
+          createdByAdminId: input.createdByAdminId ?? null,
+        },
       },
-    });
+      tx,
+    );
 
     return checkout;
   });

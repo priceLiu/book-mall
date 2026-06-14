@@ -4,16 +4,15 @@ import {
   aggregateUsageByModel,
   listUsageRecords,
 } from "@/lib/billing/credit-account-service";
-import { listUserTenantMemberships } from "@/lib/tenant/context";
+import { canViewTeamBilling, resolveTeamFinanceAccess } from "@/lib/finance/team-finance-guard";
 import {
-  financeForbidden,
   financeJson,
   financeOptions,
   financeUnauthorized,
   getFinanceSession,
 } from "@/lib/finance/finance-api";
 
-/** 团队成员只读「我的用量」（团队上下文下按 actorBookUserId + tenantId 过滤）。 */
+/** 团队用量：OWNER/ADMIN 可见全员；MEMBER 仅本人。 */
 export async function OPTIONS(request: NextRequest) {
   return financeOptions(request);
 }
@@ -23,21 +22,19 @@ export async function GET(request: NextRequest) {
   if (!user) return financeUnauthorized(request);
 
   const tenantId = request.nextUrl.searchParams.get("tenantId");
+  const actorUserId = request.nextUrl.searchParams.get("actorUserId")?.trim() || undefined;
   const take = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("take") ?? 50)));
 
-  const memberships = await listUserTenantMemberships(user.id);
-  const teams = memberships.filter((m) => m.tenantType === "TEAM");
+  const access = await resolveTeamFinanceAccess(user.id, tenantId);
 
-  if (teams.length === 0) {
+  if (!access.hasTeam || !access.selected) {
     return financeJson(request, { hasTeam: false, teams: [], recent: [], byModel: [], total: 0 });
   }
 
-  const selected =
-    teams.find((t) => t.tenantId === tenantId) ?? teams[0];
-
+  const teamWide = canViewTeamBilling(access.selected.role);
   const query = {
-    bookUserId: user.id,
-    tenantId: selected.tenantId,
+    bookUserId: teamWide ? actorUserId : user.id,
+    tenantId: access.selected.tenantId,
     take,
   };
 
@@ -48,14 +45,11 @@ export async function GET(request: NextRequest) {
 
   return financeJson(request, {
     hasTeam: true,
-    tenantId: selected.tenantId,
-    tenantName: selected.tenantName,
-    role: selected.role,
-    teams: teams.map((t) => ({
-      tenantId: t.tenantId,
-      tenantName: t.tenantName,
-      role: t.role,
-    })),
+    canViewAll: teamWide,
+    tenantId: access.selected.tenantId,
+    tenantName: access.selected.tenantName,
+    role: access.selected.role,
+    teams: access.teams,
     byModel,
     recent: recent.rows,
     total: recent.total,

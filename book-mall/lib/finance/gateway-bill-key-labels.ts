@@ -15,17 +15,6 @@ export type GatewayLogKeyLabels = {
 
 const EMPTY = "--";
 
-export type GatewayLogKeyLabelInput = {
-  apiKeyId: string;
-  credentialId: string | null;
-  credentialAliasSnapshot: string | null;
-};
-
-export type GatewayLogKeyLabels = {
-  gatewayKey: string;
-  userKey: string;
-};
-
 function formatGatewayKeyLabel(
   row: { name: string; keyPrefix: string } | undefined,
 ): string {

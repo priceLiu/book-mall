@@ -62,10 +62,18 @@ function periodKeyFromDate(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-async function buildGatewayLogScopeWhere(
-  userId?: string,
-): Promise<Prisma.GatewayRequestLogWhereInput> {
-  if (!userId) return {};
+async function buildGatewayLogScopeWhere(input: {
+  userId?: string;
+  tenantId?: string;
+  actorUserId?: string;
+}): Promise<Prisma.GatewayRequestLogWhereInput> {
+  if (input.tenantId) {
+    const where: Prisma.GatewayRequestLogWhereInput = { tenantId: input.tenantId };
+    if (input.actorUserId) where.actorBookUserId = input.actorUserId;
+    return where;
+  }
+  if (!input.userId) return {};
+  const userId = input.userId;
   const [gatewayUser, bookUser] = await Promise.all([
     prisma.gatewayUser.findUnique({
       where: { bookUserId: userId },
@@ -88,12 +96,35 @@ async function buildGatewayLogScopeWhere(
 
 async function loadSettlementLinesForQuotaSnapshots(opts: {
   userId?: string;
+  tenantId?: string;
   settlementsInBatch: {
     ownerType: "USER" | "TENANT";
     ownerId: string;
     settlementKind: string;
   }[];
 }) {
+  if (opts.tenantId) {
+    return prisma.billingSettlementLine.findMany({
+      where: {
+        settlementKind: "BYOK_QUOTA_INCLUDED",
+        ownerType: "TENANT",
+        ownerId: opts.tenantId,
+        byokTaskKind: { not: null },
+      },
+      select: {
+        gatewayLogId: true,
+        submittedAt: true,
+        ownerType: true,
+        ownerId: true,
+        periodKey: true,
+        byokTaskKind: true,
+        settlementKind: true,
+        quotaDelta: true,
+        monthlyIncluded: true,
+      },
+      orderBy: { submittedAt: "asc" },
+    });
+  }
   if (opts.userId) {
     return prisma.billingSettlementLine.findMany({
       where: {
@@ -154,6 +185,8 @@ async function loadSettlementLinesForQuotaSnapshots(opts: {
 async function buildGatewayRows(input: {
   tab: BillingDetailsTab;
   userId?: string;
+  tenantId?: string;
+  actorUserId?: string;
   take: number;
 }): Promise<{
   rows: Record<string, string>[];
@@ -162,7 +195,11 @@ async function buildGatewayRows(input: {
   failedCalls: number;
   returned: number;
 }> {
-  const scopeWhere = await buildGatewayLogScopeWhere(input.userId);
+  const scopeWhere = await buildGatewayLogScopeWhere({
+    userId: input.userId,
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+  });
   const where: Prisma.GatewayRequestLogWhereInput = {
     ...scopeWhere,
   };
@@ -198,6 +235,7 @@ async function buildGatewayRows(input: {
 
   const settlementLinesForSnapshots = await loadSettlementLinesForQuotaSnapshots({
     userId: input.userId,
+    tenantId: input.tenantId,
     settlementsInBatch: [...settlements.values()],
   });
   const sequentialSnapshots = computeSequentialByokQuotaSnapshots(
@@ -336,5 +374,54 @@ export async function fetchBillingDetailsAllUsers(input: {
     failedCalls: gatewayPart.failedCalls,
     totalPoints: totalCredits,
     totalCredits,
+  };
+}
+
+export async function fetchBillingDetailsForTenant(input: {
+  tenantId: string;
+  actorUserId?: string;
+  tab: BillingDetailsTab;
+  take?: number;
+}) {
+  const take = Math.min(2000, Math.max(1, input.take ?? 500));
+
+  const [tenant, pools, gatewayPart] = await Promise.all([
+    prisma.tenant.findUnique({
+      where: { id: input.tenantId },
+      select: { id: true, name: true, ownerUserId: true },
+    }),
+    getPoolBalances({ ownerType: "TENANT", ownerId: input.tenantId }),
+    buildGatewayRows({
+      tab: input.tab,
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      take,
+    }),
+  ]);
+
+  if (!tenant) return null;
+
+  const balanceCredits = pools.general.balance + pools.video.balance;
+  const totalCredits = sumCredits(gatewayPart.rows);
+
+  return {
+    source: "finance-2.0",
+    tab: input.tab,
+    tenant: { id: tenant.id, name: tenant.name },
+    balancePoints: balanceCredits,
+    poolBalances: {
+      general: pools.general.balance,
+      video: pools.video.balance,
+    },
+    totalCalls: gatewayPart.totalCalls,
+    succeededCalls: gatewayPart.succeededCalls,
+    failedCalls: gatewayPart.failedCalls,
+    totalPoints: totalCredits,
+    totalCredits,
+    rows: gatewayPart.rows,
+    packageReconciliation: null,
+    returned: gatewayPart.returned,
+    take,
+    truncated: gatewayPart.returned >= take,
   };
 }

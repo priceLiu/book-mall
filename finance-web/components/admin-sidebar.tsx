@@ -58,6 +58,13 @@ const NAV_GROUPS: NavGroup[] = [
     label: "账务明细",
     items: [
       {
+        href: "/admin/teams",
+        label: "团队列表",
+        icon: Users,
+        prefix: "/admin/teams",
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
+      {
         href: "/admin/billing/users",
         label: "用户明细",
         icon: UserCircle2,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
@@ -24,11 +25,20 @@ type TaskUsageRow = {
   overageCreditsPerTask: number;
 };
 
+type MemberBreakdown = {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  byTaskKind: { taskKind: string | null; label: string; count: number }[];
+};
+
 type ByokResponse = {
   periodKey: string;
+  tenantName?: string;
   bill: ByokBill | null;
   message?: string;
   taskUsage?: TaskUsageRow[];
+  memberBreakdown?: MemberBreakdown[];
 };
 
 function recentPeriodKeys(count = 6): string[] {
@@ -41,8 +51,15 @@ function recentPeriodKeys(count = 6): string[] {
   return out;
 }
 
-export function BillingByokClient() {
+type BillingByokClientProps = {
+  scope?: "account" | "team";
+  tenantId?: string;
+};
+
+export function BillingByokClient({ scope = "account", tenantId }: BillingByokClientProps) {
   const base = useBookMallBaseUrl();
+  const searchParams = useSearchParams();
+  const resolvedTenantId = tenantId ?? searchParams.get("tenantId") ?? undefined;
   const periods = recentPeriodKeys();
   const [periodKey, setPeriodKey] = useState(periods[0]);
   const [data, setData] = useState<ByokResponse | null>(null);
@@ -50,17 +67,22 @@ export function BillingByokClient() {
 
   const load = useCallback(async () => {
     if (!base) return;
-    const r = await financeApiFetch<ByokResponse>(
-      base,
-      `/api/finance/account/byok-bill?periodKey=${encodeURIComponent(periodKey)}`,
-    );
+    const qs = new URLSearchParams({ periodKey });
+    let path: string;
+    if (scope === "team") {
+      if (resolvedTenantId) qs.set("tenantId", resolvedTenantId);
+      path = `/api/finance/team/byok-bill?${qs}`;
+    } else {
+      path = `/api/finance/account/byok-bill?${qs}`;
+    }
+    const r = await financeApiFetch<ByokResponse>(base, path);
     if (r.ok) {
       setData(r.data);
       setError(null);
     } else {
       setError(r.error);
     }
-  }, [base, periodKey]);
+  }, [base, periodKey, scope, resolvedTenantId]);
 
   useEffect(() => {
     load();
@@ -71,14 +93,17 @@ export function BillingByokClient() {
 
   const bill = data.bill;
   const taskUsage = data.taskUsage ?? [];
+  const memberBreakdown = data.memberBreakdown ?? [];
 
   return (
     <FinancePageShell>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-medium text-[#262626]">BYOK 任务用量</h1>
+          <h1 className="text-lg font-medium text-[#262626]">
+            {scope === "team" ? `团队 BYOK 任务用量${data.tenantName ? ` · ${data.tenantName}` : ""}` : "BYOK 任务用量"}
+          </h1>
           <p className="mt-1 text-sm text-[#8c8c8c]">
-            套餐内次数按自然月累计；每次成功生成扣 1 次，超额从轻量包按固定积分扣分。
+            套餐内次数按自然月累计；超额从轻量包按固定积分扣分。
           </p>
         </div>
         <select
@@ -112,43 +137,54 @@ export function BillingByokClient() {
                 <tr key={u.taskKind} className="border-b border-[#f0f0f0]">
                   <td className="py-2">
                     {u.label}
-                    <span className="ml-1 text-xs text-[#8c8c8c]">
-                      （含 {u.monthlyIncluded} 次/月）
-                    </span>
+                    <span className="ml-1 text-xs text-[#8c8c8c]">（含 {u.monthlyIncluded} 次/月）</span>
                   </td>
                   <td className="py-2 text-right tabular-nums">
                     {u.includedUsed} / {u.monthlyIncluded}
                   </td>
                   <td className="py-2 text-right tabular-nums">{u.includedRemaining}</td>
                   <td className="py-2 text-right tabular-nums">{u.overageUsed}</td>
-                  <td className="py-2 text-right tabular-nums">
-                    {u.overageCredits}
-                    {u.overageUsed > 0 ? (
-                      <span className="ml-1 text-xs text-[#8c8c8c]">
-                        （{u.overageCreditsPerTask} 分/次）
-                      </span>
-                    ) : null}
-                  </td>
+                  <td className="py-2 text-right tabular-nums">{u.overageCredits}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         ) : (
-          <p className="text-sm text-[#8c8c8c]">
-            暂无记录。成功生成后会自动扣减套餐内次数；超额扣分见「积分流水」。
-          </p>
+          <p className="text-sm text-[#8c8c8c]">{data.message ?? "暂无记录"}</p>
         )}
       </section>
+
+      {scope === "team" && memberBreakdown.length > 0 ? (
+        <section className="rounded border border-[#e8e8e8] bg-white p-4">
+          <h2 className="mb-3 text-sm font-medium">成员 BYOK 调用</h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-[#8c8c8c]">
+                <th className="py-2">成员</th>
+                <th className="py-2">任务分布</th>
+              </tr>
+            </thead>
+            <tbody>
+              {memberBreakdown.map((m) => (
+                <tr key={m.userId} className="border-b border-[#f0f0f0]">
+                  <td className="py-2">{m.name || m.email || m.userId.slice(0, 8)}</td>
+                  <td className="py-2 text-xs text-[#595959]">
+                    {m.byTaskKind.map((t) => `${t.label}×${t.count}`).join(" · ")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
 
       {!bill ? (
         <p className="text-sm text-[#8c8c8c]">{data.message ?? "无有效 BYOK 套餐"}</p>
       ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <StatCard label="技术服务费" yuan={bill.techServiceFeeYuan} />
-            <StatCard label="本月应付" yuan={bill.techServiceFeeYuan} highlight />
-          </div>
-        </>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <StatCard label="技术服务费" yuan={bill.techServiceFeeYuan} />
+          <StatCard label="本月应付" yuan={bill.totalYuan} highlight />
+        </div>
       )}
     </FinancePageShell>
   );
