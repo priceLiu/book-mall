@@ -28,7 +28,7 @@
 }
 
 :root {
-  --canvas-bg: #0b0b14;
+  --canvas-bg: #141414;
   --canvas-surface: #13131f;
   --canvas-surface-2: #1a1a2b;
   --canvas-border: rgba(255, 255, 255, 0.1);
@@ -252,27 +252,32 @@ body {
 
 /* 让 edge 的可点击区域宽一点（默认很难命中） */
 .react-flow__edge-interaction {
-  stroke-width: 22 !important;
+  stroke-width: 32 !important;
 }
 
 /* 选中节点 → 上下游连线流动动效 */
 @keyframes pro2-edge-dash {
   to {
-    stroke-dashoffset: -16;
+    stroke-dashoffset: -10;
   }
 }
 .react-flow__edge.pro2-edge-active .react-flow__edge-path {
-  stroke-dasharray: 7 5;
+  stroke-dasharray: 4 6;
+  stroke-width: 1.5 !important;
   animation: pro2-edge-dash 0.55s linear infinite;
   transition:
     stroke 0.2s ease-out,
     stroke-width 0.2s ease-out;
 }
 .react-flow__edge.pro2-edge-up .react-flow__edge-path {
-  filter: drop-shadow(0 0 5px rgba(96, 165, 250, 0.75));
+  filter: drop-shadow(0 0 2px rgba(96, 165, 250, 0.45));
 }
 .react-flow__edge.pro2-edge-down .react-flow__edge-path {
-  filter: drop-shadow(0 0 5px rgba(167, 139, 250, 0.75));
+  filter: drop-shadow(0 0 2px rgba(167, 139, 250, 0.45));
+}
+.react-flow__connection-path {
+  stroke-width: 1 !important;
+  stroke-dasharray: 4 6;
 }
 .react-flow__edge .react-flow__edge-path {
   transition: opacity 0.2s ease-out;
@@ -298,9 +303,79 @@ body {
   border-radius: 999px;
 }
 
-/* Pro2 侧栏 +：默认可点击；仅拖线中显示十字准星 */
+/* LibTV / 画布节点 · 连线吸附：左右 Handle 热区铺满节点高度（排除侧栏 +） */
+.canvas-flow-wrap
+  .react-flow__node:not(.react-flow__node-group)
+  .react-flow__handle-left:not(.pro2-node-side-plus-handle) {
+  top: 0 !important;
+  left: -6px !important;
+  width: 20px !important;
+  height: 100% !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  opacity: 0 !important;
+}
+
+.canvas-flow-wrap
+  .react-flow__node:not(.react-flow__node-group)
+  .react-flow__handle-right:not(.pro2-node-side-plus-handle) {
+  top: 0 !important;
+  right: -6px !important;
+  left: auto !important;
+  width: 20px !important;
+  height: 100% !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  opacity: 0 !important;
+}
+
+.canvas-flow-wrap
+  .react-flow__node:not(.react-flow__node-group)
+  .react-flow__handle-top:not(.pro2-node-side-plus-handle) {
+  top: -6px !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 20px !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  opacity: 0 !important;
+}
+
+.canvas-flow-wrap
+  .react-flow__node:not(.react-flow__node-group)
+  .react-flow__handle-bottom:not(.pro2-node-side-plus-handle) {
+  bottom: -6px !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 20px !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  opacity: 0 !important;
+}
+
+/* Pro2 / LibTV 侧栏 +：保持圆形可见；仅拖线中显示十字准星 */
 .react-flow__handle.pro2-node-side-plus-handle {
   cursor: pointer !important;
+  opacity: 1 !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  border-radius: 9999px !important;
+  pointer-events: auto !important;
+}
+.react-flow__handle.pro2-node-side-plus-handle.react-flow__handle-left {
+  left: -12px !important;
+}
+.react-flow__handle.pro2-node-side-plus-handle.react-flow__handle-right {
+  right: -12px !important;
+  left: auto !important;
+}
+.canvas-connecting .react-flow__handle.pro2-node-side-plus-handle {
+  opacity: 1 !important;
+  pointer-events: all !important;
 }
 .canvas-connecting .react-flow__handle.pro2-node-side-plus-handle.connectingto,
 .canvas-connecting .react-flow__handle.pro2-node-side-plus-handle.connectingfrom,

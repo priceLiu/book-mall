@@ -12,7 +12,10 @@ import {
 } from "./sbv1-node-chrome";
 import { isSbv1MediaGroup, sbv1ImageChildren } from "./sbv1-media-group-meta";
 import { applySbv1MediaGroupRelayout } from "./sbv1-media-group-layout";
-import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
+import {
+  SBV1_DEFAULT_IMAGE_NODE_DATA,
+  SBV1_DEFAULT_VIDEO_ENGINE_DATA,
+} from "./sbv1-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
 
 const GAP = 48;
@@ -21,8 +24,7 @@ export function buildSbv1ImageNodeData(
   overrides?: Record<string, unknown>,
 ): Record<string, unknown> {
   return {
-    label: "图片",
-    dockInput: "",
+    ...SBV1_DEFAULT_IMAGE_NODE_DATA,
     ...overrides,
   };
 }

@@ -236,7 +236,7 @@ function EnginePickerInlinePanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {capabilityMismatch ? (
         <p className="rounded border border-amber-400/25 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-100/90">
           {capabilityMismatch}
@@ -267,27 +267,15 @@ function EnginePickerInlinePanel({
             />
           ))}
           {draft && hasParams ? (
-            <section className="rounded-xl border border-white/10 bg-black/20 p-4">
-              <p className="mb-3 text-[12px] font-medium text-white">
-                模型参数
-                <span className="ml-2 font-normal text-white/50">
-                  {draft.model.displayName || draft.model.modelKey}
-                </span>
-              </p>
-              <DynamicParamForm
-                variant="panel"
-                schema={draft.model.paramsSchema}
-                value={draft.params}
-                onChange={(next) => {
-                  if (!draft) return;
-                  emitDraft({ ...draft, params: next });
-                }}
-              />
-            </section>
-          ) : draft && !hasParams ? (
-            <p className="text-[12px] text-white/45">
-              当前模型无可调参数。
-            </p>
+            <DynamicParamForm
+              variant="panel"
+              schema={draft.model.paramsSchema}
+              value={draft.params}
+              onChange={(next) => {
+                if (!draft) return;
+                emitDraft({ ...draft, params: next });
+              }}
+            />
           ) : null}
         </>
       )}
@@ -368,12 +356,6 @@ function EngineModelModal({
       : role === "VIDEO"
         ? "选择视频模型"
         : "选择生图模型";
-  const subtitle =
-    role === "LLM"
-      ? "选模型并调整推理参数，用于生成设计方案。"
-      : role === "VIDEO"
-        ? "图生视频模型，需 KIE 系统 Provider。"
-        : "选模型并调整比例 / 分辨率等，用于最终出图。";
 
   const hasParams =
     !!draft?.model.paramsSchema && draft.model.paramsSchema.length > 0;
@@ -393,13 +375,10 @@ function EngineModelModal({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-white/5 px-5 py-4">
-          <div>
-            <p className="flex items-center gap-2 text-[15px] font-medium text-white">
-              <Sparkles className="size-4 text-[var(--canvas-accent,#a78bfa)]" />
-              {title}
-            </p>
-            <p className="mt-0.5 text-[12px] text-white/60">{subtitle}</p>
-          </div>
+          <p className="flex items-center gap-2 text-[15px] font-medium text-white">
+            <Sparkles className="size-4 text-[var(--canvas-accent,#a78bfa)]" />
+            {title}
+          </p>
           <button
             type="button"
             onClick={onClose}
@@ -438,71 +417,46 @@ function EngineModelModal({
               ))}
 
               {draft && hasParams ? (
-                <section className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <p className="mb-3 text-[12px] font-medium text-white">
-                    模型参数
-                    <span className="ml-2 font-normal text-white/50">
-                      {draft.model.displayName || draft.model.modelKey}
-                    </span>
-                  </p>
-                  <DynamicParamForm
-                    variant="panel"
-                    schema={draft.model.paramsSchema}
-                    value={draft.params}
-                    onChange={(next) =>
-                      setDraft((cur) =>
-                        cur ? { ...cur, params: next } : cur,
-                      )
-                    }
-                  />
-                </section>
-              ) : draft && !hasParams ? (
-                <p className="text-[12px] text-white/45">
-                  当前模型无可调参数，选好后直接确认即可。
-                </p>
+                <DynamicParamForm
+                  variant="panel"
+                  schema={draft.model.paramsSchema}
+                  value={draft.params}
+                  onChange={(next) =>
+                    setDraft((cur) =>
+                      cur ? { ...cur, params: next } : cur,
+                    )
+                  }
+                />
               ) : null}
             </div>
           )}
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/5 bg-black/20 px-5 py-3">
-          <span className="text-[11px] text-white/50">
-            没看到要的模型？
-            <a
-              href="/settings/providers"
-              className="ml-1 text-[var(--canvas-accent,#a78bfa)] hover:underline"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Provider 配置
-            </a>
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md border border-white/10 px-3 py-1.5 text-[12px] text-white/80 hover:border-white/30 hover:text-white"
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              disabled={!draft}
-              onClick={() => {
-                if (!draft) return;
-                onConfirm({
-                  providerId: draft.provider.id,
-                  modelKey: draft.model.modelKey,
-                  params: draft.params,
-                  model: draft.model,
-                  provider: draft.provider,
-                });
-              }}
-              className="rounded-md bg-[var(--canvas-accent,#a78bfa)] px-4 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft,#c4b5fd)] disabled:opacity-50"
-            >
-              确认
-            </button>
-          </div>
+        <footer className="flex items-center justify-end gap-2 border-t border-white/5 bg-black/20 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-white/10 px-3 py-1.5 text-[12px] text-white/80 hover:border-white/30 hover:text-white"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            disabled={!draft}
+            onClick={() => {
+              if (!draft) return;
+              onConfirm({
+                providerId: draft.provider.id,
+                modelKey: draft.model.modelKey,
+                params: draft.params,
+                model: draft.model,
+                provider: draft.provider,
+              });
+            }}
+            className="rounded-md bg-[var(--canvas-accent,#a78bfa)] px-4 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft,#c4b5fd)] disabled:opacity-50"
+          >
+            确认
+          </button>
         </footer>
       </div>
     </div>
@@ -543,24 +497,10 @@ function ProviderGroup({
   draft: DraftSelection | null;
   onSelectModel: (m: CanvasProviderModelDto) => void;
 }) {
-  const isSystem = provider.id.startsWith("system:");
   const isPlatformOffering = provider.id === "platform:offering";
   return (
     <section>
-      {!isPlatformOffering ? (
-        <header className="mb-2 flex items-center gap-2">
-          {isSystem ? (
-            <span className="rounded bg-[var(--canvas-accent,#a78bfa)]/30 px-1.5 py-0.5 text-[10px] text-white">
-              系统
-            </span>
-          ) : null}
-          <h3 className="text-[12px] font-medium text-white">{provider.alias}</h3>
-          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">
-            {provider.kind}
-          </span>
-        </header>
-      ) : null}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {models.map((m) => {
           const selected =
             draft?.provider.id === provider.id &&
@@ -582,7 +522,7 @@ function ProviderGroup({
 
 function ModelCard({
   model,
-  providerKind,
+  providerKind: _providerKind,
   selected,
   onClick,
 }: {
@@ -591,7 +531,6 @@ function ModelCard({
   selected: boolean;
   onClick: () => void;
 }) {
-  const paramCount = model.paramsSchema?.length ?? 0;
   return (
     <button
       type="button"
@@ -601,33 +540,15 @@ function ModelCard({
         onClick();
       }}
       className={[
-        "group relative flex h-full flex-col gap-1.5 rounded-xl border px-3 py-2.5 text-left transition",
+        "relative rounded-xl border px-4 py-3 text-left transition",
         selected
-          ? "border-white bg-white/[.06]"
-          : "border-white/15 hover:border-white/40 hover:bg-white/[.03]",
+          ? "border-white bg-white/[.06] text-white"
+          : "border-white/15 text-white/75 hover:border-white/30 hover:text-white",
       ].join(" ")}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="line-clamp-1 text-[13px] font-medium text-white">
-          {model.displayName || model.modelKey}
-        </p>
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${roleTone(model.role)}`}>
-          {model.role}
-        </span>
-      </div>
-      <p className="font-mono text-[11px] text-white/55 line-clamp-1">
-        {model.modelKey}
+      <p className="line-clamp-2 text-[13px] font-medium">
+        {model.displayName || model.modelKey}
       </p>
-      {model.description ? (
-        <p className="text-[11px] leading-relaxed text-white/55 line-clamp-2">
-          {model.description}
-        </p>
-      ) : providerKind ? (
-        <p className="text-[11px] text-white/35">{providerKind}</p>
-      ) : null}
-      {paramCount > 0 ? (
-        <p className="text-[10px] text-white/40">{paramCount} 项可调参数</p>
-      ) : null}
       {selected ? (
         <span className="absolute right-2 top-2 grid size-4 place-items-center rounded-full bg-white text-[9px] font-bold text-black">
           ✓
@@ -635,19 +556,6 @@ function ModelCard({
       ) : null}
     </button>
   );
-}
-
-function roleTone(role: string): string {
-  switch (role) {
-    case "IMAGE":
-      return "bg-amber-500/20 text-amber-200";
-    case "LLM":
-      return "bg-emerald-500/20 text-emerald-200";
-    case "VIDEO":
-      return "bg-sky-500/20 text-sky-200";
-    default:
-      return "bg-white/10 text-white/70";
-  }
 }
 
 function EmptyState({ role }: { role: "LLM" | "IMAGE" | "VIDEO" }) {

@@ -9,6 +9,12 @@ const STYLE_ASSET_CONNECT_TARGETS = new Set([
   "story-pro2-script-hub",
   "story-pro2-image",
   "story-pro2-starter",
+  "sbv1-image",
+]);
+
+const IMAGE_STYLE_LINK_TARGETS = new Set([
+  "story-pro2-image",
+  "sbv1-image",
 ]);
 
 /** 风格素材节点可连出的目标类型 */
@@ -87,4 +93,39 @@ export function buildPro2StyleAssetToHubEdge(
     sourceHandle: "style",
     targetHandle: "in_text",
   };
+}
+
+export function buildPro2StyleAssetToImageEdge(
+  styleNodeId: string,
+  imageNodeId: string,
+): CanvasFlowEdge {
+  return {
+    id: `e-style-${styleNodeId}-${imageNodeId}`,
+    source: styleNodeId,
+    target: imageNodeId,
+    sourceHandle: "style",
+    targetHandle: "in_image",
+  };
+}
+
+/** 图片节点左侧已连的风格素材（Dock 风格库选中后复用更新） */
+export function findStyleAssetLinkedToImage(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  imageNodeId: string,
+): CanvasFlowNode | undefined {
+  for (const e of edges) {
+    if (e.target !== imageNodeId) continue;
+    if (e.targetHandle && e.targetHandle !== "in_image") continue;
+    const source = nodes.find((n) => n.id === e.source);
+    if (
+      source?.type === STYLE_ASSET_TYPE &&
+      IMAGE_STYLE_LINK_TARGETS.has(
+        nodes.find((n) => n.id === imageNodeId)?.type ?? "",
+      )
+    ) {
+      return source;
+    }
+  }
+  return undefined;
 }

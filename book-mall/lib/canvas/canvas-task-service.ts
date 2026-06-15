@@ -40,6 +40,7 @@ import {
   storyScopesConflict,
   type CanvasTaskStoryScope,
 } from "./canvas-story-scope";
+import { enrichCanvasTaskRows } from "./canvas-task-billing";
 import { persistCanvasKieResultToOss } from "./canvas-oss";
 import {
   canvasGwCreateBailianR2vJob,
@@ -1541,6 +1542,8 @@ export async function listProjectTasks(args: {
         mediaKind?: string;
         llmSection?: string;
       };
+      creditsCharged?: number | null;
+      billingMode?: "PLATFORM_CREDIT" | "BYOK" | null;
     }
   >
 > {
@@ -1575,9 +1578,10 @@ export async function listProjectTasks(args: {
       inputPayload: true,
     },
   });
-  return rows.map(({ inputPayload, ...row }) => ({
+  const enriched = await enrichCanvasTaskRows(rows);
+  return enriched.map(({ inputPayload: _ip, ...row }) => ({
     ...row,
-    storyScope: extractStoryScopeFromInputPayload(inputPayload),
+    storyScope: extractStoryScopeFromInputPayload(_ip),
   }));
 }
 

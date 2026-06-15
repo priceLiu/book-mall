@@ -39,17 +39,15 @@ export function DynamicParamForm({
 
   if (variant === "panel") {
     return (
-      <div className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {schema.map((item) => (
-            <PanelField
-              key={item.key}
-              item={item}
-              cur={value[item.key]}
-              onPatch={(v) => onChange({ ...value, [item.key]: v })}
-            />
-          ))}
-        </div>
+      <div className="space-y-5">
+        {schema.map((item) => (
+          <PanelField
+            key={item.key}
+            item={item}
+            cur={value[item.key]}
+            onPatch={(v) => onChange({ ...value, [item.key]: v })}
+          />
+        ))}
       </div>
     );
   }
@@ -109,17 +107,10 @@ function PanelField({
 }) {
   if (item.type === "select") {
     const val = String(cur ?? item.defaultValue ?? item.options[0]?.value ?? "");
-    const spanFull = item.options.length > 4;
     return (
-      <div className={spanFull ? "sm:col-span-2" : "sm:col-span-2"}>
-        <label className="block text-[12px] font-medium text-white/85">
-          {item.label}
-        </label>
-        <div
-          className="mt-2 flex w-full gap-1 rounded-lg border border-white/20 bg-black/50 p-1"
-          role="group"
-          aria-label={item.label}
-        >
+      <div>
+        <p className="mb-2 text-[13px] text-white/85">{item.label}</p>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={item.label}>
           {item.options.map((o) => {
             const active = val === o.value;
             return (
@@ -129,10 +120,10 @@ function PanelField({
                 aria-pressed={active}
                 onClick={() => onPatch(o.value)}
                 className={[
-                  "min-h-[36px] flex-1 rounded-md px-3 py-2 text-[13px] font-semibold tracking-wide transition",
+                  "min-w-[4.5rem] rounded-lg border px-4 py-2 text-[13px] font-medium transition",
                   active
-                    ? "bg-[var(--canvas-accent,#a78bfa)] text-white shadow-sm ring-1 ring-white/20"
-                    : "text-white/80 hover:bg-white/10 hover:text-white",
+                    ? "border-white bg-white/[.06] text-white"
+                    : "border-white/15 text-white/55 hover:border-white/30 hover:text-white/80",
                 ].join(" ")}
               >
                 {o.label}
@@ -140,9 +131,6 @@ function PanelField({
             );
           })}
         </div>
-        {item.help ? (
-          <p className="mt-1.5 text-[10px] text-white/50">{item.help}</p>
-        ) : null}
       </div>
     );
   }
@@ -159,16 +147,11 @@ function PanelField({
 
     if (hasRange) {
       const step = item.step ?? 1;
-      const unit = item.label.includes("token") ? "" : "";
+      const suffix = item.label.includes("时长") ? "s" : "";
       return (
-        <div className="sm:col-span-2">
-          <label className="block text-[12px] text-white/60">
-            {item.label}
-            {item.min != null && item.max != null
-              ? `（${item.min}~${item.max}）`
-              : null}
-          </label>
-          <div className="mt-2 flex items-center gap-3">
+        <div>
+          <p className="mb-2 text-[13px] text-white/85">{item.label}</p>
+          <div className="flex items-center gap-3">
             <input
               type="range"
               min={item.min}
@@ -176,23 +159,20 @@ function PanelField({
               step={step}
               value={num}
               onChange={(e) => onPatch(Number(e.target.value))}
-              className={`${RF_NODE_SCROLL} flex-1 accent-[var(--canvas-accent,#a78bfa)]`}
+              className={`${RF_NODE_SCROLL} h-1.5 flex-1 cursor-pointer accent-white`}
             />
-            <span className="min-w-[3.5rem] rounded-md border border-white/15 px-2 py-1 text-center text-[12px] text-white/85">
+            <span className="min-w-[2.5rem] text-right text-[13px] font-medium text-white">
               {num}
-              {unit}
+              {suffix}
             </span>
           </div>
-          {item.help ? (
-            <p className="mt-1 text-[10px] text-white/45">{item.help}</p>
-          ) : null}
         </div>
       );
     }
 
     return (
       <div>
-        <label className="block text-[12px] text-white/60">{item.label}</label>
+        <p className="mb-2 text-[13px] text-white/85">{item.label}</p>
         <input
           type="number"
           min={item.min}
@@ -203,11 +183,8 @@ function PanelField({
             const v = e.target.value === "" ? undefined : Number(e.target.value);
             onPatch(v);
           }}
-          className={`${RF_NODE_SCROLL} mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[13px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+          className={`${RF_NODE_SCROLL} w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-[13px] text-white focus:border-white/35 focus:outline-none`}
         />
-        {item.help ? (
-          <p className="mt-1 text-[10px] text-white/45">{item.help}</p>
-        ) : null}
       </div>
     );
   }
@@ -215,55 +192,62 @@ function PanelField({
   if (item.type === "boolean") {
     const checked = cur === undefined ? !!item.defaultValue : !!cur;
     return (
-      <label className="flex items-start gap-2 rounded-lg border border-white/10 bg-black/20 p-3 text-[12px] sm:col-span-2">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onPatch(e.target.checked)}
-          className={`${RF_NODE_SCROLL} mt-0.5 accent-[var(--canvas-accent,#a78bfa)]`}
-        />
-        <span>
-          <span className="font-medium text-white">{item.label}</span>
-          {item.help ? (
-            <span className="ml-1 text-white/50">{item.help}</span>
-          ) : null}
-        </span>
-      </label>
+      <div>
+        <p className="mb-2 text-[13px] text-white/85">{item.label}</p>
+        <div className="flex gap-2" role="group" aria-label={item.label}>
+          {[
+            { id: true, label: "开启" },
+            { id: false, label: "关闭" },
+          ].map((opt) => {
+            const active = checked === opt.id;
+            return (
+              <button
+                key={String(opt.id)}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onPatch(opt.id)}
+                className={[
+                  "flex-1 rounded-lg border px-4 py-2 text-[13px] font-medium transition",
+                  active
+                    ? "border-white bg-white/[.06] text-white"
+                    : "border-white/15 text-white/55 hover:border-white/30 hover:text-white/80",
+                ].join(" ")}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     );
   }
 
   if (item.type === "textarea") {
     return (
-      <div className="sm:col-span-2">
-        <label className="block text-[12px] text-white/60">{item.label}</label>
+      <div>
+        <p className="mb-2 text-[13px] text-white/85">{item.label}</p>
         <textarea
           rows={3}
           value={typeof cur === "string" ? cur : item.defaultValue ?? ""}
           placeholder={item.placeholder}
           onChange={(e) => onPatch(e.target.value)}
           onWheel={onCanvasFormWheel}
-          className={`${RF_FORM_CONTROL} mt-2 max-h-40 overflow-y-auto resize-y rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-[13px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+          className={`${RF_FORM_CONTROL} max-h-40 w-full resize-y overflow-y-auto rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-[13px] text-white focus:border-white/35 focus:outline-none`}
         />
-        {item.help ? (
-          <p className="mt-1 text-[10px] text-white/45">{item.help}</p>
-        ) : null}
       </div>
     );
   }
 
   return (
     <div>
-      <label className="block text-[12px] text-white/60">{item.label}</label>
+      <p className="mb-2 text-[13px] text-white/85">{item.label}</p>
       <input
         type="text"
         value={typeof cur === "string" ? cur : item.defaultValue ?? ""}
         placeholder={item.placeholder}
         onChange={(e) => onPatch(e.target.value)}
-        className={`${RF_NODE_SCROLL} mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-[13px] text-white focus:border-[var(--canvas-accent)]/60 focus:outline-none`}
+        className={`${RF_NODE_SCROLL} w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-[13px] text-white focus:border-white/35 focus:outline-none`}
       />
-      {item.help ? (
-        <p className="mt-1 text-[10px] text-white/45">{item.help}</p>
-      ) : null}
     </div>
   );
 }

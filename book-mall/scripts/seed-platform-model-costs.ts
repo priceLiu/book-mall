@@ -41,9 +41,9 @@ const EXTRA_COSTS: CostSeed[] = [
     listCostYuan: 0.0015,
     discountRate: 0.05,
   },
-  // KIE 生图
+  // KIE 生图 · nano-banana-pro 按清晰度分档（Gateway 路由仍用 lib-nano-pro）
   {
-    canonicalModelKey: "lib-nano-pro",
+    canonicalModelKey: "lib-nano-pro-1k",
     vendor: "kie",
     unit: "PER_IMAGE",
     tierRaw: "1K",
@@ -51,7 +51,7 @@ const EXTRA_COSTS: CostSeed[] = [
     discountRate: 0.05,
   },
   {
-    canonicalModelKey: "lib-nano-pro",
+    canonicalModelKey: "lib-nano-pro-2k",
     vendor: "kie",
     unit: "PER_IMAGE",
     tierRaw: "2K",
@@ -59,7 +59,7 @@ const EXTRA_COSTS: CostSeed[] = [
     discountRate: 0.05,
   },
   {
-    canonicalModelKey: "lib-nano-pro",
+    canonicalModelKey: "lib-nano-pro-4k",
     vendor: "kie",
     unit: "PER_IMAGE",
     tierRaw: "4K",
@@ -126,7 +126,8 @@ const EXTRA_COSTS: CostSeed[] = [
     canonicalModelKey: "happyhorse-r2v",
     vendor: "aliyun",
     unit: "PER_SEC",
-    listCostYuan: 0.22,
+    tierRaw: "标准",
+    listCostYuan: 0.9,
     discountRate: 0.1,
   },
   {

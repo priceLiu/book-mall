@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import { Maximize2, RefreshCw, Video } from "lucide-react";
@@ -29,6 +30,7 @@ import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { cn } from "@/lib/utils";
+import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
 import { Pro2ImageNodeToolbar } from "../pro2/pro2-image-node-toolbar";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
@@ -48,6 +50,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const saveAsAsset = useSaveNodeAsAsset();
   const { succeeded } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
+  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
   const videoUrl =
     d.runtime?.ossUrl ??
@@ -58,7 +62,15 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   const isGenerating = isLibtvMediaGenerating(d);
   const hasVideo = Boolean(videoUrl);
-  const showSidePlus = Boolean(selected && !isGenerating);
+  const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
+
+  useLibtvMediaNodeAutoFit({
+    nodeId: id,
+    mediaUrl: videoUrl,
+    kind: "video",
+    profile: "sbv1-video",
+    disabled: !hasVideo || isGenerating,
+  });
 
   const spawnStore = useMemo(
     () => ({ nodes, edges, addNode, addNodeInGroup, setNodes, setEdges }),
@@ -105,6 +117,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       <div
         className={SBV1_NODE_OUTER_CLASS}
         data-sbv1-dock-anchor={id}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
       >
         <Handle
           id="in_ref"

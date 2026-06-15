@@ -7,9 +7,9 @@ import {
   ImageIcon,
   Loader2,
   Plus,
-  ScanFace,
   SlidersHorizontal,
   X,
+  Zap,
 } from "lucide-react";
 import {
   MentionsTextarea,
@@ -22,7 +22,7 @@ import {
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "@/components/canvas/pro2/pro2-input-dock-shell";
-import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
+import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
 import { spawnSbv1PastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
@@ -30,10 +30,11 @@ import {
   SBV1_REF_THUMB_CLASS,
 } from "@/lib/canvas/sbv1-node-chrome";
 import {
-  estimateSbv1ListCostYuan,
   getSbv1VolcengineModelById,
   migrateSbv1ModelVariantId,
+  resolveSbv1VariantIdFromEngine,
 } from "@/lib/canvas/sbv1-video-models";
+import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import type { Sbv1UpstreamRefLink } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -41,14 +42,13 @@ import {
   SBV1_DOCK_ACTIVE_REF_BORDER_CLASS,
   SBV1_DOCK_REF_IDLE_BORDER_CLASS,
 } from "@/lib/canvas/dock-active-ref-chrome";
+import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import {
   Sbv1VideoGenerateSettingsModal,
   sbv1VideoSettingsTriggerLabel,
 } from "./sbv1-video-generate-settings-modal";
-import { useSbv1PortraitLivenessStatus } from "@/lib/canvas/use-sbv1-portrait-liveness-status";
-import { Sbv1PortraitLivenessModal } from "./sbv1-portrait-liveness-modal";
 
 function RefPreviewCard({
   link,
@@ -103,6 +103,7 @@ export function Sbv1VideoEngineChatInput({
   onPatch,
   onRun,
   placement,
+  hidden,
 }: {
   nodeId: string;
   data: Sbv1VideoEngineNodeData;
@@ -111,7 +112,8 @@ export function Sbv1VideoEngineChatInput({
   isGenerating: boolean;
   onPatch: (patch: Partial<Sbv1VideoEngineNodeData>) => void;
   onRun: () => void;
-  placement: { left: number; top: number; dockW: number };
+  placement: LibtvDockFlowPlacement;
+  hidden?: boolean;
 }) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
@@ -124,21 +126,25 @@ export function Sbv1VideoEngineChatInput({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [livenessOpen, setLivenessOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const { groupId, verifiedAt, refresh, isVerified } =
-    useSbv1PortraitLivenessStatus(Boolean(base));
 
   const smartMulti = data.referenceMode === "smart_multi";
+  /** Dock 预估与财务后台一致：视频按 15s 封顶；智能多帧未设时长时也按 15s 展示 */
+  const billableDurationSec = (() => {
+    const cap = 15;
+    if (smartMulti && (data.durationSec ?? 0) <= 0) return cap;
+    const s = Math.max(1, Math.round(data.durationSec || cap));
+    return Math.min(s, cap);
+  })();
   const variantId = migrateSbv1ModelVariantId(
-    data.volcengineVariantId ?? data.jimengModelId,
+    data.volcengineVariantId ??
+      data.jimengModelId ??
+      resolveSbv1VariantIdFromEngine(data.engine, providers),
   );
   const selectedModel = getSbv1VolcengineModelById(variantId, providers);
+  const modelKey = selectedModel.engine.modelKey;
   const settingsLabel = sbv1VideoSettingsTriggerLabel(data, providers);
-  const estCostYuan = estimateSbv1ListCostYuan({
-    listCostYuanPerSec: selectedModel.listCostYuanPerSec,
-    durationSec: smartMulti && data.durationSec <= 0 ? 4 : data.durationSec,
-  });
+  const estCredits = useModelCreditsPreview(modelKey, billableDurationSec, variantId);
 
   const hasRefs = upstreamLinks.some((l) => l.previewUrl);
   const hasPrompt = Boolean((data.prompt ?? "").trim());
@@ -219,7 +225,7 @@ export function Sbv1VideoEngineChatInput({
     ) : null;
 
   const toolbar = (
-    <Pro2DockToolbar>
+    <Pro2DockToolbar className="gap-2">
       <div className="flex shrink-0 items-center gap-0.5">
         <button
           type="button"
@@ -239,33 +245,26 @@ export function Sbv1VideoEngineChatInput({
         >
           <SlidersHorizontal className="size-4" />
         </button>
-        <button
-          type="button"
-          title="真人人像 · 活体认证"
-          disabled={isGenerating}
-          className={cn(
-            "nodrag rounded-md p-1.5 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40",
-            isVerified ? "text-cyan-300/90" : "text-white/40",
-          )}
-          onClick={() => setLivenessOpen(true)}
-        >
-          <ScanFace className="size-4" />
-        </button>
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-        <button
-          type="button"
-          disabled={isGenerating}
-          className="nodrag flex h-8 min-w-0 max-w-[min(220px,45%)] items-center gap-1 rounded-md px-2 text-[13px] text-white/65 hover:bg-white/[0.06] hover:text-white/90"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <span className="truncate">{settingsLabel}</span>
-          <ChevronDown className="size-3.5 shrink-0 opacity-45" />
-        </button>
-        {estCostYuan != null ? (
-          <span className="shrink-0 text-[10px] tabular-nums text-white/35">
-            ≈¥{estCostYuan.toFixed(2)}
+      <button
+        type="button"
+        disabled={isGenerating}
+        className="nodrag flex h-8 min-w-0 flex-1 items-center gap-1 rounded-md px-2 text-left text-[13px] text-white/65 hover:bg-white/[0.06] hover:text-white/90"
+        onClick={() => setSettingsOpen(true)}
+      >
+        <span className="truncate">{settingsLabel}</span>
+        <ChevronDown className="size-3.5 shrink-0 opacity-45" />
+      </button>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        {estCredits?.credits != null ? (
+          <span
+            className="flex shrink-0 items-center gap-1 text-[13px] tabular-nums text-amber-200/90"
+            title={`${billableDurationSec}s 封顶 · ${estCredits.canonicalModelKey} · 预计扣 ${estCredits.credits} 积分（按当前套餐折算，与实扣一致）`}
+          >
+            <Zap className="size-3.5 fill-amber-300/90 text-amber-300/90" />
+            {estCredits.credits}
           </span>
         ) : null}
         <button
@@ -288,10 +287,9 @@ export function Sbv1VideoEngineChatInput({
   return (
     <>
       <Pro2InputDockShell
-        left={placement.left}
-        top={placement.top}
-        width={placement.dockW}
+        flowAnchor={placement}
         dockClassName="sbv1-video-engine-dock"
+        hidden={hidden}
         footer={
           <>
             {refBar}
@@ -327,7 +325,6 @@ export function Sbv1VideoEngineChatInput({
             className={cn(
               SBV1_CHAT_INPUT_TEXTAREA_CLASS,
               RF_FORM_CONTROL,
-              RF_NO_WHEEL,
               "min-h-0 px-4 py-3",
             )}
             wrapperClassName="min-h-[72px]"
@@ -372,16 +369,6 @@ export function Sbv1VideoEngineChatInput({
         data={data}
         onClose={() => setSettingsOpen(false)}
         onConfirm={onPatch}
-      />
-
-      <Sbv1PortraitLivenessModal
-        open={livenessOpen}
-        existingGroupId={groupId}
-        verifiedAt={verifiedAt}
-        onClose={() => setLivenessOpen(false)}
-        onSuccess={() => {
-          void refresh();
-        }}
       />
     </>
   );

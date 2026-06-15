@@ -157,6 +157,15 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
 
   const offeringByCanonical = new Map(offerings.map((o) => [o.canonicalModelKey, o]));
 
+  const publishedPrices =
+    input.persona === "PLATFORM_CREDIT"
+      ? await prisma.modelCreditPrice.findMany({
+          where: { active: true },
+          select: { canonicalModelKey: true, creditsPerUnit: true },
+        })
+      : [];
+  const priceByCanonical = new Map(publishedPrices.map((p) => [p.canonicalModelKey, p]));
+
   // BYOK: 展示所有凭证匹配的 route（按 modelKey 去重，同 canonical 多厂商可出现多条）
   if (input.persona === "BYOK") {
     const seenKeys = new Set<string>();
@@ -199,6 +208,8 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
 
     const offering = offeringByCanonical.get(catalog.canonicalKey);
     if (!offering?.activeModelKey) continue;
+    const priceRow = priceByCanonical.get(catalog.canonicalKey);
+    if (!priceRow) continue;
     rows.push({
       canonicalModelKey: catalog.canonicalKey,
       modelKey: offering.activeModelKey,
@@ -211,7 +222,7 @@ export async function listModelsForApp(input: ListModelsForAppInput): Promise<Re
       providerKind: offering.activeProviderKind ?? route.providerKind,
       vendor: offering.activeVendor ?? route.vendor,
       credentialBound: true,
-      creditsPerUnit: offering.publishedCreditsPerUnit,
+      creditsPerUnit: offering.publishedCreditsPerUnit ?? priceRow.creditsPerUnit,
       platformOffering: true,
     });
   }

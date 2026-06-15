@@ -14,10 +14,10 @@ export const DEFAULT_MARGIN_M = 2.5;
 export const DEFAULT_MIN_MARGIN_GUARD = 0.3;
 /** 财务 2.0：视频固定 15s 计费封顶 */
 export const DEFAULT_VIDEO_SEC = 15;
-/** 财务 2.0：视频系数 M=4 → 恰好 75% 毛利 */
-export const DEFAULT_VIDEO_MARGIN_M = 4;
-/** 财务 2.0：视频毛利护栏 ≥75% */
-export const DEFAULT_VIDEO_MIN_MARGIN_GUARD = 0.75;
+/** 定价 1.5：普通视频默认 M=1.5（≈33% 毛利） */
+export const DEFAULT_VIDEO_MARGIN_M = 1.5;
+/** 贵视频 M=1.0 允许贴成本；护栏略负以容纳取整误差 */
+export const DEFAULT_VIDEO_MIN_MARGIN_GUARD = -0.02;
 
 /**
  * 逐档单价派生 + 积分取整会引入约 ±0.2pct 的毛利误差（见验收标准 §1 容差）。
@@ -35,9 +35,9 @@ export interface PricingConfig {
   defaultMarginM: number;
   minMarginGuard: number;
   defaultVideoSec: number;
-  /** 视频专项系数 M（默认 4 → 75% 毛利） */
+  /** 视频专项系数 M（普通视频默认 1.5；贵视频由 model-margin-policy 覆盖为 1.0） */
   videoMarginM: number;
-  /** 视频专项毛利护栏（默认 0.75） */
+  /** 视频专项毛利护栏（默认 -0.02，允许 M=1.0 贴成本） */
   videoMinMarginGuard: number;
 }
 

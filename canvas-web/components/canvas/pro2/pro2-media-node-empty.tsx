@@ -24,7 +24,7 @@ export function Pro2MediaNodeEmptyState({
         className,
       )}
     >
-      <Icon className="size-8 text-white/20" strokeWidth={1.5} />
+      <Icon className="size-28 text-white/20" strokeWidth={1.25} />
       <span className="text-[11px] text-white/45">{label}</span>
     </div>
   );

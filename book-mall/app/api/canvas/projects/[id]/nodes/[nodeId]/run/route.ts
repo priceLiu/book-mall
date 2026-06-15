@@ -6,10 +6,7 @@ import {
   readJsonBody,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
-import {
-  scheduleCanvasPollWorkerForProject,
-  submitCanvasNodeTask,
-} from "@/lib/canvas/canvas-task-service";
+import { enrichSingleCanvasTask } from "@/lib/canvas/canvas-task-billing";
 import { assertGatewayApiKeyLinkedForUser } from "@/lib/canvas/book-gateway-link";
 import {
   runAiEngineNode,
@@ -43,6 +40,7 @@ import {
   isSbv1PipelineNodeType,
   storyPro2ToProRunnerType,
 } from "@/lib/canvas/canvas-story-edition";
+import { runSbv1ImageNode } from "@/lib/canvas/sbv1-image-runner";
 import { runSbv1VideoEngineNode } from "@/lib/canvas/sbv1-video-engine-runner";
 import { storyProStyleGateError } from "@/lib/canvas/story-pro-style-anchor";
 import { resolveCharacterRowAssetRefUrls } from "@/lib/canvas/story-pro-character-ref-resolve";
@@ -299,6 +297,8 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         forceFresh,
         engineKind: node.type,
       });
+    } else if (node.type === "sbv1-image") {
+      result = await runSbv1ImageNode({ ...baseArgs, forceFresh });
     } else if (node.type === "sbv1-video-engine") {
       result = await runSbv1VideoEngineNode({ ...baseArgs, forceFresh });
     } else if (node.type === "video-engine") {
@@ -319,8 +319,9 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     ) {
       scheduleCanvasPollWorkerForProject(projectId);
     }
+    const task = await enrichSingleCanvasTask(result.task);
     return NextResponse.json(
-      { reused: result.reused, task: result.task },
+      { reused: result.reused, task },
       { status: result.reused ? 200 : 202, headers: jsonHeaders(request) },
     );
   } catch (err) {

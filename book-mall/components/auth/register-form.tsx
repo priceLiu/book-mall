@@ -13,7 +13,7 @@ import {
   BoxReveal,
 } from "@/components/auth/animated-auth-ui";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
-import { markBookMallSessionActive } from "@/lib/session-kicked-marker";
+import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 import { cn } from "@/lib/utils";
 
 const PERSONA_OPTIONS: {
@@ -84,9 +84,8 @@ export function RegisterForm() {
         router.push("/login?registered=1");
         return;
       }
-      markBookMallSessionActive();
-      router.push("/account");
-      router.refresh();
+      navigateAfterAuth("/account");
+      return;
     } finally {
       setLoading(false);
     }

@@ -43,7 +43,7 @@ export function FinanceHelpClient() {
         </p>
         <ol className="mt-2 list-inside list-decimal space-y-2 text-sm text-[#595959]">
           <li>
-            <strong>模型挂牌价（元）</strong> = 渠道净成本 × 系数 M（视频 M=4，文本/图默认 2.5）
+            <strong>模型挂牌价（元）</strong> = 渠道净成本 × 系数 M（贵视频 M=1.0、普通视频 M=1.5、生图 1.5–2.0、LLM 默认 2.5）
           </li>
           <li>
             <strong>全局锚定</strong>（默认 ¥0.04/积分）用于报价计算器预览：
@@ -52,7 +52,7 @@ export function FinanceHelpClient() {
           <li>
             <strong>用户实际扣分</strong>按所属套餐单价：
             <code className="mx-1 rounded bg-[#fafafa] px-1">扣分 = round(挂牌价 ÷ (套餐价÷月积分))</code>
-            使各档位真实毛利尽量恒定（视频约 75%）
+            贵视频各档实测毛利 ≈ 0%（贴成本）；普通视频 ≈ 33%
           </li>
           <li>
             <strong>文本 Token 计费单位</strong>：按<strong>千 Token</strong>计一次（
@@ -90,7 +90,7 @@ export function FinanceHelpClient() {
         <h2 className={h2}>三、视频专项规则（15 秒）</h2>
         <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-[#595959]">
           <li>单条最长 15 秒，按秒计费，超过 15 秒仍按 15 秒计</li>
-          <li>视频系数 M 最低 4，毛利护栏 ≥ 75%</li>
+          <li>视频系数分档：贵视频 M=1.0（贴成本）、普通 M=1.5；护栏 ≥ -0.02</li>
           <li>先冻结视频池积分 → 渲染成功结算；厂商全失败才全额退还</li>
           <li>通用积分池与视频专用池隔离（账户配置了 videoMonthlyGrant 时启用双池）</li>
           <li>并发 2 / 队列 10 / 批量 ≤5 集 / 5 分钟 ≥10 条触发 15 分钟冷却</li>

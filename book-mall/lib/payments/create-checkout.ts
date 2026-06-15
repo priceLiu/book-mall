@@ -2,8 +2,6 @@ import type { Prisma } from "@prisma/client";
 import type { PaymentProductKind } from "@prisma/client";
 
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
-import { BYOK_SCOPE_TEAM_SEAT } from "@/lib/billing/byok-pricing";
-import { resolveByokSeatsForTenant } from "@/lib/billing/byok-subscription-service";
 import { packById } from "@/lib/billing/credit-topup-packs";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
@@ -87,46 +85,9 @@ export async function createPaymentCheckout(input: {
       };
       break;
     }
-    case "BYOK_PERSONAL": {
-      await assertBillingPersona(userId, "BYOK");
-      const cfg = await prisma.byokServiceConfig.findUnique({
-        where: { scopeKey: payload.scopeKey },
-      });
-      if (!cfg || !cfg.active) throw new Error("无效的 BYOK 套餐");
-      amountYuan = Number(cfg.techServiceFeeYuan);
-      productSnapshot = { scopeKey: cfg.scopeKey, label: cfg.label };
-      break;
-    }
-    case "BYOK_TEAM": {
-      await assertBillingPersona(userId, "BYOK");
-      const cfg = await prisma.byokServiceConfig.findUnique({
-        where: { scopeKey: payload.scopeKey },
-      });
-      if (!cfg || !cfg.active || payload.scopeKey !== BYOK_SCOPE_TEAM_SEAT) {
-        throw new Error("无效的团队 BYOK 套餐");
-      }
-      const member = await prisma.tenantMember.findFirst({
-        where: { userId, tenantId: payload.tenantId, status: "ACTIVE" },
-        include: { tenant: { select: { type: true, status: true } } },
-      });
-      if (!member || member.tenant.type !== "TEAM" || member.tenant.status !== "ACTIVE") {
-        throw new Error("你不是该团队的活跃成员");
-      }
-      if (!canTenant(member.role, "billing:manage")) {
-        throw new Error("仅团队主账号可开通团队 BYOK");
-      }
-      const seats = payload.seats
-        ? Math.max(cfg.minSeats ?? 3, Math.round(payload.seats))
-        : await resolveByokSeatsForTenant(payload.tenantId);
-      amountYuan = Number(cfg.techServiceFeeYuan) * seats;
-      productSnapshot = {
-        scopeKey: cfg.scopeKey,
-        label: cfg.label,
-        tenantId: payload.tenantId,
-        seats,
-      };
-      break;
-    }
+    case "BYOK_PERSONAL":
+    case "BYOK_TEAM":
+      throw new Error("BYOK 技术服务费已退役，请开通会员订阅（报价页）并绑定 Gateway Key");
     case "CREDIT_TOPUP": {
       const pack = packById(payload.packId);
       if (!pack) throw new Error("无效的积分包档位");

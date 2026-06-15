@@ -10,9 +10,19 @@ import {
   videoBillableSeconds,
 } from "@/lib/pricing/credit-pricing-formulas";
 
+import { libNanoProCanonicalFromModelKey } from "@/lib/billing/lib-nano-pro-canonical";
+import {
+  sbv1VideoCanonicalFromParams,
+  sbv1VideoCanonicalKey,
+} from "@/lib/billing/sbv1-video-canonical";
+
 export interface CreditsPreviewInput {
   /** 厂商/工具站模型 key，经别名归口到 canonical */
   modelKey: string;
+  /** sbv1 展示变体 id（优先于 modelKey 别名） */
+  variantId?: string | null;
+  /** 显式 canonical（BFF 已解析时传入） */
+  canonicalModelKey?: string | null;
   /** 用户档位「每积分单价」；缺省时读 CreditAccount.pricePerCreditYuan */
   pricePerCreditYuan?: number | null;
   ownerType?: "USER" | "TENANT";
@@ -20,6 +30,8 @@ export interface CreditsPreviewInput {
   units?: number;
   durationSec?: number | null;
   imageCount?: number | null;
+  /** KIE nano-banana / sbv1 生图清晰度分档（1K / 2K / 4K） */
+  resolution?: string | null;
 }
 
 export interface CreditsPreviewResult {
@@ -68,11 +80,32 @@ function billableUnits(
   return Math.max(1, Math.round(input.units ?? 1));
 }
 
+async function resolvePreviewCanonical(input: CreditsPreviewInput): Promise<string | null> {
+  const explicit = input.canonicalModelKey?.trim();
+  if (explicit) return explicit;
+
+  const fromVariant = sbv1VideoCanonicalKey(input.variantId);
+  if (fromVariant) return fromVariant;
+
+  const fromNano = libNanoProCanonicalFromModelKey(
+    input.modelKey,
+    input.resolution,
+  );
+  if (fromNano) return fromNano;
+
+  const fromKey = await resolveCanonicalModelKey(input.modelKey);
+  if (fromKey === "lib-nano-pro") {
+    return libNanoProCanonicalFromModelKey(input.modelKey, input.resolution);
+  }
+  if (fromKey) return fromKey;
+
+  return sbv1VideoCanonicalFromParams({ modelKey: input.modelKey });
+}
+
 export async function previewModelCredits(
   input: CreditsPreviewInput,
 ): Promise<CreditsPreviewResult | null> {
-  const canonical =
-    (await resolveCanonicalModelKey(input.modelKey)) ?? input.modelKey.trim();
+  const canonical = (await resolvePreviewCanonical(input)) ?? input.modelKey.trim();
   if (!canonical) return null;
 
   const snap = await resolveCostSnapshot(canonical);

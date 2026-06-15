@@ -58,8 +58,8 @@ export async function savePricingConfigAction(formData: FormData): Promise<Actio
   const defaultMarginM = num(formData.get("defaultMarginM"), 2.5);
   const minMarginGuard = num(formData.get("minMarginGuard"), 0.3);
   const defaultVideoSec = Math.max(1, Math.round(num(formData.get("defaultVideoSec"), 15)));
-  const videoMarginM = num(formData.get("videoMarginM"), 4);
-  const videoMinMarginGuard = num(formData.get("videoMinMarginGuard"), 0.75);
+  const videoMarginM = num(formData.get("videoMarginM"), 1.5);
+  const videoMinMarginGuard = num(formData.get("videoMinMarginGuard"), -0.02);
   if (creditAnchorYuan <= 0) return { ok: false, error: "锚定单价必须大于 0" };
   await prisma.platformPricingConfig.upsert({
     where: { id: "default" },

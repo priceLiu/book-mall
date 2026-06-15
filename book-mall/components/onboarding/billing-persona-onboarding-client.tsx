@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 import type { BillingPersona } from "@prisma/client";
 import { AuthAnimatedScreen } from "@/components/auth/auth-animated-screen";
 import { BoxReveal } from "@/components/auth/animated-auth-ui";
@@ -26,7 +26,6 @@ const PERSONA_OPTIONS: {
 ];
 
 export function BillingPersonaOnboardingClient() {
-  const router = useRouter();
   const [billingPersona, setBillingPersona] = useState<BillingPersona>("PLATFORM_CREDIT");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,8 +44,8 @@ export function BillingPersonaOnboardingClient() {
         setError(data.error ?? "保存失败");
         return;
       }
-      router.push(`/onboarding/welcome?persona=${billingPersona}`);
-      router.refresh();
+      navigateAfterAuth(`/onboarding/welcome?persona=${billingPersona}`);
+      return;
     } finally {
       setLoading(false);
     }

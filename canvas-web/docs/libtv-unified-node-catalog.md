@@ -75,6 +75,19 @@
 
 **禁止**：sbv1 图片单独定义与 Pro2 不同的默认尺寸；新节点勿用 `libtvMediaNodeHeightForWidth`（4:3 历史 helper）。
 
+**媒体到达后自动适配**（空态保持上表默认 · 有图/有视频后按真实宽高比改尺寸）：
+
+| 规则 | 说明 |
+| --- | --- |
+| 实现 | `useLibtvMediaNodeAutoFit` · `lib/canvas/libtv-media-node-auto-fit.ts` |
+| 适用 | `story-pro2-image` · `sbv1-image` · `sbv1-video-engine` |
+| 探测 | 图片 `natural*` · 视频 `loadedmetadata` |
+| 新媒体 | 始终重算（覆盖用户曾手动拉伸） |
+| 组内 sbv1 参考图 | 宫格 relayout 用统一格，跳过自动适配 |
+| 组内视频合成 | `mediaFit` + 组布局用实测尺寸 |
+
+详见 [`storyboard-video-1.0-node-interaction-spec.md`](./storyboard-video-1.0-node-interaction-spec.md) §5.1。
+
 ### 1.4 打组 / 组顶栏样式（统一）
 
 | 场景 | 组件 | 壳层 |

@@ -251,8 +251,7 @@ export function Pro2ScriptInputDock() {
 
   return (
     <Pro2InputDockShell
-      left={placement.left}
-      top={placement.top}
+      flowAnchor={placement}
       dockClassName="pro2-script-dock"
       header={
         <Pro2DockContextBar>

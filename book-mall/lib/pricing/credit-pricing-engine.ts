@@ -8,8 +8,8 @@
  */
 import { prisma } from "@/lib/prisma";
 
-import {
-  computeCreditPrice,
+import { computeCreditPrice,
+  computeNetCost,
   DEFAULT_CREDIT_ANCHOR_YUAN,
   DEFAULT_MARGIN_M,
   DEFAULT_MIN_MARGIN_GUARD,
@@ -18,12 +18,13 @@ import {
   DEFAULT_VIDEO_SEC,
   FALLBACK_PRICING_CONFIG,
   marginGuardForUnit,
-  marginMForUnit,
   marginPassesGuard,
   type PricingConfig,
 } from "./credit-pricing-formulas";
+import { resolveModelMarginM } from "./model-margin-policy";
 
 export * from "./credit-pricing-formulas";
+export { resolveModelMarginM, expectedAnchorMarginForM } from "./model-margin-policy";
 
 function toNum(v: unknown, fallback = 0): number {
   if (v == null) return fallback;
@@ -97,13 +98,17 @@ export async function publishModelCreditPrice(input: {
   const chosen = [...profiles].sort((a, b) => {
     const r = (channelRank[a.channel] ?? 9) - (channelRank[b.channel] ?? 9);
     if (r !== 0) return r;
-    return toNum(a.netCostYuan) - toNum(b.netCostYuan);
+    const netA = computeNetCost(toNum(a.listCostYuan), toNum(a.discountRate));
+    const netB = computeNetCost(toNum(b.listCostYuan), toNum(b.discountRate));
+    return netB - netA;
   })[0];
 
-  // 按计费类型取系数 M 与毛利护栏（视频 PER_SEC → videoMarginM=4 / 护栏 0.75）
+  const netCostYuan = computeNetCost(toNum(chosen.listCostYuan), toNum(chosen.discountRate));
   const marginM =
     input.marginM ??
-    marginMForUnit(chosen.unit, {
+    resolveModelMarginM({
+      unit: chosen.unit,
+      netCostYuan,
       defaultMarginM: config.defaultMarginM,
       videoMarginM: config.videoMarginM,
     });

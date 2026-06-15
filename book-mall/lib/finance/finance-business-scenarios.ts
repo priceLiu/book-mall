@@ -237,7 +237,7 @@ export function buildFinanceBusinessScenarios(): FinanceBusinessScenariosPayload
     intro:
       "用「用户付多少钱 → 消耗多少积分 → 我们付厂商多少成本 → 确认多少收入 → 剩多少利润」帮财务同事快速看懂个人与团队套餐的经济账。",
     benchmarkNote:
-      "以下数字以验收基准模型 happyhorse-r2v、15 秒视频、M=4（目标毛利 75%）核算；不同模型扣分与成本略有差异，完整 30 模型明细见 Scenario Lab。",
+      "以下数字以验收基准模型 happyhorse-r2v、15 秒视频、贵视频 M=1.0（贴成本）核算；不同模型按 M 分档（普通视频 M=1.5），完整 30 模型明细见 Scenario Lab。",
     validation: {
       ok: validation.ok,
       modelCount: meta.seedsCount,

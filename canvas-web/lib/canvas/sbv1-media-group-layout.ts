@@ -26,8 +26,11 @@ function sbv1VideoEngineDimensions(n: CanvasFlowNode): {
   width: number;
   height: number;
 } {
+  const { w, h } = nodeMeasuredSize(n);
   if (Boolean((n.data as { manualSize?: boolean }).manualSize)) {
-    const { w, h } = nodeMeasuredSize(n);
+    return { width: w, height: h };
+  }
+  if (Boolean((n.data as { mediaFit?: boolean }).mediaFit)) {
     return { width: w, height: h };
   }
   return {

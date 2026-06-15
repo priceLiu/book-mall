@@ -2,6 +2,7 @@
  * 分镜视频 1.0 · sbv1-video-engine runner
  */
 import { CanvasProjectError } from "./canvas-project-service";
+import { resolveVolcengineVideoRatio } from "./canvas-video-volcengine";
 import {
   runVideoEngineNode,
   type RunEngineNodeArgs,
@@ -27,8 +28,10 @@ export async function runSbv1VideoEngineNode(
     ...((data.params as Record<string, unknown> | undefined) ?? {}),
   };
 
-  const aspectRatio = String(data.aspectRatio ?? params.aspect_ratio ?? "16:9");
-  const durationSec = Number(data.durationSec ?? params.duration ?? 5);
+  const aspectRatio = resolveVolcengineVideoRatio(
+    String(data.aspectRatio ?? params.aspect_ratio ?? "16:9"),
+  );
+  const durationSec = Number(data.durationSec ?? params.duration ?? 15);
   const resolution = String(
     data.resolution ?? params.resolution ?? "1080p",
   ).toLowerCase();

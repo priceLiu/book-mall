@@ -3,7 +3,6 @@
 import { type FormEvent, useState, useTransition } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { AuthAnimatedScreen } from "@/components/auth/auth-animated-screen";
 import {
@@ -12,7 +11,7 @@ import {
   BoxReveal,
 } from "@/components/auth/animated-auth-ui";
 import { maskPhone } from "@/lib/auth/phone";
-import { markBookMallSessionActive } from "@/lib/session-kicked-marker";
+import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 
 export function TeamInviteClient({
   token,
@@ -33,7 +32,6 @@ export function TeamInviteClient({
   isLoggedIn: boolean;
   hasStaleSession: boolean;
 }) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -83,8 +81,7 @@ export function TeamInviteClient({
       setError(data.error ?? "接受邀请失败");
       return false;
     }
-    router.push("/account/team");
-    router.refresh();
+    navigateAfterAuth("/account/team");
     return true;
   }
 
@@ -169,7 +166,6 @@ export function TeamInviteClient({
           }
         }
 
-        markBookMallSessionActive();
         await acceptAfterAuth();
       } catch {
         setError("网络异常，请稍后重试");

@@ -10,8 +10,6 @@ import {
   verifySmsCode,
 } from "@/lib/auth/sms-verification-service";
 import { deriveEcomBillingMode } from "@/lib/billing/billing-persona";
-import { ensureBookUserGatewayIdentitySynced } from "@/lib/gateway/sync-user";
-import { ensurePlatformManagedKeyForUser } from "@/lib/gateway/platform-managed-key";
 import { prisma } from "@/lib/prisma";
 import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 
@@ -74,7 +72,6 @@ export async function POST(request: Request) {
     const lockedAt = new Date();
     const verifiedAt = new Date();
 
-    let createdUserId: string | null = null;
     await prisma.$transaction(async (tx) => {
       if (existing) {
         const user = await tx.user.update({
@@ -89,7 +86,6 @@ export async function POST(request: Request) {
             ecomBillingMode: deriveEcomBillingMode(billingPersona),
           },
         });
-        createdUserId = user.id;
         const wallet = await tx.wallet.findUnique({ where: { userId: user.id } });
         if (!wallet) {
           await tx.wallet.create({ data: { userId: user.id } });
@@ -106,27 +102,12 @@ export async function POST(request: Request) {
             ecomBillingMode: deriveEcomBillingMode(billingPersona),
           },
         });
-        createdUserId = user.id;
         await tx.wallet.create({ data: { userId: user.id } });
       }
     });
 
-    if (createdUserId) {
-      try {
-        await ensureBookUserGatewayIdentitySynced(createdUserId);
-        if (billingPersona === "PLATFORM_CREDIT") {
-          await ensurePlatformManagedKeyForUser(createdUserId);
-        }
-      } catch (syncErr) {
-        console.warn("[register] gateway sync failed", syncErr);
-      }
-    }
-
-    await prisma.platformConfig.upsert({
-      where: { id: "default" },
-      create: { id: "default" },
-      update: {},
-    });
+    // Gateway 身份 / sk-gw 在首次 SSO 或生成时懒加载（见 sync-user / platform-managed-key），
+    // 不在注册热路径阻塞，避免注册 + 登录连续等待 2～3 秒。
 
     return NextResponse.json({ ok: true, billingPersona, phone });
   } catch (e) {

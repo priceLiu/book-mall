@@ -182,11 +182,15 @@ export function BillingByokClient({ scope = "account", tenantId }: BillingByokCl
 
       {!bill ? (
         <p className="text-sm text-[#8c8c8c]">{data.message ?? "无有效 BYOK 套餐"}</p>
-      ) : (
+      ) : bill.resourceFeeYuan > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          <StatCard label="技术服务费" yuan={bill.techServiceFeeYuan} />
+          <StatCard label="资源计量费" yuan={bill.resourceFeeYuan} />
           <StatCard label="本月应付" yuan={bill.totalYuan} highlight />
         </div>
+      ) : (
+        <p className="text-sm text-[#8c8c8c]">
+          本月无额外平台费用；超额编排已从轻量包扣分（见上表）。
+        </p>
       )}
     </FinancePageShell>
   );

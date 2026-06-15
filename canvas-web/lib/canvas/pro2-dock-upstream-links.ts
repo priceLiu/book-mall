@@ -176,3 +176,12 @@ export function resolvePro2DockUpstreamLinks(
 
   return out;
 }
+
+/** Dock 顶栏风格按钮 · 已连风格素材节点 */
+export function resolvePro2DockStyleFromUpstream(
+  links: Pro2DockUpstreamLink[],
+): { name: string } | null {
+  const style = links.find((l) => l.id.startsWith("up-style-"));
+  if (!style) return null;
+  return { name: style.label };
+}

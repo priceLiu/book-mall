@@ -1,9 +1,16 @@
+import type {
+  Sbv1ImageAspectRatio,
+  Sbv1ImageQuality,
+  Sbv1ImageResolution,
+} from "./sbv1-image-models";
+import { buildSbv1ImageEngineParams } from "./sbv1-image-models";
 import type { CanvasEnginePick, CanvasNodeRuntime } from "./types";
 import { GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID } from "./system-providers";
 
 export type Sbv1ReferenceMode = "omni" | "first_last" | "smart_multi";
 
 export type Sbv1AspectRatio =
+  | "auto"
   | "21:9"
   | "16:9"
   | "4:3"
@@ -37,6 +44,25 @@ export type Sbv1ImageNodeData = {
     prompt: string;
     imageUrl: string;
   };
+  engine?: CanvasEnginePick;
+  aspectRatio?: Sbv1ImageAspectRatio;
+  imageQuality?: Sbv1ImageQuality;
+  resolution?: Sbv1ImageResolution;
+  outputCount?: number;
+};
+
+export const SBV1_DEFAULT_IMAGE_NODE_DATA: Sbv1ImageNodeData = {
+  label: "图片",
+  dockInput: "",
+  aspectRatio: "auto",
+  imageQuality: "standard",
+  resolution: "2K",
+  outputCount: 1,
+  engine: {
+    providerId: "",
+    modelKey: "nano-banana-pro",
+    params: buildSbv1ImageEngineParams({}),
+  },
 };
 
 export type Sbv1VideoEngineNodeData = {
@@ -68,10 +94,10 @@ export const SBV1_DEFAULT_VIDEO_ENGINE_DATA: Sbv1VideoEngineNodeData = {
   engine: {
     providerId: GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
     modelKey: "doubao-seedance-2.0",
-    params: { resolution: "720p", generate_audio: true },
+    params: { resolution: "720p", generate_audio: true, duration: 15 },
   },
   aspectRatio: "4:3",
-  durationSec: 5,
+  durationSec: 15,
   resolution: "720p",
   refSlots: [],
 };

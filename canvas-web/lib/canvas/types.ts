@@ -49,6 +49,7 @@ import {
   PRO2_FRAME_BOARD_WIDTH,
 } from "./story-pro2-node-chrome";
 import {
+  SBV1_DEFAULT_IMAGE_NODE_DATA,
   SBV1_DEFAULT_VIDEO_ENGINE_DATA,
 } from "./sbv1-workspace-types";
 import {
@@ -694,8 +695,7 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     label: "剪映导出 · 专业版 2.0",
   } as Record<string, unknown>,
   "sbv1-image": {
-    label: "图片",
-    dockInput: "",
+    ...SBV1_DEFAULT_IMAGE_NODE_DATA,
   } as Record<string, unknown>,
   "sbv1-video-engine": {
     ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,

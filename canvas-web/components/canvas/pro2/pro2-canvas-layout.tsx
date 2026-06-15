@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
+import { CanvasCreditsToastHost } from "@/components/canvas/canvas-credits-toast-host";
 import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { spawnPro2StyleAssetFromPreset } from "@/lib/canvas/pro2-spawn-style-asset";
+import {
+  spawnPro2StyleAssetFromPreset,
+  spawnPro2StyleAssetLeftOfImageFromPreset,
+} from "@/lib/canvas/pro2-spawn-style-asset";
 import type { StyleLibraryPreset } from "@/lib/canvas/style-library/catalog";
 import { Pro2CanvasToolbar } from "./pro2-canvas-toolbar";
 
@@ -28,6 +32,7 @@ export function Pro2CanvasLayout({
     (s) => s.setPro2StyleLibImageNodeId,
   );
   const getNodes = useCallback(() => useCanvasStore.getState().nodes, []);
+  const getEdges = useCallback(() => useCanvasStore.getState().edges, []);
 
   const [styleLibOpen, setStyleLibOpen] = useState(false);
 
@@ -46,13 +51,15 @@ export function Pro2CanvasLayout({
   const onStylePresetPicked = useCallback(
     (preset: StyleLibraryPreset) => {
       if (styleLibImageNodeId) {
-        updateNodeData(styleLibImageNodeId, {
-          dockStyleRef: {
-            presetId: preset.id,
-            name: preset.name,
-            prompt: preset.prompt,
-            imageUrl: preset.imageUrl,
-          },
+        spawnPro2StyleAssetLeftOfImageFromPreset({
+          preset,
+          imageNodeId: styleLibImageNodeId,
+          addNode,
+          setNodes,
+          setEdges,
+          getNodes,
+          getEdges,
+          updateNodeData,
         });
         closeStyleLib();
         return;
@@ -74,6 +81,7 @@ export function Pro2CanvasLayout({
       setNodes,
       setEdges,
       getNodes,
+      getEdges,
     ],
   );
 
@@ -101,6 +109,7 @@ export function Pro2CanvasLayout({
         onClose={closeStyleLib}
         onSpawn={onStylePresetPicked}
       />
+      <CanvasCreditsToastHost />
     </div>
   );
 }

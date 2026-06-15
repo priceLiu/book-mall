@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import { PRO2_RIGHT_ADD_MENU, PRO2_STARTER_LEFT_ADD_MENU } from "@/lib/canvas/pro2-add-node-menu";
 import {
@@ -89,10 +90,14 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     position: { x: 0, y: 0 },
   } as never);
   const linked = pro2HubIsLinkedOutline(nodes, edges, id, d);
+  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
+  const { hovered: sideHover, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const showTryMenu = !hasTable && !isGenerating && !linked;
   const showToolbar = Boolean(selected && hasTable && !isGenerating);
   const showSidePlus = Boolean(
-    selected && (hasPreviewContent || linked) && !isGenerating,
+    (sideHover || selected || connectingFromNodeId) &&
+      (hasPreviewContent || linked) &&
+      !isGenerating,
   );
 
   const spawnNeighbor = useCallback(
@@ -220,6 +225,8 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     <div
       className="relative flex h-full w-full min-h-0 min-w-0 cursor-grab flex-col active:cursor-grabbing"
       data-pro2-dock-anchor={id}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
     >
       <Pro2NodeResizer
         isVisible={!!selected}

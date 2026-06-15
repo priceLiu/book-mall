@@ -150,7 +150,7 @@ export function PlanChangeSimulationPanel({
               单次厂商净成本：<strong className="text-[#262626]">¥{report?.baseCostYuan?.toFixed(4)}</strong>
             </li>
             <li>
-              视频系数 M：<strong className="text-[#262626]">{bundle.videoMarginM ?? 4}</strong> → 目标毛利约 75%
+              视频系数 M：<strong className="text-[#262626]">{bundle.videoMarginM ?? 1.5}</strong>（贵视频 1.0 / 普通 1.5）
             </li>
           </ul>
         </section>

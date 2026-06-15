@@ -8,6 +8,7 @@ import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
+import { CanvasCreditsToastHost } from "@/components/canvas/canvas-credits-toast-host";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { Pro2CanvasLayout } from "@/components/canvas/pro2/pro2-canvas-layout";
 import { Sbv1CanvasLayout } from "@/components/canvas/sbv1/sbv1-canvas-layout";
@@ -53,6 +54,7 @@ import {
 import { defaultCanvasProjectName } from "@/lib/canvas/default-project-name";
 import { GatewayLinkBanner } from "@/components/canvas/gateway-link-banner";
 import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
+import { prefetchUserProviders } from "@/lib/canvas/use-user-providers";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
 import { hasStoryPro2Pipeline } from "@/lib/canvas/story-pro2-pipeline";
@@ -87,6 +89,10 @@ function Inner({ projectId }: { projectId: string }) {
   } = useGatewayLinkStatus();
   const gatewayLinkBlocked = !gatewayLinkLoading && !gatewayLinked;
   const dialogs = useDialogs();
+
+  useEffect(() => {
+    prefetchUserProviders(base);
+  }, [base]);
   const hydrate = useCanvasStore((s) => s.hydrate);
   const toGraph = useCanvasStore((s) => s.toGraph);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -872,6 +878,7 @@ function Inner({ projectId }: { projectId: string }) {
         ) : (
           <>
             <FlowCanvas projectId={projectId} onUndo={undo} onRedo={redo} />
+            <CanvasCreditsToastHost />
             <div className="pointer-events-none absolute inset-x-0 top-2 z-[60] flex justify-center px-2">
               <NodePalette onAdd={onAddViaPalette} />
             </div>

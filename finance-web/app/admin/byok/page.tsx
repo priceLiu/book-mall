@@ -1,12 +1,6 @@
-import { FinanceAdminGate } from "@/components/finance-admin-gate";
-import { ByokClient } from "@/components/admin/byok-client";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default function ByokPage() {
-  return (
-    <FinanceAdminGate require="managePricing">
-      <ByokClient />
-    </FinanceAdminGate>
-  );
+/** 积分换算 1.0：BYOK 技术服务费定价页已退役，见积分换算工作台。 */
+export default function AdminByokPage() {
+  redirect("/admin/credit-pricing");
 }

@@ -107,6 +107,8 @@ export type CanvasTaskRecord = {
   kieTaskId: string | null;
   createdAt: string;
   updatedAt: string;
+  creditsCharged?: number | null;
+  billingMode?: "PLATFORM_CREDIT" | "BYOK" | null;
   /** 漫剧列行 / 文案段（来自任务 inputPayload.storyScope） */
   storyScope?: CanvasTaskStoryScope;
 };

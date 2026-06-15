@@ -14,6 +14,7 @@ import { directPredecessors } from "./topo";
 import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
 import { dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
 import { resolvePro2DockUpstreamLinks } from "./pro2-dock-upstream-links";
+import { findStyleAssetLinkedToImage } from "./pro2-style-asset-connect";
 import { pro2DockMentionRefCatalog } from "./pro2-dock-ref-catalog";
 import { resolveSbv1UpstreamRefLinks } from "./sbv1-upstream-ref-links";
 import type { StoryRefImage } from "./story-ref-image";
@@ -39,6 +40,7 @@ import {
   isAnyStoryVideoColumnType,
 } from "./story-workspace-resolver";
 import { formatCanvasTaskError } from "./friendly-task-error";
+import { maybeNotifyCanvasCreditsSettled } from "./canvas-credits-notify";
 import {
   registerCanvasRunBus,
   type CanvasStoryRunJob,
@@ -56,6 +58,11 @@ import {
   storyApplyTaskResult,
   storyRunPendingPatch,
 } from "./story-run-apply";
+import {
+  sbv1ImageFailurePatch,
+  sbv1ImagePatchFromTask,
+} from "./sbv1-image-task-apply";
+import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import { resolveStoryProRunStylePayload } from "./story-pro-run-style-context";
 import { commitStoryVideoRowRun } from "./story-video-run";
 import type {
@@ -181,6 +188,9 @@ function resolveImageInputsRaw(
     } else if (p.type === "sbv1-image") {
       const d = p.data as { ossUrl?: string; blobUrl?: string };
       if (d.ossUrl) out.push(d.ossUrl);
+    } else if (p.type === "story-pro2-style-asset") {
+      const d = p.data as { imageUrl?: string };
+      if (d.imageUrl?.trim()) out.push(d.imageUrl.trim());
     } else if (isRefGridNodeType(p.type ?? "")) {
       out.push(...collectRefImageUrlsFromGridNode(p));
     } else if (p.type === "image-engine" || p.type === "three-view-engine" || p.type === "video-engine") {
@@ -331,6 +341,32 @@ function resolveImageInputs(
   return resolveImageInputsRaw(nodes, edges, nodeId);
 }
 
+function resolveSbv1ImageRunData(
+  node: CanvasFlowNode,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const styleNode = findStyleAssetLinkedToImage(nodes, edges, node.id);
+  if (!styleNode) return data;
+  const sd = styleNode.data as {
+    presetId?: string;
+    styleName?: string;
+    stylePrompt?: string;
+    styleAnchorZh?: string;
+    imageUrl?: string;
+  };
+  return {
+    ...data,
+    dockStyleRef: {
+      presetId: sd.presetId,
+      name: sd.styleName,
+      prompt: sd.stylePrompt ?? sd.styleAnchorZh,
+      imageUrl: sd.imageUrl,
+    },
+  };
+}
+
 /** ai-engine / story LLM 完成时，把 textOutput 写入下游 text / md-preview 依赖的 text 节点 */
 function propagateTextOutputToDownstream(
   nodeId: string,
@@ -358,6 +394,32 @@ function propagateAiOutputToDownstreamText(
   setNodeRuntime: (id: string, runtime: Partial<{ textOutput: string }>) => void,
 ) {
   propagateTextOutputToDownstream(nodeId, textOutput, setNodeRuntime);
+}
+
+function applySbv1ImageTaskResult(
+  node: CanvasFlowNode,
+  task: CanvasTaskRecord,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): boolean {
+  if (node.type !== "sbv1-image") return false;
+  const patch = sbv1ImagePatchFromTask(
+    node.data as unknown as Sbv1ImageNodeData,
+    task,
+  );
+  if (!patch) return false;
+  updateNodeData(node.id, patch);
+  return true;
+}
+
+function applySbv1ImageRunFailure(
+  node: CanvasFlowNode | undefined,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+  failCode: string,
+  failMessage: string,
+): boolean {
+  if (!node || node.type !== "sbv1-image") return false;
+  updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage));
+  return true;
 }
 
 /** 解析单个节点的 textInputs（按入边出现顺序拼接）。 */
@@ -530,11 +592,21 @@ export function useCanvasRunner(
             useCanvasStore.getState().nodes,
           );
         } else if (job.nodeId) {
-          setNodeRuntime(job.nodeId, {
-            status: "error",
-            failCode: "RUN_ABORTED",
-            failMessage: formatCanvasTaskError("RUN_ABORTED", message),
-          });
+          const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
+          if (
+            !applySbv1ImageRunFailure(
+              node,
+              updateNodeData,
+              "RUN_ABORTED",
+              message,
+            )
+          ) {
+            setNodeRuntime(job.nodeId, {
+              status: "error",
+              failCode: "RUN_ABORTED",
+              failMessage: formatCanvasTaskError("RUN_ABORTED", message),
+            });
+          }
         }
       }
       sequentialRef.current = null;
@@ -631,6 +703,10 @@ export function useCanvasRunner(
         );
 
         const data = node.data as Record<string, unknown>;
+        const runData =
+          node.type === "sbv1-image"
+            ? resolveSbv1ImageRunData(node, state.nodes, state.edges, data)
+            : data;
         const modelKey =
           typeof data.modelKey === "string" ? data.modelKey : undefined;
         const stylePayload = resolveStoryProRunStylePayload(
@@ -686,7 +762,7 @@ export function useCanvasRunner(
           node: {
             type: node.type ?? "image-engine",
             modelKey,
-            data,
+            data: runData,
             imageInputs,
             textInputs,
           },
@@ -712,6 +788,10 @@ export function useCanvasRunner(
               updateNodeData,
               nodesNow,
             );
+          } else if (
+            applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData)
+          ) {
+            /* ossUrl + runtime */
           } else {
             setNodeRuntime(nodeId, {
               status: "done",
@@ -733,6 +813,7 @@ export function useCanvasRunner(
               );
             }
           }
+          maybeNotifyCanvasCreditsSettled(r.task);
         } else if (r.task.status === "FAILED") {
           if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
             storyApplyTaskResult(
@@ -742,6 +823,10 @@ export function useCanvasRunner(
               updateNodeData,
               nodesNow,
             );
+          } else if (
+            applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData)
+          ) {
+            /* ossUrl + runtime */
           } else {
             setNodeRuntime(nodeId, {
               status: "error",
@@ -761,6 +846,8 @@ export function useCanvasRunner(
             updateNodeData,
             nodesNow,
           );
+        } else if (applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData)) {
+          /* pending / running */
         } else {
           setNodeRuntime(nodeId, {
             status: "running",
@@ -822,6 +909,8 @@ export function useCanvasRunner(
                   updateNodeData,
                   useCanvasStore.getState().nodes,
                 );
+              } else if (applySbv1ImageTaskResult(nodeNow, pick, updateNodeData)) {
+                /* ossUrl + runtime */
               } else if (
                 pick.status === "SUCCEEDED" &&
                 (pick.textOutput || pickTaskResultMediaUrl(pick))
@@ -880,7 +969,14 @@ export function useCanvasRunner(
             updateNodeData,
             errState.nodes,
           );
-        } else {
+        } else if (
+          !applySbv1ImageRunFailure(
+            errNode,
+            updateNodeData,
+            "REQUEST_FAILED",
+            msg,
+          )
+        ) {
           setNodeRuntime(nodeId, {
             status: "error",
             failCode: "REQUEST_FAILED",
@@ -962,13 +1058,22 @@ export function useCanvasRunner(
     (job: QueueItem) => {
       if (gatewayLinkBlocked) {
         const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
-        if (node) {
+        const gwMsg = gatewayLinkAccountUrl
+          ? `请先在 Book 个人中心关联 Gateway API Key：${gatewayLinkAccountUrl}`
+          : "请先在 Book 个人中心关联 Gateway API Key";
+        if (
+          !applySbv1ImageRunFailure(
+            node,
+            updateNodeData,
+            "GATEWAY_KEY_REQUIRED",
+            gwMsg,
+          ) &&
+          node
+        ) {
           setNodeRuntime(job.nodeId, {
             status: "error",
             failCode: "GATEWAY_KEY_REQUIRED",
-            failMessage: gatewayLinkAccountUrl
-              ? `请先在 Book 个人中心关联 Gateway API Key：${gatewayLinkAccountUrl}`
-              : "请先在 Book 个人中心关联 Gateway API Key",
+            failMessage: gwMsg,
           });
         }
         return;
@@ -1391,6 +1496,22 @@ export function useCanvasRunner(
       }
 
       const patch = runtimePatchFromCanvasTask(t);
+      if (node?.type === "sbv1-image") {
+        const sbv1Patch = sbv1ImagePatchFromTask(
+          node.data as unknown as Sbv1ImageNodeData,
+          t,
+        );
+        if (sbv1Patch) {
+          updateNodeData(nodeId, sbv1Patch);
+          const st = (sbv1Patch.runtime as CanvasNodeRuntime | undefined)?.status;
+          if (st === "done" || st === "error") {
+            const job = jobByTaskRef.current.get(t.id);
+            if (job) releaseInflightKey(runKey(job));
+            if (st === "done") maybeNotifyCanvasCreditsSettled(t);
+          }
+        }
+        return;
+      }
       if (patch) {
         setNodeRuntime(nodeId, patch);
         if (t.textOutput) {
@@ -1405,6 +1526,7 @@ export function useCanvasRunner(
         if (patch.status === "done" || patch.status === "error") {
           const job = jobByTaskRef.current.get(t.id);
           if (job) releaseInflightKey(runKey(job));
+          if (patch.status === "done") maybeNotifyCanvasCreditsSettled(t);
         }
       }
     };

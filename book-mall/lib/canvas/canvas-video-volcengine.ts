@@ -174,12 +174,12 @@ export function buildCanvasVideoVolcengineInput(args: {
   }
 
   const resolution = String(args.options?.resolution ?? "1080p").toLowerCase();
-  const durationRaw = Number(args.options?.duration ?? 5);
+  const durationRaw = Number(args.options?.duration ?? 15);
   const duration = Number.isFinite(durationRaw)
     ? Math.min(15, Math.max(4, Math.round(durationRaw)))
-    : 5;
+    : 15;
 
-  const ratio = (args.aspectRatio ?? "16:9").trim() || "16:9";
+  const ratio = resolveVolcengineVideoRatio(args.aspectRatio);
 
   return {
     model: args.modelKey,
@@ -192,4 +192,13 @@ export function buildCanvasVideoVolcengineInput(args: {
       generate_audio: args.options?.generateAudio === true,
     },
   };
+}
+
+/** UI `auto` → 方舟 API `adaptive` */
+export function resolveVolcengineVideoRatio(aspectRatio?: string): string {
+  const raw = String(aspectRatio ?? "16:9")
+    .trim()
+    .toLowerCase();
+  if (raw === "auto" || raw === "adaptive") return "adaptive";
+  return raw || "16:9";
 }

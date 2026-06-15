@@ -26,6 +26,8 @@ export function isStoryComicPipelineNode(t: string): boolean {
 export type StoryCanvasEdition = "pro" | "pro2" | "sbv1" | "comic" | "neutral";
 
 export function storyEditionForNodeType(type: string): StoryCanvasEdition {
+  /** LibTV 风格素材 · Pro2 / sbv1 共用，不触发版本互斥 */
+  if (type === "story-pro2-style-asset") return "neutral";
   if (isSbv1PipelineNodeType(type)) return "sbv1";
   if (isStoryPro2PipelineNode(type)) return "pro2";
   if (isStoryProPipelineNode(type)) return "pro";

@@ -1,7 +1,6 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { markBookMallSessionActive } from "@/lib/session-kicked-marker";
+import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 
 const PERSONAS = [
   { id: "personal", label: "个人用户", phone: "13800000001" },
@@ -22,7 +21,6 @@ const PERSONAS = [
 ] as const;
 
 export function DevAuthClient() {
-  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,9 +43,8 @@ export function DevAuthClient() {
         setError("登录失败，请确认 ALLOW_DEV_AUTH 或开发环境");
         return;
       }
-      markBookMallSessionActive();
-      router.push("/account");
-      router.refresh();
+      navigateAfterAuth("/account");
+      return;
     } finally {
       setLoading(null);
     }
