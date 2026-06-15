@@ -493,8 +493,10 @@ export function VisualLabAnalysisClient({
   const [modelId, setModelId] = useState<string>(DEFAULT_VISUAL_LAB_ANALYSIS_MODEL_ID);
 
   const [walletLoading, setWalletLoading] = useState(true);
-  const [balancePoints, setBalancePoints] = useState<number | null>(null);
-  const [usedPoints, setUsedPoints] = useState<number | null>(null);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [creditPools, setCreditPools] = useState<{ general: number; video: number } | null>(
+    null,
+  );
 
   const [uploadFailText, setUploadFailText] = useState<string | null>(null);
   const [infoBannerDismissed, setInfoBannerDismissed] = useState(false);
@@ -618,39 +620,27 @@ export function VisualLabAnalysisClient({
     (async () => {
       setWalletLoading(true);
       try {
-        const [wr, ur] = await Promise.all([
-          fetch("/api/tool-wallet", { cache: "no-store", credentials: "same-origin" }),
-          fetch("/api/tool-usage?page=1&limit=1", {
-            cache: "no-store",
-            credentials: "same-origin",
-          }),
-        ]);
+        const wr = await fetch("/api/tool-credits", {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
         const wj = (await wr.json().catch(() => null)) as {
-          balancePoints?: number | null;
+          creditBalance?: number | null;
+          creditPools?: { general: number; video: number } | null;
           active?: boolean;
         } | null;
-        const uj = (await ur.json().catch(() => null)) as {
-          summaryByTool?: { sumPoints?: number | null }[];
-        } | null;
         if (cancelled) return;
-        if (wr.ok && wj && typeof wj.balancePoints === "number") {
-          setBalancePoints(Math.max(0, Math.floor(wj.balancePoints)));
+        if (wr.ok && wj && typeof wj.creditBalance === "number") {
+          setCreditBalance(Math.max(0, Math.floor(wj.creditBalance)));
+          setCreditPools(wj.creditPools ?? null);
         } else {
-          setBalancePoints(null);
-        }
-        if (ur.ok && uj?.summaryByTool && Array.isArray(uj.summaryByTool)) {
-          const sum = uj.summaryByTool.reduce(
-            (s, r) => s + (typeof r.sumPoints === "number" ? r.sumPoints : 0),
-            0,
-          );
-          setUsedPoints(sum);
-        } else {
-          setUsedPoints(null);
+          setCreditBalance(null);
+          setCreditPools(null);
         }
       } catch {
         if (!cancelled) {
-          setBalancePoints(null);
-          setUsedPoints(null);
+          setCreditBalance(null);
+          setCreditPools(null);
         }
       } finally {
         if (!cancelled) setWalletLoading(false);
@@ -661,14 +651,16 @@ export function VisualLabAnalysisClient({
     };
   }, []);
 
-  const refetchWallet = useCallback(async () => {
+  const refetchCredits = useCallback(async () => {
     try {
-      const wr = await fetch("/api/tool-wallet", { cache: "no-store", credentials: "same-origin" });
+      const wr = await fetch("/api/tool-credits", { cache: "no-store", credentials: "same-origin" });
       const wj = (await wr.json().catch(() => null)) as {
-        balancePoints?: number | null;
+        creditBalance?: number | null;
+        creditPools?: { general: number; video: number } | null;
       } | null;
-      if (wr.ok && wj && typeof wj.balancePoints === "number") {
-        setBalancePoints(Math.max(0, Math.floor(wj.balancePoints)));
+      if (wr.ok && wj && typeof wj.creditBalance === "number") {
+        setCreditBalance(Math.max(0, Math.floor(wj.creditBalance)));
+        setCreditPools(wj.creditPools ?? null);
       }
     } catch {
       /* ignore */
@@ -1011,7 +1003,7 @@ export function VisualLabAnalysisClient({
           setAnalysisReasoning(typeof data?.reasoning === "string" ? data.reasoning : "");
         }
 
-        void refetchWallet();
+        void refetchCredits();
       } catch (e) {
         const isAbort =
           (e instanceof DOMException && e.name === "AbortError") ||
@@ -1033,7 +1025,7 @@ export function VisualLabAnalysisClient({
         setAnalyzing(false);
       }
     },
-    [analyzing, modelId, thinkingTokens, showUploadFail, refetchWallet, displayPricePoints],
+    [analyzing, modelId, thinkingTokens, showUploadFail, refetchCredits, displayPricePoints],
   );
 
   const handleSend = useCallback(async () => {
@@ -1614,15 +1606,18 @@ export function VisualLabAnalysisClient({
               </div>
 
               <div className="vl-compose-toolbar-right">
-                <span className="vl-compose-balance" aria-label="已用点数与当前余额">
+                <span className="vl-compose-balance" aria-label="统一积分余额">
                   {walletLoading ? (
                     <strong>…</strong>
                   ) : (
                     <strong>
-                      已用 {formatPointsPrimaryYuanSecondary(usedPoints ?? 0)} / 余额{" "}
-                      {balancePoints != null && Number.isFinite(balancePoints)
-                        ? formatPointsPrimaryYuanSecondary(balancePoints)
+                      积分{" "}
+                      {creditBalance != null && Number.isFinite(creditBalance)
+                        ? creditBalance.toLocaleString("zh-CN")
                         : "—"}
+                      {creditPools
+                        ? `（通用 ${creditPools.general.toLocaleString("zh-CN")} · 视频 ${creditPools.video.toLocaleString("zh-CN")}）`
+                        : ""}
                     </strong>
                   )}
                 </span>

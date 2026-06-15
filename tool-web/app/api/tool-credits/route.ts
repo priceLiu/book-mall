@@ -16,7 +16,7 @@ function originOrError(): string | NextResponse {
   return origin.replace(/\/$/, "");
 }
 
-/** 透传工具 JWT 查询主站 introspect，返回钱包余额与最低线（分）。 */
+/** Finance 2.0 · 统一积分余额（通用池 + 视频池）。 */
 export async function GET() {
   const gate = await requireActiveToolsSession();
   if (!gate.ok) return gate.response;
@@ -51,20 +51,32 @@ export async function GET() {
   }
 
   const active = raw.active === true;
-  const balancePoints =
-    typeof raw.balance_points === "number" && Number.isFinite(raw.balance_points)
-      ? Math.max(0, Math.floor(raw.balance_points))
+  const creditBalance =
+    typeof raw.credit_balance === "number" && Number.isFinite(raw.credit_balance)
+      ? Math.max(0, Math.floor(raw.credit_balance))
       : null;
-  const minBalanceLinePoints =
-    typeof raw.min_balance_line_points === "number" &&
-    Number.isFinite(raw.min_balance_line_points)
-      ? Math.max(0, Math.floor(raw.min_balance_line_points))
+  const creditPoolsRaw = raw.credit_pools;
+  const creditPools =
+    creditPoolsRaw &&
+    typeof creditPoolsRaw === "object" &&
+    typeof (creditPoolsRaw as { general?: unknown }).general === "number" &&
+    typeof (creditPoolsRaw as { video?: unknown }).video === "number"
+      ? {
+          general: Math.max(
+            0,
+            Math.floor((creditPoolsRaw as { general: number }).general),
+          ),
+          video: Math.max(
+            0,
+            Math.floor((creditPoolsRaw as { video: number }).video),
+          ),
+        }
       : null;
 
   return NextResponse.json({
     active,
-    balancePoints,
-    minBalanceLinePoints,
+    creditBalance,
+    creditPools,
     reason: typeof raw.reason === "string" ? raw.reason : undefined,
   });
 }

@@ -1,9 +1,14 @@
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireActiveToolsSession } from "@/lib/require-tools-api-access";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
-const UPSTREAM = "/api/sso/tools/usage";
+const UPSTREAM = "/api/sso/tools/billing-details";
+
+const BILLING_PROXY_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  Vary: "Authorization, Cookie",
+} as const;
 
 function originOrError(): string | NextResponse {
   const origin = getMainSiteOrigin();
@@ -16,24 +21,27 @@ function originOrError(): string | NextResponse {
   return origin.replace(/\/$/, "");
 }
 
-/** 拉取当前登录用户在主站的历史工具使用明细（Bearer tools_token）。 */
-export async function GET(req: Request) {
+/** Finance 2.0 · Gateway 扣减明细（与 finance-web 账单详表同源）。 */
+export async function GET(request: NextRequest) {
   const gate = await requireActiveToolsSession();
   if (!gate.ok) return gate.response;
 
   const jar = cookies();
   const token = jar.get("tools_token")?.value?.trim();
   if (!token) {
-    return NextResponse.json({ error: "no_session", events: [] }, { status: 401 });
+    return NextResponse.json(
+      { error: "no_session" },
+      { status: 401, headers: BILLING_PROXY_HEADERS },
+    );
   }
 
   const base = originOrError();
   if (base instanceof NextResponse) return base;
 
-  const q = new URL(req.url).searchParams.toString();
-  const path = q.length > 0 ? `${UPSTREAM}?${q}` : UPSTREAM;
+  const qs = request.nextUrl.searchParams.toString();
+  const url = qs ? `${base}${UPSTREAM}?${qs}` : `${base}${UPSTREAM}`;
 
-  const r = await fetch(`${base}${path}`, {
+  const r = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
@@ -41,14 +49,6 @@ export async function GET(req: Request) {
   const text = await r.text();
   return new NextResponse(text, {
     status: r.status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...BILLING_PROXY_HEADERS },
   });
-}
-
-/** 旧钱包按次扣点已退役；扣费见 Gateway 结算。 */
-export async function POST() {
-  const gate = await requireActiveToolsSession();
-  if (!gate.ok) return gate.response;
-
-  return NextResponse.json({ ok: true, recorded: false, creditBilling: true });
 }

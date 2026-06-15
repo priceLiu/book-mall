@@ -8,6 +8,7 @@ import {
   resolveVideoPool,
   InsufficientCreditsError,
 } from "./credit-account-service";
+import { computeChargeCredits } from "./gateway-credit-settlement";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 import { resolveCanonicalModelKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
 import { computeTierCredits, videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
@@ -74,14 +75,20 @@ export async function assertCreditsBeforeGenerate(input: {
     return;
   }
 
+  const pools = await getPoolBalances(ref);
   const balance = await getCreditBalance(ref);
   let minNeeded = 1;
   if (canonical) {
-    const price = await prisma.modelCreditPrice.findFirst({
-      where: { canonicalModelKey: canonical, active: true },
-      select: { creditsPerUnit: true },
-    });
-    if (price && price.creditsPerUnit > 0) minNeeded = price.creditsPerUnit;
+    const snap = await resolveCostSnapshot(canonical).catch(() => null);
+    if (snap) {
+      const units = 1;
+      minNeeded = computeChargeCredits({
+        snapshot: snap,
+        units,
+        pricePerCreditYuan: pools.pricePerCreditYuan,
+      });
+      if (minNeeded < 1) minNeeded = 1;
+    }
   }
 
   if (balance < minNeeded) {

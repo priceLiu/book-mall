@@ -274,6 +274,22 @@ export function formatUsageYuanDisplay(
   return { value: "—", title: "暂无费用估算（非扣费失败）" };
 }
 
+/** 平台积分列：Finance 2.0 扣减积分（GatewayRequestLog.creditsCharged） */
+export function formatPlatformCreditsDisplay(
+  creditsCharged: number | null | undefined,
+): CreditsDisplay {
+  if (creditsCharged != null && Number.isFinite(creditsCharged) && creditsCharged > 0) {
+    return {
+      value: creditsCharged.toLocaleString("zh-CN"),
+      title: "平台代付扣减积分（Finance 2.0 · 与 finance-web 扣减明细一致）",
+    };
+  }
+  return {
+    value: "—",
+    title: "未扣积分（BYOK / 失败 / 未结算 / 进行中）",
+  };
+}
+
 export type TokenDisplay = {
   value: string;
   title: string;
