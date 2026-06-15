@@ -22,11 +22,12 @@ import {
   gatewayV1AudioSpeech,
   gatewayV1ChatCompletions,
   gatewayV1ChatCompletionsStream,
-  gatewayV1ClientMeta,
   gatewayV1CreateTask,
   gatewayV1ImageParsing,
   gatewayV1RecordInfo,
 } from "@/lib/gateway/gateway-v1-http-client";
+import { gatewayV1ClientMetaForBookUser } from "@/lib/gateway/gateway-log-meta-for-user";
+import { resolveCanvasProjectTeamTenantId } from "@/lib/gateway/resolve-canvas-project-team-tenant";
 import type { CanvasChatMessage } from "./providers/types";
 import { extractKieResultUrl, type KieRecordResponse } from "@/lib/story/kie-client";
 import type { BailianR2vTaskOutput } from "./canvas-video-bailian-r2v";
@@ -40,6 +41,25 @@ import {
 import type { VolcengineVideoTaskResult } from "@/lib/gateway/volcengine-client";
 
 const CLIENT_SOURCE = "CANVAS" as const;
+
+async function canvasGwMeta(
+  userId: string,
+  extra?: {
+    clientPage?: string;
+    storyProjectId?: string;
+    storyTaskId?: string;
+    projectId?: string;
+  },
+) {
+  const preferredTenantId = extra?.projectId
+    ? await resolveCanvasProjectTeamTenantId(extra.projectId)
+    : undefined;
+  const { projectId: _projectId, ...rest } = extra ?? {};
+  return gatewayV1ClientMetaForBookUser(CLIENT_SOURCE, userId, {
+    ...rest,
+    preferredTenantId,
+  });
+}
 
 async function requireGatewayAuth(userId: string) {
   const auth = await resolveGatewayAuthForBookUser(userId);
@@ -78,6 +98,7 @@ export async function canvasGwChat(
     messages: CanvasChatMessage[];
     params?: Record<string, unknown>;
     clientPage?: string;
+    projectId?: string;
   },
 ): Promise<CanvasGwChatResult> {
   const auth = await requireGatewayAuth(userId);
@@ -102,7 +123,10 @@ export async function canvasGwChat(
   const result = await gatewayV1ChatCompletions({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+    }),
   });
 
   let parsed: unknown = null;
@@ -149,6 +173,7 @@ export async function canvasGwCreateKieJob(
     input: Record<string, unknown>;
     callBackUrl?: string | null;
     clientPage?: string;
+    projectId?: string;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -169,7 +194,10 @@ export async function canvasGwCreateKieJob(
       input: opts.input,
       callBackUrl: opts.callBackUrl ?? null,
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+    }),
   });
 
   return {
@@ -185,6 +213,7 @@ export async function canvasGwCreateVolcengineVideoJob(
     model: string;
     body: Record<string, unknown>;
     clientPage?: string;
+    projectId?: string;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -208,7 +237,10 @@ export async function canvasGwCreateVolcengineVideoJob(
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
     body: { model: opts.model, input: opts.body },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+    }),
   });
 
   return {
@@ -230,6 +262,7 @@ export async function canvasGwCreateBailianR2vJob(
     seedStr?: string;
     parameterExtras?: Record<string, unknown>;
     clientPage?: string;
+    projectId?: string;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -256,7 +289,10 @@ export async function canvasGwCreateBailianR2vJob(
         parameterExtras: opts.parameterExtras,
       },
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+    }),
   });
 
   return {
@@ -274,6 +310,7 @@ export async function canvasGwCreateHunyuanJob(
     imageUrls?: string[];
     params?: Record<string, unknown>;
     clientPage?: string;
+    projectId?: string;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -296,7 +333,10 @@ export async function canvasGwCreateHunyuanJob(
         params: opts.params,
       },
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+    }),
   });
 
   return {
@@ -314,6 +354,7 @@ export async function canvasGwTts(
     voice?: string;
     languageType?: string;
     clientPage?: string;
+    projectId?: string;
   },
 ): Promise<{ buffer: Buffer; logId: string; contentType: string; ext: string }> {
   const auth = await requireGatewayAuth(userId);
@@ -339,7 +380,10 @@ export async function canvasGwTts(
         ? { language_type: opts.languageType.trim() }
         : {}),
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+    }),
   });
 
   return {
@@ -377,7 +421,7 @@ export async function canvasGwRecordInfo(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("CANVAS", { bookUserId: userId }),
+    meta: await canvasGwMeta(userId),
   });
 
   if (polled.providerKind === "BAILIAN") {
@@ -432,6 +476,7 @@ export async function canvasGwImageParsing(
     imageUrl: string;
     clothesType?: DashscopeClothesType[];
     clientPage?: string;
+    projectId?: string;
   },
 ): Promise<{ output: DashscopeParsingOutput; logId: string }> {
   const auth = await requireGatewayAuth(userId);
@@ -456,7 +501,10 @@ export async function canvasGwImageParsing(
       clothesType,
       model,
     },
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+    }),
   });
 
   return {
@@ -543,6 +591,7 @@ export async function canvasGwChatStream(
     messages: CanvasChatMessage[];
     params?: Record<string, unknown>;
     clientPage?: string;
+    projectId?: string;
   },
 ): Promise<{ logId: string; status: number; body: ReadableStream<Uint8Array> }> {
   const auth = await requireGatewayAuth(userId);
@@ -568,7 +617,10 @@ export async function canvasGwChatStream(
   const result = await gatewayV1ChatCompletionsStream({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta("CANVAS", { clientPage: opts.clientPage, bookUserId: userId }),
+    meta: await canvasGwMeta(userId, {
+      clientPage: opts.clientPage,
+      projectId: opts.projectId,
+    }),
   });
 
   const logId = result.headers.get("x-gateway-log-id") ?? "";

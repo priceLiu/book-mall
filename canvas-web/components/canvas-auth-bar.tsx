@@ -60,7 +60,7 @@ export function CanvasAuthBar() {
 
   return (
     <div className="border-b border-white/10 bg-black px-4 py-2 text-center text-xs text-[var(--canvas-muted)]">
-      已登录：{user.name ?? user.email ?? user.id}
+      已登录：{user.name ?? user.phone ?? user.email ?? user.id}
       {base ? (
         <>
           {" · "}

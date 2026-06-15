@@ -274,6 +274,9 @@ export function AdminSidebar() {
         ) : (
           <>
             <p className="text-base font-semibold text-white">{viewer.user.name?.trim() || "—"}</p>
+            {viewer.user.phone?.trim() ? (
+              <p className="mt-1 break-all text-sm text-white/80">{viewer.user.phone.trim()}</p>
+            ) : null}
             <p className="mt-1 break-all text-sm text-white/80">{viewer.user.email?.trim() || "—"}</p>
             <p className="mt-2 text-sm text-white/75">角色：{roleLabel(viewer.user.role)}</p>
           </>

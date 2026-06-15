@@ -11,6 +11,7 @@ type BillingUser = {
   id: string;
   name: string | null;
   email: string | null;
+  phone: string | null;
   lineCount: number;
   latestAt: string | null;
 };
@@ -83,10 +84,11 @@ export default function AdminBillingUsersIndexPage() {
 
       {loadState === "ok" && users && users.length > 0 && (
         <div className="overflow-x-auto rounded border border-[#e8e8e8] bg-white">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
+          <table className="w-full min-w-[720px] border-collapse text-sm">
             <thead>
               <tr className="bg-[#fafafa] text-left text-[#595959]">
                 <th className="border border-[#e8e8e8] px-3 py-2">用户</th>
+                <th className="border border-[#e8e8e8] px-3 py-2">手机号</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">邮箱</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">明细行数</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">最近一条</th>
@@ -98,6 +100,9 @@ export default function AdminBillingUsersIndexPage() {
                 <tr key={u.id} className="hover:bg-[#fafafa]">
                   <td className="border border-[#e8e8e8] px-3 py-2 font-medium">
                     {u.name ?? <span className="text-[#bfbfbf]">—</span>}
+                  </td>
+                  <td className="border border-[#e8e8e8] px-3 py-2 text-[#595959]">
+                    {u.phone ?? <span className="text-[#bfbfbf]">—</span>}
                   </td>
                   <td className="border border-[#e8e8e8] px-3 py-2 text-[#595959]">
                     {u.email ?? <span className="text-[#bfbfbf]">—</span>}

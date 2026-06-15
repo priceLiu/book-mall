@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     where,
     orderBy: { createdAt: "desc" },
     take,
-    include: { user: { select: { id: true, name: true, email: true } } },
+    include: { user: { select: { id: true, name: true, email: true, phone: true } } },
   });
 
   const baseRows = lines.map((l) =>

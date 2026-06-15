@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { buildGatewayLogWhere } from "@/lib/gateway/log-query-scope";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 import { prisma } from "@/lib/prisma";
 
@@ -14,8 +15,19 @@ export async function GET(request: NextRequest) {
   );
   const since = new Date(Date.now() - days * 86400000);
 
+  const where = await buildGatewayLogWhere(
+    {
+      gatewaySessionUser: {
+        id: user.id,
+        bookUserId: user.bookUserId,
+        email: user.email,
+      },
+    },
+    { submittedFrom: since },
+  );
+
   const logs = await prisma.gatewayRequestLog.findMany({
-    where: { userId: user.id, submittedAt: { gte: since } },
+    where,
     select: {
       model: true,
       status: true,

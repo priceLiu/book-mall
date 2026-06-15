@@ -3,6 +3,7 @@ import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 export type CanvasViewerUser = {
   id: string;
   email: string | null;
+  phone: string | null;
   name: string | null;
   role: string;
 };

@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     ownerIds.length > 0
       ? await prisma.user.findMany({
           where: { id: { in: ownerIds } },
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, phone: true },
         })
       : [];
   const ownerMap = new Map(owners.map((o) => [o.id, o]));
@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
           id: t.ownerUserId,
           name: owner?.name ?? null,
           email: owner?.email ?? null,
+          phone: owner?.phone ?? null,
         },
         createdAt: t.createdAt.toISOString(),
       };

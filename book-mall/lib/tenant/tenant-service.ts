@@ -86,7 +86,7 @@ export async function getTenantOverview(tenantId: string) {
       members: {
         where: { status: { in: ["ACTIVE", "SUSPENDED"] } },
         include: {
-          user: { select: { id: true, name: true, email: true, image: true } },
+          user: { select: { id: true, name: true, email: true, phone: true, image: true } },
           seat: { select: { id: true, label: true, status: true } },
         },
         orderBy: { joinedAt: "asc" },

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2 } from "lucide-react";
 import {
   copyTextToClipboard,
   extractLogResultUrls,
@@ -110,7 +109,19 @@ export function LogResultCell({
         className="inline-flex max-w-[140px] items-center gap-1.5 text-[11px] text-orange-200/85"
         title={progressLabel ?? "任务进行中"}
       >
-        <Loader2 className="size-3.5 shrink-0 animate-spin text-orange-300/90" />
+        <svg
+          className="size-3.5 shrink-0 animate-spin text-orange-300/90"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden
+        >
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
+        </svg>
         <span className="truncate lowercase">{progressLabel ?? "running"}</span>
       </span>
     );

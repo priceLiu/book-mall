@@ -9,14 +9,25 @@ import {
   getGatewaySsoCodeTtlSec,
   requireGatewaySsoServerSecret,
 } from "@/lib/gateway/env";
-import { syncGatewayUserFromBookUser } from "@/lib/gateway/sync-user";
+import { ensureBookUserGatewayIdentitySynced } from "@/lib/gateway/sync-user";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || !session.user.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "未登录 Book" }, { status: 401 });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { email: true, phone: true, name: true, image: true },
+  });
+  if (!user) {
+    return NextResponse.json({ error: "用户不存在" }, { status: 401 });
+  }
+  if (!user.email && !user.phone) {
+    return NextResponse.json({ error: "用户缺少登录标识" }, { status: 400 });
   }
 
   try {
@@ -40,12 +51,12 @@ export async function POST(req: Request) {
     /* default */
   }
 
-  await syncGatewayUserFromBookUser({
-    bookUserId: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    image: session.user.image,
-  });
+  try {
+    await ensureBookUserGatewayIdentitySynced(session.user.id);
+  } catch (e) {
+    console.warn("[gateway/issue] identity sync failed", e);
+    return NextResponse.json({ error: "Gateway 用户同步失败" }, { status: 500 });
+  }
 
   const code = randomBytes(24).toString("hex");
   const ttl = getGatewaySsoCodeTtlSec();

@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: targetUserId },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, phone: true },
   });
   if (!user) {
     return NextResponse.json({ error: "用户不存在" }, { status: 404, headers });
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
-  const label = user.name ?? user.email ?? "";
+  const label = user.name ?? user.phone ?? user.email ?? "";
   const ownedLines = lines.filter((l) => l.userId === targetUserId);
   const baseRows = ownedLines.map((l) => enrichBillingLineToFlatRow(l, user.id, label));
   /** v003：见 account/billing-detail-lines 同名注释——按 catalog 统一厂商列。 */
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       source: "book-mall-admin",
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, phone: user.phone },
       balancePoints: wallet?.balancePoints ?? 0,
       rows,
     },

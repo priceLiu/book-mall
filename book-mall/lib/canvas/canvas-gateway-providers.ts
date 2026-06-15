@@ -10,6 +10,10 @@ import { DEEPSEEK_KNOWN_MODELS, DEEPSEEK_SYSTEM_BASE_URL } from "./providers/dee
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
 import { STORY_TTS_GATEWAY_MODELS } from "./providers/story-tts";
 import { getGatewayLinkStatusForUser } from "@/lib/gateway/book-gateway-link";
+import { ensurePlatformManagedKeyForUser } from "@/lib/gateway/platform-managed-key";
+import { ensureBookUserGatewayIdentitySynced } from "@/lib/gateway/sync-user";
+import { getUserBillingPersona } from "@/lib/billing/billing-persona";
+import { listPlatformOfferingProvidersForUser } from "@/lib/canvas/platform-offering-providers";
 import { VOLCENGINE_ALL_KNOWN_MODELS, VOLCENGINE_VIDEO_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
 
@@ -247,6 +251,35 @@ export async function listGatewayVirtualProvidersForUser(
   }
 
   return out;
+}
+
+/** Canvas / Story 模型列表：平台代付 = 上架模型 + Gateway 虚拟 Provider（含 sbv1 火山 VIDEO） */
+export async function listCanvasProvidersForUser(userId: string): Promise<CanvasProviderDto[]> {
+  try {
+    await ensureBookUserGatewayIdentitySynced(userId);
+  } catch (e) {
+    console.warn("[listCanvasProvidersForUser] gateway identity sync failed", e);
+  }
+
+  const persona = await getUserBillingPersona(userId);
+
+  if (persona === "PLATFORM_CREDIT") {
+    try {
+      await ensurePlatformManagedKeyForUser(userId);
+    } catch (e) {
+      console.warn("[listCanvasProvidersForUser] platform key ensure failed", e);
+    }
+    const [offerings, gateway] = await Promise.all([
+      listPlatformOfferingProvidersForUser(userId),
+      listGatewayVirtualProvidersForUser(userId),
+    ]);
+    const byId = new Map<string, CanvasProviderDto>();
+    for (const p of offerings) byId.set(p.id, p);
+    for (const p of gateway) byId.set(p.id, p);
+    return [...byId.values()];
+  }
+
+  return listGatewayVirtualProvidersForUser(userId);
 }
 
 export async function getGatewayVirtualProviderForUser(

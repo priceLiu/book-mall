@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { lockBillingPersona } from "@/lib/billing/billing-persona";
-import { syncGatewayUserFromBookUser } from "@/lib/gateway/sync-user";
+import { ensureBookUserGatewayIdentitySynced } from "@/lib/gateway/sync-user";
 import { ensurePlatformManagedKeyForUser } from "@/lib/gateway/platform-managed-key";
 
 export const dynamic = "force-dynamic";
@@ -35,13 +35,10 @@ export async function POST(request: Request) {
 
   try {
     await lockBillingPersona(session.user.id, persona);
-    if (session.user.email) {
-      await syncGatewayUserFromBookUser({
-        bookUserId: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        image: session.user.image,
-      });
+    try {
+      await ensureBookUserGatewayIdentitySynced(session.user.id);
+    } catch (e) {
+      console.warn("[billing-persona] gateway identity sync failed", e);
     }
     if (persona === "PLATFORM_CREDIT") {
       await ensurePlatformManagedKeyForUser(session.user.id);

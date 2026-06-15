@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import { formatUserCellPrimary, formatUserOptionLabel } from "@/lib/user-contact-display";
 
 type RunSummary = {
   csvRowCount: number;
@@ -46,9 +47,10 @@ type Binding = {
   userId: string;
   userName: string | null;
   userEmail: string | null;
+  userPhone: string | null;
 };
 
-type UserOption = { id: string; name: string | null; email: string | null };
+type UserOption = { id: string; name: string | null; email: string | null; phone: string | null };
 
 function fmtYuan(n: number) {
   return `¥${n.toFixed(2)}`;
@@ -249,7 +251,9 @@ export function ReconciliationClient() {
                   const u = g.userId ? userMap.get(g.userId) : null;
                   return (
                     <tr key={g.userId ?? "ub"} className="border-t">
-                      <td className="px-2 py-2">{u ? `${u.name ?? ""} ${u.email ?? ""}` : "未绑定"}</td>
+                      <td className="px-2 py-2">
+                        {u ? formatUserCellPrimary(u) : "未绑定"}
+                      </td>
                       <td className="px-2 py-2 text-right text-red-600">
                         {g.deficitYuan > 0 ? fmtYuan(g.deficitYuan) : "—"}
                       </td>
@@ -293,7 +297,7 @@ export function ReconciliationClient() {
         <ul className="text-xs">
           {bindings.slice(0, 10).map((b) => (
             <li key={b.id}>
-              {b.cloudAccountId} → {b.userName ?? b.userEmail ?? b.userId}
+              {b.cloudAccountId} → {formatUserCellPrimary({ name: b.userName, email: b.userEmail, phone: b.userPhone, id: b.userId })}
             </li>
           ))}
         </ul>
@@ -307,7 +311,7 @@ export function ReconciliationClient() {
               <option value="">选择用户</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.name ?? u.email ?? u.id}
+                  {formatUserOptionLabel(u)}
                 </option>
               ))}
             </select>

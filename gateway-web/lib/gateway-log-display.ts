@@ -101,15 +101,25 @@ export function collectLogProviderKinds(
   );
 }
 
+/** 与财务明细 canonicalModelKey 对齐的展示名 */
+export function displayLogModelKey(log: {
+  model: string;
+  canonicalModelKey?: string | null;
+}): string {
+  const canonical = log.canonicalModelKey?.trim();
+  return canonical || log.model;
+}
+
 /** 从当前日志批次提取 modelKey（可按厂商收窄） */
 export function collectLogModels(
-  logs: { model: string; providerKind: string | null }[],
+  logs: { model: string; canonicalModelKey?: string | null; providerKind: string | null }[],
   providerKind?: string,
 ): string[] {
   const models = new Set<string>();
   for (const l of logs) {
     if (providerKind && l.providerKind !== providerKind) continue;
-    if (l.model?.trim()) models.add(l.model);
+    const key = displayLogModelKey(l);
+    if (key.trim()) models.add(key);
   }
   return [...models].sort((a, b) => a.localeCompare(b));
 }

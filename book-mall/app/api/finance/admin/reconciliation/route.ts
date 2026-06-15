@@ -37,11 +37,11 @@ export async function GET(request: NextRequest) {
     }),
     prisma.cloudAccountBinding.findMany({
       orderBy: { createdAt: "desc" },
-      include: { user: { select: { id: true, name: true, email: true } } },
+      include: { user: { select: { id: true, name: true, email: true, phone: true } } },
     }),
     prisma.user.findMany({
       orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, phone: true },
       take: 200,
     }),
   ]);
@@ -62,7 +62,8 @@ export async function GET(request: NextRequest) {
       userId: b.userId,
       userName: b.user.name,
       userEmail: b.user.email,
+      userPhone: b.user.phone,
     })),
-    users: users.map((u) => ({ id: u.id, name: u.name, email: u.email })),
+    users: users.map((u) => ({ id: u.id, name: u.name, email: u.email, phone: u.phone })),
   });
 }

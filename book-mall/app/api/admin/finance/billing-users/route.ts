@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
 
   const users = await prisma.user.findMany({
     where: { id: { in: sorted.map(([id]) => id) } },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, phone: true },
   });
   const userMap = new Map(users.map((u) => [u.id, u]));
 
@@ -94,11 +94,12 @@ export async function GET(request: NextRequest) {
         id,
         name: u?.name ?? null,
         email: u?.email ?? null,
+        phone: u?.phone ?? null,
         lineCount: stats.lineCount,
         latestAt: stats.latestAt?.toISOString() ?? null,
       };
     })
-    .filter((u) => u.email || u.name);
+    .filter((u) => u.email || u.name || u.phone);
 
   return NextResponse.json({ users: out }, { headers: cors });
 }

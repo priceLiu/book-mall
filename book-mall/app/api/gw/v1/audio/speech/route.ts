@@ -11,6 +11,7 @@ import {
   forwardAudioSpeech,
   parseOpenAiUsage,
   pickCredentialForKind,
+  mapGatewayPreCreateLogError,
 } from "@/lib/gateway/proxy-common";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
@@ -68,20 +69,26 @@ export async function POST(request: NextRequest) {
       : {}),
   };
 
-  const log = await createRequestLog({
-    userId: auth.userId,
-    apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: isQwenTtsModel(model)
-      ? "/services/aigc/multimodal-generation/generation"
-      : "/v1/audio/speech",
-    providerKind: route.providerKind,
-    requestKind: "TTS",
-    clientSource,
-    inputSummary: buildGatewayInputSummary(model, payload),
-    ...logMetaToRequestLogFields(logMeta),
-  });
+  let log;
+  try {
+    log = await createRequestLog({
+      userId: auth.userId,
+      apiKeyId: auth.id,
+      credentialId,
+      model,
+      endpoint: isQwenTtsModel(model)
+        ? "/services/aigc/multimodal-generation/generation"
+        : "/v1/audio/speech",
+      providerKind: route.providerKind,
+      requestKind: "TTS",
+      clientSource,
+      inputSummary: buildGatewayInputSummary(model, payload),
+      ...logMetaToRequestLogFields(logMeta),
+    });
+  } catch (e) {
+    const mapped = mapGatewayPreCreateLogError(e);
+    return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+  }
 
   try {
     const result = await forwardAudioSpeech({

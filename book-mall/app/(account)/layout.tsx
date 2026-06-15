@@ -4,10 +4,10 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { userHasMembershipToolAccess } from "@/lib/membership-tool-access";
 import { isToolsSsoConfigured } from "@/lib/sso-tools-env";
-import { getGatewayLinkStatusForUser } from "@/lib/canvas/book-gateway-link";
-import { getCanvasWebOrigin, getEcommerceWebOrigin } from "@/lib/app-web-origins";
-import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
+import { prepareAccountCanvasLaunch } from "@/lib/account-canvas-launch";
 import { buildAccountAppsMenuHint } from "@/lib/account-apps-menu-hint";
+import { getEcommerceWebOrigin } from "@/lib/app-web-origins";
+import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
 import { AccountShell } from "@/components/account/account-shell";
 
 /** Layout 内查询 Prisma；构建阶段 CI 往往无 DATABASE_URL */
@@ -26,27 +26,32 @@ export default async function AccountGroupLayout({
     select: {
       image: true,
       name: true,
-      email: true,
+      phone: true,
+      phoneVerifiedAt: true,
       billingPersona: true,
       billingPersonaLockedAt: true,
     },
   });
 
+  if (!userRecord?.phoneVerifiedAt) {
+    redirect("/onboarding/bind-phone");
+  }
+
   if (!userRecord?.billingPersonaLockedAt) {
     redirect("/onboarding/billing-persona");
   }
 
-  const [profile, hasMembership, gatewayStatus, ecomAccess] = await Promise.all([
+  const [profile, hasMembership, canvasLaunch, ecomAccess] = await Promise.all([
     Promise.resolve(userRecord),
     userHasMembershipToolAccess(session.user.id),
-    getGatewayLinkStatusForUser(session.user.id),
+    prepareAccountCanvasLaunch(session.user.id),
     userCanAccessEcommerceToolkit(session.user.id),
   ]);
 
   const toolsSsoReady = isToolsSsoConfigured();
   const canLaunchTools = toolsSsoReady && hasMembership;
   const canLaunchCanvas = canLaunchTools;
-  const canvasOriginConfigured = Boolean(getCanvasWebOrigin().startsWith("http"));
+  const { gatewayLinked, canvasOriginConfigured } = canvasLaunch;
   const ecomOriginConfigured = Boolean(getEcommerceWebOrigin().startsWith("http"));
   const canLaunchEcommerce = toolsSsoReady && ecomAccess;
 
@@ -54,11 +59,13 @@ export default async function AccountGroupLayout({
   const appsMenuHint = buildAccountAppsMenuHint({
     toolsSsoReady,
     hasToolService: hasMembership,
-    gatewayLinked: gatewayStatus.linked,
+    gatewayLinked,
     canvasOriginConfigured,
+    canLaunchCanvas,
     ecomAccess,
     ecomOriginConfigured,
     isAdmin: session.user.role === "ADMIN",
+    billingPersona: userRecord.billingPersona,
   });
 
   return (
@@ -66,14 +73,14 @@ export default async function AccountGroupLayout({
       profile={{
         image: profile?.image ?? session.user.image ?? null,
         name: profile?.name ?? session.user.name ?? null,
-        email: profile?.email ?? session.user.email ?? null,
+        phone: profile?.phone ?? session.user.phone ?? null,
       }}
       isAdmin={session.user.role === "ADMIN"}
       showToolsCta={showToolsCta}
       canLaunchTools={canLaunchTools}
       canLaunchCanvas={canLaunchCanvas}
       canvasOriginConfigured={canvasOriginConfigured}
-      gatewayLinked={gatewayStatus.linked}
+      gatewayLinked={gatewayLinked}
       canLaunchEcommerce={canLaunchEcommerce}
       ecomOriginConfigured={ecomOriginConfigured}
       appsMenuHint={appsMenuHint}

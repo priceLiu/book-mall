@@ -59,6 +59,9 @@ model User {
   name          String?
   email         String?   @unique
   emailVerified DateTime?
+  /// 大陆手机号，归一化 11 位（1xxxxxxxxx）
+  phone            String?   @unique
+  phoneVerifiedAt  DateTime?
   image         String?
   /// 邮箱密码注册时使用；OAuth 用户可为空
   passwordHash  String?
@@ -2878,6 +2881,31 @@ enum TenantInviteStatus {
   REVOKED
 }
 
+enum SmsVerificationPurpose {
+  REGISTER
+  LOGIN
+  BIND_PHONE
+  TEAM_INVITE
+  RESET_PASSWORD
+}
+
+/// 短信验证码（哈希存储，5 分钟有效）
+model SmsVerification {
+  id           String                 @id @default(cuid())
+  phone        String
+  purpose      SmsVerificationPurpose
+  codeHash     String
+  inviteToken  String?
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  sendIp       String?
+  attemptCount Int                    @default(0)
+  createdAt    DateTime               @default(now())
+
+  @@index([phone, purpose, createdAt])
+  @@index([expiresAt])
+}
+
 /// 资产可见域（跨工具统一）：个人私有 / 团队公共库
 enum AssetVisibility {
   PRIVATE // 仅本人可见（个人空间或团队内成员私有库）
@@ -2956,8 +2984,10 @@ model TenantInvite {
   id          String             @id @default(cuid())
   tenantId    String
   tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email       String
+  phone       String
   token       String             @unique
+  /// 邀请链接 query 中的验证码（与短信一并发出，供复制链接使用）
+  urlCode     String?
   role        TenantRole         @default(MEMBER)
   status      TenantInviteStatus @default(PENDING)
   expiresAt   DateTime
@@ -2968,5 +2998,5 @@ model TenantInvite {
   updatedAt   DateTime           @updatedAt
 
   @@index([tenantId, status])
-  @@index([email])
+  @@index([phone])
 }

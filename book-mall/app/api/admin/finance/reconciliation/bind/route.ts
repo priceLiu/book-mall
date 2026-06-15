@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
   }
   const bindings = await prisma.cloudAccountBinding.findMany({
     orderBy: { createdAt: "desc" },
-    include: { user: { select: { id: true, name: true, email: true } } },
+    include: { user: { select: { id: true, name: true, email: true, phone: true } } },
   });
   return NextResponse.json({ bindings }, { headers: cors });
 }

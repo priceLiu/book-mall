@@ -63,6 +63,7 @@ import { extractHunyuan3DResultUrls } from "./providers/hunyuan-3d";
 import { buildKieImageCreateArgs } from "./providers/kie";
 import { type BailianR2vTaskOutput } from "./canvas-video-bailian-r2v";
 import { CanvasProjectError } from "./canvas-project-service";
+import { assertAccessibleCanvasProject } from "./canvas-project-access";
 
 // —— Types ——
 
@@ -317,13 +318,7 @@ export type SubmitCanvasNodeResult =
 export async function submitCanvasNodeTask(
   args: SubmitCanvasNodeArgs,
 ): Promise<SubmitCanvasNodeResult> {
-  const project = await prisma.canvasProject.findFirst({
-    where: { id: args.projectId, userId: args.userId, deletedAt: null },
-    select: { id: true, userId: true },
-  });
-  if (!project) {
-    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
-  }
+  await assertAccessibleCanvasProject(args.userId, args.projectId);
 
   if (args.node.type !== "image-gen") {
     throw new CanvasProjectError(
@@ -1489,13 +1484,7 @@ export async function softDeleteCanvasTask(args: {
   projectId: string;
   taskId: string;
 }): Promise<{ ok: true }> {
-  const project = await prisma.canvasProject.findFirst({
-    where: { id: args.projectId, userId: args.userId, deletedAt: null },
-    select: { id: true },
-  });
-  if (!project) {
-    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
-  }
+  await assertAccessibleCanvasProject(args.userId, args.projectId);
   const task = await prisma.canvasGenerationTask.findFirst({
     where: { id: args.taskId, projectId: args.projectId },
   });
@@ -1555,13 +1544,7 @@ export async function listProjectTasks(args: {
     }
   >
 > {
-  const project = await prisma.canvasProject.findFirst({
-    where: { id: args.projectId, userId: args.userId, deletedAt: null },
-    select: { id: true },
-  });
-  if (!project) {
-    throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
-  }
+  await assertAccessibleCanvasProject(args.userId, args.projectId);
   const where: Prisma.CanvasGenerationTaskWhereInput = {
     projectId: args.projectId,
     deletedAt: null,

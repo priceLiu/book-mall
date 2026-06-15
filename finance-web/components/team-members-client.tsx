@@ -6,12 +6,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import { formatUserContactSubline } from "@/lib/user-contact-display";
 
 type MemberRow = {
   memberId: string;
   userId: string;
   name: string | null;
   email: string | null;
+  phone: string | null;
   role: string;
   seatLabel: string | null;
   monthlyCapCredits: number | null;
@@ -95,11 +97,15 @@ export function TeamMembersClient() {
             </tr>
           </thead>
           <tbody>
-            {data.members.map((m) => (
+            {data.members.map((m) => {
+              const contact = formatUserContactSubline(m);
+              return (
               <tr key={m.userId} className="hover:bg-[#fafafa]">
                 <td className="border border-[#e8e8e8] px-3 py-2">
                   <div className="font-medium">{m.name || "—"}</div>
-                  <div className="text-xs text-[#8c8c8c]">{m.email}</div>
+                  {contact ? (
+                    <div className="text-xs text-[#8c8c8c]">{contact}</div>
+                  ) : null}
                 </td>
                 <td className="border border-[#e8e8e8] px-3 py-2">{ROLE_LABEL[m.role] ?? m.role}</td>
                 <td className="border border-[#e8e8e8] px-3 py-2">{m.seatLabel ?? "—"}</td>
@@ -117,7 +123,8 @@ export function TeamMembersClient() {
                   </Link>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </section>

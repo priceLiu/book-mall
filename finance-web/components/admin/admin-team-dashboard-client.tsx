@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import { formatUserCellPrimary } from "@/lib/user-contact-display";
 
 type AdminTeamDashboardResponse = {
   tenantId: string;
@@ -16,7 +17,7 @@ type AdminTeamDashboardResponse = {
     bill: {
       consumed: number;
       balanceCredits: number;
-      members: { actorUserId: string; name: string | null; consumed: number }[];
+      members: { actorUserId: string; name: string | null; email: string | null; phone: string | null; consumed: number }[];
     };
     seatUsage: { used: number; limit: number };
     vendorCostYuan?: number;
@@ -111,7 +112,7 @@ export function AdminTeamDashboardClient({ tenantId }: { tenantId: string }) {
           <tbody>
             {dash.bill.members.map((m) => (
               <tr key={m.actorUserId} className="border-t border-[#f0f0f0]">
-                <td className="py-2">{m.name ?? m.actorUserId.slice(0, 8)}</td>
+                <td className="py-2">{formatUserCellPrimary({ ...m, id: m.actorUserId })}</td>
                 <td className="py-2 text-right">{fmt(m.consumed)}</td>
                 <td className="py-2">
                   <Link

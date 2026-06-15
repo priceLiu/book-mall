@@ -7,6 +7,7 @@ import {
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
 import { createCanvasProjectHistoryForUser } from "@/lib/canvas/canvas-project-history-service";
+import { assertAccessibleCanvasProject } from "@/lib/canvas/canvas-project-access";
 import {
   getCanvasProjectForUser,
   softDeleteCanvasProjectForUser,
@@ -26,10 +27,10 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   if (!guard.ok) return guard.response;
   const { id } = await ctx.params;
   try {
+    await assertAccessibleCanvasProject(guard.user.id, id);
     const inflight = await prisma.canvasGenerationTask.count({
       where: {
         projectId: id,
-        project: { userId: guard.user.id, deletedAt: null },
         status: { in: ["PENDING", "SUBMITTED"] },
       },
     });

@@ -5,10 +5,8 @@ import {
   jsonHeaders,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
-import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { getGatewayLinkStatusForUser } from "@/lib/canvas/book-gateway-link";
-import { listGatewayVirtualProvidersForUser } from "@/lib/canvas/canvas-gateway-providers";
-import { listPlatformOfferingProvidersForUser } from "@/lib/canvas/platform-offering-providers";
+import { listCanvasProvidersForUser } from "@/lib/canvas/canvas-gateway-providers";
 import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
 
 export async function OPTIONS(request: NextRequest) {
@@ -20,11 +18,7 @@ export async function GET(request: NextRequest) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   try {
-    const persona = await getUserBillingPersona(guard.user.id);
-    const gatewayProviders =
-      persona === "PLATFORM_CREDIT"
-        ? await listPlatformOfferingProvidersForUser(guard.user.id)
-        : await listGatewayVirtualProvidersForUser(guard.user.id);
+    const gatewayProviders = await listCanvasProvidersForUser(guard.user.id);
     const gatewayLink = await getGatewayLinkStatusForUser(guard.user.id);
     return NextResponse.json(
       { providers: gatewayProviders, gatewayLink },

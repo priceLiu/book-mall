@@ -363,6 +363,7 @@ export async function runAiEngineNode(
       messages,
       params,
       clientPage: gwClientPage,
+      projectId,
     });
     const text = resp.text;
     const updated = await prisma.canvasGenerationTask.update({
@@ -516,6 +517,7 @@ export async function runImageEngineNode(
           imageUrls,
           params,
           clientPage: gwClientPage,
+          projectId,
         });
         const updated = await prisma.canvasGenerationTask.update({
           where: { id: created.id },
@@ -569,6 +571,7 @@ export async function runImageEngineNode(
         input: input as Record<string, unknown>,
         callBackUrl,
         clientPage: gwClientPage,
+        projectId,
       });
       const updated = await prisma.canvasGenerationTask.update({
         where: { id: claimedTask.id },
@@ -800,6 +803,7 @@ export async function runStoryLlmEngineNode(
       messages,
       params,
       clientPage: gwClientPage,
+      projectId,
     });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: created.id },
@@ -1097,12 +1101,14 @@ export async function runVideoEngineNode(
           model,
           body: input as Record<string, unknown>,
           clientPage: gwClientPage,
+          projectId,
         })
       : await canvasGwCreateKieJob(userId, {
           model,
           input: input as Record<string, unknown>,
           callBackUrl,
           clientPage: gwClientPage,
+          projectId,
         });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: claimedTask.id },
@@ -1219,6 +1225,7 @@ export async function runTtsEngineNode(
       voice,
       languageType,
       clientPage: gwClientPage,
+      projectId,
     });
     const ossUrl = await persistCanvasBufferToOss({
       buf: ttsOut.buffer,
@@ -1390,6 +1397,7 @@ export async function runRefVideoEngineNode(
         seedStr,
         parameterExtras,
         clientPage: gwClientPage,
+        projectId,
       });
       const updated = await prisma.canvasGenerationTask.update({
         where: { id: claimedTask.id },
@@ -1489,6 +1497,7 @@ export async function runRefVideoEngineNode(
       input: input as Record<string, unknown>,
       callBackUrl,
       clientPage: gwClientPage,
+      projectId,
     });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: claimedTask.id },

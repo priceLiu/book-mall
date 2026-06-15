@@ -6,6 +6,7 @@ import {
   classifyBillingCategory,
   type BillingCategoryKey,
 } from "@/lib/billing/billing-category";
+import { buildGatewayLogActorWhere } from "@/lib/gateway/log-query-scope";
 import { getPoolBalances } from "@/lib/billing/credit-account-service";
 import {
   clientPageToToolKey,
@@ -43,11 +44,10 @@ export async function getAccountPlatformCategoryUsageRows(
 
   const [logs, settlements] = await Promise.all([
     prisma.gatewayRequestLog.findMany({
-      where: {
-        actorBookUserId: bookUserId,
-        submittedAt: { gte: since },
-        status: { in: ["SUCCEEDED", "FAILED"] },
-      },
+      where: buildGatewayLogActorWhere(bookUserId, {
+        submittedFrom: since,
+        statuses: ["SUCCEEDED", "FAILED"],
+      }),
       select: { requestKind: true, status: true, inputSummary: true },
     }),
     prisma.billingSettlementLine.findMany({
@@ -136,7 +136,10 @@ export async function getAccountUsageSummary(bookUserId: string) {
         })
       : Promise.resolve({ _sum: { credits: 0 } }),
     prisma.gatewayRequestLog.count({
-      where: { actorBookUserId: bookUserId, status: "SUCCEEDED", submittedAt: { gte: since } },
+      where: buildGatewayLogActorWhere(bookUserId, {
+        status: "SUCCEEDED",
+        submittedFrom: since,
+      }),
     }),
   ]);
 
@@ -182,11 +185,10 @@ export async function getAccountPackageUsageRows(
 
   const [logs, quotas, usage, settlementCounts] = await Promise.all([
     prisma.gatewayRequestLog.findMany({
-      where: {
-        actorBookUserId: bookUserId,
-        submittedAt: { gte: since },
-        status: { in: ["SUCCEEDED", "FAILED"] },
-      },
+      where: buildGatewayLogActorWhere(bookUserId, {
+        submittedFrom: since,
+        statuses: ["SUCCEEDED", "FAILED"],
+      }),
       select: { requestKind: true, status: true, inputSummary: true },
     }),
     scopeKey
@@ -336,7 +338,7 @@ export async function getAccountByokTaskSummary(bookUserId: string, scopeKey: st
 /** 按工具聚合 Gateway 成功调用。 */
 export async function aggregateUsageByTool(bookUserId: string) {
   const logs = await prisma.gatewayRequestLog.findMany({
-    where: { actorBookUserId: bookUserId, status: "SUCCEEDED" },
+    where: buildGatewayLogActorWhere(bookUserId, { status: "SUCCEEDED" }),
     select: { clientPage: true, creditsCharged: true },
   });
 
@@ -362,6 +364,6 @@ export async function aggregateUsageByTool(bookUserId: string) {
 
 export async function countSucceededUsage(bookUserId: string): Promise<number> {
   return prisma.gatewayRequestLog.count({
-    where: { actorBookUserId: bookUserId, status: "SUCCEEDED" },
+    where: buildGatewayLogActorWhere(bookUserId, { status: "SUCCEEDED" }),
   });
 }

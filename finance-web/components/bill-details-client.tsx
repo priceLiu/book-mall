@@ -48,7 +48,7 @@ export type BillDetailsClientProps = {
 type RemotePayload = {
   source: string;
   tab?: "usage" | "charge";
-  user?: { id: string; name: string | null; email: string | null };
+  user?: { id: string; name: string | null; email: string | null; phone: string | null };
   tenant?: { id: string; name: string | null };
   tenantId?: string;
   tenantName?: string | null;
@@ -613,7 +613,13 @@ export function BillDetailsClient({
                 ? "下表对应的「目标账号」（非你的真实登录态）"
                 : "当前账单归属（主站账号 · 与明细行锁定同一用户）"}
             </div>
-            <dl className="grid gap-2 sm:grid-cols-1 md:grid-cols-3">
+            <dl className="grid gap-2 sm:grid-cols-1 md:grid-cols-4">
+              <div>
+                <dt className="text-xs text-[#8c8c8c]">手机号</dt>
+                <dd className="mt-0.5 break-all font-medium text-[#262626]">
+                  {remoteUser.phone?.trim() || "—"}
+                </dd>
+              </div>
               <div>
                 <dt className="text-xs text-[#8c8c8c]">登录邮箱</dt>
                 <dd className="mt-0.5 break-all font-medium text-[#262626]">

@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "当前账号未设置邮箱密码（例如仅使用第三方登录），无法通过此方式修改。请联系管理员重置密码。",
+          "当前账号未设置登录密码，无法通过此方式修改。",
       },
       { status: 400 },
     );

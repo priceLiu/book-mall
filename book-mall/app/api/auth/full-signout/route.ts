@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { bumpSessionVersion } from "@/lib/auth-session-version";
+import { appendClearSessionCookieHeaders } from "@/lib/auth/clear-session-cookie-headers";
 
 export const dynamic = "force-dynamic";
 
 /**
- * 自定义全量登出：清理 NextAuth 所有可能的 Cookie 变体（host-only + 共享域）。
+ * 自定义全量登出：清理 NextAuth 所有可能的 Cookie 变体（host-only + 共享域 + localhost 开发域）。
  *
  * 背景：升级到 `NEXTAUTH_COOKIE_DOMAIN=.ai-code8.com` 后，浏览器里仍残留升级前
  * 签发的 host-only `__Secure-next-auth.session-token` / `__Host-next-auth.csrf-token`。
@@ -16,57 +20,6 @@ export const dynamic = "force-dynamic";
  * 覆盖成共享域版，所以这里改为手动 `headers.append('Set-Cookie', ...)`。
  */
 
-const SESSION_COOKIE_NAMES = [
-  "__Secure-next-auth.session-token",
-  "next-auth.session-token",
-];
-
-const CSRF_COOKIE_NAMES = [
-  "__Host-next-auth.csrf-token",
-  "__Secure-next-auth.csrf-token",
-  "next-auth.csrf-token",
-];
-
-const CALLBACK_COOKIE_NAMES = [
-  "__Secure-next-auth.callback-url",
-  "next-auth.callback-url",
-];
-
-const PKCE_COOKIE_NAMES = [
-  "__Secure-next-auth.pkce.code_verifier",
-  "next-auth.pkce.code_verifier",
-];
-
-const STATE_COOKIE_NAMES = [
-  "__Secure-next-auth.state",
-  "next-auth.state",
-];
-
-function sharedDomain(): string | undefined {
-  const d = process.env.NEXTAUTH_COOKIE_DOMAIN?.trim();
-  return d || undefined;
-}
-
-function buildClearingCookieHeader(
-  name: string,
-  domain: string | undefined,
-  secure: boolean,
-): string {
-  /** `__Host-` 前缀按规范禁止 Domain；只能按 host-only 清。 */
-  const isHostPrefix = name.startsWith("__Host-");
-  const parts = [
-    `${name}=`,
-    "Path=/",
-    "Expires=Thu, 01 Jan 1970 00:00:00 GMT",
-    "Max-Age=0",
-    "SameSite=Lax",
-  ];
-  if (!isHostPrefix && domain) parts.push(`Domain=${domain}`);
-  if (secure || name.startsWith("__Secure-") || isHostPrefix) parts.push("Secure");
-  parts.push("HttpOnly");
-  return parts.join("; ");
-}
-
 function safeRedirectTarget(raw: string | null): string {
   if (!raw) return "/";
   if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
@@ -74,6 +27,15 @@ function safeRedirectTarget(raw: string | null): string {
 }
 
 async function handle(request: NextRequest): Promise<NextResponse> {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.id) {
+    try {
+      await bumpSessionVersion(session.user.id);
+    } catch {
+      /* 非致命：仍继续清 Cookie */
+    }
+  }
+
   /**
    * 用相对路径作 Location，让浏览器按当前请求的 origin 解析。
    * CloudBase Run 容器里 `request.nextUrl.origin` 会是内部 0.0.0.0:3000，
@@ -90,31 +52,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     },
   });
 
-  const secure = process.env.NODE_ENV === "production";
-  const domain = sharedDomain();
-
-  const allNames = [
-    ...SESSION_COOKIE_NAMES,
-    ...CSRF_COOKIE_NAMES,
-    ...CALLBACK_COOKIE_NAMES,
-    ...PKCE_COOKIE_NAMES,
-    ...STATE_COOKIE_NAMES,
-  ];
-
-  for (const name of allNames) {
-    /** host-only（升级前默认）；__Host- 前缀强制按此清。 */
-    res.headers.append(
-      "Set-Cookie",
-      buildClearingCookieHeader(name, undefined, secure),
-    );
-    /** 共享域（升级后默认）；__Host- 跳过。 */
-    if (domain && !name.startsWith("__Host-")) {
-      res.headers.append(
-        "Set-Cookie",
-        buildClearingCookieHeader(name, domain, secure),
-      );
-    }
-  }
+  appendClearSessionCookieHeaders(res.headers);
 
   return res;
 }

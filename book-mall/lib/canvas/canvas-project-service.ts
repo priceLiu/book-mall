@@ -4,9 +4,13 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
+  assertAccessibleCanvasProject,
+} from "@/lib/canvas/canvas-project-access";
+import {
   canvasProjectEditionFromGraph,
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
+import { getActiveTenantContext } from "@/lib/tenant/context";
 
 export class CanvasProjectError extends Error {
   constructor(
@@ -118,12 +122,18 @@ export async function createCanvasProjectForUser(
       ? args.canvas
       : { schemaVersion: 1, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } };
 
+  const tenantCtx = await getActiveTenantContext(userId);
+
   const created = await prisma.canvasProject.create({
     data: {
       userId,
+      ownerUserId: userId,
       name,
       description,
       canvas: canvas as Prisma.InputJsonValue,
+      ...(tenantCtx?.tenantType === "TEAM"
+        ? { tenantId: tenantCtx.tenantId }
+        : {}),
     },
   });
   return {
@@ -136,8 +146,9 @@ export async function getCanvasProjectForUser(
   userId: string,
   projectId: string,
 ): Promise<CanvasProjectDetail> {
+  await assertAccessibleCanvasProject(userId, projectId);
   const p = await prisma.canvasProject.findFirst({
-    where: { id: projectId, userId, deletedAt: null },
+    where: { id: projectId, deletedAt: null },
   });
   if (!p) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
   return {

@@ -175,7 +175,7 @@ export function EcomProfileSidebar({
                 {user?.name ?? "未登录"}
               </p>
               <p className="truncate text-sm text-zinc-500">
-                {user?.email ?? "请从主站 SSO 登录"}
+                {user?.phone ?? user?.email ?? "请从主站 SSO 登录"}
               </p>
             </div>
             <button

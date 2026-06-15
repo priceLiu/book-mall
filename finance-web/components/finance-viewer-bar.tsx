@@ -42,7 +42,7 @@ export function FinanceViewerBar({ scope }: { scope: "fees" | "team" | "admin" }
           </>
         ) : (
           <>
-            {viewer.user.name || viewer.user.email} · {roleLabel(viewer.user.role)}
+            {viewer.user.name || viewer.user.phone || viewer.user.email} · {roleLabel(viewer.user.role)}
           </>
         )}
       </div>

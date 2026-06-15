@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
   const [user, wallet, lines] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, phone: true },
     }),
     prisma.wallet.findUnique({
       where: { userId },
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
 
   /** 双保险：仅序列化 viewer 本人行，避免 ORM/数据异常时越权展示。 */
   const ownedLines = lines.filter((l) => l.userId === userId);
-  const label = user.name ?? user.email ?? "";
+  const label = user.name ?? user.phone ?? user.email ?? "";
   const baseRows = ownedLines.map((l) => enrichBillingLineToFlatRow(l, user.id, label));
   /**
    * v003：用 ModelCatalog/ModelAlias 把两类行（TOOL_USAGE_GENERATED / CLOUD_CSV_IMPORT）
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       source: "book-mall",
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, phone: user.phone },
       balancePoints: wallet?.balancePoints ?? 0,
       rows,
       viewer: { authMode: viewerAuthMode },
