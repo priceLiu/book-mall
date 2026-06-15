@@ -7,26 +7,41 @@ export function syncNodeDimensionsFromChanges(
   nodes: CanvasFlowNode[],
   changes: NodeChange[],
 ): CanvasFlowNode[] {
-  const dimById = new Map<string, { width: number; height: number }>();
+  const dimById = new Map<string, { width?: number; height?: number }>();
   for (const ch of changes) {
     if (ch.type !== "dimensions" || !("id" in ch) || !ch.id || !ch.dimensions) {
       continue;
     }
-    dimById.set(ch.id, ch.dimensions);
+    const prev = dimById.get(ch.id) ?? {};
+    const attrs =
+      "setAttributes" in ch && ch.setAttributes !== undefined
+        ? ch.setAttributes
+        : true;
+    const patch = { ...prev };
+    if (attrs === true || attrs === "width") {
+      patch.width = ch.dimensions.width;
+    }
+    if (attrs === true || attrs === "height") {
+      patch.height = ch.dimensions.height;
+    }
+    dimById.set(ch.id, patch);
   }
   if (dimById.size === 0) return nodes;
   return nodes.map((n) => {
     const dim = dimById.get(n.id);
     if (!dim) return n;
+    const style = (typeof n.style === "object" && n.style ? n.style : {}) as {
+      width?: number;
+      height?: number;
+    };
+    const width = dim.width ?? n.width ?? style.width;
+    const height = dim.height ?? n.height ?? style.height;
+    if (width === undefined || height === undefined) return n;
     return {
       ...n,
-      width: dim.width,
-      height: dim.height,
-      style: {
-        ...(typeof n.style === "object" && n.style ? n.style : {}),
-        width: dim.width,
-        height: dim.height,
-      },
+      width,
+      height,
+      style: { ...style, width, height },
     } as CanvasFlowNode;
   });
 }

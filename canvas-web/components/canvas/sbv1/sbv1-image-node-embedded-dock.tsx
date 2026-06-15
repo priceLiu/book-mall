@@ -8,6 +8,7 @@ import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
+import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
@@ -70,6 +71,14 @@ export function Sbv1ImageNodeEmbeddedDock({
     () => dockActiveRefIdsFromPrompt(dockInput),
     [dockInput],
   );
+
+  usePruneStaleDockMentions({
+    nodeId: storeNode?.id ?? null,
+    prompt: dockInput,
+    mentionables,
+    field: "dockInput",
+    updateNodeData,
+  });
 
   const onPromptChange = useCallback(
     (value: string) => {

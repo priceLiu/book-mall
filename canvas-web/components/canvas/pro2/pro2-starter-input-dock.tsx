@@ -14,6 +14,7 @@ import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
+import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { STORY_PRO2_THEME_OUTLINE_SYSTEM } from "@/lib/canvas/story-pro2-theme-outline-prompt";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { EnginePicker } from "../engine-picker";
@@ -78,6 +79,14 @@ export function Pro2StarterInputDock() {
     () => dockActiveRefIdsFromPrompt(themeInput),
     [themeInput],
   );
+
+  usePruneStaleDockMentions({
+    nodeId: storeNode?.id ?? null,
+    prompt: themeInput,
+    mentionables,
+    field: "themeInput",
+    updateNodeData,
+  });
 
   useEffect(() => {
     if (!storeNode || d.providerId) return;

@@ -5,6 +5,7 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
@@ -17,6 +18,9 @@ const config: Config = {
           ink: "#f5f5f7",
           muted: "#a3a3b3",
           accent: "#a78bfa",
+        },
+        libtv: {
+          media: "#262626",
         },
       },
       fontFamily: {

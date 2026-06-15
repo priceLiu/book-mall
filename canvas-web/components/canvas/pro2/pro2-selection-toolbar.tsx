@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useReactFlow, useViewport } from "@xyflow/react";
-import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, Save } from "lucide-react";
+import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, BookmarkPlus } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -16,13 +16,17 @@ import {
 import { GROUP_COLOR_PRESETS } from "@/lib/canvas/types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
 import { cn } from "@/lib/utils";
+import {
+  PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS,
+  PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
+  PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS,
+} from "./pro2-image-node-toolbar";
 
 const TOOLBAR_HEIGHT = 44;
 const HEADER_RESERVED = 56;
 const GAP = 8;
 
-const BTN =
-  "nodrag flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/75 transition hover:bg-white/8 hover:text-white/95 disabled:cursor-not-allowed disabled:opacity-40";
+const TOOL_BTN = PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS;
 
 function imageUrlOf(node: CanvasFlowNode): string {
   const d = node.data as { ossUrl?: string; blobUrl?: string };
@@ -235,12 +239,21 @@ export function Pro2SelectionToolbar({
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center gap-1 rounded-xl border border-white/12 bg-[#1c1c1e]/95 px-2 py-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-        <LayoutGrid className="ml-0.5 size-3.5 text-white/45" />
-        <span className="mx-0.5 h-4 w-px bg-white/12" />
+      <div
+        className={cn(
+          PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
+          "nodrag pointer-events-auto",
+        )}
+      >
+        <span
+          aria-hidden
+          className="ml-0.5 size-2.5 shrink-0 rounded-full bg-white/90 nodrag pointer-events-none"
+        />
+        <LayoutGrid className="size-3.5 text-white/45 nodrag pointer-events-none" />
+        <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
         <button
           type="button"
-          className={cn(BTN)}
+          className={TOOL_BTN}
           title="保存选中的三视图到角色资产库（不裁切）"
           disabled={saving}
           onClick={() => void onSaveToAssets()}
@@ -248,13 +261,13 @@ export function Pro2SelectionToolbar({
           {saving ? (
             <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <Save className="size-3.5" />
+            <BookmarkPlus className="size-3.5" />
           )}
           保存到资产
         </button>
         <button
           type="button"
-          className={cn(BTN)}
+          className={TOOL_BTN}
           title="为选中的节点创建副本"
           onClick={onDuplicate}
         >
@@ -264,7 +277,7 @@ export function Pro2SelectionToolbar({
         <div className="relative">
           <button
             type="button"
-            className={cn(BTN)}
+            className={TOOL_BTN}
             title={`将选中 ${selectedIds.length} 个节点装进分组（设组名 / 边框色）`}
             onClick={() => setGroupOpen((v) => !v)}
           >

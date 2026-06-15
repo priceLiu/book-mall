@@ -6,6 +6,10 @@ import {
   LIBTV_INPUT_DOCK_BG,
   LIBTV_INPUT_DOCK_BORDER,
   LIBTV_INPUT_DOCK_DIVIDER,
+  LIBTV_SQUARE_IMAGE_NODE_HEIGHT,
+  LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT,
+  LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH,
+  LIBTV_SQUARE_IMAGE_NODE_WIDTH,
 } from "./libtv-node-chrome";
 
 export const PRO2_NODE_ACCENT = "#9f8fef";
@@ -44,12 +48,13 @@ export const PRO2_SCRIPT_NODE_CARD_HEIGHT = 300;
 export const PRO2_SCRIPT_NODE_MIN_HEIGHT = 220;
 export const PRO2_SCRIPT_NODE_HEIGHT = PRO2_SCRIPT_NODE_CARD_HEIGHT + 28;
 
-/** 2.0 图片节点（LibTV 薄卡） */
-export const PRO2_IMAGE_NODE_WIDTH = 280;
-export const PRO2_IMAGE_NODE_MIN_WIDTH = 220;
-export const PRO2_IMAGE_NODE_CARD_HEIGHT = 280;
-export const PRO2_IMAGE_NODE_MIN_HEIGHT = 240;
-export const PRO2_IMAGE_NODE_HEIGHT = PRO2_IMAGE_NODE_CARD_HEIGHT + 28;
+/** 2.0 图片 / 风格素材节点（LibTV 方形媒体卡 · alias `LIBTV_SQUARE_IMAGE_NODE_*`） */
+export const PRO2_IMAGE_NODE_WIDTH = LIBTV_SQUARE_IMAGE_NODE_WIDTH;
+export const PRO2_IMAGE_NODE_HEIGHT = LIBTV_SQUARE_IMAGE_NODE_HEIGHT;
+export const PRO2_IMAGE_NODE_MIN_WIDTH = LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH;
+export const PRO2_IMAGE_NODE_MIN_HEIGHT = LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT;
+/** @deprecated 与 PRO2_IMAGE_NODE_HEIGHT 相同（LibTV 图片卡无外挂标题行） */
+export const PRO2_IMAGE_NODE_CARD_HEIGHT = PRO2_IMAGE_NODE_HEIGHT;
 
 /** 2.0 三视图角色节点（图 3 · 横向矩形 · contain 完整显示） */
 export const PRO2_CHARACTER_THREE_VIEW_WIDTH = 400;
@@ -94,8 +99,13 @@ export const PRO2_TEXT_NODE_TITLE_CLASS =
 export const PRO2_COLUMN_CARD_WIDTH = 320;
 export const PRO2_COLUMN_CARD_HEIGHT = 120;
 
+/** 2.0 文本 / 脚本 / 列摘要薄卡 */
 export const PRO2_CARD_SHELL_CLASS =
-  "rounded-xl border bg-[var(--canvas-surface)]/90 shadow-sm transition-shadow";
+  "libtv-control-node-bg rounded-xl border shadow-sm transition-shadow";
+
+/** 2.0 风格素材节点（与媒体节点同色 #262626） */
+export const PRO2_STYLE_ASSET_CARD_SHELL_CLASS =
+  "libtv-media-node-bg rounded-xl border shadow-sm transition-shadow";
 
 /** @deprecated 选中态改由 pro2NodeBorderColor 控制边框，不再使用 ring */
 export const PRO2_CARD_SELECTED_CLASS = "";

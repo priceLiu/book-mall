@@ -28,7 +28,7 @@ export function AccountDevActions() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
-        <Button type="button" variant="subscription" size="sm" onClick={() => push("/checkout/topup?packId=pack-1k")}>
+        <Button type="button" variant="subscription" size="sm" onClick={() => push("/checkout/topup?packId=pack-light")}>
           轻量包收银
         </Button>
         <Button type="button" variant="subscription" size="sm" onClick={() => push("/pricing")}>

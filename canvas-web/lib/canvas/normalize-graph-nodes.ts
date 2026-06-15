@@ -28,9 +28,41 @@ export function nodeMeasuredSize(n: CanvasFlowNode): { w: number; h: number } {
   const style = n.style as { width?: number; height?: number } | undefined;
   const t = (n.type ?? "text") as CanvasNodeType;
   const def = NODE_DEFAULT_SIZE[t] ?? { width: 320, height: 240 };
-  const w = style?.width ?? n.width ?? def.width;
-  const h = style?.height ?? n.height ?? def.height;
+  const w = n.width ?? style?.width ?? def.width;
+  const h = n.height ?? style?.height ?? def.height;
   return { w: Number(w) || def.width, h: Number(h) || def.height };
+}
+
+/** 同步 node.width/height 与 style；RF 12 NodeResizer 依赖顶层 width/height，不只读 style */
+export function ensureExplicitNodeDimensions(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  let changed = false;
+  const next = nodes.map((n) => {
+    const { w, h } = nodeMeasuredSize(n);
+    const style = (typeof n.style === "object" && n.style ? n.style : {}) as {
+      width?: number;
+      height?: number;
+    };
+    const width = Number(n.width ?? style.width ?? w) || w;
+    const height = Number(n.height ?? style.height ?? h) || h;
+    if (
+      n.width === width &&
+      n.height === height &&
+      style.width === width &&
+      style.height === height
+    ) {
+      return n;
+    }
+    changed = true;
+    return {
+      ...n,
+      width,
+      height,
+      style: { ...style, width, height },
+    } as CanvasFlowNode;
+  });
+  return changed ? next : nodes;
 }
 
 /** 节点在画布上的绝对坐标（含 parent 链）。 */
@@ -827,10 +859,13 @@ export function normalizeCanvasNodes(
   edges?: CanvasFlowEdge[],
 ): CanvasFlowNode[] {
   const withLlmParams = migrateStoryOutlineLlmParamsAll(nodes);
+  const withDimensions = ensureExplicitNodeDimensions(withLlmParams);
   const sized = normalizeStoryControlNodeSizes(
     normalizeStoryMediaColumnSizes(
       normalizeJianyingExportNodeSizes(
-        normalizeRefVideoWorkflowNodeSizes(normalizeThreeViewNodeSizes(withLlmParams)),
+        normalizeRefVideoWorkflowNodeSizes(
+          normalizeThreeViewNodeSizes(withDimensions),
+        ),
       ),
       edges ?? [],
     ),

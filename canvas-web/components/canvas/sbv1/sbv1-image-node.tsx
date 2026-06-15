@@ -20,6 +20,7 @@ import {
 import {
   SBV1_CARD_DRAG_CLASS,
   SBV1_CARD_SHELL_CLASS,
+  SBV1_MEDIA_STAGE_CLASS,
   SBV1_NODE_HANDLE_CLASS,
   SBV1_NODE_OUTER_CLASS,
 } from "@/lib/canvas/sbv1-node-chrome";
@@ -258,7 +259,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
             ) : null}
           </div>
 
-          <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
+          <div className={SBV1_MEDIA_STAGE_CLASS}>
             {isGenerating ? (
               <LibtvMediaGeneratingState label={generatingLabel} variant="cyan">
                 {previewUrl ? (

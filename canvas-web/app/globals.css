@@ -41,6 +41,8 @@
   --canvas-story-video-tip-width: 520px;
   --canvas-story-video-tip-max-h: 560px;
   --canvas-story-video-tip-body-max-h: 480px;
+  --libtv-media-node-bg: #262626;
+  --libtv-control-node-bg: #141418;
 }
 
 html {
@@ -175,6 +177,16 @@ body {
   .impl-table td:last-child {
     @apply text-[var(--canvas-muted)];
   }
+}
+
+/* LibTV 媒体节点（图片 / 视频 / 三视图 / 2.0 素材）· 卡片与预览区背景 */
+.libtv-media-node-bg {
+  background-color: var(--libtv-media-node-bg);
+}
+
+/* LibTV 控制类节点（2.0 文本 / 脚本 / 列摘要等） */
+.libtv-control-node-bg {
+  background-color: var(--libtv-control-node-bg);
 }
 
 /* ----------------------------------------

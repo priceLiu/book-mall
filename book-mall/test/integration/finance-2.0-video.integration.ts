@@ -62,8 +62,8 @@ async function main() {
   try {
     // —————————————— TC-个人视频 + TC-个人退款 ——————————————
     const userId = `test-fin2-user-${randomUUID()}`;
-    const ppc = computePricePerCredit(199, 6500); // 高级版个人
-    const perVideo = computeTierCredits(VIDEO_LIST_YUAN, ppc); // 期望 1587
+    const ppc = computePricePerCredit(299, 6500); // 高级版个人
+    const perVideo = computeTierCredits(VIDEO_LIST_YUAN, ppc); // 期望 1057
     console.log(`[个人] 高级版单价 ¥${ppc.toFixed(6)}，单条 15s 视频扣分 = ${perVideo}`);
 
     await grantCredits({
@@ -151,8 +151,8 @@ async function main() {
 
     // —————————————— TC-团队分账 ——————————————
     const tenantId = `test-fin2-team-${randomUUID()}`;
-    const teamPpc = computePricePerCredit(189, 5000); // 团队高级版每席
-    const teamPerVideo = computeTierCredits(VIDEO_LIST_YUAN, teamPpc); // 期望 1286
+    const teamPpc = computePricePerCredit(289, 5000); // 团队高级版每席
+    const teamPerVideo = computeTierCredits(VIDEO_LIST_YUAN, teamPpc); // 期望 841
     console.log(`[团队] 高级版每席单价 ¥${teamPpc.toFixed(6)}，单条扣分 = ${teamPerVideo}`);
     await grantCredits({
       ref: { ownerType: "TENANT", ownerId: tenantId },

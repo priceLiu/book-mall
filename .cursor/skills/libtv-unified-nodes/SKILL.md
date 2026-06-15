@@ -19,6 +19,15 @@ description: >-
 
 **同一套组件**；仅允许：`type`、spawn 菜单、ring 色（紫 / cyan）、模型白名单、用户可见名。
 
+### 默认尺寸（强制 · alias `libtv-node-chrome.ts` / `sbv1-node-chrome.ts`）
+
+| 节点 | 350×350 方形 | 视频 |
+| --- | --- | --- |
+| Pro2 | `story-pro2-image` · `story-pro2-style-asset` | 分镜视频组格 **350×232** |
+| sbv1 | **`sbv1-image`** | **`sbv1-video-engine` 635×365** |
+
+**禁止** sbv1 图片单独定义与 Pro2 不同的默认尺寸；视频合成使用 `SBV1_VIDEO_ENGINE_*`，不与 Pro2 组格 alias。
+
 | 禁止 | 唯一实现 |
 | --- | --- |
 | 第二套 Dock / 顶栏 / 侧 `+` / 媒体壳 / 组顶栏 | 见下表 |

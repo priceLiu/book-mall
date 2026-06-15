@@ -15,6 +15,20 @@
 
 Pro2 与 sbv1 **同一套组件**；仅允许：`type`、spawn 菜单、ring 色（紫 / cyan）、业务白名单差异。
 
+## 默认尺寸（强制）
+
+真源：`lib/canvas/libtv-node-chrome.ts` · 目录 `libtv-unified-node-catalog.md` §1.3
+
+| 场景 | 尺寸 | Token |
+| --- | --- | --- |
+| 方形图片（`story-pro2-image` · `story-pro2-style-asset` · **`sbv1-image`**） | **350 × 350** | `LIBTV_SQUARE_IMAGE_NODE_*` |
+| Pro2 分镜视频组格 | **350 × 232** | `LIBTV_VIDEO_MEDIA_NODE_*` · `PRO2_VIDEO_CELL_*` |
+| **`sbv1-video-engine` / 视频合成** | **635 × 365** | `SBV1_VIDEO_ENGINE_*` |
+| 组内分镜图格 | **296 × 196** | `PRO2_FRAME_CELL_*` |
+
+- Pro2 / sbv1 **必须 alias 上述常量**，禁止单独硬编码不同默认尺寸
+- Code Review 见目录 §5
+
 ## 禁止
 
 - 第二套 Dock / 顶栏 / 侧 `+` / 媒体壳层 / 组顶栏
@@ -29,4 +43,5 @@ Pro2 与 sbv1 **同一套组件**；仅允许：`type`、spawn 菜单、ring 色
 - [ ] `Pro2NodeSidePlus` · spawn 后 `select*AfterSpawn` + `sortNodesForReactFlow`
 - [ ] 媒体：浮动 Dock · 空态 `passNodeDrag` · 有图 `Pro2ImageNodeToolbar` + `passNodeDrag`
 - [ ] 组：`Pro2MediaGroupToolbarPanel` · 点阵底
+- [ ] 默认尺寸：图片 `LIBTV_SQUARE_IMAGE_NODE_*` · 视频合成 `SBV1_VIDEO_ENGINE_*`（635×365）
 - [ ] Code Review 见目录 §5

@@ -147,8 +147,16 @@ function backfillNodeSize(n: LooseNode): LooseNode {
       changed = true;
     }
   }
-  if (!changed) return n;
-  return { ...n, style: next };
+  const width = Number(next.width ?? cur.width) || def.width;
+  const height = Number(next.height ?? cur.height) || def.height;
+  if (
+    !changed &&
+    n.width === width &&
+    n.height === height
+  ) {
+    return n;
+  }
+  return { ...n, width, height, style: next };
 }
 
 /**

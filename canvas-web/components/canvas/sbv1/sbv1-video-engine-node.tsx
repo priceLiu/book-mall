@@ -17,11 +17,12 @@ import {
 import {
   SBV1_CARD_DRAG_CLASS,
   SBV1_CARD_SHELL_CLASS,
+  SBV1_MEDIA_STAGE_CLASS,
   SBV1_NODE_HANDLE_CLASS,
   SBV1_NODE_OUTER_CLASS,
   SBV1_VIDEO_COMPOSE_LABEL,
-  SBV1_VIDEO_ENGINE_MIN_HEIGHT,
-  SBV1_VIDEO_ENGINE_WIDTH,
+  SBV1_VIDEO_ENGINE_MIN_WIDTH,
+  SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT,
 } from "@/lib/canvas/sbv1-node-chrome";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
@@ -45,8 +46,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const setEdges = useCanvasStore((s) => s.setEdges);
   const d = data as unknown as Sbv1VideoEngineNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
-  const self = nodes.find((n) => n.id === id);
-  const insideGroup = Boolean(self?.parentId);
   const { succeeded } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -99,18 +98,13 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   return (
     <>
       <Pro2NodeResizer
-        isVisible={Boolean(selected && !insideGroup)}
-        minWidth={SBV1_VIDEO_ENGINE_WIDTH}
-        minHeight={SBV1_VIDEO_ENGINE_MIN_HEIGHT}
+        isVisible={Boolean(selected)}
+        minWidth={SBV1_VIDEO_ENGINE_MIN_WIDTH}
+        minHeight={SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT}
       />
       <div
         className={SBV1_NODE_OUTER_CLASS}
         data-sbv1-dock-anchor={id}
-        style={{
-          width: SBV1_VIDEO_ENGINE_WIDTH,
-          minWidth: SBV1_VIDEO_ENGINE_WIDTH,
-          minHeight: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
-        }}
       >
         <Handle
           id="in_ref"
@@ -212,7 +206,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             </div>
           </div>
 
-          <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
+          <div className={SBV1_MEDIA_STAGE_CLASS}>
             {isGenerating ? (
               <LibtvMediaGeneratingState
                 label="视频生成中…"

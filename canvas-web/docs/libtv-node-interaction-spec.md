@@ -19,7 +19,7 @@
 | 悬停预览 | `MediaHoverBox` | 仅 Eye 小圆钮 `nodrag` |
 | 空态 / 错误 | `Pro2MediaNodeEmptyState` · `Pro2MediaNodeErrorState` | 空态 **须** `passNodeDrag`（整卡可拖） |
 | 角标缩放 | `Pro2NodeResizer` | 组内节点隐藏 |
-| 框选工具条 | `SelectionToolbar` / `Pro2SelectionToolbar` | 打组 / 自动整理 / 保存资产 |
+| 框选工具条 | `Pro2SelectionToolbar`（Pro2）/ `SelectionToolbar`（通用） | 打组 / 保存资产；**Pro2 壳层同组顶栏** |
 | 媒体组顶栏 | `Pro2MediaGroupToolbar` · `Pro2MediaGroupToolbarPanel` | 样式 **同** `Pro2ImageNodeToolbar`（`PRO2_IMAGE_NODE_TOOLBAR_*`） |
 
 **edition 差异**仅在于：节点 `type`、spawn 映射（`pro2-spawn-nodes` vs `sbv1-spawn-nodes`）、菜单项（`PRO2_*_ADD_MENU` vs `SBV1_*_ADD_MENU`）。**样式与交互不得分叉。**
@@ -42,12 +42,16 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
   Handle(s)
   Pro2NodeSidePlus（选中时）
   Pro2ImageNodeToolbar（有图 + 唯一选中，passNodeDrag）
-  LIBTV_CARD_SHELL_CLASS + LIBTV_CARD_DRAG_CLASS
+  LIBTV_MEDIA_CARD_SHELL_CLASS + LIBTV_CARD_DRAG_CLASS   ← 背景 #262626
     ├─ Header（图标 + 标题 + 状态）
-    └─ Stage（预览 / 空态[`passNodeDrag`] · **无内嵌 Dock**）
+    └─ LIBTV_MEDIA_STAGE_CLASS                           ← 背景 #262626，禁止 bg-black/40
 ```
 
-**禁止**：Pro2 外置标题 + `RF_NODE_DRAG_HANDLE` + `PRO2_MEDIA_CARD_SHELL`（旧图片节点布局）。
+**控制类节点**（文本 / 脚本）：外置标题行 + `PRO2_CARD_SHELL_CLASS`（`libtv-control-node-bg` · `#141418`）+ 预览 stage（同色，无单独暗色 overlay）。
+
+**2.0 素材**（`story-pro2-style-asset`）：缩略图区用 `PRO2_STYLE_ASSET_CARD_SHELL_CLASS`（`#262626`，同媒体）。
+
+**背景真源**：`lib/canvas/libtv-node-chrome.ts` · CSS 变量 `--libtv-media-node-bg` / `--libtv-control-node-bg` · 类 `.libtv-media-node-bg` / `.libtv-control-node-bg`（`app/globals.css`）。Tailwind 配置须含 `./lib/**`（见 `tailwind.config.ts`）。
 
 ### 2.2 排列持久化（禁止刷新回弹）
 
@@ -102,6 +106,8 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 
 **媒体组顶栏**（Pro2 三视图/分镜图组 · sbv1 参考图组）：须走 `Pro2MediaGroupToolbarPanel`（`edition` pro2/sbv1），壳层与 §5.2 完全一致；`passNodeDrag` 默认开启。
 
+**框选打组顶栏**（Pro2 · `Pro2SelectionToolbar`）：≥2 非组节点选中时出现；**必须**复用 `PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS` + 白点 + `LayoutGrid` + 分隔线 + `PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS`；禁止独立 pill 样式。操作：保存到资产 · 创建副本 · 打组（下拉弹层同组内「改名改色」）。
+
 ## 6. Store 约束
 
 以下路径 **必须** 调用 `ensureNodeDragHandles`：
@@ -120,4 +126,6 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 - [ ] 空态上传用 `role="button"` div，非整卡 `<button>`
 - [ ] 未新建第二套 Dock / 工具条 / 侧 + 组件
 - [ ] 有图顶栏走 `Pro2ImageNodeToolbar` + `PRO2_IMAGE_NODE_TOOLBAR_*` 常量
+- [ ] 媒体背景 `#262626`（壳+Stage）；控制类 `#141418`；无 Stage `bg-black/40`
+- [ ] `Pro2SelectionToolbar` 与组顶栏共用 `PRO2_IMAGE_NODE_TOOLBAR_*`
 - [ ] 拖动松手后刷新位置不变（`commitFlowNodePositions` + flush autosave）

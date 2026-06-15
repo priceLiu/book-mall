@@ -50,34 +50,34 @@ interface PlanSeed {
 
 // 个人 · 月付（锚定 ¥0.04；积分 ≈ 价 ÷ 0.04，会员利润主要来自模型渠道差价）
 const PERSONAL_MONTH: PlanSeed[] = [
-  { tier: "标准版", sortOrder: 1, priceYuan: 39, originalYuan: 59, monthlyCredits: 1000, includedSeats: 1 },
-  { tier: "进阶版", sortOrder: 2, priceYuan: 99, originalYuan: 149, monthlyCredits: 3000, includedSeats: 1 },
-  { tier: "高级版", sortOrder: 3, priceYuan: 199, originalYuan: 299, monthlyCredits: 6500, includedSeats: 1 },
-  { tier: "豪华版", sortOrder: 4, priceYuan: 399, originalYuan: 599, monthlyCredits: 14000, includedSeats: 1 },
-  { tier: "至尊版", sortOrder: 5, priceYuan: 799, originalYuan: 1199, monthlyCredits: 30000, includedSeats: 1 },
+  { tier: "标准版", sortOrder: 1, priceYuan: 69, originalYuan: 99, monthlyCredits: 1000, includedSeats: 1 },
+  { tier: "进阶版", sortOrder: 2, priceYuan: 149, originalYuan: 219, monthlyCredits: 3000, includedSeats: 1 },
+  { tier: "高级版", sortOrder: 3, priceYuan: 299, originalYuan: 449, monthlyCredits: 6500, includedSeats: 1 },
+  { tier: "豪华版", sortOrder: 4, priceYuan: 599, originalYuan: 899, monthlyCredits: 14000, includedSeats: 1 },
+  { tier: "至尊版", sortOrder: 5, priceYuan: 1199, originalYuan: 1799, monthlyCredits: 30000, includedSeats: 1 },
 ];
 
 // 个人 · 年付（约 10 个月价；积分 = 月额 × 12）
 const PERSONAL_YEAR: PlanSeed[] = [
-  { tier: "标准版", sortOrder: 1, priceYuan: 390, originalYuan: 708, promoLabel: "年付立省2个月", monthlyCredits: 12000, includedSeats: 1 },
-  { tier: "进阶版", sortOrder: 2, priceYuan: 990, originalYuan: 1788, promoLabel: "年付立省2个月", monthlyCredits: 36000, includedSeats: 1 },
-  { tier: "高级版", sortOrder: 3, priceYuan: 1990, originalYuan: 3588, promoLabel: "年付立省2个月", monthlyCredits: 78000, includedSeats: 1 },
-  { tier: "豪华版", sortOrder: 4, priceYuan: 3990, originalYuan: 7188, promoLabel: "年付立省2个月", monthlyCredits: 168000, includedSeats: 1 },
-  { tier: "至尊版", sortOrder: 5, priceYuan: 7990, originalYuan: 14388, promoLabel: "年付立省2个月", monthlyCredits: 360000, includedSeats: 1 },
+  { tier: "标准版", sortOrder: 1, priceYuan: 690, originalYuan: 990, promoLabel: "年付立省2个月", monthlyCredits: 12000, includedSeats: 1 },
+  { tier: "进阶版", sortOrder: 2, priceYuan: 1490, originalYuan: 2190, promoLabel: "年付立省2个月", monthlyCredits: 36000, includedSeats: 1 },
+  { tier: "高级版", sortOrder: 3, priceYuan: 2990, originalYuan: 4490, promoLabel: "年付立省2个月", monthlyCredits: 78000, includedSeats: 1 },
+  { tier: "豪华版", sortOrder: 4, priceYuan: 5990, originalYuan: 8990, promoLabel: "年付立省2个月", monthlyCredits: 168000, includedSeats: 1 },
+  { tier: "至尊版", sortOrder: 5, priceYuan: 11990, originalYuan: 17990, promoLabel: "年付立省2个月", monthlyCredits: 360000, includedSeats: 1 },
 ];
 
 // 团队 · 月付（按席计价：起订 3 席；仅高级版 / 豪华版 / 至尊版）
 const TEAM_MONTH: PlanSeed[] = [
-  { tier: "高级版", sortOrder: 1, priceYuan: 567, originalYuan: 852, monthlyCredits: 5000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "豪华版", sortOrder: 2, priceYuan: 747, originalYuan: 1122, monthlyCredits: 8000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "至尊版", sortOrder: 3, priceYuan: 1287, originalYuan: 1946, monthlyCredits: 15000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "高级版", sortOrder: 1, priceYuan: 867, originalYuan: 1301, monthlyCredits: 5000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "豪华版", sortOrder: 2, priceYuan: 1404, originalYuan: 2106, monthlyCredits: 8000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "至尊版", sortOrder: 3, priceYuan: 2397, originalYuan: 3596, monthlyCredits: 15000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
 ];
 
 // 团队 · 年付（每席价 ×10 个月；priceYuan = 每席年价 × 3）
 const TEAM_YEAR: PlanSeed[] = [
-  { tier: "高级版", sortOrder: 1, priceYuan: 5670, originalYuan: 10224, promoLabel: "年付立省2个月", monthlyCredits: 60000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "豪华版", sortOrder: 2, priceYuan: 7470, originalYuan: 13464, promoLabel: "年付立省2个月", monthlyCredits: 96000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
-  { tier: "至尊版", sortOrder: 3, priceYuan: 12870, originalYuan: 23364, promoLabel: "年付立省2个月", monthlyCredits: 180000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "高级版", sortOrder: 1, priceYuan: 8670, originalYuan: 15632, promoLabel: "年付立省2个月", monthlyCredits: 60000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "豪华版", sortOrder: 2, priceYuan: 14040, originalYuan: 25272, promoLabel: "年付立省2个月", monthlyCredits: 96000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
+  { tier: "至尊版", sortOrder: 3, priceYuan: 23970, originalYuan: 43254, promoLabel: "年付立省2个月", monthlyCredits: 180000, includedSeats: TEAM_MIN_INCLUDED_SEATS },
 ];
 
 // 团队席位带（人数越多每席单价越低）— perSeatPrice 取月口径，年付折算 ×10；每席积分恒定（= 该档每席积分）
@@ -90,19 +90,19 @@ interface SeatTierSeed {
 }
 const SEAT_TIERS_BY_TIER: Record<string, SeatTierSeed[]> = {
   高级版: [
-    { seatMin: 3, seatMax: 5, perSeatPriceMonthYuan: 189, perSeatCredits: 5000, sortOrder: 1 },
-    { seatMin: 6, seatMax: 10, perSeatPriceMonthYuan: 169, perSeatCredits: 5000, sortOrder: 2 },
-    { seatMin: 11, seatMax: null, perSeatPriceMonthYuan: 149, perSeatCredits: 5000, sortOrder: 3 },
+    { seatMin: 3, seatMax: 5, perSeatPriceMonthYuan: 289, perSeatCredits: 5000, sortOrder: 1 },
+    { seatMin: 6, seatMax: 10, perSeatPriceMonthYuan: 269, perSeatCredits: 5000, sortOrder: 2 },
+    { seatMin: 11, seatMax: null, perSeatPriceMonthYuan: 249, perSeatCredits: 5000, sortOrder: 3 },
   ],
   豪华版: [
-    { seatMin: 3, seatMax: 10, perSeatPriceMonthYuan: 249, perSeatCredits: 8000, sortOrder: 1 },
-    { seatMin: 11, seatMax: 20, perSeatPriceMonthYuan: 229, perSeatCredits: 8000, sortOrder: 2 },
-    { seatMin: 21, seatMax: null, perSeatPriceMonthYuan: 209, perSeatCredits: 8000, sortOrder: 3 },
+    { seatMin: 3, seatMax: 10, perSeatPriceMonthYuan: 468, perSeatCredits: 8000, sortOrder: 1 },
+    { seatMin: 11, seatMax: 20, perSeatPriceMonthYuan: 431, perSeatCredits: 8000, sortOrder: 2 },
+    { seatMin: 21, seatMax: null, perSeatPriceMonthYuan: 394, perSeatCredits: 8000, sortOrder: 3 },
   ],
   至尊版: [
-    { seatMin: 3, seatMax: 10, perSeatPriceMonthYuan: 429, perSeatCredits: 15000, sortOrder: 1 },
-    { seatMin: 11, seatMax: 20, perSeatPriceMonthYuan: 389, perSeatCredits: 15000, sortOrder: 2 },
-    { seatMin: 21, seatMax: null, perSeatPriceMonthYuan: 359, perSeatCredits: 15000, sortOrder: 3 },
+    { seatMin: 3, seatMax: 10, perSeatPriceMonthYuan: 799, perSeatCredits: 15000, sortOrder: 1 },
+    { seatMin: 11, seatMax: 20, perSeatPriceMonthYuan: 726, perSeatCredits: 15000, sortOrder: 2 },
+    { seatMin: 21, seatMax: null, perSeatPriceMonthYuan: 676, perSeatCredits: 15000, sortOrder: 3 },
   ],
 };
 

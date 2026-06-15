@@ -3,10 +3,10 @@
 import { sbv1ImageChildren } from "./sbv1-media-group-meta";
 import {
   SBV1_IMAGE_NODE_WIDTH,
-  SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+  SBV1_VIDEO_ENGINE_HEIGHT,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
-import { absoluteNodePosition, sortNodesForReactFlow } from "./normalize-graph-nodes";
+import { absoluteNodePosition, nodeMeasuredSize, sortNodesForReactFlow } from "./normalize-graph-nodes";
 import {
   PRO2_MEDIA_GRID_GAP,
   PRO2_MEDIA_GROUP_EXTRA,
@@ -21,6 +21,20 @@ import {
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
 const SBV1_VIDEO_GAP = 48;
+
+function sbv1VideoEngineDimensions(n: CanvasFlowNode): {
+  width: number;
+  height: number;
+} {
+  if (Boolean((n.data as { manualSize?: boolean }).manualSize)) {
+    const { w, h } = nodeMeasuredSize(n);
+    return { width: w, height: h };
+  }
+  return {
+    width: SBV1_VIDEO_ENGINE_WIDTH,
+    height: SBV1_VIDEO_ENGINE_HEIGHT,
+  };
+}
 
 function isSbv1MediaGroup(group: CanvasFlowNode | undefined): boolean {
   if (!group || group.type !== "group") return false;
@@ -113,7 +127,7 @@ function ejectExtraSbv1GroupEngines(
     const abs = absoluteNodePosition(n, nodes);
     const released = releaseNodeFromGroup(n, {
       x: group.position.x + gw + SBV1_VIDEO_GAP,
-      y: abs.y + outIdx * (SBV1_VIDEO_ENGINE_MIN_HEIGHT + PRO2_MEDIA_GRID_GAP),
+      y: abs.y + outIdx * (SBV1_VIDEO_ENGINE_HEIGHT + PRO2_MEDIA_GRID_GAP),
     });
     outIdx += 1;
     return released;
@@ -194,38 +208,50 @@ export function applySbv1MediaGroupRelayout(
   }
 
   if (images.length === 0 && engines.length > 0) {
+    const engineDimsList = engines.map((e) => sbv1VideoEngineDimensions(e));
     for (let i = 0; i < engines.length; i++) {
       const engine = engines[i]!;
+      const dims = engineDimsList[i]!;
+      const prevHeight =
+        i > 0
+          ? engineDimsList
+              .slice(0, i)
+              .reduce((sum, d) => sum + d.height + PRO2_MEDIA_GRID_GAP, 0)
+          : 0;
       const y =
-        PRO2_MEDIA_GROUP_PAD +
-        PRO2_MEDIA_GROUP_HEADER +
-        i * (SBV1_VIDEO_ENGINE_MIN_HEIGHT + PRO2_MEDIA_GRID_GAP);
+        PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER + prevHeight;
       next = next.map((n) =>
         n.id === engine.id
           ? {
               ...n,
               position: { x: PRO2_MEDIA_GROUP_PAD, y },
-              width: SBV1_VIDEO_ENGINE_WIDTH,
-              height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+              width: dims.width,
+              height: dims.height,
               style: {
                 ...(typeof n.style === "object" && n.style ? n.style : {}),
-                width: SBV1_VIDEO_ENGINE_WIDTH,
-                height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+                width: dims.width,
+                height: dims.height,
               },
               data: { ...n.data, pro2GroupId: groupId },
             }
           : n,
       );
     }
+    const maxEngineWidth = Math.max(
+      ...engineDimsList.map((d) => d.width),
+      SBV1_VIDEO_ENGINE_WIDTH,
+    );
+    const enginesHeight = engineDimsList.reduce(
+      (sum, d, i) =>
+        sum + d.height + (i > 0 ? PRO2_MEDIA_GRID_GAP : 0),
+      0,
+    );
     const groupWidth =
-      PRO2_MEDIA_GROUP_PAD * 2 +
-      SBV1_VIDEO_ENGINE_WIDTH +
-      PRO2_MEDIA_GROUP_EXTRA;
+      PRO2_MEDIA_GROUP_PAD * 2 + maxEngineWidth + PRO2_MEDIA_GROUP_EXTRA;
     const groupHeight =
       PRO2_MEDIA_GROUP_PAD * 2 +
       PRO2_MEDIA_GROUP_HEADER +
-      engines.length * SBV1_VIDEO_ENGINE_MIN_HEIGHT +
-      Math.max(0, engines.length - 1) * PRO2_MEDIA_GRID_GAP +
+      enginesHeight +
       PRO2_MEDIA_GROUP_EXTRA;
     next = next.map((n) =>
       n.id === groupId
@@ -282,6 +308,7 @@ export function applySbv1MediaGroupRelayout(
   let groupHeight = imageBox.height;
 
   if (engine) {
+    const engineDims = sbv1VideoEngineDimensions(engine);
     const videoX = PRO2_MEDIA_GROUP_PAD + gridContentWidth + SBV1_VIDEO_GAP;
     const videoY = PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER;
     next = next.map((n) =>
@@ -289,12 +316,12 @@ export function applySbv1MediaGroupRelayout(
         ? {
             ...n,
             position: { x: videoX, y: videoY },
-            width: SBV1_VIDEO_ENGINE_WIDTH,
-            height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+            width: engineDims.width,
+            height: engineDims.height,
             style: {
               ...(typeof n.style === "object" && n.style ? n.style : {}),
-              width: SBV1_VIDEO_ENGINE_WIDTH,
-              height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+              width: engineDims.width,
+              height: engineDims.height,
             },
             data: { ...n.data, pro2GroupId: groupId },
           }
@@ -304,14 +331,14 @@ export function applySbv1MediaGroupRelayout(
       PRO2_MEDIA_GROUP_PAD +
       gridContentWidth +
       SBV1_VIDEO_GAP +
-      SBV1_VIDEO_ENGINE_WIDTH +
+      engineDims.width +
       PRO2_MEDIA_GROUP_PAD +
       PRO2_MEDIA_GROUP_EXTRA;
     groupHeight = Math.max(
       imageBox.height,
       PRO2_MEDIA_GROUP_PAD +
         PRO2_MEDIA_GROUP_HEADER +
-        SBV1_VIDEO_ENGINE_MIN_HEIGHT +
+        engineDims.height +
         PRO2_MEDIA_GROUP_PAD +
         PRO2_MEDIA_GROUP_EXTRA,
     );

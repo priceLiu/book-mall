@@ -9,6 +9,7 @@ import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
+import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import {
   PRO2_THREE_VIEW_MODEL_KEYS,
   pickDefaultPro2ThreeViewImageEngine,
@@ -94,6 +95,14 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
     () => dockActiveRefIdsFromPrompt(dockInput),
     [dockInput],
   );
+
+  usePruneStaleDockMentions({
+    nodeId: storeNode?.id ?? null,
+    prompt: dockInput,
+    mentionables,
+    field: "dockInput",
+    updateNodeData,
+  });
 
   const syncCharacterRowPrompt = useCallback(
     (value: string) => {

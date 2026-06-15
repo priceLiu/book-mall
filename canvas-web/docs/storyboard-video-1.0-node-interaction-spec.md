@@ -77,10 +77,10 @@ SBV1_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 
 ## 5. 尺寸与缩放
 
-| 节点 | 默认宽 | 最小高 | 组内 Resizer |
+| 节点 | 默认宽 × 高 | 最小拉伸 | 组内 Resizer |
 | --- | --- | --- | --- |
-| `sbv1-image` | `SBV1_IMAGE_NODE_WIDTH` | `PRO2_IMAGE_NODE_MIN_HEIGHT` + header | 组外可选中缩放 |
-| `sbv1-video-engine` | `SBV1_VIDEO_ENGINE_WIDTH` | `SBV1_VIDEO_ENGINE_MIN_HEIGHT` | 组外可选中缩放 |
+| `sbv1-image` | **350 × 350**（`LIBTV_SQUARE_IMAGE_NODE_*` · 与 Pro2 图片同） | 220 × 220 | 组外可选中缩放 |
+| `sbv1-video-engine` | **635 × 365**（`SBV1_VIDEO_ENGINE_*`） | 380 × 218 | 组外可选中缩放 |
 
 ## 6. Store 约束
 

@@ -9,6 +9,7 @@ import { spawnPro2DockPastedImages } from "@/lib/canvas/spawn-pro2-dock-paste-im
 import { spawnSbv1ImageDockPastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
+import { removeDockRefFromState } from "@/lib/canvas/strip-dock-mentions";
 import {
   PRO2_DOCK_ACTIVE_REF_BORDER_CLASS,
   PRO2_DOCK_REF_IDLE_BORDER_CLASS,
@@ -22,6 +23,9 @@ export type Pro2DockRefImagesProps = {
   pasteActive?: boolean;
   maxCount?: number;
   activeIds?: string[];
+  /** 删除 chip 时同步从 prompt 移除 @<refId> */
+  promptValue?: string;
+  onPromptChange?: (next: string) => void;
   /** 设置后：上传/粘贴会在锚点左侧生成图片节点并连线（多图） */
   spawnAnchor?: { nodeId: string; nodeType: string };
 };
@@ -34,6 +38,8 @@ export function Pro2DockRefImages({
   pasteActive = true,
   maxCount = 6,
   activeIds = [],
+  promptValue,
+  onPromptChange,
   spawnAnchor,
 }: Pro2DockRefImagesProps) {
   const base = useBookMallBaseUrl();
@@ -154,7 +160,17 @@ export function Pro2DockRefImages({
           <button
             type="button"
             className="absolute right-0 top-0 flex size-4 items-center justify-center bg-black/65 text-white/90 opacity-0 transition group-hover:opacity-100"
-            onClick={() => onChange(refs.filter((r) => r.id !== ref.id))}
+            onClick={() => {
+              const next = removeDockRefFromState(
+                refs,
+                ref.id,
+                promptValue ?? "",
+              );
+              onChange(next.refs);
+              if (onPromptChange && promptValue != null && next.prompt !== promptValue) {
+                onPromptChange(next.prompt);
+              }
+            }}
             disabled={disabled}
           >
             <X className="size-2.5" />
