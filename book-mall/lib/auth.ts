@@ -4,10 +4,15 @@ applyBookMallProductionOriginDefaults();
 
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { normalizePhone } from "@/lib/auth/phone";
+import {
+  SmsVerificationError,
+  verifySmsCode,
+} from "@/lib/auth/sms-verification-service";
+import { allowDevMockAuth, DEV_AUTH_PASSWORD, isDevAuthPhone } from "@/lib/dev-mock-auth";
 import {
   bumpSessionVersion,
   isSingleSessionEnforced,
@@ -20,10 +25,6 @@ function nextAuthSharedCookieDomain(): string | undefined {
   return d || undefined;
 }
 
-/**
- * 跨子域共享会话时须同时覆盖 csrfToken。
- * 默认 `__Host-next-auth.csrf-token` 不能设 Domain，会导致登录/退出 CSRF 校验失败（前端表现为点了没反应）。
- */
 function buildNextAuthSharedCookies(): NextAuthOptions["cookies"] | undefined {
   const domain = nextAuthSharedCookieDomain();
   if (!domain) return undefined;
@@ -74,21 +75,53 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     CredentialsProvider({
-      name: "邮箱密码",
+      name: "手机号",
       credentials: {
-        email: { label: "邮箱", type: "email" },
+        phone: { label: "手机号", type: "text" },
         password: { label: "密码", type: "password" },
+        code: { label: "验证码", type: "text" },
+        loginMode: { label: "模式", type: "text" },
+        inviteToken: { label: "邀请 token", type: "text" },
       },
       async authorize(credentials) {
-        const email = credentials?.email?.trim().toLowerCase();
-        const password = credentials?.password;
-        if (!email || !password) return null;
+        const phone = normalizePhone(credentials?.phone);
+        if (!phone) return null;
 
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user?.passwordHash) return null;
+        const loginMode = credentials?.loginMode?.trim() || "password";
+        const inviteToken = credentials?.inviteToken?.trim() || undefined;
 
-        const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) return null;
+        const user = await prisma.user.findUnique({
+          where: { phone },
+        });
+        if (!user) return null;
+
+        if (loginMode === "otp") {
+          const code = credentials?.code?.trim();
+          if (!code) return null;
+          try {
+            await verifySmsCode({
+              phoneRaw: phone,
+              purpose: inviteToken ? "TEAM_INVITE" : "LOGIN",
+              code,
+              inviteToken,
+            });
+          } catch (e) {
+            if (e instanceof SmsVerificationError) return null;
+            throw e;
+          }
+        } else if (loginMode === "password") {
+          const password = credentials?.password;
+          if (!password || !user.passwordHash) return null;
+          const ok = await bcrypt.compare(password, user.passwordHash);
+          if (!ok) return null;
+          if (allowDevMockAuth() && isDevAuthPhone(phone) && password === DEV_AUTH_PASSWORD) {
+            // dev test account
+          }
+        } else {
+          return null;
+        }
+
+        if (!user.phoneVerifiedAt) return null;
 
         return {
           id: user.id,
@@ -99,55 +132,51 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-      ? [
-          GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          }),
-        ]
-      : []),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      if (trigger === "update" && session && typeof session === "object") {
+        const patch = session as { name?: string | null };
+        if ("name" in patch) {
+          token.name = patch.name ?? undefined;
+        }
+        return token;
+      }
+
       if (user) {
         token.sub = user.id;
         token.role = (user as { role?: string }).role ?? "USER";
         token.name = user.name ?? undefined;
         token.picture = user.image ?? undefined;
-        // 多租户：登录时缓存主空间（个人租户）id
         try {
           const u = await prisma.user.findUnique({
             where: { id: user.id },
-            select: { primaryTenantId: true },
+            select: { primaryTenantId: true, phone: true, phoneVerifiedAt: true },
           });
           token.primaryTenantId = u?.primaryTenantId ?? null;
+          token.phone = u?.phone ?? null;
+          token.phoneVerified = Boolean(u?.phoneVerifiedAt);
         } catch {
           token.primaryTenantId = null;
         }
-        // 单会话：登录自增 sessionVersion 并写入新 JWT（挤掉旧会话）
         if (isSingleSessionEnforced()) {
           try {
             token.sv = await bumpSessionVersion(user.id);
             token.svAt = Math.floor(Date.now() / 1000);
           } catch {
-            // 忽略：不阻断登录
+            /* non-fatal */
           }
         }
         return token;
       }
 
-      // 后续请求：单会话核对（限频）；不一致即失效该会话
       if (isSingleSessionEnforced() && token.sub) {
         const res = await isTokenSessionValid({
           userId: token.sub,
           tokenVersion: token.sv as number | undefined,
           lastCheckedAt: token.svAt as number | undefined,
         });
-        if (!res.valid) {
-          // 返回空 token → session 回调无 user.id → 视为已登出（被挤下线）
-          return {};
-        }
+        if (!res.valid) return {};
         token.svAt = res.checkedAt;
       }
       return token;
@@ -161,6 +190,8 @@ export const authOptions: NextAuthOptions = {
           (token.picture as string | null | undefined) ?? session.user.image;
         session.user.primaryTenantId =
           (token.primaryTenantId as string | null | undefined) ?? null;
+        session.user.phone = (token.phone as string | null | undefined) ?? null;
+        session.user.phoneVerified = Boolean(token.phoneVerified);
       }
       return session;
     },

@@ -28,7 +28,7 @@ export default async function AccountTeamPage() {
     getActiveTenantContext(userId),
     prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true },
+      select: { phone: true },
     }),
     prisma.membershipPlan.findMany({
       where: { family: "TEAM", active: true },
@@ -60,11 +60,11 @@ export default async function AccountTeamPage() {
         })
       : [];
 
-  // 收到的待接受邀请（按当前登录邮箱）
-  const incomingInvites = user?.email
+  // 收到的待接受邀请（按当前登录手机号）
+  const incomingInvites = user?.phone
     ? await prisma.tenantInvite.findMany({
         where: {
-          email: user.email.trim().toLowerCase(),
+          phone: user.phone,
           status: "PENDING",
           expiresAt: { gt: new Date() },
         },
@@ -81,7 +81,7 @@ export default async function AccountTeamPage() {
       />
       <TeamClient
         userId={userId}
-        userEmail={user?.email ?? null}
+        userPhone={user?.phone ?? null}
         memberships={memberships}
         activeTenantId={activeCtx?.tenantId ?? null}
         selectedTeamId={selectedTeamId}
@@ -107,7 +107,7 @@ export default async function AccountTeamPage() {
                   id: m.id,
                   userId: m.userId,
                   name: m.user.name,
-                  email: m.user.email,
+                  phone: m.user.phone,
                   image: m.user.image,
                   role: m.role,
                   status: m.status,
@@ -118,14 +118,17 @@ export default async function AccountTeamPage() {
         }
         invites={invites.map((i) => ({
           id: i.id,
-          email: i.email,
+          token: i.token,
+          phone: i.phone,
           role: i.role,
           expiresAt: i.expiresAt.toISOString(),
+          urlCode: i.urlCode,
         }))}
         incomingInvites={incomingInvites.map((i) => ({
           token: i.token,
           tenantName: i.tenant.name,
           role: i.role,
+          urlCode: i.urlCode,
         }))}
         teamPlans={teamPlans.map((p) => ({
           id: p.id,

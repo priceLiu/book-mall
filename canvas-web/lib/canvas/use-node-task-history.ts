@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { listCanvasProjectTasks, type CanvasTaskRecord } from "@/lib/canvas-api";
+import {
+  isCanvasApiAccessDeniedError,
+  isCanvasProjectTasksForbidden,
+  listCanvasProjectTasks,
+  type CanvasTaskRecord,
+} from "@/lib/canvas-api";
 import { taskHasDisplayableResult } from "./task-media-url";
 import { useCanvasStore } from "./store";
 
@@ -26,16 +31,21 @@ export function useNodeTaskHistory(nodeId: string | null | undefined) {
   });
 
   const [history, setHistory] = useState<CanvasTaskRecord[]>([]);
+  const [pollForbidden, setPollForbidden] = useState(false);
 
   const refreshHistory = useCallback(async () => {
-    if (!base || !projectId || !nodeId) return;
+    if (!base || !projectId || !nodeId || pollForbidden) return;
+    if (isCanvasProjectTasksForbidden(projectId)) {
+      setPollForbidden(true);
+      return;
+    }
     try {
       const tasks = await listCanvasProjectTasks(base, projectId, [nodeId]);
       setHistory(tasks);
-    } catch {
-      // ignore
+    } catch (e) {
+      if (isCanvasApiAccessDeniedError(e)) setPollForbidden(true);
     }
-  }, [base, projectId, nodeId]);
+  }, [base, projectId, nodeId, pollForbidden]);
 
   useEffect(() => {
     void refreshHistory();
@@ -43,10 +53,11 @@ export function useNodeTaskHistory(nodeId: string | null | undefined) {
 
   /** 进行中时额外拉历史，避免 KIE 已完成但节点 runtime 尚未同步 */
   useEffect(() => {
+    if (pollForbidden) return;
     if (runtimeStatus !== "running" && runtimeStatus !== "pending") return;
     const id = window.setInterval(() => void refreshHistory(), TASK_HISTORY_POLL_MS);
     return () => window.clearInterval(id);
-  }, [runtimeStatus, refreshHistory]);
+  }, [pollForbidden, runtimeStatus, refreshHistory]);
 
   const succeeded = useMemo(
     () =>

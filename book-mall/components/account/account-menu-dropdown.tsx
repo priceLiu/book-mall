@@ -3,6 +3,7 @@
 import { navigateBookMallFullSignOut } from "@/lib/session-kicked-marker";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { BillingPersona } from "@prisma/client";
 import {
   ChevronDown,
   CreditCard,
@@ -37,6 +38,7 @@ import {
   openEcomAppInNewTab,
   openToolsAppInNewTab,
 } from "@/lib/account-app-launch";
+import { isAccountCanvasLaunchClickable } from "@/lib/account-canvas-launch-clickable";
 
 const NAV_LINKS = [
   { href: "/account", label: "概览", icon: User, exact: true },
@@ -65,6 +67,7 @@ export function AccountMenuDropdown({
   gatewayLinked,
   canLaunchEcommerce,
   ecomOriginConfigured,
+  billingPersona,
 }: {
   profileLabel: string;
   isAdmin: boolean;
@@ -75,10 +78,15 @@ export function AccountMenuDropdown({
   gatewayLinked: boolean;
   canLaunchEcommerce: boolean;
   ecomOriginConfigured: boolean;
+  billingPersona: BillingPersona | null;
 }) {
   const pathname = usePathname();
-  const canvasReady =
-    gatewayLinked && canLaunchCanvas && canvasOriginConfigured;
+  const canvasReady = isAccountCanvasLaunchClickable({
+    canLaunchCanvas,
+    canvasOriginConfigured,
+    billingPersona,
+    gatewayLinked,
+  });
   const ecomReady = canLaunchEcommerce && ecomOriginConfigured;
 
   function signOut() {

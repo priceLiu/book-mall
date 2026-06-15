@@ -7,29 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { requireUserBillingPersona } from "@/lib/billing/billing-persona";
 import { createGatewayApiKey } from "@/lib/gateway/api-key-service";
 import { resolvePlatformVendorCredentialIds } from "@/lib/gateway/platform-credential-pool";
-import {
-  findGatewayUserByBookUserId,
-  syncGatewayUserFromBookUser,
-} from "@/lib/gateway/sync-user";
+import { findGatewayUserByBookUserId, ensureBookUserGatewayIdentitySynced } from "@/lib/gateway/sync-user";
 
 async function ensureGatewayUserForBookUser(bookUserId: string): Promise<string> {
-  const existing = await findGatewayUserByBookUserId(bookUserId);
-  if (existing) return existing.id;
-
-  const bookUser = await prisma.user.findUnique({
-    where: { id: bookUserId },
-    select: { email: true, name: true, image: true },
-  });
-  if (!bookUser?.email) {
-    throw new Error("Book 用户缺少邮箱，无法同步 GatewayUser");
-  }
-  const gw = await syncGatewayUserFromBookUser({
-    bookUserId,
-    email: bookUser.email,
-    name: bookUser.name,
-    image: bookUser.image,
-  });
-  if (!gw) throw new Error("GatewayUser 同步失败");
+  const gw = await ensureBookUserGatewayIdentitySynced(bookUserId);
   return gw.id;
 }
 

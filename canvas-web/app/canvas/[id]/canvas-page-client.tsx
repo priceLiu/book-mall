@@ -43,6 +43,7 @@ import type {
 } from "@/lib/canvas/types";
 import { isRunnableNodeType } from "@/lib/canvas/types";
 import {
+  clearCanvasProjectTasksForbidden,
   getCanvasProject,
   patchCanvasProject,
   saveCanvasTemplate,
@@ -295,6 +296,7 @@ function Inner({ projectId }: { projectId: string }) {
     canvasReadyRef.current = false;
     setProject(null);
     setLoading(true);
+    clearCanvasProjectTasksForbidden(projectId);
     void (async () => {
       try {
         const p = await getCanvasProject(base, projectId);
@@ -955,11 +957,13 @@ function Inner({ projectId }: { projectId: string }) {
 
   return (
     <>
-      <CanvasRunnerHost
-        projectId={projectId}
-        gatewayLinkBlocked={gatewayLinkBlocked}
-        gatewayLinkAccountUrl={gatewayAccountUrl}
-      />
+      {project && !loadError ? (
+        <CanvasRunnerHost
+          projectId={projectId}
+          gatewayLinkBlocked={gatewayLinkBlocked}
+          gatewayLinkAccountUrl={gatewayAccountUrl}
+        />
+      ) : null}
       {body}
     </>
   );

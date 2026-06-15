@@ -43,6 +43,7 @@ export function signToolsAccessToken(opts: {
   /** 写入 JWT，供工具站壳层本地验签展示（字段受限以防 Cookie 过大） */
   profile?: {
     email?: string | null;
+    phone?: string | null;
     name?: string | null;
     image?: string | null;
   };
@@ -92,12 +93,14 @@ export function signToolsAccessToken(opts: {
     if (seatId) payloadObj.seat_id = seatId;
   }
   const email = trimClaim(opts.profile?.email, 320);
+  const phone = trimClaim(opts.profile?.phone, 20);
   const name = trimClaim(opts.profile?.name, 120);
   let image = trimClaim(opts.profile?.image, 768);
   if (image && !/^https?:\/\//i.test(image)) {
     image = undefined;
   }
   if (email) payloadObj.email = email;
+  if (phone) payloadObj.phone = phone;
   if (name) payloadObj.name = name;
   if (image) payloadObj.image = image;
   if (
@@ -124,6 +127,7 @@ export type VerifiedToolsToken = {
   tier: "gold" | "admin";
   exp: number;
   email?: string;
+  phone?: string;
   name?: string;
   image?: string;
   /** 可能为空数组或省略（旧 JWT）；工具站应回落 introspect。 */
@@ -205,6 +209,7 @@ export function verifyToolsAccessToken(
   if (!tier) return null;
 
   const email = pickClaim(payloadRaw.email, 320);
+  const phone = pickClaim(payloadRaw.phone, 20);
   const name = pickClaim(payloadRaw.name, 120);
   let image = pickClaim(payloadRaw.image, 768);
   if (image && !/^https?:\/\//i.test(image)) {
@@ -218,6 +223,7 @@ export function verifyToolsAccessToken(
     exp: payloadRaw.exp,
   };
   if (email) out.email = email;
+  if (phone) out.phone = phone;
   if (name) out.name = name;
   if (image) out.image = image;
 

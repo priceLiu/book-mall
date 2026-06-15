@@ -5,6 +5,7 @@ import {
   jsonHeaders,
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
+import { assertAccessibleCanvasProject } from "@/lib/canvas/canvas-project-access";
 import {
   listProjectTasks,
   runCanvasPollWorker,
@@ -27,10 +28,11 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     ? nodeIdsParam.split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
   try {
+    await assertAccessibleCanvasProject(guard.user.id, projectId);
+
     const inflight = await prisma.canvasGenerationTask.count({
       where: {
         projectId,
-        project: { userId: guard.user.id, deletedAt: null },
         status: { in: ["PENDING", "SUBMITTED"] },
       },
     });

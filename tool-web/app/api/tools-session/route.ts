@@ -31,5 +31,14 @@ export async function GET() {
   const res = NextResponse.json(body);
   res.headers.set("X-Tools-Session-Path", diag.path);
   res.headers.set("Server-Timing", toolsSessionServerTiming(diag));
+  if (Boolean(token?.trim()) && !session.active) {
+    res.cookies.set("tools_token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+  }
   return res;
 }

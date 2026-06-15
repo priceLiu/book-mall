@@ -14,10 +14,10 @@ import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
 import {
   gatewayV1ChatCompletions,
-  gatewayV1ClientMeta,
   gatewayV1CreateTask,
   gatewayV1RecordInfo,
 } from "@/lib/gateway/gateway-v1-http-client";
+import { gatewayV1ClientMetaForBookUser } from "@/lib/gateway/gateway-log-meta-for-user";
 import {
   extractKieResultUrl,
   isKieRecordFail,
@@ -59,8 +59,7 @@ function storyMeta(
     clientPage?: string;
   },
 ) {
-  return gatewayV1ClientMeta("STORY", {
-    bookUserId: userId,
+  return gatewayV1ClientMetaForBookUser("STORY", userId, {
     storyProjectId: opts.storyProjectId,
     storyTaskId: opts.storyTaskId,
     clientPage:
@@ -100,7 +99,7 @@ export async function storyGwChat(
   const result = await gatewayV1ChatCompletions({
     apiKeyId: auth.id,
     body,
-    meta: storyMeta(userId, opts),
+    meta: await storyMeta(userId, opts),
   });
 
   let parsed: unknown = null;
@@ -157,7 +156,7 @@ export async function storyGwCreateKieJob(
       input: opts.input,
       callBackUrl: opts.callBackUrl ?? null,
     },
-    meta: storyMeta(userId, opts),
+    meta: await storyMeta(userId, opts),
   });
 
   return {
@@ -186,7 +185,7 @@ export async function storyGwRecordInfo(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("STORY", { bookUserId: userId }),
+    meta: await gatewayV1ClientMetaForBookUser("STORY", userId),
   });
 
   return polled.data as KieRecordResponse;
@@ -229,7 +228,7 @@ export async function storyGwCreateVolcengineVideoJob(
       model: opts.model,
       input: opts.body,
     },
-    meta: storyMeta(userId, opts),
+    meta: await storyMeta(userId, opts),
   });
 
   return {
@@ -266,7 +265,7 @@ export async function storyGwPollVolcengineVideo(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("STORY", { bookUserId: userId }),
+    meta: await gatewayV1ClientMetaForBookUser("STORY", userId),
   });
 
   const row = polled.data as import("@/lib/gateway/volcengine-client").VolcengineVideoTaskResult;

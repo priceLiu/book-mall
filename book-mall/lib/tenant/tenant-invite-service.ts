@@ -1,14 +1,14 @@
 /**
- * 团队邀请（gateway-multi-credential-and-tenant · 轨道 B）
- *
- * 流程：OWNER/ADMIN 生成邀请（带 token、角色、有效期）→ 受邀人登录后凭 token 接受 →
- * 自动建/复活 TenantMember 并占用一个空闲席位。
+ * 团队邀请：OWNER/ADMIN 按手机号邀请 → 短信链接自带验证码 → 受邀人打开链接即可注册/登录并加入。
  */
 import { randomBytes } from "crypto";
 
 import type { TenantRole } from "@prisma/client";
 
+import { normalizePhone } from "@/lib/auth/phone";
+import { issueSmsCode } from "@/lib/auth/sms-verification-service";
 import { prisma } from "@/lib/prisma";
+import { buildTeamInviteUrl } from "@/lib/tenant/team-invite-link";
 import { occupyIdleSeat, SeatUnavailableError } from "./tenant-service";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -19,20 +19,22 @@ function genToken(): string {
 
 export async function createInvite(input: {
   tenantId: string;
-  email: string;
+  phone: string;
   role?: TenantRole;
   createdById: string;
+  sendIp?: string | null;
 }) {
-  const email = input.email.trim().toLowerCase();
-  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    throw new Error("邮箱格式无效");
+  const phone = normalizePhone(input.phone);
+  if (!phone) {
+    throw new Error("手机号格式无效");
   }
-  // 校验席位：占用 + 待接受邀请 不得超过席位上限
+
   const tenant = await prisma.tenant.findUnique({
     where: { id: input.tenantId },
-    select: { seatLimit: true },
+    select: { seatLimit: true, name: true },
   });
   if (!tenant) throw new Error("团队不存在");
+
   const [occupied, pending] = await Promise.all([
     prisma.tenantMember.count({
       where: { tenantId: input.tenantId, status: "ACTIVE" },
@@ -45,8 +47,7 @@ export async function createInvite(input: {
     throw new SeatUnavailableError();
   }
 
-  // 已是活跃成员则拒绝
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  const existingUser = await prisma.user.findUnique({ where: { phone } });
   if (existingUser) {
     const m = await prisma.tenantMember.findUnique({
       where: { tenantId_userId: { tenantId: input.tenantId, userId: existingUser.id } },
@@ -54,10 +55,15 @@ export async function createInvite(input: {
     if (m && m.status === "ACTIVE") throw new Error("该用户已是团队成员");
   }
 
-  return prisma.tenantInvite.create({
+  const duplicatePending = await prisma.tenantInvite.findFirst({
+    where: { tenantId: input.tenantId, phone, status: "PENDING" },
+  });
+  if (duplicatePending) throw new Error("该手机号已有待接受的邀请");
+
+  const invite = await prisma.tenantInvite.create({
     data: {
       tenantId: input.tenantId,
-      email,
+      phone,
       token: genToken(),
       role: input.role ?? "MEMBER",
       status: "PENDING",
@@ -65,6 +71,48 @@ export async function createInvite(input: {
       createdById: input.createdById,
     },
   });
+
+  let urlCode: string | null = null;
+  try {
+    const issued = await issueSmsCode({
+      phoneRaw: phone,
+      purpose: "TEAM_INVITE",
+      sendIp: input.sendIp,
+      inviteToken: invite.token,
+    });
+    urlCode = issued.code;
+    await prisma.tenantInvite.update({
+      where: { id: invite.id },
+      data: { urlCode },
+    });
+  } catch (e) {
+    console.warn("[createInvite] sms failed", e);
+  }
+
+  return {
+    invite: urlCode ? { ...invite, urlCode } : invite,
+    inviteUrl: urlCode ? buildTeamInviteUrl(invite.token, urlCode) : null,
+  };
+}
+
+export async function resolveInviteLink(token: string): Promise<string> {
+  const invite = await getInviteByToken(token);
+  if (!invite || invite.status !== "PENDING") {
+    throw new Error("邀请无效或已失效");
+  }
+  if (invite.urlCode?.trim()) {
+    return buildTeamInviteUrl(invite.token, invite.urlCode.trim());
+  }
+  const issued = await issueSmsCode({
+    phoneRaw: invite.phone,
+    purpose: "TEAM_INVITE",
+    inviteToken: invite.token,
+  });
+  await prisma.tenantInvite.update({
+    where: { id: invite.id },
+    data: { urlCode: issued.code },
+  });
+  return buildTeamInviteUrl(invite.token, issued.code);
 }
 
 export async function getInviteByToken(token: string) {
@@ -108,7 +156,7 @@ export class InviteInvalidError extends Error {
   }
 }
 
-/** 接受邀请：建/复活成员并占席。要求 userId 的邮箱与邀请一致（防止串号）。 */
+/** 接受邀请：要求 userId 的手机号与邀请一致。 */
 export async function acceptInvite(input: { token: string; userId: string }) {
   return prisma.$transaction(async (tx) => {
     const invite = await tx.tenantInvite.findUnique({
@@ -126,10 +174,14 @@ export async function acceptInvite(input: { token: string; userId: string }) {
 
     const user = await tx.user.findUnique({
       where: { id: input.userId },
-      select: { email: true },
+      select: { phone: true, phoneVerifiedAt: true },
     });
-    if (!user?.email || user.email.trim().toLowerCase() !== invite.email) {
-      throw new InviteInvalidError("当前登录邮箱与邀请邮箱不一致");
+    if (
+      !user?.phone ||
+      !user.phoneVerifiedAt ||
+      normalizePhone(user.phone) !== normalizePhone(invite.phone)
+    ) {
+      throw new InviteInvalidError("当前登录手机号与邀请不一致");
     }
 
     const seatId = await occupyIdleSeat(tx, invite.tenantId);

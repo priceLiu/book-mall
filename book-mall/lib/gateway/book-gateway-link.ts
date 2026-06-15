@@ -12,7 +12,7 @@ import {
   resolveGatewayApiKeyById,
   resolveGatewayApiKeyFromBearer,
 } from "@/lib/gateway/api-key-service";
-import { findGatewayUserByBookUserId } from "@/lib/gateway/sync-user";
+import { ensureBookUserGatewayIdentitySynced } from "@/lib/gateway/sync-user";
 
 export type GatewayErrorCode =
   | "GATEWAY_KEY_REQUIRED"
@@ -115,10 +115,10 @@ export async function linkGatewayApiKeyForUser(
     );
   }
 
-  const gwUser = await findGatewayUserByBookUserId(userId);
+  const gwUser = await ensureBookUserGatewayIdentitySynced(userId).catch(() => null);
   if (!gwUser || gwUser.id !== auth.userId) {
     throw new GatewayRequiredError(
-      "该 Gateway Key 不属于当前 Book 账号，请使用同一邮箱在 Gateway 创建的密钥",
+      "该 Gateway Key 不属于当前 Book 账号，请使用同一账号在 Gateway 创建的密钥",
       "FORBIDDEN",
       403,
     );

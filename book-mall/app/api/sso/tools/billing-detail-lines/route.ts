@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   const [user, wallet, lines] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, phone: true },
     }),
     prisma.wallet.findUnique({
       where: { userId },
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     );
   }
 
-  const label = user.name ?? user.email ?? "";
+  const label = user.name ?? user.phone ?? user.email ?? "";
   const ownedLines = lines.filter((l) => l.userId === userId);
   const baseRows = ownedLines.map((l) => enrichBillingLineToFlatRow(l, user.id, label));
   /** v003：见 account/billing-detail-lines——按 catalog 把两类行的厂商列统一覆写。 */
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
   return NextResponse.json(
     {
       source: "book-mall",
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, phone: user.phone },
       balancePoints: wallet?.balancePoints ?? 0,
       rows,
     },

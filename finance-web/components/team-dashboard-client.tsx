@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import { formatUserCellPrimary } from "@/lib/user-contact-display";
 
 type DashboardResponse = {
   hasTeam: boolean;
@@ -24,7 +25,7 @@ type DashboardResponse = {
       refunded: number;
       topup: number;
       balanceCredits: number;
-      members: { actorUserId: string; name: string | null; email: string | null; consumed: number; count: number }[];
+      members: { actorUserId: string; name: string | null; email: string | null; phone: string | null; consumed: number; count: number }[];
       byModel: { canonicalModelKey: string; credits: number; count: number }[];
     };
     seatUsage: { used: number; limit: number };
@@ -50,27 +51,44 @@ export function TeamDashboardClient() {
   const base = useBookMallBaseUrl();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const tenantIdParam = searchParams.get("tenantId");
+  const periodParam = searchParams.get("period");
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(() => {
-    if (!base) return;
-    const tenantId = searchParams.get("tenantId");
-    const period = searchParams.get("period");
+  const load = useCallback(async () => {
+    if (!base) {
+      setError("未配置主站地址（BOOK_MALL_URL）");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
     const qs = new URLSearchParams();
-    if (tenantId) qs.set("tenantId", tenantId);
-    if (period) qs.set("period", period);
-    financeApiFetch<DashboardResponse>(base, `/api/finance/team/dashboard${qs.toString() ? `?${qs}` : ""}`).then(
-      (r) => (r.ok ? setData(r.data) : setError(r.error)),
-    );
-  }, [base, searchParams]);
+    if (tenantIdParam) qs.set("tenantId", tenantIdParam);
+    if (periodParam) qs.set("period", periodParam);
+    try {
+      const r = await financeApiFetch<DashboardResponse>(
+        base,
+        `/api/finance/team/dashboard${qs.toString() ? `?${qs}` : ""}`,
+      );
+      if (r.ok) setData(r.data);
+      else setError(r.error);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }, [base, tenantIdParam, periodParam]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
+  if (loading && !data) return <FinancePageState>加载中…</FinancePageState>;
   if (error) return <FinancePageState variant="error">{error}</FinancePageState>;
-  if (!data) return <FinancePageState>加载中…</FinancePageState>;
+  if (!data) return <FinancePageState variant="error">加载失败</FinancePageState>;
 
   if (!data.hasTeam) {
     return (
@@ -157,7 +175,7 @@ export function TeamDashboardClient() {
                       href={`/team/members/${m.actorUserId}?${qsTenant}`}
                       className="text-[#1890ff] hover:underline"
                     >
-                      {m.name || m.email || m.actorUserId.slice(0, 8)}
+                      {formatUserCellPrimary({ ...m, id: m.actorUserId })}
                     </Link>
                   </td>
                   <td className="py-2 text-right">{m.count}</td>

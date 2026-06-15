@@ -6,8 +6,7 @@ import {
 } from "@/lib/gateway/env";
 import { signGatewayAccessToken } from "@/lib/gateway/gateway-sso-token";
 import {
-  findGatewayUserByBookUserId,
-  syncGatewayUserFromBookUser,
+  ensureBookUserGatewayIdentitySynced,
 } from "@/lib/gateway/sync-user";
 import { prisma } from "@/lib/prisma";
 
@@ -36,8 +35,8 @@ export async function POST(req: Request) {
   }
 
   const bookUser = await prisma.user.findUnique({ where: { id: row.userId } });
-  if (!bookUser?.email) {
-    return NextResponse.json({ error: "Book 用户不存在" }, { status: 400 });
+  if (!bookUser?.email && !bookUser?.phone) {
+    return NextResponse.json({ error: "Book 用户不存在或缺少登录标识" }, { status: 400 });
   }
 
   await prisma.ssoAuthorizationCode.update({
@@ -45,16 +44,10 @@ export async function POST(req: Request) {
     data: { consumedAt: now },
   });
 
-  let gwUser = await findGatewayUserByBookUserId(bookUser.id);
-  if (!gwUser) {
-    gwUser = await syncGatewayUserFromBookUser({
-      bookUserId: bookUser.id,
-      email: bookUser.email,
-      name: bookUser.name,
-      image: bookUser.image,
-    });
-  }
-  if (!gwUser) {
+  let gwUser;
+  try {
+    gwUser = await ensureBookUserGatewayIdentitySynced(bookUser.id);
+  } catch {
     return NextResponse.json({ error: "Gateway 用户同步失败" }, { status: 500 });
   }
 

@@ -7,7 +7,6 @@ import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 import {
   getSessionVersion,
-  isSingleSessionEnforced,
 } from "@/lib/auth-session-version";
 import { mergeEcomToolkitNavKeys } from "@/lib/ecom/ecom-access";
 import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
@@ -84,7 +83,7 @@ export async function GET(req: Request) {
     return NextResponse.json(body, { status: 401, headers });
   }
 
-  if (isSingleSessionEnforced() && verified.sv != null) {
+  if (verified.sv != null) {
     const current = await getSessionVersion(verified.sub);
     if (current !== verified.sv) {
       logToolsIntrospectToConsole({
@@ -213,6 +212,7 @@ export async function GET(req: Request) {
     seat_id: tenantCtx?.seatId ?? null,
     credit_balance: creditBalance,
     email: elig.email,
+    phone: elig.phone,
     name: elig.name,
     image: elig.image,
   };

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import { formatUserCellPrimary } from "@/lib/user-contact-display";
 
 type TeamRow = {
   tenantId: string;
@@ -14,7 +15,7 @@ type TeamRow = {
   activeMembers: number;
   balanceCredits: number;
   monthConsumed: number;
-  owner: { id: string; name: string | null; email: string | null };
+  owner: { id: string; name: string | null; email: string | null; phone: string | null };
 };
 
 type TeamsResponse = {
@@ -77,7 +78,7 @@ export function AdminTeamsClient() {
                 <td className="border border-[#e8e8e8] px-3 py-2 text-right font-mono">{fmt(t.balanceCredits)}</td>
                 <td className="border border-[#e8e8e8] px-3 py-2 text-right font-mono">{fmt(t.monthConsumed)}</td>
                 <td className="border border-[#e8e8e8] px-3 py-2 text-xs text-[#595959]">
-                  {t.owner.email ?? t.owner.name ?? t.owner.id.slice(0, 8)}
+                  {formatUserCellPrimary(t.owner)}
                 </td>
                 <td className="border border-[#e8e8e8] px-3 py-2">
                   <Link href={`/admin/teams/${t.tenantId}`} className="text-[#1890ff] hover:underline">

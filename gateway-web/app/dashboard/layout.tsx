@@ -29,6 +29,7 @@ export default async function DashboardLayout({
   const session = await gatewayJson<{
     user: {
       email: string;
+      phone?: string | null;
       name: string | null;
       bookRole?: "ADMIN" | "USER";
       billingPersona?: "PLATFORM_CREDIT" | "BYOK" | null;
@@ -54,7 +55,7 @@ export default async function DashboardLayout({
         <div className="border-b border-white/10 px-4 py-5">
           <div className="text-sm font-semibold text-white">Gateway 控制台</div>
           <div className="mt-1 truncate text-xs text-[var(--gw-muted)]">
-            {user.name || user.email}
+            {user.name || user.phone || user.email}
           </div>
           <div className="mt-2 flex flex-wrap gap-1">
             <span

@@ -9,6 +9,7 @@
 import type { BillingPersona, CreditLedgerType, CreditOwnerType, CreditPool, Prisma, ResourceMeterType } from "@prisma/client";
 
 import { isStaffRole } from "@/lib/billing/billing-persona";
+import { buildGatewayLogWhereFromUsageQuery } from "@/lib/gateway/log-query-scope";
 import { prisma } from "@/lib/prisma";
 
 export interface AccountRef {
@@ -577,7 +578,7 @@ export async function sumResourceFees(ref: AccountRef, periodKey = periodKeyOf()
 // ——————————————————— 用量中心查询 ———————————————————
 
 export interface UsageQuery {
-  /** Book User.id — 按 actorBookUserId 查询；省略则查 tenant 全员（须配合 tenantId） */
+  /** Book User.id — 个人查 buildGatewayLogScopeForBookUser；团队须配合 tenantId */
   bookUserId?: string;
   tenantId?: string;
   from?: Date;
@@ -588,23 +589,9 @@ export interface UsageQuery {
   skip?: number;
 }
 
-function buildUsageWhere(q: UsageQuery): Prisma.GatewayRequestLogWhereInput {
-  const where: Prisma.GatewayRequestLogWhereInput = {};
-  if (q.bookUserId) where.actorBookUserId = q.bookUserId;
-  if (q.tenantId) where.tenantId = q.tenantId;
-  if (q.from || q.to) {
-    where.submittedAt = {};
-    if (q.from) (where.submittedAt as Prisma.DateTimeFilter).gte = q.from;
-    if (q.to) (where.submittedAt as Prisma.DateTimeFilter).lte = q.to;
-  }
-  if (q.model) where.canonicalModelKey = q.model;
-  if (q.clientSource) where.clientSource = q.clientSource as Prisma.EnumGatewayClientSourceFilter;
-  return where;
-}
-
 /** 细颗粒用量记录（按时间倒序），用于「用量中心」。 */
 export async function listUsageRecords(q: UsageQuery) {
-  const where = buildUsageWhere(q);
+  const where = await buildGatewayLogWhereFromUsageQuery(q);
 
   const [rows, total] = await Promise.all([
     prisma.gatewayRequestLog.findMany({
@@ -639,7 +626,7 @@ export async function listUsageRecords(q: UsageQuery) {
 
 /** 用量按模型聚合（积分与次数）。 */
 export async function aggregateUsageByModel(q: UsageQuery) {
-  const where = buildUsageWhere(q);
+  const where = await buildGatewayLogWhereFromUsageQuery(q);
   const grouped = await prisma.gatewayRequestLog.groupBy({
     by: ["canonicalModelKey"],
     where,

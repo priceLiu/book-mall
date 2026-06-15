@@ -23,6 +23,7 @@ export type ToolsSsoEligibility = {
   /** 会员套餐展示名（个人/团队/BYOK） */
   membershipPlanName: string | null;
   email: string | null;
+  phone: string | null;
   name: string | null;
   image: string | null;
 };
@@ -32,7 +33,7 @@ export async function getToolsSsoEligibility(userId: string): Promise<ToolsSsoEl
   const [user, gold, membership, memberAccess, billingPersona] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true, email: true, name: true, image: true },
+      select: { role: true, email: true, phone: true, name: true, image: true },
     }),
     getGoldMemberAccess(userId),
     getMembershipFlags(userId),
@@ -69,6 +70,7 @@ export async function getToolsSsoEligibility(userId: string): Promise<ToolsSsoEl
     hasActiveSubscription: hasActiveToolService,
     membershipPlanName: memberAccess.planName,
     email: user?.email ?? null,
+    phone: user?.phone ?? null,
     name: user?.name ?? null,
     image: user?.image ?? null,
   };

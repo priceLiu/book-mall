@@ -16,6 +16,7 @@ export type FinanceSessionUser = {
   id: string;
   email: string | null;
   name: string | null;
+  phone: string | null;
   role: string;
 };
 
@@ -26,6 +27,7 @@ export async function getFinanceSession(): Promise<FinanceSessionUser | null> {
     id: session.user.id,
     email: session.user.email ?? null,
     name: session.user.name ?? null,
+    phone: session.user.phone ?? null,
     role: session.user.role ?? "USER",
   };
 }

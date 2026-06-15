@@ -15,6 +15,7 @@ import {
   billingCategoryLabel,
   resolveBillingCategory,
 } from "@/lib/billing/billing-category";
+import { buildGatewayLogWhereForTeamTenant } from "@/lib/gateway/log-query-scope";
 import { getTenantOverview } from "@/lib/tenant/tenant-service";
 
 import { sumResourceFees, type AccountRef } from "./credit-account-service";
@@ -344,6 +345,7 @@ export interface TeamMemberUsage {
   actorUserId: string;
   name: string | null;
   email: string | null;
+  phone: string | null;
   consumed: number; // 本月消耗积分（CONSUME 绝对值）
   count: number; // 生成次数
   byModel: { canonicalModelKey: string; credits: number; count: number }[];
@@ -436,7 +438,7 @@ export async function buildTeamCreditBill(input: {
     const users = userIds.length
       ? await prisma.user.findMany({
           where: { id: { in: userIds } },
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, phone: true },
         })
       : [];
     const profile = new Map(users.map((u) => [u.id, u]));
@@ -446,6 +448,7 @@ export async function buildTeamCreditBill(input: {
         actorUserId,
         name: profile.get(actorUserId)?.name ?? null,
         email: profile.get(actorUserId)?.email ?? null,
+        phone: profile.get(actorUserId)?.phone ?? null,
         consumed: v.consumed,
         count: v.count,
         byModel: [...v.byModel.entries()]
@@ -518,15 +521,26 @@ export async function buildTeamDashboard(input: {
   const trendFrom = new Date(to);
   trendFrom.setUTCDate(trendFrom.getUTCDate() - 30);
 
-  const [bill, overview, logs, recentLogs] = await Promise.all([
+  const [bill, overview, teamLogWhere, recentLogWhere, trendLogWhere] =
+    await Promise.all([
     buildTeamCreditBill({ tenantId: input.tenantId, periodKey: input.periodKey }),
     getTenantOverview(input.tenantId),
+    buildGatewayLogWhereForTeamTenant(input.tenantId, {
+      submittedFrom: from,
+      submittedTo: to,
+      status: "SUCCEEDED",
+    }),
+    buildGatewayLogWhereForTeamTenant(input.tenantId),
+    buildGatewayLogWhereForTeamTenant(input.tenantId, {
+      submittedFrom: trendFrom,
+      submittedTo: to,
+      status: "SUCCEEDED",
+    }),
+  ]);
+
+  const [logs, recentLogs] = await Promise.all([
     prisma.gatewayRequestLog.findMany({
-      where: {
-        tenantId: input.tenantId,
-        submittedAt: { gte: from, lt: to },
-        status: "SUCCEEDED",
-      },
+      where: teamLogWhere,
       select: {
         billingCategory: true,
         requestKind: true,
@@ -537,7 +551,7 @@ export async function buildTeamDashboard(input: {
       },
     }),
     prisma.gatewayRequestLog.findMany({
-      where: { tenantId: input.tenantId },
+      where: recentLogWhere,
       orderBy: { submittedAt: "desc" },
       take: 50,
       select: {
@@ -574,11 +588,7 @@ export async function buildTeamDashboard(input: {
   });
 
   const trendLogs = await prisma.gatewayRequestLog.findMany({
-    where: {
-      tenantId: input.tenantId,
-      submittedAt: { gte: trendFrom, lt: to },
-      status: "SUCCEEDED",
-    },
+    where: trendLogWhere,
     select: { submittedAt: true, creditsCharged: true },
   });
   const dailyMap = new Map<string, { credits: number; count: number }>();
@@ -600,10 +610,12 @@ export async function buildTeamDashboard(input: {
     actorIds.length > 0
       ? await prisma.user.findMany({
           where: { id: { in: actorIds } },
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, phone: true },
         })
       : [];
-  const actorMap = new Map(actors.map((u) => [u.id, u.name ?? u.email ?? u.id]));
+  const actorMap = new Map(
+    actors.map((u) => [u.id, u.name ?? u.phone ?? u.email ?? u.id]),
+  );
 
   return {
     periodKey: input.periodKey,

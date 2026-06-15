@@ -91,7 +91,7 @@ model TenantInvite {
   id         String   @id @default(cuid())
   tenantId   String
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email      String?                              // 指定邮箱邀请
+  phone      String                               // 指定手机号邀请
   token      String   @unique                     // 邀请链接 token
   role       TenantRole @default(MEMBER)
   expiresAt  DateTime
@@ -143,7 +143,7 @@ channelSnapshot      String?
 ### 2.1 加入团队的三种方式
 
 1. **邀请链接**：主账号生成 `TenantInvite` → 成员打开链接 → Book 登录/注册 → 接受 → 建 `TenantMember` + 分配空席位。
-2. **邮箱邀请**：指定邮箱，已注册直接入团，未注册引导注册后入团。
+2. **手机号邀请**：指定手机号，发送短信（验证码 + 链接）；已注册同号登录后接受，未注册引导注册后入团。
 3. **企业域**（后续）：同邮箱域自动可申请加入。
 
 ### 2.2 上下文切换（多租户归属）

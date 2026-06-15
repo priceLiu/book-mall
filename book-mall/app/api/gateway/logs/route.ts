@@ -1,3 +1,4 @@
+import type { GatewayRequestStatus } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 import {
@@ -12,6 +13,7 @@ import { resolveGatewayTokenMetrics } from "@/lib/gateway/gateway-token-metrics"
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { maskApiKey } from "@/lib/canvas/secret";
+import { buildGatewayLogWhere } from "@/lib/gateway/log-query-scope";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +34,8 @@ export async function GET(request: NextRequest) {
   }
 
   const limit = Math.min(
-    100,
-    Math.max(1, Number(request.nextUrl.searchParams.get("limit") ?? "50")),
+    200,
+    Math.max(1, Number(request.nextUrl.searchParams.get("limit") ?? "100")),
   );
   const status = request.nextUrl.searchParams.get("status")?.trim();
   const submittedFrom = parseLogSubmittedFromParam(
@@ -43,19 +45,23 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get("to"),
   );
 
-  const logs = await prisma.gatewayRequestLog.findMany({
-    where: {
-      userId: user.id,
-      ...(status ? { status: status as never } : {}),
-      ...(submittedFrom || submittedTo
-        ? {
-            submittedAt: {
-              ...(submittedFrom ? { gte: submittedFrom } : {}),
-              ...(submittedTo ? { lte: submittedTo } : {}),
-            },
-          }
-        : {}),
+  const where = await buildGatewayLogWhere(
+    {
+      gatewaySessionUser: {
+        id: user.id,
+        bookUserId: user.bookUserId,
+        email: user.email,
+      },
     },
+    {
+      status: status ? (status as GatewayRequestStatus) : undefined,
+      submittedFrom: submittedFrom ?? undefined,
+      submittedTo: submittedTo ?? undefined,
+    },
+  );
+
+  const logs = await prisma.gatewayRequestLog.findMany({
+    where,
     orderBy: { submittedAt: "desc" },
     take: limit,
   });
@@ -122,10 +128,14 @@ export async function GET(request: NextRequest) {
       return {
         id: l.id,
         model: l.model,
+        canonicalModelKey: l.canonicalModelKey,
         endpoint: l.endpoint,
         status: l.status,
         requestKind: l.requestKind,
         providerKind: l.providerKind,
+        tenantId: l.tenantId,
+        actorBookUserId: l.actorBookUserId,
+        creditsCharged: l.creditsCharged,
         credentialKeyMasked: l.credentialId
           ? (credentialKeyById.get(l.credentialId) ?? null)
           : null,

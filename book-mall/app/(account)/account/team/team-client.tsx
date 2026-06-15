@@ -24,6 +24,7 @@ import {
 import {
   acceptInviteAction,
   createTeamAction,
+  getInviteLinkAction,
   inviteMemberAction,
   removeMemberAction,
   revokeInviteAction,
@@ -33,6 +34,7 @@ import {
   updateRoleAction,
 } from "./team-actions";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
+import { maskPhone } from "@/lib/auth/phone";
 import type { ActionResult } from "@/lib/server-action-result";
 
 type Role = "OWNER" | "ADMIN" | "MEMBER";
@@ -64,7 +66,7 @@ interface Overview {
     id: string;
     userId: string;
     name: string | null;
-    email: string | null;
+    phone: string | null;
     image: string | null;
     role: Role;
     status: string;
@@ -74,14 +76,21 @@ interface Overview {
 
 interface Props {
   userId: string;
-  userEmail: string | null;
+  userPhone: string | null;
   memberships: MembershipSummary[];
   activeTenantId: string | null;
   selectedTeamId: string | null;
   myRole: Role | null;
   overview: Overview | null;
-  invites: { id: string; email: string; role: Role; expiresAt: string }[];
-  incomingInvites: { token: string; tenantName: string; role: Role }[];
+  invites: {
+    id: string;
+    token: string;
+    phone: string;
+    role: Role;
+    expiresAt: string;
+    urlCode: string | null;
+  }[];
+  incomingInvites: { token: string; tenantName: string; role: Role; urlCode: string | null }[];
   teamPlans: {
     id: string;
     tier: string;
@@ -92,11 +101,66 @@ interface Props {
   }[];
 }
 
+function memberLabel(m: { name: string | null; phone: string | null }): string {
+  if (m.name?.trim()) return m.name.trim();
+  if (m.phone) return maskPhone(m.phone);
+  return "（未命名）";
+}
+
 const ROLE_LABEL: Record<Role, string> = {
   OWNER: "所有者",
   ADMIN: "管理员",
   MEMBER: "成员",
 };
+
+function CopyInviteLinkButton({
+  token,
+  urlCode,
+}: {
+  token: string;
+  urlCode: string | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [copyErr, setCopyErr] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function buildUrl(code: string): string {
+    return `${window.location.origin}/invite/t/${encodeURIComponent(token)}?${new URLSearchParams({ code: code.trim() })}`;
+  }
+
+  async function copy() {
+    setCopyErr(null);
+    startTransition(async () => {
+      let url: string;
+      if (urlCode?.trim()) {
+        url = buildUrl(urlCode);
+      } else {
+        const res = await getInviteLinkAction(token);
+        if (!res.ok) {
+          setCopyErr(res.error);
+          return;
+        }
+        url = res.data.inviteUrl;
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+      } catch {
+        setCopyErr("无法写入剪贴板，请检查浏览器权限");
+      }
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => void copy()}>
+        {copied ? "已复制" : pending ? "生成中…" : "复制链接"}
+      </Button>
+      {copyErr ? <span className="text-xs text-red-600">{copyErr}</span> : null}
+    </div>
+  );
+}
 
 function Notice({ msg }: { msg: { type: "ok" | "err"; text: string } | null }) {
   if (!msg) return null;
@@ -250,23 +314,36 @@ export function TeamClient(props: Props) {
             {props.incomingInvites.map((i) => (
               <div
                 key={i.token}
-                className="flex items-center justify-between rounded-md border px-3 py-2"
+                className="flex flex-col gap-2 rounded-md border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
               >
                 <span className="text-sm">
                   「{i.tenantName}」邀请你以 <b>{ROLE_LABEL[i.role]}</b> 身份加入
                 </span>
-                <Button
-                  size="sm"
-                  disabled={pending}
-                  onClick={() =>
-                    run(
-                      () => acceptInviteAction(buildFD({ token: i.token })),
-                      "已加入团队",
-                    )
-                  }
-                >
-                  接受
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" asChild>
+                    <a
+                      href={
+                        i.urlCode
+                          ? `/invite/t/${i.token}?${new URLSearchParams({ code: i.urlCode })}`
+                          : `/invite/t/${i.token}`
+                      }
+                    >
+                      打开邀请页
+                    </a>
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={pending}
+                    onClick={() =>
+                      run(
+                        () => acceptInviteAction(buildFD({ token: i.token })),
+                        "已加入团队",
+                      )
+                    }
+                  >
+                    直接接受
+                  </Button>
+                </div>
               </div>
             ))}
           </CardContent>
@@ -435,7 +512,7 @@ function TeamOverview({
   }) => void;
 }) {
   const t = overview.tenant;
-  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("MEMBER");
   const [cfgName, setCfgName] = useState(t.name);
   const [cfgSeatLimit, setCfgSeatLimit] = useState(t.seatLimit);
@@ -509,8 +586,10 @@ function TeamOverview({
               {overview.members.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell>
-                    <div className="font-medium">{m.name ?? "（未命名）"}</div>
-                    <div className="text-xs text-muted-foreground">{m.email}</div>
+                    <div className="font-medium">{m.name?.trim() || "（未命名）"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {m.phone ? maskPhone(m.phone) : "—"}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {canManage && m.role !== "OWNER" ? (
@@ -556,7 +635,7 @@ function TeamOverview({
                               onClick={() =>
                                 requestConfirm({
                                   title: "转移所有权",
-                                  first: `确定将团队所有权转移给「${m.name ?? m.email}」？`,
+                                  first: `确定将团队所有权转移给「${memberLabel(m)}」？`,
                                   second:
                                     "转移后你将降为管理员，无法再进行计费/充值/删除团队等操作。此操作不可撤销，确定继续？",
                                   label: "确认转移",
@@ -577,7 +656,7 @@ function TeamOverview({
                             onClick={() =>
                               requestConfirm({
                                 title: "移除成员",
-                                first: `确定将「${m.name ?? m.email}」移出团队？其席位将被释放。`,
+                                first: `确定将「${memberLabel(m)}」移出团队？其席位将被释放。`,
                                 second:
                                   "移除后该成员将立即失去团队空间访问权；其在本团队的私有资产将自动转入「团队公共库」（保留原创建者署名，不会删除云端文件）。此操作不可恢复，确定继续？",
                                 label: "确认移除",
@@ -613,19 +692,19 @@ function TeamOverview({
           <CardHeader>
             <CardTitle className="text-base">邀请成员</CardTitle>
             <CardDescription>
-              邀请将占用一个席位名额。受邀人需用<b>相同邮箱</b>登录后在本页接受。
+              邀请将占用一个席位名额。请将邀请链接发给成员（新用户需在链接页注册后再加入团队）。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap items-end gap-2">
               <div className="flex-1 min-w-[200px]">
-                <Label htmlFor="invite-email">邮箱</Label>
+                <Label htmlFor="invite-phone">手机号</Label>
                 <Input
-                  id="invite-email"
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="member@example.com"
+                  id="invite-phone"
+                  type="tel"
+                  value={invitePhone}
+                  onChange={(e) => setInvitePhone(e.target.value)}
+                  placeholder="13800138000"
                 />
               </div>
               <div>
@@ -641,18 +720,18 @@ function TeamOverview({
                 </select>
               </div>
               <Button
-                disabled={pending || !inviteEmail.trim()}
+                disabled={pending || !invitePhone.trim()}
                 onClick={() =>
                   run(
                     () =>
                       inviteMemberAction(
                         buildFD({
                           tenantId: t.id,
-                          email: inviteEmail,
+                          phone: invitePhone,
                           role: inviteRole,
                         }),
                       ),
-                    "邀请已发送",
+                    "邀请短信已发送",
                   )
                 }
               >
@@ -666,27 +745,31 @@ function TeamOverview({
                 {invites.map((i) => (
                   <div
                     key={i.id}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                    className="flex flex-col gap-2 rounded-md border px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
                   >
                     <span>
-                      {i.email}（{ROLE_LABEL[i.role]}） · 过期 {new Date(i.expiresAt).toLocaleDateString("zh-CN")}
+                      {maskPhone(i.phone)}（{ROLE_LABEL[i.role]}） · 过期{" "}
+                      {new Date(i.expiresAt).toLocaleDateString("zh-CN")}
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={pending}
-                      onClick={() =>
-                        run(
-                          () =>
-                            revokeInviteAction(
-                              buildFD({ tenantId: t.id, inviteId: i.id }),
-                            ),
-                          "邀请已撤销",
-                        )
-                      }
-                    >
-                      撤销
-                    </Button>
+                    <div className="flex shrink-0 gap-2">
+                      <CopyInviteLinkButton token={i.token} urlCode={i.urlCode} />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() =>
+                          run(
+                            () =>
+                              revokeInviteAction(
+                                buildFD({ tenantId: t.id, inviteId: i.id }),
+                              ),
+                            "邀请已撤销",
+                          )
+                        }
+                      >
+                        撤销
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

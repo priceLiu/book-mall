@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
-      user: { select: { id: true, email: true, name: true } },
+      user: { select: { id: true, email: true, name: true, phone: true } },
       order: { select: { id: true, amountYuan: true, type: true, status: true } },
       confirmedBy: { select: { email: true, name: true } },
     },

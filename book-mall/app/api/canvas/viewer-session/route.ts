@@ -21,12 +21,13 @@ export async function GET(request: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ user: null as null }, { headers });
   }
-  const { id, email, name, role } = session.user;
+  const { id, email, name, role, phone } = session.user;
   return NextResponse.json(
     {
       user: {
         id,
         email: email ?? null,
+        phone: phone ?? null,
         name: name ?? null,
         role,
       },

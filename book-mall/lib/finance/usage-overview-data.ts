@@ -1,5 +1,6 @@
-import type { GatewayClientSource, Prisma } from "@prisma/client";
+import type { GatewayClientSource } from "@prisma/client";
 
+import { buildGatewayLogOverviewWhere } from "@/lib/gateway/log-query-scope";
 import { K_CREDITS_CONSUMED } from "@/lib/finance/bill-display-keys";
 import {
   loadModelDisplayNameMap,
@@ -197,16 +198,17 @@ export async function buildUsageOverviewData(
         )
       : defaultSince;
 
-  const gatewayWhere: Prisma.GatewayRequestLogWhereInput = {
+  const gatewayWhere = await buildGatewayLogOverviewWhere({
+    tenantId: tenantId || undefined,
+    bookUserId: !tenantId && onlyUserId ? onlyUserId : undefined,
+    actorUserId: tenantId && onlyUserId ? onlyUserId : undefined,
+    submittedFrom: sinceCutoff,
     status: "SUCCEEDED",
-    submittedAt: { gte: sinceCutoff },
-    ...(onlyUserId ? { actorBookUserId: onlyUserId } : {}),
-    ...(tenantId ? { tenantId } : {}),
-    ...(persona === "BYOK" || persona === "PLATFORM_CREDIT"
-      ? { billingMode: persona }
-      : {}),
-    ...(staffFlag === "1" ? { staffFlag: true } : staffFlag === "0" ? { staffFlag: false } : {}),
-  };
+    billingMode:
+      persona === "BYOK" || persona === "PLATFORM_CREDIT" ? persona : undefined,
+    staffFlag:
+      staffFlag === "1" ? true : staffFlag === "0" ? false : undefined,
+  });
 
   const gatewayLogs = await prisma.gatewayRequestLog.findMany({
     where: gatewayWhere,

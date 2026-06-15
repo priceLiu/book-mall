@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import { formatUserCellPrimary } from "@/lib/user-contact-display";
 
 type TeamBill = {
   periodKey: string;
@@ -21,6 +22,7 @@ type TeamBill = {
     actorUserId: string;
     name: string | null;
     email: string | null;
+    phone: string | null;
     consumed: number;
     count: number;
     byModel: { canonicalModelKey: string; credits: number; count: number }[];
@@ -170,7 +172,7 @@ export function TeamBillingFinanceClient() {
               {bill.members.map((m) => (
                 <tr key={m.actorUserId} className="border-t border-[#f0f0f0]">
                   <td className="py-2">
-                    {m.name || m.email || m.actorUserId.slice(0, 8)}
+                    {formatUserCellPrimary({ ...m, id: m.actorUserId })}
                   </td>
                   <td className="py-2 text-right">{m.count}</td>
                   <td className="py-2 text-right">{fmt(m.consumed)}</td>

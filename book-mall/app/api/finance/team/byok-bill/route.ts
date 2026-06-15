@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
       memberIds.length > 0
         ? await prisma.user.findMany({
             where: { id: { in: memberIds } },
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true, email: true, phone: true },
           })
         : [];
     const memberMap = new Map(members.map((m) => [m.id, m]));
@@ -113,6 +113,7 @@ export async function GET(request: NextRequest) {
         userId: uid,
         name: profile?.name ?? null,
         email: profile?.email ?? null,
+        phone: profile?.phone ?? null,
         byTaskKind: rows.map((r) => ({
           taskKind: r.byokTaskKind,
           label: r.byokTaskKind ? (BYOK_TASK_KIND_LABEL[r.byokTaskKind] ?? r.byokTaskKind) : "—",

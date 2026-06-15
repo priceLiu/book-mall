@@ -113,6 +113,18 @@ async function main() {
     if (r.count > 0) console.log(`已设为管理员: ${email}`);
   }
 
+  const adminPhones =
+    process.env.ADMIN_PHONES?.split(",")
+      .map((p) => p.trim().replace(/\D/g, ""))
+      .filter((p) => /^1[3-9]\d{9}$/.test(p)) ?? [];
+  for (const phone of adminPhones) {
+    const r = await prisma.user.updateMany({
+      where: { phone },
+      data: { role: "ADMIN" },
+    });
+    if (r.count > 0) console.log(`已设为管理员（手机）: ${phone}`);
+  }
+
   await prisma.productCategory.upsert({
     where: { slug: "ai-courses" },
     create: {

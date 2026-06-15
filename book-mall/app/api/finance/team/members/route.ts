@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
         userId: m.userId,
         name: m.user.name,
         email: m.user.email,
+        phone: m.user.phone,
         role: m.role,
         seatId: m.seatId,
         seatLabel: m.seat?.label ?? null,

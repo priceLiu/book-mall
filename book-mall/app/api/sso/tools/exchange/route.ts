@@ -10,7 +10,6 @@ import { signToolsAccessToken } from "@/lib/tools-sso-token";
 import { resolveTenantContextForUser } from "@/lib/tenant/context";
 import {
   getSessionVersion,
-  isSingleSessionEnforced,
 } from "@/lib/auth-session-version";
 import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 import {
@@ -130,8 +129,7 @@ export async function POST(req: Request) {
   const expiresIn = getToolsJwtTtlSec();
   const ecomBillingMode = await getUserEcomBillingMode(row.userId);
   const tenantCtx = await resolveTenantContextForUser(row.userId);
-  const sessionVersion =
-    isSingleSessionEnforced() ? await getSessionVersion(row.userId) : undefined;
+  const sessionVersion = await getSessionVersion(row.userId);
   const accessToken = signToolsAccessToken({
     userId: row.userId,
     secret: jwtSecret,
@@ -150,6 +148,7 @@ export async function POST(req: Request) {
       : undefined,
     profile: {
       email: elig.email,
+      phone: elig.phone,
       name: elig.name,
       image: elig.image,
     },

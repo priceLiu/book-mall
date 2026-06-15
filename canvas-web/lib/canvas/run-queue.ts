@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
+  isCanvasApiAccessDeniedError,
   listCanvasProjectTasks,
+  markCanvasProjectTasksForbidden,
   runCanvasNode,
   type CanvasTaskRecord,
 } from "@/lib/canvas-api";
@@ -1187,6 +1189,8 @@ export function useCanvasRunner(
   useEffect(() => {
     if (!base || !projectId) return;
     let cancelled = false;
+    let pollStopped = false;
+    let intervalId = 0;
     let tickCount = 0;
     const serverInflightRef = { current: false };
     const applyStoryColumnRowTasks = (
@@ -1406,6 +1410,7 @@ export function useCanvasRunner(
     };
 
     const tick = async (forceFullScan = false) => {
+      if (cancelled || pollStopped) return;
       tickCount++;
       const periodicFullScan =
         !forceFullScan && tickCount % FULL_SCAN_EVERY_N_TICKS === 0;
@@ -1471,16 +1476,21 @@ export function useCanvasRunner(
           );
         }
         serverInflightRef.current = serverInflight > 0;
-      } catch {
-        // 网络抖动忽略
+      } catch (e) {
+        if (isCanvasApiAccessDeniedError(e)) {
+          pollStopped = true;
+          serverInflightRef.current = false;
+          markCanvasProjectTasksForbidden(projectId);
+          if (intervalId) window.clearInterval(intervalId);
+        }
       }
     };
 
-    const id = window.setInterval(() => void tick(), POLL_INTERVAL_MS);
+    intervalId = window.setInterval(() => void tick(), POLL_INTERVAL_MS);
     void tick(true);
     return () => {
       cancelled = true;
-      window.clearInterval(id);
+      if (intervalId) window.clearInterval(intervalId);
     };
   }, [base, projectId, releaseInflightKey, setNodeRuntime, updateNodeData]);
 

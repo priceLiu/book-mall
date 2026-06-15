@@ -46,7 +46,7 @@ export function ChangePasswordForm({ enabled }: { enabled: boolean }) {
   if (!enabled) {
     return (
       <p className="text-sm text-muted-foreground leading-relaxed">
-        当前账号未绑定邮箱密码登录（例如仅第三方授权登录），无法在此修改密码。如需设置密码，请联系管理员在后台为您重置。
+        当前账号未设置登录密码，无法在此修改。注册时若未设置密码，可使用验证码登录；如需设置密码，请联系管理员。
       </p>
     );
   }

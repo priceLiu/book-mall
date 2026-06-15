@@ -91,6 +91,13 @@ export default async function middleware(request: NextRequest) {
   if (early) return withProductionSecurityHeaders(early, request);
 
   const path = request.nextUrl.pathname;
+  if (path.startsWith("/invite/")) {
+    const res = NextResponse.next();
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    return withProductionSecurityHeaders(res, request);
+  }
+
   const needsAuth =
     path === "/account" ||
     path.startsWith("/account/") ||

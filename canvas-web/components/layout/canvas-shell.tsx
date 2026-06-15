@@ -57,7 +57,7 @@ function ShellAuthSlot() {
 
   return (
     <span className="hidden max-w-[140px] truncate text-[11px] text-[var(--canvas-muted)] md:inline xl:max-w-[200px]">
-      {user.name ?? user.email ?? user.id}
+      {user.name ?? user.phone ?? user.email ?? user.id}
       {base ? (
         <>
           {" · "}

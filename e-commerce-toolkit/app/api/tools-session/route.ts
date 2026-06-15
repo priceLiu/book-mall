@@ -36,11 +36,22 @@ export async function GET() {
     cache: "no-store",
   });
   const introspect = await res.json().catch(() => null);
-  return NextResponse.json({
+  const active = res.ok && Boolean((introspect as { active?: boolean })?.active);
+  const out = NextResponse.json({
     hasCookie: true,
-    active: res.ok && Boolean((introspect as { active?: boolean })?.active),
+    active,
     introspect,
     introspectStatus: res.status,
     tokenExpiresAt,
   });
+  if (!active) {
+    out.cookies.set("tools_token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+  }
+  return out;
 }

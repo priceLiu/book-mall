@@ -401,11 +401,12 @@ export function GoogleAuthButton({
 export type AnimatedAuthField = {
   name: string;
   label: string;
-  type: "text" | "email" | "password";
+  type: "text" | "email" | "password" | "tel";
   placeholder?: string;
   value: string;
   onChange: (e: ChangeEvent<HTMLInputElement>) => void;
   required?: boolean;
+  disabled?: boolean;
 };
 
 export const AnimatedAuthFields = memo(function AnimatedAuthFields({
@@ -453,7 +454,16 @@ export const AnimatedAuthFields = memo(function AnimatedAuthFields({
                 value={field.value}
                 onChange={field.onChange}
                 required={field.required !== false}
-                autoComplete={field.type === "email" ? "email" : field.type === "password" ? "current-password" : undefined}
+                disabled={field.disabled}
+                autoComplete={
+                  field.type === "email"
+                    ? "email"
+                    : field.type === "password"
+                      ? "current-password"
+                      : field.type === "tel"
+                        ? "tel"
+                        : undefined
+                }
                 className={field.type === "password" ? "pr-10" : undefined}
               />
               {field.type === "password" ? (
@@ -482,17 +492,22 @@ export function AuthSubmitButton({
   children,
   disabled,
   loading,
+  type = "submit",
+  onClick,
 }: {
   children: ReactNode;
   disabled?: boolean;
   loading?: boolean;
+  type?: "submit" | "button";
+  onClick?: () => void;
 }) {
   return (
     <BoxReveal width="100%" boxColor="hsl(var(--primary))" duration={0.3} overflow="visible">
       <button
-        type="submit"
+        type={type}
+        onClick={onClick}
         disabled={disabled || loading}
-        className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-zinc-200 to-zinc-100 font-medium text-black shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] outline-none hover:cursor-pointer disabled:opacity-60 dark:from-zinc-900 dark:to-zinc-800 dark:text-white dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]"
+        className="group/btn relative block h-10 w-full rounded-md bg-gradient-to-br from-zinc-200 to-zinc-100 font-medium text-black shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] outline-none hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 dark:from-zinc-900 dark:to-zinc-800 dark:text-white dark:shadow-[0px_1px_0px_0px_#27272a_inset,0px_-1px_0px_0px_#27272a_inset]"
       >
         {loading ? (
           <span className="flex items-center justify-center">

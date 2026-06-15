@@ -244,4 +244,9 @@ html {
   .account-center .text-primary.underline {
     @apply inline-flex h-8 min-w-[calc(5.5em+1.5rem)] shrink-0 items-center justify-center rounded-md border-0 bg-orange-500 px-3 text-sm font-medium text-white no-underline shadow-none hover:bg-orange-600 hover:text-white hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 dark:bg-orange-600 dark:hover:bg-orange-500;
   }
+
+  .account-shell-root {
+    max-width: 100%;
+    overflow-x: clip;
+  }
 }

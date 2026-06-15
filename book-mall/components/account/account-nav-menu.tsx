@@ -10,11 +10,13 @@ import { ChevronDown, Menu as MenuIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { maskPhone } from "@/lib/auth/phone";
 import {
   openCanvasAppInNewTab,
   openEcomAppInNewTab,
   openToolsAppInNewTab,
 } from "@/lib/account-app-launch";
+import { isAccountCanvasLaunchClickable } from "@/lib/account-canvas-launch-clickable";
 import {
   buildAccountNavMenuGroups,
   isAccountNavLinkActive,
@@ -45,7 +47,7 @@ const dropdownContentClass =
 type Profile = {
   image: string | null;
   name: string | null;
-  email: string | null;
+  phone: string | null;
 };
 
 type NavRuntimeProps = {
@@ -263,12 +265,21 @@ export function AccountNavMenu({
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const initial = (profile.name?.[0] || profile.email?.[0] || "?").toUpperCase();
-  const profileLabel = profile.name?.trim() || profile.email || "我的账户";
+  const initial = (
+    profile.name?.[0] ||
+    profile.phone?.[0] ||
+    "?"
+  ).toUpperCase();
+  const profileLabel = profile.name?.trim() || "未设置昵称";
+  const phoneLabel = profile.phone ? maskPhone(profile.phone) : null;
   const isSidebar = placement === "sidebar";
 
-  const canvasReady =
-    gatewayLinked && canLaunchCanvas && canvasOriginConfigured;
+  const canvasReady = isAccountCanvasLaunchClickable({
+    canLaunchCanvas,
+    canvasOriginConfigured,
+    billingPersona,
+    gatewayLinked,
+  });
   const ecomReady = canLaunchEcommerce && ecomOriginConfigured;
 
   const groups = useMemo(
@@ -277,7 +288,7 @@ export function AccountNavMenu({
         isAdmin,
         billingPersona,
         showToolsLaunch: showToolsCta && canLaunchTools,
-        showCanvasLaunch: canvasReady,
+        showCanvasLaunch: canLaunchCanvas && canvasOriginConfigured,
         showEcomLaunch: ecomReady,
       }),
     [isAdmin, billingPersona, showToolsCta, canLaunchTools, canvasReady, ecomReady],
@@ -315,7 +326,7 @@ export function AccountNavMenu({
 
   if (isSidebar) {
     return (
-      <div className="flex min-h-0 w-full min-w-0 flex-col gap-4 overflow-hidden">
+      <div className="flex w-full min-w-0 flex-col gap-4">
         <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5">
           <Avatar className="h-9 w-9 shrink-0 border border-border">
             {profile.image ? (
@@ -325,14 +336,14 @@ export function AccountNavMenu({
           </Avatar>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold">{profileLabel}</span>
-            {profile.email ? (
+            {phoneLabel ? (
               <span className="block truncate text-xs font-normal text-muted-foreground">
-                {profile.email}
+                {phoneLabel}
               </span>
             ) : null}
           </span>
         </div>
-        <nav id="account-sidebar-nav" className="min-w-0 flex-1 overflow-y-auto">
+        <nav id="account-sidebar-nav" className="min-w-0">
           <AccountSidebarNav {...navProps} />
         </nav>
         {actionMsg ? (

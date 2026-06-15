@@ -3,18 +3,27 @@ import bcrypt from "bcryptjs";
 import type { BillingPersona } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { normalizePhone } from "@/lib/auth/phone";
+import { isValidSmsCodeInput } from "@/lib/auth/sms-bypass";
+import {
+  SmsVerificationError,
+  verifySmsCode,
+} from "@/lib/auth/sms-verification-service";
 import { deriveEcomBillingMode } from "@/lib/billing/billing-persona";
-import { syncGatewayUserFromBookUser } from "@/lib/gateway/sync-user";
+import { ensureBookUserGatewayIdentitySynced } from "@/lib/gateway/sync-user";
 import { ensurePlatformManagedKeyForUser } from "@/lib/gateway/platform-managed-key";
+import { prisma } from "@/lib/prisma";
+import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 
 export const dynamic = "force-dynamic";
 
 const registerSchema = z.object({
-  email: z.string().email("邮箱格式无效"),
+  phone: z.string().min(1),
+  code: z.string().refine(isValidSmsCodeInput, "验证码格式无效"),
   password: z.string().min(8, "密码至少 8 位"),
   name: z.string().max(64).optional(),
   billingPersona: z.enum(["PLATFORM_CREDIT", "BYOK"]),
+  inviteToken: z.string().min(1).optional(),
 });
 
 function isDev() {
@@ -32,44 +41,79 @@ export async function POST(request: Request) {
       );
     }
 
-    const email = parsed.data.email.trim().toLowerCase();
+    const phone = normalizePhone(parsed.data.phone);
+    if (!phone) {
+      return NextResponse.json({ error: "手机号格式无效" }, { status: 400 });
+    }
+
+    const inviteToken = parsed.data.inviteToken?.trim() || undefined;
+    if (inviteToken) {
+      const invite = await getInviteByToken(inviteToken);
+      if (!invite || invite.status !== "PENDING") {
+        return NextResponse.json({ error: "邀请已失效" }, { status: 400 });
+      }
+      if (invite.phone !== phone) {
+        return NextResponse.json({ error: "手机号与邀请不一致" }, { status: 400 });
+      }
+    }
+
+    await verifySmsCode({
+      phoneRaw: phone,
+      purpose: inviteToken ? "TEAM_INVITE" : "REGISTER",
+      code: parsed.data.code,
+      inviteToken,
+    });
+
     const billingPersona = parsed.data.billingPersona as BillingPersona;
-    const exists = await prisma.user.findUnique({ where: { email } });
-    if (exists) {
-      return NextResponse.json(
-        { error: "该邮箱已注册" },
-        { status: 409 },
-      );
+    const existing = await prisma.user.findUnique({ where: { phone } });
+    if (existing?.phoneVerifiedAt) {
+      return NextResponse.json({ error: "该手机号已注册" }, { status: 409 });
     }
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 12);
     const lockedAt = new Date();
+    const verifiedAt = new Date();
 
     let createdUserId: string | null = null;
     await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email,
-          passwordHash,
-          name: parsed.data.name?.trim() || null,
-          billingPersona,
-          billingPersonaLockedAt: lockedAt,
-          ecomBillingMode: deriveEcomBillingMode(billingPersona),
-        },
-      });
-      createdUserId = user.id;
-      await tx.wallet.create({
-        data: { userId: user.id },
-      });
+      if (existing) {
+        const user = await tx.user.update({
+          where: { id: existing.id },
+          data: {
+            phone,
+            phoneVerifiedAt: verifiedAt,
+            passwordHash,
+            name: parsed.data.name?.trim() || existing.name,
+            billingPersona,
+            billingPersonaLockedAt: lockedAt,
+            ecomBillingMode: deriveEcomBillingMode(billingPersona),
+          },
+        });
+        createdUserId = user.id;
+        const wallet = await tx.wallet.findUnique({ where: { userId: user.id } });
+        if (!wallet) {
+          await tx.wallet.create({ data: { userId: user.id } });
+        }
+      } else {
+        const user = await tx.user.create({
+          data: {
+            phone,
+            phoneVerifiedAt: verifiedAt,
+            passwordHash,
+            name: parsed.data.name?.trim() || null,
+            billingPersona,
+            billingPersonaLockedAt: lockedAt,
+            ecomBillingMode: deriveEcomBillingMode(billingPersona),
+          },
+        });
+        createdUserId = user.id;
+        await tx.wallet.create({ data: { userId: user.id } });
+      }
     });
 
     if (createdUserId) {
       try {
-        await syncGatewayUserFromBookUser({
-          bookUserId: createdUserId,
-          email,
-          name: parsed.data.name,
-        });
+        await ensureBookUserGatewayIdentitySynced(createdUserId);
         if (billingPersona === "PLATFORM_CREDIT") {
           await ensurePlatformManagedKeyForUser(createdUserId);
         }
@@ -84,36 +128,24 @@ export async function POST(request: Request) {
       update: {},
     });
 
-    return NextResponse.json({ ok: true, billingPersona });
+    return NextResponse.json({ ok: true, billingPersona, phone });
   } catch (e) {
+    if (e instanceof SmsVerificationError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
     console.error("[register]", e);
 
-    if (e instanceof Prisma.PrismaClientKnownRequestError) {
-      if (e.code === "P2002") {
-        return NextResponse.json(
-          { error: "该邮箱已注册" },
-          { status: 409 },
-        );
-      }
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return NextResponse.json({ error: "该手机号已注册" }, { status: 409 });
     }
 
     const message = e instanceof Error ? e.message : "未知错误";
     const ret: { error: string; detail?: string } = {
       error: "注册失败，请稍后重试",
     };
-    if (isDev()) {
-      ret.detail = message;
-      const dbUnreachable =
-        message.includes("P1001") ||
-        message.includes("Can't reach database") ||
-        message.toLowerCase().includes("reach database");
-      if (dbUnreachable) {
-        ret.error = "无法连接数据库";
-        ret.detail =
-          "请确认 .env.local 中 DATABASE_URL 正确、本机网络可达 Neon，并在控制台唤醒项目；可运行 pnpm run db:deploy 测试连接。";
-      }
-    }
-
+    if (isDev()) ret.detail = message;
     return NextResponse.json(ret, { status: 500 });
   }
 }
+
+/** bind-phone 在同文件导出供 route 复用 — 实际 route 在 bind-phone/route.ts */

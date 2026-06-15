@@ -10,6 +10,8 @@ declare module "next-auth" {
       id: string;
       role: string;
       primaryTenantId?: string | null;
+      phone?: string | null;
+      phoneVerified?: boolean;
     };
   }
 }
@@ -21,7 +23,8 @@ declare module "next-auth/jwt" {
     name?: string | null;
     picture?: string | null;
     primaryTenantId?: string | null;
-    /** 单会话挤下线：JWT 内缓存的 sessionVersion 及上次核对时间（epoch 秒） */
+    phone?: string | null;
+    phoneVerified?: boolean;
     sv?: number;
     svAt?: number;
   }

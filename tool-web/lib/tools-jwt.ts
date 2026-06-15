@@ -16,6 +16,7 @@ export type VerifiedToolsJwt = {
   tier: "gold" | "admin";
   exp: number;
   email?: string;
+  phone?: string;
   name?: string;
   image?: string;
   toolsNavKeys?: string[];
@@ -84,6 +85,7 @@ export function verifyToolsJwt(token: string, secret: string): VerifiedToolsJwt 
   if (!tier) return null;
 
   const email = pickClaim(payloadRaw.email, 320);
+  const phone = pickClaim(payloadRaw.phone, 20);
   const name = pickClaim(payloadRaw.name, 120);
   const imageRaw = pickClaim(payloadRaw.image, 768);
   const image =
@@ -93,6 +95,7 @@ export function verifyToolsJwt(token: string, secret: string): VerifiedToolsJwt 
 
   const out: VerifiedToolsJwt = { sub: payloadRaw.sub, tier, exp: payloadRaw.exp };
   if (email) out.email = email;
+  if (phone) out.phone = phone;
   if (name) out.name = name;
   if (image) out.image = image;
 

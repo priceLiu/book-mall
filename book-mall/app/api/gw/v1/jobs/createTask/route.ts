@@ -8,6 +8,7 @@ import {
   createRequestLog,
   finalizeRequestLog,
   pickCredentialForKind,
+  mapGatewayPreCreateLogError,
 } from "@/lib/gateway/proxy-common";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import {
@@ -128,18 +129,24 @@ export async function POST(request: NextRequest) {
       }
     : (body.input ?? {});
 
-  const log = await createRequestLog({
-    userId: auth.userId,
-    apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/jobs/createTask",
-    providerKind: route.providerKind,
-    requestKind: route.requestKind,
-    clientSource,
-    inputSummary: buildGatewayInputSummary(model, inputForLog),
-    ...logMetaToRequestLogFields(logMeta),
-  });
+  let log;
+  try {
+    log = await createRequestLog({
+      userId: auth.userId,
+      apiKeyId: auth.id,
+      credentialId,
+      model,
+      endpoint: "/v1/jobs/createTask",
+      providerKind: route.providerKind,
+      requestKind: route.requestKind,
+      clientSource,
+      inputSummary: buildGatewayInputSummary(model, inputForLog),
+      ...logMetaToRequestLogFields(logMeta),
+    });
+  } catch (e) {
+    const mapped = mapGatewayPreCreateLogError(e);
+    return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+  }
 
   try {
     if (route.providerKind === "HUNYUAN") {

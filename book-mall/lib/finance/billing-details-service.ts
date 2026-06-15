@@ -1,5 +1,3 @@
-import type { Prisma } from "@prisma/client";
-
 import { getPoolBalances } from "@/lib/billing/credit-account-service";
 import { K_CREDITS_CONSUMED } from "@/lib/finance/bill-display-keys";
 import {
@@ -13,6 +11,7 @@ import {
   loadGatewayLogKeyLabels,
   pickGatewayLogKeyLabels,
 } from "@/lib/finance/gateway-bill-key-labels";
+import { buildGatewayLogWhere } from "@/lib/gateway/log-query-scope";
 import { prisma } from "@/lib/prisma";
 
 export type BillingDetailsTab = "usage" | "charge";
@@ -60,38 +59,6 @@ function sumCredits(rows: Record<string, string>[]): number {
 
 function periodKeyFromDate(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-async function buildGatewayLogScopeWhere(input: {
-  userId?: string;
-  tenantId?: string;
-  actorUserId?: string;
-}): Promise<Prisma.GatewayRequestLogWhereInput> {
-  if (input.tenantId) {
-    const where: Prisma.GatewayRequestLogWhereInput = { tenantId: input.tenantId };
-    if (input.actorUserId) where.actorBookUserId = input.actorUserId;
-    return where;
-  }
-  if (!input.userId) return {};
-  const userId = input.userId;
-  const [gatewayUser, bookUser] = await Promise.all([
-    prisma.gatewayUser.findUnique({
-      where: { bookUserId: userId },
-      select: { id: true },
-    }),
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { gatewayApiKeyId: true },
-    }),
-  ]);
-  const or: Prisma.GatewayRequestLogWhereInput[] = [{ actorBookUserId: userId }];
-  if (gatewayUser) {
-    or.push({ userId: gatewayUser.id });
-  }
-  if (bookUser?.gatewayApiKeyId) {
-    or.push({ apiKeyId: bookUser.gatewayApiKeyId });
-  }
-  return { OR: or };
 }
 
 async function loadSettlementLinesForQuotaSnapshots(opts: {
@@ -195,20 +162,18 @@ async function buildGatewayRows(input: {
   failedCalls: number;
   returned: number;
 }> {
-  const scopeWhere = await buildGatewayLogScopeWhere({
-    userId: input.userId,
+  const scopeInput = {
+    bookUserId: input.userId,
     tenantId: input.tenantId,
     actorUserId: input.actorUserId,
-  });
-  const where: Prisma.GatewayRequestLogWhereInput = {
-    ...scopeWhere,
   };
 
-  if (input.tab === "usage") {
-    where.status = { in: [...USAGE_TAB_STATUSES] };
-  } else {
-    where.creditsCharged = { gt: 0 };
-  }
+  const where = await buildGatewayLogWhere(
+    scopeInput,
+    input.tab === "usage"
+      ? { statuses: [...USAGE_TAB_STATUSES] }
+      : { creditsChargedGt: 0 },
+  );
 
   const logs = await prisma.gatewayRequestLog.findMany({
     where,
@@ -279,19 +244,14 @@ async function buildGatewayRows(input: {
     );
   });
 
-  const usageWhere: Prisma.GatewayRequestLogWhereInput = {
-    ...scopeWhere,
-    status: { in: [...USAGE_TAB_STATUSES] },
-  };
-
   const [succeededCalls, failedCalls] =
     input.tab === "usage"
       ? await Promise.all([
           prisma.gatewayRequestLog.count({
-            where: { ...usageWhere, status: "SUCCEEDED" },
+            where: await buildGatewayLogWhere(scopeInput, { status: "SUCCEEDED" }),
           }),
           prisma.gatewayRequestLog.count({
-            where: { ...usageWhere, status: "FAILED" },
+            where: await buildGatewayLogWhere(scopeInput, { status: "FAILED" }),
           }),
         ])
       : [0, 0];

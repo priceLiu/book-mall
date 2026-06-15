@@ -5,6 +5,7 @@ export type FinanceViewerUser = {
   id: string;
   email: string | null;
   name: string | null;
+  phone: string | null;
   role: string;
 };
 

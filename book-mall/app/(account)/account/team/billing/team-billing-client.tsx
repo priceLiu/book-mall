@@ -21,6 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { maskPhone } from "@/lib/auth/phone";
+
 interface ByModel {
   canonicalModelKey: string;
   credits: number;
@@ -29,7 +31,7 @@ interface ByModel {
 interface MemberUsage {
   actorUserId: string;
   name: string | null;
-  email: string | null;
+  phone: string | null;
   consumed: number;
   count: number;
   byModel: ByModel[];
@@ -83,11 +85,11 @@ export function TeamBillingClient(props: {
 
   const memberCsv = useMemo(() => {
     if (!props.bill) return [] as string[][];
-    const header = ["成员", "邮箱", "消耗积分", "参考金额(¥)", "生成次数", "占比%"];
+    const header = ["成员", "手机号", "消耗积分", "参考金额(¥)", "生成次数", "占比%"];
     const total = props.bill.consumed || 1;
     const rows = props.bill.members.map((m) => [
       m.name ?? m.actorUserId,
-      m.email ?? "",
+      m.phone ? maskPhone(m.phone) : "",
       String(Math.round(m.consumed)),
       (m.consumed * 0.04).toFixed(2),
       String(m.count),
@@ -266,10 +268,10 @@ export function TeamBillingClient(props: {
                           <span className="mr-1 inline-block w-3 text-muted-foreground">
                             {open ? "▾" : "▸"}
                           </span>
-                          {m.name ?? m.email ?? m.actorUserId}
-                          {m.email ? (
+                          {m.name ?? (m.phone ? maskPhone(m.phone) : m.actorUserId)}
+                          {m.phone ? (
                             <span className="ml-2 text-xs text-muted-foreground">
-                              {m.email}
+                              {maskPhone(m.phone)}
                             </span>
                           ) : null}
                         </TableCell>

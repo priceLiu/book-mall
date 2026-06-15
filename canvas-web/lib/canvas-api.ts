@@ -3,6 +3,40 @@
  */
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 
+/** 无权限或项目不存在时停止 tasks 轮询，避免控制台 404 刷屏 */
+const forbiddenCanvasProjectIds = new Set<string>();
+
+export function isCanvasProjectTasksForbidden(projectId: string): boolean {
+  return forbiddenCanvasProjectIds.has(projectId);
+}
+
+export function markCanvasProjectTasksForbidden(projectId: string): void {
+  forbiddenCanvasProjectIds.add(projectId);
+}
+
+export function clearCanvasProjectTasksForbidden(projectId: string): void {
+  forbiddenCanvasProjectIds.delete(projectId);
+}
+
+export function isCanvasApiAccessDeniedError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /\b403\b/.test(msg) || /\b404\b/.test(msg);
+}
+
+/** @deprecated 使用 isCanvasApiAccessDeniedError */
+export function isCanvasApiNotFoundError(e: unknown): boolean {
+  return isCanvasApiAccessDeniedError(e);
+}
+
+function markForbiddenCanvasProjectFromPath(
+  status: number,
+  apiPath: string,
+): void {
+  if (status !== 403 && status !== 404) return;
+  const m = apiPath.match(/^\/api\/canvas\/projects\/([^/?]+)/);
+  if (m?.[1]) markCanvasProjectTasksForbidden(m[1]);
+}
+
 export type CanvasProjectSummary = {
   id: string;
   name: string;
@@ -114,6 +148,7 @@ async function call<T>(
     } catch {
       msg = raw;
     }
+    markForbiddenCanvasProjectFromPath(r.status, apiPath);
     throw new Error(`${r.status} ${msg || r.statusText}`);
   }
   if (!raw) return undefined as unknown as T;
@@ -374,6 +409,9 @@ export async function listCanvasProjectTasks(
   projectId: string,
   nodeIds?: string[],
 ): Promise<CanvasTaskRecord[]> {
+  if (isCanvasProjectTasksForbidden(projectId)) {
+    throw new Error("403 无权访问此画布项目");
+  }
   const q = nodeIds && nodeIds.length > 0
     ? `?nodeIds=${encodeURIComponent(nodeIds.join(","))}`
     : "";

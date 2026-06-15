@@ -12,6 +12,7 @@ import {
   forwardChatCompletionsStream,
   parseOpenAiUsage,
   pickCredentialForKind,
+  mapGatewayPreCreateLogError,
 } from "@/lib/gateway/proxy-common";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import { buildGatewayChatResultSummary } from "@/lib/gateway/log-result-summary";
@@ -69,16 +70,22 @@ export async function POST(request: NextRequest) {
   );
 
   const { model: _modelField, ...restBody } = body;
-  const log = await createRequestLog({
-    userId: auth.userId,
-    apiKeyId: auth.id,
-    credentialId,
-    model,
-    endpoint: "/v1/chat/completions",
-    clientSource,
-    inputSummary: buildGatewayInputSummary(model, restBody),
-    ...logMetaToRequestLogFields(logMeta),
-  });
+  let log;
+  try {
+    log = await createRequestLog({
+      userId: auth.userId,
+      apiKeyId: auth.id,
+      credentialId,
+      model,
+      endpoint: "/v1/chat/completions",
+      clientSource,
+      inputSummary: buildGatewayInputSummary(model, restBody),
+      ...logMetaToRequestLogFields(logMeta),
+    });
+  } catch (e) {
+    const mapped = mapGatewayPreCreateLogError(e);
+    return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+  }
 
   const stream = body.stream === true;
 

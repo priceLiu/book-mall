@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
@@ -18,6 +18,7 @@ import {
 import {
   acceptInvite,
   createInvite,
+  resolveInviteLink,
   revokeInvite,
 } from "@/lib/tenant/tenant-invite-service";
 import {
@@ -28,7 +29,12 @@ import { resolvePlanCreditGrants } from "@/lib/billing/plan-credit-grants";
 import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import { grantCredits } from "@/lib/billing/credit-account-service";
 import { assertBillingPersona } from "@/lib/billing/billing-persona";
-import { ensurePlatformManagedKeyForTenant } from "@/lib/gateway/platform-managed-key";
+import {
+  ensurePlatformManagedKeyForTenant,
+  ensurePlatformManagedKeyForUser,
+} from "@/lib/gateway/platform-managed-key";
+import { ensureBookUserGatewayIdentitySynced } from "@/lib/gateway/sync-user";
+import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import type { ActionResult } from "@/lib/server-action-result";
 import { ACTIVE_TENANT_COOKIE } from "@/lib/tenant/context";
 import type { TenantRole } from "@prisma/client";
@@ -146,7 +152,9 @@ export async function createTeamAction(formData: FormData): Promise<ActionResult
   return { ok: true };
 }
 
-export async function inviteMemberAction(formData: FormData): Promise<ActionResult> {
+export async function inviteMemberAction(
+  formData: FormData,
+): Promise<ActionResult<{ inviteUrl: string | null }>> {
   const auth = await requireUser();
   if (!auth.ok) return auth;
   const tenantId = str(formData.get("tenantId"));
@@ -154,17 +162,47 @@ export async function inviteMemberAction(formData: FormData): Promise<ActionResu
   if (!perm.ok) return perm;
 
   try {
-    await createInvite({
+    const h = headers();
+    const sendIp =
+      h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip");
+    const { inviteUrl } = await createInvite({
       tenantId,
-      email: str(formData.get("email")),
+      phone: str(formData.get("phone")),
       role: pickRole(str(formData.get("role"))),
       createdById: auth.userId,
+      sendIp,
     });
+    revalidatePath("/account/team");
+    return { ok: true, data: { inviteUrl } };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
-  revalidatePath("/account/team");
-  return { ok: true };
+}
+
+export async function getInviteLinkAction(
+  token: string,
+): Promise<ActionResult<{ inviteUrl: string }>> {
+  const auth = await requireUser();
+  if (!auth.ok) return auth;
+
+  const invite = await prisma.tenantInvite.findUnique({
+    where: { token },
+    select: { tenantId: true, status: true },
+  });
+  if (!invite || invite.status !== "PENDING") {
+    return { ok: false, error: "邀请无效或已失效" };
+  }
+
+  const perm = await requirePermission(auth.userId, invite.tenantId, "member:invite");
+  if (!perm.ok) return perm;
+
+  try {
+    const inviteUrl = await resolveInviteLink(token);
+    revalidatePath("/account/team");
+    return { ok: true, data: { inviteUrl } };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 export async function revokeInviteAction(formData: FormData): Promise<ActionResult> {
@@ -292,6 +330,18 @@ export async function acceptInviteAction(formData: FormData): Promise<ActionResu
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 365,
     });
+    try {
+      await ensureBookUserGatewayIdentitySynced(auth.userId);
+    } catch (e) {
+      console.warn("[acceptInviteAction] gateway identity sync failed", e);
+    }
+    if ((await getUserBillingPersona(auth.userId)) === "PLATFORM_CREDIT") {
+      try {
+        await ensurePlatformManagedKeyForUser(auth.userId);
+      } catch (e) {
+        console.warn("[acceptInviteAction] platform key ensure failed", e);
+      }
+    }
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

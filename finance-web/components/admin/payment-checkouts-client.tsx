@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { financeApiFetch } from "@/lib/finance-viewer";
+import { formatUserCellPrimary } from "@/lib/user-contact-display";
 
 type PaymentRow = {
   id: string;
@@ -14,7 +15,7 @@ type PaymentRow = {
   confirmMode: string | null;
   paidAt: string | null;
   createdAt: string;
-  user: { email: string | null; name: string | null };
+  user: { email: string | null; name: string | null; phone: string | null };
   order: { id: string; amountYuan: number | null; type: string; status: string } | null;
   ledger: { type: string; credits: number; pool: string; createdAt: string } | null;
 };
@@ -96,7 +97,7 @@ export function PaymentCheckoutsClient() {
                     {new Date(r.createdAt).toLocaleString("zh-CN")}
                   </td>
                   <td className="px-3 py-2 font-mono">{r.remarkCode}</td>
-                  <td className="px-3 py-2">{r.user.email ?? r.user.name}</td>
+                  <td className="px-3 py-2">{formatUserCellPrimary(r.user)}</td>
                   <td className="px-3 py-2">{r.productLabel}</td>
                   <td className="px-3 py-2">{fmtYuan(r.amountYuan)}</td>
                   <td className="px-3 py-2">{r.status}</td>

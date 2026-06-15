@@ -73,6 +73,7 @@ async function fetchToolsSessionCore(bearer: string): Promise<{
               tools_role: jwt.tier === "admin" ? "admin" : "member",
               tools_nav_keys,
               email: jwt.email ?? null,
+              phone: jwt.phone ?? null,
               name: jwt.name ?? null,
               image: jwt.image ?? null,
               exp: jwt.exp,

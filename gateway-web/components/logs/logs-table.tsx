@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
 import { LogImagesCell } from "./log-images-cell";
 import { LogParamsCell } from "./log-params-cell";
 import { LogResultCell } from "./log-result-cell";
@@ -24,6 +23,7 @@ import {
   formatLogPageLabel,
   formatLogSourceTooltip,
   formatProviderKindLabel,
+  displayLogModelKey,
   logProviderFilterOptions,
   LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
@@ -31,6 +31,10 @@ import {
 export type GatewayLogRow = {
   id: string;
   model: string;
+  canonicalModelKey?: string | null;
+  tenantId?: string | null;
+  actorBookUserId?: string | null;
+  creditsCharged?: number | null;
   endpoint: string;
   status: string;
   requestKind: string;
@@ -65,13 +69,46 @@ const STATUS_OPTIONS = [
 const AUTO_REFRESH_MS = 10_000;
 const LIVE_CLOCK_MS = 1_000;
 
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
+  );
+}
+
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M21 12a9 9 0 11-2.64-6.36"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M21 3v6h-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 async function fetchGatewayLogs(params: {
   hasDateFilter: boolean;
   fromDate: string;
   toDate: string;
 }): Promise<GatewayLogRow[]> {
   const qs = new URLSearchParams({
-    limit: params.hasDateFilter ? "100" : "50",
+    limit: params.hasDateFilter ? "200" : "100",
   });
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
@@ -231,7 +268,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
       }
       if (sourceFilter && l.clientSource !== sourceFilter) return false;
       if (providerFilter && l.providerKind !== providerFilter) return false;
-      if (modelFilter && l.model !== modelFilter) return false;
+      if (modelFilter && displayLogModelKey(l) !== modelFilter) return false;
       if (
         credentialKeyFilter &&
         l.credentialKeyMasked !== credentialKeyFilter
@@ -329,9 +366,9 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               title="立即刷新日志（进行中任务会触发服务端轮询）"
             >
               {refreshing ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <SpinnerIcon className="size-3.5 animate-spin" />
               ) : (
-                <RefreshCw className="size-3.5" />
+                <RefreshIcon className="size-3.5" />
               )}
               刷新
             </button>
@@ -403,7 +440,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               <span className="text-xs text-red-400/90">{fetchError}</span>
             ) : hasDateFilter && !loading ? (
               <span className="text-[11px] text-zinc-600">
-                按 Submitted 筛选，最多 100 条
+                按 Submitted 筛选，最多 200 条
               </span>
             ) : null}
           </div>
@@ -587,8 +624,13 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                     </span>
                   </td>
                   <td className="align-top">
-                    <span className="inline-flex rounded-md bg-sky-600 px-2 py-0.5 font-mono text-[11px] font-medium text-white">
-                      {l.model}
+                    <span
+                      className="inline-flex rounded-md bg-sky-600 px-2 py-0.5 font-mono text-[11px] font-medium text-white"
+                      title={
+                        displayLogModelKey(l) !== l.model ? l.model : undefined
+                      }
+                    >
+                      {displayLogModelKey(l)}
                     </span>
                   </td>
                   <td className="align-middle">
