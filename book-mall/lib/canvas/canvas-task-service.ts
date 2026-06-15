@@ -1579,9 +1579,9 @@ export async function listProjectTasks(args: {
     },
   });
   const enriched = await enrichCanvasTaskRows(rows);
-  return enriched.map(({ inputPayload: _ip, ...row }) => ({
+  return enriched.map((row, idx) => ({
     ...row,
-    storyScope: extractStoryScopeFromInputPayload(_ip),
+    storyScope: extractStoryScopeFromInputPayload(rows[idx]?.inputPayload),
   }));
 }
 
