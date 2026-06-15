@@ -5,13 +5,17 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   clearBookMallSessionMarker,
-  hadBookMallSessionMarker,
   markBookMallSessionActive,
   SESSION_KICKED_MESSAGE,
 } from "@/lib/session-kicked-marker";
+import {
+  clearSessionKickCookieClient,
+  readSessionKickCookie,
+} from "@/lib/session-kick-cookie";
 
 /**
- * 单会话挤下线：会话从已登录变为未登录且非主动退出时，提示用户。
+ * 单会话挤下线：仅在服务端写入 bm_session_kicked 标记时提示（新登录挤掉旧会话）。
+ * 主动退出、会话过期或网络抖动不再误报「别处登录」。
  */
 export function SessionKickedWatcher() {
   const { status } = useSession();
@@ -28,11 +32,15 @@ export function SessionKickedWatcher() {
     }
 
     if (status !== "unauthenticated") return;
-    if (!wasAuthenticatedRef.current && !hadBookMallSessionMarker()) return;
+    if (!wasAuthenticatedRef.current) return;
 
     wasAuthenticatedRef.current = false;
     clearBookMallSessionMarker();
     if (pathname === "/login" || pathname === "/register") return;
+
+    if (!readSessionKickCookie()) return;
+
+    clearSessionKickCookieClient();
     setOpen(true);
   }, [status, pathname]);
 

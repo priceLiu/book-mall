@@ -6,6 +6,7 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/auth/phone";
 import {
@@ -18,6 +19,7 @@ import {
   isSingleSessionEnforced,
   isTokenSessionValid,
 } from "@/lib/auth-session-version";
+import { SESSION_KICK_COOKIE } from "@/lib/session-kick-cookie";
 
 /** 生产跨子域（book / f / tool）共享会话；本地不设 domain，保持 host-only Cookie。 */
 function nextAuthSharedCookieDomain(): string | undefined {
@@ -163,6 +165,7 @@ export const authOptions: NextAuthOptions = {
           try {
             token.sv = await bumpSessionVersion(user.id);
             token.svAt = Math.floor(Date.now() / 1000);
+            cookies().set(SESSION_KICK_COOKIE, "", { path: "/", maxAge: 0 });
           } catch {
             /* non-fatal */
           }
@@ -176,7 +179,18 @@ export const authOptions: NextAuthOptions = {
           tokenVersion: token.sv as number | undefined,
           lastCheckedAt: token.svAt as number | undefined,
         });
-        if (!res.valid) return {};
+        if (!res.valid) {
+          try {
+            cookies().set(SESSION_KICK_COOKIE, "1", {
+              path: "/",
+              maxAge: 120,
+              sameSite: "lax",
+            });
+          } catch {
+            /* non-fatal */
+          }
+          return {};
+        }
         token.svAt = res.checkedAt;
       }
       return token;

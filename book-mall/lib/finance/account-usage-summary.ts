@@ -6,8 +6,12 @@ import {
   classifyBillingCategory,
   type BillingCategoryKey,
 } from "@/lib/billing/billing-category";
-import { buildGatewayLogActorWhere } from "@/lib/gateway/log-query-scope";
+import type { AccountRef } from "@/lib/billing/credit-account-service";
 import { getPoolBalances } from "@/lib/billing/credit-account-service";
+import {
+  buildGatewayLogActorWhere,
+  buildGatewayLogWhereForTeamTenant,
+} from "@/lib/gateway/log-query-scope";
 import {
   clientPageToToolKey,
   clientPageToToolLabel,
@@ -38,20 +42,34 @@ export type PackageUsageRow = {
 /** 平台代付：本月按七类消耗（次数 + 积分，无含次额度）。 */
 export async function getAccountPlatformCategoryUsageRows(
   bookUserId: string,
+  billingOwner?: AccountRef,
 ): Promise<PackageUsageRow[]> {
   const since = monthStartUtc();
   const periodKey = currentPeriodKey();
+  const isTeamPool =
+    billingOwner?.ownerType === "TENANT" && billingOwner.ownerId;
 
   const [logs, settlements] = await Promise.all([
     prisma.gatewayRequestLog.findMany({
-      where: buildGatewayLogActorWhere(bookUserId, {
-        submittedFrom: since,
-        statuses: ["SUCCEEDED", "FAILED"],
-      }),
+      where: isTeamPool
+        ? await buildGatewayLogWhereForTeamTenant(billingOwner!.ownerId, {
+            submittedFrom: since,
+            statuses: ["SUCCEEDED", "FAILED"],
+          })
+        : buildGatewayLogActorWhere(bookUserId, {
+            submittedFrom: since,
+            statuses: ["SUCCEEDED", "FAILED"],
+          }),
       select: { requestKind: true, status: true, inputSummary: true },
     }),
     prisma.billingSettlementLine.findMany({
-      where: { actorBookUserId: bookUserId, periodKey },
+      where: isTeamPool
+        ? {
+            ownerType: "TENANT",
+            ownerId: billingOwner!.ownerId,
+            periodKey,
+          }
+        : { actorBookUserId: bookUserId, periodKey },
       select: { billingCategory: true, creditsCharged: true },
     }),
   ]);
@@ -91,8 +109,12 @@ export async function getAccountPlatformCategoryUsageRows(
 }
 
 /** 个人中心概览：本月积分（区分轻量包加购 vs 套餐月发）+ 调用统计。 */
-export async function getAccountUsageSummary(bookUserId: string) {
-  const ref = { ownerType: "USER" as const, ownerId: bookUserId };
+export async function getAccountUsageSummary(
+  bookUserId: string,
+  billingOwner?: AccountRef,
+) {
+  const ref = billingOwner ?? { ownerType: "USER" as const, ownerId: bookUserId };
+  const isTeamPool = ref.ownerType === "TENANT";
   const since = monthStartUtc();
 
   const account = await prisma.creditAccount.findUnique({
@@ -135,12 +157,19 @@ export async function getAccountUsageSummary(bookUserId: string) {
           _sum: { credits: true },
         })
       : Promise.resolve({ _sum: { credits: 0 } }),
-    prisma.gatewayRequestLog.count({
-      where: buildGatewayLogActorWhere(bookUserId, {
-        status: "SUCCEEDED",
-        submittedFrom: since,
-      }),
-    }),
+    isTeamPool
+      ? prisma.gatewayRequestLog.count({
+          where: await buildGatewayLogWhereForTeamTenant(ref.ownerId, {
+            status: "SUCCEEDED",
+            submittedFrom: since,
+          }),
+        })
+      : prisma.gatewayRequestLog.count({
+          where: buildGatewayLogActorWhere(bookUserId, {
+            status: "SUCCEEDED",
+            submittedFrom: since,
+          }),
+        }),
   ]);
 
   const topupRaw = Math.max(0, topupAgg._sum.credits ?? 0);
