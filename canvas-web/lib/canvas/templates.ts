@@ -33,7 +33,7 @@ import {
   PRO2_TEXT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import {
-  SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+  SBV1_VIDEO_ENGINE_HEIGHT,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
 import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
@@ -514,10 +514,10 @@ const SBV1_PIPELINE: CanvasGraph = {
       type: "sbv1-video-engine",
       position: { x: 280, y: 160 },
       width: SBV1_VIDEO_ENGINE_WIDTH,
-      height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+      height: SBV1_VIDEO_ENGINE_HEIGHT,
       style: {
         width: SBV1_VIDEO_ENGINE_WIDTH,
-        height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+        height: SBV1_VIDEO_ENGINE_HEIGHT,
       },
       data: { ...SBV1_DEFAULT_VIDEO_ENGINE_DATA },
     },

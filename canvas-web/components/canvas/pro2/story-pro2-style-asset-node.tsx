@@ -15,7 +15,7 @@ import {
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
-  PRO2_CARD_SHELL_CLASS,
+  PRO2_STYLE_ASSET_CARD_SHELL_CLASS,
   PRO2_IMAGE_NODE_MIN_HEIGHT,
   PRO2_IMAGE_NODE_MIN_WIDTH,
   PRO2_IMAGE_NODE_WIDTH,
@@ -152,7 +152,7 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
 
         <div
           className={cn(
-            PRO2_CARD_SHELL_CLASS,
+            PRO2_STYLE_ASSET_CARD_SHELL_CLASS,
             "relative flex h-full min-h-0 flex-col overflow-hidden",
           )}
           style={{ borderColor: pro2NodeBorderColor(!!selected) }}

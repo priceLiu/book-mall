@@ -241,7 +241,7 @@ export function ByokClient() {
       <header>
         <h1 className="text-lg font-medium text-[#262626]">BYOK 定价与核算</h1>
         <p className="mt-1 text-sm text-[#595959]">
-          自带 Key 仅两档：<strong>个人 ¥39/月</strong>、<strong>团队 ¥29/席/月（3 席起）</strong>。
+          自带 Key 仅两档：<strong>个人 ¥69/月</strong>、<strong>团队 ¥49/席/月（3 席起）</strong>。
           套餐内含任务额度，超出后从<strong>轻量包</strong>（{data.standards.lightPack.credits} 积分 /{" "}
           {yuan(data.standards.lightPack.priceYuan)}）按次扣固定积分。
         </p>

@@ -13,6 +13,7 @@ import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { pro2DockRefImageCatalog } from "@/lib/canvas/pro2-dock-ref-catalog";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
+import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import type {
   StoryPro2ImageNodeData,
   StoryProFrameRow,
@@ -106,6 +107,14 @@ export function Pro2ImageInputDock() {
     () => dockActiveRefIdsFromPrompt(dockInput),
     [dockInput],
   );
+
+  usePruneStaleDockMentions({
+    nodeId: storeNode?.id ?? null,
+    prompt: dockInput,
+    mentionables,
+    field: "dockInput",
+    updateNodeData,
+  });
 
   const syncFrameRowPrompt = useCallback(
     (value: string) => {

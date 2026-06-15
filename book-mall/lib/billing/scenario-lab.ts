@@ -9,14 +9,14 @@ export const SCENARIO_LAB_MARGIN_MAX = 0.751;
 const PERSONAL_ADVANCED = {
   scenarioKey: "personal-advanced-month",
   scenarioLabel: "个人高级版（月付）",
-  priceYuan: 199,
+  priceYuan: 299,
   monthlyCredits: 6500,
 };
 
 const TEAM_ADVANCED_4_SEATS = {
   scenarioKey: "team-advanced-4-seats",
   scenarioLabel: "团队高级版（4 席）",
-  priceYuan: 189,
+  priceYuan: 289,
   monthlyCredits: 5000,
   seats: 4,
 };

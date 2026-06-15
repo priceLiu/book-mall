@@ -194,7 +194,7 @@ export default async function AccountByokPage({
               <Link href="/account/team" className={textLink}>
                 创建团队
               </Link>
-              ，由主账号为团队单独开通（¥29/席/月，3 席起）；个人 ¥39/月 套餐可继续保留至到期。
+              ，由主账号为团队单独开通（¥49/席/月，3 席起）；个人 ¥69/月 套餐可继续保留至到期。
             </p>
             {teamSubs.length === 0 ? (
               <p className="text-muted-foreground">

@@ -1,10 +1,16 @@
 "use client";
 
-import { NodeResizer } from "@xyflow/react";
+import { NodeResizeControl } from "@xyflow/react";
 import {
   PRO2_NODE_RESIZER_HANDLE,
-  PRO2_NODE_RESIZER_LINE,
 } from "@/lib/canvas/story-pro2-node-chrome";
+
+const HANDLE_POSITIONS = [
+  "top-left",
+  "top-right",
+  "bottom-left",
+  "bottom-right",
+] as const;
 
 export type Pro2NodeResizerProps = {
   isVisible?: boolean;
@@ -12,21 +18,26 @@ export type Pro2NodeResizerProps = {
   minHeight: number;
 };
 
-/** 2.0 节点拉伸：无外框线，角点把手见 globals.css `.pro2-node-resizer-handle` */
+/** 2.0 节点拉伸：仅四角把手（不渲染边线，避免误触只能改高/宽的单向缩放） */
 export function Pro2NodeResizer({
   isVisible,
   minWidth,
   minHeight,
 }: Pro2NodeResizerProps) {
+  if (!isVisible) return null;
   return (
-    <NodeResizer
-      isVisible={isVisible}
-      minWidth={minWidth}
-      minHeight={minHeight}
-      color="transparent"
-      lineStyle={PRO2_NODE_RESIZER_LINE}
-      handleClassName="pro2-node-resizer-handle"
-      handleStyle={PRO2_NODE_RESIZER_HANDLE}
-    />
+    <>
+      {HANDLE_POSITIONS.map((position) => (
+        <NodeResizeControl
+          key={position}
+          position={position}
+          minWidth={minWidth}
+          minHeight={minHeight}
+          color="transparent"
+          className="pro2-node-resizer-handle"
+          style={PRO2_NODE_RESIZER_HANDLE}
+        />
+      ))}
+    </>
   );
 }

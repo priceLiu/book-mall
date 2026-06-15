@@ -117,6 +117,7 @@ function finalizeHydratedGraph(
   };
 }
 import { validateStoryPipelineDeletion } from "./story-pipeline-delete-guard";
+import { pruneMentionsAfterNodeRemoval } from "./strip-dock-mentions";
 import { reconcileStoryWorkspaceEdges } from "./spawn-story-workspace";
 import { hasStoryComicColumnGroups } from "./story-comic-groups";
 import {
@@ -627,7 +628,8 @@ export const useCanvasStore = create<CanvasState>()(
           type,
           position,
           data: initialData,
-          // 给 NodeResizer 提供初始 width / height；用户拖角调整后会被 React Flow 覆盖
+          width: size.width,
+          height: size.height,
           style: { width: size.width, height: size.height },
         };
         set((state) =>
@@ -660,6 +662,8 @@ export const useCanvasStore = create<CanvasState>()(
           parentId: groupId,
           extent: "parent",
           data: initialData,
+          width: size.width,
+          height: size.height,
           style: { width: size.width, height: size.height },
         };
         set((state) =>
@@ -768,11 +772,12 @@ export const useCanvasStore = create<CanvasState>()(
         }
         const edges = get().edges.filter((e) => e.source !== id && e.target !== id);
         const filtered = get().nodes.filter((n) => n.id !== id);
-        const nodes = filtered.some((n) =>
+        const pruned = pruneMentionsAfterNodeRemoval(filtered, id);
+        const nodes = pruned.some((n) =>
           String(n.type ?? "").startsWith("story-pro2-"),
         )
-          ? reconcileStoryPro2Workspace(filtered)
-          : reconcileStoryProWorkspace(filtered);
+          ? reconcileStoryPro2Workspace(pruned)
+          : reconcileStoryProWorkspace(pruned);
         set((state) => withGraphRevision(state, { nodes, edges }));
       },
 

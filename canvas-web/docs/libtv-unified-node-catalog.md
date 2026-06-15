@@ -24,7 +24,7 @@
 | 能力 | 唯一实现 |
 | --- | --- |
 | 整卡拖动 | `LIBTV_DRAG_ANYWHERE_NODE_TYPES` · 无 `dragHandle` · `ensureNodeDragHandles` |
-| 壳层 | `LIBTV_NODE_OUTER` → `LIBTV_CARD_SHELL` + `LIBTV_CARD_DRAG` |
+| 壳层 | `LIBTV_NODE_OUTER` → 背景分流见 §1.3 + `LIBTV_CARD_DRAG` |
 | 侧 `+` | `Pro2NodeSidePlus`（单击菜单 · 按住拖线 · 6px 阈值） |
 | 有图顶栏 | `Pro2ImageNodeToolbar` · `passNodeDrag` · `PRO2_IMAGE_NODE_TOOLBAR_*` |
 | 空态 / 错误 | `Pro2MediaNodeEmptyState` / `Pro2MediaNodeErrorState` · **空态须 `passNodeDrag`** |
@@ -37,11 +37,55 @@
 | 组件 | `Pro2ImageNodeToolbar` · 常量 `PRO2_IMAGE_NODE_TOOLBAR_*`（`pro2-image-node-toolbar.tsx`） |
 | 适用 | 有图媒体节点：`story-pro2-image` · `story-pro2-three-view` · `sbv1-image` |
 | 组顶栏 | `Pro2MediaGroupToolbarPanel` · **复用同一套** `PRO2_IMAGE_NODE_TOOLBAR_*` 壳层 |
+| 框选打组顶栏 | `Pro2SelectionToolbar` · **同左**（Pro2 画布 · ≥2 散节点） |
 | 位置 | 卡片上方居中 · `top: -PRO2_IMAGE_NODE_TOOLBAR_OFFSET_TOP_PX`（60px） |
 | 拖动 | **须** `passNodeDrag`（空白区可拖节点 · 按钮 `nodrag`） |
 | 禁止 | 自写第二套顶栏 · 组/media 节点外置 `RF_NODE_DRAG_HANDLE` 标题栏 |
 
-未来「保存为资产」等能力 **只扩展** 本工具条 / 组顶栏，不得新建样式分叉（见 `docs/项目产资产.md`）。
+未来「保存为资产」等能力 **只扩展** 本工具条 / 组顶栏 / 框选工具条，不得新建样式分叉（见 `docs/项目产资产.md`）。
+
+### 1.3 节点卡片背景（Pro2 · sbv1）
+
+> **真源**：`lib/canvas/libtv-node-chrome.ts` · `app/globals.css` · Pro2 薄卡 alias `story-pro2-node-chrome.ts`  
+> 背景色 **必须** 用 CSS 类（`.libtv-media-node-bg` / `.libtv-control-node-bg`），**禁止**仅写 Tailwind 任意色于 `lib/` 且未进 `tailwind content`（会不生效）。
+
+| 类别 | 色值 | Token |
+| --- | --- | --- |
+| 媒体（图片 / 视频 / 三视图） | `#262626` | `LIBTV_MEDIA_CARD_SHELL_CLASS` + `LIBTV_MEDIA_STAGE_CLASS` |
+| 控制（文本 / 脚本） | `#141418` | `PRO2_CARD_SHELL_CLASS` · `LIBTV_CONTROL_CARD_SHELL_CLASS` |
+| 2.0 素材 | `#262626` | `PRO2_STYLE_ASSET_CARD_SHELL_CLASS` |
+| 组点阵底 | `#141418` | `PRO2_MEDIA_GROUP_BG` |
+
+| `type` | 背景 |
+| --- | --- |
+| `story-pro2-starter` · `story-pro2-script-hub` | `#141418` |
+| `story-pro2-image` · `story-pro2-three-view` · `story-pro2-style-asset` | `#262626` |
+| `sbv1-image` · `sbv1-video-engine` | `#262626`（`SBV1_*` alias） |
+
+**禁止**：媒体 Stage 单独 `bg-black/40`（会盖住 `#262626`）。
+
+**默认尺寸**（真源 `lib/canvas/libtv-node-chrome.ts` · **Pro2 与 sbv1 须 alias，禁止分叉硬编码**）：
+
+| 节点 / 场景 | 尺寸 | Token |
+| --- | --- | --- |
+| 方形图片媒体（`story-pro2-image` · `story-pro2-style-asset` · **`sbv1-image`**） | **350 × 350** | `LIBTV_SQUARE_IMAGE_NODE_*` · `PRO2_IMAGE_NODE_*` · `SBV1_IMAGE_NODE_*` |
+| Pro2 分镜视频组格 | **350 × 232** | `LIBTV_VIDEO_MEDIA_NODE_*` · `PRO2_VIDEO_CELL_*` |
+| **`sbv1-video-engine` / 视频合成** | **635 × 365** | `SBV1_VIDEO_ENGINE_*`（宽 stage · 不与组格同尺寸） |
+| 组内分镜图格 | **296 × 196** | `PRO2_FRAME_CELL_*` |
+
+**禁止**：sbv1 图片单独定义与 Pro2 不同的默认尺寸；新节点勿用 `libtvMediaNodeHeightForWidth`（4:3 历史 helper）。
+
+### 1.4 打组 / 组顶栏样式（统一）
+
+| 场景 | 组件 | 壳层 |
+| --- | --- | --- |
+| 框选 ≥2 节点后打组 | `Pro2SelectionToolbar` | `PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS` |
+| 已打组 · 选中组 | `Pro2MediaGroupToolbarPanel` | 同上 |
+| 有图单节点 | `Pro2ImageNodeToolbar` | 同上 |
+
+公共结构：**白点**（`size-2.5 rounded-full bg-white/90`）+ **LayoutGrid** + **分隔线** + `PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS` 文案钮。  
+组顶栏典型项：重新生成* · 重排* · 改名改色 · 批量下载 · 保存为资产 · 解组（*按 edition/kind）。  
+框选工具条：保存到资产 · 创建副本 · 打组（下拉设组名/色，弹层同「改名改色」）。
 
 | 输入坞 | **仅浮动** `Pro2InputDockShell`（560×240）· **禁止内嵌 Dock 占满 stage** |
 | 模型 | `EnginePicker`（`.cursor/rules/pro2-model-picker.mdc`） |
@@ -106,49 +150,52 @@
 
 ### 3.1 `story-pro2-starter` / 文本
 
-- **样式**：LibTV 薄卡 · 紫 ring  
+- **样式**：LibTV 控制卡 `#141418` · 紫 ring · `PRO2_CARD_SHELL_CLASS`  
 - **功能**：大纲/主题/上传剧本 · LLM `EnginePicker` · 连 hub/图片  
 - **spawn**：`pro2-spawn-nodes` · `selectPro2NodeAfterSpawn`
 
 ### 3.2 `story-pro2-script-hub` / 分镜脚本
 
-- **样式**：LibTV 薄卡 + 预览 stage  
+- **样式**：LibTV 控制卡 `#141418` + 预览 stage  
 - **功能**：分镜表/角色表 · 生成三视图板/分镜图板 · 表编辑 Modal  
 - **Dock**：LLM · 表级操作
 
 ### 3.3 `story-pro2-image` / 图片
 
-- **样式**：LibTV 媒体卡 · 与 sbv1-image 同构  
+- **样式**：LibTV 媒体卡 `#262626` · 与 sbv1-image 同构 · Stage 用 `LIBTV_MEDIA_STAGE_CLASS`  
 - **功能**：生图/上传 · `@` 上游 · 风格库 · 组内 relayout 不覆盖用户排列  
 - **模型**：`EnginePicker role="IMAGE"`
 
 ### 3.4 `story-pro2-three-view` / 三视图
 
-- **样式**：同 §3.3  
+- **样式**：同 §3.3 · `#262626`  
 - **功能**：单角色三视图 · 角色板批量 · 禁止内嵌 Dock  
 - **模型**：三视图白名单
 
-### 3.5 `story-pro2-style-asset` / 风格
+### 3.5 `story-pro2-style-asset` / 风格素材
 
-- **样式**：LibTV 薄卡 + 缩略图  
+- **样式**：`PRO2_STYLE_ASSET_CARD_SHELL_CLASS` · `#262626` + 缩略图  
 - **功能**：风格库引用 · 右 `+` 连文本/图片 · 无 Dock
 
 ### 3.6 `sbv1-image` / 图片
 
-- **样式**：LibTV 媒体卡 · cyan ring · **须** `Pro2ImageNodeToolbar`（有图）  
+- **样式**：LibTV 媒体卡 `#262626` · cyan ring · **须** `Pro2ImageNodeToolbar`（有图）  
+- **尺寸**：**350 × 350**（与 `story-pro2-image` 同 · `LIBTV_SQUARE_IMAGE_NODE_*`）  
 - **功能**：上传/粘贴 · `@` · 风格库 · 连视频合成 `in_ref`  
 - **spawn**：`sbv1-spawn-nodes` · 组内右槽 `spawnSbv1VideoEngineFromGroup`
 
 ### 3.7 `sbv1-video-engine` / 视频合成
 
-- **样式**：LibTV 媒体卡 · 宽 stage · cyan ring  
+- **样式**：LibTV 媒体卡 `#262626` · cyan ring · `SBV1_MEDIA_STAGE_CLASS`  
+- **尺寸**：**635 × 365**（`SBV1_VIDEO_ENGINE_*` · 宽 stage · 与 Pro2 分镜视频组格 **不同**）  
 - **功能**：prompt + 参考图 · 火山 Seedance · 生成/预览 · 串联下一视频合成  
 - **Dock**：`Sbv1VideoEngineFloatingDock`（节点外 · 全部 nodrag）
 
 ### 3.8 `group` / 媒体组
 
-- **样式**：点阵底 · 组标题钮 · `LIBTV_CARD_DRAG` · Pro2 Resizer 样式  
+- **样式**：点阵底 `#141418` · 组标题钮 · `LIBTV_CARD_DRAG` · Pro2 Resizer 样式  
 - **功能**：打组/解组 · 改名改色 · 批量下载 · relayout · zIndex 选中置顶  
+- **顶栏**：`Pro2MediaGroupToolbarPanel`；框选打组前 → `Pro2SelectionToolbar`（**同壳层**）  
 - **sbv1 布局**：左参考图宫格 + 右单视频槽 · 组外串联视频
 
 ---
@@ -160,20 +207,21 @@
 | 自动保存 | 5 / 15 / 30 分钟 + 1.5s debounce · `canvas-autosave-settings.ts` |
 | 我的历史 | 每项目 15 条 · PATCH 写库 · `canvas:history-updated` |
 | 沉浸顶栏 | Pro2/sbv1 全屏 · 鼠标顶缘唤出 |
-| 框选工具条 | `Pro2SelectionToolbar` / `SelectionToolbar` |
+| 框选工具条 | `Pro2SelectionToolbar`（Pro2 · 与组顶栏同壳层）/ `SelectionToolbar`（通用） |
 
 ---
 
 ## 5. Code Review（新节点准入）
 
 - [ ] 已登记 `LIBTV_DRAG_ANYWHERE_NODE_TYPES`（若整卡可拖）
-- [ ] 壳层 `LIBTV_*` · 未用外置 `dragHandle` / 旧 `PRO2_MEDIA_CARD_SHELL`
+- [ ] 壳层 `LIBTV_*` · 背景 `#262626`（媒体）/ `#141418`（控制）· 未用外置 `dragHandle` / 旧 `PRO2_MEDIA_CARD_SHELL`
+- [ ] 框选工具条 / 组顶栏共用 `PRO2_IMAGE_NODE_TOOLBAR_*`
 - [ ] 侧 `+` → `Pro2NodeSidePlus` · spawn 后 `select*AfterSpawn` + `sortNodesForReactFlow`
 - [ ] 媒体节点：**无**内嵌 Dock · 空态 `passNodeDrag` · 有图顶栏 `passNodeDrag`
 - [ ] 组 → `Pro2MediaGroupToolbarPanel` · 点阵底 · 单视频槽（sbv1）
 - [ ] 模型 → `EnginePicker` · 无裸 `<select>` 模型列表
 - [ ] 对话框 → `useDialogs()` · 删除 → `doubleConfirm`
-- [ ] 未新建第二套 Dock / 工具条 / 组顶栏组件
+- [ ] 默认尺寸：图片 `LIBTV_SQUARE_IMAGE_NODE_*`（sbv1 与 Pro2 同值）· 视频合成 `SBV1_VIDEO_ENGINE_*`（635×365）
 
 ---
 

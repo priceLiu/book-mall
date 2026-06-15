@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import {
   Background,
-  MiniMap,
   PanOnScrollMode,
   ReactFlow,
   ReactFlowProvider,
@@ -56,6 +55,7 @@ import {
   routeClipboardImageToActivePasteSlot,
 } from "@/lib/canvas/image-upload-handlers";
 import { memoizedNodeTypes } from "./memoized-node-types";
+import { CanvasViewportToolbar } from "./canvas-viewport-toolbar";
 import { SelectionToolbar } from "./selection-toolbar";
 import { Pro2FloatingInspector } from "./pro2/pro2-floating-inspector";
 import { Pro2FrameCellInputDock } from "./pro2/pro2-frame-cell-input-dock";
@@ -596,7 +596,6 @@ function FlowCanvasInner({
   }, [rfEdges, focusEdgeIds]);
 
   const onlyRenderVisible = forceOnlyRenderVisible || rfNodes.length >= 12;
-  const showMiniMap = rfNodes.length <= 48;
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1006,15 +1005,10 @@ function FlowCanvasInner({
         {enableDragSnapGuides ? (
           <CanvasSnapGuidesOverlay guides={snapGuides} />
         ) : null}
-        {showMiniMap ? (
-          <MiniMap
-            pannable
-            zoomable
-            nodeColor={() => "rgba(167,139,250,0.6)"}
-            maskColor="rgba(11,11,20,0.8)"
-            className="!bg-[var(--canvas-surface)] !border !border-white/10 !rounded-md"
-          />
-        ) : null}
+        <CanvasViewportToolbar
+          pro2Canvas={pro2FloatingInspector}
+          sbv1Canvas={sbv1Canvas}
+        />
         {pro2FloatingInspector ? (
           <>
             <Pro2SelectionToolbar rfNodes={rfNodes} />

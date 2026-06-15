@@ -1,7 +1,7 @@
 /**
  * BYOK 定价标准（财务 2.0）
  *
- * 两档月费：个人 ¥39/月；团队 ¥29/席/月（3 席起）。
+ * 两档月费：个人 ¥69/月；团队 ¥49/席/月（3 席起）。
  * 套餐内含月度任务额度；超出后从轻量包（通用积分池）按次扣固定积分。
  *
  * 计费类别 taxonomy 见 docs/定价与风控.md §7.1
@@ -221,14 +221,14 @@ export const DEFAULT_BYOK_CONFIGS = [
   {
     scopeKey: BYOK_SCOPE_PERSONAL,
     label: "个人 BYOK",
-    techServiceFeeYuan: 39,
+    techServiceFeeYuan: 69,
     minSeats: null as number | null,
     note: "已有厂商 Key；模型费自理，平台收技术服务费 + 套餐内额度",
   },
   {
     scopeKey: BYOK_SCOPE_TEAM_SEAT,
     label: "团队 BYOK（每席位）",
-    techServiceFeeYuan: 29,
+    techServiceFeeYuan: 49,
     minSeats: BYOK_TEAM_MIN_SEATS,
     note: `${BYOK_TEAM_MIN_SEATS} 席起订；每席独立额度，团队共享轻量包余额`,
   },

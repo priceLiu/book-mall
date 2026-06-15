@@ -28,6 +28,28 @@
 | 次要字 | `text-white/55`（仅浮动检视/助手内长文，**不出现在薄卡**） |
 | 禁用 | 1.0 青 `cyan-*`、漫剧橙、助手绿 `emerald-*` |
 
+### 2.1 LibTV 节点卡片背景（Pro2 · sbv1 共用）
+
+> **真源**：`lib/canvas/libtv-node-chrome.ts` · CSS 类 `app/globals.css`（`.libtv-media-node-bg` / `.libtv-control-node-bg`）  
+> **禁止**在组件内硬编码 `bg-black/40` 或 Tailwind 任意色覆盖 Stage；背景须走 token。
+
+| 节点类别 | 背景色 | CSS 变量 | Token / class |
+| --- | --- | --- | --- |
+| **媒体**（图片 / 视频 / 三视图） | `#262626` | `--libtv-media-node-bg` | `LIBTV_MEDIA_CARD_SHELL_CLASS` · `LIBTV_MEDIA_STAGE_CLASS` · `.libtv-media-node-bg` |
+| **控制**（文本 / 脚本 / 列摘要薄卡） | `#141418` | `--libtv-control-node-bg` | `PRO2_CARD_SHELL_CLASS` · `LIBTV_CONTROL_CARD_SHELL_CLASS` · `.libtv-control-node-bg` |
+| **2.0 素材**（`story-pro2-style-asset`） | `#262626` | 同上媒体 | `PRO2_STYLE_ASSET_CARD_SHELL_CLASS` |
+| **媒体组框底**（点阵） | `#141418` | — | `PRO2_MEDIA_GROUP_BG`（仅组容器，非单节点卡片） |
+
+| Pro2 `type` | 背景 |
+| --- | --- |
+| `story-pro2-starter` | `#141418` |
+| `story-pro2-script-hub` | `#141418` |
+| `story-pro2-image` · `story-pro2-three-view` | `#262626`（壳 + Stage 同色） |
+| `story-pro2-style-asset` | `#262626` |
+| `sbv1-image` · `sbv1-video-engine` | `#262626`（经 `SBV1_CARD_SHELL_CLASS` / `SBV1_MEDIA_STAGE_CLASS`） |
+
+**Stage 规则**：媒体节点预览区 **必须** 使用 `LIBTV_MEDIA_STAGE_CLASS`，不得单独 `bg-black/40`（否则会盖住壳层色、与规范不符）。
+
 ---
 
 ## 3. 薄卡片（画布节点）
@@ -83,7 +105,7 @@
 | 规则 | 说明 |
 | --- | --- |
 | 类型 | `story-pro2-starter` / `story-pro2-image` / `story-pro2-script-hub` / `story-pro2-three-view` / `story-pro2-frame` / `story-pro2-style-asset`（登记见 `LIBTV_DRAG_ANYWHERE_NODE_TYPES`） |
-| 壳层 | **内嵌标题** + `LIBTV_CARD_SHELL_CLASS` + `LIBTV_CARD_DRAG_CLASS`（与 `sbv1-image` / `sbv1-video-engine` 同结构） |
+| 壳层 | **内嵌标题** + 见 §2.1 背景分流：`LIBTV_MEDIA_*`（媒体）或 `PRO2_CARD_SHELL_CLASS` / `LIBTV_CONTROL_*`（文本/脚本） + `LIBTV_CARD_DRAG_CLASS` |
 | 拖动 | **不设** `dragHandle`；Header 与 Stage 空白区均可拖动 |
 | 例外 | 按钮、输入、Dock、Eye 预览钮标记 `nodrag` / `nowheel` |
 | 排列持久化 | 松手 `commitFlowNodePositions` + 立即 `canvas:flush-autosave`；禁止 refresh 后 reflow 覆盖（见 `libtv-node-interaction-spec.md` §2.2） |
@@ -118,6 +140,8 @@
 ### 7.4 节点顶栏工具条
 
 有图且唯一选中时，**必须**使用 `Pro2ImageNodeToolbar`（`passNodeDrag`），样式见 [`libtv-node-interaction-spec.md`](./libtv-node-interaction-spec.md) §5。禁止自写顶栏或改壳层色值/圆角。
+
+**框选打组工具条**（≥2 散节点 · `Pro2SelectionToolbar`）与 **媒体组顶栏**（`Pro2MediaGroupToolbarPanel`）须 **同一套** `PRO2_IMAGE_NODE_TOOLBAR_*` 壳层：白点 + `LayoutGrid` + 分隔线 + 文案按钮；禁止自写 `rounded-xl bg-[#1c1c1e]` 分叉。打组下拉（组名 / 边框色）与组内「改名改色」弹层样式一致。
 
 ### 7.5 输入坞（Dock）
 
@@ -179,7 +203,9 @@
 - [ ] 侧 `+` 走 `Pro2NodeSidePlus`（单击菜单 + 拖线）  
 - [ ] `+` 生成节点可拖且自动选中  
 - [ ] 有图图片节点顶栏 `passNodeDrag`、Dock 隐藏  
-- [ ] LibTV 壳层走 `LIBTV_*` token，与 sbv1 共用组件（见 `libtv-node-interaction-spec.md`）
+- [ ] LibTV 壳层走 `LIBTV_*` token，与 sbv1 共用组件（见 `libtv-node-interaction-spec.md`）  
+- [ ] 媒体节点背景 `#262626`、文本/脚本 `#141418`；Stage 无 `bg-black/40` 覆盖  
+- [ ] 框选工具条与组顶栏共用 `PRO2_IMAGE_NODE_TOOLBAR_*`
 
 ---
 
@@ -192,11 +218,11 @@
 
 | 节点 | `type` | 壳层 | 拖动 | 侧 `+` | 输入 Dock | 顶栏工具条 | 主要文件 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **文本** | `story-pro2-starter` | LibTV 薄卡 + 标题栏 | 整卡（无 `dragHandle`） | 左/右 · 选中 | `Pro2StarterInputDock` · 浮动 | 无 | `story-pro2-starter-node.tsx` |
-| **分镜脚本** | `story-pro2-script-hub` | LibTV 薄卡 + 预览区 | 整卡 | 左/右 · 选中 | `Pro2ScriptInputDock` · 浮动 | `Pro2ScriptHubToolbar`（卡片内） | `story-pro2-script-hub-node.tsx` |
-| **图片** | `story-pro2-image` | LibTV 媒体卡 | 整卡 | 左/右 · 选中 | 空态内嵌或 `Pro2ImageInputDock` | 有图 → `Pro2ImageNodeToolbar` | `story-pro2-image-node.tsx` |
-| **三视图** | `story-pro2-three-view` | **同图片** LibTV 媒体卡 | 整卡 | 左/右 · 选中 | **仅** `Pro2ThreeViewInputDock` 浮动 | 有图 → `Pro2ImageNodeToolbar` | `story-pro2-three-view-node.tsx` |
-| **风格** | `story-pro2-style-asset` | LibTV 薄卡 + 缩略图 | 整卡 | 右 · 选中 | **无** | 无 | `story-pro2-style-asset-node.tsx` |
+| **文本** | `story-pro2-starter` | LibTV 控制卡 `#141418` + 标题栏 | 整卡（无 `dragHandle`） | 左/右 · 选中 | `Pro2StarterInputDock` · 浮动 | 无 | `story-pro2-starter-node.tsx` |
+| **分镜脚本** | `story-pro2-script-hub` | LibTV 控制卡 `#141418` + 预览区 | 整卡 | 左/右 · 选中 | `Pro2ScriptInputDock` · 浮动 | `Pro2ScriptHubToolbar`（卡片内） | `story-pro2-script-hub-node.tsx` |
+| **图片** | `story-pro2-image` | LibTV 媒体卡 `#262626` | 整卡 | 左/右 · 选中 | 空态内嵌或 `Pro2ImageInputDock` | 有图 → `Pro2ImageNodeToolbar` | `story-pro2-image-node.tsx` |
+| **三视图** | `story-pro2-three-view` | **同图片** LibTV 媒体卡 `#262626` | 整卡 | 左/右 · 选中 | **仅** `Pro2ThreeViewInputDock` 浮动 | 有图 → `Pro2ImageNodeToolbar` | `story-pro2-three-view-node.tsx` |
+| **风格素材** | `story-pro2-style-asset` | 媒体色 `#262626` + 缩略图 | 整卡 | 右 · 选中 | **无** | 无 | `story-pro2-style-asset-node.tsx` |
 | **分组** | `group` · `pro2Kind` | Pro2 媒体组框 / 点阵底 | 整卡（`LIBTV_CARD_DRAG_CLASS`） | 左/右 · 选中组 | 无 | `Pro2MediaGroupToolbarPanel` | `group-node.tsx` |
 
 ### 9.2 文本节点 · `story-pro2-starter`
@@ -226,6 +252,7 @@
 | 项 | 规范 |
 | --- | --- |
 | 职责 | 通用生图 / 分镜图（`pro2MediaRole: frame`）/ 组内占位 |
+| 默认尺寸 | **350 × 350**（`PRO2_IMAGE_NODE_*`） |
 | 壳层 | `LIBTV_NODE_OUTER` → Header + Stage；`MediaHoverBox` 有图预览 |
 | 空态 | 非 character-three-view：浮动 Dock + `passNodeDrag` 空态 |
 | 有图 | 隐藏 Dock；顶栏 `Pro2ImageNodeToolbar` · `passNodeDrag` |
@@ -260,7 +287,9 @@
 | 外观 | 暗色点阵底 `PRO2_MEDIA_GROUP_*` · 用户选色仅影响边框 |
 | 拖动 | 组框 `LIBTV_CARD_DRAG_CLASS` · 无 `dragHandle`；子节点 zIndex 1201 / 组 1200 |
 | 顶栏 | 组标题按钮选中组；选中组 → `Pro2MediaGroupToolbar` + `Pro2MediaGroupToolbarPanel` |
+| 框选打组 | ≥2 散节点 → `Pro2SelectionToolbar`（**壳层同组顶栏** · 保存到资产 / 创建副本 / 打组） |
 | 布局 | `pro2-media-group-layout` · `layoutVersion` 迁移；relayout **保留**组 position |
+| 宫格单元 | 分镜图 **`296×196`**（`PRO2_FRAME_CELL_*`）· 分镜视频 **`350×232`**（`PRO2_VIDEO_CELL_*`）；列数按镜数自动推导 |
 | 子节点 | `story-pro2-three-view` · `story-pro2-image`；组内隐藏单格 `Pro2NodeResizer` |
 
 ### 9.8 画布级能力（已定稿）
@@ -283,8 +312,8 @@
 
 | 节点 | 与 Pro2 共用 | sbv1 专有 |
 | --- | --- | --- |
-| `sbv1-image` | LibTV 媒体壳 · 侧 `+` · 顶栏 · 浮动 Dock · `passNodeDrag` | cyan ring · 连视频合成 · sbv1 spawn |
-| `sbv1-video-engine` | LibTV 媒体壳 · 侧 `+` · 拖动规则 | 视频合成 Dock · Seedance 生成 |
+| `sbv1-image` | LibTV 媒体壳 · 侧 `+` · 顶栏 · 浮动 Dock · `passNodeDrag` · **350×350** | cyan ring · 连视频合成 · sbv1 spawn |
+| `sbv1-video-engine` | LibTV 媒体壳 · 侧 `+` · 拖动规则 · **635×365** | 视频合成 Dock · Seedance 生成 |
 | `group` sbv1Styled | 点阵组框 · `Pro2MediaGroupToolbarPanel` | 参考图宫格 + 右视频槽 · 重排 |
 
 ---

@@ -3,9 +3,47 @@
  * 整卡拖动、侧 +、Dock、顶栏工具条须与此一致。
  */
 
+/** 内层卡片（非媒体 · 文本 / 脚本 / 薄卡等） */
+export const LIBTV_CONTROL_CARD_BG = "#141418";
+export const LIBTV_CONTROL_CARD_SHELL_CLASS =
+  "libtv-control-node-bg flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 shadow-lg";
+
 /** 内层卡片（挂在外层 overflow-visible 容器上，避免 + 被裁切） */
-export const LIBTV_CARD_SHELL_CLASS =
-  "flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141418] shadow-lg";
+export const LIBTV_CARD_SHELL_CLASS = LIBTV_CONTROL_CARD_SHELL_CLASS;
+
+/** 媒体节点卡片（图片 / 视频 / 三视图） */
+export const LIBTV_MEDIA_CARD_BG = "#262626";
+export const LIBTV_MEDIA_CARD_SHELL_CLASS =
+  "libtv-media-node-bg flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 shadow-lg";
+
+/** 媒体节点预览区（与卡片同色） */
+export const LIBTV_MEDIA_STAGE_CLASS =
+  "libtv-media-node-bg relative min-h-0 flex-1 overflow-hidden";
+
+/** LibTV 媒体卡内标题栏（icon + 标题 + border-b）占用高度（px） */
+export const LIBTV_MEDIA_NODE_HEADER_HEIGHT = 36;
+
+/**
+ * LibTV 方形图片媒体卡默认尺寸（Pro2 图片/风格 · sbv1 图片 · 须一致）
+ * 真源：`docs/libtv-unified-node-catalog.md` §1.3
+ */
+export const LIBTV_SQUARE_IMAGE_NODE_WIDTH = 350;
+export const LIBTV_SQUARE_IMAGE_NODE_HEIGHT = 350;
+export const LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH = 220;
+export const LIBTV_SQUARE_IMAGE_NODE_MIN_HEIGHT = 220;
+
+/**
+ * LibTV 横版视频媒体卡（Pro2 分镜视频组格 · sbv1 视频合成 · ≈3:2）
+ */
+export const LIBTV_VIDEO_MEDIA_NODE_WIDTH = 350;
+export const LIBTV_VIDEO_MEDIA_NODE_HEIGHT = 232;
+export const LIBTV_VIDEO_MEDIA_NODE_MIN_WIDTH = 260;
+export const LIBTV_VIDEO_MEDIA_NODE_MIN_HEIGHT = 172;
+
+/** 给定卡片宽度，预览区按 4:3（宽:高）计算整卡默认高度（历史 helper · 新节点勿用） */
+export function libtvMediaNodeHeightForWidth(width: number): number {
+  return LIBTV_MEDIA_NODE_HEADER_HEIGHT + Math.round((width * 3) / 4);
+}
 
 /** 整卡拖动光标（须配合无 dragHandle 节点） */
 export const LIBTV_CARD_DRAG_CLASS = "cursor-grab active:cursor-grabbing";

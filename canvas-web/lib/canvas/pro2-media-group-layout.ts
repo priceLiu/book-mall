@@ -1,16 +1,18 @@
 "use client";
 
 import {
+  LIBTV_VIDEO_MEDIA_NODE_HEIGHT,
+  LIBTV_VIDEO_MEDIA_NODE_MIN_HEIGHT,
+  LIBTV_VIDEO_MEDIA_NODE_MIN_WIDTH,
+  LIBTV_VIDEO_MEDIA_NODE_WIDTH,
+} from "./libtv-node-chrome";
+import {
   PRO2_CHARACTER_THREE_VIEW_HEIGHT,
   PRO2_CHARACTER_THREE_VIEW_WIDTH,
   PRO2_IMAGE_NODE_HEIGHT,
   PRO2_IMAGE_NODE_WIDTH,
   PRO2_SCRIPT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
-import {
-  SBV1_IMAGE_NODE_HEIGHT,
-  SBV1_IMAGE_NODE_WIDTH,
-} from "./sbv1-node-chrome";
 import { sortNodesForReactFlow } from "./normalize-graph-nodes";
 import type { CanvasFlowNode } from "./types";
 
@@ -21,9 +23,17 @@ export const PRO2_MEDIA_GROUP_PAD = 52;
 /** 组右 / 下额外空白，进一步扩大可点选组区域（复刻图 2） */
 export const PRO2_MEDIA_GROUP_EXTRA = 44;
 
-/** 分镜图（横向长方形）单元尺寸 */
-export const PRO2_FRAME_CELL_WIDTH = 300;
+/** 分镜图组 · 宫格单元（≈3:2 横版） */
+export const PRO2_FRAME_CELL_WIDTH = 296;
 export const PRO2_FRAME_CELL_HEIGHT = 196;
+export const PRO2_FRAME_CELL_MIN_WIDTH = 220;
+export const PRO2_FRAME_CELL_MIN_HEIGHT = 146;
+
+/** 分镜视频组 · 宫格单元（alias `LIBTV_VIDEO_MEDIA_NODE_*`） */
+export const PRO2_VIDEO_CELL_WIDTH = LIBTV_VIDEO_MEDIA_NODE_WIDTH;
+export const PRO2_VIDEO_CELL_HEIGHT = LIBTV_VIDEO_MEDIA_NODE_HEIGHT;
+export const PRO2_VIDEO_CELL_MIN_WIDTH = LIBTV_VIDEO_MEDIA_NODE_MIN_WIDTH;
+export const PRO2_VIDEO_CELL_MIN_HEIGHT = LIBTV_VIDEO_MEDIA_NODE_MIN_HEIGHT;
 
 /**
  * 宫格列数：按子节点数量推导，偏横向（列 ≥ 行），尽量不竖排。
@@ -38,9 +48,6 @@ export function pro2MediaChildSize(node: {
   type?: string;
   pro2MediaRole?: string;
 }): { width: number; height: number } {
-  if (node.type === "sbv1-image") {
-    return { width: SBV1_IMAGE_NODE_WIDTH, height: SBV1_IMAGE_NODE_HEIGHT };
-  }
   if (
     node.type === "story-pro2-three-view" ||
     node.pro2MediaRole === "character-three-view"
@@ -52,6 +59,9 @@ export function pro2MediaChildSize(node: {
   }
   if (node.pro2MediaRole === "frame") {
     return { width: PRO2_FRAME_CELL_WIDTH, height: PRO2_FRAME_CELL_HEIGHT };
+  }
+  if (node.pro2MediaRole === "video") {
+    return { width: PRO2_VIDEO_CELL_WIDTH, height: PRO2_VIDEO_CELL_HEIGHT };
   }
   return { width: PRO2_IMAGE_NODE_WIDTH, height: PRO2_IMAGE_NODE_HEIGHT };
 }
@@ -147,7 +157,7 @@ function isMediaGroupChildForRelayout(
 }
 
 /** 布局版本：hydrate 仅对更低版本做一次网格迁移，不覆盖已保存坐标 */
-export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 2;
+export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 3;
 
 /** 纯函数：收拢媒体子节点、宫格重排、组框贴合（与 createGroupContaining / group-node 共用） */
 export function applyPro2MediaGroupRelayout(

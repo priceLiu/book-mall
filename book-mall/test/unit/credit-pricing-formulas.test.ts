@@ -11,7 +11,7 @@ import {
 } from "@/lib/pricing/credit-pricing-formulas";
 
 /**
- * 验收基准（docs/财务2.0-验收标准.md §1）：
+ * 验收基准（docs/财务2.0-验收标准.md §1 / docs/价格2.0.md §6）：
  * happyhorse-r2v 15s 视频，净成本 0.81 元/秒 → 成本 12.15，M=4 → 挂牌价 48.6。
  */
 const NET_PER_SEC = 0.81;
@@ -21,12 +21,14 @@ const VIDEO_LIST_YUAN = VIDEO_COST_YUAN * 4; // 48.6
 
 describe("computeTierCredits — 逐档积分换算（验收表 §1.1/§1.2）", () => {
   const cases: { tier: string; price: number; credits: number; expected: number }[] = [
-    { tier: "标准版", price: 39, credits: 1000, expected: 1246 },
-    { tier: "进阶版", price: 99, credits: 3000, expected: 1473 },
-    { tier: "高级版", price: 199, credits: 6500, expected: 1587 },
-    { tier: "豪华版", price: 399, credits: 14000, expected: 1705 },
-    { tier: "至尊版", price: 799, credits: 30000, expected: 1825 },
-    { tier: "团队高级版", price: 189, credits: 5000, expected: 1286 },
+    { tier: "标准版", price: 69, credits: 1000, expected: 704 },
+    { tier: "进阶版", price: 149, credits: 3000, expected: 979 },
+    { tier: "高级版", price: 299, credits: 6500, expected: 1057 },
+    { tier: "豪华版", price: 599, credits: 14000, expected: 1136 },
+    { tier: "至尊版", price: 1199, credits: 30000, expected: 1216 },
+    { tier: "团队高级版", price: 289, credits: 5000, expected: 841 },
+    { tier: "团队豪华版", price: 468, credits: 8000, expected: 831 },
+    { tier: "团队至尊版", price: 799, credits: 15000, expected: 912 },
   ];
 
   for (const c of cases) {

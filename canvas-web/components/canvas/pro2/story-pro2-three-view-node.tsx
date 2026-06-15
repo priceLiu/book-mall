@@ -22,7 +22,8 @@ import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   LIBTV_CARD_DRAG_CLASS,
-  LIBTV_CARD_SHELL_CLASS,
+  LIBTV_MEDIA_CARD_SHELL_CLASS,
+  LIBTV_MEDIA_STAGE_CLASS,
   LIBTV_NODE_HANDLE_CLASS,
   LIBTV_NODE_OUTER_CLASS,
 } from "@/lib/canvas/libtv-node-chrome";
@@ -295,7 +296,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
 
         <div
           className={cn(
-            LIBTV_CARD_SHELL_CLASS,
+            LIBTV_MEDIA_CARD_SHELL_CLASS,
             LIBTV_CARD_DRAG_CLASS,
             "min-h-0 flex-1",
             selected && "ring-1 ring-violet-400/45",
@@ -311,7 +312,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
             ) : null}
           </div>
 
-          <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
+          <div className={LIBTV_MEDIA_STAGE_CLASS}>
             {isGenerating ? (
               <LibtvMediaGeneratingState
                 label={generatingLabel}

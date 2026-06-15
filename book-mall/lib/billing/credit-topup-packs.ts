@@ -17,24 +17,24 @@ export interface CreditTopupPack {
 
 export const CREDIT_TOPUP_PACKS: CreditTopupPack[] = [
   {
-    id: "pack-1k",
-    credits: 1000,
-    priceYuan: 40,
+    id: "pack-light",
+    credits: 1500,
+    priceYuan: 62,
     label: "轻量包",
     pool: "GENERAL",
   },
   {
-    id: "pack-3k",
-    credits: 3000,
-    priceYuan: 108,
+    id: "pack-standard",
+    credits: 4000,
+    priceYuan: 160,
     label: "标准包",
     pool: "GENERAL",
     promo: "省10%",
   },
   {
-    id: "pack-5k",
-    credits: 5000,
-    priceYuan: 170,
+    id: "pack-plus",
+    credits: 8000,
+    priceYuan: 304,
     label: "加量包",
     pool: "GENERAL",
     promo: "省15%",

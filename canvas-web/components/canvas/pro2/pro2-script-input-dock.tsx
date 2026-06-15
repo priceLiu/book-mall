@@ -14,6 +14,7 @@ import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
 import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
+import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import {
@@ -99,6 +100,14 @@ export function Pro2ScriptInputDock() {
     () => dockActiveRefIdsFromPrompt(dockInput),
     [dockInput],
   );
+
+  usePruneStaleDockMentions({
+    nodeId: storeNode?.id ?? null,
+    prompt: dockInput,
+    mentionables,
+    field: "dockInput",
+    updateNodeData,
+  });
 
   const hubRfNode = storeNode
     ? ({
@@ -256,6 +265,10 @@ export function Pro2ScriptInputDock() {
             refs={dockRefImages}
             onChange={(next) =>
               updateNodeData(storeNode.id, { dockRefImages: next })
+            }
+            promptValue={dockInput}
+            onPromptChange={(next) =>
+              updateNodeData(storeNode.id, { dockInput: next })
             }
             disabled={isGenerating}
             pasteActive={false}

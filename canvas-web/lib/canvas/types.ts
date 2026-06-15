@@ -54,7 +54,7 @@ import {
 import {
   SBV1_IMAGE_NODE_HEIGHT,
   SBV1_IMAGE_NODE_WIDTH,
-  SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+  SBV1_VIDEO_ENGINE_HEIGHT,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";
 import {
@@ -927,7 +927,7 @@ export const NODE_DEFAULT_SIZE: Record<
   },
   "sbv1-video-engine": {
     width: SBV1_VIDEO_ENGINE_WIDTH,
-    height: SBV1_VIDEO_ENGINE_MIN_HEIGHT,
+    height: SBV1_VIDEO_ENGINE_HEIGHT,
   },
   "story-pro-starter": {
     width: STORY_CONTROL_NODE_WIDTH,

@@ -17,11 +17,11 @@ const VIDEO_MODEL: ModelCostBasis = {
 };
 
 const TIERS: TierPricing[] = [
-  { tier: "标准版", priceYuan: 39, monthlyCredits: 1000 },
-  { tier: "进阶版", priceYuan: 99, monthlyCredits: 3000 },
-  { tier: "高级版", priceYuan: 199, monthlyCredits: 6500 },
-  { tier: "豪华版", priceYuan: 399, monthlyCredits: 14000 },
-  { tier: "至尊版", priceYuan: 799, monthlyCredits: 30000 },
+  { tier: "标准版", priceYuan: 69, monthlyCredits: 1000 },
+  { tier: "进阶版", priceYuan: 149, monthlyCredits: 3000 },
+  { tier: "高级版", priceYuan: 299, monthlyCredits: 6500 },
+  { tier: "豪华版", priceYuan: 599, monthlyCredits: 14000 },
+  { tier: "至尊版", priceYuan: 1199, monthlyCredits: 30000 },
 ];
 
 describe("simulatePlanChange — 六维测算（Phase 4）", () => {
@@ -33,9 +33,9 @@ describe("simulatePlanChange — 六维测算（Phase 4）", () => {
 
   it("各档扣分匹配验收表", () => {
     const byTier = new Map(report.rows.map((r) => [r.tier, r.creditsPerGen]));
-    expect(byTier.get("标准版")).toBe(1246);
-    expect(byTier.get("高级版")).toBe(1587);
-    expect(byTier.get("至尊版")).toBe(1825);
+    expect(byTier.get("标准版")).toBe(704);
+    expect(byTier.get("高级版")).toBe(1057);
+    expect(byTier.get("至尊版")).toBe(1216);
   });
 
   it("M=4 下全档毛利护栏通过（最低毛利 ≈ 75%）", () => {
@@ -64,7 +64,7 @@ describe("simulateRevenue — 营收模拟", () => {
         { tier: "至尊版", subscribers: 10 },
       ],
     });
-    expect(rev.totalRevenueYuan).toBeCloseTo(199 * 100 + 799 * 10, 2);
+    expect(rev.totalRevenueYuan).toBeCloseTo(299 * 100 + 1199 * 10, 2);
     expect(rev.blendedMargin).toBeGreaterThan(0);
   });
 });
@@ -84,11 +84,11 @@ describe("reverseBreakEven — 模式 B（保本线核验）", () => {
       model: VIDEO_MODEL,
       tiers: TIERS,
       currentCreditsByTier: [
-        { tier: "标准版", creditsPerGen: 1246 },
-        { tier: "进阶版", creditsPerGen: 1473 },
-        { tier: "高级版", creditsPerGen: 1587 },
-        { tier: "豪华版", creditsPerGen: 1705 },
-        { tier: "至尊版", creditsPerGen: 1825 },
+        { tier: "标准版", creditsPerGen: 704 },
+        { tier: "进阶版", creditsPerGen: 979 },
+        { tier: "高级版", creditsPerGen: 1057 },
+        { tier: "豪华版", creditsPerGen: 1136 },
+        { tier: "至尊版", creditsPerGen: 1216 },
       ],
     });
     expect(r.passed).toBe(true);
@@ -98,7 +98,7 @@ describe("reverseBreakEven — 模式 B（保本线核验）", () => {
   it("扣分过低 → 触发亏本（unsafe）", () => {
     const r = reverseBreakEven({
       model: VIDEO_MODEL,
-      tiers: [{ tier: "标准版", priceYuan: 39, monthlyCredits: 1000 }],
+      tiers: [{ tier: "标准版", priceYuan: 69, monthlyCredits: 1000 }],
       currentCreditsByTier: [{ tier: "标准版", creditsPerGen: 100 }],
     });
     expect(r.passed).toBe(false);

@@ -1687,7 +1687,7 @@ export function VisualLabAnalysisClient({
               <div className="vl-outcome-quota-packs">
                 <a
                   className="vl-btn vl-btn-primary vl-btn-sm"
-                  href={`${mainSiteOrigin}/checkout/topup?packId=pack-1k`}
+                  href={`${mainSiteOrigin}/checkout/topup?packId=pack-light`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -1695,7 +1695,7 @@ export function VisualLabAnalysisClient({
                 </a>
                 <a
                   className="vl-btn vl-btn-outline vl-btn-sm"
-                  href={`${mainSiteOrigin}/checkout/topup?packId=pack-3k`}
+                  href={`${mainSiteOrigin}/checkout/topup?packId=pack-standard`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

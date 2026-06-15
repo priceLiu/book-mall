@@ -1,5 +1,5 @@
 /**
- * 财务 2.0 — scenario-lab 集成脚本（mock settle 个人 + 团队各 30 次）。
+ * 财务 2.0 — scenario-lab 集成脚本（mock settle 个人 + 团队各 N 次，N = VIDEO_MODEL_SEEDS.length）。
  *
  * 运行：
  *   tsx test/integration/scenario-lab.integration.ts
@@ -8,6 +8,7 @@ import {
   buildScenarioLabRows,
   SCENARIO_LAB_MARGIN_MAX,
   SCENARIO_LAB_MARGIN_MIN,
+  scenarioLabMeta,
   validateScenarioLabRows,
 } from "@/lib/billing/scenario-lab";
 
@@ -45,9 +46,10 @@ function runScenarioBlock(
   label: string,
   scenarioKey: "personal-advanced-month" | "team-advanced-4-seats",
   rows: ReturnType<typeof buildScenarioLabRows>,
+  expectedRows: number,
 ) {
   const scenarioRows = rows.filter((r) => r.scenarioKey === scenarioKey);
-  check(`${label} 行数 = 30`, scenarioRows.length === 30, { len: scenarioRows.length });
+  check(`${label} 行数 = ${expectedRows}`, scenarioRows.length === expectedRows, { len: scenarioRows.length });
 
   for (const row of scenarioRows) {
     check(
@@ -68,20 +70,21 @@ function runScenarioBlock(
 
 function main() {
   const rows = buildScenarioLabRows();
+  const { seedsCount } = scenarioLabMeta();
   const validation = validateScenarioLabRows(rows);
   check("全量校验通过", validation.ok, validation);
 
   const callsBefore = settleCalls;
-  runScenarioBlock("个人高级版", "personal-advanced-month", rows);
+  runScenarioBlock("个人高级版", "personal-advanced-month", rows, seedsCount);
   const personalCalls = settleCalls - callsBefore;
-  check("个人 mock settle 30 次", personalCalls === 30, { personalCalls });
+  check(`个人 mock settle ${seedsCount} 次`, personalCalls === seedsCount, { personalCalls });
 
   const teamCallsBefore = settleCalls;
-  runScenarioBlock("团队高级版（4 席）", "team-advanced-4-seats", rows);
+  runScenarioBlock("团队高级版（4 席）", "team-advanced-4-seats", rows, seedsCount);
   const teamCalls = settleCalls - teamCallsBefore;
-  check("团队 mock settle 30 次", teamCalls === 30, { teamCalls });
+  check(`团队 mock settle ${seedsCount} 次`, teamCalls === seedsCount, { teamCalls });
 
-  check("合计 mock settle 60 次", settleCalls === 60, { settleCalls });
+  check(`合计 mock settle ${seedsCount * 2} 次`, settleCalls === seedsCount * 2, { settleCalls });
   check("累计积分 > 0", settleCredits > 0, { settleCredits });
   check("累计收入 > 累计成本", settleRevenueYuan > settleCostYuan, {
     settleRevenueYuan,

@@ -69,7 +69,7 @@ describe("simulateByokMonth — BYOK 权益测算", () => {
   it("套餐内用满：平台成本低于月费", () => {
     const report = simulateByokMonth({
       scopeKey: BYOK_SCOPE_PERSONAL,
-      techServiceFeeYuan: 39,
+      techServiceFeeYuan: 69,
       quotas: personalQuotas,
       usage: buildByokIncludedUsageFromQuotas(personalQuotas, 1),
     });
@@ -90,7 +90,7 @@ describe("simulateByokMonth — BYOK 权益测算", () => {
     const included = buildByokIncludedUsageFromQuotas(personalQuotas, 1);
     const report = simulateByokMonth({
       scopeKey: BYOK_SCOPE_PERSONAL,
-      techServiceFeeYuan: 39,
+      techServiceFeeYuan: 69,
       quotas: personalQuotas,
       usage: {
         TEXT_TO_IMAGE: (included.TEXT_TO_IMAGE ?? 0) + 30,
