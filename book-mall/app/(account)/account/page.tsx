@@ -7,6 +7,7 @@ import { getActiveByokSubscription } from "@/lib/billing/byok-subscription-servi
 import { getMembershipFlags } from "@/lib/membership";
 import { getMembershipToolAccess } from "@/lib/membership-tool-access";
 import { getPoolBalances } from "@/lib/billing/credit-account-service";
+import { quoteTeamPlan } from "@/lib/billing/seat-billing-service";
 import {
   getAccountPackageUsageRows,
   getAccountPlatformCategoryUsageRows,
@@ -16,6 +17,7 @@ import { AccountSectionHeader } from "@/components/account/account-section-heade
 import { AccountOverviewCards } from "@/components/account/account-overview-cards";
 import { AccountDevActions } from "@/components/account/account-dev-actions";
 import { prisma } from "@/lib/prisma";
+import { getActiveTenantContext } from "@/lib/tenant/context";
 
 export const metadata = {
   title: "概览 — 个人中心",
@@ -65,31 +67,78 @@ export default async function AccountPage({
     toolsSsoErr.length > 0 ? toolsSsoErrBanner(toolsSsoErr) : null;
 
   const billingPersona = await getUserBillingPersona(session.user.id);
+  const activeCtx = await getActiveTenantContext(session.user.id);
 
   const byokSubPromise =
     billingPersona === "BYOK"
       ? getActiveByokSubscription({ ownerType: "USER", ownerId: session.user.id })
       : Promise.resolve(null);
 
-  const [flags, memberAccess, poolBalances, creditAcc, byokSub, usageSummary] = await Promise.all([
+  const [flags, memberAccess, byokSub] = await Promise.all([
     getMembershipFlags(session.user.id),
     getMembershipToolAccess(session.user.id),
-    getPoolBalances({ ownerType: "USER", ownerId: session.user.id }),
+    byokSubPromise,
+  ]);
+
+  let teamBillingRef: { ownerType: "TENANT"; ownerId: string } | null =
+    billingPersona === "PLATFORM_CREDIT" && activeCtx?.tenantType === "TEAM"
+      ? { ownerType: "TENANT", ownerId: activeCtx.tenantId }
+      : null;
+
+  if (
+    !teamBillingRef &&
+    billingPersona === "PLATFORM_CREDIT" &&
+    memberAccess.source === "team_plan"
+  ) {
+    const teamMember = await prisma.tenantMember.findFirst({
+      where: {
+        userId: session.user.id,
+        status: "ACTIVE",
+        tenant: { type: "TEAM", status: "ACTIVE", planId: { not: null } },
+      },
+      orderBy: { joinedAt: "asc" },
+      select: { tenantId: true },
+    });
+    if (teamMember) {
+      teamBillingRef = { ownerType: "TENANT", ownerId: teamMember.tenantId };
+    }
+  }
+
+  const billingRef = teamBillingRef ?? {
+    ownerType: "USER" as const,
+    ownerId: session.user.id,
+  };
+
+  const [poolBalances, creditAcc, usageSummary, teamTenant] = await Promise.all([
+    getPoolBalances(billingRef),
     prisma.creditAccount.findUnique({
       where: {
-        ownerType_ownerId: { ownerType: "USER", ownerId: session.user.id },
+        ownerType_ownerId: billingRef,
       },
       select: { currentPeriodEnd: true, planId: true, monthlyGrantCredits: true },
     }),
-    byokSubPromise,
-    getAccountUsageSummary(session.user.id),
+    getAccountUsageSummary(session.user.id, teamBillingRef ?? undefined),
+    teamBillingRef
+      ? prisma.tenant.findUnique({
+          where: { id: teamBillingRef.ownerId },
+          select: {
+            planId: true,
+            seatLimit: true,
+            interval: true,
+            currentPeriodEnd: true,
+          },
+        })
+      : Promise.resolve(null),
   ]);
 
   const packageUsageRows =
     billingPersona === "BYOK"
       ? await getAccountPackageUsageRows(session.user.id, byokSub?.scopeKey ?? null)
       : billingPersona === "PLATFORM_CREDIT"
-        ? await getAccountPlatformCategoryUsageRows(session.user.id)
+        ? await getAccountPlatformCategoryUsageRows(
+            session.user.id,
+            teamBillingRef ?? undefined,
+          )
         : [];
 
   const byokServiceConfig =
@@ -111,7 +160,12 @@ export default async function AccountPage({
           where: { id: creditAcc.planId },
           select: { priceYuan: true, interval: true, tier: true, family: true },
         })
-      : null;
+      : teamTenant?.planId
+        ? await prisma.membershipPlan.findUnique({
+            where: { id: teamTenant.planId },
+            select: { priceYuan: true, interval: true, tier: true, family: true },
+          })
+        : null;
 
   let planPriceLabel: string | null = null;
   if (byokServiceConfig) {
@@ -122,6 +176,21 @@ export default async function AccountPage({
     } else {
       planPriceLabel = `¥${fee.toLocaleString("zh-CN")}/${unit}`;
     }
+  } else if (teamTenant?.planId) {
+    try {
+      const quote = await quoteTeamPlan({
+        planId: teamTenant.planId,
+        totalSeats: teamTenant.seatLimit,
+      });
+      const unit = teamTenant.interval === "YEAR" ? "年" : "月";
+      planPriceLabel = `¥${quote.totalPriceYuan.toLocaleString("zh-CN")}/${unit}（${quote.totalSeats} 席）`;
+    } catch {
+      if (membershipPlan) {
+        const fee = Number(membershipPlan.priceYuan);
+        const unit = membershipPlan.interval === "YEAR" ? "年" : "月";
+        planPriceLabel = `¥${fee.toLocaleString("zh-CN")}/${unit}`;
+      }
+    }
   } else if (membershipPlan) {
     const fee = Number(membershipPlan.priceYuan);
     const unit = membershipPlan.interval === "YEAR" ? "年" : "月";
@@ -131,7 +200,9 @@ export default async function AccountPage({
   const membershipPeriodEnd =
     billingPersona === "BYOK" && byokSub
       ? byokSub.periodEnd
-      : (creditAcc?.currentPeriodEnd ?? null);
+      : (teamTenant?.currentPeriodEnd ??
+        creditAcc?.currentPeriodEnd ??
+        null);
 
   return (
     <>
@@ -171,6 +242,7 @@ export default async function AccountPage({
         }
         usageSummary={usageSummary}
         packageUsageRows={packageUsageRows}
+        isTeamSharedPool={Boolean(teamBillingRef)}
       />
 
       {process.env.NODE_ENV === "development" ? (

@@ -1,5 +1,6 @@
 import { TOOLS_TOKEN_COOKIE_NAME } from "@/lib/clear-tools-token-cookie";
 import { ACTIVE_TENANT_COOKIE } from "@/lib/tenant/context";
+import { SESSION_KICK_COOKIE } from "@/lib/session-kick-cookie";
 
 const SESSION_COOKIE_NAMES = [
   "__Secure-next-auth.session-token",
@@ -108,6 +109,9 @@ export function buildClearSessionCookieHeaders(): string[] {
     headers.push(
       buildClearingPublicCookieHeader(ACTIVE_TENANT_COOKIE, { secure }),
     );
+    headers.push(
+      buildClearingPublicCookieHeader(SESSION_KICK_COOKIE, { secure }),
+    );
   }
   for (const localhostDomain of localhostDomains) {
     for (const secure of [false, true]) {
@@ -119,6 +123,12 @@ export function buildClearSessionCookieHeaders(): string[] {
       );
       headers.push(
         buildClearingPublicCookieHeader(ACTIVE_TENANT_COOKIE, {
+          domain: localhostDomain,
+          secure,
+        }),
+      );
+      headers.push(
+        buildClearingPublicCookieHeader(SESSION_KICK_COOKIE, {
           domain: localhostDomain,
           secure,
         }),

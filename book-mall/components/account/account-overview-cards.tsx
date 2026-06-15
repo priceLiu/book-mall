@@ -42,6 +42,8 @@ type Props = {
   legacyMonthlyGrantCredits?: number | null;
   usageSummary?: UsageSummary | null;
   packageUsageRows?: PackageUsageRow[];
+  /** 当前在团队空间：积分/用量展示团队共享池总量 */
+  isTeamSharedPool?: boolean;
 };
 
 function personaLabel(persona: BillingPersona | null): string {
@@ -81,6 +83,7 @@ export function AccountOverviewCards({
   legacyMonthlyGrantCredits = null,
   usageSummary = null,
   packageUsageRows = [],
+  isTeamSharedPool = false,
 }: Props) {
   const isByok = billingPersona === "BYOK";
   const textLink = accountBodyTextLinkClass();
@@ -116,6 +119,11 @@ export function AccountOverviewCards({
                 {planPriceLabel}
               </span>
             ) : null}
+            {isTeamSharedPool ? (
+              <span className="rounded-full border border-sky-500/35 bg-sky-500/10 px-3 py-1 text-xs text-sky-800 dark:text-sky-200">
+                团队共享池 · 全员合计
+              </span>
+            ) : null}
           </div>
           {membershipPeriodEnd ? (
             <p className="mt-2 text-xs text-muted-foreground tabular-nums">
@@ -130,12 +138,14 @@ export function AccountOverviewCards({
         <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
-              {isByok ? "套餐使用情况" : "本月按类型消耗"}
+              {isByok ? "套餐使用情况" : isTeamSharedPool ? "团队本月消耗" : "本月按类型消耗"}
             </CardTitle>
             <CardDescription className="text-xs">
               {isByok
                 ? "剩余 = 总数 − 套餐已用（与 Gateway 成功次数可能不同：仅 BYOK 套餐内扣次计入已用）。试衣计入文生图。"
-                : "积分池按七类统计成功/失败与扣积分（无含次额度；试衣计入文生图，明细按 modelKey 展示）。"}
+                : isTeamSharedPool
+                  ? "团队共享积分池按七类统计全员成功/失败与扣积分（试衣计入文生图）。"
+                  : "积分池按七类统计成功/失败与扣积分（无含次额度；试衣计入文生图，明细按 modelKey 展示）。"}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-3">
@@ -210,11 +220,15 @@ export function AccountOverviewCards({
       {usageSummary ? (
         <Card className="flex h-full flex-col">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">{isByok ? "轻量包积分" : "套餐积分"}</CardTitle>
+            <CardTitle className="text-base">
+              {isByok ? "轻量包积分" : isTeamSharedPool ? "团队套餐积分" : "套餐积分"}
+            </CardTitle>
             <CardDescription className="text-xs">
               {isByok
                 ? "轻量包加购与超额扣分；BYOK 月费不含月度积分发放。"
-                : "套餐月发积分与轻量包加购；用于平台代付扣费。"}
+                : isTeamSharedPool
+                  ? "团队共享池本月发放、消耗与剩余（含轻量包加购）。"
+                  : "套餐月发积分与轻量包加购；用于平台代付扣费。"}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-4">
@@ -258,13 +272,17 @@ export function AccountOverviewCards({
       <Card className="flex h-full flex-col">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">{isByok ? "当前余额" : "积分余额"}</CardTitle>
+            <CardTitle className="text-base">
+              {isByok ? "当前余额" : isTeamSharedPool ? "团队积分余额" : "积分余额"}
+            </CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" aria-hidden />
           </div>
           <CardDescription className="text-xs">
             {isByok
               ? "通用池用于超额任务与各工具月费"
-              : "通用 + 视频池 · 套餐月积分 + 轻量包"}
+              : isTeamSharedPool
+                ? "团队共享通用 + 视频池"
+                : "通用 + 视频池 · 套餐月积分 + 轻量包"}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-1 flex-col">
