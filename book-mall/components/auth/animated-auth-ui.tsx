@@ -411,12 +411,12 @@ export type AnimatedAuthField = {
 
 export const AnimatedAuthFields = memo(function AnimatedAuthFields({
   fields,
-  passwordVisible,
+  passwordVisible = false,
   onTogglePassword,
 }: {
   fields: AnimatedAuthField[];
-  passwordVisible: boolean;
-  onTogglePassword: () => void;
+  passwordVisible?: boolean;
+  onTogglePassword?: () => void;
 }) {
   return (
     <div className="mb-4 grid grid-cols-1 gap-4">
@@ -466,7 +466,7 @@ export const AnimatedAuthFields = memo(function AnimatedAuthFields({
                 }
                 className={field.type === "password" ? "pr-10" : undefined}
               />
-              {field.type === "password" ? (
+              {field.type === "password" && onTogglePassword ? (
                 <button
                   type="button"
                   onClick={onTogglePassword}
