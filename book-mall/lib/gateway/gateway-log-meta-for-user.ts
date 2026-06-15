@@ -2,10 +2,8 @@ import type { GatewayClientSource } from "@prisma/client";
 
 import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { resolveTenantContextForUser } from "@/lib/tenant/context";
-import {
-  gatewayV1ClientMeta,
-  type GatewayV1LogMeta,
-} from "@/lib/gateway/gateway-v1-http-client";
+import { gatewayV1ClientMeta } from "@/lib/gateway/gateway-v1-http-client";
+import type { GatewayV1LogMeta } from "@/lib/gateway/gateway-v1-log-meta";
 
 export type GatewayV1ClientMetaExtra = Omit<
   GatewayV1LogMeta,
