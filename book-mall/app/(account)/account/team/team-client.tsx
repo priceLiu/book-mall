@@ -248,11 +248,14 @@ export function TeamClient(props: Props) {
     first: string;
     second: string;
     label: string;
-    run: () => Promise<ActionResult>;
+    run: () => Promise<ActionResult<any>>;
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
-  function run(action: () => Promise<ActionResult>, okText = "操作成功") {
+  function run<T = undefined>(
+    action: () => Promise<ActionResult<T>>,
+    okText = "操作成功",
+  ) {
     startTransition(async () => {
       setMsg(null);
       const res = await action();
@@ -396,7 +399,7 @@ function CreateTeam({
 }: {
   teamPlans: Props["teamPlans"];
   pending: boolean;
-  run: (a: () => Promise<ActionResult>, ok?: string) => void;
+  run: <T>(a: () => Promise<ActionResult<T>>, ok?: string) => void;
   buildFD: (e: Record<string, string>) => FormData;
 }) {
   const [name, setName] = useState("");
@@ -501,14 +504,14 @@ function TeamOverview({
   canManage: boolean;
   canConfigure: boolean;
   pending: boolean;
-  run: (a: () => Promise<ActionResult>, ok?: string) => void;
+  run: <T>(a: () => Promise<ActionResult<T>>, ok?: string) => void;
   buildFD: (e: Record<string, string>) => FormData;
   requestConfirm: (c: {
     title: string;
     first: string;
     second: string;
     label: string;
-    run: () => Promise<ActionResult>;
+    run: () => Promise<ActionResult<any>>;
   }) => void;
 }) {
   const t = overview.tenant;
