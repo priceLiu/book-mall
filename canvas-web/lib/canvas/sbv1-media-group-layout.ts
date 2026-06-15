@@ -2,6 +2,7 @@
 
 import { sbv1ImageChildren } from "./sbv1-media-group-meta";
 import {
+  SBV1_IMAGE_NODE_WIDTH,
   SBV1_VIDEO_ENGINE_MIN_HEIGHT,
   SBV1_VIDEO_ENGINE_WIDTH,
 } from "./sbv1-node-chrome";

@@ -27,6 +27,8 @@ export type Sbv1ImageNodeData = {
   blobUrl?: string;
   uploading?: boolean;
   uploadError?: string;
+  /** 生图任务状态（与 ImageNodeData 一致） */
+  runtime?: CanvasNodeRuntime;
   /** 底部 / 内嵌输入坞 prompt（@ 引用上游） */
   dockInput?: string;
   dockStyleRef?: {
