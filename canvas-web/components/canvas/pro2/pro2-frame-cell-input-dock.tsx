@@ -85,8 +85,7 @@ export function Pro2FrameCellInputDock() {
 
   return (
     <Pro2InputDockShell
-      left={placement.left}
-      top={placement.top}
+      flowAnchor={placement}
       dockClassName="pro2-frame-cell-dock"
       footer={
         <Pro2DockToolbar>

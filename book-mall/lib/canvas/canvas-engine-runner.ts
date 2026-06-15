@@ -481,6 +481,11 @@ export async function runImageEngineNode(
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
+  const sbv1Billing =
+    data.sbv1Billing && typeof data.sbv1Billing === "object"
+      ? (data.sbv1Billing as Record<string, unknown>)
+      : undefined;
+
   const imageInputPayload = {
     kind: engineKind,
     prompt: clipPrompt(expandedPrompt),
@@ -491,6 +496,7 @@ export async function runImageEngineNode(
     clientPage: gwClientPage,
     /** run API 同步提交 Gateway；poll worker 勿在短时内二次 createTask */
     syncGatewaySubmit: true,
+    ...(sbv1Billing ? { sbv1Billing } : {}),
     ...(args.storyScope ? { storyScope: args.storyScope } : {}),
   } as Prisma.InputJsonValue;
 
@@ -572,6 +578,7 @@ export async function runImageEngineNode(
         callBackUrl,
         clientPage: gwClientPage,
         projectId,
+        sbv1Billing,
       });
       const updated = await prisma.canvasGenerationTask.update({
         where: { id: claimedTask.id },
@@ -593,6 +600,7 @@ export async function runImageEngineNode(
             providerKind: "KIE",
             kieModel: model,
             kieInput: input,
+            ...(sbv1Billing ? { sbv1Billing } : {}),
             ...(args.storyScope ? { storyScope: args.storyScope } : {}),
           } as Prisma.InputJsonValue,
         },
@@ -1102,6 +1110,10 @@ export async function runVideoEngineNode(
           body: input as Record<string, unknown>,
           clientPage: gwClientPage,
           projectId,
+          sbv1Billing:
+            data.sbv1Billing && typeof data.sbv1Billing === "object"
+              ? (data.sbv1Billing as Record<string, unknown>)
+              : undefined,
         })
       : await canvasGwCreateKieJob(userId, {
           model,

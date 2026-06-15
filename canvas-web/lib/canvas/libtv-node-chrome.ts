@@ -72,8 +72,7 @@ export const LIBTV_CANVAS_DOCK_BAR_CLASS =
 
 /** 节点下方浮动输入坞 · 外壳描边 / 背景（Pro2InputDockShell） */
 export const LIBTV_INPUT_DOCK_BORDER = "rgba(255, 255, 255, 0.08)";
-export const LIBTV_INPUT_DOCK_BG =
-  "linear-gradient(165deg, rgba(22, 22, 28, 0.96) 0%, rgba(16, 16, 20, 0.98) 100%)";
+export const LIBTV_INPUT_DOCK_BG = "#262626";
 export const LIBTV_INPUT_DOCK_SHELL_CLASS =
   "flex flex-col overflow-hidden rounded-2xl border shadow-[0_16px_48px_rgba(0,0,0,0.45)] backdrop-blur-xl";
 export const LIBTV_INPUT_DOCK_DIVIDER = "border-white/[0.06]";

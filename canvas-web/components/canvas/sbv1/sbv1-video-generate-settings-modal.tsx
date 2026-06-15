@@ -9,10 +9,10 @@ import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import {
   SBV1_ASPECT_RATIOS,
   SBV1_REFERENCE_MODES,
-  estimateSbv1ListCostYuan,
   getSbv1VolcengineModelById,
   migrateSbv1ModelVariantId,
   resolveSbv1VariantIdFromEngine,
+  sbv1AspectRatioLabel,
 } from "@/lib/canvas/sbv1-video-models";
 import type {
   Sbv1AspectRatio,
@@ -59,6 +59,16 @@ export function Sbv1VideoGenerateSettingsModal({
 
   const smartMulti = referenceMode === "smart_multi";
 
+  const effectiveDurationSec = useMemo(() => {
+    if (smartMulti) return 0;
+    const fromParams = Number(engineParams.duration);
+    if (Number.isFinite(fromParams) && fromParams >= 4 && fromParams <= 15) {
+      return fromParams;
+    }
+    if (durationSec >= 4 && durationSec <= 15) return durationSec;
+    return 15;
+  }, [smartMulti, engineParams.duration, durationSec]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -87,25 +97,6 @@ export function Sbv1VideoGenerateSettingsModal({
     };
   }, [open, onClose]);
 
-  const estCostYuan = useMemo(() => {
-    const variantId = resolveSbv1VariantIdFromEngine(
-      { providerId, modelKey, params: engineParams },
-      providers,
-    );
-    const model = getSbv1VolcengineModelById(variantId, providers);
-    return estimateSbv1ListCostYuan({
-      listCostYuanPerSec: model.listCostYuanPerSec,
-      durationSec: smartMulti && durationSec <= 0 ? 4 : durationSec,
-    });
-  }, [
-    providerId,
-    modelKey,
-    engineParams,
-    providers,
-    smartMulti,
-    durationSec,
-  ]);
-
   if (!mounted || !open) return null;
 
   const handleConfirm = () => {
@@ -116,8 +107,8 @@ export function Sbv1VideoGenerateSettingsModal({
       params: {
         ...engineParams,
         ...(smartMulti ? { resolution } : {}),
-        ...(!smartMulti && durationSec >= 4
-          ? { duration: durationSec }
+        ...(!smartMulti && effectiveDurationSec >= 4
+          ? { duration: effectiveDurationSec }
           : {}),
       },
     };
@@ -125,7 +116,7 @@ export function Sbv1VideoGenerateSettingsModal({
     onConfirm({
       referenceMode,
       aspectRatio,
-      durationSec: smartMulti ? 0 : durationSec,
+      durationSec: smartMulti ? 0 : effectiveDurationSec,
       resolution,
       volcengineVariantId: variantId,
       jimengModelId: variantId,
@@ -149,15 +140,10 @@ export function Sbv1VideoGenerateSettingsModal({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-3 border-b border-white/5 px-5 py-4">
-          <div>
-            <p className="flex items-center gap-2 text-[15px] font-medium text-white">
-              <Sparkles className="size-4 text-[var(--canvas-accent,#a78bfa)]" />
-              视频生成设置
-            </p>
-            <p className="mt-0.5 text-[12px] text-white/60">
-              选择火山 Seedance 模型并调整参考模式、比例与时长。
-            </p>
-          </div>
+          <p className="flex items-center gap-2 text-[15px] font-medium text-white">
+            <Sparkles className="size-4 text-[var(--canvas-accent,#a78bfa)]" />
+            视频生成设置
+          </p>
           <button
             type="button"
             onClick={onClose}
@@ -169,117 +155,78 @@ export function Sbv1VideoGenerateSettingsModal({
         </header>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
-          <section className="rounded-xl border border-white/10 bg-black/20 p-4">
-            <p className="mb-3 text-[12px] font-medium text-white">生成参数</p>
-            <div className="space-y-4">
-              <Field label="参考模式">
-                <SegmentRow
-                  options={SBV1_REFERENCE_MODES.map((m) => ({
-                    id: m.id,
-                    label: m.label,
-                  }))}
-                  value={referenceMode}
-                  onChange={(id) => {
-                    const mode = id as Sbv1ReferenceMode;
-                    setReferenceMode(mode);
-                    if (mode === "smart_multi") {
-                      setDurationSec(0);
-                    } else if (durationSec < 4 || durationSec > 15) {
-                      setDurationSec(5);
-                    }
-                  }}
-                />
-              </Field>
+          <SegmentRow
+            options={SBV1_REFERENCE_MODES.map((m) => ({
+              id: m.id,
+              label: m.label,
+            }))}
+            value={referenceMode}
+            onChange={(id) => {
+              const mode = id as Sbv1ReferenceMode;
+              setReferenceMode(mode);
+              if (mode === "smart_multi") {
+                setDurationSec(0);
+              } else if (durationSec < 4 || durationSec > 15) {
+                setDurationSec(15);
+              }
+            }}
+          />
 
-              <Field label="画面比例">
-                <SegmentRow
-                  options={SBV1_ASPECT_RATIOS.map((r) => ({
-                    id: r,
-                    label: r,
-                  }))}
-                  value={aspectRatio}
-                  onChange={(id) => setAspectRatio(id as Sbv1AspectRatio)}
-                />
-              </Field>
-
-              {smartMulti ? (
-                <Field label="分辨率">
-                  <SegmentRow
-                    options={[
-                      { id: "720p", label: "720P" },
-                      { id: "1080p", label: "1080P" },
-                    ]}
-                    value={resolution}
-                    onChange={(id) => {
-                      setResolution(id as "720p" | "1080p");
-                      setEngineParams((p) => ({ ...p, resolution: id }));
-                    }}
-                  />
-                </Field>
-              ) : (
-                <Field label="时长（秒）">
-                  <SegmentRow
-                    options={[4, 5, 6, 7, 8, 9, 10, 12, 15].map((n) => ({
-                      id: String(n),
-                      label: `${n}s`,
-                    }))}
-                    value={String(durationSec)}
-                    onChange={(id) => {
-                      const n = Number(id);
-                      setDurationSec(n);
-                      setEngineParams((p) => ({ ...p, duration: n }));
-                    }}
-                  />
-                </Field>
-              )}
-
-              <Field label="音频">
-                <SegmentRow
-                  options={[
-                    { id: "off", label: "无声" },
-                    { id: "on", label: "有声" },
-                  ]}
-                  value={Boolean(engineParams.generate_audio) ? "on" : "off"}
-                  onChange={(id) => {
-                    const generate_audio = id === "on";
-                    setEngineParams((p) => ({ ...p, generate_audio }));
-                  }}
-                />
-              </Field>
-            </div>
-          </section>
-
-          <section>
-            <p className="mb-2 text-[12px] font-medium text-white">视频模型</p>
-            <EnginePicker
-              role="VIDEO"
-              embedded
-              providerIds={[GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID]}
-              providerId={providerId}
-              modelKey={modelKey}
-              params={engineParams}
-              onChange={(next) => {
-                setProviderId(next.providerId);
-                setModelKey(next.modelKey);
-                setEngineParams(next.params);
-                const d = Number(next.params.duration);
-                if (
-                  !smartMulti &&
-                  Number.isFinite(d) &&
-                  d >= 4 &&
-                  d <= 15
-                ) {
-                  setDurationSec(d);
-                }
-              }}
+          <div>
+            <p className="mb-2 text-[13px] text-white/85">比例</p>
+            <SegmentRow
+              options={SBV1_ASPECT_RATIOS.map((r) => ({
+                id: r,
+                label: sbv1AspectRatioLabel(r),
+              }))}
+              value={aspectRatio}
+              onChange={(id) => setAspectRatio(id as Sbv1AspectRatio)}
             />
-          </section>
+          </div>
 
-          {estCostYuan != null ? (
-            <p className="text-[11px] text-white/45">
-              估算 ≈¥{estCostYuan.toFixed(2)}（火山 BYOK · 挂牌参考）
-            </p>
+          {smartMulti ? (
+            <div>
+              <p className="mb-2 text-[13px] text-white/85">清晰度</p>
+              <SegmentRow
+                options={[
+                  { id: "720p", label: "720P" },
+                  { id: "1080p", label: "1080P" },
+                ]}
+                value={resolution}
+                onChange={(id) => {
+                  setResolution(id as "720p" | "1080p");
+                  setEngineParams((p) => ({ ...p, resolution: id }));
+                }}
+              />
+            </div>
           ) : null}
+
+          <EnginePicker
+            role="VIDEO"
+            embedded
+            providerIds={[GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID]}
+            providerId={providerId}
+            modelKey={modelKey}
+            params={engineParams}
+            onChange={(next) => {
+              setProviderId(next.providerId);
+              setModelKey(next.modelKey);
+              setEngineParams(next.params);
+              const d = Number(next.params.duration);
+              if (
+                !smartMulti &&
+                Number.isFinite(d) &&
+                d >= 4 &&
+                d <= 15
+              ) {
+                setDurationSec(d);
+              }
+              const res = next.params.resolution;
+              if (res === "720p" || res === "1080p") {
+                setResolution(res);
+              }
+            }}
+          />
         </div>
 
         <footer className="flex items-center justify-end gap-2 border-t border-white/5 bg-black/20 px-5 py-3">
@@ -305,21 +252,6 @@ export function Sbv1VideoGenerateSettingsModal({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <p className="mb-1.5 text-[11px] text-white/50">{label}</p>
-      {children}
-    </div>
-  );
-}
-
 function SegmentRow({
   options,
   value,
@@ -330,16 +262,16 @@ function SegmentRow({
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       {options.map((opt) => (
         <button
           key={opt.id}
           type="button"
           className={cn(
-            "rounded-md border px-2.5 py-1 text-[11px] transition",
+            "min-w-[4.5rem] rounded-lg border px-4 py-2 text-[13px] font-medium transition",
             opt.id === value
-              ? "border-[var(--canvas-accent,#a78bfa)] bg-[var(--canvas-accent,#a78bfa)]/15 text-white"
-              : "border-white/10 text-white/70 hover:border-white/25 hover:text-white",
+              ? "border-white bg-white/[.06] text-white"
+              : "border-white/15 text-white/55 hover:border-white/30 hover:text-white/80",
           )}
           onClick={() => onChange(opt.id)}
         >

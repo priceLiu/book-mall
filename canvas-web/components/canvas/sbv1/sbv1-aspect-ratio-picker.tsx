@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { SBV1_ASPECT_RATIOS } from "@/lib/canvas/sbv1-video-models";
+import { SBV1_ASPECT_RATIOS, sbv1AspectRatioLabel } from "@/lib/canvas/sbv1-video-models";
 import type { Sbv1AspectRatio } from "@/lib/canvas/sbv1-workspace-types";
 import { cn } from "@/lib/utils";
 import {
@@ -26,7 +26,7 @@ export function Sbv1AspectRatioPicker({
         className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/85 hover:bg-white/8"
         onClick={() => setOpen(!open)}
       >
-        {value}
+        {sbv1AspectRatioLabel(value)}
         <ChevronDown className="size-3 opacity-60" />
       </button>
       <Sbv1ToolbarDropdown
@@ -48,7 +48,7 @@ export function Sbv1AspectRatioPicker({
               setOpen(false);
             }}
           >
-            {r}
+            {sbv1AspectRatioLabel(r)}
           </button>
         ))}
       </Sbv1ToolbarDropdown>

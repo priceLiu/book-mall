@@ -706,18 +706,18 @@ export async function seedByokSimplifiedPricing() {
       create: {
         scopeKey: cfg.scopeKey,
         label: cfg.label,
-        techServiceFeeYuan: cfg.techServiceFeeYuan,
+        techServiceFeeYuan: 0,
         minSeats: cfg.minSeats,
         interval: "MONTH",
-        note: cfg.note,
-        active: true,
+        note: "积分换算 1.0：技术服务费已退役，仅保留配额定义",
+        active: false,
       },
       update: {
         label: cfg.label,
-        techServiceFeeYuan: cfg.techServiceFeeYuan,
+        techServiceFeeYuan: 0,
         minSeats: cfg.minSeats,
-        note: cfg.note,
-        active: true,
+        note: "积分换算 1.0：技术服务费已退役，仅保留配额定义",
+        active: false,
       },
     });
   }

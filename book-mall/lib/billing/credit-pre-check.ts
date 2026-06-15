@@ -10,7 +10,7 @@ import {
 } from "./credit-account-service";
 import { computeChargeCredits } from "./gateway-credit-settlement";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
-import { resolveCanonicalModelKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
+import { resolveBillingCanonicalKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
 import { computeTierCredits, videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
 
 export async function resolveBillingRef(input: {
@@ -46,6 +46,7 @@ export async function assertCreditsBeforeGenerate(input: {
   apiKeyId: string;
   model: string;
   requestKind?: string | null;
+  inputSummary?: unknown;
 }): Promise<void> {
   if (!isUnifiedCreditBillingActive()) return;
 
@@ -53,7 +54,10 @@ export async function assertCreditsBeforeGenerate(input: {
   if (!ref) return;
 
   const isVideo = input.requestKind === "VIDEO";
-  const canonical = await resolveCanonicalModelKey(input.model).catch(() => null);
+  const canonical = await resolveBillingCanonicalKey({
+    modelKey: input.model,
+    inputSummary: input.inputSummary,
+  }).catch(() => null);
 
   // 视频：走视频池冻结预检（逐档单价 × 15s 封顶）
   if (isVideo) {

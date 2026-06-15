@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { previewModelCredits } from "@/lib/billing/model-credits-preview";
+import { getUserBillingPersona } from "@/lib/billing/billing-persona";
 import { requireToolsJwtSecret } from "@/lib/sso-tools-env";
 import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 
@@ -28,13 +29,26 @@ export async function GET(req: Request) {
 
   const durationRaw = url.searchParams.get("durationSec");
   const imageRaw = url.searchParams.get("imageCount");
+  const variantId = url.searchParams.get("variantId")?.trim() || null;
+  const canonicalModelKey = url.searchParams.get("canonicalModelKey")?.trim() || null;
+  const resolution = url.searchParams.get("resolution")?.trim() || null;
+
+  const persona = await getUserBillingPersona(verified.sub);
+
+  const billingOwner =
+    verified.tenant_type === "TEAM" && verified.tenant_id
+      ? ({ ownerType: "TENANT", ownerId: verified.tenant_id } as const)
+      : ({ ownerType: "USER", ownerId: verified.sub } as const);
 
   const preview = await previewModelCredits({
     modelKey,
-    ownerType: "USER",
-    ownerId: verified.sub,
+    variantId,
+    canonicalModelKey,
+    ownerType: billingOwner.ownerType,
+    ownerId: billingOwner.ownerId,
     durationSec: durationRaw ? Number(durationRaw) : null,
     imageCount: imageRaw ? Number(imageRaw) : null,
+    resolution,
   });
 
   if (!preview) {
@@ -42,7 +56,8 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({
-    scheme: "unified_credits",
+    scheme: persona === "BYOK" ? "byok" : "unified_credits",
+    billingPersona: persona ?? "PLATFORM_CREDIT",
     credits: preview.estimatedCredits,
     creditsPerUnit: preview.creditsPerUnit,
     pricePerCreditYuan: preview.pricePerCreditYuan,

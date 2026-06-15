@@ -71,9 +71,9 @@ export function DeletableEdge(props: EdgeProps) {
               e.stopPropagation();
               onRemove();
             }}
-            className="nodrag flex size-5 items-center justify-center rounded-full border border-white/20 bg-black/85 text-white/80 shadow-md hover:border-red-400/60 hover:bg-red-500/30 hover:text-red-200"
+            className="nodrag flex size-7 items-center justify-center rounded-full border border-white/20 bg-black/85 text-white/80 shadow-md hover:border-red-400/60 hover:bg-red-500/30 hover:text-red-200"
           >
-            <X className="size-3" />
+            <X className="size-4" />
           </button>
         </div>
       </EdgeLabelRenderer>

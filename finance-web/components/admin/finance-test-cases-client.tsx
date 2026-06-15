@@ -197,7 +197,7 @@ function ScenarioPanel({ scenario }: { scenario: BusinessScenario }) {
         <MetricCard label="单条厂商成本" value={yuan(sv.vendorCostYuan)} hint="付给云厂商" />
         <MetricCard label="单条确认收入" value={yuan(sv.revenueYuan)} hint="扣分 × 积分单价" />
         <MetricCard label="单条利润" value={yuan(sv.profitYuan)} hint="收入 − 成本" />
-        <MetricCard label="单条毛利率" value={pct(sv.marginRate)} hint="目标约 75%" />
+        <MetricCard label="单条毛利率" value={pct(sv.marginRate)} hint="贵视频≈0%" />
       </div>
 
       <div className="rounded border border-[#f0f0f0] bg-[#fafafa] px-3 py-2 text-xs text-[#595959]">

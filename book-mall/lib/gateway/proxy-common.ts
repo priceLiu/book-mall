@@ -25,7 +25,7 @@ import { resolveBillableImageCountFromLog } from "./log-billing-metrics";
 import { parseVideoPricingHints } from "./log-pricing-hints";
 import { estimateVendorCost } from "./pricing-estimate";
 import {
-  resolveCanonicalModelKey,
+  resolveBillingCanonicalKey,
   resolveCostSnapshot,
   type CostSnapshot,
 } from "./credit-billing-guard";
@@ -160,6 +160,7 @@ export async function createRequestLog(opts: {
       apiKeyId: opts.apiKeyId,
       model: opts.model,
       requestKind: opts.requestKind ?? route.requestKind,
+      inputSummary: opts.inputSummary,
     });
     // 视频专项风控（并发/队列/单日/批量/冷却/异常阶梯）
     if (isVideoReq) {
@@ -320,7 +321,10 @@ export async function finalizeRequestLog(
   let costSnapshot: CostSnapshot | null = null;
   try {
     if (!canonicalModelKey) {
-      canonicalModelKey = await resolveCanonicalModelKey(patch.model ?? log.model);
+      canonicalModelKey = await resolveBillingCanonicalKey({
+        modelKey: patch.model ?? log.model,
+        inputSummary: log.inputSummary,
+      });
     }
     if (canonicalModelKey) {
       costSnapshot = await resolveCostSnapshot(canonicalModelKey);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import {
@@ -41,6 +42,7 @@ import {
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
+import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox } from "../media-hover-box";
 import { Pro2ImageNodeToolbar } from "./pro2-image-node-toolbar";
@@ -66,6 +68,8 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const inputRef = useRef<HTMLInputElement>(null);
   const [hovered, setHovered] = useState(false);
+  const { hovered: sideHover, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
+  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const d = data as unknown as StoryPro2ImageNodeData;
@@ -84,7 +88,7 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
         ? "生成三视图中…"
         : "图片生成中…";
   const hasError = Boolean(d.uploadError?.trim());
-  const showSidePlus = Boolean(selected && !isGenerating);
+  const showSidePlus = Boolean((sideHover || selected || connectingFromNodeId) && !isGenerating);
   const soleSelected = useMemo(
     () => selected && nodes.filter((n) => n.selected).length === 1,
     [selected, nodes],
@@ -96,6 +100,14 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
     soleSelected,
   });
   const showImageTools = Boolean(soleSelected && hasImage && !isGenerating);
+
+  useLibtvMediaNodeAutoFit({
+    nodeId: id,
+    mediaUrl: previewUrl,
+    kind: "image",
+    profile: "square-image",
+    disabled: !hasImage || isGenerating || isCharacterThreeView,
+  });
 
   const nodeLabel = useMemo(() => {
     if (isCharacterThreeView) {
@@ -265,8 +277,8 @@ export function StoryPro2ImageNode({ id, data, selected }: NodeProps) {
         className={cn(LIBTV_NODE_OUTER_CLASS, "image-paste-host")}
         data-image-paste-host={id}
         data-pro2-dock-anchor={id}
-        onPointerEnter={() => setHovered(true)}
-        onPointerLeave={() => setHovered(false)}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
       >
         {!isCharacterThreeView ? (
           <Handle

@@ -1,10 +1,16 @@
 import { VIDEO_MODEL_SEEDS } from "@/lib/billing/video-model-seeds";
-import { computePricePerCredit, computeTierCredits, DEFAULT_VIDEO_MIN_MARGIN_GUARD, MARGIN_GUARD_TOLERANCE, round4 } from "@/lib/pricing/credit-pricing-formulas";
+import {
+  computePricePerCredit,
+  computeTierCredits,
+  MARGIN_GUARD_TOLERANCE,
+  round4,
+} from "@/lib/pricing/credit-pricing-formulas";
+import {
+  expectedAnchorMarginForM,
+  resolveModelMarginM,
+} from "@/lib/pricing/model-margin-policy";
 
 export const SCENARIO_LAB_USAGE_SECONDS = 15;
-export const SCENARIO_LAB_VIDEO_MARGIN_M = 4;
-export const SCENARIO_LAB_MARGIN_MIN = DEFAULT_VIDEO_MIN_MARGIN_GUARD - MARGIN_GUARD_TOLERANCE;
-export const SCENARIO_LAB_MARGIN_MAX = 0.751;
 
 const PERSONAL_ADVANCED = {
   scenarioKey: "personal-advanced-month",
@@ -16,8 +22,8 @@ const PERSONAL_ADVANCED = {
 const TEAM_ADVANCED_4_SEATS = {
   scenarioKey: "team-advanced-4-seats",
   scenarioLabel: "团队高级版（4 席）",
-  priceYuan: 289,
-  monthlyCredits: 5000,
+  priceYuan: 1199,
+  monthlyCredits: 33300,
   seats: 4,
 };
 
@@ -34,14 +40,20 @@ export type ScenarioLabRow = {
   credits: number;
   revenueYuan: number;
   marginRate: number;
+  marginM: number;
 };
 
 export type ScenarioLabValidation = {
   ok: boolean;
-  range: { min: number; max: number };
   totalRows: number;
   failedRows: number;
 };
+
+function expectedMarginRange(marginM: number): { min: number; max: number } {
+  const target = expectedAnchorMarginForM(marginM);
+  const tol = 0.02 + MARGIN_GUARD_TOLERANCE;
+  return { min: target - tol, max: target + tol };
+}
 
 function simulateRowsForScenario(input: {
   scenarioKey: ScenarioLabScenarioKey;
@@ -51,8 +63,10 @@ function simulateRowsForScenario(input: {
 }): ScenarioLabRow[] {
   const pricePerCreditYuan = computePricePerCredit(input.priceYuan, input.monthlyCredits);
   return VIDEO_MODEL_SEEDS.map((seed) => {
-    const costYuan = round4(seed.listCostYuan * (1 - seed.discountRate) * SCENARIO_LAB_USAGE_SECONDS);
-    const listPriceYuan = round4(costYuan * SCENARIO_LAB_VIDEO_MARGIN_M);
+    const netPerSec = seed.listCostYuan * (1 - seed.discountRate);
+    const costYuan = round4(netPerSec * SCENARIO_LAB_USAGE_SECONDS);
+    const marginM = resolveModelMarginM({ unit: "PER_SEC", netCostYuan: netPerSec });
+    const listPriceYuan = round4(costYuan * marginM);
     const credits = computeTierCredits(listPriceYuan, pricePerCreditYuan);
     const revenueYuan = round4(credits * pricePerCreditYuan);
     const marginRate = revenueYuan > 0 ? round4(1 - costYuan / revenueYuan) : 0;
@@ -65,6 +79,7 @@ function simulateRowsForScenario(input: {
       credits,
       revenueYuan,
       marginRate,
+      marginM,
     };
   });
 }
@@ -76,17 +91,14 @@ export function buildScenarioLabRows(): ScenarioLabRow[] {
   ];
 }
 
-export function validateScenarioLabRows(
-  rows: ScenarioLabRow[],
-  range: { min: number; max: number } = { min: SCENARIO_LAB_MARGIN_MIN, max: SCENARIO_LAB_MARGIN_MAX },
-): ScenarioLabValidation {
+export function validateScenarioLabRows(rows: ScenarioLabRow[]): ScenarioLabValidation {
   let failedRows = 0;
   for (const row of rows) {
-    if (row.marginRate < range.min || row.marginRate > range.max) failedRows += 1;
+    const { min, max } = expectedMarginRange(row.marginM);
+    if (row.marginRate < min || row.marginRate > max) failedRows += 1;
   }
   return {
     ok: failedRows === 0,
-    range,
     totalRows: rows.length,
     failedRows,
   };

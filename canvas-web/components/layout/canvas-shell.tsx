@@ -72,7 +72,6 @@ function ShellAuthSlot() {
 
 export function CanvasShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
-  const isHome = pathname === "/";
   const isCanvasEditor = pathname.startsWith("/canvas/");
 
   if (isCanvasEditor) {
@@ -82,12 +81,7 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-[var(--canvas-bg)]">
       <header
-        className={cn(
-          "z-40 shrink-0 border-b backdrop-blur-md",
-          isHome
-            ? "border-white/10 bg-[var(--canvas-bg)]/85"
-            : "border-white/10 bg-[var(--canvas-surface)]/90",
-        )}
+        className="z-40 shrink-0 border-b border-white/10 bg-[var(--canvas-bg)]/95 backdrop-blur-md"
         style={{ height: "var(--canvas-header-h)" }}
       >
         <div className="canvas-page flex h-full items-center justify-between gap-3">
@@ -115,10 +109,10 @@ export function CanvasShell({ children }: { children: React.ReactNode }) {
                   key={href}
                   href={href}
                   className={cn(
-                    "canvas-sans shrink-0 rounded-full px-2.5 py-1.5 text-xs transition sm:px-3 sm:text-sm",
+                    "canvas-sans shrink-0 rounded-full px-2.5 py-1.5 text-xs font-semibold tracking-tight transition sm:px-3 sm:text-sm",
                     active
-                      ? "bg-emerald-500/15 font-medium text-emerald-200 ring-1 ring-emerald-400/30"
-                      : "text-emerald-300/70 hover:text-emerald-200",
+                      ? "bg-white/10 text-white ring-1 ring-white/15"
+                      : "text-white/70 hover:text-white",
                   )}
                 >
                   {label}

@@ -72,22 +72,8 @@ export async function assertNoCrossProduct(userId: string): Promise<void> {
         "CROSS_PRODUCT",
       );
     }
-  } else {
-    const creditAcc = await prisma.creditAccount.findUnique({
-      where: { ownerType_ownerId: { ownerType: "USER", ownerId: userId } },
-      select: { planId: true, monthlyGrantCredits: true, currentPeriodEnd: true },
-    });
-    if (
-      creditAcc?.planId &&
-      creditAcc.monthlyGrantCredits > 0 &&
-      (!creditAcc.currentPeriodEnd || creditAcc.currentPeriodEnd > now)
-    ) {
-      throw new BillingPersonaError(
-        "自带 Key 账号不可同时拥有有效会员积分套餐",
-        "CROSS_PRODUCT",
-      );
-    }
   }
+  // BYOK（积分换算 1.0）：允许同时拥有会员订阅（准入 + 轻量包积分池）
 }
 
 export function deriveEcomBillingMode(persona: BillingPersona): EcomBillingMode {

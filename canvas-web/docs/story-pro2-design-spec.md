@@ -118,7 +118,7 @@
 | 手势 | 行为 |
 | --- | --- |
 | **单击** | 弹出「下一步」节点类型菜单（`PRO2_LEFT_ADD_MENU` / `PRO2_RIGHT_ADD_MENU`） |
-| **按住拖动** | 从 `+` 连出边；`connectionRadius` 吸附目标节点边框 Handle |
+| **按住拖动** | 从 `+` 连出边；`connectionRadius: 100` + 节点四边 Handle 热区 + 松手补连（`libtv-connection-snap.ts`） |
 | 位移阈值 | 移动 &lt; 6px 视为点击，≥ 6px 视为拖线（`connectOnClick={false}`） |
 
 | 侧 | Handle id | 语义 |

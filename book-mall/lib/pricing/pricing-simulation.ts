@@ -232,7 +232,7 @@ export function reverseBreakEven(input: {
   const creditByTier = new Map(input.currentCreditsByTier.map((c) => [c.tier, c.creditsPerGen]));
   const breakEven = input.tiers.map((t) => {
     const ppc = tierPricePerCredit(t);
-    const breakEvenCredits = ppc > 0 ? Math.ceil(costYuan / ppc) : 0;
+    const breakEvenCredits = ppc > 0 ? Math.max(1, Math.round(costYuan / ppc)) : 0;
     const currentCredits = creditByTier.get(t.tier) ?? 0;
     const revenue = currentCredits * ppc;
     const safetyRatio = costYuan > 0 ? round4(revenue / costYuan) : 0;

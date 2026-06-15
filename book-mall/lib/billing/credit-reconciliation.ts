@@ -434,27 +434,43 @@ export async function buildTeamCreditBill(input: {
       byMember.set(uid, cur);
     }
 
-    const userIds = [...byMember.keys()].filter((u) => u !== "(系统)");
-    const users = userIds.length
+    const activeMembers = await prisma.tenantMember.findMany({
+      where: { tenantId: input.tenantId, status: "ACTIVE" },
+      select: { userId: true },
+    });
+    const memberUserIds = [
+      ...new Set([
+        ...activeMembers.map((m) => m.userId),
+        ...[...byMember.keys()].filter((u) => u !== "(系统)"),
+      ]),
+    ];
+    const users = memberUserIds.length
       ? await prisma.user.findMany({
-          where: { id: { in: userIds } },
+          where: { id: { in: memberUserIds } },
           select: { id: true, name: true, email: true, phone: true },
         })
       : [];
     const profile = new Map(users.map((u) => [u.id, u]));
 
-    members = [...byMember.entries()]
-      .map(([actorUserId, v]) => ({
-        actorUserId,
-        name: profile.get(actorUserId)?.name ?? null,
-        email: profile.get(actorUserId)?.email ?? null,
-        phone: profile.get(actorUserId)?.phone ?? null,
-        consumed: v.consumed,
-        count: v.count,
-        byModel: [...v.byModel.entries()]
-          .map(([canonicalModelKey, m]) => ({ canonicalModelKey, ...m }))
-          .sort((a, b) => b.credits - a.credits),
-      }))
+    members = memberUserIds
+      .map((actorUserId) => {
+        const v = byMember.get(actorUserId) ?? {
+          consumed: 0,
+          count: 0,
+          byModel: new Map<string, { credits: number; count: number }>(),
+        };
+        return {
+          actorUserId,
+          name: profile.get(actorUserId)?.name ?? null,
+          email: profile.get(actorUserId)?.email ?? null,
+          phone: profile.get(actorUserId)?.phone ?? null,
+          consumed: v.consumed,
+          count: v.count,
+          byModel: [...v.byModel.entries()]
+            .map(([canonicalModelKey, m]) => ({ canonicalModelKey, ...m }))
+            .sort((a, b) => b.credits - a.credits),
+        };
+      })
       .sort((a, b) => b.consumed - a.consumed);
   }
 

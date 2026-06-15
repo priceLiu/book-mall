@@ -16,14 +16,14 @@ export const revalidate = 0;
 export const metadata = {
   title: "积分报价 · 个人 / 团队会员",
   description:
-    "统一积分体系：个人 / 团队，按月 / 年，五档套餐。透明公式：套餐积分 → 各模型每次消耗 → 可生成数量。另支持自带 Key（BYOK），仅收技术服务费与资源费。",
+    "统一积分体系：个人 / 团队会员订阅 + 轻量包充值；透明公式：套餐积分 → 各模型每次消耗。自带 Key 用户厂商 API 自理，超额编排从轻量包扣积分。",
 };
 
 export default async function PricingPage() {
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id;
 
-  const [config, plansRaw, pricesRaw, byok, byokQuotas, rates, teamTenants] = await Promise.all([
+  const [config, plansRaw, pricesRaw, byokQuotas, rates, teamTenants] = await Promise.all([
     loadPricingConfig(),
     prisma.membershipPlan.findMany({
       where: { active: true },
@@ -34,7 +34,6 @@ export default async function PricingPage() {
       where: { active: true },
       orderBy: { creditsPerUnit: "asc" },
     }),
-    prisma.byokServiceConfig.findMany({ where: { active: true }, orderBy: { techServiceFeeYuan: "asc" } }),
     prisma.byokTaskQuota.findMany({ where: { active: true }, orderBy: [{ scopeKey: "asc" }, { taskKind: "asc" }] }),
     prisma.resourceMeterRate.findMany({ where: { active: true }, orderBy: { resourceType: "asc" } }),
     userId
@@ -50,7 +49,6 @@ export default async function PricingPage() {
     <PricingPageClient
       anchorYuan={config.creditAnchorYuan}
       isLoggedIn={!!userId}
-      teamTenants={teamTenants}
       plans={plansRaw.map((p) => ({
         id: p.id,
         family: p.family,
@@ -75,13 +73,6 @@ export default async function PricingPage() {
         unit: m.unit,
         creditsPerUnit: m.creditsPerUnit,
       }))}
-      byok={byok.map((b) => ({
-        scopeKey: b.scopeKey,
-        label: b.label,
-        techServiceFeeYuan: Number(b.techServiceFeeYuan),
-        interval: b.interval,
-        minSeats: b.minSeats,
-      }))}
       byokQuotas={sortByokQuotasForDisplay(byokQuotas).map((q) => ({
         scopeKey: q.scopeKey,
         taskKind: q.taskKind,
@@ -90,6 +81,7 @@ export default async function PricingPage() {
         overageCredits: q.overageCredits,
       }))}
       rates={rates.map((r) => ({ resourceType: r.resourceType, coefficientYuan: Number(r.coefficientYuan), unitLabel: r.unitLabel }))}
+      teamTenants={teamTenants}
     />
   );
 }

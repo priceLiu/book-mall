@@ -48,7 +48,7 @@ export function Sbv1VideoToolbar({
       patch.durationSec = 0;
       patch.resolution = data.resolution ?? "720p";
     } else if (data.durationSec < 4 || data.durationSec > 15) {
-      patch.durationSec = 5;
+      patch.durationSec = 15;
     }
     onPatch(patch);
   };

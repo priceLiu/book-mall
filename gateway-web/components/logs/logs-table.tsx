@@ -149,7 +149,8 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
-  const [liveClockTick, setLiveClockTick] = useState(0);
+  /** 仅客户端更新，避免进行中 Duration 在 SSR/ hydration 时用 Date.now() 不一致 */
+  const [liveNowMs, setLiveNowMs] = useState<number | null>(null);
 
   const dateRangeInvalid = isLogDateRangeInvalid(fromDate, toDate);
   const hasDateFilter = !!(fromDate || toDate);
@@ -179,11 +180,12 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
     setLogs(initialLogs);
   }, [initialLogs]);
 
-  /** 进行中任务 · 本地每秒刷新 Duration 列 */
+  /** 进行中任务 · 挂载后再用本地时钟刷新 Duration 列（禁止 SSR 阶段读 Date.now） */
   useEffect(() => {
+    setLiveNowMs(Date.now());
     if (!hasInFlightLogs) return;
     const timer = window.setInterval(() => {
-      setLiveClockTick((n) => n + 1);
+      setLiveNowMs(Date.now());
     }, LIVE_CLOCK_MS);
     return () => window.clearInterval(timer);
   }, [hasInFlightLogs]);
@@ -583,14 +585,15 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
           </thead>
           <tbody>
             {filtered.map((l) => {
-              void liveClockTick;
               const isInProgress =
                 l.status === "RUNNING" || l.status === "PENDING";
               const durationMs = resolveLogDurationMs(
                 l.durationMs,
                 l.submittedAt,
                 l.completedAt,
-                isInProgress ? { inProgress: true, nowMs: Date.now() } : undefined,
+                isInProgress && liveNowMs != null
+                  ? { inProgress: true, nowMs: liveNowMs }
+                  : undefined,
               );
               const duration = formatDurationSeconds(durationMs);
               const usage = formatUsageYuanDisplay(l.estimatedVendorCostYuan);

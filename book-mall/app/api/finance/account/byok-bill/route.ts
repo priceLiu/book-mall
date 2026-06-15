@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     return financeJson(request, { periodKey, bill: null, message: "无有效 BYOK 套餐" });
   }
 
-  const techFee = Number(sub.techServiceFeeYuan) * (sub.seats || 1);
+  const techFee = 0;
   const bill = await buildUserByokBill({
     ref: { ownerType: "USER", ownerId: user.id },
     periodKey,

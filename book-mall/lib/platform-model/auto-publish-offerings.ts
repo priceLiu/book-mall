@@ -2,11 +2,11 @@ import type { CanvasModelRole, GatewayProviderKind } from "@prisma/client";
 
 import {
   marginGuardForUnit,
-  marginMForUnit,
   marginPassesGuard,
   publishModelCreditPrice,
   loadPricingConfig,
   computeCreditPrice,
+  resolveModelMarginM,
 } from "@/lib/pricing/credit-pricing-engine";
 import { prisma } from "@/lib/prisma";
 import {
@@ -41,6 +41,7 @@ async function loadRoutesForCanonical(
 async function pickBestRoute(
   canonicalModelKey: string,
   config: Awaited<ReturnType<typeof loadPricingConfig>>,
+  costCanonicalKey?: string,
 ): Promise<{
   route: CanonicalRouteDef;
   netCostYuan: number;
@@ -57,17 +58,23 @@ async function pickBestRoute(
   } | null = null;
 
   const routes = await loadRoutesForCanonical(canonicalModelKey);
+  const costKey = costCanonicalKey ?? canonicalModelKey;
 
   for (const route of routes) {
     const profiles = await prisma.modelCostProfile.findMany({
-      where: { canonicalModelKey, vendor: route.vendor, active: true },
+      where: { canonicalModelKey: costKey, vendor: route.vendor, active: true },
       orderBy: [{ channel: "asc" }, { netCostYuan: "asc" }],
     });
     const profile = profiles[0];
     if (!profile) continue;
 
     const netCostYuan = toNum(profile.netCostYuan);
-    const marginM = marginMForUnit(profile.unit, config);
+    const marginM = resolveModelMarginM({
+      unit: profile.unit,
+      netCostYuan,
+      defaultMarginM: config.defaultMarginM,
+      videoMarginM: config.videoMarginM,
+    });
     const minGuard = marginGuardForUnit(profile.unit, config);
     const comp = computeCreditPrice({
       listCostYuan: toNum(profile.listCostYuan),
@@ -116,7 +123,16 @@ export async function autoPublishPlatformOfferings(input?: {
       continue;
     }
 
-    const best = await pickBestRoute(def.canonicalModelKey, config);
+    const pricingCanonicalKey =
+      def.canonicalModelKey === "lib-nano-pro"
+        ? "lib-nano-pro-2k"
+        : def.canonicalModelKey;
+
+    const best = await pickBestRoute(
+      def.canonicalModelKey,
+      config,
+      pricingCanonicalKey,
+    );
     if (!best) {
       warnings.push(`${def.canonicalModelKey}: 无合规路由（成本或毛利不达标）`);
       skipped++;
@@ -124,11 +140,19 @@ export async function autoPublishPlatformOfferings(input?: {
     }
 
     try {
-      await publishModelCreditPrice({
-        canonicalModelKey: def.canonicalModelKey,
-        displayName: def.displayName,
-        publishedBy: input?.publishedBy,
-      });
+      if (def.canonicalModelKey === "lib-nano-pro") {
+        await publishModelCreditPrice({
+          canonicalModelKey: pricingCanonicalKey,
+          displayName: `${def.displayName} · 2K`,
+          publishedBy: input?.publishedBy,
+        });
+      } else {
+        await publishModelCreditPrice({
+          canonicalModelKey: def.canonicalModelKey,
+          displayName: def.displayName,
+          publishedBy: input?.publishedBy,
+        });
+      }
     } catch (e) {
       warnings.push(
         `${def.canonicalModelKey}: 发布报价失败 ${e instanceof Error ? e.message : String(e)}`,
@@ -181,7 +205,12 @@ export async function autoPublishPlatformOfferings(input?: {
         const comp = computeCreditPrice({
           listCostYuan: toNum(profile.listCostYuan),
           discountRate: toNum(profile.discountRate),
-          marginM: marginMForUnit(profile.unit, config),
+          marginM: resolveModelMarginM({
+            unit: profile.unit,
+            netCostYuan,
+            defaultMarginM: config.defaultMarginM,
+            videoMarginM: config.videoMarginM,
+          }),
           anchorYuan: config.creditAnchorYuan,
         });
         marginOk = marginPassesGuard(

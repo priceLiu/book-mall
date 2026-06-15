@@ -3,7 +3,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { AuthAnimatedScreen } from "@/components/auth/auth-animated-screen";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/components/auth/animated-auth-ui";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
 import { LoginLegacyGuide } from "@/components/auth/login-legacy-guide";
-import { markBookMallSessionActive } from "@/lib/session-kicked-marker";
+import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 import { cn } from "@/lib/utils";
 
 function safeNextPath(raw: string | null): string {
@@ -44,7 +44,6 @@ function redirectProductionHttpToHttps(): void {
 type LoginTab = "password" | "otp";
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("callbackUrl"));
 
@@ -80,9 +79,8 @@ export function LoginForm() {
         setError("登录请求失败，请清除本站 Cookie 后重试或稍后再试");
         return;
       }
-      markBookMallSessionActive();
-      router.push(next);
-      router.refresh();
+      navigateAfterAuth(next);
+      return;
     } catch {
       setError("无法连接登录服务，请刷新页面后重试");
     } finally {

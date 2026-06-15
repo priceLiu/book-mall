@@ -6,7 +6,10 @@ import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea"
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
-import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
+import {
+  resolvePro2DockUpstreamLinks,
+  resolvePro2DockStyleFromUpstream,
+} from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
@@ -96,14 +99,17 @@ export function Sbv1ImageNodeEmbeddedDock({
   if (!storeNode) return null;
 
   const styleRef = d.dockStyleRef;
+  const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
+  const styleActive = Boolean(styleRef || linkedStyle);
+  const styleLabel = styleRef?.name ?? linkedStyle?.name;
 
   return (
     <Pro2EmbeddedInputDock
       header={
         <Pro2DockContextBar>
           <Pro2DockStyleButton
-            active={Boolean(styleRef)}
-            label={styleRef?.name}
+            active={styleActive}
+            label={styleLabel}
             disabled={isRunning}
             onClick={onOpenStyleLibrary}
           />

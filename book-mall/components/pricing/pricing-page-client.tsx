@@ -35,7 +35,7 @@ import {
   type SeatBand,
 } from "@/lib/pricing/credit-pricing-formulas";
 import { CreditTopupSection } from "@/components/pricing/credit-topup-section";
-import { ByokSubscribeButtons } from "@/components/pricing/byok-subscribe-buttons";
+import { ByokMembershipCta } from "@/components/pricing/byok-subscribe-buttons";
 
 interface SeatTier {
   seatMin: number;
@@ -61,13 +61,6 @@ interface ModelPrice {
   displayName: string;
   unit: string;
   creditsPerUnit: number;
-}
-interface ByokConfig {
-  scopeKey: string;
-  label: string;
-  techServiceFeeYuan: number;
-  interval: string;
-  minSeats: number | null;
 }
 interface ByokQuota {
   scopeKey: string;
@@ -151,20 +144,18 @@ export function PricingPageClient({
   anchorYuan,
   plans,
   models,
-  byok,
   byokQuotas = [],
   rates,
+  teamTenants = [],
   isLoggedIn,
-  teamTenants,
 }: {
   anchorYuan: number;
   plans: Plan[];
   models: ModelPrice[];
-  byok: ByokConfig[];
   byokQuotas?: ByokQuota[];
   rates: ResourceRate[];
+  teamTenants?: { id: string; name: string }[];
   isLoggedIn: boolean;
-  teamTenants: { id: string; name: string }[];
 }) {
   const [family, setFamily] = useState<"PERSONAL" | "TEAM">("PERSONAL");
   const [interval, setInterval] = useState<"MONTH" | "YEAR">("MONTH");
@@ -418,67 +409,51 @@ export function PricingPageClient({
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 已有厂商 API Key？绑定后模型费用由你与厂商直接结算，平台
-                <b className="text-foreground">不扣积分、不赚差价</b>，仅收技术服务费。
-                <b className="text-foreground"> BYOK 不含月度积分发放</b>；套餐内含月度任务次数，超出后购买轻量包按次扣积分。
+                <b className="text-foreground">不扣推理积分</b>。须先
+                <b className="text-foreground">开通会员订阅</b>获得工具准入；套餐内含月度任务次数，超出后购买轻量包按次扣积分。
               </p>
               <div className="mt-3 rounded-lg border border-amber-400/40 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
                 <p className="font-medium text-foreground">BYOK 怎么扣费？</p>
                 <ul className="mt-1 list-inside list-disc space-y-0.5">
                   <li>
-                    <b className="text-foreground">月费</b>：技术服务（下方各档 ¥/月）
+                    <b className="text-foreground">会员订阅</b>：工具准入（与平台代付共用套餐体系）
                   </li>
                   <li>
-                    <b className="text-foreground">套餐内</b>：文生图（含试衣）、图生视频、视频生视频、视频理解、TTS 按次数免费（见各档额度）
+                    <b className="text-foreground">套餐内</b>：文生图（含试衣）、图生视频、视频生视频、视频理解、TTS 按次数免费
                   </li>
                   <li>
-                    <b className="text-foreground">超额</b>：从轻量包通用积分池按次扣分（锚定 ¥0.04/积分）
-                  </li>
-                  <li>
-                    <b className="text-foreground">工具月费</b>：各 AI 工具 navKey 准入费另计（见
-                    <Link href="/pricing-disclosure#tool-service-fee" className="text-amber-600 underline dark:text-amber-400">
-                      价格公示
-                    </Link>
-                    ）
+                    <b className="text-foreground">超额</b>：从轻量包通用积分池按次扣分
                   </li>
                   <li>
                     <b className="text-foreground">厂商费</b>：走你的 Gateway Key，Book 不代收
                   </li>
                 </ul>
               </div>
-              {byok.length > 0 ? (
-                <div className="mt-3 space-y-3 text-sm">
-                  {byok.map((b) => (
-                    <div key={b.scopeKey} className="rounded-lg border border-amber-300/40 p-3">
-                      <div className="flex justify-between font-semibold">
-                        <span>{b.label}</span>
-                        <span>
-                          ¥{b.techServiceFeeYuan}/{b.interval === "YEAR" ? "年" : "月"}
-                          {b.scopeKey === "team-seat" && b.minSeats ? ` / 席（${b.minSeats} 席起）` : ""}
-                        </span>
-                      </div>
-                      {byokQuotas.filter((q) => q.scopeKey === b.scopeKey).length > 0 ? (
-                        <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-                          {byokQuotas
-                            .filter((q) => q.scopeKey === b.scopeKey)
-                            .map((q) => (
-                              <li key={q.taskKind}>
-                                {q.label}：含 {q.monthlyIncluded} 次/月
-                                {b.scopeKey === "team-seat" ? "/席" : ""}，超额 {q.overageCredits} 积分/次
-                              </li>
-                            ))}
-                        </ul>
-                      ) : null}
-                      <ByokSubscribeButtons
-                        scopeKey={b.scopeKey}
-                        label={b.label}
-                        techServiceFeeYuan={b.techServiceFeeYuan}
-                        minSeats={b.minSeats}
-                        isLoggedIn={isLoggedIn}
-                        isTeamScope={b.scopeKey === "team-seat"}
-                        teamTenants={teamTenants}
-                      />
-                    </div>
-                  ))}
+              {byokQuotas.length > 0 ? (
+                <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                  {byokQuotas
+                    .filter((q) => q.scopeKey === "personal")
+                    .map((q) => (
+                      <li key={q.taskKind}>
+                        {q.label}：含 {q.monthlyIncluded} 次/月，超额 {q.overageCredits} 积分/次
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
+              <ByokMembershipCta isLoggedIn={isLoggedIn} />
+              {byokQuotas.some((q) => q.scopeKey === "team-seat") ? (
+                <div className="mt-3 border-t border-amber-300/30 pt-3">
+                  <p className="text-xs font-medium text-foreground">团队 BYOK</p>
+                  <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                    {byokQuotas
+                      .filter((q) => q.scopeKey === "team-seat")
+                      .map((q) => (
+                        <li key={q.taskKind}>
+                          {q.label}：含 {q.monthlyIncluded} 次/月/席，超额 {q.overageCredits} 积分/次
+                        </li>
+                      ))}
+                  </ul>
+                  <ByokMembershipCta isLoggedIn={isLoggedIn} isTeamScope />
                 </div>
               ) : null}
               {rates.length > 0 ? (

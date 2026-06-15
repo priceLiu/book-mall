@@ -9,6 +9,7 @@
 import type { CanvasEnginePick } from "./types";
 import { GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID } from "./system-providers";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
+import type { Sbv1AspectRatio } from "./sbv1-workspace-types";
 
 export type Sbv1VolcengineModelOption = {
   id: string;
@@ -227,6 +228,7 @@ export function migrateSbv1ModelVariantId(
 }
 
 export const SBV1_ASPECT_RATIOS = [
+  "auto",
   "21:9",
   "16:9",
   "4:3",
@@ -234,6 +236,10 @@ export const SBV1_ASPECT_RATIOS = [
   "3:4",
   "9:16",
 ] as const;
+
+export function sbv1AspectRatioLabel(r: Sbv1AspectRatio): string {
+  return r === "auto" ? "自动" : r;
+}
 
 export const SBV1_REFERENCE_MODES = [
   { id: "omni" as const, label: "全能参考" },
@@ -268,6 +274,6 @@ export function estimateSbv1ListCostYuan(args: {
 }): number | null {
   const rate = args.listCostYuanPerSec;
   if (rate == null || !Number.isFinite(rate)) return null;
-  const sec = Math.max(4, Math.min(15, Math.round(args.durationSec || 5)));
+  const sec = Math.max(4, Math.min(15, Math.round(args.durationSec || 15)));
   return Math.round(rate * sec * 100) / 100;
 }

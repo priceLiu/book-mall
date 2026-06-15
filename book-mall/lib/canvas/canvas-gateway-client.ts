@@ -174,6 +174,7 @@ export async function canvasGwCreateKieJob(
     callBackUrl?: string | null;
     clientPage?: string;
     projectId?: string;
+    sbv1Billing?: Record<string, unknown>;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -191,7 +192,10 @@ export async function canvasGwCreateKieJob(
     apiKeyId: auth.id,
     body: {
       model: opts.model,
-      input: opts.input,
+      input: {
+        ...opts.input,
+        ...(opts.sbv1Billing ? { sbv1Billing: opts.sbv1Billing } : {}),
+      },
       callBackUrl: opts.callBackUrl ?? null,
     },
     meta: await canvasGwMeta(userId, {
@@ -214,6 +218,7 @@ export async function canvasGwCreateVolcengineVideoJob(
     body: Record<string, unknown>;
     clientPage?: string;
     projectId?: string;
+    sbv1Billing?: Record<string, unknown>;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -236,7 +241,13 @@ export async function canvasGwCreateVolcengineVideoJob(
 
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
-    body: { model: opts.model, input: opts.body },
+    body: {
+      model: opts.model,
+      input: {
+        ...opts.body,
+        ...(opts.sbv1Billing ? { sbv1Billing: opts.sbv1Billing } : {}),
+      },
+    },
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
       projectId: opts.projectId,

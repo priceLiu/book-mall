@@ -152,8 +152,11 @@ type CanvasState = {
    */
   connectingFromNodeId: string | null;
   dragHoverGroupId: string | null;
+  /** 节点拖动/缩放几何进行中：浮动 Dock 隐藏，松手后恢复 */
+  canvasGeometryDragging: boolean;
   setConnectingFrom: (id: string | null) => void;
   setDragHoverGroup: (id: string | null) => void;
+  setCanvasGeometryDragging: (dragging: boolean) => void;
 
   /** 故事大纲审阅弹窗（全局，避免节点重渲染丢失 open 状态） */
   storyHubReview: { hubId: string; section: HubPreviewSection } | null;
@@ -284,8 +287,11 @@ export const useCanvasStore = create<CanvasState>()(
       graphRevision: 0,
       connectingFromNodeId: null,
       dragHoverGroupId: null,
+      canvasGeometryDragging: false,
       setConnectingFrom: (id) => set({ connectingFromNodeId: id }),
       setDragHoverGroup: (id) => set({ dragHoverGroupId: id }),
+      setCanvasGeometryDragging: (dragging) =>
+        set({ canvasGeometryDragging: dragging }),
 
       storyHubReview: null,
       openStoryHubReview: (hubId, section) =>

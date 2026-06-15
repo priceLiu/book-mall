@@ -1,6 +1,6 @@
 /**
  * 财务 2.0 — scenario-lab 与 seed 用的 30 个 PER_SEC 视频模型成本档。
- * 净成本经 M=4 发布后基准毛利 ≈75%（见 credit-pricing-formulas）。
+ * 净成本经分档 M（贵视频 1.0 / 普通 1.5）发布（见 model-margin-policy）。
  */
 export interface VideoModelSeed {
   canonicalModelKey: string;

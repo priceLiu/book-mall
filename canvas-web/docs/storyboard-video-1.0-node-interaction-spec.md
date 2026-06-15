@@ -48,7 +48,7 @@ SBV1_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 
 ## 2. 侧栏 `+`（选中时出现）
 
-复用 `Pro2NodeSidePlus`；规则同 Pro2 §7.2（单击菜单 / 按住拖线，`connectionRadius: 30`）。
+复用 `Pro2NodeSidePlus`；规则同 Pro2 §7.2（单击菜单 / 按住拖线，`connectionRadius: 100` + 节点边框热区吸附）。
 
 | 节点 | 左 + | 右 + |
 | --- | --- | --- |
@@ -81,6 +81,20 @@ SBV1_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 | --- | --- | --- | --- |
 | `sbv1-image` | **350 × 350**（`LIBTV_SQUARE_IMAGE_NODE_*` · 与 Pro2 图片同） | 220 × 220 | 组外可选中缩放 |
 | `sbv1-video-engine` | **635 × 365**（`SBV1_VIDEO_ENGINE_*`） | 380 × 218 | 组外可选中缩放 |
+
+### 5.1 媒体到达后 · 自动适配尺寸（强制）
+
+| 阶段 | 行为 |
+| --- | --- |
+| **空态 / 新建** | 使用上表默认尺寸（`NODE_DEFAULT_SIZE` · 常量 token） |
+| **上传或生成完成** | 探测图片 `naturalWidth/Height` 或视频 `videoWidth/Height`，按真实宽高比重算节点外框 |
+| **实现** | `useLibtvMediaNodeAutoFit` · `lib/canvas/libtv-media-node-auto-fit.ts` |
+| **计算** | 预览区宽 = 默认宽基准（图片 350 · 视频 635），高 = 标题栏 + 等比 stage；不低于 min 尺寸 |
+| **新媒体** | 换图 / 新视频 **始终**重算（即使用户曾手动 NodeResizer 拉伸） |
+| **组内参考图** | sbv1 媒体组宫格 relayout 仍用统一格，**跳过**自动适配（避免与宫格算法冲突） |
+| **组内视频合成** | 适配后写 `data.mediaFit`，`sbv1-media-group-layout` 用实测尺寸并重排组框 |
+
+**禁止**：在节点组件内手写第二套尺寸计算；须复用 `computeLibtvMediaNodeSize` / `useLibtvMediaNodeAutoFit`。
 
 ## 6. Store 约束
 
@@ -120,3 +134,4 @@ SBV1_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 - [ ] 交互区（Dock / Eye / 侧 +）已 `nodrag`
 - [ ] 空态未用 `<button>` 包裹整卡
 - [ ] 图片节点已挂载 `Pro2ImageNodeToolbar`（有图时）与 `Sbv1ImageInputDock`
+- [ ] 图片/视频有媒体后已走 `useLibtvMediaNodeAutoFit`（非手写尺寸）

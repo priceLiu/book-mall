@@ -18,6 +18,29 @@ const CACHE: {
   ts: 0,
 };
 const TTL_MS = 30_000;
+let prefetchInflight: Promise<void> | null = null;
+
+async function fetchUserProvidersIntoCache(base: string): Promise<void> {
+  const result = await listCanvasProviders(base);
+  CACHE.value = result.providers;
+  CACHE.gatewayLink = result.gatewayLink;
+  CACHE.ts = Date.now();
+}
+
+/** 画布页挂载时预拉 Provider，避免 EnginePicker 首次打开卡顿 */
+export function prefetchUserProviders(base: string | null | undefined): void {
+  if (!base) return;
+  const fresh = CACHE.value && Date.now() - CACHE.ts < TTL_MS;
+  if (fresh) return;
+  if (prefetchInflight) return;
+  prefetchInflight = fetchUserProvidersIntoCache(base)
+    .catch(() => {
+      /* hook 打开时会重试 */
+    })
+    .finally(() => {
+      prefetchInflight = null;
+    });
+}
 
 /**
  * 取当前用户的全部 Provider（含 models）。
@@ -47,14 +70,11 @@ export function useUserProviders(opts?: { forceRefresh?: boolean }) {
     }
     let cancelled = false;
     setLoading(true);
-    void listCanvasProviders(base)
-      .then((result) => {
+    void fetchUserProvidersIntoCache(base)
+      .then(() => {
         if (cancelled) return;
-        CACHE.value = result.providers;
-        CACHE.gatewayLink = result.gatewayLink;
-        CACHE.ts = Date.now();
-        setProviders(result.providers);
-        setGatewayLink(result.gatewayLink);
+        setProviders(CACHE.value!);
+        setGatewayLink(CACHE.gatewayLink);
         setError(null);
       })
       .catch((e) => {

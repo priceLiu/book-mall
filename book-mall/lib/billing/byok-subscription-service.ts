@@ -38,10 +38,40 @@ export async function getActiveByokSubscription(
   });
 }
 
-export async function assertActiveByokSubscription(ref: AccountRef): Promise<ByokSubscription> {
-  const sub = await getActiveByokSubscription(ref);
-  if (!sub) throw new ByokSubscriptionRequiredError();
-  return sub;
+export async function assertActiveByokSubscription(ref: AccountRef): Promise<ByokSubscription | null> {
+  const legacy = await getActiveByokSubscription(ref);
+  if (legacy) return legacy;
+
+  const now = new Date();
+  if (ref.ownerType === "USER") {
+    const acc = await prisma.creditAccount.findUnique({
+      where: { ownerType_ownerId: { ownerType: "USER", ownerId: ref.ownerId } },
+      select: { planId: true, currentPeriodEnd: true },
+    });
+    if (
+      acc?.planId &&
+      (!acc.currentPeriodEnd || acc.currentPeriodEnd > now)
+    ) {
+      return null;
+    }
+  } else {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: ref.ownerId },
+      select: { planId: true, currentPeriodEnd: true, status: true, type: true },
+    });
+    if (
+      tenant?.type === "TEAM" &&
+      tenant.status === "ACTIVE" &&
+      tenant.planId &&
+      (!tenant.currentPeriodEnd || tenant.currentPeriodEnd > now)
+    ) {
+      return null;
+    }
+  }
+
+  throw new ByokSubscriptionRequiredError(
+    "须先开通会员订阅（报价页）并关联 Gateway Key；超额编排从轻量包扣积分",
+  );
 }
 
 /** 个人有效 BYOK，或所在团队租户有有效 BYOK。 */

@@ -134,6 +134,18 @@ export function storyRunPendingPatch(
       ),
     };
   }
+  if (node.type === "sbv1-image") {
+    return {
+      uploading: true,
+      uploadError: undefined,
+      runtime: {
+        status: "pending",
+        taskId: undefined,
+        failCode: undefined,
+        failMessage: undefined,
+      } satisfies CanvasNodeRuntime,
+    };
+  }
   return null;
 }
 

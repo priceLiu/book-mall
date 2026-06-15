@@ -28,6 +28,8 @@ description: >-
 
 **禁止** sbv1 图片单独定义与 Pro2 不同的默认尺寸；视频合成使用 `SBV1_VIDEO_ENGINE_*`，不与 Pro2 组格 alias。
 
+**媒体到达后**：空态用上表默认尺寸；上传/生成完成后 `useLibtvMediaNodeAutoFit` 按真实宽高比改节点外框（见 `libtv-media-node-auto-fit.ts` · 文档 §5.1）。
+
 | 禁止 | 唯一实现 |
 | --- | --- |
 | 第二套 Dock / 顶栏 / 侧 `+` / 媒体壳 / 组顶栏 | 见下表 |
@@ -35,6 +37,7 @@ description: >-
 | 媒体空态不可拖 | `Pro2MediaNodeEmptyState` + **`passNodeDrag`** |
 | 裸 `<select>` 模型列表 | `EnginePicker` |
 | 生图/生视频 loading 仅 Loader2 | `LibtvMediaGeneratingState` |
+| 手写媒体尺寸计算 | `useLibtvMediaNodeAutoFit` · `libtv-media-node-auto-fit.ts` |
 | `window.alert/confirm/prompt` | `useDialogs()` |
 
 | 能力 | 组件 / 模块 |

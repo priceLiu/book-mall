@@ -12,7 +12,7 @@ import type { CreditCostUnit, GatewayRequestLog } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import type { CostSnapshot } from "@/lib/gateway/credit-billing-guard";
-import { resolveCostSnapshot, resolveCanonicalModelKey } from "@/lib/gateway/credit-billing-guard";
+import { resolveCostSnapshot, resolveBillingCanonicalKey } from "@/lib/gateway/credit-billing-guard";
 import {
   computeTierCredits,
   isVideoBillingUnit,
@@ -398,7 +398,12 @@ export async function reserveVideoCreditsForLog(log: GatewayRequestLog): Promise
   if (log.billingMode === "BYOK") return 0;
   if (!isVideoLog(log)) return 0;
 
-  const canonical = log.canonicalModelKey ?? (await resolveCanonicalModelKey(log.model).catch(() => null));
+  const canonical =
+    log.canonicalModelKey ??
+    (await resolveBillingCanonicalKey({
+      modelKey: log.model,
+      inputSummary: log.inputSummary,
+    }).catch(() => null));
   if (!canonical) return 0;
   const snap = await resolveCostSnapshot(canonical);
   if (!snap) return 0;

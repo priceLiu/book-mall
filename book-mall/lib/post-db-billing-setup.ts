@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import { prisma } from "@/lib/prisma";
 import { runFullAutoCalibration } from "@/lib/model-catalog/auto-calibrate";
 import { backfillModelCatalogVendorFields } from "@/lib/model-catalog/backfill-vendor-fields";
+import { seedUnifiedCreditBilling } from "@/lib/billing/seed-credit-billing";
 
 const BOOK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -42,6 +43,9 @@ export async function runPostDbBillingSetup(opts?: {
   skipRefreshSnapshots?: boolean;
 }): Promise<PostDbBillingSetupResult> {
   console.log("[post-billing] start …");
+
+  console.log("[post-billing] seedUnifiedCreditBilling …");
+  await seedUnifiedCreditBilling("post-db-billing-setup");
 
   const costProfilesBefore = await prisma.modelCostProfile.count({
     where: { active: true },

@@ -131,7 +131,7 @@ export default async function AccountByokPage({
                 <p className="tabular-nums text-muted-foreground">
                   有效期至 {personalSub.periodEnd.toLocaleString("zh-CN")}
                   {" · "}
-                  ¥{Number(personalSub.techServiceFeeYuan)}/月
+                  会员订阅准入（无技术服务费）
                 </p>
                 {quotas.length > 0 ? (
                   <ul className="space-y-1 rounded-md bg-muted/40 px-3 py-2 text-xs">
@@ -226,7 +226,7 @@ export default async function AccountByokPage({
                       <p className="mt-1 text-xs text-muted-foreground">未开通</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         <Link
-                          href={`/checkout/byok?scope=team-seat&tenantId=${tenant.id}`}
+                          href={`/pricing#team`}
                           className={textLink}
                         >
                           为团队开通 BYOK

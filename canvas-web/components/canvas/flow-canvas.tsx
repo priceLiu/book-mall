@@ -12,6 +12,7 @@ import {
   useEdgesState,
   useReactFlow,
   type NodeChange,
+  type OnConnectEnd,
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -36,6 +37,7 @@ import {
   parseProjectAssetDragPayload,
 } from "@/lib/canvas/spawn-project-asset-on-canvas";
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
+import { resolveSnapConnectionOnNodeHit } from "@/lib/canvas/libtv-connection-snap";
 import {
   applyDragSnapToNode,
   computeDragSnap,
@@ -243,6 +245,10 @@ function FlowCanvasInner({
     return unsub;
   }, [setRfNodes, setRfEdges]);
 
+  const setCanvasGeometryDragging = useCanvasStore(
+    (s) => s.setCanvasGeometryDragging,
+  );
+
   const handleNodesChange = useCallback(
     (changes: NodeChange<CanvasFlowNode>[]) => {
       // 始终只更新本地 RF 状态 → 拖动每帧只重绘被拖节点，画面流畅
@@ -251,12 +257,14 @@ function FlowCanvasInner({
         // 拖动 / 缩放过程中不写 zustand：避免每帧触发所有订阅 s.nodes 的节点重渲染
         // 终态（dragging:false / resizing:false）会在松手那帧落库
         deferStoreGraphSyncRef.current = true;
+        setCanvasGeometryDragging(true);
         return;
       }
       deferStoreGraphSyncRef.current = false;
+      setCanvasGeometryDragging(false);
       storeOnNodesChange(changes);
     },
-    [onRfNodesChange, storeOnNodesChange],
+    [onRfNodesChange, storeOnNodesChange, setCanvasGeometryDragging],
   );
 
   const handleEdgesChange = useCallback(
@@ -392,6 +400,7 @@ function FlowCanvasInner({
   const onNodeDragStart = useCallback(
     (_event: React.MouseEvent, node: { id: string; type?: string }) => {
       setIsNodeDragging(true);
+      setCanvasGeometryDragging(true);
       setSnapGuides([]);
       lastSnapGuideKeyRef.current = "";
       if (enableDragSnapGuides && node.type !== "group") {
@@ -406,7 +415,7 @@ function FlowCanvasInner({
       useCanvasStore.temporal.getState().pause();
       dragUndoPausedRef.current = true;
     },
-    [enableDragSnapGuides, getNodes],
+    [enableDragSnapGuides, getNodes, setCanvasGeometryDragging],
   );
 
   const onNodeDrag = useCallback(
@@ -471,6 +480,7 @@ function FlowCanvasInner({
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string; parentId?: string }) => {
       setIsNodeDragging(false);
+      setCanvasGeometryDragging(false);
       setSnapGuides([]);
       deferStoreGraphSyncRef.current = false;
       if (dragUndoPausedRef.current) {
@@ -522,6 +532,7 @@ function FlowCanvasInner({
       reparentNode,
       setDragHoverGroup,
       setRfNodes,
+      setCanvasGeometryDragging,
     ],
   );
 
@@ -531,9 +542,39 @@ function FlowCanvasInner({
     },
     [setConnectingFrom],
   );
-  const onConnectEnd = useCallback(() => {
-    setConnectingFrom(null);
-  }, [setConnectingFrom]);
+  const onConnectEnd = useCallback<OnConnectEnd>(
+    (event, connectionState) => {
+      setConnectingFrom(null);
+      if (connectionState.isValid) return;
+
+      const clientX =
+        "changedTouches" in event
+          ? event.changedTouches[0]?.clientX
+          : event.clientX;
+      const clientY =
+        "changedTouches" in event
+          ? event.changedTouches[0]?.clientY
+          : event.clientY;
+      if (clientX == null || clientY == null) return;
+
+      const flowPoint = screenToFlowPosition({ x: clientX, y: clientY });
+      const nodes = getNodes() as CanvasFlowNode[];
+      const snapped = resolveSnapConnectionOnNodeHit(
+        {
+          isValid: connectionState.isValid ?? undefined,
+          fromNodeId: connectionState.fromNode?.id,
+          fromHandleId: connectionState.fromHandle?.id,
+          fromHandleType: connectionState.fromHandle?.type,
+          toNodeId: connectionState.toNode?.id,
+          toHandleId: connectionState.toHandle?.id,
+        },
+        nodes,
+        flowPoint,
+      );
+      if (snapped) onConnect(snapped);
+    },
+    [setConnectingFrom, screenToFlowPosition, getNodes, onConnect],
+  );
 
   // 分组拖入高亮：仅 patch 目标 group，避免每帧克隆全图 nodes
   const decoratedNodes = useMemo(() => {
@@ -577,7 +618,7 @@ function FlowCanvasInner({
           ...e,
           zIndex: 1000,
           className: `${e.className ?? ""} pro2-edge-active pro2-edge-up`.trim(),
-          style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: 2.5 },
+          style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: 1.5 },
         };
       }
       if (focusEdgeIds.has(e.source)) {
@@ -585,7 +626,7 @@ function FlowCanvasInner({
           ...e,
           zIndex: 1000,
           className: `${e.className ?? ""} pro2-edge-active pro2-edge-down`.trim(),
-          style: { ...(e.style ?? {}), stroke: "#a78bfa", strokeWidth: 2.5 },
+          style: { ...(e.style ?? {}), stroke: "#a78bfa", strokeWidth: 1.5 },
         };
       }
       return {
@@ -998,8 +1039,9 @@ function FlowCanvasInner({
         noDragClassName="nodrag"
         minZoom={0.02}
         maxZoom={32}
-        connectionRadius={30}
+        connectionRadius={100}
         connectOnClick={false}
+        connectionLineStyle={{ strokeWidth: 1, stroke: "#60a5fa" }}
       >
         <Background gap={24} size={1} color="rgba(255,255,255,0.06)" />
         {enableDragSnapGuides ? (

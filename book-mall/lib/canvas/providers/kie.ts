@@ -280,6 +280,7 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
         options: [
           { value: "1K", label: "1K" },
           { value: "2K", label: "2K" },
+          { value: "4K", label: "4K" },
         ],
         defaultValue: "2K",
         help: "2K 细节更好，积分消耗略高。",

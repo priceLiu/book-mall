@@ -372,7 +372,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
         "canvas-group-node group/gn relative h-full w-full overflow-visible",
         isLibtvMediaGroup
           ? cn(PRO2_MEDIA_GROUP_SHELL_CLASS, LIBTV_CARD_DRAG_CLASS)
-          : "rounded-2xl",
+          : "rounded-[20px]",
       )}
       data-pro2-media-group={isLibtvMediaGroup ? id : undefined}
       style={

@@ -9,6 +9,8 @@
 import type { CreditCostUnit, GatewayProviderKind } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { libNanoProCanonicalFromModelKey } from "@/lib/billing/lib-nano-pro-canonical";
+import { resolveSbv1BillingCanonicalFromInputSummary } from "@/lib/gateway/log-pricing-hints";
 import { canonicalKeyForAlias } from "@/lib/model-catalog/resolve";
 import {
   computeBaseMarginRate,
@@ -59,6 +61,28 @@ export async function resolveCanonicalModelKey(modelKey: string): Promise<string
     if (hit) return hit;
   }
   return null;
+}
+
+/**
+ * 计费归口：sbv1 分档 variant → tier canonical；否则 modelKey 别名。
+ */
+export async function resolveBillingCanonicalKey(input: {
+  modelKey: string;
+  inputSummary?: unknown;
+}): Promise<string | null> {
+  const fromSbv1 = resolveSbv1BillingCanonicalFromInputSummary(
+    input.inputSummary,
+    input.modelKey,
+  );
+  if (fromSbv1) return fromSbv1;
+
+  const canonical = await resolveCanonicalModelKey(input.modelKey);
+  if (canonical === "lib-nano-pro") {
+    return (
+      libNanoProCanonicalFromModelKey(input.modelKey, null) ?? "lib-nano-pro-2k"
+    );
+  }
+  return canonical;
 }
 
 export interface CostSnapshot {

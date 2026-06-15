@@ -189,7 +189,7 @@ export interface ByokSettlement {
 }
 
 /**
- * BYOK 月结：技术服务费(按 scopeKey；团队可乘席位数) + 资源费(用量×系数)。
+ * BYOK 月结：仅资源费（积分换算 1.0 已退役技术服务费）。
  */
 export async function settleByokMonthly(input: {
   ref: AccountRef;
@@ -197,9 +197,9 @@ export async function settleByokMonthly(input: {
   seats?: number;
   periodKey?: string;
 }): Promise<ByokSettlement> {
-  const cfg = await prisma.byokServiceConfig.findUnique({ where: { scopeKey: input.scopeKey } });
-  const baseFee = cfg && cfg.active ? num(cfg.techServiceFeeYuan) : 0;
-  const techServiceFeeYuan = baseFee * Math.max(1, input.seats ?? 1);
+  void input.scopeKey;
+  void input.seats;
+  const techServiceFeeYuan = 0;
 
   const resources = await sumResourceFees(input.ref, input.periodKey);
   const resourceFeeYuan = resources.totalYuan;

@@ -4,9 +4,9 @@ import {
   computeCreditPrice,
   loadPricingConfig,
   marginGuardForUnit,
-  marginMForUnit,
   marginPassesGuard,
   publishModelCreditPrice,
+  resolveModelMarginM,
 } from "@/lib/pricing/credit-pricing-engine";
 import { prisma } from "@/lib/prisma";
 import {
@@ -193,10 +193,16 @@ export async function setPlatformOfferingActiveCandidate(input: {
   }
 
   const config = await loadPricingConfig();
+  const netCostYuan = toNum(profile.netCostYuan);
   const comp = computeCreditPrice({
     listCostYuan: toNum(profile.listCostYuan),
     discountRate: toNum(profile.discountRate),
-    marginM: marginMForUnit(profile.unit, config),
+    marginM: resolveModelMarginM({
+      unit: profile.unit,
+      netCostYuan,
+      defaultMarginM: config.defaultMarginM,
+      videoMarginM: config.videoMarginM,
+    }),
     anchorYuan: config.creditAnchorYuan,
   });
   if (!marginPassesGuard(comp.baseMarginRate, marginGuardForUnit(profile.unit, config))) {

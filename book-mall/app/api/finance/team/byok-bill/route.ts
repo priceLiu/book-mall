@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const techFee = Number(sub.techServiceFeeYuan) * (sub.seats || 1);
+    const techFee = 0;
     const bill = await buildUserByokBill({ ref, periodKey, techServiceFeeYuan: techFee });
 
     const usage = await prisma.byokUsageMonthly.findMany({

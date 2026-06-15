@@ -4,11 +4,19 @@ import type { StyleLibraryPreset } from "./style-library/catalog";
 import { styleLibraryPickerDefaults } from "./style-library/category-pickers";
 import type { StoryPro2StyleAssetNodeData } from "./story-pro2-workspace-types";
 import {
+  absoluteNodePosition,
+} from "./normalize-graph-nodes";
+import {
   buildPro2StyleAssetToHubEdge,
+  buildPro2StyleAssetToImageEdge,
   findPro2StyleAssetSnapScriptHub,
+  findStyleAssetLinkedToImage,
 } from "./pro2-style-asset-connect";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
-import { PRO2_SCRIPT_NODE_WIDTH } from "./story-pro2-node-chrome";
+import {
+  PRO2_IMAGE_NODE_WIDTH,
+  PRO2_SCRIPT_NODE_WIDTH,
+} from "./story-pro2-node-chrome";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { flowPositionAtViewportCenter } from "./viewport-placement";
 
@@ -88,5 +96,76 @@ export function spawnPro2StyleAssetFromPreset(args: {
     });
   }
 
+  return nodeId;
+}
+
+const DOCK_STYLE_IMAGE_TYPES = new Set(["story-pro2-image", "sbv1-image"]);
+
+/** Dock 风格库 · 在目标图片节点左侧生成/更新风格素材并连线 */
+export function spawnPro2StyleAssetLeftOfImageFromPreset(args: {
+  preset: StyleLibraryPreset;
+  imageNodeId: string;
+  addNode: (
+    type: "story-pro2-style-asset",
+    position: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+  setNodes: (
+    fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[],
+  ) => void;
+  setEdges: (fn: (edges: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+  getNodes: () => CanvasFlowNode[];
+  getEdges: () => CanvasFlowEdge[];
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+}): string {
+  const nodes = args.getNodes();
+  const imageNode = nodes.find((n) => n.id === args.imageNodeId);
+  if (!imageNode || !DOCK_STYLE_IMAGE_TYPES.has(imageNode.type ?? "")) {
+    return "";
+  }
+
+  const patch = buildPro2StyleAssetNodeData(args.preset) as unknown as Record<
+    string,
+    unknown
+  >;
+  const existing = findStyleAssetLinkedToImage(
+    nodes,
+    args.getEdges(),
+    args.imageNodeId,
+  );
+
+  args.updateNodeData(args.imageNodeId, { dockStyleRef: undefined });
+
+  if (existing) {
+    args.updateNodeData(existing.id, patch);
+    selectPro2NodeAfterSpawn(args.setNodes, existing.id);
+    return existing.id;
+  }
+
+  const abs = absoluteNodePosition(imageNode, nodes);
+  const styleW = PRO2_IMAGE_NODE_WIDTH;
+  const position = {
+    x: abs.x - styleW - SNAP_GAP,
+    y: abs.y,
+  };
+
+  const nodeId = args.addNode("story-pro2-style-asset", position, patch);
+  if (!nodeId) return "";
+
+  args.setEdges((prev) => {
+    if (
+      prev.some(
+        (e) => e.source === nodeId && e.target === args.imageNodeId,
+      )
+    ) {
+      return prev;
+    }
+    return [
+      ...prev,
+      buildPro2StyleAssetToImageEdge(nodeId, args.imageNodeId),
+    ];
+  });
+
+  selectPro2NodeAfterSpawn(args.setNodes, nodeId);
   return nodeId;
 }

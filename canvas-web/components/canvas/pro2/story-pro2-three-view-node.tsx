@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
@@ -60,6 +61,8 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
+  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
 
   const d = data as unknown as StoryPro2ThreeViewNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
@@ -71,7 +74,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const generatingLabel = d.uploading ? "上传中…" : "生成三视图中…";
   const hasError = Boolean(d.uploadError?.trim());
   const label = d.label?.trim() || "角色";
-  const showSidePlus = Boolean(selected && !isGenerating);
+  const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
   const soleSelected = useMemo(
     () => selected && nodes.filter((n) => n.selected).length === 1,
     [selected, nodes],
@@ -227,6 +230,8 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
       <div
         className={cn(LIBTV_NODE_OUTER_CLASS, "image-paste-host")}
         data-pro2-dock-anchor={id}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
       >
         <Handle
           id="in_image"

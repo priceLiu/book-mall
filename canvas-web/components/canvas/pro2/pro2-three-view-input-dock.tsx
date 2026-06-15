@@ -184,8 +184,7 @@ export function Pro2ThreeViewInputDock() {
 
   return (
     <Pro2InputDockShell
-      left={placement.left}
-      top={placement.top}
+      flowAnchor={placement}
       dockClassName="pro2-three-view-dock"
       header={
         <Pro2DockContextBar>

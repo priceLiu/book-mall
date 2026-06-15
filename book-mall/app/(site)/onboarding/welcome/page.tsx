@@ -52,7 +52,7 @@ export default async function OnboardingWelcomePage({
           {persona === "BYOK" ? (
             <ol className="list-decimal space-y-2 pl-5 text-muted-foreground">
               <li>
-                <Link href="/checkout/byok?scope=personal" className="text-primary underline">
+                <Link href="/pricing#personal" className="text-primary underline">
                   开通 BYOK 月费套餐
                 </Link>
               </li>

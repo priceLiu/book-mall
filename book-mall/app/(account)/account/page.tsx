@@ -141,19 +141,6 @@ export default async function AccountPage({
           )
         : [];
 
-  const byokServiceConfig =
-    byokSub
-      ? await prisma.byokServiceConfig.findUnique({
-          where: { scopeKey: byokSub.scopeKey },
-          select: {
-            techServiceFeeYuan: true,
-            interval: true,
-            minSeats: true,
-            label: true,
-          },
-        })
-      : null;
-
   const membershipPlan =
     billingPersona === "PLATFORM_CREDIT" && creditAcc?.planId
       ? await prisma.membershipPlan.findUnique({
@@ -168,15 +155,7 @@ export default async function AccountPage({
         : null;
 
   let planPriceLabel: string | null = null;
-  if (byokServiceConfig) {
-    const fee = Number(byokServiceConfig.techServiceFeeYuan);
-    const unit = byokServiceConfig.interval === "YEAR" ? "年" : "月";
-    if (byokServiceConfig.minSeats && byokServiceConfig.minSeats > 1) {
-      planPriceLabel = `¥${fee.toLocaleString("zh-CN")}/席/${unit}（${byokServiceConfig.minSeats} 席起）`;
-    } else {
-      planPriceLabel = `¥${fee.toLocaleString("zh-CN")}/${unit}`;
-    }
-  } else if (teamTenant?.planId) {
+  if (teamTenant?.planId) {
     try {
       const quote = await quoteTeamPlan({
         planId: teamTenant.planId,
@@ -198,11 +177,10 @@ export default async function AccountPage({
   }
 
   const membershipPeriodEnd =
-    billingPersona === "BYOK" && byokSub
-      ? byokSub.periodEnd
-      : (teamTenant?.currentPeriodEnd ??
-        creditAcc?.currentPeriodEnd ??
-        null);
+    teamTenant?.currentPeriodEnd ??
+    creditAcc?.currentPeriodEnd ??
+    byokSub?.periodEnd ??
+    null;
 
   return (
     <>

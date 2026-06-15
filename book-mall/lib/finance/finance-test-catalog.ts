@@ -98,7 +98,7 @@ export const FINANCE_VITEST_CATALOG: FinanceTestCase[] = [
     "TC-A2",
     "pricing",
     "computeTierCredits — 逐档积分换算（验收表 §1.1/§1.2）",
-    "各档实测毛利 = 75.0% ± 0.1pct",
+    "贵视频各档实测毛利 ≈ 0%（取整容差 ±1pct）",
     FILE.pricing,
   ),
   unit(
@@ -138,7 +138,7 @@ export const FINANCE_VITEST_CATALOG: FinanceTestCase[] = [
     "TC-A4",
     "pricing",
     "分类系数与护栏",
-    "视频（PER_SEC）取 M=4 / 护栏 0.75",
+    "视频（PER_SEC）分档 M=1.0/1.5 / 护栏 -0.02",
     FILE.pricing,
   ),
   unit(
@@ -154,7 +154,7 @@ export const FINANCE_VITEST_CATALOG: FinanceTestCase[] = [
     "TC-A1",
     "pricing",
     "computeCreditPrice — happyhorse 单位报价",
-    "net 0.81 / M=4 → 挂牌 3.24、81 积分/秒、毛利 75%",
+    "net 0.81 / M=1.0 → 挂牌 0.81、20 积分/秒、毛利 ≈0%",
     FILE.pricing,
   ),
   // reconciliation-diff (7)
@@ -220,7 +220,7 @@ export const FINANCE_VITEST_CATALOG: FinanceTestCase[] = [
     "TC-D1",
     "scenario-lab",
     "scenario-lab 毛利验算",
-    "个人高级版 30 行毛利在 [74.8%, 75.1%]（含 0.2% 容差）",
+    "个人高级版 30 行毛利符合 M 分档（贵视频≈0%、普通≈33%）",
     FILE.scenarioLab,
   ),
   unit(
@@ -228,7 +228,7 @@ export const FINANCE_VITEST_CATALOG: FinanceTestCase[] = [
     "TC-D2",
     "scenario-lab",
     "scenario-lab 毛利验算",
-    "团队高级版（4席）30 行毛利在 [74.8%, 75.1%]（含 0.2% 容差）",
+    "团队高级版（4席）30 行毛利符合 M 分档",
     FILE.scenarioLab,
   ),
   // pnl-alerts (6)
@@ -288,14 +288,14 @@ export const FINANCE_VITEST_CATALOG: FinanceTestCase[] = [
     "TC-B7",
     "simulation",
     "simulatePlanChange — 六维测算（Phase 4）",
-    "M=4 下全档毛利护栏通过（最低毛利 ≈ 75%）",
+    "M=1.0 贵视频全档毛利护栏通过（≈0%）",
     FILE.simulation,
   ),
   unit(
     "sim-margin-fail",
     "TC-B7",
     "simulation",
-    "护栏拦截 — M 降到 3（毛利 66.7% < 75%）",
+    "护栏拦截 — 挂牌低于成本",
     "worstMargin < 护栏 → allPassed=false",
     FILE.simulation,
   ),
@@ -312,7 +312,7 @@ export const FINANCE_VITEST_CATALOG: FinanceTestCase[] = [
     "TC-B7",
     "simulation",
     "reverseTargetMargin — 模式 A（目标毛利反推）",
-    "目标 75% → M=4、单位挂牌价 3.24",
+    "目标 33% → M≈1.5、单位挂牌价 1.215",
     FILE.simulation,
   ),
   unit(

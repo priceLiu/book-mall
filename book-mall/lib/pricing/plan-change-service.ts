@@ -229,8 +229,8 @@ export async function applyEffectiveProposal(proposalId: string, actorId: string
         defaultMarginM: 2.5,
         minMarginGuard: 0.3,
         defaultVideoSec: 15,
-        videoMarginM: payload.videoMarginM ?? 4,
-        videoMinMarginGuard: payload.guard ?? 0.75,
+        videoMarginM: payload.videoMarginM ?? 1.5,
+        videoMinMarginGuard: payload.guard ?? -0.02,
       },
       update: {
         ...(payload.videoMarginM != null ? { videoMarginM: payload.videoMarginM } : {}),

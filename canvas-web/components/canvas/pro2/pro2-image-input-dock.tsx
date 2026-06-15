@@ -10,7 +10,10 @@ import { useProjectAssets } from "@/lib/canvas/use-project-assets";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
-import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
+import {
+  resolvePro2DockUpstreamLinks,
+  resolvePro2DockStyleFromUpstream,
+} from "@/lib/canvas/pro2-dock-upstream-links";
 import { pro2DockRefImageCatalog } from "@/lib/canvas/pro2-dock-ref-catalog";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
@@ -171,20 +174,22 @@ export function Pro2ImageInputDock() {
   }
 
   const styleRef = d.dockStyleRef;
+  const linkedStyle = resolvePro2DockStyleFromUpstream(upstreamLinks);
+  const styleActive = Boolean(styleRef || linkedStyle);
+  const styleLabel = styleRef?.name ?? linkedStyle?.name;
   const canRegenerate =
     mediaRole === "frame" &&
     Boolean(d.pro2ControllerNodeId && d.pro2RowKey && dockInput.trim());
 
   return (
     <Pro2InputDockShell
-      left={placement.left}
-      top={placement.top}
+      flowAnchor={placement}
       dockClassName="pro2-image-dock"
       header={
         <Pro2DockContextBar>
           <Pro2DockStyleButton
-            active={Boolean(styleRef)}
-            label={styleRef?.name}
+            active={styleActive}
+            label={styleLabel}
             disabled={isRunning}
             onClick={onOpenStyleLibrary}
           />

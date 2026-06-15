@@ -128,7 +128,7 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         href: "/admin/credit-pricing",
-        label: "积分报价",
+        label: "积分报价与换算",
         icon: Calculator,
         prefix: "/admin/credit-pricing",
         show: (v) => canViewFinanceCost(v.user.role),
@@ -145,13 +145,6 @@ const NAV_GROUPS: NavGroup[] = [
         label: "会员套餐",
         icon: Users,
         prefix: "/admin/membership-plans",
-        show: (v) => canViewFinanceCost(v.user.role),
-      },
-      {
-        href: "/admin/byok",
-        label: "BYOK 定价",
-        icon: KeyRound,
-        prefix: "/admin/byok",
         show: (v) => canViewFinanceCost(v.user.role),
       },
       { href: "/admin/pricing-disclosure", label: "价格公示", icon: Tags, prefix: "/admin/pricing-disclosure" },
@@ -277,7 +270,6 @@ export function AdminSidebar() {
             {viewer.user.phone?.trim() ? (
               <p className="mt-1 break-all text-sm text-white/80">{viewer.user.phone.trim()}</p>
             ) : null}
-            <p className="mt-1 break-all text-sm text-white/80">{viewer.user.email?.trim() || "—"}</p>
             <p className="mt-2 text-sm text-white/75">角色：{roleLabel(viewer.user.role)}</p>
           </>
         )}

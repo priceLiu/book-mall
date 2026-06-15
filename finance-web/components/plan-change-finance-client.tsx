@@ -122,7 +122,7 @@ export function PlanChangeFinanceClient() {
           </div>
           <div>
             <label className="text-xs text-[#8c8c8c]">视频 M</label>
-            <input name="videoMarginM" type="number" step="0.1" placeholder="4" className="mt-1 w-full rounded border px-2 py-1.5 text-sm" />
+            <input name="videoMarginM" type="number" step="0.1" placeholder="1.5" className="mt-1 w-full rounded border px-2 py-1.5 text-sm" />
           </div>
           <div className="flex items-end">
             <button

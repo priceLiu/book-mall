@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
@@ -31,6 +32,7 @@ import {
   PRO2_IMAGE_NODE_MIN_WIDTH,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import { cn } from "@/lib/utils";
+import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { MediaHoverBox } from "../media-hover-box";
 import { Pro2ImageNodeToolbar } from "../pro2/pro2-image-node-toolbar";
 import {
@@ -56,7 +58,8 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [hovered, setHovered] = useState(false);
+  const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
+  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const d = data as unknown as Sbv1ImageNodeData;
@@ -65,11 +68,14 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
   const insideGroup = Boolean(self?.parentId);
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
-  const isGenerating = isLibtvMediaGenerating(d);
+  const hasError =
+    Boolean(d.uploadError?.trim()) || d.runtime?.status === "error";
+  const errorMessage =
+    d.uploadError?.trim() || d.runtime?.failMessage?.trim() || "生成失败";
+  const isGenerating = !hasError && isLibtvMediaGenerating(d);
   const generatingLabel =
     d.uploading && !d.runtime?.status ? "上传中…" : "图片生成中…";
-  const hasError = Boolean(d.uploadError?.trim());
-  const showSidePlus = Boolean(selected && !isGenerating);
+  const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
   const soleSelected = useMemo(
     () => selected && nodes.filter((n) => n.selected).length === 1,
     [selected, nodes],
@@ -80,6 +86,14 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
     soleSelected,
   });
   const showImageTools = Boolean(soleSelected && hasImage && !isGenerating);
+
+  useLibtvMediaNodeAutoFit({
+    nodeId: id,
+    mediaUrl: previewUrl,
+    kind: "image",
+    profile: "square-image",
+    disabled: !hasImage || isGenerating,
+  });
 
   const nodeLabel = useMemo(() => {
     if (d.label?.trim()) return d.label.trim();
@@ -175,8 +189,8 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
         className={cn(SBV1_NODE_OUTER_CLASS, "image-paste-host")}
         data-image-paste-host={id}
         data-pro2-dock-anchor={id}
-        onPointerEnter={() => setHovered(true)}
-        onPointerLeave={() => setHovered(false)}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
       >
         <Handle
           id="in_image"
@@ -251,8 +265,25 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
             <div className="flex items-center gap-2">
-              <ImageIcon className="size-3.5 text-cyan-300" />
-              <p className="text-xs font-medium text-white">{nodeLabel}</p>
+              <button
+                type="button"
+                className={cn(
+                  "nodrag flex items-center gap-2 rounded-md transition",
+                  !hasImage &&
+                    !isGenerating &&
+                    "cursor-pointer hover:bg-white/[0.06]",
+                )}
+                title={
+                  !hasImage && !isGenerating ? "双击上传图片" : undefined
+                }
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  if (!hasImage && !isGenerating) onPick();
+                }}
+              >
+                <ImageIcon className="size-3.5 text-cyan-300" />
+                <p className="text-xs font-medium text-white">{nodeLabel}</p>
+              </button>
             </div>
             {isGenerating ? (
               <Loader2 className="size-3.5 animate-spin text-cyan-300" />
@@ -295,14 +326,20 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
               >
                 <Pro2MediaNodeErrorState
                   icon={AlertTriangle}
-                  title="上传失败"
-                  message={d.uploadError}
+                  title={d.uploadError?.trim() ? "上传失败" : "生成失败"}
+                  message={errorMessage}
                 />
               </div>
             ) : showEmbeddedDock ? (
               <Sbv1ImageNodeEmbeddedDock nodeId={id} onUpload={onPick} />
             ) : showTryMenu ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4">
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  if (selected && !isGenerating) onPick();
+                }}
+              >
                 <Pro2MediaNodeEmptyState
                   icon={ImageIcon}
                   label="添加或生成图片"
@@ -313,7 +350,11 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
                   <p className="mt-3 text-[10px] text-white/35">
                     选中节点以编辑提示词
                   </p>
-                ) : null}
+                ) : (
+                  <p className="mt-3 text-[10px] text-white/35">
+                    双击图标上传，或在下方 Dock 输入提示词
+                  </p>
+                )}
               </div>
             ) : null}
           </div>

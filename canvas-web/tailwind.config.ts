@@ -12,7 +12,7 @@ const config: Config = {
     extend: {
       colors: {
         canvas: {
-          bg: "#0b0b14",
+          bg: "#141414",
           surface: "#13131f",
           border: "rgba(255,255,255,0.08)",
           ink: "#f5f5f7",

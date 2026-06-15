@@ -120,18 +120,40 @@ async function main() {
 
   if (missing.length === 0) {
     console.log("✓ 候选 modelKey 均已注册 GatewayModelRoute。");
-    return;
+  } else {
+    console.error(`\n✗ 未注册 GatewayModelRoute 的 modelKey（${missing.length} 个）：\n`);
+    for (const row of missing) {
+      console.error(`  - ${row.modelKey}`);
+      console.error(`      来源: ${row.sources.join(" · ")}`);
+    }
+    console.error(
+      "\n修复：补入 lib/platform-model/canonical-registry.ts + 迁移 SQL，或执行 pnpm gateway:seed-registry --confirm",
+    );
+    process.exit(1);
   }
 
-  console.error(`\n✗ 未注册 GatewayModelRoute 的 modelKey（${missing.length} 个）：\n`);
-  for (const row of missing) {
-    console.error(`  - ${row.modelKey}`);
-    console.error(`      来源: ${row.sources.join(" · ")}`);
-  }
-  console.error(
-    "\n修复：补入 lib/platform-model/canonical-registry.ts + 迁移 SQL，或执行 pnpm gateway:seed-registry --confirm",
+  const sbv1Canonicals = [
+    "seedance-2.0-720p-real",
+    "seedance-2.0-1080p-real",
+    "seedance-2.0-fast-720p-real",
+    "seedance-pro-1080p",
+  ];
+  const publishedPrices = new Set(
+    (
+      await prisma.modelCreditPrice.findMany({
+        where: { active: true, canonicalModelKey: { in: sbv1Canonicals } },
+        select: { canonicalModelKey: true },
+      })
+    ).map((p) => p.canonicalModelKey),
   );
-  process.exit(1);
+  const missingPrices = sbv1Canonicals.filter((k) => !publishedPrices.has(k));
+  if (missingPrices.length > 0) {
+    console.error(`\n✗ sbv1 视频分档未发布 ModelCreditPrice（${missingPrices.length}）：`);
+    for (const k of missingPrices) console.error(`  - ${k}`);
+    console.error("\n修复：pnpm seed:sbv1-video-credits 或在 /admin/model-credit-ledger 发布");
+    process.exit(1);
+  }
+  console.log("✓ sbv1 视频分档均已发布 ModelCreditPrice。");
 }
 
 main()
