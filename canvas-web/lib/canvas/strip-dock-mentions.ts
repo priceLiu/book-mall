@@ -33,11 +33,11 @@ export function stripMentionTokensFromPrompt(
 }
 
 /** 删除 dock 参考图 chip 时同步更新 refs + prompt */
-export function removeDockRefFromState(
-  refs: { id: string }[],
+export function removeDockRefFromState<T extends { id: string }>(
+  refs: T[],
   refId: string,
   prompt: string,
-): { refs: { id: string }[]; prompt: string } {
+): { refs: T[]; prompt: string } {
   return {
     refs: refs.filter((r) => r.id !== refId),
     prompt: stripMentionTokensFromPrompt(prompt, [refId]),
