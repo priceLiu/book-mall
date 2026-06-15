@@ -13,9 +13,10 @@ import {
   marginPassesGuard,
   publishModelCreditPrice,
 } from "@/lib/pricing/credit-pricing-engine";
-import { SCENARIO_LAB_USAGE_SECONDS, SCENARIO_LAB_VIDEO_MARGIN_M } from "@/lib/billing/scenario-lab";
+import { SCENARIO_LAB_USAGE_SECONDS } from "@/lib/billing/scenario-lab";
 import { VIDEO_MODEL_SEEDS } from "@/lib/billing/video-model-seeds";
 import { DEFAULT_VIDEO_MIN_MARGIN_GUARD } from "@/lib/pricing/credit-pricing-formulas";
+import { resolveModelMarginM } from "@/lib/pricing/model-margin-policy";
 import { simulatePlanChange } from "@/lib/pricing/pricing-simulation";
 import type {
   CreditChannel,
@@ -341,13 +342,14 @@ export async function upsertMembershipPlanAction(formData: FormData): Promise<Ac
   });
   const refModel = VIDEO_MODEL_SEEDS[0];
   const netCostYuan = refModel.listCostYuan * (1 - refModel.discountRate);
+  const marginM = resolveModelMarginM({ unit: "PER_SEC", netCostYuan });
   const sim = simulatePlanChange({
     tiers: tierRows,
     model: {
       canonicalModelKey: refModel.canonicalModelKey,
       netCostYuan,
       units: SCENARIO_LAB_USAGE_SECONDS,
-      listPriceYuan: netCostYuan * SCENARIO_LAB_VIDEO_MARGIN_M,
+      listPriceYuan: netCostYuan * marginM,
     },
     guard: DEFAULT_VIDEO_MIN_MARGIN_GUARD,
   });

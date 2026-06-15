@@ -55,6 +55,14 @@ function expectedMarginRange(marginM: number): { min: number; max: number } {
   return { min: target - tol, max: target + tol };
 }
 
+/** 按模型 M 分档的预期毛利区间（Scenario Lab / 财务说明用）。 */
+export function scenarioLabExpectedMarginRange(marginM: number): {
+  min: number;
+  max: number;
+} {
+  return expectedMarginRange(marginM);
+}
+
 function simulateRowsForScenario(input: {
   scenarioKey: ScenarioLabScenarioKey;
   scenarioLabel: string;

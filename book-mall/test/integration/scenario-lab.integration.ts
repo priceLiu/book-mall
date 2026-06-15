@@ -6,8 +6,7 @@
  */
 import {
   buildScenarioLabRows,
-  SCENARIO_LAB_MARGIN_MAX,
-  SCENARIO_LAB_MARGIN_MIN,
+  scenarioLabExpectedMarginRange,
   scenarioLabMeta,
   validateScenarioLabRows,
 } from "@/lib/billing/scenario-lab";
@@ -52,10 +51,11 @@ function runScenarioBlock(
   check(`${label} 行数 = ${expectedRows}`, scenarioRows.length === expectedRows, { len: scenarioRows.length });
 
   for (const row of scenarioRows) {
+    const { min, max } = scenarioLabExpectedMarginRange(row.marginM);
     check(
-      `${label} · ${row.model} 毛利 ∈ [${(SCENARIO_LAB_MARGIN_MIN * 100).toFixed(1)}%, ${(SCENARIO_LAB_MARGIN_MAX * 100).toFixed(1)}%]`,
-      row.marginRate >= SCENARIO_LAB_MARGIN_MIN && row.marginRate <= SCENARIO_LAB_MARGIN_MAX,
-      { marginRate: row.marginRate, model: row.model },
+      `${label} · ${row.model} 毛利 ∈ [${(min * 100).toFixed(1)}%, ${(max * 100).toFixed(1)}%] (M=${row.marginM})`,
+      row.marginRate >= min && row.marginRate <= max,
+      { marginRate: row.marginRate, model: row.model, marginM: row.marginM },
     );
     mockSettle({
       scenarioKey: row.scenarioKey,

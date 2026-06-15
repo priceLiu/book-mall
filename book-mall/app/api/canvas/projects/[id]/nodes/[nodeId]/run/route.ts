@@ -7,6 +7,10 @@ import {
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
 import { enrichSingleCanvasTask } from "@/lib/canvas/canvas-task-billing";
+import {
+  scheduleCanvasPollWorkerForProject,
+  submitCanvasNodeTask,
+} from "@/lib/canvas/canvas-task-service";
 import { assertGatewayApiKeyLinkedForUser } from "@/lib/canvas/book-gateway-link";
 import {
   runAiEngineNode,

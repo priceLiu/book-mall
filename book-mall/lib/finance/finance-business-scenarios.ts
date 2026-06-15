@@ -1,6 +1,7 @@
 import {
   buildScenarioLabRows,
   SCENARIO_LAB_USAGE_SECONDS,
+  scenarioLabExpectedMarginRange,
   scenarioLabMeta,
   validateScenarioLabRows,
 } from "@/lib/billing/scenario-lab";
@@ -205,6 +206,7 @@ export function buildFinanceBusinessScenarios(): FinanceBusinessScenariosPayload
   const rows = buildScenarioLabRows();
   const validation = validateScenarioLabRows(rows);
   const meta = scenarioLabMeta();
+  const marginBounds = rows.map((r) => scenarioLabExpectedMarginRange(r.marginM));
 
   const personalBench = rows.find(
     (r) => r.scenarioKey === "personal-advanced-month" && r.model === BENCHMARK_MODEL,
@@ -242,8 +244,8 @@ export function buildFinanceBusinessScenarios(): FinanceBusinessScenariosPayload
       ok: validation.ok,
       modelCount: meta.seedsCount,
       marginRange: {
-        minPct: round2(validation.range.min * 100),
-        maxPct: round2(validation.range.max * 100),
+        minPct: round2(Math.min(...marginBounds.map((b) => b.min)) * 100),
+        maxPct: round2(Math.max(...marginBounds.map((b) => b.max)) * 100),
       },
     },
     scenarios,
