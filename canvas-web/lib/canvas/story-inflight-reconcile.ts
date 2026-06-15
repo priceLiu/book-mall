@@ -294,7 +294,7 @@ export function reconcileStaleInflightRuntimes(
     if (skipNodeIds?.has(node.id)) continue;
 
     const rt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
-    if (!isInflightStatus(rt?.status)) continue;
+    if (!rt || !isInflightStatus(rt.status)) continue;
 
     const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
     const inflight = nodeTasks.some(

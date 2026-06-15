@@ -54,7 +54,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     d.runtime?.ossUrl ??
     d.runtime?.ephemeralUrl ??
     pickTaskResultMediaUrl(succeeded[succeeded.length - 1] ?? {}) ??
-    succeeded[succeeded.length - 1]?.ossUrl;
+    succeeded[succeeded.length - 1]?.ossUrl ??
+    undefined;
 
   const isGenerating = isLibtvMediaGenerating(d);
   const hasVideo = Boolean(videoUrl);
