@@ -88,7 +88,7 @@ export default function SmartSupportImplementationPage() {
             <li>
               多轮 DeepSeek：每次请求须携带此前全部轮次（与下文 Node 节选一致）。
             </li>
-            <li>计费若按 token / 会话计费，须与 <code>POST /api/tool-usage</code> 约定对齐后再打点。</li>
+            <li>计费经 Gateway 积分结算；明细见 <code>/app-history</code> 与 finance-web 扣减明细。</li>
             <li>
               页面入口：<Link href="/smart-support/chat">我的智能客服</Link>、
               <Link href="/smart-support">AI智能客服首页</Link>。

@@ -10,6 +10,7 @@ import {
   formatTokenDisplay,
   formatUsageYuanDisplay,
   formatLogTimestamp,
+  formatPlatformCreditsDisplay,
   isLogDateRangeInvalid,
   logSubmittedInUtcDateRange,
   pickLogProgressLabel,
@@ -561,7 +562,13 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                 className="w-[100px]"
                 title="挂牌参考费用（元），供后续费用统计；非钱包扣点。"
               >
-                Usage
+                Usage ¥
+              </th>
+              <th
+                className="w-[96px]"
+                title="平台代付扣减积分（Finance 2.0 · 与 finance-web 扣减明细一致）"
+              >
+                Credits
               </th>
               <th
                 className="w-[110px]"
@@ -587,6 +594,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               );
               const duration = formatDurationSeconds(durationMs);
               const usage = formatUsageYuanDisplay(l.estimatedVendorCostYuan);
+              const platformCredits = formatPlatformCreditsDisplay(l.creditsCharged);
               const tokens = formatTokenDisplay(
                 l.totalTokens,
                 l.promptTokens,
@@ -705,6 +713,16 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                     {isInProgress ? "—" : usage.value}
                   </td>
                   <td
+                    className="align-middle font-mono text-sm text-emerald-300/90"
+                    title={
+                      isInProgress
+                        ? "任务进行中，完成后写入扣减积分"
+                        : platformCredits.title
+                    }
+                  >
+                    {isInProgress ? "—" : platformCredits.value}
+                  </td>
+                  <td
                     className="align-middle font-mono text-sm text-zinc-300"
                     title={
                       isInProgress ? "任务进行中，完成后写入 Token" : tokens.title
@@ -735,7 +753,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             {!filtered.length ? (
               <tr>
                 <td
-                  colSpan={15}
+                  colSpan={16}
                   className="py-16 text-center text-sm text-zinc-500"
                 >
                   {logs.length

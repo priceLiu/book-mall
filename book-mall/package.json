@@ -33,6 +33,8 @@
     "pricing:normalize-upload-csv": "tsx scripts/pricing-normalize-upload-csv.ts",
     "billing:backfill-tool-usage-lines": "dotenv -e .env.local -- tsx scripts/billing-backfill-tool-usage-lines.ts",
     "billing:refresh-tool-usage-snapshot": "dotenv -e .env.local -- tsx scripts/billing-refresh-tool-usage-snapshot.ts",
+    "billing:refresh-ppc-snapshots": "dotenv -e .env.local -- tsx scripts/billing-refresh-price-per-credit-snapshots.ts",
+    "billing:align-active-pricing": "dotenv -e .env.local -- tsx scripts/billing-align-active-customer-pricing.ts",
     "billing:backfill-schemea-unit-cost": "dotenv -e .env.local -- tsx scripts/billing-backfill-schemea-unit-cost.ts",
     "dev:reset-user-billing": "dotenv -e .env.local -- tsx scripts/dev-reset-user-billing.ts",
     "reconciliation:run": "dotenv -e .env.local -- tsx scripts/reconciliation-run-cli.ts",

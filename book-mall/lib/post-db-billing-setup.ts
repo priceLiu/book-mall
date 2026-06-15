@@ -84,19 +84,12 @@ export async function runPostDbBillingSetup(opts?: {
   const lineCount = await prisma.toolBillingDetailLine.count({
     where: { source: "TOOL_USAGE_GENERATED" },
   });
-  let refreshRan = false;
-  let refreshSummary: string | null = null;
-  if (!opts?.skipRefreshSnapshots && lineCount > 0) {
+  const refreshRan = false;
+  const refreshSummary: string | null = null;
+  if (lineCount > 0) {
     console.log(
-      `[post-billing] refresh ${lineCount} TOOL_USAGE_GENERATED billing lines …`,
+      `[post-billing] skip legacy TOOL_USAGE_GENERATED refresh (${lineCount} rows; Finance 2.0 uses GatewayRequestLog)`,
     );
-    runPnpm("billing:refresh-tool-usage-snapshot");
-    refreshRan = true;
-    refreshSummary = "see billing:refresh-tool-usage-snapshot stdout";
-  } else if (opts?.skipRefreshSnapshots) {
-    console.log("[post-billing] skip refresh (skipRefreshSnapshots)");
-  } else {
-    console.log("[post-billing] skip refresh (no billing lines)");
   }
 
   const counts = {

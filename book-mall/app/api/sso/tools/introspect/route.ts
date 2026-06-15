@@ -13,7 +13,7 @@ import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 import { getActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
 import { resolveTenantContextForUser } from "@/lib/tenant/context";
-import { getCreditBalance } from "@/lib/billing/credit-account-service";
+import { getCreditBalance, getPoolBalances } from "@/lib/billing/credit-account-service";
 
 export const dynamic = "force-dynamic";
 
@@ -185,10 +185,20 @@ export async function GET(req: Request) {
     verified.tenant_id ?? null,
   );
   let creditBalance: number | null = null;
+  let creditPools: { general: number; video: number } | null = null;
   if (tenantCtx) {
     creditBalance = await getCreditBalance(tenantCtx.billingOwnerRef).catch(
       () => null,
     );
+    const pools = await getPoolBalances(tenantCtx.billingOwnerRef).catch(
+      () => null,
+    );
+    if (pools) {
+      creditPools = {
+        general: pools.general.balance,
+        video: pools.video.balance,
+      };
+    }
   }
 
   const payload = {
@@ -197,8 +207,6 @@ export async function GET(req: Request) {
     tier: verified.tier,
     tools_role: elig.isAdmin ? ("admin" as const) : ("member" as const),
     exp: verified.exp,
-    balance_points: elig.gold.balancePoints,
-    min_balance_line_points: elig.gold.minBalanceLinePoints,
     has_recharge_history: elig.gold.hasRechargeHistory,
     has_active_subscription: elig.hasActiveToolService,
     has_active_tool_service: elig.hasActiveToolService,
@@ -211,6 +219,7 @@ export async function GET(req: Request) {
     role_type: tenantCtx?.role ?? null,
     seat_id: tenantCtx?.seatId ?? null,
     credit_balance: creditBalance,
+    credit_pools: creditPools,
     email: elig.email,
     phone: elig.phone,
     name: elig.name,

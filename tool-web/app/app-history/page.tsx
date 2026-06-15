@@ -7,7 +7,7 @@ export default function AppHistoryPage() {
       <header className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>费用使用明细</h1>
         <p className={styles.pageLead}>
-          展示已成功入库的<strong>扣费</strong>流水（每页 50 条，可翻页）。页首与页尾为实时钱包余额；未标价事件显示「—」。
+          Finance 2.0 · Gateway 扣减与用量明细（与 finance-web 同源）。余额为统一积分双池（通用 + 视频）。
         </p>
       </header>
       <AppHistoryClient />
