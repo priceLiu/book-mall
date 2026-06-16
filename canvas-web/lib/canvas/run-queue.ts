@@ -10,6 +10,7 @@ import {
   type CanvasTaskRecord,
 } from "@/lib/canvas-api";
 import { useCanvasStore } from "./store";
+import { buildCanvasRunSnapshot } from "./canvas-run-snapshot";
 import { directPredecessors } from "./topo";
 import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
 import { dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
@@ -770,6 +771,7 @@ export function useCanvasRunner(
           llmSection: job.llmSection,
           rowKey: job.rowKey,
           mediaKind: job.mediaKind,
+          canvasSnapshot: buildCanvasRunSnapshot(),
           ...stylePayload,
         });
         taskByNodeRef.current.set(key, r.task.id);

@@ -1,6 +1,7 @@
 "use client";
 
 import { runCanvasNode } from "@/lib/canvas-api";
+import { buildCanvasRunSnapshot } from "@/lib/canvas/canvas-run-snapshot";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { applyVideoRowRuntime } from "@/lib/canvas/story-row-patch";
@@ -140,6 +141,7 @@ async function commitStoryTtsRowRunOnce(
       forceFresh,
       rowKey,
       mediaKind: "tts",
+      canvasSnapshot: buildCanvasRunSnapshot(),
       ...stylePayload,
     });
     const task = r.task;

@@ -1,10 +1,16 @@
 /** sessionStorage：标记本标签页曾成功登录，用于区分「主动退出」与「被新登录挤下线」。 */
 
+import {
+  clearSsoReenterSuppress,
+  markSsoReenterSuppressed,
+} from "@/lib/sso-reenter-suppress-cookie";
+
 export const BOOK_MALL_SESSION_MARKER_KEY = "book_mall_session_active";
 
 export function markBookMallSessionActive(): void {
   if (typeof sessionStorage === "undefined") return;
   sessionStorage.setItem(BOOK_MALL_SESSION_MARKER_KEY, "1");
+  clearSsoReenterSuppress();
 }
 
 export function clearBookMallSessionMarker(): void {
@@ -21,9 +27,10 @@ export function bookMallFullSignOutHref(callbackUrl = "/"): string {
   return `/api/auth/full-signout?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 }
 
-/** 主动退出：先清 marker，避免被误判为挤下线。 */
+/** 主动退出：先清 marker + 禁止子站静默换票，避免 canvas 等立刻 re-enter。 */
 export function navigateBookMallFullSignOut(callbackUrl = "/"): void {
   clearBookMallSessionMarker();
+  markSsoReenterSuppressed();
   window.location.href = bookMallFullSignOutHref(callbackUrl);
 }
 

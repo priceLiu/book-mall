@@ -16,10 +16,12 @@ import {
   Play,
   Redo2,
   Save,
+  Sparkles,
   Undo2,
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CANVAS_PROJECT_HISTORY_MAX } from "@/lib/canvas/canvas-autosave-settings";
 
 export function CanvasToolbar({
   projectName,
@@ -35,6 +37,7 @@ export function CanvasToolbar({
   onSaveTemplate,
   onOpenMyTemplates,
   onOpenMyHistory,
+  onOpenGenerationRecords,
   onOpenMyCharacters,
   onOpenMySavedScripts,
   onOpenMyVideoLibrary,
@@ -60,6 +63,7 @@ export function CanvasToolbar({
   onSaveTemplate?: () => void;
   onOpenMyTemplates?: () => void;
   onOpenMyHistory?: () => void;
+  onOpenGenerationRecords?: () => void;
   onOpenMyCharacters?: () => void;
   onOpenMySavedScripts?: () => void;
   onOpenMyVideoLibrary?: () => void;
@@ -145,10 +149,21 @@ export function CanvasToolbar({
             type="button"
             onClick={onOpenMyHistory}
             className="inline-flex items-center gap-1 rounded-md border border-violet-400/25 bg-violet-500/8 px-2 py-1 text-[11px] text-violet-100/90 hover:border-violet-400/40 hover:bg-violet-500/15 hover:text-violet-50"
-            title="查看自动/手动保存的历史版本（每项目最多 15 条）"
+            title={`自动/手动保存各 ${CANVAS_PROJECT_HISTORY_MAX} 条，互不影响`}
           >
             <History className="size-3" />
             我的历史
+          </button>
+        ) : null}
+        {onOpenGenerationRecords ? (
+          <button
+            type="button"
+            onClick={onOpenGenerationRecords}
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-400/25 bg-emerald-500/8 px-2 py-1 text-[11px] text-emerald-100/90 hover:border-emerald-400/40 hover:bg-emerald-500/15 hover:text-emerald-50"
+            title="查看成功与失败的 AI 生成记录"
+          >
+            <Sparkles className="size-3" />
+            生成记录
           </button>
         ) : null}
         {onOpenMyTemplates ? (

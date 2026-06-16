@@ -1,5 +1,7 @@
 /** Phase B：主站已登录时静默换票（无 tools_token → re-enter）。 */
 
+import { isSsoReenterSuppressedClient } from "@/lib/tools-logout-next-url";
+
 export function buildSilentReEnterHref(
   mainOrigin: string | null,
   redirectPath: string,
@@ -19,6 +21,7 @@ export function shouldAttemptSilentSso(opts: {
   loading: boolean;
   isPublicPath: boolean;
 }): boolean {
+  if (isSsoReenterSuppressedClient()) return false;
   if (opts.isPublicPath) return false;
   if (opts.loading) return false;
   if (opts.hasTokenCookie && opts.sessionActive) return false;

@@ -5,7 +5,6 @@ import type {
   ToolsSessionNoBearerDiag,
 } from "@/lib/tools-diagnostics";
 import { verifyToolsJwt } from "@/lib/tools-jwt";
-import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 
 export type ToolsIntrospectPayload = Record<string, unknown> | null;
 
@@ -49,47 +48,9 @@ async function fetchToolsSessionCore(bearer: string): Promise<{
 
   if (secret) {
     const tJwtStart = performance.now();
-    const jwt = verifyToolsJwt(bearer, secret);
+    verifyToolsJwt(bearer, secret);
     msJwtAttempt = performance.now() - tJwtStart;
-    if (jwt) {
-      const suiteKeys = [...TOOL_SUITE_NAV_KEYS];
-      const memberNeedsHttp =
-        jwt.tier !== "admin" &&
-        (!jwt.toolsNavKeys || jwt.toolsNavKeys.length === 0);
-      const needsSessionVersionCheck = jwt.sv != null;
-      if (!memberNeedsHttp && !needsSessionVersionCheck) {
-        const tools_nav_keys =
-          jwt.tier === "admin" ? suiteKeys : (jwt.toolsNavKeys ?? []);
-        return {
-          session: {
-            hasCookie: true,
-            originConfigured,
-            introspectStatus: 200,
-            active: true,
-            introspect: {
-              active: true,
-              sub: jwt.sub,
-              tier: jwt.tier,
-              tools_role: jwt.tier === "admin" ? "admin" : "member",
-              tools_nav_keys,
-              email: jwt.email ?? null,
-              phone: jwt.phone ?? null,
-              name: jwt.name ?? null,
-              image: jwt.image ?? null,
-              exp: jwt.exp,
-              session_source: "jwt_local",
-              note:
-                "本响应来自本地 JWT 验签，未请求 HTTP introspect；余额与实时准入以主站 introspect 或业务 API 为准。",
-            },
-          },
-          diag: {
-            path: "jwt_local",
-            msJwtAttempt,
-            msTotal: performance.now() - t0,
-          },
-        };
-      }
-    }
+    // 不在本地短路 active：须主站 introspect 才能感知 logout / sessionVersion 失效。
   }
 
   if (!origin) {

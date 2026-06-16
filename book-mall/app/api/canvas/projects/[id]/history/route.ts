@@ -2,7 +2,10 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import {
   createCanvasProjectHistoryForUser,
+  getCanvasProjectHistoryForUser,
+  getCanvasProjectHistoryMetaForUser,
   listCanvasProjectHistoryForUser,
+  type CanvasHistorySource,
 } from "@/lib/canvas/canvas-project-history-service";
 import {
   canvasErrorToResponse,
@@ -22,9 +25,24 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   const guard = await requireSessionUser(request);
   if (!guard.ok) return guard.response;
   const { id } = await ctx.params;
+  const entryId = request.nextUrl.searchParams.get("entryId")?.trim();
   try {
-    const items = await listCanvasProjectHistoryForUser(guard.user.id, id);
-    return NextResponse.json({ items }, { headers: jsonHeaders(request) });
+    if (entryId) {
+      const item = await getCanvasProjectHistoryForUser(
+        guard.user.id,
+        id,
+        entryId,
+      );
+      return NextResponse.json({ item }, { headers: jsonHeaders(request) });
+    }
+    const sourceRaw = request.nextUrl.searchParams.get("source")?.trim();
+    const source: CanvasHistorySource | undefined =
+      sourceRaw === "manual" || sourceRaw === "autosave" ? sourceRaw : undefined;
+    const [items, meta] = await Promise.all([
+      listCanvasProjectHistoryForUser(guard.user.id, id, { source }),
+      getCanvasProjectHistoryMetaForUser(guard.user.id, id),
+    ]);
+    return NextResponse.json({ items, meta }, { headers: jsonHeaders(request) });
   } catch (err) {
     return canvasErrorToResponse(request, err);
   }

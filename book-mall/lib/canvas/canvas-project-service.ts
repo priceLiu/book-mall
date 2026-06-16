@@ -11,6 +11,8 @@ import {
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
 import { getActiveTenantContext } from "@/lib/tenant/context";
+import { pickProjectThumbnailUrl } from "@/lib/canvas/pick-project-thumbnail";
+import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
 
 export class CanvasProjectError extends Error {
   constructor(
@@ -54,6 +56,23 @@ export type CanvasProjectDetail = CanvasProjectSummary & {
   canvas: unknown;
 };
 
+function resolveThumbnailUrl(p: {
+  thumbnailUrl: string;
+  canvas: unknown;
+}): string {
+  const stored = p.thumbnailUrl?.trim() ?? "";
+  if (stored) return stored;
+  return pickProjectThumbnailUrl(p.canvas);
+}
+
+function duplicateProjectName(sourceName: string): string {
+  const suffix = " 副本";
+  const base = sourceName.trim() || defaultCanvasProjectName();
+  const next = `${base}${suffix}`;
+  if (next.length <= MAX_NAME) return next;
+  return `${base.slice(0, MAX_NAME - suffix.length)}${suffix}`;
+}
+
 function toSummary(p: {
   id: string;
   name: string;
@@ -67,7 +86,7 @@ function toSummary(p: {
     id: p.id,
     name: p.name,
     description: p.description,
-    thumbnailUrl: p.thumbnailUrl,
+    thumbnailUrl: resolveThumbnailUrl(p),
     edition: canvasProjectEditionFromGraph(p.canvas),
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
@@ -162,8 +181,9 @@ export async function updateCanvasProjectForUser(
   projectId: string,
   patch: { name?: string; description?: string; canvas?: unknown; thumbnailUrl?: string },
 ): Promise<CanvasProjectDetail> {
+  await assertAccessibleCanvasProject(userId, projectId);
   const p = await prisma.canvasProject.findFirst({
-    where: { id: projectId, userId, deletedAt: null },
+    where: { id: projectId, deletedAt: null },
   });
   if (!p) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
 
@@ -250,4 +270,31 @@ export async function softDeleteCanvasProjectForUser(
       });
     }
   });
+}
+
+export async function duplicateCanvasProjectForUser(
+  userId: string,
+  sourceProjectId: string,
+): Promise<CanvasProjectDetail> {
+  const source = await getCanvasProjectForUser(userId, sourceProjectId);
+  const canvas = cloneCanvasGraphForDuplicate(source.canvas);
+  const thumbnailUrl =
+    source.thumbnailUrl?.trim() ||
+    pickProjectThumbnailUrl(source.canvas) ||
+    "";
+  const created = await createCanvasProjectForUser(userId, {
+    name: duplicateProjectName(source.name),
+    description: source.description,
+    canvas,
+  });
+  if (!thumbnailUrl) return created;
+
+  const updated = await prisma.canvasProject.update({
+    where: { id: created.id },
+    data: { thumbnailUrl },
+  });
+  return {
+    ...toSummary(updated),
+    canvas: updated.canvas,
+  };
 }

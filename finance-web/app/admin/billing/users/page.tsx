@@ -13,6 +13,7 @@ type BillingUser = {
   email: string | null;
   phone: string | null;
   lineCount: number;
+  succeededCalls?: number;
   latestAt: string | null;
 };
 
@@ -60,7 +61,10 @@ export default function AdminBillingUsersIndexPage() {
 
   return (
     <FinancePageShell>
-      <h1 className="text-lg font-medium text-[#262626]">有账单明细的用户</h1>
+      <h1 className="text-lg font-medium text-[#262626]">有 Gateway 调用或账单的用户</h1>
+      <p className="text-sm text-[#8c8c8c]">
+        含成功与失败调用；仅注册、从未调用 Gateway 的用户不在此列表。团队扣费请同时看「团队驾驶舱」。
+      </p>
 
       {loadState === "loading" && (
         <p className="text-sm text-[#8c8c8c]">正在加载…</p>
@@ -79,7 +83,7 @@ export default function AdminBillingUsersIndexPage() {
       )}
 
       {loadState === "ok" && users && users.length === 0 && (
-        <p className="text-sm text-[#8c8c8c]">暂无有账单明细的用户。</p>
+        <p className="text-sm text-[#8c8c8c]">暂无有 Gateway 调用或账单明细的用户。</p>
       )}
 
       {loadState === "ok" && users && users.length > 0 && (
@@ -90,7 +94,8 @@ export default function AdminBillingUsersIndexPage() {
                 <th className="border border-[#e8e8e8] px-3 py-2">用户</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">手机号</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">邮箱</th>
-                <th className="border border-[#e8e8e8] px-3 py-2">明细行数</th>
+                <th className="border border-[#e8e8e8] px-3 py-2">Gateway 调用</th>
+                <th className="border border-[#e8e8e8] px-3 py-2">成功次数</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">最近一条</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">查看明细</th>
               </tr>
@@ -110,8 +115,19 @@ export default function AdminBillingUsersIndexPage() {
                   <td className="border border-[#e8e8e8] px-3 py-2 font-mono text-[#262626]">
                     {u.lineCount}
                   </td>
-                  <td className="border border-[#e8e8e8] px-3 py-2 text-[#595959]">
-                    {u.latestAt ? new Date(u.latestAt).toLocaleString("zh-CN") : "—"}
+                  <td className="border border-[#e8e8e8] px-3 py-2 font-mono text-[#262626]">
+                    {u.succeededCalls ?? u.lineCount}
+                    {u.succeededCalls === 0 && u.lineCount > 0 ? (
+                      <span className="ml-1 text-xs text-[#faad14]">未扣费</span>
+                    ) : null}
+                  </td>
+                  <td className="border border-[#e8e8e8] px-3 py-2 text-[#595959] tabular-nums">
+                    {u.latestAt
+                      ? new Date(u.latestAt).toLocaleString("sv-SE", {
+                          timeZone: "Asia/Shanghai",
+                          hour12: false,
+                        })
+                      : "—"}
                   </td>
                   <td className="border border-[#e8e8e8] px-3 py-2">
                     <Link

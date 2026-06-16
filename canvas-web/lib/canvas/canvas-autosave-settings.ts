@@ -2,6 +2,9 @@
 
 export const CANVAS_AUTOSAVE_DEBOUNCE_MS = 1500;
 
+/** 与 book-mall `CANVAS_PROJECT_HISTORY_MAX` 一致 · 每项目历史版本环形缓冲上限 */
+export const CANVAS_PROJECT_HISTORY_MAX = 20;
+
 export type CanvasAutosaveIntervalOption = {
   id: string;
   label: string;

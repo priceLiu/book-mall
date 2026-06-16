@@ -1,6 +1,7 @@
 "use client";
 
 import { listCanvasProjectTasks, runCanvasNode } from "@/lib/canvas-api";
+import { buildCanvasRunSnapshot } from "@/lib/canvas/canvas-run-snapshot";
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
@@ -268,6 +269,7 @@ async function commitStoryVideoRowRunOnce(
       forceFresh,
       rowKey,
       mediaKind: "video",
+      canvasSnapshot: buildCanvasRunSnapshot(),
       ...stylePayload,
     });
     const task = r.task;

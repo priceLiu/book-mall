@@ -13,6 +13,7 @@ import {
   softDeleteCanvasProjectForUser,
   updateCanvasProjectForUser,
 } from "@/lib/canvas/canvas-project-service";
+import { pickProjectThumbnailUrl } from "@/lib/canvas/pick-project-thumbnail";
 import { runCanvasPollWorker } from "@/lib/canvas/canvas-task-service";
 import { prisma } from "@/lib/prisma";
 
@@ -84,7 +85,10 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       const labelRaw = (hs as { label?: unknown }).label;
       historyItem = await createCanvasProjectHistoryForUser(guard.user.id, id, {
         canvas: project.canvas,
-        thumbnailUrl: project.thumbnailUrl,
+        thumbnailUrl:
+          project.thumbnailUrl?.trim() ||
+          pickProjectThumbnailUrl(project.canvas) ||
+          undefined,
         source,
         label: typeof labelRaw === "string" ? labelRaw : undefined,
       });

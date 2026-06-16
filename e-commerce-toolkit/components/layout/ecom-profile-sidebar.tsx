@@ -120,7 +120,10 @@ export function EcomProfileSidebar({
   }
 
   function signOut() {
-    window.location.href = `${bookOrigin}/api/auth/full-signout?callbackUrl=${encodeURIComponent(bookOrigin + "/")}`;
+    if (typeof document !== "undefined") {
+      document.cookie = "sso_reenter_suppress=1; Path=/; Max-Age=300; SameSite=Lax";
+    }
+    window.location.href = `${bookOrigin}/api/auth/full-signout?callbackUrl=${encodeURIComponent("/")}`;
   }
 
   const collapseNav = () => onCollapsedChange?.(true);
