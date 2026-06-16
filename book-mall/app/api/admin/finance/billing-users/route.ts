@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (!user) return financeUnauthorized(request);
   if (!canViewFinanceCost(user.role)) return financeForbidden(request, "需要财务/超管权限");
 
-  const [legacyGrouped, gatewayGrouped] = await Promise.all([
+  const [legacyGrouped, gatewayGrouped, gatewaySucceededGrouped] = await Promise.all([
     prisma.toolBillingDetailLine.groupBy({
       by: ["userId"],
       _count: { _all: true },
@@ -32,20 +32,30 @@ export async function GET(request: NextRequest) {
     }),
     prisma.gatewayRequestLog.groupBy({
       by: ["actorBookUserId"],
-      where: { actorBookUserId: { not: null }, status: "SUCCEEDED" },
+      where: { actorBookUserId: { not: null } },
       _count: { _all: true },
       _max: { submittedAt: true },
     }),
+    prisma.gatewayRequestLog.groupBy({
+      by: ["actorBookUserId"],
+      where: { actorBookUserId: { not: null }, status: "SUCCEEDED" },
+      _count: { _all: true },
+    }),
   ]);
+
+  const succeededByUser = new Map(
+    gatewaySucceededGrouped.map((g) => [g.actorBookUserId!, g._count._all]),
+  );
 
   const merged = new Map<
     string,
-    { lineCount: number; latestAt: Date | null }
+    { lineCount: number; succeededCalls: number; latestAt: Date | null }
   >();
 
   for (const g of legacyGrouped) {
     merged.set(g.userId, {
       lineCount: g._count._all,
+      succeededCalls: g._count._all,
       latestAt: g._max.createdAt,
     });
   }
@@ -54,11 +64,17 @@ export async function GET(request: NextRequest) {
     const uid = g.actorBookUserId!;
     const ex = merged.get(uid);
     const gwLatest = g._max.submittedAt;
+    const succeededCalls = succeededByUser.get(uid) ?? 0;
     if (!ex) {
-      merged.set(uid, { lineCount: g._count._all, latestAt: gwLatest });
+      merged.set(uid, {
+        lineCount: g._count._all,
+        succeededCalls,
+        latestAt: gwLatest,
+      });
     } else {
       merged.set(uid, {
         lineCount: ex.lineCount + g._count._all,
+        succeededCalls: ex.succeededCalls + succeededCalls,
         latestAt:
           ex.latestAt && gwLatest
             ? ex.latestAt > gwLatest
@@ -96,6 +112,7 @@ export async function GET(request: NextRequest) {
         email: u?.email ?? null,
         phone: u?.phone ?? null,
         lineCount: stats.lineCount,
+        succeededCalls: stats.succeededCalls,
         latestAt: stats.latestAt?.toISOString() ?? null,
       };
     })

@@ -1,22 +1,31 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Clock, History, Loader2, RotateCcw, X } from "lucide-react";
+import { Clock, History, Loader2, RotateCcw, Trash2, X } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import {
+  ProjectAssetHoverPreviewLayer,
+  useProjectAssetHoverPreview,
+} from "@/components/canvas/project-asset-hover-preview";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
+  deleteCanvasProjectHistoryEntry,
   formatCanvasApiError,
   getCanvasProjectHistoryEntry,
   listCanvasProjectHistory,
+  type CanvasProjectHistoryMeta,
   type CanvasProjectHistorySummary,
 } from "@/lib/canvas-api";
 import {
   CANVAS_AUTOSAVE_INTERVAL_OPTIONS,
+  CANVAS_PROJECT_HISTORY_MAX,
   formatCanvasAutosaveIntervalLabel,
   getCanvasAutosaveIntervalMs,
   setCanvasAutosaveIntervalMs,
 } from "@/lib/canvas/canvas-autosave-settings";
+
+type HistoryTab = "autosave" | "manual";
 
 export function MyCanvasHistoryPanel({
   open,
@@ -31,10 +40,15 @@ export function MyCanvasHistoryPanel({
 }) {
   const base = useBookMallBaseUrl();
   const { alert, doubleConfirm } = useDialogs();
+  const { hoverPreview, showHoverPreview, hideHoverPreview } =
+    useProjectAssetHoverPreview(true);
+  const [tab, setTab] = useState<HistoryTab>("autosave");
   const [items, setItems] = useState<CanvasProjectHistorySummary[]>([]);
+  const [meta, setMeta] = useState<CanvasProjectHistoryMeta | null>(null);
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [intervalMs, setIntervalMs] = useState(getCanvasAutosaveIntervalMs);
   const openRef = useRef(open);
   openRef.current = open;
@@ -43,16 +57,18 @@ export function MyCanvasHistoryPanel({
     if (!base || !projectId) return;
     setLoading(true);
     try {
-      const list = await listCanvasProjectHistory(base, projectId);
-      setItems(list);
+      const data = await listCanvasProjectHistory(base, projectId, { source: tab });
+      setItems(data.items);
+      setMeta(data.meta);
       setListError(null);
     } catch (e) {
       setItems([]);
+      setMeta(null);
       setListError(formatCanvasApiError(e instanceof Error ? e.message : String(e)));
     } finally {
       setLoading(false);
     }
-  }, [base, projectId]);
+  }, [base, projectId, tab]);
 
   useEffect(() => {
     if (!open) return;
@@ -105,9 +121,15 @@ export function MyCanvasHistoryPanel({
       await onRestore(detail.canvas);
       onClose();
     } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      const message = raw.includes("history not found")
+        ? "该历史版本已不存在（可能已被新版本顶出）。请刷新列表后重试。"
+        : raw.includes("404")
+          ? formatCanvasApiError(raw)
+          : raw;
       await alert({
         title: "恢复失败",
-        message: e instanceof Error ? e.message : String(e),
+        message,
         variant: "error",
       });
     } finally {
@@ -115,7 +137,43 @@ export function MyCanvasHistoryPanel({
     }
   };
 
+  const onDeleteItem = async (item: CanvasProjectHistorySummary) => {
+    if (!base) return;
+    const ok = await doubleConfirm({
+      first: {
+        title: "删除此手动保存？",
+        message: `将删除「${item.label}」（${new Date(item.createdAt).toLocaleString("zh-CN")}）。`,
+        confirmLabel: "继续",
+        danger: true,
+      },
+      second: {
+        title: "再次确认 · 不可恢复",
+        message: "删除后无法从列表恢复该版本。是否继续？",
+        confirmLabel: "删除",
+        danger: true,
+      },
+    });
+    if (!ok) return;
+
+    setDeletingId(item.id);
+    try {
+      await deleteCanvasProjectHistoryEntry(base, projectId, item.id);
+      await reload();
+    } catch (e) {
+      await alert({
+        title: "删除失败",
+        message: e instanceof Error ? e.message : String(e),
+        variant: "error",
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (!open) return null;
+
+  const tabCount =
+    tab === "manual" ? meta?.manualCount ?? items.length : meta?.autosaveCount ?? items.length;
 
   return (
     <div
@@ -144,6 +202,31 @@ export function MyCanvasHistoryPanel({
           </button>
         </header>
 
+        <div className="flex gap-1 border-b border-white/8 px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setTab("autosave")}
+            className={`rounded-md px-3 py-1.5 text-[11px] ${
+              tab === "autosave"
+                ? "bg-violet-500/20 text-violet-100"
+                : "text-white/55 hover:bg-white/8"
+            }`}
+          >
+            自动保存 ({meta?.autosaveCount ?? 0}/{CANVAS_PROJECT_HISTORY_MAX})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("manual")}
+            className={`rounded-md px-3 py-1.5 text-[11px] ${
+              tab === "manual"
+                ? "bg-violet-500/20 text-violet-100"
+                : "text-white/55 hover:bg-white/8"
+            }`}
+          >
+            手动保存 ({meta?.manualCount ?? 0}/{CANVAS_PROJECT_HISTORY_MAX})
+          </button>
+        </div>
+
         <div className="border-b border-white/8 px-4 py-3">
           <div className="flex items-center gap-2 text-[11px] text-white/55">
             <Clock className="size-3.5" />
@@ -161,10 +244,11 @@ export function MyCanvasHistoryPanel({
             ))}
           </select>
           <p className="mt-2 text-[10px] leading-relaxed text-white/40">
-            每个项目最多保留 15 个版本。当前：
+            自动与手动各保留 {CANVAS_PROJECT_HISTORY_MAX} 条，互不影响。手动保存满
+            {CANVAS_PROJECT_HISTORY_MAX} 条时，继续保存会提示覆盖最旧一条，也可在此删除旧版本。
             {intervalMs === 0
-              ? " 仅手动保存会写入历史"
-              : ` 约每 ${formatCanvasAutosaveIntervalLabel(intervalMs)} 保存一次`}
+              ? " 当前：仅手动保存会写入「手动保存」历史。"
+              : ` 当前：约每 ${formatCanvasAutosaveIntervalLabel(intervalMs)} 写入「自动保存」历史。`}
           </p>
         </div>
 
@@ -181,8 +265,9 @@ export function MyCanvasHistoryPanel({
             </div>
           ) : items.length === 0 ? (
             <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
-              还没有历史版本。开启自动保存或点击「手动保存」后，会在此保留最近 15
-              个快照，可随时恢复排列与节点内容。
+              {tab === "manual"
+                ? "还没有手动保存。点击工具栏「手动保存」后，版本会出现在这里（最多 20 条）。"
+                : "还没有自动保存记录。开启间隔后会在此保留最近 20 个自动快照。"}
             </p>
           ) : (
             <ul className="space-y-2">
@@ -193,12 +278,26 @@ export function MyCanvasHistoryPanel({
                 >
                   <div className="flex items-start gap-3">
                     {item.thumbnailUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.thumbnailUrl}
-                        alt=""
-                        className="size-14 shrink-0 rounded-md border border-white/10 object-cover"
-                      />
+                      <button
+                        type="button"
+                        className="relative size-14 shrink-0 overflow-hidden rounded-md border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
+                        aria-label={`预览 ${item.label}`}
+                        onMouseEnter={(e) =>
+                          showHoverPreview({
+                            url: item.thumbnailUrl,
+                            title: item.label,
+                            anchor: e.currentTarget,
+                          })
+                        }
+                        onMouseLeave={hideHoverPreview}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.thumbnailUrl}
+                          alt=""
+                          className="size-full object-cover"
+                        />
+                      </button>
                     ) : (
                       <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/30 text-[10px] text-white/30">
                         无预览
@@ -210,21 +309,37 @@ export function MyCanvasHistoryPanel({
                       </p>
                       <p className="mt-0.5 text-[11px] text-violet-200/55">
                         {new Date(item.createdAt).toLocaleString("zh-CN")}
-                        {item.source === "manual" ? " · 手动" : " · 自动"}
                       </p>
-                      <button
-                        type="button"
-                        disabled={restoringId === item.id}
-                        onClick={() => void onRestoreItem(item)}
-                        className="mt-2 inline-flex items-center gap-1 rounded-md border border-violet-400/30 bg-violet-500/15 px-2 py-1 text-[11px] text-violet-100 hover:bg-violet-500/25 disabled:opacity-50"
-                      >
-                        {restoringId === item.id ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : (
-                          <RotateCcw className="size-3" />
-                        )}
-                        恢复此版本
-                      </button>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={restoringId === item.id}
+                          onClick={() => void onRestoreItem(item)}
+                          className="inline-flex items-center gap-1 rounded-md border border-violet-400/30 bg-violet-500/15 px-2 py-1 text-[11px] text-violet-100 hover:bg-violet-500/25 disabled:opacity-50"
+                        >
+                          {restoringId === item.id ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            <RotateCcw className="size-3" />
+                          )}
+                          恢复
+                        </button>
+                        {tab === "manual" ? (
+                          <button
+                            type="button"
+                            disabled={deletingId === item.id}
+                            onClick={() => void onDeleteItem(item)}
+                            className="inline-flex items-center gap-1 rounded-md border border-red-400/25 bg-red-500/10 px-2 py-1 text-[11px] text-red-200 hover:bg-red-500/20 disabled:opacity-50"
+                          >
+                            {deletingId === item.id ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-3" />
+                            )}
+                            删除
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -239,10 +354,11 @@ export function MyCanvasHistoryPanel({
             onClick={() => void reload()}
             className="rounded-md border border-white/12 px-3 py-1.5 text-[11px] text-white/70 hover:bg-white/8"
           >
-            刷新列表
+            刷新列表 ({tabCount})
           </button>
         </footer>
       </aside>
+      <ProjectAssetHoverPreviewLayer state={hoverPreview} />
     </div>
   );
 }

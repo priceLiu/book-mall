@@ -165,6 +165,8 @@ function FlowCanvasInner({
   const reparentNode = useCanvasStore((s) => s.reparentNode);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const fitViewNonce = useCanvasStore((s) => s.fitViewNonce);
+  const canvasFocusNodeId = useCanvasStore((s) => s.canvasFocusNodeId);
+  const canvasFocusNonce = useCanvasStore((s) => s.canvasFocusNonce);
 
   const enablePaneContextMenu = pro2FloatingInspector || sbv1Canvas;
   const enableDragSnapGuides = pro2FloatingInspector || sbv1Canvas;
@@ -336,6 +338,19 @@ function FlowCanvasInner({
     });
     return () => window.cancelAnimationFrame(t);
   }, [fitViewNonce, fitView]);
+
+  useEffect(() => {
+    if (canvasFocusNonce <= 0 || !canvasFocusNodeId) return;
+    const t = window.requestAnimationFrame(() => {
+      void fitView({
+        nodes: [{ id: canvasFocusNodeId }],
+        padding: 0.35,
+        duration: 280,
+        maxZoom: 1.2,
+      });
+    });
+    return () => window.cancelAnimationFrame(t);
+  }, [canvasFocusNonce, canvasFocusNodeId, fitView]);
 
   /** 上传一个图片 File，并在指定位置创建 image 节点。返回新节点 id。 */
   const ingestImageFile = useCallback(

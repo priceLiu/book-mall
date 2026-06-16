@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { maskPhone } from "@/lib/auth/phone";
+import { formatAdminDateTime } from "@/lib/finance/billing-datetime";
 import { AdminUserResetPasswordButton } from "@/components/admin/admin-user-reset-password-button";
 import { AdminUserBindPhoneButton } from "@/components/admin/admin-user-bind-phone-button";
 
@@ -115,8 +116,8 @@ export default async function AdminUsersPage() {
                     {u.role}
                   </span>
                 </td>
-                <td className="p-3 text-muted-foreground">
-                  {u.createdAt.toLocaleString("zh-CN")}
+                <td className="p-3 text-muted-foreground tabular-nums">
+                  {formatAdminDateTime(u.createdAt)}
                 </td>
                 <td className="p-3 align-top space-y-2">
                   <AdminUserBindPhoneButton

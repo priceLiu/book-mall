@@ -41,6 +41,10 @@ import {
   type CanvasTaskStoryScope,
 } from "./canvas-story-scope";
 import { enrichCanvasTaskRows } from "./canvas-task-billing";
+import { resolveGenerationRecordLabels } from "./generation-record-labels";
+import { resolveGenerationRecordPreview } from "./generation-record-preview";
+import { resolveCanvasHistoryIdsForTasks } from "./generation-canvas-history";
+import { findGenerationTaskRows } from "./canvas-generation-task-query";
 import { persistCanvasKieResultToOss } from "./canvas-oss";
 import {
   canvasGwCreateBailianR2vJob,
@@ -1544,6 +1548,13 @@ export async function listProjectTasks(args: {
       };
       creditsCharged?: number | null;
       billingMode?: "PLATFORM_CREDIT" | "BYOK" | null;
+      providerLabel?: string;
+      modelLabel?: string;
+      thumbnailUrl?: string | null;
+      previewUrl?: string | null;
+      previewKind?: "image" | "video" | null;
+      canvasHistoryId?: string | null;
+      canRestoreCanvas?: boolean;
     }
   >
 > {
@@ -1555,34 +1566,133 @@ export async function listProjectTasks(args: {
       ? { nodeId: { in: args.nodeIds } }
       : {}),
   };
-  const rows = await prisma.canvasGenerationTask.findMany({
+  const rows = await findGenerationTaskRows({
     where,
     orderBy: { updatedAt: "desc" },
     take: 200,
-    select: {
-      id: true,
-      nodeId: true,
-      kind: true,
-      status: true,
-      model: true,
-      ossUrl: true,
-      ephemeralUrl: true,
-      textOutput: true,
-      failCode: true,
-      failMessage: true,
-      submittedAt: true,
-      completedAt: true,
-      createdAt: true,
-      updatedAt: true,
-      kieTaskId: true,
-      inputPayload: true,
-    },
+    projectIdForRows: args.projectId,
   });
   const enriched = await enrichCanvasTaskRows(rows);
-  return enriched.map((row, idx) => ({
-    ...row,
-    storyScope: extractStoryScopeFromInputPayload(rows[idx]?.inputPayload),
-  }));
+  const historyByTask = await resolveCanvasHistoryIdsForTasks(
+    rows.map((r) => ({
+      id: r.id,
+      projectId: args.projectId,
+      createdAt: r.createdAt,
+      canvasHistoryId: r.canvasHistoryId,
+      inputPayload: r.inputPayload,
+    })),
+  );
+  return enriched.map((row, idx) => {
+    const canvasHistoryId = historyByTask.get(row.id) ?? null;
+    return {
+      ...row,
+      ...resolveGenerationRecordLabels({
+        model: row.model,
+        inputPayload: rows[idx]?.inputPayload,
+        failMessage: row.failMessage,
+      }),
+      ...resolveGenerationRecordPreview({
+        ossUrl: row.ossUrl,
+        ephemeralUrl: row.ephemeralUrl,
+        inputPayload: rows[idx]?.inputPayload,
+      }),
+      canvasHistoryId,
+      canRestoreCanvas: Boolean(canvasHistoryId),
+      storyScope: extractStoryScopeFromInputPayload(rows[idx]?.inputPayload),
+    };
+  });
+}
+
+/** 用户级生成记录（含成功/失败；可按时间筛选，用于「生成记录」面板）。 */
+export async function listUserGenerationRecords(args: {
+  userId: string;
+  projectId?: string;
+  since?: Date;
+  limit?: number;
+}): Promise<
+  Array<
+    Pick<
+      CanvasGenerationTask,
+      | "id"
+      | "projectId"
+      | "nodeId"
+      | "kind"
+      | "status"
+      | "model"
+      | "ossUrl"
+      | "ephemeralUrl"
+      | "textOutput"
+      | "failCode"
+      | "failMessage"
+      | "submittedAt"
+      | "completedAt"
+      | "createdAt"
+      | "updatedAt"
+      | "kieTaskId"
+    > & {
+      projectName: string;
+      storyScope?: {
+        rowKey?: string;
+        mediaKind?: string;
+        llmSection?: string;
+      };
+      creditsCharged?: number | null;
+      billingMode?: "PLATFORM_CREDIT" | "BYOK" | null;
+      providerLabel?: string;
+      modelLabel?: string;
+      thumbnailUrl?: string | null;
+      previewUrl?: string | null;
+      previewKind?: "image" | "video" | null;
+      canvasHistoryId?: string | null;
+      canRestoreCanvas?: boolean;
+    }
+  >
+> {
+  const limit = Math.min(Math.max(args.limit ?? 100, 1), 500);
+  const rows = await findGenerationTaskRows({
+    where: {
+      deletedAt: null,
+      project: {
+        userId: args.userId,
+        deletedAt: null,
+        ...(args.projectId ? { id: args.projectId } : {}),
+      },
+      ...(args.since ? { createdAt: { gte: args.since } } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    includeProjectName: true,
+  });
+  const enriched = await enrichCanvasTaskRows(rows);
+  const historyByTask = await resolveCanvasHistoryIdsForTasks(
+    rows.map((r) => ({
+      id: r.id,
+      projectId: r.projectId,
+      createdAt: r.createdAt,
+      canvasHistoryId: r.canvasHistoryId,
+      inputPayload: r.inputPayload,
+    })),
+  );
+  return enriched.map((row, idx) => {
+    const canvasHistoryId = historyByTask.get(row.id) ?? null;
+    return {
+      ...row,
+      projectName: rows[idx]?.project?.name ?? "",
+      ...resolveGenerationRecordLabels({
+        model: row.model,
+        inputPayload: rows[idx]?.inputPayload,
+        failMessage: row.failMessage,
+      }),
+      ...resolveGenerationRecordPreview({
+        ossUrl: row.ossUrl,
+        ephemeralUrl: row.ephemeralUrl,
+        inputPayload: rows[idx]?.inputPayload,
+      }),
+      canvasHistoryId,
+      canRestoreCanvas: Boolean(canvasHistoryId),
+      storyScope: extractStoryScopeFromInputPayload(rows[idx]?.inputPayload),
+    };
+  });
 }
 
 export type CanvasGenerationKindAlias = CanvasGenerationKind;

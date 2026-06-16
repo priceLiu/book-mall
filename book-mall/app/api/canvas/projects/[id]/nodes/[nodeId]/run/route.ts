@@ -7,6 +7,7 @@ import {
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
 import { enrichSingleCanvasTask } from "@/lib/canvas/canvas-task-billing";
+import { attachGenerationCanvasHistory } from "@/lib/canvas/generation-canvas-history";
 import {
   scheduleCanvasPollWorkerForProject,
   submitCanvasNodeTask,
@@ -324,6 +325,37 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       scheduleCanvasPollWorkerForProject(projectId);
     }
     const task = await enrichSingleCanvasTask(result.task);
+
+    const canvasSnapshot = body.body.canvasSnapshot as
+      | { canvas?: unknown; thumbnailUrl?: unknown }
+      | undefined;
+    if (
+      !result.reused &&
+      canvasSnapshot &&
+      typeof canvasSnapshot === "object" &&
+      canvasSnapshot.canvas &&
+      typeof canvasSnapshot.canvas === "object"
+    ) {
+      try {
+        await attachGenerationCanvasHistory({
+          userId: guard.user.id,
+          projectId,
+          taskId: result.task.id,
+          canvas: canvasSnapshot.canvas,
+          thumbnailUrl:
+            typeof canvasSnapshot.thumbnailUrl === "string"
+              ? canvasSnapshot.thumbnailUrl
+              : undefined,
+          nodeType: node.type,
+          model: result.task.model,
+          inputPayload: result.task.inputPayload,
+          createdAt: result.task.createdAt,
+        });
+      } catch (e) {
+        console.warn("[canvas/run] generation canvas snapshot failed", e);
+      }
+    }
+
     return NextResponse.json(
       { reused: result.reused, task },
       { status: result.reused ? 200 : 202, headers: jsonHeaders(request) },

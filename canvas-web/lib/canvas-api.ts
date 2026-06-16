@@ -209,6 +209,13 @@ export type CanvasProjectHistorySummary = {
   createdAt: string;
 };
 
+export type CanvasProjectHistoryMeta = {
+  autosaveCount: number;
+  manualCount: number;
+  maxPerSource: number;
+  oldestManual: CanvasProjectHistorySummary | null;
+};
+
 export type CanvasProjectHistorySnapshotRequest = {
   source?: "autosave" | "manual";
   label?: string;
@@ -246,22 +253,79 @@ export type CanvasProjectHistoryDetail = CanvasProjectHistorySummary & {
 export async function listCanvasProjectHistory(
   base: string,
   projectId: string,
-): Promise<CanvasProjectHistorySummary[]> {
-  const j = await call<{ items: CanvasProjectHistorySummary[] }>(
-    base,
-    `/api/canvas/projects/${projectId}/history`,
-  );
-  return j.items;
+  opts?: { source?: "autosave" | "manual" },
+): Promise<{ items: CanvasProjectHistorySummary[]; meta: CanvasProjectHistoryMeta }> {
+  const q =
+    opts?.source != null
+      ? `?source=${encodeURIComponent(opts.source)}`
+      : "";
+  const j = await call<{
+    items: CanvasProjectHistorySummary[];
+    meta: CanvasProjectHistoryMeta;
+  }>(base, `/api/canvas/projects/${projectId}/history${q}`);
+  return { items: j.items, meta: j.meta };
 }
+
+export async function deleteCanvasProjectHistoryEntry(
+  base: string,
+  projectId: string,
+  historyId: string,
+): Promise<void> {
+  await call<{ ok: true }>(
+    base,
+    `/api/canvas/projects/${projectId}/history/${historyId}`,
+    { method: "DELETE" },
+  );
+}
+
+export type CanvasGenerationRecord = CanvasTaskRecord & {
+  projectId?: string;
+  projectName?: string;
+  providerLabel?: string;
+  modelLabel?: string;
+  thumbnailUrl?: string | null;
+  previewUrl?: string | null;
+  previewKind?: "image" | "video" | null;
+  previewMedia?: Array<{
+    url: string;
+    kind: "image" | "video";
+    label: string;
+  }>;
+  canvasHistoryId?: string | null;
+  canRestoreCanvas?: boolean;
+  /** 关联 nodeId 是否仍在 persisted 画布上；无 nodeId 时为 null */
+  nodePresent?: boolean | null;
+  /** 旧接口回退：参考图（失败任务缩略图） */
+  mainFrameImageUrl?: string | null;
+  referenceImageUrls?: string[] | null;
+};
+
+export async function listCanvasGenerationRecords(
+  base: string,
+  projectId: string,
+): Promise<{
+  projectTasks: CanvasGenerationRecord[];
+  todayTasks: CanvasGenerationRecord[];
+  since: string;
+}> {
+  const j = await call<{
+    projectTasks: CanvasGenerationRecord[];
+    todayTasks: CanvasGenerationRecord[];
+    since: string;
+  }>(base, `/api/canvas/projects/${projectId}/generation-records`);
+  return j;
+}
+
 
 export async function getCanvasProjectHistoryEntry(
   base: string,
   projectId: string,
   historyId: string,
 ): Promise<CanvasProjectHistoryDetail> {
+  const q = new URLSearchParams({ entryId: historyId });
   const j = await call<{ item: CanvasProjectHistoryDetail }>(
     base,
-    `/api/canvas/projects/${projectId}/history/${historyId}`,
+    `/api/canvas/projects/${projectId}/history?${q.toString()}`,
   );
   return j.item;
 }
@@ -295,6 +359,18 @@ export async function deleteCanvasProject(
   await call<{ ok: true }>(base, `/api/canvas/projects/${id}`, {
     method: "DELETE",
   });
+}
+
+export async function duplicateCanvasProject(
+  base: string,
+  id: string,
+): Promise<CanvasProjectDetail> {
+  const j = await call<{ project: CanvasProjectDetail }>(
+    base,
+    `/api/canvas/projects/${id}/duplicate`,
+    { method: "POST" },
+  );
+  return j.project;
 }
 
 // ── engine models ──
@@ -380,6 +456,11 @@ export async function runCanvasNode(
       styleAnchorZh?: string;
       styleAnchorEn?: string;
       negativePrompt?: string;
+    };
+    /** 生成前画布快照 · 用于生成记录恢复整图 */
+    canvasSnapshot?: {
+      canvas: unknown;
+      thumbnailUrl?: string;
     };
   },
 ): Promise<{ reused: boolean; task: CanvasTaskRecord }> {

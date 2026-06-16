@@ -142,6 +142,10 @@ type CanvasState = {
   /** 生成中聚焦某节点（选中 + 平移，不写 undo 栈） */
   runningFocusNodeId: string | null;
   runningFocusNonce: number;
+  /** 用户从生成记录等入口定位节点（选中 + fitView） */
+  canvasFocusNodeId: string | null;
+  canvasFocusNonce: number;
+  focusCanvasNode: (nodeId: string) => void;
   /** 递增表示 nodes/edges 业务数据变更；纯选中不进栈。坐标松手提交会 bump 以触发 autosave */
   graphRevision: number;
 
@@ -284,6 +288,8 @@ export const useCanvasStore = create<CanvasState>()(
       fitViewNonce: 0,
       runningFocusNodeId: null,
       runningFocusNonce: 0,
+      canvasFocusNodeId: null,
+      canvasFocusNonce: 0,
       graphRevision: 0,
       connectingFromNodeId: null,
       dragHoverGroupId: null,
@@ -404,6 +410,19 @@ export const useCanvasStore = create<CanvasState>()(
           withGraphRevision(state, { edges: updater(state.edges) }),
         ),
       setViewport: (v) => set({ viewport: v }),
+
+      focusCanvasNode: (nodeId) => {
+        const all = get().nodes;
+        if (!all.some((n) => n.id === nodeId)) return;
+        set({
+          nodes: all.map((n) => ({
+            ...n,
+            selected: n.id === nodeId,
+          })),
+          canvasFocusNodeId: nodeId,
+          canvasFocusNonce: get().canvasFocusNonce + 1,
+        });
+      },
 
       onNodesChange: (changes) => {
         const prev = get().nodes;

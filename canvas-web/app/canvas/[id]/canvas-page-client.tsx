@@ -46,6 +46,7 @@ import { isRunnableNodeType } from "@/lib/canvas/types";
 import {
   clearCanvasProjectTasksForbidden,
   getCanvasProject,
+  listCanvasProjectHistory,
   patchCanvasProject,
   saveCanvasTemplate,
   type CanvasCharacterRecord,
@@ -75,9 +76,11 @@ import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
 import { SBV1_BUILTIN_TEMPLATE_ID } from "@/lib/canvas/project-edition";
 import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import { MyCanvasHistoryPanel } from "@/components/canvas/my-canvas-history-panel";
+import { MyCanvasGenerationRecordsPanel } from "@/components/canvas/my-canvas-generation-records-panel";
 import { SaveProjectAssetDialogHost } from "@/components/canvas/save-project-asset-dialog";
 import { useRegisterProjectAssetCanvasInsert } from "@/lib/canvas/use-register-project-asset-canvas-insert";
 import { CANVAS_AUTOSAVE_DEBOUNCE_MS, getCanvasAutosaveIntervalMs } from "@/lib/canvas/canvas-autosave-settings";
+import { getCanvasProjectHistoryEntry } from "@/lib/canvas-api";
 const STORY_COMIC_TEMPLATE_ID = "builtin/story-comic-pipeline";
 
 function Inner({ projectId }: { projectId: string }) {
@@ -104,6 +107,7 @@ function Inner({ projectId }: { projectId: string }) {
   );
   const isStoryComicCanvas = hasStoryComicPipeline(nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const focusCanvasNode = useCanvasStore((s) => s.focusCanvasNode);
 
   const onImportScriptFromAssistant = useCallback(
     async (md: string) => {
@@ -197,7 +201,7 @@ function Inner({ projectId }: { projectId: string }) {
     hasStoryProPipeline(nodes) && !isStoryPro2Canvas && !isSbv1Canvas;
   const showImmersiveChrome = isSbv1Canvas || isStoryPro2Canvas;
   const canvasEditorRef = useRef<HTMLDivElement>(null);
-  const { immersive, topChromeVisible, toggleImmersive } =
+  const { immersive, topChromeVisible, toggleImmersive, exitImmersive } =
     useCanvasImmersiveMode(canvasEditorRef);
   const [nameDraft, setNameDraft] = useState("");
   const [loading, setLoading] = useState(true);
@@ -216,6 +220,7 @@ function Inner({ projectId }: { projectId: string }) {
     useRegisterProjectAssetCanvasInsert();
   const [styleLibraryOpen, setStyleLibraryOpen] = useState(false);
   const [myHistoryOpen, setMyHistoryOpen] = useState(false);
+  const [myGenerationRecordsOpen, setMyGenerationRecordsOpen] = useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -250,6 +255,7 @@ function Inner({ projectId }: { projectId: string }) {
   /** 加载完成时的节点数；用于阻止误把「有内容的画布」自动保存成空。 */
   const loadedNodeCountRef = useRef(0);
   const canvasReadyRef = useRef(false);
+  const generationRecordDeepLinkRef = useRef<string | null>(null);
   /** 上次成功写入服务端的 graphRevision + viewport，用于判断是否需要自动保存 */
   const lastPersistedSnapshotRef = useRef<{
     revision: number;
@@ -300,6 +306,7 @@ function Inner({ projectId }: { projectId: string }) {
     if (!base) return;
     let cancelled = false;
     canvasReadyRef.current = false;
+    generationRecordDeepLinkRef.current = null;
     setProject(null);
     setLoading(true);
     clearCanvasProjectTasksForbidden(projectId);
@@ -380,7 +387,11 @@ function Inner({ projectId }: { projectId: string }) {
       }
     };
 
-    const runAutosave = async (force = false) => {
+    const runAutosave = async (
+      force = false,
+      opts: { writeHistory?: boolean } = {},
+    ) => {
+      const writeHistory = opts.writeHistory ?? false;
       if (autosaveInFlightRef.current) {
         autosavePendingRef.current = true;
         return;
@@ -408,10 +419,10 @@ function Inner({ projectId }: { projectId: string }) {
           canvas: typeof graph;
           thumbnailUrl?: string;
           historySnapshot?: { source: "autosave" };
-        } = {
-          canvas: graph,
-          historySnapshot: { source: "autosave" },
-        };
+        } = { canvas: graph };
+        if (writeHistory) {
+          patch.historySnapshot = { source: "autosave" };
+        }
         if (thumb && thumb !== proj.thumbnailUrl) {
           patch.thumbnailUrl = thumb;
         }
@@ -439,7 +450,7 @@ function Inner({ projectId }: { projectId: string }) {
         setSaving(false);
         if (autosavePendingRef.current) {
           autosavePendingRef.current = false;
-          void runAutosave(force);
+          void runAutosave(force, opts);
         }
       }
     };
@@ -461,7 +472,8 @@ function Inner({ projectId }: { projectId: string }) {
       clearAutosaveTimer();
       autosaveTimerRef.current = window.setTimeout(() => {
         autosaveTimerRef.current = null;
-        void runAutosave(false);
+        // 1.5s debounce：只持久化画布，不写「我的历史」
+        void runAutosave(false, { writeHistory: false });
       }, CANVAS_AUTOSAVE_DEBOUNCE_MS);
     };
 
@@ -475,7 +487,8 @@ function Inner({ projectId }: { projectId: string }) {
       autosaveIntervalRef.current = window.setInterval(() => {
         if (!canvasReadyRef.current) return;
         if (!isCanvasDirty()) return;
-        void runAutosave(false);
+        // 按用户设置的间隔（如 5 分钟）写入一条历史版本
+        void runAutosave(false, { writeHistory: true });
       }, intervalMs);
     };
 
@@ -491,7 +504,8 @@ function Inner({ projectId }: { projectId: string }) {
 
     const flushAutosaveNow = () => {
       clearAutosaveTimer();
-      void runAutosave(true);
+      // 拖动松手等：立即落盘，但不新增历史版本
+      void runAutosave(true, { writeHistory: false });
     };
 
     const onFlushAutosave = () => flushAutosaveNow();
@@ -535,6 +549,27 @@ function Inner({ projectId }: { projectId: string }) {
 
   const manualSave = useCallback(async () => {
     if (!base || !project) return;
+
+    try {
+      const { meta } = await listCanvasProjectHistory(base, projectId, {
+        source: "manual",
+      });
+      if (
+        meta.manualCount >= meta.maxPerSource &&
+        meta.oldestManual
+      ) {
+        const ok = await dialogs.confirm({
+          title: "手动保存已满",
+          message: `手动保存最多 ${meta.maxPerSource} 条。继续将覆盖最旧的一条「${meta.oldestManual.label}」（${new Date(meta.oldestManual.createdAt).toLocaleString("zh-CN")}）。也可在「我的历史 → 手动保存」中删除旧版本腾出空间。`,
+          confirmLabel: "覆盖最旧并保存",
+          danger: true,
+        });
+        if (!ok) return;
+      }
+    } catch {
+      /* 元数据失败不阻断保存 */
+    }
+
     setSaving(true);
     try {
       const graph = stripStoryProUploadedScriptMdForPersist(toGraph());
@@ -570,7 +605,7 @@ function Inner({ projectId }: { projectId: string }) {
     } finally {
       setSaving(false);
     }
-  }, [base, project, projectId, toGraph]);
+  }, [base, project, projectId, toGraph, dialogs]);
 
   const restoreFromHistory = useCallback(
     async (canvas: unknown) => {
@@ -578,12 +613,55 @@ function Inner({ projectId }: { projectId: string }) {
       hydrate(projectId, canvas as never);
       useCanvasStore.temporal.getState().clear();
       useCanvasStore.temporal.getState().resume();
+      await new Promise<void>((resolve) => {
+        queueMicrotask(() => resolve());
+      });
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+      syncLastPersistedSnapshotRef.current?.();
       setLastSavedAt(new Date());
       setSaveError(null);
-      syncLastPersistedSnapshotRef.current?.();
+      await exitImmersive();
     },
-    [hydrate, projectId],
+    [exitImmersive, hydrate, projectId],
   );
+
+  // 生成记录 · 恢复画布 / 定位节点（?restoreHistory=&focusNode=）
+  useEffect(() => {
+    if (!base || loading || !project) return;
+    const sp = new URLSearchParams(window.location.search);
+    const restoreHistory = sp.get("restoreHistory")?.trim();
+    const focusNode = sp.get("focusNode")?.trim();
+    if (!restoreHistory && !focusNode) return;
+
+    const key = `${restoreHistory ?? ""}:${focusNode ?? ""}`;
+    if (generationRecordDeepLinkRef.current === key) return;
+    generationRecordDeepLinkRef.current = key;
+
+    void (async () => {
+      if (restoreHistory) {
+        try {
+          const detail = await getCanvasProjectHistoryEntry(
+            base,
+            projectId,
+            restoreHistory,
+          );
+          await restoreFromHistory(detail.canvas);
+        } catch (e) {
+          await dialogs.alert({
+            title: "无法恢复画布",
+            message: e instanceof Error ? e.message : String(e),
+            variant: "error",
+          });
+        }
+      }
+      if (focusNode) {
+        focusCanvasNode(focusNode);
+      }
+      window.history.replaceState(null, "", `/canvas/${projectId}`);
+    })();
+  }, [base, dialogs, focusCanvasNode, loading, project, projectId, restoreFromHistory]);
 
   const commitProjectName = useCallback(async () => {
     if (!base || !project) return;
@@ -801,6 +879,7 @@ function Inner({ projectId }: { projectId: string }) {
             onRunAll={runAll}
             onOpenMyTemplates={() => setMyTemplatesOpen(true)}
             onOpenMyHistory={() => setMyHistoryOpen(true)}
+            onOpenGenerationRecords={() => setMyGenerationRecordsOpen(true)}
             onOpenMyCharacters={() => setMyCharactersOpen(true)}
             onOpenMyVideoLibrary={() => setMyVideoLibraryOpen(true)}
             onOpenMySavedScripts={
@@ -829,6 +908,12 @@ function Inner({ projectId }: { projectId: string }) {
         onClose={() => setMyHistoryOpen(false)}
         projectId={projectId}
         onRestore={restoreFromHistory}
+      />
+      <MyCanvasGenerationRecordsPanel
+        open={myGenerationRecordsOpen}
+        onClose={() => setMyGenerationRecordsOpen(false)}
+        projectId={projectId}
+        onRestoreCanvas={restoreFromHistory}
       />
       <MyTemplatesPanel
         open={myTemplatesOpen}

@@ -1,11 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { resolveToolsLogoutNextUrl, appendSsoReenterSuppressCookie } from "@/lib/tools-logout-next-url";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 
-/** 清除工具站会话 Cookie，并跳转主站首页（后续可做独立工具站首页 landing）。 */
+export const dynamic = "force-dynamic";
+
+/** 清除工具站 tools_token；支持 federated logout 链上的 `next` 参数。 */
 export async function GET(request: NextRequest) {
   const main = getMainSiteOrigin();
-  const targetUrl =
-    main != null && main.length > 0 ? new URL("/", main) : new URL("/", request.url);
+  const fallback =
+    main != null && main.length > 0 ? new URL("/", main).toString() : new URL("/", request.url).toString();
+  const targetUrl = resolveToolsLogoutNextUrl(
+    request.nextUrl.searchParams.get("next"),
+    fallback,
+    request.nextUrl.origin,
+  );
 
   const res = NextResponse.redirect(targetUrl);
   const secure = process.env.NODE_ENV === "production";
@@ -16,5 +24,6 @@ export async function GET(request: NextRequest) {
     path: "/",
     maxAge: 0,
   });
+  appendSsoReenterSuppressCookie(res);
   return res;
 }

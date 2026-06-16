@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Copy, Plus, Trash2, X } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   createCanvasProject,
   deleteCanvasProject,
+  duplicateCanvasProject,
   formatCanvasApiError,
   listCanvasTemplates,
   listMyCanvasProjects,
@@ -56,6 +57,7 @@ function Inner() {
   const [userTemplates, setUserTemplates] = useState<CanvasTemplateRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerEdition, setPickerEdition] = useState<CanvasProjectEdition>("standard");
@@ -236,6 +238,27 @@ function Inner() {
     }
   }, [base, name, pick, userTemplates]);
 
+  const onDuplicate = useCallback(
+    async (id: string, label: string) => {
+      if (!base) return;
+      setDuplicatingId(id);
+      try {
+        const created = await duplicateCanvasProject(base, id);
+        await load();
+        window.location.href = `/canvas/${created.id}`;
+      } catch (e) {
+        setError(
+          e instanceof Error
+            ? `复制「${label}」失败：${e.message}`
+            : `复制「${label}」失败`,
+        );
+      } finally {
+        setDuplicatingId(null);
+      }
+    },
+    [base, load],
+  );
+
   const onDelete = useCallback(
     async (id: string, label: string) => {
       if (!base) return;
@@ -374,6 +397,8 @@ function Inner() {
             edition="sbv1"
             projects={sbv1Projects}
             onDelete={onDelete}
+            onDuplicate={onDuplicate}
+            duplicatingId={duplicatingId}
             onRename={onRename}
             onCreate={() => onOpenPicker("sbv1")}
           />
@@ -383,6 +408,8 @@ function Inner() {
             edition="pro2"
             projects={pro2Projects}
             onDelete={onDelete}
+            onDuplicate={onDuplicate}
+            duplicatingId={duplicatingId}
             onRename={onRename}
             onCreate={() => onOpenPicker("pro2")}
           />
@@ -392,6 +419,8 @@ function Inner() {
             edition="pro"
             projects={proProjects}
             onDelete={onDelete}
+            onDuplicate={onDuplicate}
+            duplicatingId={duplicatingId}
             onRename={onRename}
             onCreate={() => onOpenPicker("pro")}
           />
@@ -401,6 +430,8 @@ function Inner() {
             edition="standard"
             projects={standardProjects}
             onDelete={onDelete}
+            onDuplicate={onDuplicate}
+            duplicatingId={duplicatingId}
             onRename={onRename}
             onCreate={() => onOpenPicker("standard")}
           />
@@ -520,6 +551,8 @@ function ProjectsSection({
   edition,
   projects,
   onDelete,
+  onDuplicate,
+  duplicatingId,
   onRename,
   onCreate,
 }: {
@@ -528,6 +561,8 @@ function ProjectsSection({
   edition: CanvasProjectEdition;
   projects: CanvasProjectSummary[];
   onDelete: (id: string, label: string) => void | Promise<void>;
+  onDuplicate: (id: string, label: string) => void | Promise<void>;
+  duplicatingId: string | null;
   onRename: (id: string, nextName: string) => void | Promise<void>;
   onCreate: () => void;
 }) {
@@ -598,7 +633,21 @@ function ProjectsSection({
                   更新于 {new Date(p.updatedAt).toLocaleString("zh-CN")}
                 </p>
               </Link>
-              <div className="mt-3 flex items-center justify-end">
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={duplicatingId === p.id}
+                  onClick={() => void onDuplicate(p.id, p.name)}
+                  className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-[var(--canvas-muted)] hover:border-cyan-400/40 hover:text-cyan-200 disabled:opacity-50"
+                  title="复制画布"
+                >
+                  {duplicatingId === p.id ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                  复制
+                </button>
                 <button
                   type="button"
                   onClick={() => void onDelete(p.id, p.name)}

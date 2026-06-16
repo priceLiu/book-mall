@@ -1,6 +1,11 @@
 /** 费用明细展示时区（对外一律北京时间）。 */
 export const BILLING_DISPLAY_TZ = "Asia/Shanghai";
 
+/** 管理后台 / 财务列表 · 统一北京时间展示。 */
+export function formatAdminDateTime(d: Date): string {
+  return formatBillingDateTime(d);
+}
+
 /** `YYYY-MM-DD HH:mm:ss`（北京时间，用于明细列与前端排序）。 */
 export function formatBillingDateTime(d: Date): string {
   return d.toLocaleString("sv-SE", {

@@ -1667,7 +1667,7 @@ model CanvasProject {
   @@index([tenantId, visibility, updatedAt])
 }
 
-/// 画布自动/手动保存历史（每项目最多保留 15 条）
+/// 画布自动/手动保存历史（每项目最多保留 20 条）
 model CanvasProjectHistory {
   id        String @id @default(cuid())
   userId    String
@@ -1681,6 +1681,8 @@ model CanvasProjectHistory {
   thumbnailUrl String @default("")
 
   createdAt DateTime @default(now())
+
+  generationTasks CanvasGenerationTask[]
 
   @@index([userId, projectId, createdAt])
   @@index([projectId, createdAt])
@@ -1986,6 +1988,10 @@ model CanvasGenerationTask {
 
   /// canvas v2: 软删；用于「删除单次结果」（OSS 清理由 cleanup queue 异步处理）
   deletedAt DateTime?
+
+  /// 点击生成时的画布快照（CanvasProjectHistory.id，source=generation）
+  canvasHistoryId String?
+  canvasHistory   CanvasProjectHistory? @relation(fields: [canvasHistoryId], references: [id], onDelete: SetNull)
 
   submittedAt  DateTime?
   completedAt  DateTime?
