@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { CanvasGenerationKind, CanvasGenerationStatus, Prisma } from "@prisma/client";
 import { Prisma as PrismaRuntime } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -28,8 +28,8 @@ export type GenerationTaskRecordRow = {
   id: string;
   projectId: string;
   nodeId: string;
-  kind: string;
-  status: string;
+  kind: CanvasGenerationKind;
+  status: CanvasGenerationStatus;
   model: string;
   ossUrl: string | null;
   ephemeralUrl: string | null;

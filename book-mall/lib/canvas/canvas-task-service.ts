@@ -44,7 +44,7 @@ import { enrichCanvasTaskRows } from "./canvas-task-billing";
 import { resolveGenerationRecordLabels } from "./generation-record-labels";
 import { resolveGenerationRecordPreview } from "./generation-record-preview";
 import { resolveCanvasHistoryIdsForTasks } from "./generation-canvas-history";
-import { findGenerationTaskRows } from "./canvas-generation-task-query";
+import { findGenerationTaskRows, type GenerationTaskRecordRow } from "./canvas-generation-task-query";
 import { persistCanvasKieResultToOss } from "./canvas-oss";
 import {
   canvasGwCreateBailianR2vJob,
@@ -1517,47 +1517,91 @@ export async function softDeleteCanvasTask(args: {
 
 // —— Listing for project tasks API ——
 
+type CanvasGenerationRecordExtras = {
+  storyScope?: CanvasTaskStoryScope;
+  creditsCharged: number | null;
+  billingMode: "PLATFORM_CREDIT" | "BYOK" | null;
+  providerLabel: string;
+  modelLabel: string;
+  thumbnailUrl: string | null;
+  previewUrl: string | null;
+  previewKind: "image" | "video" | null;
+  canvasHistoryId: string | null;
+  canRestoreCanvas: boolean;
+};
+
+type CanvasGenerationRecordListItem = Pick<
+  CanvasGenerationTask,
+  | "id"
+  | "nodeId"
+  | "kind"
+  | "status"
+  | "model"
+  | "ossUrl"
+  | "ephemeralUrl"
+  | "textOutput"
+  | "failCode"
+  | "failMessage"
+  | "submittedAt"
+  | "completedAt"
+  | "createdAt"
+  | "updatedAt"
+  | "kieTaskId"
+> &
+  CanvasGenerationRecordExtras;
+
+type CanvasUserGenerationRecordListItem = CanvasGenerationRecordListItem &
+  Pick<CanvasGenerationTask, "projectId"> & {
+    projectName: string;
+  };
+
+function buildGenerationRecordListItem(
+  source: GenerationTaskRecordRow,
+  billing: {
+    creditsCharged: number | null;
+    billingMode: "PLATFORM_CREDIT" | "BYOK" | null;
+  },
+  canvasHistoryId: string | null,
+): CanvasGenerationRecordListItem {
+  return {
+    id: source.id,
+    nodeId: source.nodeId,
+    kind: source.kind,
+    status: source.status,
+    model: source.model,
+    ossUrl: source.ossUrl,
+    ephemeralUrl: source.ephemeralUrl,
+    textOutput: source.textOutput,
+    failCode: source.failCode,
+    failMessage: source.failMessage,
+    submittedAt: source.submittedAt,
+    completedAt: source.completedAt,
+    createdAt: source.createdAt,
+    updatedAt: source.updatedAt,
+    kieTaskId: source.kieTaskId,
+    ...resolveGenerationRecordLabels({
+      model: source.model,
+      inputPayload: source.inputPayload,
+      failMessage: source.failMessage,
+    }),
+    ...resolveGenerationRecordPreview({
+      ossUrl: source.ossUrl,
+      ephemeralUrl: source.ephemeralUrl,
+      inputPayload: source.inputPayload,
+    }),
+    creditsCharged: billing.creditsCharged,
+    billingMode: billing.billingMode,
+    canvasHistoryId,
+    canRestoreCanvas: Boolean(canvasHistoryId),
+    storyScope: extractStoryScopeFromInputPayload(source.inputPayload),
+  };
+}
+
 export async function listProjectTasks(args: {
   userId: string;
   projectId: string;
   nodeIds?: string[];
-}): Promise<
-  Array<
-    Pick<
-      CanvasGenerationTask,
-      | "id"
-      | "nodeId"
-      | "kind"
-      | "status"
-      | "model"
-      | "ossUrl"
-      | "ephemeralUrl"
-      | "textOutput"
-      | "failCode"
-      | "failMessage"
-      | "submittedAt"
-      | "completedAt"
-      | "createdAt"
-      | "updatedAt"
-      | "kieTaskId"
-    > & {
-      storyScope?: {
-        rowKey?: string;
-        mediaKind?: string;
-        llmSection?: string;
-      };
-      creditsCharged?: number | null;
-      billingMode?: "PLATFORM_CREDIT" | "BYOK" | null;
-      providerLabel?: string;
-      modelLabel?: string;
-      thumbnailUrl?: string | null;
-      previewUrl?: string | null;
-      previewKind?: "image" | "video" | null;
-      canvasHistoryId?: string | null;
-      canRestoreCanvas?: boolean;
-    }
-  >
-> {
+}): Promise<CanvasGenerationRecordListItem[]> {
   await assertAccessibleCanvasProject(args.userId, args.projectId);
   const where: Prisma.CanvasGenerationTaskWhereInput = {
     projectId: args.projectId,
@@ -1583,23 +1627,18 @@ export async function listProjectTasks(args: {
     })),
   );
   return enriched.map((row, idx) => {
-    const canvasHistoryId = historyByTask.get(row.id) ?? null;
-    return {
-      ...row,
-      ...resolveGenerationRecordLabels({
-        model: row.model,
-        inputPayload: rows[idx]?.inputPayload,
-        failMessage: row.failMessage,
-      }),
-      ...resolveGenerationRecordPreview({
-        ossUrl: row.ossUrl,
-        ephemeralUrl: row.ephemeralUrl,
-        inputPayload: rows[idx]?.inputPayload,
-      }),
-      canvasHistoryId,
-      canRestoreCanvas: Boolean(canvasHistoryId),
-      storyScope: extractStoryScopeFromInputPayload(rows[idx]?.inputPayload),
-    };
+    const source = rows[idx];
+    if (!source) {
+      throw new Error("generation record row missing");
+    }
+    return buildGenerationRecordListItem(
+      source,
+      {
+        creditsCharged: row.creditsCharged,
+        billingMode: row.billingMode,
+      },
+      historyByTask.get(row.id) ?? null,
+    );
   });
 }
 
@@ -1609,45 +1648,7 @@ export async function listUserGenerationRecords(args: {
   projectId?: string;
   since?: Date;
   limit?: number;
-}): Promise<
-  Array<
-    Pick<
-      CanvasGenerationTask,
-      | "id"
-      | "projectId"
-      | "nodeId"
-      | "kind"
-      | "status"
-      | "model"
-      | "ossUrl"
-      | "ephemeralUrl"
-      | "textOutput"
-      | "failCode"
-      | "failMessage"
-      | "submittedAt"
-      | "completedAt"
-      | "createdAt"
-      | "updatedAt"
-      | "kieTaskId"
-    > & {
-      projectName: string;
-      storyScope?: {
-        rowKey?: string;
-        mediaKind?: string;
-        llmSection?: string;
-      };
-      creditsCharged?: number | null;
-      billingMode?: "PLATFORM_CREDIT" | "BYOK" | null;
-      providerLabel?: string;
-      modelLabel?: string;
-      thumbnailUrl?: string | null;
-      previewUrl?: string | null;
-      previewKind?: "image" | "video" | null;
-      canvasHistoryId?: string | null;
-      canRestoreCanvas?: boolean;
-    }
-  >
-> {
+}): Promise<CanvasUserGenerationRecordListItem[]> {
   const limit = Math.min(Math.max(args.limit ?? 100, 1), 500);
   const rows = await findGenerationTaskRows({
     where: {
@@ -1674,23 +1675,21 @@ export async function listUserGenerationRecords(args: {
     })),
   );
   return enriched.map((row, idx) => {
-    const canvasHistoryId = historyByTask.get(row.id) ?? null;
+    const source = rows[idx];
+    if (!source) {
+      throw new Error("generation record row missing");
+    }
     return {
-      ...row,
-      projectName: rows[idx]?.project?.name ?? "",
-      ...resolveGenerationRecordLabels({
-        model: row.model,
-        inputPayload: rows[idx]?.inputPayload,
-        failMessage: row.failMessage,
-      }),
-      ...resolveGenerationRecordPreview({
-        ossUrl: row.ossUrl,
-        ephemeralUrl: row.ephemeralUrl,
-        inputPayload: rows[idx]?.inputPayload,
-      }),
-      canvasHistoryId,
-      canRestoreCanvas: Boolean(canvasHistoryId),
-      storyScope: extractStoryScopeFromInputPayload(rows[idx]?.inputPayload),
+      ...buildGenerationRecordListItem(
+        source,
+        {
+          creditsCharged: row.creditsCharged,
+          billingMode: row.billingMode,
+        },
+        historyByTask.get(row.id) ?? null,
+      ),
+      projectId: source.projectId,
+      projectName: source.project?.name ?? "",
     };
   });
 }
