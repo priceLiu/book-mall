@@ -76,6 +76,13 @@ export function applyHubSectionFromTask(
         characterMd,
       );
     }
+  } else if (section === "scene") {
+    patch.sceneRuntime = runtime;
+    if (textOutput?.trim()) {
+      const sceneMd = textOutput.trim();
+      patch.sceneMd = sceneMd;
+      patch.sceneHistory = pushStoryRevision(data.sceneHistory, sceneMd);
+    }
   } else {
     patch.storyboardRuntime = runtime;
     if (textOutput?.trim()) {

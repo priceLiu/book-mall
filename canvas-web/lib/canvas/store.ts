@@ -632,6 +632,32 @@ export const useCanvasStore = create<CanvasState>()(
           nodes: state.nodes,
           updateNodeData: (nodeId, patch) => get().updateNodeData(nodeId, patch),
         });
+
+        const srcNode = state.nodes.find((n) => n.id === normalized.source);
+        const tgtNode = state.nodes.find((n) => n.id === normalized.target);
+        if (
+          srcNode?.type === "story-pro2-starter" &&
+          tgtNode?.type === "story-pro2-script-hub"
+        ) {
+          const sd = srcNode.data as import("./story-pro-workspace-types").StoryProStarterNodeData;
+          const hubPatch: Record<string, unknown> = {
+            referencedNodeIds: [srcNode.id],
+          };
+          if (sd.providerId?.trim()) hubPatch.providerId = sd.providerId;
+          if (sd.modelKey?.trim()) hubPatch.modelKey = sd.modelKey;
+          if (sd.params) hubPatch.params = sd.params;
+          const outline =
+            sd.generatedOutlineMd?.trim() || sd.uploadedScriptMd?.trim();
+          if (outline) hubPatch.outlineMd = outline;
+          get().updateNodeData(tgtNode.id, hubPatch);
+          get().updateNodeData(srcNode.id, {
+            workspaceIds: {
+              ...(sd.workspaceIds ?? {}),
+              scriptHubId: tgtNode.id,
+            },
+          });
+        }
+
         set((state) => withGraphRevision(state, { edges }));
       },
 

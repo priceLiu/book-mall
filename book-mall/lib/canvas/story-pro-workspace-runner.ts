@@ -25,11 +25,12 @@ function proClientPage(projectId: string): string {
   return `canvas/${projectId}/story-pro`;
 }
 
-export type StoryProLlmSection = "outline" | "character" | "storyboard";
+export type StoryProLlmSection = "outline" | "character" | "scene" | "storyboard";
 
 const PROMPT_KEY: Record<StoryProLlmSection, string> = {
   outline: "promptOutline",
   character: "promptCharacter",
+  scene: "promptScene",
   storyboard: "promptStoryboard",
 };
 

@@ -217,7 +217,7 @@ export function Pro2ScriptHubToolbar({
     <>
       <div
         className={cn(
-          "nodrag pointer-events-auto absolute left-1/2 z-30 flex -translate-x-1/2 items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/96 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl",
+          "nodrag pointer-events-auto absolute left-1/2 z-30 flex min-w-max -translate-x-1/2 items-center gap-0.5 whitespace-nowrap rounded-xl border border-white/10 bg-[#1c1c1e]/96 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl",
           className,
         )}
         onMouseDown={(e) => e.stopPropagation()}

@@ -1,6 +1,5 @@
 "use client";
 
-import { runStoryHubSectionsSequential } from "./batch-run-nodes";
 import type { Pro2ThreeViewBatchImagePick } from "./pro2-three-view-batch-image";
 import {
   enqueuePro2ScriptGeneration,
@@ -26,6 +25,7 @@ export function downloadPro2ScriptMarkdown(md: string, title: string): void {
   URL.revokeObjectURL(url);
 }
 
+/** 工具栏「重新生成」：重新生成完整脚本（大纲 + 角色 + 脚本表） */
 export function regeneratePro2ScriptHub(
   hubId: string,
   hubData: StoryProScriptHubNodeData,
@@ -35,24 +35,21 @@ export function regeneratePro2ScriptHub(
   dockRefImages: StoryRefImage[],
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
 ): boolean {
-  if (pro2HubHasScriptTable(hubData)) {
-    updateNodeData(hubId, { dockInput, dockRefImages });
-    runStoryHubSectionsSequential(hubId, ["character", "storyboard"], {
-      forceFresh: true,
-    });
-    return true;
-  }
-  if (pro2HubIsLinkedOutline(nodes, edges, hubId, hubData)) {
-    enqueuePro2ScriptGeneration(
-      hubId,
-      dockInput,
-      dockRefImages,
-      updateNodeData,
-      { forceFresh: true },
-    );
-    return true;
-  }
-  return false;
+  const hasInput =
+    pro2HubIsLinkedOutline(nodes, edges, hubId, hubData) ||
+    hubData.dockInput?.trim() ||
+    dockInput.trim() ||
+    hubData.outlineMd?.trim();
+  if (!hasInput) return false;
+
+  enqueuePro2ScriptGeneration(
+    hubId,
+    dockInput,
+    dockRefImages,
+    updateNodeData,
+    { forceFresh: true, nodes, edges, hubData, regenerateAll: true },
+  );
+  return true;
 }
 
 export function generatePro2FrameBoardFromHub(

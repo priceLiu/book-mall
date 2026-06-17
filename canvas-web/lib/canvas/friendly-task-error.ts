@@ -1,11 +1,72 @@
-/** 将服务端 failMessage 转为用户可读文案 */
+type LlmVendorHint = "kie" | "deepseek" | "bailian" | "volcengine" | "unknown";
+
+/** 根据 modelKey 推断 LLM 实际调用的厂商（Gateway 按 modelKey 路由，非 providerId） */
+export function inferLlmVendorFromModelKey(
+  modelKey?: string | null,
+): LlmVendorHint {
+  const m = (modelKey ?? "").trim().toLowerCase();
+  if (!m) return "unknown";
+  if (m.startsWith("deepseek")) return "deepseek";
+  if (
+    m.startsWith("google/") ||
+    m.startsWith("gemini") ||
+    m.includes("nano-banana") ||
+    m.startsWith("grok-imagine")
+  ) {
+    return "kie";
+  }
+  if (m.includes("qwen") || m.includes("bailian")) return "bailian";
+  if (m.includes("doubao") || m.includes("seedance")) return "volcengine";
+  return "unknown";
+}
+
+function insufficientBalanceMessage(modelKey?: string | null): string {
+  const vendor = inferLlmVendorFromModelKey(modelKey);
+  const modelHint = modelKey?.trim() ? `（${modelKey.trim()}）` : "";
+  switch (vendor) {
+    case "deepseek":
+      return `DeepSeek 账户余额不足${modelHint}。请在 platform.deepseek.com 为 Gateway 绑定的 DeepSeek API Key 充值后重试。`;
+    case "bailian":
+      return `百炼/通义账户余额不足${modelHint}。请在阿里云 DashScope 控制台为 Gateway 绑定的凭证充值后重试。`;
+    case "kie":
+      return `KIE 账户余额不足${modelHint}。请在 kie.ai 为 Gateway 绑定的 KIE API Key 充值后重试，或换用 DeepSeek 等非 KIE 模型。`;
+    case "volcengine":
+      return `火山方舟账户余额不足${modelHint}。请在火山引擎控制台充值后重试，或改用其它模型。`;
+    default:
+      return `模型账户余额不足${modelHint}。请检查 Gateway 绑定的对应厂商凭证余额，或换用其它模型。`;
+  }
+}
+
+/** 从 Gateway / 厂商 JSON 错误体中提取 message */
+function extractVendorErrorMessage(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("{")) return trimmed;
+  try {
+    const j = JSON.parse(trimmed) as {
+      error?: string | { message?: string; code?: string };
+      message?: string;
+    };
+    if (typeof j.error === "string") return j.error;
+    if (j.error && typeof j.error === "object") {
+      const nested = j.error.message?.trim();
+      if (nested) return nested;
+    }
+    if (j.message?.trim()) return j.message.trim();
+  } catch {
+    /* keep raw */
+  }
+  return trimmed;
+}
+
+/** 将服务端 failMessage 转为用户可读文案；可选 modelKey 用于区分 DeepSeek / KIE 等同文案错误 */
 export function formatCanvasTaskError(
   failCode?: string | null,
   failMessage?: string | null,
+  modelKey?: string | null,
 ): string {
-  const msg = (failMessage ?? "").trim();
+  const msg = extractVendorErrorMessage(failMessage ?? "");
   const code = (failCode ?? "").trim();
-  const blob = `${code} ${msg}`.toLowerCase();
+  const blob = `${code} ${msg} ${failMessage ?? ""}`.toLowerCase();
 
   if (
     blob.includes("429") ||
@@ -36,6 +97,13 @@ export function formatCanvasTaskError(
     return msg.includes("积分不足")
       ? `${msg}。请前往主站充值积分后重试。`
       : "平台积分不足，请充值后重试。";
+  }
+
+  if (
+    blob.includes("insufficient balance") ||
+    (blob.includes("insufficient") && blob.includes("balance"))
+  ) {
+    return insufficientBalanceMessage(modelKey);
   }
 
   if (

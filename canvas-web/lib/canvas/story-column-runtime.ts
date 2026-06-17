@@ -75,6 +75,7 @@ function hubSectionInflightCount(d: StoryScriptHubNodeData): number {
   let count = 0;
   if (isCanvasInflightStatus(d.outlineRuntime?.status)) count += 1;
   if (isCanvasInflightStatus(d.characterRuntime?.status)) count += 1;
+  if (isCanvasInflightStatus(d.sceneRuntime?.status)) count += 1;
   if (isCanvasInflightStatus(d.storyboardRuntime?.status)) count += 1;
   return count;
 }

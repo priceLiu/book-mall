@@ -18,34 +18,45 @@ import {
   Loader2,
   Play,
   User,
-  Video,
 } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { PRO2_SCRIPT_NODE_WIDTH } from "@/lib/canvas/story-pro2-node-chrome";
+import { PRO2_SCRIPT_HUB_NODE_LABEL } from "@/lib/canvas/story-pro2-node-chrome";
 import {
   PRO2_CARD_SHELL_CLASS,
   PRO2_NODE_HANDLE_CLASS,
   PRO2_SCRIPT_NODE_MIN_HEIGHT,
   PRO2_SCRIPT_NODE_MIN_WIDTH,
+  PRO2_SCRIPT_NODE_WIDTH,
   PRO2_TEXT_NODE_TITLE_CLASS,
   pro2NodeBorderColor,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import {
   pro2HubHasCharacterTable,
+  pro2HubHasOutlineContent,
+  pro2HubHasSceneTable,
   pro2HubHasScriptTable,
   pro2HubIsGenerating,
   pro2HubIsLinkedOutline,
   resolvePro2HubCharacterMd,
+  resolvePro2HubSceneMd,
 } from "@/lib/canvas/pro2-script-hub-helpers";
+import {
+  pro2ScriptHubLinkedMessage,
+  pro2ThinNodeIsLinked,
+  resolveLibtvThinNodeDisplayState,
+} from "@/lib/canvas/pro2-thin-node-display-state";
 import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-types";
 import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
 import { resolvePro2HubTableTitle } from "@/lib/canvas/pro2-hub-display-title";
 import { resolveStarterForHub } from "@/lib/canvas/story-workspace-resolver";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
-import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
+import {
+  LIBTV_CARD_DRAG_CLASS,
+  LIBTV_NODE_OUTER_CLASS,
+} from "@/lib/canvas/libtv-node-chrome";
 import { cn } from "@/lib/utils";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
@@ -70,9 +81,13 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as StoryProScriptHubNodeData;
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);
+  const sceneMd = resolvePro2HubSceneMd(d);
+  const outlineMd = d.outlineMd ?? "";
   const hasTable = pro2HubHasScriptTable(d);
   const hasCharacter = pro2HubHasCharacterTable(d);
-  const hasPreviewContent = hasTable || hasCharacter;
+  const hasScene = pro2HubHasSceneTable(d);
+  const hasOutline = pro2HubHasOutlineContent(d);
+  const hasPreviewContent = hasTable || hasCharacter || hasScene || hasOutline;
   const [previewTab, setPreviewTab] = useState<Pro2ScriptHubViewTab>("script");
 
   useEffect(() => {
@@ -80,8 +95,26 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       setPreviewTab("character");
     } else if (previewTab === "character" && !hasCharacter && hasTable) {
       setPreviewTab("script");
+    } else if (previewTab === "scene" && !hasScene && (hasTable || hasCharacter)) {
+      setPreviewTab(hasTable ? "script" : "character");
+    } else if (
+      previewTab === "outline" &&
+      !hasOutline &&
+      (hasTable || hasCharacter || hasScene)
+    ) {
+      setPreviewTab(
+        hasTable ? "script" : hasCharacter ? "character" : "scene",
+      );
+    } else if (
+      !hasTable &&
+      !hasCharacter &&
+      !hasScene &&
+      hasOutline &&
+      previewTab !== "outline"
+    ) {
+      setPreviewTab("outline");
     }
-  }, [hasTable, hasCharacter, previewTab]);
+  }, [hasTable, hasCharacter, hasScene, hasOutline, previewTab]);
 
   const isGenerating = pro2HubIsGenerating({
     id,
@@ -89,14 +122,32 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     type: "story-pro2-script-hub",
     position: { x: 0, y: 0 },
   } as never);
-  const linked = pro2HubIsLinkedOutline(nodes, edges, id, d);
+  const outlineLinked = pro2HubIsLinkedOutline(nodes, edges, id, d);
+  const isLinked = pro2ThinNodeIsLinked(id, edges);
+  const displayState = resolveLibtvThinNodeDisplayState({
+    hasGeneratedContent: hasPreviewContent,
+    isGenerating,
+    isLinked,
+  });
+  const linkedMessage = pro2ScriptHubLinkedMessage({
+    edges,
+    nodes,
+    hubId: id,
+    hasOutlineLink: Boolean(outlineLinked?.outlineMd?.trim()),
+  });
+  const tableTitle = useMemo(() => {
+    const starter = resolveStarterForHub(nodes, edges, id);
+    return resolvePro2HubTableTitle(starter, d.outlineMd ?? "");
+  }, [nodes, edges, id, d.outlineMd]);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const { hovered: sideHover, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
-  const showTryMenu = !hasTable && !isGenerating && !linked;
   const showToolbar = Boolean(selected && hasTable && !isGenerating);
+  const showThinTitle = displayState !== "generated" || isGenerating;
+  const previewTitle =
+    displayState === "generated" && !isGenerating ? tableTitle : undefined;
   const showSidePlus = Boolean(
     (sideHover || selected || connectingFromNodeId) &&
-      (hasPreviewContent || linked) &&
+      (hasPreviewContent || isLinked) &&
       !isGenerating,
   );
 
@@ -211,11 +262,6 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     [spawnNeighbor, alert],
   );
 
-  const tableTitle = useMemo(() => {
-    const starter = resolveStarterForHub(nodes, edges, id);
-    return resolvePro2HubTableTitle(starter, d.outlineMd ?? "");
-  }, [nodes, edges, id, d.outlineMd]);
-
   const openEditor = useCallback(() => {
     if (!hasPreviewContent) return;
     openTableEditor(id, previewTab);
@@ -223,7 +269,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
 
   return (
     <div
-      className="relative flex h-full w-full min-h-0 min-w-0 cursor-grab flex-col active:cursor-grabbing"
+      className={cn(LIBTV_NODE_OUTER_CLASS, LIBTV_CARD_DRAG_CLASS)}
       data-pro2-dock-anchor={id}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
@@ -276,18 +322,15 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         </>
       ) : null}
 
-      {!hasPreviewContent ? (
-        <div
-          className={cn(RF_NODE_DRAG_HANDLE, PRO2_TEXT_NODE_TITLE_CLASS, "mb-1.5")}
-          title="拖动标题栏移动节点"
-        >
+      {showThinTitle ? (
+        <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "mb-1.5 shrink-0")}>
           <GripVertical className="size-3.5 shrink-0 text-white/30" />
           <FileText className="size-3.5 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">脚本生成器</span>
+          <span className="min-w-0 flex-1 truncate">{PRO2_SCRIPT_HUB_NODE_LABEL}</span>
         </div>
       ) : null}
 
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1 overflow-visible">
         {showToolbar ? (
           <Pro2ScriptHubToolbar
             className="-top-[4.25rem]"
@@ -305,11 +348,11 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         style={{ borderColor: pro2NodeBorderColor(!!selected) }}
       >
         {isGenerating ? (
-          <div className="nodrag flex h-full flex-col items-center justify-center gap-2 px-3 text-[12px] text-violet-200/70">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-[12px] text-violet-200/70">
             <Loader2 className="size-5 animate-spin" />
             生成中…
           </div>
-        ) : hasPreviewContent ? (
+        ) : displayState === "generated" ? (
           <div
             className="flex h-full min-h-0 flex-col px-2 py-2"
             title="双击放大编辑"
@@ -322,23 +365,23 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
             <Pro2ScriptHubContentPreview
               className="h-full min-h-0"
               characterMd={characterMd}
+              sceneMd={sceneMd}
               storyboardMd={storyboardMd}
-              title={tableTitle}
+              outlineMd={outlineMd}
+              title={previewTitle}
               tab={previewTab}
               onTabChange={setPreviewTab}
               onExpand={openEditor}
             />
           </div>
-        ) : linked ? (
-          <div className="nodrag flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-[11px] text-white/45">
+        ) : displayState === "connected" ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-[11px] text-white/45">
             <AlignLeft className="size-8 text-white/20" />
-            <p>已链接故事大纲</p>
-            <p className="text-[10px] text-white/35">
-              在下方输入框补充剧情或参考图后发送
-            </p>
+            <p>{linkedMessage.title}</p>
+            <p className="text-[10px] text-white/35">{linkedMessage.hint}</p>
           </div>
-        ) : showTryMenu ? (
-          <div className="nodrag flex h-full min-h-0 flex-col overflow-y-auto px-3 pb-3 pt-2">
+        ) : (
+          <div className="flex h-full min-h-0 flex-col overflow-y-auto px-3 pb-3 pt-2">
             <div className="mb-3 flex justify-center pt-1">
               <AlignLeft className="size-8 text-white/20" />
             </div>
@@ -359,11 +402,6 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
             <p className="mt-3 text-center text-[10px] text-white/30">
               从文本节点右侧 + 连接脚本以自动链接大纲
             </p>
-          </div>
-        ) : (
-          <div className="nodrag flex h-full items-center justify-center px-3 text-[11px] text-white/40">
-            <Video className="mr-1.5 size-4 opacity-40" />
-            等待输入
           </div>
         )}
       </div>

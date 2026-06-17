@@ -4,13 +4,11 @@ import { useCallback, useMemo, useRef } from "react";
 import type { NodeProps } from "@xyflow/react";
 import {
   AlignLeft,
+  AlertTriangle,
   FileText,
   FileUp,
   GripVertical,
-  ImageIcon,
   Loader2,
-  Play,
-  Video,
 } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
@@ -28,11 +26,21 @@ import {
   PRO2_TEXT_NODE_TITLE_CLASS,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import {
+  LIBTV_CARD_DRAG_CLASS,
+  LIBTV_NODE_OUTER_CLASS,
+} from "@/lib/canvas/libtv-node-chrome";
+import {
+  pro2StarterHasContent,
+  pro2StarterLinkedMessage,
+  pro2ThinNodeIsLinked,
+  resolveLibtvThinNodeDisplayState,
+} from "@/lib/canvas/pro2-thin-node-display-state";
+import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
+import {
   PRO2_RIGHT_ADD_MENU,
   PRO2_STARTER_LEFT_ADD_MENU,
 } from "@/lib/canvas/pro2-add-node-menu";
-import { RF_NODE_DRAG_HANDLE } from "@/lib/canvas/react-flow-classes";
-import { storyThemePromptDisplayMd } from "@/lib/canvas/story-theme-prompt-display";
+import { MarkdownView } from "@/components/canvas/markdown-view";
 import type { StoryPro2StarterNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
@@ -46,6 +54,7 @@ import {
   STORY_PRO_UPLOAD_SCRIPT_ACCEPT,
   formatCanvasFetchError,
 } from "@/lib/canvas/story-pro-upload-script";
+import { promoteEmbeddedPackFromOutline } from "@/lib/canvas/story-hub-runtime";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { cn } from "@/lib/utils";
@@ -53,12 +62,7 @@ import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 
-const TRY_ACTIONS = [
-  { id: "upload", label: "上传剧本", icon: FileUp },
-  { id: "text2video", label: "文生视频", icon: Play },
-  { id: "image2prompt", label: "图片反推提示词", icon: ImageIcon },
-  { id: "video-analysis", label: "视频分析", icon: Video },
-] as const;
+const TRY_UPLOAD = { id: "upload", label: "上传剧本", icon: FileUp } as const;
 
 export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
@@ -73,18 +77,33 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
 
   const d = data as unknown as StoryPro2StarterNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
+  const edges = useCanvasStore((s) => s.edges);
   const outlineMd = d.generatedOutlineMd?.trim() ?? "";
   const uploadedMd = d.uploadedScriptMd?.trim() ?? "";
   const hasOutline = Boolean(outlineMd);
   const hasUploadedScript = Boolean(uploadedMd);
-  const hasCardContent = hasOutline || hasUploadedScript;
+  const hasCardContent = pro2StarterHasContent(d);
   const isGenerating =
     d.themeOutlineRuntime?.status === "pending" ||
     d.themeOutlineRuntime?.status === "running";
-  const showTryMenu = !hasCardContent && !isGenerating;
+  const outlineErrorMessage =
+    d.themeOutlineRuntime?.status === "error"
+      ? formatCanvasTaskError(
+          d.themeOutlineRuntime.failCode,
+          d.themeOutlineRuntime.failMessage,
+          d.modelKey,
+        )
+      : null;
+  const isLinked = pro2ThinNodeIsLinked(id, edges);
+  const displayState = resolveLibtvThinNodeDisplayState({
+    hasGeneratedContent: hasCardContent,
+    isGenerating,
+    isLinked,
+  });
+  const linkedMessage = pro2StarterLinkedMessage(edges, nodes, id);
   const displayMd = useMemo(() => {
     if (uploadedMd) return uploadedMd;
-    if (hasOutline) return storyThemePromptDisplayMd(outlineMd);
+    if (hasOutline) return outlineMd;
     return "";
   }, [uploadedMd, hasOutline, outlineMd]);
 
@@ -154,20 +173,9 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     [base, id, updateNodeData, alert],
   );
 
-  const onTryAction = useCallback(
-    async (actionId: string) => {
-      if (actionId === "upload") {
-        fileInputRef.current?.click();
-        return;
-      }
-      await alert({
-        title: "即将推出",
-        message: "该能力将在后续版本接入。",
-        variant: "info",
-      });
-    },
-    [alert],
-  );
+  const onTryAction = useCallback(async () => {
+    fileInputRef.current?.click();
+  }, []);
 
   const spawnNeighbor = useCallback(
     (side: "left" | "right", nodeType?: string) => {
@@ -178,18 +186,25 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
       const w = self.width ?? PRO2_TEXT_NODE_MIN_WIDTH;
 
       if (nodeType === "story-pro2-script-hub") {
-        const outline = d.generatedOutlineMd?.trim() ?? "";
+        const outline =
+          d.generatedOutlineMd?.trim() ?? d.uploadedScriptMd?.trim() ?? "";
+        const promoted = promoteEmbeddedPackFromOutline(outline, "", "");
         spawnPro2ScriptHubFromSource({
           sourceId: id,
           sourceHandle: "text",
           position: { x: self.position.x + w + gap, y: self.position.y },
           hubData: {
-            outlineMd: outline,
+            outlineMd: promoted.outlineMd,
+            characterMd: promoted.characterMd,
+            storyboardMd: promoted.storyboardMd,
             providerId: d.providerId ?? "",
             modelKey: d.modelKey ?? "",
             params: { ...STORY_PRO_LLM_PARAMS_DEFAULT, ...(d.params ?? {}) },
             referencedNodeIds: outline ? [id] : [],
           },
+          nodes,
+          edges,
+          updateNodeData,
           addNode: (type, position, nodeData) =>
             addNode(type, position, nodeData),
           setEdges,
@@ -273,6 +288,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     },
     [
       nodes,
+      edges,
       id,
       d,
       addNode,
@@ -314,7 +330,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
 
   return (
     <div
-      className="relative flex h-full w-full min-h-0 min-w-0 flex-col"
+      className={cn(LIBTV_NODE_OUTER_CLASS, LIBTV_CARD_DRAG_CLASS)}
       data-pro2-dock-anchor={id}
     >
       <Pro2NodeResizer
@@ -375,10 +391,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         />
       ) : null}
 
-      <div
-        className={cn(RF_NODE_DRAG_HANDLE, PRO2_TEXT_NODE_TITLE_CLASS, "mb-1.5")}
-        title="拖动标题栏移动节点"
-      >
+      <div className={cn(PRO2_TEXT_NODE_TITLE_CLASS, "mb-1.5 shrink-0")}>
         <GripVertical className="size-3.5 shrink-0 text-white/30" />
         <FileText className="size-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{nodeLabel}</span>
@@ -391,14 +404,21 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         )}
         style={{ borderColor: pro2NodeBorderColor(!!selected) }}
       >
-        {isGenerating ? (
-          <div className="nodrag flex h-full flex-col items-center justify-center gap-2 px-3 text-[12px] text-violet-200/70">
+        {displayState === "generated" && isGenerating ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-[12px] text-violet-200/70">
             <Loader2 className="size-5 animate-spin" />
             生成中…
           </div>
-        ) : hasCardContent ? (
+        ) : outlineErrorMessage ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
+            <AlertTriangle className="size-8 text-red-400/70" />
+            <p className="text-[11px] leading-relaxed text-red-200/85">
+              {outlineErrorMessage}
+            </p>
+          </div>
+        ) : displayState === "generated" ? (
           <div
-            className="pro2-node-scroll nodrag h-full min-h-0 cursor-pointer overflow-x-auto overflow-y-auto px-3 py-2.5"
+            className="h-full min-h-0 cursor-pointer p-2"
             title={hasUploadedScript ? "已上传剧本 · 双击放大查看" : "双击放大编辑"}
             onDoubleClick={(e) => {
               e.preventDefault();
@@ -406,35 +426,41 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
               openEditor();
             }}
           >
-            <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-white/75">
-              {displayMd}
-            </pre>
+            <div className="pro2-node-scroll h-full overflow-x-auto overflow-y-auto pr-1">
+              {hasUploadedScript ? (
+                <pre className="whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-white/75">
+                  {displayMd}
+                </pre>
+              ) : (
+                <MarkdownView
+                  content={displayMd}
+                  variant="darkPreview"
+                  className="text-[11px]"
+                />
+              )}
+            </div>
           </div>
-        ) : showTryMenu ? (
-          <div className="nodrag flex h-full min-h-0 flex-col overflow-y-auto px-3 pb-3 pt-2">
+        ) : displayState === "connected" ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
+            <AlignLeft className="size-8 text-white/20" />
+            <p className="text-[11px] text-white/45">{linkedMessage}</p>
+          </div>
+        ) : (
+          <div className="flex h-full min-h-0 flex-col px-3 pb-3 pt-2">
             <div className="mb-3 flex justify-center pt-1">
               <AlignLeft className="size-8 text-white/20" />
             </div>
             <p className="mb-2 text-[11px] text-white/45">尝试：</p>
-            <ul className="space-y-0.5">
-              {TRY_ACTIONS.map((action) => {
-                const Icon = action.icon;
-                return (
-                  <li key={action.id}>
-                    <button
-                      type="button"
-                      className="nodrag flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-[12px] text-white/85 transition hover:bg-violet-500/12"
-                      onClick={() => void onTryAction(action.id)}
-                    >
-                      <Icon className="size-4 shrink-0 text-white/55" />
-                      {action.label}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <button
+              type="button"
+              className="nodrag flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-[12px] text-white/85 transition hover:bg-violet-500/12"
+              onClick={() => void onTryAction()}
+            >
+              <TRY_UPLOAD.icon className="size-4 shrink-0 text-white/55" />
+              {TRY_UPLOAD.label}
+            </button>
           </div>
-        ) : null}
+        )}
       </div>
 
       <input

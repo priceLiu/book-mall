@@ -10,8 +10,18 @@ import {
   assertPlatformGatewayEntitlement,
   PlatformEntitlementError,
 } from "@/lib/platform-gateway-entitlement";
+import type { GatewayProviderKind } from "@prisma/client";
+
+import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { CanvasProjectError } from "./canvas-project-service";
-import { isGatewayVirtualProviderId } from "./canvas-gateway-providers";
+import {
+  GATEWAY_BAILIAN_PROVIDER_ID,
+  GATEWAY_DEEPSEEK_PROVIDER_ID,
+  GATEWAY_HUNYUAN_PROVIDER_ID,
+  GATEWAY_KIE_PROVIDER_ID,
+  GATEWAY_VOLCENGINE_PROVIDER_ID,
+  isGatewayVirtualProviderId,
+} from "./canvas-gateway-providers";
 import { isSystemProviderId } from "./canvas-system-provider";
 
 /** 仅允许 gateway:* 与 system:*（运行时会走 Gateway） */
@@ -57,6 +67,32 @@ export async function shouldCanvasUseGateway(
     );
   }
   return true;
+}
+
+const GATEWAY_ID_BY_PROVIDER_KIND: Partial<
+  Record<GatewayProviderKind, string>
+> = {
+  KIE: GATEWAY_KIE_PROVIDER_ID,
+  DEEPSEEK: GATEWAY_DEEPSEEK_PROVIDER_ID,
+  BAILIAN: GATEWAY_BAILIAN_PROVIDER_ID,
+  HUNYUAN: GATEWAY_HUNYUAN_PROVIDER_ID,
+  VOLCENGINE: GATEWAY_VOLCENGINE_PROVIDER_ID,
+};
+
+/** 节点 providerId 须与 modelKey 路由一致（Gateway 实际按 modelKey 选凭证） */
+export function assertCanvasProviderMatchesModelRoute(
+  providerId: string,
+  modelKey: string,
+): void {
+  const normalized = canvasProviderIdForGateway(providerId);
+  const route = routeGatewayModel(modelKey);
+  const expected = GATEWAY_ID_BY_PROVIDER_KIND[route.providerKind];
+  if (!expected || normalized === expected) return;
+  throw new CanvasProjectError(
+    "INVALID_INPUT",
+    `所选模型 ${modelKey} 会走 ${route.providerKind}（${expected}），与节点 Provider（${normalized}）不一致。请重新打开模型选择器确认后再生成。`,
+    400,
+  );
 }
 
 /** system:* → gateway:* 映射（节点仍可能存 legacy id） */

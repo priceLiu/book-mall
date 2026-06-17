@@ -441,7 +441,7 @@ export async function runCanvasNode(
     };
     /** 阶段 4：跳过缓存，强制创建新任务（"重新生成"） */
     forceFresh?: boolean;
-    llmSection?: "outline" | "character" | "storyboard";
+    llmSection?: "outline" | "character" | "scene" | "storyboard";
     rowKey?: string;
     mediaKind?:
       | "threeView"

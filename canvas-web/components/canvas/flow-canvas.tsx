@@ -78,6 +78,7 @@ import type {
 } from "@/lib/canvas/story-pro-workspace-types";
 import {
   pro2HubHasCharacterTable,
+  pro2HubHasOutlineContent,
   pro2HubHasScriptTable,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import { DeletableEdge } from "./edges/deletable-edge";
@@ -1024,10 +1025,11 @@ function FlowCanvasInner({
                   const d = node.data as StoryProScriptHubNodeData;
                   const hasScript = pro2HubHasScriptTable(d);
                   const hasCharacter = pro2HubHasCharacterTable(d);
-                  if (!hasScript && !hasCharacter) return;
+                  const hasOutline = pro2HubHasOutlineContent(d);
+                  if (!hasScript && !hasCharacter && !hasOutline) return;
                   openPro2ScriptTableEditor(
                     node.id,
-                    hasScript ? "script" : "character",
+                    hasScript ? "script" : hasCharacter ? "character" : "outline",
                   );
                 }
               }

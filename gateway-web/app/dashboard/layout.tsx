@@ -5,21 +5,22 @@ import { gatewayJson } from "@/lib/gateway-api";
 
 export const dynamic = "force-dynamic";
 
-const FULL_NAV = [
+const BASE_NAV = [
   { href: "/dashboard/guide", label: "操作指引" },
   { href: "/dashboard", label: "用量" },
   { href: "/dashboard/logs", label: "日志" },
+  { href: "/dashboard/market", label: "模型市场" },
+];
+
+const FULL_NAV = [
+  ...BASE_NAV,
   { href: "/dashboard/models", label: "模型管理" },
   { href: "/dashboard/keys", label: "API密钥" },
   { href: "/dashboard/playground", label: "API调试" },
   { href: "/dashboard/docs", label: "接入文档" },
 ];
 
-const READONLY_NAV = [
-  { href: "/dashboard/guide", label: "操作指引" },
-  { href: "/dashboard", label: "用量" },
-  { href: "/dashboard/logs", label: "日志" },
-];
+const READONLY_NAV = BASE_NAV;
 
 export default async function DashboardLayout({
   children,

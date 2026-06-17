@@ -147,6 +147,16 @@ function shouldReleaseStoryRunInflight(
   if (node && isAnyStoryScriptHubType(node.type ?? "") && job.llmSection) {
     return hubSectionIsComplete(node, job.llmSection);
   }
+  if (
+    node &&
+    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    job.mediaKind === "themeOutline"
+  ) {
+    const st = (
+      node.data as { themeOutlineRuntime?: { status?: string } }
+    ).themeOutlineRuntime?.status;
+    return st === "done" || st === "error";
+  }
   if (job.rowKey && node && isStoryWorkspaceNodeType(node.type ?? "")) {
     const st = storyRowRuntimeStatus(node, job);
     return st === "done" || st === "error";
@@ -837,6 +847,7 @@ export function useCanvasRunner(
               failMessage: formatCanvasTaskError(
                 r.task.failCode,
                 r.task.failMessage,
+                r.task.model,
               ),
             });
           }
@@ -933,6 +944,7 @@ export function useCanvasRunner(
                   failMessage: formatCanvasTaskError(
                     pick.failCode,
                     pick.failMessage,
+                    pick.model,
                   ),
                 });
               } else {
@@ -1322,7 +1334,7 @@ export function useCanvasRunner(
         if (!nodeTasks.length) continue;
 
         if (isAnyStoryScriptHubType(node.type ?? "")) {
-          for (const section of ["outline", "character", "storyboard"] as const) {
+          for (const section of ["outline", "character", "scene", "storyboard"] as const) {
             const scope = { llmSection: section };
             const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
             if (!pick) continue;

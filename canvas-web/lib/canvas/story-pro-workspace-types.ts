@@ -92,6 +92,8 @@ export type StoryProStyleNodeData = {
 export type StoryProScriptHubNodeData = {
   outlineMd: string;
   characterMd: string;
+  /** 2.0 · 场景视觉提示词（LLM 根据大纲场景辞典扩写） */
+  sceneMd?: string;
   storyboardMd: string;
   /** 2.0 输入坞 · 用户提示词 */
   dockInput?: string;
@@ -99,6 +101,7 @@ export type StoryProScriptHubNodeData = {
   dockRefImages?: StoryRefImage[];
   outlineRuntime?: CanvasNodeRuntime;
   characterRuntime?: CanvasNodeRuntime;
+  sceneRuntime?: CanvasNodeRuntime;
   storyboardRuntime?: CanvasNodeRuntime;
   providerId: string;
   modelKey: string;
@@ -106,9 +109,11 @@ export type StoryProScriptHubNodeData = {
   outlineSystemPrompt?: string;
   promptOutline: string;
   promptCharacter: string;
+  promptScene?: string;
   promptStoryboard: string;
   outlineHistory?: StoryTextRevision[];
   characterHistory?: StoryTextRevision[];
+  sceneHistory?: StoryTextRevision[];
   storyboardHistory?: StoryTextRevision[];
   referencedNodeIds?: string[];
   scriptFinalized?: boolean;

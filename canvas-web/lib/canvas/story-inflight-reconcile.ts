@@ -81,7 +81,9 @@ function reconcileHubSection(
       ? "outlineRuntime"
       : section === "character"
         ? "characterRuntime"
-        : "storyboardRuntime";
+        : section === "scene"
+          ? "sceneRuntime"
+          : "storyboardRuntime";
   const rt = d[rtKey as keyof StoryScriptHubNodeData] as
     | CanvasNodeRuntime
     | undefined;
@@ -100,6 +102,10 @@ function reconcileHubSection(
       updateNodeData,
       allNodes,
     );
+    return;
+  }
+
+  if (rt?.taskId && !nodeTasks.some((t) => t.id === rt.taskId)) {
     return;
   }
 
@@ -124,8 +130,38 @@ export function reconcileStaleInflightRuntimes(
 ): void {
   const skipNodeIds = opts?.skipNodeIds;
   for (const node of nodes) {
+    if (node.type === "story-pro2-starter" || node.type === "story-pro-starter") {
+      const rt = (
+        node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
+      ).themeOutlineRuntime;
+      if (isInflightStatus(rt?.status)) {
+        const scope = { mediaKind: "themeOutline" };
+        const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
+        if (!hasServerInflightForScope(tasks, node.id, scope)) {
+          const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
+          if (pick) {
+            if (!shouldSkipStoryRowTaskApply(rt, pick)) {
+              storyApplyTaskResult(
+                node,
+                pick,
+                storyRunContextFromScope(node.id, scope),
+                updateNodeData,
+                nodes,
+              );
+            }
+          } else {
+            updateNodeData(node.id, {
+              themeOutlineRuntime: clearInflightRuntime(rt),
+            });
+          }
+        }
+      }
+      continue;
+    }
+
     if (isAnyStoryScriptHubType(node.type ?? "")) {
-      for (const section of ["outline", "character", "storyboard"] as const) {
+      if (skipNodeIds?.has(node.id)) continue;
+      for (const section of ["outline", "character", "scene", "storyboard"] as const) {
         reconcileHubSection(node, section, tasks, updateNodeData, nodes);
       }
       continue;

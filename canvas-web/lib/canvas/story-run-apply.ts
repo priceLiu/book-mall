@@ -44,13 +44,17 @@ function hubSectionPatchChanged(
       ? "outlineRuntime"
       : section === "character"
         ? "characterRuntime"
-        : "storyboardRuntime";
+        : section === "scene"
+          ? "sceneRuntime"
+          : "storyboardRuntime";
   const mdKey =
     section === "outline"
       ? "outlineMd"
       : section === "character"
         ? "characterMd"
-        : "storyboardMd";
+        : section === "scene"
+          ? "sceneMd"
+          : "storyboardMd";
   const prevRt = prev[rtKey as keyof StoryScriptHubNodeData];
   const nextRt = patch[rtKey as keyof StoryScriptHubNodeData];
   const prevMd = prev[mdKey as keyof StoryScriptHubNodeData];
@@ -89,6 +93,7 @@ export function storyRunPendingPatch(
     };
     if (ctx.llmSection === "outline") return { outlineRuntime: rt };
     if (ctx.llmSection === "character") return { characterRuntime: rt };
+    if (ctx.llmSection === "scene") return { sceneRuntime: rt };
     return { storyboardRuntime: rt };
   }
   if (
@@ -176,6 +181,7 @@ export function storyApplyTaskResult(
             failMessage: formatCanvasTaskError(
               task.failCode,
               task.failMessage,
+              task.model,
             ),
           }
         : task.status === "SUBMITTED"

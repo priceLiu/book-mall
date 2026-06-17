@@ -5,6 +5,7 @@ import {
   extractCharacterSectionFromOutline,
   normalizeStoryboardSectionFromOutline,
   parseStoryboardRows,
+  extractSceneVisualDictionaryFromOutline,
 } from "./parse-md-tables";
 import type { CanvasFlowNode } from "./types";
 import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-types";
@@ -16,6 +17,7 @@ export function hubSectionRuntime(
   const d = node.data as unknown as StoryScriptHubNodeData;
   if (section === "outline") return d.outlineRuntime;
   if (section === "character") return d.characterRuntime;
+  if (section === "scene") return d.sceneRuntime;
   return d.storyboardRuntime;
 }
 
@@ -41,6 +43,11 @@ export function resolveHubSectionMd(
     const dedicated = (d.characterMd ?? "").trim();
     if (dedicated) return dedicated;
     return extractCharacterSectionFromOutline(d.outlineMd ?? "");
+  }
+  if (section === "scene") {
+    const dedicated = (d.sceneMd ?? "").trim();
+    if (dedicated) return dedicated;
+    return extractSceneVisualDictionaryFromOutline(d.outlineMd ?? "");
   }
   if (section === "storyboard") {
     const dedicated = (d.storyboardMd ?? "").trim();
@@ -97,6 +104,7 @@ export function hubSectionMd(
   const d = node.data as unknown as StoryScriptHubNodeData;
   if (section === "outline") return d.outlineMd ?? "";
   if (section === "character") return d.characterMd ?? "";
+  if (section === "scene") return d.sceneMd ?? "";
   return d.storyboardMd ?? "";
 }
 
@@ -128,6 +136,7 @@ export function hubSectionIsReady(
 ): boolean {
   const d = node.data as unknown as StoryScriptHubNodeData;
   const dedicated = hubSectionMd(node, section).trim();
+  if (section === "scene" && !dedicated) return false;
   const md = dedicated || resolveHubSectionMd(d, section).trim();
   if (!md) return false;
   if (!dedicated) return true;
@@ -157,7 +166,7 @@ export function hubAggregateStatus(
   node: CanvasFlowNode,
 ): "idle" | "running" | "done" | "error" {
   const d = node.data as unknown as StoryScriptHubNodeData;
-  const sections = ["outline", "character", "storyboard"] as const;
+  const sections = ["outline", "character", "scene", "storyboard"] as const;
   if (sections.some((s) => hubSectionRuntime(node, s)?.status === "error")) {
     return "error";
   }

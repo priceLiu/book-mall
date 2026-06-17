@@ -2,6 +2,13 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { createDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
+import { createKieJobFromServer } from "@/lib/forward-gateway-kie-server";
+import {
+  clampKieI2vDuration,
+  isKieLabI2vModel,
+  mapLabResolutionToKie,
+  resolveKieI2vFirstFrameUrl,
+} from "@/lib/kie-lab-video";
 import {
   buildI2vVideoBody,
   buildR2vVideoBody,
@@ -269,6 +276,51 @@ export async function POST(req: Request) {
       { error: "不支持的模型，请刷新页面后重试" },
       { status: 400 },
     );
+  }
+
+  if (isKieLabI2vModel(modelEntry.apiModel)) {
+    let imageUrl: string;
+    try {
+      imageUrl = await resolveKieI2vFirstFrameUrl(firstFrame);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "首帧图片处理失败" },
+        { status: 400 },
+      );
+    }
+
+    const kieResolution = mapLabResolutionToKie(resolution);
+    const kieDuration = clampKieI2vDuration(modelEntry.apiModel, duration);
+    const aspectRatio =
+      typeof body.aspectRatio === "string" ? body.aspectRatio.trim() : undefined;
+    const mode = typeof body.mode === "string" ? body.mode.trim() : undefined;
+
+    const created = await createKieJobFromServer({
+      kind: "i2v",
+      model: modelEntry.apiModel,
+      prompt,
+      imageUrls: [imageUrl],
+      resolution: kieResolution,
+      duration: kieDuration,
+      aspectRatio,
+      mode,
+      clientPage: "image-to-video",
+    });
+    if (!created.ok) {
+      return NextResponse.json(
+        {
+          error: created.error ?? "Gateway 调用失败",
+          code: created.status === 403 ? "GATEWAY_KEY_REQUIRED" : undefined,
+        },
+        { status: created.status ?? 502 },
+      );
+    }
+    return NextResponse.json({
+      taskId: created.taskId,
+      gatewayLogId: created.logId,
+      holdId: null,
+      provider: "kie",
+    });
   }
 
   const built = buildI2vVideoBody({

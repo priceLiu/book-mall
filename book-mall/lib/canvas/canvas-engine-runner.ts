@@ -46,7 +46,10 @@ import {
   canvasGwTts,
 } from "./canvas-gateway-client";
 import { GATEWAY_VOLCENGINE_PROVIDER_ID } from "./canvas-gateway-providers";
-import { shouldCanvasUseGateway } from "./canvas-gateway-run";
+import {
+  assertCanvasProviderMatchesModelRoute,
+  shouldCanvasUseGateway,
+} from "./canvas-gateway-run";
 import { persistCanvasBufferToOss } from "./canvas-oss";
 import type { CanvasRunNodeInput } from "./canvas-task-service";
 import {
@@ -710,6 +713,8 @@ export async function runStoryLlmEngineNode(
     throw new CanvasProjectError("INVALID_INPUT", `${engineKind} 缺少 providerId`);
   if (!modelKey)
     throw new CanvasProjectError("INVALID_INPUT", `${engineKind} 缺少 modelKey`);
+
+  assertCanvasProviderMatchesModelRoute(providerId, modelKey);
 
   const expandedPrompt = expandMentionsText(promptRaw, node);
   const upstreamText = (node.textInputs ?? []).filter((s) => s && s.trim());

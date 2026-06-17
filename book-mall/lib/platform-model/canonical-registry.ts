@@ -149,7 +149,7 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
   },
   {
     canonicalModelKey: "lib-nano-pro",
-    displayName: "Nano Pro 高清生图",
+    displayName: "Nano Banana Pro (KIE)",
     mediaKind: "TEXT_TO_IMAGE",
     role: "IMAGE",
     requestKind: "IMAGE",

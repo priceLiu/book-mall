@@ -4,6 +4,7 @@ import type { Pro2ScriptHubViewTab } from "@/lib/canvas/pro2-script-hub-view-typ
 import { cn } from "@/lib/utils";
 
 const TABS: Array<{ id: Pro2ScriptHubViewTab; label: string }> = [
+  { id: "outline", label: "大纲" },
   { id: "character", label: "角色" },
   { id: "script", label: "脚本" },
 ];
