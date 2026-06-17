@@ -59,3 +59,20 @@ export function flowPositionAtViewportCenter(
     y: flow.y - size.height / 2 + (Math.random() - 0.5) * jitter,
   };
 }
+
+/** 屏幕坐标 → 新节点左上角（空白处双击菜单落点等）。 */
+export function flowPositionAtScreenPoint(
+  type: CanvasNodeType,
+  screen: { x: number; y: number },
+  data?: Record<string, unknown>,
+): { x: number; y: number } {
+  const size = nodeDefaultSize(type, data);
+  if (!placementCtx) {
+    return { x: screen.x - size.width / 2, y: screen.y - size.height / 2 };
+  }
+  const flow = placementCtx.screenToFlowPosition(screen);
+  return {
+    x: flow.x - size.width / 2,
+    y: flow.y - size.height / 2,
+  };
+}

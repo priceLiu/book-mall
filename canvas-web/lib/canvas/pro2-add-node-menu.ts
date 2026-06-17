@@ -5,7 +5,6 @@ import {
   FileUp,
   Film,
   Image as ImageIcon,
-  Layers,
   LayoutGrid,
   Link2,
   Music,
@@ -68,13 +67,6 @@ const NODE_ITEMS: Pro2AddMenuItem[] = [
     icon: Scissors,
     enabled: true,
     badge: "Beta",
-  },
-  {
-    id: "director",
-    label: "导演台",
-    icon: Layers,
-    enabled: true,
-    badge: "NEW",
   },
   { id: "audio", label: "音频", icon: Music, enabled: true },
   {
@@ -145,13 +137,6 @@ export const PRO2_STARTER_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
         enabled: true,
         badge: "Beta",
       },
-      {
-        id: "director",
-        label: "导演台",
-        icon: Layers,
-        enabled: false,
-        badge: "NEW",
-      },
       { id: "audio", label: "音频", icon: Music, enabled: false },
       {
         id: "script",
@@ -200,13 +185,6 @@ export const PRO2_STYLE_ASSET_RIGHT_MENU: Pro2AddMenuSection[] = [
         icon: Scissors,
         enabled: false,
         badge: "Beta",
-      },
-      {
-        id: "director",
-        label: "导演台",
-        icon: Layers,
-        enabled: false,
-        badge: "NEW",
       },
       { id: "audio", label: "音频", icon: Music, enabled: false },
       {

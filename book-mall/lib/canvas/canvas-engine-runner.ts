@@ -305,14 +305,18 @@ export async function runAiEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
-  const created = await prisma.canvasGenerationTask.create({
+  // SUBMITTED：同步 LLM 进行中，避免 poll worker 误当作 KIE 出图 PENDING 重试。
+  // 走 createStoryScopedCanvasTask 在事务内先占位再调厂商，避免 ensure + create
+  // 竞态窗口导致同一节点/段重复提交 Gateway。
+  const created = await createStoryScopedCanvasTask({
+    projectId,
+    nodeId,
+    storyScope: args.storyScope,
+    initialStatus: "SUBMITTED",
     data: {
-      projectId,
-      nodeId,
       kind: "TEXT",
       model: modelKey,
       providerId: null,
@@ -326,8 +330,6 @@ export async function runAiEngineNode(
         imageUrls,
         textInputs: node.textInputs ?? [],
       } as Prisma.InputJsonValue,
-      // SUBMITTED：同步 LLM 进行中，避免 poll worker 误当作 KIE 出图 PENDING 重试
-      status: "SUBMITTED",
       submittedAt: new Date(),
     },
   });
@@ -757,14 +759,16 @@ export async function runStoryLlmEngineNode(
     if (reusable) return { reused: true, task: reusable };
   }
 
-  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
-  const created = await prisma.canvasGenerationTask.create({
+  // 事务内 advisory lock + 冲突检查占位，避免 ensure + create 竞态导致同段重复提交。
+  const created = await createStoryScopedCanvasTask({
+    projectId,
+    nodeId,
+    storyScope: args.storyScope,
+    initialStatus: "SUBMITTED",
     data: {
-      projectId,
-      nodeId,
       kind: "TEXT",
       model: modelKey,
       providerId: null,
@@ -778,7 +782,6 @@ export async function runStoryLlmEngineNode(
         textInputs: node.textInputs ?? [],
         ...(args.storyScope ? { storyScope: args.storyScope } : {}),
       } as Prisma.InputJsonValue,
-      status: "SUBMITTED",
       submittedAt: new Date(),
     },
   });

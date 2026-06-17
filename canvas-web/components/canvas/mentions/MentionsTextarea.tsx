@@ -24,6 +24,7 @@ import {
   getTextareaIndexFromClientPoint,
 } from "@/lib/canvas/textarea-caret-rect";
 import { MentionHoverPreviewPortal } from "./mention-hover-preview";
+import { MentionInlineThumbs } from "./mention-inline-thumbs";
 import { MentionPickerPortal } from "./mention-picker-portal";
 
 export type MentionableItem = {
@@ -57,6 +58,10 @@ export type MentionsTextareaProps = {
   mentionPickerEmptyHint?: string;
   /** 鼠标悬停 @mention 时显示缩略预览（Dock 默认开启） */
   mentionHoverPreview?: boolean;
+  /** Dock：在 @ 标签右侧内联显示缩略图（非 footer pill） */
+  mentionInlineThumb?: boolean;
+  /** mentionInlineThumb 边框色 · pro2 紫 / sbv1 cyan */
+  mentionEdition?: "pro2" | "sbv1";
 };
 
 const TOKEN_RE = /@<([^>\s]+)>/g;
@@ -133,6 +138,8 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       mentionPickerTitle,
       mentionPickerEmptyHint = "暂无已生成的角色图，请先在角色列生成。",
       mentionHoverPreview = true,
+      mentionInlineThumb = false,
+      mentionEdition = "pro2",
     },
     ref,
   ) {
@@ -424,6 +431,14 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
             `${RF_FORM_CONTROL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none${fillHeight ? " min-h-0 flex-1 h-full overflow-y-auto" : ""}`
           }
           style={style}
+        />
+        <MentionInlineThumbs
+          textareaRef={innerRef}
+          wrapperRef={wrapperRef}
+          displayValue={displayValue}
+          mentionables={mentionables}
+          enabled={mentionInlineThumb && !disabled}
+          edition={mentionEdition}
         />
         <MentionPickerPortal
           open={popoverOpen}

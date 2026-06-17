@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 /** hover 延迟隐藏，避免移向侧栏 + 时闪烁消失 */
-export function useDelayedPointerHover(delayMs = 320) {
+export function useDelayedPointerHover(delayMs = 960) {
   const [hovered, setHovered] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

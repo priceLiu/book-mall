@@ -114,7 +114,7 @@ export function StoryStoryboardTableEditor({
       <div className="overflow-x-auto overflow-y-visible">
         <table className={TABLE}>
           <colgroup>
-            <col className="w-[52px]" />
+            <col className="w-[64px]" />
             <col className="min-w-[72px]" />
             <col className="min-w-[72px]" />
             <col className="min-w-[220px]" />
@@ -143,12 +143,13 @@ export function StoryStoryboardTableEditor({
                 <td className={TD}>
                   <input
                     className={`${FIELD} px-2 py-2 text-center text-[15px] text-neutral-800`}
-                    type="number"
-                    min={1}
+                    type="text"
+                    inputMode="numeric"
                     value={row.frameIndex}
                     onChange={(e) =>
                       patchRow(index, {
-                        frameIndex: parseInt(e.target.value, 10) || 1,
+                        frameIndex:
+                          parseInt(e.target.value.replace(/\D/g, ""), 10) || 1,
                       })
                     }
                   />

@@ -1,6 +1,6 @@
 "use client";
 
-import { flowPositionAtViewportCenter } from "./viewport-placement";
+import { flowPositionAtScreenPoint, flowPositionAtViewportCenter } from "./viewport-placement";
 import {
   buildPro2ImageNodeData,
   buildPro2StarterNodeData,
@@ -9,6 +9,12 @@ import {
 } from "./pro2-spawn-nodes";
 import { PRO2_CHARACTER_THREE_VIEW_HEIGHT, PRO2_CHARACTER_THREE_VIEW_WIDTH } from "./story-pro2-node-chrome";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
+import { buildSbv1ImageNodeData } from "./sbv1-spawn-nodes";
+import { selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
+import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
+import type { CanvasNodeType } from "./types";
+
+export type LibtvCanvasEdition = "pro2" | "sbv1";
 
 export type Pro2AddNodePickDialogs = {
   alert: (opts: {
@@ -39,17 +45,29 @@ export type Pro2AddNodePickStore = {
 export type Pro2ToolbarAddNodePickOptions = {
   onOpenStyleLibrary?: () => void;
   onOpenMyHistory?: () => void;
+  edition?: LibtvCanvasEdition;
+  spawnAtScreen?: { x: number; y: number };
 };
 
 const COMING_SOON: Record<string, string> = {
   video: "视频节点",
   "video-compose": "视频合成",
-  director: "导演台",
   audio: "音频节点",
   "fx-library": "特效库",
   upload: "从本地上传资源",
   "ref-node": "参考节点",
 };
+
+function spawnPosition(
+  type: CanvasNodeType,
+  options?: Pro2ToolbarAddNodePickOptions,
+  data?: Record<string, unknown>,
+) {
+  if (options?.spawnAtScreen) {
+    return flowPositionAtScreenPoint(type, options.spawnAtScreen, data);
+  }
+  return flowPositionAtViewportCenter(type, data);
+}
 
 /** 底部工具栏 / 空白画布 · 添加节点菜单统一处理 */
 export async function handlePro2ToolbarAddNodePick(
@@ -60,6 +78,7 @@ export async function handlePro2ToolbarAddNodePick(
   options?: Pro2ToolbarAddNodePickOptions,
 ): Promise<void> {
   const { addNode, setNodes } = store;
+  const edition = options?.edition ?? "pro2";
 
   if (itemId === "style-library") {
     options?.onOpenStyleLibrary?.();
@@ -72,22 +91,43 @@ export async function handlePro2ToolbarAddNodePick(
     return;
   }
 
+  if (edition === "sbv1") {
+    if (itemId === "image" || nodeType === "sbv1-image" || nodeType === "story-pro2-image") {
+      const pos = spawnPosition("sbv1-image", options);
+      const id = addNode("sbv1-image", pos, buildSbv1ImageNodeData());
+      if (id) selectSbv1NodeAfterSpawn(setNodes, id);
+      return;
+    }
+    if (
+      itemId === "video-compose" ||
+      itemId === "video-engine" ||
+      nodeType === "sbv1-video-engine"
+    ) {
+      const pos = spawnPosition("sbv1-video-engine", options);
+      const id = addNode("sbv1-video-engine", pos, {
+        ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
+      });
+      if (id) selectSbv1NodeAfterSpawn(setNodes, id);
+      return;
+    }
+  }
+
   if (itemId === "text" && nodeType === "story-pro2-starter") {
-    const pos = flowPositionAtViewportCenter("story-pro2-starter");
+    const pos = spawnPosition("story-pro2-starter", options);
     const id = addNode("story-pro2-starter", pos, buildPro2StarterNodeData());
     if (id) selectPro2NodeAfterSpawn(setNodes, id);
     return;
   }
 
   if (itemId === "image" && nodeType === "story-pro2-image") {
-    const pos = flowPositionAtViewportCenter("story-pro2-image");
+    const pos = spawnPosition("story-pro2-image", options);
     const id = addNode("story-pro2-image", pos, buildPro2ImageNodeData());
     if (id) selectPro2NodeAfterSpawn(setNodes, id);
     return;
   }
 
   if (itemId === "three-view" && nodeType === "story-pro2-three-view") {
-    const pos = flowPositionAtViewportCenter("story-pro2-three-view");
+    const pos = spawnPosition("story-pro2-three-view", options);
     const id = addNode(
       "story-pro2-three-view",
       pos,
@@ -115,7 +155,7 @@ export async function handlePro2ToolbarAddNodePick(
   }
 
   if (itemId === "script" && nodeType === "story-pro2-script-hub") {
-    const pos = flowPositionAtViewportCenter("story-pro2-script-hub");
+    const pos = spawnPosition("story-pro2-script-hub", options);
     const id = spawnPro2ScriptHubAt(addNode, pos);
     if (id) selectPro2NodeAfterSpawn(setNodes, id);
     return;

@@ -282,6 +282,7 @@ export function Pro2StarterInputDock() {
           mentionables={mentionables}
           disabled={isGenerating}
           rows={3}
+          mentionInlineThumb
           onChange={(value) =>
             updateNodeData(storeNode.id, { themeInput: value })
           }

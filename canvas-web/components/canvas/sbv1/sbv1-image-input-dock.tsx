@@ -256,7 +256,8 @@ export function Sbv1ImageInputDock() {
           </Pro2DockContextBar>
         }
         footer={
-          <Pro2DockToolbar className="gap-2">
+          <>
+            <Pro2DockToolbar className="gap-2">
             <div className="flex shrink-0 items-center gap-0.5">
               <button
                 type="button"
@@ -304,6 +305,7 @@ export function Sbv1ImageInputDock() {
               </button>
             </div>
           </Pro2DockToolbar>
+          </>
         }
       >
         <Pro2DockPasteZone
@@ -324,6 +326,8 @@ export function Sbv1ImageInputDock() {
             mentionables={mentionables}
             disabled={isRunning}
             rows={3}
+            mentionInlineThumb
+            mentionEdition="sbv1"
             onChange={onPromptChange}
           />
         </Pro2DockPasteZone>

@@ -121,7 +121,14 @@ export function spawnSbv1NeighborFromNode(
   ) {
     const group = nodes.find((n) => n.id === self.parentId);
     if (group && isSbv1MediaGroup(group, nodes)) {
-      return spawnSbv1VideoEngineFromGroup(self.parentId, store);
+      const existingEngine = nodes.some(
+        (n) => n.parentId === self.parentId && n.type === "sbv1-video-engine",
+      );
+      // 组内还没有合成节点：纳入组内并接入全部图片；
+      // 已有合成节点：继续从当前图片生成新的独立视频节点（见下方通用分支）。
+      if (!existingEngine) {
+        return spawnSbv1VideoEngineFromGroup(self.parentId, store);
+      }
     }
   }
 
@@ -299,7 +306,6 @@ export async function handleSbv1ImageSideAddNodePick(
     script: "脚本节点",
     video: "视频节点",
     "three-view": "三视图",
-    director: "导演台",
     audio: "音频节点",
     "ref-node": "参考节点",
   };

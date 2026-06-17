@@ -218,7 +218,10 @@ type CanvasState = {
   /** 程序化调整节点尺寸（选中时仍可用 NodeResizer 手动覆盖） */
   resizeNode: (id: string, size: { width: number; height: number }) => void;
   removeNode: (id: string) => void;
-  duplicateNode: (id: string) => string | null;
+  duplicateNode: (
+    id: string,
+    options?: { preserveContent?: boolean },
+  ) => string | null;
 
   /**
    * 把一组现有节点包进新建的 group 容器（设 parentId + extent='parent'）。
@@ -832,10 +835,14 @@ export const useCanvasStore = create<CanvasState>()(
         set((state) => withGraphRevision(state, { nodes, edges }));
       },
 
-      duplicateNode: (id) => {
+      duplicateNode: (id, options) => {
         const src = get().nodes.find((n) => n.id === id);
         if (!src) return null;
         const newId = `n_${nanoid(8)}`;
+        const preserveContent = options?.preserveContent === true;
+        const data = preserveContent
+          ? (structuredClone(src.data) as Record<string, unknown>)
+          : { ...(src.data as Record<string, unknown>), runtime: undefined };
         set((state) =>
           withGraphRevision(state, {
             nodes: ensureNodeDragHandles([
@@ -843,8 +850,9 @@ export const useCanvasStore = create<CanvasState>()(
               {
                 ...src,
                 id: newId,
+                selected: false,
                 position: { x: src.position.x + 40, y: src.position.y + 40 },
-                data: { ...src.data, runtime: undefined },
+                data,
               },
             ]),
           }),

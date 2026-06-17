@@ -3,6 +3,7 @@
 import {
   BookmarkPlus,
   ChevronDown,
+  Copy,
   Download,
   Grid3x3,
   Lamp,
@@ -26,7 +27,7 @@ export const PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS =
 
 /** 仅图标操作钮 */
 export const PRO2_IMAGE_NODE_TOOLBAR_ICON_BTN_CLASS =
-  "nodrag flex size-8 shrink-0 items-center justify-center rounded-lg text-white/60 transition hover:bg-white/8 hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-40";
+  "nodrag flex size-10 shrink-0 items-center justify-center rounded-lg text-white/60 transition hover:bg-white/8 hover:text-white/90 disabled:cursor-not-allowed disabled:opacity-40";
 
 /** 工具条内分隔线 */
 export const PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS = "mx-0.5 h-5 w-px bg-white/10";
@@ -41,10 +42,14 @@ export type Pro2ImageNodeToolbarProps = {
   previewUrl?: string;
   onExpandPreview?: () => void;
   onSaveAsAsset?: () => void;
+  /** 复制节点（含生成结果与 Dock 配置） */
+  onDuplicateNode?: () => void;
   className?: string;
   style?: React.CSSProperties;
   /** sbv1：工具条空白区仍可拖节点，仅按钮 nodrag */
   passNodeDrag?: boolean;
+  /** 精简模式：仅预览 / 下载 / 复制（视频合成节点） */
+  minimal?: boolean;
 };
 
 /** 有图图片节点 · 顶部浮动工具条（LibTV 图 2） */
@@ -52,9 +57,11 @@ export function Pro2ImageNodeToolbar({
   previewUrl,
   onExpandPreview,
   onSaveAsAsset,
+  onDuplicateNode,
   className,
   style,
   passNodeDrag = false,
+  minimal = false,
 }: Pro2ImageNodeToolbarProps) {
   const { alert } = useDialogs();
 
@@ -70,30 +77,58 @@ export function Pro2ImageNodeToolbar({
     if (!previewUrl) return;
     const a = document.createElement("a");
     a.href = previewUrl;
-    a.download = "image";
+    a.download = minimal ? "video" : "image";
     a.target = "_blank";
     a.rel = "noopener noreferrer";
     a.click();
   };
 
+  if (minimal) {
+    return (
+      <ToolbarShell
+        passNodeDrag={passNodeDrag}
+        className={className}
+        style={style}
+      >
+        <button
+          type="button"
+          className={ICON_BTN}
+          title="放大预览"
+          disabled={!previewUrl}
+          onClick={onExpandPreview}
+        >
+          <Maximize2 className="size-5" />
+        </button>
+        <button
+          type="button"
+          className={ICON_BTN}
+          title="下载"
+          disabled={!previewUrl}
+          onClick={onDownload}
+        >
+          <Download className="size-5" />
+        </button>
+        {onDuplicateNode ? (
+          <button
+            type="button"
+            className={ICON_BTN}
+            title="复制节点"
+            onClick={onDuplicateNode}
+          >
+            <Copy className="size-5" />
+          </button>
+        ) : null}
+        {onSaveAsAsset ? (
+          <button type="button" className={ICON_BTN} title="保存为资产" onClick={onSaveAsAsset}>
+            <BookmarkPlus className="size-5" />
+          </button>
+        ) : null}
+      </ToolbarShell>
+    );
+  }
+
   return (
-    <div
-      className={cn(
-        PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
-        passNodeDrag
-          ? "pointer-events-none [&_button]:pointer-events-auto"
-          : "nodrag pointer-events-auto",
-        !style && "absolute left-1/2 z-30 -translate-x-1/2",
-        className,
-      )}
-      style={style}
-      {...(passNodeDrag
-        ? {}
-        : {
-            onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
-            onClick: (e: React.MouseEvent) => e.stopPropagation(),
-          })}
-    >
+    <ToolbarShell passNodeDrag={passNodeDrag} className={className} style={style}>
       <button
         type="button"
         className={TOOL_BTN}
@@ -167,7 +202,7 @@ export function Pro2ImageNodeToolbar({
         title="智能编辑"
         onClick={() => void soon("智能编辑")}
       >
-        <Wand2 className="size-4" />
+        <Wand2 className="size-5" />
       </button>
       <button
         type="button"
@@ -176,7 +211,7 @@ export function Pro2ImageNodeToolbar({
         disabled={!previewUrl}
         onClick={onDownload}
       >
-        <Download className="size-4" />
+        <Download className="size-5" />
       </button>
       <button
         type="button"
@@ -185,8 +220,52 @@ export function Pro2ImageNodeToolbar({
         disabled={!previewUrl}
         onClick={onExpandPreview}
       >
-        <Maximize2 className="size-4" />
+        <Maximize2 className="size-5" />
       </button>
+      {onDuplicateNode ? (
+        <button
+          type="button"
+          className={ICON_BTN}
+          title="复制节点"
+          onClick={onDuplicateNode}
+        >
+          <Copy className="size-5" />
+        </button>
+      ) : null}
+    </ToolbarShell>
+  );
+}
+
+function ToolbarShell({
+  passNodeDrag,
+  className,
+  style,
+  children,
+}: {
+  passNodeDrag: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS,
+        passNodeDrag
+          ? "pointer-events-none [&_button]:pointer-events-auto"
+          : "nodrag pointer-events-auto",
+        !style && "absolute left-1/2 z-30 -translate-x-1/2",
+        className,
+      )}
+      style={style}
+      {...(passNodeDrag
+        ? {}
+        : {
+            onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+            onClick: (e: React.MouseEvent) => e.stopPropagation(),
+          })}
+    >
+      {children}
     </div>
   );
 }

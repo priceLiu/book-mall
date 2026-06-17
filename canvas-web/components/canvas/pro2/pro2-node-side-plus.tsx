@@ -105,7 +105,7 @@ export function Pro2NodeSidePlus({
         ref={handleWrapRef}
         className={cn(
           "pointer-events-none absolute top-1/2 z-30 -translate-y-1/2",
-          side === "left" ? "-left-3" : "-right-3",
+          side === "left" ? "-left-5" : "-right-5",
           className,
         )}
       >
@@ -119,7 +119,7 @@ export function Pro2NodeSidePlus({
           className={cn(
             RF_NO_DRAG,
             "pro2-node-side-plus-handle pointer-events-auto",
-            "!flex !h-6 !w-6 !items-center !justify-center !rounded-full !p-0",
+            "!flex !h-12 !w-12 !items-center !justify-center !rounded-full !p-0",
             "!border !border-white/20 !bg-[#2a2a2e] !opacity-100",
             "!shadow-md transition hover:!border-violet-400/50 hover:!bg-violet-500/20",
             side === "left" ? "!-left-0" : "!-right-0",
@@ -132,7 +132,7 @@ export function Pro2NodeSidePlus({
           }
         >
           <Plus
-            className="pointer-events-none size-3.5 shrink-0 text-white/85"
+            className="pointer-events-none size-7 shrink-0 text-white/85"
             strokeWidth={2.25}
             aria-hidden
           />

@@ -337,6 +337,8 @@ export function Sbv1VideoEngineChatInput({
             onPaste={onPaste}
             mentionPickerTitle="参考图 · ←→ Enter 插入"
             mentionPickerEmptyHint="暂无已连接参考图，请先连线或上传图片。"
+            mentionInlineThumb
+            mentionEdition="sbv1"
             onKeyDownCapture={(e) => {
               if (
                 e.key === "Enter" &&
