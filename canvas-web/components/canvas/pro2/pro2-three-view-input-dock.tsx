@@ -46,7 +46,7 @@ export function Pro2ThreeViewInputDock() {
   );
 
   const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+    libtvFloatingDockHidden(s.canvasGeometryDragging),
   );
 
   const selected = useMemo(() => {

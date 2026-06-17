@@ -56,7 +56,7 @@ export function Sbv1ImageInputDock() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+    libtvFloatingDockHidden(s.canvasGeometryDragging),
   );
   const setPro2StyleLibImageNodeId = useCanvasStore(
     (s) => s.setPro2StyleLibImageNodeId,

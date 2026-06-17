@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useCallback } from "react";
 import { useStore } from "@xyflow/react";
 
 export type FlowViewport = { x: number; y: number; zoom: number };
@@ -10,8 +10,11 @@ export type FlowViewport = { x: number; y: number; zoom: number };
  * 侧栏 +、组节点等默认不 active，避免缩放时每帧重渲染整图节点。
  */
 export function useViewportTransformActive(active: boolean): FlowViewport {
-  const activeRef = useRef(active);
-  activeRef.current = active;
+  const equals = useCallback(
+    (a: FlowViewport, b: FlowViewport) =>
+      !active || (a.x === b.x && a.y === b.y && a.zoom === b.zoom),
+    [active],
+  );
 
   return useStore(
     (s) => ({
@@ -19,16 +22,11 @@ export function useViewportTransformActive(active: boolean): FlowViewport {
       y: s.transform[1],
       zoom: s.transform[2],
     }),
-    (a, b) =>
-      !activeRef.current ||
-      (a.x === b.x && a.y === b.y && a.zoom === b.zoom),
+    equals,
   );
 }
 
-/** 浮动 Dock：节点拖动或视口 pan/zoom 期间隐藏，减轻缩放卡顿 */
-export function libtvFloatingDockHidden(
-  geometryDragging: boolean,
-  viewportMoving: boolean,
-): boolean {
-  return geometryDragging || viewportMoving;
+/** 浮动 Dock：仅节点拖动期间隐藏；画布 pan/zoom 时保持显示 */
+export function libtvFloatingDockHidden(geometryDragging: boolean): boolean {
+  return geometryDragging;
 }

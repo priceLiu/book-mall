@@ -175,6 +175,29 @@ function FlowCanvasInner({
   const fitViewNonce = useCanvasStore((s) => s.fitViewNonce);
   const canvasFocusNodeId = useCanvasStore((s) => s.canvasFocusNodeId);
   const canvasFocusNonce = useCanvasStore((s) => s.canvasFocusNonce);
+  const setCanvasGeometryDragging = useCanvasStore(
+    (s) => s.setCanvasGeometryDragging,
+  );
+  const setCanvasViewportMoving = useCanvasStore(
+    (s) => s.setCanvasViewportMoving,
+  );
+
+  const applyInitialViewport = useCallback(() => {
+    if (initialFitDoneRef.current) return;
+    const vp = useCanvasStore.getState().viewport;
+    const laid = useCanvasStore.getState().nodes;
+    if (laid.length === 0) return;
+    initialFitDoneRef.current = true;
+    const noSavedViewport =
+      Math.abs(vp.x) < 1 &&
+      Math.abs(vp.y) < 1 &&
+      Math.abs(vp.zoom - 1) < 0.01;
+    if (noSavedViewport) {
+      void fitView({ padding: 0.12, duration: 0 });
+    } else {
+      void rfSetViewport(vp, { duration: 0 });
+    }
+  }, [fitView, rfSetViewport]);
 
   const enablePaneContextMenu = pro2FloatingInspector || sbv1Canvas;
   const enableDragSnapGuides = pro2FloatingInspector || sbv1Canvas;
@@ -293,10 +316,15 @@ function FlowCanvasInner({
 
   useEffect(() => {
     initialFitDoneRef.current = false;
+    setCanvasViewportMoving(false);
     const s = useCanvasStore.getState();
     setRfNodes(ensureNodeDragHandles(s.nodes));
     setRfEdges(s.edges);
-  }, [projectId, setRfNodes, setRfEdges]);
+  }, [projectId, setRfNodes, setRfEdges, setCanvasViewportMoving]);
+
+  useEffect(() => {
+    applyInitialViewport();
+  }, [projectId, rfNodes.length, applyInitialViewport]);
 
   /** Zustand → RF 本地：hydrate / undo / 拖放结束等；拖动过程中跳过避免双写 */
   useEffect(() => {
@@ -311,13 +339,6 @@ function FlowCanvasInner({
     });
     return unsub;
   }, [setRfNodes, setRfEdges]);
-
-  const setCanvasGeometryDragging = useCanvasStore(
-    (s) => s.setCanvasGeometryDragging,
-  );
-  const setCanvasViewportMoving = useCanvasStore(
-    (s) => s.setCanvasViewportMoving,
-  );
 
   const onMoveStart = useCallback(() => {
     setCanvasViewportMoving(true);
@@ -380,21 +401,8 @@ function FlowCanvasInner({
   );
 
   const onInit = useCallback(() => {
-    if (initialFitDoneRef.current) return;
-    initialFitDoneRef.current = true;
-    const vp = useCanvasStore.getState().viewport;
-    const laid = useCanvasStore.getState().nodes;
-    if (laid.length === 0) return;
-    const noSavedViewport =
-      Math.abs(vp.x) < 1 &&
-      Math.abs(vp.y) < 1 &&
-      Math.abs(vp.zoom - 1) < 0.01;
-    if (noSavedViewport) {
-      void fitView({ padding: 0.12, duration: 0 });
-    } else {
-      void rfSetViewport(vp, { duration: 0 });
-    }
-  }, [fitView, rfSetViewport]);
+    applyInitialViewport();
+  }, [applyInitialViewport]);
 
   useEffect(() => {
     registerCanvasViewportPlacement({

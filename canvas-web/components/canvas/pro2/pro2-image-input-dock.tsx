@@ -62,7 +62,7 @@ export function Pro2ImageInputDock() {
   );
 
   const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+    libtvFloatingDockHidden(s.canvasGeometryDragging),
   );
 
   const selectedImage = useMemo(() => {

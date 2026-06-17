@@ -45,7 +45,7 @@ export function Pro2StarterInputDock() {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
   const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+    libtvFloatingDockHidden(s.canvasGeometryDragging),
   );
 
   const selectedStarter = useMemo(() => {
