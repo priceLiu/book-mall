@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import { PRODUCTION_BRAND_PORTAL_ORIGIN } from "@/lib/production-origin";
 import { cn } from "@/lib/utils";
 import {
   SITE_HOME_PRODUCT_OPTIONS,
@@ -60,7 +61,11 @@ export function SiteHomeNav({
   return (
     <header className="site-home-nav sticky top-0 z-[999] w-full border-b">
       <div className="site-home-nav-container">
-        <Link href="/" className="site-home-nav-logo shrink-0" aria-label="智选 AI 首页">
+        <Link
+          href={PRODUCTION_BRAND_PORTAL_ORIGIN}
+          className="site-home-nav-logo shrink-0"
+          aria-label="智选 AI — ai-code8.com"
+        >
           <Image
             src="/logo2.png"
             alt="智选 AI"
