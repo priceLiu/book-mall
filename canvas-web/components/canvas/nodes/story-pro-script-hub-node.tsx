@@ -62,11 +62,17 @@ import { nodeMeasuredSize } from "@/lib/canvas/normalize-graph-nodes";
 const SECTION_LABEL: Record<StoryLlmSection, string> = {
   outline: "大纲",
   character: "角色",
+  scene: "场景",
   storyboard: "分镜",
 };
 
 function isHubLlmSection(section: HubPreviewSection): section is StoryLlmSection {
-  return section === "outline" || section === "character" || section === "storyboard";
+  return (
+    section === "outline" ||
+    section === "character" ||
+    section === "scene" ||
+    section === "storyboard"
+  );
 }
 
 function selectHubData(

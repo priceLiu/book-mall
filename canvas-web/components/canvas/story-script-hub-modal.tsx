@@ -54,6 +54,7 @@ import {
 const TAB_LABEL: Record<HubPreviewSection, string> = {
   outline: "故事大纲",
   character: "角色设定",
+  scene: "场景设定",
   storyboard: "分镜脚本",
   dialogue: "对白",
 };
@@ -120,9 +121,16 @@ export function StoryScriptHubModal({
   const sectionHistory = useMemo((): StoryTextRevision[] => {
     if (section === "outline") return data.outlineHistory ?? [];
     if (section === "character") return data.characterHistory ?? [];
+    if (section === "scene") return data.sceneHistory ?? [];
     if (section === "storyboard") return data.storyboardHistory ?? [];
     return data.storyboardHistory ?? [];
-  }, [section, data.outlineHistory, data.characterHistory, data.storyboardHistory]);
+  }, [
+    section,
+    data.outlineHistory,
+    data.characterHistory,
+    data.sceneHistory,
+    data.storyboardHistory,
+  ]);
 
   const persistedMd = useMemo(() => {
     if (section === "outline") return data.outlineMd ?? "";
@@ -131,6 +139,7 @@ export function StoryScriptHubModal({
     section,
     data.outlineMd,
     data.characterMd,
+    data.sceneMd,
     data.storyboardMd,
   ]);
 
@@ -147,7 +156,10 @@ export function StoryScriptHubModal({
   const dirty = section === "dialogue" ? false : draft !== persistedMd;
 
   const llmSection =
-    section === "outline" || section === "character" || section === "storyboard"
+    section === "outline" ||
+    section === "character" ||
+    section === "scene" ||
+    section === "storyboard"
       ? section
       : null;
   const sectionHasContent = llmSection
@@ -582,11 +594,9 @@ export function StoryScriptHubModal({
                 />
               ) : (
                 <p className="text-[17px] leading-[1.85] text-neutral-500">
-                  {section === "character"
-                    ? "尚无角色设定。点击顶栏「生成」或返回启动页「创作剧本」等待角色段跑完；若大纲已含「主要角色」表，保存大纲后会自动回落展示。"
-                    : section === "storyboard"
-                      ? "尚无分镜脚本。影视专业版需单独生成「分镜」段（大纲 → 角色 → 分镜顺序执行）；也可点顶栏「生成」。"
-                      : "尚无内容，可先「创作剧本」或在此直接撰写后保存。"}
+                  {section === "scene"
+                    ? "尚无场景设定。点击顶栏「生成」，或按大纲 → 角色 → 场景顺序执行。"
+                    : "尚无内容，可先「创作剧本」或在此直接撰写后保存。"}
                 </p>
               )}
             </div>
