@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useReactFlow, useViewport } from "@xyflow/react";
+import { useReactFlow } from "@xyflow/react";
+import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import {
@@ -24,7 +25,7 @@ export function Sbv1MediaGroupToolbar({
   const setNodes = useCanvasStore((s) => s.setNodes);
   const edges = useCanvasStore((s) => s.edges);
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
-  const viewport = useViewport();
+  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
 
   const group = useMemo(() => {
     const hasNonGroupSelected = rfNodes.some(
@@ -46,6 +47,8 @@ export function Sbv1MediaGroupToolbar({
       relayoutSbv1MediaGroup(setNodes, group.id, edges);
     }
   }, [group?.id, edges, setNodes, group]);
+
+  const viewport = useViewportTransformActive(Boolean(group) && !viewportMoving);
 
   const placement = useMemo(() => {
     if (!group) return null;
@@ -86,7 +89,7 @@ export function Sbv1MediaGroupToolbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group, getInternalNode, flowToScreenPosition, rfNodes, viewport]);
 
-  if (!group || !placement) return null;
+  if (viewportMoving || !group || !placement) return null;
 
   return (
     <Pro2MediaGroupToolbarPanel

@@ -5,6 +5,7 @@ import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
@@ -48,7 +49,9 @@ export function Pro2ScriptInputDock() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+  );
 
   const selectedHub = useMemo(() => {
     const picked = rfNodes.filter(
@@ -194,7 +197,7 @@ export function Pro2ScriptInputDock() {
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-script-dock"
-      hidden={canvasGeometryDragging}
+      hidden={dockHidden}
       header={
         <Pro2DockContextBar>
           <Pro2DockUpstreamChips

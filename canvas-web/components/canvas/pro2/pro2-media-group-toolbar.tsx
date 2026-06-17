@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { useReactFlow, useViewport } from "@xyflow/react";
+import { useReactFlow } from "@xyflow/react";
+import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
+import { useCanvasStore } from "@/lib/canvas/store";
 import { isPro2CharacterBoardGroup } from "@/lib/canvas/pro2-resolve-character-board-group";
 import { isPro2FrameBoardGroup } from "@/lib/canvas/pro2-resolve-frame-board-group";
 import { isPro2StyledGroup } from "@/lib/canvas/pro2-media-group-meta";
@@ -22,7 +24,7 @@ export function Pro2MediaGroupToolbar({
   rfNodes: CanvasFlowNode[];
 }) {
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
-  const viewport = useViewport();
+  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
 
   const resolved = useMemo(() => {
     // 有非组节点被选中时（框选 / 多选）→ 让位给框选工具条，避免双条
@@ -43,6 +45,8 @@ export function Pro2MediaGroupToolbar({
     }
     return { group: selectedGroup, kind: null };
   }, [rfNodes]);
+
+  const viewport = useViewportTransformActive(Boolean(resolved) && !viewportMoving);
 
   const placement = useMemo(() => {
     if (!resolved) return null;
@@ -84,7 +88,7 @@ export function Pro2MediaGroupToolbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved, getInternalNode, flowToScreenPosition, rfNodes, viewport]);
 
-  if (!resolved || !placement) return null;
+  if (viewportMoving || !resolved || !placement) return null;
 
   return (
     <Pro2MediaGroupToolbarPanel

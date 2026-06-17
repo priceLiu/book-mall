@@ -6,6 +6,7 @@ import { useNodes } from "@xyflow/react";
 import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
 import { useProjectAssets } from "@/lib/canvas/use-project-assets";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
@@ -60,7 +61,9 @@ export function Pro2ImageInputDock() {
     (s) => s.setPro2StyleLibImageNodeId,
   );
 
-  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+  );
 
   const selectedImage = useMemo(() => {
     const picked = rfNodes.filter((n) => {
@@ -187,7 +190,7 @@ export function Pro2ImageInputDock() {
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-image-dock"
-      hidden={canvasGeometryDragging}
+      hidden={dockHidden}
       header={
         <Pro2DockContextBar>
           <Pro2DockStyleButton

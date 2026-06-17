@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useReactFlow, useViewport } from "@xyflow/react";
+import { useReactFlow } from "@xyflow/react";
+import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { PRO2_DOCK_WIDTH } from "@/lib/canvas/story-pro2-node-chrome";
 
@@ -21,9 +22,10 @@ export function usePro2FrameCellDockPlacement(
   rowKey: string | null,
 ): LibtvDockFlowPlacement | null {
   const { screenToFlowPosition } = useReactFlow();
-  const viewport = useViewport();
+  const active = Boolean(nodeId && rowKey);
+  const viewport = useViewportTransformActive(active);
   const [windowSize, setWindowSize] = useState({ w: 0, h: 0 });
-  const [tick, setTick] = useState(0);
+  const [layoutTick, setLayoutTick] = useState(0);
 
   useEffect(() => {
     const sync = () =>
@@ -34,10 +36,12 @@ export function usePro2FrameCellDockPlacement(
   }, []);
 
   useEffect(() => {
-    if (!nodeId || !rowKey) return;
-    const id = window.setInterval(() => setTick((t) => t + 1), 120);
-    return () => window.clearInterval(id);
-  }, [nodeId, rowKey, viewport.x, viewport.y, viewport.zoom]);
+    if (!active) return;
+    const id = window.requestAnimationFrame(() => {
+      setLayoutTick((t) => t + 1);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [active, nodeId, rowKey]);
 
   return useMemo(() => {
     if (!nodeId || !rowKey || windowSize.w <= 0) return null;
@@ -59,10 +63,10 @@ export function usePro2FrameCellDockPlacement(
     nodeId,
     rowKey,
     windowSize,
+    layoutTick,
     viewport.x,
     viewport.y,
     viewport.zoom,
-    tick,
     screenToFlowPosition,
   ]);
 }

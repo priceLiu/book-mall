@@ -204,6 +204,10 @@ body {
   overscroll-behavior-x: none;
 }
 
+.react-flow__viewport {
+  will-change: transform;
+}
+
 .react-flow__node-group {
   background-color: transparent !important;
   background: transparent !important;

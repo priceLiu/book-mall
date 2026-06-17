@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react";
 import { ArrowUp, Loader2 } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
@@ -25,7 +26,9 @@ export function Pro2FrameCellInputDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+  );
 
   const selectedFrame = useMemo(() => {
     const picked = rfNodes.filter(
@@ -89,7 +92,7 @@ export function Pro2FrameCellInputDock() {
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-frame-cell-dock"
-      hidden={canvasGeometryDragging}
+      hidden={dockHidden}
       footer={
         <Pro2DockToolbar>
           <div className="min-w-0 flex-1" />
