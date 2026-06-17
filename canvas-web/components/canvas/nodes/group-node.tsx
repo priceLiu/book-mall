@@ -7,9 +7,9 @@ import {
   NodeResizer,
   Position,
   useReactFlow,
-  useViewport,
   type NodeProps,
 } from "@xyflow/react";
+import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import {
   Film,
   LayoutGrid,
@@ -100,7 +100,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   );
   const allNodes = useCanvasStore((s) => s.nodes);
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
-  const viewport = useViewport();
+  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
 
   const [editOpen, setEditOpen] = useState(false);
   const [pointerInside, setPointerInside] = useState(false);
@@ -145,6 +145,10 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     (selected || editOpen || pointerInside);
   const showPro2GroupSidePlus = isPro2MediaGroup && selected;
   const showSbv1GroupSidePlus = isSbv1Group && !isPro2MediaGroup && selected;
+
+  const viewport = useViewportTransformActive(
+    showToolbar || editOpen || selected || pointerInside,
+  );
 
   const getGroupScreenRect = useCallback((): ScreenRect | null => {
     const internal = getInternalNode(id) as
@@ -283,8 +287,9 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   }, [hasMediaChildren, isSbv1Group, id, setNodes, updateNodeData, d]);
 
   useEffect(() => {
+    if (viewportMoving) return;
     updateScreenPos();
-  }, [updateScreenPos, viewport.x, viewport.y, viewport.zoom, selected, allNodes]);
+  }, [updateScreenPos, viewport.x, viewport.y, viewport.zoom, selected, allNodes, viewportMoving]);
 
   useEffect(() => {
     if (selected || editOpen) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { useStore, useViewport } from "@xyflow/react";
+import { useStore } from "@xyflow/react";
 import { PRO2_DOCK_WIDTH } from "@/lib/canvas/story-pro2-node-chrome";
 
 /** 节点底边与输入坞之间的画布间距（px · flow 坐标） */
@@ -38,8 +38,6 @@ export function useLibtvDockFlowPlacement(
     defaultNodeHeight?: number;
   },
 ): LibtvDockFlowPlacement | null {
-  const viewport = useViewport();
-
   const geometry = useStore(
     useCallback(
       (state) => {
@@ -75,12 +73,5 @@ export function useLibtvDockFlowPlacement(
       flowY: geometry.y + geometry.h + LIBTV_DOCK_GAP,
       flowW: Math.max(geometry.w, minW),
     };
-  }, [
-    nodeId,
-    geometry,
-    viewport.x,
-    viewport.y,
-    viewport.zoom,
-    opts?.minFlowWidth,
-  ]);
+  }, [nodeId, geometry, opts?.minFlowWidth]);
 }

@@ -315,6 +315,28 @@ function FlowCanvasInner({
   const setCanvasGeometryDragging = useCanvasStore(
     (s) => s.setCanvasGeometryDragging,
   );
+  const setCanvasViewportMoving = useCanvasStore(
+    (s) => s.setCanvasViewportMoving,
+  );
+
+  const onMoveStart = useCallback(() => {
+    setCanvasViewportMoving(true);
+  }, [setCanvasViewportMoving]);
+
+  /** 勿用受控 viewport：节点轮询会频繁重渲染，store 里的旧视口会把滚轮缩放拉回 */
+  const onMoveEnd = useCallback(
+    (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
+      setCanvasViewportMoving(false);
+      if (viewportTimerRef.current !== null) {
+        window.clearTimeout(viewportTimerRef.current);
+      }
+      viewportTimerRef.current = window.setTimeout(() => {
+        setViewport(vp);
+        viewportTimerRef.current = null;
+      }, 350);
+    },
+    [setViewport, setCanvasViewportMoving],
+  );
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<CanvasFlowNode>[]) => {
@@ -340,20 +362,6 @@ function FlowCanvasInner({
       storeOnEdgesChange(changes);
     },
     [onRfEdgesChange, storeOnEdgesChange],
-  );
-
-  /** 勿用受控 viewport：节点轮询会频繁重渲染，store 里的旧视口会把滚轮缩放拉回 */
-  const onMoveEnd = useCallback(
-    (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
-      if (viewportTimerRef.current !== null) {
-        window.clearTimeout(viewportTimerRef.current);
-      }
-      viewportTimerRef.current = window.setTimeout(() => {
-        setViewport(vp);
-        viewportTimerRef.current = null;
-      }, 350);
-    },
-    [setViewport],
   );
 
   useEffect(
@@ -1025,6 +1033,7 @@ function FlowCanvasInner({
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         defaultViewport={viewport}
+        onMoveStart={onMoveStart}
         onMoveEnd={onMoveEnd}
         onInit={onInit}
         onSelectionEnd={

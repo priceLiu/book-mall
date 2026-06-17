@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Handle, Position, useViewport } from "@xyflow/react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Handle, Position } from "@xyflow/react";
 import type { HandleType } from "@xyflow/react";
 import { Plus } from "lucide-react";
+import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { cn } from "@/lib/utils";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
 import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
@@ -47,9 +48,8 @@ export function Pro2NodeSidePlus({
   visible = true,
 }: Pro2NodeSidePlusProps) {
   const [open, setOpen] = useState(false);
-  const [tick, setTick] = useState(0);
   const handleWrapRef = useRef<HTMLDivElement>(null);
-  const viewport = useViewport();
+  const viewport = useViewportTransformActive(open);
   const gestureRef = useRef<{
     x: number;
     y: number;
@@ -57,12 +57,6 @@ export function Pro2NodeSidePlus({
   } | null>(null);
 
   const position = side === "left" ? Position.Left : Position.Right;
-
-  useEffect(() => {
-    if (!open) return;
-    const id = window.setInterval(() => setTick((t) => t + 1), 120);
-    return () => window.clearInterval(id);
-  }, [open, viewport.x, viewport.y, viewport.zoom]);
 
   const anchor = useMemo(() => {
     if (!open) return { x: 0, y: 0 };
@@ -72,7 +66,7 @@ export function Pro2NodeSidePlus({
     const rect = handle?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
     return sideMenuAnchorFromRect(rect, side);
-  }, [open, side, viewport.x, viewport.y, viewport.zoom, tick]);
+  }, [open, side, viewport.x, viewport.y, viewport.zoom]);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     gestureRef.current = { x: e.clientX, y: e.clientY, moved: false };

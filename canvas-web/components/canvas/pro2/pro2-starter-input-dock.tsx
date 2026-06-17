@@ -7,6 +7,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
@@ -43,7 +44,9 @@ export function Pro2StarterInputDock() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+  );
 
   const selectedStarter = useMemo(() => {
     const picked = rfNodes.filter(
@@ -194,7 +197,7 @@ export function Pro2StarterInputDock() {
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-starter-dock"
-      hidden={canvasGeometryDragging}
+      hidden={dockHidden}
       header={
         <Pro2DockContextBar>
           <Pro2DockUpstreamChips

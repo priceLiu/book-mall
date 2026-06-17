@@ -1,9 +1,16 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { MentionableItem } from "./MentionsTextarea";
 import { findAllMentionRangesInDisplay } from "@/lib/canvas/mention-at-display-index";
 import { getMentionRangeClientRect } from "@/lib/canvas/textarea-caret-rect";
+import { useCanvasStore } from "@/lib/canvas/store";
 import { cn } from "@/lib/utils";
 
 const THUMB_SIZE = 16;
@@ -32,11 +39,13 @@ export function MentionInlineThumbs({
   edition?: "pro2" | "sbv1";
 }) {
   const [anchors, setAnchors] = useState<MentionInlineThumbAnchor[]>([]);
+  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
+  const rafRef = useRef<number | null>(null);
 
   const recompute = useCallback(() => {
     const el = textareaRef.current;
     const wrap = wrapperRef.current;
-    if (!enabled || !el || !wrap) {
+    if (!enabled || !el || !wrap || viewportMoving) {
       setAnchors([]);
       return;
     }
@@ -44,7 +53,10 @@ export function MentionInlineThumbs({
     const wrapRect = wrap.getBoundingClientRect();
     const next: MentionInlineThumbAnchor[] = [];
 
-    for (const range of findAllMentionRangesInDisplay(displayValue, mentionables)) {
+    for (const range of findAllMentionRangesInDisplay(
+      displayValue,
+      mentionables,
+    )) {
       if (!range.item.previewUrl) continue;
       const rect = getMentionRangeClientRect(el, range.start, range.end);
       if (!rect) continue;
@@ -57,19 +69,34 @@ export function MentionInlineThumbs({
     }
 
     setAnchors(next);
-  }, [displayValue, mentionables, enabled, textareaRef, wrapperRef]);
+  }, [
+    displayValue,
+    mentionables,
+    enabled,
+    viewportMoving,
+    textareaRef,
+    wrapperRef,
+  ]);
+
+  const scheduleRecompute = useCallback(() => {
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      recompute();
+    });
+  }, [recompute]);
 
   useLayoutEffect(() => {
-    recompute();
-  }, [recompute]);
+    scheduleRecompute();
+  }, [scheduleRecompute]);
 
   useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!enabled || !el) return;
 
-    const onScroll = () => recompute();
+    const onScroll = () => scheduleRecompute();
     el.addEventListener("scroll", onScroll, { passive: true });
-    const ro = new ResizeObserver(() => recompute());
+    const ro = new ResizeObserver(() => scheduleRecompute());
     ro.observe(el);
     window.addEventListener("resize", onScroll);
 
@@ -77,10 +104,14 @@ export function MentionInlineThumbs({
       el.removeEventListener("scroll", onScroll);
       ro.disconnect();
       window.removeEventListener("resize", onScroll);
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
-  }, [enabled, recompute, textareaRef]);
+  }, [enabled, scheduleRecompute, textareaRef]);
 
-  if (!enabled || !anchors.length) return null;
+  if (!enabled || viewportMoving || !anchors.length) return null;
 
   const borderClass =
     edition === "sbv1"

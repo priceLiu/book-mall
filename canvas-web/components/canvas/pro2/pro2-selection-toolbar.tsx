@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useReactFlow, useViewport } from "@xyflow/react";
+import { useReactFlow } from "@xyflow/react";
+import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, BookmarkPlus } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -53,7 +54,7 @@ export function Pro2SelectionToolbar({
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { flowToScreenPosition, getInternalNode } = useReactFlow();
-  const viewport = useViewport();
+  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
   const createGroupContaining = useCanvasStore((s) => s.createGroupContaining);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
@@ -105,6 +106,10 @@ export function Pro2SelectionToolbar({
     [selectedNodes],
   );
 
+  const viewport = useViewportTransformActive(
+    selectedIds.length >= 2 && !viewportMoving,
+  );
+
   const bbox = useMemo(() => {
     const pool = rfNodes.length ? rfNodes : storeNodes;
     return computePro2MultiSelectionBbox(
@@ -126,7 +131,7 @@ export function Pro2SelectionToolbar({
     return { x: top.x, y: top.y - GAP, place: "above" as const };
   }, [bbox, flowToScreenPosition, viewport]);
 
-  if (!placement || selectedIds.length < 2) return null;
+  if (viewportMoving || !placement || selectedIds.length < 2) return null;
 
   const onSaveToAssets = async () => {
     if (!saveableThreeViews.length) {

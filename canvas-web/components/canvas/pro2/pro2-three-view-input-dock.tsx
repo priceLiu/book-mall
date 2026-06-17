@@ -5,6 +5,7 @@ import { ArrowUp, Loader2, MapPin } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
@@ -44,7 +45,9 @@ export function Pro2ThreeViewInputDock() {
     (s) => s.setPro2StyleLibImageNodeId,
   );
 
-  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+  );
 
   const selected = useMemo(() => {
     const picked = rfNodes.filter(
@@ -188,7 +191,7 @@ export function Pro2ThreeViewInputDock() {
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-three-view-dock"
-      hidden={canvasGeometryDragging}
+      hidden={dockHidden}
       header={
         <Pro2DockContextBar>
           <Pro2DockStyleButton

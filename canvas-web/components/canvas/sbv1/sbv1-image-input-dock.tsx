@@ -14,6 +14,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
@@ -54,7 +55,9 @@ export function Sbv1ImageInputDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+  );
   const setPro2StyleLibImageNodeId = useCanvasStore(
     (s) => s.setPro2StyleLibImageNodeId,
   );
@@ -228,7 +231,7 @@ export function Sbv1ImageInputDock() {
       <Pro2InputDockShell
         flowAnchor={placement}
         dockClassName="sbv1-image-dock"
-        hidden={canvasGeometryDragging}
+        hidden={dockHidden}
         header={
           <Pro2DockContextBar>
             <Pro2DockStyleButton

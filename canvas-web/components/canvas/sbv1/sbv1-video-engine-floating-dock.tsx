@@ -9,6 +9,7 @@ import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-link
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
 import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
 import { useSbv1DockPlacement } from "./use-sbv1-dock-placement";
 
@@ -20,7 +21,9 @@ export function Sbv1VideoEngineFloatingDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+  );
 
   const selectedEngine = useMemo(() => {
     const picked = rfNodes.filter(
@@ -108,7 +111,7 @@ export function Sbv1VideoEngineFloatingDock() {
       onPatch={onPatch}
       onRun={onRun}
       placement={placement}
-      hidden={canvasGeometryDragging}
+      hidden={dockHidden}
     />
   );
 }
