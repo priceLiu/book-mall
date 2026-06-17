@@ -10,12 +10,13 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import {
-  PRO2_IMAGE_LEFT_ADD_MENU,
-  PRO2_RIGHT_ADD_MENU,
-} from "@/lib/canvas/pro2-add-node-menu";
+  SBV1_IMAGE_LEFT_ADD_MENU,
+  SBV1_IMAGE_RIGHT_ADD_MENU,
+} from "@/lib/canvas/sbv1-add-node-menu";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   handleSbv1ImageSideAddNodePick,
+  selectSbv1NodeAfterSpawn,
   spawnSbv1NeighborFromNode,
 } from "@/lib/canvas/sbv1-spawn-nodes";
 import {
@@ -56,6 +57,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
   const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
+  const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const inputRef = useRef<HTMLInputElement>(null);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
@@ -85,7 +87,11 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
     selected: Boolean(selected),
     soleSelected,
   });
-  const showImageTools = Boolean(soleSelected && hasImage && !isGenerating);
+  const showImageTools = Boolean(
+    soleSelected &&
+      !isGenerating &&
+      (hasImage || Boolean(d.dockInput?.trim()) || Boolean(d.engine?.modelKey)),
+  );
 
   useLibtvMediaNodeAutoFit({
     nodeId: id,
@@ -178,6 +184,11 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
     [id, spawnStore, alert],
   );
 
+  const onDuplicateNode = useCallback(() => {
+    const newId = duplicateNode(id, { preserveContent: true });
+    if (newId) selectSbv1NodeAfterSpawn(setNodes, newId);
+  }, [duplicateNode, id, setNodes]);
+
   return (
     <>
       <Pro2NodeResizer
@@ -228,7 +239,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
               handleId="plus_left"
               visible
               className="z-[60] -left-5"
-              sections={PRO2_IMAGE_LEFT_ADD_MENU}
+              sections={SBV1_IMAGE_LEFT_ADD_MENU}
               onPick={onSidePick("left")}
             />
             <Pro2NodeSidePlus
@@ -236,7 +247,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
               handleId="image"
               visible
               className="z-[60] -right-5"
-              sections={PRO2_RIGHT_ADD_MENU}
+              sections={SBV1_IMAGE_RIGHT_ADD_MENU}
               onPick={onSidePick("right")}
             />
           </>
@@ -252,6 +263,7 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
             onSaveAsAsset={() =>
               saveAsAsset(id, "sbv1-image", d as unknown as Record<string, unknown>)
             }
+            onDuplicateNode={onDuplicateNode}
           />
         ) : null}
 

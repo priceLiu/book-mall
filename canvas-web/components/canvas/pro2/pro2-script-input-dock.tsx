@@ -289,6 +289,7 @@ export function Pro2ScriptInputDock() {
           mentionables={mentionables}
           disabled={isGenerating}
           rows={3}
+          mentionInlineThumb
           onChange={(value) =>
             updateNodeData(storeNode.id, { dockInput: value })
           }

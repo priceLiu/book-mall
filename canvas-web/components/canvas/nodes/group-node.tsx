@@ -478,10 +478,13 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
       {isLibtvMediaGroup ? (
         <div className="relative z-10 flex h-8 shrink-0 items-center gap-1 px-2 pt-2">
-          <button
-            type="button"
+          {/* 整卡可拖：标题栏不加 nodrag，单击仍选中、按住可整组拖动 */}
+          <div
+            role="button"
+            tabIndex={0}
             className={cn(
-              "nodrag flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[11px] text-white/55 transition hover:bg-white/6 hover:text-white/75",
+              LIBTV_CARD_DRAG_CLASS,
+              "flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-[11px] text-white/55 transition hover:bg-white/6 hover:text-white/75",
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -492,7 +495,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             <span className="truncate font-medium tracking-wide">
               {groupHeaderLabel}
             </span>
-          </button>
+          </div>
         </div>
       ) : (
         <div className="flex h-8 items-center gap-1 rounded-t-[14px] px-2 pt-1 text-[12px] font-medium text-white">

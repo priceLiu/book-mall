@@ -263,6 +263,7 @@ export function Pro2ImageInputDock() {
           disabled={isRunning}
           rows={3}
           onChange={onPromptChange}
+          mentionInlineThumb
         />
       </Pro2DockPasteZone>
     </Pro2InputDockShell>

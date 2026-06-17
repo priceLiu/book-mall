@@ -9,7 +9,6 @@ import {
   SBV1_IMAGE_ASPECT_RATIOS,
   SBV1_IMAGE_MODEL_KEYS,
   SBV1_IMAGE_OUTPUT_COUNTS,
-  SBV1_IMAGE_QUALITIES,
   SBV1_IMAGE_RESOLUTIONS,
   buildSbv1ImageEngineParams,
   sbv1ImageAspectRatioLabel,
@@ -22,6 +21,15 @@ import { cn } from "@/lib/utils";
 
 const MODAL_Z = 1200;
 
+const QUALITY_OPTIONS: { id: Sbv1ImageQuality; label: string }[] = [
+  { id: "low", label: "低" },
+  { id: "standard", label: "标准" },
+  { id: "high", label: "高" },
+];
+
+const FORMAT_OPTIONS = ["png", "jpeg", "webp"] as const;
+type OutputFormat = (typeof FORMAT_OPTIONS)[number];
+
 export type Sbv1ImageGenerateSettingsModalProps = {
   open: boolean;
   data: Sbv1ImageNodeData;
@@ -29,7 +37,7 @@ export type Sbv1ImageGenerateSettingsModalProps = {
   onConfirm: (patch: Partial<Sbv1ImageNodeData>) => void;
 };
 
-/** 分镜视频 1.0 · 图片模型 + 画质 / 清晰度 / 比例（单弹层 · 与视频设置一致） */
+/** 分镜视频 1.0 · 图片模型 + 画质 / 清晰度 / 比例（紧凑单弹层） */
 export function Sbv1ImageGenerateSettingsModal({
   open,
   data,
@@ -48,6 +56,7 @@ export function Sbv1ImageGenerateSettingsModal({
     data.aspectRatio ?? "auto",
   );
   const [outputCount, setOutputCount] = useState(data.outputCount ?? 1);
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>("png");
   const [providerId, setProviderId] = useState(data.engine?.providerId ?? "");
   const [modelKey, setModelKey] = useState(data.engine?.modelKey ?? "");
   const [engineParams, setEngineParams] = useState<Record<string, unknown>>(
@@ -66,7 +75,12 @@ export function Sbv1ImageGenerateSettingsModal({
     setOutputCount(data.outputCount ?? 1);
     setProviderId(data.engine?.providerId ?? "");
     setModelKey(data.engine?.modelKey ?? "");
-    setEngineParams(data.engine?.params ?? {});
+    const params = data.engine?.params ?? {};
+    setEngineParams(params);
+    const fmt = String(params.output_format ?? "png").toLowerCase();
+    setOutputFormat(
+      FORMAT_OPTIONS.includes(fmt as OutputFormat) ? (fmt as OutputFormat) : "png",
+    );
   }, [open, data]);
 
   useEffect(() => {
@@ -92,6 +106,7 @@ export function Sbv1ImageGenerateSettingsModal({
       resolution,
       outputCount,
     });
+    params.output_format = outputFormat;
     onConfirm({
       imageQuality,
       resolution,
@@ -117,11 +132,11 @@ export function Sbv1ImageGenerateSettingsModal({
       }}
     >
       <div
-        className="nodrag nowheel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--canvas-surface,#161427)] shadow-2xl"
+        className="nodrag nowheel flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--canvas-surface,#161427)] shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-white/5 px-5 py-4">
-          <p className="flex items-center gap-2 text-[15px] font-medium text-white">
+        <header className="flex items-start justify-between gap-3 border-b border-white/5 px-4 py-3">
+          <p className="flex items-center gap-2 text-[14px] font-medium text-white">
             <Sparkles className="size-4 text-[var(--canvas-accent,#a78bfa)]" />
             图片生成设置
           </p>
@@ -135,22 +150,34 @@ export function Sbv1ImageGenerateSettingsModal({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
           <div>
-            <p className="mb-2 text-[13px] text-white/85">画质</p>
-            <SegmentRow
-              options={SBV1_IMAGE_QUALITIES.map((q) => ({
-                id: q.value,
-                label: q.label,
-              }))}
-              value={imageQuality}
-              onChange={(id) => setImageQuality(id as Sbv1ImageQuality)}
+            <p className="mb-1.5 text-[12px] text-white/55">模型</p>
+            <EnginePicker
+              role="IMAGE"
+              embedded
+              modelsOnly
+              allowedModelKeys={[...SBV1_IMAGE_MODEL_KEYS]}
+              providerId={providerId}
+              modelKey={modelKey}
+              params={engineParams}
+              onChange={(next) => {
+                setProviderId(next.providerId);
+                setModelKey(next.modelKey);
+                setEngineParams(next.params);
+              }}
             />
           </div>
 
-          <div>
-            <p className="mb-2 text-[13px] text-white/85">清晰度</p>
-            <SegmentRow
+          <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
+            <LabeledSegment
+              label="画质"
+              options={QUALITY_OPTIONS}
+              value={imageQuality}
+              onChange={(id) => setImageQuality(id as Sbv1ImageQuality)}
+            />
+            <LabeledSegment
+              label="清晰度"
               options={SBV1_IMAGE_RESOLUTIONS.map((r) => ({
                 id: r.value,
                 label: r.label,
@@ -160,46 +187,37 @@ export function Sbv1ImageGenerateSettingsModal({
             />
           </div>
 
-          <div>
-            <p className="mb-2 text-[13px] text-white/85">比例</p>
-            <SegmentRow
-              options={SBV1_IMAGE_ASPECT_RATIOS.map((r) => ({
-                id: r.value,
-                label: sbv1ImageAspectRatioLabel(r.value),
-              }))}
-              value={aspectRatio}
-              onChange={(id) => setAspectRatio(id as Sbv1ImageAspectRatio)}
-            />
-          </div>
+          <LabeledSegment
+            label="比例"
+            options={SBV1_IMAGE_ASPECT_RATIOS.map((r) => ({
+              id: r.value,
+              label: sbv1ImageAspectRatioLabel(r.value),
+            }))}
+            value={aspectRatio}
+            onChange={(id) => setAspectRatio(id as Sbv1ImageAspectRatio)}
+            compact
+          />
 
-          <div>
-            <p className="mb-2 text-[13px] text-white/85">张数</p>
-            <SegmentRow
+          <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
+            <LabeledSegment
+              label="张数"
               options={SBV1_IMAGE_OUTPUT_COUNTS.map((n) => ({
                 id: String(n),
-                label: `${n}张`,
+                label: String(n),
               }))}
               value={String(outputCount)}
               onChange={(id) => setOutputCount(Number(id) || 1)}
             />
+            <LabeledSegment
+              label="格式"
+              options={FORMAT_OPTIONS.map((f) => ({ id: f, label: f }))}
+              value={outputFormat}
+              onChange={(id) => setOutputFormat(id as OutputFormat)}
+            />
           </div>
-
-          <EnginePicker
-            role="IMAGE"
-            embedded
-            allowedModelKeys={[...SBV1_IMAGE_MODEL_KEYS]}
-            providerId={providerId}
-            modelKey={modelKey}
-            params={engineParams}
-            onChange={(next) => {
-              setProviderId(next.providerId);
-              setModelKey(next.modelKey);
-              setEngineParams(next.params);
-            }}
-          />
         </div>
 
-        <footer className="flex items-center justify-end gap-2 border-t border-white/5 bg-black/20 px-5 py-3">
+        <footer className="flex items-center justify-end gap-2 border-t border-white/5 bg-black/20 px-4 py-2.5">
           <button
             type="button"
             onClick={onClose}
@@ -222,23 +240,47 @@ export function Sbv1ImageGenerateSettingsModal({
   );
 }
 
+function LabeledSegment({
+  label,
+  options,
+  value,
+  onChange,
+  compact = false,
+}: {
+  label: string;
+  options: { id: string; label: string }[];
+  value: string;
+  onChange: (id: string) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={cn("min-w-0", compact ? "w-full" : "shrink-0")}>
+      <p className="mb-1 text-[12px] text-white/55">{label}</p>
+      <SegmentRow options={options} value={value} onChange={onChange} compact={compact} />
+    </div>
+  );
+}
+
 function SegmentRow({
   options,
   value,
   onChange,
+  compact = false,
 }: {
   options: { id: string; label: string }[];
   value: string;
   onChange: (id: string) => void;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className={cn("flex flex-wrap gap-1.5", compact && "max-w-full")}>
       {options.map((opt) => (
         <button
           key={opt.id}
           type="button"
           className={cn(
-            "min-w-[4.5rem] rounded-lg border px-4 py-2 text-[13px] font-medium transition",
+            "rounded-md border font-medium transition",
+            compact ? "min-w-[2.75rem] px-2 py-1 text-[11px]" : "min-w-[2.25rem] px-2.5 py-1 text-[12px]",
             opt.id === value
               ? "border-white bg-white/[.06] text-white"
               : "border-white/15 text-white/55 hover:border-white/30 hover:text-white/80",

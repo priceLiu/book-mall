@@ -13,6 +13,7 @@ import {
 } from "@/lib/canvas/sbv1-add-node-menu";
 import {
   handleSbv1SideAddNodePick,
+  selectSbv1NodeAfterSpawn,
   spawnSbv1NeighborFromNode,
 } from "@/lib/canvas/sbv1-spawn-nodes";
 import {
@@ -46,6 +47,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
+  const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const d = data as unknown as Sbv1VideoEngineNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
   const { succeeded } = useNodeTaskHistory(id);
@@ -62,6 +64,18 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   const isGenerating = isLibtvMediaGenerating(d);
   const hasVideo = Boolean(videoUrl);
+  const hasToolbarContent = Boolean(
+    hasVideo ||
+      d.prompt?.trim() ||
+      d.refSlots?.some((s) => s.ossUrl || s.blobUrl || s.imageNodeId) ||
+      d.runtime?.ossUrl ||
+      d.runtime?.ephemeralUrl,
+  );
+  const soleSelected = useMemo(
+    () => selected && nodes.filter((n) => n.selected).length === 1,
+    [selected, nodes],
+  );
+  const showToolbar = Boolean(soleSelected && hasToolbarContent && !isGenerating);
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
 
   useLibtvMediaNodeAutoFit({
@@ -106,6 +120,11 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     },
     [id, spawnStore, alert],
   );
+
+  const onDuplicateNode = useCallback(() => {
+    const newId = duplicateNode(id, { preserveContent: true });
+    if (newId) selectSbv1NodeAfterSpawn(setNodes, newId);
+  }, [duplicateNode, id, setNodes]);
 
   return (
     <>
@@ -169,9 +188,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           </>
         ) : null}
 
-        {hasVideo && selected ? (
+        {showToolbar ? (
           <Pro2ImageNodeToolbar
             passNodeDrag
+            minimal
             className="absolute left-1/2 z-40 -translate-x-1/2"
             style={{ top: -60 }}
             previewUrl={videoUrl}
@@ -184,6 +204,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 "STORYBOARD_VIDEO",
               )
             }
+            onDuplicateNode={onDuplicateNode}
           />
         ) : null}
 

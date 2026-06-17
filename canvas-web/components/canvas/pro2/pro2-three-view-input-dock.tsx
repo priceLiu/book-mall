@@ -214,7 +214,8 @@ export function Pro2ThreeViewInputDock() {
         </Pro2DockContextBar>
       }
       footer={
-        <Pro2DockToolbar>
+        <>
+          <Pro2DockToolbar>
           <div className="min-w-0 flex-1">
             <EnginePicker
               role="IMAGE"
@@ -239,6 +240,7 @@ export function Pro2ThreeViewInputDock() {
             )}
           </button>
         </Pro2DockToolbar>
+        </>
       }
     >
       <MentionsTextarea
@@ -254,6 +256,7 @@ export function Pro2ThreeViewInputDock() {
         disabled={isRunning}
         rows={4}
         onChange={onPromptChange}
+        mentionInlineThumb
       />
     </Pro2InputDockShell>
   );

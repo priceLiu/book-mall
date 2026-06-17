@@ -905,8 +905,12 @@ export function ensureNodeDragHandles(
   let changed = false;
   const next = nodes.map((n) => {
     const t = n.type ?? "";
+    // 影视专业 2.0（story-pro2-*）· 分镜视频 1.0（sbv1-*）全节点整卡可拖；
+    // 交互区由各节点内 nodrag 兜底。组节点（媒体组）同样整组可拖。
     const dragAnywhere =
       PRO2_LIBTV_DRAG_ANYWHERE_TYPES.has(t) ||
+      t.startsWith("story-pro2-") ||
+      t.startsWith("sbv1-") ||
       (t === "group" &&
         (isPro2StyledGroup(n, nodes) || isSbv1MediaGroup(n, nodes)));
     if (dragAnywhere) {

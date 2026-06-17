@@ -62,6 +62,13 @@ import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
 import { Pro2ScriptHubToolbar } from "./pro2-script-hub-toolbar";
 import { Pro2ScriptHubContentPreview } from "./pro2-script-hub-content-preview";
+import {
+  Pro2CharacterThreeViewPicker,
+  type Pro2CharacterThreeViewResult,
+} from "./pro2-character-three-view-picker";
+import { generatePro2CharacterThreeViewFromHub } from "@/lib/canvas/pro2-script-hub-toolbar-actions";
+import { resolvePro2ThreeViewBatchImageForHub } from "@/lib/canvas/pro2-three-view-batch-image";
+import { useUserProviders } from "@/lib/canvas/use-user-providers";
 
 const TRY_ACTIONS = [
   { id: "script", label: "剧本生成分镜脚本", icon: FileText },
@@ -69,14 +76,47 @@ const TRY_ACTIONS = [
   { id: "character", label: "角色生成分镜脚本", icon: User },
 ] as const;
 
+function pro2HubThreeViewStore() {
+  const state = useCanvasStore.getState();
+  return {
+    nodes: state.nodes,
+    edges: state.edges,
+    addNode: (
+      type:
+        | "story-pro2-character"
+        | "story-pro2-frame"
+        | "story-pro2-image"
+        | "story-pro2-three-view"
+        | "group",
+      position: { x: number; y: number },
+      data: Record<string, unknown>,
+    ) => state.addNode(type, position, data),
+    addNodeInGroup: (
+      type: "story-pro2-image" | "story-pro2-three-view",
+      groupId: string,
+      relativePosition: { x: number; y: number },
+      data: Record<string, unknown>,
+    ) => state.addNodeInGroup(type, groupId, relativePosition, data),
+    createGroupContaining: (
+      childIds: string[],
+      opts: { label: string; color: string },
+    ) => state.createGroupContaining(childIds, opts),
+    setEdges: state.setEdges,
+    updateNodeData: state.updateNodeData,
+    setNodes: state.setNodes,
+  };
+}
+
 export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
+  const { providers } = useUserProviders();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const openTableEditor = useCanvasStore((s) => s.openPro2ScriptTableEditor);
+  const [tvPickerOpen, setTvPickerOpen] = useState(false);
 
   const d = data as unknown as StoryProScriptHubNodeData;
   const storyboardMd = resolveHubStoryboardMd(d);
@@ -238,8 +278,41 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     [nodes, id, addNode, setNodes, setEdges],
   );
 
+  const onGenerateThreeView = useCallback(async () => {
+    if (isGenerating) return;
+    if (!hasCharacter) {
+      await alert({
+        title: "请先生成角色设定",
+        message:
+          "在底部输入坞发送生成专业版分镜脚本（含角色表）后，再生成角色三视图。",
+        variant: "warning",
+      });
+      return;
+    }
+    setTvPickerOpen(true);
+  }, [isGenerating, hasCharacter, alert]);
+
+  const runThreeViewGenerate = useCallback(
+    (result: Pro2CharacterThreeViewResult) => {
+      generatePro2CharacterThreeViewFromHub(
+        id,
+        d,
+        providers,
+        pro2HubThreeViewStore,
+        result.characterKeys,
+        result.batchImage,
+      );
+    },
+    [id, d, providers],
+  );
+
   const onSidePick = useCallback(
     (side: "left" | "right") => (itemId: string, nodeType?: string) => {
+      // 右侧 + 「三视图」与顶部工具栏「生成角色三视图」对齐：基于角色表生成三视图
+      if (itemId === "three-view" || nodeType === "story-pro2-three-view") {
+        void onGenerateThreeView();
+        return;
+      }
       void handlePro2SideAddNodePick(
         itemId,
         nodeType,
@@ -259,7 +332,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         },
       );
     },
-    [spawnNeighbor, alert],
+    [spawnNeighbor, alert, onGenerateThreeView],
   );
 
   const openEditor = useCallback(() => {
@@ -406,6 +479,14 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         )}
       </div>
       </div>
+
+      <Pro2CharacterThreeViewPicker
+        open={tvPickerOpen}
+        characterMd={characterMd}
+        initialBatchImage={resolvePro2ThreeViewBatchImageForHub(id, nodes, edges)}
+        onClose={() => setTvPickerOpen(false)}
+        onConfirm={runThreeViewGenerate}
+      />
     </div>
   );
 }

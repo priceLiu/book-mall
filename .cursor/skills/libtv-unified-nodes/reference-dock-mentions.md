@@ -31,6 +31,19 @@ Pro2 与 sbv1 所有节点底部 **浮动 Dock** 文案区使用 `MentionsTextar
 
 新增 Dock 引用类型时 **必须** 填 `previewUrl`，否则悬停与 @ 列表均无缩略图。
 
+## @ 内联缩略图（Dock 文案区）
+
+prompt 中已 `@` 且 mentionable 带 `previewUrl` 时，在 **@ 标签文字右侧** 内联显示 16×16 缩略图（箭头位置，非 footer）。
+
+| 规则 | 说明 |
+| --- | --- |
+| 组件 | `MentionInlineThumbs` · 由 `MentionsTextarea` 在 `mentionInlineThumb` 时挂载 |
+| 定位 | `getMentionRangeClientRect` · 紧贴 `@label` 末尾 + 4px |
+| 边框 | `mentionEdition` · Pro2 紫 / sbv1 cyan |
+| **禁止** | footer 工具栏上方另起 pill 行（`Pro2DockActiveMentionPills` 已废弃） |
+
+Dock 须传 `<MentionsTextarea mentionInlineThumb mentionEdition="sbv1" />`（Pro2 可省略 edition）。
+
 ## 视觉 token
 
 ```

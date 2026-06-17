@@ -9,6 +9,7 @@ import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import {
   SBV1_ASPECT_RATIOS,
   SBV1_REFERENCE_MODES,
+  SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS,
   getSbv1VolcengineModelById,
   migrateSbv1ModelVariantId,
   resolveSbv1VariantIdFromEngine,
@@ -19,10 +20,14 @@ import type {
   Sbv1ReferenceMode,
   Sbv1VideoEngineNodeData,
 } from "@/lib/canvas/sbv1-workspace-types";
-import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 
 const MODAL_Z = 1200;
+
+const RESOLUTION_OPTIONS = [
+  { id: "720p", label: "720p" },
+  { id: "1080p", label: "1080p" },
+] as const;
 
 export type Sbv1VideoGenerateSettingsModalProps = {
   open: boolean;
@@ -31,14 +36,13 @@ export type Sbv1VideoGenerateSettingsModalProps = {
   onConfirm: (patch: Partial<Sbv1VideoEngineNodeData>) => void;
 };
 
-/** 分镜视频 1.0 · 模型 + 参考模式 / 比例 / 时长 / 分辨率（单弹层，对齐 Pro2 EnginePicker） */
+/** 分镜视频 1.0 · 紧凑单弹层（模型优先 · 见 libtv-generate-settings-spec.md） */
 export function Sbv1VideoGenerateSettingsModal({
   open,
   data,
   onClose,
   onConfirm,
 }: Sbv1VideoGenerateSettingsModalProps) {
-  const { providers } = useUserProviders();
   const [mounted, setMounted] = useState(false);
 
   const [referenceMode, setReferenceMode] = useState<Sbv1ReferenceMode>(
@@ -55,6 +59,12 @@ export function Sbv1VideoGenerateSettingsModal({
   const [modelKey, setModelKey] = useState(data.engine?.modelKey ?? "");
   const [engineParams, setEngineParams] = useState<Record<string, unknown>>(
     data.engine?.params ?? {},
+  );
+  const [generateAudio, setGenerateAudio] = useState(
+    data.engine?.params?.generate_audio !== false,
+  );
+  const [watermark, setWatermark] = useState(
+    Boolean(data.engine?.params?.watermark),
   );
 
   const smartMulti = referenceMode === "smart_multi";
@@ -82,6 +92,8 @@ export function Sbv1VideoGenerateSettingsModal({
     setProviderId(normalizeSbv1EngineProviderId(data.engine?.providerId));
     setModelKey(data.engine?.modelKey ?? "");
     setEngineParams(data.engine?.params ?? {});
+    setGenerateAudio(data.engine?.params?.generate_audio !== false);
+    setWatermark(Boolean(data.engine?.params?.watermark));
   }, [open, data]);
 
   useEffect(() => {
@@ -101,18 +113,19 @@ export function Sbv1VideoGenerateSettingsModal({
 
   const handleConfirm = () => {
     if (!providerId.trim() || !modelKey.trim()) return;
+    const mergedParams = {
+      ...engineParams,
+      resolution,
+      generate_audio: generateAudio,
+      watermark,
+      ...(smartMulti ? {} : { duration: effectiveDurationSec }),
+    };
     const engine = {
       providerId,
       modelKey,
-      params: {
-        ...engineParams,
-        ...(smartMulti ? { resolution } : {}),
-        ...(!smartMulti && effectiveDurationSec >= 4
-          ? { duration: effectiveDurationSec }
-          : {}),
-      },
+      params: mergedParams,
     };
-    const variantId = resolveSbv1VariantIdFromEngine(engine, providers);
+    const variantId = resolveSbv1VariantIdFromEngine(engine);
     onConfirm({
       referenceMode,
       aspectRatio,
@@ -136,11 +149,11 @@ export function Sbv1VideoGenerateSettingsModal({
       }}
     >
       <div
-        className="nodrag nowheel flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--canvas-surface,#161427)] shadow-2xl"
+        className="nodrag nowheel flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--canvas-surface,#161427)] shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-white/5 px-5 py-4">
-          <p className="flex items-center gap-2 text-[15px] font-medium text-white">
+        <header className="flex items-start justify-between gap-3 border-b border-white/5 px-4 py-3">
+          <p className="flex items-center gap-2 text-[14px] font-medium text-white">
             <Sparkles className="size-4 text-[var(--canvas-accent,#a78bfa)]" />
             视频生成设置
           </p>
@@ -154,82 +167,109 @@ export function Sbv1VideoGenerateSettingsModal({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
-          <SegmentRow
-            options={SBV1_REFERENCE_MODES.map((m) => ({
-              id: m.id,
-              label: m.label,
-            }))}
-            value={referenceMode}
-            onChange={(id) => {
-              const mode = id as Sbv1ReferenceMode;
-              setReferenceMode(mode);
-              if (mode === "smart_multi") {
-                setDurationSec(0);
-              } else if (durationSec < 4 || durationSec > 15) {
-                setDurationSec(15);
-              }
-            }}
-          />
-
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
           <div>
-            <p className="mb-2 text-[13px] text-white/85">比例</p>
-            <SegmentRow
-              options={SBV1_ASPECT_RATIOS.map((r) => ({
-                id: r,
-                label: sbv1AspectRatioLabel(r),
-              }))}
-              value={aspectRatio}
-              onChange={(id) => setAspectRatio(id as Sbv1AspectRatio)}
+            <p className="mb-1.5 text-[12px] text-white/55">模型</p>
+            <EnginePicker
+              role="VIDEO"
+              embedded
+              modelsOnly
+              providerIds={[GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID]}
+              allowedModelKeys={[...SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS]}
+              providerId={providerId}
+              modelKey={modelKey}
+              params={engineParams}
+              onChange={(next) => {
+                setProviderId(next.providerId);
+                setModelKey(next.modelKey);
+                setEngineParams(next.params);
+              }}
             />
           </div>
 
-          {smartMulti ? (
+          <div className="flex flex-wrap items-start gap-x-5 gap-y-2">
+            <LabeledSegment
+              label="参考模式"
+              options={SBV1_REFERENCE_MODES.map((m) => ({
+                id: m.id,
+                label: m.label,
+              }))}
+              value={referenceMode}
+              onChange={(id) => {
+                const mode = id as Sbv1ReferenceMode;
+                setReferenceMode(mode);
+                if (mode === "smart_multi") {
+                  setDurationSec(0);
+                } else if (durationSec < 4 || durationSec > 15) {
+                  setDurationSec(15);
+                }
+              }}
+            />
+            <LabeledSegment
+              label="分辨率"
+              options={RESOLUTION_OPTIONS.map((r) => ({
+                id: r.id,
+                label: r.label,
+              }))}
+              value={resolution}
+              onChange={(id) => {
+                const next = id as "720p" | "1080p";
+                setResolution(next);
+                setEngineParams((p) => ({ ...p, resolution: next }));
+              }}
+            />
+          </div>
+
+          <LabeledSegment
+            label="比例"
+            options={SBV1_ASPECT_RATIOS.map((r) => ({
+              id: r,
+              label: sbv1AspectRatioLabel(r),
+            }))}
+            value={aspectRatio}
+            onChange={(id) => setAspectRatio(id as Sbv1AspectRatio)}
+            compact
+          />
+
+          {!smartMulti ? (
             <div>
-              <p className="mb-2 text-[13px] text-white/85">清晰度</p>
-              <SegmentRow
-                options={[
-                  { id: "720p", label: "720P" },
-                  { id: "1080p", label: "1080P" },
-                ]}
-                value={resolution}
-                onChange={(id) => {
-                  setResolution(id as "720p" | "1080p");
-                  setEngineParams((p) => ({ ...p, resolution: id }));
+              <div className="mb-1 flex items-center justify-between text-[12px] text-white/55">
+                <span>时长</span>
+                <span className="tabular-nums text-white/75">
+                  {effectiveDurationSec}s
+                </span>
+              </div>
+              <input
+                type="range"
+                min={4}
+                max={15}
+                step={1}
+                value={effectiveDurationSec}
+                className="nodrag h-1.5 w-full cursor-pointer accent-[var(--canvas-accent,#a78bfa)]"
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  setDurationSec(next);
+                  setEngineParams((p) => ({ ...p, duration: next }));
                 }}
               />
             </div>
           ) : null}
 
-          <EnginePicker
-            role="VIDEO"
-            embedded
-            providerIds={[GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID]}
-            providerId={providerId}
-            modelKey={modelKey}
-            params={engineParams}
-            onChange={(next) => {
-              setProviderId(next.providerId);
-              setModelKey(next.modelKey);
-              setEngineParams(next.params);
-              const d = Number(next.params.duration);
-              if (
-                !smartMulti &&
-                Number.isFinite(d) &&
-                d >= 4 &&
-                d <= 15
-              ) {
-                setDurationSec(d);
-              }
-              const res = next.params.resolution;
-              if (res === "720p" || res === "1080p") {
-                setResolution(res);
-              }
-            }}
-          />
+          <div className="flex flex-wrap items-start gap-x-5 gap-y-2">
+            <BooleanSegment
+              label="生成音频"
+              value={generateAudio}
+              onChange={setGenerateAudio}
+            />
+            <BooleanSegment
+              label="水印"
+              value={watermark}
+              onChange={setWatermark}
+            />
+          </div>
         </div>
 
-        <footer className="flex items-center justify-end gap-2 border-t border-white/5 bg-black/20 px-5 py-3">
+        <footer className="flex items-center justify-end gap-2 border-t border-white/5 bg-black/20 px-4 py-2.5">
           <button
             type="button"
             onClick={onClose}
@@ -252,23 +292,102 @@ export function Sbv1VideoGenerateSettingsModal({
   );
 }
 
+function LabeledSegment({
+  label,
+  options,
+  value,
+  onChange,
+  compact = false,
+}: {
+  label: string;
+  options: { id: string; label: string }[];
+  value: string;
+  onChange: (id: string) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={cn("min-w-0", compact ? "w-full" : "shrink-0")}>
+      <p className="mb-1 text-[12px] text-white/55">{label}</p>
+      <SegmentRow options={options} value={value} onChange={onChange} compact={compact} />
+    </div>
+  );
+}
+
+function BooleanSegment({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <div className="shrink-0">
+      <p className="mb-1 text-[12px] text-white/55">{label}</p>
+      <div className="flex gap-1.5">
+        <SegmentButton
+          active={value}
+          onClick={() => onChange(true)}
+          label="开启"
+        />
+        <SegmentButton
+          active={!value}
+          onClick={() => onChange(false)}
+          label="关闭"
+        />
+      </div>
+    </div>
+  );
+}
+
+function SegmentButton({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "min-w-[3rem] rounded-md border px-2.5 py-1 text-[12px] font-medium transition",
+        active
+          ? "border-white bg-white/[.06] text-white"
+          : "border-white/15 text-white/55 hover:border-white/30 hover:text-white/80",
+      )}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
 function SegmentRow({
   options,
   value,
   onChange,
+  compact = false,
 }: {
   options: { id: string; label: string }[];
   value: string;
   onChange: (id: string) => void;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className={cn("flex flex-wrap gap-1.5", compact && "max-w-full")}>
       {options.map((opt) => (
         <button
           key={opt.id}
           type="button"
           className={cn(
-            "min-w-[4.5rem] rounded-lg border px-4 py-2 text-[13px] font-medium transition",
+            "rounded-md border font-medium transition",
+            compact
+              ? "min-w-[2.75rem] px-2 py-1 text-[11px]"
+              : "min-w-[2.25rem] px-2.5 py-1 text-[12px]",
             opt.id === value
               ? "border-white bg-white/[.06] text-white"
               : "border-white/15 text-white/55 hover:border-white/30 hover:text-white/80",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  findAllMentionRangesInDisplay,
   findMentionAtDisplayIndex,
   findMentionRangeAtDisplayIndex,
 } from "@/lib/canvas/mention-at-display-index";
@@ -28,5 +29,13 @@ describe("findMentionAtDisplayIndex", () => {
   it("returns null outside mention", () => {
     const display = "@图片 1 游";
     expect(findMentionAtDisplayIndex(display, 6, mentionables)).toBeNull();
+  });
+});
+
+describe("findAllMentionRangesInDisplay", () => {
+  it("lists all mentions left to right", () => {
+    const display = "@图片 1 和 @图片 10";
+    const hits = findAllMentionRangesInDisplay(display, mentionables);
+    expect(hits.map((h) => h.item.id)).toEqual(["a", "b"]);
   });
 });

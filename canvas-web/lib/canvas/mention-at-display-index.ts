@@ -43,3 +43,38 @@ export function findMentionRangeAtDisplayIndex(
   }
   return null;
 }
+
+/** 展示文案中全部完整 @mention 区间（从左到右扫描） */
+export function findAllMentionRangesInDisplay(
+  display: string,
+  mentionables: MentionableItem[],
+): { item: MentionableItem; start: number; end: number }[] {
+  if (!display || mentionables.length === 0) return [];
+
+  const sorted = [...mentionables].sort(
+    (a, b) => b.label.length - a.label.length,
+  );
+  const out: { item: MentionableItem; start: number; end: number }[] = [];
+  let i = 0;
+
+  while (i < display.length) {
+    if (display[i] !== "@") {
+      i += 1;
+      continue;
+    }
+    const afterAt = display.slice(i + 1);
+    let matched = false;
+    for (const m of sorted) {
+      if (!m.label || !afterAt.startsWith(m.label)) continue;
+      const end = i + 1 + m.label.length;
+      if (end < display.length && !/\s/.test(display[end]!)) continue;
+      out.push({ item: m, start: i, end });
+      i = end;
+      matched = true;
+      break;
+    }
+    if (!matched) i += 1;
+  }
+
+  return out;
+}

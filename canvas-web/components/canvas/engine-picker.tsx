@@ -42,6 +42,8 @@ export type EnginePickerProps = {
     provider: CanvasProviderDto | null;
   }) => void;
   /** 内联展示模型卡片与参数区（不渲染触发按钮 / 独立弹层） */
+  /** 嵌入设置弹层时只展示模型列表，参数由外层表单统一编排 */
+  modelsOnly?: boolean;
   embedded?: boolean;
   /** 仅展示这些 Provider（如 gateway:volcengine） */
   providerIds?: string[];
@@ -65,6 +67,7 @@ export function EnginePicker({
   params = {},
   onChange,
   embedded = false,
+  modelsOnly = false,
   providerIds,
 }: EnginePickerProps) {
   const { providers, loading } = useUserProviders();
@@ -132,6 +135,7 @@ export function EnginePicker({
         modelKey={modelKey}
         params={params}
         capabilityMismatch={capabilityMismatch}
+        modelsOnly={modelsOnly}
         onChange={onChange}
       />
     );
@@ -196,6 +200,7 @@ function EnginePickerInlinePanel({
   modelKey,
   params,
   capabilityMismatch,
+  modelsOnly = false,
   onChange,
 }: {
   role: "LLM" | "IMAGE" | "VIDEO";
@@ -205,6 +210,7 @@ function EnginePickerInlinePanel({
   modelKey: string;
   params: Record<string, unknown>;
   capabilityMismatch: string | null;
+  modelsOnly?: boolean;
   onChange: EnginePickerProps["onChange"];
 }) {
   const [draft, setDraft] = useState<DraftSelection | null>(() =>
@@ -266,7 +272,7 @@ function EnginePickerInlinePanel({
               }}
             />
           ))}
-          {draft && hasParams ? (
+          {draft && hasParams && !modelsOnly ? (
             <DynamicParamForm
               variant="panel"
               schema={draft.model.paramsSchema}

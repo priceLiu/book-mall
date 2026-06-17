@@ -8,7 +8,6 @@ import {
   Plus,
   Upload,
   Video,
-  X,
 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -175,11 +174,7 @@ export function Pro2CanvasToolbar({
       {
         id: "add-nodes",
         name: menuOpen ? "关闭菜单" : "更多节点",
-        icon: menuOpen ? (
-          <X strokeWidth={1.75} />
-        ) : (
-          <Plus strokeWidth={1.75} />
-        ),
+        icon: <Plus strokeWidth={1.75} />,
         color: "bg-gradient-to-br from-cyan-400 to-teal-600",
         onClick: onToggleMenu,
       },

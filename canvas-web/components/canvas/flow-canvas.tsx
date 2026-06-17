@@ -87,6 +87,13 @@ import {
   type CanvasPaneContextMenuItem,
 } from "./canvas-pane-context-menu";
 import { CanvasSnapGuidesOverlay } from "./canvas-snap-guides-overlay";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { PRO2_TOOLBAR_ADD_MENU } from "@/lib/canvas/pro2-add-node-menu";
+import {
+  handlePro2ToolbarAddNodePick,
+  type Pro2AddNodePickStore,
+} from "@/lib/canvas/pro2-add-node-pick";
+import { Pro2AddNodePopover } from "./pro2/pro2-add-node-popover";
 
 const edgeTypes = {
   default: DeletableEdge,
@@ -171,10 +178,16 @@ function FlowCanvasInner({
 
   const enablePaneContextMenu = pro2FloatingInspector || sbv1Canvas;
   const enableDragSnapGuides = pro2FloatingInspector || sbv1Canvas;
+  const { alert } = useDialogs();
   const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(
     null,
   );
+  const [paneAddMenu, setPaneAddMenu] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const paneAddAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const closePaneMenu = useCallback(() => setPaneMenu(null), []);
+  const closePaneAddMenu = useCallback(() => setPaneAddMenu(null), []);
 
   const onPaneContextMenu = useCallback(
     (e: React.MouseEvent | MouseEvent) => {
@@ -204,6 +217,36 @@ function FlowCanvasInner({
       wrap.removeEventListener("contextmenu", onNativeContextMenu, true);
   }, [enablePaneContextMenu, onPaneContextMenu]);
 
+  const openPaneAddMenuAt = useCallback(
+    (clientX: number, clientY: number) => {
+      closePaneMenu();
+      ignoreNextPaneClickRef.current = true;
+      const anchor = { x: clientX, y: clientY };
+      paneAddAnchorRef.current = anchor;
+      setPaneAddMenu(anchor);
+    },
+    [closePaneMenu],
+  );
+
+  /** RF 无 onPaneDoubleClick；空白 pane 双击弹出添加节点菜单（同底部 Dock +） */
+  useEffect(() => {
+    if (!enablePaneContextMenu) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const onNativeDoubleClick = (e: MouseEvent) => {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest(".react-flow__pane")) return;
+      if (target.closest(".react-flow__node")) return;
+      if (target.closest(".react-flow__edge")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openPaneAddMenuAt(e.clientX, e.clientY);
+    };
+    wrap.addEventListener("dblclick", onNativeDoubleClick, true);
+    return () => wrap.removeEventListener("dblclick", onNativeDoubleClick, true);
+  }, [enablePaneContextMenu, openPaneAddMenuAt]);
+
   const paneMenuItems = useMemo<CanvasPaneContextMenuItem[]>(() => {
     const reflowAction = pro2FloatingInspector
       ? () => useCanvasStore.getState().reflowPro2Canvas()
@@ -226,6 +269,27 @@ function FlowCanvasInner({
       },
     ];
   }, [pro2FloatingInspector, sbv1Canvas]);
+
+  const onPaneAddPick = useCallback(
+    async (itemId: string, nodeType?: string) => {
+      const spawnAtScreen = paneAddAnchorRef.current ?? undefined;
+      closePaneAddMenu();
+      await handlePro2ToolbarAddNodePick(
+        itemId,
+        nodeType,
+        {
+          addNode: addNode as Pro2AddNodePickStore["addNode"],
+          setNodes,
+        },
+        { alert },
+        {
+          edition: sbv1Canvas ? "sbv1" : "pro2",
+          spawnAtScreen,
+        },
+      );
+    },
+    [addNode, setNodes, alert, sbv1Canvas, closePaneAddMenu],
+  );
 
   useEffect(() => {
     initialFitDoneRef.current = false;
@@ -975,11 +1039,12 @@ function FlowCanvasInner({
           pro2FloatingInspector || sbv1Canvas
             ? () => {
                 closePaneMenu();
-                if (!pro2FloatingInspector) return;
                 if (ignoreNextPaneClickRef.current) {
                   ignoreNextPaneClickRef.current = false;
                   return;
                 }
+                closePaneAddMenu();
+                if (!pro2FloatingInspector) return;
                 useCanvasStore.getState().setPro2FrameDockFocus(null);
                 setNodes((prev) =>
                   prev.map((n) => (n.selected ? { ...n, selected: false } : n)),
@@ -992,7 +1057,7 @@ function FlowCanvasInner({
         }
         onlyRenderVisibleElements={onlyRenderVisible}
         selectNodesOnDrag
-        zoomOnDoubleClick={pro2FloatingInspector ? false : undefined}
+        zoomOnDoubleClick={enablePaneContextMenu ? false : undefined}
         onNodeClick={
           pro2FloatingInspector
             ? (_e, node) => {
@@ -1096,6 +1161,13 @@ function FlowCanvasInner({
         position={paneMenu ?? { x: 0, y: 0 }}
         items={paneMenuItems}
         onClose={closePaneMenu}
+      />
+      <Pro2AddNodePopover
+        open={Boolean(paneAddMenu)}
+        anchor={paneAddMenu ?? { x: 0, y: 0 }}
+        sections={PRO2_TOOLBAR_ADD_MENU}
+        onClose={closePaneAddMenu}
+        onPick={onPaneAddPick}
       />
     </div>
   );
