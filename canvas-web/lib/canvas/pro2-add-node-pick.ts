@@ -31,7 +31,9 @@ export type Pro2AddNodePickStore = {
       | "story-pro2-image"
       | "story-pro2-script-hub"
       | "story-pro2-style-asset"
-      | "story-pro2-three-view",
+      | "story-pro2-three-view"
+      | "sbv1-image"
+      | "sbv1-video-engine",
     position: { x: number; y: number },
     data: Record<string, unknown>,
   ) => string;
