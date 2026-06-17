@@ -2,6 +2,8 @@
 
 export const PRODUCTION_MAIN_SITE_ORIGIN = "https://book.ai-code8.com";
 export const PRODUCTION_TOOL_SITE_ORIGIN = "https://tool.ai-code8.com";
+/** 品牌门户首页（顶栏 Logo 跳转）。 */
+export const PRODUCTION_BRAND_PORTAL_ORIGIN = "https://www.ai-code8.com";
 
 function isTencentCloudRunDefaultHost(host: string): boolean {
   return host.toLowerCase().endsWith(".sh.run.tcloudbase.com");

@@ -20,6 +20,7 @@ import { NotchNav, type NotchNavItem } from "../ui/notch-nav";
 import { ToggleTheme } from "./toogle-theme";
 import { siteHeaderWidthClass } from "@/lib/site-layout";
 import { cn } from "@/lib/utils";
+import { PRODUCTION_BRAND_PORTAL_ORIGIN } from "@/lib/production-origin";
 
 /** 与 NotchNav 中「产品」项 value 一致，用于凹槽高亮与路由判断 */
 const NAV_PRODUCT_VALUE = "__nav_products__";
@@ -38,10 +39,10 @@ const routeList: RouteProps[] = [
 function BrandLogoLink({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <Link
-      href="/"
+      href={PRODUCTION_BRAND_PORTAL_ORIGIN}
       className="flex shrink-0 items-center"
       onClick={onNavigate}
-      aria-label="智选AI 首页"
+      aria-label="智选 AI — ai-code8.com"
     >
       <Image
         src="/logo2.png"
