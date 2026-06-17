@@ -6,6 +6,7 @@ export type StoryModelCapability =
   | "image_t2i"
   | "image_multi_ref"
   | "video_i2v"
+  | "video_v2v"
   | "video_r2v"
   | "video_t2v"
   | "video_multi_ref";

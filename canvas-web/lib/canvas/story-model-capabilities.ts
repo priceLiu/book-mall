@@ -6,6 +6,7 @@ export type StoryModelCapability =
   | "image_t2i"
   | "image_multi_ref"
   | "video_i2v"
+  | "video_v2v"
   | "video_r2v"
   | "video_t2v"
   | "video_multi_ref";
@@ -130,6 +131,7 @@ export function storyCapabilityHint(
     image_t2i: "文生图",
     image_multi_ref: "多参考图",
     video_i2v: "图生视频",
+    video_v2v: "视频生视频",
     video_r2v: "参考生视频",
     video_t2v: "文生视频",
     video_multi_ref: "多参考图 API",
