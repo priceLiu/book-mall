@@ -32,6 +32,9 @@ const KIE_JOB_PREFIXES = [
   "flux",
   "kling",
   "veo",
+  "grok-imagine",
+  "topaz/",
+  "motion-control",
 ];
 
 const BAILIAN_R2V = new Set([
@@ -152,6 +155,25 @@ export function routeGatewayModel(model: string): RoutedModel {
     m === "qwen-text-to-image"
   ) {
     return { providerKind: "KIE", requestKind: "IMAGE" };
+  }
+
+  if (m.startsWith("grok-imagine/") && m.includes("text-to-image")) {
+    return { providerKind: "KIE", requestKind: "IMAGE" };
+  }
+
+  if (
+    m.startsWith("grok-imagine/") ||
+    m.startsWith("grok-imagine-video")
+  ) {
+    return { providerKind: "KIE", requestKind: "VIDEO" };
+  }
+
+  if (
+    m === "wan/2-6-video-to-video" ||
+    m.includes("motion-control") ||
+    m.startsWith("topaz/")
+  ) {
+    return { providerKind: "KIE", requestKind: "VIDEO" };
   }
 
   if (m.startsWith("happyhorse/")) {

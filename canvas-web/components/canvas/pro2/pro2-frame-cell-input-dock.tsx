@@ -25,6 +25,8 @@ export function Pro2FrameCellInputDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
+  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+
   const selectedFrame = useMemo(() => {
     const picked = rfNodes.filter(
       (n) => n.selected && n.type === "story-pro2-frame",
@@ -87,6 +89,7 @@ export function Pro2FrameCellInputDock() {
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-frame-cell-dock"
+      hidden={canvasGeometryDragging}
       footer={
         <Pro2DockToolbar>
           <div className="min-w-0 flex-1" />

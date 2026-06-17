@@ -42,11 +42,20 @@ function imageUrlFromNode(node: CanvasFlowNode): string | undefined {
   if (
     node.type === "image-engine" ||
     node.type === "three-view-engine" ||
-    node.type === "video-engine"
+    node.type === "video-engine" ||
+    node.type === "sbv1-video-engine"
   ) {
-    const d = node.data as unknown as ImageEngineNodeData;
+    const d = node.data as unknown as ImageEngineNodeData & {
+      ossUrl?: string;
+      blobUrl?: string;
+      videoUrl?: string;
+    };
     return (
-      pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ?? d.runtime?.ossUrl
+      pickRuntimeImagePreviewUrl(d.runtime, d.modelKey) ??
+      d.runtime?.ossUrl ??
+      d.ossUrl ??
+      d.blobUrl ??
+      d.videoUrl
     );
   }
   return undefined;
@@ -59,6 +68,16 @@ function linkFromSource(
   if (source.type === "story-pro2-starter") {
     const d = source.data as unknown as StoryProStarterNodeData;
     const outline = d.generatedOutlineMd?.trim();
+    const uploaded = d.uploadedScriptMd?.trim();
+    if (uploaded) {
+      return {
+        id: `up-script-${source.id}`,
+        kind: "outline",
+        label: d.uploadedScriptMeta?.fileName?.trim() || "已上传剧本",
+        previewMd: uploaded.slice(0, 800),
+        sourceNodeId: source.id,
+      };
+    }
     if (outline) {
       return {
         id: `up-outline-${source.id}`,

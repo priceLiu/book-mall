@@ -7,6 +7,10 @@ import {
   type StoryVideoModelId,
   type StoryVideoOptions,
 } from "@/lib/story/story-ai-constants";
+import {
+  buildKieGrokImageToVideoCreateArgs,
+  buildKieGrokVideo15PreviewCreateArgs,
+} from "@/lib/canvas/kie-grok-builders";
 
 export function buildCanvasVideoKieInput(args: {
   modelKey: string;
@@ -75,6 +79,28 @@ export function buildCanvasVideoKieInput(args: {
         duration: dur,
       },
     };
+  }
+
+  if (modelId === "grok-imagine/image-to-video") {
+    return buildKieGrokImageToVideoCreateArgs({
+      prompt: args.prompt,
+      imageUrls: mainUrl ? [mainUrl, ...extraRefs] : extraRefs,
+      mode:
+        typeof args.options?.mode === "string" ? args.options.mode : undefined,
+      duration: args.options?.duration ?? desc.defaults.duration,
+      resolution: args.options?.resolution ?? desc.defaults.resolution,
+      aspectRatio: aspect,
+    });
+  }
+
+  if (modelId === "grok-imagine-video-1-5-preview") {
+    return buildKieGrokVideo15PreviewCreateArgs({
+      prompt: args.prompt,
+      imageUrls: mainUrl ? [mainUrl] : [],
+      duration: args.options?.duration ?? desc.defaults.duration,
+      resolution: args.options?.resolution ?? desc.defaults.resolution,
+      aspectRatio: aspect,
+    });
   }
 
   return {

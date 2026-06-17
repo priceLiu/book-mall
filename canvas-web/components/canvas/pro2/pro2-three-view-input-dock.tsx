@@ -44,6 +44,8 @@ export function Pro2ThreeViewInputDock() {
     (s) => s.setPro2StyleLibImageNodeId,
   );
 
+  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+
   const selected = useMemo(() => {
     const picked = rfNodes.filter(
       (n) => n.selected && n.type === "story-pro2-three-view",
@@ -186,6 +188,7 @@ export function Pro2ThreeViewInputDock() {
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-three-view-dock"
+      hidden={canvasGeometryDragging}
       header={
         <Pro2DockContextBar>
           <Pro2DockStyleButton

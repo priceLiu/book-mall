@@ -866,6 +866,7 @@ export function ImageToVideoLabClient({
         taskId?: string;
         holdId?: string | null;
         gatewayLogId?: string;
+        provider?: string;
         error?: string;
       }>(startR);
       if (!startParsed.ok) throw new Error(startParsed.message);
@@ -887,6 +888,10 @@ export function ImageToVideoLabClient({
         typeof startJson.gatewayLogId === "string" && startJson.gatewayLogId.trim().length > 0
           ? startJson.gatewayLogId.trim()
           : null;
+      const taskProvider =
+        typeof startJson.provider === "string" && startJson.provider.trim().length > 0
+          ? startJson.provider.trim().toLowerCase()
+          : null;
 
       for (let i = 0; i < MAX_POLLS; i++) {
         if (i > 0) {
@@ -894,6 +899,7 @@ export function ImageToVideoLabClient({
         }
         const pollQs = new URLSearchParams({ id: taskId });
         if (gatewayLogId) pollQs.set("gatewayLogId", gatewayLogId);
+        if (taskProvider) pollQs.set("provider", taskProvider);
         const tr = await fetch(
           `/api/image-to-video/task?${pollQs}`,
           { cache: "no-store", credentials: "same-origin" },
@@ -929,6 +935,7 @@ export function ImageToVideoLabClient({
               taskId,
               ...(holdId ? { holdId } : {}),
               ...(gatewayLogId ? { gatewayLogId } : {}),
+              ...(taskProvider ? { provider: taskProvider } : {}),
               billingHint: {
                 apiModel: snapApiModel,
                 durationSec: snapDur,

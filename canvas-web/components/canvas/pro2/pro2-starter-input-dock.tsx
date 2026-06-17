@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -17,6 +17,7 @@ import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { STORY_PRO2_THEME_OUTLINE_SYSTEM } from "@/lib/canvas/story-pro2-theme-outline-prompt";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
+import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { EnginePicker } from "../engine-picker";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
@@ -42,6 +43,8 @@ export function Pro2StarterInputDock() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
+  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+
   const selectedStarter = useMemo(() => {
     const picked = rfNodes.filter(
       (n) => n.selected && n.type === "story-pro2-starter",
@@ -60,6 +63,27 @@ export function Pro2StarterInputDock() {
   const isGenerating =
     d.themeOutlineRuntime?.status === "pending" ||
     d.themeOutlineRuntime?.status === "running";
+  const outlineErrorMessage =
+    d.themeOutlineRuntime?.status === "error"
+      ? formatCanvasTaskError(
+          d.themeOutlineRuntime.failCode,
+          d.themeOutlineRuntime.failMessage,
+          d.modelKey,
+        )
+      : null;
+  const lastAlertedErrorRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!outlineErrorMessage || !storeNode) return;
+    const key = `${storeNode.id}:${d.themeOutlineRuntime?.taskId ?? ""}:${outlineErrorMessage}`;
+    if (lastAlertedErrorRef.current === key) return;
+    lastAlertedErrorRef.current = key;
+    void alert({
+      title: "大纲生成失败",
+      message: outlineErrorMessage,
+      variant: "error",
+    });
+  }, [outlineErrorMessage, storeNode, d.themeOutlineRuntime?.taskId, alert]);
 
   const upstreamLinks = useMemo(() => {
     if (!storeNode) return [];
@@ -126,7 +150,11 @@ export function Pro2StarterInputDock() {
       });
       return;
     }
-    if (!d.providerId?.trim() || !d.modelKey?.trim()) {
+    const live = useCanvasStore
+      .getState()
+      .nodes.find((n) => n.id === storeNode.id);
+    const liveData = (live?.data ?? {}) as StoryProStarterNodeData;
+    if (!liveData.providerId?.trim() || !liveData.modelKey?.trim()) {
       await alert({
         title: "请选择模型",
         message: "点击左下角模型选择器，选择 LLM 后再发送。",
@@ -158,7 +186,7 @@ export function Pro2StarterInputDock() {
       mediaKind: "themeOutline",
       forceFresh: true,
     });
-  }, [storeNode, themeInput, d.providerId, d.modelKey, base, alert, updateNodeData]);
+  }, [storeNode, themeInput, base, alert, updateNodeData]);
 
   if (!storeNode || !placement) return null;
 
@@ -166,6 +194,7 @@ export function Pro2StarterInputDock() {
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-starter-dock"
+      hidden={canvasGeometryDragging}
       header={
         <Pro2DockContextBar>
           <Pro2DockUpstreamChips

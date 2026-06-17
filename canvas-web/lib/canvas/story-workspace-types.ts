@@ -2,7 +2,7 @@ import type { CanvasEnginePick, CanvasNodeRuntime } from "./types";
 import type { StoryTextRevision } from "./story-revision";
 import type { StoryRefImage } from "./story-ref-image";
 
-export type StoryLlmSection = "outline" | "character" | "storyboard";
+export type StoryLlmSection = "outline" | "character" | "scene" | "storyboard";
 
 export type StoryRunContext = {
   llmSection?: StoryLlmSection;
@@ -76,9 +76,12 @@ export type StoryVideoRow = {
 export type StoryScriptHubNodeData = {
   outlineMd: string;
   characterMd: string;
+  /** 2.0 · 场景视觉提示词（由大纲场景辞典 LLM 扩写） */
+  sceneMd?: string;
   storyboardMd: string;
   outlineRuntime?: CanvasNodeRuntime;
   characterRuntime?: CanvasNodeRuntime;
+  sceneRuntime?: CanvasNodeRuntime;
   storyboardRuntime?: CanvasNodeRuntime;
   providerId: string;
   modelKey: string;
@@ -87,9 +90,11 @@ export type StoryScriptHubNodeData = {
   outlineSystemPrompt?: string;
   promptOutline: string;
   promptCharacter: string;
+  promptScene?: string;
   promptStoryboard: string;
   outlineHistory?: StoryTextRevision[];
   characterHistory?: StoryTextRevision[];
+  sceneHistory?: StoryTextRevision[];
   storyboardHistory?: StoryTextRevision[];
   referencedNodeIds?: string[];
   /** 已定稿并生成工作流后锁定 hub 文案；删除本套媒体列后自动解除 */

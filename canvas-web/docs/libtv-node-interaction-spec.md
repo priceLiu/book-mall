@@ -5,7 +5,8 @@
 > **壳层 token**：`lib/canvas/libtv-node-chrome.ts`  
 > **拖动登记**：`normalize-graph-nodes.ts` → `PRO2_LIBTV_DRAG_ANYWHERE_TYPES`（源自 `LIBTV_DRAG_ANYWHERE_NODE_TYPES`）  
 > 分镜 1.0 细则见 [`storyboard-video-1.0-node-interaction-spec.md`](./storyboard-video-1.0-node-interaction-spec.md)  
-> 影视 2.0 色彩/薄卡见 [`story-pro2-design-spec.md`](./story-pro2-design-spec.md)
+> 影视 2.0 色彩/薄卡见 [`story-pro2-design-spec.md`](./story-pro2-design-spec.md)  
+> **薄卡三态（初始 / 连线 / 生成后）**：[`libtv-node-state-spec.md`](./libtv-node-state-spec.md)
 
 ## 1. 共用组件（禁止第二套实现）
 
@@ -70,6 +71,10 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 | 浮动 Dock | 选中唯一节点 → 节点下方 `Pro2InputDockShell` / 视频 `Sbv1VideoEngineFloatingDock` |
 | 空态整卡可拖 | Stage 使用 `Pro2MediaNodeEmptyState` + **`passNodeDrag`** |
 | 三视图 | 同图片节点；`Pro2ThreeViewInputDock` |
+| **拖动时隐藏** | 节点拖动/缩放期间（`canvasGeometryDragging=true`），浮动 Dock 须 `hidden`；松手后自动恢复显示 |
+
+**实现**：`Pro2InputDockShell` 传 `hidden={canvasGeometryDragging}`；sbv1 组件（`Sbv1VideoEngineFloatingDock`、`Sbv1ImageInputDock`）已内置。
+Pro2 所有浮动 Dock（`Pro2StarterInputDock` · `Pro2ScriptInputDock` · `Pro2ImageInputDock` · `Pro2ThreeViewInputDock` · `Pro2FrameCellInputDock`）须同样传入。
 
 ## 5. 节点顶栏工具条（`Pro2ImageNodeToolbar`）
 

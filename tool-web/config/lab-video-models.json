@@ -6,6 +6,23 @@
   },
   "imageToVideo": [
     {
+      "id": "grok-imagine-i2v",
+      "apiModel": "grok-imagine/image-to-video",
+      "title": "Grok Imagine · 图生视频",
+      "description": "xAI Grok Imagine · 单图驱动视频（KIE Gateway · 平台代付）。",
+      "icon": "𝕏",
+      "provider": "kie",
+      "defaultParameters": { "mode": "normal" }
+    },
+    {
+      "id": "grok-imagine-video-15",
+      "apiModel": "grok-imagine-video-1-5-preview",
+      "title": "Grok Imagine Video 1.5",
+      "description": "xAI Grok Imagine Video 1.5 · 图生视频 · 原生音频（KIE Gateway）。",
+      "icon": "𝕏",
+      "provider": "kie"
+    },
+    {
       "id": "happyhorse-1-0-i2v",
       "apiModel": "happyhorse-1.0-i2v",
       "title": "HappyHorse-1.0-I2V",

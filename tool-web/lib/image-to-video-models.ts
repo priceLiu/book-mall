@@ -10,6 +10,8 @@ export type ImageToVideoModelOption = {
   title: string;
   description: string;
   icon: string;
+  /** 非 DashScope 时经 Gateway KIE 等 */
+  provider?: string;
   defaultParameters?: Record<string, unknown>;
 };
 
@@ -102,6 +104,9 @@ function parseModelList(
         );
       }
       entry.defaultParameters = o.defaultParameters as Record<string, unknown>;
+    }
+    if (typeof o.provider === "string" && o.provider.trim()) {
+      entry.provider = o.provider.trim();
     }
     out.push(entry);
   }

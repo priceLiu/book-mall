@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireToolSuiteNavAccess } from "@/lib/require-tools-api-access";
 import { serviceFeeSettleJson, TOOL_SERVICE_FEE_MODE } from "@/lib/tool-service-fee-mode";
 import { pollDashscopeJobFromServer } from "@/lib/forward-gateway-dashscope-server";
+import { pollKieJobFromServer } from "@/lib/forward-gateway-kie-server";
 import type { I2vTaskOutput } from "@/lib/image-to-video-dashscope";
 import { formatDashScopeI2vFailureForUser } from "@/lib/image-to-video-task-errors";
 
@@ -34,8 +35,13 @@ export async function POST(req: Request) {
     typeof body.gatewayLogId === "string" && body.gatewayLogId.trim().length > 0
       ? body.gatewayLogId.trim()
       : undefined;
+  const provider =
+    typeof body.provider === "string" ? body.provider.trim().toLowerCase() : "";
 
-  const polled = await pollDashscopeJobFromServer({ taskId, gatewayLogId });
+  const polled =
+    provider === "kie"
+      ? await pollKieJobFromServer({ taskId, gatewayLogId })
+      : await pollDashscopeJobFromServer({ taskId, gatewayLogId });
   if (!polled.ok) {
     return NextResponse.json({ error: polled.error }, { status: polled.status ?? 502 });
   }

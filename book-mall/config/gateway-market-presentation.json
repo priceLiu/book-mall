@@ -1,0 +1,96 @@
+{
+  "featuredCanonicalKeys": [
+    "grok-imagine/text-to-image",
+    "grok-imagine/image-to-video",
+    "grok-imagine-video-1-5-preview",
+    "gpt-image-2",
+    "lib-nano-pro",
+    "gpt-image-1"
+  ],
+  "defaults": {
+    "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",
+    "heroUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4"
+  },
+  "models": {
+    "grok-imagine/text-to-image": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",
+      "providerLabel": "Grok",
+      "taskTags": ["Text to Image"],
+      "readme": "xAI Grok Imagine 文生图 · KIE `grok-imagine/text-to-image`。"
+    },
+    "grok-imagine/image-to-video": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "heroUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "Grok",
+      "taskTags": ["Image to Video"],
+      "readme": "Grok Imagine 图生视频 · 支持 normal/fun/spicy mode。"
+    },
+    "grok-imagine-video-1-5-preview": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "heroUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "Grok",
+      "taskTags": ["Image to Video"],
+      "readme": "Grok Imagine Video 1.5 · 原生音频 · 1–15 秒。"
+    },
+    "gpt-image-2": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",
+      "providerLabel": "OpenAI",
+      "taskTags": ["Text to Image", "Image to Image"],
+      "readme": "GPT Image 2 · 文生图 / 图生图（input_urls）。"
+    },
+    "gpt-image-1": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",
+      "providerLabel": "OpenAI",
+      "taskTags": ["Text to Image", "Image to Image"],
+      "readme": "GPT Image 1.5 · KIE 上游 `gpt-image/1.5-text-to-image` / `gpt-image/1.5-image-to-image`。"
+    },
+    "lib-nano-pro": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1767694885407_pObJoMcy.png",
+      "providerLabel": "Google",
+      "taskTags": ["Text to Image", "Image to Image"],
+      "readme": "Nano Banana Pro（KIE nano-banana-pro）· 多图参考 · 默认 2K 清晰度。"
+    },
+    "wan/2-6-video-to-video": {
+      "providerLabel": "Wan",
+      "taskTags": ["Video to Video"],
+      "readme": "万相 2.6 视频生视频 · 保留结构、按 prompt 改造。"
+    },
+    "kling-2.6/motion-control": {
+      "providerLabel": "Kling",
+      "taskTags": ["Motion Control"],
+      "readme": "可灵 2.6 动作控制 · 参考图 + 动作视频。"
+    },
+    "kling-3.0/motion-control": {
+      "providerLabel": "Kling",
+      "taskTags": ["Motion Control"],
+      "readme": "可灵 3.0 动作控制 · 更高画质 pro 模式。"
+    },
+    "topaz/video-upscale": {
+      "providerLabel": "Topaz",
+      "taskTags": ["Video Upscale"],
+      "readme": "Topaz 视频超分 · upscale_factor 1/2/4。"
+    },
+    "seedance-2.0": {
+      "coverUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "heroUrl": "https://static.aiquickdraw.com/tools/example/1765957777782_cNJpvhRx.mp4",
+      "providerLabel": "ByteDance",
+      "taskTags": ["Image to Video", "Text to Video"],
+      "readme": "Seedance 2.0 · 多参考图生视频，经 Gateway KIE 路由。"
+    },
+    "wan2.7-image": {
+      "providerLabel": "Alibaba",
+      "taskTags": ["Text to Image"],
+      "readme": "万相 2.7 文生图 · DashScope。"
+    },
+    "qwen-turbo": {
+      "providerLabel": "Alibaba",
+      "taskTags": ["Chat"],
+      "readme": "通义 Qwen 快速对话。"
+    },
+    "deepseek-chat": {
+      "providerLabel": "DeepSeek",
+      "taskTags": ["Chat"],
+      "readme": "DeepSeek 快速对话。"
+    }
+  }
+}

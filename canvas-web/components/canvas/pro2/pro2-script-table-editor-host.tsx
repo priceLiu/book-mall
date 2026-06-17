@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
 import { extractThemeFromStorySystemPrompt } from "@/lib/canvas/story-prompts";
@@ -12,10 +12,21 @@ import {
 } from "@/lib/canvas/story-revision";
 import {
   pro2HubHasCharacterTable,
+  pro2HubHasOutlineContent,
+  pro2HubHasSceneTable,
   pro2HubHasScriptTable,
   resolvePro2HubCharacterMd,
+  resolvePro2HubSceneMd,
 } from "@/lib/canvas/pro2-script-hub-helpers";
+import { outlineDisplayMd } from "@/lib/canvas/story-hub-runtime";
 import { Pro2ScriptHubEditorModal } from "./pro2-script-table-modal";
+
+type CachedContent = {
+  storyboardMd: string;
+  characterMd: string;
+  sceneMd: string;
+  outlineMd: string;
+};
 
 /** 全局挂载 · 脚本节点全屏编辑（角色 / 分镜） */
 export function Pro2ScriptTableEditorHost() {
@@ -26,6 +37,9 @@ export function Pro2ScriptTableEditorHost() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+
+  const cachedContentRef = useRef<CachedContent | null>(null);
+  const lastEditorNodeIdRef = useRef<string | null>(null);
 
   const node = useMemo(
     () =>
@@ -40,8 +54,24 @@ export function Pro2ScriptTableEditorHost() {
   const d = (node?.data ?? {}) as StoryProScriptHubNodeData;
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);
+  const sceneMd = resolvePro2HubSceneMd(d);
+  const outlineMd = outlineDisplayMd(d.outlineMd ?? "");
   const hasContent =
-    pro2HubHasScriptTable(d) || pro2HubHasCharacterTable(d);
+    pro2HubHasScriptTable(d) ||
+    pro2HubHasCharacterTable(d) ||
+    pro2HubHasSceneTable(d) ||
+    pro2HubHasOutlineContent(d);
+
+  if (editorNodeId !== lastEditorNodeIdRef.current) {
+    lastEditorNodeIdRef.current = editorNodeId;
+    if (!editorNodeId) {
+      cachedContentRef.current = null;
+    }
+  }
+
+  if (hasContent) {
+    cachedContentRef.current = { storyboardMd, characterMd, sceneMd, outlineMd };
+  }
 
   const title = useMemo(() => {
     if (!node) return "脚本";
@@ -52,6 +82,36 @@ export function Pro2ScriptTableEditorHost() {
       ) || d.outlineMd?.split("\n")[0]?.replace(/^#+\s*/, "")?.slice(0, 32);
     return theme?.trim() ? `${theme.trim()} · 脚本` : "脚本 · 编辑";
   }, [node, nodes, edges, d.outlineMd]);
+
+  const persistOutline = useCallback(
+    (md: string) => {
+      if (!node) return;
+      const history = pushStoryRevision(
+        (d.outlineHistory as StoryTextRevision[] | undefined) ?? [],
+        md.trim(),
+      );
+      updateNodeData(node.id, {
+        outlineMd: md,
+        outlineHistory: history,
+      });
+    },
+    [node, d.outlineHistory, updateNodeData],
+  );
+
+  const persistScene = useCallback(
+    (md: string) => {
+      if (!node) return;
+      const history = pushStoryRevision(
+        (d.sceneHistory as StoryTextRevision[] | undefined) ?? [],
+        md.trim(),
+      );
+      updateNodeData(node.id, {
+        sceneMd: md,
+        sceneHistory: history,
+      });
+    },
+    [node, d.sceneHistory, updateNodeData],
+  );
 
   const persistStoryboard = useCallback(
     (md: string) => {
@@ -83,7 +143,13 @@ export function Pro2ScriptTableEditorHost() {
     [node, d.characterHistory, updateNodeData],
   );
 
-  if (!node || !hasContent) return null;
+  if (!editorNodeId) return null;
+
+  const displayContent = hasContent
+    ? { storyboardMd, characterMd, sceneMd, outlineMd }
+    : cachedContentRef.current;
+
+  if (!node || !displayContent) return null;
 
   return (
     <Pro2ScriptHubEditorModal
@@ -91,9 +157,13 @@ export function Pro2ScriptTableEditorHost() {
       title={title}
       tab={editorTab}
       onTabChange={setEditorTab}
-      characterMd={characterMd}
-      storyboardMd={storyboardMd}
+      outlineMd={displayContent.outlineMd}
+      sceneMd={displayContent.sceneMd}
+      characterMd={displayContent.characterMd}
+      storyboardMd={displayContent.storyboardMd}
       onClose={closeEditor}
+      onAutoSaveOutline={persistOutline}
+      onAutoSaveScene={persistScene}
       onAutoSaveCharacter={persistCharacter}
       onAutoSaveStoryboard={persistStoryboard}
     />

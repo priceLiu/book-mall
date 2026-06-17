@@ -132,6 +132,15 @@ export const CANVAS_BUILTIN_MODELS = [
     defaultParams: { aspect_ratio: "1:1", resolution: "2K" },
   },
   {
+    modelKey: "grok-imagine/text-to-image",
+    displayName: "Grok Imagine · 文生图",
+    vendor: "xai/grok",
+    role: "IMAGE" as const,
+    description: "xAI Grok Imagine · 文生图（KIE Gateway）。",
+    sortOrder: 8,
+    defaultParams: { aspect_ratio: "1:1" },
+  },
+  {
     modelKey: "gpt-image-1",
     displayName: "GPT Image 1.5",
     vendor: "openai",

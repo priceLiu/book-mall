@@ -29,9 +29,18 @@ export function resolveStoryHubSectionTextInputs(
     return out;
   }
 
+  if (section === "scene") {
+    const outline = outlineTextInputMd(d.outlineMd ?? "");
+    if (outline) {
+      out.push(`## 故事大纲（场景视觉辞典）\n\n${outline}`);
+    }
+    return out;
+  }
+
   if (section === "storyboard") {
     const outline = outlineTextInputMd(d.outlineMd ?? "");
     const character = (d.characterMd ?? "").trim();
+    const scene = (d.sceneMd ?? "").trim();
     const names = parseCharacterRows(character)
       .map((c) => c.name.trim())
       .filter(Boolean);
@@ -42,6 +51,9 @@ export function resolveStoryHubSectionTextInputs(
       out.push(
         `## 角色设定（分镜中的角色名须与下表「角色」列完全一致）\n\n${character}`,
       );
+    }
+    if (scene) {
+      out.push(`## 场景视觉提示词（分镜场景须与下表一致）\n\n${scene}`);
     }
     if (names.length) {
       out.push(

@@ -42,7 +42,9 @@ export function shouldSkipStoryRowTaskApply(
   const localSt = localRuntime?.status;
   if (localSt !== "pending" && localSt !== "running") return false;
   if (isServerInflightTaskStatus(pick.status)) return false;
-  if (localRuntime?.taskId && pick.id === localRuntime.taskId) return false;
+  // 本地尚未绑定 taskId（刚点发送）时，必须接受服务端终态，否则会卡在「生成中」
+  if (!localRuntime?.taskId) return false;
+  if (pick.id === localRuntime.taskId) return false;
   return pick.status === "SUCCEEDED" || pick.status === "FAILED";
 }
 
@@ -67,7 +69,11 @@ export function runtimePatchFromCanvasTask(
       status: "error",
       taskId: task.id,
       failCode: task.failCode ?? "FAILED",
-      failMessage: formatCanvasTaskError(task.failCode, task.failMessage),
+      failMessage: formatCanvasTaskError(
+          task.failCode,
+          task.failMessage,
+          task.model,
+        ),
     };
   }
   if (task.status === "SUBMITTED") {

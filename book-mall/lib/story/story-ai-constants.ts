@@ -29,6 +29,8 @@ export const STORY_VIDEO_MODEL_IDS = [
   "doubao-seedance-1.5-pro",
   "wan/2-7-image-to-video",
   "happyhorse/image-to-video",
+  "grok-imagine/image-to-video",
+  "grok-imagine-video-1-5-preview",
 ] as const;
 export type StoryVideoModelId = (typeof STORY_VIDEO_MODEL_IDS)[number];
 
@@ -42,6 +44,8 @@ export type StoryVideoOptions = {
   promptExtend?: boolean;
   /** 水印；仅 wan/2-7-text-to-video 支持 */
   watermark?: boolean;
+  /** Grok Imagine i2v · normal | fun | spicy */
+  mode?: string;
 };
 
 export type StoryVideoModelDescriptor = {
@@ -137,6 +141,26 @@ export const STORY_VIDEO_MODELS: Record<
     defaults: { resolution: "1080p", duration: 5 },
     durationRange: [3, 15] as const,
     supports: { generateAudio: false, promptExtend: false, watermark: false },
+  },
+  "grok-imagine/image-to-video": {
+    id: "grok-imagine/image-to-video",
+    label: "Grok Imagine · 图生视频",
+    description: "xAI Grok Imagine · 单图/多图驱动；mode normal/fun/spicy。",
+    requiresImage: true,
+    resolutions: ["480p", "720p"] as const,
+    defaults: { resolution: "720p", duration: 6 },
+    durationRange: [6, 30] as const,
+    supports: { generateAudio: false, promptExtend: false, watermark: false },
+  },
+  "grok-imagine-video-1-5-preview": {
+    id: "grok-imagine-video-1-5-preview",
+    label: "Grok Imagine Video 1.5",
+    description: "xAI Grok Imagine Video 1.5 · 图生视频 · 原生音频。",
+    requiresImage: true,
+    resolutions: ["480p", "720p"] as const,
+    defaults: { resolution: "720p", duration: 8 },
+    durationRange: [1, 15] as const,
+    supports: { generateAudio: true, promptExtend: false, watermark: false },
   },
 };
 

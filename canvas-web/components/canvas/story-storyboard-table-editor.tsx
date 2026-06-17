@@ -142,7 +142,7 @@ export function StoryStoryboardTableEditor({
               <tr key={`${row.frameIndex}-${index}`}>
                 <td className={TD}>
                   <input
-                    className={`${FIELD} px-2 py-2 text-center text-[15px]`}
+                    className={`${FIELD} px-2 py-2 text-center text-[15px] text-neutral-800`}
                     type="number"
                     min={1}
                     value={row.frameIndex}

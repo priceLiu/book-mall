@@ -60,6 +60,8 @@ export function Pro2ImageInputDock() {
     (s) => s.setPro2StyleLibImageNodeId,
   );
 
+  const canvasGeometryDragging = useCanvasStore((s) => s.canvasGeometryDragging);
+
   const selectedImage = useMemo(() => {
     const picked = rfNodes.filter((n) => {
       if (!n.selected || n.type !== "story-pro2-image") return false;
@@ -185,6 +187,7 @@ export function Pro2ImageInputDock() {
     <Pro2InputDockShell
       flowAnchor={placement}
       dockClassName="pro2-image-dock"
+      hidden={canvasGeometryDragging}
       header={
         <Pro2DockContextBar>
           <Pro2DockStyleButton

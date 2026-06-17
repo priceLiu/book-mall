@@ -1,5 +1,6 @@
 import type { StoryPro2StarterNodeData } from "./story-pro2-workspace-types";
 import type { CanvasFlowNode } from "./types";
+import { PRO2_SCRIPT_HUB_NODE_LABEL } from "./story-pro2-node-chrome";
 
 /** 2.0 脚本节点表头：用用户主题或大纲首段，禁止回落漫剧示例占位主题 */
 export function resolvePro2HubTableTitle(
@@ -29,5 +30,5 @@ export function resolvePro2HubTableTitle(
       return t.length > 48 ? `${t.slice(0, 48)}…` : t;
     }
   }
-  return "分镜脚本";
+  return PRO2_SCRIPT_HUB_NODE_LABEL;
 }

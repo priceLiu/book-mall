@@ -255,6 +255,8 @@ export const STORY_VIDEO_MODEL_KEYS = [
   "bytedance/seedance-2",
   "wan/2-7-image-to-video",
   "happyhorse/image-to-video",
+  "grok-imagine/image-to-video",
+  "grok-imagine-video-1-5-preview",
 ] as const;
 
 /** 影视专业版 · 百炼参考生视频（Gateway · 百炼，非 KIE 直连） */
@@ -288,6 +290,7 @@ export const STORY_PRO_FRAME_IMAGE_MODEL_KEYS = [
   "seedream-4.5",
   "gpt-image-2",
   "gpt-image-1",
+  "grok-imagine/text-to-image",
   /** 混元经 Gateway HUNYUAN，非 KIE，但支持专业版三视图/静帧 */
   "hunyuan-3d-pro",
   "hunyuan-3d-express",

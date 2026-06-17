@@ -15,6 +15,7 @@ import {
 } from "@/lib/story/kie-client";
 
 import { resolveKieGeminiChatPath } from "@/lib/gateway/model-router";
+import { buildKieGrokTextToImageCreateArgs } from "@/lib/canvas/kie-grok-builders";
 
 import {
   CanvasGatewayError,
@@ -398,6 +399,213 @@ export const KIE_KNOWN_MODELS: CanvasGatewayListModelsResult["models"] = [
     defaultParams: { aspect_ratio: "1:1", output_format: "png" },
   },
   {
+    modelKey: "grok-imagine/text-to-image",
+    displayName: "Grok Imagine · 文生图 (KIE)",
+    role: "IMAGE",
+    description: "xAI Grok Imagine · 文生图；有参考图时走图生图（image-to-video 请选视频模型）。",
+    paramsSchema: [
+      {
+        key: "aspect_ratio",
+        label: "比例",
+        type: "select",
+        options: [
+          { value: "1:1", label: "1:1" },
+          { value: "16:9", label: "16:9" },
+          { value: "9:16", label: "9:16" },
+          { value: "3:2", label: "3:2" },
+          { value: "2:3", label: "2:3" },
+        ],
+        defaultValue: "1:1",
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { aspect_ratio: "1:1" },
+  },
+  {
+    modelKey: "grok-imagine/image-to-video",
+    displayName: "Grok Imagine · 图生视频 (KIE)",
+    role: "VIDEO",
+    description: "xAI Grok Imagine · 单图/多图驱动视频（image_urls）。",
+    paramsSchema: [
+      {
+        key: "mode",
+        label: "风格",
+        type: "select",
+        options: [
+          { value: "normal", label: "normal" },
+          { value: "fun", label: "fun" },
+          { value: "spicy", label: "spicy（无外链图）" },
+        ],
+        defaultValue: "normal",
+      },
+      {
+        key: "resolution",
+        label: "分辨率",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        defaultValue: "720p",
+      },
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 6,
+        max: 30,
+        step: 1,
+        defaultValue: 6,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { mode: "normal", resolution: "720p", duration: 6 },
+  },
+  {
+    modelKey: "grok-imagine-video-1-5-preview",
+    displayName: "Grok Imagine Video 1.5 (KIE)",
+    role: "VIDEO",
+    description: "xAI Grok Imagine Video 1.5 · 图生视频 · 原生音频。",
+    paramsSchema: [
+      {
+        key: "aspect_ratio",
+        label: "比例",
+        type: "select",
+        options: [
+          { value: "auto", label: "auto" },
+          { value: "16:9", label: "16:9" },
+          { value: "9:16", label: "9:16" },
+          { value: "1:1", label: "1:1" },
+        ],
+        defaultValue: "auto",
+      },
+      {
+        key: "resolution",
+        label: "分辨率",
+        type: "select",
+        options: [
+          { value: "480p", label: "480p" },
+          { value: "720p", label: "720p" },
+        ],
+        defaultValue: "720p",
+      },
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 1,
+        max: 15,
+        step: 1,
+        defaultValue: 8,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { aspect_ratio: "auto", resolution: "720p", duration: 8 },
+  },
+  {
+    modelKey: "wan/2-6-video-to-video",
+    displayName: "Wan 2.6 · 视频生视频 (KIE)",
+    role: "VIDEO",
+    description: "通义万相 2.6 · 按提示词改造已有视频。",
+    paramsSchema: [
+      {
+        key: "resolution",
+        label: "分辨率",
+        type: "select",
+        options: [
+          { value: "720p", label: "720p" },
+          { value: "1080p", label: "1080p" },
+        ],
+        defaultValue: "1080p",
+      },
+      {
+        key: "duration",
+        label: "时长(秒)",
+        type: "number",
+        min: 5,
+        max: 10,
+        step: 5,
+        defaultValue: 5,
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { resolution: "1080p", duration: 5 },
+  },
+  {
+    modelKey: "kling-2.6/motion-control",
+    displayName: "Kling 2.6 · Motion Control (KIE)",
+    role: "VIDEO",
+    description: "可灵 2.6 · 参考图 + 动作视频驱动角色。",
+    paramsSchema: [
+      {
+        key: "mode",
+        label: "画质",
+        type: "select",
+        options: [
+          { value: "std", label: "std (720p)" },
+          { value: "pro", label: "pro (1080p)" },
+        ],
+        defaultValue: "std",
+      },
+      {
+        key: "character_orientation",
+        label: "朝向参考",
+        type: "select",
+        options: [
+          { value: "video", label: "video" },
+          { value: "image", label: "image" },
+        ],
+        defaultValue: "video",
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { mode: "std", character_orientation: "video" },
+  },
+  {
+    modelKey: "kling-3.0/motion-control",
+    displayName: "Kling 3.0 · Motion Control (KIE)",
+    role: "VIDEO",
+    description: "可灵 3.0 · 参考图 + 动作视频驱动角色。",
+    paramsSchema: [
+      {
+        key: "mode",
+        label: "画质",
+        type: "select",
+        options: [
+          { value: "std", label: "std (720p)" },
+          { value: "pro", label: "pro (1080p)" },
+        ],
+        defaultValue: "pro",
+      },
+      {
+        key: "character_orientation",
+        label: "朝向参考",
+        type: "select",
+        options: [
+          { value: "video", label: "video" },
+          { value: "image", label: "image" },
+        ],
+        defaultValue: "video",
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { mode: "pro", character_orientation: "video" },
+  },
+  {
+    modelKey: "topaz/video-upscale",
+    displayName: "Topaz · 视频超分 (KIE)",
+    role: "VIDEO",
+    description: "Topaz AI · 视频分辨率增强。",
+    paramsSchema: [
+      {
+        key: "upscale_factor",
+        label: "放大倍数",
+        type: "select",
+        options: [
+          { value: "1", label: "1×" },
+          { value: "2", label: "2×" },
+          { value: "4", label: "4×" },
+        ],
+        defaultValue: "2",
+      },
+    ] satisfies CanvasParamSchema,
+    defaultParams: { upscale_factor: "2" },
+  },
+  {
     modelKey: "kling-2.6/image-to-video",
     displayName: "Kling 2.6 i2v (KIE)",
     role: "VIDEO",
@@ -545,6 +753,14 @@ export function buildKieImageCreateArgs(args: {
     (u): u is string => typeof u === "string" && /^https?:\/\//.test(u),
   );
   const hasRefs = imageUrls.length > 0;
+
+  if (args.modelKey === "grok-imagine/text-to-image") {
+    return buildKieGrokTextToImageCreateArgs({
+      prompt: args.prompt,
+      aspectRatio: String(params.aspect_ratio ?? "1:1"),
+      enablePro: params.enable_pro === true,
+    });
+  }
 
   if (args.modelKey === "gpt-image-1") {
     const quality =

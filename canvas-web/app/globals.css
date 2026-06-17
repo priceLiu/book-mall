@@ -285,21 +285,25 @@ body {
 
 /* Pro2 脚本 / 大纲节点 · 横纵滚动条 */
 .pro2-node-scroll {
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
 }
 .pro2-node-scroll::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 .pro2-node-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.22);
+  background-clip: padding-box;
 }
 .pro2-node-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.35);
+  background-clip: padding-box;
 }
 .pro2-node-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
+  margin: 4px 2px;
+  background: transparent;
   border-radius: 999px;
 }
 

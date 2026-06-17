@@ -2,9 +2,11 @@
 
 import {
   STORY_PRO2_CHARACTER_PROMPT,
+  STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
+  STORY_PRO2_SCENE_PROMPT,
   STORY_PRO2_STORYBOARD_PROMPT,
 } from "./story-pro2-theme-outline-prompt";
-import { parseCharacterRows, parseStoryboardRows } from "./parse-md-tables";
+import { parseCharacterRows, parseSceneVisualDictionaryRows, parseStoryboardRows } from "./parse-md-tables";
 import {
   hubAggregateStatus,
   hubDataForColumnSync,
@@ -19,6 +21,8 @@ import {
 import { pickDefaultStoryImageEngine } from "./system-providers";
 import type { StoryRefImage } from "./story-ref-image";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
+import type { StoryProStarterNodeData } from "./story-pro-workspace-types";
+import type { StoryLlmSection } from "./story-workspace-types";
 import type { StoryPro2WorkspaceIds } from "./story-pro2-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { resolveStarterForHub } from "./story-workspace-resolver";
@@ -32,6 +36,8 @@ import {
   type Pro2ThreeViewBatchImagePick,
 } from "./pro2-three-view-batch-image";
 import { reflowStoryPro2Workspace } from "./story-pro2-workspace-layout";
+import { pro2ThinNodeIsLinked } from "./pro2-thin-node-display-state";
+import { extractSceneSectionMd } from "./parse-md-tables";
 import { ensurePro2FrameImageGroup } from "./pro2-spawn-frame-image-group";
 import { ensurePro2CharacterImageGroup } from "./pro2-spawn-character-image-group";
 import { formatCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
@@ -54,17 +60,80 @@ export function pro2HubHasCharacterTable(d: StoryProScriptHubNodeData): boolean 
   return parseCharacterRows(resolvePro2HubCharacterMd(d)).length > 0;
 }
 
+export function pro2HubHasOutlineContent(d: StoryProScriptHubNodeData): boolean {
+  return Boolean(d.outlineMd?.trim());
+}
+
+export function resolvePro2HubSceneMd(d: StoryProScriptHubNodeData): string {
+  if (d.sceneMd?.trim()) return d.sceneMd.trim();
+  return extractSceneSectionMd(d.outlineMd ?? "");
+}
+
+export function pro2HubHasSceneTable(d: StoryProScriptHubNodeData): boolean {
+  return parseSceneVisualDictionaryRows(resolvePro2HubSceneMd(d)).length > 0;
+}
+
+/** 2.0 脚本 hub LLM 顺序：大纲 → 角色 → 场景 → 分镜 */
+export const PRO2_HUB_SECTION_ORDER: StoryLlmSection[] = [
+  "outline",
+  "character",
+  "scene",
+  "storyboard",
+];
+
+export function resolvePro2HubLinkedStarter(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  hubId: string,
+): { starterId: string; starter: CanvasFlowNode } | null {
+  const starter = resolveStarterForHub(nodes, edges, hubId);
+  if (!starter) return null;
+  return { starterId: starter.id, starter };
+}
+
+/** 大纲真源：hub 字段 → 上游文本节点 generated / uploaded */
+export function resolvePro2HubEffectiveOutline(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  hubId: string,
+  d: StoryProScriptHubNodeData,
+): string {
+  const onHub = d.outlineMd?.trim();
+  if (onHub) return onHub;
+  const linked = resolvePro2HubLinkedStarter(nodes, edges, hubId);
+  if (!linked) return "";
+  const sd = linked.starter.data as unknown as StoryProStarterNodeData;
+  return (
+    sd.generatedOutlineMd?.trim() ||
+    sd.uploadedScriptMd?.trim() ||
+    ""
+  );
+}
+
+export function resolvePro2HubThemeInput(
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+  hubId: string,
+  d: StoryProScriptHubNodeData,
+): string {
+  const dock = d.dockInput?.trim();
+  if (dock) return dock;
+  const linked = resolvePro2HubLinkedStarter(nodes, edges, hubId);
+  if (!linked) return "";
+  const sd = linked.starter.data as unknown as StoryProStarterNodeData;
+  return sd.themeInput?.trim() || "";
+}
+
 export function pro2HubIsLinkedOutline(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
   hubId: string,
   d: StoryProScriptHubNodeData,
 ): { starterId: string; outlineMd: string } | null {
-  const outline = d.outlineMd?.trim();
-  if (!outline) return null;
-  const starter = resolveStarterForHub(nodes, edges, hubId);
-  if (!starter) return null;
-  return { starterId: starter.id, outlineMd: outline };
+  const linked = resolvePro2HubLinkedStarter(nodes, edges, hubId);
+  if (!linked) return null;
+  const outline = resolvePro2HubEffectiveOutline(nodes, edges, hubId, d);
+  return { starterId: linked.starterId, outlineMd: outline };
 }
 
 export function pro2HubIsGenerating(node: CanvasFlowNode): boolean {
@@ -88,30 +157,83 @@ export function mergePro2DockIntoPrompt(
   return parts.join("\n\n");
 }
 
-/** 阶段 A：生成专业版脚本（角色 + 分镜表） */
+/** 阶段 A：生成专业版脚本（大纲 → 角色 → 分镜脚本表） */
 export function enqueuePro2ScriptGeneration(
   hubId: string,
   dockInput: string,
   dockRefImages: StoryRefImage[],
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
-  options?: { forceFresh?: boolean },
+  options?: {
+    forceFresh?: boolean;
+    nodes?: CanvasFlowNode[];
+    edges?: CanvasFlowEdge[];
+    hubData?: StoryProScriptHubNodeData;
+    /** Dock 发送时始终生成全部三段（大纲 + 角色 + 脚本） */
+    regenerateAll?: boolean;
+  },
 ): void {
-  updateNodeData(hubId, {
+  const nodes = options?.nodes ?? [];
+  const edges = options?.edges ?? [];
+  const hubData = options?.hubData;
+  const effectiveOutline =
+    hubData && nodes.length
+      ? resolvePro2HubEffectiveOutline(nodes, edges, hubId, hubData)
+      : hubData?.outlineMd?.trim() ?? "";
+
+  const dockMergedOutline = mergePro2DockIntoPrompt(
+    STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
     dockInput,
     dockRefImages,
-    promptCharacter: mergePro2DockIntoPrompt(
-      STORY_PRO2_CHARACTER_PROMPT,
-      dockInput,
-      dockRefImages,
-    ),
-    promptStoryboard: mergePro2DockIntoPrompt(
-      STORY_PRO2_STORYBOARD_PROMPT,
-      dockInput,
-      dockRefImages,
-    ),
-  });
+  );
+  const dockMergedCharacter = mergePro2DockIntoPrompt(
+    STORY_PRO2_CHARACTER_PROMPT,
+    dockInput,
+    dockRefImages,
+  );
+  const dockMergedScene = mergePro2DockIntoPrompt(
+    STORY_PRO2_SCENE_PROMPT,
+    dockInput,
+    dockRefImages,
+  );
+  const dockMergedStoryboard = mergePro2DockIntoPrompt(
+    STORY_PRO2_STORYBOARD_PROMPT,
+    dockInput,
+    dockRefImages,
+  );
 
-  runStoryHubSectionsSequential(hubId, ["character", "storyboard"], options);
+  const sections: StoryLlmSection[] =
+    options?.regenerateAll || !effectiveOutline
+      ? [...PRO2_HUB_SECTION_ORDER]
+      : ["character", "scene", "storyboard"];
+
+  const patch: Record<string, unknown> = {
+    dockInput,
+    dockRefImages,
+    promptOutline: dockMergedOutline,
+    promptCharacter: dockMergedCharacter,
+    promptScene: dockMergedScene,
+    promptStoryboard: dockMergedStoryboard,
+  };
+  if (effectiveOutline && !hubData?.outlineMd?.trim()) {
+    patch.outlineMd = effectiveOutline;
+  }
+  const pendingRuntime = { status: "pending" as const };
+  if (sections.includes("outline")) {
+    patch.outlineRuntime = pendingRuntime;
+  }
+  if (sections.includes("character")) {
+    patch.characterRuntime = pendingRuntime;
+  }
+  if (sections.includes("scene")) {
+    patch.sceneRuntime = pendingRuntime;
+  }
+  if (sections.includes("storyboard")) {
+    patch.storyboardRuntime = pendingRuntime;
+  }
+
+  updateNodeData(hubId, patch);
+
+  runStoryHubSectionsSequential(hubId, sections, options);
 }
 
 type FrameKickoffStore = {
@@ -450,11 +572,24 @@ export function kickoffPro2CharacterThreeViewFromHub(
 export function pro2HubCanSendScriptPhase(
   node: CanvasFlowNode,
   d: StoryProScriptHubNodeData,
+  ctx?: {
+    nodes?: CanvasFlowNode[];
+    edges?: CanvasFlowEdge[];
+  },
 ): boolean {
   if (pro2HubIsGenerating(node)) return false;
-  if (!d.outlineMd?.trim()) return false;
   if (pro2HubHasScriptTable(d)) return false;
-  return Boolean(d.providerId?.trim() && d.modelKey?.trim());
+  if (!d.providerId?.trim() || !d.modelKey?.trim()) return false;
+  if (d.dockInput?.trim()) return true;
+  if (d.outlineMd?.trim()) return true;
+  if (ctx?.nodes && ctx?.edges) {
+    if (resolvePro2HubEffectiveOutline(ctx.nodes, ctx.edges, node.id, d)) {
+      return true;
+    }
+    if (resolvePro2HubThemeInput(ctx.nodes, ctx.edges, node.id, d)) return true;
+    if (pro2ThinNodeIsLinked(node.id, ctx.edges)) return true;
+  }
+  return false;
 }
 
 export function pro2HubCanSendFramePhase(
@@ -470,8 +605,21 @@ export function pro2HubCanSendFramePhase(
   return Boolean(d.providerId?.trim() && d.modelKey?.trim());
 }
 
-export function pro2HubScriptPhaseLabel(d: StoryProScriptHubNodeData): string {
+export function pro2HubScriptPhaseLabel(
+  d: StoryProScriptHubNodeData,
+  ctx?: { nodeId?: string; nodes?: CanvasFlowNode[]; edges?: CanvasFlowEdge[] },
+): string {
   if (pro2HubHasScriptTable(d)) return "frame";
   if (d.outlineMd?.trim()) return "script";
+  if (d.dockInput?.trim()) return "script";
+  if (ctx?.nodeId && ctx.nodes && ctx.edges) {
+    if (resolvePro2HubEffectiveOutline(ctx.nodes, ctx.edges, ctx.nodeId, d)) {
+      return "script";
+    }
+    if (resolvePro2HubThemeInput(ctx.nodes, ctx.edges, ctx.nodeId, d)) {
+      return "script";
+    }
+    if (pro2ThinNodeIsLinked(ctx.nodeId, ctx.edges)) return "script";
+  }
   return "empty";
 }

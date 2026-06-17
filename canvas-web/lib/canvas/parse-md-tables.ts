@@ -683,9 +683,16 @@ export type SceneVisualDictionaryRow = {
   imageKeywords: string;
 };
 
+/** 从大纲或场景段正文中提取场景 GFM 表 */
+export function extractSceneSectionMd(md: string): string {
+  const fromPrompt = extractMarkdownSectionByHeader(md, /场景视觉提示词/);
+  if (fromPrompt) return compactGfmTables(fromPrompt);
+  return extractSceneVisualDictionaryFromOutline(md);
+}
+
 /** 解析「场景视觉辞典」GFM 表 */
 export function parseSceneVisualDictionaryRows(md: string): SceneVisualDictionaryRow[] {
-  const section = extractSceneVisualDictionaryFromOutline(md);
+  const section = extractSceneSectionMd(md);
   if (!section.trim()) return [];
   const { rows } = parseMdTable(compactGfmTables(section));
   const out: SceneVisualDictionaryRow[] = [];
@@ -702,6 +709,8 @@ export function parseSceneVisualDictionaryRows(md: string): SceneVisualDictionar
       imageKeywords: pickColumn(r, [
         "生图关键词",
         "关键词",
+        "AI生图提示词(英文)",
+        "AI生图提示词",
         "image prompt",
         "image keywords",
         "prompt",
@@ -734,7 +743,10 @@ export function extractCharacterSectionFromOutline(md: string): string {
 
 /** 从大纲正文中提取「分镜脚本」段 */
 export function extractStoryboardSectionFromOutline(md: string): string {
-  const body = extractMarkdownSectionByHeader(md, /分镜脚本|分镜表|镜头序列/);
+  const body = extractMarkdownSectionByHeader(
+    md,
+    /分镜脚本|分镜表|镜头序列|分镜设计|镜头规划|镜头设计|分镜|storyboard/i,
+  );
   if (!body) return "";
   return compactGfmTables(body);
 }
@@ -958,8 +970,9 @@ export function parseStoryboardRows(md: string): StoryboardTableRow[] {
         r["镜号"] ||
         r["镜头编号"] ||
         r["index"] ||
-        String(i + 1);
-      const frameIndex = parseInt(String(rawIdx), 10) || i + 1;
+        "";
+      const parsedIdx = parseInt(String(rawIdx).replace(/\D/g, ""), 10);
+      const frameIndex = Number.isFinite(parsedIdx) && parsedIdx > 0 ? parsedIdx : i + 1;
       const shotSize = pickColumn(r, ["景别", "shot size", "framing"]);
       const cameraMove = pickColumn(r, [
         "运镜",
