@@ -71,7 +71,7 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 | 浮动 Dock | 选中唯一节点 → 节点下方 `Pro2InputDockShell` / 视频 `Sbv1VideoEngineFloatingDock` |
 | 空态整卡可拖 | Stage 使用 `Pro2MediaNodeEmptyState` + **`passNodeDrag`** |
 | 三视图 | 同图片节点；`Pro2ThreeViewInputDock` |
-| **拖动时隐藏** | 节点拖动/缩放期间（`canvasGeometryDragging=true`），浮动 Dock 须 `hidden`；松手后自动恢复显示 |
+| **拖动时隐藏** | 仅**节点拖动**期间（`canvasGeometryDragging=true`）浮动 Dock 须 `hidden`；画布 pan/zoom 时保持显示；松手后自动恢复 |
 
 **实现**：`Pro2InputDockShell` 传 `hidden={canvasGeometryDragging}`；sbv1 组件（`Sbv1VideoEngineFloatingDock`、`Sbv1ImageInputDock`）已内置。
 Pro2 所有浮动 Dock（`Pro2StarterInputDock` · `Pro2ScriptInputDock` · `Pro2ImageInputDock` · `Pro2ThreeViewInputDock` · `Pro2FrameCellInputDock`）须同样传入。

@@ -50,7 +50,7 @@ export function Pro2ScriptInputDock() {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
   const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+    libtvFloatingDockHidden(s.canvasGeometryDragging),
   );
 
   const selectedHub = useMemo(() => {

@@ -22,7 +22,7 @@ export function Sbv1VideoEngineFloatingDock() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging, s.canvasViewportMoving),
+    libtvFloatingDockHidden(s.canvasGeometryDragging),
   );
 
   const selectedEngine = useMemo(() => {
