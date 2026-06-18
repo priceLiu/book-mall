@@ -30,6 +30,7 @@ export function libtvImageRunPendingPatch(): Record<string, unknown> {
       status: "pending",
       failCode: undefined,
       failMessage: undefined,
+      dismissedFailTaskId: undefined,
     },
   };
 }
@@ -56,6 +57,7 @@ export function commitLibtvMediaRunPendingPatch(
         status: "pending",
         failCode: undefined,
         failMessage: undefined,
+        dismissedFailTaskId: undefined,
       },
     });
     return true;

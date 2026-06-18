@@ -8,7 +8,7 @@
  * 或于 .env.local 配置 VOLCENGINE_API_KEY / ARK_API_KEY 后：
  *   pnpm exec dotenv -e .env.local -- tsx scripts/setup-sbv1-volcengine-gateway.ts
  *
- * 可选：在 .env.local 配置 SBV1_VOLCENGINE_EP_MODELS=ep-xxx,ep-yyy 以在 sbv1 模型列表中注册接入点。
+ * 私域人像 IAM（Access Key / Secret）请在 Gateway 控制台「火山方舟」凭证中填写，勿写入 .env。
  */
 import {
   getGatewayLinkStatusForUser,
@@ -17,8 +17,10 @@ import {
 import { createGatewayApiKey } from "../lib/gateway/api-key-service";
 import {
   createGatewayCredential,
+  getDecryptedCredentialApiKey,
   updateGatewayCredential,
 } from "../lib/gateway/credential-service";
+import { buildVolcengineCredentialStorage } from "../lib/gateway/volcengine-gateway-credential";
 import { PERSONAL_KEY_DEFAULT_NAME } from "../lib/gateway/key-scope";
 import { prisma } from "../lib/prisma";
 import {
@@ -41,6 +43,8 @@ async function main() {
     );
     process.exit(1);
   }
+
+  const apiKeyBlob = buildVolcengineCredentialStorage({ apiKey });
 
   const bookUser = emailArg
     ? await prisma.user.findFirst({
@@ -83,18 +87,44 @@ async function main() {
       userId: gwUser.id,
       alias: "火山方舟 · 分镜视频1.0",
       providerKind: "VOLCENGINE",
-      apiKey,
+      apiKey: apiKeyBlob,
       baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     });
     credential = { id: row.id };
     console.log("[ok] VOLCENGINE 凭证已创建（分镜视频 1.0 专用别名）");
   } else {
+    const existing = await getDecryptedCredentialApiKey(credential.id);
     await updateGatewayCredential(gwUser.id, credential.id, {
-      apiKey,
+      apiKey: buildVolcengineCredentialStorage({
+        apiKey,
+        existingRaw: existing?.apiKey,
+      }),
       active: true,
       baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     });
     console.log("[ok] VOLCENGINE 凭证 Key 已更新（分镜视频 1.0 专用别名）");
+  }
+
+  // 同步平台默认别名「火山方舟」（Personal / Platform Admin 绑定池）
+  const platformCred = await prisma.gatewayVendorCredential.findFirst({
+    where: {
+      userId: gwUser.id,
+      providerKind: "VOLCENGINE",
+      alias: "火山方舟",
+    },
+    select: { id: true },
+  });
+  if (platformCred) {
+    const existingPlatform = await getDecryptedCredentialApiKey(platformCred.id);
+    await updateGatewayCredential(gwUser.id, platformCred.id, {
+      apiKey: buildVolcengineCredentialStorage({
+        apiKey,
+        existingRaw: existingPlatform?.apiKey,
+      }),
+      active: true,
+      baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    });
+    console.log("[ok] 平台别名「火山方舟」凭证 ark Key 已同步");
   }
 
   let apiKeyRow = await prisma.gatewayApiKey.findFirst({
@@ -143,9 +173,10 @@ async function main() {
 
   console.log("Book 用户:", bookUser.email);
   console.log("下一步：");
-  console.log("  1. 火山控制台开通 doubao-seedance-2.0 / 录入真人人像库");
-  console.log("  2. canvas-web 新建「分镜视频 1.0」项目测试生成");
-  console.log("  3. Gateway 日志 clientPage=canvas/{id}/sbv1 查看完整明细");
+  console.log("  1. Gateway 控制台编辑「火山方舟」凭证：填入 ark Key + IAM Access Key / Secret（人像入库）");
+  console.log("  2. 火山控制台开通 doubao-seedance-2.0 / 录入真人人像库");
+  console.log("  3. canvas-web 新建「分镜视频 1.0」项目测试生成与私域人像入库");
+  console.log("  4. Gateway 日志 model=portrait:virtual 可查看入库原图缩略图");
 }
 
 main()

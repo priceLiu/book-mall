@@ -214,7 +214,12 @@ body {
   overflow: visible !important;
 }
 
-/* 分镜视频 1.0 · 侧栏 + 须露出节点边框外 */
+/* LibTV 节点顶栏 / 侧 + 须露出节点边框外（Pro2 · sbv1 共用） */
+.canvas-flow-wrap .react-flow__node:not(.react-flow__node-group) {
+  overflow: visible !important;
+}
+
+/* 分镜视频 1.0 · 侧栏 + 须露出节点边框外（与上条等价，保留 class 语义） */
 .canvas-flow-wrap.sbv1-canvas .react-flow__node {
   overflow: visible !important;
 }

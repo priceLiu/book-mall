@@ -1,26 +1,112 @@
 import { describe, expect, it } from "vitest";
 import { signVolcengineOpenApiRequest } from "@/lib/gateway/volcengine-open-api-sign";
 import {
+  buildVolcengineCredentialStorage,
+  parseVolcengineGatewayCredential,
   parseVolcenginePortraitCredentialsFromApiKey,
+  resolveVolcengineArkApiKey,
+  resolveVolcenginePortraitCredentials,
   resolveVolcenginePortraitCredentialsFromEnv,
-} from "@/lib/gateway/volcengine-portrait-credentials";
+} from "@/lib/gateway/volcengine-gateway-credential";
 
-describe("parseVolcenginePortraitCredentialsFromApiKey", () => {
-  it("parses AK:SK pair", () => {
+describe("parseVolcengineGatewayCredential", () => {
+  it("parses plain ark key", () => {
     expect(
-      parseVolcenginePortraitCredentialsFromApiKey(
-        "AKTEST123:secret-value",
-      ),
+      parseVolcengineGatewayCredential("ark-9b038b6a-aac6-41b4-aca5-26fa9f69fd0c-a2d2f"),
     ).toEqual({
-      accessKeyId: "AKTEST123",
-      secretAccessKey: "secret-value",
+      arkApiKey: "ark-9b038b6a-aac6-41b4-aca5-26fa9f69fd0c-a2d2f",
     });
   });
 
-  it("parses JSON aksk blob", () => {
+  it("parses combined ark + IAM JSON", () => {
     expect(
-      parseVolcenginePortraitCredentialsFromApiKey(
+      parseVolcengineGatewayCredential(
         JSON.stringify({
+          apiKey: "ark-combined",
+          accessKeyId: "AKCOMBINED",
+          secretAccessKey: "sk-combined",
+        }),
+      ),
+    ).toEqual({
+      arkApiKey: "ark-combined",
+      portraitIam: {
+        accessKeyId: "AKCOMBINED",
+        secretAccessKey: "sk-combined",
+      },
+    });
+  });
+
+  it("parses legacy AK:SK only", () => {
+    expect(parseVolcengineGatewayCredential("AKTEST123:secret-value")).toEqual({
+      arkApiKey: "",
+      portraitIam: {
+        accessKeyId: "AKTEST123",
+        secretAccessKey: "secret-value",
+      },
+    });
+  });
+});
+
+describe("buildVolcengineCredentialStorage", () => {
+  it("stores plain ark when no IAM", () => {
+    expect(
+      buildVolcengineCredentialStorage({ apiKey: "ark-only-key-12345678" }),
+    ).toBe("ark-only-key-12345678");
+  });
+
+  it("stores JSON when ark + IAM", () => {
+    const raw = buildVolcengineCredentialStorage({
+      apiKey: "ark-combined",
+      accessKeyId: "AKX",
+      secretAccessKey: "SKX",
+    });
+    expect(JSON.parse(raw)).toEqual({
+      apiKey: "ark-combined",
+      accessKeyId: "AKX",
+      secretAccessKey: "SKX",
+    });
+  });
+
+  it("merges partial patch with existing JSON", () => {
+    const existing = JSON.stringify({
+      apiKey: "ark-old",
+      accessKeyId: "AKOLD",
+      secretAccessKey: "SKOLD",
+    });
+    const raw = buildVolcengineCredentialStorage({
+      apiKey: "ark-new",
+      existingRaw: existing,
+    });
+    expect(JSON.parse(raw)).toEqual({
+      apiKey: "ark-new",
+      accessKeyId: "AKOLD",
+      secretAccessKey: "SKOLD",
+    });
+  });
+});
+
+describe("resolveVolcengineArkApiKey", () => {
+  it("returns ark from combined blob", () => {
+    expect(
+      resolveVolcengineArkApiKey(
+        JSON.stringify({ apiKey: "ark-x", accessKeyId: "AK", secretAccessKey: "SK" }),
+      ),
+    ).toBe("ark-x");
+  });
+
+  it("throws when only IAM configured", () => {
+    expect(() =>
+      resolveVolcengineArkApiKey("AKONLY:skonly"),
+    ).toThrow(/ARK API Key/);
+  });
+});
+
+describe("resolveVolcenginePortraitCredentials", () => {
+  it("reads IAM from gateway JSON", () => {
+    expect(
+      resolveVolcenginePortraitCredentials(
+        JSON.stringify({
+          apiKey: "ark-x",
           accessKeyId: "AKJSON",
           secretAccessKey: "sk-json",
         }),
@@ -28,6 +114,23 @@ describe("parseVolcenginePortraitCredentialsFromApiKey", () => {
     ).toEqual({
       accessKeyId: "AKJSON",
       secretAccessKey: "sk-json",
+    });
+  });
+
+  it("throws when ark-only credential", () => {
+    expect(() =>
+      resolveVolcenginePortraitCredentials("ark-only-key-12345678"),
+    ).toThrow(/Gateway 火山凭证/);
+  });
+});
+
+describe("parseVolcenginePortraitCredentialsFromApiKey", () => {
+  it("parses AK:SK pair", () => {
+    expect(
+      parseVolcenginePortraitCredentialsFromApiKey("AKTEST123:secret-value"),
+    ).toEqual({
+      accessKeyId: "AKTEST123",
+      secretAccessKey: "secret-value",
     });
   });
 

@@ -108,7 +108,17 @@ export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[
   }
 
   if (isHttpUrl(input.imageUrl)) {
-    push(input.imageUrl, imageLabel(1, "image"), "image");
+    const role =
+      input.kind === "virtual" || input.kind === "real"
+        ? String(input.kind)
+        : "image";
+    const label =
+      input.kind === "virtual"
+        ? "入库原图 · 虚拟人像"
+        : input.kind === "real"
+          ? "入库原图 · 真人人像"
+          : imageLabel(1, "image");
+    push(input.imageUrl, label, role);
   }
   if (isHttpUrl(input.image_url)) {
     push(input.image_url, imageLabel(items.length || 1, "image"), "image");

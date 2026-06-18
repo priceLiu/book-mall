@@ -13,6 +13,7 @@ import {
   createRequestLog,
   finalizeRequestLog,
 } from "@/lib/gateway/proxy-common";
+import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import {
   buildPortraitAssetUri,
   volcengineCreatePortraitAsset,
@@ -173,12 +174,12 @@ export async function importCanvasPortraitAsset(opts: {
     providerKind: "VOLCENGINE",
     requestKind: "OTHER",
     clientSource: edition === "pro2" ? "CANVAS" : "CANVAS",
-    inputSummary: {
+    inputSummary: buildGatewayInputSummary(`portrait:${opts.kind}`, {
       kind: opts.kind,
-      imageUrl: imageUrl.slice(0, 120),
-      groupId,
       edition,
-    },
+      groupId,
+      referenceImageUrls: [imageUrl],
+    }),
   });
 
   const started = Date.now();

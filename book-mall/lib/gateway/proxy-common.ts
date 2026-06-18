@@ -15,6 +15,7 @@ import {
   routeGatewayModel,
 } from "./model-router";
 import { forwardQwenTtsSpeech, isQwenTtsModel } from "./qwen-tts-proxy";
+import { resolveVolcengineArkApiKey } from "./volcengine-gateway-credential";
 import {
   parseUsageFromUnknown,
   resolveGatewayTokenMetrics,
@@ -449,13 +450,17 @@ export async function forwardChatCompletions(opts: {
   }
 
   const requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
+  const bearerKey =
+    cred.providerKind === "VOLCENGINE"
+      ? resolveVolcengineArkApiKey(cred.apiKey)
+      : cred.apiKey;
 
   const started = Date.now();
   const r = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${cred.apiKey}`,
+      Authorization: `Bearer ${bearerKey}`,
     },
     body: JSON.stringify(requestBody),
   });
@@ -485,13 +490,17 @@ export async function forwardChatCompletionsStream(opts: {
   }
 
   const requestBody = resolveChatCompletionsBody(cred.providerKind, opts.body);
+  const bearerKey =
+    cred.providerKind === "VOLCENGINE"
+      ? resolveVolcengineArkApiKey(cred.apiKey)
+      : cred.apiKey;
 
   const started = Date.now();
   const r = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${cred.apiKey}`,
+      Authorization: `Bearer ${bearerKey}`,
     },
     body: JSON.stringify({ ...requestBody, stream: true }),
   });

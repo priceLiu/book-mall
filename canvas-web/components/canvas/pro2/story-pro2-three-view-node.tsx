@@ -248,6 +248,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
                 variant="generated"
                 alt={label}
                 fit="contain"
+                previewIconSize="lg"
                 className="absolute inset-0"
               />
             ) : hasError ? (

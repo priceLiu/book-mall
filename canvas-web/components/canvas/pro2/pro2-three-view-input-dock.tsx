@@ -45,10 +45,6 @@ export function Pro2ThreeViewInputDock() {
     (s) => s.setPro2StyleLibImageNodeId,
   );
 
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging),
-  );
-
   const selected = useMemo(() => {
     const picked = rfNodes.filter(
       (n) => n.selected && n.type === "story-pro2-three-view",
@@ -60,6 +56,14 @@ export function Pro2ThreeViewInputDock() {
     if (!selected) return null;
     return nodes.find((n) => n.id === selected.id) ?? null;
   }, [selected, nodes]);
+
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(
+      s.canvasGeometryDragging,
+      s.canvasDraggingNodeId,
+      storeNode?.id ?? null,
+    ),
+  );
 
   const placement = usePro2DockPlacement(selected?.id ?? null);
   const d = (storeNode?.data ?? {}) as StoryPro2ThreeViewNodeData;

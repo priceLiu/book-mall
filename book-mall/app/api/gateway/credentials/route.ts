@@ -5,12 +5,14 @@ import {
   createGatewayCredential,
   deleteGatewayCredential,
   GATEWAY_PROVIDER_KINDS,
+  getDecryptedCredentialApiKey,
   listGatewayCredentials,
   setDefaultGatewayCredential,
   testGatewayCredential,
   updateGatewayCredential,
 } from "@/lib/gateway/credential-service";
 import { resolveGatewayCredentialScope } from "@/lib/gateway/platform-credential-delegate";
+import { buildVolcengineCredentialStorage } from "@/lib/gateway/volcengine-gateway-credential";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +40,9 @@ const createSchema = z.object({
   channel: z.string().max(60).optional().nullable(),
   sortOrder: z.number().int().optional(),
   isDefaultForProvider: z.boolean().optional(),
+  /** 火山 · IAM Access Key（私域人像 / 活体，可选） */
+  volcengineAccessKeyId: z.string().min(4).max(200).optional(),
+  volcengineSecretAccessKey: z.string().min(4).max(200).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -55,9 +60,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "参数无效" }, { status: 400 });
   }
   try {
+    const { volcengineAccessKeyId, volcengineSecretAccessKey, ...rest } =
+      parsed.data;
+    const apiKey =
+      rest.providerKind === "VOLCENGINE"
+        ? buildVolcengineCredentialStorage({
+            apiKey: rest.apiKey,
+            accessKeyId: volcengineAccessKeyId,
+            secretAccessKey: volcengineSecretAccessKey,
+          })
+        : rest.apiKey;
     const row = await createGatewayCredential({
       userId: scope.effectiveGatewayUserId,
-      ...parsed.data,
+      ...rest,
+      apiKey,
     });
     return NextResponse.json({ credential: { id: row.id, alias: row.alias } });
   } catch (e) {
@@ -74,6 +90,8 @@ const patchSchema = z.object({
   channel: z.string().max(60).nullable().optional(),
   sortOrder: z.number().int().optional(),
   isDefaultForProvider: z.boolean().optional(),
+  volcengineAccessKeyId: z.string().min(4).max(200).nullable().optional(),
+  volcengineSecretAccessKey: z.string().min(4).max(200).nullable().optional(),
   /** action=setDefault：设为该厂商默认凭证 */
   action: z.literal("setDefault").optional(),
 });
@@ -92,12 +110,33 @@ export async function PATCH(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "参数无效" }, { status: 400 });
   }
-  const { id, action, ...patch } = parsed.data;
+  const { id, action, volcengineAccessKeyId, volcengineSecretAccessKey, ...patch } =
+    parsed.data;
   if (action === "setDefault") {
     const ok = await setDefaultGatewayCredential(scope.effectiveGatewayUserId, id);
     if (!ok) return NextResponse.json({ error: "未找到" }, { status: 404 });
     return NextResponse.json({ ok: true });
   }
+
+  const existing = await getDecryptedCredentialApiKey(id);
+  if (
+    existing?.providerKind === "VOLCENGINE" &&
+    (patch.apiKey !== undefined ||
+      volcengineAccessKeyId !== undefined ||
+      volcengineSecretAccessKey !== undefined)
+  ) {
+    try {
+      patch.apiKey = buildVolcengineCredentialStorage({
+        apiKey: patch.apiKey,
+        accessKeyId: volcengineAccessKeyId ?? undefined,
+        secretAccessKey: volcengineSecretAccessKey ?? undefined,
+        existingRaw: existing.apiKey,
+      });
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    }
+  }
+
   const row = await updateGatewayCredential(scope.effectiveGatewayUserId, id, patch);
   if (!row) return NextResponse.json({ error: "未找到" }, { status: 404 });
   return NextResponse.json({ ok: true });

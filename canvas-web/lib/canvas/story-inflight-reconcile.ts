@@ -13,6 +13,7 @@ import {
   pickPreferredCanvasTask,
   pickPreferredCanvasTaskForScope,
   runtimePatchFromCanvasTask,
+  shouldApplyCanvasTaskRuntimePatch,
   storyRunContextFromScope,
   tasksMatchStoryScope,
   type CanvasTaskStoryScope,
@@ -369,7 +370,10 @@ export function reconcileStaleInflightRuntimes(
         );
       } else {
         const patch = runtimePatchFromCanvasTask(pick);
-        if (patch) setNodeRuntime(node.id, patch);
+        const localRt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
+        if (patch && shouldApplyCanvasTaskRuntimePatch(localRt, pick, patch)) {
+          setNodeRuntime(node.id, patch);
+        }
       }
       continue;
     }

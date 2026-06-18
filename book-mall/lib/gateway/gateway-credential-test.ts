@@ -9,6 +9,7 @@ import {
   resolveDeepSeekBaseUrl,
   resolveOpenAiCompatibleBaseUrl,
 } from "@/lib/gateway/model-router";
+import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 
 function toCanvasKind(kind: GatewayProviderKind): CanvasProviderKind {
   switch (kind) {
@@ -52,7 +53,10 @@ function buildTestConfig(row: {
     id: row.id,
     alias: row.alias,
     kind: toCanvasKind(row.providerKind),
-    apiKey: decryptApiKey(row.apiKeyEncrypted),
+    apiKey:
+      row.providerKind === "VOLCENGINE"
+        ? resolveVolcengineArkApiKey(decryptApiKey(row.apiKeyEncrypted))
+        : decryptApiKey(row.apiKeyEncrypted),
     baseUrl: base,
   };
 }

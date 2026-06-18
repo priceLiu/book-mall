@@ -1,4 +1,5 @@
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
+import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import { resolveVolcengineModelKey } from "@/lib/gateway/volcengine-chat-models";
 import {
   isVolcengineVideoTaskFailed,
@@ -35,7 +36,7 @@ export async function submitVolcengineVideoJobForLog(opts: {
 
   try {
     const { taskId, requestId } = await volcengineCreateVideoTask({
-      apiKey: cred.apiKey,
+      apiKey: resolveVolcengineArkApiKey(cred.apiKey),
       baseUrl: cred.baseUrl,
       model: opts.model,
       body: payload,
@@ -86,7 +87,7 @@ export async function pollVolcengineVideoTaskForLog(opts: {
   }
 
   const polled = await volcengineGetVideoTask({
-    apiKey: cred.apiKey,
+    apiKey: resolveVolcengineArkApiKey(cred.apiKey),
     baseUrl: cred.baseUrl,
     taskId: opts.taskId,
   });

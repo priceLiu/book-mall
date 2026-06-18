@@ -149,6 +149,7 @@ function FlowCanvasInner({
   const dragUndoPausedRef = useRef(false);
   const ignoreNextPaneClickRef = useRef(false);
   const [isNodeDragging, setIsNodeDragging] = useState(false);
+  const isNodeDraggingRef = useRef(false);
   const [snapGuides, setSnapGuides] = useState<SnapGuideLine[]>([]);
   const deferStoreGraphSyncRef = useRef(false);
 
@@ -184,6 +185,9 @@ function FlowCanvasInner({
   const canvasFocusNonce = useCanvasStore((s) => s.canvasFocusNonce);
   const setCanvasGeometryDragging = useCanvasStore(
     (s) => s.setCanvasGeometryDragging,
+  );
+  const setCanvasDraggingNodeId = useCanvasStore(
+    (s) => s.setCanvasDraggingNodeId,
   );
   const setCanvasViewportMoving = useCanvasStore(
     (s) => s.setCanvasViewportMoving,
@@ -353,12 +357,25 @@ function FlowCanvasInner({
 
   const onMoveStart = useCallback(() => {
     setCanvasViewportMoving(true);
-  }, [setCanvasViewportMoving]);
+    // pan/zoom 勿触发「拖动隐藏 Dock」；仅真实节点拖动才隐藏对应 Dock
+    if (!isNodeDraggingRef.current) {
+      setCanvasGeometryDragging(false);
+      setCanvasDraggingNodeId(null);
+    }
+  }, [
+    setCanvasViewportMoving,
+    setCanvasGeometryDragging,
+    setCanvasDraggingNodeId,
+  ]);
 
   /** 勿用受控 viewport：节点轮询会频繁重渲染，store 里的旧视口会把滚轮缩放拉回 */
   const onMoveEnd = useCallback(
     (_event: MouseEvent | TouchEvent | null, vp: Viewport) => {
       setCanvasViewportMoving(false);
+      if (!isNodeDraggingRef.current) {
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+      }
       if (viewportTimerRef.current !== null) {
         window.clearTimeout(viewportTimerRef.current);
       }
@@ -367,7 +384,12 @@ function FlowCanvasInner({
         viewportTimerRef.current = null;
       }, 350);
     },
-    [setViewport, setCanvasViewportMoving],
+    [
+      setViewport,
+      setCanvasViewportMoving,
+      setCanvasGeometryDragging,
+      setCanvasDraggingNodeId,
+    ],
   );
 
   const handleNodesChange = useCallback(
@@ -379,22 +401,36 @@ function FlowCanvasInner({
         // 终态（dragging:false / resizing:false）会在松手那帧落库
         deferStoreGraphSyncRef.current = true;
         setCanvasGeometryDragging(true);
+        const draggingChange = changes.find(
+          (c) =>
+            c.type === "position" &&
+            "dragging" in c &&
+            c.dragging === true &&
+            "id" in c &&
+            c.id,
+        );
+        if (draggingChange && "id" in draggingChange) {
+          setCanvasDraggingNodeId(draggingChange.id);
+        }
         return;
       }
       // LibTV 画布：选中态仅保留在 RF 本地（不写 zustand / 不进 undo），避免点击卡顿
       if (libtvCanvas && isCanvasSelectionOnlyChange(changes)) {
         deferStoreGraphSyncRef.current = false;
         setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
         return;
       }
       deferStoreGraphSyncRef.current = false;
       setCanvasGeometryDragging(false);
+      setCanvasDraggingNodeId(null);
       storeOnNodesChange(changes);
     },
     [
       onRfNodesChange,
       storeOnNodesChange,
       setCanvasGeometryDragging,
+      setCanvasDraggingNodeId,
       libtvCanvas,
     ],
   );
@@ -522,8 +558,10 @@ function FlowCanvasInner({
 
   const onNodeDragStart = useCallback(
     (_event: React.MouseEvent, node: { id: string; type?: string }) => {
+      isNodeDraggingRef.current = true;
       setIsNodeDragging(true);
       setCanvasGeometryDragging(true);
+      setCanvasDraggingNodeId(node.id);
       setSnapGuides([]);
       lastSnapGuideKeyRef.current = "";
       if (enableDragSnapGuides && node.type !== "group") {
@@ -538,7 +576,7 @@ function FlowCanvasInner({
       useCanvasStore.temporal.getState().pause();
       dragUndoPausedRef.current = true;
     },
-    [enableDragSnapGuides, getNodes, setCanvasGeometryDragging],
+    [enableDragSnapGuides, getNodes, setCanvasGeometryDragging, setCanvasDraggingNodeId],
   );
 
   const onNodeDrag = useCallback(
@@ -602,8 +640,10 @@ function FlowCanvasInner({
 
   const onNodeDragStop = useCallback(
     (event: React.MouseEvent, node: { id: string; type?: string; parentId?: string }) => {
+      isNodeDraggingRef.current = false;
       setIsNodeDragging(false);
       setCanvasGeometryDragging(false);
+      setCanvasDraggingNodeId(null);
       setSnapGuides([]);
       deferStoreGraphSyncRef.current = false;
       if (dragUndoPausedRef.current) {

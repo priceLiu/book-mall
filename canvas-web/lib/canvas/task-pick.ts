@@ -48,6 +48,19 @@ export function shouldSkipStoryRowTaskApply(
   return pick.status === "SUCCEEDED" || pick.status === "FAILED";
 }
 
+/** 任务终态写回 node.runtime 前 · 用户已关闭的错误勿重复弹出 */
+export function shouldApplyCanvasTaskRuntimePatch(
+  localRuntime: CanvasNodeRuntime | undefined,
+  task: Pick<CanvasTaskRecord, "id" | "status">,
+  patch: Partial<CanvasNodeRuntime> | null,
+): boolean {
+  if (!patch) return false;
+  if (patch.status !== "error") return true;
+  const dismissed = localRuntime?.dismissedFailTaskId?.trim();
+  if (!dismissed) return true;
+  return task.id !== dismissed;
+}
+
 /** 引擎 / 预览节点：把任务终态写进 node.runtime */
 export function runtimePatchFromCanvasTask(
   task: CanvasTaskRecord,

@@ -258,6 +258,7 @@ export function LibtvImageNode({
             variant="generated"
             alt={nodeLabel}
             fit="contain"
+            previewIconSize="lg"
             className="absolute inset-0"
           />
         );
@@ -302,6 +303,7 @@ export function LibtvImageNode({
           variant="generated"
           alt={nodeLabel}
           fit="contain"
+          previewIconSize="lg"
           className="absolute inset-0"
         />
       );
