@@ -87,7 +87,7 @@ export type CanvasRunNodeInput = {
   /** 火山私域人像库 asset:// 引用（来自上游 LibTV 图片节点入库） */
   portraitAssetRefs?: Array<{
     url: string;
-    role?: "reference_image" | "first_frame";
+    role?: "reference_image" | "first_frame" | "last_frame";
   }>;
 };
 
