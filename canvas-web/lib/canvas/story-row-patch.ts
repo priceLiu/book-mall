@@ -1,6 +1,8 @@
 "use client";
 
 import type { CanvasNodeRuntime } from "./types";
+import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
+import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import type {
   StoryCharacterColumnNodeData,
   StoryCharacterRow,
@@ -104,6 +106,18 @@ export function applyCharacterRowRuntime(
 ): StoryCharacterRow[] {
   return rows.map((r) =>
     r.key === rowKey ? { ...r, runtime: { ...r.runtime, ...runtime } } : r,
+  );
+}
+
+export function applySceneRowRuntime(
+  rows: StoryProSceneRow[],
+  rowKey: string,
+  runtime: CanvasNodeRuntime,
+): StoryProSceneRow[] {
+  return rows.map((r) =>
+    sceneRowKeysEquivalent(r.key, rowKey)
+      ? { ...r, runtime: { ...r.runtime, ...runtime } }
+      : r,
   );
 }
 

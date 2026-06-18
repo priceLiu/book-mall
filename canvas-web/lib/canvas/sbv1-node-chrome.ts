@@ -1,4 +1,5 @@
-export const SBV1_VIDEO_COMPOSE_LABEL = "视频合成";
+/** 分镜视频 1.0 · `sbv1-video-engine` 用户可见名 */
+export const SBV1_VIDEO_COMPOSE_LABEL = "视频";
 
 /** 分镜视频 1.0 节点尺寸与样式 token（壳层与 Pro2 共用 libtv-node-chrome） */
 

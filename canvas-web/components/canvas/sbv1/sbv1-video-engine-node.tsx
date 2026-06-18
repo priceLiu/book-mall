@@ -104,7 +104,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           }
           if (
             side === "right" &&
-            (itemId === "video-engine" ||
+            (itemId === "video" ||
+              itemId === "video-engine" ||
               itemId === "video-compose" ||
               nodeType === "sbv1-video-engine")
           ) {

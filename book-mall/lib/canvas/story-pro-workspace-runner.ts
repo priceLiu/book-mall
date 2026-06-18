@@ -20,6 +20,7 @@ import {
   STORY_PRO2_THEME_OUTLINE_SYSTEM,
   STORY_PRO2_THEME_OUTLINE_USER_PREFIX,
 } from "./story-pro2-theme-outline-prompt";
+import { isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
 
 function proClientPage(projectId: string): string {
   return `canvas/${projectId}/story-pro`;
@@ -60,6 +61,11 @@ export async function runStoryProStarterThemeOutline(
     (args.node.textInputs ?? []).filter(Boolean).join("\n\n").trim();
   if (!theme) {
     throw new Error("请先填写故事主题或内容");
+  }
+  if (!isPro2StoryOutlineTextNode(data)) {
+    throw new Error(
+      "该文本节点用于提示词/下游引用，不会走故事大纲链路；请使用故事大纲模式的文本节点",
+    );
   }
   const system =
     (typeof data.themeOutlineSystemPrompt === "string"

@@ -40,6 +40,7 @@ import {
   isAnyStoryScriptHubType,
   isAnyStoryVideoColumnType,
 } from "./story-workspace-resolver";
+import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import { maybeNotifyCanvasCreditsSettled } from "./canvas-credits-notify";
 import {
@@ -56,13 +57,17 @@ import { reconcileStaleInflightRuntimes } from "./story-inflight-reconcile";
 import { resolveStoryHubSectionTextInputs } from "./story-hub-text-inputs";
 import { resolveStoryProStarterScriptInput } from "./story-pro-starter-text";
 import {
+  commitStoryRunPendingPatch,
   storyApplyTaskResult,
-  storyRunPendingPatch,
 } from "./story-run-apply";
 import {
   sbv1ImageFailurePatch,
   sbv1ImagePatchFromTask,
 } from "./sbv1-image-task-apply";
+import {
+  commitLibtvMediaRunPendingPatch,
+  isLibtvFreestandingImageNode,
+} from "./libtv-image-node-run";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import { resolveStoryProRunStylePayload } from "./story-pro-run-style-context";
 import { commitStoryVideoRowRun } from "./story-video-run";
@@ -130,7 +135,11 @@ function storyRowRuntimeStatus(
       }[];
     }
   ).rows;
-  const row = rows?.find((r) => r.key === job.rowKey);
+  const row = rows?.find((r) =>
+    isAnyStorySceneColumnType(node.type ?? "")
+      ? sceneRowKeysEquivalent(r.key, job.rowKey)
+      : r.key === job.rowKey,
+  );
   if (!row) return undefined;
   if (isAnyStoryVideoColumnType(node.type ?? "")) {
     return job.mediaKind === "tts"
@@ -412,7 +421,7 @@ function applySbv1ImageTaskResult(
   task: CanvasTaskRecord,
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
 ): boolean {
-  if (node.type !== "sbv1-image") return false;
+  if (!isLibtvFreestandingImageNode(node)) return false;
   const patch = sbv1ImagePatchFromTask(
     node.data as unknown as Sbv1ImageNodeData,
     task,
@@ -428,7 +437,7 @@ function applySbv1ImageRunFailure(
   failCode: string,
   failMessage: string,
 ): boolean {
-  if (!node || node.type !== "sbv1-image") return false;
+  if (!node || !isLibtvFreestandingImageNode(node)) return false;
   updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage));
   return true;
 }
@@ -671,9 +680,11 @@ export function useCanvasRunner(
 
     seq.activeKey = key;
     detachNodeTaskRefs(job);
-    const pending = storyRunPendingPatch(node, job);
-    if (pending) updateNodeData(job.nodeId, pending);
-    else {
+    const nodesNow = useCanvasStore.getState().nodes;
+    if (
+      !commitStoryRunPendingPatch(node, job, nodesNow, updateNodeData) &&
+      !commitLibtvMediaRunPendingPatch(node, updateNodeData)
+    ) {
       setNodeRuntime(job.nodeId, {
         status: "pending",
         failCode: undefined,
@@ -714,10 +725,9 @@ export function useCanvasRunner(
         );
 
         const data = node.data as Record<string, unknown>;
-        const runData =
-          node.type === "sbv1-image"
-            ? resolveSbv1ImageRunData(node, state.nodes, state.edges, data)
-            : data;
+        const runData = isLibtvFreestandingImageNode(node)
+          ? resolveSbv1ImageRunData(node, state.nodes, state.edges, data)
+          : data;
         const modelKey =
           typeof data.modelKey === "string" ? data.modelKey : undefined;
         const stylePayload = resolveStoryProRunStylePayload(
@@ -1025,13 +1035,10 @@ export function useCanvasRunner(
             const rowErr =
               job.rowKey &&
               node &&
-              (
-                node.data as {
-                  rows?: { key: string; runtime?: { status?: string } }[];
-                }
-              ).rows?.find((r) => r.key === job.rowKey)?.runtime?.status ===
-                "error";
-            if (rowErr || (node && nodeRuntimeStatus(node) === "error")) {
+              storyRowRuntimeStatus(node, job) === "error";
+            if (rowErr && job.mediaKind === "sceneRef") {
+              finishSequentialStep(key);
+            } else if (rowErr || (node && nodeRuntimeStatus(node) === "error")) {
               abortSequentialOnError(key);
             } else {
               finishSequentialStep(key);
@@ -1099,8 +1106,21 @@ export function useCanvasRunner(
           deferredForceFreshRef.current.set(key, job);
           const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
           if (node) {
-            const pending = storyRunPendingPatch(node, job);
-            if (pending) updateNodeData(job.nodeId, pending);
+            if (
+              !commitStoryRunPendingPatch(
+                node,
+                job,
+                useCanvasStore.getState().nodes,
+                updateNodeData,
+              ) &&
+              !commitLibtvMediaRunPendingPatch(node, updateNodeData)
+            ) {
+              setNodeRuntime(job.nodeId, {
+                status: "pending",
+                failCode: undefined,
+                failMessage: undefined,
+              });
+            }
           }
           return;
         }
@@ -1125,9 +1145,11 @@ export function useCanvasRunner(
       }
       detachNodeTaskRefs(job);
       if (node) {
-        const pending = storyRunPendingPatch(node, job);
-        if (pending) updateNodeData(job.nodeId, pending);
-        else {
+        const nodesNow = useCanvasStore.getState().nodes;
+        if (
+          !commitStoryRunPendingPatch(node, job, nodesNow, updateNodeData) &&
+          !commitLibtvMediaRunPendingPatch(node, updateNodeData)
+        ) {
           setNodeRuntime(job.nodeId, {
             status: "pending",
             failCode: undefined,
@@ -1171,7 +1193,15 @@ export function useCanvasRunner(
         forceFresh: j.forceFresh ?? forceFresh,
       }));
 
-      const runnable = normalized.filter((job) => {
+      const seenKeys = new Set<string>();
+      const deduped = normalized.filter((job) => {
+        const key = runKey(job);
+        if (seenKeys.has(key)) return false;
+        seenKeys.add(key);
+        return true;
+      });
+
+      const runnable = deduped.filter((job) => {
         const key = runKey(job);
         if (inflightRef.current.has(key)) return false;
         if (queueRef.current.some((q) => runKey(q) === key)) return false;
@@ -1276,11 +1306,8 @@ export function useCanvasRunner(
       if (isAnyStoryScriptHubType(node.type ?? "") && job.llmSection) {
         done = hubSectionIsComplete(node, job.llmSection);
       } else if (job.rowKey) {
-        const row = (
-          node.data as { rows?: { key: string; runtime?: { status?: string } }[] }
-        ).rows?.find((r) => r.key === job.rowKey);
-        done =
-          row?.runtime?.status === "done" || row?.runtime?.status === "error";
+        done = storyRowRuntimeStatus(node, job) === "done" ||
+          storyRowRuntimeStatus(node, job) === "error";
       } else if (isStoryLlmNodeType(node.type ?? "")) {
         done =
           nodeRuntimeStatus(node) === "done" && storyLlmNodeIsComplete(node);
@@ -1292,10 +1319,11 @@ export function useCanvasRunner(
       if (!done) return;
       const key = runKey(job);
       const rowErr =
-        job.rowKey &&
-        (
-          node.data as { rows?: { key: string; runtime?: { status?: string } }[] }
-        ).rows?.find((r) => r.key === job.rowKey)?.runtime?.status === "error";
+        job.rowKey && storyRowRuntimeStatus(node, job) === "error";
+      if (rowErr && job.mediaKind === "sceneRef") {
+        finishSequentialStep(key);
+        return;
+      }
       if (rowErr || nodeRuntimeStatus(node) === "error") {
         abortSequentialOnError(key);
         return;
@@ -1510,7 +1538,7 @@ export function useCanvasRunner(
       }
 
       const patch = runtimePatchFromCanvasTask(t);
-      if (node?.type === "sbv1-image") {
+      if (node && isLibtvFreestandingImageNode(node)) {
         const sbv1Patch = sbv1ImagePatchFromTask(
           node.data as unknown as Sbv1ImageNodeData,
           t,

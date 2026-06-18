@@ -18,6 +18,10 @@ import {
   storyCapabilityHint,
   type StoryModelCapability,
 } from "@/lib/canvas/story-model-capabilities";
+import {
+  gatewayModelRoleMeta,
+  type GatewayModelRole,
+} from "@/lib/canvas/gateway-model-role";
 
 export type EnginePickerProps = {
   /** 过滤模型 role：LLM / IMAGE / VIDEO */
@@ -162,7 +166,7 @@ export function EnginePicker({
             </>
           ) : (
             <span className="text-[var(--canvas-muted)]">
-              选择 {role === "LLM" ? "AI 引擎模型" : role === "VIDEO" ? "视频模型" : "生图模型"}
+              {gatewayModelRoleMeta(role as GatewayModelRole).pickerPlaceholder}
             </span>
           )}
         </span>
@@ -356,12 +360,7 @@ function EngineModelModal({
 
   if (!mounted) return null;
 
-  const title =
-    role === "LLM"
-      ? "选择 AI 引擎模型"
-      : role === "VIDEO"
-        ? "选择视频模型"
-        : "选择生图模型";
+  const title = gatewayModelRoleMeta(role as GatewayModelRole).modalTitle;
 
   const hasParams =
     !!draft?.model.paramsSchema && draft.model.paramsSchema.length > 0;

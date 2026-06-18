@@ -6,7 +6,7 @@ import {
   STORY_PRO2_SCENE_PROMPT,
   STORY_PRO2_STORYBOARD_PROMPT,
 } from "./story-pro2-theme-outline-prompt";
-import { parseCharacterRows, parseSceneVisualDictionaryRows, parseStoryboardRows } from "./parse-md-tables";
+import { parseCharacterRows, parseSceneVisualDictionaryRows, parseStoryboardRows, resolveSceneDictionaryMarkdown } from "./parse-md-tables";
 import {
   hubAggregateStatus,
   hubDataForColumnSync,
@@ -35,11 +35,21 @@ import {
   pickDefaultPro2ThreeViewImageEngine,
   type Pro2ThreeViewBatchImagePick,
 } from "./pro2-three-view-batch-image";
+import {
+  pickDefaultPro2SceneImageEngine,
+  type Pro2SceneBatchImagePick,
+} from "./pro2-scene-batch-image";
 import { reflowStoryPro2Workspace } from "./story-pro2-workspace-layout";
 import { pro2ThinNodeIsLinked } from "./pro2-thin-node-display-state";
-import { extractSceneSectionMd } from "./parse-md-tables";
 import { ensurePro2FrameImageGroup } from "./pro2-spawn-frame-image-group";
 import { ensurePro2CharacterImageGroup } from "./pro2-spawn-character-image-group";
+import {
+  batchRunPro2SceneImageNodes,
+  ensurePro2SceneImageGroup,
+  readPro2SceneRowsForHub,
+  syncPro2SceneImagesFromRows,
+} from "./pro2-spawn-scene-image-group";
+import { syncPro2FrameRowsUpstreamRefs } from "./pro2-wire-frame-board-refs";
 import { formatCharacterRowThreeViewPrompt } from "./three-view-prompt-rules";
 export function pro2HubHasScriptTable(d: StoryProScriptHubNodeData): boolean {
   const md = resolveHubStoryboardMd(d);
@@ -64,13 +74,74 @@ export function pro2HubHasOutlineContent(d: StoryProScriptHubNodeData): boolean 
   return Boolean(d.outlineMd?.trim());
 }
 
-export function resolvePro2HubSceneMd(d: StoryProScriptHubNodeData): string {
-  if (d.sceneMd?.trim()) return d.sceneMd.trim();
-  return extractSceneSectionMd(d.outlineMd ?? "");
+export type Pro2HubSceneResolveContext = {
+  nodes?: CanvasFlowNode[];
+  edges?: CanvasFlowEdge[];
+  hubId?: string;
+};
+
+function hubDataWithEffectiveOutline(
+  d: StoryProScriptHubNodeData,
+  ctx?: Pro2HubSceneResolveContext,
+): StoryProScriptHubNodeData {
+  if (d.outlineMd?.trim() || !ctx?.nodes?.length || !ctx?.edges || !ctx?.hubId) {
+    return d;
+  }
+  const outline = resolvePro2HubEffectiveOutline(
+    ctx.nodes,
+    ctx.edges,
+    ctx.hubId,
+    d,
+  );
+  if (!outline) return d;
+  return { ...d, outlineMd: outline };
 }
 
-export function pro2HubHasSceneTable(d: StoryProScriptHubNodeData): boolean {
-  return parseSceneVisualDictionaryRows(resolvePro2HubSceneMd(d)).length > 0;
+export function resolvePro2HubSceneMd(
+  d: StoryProScriptHubNodeData,
+  ctx?: Pro2HubSceneResolveContext,
+): string {
+  const synced = hubDataForColumnSync(
+    hubDataWithEffectiveOutline(d, ctx) as Parameters<
+      typeof hubDataForColumnSync
+    >[0],
+  );
+  return resolveSceneDictionaryMarkdown(
+    synced.outlineMd ?? "",
+    synced.sceneMd ?? "",
+  );
+}
+
+export function resolvePro2HubDataForColumnSync(
+  hubId: string,
+  d: StoryProScriptHubNodeData,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): StoryProScriptHubNodeData {
+  return hubDataWithEffectiveOutline(d, { nodes, edges, hubId });
+}
+
+/** 与场景列 / 场景图组共用的场景行（含 hub 前缀 key） */
+export function resolvePro2HubSceneRows(
+  hubId: string,
+  d: StoryProScriptHubNodeData,
+  nodes: CanvasFlowNode[],
+  edges: CanvasFlowEdge[],
+): import("./story-pro-workspace-types").StoryProSceneRow[] {
+  if (!pro2HubHasSceneTable(d, { nodes, edges, hubId })) return [];
+  const synced = syncStoryProColumnRows(
+    resolvePro2HubDataForColumnSync(hubId, d, nodes, edges),
+    {},
+    hubId,
+  );
+  return synced.sceneRows;
+}
+
+export function pro2HubHasSceneTable(
+  d: StoryProScriptHubNodeData,
+  ctx?: Pro2HubSceneResolveContext,
+): boolean {
+  return parseSceneVisualDictionaryRows(resolvePro2HubSceneMd(d, ctx)).length > 0;
 }
 
 /** 2.0 脚本 hub LLM 顺序：大纲 → 角色 → 场景 → 分镜 */
@@ -270,6 +341,116 @@ export type KickoffPro2FrameBoardOptions = {
   };
 };
 
+type UpstreamMediaKickoffStore = FrameKickoffStore & {
+  addNode: (
+    type:
+      | "story-pro2-character"
+      | "story-pro2-scene"
+      | "story-pro2-frame"
+      | "story-pro2-image"
+      | "story-pro2-three-view"
+      | "group",
+    position: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+};
+
+/** 连接已有（或新建）角色三视图组 / 场景图组，供生成分镜时按镜号关联参考 */
+function ensurePro2UpstreamMediaGroupsForFrameBoard(
+  getStore: () => UpstreamMediaKickoffStore,
+  hubId: string,
+  hubData: StoryProScriptHubNodeData,
+  starterId: string,
+  ws: StoryPro2WorkspaceIds,
+): {
+  characterRows: import("./story-pro-workspace-types").StoryProCharacterRow[];
+  sceneRows: import("./story-pro-workspace-types").StoryProSceneRow[];
+} {
+  let store = getStore();
+  let characterColumnId = ws.characterColumnId;
+  const legacySceneColumnId = ws.sceneColumnId;
+
+  const charNode = characterColumnId
+    ? store.nodes.find((n) => n.id === characterColumnId)
+    : undefined;
+  const existingSceneRows = readPro2SceneRowsForHub(
+    hubId,
+    store.nodes,
+    legacySceneColumnId,
+  );
+  const existingCharRows = (charNode?.data as { rows?: unknown[] })?.rows ?? [];
+
+  let columnSync = syncStoryProColumnRows(
+    resolvePro2HubDataForColumnSync(hubId, hubData, store.nodes, store.edges),
+    {
+      characterRows: existingCharRows as never,
+      sceneRows: existingSceneRows as never,
+    },
+    hubId,
+  );
+
+  if (pro2HubHasCharacterTable(hubData)) {
+    if (
+      !characterColumnId ||
+      !store.nodes.some((n) => n.id === characterColumnId)
+    ) {
+      characterColumnId = spawnStoryPro2CharacterColumnFromHub({
+        scriptHubId: hubId,
+        starterNodeId: starterId,
+        nodes: store.nodes,
+        edges: store.edges,
+        addNode: store.addNode,
+        setEdges: store.setEdges,
+        updateNodeData: store.updateNodeData,
+      });
+      store = getStore();
+    }
+    store.updateNodeData(characterColumnId, {
+      rows: columnSync.characterRows,
+      hubNodeId: hubId,
+    });
+    store = getStore();
+    ensurePro2CharacterImageGroup({
+      characterColumnId: characterColumnId!,
+      hubNodeId: hubId,
+      rows: columnSync.characterRows,
+      nodes: store.nodes,
+      addNode: store.addNode,
+      addNodeInGroup: store.addNodeInGroup,
+      createGroupContaining: store.createGroupContaining,
+      updateNodeData: store.updateNodeData,
+      setNodes: store.setNodes,
+      setEdges: store.setEdges,
+    });
+    store = getStore();
+  }
+
+  if (columnSync.sceneRows.length > 0) {
+    store.updateNodeData(hubId, { sceneRows: columnSync.sceneRows });
+    store = getStore();
+    ensurePro2SceneImageGroup({
+      hubNodeId: hubId,
+      rows: columnSync.sceneRows,
+      nodes: store.nodes,
+      edges: store.edges,
+      starterNodeId: starterId,
+      legacySceneColumnId,
+      addNode: store.addNode,
+      addNodeInGroup: store.addNodeInGroup,
+      createGroupContaining: store.createGroupContaining,
+      updateNodeData: store.updateNodeData,
+      setNodes: store.setNodes,
+      setEdges: store.setEdges,
+    });
+    store = getStore();
+  }
+
+  return {
+    characterRows: columnSync.characterRows,
+    sceneRows: columnSync.sceneRows,
+  };
+}
+
 /** 阶段 B：spawn 分镜列、同步脚本行、批量生成分镜图 */
 export function kickoffPro2FrameBoardFromHub(
   getStore: () => FrameKickoffStore,
@@ -321,12 +502,21 @@ export function kickoffPro2FrameBoardFromHub(
     hubId,
   );
 
+  const upstream = ensurePro2UpstreamMediaGroupsForFrameBoard(
+    getStore as () => UpstreamMediaKickoffStore,
+    hubId,
+    hubData,
+    starter.id,
+    ws,
+  );
+  store = getStore();
+
   const dockNote = dockInput.trim();
   const refUrls = dockRefImages
     .filter((r) => r.url && /^https?:\/\//.test(r.url))
     .map((r) => ({ ...r }));
 
-  const frameRows = synced.frameRows.map((row) => {
+  const frameRowsBase = synced.frameRows.map((row) => {
     const promptBase = row.prompt?.trim() || "";
     const withDock = dockNote
       ? `${promptBase}\n\n用户补充：${dockNote}`.trim()
@@ -339,6 +529,12 @@ export function kickoffPro2FrameBoardFromHub(
         : row.refImages,
     };
   });
+
+  const frameRows = syncPro2FrameRowsUpstreamRefs(
+    frameRowsBase,
+    upstream.characterRows,
+    upstream.sceneRows,
+  );
 
   store.updateNodeData(frameColumnId, { rows: frameRows, hubNodeId: hubId });
   store = getStore();
@@ -567,6 +763,137 @@ export function kickoffPro2CharacterThreeViewFromHub(
   }
 
   return { characterColumnId };
+}
+
+type SceneImageKickoffStore = UpstreamMediaKickoffStore;
+
+export type KickoffPro2SceneImageOptions = {
+  sceneKeys?: string[];
+  batchImage?: Pro2SceneBatchImagePick;
+};
+
+/** 阶段 B″：同步场景行、spawn 场景图组、批量生成场景图（不再 spawn 场景设计列） */
+export function kickoffPro2SceneImageFromHub(
+  getStore: () => SceneImageKickoffStore,
+  hubId: string,
+  hubData: StoryProScriptHubNodeData,
+  providers: import("@/lib/canvas-providers-api").CanvasProviderDto[],
+  options?: KickoffPro2SceneImageOptions,
+): { hubNodeId: string } | null {
+  let store = getStore();
+  const sceneCtx = { nodes: store.nodes, edges: store.edges, hubId };
+  if (!pro2HubHasSceneTable(hubData, sceneCtx)) return null;
+
+  const starter = resolveStarterForHub(store.nodes, store.edges, hubId);
+  if (!starter) return null;
+
+  const ws =
+    findStoryPro2WorkspaceForStarter(
+      store.nodes,
+      store.edges,
+      starter.id,
+      (starter.data as { workspaceIds?: StoryPro2WorkspaceIds }).workspaceIds,
+    ) ?? ({ scriptHubId: hubId } as StoryPro2WorkspaceIds);
+
+  const legacySceneColumnId = ws.sceneColumnId;
+  const existingSceneRows = readPro2SceneRowsForHub(
+    hubId,
+    store.nodes,
+    legacySceneColumnId,
+  );
+  const synced = syncStoryProColumnRows(
+    resolvePro2HubDataForColumnSync(hubId, hubData, store.nodes, store.edges),
+    { sceneRows: existingSceneRows as never },
+    hubId,
+  );
+
+  store.updateNodeData(hubId, { sceneRows: synced.sceneRows });
+  store = getStore();
+
+  const batchFromPicker = options?.batchImage;
+  if (batchFromPicker?.providerId?.trim() && batchFromPicker.modelKey?.trim()) {
+    store.updateNodeData(hubId, {
+      sceneBatchImage: {
+        providerId: batchFromPicker.providerId,
+        modelKey: batchFromPicker.modelKey,
+        params: batchFromPicker.params ?? {
+          aspect_ratio: "16:9",
+          resolution: "2K",
+          output_format: "png",
+        },
+      },
+    });
+  } else {
+    const imagePick = pickDefaultPro2SceneImageEngine(providers);
+    if (imagePick) {
+      const hubNow = store.nodes.find((n) => n.id === hubId);
+      const batch = (hubNow?.data as { sceneBatchImage?: unknown })
+        ?.sceneBatchImage as { providerId?: string } | undefined;
+      if (!batch?.providerId?.trim()) {
+        store.updateNodeData(hubId, {
+          sceneBatchImage: {
+            providerId: imagePick.providerId,
+            modelKey: imagePick.modelKey,
+            params: {
+              aspect_ratio: "16:9",
+              resolution: "2K",
+              output_format: "png",
+            },
+          },
+        });
+      }
+    }
+  }
+
+  let keys = synced.sceneRows.map((r) => r.key);
+  const picked = options?.sceneKeys?.filter((k) => k.trim());
+  if (picked?.length) {
+    const allowed = new Set(picked);
+    keys = synced.sceneRows
+      .filter((r) => allowed.has(r.key) || allowed.has(r.name))
+      .map((r) => r.key);
+  }
+  keys = Array.from(new Set(keys.filter(Boolean)));
+
+  const edges = store.edges;
+  store.setNodes((prev) => reflowStoryPro2Workspace(prev, edges));
+
+  store = getStore();
+  ensurePro2SceneImageGroup({
+    hubNodeId: hubId,
+    rows: synced.sceneRows,
+    nodes: store.nodes,
+    edges: store.edges,
+    starterNodeId: starter.id,
+    legacySceneColumnId,
+    addNode: store.addNode,
+    addNodeInGroup: store.addNodeInGroup,
+    createGroupContaining: store.createGroupContaining,
+    updateNodeData: store.updateNodeData,
+    setNodes: store.setNodes,
+    setEdges: store.setEdges,
+  });
+  store = getStore();
+  syncPro2SceneImagesFromRows(
+    store.nodes,
+    hubId,
+    synced.sceneRows,
+    store.updateNodeData,
+  );
+
+  if (keys.length) {
+    window.setTimeout(() => {
+      batchRunPro2SceneImageNodes(
+        store.nodes,
+        hubId,
+        synced.sceneRows,
+        keys,
+        { forceFresh: true },
+      );
+    }, 0);
+  }
+
+  return { hubNodeId: hubId };
 }
 
 export function pro2HubCanSendScriptPhase(

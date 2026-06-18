@@ -121,6 +121,26 @@ export function formatCanvasTaskError(
   if (blob.includes("kie chat empty content")) {
     return "KIE Gemini 返回空内容（可能被安全策略拦截或 reasoning 未输出正文）。请稍后重试，或换 deepseek-chat 等模型。";
   }
+
+  if (
+    blob.includes("transaction already closed") ||
+    blob.includes("prisma.") ||
+    blob.includes("transaction api error")
+  ) {
+    return "服务繁忙，请稍后重试。若持续失败请联系管理员。";
+  }
+
+  if (
+    blob.includes("flagged as sensitive") ||
+    blob.includes("sensitive content") ||
+    blob.includes("content policy") ||
+    blob.includes("content filter") ||
+    blob.includes("安全") ||
+    blob.includes("违规")
+  ) {
+    return "内容被模型安全策略拦截。请修改提示词（减少敏感描述）后重试，或更换模型。";
+  }
+
   if (
     blob.includes("fetch failed") ||
     blob.includes("failed to fetch") ||

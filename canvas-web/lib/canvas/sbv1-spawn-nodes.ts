@@ -294,7 +294,8 @@ export async function handleSbv1ImageSideAddNodePick(
   }
   if (
     side === "right" &&
-    (itemId === "video-compose" ||
+    (itemId === "video" ||
+      itemId === "video-compose" ||
       itemId === "video-engine" ||
       nodeType === "sbv1-video-engine")
   ) {
@@ -331,6 +332,7 @@ export async function handleSbv1SideAddNodePick(
   const enabled =
     itemId === "txt2img" ||
     itemId === "img2img" ||
+    itemId === "video" ||
     itemId === "video-engine" ||
     itemId === "video-compose" ||
     (itemId === "image" && nodeType === "sbv1-image") ||
@@ -367,6 +369,7 @@ export async function handleSbv1GroupSidePick(
 ): Promise<void> {
   await handleSbv1SideAddNodePick(itemId, nodeType, alert, () => {
     if (
+      itemId === "video" ||
       itemId === "video-engine" ||
       itemId === "video-compose" ||
       nodeType === "sbv1-video-engine"

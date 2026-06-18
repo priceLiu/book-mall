@@ -255,6 +255,20 @@ body {
   stroke-width: 32 !important;
 }
 
+/* 未 hover 的连线不挡节点侧 +；hover 时仍可点选/删除连线 */
+.react-flow__edge:not(:hover):not(.selected) .react-flow__edge-interaction {
+  pointer-events: none !important;
+}
+
+/* LibTV 侧 + · 置顶于连线交互层 */
+.pro2-node-side-plus-layer {
+  isolation: isolate;
+}
+.react-flow__node .pro2-node-side-plus-handle {
+  z-index: 20050 !important;
+  pointer-events: all !important;
+}
+
 /* 选中节点 → 上下游连线流动动效 */
 @keyframes pro2-edge-dash {
   to {

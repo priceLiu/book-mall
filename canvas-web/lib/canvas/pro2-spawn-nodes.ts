@@ -4,13 +4,15 @@ import { nanoid } from "nanoid";
 import {
   STORY_PRO_HUB_LLM_SYSTEM,
   STORY_PRO_LLM_PARAMS_DEFAULT,
-  STORY_PRO_OUTLINE_USER_PROMPT,
 } from "./story-pro-prompts";
 import {
   STORY_PRO2_CHARACTER_PROMPT,
+  STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
+  STORY_PRO2_PACK_PROMPT_VERSION,
   STORY_PRO2_SCENE_PROMPT,
   STORY_PRO2_STORYBOARD_PROMPT,
 } from "./story-pro2-theme-outline-prompt";
+import { SBV1_DEFAULT_IMAGE_NODE_DATA } from "./sbv1-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import { findStoryPro2ScriptHubForStarter } from "./spawn-story-pro2-workspace";
@@ -22,12 +24,23 @@ export function buildPro2StarterNodeData(
     starterMode: "generate",
     themeInput: "",
     generatedOutlineMd: "",
+    pro2TextPurpose: "story-outline",
     providerId: "",
     modelKey: "",
     params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
     pipelineStage: "idle",
     ...overrides,
   };
+}
+
+/** 文生图/生视频/反推等 · 不走故事大纲 LLM */
+export function buildPro2GeneralTextNodeData(
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> {
+  return buildPro2StarterNodeData({
+    pro2TextPurpose: "general",
+    ...overrides,
+  });
 }
 
 export function buildPro2ScriptHubNodeData(
@@ -42,10 +55,11 @@ export function buildPro2ScriptHubNodeData(
     modelKey: "",
     params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
     outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
-    promptOutline: STORY_PRO_OUTLINE_USER_PROMPT,
+    promptOutline: STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
     promptCharacter: STORY_PRO2_CHARACTER_PROMPT,
     promptScene: STORY_PRO2_SCENE_PROMPT,
     promptStoryboard: STORY_PRO2_STORYBOARD_PROMPT,
+    storyPro2PackPromptVersion: STORY_PRO2_PACK_PROMPT_VERSION,
     dockInput: "",
     dockRefImages: [],
     ...overrides,
@@ -56,8 +70,8 @@ export function buildPro2ImageNodeData(
   overrides?: Record<string, unknown>,
 ): Record<string, unknown> {
   return {
-    label: "图片",
-    dockInput: "",
+    ...SBV1_DEFAULT_IMAGE_NODE_DATA,
+    pro2MediaRole: "generic",
     ...overrides,
   };
 }

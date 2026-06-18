@@ -68,7 +68,7 @@ export function runStoryHubSection(
 export function batchRunStoryRowsSequential(
   columnNodeId: string,
   rowKeys: string[],
-  mediaKind: "threeView" | "frameImage" | "video" | "tts",
+  mediaKind: "threeView" | "sceneRef" | "frameImage" | "video" | "tts",
   options?: { forceFresh?: boolean },
 ) {
   busEnqueueStoryRunsSequential(

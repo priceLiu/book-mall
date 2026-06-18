@@ -65,10 +65,9 @@ import { Pro2MediaGroupToolbar } from "./pro2/pro2-media-group-toolbar";
 import { Pro2SelectionToolbar } from "./pro2/pro2-selection-toolbar";
 import { Pro2StarterInputDock } from "./pro2/pro2-starter-input-dock";
 import { Pro2ScriptInputDock } from "./pro2/pro2-script-input-dock";
-import { Pro2ImageInputDock } from "./pro2/pro2-image-input-dock";
+import { LibtvImageInputDock } from "./libtv-image-input-dock";
 import { Sbv1MediaGroupToolbar } from "./sbv1/sbv1-media-group-toolbar";
 import { Sbv1VideoEngineFloatingDock } from "./sbv1/sbv1-video-engine-floating-dock";
-import { Sbv1ImageInputDock } from "./sbv1/sbv1-image-input-dock";
 import { Pro2ThreeViewInputDock } from "./pro2/pro2-three-view-input-dock";
 import { Pro2TextNodeOutlineEditorHost } from "./pro2/pro2-text-node-outline-editor-host";
 import { Pro2ScriptTableEditorHost } from "./pro2/pro2-script-table-editor-host";
@@ -396,8 +395,13 @@ function FlowCanvasInner({
       if (dragSnapRafRef.current !== null) {
         window.cancelAnimationFrame(dragSnapRafRef.current);
       }
+      if (dragUndoPausedRef.current) {
+        useCanvasStore.temporal.getState().resume();
+        dragUndoPausedRef.current = false;
+      }
+      setCanvasGeometryDragging(false);
     },
-    [],
+    [setCanvasGeometryDragging],
   );
 
   const onInit = useCallback(() => {
@@ -1158,21 +1162,24 @@ function FlowCanvasInner({
         ) : null}
       </ReactFlow>
       {pro2FloatingInspector ? null : <SelectionToolbar />}
-      {sbv1Canvas ? <Sbv1MediaGroupToolbar rfNodes={rfNodes} /> : null}
+      {pro2FloatingInspector || sbv1Canvas ? (
+        <Sbv1MediaGroupToolbar rfNodes={rfNodes} />
+      ) : null}
       {pro2FloatingInspector ? (
         <>
           <Pro2StarterInputDock />
           <Pro2ScriptInputDock />
           <Pro2FrameCellInputDock />
-          <Pro2ImageInputDock />
           <Pro2ThreeViewInputDock />
           <Pro2FloatingInspector />
           <Pro2TextNodeOutlineEditorHost />
           <Pro2ScriptTableEditorHost />
         </>
       ) : null}
-      {sbv1Canvas ? <Sbv1ImageInputDock /> : null}
-      {sbv1Canvas ? <Sbv1VideoEngineFloatingDock /> : null}
+      {pro2FloatingInspector || sbv1Canvas ? <LibtvImageInputDock /> : null}
+      {pro2FloatingInspector || sbv1Canvas ? (
+        <Sbv1VideoEngineFloatingDock />
+      ) : null}
       <CanvasPaneContextMenu
         open={Boolean(paneMenu)}
         position={paneMenu ?? { x: 0, y: 0 }}

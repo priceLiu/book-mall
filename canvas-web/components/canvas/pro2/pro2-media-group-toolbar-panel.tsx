@@ -2,6 +2,7 @@
 
 import {
   BookmarkPlus,
+  Copy,
   Download,
   LayoutGrid,
   Loader2,
@@ -13,10 +14,15 @@ import { useMemo, useState } from "react";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useSaveGroupAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
+import {
+  batchRunPro2SceneImageNodes,
+  readPro2SceneRowsForHub,
+} from "@/lib/canvas/pro2-spawn-scene-image-group";
 import { formatCharacterRowThreeViewPrompt } from "@/lib/canvas/three-view-prompt-rules";
 import type {
   StoryProCharacterRow,
   StoryProFrameRow,
+  StoryProSceneRow,
 } from "@/lib/canvas/story-pro2-workspace-types";
 import { GROUP_COLOR_PRESETS } from "@/lib/canvas/types";
 import type { CanvasFlowNode } from "@/lib/canvas/types";
@@ -27,7 +33,7 @@ import {
   PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS,
 } from "./pro2-image-node-toolbar";
 
-export type Pro2MediaGroupKind = "character-board" | "frame-board";
+export type Pro2MediaGroupKind = "character-board" | "frame-board" | "scene-board";
 
 export type Pro2MediaGroupToolbarPanelProps = {
   groupId: string;
@@ -91,6 +97,7 @@ export function Pro2MediaGroupToolbarPanel({
 }: Pro2MediaGroupToolbarPanelProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const ungroup = useCanvasStore((s) => s.ungroup);
+  const duplicateMediaGroup = useCanvasStore((s) => s.duplicateMediaGroup);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
   const group = nodes.find((n) => n.id === groupId);
@@ -116,6 +123,19 @@ export function Pro2MediaGroupToolbarPanel({
             groupId,
       );
     }
+    if (kind === "scene-board") {
+      const hubId = (group?.data as { pro2HubNodeId?: string }).pro2HubNodeId;
+      if (hubId) {
+        const hub = nodes.find((n) => n.id === hubId);
+        if (hub) return hub;
+      }
+      return nodes.find(
+        (n) =>
+          n.type === "story-pro2-scene" &&
+          (n.data as { pro2VisualGroupId?: string }).pro2VisualGroupId ===
+            groupId,
+      );
+    }
     return nodes.find(
       (n) =>
         n.type === "story-pro2-frame" &&
@@ -127,6 +147,12 @@ export function Pro2MediaGroupToolbarPanel({
   const rowCount = useMemo(() => {
     if (kind === "character-board") {
       return readRows<StoryProCharacterRow>(controller).length;
+    }
+    if (kind === "scene-board") {
+      if (controller?.type === "story-pro2-script-hub") {
+        return readPro2SceneRowsForHub(controller.id, nodes).length;
+      }
+      return readRows<StoryProSceneRow>(controller).length;
     }
     if (kind === "frame-board") {
       return readRows<StoryProFrameRow>(controller).length;
@@ -172,6 +198,9 @@ export function Pro2MediaGroupToolbarPanel({
   }, [edition, groupId, nodes]);
 
   const canRegenerate = edition === "pro2" && Boolean(kind && controller && rowCount);
+  const canCopyGroup =
+    edition === "pro2" &&
+    Boolean(kind && (kind === "scene-board" || kind === "frame-board" || kind === "character-board"));
 
   const onRegenerateAll = () => {
     if (!controller) return;
@@ -195,6 +224,29 @@ export function Pro2MediaGroupToolbarPanel({
       );
       return;
     }
+    if (kind === "scene-board") {
+      if (controller?.type === "story-pro2-script-hub") {
+        const rows = readPro2SceneRowsForHub(controller.id, nodes);
+        if (!rows.length) return;
+        batchRunPro2SceneImageNodes(
+          nodes,
+          controller.id,
+          rows,
+          rows.map((r) => r.key),
+          { forceFresh: true },
+        );
+        return;
+      }
+      const rows = readRows<StoryProSceneRow>(controller);
+      if (!rows.length) return;
+      batchRunStoryRowsSequential(
+        controller.id,
+        rows.map((r) => r.key),
+        "sceneRef",
+        { forceFresh: true },
+      );
+      return;
+    }
     const rows = readRows<StoryProFrameRow>(controller);
     if (!rows.length) return;
     batchRunStoryRowsSequential(
@@ -204,6 +256,17 @@ export function Pro2MediaGroupToolbarPanel({
       { forceFresh: true },
     );
   };
+
+  const onCopyGroup = () => {
+    duplicateMediaGroup(groupId);
+  };
+
+  const regenerateTitle =
+    kind === "character-board"
+      ? "重新生成全部三视图"
+      : kind === "scene-board"
+        ? "重新生成全部场景图"
+        : "重新生成全部分镜图";
 
   const onBatchDownload = async () => {
     if (!downloadable.length || downloading) return;
@@ -258,22 +321,29 @@ export function Pro2MediaGroupToolbarPanel({
           <button
             type="button"
             className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
-            title={
-              kind === "character-board"
-                ? "重新生成全部三视图"
-                : "重新生成全部分镜图"
-            }
+            title={regenerateTitle}
             onClick={onRegenerateAll}
           >
             <RotateCw className="size-3.5" />
             重新生成
           </button>
         ) : null}
+        {canCopyGroup ? (
+          <button
+            type="button"
+            className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
+            title="复制整组（含全部子节点）并从脚本中枢再连一条线"
+            onClick={onCopyGroup}
+          >
+            <Copy className="size-3.5" />
+            复制组
+          </button>
+        ) : null}
         {onRelayout ? (
           <button
             type="button"
             className={PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS}
-            title="参考图与视频合成重新纳入组框"
+            title="参考图与视频重新纳入组框"
             onClick={onRelayout}
           >
             <LayoutGrid className="size-3.5" />

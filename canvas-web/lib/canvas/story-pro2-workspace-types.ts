@@ -15,9 +15,10 @@ export type {
 } from "./story-pro-workspace-types";
 
 import type { ImageNodeData } from "./types";
+import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 
 /** 2.0 图片节点 · 组内子节点角色 */
-export type Pro2ImageMediaRole = "generic" | "frame" | "character-three-view";
+export type Pro2ImageMediaRole = "generic" | "frame" | "character-three-view" | "scene";
 
 /** 2.0 角色三视图节点 data（独立 type · 横向矩形） */
 export type StoryPro2ThreeViewNodeData = ImageNodeData & {
@@ -35,7 +36,11 @@ export type StoryPro2ThreeViewNodeData = ImageNodeData & {
 };
 
 /** 2.0 图片节点 data */
-export type StoryPro2ImageNodeData = ImageNodeData & {
+export type StoryPro2ImageNodeData = ImageNodeData &
+  Pick<
+    Sbv1ImageNodeData,
+    "engine" | "aspectRatio" | "imageQuality" | "resolution" | "outputCount" | "imageMode"
+  > & {
   /** 底部输入坞提示词（@ 引用上游） */
   dockInput?: string;
   /** 组内分镜 / 三视图子节点 */

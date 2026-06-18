@@ -9,6 +9,20 @@ import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
 const MENU_SHELL_CLASS =
   "overflow-hidden rounded-xl border border-white/15 bg-[#1c1c1e] py-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.75)] ring-1 ring-black/40";
 
+const MENU_ITEM_BASE =
+  "nodrag flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors duration-75";
+
+function menuItemClass(enabled: boolean, highlighted: boolean): string {
+  if (!enabled) return cn(MENU_ITEM_BASE, "cursor-not-allowed text-white/30");
+  if (highlighted) {
+    return cn(
+      MENU_ITEM_BASE,
+      "bg-violet-500/22 text-white ring-1 ring-inset ring-violet-400/35",
+    );
+  }
+  return cn(MENU_ITEM_BASE, "text-white/88");
+}
+
 export type Pro2AddNodePopoverPlacement = "top-left" | "above-center";
 
 export type Pro2AddNodePopoverProps = {
@@ -32,6 +46,8 @@ export function Pro2AddNodePopover({
   const ref = useRef<HTMLDivElement>(null);
   const mainPanelRef = useRef<HTMLDivElement>(null);
   const [flyoutId, setFlyoutId] = useState<string | null>(null);
+  const [hoveredMainId, setHoveredMainId] = useState<string | null>(null);
+  const [hoveredFlyoutId, setHoveredFlyoutId] = useState<string | null>(null);
   const [maxMainHeight, setMaxMainHeight] = useState<number | undefined>();
 
   useLayoutEffect(() => {
@@ -52,6 +68,8 @@ export function Pro2AddNodePopover({
   useEffect(() => {
     if (!open) {
       setFlyoutId(null);
+      setHoveredMainId(null);
+      setHoveredFlyoutId(null);
       return;
     }
     const onDoc = (e: MouseEvent) => {
@@ -103,22 +121,19 @@ export function Pro2AddNodePopover({
             {section.items.map((item) => {
               const Icon = item.icon;
               const hasSub = Boolean(item.submenu?.length);
-              const active = flyoutId === item.id;
+              const highlighted =
+                hoveredMainId === item.id || flyoutId === item.id;
               return (
                 <button
                   key={item.id}
                   type="button"
                   disabled={!item.enabled}
-                  className={cn(
-                    "nodrag flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition",
-                    item.enabled
-                      ? active
-                        ? "bg-white/10 text-white"
-                        : "text-white/90 hover:bg-white/8"
-                      : "cursor-not-allowed text-white/30",
-                  )}
+                  className={menuItemClass(item.enabled, highlighted)}
                   onMouseEnter={() => {
+                    setHoveredMainId(item.id);
+                    setHoveredFlyoutId(null);
                     if (hasSub && item.enabled) setFlyoutId(item.id);
+                    else setFlyoutId(null);
                   }}
                   onClick={() => {
                     if (!item.enabled) return;
@@ -157,7 +172,7 @@ export function Pro2AddNodePopover({
 
       {flyoutSections?.length ? (
         <div
-          className={cn(MENU_SHELL_CLASS, "ml-1 min-w-[168px] self-stretch")}
+          className={cn(MENU_SHELL_CLASS, "-ml-px min-w-[168px] self-stretch")}
           style={maxMainHeight ? { maxHeight: maxMainHeight, overflowY: "auto" } : undefined}
         >
           {flyoutSections.map((section, si) => (
@@ -169,17 +184,14 @@ export function Pro2AddNodePopover({
               ) : null}
               {section.items.map((item) => {
                 const Icon = item.icon;
+                const highlighted = hoveredFlyoutId === item.id;
                 return (
                   <button
                     key={item.id}
                     type="button"
                     disabled={!item.enabled}
-                    className={cn(
-                      "nodrag flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition",
-                      item.enabled
-                        ? "text-white/90 hover:bg-white/8"
-                        : "cursor-not-allowed text-white/30",
-                    )}
+                    className={menuItemClass(item.enabled, highlighted)}
+                    onMouseEnter={() => setHoveredFlyoutId(item.id)}
                     onClick={() => {
                       if (!item.enabled) return;
                       onPick(item.id, item.nodeType);

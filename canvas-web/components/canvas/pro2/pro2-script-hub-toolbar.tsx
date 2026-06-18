@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, LayoutGrid, RotateCw, Users, BookmarkPlus } from "lucide-react";
+import { Download, LayoutGrid, MapPin, RotateCw, Users, BookmarkPlus } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
@@ -10,19 +10,26 @@ import {
   downloadPro2ScriptMarkdown,
   generatePro2CharacterThreeViewFromHub,
   generatePro2FrameBoardFromHub,
+  generatePro2SceneImageFromHub,
   pro2ScriptHubExportMarkdown,
   regeneratePro2ScriptHub,
 } from "@/lib/canvas/pro2-script-hub-toolbar-actions";
 import {
   pro2HubHasCharacterTable,
+  pro2HubHasSceneTable,
   pro2HubHasScriptTable,
   pro2HubIsGenerating,
   pro2HubIsLinkedOutline,
   resolvePro2HubCharacterMd,
+  resolvePro2HubSceneMd,
+  resolvePro2HubSceneRows,
 } from "@/lib/canvas/pro2-script-hub-helpers";
 import {
   resolvePro2ThreeViewBatchImageForHub,
 } from "@/lib/canvas/pro2-three-view-batch-image";
+import {
+  resolvePro2SceneBatchImageForHub,
+} from "@/lib/canvas/pro2-scene-batch-image";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
@@ -39,6 +46,10 @@ import {
   Pro2FrameGeneratePicker,
   type Pro2FrameGenerateResult,
 } from "./pro2-frame-generate-picker";
+import {
+  Pro2SceneImagePicker,
+  type Pro2SceneImageResult,
+} from "./pro2-scene-image-picker";
 
 const TOOL_BTN =
   "nodrag flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] text-white/75 transition hover:bg-white/8 hover:text-white/95 disabled:cursor-not-allowed disabled:opacity-40";
@@ -61,6 +72,7 @@ function pro2HubBatchStore() {
     addNode: (
       type:
         | "story-pro2-character"
+        | "story-pro2-scene"
         | "story-pro2-frame"
         | "story-pro2-image"
         | "story-pro2-three-view"
@@ -98,12 +110,14 @@ export function Pro2ScriptHubToolbar({
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const [framePickerOpen, setFramePickerOpen] = useState(false);
   const [tvPickerOpen, setTvPickerOpen] = useState(false);
+  const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const saveAsAsset = useSaveNodeAsAsset();
 
   const dockInput = hubData.dockInput ?? "";
   const dockRefImages = (hubData.dockRefImages ?? []) as StoryRefImage[];
   const hasTable = pro2HubHasScriptTable(hubData);
   const hasCharacterTable = pro2HubHasCharacterTable(hubData);
+  const hasSceneTable = pro2HubHasSceneTable(hubData, { nodes, edges, hubId });
   const linked = pro2HubIsLinkedOutline(nodes, edges, hubId, hubData);
   const isGenerating = pro2HubIsGenerating({
     id: hubId,
@@ -127,6 +141,11 @@ export function Pro2ScriptHubToolbar({
     [hubId, nodes, edges],
   );
 
+  const initialSceneBatchImage = useMemo(
+    () => resolvePro2SceneBatchImageForHub(hubId, nodes, edges),
+    [hubId, nodes, edges],
+  );
+
   const runFrameGenerate = (result: Pro2FrameGenerateResult) => {
     generatePro2FrameBoardFromHub(
       hubId,
@@ -147,6 +166,17 @@ export function Pro2ScriptHubToolbar({
       providers,
       pro2HubBatchStore,
       result.characterKeys,
+      result.batchImage,
+    );
+  };
+
+  const runSceneGenerate = (result: Pro2SceneImageResult) => {
+    generatePro2SceneImageFromHub(
+      hubId,
+      hubData,
+      providers,
+      pro2HubBatchStore,
+      result.sceneKeys,
       result.batchImage,
     );
   };
@@ -207,6 +237,20 @@ export function Pro2ScriptHubToolbar({
     setTvPickerOpen(true);
   };
 
+  const onGenerateScene = async () => {
+    if (isGenerating) return;
+    if (!hasSceneTable) {
+      await alert({
+        title: "请先生成场景设定",
+        message:
+          "请在大纲 Tab 中确认含「场景视觉辞典」表，或生成场景段后再点击「生成场景图」。",
+        variant: "warning",
+      });
+      return;
+    }
+    setScenePickerOpen(true);
+  };
+
   const onDownload = () => {
     const md = pro2ScriptHubExportMarkdown(hubData);
     if (!md.trim()) return;
@@ -236,16 +280,6 @@ export function Pro2ScriptHubToolbar({
         <button
           type="button"
           className={TOOL_BTN}
-          disabled={isGenerating || !hasTable}
-          title="选择镜号并生成分镜图"
-          onClick={() => void onGenerateFrames()}
-        >
-          <LayoutGrid className="size-3.5" />
-          <span>生成分镜</span>
-        </button>
-        <button
-          type="button"
-          className={TOOL_BTN}
           disabled={isGenerating}
           title={
             hasCharacterTable
@@ -256,6 +290,30 @@ export function Pro2ScriptHubToolbar({
         >
           <Users className="size-3.5" />
           <span>生成角色三视图</span>
+        </button>
+        <button
+          type="button"
+          className={TOOL_BTN}
+          disabled={isGenerating}
+          title={
+            hasSceneTable
+              ? "选择场景并生成场景参考图"
+              : "请先生成含场景设定的分镜脚本"
+          }
+          onClick={() => void onGenerateScene()}
+        >
+          <MapPin className="size-3.5" />
+          <span>生成场景图</span>
+        </button>
+        <button
+          type="button"
+          className={TOOL_BTN}
+          disabled={isGenerating || !hasTable}
+          title="选择镜号并生成分镜图（自动关联角色三视图与场景图）"
+          onClick={() => void onGenerateFrames()}
+        >
+          <LayoutGrid className="size-3.5" />
+          <span>生成分镜</span>
         </button>
         <div className="mx-0.5 h-5 w-px bg-white/10" />
         <button
@@ -299,6 +357,17 @@ export function Pro2ScriptHubToolbar({
         initialBatchImage={initialThreeViewBatchImage}
         onClose={() => setTvPickerOpen(false)}
         onConfirm={runThreeViewGenerate}
+      />
+
+      <Pro2SceneImagePicker
+        open={scenePickerOpen}
+        sceneMd={resolvePro2HubSceneMd(hubData, { nodes, edges, hubId })}
+        sceneRowKeys={resolvePro2HubSceneRows(hubId, hubData, nodes, edges).map(
+          (r) => ({ name: r.name, key: r.key }),
+        )}
+        initialBatchImage={initialSceneBatchImage}
+        onClose={() => setScenePickerOpen(false)}
+        onConfirm={runSceneGenerate}
       />
     </>
   );

@@ -648,21 +648,78 @@ function extractMarkdownSectionByHeader(
   md: string,
   titlePattern: RegExp,
 ): string {
-  const re = /^##\s+(.+)$/gm;
-  let match: RegExpExecArray | null;
-  const hits: Array<{ start: number; end: number; title: string }> = [];
-  while ((match = re.exec(md)) !== null) {
-    hits.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      title: match[1]?.trim() ?? "",
-    });
+  return extractMarkdownSectionByHeaderLevels(md, titlePattern, [2]);
+}
+
+/** 按标题层级（## / ### / #）提取 Markdown 段落 */
+function extractMarkdownSectionByHeaderLevels(
+  md: string,
+  titlePattern: RegExp,
+  levels: number[],
+): string {
+  for (const level of levels) {
+    const re = new RegExp(`^#{${level}}\\s+(.+)$`, "gm");
+    let match: RegExpExecArray | null;
+    const hits: Array<{ start: number; end: number; title: string }> = [];
+    while ((match = re.exec(md)) !== null) {
+      hits.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        title: match[1]?.trim() ?? "",
+      });
+    }
+    const idx = hits.findIndex((h) => titlePattern.test(h.title));
+    if (idx < 0) continue;
+    const bodyStart = hits[idx].end;
+    const bodyEnd = idx + 1 < hits.length ? hits[idx + 1].start : md.length;
+    const body = md.slice(bodyStart, bodyEnd).trim();
+    if (body) return body;
   }
-  const idx = hits.findIndex((h) => titlePattern.test(h.title));
-  if (idx < 0) return "";
-  const bodyStart = hits[idx].end;
-  const bodyEnd = idx + 1 < hits.length ? hits[idx + 1].start : md.length;
-  return md.slice(bodyStart, bodyEnd).trim();
+  return "";
+}
+
+function sceneDictionaryHeadersMatch(headers: string[]): boolean {
+  const norms = headers.map(normHeader);
+  const hasSceneName = norms.some(
+    (h) =>
+      h === "场景名" ||
+      h === "场景" ||
+      h.includes("scene name") ||
+      h === "scene" ||
+      h === "location",
+  );
+  const hasSceneMeta = norms.some((h) =>
+    ["环境", "时间", "气氛", "氛围", "environment", "time", "mood", "atmosphere"].some(
+      (alias) => h === alias || h.includes(alias),
+    ),
+  );
+  return hasSceneName && hasSceneMeta;
+}
+
+/** 无 ## 场景视觉辞典 标题时，按表头扫描全文 GFM 场景辞典表 */
+function findSceneVisualDictionaryTableBlock(md: string): string {
+  const lines = md.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const t = normalizeMdTableLine(lines[i]!);
+    if (!t.startsWith("|") || /^[\|\s\-:]+$/.test(t)) continue;
+    const headerCells = parseGfmTableRowCells(t);
+    if (!headerCells?.length) continue;
+    const block: string[] = [lines[i]!];
+    let j = i + 1;
+    while (j < lines.length) {
+      const nt = normalizeMdTableLine(lines[j]!);
+      if (!nt.startsWith("|")) break;
+      block.push(lines[j]!);
+      j++;
+    }
+    const blockMd = compactGfmTables(block.join("\n"));
+    const { headers, rows } = parseMdTable(blockMd);
+    if (headers.length && rows.length && sceneDictionaryHeadersMatch(headers)) {
+      return blockMd;
+    }
+    i = Math.max(i, j - 1);
+  }
+  return "";
 }
 
 /** 大纲展示：去掉快手版「制作包」嵌入段（角色设定卡 / 关系 / 分镜 / 核心对白），保留影视专业版「二、主要角色」等章节 */
@@ -685,9 +742,27 @@ export type SceneVisualDictionaryRow = {
 
 /** 从大纲或场景段正文中提取场景 GFM 表 */
 export function extractSceneSectionMd(md: string): string {
-  const fromPrompt = extractMarkdownSectionByHeader(md, /场景视觉提示词/);
+  const fromPrompt = extractMarkdownSectionByHeaderLevels(
+    md,
+    /场景视觉提示词/,
+    [2, 3, 1],
+  );
   if (fromPrompt) return compactGfmTables(fromPrompt);
   return extractSceneVisualDictionaryFromOutline(md);
+}
+
+/** 优先可解析的 sceneMd，否则从大纲拆出场景辞典 */
+export function resolveSceneDictionaryMarkdown(
+  outlineMd: string,
+  sceneMd = "",
+): string {
+  const dedicated = sceneMd.trim();
+  if (dedicated && parseSceneVisualDictionaryRows(dedicated).length > 0) {
+    return dedicated;
+  }
+  const fromOutline = extractSceneSectionMd(outlineMd);
+  if (fromOutline.trim()) return fromOutline;
+  return dedicated;
 }
 
 /** 解析「场景视觉辞典」GFM 表 */
@@ -708,6 +783,7 @@ export function parseSceneVisualDictionaryRows(md: string): SceneVisualDictionar
       mood: pickColumn(r, ["气氛", "氛围", "mood", "atmosphere"]),
       imageKeywords: pickColumn(r, [
         "生图关键词",
+        "生成图片关键词",
         "关键词",
         "AI生图提示词(英文)",
         "AI生图提示词",
@@ -722,11 +798,16 @@ export function parseSceneVisualDictionaryRows(md: string): SceneVisualDictionar
 
 /** 从大纲正文中提取「场景视觉辞典」段 */
 export function extractSceneVisualDictionaryFromOutline(md: string): string {
-  const body = extractMarkdownSectionByHeader(
+  const body = extractMarkdownSectionByHeaderLevels(
     md,
     /场景视觉辞典|场景辞典|场景设定|场景表/,
+    [2, 3, 1],
   );
-  return body ? compactGfmTables(body) : "";
+  if (body) {
+    const compact = compactGfmTables(body);
+    if (parseMdTable(compact).rows.length) return compact;
+  }
+  return findSceneVisualDictionaryTableBlock(md);
 }
 
 /** 从大纲正文中提取「角色设定」段（表格或列表） */

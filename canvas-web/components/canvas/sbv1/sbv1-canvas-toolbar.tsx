@@ -82,7 +82,7 @@ export function Sbv1CanvasToolbar() {
         disabled: !base,
       },
       {
-        id: "video-compose",
+        id: "video",
         name: SBV1_VIDEO_COMPOSE_LABEL,
         icon: <Video strokeWidth={1.75} />,
         color: "bg-gradient-to-br from-rose-400 to-red-600",

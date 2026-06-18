@@ -21,6 +21,40 @@ Pro2 画布及 `canvas-web` 内所有「点击后弹出选择 AI 模型 + 可调
 | 故事大纲 / 分镜脚本 LLM | `LLM` | `STORY_LLM_MODEL_KEYS` |
 | 三视图 / 分镜图 IMAGE | `IMAGE` | `PRO2_THREE_VIEW_MODEL_KEYS` / `PRO2_FRAME_IMAGE_MODEL_KEYS` 等 |
 | 分镜视频 | `VIDEO` | `STORY_PRO_VIDEO_MODEL_KEYS` 等 + `requiredCapabilities` |
+| sbv1 视频合成 | `VIDEO` | `SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS` · `gateway:sbv1-volcengine` |
+
+## Gateway role 标签（与 book-mall 登记一致）
+
+统一文案见 `canvas-web/lib/canvas/gateway-model-role.ts` · **`GATEWAY_MODEL_ROLE_META`**：
+
+| Gateway `role` | Dock 分组标题 | 弹层 / 占位 |
+|----------------|---------------|-------------|
+| `LLM` | Text model · 文本模型 | Select text model |
+| `IMAGE` | Image model · 图片模型 | Select image model |
+| `VIDEO` | Video model · 视频模型 | Select video model |
+
+`EnginePicker` 触发按钮占位与 `EngineModelModal` 标题 **必须** 走 `gatewayModelRoleMeta(role)`，禁止手写「选择 AI 引擎模型」等旧文案。
+
+## 文本节点 · 类型匹配模型（`story-pro2-starter`）
+
+**唯一入口**：`Pro2TextNodeEnginePickers`（`pro2-text-node-engine-pickers.tsx`）+ `resolvePro2TextNodeEngineRoles`（`pro2-text-node-engine-roles.ts`）。
+
+按节点用途与连线 **只展示相关 Gateway role**，供用户自选模型与参数：
+
+| 用途 / 上下文 | 展示 role | 数据槽 |
+|---------------|-----------|--------|
+| `pro2TextPurpose=story-outline` | `LLM` | `providerId` / `modelKey` / `params` |
+| 预设 `text-to-video` | `VIDEO` | `videoEngine` |
+| 预设 `image-to-prompt` | `LLM` + `IMAGE` | `providerId` / … + `imageEngine` |
+| 预设 `video-to-prompt` | `LLM` + `VIDEO` | `providerId` / … + `videoEngine` |
+| general · 出边连图片节点 | `IMAGE` | `imageEngine` |
+| general · 出边连 `sbv1-video-engine` | `VIDEO` | `videoEngine` |
+| general · 入边来自媒体（反推） | `LLM` | `providerId` / … |
+| general · 无匹配边（独立提示词） | `LLM` + `IMAGE` + `VIDEO` | 三槽均可选 |
+
+用户修改 `IMAGE` / `VIDEO` 时，`syncPro2TextNodeEngineToDownstream` 同步到直连下游 `story-pro2-image` / `sbv1-image` / `sbv1-video-engine` 的 `engine` 字段。
+
+白名单：LLM → `STORY_LLM_MODEL_KEYS`；IMAGE → `SBV1_IMAGE_MODEL_KEYS`；VIDEO（sbv1）→ `SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS`。
 
 ## 禁止
 
@@ -31,7 +65,8 @@ Pro2 画布及 `canvas-web` 内所有「点击后弹出选择 AI 模型 + 可调
 
 ## Pro2 已接入入口（须保持）
 
-- `pro2-starter-input-dock` · `pro2-script-input-dock` → `role="LLM"`
+- `pro2-starter-input-dock` → `Pro2TextNodeEnginePickers`（按 role 分类 · 见上表）
+- `pro2-script-input-dock` → `role="LLM"`
 - `pro2-three-view-input-dock` · `pro2-frame-generate-picker` · `pro2-character-three-view-picker` → `role="IMAGE"`
 - 分镜视频相关弹层 → `role="VIDEO"`
 

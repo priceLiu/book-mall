@@ -94,6 +94,14 @@ export type StoryProScriptHubNodeData = {
   characterMd: string;
   /** 2.0 · 场景视觉提示词（LLM 根据大纲场景辞典扩写） */
   sceneMd?: string;
+  /** 2.0 · 场景图组同步行（原场景设计列 rows，现挂 hub） */
+  sceneRows?: StoryProSceneRow[];
+  /** 2.0 · hub 顶栏批量场景图默认模型（弹层可覆盖） */
+  sceneBatchImage?: {
+    providerId?: string;
+    modelKey?: string;
+    params?: Record<string, unknown>;
+  };
   storyboardMd: string;
   /** 2.0 输入坞 · 用户提示词 */
   dockInput?: string;
@@ -235,6 +243,10 @@ export type StoryProStarterNodeData = {
   generatedOutlineMd?: string;
   /** 2.0 文本节点 · 大纲编辑历史（最多 3 条） */
   generatedOutlineHistory?: import("./story-revision").StoryTextRevision[];
+  /** 文本节点用途：story-outline=生成故事大纲；general=提示词/下游引用（文生图/生视频/反推等） */
+  pro2TextPurpose?: import("./pro2-text-purpose").Pro2TextPurpose;
+  /** 快捷预设组标记（image-to-prompt 等） */
+  pro2PresetKind?: string;
   themeOutlineRuntime?: CanvasNodeRuntime;
   themeOutlineSystemPrompt?: string;
   /** 运行时内存/会话用；autosave 时剥离，以 OSS 为准 */
@@ -247,6 +259,10 @@ export type StoryProStarterNodeData = {
   providerId: string;
   modelKey: string;
   params?: Record<string, unknown>;
+  /** 文本节点 · Gateway IMAGE 槽（文生图 / 下游图片节点） */
+  imageEngine?: import("./types").CanvasEnginePick;
+  /** 文本节点 · Gateway VIDEO 槽（文生视频 / 下游视频合成） */
+  videoEngine?: import("./types").CanvasEnginePick;
   pipelineStage?: "idle" | "llm_done" | "script_finalized" | "style_finalized" | "finalized";
   workspaceIds?: StoryProWorkspaceIds;
 };

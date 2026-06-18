@@ -5,6 +5,7 @@ import {
   applyCharacterRowRuntime,
   applyFrameRowRuntime,
   applyHubSectionFromTask,
+  applySceneRowRuntime,
   applyVideoRowRuntime,
 } from "./story-row-patch";
 import {
@@ -25,6 +26,9 @@ import { shouldSkipStoryRowTaskApply } from "./task-pick";
 import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
 import { syncPro2CharacterImagesFromRows } from "./pro2-spawn-character-image-group";
 import { syncPro2FrameImagesFromRows } from "./pro2-spawn-frame-image-group";
+import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
+import { isPro2StoryOutlineTextNode } from "./pro2-text-purpose";
+import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import {
   findStarterByHubId,
   isAnyStoryCharacterColumnType,
@@ -76,6 +80,12 @@ export function storyRunPendingPatch(
     (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
     ctx?.mediaKind === "themeOutline"
   ) {
+    if (
+      node.type === "story-pro2-starter" &&
+      !isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>)
+    ) {
+      return null;
+    }
     return {
       themeOutlineRuntime: {
         status: "pending",
@@ -96,11 +106,14 @@ export function storyRunPendingPatch(
     if (ctx.llmSection === "scene") return { sceneRuntime: rt };
     return { storyboardRuntime: rt };
   }
-  if (
-    (isAnyStoryCharacterColumnType(node.type ?? "") ||
-      isAnyStorySceneColumnType(node.type ?? "")) &&
-    ctx?.rowKey
-  ) {
+  if (isAnyStorySceneColumnType(node.type ?? "") && ctx?.rowKey) {
+    const rows = (node.data as { rows?: StoryProSceneRow[] }).rows;
+    if (!rows) return null;
+    return {
+      rows: applySceneRowRuntime(rows, ctx.rowKey, STORY_ROW_PENDING_RUNTIME),
+    };
+  }
+  if (isAnyStoryCharacterColumnType(node.type ?? "") && ctx?.rowKey) {
     const rows = (node.data as { rows?: { key: string; runtime?: CanvasNodeRuntime }[] })
       .rows;
     if (!rows) return null;
@@ -154,6 +167,46 @@ export function storyRunPendingPatch(
   return null;
 }
 
+function syncPro2SceneColumnVisuals(
+  node: CanvasFlowNode,
+  nextRows: StoryProSceneRow[],
+  allNodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): void {
+  syncPro2SceneImagesFromRows(
+    allNodes.map((n) =>
+      n.id === node.id ? { ...n, data: { ...n.data, rows: nextRows } } : n,
+    ),
+    node.id,
+    nextRows,
+    updateNodeData,
+  );
+}
+
+/** 写入 pending 行状态，并同步 Pro2 场景图组内子节点的扫光态 */
+export function commitStoryRunPendingPatch(
+  node: CanvasFlowNode,
+  ctx: StoryRunContext | undefined,
+  allNodes: CanvasFlowNode[],
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): boolean {
+  const pending = storyRunPendingPatch(node, ctx);
+  if (!pending) return false;
+  updateNodeData(node.id, pending);
+  if (
+    isAnyStorySceneColumnType(node.type ?? "") &&
+    Array.isArray(pending.rows)
+  ) {
+    syncPro2SceneColumnVisuals(
+      node,
+      pending.rows as StoryProSceneRow[],
+      allNodes,
+      updateNodeData,
+    );
+  }
+  return true;
+}
+
 export function storyApplyTaskResult(
   node: CanvasFlowNode,
   task: CanvasTaskRecord,
@@ -202,6 +255,12 @@ export function storyApplyTaskResult(
     (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
     ctx?.mediaKind === "themeOutline"
   ) {
+    if (
+      node.type === "story-pro2-starter" &&
+      !isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>)
+    ) {
+      return;
+    }
     const prevRt = (
       node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
     ).themeOutlineRuntime;
@@ -278,10 +337,15 @@ export function storyApplyTaskResult(
   }
 
   if (isAnyStorySceneColumnType(node.type ?? "") && ctx?.rowKey) {
-    const rows = (node.data as { rows: { key: string }[] }).rows ?? [];
-    updateNodeData(node.id, {
-      rows: applyCharacterRowRuntime(rows as never, ctx.rowKey, runtime),
-    });
+    const rows = (node.data as { rows?: StoryProSceneRow[] }).rows ?? [];
+    const nextRows = applySceneRowRuntime(rows, ctx.rowKey, runtime);
+    updateNodeData(node.id, { rows: nextRows });
+    syncPro2SceneColumnVisuals(
+      node,
+      nextRows,
+      allNodes,
+      updateNodeData,
+    );
     return;
   }
 

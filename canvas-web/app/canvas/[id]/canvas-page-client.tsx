@@ -58,8 +58,7 @@ import { useGatewayLinkStatus } from "@/lib/canvas/use-gateway-link-status";
 import { prefetchUserProviders } from "@/lib/canvas/use-user-providers";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
 import { hasStoryProPipeline } from "@/lib/canvas/story-pro-workspace-layout";
-import { hasStoryPro2Pipeline } from "@/lib/canvas/story-pro2-pipeline";
-import { hasSbv1Pipeline } from "@/lib/canvas/sbv1-pipeline";
+import { resolveCanvasLayoutShell } from "@/lib/canvas/canvas-layout-mode";
 import { canAddStoryNodeType } from "@/lib/canvas/story-edition-isolation";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { resolveStoryProAssistantImport } from "@/lib/canvas/story-pro-script-assistant";
@@ -194,9 +193,12 @@ function Inner({ projectId }: { projectId: string }) {
 
   const isSbv1Project = project?.edition === "sbv1";
   const isStoryPro2Project = project?.edition === "pro2";
-  const isSbv1Canvas = isSbv1Project || hasSbv1Pipeline(nodes);
-  const isStoryPro2Canvas =
-    (isStoryPro2Project || hasStoryPro2Pipeline(nodes)) && !isSbv1Canvas;
+  const layoutShell = resolveCanvasLayoutShell({
+    projectEdition: project?.edition,
+    nodes,
+  });
+  const isStoryPro2Canvas = layoutShell === "pro2";
+  const isSbv1Canvas = layoutShell === "sbv1";
   const isStoryProCanvas =
     hasStoryProPipeline(nodes) && !isStoryPro2Canvas && !isSbv1Canvas;
   const showImmersiveChrome = isSbv1Canvas || isStoryPro2Canvas;

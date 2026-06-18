@@ -1,5 +1,11 @@
 import type { CanvasFlowNode } from "./types";
 import {
+  isLegacyStoryPro2HubOutlinePrompt,
+  isLegacyStoryPro2ScenePrompt,
+  STORY_PRO2_PACK_PROMPT_VERSION,
+  storyPro2HubDefaultPromptPack,
+} from "./story-pro2-theme-outline-prompt";
+import {
   isLegacyStoryProDirectorPrompt,
   storyProHubDefaultPromptPack,
   STORY_PRO_PACK_PROMPT_VERSION,
@@ -23,6 +29,7 @@ const STORY_COMIC_STARTER = "story-comic-starter";
 const STORY_SCRIPT_HUB = "story-script-hub";
 const STORY_PRO_STARTER = "story-pro-starter";
 const STORY_PRO_SCRIPT_HUB = "story-pro-script-hub";
+const STORY_PRO2_SCRIPT_HUB = "story-pro2-script-hub";
 
 function comicPromptPackVersion(data: Record<string, unknown>): number {
   const v = data.storyPackPromptVersion;
@@ -153,6 +160,34 @@ function migrateStoryProScriptHubData(
   return next;
 }
 
+function pro2PromptPackVersion(data: Record<string, unknown>): number {
+  const v = data.storyPro2PackPromptVersion;
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+function migrateStoryPro2ScriptHubData(
+  data: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const curVer = pro2PromptPackVersion(data);
+  const promptOutline = String(data.promptOutline ?? "");
+  const promptScene = String(data.promptScene ?? "");
+  const needsHubPrompts =
+    curVer < STORY_PRO2_PACK_PROMPT_VERSION ||
+    isLegacyStoryPro2HubOutlinePrompt(promptOutline) ||
+    isLegacyStoryPro2ScenePrompt(promptScene);
+
+  if (!needsHubPrompts && curVer >= STORY_PRO2_PACK_PROMPT_VERSION) {
+    return null;
+  }
+
+  const defaults = storyPro2HubDefaultPromptPack();
+  return {
+    ...data,
+    ...defaults,
+    storyPro2PackPromptVersion: STORY_PRO2_PACK_PROMPT_VERSION,
+  };
+}
+
 /** 加载画布：刷新内置制作包模板 + hub 段 prompt */
 export function migrateStoryPromptPackNode(n: CanvasFlowNode): CanvasFlowNode {
   const data = { ...((n.data ?? {}) as Record<string, unknown>) };
@@ -165,6 +200,8 @@ export function migrateStoryPromptPackNode(n: CanvasFlowNode): CanvasFlowNode {
     patch = migrateStoryScriptHubData(data);
   } else if (n.type === STORY_PRO_SCRIPT_HUB) {
     patch = migrateStoryProScriptHubData(data);
+  } else if (n.type === STORY_PRO2_SCRIPT_HUB) {
+    patch = migrateStoryPro2ScriptHubData(data);
   }
   if (!patch) return n;
   return { ...n, data: patch };
@@ -232,6 +269,13 @@ export function migrateStoryPromptPackAll(
       const patch = migrateStoryProScriptHubData(
         (n.data ?? {}) as Record<string, unknown>,
         proStarterSystemByHubId.get(n.id),
+      );
+      if (!patch) return n;
+      return { ...n, data: patch };
+    }
+    if (n.type === STORY_PRO2_SCRIPT_HUB) {
+      const patch = migrateStoryPro2ScriptHubData(
+        (n.data ?? {}) as Record<string, unknown>,
       );
       if (!patch) return n;
       return { ...n, data: patch };

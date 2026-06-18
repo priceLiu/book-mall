@@ -3,9 +3,10 @@ import {
   stripOutlineCharacterTable,
   stripOutlineEmbeddedPackSections,
   extractCharacterSectionFromOutline,
+  extractSceneSectionMd,
   normalizeStoryboardSectionFromOutline,
   parseStoryboardRows,
-  extractSceneVisualDictionaryFromOutline,
+  resolveSceneDictionaryMarkdown,
 } from "./parse-md-tables";
 import type { CanvasFlowNode } from "./types";
 import type { StoryLlmSection, StoryScriptHubNodeData } from "./story-workspace-types";
@@ -45,9 +46,7 @@ export function resolveHubSectionMd(
     return extractCharacterSectionFromOutline(d.outlineMd ?? "");
   }
   if (section === "scene") {
-    const dedicated = (d.sceneMd ?? "").trim();
-    if (dedicated) return dedicated;
-    return extractSceneVisualDictionaryFromOutline(d.outlineMd ?? "");
+    return resolveSceneDictionaryMarkdown(d.outlineMd ?? "", d.sceneMd ?? "");
   }
   if (section === "storyboard") {
     const dedicated = (d.storyboardMd ?? "").trim();
@@ -72,11 +71,13 @@ export function hubDataForColumnSync(
     d.outlineMd ?? "",
     d.characterMd ?? "",
     d.storyboardMd ?? "",
+    d.sceneMd ?? "",
   );
   return {
     ...d,
     outlineMd: promoted.outlineMd || d.outlineMd || "",
     characterMd: promoted.characterMd || d.characterMd || "",
+    sceneMd: promoted.sceneMd || d.sceneMd || "",
     storyboardMd: promoted.storyboardMd || d.storyboardMd || "",
   };
 }
@@ -86,11 +87,18 @@ export function promoteEmbeddedPackFromOutline(
   outlineMd: string,
   characterMd = "",
   storyboardMd = "",
-): { outlineMd: string; characterMd: string; storyboardMd: string } {
+  sceneMd = "",
+): {
+  outlineMd: string;
+  characterMd: string;
+  sceneMd: string;
+  storyboardMd: string;
+} {
   return {
     outlineMd: outlineStripMd(outlineMd),
     characterMd:
       characterMd.trim() || extractCharacterSectionFromOutline(outlineMd),
+    sceneMd: resolveSceneDictionaryMarkdown(outlineMd, sceneMd),
     storyboardMd:
       storyboardMd.trim() ||
       normalizeStoryboardSectionFromOutline(outlineMd),
@@ -136,7 +144,6 @@ export function hubSectionIsReady(
 ): boolean {
   const d = node.data as unknown as StoryScriptHubNodeData;
   const dedicated = hubSectionMd(node, section).trim();
-  if (section === "scene" && !dedicated) return false;
   const md = dedicated || resolveHubSectionMd(d, section).trim();
   if (!md) return false;
   if (!dedicated) return true;

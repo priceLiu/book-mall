@@ -304,6 +304,15 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       });
     } else if (node.type === "sbv1-image") {
       result = await runSbv1ImageNode({ ...baseArgs, forceFresh });
+    } else if (
+      node.type === "story-pro2-image" &&
+      !["frame", "character-three-view"].includes(
+        String(
+          (node.data as { pro2MediaRole?: string }).pro2MediaRole ?? "generic",
+        ),
+      )
+    ) {
+      result = await runSbv1ImageNode({ ...baseArgs, forceFresh });
     } else if (node.type === "sbv1-video-engine") {
       result = await runSbv1VideoEngineNode({ ...baseArgs, forceFresh });
     } else if (node.type === "video-engine") {

@@ -26,6 +26,9 @@ import {
 } from "./story-pro-prompts";
 import {
   STORY_PRO2_CHARACTER_PROMPT,
+  STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
+  STORY_PRO2_PACK_PROMPT_VERSION,
+  STORY_PRO2_SCENE_PROMPT,
   STORY_PRO2_STORYBOARD_PROMPT,
 } from "./story-pro2-theme-outline-prompt";
 import {
@@ -517,6 +520,7 @@ export type OutputNodeData = {
 export type Pro2MediaGroupKind =
   | "frame-board"
   | "character-board"
+  | "scene-board"
   | "video-board";
 
 export type GroupNodeData = {
@@ -531,6 +535,8 @@ export type GroupNodeData = {
   pro2ControllerNodeId?: string;
   /** Pro2 · 手动框选打的组：统一走图1 暗色壳（即便不是媒体组） */
   pro2Styled?: boolean;
+  /** 画布底部 Dock 快捷预设组（LibTV 壳 + 水平排布，非媒体宫格） */
+  pro2ShortcutPreset?: boolean;
   /** sbv1 · 分镜视频 1.0 媒体组（子节点 sbv1-image） */
   sbv1Styled?: boolean;
 };
@@ -637,6 +643,7 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
     starterMode: "generate",
     themeInput: "",
     generatedOutlineMd: "",
+    pro2TextPurpose: "story-outline",
     uploadedScriptMd: "",
     systemPrompt: "",
     providerId: "",
@@ -655,14 +662,17 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
   "story-pro2-script-hub": {
     outlineMd: "",
     characterMd: "",
+    sceneMd: "",
     storyboardMd: "",
     providerId: "",
     modelKey: "",
     params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
     outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
-    promptOutline: STORY_PRO_OUTLINE_USER_PROMPT,
+    promptOutline: STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
     promptCharacter: STORY_PRO2_CHARACTER_PROMPT,
+    promptScene: STORY_PRO2_SCENE_PROMPT,
     promptStoryboard: STORY_PRO2_STORYBOARD_PROMPT,
+    storyPro2PackPromptVersion: STORY_PRO2_PACK_PROMPT_VERSION,
     referencedNodeIds: [],
     dockInput: "",
     dockRefImages: [],
