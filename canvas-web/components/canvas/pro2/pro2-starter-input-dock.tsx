@@ -7,7 +7,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
+import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
 import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
@@ -25,7 +25,6 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { Pro2TextNodeEnginePickers } from "./pro2-text-node-engine-pickers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
-import { usePro2DockPlacement } from "./use-pro2-dock-placement";
 import {
   Pro2DockContextBar,
   Pro2DockToolbar,
@@ -57,15 +56,10 @@ export function Pro2StarterInputDock() {
     return nodes.find((n) => n.id === selectedStarter.id) ?? null;
   }, [selectedStarter, nodes]);
 
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(
-      s.canvasGeometryDragging,
-      s.canvasDraggingNodeId,
-      storeNode?.id ?? null,
-    ),
-  );
+  const dockNodeId = selectedStarter?.id ?? storeNode?.id ?? null;
+  const { placement, hidden: dockHidden, active: dockActive } =
+    useLibtvFloatingDock(dockNodeId);
 
-  const placement = usePro2DockPlacement(selectedStarter?.id ?? null);
   const d = (storeNode?.data ?? {}) as StoryProStarterNodeData;
   const textPurpose = useMemo(
     () =>
@@ -207,7 +201,7 @@ export function Pro2StarterInputDock() {
     updateNodeData,
   });
 
-  if (!storeNode || !placement) return null;
+  if (!storeNode || !dockActive || !placement) return null;
 
   return (
     <Pro2InputDockShell

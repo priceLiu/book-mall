@@ -5,7 +5,7 @@ import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
+import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
@@ -27,7 +27,6 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
-import { usePro2DockPlacement } from "./use-pro2-dock-placement";
 import {
   Pro2DockContextBar,
   Pro2DockToolbar,
@@ -61,15 +60,10 @@ export function Pro2ScriptInputDock() {
     return nodes.find((n) => n.id === selectedHub.id) ?? null;
   }, [selectedHub, nodes]);
 
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(
-      s.canvasGeometryDragging,
-      s.canvasDraggingNodeId,
-      storeNode?.id ?? null,
-    ),
-  );
+  const dockNodeId = selectedHub?.id ?? storeNode?.id ?? null;
+  const { placement, hidden: dockHidden, active: dockActive } =
+    useLibtvFloatingDock(dockNodeId);
 
-  const placement = usePro2DockPlacement(selectedHub?.id ?? null);
   const d = (storeNode?.data ?? {}) as StoryProScriptHubNodeData;
   const dockInput = d.dockInput ?? "";
   const dockRefImages = (d.dockRefImages ?? []) as StoryRefImage[];
@@ -193,7 +187,7 @@ export function Pro2ScriptInputDock() {
     alert,
   ]);
 
-  if (!storeNode || !placement) return null;
+  if (!storeNode || !dockActive || !placement) return null;
 
   const placeholder = SCRIPT_PLACEHOLDER;
 

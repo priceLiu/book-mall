@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { useNodes } from "@xyflow/react";
+import { memo, useCallback, useMemo } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { buildSbv1DockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
@@ -11,62 +10,72 @@ import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-link
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
-import { useStableLibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
+import {
+  useLibtvFloatingDock,
+  useLibtvSoleSelectedNodeId,
+} from "@/lib/canvas/use-libtv-floating-dock";
+import { SBV1_VIDEO_DOCK_PLACEMENT_OPTS } from "@/lib/canvas/sbv1-video-dock-placement";
 import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
-import { useSbv1DockPlacement } from "./use-sbv1-dock-placement";
 
 /** 分镜视频 1.0 · 视频引擎浮动输入坞（选中节点时显示在节点下方） */
 export function Sbv1VideoEngineFloatingDock() {
+  const dockNodeId = useLibtvSoleSelectedNodeId("sbv1-video-engine");
+
+  const { placement, hidden, active } = useLibtvFloatingDock(
+    dockNodeId,
+    SBV1_VIDEO_DOCK_PLACEMENT_OPTS,
+  );
+
+  if (!dockNodeId || !active || !placement) return null;
+
+  return (
+    <Sbv1VideoEngineFloatingDockBody
+      nodeId={dockNodeId}
+      placement={placement}
+      hidden={hidden}
+    />
+  );
+}
+
+const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDockBody({
+  nodeId,
+  placement,
+  hidden,
+}: {
+  nodeId: string;
+  placement: NonNullable<ReturnType<typeof useLibtvFloatingDock>["placement"]>;
+  hidden: boolean;
+}) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
-  const rfNodes = useNodes();
-  const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const selectedEngine = useMemo(() => {
-    const picked = rfNodes.filter(
-      (n) => n.selected && n.type === "sbv1-video-engine",
-    );
-    return picked.length === 1 ? picked[0] : null;
-  }, [rfNodes]);
-
-  const storeNode = useMemo(() => {
-    if (!selectedEngine) return null;
-    return nodes.find((n) => n.id === selectedEngine.id) ?? null;
-  }, [selectedEngine, nodes]);
-
-  const nodeId = storeNode?.id ?? "";
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(
-      s.canvasGeometryDragging,
-      s.canvasDraggingNodeId,
-      nodeId || null,
+  const data = useCanvasStore(
+    useCallback(
+      (s) =>
+        (s.nodes.find((n) => n.id === nodeId)?.data ??
+          {}) as Sbv1VideoEngineNodeData,
+      [nodeId],
     ),
+    (a, b) => a === b,
   );
 
-  const placement = useStableLibtvDockFlowPlacement(
-    useSbv1DockPlacement(selectedEngine?.id ?? null),
-  );
-
-  const d = (storeNode?.data ?? {}) as Sbv1VideoEngineNodeData;
   const upstreamLinks = useMemo(
-    () => (nodeId ? resolveSbv1UpstreamRefLinks(nodeId, nodes, edges) : []),
-    [nodeId, nodes, edges],
+    () => resolveSbv1UpstreamRefLinks(nodeId, useCanvasStore.getState().nodes, edges),
+    [nodeId, edges],
   );
-  const mentionables = useMemo(() => {
-    const storeNode = nodes.find((n) => n.id === nodeId);
-    const prompt = (storeNode?.data as { prompt?: string } | undefined)?.prompt ?? "";
-    return buildSbv1DockMentionables(upstreamLinks, nodes, prompt);
-  }, [upstreamLinks, nodes, nodeId]);
+
+  const mentionables = useMemo(
+    () => buildSbv1DockMentionables(upstreamLinks, useCanvasStore.getState().nodes),
+    [upstreamLinks],
+  );
 
   const isGenerating =
-    d.runtime?.status === "pending" || d.runtime?.status === "running";
+    data.runtime?.status === "pending" || data.runtime?.status === "running";
 
   const onPatch = useCallback(
     (patch: Partial<Sbv1VideoEngineNodeData>) => {
-      if (!nodeId) return;
       updateNodeData(nodeId, patch);
     },
     [nodeId, updateNodeData],
@@ -131,19 +140,17 @@ export function Sbv1VideoEngineFloatingDock() {
     busEnqueueStoryRun({ nodeId, forceFresh: true });
   }, [nodeId, base, alert, updateNodeData]);
 
-  if (!storeNode || !placement) return null;
-
   return (
     <Sbv1VideoEngineChatInput
       nodeId={nodeId}
-      data={d}
+      data={data}
       upstreamLinks={upstreamLinks}
       mentionables={mentionables}
       isGenerating={isGenerating}
       onPatch={onPatch}
       onRun={onRun}
       placement={placement}
-      hidden={dockHidden}
+      hidden={hidden}
     />
   );
-}
+});

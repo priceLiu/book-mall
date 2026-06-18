@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
   ChevronDown,
@@ -14,6 +14,7 @@ import {
 import {
   MentionsTextarea,
   type MentionableItem,
+  type MentionsTextareaCommitHandle,
 } from "@/components/canvas/mentions/MentionsTextarea";
 import { MentionHoverPreviewPortal } from "@/components/canvas/mentions/mention-hover-preview";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -134,7 +135,7 @@ function RefPreviewCard({
   );
 }
 
-export function Sbv1VideoEngineChatInput({
+export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   nodeId,
   data,
   upstreamLinks,
@@ -158,15 +159,19 @@ export function Sbv1VideoEngineChatInput({
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
-  const nodes = useCanvasStore((s) => s.nodes);
-  const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
+  const [livePrompt, setLivePrompt] = useState(data.prompt ?? "");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    setLivePrompt(data.prompt ?? "");
+  }, [data.prompt, nodeId]);
 
   const smartMulti = data.referenceMode === "smart_multi";
   /** Dock 预估与财务后台一致：视频按 15s 封顶；智能多帧未设时长时也按 15s 展示 */
@@ -187,15 +192,15 @@ export function Sbv1VideoEngineChatInput({
   const estCredits = useModelCreditsPreview(modelKey, billableDurationSec, variantId);
 
   const hasRefs = upstreamLinks.some((l) => l.previewUrl);
-  const hasPrompt = Boolean((data.prompt ?? "").trim());
+  const hasPrompt = Boolean(livePrompt.trim());
   const activeRefIds = useMemo(
-    () => dockActiveRefIdsFromPrompt(data.prompt ?? ""),
-    [data.prompt],
+    () => dockActiveRefIdsFromPrompt(livePrompt),
+    [livePrompt],
   );
 
   usePruneStaleDockMentions({
     nodeId,
-    prompt: data.prompt ?? "",
+    prompt: livePrompt,
     mentionables,
     field: "prompt",
     updateNodeData,
@@ -205,6 +210,11 @@ export function Sbv1VideoEngineChatInput({
     (hasPrompt || hasRefs) &&
     !isGenerating &&
     Boolean(data.engine?.providerId && data.engine?.modelKey);
+
+  const runWithCommittedPrompt = useCallback(async () => {
+    promptCommitRef.current?.flushDraft();
+    await onRun();
+  }, [onRun]);
 
   const uploadFiles = useCallback(
     async (fileList: FileList | null) => {
@@ -218,6 +228,7 @@ export function Sbv1VideoEngineChatInput({
         }
         return;
       }
+      const { nodes, edges } = useCanvasStore.getState();
       await spawnSbv1PastedImages({
         anchorNodeId: nodeId,
         files: Array.from(fileList),
@@ -229,7 +240,7 @@ export function Sbv1VideoEngineChatInput({
         updateNodeData,
       });
     },
-    [base, nodeId, nodes, edges, addNode, setEdges, updateNodeData, alert],
+    [base, nodeId, addNode, setEdges, updateNodeData, alert],
   );
 
   const onDisconnect = useCallback(
@@ -262,7 +273,9 @@ export function Sbv1VideoEngineChatInput({
       <Pro2DockContextBar>
         <div className="hide-scroll-bar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
           {upstreamLinks.map((link) => {
-            const sourceNode = nodes.find((n) => n.id === link.sourceNodeId);
+            const sourceNode = useCanvasStore
+              .getState()
+              .nodes.find((n) => n.id === link.sourceNodeId);
             const importState = portraitImportUiState(
               sourceNode?.data as CanvasPortraitNodeFields | undefined,
             );
@@ -328,7 +341,7 @@ export function Sbv1VideoEngineChatInput({
           disabled={!canSend}
           title={isGenerating ? "生成中" : "生成视频"}
           className="nodrag flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={onRun}
+          onClick={runWithCommittedPrompt}
         >
           {isGenerating ? (
             <Loader2 className="size-4 animate-spin" />
@@ -389,14 +402,16 @@ export function Sbv1VideoEngineChatInput({
             mentionables={mentionables}
             disabled={isGenerating}
             rows={3}
-            onChange={(prompt, _refs, meta) =>
-              updateNodeData(nodeId, { prompt }, { commit: meta?.commit ?? true })
-            }
+            commitHandleRef={promptCommitRef}
+            onChange={(prompt, _refs, meta) => {
+              setLivePrompt(prompt);
+              if (meta?.commit === false) return;
+              updateNodeData(nodeId, { prompt }, { commit: true });
+            }}
             onPaste={onPaste}
             mentionPickerTitle="参考图 · ←→ Enter 插入"
             mentionPickerEmptyHint="暂无已连接参考图，请先连线或上传图片。"
             mentionInlineThumb
-            mentionInlineThumbHoverOnText
             mentionEdition="sbv1"
             onKeyDownCapture={(e) => {
               if (
@@ -406,7 +421,7 @@ export function Sbv1VideoEngineChatInput({
                 canSend
               ) {
                 e.preventDefault();
-                onRun();
+                void runWithCommittedPrompt();
               }
             }}
           />
@@ -433,4 +448,4 @@ export function Sbv1VideoEngineChatInput({
       />
     </>
   );
-}
+});

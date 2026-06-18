@@ -56,11 +56,12 @@ export function stripStaleMentionTokensFromPrompt(
   return stripMentionTokensFromPrompt(prompt, stale);
 }
 
-export type DockMentionPromptField = "dockInput" | "themeInput";
+export type DockMentionPromptField = "dockInput" | "themeInput" | "prompt";
 
 const DOCK_MENTION_FIELDS: DockMentionPromptField[] = [
   "dockInput",
   "themeInput",
+  "prompt",
 ];
 
 /** 某节点被删后，扫全图其余节点的 dockInput / themeInput */

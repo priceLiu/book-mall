@@ -15,7 +15,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
+import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
@@ -38,7 +38,6 @@ import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
-import { usePro2DockPlacement } from "./pro2/use-pro2-dock-placement";
 import { pro2ImageNodeUsesEmbeddedDock } from "./pro2/pro2-image-node-embedded-dock";
 import { Pro2DockPasteZone } from "./pro2/pro2-dock-paste-zone";
 import { Pro2DockRefImages } from "./pro2/pro2-dock-ref-images";
@@ -102,13 +101,9 @@ export function LibtvImageInputDock() {
     return nodes.find((n) => n.id === selectedImage.id) ?? null;
   }, [selectedImage, nodes]);
 
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(
-      s.canvasGeometryDragging,
-      s.canvasDraggingNodeId,
-      storeNode?.id ?? null,
-    ),
-  );
+  const dockNodeId = selectedImage?.id ?? storeNode?.id ?? null;
+  const { placement, hidden: dockHidden, active: dockActive } =
+    useLibtvFloatingDock(dockNodeId);
 
   const nodeType = (storeNode?.type ?? "sbv1-image") as DockImageNodeType;
   const isPro2 = nodeType === "story-pro2-image";
@@ -116,7 +111,6 @@ export function LibtvImageInputDock() {
   const isPipelineCell = isLibtvPipelineImageCell(storeNode ?? undefined);
   const showModelPicker = !isPipelineCell;
 
-  const placement = usePro2DockPlacement(selectedImage?.id ?? null);
   const settingsData = (storeNode?.data ?? {}) as Sbv1ImageNodeData;
   const dockInput = settingsData.dockInput ?? "";
   const previewUrl = settingsData.ossUrl ?? settingsData.blobUrl ?? "";
@@ -201,11 +195,8 @@ export function LibtvImageInputDock() {
   const onPromptChange = useCallback(
     (value: string, _refs?: string[], meta?: { commit?: boolean }) => {
       if (!storeNode) return;
-      updateNodeData(
-        storeNode.id,
-        { dockInput: value },
-        { commit: meta?.commit ?? true },
-      );
+      if (meta?.commit === false) return;
+      updateNodeData(storeNode.id, { dockInput: value }, { commit: true });
       syncFrameRowPrompt(value);
     },
     [storeNode, updateNodeData, syncFrameRowPrompt],
@@ -285,7 +276,7 @@ export function LibtvImageInputDock() {
 
   const onRun = isPipelineCell ? onRunPipeline : () => void onRunFreestanding();
 
-  if (!storeNode || !placement) return null;
+  if (!storeNode || !dockActive || !placement) return null;
 
   const usesEmbedded =
     nodeType === "sbv1-image"

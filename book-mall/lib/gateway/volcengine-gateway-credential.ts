@@ -148,6 +148,46 @@ export function resolveVolcenginePortraitCredentialsFromEnv(): VolcenginePortrai
   return null;
 }
 
+/** 本地 seed / setup 脚本 · 从环境变量读取 ark Key 与 IAM AK/SK */
+export function readVolcengineKeysFromEnv(): {
+  apiKey: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+} {
+  const apiKey =
+    process.env.ARK_API_KEY?.trim() ||
+    process.env.VOLCENGINE_API_KEY?.trim() ||
+    "";
+  const accessKeyId =
+    process.env.VOLCENGINE_ACCESS_KEY_ID?.trim() ||
+    process.env.VOLCENGINE_ACCESS_KEY?.trim() ||
+    process.env.VOLCENGINE_AK?.trim() ||
+    "";
+  const secretAccessKey =
+    process.env.VOLCENGINE_SECRET_ACCESS_KEY?.trim() ||
+    process.env.VOLCENGINE_SECRET_KEY?.trim() ||
+    process.env.VOLCENGINE_SK?.trim() ||
+    "";
+  return {
+    apiKey,
+    accessKeyId: accessKeyId || undefined,
+    secretAccessKey: secretAccessKey || undefined,
+  };
+}
+
+/** seed / setup · 合并 env 与已有凭证后写入 Gateway 存储格式 */
+export function buildVolcengineCredentialStorageFromEnv(
+  existingRaw?: string | null,
+): string {
+  const env = readVolcengineKeysFromEnv();
+  return buildVolcengineCredentialStorage({
+    apiKey: env.apiKey || undefined,
+    accessKeyId: env.accessKeyId,
+    secretAccessKey: env.secretAccessKey,
+    existingRaw,
+  });
+}
+
 /** 兼容旧 AK:SK 单字段 · 不含 ark Key */
 export function parseVolcenginePortraitCredentialsFromApiKey(
   apiKey: string,

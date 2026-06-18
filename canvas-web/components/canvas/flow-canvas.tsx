@@ -409,8 +409,19 @@ function FlowCanvasInner({
             "id" in c &&
             c.id,
         );
+        const resizingChange = changes.find(
+          (c) =>
+            c.type === "dimensions" &&
+            "resizing" in c &&
+            c.resizing === true &&
+            "id" in c &&
+            c.id,
+        );
         if (draggingChange && "id" in draggingChange) {
           setCanvasDraggingNodeId(draggingChange.id);
+        } else if (resizingChange) {
+          // 拖角缩放不算「拖动节点」· 勿隐藏浮动 Dock
+          setCanvasDraggingNodeId(null);
         }
         return;
       }
