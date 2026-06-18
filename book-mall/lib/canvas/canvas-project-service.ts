@@ -25,7 +25,8 @@ export class CanvasProjectError extends Error {
       | "EMPTY_PROMPT"
       | "MODEL_NOT_AVAILABLE"
       | "PROVIDER_KEYS_REQUIRED"
-      | "GATEWAY_KEY_REQUIRED",
+      | "GATEWAY_KEY_REQUIRED"
+      | "UPSTREAM_ERROR",
     message: string,
     public httpStatus = 400,
   ) {

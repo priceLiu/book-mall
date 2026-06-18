@@ -2,6 +2,7 @@
 
 import { useMemo, useRef } from "react";
 import { useNodes } from "@xyflow/react";
+import { resolveLibtvFloatingDockSelection } from "./libtv-floating-dock-selection";
 import { useCanvasStore } from "./store";
 import {
   useLibtvDockFlowPlacement,
@@ -12,42 +13,34 @@ import { libtvFloatingDockHidden } from "./use-viewport-transform-active";
 
 type PlacementOpts = NonNullable<Parameters<typeof useLibtvDockFlowPlacement>[1]>;
 
-function soleSelectedNodeIdOfType(
-  nodes: { id: string; type?: string; selected?: boolean }[],
-  nodeType: string,
-): string | null {
-  let found: string | null = null;
-  let count = 0;
-  for (const n of nodes) {
-    if (n.selected && n.type === nodeType) {
-      count += 1;
-      found = n.id;
-      if (count > 1) return null;
-    }
-  }
-  return count === 1 ? found : null;
-}
-
 /**
- * LibTV 浮动 Dock · 选中节点 id（RF 优先，store 钉选 fallback）
+ * LibTV 浮动 Dock · 某类型节点的选中 id（全局单选互斥）
  *
- * LibTV 选中态在 RF；pan/zoom 时可能闪断。`setLibtvFloatingDockSelection` 在 select 变更时写入 store。
+ * 仅当「当前全局选中 / 钉选」即该 nodeType 时才返回 id；禁止按类型各自匹配 RF selected
+ * （否则选中图片节点时视频仍 selected → 视频 Dock 不消失）。
  */
 export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
   const rfNodes = useNodes();
 
   const pinnedId = useCanvasStore(
-    (s) =>
-      s.libtvFloatingDockNodeType === nodeType ? s.libtvFloatingDockNodeId : null,
+    (s) => s.libtvFloatingDockNodeId,
+    (a, b) => a === b,
+  );
+  const pinnedType = useCanvasStore(
+    (s) => s.libtvFloatingDockNodeType,
     (a, b) => a === b,
   );
 
-  const rfId = useMemo(
-    () => soleSelectedNodeIdOfType(rfNodes, nodeType),
-    [rfNodes, nodeType],
+  const rfGlobal = useMemo(
+    () => resolveLibtvFloatingDockSelection(rfNodes),
+    [rfNodes],
   );
 
-  return rfId ?? pinnedId;
+  const activeId = rfGlobal?.nodeId ?? pinnedId;
+  const activeType = rfGlobal?.nodeType ?? pinnedType;
+
+  if (!activeId || activeType !== nodeType) return null;
+  return activeId;
 }
 
 /**

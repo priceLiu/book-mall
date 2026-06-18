@@ -1181,8 +1181,12 @@ function FlowCanvasInner({
                   return;
                 }
                 closePaneAddMenu();
-                if (!pro2FloatingInspector) return;
-                useCanvasStore.getState().setPro2FrameDockFocus(null);
+                useCanvasStore
+                  .getState()
+                  .setLibtvFloatingDockSelection(null, null);
+                if (pro2FloatingInspector) {
+                  useCanvasStore.getState().setPro2FrameDockFocus(null);
+                }
                 setRfNodes((prev) =>
                   prev.map((n) => (n.selected ? { ...n, selected: false } : n)),
                 );

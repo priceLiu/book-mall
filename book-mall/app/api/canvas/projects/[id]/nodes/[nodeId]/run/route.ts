@@ -74,7 +74,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         textInputs?: string[];
         portraitAssetRefs?: Array<{
           url: string;
-          role?: "reference_image" | "first_frame";
+          role?: "reference_image" | "first_frame" | "last_frame";
         }>;
       }
     | undefined;
@@ -145,7 +145,10 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         : [],
       portraitAssetRefs: Array.isArray(node.portraitAssetRefs)
         ? node.portraitAssetRefs.filter(
-            (r): r is { url: string; role?: "reference_image" | "first_frame" } =>
+            (r): r is {
+              url: string;
+              role?: "reference_image" | "first_frame" | "last_frame";
+            } =>
               Boolean(r) &&
               typeof r === "object" &&
               typeof (r as { url?: string }).url === "string" &&

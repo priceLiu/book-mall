@@ -256,10 +256,12 @@ export async function getCanvasPortraitImportStatus(opts: {
 /** 解析 run 请求中的 portraitAssetRefs（客户端传入） */
 export function normalizePortraitAssetRefs(
   raw: unknown,
-): Array<{ url: string; role?: "reference_image" | "first_frame" }> {
+): Array<{ url: string; role?: "reference_image" | "first_frame" | "last_frame" }> {
   if (!Array.isArray(raw)) return [];
-  const out: Array<{ url: string; role?: "reference_image" | "first_frame" }> =
-    [];
+  const out: Array<{
+    url: string;
+    role?: "reference_image" | "first_frame" | "last_frame";
+  }> = [];
   const seen = new Set<string>();
   for (const item of raw) {
     if (typeof item === "string") {
