@@ -1118,6 +1118,12 @@ export async function runVideoEngineNode(
           body: input as Record<string, unknown>,
           clientPage: gwClientPage,
           projectId,
+          providerId,
+          gatewayCredentialId:
+            typeof data.gatewayCredentialId === "string" &&
+            data.gatewayCredentialId.trim()
+              ? data.gatewayCredentialId.trim()
+              : undefined,
           sbv1Billing:
             data.sbv1Billing && typeof data.sbv1Billing === "object"
               ? (data.sbv1Billing as Record<string, unknown>)

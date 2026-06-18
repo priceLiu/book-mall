@@ -43,19 +43,23 @@
 
 ## 3. Gateway Key · 分镜视频 1.0 专用
 
-**勿将 ARK Key 写入仓库。** 本地初始化：
+**勿将 ARK Key 写入仓库。** Key 来源为 Book 环境变量 **`VOLCENGINE_API_KEY`**（平台新 Key），经 Gateway 凭证解密后调用上游；**禁止** Canvas / book-mall 业务层直连 `ark.cn-beijing.volces.com`。
+
+本地初始化：
 
 ```bash
 cd book-mall
-# 在 .env.local 设 ARK_API_KEY 或 VOLCENGINE_API_KEY，或单次 export
-ARK_API_KEY='ark-...' pnpm exec dotenv -e .env.local -- tsx scripts/setup-sbv1-volcengine-gateway.ts your@email.com
+# 在 .env.local 设 VOLCENGINE_API_KEY，或单次 export
+VOLCENGINE_API_KEY='ark-...' pnpm exec dotenv -e .env.local -- tsx scripts/setup-sbv1-volcengine-gateway.ts your@email.com
 ```
 
 脚本会：
 
-1. 创建别名 **「火山方舟 · 分镜视频1.0」** 的 VOLCENGINE 凭证  
+1. 创建别名 **「火山方舟 · 分镜视频1.0」** 的 VOLCENGINE 凭证（Key 值与平台 **「火山方舟」** 相同，便于 sk-gw 分池）  
 2. 创建 **「分镜视频 1.0 · Personal」** sk-gw 并绑定该凭证  
 3. 尝试关联 Book 个人中心 Gateway Key  
+
+运行时 Gateway 路由：`pickVolcengineCredentialForGatewayJob`（sbv1 上下文 → 上述别名；Seedance 2.0 默认平台 Key）。
 
 生成时 `clientPage` = `canvas/{projectId}/sbv1`，便于 Gateway 日志筛选。
 
@@ -89,6 +93,7 @@ Gateway 控制台 **Params** 列可查看完整 JSON；**Usage** 列为挂牌参
 | 模型展示 | `canvas-web/lib/canvas/sbv1-video-models.ts` |
 | 模型下拉 | `canvas-web/components/canvas/sbv1/sbv1-volcengine-model-picker.tsx` |
 | Runner | `book-mall/lib/canvas/sbv1-video-engine-runner.ts` |
+| 凭证路由 | `book-mall/lib/gateway/volcengine-credential-pick.ts` |
 | Gateway 目录 | `book-mall/lib/gateway/volcengine-chat-models.ts` |
 | B 表 seed | `book-mall/lib/billing/video-model-seeds.ts` |
 | 初始化脚本 | `book-mall/scripts/setup-sbv1-volcengine-gateway.ts` |

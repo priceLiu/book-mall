@@ -70,7 +70,8 @@
 
 ## 8. 生成与计费
 
-- Gateway Volcengine Seedance（`doubao-seedance-*` / `ep-*`），**禁止直连 ARK**
+- Gateway Volcengine Seedance（`doubao-seedance-*` / `ep-*`），**禁止直连 ARK**；须 `sk-gw` → `/api/gw/v1/jobs/createTask`
+- **凭证**：默认 Gateway 别名 **「火山方舟 · 分镜视频1.0」**（Key 同平台 `VOLCENGINE_API_KEY`）；见 `volcengine-credential-pick.ts`
 - 每次生成写入 `inputPayload.sbv1Billing` + Gateway 完整 Params
 - 任务轮询：`GET /api/canvas/projects/:id/tasks`
 - `clientPage`: `canvas/{projectId}/sbv1`

@@ -10,6 +10,7 @@ import {
   pickCredentialForKind,
   mapGatewayPreCreateLogError,
 } from "@/lib/gateway/proxy-common";
+import { pickVolcengineCredentialForGatewayJob } from "@/lib/gateway/volcengine-credential-pick";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import {
   routeGatewayModel,
@@ -100,7 +101,15 @@ export async function POST(request: NextRequest) {
     }
     throw e;
   }
-  const credentialId = pickCredentialForKind(auth.credentials, route.providerKind);
+  const credentialId =
+    route.providerKind === "VOLCENGINE" && route.requestKind === "VIDEO"
+      ? pickVolcengineCredentialForGatewayJob({
+          credentials: auth.credentials,
+          modelKey: model,
+          clientPage: logMeta.clientPage,
+          input: (body.input ?? null) as Record<string, unknown> | null,
+        })
+      : pickCredentialForKind(auth.credentials, route.providerKind);
   if (!credentialId) {
     return NextResponse.json(
       { error: `No ${route.providerKind} credential bound to this API key` },

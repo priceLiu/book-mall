@@ -12,6 +12,7 @@ import {
   pickCredentialForKind,
   type UsageFromResponse,
 } from "@/lib/gateway/proxy-common";
+import { pickVolcengineCredentialForGatewayJob } from "@/lib/gateway/volcengine-credential-pick";
 import { summarizeUpstreamFailMessage } from "@/lib/gateway/book-gateway-link";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import {
@@ -218,7 +219,10 @@ export async function canvasGwCreateVolcengineVideoJob(
     body: Record<string, unknown>;
     clientPage?: string;
     projectId?: string;
+    providerId?: string;
     sbv1Billing?: Record<string, unknown>;
+    /** 影视专业版 2.0 等：可选指定 Gateway 绑定的 VOLCENGINE 凭证 id */
+    gatewayCredentialId?: string;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -230,7 +234,22 @@ export async function canvasGwCreateVolcengineVideoJob(
       400,
     );
   }
-  const credentialId = pickCredentialForKind(auth.credentials, "VOLCENGINE");
+  const inputForPick: Record<string, unknown> = {
+    ...opts.body,
+    ...(opts.providerId ? { providerId: opts.providerId } : {}),
+    ...(opts.sbv1Billing ? { sbv1Billing: opts.sbv1Billing } : {}),
+    ...(opts.gatewayCredentialId
+      ? { gatewayCredentialId: opts.gatewayCredentialId }
+      : {}),
+  };
+  const credentialId = pickVolcengineCredentialForGatewayJob({
+    credentials: auth.credentials,
+    modelKey: opts.model,
+    clientPage: opts.clientPage,
+    input: inputForPick,
+    preferredCredentialId: opts.gatewayCredentialId,
+    providerId: opts.providerId,
+  });
   if (!credentialId) {
     throw new CanvasProjectError(
       "MODEL_NOT_AVAILABLE",
@@ -243,10 +262,7 @@ export async function canvasGwCreateVolcengineVideoJob(
     apiKeyId: auth.id,
     body: {
       model: opts.model,
-      input: {
-        ...opts.body,
-        ...(opts.sbv1Billing ? { sbv1Billing: opts.sbv1Billing } : {}),
-      },
+      input: inputForPick,
     },
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
