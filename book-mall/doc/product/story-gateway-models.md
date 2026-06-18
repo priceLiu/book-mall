@@ -21,6 +21,9 @@
 
 - **KIE**：漫剧 LLM/图像/视频（`bytedance/seedance-2` 等）
 - **火山方舟 (VOLCENGINE)**：Seedance 2.0/1.5 视频、豆包 Chat、`ep-*` 接入点、人像库 API
+  - 默认别名 **「火山方舟」**（`VOLCENGINE_API_KEY`）；**分镜视频 1.0** 生视频优先 **「火山方舟 · 分镜视频1.0」**（Key 相同，sk-gw 分池）
+  - **影视专业版 2.0** Seedance 生视频默认同上；可选 `gatewayCredentialId` 指定其它已绑定 VOLCENGINE 凭证
+  - 路由：`volcengine-credential-pick.ts` · 架构见 [gateway-volcengine-architecture.md](../tech/gateway-volcengine-architecture.md) §7
 - **DeepSeek**：Canvas Story LLM 兜底
 - **百炼 (BAILIAN)**：分析室 chat、TTS、百炼 R2V 参考生视频
 - **DashScope (DASHSCOPE)**：试衣、文生图、视频实验室

@@ -41,7 +41,7 @@ sequenceDiagram
 
   App->>GW: modelKey + body
   GW->>GW: routeGatewayModel
-  GW->>GW: pickCredentialForKind VOLCENGINE
+  GW->>GW: pickVolcengineCredentialForGatewayJob
   GW->>Cred: apiKey + baseUrl
   GW->>Ark: apiFamily client
 ```
@@ -110,14 +110,27 @@ Gateway 对外：
 | 多视频/音频参考 | KIE input 字段 | Ark `content[]` 条目 |
 | 接入点 | 无 | 支持 `ep-*` |
 
-## 7. 多凭证与地域（二期）
+## 7. 多凭证路由（Seedance 生视频）
 
-同一 `providerKind` 绑多条凭证（如北京/其他 region）时，当前 `pickCredentialForKind` 取 **第一条**；二期可加 alias 或模型→凭证映射。
+实现：`book-mall/lib/gateway/volcengine-credential-pick.ts`（`pickVolcengineCredentialForGatewayJob`）。
+
+**禁止直连 ARK**：Canvas / Story / 分镜视频 1.0 / 影视专业版 2.0 生视频须 `sk-gw` → `POST /api/gw/v1/jobs/createTask` → `volcengine-client.ts`；业务层不得 `fetch ark.cn-beijing.volces.com`。
+
+| 场景 | 默认凭证别名 | 可选覆盖 |
+|------|-------------|----------|
+| **分镜视频 1.0**（`clientPage` 含 `/sbv1`、`input.sbv1Billing`、或 `gateway:sbv1-volcengine`） | **火山方舟 · 分镜视频1.0** → 兜底「火山方舟」 | 否（固定 sbv1 池） |
+| **影视专业版 2.0** Seedance 生视频（`doubao-seedance-2.0` / `ep-*`） | **火山方舟**（`VOLCENGINE_API_KEY` 平台池） | 是 · `input.gatewayCredentialId` |
+| Story / 电商分镜等其它 VOLCENGINE VIDEO | **火山方舟** | 是 · `gatewayCredentialId` |
+
+Seedance 2.0 在 sbv1 与 Pro2 **默认均走平台新 Key**（经 Gateway 凭证解密，勿写入仓库）。sbv1 专用别名与平台别名 **Key 值相同**，便于日志与 sk-gw 绑定隔离。
+
+本地初始化 sbv1 凭证：`book-mall/scripts/setup-sbv1-volcengine-gateway.ts`。
 
 ## 8. 相关文件
 
 | 文件 | 说明 |
 |------|------|
+| `lib/gateway/volcengine-credential-pick.ts` | sbv1 / Pro2 Seedance 凭证 alias 路由 |
 | `lib/gateway/model-router.ts` | 路由与 defaultBaseUrl |
 | `lib/gateway/volcengine-chat-models.ts` | 目录与 upstream 别名 |
 | `lib/gateway/volcengine-client.ts` | 视频 tasks HTTP |

@@ -6,8 +6,10 @@
 import { CanvasProjectError } from "./canvas-project-service";
 import { getBookMallOrigin } from "@/lib/gateway/env";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
-import { pickCredentialForKind } from "@/lib/gateway/proxy-common";
-import type { RoutableCredential } from "@/lib/gateway/gateway-credential-match";
+import {
+  pickSbv1VolcengineCredentialId,
+  SBV1_VOLCENGINE_CREDENTIAL_ALIAS,
+} from "@/lib/gateway/volcengine-credential-pick";
 import { resolveGatewayAuthForBookUser } from "@/lib/gateway/book-gateway-link";
 import { prisma } from "@/lib/prisma";
 import {
@@ -21,8 +23,7 @@ import {
   saveSbv1PortraitLivenessCallback,
 } from "./sbv1-portrait-liveness-callback-store";
 
-/** 与 setup-sbv1-volcengine-gateway.ts 凭证别名一致 */
-export const SBV1_VOLCENGINE_CREDENTIAL_ALIAS = "火山方舟 · 分镜视频1.0";
+export { SBV1_VOLCENGINE_CREDENTIAL_ALIAS };
 
 export type Sbv1PortraitLivenessStatus = {
   verified: boolean;
@@ -40,17 +41,6 @@ function buildCallbackUrl(): string {
     );
   }
   return `${origin.replace(/\/$/, "")}/api/canvas/sbv1/portrait/liveness/callback`;
-}
-
-function pickSbv1VolcengineCredentialId(
-  credentials: RoutableCredential[],
-): string | null {
-  const volcengine = credentials.filter((c) => c.providerKind === "VOLCENGINE");
-  const sbv1 = volcengine.find(
-    (c) => c.alias?.trim() === SBV1_VOLCENGINE_CREDENTIAL_ALIAS,
-  );
-  if (sbv1) return sbv1.id;
-  return pickCredentialForKind(credentials, "VOLCENGINE");
 }
 
 async function volcengineCredentialForUser(userId: string) {

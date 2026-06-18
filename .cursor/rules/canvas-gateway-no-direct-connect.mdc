@@ -17,8 +17,11 @@ alwaysApply: false
 
 1. LLM / 生图 / 生视频 / TTS 走 `canvas-gateway-client.ts` 或 `story-gateway-client.ts`。
 2. 新 run 入口保留 `assertGatewayApiKeyLinkedForUser`（`run/route.ts` 等）。
-3. 写 Gateway 日志时带 `clientPage`（专业版：`canvas/{projectId}/story-pro`）。
+3. 写 Gateway 日志时带 `clientPage`（专业版：`canvas/{projectId}/story-pro`；分镜视频 1.0：`canvas/{projectId}/sbv1`）。
 4. 新模型先查 `book-mall/doc/product/story-gateway-models.md` 与 `model-router.ts`。
+5. **火山 Seedance 生视频**（`doubao-seedance-2.0` / `ep-*`）须经 Gateway；禁止直连 ARK。凭证路由见 `book-mall/lib/gateway/volcengine-credential-pick.ts`：
+   - **分镜视频 1.0**：默认「火山方舟 · 分镜视频1.0」（Key = `VOLCENGINE_API_KEY`）
+   - **影视专业版 2.0**：默认「火山方舟」；生视频可传 `gatewayCredentialId` 选用其它已绑定 VOLCENGINE 凭证
 
 ## 影视专业版
 
