@@ -41,13 +41,14 @@
 
 ## 5. Dock @ 内联缩略图
 
+> **完整规范**：[`libtv-dock-input-spec.md`](./libtv-dock-input-spec.md) §2
+
 | 规则 | 说明 |
 | --- | --- |
 | 开关 | `MentionsTextarea` · `mentionInlineThumb` |
-| 位置 | **@ 标签文字右侧**（文案输入区内，非 footer） |
-| 实现 | `mention-inline-thumbs.tsx` · `findAllMentionRangesInDisplay` |
-
-**禁止** footer 工具栏上方 pill 行。
+| 位置 | **@ 标签文字紧后**（正文流内 · em space 占位符 + mirror 内联 img） |
+| 实现 | `mention-inline-thumb-placeholder.ts` · `mention-inline-thumbs.tsx` |
+| 禁止 | overlay 绝对定位测量；footer pill 行 |
 
 ## 6. Code Review
 
