@@ -7,13 +7,15 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
   type ReactNode,
   type RefObject,
 } from "react";
 import type { MentionableItem } from "./MentionsTextarea";
 import { findAllMentionRangesInDisplay } from "@/lib/canvas/mention-at-display-index";
-import { getMentionRangeClientRect } from "@/lib/canvas/textarea-caret-rect";
+import {
+  countMentionThumbSlotsAt,
+  MENTION_THUMB_SLOT_CHAR,
+} from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { cn } from "@/lib/utils";
 
 export type MentionInlineThumbMirrorHandle = {
@@ -26,14 +28,7 @@ export type MentionInlineThumbMirrorHandle = {
 const THUMB_HIT_PAD = 2;
 
 const THUMB_SIZE_DEFAULT = 16;
-const THUMB_SIZE_SBV1 = 18;
-
-type ThumbPosition = {
-  id: string;
-  item: MentionableItem;
-  left: number;
-  top: number;
-};
+const THUMB_SIZE_SBV1 = 20;
 
 function pointInRect(
   x: number,
@@ -55,9 +50,111 @@ function thumbBorderClass(edition: "pro2" | "sbv1"): string {
     : "border-violet-400/70 shadow-[0_0_0_1px_rgba(167,139,250,0.35)]";
 }
 
+const MIRROR_LAYOUT_PROPS = [
+  "boxSizing",
+  "direction",
+  "fontFamily",
+  "fontSize",
+  "fontStyle",
+  "fontVariant",
+  "fontWeight",
+  "letterSpacing",
+  "lineHeight",
+  "overflowWrap",
+  "paddingTop",
+  "paddingRight",
+  "paddingBottom",
+  "paddingLeft",
+  "tabSize",
+  "textAlign",
+  "textTransform",
+  "whiteSpace",
+  "wordBreak",
+  "wordSpacing",
+] as const;
+
+function InlineMentionThumb({
+  item,
+  size,
+  borderClass,
+}: {
+  item: MentionableItem;
+  size: number;
+  borderClass: string;
+}) {
+  if (!item.previewUrl) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={item.previewUrl}
+      alt=""
+      draggable={false}
+      data-mention-thumb=""
+      data-mention-id={item.id}
+      className={cn(
+        "inline-block rounded-[3px] border object-cover align-text-bottom",
+        borderClass,
+      )}
+      style={{
+        width: size,
+        height: size,
+        marginLeft: 2,
+        verticalAlign: "text-bottom",
+      }}
+      referrerPolicy="no-referrer"
+    />
+  );
+}
+
+function buildMirrorContent(
+  displayValue: string,
+  mentionables: MentionableItem[],
+  edition: "pro2" | "sbv1",
+  thumbSize: number,
+  borderClass: string,
+): ReactNode[] {
+  const ranges = findAllMentionRangesInDisplay(displayValue, mentionables);
+  if (ranges.length === 0) return [displayValue];
+
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  let key = 0;
+
+  for (const range of ranges) {
+    if (range.start > cursor) {
+      parts.push(displayValue.slice(cursor, range.start));
+    }
+    parts.push(displayValue.slice(range.start, range.end));
+    cursor = range.end;
+
+    const slotCount = countMentionThumbSlotsAt(displayValue, cursor, edition);
+    if (slotCount > 0 && range.item.previewUrl) {
+      cursor += slotCount;
+      parts.push(
+        <InlineMentionThumb
+          key={`thumb-${range.start}-${key++}`}
+          item={range.item}
+          size={thumbSize}
+          borderClass={borderClass}
+        />,
+      );
+    }
+  }
+
+  if (cursor < displayValue.length) {
+    const tail = displayValue.slice(cursor);
+    if (tail.includes(MENTION_THUMB_SLOT_CHAR)) {
+      parts.push(tail.replace(new RegExp(`${MENTION_THUMB_SLOT_CHAR}+`, "g"), ""));
+    } else {
+      parts.push(tail);
+    }
+  }
+
+  return parts;
+}
+
 /**
- * textarea 透明字 + mirror 纯文本（与 value 1:1）+ 缩略图绝对定位 overlay。
- * 禁止在 mirror 文本流内嵌 img，否则会撑开排版导致 caret 与点击位置漂移。
+ * textarea 透明字 + mirror 分段渲染：@label 后 em space 占位符 → 内联缩略图（与 textarea 同宽换行）。
  */
 export const MentionInlineThumbMirror = forwardRef<
   MentionInlineThumbMirrorHandle,
@@ -81,102 +178,76 @@ export const MentionInlineThumbMirror = forwardRef<
   ref,
 ) {
   const mirrorRef = useRef<HTMLDivElement | null>(null);
-  const overlayRef = useRef<HTMLDivElement | null>(null);
-  const [thumbPositions, setThumbPositions] = useState<ThumbPosition[]>([]);
 
   const thumbSize = edition === "sbv1" ? THUMB_SIZE_SBV1 : THUMB_SIZE_DEFAULT;
   const borderClass = thumbBorderClass(edition);
 
-  const previewKey = useMemo(
+  const mirrorContent = useMemo(
     () =>
-      mentionables
-        .map((m) => `${m.id}:${m.previewUrl ?? ""}:${m.label}`)
-        .join("|"),
-    [mentionables],
+      buildMirrorContent(
+        displayValue,
+        mentionables,
+        edition,
+        thumbSize,
+        borderClass,
+      ),
+    [displayValue, mentionables, edition, thumbSize, borderClass],
   );
 
   const syncMirrorScroll = useCallback(() => {
     const ta = textareaRef.current;
     const mirror = mirrorRef.current;
-    const overlay = overlayRef.current;
     if (!ta || !mirror) return;
+
+    const cs = window.getComputedStyle(ta);
+    for (const prop of MIRROR_LAYOUT_PROPS) {
+      mirror.style[prop] = cs[prop];
+    }
     mirror.scrollTop = ta.scrollTop;
     mirror.scrollLeft = ta.scrollLeft;
-    if (overlay) {
-      overlay.scrollTop = ta.scrollTop;
-      overlay.scrollLeft = ta.scrollLeft;
-    }
+
     const h = ta.style.height;
-    if (h) {
-      mirror.style.height = h;
-      if (overlay) overlay.style.height = h;
-    } else {
-      const px = `${ta.offsetHeight}px`;
-      mirror.style.height = px;
-      if (overlay) overlay.style.height = px;
-    }
+    mirror.style.height = h || `${ta.offsetHeight}px`;
   }, [textareaRef]);
-
-  const layoutThumbPositions = useCallback(() => {
-    const ta = textareaRef.current;
-    if (!ta || !enabled) {
-      setThumbPositions([]);
-      return;
-    }
-
-    const taRect = ta.getBoundingClientRect();
-    const ranges = findAllMentionRangesInDisplay(displayValue, mentionables);
-    const next: ThumbPosition[] = [];
-
-    for (const range of ranges) {
-      if (!range.item.previewUrl) continue;
-      const mentionRect = getMentionRangeClientRect(ta, range.start, range.end);
-      if (!mentionRect) continue;
-      next.push({
-        id: range.item.id,
-        item: range.item,
-        left: mentionRect.right - taRect.left + 2,
-        top:
-          mentionRect.top -
-          taRect.top +
-          Math.max(0, (mentionRect.height - thumbSize) / 2),
-      });
-    }
-
-    setThumbPositions(next);
-  }, [displayValue, mentionables, enabled, textareaRef, thumbSize]);
 
   useLayoutEffect(() => {
     if (!enabled) return;
     syncMirrorScroll();
-    layoutThumbPositions();
-  }, [displayValue, previewKey, enabled, syncMirrorScroll, layoutThumbPositions]);
+    const rafId = requestAnimationFrame(syncMirrorScroll);
+    return () => cancelAnimationFrame(rafId);
+  }, [displayValue, enabled, syncMirrorScroll]);
 
   useLayoutEffect(() => {
     const ta = textareaRef.current;
     if (!enabled || !ta) return;
 
-    const onScroll = () => {
-      syncMirrorScroll();
-      layoutThumbPositions();
+    const schedule = () => {
+      requestAnimationFrame(syncMirrorScroll);
     };
-    ta.addEventListener("scroll", onScroll, { passive: true });
-    const ro = new ResizeObserver(onScroll);
+
+    ta.addEventListener("input", schedule);
+    ta.addEventListener("scroll", schedule, { passive: true });
+    const ro = new ResizeObserver(schedule);
     ro.observe(ta);
 
+    const dockScroll = ta.closest(".pro2-dock-scroll");
+    dockScroll?.addEventListener("scroll", schedule, { passive: true });
+
     return () => {
-      ta.removeEventListener("scroll", onScroll);
+      ta.removeEventListener("input", schedule);
+      ta.removeEventListener("scroll", schedule);
+      dockScroll?.removeEventListener("scroll", schedule);
       ro.disconnect();
     };
-  }, [enabled, syncMirrorScroll, layoutThumbPositions, textareaRef]);
+  }, [enabled, syncMirrorScroll, textareaRef]);
 
   useImperativeHandle(
     ref,
     () => ({
       resolveThumbAtPoint(clientX, clientY) {
-        const overlay = overlayRef.current;
-        if (!overlay) return null;
-        const thumbs = overlay.querySelectorAll<HTMLImageElement>(
+        const mirror = mirrorRef.current;
+        if (!mirror) return null;
+        const thumbs = mirror.querySelectorAll<HTMLImageElement>(
           "img[data-mention-thumb]",
         );
         for (const el of thumbs) {
@@ -198,46 +269,16 @@ export const MentionInlineThumbMirror = forwardRef<
   if (!enabled) return null;
 
   return (
-    <>
-      <div
-        ref={mirrorRef}
-        aria-hidden
-        className={cn(
-          textareaClassName,
-          "pointer-events-none absolute inset-0 z-[1] overflow-hidden whitespace-pre-wrap break-words text-white",
-        )}
-      >
-        {displayValue}
-      </div>
-      <div
-        ref={overlayRef}
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
-      >
-        {thumbPositions.map((pos) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={pos.id}
-            src={pos.item.previewUrl}
-            alt=""
-            draggable={false}
-            data-mention-thumb=""
-            data-mention-id={pos.id}
-            className={cn(
-              "absolute rounded-[3px] border object-cover",
-              borderClass,
-            )}
-            style={{
-              width: thumbSize,
-              height: thumbSize,
-              left: pos.left,
-              top: pos.top,
-            }}
-            referrerPolicy="no-referrer"
-          />
-        ))}
-      </div>
-    </>
+    <div
+      ref={mirrorRef}
+      aria-hidden
+      className={cn(
+        textareaClassName,
+        "pointer-events-none absolute inset-0 z-[1] overflow-hidden text-white",
+      )}
+    >
+      {mirrorContent}
+    </div>
   );
 });
 

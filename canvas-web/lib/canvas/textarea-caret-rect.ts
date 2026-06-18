@@ -37,33 +37,46 @@ const MIRROR_PROPS = [
   "letterSpacing",
   "wordSpacing",
   "tabSize",
+  "whiteSpace",
+  "overflowWrap",
+  "wordBreak",
 ] as const;
 
 const mirrorByTextarea = new WeakMap<HTMLTextAreaElement, HTMLDivElement>();
 
+type MirrorSync = {
+  scaleX: number;
+  scaleY: number;
+  originLeft: number;
+  originTop: number;
+};
+
 function syncMirrorStyles(
   textarea: HTMLTextAreaElement,
   mirror: HTMLDivElement,
-): CSSStyleDeclaration {
+): MirrorSync {
   const computed = window.getComputedStyle(textarea);
   const style = mirror.style;
   style.position = "fixed";
   style.visibility = "hidden";
   style.pointerEvents = "none";
-  style.whiteSpace = "pre-wrap";
-  style.wordWrap = "break-word";
   style.overflow = "auto";
   for (const prop of MIRROR_PROPS) {
     style[prop] = computed[prop];
   }
   const rect = textarea.getBoundingClientRect();
+  const layoutW = textarea.offsetWidth;
+  const layoutH = textarea.offsetHeight;
+  const scaleX = layoutW > 0 ? rect.width / layoutW : 1;
+  const scaleY = layoutH > 0 ? rect.height / layoutH : 1;
+  // mirror 用未缩放布局尺寸排版，再乘 scale 还原为视口坐标（RF pan/zoom 下准确）
   style.top = `${rect.top}px`;
   style.left = `${rect.left}px`;
-  style.width = `${rect.width}px`;
-  style.height = `${rect.height}px`;
+  style.width = `${layoutW}px`;
+  style.height = `${layoutH}px`;
   mirror.scrollTop = textarea.scrollTop;
   mirror.scrollLeft = textarea.scrollLeft;
-  return computed;
+  return { scaleX, scaleY, originLeft: rect.left, originTop: rect.top };
 }
 
 function getMirror(textarea: HTMLTextAreaElement): HTMLDivElement {
@@ -92,7 +105,8 @@ export function getTextareaCaretClientRect(
   if (position < 0) return null;
 
   const mirror = getMirror(textarea);
-  const computed = syncMirrorStyles(textarea, mirror);
+  const { scaleY } = syncMirrorStyles(textarea, mirror);
+  const computed = window.getComputedStyle(textarea);
 
   const clamped = Math.min(position, textarea.value.length);
   mirror.textContent = textarea.value.substring(0, clamped);
@@ -108,8 +122,8 @@ export function getTextareaCaretClientRect(
 
   const height =
     markerRect.height ||
-    parseFloat(computed.lineHeight) ||
-    parseFloat(computed.fontSize) ||
+    parseFloat(computed.lineHeight) * scaleY ||
+    parseFloat(computed.fontSize) * scaleY ||
     16;
 
   return {

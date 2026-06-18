@@ -201,18 +201,14 @@ export async function volcengineListAigcAssetGroups(opts: {
     result?.Groups ??
     []) as unknown[];
   if (!Array.isArray(items)) return [];
-  return items
-    .map((row) => {
-      if (!row || typeof row !== "object") return null;
-      const r = row as Record<string, unknown>;
-      const groupId = String(r.Id ?? r.GroupId ?? r.id ?? "").trim();
-      if (!groupId) return null;
-      return {
-        groupId,
-        name: String(r.Name ?? r.name ?? "").trim() || undefined,
-      };
-    })
-    .filter((x): x is { groupId: string; name?: string } => x != null);
+  return items.flatMap((row) => {
+    if (!row || typeof row !== "object") return [];
+    const r = row as Record<string, unknown>;
+    const groupId = String(r.Id ?? r.GroupId ?? r.id ?? "").trim();
+    if (!groupId) return [];
+    const name = String(r.Name ?? r.name ?? "").trim();
+    return [{ groupId, ...(name ? { name } : {}) }];
+  });
 }
 
 export async function volcengineCreatePortraitAsset(opts: {
