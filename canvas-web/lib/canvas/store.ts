@@ -182,11 +182,18 @@ type CanvasState = {
   canvasDraggingNodeId: string | null;
   /** 画布 pan/zoom 进行中：浮动 Dock / 内联 @ 缩略图暂停更新 */
   canvasViewportMoving: boolean;
+  /** LibTV 浮动 Dock · 最近一次唯一选中节点（zoom 时 RF 选中态可能闪断，Dock 读此字段） */
+  libtvFloatingDockNodeId: string | null;
+  libtvFloatingDockNodeType: string | null;
   setConnectingFrom: (id: string | null) => void;
   setDragHoverGroup: (id: string | null) => void;
   setCanvasGeometryDragging: (dragging: boolean) => void;
   setCanvasDraggingNodeId: (nodeId: string | null) => void;
   setCanvasViewportMoving: (moving: boolean) => void;
+  setLibtvFloatingDockSelection: (
+    nodeId: string | null,
+    nodeType: string | null,
+  ) => void;
 
   /** 故事大纲审阅弹窗（全局，避免节点重渲染丢失 open 状态） */
   storyHubReview: { hubId: string; section: HubPreviewSection } | null;
@@ -333,6 +340,8 @@ export const useCanvasStore = create<CanvasState>()(
       canvasGeometryDragging: false,
       canvasDraggingNodeId: null,
       canvasViewportMoving: false,
+      libtvFloatingDockNodeId: null,
+      libtvFloatingDockNodeType: null,
       setConnectingFrom: (id) => set({ connectingFromNodeId: id }),
       setDragHoverGroup: (id) => set({ dragHoverGroupId: id }),
       setCanvasGeometryDragging: (dragging) =>
@@ -341,6 +350,11 @@ export const useCanvasStore = create<CanvasState>()(
         set({ canvasDraggingNodeId: nodeId }),
       setCanvasViewportMoving: (moving) =>
         set({ canvasViewportMoving: moving }),
+      setLibtvFloatingDockSelection: (nodeId, nodeType) =>
+        set({
+          libtvFloatingDockNodeId: nodeId,
+          libtvFloatingDockNodeType: nodeType,
+        }),
 
       storyHubReview: null,
       openStoryHubReview: (hubId, section) =>
@@ -412,6 +426,8 @@ export const useCanvasStore = create<CanvasState>()(
               storyHubReview: null,
               pro2TextOutlineEditorNodeId: null,
               pro2ScriptTableEditorNodeId: null,
+              libtvFloatingDockNodeId: null,
+              libtvFloatingDockNodeType: null,
             }),
           );
           queueMicrotask(applyDeferredLayout);
@@ -428,6 +444,8 @@ export const useCanvasStore = create<CanvasState>()(
             storyHubReview: null,
             pro2TextOutlineEditorNodeId: null,
             pro2ScriptTableEditorNodeId: null,
+            libtvFloatingDockNodeId: null,
+            libtvFloatingDockNodeType: null,
           }),
         );
       },
