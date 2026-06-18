@@ -70,20 +70,17 @@ export function buildFederatedLogoutStepUrl(
 }
 
 /**
- * 从第一个子站 `/api/tools-logout?next=…` 起，串联清除各站 `tools_token`。
- * 采用 book-mall 分步跳转，避免把所有 next 嵌套进一条 Location（CloudBase 网关会 502）。
+ * full-signout 清 Cookie 后用的 **同源相对** 入口（须与大量 Set-Cookie 同响应，不可再 302 到外站）。
+ * CloudBase：Set-Cookie × 外链 Location 同包会 502；子站链路由 `/api/auth/federated-logout` 继续。
  */
-export function buildFederatedToolsLogoutStartUrl(finalCallbackUrl: string): string {
-  if (!shouldUseFederatedToolsLogoutChain()) return finalCallbackUrl;
-
-  const origins = listFederatedToolsLogoutOrigins();
-  if (origins.length === 0) return finalCallbackUrl;
-
-  const book = trimOrigin(getBookMallOrigin());
-  if (!book) return finalCallbackUrl;
-
-  const step1 = buildFederatedLogoutStepUrl(1, finalCallbackUrl, book);
-  const first = new URL("/api/tools-logout", origins[0]!);
-  first.searchParams.set("next", step1);
-  return first.toString();
+export function buildFederatedLogoutRelativeEntry(
+  callbackPath: string,
+): string | null {
+  if (!shouldUseFederatedToolsLogoutChain()) return null;
+  if (listFederatedToolsLogoutOrigins().length === 0) return null;
+  const path =
+    callbackPath.startsWith("/") && !callbackPath.startsWith("//")
+      ? callbackPath
+      : "/";
+  return `/api/auth/federated-logout?step=0&final=${encodeURIComponent(path)}`;
 }
