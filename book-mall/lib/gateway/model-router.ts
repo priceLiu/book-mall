@@ -82,6 +82,10 @@ export function routeGatewayModel(model: string): RoutedModel {
     return { providerKind: "HUNYUAN", requestKind: "IMAGE" };
   }
 
+  if (m === "portrait:virtual" || m === "portrait:real") {
+    return { providerKind: "VOLCENGINE", requestKind: "OTHER" };
+  }
+
   if (TTS_MODELS.has(m) || m.startsWith("tts-")) {
     return { providerKind: "BAILIAN", requestKind: "TTS" };
   }

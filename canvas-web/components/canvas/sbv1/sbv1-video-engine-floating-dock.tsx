@@ -5,6 +5,8 @@ import { useNodes } from "@xyflow/react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { buildSbv1DockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
+import { resolveSbv1VideoEngineInputs } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
+import { refreshSbv1UpstreamPortraitStatuses } from "@/lib/canvas/refresh-sbv1-upstream-portrait";
 import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
@@ -45,10 +47,11 @@ export function Sbv1VideoEngineFloatingDock() {
     () => (nodeId ? resolveSbv1UpstreamRefLinks(nodeId, nodes, edges) : []),
     [nodeId, nodes, edges],
   );
-  const mentionables = useMemo(
-    () => buildSbv1DockMentionables(upstreamLinks),
-    [upstreamLinks],
-  );
+  const mentionables = useMemo(() => {
+    const storeNode = nodes.find((n) => n.id === nodeId);
+    const prompt = (storeNode?.data as { prompt?: string } | undefined)?.prompt ?? "";
+    return buildSbv1DockMentionables(upstreamLinks, nodes, prompt);
+  }, [upstreamLinks, nodes, nodeId]);
 
   const isGenerating =
     d.runtime?.status === "pending" || d.runtime?.status === "running";
@@ -62,25 +65,46 @@ export function Sbv1VideoEngineFloatingDock() {
   );
 
   const onRun = useCallback(async () => {
-    const prompt = (d.prompt ?? "").trim();
-    const hasRefs = upstreamLinks.some((l) => l.previewUrl);
-    if (!prompt && !hasRefs) {
+    const projectId = useCanvasStore.getState().projectId ?? undefined;
+    if (base) {
+      await refreshSbv1UpstreamPortraitStatuses({
+        base,
+        engineNodeId: nodeId,
+        nodes: useCanvasStore.getState().nodes,
+        edges: useCanvasStore.getState().edges,
+        updateNodeData,
+        projectId,
+      });
+    }
+
+    const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
+    const storeNode = latestNodes.find((n) => n.id === nodeId);
+    const latestData = (storeNode?.data ?? {}) as Sbv1VideoEngineNodeData;
+    const prompt = (latestData.prompt ?? "").trim();
+    const resolved = resolveSbv1VideoEngineInputs(latestNodes, latestEdges, nodeId, {
+      prompt,
+      referenceMode: latestData.referenceMode ?? "omni",
+    });
+    if (!resolved.ok) {
       await alert({
         title: "无法生成",
-        message: "请填写 prompt 或连接/上传至少一张参考图。",
+        message: resolved.error,
         variant: "warning",
       });
       return;
     }
-    if (d.referenceMode === "first_last" && upstreamLinks.length < 1) {
+    if (
+      latestData.referenceMode === "first_last" &&
+      resolved.portraitAssetRefs.length < 1
+    ) {
       await alert({
         title: "首尾帧模式",
-        message: "请至少连接首帧参考图。",
+        message: "请至少连接一张已入库的参考图。",
         variant: "warning",
       });
       return;
     }
-    if (!d.engine?.providerId?.trim() || !d.engine?.modelKey?.trim()) {
+    if (!latestData.engine?.providerId?.trim() || !latestData.engine?.modelKey?.trim()) {
       await alert({
         title: "请选择模型",
         message: "请选择火山 Seedance 模型后再生成。",
@@ -97,7 +121,7 @@ export function Sbv1VideoEngineFloatingDock() {
       return;
     }
     busEnqueueStoryRun({ nodeId, forceFresh: true });
-  }, [d, upstreamLinks, base, alert, nodeId]);
+  }, [nodeId, base, alert, updateNodeData]);
 
   if (!storeNode || !placement) return null;
 

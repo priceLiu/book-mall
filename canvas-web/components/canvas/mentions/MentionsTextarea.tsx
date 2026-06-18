@@ -17,6 +17,9 @@ import {
 } from "react";
 
 import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
+import { cn } from "@/lib/utils";
+import { disposeTextareaCaretMirror } from "@/lib/canvas/textarea-caret-rect";
+import { useDeferredTextCommit } from "@/lib/canvas/use-deferred-text-commit";
 import { findMentionRangeAtDisplayIndex } from "@/lib/canvas/mention-at-display-index";
 import {
   getMentionRangeClientRect,
@@ -24,7 +27,7 @@ import {
   getTextareaIndexFromClientPoint,
 } from "@/lib/canvas/textarea-caret-rect";
 import { MentionHoverPreviewPortal } from "./mention-hover-preview";
-import { MentionInlineThumbs } from "./mention-inline-thumbs";
+import { MentionInlineThumbMirror, MENTION_INLINE_THUMB_TEXTAREA_CLASS, type MentionInlineThumbMirrorHandle } from "./mention-inline-thumbs";
 import { MentionPickerPortal } from "./mention-picker-portal";
 
 export type MentionableItem = {
@@ -38,7 +41,11 @@ export type MentionableItem = {
 
 export type MentionsTextareaProps = {
   value: string;
-  onChange: (value: string, referencedIds: string[]) => void;
+  onChange: (
+    value: string,
+    referencedIds: string[],
+    meta?: { commit?: boolean },
+  ) => void;
   mentionables: MentionableItem[];
   rows?: number;
   placeholder?: string;
@@ -60,6 +67,8 @@ export type MentionsTextareaProps = {
   mentionHoverPreview?: boolean;
   /** Dock：在 @ 标签右侧内联显示缩略图（非 footer pill） */
   mentionInlineThumb?: boolean;
+  /** 与 mentionInlineThumb 同开：悬停 @ 文案仍显示大图（默认与图片 Dock 一致） */
+  mentionInlineThumbHoverOnText?: boolean;
   /** mentionInlineThumb 边框色 · pro2 紫 / sbv1 cyan */
   mentionEdition?: "pro2" | "sbv1";
 };
@@ -139,12 +148,25 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       mentionPickerEmptyHint = "暂无已生成的角色图，请先在角色列生成。",
       mentionHoverPreview = true,
       mentionInlineThumb = false,
+      mentionInlineThumbHoverOnText = false,
       mentionEdition = "pro2",
     },
     ref,
   ) {
+    const inlineThumbEnabled = mentionInlineThumb && !disabled;
+    /** 内联缩略图已有时默认不做 @ 文案悬停（避免 mirror 测量拖垮主线程） */
+    const textHoverPreviewEnabled =
+      mentionHoverPreview &&
+      (!mentionInlineThumb || mentionInlineThumbHoverOnText);
+    const inlineThumbHoverEnabled =
+      mentionHoverPreview && inlineThumbEnabled;
+    const hoverPreviewEnabled =
+      textHoverPreviewEnabled || inlineThumbHoverEnabled;
     const wrapperRef = useRef<HTMLDivElement | null>(null);
     const innerRef = useRef<HTMLTextAreaElement | null>(null);
+    const inlineThumbMirrorRef = useRef<MentionInlineThumbMirrorHandle | null>(
+      null,
+    );
     const mentionAnchorRef = useRef<MentionAnchor | null>(null);
     const pendingCaretRef = useRef<number | null>(null);
     const hoverRafRef = useRef<number | null>(null);
@@ -169,24 +191,35 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       return getTextareaCaretClientRect(el, pos);
     }, [anchorTick]);
 
-    const displayValue = useMemo(
+    const externalDisplay = useMemo(
       () => promptToDisplay(value, mentionables),
       [value, mentionables],
     );
+
+    const emit = useCallback(
+      (display: string, commit: boolean) => {
+        const canonical = promptFromDisplay(display, mentionables);
+        onChange(canonical, parseReferencedIds(canonical), { commit });
+      },
+      [mentionables, onChange],
+    );
+
+    const {
+      draft: displayValue,
+      setDraft: setDisplayDraft,
+      schedule: scheduleEmit,
+      flush: flushEmit,
+      onFocus: onDraftFocus,
+      onBlur: onDraftBlur,
+    } = useDeferredTextCommit(externalDisplay, (display, meta) => {
+      emit(display, meta.commit);
+    });
 
     const setRef = (el: HTMLTextAreaElement | null) => {
       innerRef.current = el;
       if (typeof ref === "function") ref(el);
       else if (ref) (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
     };
-
-    const emit = useCallback(
-      (display: string) => {
-        const canonical = promptFromDisplay(display, mentionables);
-        onChange(canonical, parseReferencedIds(canonical));
-      },
-      [mentionables, onChange],
-    );
 
     const filtered = useMemo(() => {
       if (!popoverFilter) return mentionables;
@@ -250,7 +283,8 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         const token = `@${item.label} `;
         const next = `${display.slice(0, start)}${token}${display.slice(end)}`;
         pendingCaretRef.current = start + token.length;
-        emit(next);
+        setDisplayDraft(next);
+        flushEmit(next);
         closePopover();
         requestAnimationFrame(() => {
           if (innerRef.current) {
@@ -261,14 +295,14 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           }
         });
       },
-      [displayValue, emit],
+      [displayValue, flushEmit, setDisplayDraft],
     );
 
     const onTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
       const nextDisplay = e.target.value;
       const cursor = e.target.selectionStart ?? nextDisplay.length;
       pendingCaretRef.current = cursor;
-      emit(nextDisplay);
+      scheduleEmit(nextDisplay);
       let i = cursor - 1;
       while (i >= 0 && !/\s/.test(nextDisplay[i])) {
         if (nextDisplay[i] === "@") {
@@ -320,10 +354,31 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
 
     const updateHoverPreview = useCallback(
       (clientX: number, clientY: number) => {
-        if (!mentionHoverPreview || disabled || popoverOpen) {
+        if (!hoverPreviewEnabled || disabled || popoverOpen) {
           clearHoverPreview();
           return;
         }
+
+        if (inlineThumbHoverEnabled) {
+          const thumbHit =
+            inlineThumbMirrorRef.current?.resolveThumbAtPoint(
+              clientX,
+              clientY,
+            );
+          if (thumbHit) {
+            if (hoverIdRef.current !== thumbHit.item.id) {
+              hoverIdRef.current = thumbHit.item.id;
+            }
+            setHoverPreview(thumbHit);
+            return;
+          }
+        }
+
+        if (!textHoverPreviewEnabled) {
+          clearHoverPreview();
+          return;
+        }
+
         const el = innerRef.current;
         if (!el) return;
 
@@ -357,7 +412,9 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         setHoverPreview({ item: hit.item, anchorRect });
       },
       [
-        mentionHoverPreview,
+        hoverPreviewEnabled,
+        inlineThumbHoverEnabled,
+        textHoverPreviewEnabled,
         disabled,
         popoverOpen,
         displayValue,
@@ -368,7 +425,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
 
     const onMouseMove = useCallback(
       (e: MouseEvent<HTMLTextAreaElement>) => {
-        if (!mentionHoverPreview) return;
+        if (!hoverPreviewEnabled) return;
         if (hoverRafRef.current != null) {
           cancelAnimationFrame(hoverRafRef.current);
         }
@@ -378,7 +435,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           updateHoverPreview(clientX, clientY);
         });
       },
-      [mentionHoverPreview, updateHoverPreview],
+      [hoverPreviewEnabled, updateHoverPreview],
     );
 
     const onMouseLeave = useCallback(() => {
@@ -398,48 +455,63 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         if (hoverRafRef.current != null) {
           cancelAnimationFrame(hoverRafRef.current);
         }
+        const el = innerRef.current;
+        if (el) disposeTextareaCaretMirror(el);
       },
       [],
     );
+
+    const resolvedTextareaClassName =
+      className ??
+      `${RF_FORM_CONTROL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none${fillHeight ? " min-h-0 flex-1 h-full overflow-y-auto" : ""}`;
 
     return (
       <div
         ref={wrapperRef}
         className={
           wrapperClassName
-            ? `relative ${fillHeight ? "flex h-full min-h-0 flex-col " : ""}${wrapperClassName}`
-            : `relative${fillHeight ? " flex h-full min-h-0 flex-col" : ""}`
+            ? `relative overflow-visible ${fillHeight ? "flex h-full min-h-0 flex-col " : ""}${wrapperClassName}`
+            : `relative overflow-visible${fillHeight ? " flex h-full min-h-0 flex-col" : ""}`
         }
       >
-        <textarea
-          ref={setRef}
-          value={displayValue}
-          onChange={onTextChange}
-          onKeyDown={onKeyDown}
-          onKeyDownCapture={onKeyDownCapture}
-          onPaste={onPaste}
-          onBlur={onBlur}
-          onMouseMove={onMouseMove}
-          onMouseLeave={onMouseLeave}
-          autoFocus={autoFocus}
-          rows={fillHeight ? 1 : rows}
-          placeholder={placeholder}
-          disabled={disabled}
-          aria-label={ariaLabel}
-          className={
-            className ??
-            `${RF_FORM_CONTROL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none${fillHeight ? " min-h-0 flex-1 h-full overflow-y-auto" : ""}`
-          }
-          style={style}
-        />
-        <MentionInlineThumbs
-          textareaRef={innerRef}
-          wrapperRef={wrapperRef}
-          displayValue={displayValue}
-          mentionables={mentionables}
-          enabled={mentionInlineThumb && !disabled}
-          edition={mentionEdition}
-        />
+        <div className={cn("relative", fillHeight && "flex min-h-0 flex-1 flex-col")}>
+          {inlineThumbEnabled ? (
+            <MentionInlineThumbMirror
+              ref={inlineThumbMirrorRef}
+              textareaRef={innerRef}
+              displayValue={displayValue}
+              mentionables={mentionables}
+              enabled={inlineThumbEnabled}
+              edition={mentionEdition}
+              textareaClassName={resolvedTextareaClassName}
+            />
+          ) : null}
+          <textarea
+            ref={setRef}
+            value={displayValue}
+            onChange={onTextChange}
+            onKeyDown={onKeyDown}
+            onKeyDownCapture={onKeyDownCapture}
+            onPaste={onPaste}
+            onFocus={onDraftFocus}
+            onBlur={(e) => {
+              onDraftBlur(e.currentTarget.value);
+              onBlur?.();
+            }}
+            onMouseMove={onMouseMove}
+            onMouseLeave={onMouseLeave}
+            autoFocus={autoFocus}
+            rows={fillHeight ? 1 : rows}
+            placeholder={placeholder}
+            disabled={disabled}
+            aria-label={ariaLabel}
+            className={cn(
+              resolvedTextareaClassName,
+              inlineThumbEnabled && MENTION_INLINE_THUMB_TEXTAREA_CLASS,
+            )}
+            style={style}
+          />
+        </div>
         <MentionPickerPortal
           open={popoverOpen}
           anchorEl={wrapperRef.current}

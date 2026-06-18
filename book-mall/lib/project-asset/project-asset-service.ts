@@ -156,24 +156,30 @@ function buildProjectAssetWhere(
   }
 
   const projectId = filter.projectId?.trim() || null;
+  const andClauses: Prisma.ProjectAssetWhereInput[] = [];
+
   if (filter.scope === "project" && projectId) {
     base.sourceProjectId = projectId;
   } else if (filter.scope === "library") {
     base.sourceProjectId = null;
   } else if (projectId) {
-    base.OR = [{ sourceProjectId: projectId }, { sourceProjectId: null }];
+    andClauses.push({
+      OR: [{ sourceProjectId: projectId }, { sourceProjectId: null }],
+    });
   }
 
   const q = filter.search?.trim();
   if (q) {
-    base.AND = [
-      {
-        OR: [
-          { displayName: { contains: q, mode: "insensitive" } },
-          { description: { contains: q, mode: "insensitive" } },
-        ],
-      },
-    ];
+    andClauses.push({
+      OR: [
+        { displayName: { contains: q, mode: "insensitive" } },
+        { description: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (andClauses.length) {
+    base.AND = andClauses;
   }
 
   return base;

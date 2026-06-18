@@ -26,7 +26,7 @@ export function useViewportTransformActive(active: boolean): FlowViewport {
   );
 }
 
-/** 浮动 Dock：仅节点拖动期间隐藏；画布 pan/zoom 时保持显示 */
+/** 浮动 Dock：仅节点拖动期间隐藏；画布 pan/zoom 时保持显示（勿绑 canvasViewportMoving） */
 export function libtvFloatingDockHidden(geometryDragging: boolean): boolean {
   return geometryDragging;
 }

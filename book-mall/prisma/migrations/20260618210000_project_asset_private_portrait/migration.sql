@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "ProjectAssetKind" ADD VALUE 'PRIVATE_PORTRAIT';

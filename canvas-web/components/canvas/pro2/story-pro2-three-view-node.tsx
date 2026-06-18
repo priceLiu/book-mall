@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useNodes } from "@xyflow/react";
 import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -51,6 +51,7 @@ import {
 export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
+  const rfNodes = useNodes();
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
@@ -73,8 +74,8 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const label = d.label?.trim() || "角色";
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
   const soleSelected = useMemo(
-    () => selected && nodes.filter((n) => n.selected).length === 1,
-    [selected, nodes],
+    () => selected && rfNodes.filter((n) => n.selected).length === 1,
+    [selected, rfNodes],
   );
   const showImageTools = Boolean(soleSelected && hasImage && !isGenerating);
   const showEmbeddedDock = pro2ThreeViewNodeUsesEmbeddedDock(d, {

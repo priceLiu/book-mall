@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useNodes } from "@xyflow/react";
 import { Maximize2, RefreshCw, Video } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -38,9 +38,12 @@ import { StoryMediaPreviewModal } from "../story-column-media-panel";
 import { Pro2NodeResizer } from "../pro2/pro2-node-resizer";
 import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
+import { LibtvNodeErrorBanner } from "../libtv-node-error-banner";
+import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
+  const rfNodes = useNodes();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -54,6 +57,13 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
+
+  const errorBanner = useLibtvRuntimeErrorBanner({
+    nodeId: id,
+    status: d.runtime?.status,
+    failCode: d.runtime?.failCode,
+    failMessage: d.runtime?.failMessage,
+  });
 
   const videoUrl =
     d.runtime?.ossUrl ??
@@ -72,8 +82,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       d.runtime?.ephemeralUrl,
   );
   const soleSelected = useMemo(
-    () => selected && nodes.filter((n) => n.selected).length === 1,
-    [selected, nodes],
+    () => selected && rfNodes.filter((n) => n.selected).length === 1,
+    [selected, rfNodes],
   );
   const showToolbar = Boolean(soleSelected && hasToolbarContent && !isGenerating);
   const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
@@ -269,11 +279,11 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             )}
           </div>
 
-          {d.runtime?.status === "error" && d.runtime.failMessage ? (
-            <div className="nodrag shrink-0 border-t border-red-500/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">
-              {d.runtime.failMessage}
-            </div>
-          ) : null}
+          <LibtvNodeErrorBanner
+            message={errorBanner.message}
+            visible={errorBanner.visible}
+            onDismiss={errorBanner.dismiss}
+          />
         </div>
       </div>
       {previewOpen && videoUrl ? (

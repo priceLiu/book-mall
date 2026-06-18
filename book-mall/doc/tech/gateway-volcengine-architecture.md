@@ -90,9 +90,9 @@ Gateway 对外：
 
 ## 5. 人像库与 asset://
 
-- **管理**：私域虚拟人像（9 接口）、真人人像库（2 接口）经 Gateway 透明代理，共用 VOLCENGINE 凭证。
+- **管理**：私域虚拟人像（9 接口）、真人人像库（2 接口）经 Gateway 透明代理 + Canvas BFF（`/api/canvas/portrait/*`），共用 VOLCENGINE 凭证。
 - **使用**：视频生成 API 的 `content` 中引用 `asset://{AssetId}`，无需单独下载 URL。
-- **产品 UI**：本期仅 Gateway API；Canvas/Story 人像库管理 UI 为二期。
+- **产品 UI**：LibTV 图片节点工具条「私域人像入库」；真人人像 H5 活体见 sbv1 画布工具条。
 
 官方文档：
 

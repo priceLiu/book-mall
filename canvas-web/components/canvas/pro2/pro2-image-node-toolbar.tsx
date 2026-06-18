@@ -8,13 +8,20 @@ import {
   Grid3x3,
   Lamp,
   LayoutGrid,
+  Loader2,
   Maximize2,
   RotateCw,
   Scan,
+  ScanFace,
   Sparkles,
   Wand2,
 } from "lucide-react";
+import { useState } from "react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import {
+  downloadMediaUrl,
+  guessMediaDownloadFilename,
+} from "@/lib/canvas/download-media-url";
 import { cn } from "@/lib/utils";
 
 /** LibTV 节点顶栏工具条 · 壳层（规范见 libtv-node-interaction-spec.md §5） */
@@ -42,6 +49,10 @@ export type Pro2ImageNodeToolbarProps = {
   previewUrl?: string;
   onExpandPreview?: () => void;
   onSaveAsAsset?: () => void;
+  /** 私域人像入库（火山 portrait 库 → asset://） */
+  onImportPortrait?: () => void;
+  portraitImporting?: boolean;
+  portraitActive?: boolean;
   /** 复制节点（含生成结果与 Dock 配置） */
   onDuplicateNode?: () => void;
   className?: string;
@@ -57,6 +68,9 @@ export function Pro2ImageNodeToolbar({
   previewUrl,
   onExpandPreview,
   onSaveAsAsset,
+  onImportPortrait,
+  portraitImporting = false,
+  portraitActive = false,
   onDuplicateNode,
   className,
   style,
@@ -64,6 +78,7 @@ export function Pro2ImageNodeToolbar({
   minimal = false,
 }: Pro2ImageNodeToolbarProps) {
   const { alert } = useDialogs();
+  const [downloading, setDownloading] = useState(false);
 
   const soon = async (label: string) => {
     await alert({
@@ -73,14 +88,18 @@ export function Pro2ImageNodeToolbar({
     });
   };
 
-  const onDownload = () => {
-    if (!previewUrl) return;
-    const a = document.createElement("a");
-    a.href = previewUrl;
-    a.download = minimal ? "video" : "image";
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.click();
+  const onDownload = async () => {
+    if (!previewUrl || downloading) return;
+    setDownloading(true);
+    try {
+      const fallback = minimal ? "video.mp4" : "image.png";
+      await downloadMediaUrl(
+        previewUrl,
+        guessMediaDownloadFilename(previewUrl, fallback),
+      );
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (minimal) {
@@ -103,10 +122,14 @@ export function Pro2ImageNodeToolbar({
           type="button"
           className={ICON_BTN}
           title="下载"
-          disabled={!previewUrl}
-          onClick={onDownload}
+          disabled={!previewUrl || downloading}
+          onClick={() => void onDownload()}
         >
-          <Download className="size-5" />
+          {downloading ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <Download className="size-5" />
+          )}
         </button>
         {onDuplicateNode ? (
           <button
@@ -189,6 +212,27 @@ export function Pro2ImageNodeToolbar({
 
       <div className={PRO2_IMAGE_NODE_TOOLBAR_DIVIDER_CLASS} />
 
+      {onImportPortrait ? (
+        <button
+          type="button"
+          className={TOOL_BTN}
+          disabled={!previewUrl || portraitImporting}
+          title={
+            portraitActive
+              ? "已入库 · 生视频将引用 asset://"
+              : "写入火山私域人像库"
+          }
+          onClick={onImportPortrait}
+        >
+          {portraitImporting ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <ScanFace className="size-3.5" />
+          )}
+          <span>{portraitActive ? "已入库" : "私域人像入库"}</span>
+        </button>
+      ) : null}
+
       {onSaveAsAsset ? (
         <button type="button" className={TOOL_BTN} onClick={onSaveAsAsset}>
           <BookmarkPlus className="size-3.5" />
@@ -208,10 +252,14 @@ export function Pro2ImageNodeToolbar({
         type="button"
         className={ICON_BTN}
         title="下载"
-        disabled={!previewUrl}
-        onClick={onDownload}
+        disabled={!previewUrl || downloading}
+        onClick={() => void onDownload()}
       >
-        <Download className="size-5" />
+        {downloading ? (
+          <Loader2 className="size-5 animate-spin" />
+        ) : (
+          <Download className="size-5" />
+        )}
       </button>
       <button
         type="button"

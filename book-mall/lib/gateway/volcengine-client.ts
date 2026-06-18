@@ -4,6 +4,10 @@
 
 import { defaultBaseUrl } from "@/lib/gateway/model-router";
 import { resolveVolcengineModelKey } from "@/lib/gateway/volcengine-chat-models";
+import {
+  readVendorRequestIdFromHeaders,
+  readVendorRequestIdFromJson,
+} from "@/lib/gateway/vendor-request-id";
 
 export type VolcengineVideoTaskStatus =
   | "queued"
@@ -24,6 +28,49 @@ export type VolcengineVideoTaskResult = {
   };
 };
 
+export class VolcengineUpstreamError extends Error {
+  readonly status: number;
+  readonly requestId?: string;
+  readonly vendorTaskId?: string;
+
+  constructor(
+    message: string,
+    opts: { status: number; requestId?: string; vendorTaskId?: string },
+  ) {
+    super(message);
+    this.name = "VolcengineUpstreamError";
+    this.status = opts.status;
+    this.requestId = opts.requestId;
+    this.vendorTaskId = opts.vendorTaskId;
+  }
+}
+
+function volcengineUpstreamError(
+  prefix: string,
+  status: number,
+  r: Response,
+  json: unknown,
+  fallbackText: string,
+): VolcengineUpstreamError {
+  const msg =
+    (json as { error?: { message?: string } })?.error?.message ??
+    (json as { message?: string })?.message ??
+    fallbackText.slice(0, 400);
+  const requestId =
+    readVendorRequestIdFromHeaders(r.headers) ??
+    readVendorRequestIdFromJson(json) ??
+    undefined;
+  const vendorTaskId =
+    (json as { id?: string })?.id ??
+    (json as { data?: { id?: string } })?.data?.id ??
+    undefined;
+  return new VolcengineUpstreamError(`${prefix} (${status}): ${msg}`, {
+    status,
+    requestId,
+    vendorTaskId,
+  });
+}
+
 function arkBase(baseUrl?: string | null): string {
   return (baseUrl?.trim() || defaultBaseUrl("VOLCENGINE")).replace(/\/$/, "");
 }
@@ -33,7 +80,7 @@ export async function volcengineCreateVideoTask(opts: {
   baseUrl?: string | null;
   model: string;
   body: Record<string, unknown>;
-}): Promise<{ taskId: string; raw: unknown }> {
+}): Promise<{ taskId: string; requestId?: string; raw: unknown }> {
   const base = arkBase(opts.baseUrl);
   const model = resolveVolcengineModelKey(opts.model);
   const payload = { ...opts.body, model };
@@ -54,11 +101,13 @@ export async function volcengineCreateVideoTask(opts: {
     throw new Error(`火山方舟视频任务提交失败 (${r.status}): ${text.slice(0, 400)}`);
   }
   if (!r.ok) {
-    const msg =
-      (json as { error?: { message?: string } })?.error?.message ??
-      (json as { message?: string })?.message ??
-      text.slice(0, 400);
-    throw new Error(`火山方舟视频任务提交失败 (${r.status}): ${msg}`);
+    throw volcengineUpstreamError(
+      "火山方舟视频任务提交失败",
+      r.status,
+      r,
+      json,
+      text,
+    );
   }
   const id =
     (json as { id?: string })?.id ??
@@ -66,7 +115,11 @@ export async function volcengineCreateVideoTask(opts: {
   if (!id) {
     throw new Error("火山方舟未返回 task id");
   }
-  return { taskId: id, raw: json };
+  const requestId =
+    readVendorRequestIdFromHeaders(r.headers) ??
+    readVendorRequestIdFromJson(json) ??
+    undefined;
+  return { taskId: id, requestId, raw: json };
 }
 
 export async function volcengineGetVideoTask(opts: {
@@ -90,10 +143,13 @@ export async function volcengineGetVideoTask(opts: {
     throw new Error(`火山方舟任务查询失败 (${r.status}): ${text.slice(0, 400)}`);
   }
   if (!r.ok) {
-    const msg =
-      (json as { error?: { message?: string } })?.error?.message ??
-      text.slice(0, 400);
-    throw new Error(`火山方舟任务查询失败 (${r.status}): ${msg}`);
+    throw volcengineUpstreamError(
+      "火山方舟任务查询失败",
+      r.status,
+      r,
+      json,
+      text,
+    );
   }
   const output = parseVolcengineVideoTaskJson(json, opts.taskId);
   return { output, raw: json };

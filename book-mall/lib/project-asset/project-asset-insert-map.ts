@@ -154,6 +154,24 @@ export function mapProjectAssetToCanvasInsert(
         PRO2_IMAGE_SIZE,
       );
 
+    case "PRIVATE_PORTRAIT": {
+      const nodeType = edition === "sbv1" ? "sbv1-image" : "story-pro2-image";
+      return mergeAssetNodeSnapshot(
+        asset,
+        nodeType,
+        {
+          label: asset.displayName,
+          portraitKind: payload.portraitKind,
+          portraitAssetId: String(payload.portraitAssetId ?? ""),
+          portraitAssetUri: String(payload.portraitAssetUri ?? ""),
+          portraitStatus: payload.portraitStatus ?? "active",
+          portraitGroupId: payload.portraitGroupId,
+          ossUrl: String(payload.sourceOssUrl ?? ""),
+        },
+        PRO2_IMAGE_SIZE,
+      );
+    }
+
     case "AUDIO":
     case "SCENE":
     case "PROP":

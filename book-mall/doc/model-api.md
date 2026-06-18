@@ -36,8 +36,8 @@ curl -X POST https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
 | `reference_video` / `reference_audio` | ✅ | ✅ | `canvas-video-volcengine.ts` |
 | `asset://` 人像库引用 | ✅ | ✅ | `canvas-video-volcengine.ts` |
 | 豆包 Chat | ✅ | Canvas LLM | `proxy-common.ts` |
-| 私域虚拟人像 API（9） | ✅ 透明代理 | — | `/api/gw/v1/volcengine/portrait/virtual/*` |
-| 真人人像库 API（2） | ✅ 透明代理 | — | `/api/gw/v1/volcengine/portrait/real/*` |
+| 私域虚拟人像 API（9） | ✅ 透明代理 + BFF | ✅ LibTV 图片节点入库 | `/api/canvas/portrait/virtual/import` |
+| 真人人像库 API（2） | ✅ 透明代理 + BFF | ✅ 活体 + 图片入库 | `/api/canvas/portrait/real/import` |
 | Story 分镜视频火山路径 | ✅ | story-web 模型列表 | `story-gateway-client.ts`, `story-task-service.ts` |
 
 ## 官方文档

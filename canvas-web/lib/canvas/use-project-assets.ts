@@ -31,6 +31,7 @@ export function useProjectAssets(
     }
     setLoading(true);
     setError(null);
+    setAssets([]);
     try {
       const rows = await listProjectAssets(base, {
         projectId: opts?.projectId,
@@ -39,6 +40,7 @@ export function useProjectAssets(
       });
       setAssets(rows);
     } catch (e) {
+      setAssets([]);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);

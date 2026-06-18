@@ -156,6 +156,18 @@ export function normalizeProjectAssetInsertData(
     next.characterKey = str(next.label);
   }
 
+  for (const key of [
+    "portraitKind",
+    "portraitAssetId",
+    "portraitAssetUri",
+    "portraitStatus",
+    "portraitGroupId",
+  ] as const) {
+    if (data[key] != null && data[key] !== "") {
+      next[key] = data[key];
+    }
+  }
+
   delete next.title;
   delete next.imageUrl;
 

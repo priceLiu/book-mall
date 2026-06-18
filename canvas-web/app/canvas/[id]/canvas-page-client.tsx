@@ -77,6 +77,7 @@ import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
 import { MyCanvasHistoryPanel } from "@/components/canvas/my-canvas-history-panel";
 import { MyCanvasGenerationRecordsPanel } from "@/components/canvas/my-canvas-generation-records-panel";
 import { SaveProjectAssetDialogHost } from "@/components/canvas/save-project-asset-dialog";
+import { PortraitImportProgressHost } from "@/components/canvas/portrait-import-progress-dialog";
 import { useRegisterProjectAssetCanvasInsert } from "@/lib/canvas/use-register-project-asset-canvas-insert";
 import { CANVAS_AUTOSAVE_DEBOUNCE_MS, getCanvasAutosaveIntervalMs } from "@/lib/canvas/canvas-autosave-settings";
 import { getCanvasProjectHistoryEntry } from "@/lib/canvas-api";
@@ -1067,6 +1068,7 @@ export function CanvasPageClient({ projectId }: { projectId: string }) {
   return (
     <RequireAuth>
       <SaveProjectAssetDialogHost />
+      <PortraitImportProgressHost />
       <Inner projectId={projectId} />
     </RequireAuth>
   );

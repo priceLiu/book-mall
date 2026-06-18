@@ -301,8 +301,10 @@ export function Pro2StarterInputDock() {
           disabled={isGenerating}
           rows={3}
           mentionInlineThumb
-          onChange={(value) =>
-            updateNodeData(storeNode.id, { themeInput: value })
+          onChange={(value, _refs, meta) =>
+            updateNodeData(storeNode.id, { themeInput: value }, {
+              commit: meta?.commit ?? true,
+            })
           }
         />
       </Pro2DockPasteZone>

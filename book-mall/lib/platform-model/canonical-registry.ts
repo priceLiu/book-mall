@@ -318,6 +318,38 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
       { vendor: "aliyun", modelKey: "wan2.7-r2v", providerKind: "DASHSCOPE" },
     ]),
   },
+  {
+    canonicalModelKey: "portrait-virtual",
+    displayName: "私域虚拟人像库",
+    description: "火山方舟 Assets API · 虚拟人像入库 asset://",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "OTHER",
+    appTags: ["canvas", "story"],
+    sortOrder: 90,
+    primaryVendor: "volcengine",
+    billingKind: "PER_CALL",
+    unitLabel: "元/次",
+    routes: dedupeRoutes([
+      { vendor: "volcengine", modelKey: "portrait:virtual", providerKind: "VOLCENGINE" },
+    ]),
+  },
+  {
+    canonicalModelKey: "portrait-real",
+    displayName: "真人人像库",
+    description: "火山方舟 Assets API · H5 活体 + 真人 CreateAsset",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "OTHER",
+    appTags: ["canvas", "story"],
+    sortOrder: 91,
+    primaryVendor: "volcengine",
+    billingKind: "PER_CALL",
+    unitLabel: "元/次",
+    routes: dedupeRoutes([
+      { vendor: "volcengine", modelKey: "portrait:real", providerKind: "VOLCENGINE" },
+    ]),
+  },
 ];
 
 export const GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [

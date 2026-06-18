@@ -48,6 +48,17 @@ alwaysApply: false
 - 文案/表头变更须同步 `gateway-web/docs/design.md` §2 与本节
 - **禁止**在 UI 或文档中把上述列称为「已扣费」「成本结算」「Credits 消耗」
 
+## Log / Request / Vendor Task ID 列（强制语义）
+
+| 列 | 字段 | 含义 |
+|----|------|------|
+| **Log ID** | `id` | Gateway 请求日志主键（平台 cuid） |
+| **Request ID** | `vendorRequestId` | 厂商 HTTP 追踪 ID（如 Volcengine `Request ID`）；API 对历史失败行可从 `failMessage` 回填 |
+| **Vendor Task ID** | `externalTaskId` | 厂商异步任务 ID；**禁止**用 Log ID 顶替；无则为 `—` |
+
+- 实现：`gateway-web/lib/gateway-log-display.ts` · `formatLogMonospaceId` · `logs-table.tsx`
+- 落库：`GatewayRequestLog.vendorRequestId` · `book-mall/lib/gateway/vendor-request-id.ts`
+
 ## Failed 悬停（必须）
 
 凡 `status === FAILED`，**必须**能悬停查看原因，禁止「仅有 failed 字样、无 Tip」：

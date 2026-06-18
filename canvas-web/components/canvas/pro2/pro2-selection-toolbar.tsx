@@ -53,11 +53,11 @@ export function Pro2SelectionToolbar({
 }) {
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
-  const { flowToScreenPosition, getInternalNode } = useReactFlow();
+  const { flowToScreenPosition, getInternalNode, setNodes: rfSetNodes } =
+    useReactFlow();
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
   const createGroupContaining = useCanvasStore((s) => s.createGroupContaining);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
-  const setNodes = useCanvasStore((s) => s.setNodes);
   const projectId = useCanvasStore((s) => s.projectId);
 
   const storeNodes = useCanvasStore((s) => s.nodes);
@@ -66,20 +66,14 @@ export function Pro2SelectionToolbar({
   const [groupName, setGroupName] = useState("未命名分组");
   const [groupColor, setGroupColor] = useState<string>(GROUP_COLOR_PRESETS[2]);
 
-  const selectedIds = useMemo(() => {
-    const rfIds = pro2SelectedNonGroupIds(rfNodes);
-    if (rfIds.length >= 2) return rfIds;
-    const storeIds = pro2SelectedNonGroupIds(storeNodes);
-    return storeIds.length >= 2 ? storeIds : rfIds;
-  }, [rfNodes, storeNodes]);
+  const selectedIds = useMemo(
+    () => pro2SelectedNonGroupIds(rfNodes),
+    [rfNodes],
+  );
 
   const selectedNodes = useMemo(
-    () => {
-      const idSet = new Set(selectedIds);
-      const pool = rfNodes.length ? rfNodes : storeNodes;
-      return pool.filter((n) => idSet.has(n.id));
-    },
-    [selectedIds, rfNodes, storeNodes],
+    () => rfNodes.filter((n) => selectedIds.includes(n.id)),
+    [selectedIds, rfNodes],
   );
   const selectedIdsRef = useRef<string[]>([]);
   selectedIdsRef.current = selectedIds;
@@ -210,7 +204,7 @@ export function Pro2SelectionToolbar({
     }
     if (newIds.length) {
       const set = new Set(newIds);
-      setNodes((prev) => prev.map((n) => ({ ...n, selected: set.has(n.id) })));
+      rfSetNodes((prev) => prev.map((n) => ({ ...n, selected: set.has(n.id) })));
     }
   };
 

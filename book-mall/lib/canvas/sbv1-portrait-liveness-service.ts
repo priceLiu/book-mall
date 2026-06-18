@@ -18,6 +18,7 @@ import {
   type VolcenginePortraitLivenessResult,
   type VolcenginePortraitLivenessSession,
 } from "@/lib/gateway/volcengine-portrait-liveness";
+import { resolveVolcenginePortraitCredentials } from "@/lib/gateway/volcengine-portrait-credentials";
 import {
   getSbv1PortraitLivenessCallback,
   saveSbv1PortraitLivenessCallback,
@@ -108,11 +109,11 @@ export async function sbv1CreatePortraitLivenessSession(
   userId: string,
 ): Promise<VolcenginePortraitLivenessSession & { expiresInSec: number }> {
   const cred = await volcengineCredentialForUser(userId);
+  const portraitCredentials = resolveVolcenginePortraitCredentials(cred.apiKey);
   const callbackUrl = buildCallbackUrl();
   try {
     const session = await createVolcengineVisualValidateSession({
-      apiKey: cred.apiKey,
-      baseUrl: cred.baseUrl,
+      credentials: portraitCredentials,
       callbackUrl,
     });
     return { ...session, expiresInSec: 120 };
@@ -141,9 +142,9 @@ export async function sbv1PollPortraitLivenessResult(
   }
 
   const cred = await volcengineCredentialForUser(userId);
+  const portraitCredentials = resolveVolcenginePortraitCredentials(cred.apiKey);
   const result = await getVolcengineVisualValidateResult({
-    apiKey: cred.apiKey,
-    baseUrl: cred.baseUrl,
+    credentials: portraitCredentials,
     bytedToken: token,
   });
   if (result.status === "succeeded" && result.groupId) {

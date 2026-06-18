@@ -61,6 +61,7 @@ import {
   isVolcengineStoryVideoModelKey,
   VOLCENGINE_VIDEO_MULTI_REF_MODEL,
 } from "./canvas-video-volcengine";
+import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
 import { buildKieImageCreateArgs } from "./providers/kie";
 import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
 import { BAILIAN_R2V_MODEL_IDS } from "./providers/bailian-r2v";
@@ -898,12 +899,17 @@ export async function runVideoEngineNode(
     : imageInputs.slice(1);
   const lastFrameImageUrl = String(data.lastFrameImageUrl ?? "").trim();
   const forceReferenceMode = data.forceReferenceMode === true;
+  const portraitAssetRefs = normalizePortraitAssetRefs(
+    node.portraitAssetRefs ?? data.portraitAssetRefs,
+  );
+  const effectiveForceReferenceMode =
+    forceReferenceMode || portraitAssetRefs.length > 0;
   const expandedPrompt = expandVideoPrompt(promptBase, referenceImageUrls);
   if (!expandedPrompt.trim()) {
     throw new CanvasProjectError("EMPTY_PROMPT", "video-engine prompt 为空");
   }
 
-  if (!mainFrameImageUrl) {
+  if (!mainFrameImageUrl && portraitAssetRefs.length === 0) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
       "video-engine 需要分镜图作为主图",
@@ -973,7 +979,10 @@ export async function runVideoEngineNode(
     modelKey: effectiveModelKey,
     prompt: expandedPrompt,
     imageUrls: allSubmittedImageUrls,
-    params,
+    params: {
+      ...params,
+      portraitAssetRefs,
+    },
     providerId,
   });
 
@@ -1012,8 +1021,9 @@ export async function runVideoEngineNode(
           referenceImageUrls,
           referenceVideoUrls: refVideos,
           referenceAudioUrls: refAudios,
+          assetRefs: portraitAssetRefs,
           lastFrameUrl: lastFrameImageUrl,
-          forceReferenceMode,
+          forceReferenceMode: effectiveForceReferenceMode,
           options: {
             resolution: String(params.resolution ?? "1080p"),
             duration: Number(params.duration ?? 5),

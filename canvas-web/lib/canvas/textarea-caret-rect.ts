@@ -39,17 +39,13 @@ const MIRROR_PROPS = [
   "tabSize",
 ] as const;
 
-export function getTextareaCaretClientRect(
+const mirrorByTextarea = new WeakMap<HTMLTextAreaElement, HTMLDivElement>();
+
+function syncMirrorStyles(
   textarea: HTMLTextAreaElement,
-  position: number,
-): TextareaCaretClientRect | null {
-  if (position < 0) return null;
-
+  mirror: HTMLDivElement,
+): CSSStyleDeclaration {
   const computed = window.getComputedStyle(textarea);
-  const mirror = document.createElement("div");
-  mirror.setAttribute("aria-hidden", "true");
-  document.body.appendChild(mirror);
-
   const style = mirror.style;
   style.position = "fixed";
   style.visibility = "hidden";
@@ -57,11 +53,9 @@ export function getTextareaCaretClientRect(
   style.whiteSpace = "pre-wrap";
   style.wordWrap = "break-word";
   style.overflow = "auto";
-
   for (const prop of MIRROR_PROPS) {
     style[prop] = computed[prop];
   }
-
   const rect = textarea.getBoundingClientRect();
   style.top = `${rect.top}px`;
   style.left = `${rect.left}px`;
@@ -69,15 +63,48 @@ export function getTextareaCaretClientRect(
   style.height = `${rect.height}px`;
   mirror.scrollTop = textarea.scrollTop;
   mirror.scrollLeft = textarea.scrollLeft;
+  return computed;
+}
+
+function getMirror(textarea: HTMLTextAreaElement): HTMLDivElement {
+  let mirror = mirrorByTextarea.get(textarea);
+  if (!mirror) {
+    mirror = document.createElement("div");
+    mirror.setAttribute("aria-hidden", "true");
+    document.body.appendChild(mirror);
+    mirrorByTextarea.set(textarea, mirror);
+  }
+  return mirror;
+}
+
+/** textarea 卸载时释放 mirror，避免泄漏 */
+export function disposeTextareaCaretMirror(textarea: HTMLTextAreaElement): void {
+  const mirror = mirrorByTextarea.get(textarea);
+  if (!mirror) return;
+  mirror.remove();
+  mirrorByTextarea.delete(textarea);
+}
+
+export function getTextareaCaretClientRect(
+  textarea: HTMLTextAreaElement,
+  position: number,
+): TextareaCaretClientRect | null {
+  if (position < 0) return null;
+
+  const mirror = getMirror(textarea);
+  const computed = syncMirrorStyles(textarea, mirror);
 
   const clamped = Math.min(position, textarea.value.length);
   mirror.textContent = textarea.value.substring(0, clamped);
   const marker = document.createElement("span");
-  marker.textContent = textarea.value.substring(clamped) || ".";
+  marker.textContent = "\u200b";
+  marker.style.display = "inline-block";
+  marker.style.width = "0";
+  marker.style.overflow = "visible";
   mirror.appendChild(marker);
 
   const markerRect = marker.getBoundingClientRect();
-  document.body.removeChild(mirror);
+  mirror.textContent = "";
 
   const height =
     markerRect.height ||

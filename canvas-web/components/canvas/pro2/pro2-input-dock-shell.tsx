@@ -72,9 +72,10 @@ export function Pro2InputDockShell({
         left: flowAnchor.flowX,
         top: flowAnchor.flowY,
         width: dockW,
-        transform: "translate(-50%, 0)",
+        transform: "translate(-50%, 0) translateZ(0)",
         visibility: hidden ? "hidden" : "visible",
         pointerEvents: hidden ? "none" : "auto",
+        backfaceVisibility: "hidden",
       }}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}

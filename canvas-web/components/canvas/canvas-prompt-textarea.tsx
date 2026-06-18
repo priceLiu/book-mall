@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent } from "react";
 import { onCanvasFormWheel } from "@/lib/canvas/canvas-form-wheel";
+import {
+  useDeferredTextCommit,
+  type DeferredTextCommitMeta,
+} from "@/lib/canvas/use-deferred-text-commit";
 import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 
 type CanvasPromptTextareaProps = {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, meta?: DeferredTextCommitMeta) => void;
   className?: string;
   rows?: number;
   placeholder?: string;
@@ -15,7 +19,7 @@ type CanvasPromptTextareaProps = {
   "aria-label"?: string;
 };
 
-/** 画布节点内 prompt 输入：IME 组合期间不写 store，避免中文拼音被打断 */
+/** 画布节点内 prompt 输入：本地 draft + debounce 写 store；IME 组合期间不提交 */
 export function CanvasPromptTextarea({
   value,
   onChange,
@@ -25,17 +29,9 @@ export function CanvasPromptTextarea({
   disabled,
   "aria-label": ariaLabel,
 }: CanvasPromptTextareaProps) {
-  const [draft, setDraft] = useState(value);
+  const { draft, setDraft, schedule, flush, onFocus, onBlur } =
+    useDeferredTextCommit(value, onChange);
   const composingRef = useRef(false);
-
-  useEffect(() => {
-    if (!composingRef.current) setDraft(value);
-  }, [value]);
-
-  const commit = (next: string) => {
-    setDraft(next);
-    onChange(next);
-  };
 
   const stopFlowKeys = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     e.stopPropagation();
@@ -54,22 +50,24 @@ export function CanvasPromptTextarea({
         className,
       )}
       onWheel={onCanvasFormWheel}
+      onFocus={onFocus}
       onChange={(e) => {
         const next = e.target.value;
-        setDraft(next);
-        if (!composingRef.current) onChange(next);
+        if (composingRef.current) {
+          setDraft(next);
+          return;
+        }
+        schedule(next);
       }}
       onCompositionStart={() => {
         composingRef.current = true;
       }}
       onCompositionEnd={(e) => {
         composingRef.current = false;
-        commit(e.currentTarget.value);
+        flush(e.currentTarget.value);
       }}
       onBlur={(e) => {
-        if (composingRef.current) return;
-        const next = e.currentTarget.value;
-        if (next !== value) onChange(next);
+        onBlur(e.currentTarget.value);
       }}
       onKeyDown={stopFlowKeys}
       onKeyUp={stopFlowKeys}

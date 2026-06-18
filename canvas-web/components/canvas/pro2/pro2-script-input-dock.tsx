@@ -212,7 +212,7 @@ export function Pro2ScriptInputDock() {
             }
             promptValue={dockInput}
             onPromptChange={(next) =>
-              updateNodeData(storeNode.id, { dockInput: next })
+              updateNodeData(storeNode.id, { dockInput: next }, { commit: true })
             }
             disabled={isGenerating}
             pasteActive={false}
@@ -293,8 +293,10 @@ export function Pro2ScriptInputDock() {
           disabled={isGenerating}
           rows={3}
           mentionInlineThumb
-          onChange={(value) =>
-            updateNodeData(storeNode.id, { dockInput: value })
+          onChange={(value, _refs, meta) =>
+            updateNodeData(storeNode.id, { dockInput: value }, {
+              commit: meta?.commit ?? true,
+            })
           }
         />
       </Pro2DockPasteZone>

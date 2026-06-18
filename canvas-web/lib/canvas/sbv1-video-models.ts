@@ -205,7 +205,7 @@ export function buildSbv1VolcengineModelsFromGateway(
       engine: {
         providerId: GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
         modelKey: key,
-        params: { resolution: "720p", generate_audio: false },
+        params: { resolution: "720p", generate_audio: true },
       },
     });
   }
@@ -229,7 +229,7 @@ export function buildSbv1VolcengineModelsFromGateway(
       engine: {
         providerId: GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
         modelKey: key,
-        params: { resolution: "720p", generate_audio: false },
+        params: { resolution: "720p", generate_audio: true },
       },
     });
     covered.add(key.toLowerCase());

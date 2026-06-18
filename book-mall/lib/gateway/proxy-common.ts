@@ -258,6 +258,7 @@ export async function finalizeRequestLog(
     failMessage?: string;
     failCode?: string;
     externalTaskId?: string;
+    vendorRequestId?: string;
     model?: string;
     pricingTierRaw?: string;
   },
@@ -372,6 +373,7 @@ export async function finalizeRequestLog(
       failMessage: patch.failMessage,
       failCode: patch.failCode,
       externalTaskId: patch.externalTaskId,
+      vendorRequestId: patch.vendorRequestId,
       completedAt: new Date(),
       pricingModelKey: estimate.pricingModelKey,
       pricingTierRaw: estimate.pricingTierRaw,

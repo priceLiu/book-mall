@@ -463,6 +463,10 @@ export async function runCanvasNode(
       data: Record<string, unknown>;
       imageInputs?: string[];
       textInputs?: string[];
+      portraitAssetRefs?: Array<{
+        url: string;
+        role?: "reference_image" | "first_frame";
+      }>;
     };
     /** 阶段 4：跳过缓存，强制创建新任务（"重新生成"） */
     forceFresh?: boolean;
