@@ -54,12 +54,19 @@ export function Pro2ScriptTableEditorHost() {
   const d = (node?.data ?? {}) as StoryProScriptHubNodeData;
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);
-  const sceneMd = resolvePro2HubSceneMd(d);
+  const sceneCtx = useMemo(
+    () =>
+      editorNodeId
+        ? { nodes, edges, hubId: editorNodeId }
+        : undefined,
+    [editorNodeId, nodes, edges],
+  );
+  const sceneMd = resolvePro2HubSceneMd(d, sceneCtx);
   const outlineMd = outlineDisplayMd(d.outlineMd ?? "");
   const hasContent =
     pro2HubHasScriptTable(d) ||
     pro2HubHasCharacterTable(d) ||
-    pro2HubHasSceneTable(d) ||
+    pro2HubHasSceneTable(d, sceneCtx) ||
     pro2HubHasOutlineContent(d);
 
   if (editorNodeId !== lastEditorNodeIdRef.current) {

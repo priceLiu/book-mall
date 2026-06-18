@@ -14,21 +14,13 @@ import {
   Film,
   LayoutGrid,
   LayoutTemplate,
+  MapPin,
   Palette,
   Trash2,
   GripVertical,
   Users,
 } from "lucide-react";
-import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import {
-  PRO2_IMAGE_LEFT_ADD_MENU,
-  PRO2_RIGHT_ADD_MENU,
-} from "@/lib/canvas/pro2-add-node-menu";
-import { handlePro2GroupSidePick } from "@/lib/canvas/pro2-group-side-spawn";
-import { SBV1_GROUP_RIGHT_ADD_MENU } from "@/lib/canvas/sbv1-add-node-menu";
-import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
-import { handleSbv1GroupSidePick } from "@/lib/canvas/sbv1-spawn-nodes";
 import { relayoutPro2MediaGroup, PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
 import {
   isPro2MediaChildNode,
@@ -47,6 +39,7 @@ import {
 } from "@/lib/canvas/story-pro2-node-chrome";
 import { LIBTV_CARD_DRAG_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import { SBV1_NODE_HANDLE_CLASS, SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
+import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import {
   GROUP_COLOR_PRESETS,
   type GroupNodeData,
@@ -59,12 +52,12 @@ import {
   CanvasToolIcon,
   CanvasToolbarBadge,
 } from "../canvas-floating-toolbar";
-import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 const TOOLBAR_GAP = 8;
 
 function pro2MediaGroupIcon(kind?: Pro2MediaGroupKind) {
   if (kind === "frame-board") return Film;
   if (kind === "character-board") return Users;
+  if (kind === "scene-board") return MapPin;
   return Film;
 }
 /** 分组顶边以上仍算作「在分组上」，便于移向悬浮工具条 */
@@ -86,13 +79,8 @@ function pointInRect(x: number, y: number, r: ScreenRect) {
 
 /** 组容器节点：透明背景、彩色边框；hover 时在顶部边框出现屏幕固定胶囊工具条（不随画布缩放变小） */
 export function GroupNode({ id, data, selected }: NodeProps) {
-  const dialogs = useDialogs();
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const setNodes = useCanvasStore((s) => s.setNodes);
-  const setEdges = useCanvasStore((s) => s.setEdges);
-  const addNode = useCanvasStore((s) => s.addNode);
-  const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
-  const edges = useCanvasStore((s) => s.edges);
   const ungroup = useCanvasStore((s) => s.ungroup);
   const autoLayoutNodes = useCanvasStore((s) => s.autoLayoutNodes);
   const reflowStoryTemplateGroups = useCanvasStore(
@@ -143,8 +131,6 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     !isPro2MediaGroup &&
     !isSbv1Group &&
     (selected || editOpen || pointerInside);
-  const showPro2GroupSidePlus = isPro2MediaGroup && selected;
-  const showSbv1GroupSidePlus = isSbv1Group && !isPro2MediaGroup && selected;
 
   const viewport = useViewportTransformActive(
     showToolbar || editOpen || selected || pointerInside,
@@ -273,6 +259,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   useEffect(() => {
     if (!hasMediaChildren) return;
     if (isSbv1Group) return;
+    if (d.pro2ShortcutPreset) return;
     if (relayoutDoneRef.current) return;
     const version = (d as { pro2LayoutVersion?: number }).pro2LayoutVersion;
     if (version === PRO2_MEDIA_GROUP_LAYOUT_VERSION) {
@@ -337,40 +324,6 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     setNodes((prev) => prev.map((n) => ({ ...n, selected: n.id === id })));
   }, [id, setNodes]);
 
-  const onGroupSidePick = useCallback(
-    (side: "left" | "right") => (itemId: string, nodeType?: string) => {
-      void handlePro2GroupSidePick(
-        id,
-        side,
-        itemId,
-        nodeType,
-        dialogs.alert,
-        { nodes: allNodes, addNode, setNodes, setEdges },
-      );
-    },
-    [id, allNodes, addNode, setNodes, setEdges, dialogs.alert],
-  );
-
-  const onSbv1GroupSidePick = useCallback(
-    (_side: "left" | "right") => (itemId: string, nodeType?: string) => {
-      void handleSbv1GroupSidePick(
-        id,
-        itemId,
-        nodeType,
-        dialogs.alert,
-        {
-          nodes: allNodes,
-          edges,
-          addNode,
-          addNodeInGroup,
-          setNodes,
-          setEdges,
-        },
-      );
-    },
-    [id, allNodes, edges, addNode, addNodeInGroup, setNodes, setEdges, dialogs.alert],
-  );
-
   return (
     <div
       className={cn(
@@ -403,65 +356,35 @@ export function GroupNode({ id, data, selected }: NodeProps) {
             position={Position.Left}
             className={cn(
               PRO2_NODE_HANDLE_CLASS,
-              showPro2GroupSidePlus
-                ? "pointer-events-none opacity-0"
-                : selected
-                  ? "opacity-100"
-                  : "opacity-0 pointer-events-none",
+              selected ? "opacity-100" : "pointer-events-none opacity-0",
             )}
             style={{ top: "50%" }}
           />
-          {showPro2GroupSidePlus ? (
-            <>
-              <Pro2NodeSidePlus
-                side="left"
-                handleId="plus_left"
-                visible
-                className="z-[100] -left-5"
-                sections={PRO2_IMAGE_LEFT_ADD_MENU}
-                onPick={onGroupSidePick("left")}
-              />
-              <Pro2NodeSidePlus
-                side="right"
-                handleId="out_media"
-                visible
-                className="z-[100] -right-5"
-                sections={PRO2_RIGHT_ADD_MENU}
-                onPick={onGroupSidePick("right")}
-              />
-            </>
-          ) : null}
-        </>
-      ) : null}
-
-      {isSbv1Group && !isPro2MediaGroup ? (
-        <>
           <Handle
             id="out_media"
             type="source"
             position={Position.Right}
             className={cn(
-              SBV1_NODE_HANDLE_CLASS,
-              showSbv1GroupSidePlus
-                ? "pointer-events-none opacity-0"
-                : selected
-                  ? "opacity-100"
-                  : "pointer-events-none opacity-0",
+              PRO2_NODE_HANDLE_CLASS,
+              selected ? "opacity-100" : "pointer-events-none opacity-0",
             )}
             style={{ top: "50%" }}
-            title={`连线到${SBV1_VIDEO_COMPOSE_LABEL}`}
           />
-          {showSbv1GroupSidePlus ? (
-            <Pro2NodeSidePlus
-              side="right"
-              handleId="out_media"
-              visible
-              className="z-[100] -right-5"
-              sections={SBV1_GROUP_RIGHT_ADD_MENU}
-              onPick={onSbv1GroupSidePick("right")}
-            />
-          ) : null}
         </>
+      ) : null}
+
+      {isSbv1Group && !isPro2MediaGroup ? (
+        <Handle
+          id="out_media"
+          type="source"
+          position={Position.Right}
+          className={cn(
+            SBV1_NODE_HANDLE_CLASS,
+            selected ? "opacity-100" : "pointer-events-none opacity-0",
+          )}
+          style={{ top: "50%" }}
+          title={`连线到${SBV1_VIDEO_COMPOSE_LABEL}`}
+        />
       ) : null}
 
       <NodeResizer

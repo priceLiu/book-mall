@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 
 import { LIBTV_MEDIA_NODE_HEADER_HEIGHT } from "./libtv-node-chrome";
+import { isPro2StyledGroup } from "./pro2-media-group-meta";
+import { relayoutPro2MediaGroup } from "./pro2-media-group-layout";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 import { relayoutSbv1MediaGroup } from "./sbv1-media-group-layout";
 import {
@@ -182,6 +184,12 @@ export function useLibtvMediaNodeAutoFit({
           profile === "sbv1-video"
         ) {
           relayoutSbv1MediaGroup(setNodes, parentId, edges);
+        } else if (
+          parentId &&
+          parentGroup &&
+          isPro2StyledGroup(parentGroup, allNodes)
+        ) {
+          relayoutPro2MediaGroup(setNodes, parentId);
         }
       } catch {
         // 探测失败时保留当前尺寸

@@ -21,6 +21,8 @@ import {
   CANVAS_SCHEMA_VERSION,
   NODE_DEFAULT_SIZE,
 } from "./types";
+import { migratePro2SceneColumnOffCanvas } from "./pro2-spawn-scene-image-group";
+import { migratePro2TextPurposeAll } from "./pro2-text-purpose";
 import { normalizeCanvasNodes } from "./normalize-graph-nodes";
 import { migrateStoryComicStarterNode } from "./story-starter-migrate";
 import { migrateStoryOutlineLlmParams } from "./story-llm-params-migrate";
@@ -173,18 +175,22 @@ export function migrateGraphV1ToV2(graph: CanvasGraph): CanvasGraph {
       ),
     );
   const edges: CanvasFlowEdge[] = graph.edges ?? [];
-  const nodes = migrateStoryPromptPackAll(
-    normalizeCanvasNodes(
-      rawNodes.map((n) =>
-        transform(n as unknown as LooseNode),
-      ) as unknown as CanvasFlowNode[],
-      edges,
+  const rawMigrated = migratePro2SceneColumnOffCanvas(
+    rawNodes.map((n) =>
+      transform(n as unknown as LooseNode),
+    ) as unknown as CanvasFlowNode[],
+    edges,
+  );
+  const nodes = migratePro2TextPurposeAll(
+    migrateStoryPromptPackAll(
+      normalizeCanvasNodes(rawMigrated.nodes, rawMigrated.edges),
     ),
+    rawMigrated.edges,
   );
   return {
     ...graph,
     schemaVersion: CANVAS_SCHEMA_VERSION,
     nodes,
-    edges,
+    edges: rawMigrated.edges,
   };
 }

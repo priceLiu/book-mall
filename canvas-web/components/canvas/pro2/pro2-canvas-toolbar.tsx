@@ -120,6 +120,7 @@ export function Pro2CanvasToolbar({
             label: opts?.label ?? "",
             color: "",
             pro2Styled: opts?.pro2Styled,
+            pro2ShortcutPreset: opts?.pro2ShortcutPreset,
           }),
       });
     },

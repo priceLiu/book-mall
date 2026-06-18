@@ -42,8 +42,13 @@ import {
 } from "@/lib/canvas/pro2-add-node-menu";
 import { MarkdownView } from "@/components/canvas/markdown-view";
 import type { StoryPro2StarterNodeData } from "@/lib/canvas/story-pro2-workspace-types";
+import { resolvePro2TextPurpose } from "@/lib/canvas/pro2-text-purpose";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
+import {
+  resolveLibtvSideSpawnNodeType,
+  spawnLibtvNeighborFromAnchor,
+} from "@/lib/canvas/libtv-side-spawn";
 import {
   buildPro2ImageNodeData,
   buildPro2StarterNodeData,
@@ -83,11 +88,14 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   const hasOutline = Boolean(outlineMd);
   const hasUploadedScript = Boolean(uploadedMd);
   const hasCardContent = pro2StarterHasContent(d);
+  const isStoryOutlineMode =
+    resolvePro2TextPurpose(d, { nodeId: id, nodes, edges }) === "story-outline";
   const isGenerating =
-    d.themeOutlineRuntime?.status === "pending" ||
-    d.themeOutlineRuntime?.status === "running";
+    isStoryOutlineMode &&
+    (d.themeOutlineRuntime?.status === "pending" ||
+      d.themeOutlineRuntime?.status === "running");
   const outlineErrorMessage =
-    d.themeOutlineRuntime?.status === "error"
+    isStoryOutlineMode && d.themeOutlineRuntime?.status === "error"
       ? formatCanvasTaskError(
           d.themeOutlineRuntime.failCode,
           d.themeOutlineRuntime.failMessage,
@@ -188,7 +196,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
       if (nodeType === "story-pro2-script-hub") {
         const outline =
           d.generatedOutlineMd?.trim() ?? d.uploadedScriptMd?.trim() ?? "";
-        const promoted = promoteEmbeddedPackFromOutline(outline, "", "");
+        const promoted = promoteEmbeddedPackFromOutline(outline, "", "", "");
         spawnPro2ScriptHubFromSource({
           sourceId: id,
           sourceHandle: "text",
@@ -196,6 +204,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
           hubData: {
             outlineMd: promoted.outlineMd,
             characterMd: promoted.characterMd,
+            sceneMd: promoted.sceneMd,
             storyboardMd: promoted.storyboardMd,
             providerId: d.providerId ?? "",
             modelKey: d.modelKey ?? "",
@@ -311,6 +320,19 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         nodeType,
         { alert },
         () => {
+          const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
+          if (
+            spawnType === "story-pro2-three-view" ||
+            spawnType === "sbv1-video-engine"
+          ) {
+            spawnLibtvNeighborFromAnchor(id, side, spawnType, {
+              nodes,
+              addNode,
+              setNodes,
+              setEdges,
+            });
+            return;
+          }
           if (itemId === "script" || nodeType === "story-pro2-script-hub") {
             spawnNeighbor("right", "story-pro2-script-hub");
             return;

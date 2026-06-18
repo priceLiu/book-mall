@@ -9,8 +9,8 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import { PRO2_STYLE_ASSET_RIGHT_MENU } from "@/lib/canvas/pro2-add-node-menu";
 import {
+  buildPro2GeneralTextNodeData,
   buildPro2ImageNodeData,
-  buildPro2StarterNodeData,
 } from "@/lib/canvas/pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -53,7 +53,7 @@ export function StoryPro2StyleAssetNode({ id, data, selected }: NodeProps) {
         const newId = addNode(
           "story-pro2-starter",
           { x, y },
-          buildPro2StarterNodeData(),
+          buildPro2GeneralTextNodeData(),
         );
         if (!newId) return;
         setEdges((prev) => [

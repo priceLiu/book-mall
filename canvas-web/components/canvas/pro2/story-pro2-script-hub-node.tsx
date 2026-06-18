@@ -3,13 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
-import { PRO2_RIGHT_ADD_MENU, PRO2_STARTER_LEFT_ADD_MENU } from "@/lib/canvas/pro2-add-node-menu";
 import {
-  buildPro2ImageNodeData,
-  buildPro2StarterNodeData,
-  spawnPro2ScriptHubAt,
-} from "@/lib/canvas/pro2-spawn-nodes";
-import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
+  resolveLibtvSideSpawnNodeType,
+  spawnLibtvNeighborFromAnchor,
+} from "@/lib/canvas/libtv-side-spawn";
+import { PRO2_RIGHT_ADD_MENU, PRO2_STARTER_LEFT_ADD_MENU } from "@/lib/canvas/pro2-add-node-menu";
 import type { NodeProps } from "@xyflow/react";
 import {
   AlignLeft,
@@ -22,6 +20,7 @@ import {
 import { Handle, Position } from "@xyflow/react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_SCRIPT_HUB_NODE_LABEL } from "@/lib/canvas/story-pro2-node-chrome";
 import {
@@ -29,7 +28,6 @@ import {
   PRO2_NODE_HANDLE_CLASS,
   PRO2_SCRIPT_NODE_MIN_HEIGHT,
   PRO2_SCRIPT_NODE_MIN_WIDTH,
-  PRO2_SCRIPT_NODE_WIDTH,
   PRO2_TEXT_NODE_TITLE_CLASS,
   pro2NodeBorderColor,
 } from "@/lib/canvas/story-pro2-node-chrome";
@@ -121,11 +119,15 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as StoryProScriptHubNodeData;
   const storyboardMd = resolveHubStoryboardMd(d);
   const characterMd = resolvePro2HubCharacterMd(d);
-  const sceneMd = resolvePro2HubSceneMd(d);
+  const sceneCtx = useMemo(
+    () => ({ nodes, edges, hubId: id }),
+    [nodes, edges, id],
+  );
+  const sceneMd = resolvePro2HubSceneMd(d, sceneCtx);
   const outlineMd = d.outlineMd ?? "";
   const hasTable = pro2HubHasScriptTable(d);
   const hasCharacter = pro2HubHasCharacterTable(d);
-  const hasScene = pro2HubHasSceneTable(d);
+  const hasScene = pro2HubHasSceneTable(d, sceneCtx);
   const hasOutline = pro2HubHasOutlineContent(d);
   const hasPreviewContent = hasTable || hasCharacter || hasScene || hasOutline;
   const [previewTab, setPreviewTab] = useState<Pro2ScriptHubViewTab>("script");
@@ -191,93 +193,6 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       !isGenerating,
   );
 
-  const spawnNeighbor = useCallback(
-    (side: "left" | "right", nodeType?: string) => {
-      if (!nodeType) return;
-      const self = nodes.find((n) => n.id === id);
-      if (!self) return;
-      const gap = 48;
-      const w = self.width ?? PRO2_SCRIPT_NODE_WIDTH;
-      const x =
-        side === "left"
-          ? self.position.x - w - gap
-          : self.position.x + w + gap;
-      const y = self.position.y;
-
-      if (nodeType === "story-pro2-starter") {
-        const newId = addNode("story-pro2-starter", { x, y }, buildPro2StarterNodeData());
-        if (!newId) return;
-        const edge =
-          side === "left"
-            ? {
-                id: `e-${newId}-${id}`,
-                source: newId,
-                target: id,
-                sourceHandle: "text",
-                targetHandle: "in_text",
-              }
-            : {
-                id: `e-${id}-${newId}`,
-                source: id,
-                target: newId,
-                sourceHandle: "text",
-                targetHandle: "in_text",
-              };
-        setEdges((prev) => [...prev, edge]);
-        selectPro2NodeAfterSpawn(setNodes, newId);
-        return;
-      }
-
-      if (nodeType === "story-pro2-image") {
-        const newId = addNode("story-pro2-image", { x, y }, buildPro2ImageNodeData());
-        if (!newId) return;
-        const edge =
-          side === "left"
-            ? {
-                id: `e-${newId}-${id}`,
-                source: newId,
-                target: id,
-                sourceHandle: "image",
-                targetHandle: "in_text",
-              }
-            : {
-                id: `e-${id}-${newId}`,
-                source: id,
-                target: newId,
-                sourceHandle: "text",
-                targetHandle: "in_image",
-              };
-        setEdges((prev) => [...prev, edge]);
-        selectPro2NodeAfterSpawn(setNodes, newId);
-        return;
-      }
-
-      if (nodeType === "story-pro2-script-hub") {
-        const newId = spawnPro2ScriptHubAt(addNode, { x, y });
-        if (!newId) return;
-        const edge =
-          side === "left"
-            ? {
-                id: `e-${newId}-${id}`,
-                source: newId,
-                target: id,
-                sourceHandle: "text",
-                targetHandle: "in_text",
-              }
-            : {
-                id: `e-${id}-${newId}`,
-                source: id,
-                target: newId,
-                sourceHandle: "text",
-                targetHandle: "in_text",
-              };
-        setEdges((prev) => [...prev, edge]);
-        selectPro2NodeAfterSpawn(setNodes, newId);
-      }
-    },
-    [nodes, id, addNode, setNodes, setEdges],
-  );
-
   const onGenerateThreeView = useCallback(async () => {
     if (isGenerating) return;
     if (!hasCharacter) {
@@ -318,21 +233,18 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         nodeType,
         { alert },
         () => {
-          if (itemId === "text" || nodeType === "story-pro2-starter") {
-            spawnNeighbor(side, "story-pro2-starter");
-            return;
-          }
-          if (itemId === "image" || nodeType === "story-pro2-image") {
-            spawnNeighbor(side, "story-pro2-image");
-            return;
-          }
-          if (itemId === "script" || nodeType === "story-pro2-script-hub") {
-            spawnNeighbor(side, "story-pro2-script-hub");
-          }
+          const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
+          if (!spawnType) return;
+          spawnLibtvNeighborFromAnchor(id, side, spawnType, {
+            nodes,
+            addNode,
+            setNodes,
+            setEdges,
+          });
         },
       );
     },
-    [spawnNeighbor, alert, onGenerateThreeView],
+    [id, nodes, addNode, setNodes, setEdges, alert, onGenerateThreeView],
   );
 
   const openEditor = useCallback(() => {
@@ -416,15 +328,12 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       <div
         className={cn(
           PRO2_CARD_SHELL_CLASS,
-          "flex h-full min-h-0 flex-col overflow-hidden",
+          "relative flex h-full min-h-0 flex-col overflow-hidden",
         )}
         style={{ borderColor: pro2NodeBorderColor(!!selected) }}
       >
         {isGenerating ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-[12px] text-violet-200/70">
-            <Loader2 className="size-5 animate-spin" />
-            生成中…
-          </div>
+          <LibtvMediaGeneratingState label="文案生成中…" variant="violet" />
         ) : displayState === "generated" ? (
           <div
             className="flex h-full min-h-0 flex-col px-2 py-2"

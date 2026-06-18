@@ -16,12 +16,12 @@ import {
 import { sortNodesForReactFlow } from "./normalize-graph-nodes";
 import type { CanvasFlowNode } from "./types";
 
-export const PRO2_MEDIA_GRID_GAP = 20;
+export const PRO2_MEDIA_GRID_GAP = 28;
 export const PRO2_MEDIA_GROUP_HEADER = 40;
 /** 组内边距（大留白：空白区即「选中组」可点区域） */
-export const PRO2_MEDIA_GROUP_PAD = 52;
+export const PRO2_MEDIA_GROUP_PAD = 64;
 /** 组右 / 下额外空白，进一步扩大可点选组区域（复刻图 2） */
-export const PRO2_MEDIA_GROUP_EXTRA = 44;
+export const PRO2_MEDIA_GROUP_EXTRA = 56;
 
 /** 分镜图组 · 宫格单元（≈3:2 横版） */
 export const PRO2_FRAME_CELL_WIDTH = 296;
@@ -57,7 +57,7 @@ export function pro2MediaChildSize(node: {
       height: PRO2_CHARACTER_THREE_VIEW_HEIGHT,
     };
   }
-  if (node.pro2MediaRole === "frame") {
+  if (node.pro2MediaRole === "frame" || node.pro2MediaRole === "scene") {
     return { width: PRO2_FRAME_CELL_WIDTH, height: PRO2_FRAME_CELL_HEIGHT };
   }
   if (node.pro2MediaRole === "video") {
@@ -80,6 +80,118 @@ export function pro2MediaGridLayout(
       PRO2_MEDIA_GROUP_PAD +
       PRO2_MEDIA_GROUP_HEADER +
       row * (cell.height + PRO2_MEDIA_GRID_GAP),
+  };
+}
+
+/** 读取子节点实际外框（含 auto-fit 后尺寸），布局时取 max(模板, 实测) */
+export function effectivePro2MediaChildSize(node: CanvasFlowNode): {
+  width: number;
+  height: number;
+} {
+  const cell = pro2MediaChildSize({
+    type: node.type,
+    pro2MediaRole: (node.data as { pro2MediaRole?: string }).pro2MediaRole,
+  });
+  const style = node.style as { width?: number; height?: number } | undefined;
+  const w =
+    node.measured?.width ??
+    (typeof node.width === "number" ? node.width : undefined) ??
+    style?.width ??
+    cell.width;
+  const h =
+    node.measured?.height ??
+    (typeof node.height === "number" ? node.height : undefined) ??
+    style?.height ??
+    cell.height;
+  return {
+    width: Math.max(cell.width, Math.round(w)),
+    height: Math.max(cell.height, Math.round(h)),
+  };
+}
+
+type MediaChildLayout = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** 宫格重排 · 按每格实测宽高计算行高/列宽（避免生图后 auto-fit 撑破组框） */
+export function pro2MediaGridLayoutForChildren(
+  children: CanvasFlowNode[],
+  cols: number,
+): MediaChildLayout[] {
+  const count = children.length;
+  if (count === 0) return [];
+  const c = Math.max(1, cols);
+  const rows = Math.ceil(count / c);
+  const sizes = children.map((n) => effectivePro2MediaChildSize(n));
+
+  const colWidths = Array.from({ length: c }, (_, col) => {
+    let maxW = 0;
+    for (let row = 0; row < rows; row++) {
+      const idx = row * c + col;
+      if (idx >= count) continue;
+      maxW = Math.max(maxW, sizes[idx]!.width);
+    }
+    return maxW;
+  });
+
+  const rowHeights = Array.from({ length: rows }, (_, row) => {
+    let maxH = 0;
+    for (let col = 0; col < c; col++) {
+      const idx = row * c + col;
+      if (idx >= count) continue;
+      maxH = Math.max(maxH, sizes[idx]!.height);
+    }
+    return maxH;
+  });
+
+  const colX: number[] = [];
+  let x = PRO2_MEDIA_GROUP_PAD;
+  for (let col = 0; col < c; col++) {
+    colX.push(x);
+    x += colWidths[col]! + PRO2_MEDIA_GRID_GAP;
+  }
+
+  const rowY: number[] = [];
+  let y = PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER;
+  for (let row = 0; row < rows; row++) {
+    rowY.push(y);
+    y += rowHeights[row]! + PRO2_MEDIA_GRID_GAP;
+  }
+
+  return children.map((_, index) => {
+    const col = index % c;
+    const row = Math.floor(index / c);
+    const size = sizes[index]!;
+    return {
+      x: colX[col]!,
+      y: rowY[row]!,
+      width: size.width,
+      height: size.height,
+    };
+  });
+}
+
+export function pro2MediaGroupDimensionsFromLayouts(
+  layouts: MediaChildLayout[],
+  cols: number,
+): { width: number; height: number } {
+  if (layouts.length === 0) {
+    return { width: 320, height: 240 };
+  }
+  let maxRight = PRO2_MEDIA_GROUP_PAD;
+  let maxBottom = PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_HEADER;
+
+  for (const lay of layouts) {
+    maxRight = Math.max(maxRight, lay.x + lay.width);
+    maxBottom = Math.max(maxBottom, lay.y + lay.height);
+  }
+
+  return {
+    width: maxRight + PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_EXTRA,
+    height: maxBottom + PRO2_MEDIA_GROUP_PAD + PRO2_MEDIA_GROUP_EXTRA,
   };
 }
 
@@ -157,7 +269,7 @@ function isMediaGroupChildForRelayout(
 }
 
 /** 布局版本：hydrate 仅对更低版本做一次网格迁移，不覆盖已保存坐标 */
-export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 3;
+export const PRO2_MEDIA_GROUP_LAYOUT_VERSION = 4;
 
 /** 纯函数：收拢媒体子节点、宫格重排、组框贴合（与 createGroupContaining / group-node 共用） */
 export function applyPro2MediaGroupRelayout(
@@ -205,25 +317,22 @@ export function applyPro2MediaGroupRelayout(
   if (children.length === 0) return sortNodesForReactFlow(next);
 
   const cols = pro2MediaGridCols(children.length);
+  const layouts = pro2MediaGridLayoutForChildren(children, cols);
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i]!;
-    const childCell = pro2MediaChildSize({
-      type: child.type,
-      pro2MediaRole: (child.data as { pro2MediaRole?: string }).pro2MediaRole,
-    });
-    const rel = pro2MediaGridLayout(i, childCell, cols);
+    const lay = layouts[i]!;
     next = next.map((n) =>
       n.id === child.id
         ? {
             ...n,
-            position: rel,
-            width: childCell.width,
-            height: childCell.height,
+            position: { x: lay.x, y: lay.y },
+            width: lay.width,
+            height: lay.height,
             style: {
               ...(n.style ?? {}),
-              width: childCell.width,
-              height: childCell.height,
+              width: lay.width,
+              height: lay.height,
             },
             data: { ...n.data, pro2GroupId: groupId },
           }
@@ -231,16 +340,7 @@ export function applyPro2MediaGroupRelayout(
     );
   }
 
-  const layoutCell = pro2MediaChildSize({
-    type: children[0]!.type,
-    pro2MediaRole: (children[0]!.data as { pro2MediaRole?: string })
-      .pro2MediaRole,
-  });
-  const { width, height } = pro2MediaGroupDimensions(
-    children.length,
-    layoutCell,
-    cols,
-  );
+  const { width, height } = pro2MediaGroupDimensionsFromLayouts(layouts, cols);
   const resetOrigin = opts?.resetOrigin === true;
   const origin =
     resetOrigin && hubNodeId

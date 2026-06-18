@@ -5,6 +5,7 @@ import {
 import {
   buildPro2ImageNodeData,
   buildPro2StarterNodeData,
+  buildPro2GeneralTextNodeData,
 } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
 import {
@@ -14,6 +15,7 @@ import {
   PRO2_TEXT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import { SBV1_VIDEO_ENGINE_HEIGHT, SBV1_VIDEO_ENGINE_WIDTH } from "./sbv1-node-chrome";
+import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { flowPositionAtViewportCenter } from "./viewport-placement";
 
@@ -38,7 +40,11 @@ type SpawnStore = {
   setNodes: Parameters<typeof selectPro2NodeAfterSpawn>[0];
   createGroupContaining: (
     childIds: string[],
-    opts?: { label?: string; pro2Styled?: boolean },
+    opts?: {
+      label?: string;
+      pro2Styled?: boolean;
+      pro2ShortcutPreset?: boolean;
+    },
   ) => string | null;
 };
 
@@ -110,6 +116,10 @@ function relayoutShortcutPresetGroup(
   });
 }
 
+const SHORTCUT_GROUP_OPTS = {
+  pro2ShortcutPreset: true as const,
+};
+
 /** 快捷预设 · 在视口中心生成已连线的节点组（LibTV 2.0 节点） */
 export function spawnPro2ShortcutPreset(
   preset: Pro2ShortcutPresetId,
@@ -137,7 +147,7 @@ export function spawnPro2ShortcutPreset(
     const textId = store.addNode(
       "story-pro2-starter",
       { x: center.x - totalW / 2 + imageW + gap, y },
-      buildPro2StarterNodeData({ pro2PresetKind: preset }),
+      buildPro2GeneralTextNodeData({ pro2PresetKind: preset }),
     );
     store.setEdges((prev) => [
       ...prev,
@@ -151,6 +161,7 @@ export function spawnPro2ShortcutPreset(
     ]);
     const groupId = store.createGroupContaining([imageId, textId], {
       label: PRESET_LABEL[preset],
+      ...SHORTCUT_GROUP_OPTS,
     });
     queueMicrotask(() => {
       relayoutShortcutPresetGroup(
@@ -173,13 +184,20 @@ export function spawnPro2ShortcutPreset(
     const videoId = store.addNode(
       "sbv1-video-engine",
       { x: center.x - totalW / 2, y },
-      { label: "视频", pro2PresetKind: preset },
+      {
+        ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
+        label: "视频",
+        pro2PresetKind: preset,
+      },
     );
     const textId = store.addNode(
       "story-pro2-starter",
       { x: center.x - totalW / 2 + videoW + gap, y },
-      buildPro2StarterNodeData({ pro2PresetKind: preset }),
+      buildPro2GeneralTextNodeData({ pro2PresetKind: preset }),
     );
+    if (!videoId || !textId) {
+      return { groupId: null, focusNodeId: textId || videoId };
+    }
     store.setEdges((prev) => [
       ...prev,
       {
@@ -192,6 +210,7 @@ export function spawnPro2ShortcutPreset(
     ]);
     const groupId = store.createGroupContaining([videoId, textId], {
       label: PRESET_LABEL[preset],
+      ...SHORTCUT_GROUP_OPTS,
     });
     queueMicrotask(() => {
       relayoutShortcutPresetGroup(
@@ -214,13 +233,20 @@ export function spawnPro2ShortcutPreset(
   const textId = store.addNode(
     "story-pro2-starter",
     { x: center.x - totalW / 2, y },
-    buildPro2StarterNodeData({ pro2PresetKind: preset }),
+    buildPro2GeneralTextNodeData({ pro2PresetKind: preset }),
   );
   const videoId = store.addNode(
     "sbv1-video-engine",
     { x: center.x - totalW / 2 + textW + gap, y },
-    { label: "视频", pro2PresetKind: preset },
+    {
+      ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
+      label: "视频",
+      pro2PresetKind: preset,
+    },
   );
+  if (!textId || !videoId) {
+    return { groupId: null, focusNodeId: textId || videoId };
+  }
   store.setEdges((prev) => [
     ...prev,
     {
@@ -233,6 +259,7 @@ export function spawnPro2ShortcutPreset(
   ]);
   const groupId = store.createGroupContaining([textId, videoId], {
     label: PRESET_LABEL[preset],
+    ...SHORTCUT_GROUP_OPTS,
   });
   queueMicrotask(() => {
     relayoutShortcutPresetGroup(

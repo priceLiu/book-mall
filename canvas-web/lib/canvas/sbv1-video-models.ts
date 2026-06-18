@@ -98,6 +98,41 @@ export const SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS = [
   ...new Set(SBV1_VOLCENGINE_VARIANT_PRESETS.map((p) => p.modelKey)),
 ] as string[];
 
+const SBV1_DEFAULT_VIDEO_PRESET_ID = "seedance-2-720p-audio-real";
+
+/** sbv1 视频合成 · 默认 Gateway 引擎（文本节点 VIDEO 槽与 sbv1-video-engine 对齐） */
+export function pickDefaultSbv1VideoEngine(
+  providers: CanvasProviderDto[],
+): CanvasEnginePick | null {
+  const provider = providers.find(
+    (p) => p.active && p.id === GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+  );
+  if (!provider) return null;
+
+  const preferred = SBV1_VOLCENGINE_VARIANT_PRESETS.find(
+    (p) => p.id === SBV1_DEFAULT_VIDEO_PRESET_ID,
+  );
+  const tryKeys = preferred
+    ? [preferred.modelKey, ...SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS]
+    : [...SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS];
+
+  for (const key of [...new Set(tryKeys)]) {
+    const model = provider.models.find(
+      (m) => m.role === "VIDEO" && m.enabled && m.modelKey === key,
+    );
+    if (!model) continue;
+    const preset =
+      SBV1_VOLCENGINE_VARIANT_PRESETS.find((p) => p.modelKey === key) ??
+      preferred;
+    return {
+      providerId: provider.id,
+      modelKey: model.modelKey,
+      params: preset ? { ...preset.params } : {},
+    };
+  }
+  return null;
+}
+
 export function resolveSbv1VariantIdFromEngine(
   engine: {
     providerId?: string;

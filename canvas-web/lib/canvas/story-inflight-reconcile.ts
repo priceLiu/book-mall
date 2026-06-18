@@ -19,6 +19,8 @@ import {
   shouldSkipStoryRowTaskApply,
 } from "./task-pick";
 import { storyApplyTaskResult } from "./story-run-apply";
+import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
+import type { StoryProSceneRow } from "./story-pro-workspace-types";
 import type {
   StoryLlmSection,
   StoryScriptHubNodeData,
@@ -229,7 +231,19 @@ export function reconcileStaleInflightRuntimes(
           runtime: clearInflightRuntime(row.runtime),
         };
       });
-      if (changed) updateNodeData(node.id, { rows: nextRows });
+      if (changed) {
+        updateNodeData(node.id, { rows: nextRows });
+        syncPro2SceneImagesFromRows(
+          nodes.map((n) =>
+            n.id === node.id
+              ? { ...n, data: { ...n.data, rows: nextRows } }
+              : n,
+          ),
+          node.id,
+          nextRows as StoryProSceneRow[],
+          updateNodeData,
+        );
+      }
       continue;
     }
 

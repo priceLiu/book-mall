@@ -289,6 +289,7 @@ export function StoryPro2ScriptHubInspector({ id, data, selected }: NodeProps) {
         value,
         d.characterMd ?? "",
         d.storyboardMd ?? "",
+        d.sceneMd ?? "",
       );
       const { outlineMd, characterMd } = normalizeOutlineSection(
         promoted.outlineMd,
@@ -304,6 +305,16 @@ export function StoryPro2ScriptHubInspector({ id, data, selected }: NodeProps) {
         patch.characterHistory = pushStoryRevision(
           d.characterHistory,
           characterMd,
+        );
+      }
+      if (
+        promoted.sceneMd.trim() &&
+        promoted.sceneMd !== (d.sceneMd ?? "")
+      ) {
+        patch.sceneMd = promoted.sceneMd;
+        patch.sceneHistory = pushStoryRevision(
+          d.sceneHistory,
+          promoted.sceneMd,
         );
       }
       if (
@@ -357,6 +368,7 @@ export function StoryPro2ScriptHubInspector({ id, data, selected }: NodeProps) {
         hubData?.outlineMd ?? d.outlineMd ?? "",
         hubData?.characterMd ?? d.characterMd ?? "",
         hubData?.storyboardMd ?? d.storyboardMd ?? "",
+        hubData?.sceneMd ?? d.sceneMd ?? "",
       );
       const hubPatch: Partial<StoryProScriptHubNodeData> = {};
       if (
@@ -379,6 +391,16 @@ export function StoryPro2ScriptHubInspector({ id, data, selected }: NodeProps) {
           promoted.storyboardMd,
         );
       }
+      if (
+        promoted.sceneMd.trim() &&
+        promoted.sceneMd !== (d.sceneMd ?? "")
+      ) {
+        hubPatch.sceneMd = promoted.sceneMd;
+        hubPatch.sceneHistory = pushStoryRevision(
+          d.sceneHistory,
+          promoted.sceneMd,
+        );
+      }
       if (Object.keys(hubPatch).length) {
         updateNodeData(id, hubPatch);
       }
@@ -394,6 +416,8 @@ export function StoryPro2ScriptHubInspector({ id, data, selected }: NodeProps) {
           hubData?.storyboardMd ??
           d.storyboardMd ??
           "",
+        sceneMd:
+          hubPatch.sceneMd ?? hubData?.sceneMd ?? d.sceneMd ?? "",
       };
       const theme = extractThemeFromStorySystemPrompt(
         (starter.data as { systemPrompt?: string }).systemPrompt ?? "",

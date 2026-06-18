@@ -5,10 +5,12 @@ import {
   enqueuePro2ScriptGeneration,
   kickoffPro2CharacterThreeViewFromHub,
   kickoffPro2FrameBoardFromHub,
+  kickoffPro2SceneImageFromHub,
   pro2HubHasScriptTable,
   pro2HubIsLinkedOutline,
   type KickoffPro2FrameBoardOptions,
 } from "./pro2-script-hub-helpers";
+import type { Pro2SceneBatchImagePick } from "./pro2-scene-batch-image";
 import { resolveHubStoryboardMd } from "./story-hub-runtime";
 import type { StoryRefImage } from "./story-ref-image";
 import type { StoryProScriptHubNodeData } from "./story-pro-workspace-types";
@@ -153,6 +155,62 @@ export function generatePro2CharacterThreeViewFromHub(
   }
   return (
     kickoffPro2CharacterThreeViewFromHub(
+      getStore,
+      hubId,
+      hubData,
+      providers,
+      Object.keys(opts).length ? opts : undefined,
+    ) != null
+  );
+}
+
+export function generatePro2SceneImageFromHub(
+  hubId: string,
+  hubData: StoryProScriptHubNodeData,
+  providers: import("@/lib/canvas-providers-api").CanvasProviderDto[],
+  getStore: () => {
+    nodes: CanvasFlowNode[];
+    edges: CanvasFlowEdge[];
+    addNode: (
+      type:
+        | "story-pro2-character"
+        | "story-pro2-scene"
+        | "story-pro2-frame"
+        | "story-pro2-image"
+        | "story-pro2-three-view"
+        | "group",
+      position: { x: number; y: number },
+      data: Record<string, unknown>,
+    ) => string;
+    addNodeInGroup: (
+      type: "story-pro2-image" | "story-pro2-three-view",
+      groupId: string,
+      relativePosition: { x: number; y: number },
+      data: Record<string, unknown>,
+    ) => string;
+    createGroupContaining: (
+      childIds: string[],
+      opts: { label: string; color: string },
+    ) => string | null;
+    setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+    updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+    setNodes: (fn: (n: CanvasFlowNode[]) => CanvasFlowNode[]) => void;
+  },
+  selectedSceneKeys?: string[],
+  batchImage?: Pro2SceneBatchImagePick,
+): boolean {
+  const opts: {
+    sceneKeys?: string[];
+    batchImage?: Pro2SceneBatchImagePick;
+  } = {};
+  if (selectedSceneKeys?.length) {
+    opts.sceneKeys = selectedSceneKeys;
+  }
+  if (batchImage?.providerId?.trim() && batchImage.modelKey?.trim()) {
+    opts.batchImage = batchImage;
+  }
+  return (
+    kickoffPro2SceneImageFromHub(
       getStore,
       hubId,
       hubData,

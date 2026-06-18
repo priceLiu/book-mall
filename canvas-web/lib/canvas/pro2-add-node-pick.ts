@@ -9,9 +9,11 @@ import {
 } from "./pro2-spawn-nodes";
 import { PRO2_CHARACTER_THREE_VIEW_HEIGHT, PRO2_CHARACTER_THREE_VIEW_WIDTH } from "./story-pro2-node-chrome";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
-import { buildSbv1ImageNodeData } from "./sbv1-spawn-nodes";
-import { selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
+import { buildSbv1ImageNodeData, selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
 import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
+import {
+  resolveLibtvSideSpawnNodeType,
+} from "./libtv-side-spawn";
 import type { CanvasNodeType } from "./types";
 
 export type LibtvCanvasEdition = "pro2" | "sbv1";
@@ -52,8 +54,6 @@ export type Pro2ToolbarAddNodePickOptions = {
 };
 
 const COMING_SOON: Record<string, string> = {
-  video: "视频节点",
-  "video-compose": "视频合成",
   audio: "音频节点",
   "fx-library": "特效库",
   upload: "从本地上传资源",
@@ -71,6 +71,18 @@ function spawnPosition(
   return flowPositionAtViewportCenter(type, data);
 }
 
+function spawnVideoEngine(
+  store: Pro2AddNodePickStore,
+  options?: Pro2ToolbarAddNodePickOptions,
+) {
+  const { addNode, setNodes } = store;
+  const pos = spawnPosition("sbv1-video-engine", options);
+  const id = addNode("sbv1-video-engine", pos, {
+    ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
+  });
+  if (id) selectSbv1NodeAfterSpawn(setNodes, id);
+}
+
 /** 底部工具栏 / 空白画布 · 添加节点菜单统一处理 */
 export async function handlePro2ToolbarAddNodePick(
   itemId: string,
@@ -83,7 +95,11 @@ export async function handlePro2ToolbarAddNodePick(
   const edition = options?.edition ?? "pro2";
 
   if (itemId === "style-library") {
-    options?.onOpenStyleLibrary?.();
+    if (options?.onOpenStyleLibrary) {
+      options.onOpenStyleLibrary();
+    } else {
+      window.dispatchEvent(new CustomEvent("canvas:open-pro2-style-library"));
+    }
     return;
   }
 
@@ -93,22 +109,20 @@ export async function handlePro2ToolbarAddNodePick(
     return;
   }
 
+  if (
+    itemId === "video" ||
+    itemId === "video-compose" ||
+    itemId === "video-engine" ||
+    nodeType === "sbv1-video-engine"
+  ) {
+    spawnVideoEngine(store, options);
+    return;
+  }
+
   if (edition === "sbv1") {
     if (itemId === "image" || nodeType === "sbv1-image" || nodeType === "story-pro2-image") {
       const pos = spawnPosition("sbv1-image", options);
       const id = addNode("sbv1-image", pos, buildSbv1ImageNodeData());
-      if (id) selectSbv1NodeAfterSpawn(setNodes, id);
-      return;
-    }
-    if (
-      itemId === "video-compose" ||
-      itemId === "video-engine" ||
-      nodeType === "sbv1-video-engine"
-    ) {
-      const pos = spawnPosition("sbv1-video-engine", options);
-      const id = addNode("sbv1-video-engine", pos, {
-        ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
-      });
       if (id) selectSbv1NodeAfterSpawn(setNodes, id);
       return;
     }
@@ -187,15 +201,22 @@ export async function handlePro2SideAddNodePick(
   dialogs: Pro2AddNodePickDialogs,
   onSpawn: (itemId: string, nodeType?: string) => void,
 ): Promise<void> {
+  const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
   if (
+    spawnType ||
     itemId === "text" ||
     itemId === "image" ||
+    itemId === "three-view" ||
     itemId === "script" ||
+    itemId === "video" ||
+    itemId === "video-compose" ||
     nodeType === "story-pro2-starter" ||
     nodeType === "story-pro2-image" ||
-    nodeType === "story-pro2-script-hub"
+    nodeType === "story-pro2-script-hub" ||
+    nodeType === "story-pro2-three-view" ||
+    nodeType === "sbv1-video-engine"
   ) {
-    onSpawn(itemId, nodeType);
+    onSpawn(itemId, nodeType ?? spawnType);
     return;
   }
 

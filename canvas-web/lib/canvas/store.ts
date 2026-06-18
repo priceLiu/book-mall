@@ -65,6 +65,7 @@ import {
 import { applySbv1MediaGroupRelayout } from "./sbv1-media-group-layout";
 import { reflowSbv1Canvas as computeSbv1CanvasReflow } from "./sbv1-canvas-layout";
 import { reflowPro2CanvasLayout } from "./pro2-canvas-layout";
+import { duplicateMediaGroupInGraph } from "./duplicate-media-group";
 import { hasStoryComicPipeline } from "./story-comic-layout";
 import { reflowStoryComicWorkspace } from "./story-comic-workspace-layout";
 import {
@@ -76,6 +77,9 @@ import {
   reflowStoryPro2Workspace,
 } from "./story-pro2-workspace-layout";
 import { reconcileStoryProWorkspace } from "./spawn-story-pro-workspace";
+import {
+  migratePro2SceneColumnOffCanvas,
+} from "./pro2-spawn-scene-image-group";
 import { reconcileStoryPro2Workspace } from "./spawn-story-pro2-workspace";
 import { canvasNotify } from "./canvas-notify";
 import {
@@ -225,6 +229,8 @@ type CanvasState = {
     id: string,
     options?: { preserveContent?: boolean },
   ) => string | null;
+  /** 复制媒体组（含子节点）并自 hub 再连一条线 */
+  duplicateMediaGroup: (groupId: string) => string | null;
 
   /**
    * 把一组现有节点包进新建的 group 容器（设 parentId + extent='parent'）。
@@ -239,6 +245,8 @@ type CanvasState = {
       measuredSizes?: Record<string, { w: number; h: number }>;
       /** 强制走 Pro2 图1 暗色组壳（手动框选打组） */
       pro2Styled?: boolean;
+      /** 底部 Dock 快捷预设组：LibTV 壳 + 自定义水平排布 */
+      pro2ShortcutPreset?: boolean;
     },
   ) => string | null;
   /** 解散指定 group：把它的子节点 parentNode 清空、坐标恢复到画布坐标。 */
@@ -344,10 +352,12 @@ export const useCanvasStore = create<CanvasState>()(
         const raw = graph && Array.isArray(graph.nodes) ? graph : emptyGraph();
         const g = migrateGraphV1ToV2(raw);
         let edges = g.edges as CanvasFlowEdge[];
-        let normalized = normalizeCanvasNodes(
+        const migrated = migratePro2SceneColumnOffCanvas(
           g.nodes as CanvasFlowNode[],
           edges,
         );
+        edges = migrated.edges;
+        let normalized = normalizeCanvasNodes(migrated.nodes, edges);
         let nodes = normalized.some((n) =>
           String(n.type ?? "").startsWith("story-pro2-"),
         )
@@ -866,9 +876,22 @@ export const useCanvasStore = create<CanvasState>()(
         return newId;
       },
 
+      duplicateMediaGroup: (groupId) => {
+        const { nodes, edges } = get();
+        const result = duplicateMediaGroupInGraph(groupId, nodes, edges);
+        if (!result) return null;
+        set((state) =>
+          withGraphRevision(state, {
+            nodes: sortNodesForReactFlow(result.nodes),
+            edges: result.edges,
+          }),
+        );
+        return result.newGroupId;
+      },
+
       createGroupContaining: (
         childIds,
-        { label, color, measuredSizes, pro2Styled },
+        { label, color, measuredSizes, pro2Styled, pro2ShortcutPreset },
       ) => {
         const all = get().nodes;
         const effectiveChildIds = childIds.filter((id) => {
@@ -894,7 +917,9 @@ export const useCanvasStore = create<CanvasState>()(
             (c) => c.type === "sbv1-image" || c.type === "sbv1-video-engine",
           );
         const sbv1Styled = sbv1OnlyMedia;
-        const usePro2MediaGrid = Boolean(pro2Kind || pro2Styled || sbv1Styled);
+        const usePro2MediaGrid = Boolean(
+          !pro2ShortcutPreset && (pro2Kind || pro2Styled || sbv1Styled),
+        );
         const PADDING = usePro2MediaGrid ? PRO2_MEDIA_GROUP_PAD : 28;
         const HEADER = usePro2MediaGrid ? PRO2_MEDIA_GROUP_HEADER : 32;
         const boxes = children.map((c) => {
@@ -948,6 +973,10 @@ export const useCanvasStore = create<CanvasState>()(
           groupData.pro2Kind = pro2Kind;
         }
         if (pro2Styled) {
+          groupData.pro2Styled = true;
+        }
+        if (pro2ShortcutPreset) {
+          groupData.pro2ShortcutPreset = true;
           groupData.pro2Styled = true;
         }
         if (sbv1Styled) {
@@ -1209,6 +1238,21 @@ export const useCanvasStore = create<CanvasState>()(
             dragHoverGroupId: null,
           }),
         );
+
+        const relayoutGroup = (groupId: string | null) => {
+          if (!groupId) return;
+          const g = get().nodes.find((n) => n.id === groupId && n.type === "group");
+          if (!g) return;
+          const kind = (g.data as { pro2Kind?: string }).pro2Kind;
+          if (!kind) return;
+          set((state) =>
+            withGraphRevision(state, {
+              nodes: applyPro2MediaGroupRelayout(state.nodes, groupId),
+            }),
+          );
+        };
+        relayoutGroup(newParentGroupId);
+        relayoutGroup(oldParentId);
       },
 
       reflowStoryTemplateGroups: () => {

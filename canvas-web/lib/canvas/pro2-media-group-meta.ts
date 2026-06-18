@@ -25,6 +25,13 @@ export function inferPro2MediaGroupKind(
   );
   if (hasThreeView) return "character-board";
 
+  const hasScene = children.some(
+    (n) =>
+      n.type === "story-pro2-image" &&
+      (n.data as { pro2MediaRole?: string }).pro2MediaRole === "scene",
+  );
+  if (hasScene) return "scene-board";
+
   const hasFrame = children.some(
     (n) =>
       n.type === "story-pro2-image" &&
@@ -44,6 +51,7 @@ export function pro2MediaGroupDefaultLabel(
   const t = custom?.trim();
   if (t) return t;
   if (kind === "character-board") return "三视图";
+  if (kind === "scene-board") return "场景图";
   if (kind === "frame-board") return "分镜图";
   return "分镜视频";
 }
@@ -108,7 +116,7 @@ export function isPro2StyledGroup(
 ): boolean {
   if (node.type !== "group") return false;
   const d = node.data as GroupNodeData;
-  if (d.pro2Kind || d.pro2Styled) return true;
+  if (d.pro2Kind || d.pro2Styled || d.pro2ShortcutPreset) return true;
   return groupHasPro2MediaChildren(node.id, allNodes);
 }
 

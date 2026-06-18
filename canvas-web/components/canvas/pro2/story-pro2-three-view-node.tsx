@@ -11,15 +11,13 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import {
+  resolveLibtvSideSpawnNodeType,
+  spawnLibtvNeighborFromAnchor,
+} from "@/lib/canvas/libtv-side-spawn";
+import {
   PRO2_IMAGE_LEFT_ADD_MENU,
   PRO2_RIGHT_ADD_MENU,
 } from "@/lib/canvas/pro2-add-node-menu";
-import {
-  buildPro2ImageNodeData,
-  buildPro2StarterNodeData,
-  spawnPro2ScriptHubFromSource,
-} from "@/lib/canvas/pro2-spawn-nodes";
-import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   LIBTV_CARD_DRAG_CLASS,
@@ -31,7 +29,6 @@ import {
 import {
   PRO2_CHARACTER_THREE_VIEW_MIN_HEIGHT,
   PRO2_CHARACTER_THREE_VIEW_MIN_WIDTH,
-  PRO2_IMAGE_NODE_WIDTH,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryPro2ThreeViewNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
@@ -120,82 +117,6 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
     [base, id, updateNodeData],
   );
 
-  const spawnNeighbor = useCallback(
-    (side: "left" | "right", nodeType?: string) => {
-      if (!nodeType) return;
-      const selfNode = nodes.find((n) => n.id === id);
-      if (!selfNode) return;
-      const gap = 48;
-      const w = selfNode.width ?? PRO2_IMAGE_NODE_WIDTH;
-      const x =
-        side === "left"
-          ? selfNode.position.x - w - gap
-          : selfNode.position.x + w + gap;
-      const y = selfNode.position.y;
-
-      if (nodeType === "story-pro2-starter") {
-        const newId = addNode("story-pro2-starter", { x, y }, buildPro2StarterNodeData());
-        if (!newId) return;
-        const edge =
-          side === "left"
-            ? {
-                id: `e-${newId}-${id}`,
-                source: newId,
-                target: id,
-                sourceHandle: "text",
-                targetHandle: "in_image",
-              }
-            : {
-                id: `e-${id}-${newId}`,
-                source: id,
-                target: newId,
-                sourceHandle: "image",
-                targetHandle: "in_text",
-              };
-        setEdges((prev) => [...prev, edge]);
-        selectPro2NodeAfterSpawn(setNodes, newId);
-        return;
-      }
-
-      if (nodeType === "story-pro2-image") {
-        const newId = addNode("story-pro2-image", { x, y }, buildPro2ImageNodeData());
-        if (!newId) return;
-        const edge =
-          side === "left"
-            ? {
-                id: `e-${newId}-${id}`,
-                source: newId,
-                target: id,
-                sourceHandle: "image",
-                targetHandle: "in_image",
-              }
-            : {
-                id: `e-${id}-${newId}`,
-                source: id,
-                target: newId,
-                sourceHandle: "image",
-                targetHandle: "in_image",
-              };
-        setEdges((prev) => [...prev, edge]);
-        selectPro2NodeAfterSpawn(setNodes, newId);
-        return;
-      }
-
-      if (nodeType === "story-pro2-script-hub") {
-        spawnPro2ScriptHubFromSource({
-          sourceId: id,
-          sourceHandle: "image",
-          position: { x, y },
-          addNode: (type, position, nodeData) =>
-            addNode(type, position, nodeData),
-          setEdges,
-          setNodes,
-        });
-      }
-    },
-    [nodes, id, addNode, setNodes, setEdges],
-  );
-
   const onSidePick = useCallback(
     (side: "left" | "right") => (itemId: string, nodeType?: string) => {
       void handlePro2SideAddNodePick(
@@ -203,21 +124,18 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
         nodeType,
         { alert },
         () => {
-          if (itemId === "text" || nodeType === "story-pro2-starter") {
-            spawnNeighbor(side, "story-pro2-starter");
-            return;
-          }
-          if (itemId === "image" || nodeType === "story-pro2-image") {
-            spawnNeighbor(side, "story-pro2-image");
-            return;
-          }
-          if (itemId === "script" || nodeType === "story-pro2-script-hub") {
-            spawnNeighbor("right", "story-pro2-script-hub");
-          }
+          const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
+          if (!spawnType) return;
+          spawnLibtvNeighborFromAnchor(id, side, spawnType, {
+            nodes,
+            addNode,
+            setNodes,
+            setEdges,
+          });
         },
       );
     },
-    [spawnNeighbor, alert],
+    [id, nodes, addNode, setNodes, setEdges, alert],
   );
 
   return (

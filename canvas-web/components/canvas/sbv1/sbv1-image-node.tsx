@@ -1,14 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
+import { useCallback, useMemo } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { Handle, Position } from "@xyflow/react";
-import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
-import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { uploadCanvasImage } from "@/lib/canvas-api";
-import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import {
   SBV1_IMAGE_LEFT_ADD_MENU,
   SBV1_IMAGE_RIGHT_ADD_MENU,
@@ -19,37 +13,9 @@ import {
   selectSbv1NodeAfterSpawn,
   spawnSbv1NeighborFromNode,
 } from "@/lib/canvas/sbv1-spawn-nodes";
-import {
-  SBV1_CARD_DRAG_CLASS,
-  SBV1_CARD_SHELL_CLASS,
-  SBV1_MEDIA_STAGE_CLASS,
-  SBV1_NODE_HANDLE_CLASS,
-  SBV1_NODE_OUTER_CLASS,
-} from "@/lib/canvas/sbv1-node-chrome";
-import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
-import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
-import {
-  PRO2_IMAGE_NODE_MIN_HEIGHT,
-  PRO2_IMAGE_NODE_MIN_WIDTH,
-} from "@/lib/canvas/story-pro2-node-chrome";
-import { cn } from "@/lib/utils";
-import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
-import { MediaHoverBox } from "../media-hover-box";
-import { Pro2ImageNodeToolbar } from "../pro2/pro2-image-node-toolbar";
-import {
-  Pro2MediaNodeEmptyState,
-  Pro2MediaNodeErrorState,
-} from "../pro2/pro2-media-node-empty";
-import { Pro2NodeResizer } from "../pro2/pro2-node-resizer";
-import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
-import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
-import {
-  Sbv1ImageNodeEmbeddedDock,
-  sbv1ImageNodeUsesEmbeddedDock,
-} from "./sbv1-image-node-embedded-dock";
+import { LibtvImageNode } from "../libtv-image-node";
 
-export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
-  const base = useBookMallBaseUrl();
+export function Sbv1ImageNode(props: NodeProps) {
   const { alert } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -57,102 +23,6 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
   const addNodeInGroup = useCanvasStore((s) => s.addNodeInGroup);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
-  const duplicateNode = useCanvasStore((s) => s.duplicateNode);
-  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
-  const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
-  const [previewOpen, setPreviewOpen] = useState(false);
-
-  const d = data as unknown as Sbv1ImageNodeData;
-  const saveAsAsset = useSaveNodeAsAsset();
-  const self = nodes.find((n) => n.id === id);
-  const insideGroup = Boolean(self?.parentId);
-  const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
-  const hasImage = Boolean(previewUrl);
-  const hasError =
-    Boolean(d.uploadError?.trim()) || d.runtime?.status === "error";
-  const errorMessage =
-    d.uploadError?.trim() || d.runtime?.failMessage?.trim() || "生成失败";
-  const isGenerating = !hasError && isLibtvMediaGenerating(d);
-  const generatingLabel =
-    d.uploading && !d.runtime?.status ? "上传中…" : "图片生成中…";
-  const showSidePlus = Boolean((hovered || selected || connectingFromNodeId) && !isGenerating);
-  const soleSelected = useMemo(
-    () => selected && nodes.filter((n) => n.selected).length === 1,
-    [selected, nodes],
-  );
-  const showTryMenu = !hasImage && !isGenerating && !hasError;
-  const showEmbeddedDock = sbv1ImageNodeUsesEmbeddedDock(d, {
-    selected: Boolean(selected),
-    soleSelected,
-  });
-  const showImageTools = Boolean(
-    soleSelected &&
-      !isGenerating &&
-      (hasImage || Boolean(d.dockInput?.trim()) || Boolean(d.engine?.modelKey)),
-  );
-
-  useLibtvMediaNodeAutoFit({
-    nodeId: id,
-    mediaUrl: previewUrl,
-    kind: "image",
-    profile: "square-image",
-    disabled: !hasImage || isGenerating,
-  });
-
-  const nodeLabel = useMemo(() => {
-    if (d.label?.trim()) return d.label.trim();
-    const imgs = nodes.filter((n) => n.type === "sbv1-image");
-    const idx = imgs.findIndex((n) => n.id === id);
-    return `图片 ${idx >= 0 ? idx + 1 : ""}`.trim();
-  }, [nodes, id, d.label]);
-
-  const onPick = useCallback(() => inputRef.current?.click(), []);
-
-  const onFile = useCallback(
-    async (file: File) => {
-      if (
-        !file ||
-        (!file.type.startsWith("image/") &&
-          !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name))
-      ) {
-        return;
-      }
-      const blobUrl = URL.createObjectURL(file);
-      updateNodeData(id, {
-        blobUrl,
-        ossUrl: undefined,
-        uploading: true,
-        uploadError: undefined,
-        label: file.name.replace(/\.[^.]+$/, "") || "图片",
-        imageMode: "upload",
-      });
-      if (!base) {
-        updateNodeData(id, { uploading: false, uploadError: "画布未就绪" });
-        return;
-      }
-      try {
-        const ossUrl = await uploadCanvasImage(base, file);
-        updateNodeData(id, { ossUrl, uploading: false });
-      } catch (e) {
-        updateNodeData(id, {
-          uploading: false,
-          uploadError: e instanceof Error ? e.message : String(e),
-        });
-        await alert({
-          title: "上传失败",
-          message: e instanceof Error ? e.message : String(e),
-          variant: "error",
-        });
-      }
-    },
-    [id, base, updateNodeData, alert],
-  );
-
-  const pasteHostActive =
-    hovered || Boolean(selected && (showEmbeddedDock || showTryMenu));
-  usePointerImagePasteHost(pasteHostActive, id, (file) => void onFile(file));
 
   const spawnStore = useMemo(
     () => ({ nodes, edges, addNode, addNodeInGroup, setNodes, setEdges }),
@@ -167,12 +37,12 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
         side,
         alert,
         () => {
-          spawnSbv1NeighborFromNode(id, side, "sbv1-image", spawnStore);
+          spawnSbv1NeighborFromNode(props.id, side, "sbv1-image", spawnStore);
         },
         () => {
           if (side === "right") {
             spawnSbv1NeighborFromNode(
-              id,
+              props.id,
               "right",
               "sbv1-video-engine",
               spawnStore,
@@ -181,226 +51,20 @@ export function Sbv1ImageNode({ id, data, selected }: NodeProps) {
         },
       );
     },
-    [id, spawnStore, alert],
+    [props.id, spawnStore, alert],
   );
 
-  const onDuplicateNode = useCallback(() => {
-    const newId = duplicateNode(id, { preserveContent: true });
-    if (newId) selectSbv1NodeAfterSpawn(setNodes, newId);
-  }, [duplicateNode, id, setNodes]);
-
   return (
-    <>
-      <Pro2NodeResizer
-        isVisible={Boolean(selected && !insideGroup)}
-        minWidth={PRO2_IMAGE_NODE_MIN_WIDTH}
-        minHeight={PRO2_IMAGE_NODE_MIN_HEIGHT}
-      />
-      <div
-        className={cn(SBV1_NODE_OUTER_CLASS, "image-paste-host")}
-        data-image-paste-host={id}
-        data-pro2-dock-anchor={id}
-        onPointerEnter={onPointerEnter}
-        onPointerLeave={onPointerLeave}
-      >
-        <Handle
-          id="in_image"
-          type="target"
-          position={Position.Left}
-          className={cn(
-            SBV1_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          title="上游参考图"
-        />
-        <Handle
-          id="image"
-          type="source"
-          position={Position.Right}
-          className={cn(
-            SBV1_NODE_HANDLE_CLASS,
-            showSidePlus
-              ? "pointer-events-none opacity-0"
-              : selected
-                ? "opacity-100"
-                : "pointer-events-none opacity-0",
-          )}
-          title="连线到下游"
-        />
-
-        {showSidePlus ? (
-          <>
-            <Pro2NodeSidePlus
-              side="left"
-              handleId="plus_left"
-              visible
-              className="z-[60] -left-5"
-              sections={SBV1_IMAGE_LEFT_ADD_MENU}
-              onPick={onSidePick("left")}
-            />
-            <Pro2NodeSidePlus
-              side="right"
-              handleId="image"
-              visible
-              className="z-[60] -right-5"
-              sections={SBV1_IMAGE_RIGHT_ADD_MENU}
-              onPick={onSidePick("right")}
-            />
-          </>
-        ) : null}
-
-        {showImageTools ? (
-          <Pro2ImageNodeToolbar
-            passNodeDrag
-            className="absolute left-1/2 z-40 -translate-x-1/2"
-            style={{ top: -60 }}
-            previewUrl={previewUrl}
-            onExpandPreview={() => setPreviewOpen(true)}
-            onSaveAsAsset={() =>
-              saveAsAsset(id, "sbv1-image", d as unknown as Record<string, unknown>)
-            }
-            onDuplicateNode={onDuplicateNode}
-          />
-        ) : null}
-
-        <div
-          className={cn(
-            SBV1_CARD_SHELL_CLASS,
-            SBV1_CARD_DRAG_CLASS,
-            "min-h-0 flex-1",
-            selected && "ring-1 ring-cyan-400/50",
-          )}
-        >
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className={cn(
-                  "nodrag flex items-center gap-2 rounded-md transition",
-                  !hasImage &&
-                    !isGenerating &&
-                    "cursor-pointer hover:bg-white/[0.06]",
-                )}
-                title={
-                  !hasImage && !isGenerating ? "双击上传图片" : undefined
-                }
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  if (!hasImage && !isGenerating) onPick();
-                }}
-              >
-                <ImageIcon className="size-3.5 text-cyan-300" />
-                <p className="text-xs font-medium text-white">{nodeLabel}</p>
-              </button>
-            </div>
-            {isGenerating ? (
-              <Loader2 className="size-3.5 animate-spin text-cyan-300" />
-            ) : null}
-          </div>
-
-          <div className={SBV1_MEDIA_STAGE_CLASS}>
-            {isGenerating ? (
-              <LibtvMediaGeneratingState label={generatingLabel} variant="cyan">
-                {previewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={previewUrl}
-                    alt=""
-                    className="absolute inset-0 size-full object-contain opacity-40"
-                    draggable={false}
-                  />
-                ) : null}
-              </LibtvMediaGeneratingState>
-            ) : hasImage ? (
-              <MediaHoverBox
-                src={previewUrl}
-                variant="generated"
-                alt={nodeLabel}
-                fit="contain"
-                className="absolute inset-0"
-              />
-            ) : hasError ? (
-              <div
-                role="button"
-                tabIndex={0}
-                className="absolute inset-0 flex flex-col"
-                onClick={onPick}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onPick();
-                  }
-                }}
-              >
-                <Pro2MediaNodeErrorState
-                  icon={AlertTriangle}
-                  title={d.uploadError?.trim() ? "上传失败" : "生成失败"}
-                  message={errorMessage}
-                />
-              </div>
-            ) : showEmbeddedDock ? (
-              <Sbv1ImageNodeEmbeddedDock nodeId={id} onUpload={onPick} />
-            ) : showTryMenu ? (
-              <div
-                className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4"
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  if (selected && !isGenerating) onPick();
-                }}
-              >
-                <Pro2MediaNodeEmptyState
-                  icon={ImageIcon}
-                  label="添加或生成图片"
-                  className="min-h-0 pb-0"
-                  passNodeDrag
-                />
-                {!selected ? (
-                  <p className="mt-3 text-[10px] text-white/35">
-                    选中节点以编辑提示词
-                  </p>
-                ) : (
-                  <p className="mt-3 text-[10px] text-white/35">
-                    双击图标上传，或在下方 Dock 输入提示词
-                  </p>
-                )}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          e.target.value = "";
-          if (f) void onFile(f);
-        }}
-      />
-
-      {previewOpen && previewUrl ? (
-        <div
-          className="nodrag fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          onMouseDown={() => setPreviewOpen(false)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewUrl}
-            alt={nodeLabel}
-            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
-            onMouseDown={(e) => e.stopPropagation()}
-          />
-        </div>
-      ) : null}
-    </>
+    <LibtvImageNode
+      {...props}
+      edition="sbv1"
+      rfNodeType="sbv1-image"
+      saveAsAssetKind="sbv1-image"
+      leftMenuSections={SBV1_IMAGE_LEFT_ADD_MENU}
+      rightMenuSections={SBV1_IMAGE_RIGHT_ADD_MENU}
+      onSidePickLeft={onSidePick("left")}
+      onSidePickRight={onSidePick("right")}
+      onSelectAfterDuplicate={(newId) => selectSbv1NodeAfterSpawn(setNodes, newId)}
+    />
   );
 }

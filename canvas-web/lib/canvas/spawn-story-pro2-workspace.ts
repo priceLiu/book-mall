@@ -4,13 +4,15 @@ import { nanoid } from "nanoid";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { NODE_DEFAULT_SIZE } from "./types";
 import {
-  STORY_PRO_OUTLINE_USER_PROMPT,
   STORY_PRO_HUB_LLM_SYSTEM,
   STORY_PRO_LLM_PARAMS_DEFAULT,
   STORY_PRO_THEME_SYSTEM_PROMPT_DEFAULT,
 } from "./story-pro-prompts";
 import {
   STORY_PRO2_CHARACTER_PROMPT,
+  STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
+  STORY_PRO2_PACK_PROMPT_VERSION,
+  STORY_PRO2_SCENE_PROMPT,
   STORY_PRO2_STORYBOARD_PROMPT,
 } from "./story-pro2-theme-outline-prompt";
 import type { StoryPro2WorkspaceIds } from "./story-pro2-workspace-types";
@@ -234,11 +236,14 @@ export function spawnStoryPro2ScriptHub(args: SpawnProHubArgs): {
       ...sharedLlm,
       outlineMd: "",
       characterMd: "",
+      sceneMd: "",
       storyboardMd: "",
       outlineSystemPrompt: STORY_PRO_HUB_LLM_SYSTEM,
-      promptOutline: STORY_PRO_OUTLINE_USER_PROMPT,
+      promptOutline: STORY_PRO2_HUB_OUTLINE_FROM_THEME_PROMPT,
       promptCharacter: STORY_PRO2_CHARACTER_PROMPT,
+      promptScene: STORY_PRO2_SCENE_PROMPT,
       promptStoryboard: STORY_PRO2_STORYBOARD_PROMPT,
+      storyPro2PackPromptVersion: STORY_PRO2_PACK_PROMPT_VERSION,
     },
   );
 
@@ -302,6 +307,71 @@ export function spawnStoryPro2CharacterColumnFromHub(args: {
   };
   args.updateNodeData(args.starterNodeId, { workspaceIds: nextWs });
   return characterColumnId;
+}
+
+/** 2.0 LibTV · 从脚本节点 spawn 场景设计列 */
+export function spawnStoryPro2SceneColumnFromHub(args: {
+  scriptHubId: string;
+  starterNodeId: string;
+  nodes: CanvasFlowNode[];
+  edges: CanvasFlowEdge[];
+  addNode: (
+    type: "story-pro2-scene",
+    position: { x: number; y: number },
+    data: Record<string, unknown>,
+  ) => string;
+  setEdges: (fn: (e: CanvasFlowEdge[]) => CanvasFlowEdge[]) => void;
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+}): string {
+  const ws = (
+    args.nodes.find((n) => n.id === args.starterNodeId)?.data as {
+      workspaceIds?: StoryPro2WorkspaceIds;
+    }
+  )?.workspaceIds;
+  if (ws?.sceneColumnId) {
+    const existing = args.nodes.find((n) => n.id === ws.sceneColumnId);
+    if (existing?.type === "story-pro2-scene") return existing.id;
+  }
+
+  const hub = args.nodes.find((n) => n.id === args.scriptHubId);
+  if (!hub) throw new Error("找不到脚本节点");
+
+  const gap = 56;
+  const sceneW = NODE_DEFAULT_SIZE["story-pro2-scene"].width;
+  const charCol = ws?.characterColumnId
+    ? args.nodes.find((n) => n.id === ws.characterColumnId)
+    : undefined;
+
+  let x: number;
+  let y: number;
+  if (charCol) {
+    const charW =
+      charCol.width ?? NODE_DEFAULT_SIZE["story-pro2-character"].width;
+    x = (charCol.position?.x ?? 0) - sceneW - gap;
+    y = charCol.position?.y ?? hub.position?.y ?? 120;
+  } else {
+    x = (hub.position?.x ?? 0) - sceneW - gap;
+    y = hub.position?.y ?? 120;
+  }
+
+  const sceneColumnId = args.addNode(
+    "story-pro2-scene",
+    { x, y },
+    { rows: [], hubNodeId: args.scriptHubId },
+  );
+
+  connect(args.setEdges, args.scriptHubId, sceneColumnId, "text", "in_text");
+  if (charCol) {
+    connect(args.setEdges, charCol.id, sceneColumnId, "text", "in_text");
+  }
+
+  const nextWs: StoryPro2WorkspaceIds = {
+    ...(ws ?? { scriptHubId: args.scriptHubId }),
+    scriptHubId: args.scriptHubId,
+    sceneColumnId,
+  };
+  args.updateNodeData(args.starterNodeId, { workspaceIds: nextWs });
+  return sceneColumnId;
 }
 
 /** 2.0 LibTV · 从脚本节点右侧 spawn 分镜图列（不经过风格层） */

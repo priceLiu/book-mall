@@ -393,7 +393,7 @@ function Inner() {
         <div className="space-y-10">
           <ProjectsSection
             title="分镜视频 1.0"
-            subtitle="图片 + 视频合成 · 即梦 Seedance 三种参考模式"
+            subtitle="图片 + 视频 · 即梦 Seedance 三种参考模式"
             edition="sbv1"
             projects={sbv1Projects}
             onDelete={onDelete}

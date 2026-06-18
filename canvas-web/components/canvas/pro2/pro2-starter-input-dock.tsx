@@ -8,8 +8,6 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
-import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
-import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
@@ -17,11 +15,14 @@ import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-li
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
 import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { STORY_PRO2_THEME_OUTLINE_SYSTEM } from "@/lib/canvas/story-pro2-theme-outline-prompt";
+import {
+  isPro2StoryOutlineTextNode,
+  resolvePro2TextPurpose,
+} from "@/lib/canvas/pro2-text-purpose";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
-import { EnginePicker } from "../engine-picker";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
-import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
+import { Pro2TextNodeEnginePickers } from "./pro2-text-node-engine-pickers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 import { usePro2DockPlacement } from "./use-pro2-dock-placement";
@@ -62,12 +63,25 @@ export function Pro2StarterInputDock() {
 
   const placement = usePro2DockPlacement(selectedStarter?.id ?? null);
   const d = (storeNode?.data ?? {}) as StoryProStarterNodeData;
+  const textPurpose = useMemo(
+    () =>
+      storeNode
+        ? resolvePro2TextPurpose(d, {
+            nodeId: storeNode.id,
+            nodes,
+            edges,
+          })
+        : "story-outline",
+    [storeNode, d, nodes, edges],
+  );
+  const isStoryOutlineMode = textPurpose === "story-outline";
   const themeInput = d.themeInput ?? "";
   const isGenerating =
-    d.themeOutlineRuntime?.status === "pending" ||
-    d.themeOutlineRuntime?.status === "running";
+    isStoryOutlineMode &&
+    (d.themeOutlineRuntime?.status === "pending" ||
+      d.themeOutlineRuntime?.status === "running");
   const outlineErrorMessage =
-    d.themeOutlineRuntime?.status === "error"
+    isStoryOutlineMode && d.themeOutlineRuntime?.status === "error"
       ? formatCanvasTaskError(
           d.themeOutlineRuntime.failCode,
           d.themeOutlineRuntime.failMessage,
@@ -77,7 +91,7 @@ export function Pro2StarterInputDock() {
   const lastAlertedErrorRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!outlineErrorMessage || !storeNode) return;
+    if (!isStoryOutlineMode || !outlineErrorMessage || !storeNode) return;
     const key = `${storeNode.id}:${d.themeOutlineRuntime?.taskId ?? ""}:${outlineErrorMessage}`;
     if (lastAlertedErrorRef.current === key) return;
     lastAlertedErrorRef.current = key;
@@ -86,63 +100,19 @@ export function Pro2StarterInputDock() {
       message: outlineErrorMessage,
       variant: "error",
     });
-  }, [outlineErrorMessage, storeNode, d.themeOutlineRuntime?.taskId, alert]);
+  }, [isStoryOutlineMode, outlineErrorMessage, storeNode, d.themeOutlineRuntime?.taskId, alert]);
 
-  const upstreamLinks = useMemo(() => {
-    if (!storeNode) return [];
-    return resolvePro2DockUpstreamLinks(
-      storeNode.id,
-      "story-pro2-starter",
-      nodes,
-      edges,
-    );
-  }, [storeNode, nodes, edges]);
-
-  const mentionables = useMemo(
-    () => buildPro2DockMentionables(upstreamLinks),
-    [upstreamLinks],
-  );
-  const activeRefIds = useMemo(
-    () => dockActiveRefIdsFromPrompt(themeInput),
-    [themeInput],
-  );
-
-  usePruneStaleDockMentions({
-    nodeId: storeNode?.id ?? null,
-    prompt: themeInput,
-    mentionables,
-    field: "themeInput",
-    updateNodeData,
-  });
-
-  useEffect(() => {
-    if (!storeNode || d.providerId) return;
-    const pick = pickDefaultStoryLlmEngine(providers);
-    if (!pick) return;
+  const onSaveGeneralText = useCallback(() => {
+    if (!storeNode) return;
+    const text = themeInput.trim();
+    if (!text) return;
     updateNodeData(storeNode.id, {
-      providerId: pick.providerId,
-      modelKey: pick.modelKey,
-      params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
+      themeInput: text,
+      generatedOutlineMd: text,
     });
-  }, [storeNode, d.providerId, providers, updateNodeData]);
+  }, [storeNode, themeInput, updateNodeData]);
 
-  const onPickEngine = useCallback(
-    (next: {
-      providerId: string;
-      modelKey: string;
-      params: Record<string, unknown>;
-    }) => {
-      if (!storeNode) return;
-      updateNodeData(storeNode.id, {
-        providerId: next.providerId,
-        modelKey: next.modelKey,
-        params: next.params,
-      });
-    },
-    [storeNode, updateNodeData],
-  );
-
-  const onSend = useCallback(async () => {
+  const onSendOutline = useCallback(async () => {
     if (!storeNode) return;
     const theme = themeInput.trim();
     if (!theme) {
@@ -161,6 +131,15 @@ export function Pro2StarterInputDock() {
       await alert({
         title: "请选择模型",
         message: "点击左下角模型选择器，选择 LLM 后再发送。",
+        variant: "warning",
+      });
+      return;
+    }
+    if (!isPro2StoryOutlineTextNode(liveData, { nodeId: storeNode.id, nodes, edges })) {
+      await alert({
+        title: "无法生成故事大纲",
+        message:
+          "该文本节点用于提示词/下游引用（文生图、生视频、反推等），不会走故事大纲链路。",
         variant: "warning",
       });
       return;
@@ -189,7 +168,40 @@ export function Pro2StarterInputDock() {
       mediaKind: "themeOutline",
       forceFresh: true,
     });
-  }, [storeNode, themeInput, base, alert, updateNodeData]);
+  }, [storeNode, themeInput, base, alert, updateNodeData, nodes, edges]);
+
+  const onSend = isStoryOutlineMode ? onSendOutline : onSaveGeneralText;
+  const sendTitle = isStoryOutlineMode ? "生成故事大纲" : "写入节点";
+  const placeholder = isStoryOutlineMode
+    ? "写下你想讲的故事、场景或角色设定。输入 @ 可引用已链接的图片。"
+    : "输入提示词，供下游生图/生视频使用；输入 @ 可引用已链接的图片。";
+
+  const upstreamLinks = useMemo(() => {
+    if (!storeNode) return [];
+    return resolvePro2DockUpstreamLinks(
+      storeNode.id,
+      "story-pro2-starter",
+      nodes,
+      edges,
+    );
+  }, [storeNode, nodes, edges]);
+
+  const mentionables = useMemo(
+    () => buildPro2DockMentionables(upstreamLinks),
+    [upstreamLinks],
+  );
+  const activeRefIds = useMemo(
+    () => dockActiveRefIdsFromPrompt(themeInput),
+    [themeInput],
+  );
+
+  usePruneStaleDockMentions({
+    nodeId: storeNode?.id ?? null,
+    prompt: themeInput,
+    mentionables,
+    field: "themeInput",
+    updateNodeData,
+  });
 
   if (!storeNode || !placement) return null;
 
@@ -221,39 +233,42 @@ export function Pro2StarterInputDock() {
       footer={
         <>
           <Pro2DockToolbar>
-            <div className="min-w-0 flex-1">
-              <EnginePicker
-                role="LLM"
-                allowedModelKeys={[...STORY_LLM_MODEL_KEYS]}
-                providerId={d.providerId ?? ""}
-                modelKey={d.modelKey ?? ""}
-                params={d.params ?? {}}
-                onChange={onPickEngine}
-              />
-            </div>
+            <Pro2TextNodeEnginePickers
+              nodeId={storeNode.id}
+              data={d}
+              nodes={nodes}
+              edges={edges}
+              providers={providers}
+              disabled={isGenerating}
+              updateNodeData={updateNodeData}
+            />
             <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                className="nodrag rounded-md p-1.5 text-white/35 hover:bg-white/6 hover:text-white/60"
-                title="翻译（预留）"
-                disabled
-              >
-                <Languages className="size-4" />
-              </button>
-              <button
-                type="button"
-                className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] text-white/35"
-                title="消耗（预留）"
-                disabled
-              >
-                <Zap className="size-3.5" />
-                <span>1</span>
-              </button>
+              {isStoryOutlineMode ? (
+                <>
+                  <button
+                    type="button"
+                    className="nodrag rounded-md p-1.5 text-white/35 hover:bg-white/6 hover:text-white/60"
+                    title="翻译（预留）"
+                    disabled
+                  >
+                    <Languages className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="nodrag flex items-center gap-0.5 rounded-md px-1.5 py-1 text-[11px] text-white/35"
+                    title="消耗（预留）"
+                    disabled
+                  >
+                    <Zap className="size-3.5" />
+                    <span>1</span>
+                  </button>
+                </>
+              ) : null}
               <button
                 type="button"
                 disabled={isGenerating || !themeInput.trim()}
                 className="nodrag flex size-9 items-center justify-center rounded-xl bg-white text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
-                title="生成故事大纲"
+                title={sendTitle}
                 onClick={() => void onSend()}
               >
                 {isGenerating ? (
@@ -280,7 +295,7 @@ export function Pro2StarterInputDock() {
             RF_NO_WHEEL,
             "min-h-0 px-4 py-3",
           )}
-          placeholder="写下你想讲的故事、场景或角色设定。输入 @ 可引用已链接的图片。"
+          placeholder={placeholder}
           value={themeInput}
           mentionables={mentionables}
           disabled={isGenerating}

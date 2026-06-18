@@ -129,7 +129,33 @@ export function formatCanvasApiError(raw: string): string {
   if (t.includes("book_mall_url_missing") || t.includes("503")) {
     return "未配置主站地址（NEXT_PUBLIC_BOOK_MALL_URL），无法加载画布列表。";
   }
+  if (t.includes("book_mall_proxy_failed") || t.includes("ECONNREFUSED")) {
+    return "无法连接主站 book-mall（:3000）。请确认已运行 pnpm dev:all，且 book-mall 进程正常。";
+  }
+  if (/<!DOCTYPE html>/i.test(t) || /<html[\s>]/i.test(t)) {
+    if (/\b404\b/.test(t)) {
+      return "保存接口未找到（404）。请确认 book-mall（:3000）与 canvas-web（:3004）均在运行；若刚执行过 build，请重启 dev:all 或删除 canvas-web/.next 后重试。";
+    }
+    if (/\b500\b/.test(t)) {
+      return "画布服务内部错误（500）。请重启 canvas-web 开发服务；若仍失败，删除 canvas-web/.next 后重试。";
+    }
+    return "服务器返回了异常页面而非 JSON，请重启 canvas-web / book-mall 开发服务后重试。";
+  }
   return t;
+}
+
+function sanitizeCanvasApiErrorBody(status: number, raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/<!DOCTYPE html>/i.test(trimmed) || /<html[\s>]/i.test(trimmed)) {
+    return formatCanvasApiError(`${status} ${trimmed}`);
+  }
+  try {
+    const j = JSON.parse(trimmed) as { error?: string; message?: string };
+    return j.message ?? j.error ?? trimmed;
+  } catch {
+    return trimmed.length > 400 ? `${trimmed.slice(0, 400)}…` : trimmed;
+  }
 }
 
 async function call<T>(
@@ -137,21 +163,20 @@ async function call<T>(
   apiPath: string,
   init?: RequestInit,
 ): Promise<T> {
+  if (!base.trim() && typeof window !== "undefined") {
+    throw new Error(
+      "未配置主站地址（NEXT_PUBLIC_BOOK_MALL_URL），无法调用画布 API。",
+    );
+  }
   const { url, init: i } = resolveBookMallBrowserRequest(base, apiPath, init);
   const r = await fetch(url, i);
   // 一次性读出 body：Response.body 是 ReadableStream，只能消费一次。
   // 读完之后再决定 JSON / 文本，避免出现 "body stream already read"。
   const raw = await r.text();
   if (!r.ok) {
-    let msg = "";
-    try {
-      const j = JSON.parse(raw) as { error?: string; message?: string };
-      msg = j.message ?? j.error ?? "";
-    } catch {
-      msg = raw;
-    }
+    const msg = sanitizeCanvasApiErrorBody(r.status, raw);
     markForbiddenCanvasProjectFromPath(r.status, apiPath);
-    throw new Error(`${r.status} ${msg || r.statusText}`);
+    throw new Error(msg ? `${r.status} ${msg}` : `${r.status} ${r.statusText}`);
   }
   if (!raw) return undefined as unknown as T;
   try {

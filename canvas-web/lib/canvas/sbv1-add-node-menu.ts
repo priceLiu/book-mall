@@ -31,13 +31,13 @@ export const SBV1_IMAGE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 图片节点右侧 + · 视频合成（自动连线 in_ref） */
+/** 图片节点右侧 + · 视频（自动连线 in_ref） */
 export const SBV1_IMAGE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "引用该节点生成",
     items: [
       {
-        id: "video-compose",
+        id: "video",
         label: SBV1_VIDEO_COMPOSE_LABEL,
         icon: Video,
         enabled: true,
@@ -47,7 +47,7 @@ export const SBV1_IMAGE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 视频合成左侧 + · 添加上游参考（自动连线 in_ref） */
+/** 视频节点左侧 + · 添加上游参考（自动连线 in_ref） */
 export const SBV1_VIDEO_ENGINE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "添加上下文",
@@ -65,13 +65,13 @@ export const SBV1_VIDEO_ENGINE_LEFT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 视频合成右侧 + · 串联下一节点 */
+/** 视频节点右侧 + · 串联下一节点 */
 export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "串联生成",
     items: [
       {
-        id: "video-compose",
+        id: "video",
         label: SBV1_VIDEO_COMPOSE_LABEL,
         icon: Video,
         enabled: true,
@@ -81,13 +81,13 @@ export const SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   },
 ];
 
-/** 分组右侧 + · 接入视频合成 */
+/** 分组右侧 + · 接入视频 */
 export const SBV1_GROUP_RIGHT_ADD_MENU: Pro2AddMenuSection[] = [
   {
     title: "引用组内图片",
     items: [
       {
-        id: "video-compose",
+        id: "video",
         label: SBV1_VIDEO_COMPOSE_LABEL,
         icon: Video,
         enabled: true,

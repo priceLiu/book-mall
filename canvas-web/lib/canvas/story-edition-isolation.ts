@@ -38,12 +38,23 @@ export function storyEditionForNodeType(type: string): StoryCanvasEdition {
 export function canvasStoryEdition(
   nodes: CanvasFlowNode[],
 ): StoryCanvasEdition {
-  if (hasSbv1Pipeline(nodes)) return "sbv1";
+  /** Pro2 与 sbv1 混用时以 Pro2 为主（与 resolveCanvasLayoutShell 一致） */
   if (hasStoryPro2Pipeline(nodes)) return "pro2";
+  if (hasSbv1Pipeline(nodes)) return "sbv1";
   if (hasStoryProPipeline(nodes)) return "pro";
   if (hasStoryComicPipeline(nodes)) return "comic";
   return "neutral";
 }
+
+/** Pro2 / sbv1 画布可混用的 LibTV 节点（快捷预设：反推、文生视频等） */
+const LIBTV_MIXED_CANVAS_NODE_TYPES = new Set([
+  "sbv1-image",
+  "sbv1-video-engine",
+  "story-pro2-starter",
+  "story-pro2-image",
+  "story-pro2-three-view",
+  "story-pro2-style-asset",
+]);
 
 export function canAddStoryNodeType(
   type: string,
@@ -54,6 +65,13 @@ export function canAddStoryNodeType(
 
   const canvasEdition = canvasStoryEdition(nodes);
   if (canvasEdition === "neutral") return { ok: true };
+
+  if (
+    (canvasEdition === "pro2" || canvasEdition === "sbv1") &&
+    LIBTV_MIXED_CANVAS_NODE_TYPES.has(type)
+  ) {
+    return { ok: true };
+  }
 
   if (nodeEdition !== canvasEdition) {
     const labels: Record<StoryCanvasEdition, string> = {

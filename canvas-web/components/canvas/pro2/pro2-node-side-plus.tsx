@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Handle, Position } from "@xyflow/react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { Handle, Position, useStore } from "@xyflow/react";
 import type { HandleType } from "@xyflow/react";
 import { Plus } from "lucide-react";
-import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-active";
 import { cn } from "@/lib/utils";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
 import type { Pro2AddMenuSection } from "@/lib/canvas/pro2-add-node-menu";
@@ -12,16 +17,64 @@ import { Pro2AddNodePopover } from "./pro2-add-node-popover";
 
 const DRAG_THRESHOLD_PX = 6;
 const MENU_OFFSET_X = 208;
-const MENU_OFFSET_Y = 8;
+const MENU_OFFSET_Y = 12;
+/** 侧 + 水平磁吸：节点外可激活距离（左 + 靠左 / 右 + 靠右） */
+const MAGNET_OUTWARD_PX = 40;
+/** 侧 + 水平磁吸：节点内可激活距离 */
+const MAGNET_INWARD_PX = 28;
+/** 沿边跟随 · 距节点顶/底最小留白 */
+const MAGNET_VERTICAL_INSET_PX = 24;
+/** 相对节点中心最大跟随偏移（flow 坐标） */
+const MAGNET_MAX_OFFSET_FLOW_PX = 120;
 
 function sideMenuAnchorFromRect(
   rect: DOMRect,
   side: "left" | "right",
 ): { x: number; y: number } {
+  const cy = rect.top + rect.height / 2;
   return {
     x: side === "left" ? rect.left - MENU_OFFSET_X : rect.right + MENU_OFFSET_Y,
-    y: rect.top - MENU_OFFSET_Y,
+    y: cy - MENU_OFFSET_Y,
   };
+}
+
+function pointerNearSideEdge(
+  clientX: number,
+  clientY: number,
+  rect: DOMRect,
+  side: "left" | "right",
+): boolean {
+  if (
+    clientY < rect.top + MAGNET_VERTICAL_INSET_PX ||
+    clientY > rect.bottom - MAGNET_VERTICAL_INSET_PX
+  ) {
+    return false;
+  }
+  if (side === "left") {
+    return (
+      clientX >= rect.left - MAGNET_OUTWARD_PX &&
+      clientX <= rect.left + MAGNET_INWARD_PX
+    );
+  }
+  return (
+    clientX >= rect.right - MAGNET_INWARD_PX &&
+    clientX <= rect.right + MAGNET_OUTWARD_PX
+  );
+}
+
+function computeMagnetOffsetFlow(
+  clientY: number,
+  rect: DOMRect,
+  zoom: number,
+): number {
+  const centerY = rect.top + rect.height / 2;
+  const screenDy = clientY - centerY;
+  const maxScreen = Math.min(
+    rect.height * 0.38,
+    MAGNET_MAX_OFFSET_FLOW_PX * Math.max(zoom, 0.05),
+  );
+  const clampedScreen = Math.max(-maxScreen, Math.min(maxScreen, screenDy));
+  return clampedScreen / Math.max(zoom, 0.05);
 }
 
 export type Pro2NodeSidePlusProps = {
@@ -33,6 +86,8 @@ export type Pro2NodeSidePlusProps = {
   onPick: (itemId: string, nodeType?: string) => void;
   className?: string;
   visible?: boolean;
+  /** 鼠标靠近时 + 沿边跟随（组 / 有连线时更易点） */
+  magneticFollow?: boolean;
 };
 
 /**
@@ -46,11 +101,17 @@ export function Pro2NodeSidePlus({
   onPick,
   className,
   visible = true,
+  magneticFollow = true,
 }: Pro2NodeSidePlusProps) {
   const [open, setOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const [magnetOffsetY, setMagnetOffsetY] = useState(0);
   const handleWrapRef = useRef<HTMLDivElement>(null);
-  const viewport = useViewportTransformActive(open);
+  const zoom = useStore((s) => s.transform[2]);
   const gestureRef = useRef<{
+    pointerId: number;
     x: number;
     y: number;
     moved: boolean;
@@ -58,38 +119,91 @@ export function Pro2NodeSidePlus({
 
   const position = side === "left" ? Position.Left : Position.Right;
 
-  const anchor = useMemo(() => {
-    if (!open) return { x: 0, y: 0 };
+  const hostNodeEl = useCallback((): HTMLElement | null => {
+    return (
+      handleWrapRef.current?.closest(".react-flow__node") ??
+      handleWrapRef.current?.closest(".canvas-group-node") ??
+      null
+    );
+  }, []);
+
+  const captureMenuAnchor = useCallback(() => {
     const handle = handleWrapRef.current?.querySelector(
       ".pro2-node-side-plus-handle",
     ) as HTMLElement | null;
     const rect = handle?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
+    if (!rect) return null;
     return sideMenuAnchorFromRect(rect, side);
-  }, [open, side, viewport.x, viewport.y, viewport.zoom]);
+  }, [side]);
 
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    gestureRef.current = { x: e.clientX, y: e.clientY, moved: false };
+  useEffect(() => {
+    if (!visible || !magneticFollow || open) {
+      setMagnetOffsetY(0);
+      return;
+    }
+    const onPointerMove = (e: PointerEvent) => {
+      const host = hostNodeEl();
+      if (!host) return;
+      const rect = host.getBoundingClientRect();
+      if (!pointerNearSideEdge(e.clientX, e.clientY, rect, side)) {
+        setMagnetOffsetY(0);
+        return;
+      }
+      setMagnetOffsetY(computeMagnetOffsetFlow(e.clientY, rect, zoom));
+    };
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onPointerMove);
+  }, [visible, magneticFollow, open, side, hostNodeEl, zoom]);
+
+  const openMenu = useCallback(
+    (e: { stopPropagation: () => void }) => {
+      e.stopPropagation();
+      const anchor = captureMenuAnchor();
+      if (anchor) setMenuAnchor(anchor);
+      setMagnetOffsetY(0);
+      setOpen(true);
+    },
+    [captureMenuAnchor],
+  );
+
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    setMenuAnchor(null);
   }, []);
 
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+    gestureRef.current = {
+      pointerId: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      moved: false,
+    };
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
     const g = gestureRef.current;
-    if (!g || g.moved) return;
+    if (!g || g.pointerId !== e.pointerId || g.moved) return;
     if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > DRAG_THRESHOLD_PX) {
       g.moved = true;
     }
   }, []);
 
-  const onMouseUp = useCallback(
-    (e: React.MouseEvent) => {
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent) => {
       const g = gestureRef.current;
+      if (!g || g.pointerId !== e.pointerId) return;
       gestureRef.current = null;
-      if (!g || g.moved) return;
-      e.stopPropagation();
-      setOpen(true);
+      if (g.moved) return;
+      openMenu(e);
     },
-    [side],
+    [openMenu],
   );
+
+  const wrapStyle: CSSProperties = {
+    top: "50%",
+    transform: `translateY(calc(-50% + ${magnetOffsetY}px))`,
+  };
 
   if (!visible) return null;
 
@@ -97,47 +211,55 @@ export function Pro2NodeSidePlus({
     <>
       <div
         ref={handleWrapRef}
+        style={wrapStyle}
         className={cn(
-          "pointer-events-none absolute top-1/2 z-30 -translate-y-1/2",
-          side === "left" ? "-left-5" : "-right-5",
+          "pro2-node-side-plus-layer pointer-events-none absolute top-1/2",
+          side === "left" ? "-left-6" : "-right-6",
           className,
+          "z-[20050]",
         )}
       >
-        <Handle
-          id={handleId}
-          type={handleType}
-          position={position}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          className={cn(
-            RF_NO_DRAG,
-            "pro2-node-side-plus-handle pointer-events-auto",
-            "!flex !h-12 !w-12 !items-center !justify-center !rounded-full !p-0",
-            "!border !border-white/20 !bg-[#2a2a2e] !opacity-100",
-            "!shadow-md transition hover:!border-violet-400/50 hover:!bg-violet-500/20",
-            side === "left" ? "!-left-0" : "!-right-0",
-            "!top-1/2 !-translate-y-1/2",
-          )}
-          title={
-            side === "left"
-              ? "添加上下文 · 单击菜单 / 拖拽连线"
-              : "引用生成 · 单击菜单 / 拖拽连线"
-          }
-        >
-          <Plus
-            className="pointer-events-none size-7 shrink-0 text-white/85"
-            strokeWidth={2.25}
-            aria-hidden
-          />
-        </Handle>
+        <div className="pointer-events-auto relative grid size-[52px] place-items-center">
+          <Handle
+            id={handleId}
+            type={handleType}
+            position={position}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            className={cn(
+              RF_NO_DRAG,
+              "pro2-node-side-plus-handle",
+              "!flex !h-11 !w-11 !items-center !justify-center !rounded-full !p-0",
+              "!border !border-white/25 !bg-[#2a2a2e] !opacity-100",
+              "!shadow-[0_4px_16px_rgba(0,0,0,0.45)]",
+              "hover:!border-violet-400/60 hover:!bg-violet-500/25",
+              side === "left" ? "!-left-0" : "!-right-0",
+              "!top-1/2 !-translate-y-1/2",
+            )}
+            title={
+              side === "left"
+                ? "添加上下文 · 单击菜单 / 拖拽连线"
+                : "引用生成 · 单击菜单 / 拖拽连线"
+            }
+          >
+            <Plus
+              className="pointer-events-none size-6 shrink-0 text-white/90"
+              strokeWidth={2.25}
+              aria-hidden
+            />
+          </Handle>
+        </div>
       </div>
       <Pro2AddNodePopover
         open={open}
-        anchor={anchor}
+        anchor={menuAnchor ?? { x: 0, y: 0 }}
         sections={sections}
-        onClose={() => setOpen(false)}
-        onPick={onPick}
+        onClose={closeMenu}
+        onPick={(itemId, nodeType) => {
+          closeMenu();
+          onPick(itemId, nodeType);
+        }}
       />
     </>
   );

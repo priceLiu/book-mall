@@ -9,6 +9,7 @@ import {
   parseOutlineBriefCharacters,
   parseStoryboardRows,
   parseSceneVisualDictionaryRows,
+  resolveSceneDictionaryMarkdown,
   extractCharacterSectionFromOutline,
   type SceneVisualDictionaryRow,
 } from "./parse-md-tables";
@@ -252,14 +253,22 @@ export function buildSceneRowsFromHub(
   scriptHubId: string,
 ): StoryProSceneRow[] {
   const synced = hubDataForColumnSync(d);
-  const dictRows = parseSceneVisualDictionaryRows(synced.outlineMd ?? "");
+  const dictRows = parseSceneVisualDictionaryRows(
+    resolveSceneDictionaryMarkdown(synced.outlineMd ?? "", synced.sceneMd ?? ""),
+  );
   const hub = scriptHubId.trim();
-  return dictRows.map((r) => ({
-    key: hub ? storyProSceneRowKey(hub, r.name) : r.name,
-    name: r.name,
-    description: [r.environment, r.time, r.mood].filter(Boolean).join(" · "),
-    prompt: buildDefaultSceneRowPrompt(r),
-  }));
+  const byKey = new Map<string, StoryProSceneRow>();
+  for (const r of dictRows) {
+    const key = hub ? storyProSceneRowKey(hub, r.name) : r.name;
+    if (byKey.has(key)) continue;
+    byKey.set(key, {
+      key,
+      name: r.name,
+      description: [r.environment, r.time, r.mood].filter(Boolean).join(" · "),
+      prompt: buildDefaultSceneRowPrompt(r),
+    });
+  }
+  return Array.from(byKey.values());
 }
 
 /**

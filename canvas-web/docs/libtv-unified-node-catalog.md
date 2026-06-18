@@ -134,7 +134,7 @@
 
 | 节点 | type | 版 | 侧 `+` | 浮动 Dock | 顶栏 |
 | --- | --- | --- | --- | --- | --- |
-| 文本 | `story-pro2-starter` | Pro2 | 左/右 | `Pro2StarterInputDock` | 无 |
+| 文本 | `story-pro2-starter` | Pro2 | 左/右 | `Pro2StarterInputDock`（Text/Image/Video model） | 无 |
 | 分镜脚本 | `story-pro2-script-hub` | Pro2 | 左/右 | `Pro2ScriptInputDock` | 卡片内 `Pro2ScriptHubToolbar` |
 | 风格 | `story-pro2-style-asset` | Pro2 | 右 | 无 | 无 |
 
@@ -164,7 +164,13 @@
 ### 3.1 `story-pro2-starter` / 文本
 
 - **样式**：LibTV 控制卡 `#141418` · 紫 ring · `PRO2_CARD_SHELL_CLASS`  
-- **功能**：大纲/主题/上传剧本 · LLM `EnginePicker` · 连 hub/图片  
+- **功能**：大纲/主题/上传剧本 · 连 hub/图片/视频  
+- **模型（Dock）**：`Pro2TextNodeEnginePickers` · 按 Gateway role 分组  
+  - **Text model · 文本模型**（`LLM`）— 故事大纲 / 提示词优化 / 反推  
+  - **Image model · 图片模型**（`IMAGE`）— 文生图 · 白名单 `SBV1_IMAGE_MODEL_KEYS`  
+  - **Video model · 视频模型**（`VIDEO`）— 文生视频 · sbv1 火山 `SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS`  
+  - 展示哪些 role 由 `resolvePro2TextNodeEngineRoles` 按 `pro2TextPurpose` / 预设 / 连线决定；文案见 `gateway-model-role.ts`  
+  - IMAGE/VIDEO 选择会同步下游媒体节点 `engine`  
 - **spawn**：`pro2-spawn-nodes` · `selectPro2NodeAfterSpawn`
 
 ### 3.2 `story-pro2-script-hub` / 分镜脚本
