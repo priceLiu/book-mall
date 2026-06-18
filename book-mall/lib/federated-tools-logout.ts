@@ -6,7 +6,6 @@ import {
   getStoryWebOrigin,
 } from "@/lib/app-web-origins";
 import { getBookMallOrigin } from "@/lib/gateway/env";
-import { listPlatformWebOrigins } from "@/lib/platform-web-origins";
 import { getToolsPublicOrigin } from "@/lib/sso-tools-env";
 
 function trimOrigin(raw: string | null | undefined): string | null {
@@ -57,9 +56,22 @@ export function resolveBookMallCallbackUrl(
   return path;
 }
 
+/** book-mall 逐步 federated logout（`/api/auth/federated-logout?step=&final=`）。 */
+export function buildFederatedLogoutStepUrl(
+  step: number,
+  finalCallbackUrl: string,
+  bookOrigin: string,
+): string {
+  const base = bookOrigin.replace(/\/$/, "");
+  const url = new URL("/api/auth/federated-logout", base);
+  url.searchParams.set("step", String(step));
+  url.searchParams.set("final", finalCallbackUrl);
+  return url.toString();
+}
+
 /**
- * 从第一个子站 `/api/tools-logout?next=…` 起，串联清除各站 `tools_token`，
- * 最后一跳回到 `finalCallbackUrl`（通常为 Book 首页或登录页）。
+ * 从第一个子站 `/api/tools-logout?next=…` 起，串联清除各站 `tools_token`。
+ * 采用 book-mall 分步跳转，避免把所有 next 嵌套进一条 Location（CloudBase 网关会 502）。
  */
 export function buildFederatedToolsLogoutStartUrl(finalCallbackUrl: string): string {
   if (!shouldUseFederatedToolsLogoutChain()) return finalCallbackUrl;
@@ -67,13 +79,11 @@ export function buildFederatedToolsLogoutStartUrl(finalCallbackUrl: string): str
   const origins = listFederatedToolsLogoutOrigins();
   if (origins.length === 0) return finalCallbackUrl;
 
-  let next = finalCallbackUrl;
-  for (let i = origins.length - 1; i >= 0; i--) {
-    const logout = new URL("/api/tools-logout", origins[i]!);
-    logout.searchParams.set("next", next);
-    next = logout.toString();
-  }
-  return next;
-}
+  const book = trimOrigin(getBookMallOrigin());
+  if (!book) return finalCallbackUrl;
 
-export { listPlatformWebOrigins };
+  const step1 = buildFederatedLogoutStepUrl(1, finalCallbackUrl, book);
+  const first = new URL("/api/tools-logout", origins[0]!);
+  first.searchParams.set("next", step1);
+  return first.toString();
+}
