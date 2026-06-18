@@ -32,7 +32,9 @@ gateway-web 深色控制台 UI 约定。实现时以 **CSS 变量 + `globals.css
 | Status | 圆点 + 小写英文；running/pending 带深灰 pill |
 | Usage | **挂牌参考费用（元）**，供后续费用统计（B 表估算，非钱包扣点）。无估算时 `—`；进行中 `—` |
 | Token | **Token 计量**：厂商回传优先（悬停标注 VENDOR）；异步任务无 usage 时按 prompt 文本 **平台估算**（CJK 1 字≈1 tok）。悬停可看输入/输出拆分 |
-| Task ID | 完整 monospace |
+| Log ID | Gateway 请求日志 `id`（平台 cuid），完整 monospace |
+| Request ID | 厂商 HTTP 追踪 Request ID（`vendorRequestId`；历史失败行可从 `failMessage` 解析） |
+| Vendor Task ID | 厂商异步任务 ID（`externalTaskId`）；提交失败或未创建时为 `—` |
 | Results | Result 按钮 + 复制 + 悬停预览（§3） |
 | Retry Callback | 暂无则 `—` |
 

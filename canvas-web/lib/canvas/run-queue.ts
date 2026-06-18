@@ -11,6 +11,10 @@ import {
 } from "@/lib/canvas-api";
 import { useCanvasStore } from "./store";
 import { buildCanvasRunSnapshot } from "./canvas-run-snapshot";
+import { resolveSbv1VideoEngineInputs } from "./resolve-sbv1-video-engine-inputs";
+import {
+  resolvePortraitAssetRefsFromUpstream,
+} from "./resolve-portrait-asset-refs";
 import { directPredecessors } from "./topo";
 import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
 import { dockMentionRefUrlsForPrompt } from "./dock-mention-ref-urls";
@@ -715,9 +719,40 @@ export function useCanvasRunner(
           return;
         }
 
-        const imageInputs = resolveImageInputs(state.nodes, state.edges, nodeId, {
+        let imageInputs = resolveImageInputs(state.nodes, state.edges, nodeId, {
           rowKey: job.rowKey,
         });
+        let portraitAssetRefs: ReturnType<
+          typeof resolvePortraitAssetRefsFromUpstream
+        > = [];
+        if (node.type === "sbv1-video-engine") {
+          const vd = node.data as { prompt?: string; referenceMode?: string };
+          const resolved = resolveSbv1VideoEngineInputs(
+            state.nodes,
+            state.edges,
+            nodeId,
+            {
+              prompt: String(vd.prompt ?? ""),
+              referenceMode:
+                vd.referenceMode === "first_last" ||
+                vd.referenceMode === "smart_multi"
+                  ? vd.referenceMode
+                  : "omni",
+            },
+          );
+          if (!resolved.ok) {
+            abortSequential(job, resolved.error);
+            return;
+          }
+          imageInputs = resolved.imageInputs;
+          portraitAssetRefs = resolved.portraitAssetRefs;
+        } else {
+          portraitAssetRefs = resolvePortraitAssetRefsFromUpstream(
+            state.nodes,
+            state.edges,
+            nodeId,
+          );
+        }
         const textInputs = resolveStoryHubSectionTextInputs(
           node,
           job.llmSection,
@@ -786,6 +821,7 @@ export function useCanvasRunner(
             data: runData,
             imageInputs,
             textInputs,
+            portraitAssetRefs,
           },
           forceFresh,
           llmSection: job.llmSection,

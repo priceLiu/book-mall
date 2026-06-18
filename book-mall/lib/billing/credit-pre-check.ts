@@ -50,6 +50,9 @@ export async function assertCreditsBeforeGenerate(input: {
 }): Promise<void> {
   if (!isUnifiedCreditBillingActive()) return;
 
+  // 私域人像库入库走火山 AK/SK · 不计平台积分
+  if (input.model.trim().startsWith("portrait:")) return;
+
   const ref = await resolveBillingRef(input);
   if (!ref) return;
 

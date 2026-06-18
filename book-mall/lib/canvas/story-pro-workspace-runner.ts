@@ -11,6 +11,7 @@ import {
   type RunEngineNodeResult,
 } from "./canvas-engine-runner";
 import { prependStoryProStyleAnchor } from "./story-pro-style-anchor";
+import { normalizePortraitAssetRefs } from "./canvas-portrait-import-service";
 import { assertStoryVideoFrameGate } from "./story-frame-gate";
 import { resolveStoryRowRefUrls, parseMentionIds } from "./story-row-ref-urls";
 import { resolveStoryProVideoRefUrls } from "./story-pro-video-ref-resolve";
@@ -290,9 +291,13 @@ export async function runStoryProVideoRow(
     String(row.videoPrompt ?? row.dialogue ?? ""),
     args.styleAnchor,
   );
+  const portraitAssetRefs = normalizePortraitAssetRefs(
+    args.node.portraitAssetRefs ?? args.node.data?.portraitAssetRefs,
+  );
   const node: CanvasRunNodeInput = {
     ...args.node,
     type: "video-engine",
+    portraitAssetRefs,
     data: {
       prompt: videoPrompt,
       providerId: (args.node.data?.batchVideo as { providerId?: string })?.providerId,
@@ -302,6 +307,8 @@ export async function runStoryProVideoRow(
       frameImageUrl,
       mainFrameImageUrl: frameImageUrl,
       referenceImageUrls,
+      forceReferenceMode: portraitAssetRefs.length > 0,
+      portraitAssetRefs,
     },
     imageInputs: [frameImageUrl, ...referenceImageUrls],
   };

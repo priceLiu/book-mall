@@ -1,64 +1,10 @@
 /**
- * 火山方舟 · 真人人像库 · H5 活体认证（LivenessFace）
+ * 火山方舟 · 真人人像库 · H5 活体认证（LivenessFace · AK/SK）
  * 文档：https://www.volcengine.com/docs/82379/2333589
- * Action API：CreateVisualValidateSession / GetVisualValidateResult
  */
 
-import { resolveVolcengineArkApiRoot } from "@/lib/gateway/model-router";
-
-const PORTRAIT_ACTION_VERSION = "2024-01-01";
-
-function portraitActionCandidates(
-  baseUrl: string | null | undefined,
-  action: "CreateVisualValidateSession" | "GetVisualValidateResult",
-): string[] {
-  const custom = process.env.VOLCENGINE_PORTRAIT_ACTION_BASE?.trim();
-  if (custom) {
-    const sep = custom.includes("?") ? "&" : "?";
-    return [`${custom}${sep}Action=${action}&Version=${PORTRAIT_ACTION_VERSION}`];
-  }
-  const root = resolveVolcengineArkApiRoot(baseUrl);
-  const qs = `Action=${action}&Version=${PORTRAIT_ACTION_VERSION}`;
-  return [
-    `${root}/portrait?${qs}`,
-    `${root}/portrait/?${qs}`,
-  ];
-}
-
-async function postPortraitAction(
-  apiKey: string,
-  baseUrl: string | null | undefined,
-  action: "CreateVisualValidateSession" | "GetVisualValidateResult",
-  body: Record<string, unknown>,
-): Promise<{ status: number; text: string; json: unknown; url: string }> {
-  const urls = portraitActionCandidates(baseUrl, action);
-  let last: { status: number; text: string; json: unknown; url: string } = {
-    status: 0,
-    text: "",
-    json: null,
-    url: urls[0] ?? "",
-  };
-  for (const url of urls) {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const text = await r.text();
-    let json: unknown = text;
-    try {
-      json = text ? JSON.parse(text) : null;
-    } catch {
-      json = text;
-    }
-    last = { status: r.status, text, json, url };
-    if (r.status !== 404) return last;
-  }
-  return last;
-}
+import type { VolcenginePortraitCredentials } from "./volcengine-portrait-credentials";
+import { postVolcenginePortraitOpenAction } from "./volcengine-portrait-open-api";
 
 export type VolcenginePortraitLivenessSession = {
   bytedToken: string;
@@ -109,7 +55,6 @@ const PORTRAIT_GUIDE_URL =
 const PORTRAIT_CONSOLE_HINT =
   "火山方舟控制台 → 体验中心 → 我的 → 真人人像（须完成实名/企业认证）";
 
-/** 将 HTTP/上游错误转为面向用户的说明（避免裸 404 + URL） */
 export function formatVolcenginePortraitLivenessError(opts: {
   action: "CreateVisualValidateSession" | "GetVisualValidateResult";
   status: number;
@@ -132,18 +77,16 @@ export function formatVolcenginePortraitLivenessError(opts: {
   const trimmed = opts.text.trim();
   if (opts.status === 401 || opts.status === 403) {
     return (
-      "火山方舟 API Key 无效或无权限。请在 Book 个人中心检查 Gateway 绑定的 VOLCENGINE 凭证，" +
-      "并在火山控制台重新创建 API Key。"
+      "火山 IAM Access Key 无效或无 portrait 权限。" +
+      "请检查 VOLCENGINE_ACCESS_KEY / VOLCENGINE_SECRET_ACCESS_KEY。"
     );
   }
 
   if (opts.status === 404 && !trimmed) {
     return (
-      "当前火山方舟账号或 API Key 未开通「真人人像库」Portrait 接口（上游返回 404）。" +
+      "当前火山账号未开通「真人人像库」接口。" +
       `请先在 ${PORTRAIT_CONSOLE_HINT} 开通并完成认证，再重试。` +
-      ` 指南：${PORTRAIT_GUIDE_URL}` +
-      "。若已开通仍失败，请确认 Gateway 凭证 baseUrl 为 https://ark.cn-beijing.volces.com/api/v3" +
-      "（勿带 /chat/completions），或设置环境变量 VOLCENGINE_PORTRAIT_ACTION_BASE。"
+      ` 指南：${PORTRAIT_GUIDE_URL}`
     );
   }
 
@@ -155,19 +98,17 @@ export function formatVolcenginePortraitLivenessError(opts: {
 }
 
 export async function createVolcengineVisualValidateSession(opts: {
-  apiKey: string;
-  baseUrl?: string | null;
+  credentials: VolcenginePortraitCredentials;
   callbackUrl: string;
 }): Promise<VolcenginePortraitLivenessSession> {
-  const { status, text, json, url } = await postPortraitAction(
-    opts.apiKey,
-    opts.baseUrl,
-    "CreateVisualValidateSession",
-    {
+  const { status, text, json, url } = await postVolcenginePortraitOpenAction({
+    credentials: opts.credentials,
+    action: "CreateVisualValidateSession",
+    body: {
       CallbackURL: opts.callbackUrl,
       ProjectName: "default",
     },
-  );
+  });
   if (status !== 200 && status !== 201) {
     throw new Error(
       formatVolcenginePortraitLivenessError({
@@ -196,19 +137,17 @@ export async function createVolcengineVisualValidateSession(opts: {
 }
 
 export async function getVolcengineVisualValidateResult(opts: {
-  apiKey: string;
-  baseUrl?: string | null;
+  credentials: VolcenginePortraitCredentials;
   bytedToken: string;
 }): Promise<VolcenginePortraitLivenessResult> {
-  const { status, text, json } = await postPortraitAction(
-    opts.apiKey,
-    opts.baseUrl,
-    "GetVisualValidateResult",
-    {
+  const { status, text, json, url } = await postVolcenginePortraitOpenAction({
+    credentials: opts.credentials,
+    action: "GetVisualValidateResult",
+    body: {
       BytedToken: opts.bytedToken.trim(),
       ProjectName: "default",
     },
-  );
+  });
 
   const errCode = pickErrorCode(json);
   if (errCode === "ValidatePending") {
@@ -223,7 +162,7 @@ export async function getVolcengineVisualValidateResult(opts: {
         status: status || 404,
         text,
         json,
-        url: "",
+        url,
       }),
       raw: json,
     };
@@ -237,7 +176,7 @@ export async function getVolcengineVisualValidateResult(opts: {
         status,
         text,
         json,
-        url: "",
+        url,
       }),
       raw: json,
     };
@@ -245,7 +184,7 @@ export async function getVolcengineVisualValidateResult(opts: {
 
   const result = pickResultObject(json);
   const groupId = String(
-    result?.GroupId ?? result?.groupId ?? result?.AssetGroupId ?? "",
+    result?.GroupId ?? result?.groupId ?? result?.AssetGroupId ?? result?.Id ?? "",
   ).trim();
   if (groupId) {
     return { status: "succeeded", groupId, raw: json };

@@ -1762,6 +1762,7 @@ enum ProjectAssetKind {
   STORYBOARD_IMAGE
   STORYBOARD_VIDEO
   DIGITAL_HUMAN
+  PRIVATE_PORTRAIT
   STYLE
   PROMPT
   GROUP_BUNDLE
@@ -2250,6 +2251,8 @@ model GatewayRequestLog {
   requestKind    GatewayRequestKind   @default(OTHER)
   status         GatewayRequestStatus @default(PENDING)
   externalTaskId String?
+  /** 厂商 HTTP Request ID（火山 Request ID 等；非 externalTaskId） */
+  vendorRequestId String?
   clientSource   GatewayClientSource  @default(EXTERNAL)
   clientPage     String?
   storyProjectId String?
@@ -2309,6 +2312,7 @@ model GatewayRequestLog {
   @@index([userId, submittedAt])
   @@index([apiKeyId, submittedAt])
   @@index([externalTaskId])
+  @@index([vendorRequestId])
   @@index([status])
   @@index([clientSource, submittedAt])
   @@index([tenantId, submittedAt])

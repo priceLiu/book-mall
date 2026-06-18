@@ -97,6 +97,22 @@ function bumpGraphRevision(state: { graphRevision: number }): number {
   return state.graphRevision + 1;
 }
 
+/** Dock / prompt 输入中的草稿字段：debounce 写 store 时不 bump revision、不进 undo */
+const CANVAS_DRAFT_DATA_FIELDS = new Set([
+  "prompt",
+  "dockInput",
+  "themeInput",
+]);
+
+function isCanvasDraftDataPatch(
+  patch: Record<string, unknown>,
+  commit?: boolean,
+): boolean {
+  if (commit === true) return false;
+  const keys = Object.keys(patch);
+  return keys.length > 0 && keys.every((k) => CANVAS_DRAFT_DATA_FIELDS.has(k));
+}
+
 function withGraphRevision<T extends Record<string, unknown>>(
   state: { graphRevision: number },
   patch: T,
@@ -220,7 +236,11 @@ type CanvasState = {
     relativePosition: { x: number; y: number },
     data?: Record<string, unknown>,
   ) => string;
-  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+  updateNodeData: (
+    id: string,
+    patch: Record<string, unknown>,
+    options?: { commit?: boolean },
+  ) => void;
   setNodeRuntime: (id: string, runtime: Partial<CanvasNodeRuntime>) => void;
   /** 程序化调整节点尺寸（选中时仍可用 NodeResizer 手动覆盖） */
   resizeNode: (id: string, size: { width: number; height: number }) => void;
@@ -744,7 +764,7 @@ export const useCanvasStore = create<CanvasState>()(
         return id;
       },
 
-      updateNodeData: (id, patch) => {
+      updateNodeData: (id, patch, options) => {
         let nodes = get().nodes.map((n) =>
           n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
         );
@@ -757,6 +777,16 @@ export const useCanvasStore = create<CanvasState>()(
               edges,
             );
           }
+        }
+        if (isCanvasDraftDataPatch(patch, options?.commit)) {
+          const temporal = useCanvasStore.temporal.getState();
+          temporal.pause();
+          try {
+            set({ nodes });
+          } finally {
+            temporal.resume();
+          }
+          return;
         }
         set((state) => withGraphRevision(state, { nodes }));
       },

@@ -34,10 +34,26 @@
 
 ### 2.2 Gateway 人像库代理（已实现）
 
-| 库 | Gateway 路径 |
-|----|----------------|
-| 私域虚拟人像（9 接口） | `/api/gw/v1/volcengine/portrait/virtual/*` |
-| 真人人像库（2 接口） | `/api/gw/v1/volcengine/portrait/real/*` |
+| 库 | Gateway 路径 | Canvas BFF |
+|----|----------------|------------|
+| 私域虚拟人像（9 接口） | `/api/gw/v1/volcengine/portrait/virtual/*` | `POST /api/canvas/portrait/virtual/import` |
+| 真人人像库（2 接口） | `/api/gw/v1/volcengine/portrait/real/*` | `POST /api/canvas/portrait/real/import` |
+
+LibTV 图片节点（`sbv1-image` / `story-pro2-image`）浮动工具条 **「私域人像入库」** → 写入 `asset://` 至节点 data → 连线 `sbv1-video-engine` 或 Pro2 分镜视频列 run 时注入 Seedance `content[]`。
+
+状态查询：`GET /api/canvas/portrait/import/status?assetId=&kind=`
+
+### 2.3 私域虚拟人像（AI/虚构角色）
+
+- 无需 H5 活体；经 BFF 创建/复用 AIGC AssetGroup 后 `CreateAsset(HTTPS URL)`。
+- 教程：[私域虚拟人像素材库使用指南](https://www.volcengine.com/docs/82379/2333565)
+- API：[私域虚拟人像 API](https://www.volcengine.com/docs/82379/2333601)
+
+### 2.4 真人人像（已有活体 + 入库）
+
+1. **认证**：sbv1 画布工具条 → H5 活体（`User.sbv1PortraitGroupId`）
+2. **入库**：LibTV 图片节点 →「私域人像入库」→ 选择真人人像
+3. **引用**：生视频时 `asset://` 注入（同虚拟人像）
 
 凭证：与用户 `sk-gw` 绑定的 **VOLCENGINE** 厂商 Key（与视频任务共用）。
 

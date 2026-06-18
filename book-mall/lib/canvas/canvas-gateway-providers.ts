@@ -119,7 +119,7 @@ function extraSbv1VolcengineEpModels(): typeof VOLCENGINE_VIDEO_KNOWN_MODELS {
       defaultParams: {
         resolution: "720p",
         duration: 5,
-        generate_audio: false,
+        generate_audio: true,
         watermark: false,
       },
     }));

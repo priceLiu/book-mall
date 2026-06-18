@@ -47,7 +47,10 @@ export function buildCanvasVideoVolcengineInput(args: {
   referenceVideoUrls?: string[];
   referenceAudioUrls?: string[];
   /** 人像库 asset://asset-xxx */
-  assetRefs?: Array<{ url: string; role?: "reference_image" | "first_frame" }>;
+  assetRefs?: Array<{
+    url: string;
+    role?: "reference_image" | "first_frame" | "last_frame";
+  }>;
   options?: {
     resolution?: string;
     duration?: number;
@@ -91,7 +94,7 @@ export function buildCanvasVideoVolcengineInput(args: {
       if (!url || !isAssetRef(url)) return null;
       return { url, role: ref.role ?? "reference_image" };
     })
-    .filter((r): r is { url: string; role: "reference_image" | "first_frame" } => r != null);
+    .filter((r): r is { url: string; role: "reference_image" | "first_frame" | "last_frame" } => r != null);
 
   const frameAssets = assetRefs.filter((r) => isFrameContentRole(r.role));
   const referenceAssets = assetRefs.filter((r) => !isFrameContentRole(r.role));
@@ -148,23 +151,24 @@ export function buildCanvasVideoVolcengineInput(args: {
       });
     }
   } else {
-    if (mainUrl) {
+    const firstFrameAsset = frameAssets.find((r) => r.role === "first_frame");
+    const lastFrameAsset = frameAssets.find((r) => r.role === "last_frame");
+    const firstUrl = mainUrl || firstFrameAsset?.url;
+    if (firstUrl) {
       content.push({
         type: "image_url",
-        image_url: { url: mainUrl },
+        image_url: { url: firstUrl },
         role: "first_frame",
       });
     }
 
-    for (const ref of frameAssets.slice(0, 1)) {
+    if (lastFrameAsset?.url && lastFrameAsset.url !== firstUrl) {
       content.push({
         type: "image_url",
-        image_url: { url: ref.url },
-        role: ref.role,
+        image_url: { url: lastFrameAsset.url },
+        role: "last_frame",
       });
-    }
-
-    if (lastFrameHttp && lastFrameHttp !== mainUrl) {
+    } else if (lastFrameHttp && lastFrameHttp !== firstUrl) {
       content.push({
         type: "image_url",
         image_url: { url: lastFrameHttp },

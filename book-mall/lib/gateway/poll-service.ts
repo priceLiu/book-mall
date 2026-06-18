@@ -88,6 +88,7 @@ export async function expireStaleGatewayLogs(): Promise<number> {
       requestKind: "VIDEO",
       externalTaskId: null,
       submittedAt: { lt: volcengineNoTaskCutoff },
+      OR: [{ failMessage: null }, { failMessage: "" }],
     },
     data: {
       status: "FAILED",

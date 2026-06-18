@@ -37,7 +37,12 @@ export async function runSbv1VideoEngineNode(
   ).toLowerCase();
 
   const promptRaw = String(data.prompt ?? "").trim();
-  const imageInputs = httpsImageUrls(args.node.imageInputs ?? []);
+  const portraitRefs = args.node.portraitAssetRefs ?? [];
+  const hasPortraitRefs = portraitRefs.length > 0;
+  /** sbv1 角色参考只走 asset://；服务端丢弃客户端误传的 OSS 参考图 */
+  const imageInputs = hasPortraitRefs
+    ? []
+    : httpsImageUrls(args.node.imageInputs ?? []);
 
   if (!providerId || !modelKey) {
     throw new CanvasProjectError(
@@ -46,7 +51,7 @@ export async function runSbv1VideoEngineNode(
     );
   }
 
-  if (!promptRaw && imageInputs.length === 0) {
+  if (!promptRaw && imageInputs.length === 0 && !hasPortraitRefs) {
     throw new CanvasProjectError(
       "INVALID_INPUT",
       "请填写 prompt 或连接至少一张参考图",
@@ -60,37 +65,52 @@ export async function runSbv1VideoEngineNode(
   let forceReferenceMode = false;
 
   if (referenceMode === "first_last") {
-    mainFrameImageUrl = imageInputs[0] ?? "";
-    lastFrameImageUrl = imageInputs[1] ?? "";
-    if (!mainFrameImageUrl) {
-      throw new CanvasProjectError(
-        "INVALID_INPUT",
-        "首尾帧模式需要至少一张首帧参考图",
-      );
+    const firstAsset = portraitRefs.find((r) => r.role === "first_frame");
+    if (firstAsset) {
+      mainFrameImageUrl = "";
+      lastFrameImageUrl = "";
+      forceReferenceMode = false;
+    } else {
+      mainFrameImageUrl = imageInputs[0] ?? "";
+      lastFrameImageUrl = imageInputs[1] ?? "";
+      if (!mainFrameImageUrl) {
+        throw new CanvasProjectError(
+          "INVALID_INPUT",
+          "首尾帧模式需要至少一张首帧参考图（请先私域人像入库）",
+        );
+      }
     }
   } else if (referenceMode === "smart_multi") {
-    if (imageInputs.length === 0) {
+    if (imageInputs.length === 0 && !hasPortraitRefs) {
       throw new CanvasProjectError(
         "INVALID_INPUT",
         "智能多帧模式需要至少一张参考图",
       );
     }
-    mainFrameImageUrl = imageInputs[0]!;
-    referenceImageUrls = imageInputs.slice(1);
-    forceReferenceMode = imageInputs.length > 1;
+    if (imageInputs.length > 0) {
+      mainFrameImageUrl = imageInputs[0]!;
+      referenceImageUrls = imageInputs.slice(1);
+      forceReferenceMode = imageInputs.length > 1;
+    } else {
+      forceReferenceMode = true;
+    }
     params.resolution = resolution;
     params.duration = durationSec > 0 ? durationSec : 4;
   } else {
     // omni
-    if (imageInputs.length === 0) {
+    if (imageInputs.length === 0 && !hasPortraitRefs) {
       throw new CanvasProjectError(
         "INVALID_INPUT",
         "全能参考模式需要至少一张参考图",
       );
     }
-    mainFrameImageUrl = imageInputs[0]!;
-    referenceImageUrls = imageInputs.slice(1);
-    forceReferenceMode = referenceImageUrls.length > 0;
+    if (imageInputs.length > 0) {
+      mainFrameImageUrl = imageInputs[0]!;
+      referenceImageUrls = imageInputs.slice(1);
+      forceReferenceMode = referenceImageUrls.length > 0;
+    } else {
+      forceReferenceMode = true;
+    }
   }
 
   params.aspect_ratio = aspectRatio;
@@ -98,7 +118,7 @@ export async function runSbv1VideoEngineNode(
     params.duration = durationSec;
   }
   params.generate_audio =
-    params.generate_audio === true || params.generateAudio === true;
+    params.generate_audio !== false && params.generateAudio !== false;
 
   const variantId = String(
     data.volcengineVariantId ?? data.jimengModelId ?? "",
@@ -150,6 +170,7 @@ export async function runSbv1VideoEngineNode(
       ...args.node,
       type: "video-engine",
       modelKey,
+      portraitAssetRefs: args.node.portraitAssetRefs,
       data: {
         providerId,
         modelKey,
@@ -158,7 +179,11 @@ export async function runSbv1VideoEngineNode(
         mainFrameImageUrl,
         referenceImageUrls,
         lastFrameImageUrl,
-        forceReferenceMode,
+        forceReferenceMode:
+          referenceMode === "first_last" &&
+          portraitRefs.some((r) => r.role === "first_frame")
+            ? false
+            : forceReferenceMode || portraitRefs.length > 0,
         sbv1Billing,
       },
       imageInputs,

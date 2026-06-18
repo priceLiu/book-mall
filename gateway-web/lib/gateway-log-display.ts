@@ -136,6 +136,16 @@ export function formatLogCredentialKeyMasked(raw: string | null | undefined): st
   return `${value.slice(0, 4)}*****${value.slice(-4)}`;
 }
 
+/** 日志表 · Log / Request / Vendor Task ID 列 */
+export function formatLogMonospaceId(value: string | null | undefined): {
+  value: string;
+  title?: string;
+} {
+  const trimmed = value?.trim();
+  if (!trimmed) return { value: "—" };
+  return { value: trimmed, title: trimmed };
+}
+
 /** 从当前日志批次提取渠道 Key（可按厂商收窄） */
 export function collectLogCredentialKeys(
   logs: { credentialKeyMasked: string | null; providerKind: string | null }[],

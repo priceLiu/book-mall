@@ -28,8 +28,29 @@ import {
   submitKieJobForLog,
 } from "@/lib/gateway/poll-service";
 import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
+import { VolcengineUpstreamError } from "@/lib/gateway/volcengine-client";
+import {
+  extractVendorRequestIdFromText,
+} from "@/lib/gateway/vendor-request-id";
 
 export const dynamic = "force-dynamic";
+
+function vendorRequestIdFromSubmitError(e: unknown): string | undefined {
+  if (e instanceof VolcengineUpstreamError && e.requestId?.trim()) {
+    return e.requestId.trim();
+  }
+  if (e instanceof Error) {
+    return extractVendorRequestIdFromText(e.message) ?? undefined;
+  }
+  return undefined;
+}
+
+function vendorTaskIdFromSubmitError(e: unknown): string | undefined {
+  if (e instanceof VolcengineUpstreamError && e.vendorTaskId?.trim()) {
+    return e.vendorTaskId.trim();
+  }
+  return undefined;
+}
 
 const BAILIAN_R2V = new Set([
   "happyhorse-1.0-r2v",
@@ -349,6 +370,8 @@ export async function POST(request: NextRequest) {
       durationMs: 0,
       failMessage: msg.slice(0, 500),
       failCode: "UPSTREAM_SUBMIT_FAILED",
+      vendorRequestId: vendorRequestIdFromSubmitError(e),
+      externalTaskId: vendorTaskIdFromSubmitError(e),
     }).catch(() => undefined);
     return NextResponse.json({ error: msg }, { status: 502 });
   }

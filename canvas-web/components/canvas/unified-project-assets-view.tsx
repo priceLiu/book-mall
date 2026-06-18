@@ -12,6 +12,7 @@ import {
   Mic,
   Package,
   Palette,
+  ScanFace,
   Sparkles,
   Table,
   UserCircle,
@@ -61,6 +62,7 @@ const TAB_ICONS: Partial<Record<UnifiedProjectAssetTab, React.ComponentType<{ cl
   AUDIO: Mic,
   STORYBOARD_IMAGE: ImageIcon,
   STORYBOARD_VIDEO: Clapperboard,
+  PRIVATE_PORTRAIT: ScanFace,
   DIGITAL_HUMAN: UserCircle,
   STYLE: Palette,
   PROMPT: Sparkles,
@@ -95,20 +97,29 @@ export function UnifiedProjectAssetsView({
   const kindFilter = tab === "all" ? null : tab;
   const canvasInsertEnabled =
     Boolean(onInsertToCanvas) && isProjectAssetCanvasInsertAvailable();
-  const { assets, loading, refresh } = useProjectAssets(base, {
+  const { assets, loading, error, refresh } = useProjectAssets(base, {
     projectId,
     kind: kindFilter,
   });
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return assets;
-    return assets.filter(
+    let list = assets;
+    if (kindFilter) {
+      list = list.filter((a) => a.kind === kindFilter);
+    }
+    if (kindFilter === "PRIVATE_PORTRAIT") {
+      list = list.filter((a) =>
+        String(a.payload?.portraitAssetUri ?? "").startsWith("asset://"),
+      );
+    }
+    if (!q) return list;
+    return list.filter(
       (a) =>
         a.displayName.toLowerCase().includes(q) ||
         a.description.toLowerCase().includes(q),
     );
-  }, [assets, search]);
+  }, [assets, search, kindFilter]);
 
   const onDelete = async (asset: ProjectAssetRecord) => {
     if (asset.id.startsWith("legacy:")) {
@@ -212,8 +223,19 @@ export function UnifiedProjectAssetsView({
 
         {loading ? (
           <p className="text-xs text-white/45">加载中…</p>
+        ) : error ? (
+          <p className="text-xs text-rose-300/85">
+            加载失败：{error}
+            {tab === "PRIVATE_PORTRAIT"
+              ? "（若本地未执行数据库迁移，请在 book-mall 运行 pnpm db:deploy）"
+              : null}
+          </p>
         ) : filtered.length === 0 ? (
-          <p className="text-xs text-white/45">暂无资产。在画布节点顶栏点击「保存为资产」入库。</p>
+          <p className="text-xs text-white/45">
+            {tab === "PRIVATE_PORTRAIT"
+              ? "暂无私域人像。在图片节点工具栏点击「私域人像入库」，成功后会自动出现在此。"
+              : "暂无资产。在画布节点顶栏点击「保存为资产」入库。"}
+          </p>
         ) : (
           <>
             {canvasInsertEnabled ? (

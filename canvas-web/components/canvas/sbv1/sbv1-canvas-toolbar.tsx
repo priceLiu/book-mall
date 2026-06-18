@@ -11,6 +11,7 @@ import { flowPositionAtViewportCenter } from "@/lib/canvas/viewport-placement";
 import { spawnSbv1CanvasPastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useSbv1PortraitLivenessStatus } from "@/lib/canvas/use-sbv1-portrait-liveness-status";
 import { Sbv1PortraitLivenessModal } from "./sbv1-portrait-liveness-modal";
+import { LibtvCanvasDockBarSlot } from "@/components/canvas/libtv-canvas-dock-bar-slot";
 import { Sbv1Dock, type Sbv1DockItem } from "./sbv1-dock";
 
 /** 分镜视频 1.0 · 底部 macOS 磁吸 dock */
@@ -104,9 +105,9 @@ export function Sbv1CanvasToolbar() {
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 bottom-5 z-[70] flex justify-center px-4">
+      <LibtvCanvasDockBarSlot storageKey="sbv1">
         <Sbv1Dock items={dockItems} />
-      </div>
+      </LibtvCanvasDockBarSlot>
       <input
         ref={fileRef}
         type="file"

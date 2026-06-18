@@ -72,6 +72,10 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         data?: Record<string, unknown>;
         imageInputs?: string[];
         textInputs?: string[];
+        portraitAssetRefs?: Array<{
+          url: string;
+          role?: "reference_image" | "first_frame";
+        }>;
       }
     | undefined;
   if (!node || typeof node.type !== "string") {
@@ -138,6 +142,15 @@ export async function POST(request: NextRequest, ctx: Ctx) {
         : [],
       textInputs: Array.isArray(node.textInputs)
         ? node.textInputs.filter((u): u is string => typeof u === "string")
+        : [],
+      portraitAssetRefs: Array.isArray(node.portraitAssetRefs)
+        ? node.portraitAssetRefs.filter(
+            (r): r is { url: string; role?: "reference_image" | "first_frame" } =>
+              Boolean(r) &&
+              typeof r === "object" &&
+              typeof (r as { url?: string }).url === "string" &&
+              (r as { url: string }).url.startsWith("asset://"),
+          )
         : [],
     },
   };

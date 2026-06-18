@@ -8,6 +8,7 @@ export type ProjectAssetKind =
   | "STORYBOARD_IMAGE"
   | "STORYBOARD_VIDEO"
   | "DIGITAL_HUMAN"
+  | "PRIVATE_PORTRAIT"
   | "STYLE"
   | "PROMPT"
   | "GROUP_BUNDLE";

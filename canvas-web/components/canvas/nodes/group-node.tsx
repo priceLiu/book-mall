@@ -24,7 +24,6 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { relayoutPro2MediaGroup, PRO2_MEDIA_GROUP_LAYOUT_VERSION } from "@/lib/canvas/pro2-media-group-layout";
 import {
   isPro2MediaChildNode,
-  isPro2StyledGroup,
   pro2MediaGroupBorderColor,
 } from "@/lib/canvas/pro2-media-group-meta";
 import {
@@ -39,7 +38,6 @@ import {
 } from "@/lib/canvas/story-pro2-node-chrome";
 import { LIBTV_CARD_DRAG_CLASS } from "@/lib/canvas/libtv-node-chrome";
 import { SBV1_NODE_HANDLE_CLASS, SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
-import { isSbv1MediaGroup } from "@/lib/canvas/sbv1-media-group-meta";
 import {
   GROUP_COLOR_PRESETS,
   type GroupNodeData,
@@ -86,8 +84,21 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   const reflowStoryTemplateGroups = useCanvasStore(
     (s) => s.reflowStoryTemplateGroups,
   );
-  const allNodes = useCanvasStore((s) => s.nodes);
-  const { flowToScreenPosition, getInternalNode } = useReactFlow();
+  const hasMediaChildren = useCanvasStore((s) =>
+    s.nodes.some(
+      (n) =>
+        n.parentId === id &&
+        (isPro2MediaChildNode(n) || n.type === "sbv1-image"),
+    ),
+  );
+  const childrenIdsKey = useCanvasStore((s) =>
+    s.nodes
+      .filter((n) => n.parentId === id && n.type !== "group")
+      .map((n) => n.id)
+      .join("\0"),
+  );
+  const { flowToScreenPosition, getInternalNode, setNodes: rfSetNodes } =
+    useReactFlow();
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
 
   const [editOpen, setEditOpen] = useState(false);
@@ -102,16 +113,8 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
   const d = data as unknown as GroupNodeData;
   const color = d.color || GROUP_COLOR_PRESETS[2];
-  const selfNode = useMemo(
-    () => allNodes.find((n) => n.id === id),
-    [allNodes, id],
-  );
-  const isPro2MediaGroup = selfNode
-    ? isPro2StyledGroup(selfNode, allNodes)
-    : Boolean(d.pro2Kind);
-  const isSbv1Group = selfNode
-    ? isSbv1MediaGroup(selfNode, allNodes)
-    : Boolean(d.sbv1Styled);
+  const isPro2MediaGroup = Boolean(d.pro2Kind);
+  const isSbv1Group = Boolean(d.sbv1Styled);
   const isLibtvMediaGroup = isPro2MediaGroup || isSbv1Group;
   const isStoryTemplateGroup =
     id === "sc-group-characters" ||
@@ -120,11 +123,8 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     id === "sc-group-videos";
 
   const childrenIds = useMemo(
-    () =>
-      allNodes
-        .filter((n) => n.parentId === id && n.type !== "group")
-        .map((n) => n.id),
-    [allNodes, id],
+    () => (childrenIdsKey ? childrenIdsKey.split("\0") : []),
+    [childrenIdsKey],
   );
 
   const showToolbar =
@@ -133,7 +133,8 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     (selected || editOpen || pointerInside);
 
   const viewport = useViewportTransformActive(
-    showToolbar || editOpen || selected || pointerInside,
+    !isLibtvMediaGroup &&
+      (showToolbar || editOpen || selected || pointerInside),
   );
 
   const getGroupScreenRect = useCallback((): ScreenRect | null => {
@@ -247,17 +248,10 @@ export function GroupNode({ id, data, selected }: NodeProps) {
 
   // 旧媒体组迁移：仅 layout 版本落后时重排一次（禁止每次 mount 覆盖用户坐标）
   const relayoutDoneRef = useRef(false);
-  const hasMediaChildren = useMemo(
-    () =>
-      allNodes.some(
-        (n) =>
-          n.parentId === id &&
-          (isPro2MediaChildNode(n) || n.type === "sbv1-image"),
-      ),
-    [allNodes, id],
-  );
+  const pro2LayoutVersion = (d as { pro2LayoutVersion?: number }).pro2LayoutVersion;
+  const hasMediaChildrenMemo = hasMediaChildren;
   useEffect(() => {
-    if (!hasMediaChildren) return;
+    if (!hasMediaChildrenMemo) return;
     if (isSbv1Group) return;
     if (d.pro2ShortcutPreset) return;
     if (relayoutDoneRef.current) return;
@@ -271,12 +265,28 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     updateNodeData(id, {
       pro2LayoutVersion: PRO2_MEDIA_GROUP_LAYOUT_VERSION,
     });
-  }, [hasMediaChildren, isSbv1Group, id, setNodes, updateNodeData, d]);
+  }, [
+    hasMediaChildrenMemo,
+    isSbv1Group,
+    id,
+    setNodes,
+    updateNodeData,
+    d.pro2ShortcutPreset,
+    pro2LayoutVersion,
+  ]);
 
   useEffect(() => {
-    if (viewportMoving) return;
+    if (isLibtvMediaGroup || viewportMoving) return;
     updateScreenPos();
-  }, [updateScreenPos, viewport.x, viewport.y, viewport.zoom, selected, allNodes, viewportMoving]);
+  }, [
+    isLibtvMediaGroup,
+    updateScreenPos,
+    viewport.x,
+    viewport.y,
+    viewport.zoom,
+    selected,
+    viewportMoving,
+  ]);
 
   useEffect(() => {
     if (selected || editOpen) {
@@ -286,6 +296,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
   }, [selected, editOpen, cancelHide]);
 
   useEffect(() => {
+    if (isLibtvMediaGroup) return;
     const onPointerMove = (e: PointerEvent) => {
       updateScreenPos();
       if (selected || editOpen) {
@@ -304,6 +315,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     return () => window.removeEventListener("pointermove", onPointerMove);
   }, [
+    isLibtvMediaGroup,
     selected,
     editOpen,
     updateScreenPos,
@@ -321,8 +333,10 @@ export function GroupNode({ id, data, selected }: NodeProps) {
       : d.label?.trim() || "媒体组";
 
   const selectMediaGroup = useCallback(() => {
-    setNodes((prev) => prev.map((n) => ({ ...n, selected: n.id === id })));
-  }, [id, setNodes]);
+    rfSetNodes((prev) =>
+      prev.map((n) => ({ ...n, selected: n.id === id })),
+    );
+  }, [id, rfSetNodes]);
 
   return (
     <div

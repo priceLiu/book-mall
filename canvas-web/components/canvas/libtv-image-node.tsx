@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import type { NodeProps } from "@xyflow/react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useNodes } from "@xyflow/react";
 import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -25,6 +25,10 @@ import {
 } from "@/lib/canvas/story-pro2-node-chrome";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type { Pro2ImageMediaRole } from "@/lib/canvas/story-pro2-workspace-types";
+import type { CanvasPortraitNodeFields } from "@/lib/canvas/portrait-node-data";
+import { isPortraitNodeActive } from "@/lib/canvas/portrait-node-data";
+import { useImportPortraitToLibrary } from "@/lib/canvas/use-import-portrait-to-library";
+import { Sbv1PortraitLivenessModal } from "./sbv1/sbv1-portrait-liveness-modal";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { cn } from "@/lib/utils";
@@ -44,7 +48,7 @@ import {
 
 export type LibtvImageNodeEdition = "pro2" | "sbv1";
 
-export type LibtvImageNodeData = {
+export type LibtvImageNodeData = CanvasPortraitNodeFields & {
   label?: string;
   ossUrl?: string;
   blobUrl?: string;
@@ -115,6 +119,7 @@ export function LibtvImageNode({
   const chrome = EDITION_CHROME[edition];
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
+  const rfNodes = useNodes();
   const nodes = useCanvasStore((s) => s.nodes);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -122,6 +127,8 @@ export function LibtvImageNode({
   const inputRef = useRef<HTMLInputElement>(null);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [livenessOpen, setLivenessOpen] = useState(false);
+  const projectId = useCanvasStore((s) => s.projectId) ?? undefined;
 
   const d = data as unknown as LibtvImageNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
@@ -131,6 +138,17 @@ export function LibtvImageNode({
   const isCharacterThreeView = mediaRole === "character-three-view";
   const previewUrl = d.ossUrl ?? d.blobUrl ?? "";
   const hasImage = Boolean(previewUrl);
+  const portraitActive = isPortraitNodeActive(
+    (self?.data ?? d) as CanvasPortraitNodeFields,
+  );
+  const { importPortrait, importing: portraitImporting } =
+    useImportPortraitToLibrary({
+      nodeId: id,
+      edition,
+      projectId,
+      imageUrl: d.ossUrl,
+      onNeedLiveness: () => setLivenessOpen(true),
+    });
   const isGenerating = isLibtvMediaGenerating(d);
   const hasRuntimeError = d.runtime?.status === "error";
   const hasUploadError = Boolean(d.uploadError?.trim()) && !isGenerating;
@@ -143,8 +161,8 @@ export function LibtvImageNode({
     (hovered || selected || connectingFromNodeId) && !isGenerating,
   );
   const soleSelected = useMemo(
-    () => selected && nodes.filter((n) => n.selected).length === 1,
-    [selected, nodes],
+    () => selected && rfNodes.filter((n) => n.selected).length === 1,
+    [selected, rfNodes],
   );
   const showTryMenu =
     !isCharacterThreeView && !hasImage && !isGenerating && !hasError;
@@ -422,6 +440,11 @@ export function LibtvImageNode({
             onSaveAsAsset={() =>
               saveAsAsset(id, saveAsAssetKind, d as unknown as Record<string, unknown>)
             }
+            onImportPortrait={
+              d.ossUrl ? () => void importPortrait() : undefined
+            }
+            portraitImporting={portraitImporting}
+            portraitActive={portraitActive}
             onDuplicateNode={onDuplicateNode}
           />
         ) : null}
@@ -498,6 +521,12 @@ export function LibtvImageNode({
           />
         </div>
       ) : null}
+
+      <Sbv1PortraitLivenessModal
+        open={livenessOpen}
+        onClose={() => setLivenessOpen(false)}
+        onSuccess={() => setLivenessOpen(false)}
+      />
     </>
   );
 }

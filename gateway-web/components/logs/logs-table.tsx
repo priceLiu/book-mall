@@ -21,6 +21,7 @@ import {
   collectLogModels,
   collectLogProviderKinds,
   formatLogCredentialKeyMasked,
+  formatLogMonospaceId,
   formatLogPageLabel,
   formatLogSourceTooltip,
   formatProviderKindLabel,
@@ -44,6 +45,7 @@ export type GatewayLogRow = {
   clientSource: string;
   clientPage: string | null;
   externalTaskId: string | null;
+  vendorRequestId?: string | null;
   totalTokens: number | null;
   promptTokens: number | null;
   completionTokens: number | null;
@@ -534,7 +536,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
-        <table className="gw-logs-table min-w-[2100px]">
+        <table className="gw-logs-table min-w-[2580px]">
           <thead>
             <tr>
               <th className="w-11">
@@ -578,7 +580,24 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               >
                 Token
               </th>
-              <th className="min-w-[240px]">Task ID</th>
+              <th
+                className="min-w-[200px]"
+                title="Gateway 请求日志 id（平台侧 cuid）"
+              >
+                Log ID
+              </th>
+              <th
+                className="min-w-[200px]"
+                title="厂商 HTTP 追踪 Request ID（如 Volcengine 响应头 / 错误体）"
+              >
+                Request ID
+              </th>
+              <th
+                className="min-w-[200px]"
+                title="厂商异步任务 ID（externalTaskId）；提交失败或未创建时为 —"
+              >
+                Vendor Task ID
+              </th>
               <th className="w-[150px]">Results</th>
               <th className="w-[120px]">Retry Callback</th>
             </tr>
@@ -604,7 +623,9 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                 l.completionTokens,
                 l.metricsSource,
               );
-              const taskId = l.externalTaskId ?? l.id;
+              const logId = formatLogMonospaceId(l.id);
+              const requestId = formatLogMonospaceId(l.vendorRequestId);
+              const vendorTaskId = formatLogMonospaceId(l.externalTaskId);
               const progressLabel = isInProgress
                 ? pickLogProgressLabel(l.status, l.resultSummary)
                 : null;
@@ -736,9 +757,25 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   <td className="align-middle">
                     <span
                       className="block break-all font-mono text-[11px] leading-snug text-zinc-400"
-                      title={taskId}
+                      title={logId.title}
                     >
-                      {taskId}
+                      {logId.value}
+                    </span>
+                  </td>
+                  <td className="align-middle">
+                    <span
+                      className="block break-all font-mono text-[11px] leading-snug text-zinc-400"
+                      title={requestId.title}
+                    >
+                      {requestId.value}
+                    </span>
+                  </td>
+                  <td className="align-middle">
+                    <span
+                      className="block break-all font-mono text-[11px] leading-snug text-zinc-400"
+                      title={vendorTaskId.title}
+                    >
+                      {vendorTaskId.value}
                     </span>
                   </td>
                   <td className="align-middle">
@@ -756,7 +793,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             {!filtered.length ? (
               <tr>
                 <td
-                  colSpan={16}
+                  colSpan={18}
                   className="py-16 text-center text-sm text-zinc-500"
                 >
                   {logs.length

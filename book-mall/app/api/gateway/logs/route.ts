@@ -14,6 +14,7 @@ import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { maskApiKey } from "@/lib/canvas/secret";
 import { buildGatewayLogWhere } from "@/lib/gateway/log-query-scope";
+import { resolveGatewayLogVendorRequestId } from "@/lib/gateway/vendor-request-id";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -142,6 +143,10 @@ export async function GET(request: NextRequest) {
         clientSource: l.clientSource,
         clientPage: l.clientPage,
         externalTaskId: l.externalTaskId,
+        vendorRequestId: resolveGatewayLogVendorRequestId({
+          vendorRequestId: l.vendorRequestId,
+          failMessage: l.failMessage,
+        }),
         promptTokens,
         completionTokens,
         totalTokens,

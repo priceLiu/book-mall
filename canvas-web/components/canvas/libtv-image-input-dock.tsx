@@ -194,9 +194,13 @@ export function LibtvImageInputDock() {
   );
 
   const onPromptChange = useCallback(
-    (value: string) => {
+    (value: string, _refs?: string[], meta?: { commit?: boolean }) => {
       if (!storeNode) return;
-      updateNodeData(storeNode.id, { dockInput: value });
+      updateNodeData(
+        storeNode.id,
+        { dockInput: value },
+        { commit: meta?.commit ?? true },
+      );
       syncFrameRowPrompt(value);
     },
     [storeNode, updateNodeData, syncFrameRowPrompt],
@@ -431,6 +435,7 @@ export function LibtvImageInputDock() {
             disabled={isRunning}
             rows={3}
             mentionInlineThumb
+            mentionInlineThumbHoverOnText
             mentionEdition={mentionEdition}
             onChange={onPromptChange}
           />

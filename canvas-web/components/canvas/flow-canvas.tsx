@@ -18,8 +18,14 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { isCanvasInteractiveGeometryInProgress } from "@/lib/canvas/canvas-node-changes";
-import { isPro2StyledGroup } from "@/lib/canvas/pro2-media-group-meta";
+import {
+  isCanvasInteractiveGeometryInProgress,
+  isCanvasSelectionOnlyChange,
+} from "@/lib/canvas/canvas-node-changes";
+import {
+  isPro2StyledGroup,
+  syncPro2MediaGroupZIndex,
+} from "@/lib/canvas/pro2-media-group-meta";
 import type {
   CanvasFlowEdge,
   CanvasFlowNode,
@@ -37,6 +43,7 @@ import {
   parseProjectAssetDragPayload,
 } from "@/lib/canvas/spawn-project-asset-on-canvas";
 import { ensureNodeDragHandles } from "@/lib/canvas/normalize-graph-nodes";
+import { mergeStoreNodesIntoRf } from "@/lib/canvas/canvas-rf-sync";
 import { resolveSnapConnectionOnNodeHit } from "@/lib/canvas/libtv-connection-snap";
 import {
   applyDragSnapToNode,
@@ -124,6 +131,7 @@ function FlowCanvasInner({
   pro2FloatingInspector?: boolean;
   sbv1Canvas?: boolean;
 }) {
+  const libtvCanvas = pro2FloatingInspector || sbv1Canvas;
   const base = useBookMallBaseUrl();
   const wrapRef = useRef<HTMLDivElement>(null);
   const {
@@ -330,14 +338,18 @@ function FlowCanvasInner({
     const unsub = useCanvasStore.subscribe((state, prev) => {
       if (deferStoreGraphSyncRef.current) return;
       if (state.nodes !== prev.nodes) {
-        setRfNodes(ensureNodeDragHandles(state.nodes));
+        setRfNodes((rf) =>
+          mergeStoreNodesIntoRf(rf, state.nodes, {
+            preserveRfSelection: libtvCanvas,
+          }),
+        );
       }
       if (state.edges !== prev.edges) {
         setRfEdges(state.edges);
       }
     });
     return unsub;
-  }, [setRfNodes, setRfEdges]);
+  }, [setRfNodes, setRfEdges, libtvCanvas]);
 
   const onMoveStart = useCallback(() => {
     setCanvasViewportMoving(true);
@@ -369,11 +381,22 @@ function FlowCanvasInner({
         setCanvasGeometryDragging(true);
         return;
       }
+      // LibTV 画布：选中态仅保留在 RF 本地（不写 zustand / 不进 undo），避免点击卡顿
+      if (libtvCanvas && isCanvasSelectionOnlyChange(changes)) {
+        deferStoreGraphSyncRef.current = false;
+        setCanvasGeometryDragging(false);
+        return;
+      }
       deferStoreGraphSyncRef.current = false;
       setCanvasGeometryDragging(false);
       storeOnNodesChange(changes);
     },
-    [onRfNodesChange, storeOnNodesChange, setCanvasGeometryDragging],
+    [
+      onRfNodesChange,
+      storeOnNodesChange,
+      setCanvasGeometryDragging,
+      libtvCanvas,
+    ],
   );
 
   const handleEdgesChange = useCallback(
@@ -676,10 +699,16 @@ function FlowCanvasInner({
     [setConnectingFrom, screenToFlowPosition, getNodes, onConnect],
   );
 
+  // 媒体组 zIndex 随选中变化；在 RF 本地完成，不触发 zustand
+  const rfNodesForRender = useMemo(
+    () => syncPro2MediaGroupZIndex(rfNodes),
+    [rfNodes],
+  );
+
   // 分组拖入高亮：仅 patch 目标 group，避免每帧克隆全图 nodes
   const decoratedNodes = useMemo(() => {
-    if (!dragHoverGroupId) return rfNodes;
-    return rfNodes.map((n) =>
+    if (!dragHoverGroupId) return rfNodesForRender;
+    return rfNodesForRender.map((n) =>
       n.id === dragHoverGroupId
         ? {
             ...n,
@@ -687,11 +716,14 @@ function FlowCanvasInner({
           }
         : n,
     );
-  }, [rfNodes, dragHoverGroupId]);
+  }, [rfNodesForRender, dragHoverGroupId]);
+
+  const EDGE_FOCUS_MAX = 48;
 
   /** 选中单个节点 → 高亮其上游(入)/下游(出)连线并流动，其余淡化（拖动中关闭以保性能） */
   const focusEdgeIds = useMemo(() => {
     if (isNodeDragging) return null;
+    if (rfEdges.length > EDGE_FOCUS_MAX) return null;
     const sel = rfNodes.filter((n) => n.selected);
     if (sel.length !== 1) return null;
     const node = sel[0];
@@ -708,32 +740,56 @@ function FlowCanvasInner({
       }
     }
     return ids;
-  }, [rfNodes, isNodeDragging]);
+  }, [rfNodes, isNodeDragging, rfEdges.length]);
 
   const decoratedEdges = useMemo(() => {
     if (!focusEdgeIds) return rfEdges;
-    return rfEdges.map((e) => {
+    let changed = false;
+    const next = rfEdges.map((e) => {
       if (focusEdgeIds.has(e.target)) {
+        const className = `${e.className ?? ""} pro2-edge-active pro2-edge-up`.trim();
+        if (
+          e.zIndex === 1000 &&
+          className === e.className &&
+          e.style?.stroke === "#60a5fa"
+        ) {
+          return e;
+        }
+        changed = true;
         return {
           ...e,
           zIndex: 1000,
-          className: `${e.className ?? ""} pro2-edge-active pro2-edge-up`.trim(),
+          className,
           style: { ...(e.style ?? {}), stroke: "#60a5fa", strokeWidth: 1.5 },
         };
       }
       if (focusEdgeIds.has(e.source)) {
+        const className =
+          `${e.className ?? ""} pro2-edge-active pro2-edge-down`.trim();
+        if (
+          e.zIndex === 1000 &&
+          className === e.className &&
+          e.style?.stroke === "#a78bfa"
+        ) {
+          return e;
+        }
+        changed = true;
         return {
           ...e,
           zIndex: 1000,
-          className: `${e.className ?? ""} pro2-edge-active pro2-edge-down`.trim(),
+          className,
           style: { ...(e.style ?? {}), stroke: "#a78bfa", strokeWidth: 1.5 },
         };
       }
+      const opacity = (e.style as { opacity?: number } | undefined)?.opacity;
+      if (opacity === 0.18) return e;
+      changed = true;
       return {
         ...e,
         style: { ...(e.style ?? {}), opacity: 0.18 },
       };
     });
+    return changed ? next : rfEdges;
   }, [rfEdges, focusEdgeIds]);
 
   const onlyRenderVisible = forceOnlyRenderVisible || rfNodes.length >= 12;
@@ -814,7 +870,7 @@ function FlowCanvasInner({
 
   // ── 复制 / 剪切 / 粘贴：节点 + 图片
   const copySelectedToClipboard = useCallback((cut: boolean) => {
-    const all = useCanvasStore.getState().nodes;
+    const all = getNodes() as CanvasFlowNode[];
     const allEdges = useCanvasStore.getState().edges;
     const selectedNodes = all.filter((n) => n.selected && n.type !== "group");
     if (selectedNodes.length === 0) return false;
@@ -858,7 +914,7 @@ function FlowCanvasInner({
       );
     }
     return true;
-  }, [setNodes, setEdges]);
+  }, [getNodes, setNodes, setEdges]);
 
   const pasteFromClipboard = useCallback(
     (atFlowPoint?: { x: number; y: number }) => {
@@ -1067,7 +1123,7 @@ function FlowCanvasInner({
                 closePaneAddMenu();
                 if (!pro2FloatingInspector) return;
                 useCanvasStore.getState().setPro2FrameDockFocus(null);
-                setNodes((prev) =>
+                setRfNodes((prev) =>
                   prev.map((n) => (n.selected ? { ...n, selected: false } : n)),
                 );
               }
@@ -1086,7 +1142,7 @@ function FlowCanvasInner({
                 const all = useCanvasStore.getState().nodes as CanvasFlowNode[];
                 const hit = all.find((n) => n.id === node.id);
                 if (!hit || !isPro2StyledGroup(hit, all)) return;
-                setNodes((prev) =>
+                setRfNodes((prev) =>
                   prev.map((n) => ({ ...n, selected: n.id === node.id })),
                 );
               }

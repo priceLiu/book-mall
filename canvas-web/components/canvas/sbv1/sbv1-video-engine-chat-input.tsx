@@ -15,6 +15,7 @@ import {
   MentionsTextarea,
   type MentionableItem,
 } from "@/components/canvas/mentions/MentionsTextarea";
+import { MentionHoverPreviewPortal } from "@/components/canvas/mentions/mention-hover-preview";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
@@ -22,7 +23,7 @@ import {
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "@/components/canvas/pro2/pro2-input-dock-shell";
-import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
+import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { spawnSbv1PastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
@@ -43,6 +44,11 @@ import {
   SBV1_DOCK_REF_IDLE_BORDER_CLASS,
 } from "@/lib/canvas/dock-active-ref-chrome";
 import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
+import {
+  portraitImportUiState,
+  type CanvasPortraitNodeFields,
+} from "@/lib/canvas/portrait-node-data";
+import { usePruneStaleDockMentions } from "@/lib/canvas/use-prune-stale-dock-mentions";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import {
@@ -53,20 +59,36 @@ import {
 function RefPreviewCard({
   link,
   active,
+  importState,
   onDisconnect,
 }: {
   link: Sbv1UpstreamRefLink;
   active: boolean;
+  importState: ReturnType<typeof portraitImportUiState>;
   onDisconnect: () => void;
 }) {
+  const [hoverPreview, setHoverPreview] = useState<DOMRect | null>(null);
+  const mentionItem: MentionableItem = {
+    id: link.id,
+    label: link.label,
+    kind: "image",
+    previewUrl: link.previewUrl,
+  };
+
   return (
-    <div
-      className={cn(
-        SBV1_REF_THUMB_CLASS,
-        "border-2 transition-shadow",
-        active ? SBV1_DOCK_ACTIVE_REF_BORDER_CLASS : SBV1_DOCK_REF_IDLE_BORDER_CLASS,
-      )}
-    >
+    <>
+      <div
+        className={cn(
+          SBV1_REF_THUMB_CLASS,
+          "group border-2 transition-shadow",
+          active ? SBV1_DOCK_ACTIVE_REF_BORDER_CLASS : SBV1_DOCK_REF_IDLE_BORDER_CLASS,
+        )}
+        onMouseEnter={(e) => {
+          if (!link.previewUrl) return;
+          setHoverPreview(e.currentTarget.getBoundingClientRect());
+        }}
+        onMouseLeave={() => setHoverPreview(null)}
+      >
       {link.previewUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -82,6 +104,19 @@ function RefPreviewCard({
       <p className="pointer-events-none absolute bottom-0 left-0 right-0 truncate bg-black/65 px-1 py-0.5 text-[9px] text-white/80">
         {link.label}
       </p>
+      {importState === "active" ? (
+        <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-emerald-600/90 px-1 py-px text-[8px] font-medium text-white">
+          已入库
+        </span>
+      ) : importState === "pending" ? (
+        <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-amber-600/90 px-1 py-px text-[8px] font-medium text-white">
+          入库中
+        </span>
+      ) : link.previewUrl ? (
+        <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-rose-600/90 px-1 py-px text-[8px] font-medium text-white">
+          未入库
+        </span>
+      ) : null}
       <button
         type="button"
         className="nodrag absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded bg-black/75 text-white/70 opacity-0 transition hover:text-white group-hover:opacity-100"
@@ -90,7 +125,12 @@ function RefPreviewCard({
       >
         <X className="size-2.5" />
       </button>
-    </div>
+      </div>
+      <MentionHoverPreviewPortal
+        item={hoverPreview ? mentionItem : null}
+        anchorRect={hoverPreview}
+      />
+    </>
   );
 }
 
@@ -152,6 +192,15 @@ export function Sbv1VideoEngineChatInput({
     () => dockActiveRefIdsFromPrompt(data.prompt ?? ""),
     [data.prompt],
   );
+
+  usePruneStaleDockMentions({
+    nodeId,
+    prompt: data.prompt ?? "",
+    mentionables,
+    field: "prompt",
+    updateNodeData,
+  });
+
   const canSend =
     (hasPrompt || hasRefs) &&
     !isGenerating &&
@@ -212,14 +261,21 @@ export function Sbv1VideoEngineChatInput({
     upstreamLinks.length > 0 ? (
       <Pro2DockContextBar>
         <div className="hide-scroll-bar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
-          {upstreamLinks.map((link) => (
+          {upstreamLinks.map((link) => {
+            const sourceNode = nodes.find((n) => n.id === link.sourceNodeId);
+            const importState = portraitImportUiState(
+              sourceNode?.data as CanvasPortraitNodeFields | undefined,
+            );
+            return (
             <RefPreviewCard
               key={link.id}
               link={link}
               active={activeRefIds.includes(link.id)}
+              importState={importState}
               onDisconnect={() => onDisconnect(link)}
             />
-          ))}
+            );
+          })}
         </div>
       </Pro2DockContextBar>
     ) : null;
@@ -298,7 +354,7 @@ export function Sbv1VideoEngineChatInput({
         }
       >
         <div
-          className="relative min-h-0"
+          className="relative min-h-0 overflow-visible"
           onDragOver={(e) => {
             e.preventDefault();
             setIsDragging(true);
@@ -325,19 +381,22 @@ export function Sbv1VideoEngineChatInput({
             className={cn(
               SBV1_CHAT_INPUT_TEXTAREA_CLASS,
               RF_FORM_CONTROL,
+              RF_NO_WHEEL,
               "min-h-0 px-4 py-3",
             )}
-            wrapperClassName="min-h-[72px]"
-            fillHeight
             placeholder="描述你想生成的视频… 使用 @ 引用参考图，或粘贴/上传图片"
             value={data.prompt ?? ""}
             mentionables={mentionables}
             disabled={isGenerating}
-            onChange={(prompt) => onPatch({ prompt })}
+            rows={3}
+            onChange={(prompt, _refs, meta) =>
+              updateNodeData(nodeId, { prompt }, { commit: meta?.commit ?? true })
+            }
             onPaste={onPaste}
             mentionPickerTitle="参考图 · ←→ Enter 插入"
             mentionPickerEmptyHint="暂无已连接参考图，请先连线或上传图片。"
             mentionInlineThumb
+            mentionInlineThumbHoverOnText
             mentionEdition="sbv1"
             onKeyDownCapture={(e) => {
               if (

@@ -182,7 +182,10 @@ export function Sbv1VideoGenerateSettingsModal({
               onChange={(next) => {
                 setProviderId(next.providerId);
                 setModelKey(next.modelKey);
-                setEngineParams(next.params);
+                setEngineParams({
+                  ...next.params,
+                  generate_audio: generateAudio,
+                });
               }}
             />
           </div>

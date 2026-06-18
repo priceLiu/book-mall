@@ -33,20 +33,39 @@ export async function submitVolcengineVideoJobForLog(opts: {
   };
   delete payload.prompt;
 
-  const { taskId } = await volcengineCreateVideoTask({
-    apiKey: cred.apiKey,
-    baseUrl: cred.baseUrl,
-    model: opts.model,
-    body: payload,
-  });
+  try {
+    const { taskId, requestId } = await volcengineCreateVideoTask({
+      apiKey: cred.apiKey,
+      baseUrl: cred.baseUrl,
+      model: opts.model,
+      body: payload,
+    });
 
-  const { prisma } = await import("@/lib/prisma");
-  await prisma.gatewayRequestLog.update({
-    where: { id: opts.logId },
-    data: { externalTaskId: taskId },
-  });
+    const { prisma } = await import("@/lib/prisma");
+    await prisma.gatewayRequestLog.update({
+      where: { id: opts.logId },
+      data: {
+        externalTaskId: taskId,
+        ...(requestId ? { vendorRequestId: requestId } : {}),
+      },
+    });
 
-  return taskId;
+    return taskId;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const requestId =
+      e instanceof Error
+        ? msg.match(/Request id:\s*([^\s]+)/i)?.[1]
+        : undefined;
+    await finalizeRequestLog(opts.logId, {
+      status: "FAILED",
+      durationMs: 0,
+      failMessage: msg.slice(0, 500),
+      failCode: "UPSTREAM_SUBMIT_FAILED",
+      vendorRequestId: requestId,
+    }).catch(() => undefined);
+    throw e;
+  }
 }
 
 export async function pollVolcengineVideoTaskForLog(opts: {

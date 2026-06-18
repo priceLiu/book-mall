@@ -51,6 +51,7 @@ export function findAllMentionRangesInDisplay(
 ): { item: MentionableItem; start: number; end: number }[] {
   if (!display || mentionables.length === 0) return [];
 
+  const byId = new Map(mentionables.filter((m) => m.id).map((m) => [m.id, m]));
   const sorted = [...mentionables].sort(
     (a, b) => b.label.length - a.label.length,
   );
@@ -63,11 +64,25 @@ export function findAllMentionRangesInDisplay(
       continue;
     }
     const afterAt = display.slice(i + 1);
+
+    if (afterAt.startsWith("<")) {
+      const tokenEnd = afterAt.indexOf(">");
+      if (tokenEnd > 1) {
+        const id = afterAt.slice(1, tokenEnd).trim();
+        const m = byId.get(id);
+        if (m) {
+          const end = i + 1 + tokenEnd + 1;
+          out.push({ item: m, start: i, end });
+          i = end;
+          continue;
+        }
+      }
+    }
+
     let matched = false;
     for (const m of sorted) {
       if (!m.label || !afterAt.startsWith(m.label)) continue;
       const end = i + 1 + m.label.length;
-      if (end < display.length && !/\s/.test(display[end]!)) continue;
       out.push({ item: m, start: i, end });
       i = end;
       matched = true;

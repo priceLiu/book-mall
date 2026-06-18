@@ -10,6 +10,7 @@ import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
+import { CanvasPromptTextarea } from "../canvas-prompt-textarea";
 import { usePro2FrameCellDockPlacement } from "./use-pro2-frame-cell-dock-placement";
 import { Pro2DockToolbar, Pro2InputDockShell } from "./pro2-input-dock-shell";
 
@@ -61,14 +62,18 @@ export function Pro2FrameCellInputDock() {
   }, [storeNode, activeFocus]);
 
   const onPromptChange = useCallback(
-    (value: string) => {
+    (value: string, meta?: { commit?: boolean }) => {
       if (!storeNode || !activeFocus) return;
       const rows = (storeNode.data as { rows?: StoryProFrameRow[] }).rows ?? [];
-      updateNodeData(storeNode.id, {
-        rows: rows.map((r) =>
-          r.key === activeFocus.rowKey ? { ...r, prompt: value } : r,
-        ),
-      });
+      updateNodeData(
+        storeNode.id,
+        {
+          rows: rows.map((r) =>
+            r.key === activeFocus.rowKey ? { ...r, prompt: value } : r,
+          ),
+        },
+        { commit: meta?.commit ?? true },
+      );
     },
     [storeNode, activeFocus, updateNodeData],
   );
@@ -112,7 +117,7 @@ export function Pro2FrameCellInputDock() {
         </Pro2DockToolbar>
       }
     >
-      <textarea
+      <CanvasPromptTextarea
         className={cn(
           PRO2_DOCK_TEXTAREA_CLASS,
           RF_FORM_CONTROL,
@@ -123,7 +128,7 @@ export function Pro2FrameCellInputDock() {
         value={prompt}
         disabled={running}
         rows={4}
-        onChange={(e) => onPromptChange(e.target.value)}
+        onChange={onPromptChange}
       />
     </Pro2InputDockShell>
   );

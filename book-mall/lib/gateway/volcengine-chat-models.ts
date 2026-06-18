@@ -93,7 +93,7 @@ const VIDEO_PARAM_SCHEMA = [
     key: "generate_audio",
     label: "生成音频",
     type: "boolean" as const,
-    defaultValue: false,
+    defaultValue: true,
   },
   {
     key: "watermark",
@@ -114,7 +114,7 @@ export const VOLCENGINE_VIDEO_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     defaultParams: {
       resolution: "720p",
       duration: 15,
-      generate_audio: false,
+      generate_audio: true,
       watermark: false,
     },
   },
@@ -128,7 +128,7 @@ export const VOLCENGINE_VIDEO_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     defaultParams: {
       resolution: "1080p",
       duration: 15,
-      generate_audio: false,
+      generate_audio: true,
       watermark: false,
     },
   },

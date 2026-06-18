@@ -20,6 +20,7 @@ import {
 import { spawnPro2CanvasPastedImages } from "@/lib/canvas/spawn-pro2-dock-paste-images";
 import { flowPositionAtViewportCenter } from "@/lib/canvas/viewport-placement";
 import type { CanvasNodeType } from "@/lib/canvas/types";
+import { LibtvCanvasDockBarSlot } from "@/components/canvas/libtv-canvas-dock-bar-slot";
 import { Sbv1Dock, type Sbv1DockItem } from "@/components/canvas/sbv1/sbv1-dock";
 import { Pro2AddNodePopover } from "./pro2-add-node-popover";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -185,9 +186,9 @@ export function Pro2CanvasToolbar({
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 bottom-5 z-[70] flex justify-center px-4">
-        <Sbv1Dock ref={dockBarRef} items={dockItems} />
-      </div>
+      <LibtvCanvasDockBarSlot storageKey="pro2" dockRef={dockBarRef}>
+        <Sbv1Dock items={dockItems} />
+      </LibtvCanvasDockBarSlot>
       <input
         ref={fileRef}
         type="file"

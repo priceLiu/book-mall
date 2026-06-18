@@ -17,6 +17,7 @@ import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import { applyVideoRowRuntime } from "@/lib/canvas/story-row-patch";
 import { storyApplyTaskResult } from "@/lib/canvas/story-run-apply";
 import { resolveStoryProRunStylePayload } from "@/lib/canvas/story-pro-run-style-context";
+import { resolveStoryVideoRowPortraitAssetRefs } from "@/lib/canvas/story-video-portrait-refs";
 import { storyVideoGenerateBlockReason } from "@/lib/canvas/story-frame-gate";
 import { tasksMatchStoryScope } from "@/lib/canvas/task-pick";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
@@ -259,12 +260,23 @@ async function commitStoryVideoRowRunOnce(
       store.edges,
       nodeAfter,
     );
+    const videoRow = patched.find((r) => r.key === rowKey);
+    const portraitAssetRefs = resolveStoryVideoRowPortraitAssetRefs(
+      store.nodes,
+      {
+        rowKey,
+        frameColumnId,
+        referencedNodeIds: frameRow?.referencedNodeIds,
+        videoReferencedNodeIds: videoRow?.videoReferencedNodeIds,
+      },
+    );
     const r = await runCanvasNode(base, projectId, videoColumnId, {
       node: {
         type: videoNode.type,
         data: nodeAfter.data as Record<string, unknown>,
         imageInputs: [],
         textInputs: [],
+        portraitAssetRefs,
       },
       forceFresh,
       rowKey,
