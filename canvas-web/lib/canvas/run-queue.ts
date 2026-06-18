@@ -102,6 +102,7 @@ import {
   pickPreferredCanvasTaskForScope,
   preferredTasksByNode,
   runtimePatchFromCanvasTask,
+  shouldApplyCanvasTaskRuntimePatch,
   shouldSkipStoryRowTaskApply,
   storyRunContextFromScope,
 } from "./task-pick";
@@ -886,7 +887,9 @@ export function useCanvasRunner(
           ) {
             /* ossUrl + runtime */
           } else {
-            setNodeRuntime(nodeId, {
+            const localRt = (nodeNow.data as { runtime?: CanvasNodeRuntime })
+              .runtime;
+            const errorPatch: Partial<CanvasNodeRuntime> = {
               status: "error",
               taskId: r.task.id,
               failCode: r.task.failCode ?? "FAILED",
@@ -895,7 +898,10 @@ export function useCanvasRunner(
                 r.task.failMessage,
                 r.task.model,
               ),
-            });
+            };
+            if (shouldApplyCanvasTaskRuntimePatch(localRt, r.task, errorPatch)) {
+              setNodeRuntime(nodeId, errorPatch);
+            }
           }
         } else if (isStoryWorkspaceNodeType(nodeNow.type ?? "")) {
           storyApplyTaskResult(
@@ -983,7 +989,9 @@ export function useCanvasRunner(
                   textOutput: pick.textOutput ?? undefined,
                 });
               } else if (pick.status === "FAILED") {
-                setNodeRuntime(nodeId, {
+                const localRt = (nodeNow.data as { runtime?: CanvasNodeRuntime })
+                  .runtime;
+                const errorPatch: Partial<CanvasNodeRuntime> = {
                   status: "error",
                   taskId: pick.id,
                   failCode: pick.failCode ?? "FAILED",
@@ -992,7 +1000,10 @@ export function useCanvasRunner(
                     pick.failMessage,
                     pick.model,
                   ),
-                });
+                };
+                if (shouldApplyCanvasTaskRuntimePatch(localRt, pick, errorPatch)) {
+                  setNodeRuntime(nodeId, errorPatch);
+                }
               } else {
                 setNodeRuntime(nodeId, {
                   status: pick.status === "PENDING" ? "pending" : "running",
@@ -1591,6 +1602,10 @@ export function useCanvasRunner(
         return;
       }
       if (patch) {
+        const localRt = node
+          ? (node.data as { runtime?: CanvasNodeRuntime }).runtime
+          : undefined;
+        if (!shouldApplyCanvasTaskRuntimePatch(localRt, t, patch)) return;
         setNodeRuntime(nodeId, patch);
         if (t.textOutput) {
           if (node?.type === "ai-engine" || isStoryLlmNodeType(node?.type ?? "")) {

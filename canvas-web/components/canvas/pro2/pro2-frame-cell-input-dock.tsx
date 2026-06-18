@@ -27,16 +27,20 @@ export function Pro2FrameCellInputDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging),
-  );
-
   const selectedFrame = useMemo(() => {
     const picked = rfNodes.filter(
       (n) => n.selected && n.type === "story-pro2-frame",
     );
     return picked.length === 1 ? picked[0] : null;
   }, [rfNodes]);
+
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(
+      s.canvasGeometryDragging,
+      s.canvasDraggingNodeId,
+      selectedFrame?.id ?? null,
+    ),
+  );
 
   const activeFocus = useMemo(() => {
     if (!focus || !selectedFrame || focus.nodeId !== selectedFrame.id) {

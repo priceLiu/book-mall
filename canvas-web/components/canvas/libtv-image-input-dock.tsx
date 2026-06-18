@@ -76,9 +76,6 @@ export function LibtvImageInputDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging),
-  );
   const setPro2StyleLibImageNodeId = useCanvasStore(
     (s) => s.setPro2StyleLibImageNodeId,
   );
@@ -104,6 +101,14 @@ export function LibtvImageInputDock() {
     if (!selectedImage) return null;
     return nodes.find((n) => n.id === selectedImage.id) ?? null;
   }, [selectedImage, nodes]);
+
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(
+      s.canvasGeometryDragging,
+      s.canvasDraggingNodeId,
+      storeNode?.id ?? null,
+    ),
+  );
 
   const nodeType = (storeNode?.type ?? "sbv1-image") as DockImageNodeType;
   const isPro2 = nodeType === "story-pro2-image";

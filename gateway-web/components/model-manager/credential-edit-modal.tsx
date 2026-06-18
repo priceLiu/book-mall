@@ -33,6 +33,8 @@ export function CredentialEditModal({
   const [providerKind, setProviderKind] =
     useState<(typeof PROVIDERS)[number]>("DEEPSEEK");
   const [apiKey, setApiKey] = useState("");
+  const [volcengineAccessKeyId, setVolcengineAccessKeyId] = useState("");
+  const [volcengineSecretAccessKey, setVolcengineSecretAccessKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [active, setActive] = useState(true);
   const [channel, setChannel] = useState("");
@@ -49,6 +51,8 @@ export function CredentialEditModal({
         : "DEEPSEEK") as (typeof PROVIDERS)[number],
     );
     setApiKey("");
+    setVolcengineAccessKeyId("");
+    setVolcengineSecretAccessKey("");
     setBaseUrl(credential?.baseUrl ?? "");
     setActive(credential?.active ?? true);
     setChannel(credential?.channel ?? "");
@@ -57,6 +61,9 @@ export function CredentialEditModal({
   }, [open, credential, defaultProviderKind]);
 
   if (!open) return null;
+
+  const isVolcengine =
+    (isEdit ? credential?.providerKind : providerKind) === "VOLCENGINE";
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -75,6 +82,12 @@ export function CredentialEditModal({
             channel: channel.trim() || null,
             isDefaultForProvider: isDefault,
             ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+            ...(isVolcengine && volcengineAccessKeyId.trim()
+              ? { volcengineAccessKeyId: volcengineAccessKeyId.trim() }
+              : {}),
+            ...(isVolcengine && volcengineSecretAccessKey.trim()
+              ? { volcengineSecretAccessKey: volcengineSecretAccessKey.trim() }
+              : {}),
           }),
         });
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -97,6 +110,12 @@ export function CredentialEditModal({
             baseUrl: baseUrl.trim() || null,
             channel: channel.trim() || null,
             isDefaultForProvider: isDefault,
+            ...(isVolcengine && volcengineAccessKeyId.trim()
+              ? { volcengineAccessKeyId: volcengineAccessKeyId.trim() }
+              : {}),
+            ...(isVolcengine && volcengineSecretAccessKey.trim()
+              ? { volcengineSecretAccessKey: volcengineSecretAccessKey.trim() }
+              : {}),
           }),
         });
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -203,17 +222,51 @@ export function CredentialEditModal({
           )}
 
           <label className="block">
-            <span className="mb-1 block text-sm text-zinc-400">API Key</span>
+            <span className="mb-1 block text-sm text-zinc-400">
+              {isVolcengine ? "ARK API Key（Seedance 2.0 / 推理 · ark-…）" : "API Key"}
+            </span>
             <input
               className="gw-input font-mono"
               type="password"
               minLength={isEdit ? 0 : 8}
               required={!isEdit}
-              placeholder={isEdit ? "留空则不修改" : ""}
+              placeholder={isEdit ? "留空则不修改" : isVolcengine ? "ark-…" : ""}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />
           </label>
+
+          {isVolcengine ? (
+            <>
+              <p className="text-xs leading-relaxed text-zinc-500">
+                仅生视频可只填 ARK API Key。私域人像入库 / 活体认证还须 IAM Access Key（与 ark Key 不同，在火山控制台「访问控制」创建）。
+              </p>
+              <label className="block">
+                <span className="mb-1 block text-sm text-zinc-400">
+                  Access Key ID（可选 · 私域人像 / 活体）
+                </span>
+                <input
+                  className="gw-input font-mono text-xs"
+                  type="password"
+                  placeholder={isEdit ? "留空则不修改" : "AK…"}
+                  value={volcengineAccessKeyId}
+                  onChange={(e) => setVolcengineAccessKeyId(e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-sm text-zinc-400">
+                  Secret Access Key（可选 · 与 Access Key 成对填写）
+                </span>
+                <input
+                  className="gw-input font-mono text-xs"
+                  type="password"
+                  placeholder={isEdit ? "留空则不修改" : ""}
+                  value={volcengineSecretAccessKey}
+                  onChange={(e) => setVolcengineSecretAccessKey(e.target.value)}
+                />
+              </label>
+            </>
+          ) : null}
 
           <label className="block">
             <span className="mb-1 block text-sm text-zinc-400">API URL（可选）</span>

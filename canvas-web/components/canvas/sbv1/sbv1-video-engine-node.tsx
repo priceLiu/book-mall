@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes } from "@xyflow/react";
-import { Maximize2, RefreshCw, Video } from "lucide-react";
+import { Maximize2, Play, RefreshCw, Video } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
@@ -61,8 +61,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const errorBanner = useLibtvRuntimeErrorBanner({
     nodeId: id,
     status: d.runtime?.status,
+    taskId: d.runtime?.taskId,
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
+    dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
   });
 
   const videoUrl =
@@ -259,14 +261,30 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 variant="cyan"
               />
             ) : hasVideo ? (
-              <video
-                src={videoUrl ?? undefined}
-                className="absolute inset-0 size-full object-contain"
-                controls
-                playsInline
-                muted
-                draggable={false}
-              />
+              <div className="group/video absolute inset-0">
+                <video
+                  src={videoUrl ?? undefined}
+                  className="pointer-events-none absolute inset-0 size-full object-contain"
+                  playsInline
+                  muted
+                  preload="metadata"
+                  draggable={false}
+                />
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                  <button
+                    type="button"
+                    aria-label="播放"
+                    title="播放视频"
+                    className="nodrag pointer-events-auto flex size-20 items-center justify-center rounded-full border border-white/25 bg-black/50 shadow-lg backdrop-blur-sm transition-transform group-hover/video:scale-105"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPreviewOpen(true);
+                    }}
+                  >
+                    <Play className="ml-1 size-10 fill-white text-white" />
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center px-3 py-4">
                 <Pro2MediaNodeEmptyState

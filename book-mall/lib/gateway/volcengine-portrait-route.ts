@@ -14,6 +14,7 @@ import {
   type VolcenginePortraitLibrary,
 } from "@/lib/gateway/volcengine-portrait-client";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
+import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import { parseGatewayClientSource } from "@/lib/gateway/poll-service";
 
 export async function handleVolcenginePortraitProxy(
@@ -76,7 +77,7 @@ export async function handleVolcenginePortraitProxy(
   const started = Date.now();
   try {
     const result = await volcenginePortraitProxyRequest({
-      apiKey: cred.apiKey,
+      apiKey: resolveVolcengineArkApiKey(cred.apiKey),
       baseUrl: cred.baseUrl,
       library,
       pathSegments,

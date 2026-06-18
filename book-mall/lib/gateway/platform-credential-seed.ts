@@ -10,6 +10,7 @@ import {
 } from "@/lib/gateway/book-gateway-link";
 import { createGatewayApiKey } from "@/lib/gateway/api-key-service";
 import { createGatewayCredential } from "@/lib/gateway/credential-service";
+import { buildVolcengineCredentialStorage } from "@/lib/gateway/volcengine-gateway-credential";
 import {
   isLegacyPlatformKeyName,
   PERSONAL_KEY_DEFAULT_NAME,
@@ -80,7 +81,12 @@ async function ensureCredential(
     return existing.id;
   }
 
-  const apiKey = process.env[spec.env]?.trim();
+  const apiKey =
+    spec.kind === "VOLCENGINE"
+      ? buildVolcengineCredentialStorage({
+          apiKey: process.env[spec.env]?.trim() ?? "",
+        })
+      : process.env[spec.env]?.trim();
   if (!apiKey) return null;
 
   const created = await createGatewayCredential({

@@ -45,10 +45,6 @@ export function Pro2StarterInputDock() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging),
-  );
-
   const selectedStarter = useMemo(() => {
     const picked = rfNodes.filter(
       (n) => n.selected && n.type === "story-pro2-starter",
@@ -60,6 +56,14 @@ export function Pro2StarterInputDock() {
     if (!selectedStarter) return null;
     return nodes.find((n) => n.id === selectedStarter.id) ?? null;
   }, [selectedStarter, nodes]);
+
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(
+      s.canvasGeometryDragging,
+      s.canvasDraggingNodeId,
+      storeNode?.id ?? null,
+    ),
+  );
 
   const placement = usePro2DockPlacement(selectedStarter?.id ?? null);
   const d = (storeNode?.data ?? {}) as StoryProStarterNodeData;

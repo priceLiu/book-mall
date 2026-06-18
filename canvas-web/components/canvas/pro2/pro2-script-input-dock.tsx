@@ -49,10 +49,6 @@ export function Pro2ScriptInputDock() {
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
 
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging),
-  );
-
   const selectedHub = useMemo(() => {
     const picked = rfNodes.filter(
       (n) => n.selected && n.type === "story-pro2-script-hub",
@@ -64,6 +60,14 @@ export function Pro2ScriptInputDock() {
     if (!selectedHub) return null;
     return nodes.find((n) => n.id === selectedHub.id) ?? null;
   }, [selectedHub, nodes]);
+
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(
+      s.canvasGeometryDragging,
+      s.canvasDraggingNodeId,
+      storeNode?.id ?? null,
+    ),
+  );
 
   const placement = usePro2DockPlacement(selectedHub?.id ?? null);
   const d = (storeNode?.data ?? {}) as StoryProScriptHubNodeData;

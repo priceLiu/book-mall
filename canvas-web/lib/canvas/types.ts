@@ -281,6 +281,8 @@ export type CanvasNodeRuntime = {
   textOutput?: string;
   failCode?: string;
   failMessage?: string;
+  /** 用户已关闭底部错误条的任务 id · 轮询勿再写回同一条失败 */
+  dismissedFailTaskId?: string;
 };
 
 // —— 各节点 data 形状 ——

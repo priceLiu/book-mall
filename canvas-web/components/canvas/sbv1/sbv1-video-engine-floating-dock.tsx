@@ -12,6 +12,7 @@ import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types"
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
+import { useStableLibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
 import { useSbv1DockPlacement } from "./use-sbv1-dock-placement";
 
@@ -23,9 +24,6 @@ export function Sbv1VideoEngineFloatingDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(s.canvasGeometryDragging),
-  );
 
   const selectedEngine = useMemo(() => {
     const picked = rfNodes.filter(
@@ -39,9 +37,19 @@ export function Sbv1VideoEngineFloatingDock() {
     return nodes.find((n) => n.id === selectedEngine.id) ?? null;
   }, [selectedEngine, nodes]);
 
-  const placement = useSbv1DockPlacement(selectedEngine?.id ?? null);
-
   const nodeId = storeNode?.id ?? "";
+  const dockHidden = useCanvasStore((s) =>
+    libtvFloatingDockHidden(
+      s.canvasGeometryDragging,
+      s.canvasDraggingNodeId,
+      nodeId || null,
+    ),
+  );
+
+  const placement = useStableLibtvDockFlowPlacement(
+    useSbv1DockPlacement(selectedEngine?.id ?? null),
+  );
+
   const d = (storeNode?.data ?? {}) as Sbv1VideoEngineNodeData;
   const upstreamLinks = useMemo(
     () => (nodeId ? resolveSbv1UpstreamRefLinks(nodeId, nodes, edges) : []),

@@ -32,6 +32,7 @@ import {
   volcengineGetVideoTask,
   volcengineVideoTaskFailMessage,
 } from "@/lib/gateway/volcengine-client";
+import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 
 export const dynamic = "force-dynamic";
 
@@ -196,7 +197,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Credential unavailable" }, { status: 400 });
       }
       const polled = await volcengineGetVideoTask({
-        apiKey: cred.apiKey,
+        apiKey: resolveVolcengineArkApiKey(cred.apiKey),
         baseUrl: cred.baseUrl,
         taskId,
       });

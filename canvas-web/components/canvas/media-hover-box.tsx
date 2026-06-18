@@ -41,11 +41,15 @@ export type MediaHoverBoxProps = {
   prompt?: string;
   /** 打开时默认视图 */
   initialView?: "single" | "compare";
+  /** 悬停预览 Eye 尺寸 · 图片节点用 lg（约 2×） */
+  previewIconSize?: "default" | "lg";
 };
 
 /** 悬停 overlay · 仅图标（无黑底药丸、无文案）— 见 design.md §15.2 */
 const OVERLAY_ICON_BTN =
   "nodrag pointer-events-auto inline-flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm transition hover:bg-black/75 hover:scale-[1.03]";
+const OVERLAY_ICON_BTN_LG =
+  "nodrag pointer-events-auto inline-flex size-[4.5rem] items-center justify-center rounded-full border border-white/20 bg-black/55 text-white/90 shadow-lg backdrop-blur-sm transition hover:bg-black/75 hover:scale-[1.03]";
 
 export function MediaHoverBox({
   src,
@@ -62,9 +66,14 @@ export function MediaHoverBox({
   compareContext,
   prompt,
   initialView = "single",
+  previewIconSize = "default",
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const overlayBtnClass =
+    previewIconSize === "lg" ? OVERLAY_ICON_BTN_LG : OVERLAY_ICON_BTN;
+  const overlayIconClass =
+    previewIconSize === "lg" ? "size-8 pointer-events-none" : "size-4 pointer-events-none";
   const kind =
     mediaKind ?? (src && isVideoMediaUrl(src) ? "video" : "image");
   const canPreview = !!src;
@@ -162,9 +171,9 @@ export function MediaHoverBox({
                 title="上传 / 替换"
                 aria-label="上传 / 替换"
                 onClick={triggerUpload}
-                className={OVERLAY_ICON_BTN}
+                className={overlayBtnClass}
               >
-                <Upload className="size-4 pointer-events-none" strokeWidth={1.75} />
+                <Upload className={overlayIconClass} strokeWidth={1.75} />
               </button>
             ) : null}
             {canPreview ? (
@@ -173,9 +182,9 @@ export function MediaHoverBox({
                 title="预览大图"
                 aria-label="预览"
                 onClick={openPreview}
-                className={OVERLAY_ICON_BTN}
+                className={overlayBtnClass}
               >
-                <Eye className="size-4 pointer-events-none" strokeWidth={1.75} />
+                <Eye className={overlayIconClass} strokeWidth={1.75} />
               </button>
             ) : null}
           </div>

@@ -78,7 +78,7 @@ export function formatVolcenginePortraitLivenessError(opts: {
   if (opts.status === 401 || opts.status === 403) {
     return (
       "火山 IAM Access Key 无效或无 portrait 权限。" +
-      "请检查 VOLCENGINE_ACCESS_KEY / VOLCENGINE_SECRET_ACCESS_KEY。"
+      "请在 Gateway 火山凭证中检查 Access Key / Secret Access Key。"
     );
   }
 
