@@ -17,10 +17,11 @@ function safeFinalCallback(raw: string | null): string {
   return t;
 }
 
-/** 子站 tools-logout 链的下一步：继续下一 origin 或回到 Book 最终页。 */
+/** 子站 tools-logout 链（无 Set-Cookie，可安全 302 到外站）。 */
 export async function GET(request: NextRequest) {
   const stepRaw = Number(request.nextUrl.searchParams.get("step") ?? "0");
-  const step = Number.isFinite(stepRaw) && stepRaw > 0 ? Math.floor(stepRaw) : 0;
+  const step =
+    Number.isFinite(stepRaw) && stepRaw >= 0 ? Math.floor(stepRaw) : 0;
   const finalUrl = resolveBookMallCallbackUrl(
     safeFinalCallback(request.nextUrl.searchParams.get("final")),
     request.nextUrl.origin,
