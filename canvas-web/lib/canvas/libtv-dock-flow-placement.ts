@@ -22,6 +22,12 @@ type NodeFlowGeometry = {
   h: number;
 };
 
+type PlacementOpts = {
+  minFlowWidth?: number;
+  defaultNodeWidth?: number;
+  defaultNodeHeight?: number;
+};
+
 function geometryEqual(a: NodeFlowGeometry | null, b: NodeFlowGeometry | null) {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -37,10 +43,7 @@ function nodeStyleSize(node: CanvasFlowNode, axis: "width" | "height"): number |
 
 function geometryFromStoreNode(
   node: CanvasFlowNode,
-  opts?: {
-    defaultNodeWidth?: number;
-    defaultNodeHeight?: number;
-  },
+  opts?: PlacementOpts,
 ): NodeFlowGeometry {
   const w =
     (typeof node.width === "number" ? node.width : undefined) ??
@@ -66,18 +69,25 @@ function placementFromGeometry(
   };
 }
 
+function selectStoreGeometry(
+  nodes: CanvasFlowNode[],
+  nodeId: string | null,
+  opts?: PlacementOpts,
+): NodeFlowGeometry | null {
+  if (!nodeId) return null;
+  const node = nodes.find((n) => n.id === nodeId);
+  if (!node) return null;
+  return geometryFromStoreNode(node, opts);
+}
+
 /**
  * 输入坞锚点（画布 flow 坐标 · 随节点拖动 / pan/zoom 实时更新）。
  * 订阅 React Flow nodeLookup，避免松手后 zustand 与 RF 短暂不同步导致定位偏移。
- * RF 裁剪未渲染节点时回退 zustand 坐标，避免 pan/zoom 时 Dock 闪没。
+ * RF 裁剪未渲染节点时回退 zustand 坐标；equality 忽略 prompt 等 data 变更。
  */
 export function useLibtvDockFlowPlacement(
   nodeId: string | null,
-  opts?: {
-    minFlowWidth?: number;
-    defaultNodeWidth?: number;
-    defaultNodeHeight?: number;
-  },
+  opts?: PlacementOpts,
 ): LibtvDockFlowPlacement | null {
   const geometry = useStore(
     useCallback(
@@ -107,14 +117,10 @@ export function useLibtvDockFlowPlacement(
 
   const storeGeometry = useCanvasStore(
     useCallback(
-      (s) => {
-        if (!nodeId) return null;
-        const node = s.nodes.find((n) => n.id === nodeId);
-        if (!node) return null;
-        return geometryFromStoreNode(node, opts);
-      },
+      (s) => selectStoreGeometry(s.nodes, nodeId, opts),
       [nodeId, opts?.defaultNodeWidth, opts?.defaultNodeHeight],
     ),
+    geometryEqual,
   );
 
   return useMemo(() => {

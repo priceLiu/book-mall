@@ -28,7 +28,7 @@ export type Pro2InputDockShellProps = {
   dockClassName?: string;
   /** 默认 flowAnchor.flowW */
   width?: number;
-  /** 拖动节点时隐藏（仍挂载 · 保持锚点跟随） */
+  /** 拖动所属节点时隐藏（仍挂载 · 保持锚点与输入状态） */
   hidden?: boolean;
 };
 

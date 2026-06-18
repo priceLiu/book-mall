@@ -4,6 +4,7 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -14,6 +15,7 @@ import {
   type CSSProperties,
   type KeyboardEventHandler,
   type MouseEvent,
+  type Ref,
 } from "react";
 
 import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
@@ -71,6 +73,12 @@ export type MentionsTextareaProps = {
   mentionInlineThumbHoverOnText?: boolean;
   /** mentionInlineThumb 边框色 · pro2 紫 / sbv1 cyan */
   mentionEdition?: "pro2" | "sbv1";
+  /** 提交前 flush 本地 draft（生成按钮 / Enter 发送） */
+  commitHandleRef?: Ref<MentionsTextareaCommitHandle>;
+};
+
+export type MentionsTextareaCommitHandle = {
+  flushDraft: () => void;
 };
 
 const TOKEN_RE = /@<([^>\s]+)>/g;
@@ -150,6 +158,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       mentionInlineThumb = false,
       mentionInlineThumbHoverOnText = false,
       mentionEdition = "pro2",
+      commitHandleRef,
     },
     ref,
   ) {
@@ -214,6 +223,16 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
     } = useDeferredTextCommit(externalDisplay, (display, meta) => {
       emit(display, meta.commit);
     });
+
+    useImperativeHandle(
+      commitHandleRef,
+      () => ({
+        flushDraft: () => {
+          flushEmit(innerRef.current?.value ?? displayValue);
+        },
+      }),
+      [displayValue, flushEmit],
+    );
 
     const setRef = (el: HTMLTextAreaElement | null) => {
       innerRef.current = el;

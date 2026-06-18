@@ -9,8 +9,14 @@ import {
   linkGatewayApiKeyForUser,
 } from "@/lib/gateway/book-gateway-link";
 import { createGatewayApiKey } from "@/lib/gateway/api-key-service";
-import { createGatewayCredential } from "@/lib/gateway/credential-service";
-import { buildVolcengineCredentialStorage } from "@/lib/gateway/volcengine-gateway-credential";
+import {
+  createGatewayCredential,
+  getDecryptedCredentialApiKey,
+  updateGatewayCredential,
+} from "@/lib/gateway/credential-service";
+import {
+  buildVolcengineCredentialStorageFromEnv,
+} from "@/lib/gateway/volcengine-gateway-credential";
 import {
   isLegacyPlatformKeyName,
   PERSONAL_KEY_DEFAULT_NAME,
@@ -78,14 +84,25 @@ async function ensureCredential(
         data: { baseUrl: targetBase },
       });
     }
+    if (spec.kind === "VOLCENGINE") {
+      const decrypted = await getDecryptedCredentialApiKey(existing.id);
+      try {
+        const apiKey = buildVolcengineCredentialStorageFromEnv(decrypted?.apiKey);
+        await updateGatewayCredential(gatewayUserId, existing.id, {
+          apiKey,
+          active: true,
+          ...(targetBase ? { baseUrl: targetBase } : {}),
+        });
+      } catch {
+        /* env 未配齐时保留已有凭证 */
+      }
+    }
     return existing.id;
   }
 
   const apiKey =
     spec.kind === "VOLCENGINE"
-      ? buildVolcengineCredentialStorage({
-          apiKey: process.env[spec.env]?.trim() ?? "",
-        })
+      ? buildVolcengineCredentialStorageFromEnv()
       : process.env[spec.env]?.trim();
   if (!apiKey) return null;
 

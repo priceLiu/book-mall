@@ -1,0 +1,38 @@
+---
+description: LibTV 浮动输入坞持久化 — 全节点一致，仅拖动所属节点时隐藏
+globs:
+  - canvas-web/components/canvas/**/*-input-dock*.tsx
+  - canvas-web/components/canvas/**/*floating-dock*.tsx
+  - canvas-web/components/canvas/libtv-image-input-dock.tsx
+  - canvas-web/lib/canvas/use-libtv-floating-dock.ts
+  - canvas-web/lib/canvas/use-viewport-transform-active.ts
+  - canvas-web/lib/canvas/libtv-dock-flow-placement.ts
+---
+
+# LibTV 浮动输入坞 · 持久化（Pro2 + sbv1 统一）
+
+权威文档：`canvas-web/docs/libtv-node-interaction-spec.md` §2.3
+
+## 唯一隐藏条件
+
+- **仅**当用户 **position 拖动**「本 Dock 所属节点」时，`Pro2InputDockShell` 传 `hidden={true}`。
+- 使用 **`useLibtvFloatingDock(dockNodeId)`** 或 **`useLibtvFloatingDockHidden(dockNodeId)`** + **`libtvFloatingDockHidden(canvasDraggingNodeId, dockNodeId)`**。
+
+## 必须保持 Dock（不得卸载 / 不得 hidden）
+
+- 画布 pan、zoom、滚轮/触控板平移
+- NodeResizer 拖角缩放
+- 拖动**其它**节点或组
+- 任务轮询、viewport 裁剪、RF/zustand 短暂不同步
+
+## 禁止
+
+- 用 `canvasGeometryDragging` 或 `canvasViewportMoving` 控制 Dock 显隐
+- 各节点自建 hidden / placement 逻辑（须走统一 hook）
+- `if (!placement) return null` 且无 stable pin（须 `dockReady` + `useStableLibtvDockFlowPlacement`）
+- `dockNodeId` 仅读 zustand、忽略 RF 选中 id
+
+## Code Review
+
+- 新增浮动 Dock → 必须 `useLibtvFloatingDock`
+- PR 出现 `libtvFloatingDockHidden(s.canvasGeometryDragging` → **驳回**

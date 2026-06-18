@@ -5,10 +5,10 @@
  *   cd book-mall
  *   ARK_API_KEY='ark-...' pnpm exec dotenv -e .env.local -- tsx scripts/setup-sbv1-volcengine-gateway.ts [book-user-email]
  *
- * 或于 .env.local 配置 VOLCENGINE_API_KEY / ARK_API_KEY 后：
+ * 或于 .env.local 配置 VOLCENGINE_API_KEY + VOLCENGINE_ACCESS_KEY / VOLCENGINE_SECRET_ACCESS_KEY 后：
  *   pnpm exec dotenv -e .env.local -- tsx scripts/setup-sbv1-volcengine-gateway.ts
  *
- * 私域人像 IAM（Access Key / Secret）请在 Gateway 控制台「火山方舟」凭证中填写，勿写入 .env。
+ * IAM Access Key / Secret 与 ark Key 一并写入 Gateway 凭证（勿提交 git）。
  */
 import {
   getGatewayLinkStatusForUser,
@@ -20,7 +20,7 @@ import {
   getDecryptedCredentialApiKey,
   updateGatewayCredential,
 } from "../lib/gateway/credential-service";
-import { buildVolcengineCredentialStorage } from "../lib/gateway/volcengine-gateway-credential";
+import { buildVolcengineCredentialStorageFromEnv } from "../lib/gateway/volcengine-gateway-credential";
 import { PERSONAL_KEY_DEFAULT_NAME } from "../lib/gateway/key-scope";
 import { prisma } from "../lib/prisma";
 import {
@@ -44,7 +44,7 @@ async function main() {
     process.exit(1);
   }
 
-  const apiKeyBlob = buildVolcengineCredentialStorage({ apiKey });
+  const apiKeyBlob = buildVolcengineCredentialStorageFromEnv();
 
   const bookUser = emailArg
     ? await prisma.user.findFirst({
@@ -95,10 +95,7 @@ async function main() {
   } else {
     const existing = await getDecryptedCredentialApiKey(credential.id);
     await updateGatewayCredential(gwUser.id, credential.id, {
-      apiKey: buildVolcengineCredentialStorage({
-        apiKey,
-        existingRaw: existing?.apiKey,
-      }),
+      apiKey: buildVolcengineCredentialStorageFromEnv(existing?.apiKey),
       active: true,
       baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     });
@@ -117,10 +114,7 @@ async function main() {
   if (platformCred) {
     const existingPlatform = await getDecryptedCredentialApiKey(platformCred.id);
     await updateGatewayCredential(gwUser.id, platformCred.id, {
-      apiKey: buildVolcengineCredentialStorage({
-        apiKey,
-        existingRaw: existingPlatform?.apiKey,
-      }),
+      apiKey: buildVolcengineCredentialStorageFromEnv(existingPlatform?.apiKey),
       active: true,
       baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     });
@@ -173,7 +167,7 @@ async function main() {
 
   console.log("Book 用户:", bookUser.email);
   console.log("下一步：");
-  console.log("  1. Gateway 控制台编辑「火山方舟」凭证：填入 ark Key + IAM Access Key / Secret（人像入库）");
+  console.log("  1. 确认 .env.local 已配置 VOLCENGINE_API_KEY + VOLCENGINE_ACCESS_KEY + VOLCENGINE_SECRET_ACCESS_KEY");
   console.log("  2. 火山控制台开通 doubao-seedance-2.0 / 录入真人人像库");
   console.log("  3. canvas-web 新建「分镜视频 1.0」项目测试生成与私域人像入库");
   console.log("  4. Gateway 日志 model=portrait:virtual 可查看入库原图缩略图");

@@ -4,7 +4,8 @@ import { useCallback, useMemo } from "react";
 import { ArrowUp, Loader2 } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { libtvFloatingDockHidden } from "@/lib/canvas/use-viewport-transform-active";
+import { useLibtvFloatingDockHidden } from "@/lib/canvas/use-libtv-floating-dock";
+import { useStableLibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
@@ -34,13 +35,8 @@ export function Pro2FrameCellInputDock() {
     return picked.length === 1 ? picked[0] : null;
   }, [rfNodes]);
 
-  const dockHidden = useCanvasStore((s) =>
-    libtvFloatingDockHidden(
-      s.canvasGeometryDragging,
-      s.canvasDraggingNodeId,
-      selectedFrame?.id ?? null,
-    ),
-  );
+  const dockNodeId = selectedFrame?.id ?? null;
+  const dockHidden = useLibtvFloatingDockHidden(dockNodeId);
 
   const activeFocus = useMemo(() => {
     if (!focus || !selectedFrame || focus.nodeId !== selectedFrame.id) {
@@ -54,10 +50,11 @@ export function Pro2FrameCellInputDock() {
     return nodes.find((n) => n.id === activeFocus.nodeId) ?? null;
   }, [activeFocus, nodes]);
 
-  const placement = usePro2FrameCellDockPlacement(
+  const rawPlacement = usePro2FrameCellDockPlacement(
     activeFocus?.nodeId ?? null,
     activeFocus?.rowKey ?? null,
   );
+  const placement = useStableLibtvDockFlowPlacement(rawPlacement);
 
   const row = useMemo(() => {
     if (!storeNode || !activeFocus) return null;

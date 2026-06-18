@@ -28,15 +28,13 @@ export function useViewportTransformActive(active: boolean): FlowViewport {
 
 /**
  * 浮动 Dock 是否隐藏。
- * - 画布 pan/zoom：不隐藏（由 flow-canvas onMoveStart 清掉误触的 geometryDragging）
- * - 节点拖动：仅隐藏「正在被拖」的那张卡片的 Dock，其它节点已打开的 Dock 保持
+ * 唯一条件：正在 position 拖动「本 Dock 所属节点」。
+ * 勿绑 canvasGeometryDragging（resize / 误触会误隐藏）。
  */
 export function libtvFloatingDockHidden(
-  geometryDragging: boolean,
   draggingNodeId?: string | null,
   dockNodeId?: string | null,
 ): boolean {
-  if (!geometryDragging) return false;
-  if (!dockNodeId) return true;
+  if (!draggingNodeId || !dockNodeId) return false;
   return draggingNodeId === dockNodeId;
 }

@@ -68,13 +68,19 @@ LIBTV_NODE_OUTER_CLASS          ← overflow-visible，供侧 + 露出
 | 规则 | 说明 |
 | --- | --- |
 | 禁止内嵌 Dock | `pro2ImageNodeUsesEmbeddedDock` · `sbv1ImageNodeUsesEmbeddedDock` · `pro2ThreeViewNodeUsesEmbeddedDock` **均恒为 false** |
-| 浮动 Dock | 选中唯一节点 → 节点下方 `Pro2InputDockShell` / 视频 `Sbv1VideoEngineFloatingDock` |
+| 浮动 Dock | 选中**唯一**节点 → 节点下方 `Pro2InputDockShell` / 视频 `Sbv1VideoEngineFloatingDock` |
 | 空态整卡可拖 | Stage 使用 `Pro2MediaNodeEmptyState` + **`passNodeDrag`** |
 | 三视图 | 同图片节点；`Pro2ThreeViewInputDock` |
-| **拖动时隐藏** | 仅**节点拖动**期间（`canvasGeometryDragging=true`）浮动 Dock 须 `hidden`；画布 pan/zoom 时保持显示；松手后自动恢复 |
+| **唯一隐藏条件** | 仅当 **position 拖动本 Dock 所属节点** 时 `Pro2InputDockShell` 传 `hidden={true}`（`visibility:hidden`，仍挂载 · 保留输入/展开状态） |
+| **必须保持显示** | 画布 **pan / zoom / 滚轮平移** · **拖角缩放 NodeResizer** · **拖动其它节点** · **组内 relayout** — Dock **不得**卸载或清空内容 |
+| **禁止绑定** | 勿用 `canvasGeometryDragging` / `canvasViewportMoving` 控制 Dock 显隐（resize 与误触会误隐藏） |
+| **统一实现** | **`useLibtvFloatingDock(dockNodeId)`**（`lib/canvas/use-libtv-floating-dock.ts`）· 自定义锚点（分镜格）用 **`useLibtvFloatingDockHidden`** + **`useStableLibtvDockFlowPlacement`** |
+| **dockNodeId** | 须优先 **RF 选中 id**（`selectedX?.id`），再 fallback store，避免 zustand/RF 短暂不同步导致 Dock 闪没 |
+| **锚点持久** | `useLibtvDockFlowPlacement`（RF + zustand 回退）+ `useStableLibtvDockFlowPlacement`（上一帧 pin） |
 
-**实现**：`Pro2InputDockShell` 传 `hidden={canvasGeometryDragging}`；sbv1 组件（`Sbv1VideoEngineFloatingDock`、`Sbv1ImageInputDock`）已内置。
-Pro2 所有浮动 Dock（`Pro2StarterInputDock` · `Pro2ScriptInputDock` · `Pro2ImageInputDock` · `Pro2ThreeViewInputDock` · `Pro2FrameCellInputDock`）须同样传入。
+**适用组件（须全部一致）**：`LibtvImageInputDock` · `Sbv1VideoEngineFloatingDock` · `Pro2StarterInputDock` · `Pro2ScriptInputDock` · `Pro2ThreeViewInputDock` · `Pro2FrameCellInputDock`（hidden 规则同；锚点用格位 placement）。
+
+**拖动登记**：`flow-canvas.tsx` · `canvasDraggingNodeId` 仅 position 拖动写入；resize 开始时 **清空** `canvasDraggingNodeId`。
 
 ## 5. 节点顶栏工具条（`Pro2ImageNodeToolbar`）
 

@@ -53,6 +53,7 @@ description: >-
 | 预览 | `MediaHoverBox` · 仅 Eye `nodrag` |
 | **Dock @ 悬停预览** | **`MentionsTextarea`** · `mentionHoverPreview` · 见 [reference-dock-mentions.md](reference-dock-mentions.md) |
 | spawn 后 | `select*AfterSpawn` + `sortNodesForReactFlow` |
+| **浮动 Dock 持久化** | **`useLibtvFloatingDock(dockNodeId)`** · 仅拖动所属节点时 `hidden` · 见 `libtv-node-interaction-spec.md` §2.3 |
 
 ## 节点速查
 
