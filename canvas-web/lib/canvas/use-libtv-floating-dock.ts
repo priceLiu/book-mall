@@ -29,33 +29,25 @@ function soleSelectedNodeIdOfType(
 }
 
 /**
- * LibTV 浮动 Dock · 选中节点 id（RF 优先，store fallback，短暂丢失时 latch）
+ * LibTV 浮动 Dock · 选中节点 id（RF 优先，store 钉选 fallback）
  *
- * LibTV 画布 `preserveRfSelection` 下 RF 为选中真相源；勿仅读 zustand.selected。
+ * LibTV 选中态在 RF；pan/zoom 时可能闪断。`setLibtvFloatingDockSelection` 在 select 变更时写入 store。
  */
 export function useLibtvSoleSelectedNodeId(nodeType: string): string | null {
   const rfNodes = useNodes();
-  const latchedRef = useRef<string | null>(null);
+
+  const pinnedId = useCanvasStore(
+    (s) =>
+      s.libtvFloatingDockNodeType === nodeType ? s.libtvFloatingDockNodeId : null,
+    (a, b) => a === b,
+  );
 
   const rfId = useMemo(
     () => soleSelectedNodeIdOfType(rfNodes, nodeType),
     [rfNodes, nodeType],
   );
 
-  const storeId = useCanvasStore(
-    (s) => soleSelectedNodeIdOfType(s.nodes, nodeType),
-    (a, b) => a === b,
-  );
-
-  const resolved = rfId ?? storeId;
-  if (resolved) {
-    latchedRef.current = resolved;
-  } else if (rfId === null && storeId === null) {
-    const anyRf = rfNodes.some((n) => n.selected && n.type === nodeType);
-    if (!anyRf) latchedRef.current = null;
-  }
-
-  return resolved ?? latchedRef.current;
+  return rfId ?? pinnedId;
 }
 
 /**
@@ -71,7 +63,7 @@ export function useLibtvFloatingDock(
 ): {
   placement: LibtvDockFlowPlacement | null;
   hidden: boolean;
-  /** 可渲染 Dock（选中节点且锚点可用或已 latch） */
+  /** 可渲染 Dock（有节点 id 且锚点可用或已 pin） */
   active: boolean;
 } {
   const hidden = useCanvasStore((s) =>
@@ -85,15 +77,9 @@ export function useLibtvFloatingDock(
     nodeId: string;
     placement: LibtvDockFlowPlacement;
   } | null>(null);
-  const latchedRef = useRef(false);
 
   if (dockNodeId && stablePlacement) {
     pinRef.current = { nodeId: dockNodeId, placement: stablePlacement };
-    latchedRef.current = true;
-  }
-  if (!dockNodeId) {
-    pinRef.current = null;
-    latchedRef.current = false;
   }
 
   const placement =
@@ -102,9 +88,7 @@ export function useLibtvFloatingDock(
       ? pinRef.current.placement
       : null);
 
-  const active = Boolean(
-    dockNodeId && placement && (stablePlacement || latchedRef.current),
-  );
+  const active = Boolean(dockNodeId && placement);
 
   return {
     placement,

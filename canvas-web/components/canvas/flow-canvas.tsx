@@ -22,6 +22,7 @@ import {
   isCanvasInteractiveGeometryInProgress,
   isCanvasSelectionOnlyChange,
 } from "@/lib/canvas/canvas-node-changes";
+import { resolveLibtvFloatingDockSelection } from "@/lib/canvas/libtv-floating-dock-selection";
 import {
   isPro2StyledGroup,
   syncPro2MediaGroupZIndex,
@@ -430,6 +431,13 @@ function FlowCanvasInner({
         deferStoreGraphSyncRef.current = false;
         setCanvasGeometryDragging(false);
         setCanvasDraggingNodeId(null);
+        const sel = resolveLibtvFloatingDockSelection(
+          getNodes() as CanvasFlowNode[],
+        );
+        useCanvasStore.getState().setLibtvFloatingDockSelection(
+          sel?.nodeId ?? null,
+          sel?.nodeType ?? null,
+        );
         return;
       }
       deferStoreGraphSyncRef.current = false;
@@ -443,6 +451,7 @@ function FlowCanvasInner({
       setCanvasGeometryDragging,
       setCanvasDraggingNodeId,
       libtvCanvas,
+      getNodes,
     ],
   );
 

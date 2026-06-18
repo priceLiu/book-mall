@@ -21,12 +21,12 @@ import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
 export function Sbv1VideoEngineFloatingDock() {
   const dockNodeId = useLibtvSoleSelectedNodeId("sbv1-video-engine");
 
-  const { placement, hidden, active } = useLibtvFloatingDock(
+  const { placement, hidden } = useLibtvFloatingDock(
     dockNodeId,
     SBV1_VIDEO_DOCK_PLACEMENT_OPTS,
   );
 
-  if (!dockNodeId || !active || !placement) return null;
+  if (!dockNodeId || !placement) return null;
 
   return (
     <Sbv1VideoEngineFloatingDockBody

@@ -130,6 +130,7 @@ function storyRowRuntimeStatus(
   job: StoryRowJob,
 ): string | undefined {
   if (!node || !job.rowKey) return undefined;
+  const rowKey = job.rowKey;
   const rows = (
     node.data as {
       rows?: {
@@ -142,8 +143,8 @@ function storyRowRuntimeStatus(
   ).rows;
   const row = rows?.find((r) =>
     isAnyStorySceneColumnType(node.type ?? "")
-      ? sceneRowKeysEquivalent(r.key, job.rowKey)
-      : r.key === job.rowKey,
+      ? sceneRowKeysEquivalent(r.key, rowKey)
+      : r.key === rowKey,
   );
   if (!row) return undefined;
   if (isAnyStoryVideoColumnType(node.type ?? "")) {
