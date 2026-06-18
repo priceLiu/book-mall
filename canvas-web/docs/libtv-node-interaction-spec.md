@@ -15,7 +15,7 @@
 | 侧栏 `+` | `Pro2NodeSidePlus` | 单击菜单 + 按住拖线 |
 | 顶栏工具条 | `Pro2ImageNodeToolbar` | 有图 + 唯一选中；须 `passNodeDrag` |
 | 浮动 Dock | `Pro2ImageInputDock` / `Sbv1ImageInputDock` / `Pro2ThreeViewInputDock` / `Sbv1VideoEngineFloatingDock` | 锚点 `data-pro2-dock-anchor` + `usePro2DockPlacement`；**禁止内嵌 Dock 占满 stage** |
-| Dock 壳层 | `Pro2InputDockShell` · `Pro2DockPasteZone` · `Pro2DockRefImages` · `Pro2DockUpstreamChips` · `Pro2DockStyleButton` | 模型选择须 `EnginePicker` |
+| Dock 壳层 | `Pro2InputDockShell` · `Pro2DockPasteZone` · `Pro2DockRefImages` · `DockUpstreamRefPreviewCard` · `Pro2DockUpstreamChips` · `Pro2DockStyleButton` | 模型选择须 `EnginePicker`；Dock 输入见 [`libtv-dock-input-spec.md`](./libtv-dock-input-spec.md) |
 | 画布底 Dock | `Sbv1Dock` · `LIBTV_CANVAS_DOCK_BAR_CLASS` | 分镜 1.0 / 2.0 底部磁吸栏共用 |
 | 悬停预览 | `MediaHoverBox` | 仅 Eye 小圆钮 `nodrag` |
 | 空态 / 错误 | `Pro2MediaNodeEmptyState` · `Pro2MediaNodeErrorState` | 空态 **须** `passNodeDrag`（整卡可拖） |

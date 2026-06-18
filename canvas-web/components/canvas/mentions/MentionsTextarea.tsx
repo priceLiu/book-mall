@@ -192,6 +192,8 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
     const [hoverPreview, setHoverPreview] = useState<{
       item: MentionableItem;
       anchorRect: DOMRect;
+      clientX: number;
+      clientY: number;
     } | null>(null);
 
     const getMentionAnchorRect = useCallback(() => {
@@ -415,7 +417,12 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
             if (hoverIdRef.current !== thumbHit.item.id) {
               hoverIdRef.current = thumbHit.item.id;
             }
-            setHoverPreview(thumbHit);
+            setHoverPreview({
+              item: thumbHit.item,
+              anchorRect: thumbHit.anchorRect,
+              clientX,
+              clientY,
+            });
             return;
           }
         }
@@ -447,15 +454,17 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
 
         if (hoverIdRef.current === hit.item.id) {
           setHoverPreview((prev) =>
-            prev?.item.id === hit.item.id && prev.anchorRect === anchorRect
-              ? prev
-              : { item: hit.item, anchorRect },
+            prev?.item.id === hit.item.id &&
+            prev.anchorRect.left === anchorRect.left &&
+            prev.anchorRect.top === anchorRect.top
+              ? { ...prev, clientX, clientY }
+              : { item: hit.item, anchorRect, clientX, clientY },
           );
           return;
         }
 
         hoverIdRef.current = hit.item.id;
-        setHoverPreview({ item: hit.item, anchorRect });
+        setHoverPreview({ item: hit.item, anchorRect, clientX, clientY });
       },
       [
         hoverPreviewEnabled,
@@ -573,6 +582,9 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         <MentionHoverPreviewPortal
           item={hoverPreview?.item ?? null}
           anchorRect={hoverPreview?.anchorRect ?? null}
+          pointerX={hoverPreview?.clientX}
+          pointerY={hoverPreview?.clientY}
+          placement="above-pointer"
         />
       </div>
     );

@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
+import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
+import { MentionHoverPreviewPortal } from "@/components/canvas/mentions/mention-hover-preview";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
 import { useImagePasteWhenActive } from "@/lib/canvas/image-upload-handlers";
@@ -29,6 +31,93 @@ export type Pro2DockRefImagesProps = {
   /** 设置后：上传/粘贴会在锚点左侧生成图片节点并连线（多图） */
   spawnAnchor?: { nodeId: string; nodeType: string };
 };
+
+function DockRefImageChip({
+  refItem,
+  active,
+  disabled,
+  onRemove,
+}: {
+  refItem: StoryRefImage;
+  active: boolean;
+  disabled?: boolean;
+  onRemove: () => void;
+}) {
+  const [hover, setHover] = useState<{
+    rect: DOMRect;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
+
+  const mentionItem: MentionableItem = {
+    id: refItem.id,
+    label: refItem.label,
+    kind: "image",
+    previewUrl: refItem.url,
+  };
+
+  return (
+    <>
+      <div
+        className={cn(
+          "group relative size-9 overflow-hidden rounded-lg border-2 bg-white/[0.04] transition-shadow",
+          active
+            ? PRO2_DOCK_ACTIVE_REF_BORDER_CLASS
+            : PRO2_DOCK_REF_IDLE_BORDER_CLASS,
+        )}
+        title={refItem.label}
+        onMouseEnter={(e) => {
+          if (!refItem.url) return;
+          setHover({
+            rect: e.currentTarget.getBoundingClientRect(),
+            clientX: e.clientX,
+            clientY: e.clientY,
+          });
+        }}
+        onMouseMove={(e) => {
+          if (!refItem.url) return;
+          setHover({
+            rect: e.currentTarget.getBoundingClientRect(),
+            clientX: e.clientX,
+            clientY: e.clientY,
+          });
+        }}
+        onMouseLeave={() => setHover(null)}
+      >
+        {refItem.url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={refItem.url}
+            alt={refItem.label}
+            className="size-full object-cover"
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center text-[9px] text-white/40">
+            图
+          </div>
+        )}
+        <button
+          type="button"
+          className="nodrag absolute right-0 top-0 z-10 flex size-4 items-center justify-center bg-black/80 text-white/85 transition hover:bg-black hover:text-white"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          disabled={disabled}
+        >
+          <X className="size-2.5" />
+        </button>
+      </div>
+      <MentionHoverPreviewPortal
+        item={hover ? mentionItem : null}
+        anchorRect={hover?.rect ?? null}
+        pointerX={hover?.clientX}
+        pointerY={hover?.clientY}
+        placement="above-pointer"
+      />
+    </>
+  );
+}
 
 /** 输入坞 · 参考图 chip 行（粘贴 / 上传） */
 export function Pro2DockRefImages({
@@ -135,47 +224,23 @@ export function Pro2DockRefImages({
       onBlurCapture={() => setPasteZoneActive(false)}
     >
       {refs.map((ref) => (
-        <div
+        <DockRefImageChip
           key={ref.id}
-          className={cn(
-            "group relative size-9 overflow-hidden rounded-lg border-2 bg-white/[0.04] transition-shadow",
-            activeIds.includes(ref.id)
-              ? PRO2_DOCK_ACTIVE_REF_BORDER_CLASS
-              : PRO2_DOCK_REF_IDLE_BORDER_CLASS,
-          )}
-          title={ref.label}
-        >
-          {ref.url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={ref.url}
-              alt={ref.label}
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center text-[9px] text-white/40">
-              图
-            </div>
-          )}
-          <button
-            type="button"
-            className="absolute right-0 top-0 flex size-4 items-center justify-center bg-black/65 text-white/90 opacity-0 transition group-hover:opacity-100"
-            onClick={() => {
-              const next = removeDockRefFromState(
-                refs,
-                ref.id,
-                promptValue ?? "",
-              );
-              onChange(next.refs);
-              if (onPromptChange && promptValue != null && next.prompt !== promptValue) {
-                onPromptChange(next.prompt);
-              }
-            }}
-            disabled={disabled}
-          >
-            <X className="size-2.5" />
-          </button>
-        </div>
+          refItem={ref}
+          active={activeIds.includes(ref.id)}
+          disabled={disabled}
+          onRemove={() => {
+            const next = removeDockRefFromState(refs, ref.id, promptValue ?? "");
+            onChange(next.refs);
+            if (
+              onPromptChange &&
+              promptValue != null &&
+              next.prompt !== promptValue
+            ) {
+              onPromptChange(next.prompt);
+            }
+          }}
+        />
       ))}
       {spawnAnchor || refs.length < maxCount ? (
         <button
@@ -184,7 +249,11 @@ export function Pro2DockRefImages({
             "flex size-9 items-center justify-center rounded-lg border border-dashed border-white/[0.1] text-white/40 transition hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/70",
             disabled && "cursor-not-allowed opacity-40",
           )}
-          title={spawnAnchor ? "上传或粘贴参考图（生成左侧图片节点）" : "上传或粘贴参考图"}
+          title={
+            spawnAnchor
+              ? "上传或粘贴参考图（生成左侧图片节点）"
+              : "上传或粘贴参考图"
+          }
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
         >

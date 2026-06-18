@@ -8,7 +8,6 @@ import {
   Loader2,
   Plus,
   SlidersHorizontal,
-  X,
   Zap,
 } from "lucide-react";
 import {
@@ -16,7 +15,7 @@ import {
   type MentionableItem,
   type MentionsTextareaCommitHandle,
 } from "@/components/canvas/mentions/MentionsTextarea";
-import { MentionHoverPreviewPortal } from "@/components/canvas/mentions/mention-hover-preview";
+import { DockUpstreamRefPreviewCard } from "@/components/canvas/pro2/dock-upstream-ref-preview-card";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
@@ -29,7 +28,6 @@ import { spawnSbv1PastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   SBV1_CHAT_INPUT_TEXTAREA_CLASS,
-  SBV1_REF_THUMB_CLASS,
 } from "@/lib/canvas/sbv1-node-chrome";
 import {
   getSbv1VolcengineModelById,
@@ -40,10 +38,6 @@ import { useModelCreditsPreview } from "@/lib/canvas/use-model-credits-preview";
 import type { Sbv1UpstreamRefLink } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
-import {
-  SBV1_DOCK_ACTIVE_REF_BORDER_CLASS,
-  SBV1_DOCK_REF_IDLE_BORDER_CLASS,
-} from "@/lib/canvas/dock-active-ref-chrome";
 import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import {
   portraitImportUiState,
@@ -56,84 +50,6 @@ import {
   Sbv1VideoGenerateSettingsModal,
   sbv1VideoSettingsTriggerLabel,
 } from "./sbv1-video-generate-settings-modal";
-
-function RefPreviewCard({
-  link,
-  active,
-  importState,
-  onDisconnect,
-}: {
-  link: Sbv1UpstreamRefLink;
-  active: boolean;
-  importState: ReturnType<typeof portraitImportUiState>;
-  onDisconnect: () => void;
-}) {
-  const [hoverPreview, setHoverPreview] = useState<DOMRect | null>(null);
-  const mentionItem: MentionableItem = {
-    id: link.id,
-    label: link.label,
-    kind: "image",
-    previewUrl: link.previewUrl,
-  };
-
-  return (
-    <>
-      <div
-        className={cn(
-          SBV1_REF_THUMB_CLASS,
-          "group border-2 transition-shadow",
-          active ? SBV1_DOCK_ACTIVE_REF_BORDER_CLASS : SBV1_DOCK_REF_IDLE_BORDER_CLASS,
-        )}
-        onMouseEnter={(e) => {
-          if (!link.previewUrl) return;
-          setHoverPreview(e.currentTarget.getBoundingClientRect());
-        }}
-        onMouseLeave={() => setHoverPreview(null)}
-      >
-      {link.previewUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={link.previewUrl}
-          alt={link.label}
-          className="size-full object-cover"
-        />
-      ) : (
-        <div className="flex size-full items-center justify-center text-white/30">
-          <ImageIcon className="size-4" />
-        </div>
-      )}
-      <p className="pointer-events-none absolute bottom-0 left-0 right-0 truncate bg-black/65 px-1 py-0.5 text-[9px] text-white/80">
-        {link.label}
-      </p>
-      {importState === "active" ? (
-        <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-emerald-600/90 px-1 py-px text-[8px] font-medium text-white">
-          已入库
-        </span>
-      ) : importState === "pending" ? (
-        <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-amber-600/90 px-1 py-px text-[8px] font-medium text-white">
-          入库中
-        </span>
-      ) : link.previewUrl ? (
-        <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-rose-600/90 px-1 py-px text-[8px] font-medium text-white">
-          未入库
-        </span>
-      ) : null}
-      <button
-        type="button"
-        className="nodrag absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded bg-black/75 text-white/70 opacity-0 transition hover:text-white group-hover:opacity-100"
-        title="断开连线"
-        onClick={onDisconnect}
-      >
-        <X className="size-2.5" />
-      </button>
-      </div>
-      <MentionHoverPreviewPortal
-        item={hoverPreview ? mentionItem : null}
-        anchorRect={hoverPreview}
-      />
-    </>
-  );
-}
 
 export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
   nodeId,
@@ -280,13 +196,15 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               sourceNode?.data as CanvasPortraitNodeFields | undefined,
             );
             return (
-            <RefPreviewCard
-              key={link.id}
-              link={link}
-              active={activeRefIds.includes(link.id)}
-              importState={importState}
-              onDisconnect={() => onDisconnect(link)}
-            />
+              <DockUpstreamRefPreviewCard
+                key={link.id}
+                id={link.id}
+                label={link.label}
+                previewUrl={link.previewUrl}
+                active={activeRefIds.includes(link.id)}
+                importBadge={importState}
+                onDisconnect={() => onDisconnect(link)}
+              />
             );
           })}
         </div>
