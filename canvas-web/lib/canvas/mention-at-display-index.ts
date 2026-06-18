@@ -1,4 +1,11 @@
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
+import { MENTION_THUMB_SLOT_CHAR } from "@/lib/canvas/mention-inline-thumb-placeholder";
+
+function isMentionTokenBreak(ch: string | undefined): boolean {
+  if (!ch) return false;
+  if (ch === MENTION_THUMB_SLOT_CHAR) return false;
+  return /\s/.test(ch);
+}
 
 /** 光标/鼠标在展示文案中的位置是否落在某个 @mention 上 */
 export function findMentionAtDisplayIndex(
@@ -24,7 +31,7 @@ export function findMentionRangeAtDisplayIndex(
       atPos = i;
       break;
     }
-    if (i < clamped && /\s/.test(display[i]!)) break;
+    if (isMentionTokenBreak(display[i])) break;
   }
   if (atPos < 0) return null;
 

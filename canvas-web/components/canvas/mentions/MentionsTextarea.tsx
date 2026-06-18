@@ -22,6 +22,11 @@ import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 import { disposeTextareaCaretMirror } from "@/lib/canvas/textarea-caret-rect";
 import { useDeferredTextCommit } from "@/lib/canvas/use-deferred-text-commit";
+import {
+  ensureMentionThumbSlots,
+  MENTION_THUMB_SLOT_CHAR,
+  stripMentionThumbSlots,
+} from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { findMentionRangeAtDisplayIndex } from "@/lib/canvas/mention-at-display-index";
 import {
   getMentionRangeClientRect,
@@ -200,17 +205,21 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       return getTextareaCaretClientRect(el, pos);
     }, [anchorTick]);
 
-    const externalDisplay = useMemo(
-      () => promptToDisplay(value, mentionables),
-      [value, mentionables],
-    );
+    const externalDisplay = useMemo(() => {
+      const base = promptToDisplay(value, mentionables);
+      if (!inlineThumbEnabled) return base;
+      return ensureMentionThumbSlots(base, mentionables, mentionEdition);
+    }, [value, mentionables, inlineThumbEnabled, mentionEdition]);
 
     const emit = useCallback(
       (display: string, commit: boolean) => {
-        const canonical = promptFromDisplay(display, mentionables);
+        const cleaned = inlineThumbEnabled
+          ? stripMentionThumbSlots(display)
+          : display;
+        const canonical = promptFromDisplay(cleaned, mentionables);
         onChange(canonical, parseReferencedIds(canonical), { commit });
       },
-      [mentionables, onChange],
+      [inlineThumbEnabled, mentionables, onChange],
     );
 
     const {
@@ -291,16 +300,21 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           end = cursor;
           start = cursor;
           for (let i = cursor - 1; i >= 0; i--) {
-            if (display[i] === "@") {
+            const ch = display[i]!;
+            if (ch === MENTION_THUMB_SLOT_CHAR) continue;
+            if (ch === "@") {
               start = i;
               break;
             }
-            if (/\s/.test(display[i])) break;
+            if (/\s/.test(ch)) break;
           }
         }
 
         const token = `@${item.label} `;
-        const next = `${display.slice(0, start)}${token}${display.slice(end)}`;
+        let next = `${display.slice(0, start)}${token}${display.slice(end)}`;
+        if (inlineThumbEnabled) {
+          next = ensureMentionThumbSlots(next, mentionables, mentionEdition);
+        }
         pendingCaretRef.current = start + token.length;
         setDisplayDraft(next);
         flushEmit(next);
@@ -314,18 +328,31 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           }
         });
       },
-      [displayValue, flushEmit, setDisplayDraft],
+      [displayValue, flushEmit, inlineThumbEnabled, mentionEdition, mentionables, setDisplayDraft],
     );
 
     const onTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-      const nextDisplay = e.target.value;
+      const raw = e.target.value;
+      const nextDisplay = inlineThumbEnabled
+        ? ensureMentionThumbSlots(raw, mentionables, mentionEdition)
+        : raw;
       const cursor = e.target.selectionStart ?? nextDisplay.length;
-      pendingCaretRef.current = cursor;
+      if (nextDisplay !== raw) {
+        pendingCaretRef.current = cursor + (nextDisplay.length - raw.length);
+      } else {
+        pendingCaretRef.current = cursor;
+      }
       scheduleEmit(nextDisplay);
       let i = cursor - 1;
-      while (i >= 0 && !/\s/.test(nextDisplay[i])) {
-        if (nextDisplay[i] === "@") {
-          const tail = nextDisplay.slice(i + 1, cursor);
+      while (i >= 0) {
+        const ch = nextDisplay[i]!;
+        if (ch === MENTION_THUMB_SLOT_CHAR) {
+          i--;
+          continue;
+        }
+        if (/\s/.test(ch)) break;
+        if (ch === "@") {
+          const tail = stripMentionThumbSlots(nextDisplay.slice(i + 1, cursor));
           const matched = mentionables.some((m) => m.label === tail);
           if (!matched && !tail.startsWith("<")) {
             mentionAnchorRef.current = { at: i, cursor };
