@@ -1,11 +1,11 @@
 "use client";
 
-import type { CanvasFlowNode } from "./types";
+import type { Node } from "@xyflow/react";
 import { useCanvasStore } from "./store";
 
 /** LibTV 画布复制/生成后选中：同步 RF 选中态 + 浮动 Dock 锚点（store 选中在 LibTV 下不写 undo） */
 export function selectLibtvNodeAfterDuplicate(
-  rfSetNodes: (fn: (nodes: CanvasFlowNode[]) => CanvasFlowNode[]) => void,
+  rfSetNodes: (payload: Node[] | ((nodes: Node[]) => Node[])) => void,
   nodeId: string,
   nodeType: string,
 ): void {
