@@ -5,7 +5,6 @@ import {
   useCallback,
   useImperativeHandle,
   useLayoutEffect,
-  useMemo,
   useRef,
   type ReactNode,
   type RefObject,
@@ -13,10 +12,12 @@ import {
 import type { MentionableItem } from "./MentionsTextarea";
 import { findAllMentionRangesInDisplay } from "@/lib/canvas/mention-at-display-index";
 import {
-  countMentionThumbSlotsAt,
-  MENTION_THUMB_SLOT_CHAR,
-  skipMentionThumbSlotRun,
-} from "@/lib/canvas/mention-inline-thumb-placeholder";
+  INLINE_MENTION_BADGE_GAP_PX,
+  INLINE_MENTION_THUMB_PX,
+} from "@/lib/canvas/mention-inline-thumb-metrics";
+import { stripMentionThumbSlots } from "@/lib/canvas/mention-inline-thumb-placeholder";
+import { LIBTV_INPUT_DOCK_BG } from "@/lib/canvas/libtv-node-chrome";
+import { getTextareaCaretClientRect } from "@/lib/canvas/textarea-caret-rect";
 import { cn } from "@/lib/utils";
 
 export type MentionInlineThumbMirrorHandle = {
@@ -27,147 +28,152 @@ export type MentionInlineThumbMirrorHandle = {
 };
 
 const THUMB_HIT_PAD = 2;
+const BADGE_HEIGHT_PX = 24;
 
-/** 相对字号 em · 与正文行高对齐 */
-const THUMB_SIZE_DEFAULT = 0.82;
-const THUMB_SIZE_SBV1 = 0.86;
-
-function pointInRect(
-  x: number,
-  y: number,
-  rect: DOMRect,
-  pad = 0,
-): boolean {
-  return (
-    x >= rect.left - pad &&
-    x <= rect.right + pad &&
-    y >= rect.top - pad &&
-    y <= rect.bottom + pad
-  );
-}
+type BadgePlacement = {
+  item: MentionableItem;
+  label: string;
+  left: number;
+  top: number;
+  maskWidth: number;
+};
 
 function thumbBorderClass(edition: "pro2" | "sbv1"): string {
   return edition === "sbv1"
-    ? "border-cyan-400/70 shadow-[0_0_0_1px_rgba(34,211,238,0.35)]"
-    : "border-violet-400/70 shadow-[0_0_0_1px_rgba(167,139,250,0.35)]";
+    ? "border-cyan-400/70"
+    : "border-violet-400/70";
 }
 
-const MIRROR_LAYOUT_PROPS = [
-  "boxSizing",
-  "direction",
-  "fontFamily",
-  "fontSize",
-  "fontStyle",
-  "fontVariant",
-  "fontWeight",
-  "letterSpacing",
-  "lineHeight",
-  "overflowWrap",
-  "paddingTop",
-  "paddingRight",
-  "paddingBottom",
-  "paddingLeft",
-  "tabSize",
-  "textAlign",
-  "textTransform",
-  "whiteSpace",
-  "wordBreak",
-  "wordSpacing",
-] as const;
-
-function InlineMentionThumb({
-  item,
-  sizeEm,
-  borderClass,
-}: {
-  item: MentionableItem;
-  sizeEm: number;
-  borderClass: string;
-}) {
-  if (!item.previewUrl) return null;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={item.previewUrl}
-      alt=""
-      draggable={false}
-      data-mention-thumb=""
-      data-mention-id={item.id}
-      className={cn(
-        "inline-block rounded-[2px] border object-cover",
-        borderClass,
-      )}
-      style={{
-        width: `${sizeEm}em`,
-        height: `${sizeEm}em`,
-        marginLeft: "0.08em",
-        marginRight: "0.06em",
-        verticalAlign: "-0.12em",
-      }}
-      referrerPolicy="no-referrer"
-    />
-  );
-}
-
-function buildMirrorContent(
-  displayValue: string,
+function measureBadgePlacements(
+  textarea: HTMLTextAreaElement,
   mentionables: MentionableItem[],
-  edition: "pro2" | "sbv1",
-  thumbSizeEm: number,
-  borderClass: string,
-): ReactNode[] {
-  const ranges = findAllMentionRangesInDisplay(displayValue, mentionables);
-  if (ranges.length === 0) return [displayValue];
+): BadgePlacement[] {
+  const wrapper = textarea.parentElement;
+  if (!wrapper) return [];
 
-  const parts: ReactNode[] = [];
-  let cursor = 0;
-  let key = 0;
+  const wrapperRect = wrapper.getBoundingClientRect();
+  // 必须用 textarea 当前 DOM 值：受控组件在 input 与 React commit 之间 prop 会滞后
+  const clean = stripMentionThumbSlots(textarea.value);
+  const ranges = findAllMentionRangesInDisplay(clean, mentionables);
+  const out: BadgePlacement[] = [];
 
   for (const range of ranges) {
-    if (range.start > cursor) {
-      parts.push(displayValue.slice(cursor, range.start));
-    }
-    parts.push(displayValue.slice(range.start, range.end));
-    cursor = range.end;
+    if (!range.item.previewUrl) continue;
 
-    const slotCount = countMentionThumbSlotsAt(displayValue, cursor, edition);
-    if (slotCount > 0 && range.item.previewUrl) {
-      cursor += skipMentionThumbSlotRun(displayValue, cursor);
-      parts.push(
-        <InlineMentionThumb
-          key={`thumb-${range.start}-${key++}`}
-          item={range.item}
-          sizeEm={thumbSizeEm}
-          borderClass={borderClass}
-        />,
-      );
-    }
+    const start = getTextareaCaretClientRect(textarea, range.start);
+    const end = getTextareaCaretClientRect(textarea, range.end);
+    if (!start || !end) continue;
+
+    const lineH = start.height || BADGE_HEIGHT_PX;
+    out.push({
+      item: range.item,
+      label: clean.slice(range.start, range.end),
+      left: start.left - wrapperRect.left,
+      top: start.top - wrapperRect.top + (lineH - BADGE_HEIGHT_PX) / 2,
+      maskWidth: Math.max(end.left - start.left, start.height * 0.5),
+    });
   }
 
-  if (cursor < displayValue.length) {
-    const tail = displayValue.slice(cursor);
-    if (
-      tail.includes(MENTION_THUMB_SLOT_CHAR) ||
-      tail.includes("\u2002")
-    ) {
-      parts.push(
-        tail.replace(
-          /[\u2002\u2003]+/g,
-          "",
-        ),
-      );
-    } else {
-      parts.push(tail);
-    }
+  return out;
+}
+
+function expectedThumbMentionCount(
+  textarea: HTMLTextAreaElement,
+  mentionables: MentionableItem[],
+): number {
+  const clean = stripMentionThumbSlots(textarea.value);
+  return findAllMentionRangesInDisplay(clean, mentionables).filter(
+    (r) => r.item.previewUrl,
+  ).length;
+}
+
+function placementKey(p: BadgePlacement): string {
+  return [
+    p.item.id,
+    p.label,
+    Math.round(p.left),
+    Math.round(p.top),
+    Math.round(p.maskWidth),
+  ].join("|");
+}
+
+function syncBadgeDom(
+  root: HTMLDivElement,
+  placements: BadgePlacement[],
+  edition: "pro2" | "sbv1",
+): void {
+  const borderClass = thumbBorderClass(edition);
+  const wanted = new Set(placements.map((p) => p.item.id));
+
+  for (const child of [...root.children]) {
+    const id = (child as HTMLElement).dataset.mentionHostId;
+    if (id && !wanted.has(id)) child.remove();
   }
 
-  return parts;
+  for (const p of placements) {
+    let host = root.querySelector<HTMLElement>(
+      `[data-mention-host-id="${p.item.id}"]`,
+    );
+    if (!host) {
+      host = document.createElement("div");
+      host.dataset.mentionHostId = p.item.id;
+      host.className = "absolute flex items-center";
+      host.style.height = `${BADGE_HEIGHT_PX}px`;
+
+      const mask = document.createElement("span");
+      mask.className = "absolute inset-y-0 left-0";
+      mask.style.backgroundColor = LIBTV_INPUT_DOCK_BG;
+      host.appendChild(mask);
+
+      const badge = document.createElement("span");
+      badge.dataset.mentionInlineBadge = "";
+      badge.dataset.mentionId = p.item.id;
+      badge.className = cn(
+        "relative inline-flex h-6 max-w-[200px] shrink-0 items-center rounded-lg border border-white/10 px-1 text-[13px] leading-none text-white/90",
+        borderClass,
+      );
+      badge.style.backgroundColor = LIBTV_INPUT_DOCK_BG;
+      badge.style.gap = `${INLINE_MENTION_BADGE_GAP_PX}px`;
+
+      const img = document.createElement("img");
+      img.draggable = false;
+      img.dataset.mentionThumb = "";
+      img.className = "shrink-0 rounded-[4px] object-cover";
+      img.style.width = `${INLINE_MENTION_THUMB_PX}px`;
+      img.style.height = `${INLINE_MENTION_THUMB_PX}px`;
+      img.referrerPolicy = "no-referrer";
+
+      const label = document.createElement("span");
+      label.className = "mention-inline-label min-w-0 truncate";
+
+      badge.appendChild(img);
+      badge.appendChild(label);
+      host.appendChild(badge);
+      root.appendChild(host);
+    }
+
+    host.style.left = `${p.left}px`;
+    host.style.top = `${p.top}px`;
+
+    const maskEl = host.firstElementChild as HTMLElement | null;
+    if (maskEl) maskEl.style.width = `${p.maskWidth}px`;
+
+    const badgeEl = host.querySelector<HTMLElement>("[data-mention-inline-badge]");
+    const imgEl = host.querySelector<HTMLImageElement>("img[data-mention-thumb]");
+    const labelEl = host.querySelector<HTMLElement>(".mention-inline-label");
+    if (badgeEl) badgeEl.dataset.mentionId = p.item.id;
+    if (imgEl && p.item.previewUrl && imgEl.src !== p.item.previewUrl) {
+      imgEl.src = p.item.previewUrl;
+    }
+    if (labelEl) labelEl.textContent = p.label;
+  }
 }
 
 /**
- * textarea 透明字 + mirror 分段渲染：@label 后 em space 占位符 → 内联缩略图（与 textarea 同宽换行）。
+ * 内联 mention badge · LibTV 同款 [16px 图 + @label] overlay，textarea 保留纯文本。
+ * DOM 直写 placement，避免输入时 React 重绘闪烁。
  */
-export const MentionInlineThumbMirror = forwardRef<
+export const MentionInlineThumbOverlay = forwardRef<
   MentionInlineThumbMirrorHandle,
   {
     textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -175,100 +181,103 @@ export const MentionInlineThumbMirror = forwardRef<
     mentionables: MentionableItem[];
     enabled: boolean;
     edition?: "pro2" | "sbv1";
-    textareaClassName: string;
   }
->(function MentionInlineThumbMirror(
+>(function MentionInlineThumbOverlay(
   {
     textareaRef,
     displayValue,
     mentionables,
     enabled,
     edition = "pro2",
-    textareaClassName,
   },
   ref,
 ) {
-  const mirrorRef = useRef<HTMLDivElement | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const lastKeyRef = useRef("");
+  const rafRef = useRef<number | null>(null);
 
-  const thumbSizeEm =
-    edition === "sbv1" ? THUMB_SIZE_SBV1 : THUMB_SIZE_DEFAULT;
-  const borderClass = thumbBorderClass(edition);
-
-  const mirrorContent = useMemo(
-    () =>
-      buildMirrorContent(
-        displayValue,
-        mentionables,
-        edition,
-        thumbSizeEm,
-        borderClass,
-      ),
-    [displayValue, mentionables, edition, thumbSizeEm, borderClass],
-  );
-
-  const syncMirrorScroll = useCallback(() => {
+  const remeasure = useCallback(() => {
+    const root = overlayRef.current;
     const ta = textareaRef.current;
-    const mirror = mirrorRef.current;
-    if (!ta || !mirror) return;
-
-    const cs = window.getComputedStyle(ta);
-    for (const prop of MIRROR_LAYOUT_PROPS) {
-      mirror.style[prop] = cs[prop];
+    if (!root || !ta || !enabled) {
+      if (root) root.replaceChildren();
+      lastKeyRef.current = "";
+      return;
     }
-    mirror.scrollTop = ta.scrollTop;
-    mirror.scrollLeft = ta.scrollLeft;
 
-    const h = ta.style.height;
-    mirror.style.height = h || `${ta.offsetHeight}px`;
-  }, [textareaRef]);
+    const next = measureBadgePlacements(ta, mentionables);
+    if (next.length === 0 && expectedThumbMentionCount(ta, mentionables) > 0) {
+      // caret mirror 偶发失败时保留上一帧，避免输入瞬间 badge 全消失
+      return;
+    }
+
+    const key = next.map(placementKey).join(";;");
+    if (key === lastKeyRef.current) return;
+    lastKeyRef.current = key;
+    syncBadgeDom(root, next, edition);
+  }, [textareaRef, mentionables, enabled, edition]);
+
+  const scheduleRemeasure = useCallback(() => {
+    if (rafRef.current !== null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      remeasure();
+    });
+  }, [remeasure]);
 
   useLayoutEffect(() => {
-    if (!enabled) return;
-    syncMirrorScroll();
-    const rafId = requestAnimationFrame(syncMirrorScroll);
-    return () => cancelAnimationFrame(rafId);
-  }, [displayValue, enabled, syncMirrorScroll]);
+    remeasure();
+  }, [displayValue, remeasure]);
 
   useLayoutEffect(() => {
     const ta = textareaRef.current;
     if (!enabled || !ta) return;
 
-    const schedule = () => {
-      requestAnimationFrame(syncMirrorScroll);
-    };
-
-    ta.addEventListener("input", schedule);
-    ta.addEventListener("scroll", schedule, { passive: true });
-    const ro = new ResizeObserver(schedule);
+    ta.addEventListener("input", scheduleRemeasure);
+    ta.addEventListener("compositionend", scheduleRemeasure);
+    ta.addEventListener("scroll", scheduleRemeasure, { passive: true });
+    const ro = new ResizeObserver(scheduleRemeasure);
     ro.observe(ta);
 
     const dockScroll = ta.closest(".pro2-dock-scroll");
-    dockScroll?.addEventListener("scroll", schedule, { passive: true });
+    dockScroll?.addEventListener("scroll", scheduleRemeasure, { passive: true });
+    window.addEventListener("resize", scheduleRemeasure);
 
     return () => {
-      ta.removeEventListener("input", schedule);
-      ta.removeEventListener("scroll", schedule);
-      dockScroll?.removeEventListener("scroll", schedule);
+      ta.removeEventListener("input", scheduleRemeasure);
+      ta.removeEventListener("compositionend", scheduleRemeasure);
+      ta.removeEventListener("scroll", scheduleRemeasure);
+      dockScroll?.removeEventListener("scroll", scheduleRemeasure);
+      window.removeEventListener("resize", scheduleRemeasure);
       ro.disconnect();
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
-  }, [enabled, syncMirrorScroll, textareaRef]);
+  }, [enabled, scheduleRemeasure, textareaRef]);
 
   useImperativeHandle(
     ref,
     () => ({
       resolveThumbAtPoint(clientX, clientY) {
-        const mirror = mirrorRef.current;
-        if (!mirror) return null;
-        const thumbs = mirror.querySelectorAll<HTMLImageElement>(
-          "img[data-mention-thumb]",
+        const overlay = overlayRef.current;
+        if (!overlay) return null;
+        const badges = overlay.querySelectorAll<HTMLElement>(
+          "[data-mention-inline-badge]",
         );
-        for (const el of thumbs) {
-          const id = el.dataset.mentionId;
+        for (const badge of badges) {
+          const id = badge.dataset.mentionId;
           if (!id) continue;
           const item = mentionables.find((m) => m.id === id);
           if (!item?.previewUrl) continue;
-          const rect = el.getBoundingClientRect();
-          if (pointInRect(clientX, clientY, rect, THUMB_HIT_PAD)) {
+          const rect = badge.getBoundingClientRect();
+          if (
+            clientX >= rect.left - THUMB_HIT_PAD &&
+            clientX <= rect.right + THUMB_HIT_PAD &&
+            clientY >= rect.top - THUMB_HIT_PAD &&
+            clientY <= rect.bottom + THUMB_HIT_PAD
+          ) {
             return { item, anchorRect: rect };
           }
         }
@@ -282,23 +291,20 @@ export const MentionInlineThumbMirror = forwardRef<
 
   return (
     <div
-      ref={mirrorRef}
+      ref={overlayRef}
       aria-hidden
-      className={cn(
-        textareaClassName,
-        "pointer-events-none absolute inset-0 z-[1] overflow-hidden text-white",
-      )}
-    >
-      {mirrorContent}
-    </div>
+      className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
+    />
   );
 });
 
-/** mentionInlineThumb 时加在 textarea 上的 class */
-export const MENTION_INLINE_THUMB_TEXTAREA_CLASS =
-  "relative z-[2] bg-transparent text-transparent caret-white selection:bg-white/15 [-webkit-text-fill-color:transparent]";
+/** @deprecated 使用 MentionInlineThumbOverlay */
+export const MentionInlineThumbMirror = MentionInlineThumbOverlay;
 
-/** @deprecated 旧绝对定位方案 · 保留导出名避免外部引用报错 */
+/** mentionInlineThumb 时 textarea 正常显示文字 */
+export const MENTION_INLINE_THUMB_TEXTAREA_CLASS = "";
+
+/** @deprecated */
 export function MentionInlineThumbs(props: {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   wrapperRef: RefObject<HTMLElement | null>;
@@ -308,15 +314,14 @@ export function MentionInlineThumbs(props: {
   edition?: "pro2" | "sbv1";
   textareaClassName?: string;
 }): ReactNode {
-  if (!props.enabled || !props.textareaClassName) return null;
+  if (!props.enabled) return null;
   return (
-    <MentionInlineThumbMirror
+    <MentionInlineThumbOverlay
       textareaRef={props.textareaRef}
       displayValue={props.displayValue}
       mentionables={props.mentionables}
       enabled={props.enabled}
       edition={props.edition}
-      textareaClassName={props.textareaClassName}
     />
   );
 }

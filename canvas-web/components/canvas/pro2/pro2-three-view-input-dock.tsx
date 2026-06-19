@@ -7,7 +7,7 @@ import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea"
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
-import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -261,7 +261,7 @@ export function Pro2ThreeViewInputDock() {
           PRO2_DOCK_TEXTAREA_CLASS,
           RF_FORM_CONTROL,
           RF_NO_WHEEL,
-          "min-h-0 px-4 py-3",
+          PRO2_DOCK_TEXTAREA_INSET_CLASS,
         )}
         placeholder="编辑角色外观提示词；输入 @ 引用风格或参考图…"
         value={dockInput}

@@ -89,11 +89,11 @@ function UpstreamChip({
 
   return (
     <>
-      <div className="group relative size-7 shrink-0">
+      <div className="group relative size-10 shrink-0">
         <button
           type="button"
           className={cn(
-            "nodrag flex size-full items-center justify-center overflow-hidden rounded-lg border-2 bg-white/[0.04] text-white/70 transition hover:bg-white/[0.07] hover:text-white/90",
+            "nodrag flex size-full items-center justify-center overflow-hidden rounded-lg border bg-white/[0.04] text-white/70 transition hover:bg-white/[0.07] hover:text-white/90",
             active
               ? PRO2_DOCK_ACTIVE_REF_BORDER_CLASS
               : PRO2_DOCK_REF_IDLE_BORDER_CLASS,

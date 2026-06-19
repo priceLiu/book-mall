@@ -7,7 +7,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDockHidden } from "@/lib/canvas/use-libtv-floating-dock";
 import { useStableLibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placement";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
-import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
@@ -123,7 +123,7 @@ export function Pro2FrameCellInputDock() {
           PRO2_DOCK_TEXTAREA_CLASS,
           RF_FORM_CONTROL,
           RF_NO_WHEEL,
-          "nodrag min-h-0 px-4 py-3",
+          PRO2_DOCK_TEXTAREA_INSET_CLASS,
         )}
         placeholder="描述本镜画面…"
         value={prompt}

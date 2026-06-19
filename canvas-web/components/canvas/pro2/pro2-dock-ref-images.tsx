@@ -60,7 +60,7 @@ function DockRefImageChip({
     <>
       <div
         className={cn(
-          "group relative size-7 overflow-hidden rounded-lg border-2 bg-white/[0.04] transition-shadow",
+          "group relative size-10 overflow-hidden rounded-lg border bg-white/[0.04] transition-shadow",
           active
             ? PRO2_DOCK_ACTIVE_REF_BORDER_CLASS
             : PRO2_DOCK_REF_IDLE_BORDER_CLASS,

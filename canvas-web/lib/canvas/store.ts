@@ -806,7 +806,8 @@ export const useCanvasStore = create<CanvasState>()(
           const temporal = useCanvasStore.temporal.getState();
           temporal.pause();
           try {
-            set({ nodes });
+            // 草稿仍写入 store 并 bump revision，供 autosave 感知；undo 栈在 pause 内不记录
+            set((state) => withGraphRevision(state, { nodes }));
           } finally {
             temporal.resume();
           }
