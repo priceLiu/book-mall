@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "AI-code8.com - 智选AI, 一人公司, 创业老板必备",
@@ -18,7 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning className="scroll-pt-28">
-      <body className={cn("min-h-screen bg-background", inter.className)}>
+      <body className={cn("min-h-screen bg-background font-sans")}>
         <AuthSessionProvider>
           <ThemeProvider
             attribute="class"
