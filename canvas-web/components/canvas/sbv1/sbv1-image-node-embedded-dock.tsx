@@ -20,7 +20,7 @@ import { Pro2DockRefImages } from "../pro2/pro2-dock-ref-images";
 import { Pro2DockStyleButton } from "../pro2/pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "../pro2/pro2-dock-upstream-chips";
 import {
-  Pro2DockContextBar,
+  Pro2DockHeader,
   Pro2DockToolbar,
   Pro2EmbeddedInputDock,
 } from "../pro2/pro2-input-dock-shell";
@@ -110,50 +110,58 @@ export function Sbv1ImageNodeEmbeddedDock({
   return (
     <Pro2EmbeddedInputDock
       header={
-        <Pro2DockContextBar>
-          <Pro2DockStyleButton
-            active={styleActive}
-            label={styleLabel}
-            disabled={isRunning}
-            onClick={onOpenStyleLibrary}
-          />
-          <button
-            type="button"
-            disabled
-            title="标记（即将推出）"
-            className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
-          >
-            <MapPin className="size-4" strokeWidth={1.75} />
-            <span>标记</span>
-          </button>
-          {onUpload ? (
-            <button
-              type="button"
-              title="上传图片"
-              className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/70 transition hover:bg-white/[0.07]"
-              onClick={onUpload}
-            >
-              <Upload className="size-4" strokeWidth={1.75} />
-              <span>上传</span>
-            </button>
-          ) : null}
-          <Pro2DockUpstreamChips
-            links={upstreamLinks}
-            anchorNodeId={storeNode.id}
-            activeIds={activeRefIds}
-          />
-          <Pro2DockRefImages
-            refs={[]}
-            onChange={() => {}}
-            disabled={isRunning}
-            pasteActive={false}
-            spawnAnchor={{
-              nodeId: storeNode.id,
-              nodeType: "sbv1-image",
-            }}
-            maxCount={12}
-          />
-        </Pro2DockContextBar>
+        <Pro2DockHeader
+          refRow={
+            upstreamLinks.length > 0 ? (
+              <Pro2DockUpstreamChips
+                links={upstreamLinks}
+                anchorNodeId={storeNode.id}
+                activeIds={activeRefIds}
+              />
+            ) : null
+          }
+          actionRow={
+            <>
+              <Pro2DockStyleButton
+                active={styleActive}
+                label={styleLabel}
+                disabled={isRunning}
+                onClick={onOpenStyleLibrary}
+              />
+              <button
+                type="button"
+                disabled
+                title="标记（即将推出）"
+                className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
+              >
+                <MapPin className="size-4" strokeWidth={1.75} />
+                <span>标记</span>
+              </button>
+              {onUpload ? (
+                <button
+                  type="button"
+                  title="上传图片"
+                  className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/70 transition hover:bg-white/[0.07]"
+                  onClick={onUpload}
+                >
+                  <Upload className="size-4" strokeWidth={1.75} />
+                  <span>上传</span>
+                </button>
+              ) : null}
+              <Pro2DockRefImages
+                refs={[]}
+                onChange={() => {}}
+                disabled={isRunning}
+                pasteActive={false}
+                spawnAnchor={{
+                  nodeId: storeNode.id,
+                  nodeType: "sbv1-image",
+                }}
+                maxCount={12}
+              />
+            </>
+          }
+        />
       }
       footer={
         <Pro2DockToolbar>
@@ -191,6 +199,8 @@ export function Sbv1ImageNodeEmbeddedDock({
           mentionables={mentionables}
           disabled={isRunning}
           rows={2}
+          mentionInlineThumb
+          mentionEdition="sbv1"
           onChange={onPromptChange}
         />
       </Pro2DockPasteZone>

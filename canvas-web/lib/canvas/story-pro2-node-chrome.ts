@@ -175,7 +175,7 @@ export const PRO2_UPLOAD_DROPZONE_CLASS =
   "nodrag flex w-full items-center gap-2 rounded border border-dashed border-violet-400/25 bg-violet-500/8 px-2 py-2 text-left text-[11px] text-white/80 transition hover:border-violet-400/45 hover:bg-violet-500/12 disabled:cursor-not-allowed disabled:opacity-45";
 
 export const PRO2_REF_THUMB_CLASS =
-  "group relative size-14 overflow-hidden rounded border border-violet-400/20 bg-black/40";
+  "group relative size-7 overflow-hidden rounded border border-violet-400/20 bg-black/40";
 
 export const PRO2_GUIDE_PANEL_CLASS =
   "nodrag shrink-0 rounded-lg border border-violet-400/15 bg-gradient-to-br from-violet-950/30 to-transparent px-2.5 py-2";

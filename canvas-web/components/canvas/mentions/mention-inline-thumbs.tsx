@@ -15,6 +15,7 @@ import { findAllMentionRangesInDisplay } from "@/lib/canvas/mention-at-display-i
 import {
   countMentionThumbSlotsAt,
   MENTION_THUMB_SLOT_CHAR,
+  skipMentionThumbSlotRun,
 } from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { cn } from "@/lib/utils";
 
@@ -27,8 +28,9 @@ export type MentionInlineThumbMirrorHandle = {
 
 const THUMB_HIT_PAD = 2;
 
-const THUMB_SIZE_DEFAULT = 16;
-const THUMB_SIZE_SBV1 = 20;
+/** 相对字号 em · 与正文行高对齐 */
+const THUMB_SIZE_DEFAULT = 0.82;
+const THUMB_SIZE_SBV1 = 0.86;
 
 function pointInRect(
   x: number,
@@ -75,11 +77,11 @@ const MIRROR_LAYOUT_PROPS = [
 
 function InlineMentionThumb({
   item,
-  size,
+  sizeEm,
   borderClass,
 }: {
   item: MentionableItem;
-  size: number;
+  sizeEm: number;
   borderClass: string;
 }) {
   if (!item.previewUrl) return null;
@@ -92,14 +94,15 @@ function InlineMentionThumb({
       data-mention-thumb=""
       data-mention-id={item.id}
       className={cn(
-        "inline-block rounded-[3px] border object-cover align-text-bottom",
+        "inline-block rounded-[2px] border object-cover",
         borderClass,
       )}
       style={{
-        width: size,
-        height: size,
-        marginLeft: 2,
-        verticalAlign: "text-bottom",
+        width: `${sizeEm}em`,
+        height: `${sizeEm}em`,
+        marginLeft: "0.08em",
+        marginRight: "0.06em",
+        verticalAlign: "-0.12em",
       }}
       referrerPolicy="no-referrer"
     />
@@ -110,7 +113,7 @@ function buildMirrorContent(
   displayValue: string,
   mentionables: MentionableItem[],
   edition: "pro2" | "sbv1",
-  thumbSize: number,
+  thumbSizeEm: number,
   borderClass: string,
 ): ReactNode[] {
   const ranges = findAllMentionRangesInDisplay(displayValue, mentionables);
@@ -129,12 +132,12 @@ function buildMirrorContent(
 
     const slotCount = countMentionThumbSlotsAt(displayValue, cursor, edition);
     if (slotCount > 0 && range.item.previewUrl) {
-      cursor += slotCount;
+      cursor += skipMentionThumbSlotRun(displayValue, cursor);
       parts.push(
         <InlineMentionThumb
           key={`thumb-${range.start}-${key++}`}
           item={range.item}
-          size={thumbSize}
+          sizeEm={thumbSizeEm}
           borderClass={borderClass}
         />,
       );
@@ -143,8 +146,16 @@ function buildMirrorContent(
 
   if (cursor < displayValue.length) {
     const tail = displayValue.slice(cursor);
-    if (tail.includes(MENTION_THUMB_SLOT_CHAR)) {
-      parts.push(tail.replace(new RegExp(`${MENTION_THUMB_SLOT_CHAR}+`, "g"), ""));
+    if (
+      tail.includes(MENTION_THUMB_SLOT_CHAR) ||
+      tail.includes("\u2002")
+    ) {
+      parts.push(
+        tail.replace(
+          /[\u2002\u2003]+/g,
+          "",
+        ),
+      );
     } else {
       parts.push(tail);
     }
@@ -179,7 +190,8 @@ export const MentionInlineThumbMirror = forwardRef<
 ) {
   const mirrorRef = useRef<HTMLDivElement | null>(null);
 
-  const thumbSize = edition === "sbv1" ? THUMB_SIZE_SBV1 : THUMB_SIZE_DEFAULT;
+  const thumbSizeEm =
+    edition === "sbv1" ? THUMB_SIZE_SBV1 : THUMB_SIZE_DEFAULT;
   const borderClass = thumbBorderClass(edition);
 
   const mirrorContent = useMemo(
@@ -188,10 +200,10 @@ export const MentionInlineThumbMirror = forwardRef<
         displayValue,
         mentionables,
         edition,
-        thumbSize,
+        thumbSizeEm,
         borderClass,
       ),
-    [displayValue, mentionables, edition, thumbSize, borderClass],
+    [displayValue, mentionables, edition, thumbSizeEm, borderClass],
   );
 
   const syncMirrorScroll = useCallback(() => {

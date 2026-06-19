@@ -86,6 +86,7 @@ export function Pro2InputDockShell({
           "relative",
           className,
         )}
+        data-libtv-input-dock=""
         style={{
           borderColor: LIBTV_INPUT_DOCK_BORDER,
           background: LIBTV_INPUT_DOCK_BG,
@@ -122,7 +123,49 @@ export function Pro2DockContextBar({ children }: { children: ReactNode }) {
   return (
     <div
       className={cn(
-        "nodrag flex min-h-[44px] shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-2",
+        "nodrag flex min-h-[40px] shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-1.5",
+        LIBTV_INPUT_DOCK_DIVIDER,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Dock 顶栏：上行参考缩略图 · 下行操作按钮（标记 / 风格 / 上传等） */
+export function Pro2DockHeader({
+  refRow,
+  actionRow,
+}: {
+  refRow?: ReactNode;
+  actionRow?: ReactNode;
+}) {
+  if (!refRow && !actionRow) return null;
+  return (
+    <div
+      className={cn("nodrag shrink-0 border-b", LIBTV_INPUT_DOCK_DIVIDER)}
+    >
+      {refRow ? (
+        <div className="hide-scroll-bar flex min-h-[36px] min-w-0 items-center gap-1.5 overflow-x-auto border-b border-white/[0.06] px-3 py-1">
+          {refRow}
+        </div>
+      ) : null}
+      {actionRow ? (
+        <div className="flex min-h-[40px] flex-wrap items-center gap-1.5 px-3 py-1.5">
+          {actionRow}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** 仅参考缩略图行（视频 Dock 等无第二行操作时） */
+export function Pro2DockRefRow({ children }: { children: ReactNode }) {
+  if (!children) return null;
+  return (
+    <div
+      className={cn(
+        "nodrag flex min-h-[36px] shrink-0 flex-wrap items-center gap-1.5 border-b px-3 py-1",
         LIBTV_INPUT_DOCK_DIVIDER,
       )}
     >
@@ -166,6 +209,7 @@ export function Pro2EmbeddedInputDock({
   return (
     <div
       className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}
+      data-libtv-input-dock=""
     >
       {header}
       <div className="pro2-dock-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">

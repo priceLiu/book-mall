@@ -44,7 +44,7 @@ import { Pro2DockRefImages } from "./pro2/pro2-dock-ref-images";
 import { Pro2DockStyleButton } from "./pro2/pro2-dock-style-button";
 import { Pro2DockUpstreamChips } from "./pro2/pro2-dock-upstream-chips";
 import {
-  Pro2DockContextBar,
+  Pro2DockHeader,
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "./pro2/pro2-input-dock-shell";
@@ -326,30 +326,38 @@ export function LibtvImageInputDock() {
         dockClassName={isPro2 ? "pro2-image-dock" : "sbv1-image-dock"}
         hidden={dockHidden}
         header={
-          <Pro2DockContextBar>
-            <Pro2DockStyleButton
-              active={styleActive}
-              label={styleLabel}
-              disabled={isRunning}
-              onClick={onOpenStyleLibrary}
-            />
-            <Pro2DockUpstreamChips
-              links={upstreamLinks}
-              anchorNodeId={storeNode.id}
-              activeIds={activeRefIds}
-            />
-            <Pro2DockRefImages
-              refs={[]}
-              onChange={() => {}}
-              disabled={isRunning}
-              pasteActive={false}
-              spawnAnchor={{
-                nodeId: storeNode.id,
-                nodeType,
-              }}
-              maxCount={12}
-            />
-          </Pro2DockContextBar>
+          <Pro2DockHeader
+            refRow={
+              upstreamLinks.length > 0 ? (
+                <Pro2DockUpstreamChips
+                  links={upstreamLinks}
+                  anchorNodeId={storeNode.id}
+                  activeIds={activeRefIds}
+                />
+              ) : null
+            }
+            actionRow={
+              <>
+                <Pro2DockStyleButton
+                  active={styleActive}
+                  label={styleLabel}
+                  disabled={isRunning}
+                  onClick={onOpenStyleLibrary}
+                />
+                <Pro2DockRefImages
+                  refs={[]}
+                  onChange={() => {}}
+                  disabled={isRunning}
+                  pasteActive={false}
+                  spawnAnchor={{
+                    nodeId: storeNode.id,
+                    nodeType,
+                  }}
+                  maxCount={12}
+                />
+              </>
+            }
+          />
         }
         footer={
           <Pro2DockToolbar className="gap-2">

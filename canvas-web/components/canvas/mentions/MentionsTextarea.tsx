@@ -24,6 +24,7 @@ import { disposeTextareaCaretMirror } from "@/lib/canvas/textarea-caret-rect";
 import { useDeferredTextCommit } from "@/lib/canvas/use-deferred-text-commit";
 import {
   ensureMentionThumbSlots,
+  MENTION_THUMB_PAD_CHAR,
   MENTION_THUMB_SLOT_CHAR,
   stripMentionThumbSlots,
 } from "@/lib/canvas/mention-inline-thumb-placeholder";
@@ -207,6 +208,13 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       return getTextareaCaretClientRect(el, pos);
     }, [anchorTick]);
 
+    const getDockShellRect = useCallback(() => {
+      const shell = innerRef.current?.closest(
+        "[data-libtv-input-dock]",
+      ) as HTMLElement | null;
+      return shell?.getBoundingClientRect() ?? null;
+    }, []);
+
     const externalDisplay = useMemo(() => {
       const base = promptToDisplay(value, mentionables);
       if (!inlineThumbEnabled) return base;
@@ -303,7 +311,12 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           start = cursor;
           for (let i = cursor - 1; i >= 0; i--) {
             const ch = display[i]!;
-            if (ch === MENTION_THUMB_SLOT_CHAR) continue;
+            if (
+              ch === MENTION_THUMB_SLOT_CHAR ||
+              ch === MENTION_THUMB_PAD_CHAR
+            ) {
+              continue;
+            }
             if (ch === "@") {
               start = i;
               break;
@@ -348,7 +361,10 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       let i = cursor - 1;
       while (i >= 0) {
         const ch = nextDisplay[i]!;
-        if (ch === MENTION_THUMB_SLOT_CHAR) {
+        if (
+          ch === MENTION_THUMB_SLOT_CHAR ||
+          ch === MENTION_THUMB_PAD_CHAR
+        ) {
           i--;
           continue;
         }
@@ -571,6 +587,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
           open={popoverOpen}
           anchorEl={wrapperRef.current}
           getAnchorRect={getMentionAnchorRect}
+          getDockShellRect={getDockShellRect}
           items={filtered}
           selectedIndex={popoverIndex}
           headerTitle={mentionPickerTitle}

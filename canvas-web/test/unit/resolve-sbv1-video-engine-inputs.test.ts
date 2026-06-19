@@ -19,7 +19,7 @@ function makeNodes(): { nodes: CanvasFlowNode[]; edges: CanvasFlowEdge[] } {
       type: "sbv1-image",
       position: { x: 0, y: 0 },
       data: {
-        ossUrl: "https://example.com/face-b.png",
+        ossUrl: "https://example.com/scene-b.png",
       },
     },
     {
@@ -53,15 +53,18 @@ describe("resolveSbv1VideoEngineInputs", () => {
     ]);
   });
 
-  it("blocks when upstream image is not portrait-imported", () => {
+  it("passes OSS for non-imported upstream images alongside asset refs", () => {
     const { nodes, edges } = makeNodes();
     const result = resolveSbv1VideoEngineInputs(nodes, edges, "vid1", {
       prompt: "walk",
       referenceMode: "omni",
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error).toContain("私域人像入库");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.portraitAssetRefs).toEqual([
+      { url: "asset://asset-a", role: "reference_image" },
+    ]);
+    expect(result.imageInputs).toEqual(["https://example.com/scene-b.png"]);
   });
 
   it("accepts active portrait from assetId when assetUri missing", () => {
@@ -72,7 +75,7 @@ describe("resolveSbv1VideoEngineInputs", () => {
       portraitAssetId: "asset-a",
     };
     nodes[1]!.data = {
-      ossUrl: "https://example.com/face-b.png",
+      ossUrl: "https://example.com/scene-b.png",
       portraitStatus: "active",
       portraitAssetUri: "asset://asset-b",
     };
@@ -85,9 +88,24 @@ describe("resolveSbv1VideoEngineInputs", () => {
       { url: "asset://asset-a", role: "reference_image" },
       { url: "asset://asset-b", role: "reference_image" },
     ]);
+    expect(result.imageInputs).toEqual([]);
   });
 
-  it("maps first_last roles onto asset refs", () => {
+  it("maps first_last roles onto asset refs and OSS tail frame", () => {
+    const { nodes, edges } = makeNodes();
+    const result = resolveSbv1VideoEngineInputs(nodes, edges, "vid1", {
+      referenceMode: "first_last",
+    });
+    expect(result).toEqual({
+      ok: true,
+      imageInputs: ["https://example.com/scene-b.png"],
+      portraitAssetRefs: [
+        { url: "asset://asset-a", role: "first_frame" },
+      ],
+    });
+  });
+
+  it("maps first_last with both assets", () => {
     const { nodes, edges } = makeNodes();
     nodes[1]!.data = {
       ossUrl: "https://example.com/face-b.png",

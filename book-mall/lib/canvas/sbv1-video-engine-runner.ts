@@ -39,10 +39,8 @@ export async function runSbv1VideoEngineNode(
   const promptRaw = String(data.prompt ?? "").trim();
   const portraitRefs = args.node.portraitAssetRefs ?? [];
   const hasPortraitRefs = portraitRefs.length > 0;
-  /** sbv1 角色参考只走 asset://；服务端丢弃客户端误传的 OSS 参考图 */
-  const imageInputs = hasPortraitRefs
-    ? []
-    : httpsImageUrls(args.node.imageInputs ?? []);
+  /** 已入库走 asset://；未入库仍走 HTTPS OSS（可与 asset 混用） */
+  const imageInputs = httpsImageUrls(args.node.imageInputs ?? []);
 
   if (!providerId || !modelKey) {
     throw new CanvasProjectError(
@@ -66,19 +64,25 @@ export async function runSbv1VideoEngineNode(
 
   if (referenceMode === "first_last") {
     const firstAsset = portraitRefs.find((r) => r.role === "first_frame");
-    if (firstAsset) {
+    const lastAsset = portraitRefs.find((r) => r.role === "last_frame");
+    if (firstAsset && lastAsset) {
       mainFrameImageUrl = "";
       lastFrameImageUrl = "";
-      forceReferenceMode = false;
+    } else if (firstAsset && !lastAsset) {
+      mainFrameImageUrl = "";
+      lastFrameImageUrl = imageInputs[0] ?? "";
+    } else if (!firstAsset && lastAsset) {
+      mainFrameImageUrl = imageInputs[0] ?? "";
+      lastFrameImageUrl = "";
     } else {
       mainFrameImageUrl = imageInputs[0] ?? "";
       lastFrameImageUrl = imageInputs[1] ?? "";
-      if (!mainFrameImageUrl) {
-        throw new CanvasProjectError(
-          "INVALID_INPUT",
-          "首尾帧模式需要至少一张首帧参考图（请先私域人像入库）",
-        );
-      }
+    }
+    if (!firstAsset && !mainFrameImageUrl) {
+      throw new CanvasProjectError(
+        "INVALID_INPUT",
+        "首尾帧模式需要至少一张首帧参考图",
+      );
     }
   } else if (referenceMode === "smart_multi") {
     if (imageInputs.length === 0 && !hasPortraitRefs) {
@@ -90,10 +94,9 @@ export async function runSbv1VideoEngineNode(
     if (imageInputs.length > 0) {
       mainFrameImageUrl = imageInputs[0]!;
       referenceImageUrls = imageInputs.slice(1);
-      forceReferenceMode = imageInputs.length > 1;
-    } else {
-      forceReferenceMode = true;
     }
+    forceReferenceMode =
+      hasPortraitRefs || referenceImageUrls.length > 0;
     params.resolution = resolution;
     params.duration = durationSec > 0 ? durationSec : 4;
   } else {
@@ -107,10 +110,9 @@ export async function runSbv1VideoEngineNode(
     if (imageInputs.length > 0) {
       mainFrameImageUrl = imageInputs[0]!;
       referenceImageUrls = imageInputs.slice(1);
-      forceReferenceMode = referenceImageUrls.length > 0;
-    } else {
-      forceReferenceMode = true;
     }
+    forceReferenceMode =
+      hasPortraitRefs || referenceImageUrls.length > 0;
   }
 
   params.aspect_ratio = aspectRatio;
