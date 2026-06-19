@@ -2,6 +2,41 @@
 
 export const CANVAS_AI_TASK_TIMEOUT_MIN = 20;
 
+/** 火山 Seedance 等长视频（15s + 参考图 + 音频）实测可超过 20min，单独放宽。 */
+export function getCanvasVolcengineVideoTimeoutMin(): number {
+  const raw = Number(process.env.CANVAS_VOLCENGINE_VIDEO_TIMEOUT_MIN ?? "");
+  return Number.isFinite(raw) && raw > 0 ? raw : 45;
+}
+
+export function isCanvasVolcengineVideoTaskPayload(
+  payload: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!payload) return false;
+  if (payload.providerKind !== "VOLCENGINE") return false;
+  const kind = typeof payload.kind === "string" ? payload.kind : "";
+  return kind === "video-engine" || kind === "ai-video-engine";
+}
+
+/** SUBMITTED 任务超时阈值（毫秒）：火山视频用更长窗口。 */
+export function resolveCanvasSubmittedTaskTimeoutMs(input: {
+  inputPayload: unknown;
+}): number {
+  const payload =
+    input.inputPayload && typeof input.inputPayload === "object"
+      ? (input.inputPayload as Record<string, unknown>)
+      : null;
+  const min = isCanvasVolcengineVideoTaskPayload(payload)
+    ? getCanvasVolcengineVideoTimeoutMin()
+    : CANVAS_AI_TASK_TIMEOUT_MIN;
+  return min * 60 * 1000;
+}
+
+export function resolveCanvasSubmittedTaskTimeoutMin(input: {
+  inputPayload: unknown;
+}): number {
+  return Math.round(resolveCanvasSubmittedTaskTimeoutMs(input) / 60_000);
+}
+
 /** 单用户进行中 (PENDING + SUBMITTED) 任务上限 */
 export function getCanvasUserInflightMax(): number {
   const raw = Number(process.env.CANVAS_AI_USER_INFLIGHT_MAX ?? "");
@@ -17,6 +52,12 @@ export function getCanvasProjectInflightMax(): number {
   if (!Number.isFinite(raw) || raw <= 0) return 0;
   return raw;
 }
+
+/** poll worker 每轮 SUBMITTED 上限 — 见 lib/generation/poll-config.ts */
+export {
+  getGenerationPollBatch,
+  getGenerationPollBatch as getCanvasPollBatch,
+} from "@/lib/generation/poll-config";
 
 /** 由 KIE 异步轮询入口校验的 Bearer token（沿用 story 的） */
 export function getCanvasAiPollToken(): string | null {

@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes } from "@xyflow/react";
 import { Maximize2, Play, RefreshCw, Video } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
+import {
+  runtimePatchFromCanvasTask,
+  shouldApplyCanvasTaskRuntimePatch,
+} from "@/lib/canvas/task-pick";
 import {
   SBV1_VIDEO_ENGINE_LEFT_ADD_MENU,
   SBV1_VIDEO_ENGINE_RIGHT_ADD_MENU,
@@ -53,7 +57,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const d = data as unknown as Sbv1VideoEngineNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
-  const { succeeded } = useNodeTaskHistory(id);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
+  const { succeeded, history, refreshHistory } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
@@ -76,6 +81,54 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   const isGenerating = isLibtvMediaGenerating(d);
   const hasVideo = Boolean(videoUrl);
+
+  const inflightTask = useMemo(() => {
+    const boundId = d.runtime?.taskId;
+    if (boundId) {
+      const bound = history.find((t) => t.id === boundId);
+      if (
+        bound &&
+        (bound.status === "PENDING" || bound.status === "SUBMITTED")
+      ) {
+        return bound;
+      }
+    }
+    return history.find(
+      (t) => t.status === "PENDING" || t.status === "SUBMITTED",
+    );
+  }, [history, d.runtime?.taskId]);
+
+  useEffect(() => {
+    if (!isGenerating) return;
+    void refreshHistory();
+    const timer = window.setInterval(() => void refreshHistory(), 2000);
+    return () => window.clearInterval(timer);
+  }, [isGenerating, refreshHistory]);
+
+  useEffect(() => {
+    if (!inflightTask) return;
+    const patch = runtimePatchFromCanvasTask(inflightTask);
+    if (patch?.status === "pending" || patch?.status === "running") {
+      setNodeRuntime(id, patch);
+    }
+  }, [inflightTask, id, setNodeRuntime]);
+
+  /** 服务端已成功但 runtime 未同步（超时恢复 / 刷新后） */
+  useEffect(() => {
+    const latest = succeeded[succeeded.length - 1];
+    if (!latest) return;
+    const patch = runtimePatchFromCanvasTask(latest);
+    if (!patch || patch.status !== "done") return;
+    if (!shouldApplyCanvasTaskRuntimePatch(d.runtime, latest, patch)) return;
+    if (
+      d.runtime?.status === "done" &&
+      (d.runtime.ossUrl || d.runtime.ephemeralUrl)
+    ) {
+      return;
+    }
+    setNodeRuntime(id, patch);
+  }, [succeeded, d.runtime, id, setNodeRuntime]);
+
   const hasToolbarContent = Boolean(
     hasVideo ||
       d.prompt?.trim() ||
