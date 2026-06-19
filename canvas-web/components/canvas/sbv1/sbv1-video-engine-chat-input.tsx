@@ -29,6 +29,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import {
   SBV1_CHAT_INPUT_TEXTAREA_CLASS,
 } from "@/lib/canvas/sbv1-node-chrome";
+import { PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import {
   getSbv1VolcengineModelById,
   migrateSbv1ModelVariantId,
@@ -309,7 +310,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               SBV1_CHAT_INPUT_TEXTAREA_CLASS,
               RF_FORM_CONTROL,
               RF_NO_WHEEL,
-              "min-h-0 px-4 py-3",
+              PRO2_DOCK_TEXTAREA_INSET_CLASS,
             )}
             placeholder="描述你想生成的视频… 使用 @ 引用参考图，或粘贴/上传图片"
             value={data.prompt ?? ""}
@@ -319,8 +320,11 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             commitHandleRef={promptCommitRef}
             onChange={(prompt, _refs, meta) => {
               setLivePrompt(prompt);
-              if (meta?.commit === false) return;
-              updateNodeData(nodeId, { prompt }, { commit: true });
+              updateNodeData(
+                nodeId,
+                { prompt },
+                { commit: meta?.commit ?? true },
+              );
             }}
             onPaste={onPaste}
             mentionPickerTitle="参考图 · ←→ Enter 插入"

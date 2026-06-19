@@ -1,6 +1,16 @@
 import type { CanvasFlowNode } from "./types";
 import { ensureNodeDragHandles } from "./normalize-graph-nodes";
 
+function applyRfSelectionPreserved(
+  nodes: CanvasFlowNode[],
+  rfNodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  const rfSelected = new Set(
+    rfNodes.filter((n) => n.selected).map((n) => n.id),
+  );
+  return nodes.map((n) => ({ ...n, selected: rfSelected.has(n.id) }));
+}
+
 /** zustand → RF：未变化节点保留原引用，减轻 memo 失效 */
 export function mergeStoreNodesIntoRf(
   rfNodes: CanvasFlowNode[],
@@ -8,10 +18,11 @@ export function mergeStoreNodesIntoRf(
   opts?: { preserveRfSelection?: boolean },
 ): CanvasFlowNode[] {
   const preserveRfSelection = opts?.preserveRfSelection ?? false;
-  const storeHasSelection =
-    preserveRfSelection && storeNodes.some((n) => n.selected);
   if (rfNodes.length !== storeNodes.length) {
-    return ensureNodeDragHandles(storeNodes);
+    const next = ensureNodeDragHandles(storeNodes);
+    return preserveRfSelection
+      ? applyRfSelectionPreserved(next, rfNodes)
+      : next;
   }
 
   const storeById = new Map(storeNodes.map((n) => [n.id, n]));
@@ -21,10 +32,12 @@ export function mergeStoreNodesIntoRf(
   for (const rf of rfNodes) {
     const sn = storeById.get(rf.id);
     if (!sn) {
-      return ensureNodeDragHandles(storeNodes);
+      const rebuilt = ensureNodeDragHandles(storeNodes);
+      return preserveRfSelection
+        ? applyRfSelectionPreserved(rebuilt, rfNodes)
+        : rebuilt;
     }
-    const selected =
-      preserveRfSelection && !storeHasSelection ? rf.selected : sn.selected;
+    const selected = preserveRfSelection ? rf.selected : sn.selected;
     if (
       rf.type === sn.type &&
       rf.data === sn.data &&

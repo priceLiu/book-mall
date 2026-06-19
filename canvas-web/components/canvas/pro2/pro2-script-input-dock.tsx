@@ -9,7 +9,7 @@ import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
 import { STORY_LLM_MODEL_KEYS } from "@/lib/canvas/types";
 import { STORY_PRO_LLM_PARAMS_DEFAULT } from "@/lib/canvas/story-pro-prompts";
 import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
-import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import { resolvePro2DockUpstreamLinks } from "@/lib/canvas/pro2-dock-upstream-links";
 import { dockActiveRefIdsFromPrompt } from "@/lib/canvas/dock-mention-ref-urls";
@@ -289,7 +289,7 @@ export function Pro2ScriptInputDock() {
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,
             RF_NO_WHEEL,
-            "min-h-0 px-4 py-3",
+            PRO2_DOCK_TEXTAREA_INSET_CLASS,
           )}
           placeholder={`${placeholder}（输入 @ 引用大纲或参考图）`}
           value={dockInput}

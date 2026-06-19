@@ -20,6 +20,7 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   isCanvasInteractiveGeometryInProgress,
+  isCanvasPositionCommitOnly,
   isCanvasSelectionOnlyChange,
 } from "@/lib/canvas/canvas-node-changes";
 import { resolveLibtvFloatingDockSelection } from "@/lib/canvas/libtv-floating-dock-selection";
@@ -426,11 +427,7 @@ function FlowCanvasInner({
         }
         return;
       }
-      // LibTV 画布：选中态仅保留在 RF 本地（不写 zustand / 不进 undo），避免点击卡顿
-      if (libtvCanvas && isCanvasSelectionOnlyChange(changes)) {
-        deferStoreGraphSyncRef.current = false;
-        setCanvasGeometryDragging(false);
-        setCanvasDraggingNodeId(null);
+      const syncLibtvFloatingDockPinFromRf = () => {
         const sel = resolveLibtvFloatingDockSelection(
           getNodes() as CanvasFlowNode[],
         );
@@ -438,6 +435,30 @@ function FlowCanvasInner({
           sel?.nodeId ?? null,
           sel?.nodeType ?? null,
         );
+      };
+
+      // LibTV 画布：选中态仅保留在 RF 本地（不写 zustand / 不进 undo），避免点击卡顿
+      if (libtvCanvas && isCanvasSelectionOnlyChange(changes)) {
+        deferStoreGraphSyncRef.current = false;
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+        syncLibtvFloatingDockPinFromRf();
+        return;
+      }
+      if (libtvCanvas) {
+        deferStoreGraphSyncRef.current = false;
+        setCanvasGeometryDragging(false);
+        setCanvasDraggingNodeId(null);
+        // 坐标松手由 onNodeDragStop → commitFlowPositionsFromRf 落库；勿把 select 写入 store
+        if (isCanvasPositionCommitOnly(changes)) {
+          syncLibtvFloatingDockPinFromRf();
+          return;
+        }
+        const geometryChanges = changes.filter((c) => c.type !== "select");
+        if (geometryChanges.length > 0) {
+          storeOnNodesChange(geometryChanges);
+        }
+        syncLibtvFloatingDockPinFromRf();
         return;
       }
       deferStoreGraphSyncRef.current = false;
@@ -702,6 +723,15 @@ function FlowCanvasInner({
         reparentNode(node.id, gid);
       }
       setDragHoverGroup(null);
+      if (libtvCanvas && node.type && node.type !== "group") {
+        setRfNodes((prev) =>
+          prev.map((n) => ({ ...n, selected: n.id === node.id })),
+        );
+        useCanvasStore.getState().setLibtvFloatingDockSelection(
+          node.id,
+          node.type,
+        );
+      }
       if (didCommitPositions || willReparent) {
         flushAutosaveAfterDrag();
       }
@@ -712,6 +742,7 @@ function FlowCanvasInner({
       findGroupAtPoint,
       flushAutosaveAfterDrag,
       getNodes,
+      libtvCanvas,
       reparentNode,
       setDragHoverGroup,
       setRfNodes,

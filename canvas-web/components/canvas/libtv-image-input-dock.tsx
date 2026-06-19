@@ -15,8 +15,11 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
-import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import {
+  useLibtvFloatingDock,
+  useLibtvSoleSelectedNodeId,
+} from "@/lib/canvas/use-libtv-floating-dock";
+import { PRO2_DOCK_TEXTAREA_CLASS, PRO2_DOCK_TEXTAREA_INSET_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
 import {
   resolvePro2DockUpstreamLinks,
@@ -81,27 +84,26 @@ export function LibtvImageInputDock() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const selectedImage = useMemo(() => {
-    const picked = rfNodes.filter((n) => {
-      if (!n.selected) return false;
-      if (n.type === "sbv1-image") return true;
-      if (n.type === "story-pro2-image") {
-        return (
-          (n.data as { pro2MediaRole?: string }).pro2MediaRole !==
-          "character-three-view"
-        );
-      }
-      return false;
-    });
-    return picked.length === 1 ? picked[0] : null;
-  }, [rfNodes]);
+  const sbv1DockNodeId = useLibtvSoleSelectedNodeId("sbv1-image");
+  const pro2DockNodeIdRaw = useLibtvSoleSelectedNodeId("story-pro2-image");
+  const pro2DockNodeId = useMemo(() => {
+    if (!pro2DockNodeIdRaw) return null;
+    const rf = rfNodes.find((n) => n.id === pro2DockNodeIdRaw);
+    if (
+      (rf?.data as { pro2MediaRole?: string })?.pro2MediaRole ===
+      "character-three-view"
+    ) {
+      return null;
+    }
+    return pro2DockNodeIdRaw;
+  }, [pro2DockNodeIdRaw, rfNodes]);
+
+  const dockNodeId = sbv1DockNodeId ?? pro2DockNodeId;
 
   const storeNode = useMemo(() => {
-    if (!selectedImage) return null;
-    return nodes.find((n) => n.id === selectedImage.id) ?? null;
-  }, [selectedImage, nodes]);
-
-  const dockNodeId = selectedImage?.id ?? storeNode?.id ?? null;
+    if (!dockNodeId) return null;
+    return nodes.find((n) => n.id === dockNodeId) ?? null;
+  }, [dockNodeId, nodes]);
   const { placement, hidden: dockHidden, active: dockActive } =
     useLibtvFloatingDock(dockNodeId);
 
@@ -195,9 +197,14 @@ export function LibtvImageInputDock() {
   const onPromptChange = useCallback(
     (value: string, _refs?: string[], meta?: { commit?: boolean }) => {
       if (!storeNode) return;
-      if (meta?.commit === false) return;
-      updateNodeData(storeNode.id, { dockInput: value }, { commit: true });
-      syncFrameRowPrompt(value);
+      updateNodeData(
+        storeNode.id,
+        { dockInput: value },
+        { commit: meta?.commit ?? true },
+      );
+      if (meta?.commit !== false) {
+        syncFrameRowPrompt(value);
+      }
     },
     [storeNode, updateNodeData, syncFrameRowPrompt],
   );
@@ -431,7 +438,7 @@ export function LibtvImageInputDock() {
               PRO2_DOCK_TEXTAREA_CLASS,
               RF_FORM_CONTROL,
               RF_NO_WHEEL,
-              "min-h-0 px-4 py-3",
+              PRO2_DOCK_TEXTAREA_INSET_CLASS,
             )}
             placeholder={placeholder}
             value={dockInput}

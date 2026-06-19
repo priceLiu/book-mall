@@ -10,16 +10,16 @@ import type { MentionableItem } from "./MentionsTextarea";
 
 const ITEM_W = 200;
 const THUMB_H = 240;
-/** Dock 内紧凑模式 · 约为默认一半 */
-const ITEM_W_DOCK = 100;
-const THUMB_H_DOCK = 120;
+/** Dock 内紧凑模式 */
+const ITEM_W_DOCK = 80;
+const THUMB_H_DOCK = 96;
 const GAP = 8;
-const PICKER_PAD = 16;
-const PICKER_HEADER_H = 36;
+const PICKER_PAD = 12;
+const PICKER_HEADER_H = 30;
 const PICKER_MIN_W = 320;
 const PICKER_MAX_W = 960;
-const PICKER_MIN_W_DOCK = 220;
-const PICKER_MAX_W_DOCK = 640;
+const PICKER_MIN_W_DOCK = 168;
+const PICKER_MAX_W_DOCK = 440;
 const MENTION_PICKER_Z = 5000;
 
 function pickerWidthForCount(count: number, compact: boolean): number {
@@ -34,9 +34,9 @@ function pickerWidthForCount(count: number, compact: boolean): number {
 }
 
 function pickerHeightForCount(count: number, compact: boolean): number {
-  if (count <= 0) return compact ? 120 : 200;
+  if (count <= 0) return compact ? 100 : 200;
   const thumbH = compact ? THUMB_H_DOCK : THUMB_H;
-  return PICKER_HEADER_H + 16 + thumbH + 40 + 8;
+  return PICKER_HEADER_H + (compact ? 8 : 16) + thumbH + (compact ? 26 : 40) + 8;
 }
 
 type AnchorRect = {
@@ -64,13 +64,14 @@ function resolvePickerPosition(
   return { left, top: anchor.top - GAP, flip: true };
 }
 
-/** Dock 内：锚定整坞外壳，弹层在坞外下方/上方，避免挡住参考图行与正文 */
+/** Dock 内：锚定整坞外壳，弹层在坞外下方/上方，左对齐并留约 1 字符间距 */
 function resolveDockShellPickerPosition(
   dockShell: DOMRect,
   pickerW: number,
   pickerH: number,
 ): { left: number; top: number; flip: boolean } {
-  let left = dockShell.left + (dockShell.width - pickerW) / 2;
+  const leftInset = 13;
+  let left = dockShell.left + leftInset;
   left = Math.min(Math.max(12, left), window.innerWidth - pickerW - 12);
 
   const belowTop = dockShell.bottom + GAP;
@@ -246,11 +247,12 @@ export function MentionPickerPortal({
               <button
                 key={m.id}
                 type="button"
-                className={`flex shrink-0 flex-col items-stretch gap-2 rounded-lg p-2 text-center transition ${
+                className={cn(
+                  "flex shrink-0 flex-col items-stretch gap-2 rounded-lg p-2 text-center transition",
                   i === selectedIndex
                     ? "bg-[var(--canvas-accent)]/25 text-white ring-1 ring-[var(--canvas-accent)]/40"
-                    : "text-white/85 hover:bg-white/8"
-                }`}
+                    : "text-white/85 hover:bg-white/8",
+                )}
                 style={{ width: itemW }}
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -280,7 +282,7 @@ export function MentionPickerPortal({
                 <span
                   className={cn(
                     "line-clamp-2 leading-snug",
-                    compact ? "text-[10px]" : "text-[11px]",
+                    compact ? "text-[9px]" : "text-[11px]",
                   )}
                 >
                   @{m.label}

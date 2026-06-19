@@ -460,8 +460,6 @@ function Inner({ projectId }: { projectId: string }) {
 
     const scheduleAutosave = () => {
       if (!canvasReadyRef.current) return;
-      const intervalMs = getCanvasAutosaveIntervalMs();
-      if (intervalMs === 0) return;
       if (!isCanvasDirty()) return;
       const state = useCanvasStore.getState();
       if (
@@ -475,7 +473,7 @@ function Inner({ projectId }: { projectId: string }) {
       clearAutosaveTimer();
       autosaveTimerRef.current = window.setTimeout(() => {
         autosaveTimerRef.current = null;
-        // 1.5s debounce：只持久化画布，不写「我的历史」
+        // 1.5s debounce：只持久化画布，不写「我的历史」（与间隔设置无关）
         void runAutosave(false, { writeHistory: false });
       }, CANVAS_AUTOSAVE_DEBOUNCE_MS);
     };

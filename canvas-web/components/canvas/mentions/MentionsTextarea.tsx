@@ -23,10 +23,10 @@ import { cn } from "@/lib/utils";
 import { disposeTextareaCaretMirror } from "@/lib/canvas/textarea-caret-rect";
 import { useDeferredTextCommit } from "@/lib/canvas/use-deferred-text-commit";
 import {
-  ensureMentionThumbSlots,
+  ensureInlineThumbTextGaps,
+  stripMentionThumbSlots,
   MENTION_THUMB_PAD_CHAR,
   MENTION_THUMB_SLOT_CHAR,
-  stripMentionThumbSlots,
 } from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { findMentionRangeAtDisplayIndex } from "@/lib/canvas/mention-at-display-index";
 import {
@@ -35,7 +35,7 @@ import {
   getTextareaIndexFromClientPoint,
 } from "@/lib/canvas/textarea-caret-rect";
 import { MentionHoverPreviewPortal } from "./mention-hover-preview";
-import { MentionInlineThumbMirror, MENTION_INLINE_THUMB_TEXTAREA_CLASS, type MentionInlineThumbMirrorHandle } from "./mention-inline-thumbs";
+import { MentionInlineThumbOverlay, type MentionInlineThumbMirrorHandle } from "./mention-inline-thumbs";
 import { MentionPickerPortal } from "./mention-picker-portal";
 
 export type MentionableItem = {
@@ -218,8 +218,8 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
     const externalDisplay = useMemo(() => {
       const base = promptToDisplay(value, mentionables);
       if (!inlineThumbEnabled) return base;
-      return ensureMentionThumbSlots(base, mentionables, mentionEdition);
-    }, [value, mentionables, inlineThumbEnabled, mentionEdition]);
+      return ensureInlineThumbTextGaps(base, mentionables);
+    }, [value, mentionables, inlineThumbEnabled]);
 
     const emit = useCallback(
       (display: string, commit: boolean) => {
@@ -277,10 +277,10 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       const pos = pendingCaretRef.current;
       const el = innerRef.current;
       if (pos == null || !el || document.activeElement !== el) return;
-      const clamped = Math.min(pos, el.value.length);
+      const clamped = Math.min(Math.max(0, pos), el.value.length);
       el.setSelectionRange(clamped, clamped);
       pendingCaretRef.current = null;
-    }, [displayValue]);
+    });
 
     useLayoutEffect(() => {
       const el = innerRef.current;
@@ -328,39 +328,24 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         const token = `@${item.label} `;
         let next = `${display.slice(0, start)}${token}${display.slice(end)}`;
         if (inlineThumbEnabled) {
-          next = ensureMentionThumbSlots(next, mentionables, mentionEdition);
+          next = ensureInlineThumbTextGaps(next, mentionables);
         }
         pendingCaretRef.current = start + token.length;
         setDisplayDraft(next);
         flushEmit(next);
         closePopover();
-        requestAnimationFrame(() => {
-          if (innerRef.current) {
-            const newPos = pendingCaretRef.current ?? start + token.length;
-            innerRef.current.focus();
-            innerRef.current.setSelectionRange(newPos, newPos);
-            pendingCaretRef.current = null;
-          }
-        });
       },
-      [displayValue, flushEmit, inlineThumbEnabled, mentionEdition, mentionables, setDisplayDraft],
+      [displayValue, flushEmit, inlineThumbEnabled, mentionables, setDisplayDraft],
     );
 
     const onTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
       const raw = e.target.value;
-      const nextDisplay = inlineThumbEnabled
-        ? ensureMentionThumbSlots(raw, mentionables, mentionEdition)
-        : raw;
-      const cursor = e.target.selectionStart ?? nextDisplay.length;
-      if (nextDisplay !== raw) {
-        pendingCaretRef.current = cursor + (nextDisplay.length - raw.length);
-      } else {
-        pendingCaretRef.current = cursor;
-      }
-      scheduleEmit(nextDisplay);
+      scheduleEmit(raw);
+
+      const cursor = e.target.selectionStart ?? raw.length;
       let i = cursor - 1;
       while (i >= 0) {
-        const ch = nextDisplay[i]!;
+        const ch = raw[i]!;
         if (
           ch === MENTION_THUMB_SLOT_CHAR ||
           ch === MENTION_THUMB_PAD_CHAR
@@ -370,7 +355,9 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         }
         if (/\s/.test(ch)) break;
         if (ch === "@") {
-          const tail = stripMentionThumbSlots(nextDisplay.slice(i + 1, cursor));
+          const tail = inlineThumbEnabled
+            ? stripMentionThumbSlots(raw.slice(i + 1, cursor))
+            : raw.slice(i + 1, cursor);
           const matched = mentionables.some((m) => m.label === tail);
           if (!matched && !tail.startsWith("<")) {
             mentionAnchorRef.current = { at: i, cursor };
@@ -547,14 +534,13 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       >
         <div className={cn("relative", fillHeight && "flex min-h-0 flex-1 flex-col")}>
           {inlineThumbEnabled ? (
-            <MentionInlineThumbMirror
+            <MentionInlineThumbOverlay
               ref={inlineThumbMirrorRef}
               textareaRef={innerRef}
               displayValue={displayValue}
               mentionables={mentionables}
               enabled={inlineThumbEnabled}
               edition={mentionEdition}
-              textareaClassName={resolvedTextareaClassName}
             />
           ) : null}
           <textarea
@@ -564,9 +550,27 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
             onKeyDown={onKeyDown}
             onKeyDownCapture={onKeyDownCapture}
             onPaste={onPaste}
-            onFocus={onDraftFocus}
+            onFocus={() => {
+              onDraftFocus();
+              if (!inlineThumbEnabled) return;
+              const el = innerRef.current;
+              if (!el) return;
+              let cleaned = stripMentionThumbSlots(el.value);
+              cleaned = ensureInlineThumbTextGaps(cleaned, mentionables);
+              if (cleaned === el.value) return;
+              const cursor = el.selectionStart ?? cleaned.length;
+              pendingCaretRef.current = stripMentionThumbSlots(
+                el.value.slice(0, cursor),
+              ).length;
+              // 尽量保持光标：旧 invisible 占位剔除后按净长 clamp
+              pendingCaretRef.current = Math.min(
+                pendingCaretRef.current,
+                cleaned.length,
+              );
+              setDisplayDraft(cleaned);
+            }}
             onBlur={(e) => {
-              onDraftBlur(e.currentTarget.value);
+              onDraftBlur(stripMentionThumbSlots(e.currentTarget.value));
               onBlur?.();
             }}
             onMouseMove={onMouseMove}
@@ -576,10 +580,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
             placeholder={placeholder}
             disabled={disabled}
             aria-label={ariaLabel}
-            className={cn(
-              resolvedTextareaClassName,
-              inlineThumbEnabled && MENTION_INLINE_THUMB_TEXTAREA_CLASS,
-            )}
+            className={resolvedTextareaClassName}
             style={style}
           />
         </div>
