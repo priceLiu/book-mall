@@ -20,8 +20,21 @@ function taskHasSuccessPayload(task: CanvasTaskRecord): boolean {
   );
 }
 
-function isServerInflightTaskStatus(status: string): boolean {
-  return status === "PENDING" || status === "SUBMITTED";
+export function isServerInflightTaskStatus(status: string): boolean {
+  return (
+    status === "QUEUED" ||
+    status === "DISPATCHING" ||
+    status === "PENDING" ||
+    status === "SUBMITTED"
+  );
+}
+
+export function canvasTaskInflightLabel(status: string): string | null {
+  if (status === "QUEUED") return "排队中…";
+  if (status === "DISPATCHING") return "准备生成…";
+  if (status === "SUBMITTED") return null;
+  if (status === "PENDING") return null;
+  return null;
 }
 
 function newestTaskByUpdatedAt(
@@ -89,7 +102,7 @@ export function runtimePatchFromCanvasTask(
         ),
     };
   }
-  if (task.status === "SUBMITTED") {
+  if (task.status === "SUBMITTED" || task.status === "DISPATCHING") {
     return {
       status: "running",
       taskId: task.id,
@@ -97,7 +110,7 @@ export function runtimePatchFromCanvasTask(
       failMessage: undefined,
     };
   }
-  if (task.status === "PENDING") {
+  if (task.status === "QUEUED" || task.status === "PENDING") {
     return {
       status: "pending",
       taskId: task.id,

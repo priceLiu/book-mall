@@ -10,6 +10,7 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import {
   runtimePatchFromCanvasTask,
   shouldApplyCanvasTaskRuntimePatch,
+  isServerInflightTaskStatus,
 } from "@/lib/canvas/task-pick";
 import {
   SBV1_VIDEO_ENGINE_LEFT_ADD_MENU,
@@ -88,13 +89,13 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       const bound = history.find((t) => t.id === boundId);
       if (
         bound &&
-        (bound.status === "PENDING" || bound.status === "SUBMITTED")
+        isServerInflightTaskStatus(bound.status)
       ) {
         return bound;
       }
     }
     return history.find(
-      (t) => t.status === "PENDING" || t.status === "SUBMITTED",
+      (t) => isServerInflightTaskStatus(t.status),
     );
   }, [history, d.runtime?.taskId]);
 

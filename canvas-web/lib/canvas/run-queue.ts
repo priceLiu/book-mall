@@ -120,7 +120,12 @@ function isLocalInflightStatus(status?: string): boolean {
 }
 
 function isServerInflightStatus(status?: string): boolean {
-  return status === "PENDING" || status === "SUBMITTED";
+  return (
+    status === "QUEUED" ||
+    status === "DISPATCHING" ||
+    status === "PENDING" ||
+    status === "SUBMITTED"
+  );
 }
 
 type StoryRowJob = Pick<CanvasStoryRunJob, "rowKey" | "mediaKind" | "llmSection">;
@@ -1007,7 +1012,10 @@ export function useCanvasRunner(
                 }
               } else {
                 setNodeRuntime(nodeId, {
-                  status: pick.status === "PENDING" ? "pending" : "running",
+                  status:
+                    pick.status === "QUEUED" || pick.status === "PENDING"
+                      ? "pending"
+                      : "running",
                   taskId: pick.id,
                 });
               }
@@ -1539,7 +1547,10 @@ export function useCanvasRunner(
         if (job) {
           if (
             job.llmSection &&
-            (t.status === "SUBMITTED" || t.status === "PENDING") &&
+            (t.status === "SUBMITTED" ||
+              t.status === "DISPATCHING" ||
+              t.status === "PENDING" ||
+              t.status === "QUEUED") &&
             hubSectionIsComplete(node, job.llmSection) &&
             !isCanvasInflightStatus(hubSectionRuntime(node, job.llmSection)?.status)
           ) {

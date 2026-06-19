@@ -32,6 +32,8 @@ import {
   getGenerationPollTimeBudgetMs,
 } from "@/lib/generation/poll-config";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
+import { dispatchQueuedCanvasTasks } from "@/lib/generation/traffic-control/dispatch-canvas";
+import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 import {
   pollShardOverFetchSize,
   selectPollShardTasks,
@@ -167,7 +169,7 @@ async function ensureUserInflightCapacity(
   const current = await prisma.canvasGenerationTask.count({
     where: {
       project: { userId, deletedAt: null },
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
   });
   if (current + addingCount > max) {
@@ -187,7 +189,7 @@ async function ensureProjectInflightCapacity(
   const current = await prisma.canvasGenerationTask.count({
     where: {
       projectId,
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
   });
   if (current >= max) {
@@ -208,7 +210,7 @@ async function ensureNoActiveTaskForScope(
     where: {
       projectId,
       nodeId,
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
     select: { id: true, inputPayload: true },
   });
@@ -442,7 +444,7 @@ async function claimCanvasTaskForResultApply(taskId: string): Promise<boolean> {
   const claimed = await prisma.canvasGenerationTask.updateMany({
     where: {
       id: taskId,
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
     data: { lastPolledAt: new Date() },
   });
@@ -538,7 +540,7 @@ export async function applyCanvasBailianR2vPollResult(
   await prisma.canvasGenerationTask.updateMany({
     where: {
       id: taskId,
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
     data: {
       status: "SUCCEEDED",
@@ -618,7 +620,7 @@ export async function applyCanvasVolcengineVideoResult(
   await prisma.canvasGenerationTask.updateMany({
     where: {
       id: taskId,
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
     data: {
       status: "SUCCEEDED",
@@ -712,7 +714,7 @@ export async function applyCanvasKieTaskResult(
     const applied = await prisma.canvasGenerationTask.updateMany({
       where: {
         id: taskId,
-        status: { in: ["PENDING", "SUBMITTED"] },
+        status: { in: [...GENERATION_INFLIGHT_STATUSES] },
       },
       data: {
         status: "SUCCEEDED",
@@ -1286,6 +1288,8 @@ export async function runCanvasPollWorker(opts?: {
 }> {
   const result = { scanned: 0, retried: 0, succeeded: 0, failed: 0, timedOut: 0 };
   const projectFilter = opts?.projectId ? { projectId: opts.projectId } : {};
+
+  await dispatchQueuedCanvasTasks({ projectId: opts?.projectId }).catch(() => undefined);
 
   // 1) PENDING（KIE createTask 失败 / 中断）：仅 IMAGE 异步出图重试
   const pendings = await prisma.canvasGenerationTask.findMany({

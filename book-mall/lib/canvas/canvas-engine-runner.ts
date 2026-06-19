@@ -67,6 +67,12 @@ import { STORY_VIDEO_MODEL_IDS } from "@/lib/story/story-ai-constants";
 import { BAILIAN_R2V_MODEL_IDS } from "./providers/bailian-r2v";
 import { modelHasStoryCapabilities } from "./story-model-capabilities";
 import { storyEngineSystemFallback } from "./story-engine-prompts";
+import {
+  isTrafficControlEnabled,
+  GENERATION_INFLIGHT_STATUSES,
+} from "@/lib/generation/traffic-control/constants";
+import { dispatchQueuedCanvasTasks } from "@/lib/generation/traffic-control/dispatch-canvas";
+import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 
 const MAX_PROMPT_LEN = 16000;
 /** Story LLM（故事大纲等）允许更长上游参考包，避免截断创意描述 */
@@ -149,7 +155,7 @@ async function ensureUserInflightCapacity(
   const current = await prisma.canvasGenerationTask.count({
     where: {
       project: { userId, deletedAt: null },
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
   });
   if (current + addingCount > max) {
@@ -167,7 +173,7 @@ async function ensureProjectInflightCapacity(projectId: string): Promise<void> {
   const current = await prisma.canvasGenerationTask.count({
     where: {
       projectId,
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
   });
   if (current >= max) {
@@ -188,7 +194,7 @@ async function ensureNoActiveTaskForScope(
     where: {
       projectId,
       nodeId,
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
     },
     select: { id: true, inputPayload: true },
   });
@@ -1053,6 +1059,8 @@ export async function runVideoEngineNode(
     projectId,
     nodeId,
     storyScope: args.storyScope,
+    actorUserId: userId,
+    initialStatus: isTrafficControlEnabled() ? "QUEUED" : "PENDING",
     data: {
       kind: "IMAGE",
       model: effectiveModelKey,
@@ -1075,11 +1083,21 @@ export async function runVideoEngineNode(
         ...(data.sbv1Billing && typeof data.sbv1Billing === "object"
           ? { sbv1Billing: data.sbv1Billing }
           : {}),
-        syncGatewaySubmit: true,
         ...(args.storyScope ? { storyScope: args.storyScope } : {}),
+        clientPage: gwClientPage,
+        gatewayCredentialId:
+          typeof data.gatewayCredentialId === "string" &&
+          data.gatewayCredentialId.trim()
+            ? data.gatewayCredentialId.trim()
+            : undefined,
       } as Prisma.InputJsonValue,
     },
   });
+
+  if (created.status === "QUEUED") {
+    void dispatchQueuedCanvasTasks({ projectId }).catch(() => undefined);
+    return { reused: false, task: created };
+  }
 
   const callBackUrl = buildCanvasAiKieCallbackUrl("video", created.id);
 
@@ -1383,6 +1401,11 @@ export async function runRefVideoEngineNode(
       parameterExtras.prompt_extend = params.prompt_extend !== false;
     }
 
+    const queued = isTrafficControlEnabled();
+    const scope = queued
+      ? await resolveCanvasProjectTrafficScope(projectId, userId)
+      : null;
+
     const created = await prisma.canvasGenerationTask.create({
       data: {
         projectId,
@@ -1391,6 +1414,10 @@ export async function runRefVideoEngineNode(
         model: modelKey,
         providerId: null,
         inputHash,
+        status: queued ? "QUEUED" : "PENDING",
+        queuedAt: queued ? new Date() : undefined,
+        tenantId: scope?.tenantId ?? undefined,
+        actorUserId: userId,
         inputPayload: {
           kind: "ai-video-engine",
           providerKind: "BAILIAN_R2V",
@@ -1399,11 +1426,15 @@ export async function runRefVideoEngineNode(
           providerId,
           modelKey,
           referenceImageUrls: refs,
-          syncGatewaySubmit: true,
+          clientPage: gwClientPage,
         } as Prisma.InputJsonValue,
-        status: "PENDING",
       },
     });
+
+    if (queued) {
+      void dispatchQueuedCanvasTasks({ projectId }).catch(() => undefined);
+      return { reused: false, task: created };
+    }
 
     try {
       const { claimed, task: claimedTask } = await claimCanvasTaskKieSubmit(
@@ -1484,6 +1515,11 @@ export async function runRefVideoEngineNode(
     aspectRatio,
   });
 
+  const queued = isTrafficControlEnabled();
+  const scope = queued
+    ? await resolveCanvasProjectTrafficScope(projectId, userId)
+    : null;
+
   const created = await prisma.canvasGenerationTask.create({
     data: {
       projectId,
@@ -1492,6 +1528,10 @@ export async function runRefVideoEngineNode(
       model: modelKey,
       providerId: null,
       inputHash,
+      status: queued ? "QUEUED" : "PENDING",
+      queuedAt: queued ? new Date() : undefined,
+      tenantId: scope?.tenantId ?? undefined,
+      actorUserId: userId,
       inputPayload: {
         kind: "ai-video-engine",
         providerKind: "KIE",
@@ -1502,11 +1542,15 @@ export async function runRefVideoEngineNode(
         referenceImageUrls: refs,
         kieModel: model,
         kieInput: input,
-        syncGatewaySubmit: true,
+        clientPage: gwClientPage,
       } as Prisma.InputJsonValue,
-      status: "PENDING",
     },
   });
+
+  if (queued) {
+    void dispatchQueuedCanvasTasks({ projectId }).catch(() => undefined);
+    return { reused: false, task: created };
+  }
 
   const callBackUrl = buildCanvasAiKieCallbackUrl("video", created.id);
 

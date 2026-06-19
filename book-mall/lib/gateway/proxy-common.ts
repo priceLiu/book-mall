@@ -48,6 +48,7 @@ import {
   isStaffRole,
 } from "@/lib/billing/billing-persona";
 import { VideoRiskError } from "@/lib/billing/video-risk-control";
+import { releaseTrafficSlotFromGatewayLog } from "@/lib/generation/traffic-control/slot";
 
 export type { UsageFromResponse };
 
@@ -358,6 +359,25 @@ export async function finalizeRequestLog(
     }
   } catch (e) {
     console.error("[gateway] 积分结算异常（不影响生成结果）", logId, e);
+  }
+
+  if (patch.status === "SUCCEEDED" || patch.status === "FAILED") {
+    try {
+      const terminalLog = await prisma.gatewayRequestLog.findUnique({
+        where: { id: logId },
+        select: {
+          tenantId: true,
+          actorBookUserId: true,
+          userId: true,
+          requestKind: true,
+        },
+      });
+      if (terminalLog) {
+        await releaseTrafficSlotFromGatewayLog(terminalLog);
+      }
+    } catch (e) {
+      console.warn("[gateway] releaseTrafficSlot 失败（忽略）", logId, e);
+    }
   }
 }
 

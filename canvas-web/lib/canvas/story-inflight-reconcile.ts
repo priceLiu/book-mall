@@ -18,6 +18,7 @@ import {
   tasksMatchStoryScope,
   type CanvasTaskStoryScope,
   shouldSkipStoryRowTaskApply,
+  isServerInflightTaskStatus,
 } from "./task-pick";
 import { storyApplyTaskResult } from "./story-run-apply";
 import { syncPro2SceneImagesFromRows } from "./pro2-spawn-scene-image-group";
@@ -42,7 +43,7 @@ function hasServerInflightForScope(
     (t) =>
       t.nodeId === nodeId &&
       tasksMatchStoryScope(t, scope) &&
-      (t.status === "PENDING" || t.status === "SUBMITTED"),
+      isServerInflightTaskStatus(t.status),
   );
 }
 
@@ -301,7 +302,7 @@ export function reconcileStaleInflightRuntimes(
 
           if (rt?.status === "error" && hasServerInflightForScope(tasks, node.id, scope)) {
             const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
-            if (pick && (pick.status === "PENDING" || pick.status === "SUBMITTED")) {
+            if (pick && isServerInflightTaskStatus(pick.status)) {
               storyApplyTaskResult(
                 node,
                 pick,
@@ -349,7 +350,7 @@ export function reconcileStaleInflightRuntimes(
 
     const nodeTasks = tasks.filter((t) => t.nodeId === node.id);
     const inflight = nodeTasks.some(
-      (t) => t.status === "PENDING" || t.status === "SUBMITTED",
+      (t) => isServerInflightTaskStatus(t.status),
     );
     if (inflight) continue;
 
