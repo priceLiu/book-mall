@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { runCanvasPollWorker } from "@/lib/canvas/canvas-task-service";
 import { getCanvasAiPollToken } from "@/lib/canvas/canvas-constants";
-import { getGenerationPollMaxDurationSec } from "@/lib/generation/poll-config";
 
 export const runtime = "nodejs";
-export const maxDuration = getGenerationPollMaxDurationSec();
+/** Next.js 要求编译期字面量；默认 300s，与 poll-config 默认一致 */
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   const expected = getCanvasAiPollToken();
