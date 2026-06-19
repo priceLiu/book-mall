@@ -30,6 +30,7 @@ import {
   type StoryVideoModelId,
   type StoryVideoOptions,
 } from "./story-ai-constants";
+import { failGatewayLogIfStillRunning } from "@/lib/gateway/fail-gateway-log-on-timeout";
 import {
   buildCanvasVideoVolcengineInput,
   isVolcengineStoryVideoModelKey,
@@ -1098,6 +1099,96 @@ function shouldPollNow(
   );
 }
 
+/** 对单条 SUBMITTED 漫剧任务拉一次 Gateway/厂商状态；终态则写回任务表。 */
+async function pollOneSubmittedStoryTask(
+  task: StoryGenerationTask,
+): Promise<"succeeded" | "failed" | "pending"> {
+  const before = task.status;
+  const project = await prisma.storyProject.findUnique({
+    where: { id: task.projectId },
+    select: { userId: true },
+  });
+  if (!project || !task.kieTaskId) return "pending";
+
+  const isVolcengine =
+    task.kind === "FRAME_VIDEO" &&
+    isVolcengineStoryVideoModelKey(task.model);
+
+  if (isVolcengine) {
+    const polled = await Promise.race([
+      storyGwPollVolcengineVideo(project.userId, {
+        taskId: task.kieTaskId,
+        gatewayLogId: task.gatewayLogId,
+        model: task.model,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("volcengine poll timeout")),
+          POLL_INNER_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+    await prisma.storyGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        lastPolledAt: new Date(),
+        pollCount: task.pollCount + 1,
+      },
+    });
+    if (polled.state === "success") {
+      await applyVolcengineVideoTaskResult(
+        task.id,
+        polled.videoUrl,
+        polled.raw,
+      );
+    } else if (polled.state === "fail") {
+      await prisma.storyGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          status: "FAILED",
+          failCode: "VOLCENGINE_TASK_FAILED",
+          failMessage: polled.failMessage?.slice(0, 500) ?? "failed",
+          resultPayload: polled.raw as Prisma.InputJsonValue,
+          completedAt: new Date(),
+        },
+      });
+    }
+  } else {
+    const record = await Promise.race([
+      storyGwRecordInfo(project.userId, {
+        taskId: task.kieTaskId,
+        gatewayLogId: task.gatewayLogId,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("recordInfo timeout")),
+          POLL_INNER_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+    await prisma.storyGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        lastPolledAt: new Date(),
+        pollCount: task.pollCount + 1,
+      },
+    });
+    if (isKieRecordSuccess(record.state)) {
+      await applyKieTaskResult(task.id, record);
+    } else if (isKieRecordFail(record.state)) {
+      await applyKieTaskResult(task.id, record);
+    }
+  }
+
+  const after = await prisma.storyGenerationTask.findUnique({
+    where: { id: task.id },
+    select: { status: true },
+  });
+  if (after?.status === "SUCCEEDED" && before !== "SUCCEEDED") return "succeeded";
+  if (after?.status === "FAILED" && before !== "FAILED") return "failed";
+  return "pending";
+}
+
 /**
  * 选取一批 PENDING（重试 createTask）+ SUBMITTED（查询 KIE）任务推进。
  * 由 cron `/api/story/kie/poll` 与脚本 `pnpm story:poll-once` 调用。
@@ -1222,6 +1313,24 @@ export async function runPollWorker(opts?: {
     // Timeout check
     const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
     if (now - submittedTs >= timeoutMs) {
+      try {
+        const outcome = await pollOneSubmittedStoryTask(task);
+        if (outcome === "succeeded") {
+          result.succeeded++;
+          continue;
+        }
+        if (outcome === "failed") {
+          result.failed++;
+          continue;
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logKieEvent("warn", "final poll before timeout error", {
+          taskId: task.id,
+          msg,
+        });
+      }
+
       await prisma.storyGenerationTask.update({
         where: { id: task.id },
         data: {
@@ -1233,90 +1342,23 @@ export async function runPollWorker(opts?: {
           completedAt: new Date(),
         },
       });
+      const gatewayLogId = task.gatewayLogId?.trim();
+      if (gatewayLogId) {
+        await failGatewayLogIfStillRunning({
+          gatewayLogId,
+          durationMs: now - submittedTs,
+          timeoutMin: STORY_AI_TASK_TIMEOUT_MIN,
+          externalTaskId: task.kieTaskId,
+        });
+      }
       result.timedOut++;
       continue;
     }
 
     try {
-      const project = await prisma.storyProject.findUnique({
-        where: { id: task.projectId },
-        select: { userId: true },
-      });
-      if (!project) continue;
-
-      const isVolcengine =
-        task.kind === "FRAME_VIDEO" &&
-        isVolcengineStoryVideoModelKey(task.model);
-
-      if (isVolcengine) {
-        const polled = await Promise.race([
-          storyGwPollVolcengineVideo(project.userId, {
-            taskId: task.kieTaskId,
-            gatewayLogId: task.gatewayLogId,
-            model: task.model,
-          }),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error("volcengine poll timeout")),
-              POLL_INNER_TIMEOUT_MS,
-            ),
-          ),
-        ]);
-        await prisma.storyGenerationTask.update({
-          where: { id: task.id },
-          data: {
-            lastPolledAt: new Date(),
-            pollCount: task.pollCount + 1,
-          },
-        });
-        if (polled.state === "success") {
-          await applyVolcengineVideoTaskResult(
-            task.id,
-            polled.videoUrl,
-            polled.raw,
-          );
-          result.succeeded++;
-        } else if (polled.state === "fail") {
-          await prisma.storyGenerationTask.update({
-            where: { id: task.id },
-            data: {
-              status: "FAILED",
-              failCode: "VOLCENGINE_TASK_FAILED",
-              failMessage: polled.failMessage?.slice(0, 500) ?? "failed",
-              resultPayload: polled.raw as Prisma.InputJsonValue,
-              completedAt: new Date(),
-            },
-          });
-          result.failed++;
-        }
-      } else {
-        const record = await Promise.race([
-          storyGwRecordInfo(project.userId, {
-            taskId: task.kieTaskId,
-            gatewayLogId: task.gatewayLogId,
-          }),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error("recordInfo timeout")),
-              POLL_INNER_TIMEOUT_MS,
-            ),
-          ),
-        ]);
-        await prisma.storyGenerationTask.update({
-          where: { id: task.id },
-          data: {
-            lastPolledAt: new Date(),
-            pollCount: task.pollCount + 1,
-          },
-        });
-        if (isKieRecordSuccess(record.state)) {
-          await applyKieTaskResult(task.id, record);
-          result.succeeded++;
-        } else if (isKieRecordFail(record.state)) {
-          await applyKieTaskResult(task.id, record);
-          result.failed++;
-        }
-      }
+      const outcome = await pollOneSubmittedStoryTask(task);
+      if (outcome === "succeeded") result.succeeded++;
+      else if (outcome === "failed") result.failed++;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       logKieEvent("warn", "recordInfo poll error", {
