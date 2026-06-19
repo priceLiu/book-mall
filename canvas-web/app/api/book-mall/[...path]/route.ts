@@ -25,7 +25,7 @@ function bookMallRouteMissingResponse(path: string, status: number) {
   );
 }
 
-export async function proxyToBookMall(
+async function proxyToBookMall(
   request: NextRequest,
   pathSegments: string[],
 ) {
