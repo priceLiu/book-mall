@@ -243,12 +243,22 @@ export const MentionInlineThumbOverlay = forwardRef<
     dockScroll?.addEventListener("scroll", scheduleRemeasure, { passive: true });
     window.addEventListener("resize", scheduleRemeasure);
 
+    const rfViewport = ta.closest(".react-flow__viewport") as HTMLElement | null;
+    const viewportObserver =
+      rfViewport &&
+      new MutationObserver(scheduleRemeasure);
+    viewportObserver?.observe(rfViewport, {
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+
     return () => {
       ta.removeEventListener("input", scheduleRemeasure);
       ta.removeEventListener("compositionend", scheduleRemeasure);
       ta.removeEventListener("scroll", scheduleRemeasure);
       dockScroll?.removeEventListener("scroll", scheduleRemeasure);
       window.removeEventListener("resize", scheduleRemeasure);
+      viewportObserver?.disconnect();
       ro.disconnect();
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
@@ -293,7 +303,7 @@ export const MentionInlineThumbOverlay = forwardRef<
     <div
       ref={overlayRef}
       aria-hidden
-      className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
+      className="pointer-events-none absolute inset-0 z-[2] overflow-visible"
     />
   );
 });
