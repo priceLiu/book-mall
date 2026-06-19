@@ -214,12 +214,16 @@ async function patchProjectNodeFromTask(
     task.nodeId,
     runtime,
   );
+  const thumb = task.ossUrl?.trim();
+  const data: Prisma.CanvasProjectUpdateInput = {
+    canvas: nextCanvas as Prisma.InputJsonValue,
+  };
+  if (!project.thumbnailUrl && thumb) {
+    data.thumbnailUrl = thumb;
+  }
   await prisma.canvasProject.update({
     where: { id: task.projectId },
-    data: {
-      canvas: nextCanvas as Prisma.InputJsonValue,
-      ...(project.thumbnailUrl ? {} : { thumbnailUrl: task.ossUrl }),
-    },
+    data,
   });
 }
 

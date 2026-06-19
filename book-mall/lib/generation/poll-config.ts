@@ -44,7 +44,7 @@ export function getGenerationPollShardIndex(): number {
   return Math.min(Math.round(raw), Math.max(0, count - 1));
 }
 
-/** Next.js route maxDuration（秒） */
+/** Next.js route maxDuration 须在 route 文件写编译期字面量（默认 300） */
 export function getGenerationPollMaxDurationSec(): number {
   return readPositiveInt("GENERATION_POLL_MAX_DURATION_SEC", 300);
 }
