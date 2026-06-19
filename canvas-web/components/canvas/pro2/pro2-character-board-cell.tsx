@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { AlertTriangle, Copy, Loader2 } from "lucide-react";
 import type { StoryProCharacterRow } from "@/lib/canvas/story-pro-workspace-types";
+import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
 import { cn } from "@/lib/utils";
 
 function threeViewUrl(row: StoryProCharacterRow): string | undefined {
@@ -35,6 +36,7 @@ export function Pro2CharacterBoardCell({
 }: Pro2CharacterBoardCellProps) {
   const url = threeViewUrl(row);
   const st = pro2CharacterCellStatus(row);
+  const { ref: lazyRef, active: mediaActive } = useLazyMediaActive("160px");
   const failMessage = row.runtime?.failMessage?.trim();
   const taskId = row.runtime?.taskId?.trim();
 
@@ -69,13 +71,22 @@ export function Pro2CharacterBoardCell({
       </span>
 
       {url ? (
-        <div className="relative min-h-[160px] w-full flex-1">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={url}
-            alt={`${row.name} 三视图`}
-            className="size-full max-h-[280px] min-h-[140px] object-contain p-1"
-          />
+        <div
+          ref={lazyRef}
+          className="relative min-h-[160px] w-full flex-1"
+        >
+          {mediaActive ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={url}
+              alt={`${row.name} 三视图`}
+              loading="lazy"
+              decoding="async"
+              className="size-full max-h-[280px] min-h-[140px] object-contain p-1"
+            />
+          ) : (
+            <div className="size-full min-h-[140px] animate-pulse bg-white/[0.04]" />
+          )}
         </div>
       ) : st === "running" ? (
         <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center gap-2 px-4 py-8 text-[11px] text-white/50">

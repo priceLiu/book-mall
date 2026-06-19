@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { LazyColumnMediaThumb } from "./lazy-column-media-thumb";
 import type {
   StoryCharacterColumnRow,
   StoryFrameColumnRow,
@@ -42,18 +42,7 @@ function MediaThumb({
   alt: string;
   emptyLabel: string;
 }) {
-  if (url) {
-    return (
-      <div className="relative h-[88px] w-[140px] shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/50">
-        <Image src={url} alt={alt} fill className="object-contain" unoptimized />
-      </div>
-    );
-  }
-  return (
-    <div className="flex h-[88px] w-[140px] shrink-0 items-center justify-center rounded-md border border-dashed border-white/15 bg-black/30 text-[10px] text-[var(--canvas-muted)]">
-      {emptyLabel}
-    </div>
-  );
+  return <LazyColumnMediaThumb url={url} alt={alt} emptyLabel={emptyLabel} />;
 }
 
 export function StoryCharacterColumnPanel({

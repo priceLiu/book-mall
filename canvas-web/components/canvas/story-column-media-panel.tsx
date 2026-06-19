@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Clapperboard, Check, Download, Eye, RefreshCw, X } from "lucide-react";
+import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
 import { cn } from "@/lib/utils";
 import { STORY_MEDIA_COL_WIDTH } from "@/lib/canvas/story-ref-image";
 import { STORY_FRAME_ROW_STRIP_H } from "@/lib/canvas/story-column-layout";
@@ -86,8 +86,8 @@ export function StoryColumnMediaPanel({
     !generating;
   const showVideoPromptPopover =
     isFrame && hasFrameImage && Boolean(videoPrompt?.trim());
-  const framePromptAnchorRef = useRef<HTMLDivElement>(null);
-  const videoPromptTip = useStoryVideoPromptTip(framePromptAnchorRef);
+  const { ref: mediaAnchorRef, active: mediaActive } = useLazyMediaActive("160px");
+  const videoPromptTip = useStoryVideoPromptTip(mediaAnchorRef);
 
   return (
     <div
@@ -104,7 +104,7 @@ export function StoryColumnMediaPanel({
       }}
     >
       <div
-        ref={framePromptAnchorRef}
+        ref={mediaAnchorRef}
         className={cn(
           "group/frame-prompt pointer-events-auto relative min-h-0 overflow-hidden rounded-md border border-white/10 bg-black/45",
           stripLayout ? "h-full overflow-visible" : "",
@@ -121,17 +121,18 @@ export function StoryColumnMediaPanel({
             generating && storyEditionGeneratingBorderClass(edition),
           )}
         >
-        {imageUrl ? (
-          <Image
+        {imageUrl && mediaActive ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={imageUrl}
             alt=""
-            fill
-            className={cn(
-              "pointer-events-none",
-              "object-contain",
-            )}
-            unoptimized
+            loading="lazy"
+            decoding="async"
+            className="pointer-events-none absolute inset-0 size-full object-contain"
+            draggable={false}
           />
+        ) : imageUrl ? (
+          <div className="absolute inset-0 animate-pulse bg-white/[0.04]" aria-hidden />
         ) : null}
         {isFrame && hasFrameImage && canGenerateVideo ? (
           <button
@@ -179,13 +180,16 @@ export function StoryColumnMediaPanel({
             已过审
           </span>
         ) : null}
-        {videoUrl && !imageUrl ? (
+        {videoUrl && !imageUrl && mediaActive ? (
           <video
             src={videoUrl}
             className="pointer-events-none absolute inset-0 h-full w-full object-contain"
             playsInline
             muted
+            preload="metadata"
           />
+        ) : videoUrl && !imageUrl ? (
+          <div className="absolute inset-0 animate-pulse bg-white/[0.04]" aria-hidden />
         ) : null}
         {!hasVisual ? (
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[9px] text-white/25">

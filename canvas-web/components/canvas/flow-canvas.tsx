@@ -883,7 +883,8 @@ function FlowCanvasInner({
     return changed ? next : rfEdges;
   }, [rfEdges, focusEdgeIds]);
 
-  const onlyRenderVisible = forceOnlyRenderVisible || rfNodes.length >= 12;
+  const onlyRenderVisible =
+    forceOnlyRenderVisible || libtvCanvas || rfNodes.length >= 8;
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();

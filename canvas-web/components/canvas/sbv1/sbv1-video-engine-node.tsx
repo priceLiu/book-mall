@@ -37,6 +37,7 @@ import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { cn } from "@/lib/utils";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
+import { LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
 import { Pro2ImageNodeToolbar } from "../pro2/pro2-image-node-toolbar";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
@@ -316,13 +317,11 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               />
             ) : hasVideo ? (
               <div className="group/video absolute inset-0">
-                <video
+                <LazyViewportVideo
                   src={videoUrl ?? undefined}
-                  className="pointer-events-none absolute inset-0 size-full object-contain"
-                  playsInline
-                  muted
-                  preload="metadata"
-                  draggable={false}
+                  className="absolute inset-0"
+                  videoClassName="pointer-events-none object-contain"
+                  rootMargin="280px"
                 />
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                   <button

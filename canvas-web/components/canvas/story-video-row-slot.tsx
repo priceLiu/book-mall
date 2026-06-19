@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { Download, Play, RefreshCw } from "lucide-react";
+import { LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { cn } from "@/lib/utils";
 import { STORY_VIDEO_SLOT } from "@/lib/canvas/story-column-layout";
 import {
@@ -95,12 +96,11 @@ export function StoryVideoRowSlot({
           />
 
           {hasVideo ? (
-            <video
+            <LazyViewportVideo
               src={videoUrl}
-              className="absolute inset-0 h-full w-full object-cover"
-              playsInline
-              muted
-              preload="metadata"
+              className="absolute inset-0"
+              videoClassName="object-cover"
+              rootMargin="160px"
             />
           ) : (
             <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-black/40" />
