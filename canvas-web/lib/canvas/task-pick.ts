@@ -85,6 +85,7 @@ export function runtimePatchFromCanvasTask(
       taskId: task.id,
       ossUrl: pickTaskResultMediaUrl(task) ?? task.ossUrl ?? undefined,
       ephemeralUrl: task.ephemeralUrl ?? undefined,
+      posterUrl: task.posterUrl?.trim() || undefined,
       textOutput: task.textOutput ?? undefined,
       failCode: undefined,
       failMessage: undefined,

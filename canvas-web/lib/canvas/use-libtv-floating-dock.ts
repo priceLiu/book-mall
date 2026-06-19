@@ -73,6 +73,8 @@ export function useLibtvFloatingDock(
 
   if (dockNodeId && stablePlacement) {
     pinRef.current = { nodeId: dockNodeId, placement: stablePlacement };
+  } else if (!dockNodeId) {
+    pinRef.current = null;
   }
 
   const placement =

@@ -64,13 +64,14 @@ const DOCK_MENTION_FIELDS: DockMentionPromptField[] = [
   "prompt",
 ];
 
-/** 某节点被删后，扫全图其余节点的 dockInput / themeInput */
+/** 某节点被删后，扫全图其余节点的 dockInput / themeInput / prompt */
 export function pruneMentionsAfterNodeRemoval<
-  T extends { id: string; data: Record<string, unknown> },
+  T extends { id: string; data?: Record<string, unknown> | null },
 >(nodes: T[], removedNodeId: string): T[] {
   const idsToStrip = mentionIdsForRemovedCanvasNode(removedNodeId);
   return nodes.map((n) => {
     const d = n.data;
+    if (!d || typeof d !== "object") return n;
     const patch: Record<string, unknown> = {};
     for (const field of DOCK_MENTION_FIELDS) {
       const v = d[field];
@@ -79,6 +80,6 @@ export function pruneMentionsAfterNodeRemoval<
       if (next !== v) patch[field] = next;
     }
     if (Object.keys(patch).length === 0) return n;
-    return { ...n, data: { ...d, ...patch } };
+    return { ...n, data: { ...structuredClone(d), ...patch } };
   });
 }

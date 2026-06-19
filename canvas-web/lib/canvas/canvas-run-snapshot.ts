@@ -1,4 +1,4 @@
-import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
+import { pickPersistableProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
 import { stripStoryProUploadedScriptMdForPersist } from "@/lib/canvas/story-pro-upload-script";
 import { useCanvasStore } from "@/lib/canvas/store";
 
@@ -10,7 +10,7 @@ export function buildCanvasRunSnapshot(): {
   const graph = stripStoryProUploadedScriptMdForPersist(
     useCanvasStore.getState().toGraph(),
   );
-  const thumb = pickProjectThumbnailUrl(graph);
+  const thumb = pickPersistableProjectThumbnailUrl(graph);
   return {
     canvas: graph,
     ...(thumb ? { thumbnailUrl: thumb } : {}),

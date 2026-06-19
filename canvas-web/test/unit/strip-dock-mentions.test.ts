@@ -45,3 +45,21 @@ describe("removeDockRefFromState", () => {
     expect(r.prompt).toBe("text end");
   });
 });
+
+describe("pruneMentionsAfterNodeRemoval", () => {
+  it("does not throw when node data is missing", async () => {
+    const { pruneMentionsAfterNodeRemoval } = await import(
+      "@/lib/canvas/strip-dock-mentions"
+    );
+    const nodes = [
+      { id: "a", data: undefined as unknown as Record<string, unknown> },
+      {
+        id: "b",
+        data: { prompt: "hello @<n_x> world" },
+      },
+    ];
+    const next = pruneMentionsAfterNodeRemoval(nodes, "n_x");
+    expect(next).toHaveLength(2);
+    expect((next[1]!.data as { prompt: string }).prompt).toBe("hello world");
+  });
+});

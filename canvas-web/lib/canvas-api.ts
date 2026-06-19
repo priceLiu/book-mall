@@ -98,6 +98,7 @@ export type CanvasTaskRecord = {
   model: string;
   ossUrl: string | null;
   ephemeralUrl: string | null;
+  posterUrl?: string | null;
   textOutput: string | null;
   failCode: string | null;
   failMessage: string | null;

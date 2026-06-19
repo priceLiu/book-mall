@@ -9,8 +9,7 @@ import {
 } from "./pro2-spawn-nodes";
 import { PRO2_CHARACTER_THREE_VIEW_HEIGHT, PRO2_CHARACTER_THREE_VIEW_WIDTH } from "./story-pro2-node-chrome";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
-import { buildSbv1ImageNodeData, selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
-import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
+import { buildSbv1ImageNodeData, buildSbv1VideoEngineNodeData, selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
 import {
   resolveLibtvSideSpawnNodeType,
 } from "./libtv-side-spawn";
@@ -77,9 +76,7 @@ function spawnVideoEngine(
 ) {
   const { addNode, setNodes } = store;
   const pos = spawnPosition("sbv1-video-engine", options);
-  const id = addNode("sbv1-video-engine", pos, {
-    ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
-  });
+  const id = addNode("sbv1-video-engine", pos, buildSbv1VideoEngineNodeData());
   if (id) selectSbv1NodeAfterSpawn(setNodes, id);
 }
 

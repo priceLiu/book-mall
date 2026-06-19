@@ -42,6 +42,7 @@ export type GenerationTaskRecordRow = {
   updatedAt: Date;
   kieTaskId: string | null;
   inputPayload: unknown;
+  resultPayload: unknown;
   canvasHistoryId: string | null;
   project?: { name: string };
 };
@@ -63,6 +64,7 @@ const generationTaskSelectBase = {
   updatedAt: true,
   kieTaskId: true,
   inputPayload: true,
+  resultPayload: true,
 } as const;
 
 export async function findGenerationTaskRows(args: {

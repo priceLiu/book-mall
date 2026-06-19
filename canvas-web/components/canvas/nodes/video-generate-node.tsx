@@ -100,6 +100,7 @@ export function VideoGenerateNode({ id, data, selected }: NodeProps) {
           <CanvasVideoPreviewSlot
             className="min-h-0 flex-1"
             videoUrl={url}
+            posterUrl={upstreamRuntime?.posterUrl}
             downloadHref={url}
             downloadFileName="video-generate.mp4"
             generating={generating}

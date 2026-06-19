@@ -9,33 +9,36 @@ import {
   type MutableRefObject,
   type ReactElement,
 } from "react";
+import { GripHorizontal } from "lucide-react";
 import {
-  clampCanvasDockBarOffset,
-  useCanvasDockBarOffset,
+  clampCanvasDockBarPosition,
+  useCanvasDockBarPosition,
 } from "@/lib/canvas/use-canvas-dock-bar-offset";
 import { cn } from "@/lib/utils";
 
 export type LibtvCanvasDockBarSlotProps = {
-  /** localStorage 键后缀，如 `pro2` / `sbv1` */
+  /** localStorage 键，建议 `pro2:${projectId}` / `sbv1:${projectId}` */
   storageKey: string;
   children: ReactElement;
   dockRef?: MutableRefObject<HTMLDivElement | null>;
   className?: string;
 };
 
-/** 画布底部 Dock 槽：固定贴底，可左右拖动，偏移持久化 */
+/** 画布底部 Dock 槽：仅握把可拖动，位置持久化 */
 export function LibtvCanvasDockBarSlot({
   storageKey,
   children,
   dockRef,
   className,
 }: LibtvCanvasDockBarSlotProps) {
-  const [offsetX, setOffsetX] = useCanvasDockBarOffset(storageKey);
+  const [position, setPosition] = useCanvasDockBarPosition(storageKey);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
-    startOffset: number;
+    startY: number;
+    startOffsetX: number;
+    startOffsetY: number;
   } | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -48,67 +51,81 @@ export function LibtvCanvasDockBarSlot({
   );
 
   const clampToViewport = useCallback(
-    (next: number) => {
-      const w = innerRef.current?.offsetWidth ?? 0;
-      return clampCanvasDockBarOffset(w, next);
+    (next: { offsetX: number; offsetY: number }) => {
+      const el = innerRef.current;
+      const w = el?.offsetWidth ?? 0;
+      const h = el?.offsetHeight ?? 0;
+      return clampCanvasDockBarPosition(w, h, next);
     },
     [],
   );
 
   useEffect(() => {
     const onResize = () => {
-      setOffsetX((prev) => clampToViewport(prev));
+      setPosition((prev) => clampToViewport(prev));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [setOffsetX, clampToViewport]);
+  }, [setPosition, clampToViewport]);
 
   useEffect(() => {
     const el = innerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      setOffsetX((prev) => clampToViewport(prev));
+      setPosition((prev) => clampToViewport(prev));
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [setOffsetX, clampToViewport]);
+  }, [setPosition, clampToViewport]);
 
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
+  useEffect(() => {
+    if (!dragging) return;
+
+    const onMove = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      const deltaX = e.clientX - drag.startX;
+      const deltaY = drag.startY - e.clientY;
+      setPosition(
+        clampToViewport({
+          offsetX: drag.startOffsetX + deltaX,
+          offsetY: drag.startOffsetY + deltaY,
+        }),
+      );
+    };
+
+    const onUp = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      dragRef.current = null;
+      setDragging(false);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [dragging, setPosition, clampToViewport]);
+
+  const onGripPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return;
-      if ((e.target as HTMLElement).closest("button")) return;
-
       dragRef.current = {
         pointerId: e.pointerId,
         startX: e.clientX,
-        startOffset: offsetX,
+        startY: e.clientY,
+        startOffsetX: position.offsetX,
+        startOffsetY: position.offsetY,
       };
       setDragging(true);
-      e.currentTarget.setPointerCapture(e.pointerId);
       e.preventDefault();
     },
-    [offsetX],
+    [position.offsetX, position.offsetY],
   );
-
-  const onPointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      const drag = dragRef.current;
-      if (!drag || drag.pointerId !== e.pointerId) return;
-      const delta = e.clientX - drag.startX;
-      setOffsetX(clampToViewport(drag.startOffset + delta));
-    },
-    [setOffsetX, clampToViewport],
-  );
-
-  const endDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    dragRef.current = null;
-    setDragging(false);
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-  }, []);
 
   const child = cloneElement(children, {
     ref: assignDockRef,
@@ -117,26 +134,32 @@ export function LibtvCanvasDockBarSlot({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute inset-x-0 bottom-5 z-[70]",
+        "pointer-events-none absolute inset-x-0 bottom-4 z-[70]",
         className,
       )}
     >
       <div
-        className={cn(
-          "pointer-events-auto absolute bottom-0 select-none",
-          dragging ? "cursor-grabbing" : "cursor-grab",
-        )}
+        className="pointer-events-auto absolute flex flex-col items-center"
         style={{
-          left: `calc(50% + ${offsetX}px)`,
+          left: `calc(50% + ${position.offsetX}px)`,
+          bottom: `${position.offsetY}px`,
           transform: "translateX(-50%)",
-          touchAction: dragging ? "none" : undefined,
         }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
       >
-        {child}
+        <button
+          type="button"
+          data-dock-drag-handle=""
+          aria-label="拖动工具栏位置"
+          title="拖动调整位置"
+          className={cn(
+            "nodrag mb-0.5 flex h-4 w-10 cursor-grab items-center justify-center rounded-full text-white/30 transition hover:bg-white/10 hover:text-white/55 active:cursor-grabbing",
+            dragging && "cursor-grabbing text-white/55",
+          )}
+          onPointerDown={onGripPointerDown}
+        >
+          <GripHorizontal className="size-3 pointer-events-none" />
+        </button>
+        <div className="pointer-events-auto">{child}</div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import type { CanvasFlowNode, CanvasNodeType, CanvasFlowEdge } from "./types";
 import { isGroupNode, NODE_DEFAULT_SIZE } from "./types";
 import { STORY_CONTROL_NODE_HEIGHT, STORY_CONTROL_NODE_WIDTH } from "./story-node-chrome";
+import { isolateSharedCanvasNodeData } from "./clone-node-data";
 import { migrateStoryOutlineLlmParamsAll } from "./story-llm-params-migrate";
 import {
   repairStoryVideoFrameEdges,
@@ -886,9 +887,11 @@ export function normalizeCanvasNodes(
     const stacked = needsMediaGroupZ
       ? syncPro2MediaGroupZIndex(sorted)
       : sorted;
-    return ensureNodeDragHandles(stacked);
+    return ensureNodeDragHandles(isolateSharedCanvasNodeData(stacked));
   }
-  return ensureNodeDragHandles(applyStoryLayout(withPro2Groups, edges));
+  return ensureNodeDragHandles(
+    isolateSharedCanvasNodeData(applyStoryLayout(withPro2Groups, edges)),
+  );
 }
 
 import { LIBTV_DRAG_ANYWHERE_NODE_TYPES } from "./libtv-node-chrome";

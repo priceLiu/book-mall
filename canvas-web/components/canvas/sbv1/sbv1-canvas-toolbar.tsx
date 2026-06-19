@@ -4,9 +4,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { ImageIcon, ScanFace, Upload, Video } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
-import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "@/lib/canvas/sbv1-workspace-types";
+import { selectSbv1NodeAfterSpawn, buildSbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-spawn-nodes";
 import { SBV1_VIDEO_COMPOSE_LABEL } from "@/lib/canvas/sbv1-node-chrome";
-import { selectSbv1NodeAfterSpawn } from "@/lib/canvas/sbv1-spawn-nodes";
 import { flowPositionAtViewportCenter } from "@/lib/canvas/viewport-placement";
 import { spawnSbv1CanvasPastedImages } from "@/lib/canvas/spawn-sbv1-paste-images";
 import { useSbv1PortraitLivenessStatus } from "@/lib/canvas/use-sbv1-portrait-liveness-status";
@@ -15,7 +14,7 @@ import { LibtvCanvasDockBarSlot } from "@/components/canvas/libtv-canvas-dock-ba
 import { Sbv1Dock, type Sbv1DockItem } from "./sbv1-dock";
 
 /** 分镜视频 1.0 · 底部 macOS 磁吸 dock */
-export function Sbv1CanvasToolbar() {
+export function Sbv1CanvasToolbar({ projectId }: { projectId: string }) {
   const base = useBookMallBaseUrl();
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
@@ -36,7 +35,7 @@ export function Sbv1CanvasToolbar() {
     const id = addNode(
       "sbv1-video-engine",
       pos ?? { x: 280, y: 160 },
-      { ...SBV1_DEFAULT_VIDEO_ENGINE_DATA },
+      buildSbv1VideoEngineNodeData(),
     );
     if (id) selectSbv1NodeAfterSpawn(setNodes, id);
   }, [addNode, setNodes]);
@@ -105,7 +104,7 @@ export function Sbv1CanvasToolbar() {
 
   return (
     <>
-      <LibtvCanvasDockBarSlot storageKey="sbv1">
+      <LibtvCanvasDockBarSlot storageKey={`sbv1:${projectId}`}>
         <Sbv1Dock items={dockItems} />
       </LibtvCanvasDockBarSlot>
       <input

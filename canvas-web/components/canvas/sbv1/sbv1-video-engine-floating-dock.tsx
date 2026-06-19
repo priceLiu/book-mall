@@ -21,15 +21,23 @@ import { Sbv1VideoEngineChatInput } from "./sbv1-video-engine-chat-input";
 export function Sbv1VideoEngineFloatingDock() {
   const dockNodeId = useLibtvSoleSelectedNodeId("sbv1-video-engine");
 
+  const nodeExists = useCanvasStore(
+    useCallback(
+      (s) => (dockNodeId ? s.nodes.some((n) => n.id === dockNodeId) : false),
+      [dockNodeId],
+    ),
+  );
+
   const { placement, hidden } = useLibtvFloatingDock(
-    dockNodeId,
+    nodeExists ? dockNodeId : null,
     SBV1_VIDEO_DOCK_PLACEMENT_OPTS,
   );
 
-  if (!dockNodeId || !placement) return null;
+  if (!dockNodeId || !nodeExists || !placement) return null;
 
   return (
     <Sbv1VideoEngineFloatingDockBody
+      key={dockNodeId}
       nodeId={dockNodeId}
       placement={placement}
       hidden={hidden}
@@ -53,13 +61,12 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
 
   const data = useCanvasStore(
     useCallback(
-      (s) =>
-        (s.nodes.find((n) => n.id === nodeId)?.data ??
-          {}) as Sbv1VideoEngineNodeData,
+      (s) => s.nodes.find((n) => n.id === nodeId)?.data as Sbv1VideoEngineNodeData | undefined,
       [nodeId],
     ),
-    (a, b) => a === b,
   );
+
+  const nodeData = (data ?? {}) as Sbv1VideoEngineNodeData;
 
   const upstreamLinks = useMemo(
     () => resolveSbv1UpstreamRefLinks(nodeId, useCanvasStore.getState().nodes, edges),
@@ -72,7 +79,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
   );
 
   const isGenerating =
-    data.runtime?.status === "pending" || data.runtime?.status === "running";
+    nodeData.runtime?.status === "pending" || nodeData.runtime?.status === "running";
 
   const onPatch = useCallback(
     (patch: Partial<Sbv1VideoEngineNodeData>) => {
@@ -143,8 +150,9 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
 
   return (
     <Sbv1VideoEngineChatInput
+      key={nodeId}
       nodeId={nodeId}
-      data={data}
+      data={nodeData}
       upstreamLinks={upstreamLinks}
       mentionables={mentionables}
       isGenerating={isGenerating}

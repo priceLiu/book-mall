@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
-import { Handle, Position, useNodes } from "@xyflow/react";
+import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
 import { Maximize2, Play, RefreshCw, Video } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -18,9 +18,9 @@ import {
 } from "@/lib/canvas/sbv1-add-node-menu";
 import {
   handleSbv1SideAddNodePick,
-  selectSbv1NodeAfterSpawn,
   spawnSbv1NeighborFromNode,
 } from "@/lib/canvas/sbv1-spawn-nodes";
+import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
 import {
   SBV1_CARD_DRAG_CLASS,
   SBV1_CARD_SHELL_CLASS,
@@ -37,7 +37,7 @@ import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { cn } from "@/lib/utils";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
-import { LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
+import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import { Pro2MediaNodeEmptyState } from "../pro2/pro2-media-node-empty";
 import { Pro2ImageNodeToolbar } from "../pro2/pro2-image-node-toolbar";
 import { StoryMediaPreviewModal } from "../story-column-media-panel";
@@ -50,6 +50,7 @@ import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
   const rfNodes = useNodes();
+  const { setNodes: rfSetNodes } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -79,6 +80,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     d.runtime?.ephemeralUrl ??
     pickTaskResultMediaUrl(succeeded[succeeded.length - 1] ?? {}) ??
     succeeded[succeeded.length - 1]?.ossUrl ??
+    undefined;
+  const posterUrl =
+    d.runtime?.posterUrl ??
+    succeeded[succeeded.length - 1]?.posterUrl ??
     undefined;
 
   const isGenerating = isLibtvMediaGenerating(d);
@@ -191,8 +196,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   const onDuplicateNode = useCallback(() => {
     const newId = duplicateNode(id, { preserveContent: true });
-    if (newId) selectSbv1NodeAfterSpawn(setNodes, newId);
-  }, [duplicateNode, id, setNodes]);
+    if (newId) {
+      selectLibtvNodeAfterDuplicate(rfSetNodes, newId, "sbv1-video-engine");
+    }
+  }, [duplicateNode, id, rfSetNodes]);
 
   return (
     <>
@@ -317,12 +324,22 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
               />
             ) : hasVideo ? (
               <div className="group/video absolute inset-0">
-                <LazyViewportVideo
-                  src={videoUrl ?? undefined}
-                  className="absolute inset-0"
-                  videoClassName="pointer-events-none object-contain"
-                  rootMargin="280px"
-                />
+                {posterUrl?.trim() ? (
+                  <LazyViewportImage
+                    src={posterUrl}
+                    alt=""
+                    className="absolute inset-0"
+                    imgClassName="pointer-events-none object-contain"
+                    rootMargin="280px"
+                  />
+                ) : (
+                  <LazyViewportVideo
+                    src={videoUrl ?? undefined}
+                    className="absolute inset-0"
+                    videoClassName="pointer-events-none object-contain"
+                    rootMargin="280px"
+                  />
+                )}
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
                   <button
                     type="button"

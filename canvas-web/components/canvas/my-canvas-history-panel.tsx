@@ -8,6 +8,7 @@ import {
   ProjectAssetHoverPreviewLayer,
   useProjectAssetHoverPreview,
 } from "@/components/canvas/project-asset-hover-preview";
+import { ProjectCoverMedia } from "@/components/canvas/project-cover-media";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   deleteCanvasProjectHistoryEntry,
@@ -294,11 +295,11 @@ export function MyCanvasHistoryPanel({
                         }
                         onMouseLeave={hideHoverPreview}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.thumbnailUrl}
-                          alt=""
+                        <ProjectCoverMedia
+                          url={item.thumbnailUrl}
+                          alt={item.label}
                           className="size-full object-cover"
+                          placeholderLetter={item.label}
                         />
                       </button>
                     ) : (

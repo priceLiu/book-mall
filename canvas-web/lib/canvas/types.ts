@@ -278,6 +278,8 @@ export type CanvasNodeRuntime = {
   taskId?: string;
   ossUrl?: string;
   ephemeralUrl?: string;
+  /** 视频节点首帧封面（OSS JPEG），画布内只展示此图，点击播放再拉 mp4 */
+  posterUrl?: string;
   textOutput?: string;
   failCode?: string;
   failMessage?: string;

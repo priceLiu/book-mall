@@ -68,7 +68,7 @@ import { spawnStoryPro2ScriptHub } from "@/lib/canvas/spawn-story-pro2-workspace
 import { reflowStoryProWorkspace } from "@/lib/canvas/story-pro-workspace-layout";
 import { reflowStoryPro2Workspace } from "@/lib/canvas/story-pro2-workspace-layout";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
-import { pickProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
+import { pickPersistableProjectThumbnailUrl } from "@/lib/canvas/project-thumbnail";
 import { cn } from "@/lib/utils";
 import { useCanvasImmersiveMode } from "@/lib/canvas/use-canvas-immersive-mode";
 import { getBuiltinCanvasTemplate } from "@/lib/canvas/templates";
@@ -432,7 +432,7 @@ function Inner({ projectId }: { projectId: string }) {
           setSaveError("检测到画布被清空，已阻止自动保存。");
           return;
         }
-        const thumb = pickProjectThumbnailUrl(graph);
+        const thumb = pickPersistableProjectThumbnailUrl(graph);
         const patch: {
           canvas: typeof graph;
           thumbnailUrl?: string;
@@ -587,7 +587,7 @@ function Inner({ projectId }: { projectId: string }) {
     setSaving(true);
     try {
       const graph = stripStoryProUploadedScriptMdForPersist(toGraph());
-      const thumb = pickProjectThumbnailUrl(graph);
+      const thumb = pickPersistableProjectThumbnailUrl(graph);
       const patch: {
         canvas: typeof graph;
         thumbnailUrl?: string;

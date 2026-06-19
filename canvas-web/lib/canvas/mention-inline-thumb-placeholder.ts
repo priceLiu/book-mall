@@ -148,3 +148,28 @@ export function skipMentionThumbSlotRun(
   }
   return i - startIndex;
 }
+
+/** strip 后展示下标 → textarea 原始下标（含 em 占位 run） */
+export function mapDisplayIndexToRawIndex(
+  raw: string,
+  displayIndex: number,
+): number {
+  if (displayIndex <= 0) return 0;
+  let rawIdx = 0;
+  let dispIdx = 0;
+  while (rawIdx < raw.length && dispIdx < displayIndex) {
+    const skip = skipMentionThumbSlotRun(raw, rawIdx);
+    if (skip > 0) {
+      rawIdx += skip;
+      continue;
+    }
+    rawIdx += 1;
+    dispIdx += 1;
+  }
+  while (rawIdx < raw.length) {
+    const skip = skipMentionThumbSlotRun(raw, rawIdx);
+    if (skip <= 0) break;
+    rawIdx += skip;
+  }
+  return rawIdx;
+}

@@ -30,6 +30,11 @@ import {
   isGroupNode,
   isStoryWorkspaceNodeType,
 } from "./types";
+import {
+  duplicateCanvasNodeData,
+  isolateSharedCanvasNodeData,
+  mergeCanvasNodeInitialData,
+} from "./clone-node-data";
 import { migrateGraphV1ToV2 } from "./migrate";
 import {
   detachChildrenOfRemovedGroups,
@@ -410,7 +415,7 @@ export const useCanvasStore = create<CanvasState>()(
           const laid = finalizeHydratedGraph(current.nodes, current.edges);
           set((state) =>
             withGraphRevision(state, {
-              nodes: laid.nodes,
+              nodes: isolateSharedCanvasNodeData(laid.nodes),
               edges: laid.edges,
             }),
           );
@@ -420,7 +425,9 @@ export const useCanvasStore = create<CanvasState>()(
           set((state) =>
             withGraphRevision(state, {
               projectId,
-              nodes: ensureNodeDragHandles(nodes),
+              nodes: isolateSharedCanvasNodeData(
+                ensureNodeDragHandles(nodes),
+              ),
               edges,
               viewport,
               storyHubReview: null,
@@ -438,7 +445,7 @@ export const useCanvasStore = create<CanvasState>()(
         set((state) =>
           withGraphRevision(state, {
             projectId,
-            nodes: laid.nodes,
+            nodes: isolateSharedCanvasNodeData(laid.nodes),
             edges: laid.edges,
             viewport,
             storyHubReview: null,
@@ -588,7 +595,20 @@ export const useCanvasStore = create<CanvasState>()(
           return;
         }
         next = detachChildrenOfRemovedGroups(prev, next);
-        next = normalizeCanvasNodes(next, get().edges);
+        const removedNodeIds = prev
+          .filter((n) => !next.some((x) => x.id === n.id))
+          .map((n) => n.id);
+        let nextEdges = edges;
+        if (removedNodeIds.length > 0) {
+          const removedSet = new Set(removedNodeIds);
+          nextEdges = edges.filter(
+            (e) => !removedSet.has(e.source) && !removedSet.has(e.target),
+          );
+          for (const removedId of removedNodeIds) {
+            next = pruneMentionsAfterNodeRemoval(next, removedId);
+          }
+        }
+        next = normalizeCanvasNodes(next, nextEdges);
         if (next.some((n) => String(n.type ?? "").startsWith("story-pro2-"))) {
           next = reconcileStoryPro2Workspace(next);
         } else if (
@@ -621,7 +641,29 @@ export const useCanvasStore = create<CanvasState>()(
             } as CanvasFlowNode;
           });
         }
-        set((state) => withGraphRevision(state, { nodes: next }));
+        set((state) => {
+          const pinned = get().libtvFloatingDockNodeId;
+          const clearDockPin =
+            pinned && removedNodeIds.includes(pinned)
+              ? {
+                  libtvFloatingDockNodeId: null,
+                  libtvFloatingDockNodeType: null,
+                }
+              : {};
+          const patch: {
+            nodes: CanvasFlowNode[];
+            edges?: CanvasFlowEdge[];
+            libtvFloatingDockNodeId?: null;
+            libtvFloatingDockNodeType?: null;
+          } = {
+            nodes: next,
+            ...clearDockPin,
+          };
+          if (removedNodeIds.length > 0) {
+            patch.edges = nextEdges;
+          }
+          return withGraphRevision(state, patch);
+        });
       },
       onEdgesChange: (changes) =>
         set((state) =>
@@ -731,11 +773,11 @@ export const useCanvasStore = create<CanvasState>()(
           return "";
         }
         const id = `n_${nanoid(8)}`;
-        const initialData = {
-          ...(NODE_DEFAULT_DATA[type] ?? {}),
-          ...(data ?? {}),
-          __t: type,
-        };
+        const initialData = mergeCanvasNodeInitialData(
+          type,
+          NODE_DEFAULT_DATA[type],
+          data,
+        );
         const size = defaultNodeSize(type, data);
         const node: CanvasFlowNode = {
           id,
@@ -763,11 +805,11 @@ export const useCanvasStore = create<CanvasState>()(
           return get().addNode(type, relativePosition, data);
         }
         const id = `n_${nanoid(8)}`;
-        const initialData = {
-          ...(NODE_DEFAULT_DATA[type] ?? {}),
-          ...(data ?? {}),
-          __t: type,
-        };
+        const initialData = mergeCanvasNodeInitialData(
+          type,
+          NODE_DEFAULT_DATA[type],
+          data,
+        );
         const size = defaultNodeSize(type, data);
         const node: CanvasFlowNode = {
           id,
@@ -789,9 +831,15 @@ export const useCanvasStore = create<CanvasState>()(
       },
 
       updateNodeData: (id, patch, options) => {
-        let nodes = get().nodes.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, ...patch } } : n,
-        );
+        const all = get().nodes;
+        let nodes = all.map((n) => {
+          if (n.id !== id) return n;
+          const base = (n.data ?? {}) as Record<string, unknown>;
+          return {
+            ...n,
+            data: { ...structuredClone(base), ...patch },
+          };
+        });
         if (patch.rows !== undefined) {
           const t = nodes.find((n) => n.id === id)?.type;
           if (isStoryMediaColumnType(t)) {
@@ -904,7 +952,12 @@ export const useCanvasStore = create<CanvasState>()(
         )
           ? reconcileStoryPro2Workspace(pruned)
           : reconcileStoryProWorkspace(pruned);
-        set((state) => withGraphRevision(state, { nodes, edges }));
+        const s = get();
+        const clearDockPin =
+          s.libtvFloatingDockNodeId === id
+            ? { libtvFloatingDockNodeId: null, libtvFloatingDockNodeType: null }
+            : {};
+        set((state) => withGraphRevision(state, { nodes, edges, ...clearDockPin }));
       },
 
       duplicateNode: (id, options) => {
@@ -912,9 +965,10 @@ export const useCanvasStore = create<CanvasState>()(
         if (!src) return null;
         const newId = `n_${nanoid(8)}`;
         const preserveContent = options?.preserveContent === true;
-        const data = preserveContent
-          ? (structuredClone(src.data) as Record<string, unknown>)
-          : { ...(src.data as Record<string, unknown>), runtime: undefined };
+        const data = duplicateCanvasNodeData(
+          src.data as Record<string, unknown>,
+          preserveContent,
+        );
         set((state) =>
           withGraphRevision(state, {
             nodes: ensureNodeDragHandles([

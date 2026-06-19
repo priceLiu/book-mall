@@ -14,6 +14,8 @@ import {
   PRO2_DOCK_HEIGHT,
   PRO2_DOCK_HEIGHT_EXPANDED,
 } from "@/lib/canvas/story-pro2-node-chrome";
+import { useLibtvDockWheelScroll } from "@/lib/canvas/use-libtv-dock-wheel-scroll";
+import { RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 
 export type Pro2InputDockShellProps = {
@@ -57,6 +59,8 @@ export function Pro2InputDockShell({
 }: Pro2InputDockShellProps) {
   const viewportEl = useReactFlowViewportEl();
   const [expanded, setExpanded] = useState(false);
+  const [dockScrollEl, setDockScrollEl] = useState<HTMLElement | null>(null);
+  useLibtvDockWheelScroll(dockScrollEl);
   const dockW = width ?? flowAnchor.flowW;
   const dockHeight = expanded ? PRO2_DOCK_HEIGHT_EXPANDED : PRO2_DOCK_HEIGHT;
 
@@ -66,6 +70,7 @@ export function Pro2InputDockShell({
     <div
       className={cn(
         "pro2-input-dock pointer-events-auto absolute z-[1000]",
+        RF_NO_WHEEL,
         dockClassName,
       )}
       style={{
@@ -83,6 +88,7 @@ export function Pro2InputDockShell({
       <div
         className={cn(
           LIBTV_INPUT_DOCK_SHELL_CLASS,
+          RF_NO_WHEEL,
           "relative",
           className,
         )}
@@ -108,8 +114,14 @@ export function Pro2InputDockShell({
           )}
         </button>
         {header}
-        <div className="pro2-dock-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-          {children}
+        <div
+          ref={setDockScrollEl}
+          className="pro2-dock-scroll flex h-0 min-h-0 flex-1 flex-col overflow-hidden overscroll-contain [overflow-anchor:none]"
+          data-canvas-wheel-scroll
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {children}
+          </div>
         </div>
         {footer ? <div className="shrink-0">{footer}</div> : null}
       </div>
@@ -206,14 +218,25 @@ export function Pro2EmbeddedInputDock({
   footer?: ReactNode;
   className?: string;
 }) {
+  const [dockScrollEl, setDockScrollEl] = useState<HTMLElement | null>(null);
+  useLibtvDockWheelScroll(dockScrollEl);
+
   return (
     <div
-      className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}
+      className={cn(
+        "flex h-full min-h-0 flex-col overflow-hidden",
+        RF_NO_WHEEL,
+        className,
+      )}
       data-libtv-input-dock=""
     >
       {header}
-      <div className="pro2-dock-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-        {children}
+      <div
+        ref={setDockScrollEl}
+        className="pro2-dock-scroll flex h-0 min-h-0 flex-1 flex-col overflow-hidden [overflow-anchor:none]"
+        data-canvas-wheel-scroll
+      >
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
       </div>
       {footer ? <div className="shrink-0">{footer}</div> : null}
     </div>

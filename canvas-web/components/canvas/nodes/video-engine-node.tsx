@@ -55,6 +55,8 @@ export function VideoEngineNode({ id, data, selected }: NodeProps) {
     pickTaskResultMediaUrl(succeeded[succeeded.length - 1] ?? {}) ??
     succeeded[succeeded.length - 1]?.ossUrl ??
     succeeded[succeeded.length - 1]?.ephemeralUrl;
+  const posterUrl =
+    d.runtime?.posterUrl ?? succeeded[succeeded.length - 1]?.posterUrl ?? undefined;
 
   const hasGenerated =
     Boolean(videoUrl) ||
@@ -156,6 +158,7 @@ export function VideoEngineNode({ id, data, selected }: NodeProps) {
                 <NodeMediaStage>
                   <MediaHoverBox
                     src={videoUrl}
+                    posterUrl={posterUrl}
                     mediaKind="video"
                     variant="generated"
                     alt={d.frameIndex ? `镜${d.frameIndex} 视频` : "分镜视频"}

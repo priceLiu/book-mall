@@ -168,6 +168,10 @@ export const PRO2_NODE_HANDLE_CLASS =
 export const PRO2_DOCK_TEXTAREA_INSET_CLASS =
   "min-h-0 pl-[calc(1rem+0.65em)] pr-4 py-3";
 
+/** 输入坞内 textarea · 无边框 · 在 Dock 内自身滚动（不撑高外层） */
+export const PRO2_DOCK_TEXTAREA_SCROLL_CLASS =
+  "min-h-0 h-full flex-1 overflow-y-auto overscroll-contain";
+
 /** 输入坞内 textarea · 无边框 */
 export const PRO2_DOCK_TEXTAREA_CLASS =
   "nodrag w-full resize-none border-0 bg-transparent text-[13px] leading-relaxed text-white placeholder:text-white/30 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-45";

@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { usePointerImagePasteHost } from "@/lib/canvas/image-upload-handlers";
 import type { NodeProps } from "@xyflow/react";
-import { Handle, Position, useNodes } from "@xyflow/react";
+import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
 import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -30,6 +30,7 @@ import { isPortraitNodeActive } from "@/lib/canvas/portrait-node-data";
 import { useImportPortraitToLibrary } from "@/lib/canvas/use-import-portrait-to-library";
 import { Sbv1PortraitLivenessModal } from "./sbv1/sbv1-portrait-liveness-modal";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
+import { selectLibtvNodeAfterDuplicate } from "@/lib/canvas/select-libtv-node";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
@@ -121,6 +122,7 @@ export function LibtvImageNode({
   const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const rfNodes = useNodes();
+  const { setNodes: rfSetNodes } = useReactFlow();
   const nodes = useCanvasStore((s) => s.nodes);
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -239,8 +241,11 @@ export function LibtvImageNode({
 
   const onDuplicateNode = useCallback(() => {
     const newId = duplicateNode(id, { preserveContent: true });
-    if (newId) onSelectAfterDuplicate(newId);
-  }, [duplicateNode, id, onSelectAfterDuplicate]);
+    if (newId) {
+      selectLibtvNodeAfterDuplicate(rfSetNodes, newId, rfNodeType);
+      onSelectAfterDuplicate(newId);
+    }
+  }, [duplicateNode, id, rfSetNodes, rfNodeType, onSelectAfterDuplicate]);
 
   const renderStage = () => {
     if (isCharacterThreeView) {

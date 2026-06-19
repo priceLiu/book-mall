@@ -13,7 +13,7 @@ export const RF_NODE_SCROLL = RF_NO_DRAG;
 export const RF_NODE_DRAG_HANDLE_SELECTOR = `.${RF_NODE_DRAG_HANDLE}`;
 
 /**
- * 文本框 / 下拉：仅 `nodrag`（勿加 `nowheel`，否则滚轮无法平移画布）。
- * 滚轮由 {@link onCanvasFormWheel} 拦截内容滚动，超长内容用滚动条。
+ * 文本框 / 下拉：仅 `nodrag`。
+ * 画布空白处滚轮平移；LibTV 输入坞（`data-libtv-input-dock` + `nowheel`）内滚轮滚动正文区。
  */
 export const RF_FORM_CONTROL = RF_NO_DRAG;

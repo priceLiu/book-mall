@@ -58,9 +58,11 @@ import {
 import { enrichCanvasTaskRows } from "./canvas-task-billing";
 import { resolveGenerationRecordLabels } from "./generation-record-labels";
 import { resolveGenerationRecordPreview } from "./generation-record-preview";
+import { extractPosterUrlFromResultPayload } from "./video-poster-ffmpeg";
 import { resolveCanvasHistoryIdsForTasks } from "./generation-canvas-history";
 import { findGenerationTaskRows, type GenerationTaskRecordRow } from "./canvas-generation-task-query";
-import { persistCanvasKieResultToOss } from "./canvas-oss";
+import { persistCanvasKieResultToOss, persistCanvasVideoResultToOss } from "./canvas-oss";
+import { mergeResultPayloadPoster } from "./video-poster-ffmpeg";
 import {
   canvasGwCreateBailianR2vJob,
   canvasGwCreateKieJob,
@@ -511,13 +513,15 @@ export async function applyCanvasBailianR2vPollResult(
   }
 
   let ossUrl: string | null = null;
+  let posterUrl: string | undefined;
   let ossError: string | null = null;
   try {
-    ossUrl = await persistCanvasKieResultToOss({
+    const persisted = await persistCanvasVideoResultToOss({
       ephemeralUrl,
-      kind: "node-video",
       projectId: task.projectId,
     });
+    ossUrl = persisted.videoUrl;
+    posterUrl = persisted.posterUrl;
   } catch (e) {
     ossError = e instanceof Error ? e.message : String(e);
   }
@@ -546,10 +550,26 @@ export async function applyCanvasBailianR2vPollResult(
       status: "SUCCEEDED",
       ossUrl,
       ephemeralUrl,
-      resultPayload: polled.raw as Prisma.InputJsonValue,
+      resultPayload: mergeResultPayloadPoster(
+        polled.raw,
+        posterUrl,
+      ) as Prisma.InputJsonValue,
       completedAt: new Date(),
     },
   });
+  const bailianUpdated = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      projectId: true,
+      nodeId: true,
+      ossUrl: true,
+      ephemeralUrl: true,
+      completedAt: true,
+      resultPayload: true,
+    },
+  });
+  if (bailianUpdated) await patchCanvasProjectNodeRuntimeFromTask(bailianUpdated);
 }
 
 export async function applyCanvasVolcengineVideoResult(
@@ -579,13 +599,15 @@ export async function applyCanvasVolcengineVideoResult(
   }
 
   let ossUrl: string | null = null;
+  let posterUrl: string | undefined;
   let ossError: string | null = null;
   try {
-    ossUrl = await persistCanvasKieResultToOss({
+    const persisted = await persistCanvasVideoResultToOss({
       ephemeralUrl,
-      kind: "node-video",
       projectId: task.projectId,
     });
+    ossUrl = persisted.videoUrl;
+    posterUrl = persisted.posterUrl;
   } catch (e) {
     ossError = e instanceof Error ? e.message : String(e);
   }
@@ -611,6 +633,7 @@ export async function applyCanvasVolcengineVideoResult(
         ossUrl: true,
         ephemeralUrl: true,
         completedAt: true,
+        resultPayload: true,
       },
     });
     if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
@@ -626,6 +649,7 @@ export async function applyCanvasVolcengineVideoResult(
       status: "SUCCEEDED",
       ossUrl,
       ephemeralUrl,
+      resultPayload: mergeResultPayloadPoster(null, posterUrl) as Prisma.InputJsonValue,
       completedAt: new Date(),
     },
   });
@@ -638,6 +662,7 @@ export async function applyCanvasVolcengineVideoResult(
       ossUrl: true,
       ephemeralUrl: true,
       completedAt: true,
+      resultPayload: true,
     },
   });
   if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
@@ -674,6 +699,7 @@ export async function applyCanvasKieTaskResult(
       return;
     }
     let ossUrl: string | null = null;
+    let posterUrl: string | undefined;
     let ossError: string | null = null;
     const payload = task.inputPayload as { kind?: string } | null;
     const engineKind = payload?.kind ?? "";
@@ -683,12 +709,22 @@ export async function applyCanvasKieTaskResult(
         : engineKind === "tts-engine"
           ? "node-audio"
           : "node-image";
+    const isVideoOss = ossKind === "node-video";
     try {
-      ossUrl = await persistCanvasKieResultToOss({
-        ephemeralUrl,
-        kind: ossKind,
-        projectId: task.projectId,
-      });
+      if (isVideoOss) {
+        const persisted = await persistCanvasVideoResultToOss({
+          ephemeralUrl,
+          projectId: task.projectId,
+        });
+        ossUrl = persisted.videoUrl;
+        posterUrl = persisted.posterUrl;
+      } else {
+        ossUrl = await persistCanvasKieResultToOss({
+          ephemeralUrl,
+          kind: ossKind,
+          projectId: task.projectId,
+        });
+      }
     } catch (e) {
       ossError = e instanceof Error ? e.message : String(e);
       logKieEvent("error", "[canvas] persistKieResultToOss failed", {
@@ -720,11 +756,28 @@ export async function applyCanvasKieTaskResult(
         status: "SUCCEEDED",
         ossUrl,
         ephemeralUrl,
-        resultPayload: record as unknown as Prisma.InputJsonValue,
+        resultPayload: (isVideoOss
+          ? mergeResultPayloadPoster(record, posterUrl)
+          : record) as Prisma.InputJsonValue,
         completedAt: new Date(),
       },
     });
     if (applied.count === 0) return;
+    if (isVideoOss) {
+      const updated = await prisma.canvasGenerationTask.findUnique({
+        where: { id: taskId },
+        select: {
+          id: true,
+          projectId: true,
+          nodeId: true,
+          ossUrl: true,
+          ephemeralUrl: true,
+          completedAt: true,
+          resultPayload: true,
+        },
+      });
+      if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
+    }
     logKieEvent("info", "[canvas] task succeeded", {
       taskId,
       kind: task.kind,
@@ -1725,6 +1778,7 @@ type CanvasGenerationRecordExtras = {
   billingMode: "PLATFORM_CREDIT" | "BYOK" | null;
   providerLabel: string;
   modelLabel: string;
+  posterUrl: string | null;
   thumbnailUrl: string | null;
   previewUrl: string | null;
   previewKind: "image" | "video" | null;
@@ -1765,6 +1819,12 @@ function buildGenerationRecordListItem(
   },
   canvasHistoryId: string | null,
 ): CanvasGenerationRecordListItem {
+  const posterUrl = extractPosterUrlFromResultPayload(source.resultPayload);
+  const preview = resolveGenerationRecordPreview({
+    ossUrl: source.ossUrl,
+    ephemeralUrl: source.ephemeralUrl,
+    inputPayload: source.inputPayload,
+  });
   return {
     id: source.id,
     nodeId: source.nodeId,
@@ -1786,11 +1846,10 @@ function buildGenerationRecordListItem(
       inputPayload: source.inputPayload,
       failMessage: source.failMessage,
     }),
-    ...resolveGenerationRecordPreview({
-      ossUrl: source.ossUrl,
-      ephemeralUrl: source.ephemeralUrl,
-      inputPayload: source.inputPayload,
-    }),
+    posterUrl,
+    thumbnailUrl: posterUrl ?? preview.thumbnailUrl,
+    previewUrl: preview.previewUrl,
+    previewKind: preview.previewKind,
     creditsCharged: billing.creditsCharged,
     billingMode: billing.billingMode,
     canvasHistoryId,

@@ -3,7 +3,7 @@
  */
 import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
-import { persistCanvasKieResultToOss } from "@/lib/canvas/canvas-oss";
+import { persistCanvasKieResultToOss, persistCanvasVideoResultToOss } from "@/lib/canvas/canvas-oss";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
@@ -12,6 +12,7 @@ import {
   volcengineGetVideoTask,
 } from "@/lib/gateway/volcengine-client";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
+import { extractPosterUrlFromResultPayload, mergeResultPayloadPoster } from "@/lib/canvas/video-poster-ffmpeg";
 import { prisma } from "@/lib/prisma";
 
 function taskInputPayload(
@@ -26,6 +27,7 @@ export type CanvasNodeRuntimePatch = {
   taskId: string;
   ossUrl: string;
   ephemeralUrl?: string;
+  posterUrl?: string;
   failCode?: undefined;
   failMessage?: undefined;
   dismissedFailTaskId?: undefined;
@@ -107,14 +109,24 @@ async function applyRecoveredVideoResult(
   if (!task) return { ok: false, failCode: "task_not_found" };
 
   let ossUrl: string | null = null;
+  let posterUrl: string | undefined;
   try {
-    ossUrl = await persistCanvasKieResultToOss({
+    const persisted = await persistCanvasVideoResultToOss({
       ephemeralUrl: videoUrl,
-      kind: "node-video",
       projectId: task.projectId,
     });
+    ossUrl = persisted.videoUrl;
+    posterUrl = persisted.posterUrl;
   } catch {
-    // 本地/临时环境 OSS 未配时仍用厂商 URL 恢复画布展示
+    try {
+      ossUrl = await persistCanvasKieResultToOss({
+        ephemeralUrl: videoUrl,
+        kind: "node-video",
+        projectId: task.projectId,
+      });
+    } catch {
+      // 本地/临时环境 OSS 未配时仍用厂商 URL 恢复画布展示
+    }
   }
 
   await prisma.canvasGenerationTask.update({
@@ -123,6 +135,7 @@ async function applyRecoveredVideoResult(
       status: "SUCCEEDED",
       ossUrl: ossUrl ?? undefined,
       ephemeralUrl: videoUrl,
+      resultPayload: mergeResultPayloadPoster(null, posterUrl) as Prisma.InputJsonValue,
       completedAt: new Date(),
       failCode: null,
       failMessage: null,
@@ -163,7 +176,13 @@ async function finalizeGatewaySuccess(input: {
 export async function patchCanvasProjectNodeRuntimeFromTask(
   task: Pick<
     CanvasGenerationTask,
-    "id" | "projectId" | "nodeId" | "ossUrl" | "ephemeralUrl" | "completedAt"
+    | "id"
+    | "projectId"
+    | "nodeId"
+    | "ossUrl"
+    | "ephemeralUrl"
+    | "completedAt"
+    | "resultPayload"
   >,
 ): Promise<void> {
   return patchProjectNodeFromTask(task);
@@ -172,7 +191,13 @@ export async function patchCanvasProjectNodeRuntimeFromTask(
 async function patchProjectNodeFromTask(
   task: Pick<
     CanvasGenerationTask,
-    "id" | "projectId" | "nodeId" | "ossUrl" | "ephemeralUrl" | "completedAt"
+    | "id"
+    | "projectId"
+    | "nodeId"
+    | "ossUrl"
+    | "ephemeralUrl"
+    | "completedAt"
+    | "resultPayload"
   >,
 ): Promise<void> {
   const mediaUrl = task.ossUrl?.trim() || task.ephemeralUrl?.trim();
@@ -203,18 +228,20 @@ async function patchProjectNodeFromTask(
     }
   }
 
+  const posterUrl = extractPosterUrlFromResultPayload(task.resultPayload) ?? undefined;
   const runtime: CanvasNodeRuntimePatch = {
     status: "done",
     taskId: task.id,
     ossUrl: task.ossUrl?.trim() || mediaUrl,
     ephemeralUrl: task.ephemeralUrl ?? undefined,
+    ...(posterUrl ? { posterUrl } : {}),
   };
   const nextCanvas = patchCanvasJsonNodeRuntime(
     project.canvas,
     task.nodeId,
     runtime,
   );
-  const thumb = task.ossUrl?.trim();
+  const thumb = posterUrl || task.ossUrl?.trim();
   const data: Prisma.CanvasProjectUpdateInput = {
     canvas: nextCanvas as Prisma.InputJsonValue,
   };
@@ -311,6 +338,7 @@ export async function recoverCanvasVolcengineTimedOutTask(
       projectId: true,
       failCode: true,
       completedAt: true,
+      resultPayload: true,
     },
   });
   if (updated?.status !== "SUCCEEDED" || !(updated.ossUrl || updated.ephemeralUrl)) {

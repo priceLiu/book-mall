@@ -85,7 +85,7 @@ export function Sbv1CanvasLayout({
         forceOnlyRenderVisible
         sbv1Canvas
       />
-      <Sbv1CanvasToolbar />
+      <Sbv1CanvasToolbar projectId={projectId} />
       <StyleLibraryModal
         open={styleLibOpen}
         mode="spawn"

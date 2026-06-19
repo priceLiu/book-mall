@@ -15,7 +15,10 @@ import {
   INLINE_MENTION_BADGE_GAP_PX,
   INLINE_MENTION_THUMB_PX,
 } from "@/lib/canvas/mention-inline-thumb-metrics";
-import { stripMentionThumbSlots } from "@/lib/canvas/mention-inline-thumb-placeholder";
+import {
+  mapDisplayIndexToRawIndex,
+  stripMentionThumbSlots,
+} from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { LIBTV_INPUT_DOCK_BG } from "@/lib/canvas/libtv-node-chrome";
 import { getTextareaCaretClientRect } from "@/lib/canvas/textarea-caret-rect";
 import { cn } from "@/lib/utils";
@@ -25,6 +28,7 @@ export type MentionInlineThumbMirrorHandle = {
     clientX: number,
     clientY: number,
   ) => { item: MentionableItem; anchorRect: DOMRect } | null;
+  remeasure: () => void;
 };
 
 const THUMB_HIT_PAD = 2;
@@ -33,6 +37,7 @@ const BADGE_HEIGHT_PX = 24;
 type BadgePlacement = {
   item: MentionableItem;
   label: string;
+  rangeStart: number;
   left: number;
   top: number;
   maskWidth: number;
@@ -44,6 +49,12 @@ function thumbBorderClass(edition: "pro2" | "sbv1"): string {
     : "border-violet-400/70";
 }
 
+function toRawIndex(raw: string, clean: string, displayIndex: number): number {
+  if (clean.length === raw.length) return displayIndex;
+  return mapDisplayIndexToRawIndex(raw, displayIndex);
+}
+
+/** 在 scrollTop/Left=0 下测量内容坐标；滚动由 overlay transform 同步 */
 function measureBadgePlacements(
   textarea: HTMLTextAreaElement,
   mentionables: MentionableItem[],
@@ -52,22 +63,26 @@ function measureBadgePlacements(
   if (!wrapper) return [];
 
   const wrapperRect = wrapper.getBoundingClientRect();
-  // 必须用 textarea 当前 DOM 值：受控组件在 input 与 React commit 之间 prop 会滞后
-  const clean = stripMentionThumbSlots(textarea.value);
+  const raw = textarea.value;
+  const clean = stripMentionThumbSlots(raw);
   const ranges = findAllMentionRangesInDisplay(clean, mentionables);
   const out: BadgePlacement[] = [];
+  const measureScroll = { measureScrollTop: 0, measureScrollLeft: 0 };
 
   for (const range of ranges) {
     if (!range.item.previewUrl) continue;
 
-    const start = getTextareaCaretClientRect(textarea, range.start);
-    const end = getTextareaCaretClientRect(textarea, range.end);
+    const rawStart = toRawIndex(raw, clean, range.start);
+    const rawEnd = toRawIndex(raw, clean, range.end);
+    const start = getTextareaCaretClientRect(textarea, rawStart, measureScroll);
+    const end = getTextareaCaretClientRect(textarea, rawEnd, measureScroll);
     if (!start || !end) continue;
 
     const lineH = start.height || BADGE_HEIGHT_PX;
     out.push({
       item: range.item,
       label: clean.slice(range.start, range.end),
+      rangeStart: range.start,
       left: start.left - wrapperRect.left,
       top: start.top - wrapperRect.top + (lineH - BADGE_HEIGHT_PX) / 2,
       maskWidth: Math.max(end.left - start.left, start.height * 0.5),
@@ -80,6 +95,7 @@ function measureBadgePlacements(
 function placementKey(p: BadgePlacement): string {
   return [
     p.item.id,
+    p.rangeStart,
     p.label,
     Math.round(p.left),
     Math.round(p.top),
@@ -189,15 +205,20 @@ export const MentionInlineThumbOverlay = forwardRef<
   ref,
 ) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
-  const lastKeyRef = useRef("");
   const rafRef = useRef<number | null>(null);
+
+  const syncScrollOffset = useCallback(() => {
+    const ta = textareaRef.current;
+    const overlay = overlayRef.current;
+    if (!ta || !overlay) return;
+    overlay.style.transform = `translate(${-ta.scrollLeft}px, ${-ta.scrollTop}px)`;
+  }, [textareaRef]);
 
   const remeasure = useCallback(() => {
     const root = overlayRef.current;
     const ta = textareaRef.current;
     if (!root || !ta || !enabled) {
       if (root) root.replaceChildren();
-      lastKeyRef.current = "";
       return;
     }
 
@@ -209,20 +230,18 @@ export const MentionInlineThumbOverlay = forwardRef<
 
     if (expected === 0) {
       root.replaceChildren();
-      lastKeyRef.current = "";
+      syncScrollOffset();
       return;
     }
 
     if (next.length === 0 && expected > 0) {
-      // caret mirror 偶发失败时保留上一帧，避免输入瞬间 badge 全消失
+      syncScrollOffset();
       return;
     }
 
-    const key = next.map(placementKey).join(";;");
-    if (key === lastKeyRef.current) return;
-    lastKeyRef.current = key;
     syncBadgeDom(root, next, edition);
-  }, [textareaRef, mentionables, enabled, edition]);
+    syncScrollOffset();
+  }, [textareaRef, mentionables, enabled, edition, syncScrollOffset]);
 
   const scheduleRemeasure = useCallback(() => {
     if (rafRef.current !== null) return;
@@ -234,15 +253,33 @@ export const MentionInlineThumbOverlay = forwardRef<
 
   useLayoutEffect(() => {
     remeasure();
-  }, [displayValue, remeasure]);
+    let raf2: number | null = null;
+    const raf1 = requestAnimationFrame(() => {
+      syncScrollOffset();
+      remeasure();
+      raf2 = requestAnimationFrame(() => {
+        syncScrollOffset();
+        remeasure();
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2 != null) cancelAnimationFrame(raf2);
+    };
+  }, [displayValue, mentionables, remeasure, syncScrollOffset]);
 
   useLayoutEffect(() => {
     const ta = textareaRef.current;
     if (!enabled || !ta) return;
 
+    const onScroll = () => {
+      syncScrollOffset();
+    };
+    syncScrollOffset();
+
     ta.addEventListener("input", scheduleRemeasure);
     ta.addEventListener("compositionend", scheduleRemeasure);
-    ta.addEventListener("scroll", scheduleRemeasure, { passive: true });
+    ta.addEventListener("scroll", onScroll, { passive: true });
     const ro = new ResizeObserver(scheduleRemeasure);
     ro.observe(ta);
 
@@ -263,7 +300,7 @@ export const MentionInlineThumbOverlay = forwardRef<
     return () => {
       ta.removeEventListener("input", scheduleRemeasure);
       ta.removeEventListener("compositionend", scheduleRemeasure);
-      ta.removeEventListener("scroll", scheduleRemeasure);
+      ta.removeEventListener("scroll", onScroll);
       dockScroll?.removeEventListener("scroll", scheduleRemeasure);
       window.removeEventListener("resize", scheduleRemeasure);
       viewportObserver?.disconnect();
@@ -273,11 +310,12 @@ export const MentionInlineThumbOverlay = forwardRef<
         rafRef.current = null;
       }
     };
-  }, [enabled, scheduleRemeasure, textareaRef]);
+  }, [enabled, scheduleRemeasure, syncScrollOffset, textareaRef]);
 
   useImperativeHandle(
     ref,
     () => ({
+      remeasure,
       resolveThumbAtPoint(clientX, clientY) {
         const overlay = overlayRef.current;
         if (!overlay) return null;
@@ -302,7 +340,7 @@ export const MentionInlineThumbOverlay = forwardRef<
         return null;
       },
     }),
-    [mentionables],
+    [mentionables, remeasure],
   );
 
   if (!enabled) return null;
@@ -311,7 +349,7 @@ export const MentionInlineThumbOverlay = forwardRef<
     <div
       ref={overlayRef}
       aria-hidden
-      className="pointer-events-none absolute inset-0 z-[2] overflow-visible"
+      className="pointer-events-none absolute inset-0 z-[2] overflow-hidden"
     />
   );
 });
