@@ -542,16 +542,6 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         }
       >
         <div className={cn("relative", fillHeight && "flex min-h-0 flex-1 flex-col")}>
-          {inlineThumbEnabled ? (
-            <MentionInlineThumbOverlay
-              ref={inlineThumbMirrorRef}
-              textareaRef={innerRef}
-              displayValue={displayValue}
-              mentionables={mentionables}
-              enabled={inlineThumbEnabled}
-              edition={mentionEdition}
-            />
-          ) : null}
           <textarea
             ref={setRef}
             value={displayValue}
@@ -589,9 +579,22 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
             placeholder={placeholder}
             disabled={disabled}
             aria-label={ariaLabel}
-            className={resolvedTextareaClassName}
+            className={cn(
+              resolvedTextareaClassName,
+              inlineThumbEnabled && "relative z-0",
+            )}
             style={style}
           />
+          {inlineThumbEnabled ? (
+            <MentionInlineThumbOverlay
+              ref={inlineThumbMirrorRef}
+              textareaRef={innerRef}
+              displayValue={displayValue}
+              mentionables={mentionables}
+              enabled={inlineThumbEnabled}
+              edition={mentionEdition}
+            />
+          ) : null}
         </div>
         <MentionPickerPortal
           open={popoverOpen}
