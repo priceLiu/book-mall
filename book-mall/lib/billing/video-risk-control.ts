@@ -24,8 +24,63 @@ import {
 import { resolveBillingRef } from "./credit-pre-check";
 
 // ——————————————————— 阈值（纯常量，可单测） ———————————————————
-export const VIDEO_MAX_CONCURRENCY = 2; // 单账号同时渲染上限
-export const VIDEO_MAX_QUEUE = 10; // 单账号排队上限（含渲染中）
+/** @deprecated 请用 getVideoPersonalMaxConcurrency()；保留常量供单测与文档引用 */
+export const VIDEO_MAX_CONCURRENCY = 2;
+/** @deprecated 请用 getVideoPersonalMaxQueue() */
+export const VIDEO_MAX_QUEUE = 10;
+
+/** 个人账号同时渲染上限（环境变量 VIDEO_MAX_CONCURRENCY，默认 2） */
+export function getVideoPersonalMaxConcurrency(): number {
+  const raw = Number(process.env.VIDEO_MAX_CONCURRENCY ?? "");
+  return Number.isFinite(raw) && raw > 0 ? Math.round(raw) : VIDEO_MAX_CONCURRENCY;
+}
+
+/** 个人账号排队上限（环境变量 VIDEO_MAX_QUEUE，默认 10） */
+export function getVideoPersonalMaxQueue(): number {
+  const raw = Number(process.env.VIDEO_MAX_QUEUE ?? "");
+  return Number.isFinite(raw) && raw > 0 ? Math.round(raw) : VIDEO_MAX_QUEUE;
+}
+
+/** 团队排队深度 = maxConcurrency × 倍数（默认 5，即 15 并发 → 75 排队） */
+export function getVideoTeamQueueMultiplier(): number {
+  const raw = Number(process.env.VIDEO_TEAM_QUEUE_MULTIPLIER ?? "");
+  return Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 5;
+}
+
+export type VideoRiskLimits = {
+  accountId: string;
+  tier: string | null;
+  maxConcurrency: number;
+  maxQueue: number;
+  billingOwnerType: "USER" | "TENANT";
+};
+
+export function resolveVideoLimitsFromBilling(input: {
+  ownerType: "USER" | "TENANT";
+  ownerId: string;
+  tier: string | null;
+  tenantMaxConcurrency?: number | null;
+}): VideoRiskLimits {
+  if (input.ownerType === "TENANT") {
+    const maxConcurrency = Math.max(1, Math.round(input.tenantMaxConcurrency ?? 2));
+    const mult = getVideoTeamQueueMultiplier();
+    return {
+      accountId: input.ownerId,
+      tier: input.tier,
+      maxConcurrency,
+      maxQueue: maxConcurrency * mult,
+      billingOwnerType: "TENANT",
+    };
+  }
+  return {
+    accountId: input.ownerId,
+    tier: input.tier,
+    maxConcurrency: getVideoPersonalMaxConcurrency(),
+    maxQueue: getVideoPersonalMaxQueue(),
+    billingOwnerType: "USER",
+  };
+}
+
 export const VIDEO_BATCH_MAX = 5; // 单次批量（批量生成集数）上限
 export const VIDEO_BURST_WINDOW_SEC = 5 * 60; // 突发统计窗口
 export const VIDEO_BURST_THRESHOLD = 10; // 窗口内触发冷却的条数
@@ -105,8 +160,10 @@ export async function assertVideoAllowed(input: {
   accountId: string;
   tier?: string | null;
   batchCount?: number;
+  maxQueue?: number;
 }): Promise<{ popupMessage?: string }> {
   const batch = Math.max(1, Math.round(input.batchCount ?? 1));
+  const maxQueue = Math.max(1, Math.round(input.maxQueue ?? getVideoPersonalMaxQueue()));
   // 批量上限：纯阈值，始终生效（不依赖 Redis）
   if (exceedsBatchLimit(batch)) {
     throw new VideoRiskError("BATCH_TOO_LARGE", `单次批量最多 ${VIDEO_BATCH_MAX} 集，当前 ${batch}`);
@@ -147,8 +204,8 @@ export async function assertVideoAllowed(input: {
 
   // 队列上限（含渲染中）
   const queued = (await getCount(queueKey(id))) ?? 0;
-  if (queued + batch > VIDEO_MAX_QUEUE) {
-    throw new VideoRiskError("QUEUE_FULL", `排队任务已满（${VIDEO_MAX_QUEUE}），请稍后再试`);
+  if (queued + batch > maxQueue) {
+    throw new VideoRiskError("QUEUE_FULL", `排队任务已满（${maxQueue}），请稍后再试`);
   }
 
   return { popupMessage };
@@ -157,11 +214,15 @@ export async function assertVideoAllowed(input: {
 /**
  * 占用一个并发渲染槽（在实际调厂商前）。超并发抛 CONCURRENCY。无 Redis 放行。
  */
-export async function acquireVideoConcurrency(accountId: string): Promise<void> {
+export async function acquireVideoConcurrency(
+  accountId: string,
+  maxConcurrency = getVideoPersonalMaxConcurrency(),
+): Promise<void> {
   if (!isConcurrencyEnabled()) return;
-  const r = await acquireSlot({ key: concKey(accountId), max: VIDEO_MAX_CONCURRENCY, ttlSec: VIDEO_SLOT_TTL_SEC });
+  const max = Math.max(1, Math.round(maxConcurrency));
+  const r = await acquireSlot({ key: concKey(accountId), max, ttlSec: VIDEO_SLOT_TTL_SEC });
   if (!r.ok) {
-    throw new VideoRiskError("CONCURRENCY", `同时渲染任务过多（上限 ${VIDEO_MAX_CONCURRENCY}），请稍后再试`);
+    throw new VideoRiskError("CONCURRENCY", `同时渲染任务过多（上限 ${max}），请稍后再试`);
   }
 }
 
@@ -215,27 +276,63 @@ export async function getRiskLevel(accountId: string): Promise<RiskLevel> {
 
 // ——————————————————— 生成链路集成（按 apiKey/tenant 解析账户与档位） ———————————————————
 
-/** 解析生成上下文 → 风控账户标识 + 会员档（用于单日上限）。 */
-export async function resolveVideoRiskContext(input: {
+/** 解析生成上下文 → 风控账户 + 并发/队列上限（团队对齐 Tenant.maxConcurrency）。 */
+export async function resolveVideoRiskLimits(input: {
   tenantId?: string | null;
   actorBookUserId?: string | null;
   apiKeyId: string;
-}): Promise<{ accountId: string; tier: string | null } | null> {
+}): Promise<VideoRiskLimits | null> {
   const ref = await resolveBillingRef(input);
   if (!ref) return null;
+
+  let tier: string | null = null;
+  let tenantMaxConcurrency: number | null = null;
+
+  if (ref.ownerType === "TENANT") {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: ref.ownerId },
+      select: { maxConcurrency: true, packageLevel: true, planId: true },
+    });
+    tenantMaxConcurrency = tenant?.maxConcurrency ?? null;
+    tier = tenant?.packageLevel ?? null;
+    if (!tier && tenant?.planId) {
+      const plan = await prisma.membershipPlan.findUnique({
+        where: { id: tenant.planId },
+        select: { tier: true },
+      });
+      tier = plan?.tier ?? null;
+    }
+  }
+
   const account = await prisma.creditAccount.findUnique({
     where: { ownerType_ownerId: { ownerType: ref.ownerType, ownerId: ref.ownerId } },
     select: { planId: true },
   });
-  let tier: string | null = null;
-  if (account?.planId) {
+  if (!tier && account?.planId) {
     const plan = await prisma.membershipPlan.findUnique({
       where: { id: account.planId },
       select: { tier: true },
     });
     tier = plan?.tier ?? null;
   }
-  return { accountId: ref.ownerId, tier };
+
+  return resolveVideoLimitsFromBilling({
+    ownerType: ref.ownerType,
+    ownerId: ref.ownerId,
+    tier,
+    tenantMaxConcurrency,
+  });
+}
+
+/** @deprecated 请用 resolveVideoRiskLimits */
+export async function resolveVideoRiskContext(input: {
+  tenantId?: string | null;
+  actorBookUserId?: string | null;
+  apiKeyId: string;
+}): Promise<{ accountId: string; tier: string | null } | null> {
+  const limits = await resolveVideoRiskLimits(input);
+  if (!limits) return null;
+  return { accountId: limits.accountId, tier: limits.tier };
 }
 
 /**
@@ -255,13 +352,18 @@ export async function guardVideoGenerate(input: {
   }
   if (!isConcurrencyEnabled()) return { accountId: null };
 
-  const ctx = await resolveVideoRiskContext(input);
-  if (!ctx) return { accountId: null };
+  const limits = await resolveVideoRiskLimits(input);
+  if (!limits) return { accountId: null };
 
-  const risk = await assertVideoAllowed({ accountId: ctx.accountId, tier: ctx.tier, batchCount: batch });
-  await acquireVideoConcurrency(ctx.accountId);
-  await recordVideoSubmission({ accountId: ctx.accountId, batchCount: batch });
-  return { accountId: ctx.accountId, riskPopup: risk.popupMessage };
+  const risk = await assertVideoAllowed({
+    accountId: limits.accountId,
+    tier: limits.tier,
+    batchCount: batch,
+    maxQueue: limits.maxQueue,
+  });
+  await acquireVideoConcurrency(limits.accountId, limits.maxConcurrency);
+  await recordVideoSubmission({ accountId: limits.accountId, batchCount: batch });
+  return { accountId: limits.accountId, riskPopup: risk.popupMessage };
 }
 
 /** 视频任务结束（成功/失败）释放并发与队列计数。 */

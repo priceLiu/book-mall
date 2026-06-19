@@ -12,6 +12,7 @@ import {
   handleMemberDeparture,
   type DepartureDisposition,
 } from "./asset-sharing-service";
+import { resolveDefaultTeamMaxConcurrency } from "./team-concurrency";
 
 export interface CreateTeamInput {
   ownerUserId: string;
@@ -27,6 +28,11 @@ export interface CreateTeamInput {
 /** 创建团队租户：建租户 + 席位 + OWNER 成员 + TENANT 积分账户。 */
 export async function createTeamTenant(input: CreateTeamInput) {
   const seatLimit = Math.max(1, Math.round(input.seatLimit));
+  const maxConcurrency = resolveDefaultTeamMaxConcurrency({
+    seatLimit,
+    packageLevel: input.packageLevel,
+    explicit: input.maxConcurrency,
+  });
   const tenant = await prisma.$transaction(async (tx) => {
     const t = await tx.tenant.create({
       data: {
@@ -38,7 +44,7 @@ export async function createTeamTenant(input: CreateTeamInput) {
         interval: input.interval ?? null,
         seatLimit,
         perSeatCapCredits: input.perSeatCapCredits ?? null,
-        maxConcurrency: input.maxConcurrency ?? 2,
+        maxConcurrency,
         status: "ACTIVE",
       },
     });

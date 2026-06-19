@@ -22,6 +22,9 @@ import {
   buildCanvasAiKieCallbackUrl,
   getCanvasProjectInflightMax,
   getCanvasUserInflightMax,
+  getGenerationPollBatch,
+  resolveCanvasSubmittedTaskTimeoutMin,
+  resolveCanvasSubmittedTaskTimeoutMs,
 } from "./canvas-constants";
 import {
   extractKieResultUrl,
@@ -52,6 +55,12 @@ import {
   canvasGwRecordInfo,
 } from "./canvas-gateway-client";
 import { failGatewayLogIfStillRunning } from "@/lib/gateway/fail-gateway-log-on-timeout";
+import { patchCanvasProjectNodeRuntimeFromTask } from "@/lib/canvas/canvas-volcengine-recover";
+import {
+  buildCanvasPollErrorPatch,
+  buildCanvasTimeoutFailFields,
+  probeCanvasSubmittedTaskAtTimeout,
+} from "@/lib/canvas/canvas-poll-timeout-diagnostics";
 import {
   isVolcengineVideoTaskFailed,
   isVolcengineVideoTaskSuccess,
@@ -572,13 +581,27 @@ export async function applyCanvasVolcengineVideoResult(
     await prisma.canvasGenerationTask.update({
       where: { id: taskId },
       data: {
-        status: "FAILED",
-        failCode: "OSS_UPLOAD_FAILED",
-        failMessage: ossError ?? "OSS upload failed",
+        status: "SUCCEEDED",
         ephemeralUrl,
+        failCode: null,
+        failMessage: ossError
+          ? `OSS skipped: ${ossError.slice(0, 200)}`
+          : null,
         completedAt: new Date(),
       },
     });
+    const updated = await prisma.canvasGenerationTask.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        projectId: true,
+        nodeId: true,
+        ossUrl: true,
+        ephemeralUrl: true,
+        completedAt: true,
+      },
+    });
+    if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
     return;
   }
 
@@ -594,6 +617,18 @@ export async function applyCanvasVolcengineVideoResult(
       completedAt: new Date(),
     },
   });
+  const updated = await prisma.canvasGenerationTask.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      projectId: true,
+      nodeId: true,
+      ossUrl: true,
+      ephemeralUrl: true,
+      completedAt: true,
+    },
+  });
+  if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
 }
 
 export async function applyCanvasKieTaskResult(
@@ -831,7 +866,7 @@ export function scheduleCanvasPollWorkerForProject(projectId: string): void {
   });
 }
 
-const POLL_BATCH = 20;
+const POLL_BATCH = getGenerationPollBatch();
 const POLL_INNER_TIMEOUT_MS = 8000;
 const RETRY_PENDING_LIMIT = 3;
 /** ai-engine 同步 LLM 若进程中断，PENDING 任务超过此时间则标记失败 */
@@ -1375,15 +1410,17 @@ export async function runCanvasPollWorker(opts?: {
     take: POLL_BATCH,
     include: { project: { select: { userId: true } } },
   });
-  const timeoutMs = CANVAS_AI_TASK_TIMEOUT_MIN * 60 * 1000;
   const now = Date.now();
   for (const task of submitted) {
     result.scanned++;
     if (!task.kieTaskId) continue;
     if (!shouldPollSubmittedNow(task)) continue;
 
+    const timeoutMs = resolveCanvasSubmittedTaskTimeoutMs(task);
+    const timeoutMin = resolveCanvasSubmittedTaskTimeoutMin(task);
     const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
     if (now - submittedTs >= timeoutMs) {
+      let finalPollError: string | undefined;
       try {
         const outcome = await pollOneSubmittedCanvasTask(task);
         if (outcome === "succeeded") {
@@ -1395,13 +1432,69 @@ export async function runCanvasPollWorker(opts?: {
           continue;
         }
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
+        finalPollError = e instanceof Error ? e.message : String(e);
         logKieEvent("warn", "[canvas] final poll before timeout error", {
           taskId: task.id,
-          msg,
+          msg: finalPollError,
         });
       }
 
+      const afterFinalPoll = await prisma.canvasGenerationTask.findUnique({
+        where: { id: task.id },
+        select: { status: true },
+      });
+      if (afterFinalPoll?.status === "SUCCEEDED") {
+        result.succeeded++;
+        continue;
+      }
+      if (afterFinalPoll?.status === "FAILED") {
+        result.failed++;
+        continue;
+      }
+
+      const diagnosis = await probeCanvasSubmittedTaskAtTimeout({
+        task,
+        timeoutMin,
+        waitedMs: now - submittedTs,
+        finalPollError,
+      });
+
+      if (
+        diagnosis.cause === "vendor_already_succeeded" &&
+        diagnosis.videoUrl?.trim()
+      ) {
+        await applyCanvasVolcengineVideoResult(task.id, diagnosis.videoUrl);
+        const recovered = await prisma.canvasGenerationTask.findUnique({
+          where: { id: task.id },
+          select: { status: true },
+        });
+        if (recovered?.status === "SUCCEEDED") {
+          logKieEvent("warn", "[canvas] timeout probe recovered vendor success", {
+            taskId: task.id,
+            cause: diagnosis.cause,
+            vendorStatus: diagnosis.vendorStatus,
+          });
+          result.succeeded++;
+          continue;
+        }
+      }
+
+      logKieEvent("warn", "[canvas] task timeout", {
+        taskId: task.id,
+        nodeId: task.nodeId,
+        projectId: task.projectId,
+        kieTaskId: task.kieTaskId,
+        cause: diagnosis.cause,
+        vendorStatus: diagnosis.vendorStatus,
+        gatewayLogStatus: diagnosis.gatewayLogStatus,
+        timeoutMin,
+        waitedMs: now - submittedTs,
+        pollCount: task.pollCount,
+        finalPollError,
+        probeError: diagnosis.probeError,
+      });
+
+      const failFields = buildCanvasTimeoutFailFields(task, diagnosis);
       const payload = taskInputPayload(task);
       const gatewayLogId =
         typeof payload?.gatewayLogId === "string"
@@ -1411,8 +1504,9 @@ export async function runCanvasPollWorker(opts?: {
         where: { id: task.id },
         data: {
           status: "FAILED",
-          failCode: "timeout",
-          failMessage: `task exceeded ${CANVAS_AI_TASK_TIMEOUT_MIN} min`,
+          failCode: failFields.failCode,
+          failMessage: failFields.failMessage,
+          resultPayload: failFields.resultPayload,
           lastPolledAt: new Date(),
           pollCount: task.pollCount + 1,
           completedAt: new Date(),
@@ -1422,7 +1516,7 @@ export async function runCanvasPollWorker(opts?: {
         await failGatewayLogIfStillRunning({
           gatewayLogId,
           durationMs: now - submittedTs,
-          timeoutMin: CANVAS_AI_TASK_TIMEOUT_MIN,
+          timeoutMin,
           externalTaskId: task.kieTaskId,
         });
       }
@@ -1445,6 +1539,7 @@ export async function runCanvasPollWorker(opts?: {
         data: {
           lastPolledAt: new Date(),
           pollCount: task.pollCount + 1,
+          ...buildCanvasPollErrorPatch(task, msg),
         },
       });
     }

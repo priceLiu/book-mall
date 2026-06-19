@@ -74,7 +74,16 @@ async function reopenTimedOutTaskForApply(taskId: string): Promise<boolean> {
     where: {
       id: taskId,
       status: "FAILED",
-      failCode: { in: ["timeout", "OSS_UPLOAD_FAILED"] },
+      failCode: {
+        in: [
+          "timeout",
+          "timeout_vendor_running",
+          "timeout_poll_error",
+          "timeout_gateway_sync",
+          "timeout_no_gateway",
+          "OSS_UPLOAD_FAILED",
+        ],
+      },
     },
     data: {
       status: "SUBMITTED",
@@ -151,6 +160,15 @@ async function finalizeGatewaySuccess(input: {
   });
 }
 
+export async function patchCanvasProjectNodeRuntimeFromTask(
+  task: Pick<
+    CanvasGenerationTask,
+    "id" | "projectId" | "nodeId" | "ossUrl" | "ephemeralUrl" | "completedAt"
+  >,
+): Promise<void> {
+  return patchProjectNodeFromTask(task);
+}
+
 async function patchProjectNodeFromTask(
   task: Pick<
     CanvasGenerationTask,
@@ -220,7 +238,15 @@ export async function recoverCanvasVolcengineTimedOutTask(
   }
   if (
     task.status !== "FAILED" ||
-    (task.failCode !== "timeout" && task.failCode !== "OSS_UPLOAD_FAILED")
+    !task.failCode ||
+    ![
+      "timeout",
+      "timeout_vendor_running",
+      "timeout_poll_error",
+      "timeout_gateway_sync",
+      "timeout_no_gateway",
+      "OSS_UPLOAD_FAILED",
+    ].includes(task.failCode)
   ) {
     return { ok: false, reason: `status=${task.status} failCode=${task.failCode}` };
   }

@@ -31,6 +31,7 @@ import {
   type StoryVideoOptions,
 } from "./story-ai-constants";
 import { failGatewayLogIfStillRunning } from "@/lib/gateway/fail-gateway-log-on-timeout";
+import { getGenerationPollBatch } from "@/lib/canvas/canvas-constants";
 import {
   buildCanvasVideoVolcengineInput,
   isVolcengineStoryVideoModelKey,
@@ -1085,7 +1086,7 @@ export function schedulePollWorkerForProject(projectId: string): void {
   });
 }
 
-const POLL_BATCH = 20;
+const POLL_BATCH = getGenerationPollBatch();
 const POLL_INNER_TIMEOUT_MS = 8000;
 const RETRY_PENDING_LIMIT = 3;
 

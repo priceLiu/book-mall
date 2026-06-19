@@ -6,7 +6,7 @@
 |----------|-------------|----------|----------|
 | `book-mall-story-kie-poll.zip` | `book-mall-story-kie-poll` | `POST /api/story/kie/poll` | 每 1 分钟 |
 | `book-mall-story-kie-cleanup.zip` | `book-mall-story-kie-cleanup` | `POST /api/story/kie/cleanup` | 每 1 分钟 |
-| `book-mall-canvas-kie-poll.zip` | `book-mall-canvas-kie-poll` | `POST /api/canvas/kie/poll` | 每 1 分钟 |
+| `book-mall-canvas-kie-poll.zip` | `book-mall-canvas-kie-poll` | `POST /api/canvas/kie/poll` | 每 1 分钟（~15 人同时长视频建议 **30 秒**） |
 | `book-mall-canvas-kie-cleanup.zip` | `book-mall-canvas-kie-cleanup` | `POST /api/canvas/kie/cleanup` | 每 1 分钟 |
 
 重新打包（仓库根目录执行）：
