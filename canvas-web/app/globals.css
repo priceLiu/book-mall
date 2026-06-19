@@ -43,6 +43,9 @@
   --canvas-story-video-tip-body-max-h: 480px;
   --libtv-media-node-bg: #262626;
   --libtv-control-node-bg: #141418;
+  /* 构建环境不可访问 fonts.gstatic.com · 用系统字体栈，见 app/layout.tsx */
+  --font-inter: "PingFang SC", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-playfair: "Songti SC", "Noto Serif SC", ui-serif, Georgia, "Times New Roman", serif;
 }
 
 html {

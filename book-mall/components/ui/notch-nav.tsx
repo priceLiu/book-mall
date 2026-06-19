@@ -198,7 +198,7 @@ export function NotchNav({
           <div
             aria-hidden="true"
             className={cn(
-              "pointer-events-none absolute overflow-hidden rounded-sm transition-all ease-[cubic-bezier(0.22,1,0.36,1)]",
+              "pointer-events-none absolute overflow-hidden rounded-sm transition-all ease-notch",
               reducedMotion ? "duration-0" : "duration-300",
               ready ? "opacity-100" : "opacity-0",
             )}

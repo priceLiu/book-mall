@@ -160,7 +160,16 @@ html {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    /* 构建环境不可访问 fonts.gstatic.com · 见 app/layout.tsx */
+    font-family:
+      "PingFang SC",
+      "Noto Sans SC",
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      sans-serif;
   }
 }
 
