@@ -41,28 +41,15 @@ import { ByokSubscriptionRequiredError } from "@/lib/billing/byok-subscription-s
 import {
   guardVideoGenerate,
   releaseVideoGenerate,
-  resolveVideoRiskContext,
 } from "@/lib/billing/video-risk-control";
 import { assertByokQuotaBeforeGenerate } from "@/lib/billing/byok-overage-service";
 import { resolveGatewayLogBillingMode } from "@/lib/billing/gateway-billing-mode";
 import {
   isStaffRole,
 } from "@/lib/billing/billing-persona";
-import {
-  acquireTenantSlot,
-  releaseTenantSlot,
-  isConcurrencyEnabled,
-} from "@/lib/redis-service";
+import { VideoRiskError } from "@/lib/billing/video-risk-control";
 
 export type { UsageFromResponse };
-
-/** 租户并发超限（里程碑 7，仅在配置 REDIS_URL 时触发）。 */
-export class ConcurrencyLimitError extends Error {
-  constructor(public readonly max: number) {
-    super(`并发任务已达上限（${max}），请稍后再试`);
-    this.name = "ConcurrencyLimitError";
-  }
-}
 
 /** createRequestLog 预检失败 → HTTP 状态与可读文案（避免 route 未捕获时变成裸 500）。 */
 export function mapGatewayPreCreateLogError(e: unknown): { status: number; error: string } {
@@ -75,7 +62,7 @@ export function mapGatewayPreCreateLogError(e: unknown): { status: number; error
   if (e instanceof ByokSubscriptionRequiredError) {
     return { status: 403, error: e.message };
   }
-  if (e instanceof ConcurrencyLimitError) {
+  if (e instanceof VideoRiskError) {
     return { status: 429, error: e.message };
   }
   if (e instanceof Error && e.message.trim()) {
@@ -163,7 +150,7 @@ export async function createRequestLog(opts: {
       requestKind: opts.requestKind ?? route.requestKind,
       inputSummary: opts.inputSummary,
     });
-    // 视频专项风控（并发/队列/单日/批量/冷却/异常阶梯）
+    // 视频专项风控（当前仅批量上限）
     if (isVideoReq) {
       const g = await guardVideoGenerate({
         tenantId: opts.tenantId,
@@ -183,16 +170,6 @@ export async function createRequestLog(opts: {
       inputSummary: opts.inputSummary,
     });
   }
-  if (isConcurrencyEnabled() && opts.tenantId) {
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: opts.tenantId },
-      select: { maxConcurrency: true },
-    });
-    const max = tenant?.maxConcurrency ?? 0;
-    const slot = await acquireTenantSlot({ tenantId: opts.tenantId, max });
-    if (!slot.ok) throw new ConcurrencyLimitError(slot.max ?? max);
-  }
-
   const log = await prisma.gatewayRequestLog.create({
     data: {
       userId: opts.userId,
@@ -226,14 +203,11 @@ export async function createRequestLog(opts: {
     },
   });
 
-  // 视频「先冻结后渲染」：发起前冻结预扣；余额不足回滚并阻断（释放并发槽与风控占用）
+  // 视频「先冻结后渲染」：发起前冻结预扣；余额不足回滚并阻断
   if (billingMode === "PLATFORM_CREDIT" && log.requestKind === "VIDEO") {
     try {
       await reserveVideoCreditsForLog(log);
     } catch (e) {
-      if (isConcurrencyEnabled() && opts.tenantId) {
-        await releaseTenantSlot(opts.tenantId).catch(() => undefined);
-      }
       await releaseVideoGenerate(riskAccountId).catch(() => undefined);
       await prisma.gatewayRequestLog
         .update({
@@ -266,29 +240,6 @@ export async function finalizeRequestLog(
 ) {
   const log = await prisma.gatewayRequestLog.findUnique({ where: { id: logId } });
   if (!log) return;
-
-  // 租户并发限流：任务结束释放占用（仅配置 REDIS_URL 时生效）
-  if (isConcurrencyEnabled() && log.tenantId) {
-    try {
-      await releaseTenantSlot(log.tenantId);
-    } catch {
-      // 释放失败不影响结算（有 TTL 兜底）
-    }
-  }
-
-  // 视频专项风控：任务结束释放并发与队列计数
-  if (isConcurrencyEnabled() && log.requestKind === "VIDEO") {
-    try {
-      const ctx = await resolveVideoRiskContext({
-        tenantId: log.tenantId,
-        actorBookUserId: log.actorBookUserId,
-        apiKeyId: log.apiKeyId,
-      });
-      await releaseVideoGenerate(ctx?.accountId ?? null);
-    } catch {
-      // 释放失败不影响结算（有 TTL 兜底）
-    }
-  }
 
   let durationMs = patch.durationMs;
   if (durationMs <= 0 && log.submittedAt) {

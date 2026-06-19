@@ -1,6 +1,6 @@
 /**
- * Canvas / Story 异步任务 poll worker 扩缩容配置。
- * 支撑 50～100+ 人同时长视频：并行 poll、多轮扫描、分片、时间预算。
+ * Canvas / Story 异步任务 poll worker。
+ * 默认值按「≥20 人同时长视频、更多人数可继续扩」内置，日常不必配 env。
  */
 
 function readPositiveInt(envKey: string, fallback: number): number {
@@ -8,7 +8,7 @@ function readPositiveInt(envKey: string, fallback: number): number {
   return Number.isFinite(raw) && raw > 0 ? Math.round(raw) : fallback;
 }
 
-/** 每轮 DB 取出的 SUBMITTED 上限（默认 100） */
+/** 每轮 DB 取出的 SUBMITTED 上限（默认 100，约覆盖 20～100 人各 1 条长视频） */
 export function getGenerationPollBatch(): number {
   const raw = Number(
     process.env.GENERATION_POLL_BATCH ?? process.env.CANVAS_POLL_BATCH ?? "",

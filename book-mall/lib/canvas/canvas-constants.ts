@@ -45,12 +45,15 @@ export function getCanvasUserInflightMax(): number {
 
 /**
  * 单画布项目并发上限（前端运行队列 + 后端校验）。
- * 默认 0 = 不限制；设为正整数则启用上限。
+ * 默认 5；env=0 表示不限制。
  */
 export function getCanvasProjectInflightMax(): number {
   const raw = Number(process.env.CANVAS_PROJECT_INFLIGHT_MAX ?? "");
-  if (!Number.isFinite(raw) || raw <= 0) return 0;
-  return raw;
+  if (Number.isFinite(raw)) {
+    if (raw <= 0) return 0;
+    return Math.round(raw);
+  }
+  return 5;
 }
 
 /** poll worker 每轮 SUBMITTED 上限 — 见 lib/generation/poll-config.ts */

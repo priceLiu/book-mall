@@ -11,17 +11,22 @@ import {
 } from "@/lib/billing/video-risk-control";
 
 describe("team-concurrency", () => {
-  it("15 席至尊团队默认 15 路 Gateway 并发", () => {
+  it("20 席团队默认 20 路（保底，无需 env）", () => {
     expect(
-      resolveDefaultTeamMaxConcurrency({ seatLimit: 15, packageLevel: "至尊版" }),
-    ).toBe(15);
+      resolveDefaultTeamMaxConcurrency({ seatLimit: 20, packageLevel: "标准版" }),
+    ).toBe(20);
   });
 
-  it("15 席标准团队受档位封顶为 2", () => {
+  it("50 席团队随席位扩展到 50 路", () => {
+    expect(
+      resolveDefaultTeamMaxConcurrency({ seatLimit: 50, packageLevel: "标准版" }),
+    ).toBe(50);
+  });
+
+  it("15 席团队按席位数（未满 20 保底）", () => {
     expect(
       resolveDefaultTeamMaxConcurrency({ seatLimit: 15, packageLevel: "标准版" }),
-    ).toBe(2);
-    expect(teamTierMaxConcurrency("标准版")).toBe(2);
+    ).toBe(15);
   });
 });
 
