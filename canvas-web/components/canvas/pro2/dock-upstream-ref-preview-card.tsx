@@ -81,34 +81,34 @@ export function DockUpstreamRefPreviewCard({
             <ImageIcon className="size-4" />
           </div>
         )}
-        <p className="pointer-events-none absolute bottom-0 left-0 right-0 truncate bg-black/65 px-1 py-0.5 text-[9px] text-white/80">
+        <p className="pointer-events-none absolute bottom-0 left-0 right-0 truncate bg-black/65 px-0.5 py-px text-[7px] text-white/80">
           {label}
         </p>
         {importBadge === "active" ? (
-          <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-emerald-600/90 px-1 py-px text-[8px] font-medium text-white">
+          <span className="pointer-events-none absolute left-px top-px rounded bg-emerald-600/90 px-0.5 py-px text-[7px] font-medium leading-none text-white">
             已入库
           </span>
         ) : importBadge === "pending" ? (
-          <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-amber-600/90 px-1 py-px text-[8px] font-medium text-white">
+          <span className="pointer-events-none absolute left-px top-px rounded bg-amber-600/90 px-0.5 py-px text-[7px] font-medium leading-none text-white">
             入库中
           </span>
         ) : importBadge === "failed" || importBadge === "missing" ? (
           previewUrl ? (
-            <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-rose-600/90 px-1 py-px text-[8px] font-medium text-white">
+            <span className="pointer-events-none absolute left-px top-px rounded bg-rose-600/90 px-0.5 py-px text-[7px] font-medium leading-none text-white">
               未入库
             </span>
           ) : null
         ) : null}
         <button
           type="button"
-          className="nodrag absolute right-0.5 top-0.5 z-10 flex size-4 items-center justify-center rounded bg-black/80 text-white/85 shadow-sm transition hover:bg-black hover:text-white"
+          className="nodrag absolute right-px top-px z-10 flex size-3 items-center justify-center rounded bg-black/80 text-white/85 shadow-sm transition hover:bg-black hover:text-white"
           title="断开连线"
           onClick={(e) => {
             e.stopPropagation();
             onDisconnect();
           }}
         >
-          <X className="size-2.5" />
+          <X className="size-2" />
         </button>
       </div>
       <MentionHoverPreviewPortal

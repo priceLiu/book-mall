@@ -1,9 +1,14 @@
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
-import { MENTION_THUMB_SLOT_CHAR } from "@/lib/canvas/mention-inline-thumb-placeholder";
+import {
+  MENTION_THUMB_PAD_CHAR,
+  MENTION_THUMB_SLOT_CHAR,
+} from "@/lib/canvas/mention-inline-thumb-placeholder";
 
 function isMentionTokenBreak(ch: string | undefined): boolean {
   if (!ch) return false;
-  if (ch === MENTION_THUMB_SLOT_CHAR) return false;
+  if (ch === MENTION_THUMB_SLOT_CHAR || ch === MENTION_THUMB_PAD_CHAR) {
+    return false;
+  }
   return /\s/.test(ch);
 }
 

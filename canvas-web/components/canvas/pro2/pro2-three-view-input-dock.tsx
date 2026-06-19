@@ -25,7 +25,7 @@ import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
 import { EnginePicker } from "../engine-picker";
 import {
-  Pro2DockContextBar,
+  Pro2DockHeader,
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "./pro2-input-dock-shell";
@@ -195,28 +195,36 @@ export function Pro2ThreeViewInputDock() {
       dockClassName="pro2-three-view-dock"
       hidden={dockHidden}
       header={
-        <Pro2DockContextBar>
-          <Pro2DockStyleButton
-            active={Boolean(styleRef)}
-            label={styleRef?.name}
-            disabled={isRunning}
-            onClick={onOpenStyleLibrary}
-          />
-          <button
-            type="button"
-            disabled
-            title="标记（即将推出）"
-            className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
-          >
-            <MapPin className="size-4" strokeWidth={1.75} />
-            <span>标记</span>
-          </button>
-          <Pro2DockUpstreamChips
-            links={upstreamLinks}
-            anchorNodeId={storeNode.id}
-            activeIds={activeRefIds}
-          />
-        </Pro2DockContextBar>
+        <Pro2DockHeader
+          refRow={
+            upstreamLinks.length > 0 ? (
+              <Pro2DockUpstreamChips
+                links={upstreamLinks}
+                anchorNodeId={storeNode.id}
+                activeIds={activeRefIds}
+              />
+            ) : null
+          }
+          actionRow={
+            <>
+              <Pro2DockStyleButton
+                active={Boolean(styleRef)}
+                label={styleRef?.name}
+                disabled={isRunning}
+                onClick={onOpenStyleLibrary}
+              />
+              <button
+                type="button"
+                disabled
+                title="标记（即将推出）"
+                className="nodrag flex size-9 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-white/12 bg-white/[0.04] text-[9px] text-white/35"
+              >
+                <MapPin className="size-4" strokeWidth={1.75} />
+                <span>标记</span>
+              </button>
+            </>
+          }
+        />
       }
       footer={
         <>
@@ -262,6 +270,7 @@ export function Pro2ThreeViewInputDock() {
         rows={4}
         onChange={onPromptChange}
         mentionInlineThumb
+        mentionEdition="pro2"
       />
     </Pro2InputDockShell>
   );

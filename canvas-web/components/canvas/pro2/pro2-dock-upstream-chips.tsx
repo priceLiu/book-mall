@@ -89,7 +89,7 @@ function UpstreamChip({
 
   return (
     <>
-      <div className="group relative size-9 shrink-0">
+      <div className="group relative size-7 shrink-0">
         <button
           type="button"
           className={cn(
@@ -113,7 +113,7 @@ function UpstreamChip({
           )}
         </button>
         <span
-          className="pointer-events-none absolute left-0 top-0 z-10 flex size-4 items-center justify-center rounded-br-md bg-black/75 text-[9px] font-medium text-white/90"
+          className="pointer-events-none absolute left-0 top-0 z-10 flex size-3 items-center justify-center rounded-br-md bg-black/75 text-[8px] font-medium text-white/90"
           aria-hidden
         >
           {index + 1}

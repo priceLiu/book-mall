@@ -112,11 +112,12 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     }
     if (
       latestData.referenceMode === "first_last" &&
-      resolved.portraitAssetRefs.length < 1
+      resolved.portraitAssetRefs.length < 1 &&
+      resolved.imageInputs.length < 1
     ) {
       await alert({
         title: "首尾帧模式",
-        message: "请至少连接一张已入库的参考图。",
+        message: "请至少连接一张参考图（已入库或未入库均可）。",
         variant: "warning",
       });
       return;

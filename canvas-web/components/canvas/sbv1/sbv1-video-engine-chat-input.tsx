@@ -19,7 +19,7 @@ import { DockUpstreamRefPreviewCard } from "@/components/canvas/pro2/dock-upstre
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
-  Pro2DockContextBar,
+  Pro2DockRefRow,
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "@/components/canvas/pro2/pro2-input-dock-shell";
@@ -186,7 +186,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 
   const refBar =
     upstreamLinks.length > 0 ? (
-      <Pro2DockContextBar>
+      <Pro2DockRefRow>
         <div className="hide-scroll-bar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
           {upstreamLinks.map((link) => {
             const sourceNode = useCanvasStore
@@ -208,7 +208,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             );
           })}
         </div>
-      </Pro2DockContextBar>
+      </Pro2DockRefRow>
     ) : null;
 
   const toolbar = (
@@ -277,12 +277,8 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         flowAnchor={placement}
         dockClassName="sbv1-video-engine-dock"
         hidden={hidden}
-        footer={
-          <>
-            {refBar}
-            {toolbar}
-          </>
-        }
+        header={refBar}
+        footer={toolbar}
       >
         <div
           className="relative min-h-0 overflow-visible"

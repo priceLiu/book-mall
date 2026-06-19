@@ -33,7 +33,7 @@ import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { cn } from "@/lib/utils";
 import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
-import { LibtvNodeHeaderPreviewButton } from "./libtv-node-header-preview-button";
+import { LibtvNodeHeaderActions } from "./libtv-node-header-preview-button";
 import { Pro2ImageNodeToolbar } from "./pro2/pro2-image-node-toolbar";
 import {
   Pro2MediaNodeEmptyState,
@@ -490,9 +490,11 @@ export function LibtvImageNode({
             {isGenerating ? (
               <Loader2 className={cn("size-3.5 animate-spin", chrome.spinner)} />
             ) : (
-              <LibtvNodeHeaderPreviewButton
-                visible={hasImage}
-                onClick={() => setPreviewOpen(true)}
+              <LibtvNodeHeaderActions
+                portraitActive={portraitActive}
+                portraitImporting={portraitImporting}
+                showPreview={hasImage}
+                onPreview={() => setPreviewOpen(true)}
               />
             )}
           </div>

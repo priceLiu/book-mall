@@ -5,21 +5,38 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { GripVertical, X } from "lucide-react";
 import { RF_NO_DRAG } from "@/lib/canvas/react-flow-classes";
+import { cn } from "@/lib/utils";
 import type { MentionableItem } from "./MentionsTextarea";
 
 const ITEM_W = 200;
 const THUMB_H = 240;
+/** Dock 内紧凑模式 · 约为默认一半 */
+const ITEM_W_DOCK = 100;
+const THUMB_H_DOCK = 120;
 const GAP = 8;
 const PICKER_PAD = 16;
+const PICKER_HEADER_H = 36;
 const PICKER_MIN_W = 320;
 const PICKER_MAX_W = 960;
-const PICKER_EST_HEIGHT = 320;
+const PICKER_MIN_W_DOCK = 220;
+const PICKER_MAX_W_DOCK = 640;
 const MENTION_PICKER_Z = 5000;
 
-function pickerWidthForCount(count: number): number {
-  if (count <= 0) return PICKER_MIN_W;
-  const content = count * ITEM_W + Math.max(0, count - 1) * 8 + PICKER_PAD;
-  return Math.min(PICKER_MAX_W, Math.max(PICKER_MIN_W, content));
+function pickerWidthForCount(count: number, compact: boolean): number {
+  if (count <= 0) {
+    return compact ? PICKER_MIN_W_DOCK : PICKER_MIN_W;
+  }
+  const itemW = compact ? ITEM_W_DOCK : ITEM_W;
+  const minW = compact ? PICKER_MIN_W_DOCK : PICKER_MIN_W;
+  const maxW = compact ? PICKER_MAX_W_DOCK : PICKER_MAX_W;
+  const content = count * itemW + Math.max(0, count - 1) * 8 + PICKER_PAD;
+  return Math.min(maxW, Math.max(minW, content));
+}
+
+function pickerHeightForCount(count: number, compact: boolean): number {
+  if (count <= 0) return compact ? 120 : 200;
+  const thumbH = compact ? THUMB_H_DOCK : THUMB_H;
+  return PICKER_HEADER_H + 16 + thumbH + 40 + 8;
 }
 
 type AnchorRect = {
@@ -31,6 +48,7 @@ type AnchorRect = {
 function resolvePickerPosition(
   anchor: AnchorRect,
   pickerW: number,
+  pickerH: number,
 ): { left: number; top: number; flip: boolean } {
   let left = anchor.left;
   left = Math.min(Math.max(12, left), window.innerWidth - pickerW - 12);
@@ -38,7 +56,7 @@ function resolvePickerPosition(
   const spaceBelow = window.innerHeight - anchor.bottom - GAP;
   const spaceAbove = anchor.top - GAP;
   const preferBelow =
-    spaceBelow >= PICKER_EST_HEIGHT || spaceBelow >= spaceAbove;
+    spaceBelow >= pickerH || spaceBelow >= spaceAbove;
 
   if (preferBelow) {
     return { left, top: anchor.bottom + GAP, flip: false };
@@ -46,10 +64,37 @@ function resolvePickerPosition(
   return { left, top: anchor.top - GAP, flip: true };
 }
 
+/** Dock 内：锚定整坞外壳，弹层在坞外下方/上方，避免挡住参考图行与正文 */
+function resolveDockShellPickerPosition(
+  dockShell: DOMRect,
+  pickerW: number,
+  pickerH: number,
+): { left: number; top: number; flip: boolean } {
+  let left = dockShell.left + (dockShell.width - pickerW) / 2;
+  left = Math.min(Math.max(12, left), window.innerWidth - pickerW - 12);
+
+  const belowTop = dockShell.bottom + GAP;
+  if (belowTop + pickerH <= window.innerHeight - 12) {
+    return { left, top: belowTop, flip: false };
+  }
+
+  const aboveTop = dockShell.top - GAP;
+  if (aboveTop - pickerH >= 12) {
+    return { left, top: aboveTop, flip: true };
+  }
+
+  return {
+    left,
+    top: Math.min(belowTop, window.innerHeight - pickerH - 12),
+    flip: false,
+  };
+}
+
 export function MentionPickerPortal({
   open,
   anchorEl,
   getAnchorRect,
+  getDockShellRect,
   items,
   selectedIndex,
   headerTitle = "角色 · 拖标题栏移动 · ←→ Enter 插入",
@@ -62,6 +107,8 @@ export function MentionPickerPortal({
   anchorEl: HTMLElement | null;
   /** 优先：光标 / @ 锚点坐标 */
   getAnchorRect?: () => AnchorRect | null;
+  /** LibTV 输入坞外壳 · 有则弹层锚在坞外，避免挡住坞内参考图 */
+  getDockShellRect?: () => DOMRect | null;
   items: MentionableItem[];
   selectedIndex: number;
   headerTitle?: string;
@@ -79,6 +126,16 @@ export function MentionPickerPortal({
   }, []);
 
   const updateAnchor = useCallback(() => {
+    const dockShell = getDockShellRect?.() ?? null;
+    const compact = Boolean(dockShell);
+    const w = pickerWidthForCount(items.length, compact);
+    const h = pickerHeightForCount(items.length, compact);
+
+    if (dockShell) {
+      setBasePos(resolveDockShellPickerPosition(dockShell, w, h));
+      return;
+    }
+
     const caret = getAnchorRect?.() ?? null;
     const fallback = anchorEl?.getBoundingClientRect();
     const anchor: AnchorRect | null = caret
@@ -92,9 +149,8 @@ export function MentionPickerPortal({
         : null;
     if (!anchor) return;
 
-    const w = pickerWidthForCount(items.length);
-    setBasePos(resolvePickerPosition(anchor, w));
-  }, [anchorEl, getAnchorRect, items.length]);
+    setBasePos(resolvePickerPosition(anchor, w, h));
+  }, [anchorEl, getAnchorRect, getDockShellRect, items.length]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -148,7 +204,11 @@ export function MentionPickerPortal({
 
   const left = basePos.left + drag.x;
   const top = basePos.top + drag.y;
-  const pickerW = pickerWidthForCount(items.length);
+  const dockShell = getDockShellRect?.() ?? null;
+  const compact = Boolean(dockShell);
+  const pickerW = pickerWidthForCount(items.length, compact);
+  const itemW = compact ? ITEM_W_DOCK : ITEM_W;
+  const thumbH = compact ? THUMB_H_DOCK : THUMB_H;
 
   return createPortal(
     <div
@@ -191,7 +251,7 @@ export function MentionPickerPortal({
                     ? "bg-[var(--canvas-accent)]/25 text-white ring-1 ring-[var(--canvas-accent)]/40"
                     : "text-white/85 hover:bg-white/8"
                 }`}
-                style={{ width: ITEM_W }}
+                style={{ width: itemW }}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   onSelect(m);
@@ -201,7 +261,7 @@ export function MentionPickerPortal({
                 {m.previewUrl ? (
                   <span
                     className="relative w-full overflow-hidden rounded-md border border-white/15 bg-black/40"
-                    style={{ height: THUMB_H }}
+                    style={{ height: thumbH }}
                   >
                     <Image
                       src={m.previewUrl}
@@ -214,10 +274,15 @@ export function MentionPickerPortal({
                 ) : (
                   <span
                     className="w-full rounded-md border border-dashed border-white/15 bg-white/5"
-                    style={{ height: THUMB_H }}
+                    style={{ height: thumbH }}
                   />
                 )}
-                <span className="line-clamp-2 text-[11px] leading-snug">
+                <span
+                  className={cn(
+                    "line-clamp-2 leading-snug",
+                    compact ? "text-[10px]" : "text-[11px]",
+                  )}
+                >
                   @{m.label}
                 </span>
               </button>

@@ -26,7 +26,7 @@ import { Pro2TextNodeEnginePickers } from "./pro2-text-node-engine-pickers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 import {
-  Pro2DockContextBar,
+  Pro2DockHeader,
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "./pro2-input-dock-shell";
@@ -209,24 +209,30 @@ export function Pro2StarterInputDock() {
       dockClassName="pro2-starter-dock"
       hidden={dockHidden}
       header={
-        <Pro2DockContextBar>
-          <Pro2DockUpstreamChips
-            links={upstreamLinks}
-            anchorNodeId={storeNode.id}
-            activeIds={activeRefIds}
-          />
-          <Pro2DockRefImages
-            refs={[]}
-            onChange={() => {}}
-            disabled={isGenerating}
-            pasteActive={false}
-            spawnAnchor={{
-              nodeId: storeNode.id,
-              nodeType: "story-pro2-starter",
-            }}
-            maxCount={12}
-          />
-        </Pro2DockContextBar>
+        <Pro2DockHeader
+          refRow={
+            upstreamLinks.length > 0 ? (
+              <Pro2DockUpstreamChips
+                links={upstreamLinks}
+                anchorNodeId={storeNode.id}
+                activeIds={activeRefIds}
+              />
+            ) : null
+          }
+          actionRow={
+            <Pro2DockRefImages
+              refs={[]}
+              onChange={() => {}}
+              disabled={isGenerating}
+              pasteActive={false}
+              spawnAnchor={{
+                nodeId: storeNode.id,
+                nodeType: "story-pro2-starter",
+              }}
+              maxCount={12}
+            />
+          }
+        />
       }
       footer={
         <>
@@ -299,6 +305,7 @@ export function Pro2StarterInputDock() {
           disabled={isGenerating}
           rows={3}
           mentionInlineThumb
+          mentionEdition="pro2"
           onChange={(value, _refs, meta) =>
             updateNodeData(storeNode.id, { themeInput: value }, {
               commit: meta?.commit ?? true,

@@ -53,9 +53,45 @@ function portraitRefWithRole(
   return { url, role };
 }
 
+function httpsOssFromImageNode(node: CanvasFlowNode): string | null {
+  const oss = String((node.data as { ossUrl?: string }).ossUrl ?? "").trim();
+  if (/^https:\/\//.test(oss)) return oss;
+  const blob = String((node.data as { blobUrl?: string }).blobUrl ?? "").trim();
+  if (/^https:\/\//.test(blob)) return blob;
+  return null;
+}
+
+type UpstreamMediaSlot =
+  | { kind: "asset"; url: string }
+  | { kind: "oss"; url: string };
+
+function resolveUpstreamMediaSlot(
+  imgNode: CanvasFlowNode,
+  previewUrl?: string,
+): UpstreamMediaSlot | "pending" | null {
+  const ref = portraitAssetRefFromNodeData(
+    imgNode.data as CanvasPortraitNodeFields,
+  );
+  if (ref) return { kind: "asset", url: ref.url };
+
+  const importState = portraitImportUiState(
+    imgNode.data as CanvasPortraitNodeFields,
+  );
+  if (importState === "pending") return "pending";
+
+  const oss = httpsOssFromImageNode(imgNode);
+  if (oss) return { kind: "oss", url: oss };
+  if (previewUrl && /^https:\/\//.test(previewUrl)) {
+    return { kind: "oss", url: previewUrl };
+  }
+  return null;
+}
+
 /**
- * sbv1 视频合成 · 参考图只走私域人像库 asset://，禁止直连 OSS HTTPS。
- * 上游 sbv1-image 须先「私域人像入库」为 active。
+ * sbv1 视频合成 · Seedance 2.0 参考图：
+ * - 已「私域人像入库」→ asset://（portraitAssetRefs）
+ * - 未入库 → 公网 HTTPS OSS（imageInputs，与旧逻辑一致）
+ * 真人人像主体须入库；虚拟/场景图可按需选择是否入库。
  */
 export function resolveSbv1VideoEngineInputs(
   nodes: CanvasFlowNode[],
@@ -75,77 +111,106 @@ export function resolveSbv1VideoEngineInputs(
       ? upstreamLinks.filter((l) => mentionedIds.includes(l.id))
       : upstreamLinks;
 
-  const portraitAssetRefs: PortraitAssetRefPayload[] = [];
+  const slots: UpstreamMediaSlot[] = [];
   const pendingImport: string[] = [];
-  const missingImport: string[] = [];
 
   for (const link of activeLinks) {
     const imgNode = nodes.find((n) => n.id === link.sourceNodeId);
     if (!imgNode || imgNode.type !== "sbv1-image") continue;
-    if (!link.previewUrl && !isPortraitNodeActive(imgNode.data as CanvasPortraitNodeFields)) {
+    if (
+      !link.previewUrl &&
+      !isPortraitNodeActive(imgNode.data as CanvasPortraitNodeFields) &&
+      !httpsOssFromImageNode(imgNode)
+    ) {
       continue;
     }
-    const ref = portraitAssetRefFromNodeData(
-      imgNode.data as CanvasPortraitNodeFields,
-    );
-    if (ref) {
-      portraitAssetRefs.push(ref);
-      continue;
-    }
-    const importState = portraitImportUiState(
-      imgNode.data as CanvasPortraitNodeFields,
-    );
-    if (importState === "pending") {
+    const slot = resolveUpstreamMediaSlot(imgNode, link.previewUrl);
+    if (slot === "pending") {
       pendingImport.push(link.label);
-    } else {
-      missingImport.push(link.label);
+      continue;
     }
+    if (slot) slots.push(slot);
   }
 
   if (pendingImport.length > 0) {
     return {
       ok: false,
-      error: `参考图 ${pendingImport.join("、")} 仍在火山侧处理中。请在对应图片节点工具栏等待「已入库」后再生成。`,
+      error: `参考图 ${pendingImport.join("、")} 仍在火山侧处理中。请在对应图片节点等待标题栏勾标出现后再生成。`,
     };
   }
 
-  if (missingImport.length > 0) {
-    return {
-      ok: false,
-      error: `参考图 ${missingImport.join("、")} 须在被连线的图片节点上完成「私域人像入库」（工具栏显示「已入库」才算就绪）。Gateway 入库成功须写回该节点；若工具栏仍显示「私域人像入库」，请对连线上的图片再点一次入库。生视频时火山只接受 asset:// 引用。`,
-    };
-  }
-
-  const deduped = dedupePortraitAssetRefs(portraitAssetRefs);
-  let refsWithRoles: PortraitAssetRefPayload[] = deduped;
+  const styleHttps = resolveNonSbv1ImageHttpsInputs(nodes, edges, engineNodeId);
 
   if (referenceMode === "first_last") {
-    if (deduped.length < 1) {
+    if (slots.length < 1) {
       return {
         ok: false,
-        error: "首尾帧模式需要至少一张已入库的参考图。",
+        error: "首尾帧模式需要至少一张参考图（已入库 asset:// 或未入库 OSS 均可）。",
       };
     }
-    refsWithRoles = [
-      portraitRefWithRole(deduped[0]!.url, "first_frame"),
-      ...(deduped[1]
-        ? [portraitRefWithRole(deduped[1].url, "last_frame")]
-        : []),
-    ];
+
+    const portraitAssetRefs: PortraitAssetRefPayload[] = [];
+    const imageInputs: string[] = [];
+
+    const first = slots[0]!;
+    if (first.kind === "asset") {
+      portraitAssetRefs.push(portraitRefWithRole(first.url, "first_frame"));
+    } else {
+      imageInputs.push(first.url);
+    }
+
+    const last = slots[1];
+    if (last) {
+      if (last.kind === "asset") {
+        portraitAssetRefs.push(portraitRefWithRole(last.url, "last_frame"));
+      } else {
+        imageInputs.push(last.url);
+      }
+    }
+
+    if (
+      !prompt &&
+      portraitAssetRefs.length === 0 &&
+      imageInputs.length === 0 &&
+      styleHttps.length === 0
+    ) {
+      return {
+        ok: false,
+        error: "请填写 prompt 或连接至少一张参考图。",
+      };
+    }
+
+    return {
+      ok: true,
+      imageInputs: [...new Set([...imageInputs, ...styleHttps])],
+      portraitAssetRefs: dedupePortraitAssetRefs(portraitAssetRefs),
+    };
   }
 
-  const imageInputs = resolveNonSbv1ImageHttpsInputs(nodes, edges, engineNodeId);
+  const portraitAssetRefs: PortraitAssetRefPayload[] = [];
+  const imageInputs: string[] = [];
 
-  if (!prompt && refsWithRoles.length === 0 && imageInputs.length === 0) {
+  for (const slot of slots) {
+    if (slot.kind === "asset") {
+      portraitAssetRefs.push(portraitRefWithRole(slot.url, "reference_image"));
+    } else {
+      imageInputs.push(slot.url);
+    }
+  }
+
+  const dedupedAssets = dedupePortraitAssetRefs(portraitAssetRefs);
+  const dedupedImages = [...new Set([...imageInputs, ...styleHttps])];
+
+  if (!prompt && dedupedAssets.length === 0 && dedupedImages.length === 0) {
     return {
       ok: false,
-      error: "请填写 prompt 或连接至少一张已入库的参考图。",
+      error: "请填写 prompt 或连接至少一张参考图。",
     };
   }
 
   return {
     ok: true,
-    imageInputs,
-    portraitAssetRefs: refsWithRoles,
+    imageInputs: dedupedImages,
+    portraitAssetRefs: dedupedAssets,
   };
 }

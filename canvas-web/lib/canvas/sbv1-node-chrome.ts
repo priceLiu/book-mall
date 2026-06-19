@@ -55,7 +55,7 @@ export const SBV1_CHAT_INPUT_SHELL_STYLE = {
 } as const;
 export const SBV1_CHAT_INPUT_TEXTAREA_CLASS = PRO2_DOCK_TEXTAREA_CLASS;
 export const SBV1_REF_THUMB_CLASS =
-  "group relative size-14 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40";
+  "group relative size-7 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/40";
 
 export const SBV1_DOCK_TEXTAREA_CLASS =
   "min-h-[88px] w-full resize-none border-0 bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/35 focus:outline-none focus:ring-0";

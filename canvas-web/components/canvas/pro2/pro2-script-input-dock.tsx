@@ -28,7 +28,7 @@ import { pickDefaultStoryLlmEngine } from "@/lib/canvas/system-providers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
 import { cn } from "@/lib/utils";
 import {
-  Pro2DockContextBar,
+  Pro2DockHeader,
   Pro2DockToolbar,
   Pro2InputDockShell,
 } from "./pro2-input-dock-shell";
@@ -197,31 +197,37 @@ export function Pro2ScriptInputDock() {
       dockClassName="pro2-script-dock"
       hidden={dockHidden}
       header={
-        <Pro2DockContextBar>
-          <Pro2DockUpstreamChips
-            links={upstreamLinks}
-            anchorNodeId={storeNode.id}
-            activeIds={activeRefIds}
-          />
-          <Pro2DockRefImages
-            refs={dockRefImages}
-            onChange={(next) =>
-              updateNodeData(storeNode.id, { dockRefImages: next })
-            }
-            promptValue={dockInput}
-            onPromptChange={(next) =>
-              updateNodeData(storeNode.id, { dockInput: next }, { commit: true })
-            }
-            disabled={isGenerating}
-            pasteActive={false}
-            activeIds={activeRefIds}
-            spawnAnchor={{
-              nodeId: storeNode.id,
-              nodeType: "story-pro2-script-hub",
-            }}
-            maxCount={12}
-          />
-        </Pro2DockContextBar>
+        <Pro2DockHeader
+          refRow={
+            upstreamLinks.length > 0 ? (
+              <Pro2DockUpstreamChips
+                links={upstreamLinks}
+                anchorNodeId={storeNode.id}
+                activeIds={activeRefIds}
+              />
+            ) : null
+          }
+          actionRow={
+            <Pro2DockRefImages
+              refs={dockRefImages}
+              onChange={(next) =>
+                updateNodeData(storeNode.id, { dockRefImages: next })
+              }
+              promptValue={dockInput}
+              onPromptChange={(next) =>
+                updateNodeData(storeNode.id, { dockInput: next }, { commit: true })
+              }
+              disabled={isGenerating}
+              pasteActive={false}
+              activeIds={activeRefIds}
+              spawnAnchor={{
+                nodeId: storeNode.id,
+                nodeType: "story-pro2-script-hub",
+              }}
+              maxCount={12}
+            />
+          }
+        />
       }
       footer={
         <>
@@ -291,6 +297,7 @@ export function Pro2ScriptInputDock() {
           disabled={isGenerating}
           rows={3}
           mentionInlineThumb
+          mentionEdition="pro2"
           onChange={(value, _refs, meta) =>
             updateNodeData(storeNode.id, { dockInput: value }, {
               commit: meta?.commit ?? true,
