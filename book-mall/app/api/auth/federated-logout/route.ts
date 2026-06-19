@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   buildFederatedLogoutStepUrl,
+  buildToolsLogoutHopUrl,
   listFederatedToolsLogoutOrigins,
   resolveBookMallCallbackUrl,
   shouldUseFederatedToolsLogoutChain,
@@ -17,7 +18,7 @@ function safeFinalCallback(raw: string | null): string {
   return t;
 }
 
-/** 子站 tools-logout 链（无 Set-Cookie，可安全 302 到外站）。 */
+/** 子站 tools-session federated logout 链（无 Set-Cookie 冲突，可安全 302 到外站）。 */
 export async function GET(request: NextRequest) {
   const stepRaw = Number(request.nextUrl.searchParams.get("step") ?? "0");
   const step =
@@ -44,9 +45,8 @@ export async function GET(request: NextRequest) {
   }
 
   const nextStep = buildFederatedLogoutStepUrl(step + 1, finalUrl, book);
-  const hop = new URL("/api/tools-logout", origins[step]!);
-  hop.searchParams.set("next", nextStep);
-  return NextResponse.redirect(hop.toString(), 302);
+  const hopUrl = buildToolsLogoutHopUrl(origins[step]!, nextStep);
+  return NextResponse.redirect(hopUrl, 302);
 }
 
 function trimBookOrigin(raw: string): string | null {

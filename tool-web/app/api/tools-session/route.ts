@@ -1,11 +1,15 @@
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import {
   toolsDiagnosticsEnabled,
   toolsSessionServerTiming,
 } from "@/lib/tools-diagnostics";
 import { logToolsSessionDiagToConsole } from "@/lib/tools-session-console-log";
 import { fetchToolsSessionUncachedWithDiag } from "@/lib/tools-introspect";
+import {
+  isToolsFederatedLogoutRequest,
+  respondToolsFederatedLogout,
+} from "@/lib/tools-federated-logout";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +22,11 @@ export const dynamic = "force-dynamic";
  * - `TOOLS_DIAGNOSTICS=1` 时 JSON 根级附带 `_diag`
  * - `NODE_ENV=development` 或 `TOOLS_DIAGNOSTICS=1` 时在**工具站服务端终端**打印一行摘要与解读（不含令牌）
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (isToolsFederatedLogoutRequest(request)) {
+    return respondToolsFederatedLogout(request);
+  }
+
   const jar = cookies();
   const token = jar.get("tools_token")?.value;
   const { session, diag } = await fetchToolsSessionUncachedWithDiag(token);

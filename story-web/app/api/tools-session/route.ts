@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { fetchToolsSessionUncachedWithDiag } from "@/lib/tools-introspect";
+import {
+  isToolsFederatedLogoutRequest,
+  respondToolsFederatedLogout,
+} from "@/lib/tools-federated-logout";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +23,11 @@ function maybeClearToolsTokenCookie(
   });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (isToolsFederatedLogoutRequest(request)) {
+    return respondToolsFederatedLogout(request);
+  }
+
   const token = cookies().get("tools_token")?.value;
   const hadToken = Boolean(token?.trim());
   const { session } = await fetchToolsSessionUncachedWithDiag(token);
