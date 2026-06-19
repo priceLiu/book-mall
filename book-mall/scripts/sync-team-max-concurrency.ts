@@ -9,7 +9,7 @@ import { resolveDefaultTeamMaxConcurrency } from "@/lib/tenant/team-concurrency"
 
 async function main() {
   const teams = await prisma.tenant.findMany({
-    where: { type: "TEAM", maxConcurrency: 2 },
+    where: { type: "TEAM" },
     select: { id: true, name: true, seatLimit: true, packageLevel: true, maxConcurrency: true },
   });
 
@@ -19,7 +19,7 @@ async function main() {
       seatLimit: t.seatLimit,
       packageLevel: t.packageLevel,
     });
-    if (next === t.maxConcurrency) continue;
+    if (next <= t.maxConcurrency) continue;
     await prisma.tenant.update({
       where: { id: t.id },
       data: { maxConcurrency: next },

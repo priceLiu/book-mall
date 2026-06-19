@@ -27,6 +27,16 @@ import {
   resolveCanvasSubmittedTaskTimeoutMs,
 } from "./canvas-constants";
 import {
+  getGenerationPollConcurrency,
+  getGenerationPollMaxPasses,
+  getGenerationPollTimeBudgetMs,
+} from "@/lib/generation/poll-config";
+import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
+import {
+  pollShardOverFetchSize,
+  selectPollShardTasks,
+} from "@/lib/generation/poll-shard";
+import {
   extractKieResultUrl,
   KieError,
   logKieEvent,
@@ -866,7 +876,6 @@ export function scheduleCanvasPollWorkerForProject(projectId: string): void {
   });
 }
 
-const POLL_BATCH = getGenerationPollBatch();
 const POLL_INNER_TIMEOUT_MS = 8000;
 const RETRY_PENDING_LIMIT = 3;
 /** ai-engine 同步 LLM 若进程中断，PENDING 任务超过此时间则标记失败 */
@@ -1111,6 +1120,160 @@ async function pollOneSubmittedCanvasTask(
   return "pending";
 }
 
+type SubmittedPollDelta = {
+  scanned: number;
+  succeeded: number;
+  failed: number;
+  timedOut: number;
+};
+
+/** 推进单条 SUBMITTED 任务（供并行 poll worker 调用）。 */
+async function advanceOneSubmittedCanvasTask(
+  task: SubmittedCanvasPollTask,
+  now: number,
+): Promise<SubmittedPollDelta> {
+  const delta: SubmittedPollDelta = {
+    scanned: 1,
+    succeeded: 0,
+    failed: 0,
+    timedOut: 0,
+  };
+  if (!task.kieTaskId) return delta;
+  if (!shouldPollSubmittedNow(task)) {
+    delta.scanned = 0;
+    return delta;
+  }
+
+  const timeoutMs = resolveCanvasSubmittedTaskTimeoutMs(task);
+  const timeoutMin = resolveCanvasSubmittedTaskTimeoutMin(task);
+  const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
+  if (now - submittedTs >= timeoutMs) {
+    let finalPollError: string | undefined;
+    try {
+      const outcome = await pollOneSubmittedCanvasTask(task);
+      if (outcome === "succeeded") {
+        delta.succeeded = 1;
+        return delta;
+      }
+      if (outcome === "failed") {
+        delta.failed = 1;
+        return delta;
+      }
+    } catch (e) {
+      finalPollError = e instanceof Error ? e.message : String(e);
+      logKieEvent("warn", "[canvas] final poll before timeout error", {
+        taskId: task.id,
+        msg: finalPollError,
+      });
+    }
+
+    const afterFinalPoll = await prisma.canvasGenerationTask.findUnique({
+      where: { id: task.id },
+      select: { status: true },
+    });
+    if (afterFinalPoll?.status === "SUCCEEDED") {
+      delta.succeeded = 1;
+      return delta;
+    }
+    if (afterFinalPoll?.status === "FAILED") {
+      delta.failed = 1;
+      return delta;
+    }
+
+    const diagnosis = await probeCanvasSubmittedTaskAtTimeout({
+      task,
+      timeoutMin,
+      waitedMs: now - submittedTs,
+      finalPollError,
+    });
+
+    if (
+      diagnosis.cause === "vendor_already_succeeded" &&
+      diagnosis.videoUrl?.trim()
+    ) {
+      await applyCanvasVolcengineVideoResult(task.id, diagnosis.videoUrl);
+      const recovered = await prisma.canvasGenerationTask.findUnique({
+        where: { id: task.id },
+        select: { status: true },
+      });
+      if (recovered?.status === "SUCCEEDED") {
+        logKieEvent("warn", "[canvas] timeout probe recovered vendor success", {
+          taskId: task.id,
+          cause: diagnosis.cause,
+          vendorStatus: diagnosis.vendorStatus,
+        });
+        delta.succeeded = 1;
+        return delta;
+      }
+    }
+
+    logKieEvent("warn", "[canvas] task timeout", {
+      taskId: task.id,
+      nodeId: task.nodeId,
+      projectId: task.projectId,
+      kieTaskId: task.kieTaskId,
+      cause: diagnosis.cause,
+      vendorStatus: diagnosis.vendorStatus,
+      gatewayLogStatus: diagnosis.gatewayLogStatus,
+      timeoutMin,
+      waitedMs: now - submittedTs,
+      pollCount: task.pollCount,
+      finalPollError,
+      probeError: diagnosis.probeError,
+    });
+
+    const failFields = buildCanvasTimeoutFailFields(task, diagnosis);
+    const payload = taskInputPayload(task);
+    const gatewayLogId =
+      typeof payload?.gatewayLogId === "string"
+        ? payload.gatewayLogId.trim()
+        : "";
+    await prisma.canvasGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        status: "FAILED",
+        failCode: failFields.failCode,
+        failMessage: failFields.failMessage,
+        resultPayload: failFields.resultPayload,
+        lastPolledAt: new Date(),
+        pollCount: task.pollCount + 1,
+        completedAt: new Date(),
+      },
+    });
+    if (gatewayLogId) {
+      await failGatewayLogIfStillRunning({
+        gatewayLogId,
+        durationMs: now - submittedTs,
+        timeoutMin,
+        externalTaskId: task.kieTaskId,
+      });
+    }
+    delta.timedOut = 1;
+    return delta;
+  }
+
+  try {
+    const outcome = await pollOneSubmittedCanvasTask(task);
+    if (outcome === "succeeded") delta.succeeded = 1;
+    else if (outcome === "failed") delta.failed = 1;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logKieEvent("warn", "[canvas] poll iteration error", {
+      taskId: task.id,
+      msg,
+    });
+    await prisma.canvasGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        lastPolledAt: new Date(),
+        pollCount: task.pollCount + 1,
+        ...buildCanvasPollErrorPatch(task, msg),
+      },
+    });
+  }
+  return delta;
+}
+
 export async function runCanvasPollWorker(opts?: {
   /** 仅推进指定项目的任务（项目页 GET / 提交后按需 poll 用） */
   projectId?: string;
@@ -1128,7 +1291,7 @@ export async function runCanvasPollWorker(opts?: {
   const pendings = await prisma.canvasGenerationTask.findMany({
     where: { status: "PENDING", pollCount: { lt: RETRY_PENDING_LIMIT }, ...projectFilter },
     orderBy: { createdAt: "asc" },
-    take: POLL_BATCH,
+    take: getGenerationPollBatch(),
     include: { project: { select: { userId: true } } },
   });
   for (const task of pendings) {
@@ -1403,146 +1566,40 @@ export async function runCanvasPollWorker(opts?: {
     }
   }
 
-  // 2) SUBMITTED：查询 recordInfo
-  const submitted = await prisma.canvasGenerationTask.findMany({
-    where: { status: "SUBMITTED", kieTaskId: { not: null }, ...projectFilter },
-    orderBy: { lastPolledAt: { sort: "asc", nulls: "first" } },
-    take: POLL_BATCH,
-    include: { project: { select: { userId: true } } },
-  });
-  const now = Date.now();
-  for (const task of submitted) {
-    result.scanned++;
-    if (!task.kieTaskId) continue;
-    if (!shouldPollSubmittedNow(task)) continue;
+  // 2) SUBMITTED：并行 poll + 多轮扫描（全站 cron）；单项目仍单轮串行
+  const pollBatch = getGenerationPollBatch();
+  const scaledPoll = !opts?.projectId;
+  const deadline = scaledPoll
+    ? Date.now() + getGenerationPollTimeBudgetMs()
+    : Number.MAX_SAFE_INTEGER;
+  const maxPasses = scaledPoll ? getGenerationPollMaxPasses() : 1;
+  const concurrency = scaledPoll ? getGenerationPollConcurrency() : 1;
 
-    const timeoutMs = resolveCanvasSubmittedTaskTimeoutMs(task);
-    const timeoutMin = resolveCanvasSubmittedTaskTimeoutMin(task);
-    const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
-    if (now - submittedTs >= timeoutMs) {
-      let finalPollError: string | undefined;
-      try {
-        const outcome = await pollOneSubmittedCanvasTask(task);
-        if (outcome === "succeeded") {
-          result.succeeded++;
-          continue;
-        }
-        if (outcome === "failed") {
-          result.failed++;
-          continue;
-        }
-      } catch (e) {
-        finalPollError = e instanceof Error ? e.message : String(e);
-        logKieEvent("warn", "[canvas] final poll before timeout error", {
-          taskId: task.id,
-          msg: finalPollError,
-        });
-      }
+  for (let pass = 0; pass < maxPasses && Date.now() < deadline; pass++) {
+    const fetchSize = scaledPoll ? pollShardOverFetchSize(pollBatch) : pollBatch;
+    const candidates = await prisma.canvasGenerationTask.findMany({
+      where: { status: "SUBMITTED", kieTaskId: { not: null }, ...projectFilter },
+      orderBy: { lastPolledAt: { sort: "asc", nulls: "first" } },
+      take: fetchSize,
+      include: { project: { select: { userId: true } } },
+    });
+    const submitted = scaledPoll
+      ? selectPollShardTasks(candidates, pollBatch)
+      : candidates;
+    if (submitted.length === 0) break;
 
-      const afterFinalPoll = await prisma.canvasGenerationTask.findUnique({
-        where: { id: task.id },
-        select: { status: true },
-      });
-      if (afterFinalPoll?.status === "SUCCEEDED") {
-        result.succeeded++;
-        continue;
-      }
-      if (afterFinalPoll?.status === "FAILED") {
-        result.failed++;
-        continue;
-      }
-
-      const diagnosis = await probeCanvasSubmittedTaskAtTimeout({
-        task,
-        timeoutMin,
-        waitedMs: now - submittedTs,
-        finalPollError,
-      });
-
-      if (
-        diagnosis.cause === "vendor_already_succeeded" &&
-        diagnosis.videoUrl?.trim()
-      ) {
-        await applyCanvasVolcengineVideoResult(task.id, diagnosis.videoUrl);
-        const recovered = await prisma.canvasGenerationTask.findUnique({
-          where: { id: task.id },
-          select: { status: true },
-        });
-        if (recovered?.status === "SUCCEEDED") {
-          logKieEvent("warn", "[canvas] timeout probe recovered vendor success", {
-            taskId: task.id,
-            cause: diagnosis.cause,
-            vendorStatus: diagnosis.vendorStatus,
-          });
-          result.succeeded++;
-          continue;
-        }
-      }
-
-      logKieEvent("warn", "[canvas] task timeout", {
-        taskId: task.id,
-        nodeId: task.nodeId,
-        projectId: task.projectId,
-        kieTaskId: task.kieTaskId,
-        cause: diagnosis.cause,
-        vendorStatus: diagnosis.vendorStatus,
-        gatewayLogStatus: diagnosis.gatewayLogStatus,
-        timeoutMin,
-        waitedMs: now - submittedTs,
-        pollCount: task.pollCount,
-        finalPollError,
-        probeError: diagnosis.probeError,
-      });
-
-      const failFields = buildCanvasTimeoutFailFields(task, diagnosis);
-      const payload = taskInputPayload(task);
-      const gatewayLogId =
-        typeof payload?.gatewayLogId === "string"
-          ? payload.gatewayLogId.trim()
-          : "";
-      await prisma.canvasGenerationTask.update({
-        where: { id: task.id },
-        data: {
-          status: "FAILED",
-          failCode: failFields.failCode,
-          failMessage: failFields.failMessage,
-          resultPayload: failFields.resultPayload,
-          lastPolledAt: new Date(),
-          pollCount: task.pollCount + 1,
-          completedAt: new Date(),
-        },
-      });
-      if (gatewayLogId) {
-        await failGatewayLogIfStillRunning({
-          gatewayLogId,
-          durationMs: now - submittedTs,
-          timeoutMin,
-          externalTaskId: task.kieTaskId,
-        });
-      }
-      result.timedOut++;
-      continue;
-    }
-
-    try {
-      const outcome = await pollOneSubmittedCanvasTask(task);
-      if (outcome === "succeeded") result.succeeded++;
-      else if (outcome === "failed") result.failed++;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      logKieEvent("warn", "[canvas] poll iteration error", {
-        taskId: task.id,
-        msg,
-      });
-      await prisma.canvasGenerationTask.update({
-        where: { id: task.id },
-        data: {
-          lastPolledAt: new Date(),
-          pollCount: task.pollCount + 1,
-          ...buildCanvasPollErrorPatch(task, msg),
-        },
-      });
-    }
+    const tickNow = Date.now();
+    await mapWithConcurrency(
+      submitted,
+      async (task) => {
+        const d = await advanceOneSubmittedCanvasTask(task, tickNow);
+        result.scanned += d.scanned;
+        result.succeeded += d.succeeded;
+        result.failed += d.failed;
+        result.timedOut += d.timedOut;
+      },
+      concurrency,
+    );
   }
 
   return result;

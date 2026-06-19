@@ -46,6 +46,15 @@ describe("findAllMentionRangesInDisplay", () => {
     expect(hits.map((h) => h.item.id)).toEqual(["a", "b"]);
   });
 
+  it("lists duplicate same-label mentions (each gets inline thumb)", () => {
+    const display =
+      "画面中的人物 @图片 1 被铁链捆绑，血鬼魔王伸手攻击抓向 @图片 1";
+    const hits = findAllMentionRangesInDisplay(display, mentionables);
+    expect(hits).toHaveLength(2);
+    expect(hits.every((h) => h.item.id === "a")).toBe(true);
+    expect(hits[0]!.start).toBeLessThan(hits[1]!.start);
+  });
+
   it("matches canonical @<id> tokens", () => {
     const display = "你好 @<a> 和 @<b> 结尾";
     const hits = findAllMentionRangesInDisplay(display, mentionables);

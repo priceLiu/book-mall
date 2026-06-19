@@ -1555,6 +1555,7 @@ model StoryGenerationTask {
   updatedAt DateTime @updatedAt
 
   @@index([status, submittedAt])
+  @@index([status, lastPolledAt])
   @@index([projectId, kind])
   @@index([characterId])
   @@index([frameId])
@@ -2003,6 +2004,7 @@ model CanvasGenerationTask {
   updatedAt DateTime @updatedAt
 
   @@index([status, submittedAt])
+  @@index([status, lastPolledAt])
   @@index([projectId, nodeId])
   @@index([projectId, inputHash])
   @@index([providerId])

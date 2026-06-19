@@ -35,7 +35,12 @@ Pro2InputDockShell
 3. 用户编辑 → 每次 input 后 re-ensure（占位始终贴在 mention 末尾）
 4. `stripMentionThumbSlots` → `promptFromDisplay` → `@<id>`
 
-### 2.2 Code Review
+### 2.3 删除 @mention
+
+内联缩略图模式下 `@label` 文字被 mask 遮住，须 **Backspace / Delete 一次删掉整段**（`mention-inline-delete.ts`），含为 badge 预留的尾随空格；不可依赖逐字 Backspace。
+
+
+### 2.4 Code Review
 
 - [ ] 是否仍用 `getMentionRangeClientRect` + overlay 绝对定位贴图？→ **驳回**
 - [ ] mirror 是否硬编码 `break-words` 导致与 textarea 换行不一致？

@@ -8,9 +8,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { runPollWorker } from "@/lib/story/story-task-service";
 import { getStoryAiPollToken } from "@/lib/story/story-ai-constants";
+import { getGenerationPollMaxDurationSec } from "@/lib/generation/poll-config";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = getGenerationPollMaxDurationSec();
 
 export async function POST(request: NextRequest) {
   const expected = getStoryAiPollToken();
