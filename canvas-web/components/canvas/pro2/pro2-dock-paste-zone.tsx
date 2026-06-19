@@ -134,7 +134,7 @@ export function Pro2DockPasteZone({
   return (
     <div
       className={cn(
-        "pro2-dock-paste-zone transition-[box-shadow,outline-color] duration-150",
+        "pro2-dock-paste-zone flex min-h-0 flex-1 flex-col transition-[box-shadow,outline-color] duration-150",
         dragOver &&
           "rounded-2xl outline outline-2 outline-offset-0 outline-violet-400/55 ring-4 ring-violet-500/15",
       )}

@@ -24,6 +24,7 @@ import {
   isCanvasSelectionOnlyChange,
 } from "@/lib/canvas/canvas-node-changes";
 import { resolveLibtvFloatingDockSelection } from "@/lib/canvas/libtv-floating-dock-selection";
+import { cloneCanvasNodeData } from "@/lib/canvas/clone-node-data";
 import {
   isPro2StyledGroup,
   syncPro2MediaGroupZIndex,
@@ -57,6 +58,8 @@ import {
   type SnapGuideLine,
 } from "@/lib/canvas/canvas-drag-snap";
 import { onCanvasWheelCapture } from "@/lib/canvas/canvas-form-wheel";
+import { canvasNotify } from "@/lib/canvas/canvas-notify";
+import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
 import {
   allImageFilesFromDataTransfer,
   isEditablePasteTarget,
@@ -396,8 +399,41 @@ function FlowCanvasInner({
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<CanvasFlowNode>[]) => {
+      let rfChanges = changes;
+      const removeIds = changes
+        .filter(
+          (c): c is NodeChange & { type: "remove"; id: string } =>
+            c.type === "remove" && "id" in c && typeof c.id === "string",
+        )
+        .map((c) => c.id);
+      if (removeIds.length > 0) {
+        const { nodes, edges } = useCanvasStore.getState();
+        const validation = validateStoryPipelineDeletion(
+          removeIds,
+          nodes,
+          edges,
+        );
+        const allowed = new Set(
+          validation.ok
+            ? validation.allowedIds
+            : removeIds.filter((id) => !validation.blockedIds.includes(id)),
+        );
+        if (!validation.ok) {
+          canvasNotify({
+            title: "无法删除该节点",
+            message: validation.message,
+            variant: "error",
+          });
+        }
+        rfChanges = changes.filter(
+          (c) =>
+            c.type !== "remove" ||
+            ("id" in c && typeof c.id === "string" && allowed.has(c.id)),
+        );
+      }
+
       // 始终只更新本地 RF 状态 → 拖动每帧只重绘被拖节点，画面流畅
-      onRfNodesChange(changes);
+      onRfNodesChange(rfChanges);
       if (isCanvasInteractiveGeometryInProgress(changes)) {
         // 拖动 / 缩放过程中不写 zustand：避免每帧触发所有订阅 s.nodes 的节点重渲染
         // 终态（dragging:false / resizing:false）会在松手那帧落库
@@ -454,7 +490,7 @@ function FlowCanvasInner({
           syncLibtvFloatingDockPinFromRf();
           return;
         }
-        const geometryChanges = changes.filter((c) => c.type !== "select");
+        const geometryChanges = rfChanges.filter((c) => c.type !== "select");
         if (geometryChanges.length > 0) {
           storeOnNodesChange(geometryChanges);
         }
@@ -464,7 +500,7 @@ function FlowCanvasInner({
       deferStoreGraphSyncRef.current = false;
       setCanvasGeometryDragging(false);
       setCanvasDraggingNodeId(null);
-      storeOnNodesChange(changes);
+      storeOnNodesChange(rfChanges);
     },
     [
       onRfNodesChange,
@@ -1038,7 +1074,7 @@ function FlowCanvasInner({
             x: n.position.x + baseShift.x,
             y: n.position.y + baseShift.y,
           },
-          { ...n.data },
+          { ...cloneCanvasNodeData(n.data as Record<string, unknown>) },
         );
         idMap.set(n.id, newId);
       }

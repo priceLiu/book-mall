@@ -11,8 +11,13 @@ import {
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
 import { getActiveTenantContext } from "@/lib/tenant/context";
-import { pickProjectThumbnailUrl } from "@/lib/canvas/pick-project-thumbnail";
+import {
+  pickPersistableProjectThumbnailUrl,
+  pickProjectThumbnailUrl,
+} from "@/lib/canvas/pick-project-thumbnail";
 import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
+import { extractManagedOssObjectKey } from "@/lib/oss-delete-object";
+import { readOssEnv } from "@/lib/oss-client";
 
 export class CanvasProjectError extends Error {
   constructor(
@@ -57,11 +62,26 @@ export type CanvasProjectDetail = CanvasProjectSummary & {
   canvas: unknown;
 };
 
+function isTrustworthyStoredThumbnail(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  const cfg = readOssEnv();
+  if ("error" in cfg) {
+    return /myqcloud\.com/i.test(trimmed) || /aliyuncs\.com/i.test(trimmed);
+  }
+  return extractManagedOssObjectKey(trimmed, cfg) !== null;
+}
+
 function resolveThumbnailUrl(p: {
   thumbnailUrl: string;
   canvas: unknown;
 }): string {
   const stored = p.thumbnailUrl?.trim() ?? "";
+  const persistable = pickPersistableProjectThumbnailUrl(p.canvas);
+
+  if (persistable && (!stored || !isTrustworthyStoredThumbnail(stored))) {
+    return persistable;
+  }
   if (stored) return stored;
   return pickProjectThumbnailUrl(p.canvas);
 }

@@ -15,7 +15,7 @@ import {
   PRO2_TEXT_NODE_WIDTH,
 } from "./story-pro2-node-chrome";
 import { SBV1_VIDEO_ENGINE_HEIGHT, SBV1_VIDEO_ENGINE_WIDTH } from "./sbv1-node-chrome";
-import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
+import { buildSbv1VideoEngineNodeData } from "./sbv1-spawn-nodes";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 import { flowPositionAtViewportCenter } from "./viewport-placement";
 
@@ -184,11 +184,10 @@ export function spawnPro2ShortcutPreset(
     const videoId = store.addNode(
       "sbv1-video-engine",
       { x: center.x - totalW / 2, y },
-      {
-        ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
+      buildSbv1VideoEngineNodeData({
         label: "视频",
         pro2PresetKind: preset,
-      },
+      }),
     );
     const textId = store.addNode(
       "story-pro2-starter",
@@ -238,11 +237,10 @@ export function spawnPro2ShortcutPreset(
   const videoId = store.addNode(
     "sbv1-video-engine",
     { x: center.x - totalW / 2 + textW + gap, y },
-    {
-      ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
+    buildSbv1VideoEngineNodeData({
       label: "视频",
       pro2PresetKind: preset,
-    },
+    }),
   );
   if (!textId || !videoId) {
     return { groupId: null, focusNodeId: textId || videoId };

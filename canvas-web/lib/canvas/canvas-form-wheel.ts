@@ -19,8 +19,27 @@ export const CANVAS_BLOCK_NAV_GESTURE_SELECTOR =
 /** 需要保留原生滚动的区域（侧栏、弹层列表等） */
 export const CANVAS_NATIVE_SCROLL_SELECTOR = "[data-canvas-wheel-scroll]";
 
+/** LibTV 浮动 / 内嵌输入坞（prompt · @ 引用等） */
+export const LIBTV_INPUT_DOCK_SELECTOR = "[data-libtv-input-dock]";
+
+/** Dock 正文滚动区（textarea 自动增高，滚动条在此容器） */
+export const LIBTV_DOCK_SCROLL_SELECTOR = ".pro2-dock-scroll";
+
 function isHorizontalDominantWheel(nativeEvent: WheelEvent): boolean {
   return Math.abs(nativeEvent.deltaX) > Math.abs(nativeEvent.deltaY);
+}
+
+function normalizeWheelDeltaY(
+  nativeEvent: WheelEvent,
+  scrollEl: HTMLElement,
+): number {
+  let dy = nativeEvent.deltaY;
+  if (nativeEvent.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    dy *= 16;
+  } else if (nativeEvent.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    dy *= scrollEl.clientHeight || 240;
+  }
+  return dy;
 }
 
 export function isCanvasFormWheelTarget(target: EventTarget | null): boolean {
@@ -33,8 +52,14 @@ export function isCanvasNodeScrollWheelTarget(target: EventTarget | null): boole
   return !!target.closest(CANVAS_NODE_SCROLL_SELECTOR);
 }
 
+export function isLibtvInputDockWheelTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest(LIBTV_INPUT_DOCK_SELECTOR);
+}
+
 /** 滚轮不滚内容、交给 React Flow panOnScroll（与 textarea 相同策略） */
 export function isCanvasWheelScrollBlockTarget(target: EventTarget | null): boolean {
+  if (isLibtvInputDockWheelTarget(target)) return false;
   return (
     isCanvasFormWheelTarget(target) || isCanvasNodeScrollWheelTarget(target)
   );
@@ -50,6 +75,7 @@ export function isCanvasViewportWheelTarget(target: EventTarget | null): boolean
   if (!target.closest(CANVAS_VIEWPORT_WHEEL_ROOT)) return false;
   if (target.closest(".nowheel")) return false;
   if (target.closest(CANVAS_NATIVE_SCROLL_SELECTOR)) return false;
+  if (target.closest(LIBTV_INPUT_DOCK_SELECTOR)) return false;
   return true;
 }
 
@@ -59,6 +85,7 @@ export function shouldBlockCanvasViewportWheel(nativeEvent: WheelEvent): boolean
   if (!(target instanceof Element)) return false;
   if (nativeEvent.ctrlKey || nativeEvent.metaKey) return false;
   if (target.closest(CANVAS_NATIVE_SCROLL_SELECTOR)) return false;
+  if (target.closest(LIBTV_INPUT_DOCK_SELECTOR)) return false;
 
   const horizontal = isHorizontalDominantWheel(nativeEvent);
   const inEditor = isCanvasEditorWheelTarget(target);
@@ -69,6 +96,70 @@ export function shouldBlockCanvasViewportWheel(nativeEvent: WheelEvent): boolean
 
   if (!inViewport) return false;
   if (target.closest(".nowheel") && !horizontal) return false;
+  return true;
+}
+
+function resolveLibtvDockScrollEl(target: Element): HTMLElement | null {
+  const dock = target.closest(LIBTV_INPUT_DOCK_SELECTOR);
+  if (dock) {
+    const ta = target.closest("textarea");
+    if (ta && dock.contains(ta) && ta.scrollHeight > ta.clientHeight + 1) {
+      return ta;
+    }
+  }
+
+  const direct = target.closest(
+    LIBTV_DOCK_SCROLL_SELECTOR,
+  ) as HTMLElement | null;
+  if (direct) return direct;
+  return (
+    (dock?.querySelector(LIBTV_DOCK_SCROLL_SELECTOR) as HTMLElement | null) ??
+    null
+  );
+}
+
+/**
+ * LibTV 输入坞：手动滚动 `.pro2-dock-scroll`（textarea 无内滚，滚轮不会自动冒泡到父级）。
+ * 须在画布 capture 最前执行并 stopPropagation，避免 React Flow panOnScroll 抢事件。
+ * @returns 是否已消费该 wheel 事件
+ */
+export function handleLibtvDockWheelScroll(nativeEvent: WheelEvent): boolean {
+  const { target } = nativeEvent;
+  if (!(target instanceof Element)) return false;
+  if (!target.closest(LIBTV_INPUT_DOCK_SELECTOR)) return false;
+  if (nativeEvent.ctrlKey || nativeEvent.metaKey) return false;
+
+  const scrollEl = resolveLibtvDockScrollEl(target);
+  if (!scrollEl) return false;
+
+  const absX = Math.abs(nativeEvent.deltaX);
+  const absY = Math.abs(nativeEvent.deltaY);
+  if (absY < 1 || absY <= absX) return false;
+
+  const maxScroll = scrollEl.scrollHeight - scrollEl.clientHeight;
+  if (maxScroll <= 0.5) return false;
+
+  const dy = normalizeWheelDeltaY(nativeEvent, scrollEl);
+  const prevTop = scrollEl.scrollTop;
+  const nextTop = Math.max(0, Math.min(maxScroll, prevTop + dy));
+  scrollEl.scrollTop = nextTop;
+
+  const atTop = prevTop <= 0.5;
+  const atBottom = prevTop >= maxScroll - 0.5;
+  const scrollingUp = dy < 0;
+  const scrollingDown = dy > 0;
+  const moved = Math.abs(nextTop - prevTop) > 0.5;
+
+  // 顶/底继续滚：交给画布平移
+  if (!moved && ((atTop && scrollingUp) || (atBottom && scrollingDown))) {
+    return false;
+  }
+
+  nativeEvent.preventDefault();
+  nativeEvent.stopPropagation();
+  if (typeof nativeEvent.stopImmediatePropagation === "function") {
+    nativeEvent.stopImmediatePropagation();
+  }
   return true;
 }
 
@@ -91,6 +182,7 @@ export function blockCanvasViewportWheelNavigation(nativeEvent: WheelEvent): voi
 }
 
 export function handleCanvasWheel(nativeEvent: WheelEvent): void {
+  if (handleLibtvDockWheelScroll(nativeEvent)) return;
   blockCanvasFormWheelScroll(nativeEvent);
   blockCanvasViewportWheelNavigation(nativeEvent);
 }
@@ -99,7 +191,14 @@ export function onCanvasFormWheel(e: ReactWheelEvent<HTMLElement>): void {
   handleCanvasWheel(e.nativeEvent);
 }
 
-/** 画布容器 capture：表单 + 视口平移 */
+/** scroll 容器 onWheelCapture 双保险（主逻辑在 {@link handleCanvasWheel}） */
+export function onLibtvDockScrollWheelCapture(
+  e: ReactWheelEvent<HTMLElement>,
+): void {
+  handleLibtvDockWheelScroll(e.nativeEvent);
+}
+
+/** 画布容器 capture：Dock 滚动优先，其次表单 + 视口平移 */
 export const onCanvasWheelCapture = onCanvasFormWheel;
 
 /** @deprecated 使用 {@link onCanvasWheelCapture} */

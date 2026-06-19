@@ -54,6 +54,7 @@ type MirrorSync = {
 function syncMirrorStyles(
   textarea: HTMLTextAreaElement,
   mirror: HTMLDivElement,
+  scrollOverride?: { top: number; left: number },
 ): MirrorSync {
   const computed = window.getComputedStyle(textarea);
   const style = mirror.style;
@@ -74,8 +75,8 @@ function syncMirrorStyles(
   style.left = `${rect.left}px`;
   style.width = `${layoutW}px`;
   style.height = `${layoutH}px`;
-  mirror.scrollTop = textarea.scrollTop;
-  mirror.scrollLeft = textarea.scrollLeft;
+  mirror.scrollTop = scrollOverride?.top ?? textarea.scrollTop;
+  mirror.scrollLeft = scrollOverride?.left ?? textarea.scrollLeft;
   return { scaleX, scaleY, originLeft: rect.left, originTop: rect.top };
 }
 
@@ -101,11 +102,20 @@ export function disposeTextareaCaretMirror(textarea: HTMLTextAreaElement): void 
 export function getTextareaCaretClientRect(
   textarea: HTMLTextAreaElement,
   position: number,
+  options?: { measureScrollTop?: number; measureScrollLeft?: number },
 ): TextareaCaretClientRect | null {
   if (position < 0) return null;
 
   const mirror = getMirror(textarea);
-  const { scaleY } = syncMirrorStyles(textarea, mirror);
+  const scrollOverride =
+    options?.measureScrollTop !== undefined ||
+    options?.measureScrollLeft !== undefined
+      ? {
+          top: options.measureScrollTop ?? textarea.scrollTop,
+          left: options.measureScrollLeft ?? textarea.scrollLeft,
+        }
+      : undefined;
+  const { scaleY } = syncMirrorStyles(textarea, mirror, scrollOverride);
   const computed = window.getComputedStyle(textarea);
 
   const clamped = Math.min(position, textarea.value.length);

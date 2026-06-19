@@ -4,16 +4,17 @@ import type { ReactNode } from "react";
 import { Download, Play, RefreshCw } from "lucide-react";
 
 import { SaveVideoToLibraryButton } from "@/components/canvas/save-video-to-library-button";
-import { LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
+import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library-types";
 import { cn } from "@/lib/utils";
 
 const SLOT_DOWNLOAD_BTN =
   "nodrag absolute z-20 inline-flex size-11 items-center justify-center rounded-full border border-white/30 bg-black/70 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/90 hover:scale-105";
 
-/** 与分镜视频列 StoryVideoRowSlot 一致：原生 video 缩略 + 居中播放钮，点击由父级弹层播放 */
+/** 与分镜视频列 StoryVideoRowSlot 一致：默认封面图，点击播放再加载 mp4 */
 export function CanvasVideoPreviewSlot({
   videoUrl,
+  posterUrl,
   generating,
   onPreview,
   downloadHref,
@@ -25,6 +26,7 @@ export function CanvasVideoPreviewSlot({
   saveToLibrary,
 }: {
   videoUrl?: string;
+  posterUrl?: string;
   generating?: boolean;
   onPreview?: () => void;
   downloadHref?: string;
@@ -33,10 +35,10 @@ export function CanvasVideoPreviewSlot({
   className?: string;
   emptyIcon?: ReactNode;
   emptyMessage?: string;
-  /** 画布视频节点 · 保存到我的视频库 */
   saveToLibrary?: Omit<SaveVideoToLibraryInput, "sourceUrl"> | null;
 }) {
   const hasVideo = Boolean(videoUrl);
+  const displayPoster = posterUrl?.trim();
 
   return (
     <div
@@ -47,12 +49,22 @@ export function CanvasVideoPreviewSlot({
       )}
     >
       {hasVideo ? (
-        <LazyViewportVideo
-          src={videoUrl}
-          className="absolute inset-0"
-          videoClassName="object-cover object-center"
-          rootMargin="200px"
-        />
+        displayPoster ? (
+          <LazyViewportImage
+            src={displayPoster}
+            alt=""
+            className="absolute inset-0"
+            imgClassName="object-cover object-center"
+            rootMargin="200px"
+          />
+        ) : (
+          <LazyViewportVideo
+            src={videoUrl}
+            className="absolute inset-0"
+            videoClassName="object-cover object-center"
+            rootMargin="200px"
+          />
+        )
       ) : (
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-black/40" />
       )}

@@ -82,13 +82,23 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const promptCommitRef = useRef<MentionsTextareaCommitHandle | null>(null);
-  const [livePrompt, setLivePrompt] = useState(data.prompt ?? "");
+  const storedPrompt = useCanvasStore(
+    useCallback(
+      (s) =>
+        String(
+          (s.nodes.find((n) => n.id === nodeId)?.data as Sbv1VideoEngineNodeData | undefined)
+            ?.prompt ?? "",
+        ),
+      [nodeId],
+    ),
+  );
+  const [livePrompt, setLivePrompt] = useState(storedPrompt);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
-    setLivePrompt(data.prompt ?? "");
-  }, [data.prompt, nodeId]);
+    setLivePrompt(storedPrompt);
+  }, [storedPrompt, nodeId]);
 
   const smartMulti = data.referenceMode === "smart_multi";
   /** Dock 预估与财务后台一致：视频按 15s 封顶；智能多帧未设时长时也按 15s 展示 */
@@ -117,7 +127,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
 
   usePruneStaleDockMentions({
     nodeId,
-    prompt: livePrompt,
+    prompt: storedPrompt,
     mentionables,
     field: "prompt",
     updateNodeData,
@@ -282,7 +292,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
         footer={toolbar}
       >
         <div
-          className="relative min-h-0 overflow-visible"
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
           onDragOver={(e) => {
             e.preventDefault();
             setIsDragging(true);
@@ -306,6 +316,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             </div>
           ) : null}
           <MentionsTextarea
+            key={nodeId}
             className={cn(
               SBV1_CHAT_INPUT_TEXTAREA_CLASS,
               RF_FORM_CONTROL,
@@ -313,7 +324,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               PRO2_DOCK_TEXTAREA_INSET_CLASS,
             )}
             placeholder="描述你想生成的视频… 使用 @ 引用参考图，或粘贴/上传图片"
-            value={data.prompt ?? ""}
+            value={storedPrompt}
             mentionables={mentionables}
             disabled={isGenerating}
             rows={3}
@@ -331,17 +342,6 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
             mentionPickerEmptyHint="暂无已连接参考图，请先连线或上传图片。"
             mentionInlineThumb
             mentionEdition="sbv1"
-            onKeyDownCapture={(e) => {
-              if (
-                e.key === "Enter" &&
-                !e.shiftKey &&
-                !e.nativeEvent.isComposing &&
-                canSend
-              ) {
-                e.preventDefault();
-                void runWithCommittedPrompt();
-              }
-            }}
           />
         </div>
       </Pro2InputDockShell>

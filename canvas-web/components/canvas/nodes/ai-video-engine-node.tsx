@@ -92,6 +92,8 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
     pickTaskResultMediaUrl(succeeded[succeeded.length - 1] ?? {}) ??
     succeeded[succeeded.length - 1]?.ossUrl ??
     succeeded[succeeded.length - 1]?.ephemeralUrl;
+  const posterUrl =
+    d.runtime?.posterUrl ?? succeeded[succeeded.length - 1]?.posterUrl ?? undefined;
 
   const hasGenerated =
     Boolean(videoUrl) ||
@@ -264,6 +266,7 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
               <CanvasVideoPreviewSlot
                 className={REF_VIDEO_PREVIEW_CLASS}
                 videoUrl={videoUrl ?? undefined}
+                posterUrl={posterUrl ?? undefined}
                 downloadHref={videoUrl ?? undefined}
                 downloadFileName="ref-video.mp4"
                 generating={showGenerating}

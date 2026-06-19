@@ -16,6 +16,7 @@ import {
   SBV1_DEFAULT_IMAGE_NODE_DATA,
   SBV1_DEFAULT_VIDEO_ENGINE_DATA,
 } from "./sbv1-workspace-types";
+import { cloneCanvasNodeData } from "./clone-node-data";
 import type { CanvasFlowEdge, CanvasFlowNode, CanvasNodeType } from "./types";
 
 const GAP = 48;
@@ -24,8 +25,17 @@ export function buildSbv1ImageNodeData(
   overrides?: Record<string, unknown>,
 ): Record<string, unknown> {
   return {
-    ...SBV1_DEFAULT_IMAGE_NODE_DATA,
-    ...overrides,
+    ...cloneCanvasNodeData(SBV1_DEFAULT_IMAGE_NODE_DATA),
+    ...cloneCanvasNodeData(overrides),
+  };
+}
+
+export function buildSbv1VideoEngineNodeData(
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...cloneCanvasNodeData(SBV1_DEFAULT_VIDEO_ENGINE_DATA),
+    ...cloneCanvasNodeData(overrides),
   };
 }
 
@@ -195,9 +205,7 @@ export function spawnSbv1NeighborFromNode(
   }
 
   if (nodeType === "sbv1-video-engine") {
-    const newId = addNode("sbv1-video-engine", { x, y }, {
-      ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
-    });
+    const newId = addNode("sbv1-video-engine", { x, y }, buildSbv1VideoEngineNodeData());
     if (!newId) return "";
     const edge =
       self.type === "sbv1-image"
@@ -241,7 +249,7 @@ export function spawnSbv1VideoEngineFromGroup(
     "sbv1-video-engine",
     groupId,
     { x: 0, y: 0 },
-    { ...SBV1_DEFAULT_VIDEO_ENGINE_DATA },
+    buildSbv1VideoEngineNodeData(),
   );
   if (!engineId) return "";
 

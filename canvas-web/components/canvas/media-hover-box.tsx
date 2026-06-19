@@ -29,6 +29,8 @@ export type MediaHoverBoxProps = {
   onUpload?: () => void;
   /** 拖入图片文件时回调（与 onUpload 互补） */
   onImageFile?: (file: File) => void;
+  /** 视频节点首帧封面；有则 Stage 只展示 JPEG，不预加载 mp4 */
+  posterUrl?: string;
   alt?: string;
   className?: string;
   placeholder?: ReactNode;
@@ -56,6 +58,7 @@ const OVERLAY_ICON_BTN_LG =
 
 export function MediaHoverBox({
   src,
+  posterUrl,
   mediaKind,
   variant = "generated",
   onUpload,
@@ -136,7 +139,23 @@ export function MediaHoverBox({
         }}
       >
         {src && mediaActive ? (
-          kind === "video" ? (
+          kind === "video" && posterUrl?.trim() ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={posterUrl}
+              alt={alt}
+              loading="lazy"
+              decoding="async"
+              className={
+                naturalSize
+                  ? "block w-full"
+                  : fit === "cover"
+                    ? "h-full w-full object-cover"
+                    : "h-full w-full object-contain"
+              }
+              draggable={false}
+            />
+          ) : kind === "video" ? (
             <video
               src={src}
               className={

@@ -12,6 +12,7 @@ import {
   buildStyleLibraryOssKey,
   type CanvasOssKind,
 } from "./canvas-constants";
+import { extractVideoFirstFrameJpeg } from "./video-poster-ffmpeg";
 
 const MAX_IMAGE_BYTES = 30 * 1024 * 1024; // 30MB
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB
@@ -167,6 +168,55 @@ export async function persistCanvasKieResultToOss(args: {
   throw lastError instanceof Error
     ? lastError
     : new Error(String(lastError ?? "persistCanvasKieResultToOss failed"));
+}
+
+/** 视频落 OSS 并尝试 ffmpeg 截首帧封面（JPEG → node-image）。 */
+export async function persistCanvasVideoResultToOss(args: {
+  ephemeralUrl: string;
+  projectId?: string;
+  userId?: string;
+}): Promise<{ videoUrl: string; posterUrl?: string }> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const cfg = cfgRaw;
+
+  const dl = await downloadToBuffer(args.ephemeralUrl, MAX_VIDEO_BYTES);
+  const ext = dl.ext || "mp4";
+  const videoKey = buildCanvasOssKey("node-video", {
+    projectId: args.projectId,
+    userId: args.userId,
+    ext,
+  });
+  const videoUrl = await uploadBufferToOss({
+    cfg,
+    key: videoKey,
+    buf: dl.buf,
+    contentType: dl.contentType || "video/mp4",
+  });
+
+  let posterUrl: string | undefined;
+  const frameBuf = await extractVideoFirstFrameJpeg(dl.buf);
+  if (frameBuf) {
+    try {
+      const posterKey = buildCanvasOssKey("node-image", {
+        projectId: args.projectId,
+        userId: args.userId,
+        ext: "jpg",
+      });
+      posterUrl = await uploadBufferToOss({
+        cfg,
+        key: posterKey,
+        buf: frameBuf,
+        contentType: "image/jpeg",
+      });
+    } catch {
+      /* 封面失败不阻断视频 */
+    }
+  }
+
+  return { videoUrl, posterUrl };
 }
 
 /** 直接上传 buffer（TTS 等同步生成）。 */

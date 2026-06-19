@@ -19,16 +19,26 @@ import {
 } from "react";
 
 import { RF_FORM_CONTROL } from "@/lib/canvas/react-flow-classes";
+import {
+  handleLibtvDockWheelScroll,
+  LIBTV_INPUT_DOCK_SELECTOR,
+} from "@/lib/canvas/canvas-form-wheel";
+import { isLibtvDockTextarea } from "@/lib/canvas/dock-textarea-layout";
+import { PRO2_DOCK_TEXTAREA_SCROLL_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { cn } from "@/lib/utils";
 import { disposeTextareaCaretMirror } from "@/lib/canvas/textarea-caret-rect";
 import { useDeferredTextCommit } from "@/lib/canvas/use-deferred-text-commit";
 import {
   ensureInlineThumbTextGaps,
+  mapDisplayIndexToRawIndex,
   stripMentionThumbSlots,
   MENTION_THUMB_PAD_CHAR,
   MENTION_THUMB_SLOT_CHAR,
 } from "@/lib/canvas/mention-inline-thumb-placeholder";
-import { findMentionRangeAtDisplayIndex } from "@/lib/canvas/mention-at-display-index";
+import {
+  findAllMentionRangesInDisplay,
+  findMentionRangeAtDisplayIndex,
+} from "@/lib/canvas/mention-at-display-index";
 import { resolveInlineMentionDelete } from "@/lib/canvas/mention-inline-delete";
 import {
   getMentionRangeClientRect,
@@ -80,7 +90,7 @@ export type MentionsTextareaProps = {
   mentionInlineThumbHoverOnText?: boolean;
   /** mentionInlineThumb 边框色 · pro2 紫 / sbv1 cyan */
   mentionEdition?: "pro2" | "sbv1";
-  /** 提交前 flush 本地 draft（生成按钮 / Enter 发送） */
+  /** 提交前 flush 本地 draft（生成按钮点击时） */
   commitHandleRef?: Ref<MentionsTextareaCommitHandle>;
 };
 
@@ -185,6 +195,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
     );
     const mentionAnchorRef = useRef<MentionAnchor | null>(null);
     const pendingCaretRef = useRef<number | null>(null);
+    const [libtvDockScroll, setLibtvDockScroll] = useState(false);
     const hoverRafRef = useRef<number | null>(null);
     const hoverIdRef = useRef<string | null>(null);
     const [popoverOpen, setPopoverOpen] = useState(false);
@@ -256,6 +267,9 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
 
     const setRef = (el: HTMLTextAreaElement | null) => {
       innerRef.current = el;
+      if (el) {
+        setLibtvDockScroll(isLibtvDockTextarea(el));
+      }
       if (typeof ref === "function") ref(el);
       else if (ref) (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
     };
@@ -274,6 +288,14 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       if (popoverIndex >= filtered.length) setPopoverIndex(0);
     }, [filtered.length, popoverIndex]);
 
+    const scheduleInlineThumbRemeasure = useCallback(() => {
+      if (!inlineThumbEnabled) return;
+      inlineThumbMirrorRef.current?.remeasure();
+      requestAnimationFrame(() => {
+        inlineThumbMirrorRef.current?.remeasure();
+      });
+    }, [inlineThumbEnabled]);
+
     useLayoutEffect(() => {
       const pos = pendingCaretRef.current;
       const el = innerRef.current;
@@ -281,14 +303,15 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       const clamped = Math.min(Math.max(0, pos), el.value.length);
       el.setSelectionRange(clamped, clamped);
       pendingCaretRef.current = null;
+      scheduleInlineThumbRemeasure();
     });
 
     useLayoutEffect(() => {
       const el = innerRef.current;
-      if (!el) return;
+      if (!el || fillHeight || libtvDockScroll) return;
       el.style.height = "auto";
       el.style.height = `${el.scrollHeight}px`;
-    }, [displayValue]);
+    }, [displayValue, fillHeight, libtvDockScroll]);
 
     const closePopover = () => {
       setPopoverOpen(false);
@@ -330,13 +353,36 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         let next = `${display.slice(0, start)}${token}${display.slice(end)}`;
         if (inlineThumbEnabled) {
           next = ensureInlineThumbTextGaps(next, mentionables);
+          const cleanNext = stripMentionThumbSlots(next);
+          const inserted = findAllMentionRangesInDisplay(cleanNext, mentionables)
+            .filter((r) => r.item.id === item.id && r.start >= start - 2)
+            .sort((a, b) => a.start - b.start)[0];
+          if (inserted) {
+            let caretInClean = inserted.end;
+            if (token.endsWith(" ")) caretInClean += 1;
+            pendingCaretRef.current =
+              cleanNext.length === next.length
+                ? caretInClean
+                : mapDisplayIndexToRawIndex(next, caretInClean);
+          } else {
+            pendingCaretRef.current = start + token.length;
+          }
+        } else {
+          pendingCaretRef.current = start + token.length;
         }
-        pendingCaretRef.current = start + token.length;
         setDisplayDraft(next);
         flushEmit(next);
         closePopover();
+        scheduleInlineThumbRemeasure();
       },
-      [displayValue, flushEmit, inlineThumbEnabled, mentionables, setDisplayDraft],
+      [
+        displayValue,
+        flushEmit,
+        inlineThumbEnabled,
+        mentionables,
+        scheduleInlineThumbRemeasure,
+        setDisplayDraft,
+      ],
     );
 
     const onTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -424,6 +470,22 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
         e.preventDefault();
         closePopover();
       }
+    };
+
+    const handleKeyDownCapture = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      const inLibtvDock =
+        libtvDockScroll ||
+        Boolean(innerRef.current?.closest(LIBTV_INPUT_DOCK_SELECTOR));
+      if (
+        inLibtvDock &&
+        e.key === "Enter" &&
+        !popoverOpen &&
+        !e.nativeEvent.isComposing
+      ) {
+        // Dock 内 Enter 换行；阻止冒泡，避免触达画布层快捷键/生成逻辑
+        e.stopPropagation();
+      }
+      onKeyDownCapture?.(e);
     };
 
     const clearHoverPreview = useCallback(() => {
@@ -556,31 +618,52 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       [],
     );
 
-    const resolvedTextareaClassName =
+    useEffect(() => {
+      const el = innerRef.current;
+      if (!el?.closest(LIBTV_INPUT_DOCK_SELECTOR)) return;
+      const onWheel = (e: WheelEvent) => {
+        handleLibtvDockWheelScroll(e);
+      };
+      el.addEventListener("wheel", onWheel, { capture: true, passive: false });
+      return () => {
+        el.removeEventListener("wheel", onWheel, { capture: true });
+      };
+    }, []);
+
+    const stretchInParent = fillHeight || libtvDockScroll;
+
+    const resolvedTextareaClassName = cn(
       className ??
-      `${RF_FORM_CONTROL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none${fillHeight ? " min-h-0 flex-1 h-full overflow-y-auto" : ""}`;
+        `${RF_FORM_CONTROL} w-full resize-none overflow-hidden rounded-md border border-white/10 bg-black/30 p-2 font-mono text-[10px] leading-snug text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none${stretchInParent ? " min-h-0 flex-1 h-full overflow-y-auto" : ""}`,
+      libtvDockScroll && PRO2_DOCK_TEXTAREA_SCROLL_CLASS,
+    );
 
     return (
       <div
         ref={wrapperRef}
         className={
           wrapperClassName
-            ? `relative overflow-visible ${fillHeight ? "flex h-full min-h-0 flex-col " : ""}${wrapperClassName}`
-            : `relative overflow-visible${fillHeight ? " flex h-full min-h-0 flex-col" : ""}`
+            ? `relative overflow-visible ${stretchInParent ? "flex h-full min-h-0 flex-1 flex-col " : ""}${wrapperClassName}`
+            : `relative overflow-visible${stretchInParent ? " flex h-full min-h-0 flex-1 flex-col" : ""}`
         }
       >
-        <div className={cn("relative", fillHeight && "flex min-h-0 flex-1 flex-col")}>
+        <div
+          className={cn(
+            "relative",
+            stretchInParent && "flex min-h-0 flex-1 flex-col",
+          )}
+        >
           <textarea
             ref={setRef}
             value={displayValue}
             onChange={onTextChange}
             onKeyDown={onKeyDown}
-            onKeyDownCapture={onKeyDownCapture}
+            onKeyDownCapture={handleKeyDownCapture}
             onPaste={onPaste}
             onFocus={() => {
               onDraftFocus();
-              if (!inlineThumbEnabled) return;
               const el = innerRef.current;
+              if (!inlineThumbEnabled) return;
               if (!el) return;
               let cleaned = stripMentionThumbSlots(el.value);
               cleaned = ensureInlineThumbTextGaps(cleaned, mentionables);
@@ -603,7 +686,7 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
             onMouseMove={onMouseMove}
             onMouseLeave={onMouseLeave}
             autoFocus={autoFocus}
-            rows={fillHeight ? 1 : rows}
+            rows={stretchInParent ? 1 : rows}
             placeholder={placeholder}
             disabled={disabled}
             aria-label={ariaLabel}

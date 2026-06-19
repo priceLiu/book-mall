@@ -9,9 +9,8 @@ import {
   spawnPro2ScriptHubFromSource,
 } from "./pro2-spawn-nodes";
 import { selectPro2NodeAfterSpawn } from "./pro2-spawn-select";
-import { selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
+import { selectSbv1NodeAfterSpawn, buildSbv1VideoEngineNodeData } from "./sbv1-spawn-nodes";
 import { SBV1_VIDEO_ENGINE_WIDTH } from "./sbv1-node-chrome";
-import { SBV1_DEFAULT_VIDEO_ENGINE_DATA } from "./sbv1-workspace-types";
 import {
   PRO2_CHARACTER_THREE_VIEW_HEIGHT,
   PRO2_CHARACTER_THREE_VIEW_WIDTH,
@@ -178,9 +177,7 @@ export function spawnLibtvNeighborFromAnchor(
   }
 
   if (nodeType === "sbv1-video-engine") {
-    const newId = addNode("sbv1-video-engine", { x, y }, {
-      ...SBV1_DEFAULT_VIDEO_ENGINE_DATA,
-    });
+    const newId = addNode("sbv1-video-engine", { x, y }, buildSbv1VideoEngineNodeData());
     if (!newId) return "";
     if (canRefVideoFromAnchor(anchor) && side === "right") {
       pushEdge(setEdges, {

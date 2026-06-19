@@ -95,6 +95,7 @@ export function Pro2CanvasLayout({
         pro2FloatingInspector
       />
       <Pro2CanvasToolbar
+        projectId={projectId}
         onOpenStyleLibrary={() => {
           setPro2StyleLibImageNodeId(null);
           setStyleLibOpen(true);

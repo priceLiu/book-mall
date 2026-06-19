@@ -6,6 +6,7 @@ import { Loader2, Copy, Plus, Trash2, X } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { ProjectCoverMedia } from "@/components/canvas/project-cover-media";
 import {
   createCanvasProject,
   deleteCanvasProject,
@@ -604,21 +605,11 @@ function ProjectsSection({
             >
               <Link href={`/canvas/${p.id}`} className="block">
                 <div className="aspect-video overflow-hidden rounded-xl bg-gradient-to-br from-[var(--canvas-accent)]/15 to-[var(--canvas-surface-2)]">
-                  {p.thumbnailUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={p.thumbnailUrl}
-                      alt={p.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full flex-col items-center justify-center text-[var(--canvas-muted)]">
-                      <span className="text-3xl font-light text-white/25">
-                        {p.name.slice(0, 1) || "画"}
-                      </span>
-                      <span className="mt-1 text-[10px] text-white/30">等待出图</span>
-                    </div>
-                  )}
+                  <ProjectCoverMedia
+                    url={p.thumbnailUrl}
+                    alt={p.name}
+                    placeholderLetter={p.name}
+                  />
                 </div>
                 <ProjectNameEditor
                   name={p.name}

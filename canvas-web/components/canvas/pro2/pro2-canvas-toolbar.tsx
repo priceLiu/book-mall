@@ -26,12 +26,14 @@ import { Pro2AddNodePopover } from "./pro2-add-node-popover";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 
 export type Pro2CanvasToolbarProps = {
+  projectId: string;
   onOpenStyleLibrary?: () => void;
   onOpenMyHistory?: () => void;
 };
 
 /** 2.0 画布底部 Dock · 与分镜 1.0 同款四色磁吸图标；功能保持 Pro2 菜单/快捷添加 */
 export function Pro2CanvasToolbar({
+  projectId,
   onOpenStyleLibrary,
   onOpenMyHistory,
 }: Pro2CanvasToolbarProps) {
@@ -186,7 +188,7 @@ export function Pro2CanvasToolbar({
 
   return (
     <>
-      <LibtvCanvasDockBarSlot storageKey="pro2" dockRef={dockBarRef}>
+      <LibtvCanvasDockBarSlot storageKey={`pro2:${projectId}`} dockRef={dockBarRef}>
         <Sbv1Dock items={dockItems} />
       </LibtvCanvasDockBarSlot>
       <input
