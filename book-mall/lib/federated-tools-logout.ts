@@ -20,8 +20,7 @@ export function shouldUseFederatedToolsLogoutChain(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-/** 退出时须逐站清除 `tools_token` 的子应用 Origin（去重、稳定顺序）。 */
-export function listFederatedToolsLogoutOrigins(): string[] {
+function listAllFederatedToolsLogoutCandidates(): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   const candidates = [
@@ -38,6 +37,49 @@ export function listFederatedToolsLogoutOrigins(): string[] {
     out.push(o);
   }
   return out;
+}
+
+function parseExplicitFederatedLogoutOrigins(raw: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const o = trimOrigin(part);
+    if (!o || seen.has(o)) continue;
+    seen.add(o);
+    out.push(o);
+  }
+  return out;
+}
+
+/** 生产默认仅 tool + canvas（均已上线 federated logout）；其余子站发版后写入 env。 */
+function listProductionDefaultFederatedLogoutOrigins(): string[] {
+  const ready = new Set(
+    [getToolsPublicOrigin(), getCanvasWebOrigin()]
+      .map(trimOrigin)
+      .filter(Boolean) as string[],
+  );
+  return listAllFederatedToolsLogoutCandidates().filter((o) => ready.has(o));
+}
+
+/** 退出时须逐站清除 `tools_token` 的子应用 Origin（去重、稳定顺序）。 */
+export function listFederatedToolsLogoutOrigins(): string[] {
+  const explicit = process.env.FEDERATED_TOOLS_LOGOUT_ORIGINS?.trim();
+  if (explicit) return parseExplicitFederatedLogoutOrigins(explicit);
+  if (process.env.NODE_ENV === "production") {
+    return listProductionDefaultFederatedLogoutOrigins();
+  }
+  return listAllFederatedToolsLogoutCandidates();
+}
+
+/**
+ * federated logout 链上的子站跳转 URL。
+ * 使用 `/api/tools-session?federated_logout=1`（各子站均已部署），避免依赖较新的 `/api/tools-logout`。
+ */
+export function buildToolsLogoutHopUrl(origin: string, nextStepUrl: string): string {
+  const hop = new URL("/api/tools-session", origin.replace(/\/$/, ""));
+  hop.searchParams.set("federated_logout", "1");
+  hop.searchParams.set("next", nextStepUrl);
+  return hop.toString();
 }
 
 /**

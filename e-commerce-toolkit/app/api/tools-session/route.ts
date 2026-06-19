@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getMainSiteOrigin } from "@/lib/site-origin";
+import {
+  isToolsFederatedLogoutRequest,
+  respondToolsFederatedLogout,
+} from "@/lib/tools-federated-logout";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +23,11 @@ function readJwtExp(token: string): number | null {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (isToolsFederatedLogoutRequest(request)) {
+    return respondToolsFederatedLogout(request);
+  }
+
   const token = cookies().get("tools_token")?.value?.trim();
   const origin = getMainSiteOrigin();
   const tokenExpiresAt = token ? readJwtExp(token) : null;
