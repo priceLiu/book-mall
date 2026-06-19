@@ -12,7 +12,23 @@ function shouldStreamProxyResponse(contentType: string, path: string): boolean {
   return false;
 }
 
-async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
+function bookMallRouteMissingResponse(path: string, status: number) {
+  return NextResponse.json(
+    {
+      error: "book_mall_route_missing",
+      message:
+        `主站 book-mall 未提供 /${path}（HTTP ${status}）。` +
+        "请部署含私域人像入库 API 的最新 book-mall，并执行 prisma migrate deploy。",
+      path: `/${path}`,
+    },
+    { status: 502 },
+  );
+}
+
+export async function proxyToBookMall(
+  request: NextRequest,
+  pathSegments: string[],
+) {
   const base = getBookMallBaseUrlServer();
   if (!base) {
     return NextResponse.json(
@@ -55,6 +71,13 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
       return new NextResponse(r.body, { status: r.status, headers: outHeaders });
     }
     const respBuf = await r.arrayBuffer();
+    const ctLower = contentType.toLowerCase();
+    if (
+      (r.status === 404 || r.status === 405) &&
+      ctLower.includes("text/html")
+    ) {
+      return bookMallRouteMissingResponse(path, r.status);
+    }
     return new NextResponse(respBuf, {
       status: r.status,
       headers: {

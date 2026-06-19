@@ -251,7 +251,7 @@ export function Sbv1PortraitLivenessModal({
                 />
               </div>
               <p className="text-center text-[12px] text-white/55">
-                请用手机扫码或打开链接，完成真人活体认证（约 2 分钟内有效）
+                请用手机扫码或打开链接，完成真人活体认证（BytedToken 30 分钟内有效）
               </p>
               <div className="flex flex-wrap gap-2">
                 <button

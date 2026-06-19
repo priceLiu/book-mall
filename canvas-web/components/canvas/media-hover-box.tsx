@@ -43,6 +43,8 @@ export type MediaHoverBoxProps = {
   initialView?: "single" | "compare";
   /** 悬停预览 Eye 尺寸 · 图片节点用 lg（约 2×） */
   previewIconSize?: "default" | "lg";
+  /** LibTV 图片节点：预览改在标题栏 Eye，Stage 不显示居中 Eye */
+  hidePreviewOverlay?: boolean;
 };
 
 /** 悬停 overlay · 仅图标（无黑底药丸、无文案）— 见 design.md §15.2 */
@@ -67,6 +69,7 @@ export function MediaHoverBox({
   prompt,
   initialView = "single",
   previewIconSize = "default",
+  hidePreviewOverlay = false,
 }: MediaHoverBoxProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -176,7 +179,7 @@ export function MediaHoverBox({
                 <Upload className={overlayIconClass} strokeWidth={1.75} />
               </button>
             ) : null}
-            {canPreview ? (
+            {canPreview && !hidePreviewOverlay ? (
               <button
                 type="button"
                 title="预览大图"

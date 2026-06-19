@@ -3,12 +3,6 @@
  */
 
 import { CanvasProjectError } from "./canvas-project-service";
-import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
-import { resolveGatewayAuthForBookUser } from "@/lib/gateway/book-gateway-link";
-import {
-  pickSbv1VolcengineCredentialId,
-  pickVolcengineCredentialForGatewayJob,
-} from "@/lib/gateway/volcengine-credential-pick";
 import {
   createRequestLog,
   finalizeRequestLog,
@@ -22,7 +16,7 @@ import {
   volcengineResolveOrCreateAigcGroup,
   type VolcenginePortraitAssetRecord,
 } from "@/lib/gateway/volcengine-portrait-actions";
-import { resolveVolcenginePortraitCredentials } from "@/lib/gateway/volcengine-portrait-credentials";
+import { resolveCanvasPortraitVolcengineCredential } from "./canvas-portrait-volcengine-credential";
 import { getSbv1PortraitLivenessStatus } from "./sbv1-portrait-liveness-service";
 
 export type CanvasPortraitKind = "virtual" | "real";
@@ -43,53 +37,8 @@ function isHttpsUrl(u: string): boolean {
 async function volcengineCredentialForUser(
   userId: string,
   clientPage: string,
-): Promise<{
-  gatewayUserId: string;
-  apiKeyId: string;
-  credentialId: string;
-  apiKey: string;
-  baseUrl: string | null;
-}> {
-  const auth = await resolveGatewayAuthForBookUser(userId);
-  if (!auth) {
-    throw new CanvasProjectError(
-      "GATEWAY_KEY_REQUIRED",
-      "请先在 Book 个人中心关联 Gateway API Key",
-      403,
-    );
-  }
-  const sbv1 = clientPage.includes("/sbv1");
-  const credentialId = sbv1
-    ? pickSbv1VolcengineCredentialId(auth.credentials)
-    : pickVolcengineCredentialForGatewayJob({
-        credentials: auth.credentials,
-        modelKey: "doubao-seedance-2.0",
-        clientPage,
-        input: null,
-        providerId: null,
-      });
-  if (!credentialId) {
-    throw new CanvasProjectError(
-      "GATEWAY_KEY_REQUIRED",
-      "Gateway Key 未绑定火山方舟（VOLCENGINE）凭证",
-      403,
-    );
-  }
-  const cred = await getDecryptedCredentialApiKey(credentialId);
-  if (!cred?.apiKey) {
-    throw new CanvasProjectError(
-      "GATEWAY_KEY_REQUIRED",
-      "火山方舟凭证不可用",
-      503,
-    );
-  }
-  return {
-    gatewayUserId: auth.userId,
-    apiKeyId: auth.id,
-    credentialId,
-    apiKey: cred.apiKey,
-    baseUrl: cred.baseUrl ?? null,
-  };
+) {
+  return resolveCanvasPortraitVolcengineCredential({ userId, clientPage });
 }
 
 function mapAssetToResult(
@@ -141,9 +90,8 @@ export async function importCanvasPortraitAsset(opts: {
       ? `canvas/${opts.projectId ?? "unknown"}/story-pro2`
       : `canvas/${opts.projectId ?? "unknown"}/sbv1`;
 
-  const { gatewayUserId, apiKeyId, credentialId, apiKey } =
+  const { gatewayUserId, apiKeyId, credentialId, portraitCredentials } =
     await volcengineCredentialForUser(opts.userId, clientPage);
-  const portraitCredentials = resolveVolcenginePortraitCredentials(apiKey);
 
   let groupId: string;
   if (opts.kind === "real") {
@@ -241,11 +189,10 @@ export async function getCanvasPortraitImportStatus(opts: {
     edition === "pro2"
       ? `canvas/${opts.projectId ?? "unknown"}/story-pro2`
       : `canvas/${opts.projectId ?? "unknown"}/sbv1`;
-  const { apiKey } = await volcengineCredentialForUser(
+  const { portraitCredentials } = await volcengineCredentialForUser(
     opts.userId,
     clientPage,
   );
-  const portraitCredentials = resolveVolcenginePortraitCredentials(apiKey);
   const asset = await volcengineGetPortraitAsset({
     credentials: portraitCredentials,
     assetId,

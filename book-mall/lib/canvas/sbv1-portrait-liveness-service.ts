@@ -1,16 +1,18 @@
 /**
  * 分镜视频 1.0 · 真人人像 H5 活体认证（经用户 Gateway VOLCENGINE 凭证）
  * GroupId 持久化在 Book User 账号级，与画布节点无关。
+ *
+ * 鉴权与私域虚拟人入库相同：Gateway「火山方舟 · 分镜视频1.0」凭证 → IAM AK/SK → open.volcengineapi.com
  */
 
 import { CanvasProjectError } from "./canvas-project-service";
 import { getBookMallOrigin } from "@/lib/gateway/env";
-import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import {
-  pickSbv1VolcengineCredentialId,
-  SBV1_VOLCENGINE_CREDENTIAL_ALIAS,
-} from "@/lib/gateway/volcengine-credential-pick";
-import { resolveGatewayAuthForBookUser } from "@/lib/gateway/book-gateway-link";
+  createRequestLog,
+  finalizeRequestLog,
+} from "@/lib/gateway/proxy-common";
+import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
+import { SBV1_VOLCENGINE_CREDENTIAL_ALIAS } from "@/lib/gateway/volcengine-credential-pick";
 import { prisma } from "@/lib/prisma";
 import {
   createVolcengineVisualValidateSession,
@@ -18,10 +20,15 @@ import {
   type VolcenginePortraitLivenessResult,
   type VolcenginePortraitLivenessSession,
 } from "@/lib/gateway/volcengine-portrait-liveness";
-import { resolveVolcenginePortraitCredentials } from "@/lib/gateway/volcengine-portrait-credentials";
+import {
+  resolveCanvasPortraitVolcengineCredential,
+  SBV1_PORTRAIT_LIVENESS_CLIENT_PAGE,
+} from "./canvas-portrait-volcengine-credential";
 import {
   getSbv1PortraitLivenessCallback,
+  getSbv1PortraitLivenessSessionOwner,
   saveSbv1PortraitLivenessCallback,
+  saveSbv1PortraitLivenessSession,
 } from "./sbv1-portrait-liveness-callback-store";
 
 export { SBV1_VOLCENGINE_CREDENTIAL_ALIAS };
@@ -31,6 +38,8 @@ export type Sbv1PortraitLivenessStatus = {
   groupId?: string;
   verifiedAt?: string;
 };
+
+const CLIENT_PAGE = SBV1_PORTRAIT_LIVENESS_CLIENT_PAGE;
 
 function buildCallbackUrl(): string {
   const origin = getBookMallOrigin();
@@ -42,34 +51,6 @@ function buildCallbackUrl(): string {
     );
   }
   return `${origin.replace(/\/$/, "")}/api/canvas/sbv1/portrait/liveness/callback`;
-}
-
-async function volcengineCredentialForUser(userId: string) {
-  const auth = await resolveGatewayAuthForBookUser(userId);
-  if (!auth) {
-    throw new CanvasProjectError(
-      "GATEWAY_KEY_REQUIRED",
-      "请先在 Book 个人中心关联 Gateway API Key（分镜视频 1.0 · Personal）",
-      403,
-    );
-  }
-  const credentialId = pickSbv1VolcengineCredentialId(auth.credentials);
-  if (!credentialId) {
-    throw new CanvasProjectError(
-      "GATEWAY_KEY_REQUIRED",
-      "Gateway Key 未绑定火山方舟（VOLCENGINE）凭证",
-      403,
-    );
-  }
-  const cred = await getDecryptedCredentialApiKey(credentialId);
-  if (!cred?.apiKey) {
-    throw new CanvasProjectError(
-      "GATEWAY_KEY_REQUIRED",
-      "火山方舟凭证不可用",
-      503,
-    );
-  }
-  return cred;
 }
 
 export async function getSbv1PortraitLivenessStatus(
@@ -108,17 +89,54 @@ async function saveSbv1PortraitLivenessSuccess(
 export async function sbv1CreatePortraitLivenessSession(
   userId: string,
 ): Promise<VolcenginePortraitLivenessSession & { expiresInSec: number }> {
-  const cred = await volcengineCredentialForUser(userId);
-  const portraitCredentials = resolveVolcenginePortraitCredentials(cred.apiKey);
+  const {
+    gatewayUserId,
+    apiKeyId,
+    credentialId,
+    portraitCredentials,
+  } = await resolveCanvasPortraitVolcengineCredential({
+    userId,
+    clientPage: CLIENT_PAGE,
+  });
+
   const callbackUrl = buildCallbackUrl();
+  const log = await createRequestLog({
+    userId: gatewayUserId,
+    actorBookUserId: userId,
+    apiKeyId,
+    credentialId,
+    clientPage: CLIENT_PAGE,
+    model: "portrait:liveness",
+    endpoint: "/canvas/sbv1/portrait/liveness/session",
+    providerKind: "VOLCENGINE",
+    requestKind: "OTHER",
+    clientSource: "CANVAS",
+    inputSummary: buildGatewayInputSummary("portrait:liveness", {
+      action: "CreateVisualValidateSession",
+      callbackUrl,
+    }),
+  });
+
+  const started = Date.now();
   try {
     const session = await createVolcengineVisualValidateSession({
       credentials: portraitCredentials,
       callbackUrl,
     });
-    return { ...session, expiresInSec: 120 };
+    saveSbv1PortraitLivenessSession(userId, session.bytedToken);
+    await finalizeRequestLog(log.id, {
+      status: "SUCCEEDED",
+      durationMs: Date.now() - started,
+      resultSummary: { hasH5Link: Boolean(session.h5Link) },
+    });
+    return { ...session, expiresInSec: 30 * 60 };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: Date.now() - started,
+      failMessage: msg.slice(0, 500),
+    });
     throw new CanvasProjectError("MODEL_NOT_AVAILABLE", msg, 502);
   }
 }
@@ -132,6 +150,22 @@ export async function sbv1PollPortraitLivenessResult(
     throw new CanvasProjectError("INVALID_INPUT", "缺少 bytedToken", 400);
   }
 
+  const sessionOwner = getSbv1PortraitLivenessSessionOwner(token);
+  if (sessionOwner && sessionOwner !== userId) {
+    throw new CanvasProjectError(
+      "FORBIDDEN",
+      "无权查询该活体会话",
+      403,
+    );
+  }
+  if (!sessionOwner && !getSbv1PortraitLivenessCallback(token)) {
+    throw new CanvasProjectError(
+      "INVALID_INPUT",
+      "活体会话已过期，请重新发起认证",
+      400,
+    );
+  }
+
   const callback = getSbv1PortraitLivenessCallback(token);
   if (callback?.resultCode && callback.resultCode !== "10000") {
     return {
@@ -141,16 +175,79 @@ export async function sbv1PollPortraitLivenessResult(
     };
   }
 
-  const cred = await volcengineCredentialForUser(userId);
-  const portraitCredentials = resolveVolcenginePortraitCredentials(cred.apiKey);
-  const result = await getVolcengineVisualValidateResult({
-    credentials: portraitCredentials,
-    bytedToken: token,
-  });
-  if (result.status === "succeeded" && result.groupId) {
-    await saveSbv1PortraitLivenessSuccess(userId, result.groupId);
+  // 文档要求：H5 完成且 resultCode=10000 后再调用 GetVisualValidateResult
+  if (!callback || callback.resultCode !== "10000") {
+    return {
+      status: "pending",
+      message: "等待 H5 活体认证完成",
+      raw: callback,
+    };
   }
-  return result;
+
+  const {
+    gatewayUserId,
+    apiKeyId,
+    credentialId,
+    portraitCredentials,
+  } = await resolveCanvasPortraitVolcengineCredential({
+    userId,
+    clientPage: CLIENT_PAGE,
+  });
+
+  const log = await createRequestLog({
+    userId: gatewayUserId,
+    actorBookUserId: userId,
+    apiKeyId,
+    credentialId,
+    clientPage: CLIENT_PAGE,
+    model: "portrait:liveness",
+    endpoint: "/canvas/sbv1/portrait/liveness/result",
+    providerKind: "VOLCENGINE",
+    requestKind: "OTHER",
+    clientSource: "CANVAS",
+    inputSummary: buildGatewayInputSummary("portrait:liveness", {
+      action: "GetVisualValidateResult",
+    }),
+  });
+
+  const started = Date.now();
+  try {
+    const result = await getVolcengineVisualValidateResult({
+      credentials: portraitCredentials,
+      bytedToken: token,
+    });
+    if (result.status === "succeeded" && result.groupId) {
+      await saveSbv1PortraitLivenessSuccess(userId, result.groupId);
+      await finalizeRequestLog(log.id, {
+        status: "SUCCEEDED",
+        durationMs: Date.now() - started,
+        resultSummary: { groupId: result.groupId },
+      });
+    } else if (result.status === "failed") {
+      await finalizeRequestLog(log.id, {
+        status: "FAILED",
+        durationMs: Date.now() - started,
+        failMessage: result.message?.slice(0, 500),
+      });
+    } else {
+      await finalizeRequestLog(log.id, {
+        status: "SUCCEEDED",
+        durationMs: Date.now() - started,
+        resultSummary: { status: "pending" },
+      });
+    }
+    return result;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await finalizeRequestLog(log.id, {
+      status: "FAILED",
+      durationMs: Date.now() - started,
+      failMessage: msg.slice(0, 500),
+    });
+    throw e instanceof CanvasProjectError
+      ? e
+      : new CanvasProjectError("UPSTREAM_ERROR", msg, 502);
+  }
 }
 
 export function sbv1RecordPortraitLivenessCallback(
