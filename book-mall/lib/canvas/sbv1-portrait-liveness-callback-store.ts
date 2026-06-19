@@ -1,5 +1,5 @@
 /**
- * 真人人像 H5 活体 · CallbackURL 回写缓存（进程内 TTL）
+ * 真人人像 H5 活体 · 会话与 CallbackURL 回写缓存（进程内 TTL）
  * 火山 H5 完成后跳转 CallbackURL 并携带 resultCode / bytedToken。
  */
 
@@ -9,15 +9,48 @@ export type Sbv1PortraitLivenessCallbackRecord = {
   receivedAt: string;
 };
 
-const TTL_MS = 10 * 60 * 1000;
-const store = new Map<string, Sbv1PortraitLivenessCallbackRecord>();
+export type Sbv1PortraitLivenessSessionRecord = {
+  userId: string;
+  bytedToken: string;
+  createdAt: string;
+};
+
+const TTL_MS = 35 * 60 * 1000;
+const callbackStore = new Map<string, Sbv1PortraitLivenessCallbackRecord>();
+const sessionStore = new Map<string, Sbv1PortraitLivenessSessionRecord>();
 
 function pruneExpired(now = Date.now()): void {
-  for (const [key, row] of store.entries()) {
+  for (const [key, row] of callbackStore.entries()) {
     if (now - new Date(row.receivedAt).getTime() > TTL_MS) {
-      store.delete(key);
+      callbackStore.delete(key);
     }
   }
+  for (const [key, row] of sessionStore.entries()) {
+    if (now - new Date(row.createdAt).getTime() > TTL_MS) {
+      sessionStore.delete(key);
+    }
+  }
+}
+
+export function saveSbv1PortraitLivenessSession(
+  userId: string,
+  bytedToken: string,
+): void {
+  const token = bytedToken.trim();
+  if (!token || !userId.trim()) return;
+  pruneExpired();
+  sessionStore.set(token, {
+    userId: userId.trim(),
+    bytedToken: token,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+export function getSbv1PortraitLivenessSessionOwner(
+  bytedToken: string,
+): string | null {
+  pruneExpired();
+  return sessionStore.get(bytedToken.trim())?.userId ?? null;
 }
 
 export function saveSbv1PortraitLivenessCallback(
@@ -27,7 +60,7 @@ export function saveSbv1PortraitLivenessCallback(
   const token = bytedToken.trim();
   if (!token) return;
   pruneExpired();
-  store.set(token, {
+  callbackStore.set(token, {
     bytedToken: token,
     resultCode: resultCode?.trim() || undefined,
     receivedAt: new Date().toISOString(),
@@ -38,5 +71,5 @@ export function getSbv1PortraitLivenessCallback(
   bytedToken: string,
 ): Sbv1PortraitLivenessCallbackRecord | null {
   pruneExpired();
-  return store.get(bytedToken.trim()) ?? null;
+  return callbackStore.get(bytedToken.trim()) ?? null;
 }

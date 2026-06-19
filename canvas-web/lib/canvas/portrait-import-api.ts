@@ -1,4 +1,5 @@
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
+import { formatPortraitImportApiError } from "@/lib/canvas/portrait-import-api-error";
 import type {
   CanvasPortraitKind,
   CanvasPortraitNodeStatus,
@@ -22,14 +23,7 @@ async function call<T>(
   const r = await fetch(url, reqInit);
   const raw = await r.text();
   if (!r.ok) {
-    let msg = raw;
-    try {
-      const j = JSON.parse(raw) as { error?: string; message?: string };
-      msg = j.message ?? j.error ?? raw;
-    } catch {
-      /* keep raw */
-    }
-    throw new Error(msg || r.statusText);
+    throw new Error(formatPortraitImportApiError(raw, r.status, path));
   }
   return raw ? (JSON.parse(raw) as T) : (undefined as unknown as T);
 }

@@ -32,7 +32,8 @@ import { Sbv1PortraitLivenessModal } from "./sbv1/sbv1-portrait-liveness-modal";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { cn } from "@/lib/utils";
-import { MediaHoverBox } from "./media-hover-box";
+import { MediaHoverBox, MediaPreviewLightbox } from "./media-hover-box";
+import { LibtvNodeHeaderPreviewButton } from "./libtv-node-header-preview-button";
 import { Pro2ImageNodeToolbar } from "./pro2/pro2-image-node-toolbar";
 import {
   Pro2MediaNodeEmptyState,
@@ -258,7 +259,7 @@ export function LibtvImageNode({
             variant="generated"
             alt={nodeLabel}
             fit="contain"
-            previewIconSize="lg"
+            hidePreviewOverlay
             className="absolute inset-0"
           />
         );
@@ -303,7 +304,7 @@ export function LibtvImageNode({
           variant="generated"
           alt={nodeLabel}
           fit="contain"
-          previewIconSize="lg"
+          hidePreviewOverlay
           className="absolute inset-0"
         />
       );
@@ -488,7 +489,12 @@ export function LibtvImageNode({
             </div>
             {isGenerating ? (
               <Loader2 className={cn("size-3.5 animate-spin", chrome.spinner)} />
-            ) : null}
+            ) : (
+              <LibtvNodeHeaderPreviewButton
+                visible={hasImage}
+                onClick={() => setPreviewOpen(true)}
+              />
+            )}
           </div>
 
           <div className={LIBTV_MEDIA_STAGE_CLASS}>{renderStage()}</div>
@@ -508,20 +514,12 @@ export function LibtvImageNode({
       />
 
       {previewOpen && previewUrl ? (
-        <div
-          className="nodrag fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          onMouseDown={() => setPreviewOpen(false)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewUrl}
-            alt={nodeLabel}
-            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
-            onMouseDown={(e) => e.stopPropagation()}
-          />
-        </div>
+        <MediaPreviewLightbox
+          src={previewUrl}
+          kind="image"
+          alt={nodeLabel}
+          onClose={() => setPreviewOpen(false)}
+        />
       ) : null}
 
       <Sbv1PortraitLivenessModal

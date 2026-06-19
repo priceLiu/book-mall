@@ -33,7 +33,8 @@ import {
 import type { StoryPro2ThreeViewNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { cn } from "@/lib/utils";
-import { MediaHoverBox } from "../media-hover-box";
+import { MediaHoverBox, MediaPreviewLightbox } from "../media-hover-box";
+import { LibtvNodeHeaderPreviewButton } from "../libtv-node-header-preview-button";
 import {
   Pro2MediaNodeEmptyState,
   Pro2MediaNodeErrorState,
@@ -233,7 +234,12 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
             </div>
             {isGenerating ? (
               <Loader2 className="size-3.5 animate-spin text-violet-300" />
-            ) : null}
+            ) : (
+              <LibtvNodeHeaderPreviewButton
+                visible={hasImage}
+                onClick={() => setPreviewOpen(true)}
+              />
+            )}
           </div>
 
           <div className={LIBTV_MEDIA_STAGE_CLASS}>
@@ -248,7 +254,7 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
                 variant="generated"
                 alt={label}
                 fit="contain"
-                previewIconSize="lg"
+                hidePreviewOverlay
                 className="absolute inset-0"
               />
             ) : hasError ? (
@@ -289,20 +295,12 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
       />
 
       {previewOpen && previewUrl ? (
-        <div
-          className="nodrag fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          onMouseDown={() => setPreviewOpen(false)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewUrl}
-            alt={label}
-            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
-            onMouseDown={(e) => e.stopPropagation()}
-          />
-        </div>
+        <MediaPreviewLightbox
+          src={previewUrl}
+          kind="image"
+          alt={label}
+          onClose={() => setPreviewOpen(false)}
+        />
       ) : null}
     </>
   );

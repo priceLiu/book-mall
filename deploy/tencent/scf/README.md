@@ -65,4 +65,9 @@ CANVAS_SECRET_KEY=            # openssl rand -base64 32，部署前固定
 NEXTAUTH_COOKIE_DOMAIN=.ai-code8.com
 ```
 
-并确保 book-mall 已部署含 canvas 迁移的版本（`prisma migrate deploy`）。
+并确保 book-mall 已部署含 canvas 迁移的版本（`prisma migrate deploy`），且包含：
+
+- `POST /api/canvas/portrait/virtual/import` · `POST /api/canvas/portrait/real/import`
+- 迁移 `20260618210000_project_asset_private_portrait`（`ProjectAssetKind.PRIVATE_PORTRAIT`）
+
+LibTV 图片节点「入库」依赖上述 API；若返回 404，说明主站镜像过旧（检查 CloudBase 构建是否成功）。

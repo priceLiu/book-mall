@@ -46,8 +46,16 @@ function pickResponseMetadataError(
   };
 }
 
-function pickErrorCode(json: unknown): string | undefined {
-  return pickResponseMetadataError(json)?.code;
+/** H5 未完成或 GroupId 尚未就绪 · 应继续轮询，不可当作终态失败 */
+export function isVisualValidateResultPendingError(
+  errCode?: string,
+  message?: string,
+): boolean {
+  if (errCode === "ValidatePending") return true;
+  const msg = message?.toLowerCase() ?? "";
+  if (errCode?.startsWith("NotFound") && msg.includes("token")) return true;
+  if (msg.includes("visual face token is not found")) return true;
+  return false;
 }
 
 const PORTRAIT_GUIDE_URL =
@@ -149,12 +157,26 @@ export async function getVolcengineVisualValidateResult(opts: {
     },
   });
 
-  const errCode = pickErrorCode(json);
-  if (errCode === "ValidatePending") {
+  const metaErr = pickResponseMetadataError(json);
+  const errCode = metaErr?.code;
+  if (isVisualValidateResultPendingError(errCode, metaErr?.message)) {
     return { status: "pending", raw: json };
   }
 
   if (!status || status === 404) {
+    if (metaErr?.code || metaErr?.message) {
+      return {
+        status: "failed",
+        message: formatVolcenginePortraitLivenessError({
+          action: "GetVisualValidateResult",
+          status: status || 404,
+          text,
+          json,
+          url,
+        }),
+        raw: json,
+      };
+    }
     return {
       status: "failed",
       message: formatVolcenginePortraitLivenessError({

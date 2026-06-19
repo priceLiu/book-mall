@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { formatVolcenginePortraitLivenessError } from "@/lib/gateway/volcengine-portrait-liveness";
+import {
+  formatVolcenginePortraitLivenessError,
+  isVisualValidateResultPendingError,
+} from "@/lib/gateway/volcengine-portrait-liveness";
 
 describe("formatVolcenginePortraitLivenessError", () => {
   it("maps empty 404 to portrait entitlement guidance", () => {
@@ -27,5 +30,14 @@ describe("formatVolcenginePortraitLivenessError", () => {
       url: "",
     });
     expect(msg).toContain("尚未完成");
+  });
+
+  it("treats NotFound visual face token as pending", () => {
+    expect(
+      isVisualValidateResultPendingError(
+        "NotFound.20260619095123C0381C454250C32CF106",
+        "The specified token Visual Face token is not found.",
+      ),
+    ).toBe(true);
   });
 });
