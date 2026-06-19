@@ -29,6 +29,7 @@ import {
   MENTION_THUMB_SLOT_CHAR,
 } from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { findMentionRangeAtDisplayIndex } from "@/lib/canvas/mention-at-display-index";
+import { resolveInlineMentionDelete } from "@/lib/canvas/mention-inline-delete";
 import {
   getMentionRangeClientRect,
   getTextareaCaretClientRect,
@@ -378,7 +379,34 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       setAnchorTick((t) => t + 1);
     }, [popoverOpen, displayValue, popoverFilter]);
 
+    const onInlineMentionKeyDown = (
+      e: KeyboardEvent<HTMLTextAreaElement>,
+    ) => {
+      if (!inlineThumbEnabled) return;
+      if (e.key !== "Backspace" && e.key !== "Delete") return;
+      if (e.nativeEvent.isComposing) return;
+      const el = innerRef.current;
+      if (!el) return;
+
+      const resolved = resolveInlineMentionDelete(
+        el.value,
+        el.selectionStart ?? 0,
+        el.selectionEnd ?? 0,
+        mentionables,
+        e.key,
+      );
+      if (!resolved) return;
+
+      e.preventDefault();
+      pendingCaretRef.current = resolved.caret;
+      setDisplayDraft(resolved.next);
+      scheduleEmit(resolved.next);
+      closePopover();
+    };
+
     const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      onInlineMentionKeyDown(e);
+      if (e.defaultPrevented) return;
       if (!popoverOpen) return;
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();

@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { runCanvasPollWorker } from "@/lib/canvas/canvas-task-service";
 import { getCanvasAiPollToken } from "@/lib/canvas/canvas-constants";
+import { getGenerationPollMaxDurationSec } from "@/lib/generation/poll-config";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = getGenerationPollMaxDurationSec();
 
 export async function POST(request: NextRequest) {
   const expected = getCanvasAiPollToken();

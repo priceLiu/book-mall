@@ -77,16 +77,6 @@ function measureBadgePlacements(
   return out;
 }
 
-function expectedThumbMentionCount(
-  textarea: HTMLTextAreaElement,
-  mentionables: MentionableItem[],
-): number {
-  const clean = stripMentionThumbSlots(textarea.value);
-  return findAllMentionRangesInDisplay(clean, mentionables).filter(
-    (r) => r.item.previewUrl,
-  ).length;
-}
-
 function placementKey(p: BadgePlacement): string {
   return [
     p.item.id,
@@ -103,7 +93,7 @@ function syncBadgeDom(
   edition: "pro2" | "sbv1",
 ): void {
   const borderClass = thumbBorderClass(edition);
-  const wanted = new Set(placements.map((p) => p.item.id));
+  const wanted = new Set(placements.map((p) => placementKey(p)));
 
   for (const child of [...root.children]) {
     const id = (child as HTMLElement).dataset.mentionHostId;
@@ -111,12 +101,18 @@ function syncBadgeDom(
   }
 
   for (const p of placements) {
-    let host = root.querySelector<HTMLElement>(
-      `[data-mention-host-id="${p.item.id}"]`,
-    );
+    const hostId = placementKey(p);
+    let host: HTMLElement | null = null;
+    for (const child of root.children) {
+      const el = child as HTMLElement;
+      if (el.dataset.mentionHostId === hostId) {
+        host = el;
+        break;
+      }
+    }
     if (!host) {
       host = document.createElement("div");
-      host.dataset.mentionHostId = p.item.id;
+      host.dataset.mentionHostId = hostId;
       host.className = "absolute flex items-center";
       host.style.height = `${BADGE_HEIGHT_PX}px`;
 
@@ -206,7 +202,18 @@ export const MentionInlineThumbOverlay = forwardRef<
     }
 
     const next = measureBadgePlacements(ta, mentionables);
-    if (next.length === 0 && expectedThumbMentionCount(ta, mentionables) > 0) {
+    const clean = stripMentionThumbSlots(ta.value);
+    const expected = findAllMentionRangesInDisplay(clean, mentionables).filter(
+      (r) => r.item.previewUrl,
+    ).length;
+
+    if (expected === 0) {
+      root.replaceChildren();
+      lastKeyRef.current = "";
+      return;
+    }
+
+    if (next.length === 0 && expected > 0) {
       // caret mirror 偶发失败时保留上一帧，避免输入瞬间 badge 全消失
       return;
     }

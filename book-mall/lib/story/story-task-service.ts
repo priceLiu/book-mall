@@ -33,6 +33,16 @@ import {
 import { failGatewayLogIfStillRunning } from "@/lib/gateway/fail-gateway-log-on-timeout";
 import { getGenerationPollBatch } from "@/lib/canvas/canvas-constants";
 import {
+  getGenerationPollConcurrency,
+  getGenerationPollMaxPasses,
+  getGenerationPollTimeBudgetMs,
+} from "@/lib/generation/poll-config";
+import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
+import {
+  pollShardOverFetchSize,
+  selectPollShardTasks,
+} from "@/lib/generation/poll-shard";
+import {
   buildCanvasVideoVolcengineInput,
   isVolcengineStoryVideoModelKey,
 } from "@/lib/canvas/canvas-video-volcengine";
@@ -1086,7 +1096,6 @@ export function schedulePollWorkerForProject(projectId: string): void {
   });
 }
 
-const POLL_BATCH = getGenerationPollBatch();
 const POLL_INNER_TIMEOUT_MS = 8000;
 const RETRY_PENDING_LIMIT = 3;
 
@@ -1190,6 +1199,97 @@ async function pollOneSubmittedStoryTask(
   return "pending";
 }
 
+type StorySubmittedPollDelta = {
+  scanned: number;
+  succeeded: number;
+  failed: number;
+  timedOut: number;
+};
+
+async function advanceOneSubmittedStoryTask(
+  task: StoryGenerationTask,
+  now: number,
+): Promise<StorySubmittedPollDelta> {
+  const delta: StorySubmittedPollDelta = {
+    scanned: 1,
+    succeeded: 0,
+    failed: 0,
+    timedOut: 0,
+  };
+  if (!task.kieTaskId) return delta;
+  if (!shouldPollNow(task)) {
+    delta.scanned = 0;
+    return delta;
+  }
+
+  const timeoutMs = STORY_AI_TASK_TIMEOUT_MIN * 60 * 1000;
+  const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
+  if (now - submittedTs >= timeoutMs) {
+    try {
+      const outcome = await pollOneSubmittedStoryTask(task);
+      if (outcome === "succeeded") {
+        delta.succeeded = 1;
+        return delta;
+      }
+      if (outcome === "failed") {
+        delta.failed = 1;
+        return delta;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logKieEvent("warn", "final poll before timeout error", {
+        taskId: task.id,
+        msg,
+      });
+    }
+
+    await prisma.storyGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        status: "FAILED",
+        failCode: "timeout",
+        failMessage: `task exceeded ${STORY_AI_TASK_TIMEOUT_MIN} min`,
+        lastPolledAt: new Date(),
+        pollCount: task.pollCount + 1,
+        completedAt: new Date(),
+      },
+    });
+    const gatewayLogId = task.gatewayLogId?.trim();
+    if (gatewayLogId) {
+      await failGatewayLogIfStillRunning({
+        gatewayLogId,
+        durationMs: now - submittedTs,
+        timeoutMin: STORY_AI_TASK_TIMEOUT_MIN,
+        externalTaskId: task.kieTaskId,
+      });
+    }
+    delta.timedOut = 1;
+    return delta;
+  }
+
+  try {
+    const outcome = await pollOneSubmittedStoryTask(task);
+    if (outcome === "succeeded") delta.succeeded = 1;
+    else if (outcome === "failed") delta.failed = 1;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logKieEvent("warn", "recordInfo poll error", {
+      taskId: task.id,
+      kieTaskId: task.kieTaskId,
+      msg,
+    });
+    await prisma.storyGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        lastPolledAt: new Date(),
+        pollCount: task.pollCount + 1,
+        failMessage: msg.slice(0, 500),
+      },
+    });
+  }
+  return delta;
+}
+
 /**
  * 选取一批 PENDING（重试 createTask）+ SUBMITTED（查询 KIE）任务推进。
  * 由 cron `/api/story/kie/poll` 与脚本 `pnpm story:poll-once` 调用。
@@ -1215,7 +1315,7 @@ export async function runPollWorker(opts?: {
       ...projectFilter,
     },
     orderBy: { createdAt: "asc" },
-    take: POLL_BATCH,
+    take: getGenerationPollBatch(),
   });
   for (const task of pendings) {
     result.scanned++;
@@ -1294,88 +1394,43 @@ export async function runPollWorker(opts?: {
     }
   }
 
-  // 2) SUBMITTED 任务：查询 recordInfo
-  const submitted = await prisma.storyGenerationTask.findMany({
-    where: {
-      status: "SUBMITTED",
-      kieTaskId: { not: null },
-      ...projectFilter,
-    },
-    orderBy: { lastPolledAt: { sort: "asc", nulls: "first" } },
-    take: POLL_BATCH,
-  });
-  const timeoutMs = STORY_AI_TASK_TIMEOUT_MIN * 60 * 1000;
-  const now = Date.now();
-  for (const task of submitted) {
-    result.scanned++;
-    if (!task.kieTaskId) continue;
-    if (!shouldPollNow(task)) continue;
+  // 2) SUBMITTED 任务：并行 poll + 多轮扫描
+  const pollBatch = getGenerationPollBatch();
+  const scaledPoll = !opts?.projectId;
+  const deadline = scaledPoll
+    ? Date.now() + getGenerationPollTimeBudgetMs()
+    : Number.MAX_SAFE_INTEGER;
+  const maxPasses = scaledPoll ? getGenerationPollMaxPasses() : 1;
+  const concurrency = scaledPoll ? getGenerationPollConcurrency() : 1;
 
-    // Timeout check
-    const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
-    if (now - submittedTs >= timeoutMs) {
-      try {
-        const outcome = await pollOneSubmittedStoryTask(task);
-        if (outcome === "succeeded") {
-          result.succeeded++;
-          continue;
-        }
-        if (outcome === "failed") {
-          result.failed++;
-          continue;
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        logKieEvent("warn", "final poll before timeout error", {
-          taskId: task.id,
-          msg,
-        });
-      }
+  for (let pass = 0; pass < maxPasses && Date.now() < deadline; pass++) {
+    const fetchSize = scaledPoll ? pollShardOverFetchSize(pollBatch) : pollBatch;
+    const candidates = await prisma.storyGenerationTask.findMany({
+      where: {
+        status: "SUBMITTED",
+        kieTaskId: { not: null },
+        ...projectFilter,
+      },
+      orderBy: { lastPolledAt: { sort: "asc", nulls: "first" } },
+      take: fetchSize,
+    });
+    const submitted = scaledPoll
+      ? selectPollShardTasks(candidates, pollBatch)
+      : candidates;
+    if (submitted.length === 0) break;
 
-      await prisma.storyGenerationTask.update({
-        where: { id: task.id },
-        data: {
-          status: "FAILED",
-          failCode: "timeout",
-          failMessage: `task exceeded ${STORY_AI_TASK_TIMEOUT_MIN} min`,
-          lastPolledAt: new Date(),
-          pollCount: task.pollCount + 1,
-          completedAt: new Date(),
-        },
-      });
-      const gatewayLogId = task.gatewayLogId?.trim();
-      if (gatewayLogId) {
-        await failGatewayLogIfStillRunning({
-          gatewayLogId,
-          durationMs: now - submittedTs,
-          timeoutMin: STORY_AI_TASK_TIMEOUT_MIN,
-          externalTaskId: task.kieTaskId,
-        });
-      }
-      result.timedOut++;
-      continue;
-    }
-
-    try {
-      const outcome = await pollOneSubmittedStoryTask(task);
-      if (outcome === "succeeded") result.succeeded++;
-      else if (outcome === "failed") result.failed++;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      logKieEvent("warn", "recordInfo poll error", {
-        taskId: task.id,
-        kieTaskId: task.kieTaskId,
-        msg,
-      });
-      await prisma.storyGenerationTask.update({
-        where: { id: task.id },
-        data: {
-          lastPolledAt: new Date(),
-          pollCount: task.pollCount + 1,
-          failMessage: msg.slice(0, 500),
-        },
-      });
-    }
+    const tickNow = Date.now();
+    await mapWithConcurrency(
+      submitted,
+      async (task) => {
+        const d = await advanceOneSubmittedStoryTask(task, tickNow);
+        result.scanned += d.scanned;
+        result.succeeded += d.succeeded;
+        result.failed += d.failed;
+        result.timedOut += d.timedOut;
+      },
+      concurrency,
+    );
   }
 
   return result;

@@ -25,9 +25,10 @@ done
 3. **环境变量**（必填）：
    - `STORY_AI_POLL_TOKEN` = 与 book-mall 生产环境 **完全相同**
    - （可选）`BOOK_MALL_HOST` = `book.ai-code8.com`（默认已是）
-4. **超时时间**：60 秒
-5. **上传**：本地上传 → 选对应 zip
-6. **触发器**：定时触发器，Cron 示例（7 段，每秒位）：
+4. **超时时间**：book-mall poll API 默认 `GENERATION_POLL_MAX_DURATION_SEC=300`；SCF 若上限 60s 仍可用（worker 会在 50s 预算内返回）。**100+ 并发建议**另起 book-mall 侧车跑 `pnpm canvas:poll-loop`（5s），或部署 **4 个分片 SCF**（见下）。
+5. **水平分片（50～100+ 路 SUBMITTED）**：复制 `book-mall-canvas-kie-poll` 为 4 个函数，book-mall env 设 `GENERATION_POLL_SHARD_COUNT=4`，各函数额外 env：`GENERATION_POLL_SHARD_INDEX=0`…`3`；Cron 可均为每 30 秒。
+6. **上传**：本地上传 → 选对应 zip
+7. **触发器**：定时触发器，Cron 示例（7 段，每秒位）：
    - poll：`0 */1 * * * *`（每分钟第 0 秒）
    - cleanup：`30 */1 * * * *`（每分钟第 30 秒，与 poll 错开）
 
