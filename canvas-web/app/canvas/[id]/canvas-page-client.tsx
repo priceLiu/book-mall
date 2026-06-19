@@ -328,11 +328,17 @@ function Inner({ projectId }: { projectId: string }) {
         setProject(p);
         setNameDraft(p.name);
         canvasReadyRef.current = true;
-        const s = useCanvasStore.getState();
-        lastPersistedSnapshotRef.current = {
-          revision: s.graphRevision,
-          viewport: JSON.stringify(s.viewport),
+        const syncLoadedPersistedSnapshot = () => {
+          const s = useCanvasStore.getState();
+          lastPersistedSnapshotRef.current = {
+            revision: s.graphRevision,
+            viewport: JSON.stringify(s.viewport),
+          };
         };
+        syncLoadedPersistedSnapshot();
+        // hydrate 可能 queueMicrotask 二次 finalize，延迟对齐 revision 避免误判已保存
+        queueMicrotask(syncLoadedPersistedSnapshot);
+        requestAnimationFrame(syncLoadedPersistedSnapshot);
         setLoadError(null);
       } catch (e) {
         if (!cancelled) {
@@ -394,7 +400,12 @@ function Inner({ projectId }: { projectId: string }) {
       force = false,
       opts: { writeHistory?: boolean } = {},
     ) => {
-      const writeHistory = opts.writeHistory ?? false;
+      let writeHistory = opts.writeHistory ?? false;
+      const autosaveIntervalMs = getCanvasAutosaveIntervalMs();
+      // debounce / flush 落盘：间隔未关闭时同步写「自动保存」历史
+      if (!writeHistory && autosaveIntervalMs > 0) {
+        writeHistory = true;
+      }
       if (autosaveInFlightRef.current) {
         autosavePendingRef.current = true;
         return;
@@ -407,6 +418,10 @@ function Inner({ projectId }: { projectId: string }) {
       autosaveInFlightRef.current = true;
       setSaving(true);
       try {
+        window.dispatchEvent(new CustomEvent("canvas:flush-text-drafts"));
+        await new Promise<void>((resolve) => {
+          queueMicrotask(() => resolve());
+        });
         const graph = stripStoryProUploadedScriptMdForPersist(
           useCanvasStore.getState().toGraph(),
         );
@@ -473,8 +488,7 @@ function Inner({ projectId }: { projectId: string }) {
       clearAutosaveTimer();
       autosaveTimerRef.current = window.setTimeout(() => {
         autosaveTimerRef.current = null;
-        // 1.5s debounce：只持久化画布，不写「我的历史」（与间隔设置无关）
-        void runAutosave(false, { writeHistory: false });
+        void runAutosave(false);
       }, CANVAS_AUTOSAVE_DEBOUNCE_MS);
     };
 
@@ -505,8 +519,7 @@ function Inner({ projectId }: { projectId: string }) {
 
     const flushAutosaveNow = () => {
       clearAutosaveTimer();
-      // 拖动松手等：立即落盘，但不新增历史版本
-      void runAutosave(true, { writeHistory: false });
+      void runAutosave(true, { writeHistory: getCanvasAutosaveIntervalMs() > 0 });
     };
 
     const onFlushAutosave = () => flushAutosaveNow();

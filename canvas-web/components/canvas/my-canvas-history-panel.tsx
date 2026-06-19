@@ -18,6 +18,7 @@ import {
   type CanvasProjectHistorySummary,
 } from "@/lib/canvas-api";
 import {
+  CANVAS_AUTOSAVE_DEBOUNCE_MS,
   CANVAS_AUTOSAVE_INTERVAL_OPTIONS,
   CANVAS_PROJECT_HISTORY_MAX,
   formatCanvasAutosaveIntervalLabel,
@@ -248,7 +249,7 @@ export function MyCanvasHistoryPanel({
             {CANVAS_PROJECT_HISTORY_MAX} 条时，继续保存会提示覆盖最旧一条，也可在此删除旧版本。
             {intervalMs === 0
               ? " 当前：仅手动保存会写入「手动保存」历史。"
-              : ` 当前：约每 ${formatCanvasAutosaveIntervalLabel(intervalMs)} 写入「自动保存」历史。`}
+              : ` 当前：编辑停顿约 ${CANVAS_AUTOSAVE_DEBOUNCE_MS / 1000} 秒后写入「自动保存」；另约每 ${formatCanvasAutosaveIntervalLabel(intervalMs)} 补一条备份。`}
           </p>
         </div>
 
@@ -267,7 +268,9 @@ export function MyCanvasHistoryPanel({
             <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
               {tab === "manual"
                 ? "还没有手动保存。点击工具栏「手动保存」后，版本会出现在这里（最多 20 条）。"
-                : "还没有自动保存记录。开启间隔后会在此保留最近 20 个自动快照。"}
+                : intervalMs <= 0
+                  ? "已关闭自动保存历史。可在上方改间隔；画布仍会在编辑后自动落盘到项目。"
+                  : "还没有自动保存记录。编辑停顿约 1.5 秒后会写入一条快照（最多 20 条）。"}
             </p>
           ) : (
             <ul className="space-y-2">
