@@ -97,7 +97,7 @@ function bumpGraphRevision(state: { graphRevision: number }): number {
   return state.graphRevision + 1;
 }
 
-/** Dock / prompt 输入中的草稿字段：debounce 写 store 时不 bump revision、不进 undo */
+/** Dock / prompt 草稿字段：debounce 写 store 时 pause undo，但仍 bump graphRevision 供 autosave */
 const CANVAS_DRAFT_DATA_FIELDS = new Set([
   "prompt",
   "dockInput",

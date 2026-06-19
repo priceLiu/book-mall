@@ -508,6 +508,15 @@ export const MentionsTextarea = forwardRef<HTMLTextAreaElement, MentionsTextarea
       if (popoverOpen) clearHoverPreview();
     }, [popoverOpen, clearHoverPreview]);
 
+    useEffect(() => {
+      const onFlushDrafts = () => {
+        flushEmit(innerRef.current?.value ?? displayValue);
+      };
+      window.addEventListener("canvas:flush-text-drafts", onFlushDrafts);
+      return () =>
+        window.removeEventListener("canvas:flush-text-drafts", onFlushDrafts);
+    }, [displayValue, flushEmit]);
+
     useEffect(
       () => () => {
         if (hoverRafRef.current != null) {
