@@ -303,6 +303,7 @@ export async function recoverCanvasVolcengineTimedOutTask(
   const updated = await prisma.canvasGenerationTask.findUnique({
     where: { id: taskId },
     select: {
+      id: true,
       status: true,
       ossUrl: true,
       ephemeralUrl: true,
