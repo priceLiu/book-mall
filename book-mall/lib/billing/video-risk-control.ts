@@ -11,6 +11,21 @@ export const VIDEO_MAX_CONCURRENCY = 2;
 export const VIDEO_MAX_QUEUE = 10;
 export const VIDEO_BATCH_MAX = 5;
 
+/** 套餐档日 cap 参考值（管理端异常扫描用；Gateway 入口暂不强制） */
+export const VIDEO_DAILY_CAP_BY_TIER: Record<string, number> = {
+  标准版: 30,
+  进阶版: 90,
+  高级版: 200,
+  豪华版: 400,
+  至尊版: 800,
+};
+export const VIDEO_DAILY_CAP_DEFAULT = 30;
+
+export function videoDailyCapForTier(tier?: string | null): number {
+  if (!tier) return VIDEO_DAILY_CAP_DEFAULT;
+  return VIDEO_DAILY_CAP_BY_TIER[tier] ?? VIDEO_DAILY_CAP_DEFAULT;
+}
+
 export function getVideoPersonalMaxConcurrency(): number {
   const raw = Number(process.env.VIDEO_MAX_CONCURRENCY ?? "");
   return Number.isFinite(raw) && raw > 0 ? Math.round(raw) : VIDEO_MAX_CONCURRENCY;

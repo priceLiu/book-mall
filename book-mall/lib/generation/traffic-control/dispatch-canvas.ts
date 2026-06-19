@@ -1,0 +1,297 @@
+import type { CanvasGenerationTask } from "@prisma/client";
+
+import {
+  buildCanvasAiKieCallbackUrl,
+} from "@/lib/canvas/canvas-constants";
+import { claimCanvasTaskKieSubmit } from "@/lib/canvas/canvas-kie-gateway-claim";
+import {
+  canvasGwCreateBailianR2vJob,
+  canvasGwCreateKieJob,
+  canvasGwCreateVolcengineVideoJob,
+} from "@/lib/canvas/canvas-gateway-client";
+import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
+import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
+import { refundFailedGatewayLog } from "@/lib/billing/gateway-credit-settlement";
+import { prisma } from "@/lib/prisma";
+
+import {
+  getDispatchBatch,
+  getDispatchingStaleSec,
+  getQueueTimeoutMin,
+  isTrafficControlEnabled,
+} from "./constants";
+import { isCanvasVideoTrafficKind } from "./admit-canvas";
+import {
+  acquireTrafficSlotInTx,
+  releaseTrafficSlot,
+} from "./slot";
+import { resolveCanvasProjectTrafficScope } from "./scope-key";
+import { nextDispatchAfterFromSpacing } from "./token-bucket";
+
+function taskInputPayload(
+  task: Pick<CanvasGenerationTask, "inputPayload">,
+): Record<string, unknown> {
+  const p = task.inputPayload;
+  if (!p || typeof p !== "object" || Array.isArray(p)) return {};
+  return p as Record<string, unknown>;
+}
+
+function resolveCanvasClientPage(projectId: string, clientPage?: string): string {
+  const cp = clientPage?.trim();
+  if (cp) return cp;
+  return `canvas/${projectId}`;
+}
+
+async function submitCanvasVideoToGateway(
+  task: CanvasGenerationTask & { project: { userId: string } },
+  payload: Record<string, unknown>,
+): Promise<{ taskId: string; logId: string }> {
+  const userId = task.project.userId;
+  const clientPage = resolveCanvasClientPage(
+    task.projectId,
+    typeof payload.clientPage === "string" ? payload.clientPage : undefined,
+  );
+  const providerKind = payload.providerKind;
+
+  if (providerKind === "BAILIAN_R2V") {
+    const params = (payload.params as Record<string, unknown>) ?? {};
+    const refs = Array.isArray(payload.referenceImageUrls)
+      ? (payload.referenceImageUrls as string[])
+      : [];
+    const resolution =
+      String(params.resolution ?? "1080P") === "720P" ? "720P" : "1080P";
+    const job = await canvasGwCreateBailianR2vJob(userId, {
+      model: task.model,
+      prompt: String(payload.prompt ?? ""),
+      referenceImageUrls: refs,
+      resolution,
+      ratio: String(params.ratio ?? "16:9"),
+      duration: Number(params.duration ?? 5),
+      seedStr: String(params.seed ?? ""),
+      parameterExtras:
+        task.model.startsWith("wan2.")
+          ? { prompt_extend: params.prompt_extend !== false }
+          : undefined,
+      clientPage,
+      projectId: task.projectId,
+    });
+    return { taskId: job.taskId, logId: job.logId };
+  }
+
+  if (providerKind === "VOLCENGINE") {
+    const data = payload;
+    const job = await canvasGwCreateVolcengineVideoJob(userId, {
+      model: String(payload.volcengineModel ?? task.model),
+      body: (payload.volcengineBody as Record<string, unknown>) ?? {},
+      clientPage,
+      projectId: task.projectId,
+      providerId: typeof payload.providerId === "string" ? payload.providerId : undefined,
+      gatewayCredentialId:
+        typeof data.gatewayCredentialId === "string" && data.gatewayCredentialId.trim()
+          ? data.gatewayCredentialId.trim()
+          : undefined,
+      sbv1Billing:
+        data.sbv1Billing && typeof data.sbv1Billing === "object"
+          ? (data.sbv1Billing as Record<string, unknown>)
+          : undefined,
+    });
+    return { taskId: job.taskId, logId: job.logId };
+  }
+
+  const callBackUrl = buildCanvasAiKieCallbackUrl("video", task.id);
+  const job = await canvasGwCreateKieJob(userId, {
+    model: String(payload.kieModel ?? task.model),
+    input: (payload.kieInput as Record<string, unknown>) ?? {},
+    callBackUrl,
+    clientPage,
+    projectId: task.projectId,
+  });
+  return { taskId: job.taskId, logId: job.logId };
+}
+
+async function cancelQueueTimeouts(projectId?: string): Promise<number> {
+  const cutoff = new Date(Date.now() - getQueueTimeoutMin() * 60_000);
+  const res = await prisma.canvasGenerationTask.updateMany({
+    where: {
+      status: "QUEUED",
+      queuedAt: { lt: cutoff },
+      ...(projectId ? { projectId } : {}),
+    },
+    data: {
+      status: "CANCELLED",
+      failCode: "QUEUE_TIMEOUT",
+      failMessage: `排队超过 ${getQueueTimeoutMin()} 分钟，请重试`,
+      completedAt: new Date(),
+    },
+  });
+  return res.count;
+}
+
+async function recoverStaleDispatching(projectId?: string): Promise<number> {
+  const cutoff = new Date(Date.now() - getDispatchingStaleSec() * 1000);
+  const stale = await prisma.canvasGenerationTask.findMany({
+    where: {
+      status: "DISPATCHING",
+      updatedAt: { lt: cutoff },
+      ...(projectId ? { projectId } : {}),
+    },
+    select: {
+      id: true,
+      projectId: true,
+      tenantId: true,
+      actorUserId: true,
+      project: { select: { userId: true } },
+    },
+    take: 20,
+  });
+  let n = 0;
+  for (const t of stale) {
+    const scope = await resolveCanvasProjectTrafficScope(
+      t.projectId,
+      t.actorUserId ?? t.project.userId,
+    );
+    await releaseTrafficSlot(scope.scopeKey);
+    await prisma.canvasGenerationTask.update({
+      where: { id: t.id },
+      data: {
+        status: "QUEUED",
+        dispatchAfter: new Date(),
+        failCode: null,
+        failMessage: null,
+      },
+    });
+    n++;
+  }
+  return n;
+}
+
+async function dispatchOneCanvasQueuedTask(
+  task: CanvasGenerationTask & { project: { userId: string } },
+): Promise<"dispatched" | "skipped" | "failed"> {
+  const payload = taskInputPayload(task);
+  if (!isCanvasVideoTrafficKind(payload)) return "skipped";
+
+  const now = new Date();
+  if (task.dispatchAfter && task.dispatchAfter.getTime() > now.getTime()) {
+    return "skipped";
+  }
+
+  const actorUserId = task.actorUserId ?? task.project.userId;
+  const scope = await resolveCanvasProjectTrafficScope(task.projectId, actorUserId);
+
+  const slotResult = await prisma.$transaction(async (tx) => {
+    const fresh = await tx.canvasGenerationTask.findUnique({ where: { id: task.id } });
+    if (!fresh || fresh.status !== "QUEUED") return { action: "skipped" as const };
+
+    const acquired = await acquireTrafficSlotInTx(tx, scope);
+    if (!acquired.ok) {
+      const retryAfter =
+        acquired.retryAfter ?? nextDispatchAfterFromSpacing(new Date());
+      await tx.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: { dispatchAfter: retryAfter },
+      });
+      return { action: "skipped" as const };
+    }
+
+    await tx.canvasGenerationTask.update({
+      where: { id: task.id },
+      data: { status: "DISPATCHING", dispatchAfter: null },
+    });
+    return { action: "claimed" as const };
+  });
+
+  if (slotResult.action !== "claimed") return "skipped";
+
+  try {
+    const { claimed, task: claimedTask } = await claimCanvasTaskKieSubmit(task.id);
+    if (!claimed) {
+      await releaseTrafficSlot(scope.scopeKey);
+      return "skipped";
+    }
+
+    const job = await submitCanvasVideoToGateway(
+      { ...claimedTask, project: task.project },
+      taskInputPayload(claimedTask),
+    );
+
+    await prisma.canvasGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        status: "SUBMITTED",
+        kieTaskId: job.taskId,
+        submittedAt: new Date(),
+        lastPolledAt: new Date(),
+        inputPayload: {
+          ...taskInputPayload(claimedTask),
+          gatewayLogId: job.logId,
+          gatewayKieSubmitClaimed: true,
+          syncGatewaySubmit: true,
+          trafficScopeKey: scope.scopeKey,
+        },
+      },
+    });
+    return "dispatched";
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const code =
+      e instanceof CanvasProjectError ? e.code : "VIDEO_DISPATCH_FAILED";
+
+    await prisma.canvasGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        status: "FAILED",
+        failCode: code,
+        failMessage: msg.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    await releaseTrafficSlot(scope.scopeKey);
+    return "failed";
+  }
+}
+
+/** poll worker 入口：出队 QUEUED 画布视频任务 */
+export async function dispatchQueuedCanvasTasks(opts?: {
+  projectId?: string;
+}): Promise<{ cancelled: number; recovered: number; dispatched: number; skipped: number; failed: number }> {
+  const result = { cancelled: 0, recovered: 0, dispatched: 0, skipped: 0, failed: 0 };
+  if (!isTrafficControlEnabled()) return result;
+
+  result.cancelled = await cancelQueueTimeouts(opts?.projectId);
+  result.recovered = await recoverStaleDispatching(opts?.projectId);
+
+  const batch = getDispatchBatch();
+  const queued = await prisma.canvasGenerationTask.findMany({
+    where: {
+      status: "QUEUED",
+      ...(opts?.projectId ? { projectId: opts.projectId } : {}),
+      OR: [{ dispatchAfter: null }, { dispatchAfter: { lte: new Date() } }],
+    },
+    orderBy: [{ queuedAt: "asc" }, { createdAt: "asc" }],
+    take: batch,
+    include: { project: { select: { userId: true } } },
+  });
+
+  for (const task of queued) {
+    const r = await dispatchOneCanvasQueuedTask(task);
+    if (r === "dispatched") result.dispatched++;
+    else if (r === "failed") result.failed++;
+    else result.skipped++;
+  }
+
+  return result;
+}
+
+/** DISPATCHING 失败且已 create log 时的清理（供扩展） */
+export async function abortDispatchingGatewayLog(logId: string): Promise<void> {
+  const log = await prisma.gatewayRequestLog.findUnique({ where: { id: logId } });
+  if (!log || log.status !== "RUNNING") return;
+  await finalizeRequestLog(log.id, {
+    status: "FAILED",
+    durationMs: 0,
+    failCode: "DISPATCH_DISPATCH_ABORT",
+    failMessage: "dispatch aborted",
+  });
+  await refundFailedGatewayLog(log);
+}

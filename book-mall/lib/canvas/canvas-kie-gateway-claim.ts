@@ -30,7 +30,7 @@ export async function findProjectInflightTaskByInputHash(
     where: {
       projectId,
       inputHash,
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: ["PENDING", "SUBMITTED", "QUEUED", "DISPATCHING"] },
       deletedAt: null,
     },
     orderBy: { createdAt: "desc" },

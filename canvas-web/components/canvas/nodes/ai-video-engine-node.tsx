@@ -15,7 +15,7 @@ import {
 import { collectRefImageUrlsFromGridNode } from "@/lib/canvas/ref-video-edges";
 import { directPredecessors } from "@/lib/canvas/topo";
 import { pickDefaultRefVideoEngine } from "@/lib/canvas/system-providers";
-import { runtimePatchFromCanvasTask } from "@/lib/canvas/task-pick";
+import { runtimePatchFromCanvasTask, isServerInflightTaskStatus } from "@/lib/canvas/task-pick";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
@@ -107,16 +107,11 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
     const boundId = d.runtime?.taskId;
     if (boundId) {
       const bound = history.find((t) => t.id === boundId);
-      if (
-        bound &&
-        (bound.status === "PENDING" || bound.status === "SUBMITTED")
-      ) {
+      if (bound && isServerInflightTaskStatus(bound.status)) {
         return bound;
       }
     }
-    return history.find(
-      (t) => t.status === "PENDING" || t.status === "SUBMITTED",
-    );
+    return history.find((t) => isServerInflightTaskStatus(t.status));
   }, [history, d.runtime?.taskId]);
 
   const waitSince =

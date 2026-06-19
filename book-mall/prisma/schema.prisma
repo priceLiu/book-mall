@@ -1409,6 +1409,8 @@ enum StoryGenerationKind {
 }
 
 enum StoryGenerationStatus {
+  QUEUED
+  DISPATCHING
   PENDING
   SUBMITTED
   SUCCEEDED
@@ -1551,11 +1553,17 @@ model StoryGenerationTask {
   lastPolledAt DateTime?
   pollCount    Int       @default(0)
 
+  queuedAt      DateTime?
+  dispatchAfter DateTime?
+  tenantId      String?
+  actorUserId   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status, submittedAt])
   @@index([status, lastPolledAt])
+  @@index([status, queuedAt])
   @@index([projectId, kind])
   @@index([characterId])
   @@index([frameId])
@@ -1602,6 +1610,8 @@ enum CanvasGenerationKind {
 }
 
 enum CanvasGenerationStatus {
+  QUEUED
+  DISPATCHING
   PENDING
   SUBMITTED
   SUCCEEDED
@@ -2000,15 +2010,37 @@ model CanvasGenerationTask {
   lastPolledAt DateTime?
   pollCount    Int       @default(0)
 
+  queuedAt      DateTime?
+  dispatchAfter DateTime?
+  tenantId      String?
+  actorUserId   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status, submittedAt])
   @@index([status, lastPolledAt])
+  @@index([status, queuedAt])
   @@index([projectId, nodeId])
   @@index([projectId, inputHash])
   @@index([providerId])
   @@index([projectId, nodeId, deletedAt, createdAt])
+}
+
+/// 生成交通控流状态（租户 / 个人 scope，Single Writer：book-mall）
+model GenerationTrafficState {
+  scopeKey          String   @id
+  ownerType         String
+  ownerId           String
+  runningVideoCount Int      @default(0)
+  dispatchTokens    Float    @default(0)
+  lastTokenRefillAt DateTime @default(now())
+  lastDispatchAt    DateTime?
+  maxConcurrency    Int      @default(2)
+  tokensPerSec      Float    @default(0.5)
+  updatedAt         DateTime @updatedAt
+
+  @@index([ownerType, ownerId])
 }
 
 /// 画布 OSS 清理队列（mirror StoryOssCleanupQueue）

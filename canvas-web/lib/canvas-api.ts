@@ -94,7 +94,7 @@ export type CanvasTaskRecord = {
   id: string;
   nodeId: string;
   kind: "IMAGE" | "TEXT";
-  status: "PENDING" | "SUBMITTED" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+  status: "QUEUED" | "DISPATCHING" | "PENDING" | "SUBMITTED" | "SUCCEEDED" | "FAILED" | "CANCELLED";
   model: string;
   ossUrl: string | null;
   ephemeralUrl: string | null;

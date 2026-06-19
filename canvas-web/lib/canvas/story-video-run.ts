@@ -67,7 +67,12 @@ function isNetworkLikeError(msg: string): boolean {
 }
 
 function isInflightTaskStatus(status: string): boolean {
-  return status === "PENDING" || status === "SUBMITTED";
+  return (
+    status === "QUEUED" ||
+    status === "DISPATCHING" ||
+    status === "PENDING" ||
+    status === "SUBMITTED"
+  );
 }
 
 function patchVideoRowsForRun(

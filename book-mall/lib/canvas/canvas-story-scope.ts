@@ -1,10 +1,12 @@
 /** 漫剧列行 / 文案段任务 scope（存于 inputPayload.storyScope） */
 
 import { createHash } from "node:crypto";
-import type { CanvasGenerationTask, Prisma } from "@prisma/client";
+import type { Prisma, CanvasGenerationTask } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { CanvasProjectError } from "./canvas-project-service";
+import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
+import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 
 export type CanvasTaskStoryScope = {
   rowKey?: string;
@@ -70,7 +72,7 @@ async function findInflightScopeConflict(
     where: {
       projectId,
       nodeId,
-      status: { in: ["PENDING", "SUBMITTED"] },
+      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
       deletedAt: null,
     },
     select: { inputPayload: true },
@@ -106,10 +108,11 @@ export async function createStoryScopedCanvasTask(
     projectId: string;
     nodeId: string;
     storyScope?: CanvasTaskStoryScope;
-    initialStatus?: "PENDING" | "SUBMITTED";
+    initialStatus?: "PENDING" | "SUBMITTED" | "QUEUED";
+    actorUserId?: string;
     data: Omit<
       Prisma.CanvasGenerationTaskUncheckedCreateInput,
-      "projectId" | "nodeId" | "status"
+      "projectId" | "nodeId" | "status" | "queuedAt" | "tenantId" | "actorUserId"
     >;
   },
 ): Promise<CanvasGenerationTask> {
@@ -142,12 +145,26 @@ export async function createStoryScopedCanvasTask(
             ? { storyScope: args.storyScope }
             : payload;
 
+      const status = args.initialStatus ?? "PENDING";
+      const actorUserId = args.actorUserId;
+      let tenantId: string | null = null;
+      if (actorUserId && status === "QUEUED") {
+        const scope = await resolveCanvasProjectTrafficScope(
+          args.projectId,
+          actorUserId,
+        );
+        tenantId = scope.tenantId ?? null;
+      }
+
       return tx.canvasGenerationTask.create({
         data: {
           ...args.data,
           projectId: args.projectId,
           nodeId: args.nodeId,
-          status: args.initialStatus ?? "PENDING",
+          status,
+          queuedAt: status === "QUEUED" ? new Date() : undefined,
+          tenantId: tenantId ?? undefined,
+          actorUserId: actorUserId ?? undefined,
           inputPayload: scopePatch as Prisma.InputJsonValue,
         },
       });

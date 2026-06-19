@@ -42,6 +42,9 @@ import {
   pollShardOverFetchSize,
   selectPollShardTasks,
 } from "@/lib/generation/poll-shard";
+import { isTrafficControlEnabled } from "@/lib/generation/traffic-control/constants";
+import { dispatchQueuedStoryTasks } from "@/lib/generation/traffic-control/dispatch-story";
+import { resolveStoryProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 import {
   buildCanvasVideoVolcengineInput,
   isVolcengineStoryVideoModelKey,
@@ -328,8 +331,22 @@ type SubmitArgs = {
   frameId?: string | null;
 };
 
-/** 创建一笔 PENDING 任务，立即尝试调 KIE；失败也保留任务（后续 poll worker 重试 ≤3 次）。 */
+/** 创建一笔 PENDING/QUEUED 任务，立即尝试调 KIE（视频可走 QUEUED）；失败也保留任务（后续 poll worker 重试 ≤3 次）。 */
 async function submitGenerationTask(args: SubmitArgs): Promise<string> {
+  const project = await prisma.storyProject.findUnique({
+    where: { id: args.projectId },
+    select: { userId: true },
+  });
+  if (!project) {
+    throw new StoryProjectError("NOT_FOUND", "project not found", 404);
+  }
+
+  const useVideoQueue =
+    args.kind === "FRAME_VIDEO" && isTrafficControlEnabled();
+  const scope = useVideoQueue
+    ? await resolveStoryProjectTrafficScope(args.projectId, project.userId)
+    : null;
+
   const task = await prisma.storyGenerationTask.create({
     data: {
       projectId: args.projectId,
@@ -338,7 +355,10 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
       inputPayload: args.input as Prisma.InputJsonValue,
       characterId: args.characterId ?? null,
       frameId: args.frameId ?? null,
-      status: "PENDING",
+      status: useVideoQueue ? "QUEUED" : "PENDING",
+      queuedAt: useVideoQueue ? new Date() : undefined,
+      tenantId: scope?.tenantId ?? null,
+      actorUserId: project.userId,
     },
   });
 
@@ -376,20 +396,17 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
       break;
   }
 
+  if (useVideoQueue) {
+    void dispatchQueuedStoryTasks({ projectId: args.projectId }).catch(() => undefined);
+    return task.id;
+  }
+
   const callBackUrl =
     args.kind === "FRAME_VIDEO"
       ? buildStoryAiKieCallbackUrl("video", task.id)
       : buildStoryAiKieCallbackUrl("image", task.id);
 
   try {
-    const project = await prisma.storyProject.findUnique({
-      where: { id: args.projectId },
-      select: { userId: true },
-    });
-    if (!project) {
-      throw new StoryProjectError("NOT_FOUND", "project not found", 404);
-    }
-
     const isVolcengine =
       args.kind === "FRAME_VIDEO" && isVolcengineStoryVideoModelKey(args.model);
     const { taskId, logId } = isVolcengine
@@ -1306,6 +1323,8 @@ export async function runPollWorker(opts?: {
 }> {
   const result = { scanned: 0, retried: 0, succeeded: 0, failed: 0, timedOut: 0 };
   const projectFilter = opts?.projectId ? { projectId: opts.projectId } : {};
+
+  await dispatchQueuedStoryTasks({ projectId: opts?.projectId }).catch(() => undefined);
 
   // 1) PENDING 任务（createTask 失败的）：重试 createTask，最多 RETRY_PENDING_LIMIT 次
   const pendings = await prisma.storyGenerationTask.findMany({
