@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Download, Play, RefreshCw } from "lucide-react";
 
 import { SaveVideoToLibraryButton } from "@/components/canvas/save-video-to-library-button";
+import { LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
 import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library-types";
 import { cn } from "@/lib/utils";
 
@@ -46,12 +47,11 @@ export function CanvasVideoPreviewSlot({
       )}
     >
       {hasVideo ? (
-        <video
+        <LazyViewportVideo
           src={videoUrl}
-          className="absolute inset-0 size-full object-cover object-center"
-          playsInline
-          muted
-          preload="metadata"
+          className="absolute inset-0"
+          videoClassName="object-cover object-center"
+          rootMargin="200px"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-black/40" />

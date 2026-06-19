@@ -108,6 +108,8 @@ import {
 } from "./task-pick";
 
 const POLL_INTERVAL_MS = 2000;
+/** 打开画布后延迟全量任务扫描，避免首屏与大量媒体加载抢主线程 */
+const INITIAL_FULL_SCAN_DELAY_MS = 2500;
 /** 每 N 次 tick 做一次全项目任务扫描，避免刷新后 runtime 丢失导致轮询停住 */
 const FULL_SCAN_EVERY_N_TICKS = 3;
 
@@ -1714,10 +1716,15 @@ export function useCanvasRunner(
     };
 
     intervalId = window.setInterval(() => void tick(), POLL_INTERVAL_MS);
-    void tick(true);
+    void tick(false);
+    const fullScanTimer = window.setTimeout(
+      () => void tick(true),
+      INITIAL_FULL_SCAN_DELAY_MS,
+    );
     return () => {
       cancelled = true;
       if (intervalId) window.clearInterval(intervalId);
+      window.clearTimeout(fullScanTimer);
     };
   }, [base, projectId, releaseInflightKey, setNodeRuntime, updateNodeData]);
 

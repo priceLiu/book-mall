@@ -15,6 +15,7 @@ import {
 } from "./compare-utils";
 import { CompareSplitView, CompareToolbar, useCompareSides } from "./compare-view";
 import { CanvasVideoPlayer } from "./canvas-video-player";
+import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
 
 /** 根据 URL 猜测是否为视频 */
 export function isVideoMediaUrl(url: string): boolean {
@@ -77,6 +78,7 @@ export function MediaHoverBox({
     previewIconSize === "lg" ? OVERLAY_ICON_BTN_LG : OVERLAY_ICON_BTN;
   const overlayIconClass =
     previewIconSize === "lg" ? "size-8 pointer-events-none" : "size-4 pointer-events-none";
+  const { ref: lazyRef, active: mediaActive } = useLazyMediaActive();
   const kind =
     mediaKind ?? (src && isVideoMediaUrl(src) ? "video" : "image");
   const canPreview = !!src;
@@ -115,6 +117,7 @@ export function MediaHoverBox({
   return (
     <>
       <div
+        ref={lazyRef}
         className={`group/media relative overflow-hidden ${
           naturalSize ? "w-full" : "h-full w-full"
         } ${dragOver ? "ring-2 ring-white/30" : ""} ${className}`}
@@ -132,7 +135,7 @@ export function MediaHoverBox({
           setDragOver(false);
         }}
       >
-        {src ? (
+        {src && mediaActive ? (
           kind === "video" ? (
             <video
               src={src}
@@ -152,6 +155,8 @@ export function MediaHoverBox({
             <img
               src={src}
               alt={alt}
+              loading="lazy"
+              decoding="async"
               className={
                 naturalSize
                   ? "block h-auto w-full object-contain"
@@ -162,6 +167,8 @@ export function MediaHoverBox({
               draggable={false}
             />
           )
+        ) : src ? (
+          <div className="size-full animate-pulse bg-white/[0.04]" aria-hidden />
         ) : (
           placeholder
         )}
