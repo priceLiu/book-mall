@@ -51,6 +51,7 @@ import {
   canvasGwCreateKieJob,
   canvasGwRecordInfo,
 } from "./canvas-gateway-client";
+import { failGatewayLogIfStillRunning } from "@/lib/gateway/fail-gateway-log-on-timeout";
 import {
   isVolcengineVideoTaskFailed,
   isVolcengineVideoTaskSuccess,
@@ -966,6 +967,115 @@ function shouldPollSubmittedNow(
   return Date.now() - task.lastPolledAt.getTime() >= 3_000;
 }
 
+type SubmittedCanvasPollTask = CanvasGenerationTask & {
+  project: { userId: string };
+};
+
+/** 对单条 SUBMITTED 任务拉一次 Gateway 状态；终态则写回任务表。 */
+async function pollOneSubmittedCanvasTask(
+  task: SubmittedCanvasPollTask,
+): Promise<"succeeded" | "failed" | "pending"> {
+  const before = task.status;
+  const payload = taskInputPayload(task);
+  const useGateway = await shouldCanvasTaskUseGateway(
+    task.project.userId,
+    payload,
+  );
+
+  if (!useGateway || !task.kieTaskId || !payload?.gatewayLogId) {
+    await prisma.canvasGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        status: "FAILED",
+        failCode: "GATEWAY_LEGACY_TASK",
+        failMessage: "旧任务无 Gateway 日志，请重新生成",
+        completedAt: new Date(),
+        lastPolledAt: new Date(),
+        pollCount: task.pollCount + 1,
+      },
+    });
+    return "failed";
+  }
+
+  const providerKind = gatewayProviderKindFromPayload(payload);
+  const gw = await Promise.race([
+    canvasGwRecordInfo(task.project.userId, {
+      taskId: task.kieTaskId,
+      providerKind,
+      gatewayLogId: String(payload.gatewayLogId),
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error("gateway recordInfo timeout")),
+        POLL_INNER_TIMEOUT_MS,
+      ),
+    ),
+  ]);
+
+  if (gw.providerKind === "BAILIAN") {
+    await applyCanvasBailianR2vPollResult(task.id, {
+      ok: true,
+      output: gw.output,
+      raw: gw.output,
+    });
+  } else if (gw.providerKind === "KIE") {
+    await applyCanvasKieTaskResult(task.id, gw.record);
+  } else if (gw.providerKind === "VOLCENGINE") {
+    const row = gw.task;
+    if (isVolcengineVideoTaskSuccess(row)) {
+      await applyCanvasVolcengineVideoResult(task.id, row.content?.video_url);
+    } else if (isVolcengineVideoTaskFailed(row)) {
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          status: "FAILED",
+          failCode: "VOLCENGINE_TASK_FAILED",
+          failMessage:
+            typeof row.error === "string"
+              ? row.error
+              : (row.error?.message ?? `status=${row.status}`),
+          completedAt: new Date(),
+        },
+      });
+    }
+  } else if (gw.providerKind === "HUNYUAN") {
+    const polled = gw.polled;
+    if (polled.state === "succeeded" && polled.resultUrls?.[0]) {
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          status: "SUCCEEDED",
+          ossUrl: polled.resultUrls[0],
+          completedAt: new Date(),
+        },
+      });
+    } else if (polled.state === "failed") {
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: {
+          status: "FAILED",
+          failCode: polled.errorCode ?? "HUNYUAN_FAILED",
+          failMessage: polled.errorMessage?.slice(0, 500),
+          completedAt: new Date(),
+        },
+      });
+    }
+  }
+
+  const after = await prisma.canvasGenerationTask.findUnique({
+    where: { id: task.id },
+    select: { status: true },
+  });
+  await prisma.canvasGenerationTask.update({
+    where: { id: task.id },
+    data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+  });
+
+  if (after?.status === "SUCCEEDED" && before !== "SUCCEEDED") return "succeeded";
+  if (after?.status === "FAILED" && before !== "FAILED") return "failed";
+  return "pending";
+}
+
 export async function runCanvasPollWorker(opts?: {
   /** 仅推进指定项目的任务（项目页 GET / 提交后按需 poll 用） */
   projectId?: string;
@@ -1274,6 +1384,29 @@ export async function runCanvasPollWorker(opts?: {
 
     const submittedTs = (task.submittedAt ?? task.createdAt).getTime();
     if (now - submittedTs >= timeoutMs) {
+      try {
+        const outcome = await pollOneSubmittedCanvasTask(task);
+        if (outcome === "succeeded") {
+          result.succeeded++;
+          continue;
+        }
+        if (outcome === "failed") {
+          result.failed++;
+          continue;
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logKieEvent("warn", "[canvas] final poll before timeout error", {
+          taskId: task.id,
+          msg,
+        });
+      }
+
+      const payload = taskInputPayload(task);
+      const gatewayLogId =
+        typeof payload?.gatewayLogId === "string"
+          ? payload.gatewayLogId.trim()
+          : "";
       await prisma.canvasGenerationTask.update({
         where: { id: task.id },
         data: {
@@ -1285,114 +1418,22 @@ export async function runCanvasPollWorker(opts?: {
           completedAt: new Date(),
         },
       });
+      if (gatewayLogId) {
+        await failGatewayLogIfStillRunning({
+          gatewayLogId,
+          durationMs: now - submittedTs,
+          timeoutMin: CANVAS_AI_TASK_TIMEOUT_MIN,
+          externalTaskId: task.kieTaskId,
+        });
+      }
       result.timedOut++;
       continue;
     }
 
     try {
-      const before = task.status;
-      const payload = taskInputPayload(task);
-      const useGateway = await shouldCanvasTaskUseGateway(
-        task.project.userId,
-        payload,
-      );
-
-      if (!useGateway || !task.kieTaskId || !payload?.gatewayLogId) {
-        await prisma.canvasGenerationTask.update({
-          where: { id: task.id },
-          data: {
-            status: "FAILED",
-            failCode: "GATEWAY_LEGACY_TASK",
-            failMessage: "旧任务无 Gateway 日志，请重新生成",
-            completedAt: new Date(),
-            lastPolledAt: new Date(),
-            pollCount: task.pollCount + 1,
-          },
-        });
-        result.failed++;
-        continue;
-      }
-
-      const providerKind = gatewayProviderKindFromPayload(payload);
-      const gw = await Promise.race([
-        canvasGwRecordInfo(task.project.userId, {
-          taskId: task.kieTaskId,
-          providerKind,
-          gatewayLogId: String(payload.gatewayLogId),
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("gateway recordInfo timeout")),
-            POLL_INNER_TIMEOUT_MS,
-          ),
-        ),
-      ]);
-      if (gw.providerKind === "BAILIAN") {
-        await applyCanvasBailianR2vPollResult(task.id, {
-          ok: true,
-          output: gw.output,
-          raw: gw.output,
-        });
-      } else if (gw.providerKind === "KIE") {
-        await applyCanvasKieTaskResult(task.id, gw.record);
-      } else if (gw.providerKind === "VOLCENGINE") {
-        const row = gw.task;
-        if (isVolcengineVideoTaskSuccess(row)) {
-          await applyCanvasVolcengineVideoResult(
-            task.id,
-            row.content?.video_url,
-          );
-        } else if (isVolcengineVideoTaskFailed(row)) {
-          await prisma.canvasGenerationTask.update({
-            where: { id: task.id },
-            data: {
-              status: "FAILED",
-              failCode: "VOLCENGINE_TASK_FAILED",
-              failMessage:
-                typeof row.error === "string"
-                  ? row.error
-                  : (row.error?.message ?? `status=${row.status}`),
-              completedAt: new Date(),
-            },
-          });
-        }
-      } else if (gw.providerKind === "HUNYUAN") {
-        const polled = gw.polled;
-        if (polled.state === "succeeded" && polled.resultUrls?.[0]) {
-          await prisma.canvasGenerationTask.update({
-            where: { id: task.id },
-            data: {
-              status: "SUCCEEDED",
-              ossUrl: polled.resultUrls[0],
-              completedAt: new Date(),
-            },
-          });
-        } else if (polled.state === "failed") {
-          await prisma.canvasGenerationTask.update({
-            where: { id: task.id },
-            data: {
-              status: "FAILED",
-              failCode: polled.errorCode ?? "HUNYUAN_FAILED",
-              failMessage: polled.errorMessage?.slice(0, 500),
-              completedAt: new Date(),
-            },
-          });
-        }
-      }
-
-      const after = await prisma.canvasGenerationTask.findUnique({
-        where: { id: task.id },
-        select: { status: true },
-      });
-      if (after?.status === "SUCCEEDED" && before !== "SUCCEEDED") {
-        result.succeeded++;
-      } else if (after?.status === "FAILED" && before !== "FAILED") {
-        result.failed++;
-      }
-      await prisma.canvasGenerationTask.update({
-        where: { id: task.id },
-        data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
-      });
+      const outcome = await pollOneSubmittedCanvasTask(task);
+      if (outcome === "succeeded") result.succeeded++;
+      else if (outcome === "failed") result.failed++;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       logKieEvent("warn", "[canvas] poll iteration error", {
