@@ -120,11 +120,22 @@ export async function probeLibtvMediaNaturalSize(
 type UseLibtvMediaNodeAutoFitArgs = {
   nodeId: string;
   mediaUrl?: string;
+  /** 视频首帧封面；有则优先用 JPEG 探测，避免打开画布时 N 路 mp4 metadata */
+  posterUrl?: string;
   kind: "image" | "video";
   profile: LibtvMediaAutoFitProfile;
   /** 上传/生成中时不探测尺寸 */
   disabled?: boolean;
 };
+
+function scheduleIdleWork(work: () => void): () => void {
+  if (typeof requestIdleCallback !== "undefined") {
+    const id = requestIdleCallback(work, { timeout: 3000 });
+    return () => cancelIdleCallback(id);
+  }
+  const id = window.setTimeout(work, 48);
+  return () => window.clearTimeout(id);
+}
 
 /**
  * LibTV 媒体节点 · 有图/有视频后按真实宽高比自动改节点尺寸。
@@ -135,6 +146,7 @@ type UseLibtvMediaNodeAutoFitArgs = {
 export function useLibtvMediaNodeAutoFit({
   nodeId,
   mediaUrl,
+  posterUrl,
   kind,
   profile,
   disabled = false,
@@ -146,13 +158,23 @@ export function useLibtvMediaNodeAutoFit({
   const parentId = useCanvasStore(
     (s) => s.nodes.find((n) => n.id === nodeId)?.parentId,
   );
-  const allNodes = useCanvasStore((s) => s.nodes);
-  const parentGroup = useCanvasStore((s) =>
-    parentId ? s.nodes.find((n) => n.id === parentId) : undefined,
+  const mediaFitKey = useCanvasStore(
+    (s) =>
+      (s.nodes.find((n) => n.id === nodeId)?.data as { mediaFitKey?: string })
+        ?.mediaFitKey,
   );
-  const skipForSbv1GroupImage =
-    kind === "image" &&
-    Boolean(parentGroup && isSbv1MediaGroup(parentGroup, allNodes));
+  const mediaFit = useCanvasStore(
+    (s) =>
+      Boolean(
+        (s.nodes.find((n) => n.id === nodeId)?.data as { mediaFit?: boolean })
+          ?.mediaFit,
+      ),
+  );
+  const skipForSbv1GroupImage = useCanvasStore((s) => {
+    if (kind !== "image" || !parentId) return false;
+    const parentGroup = s.nodes.find((n) => n.id === parentId);
+    return Boolean(parentGroup && isSbv1MediaGroup(parentGroup, s.nodes));
+  });
 
   const lastFitKey = useRef("");
 
@@ -160,55 +182,72 @@ export function useLibtvMediaNodeAutoFit({
     const url = mediaUrl?.trim();
     if (!url || disabled || skipForSbv1GroupImage) return;
 
-    const key = `${kind}|${url}|${profile}`;
-    if (lastFitKey.current === key) return;
+    const poster = posterUrl?.trim();
+    const probeUrl = kind === "video" && poster ? poster : url;
+    const probeKind: "image" | "video" =
+      kind === "video" && poster ? "image" : kind;
+    const fitKey = `${probeKind}|${probeUrl}|${profile}`;
+
+    if (mediaFit && mediaFitKey === url) {
+      lastFitKey.current = fitKey;
+      return;
+    }
+    if (lastFitKey.current === fitKey) return;
 
     let cancelled = false;
 
-    void (async () => {
-      try {
-        const { w, h } = await probeLibtvMediaNaturalSize(url, kind);
-        if (cancelled) return;
-        const size = computeLibtvMediaNodeSize(w, h, profile);
-        resizeNode(nodeId, size);
-        updateNodeData(nodeId, {
-          mediaFit: true,
-          mediaFitKey: url,
-        });
-        lastFitKey.current = key;
+    const cancelIdle = scheduleIdleWork(() => {
+      void (async () => {
+        try {
+          const { w, h } = await probeLibtvMediaNaturalSize(probeUrl, probeKind);
+          if (cancelled) return;
+          const size = computeLibtvMediaNodeSize(w, h, profile);
+          resizeNode(nodeId, size);
+          updateNodeData(nodeId, {
+            mediaFit: true,
+            mediaFitKey: url,
+          });
+          lastFitKey.current = fitKey;
 
-        if (
-          parentId &&
-          parentGroup &&
-          isSbv1MediaGroup(parentGroup, allNodes) &&
-          profile === "sbv1-video"
-        ) {
-          relayoutSbv1MediaGroup(setNodes, parentId, edges);
-        } else if (
-          parentId &&
-          parentGroup &&
-          isPro2StyledGroup(parentGroup, allNodes)
-        ) {
-          relayoutPro2MediaGroup(setNodes, parentId);
+          const state = useCanvasStore.getState();
+          const parentGroup = parentId
+            ? state.nodes.find((n) => n.id === parentId)
+            : undefined;
+          if (
+            parentId &&
+            parentGroup &&
+            isSbv1MediaGroup(parentGroup, state.nodes) &&
+            profile === "sbv1-video"
+          ) {
+            relayoutSbv1MediaGroup(setNodes, parentId, edges);
+          } else if (
+            parentId &&
+            parentGroup &&
+            isPro2StyledGroup(parentGroup, state.nodes)
+          ) {
+            relayoutPro2MediaGroup(setNodes, parentId);
+          }
+        } catch {
+          // 探测失败时保留当前尺寸
         }
-      } catch {
-        // 探测失败时保留当前尺寸
-      }
-    })();
+      })();
+    });
 
     return () => {
       cancelled = true;
+      cancelIdle();
     };
   }, [
     nodeId,
     mediaUrl,
+    posterUrl,
     kind,
     profile,
     disabled,
     skipForSbv1GroupImage,
     parentId,
-    parentGroup,
-    allNodes,
+    mediaFit,
+    mediaFitKey,
     edges,
     resizeNode,
     updateNodeData,

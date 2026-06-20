@@ -131,8 +131,6 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
   useEffect(() => {
     if (!runPending && !isGenerating) return;
     void refreshHistory();
-    const timer = window.setInterval(() => void refreshHistory(), 2000);
-    return () => window.clearInterval(timer);
   }, [runPending, isGenerating, refreshHistory]);
 
   useEffect(() => {

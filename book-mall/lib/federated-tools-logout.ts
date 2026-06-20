@@ -73,11 +73,10 @@ export function listFederatedToolsLogoutOrigins(): string[] {
 
 /**
  * federated logout 链上的子站跳转 URL。
- * 使用 `/api/tools-session?federated_logout=1`（各子站均已部署），避免依赖较新的 `/api/tools-logout`。
+ * 使用 `/api/tools-logout?next=`（各子站长期可用）；勿用 tools-session JSON 诊断端点。
  */
 export function buildToolsLogoutHopUrl(origin: string, nextStepUrl: string): string {
-  const hop = new URL("/api/tools-session", origin.replace(/\/$/, ""));
-  hop.searchParams.set("federated_logout", "1");
+  const hop = new URL("/api/tools-logout", origin.replace(/\/$/, ""));
   hop.searchParams.set("next", nextStepUrl);
   return hop.toString();
 }

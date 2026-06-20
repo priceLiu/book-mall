@@ -72,7 +72,13 @@ export function LibtvCanvasDockBarSlot({
     const el = innerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      setPosition((prev) => clampToViewport(prev));
+      setPosition((prev) => {
+        const next = clampToViewport(prev);
+        if (next.offsetX === prev.offsetX && next.offsetY === prev.offsetY) {
+          return prev;
+        }
+        return next;
+      });
     });
     ro.observe(el);
     return () => ro.disconnect();

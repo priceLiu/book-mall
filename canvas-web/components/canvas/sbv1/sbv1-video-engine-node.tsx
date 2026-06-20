@@ -108,8 +108,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   useEffect(() => {
     if (!isGenerating) return;
     void refreshHistory();
-    const timer = window.setInterval(() => void refreshHistory(), 2000);
-    return () => window.clearInterval(timer);
   }, [isGenerating, refreshHistory]);
 
   useEffect(() => {
@@ -153,6 +151,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   useLibtvMediaNodeAutoFit({
     nodeId: id,
     mediaUrl: videoUrl,
+    posterUrl,
     kind: "video",
     profile: "sbv1-video",
     disabled: !hasVideo || isGenerating,
