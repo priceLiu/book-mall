@@ -610,7 +610,7 @@ function FlowCanvasInner({
         label: labelOverride ?? normalized.name ?? "粘贴的图片",
       });
       try {
-        const ossUrl = await uploadCanvasImage(base, normalized);
+        const ossUrl = await uploadCanvasImage(base, file);
         updateNodeData(id, { ossUrl, uploading: false });
       } catch (e) {
         updateNodeData(id, {

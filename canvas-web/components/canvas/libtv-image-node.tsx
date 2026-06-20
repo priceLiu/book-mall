@@ -232,7 +232,7 @@ export function LibtvImageNode({
         return;
       }
       try {
-        const ossUrl = await uploadCanvasImage(base, normalized);
+        const ossUrl = await uploadCanvasImage(base, file);
         updateNodeData(id, { ossUrl, uploading: false });
       } catch (e) {
         updateNodeData(id, {

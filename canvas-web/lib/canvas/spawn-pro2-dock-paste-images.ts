@@ -139,7 +139,7 @@ export async function spawnPro2DockPastedImages(
     });
 
     try {
-      const ossUrl = await uploadCanvasImage(args.base, normalized);
+      const ossUrl = await uploadCanvasImage(args.base, file);
       args.updateNodeData(newId, { ossUrl, uploading: false, label });
     } catch (e) {
       args.updateNodeData(newId, {
@@ -204,7 +204,7 @@ export async function spawnPro2CanvasPastedImages(args: {
       },
     );
     createdIds.push(id);
-    void uploadCanvasImage(args.base, normalized)
+      void uploadCanvasImage(args.base, file)
       .then((ossUrl) => {
         args.updateNodeData(id, { ossUrl, uploading: false });
       })
