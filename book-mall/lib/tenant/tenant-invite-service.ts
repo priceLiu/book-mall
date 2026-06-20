@@ -254,6 +254,18 @@ export async function acceptInvite(input: { token: string; userId: string }) {
       where: { id: invite.id },
       data: { status: "ACCEPTED", acceptedAt: new Date() },
     });
+
+    const team = await tx.tenant.findUnique({
+      where: { id: invite.tenantId },
+      select: { type: true },
+    });
+    if (team?.type === "TEAM") {
+      await tx.user.update({
+        where: { id: input.userId },
+        data: { primaryTenantId: invite.tenantId },
+      });
+    }
+
     return member;
   });
 }

@@ -16,6 +16,11 @@ import {
   buildGatewayLogWhereForTeamTenant,
   type GatewayLogFilterInput,
 } from "@/lib/gateway/log-query-scope";
+import {
+  fetchUserGatewayTokenUsage,
+  gatewayTokenUsageToRecord,
+} from "@/lib/gateway/gateway-token-usage-aggregate";
+import { currentPeriodKey, periodBounds } from "@/lib/finance/team-finance-guard";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -304,8 +309,10 @@ export async function fetchBillingDetailsForUser(input: {
   take?: number;
 }) {
   const take = Math.min(2000, Math.max(1, input.take ?? 500));
+  const periodKey = currentPeriodKey();
+  const { from, to } = periodBounds(periodKey);
 
-  const [user, pools, gatewayPart, packageReconciliation] = await Promise.all([
+  const [user, pools, gatewayPart, packageReconciliation, tokenUsageRaw] = await Promise.all([
     prisma.user.findUnique({
       where: { id: input.userId },
       select: { id: true, name: true, email: true },
@@ -313,6 +320,11 @@ export async function fetchBillingDetailsForUser(input: {
     getPoolBalances({ ownerType: "USER", ownerId: input.userId }),
     buildGatewayRows({ tab: input.tab, userId: input.userId, take }),
     fetchUserPackageReconciliation(input.userId),
+    fetchUserGatewayTokenUsage({
+      bookUserId: input.userId,
+      submittedFrom: from,
+      submittedTo: to,
+    }),
   ]);
 
   if (!user) return null;
@@ -339,6 +351,8 @@ export async function fetchBillingDetailsForUser(input: {
     returned: gatewayPart.returned,
     take,
     truncated: gatewayPart.returned >= take,
+    periodKey,
+    tokenUsage: gatewayTokenUsageToRecord(tokenUsageRaw),
   };
 }
 

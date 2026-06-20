@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env.local
+*.md
+prompt-optimizer/node_modules
+prompt-optimizer/packages/**/node_modules
+prompt-optimizer/packages/**/dist
+prompt-optimizer/.git
+prompt-optimizer/docs
+prompt-optimizer/mkdocs
+prompt-optimizer/images
+prompt-optimizer/tests
+prompt-optimizer/site
+prompt-optimizer/releases

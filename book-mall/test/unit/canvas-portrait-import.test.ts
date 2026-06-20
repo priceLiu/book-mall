@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildPortraitAssetUri,
   formatVolcenginePortraitActionError,
+  sanitizeVolcenginePortraitName,
+  VOLCENGINE_PORTRAIT_NAME_MAX_LEN,
 } from "@/lib/gateway/volcengine-portrait-actions";
 import { normalizePortraitAssetRefs } from "@/lib/canvas/canvas-portrait-import-service";
 import { buildCanvasVideoVolcengineInput } from "@/lib/canvas/canvas-video-volcengine";
@@ -22,6 +24,28 @@ describe("formatVolcenginePortraitActionError", () => {
       json: null,
     });
     expect(msg).toContain("人像库");
+  });
+});
+
+describe("sanitizeVolcenginePortraitName", () => {
+  it("truncates to 64 characters", () => {
+    const long = "a".repeat(80);
+    expect(sanitizeVolcenginePortraitName(long)).toHaveLength(
+      VOLCENGINE_PORTRAIT_NAME_MAX_LEN,
+    );
+  });
+
+  it("counts unicode code points", () => {
+    const long = "人".repeat(80);
+    expect(sanitizeVolcenginePortraitName(long)).toHaveLength(
+      VOLCENGINE_PORTRAIT_NAME_MAX_LEN,
+    );
+  });
+
+  it("uses fallback when empty", () => {
+    expect(sanitizeVolcenginePortraitName("  ", "canvas-portrait")).toBe(
+      "canvas-portrait",
+    );
   });
 });
 

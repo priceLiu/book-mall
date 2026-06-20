@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { BillingPersona } from "@prisma/client";
 import {
   ChevronDown,
+  Copy,
   CreditCard,
   Home,
   LayoutGrid,
@@ -36,6 +37,7 @@ import { ToggleTheme } from "@/components/layout/toogle-theme";
 import {
   openCanvasAppInNewTab,
   openEcomAppInNewTab,
+  openQuickReplicaAppInNewTab,
   openToolsAppInNewTab,
 } from "@/lib/account-app-launch";
 import { isAccountCanvasLaunchClickable } from "@/lib/account-canvas-launch-clickable";
@@ -67,6 +69,8 @@ export function AccountMenuDropdown({
   gatewayLinked,
   canLaunchEcommerce,
   ecomOriginConfigured,
+  canLaunchQuickReplica,
+  quickReplicaOriginConfigured,
   billingPersona,
 }: {
   profileLabel: string;
@@ -78,6 +82,8 @@ export function AccountMenuDropdown({
   gatewayLinked: boolean;
   canLaunchEcommerce: boolean;
   ecomOriginConfigured: boolean;
+  canLaunchQuickReplica: boolean;
+  quickReplicaOriginConfigured: boolean;
   billingPersona: BillingPersona | null;
 }) {
   const pathname = usePathname();
@@ -88,6 +94,12 @@ export function AccountMenuDropdown({
     gatewayLinked,
   });
   const ecomReady = canLaunchEcommerce && ecomOriginConfigured;
+  const quickReplicaReady = isAccountCanvasLaunchClickable({
+    canLaunchCanvas: canLaunchQuickReplica,
+    canvasOriginConfigured: quickReplicaOriginConfigured,
+    billingPersona,
+    gatewayLinked,
+  });
 
   function signOut() {
     navigateBookMallFullSignOut("/");
@@ -190,6 +202,18 @@ export function AccountMenuDropdown({
                     <ShoppingBag />
                     <span>电商工具箱</span>
                   </DropdownMenuItem>
+                  {quickReplicaOriginConfigured ? (
+                    <DropdownMenuItem
+                      disabled={!quickReplicaReady}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        openQuickReplicaAppInNewTab("/");
+                      }}
+                    >
+                      <Copy />
+                      <span>快速复制</span>
+                    </DropdownMenuItem>
+                  ) : null}
                 </DropdownMenuSubContent>
               </DropdownMenuPortal>
             </DropdownMenuSub>

@@ -1,0 +1,8 @@
+node_modules
+.next
+.env.local
+# Vue 构建产物由 Docker / build:vendor 生成，不提交
+public/assets
+public/index.html
+public/config.js
+public/favicon.ico

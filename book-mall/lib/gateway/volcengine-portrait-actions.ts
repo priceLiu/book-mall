@@ -31,6 +31,21 @@ export type VolcenginePortraitAssetRecord = {
   raw: unknown;
 };
 
+/** 火山 CreateAsset / CreateAssetGroup · Name 上限（InvalidParameter.Name） */
+export const VOLCENGINE_PORTRAIT_NAME_MAX_LEN = 64;
+
+/** 截断至火山 Name 上限；空串回退 fallback。 */
+export function sanitizeVolcenginePortraitName(
+  name: string | null | undefined,
+  fallback = "canvas-portrait",
+): string {
+  const trimmed = String(name ?? "").trim();
+  const base = trimmed || fallback.trim() || "canvas-portrait";
+  const chars = [...base];
+  if (chars.length <= VOLCENGINE_PORTRAIT_NAME_MAX_LEN) return base;
+  return chars.slice(0, VOLCENGINE_PORTRAIT_NAME_MAX_LEN).join("");
+}
+
 function pickResultObject(json: unknown): Record<string, unknown> | null {
   if (!json || typeof json !== "object") return null;
   const root = json as Record<string, unknown>;
@@ -163,7 +178,7 @@ export async function volcengineCreateAigcAssetGroup(opts: {
     "CreateAssetGroup",
     {
       GroupType: "AIGC",
-      Name: opts.name.trim() || "Canvas虚拟人像",
+      Name: sanitizeVolcenginePortraitName(opts.name, "Canvas虚拟人像"),
       Description: opts.description?.trim() || undefined,
       ProjectName: "default",
     },
@@ -225,7 +240,7 @@ export async function volcengineCreatePortraitAsset(opts: {
       GroupId: opts.groupId.trim(),
       URL: opts.url.trim(),
       AssetType: opts.assetType ?? "Image",
-      Name: opts.name?.trim() || "canvas-portrait",
+      Name: sanitizeVolcenginePortraitName(opts.name, "canvas-portrait"),
       ProjectName: "default",
     },
   );
@@ -298,7 +313,7 @@ export async function volcengineResolveOrCreateAigcGroup(opts: {
   if (groups[0]?.groupId) return groups[0].groupId;
   const created = await volcengineCreateAigcAssetGroup({
     credentials: opts.credentials,
-    name: preferred || "Canvas虚拟人像",
+    name: sanitizeVolcenginePortraitName(preferred, "Canvas虚拟人像"),
   });
   return created.groupId;
 }

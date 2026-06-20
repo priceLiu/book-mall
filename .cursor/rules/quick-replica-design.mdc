@@ -1,0 +1,18 @@
+---
+description: QuickReplica UI 须遵循 MiniMax DESIGN.md 与 qr-* 组件类
+globs:
+  - quick-replica-web/**/*.tsx
+  - quick-replica-web/**/*.css
+---
+
+# QuickReplica · MiniMax 设计约束
+
+改 UI 前读取 **`quick-replica-web/DESIGN.md`** 与 **`app/globals.css`** 中 `--qr-*` / `qr-*` 类。
+
+- 主按钮用 `qr-btn-primary`（brand blue `#3b82f6`），禁止粉紫渐变 CTA
+- 卡片用 `qr-card` / `qr-card-selected`（20px 圆角、紫调 shadow）
+- 表单用 `qr-input`；弹层用 `qr-modal-shell`
+- 装饰粉 `#ea5ec1` 仅 badge/pin，勿用于主按钮文字
+- 禁止 `window.alert/confirm/prompt` → `QrModal`
+
+详细规范见 skill：`.cursor/skills/quick-replica-minimax/SKILL.md`

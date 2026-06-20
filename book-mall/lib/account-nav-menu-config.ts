@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { BillingPersona } from "@prisma/client";
 import {
+  Copy,
   CreditCard,
   GraduationCap,
   Home,
@@ -77,6 +78,7 @@ export function buildAccountNavMenuGroups(input: {
   showToolsLaunch: boolean;
   showCanvasLaunch: boolean;
   showEcomLaunch: boolean;
+  showQuickReplicaLaunch: boolean;
 }): AccountNavMenuGroup[] {
   const isByok = input.billingPersona === "BYOK";
   const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
@@ -136,6 +138,9 @@ export function buildAccountNavMenuGroups(input: {
   }
   if (input.showEcomLaunch) {
     appItems.push({ kind: "action", id: "launch-ecom", label: "打开电商工具箱", icon: LayoutGrid });
+  }
+  if (input.showQuickReplicaLaunch) {
+    appItems.push({ kind: "action", id: "launch-quick-replica", label: "快速复制", icon: Copy });
   }
   if (appItems.length > 0) {
     groups.push({ id: "apps", label: GROUP_LABELS.apps, items: appItems });

@@ -15,6 +15,8 @@ export function AccountShell({
   gatewayLinked,
   canLaunchEcommerce,
   ecomOriginConfigured,
+  canLaunchQuickReplica,
+  quickReplicaOriginConfigured,
   appsMenuHint,
   billingPersona,
   children,
@@ -28,6 +30,8 @@ export function AccountShell({
   gatewayLinked: boolean;
   canLaunchEcommerce: boolean;
   ecomOriginConfigured: boolean;
+  canLaunchQuickReplica: boolean;
+  quickReplicaOriginConfigured: boolean;
   appsMenuHint: string | null;
   billingPersona: import("@prisma/client").BillingPersona | null;
   children: React.ReactNode;
@@ -42,6 +46,8 @@ export function AccountShell({
     gatewayLinked,
     canLaunchEcommerce,
     ecomOriginConfigured,
+    canLaunchQuickReplica,
+    quickReplicaOriginConfigured,
     appsMenuHint,
     billingPersona,
   };

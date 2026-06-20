@@ -22,6 +22,7 @@ const PORTS = [
   { port: 3005, label: "gateway-web" },
   { port: 3006, label: "prompt-optimizer-platform" },
   { port: 3007, label: "e-commerce-toolkit" },
+  { port: 3008, label: "quick-replica-web" },
 ];
 
 function listListenersOnPort(port) {

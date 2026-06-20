@@ -1,0 +1,527 @@
+[
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-video-frame-to-video",
+    "category": "video",
+    "kind": "frame-to-video",
+    "title": "帧到视频",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "A cute rabbit turns its head slowly in a greenhouse.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "wan/2-6-video-to-video",
+        "params": {
+          "duration": 5
+        }
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-video-frame-to-video/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-video-text-to-video",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "文字转视频",
+    "badges": [
+      "new"
+    ],
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "Y2K fashion girl filming with a camcorder on city street.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-video-text-to-video/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-video-smart-shot",
+    "category": "video",
+    "kind": "smart-shot",
+    "title": "智能射击",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "Cowboy in desert, cinematic wide shot, dust in the air.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "wan/2-6-video-to-video",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-video-smart-shot/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-video-motion-sync",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "运动同步",
+    "badges": [
+      "pinned",
+      "hot"
+    ],
+    "reference": {
+      "slots": {
+        "targetImage": {
+          "url": "https://picsum.photos/seed/motion-target/480/360"
+        },
+        "referenceVideo": {
+          "url": "https://storage.example.com/demo/dance-ref.mp4"
+        }
+      },
+      "prompt": {
+        "text": "Outdoor tennis court, sunny day, natural camera movement.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-video-motion-sync/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-video-lip-sync",
+    "category": "video",
+    "kind": "lip-sync",
+    "toolKey": "lip-sync",
+    "title": "唇语同步",
+    "badges": [
+      "pinned"
+    ],
+    "reference": {
+      "slots": {
+        "targetImage": {
+          "url": "https://picsum.photos/seed/lip-target/480/360"
+        },
+        "referenceAudio": {
+          "url": "https://storage.example.com/demo/voice.mp3"
+        }
+      },
+      "prompt": {
+        "text": "Man with boombox, urban background.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-video-lip-sync/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-video-visual-effects",
+    "category": "video",
+    "kind": "visual-effects",
+    "title": "视觉特效",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "Astronaut walking through neon corridor.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "wan/2-6-video-to-video",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-video-visual-effects/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-image-create",
+    "category": "image",
+    "kind": "create-image",
+    "title": "创建图像",
+    "reference": {
+      "slots": {
+        "characterRefs": [
+          {
+            "handle": "@fluffy",
+            "url": "https://picsum.photos/seed/dog/480/360"
+          }
+        ]
+      },
+      "prompt": {
+        "text": "@fluffy in glasses, studio lighting.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-image-create/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-image-variation",
+    "category": "image",
+    "kind": "image-variation",
+    "title": "图像变化",
+    "reference": {
+      "slots": {
+        "targetImage": {
+          "url": "https://picsum.photos/seed/variation/480/360"
+        }
+      },
+      "prompt": {
+        "text": "Same person, autumn park background.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-image-variation/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-image-edit",
+    "category": "image",
+    "kind": "edit-image",
+    "toolKey": "edit-image",
+    "title": "编辑图像",
+    "badges": [
+      "pinned"
+    ],
+    "reference": {
+      "slots": {
+        "targetImage": {
+          "url": "https://picsum.photos/seed/edit/480/360"
+        }
+      },
+      "prompt": {
+        "text": "add a gum bubble",
+        "locale": "en"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-image-edit/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-image-upscale",
+    "category": "image",
+    "kind": "image-upscale",
+    "title": "图像放大",
+    "reference": {
+      "slots": {
+        "targetImage": {
+          "url": "https://picsum.photos/seed/upscale/480/360"
+        }
+      },
+      "prompt": {
+        "text": "Enhance detail, preserve colors.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "topaz/image-upscale",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-image-upscale/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-character-create",
+    "category": "character",
+    "kind": "create-character",
+    "title": "创建角色",
+    "badges": [
+      "new"
+    ],
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "Portrait of a woman in sun hat, soft light.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-character-create/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-character-video",
+    "category": "character",
+    "kind": "character-video",
+    "title": "角色视频",
+    "reference": {
+      "slots": {
+        "characterRefs": [
+          {
+            "handle": "@ire",
+            "url": "https://picsum.photos/seed/ire/480/360"
+          }
+        ]
+      },
+      "prompt": {
+        "text": "@ire in Y2K outfit, camcorder selfie.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-character-video/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-character-motion",
+    "category": "character",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "运动同步",
+    "badges": [
+      "pinned"
+    ],
+    "reference": {
+      "slots": {
+        "targetImage": {
+          "url": "https://picsum.photos/seed/char-motion/480/360"
+        },
+        "referenceVideo": {
+          "url": "https://storage.example.com/demo/dance-ref.mp4"
+        }
+      },
+      "prompt": {
+        "text": "Character performs dance moves on stage.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-character-motion/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-world-create",
+    "category": "world",
+    "kind": "create-world",
+    "title": "创造世界",
+    "reference": {
+      "slots": {
+        "sceneImages": [
+          {
+            "url": "https://picsum.photos/seed/world-desert/480/360",
+            "label": "主场景"
+          }
+        ]
+      },
+      "prompt": {
+        "text": "Futuristic desert city at golden hour.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-world-create/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-world-camera",
+    "category": "world",
+    "kind": "world-camera",
+    "title": "3D世界摄像头",
+    "reference": {
+      "slots": {
+        "sceneImages": [
+          {
+            "url": "https://picsum.photos/seed/world-sea/480/360",
+            "label": "海岸"
+          }
+        ]
+      },
+      "prompt": {
+        "text": "Mediterranean white building by the sea.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "wan/2-6-video-to-video",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-world-camera/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-world-scene",
+    "category": "world",
+    "kind": "scene-actor",
+    "title": "场景演员",
+    "reference": {
+      "slots": {
+        "sceneImages": [
+          {
+            "url": "https://picsum.photos/seed/world-room/480/360",
+            "label": "房间"
+          }
+        ]
+      },
+      "prompt": {
+        "text": "Musician in a poster-filled room.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-world-scene/480/360"
+  },
+  {
+    "schemaVersion": 1,
+    "source": "builtin",
+    "visibility": "public",
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z",
+    "id": "builtin-audio-placeholder",
+    "category": "audio",
+    "kind": "add-sound",
+    "title": "添加音效",
+    "reference": {
+      "slots": {
+        "referenceAudio": {
+          "url": "https://storage.example.com/demo/sfx.mp3"
+        }
+      },
+      "prompt": {
+        "text": "Festive piñata party ambience.",
+        "locale": "en"
+      },
+      "model": {
+        "role": "AUDIO",
+        "modelKey": "audio-placeholder",
+        "params": {}
+      }
+    },
+    "thumbnailUrl": "https://picsum.photos/seed/builtin-audio-placeholder/480/360"
+  }
+]

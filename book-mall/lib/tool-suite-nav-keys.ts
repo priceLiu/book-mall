@@ -10,6 +10,7 @@ export const TOOL_SUITE_NAV_KEYS = [
   "story-theater",
   "ai-poster-canvas",
   "prompt-optimizer",
+  "quick-replica",
   "smart-support",
   "app-history",
   "e-commerce-toolkit",

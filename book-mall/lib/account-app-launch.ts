@@ -45,3 +45,9 @@ export function openEcomAppInNewTab(redirectPath = "/") {
   const href = `/ecom-open?path=${encodeURIComponent(path)}`;
   window.open(href, "_blank", "noopener,noreferrer");
 }
+
+export function openQuickReplicaAppInNewTab(redirectPath = "/") {
+  const path = redirectPath.startsWith("/") ? redirectPath : `/${redirectPath}`;
+  const href = `/quick-replica-open?path=${encodeURIComponent(path)}`;
+  window.open(href, "_blank", "noopener,noreferrer");
+}

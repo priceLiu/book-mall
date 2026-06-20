@@ -6,7 +6,7 @@
 pnpm install                        # 根目录 concurrently
 pnpm --dir e-commerce-toolkit install   # 首次：电商工具箱依赖（dev:all 会起 :3007）
 pnpm --dir book-mall install            # 主站与其它子站按需在各自目录 install
-pnpm dev:all                        # 同时启动 3000–3007（含 e-commerce-toolkit）
+pnpm dev:all                        # 同时启动 3000–3008（含 e-commerce-toolkit、quick-replica-web）
 ```
 
 `dev:all` 进程表见仓库根 `scripts/dev-all.mjs`；终端里电商工具箱日志前缀为 `[ecom]`。
@@ -31,6 +31,7 @@ pnpm dev:all                        # 同时启动 3000–3007（含 e-commerce-
 | gateway-web（Gateway BYOK） | 3005 | http://localhost:3005 |
 | prompt-optimizer-platform（提示词优化器） | 3006 | http://localhost:3006 |
 | e-commerce-toolkit（电商工具箱） | 3007 | http://localhost:3007 |
+| quick-replica-web（快速复制） | 3008 | http://localhost:3008 |
 
 ## 漫剧：带上 KIE 轮询
 

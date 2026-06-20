@@ -11,6 +11,8 @@ export function buildAccountAppsMenuHint(input: {
   canLaunchCanvas: boolean;
   ecomAccess: boolean;
   ecomOriginConfigured: boolean;
+  quickReplicaOriginConfigured: boolean;
+  canLaunchQuickReplica: boolean;
   isAdmin: boolean;
   billingPersona: BillingPersona | null;
 }): string | null {
@@ -28,8 +30,14 @@ export function buildAccountAppsMenuHint(input: {
     input.toolsSsoReady &&
     (input.isAdmin || input.ecomAccess) &&
     input.ecomOriginConfigured;
+  const quickReplicaReady = isAccountCanvasLaunchClickable({
+    canLaunchCanvas: input.canLaunchQuickReplica,
+    canvasOriginConfigured: input.quickReplicaOriginConfigured,
+    billingPersona: input.billingPersona,
+    gatewayLinked: input.gatewayLinked,
+  });
 
-  if (canLaunchTools || canvasReady || ecomReady) {
+  if (canLaunchTools || canvasReady || ecomReady || quickReplicaReady) {
     if (canvasVisible && !canvasReady && input.billingPersona === "BYOK") {
       return "AI 画布需先在「Gateway API Key」完成 sk-gw 关联。";
     }
@@ -52,9 +60,9 @@ export function buildAccountAppsMenuHint(input: {
       : "AI 画布 Gateway 关联未完成，请稍后重试或联系团队管理员。";
   }
 
-  if (!input.canvasOriginConfigured || !input.ecomOriginConfigured) {
+  if (!input.canvasOriginConfigured || !input.ecomOriginConfigured || !input.quickReplicaOriginConfigured) {
     return process.env.NODE_ENV === "development"
-      ? "应用未显示：检查 CANVAS_WEB_ORIGIN / ECOMMERCE_PUBLIC_ORIGIN 环境变量。"
+      ? "应用未显示：检查 CANVAS_WEB_ORIGIN / ECOMMERCE_PUBLIC_ORIGIN / QUICK_REPLICA_PUBLIC_ORIGIN 环境变量。"
       : null;
   }
 

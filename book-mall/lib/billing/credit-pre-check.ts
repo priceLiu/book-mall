@@ -12,6 +12,7 @@ import { computeChargeCredits } from "./gateway-credit-settlement";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 import { resolveBillingCanonicalKey, resolveCostSnapshot } from "@/lib/gateway/credit-billing-guard";
 import { computeTierCredits, videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
+import { resolveTeamBillingFallbackTenantId } from "./resolve-team-billing-fallback";
 
 export async function resolveBillingRef(input: {
   tenantId?: string | null;
@@ -36,6 +37,12 @@ export async function resolveBillingRef(input: {
       })
     )?.id;
   if (!actorId) return null;
+
+  const teamTenantId = await resolveTeamBillingFallbackTenantId(actorId);
+  if (teamTenantId) {
+    return { ownerType: "TENANT", ownerId: teamTenantId };
+  }
+
   return { ownerType: "USER", ownerId: actorId };
 }
 

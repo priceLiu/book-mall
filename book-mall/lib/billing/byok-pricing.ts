@@ -182,6 +182,82 @@ function isVideoToVideoInput(inputSummary: unknown): boolean {
   );
 }
 
+function videoInputRecord(inputSummary: unknown): Record<string, unknown> | null {
+  if (!inputSummary || typeof inputSummary !== "object" || Array.isArray(inputSummary)) {
+    return null;
+  }
+  const root = inputSummary as Record<string, unknown>;
+  const nested =
+    root.input && typeof root.input === "object" && !Array.isArray(root.input)
+      ? (root.input as Record<string, unknown>)
+      : null;
+  return nested ?? root;
+}
+
+function hasReferenceImageInVideoInput(inputSummary: unknown): boolean {
+  const input = videoInputRecord(inputSummary);
+  if (!input) return false;
+  const imageFields = [
+    "imageUrl",
+    "image_url",
+    "firstFrameUrl",
+    "first_frame_url",
+    "firstFrameImage",
+    "first_frame_image",
+    "imgUrl",
+    "img_url",
+  ];
+  for (const key of imageFields) {
+    const v = input[key];
+    if (typeof v === "string" && v.trim()) return true;
+  }
+  const refArrays = [
+    input.referenceImageUrls,
+    input.reference_image_urls,
+    input.image_urls,
+    input.imageUrls,
+    input.referenceImages,
+    input.reference_images,
+  ];
+  for (const arr of refArrays) {
+    if (Array.isArray(arr) && arr.some((u) => typeof u === "string" && u.trim())) {
+      return true;
+    }
+  }
+  const assetRefs = input.assetRefs ?? input.asset_refs;
+  if (Array.isArray(assetRefs)) {
+    for (const ref of assetRefs) {
+      if (!ref || typeof ref !== "object") continue;
+      const role = String((ref as Record<string, unknown>).role ?? "");
+      if (role === "first_frame" || role === "last_frame" || role === "reference_image") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** VIDEO 请求是否为纯文生视频（无首帧/参考图；与图生视频区分）。 */
+export function isTextToVideoInput(inputSummary: unknown): boolean {
+  if (isVideoToVideoInput(inputSummary)) return false;
+  const input = videoInputRecord(inputSummary);
+  if (!input) return false;
+  if (hasReferenceImageInVideoInput(inputSummary)) return false;
+
+  const model = String(input.model ?? "").trim().toLowerCase();
+  if (
+    model.includes("text-to-video") ||
+    model.includes("text_to_video") ||
+    model.includes("/t2v") ||
+    model.endsWith("-t2v")
+  ) {
+    return true;
+  }
+
+  const prompt = input.prompt;
+  return typeof prompt === "string" && prompt.trim().length > 0;
+}
+
 /** 将 Gateway 日志映射为 BYOK 任务类型（报表与结算共用）。纯 CHAT 文字返回 null。 */
 export function mapLogToByokTaskKind(log: {
   requestKind: string;

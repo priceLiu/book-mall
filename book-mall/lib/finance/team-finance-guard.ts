@@ -55,6 +55,13 @@ export function currentPeriodKey(d = new Date()): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+export function periodBounds(periodKey: string): { from: Date; to: Date } {
+  const [y, m] = periodKey.split("-").map((s) => Number(s));
+  const from = new Date(Date.UTC(y, (m ?? 1) - 1, 1));
+  const to = new Date(Date.UTC(y, m ?? 1, 1));
+  return { from, to };
+}
+
 function toTeamSummary(m: TenantMembershipSummary): TeamFinanceTeamSummary {
   return {
     tenantId: m.tenantId,

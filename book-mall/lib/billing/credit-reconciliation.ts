@@ -16,6 +16,10 @@ import {
   resolveBillingCategory,
 } from "@/lib/billing/billing-category";
 import { buildGatewayLogWhereForTeamTenant } from "@/lib/gateway/log-query-scope";
+import {
+  fetchTeamGatewayTokenUsage,
+  gatewayTokenUsageToRecord,
+} from "@/lib/gateway/gateway-token-usage-aggregate";
 import { getTenantOverview } from "@/lib/tenant/tenant-service";
 
 import { sumResourceFees, type AccountRef } from "./credit-account-service";
@@ -512,6 +516,7 @@ export interface TeamDashboardPayload {
   bill: TeamCreditBill;
   seatUsage: { used: number; limit: number };
   byCategory: { category: string; label: string; count: number; credits: number }[];
+  tokenUsage: ReturnType<typeof gatewayTokenUsageToRecord>;
   dailyTrend: { date: string; credits: number; count: number }[];
   recentLogs: {
     id: string;
@@ -537,7 +542,7 @@ export async function buildTeamDashboard(input: {
   const trendFrom = new Date(to);
   trendFrom.setUTCDate(trendFrom.getUTCDate() - 30);
 
-  const [bill, overview, teamLogWhere, recentLogWhere, trendLogWhere] =
+  const [bill, overview, teamLogWhere, recentLogWhere, trendLogWhere, tokenUsageRaw] =
     await Promise.all([
     buildTeamCreditBill({ tenantId: input.tenantId, periodKey: input.periodKey }),
     getTenantOverview(input.tenantId),
@@ -551,6 +556,11 @@ export async function buildTeamDashboard(input: {
       submittedFrom: trendFrom,
       submittedTo: to,
       status: "SUCCEEDED",
+    }),
+    fetchTeamGatewayTokenUsage({
+      tenantId: input.tenantId,
+      submittedFrom: from,
+      submittedTo: to,
     }),
   ]);
 
@@ -641,6 +651,7 @@ export async function buildTeamDashboard(input: {
       limit: overview?.seatLimit ?? 0,
     },
     byCategory,
+    tokenUsage: gatewayTokenUsageToRecord(tokenUsageRaw),
     dailyTrend,
     recentLogs: recentLogs.map((l) => ({
       id: l.id,

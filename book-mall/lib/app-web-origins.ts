@@ -41,6 +41,16 @@ export function getPromptOptimizerOrigin(): string {
   );
 }
 
+export function getQuickReplicaOrigin(): string {
+  return trimOrigin(
+    process.env.NEXT_PUBLIC_QUICK_REPLICA_ORIGIN ??
+      process.env.QUICK_REPLICA_PUBLIC_ORIGIN,
+    process.env.NODE_ENV === "production"
+      ? "https://replica.ai-code8.com"
+      : "http://localhost:3008",
+  );
+}
+
 export function buildAppWebUrl(origin: string, path: string): string {
   const base = origin.replace(/\/$/, "");
   if (!path || path === "/") return `${base}/`;

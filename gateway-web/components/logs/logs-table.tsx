@@ -180,6 +180,8 @@ async function fetchGatewayLogs(params: {
   providerFilter: string;
   modelFilter: string;
   credentialIdFilter: string;
+  skipPoll?: boolean;
+  poll?: boolean;
 }): Promise<GatewayLogsResponse> {
   const qs = new URLSearchParams({
     page: String(params.page),
@@ -192,6 +194,8 @@ async function fetchGatewayLogs(params: {
   if (params.providerFilter) qs.set("providerKind", params.providerFilter);
   if (params.modelFilter) qs.set("model", params.modelFilter);
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
+  if (params.skipPoll !== false) qs.set("skipPoll", "1");
+  if (params.poll) qs.set("poll", "1");
   const res = await fetch(`/api/book-mall/api/gateway/logs?${qs.toString()}`);
   const data = (await res.json().catch(() => null)) as
     | (GatewayLogsResponse & { error?: string })
@@ -293,10 +297,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     [logs],
   );
 
-  const loadLogs = useCallback(async () => {
+  const loadLogs = useCallback(async (opts?: { poll?: boolean }) => {
     setFetchError(null);
     try {
-      const data = await fetchGatewayLogs(fetchParams);
+      const data = await fetchGatewayLogs({
+        ...fetchParams,
+        skipPoll: !opts?.poll,
+        poll: opts?.poll,
+      });
       setLogs(data.logs);
       setTotal(data.total);
       setPage(data.page);
@@ -314,7 +322,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const refreshLogs = useCallback(async () => {
     setRefreshing(true);
     try {
-      return await loadLogs();
+      return await loadLogs({ poll: true });
     } finally {
       setRefreshing(false);
     }
@@ -358,7 +366,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     let cancelled = false;
     const run = async () => {
       if (cancelled) return;
-      await refreshLogs();
+      await loadLogs({ poll: true });
     };
 
     void run();
@@ -370,7 +378,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [autoRefresh, hasInFlightLogs, refreshLogs]);
+  }, [autoRefresh, hasInFlightLogs, loadLogs]);
 
   /** 筛选 / 分页 / 每页条数变更时拉取 */
   useEffect(() => {
