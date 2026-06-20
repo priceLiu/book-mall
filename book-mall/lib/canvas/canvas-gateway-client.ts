@@ -100,6 +100,7 @@ export async function canvasGwChat(
     params?: Record<string, unknown>;
     clientPage?: string;
     projectId?: string;
+    canvasTaskId?: string;
   },
 ): Promise<CanvasGwChatResult> {
   const auth = await requireGatewayAuth(userId);
@@ -392,6 +393,7 @@ export async function canvasGwTts(
     languageType?: string;
     clientPage?: string;
     projectId?: string;
+    canvasTaskId?: string;
   },
 ): Promise<{ buffer: Buffer; logId: string; contentType: string; ext: string }> {
   const auth = await requireGatewayAuth(userId);
@@ -515,6 +517,7 @@ export async function canvasGwImageParsing(
     clothesType?: DashscopeClothesType[];
     clientPage?: string;
     projectId?: string;
+    canvasTaskId?: string;
   },
 ): Promise<{ output: DashscopeParsingOutput; logId: string }> {
   const auth = await requireGatewayAuth(userId);
@@ -631,6 +634,7 @@ export async function canvasGwChatStream(
     params?: Record<string, unknown>;
     clientPage?: string;
     projectId?: string;
+    canvasTaskId?: string;
   },
 ): Promise<{ logId: string; status: number; body: ReadableStream<Uint8Array> }> {
   const auth = await requireGatewayAuth(userId);
