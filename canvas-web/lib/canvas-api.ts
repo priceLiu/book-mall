@@ -2,7 +2,7 @@
  * 浏览器侧 canvas API 客户端：统一处理跨域代理与 cookie。
  */
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
-import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
+import { ensureCanvasUploadFileMeta } from "@/lib/canvas/normalize-canvas-image-file";
 
 /** 无权限或项目不存在时停止 tasks 轮询，避免控制台 404 刷屏 */
 const forbiddenCanvasProjectIds = new Set<string>();
@@ -542,8 +542,7 @@ export async function uploadCanvasImage(
   base: string,
   file: File,
 ): Promise<string> {
-  const normalized = await normalizeCanvasImageFile(file);
-  return uploadCanvasFile(base, normalized);
+  return uploadCanvasFile(base, ensureCanvasUploadFileMeta(file));
 }
 
 export async function uploadCanvasFile(

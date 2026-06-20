@@ -8,6 +8,7 @@ import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
 import {
   inferCanvasUploadImageMime,
   normalizeCanvasUploadImageBuffer,
+  sniffImageMimeFromBuffer,
 } from "@/lib/canvas/canvas-image-upload-normalize";
 
 export const runtime = "nodejs";
@@ -127,10 +128,15 @@ export async function POST(request: NextRequest) {
     );
   }
   const fileName = file.name.trim();
-  const mime = inferCanvasUploadImageMime(
+  let buf = Buffer.from(await file.arrayBuffer());
+  let mime = inferCanvasUploadImageMime(
     file.type.toLowerCase(),
     fileName,
   );
+  if (!mime.startsWith("image/")) {
+    const sniffed = sniffImageMimeFromBuffer(buf);
+    if (sniffed) mime = sniffed;
+  }
   const textUpload = isTextUpload(mime, fileName);
   const audioUpload = isAudioUpload(mime, fileName);
   const imageUpload =
@@ -145,7 +151,6 @@ export async function POST(request: NextRequest) {
       { status: 415, headers: jsonHeaders(request) },
     );
   }
-  let buf = Buffer.from(await file.arrayBuffer());
   if (textUpload) {
     const sample = buf.subarray(0, Math.min(buf.length, 4096)).toString("utf8");
     if (sample.includes("\0")) {
