@@ -6,7 +6,10 @@ import { randomBytes } from "crypto";
 import type { TenantRole } from "@prisma/client";
 
 import { normalizePhone } from "@/lib/auth/phone";
-import { issueSmsCode } from "@/lib/auth/sms-verification-service";
+import {
+  isTeamInviteUrlCodeValid,
+  issueSmsCode,
+} from "@/lib/auth/sms-verification-service";
 import { prisma } from "@/lib/prisma";
 import { buildTeamInviteUrl } from "@/lib/tenant/team-invite-link";
 import { occupyIdleSeat, SeatUnavailableError } from "./tenant-service";
@@ -15,6 +18,34 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function genToken(): string {
   return randomBytes(24).toString("base64url");
+}
+
+/** 将已过 expiresAt 但仍为 PENDING 的邀请标记为 EXPIRED。 */
+export async function expireStalePendingInvites(opts?: {
+  tenantId?: string;
+  phone?: string;
+}): Promise<number> {
+  const now = new Date();
+  const phone = opts?.phone ? normalizePhone(opts.phone) : null;
+  const result = await prisma.tenantInvite.updateMany({
+    where: {
+      status: "PENDING",
+      expiresAt: { lt: now },
+      ...(opts?.tenantId ? { tenantId: opts.tenantId } : {}),
+      ...(phone ? { phone } : {}),
+    },
+    data: { status: "EXPIRED" },
+  });
+  return result.count;
+}
+
+function pendingInviteWhere(tenantId: string, phone?: string) {
+  return {
+    tenantId,
+    status: "PENDING" as const,
+    expiresAt: { gt: new Date() },
+    ...(phone ? { phone } : {}),
+  };
 }
 
 export async function createInvite(input: {
@@ -29,6 +60,8 @@ export async function createInvite(input: {
     throw new Error("手机号格式无效");
   }
 
+  await expireStalePendingInvites({ tenantId: input.tenantId, phone });
+
   const tenant = await prisma.tenant.findUnique({
     where: { id: input.tenantId },
     select: { seatLimit: true, name: true },
@@ -40,7 +73,7 @@ export async function createInvite(input: {
       where: { tenantId: input.tenantId, status: "ACTIVE" },
     }),
     prisma.tenantInvite.count({
-      where: { tenantId: input.tenantId, status: "PENDING" },
+      where: pendingInviteWhere(input.tenantId),
     }),
   ]);
   if (occupied + pending >= tenant.seatLimit) {
@@ -56,7 +89,7 @@ export async function createInvite(input: {
   }
 
   const duplicatePending = await prisma.tenantInvite.findFirst({
-    where: { tenantId: input.tenantId, phone, status: "PENDING" },
+    where: pendingInviteWhere(input.tenantId, phone),
   });
   if (duplicatePending) throw new Error("该手机号已有待接受的邀请");
 
@@ -100,9 +133,19 @@ export async function resolveInviteLink(token: string): Promise<string> {
   if (!invite || invite.status !== "PENDING") {
     throw new Error("邀请无效或已失效");
   }
-  if (invite.urlCode?.trim()) {
-    return buildTeamInviteUrl(invite.token, invite.urlCode.trim());
+
+  const stored = invite.urlCode?.trim();
+  if (
+    stored &&
+    (await isTeamInviteUrlCodeValid({
+      phoneRaw: invite.phone,
+      inviteToken: invite.token,
+      code: stored,
+    }))
+  ) {
+    return buildTeamInviteUrl(invite.token, stored);
   }
+
   const issued = await issueSmsCode({
     phoneRaw: invite.phone,
     purpose: "TEAM_INVITE",
@@ -121,6 +164,7 @@ export async function getInviteByToken(token: string) {
     include: { tenant: { select: { id: true, name: true, type: true } } },
   });
   if (!invite) return null;
+
   if (invite.status === "PENDING" && invite.expiresAt < new Date()) {
     await prisma.tenantInvite.update({
       where: { id: invite.id },
@@ -132,8 +176,9 @@ export async function getInviteByToken(token: string) {
 }
 
 export async function listInvites(tenantId: string) {
+  await expireStalePendingInvites({ tenantId });
   return prisma.tenantInvite.findMany({
-    where: { tenantId, status: "PENDING" },
+    where: pendingInviteWhere(tenantId),
     orderBy: { createdAt: "desc" },
   });
 }

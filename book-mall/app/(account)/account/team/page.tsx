@@ -10,6 +10,10 @@ import {
 } from "@/lib/tenant/context";
 import { getTenantOverview } from "@/lib/tenant/tenant-service";
 import { canTenant } from "@/lib/tenant/permission";
+import {
+  expireStalePendingInvites,
+  listInvites,
+} from "@/lib/tenant/tenant-invite-service";
 import { TeamClient } from "./team-client";
 
 export const dynamic = "force-dynamic";
@@ -54,12 +58,12 @@ export default async function AccountTeamPage() {
   const canManageMembers = myRole ? canTenant(myRole, "member:manage") : false;
   const invites =
     selectedTeamId && canManageMembers
-      ? await prisma.tenantInvite.findMany({
-          where: { tenantId: selectedTeamId, status: "PENDING" },
-          orderBy: { createdAt: "desc" },
-        })
+      ? await listInvites(selectedTeamId)
       : [];
 
+  if (user?.phone) {
+    await expireStalePendingInvites({ phone: user.phone });
+  }
   // 收到的待接受邀请（按当前登录手机号）
   const incomingInvites = user?.phone
     ? await prisma.tenantInvite.findMany({

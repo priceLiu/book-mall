@@ -7,6 +7,7 @@ import { InviteStaleSessionCleaner } from "@/components/team/invite-stale-sessio
 import { authOptions } from "@/lib/auth";
 import { normalizePhone } from "@/lib/auth/phone";
 import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
+import { pickTeamInviteUrlCode } from "@/lib/tenant/team-invite-link";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -19,12 +20,7 @@ function pickInviteCode(
   searchParams: Record<string, string | string[] | undefined> | undefined,
   storedUrlCode: string | null | undefined,
 ): string | null {
-  const raw = searchParams?.code;
-  const fromQuery = Array.isArray(raw) ? raw[0] : raw;
-  const q = fromQuery?.trim();
-  if (q) return q;
-  const stored = storedUrlCode?.trim();
-  return stored || null;
+  return pickTeamInviteUrlCode(searchParams, storedUrlCode);
 }
 
 export default async function TeamInvitePage({
