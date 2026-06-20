@@ -235,7 +235,7 @@ export function resolveVolcengineLogTiming(input: {
   const live = computeVolcengineTimingBreakdown({
     trace,
     submittedAtMs: input.submittedAt.getTime(),
-    completedAtMs: input.completedAtMs?.getTime() ?? null,
+    completedAtMs: input.completedAt?.getTime() ?? null,
     nowMs: input.nowMs,
   });
 

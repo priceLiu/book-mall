@@ -1,4 +1,5 @@
 import type { GatewayRequestLog } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { isGatewayLogTerminalStatus } from "@/lib/gateway/log-progress";
@@ -54,7 +55,7 @@ export async function persistVolcengineTimingOnPoll(input: {
         status: { notIn: ["SUCCEEDED", "FAILED", "CANCELLED"] },
       },
       data: {
-        resultSummary: nextSummary,
+        resultSummary: nextSummary as Prisma.InputJsonValue,
         lastPolledAt: new Date(polledAtMs),
         pollCount: { increment: 1 },
       },
