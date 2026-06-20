@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { canViewFinanceCost } from "@/lib/auth/permissions";
 import { formatUserDisplayLabel } from "@/lib/auth/user-display";
+import { listDashboardTeamOptions } from "@/lib/gateway/log-dashboard-teams";
 import { resolveGatewaySessionBookUserId } from "@/lib/gateway/log-query-scope";
-import { fetchGatewayLogActorDisplays } from "@/lib/gateway/log-dashboard-actor";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 import { prisma } from "@/lib/prisma";
 
@@ -27,26 +27,10 @@ export async function GET(request: NextRequest) {
     : null;
   const isPlatformAdmin = canViewFinanceCost(bookUser?.role);
 
-  const memberships =
+  const teams =
     bookUserId != null
-      ? await prisma.tenantMember.findMany({
-          where: {
-            userId: bookUserId,
-            status: "ACTIVE",
-            role: { in: ["OWNER", "ADMIN"] },
-          },
-          select: {
-            tenant: { select: { id: true, name: true, type: true } },
-          },
-          orderBy: { tenant: { name: "asc" } },
-        })
+      ? await listDashboardTeamOptions(bookUserId, { isPlatformAdmin })
       : [];
-
-  const teams = memberships.map((m) => ({
-    id: m.tenant.id,
-    name: m.tenant.name,
-    type: m.tenant.type,
-  }));
 
   return NextResponse.json({
     isPlatformAdmin,

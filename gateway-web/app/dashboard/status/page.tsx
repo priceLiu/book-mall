@@ -3,6 +3,15 @@ import { gatewayJson } from "@/lib/gateway-api";
 
 export const dynamic = "force-dynamic";
 
+type DashboardTeamOption = {
+  id: string;
+  name: string;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+  canViewAllMembers: boolean;
+  isPlatformScope?: boolean;
+  ownerHint?: string | null;
+};
+
 type DashboardMeta = {
   isPlatformAdmin: boolean;
   bookUserId: string | null;
@@ -12,7 +21,7 @@ type DashboardMeta = {
     name: string | null;
     displayLabel: string;
   } | null;
-  teams: { id: string; name: string; type?: string }[];
+  teams: DashboardTeamOption[];
 };
 
 export default async function StatusDashboardPage() {

@@ -28,12 +28,21 @@ import {
   type GatewayLogPageSizePreset,
 } from "@/lib/gateway-log-pagination-config";
 
-const POLL_MS = 20_000;
+const POLL_MS = 30_000;
 const LIVE_CLOCK_MS = 1_000;
 
 type DashboardScope = "all" | "team" | "actor" | "project";
 type DetailTab = "succeeded" | "inProgress" | "failed";
 type ViewMode = "dashboard" | "table";
+
+type DashboardTeamOption = {
+  id: string;
+  name: string;
+  role: "OWNER" | "ADMIN" | "MEMBER";
+  canViewAllMembers: boolean;
+  isPlatformScope?: boolean;
+  ownerHint?: string | null;
+};
 
 type DashboardMeta = {
   isPlatformAdmin: boolean;
@@ -44,8 +53,18 @@ type DashboardMeta = {
     name: string | null;
     displayLabel: string;
   } | null;
-  teams: { id: string; name: string; type?: string }[];
+  teams: DashboardTeamOption[];
 };
+
+function formatTeamOptionLabel(team: DashboardTeamOption): string {
+  if (team.isPlatformScope) {
+    const base = team.ownerHint ? `${team.name} · ${team.ownerHint}` : team.name;
+    return `${base}（全站）`;
+  }
+  if (team.role === "OWNER") return `${team.name}（主账号）`;
+  if (team.role === "ADMIN") return `${team.name}（管理员）`;
+  return `${team.name}（成员）`;
+}
 
 type StatusLogRow = GatewayLogRow & {
   billingCategory?: string | null;
@@ -99,14 +118,47 @@ const TAB_CONFIG: { id: DetailTab; label: string; query: Record<string, string> 
   { id: "failed", label: "失败", query: { status: "FAILED" } },
 ];
 
+function normalizeFilterState(
+  state: FilterState,
+  teams: DashboardTeamOption[],
+): FilterState {
+  if (state.scope === "team") {
+    const tenantId = state.tenantId || teams[0]?.id || "";
+    if (!tenantId) {
+      return { ...state, scope: "all", tenantId: "" };
+    }
+    return { ...state, tenantId };
+  }
+  if (state.scope === "project" && !state.storyProjectId.trim()) {
+    return { ...state, scope: "all" };
+  }
+  return state;
+}
+
+function filtersEqual(a: FilterState, b: FilterState): boolean {
+  return (
+    a.scope === b.scope &&
+    a.tenantId === b.tenantId &&
+    a.actorPhone === b.actorPhone &&
+    a.storyProjectId === b.storyProjectId &&
+    a.hours === b.hours &&
+    a.fromDate === b.fromDate &&
+    a.toDate === b.toDate
+  );
+}
+
 function buildQueryString(
   filters: FilterState,
   extra: Record<string, string | number | undefined>,
 ): string {
   const qs = new URLSearchParams();
-  if (filters.scope !== "all") qs.set("scope", filters.scope);
-  if (filters.scope === "team" && filters.tenantId) {
-    qs.set("tenantId", filters.tenantId);
+  if (filters.scope === "team") {
+    if (filters.tenantId) {
+      qs.set("scope", "team");
+      qs.set("tenantId", filters.tenantId);
+    }
+  } else if (filters.scope !== "all") {
+    qs.set("scope", filters.scope);
   }
   if (
     (filters.scope === "team" || filters.scope === "actor") &&
@@ -131,9 +183,14 @@ function buildQueryString(
 
 async function fetchJson<T>(
   path: string,
-): Promise<{ ok: true; data: T } | { ok: false; status: number }> {
+): Promise<
+  { ok: true; data: T } | { ok: false; status: number; error?: string }
+> {
   const res = await fetch(path);
-  if (!res.ok) return { ok: false, status: res.status };
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    return { ok: false, status: res.status, error: body?.error };
+  }
   return { ok: true, data: (await res.json()) as T };
 }
 
@@ -207,17 +264,23 @@ function StatCard({
 }
 
 export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta }) {
+  const defaultFilters = (): FilterState =>
+    normalizeFilterState(
+      {
+        scope: "all",
+        tenantId: initialMeta.teams[0]?.id ?? "",
+        actorPhone: "",
+        storyProjectId: "",
+        hours: "12",
+        fromDate: "",
+        toDate: "",
+      },
+      initialMeta.teams,
+    );
+
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
-  const [filters, setFilters] = useState<FilterState>(() => ({
-    scope: "all",
-    tenantId: initialMeta.teams[0]?.id ?? "",
-    actorPhone: "",
-    storyProjectId: "",
-    hours: "12",
-    fromDate: "",
-    toDate: "",
-  }));
-  const [applied, setApplied] = useState<FilterState>(filters);
+  const [filters, setFilters] = useState<FilterState>(() => defaultFilters());
+  const [applied, setApplied] = useState<FilterState>(() => defaultFilters());
   const [phoneDraft, setPhoneDraft] = useState("");
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("inProgress");
@@ -262,7 +325,27 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     setDetailPage(1);
   }, []);
 
+  const commitFilters = useCallback(
+    (next: FilterState) => {
+      const normalized = normalizeFilterState(next, initialMeta.teams);
+      setFilters((prev) => (filtersEqual(prev, normalized) ? prev : normalized));
+      setApplied((prev) => (filtersEqual(prev, normalized) ? prev : normalized));
+    },
+    [initialMeta.teams],
+  );
+
   const loadData = useCallback(async () => {
+    if (applied.scope === "team" && !applied.tenantId) {
+      setError(
+        initialMeta.teams.length === 0
+          ? "当前账号未加入任何团队"
+          : "请选择团队后再查看",
+      );
+      setLoading(false);
+      setDetailLoading(false);
+      return;
+    }
+
     const seq = ++loadSeqRef.current;
     setLoading(true);
     setDetailLoading(true);
@@ -289,7 +372,9 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         setError(
           statsRes.status === 401
             ? "登录已失效，请重新登录"
-            : `加载统计失败（${statsRes.status}）`,
+            : statsRes.error
+              ? `${statsRes.error}（${statsRes.status}）`
+              : `加载统计失败（${statsRes.status}）`,
         );
         return;
       }
@@ -314,7 +399,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         setDetailLoading(false);
       }
     }
-  }, [applied, detailPage, pageSize, tabQuery]);
+  }, [applied, detailPage, pageSize, tabQuery, initialMeta.teams.length]);
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
@@ -343,30 +428,17 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   }, [loadData, viewMode]);
 
   const applyFilters = () => {
-    setFilters((f) => ({ ...f, actorPhone: phoneDraft }));
-    setApplied({ ...filters, actorPhone: phoneDraft });
+    commitFilters({ ...filters, actorPhone: phoneDraft });
   };
 
   useEffect(() => {
     if (filters.scope !== "team" && filters.scope !== "actor") return;
+    if (filters.scope === "team" && !filters.tenantId) return;
     const timer = window.setTimeout(() => {
-      setApplied((prev) => {
-        if (
-          prev.scope === filters.scope &&
-          prev.tenantId === filters.tenantId &&
-          prev.actorPhone === phoneDraft &&
-          prev.hours === filters.hours &&
-          prev.fromDate === filters.fromDate &&
-          prev.toDate === filters.toDate &&
-          prev.storyProjectId === filters.storyProjectId
-        ) {
-          return prev;
-        }
-        return { ...filters, actorPhone: phoneDraft };
-      });
+      commitFilters({ ...filters, actorPhone: phoneDraft });
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [phoneDraft, filters]);
+  }, [phoneDraft, filters.scope, filters.tenantId, commitFilters, filters]);
 
   const exportQueryString = buildQueryString(applied, {});
   const activeTabLabel =
@@ -387,7 +459,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         <div>
           <h1 className="text-xl font-semibold text-white">状态驾驶舱</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            数字、状态与失败原因与 Gateway 日志同源 · 每 20 秒自动刷新
+            数字、状态与失败原因与 Gateway 日志同源 · 每 30 秒自动刷新
           </p>
         </div>
         {loading ? (
@@ -426,12 +498,18 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           <select
             className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
             value={filters.scope}
-            onChange={(e) =>
-              setFilters((f) => ({
-                ...f,
-                scope: e.target.value as DashboardScope,
-              }))
-            }
+            onChange={(e) => {
+              const scope = e.target.value as DashboardScope;
+              commitFilters({
+                ...filters,
+                scope,
+                tenantId:
+                  scope === "team"
+                    ? filters.tenantId || initialMeta.teams[0]?.id || ""
+                    : filters.tenantId,
+                actorPhone: phoneDraft,
+              });
+            }}
           >
             <option value="all">全站 / 可见范围</option>
             <option value="team">团队</option>
@@ -448,15 +526,19 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                 className="min-w-[180px] rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
                 value={filters.tenantId}
                 onChange={(e) =>
-                  setFilters((f) => ({ ...f, tenantId: e.target.value }))
+                  commitFilters({
+                    ...filters,
+                    tenantId: e.target.value,
+                    actorPhone: phoneDraft,
+                  })
                 }
               >
                 {initialMeta.teams.length === 0 ? (
-                  <option value="">无管理团队</option>
+                  <option value="">无加入的团队</option>
                 ) : (
                   initialMeta.teams.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.type === "PERSONAL" ? `${t.name}（个人空间）` : t.name}
+                      {formatTeamOptionLabel(t)}
                     </option>
                   ))
                 )}
