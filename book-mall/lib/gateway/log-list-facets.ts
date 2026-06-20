@@ -79,7 +79,8 @@ export async function resolveGatewayLogListFacets(
     models: [...models].sort((a, b) => a.localeCompare(b)),
     providerKinds: providerRows
       .map((r) => r.providerKind)
-      .filter((k): k is string => !!k),
+      .filter((k) => k != null)
+      .map((k) => k as string),
     credentialKeys: credentials
       .map((c) => ({ id: c.id, masked: maskApiKey(c.apiKeyEncrypted) }))
       .sort((a, b) => a.masked.localeCompare(b.masked)),
