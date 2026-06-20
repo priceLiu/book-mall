@@ -85,12 +85,12 @@ export async function normalizeCanvasUploadImageBuffer(
 
   if (meta.format === "jpeg") {
     const out = await pipeline.jpeg({ quality: 92, mozjpeg: true }).toBuffer();
-    return { buf: out, contentType: "image/jpeg", ext: "jpg" };
+    return { buf: Buffer.from(out), contentType: "image/jpeg", ext: "jpg" };
   }
 
   const out = await pipeline
     .flatten({ background: { r: 255, g: 255, b: 255 } })
     .jpeg({ quality: 92, mozjpeg: true })
     .toBuffer();
-  return { buf: out, contentType: "image/jpeg", ext: "jpg" };
+  return { buf: Buffer.from(out), contentType: "image/jpeg", ext: "jpg" };
 }
