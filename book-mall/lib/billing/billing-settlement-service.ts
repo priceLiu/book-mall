@@ -33,6 +33,8 @@ export type RecordBillingSettlementInput = {
   creditsCharged?: number;
   creditLedgerId?: string | null;
   feeDescription?: string | null;
+  /** 视频按秒计费时的计费秒数（财务明细展示） */
+  videoBillableSeconds?: number | null;
 };
 
 function buildFeeDescription(input: RecordBillingSettlementInput): string {
@@ -66,8 +68,11 @@ function buildFeeDescription(input: RecordBillingSettlementInput): string {
       return `BYOK 超额 · ${taskLabel}${tryonSuffix}${unitSuffix} 扣 ${input.creditsCharged ?? 0} 积分${remaining}`;
     case "PLATFORM_CREDIT":
       return `平台代付 · ${catLabel}${tryonSuffix}${unitSuffix} · 扣 ${input.creditsCharged ?? 0} 积分`;
-    case "PLATFORM_VIDEO":
-      return `平台代付 · ${catLabel} · 视频扣 ${input.creditsCharged ?? 0} 积分`;
+    case "PLATFORM_VIDEO": {
+      const sec = input.videoBillableSeconds;
+      const secSuffix = sec != null && sec > 0 ? ` · ${sec} 秒` : "";
+      return `平台代付 · ${catLabel}${secSuffix} · 视频扣 ${input.creditsCharged ?? 0} 积分`;
+    }
     case "METER_ONLY":
       return `BYOK 调用 · ${taskLabel}${tryonSuffix}${unitSuffix}（仅计量）`;
     case "NONE":

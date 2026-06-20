@@ -1,3 +1,6 @@
+import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
+import { videoBillableSeconds } from "@/lib/pricing/credit-pricing-formulas";
+
 /** Gateway 日志 → 财务结算用量（张/秒/token） */
 
 function inputRecord(inputSummary: unknown): Record<string, unknown> | null {
@@ -63,4 +66,14 @@ export function resolveBillableImageCountFromLog(log: {
   }
 
   return 1;
+}
+
+/** 视频：从 inputSummary 解析用户选择时长，封顶 15s；缺省 15s。 */
+export function resolveBillableVideoSecondsFromLog(log: {
+  requestKind?: string | null;
+  inputSummary?: unknown;
+}): number {
+  if (log.requestKind !== "VIDEO") return 1;
+  const hints = parseVideoPricingHints(log.inputSummary);
+  return videoBillableSeconds(hints.durationSec);
 }

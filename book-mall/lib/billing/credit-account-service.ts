@@ -527,6 +527,31 @@ export async function releaseReserved(input: {
   return res;
 }
 
+/** 人工校正积分（ADJUST），用于回补多扣等场景。 */
+export async function adjustCredits(input: {
+  ref: AccountRef;
+  credits: number;
+  pool?: PoolKind;
+  actorUserId?: string | null;
+  gatewayLogId?: string | null;
+  idempotencyKey?: string | null;
+  description?: string | null;
+}) {
+  const credits = Math.round(input.credits);
+  if (credits === 0) return null;
+  return writeLedger({
+    ref: input.ref,
+    type: "ADJUST",
+    credits,
+    pool: input.pool ?? "GENERAL",
+    actorUserId: input.actorUserId,
+    refType: input.gatewayLogId ? "gateway_log" : "adjust",
+    refId: input.gatewayLogId ?? null,
+    idempotencyKey: input.idempotencyKey ?? null,
+    description: input.description ?? "积分校正",
+  });
+}
+
 // ——————————————————— BYOK 资源计量 ———————————————————
 
 function periodKeyOf(d = new Date()): string {

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   imageCountFromInputSummary,
   resolveBillableImageCountFromLog,
+  resolveBillableVideoSecondsFromLog,
 } from "@/lib/gateway/log-billing-metrics";
 
 describe("log-billing-metrics", () => {
@@ -37,5 +38,20 @@ describe("log-billing-metrics", () => {
         },
       }),
     ).toBe(2);
+  });
+
+  it("VIDEO counts reference duration as seconds", () => {
+    expect(
+      resolveBillableVideoSecondsFromLog({
+        requestKind: "VIDEO",
+        inputSummary: { input: { duration: 10 } },
+      }),
+    ).toBe(10);
+    expect(
+      resolveBillableVideoSecondsFromLog({
+        requestKind: "VIDEO",
+        inputSummary: { input: { durationSec: 5 } },
+      }),
+    ).toBe(5);
   });
 });

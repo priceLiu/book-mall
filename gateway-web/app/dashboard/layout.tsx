@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { DashboardNav } from "@/components/dashboard-nav";
 import { LogoutButton } from "@/components/logout-button";
 import { gatewayJson } from "@/lib/gateway-api";
 
@@ -79,17 +79,7 @@ export default async function DashboardLayout({
             ) : null}
           </div>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 p-3">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-lg px-3 py-2 text-sm text-[var(--gw-muted)] transition hover:bg-white/5 hover:text-white"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <DashboardNav items={nav} />
         <div className="p-3">
           <LogoutButton />
         </div>

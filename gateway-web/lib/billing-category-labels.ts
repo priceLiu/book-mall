@@ -1,6 +1,7 @@
 /** 七类 billingCategory 展示标签（与 book-mall billing-category.ts 一致） */
 export const BILLING_CATEGORY_LABEL: Record<string, string> = {
   TEXT_TO_IMAGE: "文生图（含试衣）",
+  PORTRAIT_IMPORT: "人像入库",
   IMAGE_TO_VIDEO: "图生视频",
   VIDEO_TO_VIDEO: "视频生视频",
   VIDEO_UNDERSTANDING: "视频理解",
