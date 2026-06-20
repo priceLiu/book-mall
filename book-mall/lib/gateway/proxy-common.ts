@@ -23,6 +23,7 @@ import {
 } from "./gateway-token-metrics";
 import { assertModelRegistered, UnregisteredGatewayModelError } from "./model-registry";
 import { resolveBillableImageCountFromLog } from "./log-billing-metrics";
+import { inferGatewayFailCode } from "./log-fail-code";
 import { parseVideoPricingHints } from "./log-pricing-hints";
 import { estimateVendorCost } from "./pricing-estimate";
 import {
@@ -309,6 +310,14 @@ export async function finalizeRequestLog(
     }
   }
 
+  const resolvedFailCode =
+    patch.status === "FAILED"
+      ? inferGatewayFailCode({
+          failCode: patch.failCode,
+          failMessage: patch.failMessage,
+        })
+      : patch.failCode;
+
   await prisma.gatewayRequestLog.update({
     where: { id: logId },
     data: {
@@ -324,7 +333,7 @@ export async function finalizeRequestLog(
       metricsSource: tokenMetrics.metricsSource,
       resultSummary: patch.resultSummary ?? undefined,
       failMessage: patch.failMessage,
-      failCode: patch.failCode,
+      failCode: resolvedFailCode,
       externalTaskId: patch.externalTaskId,
       vendorRequestId: patch.vendorRequestId,
       completedAt: new Date(),

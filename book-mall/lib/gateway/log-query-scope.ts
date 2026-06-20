@@ -24,6 +24,7 @@ export type GatewayLogScopeInput = {
 export type GatewayLogFilterInput = {
   status?: GatewayRequestStatus;
   statuses?: GatewayRequestStatus[];
+  storyProjectId?: string;
   submittedFrom?: Date;
   submittedTo?: Date;
   canonicalModelKey?: string;
@@ -215,6 +216,7 @@ export function mergeGatewayLogFilters(
   const extra: Prisma.GatewayRequestLogWhereInput = {};
   if (filters.status) extra.status = filters.status;
   if (filters.statuses?.length) extra.status = { in: filters.statuses };
+  if (filters.storyProjectId) extra.storyProjectId = filters.storyProjectId;
   if (filters.submittedFrom || filters.submittedTo) {
     extra.submittedAt = {
       ...(filters.submittedFrom ? { gte: filters.submittedFrom } : {}),

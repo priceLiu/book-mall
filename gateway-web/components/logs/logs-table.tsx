@@ -63,6 +63,8 @@ export type GatewayLogRow = {
   estimatedVendorCostYuan: string | null;
   failCode: string | null;
   failMessage: string | null;
+  billingCategory?: string | null;
+  storyProjectId?: string | null;
   inputSummary: unknown;
   resultSummary: unknown;
   submittedAt: string;

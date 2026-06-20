@@ -1,6 +1,42 @@
 /** Gateway 日志列表 · 查询参数解析 */
 
+import type { GatewayRequestStatus } from "@prisma/client";
+
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+const VALID_LOG_STATUSES = new Set<GatewayRequestStatus>([
+  "PENDING",
+  "RUNNING",
+  "SUCCEEDED",
+  "FAILED",
+  "CANCELLED",
+]);
+
+export const DASHBOARD_HOURS_PRESETS = [1, 3, 6, 12] as const;
+
+export function parseDashboardHoursParam(
+  value: string | null | undefined,
+): number | undefined {
+  const n = Number(value?.trim());
+  if (!Number.isFinite(n)) return undefined;
+  return (DASHBOARD_HOURS_PRESETS as readonly number[]).includes(n)
+    ? n
+    : undefined;
+}
+
+export function parseLogStatusesParam(
+  value: string | null | undefined,
+): GatewayRequestStatus[] | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  const parsed = raw
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter((s): s is GatewayRequestStatus =>
+      VALID_LOG_STATUSES.has(s as GatewayRequestStatus),
+    );
+  return parsed.length > 0 ? parsed : undefined;
+}
 
 export const GATEWAY_LOG_PAGE_SIZE_DEFAULT = 20;
 export const GATEWAY_LOG_PAGE_SIZE_MAX = 500;

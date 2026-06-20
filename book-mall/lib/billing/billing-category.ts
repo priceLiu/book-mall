@@ -26,6 +26,10 @@ export const BILLING_CATEGORY_ORDER: BillingCategory[] = [
   "OTHER",
 ];
 
+/** 驾驶舱 / 报表图表：仅展示收费大类型，不含 OTHER。 */
+export const BILLING_CATEGORY_CHART_ORDER: BillingCategory[] =
+  BILLING_CATEGORY_ORDER.filter((c) => c !== "OTHER");
+
 export function billingCategoryLabel(cat: BillingCategory | null | undefined): string {
   if (!cat) return "—";
   return BILLING_CATEGORY_LABEL[cat] ?? cat;
@@ -49,4 +53,28 @@ export function resolveBillingCategory(
 ): BillingCategory {
   if (persisted) return persisted;
   return classifyBillingCategory(log);
+}
+
+/**
+ * 驾驶舱图表专用：始终归入收费大类型，不展示 OTHER。
+ *  persisted=OTHER 或无法映射时，按 requestKind 回退。
+ */
+export function resolveDashboardChartCategory(
+  log: { requestKind: string; inputSummary?: unknown },
+  persisted?: BillingCategory | null,
+): BillingCategory {
+  const raw =
+    persisted && persisted !== "OTHER"
+      ? persisted
+      : classifyBillingCategory(log);
+  if (raw !== "OTHER") return raw;
+  if (log.requestKind === "VIDEO") {
+    return mapLogToByokTaskKind(log) ?? "IMAGE_TO_VIDEO";
+  }
+  if (log.requestKind === "IMAGE" || log.requestKind === "TRYON") {
+    return "TEXT_TO_IMAGE";
+  }
+  if (log.requestKind === "TTS") return "TTS";
+  if (log.requestKind === "CHAT") return "TEXT";
+  return "TEXT";
 }

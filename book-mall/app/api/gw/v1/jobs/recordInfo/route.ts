@@ -10,6 +10,7 @@ import {
   touchGatewayLogProgress,
 } from "@/lib/gateway/log-progress";
 import { persistVolcengineTimingOnPoll } from "@/lib/gateway/log-volcengine-timing-persist";
+import { inferGatewayFailCode } from "@/lib/gateway/log-fail-code";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { prisma } from "@/lib/prisma";
 import {
@@ -297,6 +298,11 @@ export async function GET(request: NextRequest) {
             ? Date.now() - log.submittedAt.getTime()
             : 0,
           failMessage: data.failMsg ?? data.failCode ?? "failed",
+          failCode:
+            inferGatewayFailCode({
+              failMessage: data.failMsg,
+              upstreamCode: data.failCode,
+            }) ?? "KIE_TASK_FAILED",
           externalTaskId: data.taskId,
           model: data.model || log.model,
         });
