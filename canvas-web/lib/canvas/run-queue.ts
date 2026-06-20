@@ -1576,6 +1576,9 @@ export function useCanvasRunner(
         return;
       }
 
+      const localRt = node
+        ? (node.data as { runtime?: CanvasNodeRuntime }).runtime
+        : undefined;
       const localSt = node ? nodeRuntimeStatus(node) : undefined;
       let boundTaskId: string | undefined;
       for (const [k, tid] of Array.from(taskByNodeRef.current.entries())) {
@@ -1584,11 +1587,16 @@ export function useCanvasRunner(
         }
       }
       boundTaskId ??= taskByNodeRef.current.get(nodeId);
+      const localTaskId = localRt?.taskId?.trim();
       const isTerminal =
         t.status === "SUCCEEDED" || t.status === "FAILED";
+      const isCurrentTaskTerminal =
+        jobByTaskRef.current.has(t.id) ||
+        (localTaskId != null && localTaskId === t.id) ||
+        boundTaskId === t.id;
       // 本地 pending/running 时，列表「最新」可能仍是上一轮终态任务
       if (isLocalInflightStatus(localSt) && isTerminal) {
-        if (!jobByTaskRef.current.has(t.id)) return;
+        if (!isCurrentTaskTerminal) return;
       }
       // 仍绑定其它 taskId 时，忽略「非当前任务」的终态，避免旧成功覆盖新提交
       if (
@@ -1618,9 +1626,6 @@ export function useCanvasRunner(
         return;
       }
       if (patch) {
-        const localRt = node
-          ? (node.data as { runtime?: CanvasNodeRuntime }).runtime
-          : undefined;
         if (!shouldApplyCanvasTaskRuntimePatch(localRt, t, patch)) return;
         setNodeRuntime(nodeId, patch);
         if (t.textOutput) {
@@ -1634,7 +1639,14 @@ export function useCanvasRunner(
         }
         if (patch.status === "done" || patch.status === "error") {
           const job = jobByTaskRef.current.get(t.id);
-          if (job) releaseInflightKey(runKey(job));
+          if (job) {
+            releaseInflightKey(runKey(job));
+          } else {
+            releaseInflightKey(nodeId);
+            for (const key of Array.from(inflightRef.current)) {
+              if (key.startsWith(`${nodeId}:`)) releaseInflightKey(key);
+            }
+          }
           if (patch.status === "done") maybeNotifyCanvasCreditsSettled(t);
         }
       }

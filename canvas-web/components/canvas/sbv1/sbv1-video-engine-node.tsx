@@ -118,14 +118,17 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     }
   }, [inflightTask, id, setNodeRuntime]);
 
-  /** 服务端已成功但 runtime 未同步（超时恢复 / 刷新后） */
+  /** 任务已在服务端成功但 runtime 仍停在 pending/running（Gateway 已终态 / 刷新 / 轮询竞态） */
   useEffect(() => {
-    if (isGenerating || inflightTask) return;
-    const latest = succeeded[succeeded.length - 1];
-    if (!latest) return;
-    const patch = runtimePatchFromCanvasTask(latest);
+    if (inflightTask) return;
+    const boundId = d.runtime?.taskId?.trim();
+    const terminal = boundId
+      ? history.find((t) => t.id === boundId && t.status === "SUCCEEDED")
+      : succeeded[succeeded.length - 1];
+    if (!terminal || terminal.status !== "SUCCEEDED") return;
+    const patch = runtimePatchFromCanvasTask(terminal);
     if (!patch || patch.status !== "done") return;
-    if (!shouldApplyCanvasTaskRuntimePatch(d.runtime, latest, patch)) return;
+    if (!shouldApplyCanvasTaskRuntimePatch(d.runtime, terminal, patch)) return;
     if (
       d.runtime?.status === "done" &&
       (d.runtime.ossUrl || d.runtime.ephemeralUrl)
@@ -133,7 +136,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       return;
     }
     setNodeRuntime(id, patch);
-  }, [succeeded, d.runtime, id, setNodeRuntime, isGenerating, inflightTask]);
+  }, [history, succeeded, d.runtime, id, setNodeRuntime, inflightTask]);
 
   const hasToolbarContent = Boolean(
     hasVideo ||
