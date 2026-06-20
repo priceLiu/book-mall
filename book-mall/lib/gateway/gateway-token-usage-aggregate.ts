@@ -1,51 +1,56 @@
 /**
- * Gateway 日志 Token 聚合 — 财务团队/个人列表唯一归口。
- * 与 gateway-log-response-rows 一致：SUCCEEDED 且库内缺 token 时走 resolveGatewayTokenMetrics 回退。
+ * Gateway 日志用量聚合 — 财务团队/个人列表唯一归口。
+ * 按七类计费单位统计：图/试衣=张，视频=秒，文字/TTS/视频理解=千 Token。
  */
 import type { BillingCategory, GatewayRequestLog, Prisma } from "@prisma/client";
 
 import {
   BILLING_CATEGORY_ORDER,
+  isPortraitLibraryGatewayLog,
   resolveBillingCategory,
 } from "@/lib/billing/billing-category";
 import { isTextToVideoInput } from "@/lib/billing/byok-pricing";
 import { resolveGatewayTokenMetrics } from "@/lib/gateway/gateway-token-metrics";
+import {
+  resolveBillableImageCountFromLog,
+  resolveBillableVideoSecondsFromLog,
+} from "@/lib/gateway/log-billing-metrics";
 import { buildGatewayLogWhereForTeamTenant } from "@/lib/gateway/log-query-scope";
 import { prisma } from "@/lib/prisma";
 
-export type GatewayTokenUsageSummary = {
-  totalTokens: number;
-  textToImageTokens: number;
-  imageToVideoTokens: number;
-  textToVideoTokens: number;
-  videoToVideoTokens: number;
-  videoUnderstandingTokens: number;
-  ttsTokens: number;
-  textTokens: number;
-  otherTokens: number;
-  seedance20Tokens: number;
+/** 与 finance-web FinanceGatewayUsage 字段对齐。 */
+export type GatewayUsageSummary = {
+  textToImageImages: number;
+  imageToVideoSeconds: number;
+  textToVideoSeconds: number;
+  videoToVideoSeconds: number;
+  videoUnderstandingKTokens: number;
+  ttsKTokens: number;
+  textKTokens: number;
+  seedance20Seconds: number;
+  otherCalls: number;
   succeededCalls: number;
-  callsWithTokens: number;
-  callsWithoutTokens: number;
 };
 
-export const EMPTY_GATEWAY_TOKEN_USAGE: GatewayTokenUsageSummary = {
-  totalTokens: 0,
-  textToImageTokens: 0,
-  imageToVideoTokens: 0,
-  textToVideoTokens: 0,
-  videoToVideoTokens: 0,
-  videoUnderstandingTokens: 0,
-  ttsTokens: 0,
-  textTokens: 0,
-  otherTokens: 0,
-  seedance20Tokens: 0,
+/** @deprecated 别名，逐步迁移 */
+export type GatewayTokenUsageSummary = GatewayUsageSummary;
+
+export const EMPTY_GATEWAY_USAGE: GatewayUsageSummary = {
+  textToImageImages: 0,
+  imageToVideoSeconds: 0,
+  textToVideoSeconds: 0,
+  videoToVideoSeconds: 0,
+  videoUnderstandingKTokens: 0,
+  ttsKTokens: 0,
+  textKTokens: 0,
+  seedance20Seconds: 0,
+  otherCalls: 0,
   succeededCalls: 0,
-  callsWithTokens: 0,
-  callsWithoutTokens: 0,
 };
 
-const GATEWAY_TOKEN_LOG_SELECT = {
+export const EMPTY_GATEWAY_TOKEN_USAGE = EMPTY_GATEWAY_USAGE;
+
+const GATEWAY_USAGE_LOG_SELECT = {
   status: true,
   requestKind: true,
   inputSummary: true,
@@ -64,7 +69,7 @@ const GATEWAY_TOKEN_LOG_SELECT = {
 
 export type GatewayTokenLogRow = Pick<
   GatewayRequestLog,
-  keyof typeof GATEWAY_TOKEN_LOG_SELECT
+  keyof typeof GATEWAY_USAGE_LOG_SELECT
 >;
 
 /** Seedance 2.0 模型归口（火山 doubao-seedance-2.0 / KIE bytedance/seedance-2 等）。 */
@@ -79,8 +84,8 @@ export function matchesSeedance20ModelKey(modelKey: string | null | undefined): 
   return false;
 }
 
-/** 与 gateway-log-response-rows 对齐的有效 token 数。 */
-export function resolveEffectiveLogTotalTokens(log: GatewayTokenLogRow): number {
+/** LLM 类：厂商 usage 或 prompt 估算 → 千 Token。 */
+export function resolveEffectiveLogKTokens(log: GatewayTokenLogRow): number {
   if (log.status !== "SUCCEEDED") return 0;
 
   let totalTokens = log.totalTokens;
@@ -95,72 +100,129 @@ export function resolveEffectiveLogTotalTokens(log: GatewayTokenLogRow): number 
     }
   }
 
+  if (totalTokens == null || totalTokens <= 0) return 0;
+  return Math.max(1, Math.ceil(totalTokens / 1000));
+}
+
+/** @deprecated 仅 LLM 类明细仍用；列表聚合请走 resolveBillableUsageForLog。 */
+export function resolveEffectiveLogTotalTokens(log: GatewayTokenLogRow): number {
+  if (log.status !== "SUCCEEDED") return 0;
+  let totalTokens = log.totalTokens;
+  if (!log.hasTokenUsage || !totalTokens || totalTokens <= 0) {
+    const tm = resolveGatewayTokenMetrics({
+      inputSummary: log.inputSummary,
+      resultSummary: log.resultSummary,
+      requestKind: log.requestKind,
+    });
+    if (tm.hasTokenUsage && tm.totalTokens != null && tm.totalTokens > 0) {
+      totalTokens = tm.totalTokens;
+    }
+  }
   return totalTokens != null && totalTokens > 0 ? totalTokens : 0;
 }
 
-function addToCategory(
-  summary: GatewayTokenUsageSummary,
-  category: BillingCategory,
-  tokens: number,
-) {
+function addKTokensToCategory(summary: GatewayUsageSummary, category: BillingCategory, kTokens: number) {
   switch (category) {
-    case "TEXT_TO_IMAGE":
-      summary.textToImageTokens += tokens;
-      break;
-    case "VIDEO_TO_VIDEO":
-      summary.videoToVideoTokens += tokens;
-      break;
     case "VIDEO_UNDERSTANDING":
-      summary.videoUnderstandingTokens += tokens;
+      summary.videoUnderstandingKTokens += kTokens;
       break;
     case "TTS":
-      summary.ttsTokens += tokens;
+      summary.ttsKTokens += kTokens;
       break;
     case "TEXT":
-      summary.textTokens += tokens;
+      summary.textKTokens += kTokens;
       break;
     case "OTHER":
-      summary.otherTokens += tokens;
+      summary.otherCalls += 1;
       break;
-    case "IMAGE_TO_VIDEO":
     default:
       break;
   }
 }
 
+/** 单条成功日志 → 计费用量（张 / 秒 / 千 Token / 次）。供明细/测试使用。 */
+export function resolveBillableUsageForLog(log: GatewayTokenLogRow): {
+  category: BillingCategory;
+  amount: number;
+} {
+  const category = resolveBillingCategory(log, log.billingCategory);
+
+  if (isPortraitLibraryGatewayLog(log)) {
+    return { category: "OTHER", amount: 1 };
+  }
+
+  if (category === "TEXT_TO_IMAGE" || log.requestKind === "IMAGE" || log.requestKind === "TRYON") {
+    return { category: "TEXT_TO_IMAGE", amount: resolveBillableImageCountFromLog(log) };
+  }
+
+  if (log.requestKind === "VIDEO" || category === "IMAGE_TO_VIDEO" || category === "VIDEO_TO_VIDEO") {
+    const seconds = resolveBillableVideoSecondsFromLog(log);
+    if (category === "VIDEO_TO_VIDEO") return { category: "VIDEO_TO_VIDEO", amount: seconds };
+    if (isTextToVideoInput(log.inputSummary)) return { category: "IMAGE_TO_VIDEO", amount: seconds };
+    return { category: "IMAGE_TO_VIDEO", amount: seconds };
+  }
+
+  if (category === "VIDEO_UNDERSTANDING" || category === "TTS" || category === "TEXT") {
+    return { category, amount: resolveEffectiveLogKTokens(log) };
+  }
+
+  return { category: "OTHER", amount: 1 };
+}
+
+function addUsageToSummary(summary: GatewayUsageSummary, log: GatewayTokenLogRow) {
+  if (isPortraitLibraryGatewayLog(log)) {
+    summary.otherCalls += 1;
+    return;
+  }
+
+  const category = resolveBillingCategory(log, log.billingCategory);
+
+  if (category === "TEXT_TO_IMAGE" || log.requestKind === "IMAGE" || log.requestKind === "TRYON") {
+    summary.textToImageImages += resolveBillableImageCountFromLog(log);
+    return;
+  }
+
+  if (log.requestKind === "VIDEO") {
+    const seconds = resolveBillableVideoSecondsFromLog(log);
+    if (category === "VIDEO_TO_VIDEO") {
+      summary.videoToVideoSeconds += seconds;
+    } else if (isTextToVideoInput(log.inputSummary)) {
+      summary.textToVideoSeconds += seconds;
+    } else {
+      summary.imageToVideoSeconds += seconds;
+    }
+    const modelKey = log.canonicalModelKey ?? log.model;
+    if (matchesSeedance20ModelKey(modelKey)) {
+      summary.seedance20Seconds += seconds;
+    }
+    return;
+  }
+
+  if (category === "VIDEO_TO_VIDEO") {
+    summary.videoToVideoSeconds += resolveBillableVideoSecondsFromLog({
+      ...log,
+      requestKind: "VIDEO",
+    });
+    return;
+  }
+
+  if (category === "VIDEO_UNDERSTANDING" || category === "TTS" || category === "TEXT") {
+    addKTokensToCategory(summary, category, resolveEffectiveLogKTokens(log));
+    return;
+  }
+
+  summary.otherCalls += 1;
+}
+
 export function aggregateGatewayTokenUsageFromLogs(
   logs: GatewayTokenLogRow[],
-): GatewayTokenUsageSummary {
-  const summary: GatewayTokenUsageSummary = { ...EMPTY_GATEWAY_TOKEN_USAGE };
+): GatewayUsageSummary {
+  const summary: GatewayUsageSummary = { ...EMPTY_GATEWAY_USAGE };
 
   for (const log of logs) {
     if (log.status !== "SUCCEEDED") continue;
     summary.succeededCalls += 1;
-
-    const tokens = resolveEffectiveLogTotalTokens(log);
-    if (tokens > 0) {
-      summary.callsWithTokens += 1;
-    } else {
-      summary.callsWithoutTokens += 1;
-    }
-
-    const category = resolveBillingCategory(log, log.billingCategory);
-    if (category === "IMAGE_TO_VIDEO" && log.requestKind === "VIDEO") {
-      if (isTextToVideoInput(log.inputSummary)) {
-        summary.textToVideoTokens += tokens;
-      } else {
-        summary.imageToVideoTokens += tokens;
-      }
-    } else {
-      addToCategory(summary, category, tokens);
-    }
-
-    summary.totalTokens += tokens;
-
-    const modelKey = log.canonicalModelKey ?? log.model;
-    if (matchesSeedance20ModelKey(modelKey)) {
-      summary.seedance20Tokens += tokens;
-    }
+    addUsageToSummary(summary, log);
   }
 
   return summary;
@@ -169,7 +231,7 @@ export function aggregateGatewayTokenUsageFromLogs(
 export async function fetchGatewayTokenUsage(where: Prisma.GatewayRequestLogWhereInput) {
   const logs = await prisma.gatewayRequestLog.findMany({
     where: { AND: [where, { status: "SUCCEEDED" }] },
-    select: GATEWAY_TOKEN_LOG_SELECT,
+    select: GATEWAY_USAGE_LOG_SELECT,
   });
   return aggregateGatewayTokenUsageFromLogs(logs);
 }
@@ -200,15 +262,14 @@ export async function fetchUserGatewayTokenUsage(input: {
   return fetchGatewayTokenUsage(where);
 }
 
-/** 团队列表批量聚合（单次查库，按 tenantId 分桶）。 */
 export async function batchAggregateTeamGatewayTokenUsage(input: {
   tenantIds: string[];
   submittedFrom: Date;
   submittedTo: Date;
-}): Promise<Map<string, GatewayTokenUsageSummary>> {
-  const result = new Map<string, GatewayTokenUsageSummary>();
+}): Promise<Map<string, GatewayUsageSummary>> {
+  const result = new Map<string, GatewayUsageSummary>();
   for (const tenantId of input.tenantIds) {
-    result.set(tenantId, { ...EMPTY_GATEWAY_TOKEN_USAGE });
+    result.set(tenantId, { ...EMPTY_GATEWAY_USAGE });
   }
   if (input.tenantIds.length === 0) return result;
 
@@ -234,7 +295,7 @@ export async function batchAggregateTeamGatewayTokenUsage(input: {
         ...(memberIds.length > 0 ? [{ actorBookUserId: { in: memberIds } }] : []),
       ],
     },
-    select: GATEWAY_TOKEN_LOG_SELECT,
+    select: GATEWAY_USAGE_LOG_SELECT,
   });
 
   const logsByTenant = new Map<string, GatewayTokenLogRow[]>();
@@ -263,15 +324,14 @@ export async function batchAggregateTeamGatewayTokenUsage(input: {
   return result;
 }
 
-/** 个人 admin 列表批量聚合。 */
 export async function batchAggregateUserGatewayTokenUsage(input: {
   bookUserIds: string[];
   submittedFrom: Date;
   submittedTo: Date;
-}): Promise<Map<string, GatewayTokenUsageSummary>> {
-  const result = new Map<string, GatewayTokenUsageSummary>();
+}): Promise<Map<string, GatewayUsageSummary>> {
+  const result = new Map<string, GatewayUsageSummary>();
   for (const userId of input.bookUserIds) {
-    result.set(userId, { ...EMPTY_GATEWAY_TOKEN_USAGE });
+    result.set(userId, { ...EMPTY_GATEWAY_USAGE });
   }
   if (input.bookUserIds.length === 0) return result;
 
@@ -281,7 +341,7 @@ export async function batchAggregateUserGatewayTokenUsage(input: {
       submittedAt: { gte: input.submittedFrom, lt: input.submittedTo },
       actorBookUserId: { in: input.bookUserIds },
     },
-    select: GATEWAY_TOKEN_LOG_SELECT,
+    select: GATEWAY_USAGE_LOG_SELECT,
   });
 
   const logsByUser = new Map<string, GatewayTokenLogRow[]>();
@@ -301,50 +361,53 @@ export async function batchAggregateUserGatewayTokenUsage(input: {
 }
 
 export function gatewayTokenUsageToRecord(
-  summary: GatewayTokenUsageSummary,
+  summary: GatewayUsageSummary,
 ): Record<string, number> {
   return {
-    totalTokens: summary.totalTokens,
-    textToImageTokens: summary.textToImageTokens,
-    imageToVideoTokens: summary.imageToVideoTokens,
-    textToVideoTokens: summary.textToVideoTokens,
-    videoToVideoTokens: summary.videoToVideoTokens,
-    videoUnderstandingTokens: summary.videoUnderstandingTokens,
-    ttsTokens: summary.ttsTokens,
-    textTokens: summary.textTokens,
-    otherTokens: summary.otherTokens,
-    seedance20Tokens: summary.seedance20Tokens,
+    textToImageImages: summary.textToImageImages,
+    imageToVideoSeconds: summary.imageToVideoSeconds,
+    textToVideoSeconds: summary.textToVideoSeconds,
+    videoToVideoSeconds: summary.videoToVideoSeconds,
+    videoUnderstandingKTokens: summary.videoUnderstandingKTokens,
+    ttsKTokens: summary.ttsKTokens,
+    textKTokens: summary.textKTokens,
+    seedance20Seconds: summary.seedance20Seconds,
+    otherCalls: summary.otherCalls,
   };
 }
 
-export const FINANCE_TOKEN_COLUMN_META = [
-  { key: "totalTokens", label: "Token 消耗总量" },
-  { key: "textToImageTokens", label: "文生图 Token" },
-  { key: "imageToVideoTokens", label: "图生视频 Token" },
-  { key: "textToVideoTokens", label: "文生视频 Token" },
-  { key: "videoToVideoTokens", label: "视频生视频 Token" },
-  { key: "videoUnderstandingTokens", label: "视频理解 Token" },
-  { key: "ttsTokens", label: "TTS Token" },
-  { key: "textTokens", label: "文字 Token" },
-  { key: "seedance20Tokens", label: "Seedance 2.0 Token" },
-  { key: "otherTokens", label: "其他 Token" },
+export const FINANCE_USAGE_COLUMN_META = [
+  { key: "textToImageImages", label: "文生图 · 张" },
+  { key: "imageToVideoSeconds", label: "图生视频 · 秒" },
+  { key: "textToVideoSeconds", label: "文生视频 · 秒" },
+  { key: "videoToVideoSeconds", label: "视频生视频 · 秒" },
+  { key: "videoUnderstandingKTokens", label: "视频理解 · 千Token" },
+  { key: "ttsKTokens", label: "TTS · 千Token" },
+  { key: "textKTokens", label: "文字 · 千Token" },
+  { key: "seedance20Seconds", label: "Seedance 2.0 · 秒" },
+  { key: "otherCalls", label: "其他 · 次" },
 ] as const;
 
-/** 七类 BillingCategory 与财务 token 列映射说明（文生视频为 IMAGE_TO_VIDEO 子集）。 */
-export const BILLING_CATEGORY_TOKEN_KEYS = BILLING_CATEGORY_ORDER.map((category) => ({
+/** @deprecated 使用 FINANCE_USAGE_COLUMN_META */
+export const FINANCE_TOKEN_COLUMN_META = FINANCE_USAGE_COLUMN_META;
+
+export const BILLING_CATEGORY_USAGE_KEYS = BILLING_CATEGORY_ORDER.map((category) => ({
   category,
-  tokenKey:
+  usageKey:
     category === "IMAGE_TO_VIDEO"
-      ? ["imageToVideoTokens", "textToVideoTokens"]
+      ? ["imageToVideoSeconds", "textToVideoSeconds"]
       : category === "TEXT_TO_IMAGE"
-        ? "textToImageTokens"
+        ? "textToImageImages"
         : category === "VIDEO_TO_VIDEO"
-          ? "videoToVideoTokens"
+          ? "videoToVideoSeconds"
           : category === "VIDEO_UNDERSTANDING"
-            ? "videoUnderstandingTokens"
+            ? "videoUnderstandingKTokens"
             : category === "TTS"
-              ? "ttsTokens"
+              ? "ttsKTokens"
               : category === "TEXT"
-                ? "textTokens"
-                : "otherTokens",
+                ? "textKTokens"
+                : "otherCalls",
 }));
+
+/** @deprecated */
+export const BILLING_CATEGORY_TOKEN_KEYS = BILLING_CATEGORY_USAGE_KEYS;

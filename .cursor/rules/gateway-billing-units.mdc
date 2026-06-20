@@ -1,0 +1,34 @@
+---
+description: Gateway/财务用量统计 · 计费单位（张/秒/千Token/次）唯一口径
+globs: book-mall/lib/gateway/gateway-token-usage-aggregate.ts,book-mall/lib/gateway/log-billing-metrics.ts,finance-web/components/admin/finance-token-usage-columns.tsx,book-mall/lib/finance/gateway-bill-projection.ts,gateway-web/app/dashboard/page.tsx
+alwaysApply: false
+---
+
+# Gateway 用量 · 计费单位
+
+权威实现：`book-mall/lib/gateway/gateway-token-usage-aggregate.ts` · `resolveBillableUsageForLog`  
+财务列定义：`FINANCE_USAGE_COLUMN_META` / `finance-web/.../finance-token-usage-columns.tsx`
+
+## 单位表（禁止用 Token 列代替全部类型）
+
+| 统计列 / 类型 | 单位 | 计数规则 |
+|---|---|---|
+| **文生图**（含试衣 `IMAGE`/`TRYON`） | **张** | `resolveBillableImageCountFromLog`（参考图张数或 1） |
+| **图生视频** | **秒** | 日志 `duration` / 成片秒数 |
+| **文生视频** | **秒** | 无首帧参考的 `VIDEO` |
+| **视频生视频** | **秒** | v2v / 参考视频 |
+| **视频理解** | **千 Token** | 厂商 usage 或 prompt 估算 ÷1000 向上取整 |
+| **TTS** | **千 Token** | 同上 |
+| **文字**（纯 CHAT） | **千 Token** | 同上 |
+| **Seedance 2.0** | **秒** | 视频秒数子集（`matchesSeedance20ModelKey`） |
+| **其他** | **次** | 每条成功日志 +1（含 `portrait:*` 人像入库、`OTHER`） |
+
+## 与驾驶舱图表的区别
+
+- **财务 / 用量页**：按上表 **张/秒/千Token/次** 汇总；人像入库计入 **其他 · 次**，**不**计入文生图张数。
+- **状态驾驶舱**：成功柱状图可单独展示 **人像入库**（`PORTRAIT_IMPORT`）；文生图仅含 `IMAGE`/`TRYON` 等真实生图。
+
+## Code Review
+
+- 新增 Gateway 能力须明确落入上表之一；不得在前端硬编码另一套单位。
+- 列表/团队/个人用量列标签须带单位（张/秒/千Token/次），与 `FINANCE_USAGE_COLUMN_META` 一致。

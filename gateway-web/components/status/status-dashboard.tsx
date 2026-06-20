@@ -86,6 +86,18 @@ type DashboardStats = {
     inProgress: { category: string; label: string; count: number }[];
     succeeded: { category: string; label: string; count: number }[];
   };
+  byModel: {
+    inProgress: {
+      model: string;
+      canonicalModelKey: string | null;
+      count: number;
+    }[];
+    succeeded: {
+      model: string;
+      canonicalModelKey: string | null;
+      count: number;
+    }[];
+  };
 };
 
 type StatsSummaryResponse = {
@@ -95,6 +107,14 @@ type StatsSummaryResponse = {
 type StatsCategoriesResponse = {
   byCategory: DashboardStats["byCategory"];
 };
+
+type StatsModelsResponse = {
+  byModel: DashboardStats["byModel"];
+};
+
+type StatsAllResponse = StatsSummaryResponse &
+  StatsCategoriesResponse &
+  StatsModelsResponse;
 
 type InFlightLogsResponse = {
   logs: StatusLogRow[];
@@ -358,6 +378,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         inProgress: [],
         succeeded: [],
       },
+      byModel: prev?.byModel ?? {
+        inProgress: [],
+        succeeded: [],
+      },
     }));
     return statsRes;
   }, [applied]);
@@ -377,7 +401,27 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         cancelled: 0,
       },
       byCategory: statsRes.data.byCategory,
+      byModel: prev?.byModel ?? {
+        inProgress: [],
+        succeeded: [],
+      },
     }));
+    return statsRes;
+  }, [applied]);
+
+  /** 轮询用：卡片与柱状图同一请求，避免 summary / categories 不同步。 */
+  const loadStatsAll = useCallback(async () => {
+    if (applied.scope === "team" && !applied.tenantId) return null;
+    const statsQs = buildQueryString(applied, { parts: "all" });
+    const statsRes = await fetchJson<StatsAllResponse>(
+      `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
+    );
+    if (!statsRes.ok) return statsRes;
+    setStats({
+      cards: statsRes.data.cards,
+      byCategory: statsRes.data.byCategory,
+      byModel: statsRes.data.byModel,
+    });
     return statsRes;
   }, [applied]);
 
@@ -441,24 +485,18 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       setError(null);
 
       try {
-        const [summaryRes, categoriesRes] = await Promise.all([
-          loadSummary(),
-          loadCategories(),
-        ]);
+        const statsRes = await loadStatsAll();
         if (seq !== loadSeqRef.current) return;
 
-        if (summaryRes && !summaryRes.ok) {
+        if (statsRes && !statsRes.ok) {
           setError(
-            summaryRes.status === 401
+            statsRes.status === 401
               ? "登录已失效，请重新登录"
-              : summaryRes.error
-                ? `${summaryRes.error}（${summaryRes.status}）`
-                : `加载统计失败（${summaryRes.status}）`,
+              : statsRes.error
+                ? `${statsRes.error}（${statsRes.status}）`
+                : `加载统计失败（${statsRes.status}）`,
           );
           return;
-        }
-        if (categoriesRes && !categoriesRes.ok) {
-          /* 分类图失败不阻塞卡片 */
         }
         hasLoadedOnceRef.current = true;
         setHasLoadedOnce(true);
@@ -474,8 +512,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   }, [
     applied,
     initialMeta.teams.length,
-    loadCategories,
-    loadSummary,
+    loadStatsAll,
   ]);
 
   useEffect(() => {
@@ -506,14 +543,14 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     const ms =
       inProgressCount > 0 ? SUMMARY_POLL_ACTIVE_MS : SUMMARY_POLL_IDLE_MS;
     const refresh = () => {
-      if (document.visibilityState === "visible") void loadSummary();
+      if (document.visibilityState === "visible") void loadStatsAll();
     };
     refresh();
     summaryPollRef.current = setInterval(refresh, ms);
     return () => {
       if (summaryPollRef.current) clearInterval(summaryPollRef.current);
     };
-  }, [inProgressCount, loadSummary, viewMode]);
+  }, [inProgressCount, loadStatsAll, viewMode]);
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
@@ -811,6 +848,14 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               }))}
             />
           </div>
+
+          <HorizontalCategoryBars
+            title="成功 · 按模型（Top 20）"
+            rows={stats.byModel.succeeded.map((r) => ({
+              label: displayLogModelKey(r),
+              count: r.count,
+            }))}
+          />
         </div>
       ) : viewMode === "dashboard" && loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -4,8 +4,9 @@
 import type { BillingCategory, GatewayRequestStatus, Prisma } from "@prisma/client";
 
 import {
-  BILLING_CATEGORY_CHART_ORDER,
-  billingCategoryLabel,
+  dashboardStatusChartCategoryLabel,
+  DASHBOARD_STATUS_CHART_ORDER,
+  type DashboardChartCategoryKey,
   resolveDashboardChartCategory,
 } from "@/lib/billing/billing-category";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +15,8 @@ export const DASHBOARD_IN_PROGRESS_STATUSES: GatewayRequestStatus[] = [
   "PENDING",
   "RUNNING",
 ];
+
+export const DASHBOARD_MODEL_BREAKDOWN_LIMIT = 20;
 
 export type DashboardStatusBucket =
   | "inProgress"
@@ -31,8 +34,14 @@ export function dashboardStatusBucket(
 }
 
 export type DashboardCategoryCount = {
-  category: BillingCategory;
+  category: DashboardChartCategoryKey;
   label: string;
+  count: number;
+};
+
+export type DashboardModelCount = {
+  model: string;
+  canonicalModelKey: string | null;
   count: number;
 };
 
@@ -49,6 +58,19 @@ export type DashboardStatsPayload = {
     inProgress: DashboardCategoryCount[];
     succeeded: DashboardCategoryCount[];
   };
+  byModel: {
+    inProgress: DashboardModelCount[];
+    succeeded: DashboardModelCount[];
+  };
+};
+
+export type DashboardChartLogRow = {
+  status: GatewayRequestStatus;
+  requestKind: string;
+  inputSummary: unknown;
+  billingCategory: BillingCategory | null;
+  model: string | null;
+  canonicalModelKey: string | null;
 };
 
 export function emptyDashboardCards(): DashboardCards {
@@ -56,20 +78,22 @@ export function emptyDashboardCards(): DashboardCards {
 }
 
 export function buildEmptyCategoryCounts(): DashboardCategoryCount[] {
-  return BILLING_CATEGORY_CHART_ORDER.map((category) => ({
+  return DASHBOARD_STATUS_CHART_ORDER.map((category) => ({
     category,
-    label: billingCategoryLabel(category),
+    label: dashboardStatusChartCategoryLabel(category),
     count: 0,
   }));
 }
 
+function resolveChartLogModelKey(row: DashboardChartLogRow): string {
+  const canonical = row.canonicalModelKey?.trim();
+  if (canonical) return canonical;
+  const model = row.model?.trim();
+  return model || "unknown";
+}
+
 function aggregateChartCategories(
-  rows: {
-    status: GatewayRequestStatus;
-    requestKind: string;
-    inputSummary: unknown;
-    billingCategory: BillingCategory | null;
-  }[],
+  rows: DashboardChartLogRow[],
 ): DashboardStatsPayload["byCategory"] {
   const inProgress = buildEmptyCategoryCounts();
   const succeeded = buildEmptyCategoryCounts();
@@ -85,6 +109,41 @@ function aggregateChartCategories(
   return { inProgress, succeeded };
 }
 
+function aggregateChartModels(
+  rows: DashboardChartLogRow[],
+): DashboardStatsPayload["byModel"] {
+  const inProgress = new Map<string, DashboardModelCount>();
+  const succeeded = new Map<string, DashboardModelCount>();
+
+  for (const row of rows) {
+    const bucket = dashboardStatusBucket(row.status);
+    if (bucket !== "inProgress" && bucket !== "succeeded") continue;
+    const modelKey = resolveChartLogModelKey(row);
+    const target = bucket === "inProgress" ? inProgress : succeeded;
+    const existing = target.get(modelKey);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    target.set(modelKey, {
+      model: row.model?.trim() || modelKey,
+      canonicalModelKey: row.canonicalModelKey?.trim() || null,
+      count: 1,
+    });
+  }
+
+  return {
+    inProgress: sortModelCounts(inProgress),
+    succeeded: sortModelCounts(succeeded),
+  };
+}
+
+function sortModelCounts(map: Map<string, DashboardModelCount>): DashboardModelCount[] {
+  return [...map.values()]
+    .sort((a, b) => b.count - a.count || a.model.localeCompare(b.model))
+    .slice(0, DASHBOARD_MODEL_BREAKDOWN_LIMIT);
+}
+
 export function mergeStatusGroupCounts(
   groups: { status: GatewayRequestStatus; count: number }[],
 ): DashboardCards {
@@ -97,11 +156,35 @@ export function mergeStatusGroupCounts(
 
 function bumpCategoryCount(
   rows: DashboardCategoryCount[],
-  category: BillingCategory,
+  category: DashboardChartCategoryKey,
   delta: number,
 ) {
   const row = rows.find((r) => r.category === category);
   if (row) row.count += delta;
+}
+
+const CHART_LOG_SELECT = {
+  status: true,
+  requestKind: true,
+  inputSummary: true,
+  billingCategory: true,
+  model: true,
+  canonicalModelKey: true,
+} satisfies Prisma.GatewayRequestLogSelect;
+
+async function fetchDashboardChartRows(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<DashboardChartLogRow[]> {
+  const chartStatuses: GatewayRequestStatus[] = [
+    ...DASHBOARD_IN_PROGRESS_STATUSES,
+    "SUCCEEDED",
+  ];
+  return prisma.gatewayRequestLog.findMany({
+    where: {
+      AND: [where, { status: { in: chartStatuses } }],
+    },
+    select: CHART_LOG_SELECT,
+  });
 }
 
 export async function fetchDashboardStatsSummary(
@@ -122,48 +205,55 @@ export async function fetchDashboardStatsSummary(
 export async function fetchDashboardCategoryStats(
   where: Prisma.GatewayRequestLogWhereInput,
 ): Promise<{ byCategory: DashboardStatsPayload["byCategory"] }> {
-  const chartStatuses: GatewayRequestStatus[] = [
-    ...DASHBOARD_IN_PROGRESS_STATUSES,
-    "SUCCEEDED",
-  ];
-  const chartRows = await prisma.gatewayRequestLog.findMany({
-    where: {
-      AND: [where, { status: { in: chartStatuses } }],
-    },
-    select: {
-      status: true,
-      requestKind: true,
-      inputSummary: true,
-      billingCategory: true,
-    },
-  });
+  const chartRows = await fetchDashboardChartRows(where);
   return { byCategory: aggregateChartCategories(chartRows) };
 }
 
-export type DashboardStatsParts = "summary" | "categories";
+export async function fetchDashboardModelStats(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<{ byModel: DashboardStatsPayload["byModel"] }> {
+  const chartRows = await fetchDashboardChartRows(where);
+  return { byModel: aggregateChartModels(chartRows) };
+}
+
+export async function fetchDashboardChartStats(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<Pick<DashboardStatsPayload, "byCategory" | "byModel">> {
+  const chartRows = await fetchDashboardChartRows(where);
+  return {
+    byCategory: aggregateChartCategories(chartRows),
+    byModel: aggregateChartModels(chartRows),
+  };
+}
+
+export type DashboardStatsParts = "summary" | "categories" | "models";
 
 export function parseDashboardStatsParts(
   raw: string | null | undefined,
 ): Set<DashboardStatsParts> {
   const v = raw?.trim().toLowerCase();
   if (!v || v === "all") {
-    return new Set(["summary", "categories"]);
+    return new Set(["summary", "categories", "models"]);
   }
   const parts = new Set<DashboardStatsParts>();
   for (const token of v.split(",")) {
     const t = token.trim();
-    if (t === "summary" || t === "categories") parts.add(t);
+    if (t === "summary" || t === "categories" || t === "models") parts.add(t);
   }
-  if (parts.size === 0) return new Set(["summary", "categories"]);
+  if (parts.size === 0) return new Set(["summary", "categories", "models"]);
   return parts;
 }
 
 export async function fetchDashboardStats(
   where: Prisma.GatewayRequestLogWhereInput,
 ): Promise<DashboardStatsPayload> {
-  const [summary, categories] = await Promise.all([
+  const [summary, charts] = await Promise.all([
     fetchDashboardStatsSummary(where),
-    fetchDashboardCategoryStats(where),
+    fetchDashboardChartStats(where),
   ]);
-  return { cards: summary.cards, byCategory: categories.byCategory };
+  return {
+    cards: summary.cards,
+    byCategory: charts.byCategory,
+    byModel: charts.byModel,
+  };
 }

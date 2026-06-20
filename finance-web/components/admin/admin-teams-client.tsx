@@ -78,7 +78,7 @@ export function AdminTeamsClient() {
       <header>
         <h1 className="text-lg font-medium text-[#262626]">团队列表</h1>
         <p className="mt-1 text-sm text-[#8c8c8c]">
-          账期 {data.periodKey} · 共 {data.total} 个团队 · 「套餐总积分」含通用+视频池月发放；「剩余积分」为两池可用余额合计；Token 列统计本月成功 Gateway 调用（与 Gateway 日志同源，无厂商 usage 时按 prompt 估算）
+          账期 {data.periodKey} · 共 {data.total} 个团队 · 「套餐总积分」含通用+视频池月发放；「剩余积分」为两池可用余额合计；Gateway 用量列按张/秒/千Token 汇总（与账单计费单位一致）
         </p>
       </header>
 
@@ -90,14 +90,14 @@ export function AdminTeamsClient() {
               <th className="border border-[#e8e8e8] px-3 py-2">套餐</th>
               <th className="border border-[#e8e8e8] px-3 py-2 text-right">套餐总积分</th>
               <th className="border border-[#e8e8e8] px-3 py-2 text-right">套餐总金额</th>
+              <th className="border border-[#e8e8e8] px-3 py-2 text-right">剩余积分</th>
+              <th className="border border-[#e8e8e8] px-3 py-2 text-right">本月消耗（积分）</th>
+              <FinanceTokenUsageHeaderCells />
               <th className="border border-[#e8e8e8] px-3 py-2">计费周期</th>
               <th className="border border-[#e8e8e8] px-3 py-2">起始日</th>
               <th className="border border-[#e8e8e8] px-3 py-2">到期日</th>
               <th className="border border-[#e8e8e8] px-3 py-2 text-right">续期次数</th>
               <th className="border border-[#e8e8e8] px-3 py-2">席位</th>
-              <th className="border border-[#e8e8e8] px-3 py-2 text-right">剩余积分</th>
-              <th className="border border-[#e8e8e8] px-3 py-2 text-right">本月消耗（积分）</th>
-              <FinanceTokenUsageHeaderCells />
               <th className="border border-[#e8e8e8] px-3 py-2">主账号</th>
               <th className="border border-[#e8e8e8] px-3 py-2">操作</th>
             </tr>
@@ -113,6 +113,13 @@ export function AdminTeamsClient() {
                 <td className="border border-[#e8e8e8] px-3 py-2 text-right font-mono">
                   {fmtYuan(t.packageTotalPriceYuan)}
                 </td>
+                <td className="border border-[#e8e8e8] px-3 py-2 text-right font-mono">
+                  {fmt(t.balanceCredits)}
+                </td>
+                <td className="border border-[#e8e8e8] px-3 py-2 text-right font-mono">
+                  {fmt(t.monthConsumed)}
+                </td>
+                <FinanceTokenUsageRowCells usage={t.tokenUsage} />
                 <td className="border border-[#e8e8e8] px-3 py-2">{t.packageIntervalLabel}</td>
                 <td className="border border-[#e8e8e8] px-3 py-2">{fmtDate(t.periodStartAt)}</td>
                 <td className="border border-[#e8e8e8] px-3 py-2">
@@ -124,13 +131,6 @@ export function AdminTeamsClient() {
                 <td className="border border-[#e8e8e8] px-3 py-2">
                   {t.activeMembers} / {t.seatLimit}
                 </td>
-                <td className="border border-[#e8e8e8] px-3 py-2 text-right font-mono">
-                  {fmt(t.balanceCredits)}
-                </td>
-                <td className="border border-[#e8e8e8] px-3 py-2 text-right font-mono">
-                  {fmt(t.monthConsumed)}
-                </td>
-                <FinanceTokenUsageRowCells usage={t.tokenUsage} />
                 <td className="border border-[#e8e8e8] px-3 py-2 text-xs text-[#595959]">
                   {formatUserCellPrimary(t.owner)}
                 </td>

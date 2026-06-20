@@ -39,11 +39,57 @@ import {
 import { recordBillingSettlement } from "./billing-settlement-service";
 import { extractTryonModelKey } from "./byok-pricing";
 import { aiTryonModelLabel } from "@/lib/pricing/ai-tryon-cost";
-import { resolveBillableImageCountFromLog } from "@/lib/gateway/log-billing-metrics";
+import { resolveBillableImageCountFromLog, resolveBillableVideoSecondsFromLog } from "@/lib/gateway/log-billing-metrics";
+import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 
 export function creditBillingEnabled(): boolean {
   return isUnifiedCreditBillingActive();
+}
+
+/** 视频按秒积分（与 reserve / settle 共用）。 */
+export function computeVideoChargeCredits(input: {
+  snapshot: CostSnapshot;
+  durationSec?: number | null;
+  pricePerCreditYuan: number | null;
+}): { units: number; credits: number } {
+  const units = billableUnitCount(input.snapshot.unit, {
+    durationSec: input.durationSec,
+  });
+  const credits = computeChargeCredits({
+    snapshot: input.snapshot,
+    units,
+    pricePerCreditYuan: input.pricePerCreditYuan,
+  });
+  return { units, credits };
+}
+
+function resolveVideoDurationSec(
+  log: GatewayRequestLog,
+  metrics: { durationSec?: number | null },
+): number {
+  if (metrics.durationSec != null && metrics.durationSec > 0) {
+    return videoBillableSeconds(metrics.durationSec);
+  }
+  return resolveBillableVideoSecondsFromLog(log);
+}
+
+async function recordVideoSettlement(input: {
+  log: GatewayRequestLog;
+  ref: AccountRef;
+  creditsCharged: number;
+  creditLedgerId?: string | null;
+  videoBillableSeconds: number;
+}) {
+  await recordBillingSettlement({
+    log: input.log,
+    ref: input.ref,
+    settlementKind: "PLATFORM_VIDEO",
+    creditsCharged: input.creditsCharged,
+    creditLedgerId: input.creditLedgerId ?? null,
+    billingCategory: classifyBillingCategory(input.log),
+    videoBillableSeconds: input.videoBillableSeconds,
+  }).catch(() => undefined);
 }
 
 interface BillingTarget {
@@ -52,6 +98,34 @@ interface BillingTarget {
   tenantId: string | null;
   actorUserId: string | null;
   seatId: string | null;
+}
+
+/** 按日志解析视频应扣积分（回补 / 预览共用）。 */
+export async function computeExpectedVideoCreditsForLog(
+  log: Pick<GatewayRequestLog, "id" | "model" | "canonicalModelKey" | "inputSummary" | "tenantId" | "actorBookUserId" | "apiKeyId">,
+  metrics?: { durationSec?: number | null },
+): Promise<{ units: number; credits: number } | null> {
+  const target = await resolveLogBillingTarget(log as GatewayRequestLog);
+  if (!target) return null;
+  const canonical =
+    log.canonicalModelKey ??
+    (await resolveBillingCanonicalKey({
+      modelKey: log.model,
+      inputSummary: log.inputSummary,
+    }).catch(() => null));
+  if (!canonical) return null;
+  const snap = await resolveCostSnapshot(canonical);
+  if (!snap) return null;
+  const pools = await getPoolBalances(target.ref);
+  const durationSec =
+    metrics?.durationSec != null && metrics.durationSec > 0
+      ? videoBillableSeconds(metrics.durationSec)
+      : resolveBillableVideoSecondsFromLog(log);
+  return computeVideoChargeCredits({
+    snapshot: snap,
+    durationSec,
+    pricePerCreditYuan: pools.pricePerCreditYuan,
+  });
 }
 
 /** 该日志是否属于「视频」计费（按 requestKind 或单位 PER_SEC）。 */
@@ -256,9 +330,9 @@ export async function settleSucceededGatewayLog(input: {
 }
 
 /**
- * 视频结算：以发起时的 RESERVE 流水为冻结额真值。
- *  - 有 RESERVE：按冻结额 settle（reserve == settle，杜绝幻影冻结 / 重复扣 / 时长漂移）。
- *  - 无 RESERVE（冻结被跳过/为 0）：直接实扣，避免「成功却未扣费」漏记（需报价快照）。
+ * 视频结算：按实际时长扣费。
+ *  - 有 RESERVE：settle(实扣) + 多冻部分 release-overcharge 退还。
+ *  - 无 RESERVE：直接实扣。
  */
 async function settleVideoFromReserve(
   target: BillingTarget,
@@ -266,6 +340,17 @@ async function settleVideoFromReserve(
   snap: CostSnapshot | null,
   metrics: { durationSec?: number | null; images?: number | null; totalTokens?: number | null },
 ): Promise<number> {
+  const billableSec = resolveVideoDurationSec(log, metrics);
+  const pools = await getPoolBalances(target.ref);
+  const settleCredits =
+    snap != null
+      ? computeVideoChargeCredits({
+          snapshot: snap,
+          durationSec: billableSec,
+          pricePerCreditYuan: pools.pricePerCreditYuan,
+        }).credits
+      : 0;
+
   const reserveLedger = await prisma.creditLedger.findUnique({
     where: { idempotencyKey: `reserve:${log.id}` },
     select: { credits: true, pool: true },
@@ -273,10 +358,11 @@ async function settleVideoFromReserve(
   if (reserveLedger) {
     const frozen = Math.abs(reserveLedger.credits);
     if (frozen <= 0) return 0;
+    const chargeCredits = settleCredits > 0 ? settleCredits : frozen;
     try {
       await settleReserved({
         ref: target.ref,
-        credits: frozen,
+        credits: chargeCredits,
         pool: reserveLedger.pool,
         actorUserId: target.actorUserId,
         seatId: target.seatId,
@@ -285,39 +371,60 @@ async function settleVideoFromReserve(
         costSnapshotYuan: snap?.netCostYuan ?? null,
         marginSnapshot: snap?.marginRate ?? null,
       });
+      const overcharge = frozen - chargeCredits;
+      if (overcharge > 0) {
+        await releaseReserved({
+          ref: target.ref,
+          credits: overcharge,
+          pool: reserveLedger.pool,
+          gatewayLogId: log.id,
+          idempotencyKey: `release-overcharge:${log.id}`,
+          description: `视频按时长结算退还（${billableSec} 秒，预扣 ${frozen} → 实扣 ${chargeCredits}）`,
+        });
+      } else if (chargeCredits > frozen) {
+        const extra = chargeCredits - frozen;
+        await consumeCredits({
+          ref: target.ref,
+          credits: extra,
+          pool: reserveLedger.pool,
+          actorUserId: target.actorUserId,
+          seatId: target.seatId,
+          gatewayLogId: log.id,
+          canonicalModelKey: snap?.canonicalModelKey ?? log.canonicalModelKey ?? null,
+          costSnapshotYuan: snap?.netCostYuan ?? null,
+          marginSnapshot: snap?.marginRate ?? null,
+          idempotencyKey: `video-extra:${log.id}`,
+          allowNegative: true,
+        });
+        await prisma.gatewayRequestLog.update({
+          where: { id: log.id },
+          data: { creditsCharged: chargeCredits },
+        });
+      }
       const settleLedger = await prisma.creditLedger.findUnique({
         where: { idempotencyKey: `settle:${log.id}` },
         select: { id: true },
       });
-      await recordBillingSettlement({
+      await recordVideoSettlement({
         log,
         ref: target.ref,
-        settlementKind: "PLATFORM_VIDEO",
-        creditsCharged: frozen,
+        creditsCharged: chargeCredits,
         creditLedgerId: settleLedger?.id ?? null,
-        billingCategory: classifyBillingCategory(log),
-      }).catch(() => undefined);
-      return frozen;
+        videoBillableSeconds: billableSec,
+      });
+      return chargeCredits;
     } catch (e) {
       console.error("[credit-settlement] video settle 失败", log.id, e);
       return 0;
     }
   }
 
-  if (!snap) return 0;
-  const pools = await getPoolBalances(target.ref);
-  const units = billableUnitCount(snap.unit, metrics);
-  const credits = computeChargeCredits({
-    snapshot: snap,
-    units,
-    pricePerCreditYuan: pools.pricePerCreditYuan,
-  });
-  if (credits <= 0) return 0;
+  if (!snap || settleCredits <= 0) return 0;
   const pool: PoolKind = await resolveVideoPool(target.ref);
   try {
     const consumeRes = await consumeCredits({
       ref: target.ref,
-      credits,
+      credits: settleCredits,
       pool,
       actorUserId: target.actorUserId,
       seatId: target.seatId,
@@ -327,15 +434,14 @@ async function settleVideoFromReserve(
       marginSnapshot: snap.marginRate,
       allowNegative: true,
     });
-    await recordBillingSettlement({
+    await recordVideoSettlement({
       log,
       ref: target.ref,
-      settlementKind: "PLATFORM_VIDEO",
-      creditsCharged: credits,
+      creditsCharged: settleCredits,
       creditLedgerId: consumeRes.ledger.id,
-      billingCategory: classifyBillingCategory(log),
-    }).catch(() => undefined);
-    return credits;
+      videoBillableSeconds: billableSec,
+    });
+    return settleCredits;
   } catch (e) {
     console.error("[credit-settlement] video consume(fallback) 失败", log.id, e);
     return 0;
@@ -412,11 +518,10 @@ export async function reserveVideoCreditsForLog(log: GatewayRequestLog): Promise
   if (!target) return 0;
 
   const pools = await getPoolBalances(target.ref);
-  // 视频固定按 15s 封顶冻结
-  const units = videoBillableSeconds(null);
-  const credits = computeChargeCredits({
+  const hints = parseVideoPricingHints(log.inputSummary);
+  const { credits } = computeVideoChargeCredits({
     snapshot: snap,
-    units,
+    durationSec: hints.durationSec,
     pricePerCreditYuan: pools.pricePerCreditYuan,
   });
   if (credits === 0) return 0;

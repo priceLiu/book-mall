@@ -20,7 +20,7 @@ import {
   normalizeByokFeeDescription,
   normalizeByokQuotaSettlementSnapshot,
 } from "@/lib/billing/byok-pricing";
-import { resolveBillableImageCountFromLog } from "@/lib/gateway/log-billing-metrics";
+import { resolveBillableImageCountFromLog, resolveBillableVideoSecondsFromLog } from "@/lib/gateway/log-billing-metrics";
 import {
   ALL_DISPLAY_KEYS,
   K_CREDITS_CONSUMED,
@@ -273,7 +273,10 @@ export function projectGatewayLogToBillRow(
     ? normalizeByokFeeDescription(feeText, true, quotaSnap.includedRemainingAfter)
     : feeText;
 
-  const usageUnits = resolveBillableImageCountFromLog(log);
+  const usageUnits =
+    log.requestKind === "VIDEO"
+      ? resolveBillableVideoSecondsFromLog(log)
+      : resolveBillableImageCountFromLog(log);
   row["平台用量/用量"] = String(usageUnits);
   row["平台用量/用量单位"] = requestKindUnit(log.requestKind, billingCategory);
 

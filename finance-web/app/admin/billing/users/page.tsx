@@ -77,7 +77,7 @@ export default function AdminBillingUsersIndexPage() {
       <h1 className="text-lg font-medium text-[#262626]">有 Gateway 调用或账单的用户</h1>
       <p className="text-sm text-[#8c8c8c]">
         含成功与失败调用；仅注册、从未调用 Gateway 的用户不在此列表。团队扣费请同时看「团队驾驶舱」。
-        {periodKey ? ` Token 列统计账期 ${periodKey} 成功调用。` : null}
+        {periodKey ? ` Gateway 用量列统计账期 ${periodKey}（张/秒/千Token）。` : null}
       </p>
 
       {loadState === "loading" && (
