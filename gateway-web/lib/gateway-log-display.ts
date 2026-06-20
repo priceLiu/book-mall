@@ -146,6 +146,56 @@ export function formatLogMonospaceId(value: string | null | undefined): {
   return { value: trimmed, title: trimmed };
 }
 
+/** 日志表 · Canvas 节点 task / Story task 关联列 */
+export function formatLogAppTaskCell(input: {
+  appTaskId?: string | null;
+  appTaskKind?: string | null;
+  appTaskNodeId?: string | null;
+}): { value: string; title?: string } {
+  const taskId = input.appTaskId?.trim();
+  if (!taskId) return { value: "—" };
+  const kind =
+    input.appTaskKind === "canvas"
+      ? "Canvas 节点 task"
+      : input.appTaskKind === "story"
+        ? "Story task"
+        : "应用 task";
+  const nodeId = input.appTaskNodeId?.trim();
+  const title = nodeId
+    ? `${kind}\nTask: ${taskId}\nNode: ${nodeId}`
+    : `${kind}\nTask: ${taskId}`;
+  return { value: taskId, title };
+}
+
+const POLL_DELAY_LIMIT_MS = 10_000;
+
+/** 日志表 · 火山视频耗时阶段（排队 / 生成 / 轮询延迟） */
+export function formatLogTimingPhaseCell(
+  ms: number | null | undefined,
+  phase: "queue" | "generate" | "poll",
+  opts?: { overLimit?: boolean },
+): { value: string; title?: string; warn?: boolean } {
+  if (ms == null || ms < 0) return { value: "—" };
+  const sec = Math.round(ms / 1000);
+  const labels = {
+    queue: "火山排队",
+    generate: "实际生成",
+    poll: "轮询延迟",
+  } as const;
+  const title = `${labels[phase]} · ${sec}s`;
+  if (phase === "poll") {
+    const warn = opts?.overLimit === true || ms > POLL_DELAY_LIMIT_MS;
+    return {
+      value: `${sec}s`,
+      title: warn
+        ? `${title}（超过 10s 上限，请检查 poll worker / 画布页是否打开）`
+        : title,
+      warn,
+    };
+  }
+  return { value: `${sec}s`, title };
+}
+
 /** 从当前日志批次提取渠道 Key（可按厂商收窄） */
 export function collectLogCredentialKeys(
   logs: { credentialKeyMasked: string | null; providerKind: string | null }[],

@@ -6,14 +6,20 @@ import {
   runGatewayPollWorker,
 } from "@/lib/gateway/poll-service";
 import {
+  computeLogTotalPages,
+  parseLogLimitParam,
+  parseLogPageParam,
   parseLogSubmittedFromParam,
   parseLogSubmittedToParam,
 } from "@/lib/gateway/log-query-params";
+import { resolveGatewayLogListFacets } from "@/lib/gateway/log-list-facets";
 import { resolveGatewayTokenMetrics } from "@/lib/gateway/gateway-token-metrics";
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { maskApiKey } from "@/lib/canvas/secret";
 import { buildGatewayLogWhere } from "@/lib/gateway/log-query-scope";
+import { resolveGatewayLogAppTaskLinks } from "@/lib/gateway/log-app-task-link";
+import { resolveVolcengineLogTiming } from "@/lib/gateway/log-volcengine-timing";
 import { resolveGatewayLogVendorRequestId } from "@/lib/gateway/vendor-request-id";
 import { prisma } from "@/lib/prisma";
 
@@ -34,11 +40,13 @@ export async function GET(request: NextRequest) {
     /* ignore */
   }
 
-  const limit = Math.min(
-    200,
-    Math.max(1, Number(request.nextUrl.searchParams.get("limit") ?? "100")),
-  );
+  const page = parseLogPageParam(request.nextUrl.searchParams.get("page"));
+  const pageSize = parseLogLimitParam(request.nextUrl.searchParams.get("limit"));
   const status = request.nextUrl.searchParams.get("status")?.trim();
+  const clientSource = request.nextUrl.searchParams.get("clientSource")?.trim();
+  const providerKind = request.nextUrl.searchParams.get("providerKind")?.trim();
+  const model = request.nextUrl.searchParams.get("model")?.trim();
+  const credentialId = request.nextUrl.searchParams.get("credentialId")?.trim();
   const submittedFrom = parseLogSubmittedFromParam(
     request.nextUrl.searchParams.get("from"),
   );
@@ -46,25 +54,49 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get("to"),
   );
 
-  const where = await buildGatewayLogWhere(
-    {
-      gatewaySessionUser: {
-        id: user.id,
-        bookUserId: user.bookUserId,
-        email: user.email,
-      },
+  const scopeInput = {
+    gatewaySessionUser: {
+      id: user.id,
+      bookUserId: user.bookUserId,
+      email: user.email,
     },
-    {
-      status: status ? (status as GatewayRequestStatus) : undefined,
-      submittedFrom: submittedFrom ?? undefined,
-      submittedTo: submittedTo ?? undefined,
-    },
-  );
+  };
+
+  const listFilters = {
+    status: status ? (status as GatewayRequestStatus) : undefined,
+    submittedFrom: submittedFrom ?? undefined,
+    submittedTo: submittedTo ?? undefined,
+    clientSource: clientSource || undefined,
+    providerKind: providerKind || undefined,
+    model: model || undefined,
+    credentialId: credentialId || undefined,
+  };
+
+  const where = await buildGatewayLogWhere(scopeInput, listFilters);
+
+  const facetFilters = {
+    status: listFilters.status,
+    submittedFrom: listFilters.submittedFrom,
+    submittedTo: listFilters.submittedTo,
+    clientSource: listFilters.clientSource,
+    providerKind: listFilters.providerKind,
+  };
+  const facetWhere = await buildGatewayLogWhere(scopeInput, facetFilters);
+
+  const [total, facets] = await Promise.all([
+    prisma.gatewayRequestLog.count({ where }),
+    resolveGatewayLogListFacets(facetWhere, providerKind || undefined),
+  ]);
+
+  const totalPages = computeLogTotalPages(total, pageSize);
+  const safePage =
+    total === 0 ? 1 : Math.min(Math.max(1, page), totalPages);
 
   const logs = await prisma.gatewayRequestLog.findMany({
     where,
     orderBy: { submittedAt: "desc" },
-    take: limit,
+    skip: (safePage - 1) * pageSize,
+    take: pageSize,
   });
 
   const credentialIds = [
@@ -83,8 +115,18 @@ export async function GET(request: NextRequest) {
     credentialRows.map((c) => [c.id, maskApiKey(c.apiKeyEncrypted)]),
   );
 
+  const appTaskLinks = await resolveGatewayLogAppTaskLinks(logs);
+
   const rows = await Promise.all(
     logs.map(async (l) => {
+      const appTask = appTaskLinks.get(l.id);
+      const timing = resolveVolcengineLogTiming({
+        providerKind: l.providerKind,
+        requestKind: l.requestKind,
+        submittedAt: l.submittedAt,
+        completedAt: l.completedAt,
+        resultSummary: l.resultSummary,
+      });
       let estimatedVendorCostYuan = l.estimatedVendorCostYuan?.toString() ?? null;
       if (
         l.status === "SUCCEEDED" &&
@@ -140,6 +182,7 @@ export async function GET(request: NextRequest) {
         credentialKeyMasked: l.credentialId
           ? (credentialKeyById.get(l.credentialId) ?? null)
           : null,
+        credentialId: l.credentialId,
         clientSource: l.clientSource,
         clientPage: l.clientPage,
         externalTaskId: l.externalTaskId,
@@ -152,6 +195,15 @@ export async function GET(request: NextRequest) {
         totalTokens,
         metricsSource,
         durationMs: l.durationMs,
+        vendorDurationMs: l.vendorDurationMs,
+        storyTaskId: l.storyTaskId,
+        appTaskId: appTask?.appTaskId ?? l.storyTaskId ?? null,
+        appTaskKind: appTask?.appTaskKind ?? null,
+        appTaskNodeId: appTask?.nodeId ?? null,
+        queueMs: timing?.queueMs ?? null,
+        generateMs: timing?.generateMs ?? null,
+        pollDelayMs: timing?.pollDelayMs ?? null,
+        pollDelayOverLimit: timing?.pollDelayOverLimit ?? false,
         estimatedVendorCostYuan,
         failCode: l.failCode,
         failMessage: l.failMessage,
@@ -163,5 +215,12 @@ export async function GET(request: NextRequest) {
     }),
   );
 
-  return NextResponse.json({ logs: rows });
+  return NextResponse.json({
+    logs: rows,
+    total,
+    page: safePage,
+    pageSize,
+    totalPages,
+    facets,
+  });
 }
