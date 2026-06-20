@@ -361,13 +361,9 @@ export async function qrPollGenerateJob(
 
   if (normalized.task_status === "SUCCEEDED") {
     const outputUrl =
-      normalized.video_url ??
-      normalized.image_url ??
-      extractKieResultUrl(record) ??
-      undefined;
+      normalized.video_url ?? extractKieResultUrl(record) ?? undefined;
     if (outputUrl) {
-      const mediaType =
-        normalized.image_url || log.requestKind === "IMAGE" ? "image" : "video";
+      const mediaType = log.requestKind === "IMAGE" ? "image" : "video";
       await finalizeRequestLog(logId, {
         status: "SUCCEEDED",
         durationMs: log.submittedAt ? Date.now() - log.submittedAt.getTime() : 0,

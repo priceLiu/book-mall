@@ -32,7 +32,10 @@ function escapeCsvCell(value: string | number | null | undefined): string {
   return s;
 }
 
-function buildCsv(headers: string[], rows: string[][]): string {
+function buildCsv(
+  headers: string[],
+  rows: (string | number | null | undefined)[][],
+): string {
   const lines = [
     headers.map(escapeCsvCell).join(","),
     ...rows.map((row) => row.map(escapeCsvCell).join(",")),
