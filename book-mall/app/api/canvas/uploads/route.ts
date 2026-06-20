@@ -161,12 +161,12 @@ export async function POST(request: NextRequest) {
     }
   }
   try {
-    let uploadBuf = buf;
+    let uploadBuf: Buffer = buf;
     let uploadMime = mime;
     let uploadExt = extForMime(mime, fileName);
     if (imageUpload) {
       const normalized = await normalizeCanvasUploadImageBuffer(buf);
-      uploadBuf = normalized.buf;
+      uploadBuf = Buffer.from(normalized.buf);
       uploadMime = normalized.contentType;
       uploadExt = normalized.ext;
     }
