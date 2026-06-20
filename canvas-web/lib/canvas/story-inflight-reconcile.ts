@@ -354,6 +354,11 @@ export function reconcileStaleInflightRuntimes(
     );
     if (inflight) continue;
 
+    // 刚提交：本地 pending/running 尚未绑定 taskId，勿误清或误贴历史终态
+    if (!rt.taskId) {
+      continue;
+    }
+
     // 刚提交：本地已绑定 taskId，列表可能尚未返回该任务
     if (rt.taskId && !nodeTasks.some((t) => t.id === rt.taskId)) {
       continue;
