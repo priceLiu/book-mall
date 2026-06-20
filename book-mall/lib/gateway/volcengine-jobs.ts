@@ -9,6 +9,7 @@ import {
   volcengineVideoTaskFailMessage,
 } from "@/lib/gateway/volcengine-client";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
+import { persistVolcengineTimingOnPoll } from "@/lib/gateway/log-volcengine-timing-persist";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 
 export async function submitVolcengineVideoJobForLog(opts: {
@@ -92,31 +93,68 @@ export async function pollVolcengineVideoTaskForLog(opts: {
     taskId: opts.taskId,
   });
   const row = polled.output;
+  const { prisma } = await import("@/lib/prisma");
+  const log = await prisma.gatewayRequestLog.findUnique({
+    where: { id: opts.logId },
+    select: {
+      id: true,
+      submittedAt: true,
+      completedAt: true,
+      resultSummary: true,
+      status: true,
+    },
+  });
+  if (!log) return "done";
+
+  const vendorStatus = String(row.status ?? "running");
 
   if (isVolcengineVideoTaskSuccess(row)) {
     const videoUrl = row.content?.video_url;
+    const baseSummary = buildGatewayTaskResultSummary(
+      polled.raw,
+      videoUrl ? { videoUrl } : { status: row.status },
+    );
+    const { resultSummary } = await persistVolcengineTimingOnPoll({
+      log,
+      vendorStatus,
+      vendorRaw: polled.raw,
+      resultSummaryOverride: baseSummary,
+    });
     await finalizeRequestLog(opts.logId, {
       status: "SUCCEEDED",
       durationMs: Date.now() - opts.startedAt,
-      resultSummary: buildGatewayTaskResultSummary(
-        polled.raw,
-        videoUrl ? { videoUrl } : { status: row.status },
-      ),
+      resultSummary,
       externalTaskId: opts.taskId,
     });
     return "done";
   }
 
   if (isVolcengineVideoTaskFailed(row)) {
+    const { resultSummary } = await persistVolcengineTimingOnPoll({
+      log,
+      vendorStatus,
+      vendorRaw: polled.raw,
+      resultSummaryOverride: buildGatewayTaskResultSummary(polled.raw, {
+        status: row.status,
+        error: row.error,
+      }),
+    });
     await finalizeRequestLog(opts.logId, {
       status: "FAILED",
       durationMs: Date.now() - opts.startedAt,
       failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
       failCode: "VOLCENGINE_TASK_FAILED",
       externalTaskId: opts.taskId,
+      resultSummary,
     });
     return "done";
   }
+
+  await persistVolcengineTimingOnPoll({
+    log,
+    vendorStatus,
+    vendorRaw: polled.raw,
+  });
 
   return "pending";
 }

@@ -9,6 +9,7 @@ import {
   buildGatewayLogProgressSummary,
   touchGatewayLogProgress,
 } from "@/lib/gateway/log-progress";
+import { persistVolcengineTimingOnPoll } from "@/lib/gateway/log-volcengine-timing-persist";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { prisma } from "@/lib/prisma";
 import {
@@ -203,22 +204,37 @@ export async function GET(request: NextRequest) {
       });
       const row = polled.output;
       if (log) {
+        const vendorStatus = String(row.status ?? "running");
         if (isVolcengineVideoTaskSuccess(row)) {
+          const slim = row.content?.video_url
+            ? { videoUrl: row.content.video_url }
+            : { status: row.status };
+          const baseSummary = buildGatewayTaskResultSummary(polled.raw, slim);
+          const { resultSummary } = await persistVolcengineTimingOnPoll({
+            log,
+            vendorStatus,
+            vendorRaw: polled.raw,
+            resultSummaryOverride: baseSummary,
+          });
           await finalizeRequestLog(log.id, {
             status: "SUCCEEDED",
             durationMs: log.submittedAt
               ? Date.now() - log.submittedAt.getTime()
               : 0,
-            resultSummary: buildGatewayTaskResultSummary(
-              polled.raw,
-              row.content?.video_url
-                ? { videoUrl: row.content.video_url }
-                : { status: row.status },
-            ),
+            resultSummary,
             externalTaskId: taskId,
             model: log.model,
           });
         } else if (isVolcengineVideoTaskFailed(row)) {
+          const { resultSummary } = await persistVolcengineTimingOnPoll({
+            log,
+            vendorStatus,
+            vendorRaw: polled.raw,
+            resultSummaryOverride: buildGatewayTaskResultSummary(polled.raw, {
+              status: row.status,
+              error: row.error,
+            }),
+          });
           await finalizeRequestLog(log.id, {
             status: "FAILED",
             durationMs: log.submittedAt
@@ -228,15 +244,18 @@ export async function GET(request: NextRequest) {
             failCode: "VOLCENGINE_TASK_FAILED",
             externalTaskId: taskId,
             model: log.model,
+            resultSummary,
           });
         } else if (isVolcengineVideoTaskInProgress(row)) {
-          await touchGatewayLogProgress(
-            log.id,
-            buildGatewayLogProgressSummary({
+          await persistVolcengineTimingOnPoll({
+            log,
+            vendorStatus,
+            vendorRaw: polled.raw,
+            resultSummaryOverride: buildGatewayLogProgressSummary({
               providerKind: "VOLCENGINE",
-              status: String(row.status ?? "running"),
+              status: vendorStatus,
             }),
-          );
+          });
         }
       }
       return NextResponse.json({

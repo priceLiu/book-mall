@@ -127,6 +127,7 @@ export async function canvasGwChat(
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
       projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
     }),
   });
 
@@ -175,6 +176,7 @@ export async function canvasGwCreateKieJob(
     callBackUrl?: string | null;
     clientPage?: string;
     projectId?: string;
+    canvasTaskId?: string;
     sbv1Billing?: Record<string, unknown>;
   },
 ): Promise<CanvasGwJobResult> {
@@ -202,6 +204,7 @@ export async function canvasGwCreateKieJob(
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
       projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
     }),
   });
 
@@ -223,6 +226,8 @@ export async function canvasGwCreateVolcengineVideoJob(
     sbv1Billing?: Record<string, unknown>;
     /** 影视专业版 2.0 等：可选指定 Gateway 绑定的 VOLCENGINE 凭证 id */
     gatewayCredentialId?: string;
+    /** CanvasGenerationTask.id，写入 Gateway 日志 storyTaskId 便于对账 */
+    canvasTaskId?: string;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -267,6 +272,7 @@ export async function canvasGwCreateVolcengineVideoJob(
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
       projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
     }),
   });
 
@@ -290,6 +296,7 @@ export async function canvasGwCreateBailianR2vJob(
     parameterExtras?: Record<string, unknown>;
     clientPage?: string;
     projectId?: string;
+    canvasTaskId?: string;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -319,6 +326,7 @@ export async function canvasGwCreateBailianR2vJob(
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
       projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
     }),
   });
 
@@ -338,6 +346,7 @@ export async function canvasGwCreateHunyuanJob(
     params?: Record<string, unknown>;
     clientPage?: string;
     projectId?: string;
+    canvasTaskId?: string;
   },
 ): Promise<CanvasGwJobResult> {
   const auth = await requireGatewayAuth(userId);
@@ -363,6 +372,7 @@ export async function canvasGwCreateHunyuanJob(
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
       projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
     }),
   });
 
@@ -410,6 +420,7 @@ export async function canvasGwTts(
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
       projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
     }),
   });
 
@@ -531,6 +542,7 @@ export async function canvasGwImageParsing(
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
       projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
     }),
   });
 
@@ -647,6 +659,7 @@ export async function canvasGwChatStream(
     meta: await canvasGwMeta(userId, {
       clientPage: opts.clientPage,
       projectId: opts.projectId,
+      storyTaskId: opts.canvasTaskId,
     }),
   });
 

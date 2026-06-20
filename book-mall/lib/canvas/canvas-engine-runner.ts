@@ -536,6 +536,7 @@ export async function runImageEngineNode(
           params,
           clientPage: gwClientPage,
           projectId,
+          canvasTaskId: created.id,
         });
         const updated = await prisma.canvasGenerationTask.update({
           where: { id: created.id },
@@ -590,6 +591,7 @@ export async function runImageEngineNode(
         callBackUrl,
         clientPage: gwClientPage,
         projectId,
+        canvasTaskId: claimedTask.id,
         sbv1Billing,
       });
       const updated = await prisma.canvasGenerationTask.update({
@@ -1146,6 +1148,7 @@ export async function runVideoEngineNode(
           body: input as Record<string, unknown>,
           clientPage: gwClientPage,
           projectId,
+          canvasTaskId: claimedTask.id,
           providerId,
           gatewayCredentialId:
             typeof data.gatewayCredentialId === "string" &&
@@ -1163,6 +1166,7 @@ export async function runVideoEngineNode(
           callBackUrl,
           clientPage: gwClientPage,
           projectId,
+          canvasTaskId: claimedTask.id,
         });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: claimedTask.id },
@@ -1465,6 +1469,7 @@ export async function runRefVideoEngineNode(
         parameterExtras,
         clientPage: gwClientPage,
         projectId,
+        canvasTaskId: claimedTask.id,
       });
       const updated = await prisma.canvasGenerationTask.update({
         where: { id: claimedTask.id },
@@ -1578,6 +1583,7 @@ export async function runRefVideoEngineNode(
       callBackUrl,
       clientPage: gwClientPage,
       projectId,
+      canvasTaskId: claimedTask.id,
     });
     const updated = await prisma.canvasGenerationTask.update({
       where: { id: claimedTask.id },

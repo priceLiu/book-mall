@@ -27,6 +27,10 @@ export type GatewayLogFilterInput = {
   submittedFrom?: Date;
   submittedTo?: Date;
   canonicalModelKey?: string;
+  /** 日志页展示 modelKey（canonical 优先，否则 model） */
+  model?: string;
+  providerKind?: string;
+  credentialId?: string;
   clientSource?: string;
   creditsChargedGt?: number;
 };
@@ -205,6 +209,9 @@ export function mergeGatewayLogFilters(
 ): Prisma.GatewayRequestLogWhereInput {
   if (!filters) return scope;
 
+  const parts: Prisma.GatewayRequestLogWhereInput[] = [];
+  if (Object.keys(scope).length > 0) parts.push(scope);
+
   const extra: Prisma.GatewayRequestLogWhereInput = {};
   if (filters.status) extra.status = filters.status;
   if (filters.statuses?.length) extra.status = { in: filters.statuses };
@@ -215,6 +222,11 @@ export function mergeGatewayLogFilters(
     };
   }
   if (filters.canonicalModelKey) extra.canonicalModelKey = filters.canonicalModelKey;
+  if (filters.providerKind) {
+    extra.providerKind =
+      filters.providerKind as Prisma.EnumGatewayProviderKindFilter;
+  }
+  if (filters.credentialId) extra.credentialId = filters.credentialId;
   if (filters.clientSource) {
     extra.clientSource =
       filters.clientSource as Prisma.EnumGatewayClientSourceFilter;
@@ -222,10 +234,17 @@ export function mergeGatewayLogFilters(
   if (filters.creditsChargedGt != null) {
     extra.creditsCharged = { gt: filters.creditsChargedGt };
   }
+  if (Object.keys(extra).length > 0) parts.push(extra);
 
-  if (Object.keys(extra).length === 0) return scope;
-  if (Object.keys(scope).length === 0) return extra;
-  return { AND: [scope, extra] };
+  if (filters.model) {
+    parts.push({
+      OR: [{ canonicalModelKey: filters.model }, { model: filters.model }],
+    });
+  }
+
+  if (parts.length === 0) return {};
+  if (parts.length === 1) return parts[0]!;
+  return { AND: parts };
 }
 
 export async function buildGatewayLogWhere(

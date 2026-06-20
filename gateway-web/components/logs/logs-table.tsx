@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogImagesCell } from "./log-images-cell";
 import { LogParamsCell } from "./log-params-cell";
 import { LogResultCell } from "./log-result-cell";
@@ -12,12 +12,10 @@ import {
   formatLogTimestamp,
   formatPlatformCreditsDisplay,
   isLogDateRangeInvalid,
-  logSubmittedInUtcDateRange,
   pickLogProgressLabel,
   resolveLogDurationMs,
 } from "@/lib/gateway-log-params";
 import {
-  collectLogCredentialKeys,
   collectLogModels,
   collectLogProviderKinds,
   formatLogCredentialKeyMasked,
@@ -26,6 +24,8 @@ import {
   formatLogSourceTooltip,
   formatProviderKindLabel,
   displayLogModelKey,
+  formatLogAppTaskCell,
+  formatLogTimingPhaseCell,
   logProviderFilterOptions,
   LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
@@ -51,6 +51,15 @@ export type GatewayLogRow = {
   completionTokens: number | null;
   metricsSource?: string | null;
   durationMs: number | null;
+  vendorDurationMs?: number | null;
+  storyTaskId?: string | null;
+  appTaskId?: string | null;
+  appTaskKind?: string | null;
+  appTaskNodeId?: string | null;
+  queueMs?: number | null;
+  generateMs?: number | null;
+  pollDelayMs?: number | null;
+  pollDelayOverLimit?: boolean;
   estimatedVendorCostYuan: string | null;
   failCode: string | null;
   failMessage: string | null;
@@ -58,6 +67,7 @@ export type GatewayLogRow = {
   resultSummary: unknown;
   submittedAt: string;
   completedAt: string | null;
+  credentialId?: string | null;
 };
 
 const STATUS_OPTIONS = [
@@ -69,7 +79,60 @@ const STATUS_OPTIONS = [
   { value: "CANCELLED", label: "cancelled" },
 ];
 
-const AUTO_REFRESH_MS = 10_000;
+const PAGE_SIZE_PRESETS = [20, 50, 100] as const;
+const PAGE_SIZE_STORAGE_KEY = "gw-logs-page-size";
+const PAGE_SIZE_MAX = 500;
+
+type PageSizePreset = (typeof PAGE_SIZE_PRESETS)[number] | "custom";
+
+type GatewayLogFacets = {
+  models: string[];
+  providerKinds: string[];
+  credentialKeys: { id: string; masked: string }[];
+};
+
+type GatewayLogsResponse = {
+  logs: GatewayLogRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  facets?: GatewayLogFacets;
+};
+
+export type GatewayLogsInitialData = {
+  logs: GatewayLogRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  facets?: GatewayLogFacets;
+};
+
+function readStoredPageSize(): number {
+  if (typeof window === "undefined") return PAGE_SIZE_PRESETS[0];
+  try {
+    const raw = window.localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 1 && n <= PAGE_SIZE_MAX) return Math.floor(n);
+  } catch {
+    /* ignore */
+  }
+  return PAGE_SIZE_PRESETS[0];
+}
+
+function resolvePageSizePreset(size: number): PageSizePreset {
+  return PAGE_SIZE_PRESETS.includes(size as (typeof PAGE_SIZE_PRESETS)[number])
+    ? (size as (typeof PAGE_SIZE_PRESETS)[number])
+    : "custom";
+}
+
+function clampPageSize(value: number): number {
+  if (!Number.isFinite(value) || value < 1) return PAGE_SIZE_PRESETS[0];
+  return Math.min(PAGE_SIZE_MAX, Math.floor(value));
+}
+
+const AUTO_REFRESH_MS = 8_000;
 const LIVE_CLOCK_MS = 1_000;
 
 function SpinnerIcon({ className }: { className?: string }) {
@@ -106,24 +169,42 @@ function RefreshIcon({ className }: { className?: string }) {
 }
 
 async function fetchGatewayLogs(params: {
-  hasDateFilter: boolean;
+  page: number;
+  pageSize: number;
   fromDate: string;
   toDate: string;
-}): Promise<GatewayLogRow[]> {
+  statusFilter: string;
+  sourceFilter: string;
+  providerFilter: string;
+  modelFilter: string;
+  credentialIdFilter: string;
+}): Promise<GatewayLogsResponse> {
   const qs = new URLSearchParams({
-    limit: params.hasDateFilter ? "200" : "100",
+    page: String(params.page),
+    limit: String(params.pageSize),
   });
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
+  if (params.statusFilter) qs.set("status", params.statusFilter);
+  if (params.sourceFilter) qs.set("clientSource", params.sourceFilter);
+  if (params.providerFilter) qs.set("providerKind", params.providerFilter);
+  if (params.modelFilter) qs.set("model", params.modelFilter);
+  if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
   const res = await fetch(`/api/book-mall/api/gateway/logs?${qs.toString()}`);
-  const data = (await res.json().catch(() => null)) as {
-    logs?: GatewayLogRow[];
-    error?: string;
-  } | null;
+  const data = (await res.json().catch(() => null)) as
+    | (GatewayLogsResponse & { error?: string })
+    | null;
   if (!res.ok) {
     throw new Error(data?.error ?? "加载日志失败");
   }
-  return data?.logs ?? [];
+  return {
+    logs: data?.logs ?? [],
+    total: data?.total ?? 0,
+    page: data?.page ?? params.page,
+    pageSize: data?.pageSize ?? params.pageSize,
+    totalPages: data?.totalPages ?? 1,
+    facets: data?.facets,
+  };
 }
 
 function logFilterChipClass(active: boolean): string {
@@ -136,12 +217,25 @@ function clearSelectionOnFilter(setSelected: (s: Set<string>) => void) {
   setSelected(new Set());
 }
 
-export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
-  const [logs, setLogs] = useState(initialLogs);
+export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData }) {
+  const [logs, setLogs] = useState(initialData.logs);
+  const [total, setTotal] = useState(initialData.total);
+  const [page, setPage] = useState(initialData.page || 1);
+  const [totalPages, setTotalPages] = useState(initialData.totalPages || 1);
+  const [pageSize, setPageSize] = useState(initialData.pageSize || PAGE_SIZE_PRESETS[0]);
+  const [pageSizePreset, setPageSizePreset] = useState<PageSizePreset>(
+    resolvePageSizePreset(initialData.pageSize || PAGE_SIZE_PRESETS[0]),
+  );
+  const [customPageSizeInput, setCustomPageSizeInput] = useState(
+    String(initialData.pageSize || PAGE_SIZE_PRESETS[0]),
+  );
+  const [facets, setFacets] = useState<GatewayLogFacets>(
+    initialData.facets ?? { models: [], providerKinds: [], credentialKeys: [] },
+  );
   const [sourceFilter, setSourceFilter] = useState("");
   const [providerFilter, setProviderFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
-  const [credentialKeyFilter, setCredentialKeyFilter] = useState("");
+  const [credentialIdFilter, setCredentialIdFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -155,32 +249,95 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
   const [liveNowMs, setLiveNowMs] = useState<number | null>(null);
 
   const dateRangeInvalid = isLogDateRangeInvalid(fromDate, toDate);
-  const hasDateFilter = !!(fromDate || toDate);
+
+  const skipInitialFetchRef = useRef(true);
+
+  const fetchParams = useMemo(
+    () => ({
+      page,
+      pageSize,
+      fromDate,
+      toDate,
+      statusFilter,
+      sourceFilter,
+      providerFilter,
+      modelFilter,
+      credentialIdFilter,
+    }),
+    [
+      page,
+      pageSize,
+      fromDate,
+      toDate,
+      statusFilter,
+      sourceFilter,
+      providerFilter,
+      modelFilter,
+      credentialIdFilter,
+    ],
+  );
+
+  const filtersAreDefault =
+    !sourceFilter &&
+    !providerFilter &&
+    !modelFilter &&
+    !credentialIdFilter &&
+    !statusFilter &&
+    !fromDate &&
+    !toDate;
 
   const hasInFlightLogs = useMemo(
     () => logs.some((l) => l.status === "RUNNING" || l.status === "PENDING"),
     [logs],
   );
 
-  const refreshLogs = useCallback(async () => {
-    setRefreshing(true);
+  const loadLogs = useCallback(async () => {
     setFetchError(null);
     try {
-      const next = await fetchGatewayLogs({ hasDateFilter, fromDate, toDate });
-      setLogs(next);
+      const data = await fetchGatewayLogs(fetchParams);
+      setLogs(data.logs);
+      setTotal(data.total);
+      setPage(data.page);
+      setTotalPages(data.totalPages);
+      setPageSize(data.pageSize);
+      if (data.facets) setFacets(data.facets);
       setLastRefreshedAt(new Date());
-      return next;
+      return data;
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : "加载日志失败");
       return null;
+    }
+  }, [fetchParams]);
+
+  const refreshLogs = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      return await loadLogs();
     } finally {
       setRefreshing(false);
     }
-  }, [hasDateFilter, fromDate, toDate]);
+  }, [loadLogs]);
 
   useEffect(() => {
-    setLogs(initialLogs);
-  }, [initialLogs]);
+    setLogs(initialData.logs);
+    setTotal(initialData.total);
+    setPage(initialData.page || 1);
+    setTotalPages(initialData.totalPages || 1);
+    setPageSize(initialData.pageSize || PAGE_SIZE_PRESETS[0]);
+    if (initialData.facets) setFacets(initialData.facets);
+  }, [initialData]);
+
+  useEffect(() => {
+    const stored = readStoredPageSize();
+    if (stored !== initialData.pageSize) {
+      setPageSize(stored);
+      setPageSizePreset(resolvePageSizePreset(stored));
+      setCustomPageSizeInput(String(stored));
+      setPage(1);
+      skipInitialFetchRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅挂载时恢复每页条数
+  }, []);
 
   /** 进行中任务 · 挂载后再用本地时钟刷新 Duration 列（禁止 SSR 阶段读 Date.now） */
   useEffect(() => {
@@ -213,13 +370,20 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
     };
   }, [autoRefresh, hasInFlightLogs, refreshLogs]);
 
+  /** 筛选 / 分页 / 每页条数变更时拉取 */
   useEffect(() => {
-    if (!hasDateFilter) {
-      setFetchError(null);
-      setLoading(false);
-      return;
-    }
     if (dateRangeInvalid) return;
+
+    if (skipInitialFetchRef.current) {
+      skipInitialFetchRef.current = false;
+      if (
+        filtersAreDefault &&
+        page === (initialData.page || 1) &&
+        pageSize === (initialData.pageSize || PAGE_SIZE_PRESETS[0])
+      ) {
+        return;
+      }
+    }
 
     let cancelled = false;
     const timer = window.setTimeout(() => {
@@ -227,9 +391,14 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
         setLoading(true);
         setFetchError(null);
         try {
-          const next = await fetchGatewayLogs({ hasDateFilter, fromDate, toDate });
+          const data = await fetchGatewayLogs(fetchParams);
           if (cancelled) return;
-          setLogs(next);
+          setLogs(data.logs);
+          setTotal(data.total);
+          setPage(data.page);
+          setTotalPages(data.totalPages);
+          setPageSize(data.pageSize);
+          if (data.facets) setFacets(data.facets);
           setLastRefreshedAt(new Date());
         } catch (e) {
           if (!cancelled) {
@@ -245,65 +414,58 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [fromDate, toDate, hasDateFilter, dateRangeInvalid]);
+  }, [fetchParams, dateRangeInvalid, filtersAreDefault, initialData.page, initialData.pageSize, page, pageSize]);
 
-  const providerKinds = useMemo(
-    () => logProviderFilterOptions(collectLogProviderKinds(logs)),
-    [logs],
-  );
+  const providerKinds = useMemo(() => {
+    if (facets.providerKinds.length) {
+      return logProviderFilterOptions(facets.providerKinds);
+    }
+    return logProviderFilterOptions(collectLogProviderKinds(logs));
+  }, [facets.providerKinds, logs]);
 
-  const modelOptions = useMemo(
-    () => collectLogModels(logs, providerFilter || undefined),
-    [logs, providerFilter],
-  );
+  const modelOptions = useMemo(() => {
+    if (facets.models.length) return facets.models;
+    return collectLogModels(logs, providerFilter || undefined);
+  }, [facets.models, logs, providerFilter]);
 
-  const credentialKeyOptions = useMemo(
-    () => collectLogCredentialKeys(logs, providerFilter || undefined),
-    [logs, providerFilter],
-  );
-
-  const filtered = useMemo(() => {
-    return logs.filter((l) => {
-      if (
-        hasDateFilter &&
-        !dateRangeInvalid &&
-        !logSubmittedInUtcDateRange(l.submittedAt, fromDate, toDate)
-      ) {
-        return false;
+  const credentialKeyOptions = useMemo(() => {
+    if (facets.credentialKeys.length) return facets.credentialKeys;
+    const map = new Map<string, string>();
+    for (const l of logs) {
+      if (providerFilter && l.providerKind !== providerFilter) continue;
+      if (l.credentialId && l.credentialKeyMasked) {
+        map.set(l.credentialId, l.credentialKeyMasked);
       }
-      if (sourceFilter && l.clientSource !== sourceFilter) return false;
-      if (providerFilter && l.providerKind !== providerFilter) return false;
-      if (modelFilter && displayLogModelKey(l) !== modelFilter) return false;
-      if (
-        credentialKeyFilter &&
-        l.credentialKeyMasked !== credentialKeyFilter
-      ) {
-        return false;
-      }
-      if (statusFilter && l.status !== statusFilter) return false;
-      return true;
-    });
-  }, [
-    logs,
-    hasDateFilter,
-    dateRangeInvalid,
-    fromDate,
-    toDate,
-    sourceFilter,
-    providerFilter,
-    modelFilter,
-    credentialKeyFilter,
-    statusFilter,
-  ]);
+    }
+    return [...map.entries()]
+      .map(([id, masked]) => ({ id, masked }))
+      .sort((a, b) => a.masked.localeCompare(b.masked));
+  }, [facets.credentialKeys, logs, providerFilter]);
+
+  const resetPage = () => setPage(1);
+
+  const applyPageSize = (next: number) => {
+    const clamped = clampPageSize(next);
+    setPageSize(clamped);
+    setPageSizePreset(resolvePageSizePreset(clamped));
+    setCustomPageSizeInput(String(clamped));
+    setPage(1);
+    clearSelectionOnFilter(setSelected);
+    try {
+      window.localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(clamped));
+    } catch {
+      /* ignore */
+    }
+  };
 
   const allSelected =
-    filtered.length > 0 && filtered.every((l) => selected.has(l.id));
+    logs.length > 0 && logs.every((l) => selected.has(l.id));
 
   const toggleAll = () => {
     if (allSelected) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(filtered.map((l) => l.id)));
+      setSelected(new Set(logs.map((l) => l.id)));
     }
   };
 
@@ -331,6 +493,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   className={logFilterChipClass(active)}
                   onClick={() => {
                     setSourceFilter(opt.value);
+                    resetPage();
                     clearSelectionOnFilter(setSelected);
                   }}
                 >
@@ -341,10 +504,10 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             <span className="ml-2 shrink-0 text-[11px] text-zinc-600">
               {loading
                 ? "加载中…"
-                : `${filtered.length} / ${logs.length} 条`}
-              {hasDateFilter && !loading ? " · 按日期" : ""}
+                : `共 ${total} 条 · 第 ${page}/${totalPages} 页 · 本页 ${logs.length} 条`}
+              {(fromDate || toDate) && !loading ? " · 按日期" : ""}
               {hasInFlightLogs && autoRefresh
-                ? " · 自动刷新 10s"
+                ? " · 自动刷新 8s"
                 : hasInFlightLogs
                   ? " · 有进行中任务"
                   : ""}
@@ -388,6 +551,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   max={toDate || undefined}
                   onChange={(e) => {
                     setFromDate(e.target.value);
+                    resetPage();
                     clearSelectionOnFilter(setSelected);
                   }}
                   className="w-[148px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20 [color-scheme:dark]"
@@ -402,6 +566,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   min={fromDate || undefined}
                   onChange={(e) => {
                     setToDate(e.target.value);
+                    resetPage();
                     clearSelectionOnFilter(setSelected);
                   }}
                   className="w-[148px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20 [color-scheme:dark]"
@@ -415,6 +580,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   onClick={() => {
                     setFromDate("");
                     setToDate("");
+                    resetPage();
                     clearSelectionOnFilter(setSelected);
                   }}
                 >
@@ -425,6 +591,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
+                  resetPage();
                   clearSelectionOnFilter(setSelected);
                 }}
                 className="mb-0.5 min-w-[160px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20"
@@ -443,10 +610,6 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               </span>
             ) : fetchError ? (
               <span className="text-xs text-red-400/90">{fetchError}</span>
-            ) : hasDateFilter && !loading ? (
-              <span className="text-[11px] text-zinc-600">
-                按 Submitted 筛选，最多 200 条
-              </span>
             ) : null}
           </div>
         </div>
@@ -459,7 +622,8 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             onClick={() => {
               setProviderFilter("");
               setModelFilter("");
-              setCredentialKeyFilter("");
+              setCredentialIdFilter("");
+              resetPage();
               clearSelectionOnFilter(setSelected);
             }}
           >
@@ -473,7 +637,8 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               onClick={() => {
                 setProviderFilter(kind);
                 setModelFilter("");
-                setCredentialKeyFilter("");
+                setCredentialIdFilter("");
+                resetPage();
                 clearSelectionOnFilter(setSelected);
               }}
             >
@@ -488,6 +653,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             value={modelFilter}
             onChange={(e) => {
               setModelFilter(e.target.value);
+              resetPage();
               clearSelectionOnFilter(setSelected);
             }}
             disabled={!modelOptions.length}
@@ -511,9 +677,10 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
         <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
           <span className="shrink-0 text-xs text-zinc-500">渠道 Key</span>
           <select
-            value={credentialKeyFilter}
+            value={credentialIdFilter}
             onChange={(e) => {
-              setCredentialKeyFilter(e.target.value);
+              setCredentialIdFilter(e.target.value);
+              resetPage();
               clearSelectionOnFilter(setSelected);
             }}
             disabled={!credentialKeyOptions.length}
@@ -521,9 +688,9 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             aria-label="按渠道 Key 筛选"
           >
             <option value="">全部 Key</option>
-            {credentialKeyOptions.map((key) => (
-              <option key={key} value={key}>
-                {formatLogCredentialKeyMasked(key)}
+            {credentialKeyOptions.map((item) => (
+              <option key={item.id} value={item.id}>
+                {formatLogCredentialKeyMasked(item.masked)}
               </option>
             ))}
           </select>
@@ -536,7 +703,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
-        <table className="gw-logs-table min-w-[2580px]">
+        <table className="gw-logs-table min-w-[3020px]">
           <thead>
             <tr>
               <th className="w-11">
@@ -559,9 +726,38 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               <th className="min-w-[480px]">Params</th>
               <th className="min-w-[280px]">Images</th>
               <th className="w-[120px]">Status</th>
-              <th className="w-[88px]">Duration</th>
+              <th
+                className="w-[88px]"
+                title="Gateway 观测耗时：Submitted → Completed（或进行中为实时计时）。含火山排队与轮询间隔，非厂商控制台内的纯渲染秒数。"
+              >
+                Duration
+              </th>
+              <th
+                className="w-[88px]"
+                title="Gateway 提交 → 首次观测到火山 running（或仍在 queued 时的累计排队）"
+              >
+                Queue
+              </th>
+              <th
+                className="w-[88px]"
+                title="首次 running → 厂商 updated_at（任务完成）；进行中为实时累计"
+              >
+                Generate
+              </th>
+              <th
+                className="w-[96px]"
+                title="厂商 updated_at → Gateway 检测到成功；应 ≤10s，超出标红"
+              >
+                Poll Δ
+              </th>
               <th className="min-w-[168px]">Submitted</th>
               <th className="min-w-[168px]">Completed</th>
+              <th
+                className="min-w-[200px]"
+                title="Canvas 画布节点 task（CanvasGenerationTask.id）或 Story 任务 id；悬停可看 nodeId"
+              >
+                Node Task
+              </th>
               <th
                 className="w-[100px]"
                 title="挂牌参考费用（元），供后续费用统计；非钱包扣点。"
@@ -603,7 +799,7 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((l) => {
+            {logs.map((l) => {
               const isInProgress =
                 l.status === "RUNNING" || l.status === "PENDING";
               const durationMs = resolveLogDurationMs(
@@ -626,6 +822,12 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
               const logId = formatLogMonospaceId(l.id);
               const requestId = formatLogMonospaceId(l.vendorRequestId);
               const vendorTaskId = formatLogMonospaceId(l.externalTaskId);
+              const appTask = formatLogAppTaskCell(l);
+              const queueCell = formatLogTimingPhaseCell(l.queueMs, "queue");
+              const generateCell = formatLogTimingPhaseCell(l.generateMs, "generate");
+              const pollCell = formatLogTimingPhaseCell(l.pollDelayMs, "poll", {
+                overLimit: l.pollDelayOverLimit,
+              });
               const progressLabel = isInProgress
                 ? pickLogProgressLabel(l.status, l.resultSummary)
                 : null;
@@ -705,6 +907,32 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                   </td>
                   <td className="align-middle">
                     <span
+                      className="font-mono text-sm text-zinc-300"
+                      title={queueCell.title}
+                    >
+                      {queueCell.value}
+                    </span>
+                  </td>
+                  <td className="align-middle">
+                    <span
+                      className="font-mono text-sm text-zinc-300"
+                      title={generateCell.title}
+                    >
+                      {generateCell.value}
+                    </span>
+                  </td>
+                  <td className="align-middle">
+                    <span
+                      className={`font-mono text-sm ${
+                        pollCell.warn ? "text-amber-400" : "text-zinc-300"
+                      }`}
+                      title={pollCell.title}
+                    >
+                      {pollCell.value}
+                    </span>
+                  </td>
+                  <td className="align-middle">
+                    <span
                       className="block whitespace-nowrap font-mono text-[11px] leading-snug text-zinc-400"
                       title={l.submittedAt}
                     >
@@ -727,6 +955,14 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                         —
                       </span>
                     )}
+                  </td>
+                  <td className="align-middle">
+                    <span
+                      className="block break-all font-mono text-[11px] leading-snug text-zinc-400"
+                      title={appTask.title}
+                    >
+                      {appTask.value}
+                    </span>
                   </td>
                   <td
                     className="align-middle font-mono text-sm text-zinc-300"
@@ -790,20 +1026,100 @@ export function LogsTable({ initialLogs }: { initialLogs: GatewayLogRow[] }) {
                 </tr>
               );
             })}
-            {!filtered.length ? (
+            {!logs.length ? (
               <tr>
                 <td
-                  colSpan={18}
+                  colSpan={22}
                   className="py-16 text-center text-sm text-zinc-500"
                 >
-                  {logs.length
-                    ? "暂无符合筛选条件的日志"
-                    : "暂无日志"}
+                  {total > 0 ? "本页暂无数据" : "暂无日志"}
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-[#0f0f14] px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-zinc-500">每页</span>
+          <select
+            value={pageSizePreset}
+            onChange={(e) => {
+              const next = e.target.value as PageSizePreset;
+              setPageSizePreset(next);
+              if (next === "custom") return;
+              applyPageSize(Number(next));
+            }}
+            className="rounded-lg border border-white/10 bg-[#141419] px-2.5 py-1.5 text-xs text-zinc-300 outline-none focus:border-white/20"
+            aria-label="每页条数"
+          >
+            {PAGE_SIZE_PRESETS.map((n) => (
+              <option key={n} value={String(n)}>
+                {n}
+              </option>
+            ))}
+            <option value="custom">自定义</option>
+          </select>
+          {pageSizePreset === "custom" ? (
+            <label className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
+              <input
+                type="number"
+                min={1}
+                max={PAGE_SIZE_MAX}
+                value={customPageSizeInput}
+                onChange={(e) => setCustomPageSizeInput(e.target.value)}
+                onBlur={() => {
+                  const n = clampPageSize(Number(customPageSizeInput));
+                  applyPageSize(n);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  const n = clampPageSize(Number(customPageSizeInput));
+                  applyPageSize(n);
+                }}
+                className="w-20 rounded-lg border border-white/10 bg-[#141419] px-2 py-1.5 font-mono text-xs text-zinc-300 outline-none focus:border-white/20"
+                aria-label="自定义每页条数"
+              />
+              条
+            </label>
+          ) : null}
+          <span className="text-[11px] text-zinc-600">
+            最多 {PAGE_SIZE_MAX} 条/页
+          </span>
+        </div>
+
+        {totalPages > 1 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1 || loading}
+              onClick={() => {
+                setPage((p) => Math.max(1, p - 1));
+                clearSelectionOnFilter(setSelected);
+              }}
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              上一页
+            </button>
+            <span className="text-xs text-zinc-500">
+              第 {page} / {totalPages} 页
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages || loading}
+              onClick={() => {
+                setPage((p) => Math.min(totalPages, p + 1));
+                clearSelectionOnFilter(setSelected);
+              }}
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              下一页
+            </button>
+          </div>
+        ) : (
+          <span className="text-xs text-zinc-600">共 {total} 条</span>
+        )}
       </div>
     </div>
   );
