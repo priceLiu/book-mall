@@ -17,6 +17,12 @@ import { prisma } from "@/lib/prisma";
 import { sendSmsMessage } from "@/lib/sms/send-sms";
 
 const CODE_TTL_MS = 5 * 60 * 1000;
+/** 团队邀请链接内验证码与 TenantInvite 同 TTL（7 天） */
+const TEAM_INVITE_CODE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function codeTtlMs(purpose: SmsVerificationPurpose): number {
+  return purpose === "TEAM_INVITE" ? TEAM_INVITE_CODE_TTL_MS : CODE_TTL_MS;
+}
 const SEND_COOLDOWN_MS = 60 * 1000;
 const MAX_DAILY_PER_PHONE = 10;
 const MAX_DAILY_PER_IP = 30;
@@ -97,7 +103,7 @@ export async function issueSmsCode(input: {
 
   const code = isMockSmsPhone(phone) ? MOCK_SMS_CODE : generateCode();
   const codeHash = await bcrypt.hash(code, 10);
-  const expiresAt = new Date(now.getTime() + CODE_TTL_MS);
+  const expiresAt = new Date(now.getTime() + codeTtlMs(input.purpose));
 
   await prisma.smsVerification.create({
     data: {
@@ -124,6 +130,50 @@ export async function issueSmsCode(input: {
   return result;
 }
 
+/** 团队邀请链接中的 code 是否仍有效（未消费、未过期、与 token 绑定）。 */
+export async function isTeamInviteUrlCodeValid(input: {
+  phoneRaw: string;
+  inviteToken: string;
+  code: string;
+}): Promise<boolean> {
+  const phone = normalizePhone(input.phoneRaw);
+  const code = input.code.trim();
+  if (!phone || !code) return false;
+
+  if (verifySmsBypass({ phoneNormalized: phone, code })) {
+    return true;
+  }
+
+  const invite = await prisma.tenantInvite.findUnique({
+    where: { token: input.inviteToken.trim() },
+    select: { phone: true, urlCode: true, status: true, expiresAt: true },
+  });
+  if (
+    invite &&
+    invite.status === "PENDING" &&
+    invite.expiresAt > new Date() &&
+    normalizePhone(invite.phone) === phone &&
+    invite.urlCode?.trim() === code
+  ) {
+    return true;
+  }
+
+  if (!/^\d{6}$/.test(code)) return false;
+
+  const row = await prisma.smsVerification.findFirst({
+    where: {
+      phone,
+      purpose: "TEAM_INVITE",
+      inviteToken: input.inviteToken.trim(),
+      consumedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!row) return false;
+  return bcrypt.compare(code, row.codeHash);
+}
+
 export async function verifySmsCode(input: {
   phoneRaw: string;
   purpose: SmsVerificationPurpose;
@@ -141,6 +191,22 @@ export async function verifySmsCode(input: {
 
   if (!/^\d{6}$/.test(code)) {
     throw new SmsVerificationError("验证码格式无效");
+  }
+
+  if (input.purpose === "TEAM_INVITE" && input.inviteToken?.trim()) {
+    const invite = await prisma.tenantInvite.findUnique({
+      where: { token: input.inviteToken.trim() },
+      select: { phone: true, urlCode: true, status: true, expiresAt: true },
+    });
+    if (
+      invite &&
+      invite.status === "PENDING" &&
+      invite.expiresAt > new Date() &&
+      normalizePhone(invite.phone) === phone &&
+      invite.urlCode?.trim() === code
+    ) {
+      return;
+    }
   }
 
   const row = await prisma.smsVerification.findFirst({

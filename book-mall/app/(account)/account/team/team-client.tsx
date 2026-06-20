@@ -113,35 +113,20 @@ const ROLE_LABEL: Record<Role, string> = {
   MEMBER: "成员",
 };
 
-function CopyInviteLinkButton({
-  token,
-  urlCode,
-}: {
-  token: string;
-  urlCode: string | null;
-}) {
+function CopyInviteLinkButton({ token }: { token: string }) {
   const [copied, setCopied] = useState(false);
   const [copyErr, setCopyErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function buildUrl(code: string): string {
-    return `${window.location.origin}/invite/t/${encodeURIComponent(token)}?${new URLSearchParams({ code: code.trim() })}`;
-  }
-
   async function copy() {
     setCopyErr(null);
     startTransition(async () => {
-      let url: string;
-      if (urlCode?.trim()) {
-        url = buildUrl(urlCode);
-      } else {
-        const res = await getInviteLinkAction(token);
-        if (!res.ok) {
-          setCopyErr(res.error);
-          return;
-        }
-        url = res.data.inviteUrl;
+      const res = await getInviteLinkAction(token);
+      if (!res.ok) {
+        setCopyErr(res.error);
+        return;
       }
+      const url = res.data.inviteUrl;
       try {
         await navigator.clipboard.writeText(url);
         setCopied(true);
@@ -755,7 +740,7 @@ function TeamOverview({
                       {new Date(i.expiresAt).toLocaleDateString("zh-CN")}
                     </span>
                     <div className="flex shrink-0 gap-2">
-                      <CopyInviteLinkButton token={i.token} urlCode={i.urlCode} />
+                      <CopyInviteLinkButton token={i.token} />
                       <Button
                         variant="ghost"
                         size="sm"

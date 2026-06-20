@@ -12,3 +12,18 @@ export function buildTeamInviteUrl(token: string, code: string): string {
   const q = new URLSearchParams({ code: code.trim() });
   return `${bookMallPublicOrigin()}/invite/t/${encodeURIComponent(token)}?${q.toString()}`;
 }
+
+/**
+ * 优先使用 DB 中最新 urlCode（避免旧短信 query 中过期 code 覆盖新链接）。
+ */
+export function pickTeamInviteUrlCode(
+  searchParams: Record<string, string | string[] | undefined> | undefined,
+  storedUrlCode: string | null | undefined,
+): string | null {
+  const stored = storedUrlCode?.trim();
+  if (stored) return stored;
+  const raw = searchParams?.code;
+  const fromQuery = Array.isArray(raw) ? raw[0] : raw;
+  const q = fromQuery?.trim();
+  return q || null;
+}
