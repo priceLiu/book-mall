@@ -4,6 +4,7 @@
 import type { GatewayRequestStatus, Prisma } from "@prisma/client";
 
 import { canViewFinanceCost } from "@/lib/auth/permissions";
+import { canViewTeamBilling } from "@/lib/finance/team-finance-guard";
 import {
   parseDashboardHoursParam,
   parseLogStatusesParam,
@@ -17,13 +18,13 @@ import {
   resolveGatewaySessionBookUserId,
   type GatewayLogFilterInput,
 } from "@/lib/gateway/log-query-scope";
-import { prisma } from "@/lib/prisma";
 import {
   emptyActorWhere,
   parseActorPhoneQuery,
   resolveBookUserIdsByPhoneQuery,
   resolveTeamMemberUserIds,
 } from "@/lib/gateway/log-dashboard-actor";
+import { prisma } from "@/lib/prisma";
 
 export type DashboardScopeParam = "all" | "team" | "actor" | "project";
 
@@ -99,24 +100,14 @@ export function parseDashboardQueryFromSearchParams(
   };
 }
 
-async function assertTeamDashboardAccess(
+async function resolveTeamMembership(
   bookUserId: string,
   tenantId: string,
-  isPlatformAdmin: boolean,
 ) {
-  if (isPlatformAdmin) return;
-  const membership = await prisma.tenantMember.findFirst({
-    where: {
-      tenantId,
-      userId: bookUserId,
-      status: "ACTIVE",
-      role: { in: ["OWNER", "ADMIN"] },
-    },
-    select: { id: true },
+  return prisma.tenantMember.findFirst({
+    where: { tenantId, userId: bookUserId, status: "ACTIVE" },
+    select: { role: true },
   });
-  if (!membership) {
-    throw new DashboardScopeError("无权查看该团队", 403);
-  }
 }
 
 async function applyActorPhoneFilter(
@@ -172,17 +163,33 @@ export async function buildDashboardLogWhere(input: {
   switch (input.query.scope) {
     case "team": {
       if (!input.query.tenantId) {
-        throw new DashboardScopeError("团队筛选须指定 tenantId", 400);
+        base = await buildGatewayLogScopeForGatewaySessionUser(
+          input.gatewaySessionUser,
+        );
+        break;
       }
       if (!bookUserId) {
         throw new DashboardScopeError("未关联 Book 账号", 403);
       }
-      await assertTeamDashboardAccess(
-        bookUserId,
-        input.query.tenantId,
-        isPlatformAdmin,
-      );
-      base = await buildGatewayLogWhereForTeamTenant(input.query.tenantId);
+      const membership = isPlatformAdmin
+        ? null
+        : await resolveTeamMembership(bookUserId, input.query.tenantId);
+      if (!isPlatformAdmin && !membership) {
+        throw new DashboardScopeError("无权查看该团队", 403);
+      }
+      if (
+        isPlatformAdmin ||
+        (membership && canViewTeamBilling(membership.role))
+      ) {
+        base = await buildGatewayLogWhereForTeamTenant(input.query.tenantId);
+      } else {
+        base = {
+          AND: [
+            { tenantId: input.query.tenantId },
+            { actorBookUserId: bookUserId },
+          ],
+        };
+      }
       break;
     }
     case "actor": {
