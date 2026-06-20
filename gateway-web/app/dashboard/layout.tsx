@@ -9,6 +9,7 @@ const BASE_NAV = [
   { href: "/dashboard/guide", label: "操作指引" },
   { href: "/dashboard", label: "用量" },
   { href: "/dashboard/logs", label: "日志" },
+  { href: "/dashboard/status", label: "状态" },
   { href: "/dashboard/market", label: "模型市场" },
 ];
 

@@ -5,6 +5,10 @@ import {
   formatRequestStatusShortLabel,
   type LogRequestStatus,
 } from "@/lib/gateway-log-display";
+import {
+  gatewayFailMessageDisplay,
+  resolveGatewayFailCodeDisplay,
+} from "@/lib/gateway-log-fail";
 import { LogPreviewTipShell } from "./log-preview-tip-shell";
 import { useLogHoverTip } from "./use-log-hover-tip";
 
@@ -46,12 +50,10 @@ export function LogStatusBadge({
   const anchorRef = useRef<HTMLSpanElement>(null);
 
   const isFailed = normalized === "FAILED";
-  const code = failCode?.trim() || (isFailed ? "FAILED" : "");
-  const message =
-    failMessage?.trim() ||
-    (isFailed
-      ? "未记录详细原因（常见于上游空响应、连接中断或旧版日志）。请悬停查看 Params，或重试请求。"
-      : "");
+  const code = resolveGatewayFailCodeDisplay({ failCode, failMessage });
+  const message = isFailed
+    ? gatewayFailMessageDisplay(failMessage)
+    : "";
   const hasFailTip = isFailed;
   const copyText = hasFailTip ? `code: ${code}\n\nmessage: ${message}` : undefined;
   const nativeTitle = hasFailTip ? `${code}: ${message}` : undefined;

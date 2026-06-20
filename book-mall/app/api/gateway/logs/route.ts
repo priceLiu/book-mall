@@ -1,4 +1,3 @@
-import type { GatewayRequestStatus } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 import {
@@ -9,16 +8,19 @@ import {
   computeLogTotalPages,
   parseLogLimitParam,
   parseLogPageParam,
-  parseLogSubmittedFromParam,
-  parseLogSubmittedToParam,
 } from "@/lib/gateway/log-query-params";
 import { resolveGatewayLogListFacets } from "@/lib/gateway/log-list-facets";
 import { resolveGatewayTokenMetrics } from "@/lib/gateway/gateway-token-metrics";
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { maskApiKey } from "@/lib/canvas/secret";
-import { buildGatewayLogWhere } from "@/lib/gateway/log-query-scope";
+import {
+  buildDashboardLogWhere,
+  DashboardScopeError,
+  parseDashboardQueryFromSearchParams,
+} from "@/lib/gateway/log-dashboard-query";
 import { resolveGatewayLogAppTaskLinks } from "@/lib/gateway/log-app-task-link";
+import { fetchGatewayLogActorDisplays } from "@/lib/gateway/log-dashboard-actor";
 import { resolveVolcengineLogTiming } from "@/lib/gateway/log-volcengine-timing";
 import { resolveGatewayLogVendorRequestId } from "@/lib/gateway/vendor-request-id";
 import { prisma } from "@/lib/prisma";
@@ -42,17 +44,7 @@ export async function GET(request: NextRequest) {
 
   const page = parseLogPageParam(request.nextUrl.searchParams.get("page"));
   const pageSize = parseLogLimitParam(request.nextUrl.searchParams.get("limit"));
-  const status = request.nextUrl.searchParams.get("status")?.trim();
-  const clientSource = request.nextUrl.searchParams.get("clientSource")?.trim();
-  const providerKind = request.nextUrl.searchParams.get("providerKind")?.trim();
-  const model = request.nextUrl.searchParams.get("model")?.trim();
-  const credentialId = request.nextUrl.searchParams.get("credentialId")?.trim();
-  const submittedFrom = parseLogSubmittedFromParam(
-    request.nextUrl.searchParams.get("from"),
-  );
-  const submittedTo = parseLogSubmittedToParam(
-    request.nextUrl.searchParams.get("to"),
-  );
+  const query = parseDashboardQueryFromSearchParams(request.nextUrl.searchParams);
 
   const scopeInput = {
     gatewaySessionUser: {
@@ -62,26 +54,31 @@ export async function GET(request: NextRequest) {
     },
   };
 
-  const listFilters = {
-    status: status ? (status as GatewayRequestStatus) : undefined,
-    submittedFrom: submittedFrom ?? undefined,
-    submittedTo: submittedTo ?? undefined,
-    clientSource: clientSource || undefined,
-    providerKind: providerKind || undefined,
-    model: model || undefined,
-    credentialId: credentialId || undefined,
-  };
-
-  const where = await buildGatewayLogWhere(scopeInput, listFilters);
+  let where;
+  try {
+    where = await buildDashboardLogWhere({ gatewaySessionUser: scopeInput.gatewaySessionUser, query });
+  } catch (e) {
+    if (e instanceof DashboardScopeError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
+    throw e;
+  }
 
   const facetFilters = {
-    status: listFilters.status,
-    submittedFrom: listFilters.submittedFrom,
-    submittedTo: listFilters.submittedTo,
-    clientSource: listFilters.clientSource,
-    providerKind: listFilters.providerKind,
+    status: query.filters.status,
+    statuses: query.filters.statuses,
+    submittedFrom: query.filters.submittedFrom,
+    submittedTo: query.filters.submittedTo,
+    clientSource: query.filters.clientSource,
+    providerKind: query.filters.providerKind,
+    storyProjectId: query.filters.storyProjectId,
   };
-  const facetWhere = await buildGatewayLogWhere(scopeInput, facetFilters);
+  const facetWhere = await buildDashboardLogWhere({
+    gatewaySessionUser: scopeInput.gatewaySessionUser,
+    query: { ...query, filters: facetFilters },
+  });
+
+  const providerKind = query.filters.providerKind;
 
   const [total, facets] = await Promise.all([
     prisma.gatewayRequestLog.count({ where }),
@@ -117,9 +114,18 @@ export async function GET(request: NextRequest) {
 
   const appTaskLinks = await resolveGatewayLogAppTaskLinks(logs);
 
+  const actorIds = logs
+    .map((l) => l.actorBookUserId)
+    .filter((id): id is string => !!id);
+  const actorMap = await fetchGatewayLogActorDisplays(actorIds);
+
   const rows = await Promise.all(
     logs.map(async (l) => {
       const appTask = appTaskLinks.get(l.id);
+      const actor =
+        l.actorBookUserId != null
+          ? (actorMap.get(l.actorBookUserId) ?? null)
+          : null;
       const timing = resolveVolcengineLogTiming({
         providerKind: l.providerKind,
         requestKind: l.requestKind,
@@ -178,6 +184,9 @@ export async function GET(request: NextRequest) {
         providerKind: l.providerKind,
         tenantId: l.tenantId,
         actorBookUserId: l.actorBookUserId,
+        actorPhone: actor?.phone ?? null,
+        actorName: actor?.name ?? null,
+        actorDisplayLabel: actor?.displayLabel ?? null,
         creditsCharged: l.creditsCharged,
         credentialKeyMasked: l.credentialId
           ? (credentialKeyById.get(l.credentialId) ?? null)
@@ -207,6 +216,8 @@ export async function GET(request: NextRequest) {
         estimatedVendorCostYuan,
         failCode: l.failCode,
         failMessage: l.failMessage,
+        billingCategory: l.billingCategory,
+        storyProjectId: l.storyProjectId,
         inputSummary: l.inputSummary,
         resultSummary: l.resultSummary,
         submittedAt: l.submittedAt.toISOString(),
