@@ -17,6 +17,7 @@ import {
   type VolcenginePortraitAssetRecord,
 } from "@/lib/gateway/volcengine-portrait-actions";
 import { resolveCanvasPortraitVolcengineCredential } from "./canvas-portrait-volcengine-credential";
+import { ensureVolcenginePortraitImageUrl } from "./canvas-portrait-image-url";
 import { getSbv1PortraitLivenessStatus } from "./sbv1-portrait-liveness-service";
 
 export type CanvasPortraitKind = "virtual" | "real";
@@ -83,6 +84,10 @@ export async function importCanvasPortraitAsset(opts: {
       "入库图片须为公网 HTTPS URL（请先上传至 OSS）",
     );
   }
+  const portraitImageUrl = await ensureVolcenginePortraitImageUrl({
+    userId: opts.userId,
+    imageUrl,
+  });
 
   const edition = opts.edition ?? "sbv1";
   const clientPage =
@@ -126,7 +131,7 @@ export async function importCanvasPortraitAsset(opts: {
       kind: opts.kind,
       edition,
       groupId,
-      referenceImageUrls: [imageUrl],
+      referenceImageUrls: [portraitImageUrl],
     }),
   });
 
@@ -135,7 +140,7 @@ export async function importCanvasPortraitAsset(opts: {
     const created = await volcengineCreatePortraitAsset({
       credentials: portraitCredentials,
       groupId,
-      url: imageUrl,
+      url: portraitImageUrl,
       assetType: "Image",
       name: opts.name?.trim() || "canvas-portrait",
     });
