@@ -83,6 +83,14 @@ function disposePool(projectId: string) {
   pools.delete(projectId);
 }
 
+function ensureProjectTaskPoll(projectId: string, base: string) {
+  const pool = getPool(projectId);
+  if (pool.pollForbidden || pool.pollTimer) return;
+  pool.pollTimer = setInterval(() => {
+    void refreshProjectTasks(projectId, base);
+  }, TASK_HISTORY_POLL_MS);
+}
+
 async function refreshProjectTasks(projectId: string, base: string) {
   const pool = getPool(projectId);
   if (pool.pollForbidden || pool.inflight) return;
@@ -105,11 +113,7 @@ async function refreshProjectTasks(projectId: string, base: string) {
         t.status === "SUBMITTED",
     );
     if (!pool.needsInflightPoll) stopPollTimer(pool);
-    else if (!pool.pollTimer) {
-      pool.pollTimer = setInterval(() => {
-        void refreshProjectTasks(projectId, base);
-      }, TASK_HISTORY_POLL_MS);
-    }
+    else ensureProjectTaskPoll(projectId, base);
     emitPool(projectId);
   } catch (e) {
     if (isCanvasApiAccessDeniedError(e)) {
@@ -130,6 +134,22 @@ function scheduleProjectTaskRefresh(projectId: string, base: string) {
     pool.debounceTimer = null;
     void refreshProjectTasks(projectId, base);
   }, BATCH_DEBOUNCE_MS);
+}
+
+/** 生成中立即拉任务，不走 debounce */
+function flushProjectTaskRefresh(projectId: string, base: string) {
+  const pool = getPool(projectId);
+  if (pool.pollForbidden) return;
+  if (pool.debounceTimer) {
+    clearTimeout(pool.debounceTimer);
+    pool.debounceTimer = null;
+  }
+  if (pool.initialTimer) {
+    clearTimeout(pool.initialTimer);
+    pool.initialTimer = null;
+  }
+  ensureProjectTaskPoll(projectId, base);
+  void refreshProjectTasks(projectId, base);
 }
 
 function subscribeProjectTasks(
@@ -161,6 +181,10 @@ function getProjectTasksSnapshot(projectId: string): CanvasTaskRecord[] {
 
 function getProjectPollForbidden(projectId: string): boolean {
   return pools.get(projectId)?.pollForbidden ?? false;
+}
+
+function isLocalInflightStatus(status?: string): boolean {
+  return status === "pending" || status === "running";
 }
 
 /** 拉取某节点的任务历史；生图引擎 / 输出节点复用（项目级批量池）。 */
@@ -202,11 +226,19 @@ export function useNodeTaskHistory(nodeId: string | null | undefined) {
 
   const refreshHistory = useCallback(async () => {
     if (!base || !projectId || !nodeId || pollForbidden) return;
-    scheduleProjectTaskRefresh(projectId, base);
-  }, [base, projectId, nodeId, pollForbidden]);
+    if (isLocalInflightStatus(runtimeStatus)) {
+      flushProjectTaskRefresh(projectId, base);
+    } else {
+      scheduleProjectTaskRefresh(projectId, base);
+    }
+  }, [base, projectId, nodeId, pollForbidden, runtimeStatus]);
 
   useEffect(() => {
     if (!base || !projectId || pollForbidden) return;
+    if (isLocalInflightStatus(runtimeStatus)) {
+      flushProjectTaskRefresh(projectId, base);
+      return;
+    }
     scheduleProjectTaskRefresh(projectId, base);
   }, [base, projectId, pollForbidden, runtimeTaskId, runtimeStatus]);
 

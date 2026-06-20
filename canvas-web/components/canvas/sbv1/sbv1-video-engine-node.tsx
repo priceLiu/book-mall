@@ -120,6 +120,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   /** 服务端已成功但 runtime 未同步（超时恢复 / 刷新后） */
   useEffect(() => {
+    if (isGenerating || inflightTask) return;
     const latest = succeeded[succeeded.length - 1];
     if (!latest) return;
     const patch = runtimePatchFromCanvasTask(latest);
@@ -132,7 +133,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       return;
     }
     setNodeRuntime(id, patch);
-  }, [succeeded, d.runtime, id, setNodeRuntime]);
+  }, [succeeded, d.runtime, id, setNodeRuntime, isGenerating, inflightTask]);
 
   const hasToolbarContent = Boolean(
     hasVideo ||
