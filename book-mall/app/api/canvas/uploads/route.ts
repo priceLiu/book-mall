@@ -5,12 +5,25 @@ import {
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
+import {
+  inferCanvasUploadImageMime,
+  normalizeCanvasUploadImageBuffer,
+} from "@/lib/canvas/canvas-image-upload-normalize";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_BYTES = 30 * 1024 * 1024;
-const ACCEPTED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ACCEPTED_IMAGE_MIME = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/bmp",
+  "image/x-ms-bmp",
+  "image/tiff",
+]);
 const ACCEPTED_AUDIO_MIME = new Set([
   "audio/mpeg",
   "audio/mp3",
@@ -113,17 +126,26 @@ export async function POST(request: NextRequest) {
       { status: 413, headers: jsonHeaders(request) },
     );
   }
-  const mime = file.type.toLowerCase();
   const fileName = file.name.trim();
+  const mime = inferCanvasUploadImageMime(
+    file.type.toLowerCase(),
+    fileName,
+  );
   const textUpload = isTextUpload(mime, fileName);
   const audioUpload = isAudioUpload(mime, fileName);
-  if (!textUpload && !audioUpload && !ACCEPTED_IMAGE_MIME.has(mime)) {
+  const imageUpload =
+    !textUpload &&
+    !audioUpload &&
+    (ACCEPTED_IMAGE_MIME.has(mime) ||
+      mime.startsWith("image/") ||
+      /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(fileName));
+  if (!textUpload && !audioUpload && !imageUpload) {
     return NextResponse.json(
-      { error: "UNSUPPORTED_MIME", mime },
+      { error: "UNSUPPORTED_MIME", mime: file.type || mime },
       { status: 415, headers: jsonHeaders(request) },
     );
   }
-  const buf = Buffer.from(await file.arrayBuffer());
+  let buf = Buffer.from(await file.arrayBuffer());
   if (textUpload) {
     const sample = buf.subarray(0, Math.min(buf.length, 4096)).toString("utf8");
     if (sample.includes("\0")) {
@@ -134,17 +156,26 @@ export async function POST(request: NextRequest) {
     }
   }
   try {
+    let uploadBuf = buf;
+    let uploadMime = mime;
+    let uploadExt = extForMime(mime, fileName);
+    if (imageUpload) {
+      const normalized = await normalizeCanvasUploadImageBuffer(buf);
+      uploadBuf = normalized.buf;
+      uploadMime = normalized.contentType;
+      uploadExt = normalized.ext;
+    }
     const ossUrl = await uploadCanvasUserBuffer({
-      buf,
+      buf: uploadBuf,
       contentType: textUpload
         ? mime === "text/markdown"
           ? "text/markdown; charset=utf-8"
           : "text/plain; charset=utf-8"
         : audioUpload && !mime.startsWith("audio/")
           ? "audio/mpeg"
-          : mime,
+          : uploadMime,
       userId: guard.user.id,
-      ext: extForMime(mime, fileName),
+      ext: textUpload || audioUpload ? extForMime(mime, fileName) : uploadExt,
     });
     return NextResponse.json(
       { ossUrl },

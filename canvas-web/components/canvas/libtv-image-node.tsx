@@ -9,6 +9,7 @@ import { AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
+import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   LIBTV_CARD_DRAG_CLASS,
@@ -201,17 +202,29 @@ export function LibtvImageNode({
       if (
         !file ||
         (!file.type.startsWith("image/") &&
-          !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name))
+          !/\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(file.name) &&
+          !(file.size > 0 && !file.type))
       ) {
         return;
       }
-      const blobUrl = URL.createObjectURL(file);
+      let normalized: File;
+      try {
+        normalized = await normalizeCanvasImageFile(file);
+      } catch (e) {
+        await alert({
+          title: "无法读取图片",
+          message: e instanceof Error ? e.message : String(e),
+          variant: "error",
+        });
+        return;
+      }
+      const blobUrl = URL.createObjectURL(normalized);
       updateNodeData(id, {
         blobUrl,
         ossUrl: undefined,
         uploading: true,
         uploadError: undefined,
-        label: file.name.replace(/\.[^.]+$/, "") || "图片",
+        label: normalized.name.replace(/\.[^.]+$/, "") || "图片",
         ...(edition === "sbv1" ? { imageMode: "upload" as const } : {}),
       });
       if (!base) {
@@ -219,7 +232,7 @@ export function LibtvImageNode({
         return;
       }
       try {
-        const ossUrl = await uploadCanvasImage(base, file);
+        const ossUrl = await uploadCanvasImage(base, normalized);
         updateNodeData(id, { ossUrl, uploading: false });
       } catch (e) {
         updateNodeData(id, {

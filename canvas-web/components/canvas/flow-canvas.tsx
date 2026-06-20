@@ -37,6 +37,7 @@ import type {
 import { buildTextNodeDataFromPreset } from "@/lib/canvas/text-templates";
 import { buildImageEngineDataFromPreset } from "@/lib/canvas/image-engine-presets";
 import { uploadCanvasImage } from "@/lib/canvas-api";
+import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
 import {
   registerCanvasViewportPlacement,
   unregisterCanvasViewportPlacement,
@@ -62,6 +63,7 @@ import { canvasNotify } from "@/lib/canvas/canvas-notify";
 import { validateStoryPipelineDeletion } from "@/lib/canvas/story-pipeline-delete-guard";
 import {
   allImageFilesFromDataTransfer,
+  resolveClipboardImageFiles,
   isEditablePasteTarget,
   getLastPointerClient,
   isImagePasteSlotTarget,
@@ -580,7 +582,23 @@ function FlowCanvasInner({
       position: { x: number; y: number },
       labelOverride?: string,
     ) => {
-      const blobUrl = URL.createObjectURL(file);
+      let normalized = file;
+      try {
+        normalized = await normalizeCanvasImageFile(file);
+      } catch (e) {
+        const imageType: CanvasNodeType = sbv1Canvas
+          ? "sbv1-image"
+          : pro2FloatingInspector
+            ? "story-pro2-image"
+            : "image";
+        const id = addNode(imageType, position, {
+          uploading: false,
+          uploadError: e instanceof Error ? e.message : String(e),
+          label: labelOverride ?? file.name ?? "粘贴的图片",
+        });
+        return id;
+      }
+      const blobUrl = URL.createObjectURL(normalized);
       const imageType: CanvasNodeType = sbv1Canvas
         ? "sbv1-image"
         : pro2FloatingInspector
@@ -589,10 +607,10 @@ function FlowCanvasInner({
       const id = addNode(imageType, position, {
         blobUrl,
         uploading: true,
-        label: labelOverride ?? file.name ?? "粘贴的图片",
+        label: labelOverride ?? normalized.name ?? "粘贴的图片",
       });
       try {
-        const ossUrl = await uploadCanvasImage(base, file);
+        const ossUrl = await uploadCanvasImage(base, normalized);
         updateNodeData(id, { ossUrl, uploading: false });
       } catch (e) {
         updateNodeData(id, {
@@ -1105,7 +1123,14 @@ function FlowCanvasInner({
       if (event.defaultPrevented) return;
       const t = event.target as HTMLElement | null;
       const dt = event.clipboardData;
-      const imageFiles = allImageFilesFromDataTransfer(dt);
+      let imageFiles = allImageFilesFromDataTransfer(dt);
+      if (!imageFiles.length) {
+        imageFiles = await resolveClipboardImageFiles(dt);
+      } else {
+        imageFiles = await Promise.all(
+          imageFiles.map((f) => normalizeCanvasImageFile(f)),
+        );
+      }
 
       if (
         t &&

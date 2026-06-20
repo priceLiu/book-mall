@@ -43,18 +43,25 @@ export function useImportPortraitToLibrary(opts: UseImportPortraitOptions) {
       });
       return;
     }
-    const imageUrl = opts.imageUrl?.trim() ?? "";
-    if (!/^https:\/\//.test(imageUrl)) {
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === opts.nodeId);
+    const d = (node?.data ?? {}) as Record<string, unknown>;
+    if (d.uploading) {
       await alert({
         title: "无法入库",
-        message: "请先生成或上传图片（须为 HTTPS OSS 地址）后再入库。",
+        message: "图片仍在上传中，请稍候再试。",
         variant: "warning",
       });
       return;
     }
-
-    const node = useCanvasStore.getState().nodes.find((n) => n.id === opts.nodeId);
-    const d = (node?.data ?? {}) as Record<string, unknown>;
+    const imageUrl = opts.imageUrl?.trim() ?? "";
+    if (!/^https:\/\//.test(imageUrl)) {
+      await alert({
+        title: "无法入库",
+        message: "请等待图片上传完成（须为 HTTPS OSS 地址）后再入库。",
+        variant: "warning",
+      });
+      return;
+    }
     if (d.portraitStatus === "active" && d.portraitAssetUri) {
       const ok = await doubleConfirm({
         first: {

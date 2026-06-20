@@ -1,8 +1,35 @@
 import { useEffect, useRef, type DragEventHandler } from "react";
 
+import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
+
+const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i;
+
+const CLIPBOARD_IMAGE_TYPES = new Set([
+  "public.png",
+  "public.jpeg",
+  "public.tiff",
+  "image/bmp",
+  "image/x-ms-bmp",
+  "image/tiff",
+  "image/x-png",
+]);
+
+function isImageClipboardItemType(type: string): boolean {
+  const t = type.toLowerCase();
+  if (t.startsWith("image/")) {
+    return t !== "image/svg+xml";
+  }
+  return CLIPBOARD_IMAGE_TYPES.has(t);
+}
+
 function isClipboardImageFile(file: File): boolean {
-  if (file.type.startsWith("image/")) return true;
-  if (!file.type && /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name)) return true;
+  if (file.size <= 0) return false;
+  if (file.type.startsWith("image/") && file.type !== "image/svg+xml") {
+    return true;
+  }
+  if (!file.type && IMAGE_EXT.test(file.name)) return true;
+  /** Windows 截图/部分浏览器粘贴：type 为空但仍是有效位图 */
+  if (!file.type && file.size > 0) return true;
   return false;
 }
 
@@ -29,17 +56,24 @@ export function allImageFilesFromDataTransfer(
     for (const item of Array.from(dt.items)) {
       if (item.kind !== "file") continue;
       const type = item.type ?? "";
-      if (
-        !type.startsWith("image/") &&
-        type !== "public.png" &&
-        type !== "public.jpeg"
-      ) {
-        continue;
-      }
+      if (!isImageClipboardItemType(type) && type !== "") continue;
       push(item.getAsFile());
     }
   }
   return out;
+}
+
+/** 剪贴板图片（含 URL 回落）；规范化后供上传/预览 */
+export async function resolveClipboardImageFiles(
+  dt: DataTransfer | null | undefined,
+): Promise<File[]> {
+  const direct = allImageFilesFromDataTransfer(dt);
+  if (direct.length) {
+    return Promise.all(direct.map((f) => normalizeCanvasImageFile(f)));
+  }
+  const urlFile = await imageFileFromClipboardUrl(dt);
+  if (!urlFile) return [];
+  return [await normalizeCanvasImageFile(urlFile)];
 }
 
 /** 从剪贴板或拖放 DataTransfer 中取第一张图片文件 */
@@ -54,9 +88,7 @@ export function firstImageFileFromDataTransfer(
     for (const item of Array.from(dt.items)) {
       if (item.kind !== "file") continue;
       const type = item.type ?? "";
-      if (!type.startsWith("image/") && type !== "public.png" && type !== "public.jpeg") {
-        continue;
-      }
+      if (!isImageClipboardItemType(type) && type !== "") continue;
       const f = item.getAsFile();
       if (f && isClipboardImageFile(f)) return f;
     }
@@ -234,9 +266,8 @@ function pickImagePasteTarget(): ImagePasteTarget | null {
 async function resolveClipboardImageFile(
   dt: DataTransfer | null | undefined,
 ): Promise<File | null> {
-  const direct = firstImageFileFromDataTransfer(dt);
-  if (direct) return direct;
-  return imageFileFromClipboardUrl(dt);
+  const files = await resolveClipboardImageFiles(dt);
+  return files[0] ?? null;
 }
 
 function activePasteTargetRequiresZone(target: ImagePasteTarget): boolean {
@@ -275,7 +306,10 @@ export async function routeClipboardImageToActivePasteSlot(
   }
   const files = allImageFilesFromDataTransfer(dt);
   if (files.length) {
-    return deliverFilesToPasteTarget(target, files);
+    const normalized = await Promise.all(
+      files.map((f) => normalizeCanvasImageFile(f)),
+    );
+    return deliverFilesToPasteTarget(target, normalized);
   }
   const file = await resolveClipboardImageFile(dt);
   if (!file) return false;
