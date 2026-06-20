@@ -18,7 +18,7 @@ describe("federated-tools-logout", () => {
     vi.unstubAllEnvs();
   });
 
-  it("buildToolsLogoutHopUrl uses tools-session federated_logout", async () => {
+  it("buildToolsLogoutHopUrl uses tools-logout with next", async () => {
     const { buildToolsLogoutHopUrl } = await import(
       "@/lib/federated-tools-logout"
     );
@@ -27,7 +27,7 @@ describe("federated-tools-logout", () => {
       "https://book.example.com/api/auth/federated-logout?step=1",
     );
     expect(url).toBe(
-      "https://story.example.com/api/tools-session?federated_logout=1&next=https%3A%2F%2Fbook.example.com%2Fapi%2Fauth%2Ffederated-logout%3Fstep%3D1",
+      "https://story.example.com/api/tools-logout?next=https%3A%2F%2Fbook.example.com%2Fapi%2Fauth%2Ffederated-logout%3Fstep%3D1",
     );
   });
 

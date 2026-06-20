@@ -21,7 +21,10 @@ import {
 } from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { LIBTV_INPUT_DOCK_BG } from "@/lib/canvas/libtv-node-chrome";
 import { getTextareaCaretClientRect } from "@/lib/canvas/textarea-caret-rect";
+import { useCanvasStore } from "@/lib/canvas/store";
 import { cn } from "@/lib/utils";
+
+const REMEASURE_DEBOUNCE_MS = 80;
 
 export type MentionInlineThumbMirrorHandle = {
   resolveThumbAtPoint: (
@@ -206,6 +209,8 @@ export const MentionInlineThumbOverlay = forwardRef<
 ) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
+  const debounceRef = useRef<number | null>(null);
+  const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
 
   const syncScrollOffset = useCallback(() => {
     const ta = textareaRef.current;
@@ -244,12 +249,17 @@ export const MentionInlineThumbOverlay = forwardRef<
   }, [textareaRef, mentionables, enabled, edition, syncScrollOffset]);
 
   const scheduleRemeasure = useCallback(() => {
-    if (rafRef.current !== null) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      remeasure();
-    });
-  }, [remeasure]);
+    if (viewportMoving) return;
+    if (debounceRef.current !== null) return;
+    debounceRef.current = window.setTimeout(() => {
+      debounceRef.current = null;
+      if (rafRef.current !== null) return;
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        remeasure();
+      });
+    }, REMEASURE_DEBOUNCE_MS);
+  }, [remeasure, viewportMoving]);
 
   useLayoutEffect(() => {
     remeasure();
@@ -287,30 +297,28 @@ export const MentionInlineThumbOverlay = forwardRef<
     dockScroll?.addEventListener("scroll", scheduleRemeasure, { passive: true });
     window.addEventListener("resize", scheduleRemeasure);
 
-    const rfViewport = ta.closest(".react-flow__viewport") as HTMLElement | null;
-    let viewportObserver: MutationObserver | null = null;
-    if (rfViewport) {
-      viewportObserver = new MutationObserver(scheduleRemeasure);
-      viewportObserver.observe(rfViewport, {
-        attributes: true,
-        attributeFilter: ["style"],
-      });
-    }
-
     return () => {
       ta.removeEventListener("input", scheduleRemeasure);
       ta.removeEventListener("compositionend", scheduleRemeasure);
       ta.removeEventListener("scroll", onScroll);
       dockScroll?.removeEventListener("scroll", scheduleRemeasure);
       window.removeEventListener("resize", scheduleRemeasure);
-      viewportObserver?.disconnect();
       ro.disconnect();
+      if (debounceRef.current !== null) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
     };
   }, [enabled, scheduleRemeasure, syncScrollOffset, textareaRef]);
+
+  useLayoutEffect(() => {
+    if (!enabled || viewportMoving) return;
+    scheduleRemeasure();
+  }, [enabled, viewportMoving, scheduleRemeasure]);
 
   useImperativeHandle(
     ref,
