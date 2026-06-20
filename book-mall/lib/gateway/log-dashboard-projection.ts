@@ -104,38 +104,66 @@ function bumpCategoryCount(
   if (row) row.count += delta;
 }
 
-export async function fetchDashboardStats(
+export async function fetchDashboardStatsSummary(
   where: Prisma.GatewayRequestLogWhereInput,
-): Promise<DashboardStatsPayload> {
+): Promise<{ cards: DashboardCards }> {
+  const statusGroups = await prisma.gatewayRequestLog.groupBy({
+    by: ["status"],
+    where,
+    _count: { _all: true },
+  });
+  return {
+    cards: mergeStatusGroupCounts(
+      statusGroups.map((g) => ({ status: g.status, count: g._count._all })),
+    ),
+  };
+}
+
+export async function fetchDashboardCategoryStats(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<{ byCategory: DashboardStatsPayload["byCategory"] }> {
   const chartStatuses: GatewayRequestStatus[] = [
     ...DASHBOARD_IN_PROGRESS_STATUSES,
     "SUCCEEDED",
   ];
+  const chartRows = await prisma.gatewayRequestLog.findMany({
+    where: {
+      AND: [where, { status: { in: chartStatuses } }],
+    },
+    select: {
+      status: true,
+      requestKind: true,
+      inputSummary: true,
+      billingCategory: true,
+    },
+  });
+  return { byCategory: aggregateChartCategories(chartRows) };
+}
 
-  const [statusGroups, chartRows] = await Promise.all([
-    prisma.gatewayRequestLog.groupBy({
-      by: ["status"],
-      where,
-      _count: { _all: true },
-    }),
-    prisma.gatewayRequestLog.findMany({
-      where: {
-        AND: [where, { status: { in: chartStatuses } }],
-      },
-      select: {
-        status: true,
-        requestKind: true,
-        inputSummary: true,
-        billingCategory: true,
-      },
-    }),
+export type DashboardStatsParts = "summary" | "categories";
+
+export function parseDashboardStatsParts(
+  raw: string | null | undefined,
+): Set<DashboardStatsParts> {
+  const v = raw?.trim().toLowerCase();
+  if (!v || v === "all") {
+    return new Set(["summary", "categories"]);
+  }
+  const parts = new Set<DashboardStatsParts>();
+  for (const token of v.split(",")) {
+    const t = token.trim();
+    if (t === "summary" || t === "categories") parts.add(t);
+  }
+  if (parts.size === 0) return new Set(["summary", "categories"]);
+  return parts;
+}
+
+export async function fetchDashboardStats(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<DashboardStatsPayload> {
+  const [summary, categories] = await Promise.all([
+    fetchDashboardStatsSummary(where),
+    fetchDashboardCategoryStats(where),
   ]);
-
-  const cards = mergeStatusGroupCounts(
-    statusGroups.map((g) => ({ status: g.status, count: g._count._all })),
-  );
-
-  const byCategory = aggregateChartCategories(chartRows);
-
-  return { cards, byCategory };
+  return { cards: summary.cards, byCategory: categories.byCategory };
 }

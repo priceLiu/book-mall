@@ -20,6 +20,10 @@ import {
   PackageReconciliationPanel,
   type PackageReconciliationData,
 } from "@/components/package-reconciliation-panel";
+import {
+  FinanceTokenUsageSummaryPanel,
+  type FinanceTokenUsage,
+} from "@/components/admin/finance-token-usage-columns";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -62,6 +66,8 @@ type RemotePayload = {
   truncated?: boolean;
   rows: Record<string, string>[];
   packageReconciliation?: PackageReconciliationData | null;
+  periodKey?: string;
+  tokenUsage?: FinanceTokenUsage;
   /** 主站 API 返回：是否凭 NextAuth 会话拉取（本地 devUserId / 代理则非 session） */
   viewer?: { authMode: "session" | "dev_user_id" };
 };
@@ -183,6 +189,8 @@ export function BillDetailsClient({
   >(undefined);
   const [packageReconciliation, setPackageReconciliation] =
     useState<PackageReconciliationData | null>(null);
+  const [tokenUsage, setTokenUsage] = useState<FinanceTokenUsage | null>(null);
+  const [tokenPeriodKey, setTokenPeriodKey] = useState<string>("");
   const [groupByUser, setGroupByUser] = useState(true);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
 
@@ -276,6 +284,8 @@ export function BillDetailsClient({
           setWalletBalancePoints(null);
           setViewerAuthMode(undefined);
           setPackageReconciliation(null);
+          setTokenUsage(null);
+          setTokenPeriodKey("");
         } else {
           const ud = data as RemotePayload;
           setRemoteUser(ud.user ?? null);
@@ -285,6 +295,8 @@ export function BillDetailsClient({
           setSucceededCallsRemote(ud.succeededCalls ?? null);
           setFailedCallsRemote(ud.failedCalls ?? null);
           setPackageReconciliation(ud.packageReconciliation ?? null);
+          setTokenUsage(ud.tokenUsage ?? null);
+          setTokenPeriodKey(ud.periodKey ?? "");
           setRowsTruncated(Boolean(ud.truncated));
           setViewerAuthMode(
             ud.viewer?.authMode ?? ((useDevProxy || devId) && !adminTargetUserId ? "dev_user_id" : "session"),
@@ -306,6 +318,8 @@ export function BillDetailsClient({
         setAllTruncated(false);
         setRowsTruncated(false);
         setPackageReconciliation(null);
+        setTokenUsage(null);
+        setTokenPeriodKey("");
         const msg = e instanceof Error ? e.message : String(e);
         const tip = bookMallLoginHint(
           base,
@@ -656,6 +670,13 @@ export function BillDetailsClient({
 
         {!isAllUsers && packageReconciliation ? (
           <PackageReconciliationPanel data={packageReconciliation} />
+        ) : null}
+
+        {adminTargetUserId && effectiveRole === "admin" && tokenUsage ? (
+          <FinanceTokenUsageSummaryPanel
+            usage={tokenUsage}
+            periodKey={tokenPeriodKey || undefined}
+          />
         ) : null}
 
         {!isAllUsers && (loadState === "loading" || loadState === "error" || (loadState === "idle" && hint)) ? (

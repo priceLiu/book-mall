@@ -11,7 +11,7 @@ export default function AdminUserBillingPage({ params }: Props) {
         <p className="mt-1 text-xs text-[#8c8c8c]">
           数据来自 book-mall{" "}
           <code className="rounded bg-[#f5f5f5] px-1">/api/finance/admin/billing-details</code>
-          （请先在 book-mall 以管理员登录同一浏览器会话）。
+          （含账期 Token 汇总；请先在 book-mall 以管理员登录同一浏览器会话）。
         </p>
       </header>
       <BillDetailsClient adminTargetUserId={params.userId} viewerRole="admin" />

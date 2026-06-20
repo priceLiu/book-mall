@@ -137,7 +137,7 @@ export function TeamBillingFinanceClient() {
             <Stat label="消耗" value={bill.consumed} />
             <Stat label="返还" value={bill.refunded} />
             <Stat label="充值" value={bill.topup} />
-            <Stat label="池余额" value={bill.balanceCredits} />
+            <Stat label="剩余积分" value={bill.balanceCredits} />
           </div>
 
           <TableSection title="按模型">

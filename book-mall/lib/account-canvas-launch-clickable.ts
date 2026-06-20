@@ -2,7 +2,7 @@
 
 export type AccountCanvasLaunchPersona = "BYOK" | "PLATFORM_CREDIT" | null;
 
-/** 侧栏 / 概览「打开画布」是否可点（平台代付不强制先 linked） */
+/** 侧栏 / 概览「打开画布 / 快速复制」是否可点（平台代付不强制先 linked） */
 export function isAccountCanvasLaunchClickable(input: {
   canLaunchCanvas: boolean;
   canvasOriginConfigured: boolean;

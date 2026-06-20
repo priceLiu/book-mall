@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { canViewFinanceCost } from "@/lib/auth/permissions";
+import {
+  batchAggregateUserGatewayTokenUsage,
+  EMPTY_GATEWAY_TOKEN_USAGE,
+  gatewayTokenUsageToRecord,
+} from "@/lib/gateway/gateway-token-usage-aggregate";
+import { currentPeriodKey, periodBounds } from "@/lib/finance/team-finance-guard";
 import { prisma } from "@/lib/prisma";
 import {
   financeForbidden,
@@ -103,9 +109,21 @@ export async function GET(request: NextRequest) {
   });
   const userMap = new Map(users.map((u) => [u.id, u]));
 
+  const periodKey = currentPeriodKey();
+  const { from, to } = periodBounds(periodKey);
+  const userIds = sorted.map(([id]) => id);
+  const tokenByUser = await batchAggregateUserGatewayTokenUsage({
+    bookUserIds: userIds,
+    submittedFrom: from,
+    submittedTo: to,
+  });
+
   const out = sorted
     .map(([id, stats]) => {
       const u = userMap.get(id);
+      const tokenUsage = gatewayTokenUsageToRecord(
+        tokenByUser.get(id) ?? EMPTY_GATEWAY_TOKEN_USAGE,
+      );
       return {
         id,
         name: u?.name ?? null,
@@ -114,9 +132,11 @@ export async function GET(request: NextRequest) {
         lineCount: stats.lineCount,
         succeededCalls: stats.succeededCalls,
         latestAt: stats.latestAt?.toISOString() ?? null,
+        periodKey,
+        tokenUsage,
       };
     })
     .filter((u) => u.email || u.name || u.phone);
 
-  return NextResponse.json({ users: out }, { headers: cors });
+  return NextResponse.json({ users: out, periodKey }, { headers: cors });
 }

@@ -1,6 +1,6 @@
 # 腾讯云部署说明
 
-本仓库已带好 **`book-mall/Dockerfile`**、**`tool-web/Dockerfile`**、**`finance-web/Dockerfile`**、**`story-web/Dockerfile`**、**`canvas-web/Dockerfile`**、**`gateway-web/Dockerfile`**、**`prompt-optimizer-platform/Dockerfile`**、**`e-commerce-toolkit/Dockerfile`**（Next.js `standalone` 镜像；prompt 含上游 Vue vendor 多阶段构建）。  
+本仓库已带好 **`book-mall/Dockerfile`**、**`tool-web/Dockerfile`**、**`finance-web/Dockerfile`**、**`story-web/Dockerfile`**、**`canvas-web/Dockerfile`**、**`gateway-web/Dockerfile`**、**`prompt-optimizer-platform/Dockerfile`**、**`e-commerce-toolkit/Dockerfile`**、**`quick-replica-web/Dockerfile`**（Next.js `standalone` 镜像；prompt 含上游 Vue vendor 多阶段构建）。  
 在腾讯云 **自动构建、自动部署** 的场景下，你 **不必** 在自己电脑上执行 `docker compose`，也不必 SSH 上服务器敲命令——流水线会在每次推送后构建镜像并发布。
 
 > **第一次开服务 / 重建服务**：直接看 **[`cloudbase-build-guide.md`](./cloudbase-build-guide.md)**（控制台逐步流程、字段对照、环境变量、验收清单、故障排查）。本文档保留为概览。
@@ -50,12 +50,12 @@ priceLiu/book-mall（一个 Git 仓库，推送后云构建可选这一条）
 
 | 控制台配置项 | 主站 | 工具站 | **财务控制台** | **漫剧 story-web** | **canvas-web** | **gateway-web** | **提示词优化器** | **电商工具箱** |
 |-------------|------|--------|----------------|-------------------|----------------|-----------------|------------------|----------------|
-| **Git 仓库** | `priceLiu/book-mall` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
-| **分支** | `main` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
-| **目标目录** | `book-mall` | `tool-web` | `finance-web` | `story-web` | `canvas-web` | `gateway-web` | **`prompt-optimizer-platform`** | **`e-commerce-toolkit`** |
-| **Dockerfile** | 默认 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
-| **容器监听端口** | **3000** | **3001** | **3002** | **3003** | **3004** | **3005** | **3006** | **3007** |
-| **自定义域（示例）** | `book.ai-code8.com` | `tool.ai-code8.com` | `f.ai-code8.com` | `story.ai-code8.com` | `canvas.ai-code8.com` | `gateway.ai-code8.com` | **`prompt.ai-code8.com`** | **`ecom.ai-code8.com`** |
+| **Git 仓库** | `priceLiu/book-mall` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| **分支** | `main` | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| **目标目录** | `book-mall` | `tool-web` | `finance-web` | `story-web` | `canvas-web` | `gateway-web` | **`prompt-optimizer-platform`** | **`e-commerce-toolkit`** | **`quick-replica-web`** |
+| **Dockerfile** | 默认 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| **容器监听端口** | **3000** | **3001** | **3002** | **3003** | **3004** | **3005** | **3006** | **3007** | **3008** |
+| **自定义域（示例）** | `book.ai-code8.com` | `tool.ai-code8.com` | `f.ai-code8.com` | `story.ai-code8.com` | `canvas.ai-code8.com` | `gateway.ai-code8.com` | **`prompt.ai-code8.com`** | **`ecom.ai-code8.com`** | **`replica.ai-code8.com`** |
 
 要点：
 

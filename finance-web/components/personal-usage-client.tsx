@@ -13,6 +13,13 @@ type UsageData = {
     video: { balance: number; reserved: number };
     pricePerCreditYuan: number | null;
   };
+  teamContext?: {
+    tenantId: string;
+    tenantName: string;
+    role: string;
+    balanceCredits: number;
+    packageLevel: string | null;
+  } | null;
   totalCalls: number;
   totalConsumed: number;
   byModel: { canonicalModelKey: string; count: number; creditsCharged: number }[];
@@ -83,9 +90,31 @@ export function PersonalUsageClient() {
         </Link>
       </header>
 
+      {data.teamContext ? (
+        <section className="rounded border border-[#91d5ff] bg-[#e6f7ff] p-4 text-sm text-[#003a8c]">
+          <p className="font-medium">
+            您已加入团队「{data.teamContext.tenantName}」
+            {data.teamContext.packageLevel ? `（${data.teamContext.packageLevel}）` : ""}
+          </p>
+          <p className="mt-1">
+            生成任务从团队共享池扣积分，当前团队剩余积分{" "}
+            <span className="font-semibold">
+              {data.teamContext.balanceCredits.toLocaleString("zh-CN")}
+            </span>
+            。下方「个人池余额」为个人空间账户，团队成员通常为 0。
+          </p>
+          <Link href="/team/usage" className="mt-2 inline-block text-[#1890ff] hover:underline">
+            查看团队积分用量 →
+          </Link>
+        </section>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="成功调用总次数" value={data.totalCalls} />
-        <StatCard label="通用池余额" value={data.balance} />
+        <StatCard
+          label={data.teamContext ? "个人池余额" : "通用池余额"}
+          value={data.balance}
+        />
         <StatCard label="视频池余额" value={data.pools.video.balance} />
         <StatCard label="视频冻结中" value={data.pools.video.reserved} />
         <StatCard label="累计消耗积分" value={data.totalConsumed} />

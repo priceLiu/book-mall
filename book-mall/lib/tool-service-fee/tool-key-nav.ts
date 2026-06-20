@@ -22,6 +22,9 @@ export function clientPageToServiceNavKey(clientPage: string): ToolSuiteNavKey |
   if (p.startsWith("prompt-optimizer") || p.includes("prompt-optimizer")) {
     return "prompt-optimizer";
   }
+  if (p.startsWith("quick-replica") || p.includes("quick-replica")) {
+    return "quick-replica";
+  }
   if (p.startsWith("ecom/") || p.includes("e-commerce")) {
     return "e-commerce-toolkit";
   }

@@ -28,7 +28,9 @@ import {
   type GatewayLogPageSizePreset,
 } from "@/lib/gateway-log-pagination-config";
 
-const POLL_MS = 30_000;
+const SUMMARY_POLL_IDLE_MS = 60_000;
+const SUMMARY_POLL_ACTIVE_MS = 10_000;
+const IN_FLIGHT_POLL_MS = 10_000;
 const LIVE_CLOCK_MS = 1_000;
 
 type DashboardScope = "all" | "team" | "actor" | "project";
@@ -86,12 +88,18 @@ type DashboardStats = {
   };
 };
 
-type LogsResponse = {
-  logs: GatewayLogRow[];
+type StatsSummaryResponse = {
+  cards: DashboardStats["cards"];
+};
+
+type StatsCategoriesResponse = {
+  byCategory: DashboardStats["byCategory"];
+};
+
+type InFlightLogsResponse = {
+  logs: StatusLogRow[];
   total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
+  limit: number;
 };
 
 type FilterState = {
@@ -299,10 +307,13 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const [detailLoading, setDetailLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [, setClock] = useState(0);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [liveNowMs, setLiveNowMs] = useState(0);
+  const summaryPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const inFlightPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const loadSeqRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
+  const inProgressCount = stats?.cards.inProgress ?? 0;
+  const hasInFlight = inProgressCount > 0 || activeTab === "inProgress";
 
   const tabQuery = useMemo(
     () => TAB_CONFIG.find((t) => t.id === activeTab)?.query ?? {},
@@ -334,77 +345,149 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     [initialMeta.teams],
   );
 
-  const loadData = useCallback(async () => {
-    if (applied.scope === "team" && !applied.tenantId) {
-      setError(
-        initialMeta.teams.length === 0
-          ? "当前账号未加入任何团队"
-          : "请选择团队后再查看",
-      );
-      setLoading(false);
-      setDetailLoading(false);
-      return;
-    }
+  const loadSummary = useCallback(async () => {
+    if (applied.scope === "team" && !applied.tenantId) return null;
+    const statsQs = buildQueryString(applied, { parts: "summary" });
+    const statsRes = await fetchJson<StatsSummaryResponse>(
+      `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
+    );
+    if (!statsRes.ok) return statsRes;
+    setStats((prev) => ({
+      cards: statsRes.data.cards,
+      byCategory: prev?.byCategory ?? {
+        inProgress: [],
+        succeeded: [],
+      },
+    }));
+    return statsRes;
+  }, [applied]);
 
-    const seq = ++loadSeqRef.current;
-    setLoading(true);
-    setDetailLoading(true);
-    setError(null);
-    const statsQs = buildQueryString(applied, {});
-    const logsQs = buildQueryString(applied, {
-      ...tabQuery,
-      page: detailPage,
-      limit: pageSize,
-    });
+  const loadCategories = useCallback(async () => {
+    if (applied.scope === "team" && !applied.tenantId) return null;
+    const statsQs = buildQueryString(applied, { parts: "categories" });
+    const statsRes = await fetchJson<StatsCategoriesResponse>(
+      `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
+    );
+    if (!statsRes.ok) return statsRes;
+    setStats((prev) => ({
+      cards: prev?.cards ?? {
+        inProgress: 0,
+        succeeded: 0,
+        failed: 0,
+        cancelled: 0,
+      },
+      byCategory: statsRes.data.byCategory,
+    }));
+    return statsRes;
+  }, [applied]);
 
-    try {
-      const [statsRes, logsRes] = await Promise.all([
-        fetchJson<DashboardStats>(
-          `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
-        ),
-        fetchJson<LogsResponse>(
-          `/api/book-mall/api/gateway/logs?${logsQs}`,
-        ),
-      ]);
-      if (seq !== loadSeqRef.current) return;
+  const loadDetailLogs = useCallback(
+    async (opts?: { skipPoll?: boolean; poll?: boolean }) => {
+      if (applied.scope === "team" && !applied.tenantId) return null;
 
-      if (!statsRes.ok) {
-        setError(
-          statsRes.status === 401
-            ? "登录已失效，请重新登录"
-            : statsRes.error
-              ? `${statsRes.error}（${statsRes.status}）`
-              : `加载统计失败（${statsRes.status}）`,
+      if (activeTab === "inProgress") {
+        const qs = buildQueryString(applied, {
+          ...(opts?.poll ? { poll: "1" } : {}),
+          ...(opts?.skipPoll ? { skipPoll: "1" } : {}),
+        });
+        const res = await fetchJson<InFlightLogsResponse>(
+          `/api/book-mall/api/gateway/logs/in-flight?${qs}`,
         );
-        return;
+        if (res.ok) {
+          setLogs(res.data.logs ?? []);
+          setLogsTotal(res.data.total ?? 0);
+          setLogsTotalPages(1);
+        }
+        return res;
       }
-      setStats(statsRes.data);
-      if (logsRes.ok) {
-        setLogs(logsRes.data.logs ?? []);
-        setLogsTotal(logsRes.data.total ?? 0);
-        setLogsTotalPages(logsRes.data.totalPages ?? 1);
-      } else if (!hasLoadedOnceRef.current) {
-        setLogs([]);
-        setLogsTotal(0);
-        setLogsTotalPages(1);
+
+      const logsQs = buildQueryString(applied, {
+        ...tabQuery,
+        page: detailPage,
+        limit: pageSize,
+        skipPoll: opts?.skipPoll === false ? undefined : "1",
+        ...(opts?.poll ? { poll: "1" } : {}),
+      });
+      const res = await fetchJson<{
+        logs: StatusLogRow[];
+        total: number;
+        totalPages: number;
+      }>(`/api/book-mall/api/gateway/logs?${logsQs}`);
+      if (res.ok) {
+        setLogs(res.data.logs ?? []);
+        setLogsTotal(res.data.total ?? 0);
+        setLogsTotalPages(res.data.totalPages ?? 1);
       }
-      hasLoadedOnceRef.current = true;
-      setHasLoadedOnce(true);
-    } catch {
-      if (seq !== loadSeqRef.current) return;
-      setError("网络异常，请稍后重试");
-    } finally {
-      if (seq === loadSeqRef.current) {
+      return res;
+    },
+    [activeTab, applied, detailPage, pageSize, tabQuery],
+  );
+
+  const loadAll = useCallback(async () => {
+      if (applied.scope === "team" && !applied.tenantId) {
+        setError(
+          initialMeta.teams.length === 0
+            ? "当前账号未加入任何团队"
+            : "请选择团队后再查看",
+        );
         setLoading(false);
         setDetailLoading(false);
+        return;
       }
-    }
-  }, [applied, detailPage, pageSize, tabQuery, initialMeta.teams.length]);
+
+      const seq = ++loadSeqRef.current;
+      setLoading(true);
+      setDetailLoading(true);
+      setError(null);
+
+      try {
+        const [summaryRes, categoriesRes] = await Promise.all([
+          loadSummary(),
+          loadCategories(),
+        ]);
+        if (seq !== loadSeqRef.current) return;
+
+        if (summaryRes && !summaryRes.ok) {
+          setError(
+            summaryRes.status === 401
+              ? "登录已失效，请重新登录"
+              : summaryRes.error
+                ? `${summaryRes.error}（${summaryRes.status}）`
+                : `加载统计失败（${summaryRes.status}）`,
+          );
+          return;
+        }
+        if (categoriesRes && !categoriesRes.ok) {
+          /* 分类图失败不阻塞卡片 */
+        }
+        hasLoadedOnceRef.current = true;
+        setHasLoadedOnce(true);
+      } catch {
+        if (seq !== loadSeqRef.current) return;
+        setError("网络异常，请稍后重试");
+      } finally {
+        if (seq === loadSeqRef.current) {
+          setLoading(false);
+          setDetailLoading(false);
+        }
+      }
+  }, [
+    applied,
+    initialMeta.teams.length,
+    loadCategories,
+    loadSummary,
+  ]);
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
-    void loadData();
-  }, [loadData, viewMode]);
+    void loadAll();
+  }, [loadAll, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "dashboard") return;
+    setDetailLoading(true);
+    void loadDetailLogs({ skipPoll: true }).finally(() => setDetailLoading(false));
+  }, [activeTab, applied, detailPage, pageSize, loadDetailLogs, viewMode]);
 
   useEffect(() => {
     setDetailPage(1);
@@ -412,20 +495,39 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   }, [activeTab, applied, pageSize]);
 
   useEffect(() => {
-    const tick = setInterval(() => setClock((c) => c + 1), LIVE_CLOCK_MS);
+    setLiveNowMs(Date.now());
+    if (!hasInFlight) return;
+    const tick = setInterval(() => setLiveNowMs(Date.now()), LIVE_CLOCK_MS);
     return () => clearInterval(tick);
-  }, []);
+  }, [hasInFlight]);
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
+    const ms =
+      inProgressCount > 0 ? SUMMARY_POLL_ACTIVE_MS : SUMMARY_POLL_IDLE_MS;
     const refresh = () => {
-      if (document.visibilityState === "visible") void loadData();
+      if (document.visibilityState === "visible") void loadSummary();
     };
-    pollRef.current = setInterval(refresh, POLL_MS);
+    refresh();
+    summaryPollRef.current = setInterval(refresh, ms);
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (summaryPollRef.current) clearInterval(summaryPollRef.current);
     };
-  }, [loadData, viewMode]);
+  }, [inProgressCount, loadSummary, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "dashboard") return;
+    if (activeTab !== "inProgress" || inProgressCount <= 0) return;
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadDetailLogs({ poll: true, skipPoll: false });
+    };
+    refresh();
+    inFlightPollRef.current = setInterval(refresh, IN_FLIGHT_POLL_MS);
+    return () => {
+      if (inFlightPollRef.current) clearInterval(inFlightPollRef.current);
+    };
+  }, [activeTab, inProgressCount, loadDetailLogs, viewMode]);
 
   const applyFilters = () => {
     commitFilters({ ...filters, actorPhone: phoneDraft });
@@ -459,7 +561,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         <div>
           <h1 className="text-xl font-semibold text-white">状态驾驶舱</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            数字、状态与失败原因与 Gateway 日志同源 · 每 30 秒自动刷新
+            统计卡片按需刷新（无进行中约 60s / 有进行中约 10s）· 仅「生成中」Tab 在有任务时约 10s 增量拉取 · 成功/失败明细按需加载
           </p>
         </div>
         {loading ? (
@@ -638,7 +740,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         </button>
         <button
           type="button"
-          onClick={() => void loadData()}
+          onClick={() => {
+            void loadAll();
+            void loadDetailLogs({ poll: true, skipPoll: false });
+          }}
           disabled={loading}
           className="rounded-md border border-white/15 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
         >
@@ -814,6 +919,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                     {
                       inProgress:
                         log.status === "PENDING" || log.status === "RUNNING",
+                      nowMs: liveNowMs || undefined,
                     },
                   );
                   const progressLabel = pickLogProgressLabel(

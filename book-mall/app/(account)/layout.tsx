@@ -6,7 +6,7 @@ import { userHasMembershipToolAccess } from "@/lib/membership-tool-access";
 import { isToolsSsoConfigured } from "@/lib/sso-tools-env";
 import { prepareAccountCanvasLaunch } from "@/lib/account-canvas-launch";
 import { buildAccountAppsMenuHint } from "@/lib/account-apps-menu-hint";
-import { getEcommerceWebOrigin } from "@/lib/app-web-origins";
+import { getEcommerceWebOrigin, getQuickReplicaOrigin } from "@/lib/app-web-origins";
 import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
 import { AccountShell } from "@/components/account/account-shell";
 
@@ -53,7 +53,9 @@ export default async function AccountGroupLayout({
   const canLaunchCanvas = canLaunchTools;
   const { gatewayLinked, canvasOriginConfigured } = canvasLaunch;
   const ecomOriginConfigured = Boolean(getEcommerceWebOrigin().startsWith("http"));
+  const quickReplicaOriginConfigured = Boolean(getQuickReplicaOrigin().startsWith("http"));
   const canLaunchEcommerce = toolsSsoReady && ecomAccess;
+  const canLaunchQuickReplica = canLaunchTools;
 
   const showToolsCta = toolsSsoReady;
   const appsMenuHint = buildAccountAppsMenuHint({
@@ -64,6 +66,8 @@ export default async function AccountGroupLayout({
     canLaunchCanvas,
     ecomAccess,
     ecomOriginConfigured,
+    quickReplicaOriginConfigured,
+    canLaunchQuickReplica,
     isAdmin: session.user.role === "ADMIN",
     billingPersona: userRecord.billingPersona,
   });
@@ -83,6 +87,8 @@ export default async function AccountGroupLayout({
       gatewayLinked={gatewayLinked}
       canLaunchEcommerce={canLaunchEcommerce}
       ecomOriginConfigured={ecomOriginConfigured}
+      canLaunchQuickReplica={canLaunchQuickReplica}
+      quickReplicaOriginConfigured={quickReplicaOriginConfigured}
       appsMenuHint={appsMenuHint}
       billingPersona={userRecord.billingPersona}
     >

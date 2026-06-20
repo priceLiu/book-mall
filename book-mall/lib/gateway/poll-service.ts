@@ -126,6 +126,7 @@ export function parseGatewayClientSource(
   if (v === "CANVAS") return "CANVAS";
   if (v === "TOOL") return "TOOL";
   if (v === "E_COMMERCE") return "E_COMMERCE";
+  if (v === "QUICK_REPLICA") return "QUICK_REPLICA";
   if (v === "GATEWAY_CONSOLE") return "GATEWAY_CONSOLE";
   return "EXTERNAL";
 }

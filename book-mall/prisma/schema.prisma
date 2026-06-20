@@ -110,6 +110,8 @@ model User {
   ecomStoryboardProjects           EcomStoryboardProject[]
   mediaRenderJobs                  MediaRenderJob[]
   mediaStorageGrants               UserMediaStorageGrant[]
+  qrTemplates                      QrTemplate[]
+  qrKindFeaturedUpdates            QrKindFeatured[] @relation("QrKindFeaturedUpdater")
 
   /// 多租户：主空间（个人租户）。回填脚本为每个用户建 PERSONAL 租户后写入。
   primaryTenantId      String?
@@ -2171,6 +2173,7 @@ enum GatewayClientSource {
   STORY
   TOOL
   E_COMMERCE
+  QUICK_REPLICA
   EXTERNAL
 }
 
@@ -3043,4 +3046,37 @@ model TenantInvite {
 
   @@index([tenantId, status])
   @@index([phone])
+}
+
+/// QuickReplica 用户模板（内置模板见 content/quick-replica/builtin-all.json）
+model QrTemplate {
+  id                  String    @id @default(cuid())
+  ownerUserId         String?
+  ownerUser           User?     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  category            String
+  kind                String
+  toolKey             String?
+  title               String
+  thumbnailUrl        String
+  badges              Json?
+  visibility          String    @default("private")
+  reference           Json
+  output              Json?
+  sortOrder           Int       @default(0)
+  gatewayRequestLogId String?   @unique
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([ownerUserId, category, kind, deletedAt])
+}
+
+/// QuickReplica · 管理员推荐的 kind 分类示例（中栏缩略图）
+model QrKindFeatured {
+  kind            String   @id
+  templateId      String
+  templateSource  String
+  updatedByUserId String
+  updatedByUser   User     @relation("QrKindFeaturedUpdater", fields: [updatedByUserId], references: [id], onDelete: Cascade)
+  updatedAt       DateTime @updatedAt
 }

@@ -91,6 +91,18 @@ export function getDevHubServices(): DevHubService[] {
       openable: true,
     },
     {
+      id: "quick-replica",
+      label: "quick-replica-web",
+      description: "快速复制 · 模板浏览 + 运动同步",
+      url: trimOrigin(
+        process.env.NEXT_PUBLIC_QUICK_REPLICA_ORIGIN ??
+          process.env.QUICK_REPLICA_PUBLIC_ORIGIN,
+        "http://localhost:3008",
+      ),
+      port: 3008,
+      openable: true,
+    },
+    {
       id: "gateway",
       label: "gateway-web",
       description: "Gateway BYOK · 厂商 Key / 请求日志 / 调试",

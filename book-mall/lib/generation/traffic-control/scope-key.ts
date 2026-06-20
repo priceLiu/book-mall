@@ -1,4 +1,5 @@
 import { getVideoPersonalMaxConcurrency } from "@/lib/billing/video-risk-control";
+import { resolveTeamBillingFallbackTenantId } from "@/lib/billing/resolve-team-billing-fallback";
 import { prisma } from "@/lib/prisma";
 import { resolveDefaultTeamMaxConcurrency } from "@/lib/tenant/team-concurrency";
 
@@ -50,6 +51,14 @@ export async function resolveCanvasProjectTrafficScope(
     select: { tenantId: true, userId: true },
   });
   if (!project) {
+    const teamFallback = await resolveTeamBillingFallbackTenantId(actorUserId);
+    if (teamFallback) {
+      return resolveTrafficScopeFromIds({
+        tenantId: teamFallback,
+        actorUserId,
+        userId: actorUserId,
+      });
+    }
     return resolveTrafficScopeFromIds({ userId: actorUserId, actorUserId });
   }
   if (project.tenantId) {
@@ -65,6 +74,16 @@ export async function resolveCanvasProjectTrafficScope(
       });
     }
   }
+
+  const teamFallback = await resolveTeamBillingFallbackTenantId(actorUserId);
+  if (teamFallback) {
+    return resolveTrafficScopeFromIds({
+      tenantId: teamFallback,
+      actorUserId,
+      userId: project.userId,
+    });
+  }
+
   return resolveTrafficScopeFromIds({
     userId: project.userId,
     actorUserId,
@@ -80,6 +99,14 @@ export async function resolveStoryProjectTrafficScope(
     select: { tenantId: true, userId: true },
   });
   if (!project) {
+    const teamFallback = await resolveTeamBillingFallbackTenantId(actorUserId);
+    if (teamFallback) {
+      return resolveTrafficScopeFromIds({
+        tenantId: teamFallback,
+        actorUserId,
+        userId: actorUserId,
+      });
+    }
     return resolveTrafficScopeFromIds({ userId: actorUserId, actorUserId });
   }
   if (project.tenantId) {
@@ -95,6 +122,16 @@ export async function resolveStoryProjectTrafficScope(
       });
     }
   }
+
+  const teamFallback = await resolveTeamBillingFallbackTenantId(actorUserId);
+  if (teamFallback) {
+    return resolveTrafficScopeFromIds({
+      tenantId: teamFallback,
+      actorUserId,
+      userId: project.userId,
+    });
+  }
+
   return resolveTrafficScopeFromIds({
     userId: project.userId,
     actorUserId,

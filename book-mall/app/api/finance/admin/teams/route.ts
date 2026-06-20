@@ -2,7 +2,13 @@ import { NextRequest } from "next/server";
 
 import { buildTeamCreditBill } from "@/lib/billing/credit-reconciliation";
 import { canViewFinanceCost } from "@/lib/auth/permissions";
-import { currentPeriodKey } from "@/lib/finance/team-finance-guard";
+import {
+  batchAggregateTeamGatewayTokenUsage,
+  EMPTY_GATEWAY_TOKEN_USAGE,
+  gatewayTokenUsageToRecord,
+} from "@/lib/gateway/gateway-token-usage-aggregate";
+import { currentPeriodKey, periodBounds } from "@/lib/finance/team-finance-guard";
+import { resolveTenantPackageSnapshot } from "@/lib/finance/tenant-package-snapshot";
 import { prisma } from "@/lib/prisma";
 import {
   financeForbidden,
@@ -41,6 +47,9 @@ export async function GET(request: NextRequest) {
         packageLevel: true,
         seatLimit: true,
         ownerUserId: true,
+        planId: true,
+        interval: true,
+        currentPeriodEnd: true,
         createdAt: true,
       },
     }),
@@ -57,37 +66,46 @@ export async function GET(request: NextRequest) {
       : [];
   const ownerMap = new Map(owners.map((o) => [o.id, o]));
 
-  const tenantIds = tenants.map((t) => t.id);
-  const accounts =
-    tenantIds.length > 0
-      ? await prisma.creditAccount.findMany({
-          where: { ownerType: "TENANT", ownerId: { in: tenantIds } },
-          select: { ownerId: true, balanceCredits: true },
-        })
-      : [];
-  const balanceMap = new Map(accounts.map((a) => [a.ownerId, a.balanceCredits]));
+  const { from, to } = periodBounds(periodKey);
+  const tokenByTenant = await batchAggregateTeamGatewayTokenUsage({
+    tenantIds: tenants.map((t) => t.id),
+    submittedFrom: from,
+    submittedTo: to,
+  });
 
   const teams = await Promise.all(
     tenants.map(async (t) => {
       const bill = await buildTeamCreditBill({ tenantId: t.id, periodKey });
+      const pkg = await resolveTenantPackageSnapshot(t);
       const owner = ownerMap.get(t.ownerUserId);
       const activeMembers = await prisma.tenantMember.count({
         where: { tenantId: t.id, status: "ACTIVE" },
       });
+      const tokenUsage = gatewayTokenUsageToRecord(
+        tokenByTenant.get(t.id) ?? EMPTY_GATEWAY_TOKEN_USAGE,
+      );
       return {
         tenantId: t.id,
         name: t.name,
         packageLevel: t.packageLevel,
         seatLimit: t.seatLimit,
         activeMembers,
-        balanceCredits: balanceMap.get(t.id) ?? 0,
+        balanceCredits: pkg.remainingCredits,
         monthConsumed: bill.consumed,
+        packageTotalCredits: pkg.packageTotalCredits,
+        packageTotalPriceYuan: pkg.packageTotalPriceYuan,
+        packageInterval: pkg.packageInterval,
+        packageIntervalLabel: pkg.packageIntervalLabel,
+        periodStartAt: pkg.periodStartAt,
+        periodEndAt: pkg.periodEndAt,
+        renewalCount: pkg.renewalCount,
         owner: {
           id: t.ownerUserId,
           name: owner?.name ?? null,
           email: owner?.email ?? null,
           phone: owner?.phone ?? null,
         },
+        tokenUsage,
         createdAt: t.createdAt.toISOString(),
       };
     }),

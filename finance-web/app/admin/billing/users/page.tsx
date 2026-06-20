@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import {
+  FinanceTokenUsageHeaderCells,
+  FinanceTokenUsageRowCells,
+  type FinanceTokenUsage,
+} from "@/components/admin/finance-token-usage-columns";
 import { FinancePageShell } from "@/components/finance-page-shell";
 import { bookMallLoginHint } from "@/lib/book-mall-login-hint";
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
@@ -15,11 +20,18 @@ type BillingUser = {
   lineCount: number;
   succeededCalls?: number;
   latestAt: string | null;
+  tokenUsage: FinanceTokenUsage;
+};
+
+type BillingUsersResponse = {
+  users: BillingUser[];
+  periodKey: string;
 };
 
 export default function AdminBillingUsersIndexPage() {
   const base = useBookMallBaseUrl();
   const [users, setUsers] = useState<BillingUser[] | null>(null);
+  const [periodKey, setPeriodKey] = useState<string>("");
   const [loadState, setLoadState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [hint, setHint] = useState<string | null>(null);
 
@@ -45,8 +57,9 @@ export default function AdminBillingUsersIndexPage() {
           setHint(`接口错误 HTTP ${res.status}`);
           return;
         }
-        const data = (await res.json()) as { users: BillingUser[] };
+        const data = (await res.json()) as BillingUsersResponse;
         setUsers(data.users);
+        setPeriodKey(data.periodKey);
         setLoadState("ok");
       })
       .catch((e) => {
@@ -64,6 +77,7 @@ export default function AdminBillingUsersIndexPage() {
       <h1 className="text-lg font-medium text-[#262626]">有 Gateway 调用或账单的用户</h1>
       <p className="text-sm text-[#8c8c8c]">
         含成功与失败调用；仅注册、从未调用 Gateway 的用户不在此列表。团队扣费请同时看「团队驾驶舱」。
+        {periodKey ? ` Token 列统计账期 ${periodKey} 成功调用。` : null}
       </p>
 
       {loadState === "loading" && (
@@ -88,7 +102,7 @@ export default function AdminBillingUsersIndexPage() {
 
       {loadState === "ok" && users && users.length > 0 && (
         <div className="overflow-x-auto rounded border border-[#e8e8e8] bg-white">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
+          <table className="w-full min-w-[2200px] border-collapse text-sm">
             <thead>
               <tr className="bg-[#fafafa] text-left text-[#595959]">
                 <th className="border border-[#e8e8e8] px-3 py-2">用户</th>
@@ -96,6 +110,7 @@ export default function AdminBillingUsersIndexPage() {
                 <th className="border border-[#e8e8e8] px-3 py-2">邮箱</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">Gateway 调用</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">成功次数</th>
+                <FinanceTokenUsageHeaderCells />
                 <th className="border border-[#e8e8e8] px-3 py-2">最近一条</th>
                 <th className="border border-[#e8e8e8] px-3 py-2">查看明细</th>
               </tr>
@@ -121,6 +136,7 @@ export default function AdminBillingUsersIndexPage() {
                       <span className="ml-1 text-xs text-[#faad14]">未扣费</span>
                     ) : null}
                   </td>
+                  <FinanceTokenUsageRowCells usage={u.tokenUsage} />
                   <td className="border border-[#e8e8e8] px-3 py-2 text-[#595959] tabular-nums">
                     {u.latestAt
                       ? new Date(u.latestAt).toLocaleString("sv-SE", {

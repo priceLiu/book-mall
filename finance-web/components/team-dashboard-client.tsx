@@ -148,7 +148,7 @@ export function TeamDashboardClient() {
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label="池余额" value={bill.balanceCredits} />
+        <Stat label="剩余积分" value={bill.balanceCredits} />
         <Stat label="月消耗" value={bill.consumed} />
         <Stat label="月发放" value={bill.granted} />
         <Stat label="席位占用" value={dash.seatUsage.used} suffix={`/ ${dash.seatUsage.limit}`} />

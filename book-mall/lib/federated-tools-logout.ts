@@ -3,6 +3,7 @@ import {
   getCanvasWebOrigin,
   getEcommerceWebOrigin,
   getPromptOptimizerOrigin,
+  getQuickReplicaOrigin,
   getStoryWebOrigin,
 } from "@/lib/app-web-origins";
 import { getBookMallOrigin } from "@/lib/gateway/env";
@@ -28,6 +29,7 @@ function listAllFederatedToolsLogoutCandidates(): string[] {
     getCanvasWebOrigin(),
     getStoryWebOrigin(),
     getPromptOptimizerOrigin(),
+    getQuickReplicaOrigin(),
     getEcommerceWebOrigin(),
   ];
   for (const raw of candidates) {

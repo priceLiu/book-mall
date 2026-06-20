@@ -14,6 +14,7 @@ import { maskPhone } from "@/lib/auth/phone";
 import {
   openCanvasAppInNewTab,
   openEcomAppInNewTab,
+  openQuickReplicaAppInNewTab,
   openToolsAppInNewTab,
 } from "@/lib/account-app-launch";
 import { isAccountCanvasLaunchClickable } from "@/lib/account-canvas-launch-clickable";
@@ -56,6 +57,7 @@ type NavRuntimeProps = {
   canLaunchTools: boolean;
   canvasReady: boolean;
   ecomReady: boolean;
+  quickReplicaReady: boolean;
   onAction: (id: string) => void;
 };
 
@@ -66,6 +68,7 @@ function AccountSidebarNav({
   canLaunchTools,
   canvasReady,
   ecomReady,
+  quickReplicaReady,
   onAction,
   appsMenuHint,
 }: NavRuntimeProps & { appsMenuHint: string | null }) {
@@ -108,7 +111,8 @@ function AccountSidebarNav({
     const disabled =
       (item.id === "launch-tools" && !canLaunchTools) ||
       (item.id === "launch-canvas" && !canvasReady) ||
-      (item.id === "launch-ecom" && !ecomReady);
+      (item.id === "launch-ecom" && !ecomReady) ||
+      (item.id === "launch-quick-replica" && !quickReplicaReady);
 
     const subscriptionAction = isSubscriptionAction(item);
 
@@ -156,7 +160,7 @@ function AccountSidebarNav({
 
 /** 移动端 Ark 下拉菜单 */
 function AccountDropdownNav(props: NavRuntimeProps) {
-  const { groups, pathname, canLaunchTools, canvasReady, ecomReady, onAction } = props;
+  const { groups, pathname, canLaunchTools, canvasReady, ecomReady, quickReplicaReady, onAction } = props;
 
   function renderLink(item: AccountNavLinkItem) {
     const active = isAccountNavLinkActive(pathname, item.href, item.exact);
@@ -192,7 +196,8 @@ function AccountDropdownNav(props: NavRuntimeProps) {
     const disabled =
       (item.id === "launch-tools" && !canLaunchTools) ||
       (item.id === "launch-canvas" && !canvasReady) ||
-      (item.id === "launch-ecom" && !ecomReady);
+      (item.id === "launch-ecom" && !ecomReady) ||
+      (item.id === "launch-quick-replica" && !quickReplicaReady);
 
     const subscriptionAction = isSubscriptionAction(item);
 
@@ -244,6 +249,8 @@ export function AccountNavMenu({
   gatewayLinked,
   canLaunchEcommerce,
   ecomOriginConfigured,
+  canLaunchQuickReplica,
+  quickReplicaOriginConfigured,
   appsMenuHint,
   billingPersona,
   placement = "sidebar",
@@ -258,6 +265,8 @@ export function AccountNavMenu({
   gatewayLinked: boolean;
   canLaunchEcommerce: boolean;
   ecomOriginConfigured: boolean;
+  canLaunchQuickReplica: boolean;
+  quickReplicaOriginConfigured: boolean;
   appsMenuHint: string | null;
   placement?: "sidebar" | "header";
 }) {
@@ -281,6 +290,12 @@ export function AccountNavMenu({
     gatewayLinked,
   });
   const ecomReady = canLaunchEcommerce && ecomOriginConfigured;
+  const quickReplicaReady = isAccountCanvasLaunchClickable({
+    canLaunchCanvas: canLaunchQuickReplica,
+    canvasOriginConfigured: quickReplicaOriginConfigured,
+    billingPersona,
+    gatewayLinked,
+  });
 
   const groups = useMemo(
     () =>
@@ -290,8 +305,18 @@ export function AccountNavMenu({
         showToolsLaunch: showToolsCta && canLaunchTools,
         showCanvasLaunch: canLaunchCanvas && canvasOriginConfigured,
         showEcomLaunch: ecomReady,
+        showQuickReplicaLaunch: canLaunchQuickReplica && quickReplicaOriginConfigured,
       }),
-    [isAdmin, billingPersona, showToolsCta, canLaunchTools, canvasReady, ecomReady],
+    [
+      isAdmin,
+      billingPersona,
+      showToolsCta,
+      canLaunchTools,
+      canvasReady,
+      ecomReady,
+      canLaunchQuickReplica,
+      quickReplicaOriginConfigured,
+    ],
   );
 
   async function runAction(id: string) {
@@ -311,6 +336,10 @@ export function AccountNavMenu({
     }
     if (id === "launch-ecom") {
       openEcomAppInNewTab("/");
+      return;
+    }
+    if (id === "launch-quick-replica") {
+      openQuickReplicaAppInNewTab("/");
     }
   }
 
@@ -320,6 +349,7 @@ export function AccountNavMenu({
     canLaunchTools,
     canvasReady,
     ecomReady,
+    quickReplicaReady,
     onAction: (id) => void runAction(id),
     appsMenuHint,
   };

@@ -6,6 +6,7 @@ import {
   currentPeriodKey,
   recentPeriodKeys,
 } from "@/lib/finance/team-finance-guard";
+import { resolveTenantPackageSnapshot } from "@/lib/finance/tenant-package-snapshot";
 import { getTenant } from "@/lib/tenant/tenant-service";
 import {
   financeForbidden,
@@ -44,11 +45,21 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     includeCost: true,
   });
 
+  const packageSnapshot = await resolveTenantPackageSnapshot({
+    id: tenant.id,
+    planId: tenant.planId,
+    seatLimit: tenant.seatLimit,
+    interval: tenant.interval,
+    currentPeriodEnd: tenant.currentPeriodEnd,
+    createdAt: tenant.createdAt,
+  });
+
   return financeJson(request, {
     tenantId: params.tenantId,
     tenantName: tenant.name,
     period,
     periods,
+    packageSnapshot,
     dashboard,
   });
 }
