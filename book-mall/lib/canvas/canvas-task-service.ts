@@ -932,14 +932,42 @@ export async function applyCanvasGatewayPollResult(
 
 // —— Polling worker ——
 
-/** 提交 KIE 任务后异步 poll 一次，避免仅依赖 cron/回调 */
-export function scheduleCanvasPollWorkerForProject(projectId: string): void {
-  void runCanvasPollWorker({ projectId }).catch((e) => {
-    console.warn("[canvas] opportunistic poll failed", {
-      projectId,
-      error: e instanceof Error ? e.message : String(e),
+/**
+ * 后台疏导轮询的「交通管制」：
+ * - 全局单飞：同一进程同一时刻只跑一个 opportunistic poll，避免多项目 / 多请求
+ *   并发触发 runCanvasPollWorker（内部对 DB 大量突发查询）把连接池（如 limit=4）打满，
+ *   进而拖死准入校验等热路径（getByokToolAccess 取不到连接而 30s 超时）。
+ * - 每项目节流：同项目最短间隔内不重复触发。
+ * 正式环境仍由独立 poll-loop / cron 进程推进，此处仅为兜底，跳过无副作用。
+ */
+let opportunisticPollInFlight = false;
+const lastOpportunisticPollByProject = new Map<string, number>();
+const OPPORTUNISTIC_POLL_MIN_GAP_MS = 8000;
+
+export function scheduleOpportunisticCanvasPoll(projectId: string): void {
+  if (process.env.CANVAS_DISABLE_OPPORTUNISTIC_POLL === "1") return;
+  const now = Date.now();
+  const last = lastOpportunisticPollByProject.get(projectId) ?? 0;
+  if (now - last < OPPORTUNISTIC_POLL_MIN_GAP_MS) return;
+  // 全局单飞：已有后台轮询在跑就直接跳过，绝不并发抢连接
+  if (opportunisticPollInFlight) return;
+  lastOpportunisticPollByProject.set(projectId, now);
+  opportunisticPollInFlight = true;
+  void runCanvasPollWorker({ projectId })
+    .catch((e) => {
+      console.warn("[canvas] opportunistic poll failed", {
+        projectId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    })
+    .finally(() => {
+      opportunisticPollInFlight = false;
     });
-  });
+}
+
+/** 提交 KIE 任务后异步 poll 一次，避免仅依赖 cron/回调（走统一单飞管制） */
+export function scheduleCanvasPollWorkerForProject(projectId: string): void {
+  scheduleOpportunisticCanvasPoll(projectId);
 }
 
 const POLL_INNER_TIMEOUT_MS = getGenerationPollInnerTimeoutMs();

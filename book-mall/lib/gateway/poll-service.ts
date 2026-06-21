@@ -221,6 +221,31 @@ async function runGatewayEscalationPollLane(
   return updated;
 }
 
+/** 视频槽位自愈：按实际 RUNNING 视频日志重算 runningVideoCount，修复泄漏/卡死残留的占槽。
+ * 全量扫描 traffic state 较重，限频每 5min 一次。 */
+const SLOT_RECONCILE_INTERVAL_MS = 5 * 60 * 1000;
+let lastSlotReconcileAt = 0;
+
+async function maybeReconcileRunningSlotCounts(): Promise<void> {
+  const now = Date.now();
+  if (now - lastSlotReconcileAt < SLOT_RECONCILE_INTERVAL_MS) return;
+  lastSlotReconcileAt = now;
+  try {
+    const { reconcileRunningSlotCounts } = await import(
+      "@/lib/generation/traffic-control/reconcile"
+    );
+    const fixed = await reconcileRunningSlotCounts();
+    if (fixed > 0) {
+      console.info("[gateway-poll] reconciled video slot counts", { fixed });
+    }
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] slot reconcile skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+}
+
 export async function runGatewayPollWorker(opts?: { limit?: number }) {
   try {
     await expireStaleGatewayLogs();
@@ -230,6 +255,8 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
       e instanceof Error ? e.message : String(e),
     );
   }
+
+  await maybeReconcileRunningSlotCounts();
 
   let autoHandler: Awaited<
     ReturnType<typeof maybeRunSlowWarnAutoHandler>

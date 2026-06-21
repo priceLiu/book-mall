@@ -5,6 +5,7 @@ type VolcengineTimingTrace = {
   vendorUpdatedAtMs?: number;
   vendorUpdatedStaleSinceMs?: number;
   firstRunningAtMs?: number;
+  lastPolledAtMs?: number;
 };
 
 function readVolcengineTimingTrace(
@@ -20,13 +21,6 @@ function readVolcengineTimingTrace(
     }
   }
   return null;
-}
-
-function isVendorUpdatedFrozen(trace: VolcengineTimingTrace): boolean {
-  return (
-    trace.vendorUpdatedStaleSinceMs != null &&
-    trace.vendorUpdatedAtMs != null
-  );
 }
 
 /** 进行中火山视频 · Generate / Poll Δ 与 book-mall 一致（厂商 updated_at 停更后拆分） */
@@ -50,15 +44,12 @@ export function liveVolcengineVideoTiming(input: {
   const submittedMs = new Date(input.submittedAt).getTime();
   const queueMs = Math.max(0, genStart - submittedMs);
 
-  let generateMs: number;
-  let pollDelayMs: number;
-  if (isVendorUpdatedFrozen(trace) && trace.vendorUpdatedAtMs != null) {
-    generateMs = Math.max(0, trace.vendorUpdatedAtMs - genStart);
-    pollDelayMs = Math.max(0, input.nowMs - trace.vendorUpdatedAtMs);
-  } else {
-    generateMs = Math.max(0, input.nowMs - genStart);
-    pollDelayMs = 0;
-  }
+  // 火山生成中 updated_at 不前进，无法用其拆分：Generate 走墙钟（仍在生成，持续增长），
+  // Poll Δ = 我方轮询延迟（now − 最近一次 poll），正常 ≈ 轮询间隔，停摆才增大。
+  const generateMs = Math.max(0, input.nowMs - genStart);
+  const lastPolled = trace.lastPolledAtMs;
+  const pollDelayMs =
+    lastPolled != null ? Math.max(0, input.nowMs - lastPolled) : 0;
 
   return {
     queueMs,

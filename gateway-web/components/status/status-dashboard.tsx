@@ -233,6 +233,34 @@ async function fetchJson<T>(
   return { ok: true, data: (await res.json()) as T };
 }
 
+type DetailLogsDelta = {
+  created: StatusLogRow[];
+  updated: StatusLogRow[];
+};
+
+/**
+ * 「生成中」Tab 增量合并：updated 原地替换、created 去重前插，
+ * 然后只保留仍在途（PENDING/RUNNING）的行——已完成的行会自动从生成中列表移除。
+ */
+function mergeInProgressDelta(
+  prev: StatusLogRow[],
+  delta: DetailLogsDelta,
+  pageSize: number,
+): StatusLogRow[] {
+  const map = new Map(prev.map((r) => [r.id, r]));
+  for (const u of delta.updated) {
+    if (map.has(u.id)) map.set(u.id, u);
+  }
+  for (const c of delta.created) map.set(c.id, c);
+  const rows = [...map.values()]
+    .filter((r) => r.status === "PENDING" || r.status === "RUNNING")
+    .sort((a, b) => {
+      if (a.submittedAt === b.submittedAt) return a.id < b.id ? 1 : -1;
+      return a.submittedAt < b.submittedAt ? 1 : -1;
+    });
+  return pageSize > 0 ? rows.slice(0, pageSize) : rows;
+}
+
 function SpinnerIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -346,6 +374,15 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const hasLoadedOnceRef = useRef(false);
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
+  /** 增量合并需读取最新「列表 / 页码 / Tab / 每页条数」，避免轮询闭包过期 */
+  const logsRef = useRef(logs);
+  logsRef.current = logs;
+  const detailPageRef = useRef(detailPage);
+  detailPageRef.current = detailPage;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const pageSizeRef = useRef(pageSize);
+  pageSizeRef.current = pageSize;
   const inProgressCount = stats?.cards.inProgress ?? 0;
   const slowWarnCount = stats?.cards.slowWarn ?? 0;
   const hasInFlight =
@@ -474,6 +511,46 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     [activeTab, applied, detailPage, pageSize, tabQuery],
   );
 
+  /**
+   * 「生成中」Tab（第 1 页）增量轮询：只拉新行 + 在途行最新状态，客户端合并并剔除已完成行，
+   * 避免每 10s 全量 count + findMany。非第 1 页或列表为空时回退全量。
+   */
+  const loadInProgressDelta = useCallback(async () => {
+    if (activeTabRef.current !== "inProgress" || detailPageRef.current !== 1) {
+      return loadDetailLogs({ poll: true, skipPoll: false });
+    }
+    const current = logsRef.current;
+    if (current.length === 0) {
+      return loadDetailLogs({ poll: true, skipPoll: false });
+    }
+    let cursor = current[0]?.submittedAt ?? "";
+    for (const r of current) {
+      if (r.submittedAt > cursor) cursor = r.submittedAt;
+    }
+    if (!cursor) return loadDetailLogs({ poll: true, skipPoll: false });
+    const ids = current.map((l) => l.id);
+    const qs = buildQueryString(applied, {
+      statuses: "PENDING,RUNNING",
+      since: cursor,
+      ids: ids.join(","),
+      poll: "1",
+    });
+    const res = await fetchJson<DetailLogsDelta>(
+      `/api/book-mall/api/gateway/logs/delta?${qs}`,
+    );
+    if (res.ok) {
+      const merged = mergeInProgressDelta(
+        logsRef.current,
+        res.data,
+        pageSizeRef.current,
+      );
+      setLogs(merged);
+      setLogsTotal(merged.length);
+      setLogsTotalPages(1);
+    }
+    return res;
+  }, [applied, loadDetailLogs]);
+
   const loadAll = useCallback(async () => {
       if (applied.scope === "team" && !applied.tenantId) {
         setError(
@@ -554,7 +631,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     const refresh = () => {
       if (document.visibilityState === "visible") void loadStatsAll();
     };
-    refresh();
+    // 不在此处立即 refresh()：首屏统计已由 loadAll() 拉取；该 effect 还会随
+    // inProgress/slowWarn 计数变化重跑，立即 refresh 会造成挂载与计数变化时的重复全量查询。
     summaryPollRef.current = setInterval(refresh, ms);
     return () => {
       if (summaryPollRef.current) clearInterval(summaryPollRef.current);
@@ -568,16 +646,29 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     const shouldPollSlowWarn =
       activeTab === "slowWarn" && slowWarnCount > 0;
     if (!shouldPollInProgress && !shouldPollSlowWarn) return;
-    const refresh = () => {
+    // 首次（含切 Tab）走全量，建立干净基线；之后每 10s「生成中」走增量、「预警」仍全量。
+    const refreshFull = () => {
       if (document.visibilityState !== "visible") return;
       void loadDetailLogs({ poll: true, skipPoll: false });
     };
-    refresh();
-    inFlightPollRef.current = setInterval(refresh, IN_FLIGHT_POLL_MS);
+    const refreshTick = () => {
+      if (document.visibilityState !== "visible") return;
+      if (shouldPollInProgress) void loadInProgressDelta();
+      else void loadDetailLogs({ poll: true, skipPoll: false });
+    };
+    refreshFull();
+    inFlightPollRef.current = setInterval(refreshTick, IN_FLIGHT_POLL_MS);
     return () => {
       if (inFlightPollRef.current) clearInterval(inFlightPollRef.current);
     };
-  }, [activeTab, inProgressCount, slowWarnCount, loadDetailLogs, viewMode]);
+  }, [
+    activeTab,
+    inProgressCount,
+    slowWarnCount,
+    loadDetailLogs,
+    loadInProgressDelta,
+    viewMode,
+  ]);
 
   const applyFilters = () => {
     commitFilters({ ...filters, actorPhone: phoneDraft });

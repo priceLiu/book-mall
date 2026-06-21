@@ -89,7 +89,7 @@ async function releaseStaleVideoReserves(): Promise<number> {
   return n;
 }
 
-async function reconcileRunningSlotCounts(): Promise<number> {
+export async function reconcileRunningSlotCounts(): Promise<number> {
   const states = await prisma.generationTrafficState.findMany({ take: 200 });
   let fixed = 0;
   for (const state of states) {

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { Prisma, CanvasGenerationTask } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { runTxWithRetry } from "@/lib/db-tx-retry";
 import { CanvasProjectError } from "./canvas-project-service";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
@@ -116,8 +117,12 @@ export async function createStoryScopedCanvasTask(
     >;
   },
 ): Promise<CanvasGenerationTask> {
-  return prisma.$transaction(
-    async (tx) => {
+  // 同 (project,node,scope) 由 pg_advisory_xact_lock 串行化，已足够互斥去重，
+  // 无需 Serializable（其谓词锁在并发下徒增 P2034 写冲突 → "数据库繁忙，任务未提交"）。
+  // 改默认隔离级 + 瞬时错误重试（连接池耗尽 / 写冲突），消除「点几次才成功」。
+  return runTxWithRetry(
+    () =>
+      prisma.$transaction(async (tx) => {
       const [k1, k2] = storyScopeAdvisoryLockKeys(
         args.projectId,
         args.nodeId,
@@ -168,7 +173,7 @@ export async function createStoryScopedCanvasTask(
           inputPayload: scopePatch as Prisma.InputJsonValue,
         },
       });
-    },
-    { isolationLevel: "Serializable" },
+      }),
+    { label: "createStoryScopedCanvasTask" },
   );
 }

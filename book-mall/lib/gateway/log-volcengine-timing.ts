@@ -11,10 +11,27 @@ export const GATEWAY_POLL_DELAY_LIMIT_MS = 10_000;
 export const VOLCENGINE_QUEUED_STALE_MS = 10 * 60 * 1000;
 /** running 且厂商已返回终态、Gateway 仍未 completed 超过此阈值 → 诊断用 */
 export const VOLCENGINE_POLL_LAG_FAIL_MS = 2 * 60 * 1000;
-/** 厂商 updated_at 停更 + Gateway 轮询中断超过此阈值 → 自动收口（与慢任务预警 800s 对齐） */
-export const VOLCENGINE_GATEWAY_POLL_STALL_MS = 800 * 1000;
 /** Gateway 未 poll 超过此间隔视为轮询中断 */
 export const VOLCENGINE_GATEWAY_POLL_GAP_MS = 2 * 60 * 1000;
+
+/**
+ * 自动释放（卡死收口）阈值：以「厂商停更时长」为准。
+ *
+ * running 火山视频自厂商 updated_at 最近一次推进起（Seedance 生成期间 updated_at 恒等于
+ * created_at，故等价于"自厂商建任务起的生成墙钟"）超过此值仍未转终态 → 判定卡死，收口
+ * 并释放交通槽。该口径同时覆盖"我方轮询中断"（loop 挂掉时停更时长照常随墙钟增长）。
+ *
+ * 取值依据：实测正常生成（含高负载）最长约 744s（~12.4min）。默认 10min（600s）以求卡死后尽快
+ * 释放槽位；注意此值已接近实测最长生成时长，若线上出现"正常长视频被误判卡死"的情况，
+ * 通过环境变量 VOLCENGINE_VENDOR_STALE_RELEASE_MS 上调（单位 ms，下限 60s）。
+ */
+export const VOLCENGINE_VENDOR_STALE_RELEASE_MS = (() => {
+  const raw = Number(process.env.VOLCENGINE_VENDOR_STALE_RELEASE_MS);
+  return Number.isFinite(raw) && raw >= 60_000 ? raw : 10 * 60 * 1000;
+})();
+
+/** @deprecated 旧的"无 poll 800s"口径，保留导出避免外部引用断裂；释放改用厂商停更时长。 */
+export const VOLCENGINE_GATEWAY_POLL_STALL_MS = VOLCENGINE_VENDOR_STALE_RELEASE_MS;
 
 export type VolcengineTimingTrace = {
   kind: "volcengine_timing";
@@ -215,20 +232,21 @@ export function computeVolcengineTimingBreakdown(input: {
   let pollDelayMs: number | null = null;
 
   if (!isTerminal) {
-    if (genStart != null) {
-      if (
-        isVolcengineVendorUpdatedFrozen(trace) &&
-        trace.vendorUpdatedAtMs != null
-      ) {
-        // 火山 running 时 updated_at 常不变：Generate 取厂商时间轴，停更计入 pollDelayMs
-        generateMs = Math.max(0, trace.vendorUpdatedAtMs - genStart);
-        pollDelayMs = Math.max(0, now - trace.vendorUpdatedAtMs);
-      } else {
-        generateMs = Math.max(0, now - genStart);
-      }
-    } else if (firstRunning != null) {
-      generateMs = Math.max(0, now - firstRunning);
+    // 火山 Seedance 生成中 updated_at 不前进（恒等于 created_at，直到出结果才跳到完成
+    // 时刻），故生成中无法用 vendor updated_at 拆分。Generate 直接走墙钟
+    // （now − genStart，持续增长 = 仍在生成）；Poll Δ 表示「我方轮询延迟」
+    // （now − 最近一次成功 poll），正常 ≈ 轮询间隔，仅当我方轮询停摆才增大，
+    // 同时作为卡死信号。（终态拆分仍以 vendor updated_at 为准，见下。）
+    // 仅在已进入 running 后计 Generate；纯 queued（厂商尚未开始生成）不计生成。
+    const st = normalizeStatus(trace.lastStatus);
+    const hasStartedRunning =
+      st === "running" || st === "processing" || firstRunning != null;
+    if (hasStartedRunning) {
+      const base = genStart ?? firstRunning;
+      if (base != null) generateMs = Math.max(0, now - base);
     }
+    const lastPolled = trace.lastPolledAtMs;
+    pollDelayMs = lastPolled != null ? Math.max(0, now - lastPolled) : 0;
   } else if (vendorCreated != null && vendorUpdated != null) {
     generateMs = Math.max(0, vendorUpdated - vendorCreated);
     if (input.completedAtMs != null) {
@@ -241,12 +259,17 @@ export function computeVolcengineTimingBreakdown(input: {
     }
   }
 
+  // 终态：Poll Δ = 厂商完成 → 我方记录完成的滞后，>10s 即异常。
+  // 生成中：Poll Δ = 我方轮询间隔，正常可达数十秒，仅当超过轮询中断阈值（2min）
+  // 才视为我方轮询停摆（卡死信号），避免正常长视频频繁误报。
+  const pollLimit = isTerminal
+    ? GATEWAY_POLL_DELAY_LIMIT_MS
+    : VOLCENGINE_GATEWAY_POLL_GAP_MS;
   return {
     queueMs,
     generateMs,
     pollDelayMs,
-    pollDelayOverLimit:
-      pollDelayMs != null && pollDelayMs > GATEWAY_POLL_DELAY_LIMIT_MS,
+    pollDelayOverLimit: pollDelayMs != null && pollDelayMs > pollLimit,
   };
 }
 
@@ -314,23 +337,45 @@ export function isVolcengineQueuedStale(
   return nowMs - trace.vendorUpdatedStaleSinceMs >= staleMs;
 }
 
+/** 自厂商 updated_at 最近一次推进起的「停更时长」（ms）；无任何时间锚则为 null。 */
+export function volcengineVendorStaleMs(
+  trace: VolcengineTimingTrace,
+  nowMs: number = Date.now(),
+): number | null {
+  const staleSince = trace.vendorUpdatedAtMs ?? volcengineTimingGenStartMs(trace);
+  if (staleSince == null) return null;
+  return Math.max(0, nowMs - staleSince);
+}
+
 /**
- * 厂商 updated_at 停更已久且 Gateway 轮询已中断（如 DB 503 / poll worker 停）。
- * 与「正常长视频 running（lastPolledAt 仍刷新）」区分。
+ * 卡死收口判定：running 火山视频「厂商停更时长」≥ 阈值（默认 18min）→ 视为卡死。
+ *
+ * 以厂商停更时长为准而非"无 poll N 秒"：
+ *  - 厂商真卡住（updated_at 长期不动）：停更时长照常增长 → 命中；
+ *  - 我方 poll loop 挂掉（DB 503 等）：停更时长同样随墙钟增长 → 命中（覆盖图 7 场景）；
+ *  - 正常长视频：阈值远高于实测最长生成（~744s），不会误杀。
+ */
+export function isVolcengineVendorStuck(
+  trace: VolcengineTimingTrace,
+  nowMs: number = Date.now(),
+  staleMs: number = VOLCENGINE_VENDOR_STALE_RELEASE_MS,
+): boolean {
+  if (normalizeStatus(trace.lastStatus) !== "running") return false;
+  const stale = volcengineVendorStaleMs(trace, nowMs);
+  return stale != null && stale >= staleMs;
+}
+
+/**
+ * @deprecated 改用 isVolcengineVendorStuck（以厂商停更时长为准）。保留旧签名以兼容引用方；
+ * lastPolledAt 参数已不再参与判定。
  */
 export function isVolcengineGatewayPollStalled(
   trace: VolcengineTimingTrace,
-  lastPolledAt: Date | null | undefined,
+  _lastPolledAt?: Date | null,
   nowMs: number = Date.now(),
-  stallMs: number = VOLCENGINE_GATEWAY_POLL_STALL_MS,
-  pollGapMs: number = VOLCENGINE_GATEWAY_POLL_GAP_MS,
+  staleMs: number = VOLCENGINE_VENDOR_STALE_RELEASE_MS,
 ): boolean {
-  if (normalizeStatus(trace.lastStatus) !== "running") return false;
-  const lag = volcenginePollLagMs(trace, nowMs);
-  if (lag == null || lag < stallMs) return false;
-  const lastPollMs = lastPolledAt?.getTime();
-  if (lastPollMs == null || nowMs - lastPollMs < pollGapMs) return false;
-  return true;
+  return isVolcengineVendorStuck(trace, nowMs, staleMs);
 }
 
 /** 厂商已返回终态，Gateway 日志仍未 completed（极少见，供诊断） */

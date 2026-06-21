@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { runTxWithRetry } from "@/lib/db-tx-retry";
 import { CanvasProjectError } from "./canvas-project-service";
 
 function taskInputPayload(
@@ -57,8 +58,11 @@ export async function assertNoProjectInflightByInputHash(
 export async function claimCanvasTaskKieSubmit(
   taskId: string,
 ): Promise<{ claimed: boolean; task: CanvasGenerationTask }> {
-  return prisma.$transaction(
-    async (tx) => {
+  // 同 taskId 由 pg_advisory_xact_lock 串行化即足够互斥；去掉 Serializable，
+  // 改默认隔离级 + 瞬时错误重试，避免高并发 dispatch 时 P2034 → VIDEO_DISPATCH_FAILED。
+  return runTxWithRetry(
+    () =>
+      prisma.$transaction(async (tx) => {
       const [k1, k2] = taskAdvisoryLockKeys(taskId);
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${k1}::int, ${k2}::int)`;
 
@@ -88,7 +92,7 @@ export async function claimCanvasTaskKieSubmit(
         data: { inputPayload: nextPayload },
       });
       return { claimed: true, task: updated };
-    },
-    { isolationLevel: "Serializable" },
+      }),
+    { label: "claimCanvasTaskKieSubmit" },
   );
 }

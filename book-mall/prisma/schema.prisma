@@ -2353,6 +2353,9 @@ model GatewayRequestLog {
   @@index([externalTaskId])
   @@index([vendorRequestId])
   @@index([status])
+  // 状态仪表盘/轮询池/在飞查询：按状态 + 时间/轮询时间复合，避免大表扫 status 后再过滤
+  @@index([status, submittedAt])
+  @@index([status, lastPolledAt])
   @@index([clientSource, submittedAt])
   @@index([tenantId, submittedAt])
   @@index([actorBookUserId, submittedAt])

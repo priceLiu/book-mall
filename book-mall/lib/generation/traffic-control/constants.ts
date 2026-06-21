@@ -16,11 +16,11 @@ export function isTrafficControlEnabled(): boolean {
 }
 
 export function getActorDispatchMinMs(): number {
-  return readPositiveInt("ACTOR_DISPATCH_MIN_MS", 2500);
+  return readPositiveInt("ACTOR_DISPATCH_MIN_MS", 1200);
 }
 
 export function getTrafficTokensPerSec(): number {
-  return readPositiveFloat("TRAFFIC_TOKENS_PER_SEC", 0.5);
+  return readPositiveFloat("TRAFFIC_TOKENS_PER_SEC", 1);
 }
 
 export function getQueueTimeoutMin(): number {
@@ -43,7 +43,8 @@ export function getReconcileRunningVideoMaxMin(): number {
 export function computeTokenBurst(maxConcurrency: number): number {
   const env = Number(process.env.TRAFFIC_TOKEN_BURST ?? "");
   if (Number.isFinite(env) && env > 0) return Math.round(env);
-  return Math.max(2, Math.ceil(maxConcurrency / 4));
+  // 突发额度 ≈ 并发上限的一半，保证小批量（≤一半并发）几乎同时下发、各自立刻产生 gateway 日志
+  return Math.max(3, Math.ceil(maxConcurrency / 2));
 }
 
 /** Canvas / Story 进行中状态（inflight 计数） */

@@ -65,15 +65,24 @@ export async function acquireTrafficSlotInTx(
     return { ok: false, reason: "concurrency" };
   }
 
-  await tx.generationTrafficState.update({
-    where: { scopeKey: scope.scopeKey },
+  // 原子占槽：WHERE 守卫 runningVideoCount < maxConcurrency。即使另一笔下发事务并发占槽，
+  // 行级写锁会在本 UPDATE 取锁后按"最新已提交值"重新判定守卫，从而硬性不越过并发上限
+  // （此前 read-then-write 在 ReadCommitted 下会出现 7 > 6 的越额并发）。
+  const claimed = await tx.generationTrafficState.updateMany({
+    where: {
+      scopeKey: scope.scopeKey,
+      runningVideoCount: { lt: state.maxConcurrency },
+    },
     data: {
-      runningVideoCount: state.runningVideoCount + 1,
+      runningVideoCount: { increment: 1 },
       dispatchTokens: tokens - 1,
       lastTokenRefillAt: now,
       lastDispatchAt: now,
     },
   });
+  if (claimed.count === 0) {
+    return { ok: false, reason: "concurrency" };
+  }
 
   return { ok: true };
 }

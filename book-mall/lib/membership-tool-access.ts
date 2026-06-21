@@ -15,11 +15,37 @@ export type MembershipToolAccess = {
 };
 
 /**
+ * 准入校验热路径缓存（introspect / 每次 Gateway 调用都会查）：
+ * 短 TTL 进程内缓存，避免高并发下每请求多条 user/creditAccount/tenant 查询
+ * 抢占有限连接池（如 limit=4）导致整体卡死。订阅变更后最多 TTL 秒延迟生效，可接受。
+ */
+const ACCESS_CACHE_TTL_MS = 15_000;
+const accessCache = new Map<string, { value: MembershipToolAccess; expiresAt: number }>();
+
+/** 订阅/套餐变更后可调用以立即失效（如支付回调、关联 Key 后）。 */
+export function invalidateMembershipToolAccessCache(userId?: string): void {
+  if (userId) accessCache.delete(userId);
+  else accessCache.clear();
+}
+
+/**
  * 工具准入：按 billingPersona 单一路径，禁止混用。
  * PLATFORM_CREDIT → 有效积分会员（个人/团队）
  * BYOK → 有效 BYOK 订阅 + 已关联 Gateway Key
  */
 export async function getMembershipToolAccess(
+  userId: string,
+): Promise<MembershipToolAccess> {
+  const nowMs = Date.now();
+  const cached = accessCache.get(userId);
+  if (cached && cached.expiresAt > nowMs) return cached.value;
+
+  const value = await computeMembershipToolAccess(userId);
+  accessCache.set(userId, { value, expiresAt: nowMs + ACCESS_CACHE_TTL_MS });
+  return value;
+}
+
+async function computeMembershipToolAccess(
   userId: string,
 ): Promise<MembershipToolAccess> {
   const now = new Date();
