@@ -2,9 +2,10 @@
  * Gateway 日志读 API · opportunistic poll 限流（避免状态页每 30s 全量触发厂商轮询）。
  */
 import {
-  expireStaleGatewayLogs,
   runGatewayPollWorker,
 } from "@/lib/gateway/poll-service";
+import type { SlowWarnAutoHandlerResult } from "@/lib/generation/slow-warn-auto-handler";
+import { runCanvasPollWorker } from "@/lib/canvas/canvas-task-service";
 
 const MIN_INTERVAL_MS = 10_000;
 const lastPollAtByUser = new Map<string, number>();
@@ -19,7 +20,7 @@ export type OpportunisticPollOpts = {
 export async function maybeRunOpportunisticGatewayPoll(
   userId: string,
   opts?: OpportunisticPollOpts,
-): Promise<{ ran: boolean }> {
+): Promise<{ ran: boolean; autoHandler?: SlowWarnAutoHandlerResult }> {
   if (opts?.skip) return { ran: false };
 
   const now = Date.now();
@@ -29,17 +30,19 @@ export async function maybeRunOpportunisticGatewayPoll(
   }
 
   lastPollAtByUser.set(userId, now);
+  let autoHandler: SlowWarnAutoHandlerResult | undefined;
   try {
-    await runGatewayPollWorker({ limit: 30 });
+    const gw = await runGatewayPollWorker({ limit: 30 });
+    autoHandler = gw.autoHandler;
   } catch {
     /* ignore */
   }
   try {
-    await expireStaleGatewayLogs();
+    await runCanvasPollWorker();
   } catch {
     /* ignore */
   }
-  return { ran: true };
+  return { ran: true, autoHandler };
 }
 
 export function parseGatewayLogPollParams(searchParams: URLSearchParams): {

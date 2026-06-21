@@ -872,7 +872,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             loading ? "opacity-70" : "opacity-100"
           }`}
         >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label="生成中"
               value={stats.cards.inProgress}
@@ -889,16 +889,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               accent="text-red-400"
             />
             <StatCard
-              label="预警"
-              value={stats.cards.slowWarn}
-              accent="text-orange-400"
-              sub={`耗时 ≥ ${SLOW_WARN_THRESHOLD_SEC}s`}
-            />
-            <StatCard
               label="已取消"
               value={stats.cards.cancelled}
               accent="text-zinc-400"
-              sub="无单独 Tab · 与 Gateway cancelled 一致"
+              sub="预警阈值请在「轮询池」调整"
             />
           </div>
 
@@ -928,8 +922,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           />
         </div>
       ) : viewMode === "dashboard" && loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
             <StatCardSkeleton key={i} />
           ))}
         </div>

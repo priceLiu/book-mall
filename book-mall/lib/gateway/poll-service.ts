@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import type { GatewayClientSource } from "@prisma/client";
-import { getGenerationSlowWarnMs } from "@/lib/generation/poll-config";
-import { escalateSlowCanvasSubmittedTasks } from "@/lib/generation/slow-generation";
+import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
+import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-handler";
+import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
 import {
@@ -133,6 +134,82 @@ export function parseGatewayClientSource(
   return "EXTERNAL";
 }
 
+const GATEWAY_POLL_PROVIDER_KINDS = [
+  "KIE",
+  "BAILIAN",
+  "DASHSCOPE",
+  "HUNYUAN",
+  "VOLCENGINE",
+] as const;
+
+const MAIN_POLL_TIMEOUT_MS = 45_000;
+const ESCALATION_POLL_TIMEOUT_MS = 20_000;
+
+type PollableGatewayRow = {
+  id: string;
+  status: string;
+  apiKeyId: string | null;
+  externalTaskId: string | null;
+};
+
+async function pollGatewayLogWithTimeout(
+  row: PollableGatewayRow,
+  timeoutMs: number,
+): Promise<"updated" | "pending" | "skipped"> {
+  if (!row.externalTaskId || !row.apiKeyId) return "skipped";
+  const beforeStatus = row.status;
+  try {
+    await Promise.race([
+      gatewayV1RecordInfo({
+        apiKeyId: row.apiKeyId,
+        taskId: row.externalTaskId,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("gateway recordInfo timeout")),
+          timeoutMs,
+        ),
+      ),
+    ]);
+  } catch {
+    await prisma.gatewayRequestLog.update({
+      where: { id: row.id },
+      data: { lastPolledAt: new Date(), pollCount: { increment: 1 } },
+    });
+    return "pending";
+  }
+
+  await prisma.gatewayRequestLog.update({
+    where: { id: row.id },
+    data: { lastPolledAt: new Date(), pollCount: { increment: 1 } },
+  });
+  const after = await prisma.gatewayRequestLog.findUnique({
+    where: { id: row.id },
+    select: { status: true },
+  });
+  if (beforeStatus === "RUNNING" && after?.status !== "RUNNING") {
+    return "updated";
+  }
+  return "pending";
+}
+
+/** 慢任务升格通道：20s 超时 + 并行，不阻塞主通道 */
+async function runGatewayEscalationPollLane(
+  rows: PollableGatewayRow[],
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  let updated = 0;
+  await mapWithConcurrency(
+    rows,
+    async (row) => {
+      const r = await pollGatewayLogWithTimeout(row, ESCALATION_POLL_TIMEOUT_MS);
+      if (r === "updated") updated++;
+    },
+    5,
+  );
+  return updated;
+}
+
 export async function runGatewayPollWorker(opts?: { limit?: number }) {
   try {
     await expireStaleGatewayLogs();
@@ -143,31 +220,46 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
     );
   }
 
+  let autoHandler: Awaited<
+    ReturnType<typeof maybeRunSlowWarnAutoHandler>
+  > | undefined;
+
   try {
-    const esc = await escalateSlowCanvasSubmittedTasks({ limit: 10 });
-    if (esc.recovered > 0) {
-      console.info("[gateway-poll] slow canvas recovery", esc);
+    autoHandler = await maybeRunSlowWarnAutoHandler({ limit: 20, force: true });
+    if (
+      autoHandler.gatewaySucceededSync > 0 ||
+      autoHandler.slowCanvasRecovered > 0 ||
+      autoHandler.slowGatewayRecovered > 0
+    ) {
+      console.info("[gateway-poll] slow-warn auto", autoHandler);
     }
   } catch (e) {
     console.warn(
-      "[gateway-poll] escalateSlowCanvasSubmittedTasks skipped",
+      "[gateway-poll] slow-warn auto skipped",
       e instanceof Error ? e.message : String(e),
     );
+    autoHandler = undefined;
   }
 
   const limit = opts?.limit ?? 20;
-  const providerKinds = ["KIE", "BAILIAN", "DASHSCOPE", "HUNYUAN", "VOLCENGINE"] as const;
-  const slowCutoff = new Date(Date.now() - getGenerationSlowWarnMs());
+  const slowMs = await resolveGenerationSlowWarnMs();
+  const slowCutoff = new Date(Date.now() - slowMs);
 
   const slowRows = await prisma.gatewayRequestLog.findMany({
     where: {
       status: "RUNNING",
       externalTaskId: { not: null },
       submittedAt: { lte: slowCutoff },
-      providerKind: { in: [...providerKinds] },
+      providerKind: { in: [...GATEWAY_POLL_PROVIDER_KINDS] },
     },
     orderBy: { submittedAt: "asc" },
     take: limit,
+    select: {
+      id: true,
+      status: true,
+      apiKeyId: true,
+      externalTaskId: true,
+    },
   });
   const slowIds = new Set(slowRows.map((r) => r.id));
   const normalLimit = Math.max(0, limit - slowRows.length);
@@ -177,49 +269,42 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
           where: {
             status: "RUNNING",
             externalTaskId: { not: null },
-            providerKind: { in: [...providerKinds] },
-            ...(slowIds.size > 0 ? { id: { notIn: [...slowIds] } } : {}),
+            providerKind: { in: [...GATEWAY_POLL_PROVIDER_KINDS] },
+            ...(slowIds.size > 0 ? { id: { notIn: Array.from(slowIds) } } : {}),
           },
           orderBy: [{ submittedAt: "desc" }, { pollCount: "asc" }],
           take: normalLimit,
+          select: {
+            id: true,
+            status: true,
+            apiKeyId: true,
+            externalTaskId: true,
+          },
         })
       : [];
-  const rows = [...slowRows, ...normalRows];
 
-  let updated = 0;
-  for (const row of rows) {
-    if (!row.externalTaskId || !row.apiKeyId) continue;
-    const beforeStatus = row.status;
-    try {
-      await gatewayV1RecordInfo({
-        apiKeyId: row.apiKeyId,
-        taskId: row.externalTaskId,
-      });
-      await prisma.gatewayRequestLog.update({
-        where: { id: row.id },
-        data: {
-          lastPolledAt: new Date(),
-          pollCount: { increment: 1 },
+  const [escUpdated, mainUpdated] = await Promise.all([
+    runGatewayEscalationPollLane(slowRows),
+    (async () => {
+      let updated = 0;
+      await mapWithConcurrency(
+        normalRows,
+        async (row) => {
+          const r = await pollGatewayLogWithTimeout(row, MAIN_POLL_TIMEOUT_MS);
+          if (r === "updated") updated++;
         },
-      });
-      const after = await prisma.gatewayRequestLog.findUnique({
-        where: { id: row.id },
-        select: { status: true },
-      });
-      if (beforeStatus === "RUNNING" && after?.status !== "RUNNING") {
-        updated++;
-      }
-    } catch {
-      await prisma.gatewayRequestLog.update({
-        where: { id: row.id },
-        data: {
-          lastPolledAt: new Date(),
-          pollCount: { increment: 1 },
-        },
-      });
-    }
-  }
-  return { scanned: rows.length, updated };
+        5,
+      );
+      return updated;
+    })(),
+  ]);
+
+  return {
+    scanned: slowRows.length + normalRows.length,
+    updated: escUpdated + mainUpdated,
+    escalation: escUpdated,
+    autoHandler,
+  };
 }
 
 export async function submitKieJobForLog(opts: {

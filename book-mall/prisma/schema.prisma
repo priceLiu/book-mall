@@ -557,6 +557,8 @@ model PlatformConfig {
   /// v005（2026-05-18）：默认从 30 → 10。视频任务实际生成大多 < 5 分钟；
   /// 留 10 分钟兜底足够，避免长尾未 settle 的 hold 长期占住用户余额。
   walletHoldDefaultTtlMin    Int      @default(10)
+  /// 生成耗时预警（秒）：Gateway 轮询池 / poll 升格；默认 800
+  generationSlowWarnSec      Int      @default(800)
   updatedAt                  DateTime @updatedAt
 }
 
