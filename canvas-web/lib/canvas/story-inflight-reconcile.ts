@@ -384,6 +384,16 @@ export function reconcileStaleInflightRuntimes(
       continue;
     }
 
-    setNodeRuntime(node.id, clearInflightRuntime(rt));
+    if (rowHasMediaResult(rt)) {
+      setNodeRuntime(node.id, clearInflightRuntime(rt));
+    } else {
+      setNodeRuntime(node.id, {
+        status: "error",
+        taskId: rt.taskId,
+        failCode: "RUN_STALE",
+        failMessage:
+          "生成未完成（服务端无进行中的任务）。请重试；若仍失败请查看 Gateway 状态或联系管理员。",
+      });
+    }
   }
 }
