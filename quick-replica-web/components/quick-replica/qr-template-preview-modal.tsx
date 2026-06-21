@@ -124,31 +124,32 @@ export function QrTemplatePreviewModal({
   return (
     <QrModal open={open} onClose={onClose} variant="preview" hideHeader>
       <div className="grid min-h-0 flex-1 grid-cols-3">
-        {/* 左 2/3 · 参考作品（按比例） */}
+        {/* 左 2/3 · 参考作品（填满可用区域，按比例 contain） */}
         <div
-          className="col-span-2 flex min-h-0 flex-col"
+          className="relative col-span-2 min-h-0 overflow-hidden"
           style={{ background: "var(--qr-bg-page)" }}
         >
-          <div className="relative flex min-h-0 flex-1 items-center justify-center p-4">
-            {isVideo && previewUrl ? (
+          {previewUrl ? (
+            isVideo ? (
               <video
                 src={previewUrl}
                 controls
-                className="max-h-full max-w-full object-contain"
-                style={{ aspectRatio: aspectLabel.replace(":", " / ") }}
+                className="absolute inset-0 h-full w-full object-contain"
+                playsInline
               />
-            ) : previewUrl ? (
+            ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={previewUrl}
                 alt={template.title}
-                className="max-h-full max-w-full object-contain"
-                style={{ aspectRatio: aspectLabel.replace(":", " / ") }}
+                className="absolute inset-0 h-full w-full object-contain"
               />
-            ) : (
+            )
+          ) : (
+            <div className="flex h-full items-center justify-center">
               <p className="text-xs text-[var(--qr-text-muted)]">暂无预览</p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* 右 1/3 · 模板细节 / 提示词 */}

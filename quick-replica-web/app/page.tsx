@@ -27,10 +27,15 @@ export default async function HomePage() {
   const session = await fetchToolsSession(token);
   const intro = session.introspect;
   const canManageFeatured = await fetchCanManageFeatured(token);
+  const mainOrigin = getMainSiteOrigin();
+  const bookMallAdminUrl = mainOrigin
+    ? `${mainOrigin}/admin/quick-replica/templates`
+    : null;
 
   return (
     <QrAppClient
       canManageFeatured={canManageFeatured}
+      bookMallAdminUrl={bookMallAdminUrl}
       session={
         intro
           ? {

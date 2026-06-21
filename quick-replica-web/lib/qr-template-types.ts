@@ -48,6 +48,8 @@ export type QrWorkspaceDraft = {
   kind: string;
   toolKey?: string;
   title?: string;
+  /** 复制或新建后自动保存的用户模板 id，用于后续编辑同步 */
+  savedTemplateId?: string;
   targetImageUrl: string;
   referenceVideoUrl: string;
   referenceAudioUrl: string;
@@ -479,6 +481,7 @@ export function templateToWorkspaceDraft(t: QrTemplate): QrWorkspaceDraft {
     kind: t.kind,
     toolKey: t.toolKey,
     title: t.title,
+    savedTemplateId: t.source === "user" ? t.id : undefined,
     targetImageUrl: t.reference.slots.targetImage?.url ?? "",
     referenceVideoUrl: t.reference.slots.referenceVideo?.url ?? "",
     referenceAudioUrl: t.reference.slots.referenceAudio?.url ?? "",

@@ -187,6 +187,52 @@ export async function findQrTemplateByLogId(logId: string): Promise<QrTemplateJs
   return row ? rowToJson(row) : null;
 }
 
+function draftToTemplateReference(
+  draft: import("@/lib/quick-replica/qr-types").QrWorkspaceDraft,
+): QrTemplateJson["reference"] {
+  const slots: QrTemplateJson["reference"]["slots"] = {};
+  if (draft.targetImageUrl.trim()) {
+    slots.targetImage = { url: draft.targetImageUrl.trim() };
+  }
+  if (draft.referenceVideoUrl.trim()) {
+    slots.referenceVideo = { url: draft.referenceVideoUrl.trim() };
+  }
+  if (draft.referenceAudioUrl.trim()) {
+    slots.referenceAudio = { url: draft.referenceAudioUrl.trim() };
+  }
+  if (draft.sceneImageUrls.length > 0) {
+    slots.sceneImages = draft.sceneImageUrls
+      .filter((url) => url.trim())
+      .map((url) => ({ url: url.trim() }));
+  }
+  const role: QrTemplateJson["reference"]["model"]["role"] =
+    draft.category === "audio"
+      ? "AUDIO"
+      : draft.category === "image"
+        ? "IMAGE"
+        : "VIDEO";
+  return {
+    slots,
+    prompt: { text: draft.prompt },
+    model: {
+      role,
+      modelKey: draft.modelKey,
+      params: draft.mode ? { mode: draft.mode } : {},
+    },
+  };
+}
+
+function resolveDraftThumbnailUrl(
+  draft: import("@/lib/quick-replica/qr-types").QrWorkspaceDraft,
+): string {
+  return (
+    draft.targetImageUrl.trim() ||
+    draft.referenceVideoUrl.trim() ||
+    draft.sceneImageUrls.find((url) => url.trim())?.trim() ||
+    ""
+  );
+}
+
 export async function createUserQrTemplate(args: {
   userId: string;
   category: QrCategory;
@@ -214,6 +260,38 @@ export async function createUserQrTemplate(args: {
       output: args.output ? (args.output as Prisma.InputJsonValue) : undefined,
       sortOrder: args.sortOrder ?? 0,
       gatewayRequestLogId: args.gatewayRequestLogId ?? null,
+    },
+  });
+  return rowToJson(row);
+}
+
+export async function updateUserQrTemplate(args: {
+  userId: string;
+  id: string;
+  draft: import("@/lib/quick-replica/qr-types").QrWorkspaceDraft;
+}): Promise<QrTemplateJson | null> {
+  const existing = await prisma.qrTemplate.findFirst({
+    where: { id: args.id, ownerUserId: args.userId, deletedAt: null },
+  });
+  if (!existing) return null;
+
+  const reference = draftToTemplateReference(args.draft);
+  const thumbnailUrl =
+    resolveDraftThumbnailUrl(args.draft) || existing.thumbnailUrl;
+  const title =
+    args.draft.title?.trim() ||
+    existing.title ||
+    args.draft.kind;
+
+  const row = await prisma.qrTemplate.update({
+    where: { id: args.id },
+    data: {
+      category: args.draft.category,
+      kind: args.draft.kind,
+      toolKey: args.draft.toolKey ?? null,
+      title,
+      thumbnailUrl,
+      reference: reference as Prisma.InputJsonValue,
     },
   });
   return rowToJson(row);

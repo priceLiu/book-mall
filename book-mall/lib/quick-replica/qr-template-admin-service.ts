@@ -22,6 +22,7 @@ export type AdminQrTemplateRow = {
   thumbnailUrl: string;
   promptText: string;
   reference: QrTemplateJson["reference"];
+  output?: QrTemplateJson["output"];
   sortOrder: number;
   mediaType: "image" | "video" | "audio";
   updatedAt: string;
@@ -104,6 +105,7 @@ export async function listAdminQrTemplates(filters: {
       thumbnailUrl: effective.thumbnailUrl,
       promptText: effective.reference.prompt.text,
       reference: effective.reference,
+      output: effective.output,
       sortOrder: effective.sortOrder,
       mediaType: inferMediaType(effective),
       updatedAt: effective.updatedAt,
@@ -138,6 +140,7 @@ export async function listAdminQrTemplates(filters: {
       thumbnailUrl: json.thumbnailUrl,
       promptText: json.reference.prompt.text,
       reference: json.reference,
+      output: json.output,
       sortOrder: json.sortOrder,
       mediaType: inferMediaType(json),
       updatedAt: json.updatedAt,
