@@ -61,7 +61,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as Sbv1VideoEngineNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
-  const { succeeded, history, refreshHistory } = useNodeTaskHistory(id);
+  const { succeeded, history } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
@@ -104,11 +104,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       (t) => isServerInflightTaskStatus(t.status),
     );
   }, [history, d.runtime?.taskId]);
-
-  useEffect(() => {
-    if (!isGenerating) return;
-    void refreshHistory();
-  }, [isGenerating, refreshHistory]);
 
   useEffect(() => {
     if (!inflightTask) return;

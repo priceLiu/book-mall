@@ -69,7 +69,11 @@ import {
   canvasGwRecordInfo,
 } from "./canvas-gateway-client";
 import { failGatewayLogIfStillRunning } from "@/lib/gateway/fail-gateway-log-on-timeout";
-import { patchCanvasProjectNodeRuntimeFromTask } from "@/lib/canvas/canvas-volcengine-recover";
+import {
+  extractVolcengineVideoUrlFromGatewaySummary,
+  patchCanvasProjectNodeRuntimeFromTask,
+} from "@/lib/canvas/canvas-volcengine-recover";
+import { getGenerationPollInnerTimeoutMs } from "@/lib/generation/poll-config";
 import {
   buildCanvasPollErrorPatch,
   buildCanvasTimeoutFailFields,
@@ -931,7 +935,7 @@ export function scheduleCanvasPollWorkerForProject(projectId: string): void {
   });
 }
 
-const POLL_INNER_TIMEOUT_MS = 8000;
+const POLL_INNER_TIMEOUT_MS = getGenerationPollInnerTimeoutMs();
 const RETRY_PENDING_LIMIT = 3;
 /** ai-engine 同步 LLM 若进程中断，PENDING 任务超过此时间则标记失败 */
 const TEXT_PENDING_STALE_MS = 15 * 60 * 1000;
@@ -1088,6 +1092,62 @@ async function pollOneSubmittedCanvasTask(
         status: "FAILED",
         failCode: "GATEWAY_LEGACY_TASK",
         failMessage: "旧任务无 Gateway 日志，请重新生成",
+        completedAt: new Date(),
+        lastPolledAt: new Date(),
+        pollCount: task.pollCount + 1,
+      },
+    });
+    return "failed";
+  }
+
+  const gatewayLogId = String(payload.gatewayLogId).trim();
+  const gatewayLog = await prisma.gatewayRequestLog.findUnique({
+    where: { id: gatewayLogId },
+    select: {
+      status: true,
+      failCode: true,
+      failMessage: true,
+      resultSummary: true,
+      providerKind: true,
+    },
+  });
+  if (gatewayLog?.status === "SUCCEEDED") {
+    const providerKind = gatewayProviderKindFromPayload(payload);
+    if (
+      providerKind === "VOLCENGINE" ||
+      gatewayLog.providerKind === "VOLCENGINE"
+    ) {
+      const videoUrl = extractVolcengineVideoUrlFromGatewaySummary(
+        gatewayLog.resultSummary,
+      );
+      if (videoUrl) {
+        await applyCanvasVolcengineVideoResult(task.id, videoUrl);
+        const after = await prisma.canvasGenerationTask.findUnique({
+          where: { id: task.id },
+          select: { status: true },
+        });
+        await prisma.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+        });
+        if (after?.status === "SUCCEEDED" && before !== "SUCCEEDED") {
+          return "succeeded";
+        }
+        if (after?.status === "FAILED" && before !== "FAILED") {
+          return "failed";
+        }
+        return "pending";
+      }
+    }
+  } else if (gatewayLog?.status === "FAILED") {
+    await prisma.canvasGenerationTask.update({
+      where: { id: task.id },
+      data: {
+        status: "FAILED",
+        failCode: gatewayLog.failCode ?? "GATEWAY_TASK_FAILED",
+        failMessage:
+          gatewayLog.failMessage?.slice(0, 500) ??
+          "Gateway 任务失败，请查看状态页日志",
         completedAt: new Date(),
         lastPolledAt: new Date(),
         pollCount: task.pollCount + 1,

@@ -12,7 +12,6 @@ import {
 import { taskHasDisplayableResult } from "./task-media-url";
 import { useCanvasStore } from "./store";
 
-const TASK_HISTORY_POLL_MS = 2000;
 /** 打开画布后合并批量拉任务，避免 N 个节点各发一次 HTTP */
 const BATCH_DEBOUNCE_MS = 120;
 /** 首屏后再拉历史，与媒体懒加载错开 */
@@ -20,30 +19,38 @@ const INITIAL_FETCH_DELAY_MS = 1200;
 
 type ProjectTaskPool = {
   tasks: CanvasTaskRecord[];
+  snapshotFingerprint: string;
   pollForbidden: boolean;
   subscribers: number;
-  pollTimer: ReturnType<typeof setInterval> | null;
   debounceTimer: ReturnType<typeof setTimeout> | null;
   initialTimer: ReturnType<typeof setTimeout> | null;
   inflight: boolean;
-  needsInflightPoll: boolean;
   listeners: Set<() => void>;
 };
 
 const pools = new Map<string, ProjectTaskPool>();
+
+function taskListFingerprint(tasks: CanvasTaskRecord[]): string {
+  if (!tasks.length) return "";
+  return tasks
+    .map(
+      (t) =>
+        `${t.id}:${t.status}:${t.updatedAt}:${t.ossUrl ?? ""}:${t.ephemeralUrl ?? ""}:${t.textOutput?.length ?? 0}`,
+    )
+    .join("|");
+}
 
 function getPool(projectId: string): ProjectTaskPool {
   let pool = pools.get(projectId);
   if (!pool) {
     pool = {
       tasks: [],
+      snapshotFingerprint: "",
       pollForbidden: false,
       subscribers: 0,
-      pollTimer: null,
       debounceTimer: null,
       initialTimer: null,
       inflight: false,
-      needsInflightPoll: false,
       listeners: new Set(),
     };
     pools.set(projectId, pool);
@@ -57,13 +64,6 @@ function emitPool(projectId: string) {
   for (const listener of pool.listeners) listener();
 }
 
-function stopPollTimer(pool: ProjectTaskPool) {
-  if (pool.pollTimer) {
-    clearInterval(pool.pollTimer);
-    pool.pollTimer = null;
-  }
-}
-
 function clearPoolTimers(pool: ProjectTaskPool) {
   if (pool.debounceTimer) {
     clearTimeout(pool.debounceTimer);
@@ -73,7 +73,6 @@ function clearPoolTimers(pool: ProjectTaskPool) {
     clearTimeout(pool.initialTimer);
     pool.initialTimer = null;
   }
-  stopPollTimer(pool);
 }
 
 function disposePool(projectId: string) {
@@ -83,12 +82,25 @@ function disposePool(projectId: string) {
   pools.delete(projectId);
 }
 
-function ensureProjectTaskPoll(projectId: string, base: string) {
+/** run-queue 轮询结果写入共享池，避免第二套 interval 与全画布重渲染风暴 */
+export function ingestCanvasProjectTasks(
+  projectId: string,
+  tasks: CanvasTaskRecord[],
+) {
   const pool = getPool(projectId);
-  if (pool.pollForbidden || pool.pollTimer) return;
-  pool.pollTimer = setInterval(() => {
-    void refreshProjectTasks(projectId, base);
-  }, TASK_HISTORY_POLL_MS);
+  const fp = taskListFingerprint(tasks);
+  if (pool.snapshotFingerprint === fp) return;
+  pool.snapshotFingerprint = fp;
+  pool.tasks = tasks;
+  emitPool(projectId);
+}
+
+export function markCanvasProjectTasksPoolForbidden(projectId: string) {
+  const pool = pools.get(projectId);
+  if (!pool) return;
+  pool.pollForbidden = true;
+  clearPoolTimers(pool);
+  emitPool(projectId);
 }
 
 async function refreshProjectTasks(projectId: string, base: string) {
@@ -96,7 +108,7 @@ async function refreshProjectTasks(projectId: string, base: string) {
   if (pool.pollForbidden || pool.inflight) return;
   if (isCanvasProjectTasksForbidden(projectId)) {
     pool.pollForbidden = true;
-    stopPollTimer(pool);
+    clearPoolTimers(pool);
     emitPool(projectId);
     return;
   }
@@ -104,21 +116,11 @@ async function refreshProjectTasks(projectId: string, base: string) {
   pool.inflight = true;
   try {
     const tasks = await listCanvasProjectTasks(base, projectId);
-    pool.tasks = tasks;
-    pool.needsInflightPoll = tasks.some(
-      (t) =>
-        t.status === "QUEUED" ||
-        t.status === "DISPATCHING" ||
-        t.status === "PENDING" ||
-        t.status === "SUBMITTED",
-    );
-    if (!pool.needsInflightPoll) stopPollTimer(pool);
-    else ensureProjectTaskPoll(projectId, base);
-    emitPool(projectId);
+    ingestCanvasProjectTasks(projectId, tasks);
   } catch (e) {
     if (isCanvasApiAccessDeniedError(e)) {
       pool.pollForbidden = true;
-      stopPollTimer(pool);
+      clearPoolTimers(pool);
       emitPool(projectId);
     }
   } finally {
@@ -136,22 +138,6 @@ function scheduleProjectTaskRefresh(projectId: string, base: string) {
   }, BATCH_DEBOUNCE_MS);
 }
 
-/** 生成中立即拉任务，不走 debounce */
-function flushProjectTaskRefresh(projectId: string, base: string) {
-  const pool = getPool(projectId);
-  if (pool.pollForbidden) return;
-  if (pool.debounceTimer) {
-    clearTimeout(pool.debounceTimer);
-    pool.debounceTimer = null;
-  }
-  if (pool.initialTimer) {
-    clearTimeout(pool.initialTimer);
-    pool.initialTimer = null;
-  }
-  ensureProjectTaskPoll(projectId, base);
-  void refreshProjectTasks(projectId, base);
-}
-
 function subscribeProjectTasks(
   projectId: string,
   base: string,
@@ -161,7 +147,7 @@ function subscribeProjectTasks(
   pool.subscribers += 1;
   pool.listeners.add(listener);
 
-  if (!pool.initialTimer && !pool.pollForbidden) {
+  if (!pool.initialTimer && !pool.pollForbidden && !pool.tasks.length) {
     pool.initialTimer = setTimeout(() => {
       pool.initialTimer = null;
       scheduleProjectTaskRefresh(projectId, base);
@@ -180,11 +166,10 @@ function getProjectTasksSnapshot(projectId: string): CanvasTaskRecord[] {
 }
 
 function getProjectPollForbidden(projectId: string): boolean {
-  return pools.get(projectId)?.pollForbidden ?? false;
-}
-
-function isLocalInflightStatus(status?: string): boolean {
-  return status === "pending" || status === "running";
+  return (
+    (pools.get(projectId)?.pollForbidden ?? false) ||
+    isCanvasProjectTasksForbidden(projectId)
+  );
 }
 
 /** 拉取某节点的任务历史；生图引擎 / 输出节点复用（项目级批量池）。 */
@@ -196,11 +181,6 @@ export function useNodeTaskHistory(nodeId: string | null | undefined) {
     const n = s.nodes.find((x) => x.id === nodeId);
     return (n?.data as { runtime?: { taskId?: string; status?: string } })
       ?.runtime?.taskId;
-  });
-  const runtimeStatus = useCanvasStore((s) => {
-    if (!nodeId) return undefined;
-    const n = s.nodes.find((x) => x.id === nodeId);
-    return (n?.data as { runtime?: { status?: string } })?.runtime?.status;
   });
 
   const subscribe = useCallback(
@@ -226,21 +206,14 @@ export function useNodeTaskHistory(nodeId: string | null | undefined) {
 
   const refreshHistory = useCallback(async () => {
     if (!base || !projectId || !nodeId || pollForbidden) return;
-    if (isLocalInflightStatus(runtimeStatus)) {
-      flushProjectTaskRefresh(projectId, base);
-    } else {
-      scheduleProjectTaskRefresh(projectId, base);
-    }
-  }, [base, projectId, nodeId, pollForbidden, runtimeStatus]);
-
-  useEffect(() => {
-    if (!base || !projectId || pollForbidden) return;
-    if (isLocalInflightStatus(runtimeStatus)) {
-      flushProjectTaskRefresh(projectId, base);
-      return;
-    }
     scheduleProjectTaskRefresh(projectId, base);
-  }, [base, projectId, pollForbidden, runtimeTaskId, runtimeStatus]);
+  }, [base, projectId, nodeId, pollForbidden]);
+
+  /** 新 taskId 绑定后 debounce 补拉一次；进行中轮询由 run-queue 单通道负责 */
+  useEffect(() => {
+    if (!base || !projectId || pollForbidden || !runtimeTaskId) return;
+    scheduleProjectTaskRefresh(projectId, base);
+  }, [base, projectId, pollForbidden, runtimeTaskId]);
 
   const succeeded = useMemo(
     () =>

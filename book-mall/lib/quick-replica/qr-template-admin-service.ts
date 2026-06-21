@@ -6,6 +6,11 @@ import {
   listBuiltinQrTemplates,
 } from "@/lib/quick-replica/builtin-templates";
 import { getKindDef, getKindsForCategory } from "@/lib/quick-replica/qr-kinds";
+import {
+  buildAdminOutput,
+  buildAdminReference,
+  type AdminTemplateFormInput,
+} from "@/lib/quick-replica/qr-admin-template-form";
 import type { QrCategory, QrTemplateJson } from "@/lib/quick-replica/qr-types";
 import { rowToJson } from "@/lib/quick-replica/qr-template-service";
 
@@ -152,47 +157,8 @@ export async function listAdminQrTemplates(filters: {
   );
 }
 
-function defaultReference(args: {
-  category: QrCategory;
-  kind: string;
-  toolKey?: string;
-  promptText: string;
-  thumbnailUrl: string;
-  mediaUrl?: string;
-  modelKey?: string;
-}): QrTemplateJson["reference"] {
-  const mediaUrl = args.mediaUrl?.trim() || args.thumbnailUrl;
-  const modelKey =
-    args.modelKey?.trim() ||
-    (args.kind === "motion-sync"
-      ? "kling-2.6/motion-control"
-      : args.category === "video"
-        ? "wan/2-6-video-to-video"
-        : args.kind === "edit-image"
-          ? "gpt-image-2"
-          : "lib-nano-pro");
-  const role =
-    args.category === "video" ? "VIDEO" : args.category === "audio" ? "AUDIO" : "IMAGE";
-
-  const slots: QrTemplateJson["reference"]["slots"] = {};
-  if (args.category === "video" || /\.(mp4|webm|mov)(\?|$)/i.test(mediaUrl)) {
-    slots.referenceVideo = { url: mediaUrl };
-  } else if (args.kind === "edit-image" || args.toolKey === "edit-image") {
-    slots.targetImage = { url: mediaUrl };
-  }
-
-  return {
-    slots,
-    prompt: {
-      text: args.promptText,
-      locale: /[\u4e00-\u9fff]/.test(args.promptText) ? "zh" : "en",
-    },
-    model: {
-      role,
-      modelKey,
-      params: {},
-    },
-  };
+function defaultReference(args: AdminTemplateFormInput): QrTemplateJson["reference"] {
+  return buildAdminReference(args);
 }
 
 export async function upsertAdminQrTemplate(args: {
@@ -206,6 +172,9 @@ export async function upsertAdminQrTemplate(args: {
   thumbnailUrl: string;
   promptText: string;
   mediaUrl?: string;
+  targetImageUrl?: string;
+  referenceVideoUrl?: string;
+  outputUrl?: string;
   modelKey?: string;
   sortOrder?: number;
 }): Promise<AdminQrTemplateRow> {
@@ -217,23 +186,53 @@ export async function upsertAdminQrTemplate(args: {
     throw new Error(`kind ${args.kind} 不属于分类 ${args.category}`);
   }
 
-  const reference = defaultReference({
+  let existingBuiltin: QrTemplateJson | null = null;
+  if (args.catalogBuiltinId) {
+    existingBuiltin = getBuiltinQrTemplateById(args.catalogBuiltinId);
+  }
+  if (args.dbId) {
+    const existingRow = await prisma.qrTemplate.findFirst({
+      where: { id: args.dbId, deletedAt: null },
+    });
+    if (existingRow) {
+      const json = rowToJson(existingRow);
+      existingBuiltin = existingBuiltin
+        ? {
+            ...existingBuiltin,
+            reference: json.reference,
+            output: json.output ?? existingBuiltin.output,
+          }
+        : json;
+    }
+  }
+
+  const formInput: AdminTemplateFormInput = {
     category: args.category,
     kind: args.kind,
     toolKey: args.toolKey,
-    promptText: args.promptText,
+    title: args.title,
     thumbnailUrl: args.thumbnailUrl,
+    promptText: args.promptText,
     mediaUrl: args.mediaUrl,
+    targetImageUrl: args.targetImageUrl,
+    referenceVideoUrl: args.referenceVideoUrl,
+    outputUrl: args.outputUrl,
     modelKey: args.modelKey,
-  });
+    sortOrder: args.sortOrder,
+    existingReference: existingBuiltin?.reference,
+    existingOutput: existingBuiltin?.output,
+  };
+  const reference = defaultReference(formInput);
+  const output = buildAdminOutput(formInput, reference);
 
   const data = {
     category: args.category,
     kind: args.kind,
-    toolKey: args.toolKey ?? null,
+    toolKey: args.toolKey ?? (args.kind === "motion-sync" ? "motion-sync" : null),
     title: args.title.trim(),
     thumbnailUrl: args.thumbnailUrl.trim(),
     reference: reference as Prisma.InputJsonValue,
+    output: output ? (output as Prisma.InputJsonValue) : undefined,
     sortOrder: args.sortOrder ?? 0,
     visibility: "public",
     isPlatformCatalog: true,
@@ -288,6 +287,7 @@ export async function upsertAdminQrTemplate(args: {
     thumbnailUrl: json.thumbnailUrl,
     promptText: json.reference.prompt.text,
     reference: json.reference,
+    output: json.output,
     sortOrder: json.sortOrder,
     mediaType: inferMediaType(json),
     updatedAt: json.updatedAt,

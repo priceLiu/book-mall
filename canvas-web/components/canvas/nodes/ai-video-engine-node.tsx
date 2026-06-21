@@ -127,11 +127,11 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
     if (!isGenerating) setRunPending(false);
   }, [isGenerating]);
 
-  /** 点击生成后、任务写入历史前：轮询任务列表并同步 pending/running */
+  /** 点击生成后、任务写入历史前：run-queue 轮询会写入共享任务池 */
   useEffect(() => {
-    if (!runPending && !isGenerating) return;
+    if (!runPending) return;
     void refreshHistory();
-  }, [runPending, isGenerating, refreshHistory]);
+  }, [runPending, refreshHistory]);
 
   useEffect(() => {
     if (!inflightTask) return;

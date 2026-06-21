@@ -34,6 +34,7 @@ import { failGatewayLogIfStillRunning } from "@/lib/gateway/fail-gateway-log-on-
 import { getGenerationPollBatch } from "@/lib/canvas/canvas-constants";
 import {
   getGenerationPollConcurrency,
+  getGenerationPollInnerTimeoutMs,
   getGenerationPollMaxPasses,
   getGenerationPollTimeBudgetMs,
 } from "@/lib/generation/poll-config";
@@ -1113,7 +1114,7 @@ export function schedulePollWorkerForProject(projectId: string): void {
   });
 }
 
-const POLL_INNER_TIMEOUT_MS = 8000;
+const POLL_INNER_TIMEOUT_MS = getGenerationPollInnerTimeoutMs();
 const RETRY_PENDING_LIMIT = 3;
 
 function shouldPollNow(

@@ -6,7 +6,7 @@
  *
  * 所有写操作在事务内更新余额 + 落流水（含 balanceAfter 与幂等键）。
  */
-import type { BillingPersona, CreditLedgerType, CreditOwnerType, CreditPool, Prisma, ResourceMeterType } from "@prisma/client";
+import { Prisma, type BillingPersona, type CreditLedgerType, type CreditOwnerType, type CreditPool, type ResourceMeterType } from "@prisma/client";
 
 import { isStaffRole } from "@/lib/billing/billing-persona";
 import { buildGatewayLogWhereFromUsageQuery } from "@/lib/gateway/log-query-scope";
@@ -168,23 +168,44 @@ async function writeLedger(input: LedgerWriteInput) {
 
     const personaFields = await resolveLedgerPersonaFields(input);
 
-    const ledger = await tx.creditLedger.create({
-      data: {
-        accountId: account.id,
-        type: input.type,
-        credits: input.credits,
-        balanceAfter,
-        pool,
-        actorUserId: input.actorUserId ?? null,
-        refType: input.refType ?? null,
-        refId: input.refId ?? null,
-        costSnapshotYuan: input.costSnapshotYuan ?? null,
-        idempotencyKey: input.idempotencyKey ?? null,
-        description: input.description ?? null,
-        staffFlag: personaFields.staffFlag,
-        billingPersonaSnap: personaFields.billingPersonaSnap,
-      },
-    });
+    let ledger;
+    try {
+      ledger = await tx.creditLedger.create({
+        data: {
+          accountId: account.id,
+          type: input.type,
+          credits: input.credits,
+          balanceAfter,
+          pool,
+          actorUserId: input.actorUserId ?? null,
+          refType: input.refType ?? null,
+          refId: input.refId ?? null,
+          costSnapshotYuan: input.costSnapshotYuan ?? null,
+          idempotencyKey: input.idempotencyKey ?? null,
+          description: input.description ?? null,
+          staffFlag: personaFields.staffFlag,
+          billingPersonaSnap: personaFields.billingPersonaSnap,
+        },
+      });
+    } catch (e) {
+      if (
+        input.idempotencyKey &&
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
+        const existing = await tx.creditLedger.findUnique({
+          where: { idempotencyKey: input.idempotencyKey },
+        });
+        if (existing) {
+          return {
+            ledger: existing,
+            balanceAfter: existing.balanceAfter,
+            deduped: true as const,
+          };
+        }
+      }
+      throw e;
+    }
 
     return { ledger, balanceAfter: (updated[fields.balance] as number) ?? balanceAfter, deduped: false as const };
   });

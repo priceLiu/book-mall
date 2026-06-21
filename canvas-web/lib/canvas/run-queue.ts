@@ -106,6 +106,10 @@ import {
   shouldSkipStoryRowTaskApply,
   storyRunContextFromScope,
 } from "./task-pick";
+import {
+  ingestCanvasProjectTasks,
+  markCanvasProjectTasksPoolForbidden,
+} from "./use-node-task-history";
 
 const POLL_INTERVAL_MS = 2000;
 /** 打开画布后延迟全量任务扫描，避免首屏与大量媒体加载抢主线程 */
@@ -1677,6 +1681,7 @@ export function useCanvasRunner(
       try {
         const tasks = await listCanvasProjectTasks(base, projectId, nodeIds);
         if (cancelled) return;
+        ingestCanvasProjectTasks(projectId, tasks);
         const nodesNow = useCanvasStore.getState().nodes;
         applyStoryColumnRowTasks(tasks, nodesNow);
         const skipReconcileNodeIds = new Set<string>();
@@ -1724,6 +1729,7 @@ export function useCanvasRunner(
           pollStopped = true;
           serverInflightRef.current = false;
           markCanvasProjectTasksForbidden(projectId);
+          markCanvasProjectTasksPoolForbidden(projectId);
           if (intervalId) window.clearInterval(intervalId);
         }
       }

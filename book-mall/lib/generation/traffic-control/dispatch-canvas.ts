@@ -258,6 +258,7 @@ export async function dispatchQueuedCanvasTasks(opts?: {
   const result = { cancelled: 0, recovered: 0, dispatched: 0, skipped: 0, failed: 0 };
   if (!isTrafficControlEnabled()) return result;
 
+  try {
   result.cancelled = await cancelQueueTimeouts(opts?.projectId);
   result.recovered = await recoverStaleDispatching(opts?.projectId);
 
@@ -281,6 +282,13 @@ export async function dispatchQueuedCanvasTasks(opts?: {
   }
 
   return result;
+  } catch (e) {
+    console.warn(
+      "[canvas-dispatch] skipped (db unavailable?)",
+      e instanceof Error ? e.message : String(e),
+    );
+    return result;
+  }
 }
 
 /** DISPATCHING 失败且已 create log 时的清理（供扩展） */

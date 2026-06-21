@@ -79,10 +79,6 @@ export function QrAppClient({
   const browseKey = useMemo(() => {
     if (navMode === "home") return "";
     const parts = [templateScope];
-    if (navMode === "admin") {
-      parts.push("admin", category);
-      return parts.join("|");
-    }
     if (navMode !== "my-works" && category) parts.push(category);
     if (selectedKind) parts.push(selectedKind);
     if (pinnedToolKey && navMode === "pinned-tool") parts.push(pinnedToolKey);
@@ -110,17 +106,20 @@ export function QrAppClient({
 
     const qs = new URLSearchParams({ scope: templateScope });
     if (navMode !== "my-works" && category) qs.set("category", category);
-    if (selectedKind && navMode !== "admin") qs.set("kind", selectedKind);
+    if (selectedKind) qs.set("kind", selectedKind);
     if (pinnedToolKey && navMode === "pinned-tool") qs.set("toolKey", pinnedToolKey);
     try {
       const res = await fetch(
         `/api/book-mall/api/platform/v1/quick-replica/templates?${qs}`,
       );
-      if (res.ok && browseKeyRef.current === requestKey) {
+      if (browseKeyRef.current !== requestKey) return;
+      if (res.ok) {
         const data = (await res.json()) as { templates: QrTemplate[] };
         const list = data.templates ?? [];
         templatesCacheRef.current.set(requestKey, list);
         setTemplates(list);
+      } else {
+        setTemplates([]);
       }
     } finally {
       if (browseKeyRef.current === requestKey) {
@@ -202,7 +201,7 @@ export function QrAppClient({
   );
 
   useEffect(() => {
-    if (navMode !== "category" && navMode !== "my-works") return;
+    if (navMode !== "category" && navMode !== "my-works" && navMode !== "admin") return;
     for (const cat of QR_CATEGORIES) {
       prefetchTemplateList(qrTemplateCacheKey("all", cat.id), { category: cat.id });
     }
@@ -226,7 +225,10 @@ export function QrAppClient({
   }, [navMode, category, prefetchTemplateList]);
 
   const galleryTitleSuffix = useMemo(() => {
-    if (navMode === "admin") return "推荐模板";
+    if (navMode === "admin") {
+      if (selectedKind === "motion-sync") return "运动同步";
+      return "推荐模板";
+    }
     if (navMode === "my-works") return "我的作品";
     if (selectedKind) return getKindDef(selectedKind)?.label ?? selectedKind;
     if (pinnedToolKey) return QR_PINNED_LABEL(pinnedToolKey);
@@ -269,7 +271,8 @@ export function QrAppClient({
     setMiddleMode("browse");
     setSelectedKind(null);
     setPinnedToolKey(null);
-    const cacheKey = qrTemplateCacheKey("all", category);
+    setCategory("video");
+    const cacheKey = qrTemplateCacheKey("all", "video");
     setTemplates(templatesCacheRef.current.get(cacheKey) ?? []);
     setTemplatesLoading(true);
   };
@@ -280,6 +283,21 @@ export function QrAppClient({
     void loadTemplates();
     void loadKinds();
   }, [loadKinds, loadTemplates]);
+
+  const handleAdminScopeChange = useCallback(
+    (scope: { category: QrCategory; kind: string | null }) => {
+      setCategory(scope.category);
+      setSelectedKind(scope.kind);
+      const cacheKey = qrTemplateCacheKey(
+        "all",
+        scope.category,
+        scope.kind ?? undefined,
+      );
+      setTemplates(templatesCacheRef.current.get(cacheKey) ?? []);
+      setTemplatesLoading(true);
+    },
+    [],
+  );
 
   const onPinnedTool = (toolKey: string, cat: QrCategory, kind: string) => {
     setNavMode("pinned-tool");
@@ -365,6 +383,7 @@ export function QrAppClient({
         <QrAdminPanel
           bookMallAdminUrl={bookMallAdminUrl}
           onTemplatesChanged={refreshTemplateCaches}
+          onScopeChange={handleAdminScopeChange}
         />
       );
     }

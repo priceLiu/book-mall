@@ -8,6 +8,7 @@ import {
 import { resolveQrTemplatePreviewMedia } from "@/lib/quick-replica/qr-template-preview-media";
 
 type QrCategory = "video" | "image" | "character" | "world" | "audio";
+type AdminPrimaryTab = QrCategory | "motion-sync";
 
 type AdminTemplateRow = {
   id: string;
@@ -77,7 +78,10 @@ async function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 export default function AdminQuickReplicaTemplatesPage() {
-  const [category, setCategory] = useState<QrCategory>("image");
+  const [primaryTab, setPrimaryTab] = useState<AdminPrimaryTab>("image");
+  const [kindFilter, setKindFilter] = useState("");
+  const category: QrCategory = primaryTab === "motion-sync" ? "video" : primaryTab;
+  const effectiveKind = primaryTab === "motion-sync" ? "motion-sync" : kindFilter;
   const [templates, setTemplates] = useState<AdminTemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,11 +93,12 @@ export default function AdminQuickReplicaTemplatesPage() {
 
   const load = useCallback(async () => {
     const qs = new URLSearchParams({ category });
+    if (effectiveKind) qs.set("kind", effectiveKind);
     const res = await fetch(`/api/admin/quick-replica/templates?${qs}`, { cache: "no-store" });
     const data = (await res.json()) as { templates?: AdminTemplateRow[]; error?: string };
     if (!res.ok) throw new Error(data.error ?? "加载失败");
     setTemplates(Array.isArray(data.templates) ? data.templates : []);
-  }, [category]);
+  }, [category, effectiveKind]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,7 +121,13 @@ export default function AdminQuickReplicaTemplatesPage() {
   const filteredCount = useMemo(() => templates.length, [templates]);
 
   function openCreate() {
-    setForm({ ...EMPTY_FORM, category, kind: category === "video" ? "text-to-video" : "create-image" });
+    const defaultKind =
+      primaryTab === "motion-sync"
+        ? "motion-sync"
+        : category === "video"
+          ? "text-to-video"
+          : "create-image";
+    setForm({ ...EMPTY_FORM, category, kind: defaultKind });
     setFormOpen(true);
   }
 
@@ -253,15 +264,32 @@ export default function AdminQuickReplicaTemplatesPage() {
             key={c.id}
             type="button"
             className={`rounded-full px-3 py-1 text-sm font-medium transition ${
-              category === c.id
+              primaryTab === c.id
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
-            onClick={() => setCategory(c.id)}
+            onClick={() => {
+              setPrimaryTab(c.id);
+              setKindFilter("");
+            }}
           >
             {c.label}
           </button>
         ))}
+        <button
+          type="button"
+          className={`rounded-full px-3 py-1 text-sm font-medium transition ${
+            primaryTab === "motion-sync"
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          }`}
+          onClick={() => {
+            setPrimaryTab("motion-sync");
+            setKindFilter("");
+          }}
+        >
+          运动同步
+        </button>
         <span className="ml-auto self-center text-sm text-muted-foreground">{filteredCount} 项</span>
       </div>
 

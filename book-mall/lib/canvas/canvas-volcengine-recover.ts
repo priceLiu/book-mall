@@ -213,7 +213,14 @@ async function patchProjectNodeFromTask(
   };
   const node = canvas.nodes?.find((n) => n.id === task.nodeId);
   const existingTaskId = node?.data?.runtime?.taskId?.trim();
-  if (existingTaskId && existingTaskId !== task.id) {
+  const existingStatus = (
+    node?.data?.runtime as { status?: string } | undefined
+  )?.status;
+  if (
+    existingTaskId &&
+    existingTaskId !== task.id &&
+    existingStatus === "done"
+  ) {
     const existing = await prisma.canvasGenerationTask.findUnique({
       where: { id: existingTaskId },
       select: { completedAt: true, status: true },
@@ -358,4 +365,32 @@ export async function recoverCanvasVolcengineTimedOutTask(
   await patchProjectNodeFromTask(updated);
 
   return { ok: true, ossUrl: updated.ossUrl ?? updated.ephemeralUrl ?? undefined };
+}
+
+/** 从 Gateway 终态 resultSummary 提取火山 video_url（免二次 recordInfo） */
+export function extractVolcengineVideoUrlFromGatewaySummary(
+  summary: unknown,
+): string | null {
+  if (!summary || typeof summary !== "object") return null;
+  const root = summary as Record<string, unknown>;
+  if (typeof root.videoUrl === "string" && root.videoUrl.trim()) {
+    return root.videoUrl.trim();
+  }
+  const readContent = (obj: Record<string, unknown>): string | null => {
+    const content = obj.content;
+    if (!content || typeof content !== "object") return null;
+    const url = (content as { video_url?: unknown }).video_url;
+    return typeof url === "string" && url.trim() ? url.trim() : null;
+  };
+  const direct = readContent(root);
+  if (direct) return direct;
+  const output = root.output;
+  if (output && typeof output === "object") {
+    const nested = readContent(output as Record<string, unknown>);
+    if (nested) return nested;
+  }
+  if (typeof root.result_url === "string" && root.result_url.trim()) {
+    return root.result_url.trim();
+  }
+  return null;
 }
