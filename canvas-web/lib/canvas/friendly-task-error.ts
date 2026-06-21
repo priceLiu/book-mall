@@ -125,9 +125,11 @@ export function formatCanvasTaskError(
   if (
     blob.includes("transaction already closed") ||
     blob.includes("prisma.") ||
-    blob.includes("transaction api error")
+    blob.includes("transaction api error") ||
+    blob.includes("connection pool") ||
+    blob.includes("timed out fetching a new connection")
   ) {
-    return "服务繁忙，请稍后重试。若持续失败请联系管理员。";
+    return "数据库连接繁忙，任务未能提交。请等待 5～10 秒后重试；dev 环境可改用 pnpm dev:all:nopoll 减少连接占用。";
   }
 
   if (

@@ -49,7 +49,7 @@ function resolvePrismaDatasourceUrl(): string | undefined {
     ) {
       url.searchParams.set(
         "connection_limit",
-        process.env.PRISMA_CONNECTION_LIMIT ?? "4",
+        process.env.PRISMA_CONNECTION_LIMIT ?? "2",
       );
     }
     return url.toString();

@@ -29,6 +29,7 @@ import {
   logProviderFilterOptions,
   LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
+import { liveVolcengineVideoTiming } from "@/lib/volcengine-log-timing-live";
 
 export type GatewayLogRow = {
   id: string;
@@ -296,6 +297,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     () => logs.some((l) => l.status === "RUNNING" || l.status === "PENDING"),
     [logs],
   );
+  const hasInFlightLogsRef = useRef(hasInFlightLogs);
+  hasInFlightLogsRef.current = hasInFlightLogs;
 
   const loadLogs = useCallback(async (opts?: { poll?: boolean }) => {
     setFetchError(null);
@@ -359,14 +362,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     return () => window.clearInterval(timer);
   }, [hasInFlightLogs]);
 
-  /** 有进行中任务时每 10s 拉取（服务端 opportunistic 轮询厂商任务） */
+  /** 开启自动刷新时定期拉列表；有进行中任务时附带 poll=1 触发服务端 opportunistic 轮询 */
   useEffect(() => {
-    if (!autoRefresh || !hasInFlightLogs) return;
+    if (!autoRefresh) return;
 
     let cancelled = false;
     const run = async () => {
       if (cancelled) return;
-      await loadLogs({ poll: true });
+      await loadLogs({ poll: hasInFlightLogsRef.current });
     };
 
     void run();
@@ -378,7 +381,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [autoRefresh, hasInFlightLogs, loadLogs]);
+  }, [autoRefresh, loadLogs]);
 
   /** 筛选 / 分页 / 每页条数变更时拉取 */
   useEffect(() => {
@@ -516,8 +519,10 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 ? "加载中…"
                 : `共 ${total} 条 · 第 ${page}/${totalPages} 页 · 本页 ${logs.length} 条`}
               {(fromDate || toDate) && !loading ? " · 按日期" : ""}
-              {hasInFlightLogs && autoRefresh
-                ? " · 自动刷新 8s"
+              {autoRefresh
+                ? hasInFlightLogs
+                  ? " · 自动刷新 8s · 轮询厂商"
+                  : " · 自动刷新 8s"
                 : hasInFlightLogs
                   ? " · 有进行中任务"
                   : ""}
@@ -750,13 +755,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="w-[88px]"
-                title="首次 running → 厂商 updated_at（任务完成）；进行中为实时累计"
+                title="厂商 created_at → updated_at（进行中 updated_at 停更后不再增长，停更时长见 Poll Δ）"
               >
                 Generate
               </th>
               <th
                 className="w-[96px]"
-                title="厂商 updated_at → Gateway 检测到成功；应 ≤10s，超出标红"
+                title="厂商 updated_at 停更时长（进行中）或终态时 Gateway 检测延迟；应 ≤10s，超出标红"
               >
                 Poll Δ
               </th>
@@ -812,14 +817,28 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             {logs.map((l) => {
               const isInProgress =
                 l.status === "RUNNING" || l.status === "PENDING";
-              const durationMs = resolveLogDurationMs(
-                l.durationMs,
-                l.submittedAt,
-                l.completedAt,
+              const liveVolc =
                 isInProgress && liveNowMs != null
-                  ? { inProgress: true, nowMs: liveNowMs }
-                  : undefined,
-              );
+                  ? liveVolcengineVideoTiming({
+                      submittedAt: l.submittedAt,
+                      completedAt: l.completedAt,
+                      resultSummary: l.resultSummary,
+                      nowMs: liveNowMs,
+                    })
+                  : null;
+              const queueMs = liveVolc?.queueMs ?? l.queueMs;
+              const generateMs = liveVolc?.generateMs ?? l.generateMs;
+              const durationMs =
+                liveVolc != null
+                  ? liveVolc.totalMs
+                  : resolveLogDurationMs(
+                      l.durationMs,
+                      l.submittedAt,
+                      l.completedAt,
+                      isInProgress && liveNowMs != null
+                        ? { inProgress: true, nowMs: liveNowMs }
+                        : undefined,
+                    );
               const duration = formatDurationSeconds(durationMs);
               const usage = formatUsageYuanDisplay(l.estimatedVendorCostYuan);
               const platformCredits = formatPlatformCreditsDisplay(l.creditsCharged);
@@ -833,10 +852,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               const requestId = formatLogMonospaceId(l.vendorRequestId);
               const vendorTaskId = formatLogMonospaceId(l.externalTaskId);
               const appTask = formatLogAppTaskCell(l);
-              const queueCell = formatLogTimingPhaseCell(l.queueMs, "queue");
-              const generateCell = formatLogTimingPhaseCell(l.generateMs, "generate");
-              const pollCell = formatLogTimingPhaseCell(l.pollDelayMs, "poll", {
-                overLimit: l.pollDelayOverLimit,
+              const queueCell = formatLogTimingPhaseCell(queueMs, "queue");
+              const generateCell = formatLogTimingPhaseCell(generateMs, "generate");
+              const pollDelayMs = liveVolc?.pollDelayMs ?? l.pollDelayMs;
+              const pollCell = formatLogTimingPhaseCell(pollDelayMs, "poll", {
+                overLimit:
+                  pollDelayMs != null &&
+                  pollDelayMs > 10_000,
               });
               const progressLabel = isInProgress
                 ? pickLogProgressLabel(l.status, l.resultSummary)

@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       userId: auth.userId,
       externalTaskId: taskId,
     },
+    orderBy: { submittedAt: "desc" },
   });
 
   const credentialId =

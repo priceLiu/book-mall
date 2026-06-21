@@ -102,6 +102,7 @@ export async function pollVolcengineVideoTaskForLog(opts: {
       completedAt: true,
       resultSummary: true,
       status: true,
+      lastPolledAt: true,
     },
   });
   if (!log) return "done";
