@@ -21,6 +21,12 @@ import {
 } from "@/lib/canvas/pro2-text-purpose";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
+import {
+  buildLibtvRuntimeErrorAlertKey,
+  libtvRuntimeErrorAlertScope,
+  markLibtvRuntimeErrorAlertShown,
+  shouldShowLibtvRuntimeErrorAlert,
+} from "@/lib/canvas/libtv-runtime-error-alert";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { Pro2TextNodeEnginePickers } from "./pro2-text-node-engine-pickers";
 import { RF_FORM_CONTROL, RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
@@ -90,15 +96,41 @@ export function Pro2StarterInputDock() {
 
   useEffect(() => {
     if (!isStoryOutlineMode || !outlineErrorMessage || !storeNode) return;
-    const key = `${storeNode.id}:${d.themeOutlineRuntime?.taskId ?? ""}:${outlineErrorMessage}`;
+    const taskId = d.themeOutlineRuntime?.taskId?.trim();
+    const storageKey = buildLibtvRuntimeErrorAlertKey({
+      scope: libtvRuntimeErrorAlertScope(),
+      nodeId: storeNode.id,
+      taskId,
+      failCode: d.themeOutlineRuntime?.failCode,
+      failMessage: outlineErrorMessage,
+    });
+    if (
+      !shouldShowLibtvRuntimeErrorAlert({
+        taskId,
+        dismissedFailTaskId: d.themeOutlineRuntime?.dismissedFailTaskId,
+        storageKey,
+      })
+    ) {
+      return;
+    }
+    const key = storageKey;
     if (lastAlertedErrorRef.current === key) return;
     lastAlertedErrorRef.current = key;
+    markLibtvRuntimeErrorAlertShown(storageKey);
     void alert({
       title: "大纲生成失败",
       message: outlineErrorMessage,
       variant: "error",
     });
-  }, [isStoryOutlineMode, outlineErrorMessage, storeNode, d.themeOutlineRuntime?.taskId, alert]);
+  }, [
+    isStoryOutlineMode,
+    outlineErrorMessage,
+    storeNode,
+    d.themeOutlineRuntime?.taskId,
+    d.themeOutlineRuntime?.failCode,
+    d.themeOutlineRuntime?.dismissedFailTaskId,
+    alert,
+  ]);
 
   const onSaveGeneralText = useCallback(() => {
     if (!storeNode) return;

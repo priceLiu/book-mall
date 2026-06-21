@@ -5,6 +5,7 @@ import {
   BYOK_SCOPE_PERSONAL,
   DEFAULT_BYOK_QUOTAS,
   buildByokIncludedUsageFromQuotas,
+  byokOverageCreditPool,
   hasVideoAttachmentInChatInput,
   mapLogToByokTaskKind,
   normalizeByokFeeDescription,
@@ -128,5 +129,18 @@ describe("normalizeByokQuotaSettlementSnapshot — 试衣并入文生图", () =>
     expect(text).toContain("文生图（含试衣）");
     expect(text).toContain("套餐剩余 129");
     expect(text).not.toContain("AI试衣");
+  });
+});
+
+describe("byokOverageCreditPool", () => {
+  it("video task kinds use VIDEO pool", () => {
+    expect(byokOverageCreditPool("IMAGE_TO_VIDEO")).toBe("VIDEO");
+    expect(byokOverageCreditPool("VIDEO_TO_VIDEO")).toBe("VIDEO");
+  });
+
+  it("non-video task kinds use GENERAL pool", () => {
+    expect(byokOverageCreditPool("TEXT_TO_IMAGE")).toBe("GENERAL");
+    expect(byokOverageCreditPool("VIDEO_UNDERSTANDING")).toBe("GENERAL");
+    expect(byokOverageCreditPool("TTS")).toBe("GENERAL");
   });
 });

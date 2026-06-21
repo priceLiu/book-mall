@@ -31,6 +31,15 @@ export const BYOK_TASK_KIND_LABEL: Record<ByokTaskKind, string> = {
   TTS: "TTS / 语音",
 };
 
+/** BYOK 超额扣次使用的积分池：视频类走 VIDEO 加量包，其余走 GENERAL 轻量包。 */
+export function byokOverageCreditPool(
+  taskKind: ByokTaskKind,
+): "GENERAL" | "VIDEO" {
+  return taskKind === "IMAGE_TO_VIDEO" || taskKind === "VIDEO_TO_VIDEO"
+    ? "VIDEO"
+    : "GENERAL";
+}
+
 /** 迁移前独立 TRYON 额度快照（已并入 TEXT_TO_IMAGE，勿再单独计费）。 */
 export const LEGACY_TRYON_QUOTA_MONTHLY = {
   personal: 30,

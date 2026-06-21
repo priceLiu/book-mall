@@ -5,6 +5,7 @@ import {
   BYOK_SCOPE_PERSONAL,
   BYOK_SCOPE_TEAM_SEAT,
   BYOK_TEAM_MIN_SEATS,
+  byokOverageCreditPool,
   mapLogToByokTaskKind,
 } from "@/lib/billing/byok-pricing";
 import { assertActiveByokSubscription } from "@/lib/billing/byok-subscription-service";
@@ -72,7 +73,7 @@ async function loadQuota(scopeKey: string, taskKind: ByokTaskKind) {
   });
 }
 
-/** BYOK 发起前：若将超额，检查轻量包（通用池）余额是否足够。 */
+/** BYOK 发起前：若将超额，检查对应积分池余额（视频 → VIDEO 加量包，其余 → GENERAL 轻量包）。 */
 export async function assertByokQuotaBeforeGenerate(input: {
   tenantId?: string | null;
   actorBookUserId?: string | null;
@@ -115,9 +116,11 @@ export async function assertByokQuotaBeforeGenerate(input: {
 
   if (used < limit) return;
 
+  const pool = byokOverageCreditPool(taskKind);
   const pools = await getPoolBalances(ref);
   const needed = quota.overageCredits;
-  const available = pools.general.balance;
+  const available =
+    pool === "VIDEO" ? pools.video.balance : pools.general.balance;
   if (available < needed) {
     throw new InsufficientCreditsError(
       available,
@@ -341,10 +344,11 @@ export async function settleByokOverage(log: GatewayRequestLog): Promise<ByokOve
   });
 
   if (result.creditsCharged > 0) {
+    const overagePool = byokOverageCreditPool(taskKind);
     const consumeRes = await consumeCredits({
       ref: target.ref,
       credits: result.creditsCharged,
-      pool: "GENERAL",
+      pool: overagePool,
       actorUserId: target.actorUserId,
       seatId: target.seatId,
       gatewayLogId: log.id,

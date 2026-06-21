@@ -46,6 +46,12 @@ import { Pro2NodeSidePlus } from "../pro2/pro2-node-side-plus";
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import { LibtvNodeErrorBanner } from "../libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
+import {
+  buildLibtvRuntimeErrorAlertKey,
+  libtvRuntimeErrorAlertScope,
+  markLibtvRuntimeErrorAlertShown,
+  shouldShowLibtvRuntimeErrorAlert,
+} from "@/lib/canvas/libtv-runtime-error-alert";
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const { alert } = useDialogs();
@@ -80,9 +86,27 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     if (d.runtime?.status !== "error") return;
     const msg = d.runtime.failMessage?.trim();
     if (!msg) return;
-    const sig = `${d.runtime.taskId ?? ""}:${d.runtime.failCode ?? ""}:${msg}`;
+    const taskId = d.runtime.taskId?.trim();
+    const storageKey = buildLibtvRuntimeErrorAlertKey({
+      scope: libtvRuntimeErrorAlertScope(),
+      nodeId: id,
+      taskId,
+      failCode: d.runtime.failCode,
+      failMessage: msg,
+    });
+    if (
+      !shouldShowLibtvRuntimeErrorAlert({
+        taskId,
+        dismissedFailTaskId: d.runtime.dismissedFailTaskId,
+        storageKey,
+      })
+    ) {
+      return;
+    }
+    const sig = `${storageKey}`;
     if (lastAlertedErrorRef.current === sig) return;
     lastAlertedErrorRef.current = sig;
+    markLibtvRuntimeErrorAlertShown(storageKey);
     void alert({
       title: "视频生成失败",
       message: msg,
@@ -90,10 +114,12 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     });
   }, [
     alert,
+    id,
     d.runtime?.status,
     d.runtime?.taskId,
     d.runtime?.failCode,
     d.runtime?.failMessage,
+    d.runtime?.dismissedFailTaskId,
   ]);
 
   const videoUrl =
