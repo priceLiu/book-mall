@@ -54,6 +54,11 @@ export function getGenerationPollMaxDurationSec(): number {
   return readPositiveInt("GENERATION_POLL_MAX_DURATION_SEC", 300);
 }
 
+/** 生成耗时预警阈值 ms（默认 800s；列表「预警」Tab + poll 升格） */
+export function getGenerationSlowWarnMs(): number {
+  return readPositiveInt("GENERATION_SLOW_WARN_MS", 800_000);
+}
+
 /** 团队 Gateway/视频并发全局上限（覆盖套餐档 35 封顶；如 100、200） */
 export function getTeamMaxConcurrencyCap(): number | null {
   const raw = Number(process.env.TEAM_MAX_CONCURRENCY_CAP ?? "");

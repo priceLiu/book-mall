@@ -73,7 +73,13 @@ import {
   extractVolcengineVideoUrlFromGatewaySummary,
   patchCanvasProjectNodeRuntimeFromTask,
 } from "@/lib/canvas/canvas-volcengine-recover";
-import { getGenerationPollInnerTimeoutMs } from "@/lib/generation/poll-config";
+import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
+import { isCanvasVolcengineVideoTaskPayload } from "@/lib/canvas/canvas-constants";
+import { getGenerationPollInnerTimeoutMs, getGenerationSlowWarnMs } from "@/lib/generation/poll-config";
+import {
+  escalateSlowCanvasSubmittedTasks,
+  isSlowGenerationAge,
+} from "@/lib/generation/slow-generation";
 import {
   buildCanvasPollErrorPatch,
   buildCanvasTimeoutFailFields,
@@ -1062,10 +1068,18 @@ function shouldDeferPollSyncGatewaySubmit(
   return Date.now() - task.createdAt.getTime() < SYNC_GATEWAY_SUBMIT_GRACE_MS;
 }
 
-/** SUBMITTED 异步出图：固定短间隔，避免指数退避拖到 60s 才同步 KIE 结果 */
+/** SUBMITTED 异步出图：固定短间隔；超 800s 预警任务每轮必 poll */
 function shouldPollSubmittedNow(
-  task: Pick<CanvasGenerationTask, "lastPolledAt">,
+  task: Pick<
+    CanvasGenerationTask,
+    "lastPolledAt" | "submittedAt" | "createdAt"
+  >,
 ): boolean {
+  if (
+    isSlowGenerationAge(task.submittedAt, task.createdAt)
+  ) {
+    return true;
+  }
   if (!task.lastPolledAt) return true;
   return Date.now() - task.lastPolledAt.getTime() >= 3_000;
 }
@@ -1154,6 +1168,25 @@ async function pollOneSubmittedCanvasTask(
       },
     });
     return "failed";
+  }
+
+  if (
+    isSlowGenerationAge(task.submittedAt, task.createdAt) &&
+    isCanvasVolcengineVideoTaskPayload(payload)
+  ) {
+    const recovered = await recoverCanvasVideoTaskDisplay(task.id);
+    if (recovered.ok && recovered.action !== "noop" && recovered.action !== "failed") {
+      const afterRecover = await prisma.canvasGenerationTask.findUnique({
+        where: { id: task.id },
+        select: { status: true },
+      });
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+      });
+      if (afterRecover?.status === "SUCCEEDED") return "succeeded";
+      if (afterRecover?.status === "FAILED") return "failed";
+    }
   }
 
   const providerKind = gatewayProviderKindFromPayload(payload);
@@ -1403,6 +1436,10 @@ export async function runCanvasPollWorker(opts?: {
   const projectFilter = opts?.projectId ? { projectId: opts.projectId } : {};
 
   await dispatchQueuedCanvasTasks({ projectId: opts?.projectId }).catch(() => undefined);
+
+  if (!opts?.projectId) {
+    await escalateSlowCanvasSubmittedTasks({ limit: 10 }).catch(() => undefined);
+  }
 
   // 1) PENDING（KIE createTask 失败 / 中断）：仅 IMAGE 异步出图重试
   const pendings = await prisma.canvasGenerationTask.findMany({
@@ -1694,14 +1731,27 @@ export async function runCanvasPollWorker(opts?: {
 
   for (let pass = 0; pass < maxPasses && Date.now() < deadline; pass++) {
     const fetchSize = scaledPoll ? pollShardOverFetchSize(pollBatch) : pollBatch;
+    const slowCutoff = new Date(Date.now() - getGenerationSlowWarnMs());
     const candidates = await prisma.canvasGenerationTask.findMany({
       where: { status: "SUBMITTED", kieTaskId: { not: null }, ...projectFilter },
-      orderBy: { lastPolledAt: { sort: "asc", nulls: "first" } },
+      orderBy: [
+        { submittedAt: "asc" },
+        { lastPolledAt: { sort: "asc", nulls: "first" } },
+      ],
       take: fetchSize,
       include: { project: { select: { userId: true } } },
     });
     const submitted = scaledPoll
-      ? selectPollShardTasks(candidates, pollBatch)
+      ? selectPollShardTasks(
+          [...candidates].sort((a, b) => {
+            const aSlow =
+              (a.submittedAt ?? a.createdAt) <= slowCutoff ? 0 : 1;
+            const bSlow =
+              (b.submittedAt ?? b.createdAt) <= slowCutoff ? 0 : 1;
+            return aSlow - bSlow;
+          }),
+          pollBatch,
+        )
       : candidates;
     if (submitted.length === 0) break;
 

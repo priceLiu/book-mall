@@ -6,6 +6,8 @@
  */
 import type { GatewayRequestStatus, Prisma } from "@prisma/client";
 
+import { buildSlowGenerationWhere } from "@/lib/generation/slow-generation";
+
 import { phoneFromGatewayEmail } from "@/lib/auth/user-display";
 import { canViewFinanceCost } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -37,6 +39,8 @@ export type GatewayLogFilterInput = {
   credentialId?: string;
   clientSource?: string;
   creditsChargedGt?: number;
+  /** 耗时 ≥ GENERATION_SLOW_WARN_MS（默认 800s）或进行中已超该阈值 */
+  slowWarn?: boolean;
 };
 
 /** 与 credit-account-service UsageQuery 对齐的过滤器（范围 + 时间/模型/source） */
@@ -241,6 +245,10 @@ export function mergeGatewayLogFilters(
     extra.creditsCharged = { gt: filters.creditsChargedGt };
   }
   if (Object.keys(extra).length > 0) parts.push(extra);
+
+  if (filters.slowWarn) {
+    parts.push(buildSlowGenerationWhere());
+  }
 
   if (filters.model) {
     parts.push({
