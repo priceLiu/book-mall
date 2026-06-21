@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
@@ -74,6 +74,27 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
   });
+
+  const lastAlertedErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (d.runtime?.status !== "error") return;
+    const msg = d.runtime.failMessage?.trim();
+    if (!msg) return;
+    const sig = `${d.runtime.taskId ?? ""}:${d.runtime.failCode ?? ""}:${msg}`;
+    if (lastAlertedErrorRef.current === sig) return;
+    lastAlertedErrorRef.current = sig;
+    void alert({
+      title: "视频生成失败",
+      message: msg,
+      variant: "error",
+    });
+  }, [
+    alert,
+    d.runtime?.status,
+    d.runtime?.taskId,
+    d.runtime?.failCode,
+    d.runtime?.failMessage,
+  ]);
 
   const videoUrl =
     d.runtime?.ossUrl ??

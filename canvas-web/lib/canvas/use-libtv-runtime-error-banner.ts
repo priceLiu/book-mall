@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "./store";
 import type { CanvasNodeRuntime } from "./types";
 
-/** LibTV 媒体节点 · 生成失败条默认自动收起时长 */
-export const LIBTV_RUNTIME_ERROR_AUTO_DISMISS_MS = 12_000;
+/** @deprecated 错误条改为仅手动关闭，避免用户错过失败原因 */
+export const LIBTV_RUNTIME_ERROR_AUTO_DISMISS_MS = 0;
 
 export function useLibtvRuntimeErrorBanner(opts: {
   nodeId: string;
@@ -61,11 +61,11 @@ export function useLibtvRuntimeErrorBanner(opts: {
     }
     setMessage(msg);
     setVisible(true);
-    const timer = window.setTimeout(
-      () => dismissRef.current(),
-      opts.autoDismissMs ?? LIBTV_RUNTIME_ERROR_AUTO_DISMISS_MS,
-    );
-    return () => window.clearTimeout(timer);
+    const autoDismissMs = opts.autoDismissMs ?? LIBTV_RUNTIME_ERROR_AUTO_DISMISS_MS;
+    if (autoDismissMs > 0) {
+      const timer = window.setTimeout(() => dismissRef.current(), autoDismissMs);
+      return () => window.clearTimeout(timer);
+    }
   }, [
     opts.status,
     opts.taskId,

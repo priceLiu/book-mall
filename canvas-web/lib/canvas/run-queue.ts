@@ -1161,6 +1161,11 @@ export function useCanvasRunner(
             failMessage: gwMsg,
           });
         }
+        window.dispatchEvent(
+          new CustomEvent("canvas:generation-blocked", {
+            detail: { nodeId: job.nodeId, message: gwMsg },
+          }),
+        );
         return;
       }
       const key = runKey(job);

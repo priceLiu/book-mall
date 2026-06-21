@@ -96,6 +96,21 @@ function Inner({ projectId }: { projectId: string }) {
   useEffect(() => {
     prefetchUserProviders(base);
   }, [base]);
+
+  useEffect(() => {
+    const onBlocked = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ message?: string }>).detail;
+      const message = detail?.message?.trim();
+      if (!message) return;
+      void dialogs.alert({
+        title: "无法生成",
+        message,
+        variant: "warning",
+      });
+    };
+    window.addEventListener("canvas:generation-blocked", onBlocked);
+    return () => window.removeEventListener("canvas:generation-blocked", onBlocked);
+  }, [dialogs]);
   const hydrate = useCanvasStore((s) => s.hydrate);
   const toGraph = useCanvasStore((s) => s.toGraph);
   const addNode = useCanvasStore((s) => s.addNode);
