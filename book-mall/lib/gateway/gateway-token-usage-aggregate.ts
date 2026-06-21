@@ -2,7 +2,7 @@
  * Gateway 日志用量聚合 — 财务团队/个人列表唯一归口。
  * 按七类计费单位统计：图/试衣=张，视频=秒，文字/TTS/视频理解=千 Token。
  */
-import type { BillingCategory, GatewayRequestLog, Prisma } from "@prisma/client";
+import type { BillingCategory, GatewayRequestLog, GatewayRequestStatus, Prisma } from "@prisma/client";
 
 import {
   BILLING_CATEGORY_ORDER,
@@ -15,7 +15,15 @@ import {
   resolveBillableImageCountFromLog,
   resolveBillableVideoSecondsFromLog,
 } from "@/lib/gateway/log-billing-metrics";
-import { buildGatewayLogWhereForTeamTenant } from "@/lib/gateway/log-query-scope";
+import {
+  buildTeamGatewayUsageWhere,
+  loadTeamGatewayScopeContext,
+  resolveTeamTenantIdsForGatewayLog,
+} from "@/lib/gateway/log-query-scope";
+import {
+  buildFinancePeriodSubmittedAt,
+  FINANCE_USAGE_AGGREGATE_STATUS,
+} from "@/lib/gateway/finance-log-query";
 import { prisma } from "@/lib/prisma";
 
 /** 与 finance-web FinanceGatewayUsage 字段对齐。 */
@@ -65,6 +73,8 @@ const GATEWAY_USAGE_LOG_SELECT = {
   metricsSource: true,
   tenantId: true,
   actorBookUserId: true,
+  apiKeyId: true,
+  clientPage: true,
 } satisfies Prisma.GatewayRequestLogSelect;
 
 export type GatewayTokenLogRow = Pick<
@@ -230,10 +240,35 @@ export function aggregateGatewayTokenUsageFromLogs(
 
 export async function fetchGatewayTokenUsage(where: Prisma.GatewayRequestLogWhereInput) {
   const logs = await prisma.gatewayRequestLog.findMany({
-    where: { AND: [where, { status: "SUCCEEDED" }] },
+    where: {
+      AND: [where, { status: FINANCE_USAGE_AGGREGATE_STATUS }],
+    },
     select: GATEWAY_USAGE_LOG_SELECT,
   });
   return aggregateGatewayTokenUsageFromLogs(logs);
+}
+
+/** 团队 scope 成功日志 — 财务列表 / 团队驾驶舱用量唯一取数入口 */
+export async function fetchTeamGatewayUsageLogs(input: {
+  tenantIds: string[];
+  submittedFrom?: Date;
+  submittedBefore?: Date;
+  submittedTo?: Date;
+  status?: GatewayRequestStatus;
+}): Promise<GatewayTokenLogRow[]> {
+  const where = await buildTeamGatewayUsageWhere({
+    tenantIds: input.tenantIds,
+    filters: {
+      submittedFrom: input.submittedFrom,
+      submittedBefore: input.submittedBefore,
+      submittedTo: input.submittedTo,
+      status: input.status ?? FINANCE_USAGE_AGGREGATE_STATUS,
+    },
+  });
+  return prisma.gatewayRequestLog.findMany({
+    where,
+    select: GATEWAY_USAGE_LOG_SELECT,
+  });
 }
 
 export async function fetchTeamGatewayTokenUsage(input: {
@@ -241,12 +276,12 @@ export async function fetchTeamGatewayTokenUsage(input: {
   submittedFrom: Date;
   submittedTo: Date;
 }) {
-  const where = await buildGatewayLogWhereForTeamTenant(input.tenantId, {
+  const logs = await fetchTeamGatewayUsageLogs({
+    tenantIds: [input.tenantId],
     submittedFrom: input.submittedFrom,
-    submittedTo: input.submittedTo,
-    status: "SUCCEEDED",
+    submittedBefore: input.submittedTo,
   });
-  return fetchGatewayTokenUsage(where);
+  return aggregateGatewayTokenUsageFromLogs(logs);
 }
 
 export async function fetchUserGatewayTokenUsage(input: {
@@ -255,11 +290,17 @@ export async function fetchUserGatewayTokenUsage(input: {
   submittedTo: Date;
 }) {
   const where: Prisma.GatewayRequestLogWhereInput = {
-    actorBookUserId: input.bookUserId,
-    submittedAt: { gte: input.submittedFrom, lt: input.submittedTo },
-    status: "SUCCEEDED",
+    AND: [
+      { actorBookUserId: input.bookUserId },
+      buildFinancePeriodSubmittedAt(input.submittedFrom, input.submittedTo),
+      { status: FINANCE_USAGE_AGGREGATE_STATUS },
+    ],
   };
-  return fetchGatewayTokenUsage(where);
+  const logs = await prisma.gatewayRequestLog.findMany({
+    where,
+    select: GATEWAY_USAGE_LOG_SELECT,
+  });
+  return aggregateGatewayTokenUsageFromLogs(logs);
 }
 
 export async function batchAggregateTeamGatewayTokenUsage(input: {
@@ -273,29 +314,11 @@ export async function batchAggregateTeamGatewayTokenUsage(input: {
   }
   if (input.tenantIds.length === 0) return result;
 
-  const tenantIdSet = new Set(input.tenantIds);
-  const memberships = await prisma.tenantMember.findMany({
-    where: { tenantId: { in: input.tenantIds }, status: "ACTIVE" },
-    select: { tenantId: true, userId: true },
-  });
-  const memberIds = [...new Set(memberships.map((m) => m.userId))];
-  const teamsByUser = new Map<string, string[]>();
-  for (const m of memberships) {
-    const cur = teamsByUser.get(m.userId) ?? [];
-    cur.push(m.tenantId);
-    teamsByUser.set(m.userId, cur);
-  }
-
-  const logs = await prisma.gatewayRequestLog.findMany({
-    where: {
-      status: "SUCCEEDED",
-      submittedAt: { gte: input.submittedFrom, lt: input.submittedTo },
-      OR: [
-        { tenantId: { in: input.tenantIds } },
-        ...(memberIds.length > 0 ? [{ actorBookUserId: { in: memberIds } }] : []),
-      ],
-    },
-    select: GATEWAY_USAGE_LOG_SELECT,
+  const scopeCtx = await loadTeamGatewayScopeContext(input.tenantIds);
+  const logs = await fetchTeamGatewayUsageLogs({
+    tenantIds: input.tenantIds,
+    submittedFrom: input.submittedFrom,
+    submittedBefore: input.submittedTo,
   });
 
   const logsByTenant = new Map<string, GatewayTokenLogRow[]>();
@@ -304,15 +327,7 @@ export async function batchAggregateTeamGatewayTokenUsage(input: {
   }
 
   for (const log of logs) {
-    const targets = new Set<string>();
-    if (log.tenantId && tenantIdSet.has(log.tenantId)) {
-      targets.add(log.tenantId);
-    } else if (log.actorBookUserId) {
-      for (const tenantId of teamsByUser.get(log.actorBookUserId) ?? []) {
-        if (tenantIdSet.has(tenantId)) targets.add(tenantId);
-      }
-    }
-    for (const tenantId of targets) {
+    for (const tenantId of resolveTeamTenantIdsForGatewayLog(log, scopeCtx)) {
       logsByTenant.get(tenantId)?.push(log);
     }
   }
@@ -337,9 +352,11 @@ export async function batchAggregateUserGatewayTokenUsage(input: {
 
   const logs = await prisma.gatewayRequestLog.findMany({
     where: {
-      status: "SUCCEEDED",
-      submittedAt: { gte: input.submittedFrom, lt: input.submittedTo },
-      actorBookUserId: { in: input.bookUserIds },
+      AND: [
+        { actorBookUserId: { in: input.bookUserIds } },
+        buildFinancePeriodSubmittedAt(input.submittedFrom, input.submittedTo),
+        { status: FINANCE_USAGE_AGGREGATE_STATUS },
+      ],
     },
     select: GATEWAY_USAGE_LOG_SELECT,
   });

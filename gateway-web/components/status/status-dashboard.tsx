@@ -15,6 +15,7 @@ import {
 import {
   formatDurationSeconds,
   formatLogTimestamp,
+  isLogDateRangeInvalid,
   pickLogProgressLabel,
   resolveLogDurationMs,
 } from "@/lib/gateway-log-params";
@@ -116,10 +117,11 @@ type StatsAllResponse = StatsSummaryResponse &
   StatsCategoriesResponse &
   StatsModelsResponse;
 
-type InFlightLogsResponse = {
+type DetailLogsResponse = {
   logs: StatusLogRow[];
   total: number;
-  limit: number;
+  page: number;
+  totalPages: number;
 };
 
 type FilterState = {
@@ -331,7 +333,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const summaryPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inFlightPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const loadSeqRef = useRef(0);
+  const detailLoadSeqRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
   const inProgressCount = stats?.cards.inProgress ?? 0;
   const hasInFlight = inProgressCount > 0 || activeTab === "inProgress";
 
@@ -429,22 +434,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     async (opts?: { skipPoll?: boolean; poll?: boolean }) => {
       if (applied.scope === "team" && !applied.tenantId) return null;
 
-      if (activeTab === "inProgress") {
-        const qs = buildQueryString(applied, {
-          ...(opts?.poll ? { poll: "1" } : {}),
-          ...(opts?.skipPoll ? { skipPoll: "1" } : {}),
-        });
-        const res = await fetchJson<InFlightLogsResponse>(
-          `/api/book-mall/api/gateway/logs/in-flight?${qs}`,
-        );
-        if (res.ok) {
-          setLogs(res.data.logs ?? []);
-          setLogsTotal(res.data.total ?? 0);
-          setLogsTotalPages(1);
-        }
-        return res;
-      }
-
+      const seq = ++detailLoadSeqRef.current;
       const logsQs = buildQueryString(applied, {
         ...tabQuery,
         page: detailPage,
@@ -452,15 +442,17 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         skipPoll: opts?.skipPoll === false ? undefined : "1",
         ...(opts?.poll ? { poll: "1" } : {}),
       });
-      const res = await fetchJson<{
-        logs: StatusLogRow[];
-        total: number;
-        totalPages: number;
-      }>(`/api/book-mall/api/gateway/logs?${logsQs}`);
+      const res = await fetchJson<DetailLogsResponse>(
+        `/api/book-mall/api/gateway/logs?${logsQs}`,
+      );
+      if (seq !== detailLoadSeqRef.current) return res;
       if (res.ok) {
         setLogs(res.data.logs ?? []);
         setLogsTotal(res.data.total ?? 0);
         setLogsTotalPages(res.data.totalPages ?? 1);
+        if (typeof res.data.page === "number" && res.data.page !== detailPage) {
+          setDetailPage(res.data.page);
+        }
       }
       return res;
     },
@@ -570,6 +562,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     commitFilters({ ...filters, actorPhone: phoneDraft });
   };
 
+  const dateRangeInvalid = isLogDateRangeInvalid(
+    filters.fromDate,
+    filters.toDate,
+  );
+
   useEffect(() => {
     if (filters.scope !== "team" && filters.scope !== "actor") return;
     if (filters.scope === "team" && !filters.tenantId) return;
@@ -578,6 +575,20 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     }, 400);
     return () => window.clearTimeout(timer);
   }, [phoneDraft, filters.scope, filters.tenantId, commitFilters, filters]);
+
+  useEffect(() => {
+    if (dateRangeInvalid) return;
+    const timer = window.setTimeout(() => {
+      commitFilters({ ...filtersRef.current, actorPhone: phoneDraft });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [
+    filters.fromDate,
+    filters.toDate,
+    dateRangeInvalid,
+    commitFilters,
+    phoneDraft,
+  ]);
 
   const exportQueryString = buildQueryString(applied, {});
   const activeTabLabel =
@@ -729,9 +740,16 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           <select
             className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
             value={filters.hours}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, hours: e.target.value }))
-            }
+            onChange={(e) => {
+              const hours = e.target.value;
+              commitFilters({
+                ...filters,
+                hours,
+                fromDate: hours ? "" : filters.fromDate,
+                toDate: hours ? "" : filters.toDate,
+                actorPhone: phoneDraft,
+              });
+            }}
           >
             {HOUR_OPTIONS.map((o) => (
               <option key={o.value || "all"} value={o.value}>
@@ -741,31 +759,55 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           </select>
         </label>
 
-        {!filters.hours ? (
-          <>
-            <label className="flex flex-col gap-1 text-xs text-zinc-400">
-              起（UTC）
-              <input
-                type="date"
-                className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
-                value={filters.fromDate}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, fromDate: e.target.value }))
-                }
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-zinc-400">
-              止（UTC）
-              <input
-                type="date"
-                className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
-                value={filters.toDate}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, toDate: e.target.value }))
-                }
-              />
-            </label>
-          </>
+        <label className="flex flex-col gap-1 text-xs text-zinc-400">
+          起（UTC）
+          <input
+            type="date"
+            className="w-[148px] rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-sky-500/50 [color-scheme:dark]"
+            value={filters.fromDate}
+            max={filters.toDate || undefined}
+            onChange={(e) =>
+              setFilters((f) => ({
+                ...f,
+                hours: "",
+                fromDate: e.target.value,
+              }))
+            }
+            aria-label="开始日期 UTC"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-zinc-400">
+          止（UTC）
+          <input
+            type="date"
+            className="w-[148px] rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-sky-500/50 [color-scheme:dark]"
+            value={filters.toDate}
+            min={filters.fromDate || undefined}
+            onChange={(e) =>
+              setFilters((f) => ({
+                ...f,
+                hours: "",
+                toDate: e.target.value,
+              }))
+            }
+            aria-label="结束日期 UTC"
+          />
+        </label>
+        {filters.fromDate || filters.toDate ? (
+          <button
+            type="button"
+            className="mb-0.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200"
+            onClick={() =>
+              setFilters((f) => ({ ...f, hours: "", fromDate: "", toDate: "" }))
+            }
+          >
+            清除日期
+          </button>
+        ) : null}
+        {dateRangeInvalid ? (
+          <span className="mb-0.5 text-xs text-amber-400/90">
+            结束日期不能早于开始日期
+          </span>
         ) : null}
 
         <button
@@ -877,7 +919,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               key={tab.id}
               type="button"
               disabled={loading && !hasLoadedOnce}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setDetailPage(1);
+              }}
               className={`px-4 py-3 text-sm disabled:cursor-wait disabled:opacity-60 ${
                 activeTab === tab.id
                   ? "border-b-2 border-sky-500 text-white"
@@ -916,6 +961,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           >
             <thead>
               <tr className="border-b border-white/10 text-xs uppercase text-zinc-500">
+                <th className="w-12 px-4 py-3 text-right font-medium">#</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 {showFailColumns ? (
                   <>
@@ -956,7 +1002,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                   </td>
                 </tr>
               ) : (
-                logs.map((log) => {
+                logs.map((log, index) => {
+                  const rowNo = (detailPage - 1) * pageSize + index + 1;
                   const durationMs = resolveLogDurationMs(
                     log.durationMs,
                     log.submittedAt,
@@ -981,6 +1028,9 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                       key={log.id}
                       className="border-b border-white/5 hover:bg-white/[0.02]"
                     >
+                      <td className="px-4 py-3 text-right font-mono tabular-nums text-zinc-500">
+                        {rowNo}
+                      </td>
                       <td className="px-4 py-3">
                         <LogStatusBadge
                           status={log.status as "PENDING"}

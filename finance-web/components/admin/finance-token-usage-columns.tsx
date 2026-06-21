@@ -58,7 +58,7 @@ export function FinanceTokenUsageCell({
           : "本月成功 Gateway 调用用量"
       }
     >
-      {value > 0 ? fmtUsage(value) : "—"}
+      {fmtUsage(value)}
     </span>
   );
 }
@@ -122,7 +122,7 @@ export function FinanceTokenUsageSummaryPanel({
                   key={col.key}
                   className="border border-[#e8e8e8] px-3 py-2 text-right font-mono tabular-nums"
                 >
-                  {usage[col.key] > 0 ? fmtUsage(usage[col.key]) : "—"}
+                  {fmtUsage(usage[col.key] ?? 0)}
                 </td>
               ))}
             </tr>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { FinancePageShell, FinancePageState } from "@/components/finance-page-shell";
 import {
@@ -11,6 +11,16 @@ import {
 } from "@/components/admin/finance-token-usage-columns";
 import { financeApiFetch } from "@/lib/finance-viewer";
 import { formatUserCellPrimary } from "@/lib/user-contact-display";
+
+function recentPeriodKeys(count = 6): string[] {
+  const now = new Date();
+  const out: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+  }
+  return out;
+}
 
 type TeamRow = {
   tenantId: string;
@@ -56,15 +66,19 @@ function fmtDate(iso: string) {
 
 export function AdminTeamsClient() {
   const base = useBookMallBaseUrl();
+  const periods = useMemo(() => recentPeriodKeys(), []);
+  const [periodKey, setPeriodKey] = useState(periods[0] ?? "");
   const [data, setData] = useState<TeamsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    if (!base) return;
-    financeApiFetch<TeamsResponse>(base, "/api/finance/admin/teams").then((r) =>
-      r.ok ? setData(r.data) : setError(r.error),
-    );
-  }, [base]);
+    if (!base || !periodKey) return;
+    setError(null);
+    financeApiFetch<TeamsResponse>(
+      base,
+      `/api/finance/admin/teams?periodKey=${encodeURIComponent(periodKey)}`,
+    ).then((r) => (r.ok ? setData(r.data) : setError(r.error)));
+  }, [base, periodKey]);
 
   useEffect(() => {
     load();
@@ -75,11 +89,28 @@ export function AdminTeamsClient() {
 
   return (
     <FinancePageShell>
-      <header>
-        <h1 className="text-lg font-medium text-[#262626]">团队列表</h1>
-        <p className="mt-1 text-sm text-[#8c8c8c]">
-          账期 {data.periodKey} · 共 {data.total} 个团队 · 「套餐总积分」含通用+视频池月发放；「剩余积分」为两池可用余额合计；Gateway 用量列按张/秒/千Token 汇总（与账单计费单位一致）
-        </p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-medium text-[#262626]">团队列表</h1>
+          <p className="mt-1 text-sm text-[#8c8c8c]">
+            账期 {data.periodKey} · 共 {data.total} 个团队 · Gateway 用量与状态驾驶舱「团队 +
+            同一账期」同源；全站文生图/试衣见「用户列表」，人像入库归「其他 · 次」
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-[#595959]">
+          <span>账期</span>
+          <select
+            value={periodKey}
+            onChange={(e) => setPeriodKey(e.target.value)}
+            className="rounded border border-[#d9d9d9] bg-white px-2 py-1"
+          >
+            {periods.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </label>
       </header>
 
       <section className="overflow-x-auto rounded border border-[#e8e8e8] bg-white">
