@@ -2,16 +2,20 @@
  * Gateway 日志 · 火山视频任务耗时拆分（排队 / 生成 / 轮询延迟）
  *
  * - 排队：Gateway submittedAt → 首次观测到 running（或进行中 queued 段）
- * - 生成：首次 running → 厂商 updated_at（成功）或当前时刻（进行中）
+ * - 生成：首次 running → 厂商 updated_at（进行中亦以厂商时间为准，不随页面刷新虚增）
  * - 轮询延迟：厂商 updated_at → Gateway completedAt（应 ≤10s）
  */
 
 export const GATEWAY_POLL_DELAY_LIMIT_MS = 10_000;
+/** 厂商 updated_at 连续停更超过此阈值且仍为 running → 判定卡死 */
+export const VOLCENGINE_VENDOR_UPDATED_STALE_MS = 10 * 60 * 1000;
 
 export type VolcengineTimingTrace = {
   kind: "volcengine_timing";
   vendorCreatedAtMs?: number;
   vendorUpdatedAtMs?: number;
+  /** 首次观测到 vendor updated_at 不再变化的时刻（连续 poll 回包相同 updated_at） */
+  vendorUpdatedStaleSinceMs?: number;
   firstQueuedAtMs?: number;
   firstRunningAtMs?: number;
   vendorSucceededAtMs?: number;
@@ -118,7 +122,14 @@ export function mergeVolcengineTimingTrace(
     trace.vendorCreatedAtMs = trace.vendorCreatedAtMs ?? createdAtMs;
   }
   if (updatedAtMs != null) {
-    trace.vendorUpdatedAtMs = updatedAtMs;
+    const prevUpdated = trace.vendorUpdatedAtMs;
+    if (prevUpdated != null && updatedAtMs === prevUpdated) {
+      trace.vendorUpdatedStaleSinceMs =
+        trace.vendorUpdatedStaleSinceMs ?? now;
+    } else {
+      trace.vendorUpdatedAtMs = updatedAtMs;
+      trace.vendorUpdatedStaleSinceMs = undefined;
+    }
   }
 
   if (status === "queued" && trace.firstQueuedAtMs == null) {
@@ -168,7 +179,7 @@ export function computeVolcengineTimingBreakdown(input: {
   }
 
   let generateMs: number | null = null;
-  if (firstRunning != null && vendorUpdated != null && isTerminal) {
+  if (firstRunning != null && vendorUpdated != null) {
     generateMs = Math.max(0, vendorUpdated - firstRunning);
   } else if (firstRunning != null && !isTerminal) {
     generateMs = Math.max(0, now - firstRunning);
@@ -241,4 +252,23 @@ export function resolveVolcengineLogTiming(input: {
 
   if (!input.completedAt) return live;
   return stored ?? live;
+}
+
+const VENDOR_IN_PROGRESS_STATUSES = new Set([
+  "queued",
+  "running",
+  "processing",
+  "pending",
+]);
+
+/** 厂商 updated_at 停更且任务仍为进行中 → 卡死 */
+export function isVolcengineVendorUpdatedStale(
+  trace: VolcengineTimingTrace,
+  nowMs: number = Date.now(),
+  staleMs: number = VOLCENGINE_VENDOR_UPDATED_STALE_MS,
+): boolean {
+  if (trace.vendorUpdatedStaleSinceMs == null) return false;
+  const status = normalizeStatus(trace.lastStatus);
+  if (!VENDOR_IN_PROGRESS_STATUSES.has(status)) return false;
+  return nowMs - trace.vendorUpdatedStaleSinceMs >= staleMs;
 }

@@ -248,7 +248,7 @@ export async function GET(request: NextRequest) {
             resultSummary,
           });
         } else if (isVolcengineVideoTaskInProgress(row)) {
-          await persistVolcengineTimingOnPoll({
+          const { vendorStalled } = await persistVolcengineTimingOnPoll({
             log,
             vendorStatus,
             vendorRaw: polled.raw,
@@ -257,6 +257,14 @@ export async function GET(request: NextRequest) {
               status: vendorStatus,
             }),
           });
+          if (vendorStalled) {
+            return NextResponse.json({
+              code: 200,
+              data: row,
+              providerKind: "VOLCENGINE",
+              vendorStalled: true,
+            });
+          }
         }
       }
       return NextResponse.json({

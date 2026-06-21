@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeVolcengineTimingBreakdown,
+  isVolcengineVendorUpdatedStale,
   mergeVolcengineTimingTrace,
   resolveVolcengineLogTiming,
 } from "@/lib/gateway/log-volcengine-timing";
@@ -65,5 +66,65 @@ describe("log-volcengine-timing", () => {
         resultSummary: null,
       }),
     ).toBeNull();
+  });
+
+  it("in-flight generateMs follows vendor updated_at, not wall clock", () => {
+    const submittedAtMs = 1_000_000;
+    const firstRunningAtMs = 1_000_000 + 60_000;
+    const vendorUpdatedAtMs = 1_000_000 + 300_000;
+    const nowMs = 1_000_000 + 600_000;
+
+    const trace = mergeVolcengineTimingTrace(null, {
+      status: "running",
+      raw: {
+        created_at: submittedAtMs / 1000,
+        updated_at: vendorUpdatedAtMs / 1000,
+      },
+      polledAtMs: firstRunningAtMs,
+    });
+    const staleTrace = mergeVolcengineTimingTrace(trace, {
+      status: "running",
+      raw: { updated_at: vendorUpdatedAtMs / 1000 },
+      polledAtMs: nowMs,
+    });
+
+    const breakdown = computeVolcengineTimingBreakdown({
+      trace: staleTrace,
+      submittedAtMs,
+      completedAtMs: null,
+      nowMs,
+    });
+
+    expect(breakdown.generateMs).toBe(240_000);
+    expect(breakdown.generateMs).not.toBe(nowMs - firstRunningAtMs);
+  });
+
+  it("detects vendor updated_at stall after threshold", () => {
+    const vendorUpdatedAtMs = 1_000_000;
+    const firstPoll = mergeVolcengineTimingTrace(null, {
+      status: "running",
+      raw: { updated_at: vendorUpdatedAtMs / 1000 },
+      polledAtMs: vendorUpdatedAtMs,
+    });
+    const secondPoll = mergeVolcengineTimingTrace(firstPoll, {
+      status: "running",
+      raw: { updated_at: vendorUpdatedAtMs / 1000 },
+      polledAtMs: vendorUpdatedAtMs + 60_000,
+    });
+
+    expect(
+      isVolcengineVendorUpdatedStale(
+        secondPoll,
+        vendorUpdatedAtMs + 60_000,
+        10 * 60 * 1000,
+      ),
+    ).toBe(false);
+    expect(
+      isVolcengineVendorUpdatedStale(
+        secondPoll,
+        vendorUpdatedAtMs + 11 * 60 * 1000,
+        10 * 60 * 1000,
+      ),
+    ).toBe(true);
   });
 });

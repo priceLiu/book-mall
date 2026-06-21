@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { DashboardNav } from "@/components/dashboard-nav";
+import { GatewayDatabaseUnavailable } from "@/components/gateway-database-unavailable";
 import { LogoutButton } from "@/components/logout-button";
 import { gatewayJson } from "@/lib/gateway-api";
 
@@ -39,6 +40,16 @@ export default async function DashboardLayout({
       platformPoolDelegate?: { canonicalOwnerEmail: string } | null;
     } | null;
   }>("/api/gateway/auth/session");
+  if (session.status === 503) {
+    const msg =
+      session.data &&
+      typeof session.data === "object" &&
+      "message" in session.data &&
+      typeof (session.data as { message?: unknown }).message === "string"
+        ? (session.data as { message: string }).message
+        : undefined;
+    return <GatewayDatabaseUnavailable message={msg} />;
+  }
   if (!session.ok || !session.data?.user) {
     redirect("/login");
   }
