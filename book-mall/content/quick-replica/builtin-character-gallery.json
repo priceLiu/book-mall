@@ -1,0 +1,577 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-01",
+    "category": "character",
+    "kind": "create-character",
+    "title": "布莱克",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-01.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "布莱克",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-02",
+    "category": "character",
+    "kind": "create-character",
+    "title": "布拉姆",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-02.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "布拉姆",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 101,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-03",
+    "category": "character",
+    "kind": "create-character",
+    "title": "伊桑",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-03.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "伊桑",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 102,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-04",
+    "category": "character",
+    "kind": "create-character",
+    "title": "弗蕾雅",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-04.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "弗蕾雅",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 103,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-05",
+    "category": "character",
+    "kind": "create-character",
+    "title": "叮当",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-05.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "叮当",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 104,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-06",
+    "category": "character",
+    "kind": "create-character",
+    "title": "凯恩",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-06.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "凯恩",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 105,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-07",
+    "category": "character",
+    "kind": "create-character",
+    "title": "基拉",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-07.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "基拉",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 106,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-08",
+    "category": "character",
+    "kind": "create-character",
+    "title": "狮子座",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-08.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "狮子座",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 107,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-09",
+    "category": "character",
+    "kind": "create-character",
+    "title": "萝拉",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-09.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "萝拉",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 108,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-10",
+    "category": "character",
+    "kind": "create-character",
+    "title": "梅芙",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-10.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "梅芙",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 109,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-11",
+    "category": "character",
+    "kind": "create-character",
+    "title": "马库斯",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-11.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "马库斯",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 110,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-12",
+    "category": "character",
+    "kind": "create-character",
+    "title": "马洛",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-12.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "马洛",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 111,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-13",
+    "category": "character",
+    "kind": "create-character",
+    "title": "蒙蒙",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-13.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "蒙蒙",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 112,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-14",
+    "category": "character",
+    "kind": "create-character",
+    "title": "诺亚",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-14.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "诺亚",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 113,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-15",
+    "category": "character",
+    "kind": "create-character",
+    "title": "肉豆蔻",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-15.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "肉豆蔻",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 114,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-16",
+    "category": "character",
+    "kind": "create-character",
+    "title": "缟玛瑙",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-16.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "缟玛瑙",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 115,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-17",
+    "category": "character",
+    "kind": "create-character",
+    "title": "棱镜",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-17.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "棱镜",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 116,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-18",
+    "category": "character",
+    "kind": "create-character",
+    "title": "瑞文",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-18.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "瑞文",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 117,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-19",
+    "category": "character",
+    "kind": "create-character",
+    "title": "拉斯蒂",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-19.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "拉斯蒂",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 118,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-20",
+    "category": "character",
+    "kind": "create-character",
+    "title": "沙",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-20.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "沙",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 119,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-21",
+    "category": "character",
+    "kind": "create-character",
+    "title": "塔莎",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-21.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "塔莎",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 120,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-22",
+    "category": "character",
+    "kind": "create-character",
+    "title": "维拉",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-22.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "维拉",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 121,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-character-gallery-23",
+    "category": "character",
+    "kind": "create-character",
+    "title": "中提琴",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-character-gallery-23.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "中提琴",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 122,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  }
+]

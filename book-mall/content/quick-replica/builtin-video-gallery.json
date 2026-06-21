@@ -1,0 +1,602 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-01",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "体育场直播",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-01.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "体育场直播",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-01-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-02",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "肌肤光泽",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-02.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "肌肤光泽",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-02-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 101,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-03",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "花园回声",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-03.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "花园回声",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-03-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 102,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-04",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "龙之决斗",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-04.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "龙之决斗",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-04-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 103,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-05",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "街道流量",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-05.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "街道流量",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-05-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 104,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-06",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "面包工艺",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-06.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "面包工艺",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-06-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 105,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-07",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "皱纹消失",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-07.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "皱纹消失",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-07-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 106,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-08",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "午夜钥匙",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-08.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "午夜钥匙",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-08-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 107,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-09",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "复古饼干",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-09.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "复古饼干",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-09-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 108,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-10",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "Juicy Lips",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-10.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "Juicy Lips",
+        "locale": "en"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-10-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 109,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-11",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "激烈对峙",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-11.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "激烈对峙",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-11-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 110,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-12",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "动物追逐",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-12.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "动物追逐",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-12-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 111,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-13",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "冰锁",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-13.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "冰锁",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-13-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 112,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-14",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "爱情射击",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-14.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "爱情射击",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-14-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 113,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-15",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "深渊之战",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-15.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "深渊之战",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-15-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 114,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-16",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "黄金决斗",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-16.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "黄金决斗",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-16-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 115,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-17",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "风格大师",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-17.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "风格大师",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-17-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 116,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-18",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "刀锋华尔兹",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-18.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "刀锋华尔兹",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-18-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 117,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-19",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "霓虹浪人",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-19.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "霓虹浪人",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-19-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 118,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-video-gallery-20",
+    "category": "video",
+    "kind": "text-to-video",
+    "title": "奥里秀",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-20.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "奥里秀",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "grok-imagine/image-to-video",
+        "params": {}
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-video-gallery-20-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 119,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  }
+]

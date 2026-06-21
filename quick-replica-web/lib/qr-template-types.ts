@@ -137,6 +137,39 @@ export function getKindDef(kindId: string): QrKindDef | null {
   return null;
 }
 
+/** 右栏有独立 gallery 的子 kind（须预取 template cache，与 book-mall filterTemplatesForGallery 对齐） */
+export const QR_KIND_GALLERY_PREFETCH: ReadonlyArray<{
+  category: QrCategory;
+  kind: string;
+}> = [
+  { category: "video", kind: "motion-sync" },
+  /** 视频顶层 gallery 条目 kind 均为 text-to-video，选中该子类时须单独 cache key */
+  { category: "video", kind: "text-to-video" },
+];
+
+export function invalidateQrTemplateCacheForCategory(
+  cache: Map<string, QrTemplate[]>,
+  category: QrCategory,
+  scope = "all",
+): void {
+  const prefix = `${scope}|${category}`;
+  for (const key of cache.keys()) {
+    if (key === prefix || key.startsWith(`${prefix}|`)) {
+      cache.delete(key);
+    }
+  }
+}
+
+export function qrTemplateCacheKey(
+  scope: string,
+  category: QrCategory,
+  kind?: string | null,
+): string {
+  const parts = [scope, category];
+  if (kind) parts.push(kind);
+  return parts.join("|");
+}
+
 export function defaultWorkspaceDraft(input: {
   category: QrCategory;
   kind: string;

@@ -112,6 +112,13 @@ export function buildStyleLibraryOssKey(id: string, ext: string): string {
   return `canvas/style-library/${safeId}.${safeExt}`;
 }
 
+/** QuickReplica 内置模板预览图（固定 key） */
+export function buildQuickReplicaBuiltinOssKey(id: string, ext: string): string {
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeExt = ext.replace(/^\./, "").toLowerCase() || "webp";
+  return `quick-replica/builtin/${safeId}.${safeExt}`;
+}
+
 export function buildCanvasOssKey(
   kind: CanvasOssKind,
   args: { projectId?: string; userId?: string; ext: string },

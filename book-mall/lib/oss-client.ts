@@ -30,7 +30,10 @@ export function readOssEnv(): OssEnvConfig | { error: string } {
 }
 
 /** 运行时动态加载 ali-oss */
-export async function createOssClientFrom(cfg: OssEnvConfig) {
+export async function createOssClientFrom(
+  cfg: OssEnvConfig,
+  opts?: { timeoutMs?: number },
+) {
   const OSS = (await import("ali-oss")).default;
   return new OSS({
     accessKeyId: cfg.accessKeyId,
@@ -39,6 +42,7 @@ export async function createOssClientFrom(cfg: OssEnvConfig) {
     authorizationV4: true,
     bucket: cfg.bucket,
     secure: true,
+    timeout: opts?.timeoutMs ?? 60_000,
     ...(cfg.endpoint ? { endpoint: cfg.endpoint } : {}),
   });
 }

@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className={`${dmSans.variable} ${outfit.variable}`}>
       <body
-        className="min-h-dvh antialiased"
+        className="h-dvh overflow-hidden antialiased"
         style={{
           background: "var(--qr-bg-page)",
           color: "var(--qr-text-primary)",

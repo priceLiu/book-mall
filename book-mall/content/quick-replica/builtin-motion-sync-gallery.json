@@ -1,0 +1,762 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-01",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "南瓜舞",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-01.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-01-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "南瓜舞",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-01-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-02",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "表达挑战",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-02.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-02-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "表达挑战",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-02-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 101,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-03",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "动漫舞蹈",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-03.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-03-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "动漫舞蹈",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-03-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 102,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-04",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "摩托车舞",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-04.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-04-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "摩托车舞",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-04-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 103,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-05",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "热舞",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-05.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-05-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "热舞",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-05-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 104,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-06",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "病毒式舞蹈",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-06.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-06-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "病毒式舞蹈",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-06-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 105,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-07",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "新年舞蹈",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-07.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-07-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "新年舞蹈",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-07-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 106,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-08",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "财富在行动中",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-08.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-08-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "财富在行动中",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-08-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 107,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-09",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "超速驱动",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-09.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-09-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "超速驱动",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-09-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 108,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-10",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "爆米花",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-10.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-10-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "爆米花",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-10-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 109,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-11",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "蹦蹦舞",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-11.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-11-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "蹦蹦舞",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-11-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 110,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-12",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "爱情主题曲",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-12.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-12-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "爱情主题曲",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-12-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 111,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-13",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "好运之舞",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-13.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-13-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "好运之舞",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-13-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 112,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-14",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "爵士乐",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-14.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-14-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "爵士乐",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-14-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 113,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-15",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "武术",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-15.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-15-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "武术",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-15-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 114,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-16",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "可爱的舞蹈",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-16.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-16-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "可爱的舞蹈",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-16-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 115,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-17",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "香奈儿舞蹈",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-17.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-17-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "香奈儿舞蹈",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-17-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 116,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-18",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "炫酷舞",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-18.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-18-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "炫酷舞",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-18-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 117,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-19",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "跑步",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-19.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-19-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "跑步",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-19-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 118,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-motion-sync-gallery-20",
+    "category": "video",
+    "kind": "motion-sync",
+    "toolKey": "motion-sync",
+    "title": "中国趋势",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-20.jpg",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {
+        "referenceVideo": {
+          "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-20-video.mp4"
+        }
+      },
+      "prompt": {
+        "text": "中国趋势",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "VIDEO",
+        "modelKey": "kling-2.6/motion-control",
+        "params": {
+          "mode": "std",
+          "character_orientation": "video"
+        }
+      }
+    },
+    "output": {
+      "mediaType": "video",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-motion-sync-gallery-20-video.mp4",
+      "createdAt": "2026-06-20T00:00:00.000Z"
+    },
+    "sortOrder": 119,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  }
+]

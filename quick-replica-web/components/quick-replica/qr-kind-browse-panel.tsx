@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Pin } from "lucide-react";
 
+import { QrKindBrowseSkeleton } from "@/components/quick-replica/qr-panel-skeletons";
 import type { QrCategory, QrKindBrowseItem } from "@/lib/qr-template-types";
 import { QR_CATEGORIES, QR_PINNED_TOOLS } from "@/lib/qr-template-types";
 
@@ -32,32 +34,45 @@ function resolveKindMedia(item: QrKindBrowseItem): {
 function KindCard({
   item,
   selected,
+  galleryLoading,
   onSelect,
 }: {
   item: QrKindBrowseItem;
   selected: boolean;
+  galleryLoading?: boolean;
   onSelect: () => void;
 }) {
   const { imageUrl, videoUrl } = resolveKindMedia(item);
+  const [mediaReady, setMediaReady] = useState(false);
   const showPin =
     PINNED_KINDS.has(item.kind) ||
     item.featuredTemplate?.badges?.includes("pinned") ||
     Boolean(item.toolKey);
 
+  useEffect(() => {
+    setMediaReady(false);
+  }, [item.kind, imageUrl, videoUrl]);
+
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`qr-card group relative ${selected ? "qr-card-selected" : ""}`}
+      className={`qr-card group relative ${selected ? "qr-card-selected" : ""}${
+        selected && galleryLoading ? " qr-card-loading" : ""
+      }`}
     >
-      <div className="aspect-[4/3] w-full overflow-hidden bg-zinc-900">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-900">
+        {!mediaReady && (imageUrl || videoUrl) ? (
+          <div className="qr-skeleton absolute inset-0" aria-hidden />
+        ) : null}
         {videoUrl && !imageUrl ? (
           <video
             src={videoUrl}
             muted
             playsInline
             preload="metadata"
-            className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+            onLoadedData={() => setMediaReady(true)}
+            className={`h-full w-full object-cover transition group-hover:scale-[1.02]${mediaReady ? " opacity-100" : " opacity-0"}`}
           />
         ) : imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -66,7 +81,8 @@ function KindCard({
             alt={item.label}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+            onLoad={() => setMediaReady(true)}
+            className={`h-full w-full object-cover transition group-hover:scale-[1.02]${mediaReady ? " opacity-100" : " opacity-0"}`}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-zinc-600">
@@ -95,6 +111,7 @@ type Props = {
   items: QrKindBrowseItem[];
   selectedKind: string | null;
   loading: boolean;
+  templatesLoading?: boolean;
   emptyMessage?: string;
   onSelectKind: (kind: string) => void;
 };
@@ -104,38 +121,50 @@ export function QrKindBrowsePanel({
   items,
   selectedKind,
   loading,
+  templatesLoading = false,
   emptyMessage,
   onSelectKind,
 }: Props) {
   const categoryLabel = QR_CATEGORIES.find((c) => c.id === category)?.label ?? category;
+  const showSkeleton = loading && items.length === 0;
+  const showRefreshing = loading && items.length > 0;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="qr-panel-header">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="qr-panel-header shrink-0">
         <span>{categoryLabel}</span>
         {loading ? (
-          <span className="qr-panel-muted">加载中…</span>
+          <span className="qr-panel-muted animate-pulse">加载中…</span>
         ) : (
           <span className="qr-panel-muted">{items.length} 类</span>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {loading && items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-500">加载中…</p>
+      <div className="qr-scroll-panel relative min-h-0 flex-1 p-4">
+        {showSkeleton ? (
+          <QrKindBrowseSkeleton />
         ) : items.length === 0 ? (
           <p className="py-8 text-center text-sm text-zinc-500">
             {emptyMessage ?? "该分类暂无类型"}
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {items.map((item) => (
-              <KindCard
-                key={item.kind}
-                item={item}
-                selected={selectedKind === item.kind}
-                onSelect={() => onSelectKind(item.kind)}
-              />
-            ))}
+          <div
+            className={
+              showRefreshing ? "qr-panel-content-pending" : "qr-panel-content-ready"
+            }
+          >
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {items.map((item) => (
+                <KindCard
+                  key={item.kind}
+                  item={item}
+                  selected={selectedKind === item.kind}
+                  galleryLoading={
+                    selectedKind === item.kind && templatesLoading
+                  }
+                  onSelect={() => onSelectKind(item.kind)}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>

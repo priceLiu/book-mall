@@ -3053,6 +3053,10 @@ model QrTemplate {
   id                  String    @id @default(cuid())
   ownerUserId         String?
   ownerUser           User?     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  /// 覆盖同名内置模板 id（如 qr-image-gallery-01）
+  catalogBuiltinId    String?   @unique
+  /// 平台运营在管理后台维护的公开模板（非用户作品）
+  isPlatformCatalog   Boolean   @default(false)
   category            String
   kind                String
   toolKey             String?
@@ -3069,6 +3073,7 @@ model QrTemplate {
   updatedAt           DateTime  @updatedAt
 
   @@index([ownerUserId, category, kind, deletedAt])
+  @@index([isPlatformCatalog, visibility, deletedAt])
 }
 
 /// QuickReplica · 管理员推荐的 kind 分类示例（中栏缩略图）

@@ -58,6 +58,14 @@ body {
   height: 100%;
 }
 
+html {
+  overflow: hidden;
+}
+
+body {
+  overflow: hidden;
+}
+
 @layer components {
   .qr-btn-primary {
     @apply inline-flex items-center justify-center font-medium text-white transition;
@@ -144,6 +152,10 @@ body {
     outline-offset: 0;
   }
 
+  .qr-card-loading {
+    opacity: 0.72;
+  }
+
   .qr-input {
     @apply w-full outline-none transition;
     padding: 10px 14px;
@@ -194,5 +206,44 @@ body {
     font-weight: 500;
     color: var(--qr-text-secondary);
     line-height: 1.5;
+  }
+
+  /** 面板内唯一滚动区：预留滚动条槽位，避免滚动时宽度抖动 */
+  .qr-scroll-panel {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .qr-skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: qr-skeleton-shimmer 1.2s ease-in-out infinite;
+  }
+
+  .qr-panel-content-pending {
+    opacity: 0.45;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .qr-panel-content-ready {
+    opacity: 1;
+    transition: opacity 0.25s ease;
+  }
+
+  @keyframes qr-skeleton-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 }

@@ -1,0 +1,977 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-01",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 1",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-01.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 1",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-02",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 2",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-02.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 2",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 101,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-03",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 3",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-03.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 3",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 102,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-04",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 4",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-04.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 4",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 103,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-05",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 5",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-05.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 5",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 104,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-06",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 6",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-06.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 6",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 105,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-07",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 7",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-07.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 7",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 106,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-08",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 8",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-08.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 8",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 107,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-09",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 9",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-09.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 9",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 108,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-10",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 10",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-10.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 10",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 109,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-11",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 11",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-11.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 11",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 110,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-12",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 12",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-12.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 12",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 111,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-13",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 13",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-13.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 13",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 112,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-14",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 14",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-14.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 14",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 113,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-15",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 15",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-15.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 15",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 114,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-16",
+    "category": "image",
+    "kind": "create-image",
+    "title": "2040年代科技时装模型",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-16.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "2040年代科技时装模型",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 115,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-17",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 17",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-17.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 17",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 116,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-18",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 18",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-18.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 18",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 117,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-19",
+    "category": "image",
+    "kind": "create-image",
+    "title": "农舍附近，一群超现实的动物正在观看龙卷风",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-19.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "农舍附近，一群超现实的动物正在观看龙卷风",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 118,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-20",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 20",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-20.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 20",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 119,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-21",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 21",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-21.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 21",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 120,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-22",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 22",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-22.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 22",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 121,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-23",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 23",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-23.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 23",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 122,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-24",
+    "category": "image",
+    "kind": "create-image",
+    "title": "可视化研究",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-24.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "可视化研究",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 123,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-25",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 25",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-25.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 25",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 124,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-26",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 26",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-26.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 26",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 125,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-27",
+    "category": "image",
+    "kind": "create-image",
+    "title": "超现实的电影景观",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-27.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "超现实的电影景观",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 126,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-28",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 28",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-28.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 28",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 127,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-29",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 29",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-29.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 29",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 128,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-30",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 30",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-30.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 30",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 129,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-31",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 31",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-31.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 31",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 130,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-32",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 32",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-32.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 32",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 131,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-33",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 33",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-33.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 33",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 132,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-34",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 34",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-34.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 34",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 133,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-35",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 35",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-35.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 35",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 134,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-36",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 36",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-36.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 36",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 135,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-37",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 37",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-37.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 37",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 136,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-38",
+    "category": "image",
+    "kind": "create-image",
+    "title": "图像灵感 38",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-38.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "图像灵感 38",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 137,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-image-gallery-39",
+    "category": "image",
+    "kind": "create-image",
+    "title": "8 位风格",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-image-gallery-39.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "8 位风格",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 138,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  }
+]

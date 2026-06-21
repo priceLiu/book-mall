@@ -117,8 +117,8 @@ export function QrWorkspacePanel({
     draft.category === "world" || draft.kind.includes("scene");
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="qr-panel-header">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="qr-panel-header shrink-0">
         <span>{kindDef?.label ?? draft.kind}</span>
         {onBackToBrowse ? (
           <button
@@ -131,7 +131,7 @@ export function QrWorkspacePanel({
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="qr-scroll-panel min-h-0 flex-1 p-4">
         {isMotionSync ? (
           <QrMotionSyncForm
             draft={draft}
