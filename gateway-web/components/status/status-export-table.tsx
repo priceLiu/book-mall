@@ -115,6 +115,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
       setRows(data.logs ?? []);
       setTotal(data.total ?? 0);
       setTotalPages(data.totalPages ?? 1);
+      if (typeof data.page === "number") setPage(data.page);
     } catch {
       if (seq !== seqRef.current) return;
       setError("网络异常，请稍后重试");
@@ -189,6 +190,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
         >
           <thead>
             <tr className="border-b border-white/10 text-xs uppercase text-zinc-500">
+              <th className="w-12 px-3 py-2 text-right font-medium">#</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">失败码</th>
               <th className="px-3 py-2 font-medium">失败原因</th>
@@ -205,7 +207,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
           <tbody>
             {loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-12 text-center text-zinc-400">
+                <td colSpan={12} className="px-4 py-12 text-center text-zinc-400">
                   <div className="inline-flex items-center gap-2">
                     <SpinnerIcon className="h-5 w-5 text-sky-400" />
                     正在加载表格…
@@ -214,12 +216,13 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={12} className="px-4 py-8 text-center text-zinc-500">
                   当前筛选下暂无记录
                 </td>
               </tr>
             ) : (
-              rows.map((row) => {
+              rows.map((row, index) => {
+                const rowNo = (page - 1) * pageSize + index + 1;
                 const failCode = resolveGatewayFailCodeDisplay({
                   failCode: row.failCode,
                   failMessage: row.failMessage,
@@ -233,6 +236,9 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
                     key={row.id}
                     className="border-b border-white/5 hover:bg-white/[0.02]"
                   >
+                    <td className="px-3 py-2 text-right font-mono tabular-nums text-zinc-500">
+                      {rowNo}
+                    </td>
                     <td className="px-3 py-2 lowercase text-zinc-300">
                       {row.status.toLowerCase()}
                     </td>

@@ -679,6 +679,14 @@ export function BillDetailsClient({
           />
         ) : null}
 
+        {adminTeamTenantId && effectiveRole === "admin" && tokenUsage ? (
+          <FinanceTokenUsageSummaryPanel
+            usage={tokenUsage}
+            periodKey={tokenPeriodKey || undefined}
+            title={`团队 Gateway 用量${remoteTenantName ? ` · ${remoteTenantName}` : ""}`}
+          />
+        ) : null}
+
         {!isAllUsers && (loadState === "loading" || loadState === "error" || (loadState === "idle" && hint)) ? (
           <div
             className={cn(

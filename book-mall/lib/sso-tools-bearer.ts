@@ -4,7 +4,7 @@ import { verifyToolsAccessToken } from "@/lib/tools-sso-token";
 
 /** 工具站请求头 `Authorization: Bearer <tools_token>` 校验（与 `/api/sso/tools/usage` 一致）。 */
 export function verifyToolsBearer(req: Request):
-  | { ok: true; userId: string }
+  | { ok: true; userId: string; preferredTenantId?: string }
   | { ok: false; res: NextResponse } {
   let jwtSecret: string;
   try {
@@ -31,5 +31,12 @@ export function verifyToolsBearer(req: Request):
       res: NextResponse.json({ error: "无效或过期的工具令牌" }, { status: 401 }),
     };
   }
-  return { ok: true, userId: verified.sub };
+  return {
+    ok: true,
+    userId: verified.sub,
+    preferredTenantId:
+      verified.tenant_type === "TEAM" && verified.tenant_id?.trim()
+        ? verified.tenant_id.trim()
+        : undefined,
+  };
 }

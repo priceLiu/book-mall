@@ -19,10 +19,10 @@ import {
 import {
   gatewayV1ChatCompletions,
   gatewayV1ChatCompletionsStream,
-  gatewayV1ClientMeta,
   gatewayV1CreateTask,
   gatewayV1RecordInfo,
 } from "@/lib/gateway/gateway-v1-http-client";
+import { gatewayV1ClientMetaForBookUser } from "@/lib/gateway/gateway-log-meta-for-user";
 import { routeGatewayModel } from "@/lib/gateway/model-router";
 import { buildGatewayInputSummary } from "@/lib/gateway/log-input-summary";
 import {
@@ -33,6 +33,18 @@ import {
 import type { DashscopeTaskOutput } from "@/lib/gateway/dashscope-client";
 
 const CLIENT_SOURCE: GatewayClientSource = "TOOL";
+
+type ToolGatewayTenantOpts = {
+  preferredTenantId?: string | null;
+};
+
+async function toolGwMeta(userId: string, extra?: ToolGatewayTenantOpts & { clientPage?: string }) {
+  const { preferredTenantId, clientPage } = extra ?? {};
+  return gatewayV1ClientMetaForBookUser(CLIENT_SOURCE, userId, {
+    clientPage,
+    preferredTenantId,
+  });
+}
 
 async function requireGatewayAuth(userId: string) {
   await assertGatewayApiKeyLinkedForUser(userId);
@@ -71,7 +83,7 @@ export async function toolGwCreateDashscopeJob(
         body: Record<string, unknown>;
         clientPage?: string;
       }
-  ),
+  ) & ToolGatewayTenantOpts,
 ): Promise<{ taskId: string; logId: string; providerKind: GatewayProviderKind }> {
   const auth = await requireGatewayAuth(userId);
   const credentialId = pickCredentialForKind(auth.credentials, "DASHSCOPE");
@@ -114,9 +126,9 @@ export async function toolGwCreateDashscopeJob(
   const created = await gatewayV1CreateTask({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta(CLIENT_SOURCE, {
+    meta: await toolGwMeta(userId, {
       clientPage: opts.clientPage,
-      bookUserId: userId,
+      preferredTenantId: opts.preferredTenantId,
     }),
   });
 
@@ -140,7 +152,7 @@ export async function toolGwPollDashscope(
   const polled = await gatewayV1RecordInfo({
     apiKeyId: auth.id,
     taskId: opts.taskId,
-    meta: gatewayV1ClientMeta("TOOL", { bookUserId: userId }),
+    meta: await toolGwMeta(userId),
   });
 
   return polled.data as DashscopeTaskOutput;
@@ -173,10 +185,7 @@ export async function toolGwChat(
   const result = await gatewayV1ChatCompletions({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta(CLIENT_SOURCE, {
-      clientPage: opts.clientPage,
-      bookUserId: userId,
-    }),
+    meta: await toolGwMeta(userId, { clientPage: opts.clientPage }),
   });
   let parsed: unknown = null;
   try {
@@ -300,10 +309,7 @@ export async function toolGwChatStream(
   const result = await gatewayV1ChatCompletionsStream({
     apiKeyId: auth.id,
     body,
-    meta: gatewayV1ClientMeta(CLIENT_SOURCE, {
-      clientPage: opts.clientPage,
-      bookUserId: userId,
-    }),
+    meta: await toolGwMeta(userId, { clientPage: opts.clientPage }),
   });
 
   const logId = result.headers.get("x-gateway-log-id") ?? "";

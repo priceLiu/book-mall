@@ -17,17 +17,22 @@ import {
   type GatewayLogFilterInput,
 } from "@/lib/gateway/log-query-scope";
 import {
+  BILLING_DETAILS_USAGE_STATUSES,
+  financePeriodFromKey,
+} from "@/lib/gateway/finance-log-query";
+import {
+  fetchTeamGatewayTokenUsage,
   fetchUserGatewayTokenUsage,
   gatewayTokenUsageToRecord,
 } from "@/lib/gateway/gateway-token-usage-aggregate";
-import { currentPeriodKey, periodBounds } from "@/lib/finance/team-finance-guard";
+import { currentPeriodKey } from "@/lib/finance/team-finance-guard";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type BillingDetailsTab = "usage" | "charge";
 
 /** 「全部用量」Tab：展示已结束的调用（成功 + 失败），不含进行中。 */
-const USAGE_TAB_STATUSES = ["SUCCEEDED", "FAILED"] as const;
+const USAGE_TAB_STATUSES = BILLING_DETAILS_USAGE_STATUSES;
 
 const GATEWAY_SELECT = {
   id: true,
@@ -188,6 +193,7 @@ async function buildGatewayRows(input: {
   tenantId?: string;
   actorUserId?: string;
   take: number;
+  periodKey?: string;
 }): Promise<{
   rows: Record<string, string>[];
   totalCalls: number;
@@ -195,10 +201,17 @@ async function buildGatewayRows(input: {
   failedCalls: number;
   returned: number;
 }> {
+  const periodKey = input.periodKey ?? currentPeriodKey();
+  const { from, to } = financePeriodFromKey(periodKey);
+  const periodFilters: GatewayLogFilterInput = {
+    submittedFrom: from,
+    submittedBefore: to,
+  };
+
   const tabFilters: GatewayLogFilterInput =
     input.tab === "usage"
-      ? { statuses: [...USAGE_TAB_STATUSES] }
-      : { creditsChargedGt: 0 };
+      ? { statuses: [...USAGE_TAB_STATUSES], ...periodFilters }
+      : { creditsChargedGt: 0, ...periodFilters };
 
   const where = await resolveBillingGatewayWhere({
     userId: input.userId,
@@ -284,7 +297,7 @@ async function buildGatewayRows(input: {
               userId: input.userId,
               tenantId: input.tenantId,
               actorUserId: input.actorUserId,
-              filters: { status: "SUCCEEDED" },
+              filters: { status: "SUCCEEDED", ...periodFilters },
             }),
           }),
           prisma.gatewayRequestLog.count({
@@ -292,7 +305,7 @@ async function buildGatewayRows(input: {
               userId: input.userId,
               tenantId: input.tenantId,
               actorUserId: input.actorUserId,
-              filters: { status: "FAILED" },
+              filters: { status: "FAILED", ...periodFilters },
             }),
           }),
         ])
@@ -310,7 +323,7 @@ export async function fetchBillingDetailsForUser(input: {
 }) {
   const take = Math.min(2000, Math.max(1, input.take ?? 500));
   const periodKey = currentPeriodKey();
-  const { from, to } = periodBounds(periodKey);
+  const { from, to } = financePeriodFromKey(periodKey);
 
   const [user, pools, gatewayPart, packageReconciliation, tokenUsageRaw] = await Promise.all([
     prisma.user.findUnique({
@@ -318,7 +331,7 @@ export async function fetchBillingDetailsForUser(input: {
       select: { id: true, name: true, email: true },
     }),
     getPoolBalances({ ownerType: "USER", ownerId: input.userId }),
-    buildGatewayRows({ tab: input.tab, userId: input.userId, take }),
+    buildGatewayRows({ tab: input.tab, userId: input.userId, take, periodKey }),
     fetchUserPackageReconciliation(input.userId),
     fetchUserGatewayTokenUsage({
       bookUserId: input.userId,
@@ -395,8 +408,10 @@ export async function fetchBillingDetailsForTenant(input: {
   take?: number;
 }) {
   const take = Math.min(2000, Math.max(1, input.take ?? 500));
+  const periodKey = currentPeriodKey();
+  const { from, to } = financePeriodFromKey(periodKey);
 
-  const [tenant, pools, gatewayPart] = await Promise.all([
+  const [tenant, pools, gatewayPart, tokenUsageRaw] = await Promise.all([
     prisma.tenant.findUnique({
       where: { id: input.tenantId },
       select: { id: true, name: true, ownerUserId: true },
@@ -407,6 +422,12 @@ export async function fetchBillingDetailsForTenant(input: {
       tenantId: input.tenantId,
       actorUserId: input.actorUserId,
       take,
+      periodKey,
+    }),
+    fetchTeamGatewayTokenUsage({
+      tenantId: input.tenantId,
+      submittedFrom: from,
+      submittedTo: to,
     }),
   ]);
 
@@ -434,5 +455,7 @@ export async function fetchBillingDetailsForTenant(input: {
     returned: gatewayPart.returned,
     take,
     truncated: gatewayPart.returned >= take,
+    periodKey,
+    tokenUsage: gatewayTokenUsageToRecord(tokenUsageRaw),
   };
 }

@@ -15,7 +15,7 @@ import {
   billingCategoryLabel,
   resolveBillingCategory,
 } from "@/lib/billing/billing-category";
-import { buildGatewayLogWhereForTeamTenant } from "@/lib/gateway/log-query-scope";
+import { buildTeamGatewayUsageWhere } from "@/lib/gateway/log-query-scope";
 import {
   fetchTeamGatewayTokenUsage,
   gatewayTokenUsageToRecord,
@@ -546,16 +546,22 @@ export async function buildTeamDashboard(input: {
     await Promise.all([
     buildTeamCreditBill({ tenantId: input.tenantId, periodKey: input.periodKey }),
     getTenantOverview(input.tenantId),
-    buildGatewayLogWhereForTeamTenant(input.tenantId, {
-      submittedFrom: from,
-      submittedTo: to,
-      status: "SUCCEEDED",
+    buildTeamGatewayUsageWhere({
+      tenantIds: [input.tenantId],
+      filters: {
+        submittedFrom: from,
+        submittedBefore: to,
+        status: "SUCCEEDED",
+      },
     }),
-    buildGatewayLogWhereForTeamTenant(input.tenantId),
-    buildGatewayLogWhereForTeamTenant(input.tenantId, {
-      submittedFrom: trendFrom,
-      submittedTo: to,
-      status: "SUCCEEDED",
+    buildTeamGatewayUsageWhere({ tenantIds: [input.tenantId] }),
+    buildTeamGatewayUsageWhere({
+      tenantIds: [input.tenantId],
+      filters: {
+        submittedFrom: trendFrom,
+        submittedBefore: to,
+        status: "SUCCEEDED",
+      },
     }),
     fetchTeamGatewayTokenUsage({
       tenantId: input.tenantId,
@@ -664,7 +670,8 @@ export async function buildTeamDashboard(input: {
       billingMode: l.billingMode,
     })),
     ...(input.includeCost ? { vendorCostYuan } : {}),
-    note: "仅展示含团队 ID 的 Gateway 记录；历史无 tenantId 的调用不在此视图内。",
+    note:
+      "团队用量 = tenantId / 活跃成员 actor / 团队 sk-gw / 团队 Canvas 项目 clientPage 的成功 Gateway（账期 UTC 半开区间）；与状态驾驶舱 team scope + 财务列表 tokenUsage 同源。全站/个人空间调用见用户列表。",
   };
 }
 

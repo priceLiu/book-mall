@@ -23,10 +23,10 @@ async function resolveToolUser(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const userId = await resolveToolUser(request);
-  if (!userId) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
-  }
+  const auth = verifyToolsBearer(request);
+  if (!auth.ok) return auth.res;
+  const userId = auth.userId;
+  const preferredTenantId = auth.preferredTenantId;
 
   let body: Record<string, unknown>;
   try {
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
         bottomGarmentUrl:
           typeof body.bottomGarmentUrl === "string" ? body.bottomGarmentUrl : undefined,
         clientPage,
+        preferredTenantId,
       });
       return NextResponse.json({ ok: true, ...result });
     }
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
           typeof body.negativePrompt === "string" ? body.negativePrompt : undefined,
         n: Number(body.n ?? 1),
         clientPage,
+        preferredTenantId,
       });
       return NextResponse.json({ ok: true, ...result });
     }
@@ -105,6 +107,7 @@ export async function POST(request: Request) {
         model,
         body: videoBody as Record<string, unknown>,
         clientPage,
+        preferredTenantId,
       });
       return NextResponse.json({ ok: true, ...result });
     }
