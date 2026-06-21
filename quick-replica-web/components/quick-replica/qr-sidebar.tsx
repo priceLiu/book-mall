@@ -6,6 +6,7 @@ import {
   Globe,
   Home,
   ImageIcon,
+  Settings2,
   Smile,
   Video,
   Volume2,
@@ -18,7 +19,7 @@ import {
   type QrCategory,
 } from "@/lib/qr-template-types";
 
-export type QrNavMode = "home" | "category" | "my-works" | "pinned-tool";
+export type QrNavMode = "home" | "category" | "my-works" | "pinned-tool" | "admin";
 
 const CATEGORY_ICONS: Record<QrCategory, typeof Video> = {
   video: Video,
@@ -33,11 +34,13 @@ type Props = {
   category: QrCategory;
   pinnedToolKey: string | null;
   sidebarOpen: boolean;
+  canManageFeatured?: boolean;
   onCloseSidebar: () => void;
   onHome: () => void;
   onCategory: (category: QrCategory) => void;
   onMyWorks: () => void;
   onPinnedTool: (toolKey: string, category: QrCategory, kind: string) => void;
+  onAdmin?: () => void;
 };
 
 export function QrSidebar({
@@ -45,11 +48,13 @@ export function QrSidebar({
   category,
   pinnedToolKey,
   sidebarOpen,
+  canManageFeatured = false,
   onCloseSidebar,
   onHome,
   onCategory,
   onMyWorks,
   onPinnedTool,
+  onAdmin,
 }: Props) {
   return (
     <>
@@ -132,7 +137,27 @@ export function QrSidebar({
           ))}
         </div>
 
-        <div className="mt-auto pt-4">
+        <div className="mt-auto space-y-1 pt-4">
+          {canManageFeatured && onAdmin ? (
+            <>
+              <div className="mb-2 text-xs uppercase tracking-wide qr-panel-muted">管理</div>
+              <button
+                type="button"
+                onClick={() => {
+                  onAdmin();
+                  onCloseSidebar();
+                }}
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm transition ${
+                  navMode === "admin"
+                    ? "qr-nav-active"
+                    : "text-[var(--qr-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--qr-text-primary)]"
+                }`}
+              >
+                <Settings2 className="h-4 w-4 shrink-0" />
+                管理后台
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
             onClick={() => {

@@ -64,6 +64,8 @@ export type QrWorkspaceDraft = {
   kind: string;
   toolKey?: string;
   title?: string;
+  /** 复制或新建后自动保存的用户模板 id，用于后续编辑同步 */
+  savedTemplateId?: string;
   targetImageUrl: string;
   referenceVideoUrl: string;
   referenceAudioUrl: string;

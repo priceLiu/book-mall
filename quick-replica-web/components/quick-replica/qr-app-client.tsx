@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Menu, Sparkles, Video, ImageIcon, Smile, Globe, Volume2 } from "lucide-react";
 
 import { QrGeneratePreviewModal } from "@/components/quick-replica/qr-generate-preview-modal";
+import { QrAdminPanel } from "@/components/quick-replica/qr-admin-panel";
 import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-panel";
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
 import { QrTemplateGallery } from "@/components/quick-replica/qr-template-gallery";
@@ -25,6 +26,7 @@ import {
   type QrWorkspaceDraft,
   templateToWorkspaceDraft,
 } from "@/lib/qr-template-types";
+import { saveCopiedTemplate } from "@/lib/qr-template-save";
 
 type SessionInfo = {
   name?: string | null;
@@ -37,6 +39,7 @@ type MiddleMode = "browse" | "workspace" | "welcome";
 type Props = {
   session: SessionInfo | null;
   canManageFeatured?: boolean;
+  bookMallAdminUrl?: string | null;
 };
 
 const CATEGORY_ICONS: Record<QrCategory, typeof Video> = {
@@ -47,7 +50,11 @@ const CATEGORY_ICONS: Record<QrCategory, typeof Video> = {
   audio: Volume2,
 };
 
-export function QrAppClient({ session, canManageFeatured = false }: Props) {
+export function QrAppClient({
+  session,
+  canManageFeatured = false,
+  bookMallAdminUrl = null,
+}: Props) {
   const [navMode, setNavMode] = useState<QrNavMode>("home");
   const [middleMode, setMiddleMode] = useState<MiddleMode>("welcome");
   const [category, setCategory] = useState<QrCategory>("video");
@@ -72,6 +79,10 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
   const browseKey = useMemo(() => {
     if (navMode === "home") return "";
     const parts = [templateScope];
+    if (navMode === "admin") {
+      parts.push("admin", category);
+      return parts.join("|");
+    }
     if (navMode !== "my-works" && category) parts.push(category);
     if (selectedKind) parts.push(selectedKind);
     if (pinnedToolKey && navMode === "pinned-tool") parts.push(pinnedToolKey);
@@ -99,7 +110,7 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
 
     const qs = new URLSearchParams({ scope: templateScope });
     if (navMode !== "my-works" && category) qs.set("category", category);
-    if (selectedKind) qs.set("kind", selectedKind);
+    if (selectedKind && navMode !== "admin") qs.set("kind", selectedKind);
     if (pinnedToolKey && navMode === "pinned-tool") qs.set("toolKey", pinnedToolKey);
     try {
       const res = await fetch(
@@ -215,6 +226,7 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
   }, [navMode, category, prefetchTemplateList]);
 
   const galleryTitleSuffix = useMemo(() => {
+    if (navMode === "admin") return "推荐模板";
     if (navMode === "my-works") return "我的作品";
     if (selectedKind) return getKindDef(selectedKind)?.label ?? selectedKind;
     if (pinnedToolKey) return QR_PINNED_LABEL(pinnedToolKey);
@@ -251,6 +263,23 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
     setSelectedKind(null);
     setPinnedToolKey(null);
   };
+
+  const onAdmin = () => {
+    setNavMode("admin");
+    setMiddleMode("browse");
+    setSelectedKind(null);
+    setPinnedToolKey(null);
+    const cacheKey = qrTemplateCacheKey("all", category);
+    setTemplates(templatesCacheRef.current.get(cacheKey) ?? []);
+    setTemplatesLoading(true);
+  };
+
+  const refreshTemplateCaches = useCallback(() => {
+    templatesCacheRef.current.clear();
+    kindsCacheRef.current.clear();
+    void loadTemplates();
+    void loadKinds();
+  }, [loadKinds, loadTemplates]);
 
   const onPinnedTool = (toolKey: string, cat: QrCategory, kind: string) => {
     setNavMode("pinned-tool");
@@ -289,10 +318,27 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
   };
 
   const onCopyTemplate = (t: QrTemplate) => {
-    setDraft(templateToWorkspaceDraft(t));
+    const nextDraft = templateToWorkspaceDraft(t);
+    setDraft(nextDraft);
     setMiddleMode("workspace");
     if (t.category) setCategory(t.category);
     setSelectedKind(t.kind);
+    if (navMode === "home" || navMode === "admin") {
+      setNavMode("category");
+    }
+
+    void (async () => {
+      const result = await saveCopiedTemplate(t);
+      if ("error" in result) return;
+      const saved = result.template;
+      setDraft((prev) => ({
+        ...prev,
+        savedTemplateId: saved.id,
+        title: saved.title,
+        prompt: saved.reference.prompt.text,
+      }));
+      invalidateQrTemplateCacheForCategory(templatesCacheRef.current, saved.category);
+    })();
   };
 
   const onGenerateComplete = (result: QrGenerateJobResult) => {
@@ -314,6 +360,14 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
   };
 
   const middlePanel = (() => {
+    if (navMode === "admin") {
+      return (
+        <QrAdminPanel
+          bookMallAdminUrl={bookMallAdminUrl}
+          onTemplatesChanged={refreshTemplateCaches}
+        />
+      );
+    }
     if (middleMode === "welcome") {
       return (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center">
@@ -416,11 +470,13 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
           category={category}
           pinnedToolKey={pinnedToolKey}
           sidebarOpen={sidebarOpen}
+          canManageFeatured={canManageFeatured}
           onCloseSidebar={() => setSidebarOpen(false)}
           onHome={onHome}
           onCategory={onCategory}
           onMyWorks={onMyWorks}
           onPinnedTool={onPinnedTool}
+          onAdmin={canManageFeatured ? onAdmin : undefined}
         />
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">

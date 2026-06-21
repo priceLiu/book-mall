@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { QrMotionSyncForm } from "@/components/quick-replica/qr-motion-sync-workspace";
+import { persistWorkspaceDraft } from "@/lib/qr-template-save";
 import {
   getKindDef,
   type QrTemplate,
@@ -40,8 +41,24 @@ export function QrWorkspacePanel({
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveHint, setSaveHint] = useState<string | null>(null);
   const kindDef = getKindDef(draft.kind);
   const isMotionSync = draft.kind === "motion-sync" || draft.toolKey === "motion-sync";
+
+  useEffect(() => {
+    if (!draft.savedTemplateId) return;
+    setSaveHint("保存中…");
+    const timer = window.setTimeout(() => {
+      void persistWorkspaceDraft(draft).then((result) => {
+        if (result.ok) {
+          setSaveHint("已自动保存");
+        } else {
+          setSaveHint(null);
+        }
+      });
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [draft]);
 
   const uploadAsset = async (file: File, kind: "image" | "video" | "audio") => {
     const dataUrl = await readFileAsDataUrl(file);
@@ -120,7 +137,11 @@ export function QrWorkspacePanel({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="qr-panel-header shrink-0">
         <span>{kindDef?.label ?? draft.kind}</span>
-        {onBackToBrowse ? (
+        <div className="flex items-center gap-3">
+          {saveHint ? (
+            <span className="text-[10px] text-[var(--qr-text-muted)]">{saveHint}</span>
+          ) : null}
+          {onBackToBrowse ? (
           <button
             type="button"
             className="text-xs text-[var(--qr-text-muted)] hover:text-[var(--qr-text-primary)]"
@@ -128,7 +149,8 @@ export function QrWorkspacePanel({
           >
             返回列表
           </button>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       <div className="qr-scroll-panel min-h-0 flex-1 p-4">

@@ -5,6 +5,7 @@ import {
   confirmDestructiveTwice,
   CONFIRM_DELETE_LIBRARY_OSS_SECOND_ZH,
 } from "@/lib/confirm-destructive-twice";
+import { resolveQrTemplatePreviewMedia } from "@/lib/quick-replica/qr-template-preview-media";
 
 type QrCategory = "video" | "image" | "character" | "world" | "audio";
 
@@ -20,6 +21,12 @@ type AdminTemplateRow = {
   title: string;
   thumbnailUrl: string;
   promptText: string;
+  reference?: {
+    slots?: {
+      referenceVideo?: { url?: string };
+    };
+  };
+  output?: { url?: string; mediaType?: string };
   sortOrder: number;
   mediaType: "image" | "video" | "audio";
 };
@@ -278,14 +285,41 @@ export default function AdminQuickReplicaTemplatesPage() {
               {templates.map((row) => (
                 <tr key={row.id} className="border-t border-border align-top">
                   <td className="px-3 py-2">
-                    <div className="h-16 w-12 overflow-hidden rounded bg-muted">
-                      {row.mediaType === "video" ? (
-                        <video src={row.thumbnailUrl} className="h-full w-full object-cover" muted playsInline />
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={row.thumbnailUrl} alt="" className="h-full w-full object-cover" />
-                      )}
-                    </div>
+                    {(() => {
+                      const preview = resolveQrTemplatePreviewMedia({
+                        thumbnailUrl: row.thumbnailUrl,
+                        mediaType: row.mediaType,
+                        outputUrl: row.output?.url,
+                        referenceVideoUrl: row.reference?.slots?.referenceVideo?.url,
+                      });
+                      return (
+                        <div className="h-16 w-12 overflow-hidden rounded bg-muted">
+                          {!preview ? (
+                            <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
+                              —
+                            </div>
+                          ) : preview.kind === "video" ? (
+                            <video
+                              src={preview.url}
+                              poster={preview.poster}
+                              className="h-full w-full object-cover"
+                              muted
+                              playsInline
+                              preload="metadata"
+                            />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={preview.url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="max-w-[10rem] px-3 py-2">
                     <div className="font-medium">{row.title}</div>
