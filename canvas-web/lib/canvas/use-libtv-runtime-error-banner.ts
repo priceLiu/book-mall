@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "./store";
 import type { CanvasNodeRuntime } from "./types";
+import {
+  buildLibtvRuntimeErrorAlertKey,
+  libtvRuntimeErrorAlertScope,
+  markLibtvRuntimeErrorAlertShown,
+} from "./libtv-runtime-error-alert";
 
 /** @deprecated 错误条改为仅手动关闭，避免用户错过失败原因 */
 export const LIBTV_RUNTIME_ERROR_AUTO_DISMISS_MS = 0;
@@ -25,6 +30,18 @@ export function useLibtvRuntimeErrorBanner(opts: {
     const node = useCanvasStore.getState().nodes.find((n) => n.id === opts.nodeId);
     const rt = (node?.data as { runtime?: CanvasNodeRuntime } | undefined)?.runtime;
     if (rt?.taskId) dismissedLocallyRef.current = rt.taskId;
+    const msg = rt?.failMessage?.trim();
+    if (msg) {
+      markLibtvRuntimeErrorAlertShown(
+        buildLibtvRuntimeErrorAlertKey({
+          scope: libtvRuntimeErrorAlertScope(),
+          nodeId: opts.nodeId,
+          taskId: rt?.taskId,
+          failCode: rt?.failCode,
+          failMessage: msg,
+        }),
+      );
+    }
     setVisible(false);
     if (rt?.status !== "error") return;
     const hasMedia = Boolean(rt.ossUrl?.trim() || rt.ephemeralUrl?.trim());
