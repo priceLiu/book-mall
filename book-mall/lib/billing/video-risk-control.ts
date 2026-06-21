@@ -7,8 +7,8 @@
 import { prisma } from "@/lib/prisma";
 import { resolveBillingRef } from "./credit-pre-check";
 
-export const VIDEO_MAX_CONCURRENCY = 2;
-export const VIDEO_MAX_QUEUE = 10;
+export const VIDEO_MAX_CONCURRENCY = 6;
+export const VIDEO_MAX_QUEUE = 16;
 export const VIDEO_BATCH_MAX = 5;
 
 /** 套餐档日 cap 参考值（管理端异常扫描用；Gateway 入口暂不强制） */

@@ -112,17 +112,23 @@ export async function persistVolcengineTimingOnPoll(input: {
   return { breakdown, resultSummary: nextSummary };
 }
 
-/** DB 可用时：收口「厂商 updated_at 停更 + Gateway 轮询中断」的 RUNNING 日志 */
+/** DB 可用时：按「厂商停更时长」收口卡死的 RUNNING 火山视频日志并释放槽位 */
 export async function expireVolcengineGatewayPollStalledLogs(
   nowMs: number = Date.now(),
 ): Promise<number> {
   const {
-    isVolcengineGatewayPollStalled,
+    isVolcengineVendorStuck,
+    volcengineVendorStaleMs,
+    VOLCENGINE_VENDOR_STALE_RELEASE_MS,
     readVolcengineTimingTrace,
     computeVolcengineTimingBreakdown,
     attachGatewayTimingToSummary,
   } = await import("@/lib/gateway/log-volcengine-timing");
-  const pollGapCutoff = new Date(nowMs - 2 * 60 * 1000);
+
+  // 粗筛：提交已超过阈值的 running 任务才可能卡死（命中 [status, submittedAt] 索引）；
+  // 精判用厂商停更时长（vendor updated_at），不再依赖 lastPolledAt 间断。
+  const submittedCutoff = new Date(nowMs - VOLCENGINE_VENDOR_STALE_RELEASE_MS);
+  const staleMin = Math.round(VOLCENGINE_VENDOR_STALE_RELEASE_MS / 60_000);
 
   const rows = await prisma.gatewayRequestLog.findMany({
     where: {
@@ -130,17 +136,14 @@ export async function expireVolcengineGatewayPollStalledLogs(
       providerKind: "VOLCENGINE",
       requestKind: "VIDEO",
       externalTaskId: { not: null },
-      OR: [
-        { lastPolledAt: { lt: pollGapCutoff } },
-        { lastPolledAt: null, submittedAt: { lt: pollGapCutoff } },
-      ],
+      submittedAt: { lt: submittedCutoff },
     },
     select: {
       id: true,
       submittedAt: true,
       resultSummary: true,
-      lastPolledAt: true,
     },
+    orderBy: { submittedAt: "asc" },
     take: 50,
   });
 
@@ -148,11 +151,8 @@ export async function expireVolcengineGatewayPollStalledLogs(
   for (const row of rows) {
     const trace = readVolcengineTimingTrace(row.resultSummary);
     if (!trace) continue;
-    if (
-      !isVolcengineGatewayPollStalled(trace, row.lastPolledAt, nowMs)
-    ) {
-      continue;
-    }
+    if (!isVolcengineVendorStuck(trace, nowMs)) continue;
+
     const breakdown = computeVolcengineTimingBreakdown({
       trace,
       submittedAtMs: row.submittedAt.getTime(),
@@ -165,12 +165,14 @@ export async function expireVolcengineGatewayPollStalledLogs(
       breakdown,
     );
     const durationMs = nowMs - row.submittedAt.getTime();
+    const staleSec = Math.round((volcengineVendorStaleMs(trace, nowMs) ?? 0) / 1000);
     await finalizeRequestLog(row.id, {
       status: "FAILED",
       durationMs,
       failCode: "VOLCENGINE_GATEWAY_POLL_STALL",
       failMessage:
-        "厂商 updated_at 已停更超过 800s 且 Gateway 轮询中断（常见原因：数据库连接池耗尽）。请在厂商控制台核对任务；恢复 DB 后可用轮询池「恢复」",
+        `厂商已停更约 ${staleSec}s（超过 ${staleMin}min 自动收口阈值）仍未返回结果，判定卡死并已释放槽位。` +
+        "请在厂商控制台核对任务；若确已生成，可在轮询池「恢复」。",
       resultSummary,
     });
     closed++;

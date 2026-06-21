@@ -183,6 +183,8 @@ async function fetchGatewayLogs(params: {
   credentialIdFilter: string;
   skipPoll?: boolean;
   poll?: boolean;
+  /** 自动刷新 tick 传 false：不重算分面，沿用上一次 facets，降低 DB 压力 */
+  includeFacets?: boolean;
 }): Promise<GatewayLogsResponse> {
   const qs = new URLSearchParams({
     page: String(params.page),
@@ -197,6 +199,7 @@ async function fetchGatewayLogs(params: {
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
   if (params.skipPoll !== false) qs.set("skipPoll", "1");
   if (params.poll) qs.set("poll", "1");
+  if (params.includeFacets === false) qs.set("facets", "0");
   const res = await fetch(`/api/book-mall/api/gateway/logs?${qs.toString()}`);
   const data = (await res.json().catch(() => null)) as
     | (GatewayLogsResponse & { error?: string })
@@ -212,6 +215,76 @@ async function fetchGatewayLogs(params: {
     totalPages: data?.totalPages ?? 1,
     facets: data?.facets,
   };
+}
+
+type GatewayLogsDelta = {
+  created: GatewayLogRow[];
+  updated: GatewayLogRow[];
+  serverNowMs: number;
+  sinceApplied: string | null;
+};
+
+/** 增量拉取：自上次游标起的新行 + 在途行最新状态（不算 count / facets / 全量行） */
+async function fetchGatewayLogsDelta(params: {
+  since: string;
+  ids: string[];
+  fromDate: string;
+  toDate: string;
+  statusFilter: string;
+  sourceFilter: string;
+  providerFilter: string;
+  modelFilter: string;
+  credentialIdFilter: string;
+  poll?: boolean;
+}): Promise<GatewayLogsDelta> {
+  const qs = new URLSearchParams();
+  qs.set("since", params.since);
+  if (params.ids.length) qs.set("ids", params.ids.join(","));
+  if (params.fromDate) qs.set("from", params.fromDate);
+  if (params.toDate) qs.set("to", params.toDate);
+  if (params.statusFilter) qs.set("status", params.statusFilter);
+  if (params.sourceFilter) qs.set("clientSource", params.sourceFilter);
+  if (params.providerFilter) qs.set("providerKind", params.providerFilter);
+  if (params.modelFilter) qs.set("model", params.modelFilter);
+  if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
+  if (params.poll) qs.set("poll", "1");
+  else qs.set("skipPoll", "1");
+  const res = await fetch(`/api/book-mall/api/gateway/logs/delta?${qs.toString()}`);
+  const data = (await res.json().catch(() => null)) as
+    | (GatewayLogsDelta & { error?: string })
+    | null;
+  if (!res.ok) {
+    throw new Error(data?.error ?? "加载日志失败");
+  }
+  return {
+    created: data?.created ?? [],
+    updated: data?.updated ?? [],
+    serverNowMs: data?.serverNowMs ?? Date.now(),
+    sinceApplied: data?.sinceApplied ?? null,
+  };
+}
+
+/** 升序游标合并：updated 原地替换、created 去重前插，按 submittedAt desc 排序并截断到 pageSize */
+function mergeLogsDelta(
+  prev: GatewayLogRow[],
+  delta: GatewayLogsDelta,
+  pageSize: number,
+): { rows: GatewayLogRow[]; addedCount: number } {
+  const map = new Map(prev.map((r) => [r.id, r]));
+  for (const u of delta.updated) {
+    if (map.has(u.id)) map.set(u.id, u);
+  }
+  let addedCount = 0;
+  for (const c of delta.created) {
+    if (!map.has(c.id)) addedCount += 1;
+    map.set(c.id, c);
+  }
+  const rows = [...map.values()].sort((a, b) => {
+    if (a.submittedAt === b.submittedAt) return a.id < b.id ? 1 : -1;
+    return a.submittedAt < b.submittedAt ? 1 : -1;
+  });
+  const capped = pageSize > 0 ? rows.slice(0, pageSize) : rows;
+  return { rows: capped, addedCount };
 }
 
 function logFilterChipClass(active: boolean): string {
@@ -300,13 +373,22 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const hasInFlightLogsRef = useRef(hasInFlightLogs);
   hasInFlightLogsRef.current = hasInFlightLogs;
 
-  const loadLogs = useCallback(async (opts?: { poll?: boolean }) => {
+  /** 增量合并需读取「当前列表 / 页码 / 每页条数」的最新值，避免闭包过期 */
+  const logsRef = useRef(logs);
+  logsRef.current = logs;
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const pageSizeRef = useRef(pageSize);
+  pageSizeRef.current = pageSize;
+
+  const loadLogs = useCallback(async (opts?: { poll?: boolean; includeFacets?: boolean }) => {
     setFetchError(null);
     try {
       const data = await fetchGatewayLogs({
         ...fetchParams,
         skipPoll: !opts?.poll,
         poll: opts?.poll,
+        includeFacets: opts?.includeFacets,
       });
       setLogs(data.logs);
       setTotal(data.total);
@@ -330,6 +412,64 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       setRefreshing(false);
     }
   }, [loadLogs]);
+
+  /**
+   * 增量刷新（仅第 1 页、按 submittedAt desc 时使用）：只拉新行 + 在途行最新状态，
+   * 客户端合并，避免每 8s 全量 count + findMany 压数据库。列表为空时回退全量。
+   */
+  const loadLogsDelta = useCallback(
+    async (opts?: { poll?: boolean }) => {
+      const current = logsRef.current;
+      if (current.length === 0) {
+        return loadLogs({ poll: opts?.poll, includeFacets: false });
+      }
+      let cursor = current[0]?.submittedAt ?? "";
+      for (const r of current) {
+        if (r.submittedAt > cursor) cursor = r.submittedAt;
+      }
+      if (!cursor) {
+        return loadLogs({ poll: opts?.poll, includeFacets: false });
+      }
+      const inFlightIds = current
+        .filter((l) => l.status === "RUNNING" || l.status === "PENDING")
+        .map((l) => l.id);
+      setFetchError(null);
+      try {
+        const delta = await fetchGatewayLogsDelta({
+          since: cursor,
+          ids: inFlightIds,
+          fromDate,
+          toDate,
+          statusFilter,
+          sourceFilter,
+          providerFilter,
+          modelFilter,
+          credentialIdFilter,
+          poll: opts?.poll,
+        });
+        const merged = mergeLogsDelta(logsRef.current, delta, pageSizeRef.current);
+        setLogs(merged.rows);
+        if (merged.addedCount > 0) {
+          setTotal((t) => t + merged.addedCount);
+        }
+        setLastRefreshedAt(new Date());
+        return null;
+      } catch (e) {
+        setFetchError(e instanceof Error ? e.message : "加载日志失败");
+        return null;
+      }
+    },
+    [
+      loadLogs,
+      fromDate,
+      toDate,
+      statusFilter,
+      sourceFilter,
+      providerFilter,
+      modelFilter,
+      credentialIdFilter,
+    ],
+  );
 
   useEffect(() => {
     setLogs(initialData.logs);
@@ -369,7 +509,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     let cancelled = false;
     const run = async () => {
       if (cancelled) return;
-      await loadLogs({ poll: hasInFlightLogsRef.current });
+      const poll = hasInFlightLogsRef.current;
+      // 第 1 页（按 submittedAt desc）走增量「只加新数据」；其他页回退全量。
+      // 全量也不重算分面（facets），沿用上一次值，减少每 8s 的额外查询。
+      if (pageRef.current === 1) {
+        await loadLogsDelta({ poll });
+      } else {
+        await loadLogs({ poll, includeFacets: false });
+      }
     };
 
     void run();
@@ -381,7 +528,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [autoRefresh, loadLogs]);
+  }, [autoRefresh, loadLogs, loadLogsDelta]);
 
   /** 筛选 / 分页 / 每页条数变更时拉取 */
   useEffect(() => {

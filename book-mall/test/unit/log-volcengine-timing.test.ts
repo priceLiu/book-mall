@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeVolcengineTimingBreakdown,
-  isVolcengineGatewayPollStalled,
+  isVolcengineVendorStuck,
   isVolcenginePollLagCritical,
   isVolcengineQueuedStale,
   mergeVolcengineTimingTrace,
   resolveVolcengineLogTiming,
+  VOLCENGINE_VENDOR_STALE_RELEASE_MS,
 } from "@/lib/gateway/log-volcengine-timing";
 
 describe("log-volcengine-timing", () => {
@@ -70,7 +71,9 @@ describe("log-volcengine-timing", () => {
     ).toBeNull();
   });
 
-  it("in-flight running splits generate vs vendor-stale poll lag when updated_at frozen", () => {
+  it("in-flight running: Generate tracks wall-clock, Poll Δ = our poll lag (fresh poll → 0)", () => {
+    // 火山生成中 updated_at 恒等于 created_at：Generate 必须走墙钟（仍在生成，持续增长），
+    // Poll Δ 只反映我方轮询延迟。刚 poll 过 → Poll Δ ≈ 0，绝不能把生成时间写进 Poll Δ。
     const submittedAtMs = 1_000_000;
     const genStartMs = 1_000_000 + 3_000;
     const firstPollMs = genStartMs + 5_000;
@@ -84,28 +87,80 @@ describe("log-volcengine-timing", () => {
       },
       polledAtMs: firstPollMs,
     });
-    const traceFrozen = mergeVolcengineTimingTrace(trace, {
+    const traceFresh = mergeVolcengineTimingTrace(trace, {
       status: "running",
       raw: {
         created_at: genStartMs / 1000,
         updated_at: genStartMs / 1000,
       },
-      polledAtMs: nowMs,
+      polledAtMs: nowMs, // 刚刚成功 poll
     });
 
     const breakdown = computeVolcengineTimingBreakdown({
-      trace: traceFrozen,
+      trace: traceFresh,
       submittedAtMs,
       completedAtMs: null,
       nowMs,
     });
 
     expect(breakdown.queueMs).toBe(3_000);
-    expect(breakdown.generateMs).toBe(0);
-    expect(breakdown.pollDelayMs).toBe(65_000);
-    expect(breakdown.queueMs! + breakdown.generateMs! + breakdown.pollDelayMs!).toBe(
-      nowMs - submittedAtMs,
-    );
+    expect(breakdown.generateMs).toBe(65_000); // 墙钟生成时长
+    expect(breakdown.pollDelayMs).toBe(0); // 刚 poll 过，无延迟
+    expect(breakdown.pollDelayOverLimit).toBe(false);
+  });
+
+  it("in-flight running: Poll Δ grows when our poll loop falls behind (stall signal)", () => {
+    // 单次 poll 后我方久未再 poll：Generate 仍走墙钟，Poll Δ = now − 最近一次 poll。
+    const submittedAtMs = 1_000_000;
+    const genStartMs = 1_000_000 + 3_000;
+    const lastPollMs = genStartMs + 5_000;
+    const nowMs = 1_000_000 + 68_000;
+
+    const trace = mergeVolcengineTimingTrace(null, {
+      status: "running",
+      raw: {
+        created_at: genStartMs / 1000,
+        updated_at: genStartMs / 1000,
+      },
+      polledAtMs: lastPollMs,
+    });
+
+    const breakdown = computeVolcengineTimingBreakdown({
+      trace,
+      submittedAtMs,
+      completedAtMs: null,
+      nowMs,
+    });
+
+    expect(breakdown.queueMs).toBe(3_000);
+    expect(breakdown.generateMs).toBe(65_000); // 墙钟生成时长
+    expect(breakdown.pollDelayMs).toBe(60_000); // now − lastPolled
+  });
+
+  it("terminal still splits generate vs poll delay via vendor updated_at", () => {
+    // 终态拆分逻辑不变：Generate = updated_at − created_at，Poll Δ = completed − updated_at。
+    const submittedAtMs = 1_000_000;
+    const genStartMs = 1_000_000;
+    const vendorUpdatedAtMs = genStartMs + 200_000;
+    const completedAtMs = genStartMs + 203_000;
+
+    const trace = mergeVolcengineTimingTrace(null, {
+      status: "succeeded",
+      raw: {
+        created_at: genStartMs / 1000,
+        updated_at: vendorUpdatedAtMs / 1000,
+      },
+      polledAtMs: completedAtMs,
+    });
+
+    const breakdown = computeVolcengineTimingBreakdown({
+      trace,
+      submittedAtMs,
+      completedAtMs,
+    });
+
+    expect(breakdown.generateMs).toBe(200_000);
+    expect(breakdown.pollDelayMs).toBe(3_000);
   });
 
   it("does not treat poll lag critical while vendor still running", () => {
@@ -145,25 +200,23 @@ describe("log-volcengine-timing", () => {
       },
       polledAtMs: genStartMs + 5_000,
     });
-    const frozen = mergeVolcengineTimingTrace(trace, {
+    // 厂商停更时长 ≥ 阈值 → 卡死
+    const stuckNow = genStartMs + VOLCENGINE_VENDOR_STALE_RELEASE_MS + 1_000;
+    expect(isVolcengineVendorStuck(trace, stuckNow)).toBe(true);
+    // 停更时长低于阈值 → 不判卡死（取阈值的一半，避免与阈值边界耦合）
+    const okNow = genStartMs + VOLCENGINE_VENDOR_STALE_RELEASE_MS / 2;
+    expect(isVolcengineVendorStuck(trace, okNow)).toBe(false);
+  });
+
+  it("vendor-stale release also catches a dead poll loop (image 7), regardless of last poll", () => {
+    // loop 挂掉后不再 poll：厂商停更时长照常随墙钟增长，超阈值即可收口释放槽位。
+    const genStartMs = 1_000_000;
+    const trace = mergeVolcengineTimingTrace(null, {
       status: "running",
-      raw: {
-        created_at: genStartMs / 1000,
-        updated_at: genStartMs / 1000,
-      },
-      polledAtMs: genStartMs + 810_000,
+      raw: { created_at: genStartMs / 1000, updated_at: genStartMs / 1000 },
+      polledAtMs: genStartMs + 5_000, // 仅一次 poll，之后 loop 死
     });
-    const nowMs = genStartMs + 810_000;
-    const lastPolledAt = new Date(genStartMs + 600_000);
-    expect(
-      isVolcengineGatewayPollStalled(frozen, lastPolledAt, nowMs),
-    ).toBe(true);
-    expect(
-      isVolcengineGatewayPollStalled(
-        frozen,
-        new Date(nowMs - 30_000),
-        nowMs,
-      ),
-    ).toBe(false);
+    const nowMs = genStartMs + VOLCENGINE_VENDOR_STALE_RELEASE_MS + 120_000;
+    expect(isVolcengineVendorStuck(trace, nowMs)).toBe(true);
   });
 });

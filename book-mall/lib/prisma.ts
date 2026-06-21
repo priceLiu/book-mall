@@ -1,6 +1,7 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
 
 /**
  * 挂在 globalThis，避免 dev 热更新重复 `new PrismaClient()`。
@@ -43,14 +44,16 @@ function resolvePrismaDatasourceUrl(): string | undefined {
         process.env.PRISMA_POOL_TIMEOUT ?? "30",
       );
     }
-    if (
-      process.env.NODE_ENV === "development" &&
-      !url.searchParams.has("connection_limit")
-    ) {
-      url.searchParams.set(
-        "connection_limit",
-        process.env.PRISMA_CONNECTION_LIMIT ?? "2",
-      );
+    if (process.env.NODE_ENV === "development") {
+      // 显式 PRISMA_CONNECTION_LIMIT 优先于 URL 上的 connection_limit：
+      // dev:all 里 poll-loop 子进程设 =1（保持 1 连接），book-mall 主进程不设则沿用 URL 值。
+      // 否则 URL 上的 connection_limit 会覆盖所有子进程，导致每个 poll-loop 都开满（连接数翻几倍）。
+      const explicit = process.env.PRISMA_CONNECTION_LIMIT?.trim();
+      if (explicit) {
+        url.searchParams.set("connection_limit", explicit);
+      } else if (!url.searchParams.has("connection_limit")) {
+        url.searchParams.set("connection_limit", "2");
+      }
     }
     return url.toString();
   } catch {
@@ -60,13 +63,49 @@ function resolvePrismaDatasourceUrl(): string | undefined {
 
 const datasourceUrl = resolvePrismaDatasourceUrl();
 
+/**
+ * 腾讯云 PostgreSQL **直连**（无 pgbouncer）会回收空闲 TCP 连接，Prisma 复用到失效连接时报
+ * `P1017` / `Server has closed the connection` / `kind: Closed`。该错误发生在「连接获取阶段，
+ * 查询尚未执行」，故**自动重试**即可换到新连接成功——消除用户「点几次才有反应」。
+ * 仅重试连接级错误（见 isPrismaConnectionUnavailable）；业务错误立即抛出。
+ * 注：扩展后类型为 DynamicClientExtension，运行时对 model 操作 / $transaction / $queryRaw /
+ * $disconnect 完全兼容（代码未使用 $on/$use），对外仍以 PrismaClient 类型导出以兼容全部调用方。
+ */
+const DB_RETRY_MAX = 2;
+const DB_RETRY_BASE_DELAY_MS = 60;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 function buildPrismaClient(): PrismaClient {
-  return new PrismaClient({
+  const base = new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
     ...(datasourceUrl
       ? { datasources: { db: { url: datasourceUrl } } }
       : {}),
   });
+
+  const extended = base.$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ args, query }) {
+          let lastErr: unknown;
+          for (let attempt = 0; attempt <= DB_RETRY_MAX; attempt++) {
+            try {
+              return await query(args);
+            } catch (e) {
+              lastErr = e;
+              if (!isPrismaConnectionUnavailable(e) || attempt === DB_RETRY_MAX) {
+                throw e;
+              }
+              await sleep(DB_RETRY_BASE_DELAY_MS * (attempt + 1));
+            }
+          }
+          throw lastErr;
+        },
+      },
+    },
+  });
+
+  return extended as unknown as PrismaClient;
 }
 
 const clientStamp = generatedClientStamp();

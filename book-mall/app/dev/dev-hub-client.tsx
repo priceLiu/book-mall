@@ -193,6 +193,12 @@ export function DevHubClient({
           >
             画布 KIE 任务看板 →
           </Link>
+          <Link
+            href="/dev/canvas/i2v-load-test"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-fuchsia-500/40 bg-fuchsia-500/10 px-3 py-1.5 text-xs font-medium text-fuchsia-200 transition hover:border-fuchsia-400 hover:bg-fuchsia-500/20"
+          >
+            图生视频并发压测 →
+          </Link>
         </div>
         <p className="mt-3 text-xs text-zinc-500">
           上次检测：{new Date(checkedAt).toLocaleString("zh-CN")}

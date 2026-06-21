@@ -81,9 +81,16 @@ export async function GET(request: NextRequest) {
 
     const providerKind = query.filters.providerKind;
 
+    // 自动刷新 tick 传 facets=0：facets（按 provider/model/credential 分面，3~4 条额外查询）
+    // 只在首屏 / 改筛选时才需要重算，8s 轮询不必每次都算，显著降低读页面对 DB 的压力。
+    const facetsParam = request.nextUrl.searchParams.get("facets")?.trim();
+    const includeFacets = facetsParam !== "0" && facetsParam !== "false";
+
     const [total, facets] = await Promise.all([
       prisma.gatewayRequestLog.count({ where }),
-      resolveGatewayLogListFacets(facetWhere, providerKind || undefined),
+      includeFacets
+        ? resolveGatewayLogListFacets(facetWhere, providerKind || undefined)
+        : Promise.resolve(null),
     ]);
 
     const totalPages = computeLogTotalPages(total, pageSize);
@@ -105,6 +112,7 @@ export async function GET(request: NextRequest) {
       page: safePage,
       pageSize,
       totalPages,
+      // facets=null 表示本次未重算，前端沿用上一次的分面值。
       facets,
     });
   } catch (e) {

@@ -89,57 +89,13 @@ export function buildEmptyCategoryCounts(): DashboardCategoryCount[] {
   }));
 }
 
-function resolveChartLogModelKey(row: DashboardChartLogRow): string {
-  const canonical = row.canonicalModelKey?.trim();
+function resolveModelKeyFromParts(
+  canonicalModelKey: string | null,
+  model: string | null,
+): string {
+  const canonical = canonicalModelKey?.trim();
   if (canonical) return canonical;
-  const model = row.model?.trim();
-  return model || "unknown";
-}
-
-function aggregateChartCategories(
-  rows: DashboardChartLogRow[],
-): DashboardStatsPayload["byCategory"] {
-  const inProgress = buildEmptyCategoryCounts();
-  const succeeded = buildEmptyCategoryCounts();
-
-  for (const row of rows) {
-    const bucket = dashboardStatusBucket(row.status);
-    if (bucket !== "inProgress" && bucket !== "succeeded") continue;
-    const cat = resolveDashboardChartCategory(row, row.billingCategory);
-    const target = bucket === "inProgress" ? inProgress : succeeded;
-    bumpCategoryCount(target, cat, 1);
-  }
-
-  return { inProgress, succeeded };
-}
-
-function aggregateChartModels(
-  rows: DashboardChartLogRow[],
-): DashboardStatsPayload["byModel"] {
-  const inProgress = new Map<string, DashboardModelCount>();
-  const succeeded = new Map<string, DashboardModelCount>();
-
-  for (const row of rows) {
-    const bucket = dashboardStatusBucket(row.status);
-    if (bucket !== "inProgress" && bucket !== "succeeded") continue;
-    const modelKey = resolveChartLogModelKey(row);
-    const target = bucket === "inProgress" ? inProgress : succeeded;
-    const existing = target.get(modelKey);
-    if (existing) {
-      existing.count += 1;
-      continue;
-    }
-    target.set(modelKey, {
-      model: row.model?.trim() || modelKey,
-      canonicalModelKey: row.canonicalModelKey?.trim() || null,
-      count: 1,
-    });
-  }
-
-  return {
-    inProgress: sortModelCounts(inProgress),
-    succeeded: sortModelCounts(succeeded),
-  };
+  return model?.trim() || "unknown";
 }
 
 function sortModelCounts(map: Map<string, DashboardModelCount>): DashboardModelCount[] {
@@ -176,19 +132,96 @@ const CHART_LOG_SELECT = {
   canonicalModelKey: true,
 } satisfies Prisma.GatewayRequestLogSelect;
 
-async function fetchDashboardChartRows(
+const CHART_STATUSES: GatewayRequestStatus[] = [
+  ...DASHBOARD_IN_PROGRESS_STATUSES,
+  "SUCCEEDED",
+];
+
+/**
+ * 模型分布：纯列聚合，交给 DB groupBy（不再把窗口内所有行拉到 Node）。
+ */
+async function fetchChartModelStats(
   where: Prisma.GatewayRequestLogWhereInput,
-): Promise<DashboardChartLogRow[]> {
-  const chartStatuses: GatewayRequestStatus[] = [
-    ...DASHBOARD_IN_PROGRESS_STATUSES,
-    "SUCCEEDED",
-  ];
-  return prisma.gatewayRequestLog.findMany({
-    where: {
-      AND: [where, { status: { in: chartStatuses } }],
-    },
-    select: CHART_LOG_SELECT,
+): Promise<DashboardStatsPayload["byModel"]> {
+  const groups = await prisma.gatewayRequestLog.groupBy({
+    by: ["status", "canonicalModelKey", "model"],
+    where: { AND: [where, { status: { in: CHART_STATUSES } }] },
+    _count: { _all: true },
   });
+  const inProgress = new Map<string, DashboardModelCount>();
+  const succeeded = new Map<string, DashboardModelCount>();
+  for (const g of groups) {
+    const bucket = dashboardStatusBucket(g.status);
+    if (bucket !== "inProgress" && bucket !== "succeeded") continue;
+    const target = bucket === "inProgress" ? inProgress : succeeded;
+    const modelKey = resolveModelKeyFromParts(g.canonicalModelKey, g.model);
+    const count = g._count._all;
+    const existing = target.get(modelKey);
+    if (existing) {
+      existing.count += count;
+      continue;
+    }
+    target.set(modelKey, {
+      model: g.model?.trim() || modelKey,
+      canonicalModelKey: g.canonicalModelKey?.trim() || null,
+      count,
+    });
+  }
+  return {
+    inProgress: sortModelCounts(inProgress),
+    succeeded: sortModelCounts(succeeded),
+  };
+}
+
+/**
+ * 类别分布：已落库的具体大类（billingCategory != OTHER/null）直接 DB groupBy 计数；
+ * 仅 OTHER / NULL 子集才需要拉行按 requestKind/model/inputSummary 运行时归类
+ * （该子集通常远小于全量，避免对大表无上限全扫）。结果与逐行聚合一致。
+ */
+async function fetchChartCategoryStats(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<DashboardStatsPayload["byCategory"]> {
+  const inProgress = buildEmptyCategoryCounts();
+  const succeeded = buildEmptyCategoryCounts();
+  const chartWhere: Prisma.GatewayRequestLogWhereInput = {
+    AND: [where, { status: { in: CHART_STATUSES } }],
+  };
+
+  const [groups, otherRows] = await Promise.all([
+    prisma.gatewayRequestLog.groupBy({
+      by: ["status", "billingCategory"],
+      where: chartWhere,
+      _count: { _all: true },
+    }),
+    prisma.gatewayRequestLog.findMany({
+      where: {
+        AND: [chartWhere, { OR: [{ billingCategory: null }, { billingCategory: "OTHER" }] }],
+      },
+      select: CHART_LOG_SELECT,
+    }),
+  ]);
+
+  for (const g of groups) {
+    if (!g.billingCategory || g.billingCategory === "OTHER") continue;
+    const bucket = dashboardStatusBucket(g.status);
+    const target =
+      bucket === "inProgress" ? inProgress : bucket === "succeeded" ? succeeded : null;
+    if (!target) continue;
+    bumpCategoryCount(
+      target,
+      g.billingCategory as DashboardChartCategoryKey,
+      g._count._all,
+    );
+  }
+
+  for (const row of otherRows) {
+    const bucket = dashboardStatusBucket(row.status);
+    if (bucket !== "inProgress" && bucket !== "succeeded") continue;
+    const cat = resolveDashboardChartCategory(row, row.billingCategory);
+    bumpCategoryCount(bucket === "inProgress" ? inProgress : succeeded, cat, 1);
+  }
+
+  return { inProgress, succeeded };
 }
 
 export async function fetchDashboardStatsSummary(
@@ -220,25 +253,23 @@ export async function fetchDashboardStatsSummary(
 export async function fetchDashboardCategoryStats(
   where: Prisma.GatewayRequestLogWhereInput,
 ): Promise<{ byCategory: DashboardStatsPayload["byCategory"] }> {
-  const chartRows = await fetchDashboardChartRows(where);
-  return { byCategory: aggregateChartCategories(chartRows) };
+  return { byCategory: await fetchChartCategoryStats(where) };
 }
 
 export async function fetchDashboardModelStats(
   where: Prisma.GatewayRequestLogWhereInput,
 ): Promise<{ byModel: DashboardStatsPayload["byModel"] }> {
-  const chartRows = await fetchDashboardChartRows(where);
-  return { byModel: aggregateChartModels(chartRows) };
+  return { byModel: await fetchChartModelStats(where) };
 }
 
 export async function fetchDashboardChartStats(
   where: Prisma.GatewayRequestLogWhereInput,
 ): Promise<Pick<DashboardStatsPayload, "byCategory" | "byModel">> {
-  const chartRows = await fetchDashboardChartRows(where);
-  return {
-    byCategory: aggregateChartCategories(chartRows),
-    byModel: aggregateChartModels(chartRows),
-  };
+  const [byCategory, byModel] = await Promise.all([
+    fetchChartCategoryStats(where),
+    fetchChartModelStats(where),
+  ]);
+  return { byCategory, byModel };
 }
 
 export type DashboardStatsParts = "summary" | "categories" | "models";

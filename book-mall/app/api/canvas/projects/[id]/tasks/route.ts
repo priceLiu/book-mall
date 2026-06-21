@@ -7,7 +7,7 @@ import {
 } from "@/lib/canvas/api-helpers";
 import {
   listProjectTasks,
-  runCanvasPollWorker,
+  scheduleOpportunisticCanvasPoll,
 } from "@/lib/canvas/canvas-task-service";
 import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
 
@@ -28,9 +28,6 @@ const READ_TIMEOUT_MS = (() => {
   return Number.isFinite(raw) && raw >= 1000 ? raw : 6000;
 })();
 
-const POLL_TRIGGER_MIN_GAP_MS = 8000;
-const lastPollTriggerByProject = new Map<string, number>();
-
 /** 与 canvas-kie-gateway-claim 一致的「进行中」状态集合 */
 const CANVAS_INFLIGHT_STATUS = new Set<string>([
   "PENDING",
@@ -44,21 +41,6 @@ class CanvasTasksReadTimeout extends Error {
     super("canvas tasks read timeout");
     this.name = "CanvasTasksReadTimeout";
   }
-}
-
-/** 后台疏导：节流 + fire-and-forget，绝不阻塞用户读请求 */
-function maybeTriggerCanvasProjectPoll(projectId: string): void {
-  if (process.env.CANVAS_DISABLE_OPPORTUNISTIC_POLL === "1") return;
-  const now = Date.now();
-  const last = lastPollTriggerByProject.get(projectId) ?? 0;
-  if (now - last < POLL_TRIGGER_MIN_GAP_MS) return;
-  lastPollTriggerByProject.set(projectId, now);
-  void runCanvasPollWorker({ projectId }).catch((e) => {
-    console.warn(
-      "[canvas/tasks] background poll failed",
-      e instanceof Error ? e.message : String(e),
-    );
-  });
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -92,19 +74,19 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       }),
     ]);
 
-    // 仅当本次读到「有进行中任务」时，后台 fire-and-forget 推进（节流），不阻塞响应
+    // 仅当本次读到「有进行中任务」时，后台疏导推进（全局单飞 + 每项目节流），不阻塞响应
     const hasInflight = tasks.some((t) => CANVAS_INFLIGHT_STATUS.has(t.status));
-    if (hasInflight) maybeTriggerCanvasProjectPoll(projectId);
+    if (hasInflight) scheduleOpportunisticCanvasPoll(projectId);
 
     return NextResponse.json({ tasks }, { headers: jsonHeaders(request) });
   } catch (err) {
-    // 读超时 / DB 不可用：返回 stale，让前端保留上一帧，绝不让画布白屏或 503 卡死
+    // 读超时 / DB 不可用：返回 stale，让前端保留上一帧，绝不让画布白屏或 503 卡死。
+    // 注意：此时库多半已塞车（连接池耗尽），绝不再起后台轮询火上浇油——
+    // 等下一次正常读取再触发疏导。
     if (
       err instanceof CanvasTasksReadTimeout ||
       isPrismaConnectionUnavailable(err)
     ) {
-      // 读慢通常意味着库在塞车：仍尝试后台疏导一次（节流、不 await）
-      maybeTriggerCanvasProjectPoll(projectId);
       return NextResponse.json(
         { tasks: null, stale: true },
         { status: 200, headers: jsonHeaders(request) },

@@ -7,11 +7,17 @@ import {
 import type { SlowWarnAutoHandlerResult } from "@/lib/generation/slow-warn-auto-handler";
 import { runCanvasPollWorker } from "@/lib/canvas/canvas-task-service";
 
-const MIN_INTERVAL_MS = 10_000;
+// 自动 tick（含 poll=1）的合并间隔：日志/状态/轮询池三页 + 多标签同时打开时，
+// 同一用户每个周期最多触发一次重量级 poll worker，避免读页面把连接池打满、
+// 与「点生成」抢连接（用户反馈的核心瓶颈）。
+const MIN_INTERVAL_MS = 15_000;
+// force（poll=1）不再完全绕过限流——这些 poll=1 多为前端自动刷新而非真人手点；
+// 仅给一个更短的下限，防止连点/多页并发把后台 worker 跑爆。
+const FORCED_MIN_INTERVAL_MS = 6_000;
 const lastPollAtByUser = new Map<string, number>();
 
 export type OpportunisticPollOpts = {
-  /** 手动刷新：忽略限流 */
+  /** 手动刷新：使用更短的限流下限（仍限流，不再完全绕过） */
   force?: boolean;
   /** 明确禁止（历史明细 / 统计只读） */
   skip?: boolean;
@@ -25,7 +31,8 @@ export async function maybeRunOpportunisticGatewayPoll(
 
   const now = Date.now();
   const last = lastPollAtByUser.get(userId) ?? 0;
-  if (!opts?.force && now - last < MIN_INTERVAL_MS) {
+  const minInterval = opts?.force ? FORCED_MIN_INTERVAL_MS : MIN_INTERVAL_MS;
+  if (now - last < minInterval) {
     return { ran: false };
   }
 
