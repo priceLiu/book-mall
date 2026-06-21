@@ -75,9 +75,10 @@ import {
 } from "@/lib/canvas/canvas-volcengine-recover";
 import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
 import { isCanvasVolcengineVideoTaskPayload } from "@/lib/canvas/canvas-constants";
-import { getGenerationPollInnerTimeoutMs, getGenerationSlowWarnMs } from "@/lib/generation/poll-config";
+import { getGenerationPollInnerTimeoutMs } from "@/lib/generation/poll-config";
+import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
+import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-handler";
 import {
-  escalateSlowCanvasSubmittedTasks,
   isSlowGenerationAge,
 } from "@/lib/generation/slow-generation";
 import {
@@ -1437,8 +1438,19 @@ export async function runCanvasPollWorker(opts?: {
 
   await dispatchQueuedCanvasTasks({ projectId: opts?.projectId }).catch(() => undefined);
 
-  if (!opts?.projectId) {
-    await escalateSlowCanvasSubmittedTasks({ limit: 10 }).catch(() => undefined);
+  if (opts?.projectId) {
+    try {
+      const auto = await maybeRunSlowWarnAutoHandler({ limit: 8, force: true });
+      if (
+        auto.gatewaySucceededSync > 0 ||
+        auto.slowCanvasRecovered > 0 ||
+        auto.slowGatewayRecovered > 0
+      ) {
+        logKieEvent("info", "[canvas] slow-warn auto", auto);
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   // 1) PENDING（KIE createTask 失败 / 中断）：仅 IMAGE 异步出图重试
@@ -1731,7 +1743,7 @@ export async function runCanvasPollWorker(opts?: {
 
   for (let pass = 0; pass < maxPasses && Date.now() < deadline; pass++) {
     const fetchSize = scaledPoll ? pollShardOverFetchSize(pollBatch) : pollBatch;
-    const slowCutoff = new Date(Date.now() - getGenerationSlowWarnMs());
+    const slowCutoff = new Date(Date.now() - (await resolveGenerationSlowWarnMs()));
     const candidates = await prisma.canvasGenerationTask.findMany({
       where: { status: "SUBMITTED", kieTaskId: { not: null }, ...projectFilter },
       orderBy: [

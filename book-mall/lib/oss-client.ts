@@ -44,5 +44,47 @@ export async function createOssClientFrom(
     secure: true,
     timeout: opts?.timeoutMs ?? 60_000,
     ...(cfg.endpoint ? { endpoint: cfg.endpoint } : {}),
+  } as ConstructorParameters<typeof OSS>[0]);
+}
+
+type OssMultipartClient = {
+  multipartUpload: (
+    name: string,
+    file: Buffer,
+    options?: Record<string, unknown>,
+  ) => Promise<{ url?: string }>;
+};
+
+/** ali-oss 运行时支持 multipartUpload，但 @types 未声明 */
+export async function ossUploadBuffer(
+  client: Awaited<ReturnType<typeof createOssClientFrom>>,
+  args: {
+    key: string;
+    buf: Buffer;
+    contentType: string;
+    useMultipart: boolean;
+    timeoutMs: number;
+  },
+): Promise<{ url?: string }> {
+  const ct = args.contentType.split(";")[0].trim() || "application/octet-stream";
+  if (args.useMultipart) {
+    return (client as unknown as OssMultipartClient).multipartUpload(
+      args.key,
+      args.buf,
+      {
+        parallel: 4,
+        partSize: 1024 * 1024,
+        timeout: args.timeoutMs,
+        mime: ct,
+        headers: {
+          "Content-Type": ct,
+          "x-oss-object-acl": "public-read",
+        },
+      },
+    );
+  }
+  return client.put(args.key, args.buf, {
+    headers: { "Content-Type": ct },
+    ACL: "public-read",
   });
 }

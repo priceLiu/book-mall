@@ -10,6 +10,7 @@ import {
   resolveDashboardChartCategory,
 } from "@/lib/billing/billing-category";
 import { buildSlowGenerationWhere } from "@/lib/generation/slow-generation";
+import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { prisma } from "@/lib/prisma";
 
 export const DASHBOARD_IN_PROGRESS_STATUSES: GatewayRequestStatus[] = [
@@ -193,16 +194,19 @@ async function fetchDashboardChartRows(
 export async function fetchDashboardStatsSummary(
   where: Prisma.GatewayRequestLogWhereInput,
 ): Promise<{ cards: DashboardCards }> {
-  const [statusGroups, slowWarn] = await Promise.all([
+  const [statusGroups, slowWarnMs] = await Promise.all([
     prisma.gatewayRequestLog.groupBy({
       by: ["status"],
       where,
       _count: { _all: true },
     }),
-    prisma.gatewayRequestLog.count({
-      where: { AND: [where, buildSlowGenerationWhere()] },
-    }),
+    resolveGenerationSlowWarnMs(),
   ]);
+  const slowWarn = await prisma.gatewayRequestLog.count({
+    where: {
+      AND: [where, buildSlowGenerationWhere(slowWarnMs)],
+    },
+  });
   return {
     cards: {
       ...mergeStatusGroupCounts(

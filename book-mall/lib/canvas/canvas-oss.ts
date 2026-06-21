@@ -4,6 +4,7 @@
  */
 import {
   createOssClientFrom,
+  ossUploadBuffer,
   readOssEnv,
   type OssEnvConfig,
 } from "@/lib/oss-client";
@@ -89,23 +90,13 @@ async function uploadBufferToOss(args: {
   const ct = args.contentType.split(";")[0].trim() || "application/octet-stream";
   let result: { url?: string };
   try {
-    if (useMultipart) {
-      result = await client.multipartUpload(args.key, args.buf, {
-        parallel: 4,
-        partSize: 1024 * 1024,
-        timeout: timeoutMs,
-        mime: ct,
-        headers: {
-          "Content-Type": ct,
-          "x-oss-object-acl": "public-read",
-        },
-      });
-    } else {
-      result = await client.put(args.key, args.buf, {
-        headers: { "Content-Type": ct },
-        ACL: "public-read",
-      });
-    }
+    result = await ossUploadBuffer(client, {
+      key: args.key,
+      buf: args.buf,
+      contentType: ct,
+      useMultipart,
+      timeoutMs,
+    });
   } catch (e) {
     const raw = e instanceof Error ? e.message : String(e);
     if (

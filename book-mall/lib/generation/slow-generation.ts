@@ -8,6 +8,7 @@ import { isCanvasVolcengineVideoTaskPayload } from "@/lib/canvas/canvas-constant
 import { prisma } from "@/lib/prisma";
 
 import { getGenerationSlowWarnMs } from "./poll-config";
+import { resolveGenerationSlowWarnMs } from "./slow-warn-config";
 
 const IN_FLIGHT_SLOW_STATUSES = ["PENDING", "RUNNING"] as const;
 
@@ -49,8 +50,10 @@ function taskInputPayload(
 export async function escalateSlowCanvasSubmittedTasks(opts?: {
   projectId?: string;
   limit?: number;
+  thresholdMs?: number;
 }): Promise<{ scanned: number; recovered: number }> {
-  const thresholdMs = getGenerationSlowWarnMs();
+  const thresholdMs =
+    opts?.thresholdMs ?? (await resolveGenerationSlowWarnMs());
   const cutoff = new Date(Date.now() - thresholdMs);
   const limit = opts?.limit ?? 15;
 
