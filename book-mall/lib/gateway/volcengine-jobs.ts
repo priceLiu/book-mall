@@ -156,5 +156,11 @@ export async function pollVolcengineVideoTaskForLog(opts: {
     vendorRaw: polled.raw,
   });
 
+  const after = await prisma.gatewayRequestLog.findUnique({
+    where: { id: opts.logId },
+    select: { status: true },
+  });
+  if (after?.status !== "RUNNING") return "done";
+
   return "pending";
 }

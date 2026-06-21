@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveGatewayBookRole } from "@/lib/gateway/book-role";
 import { resolveGatewayCredentialScope } from "@/lib/gateway/platform-credential-delegate";
+import {
+  gatewayDatabaseUnavailableResponse,
+  isGatewayDatabaseError,
+} from "@/lib/gateway/gateway-route-errors";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 import { phoneFromGatewayEmail } from "@/lib/auth/user-display";
 import { prisma } from "@/lib/prisma";
@@ -8,39 +12,47 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const user = await requireGatewaySessionUser(request);
-  if (!user) {
-    return NextResponse.json({ user: null }, { status: 401 });
-  }
-  const bookRole = await resolveGatewayBookRole(user);
-  const credentialScope = await resolveGatewayCredentialScope(user);
-  let billingPersona: string | null = null;
-  let phone: string | null = phoneFromGatewayEmail(user.email);
-  if (user.bookUserId) {
-    const bookUser = await prisma.user.findUnique({
-      where: { id: user.bookUserId },
-      select: { billingPersona: true, billingPersonaLockedAt: true, phone: true },
-    });
-    if (bookUser?.billingPersonaLockedAt) {
-      billingPersona = bookUser.billingPersona;
+  try {
+    const user = await requireGatewaySessionUser(request);
+    if (!user) {
+      return NextResponse.json({ user: null }, { status: 401 });
     }
-    phone = bookUser?.phone ?? phone;
+    const bookRole = await resolveGatewayBookRole(user);
+    const credentialScope = await resolveGatewayCredentialScope(user);
+    let billingPersona: string | null = null;
+    let phone: string | null = phoneFromGatewayEmail(user.email);
+    if (user.bookUserId) {
+      const bookUser = await prisma.user.findUnique({
+        where: { id: user.bookUserId },
+        select: { billingPersona: true, billingPersonaLockedAt: true, phone: true },
+      });
+      if (bookUser?.billingPersonaLockedAt) {
+        billingPersona = bookUser.billingPersona;
+      }
+      phone = bookUser?.phone ?? phone;
+    }
+    return NextResponse.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        phone,
+        name: user.name,
+        source: user.source,
+        bookUserId: user.bookUserId,
+        bookRole,
+        billingPersona,
+        platformPoolDelegate: credentialScope.isPlatformPoolDelegate
+          ? { canonicalOwnerEmail: credentialScope.canonicalOwnerEmail }
+          : null,
+      },
+    });
+  } catch (e) {
+    if (isGatewayDatabaseError(e)) {
+      console.error("[gateway/session] database unavailable", e);
+      return gatewayDatabaseUnavailableResponse();
+    }
+    throw e;
   }
-  return NextResponse.json({
-    user: {
-      id: user.id,
-      email: user.email,
-      phone,
-      name: user.name,
-      source: user.source,
-      bookUserId: user.bookUserId,
-      bookRole,
-      billingPersona,
-      platformPoolDelegate: credentialScope.isPlatformPoolDelegate
-        ? { canonicalOwnerEmail: credentialScope.canonicalOwnerEmail }
-        : null,
-    },
-  });
 }
 
 export async function DELETE(request: NextRequest) {

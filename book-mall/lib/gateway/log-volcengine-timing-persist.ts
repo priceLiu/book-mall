@@ -3,9 +3,11 @@ import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { isGatewayLogTerminalStatus } from "@/lib/gateway/log-progress";
+import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import {
   attachGatewayTimingToSummary,
   computeVolcengineTimingBreakdown,
+  isVolcengineVendorUpdatedStale,
   mergeVolcengineTimingTrace,
   readVolcengineTimingTrace,
   type VolcengineTimingBreakdown,
@@ -24,6 +26,7 @@ export async function persistVolcengineTimingOnPoll(input: {
 }): Promise<{
   breakdown: VolcengineTimingBreakdown;
   resultSummary: Record<string, unknown>;
+  vendorStalled?: boolean;
 }> {
   const polledAtMs = Date.now();
   const trace = mergeVolcengineTimingTrace(
@@ -47,6 +50,25 @@ export async function persistVolcengineTimingOnPoll(input: {
     breakdown,
     input.resultSummaryOverride,
   );
+
+  const vendorStalled =
+    !isGatewayLogTerminalStatus(input.log.status) &&
+    isVolcengineVendorUpdatedStale(trace, polledAtMs);
+
+  if (vendorStalled) {
+    const durationMs = input.log.submittedAt
+      ? polledAtMs - input.log.submittedAt.getTime()
+      : 0;
+    await finalizeRequestLog(input.log.id, {
+      status: "FAILED",
+      durationMs,
+      failCode: "VOLCENGINE_VENDOR_STALE",
+      failMessage:
+        "Volcengine 任务 updated_at 已停更超过 10 分钟且仍为进行中，判定厂商卡死；请在控制台核对或重试",
+      resultSummary: nextSummary,
+    });
+    return { breakdown, resultSummary: nextSummary, vendorStalled: true };
+  }
 
   if (!isGatewayLogTerminalStatus(input.log.status)) {
     await prisma.gatewayRequestLog.updateMany({
