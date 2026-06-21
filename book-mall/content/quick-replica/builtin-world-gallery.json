@@ -1,0 +1,1052 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-01",
+    "category": "world",
+    "kind": "create-world",
+    "title": "山湖日落",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-01.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "山湖日落",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 100,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-02",
+    "category": "world",
+    "kind": "create-world",
+    "title": "魔法森林树屋图书馆",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-02.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "魔法森林树屋图书馆",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 101,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-03",
+    "category": "world",
+    "kind": "create-world",
+    "title": "传统日式室内设计，可欣赏花园景色",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-03.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "传统日式室内设计，可欣赏花园景色",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 102,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-04",
+    "category": "world",
+    "kind": "create-world",
+    "title": "日落时分的威尼斯漂浮城市景观",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-04.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "日落时分的威尼斯漂浮城市景观",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 103,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-05",
+    "category": "world",
+    "kind": "create-world",
+    "title": "蒸汽朋克火车车厢温室",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-05.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "蒸汽朋克火车车厢温室",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 104,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-06",
+    "category": "world",
+    "kind": "create-world",
+    "title": "梦幻冰酒店 北极光",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-06.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "梦幻冰酒店 北极光",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 105,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-07",
+    "category": "world",
+    "kind": "create-world",
+    "title": "绿植环绕的温馨咖啡馆内部",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-07.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "绿植环绕的温馨咖啡馆内部",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 106,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-08",
+    "category": "world",
+    "kind": "create-world",
+    "title": "乡村风格浴室静谧之所",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-08.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "乡村风格浴室静谧之所",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 107,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-09",
+    "category": "world",
+    "kind": "create-world",
+    "title": "神秘水晶洞穴内部",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-09.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "神秘水晶洞穴内部",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 108,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-10",
+    "category": "world",
+    "kind": "create-world",
+    "title": "格兰德粉彩酒店大堂",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-10.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "格兰德粉彩酒店大堂",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 109,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-11",
+    "category": "world",
+    "kind": "create-world",
+    "title": "无限阶梯和拱形结构",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-11.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "无限阶梯和拱形结构",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 110,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-12",
+    "category": "world",
+    "kind": "create-world",
+    "title": "极简主义卧室和步入式衣帽间",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-12.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "极简主义卧室和步入式衣帽间",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 111,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-13",
+    "category": "world",
+    "kind": "create-world",
+    "title": "蒸汽朋克云中大都会",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-13.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "蒸汽朋克云中大都会",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 112,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-14",
+    "category": "world",
+    "kind": "create-world",
+    "title": "闪耀海景悬崖小屋",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-14.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "闪耀海景悬崖小屋",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 113,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-15",
+    "category": "world",
+    "kind": "create-world",
+    "title": "宁静的海滨日落豪华度假胜地",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-15.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "宁静的海滨日落豪华度假胜地",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 114,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-16",
+    "category": "world",
+    "kind": "create-world",
+    "title": "宏伟的城堡入口",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-16.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "宏伟的城堡入口",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 115,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-17",
+    "category": "world",
+    "kind": "create-world",
+    "title": "充满活力的走廊和楼梯",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-17.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "充满活力的走廊和楼梯",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 116,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-18",
+    "category": "world",
+    "kind": "create-world",
+    "title": "宏伟的拱形图书馆走廊",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-18.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "宏伟的拱形图书馆走廊",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 117,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-19",
+    "category": "world",
+    "kind": "create-world",
+    "title": "奇幻糖果乐园梦境",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-19.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "奇幻糖果乐园梦境",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 118,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-20",
+    "category": "world",
+    "kind": "create-world",
+    "title": "秋季日本花园保护区",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-20.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "秋季日本花园保护区",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 119,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-21",
+    "category": "world",
+    "kind": "create-world",
+    "title": "未来太空飞船内部指挥中心",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-21.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "未来太空飞船内部指挥中心",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 120,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-22",
+    "category": "world",
+    "kind": "create-world",
+    "title": "北极村，宁静倒影",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-22.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "北极村，宁静倒影",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 121,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-23",
+    "category": "world",
+    "kind": "create-world",
+    "title": "未来主义太空飞船卧室星球景观",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-23.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "未来主义太空飞船卧室星球景观",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 122,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-24",
+    "category": "world",
+    "kind": "create-world",
+    "title": "质朴的洞穴式海滨度假胜地",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-24.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "质朴的洞穴式海滨度假胜地",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 123,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-25",
+    "category": "world",
+    "kind": "create-world",
+    "title": "粉红海岸街天堂",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-25.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "粉红海岸街天堂",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 124,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-26",
+    "category": "world",
+    "kind": "create-world",
+    "title": "温馨的客厅内饰",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-26.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "温馨的客厅内饰",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 125,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-27",
+    "category": "world",
+    "kind": "create-world",
+    "title": "宏伟的大教堂和正式花园",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-27.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "宏伟的大教堂和正式花园",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 126,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-28",
+    "category": "world",
+    "kind": "create-world",
+    "title": "有葡萄园的山村",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-28.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "有葡萄园的山村",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 127,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-29",
+    "category": "world",
+    "kind": "create-world",
+    "title": "废弃火车站，杂草丛生",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-29.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "废弃火车站，杂草丛生",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 128,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-30",
+    "category": "world",
+    "kind": "create-world",
+    "title": "山顶上的棋盘",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-30.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "山顶上的棋盘",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 129,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-31",
+    "category": "world",
+    "kind": "create-world",
+    "title": "古朴的山地火车站",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-31.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "古朴的山地火车站",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 130,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-32",
+    "category": "world",
+    "kind": "create-world",
+    "title": "日式房间与静谧花园",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-32.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "日式房间与静谧花园",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 131,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-33",
+    "category": "world",
+    "kind": "create-world",
+    "title": "宁静的日式池塘小屋",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-33.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "宁静的日式池塘小屋",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 132,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-34",
+    "category": "world",
+    "kind": "create-world",
+    "title": "复古迷你美式餐馆",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-34.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "复古迷你美式餐馆",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 133,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-35",
+    "category": "world",
+    "kind": "create-world",
+    "title": "圣托里尼岛沿海村庄",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-35.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "圣托里尼岛沿海村庄",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 134,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-36",
+    "category": "world",
+    "kind": "create-world",
+    "title": "翠绿山脉中的古老寺庙",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-36.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "翠绿山脉中的古老寺庙",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 135,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-37",
+    "category": "world",
+    "kind": "create-world",
+    "title": "迷人的花园小径小屋",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-37.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "迷人的花园小径小屋",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 136,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-38",
+    "category": "world",
+    "kind": "create-world",
+    "title": "迷人的乡村鹅卵石小路",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-38.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "迷人的乡村鹅卵石小路",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 137,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-39",
+    "category": "world",
+    "kind": "create-world",
+    "title": "温馨的乡村住宅内饰",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-39.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "温馨的乡村住宅内饰",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 138,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-40",
+    "category": "world",
+    "kind": "create-world",
+    "title": "魔法城堡彩虹景观",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-40.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "魔法城堡彩虹景观",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 139,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-41",
+    "category": "world",
+    "kind": "create-world",
+    "title": "华丽、宏伟、神圣的小教堂内部",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-41.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "华丽、宏伟、神圣的小教堂内部",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 140,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  },
+  {
+    "schemaVersion": 1,
+    "id": "qr-world-gallery-42",
+    "category": "world",
+    "kind": "create-world",
+    "title": "历史悠久的欧洲小巷，内设洗衣房",
+    "thumbnailUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/quick-replica/builtin/qr-world-gallery-42.webp",
+    "source": "builtin",
+    "visibility": "public",
+    "reference": {
+      "slots": {},
+      "prompt": {
+        "text": "历史悠久的欧洲小巷，内设洗衣房",
+        "locale": "zh"
+      },
+      "model": {
+        "role": "IMAGE",
+        "modelKey": "lib-nano-pro",
+        "params": {}
+      }
+    },
+    "sortOrder": 141,
+    "createdAt": "2026-06-20T00:00:00.000Z",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  }
+]

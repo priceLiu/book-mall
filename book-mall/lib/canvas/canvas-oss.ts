@@ -9,6 +9,7 @@ import {
 } from "@/lib/oss-client";
 import {
   buildCanvasOssKey,
+  buildQuickReplicaBuiltinOssKey,
   buildStyleLibraryOssKey,
   type CanvasOssKind,
 } from "./canvas-constants";
@@ -71,6 +72,9 @@ async function downloadToBuffer(
   return { buf, contentType, ext };
 }
 
+const MULTIPART_UPLOAD_THRESHOLD_BYTES = 5 * 1024 * 1024;
+const LARGE_UPLOAD_TIMEOUT_MS = 600_000;
+
 async function uploadBufferToOss(args: {
   cfg: OssEnvConfig;
   key: string;
@@ -79,14 +83,29 @@ async function uploadBufferToOss(args: {
   /** 百炼等阿里云服务拉取：用 bucket 直链，避免自定义 CDN 域返回异常 */
   preferBucketUrl?: boolean;
 }): Promise<string> {
-  const client = await createOssClientFrom(args.cfg);
+  const useMultipart = args.buf.byteLength >= MULTIPART_UPLOAD_THRESHOLD_BYTES;
+  const timeoutMs = useMultipart ? LARGE_UPLOAD_TIMEOUT_MS : 60_000;
+  const client = await createOssClientFrom(args.cfg, { timeoutMs });
   const ct = args.contentType.split(";")[0].trim() || "application/octet-stream";
-  let result: Awaited<ReturnType<typeof client.put>>;
+  let result: { url?: string };
   try {
-    result = await client.put(args.key, args.buf, {
-      headers: { "Content-Type": ct },
-      ACL: "public-read",
-    });
+    if (useMultipart) {
+      result = await client.multipartUpload(args.key, args.buf, {
+        parallel: 4,
+        partSize: 1024 * 1024,
+        timeout: timeoutMs,
+        mime: ct,
+        headers: {
+          "Content-Type": ct,
+          "x-oss-object-acl": "public-read",
+        },
+      });
+    } else {
+      result = await client.put(args.key, args.buf, {
+        headers: { "Content-Type": ct },
+        ACL: "public-read",
+      });
+    }
   } catch (e) {
     const raw = e instanceof Error ? e.message : String(e);
     if (
@@ -257,6 +276,26 @@ export async function uploadStyleLibraryPreview(args: {
     throw new Error(cfgRaw.error);
   }
   const key = buildStyleLibraryOssKey(args.id, args.ext);
+  return uploadBufferToOss({
+    cfg: cfgRaw,
+    key,
+    buf: args.buf,
+    contentType: args.contentType,
+  });
+}
+
+/** QuickReplica 内置模板预览图（固定 OSS key）。 */
+export async function uploadQuickReplicaBuiltinPreview(args: {
+  id: string;
+  buf: Buffer;
+  contentType: string;
+  ext: string;
+}): Promise<string> {
+  const cfgRaw = readOssEnv();
+  if ("error" in cfgRaw) {
+    throw new Error(cfgRaw.error);
+  }
+  const key = buildQuickReplicaBuiltinOssKey(args.id, args.ext);
   return uploadBufferToOss({
     cfg: cfgRaw,
     key,

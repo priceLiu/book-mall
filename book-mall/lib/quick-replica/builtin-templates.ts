@@ -5,11 +5,26 @@ import type { QrCategory, QrTemplateJson } from "@/lib/quick-replica/qr-types";
 
 let cached: QrTemplateJson[] | null = null;
 
+function loadJsonFile(relativePath: string): QrTemplateJson[] {
+  const file = join(process.cwd(), "content", "quick-replica", relativePath);
+  try {
+    const raw = readFileSync(file, "utf8");
+    const parsed = JSON.parse(raw) as QrTemplateJson | QrTemplateJson[];
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return [];
+  }
+}
+
 function loadFromJson(): QrTemplateJson[] {
-  const file = join(process.cwd(), "content", "quick-replica", "builtin-all.json");
-  const raw = readFileSync(file, "utf8");
-  const parsed = JSON.parse(raw) as QrTemplateJson | QrTemplateJson[];
-  return Array.isArray(parsed) ? parsed : [parsed];
+  return [
+    ...loadJsonFile("builtin-all.json"),
+    ...loadJsonFile("builtin-image-gallery.json"),
+    ...loadJsonFile("builtin-character-gallery.json"),
+    ...loadJsonFile("builtin-world-gallery.json"),
+    ...loadJsonFile("builtin-video-gallery.json"),
+    ...loadJsonFile("builtin-motion-sync-gallery.json"),
+  ];
 }
 
 export function getBuiltinQrTemplates(): QrTemplateJson[] {

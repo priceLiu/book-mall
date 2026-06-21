@@ -48,3 +48,24 @@ export async function uploadQuickReplicaAsset(args: {
   });
   return { url };
 }
+
+export async function uploadQuickReplicaCatalogAsset(args: {
+  catalogKey: string;
+  dataUrl: string;
+  kind: "image" | "video";
+}): Promise<{ url: string }> {
+  const { uploadQuickReplicaBuiltinPreview } = await import("@/lib/canvas/canvas-oss");
+  const { buf, contentType, ext } = parseDataUrl(args.dataUrl);
+  const maxBytes = args.kind === "video" ? 200 * 1024 * 1024 : 30 * 1024 * 1024;
+  if (buf.byteLength > maxBytes) {
+    throw new Error("文件过大");
+  }
+  const safeKey = args.catalogKey.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80);
+  const url = await uploadQuickReplicaBuiltinPreview({
+    id: `catalog-${safeKey}`,
+    buf,
+    contentType,
+    ext,
+  });
+  return { url };
+}

@@ -5,7 +5,42 @@ import {
   getBuiltinQrTemplateById,
   listBuiltinQrTemplates,
 } from "@/lib/quick-replica/builtin-templates";
+import { filterTemplatesForGallery } from "@/lib/quick-replica/qr-template-catalog";
 import type { QrCategory, QrTemplateJson, QrTemplateListFilters } from "@/lib/quick-replica/qr-types";
+
+function mergeBuiltinWithOverride(
+  builtin: QrTemplateJson,
+  override: QrTemplateJson,
+): QrTemplateJson {
+  return {
+    ...override,
+    id: builtin.id,
+    source: "builtin",
+    visibility: "public",
+  };
+}
+
+async function loadCatalogOverrideMap(): Promise<Map<string, QrTemplateJson>> {
+  const rows = await prisma.qrTemplate.findMany({
+    where: { catalogBuiltinId: { not: null }, deletedAt: null },
+  });
+  const map = new Map<string, QrTemplateJson>();
+  for (const row of rows) {
+    if (!row.catalogBuiltinId) continue;
+    map.set(row.catalogBuiltinId, rowToJson(row));
+  }
+  return map;
+}
+
+function applyCatalogOverridesToBuiltin(
+  builtins: QrTemplateJson[],
+  overrideMap: Map<string, QrTemplateJson>,
+): QrTemplateJson[] {
+  return builtins.map((b) => {
+    const override = overrideMap.get(b.id);
+    return override ? mergeBuiltinWithOverride(b, override) : b;
+  });
+}
 
 export function rowToJson(row: {
   id: string;
@@ -78,7 +113,9 @@ export async function listQrTemplates(
     return userRows.map(rowToJson);
   }
 
-  const builtin = listBuiltinQrTemplates(filters);
+  const builtinRaw = listBuiltinQrTemplates(filters);
+  const overrideMap = await loadCatalogOverrideMap();
+  const builtin = applyCatalogOverridesToBuiltin(builtinRaw, overrideMap);
 
   const ownWhere: Prisma.QrTemplateWhereInput = {
     ownerUserId: userId,
@@ -91,6 +128,7 @@ export async function listQrTemplates(
   const publicWhere: Prisma.QrTemplateWhereInput = {
     visibility: "public",
     deletedAt: null,
+    catalogBuiltinId: null,
     NOT: { ownerUserId: userId },
   };
   if (filters.category) publicWhere.category = filters.category;
@@ -113,7 +151,8 @@ export async function listQrTemplates(
     ...publicRows.map(rowToJson),
     ...builtin,
   ]);
-  return merged.sort(
+  const filtered = filterTemplatesForGallery(merged, filters);
+  return filtered.sort(
     (a, b) => a.sortOrder - b.sortOrder || b.createdAt.localeCompare(a.createdAt),
   );
 }
@@ -122,7 +161,13 @@ export async function getQrTemplateById(
   userId: string,
   id: string,
 ): Promise<QrTemplateJson | null> {
+  const overrideRow = await prisma.qrTemplate.findFirst({
+    where: { catalogBuiltinId: id, deletedAt: null, visibility: "public" },
+  });
   const builtin = getBuiltinQrTemplateById(id);
+  if (builtin && overrideRow) {
+    return mergeBuiltinWithOverride(builtin, rowToJson(overrideRow));
+  }
   if (builtin) return builtin;
 
   const row = await prisma.qrTemplate.findFirst({

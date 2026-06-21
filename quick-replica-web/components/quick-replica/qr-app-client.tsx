@@ -14,8 +14,11 @@ import {
 } from "@/components/quick-replica/qr-workspace-panel";
 import {
   QR_CATEGORIES,
+  QR_KIND_GALLERY_PREFETCH,
   defaultWorkspaceDraft,
   getKindDef,
+  invalidateQrTemplateCacheForCategory,
+  qrTemplateCacheKey,
   type QrCategory,
   type QrKindBrowseItem,
   type QrTemplate,
@@ -59,18 +62,41 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [kindsLoading, setKindsLoading] = useState(false);
   const kindsCacheRef = useRef<Map<QrCategory, QrKindBrowseItem[]>>(new Map());
+  const templatesCacheRef = useRef<Map<string, QrTemplate[]>>(new Map());
   const [draft, setDraft] = useState<QrWorkspaceDraft>(
     defaultWorkspaceDraft({ category: "video", kind: "text-to-video" }),
   );
 
   const templateScope = navMode === "my-works" ? "my" : "all";
 
+  const browseKey = useMemo(() => {
+    if (navMode === "home") return "";
+    const parts = [templateScope];
+    if (navMode !== "my-works" && category) parts.push(category);
+    if (selectedKind) parts.push(selectedKind);
+    if (pinnedToolKey && navMode === "pinned-tool") parts.push(pinnedToolKey);
+    return parts.join("|");
+  }, [navMode, category, selectedKind, pinnedToolKey, templateScope]);
+
+  const browseKeyRef = useRef(browseKey);
+  browseKeyRef.current = browseKey;
+
   const loadTemplates = useCallback(async () => {
     if (navMode === "home") {
       setTemplates([]);
+      setTemplatesLoading(false);
       return;
     }
+
+    const requestKey = browseKeyRef.current;
+    const cached = templatesCacheRef.current.get(requestKey);
+    if (cached) {
+      setTemplates(cached);
+    } else {
+      setTemplates([]);
+    }
     setTemplatesLoading(true);
+
     const qs = new URLSearchParams({ scope: templateScope });
     if (navMode !== "my-works" && category) qs.set("category", category);
     if (selectedKind) qs.set("kind", selectedKind);
@@ -79,39 +105,48 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
       const res = await fetch(
         `/api/book-mall/api/platform/v1/quick-replica/templates?${qs}`,
       );
-      if (res.ok) {
+      if (res.ok && browseKeyRef.current === requestKey) {
         const data = (await res.json()) as { templates: QrTemplate[] };
-        setTemplates(data.templates ?? []);
+        const list = data.templates ?? [];
+        templatesCacheRef.current.set(requestKey, list);
+        setTemplates(list);
       }
     } finally {
-      setTemplatesLoading(false);
+      if (browseKeyRef.current === requestKey) {
+        setTemplatesLoading(false);
+      }
     }
   }, [navMode, category, selectedKind, pinnedToolKey, templateScope]);
 
   const loadKinds = useCallback(async () => {
     if (navMode === "my-works" || navMode === "home" || navMode === "pinned-tool") {
       setKindItems([]);
+      setKindsLoading(false);
       return;
     }
 
-    const cached = kindsCacheRef.current.get(category);
+    const requestCategory = category;
+    const cached = kindsCacheRef.current.get(requestCategory);
     if (cached) {
       setKindItems(cached);
+    } else {
+      setKindItems([]);
     }
-
-    setKindsLoading(!cached);
+    setKindsLoading(true);
     try {
       const res = await fetch(
-        `/api/book-mall/api/platform/v1/quick-replica/kinds?category=${encodeURIComponent(category)}`,
+        `/api/book-mall/api/platform/v1/quick-replica/kinds?category=${encodeURIComponent(requestCategory)}`,
       );
-      if (res.ok) {
+      if (res.ok && category === requestCategory) {
         const data = (await res.json()) as { kinds: QrKindBrowseItem[] };
         const kinds = data.kinds ?? [];
-        kindsCacheRef.current.set(category, kinds);
+        kindsCacheRef.current.set(requestCategory, kinds);
         setKindItems(kinds);
       }
     } finally {
-      setKindsLoading(false);
+      if (category === requestCategory) {
+        setKindsLoading(false);
+      }
     }
   }, [navMode, category]);
 
@@ -126,7 +161,7 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
   useEffect(() => {
     if (navMode !== "category") return;
     for (const cat of QR_CATEGORIES) {
-      if (cat.id === category || kindsCacheRef.current.has(cat.id)) continue;
+      if (kindsCacheRef.current.has(cat.id)) continue;
       void fetch(
         `/api/book-mall/api/platform/v1/quick-replica/kinds?category=${encodeURIComponent(cat.id)}`,
       )
@@ -137,6 +172,47 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
         .catch(() => undefined);
     }
   }, [navMode, category]);
+
+  const prefetchTemplateList = useCallback(
+    (cacheKey: string, params: { category: QrCategory; kind?: string }) => {
+      if (templatesCacheRef.current.has(cacheKey)) return;
+      const qs = new URLSearchParams({ scope: "all", category: params.category });
+      if (params.kind) qs.set("kind", params.kind);
+      void fetch(
+        `/api/book-mall/api/platform/v1/quick-replica/templates?${qs}`,
+      )
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { templates?: QrTemplate[] } | null) => {
+          if (data?.templates) templatesCacheRef.current.set(cacheKey, data.templates);
+        })
+        .catch(() => undefined);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (navMode !== "category" && navMode !== "my-works") return;
+    for (const cat of QR_CATEGORIES) {
+      prefetchTemplateList(qrTemplateCacheKey("all", cat.id), { category: cat.id });
+    }
+    for (const { category: cat, kind } of QR_KIND_GALLERY_PREFETCH) {
+      prefetchTemplateList(qrTemplateCacheKey("all", cat, kind), {
+        category: cat,
+        kind,
+      });
+    }
+  }, [navMode, prefetchTemplateList]);
+
+  useEffect(() => {
+    if (navMode !== "category" || category !== "video") return;
+    for (const { category: cat, kind } of QR_KIND_GALLERY_PREFETCH) {
+      if (cat !== "video") continue;
+      prefetchTemplateList(qrTemplateCacheKey("all", cat, kind), {
+        category: cat,
+        kind,
+      });
+    }
+  }, [navMode, category, prefetchTemplateList]);
 
   const galleryTitleSuffix = useMemo(() => {
     if (navMode === "my-works") return "我的作品";
@@ -159,6 +235,14 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
     setMiddleMode("browse");
     setSelectedKind(null);
     setPinnedToolKey(null);
+    const cachedKinds = kindsCacheRef.current.get(cat);
+    setKindItems(cachedKinds ?? []);
+    setKindsLoading(true);
+    const cachedTemplates = templatesCacheRef.current.get(
+      qrTemplateCacheKey("all", cat),
+    );
+    setTemplates(cachedTemplates ?? []);
+    setTemplatesLoading(true);
   };
 
   const onMyWorks = () => {
@@ -178,9 +262,30 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
   };
 
   const onSelectKind = (kind: string) => {
+    if (selectedKind === kind) {
+      setSelectedKind(null);
+      setPinnedToolKey(null);
+      const cacheKey = qrTemplateCacheKey("all", category);
+      const cachedTemplates = templatesCacheRef.current.get(cacheKey);
+      setTemplates(cachedTemplates ?? []);
+      setTemplatesLoading(true);
+      return;
+    }
+
     setSelectedKind(kind);
     const def = getKindDef(kind);
-    if (def?.toolKey) setPinnedToolKey(def.toolKey);
+    setPinnedToolKey(def?.toolKey ?? null);
+    const cacheKey = qrTemplateCacheKey("all", category, kind);
+    let cachedTemplates = templatesCacheRef.current.get(cacheKey);
+    if (
+      !cachedTemplates &&
+      category === "video" &&
+      kind === "text-to-video"
+    ) {
+      cachedTemplates = templatesCacheRef.current.get(qrTemplateCacheKey("all", category));
+    }
+    setTemplates(cachedTemplates ?? []);
+    setTemplatesLoading(true);
   };
 
   const onCopyTemplate = (t: QrTemplate) => {
@@ -203,6 +308,7 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
       ]);
     }
     kindsCacheRef.current.delete(category);
+    invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
     void loadTemplates();
     void loadKinds();
   };
@@ -210,7 +316,7 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
   const middlePanel = (() => {
     if (middleMode === "welcome") {
       return (
-        <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6 text-center">
           <Sparkles className="mb-3 h-8 w-8" style={{ color: "var(--qr-brand)" }} />
           <p className="text-sm text-[var(--qr-text-secondary)]">
             选择左侧分类浏览模板，或点击置顶工具进入工作区
@@ -234,7 +340,7 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
     }
     if (navMode === "my-works") {
       return (
-        <div className="flex h-full flex-col">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="border-b border-white/10 px-4 py-2 text-sm font-medium">
             我的作品
           </div>
@@ -255,17 +361,19 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
     }
     return (
       <QrKindBrowsePanel
+        key={category}
         category={category}
         items={kindItems}
         selectedKind={selectedKind}
         loading={kindsLoading}
+        templatesLoading={templatesLoading}
         onSelectKind={onSelectKind}
       />
     );
   })();
 
   return (
-    <div className="flex h-dvh flex-col" style={{ background: "var(--qr-bg-page)" }}>
+    <div className="flex h-dvh flex-col overflow-hidden" style={{ background: "var(--qr-bg-page)" }}>
       <header
         className="flex shrink-0 items-center justify-between px-4 py-3"
         style={{
@@ -302,7 +410,7 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <QrSidebar
           navMode={navMode}
           category={category}
@@ -315,21 +423,22 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
           onPinnedTool={onPinnedTool}
         />
 
-        <main className="flex min-w-0 flex-1 flex-col lg:flex-row">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
           <section
-            className="flex min-h-[280px] min-w-0 flex-1 flex-col lg:min-w-[480px] lg:max-w-2xl lg:flex-[1.15] lg:border-b-0 lg:border-r"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-w-[480px] lg:max-w-2xl lg:flex-[1.15] lg:border-b-0 lg:border-r"
             style={{ borderBottom: "1px solid var(--qr-border)", borderColor: "var(--qr-border)" }}
           >
             {middlePanel}
           </section>
 
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col lg:min-w-[400px]">
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:min-w-[400px]">
             {navMode === "home" ? (
               <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
                 选择分类后在此浏览模板
               </div>
             ) : (
               <QrTemplateGallery
+                key={browseKey || category}
                 category={navMode === "my-works" ? null : category}
                 titleSuffix={galleryTitleSuffix}
                 templates={templates}
@@ -377,7 +486,9 @@ export function QrAppClient({ session, canManageFeatured = false }: Props) {
         onCopy={onCopyTemplate}
         onFeaturedUpdated={() => {
           kindsCacheRef.current.delete(category);
+          invalidateQrTemplateCacheForCategory(templatesCacheRef.current, category);
           void loadKinds();
+          void loadTemplates();
         }}
       />
 

@@ -3,6 +3,7 @@ import {
   getBuiltinQrTemplateById,
   listBuiltinQrTemplates,
 } from "@/lib/quick-replica/builtin-templates";
+import { filterBuiltinsForKindBrowse } from "@/lib/quick-replica/qr-template-catalog";
 import { getKindDef, getKindsForCategory } from "@/lib/quick-replica/qr-kinds";
 import type { QrCategory, QrKindBrowseItem, QrTemplateJson } from "@/lib/quick-replica/qr-types";
 import { rowToJson } from "@/lib/quick-replica/qr-template-service";
@@ -19,7 +20,7 @@ function firstTemplateByKind(rows: QrTemplateRow[]): Map<string, QrTemplateJson>
 
 function builtinFirstByKind(category: QrCategory, kindIds: string[]): Map<string, QrTemplateJson> {
   const map = new Map<string, QrTemplateJson>();
-  for (const t of listBuiltinQrTemplates({ category })) {
+  for (const t of filterBuiltinsForKindBrowse(listBuiltinQrTemplates({ category }))) {
     if (!kindIds.includes(t.kind)) continue;
     if (!map.has(t.kind)) map.set(t.kind, t);
   }
@@ -66,7 +67,7 @@ export async function resolveFeaturedTemplate(args: {
     if (row) return rowToJson(row);
   }
 
-  const builtin = listBuiltinQrTemplates({ kind: args.kind })[0];
+  const builtin = filterBuiltinsForKindBrowse(listBuiltinQrTemplates({ kind: args.kind }))[0];
   if (builtin) return builtin;
 
   const publicRow = await prisma.qrTemplate.findFirst({

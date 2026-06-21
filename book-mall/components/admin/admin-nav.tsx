@@ -300,6 +300,9 @@ export function AdminNav({
               <Link href="/admin/tool-libraries">资源库（图/视频）</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
+              <Link href="/admin/quick-replica/templates">快速复制模板</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link href="/admin/tool-usage">工具使用明细与费用</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
