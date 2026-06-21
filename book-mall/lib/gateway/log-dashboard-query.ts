@@ -82,6 +82,8 @@ export function parseDashboardFiltersFromSearchParams(
     model: params.get("model")?.trim() || undefined,
     credentialId: params.get("credentialId")?.trim() || undefined,
     storyProjectId: params.get("storyProjectId")?.trim() || undefined,
+    slowWarn:
+      params.get("slowWarn") === "1" || params.get("slowWarn") === "true",
   };
 }
 

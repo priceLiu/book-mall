@@ -34,8 +34,11 @@ const SUMMARY_POLL_ACTIVE_MS = 10_000;
 const IN_FLIGHT_POLL_MS = 10_000;
 const LIVE_CLOCK_MS = 1_000;
 
+const SLOW_WARN_THRESHOLD_MS = 800_000;
+const SLOW_WARN_THRESHOLD_SEC = SLOW_WARN_THRESHOLD_MS / 1000;
+
 type DashboardScope = "all" | "team" | "actor" | "project";
-type DetailTab = "succeeded" | "inProgress" | "failed";
+type DetailTab = "succeeded" | "inProgress" | "failed" | "slowWarn";
 type ViewMode = "dashboard" | "table";
 
 type DashboardTeamOption = {
@@ -82,6 +85,7 @@ type DashboardStats = {
     succeeded: number;
     failed: number;
     cancelled: number;
+    slowWarn: number;
   };
   byCategory: {
     inProgress: { category: string; label: string; count: number }[];
@@ -146,6 +150,11 @@ const TAB_CONFIG: { id: DetailTab; label: string; query: Record<string, string> 
   { id: "succeeded", label: "成功", query: { status: "SUCCEEDED" } },
   { id: "inProgress", label: "生成中", query: { statuses: "PENDING,RUNNING" } },
   { id: "failed", label: "失败", query: { status: "FAILED" } },
+  {
+    id: "slowWarn",
+    label: "预警",
+    query: { slowWarn: "1" },
+  },
 ];
 
 function normalizeFilterState(
@@ -338,7 +347,12 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
   const inProgressCount = stats?.cards.inProgress ?? 0;
-  const hasInFlight = inProgressCount > 0 || activeTab === "inProgress";
+  const slowWarnCount = stats?.cards.slowWarn ?? 0;
+  const hasInFlight =
+    inProgressCount > 0 ||
+    slowWarnCount > 0 ||
+    activeTab === "inProgress" ||
+    activeTab === "slowWarn";
 
   const tabQuery = useMemo(
     () => TAB_CONFIG.find((t) => t.id === activeTab)?.query ?? {},
@@ -404,6 +418,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         succeeded: 0,
         failed: 0,
         cancelled: 0,
+        slowWarn: 0,
       },
       byCategory: statsRes.data.byCategory,
       byModel: prev?.byModel ?? {
@@ -533,7 +548,9 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   useEffect(() => {
     if (viewMode !== "dashboard") return;
     const ms =
-      inProgressCount > 0 ? SUMMARY_POLL_ACTIVE_MS : SUMMARY_POLL_IDLE_MS;
+      inProgressCount > 0 || slowWarnCount > 0
+        ? SUMMARY_POLL_ACTIVE_MS
+        : SUMMARY_POLL_IDLE_MS;
     const refresh = () => {
       if (document.visibilityState === "visible") void loadStatsAll();
     };
@@ -542,11 +559,15 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     return () => {
       if (summaryPollRef.current) clearInterval(summaryPollRef.current);
     };
-  }, [inProgressCount, loadStatsAll, viewMode]);
+  }, [inProgressCount, slowWarnCount, loadStatsAll, viewMode]);
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
-    if (activeTab !== "inProgress" || inProgressCount <= 0) return;
+    const shouldPollInProgress =
+      activeTab === "inProgress" && inProgressCount > 0;
+    const shouldPollSlowWarn =
+      activeTab === "slowWarn" && slowWarnCount > 0;
+    if (!shouldPollInProgress && !shouldPollSlowWarn) return;
     const refresh = () => {
       if (document.visibilityState !== "visible") return;
       void loadDetailLogs({ poll: true, skipPoll: false });
@@ -556,7 +577,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     return () => {
       if (inFlightPollRef.current) clearInterval(inFlightPollRef.current);
     };
-  }, [activeTab, inProgressCount, loadDetailLogs, viewMode]);
+  }, [activeTab, inProgressCount, slowWarnCount, loadDetailLogs, viewMode]);
 
   const applyFilters = () => {
     commitFilters({ ...filters, actorPhone: phoneDraft });
@@ -598,6 +619,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     applied.scope === "actor" ||
     applied.scope === "all";
   const showFailColumns = activeTab === "failed";
+  const showSlowWarnHint = activeTab === "slowWarn";
 
   const loadingMessage = hasLoadedOnce
     ? "正在更新数据…"
@@ -609,7 +631,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         <div>
           <h1 className="text-xl font-semibold text-white">状态驾驶舱</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            统计卡片按需刷新（无进行中约 60s / 有进行中约 10s）· 仅「生成中」Tab 在有任务时约 10s 增量拉取 · 成功/失败明细按需加载
+            统计卡片按需刷新（无进行中约 60s / 有进行中或预警约 10s）·「生成中」「预警」Tab 在有任务时约 10s 增量拉取 · 成功/失败明细按需加载
           </p>
         </div>
         {loading ? (
@@ -850,7 +872,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             loading ? "opacity-70" : "opacity-100"
           }`}
         >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard
               label="生成中"
               value={stats.cards.inProgress}
@@ -865,6 +887,12 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               label="失败"
               value={stats.cards.failed}
               accent="text-red-400"
+            />
+            <StatCard
+              label="预警"
+              value={stats.cards.slowWarn}
+              accent="text-orange-400"
+              sub={`耗时 ≥ ${SLOW_WARN_THRESHOLD_SEC}s`}
             />
             <StatCard
               label="已取消"
@@ -900,8 +928,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           />
         </div>
       ) : viewMode === "dashboard" && loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
             <StatCardSkeleton key={i} />
           ))}
         </div>
@@ -1069,9 +1097,26 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                         </>
                       ) : null}
                       <td className="px-4 py-3 tabular-nums text-zinc-300">
-                        {durationMs != null
-                          ? formatDurationSeconds(durationMs)
-                          : "—"}
+                        <span
+                          className={
+                            showSlowWarnHint &&
+                            durationMs != null &&
+                            durationMs >= SLOW_WARN_THRESHOLD_MS
+                              ? "font-medium text-orange-300"
+                              : undefined
+                          }
+                        >
+                          {durationMs != null
+                            ? formatDurationSeconds(durationMs)
+                            : "—"}
+                        </span>
+                        {showSlowWarnHint &&
+                        durationMs != null &&
+                        durationMs >= SLOW_WARN_THRESHOLD_MS ? (
+                          <span className="ml-2 text-xs text-orange-400/90">
+                            ≥{SLOW_WARN_THRESHOLD_SEC}s
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-zinc-400">
                         {formatLogTimestamp(log.submittedAt)}

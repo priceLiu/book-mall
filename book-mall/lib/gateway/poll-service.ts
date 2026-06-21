@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { GatewayClientSource } from "@prisma/client";
+import { getGenerationSlowWarnMs } from "@/lib/generation/poll-config";
+import { escalateSlowCanvasSubmittedTasks } from "@/lib/generation/slow-generation";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
 import {
@@ -140,18 +142,49 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
       e instanceof Error ? e.message : String(e),
     );
   }
+
+  try {
+    const esc = await escalateSlowCanvasSubmittedTasks({ limit: 10 });
+    if (esc.recovered > 0) {
+      console.info("[gateway-poll] slow canvas recovery", esc);
+    }
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] escalateSlowCanvasSubmittedTasks skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
   const limit = opts?.limit ?? 20;
-  const rows = await prisma.gatewayRequestLog.findMany({
+  const providerKinds = ["KIE", "BAILIAN", "DASHSCOPE", "HUNYUAN", "VOLCENGINE"] as const;
+  const slowCutoff = new Date(Date.now() - getGenerationSlowWarnMs());
+
+  const slowRows = await prisma.gatewayRequestLog.findMany({
     where: {
       status: "RUNNING",
       externalTaskId: { not: null },
-      providerKind: {
-        in: ["KIE", "BAILIAN", "DASHSCOPE", "HUNYUAN", "VOLCENGINE"],
-      },
+      submittedAt: { lte: slowCutoff },
+      providerKind: { in: [...providerKinds] },
     },
-    orderBy: [{ submittedAt: "desc" }, { pollCount: "asc" }],
+    orderBy: { submittedAt: "asc" },
     take: limit,
   });
+  const slowIds = new Set(slowRows.map((r) => r.id));
+  const normalLimit = Math.max(0, limit - slowRows.length);
+  const normalRows =
+    normalLimit > 0
+      ? await prisma.gatewayRequestLog.findMany({
+          where: {
+            status: "RUNNING",
+            externalTaskId: { not: null },
+            providerKind: { in: [...providerKinds] },
+            ...(slowIds.size > 0 ? { id: { notIn: [...slowIds] } } : {}),
+          },
+          orderBy: [{ submittedAt: "desc" }, { pollCount: "asc" }],
+          take: normalLimit,
+        })
+      : [];
+  const rows = [...slowRows, ...normalRows];
 
   let updated = 0;
   for (const row of rows) {

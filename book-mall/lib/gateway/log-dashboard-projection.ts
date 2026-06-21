@@ -9,6 +9,7 @@ import {
   type DashboardChartCategoryKey,
   resolveDashboardChartCategory,
 } from "@/lib/billing/billing-category";
+import { buildSlowGenerationWhere } from "@/lib/generation/slow-generation";
 import { prisma } from "@/lib/prisma";
 
 export const DASHBOARD_IN_PROGRESS_STATUSES: GatewayRequestStatus[] = [
@@ -50,6 +51,8 @@ export type DashboardCards = {
   succeeded: number;
   failed: number;
   cancelled: number;
+  /** 耗时 ≥800s（含进行中已超阈值） */
+  slowWarn: number;
 };
 
 export type DashboardStatsPayload = {
@@ -74,7 +77,7 @@ export type DashboardChartLogRow = {
 };
 
 export function emptyDashboardCards(): DashboardCards {
-  return { inProgress: 0, succeeded: 0, failed: 0, cancelled: 0 };
+  return { inProgress: 0, succeeded: 0, failed: 0, cancelled: 0, slowWarn: 0 };
 }
 
 export function buildEmptyCategoryCounts(): DashboardCategoryCount[] {
@@ -190,15 +193,23 @@ async function fetchDashboardChartRows(
 export async function fetchDashboardStatsSummary(
   where: Prisma.GatewayRequestLogWhereInput,
 ): Promise<{ cards: DashboardCards }> {
-  const statusGroups = await prisma.gatewayRequestLog.groupBy({
-    by: ["status"],
-    where,
-    _count: { _all: true },
-  });
+  const [statusGroups, slowWarn] = await Promise.all([
+    prisma.gatewayRequestLog.groupBy({
+      by: ["status"],
+      where,
+      _count: { _all: true },
+    }),
+    prisma.gatewayRequestLog.count({
+      where: { AND: [where, buildSlowGenerationWhere()] },
+    }),
+  ]);
   return {
-    cards: mergeStatusGroupCounts(
-      statusGroups.map((g) => ({ status: g.status, count: g._count._all })),
-    ),
+    cards: {
+      ...mergeStatusGroupCounts(
+        statusGroups.map((g) => ({ status: g.status, count: g._count._all })),
+      ),
+      slowWarn,
+    },
   };
 }
 
