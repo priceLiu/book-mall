@@ -3,6 +3,7 @@ import type { GatewayClientSource } from "@prisma/client";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-handler";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
+import { expireVolcengineGatewayPollStalledLogs } from "@/lib/gateway/log-volcengine-timing-persist";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
 import {
@@ -118,7 +119,17 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     },
   });
 
-  return r0.count + r1.count + r2.count + r3a.count + r3.count;
+  let r4 = 0;
+  try {
+    r4 = await expireVolcengineGatewayPollStalledLogs(now);
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] expireVolcengineGatewayPollStalledLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  return r0.count + r1.count + r2.count + r3a.count + r3.count + r4;
 }
 
 export function parseGatewayClientSource(

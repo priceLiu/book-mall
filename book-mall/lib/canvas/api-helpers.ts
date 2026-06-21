@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import { resolvePlatformUser } from "@/lib/platform-auth";
 import { canvasCorsHeaders } from "./cors";
@@ -8,6 +7,7 @@ import { CanvasSecretError } from "./secret";
 import { CanvasCharacterError } from "./canvas-character-service";
 import { StoryFrameGateError } from "./story-frame-gate";
 import { StoryModelCapabilityError } from "./story-model-capabilities";
+import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
@@ -59,15 +59,6 @@ export async function requireSessionUser(
 
 export function isAdmin(user: AuthorizedSessionUser): boolean {
   return user.role === "admin";
-}
-
-function isDatabaseUnavailable(err: unknown): boolean {
-  if (err instanceof Prisma.PrismaClientInitializationError) return true;
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    return err.code === "P1001" || err.code === "P1017";
-  }
-  const msg = err instanceof Error ? err.message : String(err);
-  return /can't reach database|database server/i.test(msg);
 }
 
 /** schema 已含 VOLCENGINE 等枚举，但运行中 Prisma Client 未 regenerate */
@@ -127,7 +118,7 @@ export function canvasErrorToResponse(
       { status: 503, headers: jsonHeaders(request) },
     );
   }
-  if (isDatabaseUnavailable(err)) {
+  if (isPrismaConnectionUnavailable(err)) {
     console.error("[canvas-api] database unavailable", err);
     return NextResponse.json(
       {

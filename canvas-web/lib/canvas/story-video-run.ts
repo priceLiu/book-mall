@@ -127,6 +127,7 @@ async function recoverInflightVideoTask(
     const tasks = await listCanvasProjectTasks(base, projectId, [
       videoColumnId,
     ]);
+    if (tasks == null) return null;
     const scope = { rowKey, mediaKind: "video" as const };
     const inflight = tasks
       .filter(

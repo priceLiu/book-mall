@@ -1,20 +1,26 @@
 /**
  * Gateway 日志 · 火山视频任务耗时拆分（排队 / 生成 / 轮询延迟）
  *
- * - 排队：Gateway submittedAt → 首次观测到 running（或进行中 queued 段）
- * - 生成：首次 running → 厂商 updated_at（进行中亦以厂商时间为准，不随页面刷新虚增）
- * - 轮询延迟：厂商 updated_at → Gateway completedAt（应 ≤10s）
+ * - 排队：Gateway submittedAt → 厂商 created_at（无则回退首次 poll 观测 running）
+ * - 生成（进行中）：墙钟 now − genStart
+ * - 轮询延迟（终态）：Gateway completedAt − vendor updated_at
  */
 
 export const GATEWAY_POLL_DELAY_LIMIT_MS = 10_000;
-/** 厂商 updated_at 连续停更超过此阈值且仍为 running → 判定卡死 */
-export const VOLCENGINE_VENDOR_UPDATED_STALE_MS = 10 * 60 * 1000;
+/** queued 阶段 updated_at 停更超过此阈值 → 排队卡死 */
+export const VOLCENGINE_QUEUED_STALE_MS = 10 * 60 * 1000;
+/** running 且厂商已返回终态、Gateway 仍未 completed 超过此阈值 → 诊断用 */
+export const VOLCENGINE_POLL_LAG_FAIL_MS = 2 * 60 * 1000;
+/** 厂商 updated_at 停更 + Gateway 轮询中断超过此阈值 → 自动收口（与慢任务预警 800s 对齐） */
+export const VOLCENGINE_GATEWAY_POLL_STALL_MS = 800 * 1000;
+/** Gateway 未 poll 超过此间隔视为轮询中断 */
+export const VOLCENGINE_GATEWAY_POLL_GAP_MS = 2 * 60 * 1000;
 
 export type VolcengineTimingTrace = {
   kind: "volcengine_timing";
   vendorCreatedAtMs?: number;
   vendorUpdatedAtMs?: number;
-  /** 首次观测到 vendor updated_at 不再变化的时刻（连续 poll 回包相同 updated_at） */
+  /** 连续 poll 回包相同 updated_at 的起始时刻 */
   vendorUpdatedStaleSinceMs?: number;
   firstQueuedAtMs?: number;
   firstRunningAtMs?: number;
@@ -146,12 +152,36 @@ export function mergeVolcengineTimingTrace(
     trace.vendorSucceededAtMs = updatedAtMs ?? now;
     if (updatedAtMs != null) trace.vendorUpdatedAtMs = updatedAtMs;
     if (trace.firstRunningAtMs == null && updatedAtMs != null) {
-      // 单次轮询直接从 queued 跳到 succeeded 时，用 vendor 时间轴兜底
       trace.firstRunningAtMs = trace.vendorCreatedAtMs ?? trace.firstQueuedAtMs;
     }
   }
 
   return trace;
+}
+
+export function volcengineTimingGenStartMs(
+  trace: VolcengineTimingTrace,
+): number | null {
+  return trace.vendorCreatedAtMs ?? trace.firstRunningAtMs ?? null;
+}
+
+/** 连续两次 poll 回包相同 updated_at（仅用于诊断，进行中 Generate 仍走墙钟） */
+export function isVolcengineVendorUpdatedFrozen(
+  trace: VolcengineTimingTrace,
+): boolean {
+  return (
+    trace.vendorUpdatedStaleSinceMs != null &&
+    trace.vendorUpdatedAtMs != null
+  );
+}
+
+/** Gateway 侧轮询滞后：厂商停更后墙钟 − vendor updated_at */
+export function volcenginePollLagMs(
+  trace: VolcengineTimingTrace,
+  nowMs: number = Date.now(),
+): number | null {
+  if (!isVolcengineVendorUpdatedFrozen(trace)) return null;
+  return Math.max(0, nowMs - trace.vendorUpdatedAtMs!);
 }
 
 export function computeVolcengineTimingBreakdown(input: {
@@ -168,9 +198,12 @@ export function computeVolcengineTimingBreakdown(input: {
   const firstRunning = trace.firstRunningAtMs;
   const firstQueued = trace.firstQueuedAtMs;
   const isTerminal = input.completedAtMs != null;
+  const genStart = volcengineTimingGenStartMs(trace);
 
   let queueMs: number | null = null;
-  if (firstRunning != null) {
+  if (genStart != null) {
+    queueMs = Math.max(0, genStart - submitted);
+  } else if (firstRunning != null) {
     queueMs = Math.max(0, firstRunning - submitted);
   } else if (!isTerminal && (trace.lastStatus === "queued" || firstQueued != null)) {
     queueMs = Math.max(0, now - submitted);
@@ -179,17 +212,33 @@ export function computeVolcengineTimingBreakdown(input: {
   }
 
   let generateMs: number | null = null;
-  if (firstRunning != null && vendorUpdated != null) {
-    generateMs = Math.max(0, vendorUpdated - firstRunning);
-  } else if (firstRunning != null && !isTerminal) {
-    generateMs = Math.max(0, now - firstRunning);
-  } else if (isTerminal && vendorCreated != null && vendorUpdated != null) {
-    generateMs = Math.max(0, vendorUpdated - vendorCreated);
-  }
-
   let pollDelayMs: number | null = null;
-  if (isTerminal && vendorUpdated != null && input.completedAtMs != null) {
-    pollDelayMs = Math.max(0, input.completedAtMs - vendorUpdated);
+
+  if (!isTerminal) {
+    if (genStart != null) {
+      if (
+        isVolcengineVendorUpdatedFrozen(trace) &&
+        trace.vendorUpdatedAtMs != null
+      ) {
+        // 火山 running 时 updated_at 常不变：Generate 取厂商时间轴，停更计入 pollDelayMs
+        generateMs = Math.max(0, trace.vendorUpdatedAtMs - genStart);
+        pollDelayMs = Math.max(0, now - trace.vendorUpdatedAtMs);
+      } else {
+        generateMs = Math.max(0, now - genStart);
+      }
+    } else if (firstRunning != null) {
+      generateMs = Math.max(0, now - firstRunning);
+    }
+  } else if (vendorCreated != null && vendorUpdated != null) {
+    generateMs = Math.max(0, vendorUpdated - vendorCreated);
+    if (input.completedAtMs != null) {
+      pollDelayMs = Math.max(0, input.completedAtMs - vendorUpdated);
+    }
+  } else if (firstRunning != null && vendorUpdated != null) {
+    generateMs = Math.max(0, vendorUpdated - firstRunning);
+    if (input.completedAtMs != null) {
+      pollDelayMs = Math.max(0, input.completedAtMs - vendorUpdated);
+    }
   }
 
   return {
@@ -254,21 +303,59 @@ export function resolveVolcengineLogTiming(input: {
   return stored ?? live;
 }
 
-const VENDOR_IN_PROGRESS_STATUSES = new Set([
-  "queued",
-  "running",
-  "processing",
-  "pending",
-]);
-
-/** 厂商 updated_at 停更且任务仍为进行中 → 卡死 */
-export function isVolcengineVendorUpdatedStale(
+/** queued 阶段 updated_at 长期停更 */
+export function isVolcengineQueuedStale(
   trace: VolcengineTimingTrace,
   nowMs: number = Date.now(),
-  staleMs: number = VOLCENGINE_VENDOR_UPDATED_STALE_MS,
+  staleMs: number = VOLCENGINE_QUEUED_STALE_MS,
 ): boolean {
   if (trace.vendorUpdatedStaleSinceMs == null) return false;
-  const status = normalizeStatus(trace.lastStatus);
-  if (!VENDOR_IN_PROGRESS_STATUSES.has(status)) return false;
+  if (normalizeStatus(trace.lastStatus) !== "queued") return false;
   return nowMs - trace.vendorUpdatedStaleSinceMs >= staleMs;
+}
+
+/**
+ * 厂商 updated_at 停更已久且 Gateway 轮询已中断（如 DB 503 / poll worker 停）。
+ * 与「正常长视频 running（lastPolledAt 仍刷新）」区分。
+ */
+export function isVolcengineGatewayPollStalled(
+  trace: VolcengineTimingTrace,
+  lastPolledAt: Date | null | undefined,
+  nowMs: number = Date.now(),
+  stallMs: number = VOLCENGINE_GATEWAY_POLL_STALL_MS,
+  pollGapMs: number = VOLCENGINE_GATEWAY_POLL_GAP_MS,
+): boolean {
+  if (normalizeStatus(trace.lastStatus) !== "running") return false;
+  const lag = volcenginePollLagMs(trace, nowMs);
+  if (lag == null || lag < stallMs) return false;
+  const lastPollMs = lastPolledAt?.getTime();
+  if (lastPollMs == null || nowMs - lastPollMs < pollGapMs) return false;
+  return true;
+}
+
+/** 厂商已返回终态，Gateway 日志仍未 completed（极少见，供诊断） */
+export function isVolcenginePollLagCritical(
+  trace: VolcengineTimingTrace,
+  nowMs: number = Date.now(),
+  failMs: number = VOLCENGINE_POLL_LAG_FAIL_MS,
+): boolean {
+  const status = normalizeStatus(trace.lastStatus);
+  const vendorTerminal =
+    status === "succeeded" ||
+    status === "completed" ||
+    status === "success" ||
+    status === "failed" ||
+    status === "cancelled";
+  if (!vendorTerminal) return false;
+  if (trace.lastPolledAtMs == null || trace.vendorUpdatedAtMs == null) return false;
+  return nowMs - trace.lastPolledAtMs >= failMs;
+}
+
+/** @deprecated 使用 isVolcengineQueuedStale */
+export function isVolcengineVendorUpdatedStale(
+  trace: VolcengineTimingTrace,
+  nowMs?: number,
+  staleMs?: number,
+): boolean {
+  return isVolcengineQueuedStale(trace, nowMs, staleMs);
 }

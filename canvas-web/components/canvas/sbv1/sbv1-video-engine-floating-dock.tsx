@@ -5,7 +5,6 @@ import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { buildSbv1DockMentionables } from "@/lib/canvas/sbv1-dock-mentionables";
 import { resolveSbv1VideoEngineInputs } from "@/lib/canvas/resolve-sbv1-video-engine-inputs";
-import { refreshSbv1UpstreamPortraitStatuses } from "@/lib/canvas/refresh-sbv1-upstream-portrait";
 import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
@@ -89,18 +88,6 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
   );
 
   const onRun = useCallback(async () => {
-    const projectId = useCanvasStore.getState().projectId ?? undefined;
-    if (base) {
-      await refreshSbv1UpstreamPortraitStatuses({
-        base,
-        engineNodeId: nodeId,
-        nodes: useCanvasStore.getState().nodes,
-        edges: useCanvasStore.getState().edges,
-        updateNodeData,
-        projectId,
-      });
-    }
-
     const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
     const storeNode = latestNodes.find((n) => n.id === nodeId);
     const latestData = (storeNode?.data ?? {}) as Sbv1VideoEngineNodeData;
@@ -145,8 +132,10 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       });
       return;
     }
-    busEnqueueStoryRun({ nodeId, forceFresh: true });
-  }, [nodeId, base, alert, updateNodeData]);
+    const rt = latestData.runtime?.status;
+    const forceFresh = rt !== "pending" && rt !== "running";
+    busEnqueueStoryRun({ nodeId, forceFresh });
+  }, [nodeId, base, alert]);
 
   return (
     <Sbv1VideoEngineChatInput

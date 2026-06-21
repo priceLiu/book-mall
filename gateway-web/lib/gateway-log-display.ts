@@ -179,8 +179,8 @@ export function formatLogTimingPhaseCell(
   const sec = Math.round(ms / 1000);
   const labels = {
     queue: "火山排队",
-    generate: "实际生成",
-    poll: "轮询延迟",
+    generate: "厂商生成（updated_at − created_at）",
+    poll: "停更 / 轮询延迟",
   } as const;
   const title = `${labels[phase]} · ${sec}s`;
   if (phase === "poll") {

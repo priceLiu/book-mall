@@ -11,6 +11,7 @@ import {
 } from "@/lib/canvas-api";
 import { useCanvasStore } from "./store";
 import { buildCanvasRunSnapshot } from "./canvas-run-snapshot";
+import { refreshSbv1UpstreamPortraitStatuses } from "./refresh-sbv1-upstream-portrait";
 import { resolveSbv1VideoEngineInputs } from "./resolve-sbv1-video-engine-inputs";
 import {
   resolvePortraitAssetRefsFromUpstream,
@@ -706,6 +707,7 @@ export function useCanvasRunner(
     ) {
       setNodeRuntime(job.nodeId, {
         status: "pending",
+        taskId: undefined,
         failCode: undefined,
         failMessage: undefined,
       });
@@ -741,10 +743,26 @@ export function useCanvasRunner(
           typeof resolvePortraitAssetRefsFromUpstream
         > = [];
         if (node.type === "sbv1-video-engine") {
-          const vd = node.data as { prompt?: string; referenceMode?: string };
+          if (base && projectId) {
+            await refreshSbv1UpstreamPortraitStatuses({
+              base,
+              engineNodeId: nodeId,
+              nodes: useCanvasStore.getState().nodes,
+              edges: useCanvasStore.getState().edges,
+              updateNodeData,
+              projectId,
+            });
+          }
+          const stateAfterPortrait = useCanvasStore.getState();
+          const nodeAfterPortrait =
+            stateAfterPortrait.nodes.find((n) => n.id === nodeId) ?? node;
+          const vd = nodeAfterPortrait.data as {
+            prompt?: string;
+            referenceMode?: string;
+          };
           const resolved = resolveSbv1VideoEngineInputs(
-            state.nodes,
-            state.edges,
+            stateAfterPortrait.nodes,
+            stateAfterPortrait.edges,
             nodeId,
             {
               prompt: String(vd.prompt ?? ""),
@@ -934,6 +952,7 @@ export function useCanvasRunner(
           });
           void listCanvasProjectTasks(base, projectId, [nodeId])
             .then((tasks) => {
+              if (tasks == null) return;
               const scope =
                 job.rowKey || job.mediaKind || job.llmSection
                   ? {
@@ -963,7 +982,7 @@ export function useCanvasRunner(
         if (isInflightConflict && base && projectId) {
           try {
             const tasks = await listCanvasProjectTasks(base, projectId, [nodeId]);
-            const scoped = tasks.filter((t) => t.nodeId === nodeId);
+            const scoped = (tasks ?? []).filter((t) => t.nodeId === nodeId);
             const scope = {
               rowKey: job.rowKey,
               mediaKind: job.mediaKind,
@@ -1125,11 +1144,15 @@ export function useCanvasRunner(
   );
 
   const drain = useCallback(() => {
-    while (queueRef.current.length > 0) {
-      const item = queueRef.current[0]!;
+    let i = 0;
+    while (i < queueRef.current.length) {
+      const item = queueRef.current[i]!;
       const key = runKey(item);
-      if (inflightRef.current.has(key)) break;
-      queueRef.current.shift();
+      if (inflightRef.current.has(key)) {
+        i++;
+        continue;
+      }
+      queueRef.current.splice(i, 1);
       inflightRef.current.add(key);
       void runOne(item);
     }
@@ -1186,6 +1209,7 @@ export function useCanvasRunner(
             ) {
               setNodeRuntime(job.nodeId, {
                 status: "pending",
+                taskId: undefined,
                 failCode: undefined,
                 failMessage: undefined,
               });
@@ -1221,6 +1245,7 @@ export function useCanvasRunner(
         ) {
           setNodeRuntime(job.nodeId, {
             status: "pending",
+            taskId: undefined,
             failCode: undefined,
             failMessage: undefined,
           });
@@ -1686,6 +1711,8 @@ export function useCanvasRunner(
       try {
         const tasks = await listCanvasProjectTasks(base, projectId, nodeIds);
         if (cancelled) return;
+        // 读道降级（DB 塞车 / 不可用）：保留上一帧，不覆盖快照、不误清进行中状态
+        if (tasks == null) return;
         ingestCanvasProjectTasks(projectId, tasks);
         const nodesNow = useCanvasStore.getState().nodes;
         applyStoryColumnRowTasks(tasks, nodesNow);

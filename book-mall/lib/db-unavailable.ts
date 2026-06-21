@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 
 const CONNECTION_UNAVAILABLE_RE =
-  /Can't reach database server|Server has closed the connection|PrismaClientInitializationError|connection pool|pool timeout|Timed out fetching a new connection/i;
+  /Can't reach database server|Server has closed the connection|PrismaClientInitializationError|connection pool|pool timeout|Timed out fetching a new connection|transaction already closed|Transaction API error/i;
 
 /** 数据库不可达、连接池耗尽、连接关闭等：避免整页 500，用于前台读库降级 */
 export function isPrismaConnectionUnavailable(error: unknown): boolean {
@@ -14,6 +14,9 @@ export function isPrismaConnectionUnavailable(error: unknown): boolean {
   }
   return false;
 }
+
+/** @deprecated 使用 isPrismaConnectionUnavailable */
+export const isDatabaseUnavailable = isPrismaConnectionUnavailable;
 
 export function prismaConnectionUnavailableMessage(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error);

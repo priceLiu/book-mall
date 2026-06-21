@@ -28,6 +28,7 @@ export function libtvImageRunPendingPatch(): Record<string, unknown> {
     uploadError: undefined,
     runtime: {
       status: "pending",
+      taskId: undefined,
       failCode: undefined,
       failMessage: undefined,
       dismissedFailTaskId: undefined,
@@ -55,6 +56,7 @@ export function commitLibtvMediaRunPendingPatch(
     updateNodeData(node.id, {
       runtime: {
         status: "pending",
+        taskId: undefined,
         failCode: undefined,
         failMessage: undefined,
         dismissedFailTaskId: undefined,

@@ -1984,6 +1984,12 @@ export async function listProjectTasks(args: {
   userId: string;
   projectId: string;
   nodeIds?: string[];
+  /**
+   * 轻量读（高频轮询用）：跳过画布历史解析；仅对终态任务查计费快照
+   * （进行中任务本就无 creditsCharged）。可恢复画布等字段由「生成记录」面板的
+   * /generation-records 端点提供，不在此高频路径里付出 DB 代价。
+   */
+  lightweight?: boolean;
 }): Promise<CanvasGenerationRecordListItem[]> {
   await assertAccessibleCanvasProject(args.userId, args.projectId);
   const where: Prisma.CanvasGenerationTaskWhereInput = {
@@ -1999,6 +2005,31 @@ export async function listProjectTasks(args: {
     take: 200,
     projectIdForRows: args.projectId,
   });
+
+  if (args.lightweight) {
+    // 仅终态任务需要计费快照（积分 toast）；进行中任务跳过，避免每 5s 多查 gatewayRequestLog
+    const terminalRows = rows.filter(
+      (r) => r.status === "SUCCEEDED" || r.status === "FAILED",
+    );
+    const enrichedTerminal = await enrichCanvasTaskRows(terminalRows);
+    const billingById = new Map(
+      enrichedTerminal.map((e) => [
+        e.id,
+        { creditsCharged: e.creditsCharged, billingMode: e.billingMode },
+      ]),
+    );
+    return rows.map((source) =>
+      buildGenerationRecordListItem(
+        source,
+        billingById.get(source.id) ?? {
+          creditsCharged: null,
+          billingMode: null,
+        },
+        null,
+      ),
+    );
+  }
+
   const enriched = await enrichCanvasTaskRows(rows);
   const historyByTask = await resolveCanvasHistoryIdsForTasks(
     rows.map((r) => ({

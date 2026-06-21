@@ -116,7 +116,8 @@ async function refreshProjectTasks(projectId: string, base: string) {
   pool.inflight = true;
   try {
     const tasks = await listCanvasProjectTasks(base, projectId);
-    ingestCanvasProjectTasks(projectId, tasks);
+    // 读道降级（DB 塞车 / 不可用）：保留上次快照，不覆盖
+    if (tasks != null) ingestCanvasProjectTasks(projectId, tasks);
   } catch (e) {
     if (isCanvasApiAccessDeniedError(e)) {
       pool.pollForbidden = true;

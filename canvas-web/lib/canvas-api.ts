@@ -518,21 +518,28 @@ export async function deleteCanvasTask(
   );
 }
 
+/**
+ * 拉取项目任务列表。
+ *
+ * 返回 `null` 表示后端读道「降级 / 超时」（DB 塞车或不可用），调用方应
+ * **保留上一帧快照、不要覆盖**，避免画布因一次读失败而清空显示。
+ */
 export async function listCanvasProjectTasks(
   base: string,
   projectId: string,
   nodeIds?: string[],
-): Promise<CanvasTaskRecord[]> {
+): Promise<CanvasTaskRecord[] | null> {
   if (isCanvasProjectTasksForbidden(projectId)) {
     throw new Error("403 无权访问此画布项目");
   }
   const q = nodeIds && nodeIds.length > 0
     ? `?nodeIds=${encodeURIComponent(nodeIds.join(","))}`
     : "";
-  const j = await call<{ tasks: CanvasTaskRecord[] }>(
+  const j = await call<{ tasks: CanvasTaskRecord[] | null; stale?: boolean }>(
     base,
     `/api/canvas/projects/${projectId}/tasks${q}`,
   );
+  if (j.stale || j.tasks == null) return null;
   return j.tasks;
 }
 

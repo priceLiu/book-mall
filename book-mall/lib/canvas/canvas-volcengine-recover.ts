@@ -5,6 +5,7 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import { persistCanvasKieResultToOss, persistCanvasVideoResultToOss } from "@/lib/canvas/canvas-oss";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
+import { persistVolcengineTimingOnPoll } from "@/lib/gateway/log-volcengine-timing-persist";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import {
@@ -149,12 +150,30 @@ async function finalizeGatewaySuccess(input: {
   taskId: string;
   videoUrl: string;
   raw: unknown;
+  vendorStatus: string;
   submittedAt: Date | null;
 }): Promise<void> {
   const log = await prisma.gatewayRequestLog.findUnique({
     where: { id: input.gatewayLogId },
   });
   if (!log) return;
+
+  const baseSummary = buildGatewayTaskResultSummary(input.raw, {
+    videoUrl: input.videoUrl,
+  });
+  const { resultSummary } = await persistVolcengineTimingOnPoll({
+    log: {
+      id: log.id,
+      submittedAt: log.submittedAt,
+      completedAt: log.completedAt,
+      resultSummary: log.resultSummary,
+      status: log.status,
+      lastPolledAt: log.lastPolledAt,
+    },
+    vendorStatus: input.vendorStatus,
+    vendorRaw: input.raw,
+    resultSummaryOverride: baseSummary,
+  });
 
   const durationMs = log.submittedAt
     ? Math.max(0, Date.now() - log.submittedAt.getTime())
@@ -165,9 +184,7 @@ async function finalizeGatewaySuccess(input: {
     durationMs,
     failCode: undefined,
     failMessage: undefined,
-    resultSummary: buildGatewayTaskResultSummary(input.raw, {
-      videoUrl: input.videoUrl,
-    }),
+    resultSummary,
     externalTaskId: input.taskId,
     model: log.model,
   });
@@ -360,6 +377,7 @@ export async function recoverCanvasVolcengineTimedOutTask(
     taskId: vendorTaskId,
     videoUrl: vendor.videoUrl,
     raw: vendor.raw,
+    vendorStatus: vendor.status,
     submittedAt: log.submittedAt,
   });
   await patchProjectNodeFromTask(updated);
