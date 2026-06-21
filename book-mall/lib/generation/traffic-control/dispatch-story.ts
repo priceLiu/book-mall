@@ -106,6 +106,7 @@ export async function dispatchQueuedStoryTasks(opts?: {
   const result = { dispatched: 0, skipped: 0, failed: 0, cancelled: 0 };
   if (!isTrafficControlEnabled()) return result;
 
+  try {
   const cutoff = new Date(Date.now() - getQueueTimeoutMin() * 60_000);
   const cancelled = await prisma.storyGenerationTask.updateMany({
     where: {
@@ -142,6 +143,13 @@ export async function dispatchQueuedStoryTasks(opts?: {
   }
 
   return result;
+  } catch (e) {
+    console.warn(
+      "[story-dispatch] skipped (db unavailable?)",
+      e instanceof Error ? e.message : String(e),
+    );
+    return result;
+  }
 }
 
 export async function admitStoryFrameVideoTask(input: {

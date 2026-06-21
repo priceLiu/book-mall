@@ -18,10 +18,21 @@ export function resolveQrTemplatePreviewMedia(input: {
   mediaType?: "image" | "video" | "audio";
   outputUrl?: string | null;
   referenceVideoUrl?: string | null;
+  /** 大预览区：有视频 URL 时优先播视频，封面仅作 poster */
+  preferVideo?: boolean;
 }): QrPreviewMedia | null {
   const thumb = input.thumbnailUrl?.trim() ?? "";
   const outputUrl = input.outputUrl?.trim() ?? "";
   const refVideo = input.referenceVideoUrl?.trim() ?? "";
+
+  if (input.preferVideo) {
+    if (outputUrl && isVideoMediaUrl(outputUrl)) {
+      return { url: outputUrl, kind: "video", poster: thumb || undefined };
+    }
+    if (refVideo && isVideoMediaUrl(refVideo)) {
+      return { url: refVideo, kind: "video", poster: thumb || undefined };
+    }
+  }
 
   if (thumb && isImageMediaUrl(thumb)) {
     return { url: thumb, kind: "image" };

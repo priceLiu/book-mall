@@ -56,6 +56,8 @@
     "story:poll-loop": "dotenv -e .env.local -- tsx scripts/story-ai-poll-loop.ts",
     "canvas:poll-once": "dotenv -e .env.local -- tsx scripts/canvas-ai-poll.ts",
     "canvas:poll-loop": "dotenv -e .env.local -- tsx scripts/canvas-ai-poll-loop.ts",
+    "canvas:recover-stuck-video": "dotenv -e .env.local -- tsx scripts/recover-canvas-stuck-video.ts",
+    "canvas:recover-volcengine-timeout": "dotenv -e .env.local -- tsx scripts/recover-canvas-volcengine-timeout.ts",
     "generation:reconcile-traffic": "dotenv -e .env.local -- tsx scripts/reconcile-generation-traffic.ts",
     "canvas:generate-style-library-placeholders": "tsx scripts/generate-style-library-placeholders.ts",
     "canvas:fetch-style-library-from-html": "tsx scripts/fetch-style-library-from-html.ts",

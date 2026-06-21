@@ -20,8 +20,8 @@ import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
 
 const STALE_RUNNING_NO_TASK_MS = 3 * 60 * 1000;
-/** 火山视频提交失败但未写入 externalTaskId 时，尽快收口 RUNNING */
-const STALE_VOLCENGINE_NO_TASK_MS = 90 * 1000;
+/** 火山视频提交失败但未写入 externalTaskId 时，尽快收口 RUNNING（高负载下 submit 可能 >90s） */
+const STALE_VOLCENGINE_NO_TASK_MS = 5 * 60 * 1000;
 const STALE_RUNNING_WITH_TASK_MS = 6 * 60 * 60 * 1000;
 /** 火山视频任务：过长仍 RUNNING 则自动收口（避免日志页一直 running） */
 const STALE_VOLCENGINE_VIDEO_MS = 90 * 60 * 1000;
@@ -132,7 +132,14 @@ export function parseGatewayClientSource(
 }
 
 export async function runGatewayPollWorker(opts?: { limit?: number }) {
-  await expireStaleGatewayLogs();
+  try {
+    await expireStaleGatewayLogs();
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] expireStaleGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
   const limit = opts?.limit ?? 20;
   const rows = await prisma.gatewayRequestLog.findMany({
     where: {

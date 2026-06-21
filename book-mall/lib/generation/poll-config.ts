@@ -31,6 +31,11 @@ export function getGenerationPollTimeBudgetMs(): number {
   return readPositiveInt("GENERATION_POLL_TIME_BUDGET_MS", 50_000);
 }
 
+/** 单次 recordInfo / createTask 内层超时（默认 45s；dev 下 recordInfo 常 >8s） */
+export function getGenerationPollInnerTimeoutMs(): number {
+  return readPositiveInt("GENERATION_POLL_INNER_TIMEOUT_MS", 45_000);
+}
+
 /** 分片总数（多实例/多 SCF 时设为 4/8…，默认 1 = 不分片） */
 export function getGenerationPollShardCount(): number {
   return readPositiveInt("GENERATION_POLL_SHARD_COUNT", 1);

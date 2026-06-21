@@ -5,6 +5,7 @@ import {
   upsertAdminQrTemplate,
 } from "@/lib/quick-replica/qr-template-admin-service";
 import { requireQuickReplicaFinanceAdmin } from "@/lib/quick-replica/qr-platform-auth";
+import { parseAdminUpsertOptionalFields } from "@/lib/quick-replica/qr-admin-template-form";
 import type { QrCategory } from "@/lib/quick-replica/qr-types";
 
 export const dynamic = "force-dynamic";
@@ -59,13 +60,11 @@ export async function POST(request: Request) {
       adminUserId: auth.userId,
       category,
       kind,
-      toolKey: typeof body.toolKey === "string" ? body.toolKey : undefined,
       title,
       thumbnailUrl,
       promptText,
-      mediaUrl: typeof body.mediaUrl === "string" ? body.mediaUrl : undefined,
-      modelKey: typeof body.modelKey === "string" ? body.modelKey : undefined,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0,
+      ...parseAdminUpsertOptionalFields(body),
     });
     return NextResponse.json({ template }, { status: 201 });
   } catch (e) {

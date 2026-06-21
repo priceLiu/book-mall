@@ -34,6 +34,13 @@ export function inferGatewayFailCode(input: {
   if (blob.includes("insufficient") && blob.includes("credit")) {
     return "INSUFFICIENT_CREDITS";
   }
+  if (
+    blob.includes("recordinfo timeout") ||
+    blob.includes("poll iteration") ||
+    blob.includes("createTask retry timeout")
+  ) {
+    return "POLL_TRANSIENT";
+  }
   if (blob.includes("timeout") || blob.includes("timed out")) {
     return "STALE_TIMEOUT";
   }
