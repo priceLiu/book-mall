@@ -221,9 +221,10 @@ export function DashboardShell({
   }
 
   const desktopAsideWidth = sidebarCollapsed ? "md:w-14" : "md:w-56";
+  const isLogsPage = pathname === "/dashboard/logs";
 
   return (
-    <div className="flex min-h-screen bg-[var(--gw-bg)]">
+    <div className="flex h-dvh min-h-screen overflow-hidden bg-[var(--gw-bg)]">
       {/* 桌面端：可收缩静态侧栏 */}
       <aside
         className={`hidden shrink-0 flex-col border-r border-white/10 bg-[var(--gw-surface)] transition-[width] duration-200 md:flex md:min-h-screen ${desktopAsideWidth}`}
@@ -272,7 +273,7 @@ export function DashboardShell({
         />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/10 bg-[var(--gw-surface)] px-4 md:hidden">
           <button
             type="button"
@@ -284,7 +285,15 @@ export function DashboardShell({
           </button>
           <span className="truncate text-sm font-medium text-white">Gateway 控制台</span>
         </header>
-        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+        <main
+          className={
+            isLogsPage
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden p-4 md:p-6"
+              : "min-h-0 flex-1 overflow-auto p-4 md:p-6"
+          }
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

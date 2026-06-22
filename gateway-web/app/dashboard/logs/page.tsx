@@ -21,7 +21,7 @@ export default async function DashboardLogsPage() {
   };
 
   return (
-    <div className="flex min-h-[calc(100dvh-7rem)] flex-col gap-4 md:min-h-[calc(100dvh-5rem)]">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <div className="shrink-0">
         <h1 className="text-xl font-semibold text-white">Logs</h1>
         <p className="mt-1 text-sm text-zinc-500">
