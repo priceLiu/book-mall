@@ -1,7 +1,10 @@
 /**
  * Canvas / Story 异步任务 poll worker。
  * 默认值按「≥20 人同时长视频、更多人数可继续扩」内置，日常不必配 env。
+ * 实际并行路数由 getEffectiveGenerationPollConcurrency() 按本进程 connection_limit 封顶。
  */
+
+import { getPrismaConnectionLimit } from "@/lib/prisma-pool-config";
 
 function readPositiveInt(envKey: string, fallback: number): number {
   const raw = Number(process.env[envKey] ?? "");
@@ -19,6 +22,20 @@ export function getGenerationPollBatch(): number {
 /** 同一 tick 内并行 poll 厂商/Gateway 的路数（默认 25） */
 export function getGenerationPollConcurrency(): number {
   return readPositiveInt("GENERATION_POLL_CONCURRENCY", 25);
+}
+
+/**
+ * 按本进程 Prisma 连接池上限封顶 poll 并行度。
+ * poll-loop 子进程 PRISMA_CONNECTION_LIMIT=1 时自动降为 1，避免 25 路抢 1 连接 → pool timeout。
+ * web 进程保留 WEB_DB_RESERVE 条连接给 run / tasks 读等 API。
+ */
+const WEB_DB_RESERVE = 3;
+
+export function getEffectiveGenerationPollConcurrency(): number {
+  const configured = getGenerationPollConcurrency();
+  const poolLimit = getPrismaConnectionLimit();
+  const cap = Math.max(1, poolLimit - WEB_DB_RESERVE);
+  return Math.min(configured, cap);
 }
 
 /** 单次 worker 最多连续扫描轮数（默认 10） */

@@ -68,7 +68,7 @@ export async function lookupCheckoutByRemarkCode(code: string) {
       status: { in: ["PENDING", "AWAITING_CONFIRM"] },
     },
     include: {
-      user: { select: { id: true, email: true, name: true } },
+      user: { select: { id: true, email: true, name: true, phone: true } },
     },
     orderBy: { createdAt: "desc" },
   });

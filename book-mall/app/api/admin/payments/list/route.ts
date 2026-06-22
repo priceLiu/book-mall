@@ -20,10 +20,29 @@ export async function GET(request: NextRequest) {
 
   const rows = await prisma.paymentCheckout.findMany({
     where,
-    include: { user: { select: { id: true, email: true, name: true } } },
+    include: { user: { select: { id: true, email: true, name: true, phone: true } } },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
+
+  const checkoutIds = rows.map((c) => c.id);
+  const submittedEvents =
+    checkoutIds.length > 0
+      ? await prisma.paymentEvent.findMany({
+          where: {
+            checkoutId: { in: checkoutIds },
+            action: "USER_SUBMITTED",
+          },
+          select: { checkoutId: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
+  const submittedAtByCheckout = new Map<string, string>();
+  for (const ev of submittedEvents) {
+    if (!submittedAtByCheckout.has(ev.checkoutId)) {
+      submittedAtByCheckout.set(ev.checkoutId, ev.createdAt.toISOString());
+    }
+  }
 
   return NextResponse.json({
     checkouts: rows.map((c) => {
@@ -37,6 +56,7 @@ export async function GET(request: NextRequest) {
         productKind: c.productKind,
         productLabel: productKindLabel(c.productKind, snap),
         createdAt: c.createdAt.toISOString(),
+        submittedAt: submittedAtByCheckout.get(c.id) ?? null,
         paidAt: c.paidAt?.toISOString() ?? null,
         user: c.user,
       };

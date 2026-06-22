@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getGenerationPollBatch,
   getGenerationPollConcurrency,
+  getEffectiveGenerationPollConcurrency,
   getGenerationPollShardCount,
 } from "@/lib/generation/poll-config";
 import {
@@ -16,6 +17,18 @@ describe("generation poll scale defaults", () => {
     expect(getGenerationPollBatch()).toBe(100);
     expect(getGenerationPollConcurrency()).toBe(25);
     expect(getGenerationPollShardCount()).toBe(1);
+  });
+
+  it("effective 并发不超过 connection_limit - 预留", () => {
+    const prevLimit = process.env.PRISMA_CONNECTION_LIMIT;
+    process.env.PRISMA_CONNECTION_LIMIT = "1";
+    expect(getEffectiveGenerationPollConcurrency()).toBe(1);
+    process.env.PRISMA_CONNECTION_LIMIT = "20";
+    expect(getEffectiveGenerationPollConcurrency()).toBe(
+      Math.min(25, 20 - 3),
+    );
+    if (prevLimit === undefined) delete process.env.PRISMA_CONNECTION_LIMIT;
+    else process.env.PRISMA_CONNECTION_LIMIT = prevLimit;
   });
 });
 

@@ -27,7 +27,7 @@ import {
   resolveCanvasSubmittedTaskTimeoutMs,
 } from "./canvas-constants";
 import {
-  getGenerationPollConcurrency,
+  getEffectiveGenerationPollConcurrency,
   getGenerationPollMaxPasses,
   getGenerationPollTimeBudgetMs,
 } from "@/lib/generation/poll-config";
@@ -1786,7 +1786,7 @@ export async function runCanvasPollWorker(opts?: {
     ? Date.now() + getGenerationPollTimeBudgetMs()
     : Number.MAX_SAFE_INTEGER;
   const maxPasses = scaledPoll ? getGenerationPollMaxPasses() : 1;
-  const concurrency = scaledPoll ? getGenerationPollConcurrency() : 1;
+  const concurrency = scaledPoll ? getEffectiveGenerationPollConcurrency() : 1;
 
   for (let pass = 0; pass < maxPasses && Date.now() < deadline; pass++) {
     const fetchSize = scaledPoll ? pollShardOverFetchSize(pollBatch) : pollBatch;

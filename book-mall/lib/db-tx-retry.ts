@@ -28,6 +28,12 @@ export function isRetryableTxError(error: unknown): boolean {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/** 画布建任务 / claim 等热路径：默认 5s 事务超时在连接池排队时易误报「数据库繁忙」。 */
+export const CANVAS_DB_TX_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 30_000,
+} as const;
+
 /**
  * 以指数退避重试一个**短事务工厂**。每次重试都重新调用 `fn()`，确保开新事务。
  * 仅重试瞬时错误（见 isRetryableTxError）；业务错误立即抛出。

@@ -7,7 +7,7 @@ import { CanvasSecretError } from "./secret";
 import { CanvasCharacterError } from "./canvas-character-service";
 import { StoryFrameGateError } from "./story-frame-gate";
 import { StoryModelCapabilityError } from "./story-model-capabilities";
-import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
+import { isPrismaConnectionUnavailable, prismaConnectionUnavailableMessage } from "@/lib/db-unavailable";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
@@ -122,10 +122,17 @@ export function canvasErrorToResponse(
     console.error("[canvas-api] database unavailable", err);
     return NextResponse.json(
       {
-        error: "DATABASE_UNAVAILABLE",
-        message: "数据库暂不可用，请检查网络或 book-mall 的 DATABASE_URL 连接",
+        error: "SYSTEM_BUSY",
+        message: prismaConnectionUnavailableMessage(err),
+        retryAfterSec: 5,
       },
-      { status: 503, headers: jsonHeaders(request) },
+      {
+        status: 503,
+        headers: {
+          ...jsonHeaders(request),
+          "Retry-After": "5",
+        },
+      },
     );
   }
   console.error("[canvas-api] unexpected error", err);

@@ -127,9 +127,11 @@ export function formatCanvasTaskError(
     blob.includes("prisma.") ||
     blob.includes("transaction api error") ||
     blob.includes("connection pool") ||
-    blob.includes("timed out fetching a new connection")
+    blob.includes("timed out fetching a new connection") ||
+    blob.includes("server has closed the connection") ||
+    blob.includes("can't reach database server")
   ) {
-    return "数据库连接繁忙，任务未能提交。请等待 5～10 秒后重试；dev 环境可改用 pnpm dev:all:nopoll 减少连接占用。";
+    return "系统繁忙，任务已加入队列或正在自动重试，请稍候勿重复点击。";
   }
 
   if (
