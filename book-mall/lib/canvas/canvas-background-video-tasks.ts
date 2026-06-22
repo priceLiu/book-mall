@@ -93,10 +93,10 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
 
   for (const task of tasks) {
     const payload = taskPayload(task);
-    if (!isCanvasVolcengineVideoTaskPayload(payload)) continue;
+    if (!payload || !isCanvasVolcengineVideoTaskPayload(payload)) continue;
 
     const gatewayLogId =
-      typeof payload?.gatewayLogId === "string"
+      typeof payload.gatewayLogId === "string"
         ? payload.gatewayLogId.trim()
         : null;
     const since = task.submittedAt ?? task.createdAt;
