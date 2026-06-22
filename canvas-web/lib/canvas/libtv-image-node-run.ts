@@ -1,4 +1,4 @@
-import type { CanvasFlowNode } from "./types";
+import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 
 /** 组内分镜格：走列 batch，不用 Dock 模型选择 */
 export function isLibtvPipelineImageCell(
@@ -21,19 +21,58 @@ export function isLibtvFreestandingImageNode(
   return false;
 }
 
-/** 点击生成后立即进入扫光态（不等 API 返回） */
+/** 点击生成后立即进入扫光态（不等 API / 入队返回） */
 export function libtvImageRunPendingPatch(): Record<string, unknown> {
   return {
     uploading: true,
     uploadError: undefined,
+    runtime: libtvMediaRunPendingRuntime(),
+  };
+}
+
+export function libtvMediaRunPendingRuntime(): CanvasNodeRuntime {
+  return {
+    status: "pending",
+    taskId: undefined,
+    failCode: undefined,
+    failMessage: undefined,
+    dismissedFailTaskId: undefined,
+  };
+}
+
+export function libtvMediaRunIdlePatch(): Record<string, unknown> {
+  return {
+    uploading: false,
+    uploadError: undefined,
     runtime: {
-      status: "pending",
+      status: "idle",
       taskId: undefined,
       failCode: undefined,
       failMessage: undefined,
       dismissedFailTaskId: undefined,
-    },
+    } satisfies CanvasNodeRuntime,
   };
+}
+
+/** 点击生成瞬间 · 节点 + Dock 同步进入 pending（校验失败时再 revert） */
+export function optimisticLibtvMediaRunStart(
+  nodeId: string,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+  setNodeRuntime?: (id: string, runtime: Partial<CanvasNodeRuntime>) => void,
+): void {
+  const patch = libtvImageRunPendingPatch();
+  updateNodeData(nodeId, patch);
+  setNodeRuntime?.(nodeId, patch.runtime as Partial<CanvasNodeRuntime>);
+}
+
+export function revertOptimisticLibtvMediaRunStart(
+  nodeId: string,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+  setNodeRuntime?: (id: string, runtime: Partial<CanvasNodeRuntime>) => void,
+): void {
+  const patch = libtvMediaRunIdlePatch();
+  updateNodeData(nodeId, patch);
+  setNodeRuntime?.(nodeId, patch.runtime as Partial<CanvasNodeRuntime>);
 }
 
 export function commitLibtvImageRunPendingPatch(
@@ -53,15 +92,7 @@ export function commitLibtvMediaRunPendingPatch(
   if (!node) return false;
   if (commitLibtvImageRunPendingPatch(node, updateNodeData)) return true;
   if (node.type === "sbv1-video-engine") {
-    updateNodeData(node.id, {
-      runtime: {
-        status: "pending",
-        taskId: undefined,
-        failCode: undefined,
-        failMessage: undefined,
-        dismissedFailTaskId: undefined,
-      },
-    });
+    updateNodeData(node.id, libtvImageRunPendingPatch());
     return true;
   }
   return false;

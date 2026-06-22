@@ -33,6 +33,8 @@ import type { Sbv1ImageNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import {
   isLibtvFreestandingImageNode,
   isLibtvPipelineImageCell,
+  optimisticLibtvMediaRunStart,
+  revertOptimisticLibtvMediaRunStart,
 } from "@/lib/canvas/libtv-image-node-run";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
@@ -78,6 +80,7 @@ export function LibtvImageInputDock() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
   const setPro2StyleLibImageNodeId = useCanvasStore(
     (s) => s.setPro2StyleLibImageNodeId,
   );
@@ -227,6 +230,10 @@ export function LibtvImageInputDock() {
 
   const onRunFreestanding = useCallback(async () => {
     if (!storeNode || !isLibtvFreestandingImageNode(storeNode)) return;
+    optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
+    const revertPending = () =>
+      revertOptimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
+
     let runEngine = engine;
     if (!runEngine?.providerId?.trim()) {
       const seed = pickDefaultSbv1ImageEngine(providers);
@@ -236,6 +243,7 @@ export function LibtvImageInputDock() {
       }
     }
     if (!runEngine?.providerId?.trim() || !runEngine.modelKey?.trim()) {
+      revertPending();
       await alert({
         title: "请选择模型",
         message:
@@ -252,6 +260,7 @@ export function LibtvImageInputDock() {
       Boolean(settingsData.dockStyleRef?.imageUrl) ||
       Boolean(linkedStyle);
     if (!prompt && !hasRefs) {
+      revertPending();
       await alert({
         title: "请输入提示词",
         message: "可直接文字生图，或上传/连接图片后输入编辑指令。",
@@ -260,6 +269,7 @@ export function LibtvImageInputDock() {
       return;
     }
     if (!base) {
+      revertPending();
       await alert({
         title: "画布未就绪",
         message: "请刷新页面后重试。",
@@ -273,6 +283,7 @@ export function LibtvImageInputDock() {
     engine,
     providers,
     updateNodeData,
+    setNodeRuntime,
     dockInput,
     hasImage,
     upstreamLinks,

@@ -14,8 +14,10 @@ export function isLibtvMediaGenerating(data: {
   uploading?: unknown;
   runtime?: { status?: string } | null;
 }): boolean {
-  if (data.uploading) return true;
   const s = data.runtime?.status;
+  // 终态优先：乐观 UI 可能遗留 uploading=true，勿把已完成节点仍显示为生成中
+  if (s === "done" || s === "error" || s === "idle") return false;
+  if (data.uploading) return true;
   return s === "running" || s === "pending";
 }
 

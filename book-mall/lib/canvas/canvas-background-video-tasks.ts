@@ -60,7 +60,7 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
   const tasks = await prisma.canvasGenerationTask.findMany({
     where: {
       projectId: input.projectId,
-      status: { in: ["SUBMITTED", "PENDING", "FAILED", "SUCCEEDED"] },
+      status: { in: ["SUBMITTED", "PENDING", "DISPATCHING", "FAILED", "SUCCEEDED"] },
     },
     orderBy: { updatedAt: "desc" },
     take: 200,
@@ -82,10 +82,19 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
   const now = Date.now();
   const out: CanvasBackgroundVideoTaskRow[] = [];
 
-  for (const task of tasks) {
-    if (!isCanvasVolcengineVideoTaskPayload(taskPayload(task))) continue;
+  type Candidate = {
+    task: (typeof tasks)[number];
+    payload: Record<string, unknown>;
+    gatewayLogId: string | null;
+    since: Date;
+    ageSec: number;
+  };
+  const candidates: Candidate[] = [];
 
+  for (const task of tasks) {
     const payload = taskPayload(task);
+    if (!isCanvasVolcengineVideoTaskPayload(payload)) continue;
+
     const gatewayLogId =
       typeof payload?.gatewayLogId === "string"
         ? payload.gatewayLogId.trim()
@@ -93,23 +102,37 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
     const since = task.submittedAt ?? task.createdAt;
     const ageSec = Math.max(0, Math.floor((now - since.getTime()) / 1000));
 
-    let gatewayStatus: string | null = null;
-    let gatewayFailCode: string | null = null;
-    let gatewayBg = false;
-    if (gatewayLogId) {
-      const gl = await prisma.gatewayRequestLog.findUnique({
-        where: { id: gatewayLogId },
-        select: { status: true, failCode: true, resultSummary: true },
-      });
-      gatewayStatus = gl?.status ?? null;
-      gatewayFailCode = gl?.failCode ?? null;
-      gatewayBg = Boolean(readVideoBackgroundGeneration(gl?.resultSummary)?.slotReleased);
-    }
+    candidates.push({ task, payload, gatewayLogId, since, ageSec });
+  }
+
+  const gatewayLogIds = [
+    ...new Set(
+      candidates
+        .map((c) => c.gatewayLogId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const gatewayLogs =
+    gatewayLogIds.length > 0
+      ? await prisma.gatewayRequestLog.findMany({
+          where: { id: { in: gatewayLogIds } },
+          select: { id: true, status: true, failCode: true, resultSummary: true },
+        })
+      : [];
+  const gatewayLogMap = new Map(gatewayLogs.map((gl) => [gl.id, gl]));
+
+  for (const { task, gatewayLogId, since, ageSec } of candidates) {
+
+    const gl = gatewayLogId ? gatewayLogMap.get(gatewayLogId) : undefined;
+    const gatewayStatus = gl?.status ?? null;
+    const gatewayFailCode = gl?.failCode ?? null;
+    const gatewayBg = Boolean(readVideoBackgroundGeneration(gl?.resultSummary)?.slotReleased);
 
     const hasMedia = Boolean(task.ossUrl?.trim() || task.ephemeralUrl?.trim());
     const inflight =
       task.status === "SUBMITTED" ||
       task.status === "PENDING" ||
+      task.status === "DISPATCHING" ||
       gatewayStatus === "RUNNING" ||
       gatewayStatus === "PENDING";
 

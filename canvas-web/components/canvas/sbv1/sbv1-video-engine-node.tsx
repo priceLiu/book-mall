@@ -32,8 +32,10 @@ import {
   SBV1_VIDEO_ENGINE_RESIZE_MIN_HEIGHT,
 } from "@/lib/canvas/sbv1-node-chrome";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
+import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
+import { sbv1VideoPatchFromTask } from "@/lib/canvas/sbv1-image-task-apply";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { cn } from "@/lib/utils";
@@ -68,6 +70,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as Sbv1VideoEngineNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
   const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const { succeeded, history } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
   const { hovered, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
@@ -164,31 +167,48 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   useEffect(() => {
     if (!inflightTask) return;
+    const nodePatch = sbv1VideoPatchFromTask(inflightTask);
+    if (nodePatch) {
+      updateNodeData(id, nodePatch);
+      return;
+    }
     const patch = runtimePatchFromCanvasTask(inflightTask);
     if (patch?.status === "pending" || patch?.status === "running") {
       setNodeRuntime(id, patch);
     }
-  }, [inflightTask, id, setNodeRuntime]);
+  }, [inflightTask, id, setNodeRuntime, updateNodeData]);
 
-  /** 任务已在服务端成功但 runtime 仍停在 pending/running（Gateway 已终态 / 刷新 / 轮询竞态） */
+  /** 任务已在服务端终态但 runtime 仍停在 pending/running（须已绑定 taskId，勿误伤刚点的乐观 pending） */
   useEffect(() => {
     if (inflightTask) return;
     const boundId = d.runtime?.taskId?.trim();
-    const terminal = boundId
-      ? history.find((t) => t.id === boundId && t.status === "SUCCEEDED")
-      : succeeded[succeeded.length - 1];
-    if (!terminal || terminal.status !== "SUCCEEDED") return;
-    const patch = runtimePatchFromCanvasTask(terminal);
-    if (!patch || patch.status !== "done") return;
-    if (!shouldApplyCanvasTaskRuntimePatch(d.runtime, terminal, patch)) return;
-    if (
-      d.runtime?.status === "done" &&
-      (d.runtime.ossUrl || d.runtime.ephemeralUrl)
-    ) {
-      return;
-    }
-    setNodeRuntime(id, patch);
-  }, [history, succeeded, d.runtime, id, setNodeRuntime, inflightTask]);
+    if (!boundId) return;
+
+    const localSt = d.runtime?.status;
+    if (localSt !== "pending" && localSt !== "running") return;
+
+    const terminal = history.find(
+      (t) =>
+        t.id === boundId &&
+        (t.status === "SUCCEEDED" || t.status === "FAILED"),
+    );
+    if (!terminal) return;
+
+    const nodePatch = sbv1VideoPatchFromTask(terminal);
+    if (!nodePatch) return;
+    const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
+    if (!rtPatch) return;
+    if (!shouldApplyCanvasTaskRuntimePatch(d.runtime, terminal, rtPatch)) return;
+    updateNodeData(id, nodePatch);
+  }, [history, d.runtime, id, updateNodeData, inflightTask]);
+
+  /** 乐观 UI 遗留 uploading=true · 任务已终态时清掉并落盘 */
+  useEffect(() => {
+    if (!d.uploading) return;
+    const st = d.runtime?.status;
+    if (st !== "done" && st !== "error" && st !== "idle") return;
+    updateNodeData(id, { uploading: false, uploadError: undefined });
+  }, [d.uploading, d.runtime?.status, id, updateNodeData]);
 
   const hasToolbarContent = Boolean(
     hasVideo ||

@@ -9,6 +9,7 @@ import type { VideoEngineNodeData } from "@/lib/canvas/types";
 import { STORY_VIDEO_MODEL_KEYS } from "@/lib/canvas/types";
 import { resolveReferencedNodeIds } from "@/lib/canvas/referenced-nodes";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
+import { optimisticLibtvMediaRunStart } from "@/lib/canvas/libtv-image-node-run";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import { SaveVideoToLibraryButton } from "../save-video-to-library-button";
 import { NodeShell } from "../node-shell";
@@ -36,6 +37,7 @@ import {
 
 export function VideoEngineNode({ id, data, selected }: NodeProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
   const d = data as unknown as VideoEngineNodeData;
   const { succeeded } = useNodeTaskHistory(id);
 
@@ -67,6 +69,7 @@ export function VideoEngineNode({ id, data, selected }: NodeProps) {
     d.runtime?.status === "running" || d.runtime?.status === "pending";
 
   const onRun = (forceFresh: boolean) => {
+    optimisticLibtvMediaRunStart(id, updateNodeData, setNodeRuntime);
     window.dispatchEvent(
       new CustomEvent("canvas:run-node", { detail: { nodeId: id, forceFresh } }),
     );

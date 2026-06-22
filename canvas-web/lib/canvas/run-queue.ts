@@ -47,7 +47,7 @@ import {
 } from "./story-workspace-resolver";
 import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
 import { formatCanvasTaskError } from "./friendly-task-error";
-import { maybeNotifyCanvasCreditsSettled } from "./canvas-credits-notify";
+import { maybeNotifyCanvasCreditsSettled, markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import {
   registerCanvasRunBus,
   type CanvasStoryRunJob,
@@ -68,6 +68,7 @@ import {
 import {
   sbv1ImageFailurePatch,
   sbv1ImagePatchFromTask,
+  sbv1VideoPatchFromTask,
 } from "./sbv1-image-task-apply";
 import {
   commitLibtvMediaRunPendingPatch,
@@ -451,15 +452,40 @@ function applySbv1ImageTaskResult(
   return true;
 }
 
+function applySbv1VideoTaskResult(
+  node: CanvasFlowNode,
+  task: CanvasTaskRecord,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+): boolean {
+  if (node.type !== "sbv1-video-engine") return false;
+  const patch = sbv1VideoPatchFromTask(task);
+  if (!patch) return false;
+  updateNodeData(node.id, patch);
+  return true;
+}
+
+function applyLibtvMediaRunFailure(
+  node: CanvasFlowNode | undefined,
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void,
+  failCode: string,
+  failMessage: string,
+): boolean {
+  if (!node) return false;
+  if (isLibtvFreestandingImageNode(node) || node.type === "sbv1-video-engine") {
+    updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage));
+    return true;
+  }
+  return false;
+}
+
+/** @deprecated use applyLibtvMediaRunFailure */
 function applySbv1ImageRunFailure(
   node: CanvasFlowNode | undefined,
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
   failCode: string,
   failMessage: string,
 ): boolean {
-  if (!node || !isLibtvFreestandingImageNode(node)) return false;
-  updateNodeData(node.id, sbv1ImageFailurePatch(failCode, failMessage));
-  return true;
+  return applyLibtvMediaRunFailure(node, updateNodeData, failCode, failMessage);
 }
 
 /** 解析单个节点的 textInputs（按入边出现顺序拼接）。 */
@@ -724,6 +750,7 @@ export function useCanvasRunner(
     async (job: QueueItem) => {
       const key = runKey(job);
       const { nodeId, forceFresh } = job;
+      markCanvasNodeGenerationStarted(nodeId);
       try {
         if (!base || !projectId) {
           abortSequential(job, "画布未就绪，请刷新页面后重试");
@@ -880,7 +907,8 @@ export function useCanvasRunner(
               nodesNow,
             );
           } else if (
-            applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData)
+            applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
+            applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData)
           ) {
             /* ossUrl + runtime */
           } else {
@@ -915,7 +943,8 @@ export function useCanvasRunner(
               nodesNow,
             );
           } else if (
-            applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData)
+            applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
+            applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData)
           ) {
             /* ossUrl + runtime */
           } else {
@@ -943,7 +972,10 @@ export function useCanvasRunner(
             updateNodeData,
             nodesNow,
           );
-        } else if (applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData)) {
+        } else if (
+          applySbv1ImageTaskResult(nodeNow, r.task, updateNodeData) ||
+          applySbv1VideoTaskResult(nodeNow, r.task, updateNodeData)
+        ) {
           /* pending / running */
         } else {
           setNodeRuntime(nodeId, {
@@ -1007,7 +1039,10 @@ export function useCanvasRunner(
                   updateNodeData,
                   useCanvasStore.getState().nodes,
                 );
-              } else if (applySbv1ImageTaskResult(nodeNow, pick, updateNodeData)) {
+              } else if (
+                applySbv1ImageTaskResult(nodeNow, pick, updateNodeData) ||
+                applySbv1VideoTaskResult(nodeNow, pick, updateNodeData)
+              ) {
                 /* ossUrl + runtime */
               } else if (
                 pick.status === "SUCCEEDED" &&
@@ -1651,6 +1686,19 @@ export function useCanvasRunner(
         if (sbv1Patch) {
           updateNodeData(nodeId, sbv1Patch);
           const st = (sbv1Patch.runtime as CanvasNodeRuntime | undefined)?.status;
+          if (st === "done" || st === "error") {
+            const job = jobByTaskRef.current.get(t.id);
+            if (job) releaseInflightKey(runKey(job));
+            if (st === "done") maybeNotifyCanvasCreditsSettled(t);
+          }
+        }
+        return;
+      }
+      if (node?.type === "sbv1-video-engine") {
+        const videoPatch = sbv1VideoPatchFromTask(t);
+        if (videoPatch) {
+          updateNodeData(nodeId, videoPatch);
+          const st = (videoPatch.runtime as CanvasNodeRuntime | undefined)?.status;
           if (st === "done" || st === "error") {
             const job = jobByTaskRef.current.get(t.id);
             if (job) releaseInflightKey(runKey(job));

@@ -8,6 +8,10 @@ import { resolveSbv1VideoEngineInputs } from "@/lib/canvas/resolve-sbv1-video-en
 import { resolveSbv1UpstreamRefLinks } from "@/lib/canvas/sbv1-upstream-ref-links";
 import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
+import {
+  optimisticLibtvMediaRunStart,
+  revertOptimisticLibtvMediaRunStart,
+} from "@/lib/canvas/libtv-image-node-run";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   useLibtvFloatingDock,
@@ -57,6 +61,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
   const { alert } = useDialogs();
   const edges = useCanvasStore((s) => s.edges);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
 
   const data = useCanvasStore(
     useCallback(
@@ -91,12 +96,19 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
     const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
     const storeNode = latestNodes.find((n) => n.id === nodeId);
     const latestData = (storeNode?.data ?? {}) as Sbv1VideoEngineNodeData;
+
+    optimisticLibtvMediaRunStart(nodeId, updateNodeData, setNodeRuntime);
+
+    const revertPending = () =>
+      revertOptimisticLibtvMediaRunStart(nodeId, updateNodeData, setNodeRuntime);
+
     const prompt = (latestData.prompt ?? "").trim();
     const resolved = resolveSbv1VideoEngineInputs(latestNodes, latestEdges, nodeId, {
       prompt,
       referenceMode: latestData.referenceMode ?? "omni",
     });
     if (!resolved.ok) {
+      revertPending();
       await alert({
         title: "无法生成",
         message: resolved.error,
@@ -109,6 +121,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       resolved.portraitAssetRefs.length < 1 &&
       resolved.imageInputs.length < 1
     ) {
+      revertPending();
       await alert({
         title: "首尾帧模式",
         message: "请至少连接一张参考图（已入库或未入库均可）。",
@@ -117,6 +130,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       return;
     }
     if (!latestData.engine?.providerId?.trim() || !latestData.engine?.modelKey?.trim()) {
+      revertPending();
       await alert({
         title: "请选择模型",
         message: "请选择火山 Seedance 模型后再生成。",
@@ -125,6 +139,7 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       return;
     }
     if (!base) {
+      revertPending();
       await alert({
         title: "画布未就绪",
         message: "请刷新页面后重试。",
@@ -132,10 +147,8 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
       });
       return;
     }
-    const rt = latestData.runtime?.status;
-    const forceFresh = rt !== "pending" && rt !== "running";
-    busEnqueueStoryRun({ nodeId, forceFresh });
-  }, [nodeId, base, alert]);
+    busEnqueueStoryRun({ nodeId, forceFresh: true });
+  }, [nodeId, base, alert, updateNodeData, setNodeRuntime]);
 
   return (
     <Sbv1VideoEngineChatInput
