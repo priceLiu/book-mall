@@ -26,6 +26,10 @@ export default async function AdminToolServiceFeePage() {
           </Link>
         </p>
         <h1 className="text-2xl font-bold">工具技术服务费定价</h1>
+        <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm leading-relaxed text-amber-900 dark:text-amber-100">
+          <strong className="font-medium">Legacy：</strong>
+          Phase D 工具月费模型；当前主路径为财务控制台「工具会员套餐与席位」。本页仅作历史定价查阅，已从管理顶栏移除。
+        </p>
         <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
           Phase D：用户开通/续订工具时从钱包扣「月费点数」，延长 30 天服务期。单次 AI 生成不另扣点（走 Gateway BYOK）。
           详见{" "}

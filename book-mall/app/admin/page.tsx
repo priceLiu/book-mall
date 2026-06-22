@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { WalletEntryType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatPointsAsYuan } from "@/lib/currency";
-import { toolKeyToLabel } from "@/lib/tool-key-label";
+import { creditLedgerTypeLabel } from "@/lib/admin/admin-nav-config";
 import {
   Card,
   CardContent,
@@ -28,6 +28,10 @@ const AdminToolUsageBarChart = dynamic(
   },
 );
 
+function financeUsageHref(origin: string | null): string {
+  return origin ? `${origin}/admin/usage-overview` : "/admin/finance/usage-overview";
+}
+
 export default async function AdminDashboardPage() {
   const now = new Date();
   const [
@@ -36,7 +40,8 @@ export default async function AdminDashboardPage() {
     balanceSum,
     rechargeSum,
     rechargeTxCount,
-    toolUsageGroups,
+    creditLedgerGroups,
+    creditConsumeSum,
   ] = await prisma.$transaction([
     prisma.user.count(),
     prisma.subscription.count({
@@ -50,27 +55,34 @@ export default async function AdminDashboardPage() {
     prisma.walletEntry.count({
       where: { type: WalletEntryType.RECHARGE },
     }),
-    prisma.toolUsageEvent.groupBy({
-      by: ["toolKey"],
-      orderBy: { toolKey: "asc" },
+    prisma.creditLedger.groupBy({
+      by: ["type"],
+      where: { type: { in: ["CONSUME", "SETTLE"] } },
+      _count: { id: true },
+      _sum: { credits: true },
+    }),
+    prisma.creditLedger.aggregate({
+      where: { type: { in: ["CONSUME", "SETTLE"] } },
+      _sum: { credits: true },
       _count: { id: true },
     }),
   ]);
 
   const totalBalance = balanceSum._sum.balancePoints ?? 0;
   const totalRecharge = rechargeSum._sum.amountPoints ?? 0;
+  const totalCreditConsumed = Math.abs(creditConsumeSum._sum.credits ?? 0);
 
   const financeWebOrigin = getFinanceWebPublicOrigin();
+  const usageHref = financeUsageHref(financeWebOrigin);
 
-  const toolUsageChartData = [...toolUsageGroups]
+  const creditChartData = [...creditLedgerGroups]
     .sort(
       (a, b) =>
-        ((b._count as { id: number } | undefined)?.id ?? 0) -
-        ((a._count as { id: number } | undefined)?.id ?? 0),
+        Math.abs(b._sum.credits ?? 0) - Math.abs(a._sum.credits ?? 0),
     )
     .map((g) => ({
-      label: toolKeyToLabel(g.toolKey),
-      count: (g._count as { id: number } | undefined)?.id ?? 0,
+      label: creditLedgerTypeLabel(g.type),
+      count: Math.abs(g._sum.credits ?? 0),
     }));
 
   return (
@@ -78,8 +90,7 @@ export default async function AdminDashboardPage() {
       <div>
         <h1 className="text-2xl font-bold">概览</h1>
         <p className="text-sm text-muted-foreground">
-          用户、订阅与资金汇总（账本为<strong className="font-medium text-foreground">点</strong>，100 点 = 1
-          元）；充值与工具消耗明细见对应入口。
+          Book 运营 KPI（用户、课程订阅、钱包）；积分消耗明细见财务控制台。
         </p>
         <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
           <Link
@@ -90,23 +101,28 @@ export default async function AdminDashboardPage() {
           >
             前台价格公示
           </Link>
+          <span className="text-muted-foreground">·</span>
           {financeWebOrigin ? (
-            <>
-              <span className="text-muted-foreground">·</span>
-              <a
-                href={`${financeWebOrigin}/admin/billing/users`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                账单明细（按用户）
-              </a>
-            </>
-          ) : null}
+            <a
+              href={usageHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              费用多维度概览（财务控制台）
+            </a>
+          ) : (
+            <Link
+              href={usageHref}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              费用多维度概览
+            </Link>
+          )}
         </p>
       </div>
 
-      <div className="grid gap-4 items-stretch sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Card className="flex h-full flex-col">
           <CardHeader className="pb-2">
             <CardDescription>注册用户</CardDescription>
@@ -115,9 +131,14 @@ export default async function AdminDashboardPage() {
         </Card>
         <Card className="flex h-full flex-col">
           <CardHeader className="pb-2">
-            <CardDescription>有效订阅</CardDescription>
+            <CardDescription>有效课程订阅</CardDescription>
             <CardTitle className="text-3xl tabular-nums">{activeSubscriptions}</CardTitle>
           </CardHeader>
+          <CardContent className="pt-0 text-xs text-muted-foreground">
+            <Link href="/admin/billing" className="font-medium text-primary underline-offset-4 hover:underline">
+              课程订阅管理 →
+            </Link>
+          </CardContent>
         </Card>
         <Card className="flex h-full flex-col">
           <CardHeader className="shrink-0 pb-2">
@@ -129,14 +150,14 @@ export default async function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0 text-xs text-muted-foreground">
             <p className="min-h-[3rem] leading-snug">
-              钱包流水类型「充值」的 <code className="rounded bg-muted px-1">amountPoints</code> 之和（含营销赠送点数）
-              · 约合 <span className="tabular-nums">¥{formatPointsAsYuan(totalRecharge)}</span>
+              钱包流水「充值」合计 · 约合{" "}
+              <span className="tabular-nums">¥{formatPointsAsYuan(totalRecharge)}</span>
             </p>
             <Link
-              href="/admin/finance/recharges"
+              href="/admin/payments"
               className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
             >
-              查看充值明细 →
+              支付核对 →
             </Link>
           </CardContent>
         </Card>
@@ -146,14 +167,12 @@ export default async function AdminDashboardPage() {
             <CardTitle className="text-3xl tabular-nums">{rechargeTxCount}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0 text-xs text-muted-foreground">
-            <p className="min-h-[3rem] leading-snug">
-              钱包流水类型为「充值」的分录条数（入账次数口径）
-            </p>
+            <p className="min-h-[3rem] leading-snug">钱包 RECHARGE 分录条数</p>
             <Link
-              href="/admin/finance/recharges"
+              href="/admin/payments"
               className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
             >
-              充值明细 →
+              支付核对 →
             </Link>
           </CardContent>
         </Card>
@@ -167,35 +186,49 @@ export default async function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="flex flex-1 flex-col pt-0 text-xs text-muted-foreground">
             <p className="min-h-[3rem] leading-snug">
-              各用户 <code className="rounded bg-muted px-1">Wallet.balancePoints</code> 之和 · 约合{" "}
+              各用户钱包余额之和 · 约合{" "}
               <span className="tabular-nums">¥{formatPointsAsYuan(totalBalance)}</span>
             </p>
-            <Link
-              href="/admin/tool-usage"
-              className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
-            >
-              查看工具使用明细与费用 →
-            </Link>
+            {financeWebOrigin ? (
+              <a
+                href={usageHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
+              >
+                费用概览（财务控制台）→
+              </a>
+            ) : (
+              <Link
+                href={usageHref}
+                className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
+              >
+                费用概览 →
+              </Link>
+            )}
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">各工具使用次数</CardTitle>
+          <CardTitle className="text-base">积分消耗汇总</CardTitle>
           <CardDescription>
-            按主站 <code className="rounded bg-muted px-1 text-xs">ToolUsageEvent</code>{" "}
-            汇总（当前库内各 <code className="rounded bg-muted px-1 text-xs">toolKey</code>{" "}
-            流水条数）
+            按 <code className="rounded bg-muted px-1 text-xs">CreditLedger</code>{" "}
+            的 CONSUME / SETTLE 汇总（点数绝对值）；共{" "}
+            <span className="tabular-nums font-medium text-foreground">
+              {totalCreditConsumed.toLocaleString("zh-CN")}
+            </span>{" "}
+            点 · {creditConsumeSum._count.id ?? 0} 条流水
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
-          {toolUsageChartData.length === 0 ? (
+          {creditChartData.length === 0 ? (
             <div className="flex min-h-[240px] items-center justify-center rounded-md border border-dashed border-muted-foreground/25 bg-muted/30 text-sm text-muted-foreground">
-              暂无工具入账流水，生成扣费事件后将在此汇总。
+              暂无积分扣减流水。
             </div>
           ) : (
-            <AdminToolUsageBarChart data={toolUsageChartData} />
+            <AdminToolUsageBarChart data={creditChartData} />
           )}
         </CardContent>
       </Card>

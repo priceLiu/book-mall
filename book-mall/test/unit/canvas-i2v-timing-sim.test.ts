@@ -5,7 +5,8 @@
  *   - 总耗时 durationMs ≈ 排队 + 生成 + 轮询延迟
  *   - 排队 queueMs   = 厂商 created_at − Gateway submittedAt
  *   - 生成 generateMs = 厂商 updated_at − created_at（厂商时间轴；停更即冻结，不随墙钟涨）
- *   - 轮询延迟 pollDelayMs = Gateway completedAt − 厂商 updated_at
+ *   - 后处理 vendorPostProcessMs = 首次 succeeded − 厂商 updated_at
+ *   - 轮询延迟 pollDelayMs = Gateway completedAt − 首次 succeeded
  *
  * 配套真实在线压测见 /dev/canvas/i2v-load-test（Seedance 2.0、10 路）。
  */
@@ -51,7 +52,7 @@ function replay(events: PollEvent[]): VolcengineTimingTrace {
  * @param offset 相对 BASE 的提交时刻（模拟 10 路错峰被出队）
  * @param queueSec 厂商排队（created_at − submitted）
  * @param genSec   厂商生成（updated_at − created_at）
- * @param pollLagSec Gateway 轮询延迟（completed − updated_at）
+ * @param pollLagSec 首次 succeeded 前的后处理/收口延迟（completed − updated_at，success 与 updated 同 poll 时全归 postProcess）
  */
 function makeJob(
   offset: number,
@@ -90,7 +91,8 @@ function makeJob(
     expected: {
       queueMs: queueSec * SEC,
       generateMs: genSec * SEC,
-      pollDelayMs: pollLagSec * SEC,
+      vendorPostProcessMs: pollLagSec * SEC,
+      pollDelayMs: 0,
       durationMs: (queueSec + genSec + pollLagSec) * SEC,
     },
     trace: replay(events),
@@ -107,12 +109,15 @@ describe("i2v 并发压测 · 日志 4 时间正确性", () => {
     });
     expect(b.queueMs).toBe(job.expected.queueMs);
     expect(b.generateMs).toBe(job.expected.generateMs);
+    expect(b.vendorPostProcessMs).toBe(job.expected.vendorPostProcessMs);
     expect(b.pollDelayMs).toBe(job.expected.pollDelayMs);
     expect(b.pollDelayOverLimit).toBe(false);
-    // 三段和 == 总耗时
-    expect(b.queueMs! + b.generateMs! + b.pollDelayMs!).toBe(
-      job.expected.durationMs,
-    );
+    expect(
+      b.queueMs! +
+        b.generateMs! +
+        (b.vendorPostProcessMs ?? 0) +
+        (b.pollDelayMs ?? 0),
+    ).toBe(job.expected.durationMs);
   });
 
   it("10 路并发：各自错峰提交，四个时间逐条正确且自洽", () => {
@@ -134,9 +139,15 @@ describe("i2v 并发压测 · 日志 4 时间正确性", () => {
       });
       expect(b.queueMs, `job#${i} queue`).toBe(job.expected.queueMs);
       expect(b.generateMs, `job#${i} generate`).toBe(job.expected.generateMs);
+      expect(b.vendorPostProcessMs, `job#${i} postProcess`).toBe(
+        job.expected.vendorPostProcessMs,
+      );
       expect(b.pollDelayMs, `job#${i} pollDelay`).toBe(job.expected.pollDelayMs);
       expect(
-        b.queueMs! + b.generateMs! + b.pollDelayMs!,
+        b.queueMs! +
+          b.generateMs! +
+          (b.vendorPostProcessMs ?? 0) +
+          (b.pollDelayMs ?? 0),
         `job#${i} sum==duration`,
       ).toBe(job.expected.durationMs);
       expect(b.pollDelayOverLimit, `job#${i} pollDelay over limit`).toBe(false);

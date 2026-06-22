@@ -224,9 +224,10 @@ export type I2vTaskTiming = {
   durationMs: number | null;
   queueMs: number | null;
   generateMs: number | null;
+  vendorPostProcessMs: number | null;
   pollDelayMs: number | null;
   pollDelayOverLimit: boolean;
-  /** durationMs 与 (queue+generate+poll) 的差（ms），用于一致性校验 */
+  /** durationMs 与 (queue+generate+postProcess+poll) 的差（ms），用于一致性校验 */
   sumDeltaMs: number | null;
 };
 
@@ -348,6 +349,7 @@ export async function getI2vLoadTestStatus(
       durationMs: null,
       queueMs: null,
       generateMs: null,
+      vendorPostProcessMs: null,
       pollDelayMs: null,
       pollDelayOverLimit: false,
       sumDeltaMs: null,
@@ -368,13 +370,17 @@ export async function getI2vLoadTestStatus(
           : nowMs - log.submittedAt.getTime());
       const q = breakdown?.queueMs ?? null;
       const g = breakdown?.generateMs ?? null;
+      const pp = breakdown?.vendorPostProcessMs ?? null;
       const p = breakdown?.pollDelayMs ?? null;
       const sum =
-        q != null && g != null && p != null ? q + g + p : null;
+        q != null && g != null && pp != null && p != null
+          ? q + g + pp + p
+          : null;
       timing = {
         durationMs,
         queueMs: q,
         generateMs: g,
+        vendorPostProcessMs: pp,
         pollDelayMs: p,
         pollDelayOverLimit: breakdown?.pollDelayOverLimit ?? false,
         sumDeltaMs: sum != null && durationMs != null ? durationMs - sum : null,
@@ -502,7 +508,7 @@ function computeVerdicts(input: {
     release = { verdict: "pass", detail: "队列已排空，槽位已全部释放（归零）" };
   }
 
-  // Q4 四个时间正确：对每条成功任务，4 值齐全且 duration ≈ queue+generate+poll
+  // Q4 五个时间正确：对每条成功任务，5 值齐全且 duration ≈ queue+generate+postProcess+poll
   const withTiming = snapshots.filter((s) => s.status === "SUCCEEDED");
   let timing: I2vVerdicts["timing"];
   if (withTiming.length === 0) {
@@ -514,12 +520,17 @@ function computeVerdicts(input: {
     let overLimit = 0;
     for (const s of withTiming) {
       const t = s.timing;
-      if (t.queueMs == null || t.generateMs == null || t.pollDelayMs == null) {
+      if (
+        t.queueMs == null ||
+        t.generateMs == null ||
+        t.vendorPostProcessMs == null ||
+        t.pollDelayMs == null
+      ) {
         problems.push(`${s.nodeId}: 时间拆分缺失`);
         continue;
       }
       if (t.generateMs <= 0) problems.push(`${s.nodeId}: 厂商生成时间为 0`);
-      // duration 与三段和的偏差容忍 2s（轮询/写库的小抖动）
+      // duration 与四段和的偏差容忍 2s（轮询/写库的小抖动）
       if (t.sumDeltaMs != null && Math.abs(t.sumDeltaMs) > 2000) {
         problems.push(
           `${s.nodeId}: 总耗时与三段和偏差 ${Math.round(t.sumDeltaMs)}ms`,
@@ -536,7 +547,7 @@ function computeVerdicts(input: {
           : "";
       timing = {
         verdict: "pass",
-        detail: `已校验 ${withTiming.length} 条：四时间齐全且总耗时≈排队+生成+轮询${warn}`,
+        detail: `已校验 ${withTiming.length} 条：五时间齐全且总耗时≈排队+生成+后处理+Poll${warn}`,
       };
     }
   }

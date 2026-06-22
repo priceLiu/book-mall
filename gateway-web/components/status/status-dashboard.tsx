@@ -16,9 +16,12 @@ import {
   formatDurationSeconds,
   formatLogTimestamp,
   isLogDateRangeInvalid,
+  isLogInProgress,
   pickLogProgressLabel,
-  resolveLogDurationMs,
+  resolveLogDisplayDurationMs,
 } from "@/lib/gateway-log-params";
+import { resolveLiveLogPhaseTiming } from "@/lib/volcengine-log-timing-live";
+import { useLiveWallClockMs } from "@/lib/use-live-wall-clock";
 import { displayLogModelKey } from "@/lib/gateway-log-display";
 import {
   clampGatewayLogPageSize,
@@ -366,7 +369,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const [detailLoading, setDetailLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [liveNowMs, setLiveNowMs] = useState(0);
+  const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
   const summaryPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inFlightPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const loadSeqRef = useRef(0);
@@ -614,13 +617,6 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     setDetailPage(1);
     setDetailLoading(true);
   }, [activeTab, applied, pageSize]);
-
-  useEffect(() => {
-    setLiveNowMs(Date.now());
-    if (!hasInFlight) return;
-    const tick = setInterval(() => setLiveNowMs(Date.now()), LIVE_CLOCK_MS);
-    return () => clearInterval(tick);
-  }, [hasInFlight]);
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
@@ -1117,20 +1113,41 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               ) : (
                 logs.map((log, index) => {
                   const rowNo = (detailPage - 1) * pageSize + index + 1;
-                  const durationMs = resolveLogDurationMs(
-                    log.durationMs,
-                    log.submittedAt,
-                    log.completedAt,
-                    {
-                      inProgress:
-                        log.status === "PENDING" || log.status === "RUNNING",
-                      nowMs: liveNowMs || undefined,
+                  const isInProgress = isLogInProgress(log.status);
+                  const live = resolveLiveLogPhaseTiming({
+                    submittedAt: log.submittedAt,
+                    completedAt: log.completedAt,
+                    status: log.status,
+                    resultSummary: log.resultSummary,
+                    nowMs: liveNowMs,
+                    server: {
+                      queueMs: log.queueMs,
+                      generateMs: log.generateMs,
+                      vendorPostProcessMs: log.vendorPostProcessMs,
+                      pollDelayMs: log.pollDelayMs,
                     },
-                  );
-                  const progressLabel = pickLogProgressLabel(
-                    log.status,
-                    log.resultSummary,
-                  );
+                  });
+                  const durationMs = resolveLogDisplayDurationMs({
+                    durationMs: log.durationMs,
+                    submittedAt: log.submittedAt,
+                    completedAt: log.completedAt,
+                    isInProgress,
+                    nowMs: liveNowMs,
+                    queueMs: live.queueMs,
+                    generateMs: live.generateMs,
+                    vendorPostProcessMs: live.vendorPostProcessMs,
+                    pollDelayMs: live.pollDelayMs,
+                    liveTotalMs: live.totalMs,
+                  });
+                  const rawProgressLabel = isInProgress
+                    ? pickLogProgressLabel(log.status, log.resultSummary)
+                    : null;
+                  const statusShort = log.status.trim().toLowerCase();
+                  const progressLabel =
+                    rawProgressLabel &&
+                    rawProgressLabel.trim().toLowerCase() !== statusShort
+                      ? rawProgressLabel
+                      : null;
                   const failCode = resolveGatewayFailCodeDisplay({
                     failCode: log.failCode,
                     failMessage: log.failMessage,

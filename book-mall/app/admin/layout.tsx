@@ -33,11 +33,12 @@ export default async function AdminLayout({
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-border bg-card text-card-foreground shadow-sm">
-        <div className="container flex min-h-14 max-w-screen-xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 mx-auto">
-          <Link href="/admin" className="font-semibold text-card-foreground shrink-0 hover:text-primary">
+        <div className="container mx-auto flex min-h-14 max-w-screen-xl items-center gap-2 px-4 py-2">
+          <Link href="/admin" className="shrink-0 font-semibold text-card-foreground hover:text-primary">
             管理后台
           </Link>
-          <AdminNav
+          <div className="min-w-0 flex-1">
+            <AdminNav
             user={{
               id: session.user.id,
               email: session.user.email ?? null,
@@ -47,7 +48,8 @@ export default async function AdminLayout({
             toolsSsoReady={toolsSsoDiag.ready}
             toolsSsoIssues={toolsSsoDiag.issues}
             financeWebOrigin={financeWebOrigin}
-          />
+            />
+          </div>
         </div>
       </header>
       <div className="container max-w-screen-xl px-4 py-8 mx-auto">{children}</div>

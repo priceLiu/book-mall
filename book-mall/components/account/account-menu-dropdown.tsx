@@ -19,6 +19,7 @@ import {
   User,
   Users,
   Zap,
+  Activity,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,6 +42,7 @@ import {
   openToolsAppInNewTab,
 } from "@/lib/account-app-launch";
 import { isAccountCanvasLaunchClickable } from "@/lib/account-canvas-launch-clickable";
+import { GATEWAY_LOGS_SSO_HREF } from "@/lib/gateway/gateway-console-sso";
 
 const NAV_LINKS = [
   { href: "/account", label: "概览", icon: User, exact: true },
@@ -148,17 +150,30 @@ export function AccountMenuDropdown({
               </DropdownMenuItem>
             ))}
             {isAdmin ? (
-              <DropdownMenuItem asChild>
-                <Link
-                  href="/admin"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground"
-                >
-                  <Settings />
-                  <span>管理后台</span>
-                </Link>
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem asChild>
+                  <Link
+                    href="/admin"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground"
+                  >
+                    <Settings />
+                    <span>管理后台</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link
+                    href={GATEWAY_LOGS_SSO_HREF}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground"
+                  >
+                    <Activity />
+                    <span>Gateway 日志</span>
+                  </Link>
+                </DropdownMenuItem>
+              </>
             ) : null}
           </DropdownMenuGroup>
           <DropdownMenuSeparator />

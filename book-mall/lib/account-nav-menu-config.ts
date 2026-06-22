@@ -17,6 +17,7 @@ import {
   BarChart3,
   Receipt,
   ScrollText,
+  Activity,
 } from "lucide-react";
 
 export type AccountNavLinkItem = {
@@ -57,6 +58,7 @@ const GROUP_LABELS = {
 } as const;
 
 import { getFinanceFeesRedirectUrl } from "@/lib/finance-account-redirect";
+import { GATEWAY_LOGS_SSO_HREF } from "@/lib/gateway/gateway-console-sso";
 
 function financeNavItem(
   path: string,
@@ -124,6 +126,13 @@ export function buildAccountNavMenuGroups(input: {
           label: "管理后台",
           icon: Settings,
           external: true,
+        },
+        {
+          kind: "link",
+          href: GATEWAY_LOGS_SSO_HREF,
+          label: "Gateway 日志",
+          icon: Activity,
+          openInNewTab: true,
         },
       ],
     });

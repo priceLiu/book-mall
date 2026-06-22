@@ -12,8 +12,9 @@ import {
   formatLogTimestamp,
   formatPlatformCreditsDisplay,
   isLogDateRangeInvalid,
+  isLogInProgress,
   pickLogProgressLabel,
-  resolveLogDurationMs,
+  resolveLogDisplayDurationMs,
 } from "@/lib/gateway-log-params";
 import {
   collectLogModels,
@@ -29,12 +30,14 @@ import {
   logProviderFilterOptions,
   LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
-import { liveVolcengineVideoTiming } from "@/lib/volcengine-log-timing-live";
+import { resolveLiveLogPhaseTiming } from "@/lib/volcengine-log-timing-live";
+import { useLiveWallClockMs } from "@/lib/use-live-wall-clock";
 
 export type GatewayLogRow = {
   id: string;
   model: string;
   canonicalModelKey?: string | null;
+  displayModelKey?: string | null;
   tenantId?: string | null;
   actorBookUserId?: string | null;
   creditsCharged?: number | null;
@@ -59,6 +62,7 @@ export type GatewayLogRow = {
   appTaskNodeId?: string | null;
   queueMs?: number | null;
   generateMs?: number | null;
+  vendorPostProcessMs?: number | null;
   pollDelayMs?: number | null;
   pollDelayOverLimit?: boolean;
   estimatedVendorCostYuan: string | null;
@@ -136,6 +140,7 @@ function clampPageSize(value: number): number {
 }
 
 const AUTO_REFRESH_MS = 8_000;
+/** 进行中 Duration / 各阶段墙钟刷新间隔 */
 const LIVE_CLOCK_MS = 1_000;
 
 function SpinnerIcon({ className }: { className?: string }) {
@@ -325,8 +330,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
-  /** 仅客户端更新，避免进行中 Duration 在 SSR/ hydration 时用 Date.now() 不一致 */
-  const [liveNowMs, setLiveNowMs] = useState<number | null>(null);
+  /** 每秒 tick，驱动进行中 Duration / Queue / Generate / Poll 墙钟重算 */
+  const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
 
   const dateRangeInvalid = isLogDateRangeInvalid(fromDate, toDate);
 
@@ -367,7 +372,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     !toDate;
 
   const hasInFlightLogs = useMemo(
-    () => logs.some((l) => l.status === "RUNNING" || l.status === "PENDING"),
+    () => logs.some((l) => isLogInProgress(l.status)),
     [logs],
   );
   const hasInFlightLogsRef = useRef(hasInFlightLogs);
@@ -431,7 +436,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         return loadLogs({ poll: opts?.poll, includeFacets: false });
       }
       const inFlightIds = current
-        .filter((l) => l.status === "RUNNING" || l.status === "PENDING")
+        .filter((l) => isLogInProgress(l.status))
         .map((l) => l.id);
       setFetchError(null);
       try {
@@ -491,16 +496,6 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅挂载时恢复每页条数
   }, []);
-
-  /** 进行中任务 · 挂载后再用本地时钟刷新 Duration 列（禁止 SSR 阶段读 Date.now） */
-  useEffect(() => {
-    setLiveNowMs(Date.now());
-    if (!hasInFlightLogs) return;
-    const timer = window.setInterval(() => {
-      setLiveNowMs(Date.now());
-    }, LIVE_CLOCK_MS);
-    return () => window.clearInterval(timer);
-  }, [hasInFlightLogs]);
 
   /** 开启自动刷新时定期拉列表；有进行中任务时附带 poll=1 触发服务端 opportunistic 轮询 */
   useEffect(() => {
@@ -902,13 +897,19 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="w-[88px]"
-                title="厂商 created_at → updated_at（进行中 updated_at 停更后不再增长，停更时长见 Poll Δ）"
+                title="厂商 created_at → updated_at（GPU 生成阶段）"
               >
                 Generate
               </th>
               <th
                 className="w-[96px]"
-                title="厂商 updated_at 停更时长（进行中）或终态时 Gateway 检测延迟；应 ≤10s，超出标红"
+                title="厂商 updated_at 已跳变后至 status=succeeded 的后处理/打包（Seedance 常见 status 仍 running）；进行中为实时墙钟"
+              >
+                PostProc
+              </th>
+              <th
+                className="w-[88px]"
+                title="首次观测 succeeded → Gateway completedAt（我方收口延迟）；进行中为我方轮询间隔"
               >
                 Poll Δ
               </th>
@@ -962,30 +963,36 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
           </thead>
           <tbody>
             {logs.map((l) => {
-              const isInProgress =
-                l.status === "RUNNING" || l.status === "PENDING";
-              const liveVolc =
-                isInProgress && liveNowMs != null
-                  ? liveVolcengineVideoTiming({
-                      submittedAt: l.submittedAt,
-                      completedAt: l.completedAt,
-                      resultSummary: l.resultSummary,
-                      nowMs: liveNowMs,
-                    })
-                  : null;
-              const queueMs = liveVolc?.queueMs ?? l.queueMs;
-              const generateMs = liveVolc?.generateMs ?? l.generateMs;
-              const durationMs =
-                liveVolc != null
-                  ? liveVolc.totalMs
-                  : resolveLogDurationMs(
-                      l.durationMs,
-                      l.submittedAt,
-                      l.completedAt,
-                      isInProgress && liveNowMs != null
-                        ? { inProgress: true, nowMs: liveNowMs }
-                        : undefined,
-                    );
+              const isInProgress = isLogInProgress(l.status);
+              const live = resolveLiveLogPhaseTiming({
+                submittedAt: l.submittedAt,
+                completedAt: l.completedAt,
+                status: l.status,
+                resultSummary: l.resultSummary,
+                nowMs: liveNowMs,
+                server: {
+                  queueMs: l.queueMs,
+                  generateMs: l.generateMs,
+                  vendorPostProcessMs: l.vendorPostProcessMs,
+                  pollDelayMs: l.pollDelayMs,
+                },
+              });
+              const queueMs = live.queueMs;
+              const generateMs = live.generateMs;
+              const vendorPostProcessMs = live.vendorPostProcessMs;
+              const pollDelayMs = live.pollDelayMs;
+              const durationMs = resolveLogDisplayDurationMs({
+                durationMs: l.durationMs,
+                submittedAt: l.submittedAt,
+                completedAt: l.completedAt,
+                isInProgress,
+                nowMs: liveNowMs,
+                queueMs,
+                generateMs,
+                vendorPostProcessMs,
+                pollDelayMs,
+                liveTotalMs: live.totalMs,
+              });
               const duration = formatDurationSeconds(durationMs);
               const usage = formatUsageYuanDisplay(l.estimatedVendorCostYuan);
               const platformCredits = formatPlatformCreditsDisplay(l.creditsCharged);
@@ -1001,15 +1008,25 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               const appTask = formatLogAppTaskCell(l);
               const queueCell = formatLogTimingPhaseCell(queueMs, "queue");
               const generateCell = formatLogTimingPhaseCell(generateMs, "generate");
-              const pollDelayMs = liveVolc?.pollDelayMs ?? l.pollDelayMs;
+              const postProcCell = formatLogTimingPhaseCell(
+                vendorPostProcessMs,
+                "postproc",
+              );
               const pollCell = formatLogTimingPhaseCell(pollDelayMs, "poll", {
                 overLimit:
+                  !isInProgress &&
                   pollDelayMs != null &&
                   pollDelayMs > 10_000,
               });
-              const progressLabel = isInProgress
+              const rawProgressLabel = isInProgress
                 ? pickLogProgressLabel(l.status, l.resultSummary)
                 : null;
+              const statusShort = l.status.trim().toLowerCase();
+              const progressLabel =
+                rawProgressLabel &&
+                rawProgressLabel.trim().toLowerCase() !== statusShort
+                  ? rawProgressLabel
+                  : null;
               const sourceLabel = formatLogPageLabel(l.clientSource, l.clientPage);
               const sourceTitle = formatLogSourceTooltip(
                 l.clientSource,
@@ -1098,6 +1115,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                       title={generateCell.title}
                     >
                       {generateCell.value}
+                    </span>
+                  </td>
+                  <td className="align-middle">
+                    <span
+                      className="font-mono text-sm text-zinc-300"
+                      title={postProcCell.title}
+                    >
+                      {postProcCell.value}
                     </span>
                   </td>
                   <td className="align-middle">

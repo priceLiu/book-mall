@@ -138,6 +138,16 @@ export async function createRequestLog(opts: {
     actorBookUserId: opts.actorBookUserId,
   });
 
+  let canonicalModelKey: string | null = null;
+  try {
+    canonicalModelKey = await resolveBillingCanonicalKey({
+      modelKey: opts.model,
+      inputSummary: opts.inputSummary,
+    });
+  } catch {
+    // 归口失败不阻断建日志
+  }
+
   const isVideoReq = (opts.requestKind ?? route.requestKind) === "VIDEO";
   let riskAccountId: string | null = null;
   let riskPopup: string | undefined;
@@ -201,6 +211,7 @@ export async function createRequestLog(opts: {
       billingMode,
       staffFlag,
       billingPersonaSnap: billingPersonaSnap ?? undefined,
+      canonicalModelKey: canonicalModelKey ?? undefined,
       submittedAt: new Date(),
     },
   });

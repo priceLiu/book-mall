@@ -105,7 +105,10 @@ export function collectLogProviderKinds(
 export function displayLogModelKey(log: {
   model: string;
   canonicalModelKey?: string | null;
+  displayModelKey?: string | null;
 }): string {
+  const display = log.displayModelKey?.trim();
+  if (display) return display;
   const canonical = log.canonicalModelKey?.trim();
   return canonical || log.model;
 }
@@ -169,10 +172,10 @@ export function formatLogAppTaskCell(input: {
 
 const POLL_DELAY_LIMIT_MS = 10_000;
 
-/** 日志表 · 火山视频耗时阶段（排队 / 生成 / 轮询延迟） */
+/** 日志表 · 火山视频耗时阶段（排队 / 生成 / 后处理 / 轮询延迟） */
 export function formatLogTimingPhaseCell(
   ms: number | null | undefined,
-  phase: "queue" | "generate" | "poll",
+  phase: "queue" | "generate" | "postproc" | "poll",
   opts?: { overLimit?: boolean },
 ): { value: string; title?: string; warn?: boolean } {
   if (ms == null || ms < 0) return { value: "—" };
@@ -180,7 +183,8 @@ export function formatLogTimingPhaseCell(
   const labels = {
     queue: "火山排队",
     generate: "厂商生成（updated_at − created_at）",
-    poll: "停更 / 轮询延迟",
+    postproc: "厂商后处理（updated_at 跳变 → 首次 succeeded）",
+    poll: "我方轮询 / 收口延迟",
   } as const;
   const title = `${labels[phase]} · ${sec}s`;
   if (phase === "poll") {

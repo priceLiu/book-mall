@@ -63,16 +63,13 @@ export function AccountShell({
 
         <div className="min-w-0">
           <header className="sticky top-0 z-10 flex h-12 items-center justify-between gap-3 border-b border-border bg-background px-4 md:px-6">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <p className="truncate text-sm font-medium text-muted-foreground md:hidden">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <AccountMobileNavSlot {...menuProps} />
+              <p className="truncate text-sm font-medium text-muted-foreground">
                 <Link href="/account" className="hover:text-foreground">
                   个人中心
                 </Link>
               </p>
-              <p className="hidden truncate text-sm font-medium text-muted-foreground md:block">
-                个人中心
-              </p>
-              <AccountMobileNavSlot {...menuProps} />
             </div>
             <ToggleTheme iconOnly className="shrink-0" />
           </header>
