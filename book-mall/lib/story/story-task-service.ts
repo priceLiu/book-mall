@@ -33,7 +33,7 @@ import {
 import { failGatewayLogIfStillRunning } from "@/lib/gateway/fail-gateway-log-on-timeout";
 import { getGenerationPollBatch } from "@/lib/canvas/canvas-constants";
 import {
-  getGenerationPollConcurrency,
+  getEffectiveGenerationPollConcurrency,
   getGenerationPollInnerTimeoutMs,
   getGenerationPollMaxPasses,
   getGenerationPollTimeBudgetMs,
@@ -1421,7 +1421,7 @@ export async function runPollWorker(opts?: {
     ? Date.now() + getGenerationPollTimeBudgetMs()
     : Number.MAX_SAFE_INTEGER;
   const maxPasses = scaledPoll ? getGenerationPollMaxPasses() : 1;
-  const concurrency = scaledPoll ? getGenerationPollConcurrency() : 1;
+  const concurrency = scaledPoll ? getEffectiveGenerationPollConcurrency() : 1;
 
   for (let pass = 0; pass < maxPasses && Date.now() < deadline; pass++) {
     const fetchSize = scaledPoll ? pollShardOverFetchSize(pollBatch) : pollBatch;

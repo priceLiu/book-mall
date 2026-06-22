@@ -2,6 +2,12 @@ import { statSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
+import {
+  resolvePrismaDatasourceUrl,
+  getPrismaConnectionLimit,
+} from "@/lib/prisma-pool-config";
+
+export { getPrismaConnectionLimit };
 
 /**
  * 挂在 globalThis，避免 dev 热更新重复 `new PrismaClient()`。
@@ -33,34 +39,6 @@ function generatedClientStamp(): string {
   }
 }
 
-function resolvePrismaDatasourceUrl(): string | undefined {
-  const raw = process.env.DATABASE_URL?.trim();
-  if (!raw) return undefined;
-  try {
-    const url = new URL(raw);
-    if (!url.searchParams.has("pool_timeout")) {
-      url.searchParams.set(
-        "pool_timeout",
-        process.env.PRISMA_POOL_TIMEOUT ?? "30",
-      );
-    }
-    if (process.env.NODE_ENV === "development") {
-      // 显式 PRISMA_CONNECTION_LIMIT 优先于 URL 上的 connection_limit：
-      // dev:all 里 poll-loop 子进程设 =1（保持 1 连接），book-mall 主进程不设则沿用 URL 值。
-      // 否则 URL 上的 connection_limit 会覆盖所有子进程，导致每个 poll-loop 都开满（连接数翻几倍）。
-      const explicit = process.env.PRISMA_CONNECTION_LIMIT?.trim();
-      if (explicit) {
-        url.searchParams.set("connection_limit", explicit);
-      } else if (!url.searchParams.has("connection_limit")) {
-        url.searchParams.set("connection_limit", "2");
-      }
-    }
-    return url.toString();
-  } catch {
-    return raw;
-  }
-}
-
 const datasourceUrl = resolvePrismaDatasourceUrl();
 
 /**
@@ -71,7 +49,7 @@ const datasourceUrl = resolvePrismaDatasourceUrl();
  * 注：扩展后类型为 DynamicClientExtension，运行时对 model 操作 / $transaction / $queryRaw /
  * $disconnect 完全兼容（代码未使用 $on/$use），对外仍以 PrismaClient 类型导出以兼容全部调用方。
  */
-const DB_RETRY_MAX = 2;
+const DB_RETRY_MAX = 3;
 const DB_RETRY_BASE_DELAY_MS = 60;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 

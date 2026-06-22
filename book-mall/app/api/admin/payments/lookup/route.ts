@@ -4,6 +4,7 @@ import { lookupCheckoutByRemarkCode } from "@/lib/payments/confirm-checkout";
 import { isValidRemarkCode, normalizeRemarkCode } from "@/lib/payments/remark-code";
 import { productKindLabel } from "@/lib/payments/product-labels";
 import { requirePaymentAdminSession } from "@/lib/payments/session-auth";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,11 @@ export async function GET(request: NextRequest) {
   }
 
   const snap = checkout.productSnapshot as Record<string, unknown>;
+  const submitted = await prisma.paymentEvent.findFirst({
+    where: { checkoutId: checkout.id, action: "USER_SUBMITTED" },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
   return NextResponse.json({
     checkout: {
       id: checkout.id,
@@ -34,6 +40,7 @@ export async function GET(request: NextRequest) {
       productKind: checkout.productKind,
       productLabel: productKindLabel(checkout.productKind, snap),
       createdAt: checkout.createdAt.toISOString(),
+      submittedAt: submitted?.createdAt.toISOString() ?? null,
       expiresAt: checkout.expiresAt.toISOString(),
       user: checkout.user,
     },

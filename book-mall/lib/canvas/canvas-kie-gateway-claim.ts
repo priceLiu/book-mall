@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { runTxWithRetry } from "@/lib/db-tx-retry";
+import { CANVAS_DB_TX_OPTIONS, runTxWithRetry } from "@/lib/db-tx-retry";
 import { CanvasProjectError } from "./canvas-project-service";
 
 function taskInputPayload(
@@ -92,7 +92,7 @@ export async function claimCanvasTaskKieSubmit(
         data: { inputPayload: nextPayload },
       });
       return { claimed: true, task: updated };
-      }),
-    { label: "claimCanvasTaskKieSubmit" },
+      }, CANVAS_DB_TX_OPTIONS),
+    { label: "claimCanvasTaskKieSubmit", maxRetries: 5 },
   );
 }

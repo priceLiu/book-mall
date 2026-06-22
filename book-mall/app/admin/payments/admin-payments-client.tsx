@@ -12,12 +12,23 @@ type CheckoutRow = {
   amountYuan: number;
   productLabel: string;
   createdAt: string;
-  user: { email: string | null; name: string | null };
+  submittedAt: string | null;
+  user: { email: string | null; name: string | null; phone?: string | null };
 };
+
+function formatCheckoutTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("zh-CN", { hour12: false });
+}
+
+function userLabel(user: CheckoutRow["user"]): string {
+  return user.name || user.phone || user.email || "—";
+}
 
 type LookupResult = CheckoutRow & {
   outTradeNo: string;
   expiresAt: string;
+  submittedAt?: string | null;
 };
 
 export function AdminPaymentsClient() {
@@ -135,7 +146,15 @@ export function AdminPaymentsClient() {
           <div className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/5 p-4 text-sm space-y-2">
             <p>
               <span className="text-muted-foreground">用户：</span>
-              {lookup.user.name || lookup.user.email}
+              {userLabel(lookup.user)}
+            </p>
+            <p>
+              <span className="text-muted-foreground">下单时间：</span>
+              {formatCheckoutTime(lookup.createdAt)}
+            </p>
+            <p>
+              <span className="text-muted-foreground">提交核对：</span>
+              {formatCheckoutTime(lookup.submittedAt)}
             </p>
             <p>
               <span className="text-muted-foreground">商品：</span>
@@ -184,6 +203,8 @@ export function AdminPaymentsClient() {
                 <th className="py-2">用户</th>
                 <th className="py-2">商品</th>
                 <th className="py-2">金额</th>
+                <th className="py-2 whitespace-nowrap">下单时间</th>
+                <th className="py-2 whitespace-nowrap">提交核对</th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -191,9 +212,15 @@ export function AdminPaymentsClient() {
               {pending.map((row) => (
                 <tr key={row.id} className="border-b border-border/60">
                   <td className="py-2 font-mono">{row.remarkCode}</td>
-                  <td className="py-2">{row.user.email}</td>
+                  <td className="py-2">{userLabel(row.user)}</td>
                   <td className="py-2">{row.productLabel}</td>
                   <td className="py-2">¥{row.amountYuan.toFixed(2)}</td>
+                  <td className="py-2 whitespace-nowrap text-xs text-muted-foreground">
+                    {formatCheckoutTime(row.createdAt)}
+                  </td>
+                  <td className="py-2 whitespace-nowrap text-xs text-muted-foreground">
+                    {formatCheckoutTime(row.submittedAt)}
+                  </td>
                   <td className="py-2 text-right space-x-2">
                     <Button
                       type="button"

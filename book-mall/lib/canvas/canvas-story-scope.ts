@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import type { Prisma, CanvasGenerationTask } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { runTxWithRetry } from "@/lib/db-tx-retry";
+import { CANVAS_DB_TX_OPTIONS, runTxWithRetry } from "@/lib/db-tx-retry";
 import { CanvasProjectError } from "./canvas-project-service";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
@@ -117,6 +117,18 @@ export async function createStoryScopedCanvasTask(
     >;
   },
 ): Promise<CanvasGenerationTask> {
+  const status = args.initialStatus ?? "PENDING";
+  const actorUserId = args.actorUserId;
+  // 事务外解析 scope，缩短持连接时间（resolve 含额外读库，不应占 advisory lock）。
+  let tenantId: string | null = null;
+  if (actorUserId && status === "QUEUED") {
+    const scope = await resolveCanvasProjectTrafficScope(
+      args.projectId,
+      actorUserId,
+    );
+    tenantId = scope.tenantId ?? null;
+  }
+
   // 同 (project,node,scope) 由 pg_advisory_xact_lock 串行化，已足够互斥去重，
   // 无需 Serializable（其谓词锁在并发下徒增 P2034 写冲突 → "数据库繁忙，任务未提交"）。
   // 改默认隔离级 + 瞬时错误重试（连接池耗尽 / 写冲突），消除「点几次才成功」。
@@ -150,17 +162,6 @@ export async function createStoryScopedCanvasTask(
             ? { storyScope: args.storyScope }
             : payload;
 
-      const status = args.initialStatus ?? "PENDING";
-      const actorUserId = args.actorUserId;
-      let tenantId: string | null = null;
-      if (actorUserId && status === "QUEUED") {
-        const scope = await resolveCanvasProjectTrafficScope(
-          args.projectId,
-          actorUserId,
-        );
-        tenantId = scope.tenantId ?? null;
-      }
-
       return tx.canvasGenerationTask.create({
         data: {
           ...args.data,
@@ -173,7 +174,7 @@ export async function createStoryScopedCanvasTask(
           inputPayload: scopePatch as Prisma.InputJsonValue,
         },
       });
-      }),
-    { label: "createStoryScopedCanvasTask" },
+      }, CANVAS_DB_TX_OPTIONS),
+    { label: "createStoryScopedCanvasTask", maxRetries: 5 },
   );
 }

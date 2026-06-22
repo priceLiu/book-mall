@@ -2,6 +2,7 @@
  * Book 财务结算流水（非 Gateway 职责）。
  * Gateway 只记录调用；套餐扣次 / 积分扣减由 Book 在 finalize 后写入，供财务对帐。
  */
+import { Prisma } from "@prisma/client";
 import type {
   BillingCategory,
   BillingSettlementKind,
@@ -101,31 +102,45 @@ export async function recordBillingSettlement(input: RecordBillingSettlementInpu
   const periodKey = `${log.submittedAt.getUTCFullYear()}-${String(log.submittedAt.getUTCMonth() + 1).padStart(2, "0")}`;
 
   const line = await prisma.$transaction(async (tx) => {
-    const created = await tx.billingSettlementLine.create({
-      data: {
-        gatewayLogId: log.id,
-        ownerType: input.ref.ownerType,
-        ownerId: input.ref.ownerId,
-        actorBookUserId: log.actorBookUserId,
-        periodKey,
-        settlementKind: input.settlementKind,
-        byokTaskKind: input.byokTaskKind ?? null,
-        billingCategory,
-        tryonModelKey,
-        quotaDelta,
-        monthlyIncluded: input.monthlyIncluded ?? null,
-        includedUsedAfter: input.includedUsedAfter ?? null,
-        includedRemainingAfter: input.includedRemainingAfter ?? null,
-        isOverage: input.isOverage ?? false,
-        creditsCharged,
-        creditLedgerId: input.creditLedgerId ?? null,
-        canonicalModelKey: log.canonicalModelKey ?? log.model ?? null,
-        requestKind: log.requestKind,
-        clientPage: log.clientPage,
-        feeDescription,
-        submittedAt: log.submittedAt,
-      },
-    });
+    let created;
+    try {
+      created = await tx.billingSettlementLine.create({
+        data: {
+          gatewayLogId: log.id,
+          ownerType: input.ref.ownerType,
+          ownerId: input.ref.ownerId,
+          actorBookUserId: log.actorBookUserId,
+          periodKey,
+          settlementKind: input.settlementKind,
+          byokTaskKind: input.byokTaskKind ?? null,
+          billingCategory,
+          tryonModelKey,
+          quotaDelta,
+          monthlyIncluded: input.monthlyIncluded ?? null,
+          includedUsedAfter: input.includedUsedAfter ?? null,
+          includedRemainingAfter: input.includedRemainingAfter ?? null,
+          isOverage: input.isOverage ?? false,
+          creditsCharged,
+          creditLedgerId: input.creditLedgerId ?? null,
+          canonicalModelKey: log.canonicalModelKey ?? log.model ?? null,
+          requestKind: log.requestKind,
+          clientPage: log.clientPage,
+          feeDescription,
+          submittedAt: log.submittedAt,
+        },
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
+        const dup = await tx.billingSettlementLine.findUnique({
+          where: { gatewayLogId: log.id },
+        });
+        if (dup) return dup;
+      }
+      throw e;
+    }
 
     await tx.gatewayRequestLog.update({
       where: { id: log.id },
