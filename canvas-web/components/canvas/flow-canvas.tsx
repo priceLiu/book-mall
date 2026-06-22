@@ -72,6 +72,7 @@ import {
 } from "@/lib/canvas/image-upload-handlers";
 import { memoizedNodeTypes } from "./memoized-node-types";
 import { CanvasViewportToolbar } from "./canvas-viewport-toolbar";
+import { CanvasBackgroundVideoPanel } from "./canvas-background-video-panel";
 import { SelectionToolbar } from "./selection-toolbar";
 import { Pro2FloatingInspector } from "./pro2/pro2-floating-inspector";
 import { Pro2FrameCellInputDock } from "./pro2/pro2-frame-cell-input-dock";
@@ -1464,6 +1465,7 @@ export function FlowCanvas({
           pro2FloatingInspector={pro2FloatingInspector}
           sbv1Canvas={sbv1Canvas}
         />
+        <CanvasBackgroundVideoPanel projectId={projectId} />
       </ReactFlowProvider>
     </div>
   );

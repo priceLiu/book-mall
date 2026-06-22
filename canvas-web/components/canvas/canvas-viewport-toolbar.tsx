@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { LayoutGrid, Map, Minus, Plus } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { MiniMap, Panel, useReactFlow, useViewport } from "@xyflow/react";
+import { LayoutGrid, Map, Minus, Plus, Video } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
 import { hasStoryComicPipeline } from "@/lib/canvas/story-comic-layout";
@@ -32,6 +32,11 @@ function viewportBtnClass(active?: boolean) {
 }
 
 /** 画布右下角：画面整理 · 小地图 · 缩放比例 */
+export const CANVAS_BACKGROUND_VIDEO_PANEL_TOGGLE_EVENT =
+  "canvas:background-video-panel-toggle";
+export const CANVAS_BACKGROUND_VIDEO_TASK_COUNT_EVENT =
+  "canvas:background-video-task-count";
+
 export function CanvasViewportToolbar({
   pro2Canvas = false,
   sbv1Canvas = false,
@@ -42,6 +47,25 @@ export function CanvasViewportToolbar({
   const { zoom } = useViewport();
   const { zoomIn, zoomOut } = useReactFlow();
   const [minimapOpen, setMinimapOpen] = useState(false);
+  const [bgVideoOpen, setBgVideoOpen] = useState(false);
+  const [bgVideoCount, setBgVideoCount] = useState(0);
+
+  useEffect(() => {
+    const onCount = (e: Event) => {
+      const detail = (e as CustomEvent<{ count?: number }>).detail;
+      setBgVideoCount(typeof detail?.count === "number" ? detail.count : 0);
+    };
+    const onOpen = (e: Event) => {
+      const open = (e as CustomEvent<{ open?: boolean }>).detail?.open;
+      if (typeof open === "boolean") setBgVideoOpen(open);
+    };
+    window.addEventListener(CANVAS_BACKGROUND_VIDEO_TASK_COUNT_EVENT, onCount);
+    window.addEventListener("canvas:background-video-panel-open", onOpen);
+    return () => {
+      window.removeEventListener(CANVAS_BACKGROUND_VIDEO_TASK_COUNT_EVENT, onCount);
+      window.removeEventListener("canvas:background-video-panel-open", onOpen);
+    };
+  }, []);
 
   const nodes = useCanvasStore((s) => s.nodes);
   const reflowPro2 = useCanvasStore((s) => s.reflowPro2Canvas);
@@ -121,6 +145,40 @@ export function CanvasViewportToolbar({
             onClick={() => setMinimapOpen((open) => !open)}
           >
             <Map className="size-4" strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            className={cn(
+              viewportBtnClass(bgVideoOpen || bgVideoCount > 0),
+              bgVideoCount > 0 && !bgVideoOpen && "text-orange-200",
+            )}
+            title={
+              bgVideoCount > 0
+                ? `后台视频 · ${bgVideoCount} 个任务`
+                : "后台视频 — 长视频持续生成与恢复"
+            }
+            aria-label="后台视频"
+            aria-pressed={bgVideoOpen}
+            onClick={() => {
+              setBgVideoOpen((open) => {
+                const next = !open;
+                window.dispatchEvent(
+                  new CustomEvent(CANVAS_BACKGROUND_VIDEO_PANEL_TOGGLE_EVENT, {
+                    detail: { open: next },
+                  }),
+                );
+                return next;
+              });
+            }}
+          >
+            <span className="relative">
+              <Video className="size-4" strokeWidth={1.75} />
+              {bgVideoCount > 0 ? (
+                <span className="absolute -right-1.5 -top-1.5 flex size-3.5 items-center justify-center rounded-full bg-orange-500 text-[8px] font-bold text-white">
+                  {bgVideoCount > 9 ? "9+" : bgVideoCount}
+                </span>
+              ) : null}
+            </span>
           </button>
           <div className="mx-0.5 h-5 w-px shrink-0 bg-white/10" aria-hidden />
           <button

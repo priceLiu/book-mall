@@ -138,9 +138,9 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
     !isGenerating &&
     Boolean(data.engine?.providerId && data.engine?.modelKey);
 
-  const runWithCommittedPrompt = useCallback(async () => {
+  const runWithCommittedPrompt = useCallback(() => {
     promptCommitRef.current?.flushDraft();
-    await onRun();
+    void onRun();
   }, [onRun]);
 
   const uploadFiles = useCallback(

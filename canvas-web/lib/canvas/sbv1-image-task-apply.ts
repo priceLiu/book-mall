@@ -65,6 +65,75 @@ export function sbv1ImagePatchFromTask(
   return null;
 }
 
+const VIDEO_INFLIGHT_STATUSES = new Set([
+  "QUEUED",
+  "DISPATCHING",
+  "PENDING",
+  "SUBMITTED",
+]);
+
+/** sbv1-video-engine 任务结果写回 runtime（与 image 一样清除 uploading） */
+export function sbv1VideoPatchFromTask(
+  task: CanvasTaskRecord,
+): Record<string, unknown> | null {
+  const mediaUrl =
+    pickTaskResultMediaUrl(task) ??
+    task.ossUrl ??
+    task.ephemeralUrl ??
+    undefined;
+
+  if (task.status === "SUCCEEDED" && mediaUrl) {
+    return {
+      uploading: false,
+      uploadError: undefined,
+      runtime: {
+        status: "done",
+        taskId: task.id,
+        ossUrl: mediaUrl,
+        ephemeralUrl: task.ephemeralUrl ?? undefined,
+        posterUrl: task.posterUrl?.trim() || undefined,
+        failCode: undefined,
+        failMessage: undefined,
+      } satisfies CanvasNodeRuntime,
+    };
+  }
+
+  if (task.status === "FAILED") {
+    return {
+      uploading: false,
+      uploadError: undefined,
+      runtime: {
+        status: "error",
+        taskId: task.id,
+        failCode: task.failCode ?? "FAILED",
+        failMessage: formatCanvasTaskError(
+          task.failCode,
+          task.failMessage,
+          task.model,
+        ),
+      } satisfies CanvasNodeRuntime,
+    };
+  }
+
+  if (VIDEO_INFLIGHT_STATUSES.has(task.status)) {
+    return {
+      uploading: true,
+      uploadError: undefined,
+      runtime: {
+        status:
+          task.status === "QUEUED" || task.status === "PENDING"
+            ? "pending"
+            : "running",
+        taskId: task.id,
+        failCode: undefined,
+        failMessage: undefined,
+      } satisfies CanvasNodeRuntime,
+    };
+  }
+
+  return null;
+}
+
 /** 运行失败 / 中止 · 清除 uploading 并写入 runtime.error（节点 UI 可读） */
 export function sbv1ImageFailurePatch(
   failCode: string,
