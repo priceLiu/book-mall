@@ -171,6 +171,7 @@ export function AdminTeamDashboardClient({ tenantId }: { tenantId: string }) {
           <thead>
             <tr className="text-left text-[#8c8c8c]">
               <th className="py-2">成员</th>
+              <th className="py-2">手机号</th>
               <th className="py-2 text-right">本月消耗</th>
               <th className="py-2">操作</th>
             </tr>
@@ -179,6 +180,7 @@ export function AdminTeamDashboardClient({ tenantId }: { tenantId: string }) {
             {dash.bill.members.map((m) => (
               <tr key={m.actorUserId} className="border-t border-[#f0f0f0]">
                 <td className="py-2">{formatUserCellPrimary({ ...m, id: m.actorUserId })}</td>
+                <td className="py-2 font-mono text-[#595959]">{m.phone?.trim() || "—"}</td>
                 <td className="py-2 text-right">{fmt(m.consumed)}</td>
                 <td className="py-2">
                   <Link
