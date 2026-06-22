@@ -40,6 +40,8 @@ export type GatewayLogRow = {
   displayModelKey?: string | null;
   tenantId?: string | null;
   actorBookUserId?: string | null;
+  actorPhone?: string | null;
+  actorName?: string | null;
   creditsCharged?: number | null;
   endpoint: string;
   status: string;
@@ -860,7 +862,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
-        <table className="gw-logs-table min-w-[3020px]">
+        <table className="gw-logs-table min-w-[3260px]">
           <thead>
             <tr>
               <th className="w-11">
@@ -871,6 +873,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   className="h-3.5 w-3.5 rounded border-white/20 bg-transparent accent-sky-500"
                   aria-label="全选"
                 />
+              </th>
+              <th className="min-w-[120px]" title="发起请求的用户手机号">
+                Phone
+              </th>
+              <th className="min-w-[100px]" title="用户昵称">
+                Nick
               </th>
               <th className="w-[88px]">Source</th>
               <th className="min-w-[168px]">Model</th>
@@ -1044,6 +1052,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                       className="h-3.5 w-3.5 rounded border-white/20 bg-transparent accent-sky-500"
                       aria-label={`选择 ${l.id}`}
                     />
+                  </td>
+                  <td className="align-middle tabular-nums text-sm text-zinc-300">
+                    {l.actorPhone?.trim() || "—"}
+                  </td>
+                  <td className="align-middle text-sm text-zinc-300">
+                    {l.actorName?.trim() || "—"}
                   </td>
                   <td className="align-middle">
                     <span
@@ -1233,7 +1247,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             {!logs.length ? (
               <tr>
                 <td
-                  colSpan={22}
+                  colSpan={24}
                   className="py-16 text-center text-sm text-zinc-500"
                 >
                   {total > 0 ? "本页暂无数据" : "暂无日志"}
