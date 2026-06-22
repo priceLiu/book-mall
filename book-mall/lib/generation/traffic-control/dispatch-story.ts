@@ -1,6 +1,7 @@
 import type { StoryGenerationTask, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { isTransientSystemBusyError, runTxWithRetry } from "@/lib/db-tx-retry";
 import { buildStoryAiKieCallbackUrl } from "@/lib/story/story-ai-constants";
 import {
   storyGwCreateKieJob,
@@ -55,10 +56,11 @@ async function dispatchOneStoryQueuedTask(
 
   if (slotResult.action !== "claimed") return "skipped";
 
+  let vendorJob: { taskId: string; logId: string } | null = null;
   try {
     const isVolcengine = isVolcengineStoryVideoModelKey(task.model);
     const callBackUrl = buildStoryAiKieCallbackUrl("video", task.id);
-    const { taskId, logId } = isVolcengine
+    const job = isVolcengine
       ? await storyGwCreateVolcengineVideoJob(task.project.userId, {
           model: task.model,
           body: input,
@@ -72,20 +74,42 @@ async function dispatchOneStoryQueuedTask(
           storyProjectId: task.projectId,
           storyTaskId: task.id,
         });
+    vendorJob = job;
 
-    await prisma.storyGenerationTask.update({
-      where: { id: task.id },
-      data: {
-        status: "SUBMITTED",
-        kieTaskId: taskId,
-        gatewayLogId: logId,
-        submittedAt: new Date(),
-        lastPolledAt: new Date(),
-      },
-    });
+    await runTxWithRetry(
+      () =>
+        prisma.storyGenerationTask.update({
+          where: { id: task.id },
+          data: {
+            status: "SUBMITTED",
+            kieTaskId: job.taskId,
+            gatewayLogId: job.logId,
+            submittedAt: new Date(),
+            lastPolledAt: new Date(),
+          },
+        }),
+      { label: "story-dispatch-submitted-write", maxRetries: 5 },
+    );
     return "dispatched";
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    await releaseTrafficSlot(scope.scopeKey);
+
+    if (!vendorJob && isTransientSystemBusyError(e)) {
+      await prisma.storyGenerationTask
+        .update({
+          where: { id: task.id },
+          data: {
+            status: "QUEUED",
+            dispatchAfter: new Date(Date.now() + 5_000),
+            failCode: null,
+            failMessage: null,
+          },
+        })
+        .catch(() => undefined);
+      return "skipped";
+    }
+
     await prisma.storyGenerationTask.update({
       where: { id: task.id },
       data: {
@@ -95,7 +119,6 @@ async function dispatchOneStoryQueuedTask(
         completedAt: new Date(),
       },
     });
-    await releaseTrafficSlot(scope.scopeKey);
     return "failed";
   }
 }

@@ -12,6 +12,11 @@ import {
   runCanvasPollWorker,
 } from "@/lib/canvas/canvas-task-service";
 import { createHeartbeat } from "@/lib/dev-heartbeat";
+import {
+  isPollWorkerDbError,
+  nextPollIntervalMs,
+  pollDbFailureStreak,
+} from "@/lib/db-poll-backoff";
 
 const POLL_INTERVAL_MS = (() => {
   const raw = Number(process.env.CANVAS_POLL_INTERVAL_MS ?? "");
@@ -36,9 +41,10 @@ function nowHHMMSS(): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-async function tick() {
+async function tick(): Promise<boolean> {
   iter += 1;
   let lastResult: Record<string, unknown> | null = null;
+  let dbError = false;
   try {
     const r = await runCanvasPollWorker();
     lastResult = r as unknown as Record<string, unknown>;
@@ -46,10 +52,11 @@ async function tick() {
       console.log(`[${nowHHMMSS()}] canvas-poll #${iter}`, JSON.stringify(r));
     }
   } catch (e) {
+    dbError = isPollWorkerDbError(e);
     console.error(`[${nowHHMMSS()}] canvas-poll #${iter} error`, e);
     await heartbeat.recordError(e);
   }
-  if (iter % CLEANUP_EVERY_N === 0) {
+  if (iter % CLEANUP_EVERY_N === 0 && !dbError) {
     try {
       const r = await runCanvasCleanupWorker();
       if (r.scanned > 0) {
@@ -63,6 +70,7 @@ async function tick() {
     }
   }
   await heartbeat.recordTick(lastResult);
+  return dbError;
 }
 
 async function main() {
@@ -82,9 +90,15 @@ async function main() {
   });
 
   while (!stopping) {
-    await tick();
+    const dbError = await tick();
     if (stopping) break;
-    await new Promise((res) => setTimeout(res, POLL_INTERVAL_MS));
+    const waitMs = nextPollIntervalMs(POLL_INTERVAL_MS, dbError);
+    if (dbError && pollDbFailureStreak() > 1) {
+      console.warn(
+        `[canvas:poll-loop] db backoff ${waitMs}ms (streak=${pollDbFailureStreak()})`,
+      );
+    }
+    await new Promise((res) => setTimeout(res, waitMs));
   }
 
   console.log("[canvas:poll-loop] stopped");

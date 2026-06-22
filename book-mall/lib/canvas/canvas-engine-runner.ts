@@ -71,7 +71,8 @@ import {
   isTrafficControlEnabled,
   GENERATION_INFLIGHT_STATUSES,
 } from "@/lib/generation/traffic-control/constants";
-import { dispatchQueuedCanvasTasks } from "@/lib/generation/traffic-control/dispatch-canvas";
+import { fireCanvasDispatchForProject } from "@/lib/generation/traffic-control/fire-canvas-dispatch";
+import { assertVideoCreditsBeforeTrafficQueue } from "@/lib/generation/traffic-control/video-queue-precheck";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 
 const MAX_PROMPT_LEN = 16000;
@@ -1057,6 +1058,13 @@ export async function runVideoEngineNode(
         aspectRatio: params.aspect_ratio === "9:16" ? "9:16" : "16:9",
       });
 
+  await assertVideoCreditsBeforeTrafficQueue({
+    userId,
+    projectId,
+    model: effectiveModelKey,
+    params,
+  });
+
   const created = await createStoryScopedCanvasTask({
     projectId,
     nodeId,
@@ -1097,7 +1105,7 @@ export async function runVideoEngineNode(
   });
 
   if (created.status === "QUEUED") {
-    void dispatchQueuedCanvasTasks({ projectId }).catch(() => undefined);
+    fireCanvasDispatchForProject(projectId, "runVideoEngineNode");
     return { reused: false, task: created };
   }
 
@@ -1410,6 +1418,13 @@ export async function runRefVideoEngineNode(
       ? await resolveCanvasProjectTrafficScope(projectId, userId)
       : null;
 
+    await assertVideoCreditsBeforeTrafficQueue({
+      userId,
+      projectId,
+      model: modelKey,
+      params: { ...params, duration, resolution },
+    });
+
     const created = await prisma.canvasGenerationTask.create({
       data: {
         projectId,
@@ -1436,7 +1451,7 @@ export async function runRefVideoEngineNode(
     });
 
     if (queued) {
-      void dispatchQueuedCanvasTasks({ projectId }).catch(() => undefined);
+      fireCanvasDispatchForProject(projectId, "runRefVideoEngineNode-bailian");
       return { reused: false, task: created };
     }
 
@@ -1525,6 +1540,13 @@ export async function runRefVideoEngineNode(
     ? await resolveCanvasProjectTrafficScope(projectId, userId)
     : null;
 
+  await assertVideoCreditsBeforeTrafficQueue({
+    userId,
+    projectId,
+    model: modelKey,
+    params,
+  });
+
   const created = await prisma.canvasGenerationTask.create({
     data: {
       projectId,
@@ -1553,7 +1575,7 @@ export async function runRefVideoEngineNode(
   });
 
   if (queued) {
-    void dispatchQueuedCanvasTasks({ projectId }).catch(() => undefined);
+    fireCanvasDispatchForProject(projectId, "runRefVideoEngineNode-kie");
     return { reused: false, task: created };
   }
 

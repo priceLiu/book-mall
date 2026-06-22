@@ -25,7 +25,7 @@ export default async function DashboardLogsPage() {
       <div className="shrink-0">
         <h1 className="text-xl font-semibold text-white">Logs</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          分页浏览 · 每页 20 / 50 / 100 或自定义 · 可按应用 / 厂商 / 模型 / 提交日期筛选 · 有进行中任务时每 8 秒自动刷新进度 · 可收起筛选区以显示更多列表
+          分页浏览 · 每页 20 / 50 / 100 或自定义 · 可按应用 / 厂商 / 模型 / 提交日期筛选 · 有进行中任务时每 8 秒自动刷新进度 · 表头「Canvas 排队」为尚无 Gateway log 的画布视频任务数
         </p>
       </div>
 

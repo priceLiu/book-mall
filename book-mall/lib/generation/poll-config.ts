@@ -53,6 +53,11 @@ export function getGenerationPollInnerTimeoutMs(): number {
   return readPositiveInt("GENERATION_POLL_INNER_TIMEOUT_MS", 45_000);
 }
 
+/** 单条 recordInfo 之间的节流 ms（高负载时可设 200–500 降低 DB/Gateway 读频率） */
+export function getGenerationPollRecordPauseMs(): number {
+  return readPositiveInt("GENERATION_POLL_RECORD_PAUSE_MS", 0);
+}
+
 /** 分片总数（多实例/多 SCF 时设为 4/8…，默认 1 = 不分片） */
 export function getGenerationPollShardCount(): number {
   return readPositiveInt("GENERATION_POLL_SHARD_COUNT", 1);

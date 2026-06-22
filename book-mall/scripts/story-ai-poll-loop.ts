@@ -14,6 +14,11 @@ import {
   runPollWorker,
 } from "@/lib/story/story-task-service";
 import { createHeartbeat } from "@/lib/dev-heartbeat";
+import {
+  isPollWorkerDbError,
+  nextPollIntervalMs,
+  pollDbFailureStreak,
+} from "@/lib/db-poll-backoff";
 
 const POLL_INTERVAL_MS = (() => {
   const raw = Number(process.env.STORY_POLL_INTERVAL_MS ?? "");
@@ -38,9 +43,10 @@ function nowHHMMSS(): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-async function tick() {
+async function tick(): Promise<boolean> {
   iter += 1;
   let lastResult: Record<string, unknown> | null = null;
+  let dbError = false;
   try {
     const r = await runPollWorker();
     lastResult = r as unknown as Record<string, unknown>;
@@ -51,11 +57,12 @@ async function tick() {
       );
     }
   } catch (e) {
+    dbError = isPollWorkerDbError(e);
     console.error(`[${nowHHMMSS()}] poll #${iter} error`, e);
     await heartbeat.recordError(e);
   }
 
-  if (iter % CLEANUP_EVERY_N === 0) {
+  if (iter % CLEANUP_EVERY_N === 0 && !dbError) {
     try {
       const r = await runCleanupWorker();
       if (r.scanned > 0) {
@@ -70,6 +77,7 @@ async function tick() {
   }
 
   await heartbeat.recordTick(lastResult);
+  return dbError;
 }
 
 async function main() {
@@ -87,9 +95,15 @@ async function main() {
   });
 
   while (!stopping) {
-    await tick();
+    const dbError = await tick();
     if (stopping) break;
-    await new Promise((res) => setTimeout(res, POLL_INTERVAL_MS));
+    const waitMs = nextPollIntervalMs(POLL_INTERVAL_MS, dbError);
+    if (dbError && pollDbFailureStreak() > 1) {
+      console.warn(
+        `[story:poll-loop] db backoff ${waitMs}ms (streak=${pollDbFailureStreak()})`,
+      );
+    }
+    await new Promise((res) => setTimeout(res, waitMs));
   }
 
   console.log("[story:poll-loop] stopped");

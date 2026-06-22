@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogImagesCell } from "./log-images-cell";
 import { LogParamsCell } from "./log-params-cell";
@@ -101,6 +102,15 @@ type GatewayLogFacets = {
   credentialKeys: { id: string; masked: string }[];
 };
 
+type CanvasQueueWithoutLogStats = {
+  total: number;
+  queued: number;
+  dispatching: number;
+  staleCount: number;
+  staleMinutes: number;
+  fetchedAt: string;
+};
+
 type GatewayLogsResponse = {
   logs: GatewayLogRow[];
   total: number;
@@ -108,6 +118,7 @@ type GatewayLogsResponse = {
   pageSize: number;
   totalPages: number;
   facets?: GatewayLogFacets;
+  canvasQueueStats?: CanvasQueueWithoutLogStats | null;
 };
 
 export type GatewayLogsInitialData = {
@@ -117,6 +128,7 @@ export type GatewayLogsInitialData = {
   pageSize: number;
   totalPages: number;
   facets?: GatewayLogFacets;
+  canvasQueueStats?: CanvasQueueWithoutLogStats | null;
 };
 
 function readStoredPageSize(): number {
@@ -259,7 +271,14 @@ async function fetchGatewayLogs(params: {
     pageSize: data?.pageSize ?? params.pageSize,
     totalPages: data?.totalPages ?? 1,
     facets: data?.facets,
+    canvasQueueStats: data?.canvasQueueStats ?? null,
   };
+}
+
+async function fetchCanvasQueueStats(): Promise<CanvasQueueWithoutLogStats | null> {
+  const res = await fetch("/api/book-mall/api/gateway/logs/canvas-queue?staleMin=2");
+  if (!res.ok) return null;
+  return (await res.json().catch(() => null)) as CanvasQueueWithoutLogStats | null;
 }
 
 type GatewayLogsDelta = {
@@ -371,6 +390,9 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [canvasQueueStats, setCanvasQueueStats] = useState(
+    initialData.canvasQueueStats ?? null,
+  );
   /** 每秒 tick，驱动进行中 Duration / Queue / Generate / Poll 墙钟重算 */
   const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
 
@@ -446,6 +468,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       setTotalPages(data.totalPages);
       setPageSize(data.pageSize);
       if (data.facets) setFacets(data.facets);
+      if (data.canvasQueueStats) setCanvasQueueStats(data.canvasQueueStats);
       setLastRefreshedAt(new Date());
       return data;
     } catch (e) {
@@ -502,6 +525,9 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         if (merged.addedCount > 0) {
           setTotal((t) => t + merged.addedCount);
         }
+        void fetchCanvasQueueStats().then((s) => {
+          if (s) setCanvasQueueStats(s);
+        });
         setLastRefreshedAt(new Date());
         return null;
       } catch (e) {
@@ -765,7 +791,27 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               {lastRefreshedAt && !loading
                 ? ` · 更新 ${lastRefreshedAt.toLocaleTimeString()}`
                 : ""}
+              {canvasQueueStats && canvasQueueStats.total > 0 ? (
+                <span
+                  className="ml-1 text-violet-300/95"
+                  title="交通控流排队中的画布视频任务，createTask 成功前不会产生 Gateway 日志"
+                >
+                  · 画布排队（尚无 log）{" "}
+                  <span className="font-medium text-violet-200">
+                    {canvasQueueStats.total}
+                  </span>
+                  {canvasQueueStats.staleCount > 0
+                    ? ` · ≥${canvasQueueStats.staleMinutes}min ${canvasQueueStats.staleCount}`
+                    : ""}
+                </span>
+              ) : null}
             </span>
+            <Link
+              href="/dashboard/poll-pool"
+              className="shrink-0 text-[11px] text-sky-400/90 underline-offset-2 hover:text-sky-300 hover:underline"
+            >
+              轮询池
+            </Link>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {fetchError ? (
@@ -982,7 +1028,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       </div>
 
       <div className="gw-logs-table-scroll gw-scrollbar-thin min-h-0 flex-1 overflow-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
-        <table className="gw-logs-table min-w-[3260px]">
+        <table className="gw-logs-table min-w-[3356px]">
           <thead>
             <tr>
               <th className="w-11">
@@ -1015,6 +1061,15 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 title="任务状态；失败行展示 failCode 与 failMessage"
               >
                 Status
+              </th>
+              <th
+                className="w-[96px]"
+                title="全站汇总：CanvasGenerationTask 处于 QUEUED/DISPATCHING、尚未 createTask 产生 Gateway 日志的数量（非本行字段）"
+              >
+                <div>Canvas 排队</div>
+                <div className="mt-0.5 text-[10px] font-normal normal-case tracking-normal text-violet-300/90">
+                  {canvasQueueStats ? canvasQueueStats.total : "—"}
+                </div>
               </th>
               <th
                 className="w-[88px]"
@@ -1223,6 +1278,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                       failMessage={l.failMessage}
                       progressLabel={progressLabel}
                     />
+                  </td>
+                  <td
+                    className="align-middle text-center text-xs text-zinc-600"
+                    title="汇总见表头；单行日志与画布排队无直接对应"
+                  >
+                    —
                   </td>
                   <td
                     className="align-middle font-mono text-sm text-zinc-300"

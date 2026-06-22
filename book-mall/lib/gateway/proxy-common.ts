@@ -50,8 +50,13 @@ import {
 } from "@/lib/billing/billing-persona";
 import { VideoRiskError } from "@/lib/billing/video-risk-control";
 import { releaseTrafficSlotFromGatewayLog } from "@/lib/generation/traffic-control/slot";
+import { mapBillingFailureForGatewayLog } from "@/lib/billing/billing-failure-map";
 
 export type { UsageFromResponse };
+
+function mapGatewayBillingFailure(e: unknown): { failCode: string; failMessage: string } {
+  return mapBillingFailureForGatewayLog(e);
+}
 
 /** createRequestLog 预检失败 → HTTP 状态与可读文案（避免 route 未捕获时变成裸 500）。 */
 export function mapGatewayPreCreateLogError(e: unknown): { status: number; error: string } {
@@ -66,6 +71,13 @@ export function mapGatewayPreCreateLogError(e: unknown): { status: number; error
   }
   if (e instanceof VideoRiskError) {
     return { status: 429, error: e.message };
+  }
+  const billing = mapGatewayBillingFailure(e);
+  if (billing.failCode === "INSUFFICIENT_CREDITS") {
+    return { status: 402, error: billing.failMessage };
+  }
+  if (billing.failCode === "SYSTEM_BUSY") {
+    return { status: 503, error: billing.failMessage };
   }
   if (e instanceof Error && e.message.trim()) {
     return { status: 500, error: e.message };
@@ -222,10 +234,16 @@ export async function createRequestLog(opts: {
       await reserveVideoCreditsForLog(log);
     } catch (e) {
       await releaseVideoGenerate(riskAccountId).catch(() => undefined);
+      const { failCode, failMessage } = mapGatewayBillingFailure(e);
       await prisma.gatewayRequestLog
         .update({
           where: { id: log.id },
-          data: { status: "FAILED", failCode: "INSUFFICIENT_CREDITS", failMessage: (e as Error).message, completedAt: new Date() },
+          data: {
+            status: "FAILED",
+            failCode,
+            failMessage,
+            completedAt: new Date(),
+          },
         })
         .catch(() => undefined);
       throw e;
