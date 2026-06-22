@@ -3,6 +3,7 @@
  */
 import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
 import { applyCanvasVolcengineVideoResult } from "@/lib/canvas/canvas-task-service";
+import { extractVolcengineVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-volcengine-recover";
 import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-stall-recover";
 import { isRecoverableVolcengineStallFailCode } from "@/lib/gateway/video-background-generation";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
@@ -84,6 +85,7 @@ export async function releasePollPoolGatewayLog(
     select: {
       id: true,
       status: true,
+      failCode: true,
       apiKeyId: true,
       externalTaskId: true,
       submittedAt: true,
