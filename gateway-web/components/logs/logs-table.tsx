@@ -90,6 +90,7 @@ const STATUS_OPTIONS = [
 
 const PAGE_SIZE_PRESETS = [20, 50, 100] as const;
 const PAGE_SIZE_STORAGE_KEY = "gw-logs-page-size";
+const FILTERS_COLLAPSED_STORAGE_KEY = "gw-logs-filters-collapsed";
 const PAGE_SIZE_MAX = 500;
 
 type PageSizePreset = (typeof PAGE_SIZE_PRESETS)[number] | "custom";
@@ -128,6 +129,23 @@ function readStoredPageSize(): number {
     /* ignore */
   }
   return PAGE_SIZE_PRESETS[0];
+}
+
+function readFiltersCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(FILTERS_COLLAPSED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeFiltersCollapsed(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(FILTERS_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
 }
 
 function resolvePageSizePreset(size: number): PageSizePreset {
@@ -169,6 +187,26 @@ function RefreshIcon({ className }: { className?: string }) {
       />
       <path
         d="M21 3v6h-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronIcon({ className, expanded }: { className?: string; expanded: boolean }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+      style={{ transform: expanded ? "rotate(180deg)" : undefined }}
+    >
+      <path
+        d="M6 9l6 6 6-6"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
@@ -332,8 +370,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   /** 每秒 tick，驱动进行中 Duration / Queue / Generate / Poll 墙钟重算 */
   const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
+
+  useEffect(() => {
+    setFiltersCollapsed(readFiltersCollapsed());
+  }, []);
 
   const dateRangeInvalid = isLogDateRangeInvalid(fromDate, toDate);
 
@@ -599,6 +642,55 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       .sort((a, b) => a.masked.localeCompare(b.masked));
   }, [facets.credentialKeys, logs, providerFilter]);
 
+  const activeFilterLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (sourceFilter) {
+      const opt = LOG_APP_FILTER_OPTIONS.find((o) => o.value === sourceFilter);
+      labels.push(`应用: ${opt?.label ?? sourceFilter}`);
+    }
+    if (fromDate || toDate) {
+      labels.push(
+        fromDate && toDate
+          ? `日期: ${fromDate} ~ ${toDate}`
+          : fromDate
+            ? `从 ${fromDate}`
+            : `至 ${toDate}`,
+      );
+    }
+    if (statusFilter) {
+      const opt = STATUS_OPTIONS.find((o) => o.value === statusFilter);
+      labels.push(`状态: ${opt?.label ?? statusFilter}`);
+    }
+    if (providerFilter) {
+      labels.push(`厂商: ${formatProviderKindLabel(providerFilter)}`);
+    }
+    if (modelFilter) labels.push(`模型: ${modelFilter}`);
+    if (credentialIdFilter) {
+      const cred = credentialKeyOptions.find((c) => c.id === credentialIdFilter);
+      labels.push(
+        `Key: ${cred ? formatLogCredentialKeyMasked(cred.masked) : credentialIdFilter}`,
+      );
+    }
+    return labels;
+  }, [
+    sourceFilter,
+    fromDate,
+    toDate,
+    statusFilter,
+    providerFilter,
+    modelFilter,
+    credentialIdFilter,
+    credentialKeyOptions,
+  ]);
+
+  const toggleFiltersCollapsed = () => {
+    setFiltersCollapsed((prev) => {
+      const next = !prev;
+      writeFiltersCollapsed(next);
+      return next;
+    });
+  };
+
   const resetPage = () => setPage(1);
 
   const applyPageSize = (next: number) => {
@@ -636,8 +728,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2.5 rounded-xl border border-white/[0.06] bg-[#0f0f14] px-3 py-2.5">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="shrink-0 space-y-2.5 rounded-xl border border-white/[0.06] bg-[#0f0f14] px-3 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className="mr-1 shrink-0 text-xs text-zinc-500">应用</span>
@@ -676,7 +768,10 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             </span>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <label className="mb-0.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:text-zinc-200">
+            {fetchError ? (
+              <span className="text-xs text-red-400/90">{fetchError}</span>
+            ) : null}
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:text-zinc-200">
               <input
                 type="checkbox"
                 checked={autoRefresh}
@@ -688,7 +783,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             <button
               type="button"
               disabled={refreshing || loading}
-              className="mb-0.5 inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => void refreshLogs()}
               title="立即刷新日志（进行中任务会触发服务端轮询）"
             >
@@ -699,9 +794,36 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               )}
               刷新
             </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200"
+              onClick={toggleFiltersCollapsed}
+              aria-expanded={!filtersCollapsed}
+              title={filtersCollapsed ? "展开筛选条件" : "收起筛选条件以显示更多列表"}
+            >
+              <ChevronIcon className="size-3.5 transition-transform" expanded={!filtersCollapsed} />
+              {filtersCollapsed ? "展开筛选" : "收起筛选"}
+            </button>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            <div className="flex flex-wrap items-end justify-end gap-2">
+        </div>
+
+        {filtersCollapsed && !filtersAreDefault ? (
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-white/[0.06] pt-2">
+            <span className="shrink-0 text-[11px] text-zinc-600">已筛选</span>
+            {activeFilterLabels.map((label) => (
+              <span
+                key={label}
+                className="rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-200/90"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {!filtersCollapsed ? (
+          <>
+            <div className="flex flex-wrap items-end justify-end gap-2 border-t border-white/[0.06] pt-2.5">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-zinc-500">开始日期</span>
                 <input
@@ -735,7 +857,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               {fromDate || toDate ? (
                 <button
                   type="button"
-                  className="mb-0.5 rounded-lg border border-white/10 px-2.5 py-2 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200"
+                  className="rounded-lg border border-white/10 px-2.5 py-2 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200"
                   onClick={() => {
                     setFromDate("");
                     setToDate("");
@@ -753,7 +875,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   resetPage();
                   clearSelectionOnFilter(setSelected);
                 }}
-                className="mb-0.5 min-w-[160px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20"
+                className="min-w-[160px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20"
                 aria-label="按状态筛选"
               >
                 {STATUS_OPTIONS.map((o) => (
@@ -762,106 +884,110 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </option>
                 ))}
               </select>
+              {dateRangeInvalid ? (
+                <span className="self-center text-xs text-amber-400/90">
+                  结束日期不能早于开始日期
+                </span>
+              ) : null}
             </div>
-            {dateRangeInvalid ? (
-              <span className="text-xs text-amber-400/90">
-                结束日期不能早于开始日期
-              </span>
-            ) : fetchError ? (
-              <span className="text-xs text-red-400/90">{fetchError}</span>
-            ) : null}
-          </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-white/[0.06] pt-2.5">
-          <span className="mr-1 shrink-0 text-xs text-zinc-500">厂商</span>
-          <button
-            type="button"
-            className={logFilterChipClass(!providerFilter)}
-            onClick={() => {
-              setProviderFilter("");
-              setModelFilter("");
-              setCredentialIdFilter("");
-              resetPage();
-              clearSelectionOnFilter(setSelected);
-            }}
-          >
-            全部
-          </button>
-          {providerKinds.map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              className={logFilterChipClass(providerFilter === kind)}
-              onClick={() => {
-                setProviderFilter(kind);
-                setModelFilter("");
-                setCredentialIdFilter("");
-                resetPage();
-                clearSelectionOnFilter(setSelected);
-              }}
-            >
-              {formatProviderKindLabel(kind)}
-            </button>
-          ))}
-        </div>
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-white/[0.06] pt-2.5">
+              <span className="mr-1 shrink-0 text-xs text-zinc-500">厂商</span>
+              <button
+                type="button"
+                className={logFilterChipClass(!providerFilter)}
+                onClick={() => {
+                  setProviderFilter("");
+                  setModelFilter("");
+                  setCredentialIdFilter("");
+                  resetPage();
+                  clearSelectionOnFilter(setSelected);
+                }}
+              >
+                全部
+              </button>
+              {providerKinds.map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  className={logFilterChipClass(providerFilter === kind)}
+                  onClick={() => {
+                    setProviderFilter(kind);
+                    setModelFilter("");
+                    setCredentialIdFilter("");
+                    resetPage();
+                    clearSelectionOnFilter(setSelected);
+                  }}
+                >
+                  {formatProviderKindLabel(kind)}
+                </button>
+              ))}
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
-          <span className="shrink-0 text-xs text-zinc-500">模型</span>
-          <select
-            value={modelFilter}
-            onChange={(e) => {
-              setModelFilter(e.target.value);
-              resetPage();
-              clearSelectionOnFilter(setSelected);
-            }}
-            disabled={!modelOptions.length}
-            className="min-w-[min(100%,320px)] max-w-xl flex-1 rounded-lg border border-white/10 bg-[#141419] px-3 py-2 font-mono text-xs text-zinc-300 outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="按模型筛选"
-          >
-            <option value="">全部模型</option>
-            {modelOptions.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          {providerFilter ? (
-            <span className="shrink-0 text-[11px] text-zinc-600">
-              已按 {formatProviderKindLabel(providerFilter)} 收窄
-            </span>
-          ) : null}
-        </div>
+            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
+              <span className="shrink-0 text-xs text-zinc-500">模型</span>
+              <select
+                value={modelFilter}
+                onChange={(e) => {
+                  setModelFilter(e.target.value);
+                  resetPage();
+                  clearSelectionOnFilter(setSelected);
+                }}
+                disabled={!modelOptions.length}
+                className="min-w-[min(100%,320px)] max-w-xl flex-1 rounded-lg border border-white/10 bg-[#141419] px-3 py-2 font-mono text-xs text-zinc-300 outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="按模型筛选"
+              >
+                <option value="">全部模型</option>
+                {modelOptions.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              {providerFilter ? (
+                <span className="shrink-0 text-[11px] text-zinc-600">
+                  已按 {formatProviderKindLabel(providerFilter)} 收窄
+                </span>
+              ) : null}
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
-          <span className="shrink-0 text-xs text-zinc-500">渠道 Key</span>
-          <select
-            value={credentialIdFilter}
-            onChange={(e) => {
-              setCredentialIdFilter(e.target.value);
-              resetPage();
-              clearSelectionOnFilter(setSelected);
-            }}
-            disabled={!credentialKeyOptions.length}
-            className="min-w-[min(100%,280px)] max-w-md flex-1 rounded-lg border border-white/10 bg-[#141419] px-3 py-2 font-mono text-xs text-zinc-300 outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="按渠道 Key 筛选"
-          >
-            <option value="">全部 Key</option>
-            {credentialKeyOptions.map((item) => (
-              <option key={item.id} value={item.id}>
-                {formatLogCredentialKeyMasked(item.masked)}
-              </option>
-            ))}
-          </select>
-          {!credentialKeyOptions.length ? (
-            <span className="shrink-0 text-[11px] text-zinc-600">
-              当前批次无渠道 Key 记录
-            </span>
-          ) : null}
-        </div>
+            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
+              <span className="shrink-0 text-xs text-zinc-500">渠道 Key</span>
+              <select
+                value={credentialIdFilter}
+                onChange={(e) => {
+                  setCredentialIdFilter(e.target.value);
+                  resetPage();
+                  clearSelectionOnFilter(setSelected);
+                }}
+                disabled={!credentialKeyOptions.length}
+                className="min-w-[min(100%,280px)] max-w-md flex-1 rounded-lg border border-white/10 bg-[#141419] px-3 py-2 font-mono text-xs text-zinc-300 outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="按渠道 Key 筛选"
+              >
+                <option value="">全部 Key</option>
+                {credentialKeyOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {formatLogCredentialKeyMasked(item.masked)}
+                  </option>
+                ))}
+              </select>
+              {!credentialKeyOptions.length ? (
+                <span className="shrink-0 text-[11px] text-zinc-600">
+                  当前批次无渠道 Key 记录
+                </span>
+              ) : null}
+            </div>
+          </>
+        ) : null}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
+      <div
+        className={`gw-logs-table-scroll gw-scrollbar-thin min-h-[240px] flex-1 overflow-auto rounded-xl border border-white/[0.06] bg-[#0f0f14] ${
+          filtersCollapsed
+            ? "max-h-[calc(100dvh-13rem)] md:max-h-[calc(100dvh-11rem)]"
+            : "max-h-[calc(100dvh-20rem)] md:max-h-[calc(100dvh-17rem)]"
+        }`}
+      >
         <table className="gw-logs-table min-w-[3260px]">
           <thead>
             <tr>
@@ -890,7 +1016,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th className="min-w-[480px]">Params</th>
               <th className="min-w-[280px]">Images</th>
-              <th className="w-[120px]">Status</th>
+              <th
+                className="min-w-[220px]"
+                title="任务状态；失败行展示 failCode 与 failMessage"
+              >
+                Status
+              </th>
               <th
                 className="w-[88px]"
                 title="Gateway 观测耗时：Submitted → Completed（或进行中为实时计时）。含火山排队与轮询间隔，非厂商控制台内的纯渲染秒数。"
@@ -905,19 +1036,19 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="w-[88px]"
-                title="厂商 created_at → updated_at（GPU 生成阶段）"
+                title="厂商 GPU 生成：进行中为墙钟；成功为 updated_at−created_at；失败为观测到厂商终态前的等待"
               >
                 Generate
               </th>
               <th
                 className="w-[96px]"
-                title="厂商 updated_at 已跳变后至 status=succeeded 的后处理/打包（Seedance 常见 status 仍 running）；进行中为实时墙钟"
+                title="仅成功任务：updated_at 跳变 → 首次 succeeded 的后处理/打包；失败任务为 —"
               >
                 PostProc
               </th>
               <th
                 className="w-[88px]"
-                title="首次观测 succeeded → Gateway completedAt（我方收口延迟）；进行中为我方轮询间隔"
+                title="成功：首次 succeeded → Gateway completed；失败：观测到厂商终态/末次 poll → completed（我方收口延迟）"
               >
                 Poll Δ
               </th>
@@ -1258,7 +1389,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         </table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-[#0f0f14] px-3 py-2.5">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-[#0f0f14] px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-zinc-500">每页</span>
           <select

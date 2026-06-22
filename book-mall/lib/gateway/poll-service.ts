@@ -3,7 +3,10 @@ import type { GatewayClientSource } from "@prisma/client";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-handler";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
-import { expireVolcengineGatewayPollStalledLogs } from "@/lib/gateway/log-volcengine-timing-persist";
+import {
+  promoteVolcengineTasksToBackgroundGeneration,
+} from "@/lib/gateway/volcengine-background-promote";
+import { recoverMisclassifiedVolcengineStallLogs } from "@/lib/gateway/volcengine-stall-recover";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
 import {
@@ -22,6 +25,8 @@ import {
 } from "./dashscope-client";
 import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
+
+import { SUBMIT_ORPHAN_FAIL } from "@/lib/gateway/gateway-submit-error-policy";
 
 const STALE_RUNNING_NO_TASK_MS = 3 * 60 * 1000;
 /** 火山视频提交失败但未写入 externalTaskId 时，尽快收口 RUNNING（高负载下 submit 可能 >90s） */
@@ -96,8 +101,8 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     },
     data: {
       status: "FAILED",
-      failCode: "UPSTREAM_SUBMIT_FAILED",
-      failMessage: "火山视频任务未成功提交（无厂商 taskId）",
+      failCode: SUBMIT_ORPHAN_FAIL.failCode,
+      failMessage: SUBMIT_ORPHAN_FAIL.failMessage,
       completedAt: new Date(),
     },
   });
@@ -121,10 +126,10 @@ export async function expireStaleGatewayLogs(): Promise<number> {
 
   let r4 = 0;
   try {
-    r4 = await expireVolcengineGatewayPollStalledLogs(now);
+    r4 = await promoteVolcengineTasksToBackgroundGeneration(now);
   } catch (e) {
     console.warn(
-      "[gateway-poll] expireVolcengineGatewayPollStalledLogs skipped",
+      "[gateway-poll] promoteVolcengineTasksToBackgroundGeneration skipped",
       e instanceof Error ? e.message : String(e),
     );
   }
@@ -337,10 +342,25 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
     })(),
   ]);
 
+  let stallRecovered = 0;
+  try {
+    const stall = await recoverMisclassifiedVolcengineStallLogs({ limit: 20 });
+    stallRecovered = stall.recovered;
+    if (stall.recovered > 0) {
+      console.info("[gateway-poll] recovered misclassified stall logs", stall);
+    }
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] recoverMisclassifiedVolcengineStallLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
   return {
     scanned: slowRows.length + normalRows.length,
     updated: escUpdated + mainUpdated,
     escalation: escUpdated,
+    stallRecovered,
     autoHandler,
   };
 }

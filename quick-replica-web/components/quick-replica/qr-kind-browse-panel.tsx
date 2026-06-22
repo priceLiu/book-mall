@@ -26,6 +26,7 @@ function resolveKindMedia(item: QrKindBrowseItem): {
     t.reference.slots.targetImage?.url ||
     t.reference.slots.sceneImages?.[0]?.url ||
     t.reference.slots.characterRefs?.[0]?.url ||
+    (t.output?.mediaType === "image" ? t.output.url : null) ||
     null;
 
   return { imageUrl, videoUrl };
@@ -44,6 +45,7 @@ function KindCard({
 }) {
   const { imageUrl, videoUrl } = resolveKindMedia(item);
   const [mediaReady, setMediaReady] = useState(false);
+  const [mediaFailed, setMediaFailed] = useState(false);
   const showPin =
     PINNED_KINDS.has(item.kind) ||
     item.featuredTemplate?.badges?.includes("pinned") ||
@@ -51,7 +53,14 @@ function KindCard({
 
   useEffect(() => {
     setMediaReady(false);
+    setMediaFailed(false);
   }, [item.kind, imageUrl, videoUrl]);
+
+  useEffect(() => {
+    if (!imageUrl && !videoUrl) return;
+    const timer = window.setTimeout(() => setMediaReady(true), 12_000);
+    return () => window.clearTimeout(timer);
+  }, [imageUrl, videoUrl]);
 
   return (
     <button
@@ -62,19 +71,23 @@ function KindCard({
       }`}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-900">
-        {!mediaReady && (imageUrl || videoUrl) ? (
+        {!mediaReady && (imageUrl || videoUrl) && !mediaFailed ? (
           <div className="qr-skeleton absolute inset-0" aria-hidden />
         ) : null}
-        {videoUrl && !imageUrl ? (
+        {videoUrl && !imageUrl && !mediaFailed ? (
           <video
             src={videoUrl}
             muted
             playsInline
             preload="metadata"
             onLoadedData={() => setMediaReady(true)}
+            onError={() => {
+              setMediaFailed(true);
+              setMediaReady(true);
+            }}
             className={`h-full w-full object-cover transition group-hover:scale-[1.02]${mediaReady ? " opacity-100" : " opacity-0"}`}
           />
-        ) : imageUrl ? (
+        ) : imageUrl && !mediaFailed ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={imageUrl}
@@ -82,11 +95,18 @@ function KindCard({
             loading="lazy"
             decoding="async"
             onLoad={() => setMediaReady(true)}
+            onError={() => {
+              setMediaFailed(true);
+              setMediaReady(true);
+            }}
             className={`h-full w-full object-cover transition group-hover:scale-[1.02]${mediaReady ? " opacity-100" : " opacity-0"}`}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-xs text-zinc-600">
-            {item.label}
+          <div className="flex h-full flex-col items-center justify-center gap-1 px-2 text-center text-xs text-zinc-500">
+            <span>{item.label}</span>
+            {mediaFailed ? (
+              <span className="text-[10px] text-zinc-600">封面加载失败</span>
+            ) : null}
           </div>
         )}
       </div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
+import { CanvasBackgroundVideoPanel } from "@/components/canvas/canvas-background-video-panel";
 import { CanvasCreditsToastHost } from "@/components/canvas/canvas-credits-toast-host";
 import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -93,6 +94,7 @@ export function Sbv1CanvasLayout({
         onSpawn={onStylePresetPicked}
       />
       <CanvasCreditsToastHost />
+      <CanvasBackgroundVideoPanel projectId={projectId} />
     </div>
   );
 }

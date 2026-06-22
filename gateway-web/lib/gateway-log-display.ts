@@ -182,8 +182,8 @@ export function formatLogTimingPhaseCell(
   const sec = Math.round(ms / 1000);
   const labels = {
     queue: "火山排队",
-    generate: "厂商生成（updated_at − created_at）",
-    postproc: "厂商后处理（updated_at 跳变 → 首次 succeeded）",
+    generate: "厂商生成（进行中为墙钟；失败为等厂商终态）",
+    postproc: "厂商后处理（仅成功任务；updated_at → succeeded）",
     poll: "我方轮询 / 收口延迟",
   } as const;
   const title = `${labels[phase]} · ${sec}s`;

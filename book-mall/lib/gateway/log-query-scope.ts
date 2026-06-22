@@ -7,6 +7,7 @@
 import type { GatewayRequestStatus, Prisma } from "@prisma/client";
 
 import { buildSlowGenerationWhere } from "@/lib/generation/slow-generation";
+import { buildVideoBackgroundWaitWhere } from "@/lib/gateway/video-task-wait-policy";
 
 import { phoneFromGatewayEmail } from "@/lib/auth/user-display";
 import { canViewFinanceCost } from "@/lib/auth/permissions";
@@ -41,6 +42,10 @@ export type GatewayLogFilterInput = {
   creditsChargedGt?: number;
   /** 耗时 ≥ GENERATION_SLOW_WARN_MS（默认 800s）或进行中已超该阈值 */
   slowWarn?: boolean;
+  /** 进行中且已等待 ≥10min */
+  backgroundWait?: boolean;
+  /** 精确匹配 failCode（失败 Tab 分栏） */
+  failCode?: string;
 };
 
 /** 与 credit-account-service UsageQuery 对齐的过滤器（范围 + 时间/模型/source） */
@@ -248,6 +253,14 @@ export function mergeGatewayLogFilters(
 
   if (filters.slowWarn) {
     parts.push(buildSlowGenerationWhere());
+  }
+
+  if (filters.backgroundWait) {
+    parts.push(buildVideoBackgroundWaitWhere());
+  }
+
+  if (filters.failCode?.trim()) {
+    parts.push({ failCode: filters.failCode.trim() });
   }
 
   if (filters.model) {

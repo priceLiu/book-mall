@@ -56,6 +56,13 @@ function volcengineUpstreamError(
     (json as { error?: { message?: string } })?.error?.message ??
     (json as { message?: string })?.message ??
     fallbackText.slice(0, 400);
+  const vendorErrorCode =
+    (json as { error?: { code?: string | number } })?.error?.code ??
+    (json as { code?: string | number })?.code;
+  const codeSuffix =
+    vendorErrorCode != null && vendorErrorCode !== ""
+      ? ` [错误码：${vendorErrorCode}]`
+      : "";
   const requestId =
     readVendorRequestIdFromHeaders(r.headers) ??
     readVendorRequestIdFromJson(json) ??
@@ -64,7 +71,7 @@ function volcengineUpstreamError(
     (json as { id?: string })?.id ??
     (json as { data?: { id?: string } })?.data?.id ??
     undefined;
-  return new VolcengineUpstreamError(`${prefix} (${status}): ${msg}`, {
+  return new VolcengineUpstreamError(`${prefix} (${status}): ${msg}${codeSuffix}`, {
     status,
     requestId,
     vendorTaskId,

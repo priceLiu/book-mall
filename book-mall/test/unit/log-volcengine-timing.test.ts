@@ -215,6 +215,40 @@ describe("log-volcengine-timing", () => {
     expect(breakdown.pollDelayMs).toBe(60_000); // now − lastPolled
   });
 
+  it("terminal failed without succeeded does not bucket into postproc", () => {
+    const submittedAtMs = 1_000_000;
+    const genStartMs = 1_000_000 + 3_000;
+    const vendorFailedAtMs = genStartMs + 300_000;
+    const completedAtMs = genStartMs + 3_000_000;
+
+    let trace = mergeVolcengineTimingTrace(null, {
+      status: "running",
+      raw: {
+        created_at: genStartMs / 1000,
+        updated_at: genStartMs / 1000,
+      },
+      polledAtMs: genStartMs + 5_000,
+    });
+    trace = mergeVolcengineTimingTrace(trace, {
+      status: "failed",
+      raw: {
+        created_at: genStartMs / 1000,
+        updated_at: genStartMs / 1000,
+      },
+      polledAtMs: vendorFailedAtMs,
+    });
+
+    const breakdown = computeVolcengineTimingBreakdown({
+      trace,
+      submittedAtMs,
+      completedAtMs,
+    });
+
+    expect(breakdown.generateMs).toBe(300_000);
+    expect(breakdown.vendorPostProcessMs).toBeNull();
+    expect(breakdown.pollDelayMs).toBe(2_700_000);
+  });
+
   it("terminal still splits generate / post-process / poll via vendor updated_at", () => {
     // 终态：Generate = updated_at − created_at；PostProc = firstSucceeded − updated_at；Poll = completed − firstSucceeded
     const submittedAtMs = 1_000_000;
@@ -269,7 +303,7 @@ describe("log-volcengine-timing", () => {
     expect(isVolcengineQueuedStale(trace, vendorUpdatedAtMs + 60_000)).toBe(false);
   });
 
-  it("flags gateway poll stall when vendor updated_at frozen and poll gap exceeded", () => {
+  it("detects vendor updated_at frozen for background promotion threshold", () => {
     const genStartMs = 1_000_000;
     const trace = mergeVolcengineTimingTrace(null, {
       status: "running",
@@ -279,16 +313,16 @@ describe("log-volcengine-timing", () => {
       },
       polledAtMs: genStartMs + 5_000,
     });
-    // 厂商停更时长 ≥ 阈值 → 卡死
+    // 厂商进度冻结 ≥ 阈值 → 满足后台化条件（不再 FAILED）
     const stuckNow = genStartMs + VOLCENGINE_VENDOR_STALE_RELEASE_MS + 1_000;
     expect(isVolcengineVendorStuck(trace, stuckNow)).toBe(true);
-    // 停更时长低于阈值 → 不判卡死（取阈值的一半，避免与阈值边界耦合）
+    // 停更时长低于阈值 → 不触发后台化
     const okNow = genStartMs + VOLCENGINE_VENDOR_STALE_RELEASE_MS / 2;
     expect(isVolcengineVendorStuck(trace, okNow)).toBe(false);
   });
 
-  it("vendor-stale release also catches a dead poll loop (image 7), regardless of last poll", () => {
-    // loop 挂掉后不再 poll：厂商停更时长照常随墙钟增长，超阈值即可收口释放槽位。
+  it("vendor-stale also detected when poll loop stops (diagnostic)", () => {
+    // loop 挂掉后不再 poll：vendor 进度冻结时长仍随墙钟增长。
     const genStartMs = 1_000_000;
     const trace = mergeVolcengineTimingTrace(null, {
       status: "running",

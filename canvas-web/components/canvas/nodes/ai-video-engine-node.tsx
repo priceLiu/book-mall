@@ -18,6 +18,7 @@ import { pickDefaultRefVideoEngine } from "@/lib/canvas/system-providers";
 import { runtimePatchFromCanvasTask, isServerInflightTaskStatus } from "@/lib/canvas/task-pick";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
+import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import {
   refVideoDurationFromParams,
@@ -41,18 +42,6 @@ import {
 
 const REF_VIDEO_PROMPT_CLASS = `${RF_FORM_CONTROL} h-full min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-md border border-white/10 bg-black/30 p-2.5 font-mono text-[12px] leading-relaxed text-white placeholder:text-[var(--canvas-muted)] focus:border-[var(--canvas-accent)]/60 focus:outline-none`;
 const REF_VIDEO_PREVIEW_CLASS = "h-full min-h-0 w-full";
-
-function useElapsedMinutes(sinceIso: string | null | undefined): number | null {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!sinceIso) return;
-    const id = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(id);
-  }, [sinceIso]);
-  if (!sinceIso) return null;
-  const ms = Math.max(0, now - new Date(sinceIso).getTime());
-  return Math.floor(ms / 60_000);
-}
 
 export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
@@ -118,7 +107,12 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
 
   const waitSince =
     inflightTask?.submittedAt ?? inflightTask?.createdAt ?? null;
-  const waitMinutes = useElapsedMinutes(showGenerating ? waitSince : null);
+  const isPending = d.runtime?.status === "pending";
+  const { generatingLabel, waitHint, isBackground } = useVideoGeneratingWait(
+    showGenerating,
+    waitSince,
+    isPending,
+  );
   const isBailian =
     refVideoProviderKind(d.modelKey ?? "") === "BAILIAN_R2V";
   const bailianTaskId = isBailian ? inflightTask?.kieTaskId : null;
@@ -275,9 +269,7 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
                 emptyMessage={
                   showGenerating ? undefined : "生成结果将显示在此"
                 }
-                generatingLabel={
-                  d.runtime?.status === "pending" ? "排队中…" : "视频生成中…"
-                }
+                generatingLabel={generatingLabel}
                 saveToLibrary={
                   videoUrl && !showGenerating
                     ? {
@@ -293,9 +285,13 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
             }
           />
 
-          {showGenerating && waitMinutes !== null ? (
-            <p className="shrink-0 truncate px-0.5 font-mono text-[10px] leading-snug text-white/45">
-              已等待 {waitMinutes} 分钟
+          {showGenerating && waitHint ? (
+            <p
+              className={`shrink-0 truncate px-0.5 font-mono text-[10px] leading-snug ${
+                isBackground ? "text-orange-300/80" : "text-white/45"
+              }`}
+            >
+              {waitHint}
               {bailianTaskId ? ` / 百炼 ${bailianTaskId}` : null}
             </p>
           ) : null}

@@ -35,13 +35,14 @@ export function isQrGalleryTemplate(t: Pick<QrTemplateJson, "id">): boolean {
   );
 }
 
-/** 中栏 kind 卡片占位（picsum），不进右栏模板区 */
+/** 中栏 kind 卡片占位，不进右栏模板区 */
 export function isQrKindThumbBuiltin(t: Pick<QrTemplateJson, "id">): boolean {
   return (
     t.id.startsWith("builtin-image-") ||
     t.id.startsWith("builtin-character-") ||
     t.id.startsWith("builtin-world-") ||
-    t.id.startsWith("builtin-video-")
+    t.id.startsWith("builtin-video-") ||
+    t.id.startsWith("builtin-audio-")
   );
 }
 

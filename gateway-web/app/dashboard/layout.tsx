@@ -9,8 +9,8 @@ const BASE_NAV = [
   { href: "/dashboard/guide", label: "操作指引" },
   { href: "/dashboard", label: "用量" },
   { href: "/dashboard/logs", label: "日志" },
-  { href: "/dashboard/status", label: "状态" },
-  { href: "/dashboard/poll-pool", label: "轮询池" },
+  { href: "/dashboard/status", label: "状态", badgeKey: "backgroundWait" as const },
+  { href: "/dashboard/poll-pool", label: "轮询池", badgeKey: "backgroundWait" as const },
   { href: "/dashboard/market", label: "模型市场" },
 ];
 

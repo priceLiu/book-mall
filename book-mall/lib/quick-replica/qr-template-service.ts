@@ -217,7 +217,12 @@ function draftToTemplateReference(
     model: {
       role,
       modelKey: draft.modelKey,
-      params: draft.mode ? { mode: draft.mode } : {},
+      params: {
+        ...(draft.mode ? { mode: draft.mode } : {}),
+        ...(draft.characterOrientation
+          ? { character_orientation: draft.characterOrientation }
+          : {}),
+      },
     },
   };
 }
@@ -317,6 +322,10 @@ export function templateToWorkspaceDraft(
       typeof t.reference.model.params.mode === "string"
         ? t.reference.model.params.mode
         : undefined,
+    characterOrientation:
+      typeof t.reference.model.params.character_orientation === "string"
+        ? t.reference.model.params.character_orientation
+        : undefined,
   };
 }
 
@@ -338,5 +347,7 @@ export function defaultWorkspaceDraft(input: {
       input.kind === "motion-sync"
         ? "kling-2.6/motion-control"
         : "lib-nano-pro",
+    mode: input.kind === "motion-sync" ? "std" : undefined,
+    characterOrientation: input.kind === "motion-sync" ? "video" : undefined,
   };
 }

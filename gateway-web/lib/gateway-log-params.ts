@@ -64,6 +64,27 @@ function parseInputSummary(inputSummary: unknown): {
   return { model, input: inputObj };
 }
 
+/** 视频任务 Params · 提取可读 prompt（Volcengine content / 百炼 prompt 等） */
+export function extractLogVideoPrompt(inputSummary: unknown): string {
+  const { input } = parseInputSummary(inputSummary);
+  if (typeof input.prompt === "string" && input.prompt.trim()) {
+    return input.prompt.trim();
+  }
+  const content = input.content;
+  if (Array.isArray(content)) {
+    const texts: string[] = [];
+    for (const item of content) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as Record<string, unknown>;
+      if (typeof row.text === "string" && row.text.trim()) {
+        texts.push(row.text.trim());
+      }
+    }
+    if (texts.length) return texts.join(" | ");
+  }
+  return "";
+}
+
 function isHttpUrl(value: unknown): value is string {
   return typeof value === "string" && /^https?:\/\//.test(value.trim());
 }

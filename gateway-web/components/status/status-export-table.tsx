@@ -229,7 +229,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
                 });
                 const failMessage =
                   row.status === "FAILED"
-                    ? gatewayFailMessageDisplay(row.failMessage)
+                    ? gatewayFailMessageDisplay(row.failMessage, row.failCode)
                     : "—";
                 return (
                   <tr

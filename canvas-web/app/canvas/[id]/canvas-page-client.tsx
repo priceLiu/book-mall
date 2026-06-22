@@ -8,6 +8,7 @@ import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
+import { CanvasBackgroundVideoPanel } from "@/components/canvas/canvas-background-video-panel";
 import { CanvasCreditsToastHost } from "@/components/canvas/canvas-credits-toast-host";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { Pro2CanvasLayout } from "@/components/canvas/pro2/pro2-canvas-layout";
@@ -993,6 +994,7 @@ function Inner({ projectId }: { projectId: string }) {
           <>
             <FlowCanvas projectId={projectId} onUndo={undo} onRedo={redo} />
             <CanvasCreditsToastHost />
+            <CanvasBackgroundVideoPanel projectId={projectId} />
             <div className="pointer-events-none absolute inset-x-0 top-2 z-[60] flex justify-center px-2">
               <NodePalette onAdd={onAddViaPalette} />
             </div>

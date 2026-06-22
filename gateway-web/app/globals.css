@@ -57,8 +57,22 @@ body {
     @apply w-full text-left text-sm;
   }
 
+  /** 日志表滚动区：表头 sticky 相对此容器 */
+  .gw-logs-table-scroll {
+    isolation: isolate;
+  }
+
   .gw-logs-table th {
     @apply border-b border-white/[0.08] bg-[#121218] px-4 py-3 text-xs font-normal text-zinc-500;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .gw-logs-table thead {
+    position: relative;
+    z-index: 20;
   }
 
   .gw-logs-table td {

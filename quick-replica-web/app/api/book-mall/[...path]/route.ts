@@ -87,6 +87,13 @@ export async function PATCH(
   return proxyToBookMall(request, ctx.params.path);
 }
 
+export async function PUT(
+  request: NextRequest,
+  ctx: { params: { path: string[] } },
+) {
+  return proxyToBookMall(request, ctx.params.path);
+}
+
 export async function DELETE(
   request: NextRequest,
   ctx: { params: { path: string[] } },

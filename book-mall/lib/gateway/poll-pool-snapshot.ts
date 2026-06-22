@@ -8,6 +8,10 @@ import {
   isSlowGenerationAge,
 } from "@/lib/generation/slow-generation";
 import {
+  isVideoBackgroundWaitAge,
+  VIDEO_BACKGROUND_UI_MS,
+} from "@/lib/gateway/video-task-wait-policy";
+import {
   readGenerationSlowWarnConfig,
   resolveGenerationSlowWarnMs,
 } from "@/lib/generation/slow-warn-config";
@@ -44,6 +48,7 @@ export type PollPoolGatewayRow = {
   pollCount: number;
   ageSec: number;
   slowWarn: boolean;
+  backgroundWait: boolean;
   gatewayLogId: string;
 };
 
@@ -62,6 +67,7 @@ export type PollPoolAppTaskRow = {
   pollCount: number;
   ageSec: number;
   slowWarn: boolean;
+  backgroundWait: boolean;
 };
 
 export type PollPoolSnapshot = {
@@ -70,24 +76,29 @@ export type PollPoolSnapshot = {
     slowWarnMs: number;
     slowWarnSec: number;
     slowWarnSource?: "platform" | "env";
+    backgroundWaitMs: number;
+    backgroundWaitSec: number;
     gatewayPollLimit: number;
     canvasPollBatch: number;
   };
   gateway: {
     total: number;
     slowCount: number;
+    backgroundCount: number;
     queue: PollPoolGatewayRow[];
   };
   canvas: {
     totalSubmitted: number;
     totalPending: number;
     slowCount: number;
+    backgroundCount: number;
     queue: PollPoolAppTaskRow[];
   };
   story: {
     totalSubmitted: number;
     totalPending: number;
     slowCount: number;
+    backgroundCount: number;
     queue: PollPoolAppTaskRow[];
   };
 };
@@ -179,6 +190,11 @@ function mapGatewayRow(
       row.submittedAt,
       nowMs,
       slowWarnMs,
+    ),
+    backgroundWait: isVideoBackgroundWaitAge(
+      row.submittedAt,
+      row.submittedAt,
+      nowMs,
     ),
   };
 }
@@ -378,6 +394,11 @@ export async function fetchPollPoolSnapshot(input: {
         nowMs,
         slowWarnMs,
       ),
+      backgroundWait: isVideoBackgroundWaitAge(
+        task.submittedAt,
+        task.createdAt,
+        nowMs,
+      ),
     };
   };
 
@@ -386,6 +407,9 @@ export async function fetchPollPoolSnapshot(input: {
 
   const canvasSlowCount = canvasQueue.filter((t) => t.slowWarn).length;
   const storySlowCount = storyQueue.filter((t) => t.slowWarn).length;
+  const gatewayBackgroundCount = gatewayQueue.filter((t) => t.backgroundWait).length;
+  const canvasBackgroundCount = canvasQueue.filter((t) => t.backgroundWait).length;
+  const storyBackgroundCount = storyQueue.filter((t) => t.backgroundWait).length;
 
   const warnCfg = await readGenerationSlowWarnConfig();
 
@@ -395,24 +419,29 @@ export async function fetchPollPoolSnapshot(input: {
       slowWarnMs: warnCfg.slowWarnMs,
       slowWarnSec: warnCfg.slowWarnSec,
       slowWarnSource: warnCfg.source,
+      backgroundWaitMs: VIDEO_BACKGROUND_UI_MS,
+      backgroundWaitSec: VIDEO_BACKGROUND_UI_MS / 1000,
       gatewayPollLimit: 20,
       canvasPollBatch: getGenerationPollBatch(),
     },
     gateway: {
       total: gatewayTotal,
       slowCount: gatewaySlowCount,
+      backgroundCount: gatewayBackgroundCount,
       queue: gatewayQueue,
     },
     canvas: {
       totalSubmitted: canvasTasks.filter((t) => t.status === "SUBMITTED").length,
       totalPending: canvasTasks.filter((t) => t.status === "PENDING").length,
       slowCount: canvasSlowCount,
+      backgroundCount: canvasBackgroundCount,
       queue: canvasQueue,
     },
     story: {
       totalSubmitted: storyTasks.filter((t) => t.status === "SUBMITTED").length,
       totalPending: storyTasks.filter((t) => t.status === "PENDING").length,
       slowCount: storySlowCount,
+      backgroundCount: storyBackgroundCount,
       queue: storyQueue,
     },
   };

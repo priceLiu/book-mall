@@ -23,12 +23,15 @@ export function isLibtvMediaGenerating(data: {
 export function LibtvMediaGeneratingState({
   label,
   variant = "cyan",
+  tone = "active",
   className,
   children,
 }: {
   label: string;
   /** sbv1 / 分镜1.0 → cyan；Pro2 → violet */
   variant?: "cyan" | "violet";
+  /** 超过 10min 后台轮询 */
+  tone?: "active" | "background";
   className?: string;
   /** 可选：上传中半透明底图等 */
   children?: ReactNode;
@@ -42,9 +45,11 @@ export function LibtvMediaGeneratingState({
     "lg",
   );
   const labelClass =
-    variant === "violet"
-      ? "text-[11px] font-medium text-violet-200/80"
-      : "text-[11px] font-medium text-cyan-200/80";
+    tone === "background"
+      ? "text-[11px] font-medium text-orange-200/90"
+      : variant === "violet"
+        ? "text-[11px] font-medium text-violet-200/80"
+        : "text-[11px] font-medium text-cyan-200/80";
 
   return (
     <div className={cn("absolute inset-0 overflow-hidden", shimmerClass, className)}>

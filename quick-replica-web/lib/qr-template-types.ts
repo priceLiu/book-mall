@@ -57,6 +57,9 @@ export type QrWorkspaceDraft = {
   prompt: string;
   modelKey: string;
   mode?: string;
+  characterOrientation?: string;
+  /** UI 预留：保留参考视频原声（暂未接入 KIE motion-control） */
+  keepOriginalSound?: boolean;
 };
 
 export type QrKindDef = {
@@ -188,6 +191,9 @@ export function defaultWorkspaceDraft(input: {
     prompt: "",
     modelKey:
       input.kind === "motion-sync" ? "kling-2.6/motion-control" : "lib-nano-pro",
+    mode: input.kind === "motion-sync" ? "std" : undefined,
+    characterOrientation: input.kind === "motion-sync" ? "video" : undefined,
+    keepOriginalSound: input.kind === "motion-sync" ? true : undefined,
   };
 }
 
@@ -216,8 +222,28 @@ export const QR_PINNED_TOOLS: {
 ];
 
 export const MOTION_SYNC_MODELS = [
-  { modelKey: "kling-2.6/motion-control", label: "Kling 2.6 Motion Control" },
-  { modelKey: "kling-3.0/motion-control", label: "Kling 3.0 Motion Control" },
+  {
+    modelKey: "kling-2.6/motion-control",
+    label: "Kling 2.6",
+    subtitle: "运动模仿",
+    defaultMode: "std" as const,
+  },
+  {
+    modelKey: "kling-3.0/motion-control",
+    label: "Kling 3.0",
+    subtitle: "运动模仿",
+    defaultMode: "pro" as const,
+  },
+] as const;
+
+export const MOTION_SYNC_VIDEO_MODES = [
+  { value: "std", label: "标准", hint: "720p" },
+  { value: "pro", label: "高品质", hint: "1080p" },
+] as const;
+
+export const MOTION_SYNC_CHARACTER_ORIENTATIONS = [
+  { value: "video", label: "精确的", hint: "跟随参考视频朝向" },
+  { value: "image", label: "跟随图片", hint: "跟随角色图朝向" },
 ] as const;
 
 function thumb(seed: string): string {
@@ -491,6 +517,10 @@ export function templateToWorkspaceDraft(t: QrTemplate): QrWorkspaceDraft {
     mode:
       typeof t.reference.model.params.mode === "string"
         ? t.reference.model.params.mode
+        : undefined,
+    characterOrientation:
+      typeof t.reference.model.params.character_orientation === "string"
+        ? t.reference.model.params.character_orientation
         : undefined,
   };
 }

@@ -29,6 +29,8 @@ import {
 } from "@/lib/gateway/poll-service";
 import { submitVolcengineVideoJobForLog } from "@/lib/gateway/volcengine-jobs";
 import { VolcengineUpstreamError } from "@/lib/gateway/volcengine-client";
+import { buildSubmitFailureFinalizePayload } from "@/lib/gateway/gateway-submit-error-policy";
+import { prisma } from "@/lib/prisma";
 import {
   extractVendorRequestIdFromText,
 } from "@/lib/gateway/vendor-request-id";
@@ -365,14 +367,16 @@ export async function POST(request: NextRequest) {
     });
   } catch (e) {
     const msg = (e as Error).message || "createTask failed";
-    await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: msg.slice(0, 500),
-      failCode: "UPSTREAM_SUBMIT_FAILED",
-      vendorRequestId: vendorRequestIdFromSubmitError(e),
-      externalTaskId: vendorTaskIdFromSubmitError(e),
-    }).catch(() => undefined);
+    const row = await prisma.gatewayRequestLog.findUnique({
+      where: { id: log.id },
+      select: { status: true },
+    });
+    if (row?.status === "RUNNING") {
+      const finalizePayload = await buildSubmitFailureFinalizePayload(e, {
+        externalTaskId: vendorTaskIdFromSubmitError(e),
+      });
+      await finalizeRequestLog(log.id, finalizePayload).catch(() => undefined);
+    }
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

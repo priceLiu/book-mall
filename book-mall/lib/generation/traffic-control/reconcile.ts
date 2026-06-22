@@ -8,7 +8,11 @@ import {
   getDispatchingStaleSec,
   getReconcileRunningVideoMaxMin,
 } from "./constants";
-import { releaseTrafficSlot, releaseTrafficSlotFromGatewayLog } from "./slot";
+import { isGatewayVideoLogOccupyingTrafficSlot } from "@/lib/gateway/video-background-generation";
+import {
+  releaseTrafficSlot,
+  releaseTrafficSlotFromGatewayLog,
+} from "./slot";
 import { resolveTrafficScopeFromIds } from "./scope-key";
 import { dispatchQueuedCanvasTasks } from "./dispatch-canvas";
 
@@ -102,7 +106,18 @@ export async function reconcileRunningSlotCounts(): Promise<number> {
             status: "RUNNING" as const,
             OR: [{ actorBookUserId: state.ownerId }, { userId: state.ownerId }],
           };
-    const actual = await prisma.gatewayRequestLog.count({ where });
+    const rows = await prisma.gatewayRequestLog.findMany({
+      where,
+      select: { resultSummary: true },
+      take: 500,
+    });
+    const actual = rows.filter((row) =>
+      isGatewayVideoLogOccupyingTrafficSlot({
+        status: "RUNNING",
+        requestKind: "VIDEO",
+        resultSummary: row.resultSummary,
+      }),
+    ).length;
     if (actual !== state.runningVideoCount) {
       await prisma.generationTrafficState.update({
         where: { scopeKey: state.scopeKey },

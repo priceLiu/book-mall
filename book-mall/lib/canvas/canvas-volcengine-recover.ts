@@ -301,6 +301,8 @@ export async function recoverCanvasVolcengineTimedOutTask(
       "timeout_gateway_sync",
       "timeout_no_gateway",
       "OSS_UPLOAD_FAILED",
+      "VOLCENGINE_GATEWAY_POLL_STALL",
+      "GATEWAY_TASK_FAILED",
     ].includes(task.failCode)
   ) {
     return { ok: false, reason: `status=${task.status} failCode=${task.failCode}` };

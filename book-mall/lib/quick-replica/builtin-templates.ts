@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { normalizeBuiltinQrTemplates } from "@/lib/quick-replica/builtin-kind-thumbs";
 import type { QrCategory, QrTemplateJson } from "@/lib/quick-replica/qr-types";
 
 let cached: QrTemplateJson[] | null = null;
@@ -28,7 +29,7 @@ function loadFromJson(): QrTemplateJson[] {
 }
 
 export function getBuiltinQrTemplates(): QrTemplateJson[] {
-  if (!cached) cached = loadFromJson();
+  if (!cached) cached = normalizeBuiltinQrTemplates(loadFromJson());
   return cached;
 }
 

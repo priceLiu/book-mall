@@ -1,17 +1,12 @@
 /**
- * Gateway 日志 failCode 推断与展示（与 failMessage 对齐，不另建失败 taxonomy）。
+ * Gateway 日志 failCode 推断与展示（与 gateway-submit-error-policy 对齐）。
  */
+import {
+  CONTENT_POLICY_MARKERS,
+  isContentPolicySubmitMessage,
+} from "@/lib/gateway/gateway-submit-error-policy";
 
-const CONTENT_POLICY_MARKERS = [
-  "flagged as sensitive",
-  "sensitive content",
-  "content policy",
-  "content filter",
-  "moderation",
-  "安全",
-  "违规",
-  "敏感",
-] as const;
+export { CONTENT_POLICY_MARKERS, isContentPolicySubmitMessage };
 
 /** 写入 GatewayRequestLog 前：failCode 为空时从 message / 上游 code 推断。 */
 export function inferGatewayFailCode(input: {
@@ -28,8 +23,11 @@ export function inferGatewayFailCode(input: {
   const blob = (input.failMessage ?? "").toLowerCase();
   if (!blob) return undefined;
 
-  if (CONTENT_POLICY_MARKERS.some((m) => blob.includes(m))) {
+  if (isContentPolicySubmitMessage(input.failMessage)) {
     return "CONTENT_POLICY";
+  }
+  if (blob.includes("无厂商 taskid") || blob.includes("未成功提交（无厂商 taskid）")) {
+    return "SUBMIT_ORPHAN";
   }
   if (blob.includes("insufficient") && blob.includes("credit")) {
     return "INSUFFICIENT_CREDITS";
@@ -58,8 +56,7 @@ export function resolveGatewayFailCodeDisplay(input: {
 export function isContentPolicyFailMessage(
   failMessage?: string | null,
 ): boolean {
-  const blob = (failMessage ?? "").toLowerCase();
-  return CONTENT_POLICY_MARKERS.some((m) => blob.includes(m));
+  return isContentPolicySubmitMessage(failMessage);
 }
 
 /** 中文可读说明（仅 UI；存储仍以 failMessage 为准）。 */
