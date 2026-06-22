@@ -79,11 +79,11 @@ export default async function AdminDashboardPage() {
   const creditChartData = [...creditLedgerGroups]
     .sort(
       (a, b) =>
-        Math.abs(b._sum.credits ?? 0) - Math.abs(a._sum.credits ?? 0),
+        Math.abs(b._sum?.credits ?? 0) - Math.abs(a._sum?.credits ?? 0),
     )
     .map((g) => ({
       label: creditLedgerTypeLabel(g.type),
-      count: Math.abs(g._sum.credits ?? 0),
+      count: Math.abs(g._sum?.credits ?? 0),
     }));
 
   return (
