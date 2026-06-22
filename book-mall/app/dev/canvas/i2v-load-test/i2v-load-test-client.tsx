@@ -294,6 +294,18 @@ export function I2vLoadTestClient() {
       </header>
 
       <main className="mx-auto max-w-[1400px] space-y-4 px-4 py-6 sm:px-6">
+        <section className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-4 text-[11px] leading-relaxed text-sky-100/90">
+          <p className="font-medium text-sky-200">两轮回归（各 4～5 条）· 详见 doc/tech/gateway-video-task-handling.md §5</p>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-sky-100/80">
+            <li>
+              <strong>第一轮</strong>：本页并发 4～5 条正常 prompt → Tick 至排空 → Gateway Logs 条数一致、failCode 非 SUBMIT_ORPHAN。
+            </li>
+            <li>
+              <strong>第二轮</strong>：1 条故意敏感 prompt（期望 Gateway failCode=CONTENT_POLICY，&lt;10s）+ 3～4 条正常对照；在 Logs 核对 failMessage。
+            </li>
+          </ul>
+        </section>
+
         {/* 配置区 */}
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
           <div className="flex flex-wrap items-end gap-4">

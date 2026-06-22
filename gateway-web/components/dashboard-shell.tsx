@@ -2,12 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { IconClose, IconMenu } from "@/components/icons";
+import {
+  IconClose,
+  IconMenu,
+  IconSidebarCollapse,
+  IconSidebarExpand,
+} from "@/components/icons";
 
 import { DashboardNav } from "@/components/dashboard-nav";
 import { LogoutButton } from "@/components/logout-button";
 
-export type DashboardNavItem = { href: string; label: string };
+export type DashboardNavItem = {
+  href: string;
+  label: string;
+  badgeKey?: "backgroundWait";
+};
 
 type DashboardUser = {
   email: string;
@@ -18,17 +27,55 @@ type DashboardUser = {
   platformPoolDelegate?: { canonicalOwnerEmail: string } | null;
 };
 
-function SidebarHeader({ user }: { user: DashboardUser }) {
+const SIDEBAR_COLLAPSED_KEY = "gw-sidebar-collapsed";
+
+function readSidebarCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeSidebarCollapsed(collapsed: boolean) {
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+function SidebarHeader({
+  user,
+  collapsed,
+}: {
+  user: DashboardUser;
+  collapsed?: boolean;
+}) {
   const isAdmin = user.bookRole === "ADMIN";
   const isByok = user.billingPersona === "BYOK";
   const isPlatformPoolDelegate = Boolean(user.platformPoolDelegate);
+  const displayName = user.name || user.phone || user.email;
+  const initial = (displayName.trim()[0] ?? "G").toUpperCase();
+
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center border-b border-white/10 px-2 py-4">
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/20 text-sm font-semibold text-sky-200"
+          title={displayName}
+        >
+          {initial}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="border-b border-white/10 px-4 py-5">
       <div className="text-sm font-semibold text-white">Gateway 控制台</div>
-      <div className="mt-1 truncate text-xs text-[var(--gw-muted)]">
-        {user.name || user.phone || user.email}
-      </div>
+      <div className="mt-1 truncate text-xs text-[var(--gw-muted)]">{displayName}</div>
       <div className="mt-2 flex flex-wrap gap-1">
         <span
           className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
@@ -55,21 +102,92 @@ function SidebarHeader({ user }: { user: DashboardUser }) {
 function SidebarBody({
   user,
   nav,
+  collapsed,
+  navBadges,
   onNavigate,
+  onToggleCollapse,
 }: {
   user: DashboardUser;
   nav: DashboardNavItem[];
+  collapsed?: boolean;
+  navBadges?: Partial<Record<"backgroundWait", number>>;
   onNavigate?: () => void;
+  onToggleCollapse?: () => void;
 }) {
   return (
     <>
-      <SidebarHeader user={user} />
-      <DashboardNav items={nav} onNavigate={onNavigate} />
-      <div className="mt-auto p-3">
-        <LogoutButton />
+      <SidebarHeader user={user} collapsed={collapsed} />
+      <DashboardNav
+        items={nav}
+        collapsed={collapsed}
+        navBadges={navBadges}
+        onNavigate={onNavigate}
+      />
+      <div className={`mt-auto space-y-2 ${collapsed ? "px-2 py-2" : "p-3"}`}>
+        {onToggleCollapse ? (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className={`flex w-full items-center rounded-lg text-zinc-400 transition hover:bg-white/5 hover:text-white ${
+              collapsed ? "justify-center p-2" : "gap-2 px-3 py-2 text-xs"
+            }`}
+            title={collapsed ? "展开侧栏" : "收起侧栏"}
+            aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
+          >
+            {collapsed ? (
+              <IconSidebarExpand className="h-5 w-5" />
+            ) : (
+              <>
+                <IconSidebarCollapse className="h-4 w-4 shrink-0" />
+                <span>收起侧栏</span>
+              </>
+            )}
+          </button>
+        ) : null}
+        <LogoutButton collapsed={collapsed} />
       </div>
     </>
   );
+}
+
+const NAV_BADGE_POLL_MS = 30_000;
+
+function useGatewayNavBadges() {
+  const [badges, setBadges] = useState<Partial<Record<"backgroundWait", number>>>(
+    {},
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch(
+          "/api/book-mall/api/gateway/logs/stats?parts=summary&hours=6&scope=all",
+        );
+        const body = (await res.json().catch(() => null)) as {
+          cards?: { backgroundWait?: number };
+        } | null;
+        if (cancelled || !res.ok || !body?.cards) return;
+        setBadges({
+          backgroundWait: body.cards.backgroundWait ?? 0,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+
+    void load();
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, NAV_BADGE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  return badges;
 }
 
 export function DashboardShell({
@@ -83,19 +201,43 @@ export function DashboardShell({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const navBadges = useGatewayNavBadges();
+
+  useEffect(() => {
+    setSidebarCollapsed(readSidebarCollapsed());
+  }, []);
 
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
 
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      writeSidebarCollapsed(next);
+      return next;
+    });
+  }
+
+  const desktopAsideWidth = sidebarCollapsed ? "md:w-14" : "md:w-56";
+
   return (
     <div className="flex min-h-screen bg-[var(--gw-bg)]">
-      {/* 桌面端：与原 layout 一致的静态侧栏 */}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-white/10 bg-[var(--gw-surface)] md:flex md:min-h-screen">
-        <SidebarBody user={user} nav={nav} />
+      {/* 桌面端：可收缩静态侧栏 */}
+      <aside
+        className={`hidden shrink-0 flex-col border-r border-white/10 bg-[var(--gw-surface)] transition-[width] duration-200 md:flex md:min-h-screen ${desktopAsideWidth}`}
+      >
+        <SidebarBody
+          user={user}
+          nav={nav}
+          collapsed={sidebarCollapsed}
+          navBadges={navBadges}
+          onToggleCollapse={toggleSidebarCollapsed}
+        />
       </aside>
 
-      {/* 移动端：抽屉侧栏（不与桌面共用 fixed/static 切换） */}
+      {/* 移动端：抽屉侧栏 */}
       {sidebarOpen ? (
         <button
           type="button"
@@ -122,7 +264,12 @@ export function DashboardShell({
             <IconClose className="h-5 w-5" />
           </button>
         </div>
-        <SidebarBody user={user} nav={nav} onNavigate={() => setSidebarOpen(false)} />
+        <SidebarBody
+          user={user}
+          nav={nav}
+          navBadges={navBadges}
+          onNavigate={() => setSidebarOpen(false)}
+        />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

@@ -543,6 +543,41 @@ export async function listCanvasProjectTasks(
   return j.tasks;
 }
 
+export type CanvasBackgroundVideoTaskRow = {
+  taskId: string;
+  nodeId: string;
+  status: string;
+  failCode: string | null;
+  gatewayLogId: string | null;
+  gatewayStatus: string | null;
+  vendorTaskId: string | null;
+  submittedAt: string;
+  ageSec: number;
+  kind: "background_generating" | "recoverable_stall" | "ready_to_load";
+  label: string;
+  hint: string;
+  canRecover: boolean;
+};
+
+export async function listCanvasBackgroundVideoTasks(
+  base: string,
+  projectId: string,
+): Promise<{ tasks: CanvasBackgroundVideoTaskRow[]; config: { backgroundLabel: string } }> {
+  return call(base, `/api/canvas/projects/${projectId}/background-video-tasks`);
+}
+
+export async function recoverCanvasBackgroundVideoTask(
+  base: string,
+  projectId: string,
+  taskId: string,
+): Promise<{ ok: boolean; result: { ok: boolean; action: string; reason?: string } }> {
+  return call(base, `/api/canvas/projects/${projectId}/background-video-tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ taskId }),
+  });
+}
+
 // ── uploads ──
 
 export async function uploadCanvasImage(

@@ -4,8 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GatewayLogRow } from "@/components/logs/logs-table";
 import { LogStatusBadge } from "@/components/logs/log-status-badge";
-import { GatewayLogPaginationBar } from "@/components/logs/gateway-log-pagination-bar";
+import { CopyLogIdButton } from "@/components/status/copy-log-id-button";
+import { RecoverStallLogButton } from "@/components/status/recover-stall-log-button";
 import { HorizontalCategoryBars } from "./horizontal-category-bars";
+import {
+  GATEWAY_FAIL_CODE_TABS,
+  resolveFailCodeTab,
+} from "@/lib/gateway-fail-code-tabs";
 import { StatusExportTable } from "./status-export-table";
 import { billingCategoryLabel } from "@/lib/billing-category-labels";
 import {
@@ -15,6 +20,7 @@ import {
 import {
   formatDurationSeconds,
   formatLogTimestamp,
+  extractLogVideoPrompt,
   isLogDateRangeInvalid,
   isLogInProgress,
   pickLogProgressLabel,
@@ -39,9 +45,12 @@ const LIVE_CLOCK_MS = 1_000;
 
 const SLOW_WARN_THRESHOLD_MS = 800_000;
 const SLOW_WARN_THRESHOLD_SEC = SLOW_WARN_THRESHOLD_MS / 1000;
+const BACKGROUND_WAIT_THRESHOLD_MS = 600_000;
+const BACKGROUND_WAIT_THRESHOLD_SEC = BACKGROUND_WAIT_THRESHOLD_MS / 1000;
+const INFINITE_SCROLL_MAX_ROWS = 500;
 
 type DashboardScope = "all" | "team" | "actor" | "project";
-type DetailTab = "succeeded" | "inProgress" | "failed" | "slowWarn";
+type DetailTab = "succeeded" | "inProgress" | "failed" | "backgroundWait" | "slowWarn";
 type ViewMode = "dashboard" | "table";
 
 type DashboardTeamOption = {
@@ -89,6 +98,7 @@ type DashboardStats = {
     failed: number;
     cancelled: number;
     slowWarn: number;
+    backgroundWait: number;
   };
   byCategory: {
     inProgress: { category: string; label: string; count: number }[];
@@ -124,6 +134,11 @@ type StatsAllResponse = StatsSummaryResponse &
   StatsCategoriesResponse &
   StatsModelsResponse;
 
+type StatsFailCodesResponse = {
+  failCodes: { failCode: string; count: number }[];
+  failedTotal: number;
+};
+
 type DetailLogsResponse = {
   logs: StatusLogRow[];
   total: number;
@@ -152,6 +167,11 @@ const HOUR_OPTIONS = [
 const TAB_CONFIG: { id: DetailTab; label: string; query: Record<string, string> }[] = [
   { id: "succeeded", label: "成功", query: { status: "SUCCEEDED" } },
   { id: "inProgress", label: "生成中", query: { statuses: "PENDING,RUNNING" } },
+  {
+    id: "backgroundWait",
+    label: "后台等待",
+    query: { backgroundWait: "1" },
+  },
   { id: "failed", label: "失败", query: { status: "FAILED" } },
   {
     id: "slowWarn",
@@ -354,7 +374,14 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const [phoneDraft, setPhoneDraft] = useState("");
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("inProgress");
-  const [detailPage, setDetailPage] = useState(1);
+  const [failedFailCodeTab, setFailedFailCodeTab] = useState("all");
+  const [failCodeCounts, setFailCodeCounts] = useState<
+    { failCode: string; count: number }[]
+  >([]);
+  const [failedTotal, setFailedTotal] = useState(0);
+  const [loadedPages, setLoadedPages] = useState(1);
+  const [hasMoreLogs, setHasMoreLogs] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [pageSize, setPageSize] = useState<number>(GATEWAY_LOG_PAGE_SIZE_DEFAULT);
   const [pageSizePreset, setPageSizePreset] = useState<GatewayLogPageSizePreset>(
     GATEWAY_LOG_PAGE_SIZE_DEFAULT,
@@ -380,24 +407,33 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   /** 增量合并需读取最新「列表 / 页码 / Tab / 每页条数」，避免轮询闭包过期 */
   const logsRef = useRef(logs);
   logsRef.current = logs;
-  const detailPageRef = useRef(detailPage);
-  detailPageRef.current = detailPage;
+  const loadedPagesRef = useRef(loadedPages);
+  loadedPagesRef.current = loadedPages;
+  const hasMoreLogsRef = useRef(hasMoreLogs);
+  hasMoreLogsRef.current = hasMoreLogs;
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
   const pageSizeRef = useRef(pageSize);
   pageSizeRef.current = pageSize;
   const inProgressCount = stats?.cards.inProgress ?? 0;
   const slowWarnCount = stats?.cards.slowWarn ?? 0;
+  const backgroundWaitCount = stats?.cards.backgroundWait ?? 0;
   const hasInFlight =
     inProgressCount > 0 ||
     slowWarnCount > 0 ||
+    backgroundWaitCount > 0 ||
     activeTab === "inProgress" ||
+    activeTab === "backgroundWait" ||
     activeTab === "slowWarn";
 
-  const tabQuery = useMemo(
-    () => TAB_CONFIG.find((t) => t.id === activeTab)?.query ?? {},
-    [activeTab],
-  );
+  const tabQuery = useMemo(() => {
+    const base = TAB_CONFIG.find((t) => t.id === activeTab)?.query ?? {};
+    if (activeTab !== "failed" || failedFailCodeTab === "all") return base;
+    const failTab = resolveFailCodeTab(failedFailCodeTab);
+    if (!failTab.failCode) return base;
+    return { ...base, failCode: failTab.failCode };
+  }, [activeTab, failedFailCodeTab]);
 
   useEffect(() => {
     const stored = readStoredGatewayLogPageSize();
@@ -412,7 +448,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     setPageSizePreset(resolveGatewayLogPageSizePreset(clamped));
     setCustomPageSizeInput(String(clamped));
     persistGatewayLogPageSize(clamped);
-    setDetailPage(1);
+    setLoadedPages(1);
+    setHasMoreLogs(true);
   }, []);
 
   const commitFilters = useCallback(
@@ -459,6 +496,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         failed: 0,
         cancelled: 0,
         slowWarn: 0,
+        backgroundWait: 0,
       },
       byCategory: statsRes.data.byCategory,
       byModel: prev?.byModel ?? {
@@ -486,13 +524,28 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   }, [applied]);
 
   const loadDetailLogs = useCallback(
-    async (opts?: { skipPoll?: boolean; poll?: boolean }) => {
+    async (opts?: {
+      skipPoll?: boolean;
+      poll?: boolean;
+      reset?: boolean;
+      append?: boolean;
+    }) => {
       if (applied.scope === "team" && !applied.tenantId) return null;
 
+      const append = opts?.append === true && opts?.reset !== true;
+      if (
+        append &&
+        (!hasMoreLogsRef.current ||
+          logsRef.current.length >= INFINITE_SCROLL_MAX_ROWS)
+      ) {
+        return null;
+      }
+
+      const targetPage = append ? loadedPagesRef.current + 1 : 1;
       const seq = ++detailLoadSeqRef.current;
       const logsQs = buildQueryString(applied, {
         ...tabQuery,
-        page: detailPage,
+        page: targetPage,
         limit: pageSize,
         skipPoll: opts?.skipPoll === false ? undefined : "1",
         ...(opts?.poll ? { poll: "1" } : {}),
@@ -502,35 +555,72 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       );
       if (seq !== detailLoadSeqRef.current) return res;
       if (res.ok) {
-        setLogs(res.data.logs ?? []);
-        setLogsTotal(res.data.total ?? 0);
-        setLogsTotalPages(res.data.totalPages ?? 1);
-        if (typeof res.data.page === "number" && res.data.page !== detailPage) {
-          setDetailPage(res.data.page);
+        const batch = res.data.logs ?? [];
+        const responsePage = res.data.page ?? targetPage;
+        const totalPages = res.data.totalPages ?? 1;
+        if (append) {
+          setLogs((prev) => {
+            const seen = new Set(prev.map((l) => l.id));
+            const merged = [...prev];
+            for (const row of batch) {
+              if (!seen.has(row.id)) merged.push(row);
+            }
+            const capped = merged.slice(0, INFINITE_SCROLL_MAX_ROWS);
+            setHasMoreLogs(
+              responsePage < totalPages &&
+                capped.length < INFINITE_SCROLL_MAX_ROWS,
+            );
+            return capped;
+          });
+        } else {
+          setLogs(batch);
+          setHasMoreLogs(
+            responsePage < totalPages &&
+              batch.length < INFINITE_SCROLL_MAX_ROWS,
+          );
         }
+        setLoadedPages(responsePage);
+        setLogsTotal(res.data.total ?? 0);
+        setLogsTotalPages(totalPages);
       }
       return res;
     },
-    [activeTab, applied, detailPage, pageSize, tabQuery],
+    [activeTab, applied, failedFailCodeTab, pageSize, tabQuery],
   );
+
+  const loadFailCodeCounts = useCallback(async () => {
+    if (applied.scope === "team" && !applied.tenantId) return;
+    const statsQs = buildQueryString(applied, { parts: "failCodes" });
+    const res = await fetchJson<StatsFailCodesResponse>(
+      `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
+    );
+    if (res.ok) {
+      setFailCodeCounts(res.data.failCodes ?? []);
+      setFailedTotal(res.data.failedTotal ?? 0);
+    }
+  }, [applied]);
 
   /**
    * 「生成中」Tab（第 1 页）增量轮询：只拉新行 + 在途行最新状态，客户端合并并剔除已完成行，
    * 避免每 10s 全量 count + findMany。非第 1 页或列表为空时回退全量。
    */
   const loadInProgressDelta = useCallback(async () => {
-    if (activeTabRef.current !== "inProgress" || detailPageRef.current !== 1) {
-      return loadDetailLogs({ poll: true, skipPoll: false });
+    if (
+      activeTabRef.current !== "inProgress" ||
+      loadedPagesRef.current !== 1 ||
+      logsRef.current.length > pageSizeRef.current
+    ) {
+      return loadDetailLogs({ poll: true, skipPoll: false, reset: true });
     }
     const current = logsRef.current;
     if (current.length === 0) {
-      return loadDetailLogs({ poll: true, skipPoll: false });
+      return loadDetailLogs({ poll: true, skipPoll: false, reset: true });
     }
     let cursor = current[0]?.submittedAt ?? "";
     for (const r of current) {
       if (r.submittedAt > cursor) cursor = r.submittedAt;
     }
-    if (!cursor) return loadDetailLogs({ poll: true, skipPoll: false });
+    if (!cursor) return loadDetailLogs({ poll: true, skipPoll: false, reset: true });
     const ids = current.map((l) => l.id);
     const qs = buildQueryString(applied, {
       statuses: "PENDING,RUNNING",
@@ -609,21 +699,62 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
+    setLoadedPages(1);
+    setHasMoreLogs(true);
     setDetailLoading(true);
-    void loadDetailLogs({ skipPoll: true }).finally(() => setDetailLoading(false));
-  }, [activeTab, applied, detailPage, pageSize, loadDetailLogs, viewMode]);
+    void loadDetailLogs({ skipPoll: true, reset: true }).finally(() =>
+      setDetailLoading(false),
+    );
+  }, [
+    activeTab,
+    failedFailCodeTab,
+    applied,
+    pageSize,
+    loadDetailLogs,
+    viewMode,
+  ]);
 
   useEffect(() => {
-    setDetailPage(1);
-    setDetailLoading(true);
-  }, [activeTab, applied, pageSize]);
+    if (viewMode !== "dashboard" || activeTab !== "failed") return;
+    void loadFailCodeCounts();
+  }, [activeTab, applied, loadFailCodeCounts, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "dashboard") return;
+    const el = loadMoreSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        if (detailLoading || loadingMore || !hasMoreLogsRef.current) return;
+        if (logsRef.current.length >= INFINITE_SCROLL_MAX_ROWS) return;
+        setLoadingMore(true);
+        void loadDetailLogs({ append: true, skipPoll: true }).finally(() =>
+          setLoadingMore(false),
+        );
+      },
+      { rootMargin: "320px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [
+    viewMode,
+    detailLoading,
+    loadingMore,
+    hasMoreLogs,
+    logs.length,
+    loadDetailLogs,
+  ]);
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
     const ms =
-      inProgressCount > 0 || slowWarnCount > 0
-        ? SUMMARY_POLL_ACTIVE_MS
-        : SUMMARY_POLL_IDLE_MS;
+      activeTab === "failed" ||
+      activeTab === "succeeded"
+        ? SUMMARY_POLL_IDLE_MS
+        : inProgressCount > 0 || slowWarnCount > 0 || backgroundWaitCount > 0
+          ? SUMMARY_POLL_ACTIVE_MS
+          : SUMMARY_POLL_IDLE_MS;
     const refresh = () => {
       if (document.visibilityState === "visible") void loadStatsAll();
     };
@@ -633,15 +764,17 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     return () => {
       if (summaryPollRef.current) clearInterval(summaryPollRef.current);
     };
-  }, [inProgressCount, slowWarnCount, loadStatsAll, viewMode]);
+  }, [activeTab, inProgressCount, slowWarnCount, backgroundWaitCount, loadStatsAll, viewMode]);
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
     const shouldPollInProgress =
       activeTab === "inProgress" && inProgressCount > 0;
+    const shouldPollBackgroundWait =
+      activeTab === "backgroundWait" && backgroundWaitCount > 0;
     const shouldPollSlowWarn =
       activeTab === "slowWarn" && slowWarnCount > 0;
-    if (!shouldPollInProgress && !shouldPollSlowWarn) return;
+    if (!shouldPollInProgress && !shouldPollBackgroundWait && !shouldPollSlowWarn) return;
     // 首次（含切 Tab）走全量，建立干净基线；之后每 10s「生成中」走增量、「预警」仍全量。
     const refreshFull = () => {
       if (document.visibilityState !== "visible") return;
@@ -660,6 +793,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   }, [
     activeTab,
     inProgressCount,
+    backgroundWaitCount,
     slowWarnCount,
     loadDetailLogs,
     loadInProgressDelta,
@@ -707,6 +841,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     applied.scope === "all";
   const showFailColumns = activeTab === "failed";
   const showSlowWarnHint = activeTab === "slowWarn";
+  const showBackgroundWaitHint = activeTab === "backgroundWait";
 
   const loadingMessage = hasLoadedOnce
     ? "正在更新数据…"
@@ -718,7 +853,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         <div>
           <h1 className="text-xl font-semibold text-white">状态驾驶舱</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            统计卡片按需刷新（无进行中约 60s / 有进行中或预警约 10s）·「生成中」「预警」Tab 在有任务时约 10s 增量拉取 · 成功/失败明细按需加载
+            统计卡片按需刷新（无进行中约 60s / 有进行中或预警约 10s）·「生成中」「后台等待」「预警」Tab 在有任务时约 10s 增量拉取 · 成功/失败明细按需加载
           </p>
         </div>
         {loading ? (
@@ -964,6 +1099,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               label="生成中"
               value={stats.cards.inProgress}
               accent="text-amber-300"
+              sub={
+                stats.cards.backgroundWait > 0
+                  ? `后台等待 ${stats.cards.backgroundWait}`
+                  : undefined
+              }
             />
             <StatCard
               label="成功"
@@ -1030,7 +1170,9 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               disabled={loading && !hasLoadedOnce}
               onClick={() => {
                 setActiveTab(tab.id);
-                setDetailPage(1);
+                setLoadedPages(1);
+                setHasMoreLogs(true);
+                if (tab.id !== "failed") setFailedFailCodeTab("all");
               }}
               className={`px-4 py-3 text-sm disabled:cursor-wait disabled:opacity-60 ${
                 activeTab === tab.id
@@ -1054,6 +1196,47 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           ) : null}
         </div>
 
+        {activeTab === "failed" ? (
+          <div className="flex flex-wrap gap-1.5 border-b border-white/10 px-3 py-2">
+            {GATEWAY_FAIL_CODE_TABS.map((tab) => {
+              const count =
+                tab.id === "all"
+                  ? failedTotal
+                  : (failCodeCounts.find((c) => c.failCode === tab.failCode)
+                      ?.count ?? 0);
+              const alwaysShow =
+                tab.id === "all" ||
+                tab.id === "VOLCENGINE_GATEWAY_POLL_STALL";
+              if (!alwaysShow && count === 0) return null;
+              const active = failedFailCodeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setFailedFailCodeTab(tab.id);
+                    setLoadedPages(1);
+                    setHasMoreLogs(true);
+                  }}
+                  className={`rounded-full border px-3 py-1 text-xs transition ${
+                    active
+                      ? "border-red-500/40 bg-red-500/15 text-red-100"
+                      : "border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                  }`}
+                  title={tab.description}
+                >
+                  {tab.label}
+                  <span className="ml-1 tabular-nums text-zinc-500">{count}</span>
+                </button>
+              );
+            })}
+            <p className="w-full px-1 text-[11px] text-zinc-500">
+              历史误杀（<span className="text-orange-300/90">VOLCENGINE_GATEWAY_POLL_STALL</span>
+              ）：点上方「历史误杀可恢复」筛选，表格最右列「厂商复核恢复」向火山查片并写回成功；新任务 ≥10min 只会转后台，不再因此失败。
+            </p>
+          </div>
+        ) : null}
+
         <div className="relative overflow-x-auto">
           {detailLoading && logs.length > 0 ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-[1px]">
@@ -1076,6 +1259,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                   <>
                     <th className="px-4 py-3 font-medium">失败码</th>
                     <th className="px-4 py-3 font-medium">失败原因</th>
+                    <th className="min-w-[200px] px-4 py-3 font-medium">Prompt</th>
+                    <th className="px-4 py-3 font-medium">Vendor Task</th>
+                    <th className="px-4 py-3 font-medium">Request ID</th>
+                    <th className="px-4 py-3 font-medium">恢复</th>
                   </>
                 ) : null}
                 <th className="px-4 py-3 font-medium">Model</th>
@@ -1112,7 +1299,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                 </tr>
               ) : (
                 logs.map((log, index) => {
-                  const rowNo = (detailPage - 1) * pageSize + index + 1;
+                  const rowNo = index + 1;
                   const isInProgress = isLogInProgress(log.status);
                   const live = resolveLiveLogPhaseTiming({
                     submittedAt: log.submittedAt,
@@ -1152,7 +1339,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                     failCode: log.failCode,
                     failMessage: log.failMessage,
                   });
-                  const failMessage = gatewayFailMessageDisplay(log.failMessage);
+                  const failMessage = gatewayFailMessageDisplay(
+                    log.failMessage,
+                    log.failCode,
+                  );
+                  const videoPrompt = extractLogVideoPrompt(log.inputSummary);
                   return (
                     <tr
                       key={log.id}
@@ -1176,6 +1367,38 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                           </td>
                           <td className="max-w-[220px] px-4 py-3 text-xs leading-relaxed text-zinc-400">
                             {failMessage}
+                          </td>
+                          <td
+                            className="max-w-[280px] px-4 py-3 text-xs leading-relaxed text-zinc-300"
+                            title={videoPrompt || undefined}
+                          >
+                            {videoPrompt ? (
+                              <span className="line-clamp-3">{videoPrompt}</span>
+                            ) : (
+                              <span className="text-zinc-600">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <CopyLogIdButton
+                              value={log.externalTaskId}
+                              label="Vendor Task ID"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <CopyLogIdButton
+                              value={log.vendorRequestId}
+                              label="Request ID"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <RecoverStallLogButton
+                              logId={log.id}
+                              failCode={log.failCode}
+                              failMessage={log.failMessage}
+                              onDone={() =>
+                                void loadDetailLogs({ poll: true, skipPoll: false, reset: true })
+                              }
+                            />
                           </td>
                         </>
                       ) : null}
@@ -1219,6 +1442,13 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                             ≥{SLOW_WARN_THRESHOLD_SEC}s
                           </span>
                         ) : null}
+                        {showBackgroundWaitHint &&
+                        durationMs != null &&
+                        durationMs >= BACKGROUND_WAIT_THRESHOLD_MS ? (
+                          <span className="ml-2 text-xs text-orange-400/90">
+                            ≥{BACKGROUND_WAIT_THRESHOLD_SEC}s
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-zinc-400">
                         {formatLogTimestamp(log.submittedAt)}
@@ -1240,20 +1470,65 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           </table>
         </div>
 
-        <GatewayLogPaginationBar
-          page={detailPage}
-          totalPages={logsTotalPages}
-          total={logsTotal}
-          rowCount={logs.length}
-          pageSize={pageSize}
-          pageSizePreset={pageSizePreset}
-          customPageSizeInput={customPageSizeInput}
-          loading={detailLoading}
-          onPageChange={setDetailPage}
-          onPageSizePresetChange={setPageSizePreset}
-          onCustomPageSizeInputChange={setCustomPageSizeInput}
-          onApplyCustomPageSize={applyPageSize}
-        />
+        <div ref={loadMoreSentinelRef} className="h-1" aria-hidden />
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+            <span>
+              已加载 {logs.length} / {logsTotal} 条
+              {loadedPages > 1 ? ` · 已翻 ${loadedPages} 页` : ""}
+            </span>
+            <span className="text-zinc-600">|</span>
+            <span>每批</span>
+            <select
+              value={pageSizePreset}
+              onChange={(e) => {
+                const next = e.target.value as GatewayLogPageSizePreset;
+                setPageSizePreset(next);
+                if (next === "custom") return;
+                applyPageSize(Number(next));
+              }}
+              className="rounded-lg border border-white/10 bg-[#141419] px-2.5 py-1.5 text-xs text-zinc-300 outline-none focus:border-white/20"
+              aria-label="每批条数"
+            >
+              {[20, 50, 100].map((n) => (
+                <option key={n} value={String(n)}>
+                  {n}
+                </option>
+              ))}
+              <option value="custom">自定义</option>
+            </select>
+            {pageSizePreset === "custom" ? (
+              <label className="inline-flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={customPageSizeInput}
+                  onChange={(e) => setCustomPageSizeInput(e.target.value)}
+                  onBlur={() => {
+                    applyPageSize(Number(customPageSizeInput));
+                  }}
+                  className="w-20 rounded-lg border border-white/10 bg-[#141419] px-2 py-1.5 font-mono text-xs text-zinc-300 outline-none focus:border-white/20"
+                />
+                条
+              </label>
+            ) : null}
+          </div>
+          <div className="text-xs text-zinc-500">
+            {loadingMore ? (
+              <span className="text-sky-300/90">正在加载更多…</span>
+            ) : hasMoreLogs && logs.length < INFINITE_SCROLL_MAX_ROWS ? (
+              <span>向下滚动自动加载（每批 {pageSize} 条，单次最多 {INFINITE_SCROLL_MAX_ROWS} 条）</span>
+            ) : logs.length >= INFINITE_SCROLL_MAX_ROWS ? (
+              <span className="text-amber-300/90">
+                已达单次加载上限，请缩小时间范围后刷新
+              </span>
+            ) : (
+              <span>已全部加载</span>
+            )}
+          </div>
+        </div>
       </div>
       ) : null}
     </div>

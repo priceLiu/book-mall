@@ -73,4 +73,6 @@ export type QrWorkspaceDraft = {
   prompt: string;
   modelKey: string;
   mode?: string;
+  characterOrientation?: string;
+  keepOriginalSound?: boolean;
 };

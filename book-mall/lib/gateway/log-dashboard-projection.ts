@@ -11,6 +11,7 @@ import {
 } from "@/lib/billing/billing-category";
 import { buildSlowGenerationWhere } from "@/lib/generation/slow-generation";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
+import { buildVideoBackgroundWaitWhere } from "@/lib/gateway/video-task-wait-policy";
 import { prisma } from "@/lib/prisma";
 
 export const DASHBOARD_IN_PROGRESS_STATUSES: GatewayRequestStatus[] = [
@@ -54,6 +55,8 @@ export type DashboardCards = {
   cancelled: number;
   /** 耗时 ≥800s（含进行中已超阈值） */
   slowWarn: number;
+  /** 进行中且已等待 ≥10min（后台化 UI 阈值） */
+  backgroundWait: number;
 };
 
 export type DashboardStatsPayload = {
@@ -78,7 +81,14 @@ export type DashboardChartLogRow = {
 };
 
 export function emptyDashboardCards(): DashboardCards {
-  return { inProgress: 0, succeeded: 0, failed: 0, cancelled: 0, slowWarn: 0 };
+  return {
+    inProgress: 0,
+    succeeded: 0,
+    failed: 0,
+    cancelled: 0,
+    slowWarn: 0,
+    backgroundWait: 0,
+  };
 }
 
 export function buildEmptyCategoryCounts(): DashboardCategoryCount[] {
@@ -235,19 +245,56 @@ export async function fetchDashboardStatsSummary(
     }),
     resolveGenerationSlowWarnMs(),
   ]);
-  const slowWarn = await prisma.gatewayRequestLog.count({
-    where: {
-      AND: [where, buildSlowGenerationWhere(slowWarnMs)],
-    },
-  });
+  const [slowWarn, backgroundWait] = await Promise.all([
+    prisma.gatewayRequestLog.count({
+      where: {
+        AND: [where, buildSlowGenerationWhere(slowWarnMs)],
+      },
+    }),
+    prisma.gatewayRequestLog.count({
+      where: {
+        AND: [where, buildVideoBackgroundWaitWhere()],
+      },
+    }),
+  ]);
   return {
     cards: {
       ...mergeStatusGroupCounts(
         statusGroups.map((g) => ({ status: g.status, count: g._count._all })),
       ),
       slowWarn,
+      backgroundWait,
     },
   };
+}
+
+export type DashboardFailCodeCount = {
+  failCode: string;
+  count: number;
+};
+
+/** 失败日志 · 按 failCode 分组（状态页失败 Tab 分栏） */
+export async function fetchDashboardFailCodeCounts(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<{ failCodes: DashboardFailCodeCount[]; failedTotal: number }> {
+  const failedWhere: Prisma.GatewayRequestLogWhereInput = {
+    AND: [where, { status: "FAILED" }],
+  };
+  const [groups, failedTotal] = await Promise.all([
+    prisma.gatewayRequestLog.groupBy({
+      by: ["failCode"],
+      where: failedWhere,
+      _count: { _all: true },
+    }),
+    prisma.gatewayRequestLog.count({ where: failedWhere }),
+  ]);
+  const failCodes = groups
+    .map((g) => ({
+      failCode: g.failCode?.trim() || "UNKNOWN",
+      count: g._count._all,
+    }))
+    .sort((a, b) => b.count - a.count);
+  return { failCodes, failedTotal };
 }
 
 export async function fetchDashboardCategoryStats(
@@ -272,7 +319,7 @@ export async function fetchDashboardChartStats(
   return { byCategory, byModel };
 }
 
-export type DashboardStatsParts = "summary" | "categories" | "models";
+export type DashboardStatsParts = "summary" | "categories" | "models" | "failCodes";
 
 export function parseDashboardStatsParts(
   raw: string | null | undefined,
@@ -284,7 +331,14 @@ export function parseDashboardStatsParts(
   const parts = new Set<DashboardStatsParts>();
   for (const token of v.split(",")) {
     const t = token.trim();
-    if (t === "summary" || t === "categories" || t === "models") parts.add(t);
+    if (
+      t === "summary" ||
+      t === "categories" ||
+      t === "models" ||
+      t === "failCodes"
+    ) {
+      parts.add(t);
+    }
   }
   if (parts.size === 0) return new Set(["summary", "categories", "models"]);
   return parts;

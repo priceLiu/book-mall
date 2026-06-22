@@ -2,6 +2,7 @@
 
 const CONTENT_POLICY_MARKERS = [
   "flagged as sensitive",
+  "sensitive information",
   "sensitive content",
   "content policy",
   "content filter",
@@ -10,6 +11,30 @@ const CONTENT_POLICY_MARKERS = [
   "违规",
   "敏感",
 ] as const;
+
+const FAIL_CODE_HINTS: Record<string, string> = {
+  CONTENT_POLICY:
+    "提示词或参考素材触发厂商内容安全策略，请改写后重试。",
+  INVALID_INPUT: "请求参数不符合厂商要求（比例、参考图、content 结构等）。",
+  MODEL_NOT_FOUND: "模型或接入点不存在，请检查 Gateway 登记与凭证。",
+  UPSTREAM_AUTH_FAILED: "火山凭证无效或无权限。",
+  UPSTREAM_TRANSIENT: "厂商或网络瞬态错误；Gateway 已有限重试。",
+  SUBMIT_ORPHAN:
+    "已建 Gateway 日志但未拿到厂商 taskId（submit 挂起/进程中断），非内容安全 400。",
+  UPSTREAM_SUBMIT_FAILED:
+    "厂商在提交阶段拒绝或未知错误（未创建 taskId）。多为参数/配额/权限，请复制 Request ID 给厂商，而非 Vendor Task ID。",
+  STALE_TIMEOUT:
+    "Gateway 轮询超时后自动收口；厂商侧可能早已结束，请核对 Vendor Task ID。",
+  VOLCENGINE_GATEWAY_POLL_STALL:
+    "历史误杀（旧版停更收口）：厂商可能已出片，请点「厂商复核恢复」或到画布右下角加载。新任务 ≥10min 会转入持续后台生成，不再因此失败。",
+  VOLCENGINE_QUEUED_STALE:
+    "厂商 queued 阶段长时间无进展，Gateway 自动失败。",
+  VOLCENGINE_POLL_LAG:
+    "厂商已返回终态，Gateway 日志未及时 completed，请检查 poll worker。",
+  STALE_ORPHAN:
+    "请求未成功提交厂商（无 taskId），Gateway 自动关闭。",
+  POLL_TRANSIENT: "轮询或提交 transient 超时，可重试。",
+};
 
 function inferFailCode(input: {
   failCode?: string | null;
@@ -23,6 +48,9 @@ function inferFailCode(input: {
 
   if (CONTENT_POLICY_MARKERS.some((m) => blob.includes(m))) {
     return "CONTENT_POLICY";
+  }
+  if (blob.includes("无厂商 taskid") || blob.includes("未成功提交（无厂商 taskid）")) {
+    return "SUBMIT_ORPHAN";
   }
   if (blob.includes("insufficient") && blob.includes("credit")) {
     return "INSUFFICIENT_CREDITS";
@@ -47,16 +75,49 @@ export function resolveGatewayFailCodeDisplay(input: {
   return inferFailCode(input) ?? "FAILED";
 }
 
+export function gatewayFailCodeHint(failCode?: string | null): string | null {
+  const code = failCode?.trim();
+  if (!code) return null;
+  return FAIL_CODE_HINTS[code] ?? null;
+}
+
 export function gatewayFailMessageDisplay(
   failMessage?: string | null,
+  failCode?: string | null,
 ): string {
   const raw = failMessage?.trim();
+  const code = resolveGatewayFailCodeDisplay({ failCode, failMessage });
+  const hint = gatewayFailCodeHint(code);
+
   if (!raw) {
-    return "未记录详细原因（常见于上游空响应、连接中断或旧版日志）。请悬停查看 Params，或重试请求。";
+    const base =
+      "未记录详细原因（常见于上游空响应、连接中断或旧版日志）。请查看 Params 或重试。";
+    return hint ? `${base} ${hint}` : base;
   }
+
   const blob = raw.toLowerCase();
   if (CONTENT_POLICY_MARKERS.some((m) => blob.includes(m))) {
-    return "内容被模型安全策略拦截。请修改提示词（减少敏感、暴力描述）后重试，或更换模型。";
+    return (
+      hint ??
+      "内容被模型安全策略拦截。请修改提示词（减少敏感、暴力描述）后重试，或更换模型。"
+    );
+  }
+
+  if (hint && !raw.includes(hint.slice(0, 12))) {
+    return `${raw} · ${hint}`;
   }
   return raw;
+}
+
+export function formatGatewayFailInline(input: {
+  failCode?: string | null;
+  failMessage?: string | null;
+}): { code: string; message: string; title: string } {
+  const code = resolveGatewayFailCodeDisplay(input);
+  const message = gatewayFailMessageDisplay(input.failMessage, input.failCode);
+  return {
+    code,
+    message,
+    title: `failCode: ${code}\nfailMessage: ${message}`,
+  };
 }

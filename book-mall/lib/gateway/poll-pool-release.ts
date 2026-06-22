@@ -3,7 +3,8 @@
  */
 import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
 import { applyCanvasVolcengineVideoResult } from "@/lib/canvas/canvas-task-service";
-import { extractVolcengineVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-volcengine-recover";
+import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-stall-recover";
+import { isRecoverableVolcengineStallFailCode } from "@/lib/gateway/video-background-generation";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { prisma } from "@/lib/prisma";
@@ -103,6 +104,31 @@ export async function releasePollPoolGatewayLog(
   const slowWarnMs = await resolveGenerationSlowWarnMs();
 
   if (action === "recover") {
+    if (
+      log.status === "FAILED" &&
+      isRecoverableVolcengineStallFailCode(log.failCode)
+    ) {
+      const r = await recoverVolcengineGatewayLogFromVendor(gatewayLogId);
+      if (r.ok && r.action === "succeeded") {
+        return {
+          ok: true,
+          action,
+          target: "gateway",
+          id: gatewayLogId,
+          message: r.message,
+          gatewayStatus: "SUCCEEDED",
+        };
+      }
+      return {
+        ok: r.action === "vendor_failed",
+        action,
+        target: "gateway",
+        id: gatewayLogId,
+        message: r.message,
+        gatewayStatus: r.gatewayStatus ?? log.status,
+      };
+    }
+
     if (log.status === "SUCCEEDED") {
       const videoUrl = extractVolcengineVideoUrlFromGatewaySummary(
         log.resultSummary,

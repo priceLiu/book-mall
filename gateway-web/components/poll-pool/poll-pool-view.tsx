@@ -18,6 +18,7 @@ type PollPoolGatewayRow = {
   pollCount: number;
   ageSec: number;
   slowWarn: boolean;
+  backgroundWait: boolean;
   gatewayLogId: string;
 };
 
@@ -36,6 +37,7 @@ type PollPoolAppTaskRow = {
   pollCount: number;
   ageSec: number;
   slowWarn: boolean;
+  backgroundWait: boolean;
 };
 
 type PollPoolResponse = {
@@ -44,24 +46,29 @@ type PollPoolResponse = {
     slowWarnMs: number;
     slowWarnSec: number;
     slowWarnSource?: "platform" | "env";
+    backgroundWaitMs: number;
+    backgroundWaitSec: number;
     gatewayPollLimit: number;
     canvasPollBatch: number;
   };
   gateway: {
     total: number;
     slowCount: number;
+    backgroundCount: number;
     queue: PollPoolGatewayRow[];
   };
   canvas: {
     totalSubmitted: number;
     totalPending: number;
     slowCount: number;
+    backgroundCount: number;
     queue: PollPoolAppTaskRow[];
   };
   story: {
     totalSubmitted: number;
     totalPending: number;
     slowCount: number;
+    backgroundCount: number;
     queue: PollPoolAppTaskRow[];
   };
   poll?: {
@@ -81,6 +88,15 @@ const POLL_MS = 10_000;
 
 function formatAgeSec(sec: number): string {
   return formatDurationSeconds(sec * 1000);
+}
+
+function BackgroundBadge({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span className="ml-2 rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-100">
+      后台
+    </span>
+  );
 }
 
 function SlowBadge({ show }: { show: boolean }) {
@@ -151,12 +167,17 @@ function GatewayQueueTable({
             <tr
               key={row.id}
               className={`border-b border-white/5 hover:bg-white/[0.02] ${
-                row.slowWarn ? "bg-orange-500/[0.04]" : ""
+                row.backgroundWait
+                  ? "bg-amber-500/[0.05]"
+                  : row.slowWarn
+                    ? "bg-orange-500/[0.04]"
+                    : ""
               }`}
             >
               <td className="px-4 py-3 text-zinc-300">
                 {row.clientSource}
-                <SlowBadge show={row.slowWarn} />
+                <BackgroundBadge show={row.backgroundWait} />
+                <SlowBadge show={row.slowWarn && !row.backgroundWait} />
               </td>
               <td className="max-w-[160px] truncate px-4 py-3 font-mono text-xs text-zinc-300">
                 {row.canonicalModelKey ?? row.model ?? "—"}
@@ -166,7 +187,11 @@ function GatewayQueueTable({
               </td>
               <td
                 className={`px-4 py-3 tabular-nums ${
-                  row.slowWarn ? "font-medium text-orange-300" : "text-zinc-300"
+                  row.backgroundWait
+                    ? "font-medium text-amber-200"
+                    : row.slowWarn
+                      ? "font-medium text-orange-300"
+                      : "text-zinc-300"
                 }`}
               >
                 {formatAgeSec(row.ageSec)}
@@ -191,7 +216,7 @@ function GatewayQueueTable({
                 </Link>
               </td>
               <td className="px-4 py-3">
-                {row.slowWarn && onRelease ? (
+                {(row.slowWarn || row.backgroundWait) && onRelease ? (
                   <div className="flex flex-wrap gap-1">
                     <button
                       type="button"
@@ -261,12 +286,17 @@ function AppQueueTable({
             <tr
               key={row.id}
               className={`border-b border-white/5 hover:bg-white/[0.02] ${
-                row.slowWarn ? "bg-orange-500/[0.04]" : ""
+                row.backgroundWait
+                  ? "bg-amber-500/[0.05]"
+                  : row.slowWarn
+                    ? "bg-orange-500/[0.04]"
+                    : ""
               }`}
             >
               <td className="px-4 py-3 text-zinc-300">
                 {row.status}
-                <SlowBadge show={row.slowWarn} />
+                <BackgroundBadge show={row.backgroundWait} />
+                <SlowBadge show={row.slowWarn && !row.backgroundWait} />
               </td>
               <td className="max-w-[180px] truncate px-4 py-3 text-zinc-300">
                 {row.projectName}
@@ -277,7 +307,11 @@ function AppQueueTable({
               </td>
               <td
                 className={`px-4 py-3 tabular-nums ${
-                  row.slowWarn ? "font-medium text-orange-300" : "text-zinc-300"
+                  row.backgroundWait
+                    ? "font-medium text-amber-200"
+                    : row.slowWarn
+                      ? "font-medium text-orange-300"
+                      : "text-zinc-300"
                 }`}
               >
                 {formatAgeSec(row.ageSec)}
@@ -301,7 +335,7 @@ function AppQueueTable({
                 {row.id}
               </td>
               <td className="px-4 py-3">
-                {row.slowWarn && onRelease && row.app === "canvas" ? (
+                {(row.slowWarn || row.backgroundWait) && onRelease && row.app === "canvas" ? (
                   <div className="flex flex-wrap gap-1">
                     <button
                       type="button"
@@ -340,6 +374,7 @@ export function PollPoolView() {
   const [savingThreshold, setSavingThreshold] = useState(false);
   const [releaseBusyId, setReleaseBusyId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [backgroundOnly, setBackgroundOnly] = useState(false);
 
   const load = useCallback(async (opts?: { poll?: boolean }) => {
     setLoading(true);
@@ -488,6 +523,31 @@ export function PollPoolView() {
 
       {data ? (
         <>
+          {(() => {
+            const totalBackgroundCount =
+              data.gateway.backgroundCount +
+              data.canvas.backgroundCount +
+              data.story.backgroundCount;
+            const filterRows = <T extends { backgroundWait: boolean }>(rows: T[]) =>
+              backgroundOnly ? rows.filter((row) => row.backgroundWait) : rows;
+            return (
+              <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+              <input
+                type="checkbox"
+                checked={backgroundOnly}
+                onChange={(e) => setBackgroundOnly(e.target.checked)}
+                className="rounded border-white/20 bg-black/30"
+              />
+              仅显示后台等待（≥{data.config.backgroundWaitSec}s）
+            </label>
+            {totalBackgroundCount > 0 ? (
+              <span className="text-xs text-amber-200/90">
+                当前 {totalBackgroundCount} 条 · Canvas 侧应显示「持续后台生成中」
+              </span>
+            ) : null}
+          </div>
           <section className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
             <div className="flex flex-wrap items-end gap-4">
               <div>
@@ -528,26 +588,26 @@ export function PollPoolView() {
             <StatCard
               label="Gateway RUNNING"
               value={data.gateway.total}
-              sub={`预警 ${data.gateway.slowCount}`}
+              sub={`后台 ${data.gateway.backgroundCount} · 预警 ${data.gateway.slowCount}`}
               accent="text-amber-300"
             />
             <StatCard
               label="Canvas 待 poll"
               value={data.canvas.totalSubmitted + data.canvas.totalPending}
-              sub={`SUBMITTED ${data.canvas.totalSubmitted} · PENDING ${data.canvas.totalPending} · 预警 ${data.canvas.slowCount}`}
+              sub={`后台 ${data.canvas.backgroundCount} · 预警 ${data.canvas.slowCount}`}
               accent="text-sky-300"
             />
             <StatCard
               label="Story 待 poll"
               value={data.story.totalSubmitted + data.story.totalPending}
-              sub={`SUBMITTED ${data.story.totalSubmitted} · PENDING ${data.story.totalPending} · 预警 ${data.story.slowCount}`}
+              sub={`后台 ${data.story.backgroundCount} · 预警 ${data.story.slowCount}`}
               accent="text-violet-300"
             />
             <StatCard
-              label="预警阈值"
-              value={data.config.slowWarnSec}
-              sub={`升格通道 · 当前 ${data.gateway.slowCount + data.canvas.slowCount} 条`}
-              accent="text-orange-300"
+              label="后台阈值"
+              value={data.config.backgroundWaitSec}
+              sub={`固定 10min · 当前 ${totalBackgroundCount} 条`}
+              accent="text-amber-300"
             />
           </div>
 
@@ -558,11 +618,11 @@ export function PollPoolView() {
               </h2>
               <p className="mt-1 text-xs text-zinc-500">
                 与 runGatewayPollWorker 相同口径 · 慢任务优先 · 本页展示前{" "}
-                {data.gateway.queue.length} 条
+                {filterRows(data.gateway.queue).length} 条
               </p>
             </div>
             <GatewayQueueTable
-              rows={data.gateway.queue}
+              rows={filterRows(data.gateway.queue)}
               busyId={releaseBusyId}
               onRelease={(id, action) => releaseTask("gateway", id, action)}
             />
@@ -573,7 +633,7 @@ export function PollPoolView() {
               <h2 className="text-sm font-medium text-white">Canvas poll 池</h2>
             </div>
             <AppQueueTable
-              rows={data.canvas.queue}
+              rows={filterRows(data.canvas.queue)}
               title="Canvas"
               busyId={releaseBusyId}
               onRelease={(id, action) => releaseTask("canvas", id, action)}
@@ -584,7 +644,7 @@ export function PollPoolView() {
             <div className="border-b border-white/10 px-4 py-3">
               <h2 className="text-sm font-medium text-white">Story poll 池</h2>
             </div>
-            <AppQueueTable rows={data.story.queue} title="Story" />
+            <AppQueueTable rows={filterRows(data.story.queue)} title="Story" />
           </section>
 
           {data.serverTime ? (
@@ -592,6 +652,9 @@ export function PollPoolView() {
               快照时间 {new Date(data.serverTime).toLocaleString()} · 每 {POLL_MS / 1000}s 自动刷新
             </p>
           ) : null}
+              </>
+            );
+          })()}
         </>
       ) : loading ? (
         <p className="text-sm text-zinc-400">正在加载轮询池…</p>

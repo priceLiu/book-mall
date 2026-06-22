@@ -35,6 +35,7 @@ import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types"
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
+import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { cn } from "@/lib/utils";
 import { useLibtvMediaNodeAutoFit } from "@/lib/canvas/libtv-media-node-auto-fit";
 import { LazyViewportImage, LazyViewportVideo } from "@/components/canvas/lazy-viewport-media";
@@ -151,6 +152,15 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       (t) => isServerInflightTaskStatus(t.status),
     );
   }, [history, d.runtime?.taskId]);
+
+  const waitSince =
+    inflightTask?.submittedAt ?? inflightTask?.createdAt ?? null;
+  const isPending = d.runtime?.status === "pending";
+  const { generatingLabel, waitHint, isBackground } = useVideoGeneratingWait(
+    isGenerating,
+    waitSince,
+    isPending,
+  );
 
   useEffect(() => {
     if (!inflightTask) return;
@@ -364,8 +374,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           <div className={SBV1_MEDIA_STAGE_CLASS}>
             {isGenerating ? (
               <LibtvMediaGeneratingState
-                label="视频生成中…"
+                label={generatingLabel}
                 variant="cyan"
+                tone={isBackground ? "background" : "active"}
               />
             ) : hasVideo ? (
               <div className="group/video absolute inset-0">
@@ -417,6 +428,15 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
             visible={errorBanner.visible}
             onDismiss={errorBanner.dismiss}
           />
+          {isGenerating && waitHint ? (
+            <p
+              className={`border-t border-white/10 px-3 py-1.5 font-mono text-[10px] leading-snug ${
+                isBackground ? "text-orange-300/80" : "text-white/45"
+              }`}
+            >
+              {waitHint}
+            </p>
+          ) : null}
         </div>
       </div>
       {previewOpen && videoUrl ? (

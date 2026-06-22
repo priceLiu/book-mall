@@ -77,6 +77,7 @@ function buildGenericCreateBody(draft: QrWorkspaceDraft): {
       imageUrls: draft.targetImageUrl ? [draft.targetImageUrl] : undefined,
       videoUrls: draft.referenceVideoUrl ? [draft.referenceVideoUrl] : undefined,
       mode: draft.mode,
+      characterOrientation: draft.characterOrientation,
     });
   }
 
@@ -153,6 +154,7 @@ export async function qrCreateGenerateJob(
       prompt: draft.prompt,
       modelKey: draft.modelKey,
       mode: draft.mode,
+      characterOrientation: draft.characterOrientation,
     });
     return job;
   }

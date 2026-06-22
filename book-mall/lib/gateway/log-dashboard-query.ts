@@ -84,6 +84,10 @@ export function parseDashboardFiltersFromSearchParams(
     storyProjectId: params.get("storyProjectId")?.trim() || undefined,
     slowWarn:
       params.get("slowWarn") === "1" || params.get("slowWarn") === "true",
+    backgroundWait:
+      params.get("backgroundWait") === "1" ||
+      params.get("backgroundWait") === "true",
+    failCode: params.get("failCode")?.trim() || undefined,
   };
 }
 

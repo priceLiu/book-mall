@@ -45,6 +45,8 @@ export type VolcengineTimingTrace = {
   vendorSucceededAtMs?: number;
   /** 首次 poll 观测到厂商 succeeded/completed 的墙钟时刻 */
   firstSucceededPolledAtMs?: number;
+  /** 首次 poll 观测到厂商 failed/cancelled 的墙钟时刻 */
+  firstFailedPolledAtMs?: number;
   lastStatus?: string;
   lastPolledAtMs?: number;
 };
@@ -180,6 +182,12 @@ export function mergeVolcengineTimingTrace(
       trace.firstRunningAtMs = trace.vendorCreatedAtMs ?? trace.firstQueuedAtMs;
     }
   }
+  if (status === "failed" || status === "cancelled") {
+    if (trace.firstFailedPolledAtMs == null) {
+      trace.firstFailedPolledAtMs = now;
+    }
+    if (updatedAtMs != null) trace.vendorUpdatedAtMs = updatedAtMs;
+  }
 
   return trace;
 }
@@ -192,7 +200,38 @@ export function volcengineTimingGenStartMs(
 
 function isVendorTerminalStatus(status: string | undefined): boolean {
   const s = normalizeStatus(status);
-  return s === "succeeded" || s === "completed" || s === "success";
+  return (
+    s === "succeeded" ||
+    s === "completed" ||
+    s === "success" ||
+    s === "failed" ||
+    s === "cancelled"
+  );
+}
+
+function isVendorFailedStatus(status: string | undefined): boolean {
+  const s = normalizeStatus(status);
+  return s === "failed" || s === "cancelled";
+}
+
+/** Seedance 生成中 updated_at 长期等于 created_at */
+function isSeedanceFrozenUpdatedAt(
+  vendorCreated: number | undefined,
+  vendorUpdated: number | undefined,
+): boolean {
+  if (vendorCreated == null || vendorUpdated == null) return false;
+  return vendorUpdated - vendorCreated <= 5_000;
+}
+
+/** 终态失败/取消：首次观测到厂商终态的墙钟（优先 failed，回退 lastPolled） */
+export function resolveFirstFailedPolledAtMs(
+  trace: VolcengineTimingTrace,
+): number | null {
+  if (trace.firstFailedPolledAtMs != null) return trace.firstFailedPolledAtMs;
+  if (isVendorFailedStatus(trace.lastStatus)) {
+    return trace.lastPolledAtMs ?? null;
+  }
+  return null;
 }
 
 /** 终态拆分用：首次观测 succeeded 的墙钟（旧日志回退 lastPolledAtMs） */
@@ -203,10 +242,63 @@ export function resolveFirstSucceededPolledAtMs(
   if (trace.firstSucceededPolledAtMs != null) {
     return trace.firstSucceededPolledAtMs;
   }
-  if (isVendorTerminalStatus(trace.lastStatus)) {
+  const st = normalizeStatus(trace.lastStatus);
+  if (st === "succeeded" || st === "completed" || st === "success") {
     return trace.lastPolledAtMs ?? completedAtMs;
   }
   return null;
+}
+
+function splitTerminalWithoutSucceeded(input: {
+  trace: VolcengineTimingTrace;
+  completedAtMs: number;
+  genStart: number | null;
+  vendorCreated: number | undefined;
+  vendorUpdated: number | undefined;
+  firstRunning: number | undefined;
+}): Pick<
+  VolcengineTimingBreakdown,
+  "generateMs" | "vendorPostProcessMs" | "pollDelayMs"
+> {
+  const genBase =
+    input.genStart ?? input.vendorCreated ?? input.firstRunning ?? null;
+  if (genBase == null) {
+    return { generateMs: null, vendorPostProcessMs: null, pollDelayMs: null };
+  }
+
+  const vendorFailedAt = resolveFirstFailedPolledAtMs(input.trace);
+  if (vendorFailedAt != null) {
+    return {
+      generateMs: Math.max(0, vendorFailedAt - genBase),
+      vendorPostProcessMs: null,
+      pollDelayMs: Math.max(0, input.completedAtMs - vendorFailedAt),
+    };
+  }
+
+  const lastPoll = input.trace.lastPolledAtMs;
+  const totalMs = Math.max(0, input.completedAtMs - genBase);
+  const pollDelayMs =
+    lastPoll != null ? Math.max(0, input.completedAtMs - lastPoll) : 0;
+  const generateMs = Math.max(0, totalMs - pollDelayMs);
+
+  if (
+    isSeedanceFrozenUpdatedAt(input.vendorCreated, input.vendorUpdated) &&
+    generateMs <= 5_000 &&
+    totalMs > 60_000
+  ) {
+    // 旧日志：updated_at 不前进且无 failed 观测 → 全段为 Gateway 等厂商，不归入 PostProc
+    return {
+      generateMs: totalMs,
+      vendorPostProcessMs: null,
+      pollDelayMs: pollDelayMs > 0 ? pollDelayMs : null,
+    };
+  }
+
+  return {
+    generateMs,
+    vendorPostProcessMs: null,
+    pollDelayMs: pollDelayMs > 0 ? pollDelayMs : null,
+  };
 }
 
 /** 连续两次 poll 回包相同 updated_at（仅用于诊断，进行中 Generate 仍走墙钟） */
@@ -296,9 +388,17 @@ export function computeVolcengineTimingBreakdown(input: {
         vendorPostProcessMs = Math.max(0, firstSucceeded - vendorUpdated);
         pollDelayMs = Math.max(0, input.completedAtMs - firstSucceeded);
       } else {
-        // 无 succeeded 观测：整段归入后处理，Poll 置 0
-        vendorPostProcessMs = Math.max(0, input.completedAtMs - vendorUpdated);
-        pollDelayMs = 0;
+        const split = splitTerminalWithoutSucceeded({
+          trace,
+          completedAtMs: input.completedAtMs,
+          genStart,
+          vendorCreated,
+          vendorUpdated,
+          firstRunning,
+        });
+        generateMs = split.generateMs;
+        vendorPostProcessMs = split.vendorPostProcessMs;
+        pollDelayMs = split.pollDelayMs;
       }
     }
   } else if (firstRunning != null && vendorUpdated != null) {
@@ -312,8 +412,17 @@ export function computeVolcengineTimingBreakdown(input: {
         vendorPostProcessMs = Math.max(0, firstSucceeded - vendorUpdated);
         pollDelayMs = Math.max(0, input.completedAtMs - firstSucceeded);
       } else {
-        vendorPostProcessMs = Math.max(0, input.completedAtMs - vendorUpdated);
-        pollDelayMs = 0;
+        const split = splitTerminalWithoutSucceeded({
+          trace,
+          completedAtMs: input.completedAtMs,
+          genStart,
+          vendorCreated,
+          vendorUpdated,
+          firstRunning,
+        });
+        generateMs = split.generateMs ?? generateMs;
+        vendorPostProcessMs = split.vendorPostProcessMs;
+        pollDelayMs = split.pollDelayMs;
       }
     }
   }
@@ -408,12 +517,8 @@ export function volcengineVendorStaleMs(
 }
 
 /**
- * 卡死收口判定：running 火山视频「厂商停更时长」≥ 阈值（默认 18min）→ 视为卡死。
- *
- * 以厂商停更时长为准而非"无 poll N 秒"：
- *  - 厂商真卡住（updated_at 长期不动）：停更时长照常增长 → 命中；
- *  - 我方 poll loop 挂掉（DB 503 等）：停更时长同样随墙钟增长 → 命中（覆盖图 7 场景）；
- *  - 正常长视频：阈值远高于实测最长生成（~744s），不会误杀。
+ * 是否满足「转入持续后台生成」的 vendor 进度特征（running 且 updated_at 长期不变）。
+ * 仅用于 promoteVolcengineTasksToBackgroundGeneration，**不再**触发 FAILED。
  */
 export function isVolcengineVendorStuck(
   trace: VolcengineTimingTrace,

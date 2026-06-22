@@ -10,7 +10,8 @@ import {
   patchCanvasProjectNodeRuntimeFromTask,
   recoverCanvasVolcengineTimedOutTask,
 } from "@/lib/canvas/canvas-volcengine-recover";
-import { prisma } from "@/lib/prisma";
+import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-stall-recover";
+import { isRecoverableVolcengineStallFailCode } from "@/lib/gateway/video-background-generation";
 
 export type CanvasVideoRecoverAction =
   | "patched_runtime"
@@ -155,6 +156,15 @@ export async function recoverCanvasVideoTaskDisplay(
         }
       }
     }
+    if (
+      log?.status === "FAILED" &&
+      isRecoverableVolcengineStallFailCode(log.failCode)
+    ) {
+      const gw = await recoverVolcengineGatewayLogFromVendor(gatewayLogId);
+      if (gw.ok && gw.action === "succeeded") {
+        return recoverCanvasVideoTaskDisplay(task.id);
+      }
+    }
   }
 
   if (
@@ -167,6 +177,8 @@ export async function recoverCanvasVideoTaskDisplay(
       "timeout_gateway_sync",
       "timeout_no_gateway",
       "OSS_UPLOAD_FAILED",
+      "VOLCENGINE_GATEWAY_POLL_STALL",
+      "GATEWAY_TASK_FAILED",
     ].includes(task.failCode)
   ) {
     const r = await recoverCanvasVolcengineTimedOutTask(task.id);
@@ -281,7 +293,9 @@ export async function findCanvasVideoTasksNeedingRecovery(opts?: {
       (t.status === "SUBMITTED" && gatewayStatus === "SUCCEEDED") ||
       (t.status === "FAILED" &&
         t.failCode != null &&
-        t.failCode.startsWith("timeout")) ||
+        (t.failCode.startsWith("timeout") ||
+          t.failCode === "VOLCENGINE_GATEWAY_POLL_STALL" ||
+          t.failCode === "GATEWAY_TASK_FAILED")) ||
       (t.status === "SUCCEEDED" && media && !runtimeOk) ||
       (gatewayStatus === "SUCCEEDED" && !runtimeOk && !media);
 

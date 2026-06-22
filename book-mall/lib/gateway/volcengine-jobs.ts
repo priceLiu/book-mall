@@ -1,4 +1,8 @@
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
+import {
+  buildSubmitFailureFinalizePayload,
+  runGatewaySubmitWithRetry,
+} from "@/lib/gateway/gateway-submit-error-policy";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import { resolveVolcengineModelKey } from "@/lib/gateway/volcengine-chat-models";
 import {
@@ -36,12 +40,14 @@ export async function submitVolcengineVideoJobForLog(opts: {
   delete payload.prompt;
 
   try {
-    const { taskId, requestId } = await volcengineCreateVideoTask({
-      apiKey: resolveVolcengineArkApiKey(cred.apiKey),
-      baseUrl: cred.baseUrl,
-      model: opts.model,
-      body: payload,
-    });
+    const { taskId, requestId } = await runGatewaySubmitWithRetry(() =>
+      volcengineCreateVideoTask({
+        apiKey: resolveVolcengineArkApiKey(cred.apiKey),
+        baseUrl: cred.baseUrl,
+        model: opts.model,
+        body: payload,
+      }),
+    );
 
     const { prisma } = await import("@/lib/prisma");
     await prisma.gatewayRequestLog.update({
@@ -54,18 +60,8 @@ export async function submitVolcengineVideoJobForLog(opts: {
 
     return taskId;
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const requestId =
-      e instanceof Error
-        ? msg.match(/Request id:\s*([^\s]+)/i)?.[1]
-        : undefined;
-    await finalizeRequestLog(opts.logId, {
-      status: "FAILED",
-      durationMs: 0,
-      failMessage: msg.slice(0, 500),
-      failCode: "UPSTREAM_SUBMIT_FAILED",
-      vendorRequestId: requestId,
-    }).catch(() => undefined);
+    const finalizePayload = await buildSubmitFailureFinalizePayload(e);
+    await finalizeRequestLog(opts.logId, finalizePayload).catch(() => undefined);
     throw e;
   }
 }

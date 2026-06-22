@@ -1183,6 +1183,25 @@ async function pollOneSubmittedCanvasTask(
       }
     }
   } else if (gatewayLog?.status === "FAILED") {
+    const stallFail =
+      gatewayLog.failCode === "VOLCENGINE_GATEWAY_POLL_STALL" ||
+      (gatewayLog.failMessage?.includes("停更") ?? false);
+    if (stallFail && isCanvasVolcengineVideoTaskPayload(payload)) {
+      const recovered = await recoverCanvasVideoTaskDisplay(task.id);
+      await prisma.canvasGenerationTask.update({
+        where: { id: task.id },
+        data: { lastPolledAt: new Date(), pollCount: task.pollCount + 1 },
+      });
+      if (recovered.ok && recovered.action !== "failed") {
+        const after = await prisma.canvasGenerationTask.findUnique({
+          where: { id: task.id },
+          select: { status: true },
+        });
+        if (after?.status === "SUCCEEDED") return "succeeded";
+        if (after?.status === "FAILED") return "failed";
+      }
+      return "pending";
+    }
     await prisma.canvasGenerationTask.update({
       where: { id: task.id },
       data: {

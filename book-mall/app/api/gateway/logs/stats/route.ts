@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   fetchDashboardCategoryStats,
   fetchDashboardChartStats,
+  fetchDashboardFailCodeCounts,
   fetchDashboardModelStats,
   fetchDashboardStatsSummary,
   parseDashboardStatsParts,
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
     const needSummary = parts.has("summary");
     const needCategories = parts.has("categories");
     const needModels = parts.has("models");
+    const needFailCodes = parts.has("failCodes");
     const needCharts = needCategories || needModels;
 
     if (needSummary && needCharts) {
@@ -66,6 +68,12 @@ export async function GET(request: NextRequest) {
         const models = await fetchDashboardModelStats(where);
         payload.byModel = models.byModel;
       }
+    }
+
+    if (needFailCodes) {
+      const failStats = await fetchDashboardFailCodeCounts(where);
+      payload.failCodes = failStats.failCodes;
+      payload.failedTotal = failStats.failedTotal;
     }
 
     return NextResponse.json(payload);

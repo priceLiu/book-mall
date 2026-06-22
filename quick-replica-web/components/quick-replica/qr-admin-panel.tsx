@@ -5,7 +5,7 @@ import { ExternalLink, Settings2, X } from "lucide-react";
 
 import { QrModal } from "@/components/quick-replica/qr-modal";
 import { QR_CATEGORIES, QR_KINDS_BY_CATEGORY, type QrCategory, type QrTemplate } from "@/lib/qr-template-types";
-import { extractAdminFormFieldsFromTemplate, isMotionSyncKind } from "@/lib/qr-admin-form";
+import { extractAdminFormFieldsFromTemplate, isCharacterCatalogEdit, isMotionSyncKind } from "@/lib/qr-admin-form";
 import { QrAdminPreviewThumb } from "@/components/quick-replica/qr-admin-preview-thumb";
 import { resolveQrTemplatePreviewMedia } from "@/lib/qr-template-preview-media";
 
@@ -64,6 +64,19 @@ const EMPTY_FORM: FormState = {
   sortOrder: 0,
 };
 
+async function readJsonResponse(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!text.trim()) {
+    if (!res.ok) throw new Error(`请求失败 (${res.status})`);
+    return {};
+  }
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(`服务器响应异常 (${res.status})`);
+  }
+}
+
 async function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -112,6 +125,7 @@ export function QrAdminPanel({
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [formMessage, setFormMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -174,6 +188,7 @@ export function QrAdminPanel({
     });
     setFormOpen(true);
     setMessage(null);
+    setFormMessage(null);
   }
 
   function openEdit(row: AdminTemplateRow) {
@@ -198,6 +213,7 @@ export function QrAdminPanel({
     });
     setFormOpen(true);
     setMessage(null);
+    setFormMessage(null);
   }
 
   async function uploadMedia(
@@ -248,21 +264,33 @@ export function QrAdminPanel({
   async function saveForm() {
     setSaving(true);
     setMessage(null);
+    setFormMessage(null);
     try {
+      const characterEdit = isCharacterCatalogEdit(form);
+      const thumbnailUrl =
+        form.thumbnailUrl.trim() ||
+        form.mediaUrl.trim() ||
+        form.targetImageUrl.trim() ||
+        form.outputUrl.trim();
+      if (!thumbnailUrl) {
+        throw new Error(
+          characterEdit ? "缺少封面数据，请关闭后重新打开该条目" : "请先上传封面或媒体，再保存",
+        );
+      }
       const payload = {
         dbId: form.dbId,
         catalogBuiltinId: form.source === "builtin" ? form.catalogBuiltinId ?? form.id : null,
         category: form.category,
         kind: form.kind,
         toolKey: form.toolKey,
-        title: form.title,
-        thumbnailUrl: form.thumbnailUrl,
-        mediaUrl: form.mediaUrl || form.thumbnailUrl,
+        title: form.title.trim(),
+        thumbnailUrl,
+        mediaUrl: form.mediaUrl.trim() || thumbnailUrl,
         targetImageUrl: form.targetImageUrl,
         referenceVideoUrl: form.referenceVideoUrl,
         outputUrl: form.outputUrl || form.referenceVideoUrl || form.mediaUrl,
         modelKey: form.modelKey,
-        promptText: form.promptText,
+        promptText: form.promptText.trim(),
         sortOrder: form.sortOrder,
         source: form.source,
       };
@@ -275,14 +303,16 @@ export function QrAdminPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "保存失败");
+      const data = await readJsonResponse(res);
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "保存失败");
       setFormOpen(false);
       await load();
       onTemplatesChanged?.();
       setMessage("已保存，前台模板库与分类示例将同步更新");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "保存失败");
+      const text = e instanceof Error ? e.message : "保存失败";
+      setFormMessage(text);
+      setMessage(text);
     } finally {
       setSaving(false);
     }
@@ -534,8 +564,14 @@ export function QrAdminPanel({
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
+              {formMessage ? (
+                <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                  {formMessage}
+                </p>
+              ) : null}
               {(() => {
                 const motionSync = isMotionSyncKind(form.kind, form.toolKey);
+                const characterEdit = isCharacterCatalogEdit(form);
                 return (
                   <>
                     <label className="block space-y-1">
@@ -617,81 +653,93 @@ export function QrAdminPanel({
                         </label>
                       </>
                     ) : null}
-                    <label className="block space-y-1">
-                      <span className="text-xs text-[var(--qr-text-muted)]">
-                        {motionSync ? "列表封面 URL" : "封面 / 媒体 URL"}
-                      </span>
-                      <input
-                        className="qr-input w-full font-mono text-xs"
-                        value={form.thumbnailUrl}
-                        onChange={(e) => setForm((p) => ({ ...p, thumbnailUrl: e.target.value }))}
-                      />
-                    </label>
-                    {!motionSync ? (
-                      <label className="block space-y-1">
-                        <span className="text-xs text-[var(--qr-text-muted)]">媒体 URL（视频/参考图）</span>
-                        <input
-                          className="qr-input w-full font-mono text-xs"
-                          value={form.mediaUrl}
-                          onChange={(e) => setForm((p) => ({ ...p, mediaUrl: e.target.value }))}
-                        />
-                      </label>
-                    ) : null}
-                    <div className="flex flex-wrap gap-2">
-                      <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
-                        {uploading ? "上传中…" : "上传封面"}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) void uploadMedia(file, "thumbnail");
-                          }}
-                        />
-                      </label>
-                      {motionSync ? (
-                        <>
+                    {!characterEdit ? (
+                      <>
+                        <label className="block space-y-1">
+                          <span className="text-xs text-[var(--qr-text-muted)]">
+                            {motionSync ? "列表封面 URL" : "封面 / 媒体 URL"}
+                          </span>
+                          <input
+                            className="qr-input w-full font-mono text-xs"
+                            value={form.thumbnailUrl}
+                            onChange={(e) =>
+                              setForm((p) => ({ ...p, thumbnailUrl: e.target.value }))
+                            }
+                          />
+                        </label>
+                        {!motionSync ? (
+                          <label className="block space-y-1">
+                            <span className="text-xs text-[var(--qr-text-muted)]">
+                              媒体 URL（视频/参考图）
+                            </span>
+                            <input
+                              className="qr-input w-full font-mono text-xs"
+                              value={form.mediaUrl}
+                              onChange={(e) => setForm((p) => ({ ...p, mediaUrl: e.target.value }))}
+                            />
+                          </label>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
                           <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
-                            上传目标图
+                            {uploading ? "上传中…" : "上传封面"}
                             <input
                               type="file"
                               accept="image/*"
                               className="hidden"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) void uploadMedia(file, "targetImage");
+                                if (file) void uploadMedia(file, "thumbnail");
                               }}
                             />
                           </label>
-                          <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
-                            上传参考视频
-                            <input
-                              type="file"
-                              accept="video/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) void uploadMedia(file, "referenceVideo");
-                              }}
-                            />
-                          </label>
-                        </>
-                      ) : (
-                        <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
-                          上传媒体
-                          <input
-                            type="file"
-                            accept="image/*,video/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) void uploadMedia(file, "media");
-                            }}
-                          />
-                        </label>
-                      )}
-                    </div>
+                          {motionSync ? (
+                            <>
+                              <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
+                                上传目标图
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) void uploadMedia(file, "targetImage");
+                                  }}
+                                />
+                              </label>
+                              <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
+                                上传参考视频
+                                <input
+                                  type="file"
+                                  accept="video/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) void uploadMedia(file, "referenceVideo");
+                                  }}
+                                />
+                              </label>
+                            </>
+                          ) : (
+                            <label className="qr-btn-secondary cursor-pointer px-3 py-1.5 text-xs">
+                              上传媒体
+                              <input
+                                type="file"
+                                accept="image/*,video/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) void uploadMedia(file, "media");
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-xs text-[var(--qr-text-muted)]">
+                        角色条目保留原有封面，此处仅编辑标题与提示词。
+                      </p>
+                    )}
                   </>
                 );
               })()}

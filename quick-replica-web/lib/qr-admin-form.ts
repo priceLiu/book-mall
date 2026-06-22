@@ -4,6 +4,18 @@ export function isMotionSyncKind(kind: string, toolKey?: string): boolean {
   return kind === "motion-sync" || toolKey === "motion-sync";
 }
 
+/** 角色库编辑已有条目：只改标题/提示词，不展示封面 URL 与上传 */
+export function isCharacterCatalogEdit(form: {
+  category: string;
+  source: string;
+  dbId: string | null;
+  catalogBuiltinId: string | null;
+}): boolean {
+  if (form.category !== "character") return false;
+  if (form.source === "new" && !form.dbId && !form.catalogBuiltinId) return false;
+  return true;
+}
+
 export function extractAdminFormFieldsFromTemplate(t: {
   kind: string;
   toolKey?: string;

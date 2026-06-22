@@ -6,6 +6,10 @@ import {
 import { filterBuiltinsForKindBrowse } from "@/lib/quick-replica/qr-template-catalog";
 import { getKindDef, getKindsForCategory } from "@/lib/quick-replica/qr-kinds";
 import type { QrCategory, QrKindBrowseItem, QrTemplateJson } from "@/lib/quick-replica/qr-types";
+import {
+  applyCatalogOverridesToBuiltin,
+  loadCatalogOverrideMap,
+} from "@/lib/quick-replica/qr-template-admin-service";
 import { rowToJson } from "@/lib/quick-replica/qr-template-service";
 
 type QrTemplateRow = Parameters<typeof rowToJson>[0];
@@ -18,15 +22,6 @@ function firstTemplateByKind(rows: QrTemplateRow[]): Map<string, QrTemplateJson>
   return map;
 }
 
-function builtinFirstByKind(category: QrCategory, kindIds: string[]): Map<string, QrTemplateJson> {
-  const map = new Map<string, QrTemplateJson>();
-  for (const t of filterBuiltinsForKindBrowse(listBuiltinQrTemplates({ category }))) {
-    if (!kindIds.includes(t.kind)) continue;
-    if (!map.has(t.kind)) map.set(t.kind, t);
-  }
-  return map;
-}
-
 function resolveFeaturedFromMaps(args: {
   kind: string;
   featuredRow: { templateId: string; templateSource: string } | undefined;
@@ -34,11 +29,14 @@ function resolveFeaturedFromMaps(args: {
   builtinByKind: Map<string, QrTemplateJson>;
   publicByKind: Map<string, QrTemplateJson>;
   ownByKind: Map<string, QrTemplateJson>;
+  overrideMap: Map<string, QrTemplateJson>;
 }): QrTemplateJson | null {
   const row = args.featuredRow;
   if (row) {
     if (row.templateSource === "builtin") {
-      return getBuiltinQrTemplateById(row.templateId);
+      const builtin = getBuiltinQrTemplateById(row.templateId);
+      if (!builtin) return null;
+      return args.overrideMap.get(builtin.id) ?? builtin;
     }
     return args.userFeaturedById.get(row.templateId) ?? null;
   }
@@ -54,21 +52,28 @@ export async function resolveFeaturedTemplate(args: {
   kind: string;
   userId: string;
 }): Promise<QrTemplateJson | null> {
+  const overrideMap = await loadCatalogOverrideMap();
   const featured = await prisma.qrKindFeatured.findUnique({
     where: { kind: args.kind },
   });
   if (featured) {
     if (featured.templateSource === "builtin") {
-      return getBuiltinQrTemplateById(featured.templateId);
+      const builtin = getBuiltinQrTemplateById(featured.templateId);
+      if (builtin) return overrideMap.get(builtin.id) ?? builtin;
+    } else {
+      const row = await prisma.qrTemplate.findFirst({
+        where: { id: featured.templateId, deletedAt: null },
+      });
+      if (row) return rowToJson(row);
     }
-    const row = await prisma.qrTemplate.findFirst({
-      where: { id: featured.templateId, deletedAt: null },
-    });
-    if (row) return rowToJson(row);
   }
 
-  const builtin = filterBuiltinsForKindBrowse(listBuiltinQrTemplates({ kind: args.kind }))[0];
-  if (builtin) return builtin;
+  const builtinRaw = filterBuiltinsForKindBrowse(
+    listBuiltinQrTemplates({ kind: args.kind }),
+  )[0];
+  if (builtinRaw) {
+    return applyCatalogOverridesToBuiltin([builtinRaw], overrideMap)[0] ?? null;
+  }
 
   const publicRow = await prisma.qrTemplate.findFirst({
     where: { kind: args.kind, visibility: "public", deletedAt: null },
@@ -90,6 +95,8 @@ export async function listKindBrowseItems(
   const defs = getKindsForCategory(category);
   const kindIds = defs.map((d) => d.id);
   if (kindIds.length === 0) return [];
+
+  const overrideMap = await loadCatalogOverrideMap();
 
   const featuredRows = await prisma.qrKindFeatured.findMany({
     where: { kind: { in: kindIds } },
@@ -119,7 +126,14 @@ export async function listKindBrowseItems(
   const userFeaturedById = new Map(userFeaturedRows.map((r) => [r.id, rowToJson(r)]));
   const publicByKind = firstTemplateByKind(publicRows);
   const ownByKind = firstTemplateByKind(ownRows);
-  const builtinByKind = builtinFirstByKind(category, kindIds);
+  const builtinByKind = new Map<string, QrTemplateJson>();
+  for (const t of applyCatalogOverridesToBuiltin(
+    filterBuiltinsForKindBrowse(listBuiltinQrTemplates({ category })),
+    overrideMap,
+  )) {
+    if (!kindIds.includes(t.kind)) continue;
+    if (!builtinByKind.has(t.kind)) builtinByKind.set(t.kind, t);
+  }
 
   return defs.map((def) => ({
     kind: def.id,
@@ -134,6 +148,7 @@ export async function listKindBrowseItems(
       builtinByKind,
       publicByKind,
       ownByKind,
+      overrideMap,
     }),
   }));
 }

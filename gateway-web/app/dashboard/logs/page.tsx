@@ -21,15 +21,15 @@ export default async function DashboardLogsPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <div>
+    <div className="flex min-h-[calc(100dvh-7rem)] flex-col gap-4 md:min-h-[calc(100dvh-5rem)]">
+      <div className="shrink-0">
         <h1 className="text-xl font-semibold text-white">Logs</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          分页浏览 · 每页 20 / 50 / 100 或自定义 · 可按应用 / 厂商 / 模型 / 提交日期筛选 · 有进行中任务时每 8 秒自动刷新进度
+          分页浏览 · 每页 20 / 50 / 100 或自定义 · 可按应用 / 厂商 / 模型 / 提交日期筛选 · 有进行中任务时每 8 秒自动刷新进度 · 可收起筛选区以显示更多列表
         </p>
       </div>
 
-      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs leading-relaxed text-amber-100/90">
+      <div className="shrink-0 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs leading-relaxed text-amber-100/90">
         日志保留策略以站点配置为准。若 Canvas 复用了旧任务缓存，不会产生新日志——请点
         「重新生成」或修改 prompt 后再跑。新请求会记录完整 Params 与 Results 预览。
       </div>

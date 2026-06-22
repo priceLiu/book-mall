@@ -51,6 +51,7 @@ export async function qrCreateMotionSyncJob(
     prompt?: string;
     modelKey: string;
     mode?: string;
+    characterOrientation?: string;
   },
 ): Promise<{ logId: string; taskId: string; providerKind: GatewayProviderKind }> {
   const auth = await requireGatewayAuth(userId);
@@ -67,6 +68,7 @@ export async function qrCreateMotionSyncJob(
     imageUrls: [opts.targetImageUrl.trim()],
     videoUrls: [opts.referenceVideoUrl.trim()],
     mode: opts.mode,
+    characterOrientation: opts.characterOrientation,
   });
 
   const created = await gatewayV1CreateTask({
@@ -97,6 +99,7 @@ export async function qrCreateMotionSyncJob(
           prompt: opts.prompt ?? "",
           modelKey: opts.modelKey,
           mode: opts.mode ?? null,
+          characterOrientation: opts.characterOrientation ?? null,
         },
       },
     },
