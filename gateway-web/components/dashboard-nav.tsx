@@ -12,7 +12,13 @@ function isNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function DashboardNav({ items }: { items: NavItem[] }) {
+export function DashboardNav({
+  items,
+  onNavigate,
+}: {
+  items: NavItem[];
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
   return (
@@ -23,6 +29,7 @@ export function DashboardNav({ items }: { items: NavItem[] }) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={() => onNavigate?.()}
             aria-current={active ? "page" : undefined}
             className={`rounded-lg px-3 py-2 text-sm transition ${
               active

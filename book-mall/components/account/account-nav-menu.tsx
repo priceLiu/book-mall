@@ -3,12 +3,16 @@
 import { navigateBookMallFullSignOut } from "@/lib/session-kicked-marker";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
-import { Menu } from "@ark-ui/react/menu";
-import { Portal } from "@ark-ui/react/portal";
-import { ChevronDown, Menu as MenuIcon } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { Menu as MenuIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { maskPhone } from "@/lib/auth/phone";
 import {
@@ -40,10 +44,6 @@ function isSubscriptionAction(
 ): item is Extract<AccountNavMenuItem, { kind: "action" }> {
   return item.kind === "action" && item.accent === "subscription";
 }
-const triggerClass =
-  "inline-flex w-full min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-const dropdownContentClass =
-  "z-50 min-w-[15rem] rounded-lg border border-border bg-popover p-1 shadow-lg focus-visible:outline-hidden";
 
 type Profile = {
   image: string | null;
@@ -59,6 +59,7 @@ type NavRuntimeProps = {
   ecomReady: boolean;
   quickReplicaReady: boolean;
   onAction: (id: string) => void;
+  onNavigate?: () => void;
 };
 
 /** 侧栏常驻导航（不用 Ark Menu，避免 Positioner 撑满视口） */
@@ -71,6 +72,7 @@ function AccountSidebarNav({
   quickReplicaReady,
   onAction,
   appsMenuHint,
+  onNavigate,
 }: NavRuntimeProps & { appsMenuHint: string | null }) {
   function renderLink(item: AccountNavLinkItem) {
     const active = isAccountNavLinkActive(pathname, item.href, item.exact);
@@ -85,6 +87,7 @@ function AccountSidebarNav({
           target="_blank"
           rel="noopener noreferrer"
           className={className}
+          onClick={() => onNavigate?.()}
         >
           <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
           <span className="truncate">{item.label}</span>
@@ -98,6 +101,7 @@ function AccountSidebarNav({
         href={item.href}
         className={className}
         aria-current={active ? "page" : undefined}
+        onClick={() => onNavigate?.()}
       >
         <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
         <span className="truncate">{item.label}</span>
@@ -125,7 +129,10 @@ function AccountSidebarNav({
           disabled && "pointer-events-none opacity-50",
         )}
         disabled={disabled}
-        onClick={() => onAction(item.id)}
+        onClick={() => {
+          onNavigate?.();
+          void onAction(item.id);
+        }}
       >
         <Icon
           className={cn("h-4 w-4 shrink-0", subscriptionAction ? "opacity-95" : "opacity-70")}
@@ -158,87 +165,6 @@ function AccountSidebarNav({
   );
 }
 
-/** 移动端 Ark 下拉菜单 */
-function AccountDropdownNav(props: NavRuntimeProps) {
-  const { groups, pathname, canLaunchTools, canvasReady, ecomReady, quickReplicaReady, onAction } = props;
-
-  function renderLink(item: AccountNavLinkItem) {
-    const active = isAccountNavLinkActive(pathname, item.href, item.exact);
-    const Icon = item.icon;
-    const className = cn(itemClass, active && itemActiveClass);
-    const inner = (
-      <>
-        <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
-        <span>{item.label}</span>
-      </>
-    );
-
-    if (item.external || item.openInNewTab) {
-      return (
-        <Menu.Item key={item.href} value={item.href} className={className} closeOnSelect={false} asChild>
-          <a href={item.href} target="_blank" rel="noopener noreferrer">
-            {inner}
-          </a>
-        </Menu.Item>
-      );
-    }
-
-    return (
-      <Menu.Item key={item.href} value={item.href} className={className} closeOnSelect={false} asChild>
-        <Link href={item.href}>{inner}</Link>
-      </Menu.Item>
-    );
-  }
-
-  function renderItem(item: AccountNavMenuItem) {
-    if (item.kind === "link") return renderLink(item);
-    const Icon = item.icon;
-    const disabled =
-      (item.id === "launch-tools" && !canLaunchTools) ||
-      (item.id === "launch-canvas" && !canvasReady) ||
-      (item.id === "launch-ecom" && !ecomReady) ||
-      (item.id === "launch-quick-replica" && !quickReplicaReady);
-
-    const subscriptionAction = isSubscriptionAction(item);
-
-    return (
-      <Menu.Item
-        key={item.id}
-        value={item.id}
-        className={cn(
-          subscriptionAction ? signOutButtonClass : itemClass,
-          disabled && "pointer-events-none opacity-50",
-        )}
-        closeOnSelect={false}
-        onSelect={() => {
-          if (disabled) return;
-          onAction(item.id);
-        }}
-      >
-        <Icon
-          className={cn("h-4 w-4 shrink-0", subscriptionAction ? "opacity-95" : "opacity-70")}
-          aria-hidden
-        />
-        <span>{item.label}</span>
-      </Menu.Item>
-    );
-  }
-
-  return (
-    <>
-      {groups.map((group, index) => (
-        <Menu.ItemGroup key={group.id}>
-          <Menu.ItemGroupLabel className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            {group.label}
-          </Menu.ItemGroupLabel>
-          {group.items.map((item) => renderItem(item))}
-          {index < groups.length - 1 ? <Menu.Separator className={separatorClass} /> : null}
-        </Menu.ItemGroup>
-      ))}
-    </>
-  );
-}
-
 export function AccountNavMenu({
   profile,
   isAdmin,
@@ -268,11 +194,15 @@ export function AccountNavMenu({
   canLaunchQuickReplica: boolean;
   quickReplicaOriginConfigured: boolean;
   appsMenuHint: string | null;
-  placement?: "sidebar" | "header";
+  placement?: "sidebar" | "drawer";
 }) {
   const pathname = usePathname();
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   const initial = (
     profile.name?.[0] ||
@@ -351,6 +281,7 @@ export function AccountNavMenu({
     ecomReady,
     quickReplicaReady,
     onAction: (id) => void runAction(id),
+    onNavigate: () => setMobileOpen(false),
     appsMenuHint,
   };
 
@@ -384,37 +315,46 @@ export function AccountNavMenu({
   }
 
   return (
-    <div className="shrink-0">
-      <Menu.Root
-        open={mobileOpen}
-        onOpenChange={(details) => setMobileOpen(details.open)}
-        closeOnSelect={false}
-      >
-        <Menu.Trigger
-          className={cn(triggerClass, "h-9 w-auto px-3")}
-          aria-label="打开个人中心菜单"
-        >
-          <MenuIcon className="h-4 w-4 text-muted-foreground" aria-hidden />
-          <span>账户菜单</span>
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-              mobileOpen && "rotate-180",
-            )}
-            aria-hidden
-          />
-        </Menu.Trigger>
-        <Portal>
-          <Menu.Positioner className="z-[100]">
-            <Menu.Content className={dropdownContentClass}>
-              <AccountDropdownNav {...navProps} />
-            </Menu.Content>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
-      {actionMsg ? (
-        <p className="mt-2 text-xs text-destructive leading-relaxed">{actionMsg}</p>
-      ) : null}
-    </div>
+    <>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            aria-label="打开个人中心菜单"
+          >
+            <MenuIcon className="h-5 w-5" aria-hidden />
+          </button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-[15.5rem] max-w-[85vw] gap-0 p-0">
+          <SheetTitle className="sr-only">个人中心菜单</SheetTitle>
+          <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
+            <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5">
+              <Avatar className="h-9 w-9 shrink-0 border border-border">
+                {profile.image ? (
+                  <AvatarImage src={profile.image} alt="" referrerPolicy="no-referrer" />
+                ) : null}
+                <AvatarFallback className="text-xs font-medium">{initial}</AvatarFallback>
+              </Avatar>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{profileLabel}</span>
+                {phoneLabel ? (
+                  <span className="block truncate text-xs font-normal text-muted-foreground">
+                    {phoneLabel}
+                  </span>
+                ) : null}
+              </span>
+            </div>
+            <AccountSidebarNav
+              {...navProps}
+              onNavigate={() => setMobileOpen(false)}
+            />
+            {actionMsg ? (
+              <p className="mt-3 px-1 text-xs leading-relaxed text-destructive">{actionMsg}</p>
+            ) : null}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

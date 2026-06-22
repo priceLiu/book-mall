@@ -39,24 +39,102 @@ describe("log-volcengine-timing", () => {
 
     expect(breakdown.queueMs).toBe(0);
     expect(breakdown.generateMs).toBe(400_000);
-    expect(breakdown.pollDelayMs).toBe(3_000);
+    expect(breakdown.vendorPostProcessMs).toBe(3_000);
+    expect(breakdown.pollDelayMs).toBe(0);
     expect(breakdown.pollDelayOverLimit).toBe(false);
   });
 
-  it("flags poll delay over 10s on terminal log", () => {
+  it("flags poll delay over 10s on terminal log (true poll lag, not post-process)", () => {
     const submittedAtMs = 0;
-    const trace = mergeVolcengineTimingTrace(null, {
+    const vendorUpdatedAtMs = 100_000;
+    const firstSucceededAtMs = 110_000;
+    const completedAtMs = 125_000;
+    let trace = mergeVolcengineTimingTrace(null, {
+      status: "running",
+      raw: { created_at: 0, updated_at: vendorUpdatedAtMs / 1000 },
+      polledAtMs: vendorUpdatedAtMs + 1_000,
+    });
+    trace = mergeVolcengineTimingTrace(trace, {
       status: "succeeded",
-      raw: { created_at: 0, updated_at: 100 },
-      polledAtMs: 115_000,
+      raw: {
+        created_at: 0,
+        updated_at: vendorUpdatedAtMs / 1000,
+      },
+      polledAtMs: firstSucceededAtMs,
     });
     const breakdown = computeVolcengineTimingBreakdown({
       trace,
       submittedAtMs,
-      completedAtMs: 115_000,
+      completedAtMs,
     });
+    expect(breakdown.vendorPostProcessMs).toBe(10_000);
     expect(breakdown.pollDelayMs).toBe(15_000);
     expect(breakdown.pollDelayOverLimit).toBe(true);
+  });
+
+  it("Seedance: long post-process after updated_at jump, poll lag near zero", () => {
+    const submittedAtMs = 1_000_000;
+    const createdAtMs = submittedAtMs + 7_000;
+    const vendorUpdatedAtMs = createdAtMs + 484_000;
+    const firstSucceededAtMs = vendorUpdatedAtMs + 995_000;
+    const completedAtMs = firstSucceededAtMs + 1_000;
+
+    let trace = mergeVolcengineTimingTrace(null, {
+      status: "running",
+      raw: {
+        created_at: createdAtMs / 1000,
+        updated_at: createdAtMs / 1000,
+      },
+      polledAtMs: createdAtMs + 12_000,
+    });
+    trace = mergeVolcengineTimingTrace(trace, {
+      status: "running",
+      raw: {
+        created_at: createdAtMs / 1000,
+        updated_at: vendorUpdatedAtMs / 1000,
+      },
+      polledAtMs: vendorUpdatedAtMs + 2_000,
+    });
+    trace = mergeVolcengineTimingTrace(trace, {
+      status: "succeeded",
+      raw: {
+        created_at: createdAtMs / 1000,
+        updated_at: vendorUpdatedAtMs / 1000,
+      },
+      polledAtMs: firstSucceededAtMs,
+    });
+
+    const breakdown = computeVolcengineTimingBreakdown({
+      trace,
+      submittedAtMs,
+      completedAtMs,
+    });
+
+    expect(breakdown.generateMs).toBe(484_000);
+    expect(breakdown.vendorPostProcessMs).toBe(995_000);
+    expect(breakdown.pollDelayMs).toBe(1_000);
+    expect(breakdown.pollDelayOverLimit).toBe(false);
+  });
+
+  it("legacy terminal log without firstSucceededPolledAtMs falls back to lastPolledAtMs", () => {
+    const submittedAtMs = 0;
+    const vendorUpdatedAtMs = 100_000;
+    const completedAtMs = 115_000;
+    const trace: import("@/lib/gateway/log-volcengine-timing").VolcengineTimingTrace =
+      {
+        kind: "volcengine_timing",
+        lastStatus: "succeeded",
+        vendorCreatedAtMs: 0,
+        vendorUpdatedAtMs,
+        lastPolledAtMs: completedAtMs - 1_000,
+      };
+    const breakdown = computeVolcengineTimingBreakdown({
+      trace,
+      submittedAtMs,
+      completedAtMs,
+    });
+    expect(breakdown.vendorPostProcessMs).toBe(14_000);
+    expect(breakdown.pollDelayMs).toBe(1_000);
   });
 
   it("resolveVolcengineLogTiming returns null for non-volcengine video", () => {
@@ -137,8 +215,8 @@ describe("log-volcengine-timing", () => {
     expect(breakdown.pollDelayMs).toBe(60_000); // now − lastPolled
   });
 
-  it("terminal still splits generate vs poll delay via vendor updated_at", () => {
-    // 终态拆分逻辑不变：Generate = updated_at − created_at，Poll Δ = completed − updated_at。
+  it("terminal still splits generate / post-process / poll via vendor updated_at", () => {
+    // 终态：Generate = updated_at − created_at；PostProc = firstSucceeded − updated_at；Poll = completed − firstSucceeded
     const submittedAtMs = 1_000_000;
     const genStartMs = 1_000_000;
     const vendorUpdatedAtMs = genStartMs + 200_000;
@@ -160,7 +238,8 @@ describe("log-volcengine-timing", () => {
     });
 
     expect(breakdown.generateMs).toBe(200_000);
-    expect(breakdown.pollDelayMs).toBe(3_000);
+    expect(breakdown.vendorPostProcessMs).toBe(3_000);
+    expect(breakdown.pollDelayMs).toBe(0);
   });
 
   it("does not treat poll lag critical while vendor still running", () => {

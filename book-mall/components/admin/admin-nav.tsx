@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { ChevronDown, Menu as MenuIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,19 +14,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
 import { ToggleTheme } from "@/components/layout/toogle-theme";
-
+import {
+  ADMIN_TOP_LEVEL_LINKS,
+  adminNavGroupsForDesktop,
+  buildAdminNavGroups,
+  type AdminNavGroup,
+  type AdminNavLink,
+} from "@/lib/admin/admin-nav-config";
+import { cn } from "@/lib/utils";
 import { navigateBookMallFullSignOut } from "@/lib/session-kicked-marker";
 
-/** 见 navbar-sign-out-button.tsx 注释：直接走 full-signout 路由。 */
-function navigateToFullSignOut() {
-  navigateBookMallFullSignOut("/");
-}
-
-/** Ghost 顶栏按钮默认不显式前景色时，在深色/磨砂背景下可能被「吃掉」；与 `bg-card` 顶栏对齐为 card 前景色 */
 const ADMIN_NAV_GHOST =
   "h-9 px-2 text-sm font-normal text-card-foreground hover:bg-accent hover:text-accent-foreground";
+
+const SHEET_ITEM =
+  "flex w-full min-w-0 items-center rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted";
 
 export type AdminNavUserProps = {
   id: string;
@@ -32,6 +44,10 @@ export type AdminNavUserProps = {
   name: string | null;
   image: string | null;
 };
+
+function navigateToFullSignOut() {
+  navigateBookMallFullSignOut("/");
+}
 
 function avatarLooksAbsolute(url: string) {
   return /^https?:\/\//i.test(url.trim());
@@ -53,8 +69,7 @@ function AdminHeaderUser({ user }: { user: AdminNavUserProps }) {
   } else if (hasProfile) {
     secondary = `ID ${user.id.length > 22 ? `${user.id.slice(0, 20)}…` : user.id}`;
   }
-  const initial =
-    primary.length > 0 ? primary.charAt(0).toUpperCase() : "?";
+  const initial = primary.length > 0 ? primary.charAt(0).toUpperCase() : "?";
 
   return (
     <div
@@ -65,7 +80,7 @@ function AdminHeaderUser({ user }: { user: AdminNavUserProps }) {
         {img ? <AvatarImage src={img} alt="" referrerPolicy="no-referrer" /> : null}
         <AvatarFallback className="text-xs font-semibold text-card-foreground">{initial}</AvatarFallback>
       </Avatar>
-      <div className="min-w-0 flex-col leading-tight hidden sm:flex">
+      <div className="hidden min-w-0 flex-col leading-tight sm:flex">
         <span className="truncate text-sm font-medium text-card-foreground">{primary}</span>
         {secondary ? (
           <span className="truncate text-xs text-muted-foreground">{secondary}</span>
@@ -78,6 +93,156 @@ function AdminHeaderUser({ user }: { user: AdminNavUserProps }) {
   );
 }
 
+function NavLinkItem({
+  item,
+  active,
+  onNavigate,
+  className,
+}: {
+  item: AdminNavLink;
+  active?: boolean;
+  onNavigate?: () => void;
+  className?: string;
+}) {
+  const cls = cn(className, active && "bg-muted font-medium");
+
+  if (item.external) {
+    return (
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cls}
+        onClick={() => onNavigate?.()}
+      >
+        {item.label}
+      </a>
+    );
+  }
+
+  return (
+    <Link href={item.href} className={cls} aria-current={active ? "page" : undefined} onClick={() => onNavigate?.()}>
+      {item.label}
+    </Link>
+  );
+}
+
+function AdminNavDropdown({ group }: { group: AdminNavGroup }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} gap-1`}>
+          {group.label}
+          <ChevronDown className="h-4 w-4 opacity-70" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-[min(70vh,28rem)] w-56 overflow-y-auto">
+        <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {group.items.map((item) => (
+          <DropdownMenuItem key={`${group.id}-${item.href}-${item.label}`} asChild>
+            {item.external ? (
+              <a href={item.href} target="_blank" rel="noopener noreferrer">
+                {item.label}
+              </a>
+            ) : (
+              <Link href={item.href}>{item.label}</Link>
+            )}
+          </DropdownMenuItem>
+        ))}
+        {group.id === "finance" ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>对外公示</DropdownMenuLabel>
+            <DropdownMenuItem asChild>
+              <Link href="/pricing" target="_blank" rel="noopener noreferrer">
+                对外报价页（积分）
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/pricing-disclosure" target="_blank" rel="noopener noreferrer">
+                平台价目表（前台）
+              </Link>
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function AdminNavSheet({
+  groups,
+  pathname,
+  financeWebOrigin,
+}: {
+  groups: AdminNavGroup[];
+  pathname: string;
+  financeWebOrigin: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex shrink-0 items-center justify-center rounded-lg p-2 text-card-foreground transition-colors hover:bg-accent md:hidden"
+          aria-label="打开管理菜单"
+        >
+          <MenuIcon className="h-5 w-5" />
+        </button>
+      </SheetTrigger>
+      <SheetContent side="left" className="w-[17rem] max-w-[85vw] gap-0 overflow-y-auto p-0">
+        <SheetTitle className="sr-only">管理后台菜单</SheetTitle>
+        <div className="border-b border-border px-4 py-3">
+          <p className="text-sm font-semibold">管理后台</p>
+          {!financeWebOrigin ? (
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              未配置财务控制台域名时，部分链接走 Book 内重定向页。
+            </p>
+          ) : null}
+        </div>
+        <nav className="space-y-4 px-3 py-4" aria-label="管理后台导航">
+          {ADMIN_TOP_LEVEL_LINKS.map((link) => {
+            const active = link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href);
+            return (
+              <NavLinkItem
+                key={link.href}
+                item={link}
+                active={active}
+                onNavigate={() => setOpen(false)}
+                className={SHEET_ITEM}
+              />
+            );
+          })}
+          {groups.map((group) => (
+            <div key={group.id}>
+              <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => (
+                  <NavLinkItem
+                    key={`${group.id}-${item.href}-${item.label}`}
+                    item={item}
+                    onNavigate={() => setOpen(false)}
+                    className={SHEET_ITEM}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export function AdminNav({
   user,
   toolsSsoReady,
@@ -87,233 +252,25 @@ export function AdminNav({
   user: AdminNavUserProps;
   toolsSsoReady: boolean;
   toolsSsoIssues: string[];
-  /** 由服务端 layout 注入；勿在 client 读 NEXT_PUBLIC_*（构建时内联，运行时改 env 不生效） */
   financeWebOrigin: string | null;
 }) {
+  const pathname = usePathname();
+  const desktopGroups = adminNavGroupsForDesktop(financeWebOrigin);
+  const allGroups = buildAdminNavGroups(financeWebOrigin);
 
   return (
-    <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-2 text-card-foreground">
-      <div className="flex flex-wrap items-center gap-1">
-        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
-          <Link href="/admin">概览</Link>
-        </Button>
+    <nav className="flex min-w-0 flex-1 items-center gap-x-1 gap-y-2 text-card-foreground">
+      <AdminNavSheet groups={allGroups} pathname={pathname} financeWebOrigin={financeWebOrigin} />
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} gap-1`}>
-              计费与资金
-              <ChevronDown className="h-4 w-4 opacity-70" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuLabel>计费与资金</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/admin/payments">支付核对</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/billing">订阅与充值</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/recharges">充值明细</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/promo-templates">充值优惠模板</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/refunds">提现审核</Link>
-            </DropdownMenuItem>
-            {financeWebOrigin ? (
-              <DropdownMenuItem asChild>
-                <a href={`${financeWebOrigin}/admin/usage-overview`} target="_blank" rel="noopener noreferrer">
-                  费用多维度概览（财务控制台）
-                </a>
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem asChild>
-                <Link href="/admin/finance/usage-overview">费用多维度概览</Link>
-              </DropdownMenuItem>
-            )}
-            {financeWebOrigin ? (
-              <DropdownMenuItem asChild>
-                <a href={`${financeWebOrigin}/admin/reconciliation`} target="_blank" rel="noopener noreferrer">
-                  云账单对账（财务控制台）
-                </a>
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem asChild>
-                <Link href="/admin/finance/reconciliation">云账单对账</Link>
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/pricing-templates">计费模板与公式</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel>积分计费（统一）</DropdownMenuLabel>
-            {financeWebOrigin ? (
-              <>
-                <DropdownMenuItem asChild>
-                  <a href={`${financeWebOrigin}/admin/model-cost`} target="_blank" rel="noopener noreferrer">
-                    模型成本与折扣（财务控制台）
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={`${financeWebOrigin}/admin/credit-pricing`} target="_blank" rel="noopener noreferrer">
-                    积分报价计算器（财务控制台）
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={`${financeWebOrigin}/admin/membership-plans`} target="_blank" rel="noopener noreferrer">
-                    会员套餐与席位（财务控制台）
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={`${financeWebOrigin}/admin/byok`} target="_blank" rel="noopener noreferrer">
-                    BYOK 服务费与资源（财务控制台）
-                  </a>
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/finance/model-cost">模型成本与折扣</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/finance/credit-pricing">积分报价计算器</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/finance/membership-plans">会员套餐与席位</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/finance/byok">BYOK 服务费与资源</Link>
-                </DropdownMenuItem>
-              </>
-            )}
-            {financeWebOrigin ? (
-              <>
-                <DropdownMenuItem asChild>
-                  <a href={`${financeWebOrigin}/admin/plan-change`} target="_blank" rel="noopener noreferrer">
-                    调价测算与审批（财务控制台）
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={`${financeWebOrigin}/admin/pnl-alerts`} target="_blank" rel="noopener noreferrer">
-                    盈亏预警中心（财务控制台）
-                  </a>
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/finance/plan-change">调价测算与审批</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/finance/pnl-alerts">盈亏预警中心</Link>
-                </DropdownMenuItem>
-              </>
-            )}
-            <DropdownMenuItem asChild>
-              <Link href="/pricing" target="_blank" rel="noopener noreferrer">
-                对外报价页（积分）
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/pricing-disclosure" target="_blank" rel="noopener noreferrer">
-                平台价目表（前台公示）
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/cloud-pricing">价目导入版本</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/finance/model-calibration">模型校准（按厂商）</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {financeWebOrigin ? (
-              <DropdownMenuItem asChild>
-                <a
-                  href={`${financeWebOrigin}/admin/billing/users`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  账单明细（按用户）
-                </a>
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem disabled className="text-muted-foreground">
-                账单明细（未配置 NEXT_PUBLIC_FINANCE_WEB_ORIGIN）
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} gap-1`}>
-              产品与内容
-              <ChevronDown className="h-4 w-4 opacity-70" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuLabel>产品与内容</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/admin/categories">产品分类</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/products">产品管理</Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
-          <Link href="/admin/users">用户</Link>
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} gap-1`}>
-              工具应用管理
-              <ChevronDown className="h-4 w-4 opacity-70" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuLabel>工具应用管理</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/admin/tool-apps/tool-menu">工具菜单</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/sso-clients">Platform SSO 客户端</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/gateway/platform">Gateway 平台凭证池</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/tool-service-fee">工具技术服务费</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/tool-apps/manage">工具管理</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/tool-libraries">资源库（图/视频）</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/quick-replica/templates">快速复制模板</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/tool-usage">工具使用明细与费用</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/tools-sso-test">工具站跳转测试</Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
-          <Link href="/admin/security">账号安全</Link>
-        </Button>
+      <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-1 md:flex">
+        {ADMIN_TOP_LEVEL_LINKS.map((link) => (
+          <Button key={link.href} variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
+            <Link href={link.href}>{link.label}</Link>
+          </Button>
+        ))}
+        {desktopGroups.map((group) => (
+          <AdminNavDropdown key={group.id} group={group} />
+        ))}
       </div>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -321,10 +278,7 @@ export function AdminNav({
 
         <span className="mx-0.5 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
 
-        <AdminToolsStationEntry
-          toolsSsoReady={toolsSsoReady}
-          toolsSsoIssues={toolsSsoIssues}
-        />
+        <AdminToolsStationEntry toolsSsoReady={toolsSsoReady} toolsSsoIssues={toolsSsoIssues} />
 
         <span className="mx-1 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
 
@@ -332,11 +286,11 @@ export function AdminNav({
 
         <span className="mx-1 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
 
-        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
+        <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} hidden sm:inline-flex`} asChild>
           <Link href="/account">个人中心</Link>
         </Button>
 
-        <Button variant="ghost" size="sm" className={ADMIN_NAV_GHOST} asChild>
+        <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} hidden sm:inline-flex`} asChild>
           <Link href="/">回前台</Link>
         </Button>
 
@@ -344,7 +298,7 @@ export function AdminNav({
           type="button"
           variant="ghost"
           size="sm"
-          className={ADMIN_NAV_GHOST}
+          className={`${ADMIN_NAV_GHOST} hidden sm:inline-flex`}
           onClick={navigateToFullSignOut}
         >
           退出

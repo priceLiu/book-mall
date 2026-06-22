@@ -10,6 +10,7 @@ type TaskTiming = {
   durationMs: number | null;
   queueMs: number | null;
   generateMs: number | null;
+  vendorPostProcessMs: number | null;
   pollDelayMs: number | null;
   pollDelayOverLimit: boolean;
   sumDeltaMs: number | null;
@@ -459,7 +460,8 @@ export function I2vLoadTestClient() {
                   <th className="px-3 py-2.5 font-medium">总耗时</th>
                   <th className="px-3 py-2.5 font-medium">排队</th>
                   <th className="px-3 py-2.5 font-medium">厂商生成</th>
-                  <th className="px-3 py-2.5 font-medium">轮询延迟</th>
+                  <th className="px-3 py-2.5 font-medium">后处理</th>
+                  <th className="px-3 py-2.5 font-medium">Poll Δ</th>
                   <th className="px-3 py-2.5 font-medium">和校验</th>
                   <th className="px-3 py-2.5 font-medium">poll</th>
                   <th className="px-3 py-2.5 font-medium">厂商任务ID</th>
@@ -486,6 +488,9 @@ export function I2vLoadTestClient() {
                     </td>
                     <td className="px-3 py-2 tabular-nums text-emerald-200/90">
                       {ms(t.timing.generateMs)}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-sky-200/90">
+                      {ms(t.timing.vendorPostProcessMs)}
                     </td>
                     <td
                       className={`px-3 py-2 tabular-nums ${

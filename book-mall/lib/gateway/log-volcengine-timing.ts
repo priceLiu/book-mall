@@ -3,7 +3,8 @@
  *
  * - 排队：Gateway submittedAt → 厂商 created_at（无则回退首次 poll 观测 running）
  * - 生成（进行中）：墙钟 now − genStart
- * - 轮询延迟（终态）：Gateway completedAt − vendor updated_at
+ * - 后处理（终态）：首次观测 succeeded − vendor updated_at（Seedance 常见 status 仍 running）
+ * - 轮询延迟 Poll Δ（终态）：Gateway completedAt − 首次观测 succeeded
  */
 
 export const GATEWAY_POLL_DELAY_LIMIT_MS = 10_000;
@@ -42,6 +43,8 @@ export type VolcengineTimingTrace = {
   firstQueuedAtMs?: number;
   firstRunningAtMs?: number;
   vendorSucceededAtMs?: number;
+  /** 首次 poll 观测到厂商 succeeded/completed 的墙钟时刻 */
+  firstSucceededPolledAtMs?: number;
   lastStatus?: string;
   lastPolledAtMs?: number;
 };
@@ -49,6 +52,8 @@ export type VolcengineTimingTrace = {
 export type VolcengineTimingBreakdown = {
   queueMs: number | null;
   generateMs: number | null;
+  /** 终态：厂商 updated_at 跳变后至首次 succeeded 的后处理/状态滞后（进行中为 null） */
+  vendorPostProcessMs: number | null;
   pollDelayMs: number | null;
   pollDelayOverLimit: boolean;
 };
@@ -166,6 +171,9 @@ export function mergeVolcengineTimingTrace(
     status === "completed" ||
     status === "success"
   ) {
+    if (trace.firstSucceededPolledAtMs == null) {
+      trace.firstSucceededPolledAtMs = now;
+    }
     trace.vendorSucceededAtMs = updatedAtMs ?? now;
     if (updatedAtMs != null) trace.vendorUpdatedAtMs = updatedAtMs;
     if (trace.firstRunningAtMs == null && updatedAtMs != null) {
@@ -180,6 +188,25 @@ export function volcengineTimingGenStartMs(
   trace: VolcengineTimingTrace,
 ): number | null {
   return trace.vendorCreatedAtMs ?? trace.firstRunningAtMs ?? null;
+}
+
+function isVendorTerminalStatus(status: string | undefined): boolean {
+  const s = normalizeStatus(status);
+  return s === "succeeded" || s === "completed" || s === "success";
+}
+
+/** 终态拆分用：首次观测 succeeded 的墙钟（旧日志回退 lastPolledAtMs） */
+export function resolveFirstSucceededPolledAtMs(
+  trace: VolcengineTimingTrace,
+  completedAtMs: number,
+): number | null {
+  if (trace.firstSucceededPolledAtMs != null) {
+    return trace.firstSucceededPolledAtMs;
+  }
+  if (isVendorTerminalStatus(trace.lastStatus)) {
+    return trace.lastPolledAtMs ?? completedAtMs;
+  }
+  return null;
 }
 
 /** 连续两次 poll 回包相同 updated_at（仅用于诊断，进行中 Generate 仍走墙钟） */
@@ -229,6 +256,7 @@ export function computeVolcengineTimingBreakdown(input: {
   }
 
   let generateMs: number | null = null;
+  let vendorPostProcessMs: number | null = null;
   let pollDelayMs: number | null = null;
 
   if (!isTerminal) {
@@ -247,19 +275,50 @@ export function computeVolcengineTimingBreakdown(input: {
     }
     const lastPolled = trace.lastPolledAtMs;
     pollDelayMs = lastPolled != null ? Math.max(0, now - lastPolled) : 0;
+    // 进行中：updated_at 已跳离 created_at 但 status 仍 running → 实时后处理墙钟
+    if (
+      vendorUpdated != null &&
+      vendorCreated != null &&
+      vendorUpdated > vendorCreated &&
+      (st === "running" || st === "processing")
+    ) {
+      generateMs = Math.max(0, vendorUpdated - (genStart ?? vendorCreated));
+      vendorPostProcessMs = Math.max(0, now - vendorUpdated);
+    }
   } else if (vendorCreated != null && vendorUpdated != null) {
     generateMs = Math.max(0, vendorUpdated - vendorCreated);
     if (input.completedAtMs != null) {
-      pollDelayMs = Math.max(0, input.completedAtMs - vendorUpdated);
+      const firstSucceeded = resolveFirstSucceededPolledAtMs(
+        trace,
+        input.completedAtMs,
+      );
+      if (firstSucceeded != null) {
+        vendorPostProcessMs = Math.max(0, firstSucceeded - vendorUpdated);
+        pollDelayMs = Math.max(0, input.completedAtMs - firstSucceeded);
+      } else {
+        // 无 succeeded 观测：整段归入后处理，Poll 置 0
+        vendorPostProcessMs = Math.max(0, input.completedAtMs - vendorUpdated);
+        pollDelayMs = 0;
+      }
     }
   } else if (firstRunning != null && vendorUpdated != null) {
     generateMs = Math.max(0, vendorUpdated - firstRunning);
     if (input.completedAtMs != null) {
-      pollDelayMs = Math.max(0, input.completedAtMs - vendorUpdated);
+      const firstSucceeded = resolveFirstSucceededPolledAtMs(
+        trace,
+        input.completedAtMs,
+      );
+      if (firstSucceeded != null) {
+        vendorPostProcessMs = Math.max(0, firstSucceeded - vendorUpdated);
+        pollDelayMs = Math.max(0, input.completedAtMs - firstSucceeded);
+      } else {
+        vendorPostProcessMs = Math.max(0, input.completedAtMs - vendorUpdated);
+        pollDelayMs = 0;
+      }
     }
   }
 
-  // 终态：Poll Δ = 厂商完成 → 我方记录完成的滞后，>10s 即异常。
+  // 终态：Poll Δ = 首次 succeeded → Gateway completedAt，>10s 即异常。
   // 生成中：Poll Δ = 我方轮询间隔，正常可达数十秒，仅当超过轮询中断阈值（2min）
   // 才视为我方轮询停摆（卡死信号），避免正常长视频频繁误报。
   const pollLimit = isTerminal
@@ -268,6 +327,7 @@ export function computeVolcengineTimingBreakdown(input: {
   return {
     queueMs,
     generateMs,
+    vendorPostProcessMs,
     pollDelayMs,
     pollDelayOverLimit: pollDelayMs != null && pollDelayMs > pollLimit,
   };
@@ -322,8 +382,8 @@ export function resolveVolcengineLogTiming(input: {
     nowMs: input.nowMs,
   });
 
-  if (!input.completedAt) return live;
-  return stored ?? live;
+  // 有 trace 时始终 live 重算（旧 stored 无 vendorPostProcessMs，可借 lastPolledAt 回退拆分）
+  return live;
 }
 
 /** queued 阶段 updated_at 长期停更 */

@@ -10,6 +10,7 @@ import {
   type GatewayLogActorDisplay,
 } from "@/lib/gateway/log-dashboard-actor";
 import { resolveGatewayLogAppTaskLinks } from "@/lib/gateway/log-app-task-link";
+import { resolveGatewayLogDisplayModelKey } from "@/lib/gateway/gateway-log-display-model";
 import { resolveVolcengineLogTiming } from "@/lib/gateway/log-volcengine-timing";
 import {
   computeLogTotalPages,
@@ -108,12 +109,17 @@ export async function GET(request: NextRequest) {
         status: l.status,
         failCode,
         failMessage: l.failMessage,
-        model: l.canonicalModelKey ?? l.model,
+        model: resolveGatewayLogDisplayModelKey({
+          model: l.model,
+          canonicalModelKey: l.canonicalModelKey,
+          inputSummary: l.inputSummary,
+        }),
         billingCategory: category,
         billingCategoryLabel: billingCategoryLabel(category),
         durationMs: l.durationMs,
         queueMs: timing?.queueMs ?? null,
         generateMs: timing?.generateMs ?? null,
+        vendorPostProcessMs: timing?.vendorPostProcessMs ?? null,
         pollDelayMs: timing?.pollDelayMs ?? null,
         clientSource: l.clientSource,
         clientPage: l.clientPage,
@@ -140,6 +146,7 @@ export async function GET(request: NextRequest) {
         "durationMs",
         "queueMs",
         "generateMs",
+        "vendorPostProcessMs",
         "pollDelayMs",
         "actorPhone",
         "actorName",
@@ -159,6 +166,7 @@ export async function GET(request: NextRequest) {
         r.durationMs ?? "",
         r.queueMs ?? "",
         r.generateMs ?? "",
+        r.vendorPostProcessMs ?? "",
         r.pollDelayMs ?? "",
         r.actorPhone ?? "",
         r.actorName ?? "",

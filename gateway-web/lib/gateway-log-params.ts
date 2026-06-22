@@ -16,6 +16,8 @@ export type LogInputImageItem = {
   url: string;
   /** 厂商角色：reference_image / first_frame / reference 等 */
   role?: string;
+  /** false = asset:// 等人像库引用，浏览器无法直接预览 */
+  previewable?: boolean;
 };
 
 const PREVIEW_MAX_CHARS = 220;
@@ -66,6 +68,67 @@ function isHttpUrl(value: unknown): value is string {
   return typeof value === "string" && /^https?:\/\//.test(value.trim());
 }
 
+function isLogImageRef(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const t = value.trim();
+  return /^https?:\/\//.test(t) || t.startsWith("asset://");
+}
+
+function readSbv1ImageHint(inputSummary: unknown): number | null {
+  if (!inputSummary || typeof inputSummary !== "object") return null;
+  const root = inputSummary as Record<string, unknown>;
+  const input =
+    root.input && typeof root.input === "object" && !Array.isArray(root.input)
+      ? (root.input as Record<string, unknown>)
+      : root;
+  const billing =
+    (root.sbv1Billing && typeof root.sbv1Billing === "object"
+      ? root.sbv1Billing
+      : input.sbv1Billing) ?? null;
+  if (!billing || typeof billing !== "object" || Array.isArray(billing)) return null;
+  const b = billing as Record<string, unknown>;
+  const imageInputCount =
+    typeof b.imageInputCount === "number" && b.imageInputCount > 0
+      ? b.imageInputCount
+      : 0;
+  const referenceImageCount =
+    typeof b.referenceImageCount === "number" && b.referenceImageCount > 0
+      ? b.referenceImageCount
+      : 0;
+  const total = imageInputCount + referenceImageCount;
+  return total > 0 ? total : null;
+}
+
+/** sbv1 等人像库参考：无 https 图时展示计数提示 */
+export function readLogInputImageHint(inputSummary: unknown): number | null {
+  return readSbv1ImageHint(inputSummary);
+}
+
+function extractContentImages(
+  content: unknown,
+  seen: Set<string>,
+  push: (url: string, label: string, role?: string) => void,
+) {
+  if (!Array.isArray(content)) return;
+  let imgIdx = 0;
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue;
+    const b = block as Record<string, unknown>;
+    if (b.type !== "image_url") continue;
+    const imageUrl = b.image_url;
+    const url =
+      imageUrl && typeof imageUrl === "object"
+        ? (imageUrl as Record<string, unknown>).url
+        : typeof imageUrl === "string"
+          ? imageUrl
+          : undefined;
+    if (!isLogImageRef(url)) continue;
+    imgIdx += 1;
+    const role = typeof b.role === "string" ? b.role : undefined;
+    push(url, imageLabel(imgIdx, role), role);
+  }
+}
+
 function imageLabel(index: number, role?: string): string {
   const base = `Image ${index}`;
   if (role === "first_frame") return `${base} · first_frame`;
@@ -76,22 +139,51 @@ function imageLabel(index: number, role?: string): string {
 
 /** 从 Params inputSummary 提取请求侧参考图（顺序与 API 数组一致） */
 export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[] {
-  const { input } = parseInputSummary(inputSummary);
+  const { model: _model, input } = parseInputSummary(inputSummary);
+  const root =
+    inputSummary && typeof inputSummary === "object" && !Array.isArray(inputSummary)
+      ? (inputSummary as Record<string, unknown>)
+      : {};
   const items: LogInputImageItem[] = [];
   const seen = new Set<string>();
 
   const push = (url: string, label: string, role?: string) => {
     const u = url.trim();
-    if (!isHttpUrl(u) || seen.has(u)) return;
+    if (!isLogImageRef(u) || seen.has(u)) return;
     seen.add(u);
-    items.push({ label, url: u, role });
+    items.push({
+      label,
+      url: u,
+      role,
+      previewable: isHttpUrl(u),
+    });
   };
+
+  if (isLogImageRef(input.mainFrameImageUrl)) {
+    push(String(input.mainFrameImageUrl), imageLabel(1, "first_frame"), "first_frame");
+  }
+  if (isLogImageRef(input.lastFrameImageUrl)) {
+    push(String(input.lastFrameImageUrl), imageLabel(items.length || 1, "last_frame"), "last_frame");
+  }
+  if (isLogImageRef(input.lastFrameUrl)) {
+    push(String(input.lastFrameUrl), imageLabel(items.length || 1, "last_frame"), "last_frame");
+  }
 
   if (Array.isArray(input.referenceImageUrls)) {
     let idx = 1;
     for (const u of input.referenceImageUrls) {
-      if (isHttpUrl(u)) {
+      if (isLogImageRef(u)) {
         push(u, imageLabel(idx, "reference"), "reference");
+        idx += 1;
+      }
+    }
+  }
+
+  if (Array.isArray(input.imageUrls)) {
+    let idx = items.length + 1;
+    for (const u of input.imageUrls) {
+      if (isLogImageRef(u)) {
+        push(u, imageLabel(idx), "image");
         idx += 1;
       }
     }
@@ -100,14 +192,14 @@ export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[
   if (Array.isArray(input.reference_urls)) {
     let idx = items.length + 1;
     for (const u of input.reference_urls) {
-      if (isHttpUrl(u)) {
+      if (isLogImageRef(u)) {
         push(u, imageLabel(idx, "reference"), "reference");
         idx += 1;
       }
     }
   }
 
-  if (isHttpUrl(input.imageUrl)) {
+  if (isLogImageRef(input.imageUrl)) {
     const role =
       input.kind === "virtual" || input.kind === "real"
         ? String(input.kind)
@@ -118,16 +210,16 @@ export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[
         : input.kind === "real"
           ? "入库原图 · 真人人像"
           : imageLabel(1, "image");
-    push(input.imageUrl, label, role);
+    push(String(input.imageUrl), label, role);
   }
-  if (isHttpUrl(input.image_url)) {
-    push(input.image_url, imageLabel(items.length || 1, "image"), "image");
+  if (isLogImageRef(input.image_url)) {
+    push(String(input.image_url), imageLabel(items.length || 1, "image"), "image");
   }
 
   if (Array.isArray(input.image_urls)) {
     let idx = items.length + 1;
     for (const u of input.image_urls) {
-      if (isHttpUrl(u)) {
+      if (isLogImageRef(u)) {
         push(u, imageLabel(idx), "image");
         idx += 1;
       }
@@ -140,30 +232,17 @@ export function extractLogInputImages(inputSummary: unknown): LogInputImageItem[
       if (!row || typeof row !== "object") continue;
       const url = (row as Record<string, unknown>).url;
       const type = (row as Record<string, unknown>).type;
-      if (isHttpUrl(url)) {
+      if (isLogImageRef(url)) {
         const role = typeof type === "string" ? type : "media";
-        push(url, imageLabel(idx, role), role);
+        push(String(url), imageLabel(idx, role), role);
         idx += 1;
       }
     }
   }
 
-  if (Array.isArray(input.content)) {
-    let imgIdx = 0;
-    for (const block of input.content) {
-      if (!block || typeof block !== "object") continue;
-      const b = block as Record<string, unknown>;
-      if (b.type !== "image_url") continue;
-      const imageUrl = b.image_url;
-      const url =
-        imageUrl && typeof imageUrl === "object"
-          ? (imageUrl as Record<string, unknown>).url
-          : undefined;
-      if (!isHttpUrl(url)) continue;
-      imgIdx += 1;
-      const role = typeof b.role === "string" ? b.role : undefined;
-      push(url, imageLabel(imgIdx, role), role);
-    }
+  extractContentImages(input.content, seen, push);
+  if (root.content && root.content !== input.content) {
+    extractContentImages(root.content, seen, push);
   }
 
   const nestedInput = input.input;
@@ -371,6 +450,12 @@ export function formatDurationSeconds(durationMs: number | null): string {
   return `${Math.round(durationMs / 1000)}s`;
 }
 
+/** 日志 status 是否进行中（兼容大小写） */
+export function isLogInProgress(status: string): boolean {
+  const s = status.trim().toUpperCase();
+  return s === "RUNNING" || s === "PENDING";
+}
+
 /** 优先用 durationMs（>0）；0 视为未写入，回退 completedAt - submittedAt；进行中可回退 now - submittedAt */
 export function resolveLogDurationMs(
   durationMs: number | null,
@@ -389,6 +474,48 @@ export function resolveLogDurationMs(
   return ms >= 0 ? ms : null;
 }
 
+/**
+ * 日志表 Duration 列。
+ * 进行中：优先 live 拆分总耗时 / 墙钟递增，忽略 DB 里仅 poll 时写入的 durationMs；
+ * 终态：用已落库的 durationMs 或 completedAt − submittedAt。
+ */
+export function resolveLogDisplayDurationMs(input: {
+  durationMs: number | null;
+  submittedAt: string;
+  completedAt: string | null;
+  isInProgress: boolean;
+  nowMs: number | null;
+  queueMs?: number | null;
+  generateMs?: number | null;
+  vendorPostProcessMs?: number | null;
+  pollDelayMs?: number | null;
+  /** liveVolcengineVideoTiming.totalMs 或 resolveLiveLogPhaseTiming.totalMs */
+  liveTotalMs?: number | null;
+}): number | null {
+  if (input.isInProgress) {
+    if (input.liveTotalMs != null && input.liveTotalMs > 0) {
+      return input.liveTotalMs;
+    }
+    if (input.nowMs != null) {
+      const wall = input.nowMs - new Date(input.submittedAt).getTime();
+      if (wall >= 0) return wall;
+    }
+    const phaseSum =
+      Math.max(0, input.queueMs ?? 0) +
+      Math.max(0, input.generateMs ?? 0) +
+      Math.max(0, input.vendorPostProcessMs ?? 0) +
+      Math.max(0, input.pollDelayMs ?? 0);
+    if (phaseSum > 0) return phaseSum;
+    return null;
+  }
+
+  return resolveLogDurationMs(
+    input.durationMs,
+    input.submittedAt,
+    input.completedAt,
+  );
+}
+
 /** 进行中任务 · 从 resultSummary 解析厂商进度文案 */
 export function pickLogProgressLabel(
   status: string,
@@ -397,14 +524,14 @@ export function pickLogProgressLabel(
   const normalized = status.toUpperCase();
   if (normalized !== "RUNNING" && normalized !== "PENDING") return null;
   if (!resultSummary || typeof resultSummary !== "object") {
-    return normalized === "PENDING" ? "pending" : "running";
+    return null;
   }
   const obj = resultSummary as Record<string, unknown>;
   if (obj.kind === "task_progress") {
     const vendor = typeof obj.status === "string" ? obj.status.trim() : "";
     const detail = typeof obj.detail === "string" ? obj.detail.trim() : "";
     if (vendor && detail) return `${vendor} · ${detail}`;
-    if (vendor) return vendor;
+    if (vendor && vendor.toLowerCase() !== normalized.toLowerCase()) return vendor;
   }
   const candidates = [
     obj.task_status,
@@ -412,9 +539,13 @@ export function pickLogProgressLabel(
     obj.state,
   ];
   for (const c of candidates) {
-    if (typeof c === "string" && c.trim()) return c.trim();
+    if (typeof c === "string" && c.trim()) {
+      const t = c.trim();
+      if (t.toLowerCase() === normalized.toLowerCase()) continue;
+      return t;
+    }
   }
-  return normalized === "PENDING" ? "pending" : "running";
+  return null;
 }
 
 export function formatCreditsConsumed(

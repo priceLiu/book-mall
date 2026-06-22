@@ -5,6 +5,7 @@ import { resolveGatewayTokenMetrics } from "@/lib/gateway/gateway-token-metrics"
 import { fetchGatewayLogActorDisplays } from "@/lib/gateway/log-dashboard-actor";
 import { resolveGatewayLogAppTaskLinks } from "@/lib/gateway/log-app-task-link";
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
+import { resolveGatewayLogDisplayModelKey } from "@/lib/gateway/gateway-log-display-model";
 import { resolveVolcengineLogTiming } from "@/lib/gateway/log-volcengine-timing";
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { resolveGatewayLogVendorRequestId } from "@/lib/gateway/vendor-request-id";
@@ -95,6 +96,11 @@ export async function mapGatewayRequestLogsToResponseRows(
         id: l.id,
         model: l.model,
         canonicalModelKey: l.canonicalModelKey,
+        displayModelKey: resolveGatewayLogDisplayModelKey({
+          model: l.model,
+          canonicalModelKey: l.canonicalModelKey,
+          inputSummary: l.inputSummary,
+        }),
         endpoint: l.endpoint,
         status: l.status,
         requestKind: l.requestKind,
@@ -128,6 +134,7 @@ export async function mapGatewayRequestLogsToResponseRows(
         appTaskNodeId: appTask?.nodeId ?? null,
         queueMs: timing?.queueMs ?? null,
         generateMs: timing?.generateMs ?? null,
+        vendorPostProcessMs: timing?.vendorPostProcessMs ?? null,
         pollDelayMs: timing?.pollDelayMs ?? null,
         pollDelayOverLimit: timing?.pollDelayOverLimit ?? false,
         estimatedVendorCostYuan,
