@@ -12,6 +12,7 @@ import {
 } from "@/lib/canvas/canvas-volcengine-recover";
 import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-stall-recover";
 import { isRecoverableVolcengineStallFailCode } from "@/lib/gateway/video-background-generation";
+import { prisma } from "@/lib/prisma";
 
 export type CanvasVideoRecoverAction =
   | "patched_runtime"
