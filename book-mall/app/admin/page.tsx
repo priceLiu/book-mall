@@ -58,6 +58,7 @@ export default async function AdminDashboardPage() {
     prisma.creditLedger.groupBy({
       by: ["type"],
       where: { type: { in: ["CONSUME", "SETTLE"] } },
+      orderBy: { type: "asc" },
       _count: { id: true },
       _sum: { credits: true },
     }),
