@@ -197,7 +197,7 @@ export async function listMyCanvasProjects(
     base,
     "/api/canvas/projects",
   );
-  return j.projects;
+  return Array.isArray(j.projects) ? j.projects : [];
 }
 
 export async function createCanvasProject(
@@ -653,7 +653,7 @@ export async function listCanvasTemplates(
     base,
     "/api/canvas/templates",
   );
-  return j.templates;
+  return Array.isArray(j.templates) ? j.templates : [];
 }
 
 export async function saveCanvasTemplate(

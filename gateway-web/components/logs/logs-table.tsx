@@ -981,13 +981,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         ) : null}
       </div>
 
-      <div
-        className={`gw-logs-table-scroll gw-scrollbar-thin min-h-[240px] flex-1 overflow-auto rounded-xl border border-white/[0.06] bg-[#0f0f14] ${
-          filtersCollapsed
-            ? "max-h-[calc(100dvh-13rem)] md:max-h-[calc(100dvh-11rem)]"
-            : "max-h-[calc(100dvh-20rem)] md:max-h-[calc(100dvh-17rem)]"
-        }`}
-      >
+      <div className="gw-logs-table-scroll gw-scrollbar-thin min-h-0 flex-1 overflow-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
         <table className="gw-logs-table min-w-[3260px]">
           <thead>
             <tr>

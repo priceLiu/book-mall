@@ -78,8 +78,10 @@ function Inner() {
         listMyCanvasProjects(base),
         listCanvasTemplates(base).catch(() => []),
       ]);
-      setProjects(list);
-      setUserTemplates(tpl.filter((t) => !t.builtin));
+      setProjects(Array.isArray(list) ? list : []);
+      setUserTemplates(
+        (Array.isArray(tpl) ? tpl : []).filter((t) => !t.builtin),
+      );
       setError(null);
     } catch (e) {
       const raw = e instanceof Error ? e.message : "加载失败";
@@ -621,7 +623,7 @@ function ProjectsSection({
                   </p>
                 ) : null}
                 <p className="mt-3 text-[11px] text-[var(--canvas-muted)]/80">
-                  更新于 {new Date(p.updatedAt).toLocaleString("zh-CN")}
+                  更新于 {formatProjectUpdatedAt(p.updatedAt)}
                 </p>
               </Link>
               <div className="mt-3 flex items-center justify-end gap-2">
@@ -656,6 +658,12 @@ function ProjectsSection({
   );
 }
 
+function formatProjectUpdatedAt(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("zh-CN");
+}
+
 function ProjectNameEditor({
   name,
   onSave,
@@ -663,19 +671,20 @@ function ProjectNameEditor({
   name: string;
   onSave: (name: string) => void;
 }) {
+  const safeName = name ?? "";
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(name);
+  const [draft, setDraft] = useState(safeName);
 
   useEffect(() => {
-    if (!editing) setDraft(name);
-  }, [name, editing]);
+    if (!editing) setDraft(safeName);
+  }, [safeName, editing]);
 
   const commit = () => {
     setEditing(false);
-    if (draft.trim() !== name.trim()) {
+    if (draft.trim() !== safeName.trim()) {
       onSave(draft);
     } else {
-      setDraft(name);
+      setDraft(safeName);
     }
   };
 
@@ -692,7 +701,7 @@ function ProjectNameEditor({
             e.currentTarget.blur();
           }
           if (e.key === "Escape") {
-            setDraft(name);
+            setDraft(safeName);
             setEditing(false);
           }
         }}
@@ -714,7 +723,7 @@ function ProjectNameEditor({
       className="mt-3 block w-full truncate text-left text-sm font-medium text-white hover:text-[var(--canvas-accent-soft)]"
       title="点击编辑名称"
     >
-      {name}
+      {safeName || "未命名画布"}
     </button>
   );
 }
