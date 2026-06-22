@@ -29,6 +29,7 @@ import {
 import {
   getEffectiveGenerationPollConcurrency,
   getGenerationPollMaxPasses,
+  getGenerationPollRecordPauseMs,
   getGenerationPollTimeBudgetMs,
 } from "@/lib/generation/poll-config";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
@@ -1826,6 +1827,11 @@ export async function runCanvasPollWorker(opts?: {
       },
       concurrency,
     );
+
+    const recordPauseMs = getGenerationPollRecordPauseMs();
+    if (recordPauseMs > 0 && pass + 1 < maxPasses) {
+      await new Promise((r) => setTimeout(r, recordPauseMs));
+    }
   }
 
   return result;

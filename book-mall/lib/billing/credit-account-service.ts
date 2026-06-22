@@ -10,6 +10,10 @@ import { Prisma, type BillingPersona, type CreditLedgerType, type CreditOwnerTyp
 
 import { isStaffRole } from "@/lib/billing/billing-persona";
 import { buildGatewayLogWhereFromUsageQuery } from "@/lib/gateway/log-query-scope";
+import {
+  BILLING_DB_TX_OPTIONS,
+  runTxWithRetry,
+} from "@/lib/db-tx-retry";
 import { prisma } from "@/lib/prisma";
 
 export interface AccountRef {
@@ -143,72 +147,80 @@ async function writeLedger(input: LedgerWriteInput) {
     if (existing) return { ledger: existing, balanceAfter: existing.balanceAfter, deduped: true as const };
   }
 
-  return prisma.$transaction(async (tx) => {
-    const account = await tx.creditAccount.upsert({
-      where: { ownerType_ownerId: { ownerType: input.ref.ownerType, ownerId: input.ref.ownerId } },
-      create: { ownerType: input.ref.ownerType, ownerId: input.ref.ownerId },
-      update: {},
-    });
+  const personaFields = await resolveLedgerPersonaFields(input);
 
-    const curBalance = (account[fields.balance] as number) ?? 0;
-    const curReserved = (account[fields.reserved] as number) ?? 0;
-    const balanceAfter = curBalance + input.credits;
-    if (balanceAfter < 0 && !input.allowNegative) {
-      throw new InsufficientCreditsError(curBalance, -input.credits);
-    }
-    const reservedAfter = Math.max(0, curReserved + (input.reservedDelta ?? 0));
-
-    const updated = await tx.creditAccount.update({
-      where: { id: account.id },
-      data: {
-        [fields.balance]: balanceAfter,
-        [fields.reserved]: reservedAfter,
-      } as Prisma.CreditAccountUpdateInput,
-    });
-
-    const personaFields = await resolveLedgerPersonaFields(input);
-
-    let ledger;
-    try {
-      ledger = await tx.creditLedger.create({
-        data: {
-          accountId: account.id,
-          type: input.type,
-          credits: input.credits,
-          balanceAfter,
-          pool,
-          actorUserId: input.actorUserId ?? null,
-          refType: input.refType ?? null,
-          refId: input.refId ?? null,
-          costSnapshotYuan: input.costSnapshotYuan ?? null,
-          idempotencyKey: input.idempotencyKey ?? null,
-          description: input.description ?? null,
-          staffFlag: personaFields.staffFlag,
-          billingPersonaSnap: personaFields.billingPersonaSnap,
-        },
-      });
-    } catch (e) {
-      if (
-        input.idempotencyKey &&
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === "P2002"
-      ) {
-        const existing = await tx.creditLedger.findUnique({
-          where: { idempotencyKey: input.idempotencyKey },
+  return runTxWithRetry(
+    () =>
+      prisma.$transaction(async (tx) => {
+        const account = await tx.creditAccount.upsert({
+          where: { ownerType_ownerId: { ownerType: input.ref.ownerType, ownerId: input.ref.ownerId } },
+          create: { ownerType: input.ref.ownerType, ownerId: input.ref.ownerId },
+          update: {},
         });
-        if (existing) {
-          return {
-            ledger: existing,
-            balanceAfter: existing.balanceAfter,
-            deduped: true as const,
-          };
-        }
-      }
-      throw e;
-    }
 
-    return { ledger, balanceAfter: (updated[fields.balance] as number) ?? balanceAfter, deduped: false as const };
-  });
+        const curBalance = (account[fields.balance] as number) ?? 0;
+        const curReserved = (account[fields.reserved] as number) ?? 0;
+        const balanceAfter = curBalance + input.credits;
+        if (balanceAfter < 0 && !input.allowNegative) {
+          throw new InsufficientCreditsError(curBalance, -input.credits);
+        }
+        const reservedAfter = Math.max(0, curReserved + (input.reservedDelta ?? 0));
+
+        const updated = await tx.creditAccount.update({
+          where: { id: account.id },
+          data: {
+            [fields.balance]: balanceAfter,
+            [fields.reserved]: reservedAfter,
+          } as Prisma.CreditAccountUpdateInput,
+        });
+
+        let ledger;
+        try {
+          ledger = await tx.creditLedger.create({
+            data: {
+              accountId: account.id,
+              type: input.type,
+              credits: input.credits,
+              balanceAfter,
+              pool,
+              actorUserId: input.actorUserId ?? null,
+              refType: input.refType ?? null,
+              refId: input.refId ?? null,
+              costSnapshotYuan: input.costSnapshotYuan ?? null,
+              idempotencyKey: input.idempotencyKey ?? null,
+              description: input.description ?? null,
+              staffFlag: personaFields.staffFlag,
+              billingPersonaSnap: personaFields.billingPersonaSnap,
+            },
+          });
+        } catch (e) {
+          if (
+            input.idempotencyKey &&
+            e instanceof Prisma.PrismaClientKnownRequestError &&
+            e.code === "P2002"
+          ) {
+            const existing = await tx.creditLedger.findUnique({
+              where: { idempotencyKey: input.idempotencyKey },
+            });
+            if (existing) {
+              return {
+                ledger: existing,
+                balanceAfter: existing.balanceAfter,
+                deduped: true as const,
+              };
+            }
+          }
+          throw e;
+        }
+
+        return {
+          ledger,
+          balanceAfter: (updated[fields.balance] as number) ?? balanceAfter,
+          deduped: false as const,
+        };
+      }, BILLING_DB_TX_OPTIONS),
+    { label: "writeLedger" },
+  );
 }
 
 /** 套餐发放（GRANT），用于开通/续费/月度重置。 */

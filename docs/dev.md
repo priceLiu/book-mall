@@ -43,6 +43,27 @@ pnpm dev:all:story
 
 等价于 8 个子站 `pnpm dev`（含 **e-commerce-toolkit :3007**）+ `story` / `canvas` / `gateway` 三条 poll-loop。
 
+## 数据库连接（DB-Resilience-R1 · Phase C）
+
+`dev:all` + 三条 poll-loop 会**同时**连同一 `DATABASE_URL`。腾讯云 CDB **直连**时务必限制每进程连接数，否则易出现 `Can't reach database server` / `Server has closed the connection`（P1001）。
+
+**推荐**在 `book-mall/.env.local` 的 `DATABASE_URL` query 追加：
+
+```
+connection_limit=10&pool_timeout=30&connect_timeout=15
+```
+
+| 场景 | 建议 |
+|------|------|
+| 全量 `pnpm dev:all:story` | `connection_limit=10`，改 URL 后**必须重启** dev:all |
+| 仍频繁 P1001 | `pnpm dev:all:nopoll`，手动单开 poll；或暂时只起 book-mall + canvas |
+| 对账排队任务 | `pnpm --dir book-mall canvas:queued-reconcile` |
+| 洗误标 Gateway log | `pnpm --dir book-mall gateway:repair-insufficient-mislabel -- --apply` |
+
+poll-loop 子进程已在 `package.json` 设 `PRISMA_CONNECTION_LIMIT=1`。生产 PgBouncer 见 `deploy/tencent/pgbouncer/README.md`。
+
+Release 全文：`docs/releases/2026-06-db-resilience-r1.md`。
+
 ## 说明
 
 - `Ctrl+C` 会结束全部子进程（`concurrently -k`）。

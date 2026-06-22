@@ -13,7 +13,7 @@ import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { refundFailedGatewayLog } from "@/lib/billing/gateway-credit-settlement";
 import { prisma } from "@/lib/prisma";
-import { isRetryableTxError, runTxWithRetry } from "@/lib/db-tx-retry";
+import { isTransientSystemBusyError, runTxWithRetry } from "@/lib/db-tx-retry";
 
 import {
   getDispatchBatch,
@@ -204,8 +204,8 @@ async function dispatchOneCanvasQueuedTask(
 
   if (slotResult.action !== "claimed") return "skipped";
 
-  // 在调用厂商前为 false：此前的瞬时 DB 错误可安全退回队列重试（不会产生半提交 / 丢日志）。
-  let gatewaySubmitStarted = false;
+  // 仅当 createTask 成功返回 logId 后为 true；503 预检失败时仍为 false，可安全退回队列。
+  let vendorJob: { taskId: string; logId: string } | null = null;
   try {
     const { claimed, task: claimedTask } = await claimCanvasTaskKieSubmit(task.id);
     if (!claimed) {
@@ -213,11 +213,11 @@ async function dispatchOneCanvasQueuedTask(
       return "skipped";
     }
 
-    gatewaySubmitStarted = true;
     const job = await submitCanvasVideoToGateway(
       { ...claimedTask, project: task.project },
       taskInputPayload(claimedTask),
     );
+    vendorJob = job;
 
     // 厂商已受理（gateway 日志已建、vendor 任务已在跑）：此处的状态落库务必重试，
     // 否则瞬时 DB 错误会把任务误判 FAILED，留下「日志在跑 / 任务失败」的孤儿（白烧成本）。
@@ -246,9 +246,8 @@ async function dispatchOneCanvasQueuedTask(
     const msg = e instanceof Error ? e.message : String(e);
     await releaseTrafficSlot(scope.scopeKey);
 
-    // 厂商提交前的瞬时 DB 错误（连接池耗尽 / 写冲突）：退回队列稍后重试，
-    // 不判失败、不丢日志（修复「3 个视频只剩 2 条日志 / 数据库繁忙」）。
-    if (!gatewaySubmitStarted && isRetryableTxError(e)) {
+    // 厂商提交前 / createTask 503 预检失败：退回队列稍后重试，不判失败、不产生孤儿日志。
+    if (!vendorJob && isTransientSystemBusyError(e)) {
       await prisma.canvasGenerationTask
         .update({
           where: { id: task.id },

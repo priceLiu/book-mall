@@ -13,6 +13,7 @@ import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
  */
 export function isRetryableTxError(error: unknown): boolean {
   if (isPrismaConnectionUnavailable(error)) return true;
+  if (isPrismaTransactionTimeoutError(error)) return true;
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     // P2034: write conflict / deadlock（含 Serializable 序列化失败）
     // P2037: too many database connections
@@ -26,6 +27,27 @@ export function isRetryableTxError(error: unknown): boolean {
   return false;
 }
 
+/** Gateway createTask / 扣费预检返回的瞬时繁忙（尚无 logId，可安全退回队列）。 */
+export function isTransientSystemBusyError(error: unknown): boolean {
+  if (isRetryableTxError(error)) return true;
+  if (error instanceof Error) {
+    return /503|系统繁忙|Gateway createTask HTTP 503|pool timeout|Timed out fetching a new connection/i.test(
+      error.message,
+    );
+  }
+  return false;
+}
+
+/** Prisma interactive transaction 超时 / 已关闭（默认 5s 在 DB 繁忙时易触发）。 */
+export function isPrismaTransactionTimeoutError(error: unknown): boolean {
+  if (error instanceof Error) {
+    return /transaction already closed|interactive transaction timeout|expired transaction|timeout for this transaction was \d+ ms/i.test(
+      error.message,
+    );
+  }
+  return false;
+}
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** 画布建任务 / claim 等热路径：默认 5s 事务超时在连接池排队时易误报「数据库繁忙」。 */
@@ -33,6 +55,9 @@ export const CANVAS_DB_TX_OPTIONS = {
   maxWait: 10_000,
   timeout: 30_000,
 } as const;
+
+/** 积分流水 / 冻结扣费：与画布同口径，避免 reserve/settle 在 CDB 繁忙时 5s 超时。 */
+export const BILLING_DB_TX_OPTIONS = CANVAS_DB_TX_OPTIONS;
 
 /**
  * 以指数退避重试一个**短事务工厂**。每次重试都重新调用 `fn()`，确保开新事务。

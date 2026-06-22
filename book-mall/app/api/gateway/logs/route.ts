@@ -20,6 +20,9 @@ import {
   maybeRunOpportunisticGatewayPoll,
   parseGatewayLogPollParams,
 } from "@/lib/gateway/log-read-poll-guard";
+import { canViewFinanceCost } from "@/lib/auth/permissions";
+import { resolveGatewaySessionBookUserId } from "@/lib/gateway/log-query-scope";
+import { fetchCanvasQueueWithoutLogStats } from "@/lib/canvas/canvas-queue-without-log";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -86,11 +89,26 @@ export async function GET(request: NextRequest) {
     const facetsParam = request.nextUrl.searchParams.get("facets")?.trim();
     const includeFacets = facetsParam !== "0" && facetsParam !== "false";
 
-    const [total, facets] = await Promise.all([
+    const bookUserId = await resolveGatewaySessionBookUserId(user);
+    const isPlatformAdmin = bookUserId
+      ? await canViewFinanceCost(bookUserId)
+      : false;
+    const canvasOwnerUserIds =
+      isPlatformAdmin ? null : bookUserId ? [bookUserId] : [];
+    const canvasQueueStaleMin = Math.max(
+      1,
+      Number(request.nextUrl.searchParams.get("canvasQueueStaleMin") ?? "2") || 2,
+    );
+
+    const [total, facets, canvasQueueStats] = await Promise.all([
       prisma.gatewayRequestLog.count({ where }),
       includeFacets
         ? resolveGatewayLogListFacets(facetWhere, providerKind || undefined)
         : Promise.resolve(null),
+      fetchCanvasQueueWithoutLogStats({
+        ownerUserIds: canvasOwnerUserIds,
+        staleMinutes: canvasQueueStaleMin,
+      }).catch(() => null),
     ]);
 
     const totalPages = computeLogTotalPages(total, pageSize);
@@ -114,6 +132,7 @@ export async function GET(request: NextRequest) {
       totalPages,
       // facets=null 表示本次未重算，前端沿用上一次的分面值。
       facets,
+      canvasQueueStats,
     });
   } catch (e) {
     if (isGatewayDatabaseError(e)) {

@@ -34,12 +34,34 @@ const FAIL_CODE_HINTS: Record<string, string> = {
   STALE_ORPHAN:
     "请求未成功提交厂商（无 taskId），Gateway 自动关闭。",
   POLL_TRANSIENT: "轮询或提交 transient 超时，可重试。",
+  SYSTEM_BUSY:
+    "数据库或积分冻结事务繁忙/超时，非余额不足；请稍后重试。",
 };
+
+function isMislabeledInsufficientCredits(input: {
+  failCode?: string | null;
+  failMessage?: string | null;
+}): boolean {
+  if (input.failCode?.trim() !== "INSUFFICIENT_CREDITS") return false;
+  const blob = (input.failMessage ?? "").toLowerCase();
+  return (
+    blob.includes("prisma.") ||
+    blob.includes("creditledger") ||
+    blob.includes("transaction already closed") ||
+    blob.includes("interactive transaction timeout") ||
+    blob.includes("transaction api error") ||
+    blob.includes("pool timeout") ||
+    blob.includes("server has closed the connection")
+  );
+}
 
 function inferFailCode(input: {
   failCode?: string | null;
   failMessage?: string | null;
 }): string | undefined {
+  if (isMislabeledInsufficientCredits(input)) {
+    return "SYSTEM_BUSY";
+  }
   const existing = input.failCode?.trim();
   if (existing) return existing;
 
@@ -52,7 +74,20 @@ function inferFailCode(input: {
   if (blob.includes("无厂商 taskid") || blob.includes("未成功提交（无厂商 taskid）")) {
     return "SUBMIT_ORPHAN";
   }
-  if (blob.includes("insufficient") && blob.includes("credit")) {
+  if (
+    blob.includes("prisma.") ||
+    blob.includes("transaction already closed") ||
+    blob.includes("interactive transaction timeout")
+  ) {
+    return "SYSTEM_BUSY";
+  }
+  if (
+    blob.includes("积分不足") ||
+    (blob.includes("insufficient") &&
+      blob.includes("credit") &&
+      !blob.includes("prisma") &&
+      !blob.includes("creditledger"))
+  ) {
     return "INSUFFICIENT_CREDITS";
   }
   if (
@@ -88,6 +123,13 @@ export function gatewayFailMessageDisplay(
   const raw = failMessage?.trim();
   const code = resolveGatewayFailCodeDisplay({ failCode, failMessage });
   const hint = gatewayFailCodeHint(code);
+
+  if (isMislabeledInsufficientCredits({ failCode, failMessage: raw }) || code === "SYSTEM_BUSY") {
+    return (
+      hint ??
+      "系统繁忙，积分冻结超时，请稍后重试；若余额充足仍失败，请联系管理员。"
+    );
+  }
 
   if (!raw) {
     const base =
