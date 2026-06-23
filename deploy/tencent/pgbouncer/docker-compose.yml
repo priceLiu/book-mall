@@ -1,22 +1,25 @@
 # 在 CDB 同 VPC 的 CVM/TKE 节点部署 PgBouncer。
 #   1) cp userlist.txt.example userlist.txt 并填真实 md5(见该文件注释)
 #   2) 核对 pgbouncer.ini 的 [databases] host/port/dbname
-#   3) docker compose up -d
-#   4) 健康检查:psql "host=127.0.0.1 port=6432 dbname=pgbouncer user=pgbouncer_admin" -c "SHOW POOLS;"
+#   3) docker compose up -d --build   # 国内 dev 推荐 build（见 Dockerfile）
+#   4) 健康检查:psql "host=127.0.0.1 port=6432 dbname=tool_mall user=aitools_admin" -c "SELECT 1"
 #   5) 应用侧:DATABASE_URL 指向 本机:6432 + pgbouncer=true;DIRECT_DATABASE_URL 仍直连 CDB:24155
 services:
   pgbouncer:
-    image: edoburu/pgbouncer:1.23.1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tool-mall-pgbouncer:local
     container_name: tool-mall-pgbouncer
     restart: unless-stopped
     ports:
       - "6432:6432"
     volumes:
-      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./pgbouncer.runtime.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ./userlist.txt:/etc/pgbouncer/userlist.txt:ro
     healthcheck:
       # edoburu 镜像内置 pg_isready;探活 pgbouncer 自身端口。
-      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "6432", "-U", "aitools_admin", "-d", "tool_mall"]
+      test: ["CMD", "nc", "-z", "127.0.0.1", "6432"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -14,6 +14,49 @@
 
 ---
 
+## 本地 dev（Colima / Docker Desktop）
+
+与正式环境同一套 **transaction 池**，验证整条链路后再上 CloudBase。
+
+### 国内网络：镜像加速 + 本地 build
+
+Docker Hub 直连慢/超时时，**可以**用国内 registry mirror；`edoburu/pgbouncer` 在多数加速站**没有缓存**，因此本地用 **`Dockerfile` + Alpine（走加速站）** 构建，不拉第三方 PgBouncer 镜像。
+
+**Colima 配置加速（一次性）**：编辑 `~/.colima/default/colima.yaml`，将 `docker: {}` 改为：
+
+```yaml
+docker:
+  registry-mirrors:
+    - https://docker.1ms.run
+    - https://mirror.ccs.tencentyun.com
+```
+
+然后 `colima stop && colima start`。验证：`docker info | grep -A3 "Registry Mirrors"`。
+
+`start-local.sh` 会执行 `docker compose up -d --build`（`Dockerfile` 默认基础镜像 `docker.1ms.run/library/alpine:3.20`）。
+
+```bash
+# 1) 起 Docker（macOS Colima，建议已配上方 mirror）
+colima start
+
+# 2) 起 PgBouncer（自动从 book-mall/.env.local 同步 userlist）
+./deploy/tencent/pgbouncer/start-local.sh
+
+# 3) 将 book-mall/.env.local 的 DATABASE_URL 改为 127.0.0.1:6432 + pgbouncer=true
+#    DIRECT_DATABASE_URL 保持直连 CDB:24155
+# 4) 重启 dev 栈
+pnpm dev:all:clean
+
+# 停止池
+./deploy/tencent/pgbouncer/stop-local.sh
+```
+
+**macOS 注意**：`brew install pgbouncer` 安装的 1.25.x 连**远程** CDB 时可能触发 async connect `Bad file descriptor`（本机 :6432 可监听但后端连不上）。本地 dev 若 Docker Hub 不可达，**暂用直连** `DATABASE_URL`（`connection_limit=30`）即可；**生产在 VPC 内用 Docker 部署 PgBouncer** 不受影响。
+
+未起 PgBouncer 时不要使用 `127.0.0.1:6432` 的 `DATABASE_URL`。
+
+---
+
 ## 推荐拓扑
 
 ```
