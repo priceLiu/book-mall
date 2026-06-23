@@ -58,7 +58,11 @@ export function shouldSkipStoryRowTaskApply(
   // 本地尚未绑定 taskId（刚点发送）时，必须接受服务端终态，否则会卡在「生成中」
   if (!localRuntime?.taskId) return false;
   if (pick.id === localRuntime.taskId) return false;
-  return pick.status === "SUCCEEDED" || pick.status === "FAILED";
+  return (
+    pick.status === "SUCCEEDED" ||
+    pick.status === "FAILED" ||
+    pick.status === "CANCELLED"
+  );
 }
 
 /** 任务终态写回 node.runtime 前 · 用户已关闭的错误勿重复弹出 */
@@ -91,16 +95,18 @@ export function runtimePatchFromCanvasTask(
       failMessage: undefined,
     };
   }
-  if (task.status === "FAILED") {
+  if (task.status === "FAILED" || task.status === "CANCELLED") {
     return {
       status: "error",
       taskId: task.id,
-      failCode: task.failCode ?? "FAILED",
+      failCode:
+        task.failCode ??
+        (task.status === "CANCELLED" ? "CANCELLED" : "FAILED"),
       failMessage: formatCanvasTaskError(
-          task.failCode,
-          task.failMessage,
-          task.model,
-        ),
+        task.failCode,
+        task.failMessage,
+        task.model,
+      ),
     };
   }
   if (task.status === "SUBMITTED" || task.status === "DISPATCHING") {
