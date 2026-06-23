@@ -16,6 +16,7 @@ const MIN_INTERVAL_MS = 15_000;
 // 仅给一个更短的下限，防止连点/多页并发把后台 worker 跑爆。
 const FORCED_MIN_INTERVAL_MS = 6_000;
 const lastPollAtByUser = new Map<string, number>();
+let opportunisticPollInFlight = false;
 
 export type OpportunisticPollOpts = {
   /** 手动刷新：使用更短的限流下限（仍限流，不再完全绕过） */
@@ -24,30 +25,15 @@ export type OpportunisticPollOpts = {
   skip?: boolean;
 };
 
-export async function maybeRunOpportunisticGatewayPoll(
-  userId: string,
-  opts?: OpportunisticPollOpts,
-): Promise<{ ran: boolean; autoHandler?: SlowWarnAutoHandlerResult }> {
-  if (opts?.skip) return { ran: false };
+export type OpportunisticPollScheduleResult = {
+  /** 已排队后台 poll（不阻塞 HTTP） */
+  scheduled: boolean;
+};
 
-  // Gen-HotCold-R2 Phase 1：读路径默认不再触发重 poll。
-  // 仅「手动刷新(force/poll=1)」或「无后台 poll-loop 的兜底开关」时运行；
-  // 进度推进交由独立 poll-loop / cron 负责。
-  if (!opts?.force && !isOpportunisticPollFallbackEnabled()) {
-    return { ran: false };
-  }
-
-  const now = Date.now();
-  const last = lastPollAtByUser.get(userId) ?? 0;
-  const minInterval = opts?.force ? FORCED_MIN_INTERVAL_MS : MIN_INTERVAL_MS;
-  if (now - last < minInterval) {
-    return { ran: false };
-  }
-
-  lastPollAtByUser.set(userId, now);
+async function runOpportunisticGatewayPollBody(): Promise<SlowWarnAutoHandlerResult | undefined> {
   let autoHandler: SlowWarnAutoHandlerResult | undefined;
   try {
-    const gw = await runGatewayPollWorker({ limit: 30 });
+    const gw = await runGatewayPollWorker({ limit: 10 });
     autoHandler = gw.autoHandler;
   } catch {
     /* ignore */
@@ -57,7 +43,78 @@ export async function maybeRunOpportunisticGatewayPoll(
   } catch {
     /* ignore */
   }
-  return { ran: true, autoHandler };
+  return autoHandler;
+}
+
+function tryClaimOpportunisticPoll(
+  userId: string,
+  opts?: OpportunisticPollOpts,
+): boolean {
+  if (opts?.skip) return false;
+  if (!opts?.force && !isOpportunisticPollFallbackEnabled()) {
+    return false;
+  }
+  if (opportunisticPollInFlight) return false;
+  const now = Date.now();
+  const last = lastPollAtByUser.get(userId) ?? 0;
+  const minInterval = opts?.force ? FORCED_MIN_INTERVAL_MS : MIN_INTERVAL_MS;
+  if (now - last < minInterval) return false;
+  lastPollAtByUser.set(userId, now);
+  opportunisticPollInFlight = true;
+  return true;
+}
+
+/**
+ * 读路径 opportunistic poll：后台单飞执行，**不阻塞** HTTP 响应。
+ * 避免日志页 auto-refresh + poll=1 同步等厂商轮询（可达 2min）导致浏览器 Failed to fetch。
+ */
+export function scheduleOpportunisticGatewayPoll(
+  userId: string,
+  opts?: OpportunisticPollOpts,
+): OpportunisticPollScheduleResult {
+  if (!tryClaimOpportunisticPoll(userId, opts)) {
+    return { scheduled: false };
+  }
+  void runOpportunisticGatewayPollBody()
+    .catch((e) => {
+      console.warn(
+        "[gateway] opportunistic poll failed",
+        e instanceof Error ? e.message : String(e),
+      );
+    })
+    .finally(() => {
+      opportunisticPollInFlight = false;
+    });
+  return { scheduled: true };
+}
+
+/**
+ * 轮询池等管理页：需等待 poll 结果（含 slow-warn autoHandler）时使用。
+ */
+export async function awaitOpportunisticGatewayPoll(
+  userId: string,
+  opts?: OpportunisticPollOpts,
+): Promise<{ ran: boolean; autoHandler?: SlowWarnAutoHandlerResult }> {
+  if (opts?.skip) return { ran: false };
+  if (!tryClaimOpportunisticPoll(userId, opts)) {
+    return { ran: false };
+  }
+  try {
+    const autoHandler = await runOpportunisticGatewayPollBody();
+    return { ran: true, autoHandler };
+  } finally {
+    opportunisticPollInFlight = false;
+  }
+}
+
+/** @deprecated 使用 scheduleOpportunisticGatewayPoll（读 API）或 awaitOpportunisticGatewayPoll（管理页） */
+export async function maybeRunOpportunisticGatewayPoll(
+  userId: string,
+  opts?: OpportunisticPollOpts,
+): Promise<{ ran: boolean; autoHandler?: SlowWarnAutoHandlerResult }> {
+  return scheduleOpportunisticGatewayPoll(userId, opts).scheduled
+    ? { ran: true }
+    : { ran: false };
 }
 
 export function parseGatewayLogPollParams(searchParams: URLSearchParams): {

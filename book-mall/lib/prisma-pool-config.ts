@@ -5,7 +5,27 @@
 
 // 直连腾讯云 PG（无 PgBouncer）下，web 进程默认连接预算。10 太小：几个慢查询/瞬时网络抖动
 // 就会占满池 → 请求排队到 pool_timeout → 卡死。DB max_connections 余量极大（2048），抬到 30。
-const DEV_DEFAULT_CONNECTION_LIMIT = 30;
+// 经本地/云端 PgBouncer 时后端池更小，dev:all 多进程叠加易触发 query_wait_timeout，默认降到 15。
+const DEV_DIRECT_CONNECTION_LIMIT = 30;
+const DEV_PGBOUNCER_CONNECTION_LIMIT = 15;
+
+function datasourceUsesPgbouncer(raw: string | undefined): boolean {
+  if (!raw?.trim()) return false;
+  try {
+    const url = new URL(raw);
+    if (url.searchParams.get("pgbouncer") === "true") return true;
+    if (url.port === "6432") return true;
+    return false;
+  } catch {
+    return /pgbouncer=true/i.test(raw);
+  }
+}
+
+function devDefaultConnectionLimit(raw: string | undefined): number {
+  return datasourceUsesPgbouncer(raw)
+    ? DEV_PGBOUNCER_CONNECTION_LIMIT
+    : DEV_DIRECT_CONNECTION_LIMIT;
+}
 
 function readPositiveInt(raw: string | undefined): number | null {
   if (!raw?.trim()) return null;
@@ -30,7 +50,9 @@ export function getPrismaConnectionLimit(): number {
     }
   }
 
-  if (process.env.NODE_ENV === "development") return DEV_DEFAULT_CONNECTION_LIMIT;
+  if (process.env.NODE_ENV === "development") {
+    return devDefaultConnectionLimit(process.env.DATABASE_URL);
+  }
   return 10;
 }
 
@@ -54,7 +76,7 @@ function applyPoolParams(raw: string): string {
         "connection_limit",
         String(
           process.env.NODE_ENV === "development"
-            ? DEV_DEFAULT_CONNECTION_LIMIT
+            ? devDefaultConnectionLimit(raw)
             : 10,
         ),
       );
