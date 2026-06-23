@@ -9,6 +9,16 @@ type VolcengineTimingTrace = {
   lastStatus?: string;
 };
 
+function isVendorTerminalStatus(status: string): boolean {
+  return (
+    status === "succeeded" ||
+    status === "completed" ||
+    status === "success" ||
+    status === "failed" ||
+    status === "cancelled"
+  );
+}
+
 function readVolcengineTimingTrace(
   resultSummary: unknown,
 ): VolcengineTimingTrace | null {
@@ -162,4 +172,62 @@ export function resolveLiveLogPhaseTiming(input: {
     pollDelayMs,
     totalMs: wallMs,
   };
+}
+
+/** 厂商原生耗时（只读对比列；进行中火山 trace 用墙钟补 updated） */
+export function resolveVendorNativeTimingLive(input: {
+  providerKind: string | null;
+  requestKind: string;
+  vendorDurationMs?: number | null;
+  resultSummary: unknown;
+  nowMs: number;
+  server?: {
+    vendorNativeDurationMs?: number | null;
+    vendorNativeGenerateMs?: number | null;
+  };
+}): {
+  vendorNativeDurationMs: number | null;
+  vendorNativeGenerateMs: number | null;
+} {
+  const reported =
+    input.vendorDurationMs != null && input.vendorDurationMs > 0
+      ? input.vendorDurationMs
+      : null;
+
+  let vendorTraceSpanMs: number | null = null;
+  if (input.providerKind === "VOLCENGINE" && input.requestKind === "VIDEO") {
+    const trace = readVolcengineTimingTrace(input.resultSummary);
+    if (trace?.vendorCreatedAtMs != null) {
+      const st = normalizeStatus(trace.lastStatus);
+      const terminal = isVendorTerminalStatus(st);
+      const end =
+        trace.vendorUpdatedAtMs != null
+          ? trace.vendorUpdatedAtMs
+          : terminal
+            ? trace.vendorCreatedAtMs
+            : input.nowMs;
+      vendorTraceSpanMs = Math.max(0, end - trace.vendorCreatedAtMs);
+    }
+  }
+
+  const vendorNativeDurationMs = reported ?? vendorTraceSpanMs;
+  let vendorNativeGenerateMs: number | null = null;
+  if (input.providerKind === "VOLCENGINE" && input.requestKind === "VIDEO") {
+    vendorNativeGenerateMs = vendorTraceSpanMs;
+  } else if (reported != null) {
+    vendorNativeGenerateMs = reported;
+  }
+
+  if (
+    vendorNativeDurationMs == null &&
+    input.server?.vendorNativeDurationMs != null
+  ) {
+    return {
+      vendorNativeDurationMs: input.server.vendorNativeDurationMs,
+      vendorNativeGenerateMs:
+        vendorNativeGenerateMs ?? input.server.vendorNativeGenerateMs ?? null,
+    };
+  }
+
+  return { vendorNativeDurationMs, vendorNativeGenerateMs };
 }

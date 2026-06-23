@@ -6,7 +6,10 @@ import { fetchGatewayLogActorDisplays } from "@/lib/gateway/log-dashboard-actor"
 import { resolveGatewayLogAppTaskLinks } from "@/lib/gateway/log-app-task-link";
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { resolveGatewayLogDisplayModelKey } from "@/lib/gateway/gateway-log-display-model";
-import { resolveVolcengineLogTiming } from "@/lib/gateway/log-volcengine-timing";
+import {
+  resolveVendorNativeTimingForLogRow,
+  resolveVolcengineLogTiming,
+} from "@/lib/gateway/log-volcengine-timing";
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { resolveGatewayLogVendorRequestId } from "@/lib/gateway/vendor-request-id";
 import { prisma } from "@/lib/prisma";
@@ -49,6 +52,12 @@ export async function mapGatewayRequestLogsToResponseRows(
         requestKind: l.requestKind,
         submittedAt: l.submittedAt,
         completedAt: l.completedAt,
+        resultSummary: l.resultSummary,
+      });
+      const vendorNative = resolveVendorNativeTimingForLogRow({
+        providerKind: l.providerKind,
+        requestKind: l.requestKind,
+        vendorDurationMs: l.vendorDurationMs,
         resultSummary: l.resultSummary,
       });
       let estimatedVendorCostYuan = l.estimatedVendorCostYuan?.toString() ?? null;
@@ -137,6 +146,8 @@ export async function mapGatewayRequestLogsToResponseRows(
         vendorPostProcessMs: timing?.vendorPostProcessMs ?? null,
         pollDelayMs: timing?.pollDelayMs ?? null,
         pollDelayOverLimit: timing?.pollDelayOverLimit ?? false,
+        vendorNativeDurationMs: vendorNative.vendorNativeDurationMs,
+        vendorNativeGenerateMs: vendorNative.vendorNativeGenerateMs,
         estimatedVendorCostYuan,
         failCode: l.failCode,
         failMessage: l.failMessage,

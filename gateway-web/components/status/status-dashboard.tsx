@@ -41,7 +41,7 @@ import {
   gatewaySummaryPollIntervalMs,
 } from "@/lib/gateway-live-poll-policy";
 
-const IN_FLIGHT_POLL_MS = 10_000;
+const IN_FLIGHT_POLL_MS = 20_000;
 const LIVE_CLOCK_MS = 1_000;
 
 type StatusQueryMode = "live" | "history";

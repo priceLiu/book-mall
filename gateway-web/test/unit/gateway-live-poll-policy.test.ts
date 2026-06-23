@@ -21,7 +21,7 @@ describe("gateway-live-poll-policy", () => {
   it("有在飞时启用轮询", () => {
     expect(shouldGatewayLivePoll(active, false)).toBe(true);
     expect(gatewayLivePollIntervalMs(active, false)).toBe(8000);
-    expect(gatewaySummaryPollIntervalMs(active)).toBe(10000);
+    expect(gatewaySummaryPollIntervalMs(active)).toBe(20000);
   });
 
   it("列表在飞可单独触发轮询", () => {

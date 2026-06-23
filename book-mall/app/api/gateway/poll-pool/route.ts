@@ -8,6 +8,7 @@ import {
 import {
   awaitOpportunisticGatewayPoll,
   parseGatewayLogPollParams,
+  scheduleOpportunisticGatewayPoll,
 } from "@/lib/gateway/log-read-poll-guard";
 import {
   releasePollPoolCanvasTask,
@@ -62,6 +63,9 @@ export async function GET(request: NextRequest) {
 
   const pollOpts = parseGatewayLogPollParams(request.nextUrl.searchParams);
   const query = parseDashboardQueryFromSearchParams(request.nextUrl.searchParams);
+  // 轮询池只看在飞任务，去掉 hours/from 时间窗（避免多余 submittedAt 扫描）
+  query.filters.submittedFrom = undefined;
+  query.filters.submittedTo = undefined;
 
   try {
     const snapshot = await fetchPollPoolSnapshot({
@@ -77,15 +81,24 @@ export async function GET(request: NextRequest) {
       snapshot.gateway.slowCount > 0 ||
       snapshot.canvas.slowCount > 0 ||
       snapshot.story.slowCount > 0;
-    const shouldPoll = pollOpts.force || hasSlow;
 
     let pollResult: Awaited<
       ReturnType<typeof awaitOpportunisticGatewayPoll>
     > = { ran: false };
-    if (shouldPoll && !pollOpts.skip) {
+
+    if (pollOpts.skip) {
+      // 只读快照
+    } else if (pollOpts.force) {
+      // 用户点「立即 poll」：等待结果
       pollResult = await awaitOpportunisticGatewayPoll(user.id, {
         force: true,
       });
+    } else if (hasSlow) {
+      // 有预警任务：后台单飞 poll，不阻塞 HTTP（避免打开/刷新轮询池卡数分钟）
+      const scheduled = scheduleOpportunisticGatewayPoll(user.id, {
+        force: true,
+      });
+      pollResult = { ran: scheduled.scheduled };
     }
 
     return NextResponse.json({

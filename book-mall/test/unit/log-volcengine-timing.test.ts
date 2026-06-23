@@ -6,6 +6,7 @@ import {
   isVolcenginePollLagCritical,
   isVolcengineQueuedStale,
   mergeVolcengineTimingTrace,
+  resolveVendorNativeTimingForLogRow,
   resolveVolcengineLogTiming,
   VOLCENGINE_VENDOR_STALE_RELEASE_MS,
 } from "@/lib/gateway/log-volcengine-timing";
@@ -331,5 +332,37 @@ describe("log-volcengine-timing", () => {
     });
     const nowMs = genStartMs + VOLCENGINE_VENDOR_STALE_RELEASE_MS + 120_000;
     expect(isVolcengineVendorStuck(trace, nowMs)).toBe(true);
+  });
+
+  it("resolveVendorNativeTimingForLogRow uses volcengine trace span", () => {
+    const createdMs = 1_000_000;
+    const updatedMs = 1_000_000 + 120_000;
+    const trace = mergeVolcengineTimingTrace(null, {
+      status: "succeeded",
+      raw: {
+        created_at: createdMs / 1000,
+        updated_at: updatedMs / 1000,
+      },
+      polledAtMs: updatedMs + 1_000,
+    });
+    const row = resolveVendorNativeTimingForLogRow({
+      providerKind: "VOLCENGINE",
+      requestKind: "VIDEO",
+      vendorDurationMs: null,
+      resultSummary: { _gateway: { volcengineTiming: trace } },
+    });
+    expect(row.vendorNativeDurationMs).toBe(120_000);
+    expect(row.vendorNativeGenerateMs).toBe(120_000);
+  });
+
+  it("resolveVendorNativeTimingForLogRow prefers vendorDurationMs for KIE", () => {
+    const row = resolveVendorNativeTimingForLogRow({
+      providerKind: "KIE",
+      requestKind: "VIDEO",
+      vendorDurationMs: 88_000,
+      resultSummary: null,
+    });
+    expect(row.vendorNativeDurationMs).toBe(88_000);
+    expect(row.vendorNativeGenerateMs).toBe(88_000);
   });
 });

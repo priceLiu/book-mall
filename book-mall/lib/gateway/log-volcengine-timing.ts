@@ -495,6 +495,72 @@ export function resolveVolcengineLogTiming(input: {
   return live;
 }
 
+/** 厂商 API / trace 原生耗时（只读展示，不写回 DB） */
+export type VendorNativeTiming = {
+  /** 厂商显式字段（如 KIE costTime → vendorDurationMs） */
+  vendorReportedMs: number | null;
+  /** 火山 trace：created_at → updated_at */
+  vendorTraceSpanMs: number | null;
+};
+
+export function resolveVendorNativeTiming(input: {
+  providerKind: string | null;
+  requestKind: string;
+  vendorDurationMs: number | null;
+  resultSummary: unknown;
+  nowMs?: number;
+}): VendorNativeTiming {
+  const now = input.nowMs ?? Date.now();
+  const vendorReportedMs =
+    input.vendorDurationMs != null && input.vendorDurationMs > 0
+      ? input.vendorDurationMs
+      : null;
+
+  let vendorTraceSpanMs: number | null = null;
+  if (
+    input.providerKind === "VOLCENGINE" &&
+    input.requestKind === "VIDEO"
+  ) {
+    const trace = readVolcengineTimingTrace(input.resultSummary);
+    if (trace?.vendorCreatedAtMs != null) {
+      const st = normalizeStatus(trace.lastStatus);
+      const terminal = isVendorTerminalStatus(st);
+      const end =
+        trace.vendorUpdatedAtMs != null
+          ? trace.vendorUpdatedAtMs
+          : terminal
+            ? trace.vendorCreatedAtMs
+            : now;
+      vendorTraceSpanMs = Math.max(0, end - trace.vendorCreatedAtMs);
+    }
+  }
+
+  return { vendorReportedMs, vendorTraceSpanMs };
+}
+
+/** Gateway 日志 API · 厂商原生列（与 Duration / Generate 并列对比，不回写） */
+export function resolveVendorNativeTimingForLogRow(input: {
+  providerKind: string | null;
+  requestKind: string;
+  vendorDurationMs: number | null;
+  resultSummary: unknown;
+  nowMs?: number;
+}): {
+  vendorNativeDurationMs: number | null;
+  vendorNativeGenerateMs: number | null;
+} {
+  const native = resolveVendorNativeTiming(input);
+  const vendorNativeDurationMs =
+    native.vendorReportedMs ?? native.vendorTraceSpanMs;
+  let vendorNativeGenerateMs: number | null = null;
+  if (input.providerKind === "VOLCENGINE" && input.requestKind === "VIDEO") {
+    vendorNativeGenerateMs = native.vendorTraceSpanMs;
+  } else if (native.vendorReportedMs != null) {
+    vendorNativeGenerateMs = native.vendorReportedMs;
+  }
+  return { vendorNativeDurationMs, vendorNativeGenerateMs };
+}
+
 /** queued 阶段 updated_at 长期停更 */
 export function isVolcengineQueuedStale(
   trace: VolcengineTimingTrace,
