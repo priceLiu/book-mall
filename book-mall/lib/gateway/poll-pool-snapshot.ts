@@ -306,7 +306,8 @@ export async function fetchPollPoolSnapshot(input: {
       .map((r) => mapGatewayRow(r, nowMs, slowWarnMs)),
   ].slice(0, limit);
 
-  const [canvasTasks, storyTasks] = await Promise.all([
+  const [canvasTasks, storyTasks, canvasSubmittedCount, canvasPendingCount, storySubmittedCount, storyPendingCount] =
+    await Promise.all([
     prisma.canvasGenerationTask.findMany({
       where: canvasWhere,
       orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
@@ -341,9 +342,20 @@ export async function fetchPollPoolSnapshot(input: {
         createdAt: true,
         lastPolledAt: true,
         pollCount: true,
-        inputPayload: true,
         project: { select: { name: true } },
       },
+    }),
+    prisma.canvasGenerationTask.count({
+      where: { AND: [canvasWhere, { status: "SUBMITTED" }] },
+    }),
+    prisma.canvasGenerationTask.count({
+      where: { AND: [canvasWhere, { status: "PENDING" }] },
+    }),
+    prisma.storyGenerationTask.count({
+      where: { AND: [storyWhere, { status: "SUBMITTED" }] },
+    }),
+    prisma.storyGenerationTask.count({
+      where: { AND: [storyWhere, { status: "PENDING" }] },
     }),
   ]);
 
@@ -431,15 +443,15 @@ export async function fetchPollPoolSnapshot(input: {
       queue: gatewayQueue,
     },
     canvas: {
-      totalSubmitted: canvasTasks.filter((t) => t.status === "SUBMITTED").length,
-      totalPending: canvasTasks.filter((t) => t.status === "PENDING").length,
+      totalSubmitted: canvasSubmittedCount,
+      totalPending: canvasPendingCount,
       slowCount: canvasSlowCount,
       backgroundCount: canvasBackgroundCount,
       queue: canvasQueue,
     },
     story: {
-      totalSubmitted: storyTasks.filter((t) => t.status === "SUBMITTED").length,
-      totalPending: storyTasks.filter((t) => t.status === "PENDING").length,
+      totalSubmitted: storySubmittedCount,
+      totalPending: storyPendingCount,
       slowCount: storySlowCount,
       backgroundCount: storyBackgroundCount,
       queue: storyQueue,

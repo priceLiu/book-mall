@@ -11,7 +11,10 @@ import {
 } from "@/lib/gateway/log-dashboard-actor";
 import { resolveGatewayLogAppTaskLinks } from "@/lib/gateway/log-app-task-link";
 import { resolveGatewayLogDisplayModelKey } from "@/lib/gateway/gateway-log-display-model";
-import { resolveVolcengineLogTiming } from "@/lib/gateway/log-volcengine-timing";
+import {
+  resolveVendorNativeTimingForLogRow,
+  resolveVolcengineLogTiming,
+} from "@/lib/gateway/log-volcengine-timing";
 import {
   computeLogTotalPages,
   GATEWAY_LOG_PAGE_SIZE_MAX,
@@ -99,6 +102,12 @@ export async function GET(request: NextRequest) {
         completedAt: l.completedAt,
         resultSummary: l.resultSummary,
       });
+      const vendorNative = resolveVendorNativeTimingForLogRow({
+        providerKind: l.providerKind,
+        requestKind: l.requestKind,
+        vendorDurationMs: l.vendorDurationMs,
+        resultSummary: l.resultSummary,
+      });
       const category = resolveBillingCategory(l, l.billingCategory);
       const appTask = appTaskLinks.get(l.id);
       const failCode = resolveGatewayFailCodeDisplay({
@@ -123,6 +132,8 @@ export async function GET(request: NextRequest) {
         generateMs: timing?.generateMs ?? null,
         vendorPostProcessMs: timing?.vendorPostProcessMs ?? null,
         pollDelayMs: timing?.pollDelayMs ?? null,
+        vendorNativeDurationMs: vendorNative.vendorNativeDurationMs,
+        vendorNativeGenerateMs: vendorNative.vendorNativeGenerateMs,
         clientSource: l.clientSource,
         clientPage: l.clientPage,
         tenantId: l.tenantId,
@@ -150,6 +161,8 @@ export async function GET(request: NextRequest) {
         "generateMs",
         "vendorPostProcessMs",
         "pollDelayMs",
+        "vendorNativeDurationMs",
+        "vendorNativeGenerateMs",
         "actorPhone",
         "actorName",
         "actorDisplayLabel",
@@ -170,6 +183,8 @@ export async function GET(request: NextRequest) {
         r.generateMs ?? "",
         r.vendorPostProcessMs ?? "",
         r.pollDelayMs ?? "",
+        r.vendorNativeDurationMs ?? "",
+        r.vendorNativeGenerateMs ?? "",
         r.actorPhone ?? "",
         r.actorName ?? "",
         r.actorDisplayLabel ?? "",

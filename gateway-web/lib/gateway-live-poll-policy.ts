@@ -5,7 +5,7 @@
  */
 export const GATEWAY_LIVE_POLL_ACTIVE_MS = 8_000;
 export const GATEWAY_LIVE_POLL_STALE_MS = 15_000;
-export const GATEWAY_SUMMARY_POLL_ACTIVE_MS = 10_000;
+export const GATEWAY_SUMMARY_POLL_ACTIVE_MS = 20_000;
 
 export type GatewayDynamicActivityCounts = {
   inProgress: number;

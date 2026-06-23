@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatDurationSeconds } from "@/lib/gateway-log-params";
 
 type PollPoolGatewayRow = {
@@ -84,7 +84,7 @@ type PollPoolResponse = {
   error?: string;
 };
 
-const POLL_MS = 10_000;
+const POLL_MS = 20_000;
 
 function formatAgeSec(sec: number): string {
   return formatDurationSeconds(sec * 1000);
@@ -368,27 +368,38 @@ function AppQueueTable({
 
 export function PollPoolView() {
   const [data, setData] = useState<PollPoolResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slowWarnDraft, setSlowWarnDraft] = useState("800");
   const [savingThreshold, setSavingThreshold] = useState(false);
   const [releaseBusyId, setReleaseBusyId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [backgroundOnly, setBackgroundOnly] = useState(false);
+  const hasLoadedRef = useRef(false);
 
-  const load = useCallback(async (opts?: { poll?: boolean }) => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { poll?: boolean; background?: boolean }) => {
+    const isBackground = opts?.background === true;
+    if (!isBackground) {
+      setRefreshing(true);
+    }
+    if (!hasLoadedRef.current && !isBackground) {
+      setInitialLoading(true);
+    }
     setError(null);
-    const qs = new URLSearchParams({ scope: "all", hours: "12" });
+    const qs = new URLSearchParams({ scope: "all" });
     if (opts?.poll) qs.set("poll", "1");
+    else if (isBackground) qs.set("skipPoll", "1");
     const res = await fetch(`/api/book-mall/api/gateway/poll-pool?${qs.toString()}`);
     const body = (await res.json().catch(() => null)) as PollPoolResponse | null;
     if (!res.ok) {
       setError(body?.error ?? `加载失败（${res.status}）`);
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
       return;
     }
     setData(body);
+    hasLoadedRef.current = true;
     if (body?.config.slowWarnSec) {
       setSlowWarnDraft(String(body.config.slowWarnSec));
     }
@@ -412,7 +423,8 @@ export function PollPoolView() {
       }
       setActionMsg(`预警自动处理：${parts.join(" · ")}`);
     }
-    setLoading(false);
+    setInitialLoading(false);
+    setRefreshing(false);
   }, []);
 
   const saveThreshold = useCallback(async () => {
@@ -473,7 +485,9 @@ export function PollPoolView() {
   useEffect(() => {
     void load();
     const timer = setInterval(() => {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") {
+        void load({ background: true });
+      }
     }, POLL_MS);
     return () => clearInterval(timer);
   }, [load]);
@@ -493,15 +507,15 @@ export function PollPoolView() {
           <button
             type="button"
             onClick={() => void load()}
-            disabled={loading}
+            disabled={refreshing}
             className="rounded-md border border-white/15 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
           >
-            {loading ? "刷新中…" : "刷新快照"}
+            {refreshing ? "刷新中…" : "刷新快照"}
           </button>
           <button
             type="button"
             onClick={() => void load({ poll: true })}
-            disabled={loading}
+            disabled={refreshing}
             className="rounded-md border border-sky-500/40 bg-sky-500/15 px-4 py-2 text-sm text-sky-100 hover:bg-sky-500/25 disabled:opacity-50"
           >
             立即 poll
@@ -656,8 +670,11 @@ export function PollPoolView() {
             );
           })()}
         </>
-      ) : loading ? (
+      ) : initialLoading ? (
         <p className="text-sm text-zinc-400">正在加载轮询池…</p>
+      ) : null}
+      {refreshing && data ? (
+        <p className="text-xs text-zinc-500">后台刷新中…</p>
       ) : null}
     </div>
   );

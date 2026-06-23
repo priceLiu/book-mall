@@ -31,7 +31,7 @@ import {
   logProviderFilterOptions,
   LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
-import { resolveLiveLogPhaseTiming } from "@/lib/volcengine-log-timing-live";
+import { resolveLiveLogPhaseTiming, resolveVendorNativeTimingLive } from "@/lib/volcengine-log-timing-live";
 import { useLiveWallClockMs } from "@/lib/use-live-wall-clock";
 import {
   gatewayLivePollIntervalMs,
@@ -72,6 +72,8 @@ export type GatewayLogRow = {
   vendorPostProcessMs?: number | null;
   pollDelayMs?: number | null;
   pollDelayOverLimit?: boolean;
+  vendorNativeDurationMs?: number | null;
+  vendorNativeGenerateMs?: number | null;
   estimatedVendorCostYuan: string | null;
   failCode: string | null;
   failMessage: string | null;
@@ -1169,6 +1171,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 Duration
               </th>
               <th
+                className="w-[72px] text-zinc-500"
+                title="厂商原生总耗时（只读）：KIE costTime 或火山 created_at→updated_at；不写回库，可与左侧 Duration 对比。"
+              >
+                厂商 Dur
+              </th>
+              <th
                 className="w-[88px]"
                 title="Gateway 提交 → 首次观测到火山 running（或仍在 queued 时的累计排队）"
               >
@@ -1179,6 +1187,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 title="厂商 GPU 生成：进行中为墙钟；成功为 updated_at−created_at；失败为观测到厂商终态前的等待"
               >
                 Generate
+              </th>
+              <th
+                className="w-[72px] text-zinc-500"
+                title="厂商原生生成耗时（只读）：火山 trace updated_at−created_at 或 KIE costTime；不写回库，可与左侧 Generate 对比。"
+              >
+                厂商 Gen
               </th>
               <th
                 className="w-[96px]"
@@ -1282,7 +1296,24 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 pollDelayMs,
                 liveTotalMs: live.totalMs,
               });
+              const vendorNative = resolveVendorNativeTimingLive({
+                providerKind: l.providerKind,
+                requestKind: l.requestKind,
+                vendorDurationMs: l.vendorDurationMs,
+                resultSummary: l.resultSummary,
+                nowMs: liveNowMs ?? Date.now(),
+                server: {
+                  vendorNativeDurationMs: l.vendorNativeDurationMs,
+                  vendorNativeGenerateMs: l.vendorNativeGenerateMs,
+                },
+              });
               const duration = formatDurationSeconds(durationMs);
+              const vendorNativeDuration = formatDurationSeconds(
+                vendorNative.vendorNativeDurationMs,
+              );
+              const vendorNativeGenerate = formatDurationSeconds(
+                vendorNative.vendorNativeGenerateMs,
+              );
               const usage = formatUsageYuanDisplay(l.estimatedVendorCostYuan);
               const platformCredits = formatPlatformCreditsDisplay(l.creditsCharged);
               const tokens = formatTokenDisplay(
@@ -1402,6 +1433,16 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   >
                     {duration}
                   </td>
+                  <td
+                    className="align-middle font-mono text-sm text-zinc-500"
+                    title={
+                      vendorNative.vendorNativeDurationMs != null
+                        ? `厂商原生 ${vendorNative.vendorNativeDurationMs} ms（只读，不回写）`
+                        : "厂商未回传可对比总耗时"
+                    }
+                  >
+                    {vendorNativeDuration}
+                  </td>
                   <td className="align-middle">
                     <span
                       className="font-mono text-sm text-zinc-300"
@@ -1416,6 +1457,18 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                       title={generateCell.title}
                     >
                       {generateCell.value}
+                    </span>
+                  </td>
+                  <td className="align-middle">
+                    <span
+                      className="font-mono text-sm text-zinc-500"
+                      title={
+                        vendorNative.vendorNativeGenerateMs != null
+                          ? `厂商原生 ${vendorNative.vendorNativeGenerateMs} ms（只读，不回写）`
+                          : "厂商未回传可对比生成耗时"
+                      }
+                    >
+                      {vendorNativeGenerate}
                     </span>
                   </td>
                   <td className="align-middle">
