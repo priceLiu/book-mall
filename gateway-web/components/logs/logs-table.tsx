@@ -192,6 +192,19 @@ function SpinnerIcon({ className }: { className?: string }) {
   );
 }
 
+function LogsListLoadingRow({ message }: { message: string }) {
+  return (
+    <tr>
+      <td colSpan={24} className="py-20 text-center">
+        <SpinnerIcon className="mx-auto size-6 animate-spin text-sky-400/90" />
+        <p className="mt-3 text-sm text-zinc-400" role="status" aria-live="polite">
+          {message}
+        </p>
+      </td>
+    </tr>
+  );
+}
+
 function RefreshIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -653,15 +666,16 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         page === (initialData.page || 1) &&
         pageSize === (initialData.pageSize || PAGE_SIZE_PRESETS[0])
       ) {
+        setLoading(false);
         return;
       }
     }
 
+    setLoading(true);
+    setFetchError(null);
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void (async () => {
-        setLoading(true);
-        setFetchError(null);
         try {
           const data = await fetchGatewayLogs(fetchParams);
           if (cancelled) return;
@@ -671,6 +685,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
           setTotalPages(data.totalPages);
           setPageSize(data.pageSize);
           if (data.facets) setFacets(data.facets);
+          if (data.canvasQueueStats) setCanvasQueueStats(data.canvasQueueStats);
           setLastRefreshedAt(new Date());
         } catch (e) {
           if (!cancelled) {
@@ -765,6 +780,15 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
   const resetPage = () => setPage(1);
 
+  const switchViewMode = (mode: LogsViewMode) => {
+    if (mode === viewMode) return;
+    setLoading(true);
+    setFetchError(null);
+    setViewMode(mode);
+    resetPage();
+    clearSelectionOnFilter(setSelected);
+  };
+
   const applyPageSize = (next: number) => {
     const clamped = clampPageSize(next);
     setPageSize(clamped);
@@ -808,22 +832,16 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             <button
               type="button"
               className={logFilterChipClass(viewMode === "live")}
-              onClick={() => {
-                setViewMode("live");
-                resetPage();
-                clearSelectionOnFilter(setSelected);
-              }}
+              disabled={loading && viewMode !== "live"}
+              onClick={() => switchViewMode("live")}
             >
               实时（近 1h）
             </button>
             <button
               type="button"
               className={logFilterChipClass(viewMode === "history")}
-              onClick={() => {
-                setViewMode("history");
-                resetPage();
-                clearSelectionOnFilter(setSelected);
-              }}
+              disabled={loading && viewMode !== "history"}
+              onClick={() => switchViewMode("history")}
             >
               历史
             </button>
@@ -1097,7 +1115,10 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         ) : null}
       </div>
 
-      <div className="gw-logs-table-scroll gw-scrollbar-thin min-h-0 flex-1 overflow-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]">
+      <div
+        className="gw-logs-table-scroll gw-scrollbar-thin relative min-h-0 flex-1 overflow-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]"
+        aria-busy={loading}
+      >
         <table className="gw-logs-table min-w-[3356px]">
           <thead>
             <tr>
@@ -1220,6 +1241,16 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             </tr>
           </thead>
           <tbody>
+            {loading ? (
+              <LogsListLoadingRow
+                message={
+                  viewMode === "history"
+                    ? "正在查询历史归档，可能需数十秒…"
+                    : "正在加载日志…"
+                }
+              />
+            ) : (
+              <>
             {logs.map((l) => {
               const isInProgress = isLogInProgress(l.status);
               const live = resolveLiveLogPhaseTiming({
@@ -1510,6 +1541,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 </td>
               </tr>
             ) : null}
+              </>
+            )}
           </tbody>
         </table>
       </div>
