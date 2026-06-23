@@ -131,8 +131,17 @@ export async function reconcileRunningSlotCounts(): Promise<number> {
 
 async function recoverStaleDispatchingTasks(): Promise<number> {
   const cutoff = new Date(Date.now() - getDispatchingStaleSec() * 1000);
+  // 活锁防护：仅看 updatedAt 会被「反复轻触却不推进状态」的写刷新，使任务永不达到陈旧阈值
+  // 而永久卡在 DISPATCHING。补一条「无 vendor 任务 id（kieTaskId 为空）且 queuedAt 已过阈值」的判据，
+  // 该口径只依赖入队时间，不受 updatedAt 抖动影响，确保未真正派发出去的任务一定能被捞回重派。
   const stale = await prisma.canvasGenerationTask.findMany({
-    where: { status: "DISPATCHING", updatedAt: { lt: cutoff } },
+    where: {
+      status: "DISPATCHING",
+      OR: [
+        { updatedAt: { lt: cutoff } },
+        { kieTaskId: null, queuedAt: { lt: cutoff } },
+      ],
+    },
     select: { id: true, projectId: true, actorUserId: true, project: { select: { userId: true } } },
     take: 50,
   });

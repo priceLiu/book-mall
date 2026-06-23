@@ -3,7 +3,9 @@
  * poll-loop 子进程通过 PRISMA_CONNECTION_LIMIT=1 限制占用；web 进程沿用 DATABASE_URL。
  */
 
-const DEV_DEFAULT_CONNECTION_LIMIT = 20;
+// 直连腾讯云 PG（无 PgBouncer）下，web 进程默认连接预算。10 太小：几个慢查询/瞬时网络抖动
+// 就会占满池 → 请求排队到 pool_timeout → 卡死。DB max_connections 余量极大（2048），抬到 30。
+const DEV_DEFAULT_CONNECTION_LIMIT = 30;
 
 function readPositiveInt(raw: string | undefined): number | null {
   if (!raw?.trim()) return null;
