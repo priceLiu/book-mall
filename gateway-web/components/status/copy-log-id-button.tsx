@@ -27,7 +27,7 @@ export function CopyLogIdButton({
 
   if (!trimmed) {
     return (
-      <span className="text-zinc-600" title="提交阶段失败时通常无 Vendor Task ID，请复制 Request ID">
+      <span className="text-[var(--gw-muted)]" title="提交阶段失败时通常无 Vendor Task ID，请复制 Request ID">
         {emptyLabel}
       </span>
     );
@@ -37,11 +37,11 @@ export function CopyLogIdButton({
     <button
       type="button"
       onClick={() => void onCopy()}
-      className="group inline-flex max-w-full items-center gap-1 font-mono text-xs text-sky-400 hover:underline"
+      className="group inline-flex max-w-full items-center gap-1 font-mono text-xs text-[var(--gw-accent)] hover:underline"
       title={`复制 ${label}`}
     >
       <span className="truncate">{trimmed.slice(0, 14)}{trimmed.length > 14 ? "…" : ""}</span>
-      <span className="shrink-0 text-[10px] text-zinc-500 group-hover:text-sky-300">
+      <span className="shrink-0 text-[10px] text-[var(--gw-muted)] group-hover:text-[var(--gw-accent)]">
         {copied ? "已复制" : "复制"}
       </span>
     </button>

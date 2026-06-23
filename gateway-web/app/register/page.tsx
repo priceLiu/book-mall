@@ -37,7 +37,7 @@ export default function RegisterPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="gw-card w-full max-w-md">
-        <h1 className="text-xl font-semibold text-white">注册 Gateway 账号</h1>
+        <h1 className="text-xl font-semibold text-[var(--gw-ink)]">注册 Gateway 账号</h1>
         <p className="mt-1 text-sm text-[var(--gw-muted)]">
           独立 Gateway 账号；若已在 Book 注册请使用 Book SSO 登录。
         </p>

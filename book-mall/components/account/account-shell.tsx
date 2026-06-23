@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { AccountNavMenu } from "@/components/account/account-nav-menu";
 import { AccountMobileNavSlot } from "@/components/account/account-mobile-nav-slot";
-import { ToggleTheme } from "@/components/layout/toogle-theme";
 
 export function AccountShell({
   profile,
@@ -53,27 +52,28 @@ export function AccountShell({
   };
 
   return (
-    <div className="account-shell-root w-full overflow-x-clip bg-background">
+    <div className="account-shell-root site-app-shell w-full overflow-x-clip">
       <div className="grid w-full md:grid-cols-[15.5rem_minmax(0,1fr)]">
-        <aside className="hidden border-r border-border bg-card/30 md:sticky md:top-0 md:block md:max-h-screen md:self-start md:overflow-y-auto md:overscroll-y-contain">
+        <aside
+          className="site-app-sidebar hidden md:sticky md:top-16 md:block md:max-h-[calc(100dvh-4rem)] md:self-start md:overflow-y-auto md:overscroll-y-contain"
+        >
           <div className="px-3 py-4">
             <AccountNavMenu {...menuProps} placement="sidebar" />
           </div>
         </aside>
 
         <div className="min-w-0">
-          <header className="sticky top-0 z-10 flex h-12 items-center justify-between gap-3 border-b border-border bg-background px-4 md:px-6">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <AccountMobileNavSlot {...menuProps} />
-              <p className="truncate text-sm font-medium text-muted-foreground">
-                <Link href="/account" className="hover:text-foreground">
-                  个人中心
-                </Link>
-              </p>
-            </div>
-            <ToggleTheme iconOnly className="shrink-0" />
+          <header
+            className="site-app-subheader sticky top-16 z-10 flex h-12 items-center gap-3 px-4 md:hidden"
+          >
+            <AccountMobileNavSlot {...menuProps} />
+            <p className="truncate text-sm font-semibold text-[#656d76]">
+              <Link href="/account" className="hover:text-[#1f2328]">
+                个人中心
+              </Link>
+            </p>
           </header>
-          <main className="account-center px-4 py-6 md:px-8 md:py-8">
+          <main className="site-app-main account-center px-4 py-6 md:px-8 md:py-8">
             <div className="mx-auto w-full max-w-5xl min-w-0">{children}</div>
           </main>
         </div>

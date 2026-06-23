@@ -1,26 +1,35 @@
-/* 营销前台：固定浅色 YouMind 工作室风（不受全局 dark 切换影响） */
+/* 营销前台：GitHub 浅色体系（与 gateway-web 对齐） */
 :is([data-site-home], [data-site-home-header]) {
-  --font-cereal: "Cereal", "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-cereal:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Noto Sans",
+    Helvetica,
+    Arial,
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
   --background: 0 0% 100%;
-  --foreground: 240 6% 10%;
+  --foreground: 210 12% 16%;
   --card: 0 0% 100%;
-  --card-foreground: 240 6% 10%;
+  --card-foreground: 210 12% 16%;
   --popover: 0 0% 100%;
-  --popover-foreground: 240 6% 10%;
-  --primary: 240 6% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 5% 96%;
-  --secondary-foreground: 240 6% 10%;
-  --muted: 240 5% 96%;
-  --muted-foreground: 240 4% 46%;
-  --accent: 240 5% 96%;
-  --accent-foreground: 240 6% 10%;
+  --popover-foreground: 210 12% 16%;
+  --primary: 210 12% 16%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 17% 98%;
+  --secondary-foreground: 210 12% 16%;
+  --muted: 210 17% 98%;
+  --muted-foreground: 215 9% 43%;
+  --accent: 210 17% 98%;
+  --accent-foreground: 210 12% 16%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
-  --border: 240 6% 90%;
-  --input: 240 6% 90%;
-  --ring: 240 4% 46%;
-  --radius: 0.75rem;
+  --border: 210 12% 86%;
+  --input: 210 12% 86%;
+  --ring: 212 100% 40%;
+  --radius: 0.375rem;
 }
 
 [data-site-home] {
@@ -41,24 +50,7 @@
   width: 100%;
   overflow: hidden;
   scroll-margin-top: 4rem;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    "PingFang SC",
-    "Hiragino Sans GB",
-    "Microsoft YaHei",
-    "Helvetica Neue",
-    Arial,
-    sans-serif;
-}
-
-[data-site-home] .site-home-hero-ambient {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: transparent;
+  font-family: var(--font-cereal);
 }
 
 [data-site-home] .site-home-hero-inner {
@@ -96,46 +88,55 @@
 @media (min-width: 640px) {
   [data-site-home] .site-home-hero-content {
     padding-left: 1.5rem;
-    padding-right: 2rem;
+    padding-right: 1.5rem;
   }
 }
 
 @media (min-width: 1024px) {
   [data-site-home] .site-home-hero-content {
-    padding: 2rem 2rem 2rem clamp(1.5rem, 4vw, 3rem);
-    max-width: 32rem;
+    padding: 2rem 1.5rem 2rem clamp(1.5rem, 3vw, 2.5rem);
+    max-width: none;
   }
 }
 
 [data-site-home] .site-home-hero-title {
-  margin: 0 0 1.25rem;
-  font-size: clamp(1.875rem, 3.2vw, 3rem);
+  margin: 0 0 1rem;
+  font-family: var(--font-cereal);
+  font-size: clamp(1.625rem, 2.2vw + 0.75rem, 2.75rem);
   font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  color: hsl(var(--foreground));
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  color: #1f2328;
+}
+
+@media (min-width: 1024px) {
+  [data-site-home] .site-home-hero-title {
+    white-space: nowrap;
+  }
 }
 
 @media (min-width: 1280px) {
   [data-site-home] .site-home-hero-title {
-    font-size: 3rem;
-    margin-bottom: 1.5rem;
+    font-size: 2.75rem;
+    margin-bottom: 1.25rem;
   }
 }
 
 [data-site-home] .site-home-hero-subtitle {
   margin: 0;
-  max-width: 30rem;
-  font-size: 0.9375rem;
+  max-width: 36rem;
+  font-family: var(--font-cereal);
+  font-size: 1.25rem;
   font-weight: 400;
-  line-height: 1.7;
-  color: hsl(var(--muted-foreground));
+  line-height: 1.5;
+  color: #656d76;
 }
 
 @media (min-width: 1280px) {
   [data-site-home] .site-home-hero-subtitle {
-    font-size: 1rem;
-    line-height: 1.75;
+    font-size: 1.25rem;
+    line-height: 1.5;
+    max-width: 40rem;
   }
 }
 
@@ -152,43 +153,48 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 2.75rem;
-  padding: 0 1.75rem;
-  font-size: 0.9375rem;
+  height: 2.5rem;
+  padding: 0 1rem;
+  font-family: var(--font-cereal);
+  font-size: 0.875rem;
   font-weight: 500;
-  line-height: 1;
-  color: hsl(var(--primary-foreground));
+  line-height: 1.25;
+  color: #ffffff;
   text-decoration: none;
-  background: hsl(var(--primary));
-  border: 1px solid transparent;
-  border-radius: 9999px;
+  background: #1f2328;
+  border: 1px solid #1f2328;
+  border-radius: 0.375rem;
   transition: background 0.15s ease;
 }
 
 [data-site-home] .site-home-btn-primary:hover {
-  background: hsl(var(--primary) / 0.9);
+  background: #1f2328e6;
 }
 
 [data-site-home] .site-home-btn-secondary {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  height: 2.75rem;
+  height: 2.5rem;
   margin-left: 0;
-  padding: 0 1.25rem;
-  font-size: 0.9375rem;
+  padding: 0 1rem;
+  font-family: var(--font-cereal);
+  font-size: 0.875rem;
   font-weight: 500;
-  line-height: 1;
-  color: hsl(var(--foreground));
+  line-height: 1.25;
+  color: #1f2328;
   text-decoration: none;
-  background: transparent;
-  border: 1px solid hsl(var(--border));
-  border-radius: 9999px;
-  transition: background 0.15s ease;
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 0.375rem;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 [data-site-home] .site-home-btn-secondary:hover {
-  background: hsl(var(--muted));
+  background: #f6f8fa;
+  border-color: #d1d9e0;
 }
 
 [data-site-home] .site-home-btn-badge {
@@ -430,7 +436,7 @@
   opacity: 1;
 }
 
-/* —— 顶栏（全宽：Logo 左 + 导航居中 + 操作右 · 透明磨砂） —— */
+/* —— 顶栏（GitHub：白底 + 底边框） —— */
 :is([data-site-home], [data-site-home-header]) .site-home-nav {
   position: fixed;
   top: 0;
@@ -438,65 +444,10 @@
   right: 0;
   z-index: 999;
   width: 100%;
-  isolation: isolate;
   height: 4rem;
-  border-bottom: 1px solid hsl(var(--border) / 0.4);
-  background: hsl(0 0% 100% / 0.62);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow:
-    inset 0 1px 0 0 hsl(0 0% 100% / 0.85),
-    0 4px 24px -8px hsl(240 6% 10% / 0.08);
-  font-family:
-    var(--font-cereal),
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    "San Francisco Pro",
-    Roboto,
-    sans-serif,
-    "PingFang SC",
-    "Microsoft YaHei",
-    "Source Han Sans SC",
-    "Noto Sans SC";
-}
-
-:is([data-site-home], [data-site-home-header]) .site-home-nav::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  z-index: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    hsl(0 0% 100% / 0) 0%,
-    hsl(0 0% 100% / 0.95) 18%,
-    hsl(0 0% 100% / 1) 50%,
-    hsl(0 0% 100% / 0.95) 82%,
-    hsl(0 0% 100% / 0) 100%
-  );
-  pointer-events: none;
-}
-
-:is([data-site-home], [data-site-home-header]) .site-home-nav::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: radial-gradient(
-    120% 80% at 50% -20%,
-    hsl(0 0% 100% / 0.55) 0%,
-    hsl(0 0% 100% / 0.12) 42%,
-    transparent 72%
-  );
-  pointer-events: none;
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :is([data-site-home], [data-site-home-header]) .site-home-nav {
-    background: hsl(0 0% 100% / 0.94);
-  }
+  border-bottom: 1px solid #d1d9e0;
+  background: #ffffff;
+  font-family: var(--font-cereal);
 }
 
 :is([data-site-home], [data-site-home-header]) .site-home-nav-spacer {
@@ -541,24 +492,12 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.5rem 1rem;
-  font-family:
-    var(--font-cereal),
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    "San Francisco Pro",
-    Roboto,
-    sans-serif,
-    "PingFang SC",
-    "Microsoft YaHei",
-    "Source Han Sans SC",
-    "Noto Sans SC";
-  font-size: 0.9375rem;
+  font-family: var(--font-cereal);
+  font-size: 0.875rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.35;
-  color: hsl(var(--foreground));
+  letter-spacing: normal;
+  line-height: 1.25;
+  color: #1f2328;
   text-decoration: none;
   white-space: nowrap;
   background: transparent;
@@ -573,11 +512,9 @@
 
 :is([data-site-home], [data-site-home-header]) .site-home-nav-link:hover,
 :is([data-site-home], [data-site-home-header]) .site-home-nav-link[data-state="open"] {
-  color: hsl(var(--foreground));
-  background: hsl(var(--muted));
-  box-shadow:
-    inset 0 1px 0 0 hsl(0 0% 100% / 0.9),
-    0 1px 4px hsl(240 6% 10% / 0.1);
+  color: #1f2328;
+  background: #f6f8fa;
+  box-shadow: none;
 }
 
 :is([data-site-home], [data-site-home-header]) .site-home-nav-link-active {
@@ -670,56 +607,54 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 2.25rem;
-  padding: 0 1rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  font-family: var(--font-cereal);
   font-size: 0.875rem;
   font-weight: 500;
-  line-height: 1;
-  color: hsl(var(--primary-foreground));
-  background: hsl(var(--primary));
-  border: 1px solid hsl(var(--primary));
-  border-radius: 9999px;
+  line-height: 1.25;
+  color: #ffffff;
+  background: #1f2328;
+  border: 1px solid #1f2328;
+  border-radius: 0.375rem;
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.15s ease;
 }
 
 :is([data-site-home], [data-site-home-header]) .site-home-nav-action-primary:hover {
-  background: hsl(240 6% 16%);
-  border-color: hsl(240 6% 16%);
-  box-shadow: 0 2px 8px hsl(240 6% 10% / 0.18);
+  background: #1f2328e6;
+  border-color: #1f2328e6;
+  box-shadow: none;
 }
 
 :is([data-site-home], [data-site-home-header]) .site-home-nav-action-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 2.25rem;
-  padding: 0 1rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  font-family: var(--font-cereal);
   font-size: 0.875rem;
   font-weight: 500;
-  line-height: 1;
-  color: hsl(var(--foreground));
-  background: hsl(0 0% 100% / 0.45);
-  border: 1px solid hsl(var(--border) / 0.65);
-  border-radius: 0.5rem;
+  line-height: 1.25;
+  color: #1f2328;
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 0.375rem;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.65);
+  box-shadow: none;
   transition:
     background 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color 0.15s ease;
 }
 
 :is([data-site-home], [data-site-home-header]) .site-home-nav-action-outline:hover {
-  background: hsl(var(--muted));
-  border-color: hsl(var(--border));
-  color: hsl(var(--foreground));
-  box-shadow:
-    inset 0 1px 0 0 hsl(0 0% 100% / 0.9),
-    0 1px 4px hsl(240 6% 10% / 0.08);
+  background: #f6f8fa;
+  border-color: #d1d9e0;
+  color: #1f2328;
 }
 
 :is([data-site-home], [data-site-home-header]) .site-home-nav-icon-btn {
@@ -729,23 +664,19 @@
   width: 2.25rem;
   height: 2.25rem;
   padding: 0;
-  color: hsl(var(--foreground));
+  color: #1f2328;
   background: transparent;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
   cursor: pointer;
   transition:
     color 0.15s ease,
-    background 0.15s ease,
-    box-shadow 0.15s ease;
+    background 0.15s ease;
 }
 
 :is([data-site-home], [data-site-home-header]) .site-home-nav-icon-btn:hover {
-  color: hsl(var(--foreground));
-  background: hsl(var(--muted));
-  box-shadow:
-    inset 0 1px 0 0 hsl(0 0% 100% / 0.85),
-    0 1px 3px hsl(240 6% 10% / 0.08);
+  color: #1f2328;
+  background: #f6f8fa;
 }
 
 :is([data-site-home], [data-site-home-header]) .site-home-nav-icon-btn svg {
@@ -830,6 +761,87 @@
 
 [data-site-home] .site-home-below-hero {
   background-color: #ffffff;
+}
+
+/* —— 个人中心 / 管理后台（与首页 GitHub 浅色对齐） —— */
+[data-site-home] .site-app-shell {
+  background-color: #ffffff;
+  color: hsl(var(--foreground));
+  font-family: var(--font-cereal);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-site-home] .site-app-sidebar {
+  border-right: 1px solid #d1d9e0;
+  background-color: #f6f8fa;
+}
+
+[data-site-home] .site-app-subheader {
+  border-bottom: 1px solid #d1d9e0;
+  background-color: #ffffff;
+}
+
+[data-site-home] .site-app-main {
+  background-color: #ffffff;
+}
+
+[data-site-home] .site-app-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.375rem 0.75rem;
+  font-family: var(--font-cereal);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #1f2328;
+  text-decoration: none;
+  border-radius: 0.375rem;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+[data-site-home] .site-app-nav-link:hover {
+  color: #1f2328;
+  background: #f6f8fa;
+}
+
+[data-site-home] .site-app-nav-link-active {
+  font-weight: 700;
+  background: #f6f8fa;
+}
+
+[data-site-home] .site-app-section-title {
+  font-family: var(--font-cereal);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: #1f2328;
+}
+
+@media (min-width: 768px) {
+  [data-site-home] .site-app-section-title {
+    font-size: 1.5rem;
+  }
+}
+
+[data-site-home] .site-app-shell .border-secondary,
+[data-site-home] .site-app-shell .border-border {
+  border-color: #d1d9e0;
+}
+
+[data-site-home] .site-app-shell .shadow-sm {
+  box-shadow: none;
+}
+
+[data-site-home] .site-app-profile-card {
+  border: 1px solid #d1d9e0;
+  border-radius: 0.375rem;
+  background: #ffffff;
 }
 
 [data-site-home] .site-marketing-section {

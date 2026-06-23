@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 export default function PublicGuidePage() {
   return (
     <div className="min-h-screen">
-      <header className="border-b border-white/10 bg-[var(--gw-surface)]">
+      <header className="border-b border-[var(--gw-border)] bg-[var(--gw-surface)]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
-          <Link href="/" className="text-sm font-semibold text-white">
+          <Link href="/" className="text-sm font-semibold text-[var(--gw-ink)]">
             Gateway 控制台
           </Link>
           <nav className="flex items-center gap-3 text-sm">
@@ -27,7 +27,7 @@ export default function PublicGuidePage() {
             </Link>
             <Link
               href="/login"
-              className="text-[var(--gw-muted)] hover:text-white"
+              className="text-[var(--gw-muted)] hover:text-[var(--gw-ink)]"
             >
               登录
             </Link>

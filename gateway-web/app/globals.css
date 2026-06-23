@@ -2,13 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* GitHub 深色设计 token（对齐 https://github.com/ Dashboard Dark） */
 :root {
-  --gw-bg: #0c0c0f;
-  --gw-surface: #141419;
-  --gw-border: rgba(255, 255, 255, 0.08);
-  --gw-ink: #f4f4f5;
-  --gw-muted: #a1a1aa;
-  --gw-accent: #fb923c;
+  --gw-font-sans:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "Noto Sans",
+    Helvetica,
+    Arial,
+    sans-serif,
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
+  --gw-bg: #0d1117;
+  --gw-surface: #161b22;
+  --gw-surface-elevated: #161b22;
+  --gw-border: #30363d;
+  --gw-ink: #e6edf3;
+  --gw-muted: #7d8590;
+  --gw-accent: #4493f8;
+  --gw-accent-hover: #58a6ff;
+  --gw-accent-muted: rgba(56, 139, 253, 0.15);
+  --gw-hover: #21262d;
+  --gw-btn-primary-bg: #238636;
+  --gw-btn-primary-hover: #2ea043;
   --gw-log-tip-max-h: 680px;
   --gw-log-tip-body-max-h: 580px;
   --gw-log-tip-width: 720px;
@@ -17,28 +34,69 @@
 }
 
 body {
-  @apply m-0 min-h-screen bg-[var(--gw-bg)] text-[var(--gw-ink)] antialiased;
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--gw-font-sans);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--gw-ink);
+  background: var(--gw-bg);
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer components {
   .gw-card {
-    @apply rounded-xl border border-white/10 bg-[var(--gw-surface)] p-5;
+    @apply rounded-md border border-[var(--gw-border)] bg-[var(--gw-surface-elevated)] p-5;
   }
 
   .gw-input {
-    @apply w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-[var(--gw-accent)];
+    @apply w-full rounded-md border border-[var(--gw-border)] bg-[var(--gw-bg)] px-3 py-2 text-sm text-[var(--gw-ink)] outline-none;
+  }
+
+  .gw-input:focus {
+    border-color: var(--gw-accent);
+    box-shadow: 0 0 0 2px rgba(56, 139, 253, 0.3);
   }
 
   .gw-btn {
-    @apply inline-flex items-center justify-center rounded-lg bg-[var(--gw-accent)] px-4 py-2 text-sm font-medium text-black transition hover:bg-orange-400;
+    @apply inline-flex items-center justify-center rounded-md bg-[var(--gw-btn-primary-bg)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--gw-btn-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .gw-btn-ghost {
-    @apply inline-flex items-center justify-center rounded-lg border border-white/15 px-4 py-2 text-sm text-white transition hover:border-white/30 hover:bg-white/5;
+    @apply inline-flex items-center justify-center rounded-md border border-[var(--gw-border)] bg-[var(--gw-surface)] px-4 py-2 text-sm text-[var(--gw-ink)] transition hover:bg-[var(--gw-hover)];
   }
 
   .gw-btn-secondary {
-    @apply inline-flex items-center justify-center rounded-lg border border-orange-400/40 bg-orange-500/10 px-4 py-2 text-sm font-medium text-orange-300 transition hover:bg-orange-500/20;
+    @apply inline-flex items-center justify-center rounded-md border border-[var(--gw-border)] bg-[var(--gw-surface)] px-4 py-2 text-sm font-medium text-[var(--gw-ink)] transition hover:bg-[var(--gw-hover)];
+  }
+
+  .gw-btn-sm {
+    @apply inline-flex items-center justify-center rounded-md bg-[var(--gw-btn-primary-bg)] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[var(--gw-btn-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .gw-btn-xs {
+    @apply inline-flex items-center justify-center rounded-md bg-[var(--gw-btn-primary-bg)] px-2.5 py-1 text-xs font-medium text-white transition hover:bg-[var(--gw-btn-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .gw-chip {
+    @apply rounded-md border border-[var(--gw-border)] px-3 py-1.5 text-xs text-[var(--gw-muted)] transition hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)];
+  }
+
+  .gw-chip-active {
+    @apply rounded-md border border-[var(--gw-btn-primary-bg)] bg-[var(--gw-btn-primary-bg)] px-3 py-1.5 text-xs font-medium text-white;
+  }
+
+  .gw-chip-round {
+    @apply rounded-full border border-[var(--gw-border)] px-3 py-1 text-xs text-[var(--gw-muted)] transition hover:border-white/20 hover:text-[var(--gw-ink)];
+  }
+
+  .gw-chip-round-active {
+    @apply rounded-full border border-[var(--gw-btn-primary-bg)] bg-[var(--gw-btn-primary-bg)] px-3 py-1 text-xs font-medium text-white;
+  }
+
+  .gw-accent-control {
+    accent-color: var(--gw-btn-primary-bg);
   }
 
   .gw-table {
@@ -46,28 +104,27 @@ body {
   }
 
   .gw-table th {
-    @apply border-b border-white/10 px-3 py-2 text-xs font-medium uppercase tracking-wide text-[var(--gw-muted)];
+    @apply border-b border-[var(--gw-border)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--gw-muted)];
   }
 
   .gw-table td {
-    @apply border-b border-white/5 px-3 py-2 align-top;
+    @apply border-b border-[var(--gw-border)] px-3 py-2 align-top;
   }
 
   .gw-logs-table {
     @apply w-full text-left text-sm;
   }
 
-  /** 日志表滚动区：表头 sticky 相对此容器 */
   .gw-logs-table-scroll {
     isolation: isolate;
   }
 
   .gw-logs-table th {
-    @apply border-b border-white/[0.08] bg-[#121218] px-4 py-3 text-xs font-normal text-zinc-500;
+    @apply border-b border-[var(--gw-border)] bg-[var(--gw-surface)] px-4 py-3 text-xs font-semibold text-[var(--gw-muted)];
     position: sticky;
     top: 0;
     z-index: 20;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+    box-shadow: 0 1px 0 var(--gw-border);
   }
 
   .gw-logs-table thead {
@@ -76,17 +133,16 @@ body {
   }
 
   .gw-logs-table td {
-    @apply border-b border-white/[0.05] px-4 py-3 align-top;
+    @apply border-b border-[var(--gw-border)] px-4 py-3 align-top text-[var(--gw-ink)];
   }
 
   .gw-logs-row {
-    @apply transition-colors hover:bg-white/[0.03];
+    @apply transition-colors hover:bg-[var(--gw-hover)];
   }
 
-  /** 日志 Params / Result 悬停 Tip · 细滚动条（见 docs/design.md §3） */
   .gw-scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+    scrollbar-color: #484f58 transparent;
   }
 
   .gw-scrollbar-thin::-webkit-scrollbar {
@@ -99,27 +155,27 @@ body {
   }
 
   .gw-scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.22);
+    background: #484f58;
     border-radius: 999px;
   }
 
   .gw-scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.34);
+    background: #6e7681;
   }
 
   .gw-log-preview-tip {
-    @apply fixed z-[9999] rounded-xl border border-white/10 bg-[#23232c] shadow-2xl;
+    @apply fixed z-[9999] rounded-md border border-[var(--gw-border)] bg-[var(--gw-surface-elevated)] shadow-2xl;
     width: min(var(--gw-log-tip-width), calc(100vw - 32px));
     max-height: min(var(--gw-log-tip-max-h), calc(100vh - 24px));
   }
 
   .gw-log-preview-tip__body {
-    @apply gw-scrollbar-thin overflow-auto px-4 pb-3 pt-4;
+    @apply gw-scrollbar-thin overflow-auto px-4 pb-3 pt-4 text-[var(--gw-ink)];
     max-height: min(var(--gw-log-tip-body-max-h), calc(100vh - 120px));
   }
 
   .gw-log-preview-tip__footer {
-    @apply border-t border-white/[0.08] px-3 py-2.5;
+    @apply border-t border-[var(--gw-border)] px-3 py-2.5;
   }
 
   .gw-log-params-cell {
@@ -153,13 +209,13 @@ body {
     justify-content: center;
     overflow: hidden;
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: #1c1c24;
+    border: 1px solid var(--gw-border);
+    background: var(--gw-hover);
     transition: border-color 0.15s ease;
   }
 
   .gw-log-image-thumb:hover .gw-log-image-thumb__frame {
-    border-color: rgba(56, 189, 248, 0.45);
+    border-color: var(--gw-accent);
   }
 
   .gw-log-image-thumb__label {
@@ -169,11 +225,11 @@ body {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 10px;
     line-height: 1.3;
-    color: #a1a1aa;
+    color: var(--gw-muted);
   }
 
   .gw-log-image-thumb:hover .gw-log-image-thumb__label {
-    color: #e4e4e7;
+    color: var(--gw-ink);
   }
 
   .gw-log-image-preview-tip {

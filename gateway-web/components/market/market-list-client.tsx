@@ -28,11 +28,7 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-xs transition ${
-        active
-          ? "border-[var(--gw-accent)] bg-orange-500/15 text-orange-200"
-          : "border-white/10 bg-white/5 text-zinc-400 hover:border-white/20 hover:text-white"
-      }`}
+      className={active ? "gw-chip-round-active" : "gw-chip-round bg-white/5"}
     >
       {children}
     </button>
@@ -45,7 +41,7 @@ function CardCover({ model }: { model: MarketModelCard }) {
 
   if (!model.coverUrl) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-zinc-600">
+      <div className="flex h-full items-center justify-center text-xs text-[var(--gw-muted)]">
         No preview
       </div>
     );
@@ -89,24 +85,24 @@ function ModelCard({ model }: { model: MarketModelCard }) {
           router.push(href);
         }
       }}
-      className="group cursor-pointer overflow-hidden rounded-xl border border-white/10 bg-[var(--gw-surface)] transition hover:border-orange-400/30 hover:bg-white/[0.03]"
+      className="group cursor-pointer overflow-hidden rounded-xl border border-[var(--gw-border)] bg-[var(--gw-surface)] transition hover:border-orange-400/30 hover:bg-[var(--gw-hover)]"
     >
       <div className="relative aspect-[16/10] overflow-hidden bg-black/40">
         <CardCover model={model} />
         {isVideo ? (
-          <span className="absolute right-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white/90">
+          <span className="absolute right-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-[var(--gw-ink)]/90">
             VIDEO
           </span>
         ) : null}
-        <div className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-white/90">
+        <div className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] text-[var(--gw-ink)]/90">
           {model.providerLabel}
         </div>
       </div>
       <div className="space-y-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm font-medium text-white">{model.displayName}</h3>
+          <h3 className="text-sm font-medium text-[var(--gw-ink)]">{model.displayName}</h3>
           {model.creditsPerUnit != null ? (
-            <span className="shrink-0 text-[10px] text-orange-300">
+            <span className="shrink-0 text-[10px] text-[var(--gw-accent)]">
               {model.creditsPerUnit} 积分/次
             </span>
           ) : null}
@@ -115,7 +111,7 @@ function ModelCard({ model }: { model: MarketModelCard }) {
           {model.taskTags.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400"
+              className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-[var(--gw-muted)]"
             >
               {tag}
             </span>
@@ -185,7 +181,7 @@ function HeroCarousel({
   const showVideo = mounted && heroUrl?.endsWith(".mp4");
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+    <div className="relative overflow-hidden rounded-2xl border border-[var(--gw-border)] bg-black/40">
       <div className="relative aspect-[21/7] min-h-[160px]">
         {showVideo ? (
           // eslint-disable-next-line jsx-a11y/media-has-caption
@@ -215,8 +211,8 @@ function HeroCarousel({
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
-          <p className="text-xs uppercase tracking-widest text-orange-300/90">Featured</p>
-          <h2 className="mt-1 text-2xl font-semibold text-white">{title}</h2>
+          <p className="text-xs uppercase tracking-widest text-[var(--gw-accent)]/90">Featured</p>
+          <h2 className="mt-1 text-2xl font-semibold text-[var(--gw-ink)]">{title}</h2>
           <Link
             href={marketModelHref(current.canonicalKey)}
             className="gw-btn mt-4 inline-flex text-sm"
@@ -305,16 +301,16 @@ export function MarketListClient({ initial }: Props) {
           }}
         />
         {loading ? (
-          <span className="text-xs text-zinc-500">刷新中…</span>
+          <span className="text-xs text-[var(--gw-muted)]">刷新中…</span>
         ) : (
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-[var(--gw-muted)]">
             共 {data.total} 个模型 · 第 {data.page}/{data.totalPages} 页
           </span>
         )}
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--gw-muted)]">
           Provider
         </p>
         <div className="flex flex-wrap gap-2">
@@ -330,7 +326,7 @@ export function MarketListClient({ initial }: Props) {
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Task</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--gw-muted)]">Task</p>
         <div className="flex flex-wrap gap-2">
           <Chip active={task === "all"} onClick={() => onTaskChange("all")}>
             All
@@ -344,7 +340,7 @@ export function MarketListClient({ initial }: Props) {
       </div>
 
       {data.models.length === 0 ? (
-        <div className="gw-card text-center text-sm text-zinc-500">
+        <div className="gw-card text-center text-sm text-[var(--gw-muted)]">
           没有匹配的模型。平台代付用户仅展示已上架且有定价的模型；BYOK 用户需先绑定对应厂商凭证。
         </div>
       ) : (
@@ -369,11 +365,11 @@ export function MarketListClient({ initial }: Props) {
                 <button
                   key={n}
                   type="button"
-                  className={`min-w-[2rem] rounded-lg px-2.5 py-1.5 text-xs transition ${
+                  className={
                     n === data.page
-                      ? "bg-orange-500/20 text-orange-200 ring-1 ring-orange-400/40"
-                      : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                  }`}
+                      ? "gw-chip-round-active min-w-[2rem] px-2.5 py-1.5"
+                      : "min-w-[2rem] rounded-lg px-2.5 py-1.5 text-xs text-[var(--gw-muted)] transition hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)]"
+                  }
                   disabled={loading}
                   onClick={() => setPage(n)}
                 >

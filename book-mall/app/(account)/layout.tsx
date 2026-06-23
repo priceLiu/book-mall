@@ -9,6 +9,9 @@ import { buildAccountAppsMenuHint } from "@/lib/account-apps-menu-hint";
 import { getEcommerceWebOrigin, getQuickReplicaOrigin } from "@/lib/app-web-origins";
 import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
 import { AccountShell } from "@/components/account/account-shell";
+import { NavbarAuth } from "@/components/layout/navbar-auth";
+import { SiteAppShell } from "@/components/layout/site-home/site-app-shell";
+import "../site-home.css";
 
 /** Layout 内查询 Prisma；构建阶段 CI 往往无 DATABASE_URL */
 export const dynamic = "force-dynamic";
@@ -73,26 +76,31 @@ export default async function AccountGroupLayout({
   });
 
   return (
-    <AccountShell
-      profile={{
-        image: profile?.image ?? session.user.image ?? null,
-        name: profile?.name ?? session.user.name ?? null,
-        phone: profile?.phone ?? session.user.phone ?? null,
-      }}
-      isAdmin={session.user.role === "ADMIN"}
-      showToolsCta={showToolsCta}
-      canLaunchTools={canLaunchTools}
-      canLaunchCanvas={canLaunchCanvas}
-      canvasOriginConfigured={canvasOriginConfigured}
-      gatewayLinked={gatewayLinked}
-      canLaunchEcommerce={canLaunchEcommerce}
-      ecomOriginConfigured={ecomOriginConfigured}
-      canLaunchQuickReplica={canLaunchQuickReplica}
-      quickReplicaOriginConfigured={quickReplicaOriginConfigured}
-      appsMenuHint={appsMenuHint}
-      billingPersona={userRecord.billingPersona}
+    <SiteAppShell
+      isLoggedIn
+      navAuth={<NavbarAuth appearance="site-home" />}
     >
-      {children}
-    </AccountShell>
+      <AccountShell
+        profile={{
+          image: profile?.image ?? session.user.image ?? null,
+          name: profile?.name ?? session.user.name ?? null,
+          phone: profile?.phone ?? session.user.phone ?? null,
+        }}
+        isAdmin={session.user.role === "ADMIN"}
+        showToolsCta={showToolsCta}
+        canLaunchTools={canLaunchTools}
+        canLaunchCanvas={canLaunchCanvas}
+        canvasOriginConfigured={canvasOriginConfigured}
+        gatewayLinked={gatewayLinked}
+        canLaunchEcommerce={canLaunchEcommerce}
+        ecomOriginConfigured={ecomOriginConfigured}
+        canLaunchQuickReplica={canLaunchQuickReplica}
+        quickReplicaOriginConfigured={quickReplicaOriginConfigured}
+        appsMenuHint={appsMenuHint}
+        billingPersona={userRecord.billingPersona}
+      >
+        {children}
+      </AccountShell>
+    </SiteAppShell>
   );
 }

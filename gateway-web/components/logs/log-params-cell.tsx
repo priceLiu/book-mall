@@ -44,15 +44,15 @@ function ParamsFormattedBody({
   return (
     <div className="space-y-3 font-mono text-[12px] leading-[1.6]">
       <div>
-        <div className="mb-1 font-sans text-[13px] font-medium text-zinc-200">
+        <div className="mb-1 font-sans text-[13px] font-medium text-[var(--gw-ink)]">
           input:
         </div>
-        <pre className="whitespace-pre-wrap break-all text-zinc-300">
+        <pre className="whitespace-pre-wrap break-all text-[var(--gw-ink)]">
           {inputFullJson}
         </pre>
       </div>
-      <div className="font-sans text-[13px] text-zinc-300">
-        <span className="font-medium text-zinc-200">model:</span> {model}
+      <div className="font-sans text-[13px] text-[var(--gw-ink)]">
+        <span className="font-medium text-[var(--gw-ink)]">model:</span> {model}
       </div>
     </div>
   );
@@ -98,7 +98,7 @@ function ParamsPreviewTip({
             e.stopPropagation();
             onCopy();
           }}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/10 hover:text-white"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--gw-muted)] transition hover:bg-white/10 hover:text-[var(--gw-ink)]"
           title={copied ? "已复制" : "复制 Params"}
         >
           <CopyIcon className="h-4 w-4" />
@@ -181,13 +181,13 @@ export function LogParamsCell({
         onMouseEnter={showTip}
         onMouseLeave={scheduleHide}
       >
-        <div className="rounded-lg border border-white/[0.06] bg-[#1c1c24] px-3 py-2.5">
+        <div className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)] px-3 py-2.5">
           <div className="cursor-default font-mono text-[11px] leading-[1.55]">
-            <span className="text-zinc-400">input: </span>
-            <span className="break-all text-zinc-300">{inputPreviewLine}</span>
+            <span className="text-[var(--gw-muted)]">input: </span>
+            <span className="break-all text-[var(--gw-ink)]">{inputPreviewLine}</span>
           </div>
-          <div className="mt-1.5 font-mono text-[11px] text-zinc-400">
-            model: <span className="text-zinc-300">{model}</span>
+          <div className="mt-1.5 font-mono text-[11px] text-[var(--gw-muted)]">
+            model: <span className="text-[var(--gw-ink)]">{model}</span>
           </div>
           <button
             type="button"
@@ -196,7 +196,7 @@ export function LogParamsCell({
               e.stopPropagation();
               void doCopy("cell");
             }}
-            className="mt-2 inline-flex items-center gap-1 text-[11px] text-zinc-500 transition hover:text-zinc-300"
+            className="mt-2 inline-flex items-center gap-1 text-[11px] text-[var(--gw-muted)] transition hover:text-[var(--gw-ink)]"
             title={copied ? "已复制" : "复制 Params"}
           >
             <CopyIcon className="h-3 w-3" />

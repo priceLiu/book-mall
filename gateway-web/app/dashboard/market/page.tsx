@@ -24,8 +24,8 @@ export default async function MarketPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-white">Models Market</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-xl font-semibold text-[var(--gw-ink)]">Models Market</h1>
+        <p className="mt-1 text-sm text-[var(--gw-muted)]">
           浏览已上架模型 · 筛选厂商与任务类型 · 点击进入 Playground 试跑（经 Gateway 扣费 / BYOK）
         </p>
       </div>

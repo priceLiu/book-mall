@@ -317,11 +317,11 @@ function SpinnerIcon({ className }: { className?: string }) {
 function LoadingBanner({ message }: { message: string }) {
   return (
     <div
-      className="flex items-center gap-2 rounded-lg border border-sky-500/25 bg-sky-500/10 px-4 py-2.5 text-sm text-sky-100"
+      className="flex items-center gap-2 rounded-lg border border-[var(--gw-accent)]/30 bg-[var(--gw-accent-muted)] px-4 py-2.5 text-sm text-[var(--gw-accent)]"
       role="status"
       aria-live="polite"
     >
-      <SpinnerIcon className="h-4 w-4 shrink-0 text-sky-300" />
+      <SpinnerIcon className="h-4 w-4 shrink-0 text-[var(--gw-accent)]" />
       <span>{message}</span>
     </div>
   );
@@ -329,7 +329,7 @@ function LoadingBanner({ message }: { message: string }) {
 
 function StatCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-lg border border-white/10 bg-[var(--gw-surface)] p-4">
+    <div className="animate-pulse rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)] p-4">
       <div className="h-3 w-16 rounded bg-white/10" />
       <div className="mt-3 h-8 w-12 rounded bg-white/10" />
     </div>
@@ -348,12 +348,12 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[var(--gw-surface)] p-4">
-      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+    <div className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)] p-4">
+      <div className="text-xs uppercase tracking-wide text-[var(--gw-muted)]">{label}</div>
       <div className={`mt-2 text-3xl font-semibold tabular-nums ${accent}`}>
         {value}
       </div>
-      {sub ? <div className="mt-1 text-xs text-zinc-500">{sub}</div> : null}
+      {sub ? <div className="mt-1 text-xs text-[var(--gw-muted)]">{sub}</div> : null}
     </div>
   );
 }
@@ -764,7 +764,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   useEffect(() => {
     if (viewMode !== "dashboard" || queryMode !== "live") return;
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: number | undefined;
     const counts = {
       inProgress: inProgressCount,
       slowWarn: slowWarnCount,
@@ -885,20 +885,20 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-white">状态驾驶舱</h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <h1 className="text-xl font-semibold text-[var(--gw-ink)]">状态驾驶舱</h1>
+          <p className="mt-1 text-sm text-[var(--gw-muted)]">
             统计卡片按需刷新（无进行中约 60s / 有进行中或预警约 10s）·「生成中」「后台等待」「预警」Tab 在有任务时约 10s 增量拉取 · 成功/失败明细按需加载
           </p>
         </div>
         {loading ? (
-          <span className="inline-flex items-center gap-2 text-xs text-sky-300/90">
+          <span className="inline-flex items-center gap-2 text-xs text-[var(--gw-accent)]/90">
             <SpinnerIcon className="h-3.5 w-3.5" />
             {loadingMessage}
           </span>
         ) : null}
       </div>
 
-      <div className="flex gap-1 rounded-lg border border-white/10 bg-[var(--gw-surface)] p-1 w-fit">
+      <div className="flex gap-1 rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)] p-1 w-fit">
         {(
           [
             { id: "dashboard" as const, label: "驾驶舱" },
@@ -909,10 +909,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             key={tab.id}
             type="button"
             onClick={() => setViewMode(tab.id)}
-            className={`rounded-md px-4 py-2 text-sm ${
-              viewMode === tab.id
-                ? "bg-sky-600 text-white"
-                : "text-zinc-400 hover:text-white"
+            className={`px-4 py-2 text-sm disabled:cursor-wait disabled:opacity-60 ${
+              viewMode === tab.id ? "gw-chip-active" : "text-[var(--gw-muted)] hover:text-[var(--gw-ink)]"
             }`}
           >
             {tab.label}
@@ -920,11 +918,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         ))}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-white/10 bg-[var(--gw-surface)] p-4">
-        <label className="flex flex-col gap-1 text-xs text-zinc-400">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)] p-4">
+        <label className="flex flex-col gap-1 text-xs text-[var(--gw-muted)]">
           主体
           <select
-            className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
+            className="rounded-md border border-[var(--gw-border)] bg-black/30 px-2 py-1.5 text-sm text-[var(--gw-ink)]"
             value={filters.scope}
             onChange={(e) => {
               const scope = e.target.value as DashboardScope;
@@ -948,10 +946,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
 
         {filters.scope === "team" ? (
           <>
-            <label className="flex flex-col gap-1 text-xs text-zinc-400">
+            <label className="flex flex-col gap-1 text-xs text-[var(--gw-muted)]">
               团队
               <select
-                className="min-w-[180px] rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
+                className="min-w-[180px] rounded-md border border-[var(--gw-border)] bg-black/30 px-2 py-1.5 text-sm text-[var(--gw-ink)]"
                 value={filters.tenantId}
                 onChange={(e) =>
                   commitFilters({
@@ -972,10 +970,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                 )}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs text-zinc-400">
+            <label className="flex flex-col gap-1 text-xs text-[var(--gw-muted)]">
               成员手机号
               <input
-                className="min-w-[160px] rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
+                className="min-w-[160px] rounded-md border border-[var(--gw-border)] bg-black/30 px-2 py-1.5 text-sm text-[var(--gw-ink)]"
                 placeholder="输入手机号自动筛选"
                 value={phoneDraft}
                 onChange={(e) => setPhoneDraft(e.target.value)}
@@ -985,10 +983,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         ) : null}
 
         {filters.scope === "actor" ? (
-          <label className="flex flex-col gap-1 text-xs text-zinc-400">
+          <label className="flex flex-col gap-1 text-xs text-[var(--gw-muted)]">
             手机号
             <input
-              className="min-w-[160px] rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
+              className="min-w-[160px] rounded-md border border-[var(--gw-border)] bg-black/30 px-2 py-1.5 text-sm text-[var(--gw-ink)]"
               placeholder={
                 initialMeta.currentUser?.phone ??
                 initialMeta.currentUser?.displayLabel ??
@@ -1001,10 +999,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         ) : null}
 
         {filters.scope === "project" ? (
-          <label className="flex flex-col gap-1 text-xs text-zinc-400">
+          <label className="flex flex-col gap-1 text-xs text-[var(--gw-muted)]">
             storyProjectId
             <input
-              className="min-w-[200px] rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
+              className="min-w-[200px] rounded-md border border-[var(--gw-border)] bg-black/30 px-2 py-1.5 text-sm text-[var(--gw-ink)]"
               value={filters.storyProjectId}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, storyProjectId: e.target.value }))
@@ -1013,10 +1011,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           </label>
         ) : null}
 
-        <label className="flex flex-col gap-1 text-xs text-zinc-400">
+        <label className="flex flex-col gap-1 text-xs text-[var(--gw-muted)]">
           数据视图
           <select
-            className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
+            className="rounded-md border border-[var(--gw-border)] bg-black/30 px-2 py-1.5 text-sm text-[var(--gw-ink)]"
             value={queryMode}
             onChange={(e) => {
               const mode = e.target.value === "history" ? "history" : "live";
@@ -1031,10 +1029,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-xs text-zinc-400">
+        <label className="flex flex-col gap-1 text-xs text-[var(--gw-muted)]">
           时间
           <select
-            className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
+            className="rounded-md border border-[var(--gw-border)] bg-black/30 px-2 py-1.5 text-sm text-[var(--gw-ink)]"
             value={filters.hours}
             onChange={(e) => {
               const hours = e.target.value;
@@ -1055,11 +1053,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-xs text-zinc-400">
+        <label className="flex flex-col gap-1 text-xs text-[var(--gw-muted)]">
           起（UTC）
           <input
             type="date"
-            className="w-[148px] rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-sky-500/50 [color-scheme:dark]"
+            className="w-[148px] rounded-md border border-[var(--gw-border)] bg-black/30 px-2 py-1.5 text-sm text-[var(--gw-ink)] outline-none focus:border-[var(--gw-btn-primary-hover)]/60 [color-scheme:dark]"
             value={filters.fromDate}
             max={filters.toDate || undefined}
             onChange={(e) =>
@@ -1072,11 +1070,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             aria-label="开始日期 UTC"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-400">
+        <label className="flex flex-col gap-1 text-xs text-[var(--gw-muted)]">
           止（UTC）
           <input
             type="date"
-            className="w-[148px] rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-sky-500/50 [color-scheme:dark]"
+            className="w-[148px] rounded-md border border-[var(--gw-border)] bg-black/30 px-2 py-1.5 text-sm text-[var(--gw-ink)] outline-none focus:border-[var(--gw-btn-primary-hover)]/60 [color-scheme:dark]"
             value={filters.toDate}
             min={filters.fromDate || undefined}
             onChange={(e) =>
@@ -1092,7 +1090,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         {filters.fromDate || filters.toDate ? (
           <button
             type="button"
-            className="mb-0.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200"
+            className="mb-0.5 rounded-md border border-[var(--gw-border)] px-2.5 py-1.5 text-xs text-[var(--gw-muted)] transition hover:border-white/20 hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)]"
             onClick={() =>
               setFilters((f) => ({ ...f, hours: "", fromDate: "", toDate: "" }))
             }
@@ -1109,7 +1107,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         <button
           type="button"
           onClick={applyFilters}
-          className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500"
+          className="gw-btn"
         >
           应用筛选
         </button>
@@ -1120,7 +1118,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             void loadDetailLogs({ poll: true, skipPoll: false });
           }}
           disabled={loading}
-          className="rounded-md border border-white/15 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+          className="rounded-md border border-[var(--gw-border)] px-4 py-2 text-sm text-[var(--gw-ink)] hover:bg-[var(--gw-hover)] disabled:opacity-50"
         >
           {loading ? "刷新中…" : "立即刷新"}
         </button>
@@ -1170,7 +1168,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             <StatCard
               label="已取消"
               value={stats.cards.cancelled}
-              accent="text-zinc-400"
+              accent="text-[var(--gw-muted)]"
               sub="预警阈值请在「轮询池」调整"
             />
           </div>
@@ -1210,11 +1208,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
 
       {viewMode === "dashboard" ? (
       <div
-        className={`rounded-lg border border-white/10 bg-[var(--gw-surface)] transition-opacity ${
+        className={`rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)] transition-opacity ${
           loading && hasLoadedOnce ? "opacity-80" : "opacity-100"
         }`}
       >
-        <div className="flex border-b border-white/10">
+        <div className="flex border-b border-[var(--gw-border)]">
           {TAB_CONFIG.map((tab) => (
             <button
               key={tab.id}
@@ -1228,20 +1226,20 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               }}
               className={`px-4 py-3 text-sm disabled:cursor-wait disabled:opacity-60 ${
                 activeTab === tab.id
-                  ? "border-b-2 border-sky-500 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
+                  ? "border-b-2 border-[var(--gw-btn-primary-bg)] font-medium text-white"
+                  : "text-[var(--gw-muted)] hover:text-[var(--gw-ink)]"
               }`}
             >
               {tab.label}
             </button>
           ))}
           {detailLoading ? (
-            <span className="ml-auto inline-flex items-center gap-1.5 self-center pr-4 text-xs text-sky-300/90">
+            <span className="ml-auto inline-flex items-center gap-1.5 self-center pr-4 text-xs text-[var(--gw-accent)]/90">
               <SpinnerIcon className="h-3 w-3" />
               正在加载「{activeTabLabel}」明细…
             </span>
           ) : loading && hasLoadedOnce ? (
-            <span className="ml-auto inline-flex items-center gap-1.5 self-center pr-4 text-xs text-zinc-500">
+            <span className="ml-auto inline-flex items-center gap-1.5 self-center pr-4 text-xs text-[var(--gw-muted)]">
               <SpinnerIcon className="h-3 w-3" />
               刷新明细中
             </span>
@@ -1249,7 +1247,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         </div>
 
         {activeTab === "failed" ? (
-          <div className="flex flex-wrap gap-1.5 border-b border-white/10 px-3 py-2">
+          <div className="flex flex-wrap gap-1.5 border-b border-[var(--gw-border)] px-3 py-2">
             {GATEWAY_FAIL_CODE_TABS.map((tab) => {
               const count =
                 tab.id === "all"
@@ -1273,17 +1271,17 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                   className={`rounded-full border px-3 py-1 text-xs transition ${
                     active
                       ? "border-red-500/40 bg-red-500/15 text-red-100"
-                      : "border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                      : "border-[var(--gw-border)] text-[var(--gw-muted)] hover:border-white/20 hover:text-[var(--gw-ink)]"
                   }`}
                   title={tab.description}
                 >
                   {tab.label}
-                  <span className="ml-1 tabular-nums text-zinc-500">{count}</span>
+                  <span className="ml-1 tabular-nums text-[var(--gw-muted)]">{count}</span>
                 </button>
               );
             })}
-            <p className="w-full px-1 text-[11px] text-zinc-500">
-              历史误杀（<span className="text-orange-300/90">VOLCENGINE_GATEWAY_POLL_STALL</span>
+            <p className="w-full px-1 text-[11px] text-[var(--gw-muted)]">
+              历史误杀（<span className="text-[var(--gw-accent)]/90">VOLCENGINE_GATEWAY_POLL_STALL</span>
               ）：点上方「历史误杀可恢复」筛选，表格最右列「厂商复核恢复」向火山查片并写回成功；新任务 ≥10min 只会转后台，不再因此失败。
             </p>
           </div>
@@ -1292,8 +1290,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         <div className="relative overflow-x-auto">
           {detailLoading && logs.length > 0 ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-[1px]">
-              <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#1a1a22] px-4 py-2 text-sm text-zinc-200">
-                <SpinnerIcon className="h-4 w-4 text-sky-400" />
+              <div className="inline-flex items-center gap-2 rounded-lg border border-[var(--gw-border)] bg-[#1a1a22] px-4 py-2 text-sm text-[var(--gw-ink)]">
+                <SpinnerIcon className="h-4 w-4 text-[var(--gw-accent)]" />
                 正在加载「{activeTabLabel}」明细…
               </div>
             </div>
@@ -1304,7 +1302,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             }`}
           >
             <thead>
-              <tr className="border-b border-white/10 text-xs uppercase text-zinc-500">
+              <tr className="border-b border-[var(--gw-border)] text-xs uppercase text-[var(--gw-muted)]">
                 <th className="w-12 px-4 py-3 text-right font-medium">#</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 {showFailColumns ? (
@@ -1335,8 +1333,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               {detailLoading && logs.length === 0 ? (
                 <tr>
                   <td colSpan={20} className="px-4 py-12">
-                    <div className="flex flex-col items-center justify-center gap-3 text-zinc-400">
-                      <SpinnerIcon className="h-6 w-6 text-sky-400" />
+                    <div className="flex flex-col items-center justify-center gap-3 text-[var(--gw-muted)]">
+                      <SpinnerIcon className="h-6 w-6 text-[var(--gw-accent)]" />
                       <span className="text-sm">
                         正在加载「{activeTabLabel}」明细…
                       </span>
@@ -1345,7 +1343,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={20} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={20} className="px-4 py-8 text-center text-[var(--gw-muted)]">
                     当前筛选下暂无记录
                   </td>
                 </tr>
@@ -1399,9 +1397,9 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                   return (
                     <tr
                       key={log.id}
-                      className="border-b border-white/5 hover:bg-white/[0.02]"
+                      className="border-b border-[var(--gw-border)] hover:bg-[var(--gw-hover)]"
                     >
-                      <td className="px-4 py-3 text-right font-mono tabular-nums text-zinc-500">
+                      <td className="px-4 py-3 text-right font-mono tabular-nums text-[var(--gw-muted)]">
                         {rowNo}
                       </td>
                       <td className="px-4 py-3">
@@ -1417,17 +1415,17 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                           <td className="px-4 py-3 font-mono text-xs text-red-300">
                             {failCode}
                           </td>
-                          <td className="max-w-[220px] px-4 py-3 text-xs leading-relaxed text-zinc-400">
+                          <td className="max-w-[220px] px-4 py-3 text-xs leading-relaxed text-[var(--gw-muted)]">
                             {failMessage}
                           </td>
                           <td
-                            className="max-w-[280px] px-4 py-3 text-xs leading-relaxed text-zinc-300"
+                            className="max-w-[280px] px-4 py-3 text-xs leading-relaxed text-[var(--gw-ink)]"
                             title={videoPrompt || undefined}
                           >
                             {videoPrompt ? (
                               <span className="line-clamp-3">{videoPrompt}</span>
                             ) : (
-                              <span className="text-zinc-600">—</span>
+                              <span className="text-[var(--gw-muted)]">—</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -1454,32 +1452,32 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                           </td>
                         </>
                       ) : null}
-                      <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-zinc-300">
+                      <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-[var(--gw-ink)]">
                         {displayLogModelKey(log)}
                       </td>
-                      <td className="px-4 py-3 text-zinc-400">
+                      <td className="px-4 py-3 text-[var(--gw-muted)]">
                         {billingCategoryLabel(log.billingCategory)}
                       </td>
                       {showActorColumns ? (
                         <>
-                          <td className="px-4 py-3 tabular-nums text-zinc-300">
+                          <td className="px-4 py-3 tabular-nums text-[var(--gw-ink)]">
                             {log.actorPhone ?? "—"}
                           </td>
-                          <td className="px-4 py-3 text-zinc-300">
+                          <td className="px-4 py-3 text-[var(--gw-ink)]">
                             {log.actorName ?? "—"}
                           </td>
-                          <td className="px-4 py-3 text-zinc-300">
+                          <td className="px-4 py-3 text-[var(--gw-ink)]">
                             {log.actorDisplayLabel ?? "—"}
                           </td>
                         </>
                       ) : null}
-                      <td className="px-4 py-3 tabular-nums text-zinc-300">
+                      <td className="px-4 py-3 tabular-nums text-[var(--gw-ink)]">
                         <span
                           className={
                             showSlowWarnHint &&
                             durationMs != null &&
                             durationMs >= SLOW_WARN_THRESHOLD_MS
-                              ? "font-medium text-orange-300"
+                              ? "font-medium text-[var(--gw-accent)]"
                               : undefined
                           }
                         >
@@ -1502,14 +1500,14 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                           </span>
                         ) : null}
                       </td>
-                      <td className="px-4 py-3 text-zinc-400">
+                      <td className="px-4 py-3 text-[var(--gw-muted)]">
                         {formatLogTimestamp(log.submittedAt)}
                       </td>
                       <td className="px-4 py-3">
                         <Link
                           href="/dashboard/logs"
                           title={log.id}
-                          className="font-mono text-xs text-sky-400 hover:underline"
+                          className="font-mono text-xs text-[var(--gw-accent)] hover:underline"
                         >
                           {log.id.slice(0, 8)}…
                         </Link>
@@ -1524,13 +1522,13 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
 
         <div ref={loadMoreSentinelRef} className="h-1" aria-hidden />
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--gw-border)] px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--gw-muted)]">
             <span>
               已加载 {logs.length} / {logsTotal} 条
               {loadedPages > 1 ? ` · 已翻 ${loadedPages} 页` : ""}
             </span>
-            <span className="text-zinc-600">|</span>
+            <span className="text-[var(--gw-muted)]">|</span>
             <span>每批</span>
             <select
               value={pageSizePreset}
@@ -1540,7 +1538,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                 if (next === "custom") return;
                 applyPageSize(Number(next));
               }}
-              className="rounded-lg border border-white/10 bg-[#141419] px-2.5 py-1.5 text-xs text-zinc-300 outline-none focus:border-white/20"
+              className="rounded-lg border border-[var(--gw-border)] bg-[#141419] px-2.5 py-1.5 text-xs text-[var(--gw-ink)] outline-none focus:border-white/20"
               aria-label="每批条数"
             >
               {[20, 50, 100].map((n) => (
@@ -1561,15 +1559,15 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                   onBlur={() => {
                     applyPageSize(Number(customPageSizeInput));
                   }}
-                  className="w-20 rounded-lg border border-white/10 bg-[#141419] px-2 py-1.5 font-mono text-xs text-zinc-300 outline-none focus:border-white/20"
+                  className="w-20 rounded-lg border border-[var(--gw-border)] bg-[#141419] px-2 py-1.5 font-mono text-xs text-[var(--gw-ink)] outline-none focus:border-white/20"
                 />
                 条
               </label>
             ) : null}
           </div>
-          <div className="text-xs text-zinc-500">
+          <div className="text-xs text-[var(--gw-muted)]">
             {loadingMore ? (
-              <span className="text-sky-300/90">正在加载更多…</span>
+              <span className="text-[var(--gw-accent)]/90">正在加载更多…</span>
             ) : hasMoreLogs && logs.length < INFINITE_SCROLL_MAX_ROWS ? (
               <span>向下滚动自动加载（每批 {pageSize} 条，单次最多 {INFINITE_SCROLL_MAX_ROWS} 条）</span>
             ) : logs.length >= INFINITE_SCROLL_MAX_ROWS ? (

@@ -31,9 +31,9 @@ import {
 } from "@/lib/account-nav-menu-config";
 
 const itemClass =
-  "flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-hidden";
-const itemActiveClass = "bg-muted font-medium";
-const separatorClass = "mx-1 my-1 h-px bg-border";
+  "flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-[#1f2328] transition-colors hover:bg-[#f6f8fa] focus-visible:bg-[#f6f8fa] focus-visible:outline-hidden";
+const itemActiveClass = "bg-[#f6f8fa] font-semibold";
+const separatorClass = "mx-1 my-1 h-px bg-[#d1d9e0]";
 const signOutButtonClass = cn(
   buttonVariants({ variant: "default", size: "sm" }),
   "mt-1 h-9 w-full min-w-0 justify-start gap-2 px-3 font-medium focus-visible:ring-offset-background",
@@ -149,7 +149,7 @@ function AccountSidebarNav({
     <nav className="mt-2 min-w-0 w-full" aria-label="个人中心导航">
       {groups.map((group, index) => (
         <div key={group.id} className="min-w-0">
-          <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[#656d76]">
             {group.label}
           </p>
           <div className="min-w-0 space-y-0.5">{group.items.map((item) => renderItem(item))}</div>
@@ -157,7 +157,7 @@ function AccountSidebarNav({
         </div>
       ))}
       {!hasAppsGroup && appsMenuHint ? (
-        <p className="mt-3 px-3 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-3 px-3 text-[11px] leading-relaxed text-[#656d76]">
           {appsMenuHint}
         </p>
       ) : null}
@@ -288,17 +288,17 @@ export function AccountNavMenu({
   if (isSidebar) {
     return (
       <div className="flex w-full min-w-0 flex-col gap-4">
-        <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5">
-          <Avatar className="h-9 w-9 shrink-0 border border-border">
+        <div className="site-app-profile-card flex min-w-0 items-center gap-2 px-3 py-2.5">
+          <Avatar className="h-9 w-9 shrink-0 border border-[#d1d9e0]">
             {profile.image ? (
               <AvatarImage src={profile.image} alt="" referrerPolicy="no-referrer" />
             ) : null}
             <AvatarFallback className="text-xs font-medium">{initial}</AvatarFallback>
           </Avatar>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold">{profileLabel}</span>
+            <span className="block truncate text-sm font-semibold text-[#1f2328]">{profileLabel}</span>
             {phoneLabel ? (
-              <span className="block truncate text-xs font-normal text-muted-foreground">
+              <span className="block truncate text-xs font-normal text-[#656d76]">
                 {phoneLabel}
               </span>
             ) : null}
@@ -320,7 +320,7 @@ export function AccountNavMenu({
         <SheetTrigger asChild>
           <button
             type="button"
-            className="inline-flex shrink-0 items-center justify-center rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex shrink-0 items-center justify-center rounded-md p-2 text-[#656d76] transition-colors hover:bg-[#f6f8fa] hover:text-[#1f2328] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#0969da]/45 focus-visible:ring-offset-2"
             aria-label="打开个人中心菜单"
           >
             <MenuIcon className="h-5 w-5" aria-hidden />
@@ -329,17 +329,17 @@ export function AccountNavMenu({
         <SheetContent side="left" className="w-[15.5rem] max-w-[85vw] gap-0 p-0">
           <SheetTitle className="sr-only">个人中心菜单</SheetTitle>
           <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
-            <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5">
-              <Avatar className="h-9 w-9 shrink-0 border border-border">
+            <div className="site-app-profile-card flex min-w-0 items-center gap-2 px-3 py-2.5">
+              <Avatar className="h-9 w-9 shrink-0 border border-[#d1d9e0]">
                 {profile.image ? (
                   <AvatarImage src={profile.image} alt="" referrerPolicy="no-referrer" />
                 ) : null}
                 <AvatarFallback className="text-xs font-medium">{initial}</AvatarFallback>
               </Avatar>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{profileLabel}</span>
+                <span className="block truncate text-sm font-semibold text-[#1f2328]">{profileLabel}</span>
                 {phoneLabel ? (
-                  <span className="block truncate text-xs font-normal text-muted-foreground">
+                  <span className="block truncate text-xs font-normal text-[#656d76]">
                     {phoneLabel}
                   </span>
                 ) : null}

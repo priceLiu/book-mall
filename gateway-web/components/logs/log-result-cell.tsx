@@ -106,11 +106,11 @@ export function LogResultCell({
   if (isInProgress) {
     return (
       <span
-        className="inline-flex max-w-[140px] items-center gap-1.5 text-[11px] text-orange-200/85"
+        className="inline-flex max-w-[140px] items-center gap-1.5 text-[11px] text-[var(--gw-accent)]/85"
         title={progressLabel ?? "任务进行中"}
       >
         <svg
-          className="size-3.5 shrink-0 animate-spin text-orange-300/90"
+          className="size-3.5 shrink-0 animate-spin text-[var(--gw-accent)]/90"
           viewBox="0 0 24 24"
           fill="none"
           aria-hidden
@@ -128,7 +128,7 @@ export function LogResultCell({
   }
 
   if (!hasResult) {
-    return <span className="text-zinc-600">—</span>;
+    return <span className="text-[var(--gw-muted)]">—</span>;
   }
 
   const previewIsImage = previewUrl ? isImageResultUrl(previewUrl) : false;
@@ -147,7 +147,7 @@ export function LogResultCell({
               window.open(previewUrl, "_blank", "noopener,noreferrer");
             }
           }}
-          className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/50 bg-sky-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-sky-500"
+          className="gw-btn-xs inline-flex items-center gap-1.5"
         >
           <ImageIcon className="h-3.5 w-3.5" />
           Result
@@ -155,7 +155,7 @@ export function LogResultCell({
         <button
           type="button"
           onClick={onCopy}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--gw-border)] text-[var(--gw-muted)] transition hover:bg-white/10 hover:text-[var(--gw-ink)]"
           title={copied ? "已复制" : "复制结果"}
         >
           <CopyIcon className="h-3.5 w-3.5" />
@@ -175,7 +175,7 @@ export function LogResultCell({
               role="dialog"
               aria-label="Result Preview"
             >
-              <div className="border-b border-white/[0.08] px-4 py-3 text-sm font-semibold text-white">
+              <div className="border-b border-[var(--gw-border)] px-4 py-3 text-sm font-semibold text-[var(--gw-ink)]">
                 Result Preview:
               </div>
               <div className="gw-log-preview-tip__body">
@@ -194,15 +194,15 @@ export function LogResultCell({
                     className="max-h-[520px] w-full rounded-md bg-black/40"
                   />
                 ) : previewText ? (
-                  <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-zinc-300">
+                  <pre className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-[var(--gw-ink)]">
                     {previewText.length > 8000
                       ? `${previewText.slice(0, 7997)}…`
                       : previewText}
                   </pre>
                 ) : previewUrl ? (
-                  <p className="break-all font-mono text-[11px] text-zinc-400">{previewUrl}</p>
+                  <p className="break-all font-mono text-[11px] text-[var(--gw-muted)]">{previewUrl}</p>
                 ) : (
-                  <pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-zinc-400">
+                  <pre className="whitespace-pre-wrap break-all font-mono text-[11px] text-[var(--gw-muted)]">
                     {resultText.slice(0, 8000)}
                   </pre>
                 )}
@@ -211,7 +211,7 @@ export function LogResultCell({
                 <button
                   type="button"
                   onClick={(e) => void onCopy(e)}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--gw-muted)] transition hover:bg-white/10 hover:text-[var(--gw-ink)]"
                   title={copied ? "已复制" : "复制结果"}
                 >
                   <CopyIcon className="h-4 w-4" />

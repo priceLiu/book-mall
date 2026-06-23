@@ -41,20 +41,20 @@ function LogImageHoverPreview({
       role="dialog"
       aria-label={`${item.label} 预览`}
     >
-      <div className="border-b border-white/[0.08] px-4 py-2.5">
-        <div className="font-mono text-xs font-medium text-white">{item.label}</div>
+      <div className="border-b border-[var(--gw-border)] px-4 py-2.5">
+        <div className="font-mono text-xs font-medium text-[var(--gw-ink)]">{item.label}</div>
         {item.role ? (
-          <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{item.role}</div>
+          <div className="mt-0.5 font-mono text-[10px] text-[var(--gw-muted)]">{item.role}</div>
         ) : null}
       </div>
       <div className="gw-log-preview-tip__body flex items-center justify-center p-3">
         {!previewable ? (
           <div className="py-10 text-center">
-            <p className="text-sm text-zinc-400">人像库 asset 引用</p>
-            <p className="mt-2 break-all font-mono text-[11px] text-zinc-500">{item.url}</p>
+            <p className="text-sm text-[var(--gw-muted)]">人像库 asset 引用</p>
+            <p className="mt-2 break-all font-mono text-[11px] text-[var(--gw-muted)]">{item.url}</p>
           </div>
         ) : failed ? (
-          <span className="py-12 text-sm text-zinc-500">无法加载预览</span>
+          <span className="py-12 text-sm text-[var(--gw-muted)]">无法加载预览</span>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -65,18 +65,18 @@ function LogImageHoverPreview({
           />
         )}
       </div>
-      <div className="border-t border-white/[0.08] px-4 py-2">
+      <div className="border-t border-[var(--gw-border)] px-4 py-2">
         {previewable ? (
           <a
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="block break-all font-mono text-[10px] leading-snug text-sky-400/90 hover:text-sky-300"
+            className="block break-all font-mono text-[10px] leading-snug text-[var(--gw-accent)]/90 hover:text-[var(--gw-accent)]"
           >
             {item.url}
           </a>
         ) : (
-          <span className="block break-all font-mono text-[10px] leading-snug text-zinc-500">
+          <span className="block break-all font-mono text-[10px] leading-snug text-[var(--gw-muted)]">
             {item.url}
           </span>
         )}
@@ -109,7 +109,7 @@ function LogImageThumb({ item }: { item: LogInputImageItem }) {
           {assetShortLabel(item.url)}
         </span>
       ) : failed ? (
-        <span className="text-[10px] text-zinc-500">无法预览</span>
+        <span className="text-[10px] text-[var(--gw-muted)]">无法预览</span>
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -167,14 +167,14 @@ export function LogImagesCell({ inputSummary }: { inputSummary: unknown }) {
     if (hintCount != null) {
       return (
         <span
-          className="text-sm text-zinc-500"
+          className="text-sm text-[var(--gw-muted)]"
           title="参考图经人像库 asset:// 提交，无公网 URL"
         >
           {hintCount} 张参考图（asset）
         </span>
       );
     }
-    return <span className="text-sm text-zinc-600">—</span>;
+    return <span className="text-sm text-[var(--gw-muted)]">—</span>;
   }
 
   const visible = images.slice(0, MAX_VISIBLE);
@@ -189,13 +189,13 @@ export function LogImagesCell({ inputSummary }: { inputSummary: unknown }) {
         ))}
         {rest > 0 ? (
           <div className="flex shrink-0 flex-col items-center justify-center px-1">
-            <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 font-mono text-[10px] text-zinc-400">
+            <span className="rounded-md border border-[var(--gw-border)] bg-white/5 px-2 py-1 font-mono text-[10px] text-[var(--gw-muted)]">
               +{rest}
             </span>
           </div>
         ) : null}
       </div>
-      <div className="mt-1 font-mono text-[10px] text-zinc-600">
+      <div className="mt-1 font-mono text-[10px] text-[var(--gw-muted)]">
         {images.length} 张参考图
         {assetCount > 0 ? ` · ${assetCount} 张 asset` : ""} · 悬停查看
       </div>

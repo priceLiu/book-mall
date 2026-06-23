@@ -78,11 +78,11 @@ export function LogStatusBadge({
             style={{ backgroundColor: dotColor }}
             aria-hidden
           />
-          <span className="text-sm lowercase text-white">
+          <span className="text-sm lowercase text-[var(--gw-ink)]">
             {formatRequestStatusShortLabel(normalized)}
           </span>
           {isActive && progressLabel ? (
-            <span className="max-w-[88px] truncate text-[10px] lowercase text-orange-200/75">
+            <span className="max-w-[88px] truncate text-[10px] lowercase text-[var(--gw-accent)]/75">
               {progressLabel}
             </span>
           ) : null}
@@ -93,7 +93,7 @@ export function LogStatusBadge({
             <span className="block truncate font-mono text-[10px] font-medium text-red-300/95">
               {fail.code}
             </span>
-            <span className="line-clamp-2 text-[10px] leading-snug text-zinc-400">
+            <span className="line-clamp-2 text-[10px] leading-snug text-[var(--gw-muted)]">
               {fail.message}
             </span>
           </span>
@@ -111,16 +111,16 @@ export function LogStatusBadge({
         >
           <div className="space-y-3 font-mono text-[12px] leading-[1.6]">
             <div>
-              <div className="mb-1 font-sans text-[13px] font-medium text-zinc-200">
+              <div className="mb-1 font-sans text-[13px] font-medium text-[var(--gw-ink)]">
                 failCode:
               </div>
               <pre className="whitespace-pre-wrap break-all text-red-200/90">{fail.code}</pre>
             </div>
             <div>
-              <div className="mb-1 font-sans text-[13px] font-medium text-zinc-200">
+              <div className="mb-1 font-sans text-[13px] font-medium text-[var(--gw-ink)]">
                 failMessage:
               </div>
-              <pre className="whitespace-pre-wrap break-all text-zinc-300">
+              <pre className="whitespace-pre-wrap break-all text-[var(--gw-ink)]">
                 {fail.message}
               </pre>
             </div>

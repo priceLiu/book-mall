@@ -38,7 +38,7 @@ export function LogPreviewTipShell({
       role="dialog"
       aria-label={ariaLabel}
     >
-      <div className="border-b border-white/[0.08] px-4 py-3 text-sm font-semibold text-white">
+      <div className="border-b border-[var(--gw-border)] px-4 py-3 text-sm font-semibold text-[var(--gw-ink)]">
         {title}
       </div>
       <div className="gw-log-preview-tip__body">{children}</div>
@@ -51,7 +51,7 @@ export function LogPreviewTipShell({
               e.stopPropagation();
               void copyTextToClipboard(copyText);
             }}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/10 hover:text-white"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--gw-muted)] transition hover:bg-white/10 hover:text-[var(--gw-ink)]"
             title="复制"
           >
             <CopyIcon className="h-4 w-4" />

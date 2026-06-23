@@ -20,7 +20,7 @@ export default async function DashboardUsagePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">用量统计</h1>
+        <h1 className="text-2xl font-semibold text-[var(--gw-ink)]">用量统计</h1>
         <p className="mt-1 text-sm text-[var(--gw-muted)]">近 {summary?.days ?? 30} 天</p>
       </div>
 
@@ -34,7 +34,7 @@ export default async function DashboardUsagePage() {
       </div>
 
       <section className="gw-card">
-        <h2 className="mb-3 text-sm font-medium text-white">按模型 Top</h2>
+        <h2 className="mb-3 text-sm font-medium text-[var(--gw-ink)]">按模型 Top</h2>
         <table className="gw-table">
           <thead>
             <tr>
@@ -65,7 +65,7 @@ export default async function DashboardUsagePage() {
       </section>
 
       <section className="gw-card">
-        <h2 className="mb-3 text-sm font-medium text-white">按日趋势</h2>
+        <h2 className="mb-3 text-sm font-medium text-[var(--gw-ink)]">按日趋势</h2>
         <table className="gw-table">
           <thead>
             <tr>
@@ -93,7 +93,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="gw-card">
       <div className="text-xs text-[var(--gw-muted)]">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
+      <div className="mt-2 text-2xl font-semibold text-[var(--gw-ink)]">{value}</div>
     </div>
   );
 }
