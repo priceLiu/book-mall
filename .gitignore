@@ -23,3 +23,4 @@ tool-web/.env.local
 /deploy/tencent/book-mall.env
 /deploy/tencent/tool-web.env
 /deploy/tencent/pgbouncer/userlist.txt
+/deploy/tencent/pgbouncer/pgbouncer.runtime.ini
