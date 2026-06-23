@@ -59,6 +59,7 @@ export default async function PricingPage() {
         originalYuan: p.originalYuan == null ? null : Number(p.originalYuan),
         promoLabel: p.promoLabel,
         monthlyCredits: p.monthlyCredits,
+        videoMonthlyCredits: p.videoMonthlyCredits,
         includedSeats: p.includedSeats,
         seatTiers: p.seatTiers.map((t) => ({
           seatMin: t.seatMin,

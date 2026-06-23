@@ -6,29 +6,27 @@ import "@devnomic/marquee/dist/index.css";
 import { icons } from "lucide-react";
 
 const logoItems = [
-  { icon: "Sparkles", name: "AI 工具套件", accent: "text-primary" },
-  { icon: "Shirt", name: "AI 试衣", accent: "text-sky-400" },
-  { icon: "ImagePlus", name: "文生图", accent: "text-violet-400" },
-  { icon: "Headphones", name: "AI 智能客服", accent: "text-emerald-400" },
-  { icon: "LayoutDashboard", name: "工具工作台", accent: "text-amber-400" },
-  { icon: "History", name: "费用与计费", accent: "text-rose-400" },
-  { icon: "BookOpen", name: "实战课程", accent: "text-cyan-400" },
-  { icon: "Users", name: "一人公司", accent: "text-orange-400" },
+  { icon: "Sparkles", name: "AI 工具套件" },
+  { icon: "Shirt", name: "AI 试衣" },
+  { icon: "ImagePlus", name: "文生图" },
+  { icon: "Headphones", name: "AI 智能客服" },
+  { icon: "LayoutDashboard", name: "工具工作台" },
+  { icon: "History", name: "费用与计费" },
+  { icon: "BookOpen", name: "实战课程" },
+  { icon: "Users", name: "一人公司" },
 ] as const;
 
 function LogoItem({
   icon,
   name,
-  accent,
 }: {
   icon: (typeof logoItems)[number]["icon"];
   name: string;
-  accent: string;
 }) {
   return (
     <div className="site-home-logo-item flex shrink-0 items-center gap-3 whitespace-nowrap">
       <span
-        className={`flex size-9 items-center justify-center rounded-lg bg-white/5 ${accent}`}
+        className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground"
       >
         <Icon
           name={icon as keyof typeof icons}

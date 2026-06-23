@@ -35,7 +35,7 @@ const itemClass =
 const itemActiveClass = "bg-muted font-medium";
 const separatorClass = "mx-1 my-1 h-px bg-border";
 const signOutButtonClass = cn(
-  buttonVariants({ variant: "subscription", size: "sm" }),
+  buttonVariants({ variant: "default", size: "sm" }),
   "mt-1 h-9 w-full min-w-0 justify-start gap-2 px-3 font-medium focus-visible:ring-offset-background",
 );
 

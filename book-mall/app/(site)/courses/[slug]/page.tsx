@@ -38,7 +38,7 @@ export default async function CourseDetailPage({ params }: Props) {
     <main className="pb-16 pt-8 md:pt-12">
       <article className="mx-auto max-w-3xl px-4 space-y-8">
         <p className="text-sm text-muted-foreground">
-          <Link href="/courses" className="text-primary underline">
+          <Link href="/courses" className="text-foreground underline">
             ← 返回课程列表
           </Link>
         </p>

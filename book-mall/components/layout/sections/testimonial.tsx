@@ -78,9 +78,9 @@ const reviewList: ReviewProps[] = [
 
 export const TestimonialSection = () => {
   return (
-    <section id="testimonials" className="container py-24 sm:py-32">
+    <section id="testimonials" className="site-marketing-section py-24 sm:py-32">
       <div className="text-center mb-8">
-        <h2 className="text-lg text-primary text-center mb-2 tracking-wider">
+        <h2 className="text-lg text-muted-foreground text-center mb-2 tracking-wider">
           客户评价
         </h2>
 
@@ -104,11 +104,11 @@ export const TestimonialSection = () => {
               <Card className="bg-muted/50 dark:bg-card">
                 <CardContent className="pt-6 pb-0">
                   <div className="flex gap-1 pb-6">
-                    <Star className="size-4 fill-primary text-primary" />
-                    <Star className="size-4 fill-primary text-primary" />
-                    <Star className="size-4 fill-primary text-primary" />
-                    <Star className="size-4 fill-primary text-primary" />
-                    <Star className="size-4 fill-primary text-primary" />
+                    <Star className="size-4 fill-muted-foreground text-muted-foreground" />
+                    <Star className="size-4 fill-muted-foreground text-muted-foreground" />
+                    <Star className="size-4 fill-muted-foreground text-muted-foreground" />
+                    <Star className="size-4 fill-muted-foreground text-muted-foreground" />
+                    <Star className="size-4 fill-muted-foreground text-muted-foreground" />
                   </div>
                   {`"${review.comment}"`}
                 </CardContent>

@@ -49,7 +49,7 @@ const featureList: FeaturesProps[] = [
 
 export const FeaturesSection = () => {
   return (
-    <section id="features" className="container py-24 sm:py-32">
+    <section id="features" className="site-marketing-section py-24 sm:py-32">
 
       <h2 className="text-3xl md:text-4xl text-center font-bold mb-4">
         我们的不同之处
@@ -64,12 +64,12 @@ export const FeaturesSection = () => {
           <div key={title}>
             <Card className="h-full bg-background border-0 shadow-none">
               <CardHeader className="flex justify-center items-center">
-                <div className="bg-primary/20 p-2 rounded-full ring-8 ring-primary/10 mb-4">
+                <div className="bg-muted p-2 rounded-full ring-8 ring-muted/50 mb-4">
                   <Icon
                     name={icon as keyof typeof icons}
                     size={24}
-                    color="hsl(var(--primary))"
-                    className="text-primary"
+                    color="hsl(var(--muted-foreground))"
+                    className="text-muted-foreground"
                   />
                 </div>
 

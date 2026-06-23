@@ -3,6 +3,14 @@
 import { usePathname } from "next/navigation";
 import { SiteHomeNav } from "@/components/layout/site-home/site-home-nav";
 
+function isMarketingDarkShell(pathname: string): boolean {
+  if (pathname === "/") return true;
+  if (pathname === "/pricing" || pathname.startsWith("/pricing/")) return true;
+  if (pathname.startsWith("/products")) return true;
+  if (pathname.startsWith("/courses")) return true;
+  return false;
+}
+
 export function SiteLayoutShell({
   navAuth,
   isLoggedIn,
@@ -12,11 +20,12 @@ export function SiteLayoutShell({
   isLoggedIn: boolean;
   children: React.ReactNode;
 }) {
-  const isBlueHome = usePathname() === "/";
+  const pathname = usePathname();
+  const useFullDarkShell = isMarketingDarkShell(pathname);
 
-  if (isBlueHome) {
+  if (useFullDarkShell) {
     return (
-      <div data-site-home className="dark min-h-screen overflow-x-clip">
+      <div data-site-home className="min-h-screen overflow-x-clip">
         <div className="site-home-page-bg min-h-screen overflow-x-clip">
           <SiteHomeNav isLoggedIn={isLoggedIn}>{navAuth}</SiteHomeNav>
           {children}
@@ -27,7 +36,7 @@ export function SiteLayoutShell({
 
   return (
     <>
-      <div data-site-home-header className="dark">
+      <div data-site-home-header>
         <SiteHomeNav isLoggedIn={isLoggedIn}>{navAuth}</SiteHomeNav>
       </div>
       {children}

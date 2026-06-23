@@ -80,17 +80,17 @@ export function FooterSection() {
             className="pointer-events-none absolute inset-0 select-none"
             aria-hidden
           >
-            <div className="absolute top-1/3 left-1/4 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
-            <div className="absolute right-1/4 bottom-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+            <div className="absolute top-1/3 left-1/4 h-56 w-56 rounded-full bg-white/[0.03] blur-3xl" />
+            <div className="absolute right-1/4 bottom-0 h-64 w-64 rounded-full bg-white/[0.02] blur-3xl" />
           </div>
 
           <div className="footer-glass-layout relative z-[1]">
             <div className="flex w-[260px] max-w-full shrink-0 flex-col items-start">
             <Link href="/" className="mb-4 flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-md">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted text-foreground">
                 <ChevronsDownIcon className="h-5 w-5" aria-hidden />
               </span>
-              <span className="bg-gradient-to-br from-primary to-primary/70 bg-clip-text text-xl font-semibold tracking-tight text-transparent">
+              <span className="text-xl font-semibold tracking-tight text-foreground">
                 智选 AI
               </span>
             </Link>
@@ -101,7 +101,7 @@ export function FooterSection() {
               <p>成为 AI 的老板.</p>
             </div>
 
-            <div className="flex gap-3 text-primary">
+            <div className="flex gap-3 text-muted-foreground">
               {socialLinks.map(({ label, href, icon }) => (
                 <a
                   key={label}
@@ -118,7 +118,7 @@ export function FooterSection() {
             <nav className="footer-glass-nav">
             {footerNav.map((section) => (
               <div key={section.title} className="shrink-0">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-widest text-primary">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                   {section.title}
                 </div>
                 <ul className="space-y-2">

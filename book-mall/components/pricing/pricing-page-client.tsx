@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { TEAM_MIN_INCLUDED_SEATS } from "@/lib/billing/team-membership-config";
+import { deriveVideoMonthlyCredits } from "@/lib/billing/video-model-seeds";
 import {
   computeTeamSeatQuote,
   computeTierGenerations,
@@ -53,6 +54,7 @@ interface Plan {
   originalYuan: number | null;
   promoLabel: string | null;
   monthlyCredits: number;
+  videoMonthlyCredits: number;
   includedSeats: number;
   seatTiers: SeatTier[];
 }
@@ -93,16 +95,27 @@ const TEAM_DESC = [
   "专业团队首选，协作高效。",
   "视频团队，量大优惠。",
   "企业级产能与管控。",
+  "重度产出，量大更划算。",
+  "顶配产能，畅想无限。",
 ];
 
-/** 与套餐卡片统一的玻璃面板样式 */
+/** YouMind 式面板：圆角卡片 + 细边框，无玻璃 blur */
 const PANEL_CLASS =
-  "rounded-3xl border border-sky-200/70 bg-white/70 dark:border-slate-700/60 dark:bg-slate-900/50";
+  "rounded-2xl border border-border bg-white";
 
 interface Highlight {
   text: string;
   included: boolean;
-  hasInfo?: boolean;
+  nowrap?: boolean;
+}
+
+function resolvePerSeatPools(monthlyCredits: number, videoMonthlyCredits?: number) {
+  const perSeatVideo =
+    videoMonthlyCredits != null && videoMonthlyCredits > 0
+      ? videoMonthlyCredits
+      : deriveVideoMonthlyCredits(monthlyCredits);
+  const perSeatGeneral = Math.max(0, monthlyCredits - perSeatVideo);
+  return { perSeatGeneral, perSeatVideo };
 }
 
 /** 构造卡片「套餐亮点」清单（含 ✓/✗ 差异化）。 */
@@ -111,32 +124,74 @@ function buildHighlights(args: {
   index: number;
   periodLabel: string;
   monthlyCredits: number;
-  poolCredits: number;
+  videoMonthlyCredits: number;
+  teamSeats?: number;
   maxImages: number;
-  maxVideoSec: number;
+  maxVideoSecFromVideoPool: number;
 }): Highlight[] {
-  const { isTeam, index, periodLabel, monthlyCredits, poolCredits, maxImages, maxVideoSec } = args;
-  const gen = `最多约 ${maxImages.toLocaleString()} 张图 / ${maxVideoSec.toLocaleString()} 秒视频`;
+  const {
+    isTeam,
+    index,
+    periodLabel,
+    monthlyCredits,
+    videoMonthlyCredits,
+    teamSeats = 1,
+    maxImages,
+    maxVideoSecFromVideoPool,
+  } = args;
+  const { perSeatGeneral, perSeatVideo } = resolvePerSeatPools(monthlyCredits, videoMonthlyCredits);
+  const poolGeneral = isTeam ? perSeatGeneral * teamSeats : perSeatGeneral;
+  const poolVideo = isTeam ? perSeatVideo * teamSeats : perSeatVideo;
+
   if (isTeam) {
     return [
-      { text: `团队共 ${poolCredits.toLocaleString()} 积分/${periodLabel}（每席 ${monthlyCredits.toLocaleString()}）`, included: true, hasInfo: true },
-      { text: `${gen}（每席）`, included: true, hasInfo: true },
+      {
+        text: `团队 ${poolGeneral.toLocaleString()} 通用 + ${poolVideo.toLocaleString()} 视频积分/${periodLabel}（${teamSeats} 席）`,
+        included: true,
+        nowrap: true,
+      },
+      {
+        text: `每席 ${perSeatGeneral.toLocaleString()} 通用 + ${perSeatVideo.toLocaleString()} 视频（视频仅扣视频池）`,
+        included: true,
+        nowrap: true,
+      },
+      {
+        text: `最多约 ${maxImages.toLocaleString()} 张图/${periodLabel}（每席·通用池）`,
+        included: true,
+        nowrap: true,
+      },
+      {
+        text: `最多约 ${maxVideoSecFromVideoPool.toLocaleString()} 秒视频/${periodLabel}（每席·视频池）`,
+        included: true,
+        nowrap: true,
+      },
       { text: "团队共享资产库 · 多人画布协作", included: true },
       { text: "席位 / 权限 / 用量管控", included: true },
       { text: "用量报表 · 成员消耗下钻", included: index >= 0 },
       { text: "会员加速 · 高并发任务", included: index >= 1 },
-      { text: "优先支持 · 专属客户成功", included: index >= 2, hasInfo: true },
+      { text: "优先支持 · 专属客户成功", included: index >= 2 },
     ];
   }
+
   return [
-    { text: `每月 ${monthlyCredits.toLocaleString()} 积分`, included: true },
-    { text: gen, included: true, hasInfo: true },
-    { text: "全站应用通用：工具站 / Canvas / Story / 电商 / 提示词", included: true, hasInfo: true },
+    {
+      text: `每月 ${poolGeneral.toLocaleString()} 通用 + ${poolVideo.toLocaleString()} 视频积分`,
+      included: true,
+    },
+    {
+      text: "视频仅扣视频池，图文扣通用池，两池不互通",
+      included: true,
+    },
+    {
+      text: `最多约 ${maxImages.toLocaleString()} 张图（通用池）/ ${maxVideoSecFromVideoPool.toLocaleString()} 秒视频（视频池）`,
+      included: true,
+    },
+    { text: "全站应用通用：工具站 / Canvas / Story / 电商 / 提示词", included: true },
     { text: "失败 / 取消自动返还", included: true },
     { text: "去除品牌水印 · 商用授权", included: index >= 1 },
     { text: "会员专享加速 · 高并发", included: index >= 2 },
     { text: "优先排队 · 新功能内测", included: index >= 3 },
-    { text: "专属权益 · 每日登录赠积分", included: index >= 4, hasInfo: true },
+    { text: "专属权益 · 每日登录赠积分", included: index >= 4 },
   ];
 }
 
@@ -190,62 +245,54 @@ export function PricingPageClient({
   }, [plans, family]);
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-sky-50/80 via-white to-sky-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
-      <div className="relative mx-auto w-full max-w-[1928px] px-4 py-12 sm:py-16">
-        {/* 蓝金光晕 */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 select-none">
-          <div className="absolute left-1/4 top-10 h-56 w-56 rounded-full bg-sky-400/20 blur-3xl" />
-          <div className="absolute right-1/4 top-0 h-64 w-64 rounded-full bg-amber-300/25 blur-3xl" />
-        </div>
+    <div className="site-pricing-page">
+      <div className="site-pricing-hero">
+        <h1 className="site-pricing-title">专业 AI 工具 · 积分会员</h1>
+        <p className="site-pricing-subtitle">
+          透明积分体系：按月订阅发放积分，全站 AI 应用通用；自带 Key 用户厂商费用自理，超额从轻量包扣点。
+        </p>
 
-        <div className="text-center">
-          <h1 className="bg-gradient-to-r from-sky-500 via-blue-500 to-amber-400 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
-            专业 AI 工具 · 积分会员
-          </h1>
-        </div>
-
-        {/* 切换：个人/团队 + 月/年（玻璃风，与卡片统一） */}
-        <div className="mt-8 flex flex-col items-center gap-4">
-          <div
-            className={cn("inline-flex rounded-full p-1", PANEL_CLASS)}
-            style={{ backdropFilter: "blur(10px)" }}
-          >
+        <div className="site-pricing-toggles">
+          <div className="site-pricing-toggle-group">
             <ToggleBtn active={family === "PERSONAL"} onClick={() => setFamily("PERSONAL")}>
-              <Sparkles className="mr-1 h-4 w-4" /> 个人创作
+              <Sparkles className="mr-1.5 h-4 w-4" /> 个人创作
             </ToggleBtn>
             <ToggleBtn active={family === "TEAM"} onClick={() => setFamily("TEAM")}>
-              <Users className="mr-1 h-4 w-4" /> 团队 / 公司
+              <Users className="mr-1.5 h-4 w-4" /> 团队 / 公司
             </ToggleBtn>
           </div>
-          <div
-            className={cn("inline-flex rounded-full p-1 text-sm", PANEL_CLASS)}
-            style={{ backdropFilter: "blur(10px)" }}
-          >
+          <div className="site-pricing-toggle-group text-sm">
             <ToggleBtn small active={interval === "MONTH"} onClick={() => setInterval("MONTH")}>
               按月
             </ToggleBtn>
             <ToggleBtn small active={interval === "YEAR"} onClick={() => setInterval("YEAR")}>
               按年
-              <span className="ml-1 rounded bg-amber-400/20 px-1 text-xs text-amber-600 dark:text-amber-400">
+              <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                 省2个月
               </span>
             </ToggleBtn>
           </div>
         </div>
+      </div>
 
-        {/* 套餐卡片：一行五张；外层 overflow-visible 给顶边徽标留空间 */}
-        <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-relaxed text-muted-foreground">
-          下方{isTeam ? "三档" : "五档"}为<b className="text-foreground">平台代付（积分套餐）</b>：含月度积分发放，按模型扣积分。
-          {isTeam ? (
-            <>
-              团队套餐<b className="text-foreground"> 3 席起订</b>。
-            </>
-          ) : null}
-          若注册时选择<b className="text-foreground">自带 Key（BYOK）</b>，请见本页右侧说明——
-          <b className="text-foreground">不含月度积分</b>，含任务次数额度；超额与工具月费从轻量包余额扣。
+      <div className="site-pricing-disclosure">
+        <p>
+          下方{visible.length}档为平台代付（积分套餐）：月发积分拆为通用池（图文 / 文本等）与视频池（仅视频生成），两池不互通、按模型扣积分。
+          {isTeam
+            ? " 团队套餐 3 席起订，大卡价格为套餐合计（非单席价），下方标注每席单价。"
+            : null}
         </p>
-        <div className="mt-6 overflow-visible">
-          <div className="flex flex-nowrap items-start justify-center gap-6 overflow-x-auto px-2 pb-2 pt-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <p>
+          若注册时选择自带 Key（BYOK），请见本页下方说明——不含月度积分，含任务次数额度；超额与工具月费从轻量包余额扣。
+        </p>
+      </div>
+
+      <div
+        className={cn(
+          "site-pricing-plans-grid mt-8",
+          isTeam ? "site-pricing-plans-grid--team" : "site-pricing-plans-grid--personal",
+        )}
+      >
           {visible.map((p, i) => {
             const yearPrice = yearPriceByTier.get(p.tier);
             const annualSavingPct =
@@ -269,18 +316,18 @@ export function PricingPageClient({
             );
           })}
           {visible.length === 0 ? (
-            <div className="w-full rounded-xl border border-dashed py-12 text-center text-muted-foreground">
+            <div className="col-span-full rounded-2xl border border-dashed border-border py-12 text-center text-muted-foreground">
               该组合套餐即将上线
             </div>
           ) : null}
-          </div>
-        </div>
+      </div>
 
+      <div className="site-pricing-body">
         {isTeam ? (
-          <div className="mt-6 flex justify-center">
+          <div className="mt-8 flex justify-center">
             <Link
               href="/account/team"
-              className="inline-flex items-center gap-2 rounded-full border border-amber-300/50 bg-amber-500/10 px-5 py-2.5 text-sm font-medium text-amber-700 transition hover:bg-amber-500/20 dark:text-amber-300"
+              className="site-pricing-toggle inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-5 py-2.5 text-foreground transition hover:bg-muted"
             >
               <Users className="h-4 w-4" />
               团队管理入口 — 成员 / 席位 / 权限
@@ -292,33 +339,33 @@ export function PricingPageClient({
         {models.length > 0 && visible.length > 0 ? (
           <section className="mt-16">
             <div className="flex flex-wrap items-end justify-between gap-2">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="site-pricing-section-title">
                 每月可生成数量{isTeam ? " / 每席位" : ""}
               </h2>
-              <p className="text-xs text-muted-foreground">
-                *数字为「只用该模型」的估算上限；同一积分池<b className="text-amber-600 dark:text-amber-400">互斥非叠加</b>，混用扣到 0 为止。
+              <p className="site-pricing-footnote">
+                *数字为「只用该模型」的估算上限；通用池与视频池互不挪用，混用各自扣到 0 为止。
               </p>
             </div>
-            <div
-              className={cn(
-                "mt-4 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-                PANEL_CLASS,
-              )}
-              style={{ backdropFilter: "blur(10px)" }}
-            >
+            <div className={cn("mt-4 overflow-x-auto", PANEL_CLASS)}>
               <Table>
                 <TableHeader>
-                  <TableRow className="border-sky-200/50 bg-sky-50/50 hover:bg-sky-50/50 dark:border-slate-700/50 dark:bg-slate-800/40">
+                  <TableRow className="border-border bg-muted/30 hover:bg-muted/30">
                     <TableHead className="min-w-[160px] text-foreground">模型</TableHead>
                     <TableHead className="whitespace-nowrap text-right text-foreground">每次消耗</TableHead>
-                    {visible.map((p) => (
-                      <TableHead key={p.id} className="whitespace-nowrap text-right text-foreground">
-                        {p.tier}
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          {p.monthlyCredits.toLocaleString()}
-                        </span>
-                      </TableHead>
-                    ))}
+                    {visible.map((p) => {
+                      const { perSeatGeneral, perSeatVideo } = resolvePerSeatPools(
+                        p.monthlyCredits,
+                        p.videoMonthlyCredits,
+                      );
+                      return (
+                        <TableHead key={p.id} className="min-w-[7.5rem] text-right text-foreground">
+                          {p.tier}
+                          <span className="mt-0.5 block text-[10px] font-normal leading-tight text-muted-foreground">
+                            通用 {perSeatGeneral.toLocaleString()} / 视频 {perSeatVideo.toLocaleString()}
+                          </span>
+                        </TableHead>
+                      );
+                    })}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -341,8 +388,9 @@ export function PricingPageClient({
                 </TableBody>
               </Table>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              生成次数为单一模型的估算值（实际因参数而异）。{isTeam ? "团队为「每席位」口径，团队池 = 每席 × 席数。" : ""}
+            <p className="mt-2 site-pricing-footnote">
+              生成次数为单一模型的估算值（实际因参数而异）。视频行按视频池、图片行按通用池。
+              {isTeam ? " 团队为「每席位」口径，团队池 = 每席 × 席数。" : ""}
             </p>
           </section>
         ) : null}
@@ -356,41 +404,36 @@ export function PricingPageClient({
 
         {/* 规则说明 + 用完处理 */}
         <section className="mt-16 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className={cn(PANEL_CLASS, "p-6")} style={{ backdropFilter: "blur(10px)" }}>
-            <div className="flex items-center gap-2 font-semibold text-foreground">
-              <Info className="h-5 w-5 text-amber-500" /> 计费规则（一看就懂）
+          <div className={cn(PANEL_CLASS, "p-6")}>
+            <div className="site-pricing-panel-title flex items-center gap-2">
+              <Info className="h-5 w-5 text-muted-foreground" /> 计费规则（一看就懂）
             </div>
-            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+            <ul className="mt-3 space-y-2 site-pricing-body-text">
               <li>
-                <b className="text-foreground">一个共享积分池</b>：月费买「每月 N 积分」，全站 AI 应用通用。
+                双积分池：通用池（图文 / 文本等）与视频池（仅视频）分开发放、分开扣减，不可互借。
               </li>
-              <li>
-                每次生成按该模型「积分/次」从同一池扣；<b className="text-foreground">不是每个模型各有配额</b>。
-              </li>
-              <li>
-                上表「X 张 / X 秒」是<b className="text-foreground">只用该模型</b>的上限，互斥——做图就少了做视频的额度。
-              </li>
-              <li>失败 / 取消<b className="text-foreground">全额返还</b>积分。</li>
+              <li>视频池约占每席月积分的 20%（财务 2.0 默认）；通用池为其余部分。</li>
+              <li>每次生成按该模型「积分/次」从对应池扣；不是每个模型各有配额。</li>
+              <li>上表「X 张 / X 秒」是只用该模型的上限，同池内互斥——做图就少了做视频的额度。</li>
+              <li>失败 / 取消全额返还积分。</li>
             </ul>
-            <div className="mt-4 rounded-xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm">
-              <div className="font-semibold text-amber-600 dark:text-amber-400">积分用完了怎么办？</div>
-              <ul className="mt-1 space-y-1 text-muted-foreground">
+            <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 site-pricing-body-text">
+              <div className="site-pricing-panel-title">积分用完了怎么办？</div>
+              <ul className="mt-1 space-y-1">
                 <li>① 暂停生成，下个账期自动重置发放；</li>
-                <li>② 随时购买<b>积分加油包</b>，即时到账（团队进共享池）；</li>
+                <li>② 随时购买积分加油包（含视频专项包），即时到账（团队进共享池）；</li>
                 <li>③ 升级更高档，立即补足差额积分。</li>
               </ul>
             </div>
           </div>
 
           <div className="space-y-4">
-            <div className={cn(PANEL_CLASS, "p-6")} style={{ backdropFilter: "blur(10px)" }}>
-              <div className="flex items-center gap-2 font-semibold text-foreground">
-                <Calculator className="h-5 w-5 text-amber-500" /> 透明计价公式
+            <div className={cn(PANEL_CLASS, "p-6")}>
+              <div className="site-pricing-panel-title flex items-center gap-2">
+                <Calculator className="h-5 w-5 text-muted-foreground" /> 透明计价公式
               </div>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li>
-                  1 积分 ≈ <b className="text-foreground">¥{anchorYuan}</b> 挂牌价值
-                </li>
+              <ul className="mt-3 space-y-2 site-pricing-body-text">
+                <li>1 积分 ≈ ¥{anchorYuan} 挂牌价值</li>
                 <li>
                   每次消耗 = <code className="rounded bg-muted px-1 text-foreground">round(模型挂牌价 ÷ {anchorYuan})</code>
                 </li>
@@ -400,37 +443,24 @@ export function PricingPageClient({
               </ul>
             </div>
 
-            <div
-              className={cn(PANEL_CLASS, "border-amber-300/50 p-6")}
-              style={{ backdropFilter: "blur(10px)" }}
-            >
-              <div className="flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400">
-                <KeyRound className="h-5 w-5" /> 自带 Key（BYOK）
+            <div className={cn(PANEL_CLASS, "p-6")}>
+              <div className="site-pricing-panel-title flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-muted-foreground" /> 自带 Key（BYOK）
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">
-                已有厂商 API Key？绑定后模型费用由你与厂商直接结算，平台
-                <b className="text-foreground">不扣推理积分</b>。须先
-                <b className="text-foreground">开通会员订阅</b>获得工具准入；套餐内含月度任务次数，超出后购买轻量包按次扣积分。
+              <p className="mt-2 site-pricing-body-text">
+                已有厂商 API Key？绑定后模型费用由你与厂商直接结算，平台不扣推理积分。须先开通会员订阅获得工具准入；套餐内含月度任务次数，超出后购买轻量包按次扣积分。
               </p>
-              <div className="mt-3 rounded-lg border border-amber-400/40 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                <p className="font-medium text-foreground">BYOK 怎么扣费？</p>
+              <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2 site-pricing-body-text-sm">
+                <p className="site-pricing-panel-title">BYOK 怎么扣费？</p>
                 <ul className="mt-1 list-inside list-disc space-y-0.5">
-                  <li>
-                    <b className="text-foreground">会员订阅</b>：工具准入（与平台代付共用套餐体系）
-                  </li>
-                  <li>
-                    <b className="text-foreground">套餐内</b>：文生图（含试衣）、图生视频、视频生视频、视频理解、TTS 按次数免费
-                  </li>
-                  <li>
-                    <b className="text-foreground">超额</b>：从轻量包通用积分池按次扣分
-                  </li>
-                  <li>
-                    <b className="text-foreground">厂商费</b>：走你的 Gateway Key，Book 不代收
-                  </li>
+                  <li>会员订阅：工具准入（与平台代付共用套餐体系）</li>
+                  <li>套餐内：文生图（含试衣）、图生视频、视频生视频、视频理解、TTS 按次数免费</li>
+                  <li>超额：从轻量包通用积分池按次扣分</li>
+                  <li>厂商费：走你的 Gateway Key，Book 不代收</li>
                 </ul>
               </div>
               {byokQuotas.length > 0 ? (
-                <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                <ul className="mt-3 space-y-1 site-pricing-footnote">
                   {byokQuotas
                     .filter((q) => q.scopeKey === "personal")
                     .map((q) => (
@@ -442,9 +472,9 @@ export function PricingPageClient({
               ) : null}
               <ByokMembershipCta isLoggedIn={isLoggedIn} />
               {byokQuotas.some((q) => q.scopeKey === "team-seat") ? (
-                <div className="mt-3 border-t border-amber-300/30 pt-3">
-                  <p className="text-xs font-medium text-foreground">团队 BYOK</p>
-                  <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                <div className="mt-3 border-t border-border pt-3">
+                  <p className="site-pricing-panel-title">团队 BYOK</p>
+                  <ul className="mt-1 space-y-0.5 site-pricing-footnote">
                     {byokQuotas
                       .filter((q) => q.scopeKey === "team-seat")
                       .map((q) => (
@@ -457,7 +487,7 @@ export function PricingPageClient({
                 </div>
               ) : null}
               {rates.length > 0 ? (
-                <div className="mt-3 border-t border-amber-300/30 pt-3 text-xs text-muted-foreground">
+                <div className="mt-3 border-t border-border pt-3 site-pricing-footnote">
                   资源使用费：
                   {rates.map((r) => (
                     <span key={r.resourceType} className="mr-2">
@@ -470,9 +500,9 @@ export function PricingPageClient({
           </div>
         </section>
 
-        <p className="mt-10 text-center text-xs text-muted-foreground">
+        <p className="mt-10 text-center site-pricing-footnote">
           AI 课程不在积分体系内，单独购买、不受积分限制。最终解释权与计费明细见
-          <Link href="/pricing-disclosure" className="ml-1 text-amber-600 underline dark:text-amber-400">
+          <Link href="/pricing-disclosure" className="ml-1 text-foreground underline">
             价格公示
           </Link>
           。
@@ -527,13 +557,22 @@ function PlanCard({
     seats,
   });
 
-  const headlinePrice = isTeam ? quote.perSeatPriceYuan : plan.priceYuan;
+  const headlinePrice = isTeam ? quote.totalPriceYuan : plan.priceYuan;
+  const teamOriginalTotal =
+    isTeam && plan.originalYuan
+      ? Math.round((plan.originalYuan / minSeats) * quote.seats)
+      : plan.originalYuan;
   // 用于「最多生成约 …」与「1积分≈¥X」的积分口径（团队按每席）
   const basisCredits = isTeam ? quote.perSeatCredits : plan.monthlyCredits;
   const yuanPerCredit =
     basisCredits > 0 ? Math.round((headlinePrice / basisCredits) * 1000) / 1000 : anchorYuan;
-  const maxImages = minImageCpu > 0 ? Math.floor(basisCredits / minImageCpu) : 0;
-  const maxVideoSec = minVideoCpu > 0 ? Math.floor(basisCredits / minVideoCpu) : 0;
+  const { perSeatGeneral, perSeatVideo } = resolvePerSeatPools(
+    plan.monthlyCredits,
+    plan.videoMonthlyCredits,
+  );
+  const maxImages = minImageCpu > 0 ? Math.floor(perSeatGeneral / minImageCpu) : 0;
+  const maxVideoSecFromVideoPool =
+    minVideoCpu > 0 ? Math.floor(perSeatVideo / minVideoCpu) : 0;
 
   const desc = (isTeam ? TEAM_DESC : PERSONAL_DESC)[index] ?? "";
   const highlights = buildHighlights({
@@ -541,9 +580,10 @@ function PlanCard({
     index,
     periodLabel,
     monthlyCredits: plan.monthlyCredits,
-    poolCredits: quote.creditsPool,
+    videoMonthlyCredits: plan.videoMonthlyCredits,
+    teamSeats: isTeam ? quote.seats : undefined,
     maxImages,
-    maxVideoSec,
+    maxVideoSecFromVideoPool,
   });
 
   return (
@@ -551,18 +591,15 @@ function PlanCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04 }}
-      style={{ backdropFilter: "blur(10px)" }}
       className={cn(
-        "relative flex w-[360px] shrink-0 flex-col overflow-visible rounded-3xl border transition-all duration-300",
-        featured
-          ? "z-20 border-amber-300/70 bg-gradient-to-b from-amber-50/90 to-white shadow-2xl shadow-amber-200/40 dark:border-amber-500/40 dark:from-amber-500/10 dark:to-slate-900 dark:shadow-none"
-          : "border-sky-200/70 bg-white/70 hover:bg-white dark:border-slate-700/60 dark:bg-slate-900/50 dark:hover:bg-slate-900",
+        "site-pricing-plan-card relative flex w-full min-w-0 flex-col overflow-visible rounded-2xl border border-border bg-white transition-colors duration-300",
+        featured && "z-10 ring-1 ring-black/5",
       )}
     >
       {/* 顶部药丸徽标：骑在顶边线上，文字中线对齐边框（见图 2） */}
       {featured || plan.promoLabel ? (
         <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
-          <div className="whitespace-nowrap rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg shadow-orange-500/20">
+          <div className="site-pricing-plan-badge whitespace-nowrap rounded-full border border-border bg-white px-4 py-1.5 text-foreground">
             {plan.promoLabel ?? "最受欢迎"}
           </div>
         </div>
@@ -570,31 +607,44 @@ function PlanCard({
 
       {/* ===== 头部：档名 / 价格 / 描述 ===== */}
       <div className="px-6 pb-6 pt-10 text-center">
-        <div className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="mb-3 site-pricing-plan-tier">
           {isTeam ? "团队 · " : "个人 · "}
           {plan.tier}
         </div>
-        <div className="flex flex-nowrap items-baseline justify-center gap-1">
-          <span className="text-5xl font-light leading-none text-foreground">¥{headlinePrice}</span>
-          <span className="whitespace-nowrap text-base font-light text-muted-foreground">
-            /{isTeam ? `席·${periodLabel}` : periodLabel}
-          </span>
+        <div className="site-pricing-plan-price-row">
+          <span className="site-pricing-plan-currency">¥</span>
+          <span className="site-pricing-plan-price">{headlinePrice}</span>
+          <span className="site-pricing-plan-period">/{periodLabel}</span>
         </div>
-        <div className="mt-2 flex flex-nowrap items-center justify-center gap-2 text-xs text-muted-foreground">
-          {plan.originalYuan ? <span className="shrink-0 line-through">¥{plan.originalYuan}</span> : null}
+        {isTeam ? (
+          <p className="mt-2 site-pricing-plan-meta">
+            套餐价 · 每席 ¥{quote.perSeatPriceYuan}
+            <span className="mx-1 text-border">·</span>
+            {quote.seats} 席
+            {quote.seats === minSeats ? (
+              <span className="text-xs">（{minSeats} 席起订）</span>
+            ) : null}
+          </p>
+        ) : null}
+        <div className="mt-2 flex flex-nowrap items-center justify-center gap-2 site-pricing-plan-meta site-pricing-plan-meta-row">
+          {teamOriginalTotal ? (
+            <span className="shrink-0 line-through">¥{teamOriginalTotal}</span>
+          ) : null}
+          {!isTeam && plan.originalYuan ? (
+            <span className="shrink-0 line-through">¥{plan.originalYuan}</span>
+          ) : null}
           <span className="shrink-0">1积分≈¥{yuanPerCredit}</span>
           {annualSavingPct && annualSavingPct > 0 ? (
-            <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">
-              年付省{annualSavingPct}%
-            </span>
+            <span className="shrink-0">年付省{annualSavingPct}%</span>
           ) : null}
         </div>
-        <p className="mt-4 text-sm font-light leading-relaxed text-muted-foreground">{desc}</p>
+        <p className="mt-4 site-pricing-plan-desc">{desc}</p>
 
         {/* 团队席位计数器 */}
         {isTeam ? (
-          <div className="mt-5 rounded-xl border border-border/60 bg-background/60 px-2 py-2.5">
-            <div className="flex items-center justify-between gap-2">
+          <div className="site-pricing-plan-seat-box mt-5 rounded-xl border border-border/60 bg-white px-3 py-2.5">
+            <p className="mb-2 text-center site-pricing-plan-meta">调整席位数（套餐价随席数变化）</p>
+            <div className="flex items-center justify-center gap-3">
               <div className="inline-flex shrink-0 items-center rounded-lg border border-border/70 bg-background">
                 <button
                   type="button"
@@ -605,7 +655,7 @@ function PlanCard({
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
-                <span className="min-w-[2.5rem] text-center text-sm font-semibold text-foreground">
+                <span className="min-w-[2.5rem] text-center text-sm text-foreground">
                   {quote.seats} 席
                 </span>
                 <button
@@ -617,11 +667,6 @@ function PlanCard({
                   <Plus className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <div className="min-w-0 flex-1 text-right">
-                <span className="inline-block whitespace-nowrap text-sm font-bold text-amber-600 dark:text-amber-400">
-                  合计 ¥{quote.totalPriceYuan}/{periodLabel}
-                </span>
-              </div>
             </div>
           </div>
         ) : null}
@@ -629,7 +674,7 @@ function PlanCard({
 
       {/* ===== 套餐亮点 ===== */}
       <div className="px-6">
-        <h4 className="mb-5 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">套餐亮点</h4>
+        <h4 className="site-pricing-highlights-label mb-5">套餐亮点</h4>
         <div className="space-y-3.5">
           {highlights.map((f) => (
             <div key={f.text} className="flex items-start gap-3">
@@ -640,12 +685,12 @@ function PlanCard({
               )}
               <span
                 className={cn(
-                  "flex items-center gap-1.5 text-sm font-light leading-relaxed",
-                  f.included ? "text-foreground" : "text-muted-foreground line-through",
+                  "site-pricing-highlight-text",
+                  f.nowrap && "site-pricing-highlight-nowrap",
+                  !f.included && "text-muted-foreground line-through",
                 )}
               >
                 {f.text}
-                {f.hasInfo ? <Info className="h-3 w-3 shrink-0 text-muted-foreground" /> : null}
               </span>
             </div>
           ))}
@@ -656,12 +701,8 @@ function PlanCard({
       <div className="mt-auto px-6 pb-8 pt-6">
         <Button
           asChild
-          className={cn(
-            "h-12 w-full rounded-xl text-sm font-medium transition-all duration-300",
-            featured
-              ? "border-0 bg-gradient-to-r from-amber-600 to-orange-500 text-white shadow-lg hover:from-amber-500 hover:to-orange-400 hover:shadow-xl dark:text-black"
-              : "border-border/50 bg-muted/80 text-foreground hover:bg-muted dark:bg-gray-700/80 dark:hover:bg-gray-600/80 dark:text-white",
-          )}
+          variant={featured ? "default" : "outline"}
+          className="h-11 w-full rounded-full text-sm font-medium"
         >
           <Link
             href={isTeam ? `/checkout/membership?planId=${plan.id}&seats=${quote.seats}` : `/checkout/membership?planId=${plan.id}`}
@@ -669,14 +710,6 @@ function PlanCard({
             {isTeam ? "开通团队会员" : "立即开通"}
           </Link>
         </Button>
-        <div className="mt-5 text-center">
-          <p className="text-xs font-light text-muted-foreground">
-            积分如何换算？{" "}
-            <Link href="/pricing-disclosure" className="text-primary underline transition-colors hover:text-primary/80">
-              查看明细
-            </Link>
-          </p>
-        </div>
       </div>
     </motion.div>
   );
@@ -686,8 +719,8 @@ function PlanCard({
 
 function GroupRow({ icon, label, span }: { icon: React.ReactNode; label: string; span: number }) {
   return (
-    <TableRow className="border-sky-200/40 bg-sky-50/30 hover:bg-sky-50/30 dark:border-slate-700/40 dark:bg-slate-800/30">
-      <TableCell colSpan={span} className="py-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+    <TableRow className="border-border bg-muted/20 hover:bg-muted/20">
+      <TableCell colSpan={span} className="py-1.5 site-pricing-footnote font-medium">
         <span className="inline-flex items-center gap-1.5">
           {icon}
           {label}
@@ -698,18 +731,26 @@ function GroupRow({ icon, label, span }: { icon: React.ReactNode; label: string;
 }
 
 function ModelMatrixRow({ model, tiers }: { model: ModelPrice; tiers: Plan[] }) {
+  const isVideo = model.unit === "PER_SEC";
   return (
-    <TableRow className="border-sky-200/30 dark:border-slate-700/40">
+    <TableRow className="border-border">
       <TableCell className="font-medium text-foreground">{model.displayName}</TableCell>
       <TableCell className="whitespace-nowrap text-right text-muted-foreground">
         {model.creditsPerUnit} 积分 / {unitLabel(model.unit)}
       </TableCell>
-      {tiers.map((p) => (
-        <TableCell key={p.id} className="whitespace-nowrap text-right font-semibold text-foreground">
-          {computeTierGenerations(p.monthlyCredits, model.creditsPerUnit).toLocaleString()}
-          <span className="ml-0.5 text-xs font-normal text-muted-foreground">{unitLabel(model.unit)}</span>
-        </TableCell>
-      ))}
+      {tiers.map((p) => {
+        const { perSeatGeneral, perSeatVideo } = resolvePerSeatPools(
+          p.monthlyCredits,
+          p.videoMonthlyCredits,
+        );
+        const poolCredits = isVideo ? perSeatVideo : perSeatGeneral;
+        return (
+          <TableCell key={p.id} className="whitespace-nowrap text-right text-foreground">
+            {computeTierGenerations(poolCredits, model.creditsPerUnit).toLocaleString()}
+            <span className="ml-0.5 text-xs font-normal text-muted-foreground">{unitLabel(model.unit)}</span>
+          </TableCell>
+        );
+      })}
     </TableRow>
   );
 }
@@ -730,10 +771,10 @@ function ToggleBtn({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center rounded-full font-medium transition",
+        "site-pricing-toggle inline-flex items-center rounded-full transition",
         small ? "px-4 py-1.5" : "px-5 py-2",
         active
-          ? "bg-sky-600 text-white shadow-sm"
+          ? "bg-primary text-primary-foreground shadow-sm"
           : "text-muted-foreground hover:text-foreground",
       )}
     >

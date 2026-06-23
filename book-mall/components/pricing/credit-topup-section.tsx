@@ -15,7 +15,7 @@ import {
 } from "@/lib/billing/credit-topup-packs";
 
 const PANEL_CLASS =
-  "rounded-3xl border border-sky-200/70 bg-white/70 dark:border-slate-700/60 dark:bg-slate-900/50";
+  "rounded-2xl border border-border bg-card";
 
 function PackGrid({
   packs,
@@ -36,7 +36,6 @@ function PackGrid({
           <div
             key={pack.id}
             className={cn(PANEL_CLASS, "flex flex-col p-6")}
-            style={{ backdropFilter: "blur(10px)" }}
           >
             <div className="text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">
               {pack.label}
@@ -51,7 +50,7 @@ function PackGrid({
                 <span className="text-sm text-muted-foreground line-through">¥{listYuan}</span>
               ) : null}
               {pack.promo ? (
-                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                <span className="text-xs font-semibold text-muted-foreground">
                   {pack.promo}
                 </span>
               ) : null}
@@ -62,12 +61,7 @@ function PackGrid({
             </p>
             <Button
               type="button"
-              className={cn(
-                "mt-5 w-full text-white",
-                pack.pool === "VIDEO"
-                  ? "bg-violet-600 hover:bg-violet-700"
-                  : "bg-sky-600 hover:bg-sky-700",
-              )}
+              className="mt-5 w-full"
               disabled={loadingId === pack.id}
               onClick={() => onBuy(pack)}
             >
@@ -116,7 +110,7 @@ export function CreditTopupSection({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-xl font-semibold text-foreground">
-              <Zap className="h-5 w-5 text-amber-500" />
+              <Zap className="h-5 w-5 text-muted-foreground" />
               积分加油包（加量包）
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -131,7 +125,7 @@ export function CreditTopupSection({
           {isTeam ? (
             <Link
               href="/account/team"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 underline underline-offset-4 hover:text-amber-500 dark:text-amber-400"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline underline-offset-4 hover:text-muted-foreground"
             >
               <Users className="h-4 w-4" />
               团队管理入口
@@ -150,7 +144,7 @@ export function CreditTopupSection({
       <section className="mt-12">
         <div>
           <h2 className="flex items-center gap-2 text-xl font-semibold text-foreground">
-            <Film className="h-5 w-5 text-violet-500" />
+            <Film className="h-5 w-5 text-muted-foreground" />
             视频专项充值包
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -175,7 +169,7 @@ export function CreditTopupSection({
         {!isLoggedIn ? (
           <>
             {" "}
-            <Link href="/login?callbackUrl=/pricing" className="text-amber-600 underline dark:text-amber-400">
+            <Link href="/login?callbackUrl=/pricing" className="text-foreground underline">
               登录后购买
             </Link>
           </>

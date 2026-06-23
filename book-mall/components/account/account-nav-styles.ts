@@ -2,12 +2,12 @@ import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import type { AccountButtonSize } from "@/components/account/account-button-sizes";
 
-/** 个人中心主行动：统一橙色按钮（仅 sm | md | lg） */
+/** 个人中心主行动：中性 CTA（白/黑，与全站 default 一致） */
 export function accountPrimaryButtonClass(size: AccountButtonSize = "sm") {
-  return buttonVariants({ variant: "subscription", size });
+  return buttonVariants({ variant: "default", size });
 }
 
-/** 卡片内 / 段落内链接：橙色小按钮（替代蓝色 text-primary 链） */
+/** 卡片内 / 段落内链接：中性小按钮 */
 export function accountInlineLinkClass(size: AccountButtonSize = "sm") {
   return cn(
     accountPrimaryButtonClass(size),
@@ -18,8 +18,8 @@ export function accountInlineLinkClass(size: AccountButtonSize = "sm") {
 /** 段落内纯文字链（非按钮），用于「公示」等说明性跳转 */
 export function accountBodyTextLinkClass() {
   return cn(
-    "font-medium text-orange-600 underline underline-offset-2",
-    "hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300",
+    "font-medium text-foreground underline underline-offset-2",
+    "hover:text-muted-foreground",
   );
 }
 
@@ -49,6 +49,6 @@ export function accountNavActionClass(disabled?: boolean) {
     "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
     disabled
       ? "cursor-not-allowed text-muted-foreground/60"
-      : "text-foreground hover:bg-orange-500/10 hover:text-orange-600 dark:hover:text-orange-400",
+      : "text-foreground hover:bg-muted hover:text-foreground",
   );
 }

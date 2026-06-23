@@ -24,13 +24,17 @@ import {
 type NavItem = {
   label: string;
   href: string;
-  badge?: string;
+  isActive?: (pathname: string) => boolean;
 };
 
-const anchorNavLinks: NavItem[] = [
+const centerNavLinks: NavItem[] = [
   { label: "主屏", href: "#hero-video" },
   { label: "客户评价", href: "#testimonials" },
-  { label: "报价", href: "/pricing", badge: "积分" },
+  {
+    label: "报价",
+    href: "/pricing",
+    isActive: (p) => p === "/pricing" || p.startsWith("/pricing/"),
+  },
 ];
 
 export function SiteHomeNav({
@@ -59,8 +63,9 @@ export function SiteHomeNav({
   };
 
   return (
-    <header className="site-home-nav sticky top-0 z-[999] w-full border-b">
-      <div className="site-home-nav-container">
+    <>
+      <header className="site-home-nav w-full">
+        <div className="site-home-nav-container">
         <Link
           href={PRODUCTION_BRAND_PORTAL_ORIGIN}
           className="site-home-nav-logo shrink-0"
@@ -71,36 +76,39 @@ export function SiteHomeNav({
             alt="智选 AI"
             width={144}
             height={144}
-            className="h-9 w-auto object-contain dark:mix-blend-screen"
+            className="h-9 w-auto object-contain"
             priority
           />
         </Link>
 
-        <nav className="site-home-side-nav hidden lg:flex" aria-label="主导航">
-          <div className="site-home-side-nav-item site-home-side-nav-item-first">
-            <SiteHomeProductNav />
-          </div>
+        <nav className="site-home-nav-center hidden lg:flex" aria-label="主导航">
+          <SiteHomeProductNav variant="link" />
 
-          {anchorNavLinks.map((item) => (
-            <div key={item.label} className="site-home-side-nav-item">
-              <button type="button" onClick={() => navigate(item.href)} className="site-home-nav-link">
-                <span>{item.label}</span>
-                {item.badge ? <span className="site-home-nav-badge">{item.badge}</span> : null}
+          {centerNavLinks.map((item) => {
+            const active = item.isActive?.(pathname) ?? false;
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => navigate(item.href)}
+                className={cn("site-home-nav-link", active && "site-home-nav-link-active")}
+              >
+                {item.label}
               </button>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
-        <div className="site-home-nav-opts ml-auto flex items-center">
+        <div className="site-home-nav-opts flex items-center justify-end">
           <ToggleTheme
             iconOnly
-            className="site-home-nav-icon-btn hidden h-9 w-9 text-[hsl(215,16%,65%)] hover:bg-transparent hover:text-foreground sm:inline-flex [&_svg]:size-5"
+            className="site-home-nav-icon-btn hidden sm:inline-flex"
           />
 
           <div
             className={cn(
-              "site-home-nav-auth flex flex-wrap items-center justify-end gap-2",
-              !isLoggedIn && "hidden sm:flex",
+              "site-home-nav-auth-wrap",
+              !isLoggedIn && "hidden sm:block",
             )}
           >
             {children}
@@ -113,7 +121,7 @@ export function SiteHomeNav({
                   <Menu className="size-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="bg-[#0a0b0f] border-border">
+              <SheetContent side="right" className="border-border bg-background">
                 <SheetHeader>
                   <SheetTitle>菜单</SheetTitle>
                 </SheetHeader>
@@ -123,19 +131,19 @@ export function SiteHomeNav({
                     <button
                       key={item.href}
                       type="button"
-                      className="flex flex-col gap-0.5 rounded-md px-3 py-2.5 text-left hover:bg-white/5"
+                      className="site-home-nav-sheet-item flex flex-col gap-0.5 rounded-md px-3 py-2.5 text-left hover:bg-muted"
                       onClick={() => navigate(item.href)}
                     >
-                      <span className="text-sm font-semibold">{item.label}</span>
-                      <span className="text-xs text-muted-foreground">{item.description}</span>
+                      <span>{item.label}</span>
+                      <span className="text-xs font-normal text-muted-foreground">{item.description}</span>
                     </button>
                   ))}
                   <div className="my-2 border-t border-border/60" />
-                  {anchorNavLinks.map((item) => (
+                  {centerNavLinks.map((item) => (
                     <button
                       key={item.label}
                       type="button"
-                      className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm font-semibold hover:bg-white/5"
+                      className="site-home-nav-sheet-item flex items-center gap-2 rounded-md px-3 py-2.5 text-left hover:bg-muted"
                       onClick={() => navigate(item.href)}
                     >
                       {item.label}
@@ -155,6 +163,8 @@ export function SiteHomeNav({
           )}
         </div>
       </div>
-    </header>
+      </header>
+      <div className="site-home-nav-spacer" aria-hidden />
+    </>
   );
 }

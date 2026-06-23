@@ -52,12 +52,12 @@ export default async function OnboardingWelcomePage({
           {persona === "BYOK" ? (
             <ol className="list-decimal space-y-2 pl-5 text-muted-foreground">
               <li>
-                <Link href="/pricing#personal" className="text-primary underline">
+                <Link href="/pricing#personal" className="text-foreground underline">
                   开通 BYOK 月费套餐
                 </Link>
               </li>
               <li>
-                <Link href="/account/gateway" className="text-primary underline">
+                <Link href="/account/gateway" className="text-foreground underline">
                   绑定 Gateway 并添加厂商 Key
                 </Link>
               </li>
@@ -66,7 +66,7 @@ export default async function OnboardingWelcomePage({
           ) : (
             <ol className="list-decimal space-y-2 pl-5 text-muted-foreground">
               <li>
-                <Link href="/pricing" className="text-primary underline">
+                <Link href="/pricing" className="text-foreground underline">
                   选择并购买会员套餐
                 </Link>
               </li>

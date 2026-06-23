@@ -42,7 +42,7 @@ export default async function ProductDetailPage({
         <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive mb-6">
           暂时无法连接数据库，无法加载产品详情。请稍后重试。
         </p>
-        <Link href="/products" className="text-primary underline">
+        <Link href="/products" className="text-foreground underline">
           返回产品列表
         </Link>
       </main>

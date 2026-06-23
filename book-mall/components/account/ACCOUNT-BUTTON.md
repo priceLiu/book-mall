@@ -23,15 +23,16 @@
 ```tsx
 import { accountInlineLinkClass } from "@/components/account/account-nav-styles";
 
-<Button variant="subscription" size="sm">开通月费</Button>
+<Button variant="default" size="sm">开通月费</Button>
 <Link className={accountInlineLinkClass()}>充值</Link>
-<Button variant="subscription" size="md">AI 学堂</Button>
+<Button variant="default" size="md">AI 学堂</Button>
 ```
+
+`variant="subscription"` 与 `default` 样式相同（中性白/黑 CTA），可逐步迁移为 `default`。
 
 ## 禁止
 
 - `className` 覆盖 `h-*` / `px-*` / `text-*` / `min-w-*` 造第四档
 - `size="default"`（已移除）
 - 单页出现三档尺寸
-
-`.account-center a.text-primary` 与 **sm** 对齐，见 `app/globals.css`。
+- 橙色 / 电蓝装饰性主按钮（全站 YouMind 中性 token）

@@ -27,7 +27,7 @@ import {
   countGatewayLogsMerged,
   findGatewayLogsMerged,
 } from "@/lib/maintenance/hotcold-archive-read";
-import { isGatewayLogHistoryMode } from "@/lib/gateway/gateway-hot-window";
+import { isGatewayLogHistoryMode, gatewayLogHotCutoffDate } from "@/lib/gateway/gateway-hot-window";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +145,7 @@ export async function GET(request: NextRequest) {
       pageSize,
       totalPages,
       mode: query.mode,
+      hotCutoffMs: historyMode ? null : gatewayLogHotCutoffDate().getTime(),
       // facets=null 表示本次未重算，前端沿用上一次的分面值。
       facets,
       canvasQueueStats,

@@ -35,8 +35,13 @@ import { resolveLiveLogPhaseTiming, resolveVendorNativeTimingLive } from "@/lib/
 import { useLiveWallClockMs } from "@/lib/use-live-wall-clock";
 import {
   gatewayLivePollIntervalMs,
+  GATEWAY_LIVE_HOT_SYNC_MS,
   type GatewayDynamicActivityCounts,
 } from "@/lib/gateway-live-poll-policy";
+import {
+  filterLiveHotWindowRows,
+  gatewayLogHotCutoffMs,
+} from "@/lib/gateway-log-hot-window";
 
 export type GatewayLogRow = {
   id: string;
@@ -125,6 +130,7 @@ type GatewayLogsResponse = {
   totalPages: number;
   facets?: GatewayLogFacets;
   canvasQueueStats?: CanvasQueueWithoutLogStats | null;
+  hotCutoffMs?: number | null;
 };
 
 export type GatewayLogsInitialData = {
@@ -323,6 +329,7 @@ type GatewayLogsDelta = {
   updated: GatewayLogRow[];
   serverNowMs: number;
   sinceApplied: string | null;
+  hotCutoffMs?: number;
 };
 
 /** 增量拉取：自上次游标起的新行 + 在途行最新状态（不算 count / facets / 全量行） */
@@ -363,6 +370,7 @@ async function fetchGatewayLogsDelta(params: {
       updated: data?.updated ?? [],
       serverNowMs: data?.serverNowMs ?? Date.now(),
       sinceApplied: data?.sinceApplied ?? null,
+      hotCutoffMs: data?.hotCutoffMs,
     };
   } catch (e) {
     if (e instanceof Error && e.message !== "加载日志失败") {
@@ -381,7 +389,8 @@ function mergeLogsDelta(
   prev: GatewayLogRow[],
   delta: GatewayLogsDelta,
   pageSize: number,
-): { rows: GatewayLogRow[]; addedCount: number } {
+): { rows: GatewayLogRow[]; addedCount: number; removedCount: number } {
+  const hotCutoffMs = delta.hotCutoffMs ?? gatewayLogHotCutoffMs(delta.serverNowMs);
   const map = new Map(prev.map((r) => [r.id, r]));
   for (const u of delta.updated) {
     if (map.has(u.id)) map.set(u.id, u);
@@ -391,12 +400,14 @@ function mergeLogsDelta(
     if (!map.has(c.id)) addedCount += 1;
     map.set(c.id, c);
   }
-  const rows = [...map.values()].sort((a, b) => {
+  const merged = [...map.values()].sort((a, b) => {
     if (a.submittedAt === b.submittedAt) return a.id < b.id ? 1 : -1;
     return a.submittedAt < b.submittedAt ? 1 : -1;
   });
-  const capped = pageSize > 0 ? rows.slice(0, pageSize) : rows;
-  return { rows: capped, addedCount };
+  const liveRows = filterLiveHotWindowRows(merged, hotCutoffMs);
+  const removedCount = merged.length - liveRows.length;
+  const capped = pageSize > 0 ? liveRows.slice(0, pageSize) : liveRows;
+  return { rows: capped, addedCount, removedCount };
 }
 
 function logFilterChipClass(active: boolean): string {
@@ -515,7 +526,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         poll: opts?.poll,
         includeFacets: opts?.includeFacets,
       });
-      setLogs(data.logs);
+      const hotCutoffMs =
+        data.hotCutoffMs ?? (fetchParams.mode === "live" ? gatewayLogHotCutoffMs() : undefined);
+      const logs =
+        fetchParams.mode === "live" && hotCutoffMs != null
+          ? filterLiveHotWindowRows(data.logs, hotCutoffMs)
+          : data.logs;
+      setLogs(logs);
       setTotal(data.total);
       setPage(data.page);
       setTotalPages(data.totalPages);
@@ -575,8 +592,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         });
         const merged = mergeLogsDelta(logsRef.current, delta, pageSizeRef.current);
         setLogs(merged.rows);
-        if (merged.addedCount > 0) {
-          setTotal((t) => t + merged.addedCount);
+        if (merged.addedCount > 0 || merged.removedCount > 0) {
+          setTotal((t) => Math.max(0, t + merged.addedCount - merged.removedCount));
         }
         void fetchCanvasQueueStats().then((s) => {
           if (s) setCanvasQueueStats(s);
@@ -637,15 +654,22 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       if (cancelled || viewModeRef.current !== "live") return;
       const poll = hasInFlightLogsRef.current;
       if (pageRef.current === 1) {
-        await loadLogsDelta({ poll });
+        if (poll) {
+          await loadLogsDelta({ poll });
+        } else {
+          // 无在飞：全量同步热区（剔除 completedAt 已出 1h 的终态行）
+          await loadLogs({ poll: false, includeFacets: false });
+        }
       } else {
         await loadLogs({ poll, includeFacets: false });
       }
       if (cancelled) return;
-      const intervalMs = gatewayLivePollIntervalMs(
-        { inProgress: 0, slowWarn: 0, backgroundWait: 0 },
-        hasInFlightLogsRef.current,
-      );
+      const intervalMs = poll
+        ? gatewayLivePollIntervalMs(
+            { inProgress: 0, slowWarn: 0, backgroundWait: 0 },
+            true,
+          )
+        : GATEWAY_LIVE_HOT_SYNC_MS;
       schedule(intervalMs);
     };
 

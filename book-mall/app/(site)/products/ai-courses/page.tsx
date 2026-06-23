@@ -32,11 +32,11 @@ export default function AiCoursesPage() {
 
       <p className="mt-10 text-sm text-muted-foreground">
         需要在线工具？前往{" "}
-        <Link href="/products/ai-apps" className="text-primary underline-offset-4 hover:underline">
+        <Link href="/products/ai-apps" className="text-foreground underline-offset-4 hover:underline">
           AI 应用
         </Link>
         ；或{" "}
-        <Link href="/products" className="text-primary underline-offset-4 hover:underline">
+        <Link href="/products" className="text-foreground underline-offset-4 hover:underline">
           查看全部产品
         </Link>
         。

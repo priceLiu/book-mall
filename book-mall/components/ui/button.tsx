@@ -18,10 +18,9 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-        /** 订阅 / 付费主行动作（站内统一橙色） */
-        subscription:
-          "bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500",
+        link: "text-foreground underline-offset-4 hover:underline",
+        /** 订阅 / 付费主行动作（与 default 中性 CTA 一致） */
+        subscription: "bg-primary text-primary-foreground hover:bg-primary/90",
       },
       size: {
         /** 小：个人中心卡片链、表格内操作 */

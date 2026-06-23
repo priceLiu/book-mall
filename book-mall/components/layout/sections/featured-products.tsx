@@ -42,7 +42,7 @@ export async function FeaturedProductsSection() {
   if (items.length === 0) return null;
 
   return (
-    <section id="featured-products" className="max-w-[75%] mx-auto py-16 sm:py-20">
+    <section id="featured-products" className="site-marketing-section py-16 sm:py-20">
       <h2 className="text-lg md:text-xl text-center mb-2">推荐产品</h2>
       <p className="text-sm text-muted-foreground text-center mb-10 max-w-xl mx-auto leading-relaxed">
       </p>
@@ -50,7 +50,7 @@ export async function FeaturedProductsSection() {
         {items.map((p) => (
           <div
             key={p.id}
-            className="group flex h-full flex-col rounded-xl border border-secondary/80 bg-card/40 p-4 transition hover:border-primary/40 hover:bg-card"
+            className="group flex h-full flex-col rounded-xl border border-border bg-card/40 p-4 transition hover:border-border hover:bg-card"
           >
             <Link
               href={p.kind === "KNOWLEDGE" ? `/courses/${p.slug}` : `/products/${p.slug}`}
@@ -74,7 +74,7 @@ export async function FeaturedProductsSection() {
                 <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
                   {categoryLine(p.kind, p.category?.name)}
                 </p>
-                <h3 className="mb-2 line-clamp-2 text-base font-semibold leading-snug group-hover:text-primary">
+                <h3 className="mb-2 line-clamp-2 text-base font-semibold leading-snug group-hover:text-foreground">
                   {p.title}
                 </h3>
                 <p className="line-clamp-2 text-sm text-muted-foreground">{p.summary}</p>

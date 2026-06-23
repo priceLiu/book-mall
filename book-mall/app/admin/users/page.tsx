@@ -87,7 +87,7 @@ export default async function AdminUsersPage() {
                   <span
                     className={
                       teamUserIds.has(u.id)
-                        ? "rounded-md bg-blue-500/15 px-2 py-0.5 text-blue-700 dark:text-blue-300"
+                        ? "rounded-md border border-border bg-muted px-2 py-0.5 text-foreground"
                         : "rounded-md bg-muted px-2 py-0.5 text-muted-foreground"
                     }
                   >
@@ -98,7 +98,7 @@ export default async function AdminUsersPage() {
                   <span
                     className={
                       u.billingPersona === "BYOK"
-                        ? "rounded-md bg-violet-500/15 px-2 py-0.5 text-violet-700 dark:text-violet-300"
+                        ? "rounded-md border border-border bg-muted px-2 py-0.5 text-foreground"
                         : "rounded-md bg-muted px-2 py-0.5 text-muted-foreground"
                     }
                   >
@@ -109,7 +109,7 @@ export default async function AdminUsersPage() {
                   <span
                     className={
                       u.role === "ADMIN"
-                        ? "rounded-md bg-primary/15 px-2 py-0.5 text-primary"
+                        ? "rounded-md border border-border bg-muted px-2 py-0.5 text-foreground"
                         : ""
                     }
                   >

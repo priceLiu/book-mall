@@ -86,7 +86,7 @@ function AdminHeaderUser({ user }: { user: AdminNavUserProps }) {
           <span className="truncate text-xs text-muted-foreground">{secondary}</span>
         ) : null}
       </div>
-      <span className="hidden shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-primary sm:inline-flex">
+      <span className="hidden shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground sm:inline-flex">
         管理员
       </span>
     </div>
