@@ -47,23 +47,40 @@ function nodeLabelFromCanvas(canvas: unknown, nodeId: string): string {
   return label || nodeId;
 }
 
+/**
+ * 终态任务(FAILED/SUCCEEDED)回看窗口。
+ * 该端点是前台轮询热路径,旧实现把 FAILED/SUCCEEDED 全历史(take 200)连 inputPayload 一起拉,
+ * 等于每次轮询都重读冷数据。动静分离原则:在飞任务不限时(本就少),终态只看近窗——
+ * 超窗的成功任务媒体早已落节点、失败任务也早超出「可恢复」时效,无需再拉。
+ * 火山后台视频最长 ~45min,6h 足以覆盖「刚结束/可恢复」的全部场景。
+ */
+const BACKGROUND_VIDEO_TERMINAL_LOOKBACK_MS = 6 * 60 * 60 * 1000;
+const BACKGROUND_VIDEO_TASK_TAKE = 100;
+
 export async function listCanvasProjectBackgroundVideoTasks(input: {
   userId: string;
   projectId: string;
 }): Promise<CanvasBackgroundVideoTaskRow[]> {
+  // 仅做归属校验,不在此拉整张 canvas JSON(常见情况是没有后台任务,拉了就是浪费)。
   const project = await prisma.canvasProject.findFirst({
     where: { id: input.projectId, userId: input.userId },
-    select: { canvas: true },
+    select: { id: true },
   });
   if (!project) return [];
 
+  const terminalCutoff = new Date(Date.now() - BACKGROUND_VIDEO_TERMINAL_LOOKBACK_MS);
   const tasks = await prisma.canvasGenerationTask.findMany({
     where: {
       projectId: input.projectId,
-      status: { in: ["SUBMITTED", "PENDING", "DISPATCHING", "FAILED", "SUCCEEDED"] },
+      OR: [
+        // 在飞:数量天然少,命中在飞部分索引,不限时。
+        { status: { in: ["SUBMITTED", "PENDING", "DISPATCHING"] } },
+        // 终态:只看近窗,避免每次轮询重扫全历史。
+        { status: { in: ["FAILED", "SUCCEEDED"] }, updatedAt: { gte: terminalCutoff } },
+      ],
     },
     orderBy: { updatedAt: "desc" },
-    take: 200,
+    take: BACKGROUND_VIDEO_TASK_TAKE,
     select: {
       id: true,
       nodeId: true,
@@ -121,6 +138,17 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
       : [];
   const gatewayLogMap = new Map(gatewayLogs.map((gl) => [gl.id, gl]));
 
+  // 仅当确有候选任务时才拉整张 canvas(用于取节点名);无后台任务时不读这坨大 JSON。
+  const canvas =
+    candidates.length > 0
+      ? (
+          await prisma.canvasProject.findUnique({
+            where: { id: project.id },
+            select: { canvas: true },
+          })
+        )?.canvas ?? null
+      : null;
+
   for (const { task, gatewayLogId, since, ageSec } of candidates) {
 
     const gl = gatewayLogId ? gatewayLogMap.get(gatewayLogId) : undefined;
@@ -173,7 +201,7 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
       submittedAt: since.toISOString(),
       ageSec,
       kind,
-      label: nodeLabelFromCanvas(project.canvas, task.nodeId),
+      label: nodeLabelFromCanvas(canvas, task.nodeId),
       hint: recoverableStall
         ? VIDEO_BACKGROUND_RECOVER_HINT
         : VIDEO_BACKGROUND_WAIT_HINT,

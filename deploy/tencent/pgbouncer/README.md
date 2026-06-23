@@ -44,31 +44,46 @@ poll workers × 3 ──────┘
 
 ---
 
+## 应用侧改动（已在仓库落地）
+
+- `book-mall/prisma/schema.prisma` 的 `datasource` 已加 **`directUrl = env("DIRECT_DATABASE_URL")`**。
+  - 运行时(查询)走 `DATABASE_URL`(PgBouncer);**迁移/introspect 走 `DIRECT_DATABASE_URL`(直连)**。
+  - `prisma migrate` / `pnpm db:deploy` 会**自动**使用 `directUrl`,无需手工切换。
+- 各 `deploy/tencent/*.env.example` 与 `book-mall/.env.example` 已补 `DIRECT_DATABASE_URL`。
+- 无 PgBouncer 时 `DIRECT_DATABASE_URL` 填与 `DATABASE_URL` 同库的直连串即可,行为不变。
+
+## 本目录提供的部署文件
+
+| 文件 | 用途 |
+|------|------|
+| `pgbouncer.ini` | transaction 模式池配置(已含 `ignore_startup_parameters`、空闲回收 `server_idle_timeout=120`) |
+| `userlist.txt.example` | md5 认证清单模板(复制为 `userlist.txt` 填真实哈希,勿提交) |
+| `docker-compose.yml` | 在 CDB 同 VPC 节点一键起 PgBouncer(`edoburu/pgbouncer`) |
+
 ## DATABASE_URL 示例
 
-**应用运行时（经 PgBouncer）**：
+**应用运行时（经 PgBouncer，务必带 `pgbouncer=true`）**：
 
 ```
 postgresql://USER:PASS@pgbouncer.internal:6432/tool_mall?sslmode=require&pgbouncer=true&connection_limit=15&pool_timeout=30&connect_timeout=15
 ```
 
-**迁移专用（直连 CDB，仅 CI/运维）**：
+**迁移专用 `DIRECT_DATABASE_URL`（直连 CDB:24155）**：
 
 ```
 postgresql://USER:PASS@sh-postgres-xxx.tencentcdb.com:24155/tool_mall?sslmode=require&connect_timeout=30
 ```
 
-Prisma：`pnpm db:deploy` 使用 `DIRECT_DATABASE_URL`（若配置）或临时切直连。
-
 ---
 
 ## 部署步骤（ checklist ）
 
-- [ ] 在 CDB 同 VPC 部署 PgBouncer（CVM / TKE sidecar / 腾讯云数据库代理若可用）
-- [ ] `pool_mode = transaction`，`default_pool_size = 50`
-- [ ] 应用 `DATABASE_URL` 指向 PgBouncer；`connection_limit` 按上表
+- [ ] 在 CDB 同 VPC 节点部署 PgBouncer：`cp userlist.txt.example userlist.txt`(填真实 md5) → 核对 `pgbouncer.ini` 的 `[databases]` host/port → `docker compose up -d`
+- [ ] 健康检查：`psql "host=<node> port=6432 dbname=pgbouncer user=pgbouncer_admin" -c "SHOW POOLS;"`
+- [ ] CloudBase/容器环境变量：`DATABASE_URL` → PgBouncer:6432(`pgbouncer=true`)；`DIRECT_DATABASE_URL` → 直连 CDB:24155
+- [ ] `connection_limit` 按上方预算表（副本数×limit + poll×1 + 预留 ≤ `default_pool_size`）
 - [ ] poll-loop 保持 `PRISMA_CONNECTION_LIMIT=1`（package.json 已设）
-- [ ] 灰度 1 副本 → 观察 `SYSTEM_BUSY` / P1001 → 全量
+- [ ] 灰度 1 副本 → 观察 `SYSTEM_BUSY` / P1001 / `Server has closed` → 全量
 - [ ] 更新 `deploy/tencent/book-mall.env` 与 CloudBase 环境变量
 
 ---

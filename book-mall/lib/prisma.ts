@@ -54,6 +54,17 @@ const datasourceUrl = resolvePrismaDatasourceUrl();
  */
 const DB_RETRY_MAX = 3;
 const DB_RETRY_BASE_DELAY_MS = 60;
+/**
+ * 重试总时长上限（墙钟）。连接级错误里「池超时 P2024 / Timed out fetching a new connection」
+ * 每次失败前已阻塞了 pool_timeout（默认 30s），若再无脑重试 3 次会堆叠到 ~2 分钟，
+ * 表现为「点一下卡住几分钟→整页 500→进程被拖垮」。这里给重试设墙钟预算：
+ *  - 失败快（连接已关闭 P1017 等，毫秒级返回）→ 仍可在预算内多次重试换到新连接（保留原意图）；
+ *  - 失败慢（池已饱和，单次就 ~30s）→ 立即放弃重试、快速抛出「系统繁忙」，绝不再叠加。
+ */
+const DB_RETRY_BUDGET_MS = (() => {
+  const v = Number(process.env.DB_RETRY_BUDGET_MS);
+  return Number.isFinite(v) && v > 0 ? v : 8000;
+})();
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function buildPrismaClient(urlOverride?: string): PrismaClient {
@@ -68,12 +79,17 @@ function buildPrismaClient(urlOverride?: string): PrismaClient {
       $allModels: {
         async $allOperations({ args, query }) {
           let lastErr: unknown;
+          const startedAt = Date.now();
           for (let attempt = 0; attempt <= DB_RETRY_MAX; attempt++) {
             try {
               return await query(args);
             } catch (e) {
               lastErr = e;
-              if (!isPrismaConnectionUnavailable(e) || attempt === DB_RETRY_MAX) {
+              if (
+                !isPrismaConnectionUnavailable(e) ||
+                attempt === DB_RETRY_MAX ||
+                Date.now() - startedAt > DB_RETRY_BUDGET_MS
+              ) {
                 throw e;
               }
               await sleep(DB_RETRY_BASE_DELAY_MS * (attempt + 1));

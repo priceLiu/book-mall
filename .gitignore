@@ -22,3 +22,4 @@ tool-web/.env.local
 # 腾讯云部署本地密钥（从 *.example 复制，勿提交）
 /deploy/tencent/book-mall.env
 /deploy/tencent/tool-web.env
+/deploy/tencent/pgbouncer/userlist.txt

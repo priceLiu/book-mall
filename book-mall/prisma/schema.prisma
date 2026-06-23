@@ -7,7 +7,11 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // 运行时:经 PgBouncer(transaction 模式)的池化连接(URL 带 pgbouncer=true)。
   url      = env("DATABASE_URL")
+  // 迁移/introspect 专用:必须**直连** CDB(PgBouncer transaction 模式不支持迁移用的会话级特性)。
+  // 未配置 PgBouncer 时,DIRECT_DATABASE_URL 与 DATABASE_URL 相同(直连),行为不变。
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 enum UserRole {

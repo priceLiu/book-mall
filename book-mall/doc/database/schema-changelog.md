@@ -220,6 +220,18 @@
 
 ---
 
+## 2026-06-23 — PgBouncer 就绪：datasource `directUrl`（迁移直连）
+
+- **schema 变更（非迁移）**：`prisma/schema.prisma` 的 `datasource db` 新增 `directUrl = env("DIRECT_DATABASE_URL")`。
+  - 运行时查询走 `DATABASE_URL`（正式经 PgBouncer:6432，`pgbouncer=true`）；`prisma migrate` / `db:deploy` 自动改走 **`DIRECT_DATABASE_URL` 直连 CDB:24155**（transaction 池不支持迁移所需会话特性）。
+  - **无破坏**：运行时 PrismaClient **不读** directUrl（实测缺该 env 仍正常服务）；仅 CLI 迁移使用。无 PgBouncer 时填同库直连串即可，行为不变。
+- **配置**：`book-mall/.env.local`、`book-mall/.env.example`、`deploy/tencent/book-mall.env.example` 已补 `DIRECT_DATABASE_URL`；dev 连接池默认 10→30。
+- **部署文件**：`deploy/tencent/pgbouncer/`（`pgbouncer.ini` transaction 模式 + 空闲回收、`docker-compose.yml`、`userlist.txt.example`）。
+- **应用侧抗压**（同批，非 schema）：DB 重试加墙钟预算 `DB_RETRY_BUDGET_MS`（默认 8s，止住池超时叠加到分钟级）；DISPATCHING 活锁修复（按 `queuedAt` 年龄回收无 vendor id 的孤儿任务）；`background-video-tasks` 读端点动静分离（终态查询限近 6h、canvas JSON 懒加载）。
+- **回滚**：移除 `directUrl` 行并删除各 env 的 `DIRECT_DATABASE_URL` 即恢复;迁移历史不受影响（未新增迁移）。
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：
