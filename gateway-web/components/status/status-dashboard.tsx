@@ -144,9 +144,10 @@ type StatsFailCodesResponse = {
 
 type DetailLogsResponse = {
   logs: StatusLogRow[];
-  total: number;
+  total: number | null;
   page: number;
-  totalPages: number;
+  totalPages: number | null;
+  hasMore?: boolean;
 };
 
 type FilterState = {
@@ -556,6 +557,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
           ...tabQuery,
           page: targetPage,
           limit: pageSize,
+          skipCount: "1",
           skipPoll: opts?.skipPoll === false ? undefined : "1",
           ...(opts?.poll && queryMode === "live" ? { poll: "1" } : {}),
         },
@@ -568,7 +570,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       if (res.ok) {
         const batch = res.data.logs ?? [];
         const responsePage = res.data.page ?? targetPage;
-        const totalPages = res.data.totalPages ?? 1;
+        const pageHasMore =
+          res.data.hasMore ?? batch.length === pageSize;
         if (append) {
           setLogs((prev) => {
             const seen = new Set(prev.map((l) => l.id));
@@ -578,21 +581,19 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             }
             const capped = merged.slice(0, INFINITE_SCROLL_MAX_ROWS);
             setHasMoreLogs(
-              responsePage < totalPages &&
-                capped.length < INFINITE_SCROLL_MAX_ROWS,
+              pageHasMore && capped.length < INFINITE_SCROLL_MAX_ROWS,
             );
             return capped;
           });
         } else {
           setLogs(batch);
           setHasMoreLogs(
-            responsePage < totalPages &&
-              batch.length < INFINITE_SCROLL_MAX_ROWS,
+            pageHasMore && batch.length < INFINITE_SCROLL_MAX_ROWS,
           );
         }
         setLoadedPages(responsePage);
-        setLogsTotal(res.data.total ?? 0);
-        setLogsTotalPages(totalPages);
+        setLogsTotal(res.data.total ?? batch.length);
+        setLogsTotalPages(res.data.totalPages ?? 1);
       }
       return res;
     },

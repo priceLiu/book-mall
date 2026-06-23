@@ -104,6 +104,8 @@ const PAGE_SIZE_PRESETS = [20, 50, 100] as const;
 const PAGE_SIZE_STORAGE_KEY = "gw-logs-page-size";
 const FILTERS_COLLAPSED_STORAGE_KEY = "gw-logs-filters-collapsed";
 const PAGE_SIZE_MAX = 500;
+/** 历史模式单次无限滚动上限（与状态看板一致） */
+const INFINITE_SCROLL_MAX_ROWS = 500;
 
 type PageSizePreset = (typeof PAGE_SIZE_PRESETS)[number] | "custom";
 
@@ -124,10 +126,11 @@ type CanvasQueueWithoutLogStats = {
 
 type GatewayLogsResponse = {
   logs: GatewayLogRow[];
-  total: number;
+  total: number | null;
   page: number;
   pageSize: number;
-  totalPages: number;
+  totalPages: number | null;
+  hasMore?: boolean;
   facets?: GatewayLogFacets;
   canvasQueueStats?: CanvasQueueWithoutLogStats | null;
   hotCutoffMs?: number | null;
@@ -268,12 +271,15 @@ async function fetchGatewayLogs(params: {
   poll?: boolean;
   /** 自动刷新 tick 传 false：不重算分面，沿用上一次 facets，降低 DB 压力 */
   includeFacets?: boolean;
+  /** 历史追加页：跳过 count，响应带 hasMore */
+  skipCount?: boolean;
 }): Promise<GatewayLogsResponse> {
   const qs = new URLSearchParams({
     page: String(params.page),
     limit: String(params.pageSize),
     mode: params.mode,
   });
+  if (params.skipCount) qs.set("skipCount", "1");
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
   if (params.statusFilter) qs.set("status", params.statusFilter);
@@ -295,12 +301,14 @@ async function fetchGatewayLogs(params: {
     }
     return {
       logs: data?.logs ?? [],
-      total: data?.total ?? 0,
+      total: data?.total ?? null,
       page: data?.page ?? params.page,
       pageSize: data?.pageSize ?? params.pageSize,
-      totalPages: data?.totalPages ?? 1,
+      totalPages: data?.totalPages ?? null,
+      hasMore: data?.hasMore,
       facets: data?.facets,
       canvasQueueStats: data?.canvasQueueStats ?? null,
+      hotCutoffMs: data?.hotCutoffMs,
     };
   } catch (e) {
     if (e instanceof Error && e.message !== "加载日志失败") {
@@ -384,11 +392,10 @@ async function fetchGatewayLogsDelta(params: {
   }
 }
 
-/** 升序游标合并：updated 原地替换、created 去重前插，按 submittedAt desc 排序并截断到 pageSize */
+/** 升序游标合并：updated 原地替换、created 去重前插，按 submittedAt desc 排序并截断 */
 function mergeLogsDelta(
   prev: GatewayLogRow[],
   delta: GatewayLogsDelta,
-  pageSize: number,
 ): { rows: GatewayLogRow[]; addedCount: number; removedCount: number } {
   const hotCutoffMs = delta.hotCutoffMs ?? gatewayLogHotCutoffMs(delta.serverNowMs);
   const map = new Map(prev.map((r) => [r.id, r]));
@@ -406,7 +413,7 @@ function mergeLogsDelta(
   });
   const liveRows = filterLiveHotWindowRows(merged, hotCutoffMs);
   const removedCount = merged.length - liveRows.length;
-  const capped = pageSize > 0 ? liveRows.slice(0, pageSize) : liveRows;
+  const capped = liveRows.slice(0, INFINITE_SCROLL_MAX_ROWS);
   return { rows: capped, addedCount, removedCount };
 }
 
@@ -420,9 +427,6 @@ function clearSelectionOnFilter(setSelected: (s: Set<string>) => void) {
 
 export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData }) {
   const [logs, setLogs] = useState(initialData.logs);
-  const [total, setTotal] = useState(initialData.total);
-  const [page, setPage] = useState(initialData.page || 1);
-  const [totalPages, setTotalPages] = useState(initialData.totalPages || 1);
   const [pageSize, setPageSize] = useState(initialData.pageSize || PAGE_SIZE_PRESETS[0]);
   const [pageSizePreset, setPageSizePreset] = useState<PageSizePreset>(
     resolvePageSizePreset(initialData.pageSize || PAGE_SIZE_PRESETS[0]),
@@ -453,6 +457,15 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [viewMode, setViewMode] = useState<LogsViewMode>("live");
   const viewModeRef = useRef<LogsViewMode>("live");
   viewModeRef.current = viewMode;
+  const [hasMoreLogs, setHasMoreLogs] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadedPages, setLoadedPages] = useState(1);
+  const loadedPagesRef = useRef(1);
+  const hasMoreLogsRef = useRef(true);
+  const historyLoadSeqRef = useRef(0);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  loadedPagesRef.current = loadedPages;
+  hasMoreLogsRef.current = hasMoreLogs;
   /** 每秒 tick，驱动进行中 Duration / Queue / Generate / Poll 墙钟重算 */
   const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
 
@@ -464,9 +477,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
   const skipInitialFetchRef = useRef(true);
 
-  const fetchParams = useMemo(
+  const listFilterParams = useMemo(
     () => ({
-      page,
       pageSize,
       fromDate,
       toDate,
@@ -478,7 +490,6 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       mode: viewMode,
     }),
     [
-      page,
       pageSize,
       fromDate,
       toDate,
@@ -507,69 +518,117 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const hasInFlightLogsRef = useRef(hasInFlightLogs);
   hasInFlightLogsRef.current = hasInFlightLogs;
 
-  /** 增量合并需读取「当前列表 / 页码 / 每页条数」的最新值，避免闭包过期 */
   const logsRef = useRef(logs);
   logsRef.current = logs;
-  const pageRef = useRef(page);
-  pageRef.current = page;
   const pageSizeRef = useRef(pageSize);
   pageSizeRef.current = pageSize;
 
-  const loadLogs = useCallback(async (opts?: { poll?: boolean; includeFacets?: boolean }) => {
-    setFetchError(null);
-    try {
-      const data = await fetchGatewayLogs({
-        ...fetchParams,
-        skipPoll: !opts?.poll,
-        poll: opts?.poll,
-        includeFacets: opts?.includeFacets,
-      });
-      const hotCutoffMs =
-        data.hotCutoffMs ?? (fetchParams.mode === "live" ? gatewayLogHotCutoffMs() : undefined);
-      const logs =
-        fetchParams.mode === "live" && hotCutoffMs != null
-          ? filterLiveHotWindowRows(data.logs, hotCutoffMs)
-          : data.logs;
-      setLogs(logs);
-      setTotal(data.total);
-      setPage(data.page);
-      setTotalPages(data.totalPages);
-      setPageSize(data.pageSize);
-      if (data.facets) setFacets(data.facets);
-      if (data.canvasQueueStats) setCanvasQueueStats(data.canvasQueueStats);
-      setLastRefreshedAt(new Date());
-      return data;
-    } catch (e) {
-      setFetchError(e instanceof Error ? e.message : "加载日志失败");
-      return null;
-    }
-  }, [fetchParams]);
+  const resetListScroll = useCallback(() => {
+    setLoadedPages(1);
+    loadedPagesRef.current = 1;
+    setHasMoreLogs(true);
+    hasMoreLogsRef.current = true;
+  }, []);
+
+  /** 动/静数据统一：首屏或滚动追加，skipCount 跳过慢 count */
+  const loadLogsPaged = useCallback(
+    async (opts?: {
+      append?: boolean;
+      poll?: boolean;
+      includeFacets?: boolean;
+    }) => {
+      const append = opts?.append === true;
+      if (
+        append &&
+        (!hasMoreLogsRef.current ||
+          logsRef.current.length >= INFINITE_SCROLL_MAX_ROWS)
+      ) {
+        return null;
+      }
+
+      const targetPage = append ? loadedPagesRef.current + 1 : 1;
+      const seq = ++historyLoadSeqRef.current;
+
+      try {
+        setFetchError(null);
+        const data = await fetchGatewayLogs({
+          ...listFilterParams,
+          page: targetPage,
+          skipPoll: !opts?.poll,
+          poll: opts?.poll,
+          includeFacets: append ? false : opts?.includeFacets,
+          skipCount: true,
+        });
+        if (seq !== historyLoadSeqRef.current) return null;
+
+        let batch = data.logs;
+        if (listFilterParams.mode === "live") {
+          const hotCutoffMs = data.hotCutoffMs ?? gatewayLogHotCutoffMs();
+          batch = filterLiveHotWindowRows(batch, hotCutoffMs);
+        }
+
+        const pageHasMore =
+          data.hasMore ?? batch.length === listFilterParams.pageSize;
+
+        if (append) {
+          setLogs((prev) => {
+            const seen = new Set(prev.map((l) => l.id));
+            const merged = [...prev];
+            for (const row of batch) {
+              if (!seen.has(row.id)) merged.push(row);
+            }
+            const capped = merged.slice(0, INFINITE_SCROLL_MAX_ROWS);
+            setHasMoreLogs(
+              pageHasMore && capped.length < INFINITE_SCROLL_MAX_ROWS,
+            );
+            return capped;
+          });
+        } else {
+          setLogs(batch.slice(0, INFINITE_SCROLL_MAX_ROWS));
+          setHasMoreLogs(
+            pageHasMore && batch.length < INFINITE_SCROLL_MAX_ROWS,
+          );
+          if (data.facets) setFacets(data.facets);
+          if (data.canvasQueueStats) setCanvasQueueStats(data.canvasQueueStats);
+        }
+
+        setLoadedPages(targetPage);
+        loadedPagesRef.current = targetPage;
+        setLastRefreshedAt(new Date());
+        return data;
+      } catch (e) {
+        if (seq === historyLoadSeqRef.current) {
+          setFetchError(e instanceof Error ? e.message : "加载日志失败");
+        }
+        return null;
+      }
+    },
+    [listFilterParams],
+  );
 
   const refreshLogs = useCallback(async () => {
     setRefreshing(true);
     try {
-      return await loadLogs({ poll: true });
+      resetListScroll();
+      return await loadLogsPaged({ poll: true, includeFacets: false });
     } finally {
       setRefreshing(false);
     }
-  }, [loadLogs]);
+  }, [loadLogsPaged, resetListScroll]);
 
-  /**
-   * 增量刷新（仅第 1 页、按 submittedAt desc 时使用）：只拉新行 + 在途行最新状态，
-   * 客户端合并，避免每 8s 全量 count + findMany 压数据库。列表为空时回退全量。
-   */
+  /** 动数据增量刷新：只拉新行 + 在途行最新状态，客户端合并 */
   const loadLogsDelta = useCallback(
     async (opts?: { poll?: boolean }) => {
       const current = logsRef.current;
       if (current.length === 0) {
-        return loadLogs({ poll: opts?.poll, includeFacets: false });
+        return loadLogsPaged({ poll: opts?.poll, includeFacets: false });
       }
       let cursor = current[0]?.submittedAt ?? "";
       for (const r of current) {
         if (r.submittedAt > cursor) cursor = r.submittedAt;
       }
       if (!cursor) {
-        return loadLogs({ poll: opts?.poll, includeFacets: false });
+        return loadLogsPaged({ poll: opts?.poll, includeFacets: false });
       }
       const inFlightIds = current
         .filter((l) => isLogInProgress(l.status))
@@ -588,11 +647,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
           credentialIdFilter,
           poll: opts?.poll,
         });
-        const merged = mergeLogsDelta(logsRef.current, delta, pageSizeRef.current);
+        const merged = mergeLogsDelta(logsRef.current, delta);
         setLogs(merged.rows);
-        if (merged.addedCount > 0 || merged.removedCount > 0) {
-          setTotal((t) => Math.max(0, t + merged.addedCount - merged.removedCount));
-        }
         void fetchCanvasQueueStats().then((s) => {
           if (s) setCanvasQueueStats(s);
         });
@@ -604,7 +660,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       }
     },
     [
-      loadLogs,
+      loadLogsPaged,
       fromDate,
       toDate,
       statusFilter,
@@ -617,9 +673,6 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
   useEffect(() => {
     setLogs(initialData.logs);
-    setTotal(initialData.total);
-    setPage(initialData.page || 1);
-    setTotalPages(initialData.totalPages || 1);
     setPageSize(initialData.pageSize || PAGE_SIZE_PRESETS[0]);
     if (initialData.facets) setFacets(initialData.facets);
   }, [initialData]);
@@ -630,13 +683,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       setPageSize(stored);
       setPageSizePreset(resolvePageSizePreset(stored));
       setCustomPageSizeInput(String(stored));
-      setPage(1);
+      resetListScroll();
       skipInitialFetchRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅挂载时恢复每页条数
   }, []);
 
-  /** 开启自动刷新时定期拉列表；仅 live 且有动数据时 poll 厂商 */
+  /** 动数据自动刷新：有在飞走 delta；仅首屏时同步热区，已滚动加载则跳过全量 */
   useEffect(() => {
     if (!autoRefresh || viewMode !== "live") return;
 
@@ -651,15 +704,10 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     const run = async () => {
       if (cancelled || viewModeRef.current !== "live") return;
       const poll = hasInFlightLogsRef.current;
-      if (pageRef.current === 1) {
-        if (poll) {
-          await loadLogsDelta({ poll });
-        } else {
-          // 无在飞：全量同步热区（剔除 completedAt 已出 1h 的终态行）
-          await loadLogs({ poll: false, includeFacets: false });
-        }
-      } else {
-        await loadLogs({ poll, includeFacets: false });
+      if (poll) {
+        await loadLogsDelta({ poll });
+      } else if (loadedPagesRef.current === 1) {
+        await loadLogsPaged({ includeFacets: false });
       }
       if (cancelled) return;
       const intervalMs = poll
@@ -676,18 +724,17 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [autoRefresh, viewMode, loadLogs, loadLogsDelta]);
+  }, [autoRefresh, viewMode, loadLogsPaged, loadLogsDelta]);
 
-  /** 筛选 / 分页 / 每页条数变更时拉取 */
+  /** 筛选 / 每页条数 / 动静切换：重置并拉首屏（skipCount） */
   useEffect(() => {
     if (dateRangeInvalid) return;
 
-    if (skipInitialFetchRef.current) {
+    if (skipInitialFetchRef.current && viewMode === "live") {
       skipInitialFetchRef.current = false;
       if (
         initialData.logs.length > 0 &&
         filtersAreDefault &&
-        page === (initialData.page || 1) &&
         pageSize === (initialData.pageSize || PAGE_SIZE_PRESETS[0])
       ) {
         setLoading(false);
@@ -695,26 +742,18 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       }
     }
 
+    resetListScroll();
     setLoading(true);
     setFetchError(null);
+    clearSelectionOnFilter(setSelected);
+
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          const data = await fetchGatewayLogs(fetchParams);
-          if (cancelled) return;
-          setLogs(data.logs);
-          setTotal(data.total);
-          setPage(data.page);
-          setTotalPages(data.totalPages);
-          setPageSize(data.pageSize);
-          if (data.facets) setFacets(data.facets);
-          if (data.canvasQueueStats) setCanvasQueueStats(data.canvasQueueStats);
-          setLastRefreshedAt(new Date());
-        } catch (e) {
-          if (!cancelled) {
-            setFetchError(e instanceof Error ? e.message : "加载日志失败");
-          }
+          await loadLogsPaged({
+            includeFacets: viewMode === "live",
+          });
         } finally {
           if (!cancelled) setLoading(false);
         }
@@ -725,7 +764,36 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [fetchParams, dateRangeInvalid, filtersAreDefault, initialData.page, initialData.pageSize, page, pageSize]);
+  }, [
+    listFilterParams,
+    dateRangeInvalid,
+    filtersAreDefault,
+    initialData.pageSize,
+    pageSize,
+    viewMode,
+    loadLogsPaged,
+    resetListScroll,
+  ]);
+
+  useEffect(() => {
+    const el = loadMoreSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        if (loading || loadingMore || !hasMoreLogsRef.current) return;
+        if (logsRef.current.length >= INFINITE_SCROLL_MAX_ROWS) return;
+        setLoadingMore(true);
+        void loadLogsPaged({ append: true }).finally(() =>
+          setLoadingMore(false),
+        );
+      },
+      { rootMargin: "320px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loading, loadingMore, hasMoreLogs, logs.length, loadLogsPaged]);
+
 
   const providerKinds = useMemo(() => {
     if (facets.providerKinds.length) {
@@ -802,14 +870,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     });
   };
 
-  const resetPage = () => setPage(1);
+  const resetListScrollOnFilter = () => resetListScroll();
 
   const switchViewMode = (mode: LogsViewMode) => {
     if (mode === viewMode) return;
     setLoading(true);
     setFetchError(null);
     setViewMode(mode);
-    resetPage();
+    resetListScrollOnFilter();
     clearSelectionOnFilter(setSelected);
   };
 
@@ -818,7 +886,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     setPageSize(clamped);
     setPageSizePreset(resolvePageSizePreset(clamped));
     setCustomPageSizeInput(String(clamped));
-    setPage(1);
+    resetListScroll();
     clearSelectionOnFilter(setSelected);
     try {
       window.localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(clamped));
@@ -880,7 +948,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   className={logFilterChipClass(active)}
                   onClick={() => {
                     setSourceFilter(opt.value);
-                    resetPage();
+                    resetListScrollOnFilter();
                     clearSelectionOnFilter(setSelected);
                   }}
                 >
@@ -891,7 +959,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             <span className="ml-2 shrink-0 text-[11px] text-[var(--gw-muted)]">
               {loading
                 ? "加载中…"
-                : `共 ${total} 条 · 第 ${page}/${totalPages} 页 · 本页 ${logs.length} 条`}
+                : `已加载 ${logs.length} 条${loadedPages > 1 ? ` · 已翻 ${loadedPages} 页` : ""}`}
               {(fromDate || toDate) && !loading ? " · 按日期" : ""}
               {viewMode === "live"
                 ? autoRefresh && hasInFlightLogs
@@ -990,7 +1058,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   max={toDate || undefined}
                   onChange={(e) => {
                     setFromDate(e.target.value);
-                    resetPage();
+                    resetListScrollOnFilter();
                     clearSelectionOnFilter(setSelected);
                   }}
                   className="w-[148px] rounded-lg border border-[var(--gw-border)] bg-[#141419] px-3 py-2 text-sm text-[var(--gw-ink)] outline-none focus:border-white/20 [color-scheme:dark]"
@@ -1005,7 +1073,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   min={fromDate || undefined}
                   onChange={(e) => {
                     setToDate(e.target.value);
-                    resetPage();
+                    resetListScrollOnFilter();
                     clearSelectionOnFilter(setSelected);
                   }}
                   className="w-[148px] rounded-lg border border-[var(--gw-border)] bg-[#141419] px-3 py-2 text-sm text-[var(--gw-ink)] outline-none focus:border-white/20 [color-scheme:dark]"
@@ -1019,7 +1087,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   onClick={() => {
                     setFromDate("");
                     setToDate("");
-                    resetPage();
+                    resetListScrollOnFilter();
                     clearSelectionOnFilter(setSelected);
                   }}
                 >
@@ -1030,7 +1098,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
-                  resetPage();
+                  resetListScrollOnFilter();
                   clearSelectionOnFilter(setSelected);
                 }}
                 className="min-w-[160px] rounded-lg border border-[var(--gw-border)] bg-[#141419] px-3 py-2 text-sm text-[var(--gw-ink)] outline-none focus:border-white/20"
@@ -1058,7 +1126,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   setProviderFilter("");
                   setModelFilter("");
                   setCredentialIdFilter("");
-                  resetPage();
+                  resetListScrollOnFilter();
                   clearSelectionOnFilter(setSelected);
                 }}
               >
@@ -1073,7 +1141,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                     setProviderFilter(kind);
                     setModelFilter("");
                     setCredentialIdFilter("");
-                    resetPage();
+                    resetListScrollOnFilter();
                     clearSelectionOnFilter(setSelected);
                   }}
                 >
@@ -1088,7 +1156,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 value={modelFilter}
                 onChange={(e) => {
                   setModelFilter(e.target.value);
-                  resetPage();
+                  resetListScrollOnFilter();
                   clearSelectionOnFilter(setSelected);
                 }}
                 disabled={!modelOptions.length}
@@ -1115,7 +1183,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 value={credentialIdFilter}
                 onChange={(e) => {
                   setCredentialIdFilter(e.target.value);
-                  resetPage();
+                  resetListScrollOnFilter();
                   clearSelectionOnFilter(setSelected);
                 }}
                 disabled={!credentialKeyOptions.length}
@@ -1612,7 +1680,17 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   colSpan={24}
                   className="py-16 text-center text-sm text-[var(--gw-muted)]"
                 >
-                  {total > 0 ? "本页暂无数据" : "暂无日志"}
+                  {loading ? "加载中…" : "暂无日志"}
+                </td>
+              </tr>
+            ) : null}
+            {loadingMore ? (
+              <tr>
+                <td
+                  colSpan={24}
+                  className="py-4 text-center text-xs text-[var(--gw-accent)]/90"
+                >
+                  正在加载更多…
                 </td>
               </tr>
             ) : null}
@@ -1620,11 +1698,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             )}
           </tbody>
         </table>
+        <div ref={loadMoreSentinelRef} className="h-1" aria-hidden />
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--gw-border)] bg-[#0f0f14] px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-[var(--gw-muted)]">每页</span>
+          <span className="text-xs text-[var(--gw-muted)]">每批</span>
           <select
             value={pageSizePreset}
             onChange={(e) => {
@@ -1671,37 +1750,23 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
           </span>
         </div>
 
-        {totalPages > 1 ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={page <= 1 || loading}
-              onClick={() => {
-                setPage((p) => Math.max(1, p - 1));
-                clearSelectionOnFilter(setSelected);
-              }}
-              className="rounded-lg border border-[var(--gw-border)] px-3 py-1.5 text-xs text-[var(--gw-muted)] transition hover:border-white/20 hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              上一页
-            </button>
-            <span className="text-xs text-[var(--gw-muted)]">
-              第 {page} / {totalPages} 页
-            </span>
-            <button
-              type="button"
-              disabled={page >= totalPages || loading}
-              onClick={() => {
-                setPage((p) => Math.min(totalPages, p + 1));
-                clearSelectionOnFilter(setSelected);
-              }}
-              className="rounded-lg border border-[var(--gw-border)] px-3 py-1.5 text-xs text-[var(--gw-muted)] transition hover:border-white/20 hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              下一页
-            </button>
-          </div>
-        ) : (
-          <span className="text-xs text-[var(--gw-muted)]">共 {total} 条</span>
-        )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-xs text-[var(--gw-muted)]">
+            {loadingMore ? (
+              <span className="text-[var(--gw-accent)]/90">正在加载更多…</span>
+            ) : hasMoreLogs && logs.length < INFINITE_SCROLL_MAX_ROWS ? (
+              <span>
+                向下滚动自动加载（每批 {pageSize} 条，单次最多 {INFINITE_SCROLL_MAX_ROWS} 条）
+              </span>
+            ) : logs.length >= INFINITE_SCROLL_MAX_ROWS ? (
+              <span className="text-amber-300/90">
+                已达单次加载上限，请缩小时间范围后刷新
+              </span>
+            ) : (
+              <span>已全部加载</span>
+            )}
+          </span>
+        </div>
       </div>
     </div>
   );
