@@ -19,7 +19,7 @@ import {
 } from "@/lib/gateway/log-query-params";
 import { billingCategoryLabel, resolveBillingCategory } from "@/lib/billing/billing-category";
 import { resolveGatewayFailCodeDisplay } from "@/lib/gateway/log-fail-code";
-import { maybeRunOpportunisticGatewayPoll } from "@/lib/gateway/log-read-poll-guard";
+import { scheduleOpportunisticGatewayPoll } from "@/lib/gateway/log-read-poll-guard";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 import { prisma } from "@/lib/prisma";
 
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   const user = await requireGatewaySessionUser(request);
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
-  await maybeRunOpportunisticGatewayPoll(user.id, { skip: true });
+  scheduleOpportunisticGatewayPoll(user.id, { skip: true });
 
   const query = parseDashboardQueryFromSearchParams(request.nextUrl.searchParams);
   const format = request.nextUrl.searchParams.get("format")?.trim().toLowerCase();

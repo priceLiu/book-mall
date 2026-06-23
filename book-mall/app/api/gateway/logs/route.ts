@@ -17,7 +17,7 @@ import {
 } from "@/lib/gateway/gateway-route-errors";
 import { mapGatewayRequestLogsToResponseRows } from "@/lib/gateway/gateway-log-response-rows";
 import {
-  maybeRunOpportunisticGatewayPoll,
+  scheduleOpportunisticGatewayPoll,
   parseGatewayLogPollParams,
 } from "@/lib/gateway/log-read-poll-guard";
 import { canViewFinanceCost } from "@/lib/auth/permissions";
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       status === "PENDING" ||
       status === "RUNNING";
 
-    await maybeRunOpportunisticGatewayPoll(user.id, {
+    scheduleOpportunisticGatewayPoll(user.id, {
       force: pollOpts.force,
       skip: pollOpts.skip || (!pollOpts.force && !isInFlightQuery),
     });

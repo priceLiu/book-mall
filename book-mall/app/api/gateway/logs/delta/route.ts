@@ -13,7 +13,7 @@ import {
 } from "@/lib/gateway/gateway-route-errors";
 import { mapGatewayRequestLogsToResponseRows } from "@/lib/gateway/gateway-log-response-rows";
 import {
-  maybeRunOpportunisticGatewayPoll,
+  scheduleOpportunisticGatewayPoll,
   parseGatewayLogPollParams,
 } from "@/lib/gateway/log-read-poll-guard";
 import { prisma } from "@/lib/prisma";
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     const refreshIds = parseRefreshIds(params.get("ids"));
     const hasInFlight = refreshIds.length > 0;
 
-    await maybeRunOpportunisticGatewayPoll(user.id, {
+    scheduleOpportunisticGatewayPoll(user.id, {
       force: pollOpts.force,
       skip: pollOpts.skip || (!pollOpts.force && !hasInFlight),
     });

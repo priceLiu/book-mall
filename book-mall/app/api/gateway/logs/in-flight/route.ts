@@ -8,7 +8,7 @@ import {
 import { DASHBOARD_IN_PROGRESS_STATUSES } from "@/lib/gateway/log-dashboard-projection";
 import { mapGatewayRequestLogsToResponseRows } from "@/lib/gateway/gateway-log-response-rows";
 import {
-  maybeRunOpportunisticGatewayPoll,
+  scheduleOpportunisticGatewayPoll,
   parseGatewayLogPollParams,
 } from "@/lib/gateway/log-read-poll-guard";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   const pollOpts = parseGatewayLogPollParams(request.nextUrl.searchParams);
-  await maybeRunOpportunisticGatewayPoll(user.id, {
+  scheduleOpportunisticGatewayPoll(user.id, {
     force: pollOpts.force,
     skip: pollOpts.skip,
   });

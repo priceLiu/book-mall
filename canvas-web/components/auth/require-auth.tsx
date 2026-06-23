@@ -19,8 +19,8 @@ import {
   shouldAttemptSilentSso,
 } from "@/lib/tools-silent-sso";
 
-const SESSION_FETCH_TIMEOUT_MS = 12_000;
-const SESSION_FETCH_RETRY_DELAY_MS = 400;
+const SESSION_FETCH_TIMEOUT_MS = 20_000;
+const SESSION_FETCH_RETRY_DELAY_MS = 800;
 const SESSION_POLL_MS = 60_000;
 
 async function fetchToolsSessionClient(): Promise<
@@ -216,7 +216,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           连接 Book 账号…
         </div>
         <p className="text-xs text-zinc-500">
-          正在校验工具站令牌（约 12 秒，失败会自动重试一次）
+          正在校验工具站令牌（约 20 秒，失败会自动重试）
         </p>
       </div>
     );

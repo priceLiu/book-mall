@@ -6,7 +6,7 @@ import {
   parseDashboardQueryFromSearchParams,
 } from "@/lib/gateway/log-dashboard-query";
 import {
-  maybeRunOpportunisticGatewayPoll,
+  awaitOpportunisticGatewayPoll,
   parseGatewayLogPollParams,
 } from "@/lib/gateway/log-read-poll-guard";
 import {
@@ -80,10 +80,10 @@ export async function GET(request: NextRequest) {
     const shouldPoll = pollOpts.force || hasSlow;
 
     let pollResult: Awaited<
-      ReturnType<typeof maybeRunOpportunisticGatewayPoll>
+      ReturnType<typeof awaitOpportunisticGatewayPoll>
     > = { ran: false };
     if (shouldPoll && !pollOpts.skip) {
-      pollResult = await maybeRunOpportunisticGatewayPoll(user.id, {
+      pollResult = await awaitOpportunisticGatewayPoll(user.id, {
         force: true,
       });
     }

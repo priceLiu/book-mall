@@ -257,28 +257,43 @@ async function fetchGatewayLogs(params: {
   if (params.skipPoll !== false) qs.set("skipPoll", "1");
   if (params.poll) qs.set("poll", "1");
   if (params.includeFacets === false) qs.set("facets", "0");
-  const res = await fetch(`/api/book-mall/api/gateway/logs?${qs.toString()}`);
-  const data = (await res.json().catch(() => null)) as
-    | (GatewayLogsResponse & { error?: string })
-    | null;
-  if (!res.ok) {
-    throw new Error(data?.error ?? "加载日志失败");
+  try {
+    const res = await fetch(`/api/book-mall/api/gateway/logs?${qs.toString()}`);
+    const data = (await res.json().catch(() => null)) as
+      | (GatewayLogsResponse & { error?: string })
+      | null;
+    if (!res.ok) {
+      throw new Error(data?.error ?? "加载日志失败");
+    }
+    return {
+      logs: data?.logs ?? [],
+      total: data?.total ?? 0,
+      page: data?.page ?? params.page,
+      pageSize: data?.pageSize ?? params.pageSize,
+      totalPages: data?.totalPages ?? 1,
+      facets: data?.facets,
+      canvasQueueStats: data?.canvasQueueStats ?? null,
+    };
+  } catch (e) {
+    if (e instanceof Error && e.message !== "加载日志失败") {
+      throw new Error(
+        e.name === "AbortError" || /failed to fetch/i.test(e.message)
+          ? "连接主站失败，请确认 book-mall 已启动"
+          : e.message,
+      );
+    }
+    throw e;
   }
-  return {
-    logs: data?.logs ?? [],
-    total: data?.total ?? 0,
-    page: data?.page ?? params.page,
-    pageSize: data?.pageSize ?? params.pageSize,
-    totalPages: data?.totalPages ?? 1,
-    facets: data?.facets,
-    canvasQueueStats: data?.canvasQueueStats ?? null,
-  };
 }
 
 async function fetchCanvasQueueStats(): Promise<CanvasQueueWithoutLogStats | null> {
-  const res = await fetch("/api/book-mall/api/gateway/logs/canvas-queue?staleMin=2");
-  if (!res.ok) return null;
-  return (await res.json().catch(() => null)) as CanvasQueueWithoutLogStats | null;
+  try {
+    const res = await fetch("/api/book-mall/api/gateway/logs/canvas-queue?staleMin=2");
+    if (!res.ok) return null;
+    return (await res.json().catch(() => null)) as CanvasQueueWithoutLogStats | null;
+  } catch {
+    return null;
+  }
 }
 
 type GatewayLogsDelta = {
@@ -313,19 +328,30 @@ async function fetchGatewayLogsDelta(params: {
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
   if (params.poll) qs.set("poll", "1");
   else qs.set("skipPoll", "1");
-  const res = await fetch(`/api/book-mall/api/gateway/logs/delta?${qs.toString()}`);
-  const data = (await res.json().catch(() => null)) as
-    | (GatewayLogsDelta & { error?: string })
-    | null;
-  if (!res.ok) {
-    throw new Error(data?.error ?? "加载日志失败");
+  try {
+    const res = await fetch(`/api/book-mall/api/gateway/logs/delta?${qs.toString()}`);
+    const data = (await res.json().catch(() => null)) as
+      | (GatewayLogsDelta & { error?: string })
+      | null;
+    if (!res.ok) {
+      throw new Error(data?.error ?? "加载日志失败");
+    }
+    return {
+      created: data?.created ?? [],
+      updated: data?.updated ?? [],
+      serverNowMs: data?.serverNowMs ?? Date.now(),
+      sinceApplied: data?.sinceApplied ?? null,
+    };
+  } catch (e) {
+    if (e instanceof Error && e.message !== "加载日志失败") {
+      throw new Error(
+        e.name === "AbortError" || /failed to fetch/i.test(e.message)
+          ? "连接主站失败，请确认 book-mall 已启动"
+          : e.message,
+      );
+    }
+    throw e;
   }
-  return {
-    created: data?.created ?? [],
-    updated: data?.updated ?? [],
-    serverNowMs: data?.serverNowMs ?? Date.now(),
-    sinceApplied: data?.sinceApplied ?? null,
-  };
 }
 
 /** 升序游标合并：updated 原地替换、created 去重前插，按 submittedAt desc 排序并截断到 pageSize */

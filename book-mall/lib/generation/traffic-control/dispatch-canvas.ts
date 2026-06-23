@@ -133,14 +133,19 @@ async function recoverStaleDispatching(projectId?: string): Promise<number> {
   const stale = await prisma.canvasGenerationTask.findMany({
     where: {
       status: "DISPATCHING",
-      updatedAt: { lt: cutoff },
       ...(projectId ? { projectId } : {}),
+      OR: [
+        { updatedAt: { lt: cutoff } },
+        { kieTaskId: null, queuedAt: { lt: cutoff } },
+      ],
     },
     select: {
       id: true,
       projectId: true,
       tenantId: true,
       actorUserId: true,
+      inputPayload: true,
+      kieTaskId: true,
       project: { select: { userId: true } },
     },
     take: 20,
@@ -152,6 +157,9 @@ async function recoverStaleDispatching(projectId?: string): Promise<number> {
       t.actorUserId ?? t.project.userId,
     );
     await releaseTrafficSlot(scope.scopeKey);
+    const payload = taskInputPayload(t);
+    const stuckClaim =
+      payload.gatewayKieSubmitClaimed === true && !payload.gatewayLogId && !t.kieTaskId;
     await prisma.canvasGenerationTask.update({
       where: { id: t.id },
       data: {
@@ -159,6 +167,15 @@ async function recoverStaleDispatching(projectId?: string): Promise<number> {
         dispatchAfter: new Date(),
         failCode: null,
         failMessage: null,
+        ...(stuckClaim
+          ? {
+              inputPayload: {
+                ...payload,
+                gatewayKieSubmitClaimed: false,
+                syncGatewaySubmit: true,
+              },
+            }
+          : {}),
       },
     });
     n++;
@@ -210,6 +227,25 @@ async function dispatchOneCanvasQueuedTask(
     const { claimed, task: claimedTask } = await claimCanvasTaskKieSubmit(task.id);
     if (!claimed) {
       await releaseTrafficSlot(scope.scopeKey);
+      const p = taskInputPayload(claimedTask);
+      if (!claimedTask.kieTaskId && !p.gatewayLogId) {
+        await prisma.canvasGenerationTask
+          .update({
+            where: { id: task.id },
+            data: {
+              status: "QUEUED",
+              dispatchAfter: new Date(Date.now() + 2_000),
+              failCode: null,
+              failMessage: null,
+              inputPayload: {
+                ...p,
+                gatewayKieSubmitClaimed: false,
+                syncGatewaySubmit: true,
+              },
+            },
+          })
+          .catch(() => undefined);
+      }
       return "skipped";
     }
 
