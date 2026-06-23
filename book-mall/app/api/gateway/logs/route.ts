@@ -111,8 +111,14 @@ export async function GET(request: NextRequest) {
       Number(request.nextUrl.searchParams.get("canvasQueueStaleMin") ?? "2") || 2,
     );
 
+    const skipCountParam = request.nextUrl.searchParams.get("skipCount")?.trim();
+    /** skipCount=1：跳过 count（主表+归档双 count 很慢）；首屏/滚动追加均可用 */
+    const skipCount = skipCountParam === "1" || skipCountParam === "true";
+
     const [total, facets, canvasQueueStats] = await Promise.all([
-      countGatewayLogsMerged(where, query.mode),
+      skipCount
+        ? Promise.resolve(null as number | null)
+        : countGatewayLogsMerged(where, query.mode),
       includeFacets
         ? resolveGatewayLogListFacets(facetWhere, providerKind || undefined)
         : Promise.resolve(null),
@@ -124,9 +130,14 @@ export async function GET(request: NextRequest) {
           }).catch(() => null),
     ]);
 
-    const totalPages = computeLogTotalPages(total, pageSize);
+    const totalPages =
+      total === null ? null : computeLogTotalPages(total, pageSize);
     const safePage =
-      total === 0 ? 1 : Math.min(Math.max(1, page), totalPages);
+      total === null
+        ? Math.max(1, page)
+        : total === 0
+          ? 1
+          : Math.min(Math.max(1, page), totalPages!);
 
     const logs = await findGatewayLogsMerged({
       where,
@@ -137,6 +148,7 @@ export async function GET(request: NextRequest) {
     });
 
     const rows = await mapGatewayRequestLogsToResponseRows(logs);
+    const hasMore = logs.length === pageSize;
 
     return NextResponse.json({
       logs: rows,
@@ -144,6 +156,7 @@ export async function GET(request: NextRequest) {
       page: safePage,
       pageSize,
       totalPages,
+      hasMore,
       mode: query.mode,
       hotCutoffMs: historyMode ? null : gatewayLogHotCutoffDate().getTime(),
       // facets=null 表示本次未重算，前端沿用上一次的分面值。
