@@ -6,6 +6,13 @@ import type { GatewayRequestStatus, Prisma } from "@prisma/client";
 import { canViewFinanceCost } from "@/lib/auth/permissions";
 import { canViewTeamBilling } from "@/lib/finance/team-finance-guard";
 import {
+  gatewayHistoryDefaultFromDate,
+  parseGatewayLogQueryMode,
+  applyGatewayLogQueryMode,
+  type GatewayLogQueryMode,
+  gatewayLiveScopeHotSuffix,
+} from "@/lib/gateway/gateway-hot-window";
+import {
   parseDashboardHoursParam,
   parseLogStatusesParam,
   parseLogSubmittedFromParam,
@@ -52,18 +59,30 @@ export type DashboardQueryParams = {
   actorBookUserId?: string;
   actorPhone?: string;
   storyProjectId?: string;
+  /** live = 热区（默认）；history = 归档并读，不 poll */
+  mode: GatewayLogQueryMode;
   filters: GatewayLogFilterInput;
 };
 
 export function parseDashboardFiltersFromSearchParams(
   params: URLSearchParams,
+  mode: GatewayLogQueryMode = "live",
 ): GatewayLogFilterInput {
   const hours = parseDashboardHoursParam(params.get("hours"));
-  const submittedFrom =
+  let submittedFrom =
     hours != null
       ? new Date(Date.now() - hours * 3600 * 1000)
       : parseLogSubmittedFromParam(params.get("from"));
   const submittedTo = parseLogSubmittedToParam(params.get("to"));
+
+  if (
+    mode === "history" &&
+    !hours &&
+    !submittedFrom &&
+    !submittedTo
+  ) {
+    submittedFrom = gatewayHistoryDefaultFromDate();
+  }
 
   const statusRaw = params.get("status")?.trim();
   const statuses = parseLogStatusesParam(params.get("statuses"));
@@ -96,13 +115,15 @@ export function parseDashboardQueryFromSearchParams(
 ): DashboardQueryParams {
   const scope = parseDashboardScopeParam(params.get("scope"));
   const storyProjectId = params.get("storyProjectId")?.trim() || undefined;
+  const mode = parseGatewayLogQueryMode(params.get("mode"));
   return {
     scope,
     tenantId: params.get("tenantId")?.trim() || undefined,
     actorBookUserId: params.get("actorBookUserId")?.trim() || undefined,
     actorPhone: parseActorPhoneQuery(params.get("actorPhone")),
     storyProjectId,
-    filters: parseDashboardFiltersFromSearchParams(params),
+    mode,
+    filters: parseDashboardFiltersFromSearchParams(params, mode),
   };
 }
 
@@ -112,6 +133,7 @@ export function parseDashboardQueryFromSearchParams(
  * 以限制缓存行基数并匹配 live 语义；带过滤/历史查询直接走全量计算。
  */
 export function isLiveDashboardQuery(query: DashboardQueryParams): boolean {
+  if (query.mode !== "live") return false;
   const f = query.filters;
   return (
     !f.status &&
@@ -142,6 +164,7 @@ export function dashboardLiveScopeKey(
   if (!isLiveDashboardQuery(query)) return null;
   const parts = [
     "gwdash",
+    gatewayLiveScopeHotSuffix(),
     query.scope,
     query.tenantId ?? "",
     query.actorBookUserId ?? "",
@@ -281,5 +304,6 @@ export async function buildDashboardLogWhere(input: {
     bookUserId,
   });
 
-  return mergeGatewayLogFilters(withPhone, filters);
+  const merged = mergeGatewayLogFilters(withPhone, filters);
+  return applyGatewayLogQueryMode(merged, input.query.mode);
 }

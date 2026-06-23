@@ -13,6 +13,7 @@ import {
 } from "@/lib/gateway/log-read-poll-guard";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 import { prisma } from "@/lib/prisma";
+import { parseGatewayLogQueryMode } from "@/lib/gateway/gateway-hot-window";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +25,15 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   const pollOpts = parseGatewayLogPollParams(request.nextUrl.searchParams);
+  const mode = parseGatewayLogQueryMode(request.nextUrl.searchParams.get("mode"));
   scheduleOpportunisticGatewayPoll(user.id, {
     force: pollOpts.force,
-    skip: pollOpts.skip,
+    skip: pollOpts.skip || mode === "history",
   });
 
   const query = parseDashboardQueryFromSearchParams(request.nextUrl.searchParams);
+  // in-flight 仅 live 语义；强制 live 热区
+  query.mode = "live";
   let where;
   try {
     const baseWhere = await buildDashboardLogWhere({

@@ -163,7 +163,7 @@ function useGatewayNavBadges() {
     async function load() {
       try {
         const res = await fetch(
-          "/api/book-mall/api/gateway/logs/stats?parts=summary&hours=6&scope=all",
+          "/api/book-mall/api/gateway/logs/stats?parts=summary&hours=1&mode=live&scope=all",
         );
         const body = (await res.json().catch(() => null)) as {
           cards?: { backgroundWait?: number };

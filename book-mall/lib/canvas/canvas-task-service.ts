@@ -63,6 +63,10 @@ import { resolveGenerationRecordPreview } from "./generation-record-preview";
 import { extractPosterUrlFromResultPayload } from "./video-poster-ffmpeg";
 import { resolveCanvasHistoryIdsForTasks } from "./generation-canvas-history";
 import { findGenerationTaskRows, type GenerationTaskRecordRow } from "./canvas-generation-task-query";
+import {
+  buildCanvasTaskHotReadWhere,
+  canvasGenerationRecordsDefaultSince,
+} from "./canvas-task-hot-window";
 import { persistCanvasKieResultToOss, persistCanvasVideoResultToOss } from "./canvas-oss";
 import { mergeResultPayloadPoster } from "./video-poster-ffmpeg";
 import {
@@ -2055,21 +2059,25 @@ export async function listProjectTasks(args: {
    * 轻量读（高频轮询用）：跳过画布历史解析；仅对终态任务查计费快照
    * （进行中任务本就无 creditsCharged）。可恢复画布等字段由「生成记录」面板的
    * /generation-records 端点提供，不在此高频路径里付出 DB 代价。
+   * Gen-HotCold-R3：轻量读仅扫在飞 + 近 6h 终态（见 canvas-task-hot-window）。
    */
   lightweight?: boolean;
 }): Promise<CanvasGenerationRecordListItem[]> {
   await assertAccessibleCanvasProject(args.userId, args.projectId);
-  const where: Prisma.CanvasGenerationTaskWhereInput = {
+  const baseWhere: Prisma.CanvasGenerationTaskWhereInput = {
     projectId: args.projectId,
     deletedAt: null,
     ...(args.nodeIds && args.nodeIds.length > 0
       ? { nodeId: { in: args.nodeIds } }
       : {}),
   };
+  const where: Prisma.CanvasGenerationTaskWhereInput = args.lightweight
+    ? { AND: [baseWhere, buildCanvasTaskHotReadWhere()] }
+    : baseWhere;
   const rows = await findGenerationTaskRows({
     where,
     orderBy: { updatedAt: "desc" },
-    take: 200,
+    take: args.lightweight ? 100 : 200,
     projectIdForRows: args.projectId,
   });
 
@@ -2097,6 +2105,50 @@ export async function listProjectTasks(args: {
     );
   }
 
+  const enriched = await enrichCanvasTaskRows(rows);
+  const historyByTask = await resolveCanvasHistoryIdsForTasks(
+    rows.map((r) => ({
+      id: r.id,
+      projectId: args.projectId,
+      createdAt: r.createdAt,
+      canvasHistoryId: r.canvasHistoryId,
+      inputPayload: r.inputPayload,
+    })),
+  );
+  return enriched.map((row, idx) => {
+    const source = rows[idx];
+    if (!source) {
+      throw new Error("generation record row missing");
+    }
+    return buildGenerationRecordListItem(
+      source,
+      {
+        creditsCharged: row.creditsCharged,
+        billingMode: row.billingMode,
+      },
+      historyByTask.get(row.id) ?? null,
+    );
+  });
+}
+
+/** 生成记录面板：本项目近 N 天任务（低频全字段，非高频 /tasks 轮询）。 */
+export async function listProjectGenerationRecords(args: {
+  userId: string;
+  projectId: string;
+  since?: Date;
+}): Promise<CanvasGenerationRecordListItem[]> {
+  await assertAccessibleCanvasProject(args.userId, args.projectId);
+  const since = args.since ?? canvasGenerationRecordsDefaultSince();
+  const rows = await findGenerationTaskRows({
+    where: {
+      projectId: args.projectId,
+      deletedAt: null,
+      createdAt: { gte: since },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 500,
+    projectIdForRows: args.projectId,
+  });
   const enriched = await enrichCanvasTaskRows(rows);
   const historyByTask = await resolveCanvasHistoryIdsForTasks(
     rows.map((r) => ({

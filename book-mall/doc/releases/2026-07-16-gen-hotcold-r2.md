@@ -50,3 +50,14 @@
 ## 回滚
 
 生产严禁直接回滚迁移。如需停用：清空 `CANVAS_OPPORTUNISTIC_POLL`、不再调用 reconcile/archive 脚本即可回到「全量计算 + 主表」语义；投影/归档表保留不影响主流程。
+
+## R3 增量（2026-06-23）
+
+产品策略见 [gen-hotcold-policy.md](../product/gen-hotcold-policy.md)。
+
+| 主题 | 关键产出 |
+|---|---|
+| R3 热窗 | Gateway 主表默认 **1h** 热保留；`mode=live\|history`；`gateway-hot-window.ts` |
+| 归档频率 | `hotcold:archive --gateway-hours=1`（默认）；cron 15–30min |
+| 控制台 | gateway-web 实时/历史 Tab；无动停轮询 `gateway-live-poll-policy.ts` |
+| 画布任务 | `/tasks` 轻量读 6h 终态窗；生成记录 30d `listProjectGenerationRecords` |

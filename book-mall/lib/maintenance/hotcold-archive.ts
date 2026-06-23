@@ -13,12 +13,16 @@
  */
 import { Prisma } from "@prisma/client";
 
+import { getGatewayLogHotRetentionHours } from "@/lib/gateway/gateway-hot-window";
 import { prisma } from "@/lib/prisma";
 
 const GATEWAY_TERMINAL_STATUSES = ["SUCCEEDED", "FAILED", "CANCELLED"] as const;
 
 export interface ArchiveOptions {
-  retentionDays: number;
+  /** 主表热保留天数（仅 CreditLedger 等日级归档） */
+  retentionDays?: number;
+  /** Gateway 主表热保留小时数（R3 默认 1h） */
+  hotRetentionHours?: number;
   batchSize?: number;
   maxBatches?: number;
   dryRun?: boolean;
@@ -39,7 +43,8 @@ export async function archiveGatewayLogs(
   const batchSize = opts.batchSize ?? 1000;
   const maxBatches = opts.maxBatches ?? 100;
   const dryRun = opts.dryRun ?? false;
-  const cutoff = new Date(Date.now() - opts.retentionDays * 86_400_000);
+  const hotHours = opts.hotRetentionHours ?? getGatewayLogHotRetentionHours();
+  const cutoff = new Date(Date.now() - hotHours * 3_600_000);
 
   let moved = 0;
   let batches = 0;
@@ -95,7 +100,8 @@ export async function archiveCreditLedger(
   const batchSize = opts.batchSize ?? 1000;
   const maxBatches = opts.maxBatches ?? 100;
   const dryRun = opts.dryRun ?? false;
-  const cutoff = new Date(Date.now() - opts.retentionDays * 86_400_000);
+  const retentionDays = opts.retentionDays ?? 365;
+  const cutoff = new Date(Date.now() - retentionDays * 86_400_000);
 
   let moved = 0;
   let batches = 0;

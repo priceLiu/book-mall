@@ -196,3 +196,15 @@ docker compose up -d --build
 ## 五、CODING 等产品自建流水线
 
 若走自建流水线，可参考 **`deploy/tencent/coding-ci-hints.md`**。纯控制台 Git 部署通常不需要。
+
+---
+
+## 六、book-mall 定时运维（Gen-HotCold）
+
+| 命令 | 频率建议 | 说明 |
+|------|----------|------|
+| `pnpm --dir book-mall gateway:stats-reconcile` | 部署后 / 每日 | Gateway 状态投影纠偏 |
+| `pnpm --dir book-mall hotcold:archive:dry-run` | 上线前 | 预览归档候选量 |
+| `pnpm --dir book-mall hotcold:archive -- --only=gateway` | **每 15–30 分钟** | R3：终态 Gateway 日志迁入归档（默认热保留 1h） |
+
+详见 `book-mall/doc/product/gen-hotcold-policy.md`。
