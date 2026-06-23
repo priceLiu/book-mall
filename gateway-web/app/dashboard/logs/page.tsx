@@ -1,25 +1,18 @@
-import { gatewayJson } from "@/lib/gateway-api";
 import {
   LogsTable,
   type GatewayLogsInitialData,
 } from "@/components/logs/logs-table";
 
-export const dynamic = "force-dynamic";
+/** 日志列表改由客户端拉取，避免 DB 繁忙时 SSR 阻塞整页 30–60s */
+const EMPTY_INITIAL: GatewayLogsInitialData = {
+  logs: [],
+  total: 0,
+  page: 1,
+  pageSize: 20,
+  totalPages: 1,
+};
 
-export default async function DashboardLogsPage() {
-  const { data } = await gatewayJson<GatewayLogsInitialData>(
-    "/api/gateway/logs?limit=20&page=1",
-  );
-
-  const initialData: GatewayLogsInitialData = {
-    logs: data?.logs ?? [],
-    total: data?.total ?? 0,
-    page: data?.page ?? 1,
-    pageSize: data?.pageSize ?? 20,
-    totalPages: data?.totalPages ?? 1,
-    facets: data?.facets,
-  };
-
+export default function DashboardLogsPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       <div className="shrink-0">
@@ -34,7 +27,7 @@ export default async function DashboardLogsPage() {
         「重新生成」或修改 prompt 后再跑。新请求会记录完整 Params 与 Results 预览。
       </div>
 
-      <LogsTable initialData={initialData} />
+      <LogsTable initialData={EMPTY_INITIAL} />
     </div>
   );
 }

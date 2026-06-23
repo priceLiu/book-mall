@@ -4,6 +4,7 @@ vi.mock("@/lib/app-web-origins", () => ({
   getCanvasWebOrigin: () => "https://canvas.example.com",
   getEcommerceWebOrigin: () => "https://ecom.example.com",
   getPromptOptimizerOrigin: () => "https://prompt.example.com",
+  getQuickReplicaOrigin: () => "https://qr.example.com",
   getStoryWebOrigin: () => "https://story.example.com",
   buildAppWebUrl: (origin: string, path: string) =>
     `${origin.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`,

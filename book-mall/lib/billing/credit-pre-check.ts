@@ -3,7 +3,6 @@
  */
 import { prisma } from "@/lib/prisma";
 import {
-  getCreditBalance,
   getPoolBalances,
   resolveVideoPool,
   InsufficientCreditsError,
@@ -73,7 +72,8 @@ export async function assertCreditsBeforeGenerate(input: {
   if (isVideo) {
     const pools = await getPoolBalances(ref);
     const pool = await resolveVideoPool(ref);
-    const available = pool === "VIDEO" ? pools.video.balance : pools.general.balance;
+    const bucket = pool === "VIDEO" ? pools.video : pools.general;
+    const available = Math.max(0, bucket.balance - bucket.reserved);
     let minNeeded = 1;
     if (canonical) {
       const snap = await resolveCostSnapshot(canonical).catch(() => null);
@@ -90,7 +90,10 @@ export async function assertCreditsBeforeGenerate(input: {
   }
 
   const pools = await getPoolBalances(ref);
-  const balance = await getCreditBalance(ref);
+  const balance = Math.max(
+    0,
+    pools.general.balance - pools.general.reserved,
+  );
   let minNeeded = 1;
   if (canonical) {
     const snap = await resolveCostSnapshot(canonical).catch(() => null);

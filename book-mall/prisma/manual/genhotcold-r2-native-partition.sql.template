@@ -1,0 +1,60 @@
+-- ============================================================================
+-- Gen-HotCold-R2 · Phase 5B（可选 / 后置）：GatewayRequestLog 原生 RANGE 月分区
+-- ----------------------------------------------------------------------------
+-- ⚠️ 模板（.template），**不会**被 `prisma migrate deploy` 自动执行。
+-- 仅当 Phase 5A 归档稳定、单表体量仍持续增长到分区收益明确时，由 DBA 评估后手工执行。
+-- 务必先备份；分区改造需复合主键 (id, submittedAt) 且要重灌全量数据，属重操作。
+--
+-- 前提：PostgreSQL ≥ 12（声明式分区）；建议配 pg_partman 自动建/裁分区。
+-- 思路：旧表改名 → 新建分区父表（按 submittedAt 月分区）→ 建月分区 → 复制数据 → 切换。
+-- ============================================================================
+
+-- 0) 安全：在维护窗口执行，停写或低峰。
+-- BEGIN;  -- 视数据量决定是否单事务（大表建议分步、CONCURRENTLY 建索引）。
+
+-- 1) 旧表改名留底
+ALTER TABLE "GatewayRequestLog" RENAME TO "GatewayRequestLog_legacy";
+
+-- 2) 新建分区父表（与原结构同列；分区键 submittedAt 必须进主键）
+CREATE TABLE "GatewayRequestLog" (
+  LIKE "GatewayRequestLog_legacy" INCLUDING DEFAULTS INCLUDING CONSTRAINTS
+) PARTITION BY RANGE ("submittedAt");
+
+-- 复合主键（分区表主键必须包含分区键）
+ALTER TABLE "GatewayRequestLog"
+  DROP CONSTRAINT IF EXISTS "GatewayRequestLog_pkey";
+ALTER TABLE "GatewayRequestLog"
+  ADD CONSTRAINT "GatewayRequestLog_pkey" PRIMARY KEY ("id", "submittedAt");
+
+-- 3) 建月分区（示例：用 pg_partman 自动维护，或手工建近月 + default）
+-- 例：CREATE EXTENSION IF NOT EXISTS pg_partman;
+--     SELECT partman.create_parent('public."GatewayRequestLog"', 'submittedAt', 'native', 'monthly');
+CREATE TABLE IF NOT EXISTS "GatewayRequestLog_p_default"
+  PARTITION OF "GatewayRequestLog" DEFAULT;
+-- 手工示例：
+-- CREATE TABLE "GatewayRequestLog_2026_07" PARTITION OF "GatewayRequestLog"
+--   FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
+
+-- 4) 重建热点索引（在分区父表上声明，分区自动继承）
+CREATE INDEX IF NOT EXISTS "GatewayRequestLog_status_submittedAt_idx"
+  ON "GatewayRequestLog" ("status", "submittedAt");
+CREATE INDEX IF NOT EXISTS "GatewayRequestLog_status_lastPolledAt_idx"
+  ON "GatewayRequestLog" ("status", "lastPolledAt");
+-- Phase 0 的部分索引同样需要在分区表重建（partial index）。
+
+-- 5) 灌数据（按月或一次性；大表建议分批避免长事务）
+INSERT INTO "GatewayRequestLog"
+  SELECT * FROM "GatewayRequestLog_legacy";
+
+-- 6) 校验行数一致后，再删旧表
+-- SELECT
+--   (SELECT count(*) FROM "GatewayRequestLog") AS new_count,
+--   (SELECT count(*) FROM "GatewayRequestLog_legacy") AS legacy_count;
+-- DROP TABLE "GatewayRequestLog_legacy";
+
+-- COMMIT;
+
+-- 注意：Prisma schema 仍以单表声明；分区是 DB 物理实现，对应用透明。
+--       但复合主键 (id, submittedAt) 会与 Prisma 的单列 @id 冲突——
+--       届时需把 schema 的 @id 调整为 @@id([id, submittedAt]) 并在 _prisma_migrations 标记基线。
+--       这是本阶段「后置评估」的主要成本，故默认不启用。

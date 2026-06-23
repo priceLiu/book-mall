@@ -51,6 +51,10 @@ import {
 import { VideoRiskError } from "@/lib/billing/video-risk-control";
 import { releaseTrafficSlotFromGatewayLog } from "@/lib/generation/traffic-control/slot";
 import { mapBillingFailureForGatewayLog } from "@/lib/billing/billing-failure-map";
+import {
+  bumpGatewayStatusOnCreate,
+  bumpGatewayStatusOnFinalize,
+} from "@/lib/gateway/stats-counter";
 
 export type { UsageFromResponse };
 
@@ -228,6 +232,9 @@ export async function createRequestLog(opts: {
     },
   });
 
+  // Gen-HotCold-R2 Phase 2：新建 RUNNING 日志 → global 在飞 +1（best-effort）。
+  void bumpGatewayStatusOnCreate();
+
   // 视频「先冻结后渲染」：发起前冻结预扣；余额不足回滚并阻断
   if (billingMode === "PLATFORM_CREDIT" && log.requestKind === "VIDEO") {
     try {
@@ -246,6 +253,8 @@ export async function createRequestLog(opts: {
           },
         })
         .catch(() => undefined);
+      // 冻结失败立即翻 FAILED：global 在飞 → failed。
+      void bumpGatewayStatusOnFinalize("FAILED");
       throw e;
     }
   }
@@ -376,6 +385,11 @@ export async function finalizeRequestLog(
       marginSnapshot: marginSnapshot ?? undefined,
     },
   });
+
+  // Gen-HotCold-R2 Phase 2：仅当此前为在飞态才翻计数（幂等再 finalize 不重复扣）。
+  if (log.status === "PENDING" || log.status === "RUNNING") {
+    void bumpGatewayStatusOnFinalize(patch.status);
+  }
 
   // —— 统一积分结算（互斥旧钱包；不阻断主流程）——
   try {

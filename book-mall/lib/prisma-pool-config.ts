@@ -32,9 +32,7 @@ export function getPrismaConnectionLimit(): number {
   return 10;
 }
 
-export function resolvePrismaDatasourceUrl(): string | undefined {
-  const raw = process.env.DATABASE_URL?.trim();
-  if (!raw) return undefined;
+function applyPoolParams(raw: string): string {
   try {
     const url = new URL(raw);
     if (!url.searchParams.has("pool_timeout")) {
@@ -43,19 +41,41 @@ export function resolvePrismaDatasourceUrl(): string | undefined {
         process.env.PRISMA_POOL_TIMEOUT ?? "30",
       );
     }
-    if (process.env.NODE_ENV === "development") {
-      const explicit = process.env.PRISMA_CONNECTION_LIMIT?.trim();
-      if (explicit) {
-        url.searchParams.set("connection_limit", explicit);
-      } else if (!url.searchParams.has("connection_limit")) {
-        url.searchParams.set(
-          "connection_limit",
-          String(DEV_DEFAULT_CONNECTION_LIMIT),
-        );
-      }
+    // Gen-HotCold-R2 Phase 6：连接预算必须显式生效（所有环境）。
+    // 优先 PRISMA_CONNECTION_LIMIT；否则若 URL 未带 connection_limit 则按默认注入，
+    // 避免 Web + 多 poll 子进程把远端连接打满（Timed out fetching a new connection）。
+    const explicit = process.env.PRISMA_CONNECTION_LIMIT?.trim();
+    if (explicit) {
+      url.searchParams.set("connection_limit", explicit);
+    } else if (!url.searchParams.has("connection_limit")) {
+      url.searchParams.set(
+        "connection_limit",
+        String(
+          process.env.NODE_ENV === "development"
+            ? DEV_DEFAULT_CONNECTION_LIMIT
+            : 10,
+        ),
+      );
     }
     return url.toString();
   } catch {
     return raw;
   }
+}
+
+export function resolvePrismaDatasourceUrl(): string | undefined {
+  const raw = process.env.DATABASE_URL?.trim();
+  if (!raw) return undefined;
+  return applyPoolParams(raw);
+}
+
+/**
+ * 只读副本连接串（Gen-HotCold-R2 Phase 6）。
+ * 报表/仪表盘等重读可路由到只读副本，卸载主库写压力。
+ * 未配置 DATABASE_REPLICA_URL 时返回 undefined（调用方回退主库）。
+ */
+export function resolvePrismaReplicaUrl(): string | undefined {
+  const raw = process.env.DATABASE_REPLICA_URL?.trim();
+  if (!raw) return undefined;
+  return applyPoolParams(raw);
 }

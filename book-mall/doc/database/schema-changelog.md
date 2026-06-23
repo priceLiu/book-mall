@@ -199,6 +199,27 @@
 - **种子**：`ToolBillablePrice`（`ecom-toolkit__storyboard` chat / video）
 - **应用**：`pnpm run db:deploy`
 
+## 2026-07-16 — Gen-HotCold-R2：动静分离 / 投影计数 / 历史归档
+
+- **迁移目录**：
+  - `prisma/migrations/20260716130000_genhotcold_partial_indexes/`（Phase 0 · 在飞任务 / RUNNING 日志**部分索引**，裸 SQL；Prisma 无法表达 WHERE）。
+  - `prisma/migrations/20260716140000_gateway_stats_counter/`（Phase 2 · 新表 `GatewayStatsCounter`）。
+  - `prisma/migrations/20260716150000_genhotcold_archive_tables/`（Phase 5A · 新表 `GatewayRequestLogArchive`、`CreditLedgerArchive`，`LIKE` 克隆主表结构 + 精简索引 + `archivedAt`）。
+- **新表**：
+  - `GatewayStatsCounter`（`@@id([scopeKey, bucket])`）——状态页卡片投影计数。`global` 行由 `createRequestLog`/`finalizeRequestLog` 增量 bump 维持在飞实时；任意 scope 行作为短 TTL 自愈缓存（`computedAt` 过期即全量重算回填）。真相仍是 `GatewayRequestLog`，由 TTL 重算 + `gateway:stats-reconcile` 纠偏。
+  - `GatewayRequestLogArchive` / `CreditLedgerArchive`——只读历史归档（无外键）。终态/过期数据从主表事务内 `INSERT…ON CONFLICT DO NOTHING` + `DELETE` 搬迁，按 id 幂等。
+- **部分索引**（裸 SQL，不在 Prisma schema）：
+  - `CanvasGenerationTask_inflight_queuedAt_idx` / `StoryGenerationTask_inflight_queuedAt_idx`（status, queuedAt）WHERE status IN(QUEUED,DISPATCHING,PENDING,SUBMITTED）
+  - `*_submitted_lastPolledAt_idx`（lastPolledAt）WHERE status='SUBMITTED'
+  - `GatewayRequestLog_running_submittedAt_idx`（submittedAt）WHERE status='RUNNING' AND externalTaskId IS NOT NULL
+- **脚本**：`gateway:stats-reconcile`（投影纠偏 + 清陈旧签名缓存，支持 `--dry-run`）；`hotcold:archive` / `hotcold:archive:dry-run`（归档搬迁，`--gateway-days` / `--ledger-days` / `--only` / `--batch`）。
+- **连接/读路由**（Phase 6，非 schema）：所有环境注入 `connection_limit`；新增只读副本 `DATABASE_REPLICA_URL`，仪表盘聚合走 `prismaRead`（未配置则回退主库）。
+- **应用**：`pnpm --dir book-mall db:deploy`（迁移均 `IF NOT EXISTS`/幂等，非破坏）。
+- **回滚**：开发环境可 `DROP TABLE "GatewayStatsCounter","GatewayRequestLogArchive","CreditLedgerArchive";` + `DROP INDEX` 上述部分索引；生产严禁直接回滚（记录在 `_prisma_migrations`）。归档表删除前须确认数据已无需保留。
+- **逻辑**：详见 `doc/releases/2026-07-16-gen-hotcold-r2.md`、`docs/全站架构图与配置表.md` §7。
+
+---
+
 <!-- 模板（复制使用）
 ## YYYY-MM-DD — 标题
 - **迁移/脚本**：

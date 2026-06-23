@@ -106,6 +106,50 @@ export function parseDashboardQueryFromSearchParams(
   };
 }
 
+/**
+ * Gen-HotCold-R2 Phase 2：是否为「实时无过滤」的状态页查询。
+ * 仅这类查询才走投影计数缓存（bucket=live，无日期/状态/模型等过滤），
+ * 以限制缓存行基数并匹配 live 语义；带过滤/历史查询直接走全量计算。
+ */
+export function isLiveDashboardQuery(query: DashboardQueryParams): boolean {
+  const f = query.filters;
+  return (
+    !f.status &&
+    (!f.statuses || f.statuses.length === 0) &&
+    !f.submittedFrom &&
+    !f.submittedTo &&
+    !f.clientSource &&
+    !f.providerKind &&
+    !f.model &&
+    !f.credentialId &&
+    !f.failCode &&
+    !f.slowWarn &&
+    !f.backgroundWait &&
+    !f.storyProjectId &&
+    !query.storyProjectId &&
+    !query.actorPhone
+  );
+}
+
+/**
+ * 投影缓存键：完全由 (viewer, scope, tenant, actor) 决定，唯一对应一种 live where。
+ * 返回 null 表示该查询不适合走投影（带过滤）。
+ */
+export function dashboardLiveScopeKey(
+  viewerId: string,
+  query: DashboardQueryParams,
+): string | null {
+  if (!isLiveDashboardQuery(query)) return null;
+  const parts = [
+    "gwdash",
+    query.scope,
+    query.tenantId ?? "",
+    query.actorBookUserId ?? "",
+    viewerId,
+  ];
+  return parts.join(":");
+}
+
 async function resolveTeamMembership(
   bookUserId: string,
   tenantId: string,

@@ -33,6 +33,6 @@ describe("video-task-wait-policy", () => {
   it("resolveVideoGeneratingLabel switches to background label", () => {
     expect(resolveVideoGeneratingLabel(false, false)).toBe("视频生成中…");
     expect(resolveVideoGeneratingLabel(true, false)).toBe("排队中…");
-    expect(resolveVideoGeneratingLabel(false, true)).toBe("后台生成中…");
+    expect(resolveVideoGeneratingLabel(false, true)).toBe("持续后台生成中…");
   });
 });

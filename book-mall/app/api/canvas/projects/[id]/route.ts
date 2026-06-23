@@ -14,7 +14,7 @@ import {
   updateCanvasProjectForUser,
 } from "@/lib/canvas/canvas-project-service";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/pick-project-thumbnail";
-import { runCanvasPollWorker } from "@/lib/canvas/canvas-task-service";
+import { scheduleOpportunisticCanvasPoll } from "@/lib/canvas/canvas-task-service";
 import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -29,6 +29,8 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params;
   try {
     await assertAccessibleCanvasProject(guard.user.id, id);
+    // Gen-HotCold-R2 Phase 1：读路径不再阻塞等待 poll。
+    // 仅在兜底开关开启时 fire-and-forget 触发单飞轮询；进度真相交独立 poll-loop。
     const inflight = await prisma.canvasGenerationTask.count({
       where: {
         projectId: id,
@@ -36,11 +38,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       },
     });
     if (inflight > 0) {
-      try {
-        await runCanvasPollWorker({ projectId: id });
-      } catch (e) {
-        console.warn("[canvas/project GET] opportunistic poll failed", e);
-      }
+      scheduleOpportunisticCanvasPoll(id);
     }
     const project = await getCanvasProjectForUser(guard.user.id, id);
     return NextResponse.json({ project }, { headers: jsonHeaders(request) });

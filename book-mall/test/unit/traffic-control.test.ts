@@ -66,11 +66,11 @@ describe("token-bucket", () => {
     expect(tokens).toBeGreaterThanOrEqual(1);
   });
 
-  it("spacing blocks within 2.5s default window", () => {
+  it("spacing blocks within actor dispatch min window (默认 1.2s)", () => {
     const now = Date.now();
     expect(spacingBlocked(new Date(now - 1000), now)).toBe(true);
     expect(spacingBlocked(new Date(now - 5000), now)).toBe(false);
-    expect(getActorDispatchMinMs()).toBeGreaterThanOrEqual(2000);
+    expect(getActorDispatchMinMs()).toBeGreaterThanOrEqual(1000);
   });
 
   it("queue wait estimate scales with position", () => {

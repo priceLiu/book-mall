@@ -12,7 +12,9 @@ import {
 import { buildSlowGenerationWhere } from "@/lib/generation/slow-generation";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { buildVideoBackgroundWaitWhere } from "@/lib/gateway/video-task-wait-policy";
-import { prisma } from "@/lib/prisma";
+import { getProjectedDashboardCards } from "@/lib/gateway/stats-counter";
+// Gen-HotCold-R2 Phase 6：仪表盘聚合是只读重活，路由到只读副本（未配置副本时即主库）。
+import { prismaRead as prisma } from "@/lib/prisma";
 
 export const DASHBOARD_IN_PROGRESS_STATUSES: GatewayRequestStatus[] = [
   "PENDING",
@@ -234,9 +236,10 @@ async function fetchChartCategoryStats(
   return { inProgress, succeeded };
 }
 
-export async function fetchDashboardStatsSummary(
+/** 真值计算：对 GatewayRequestLog 全量 groupBy + 两次阈值 count（重活）。 */
+export async function computeDashboardSummaryCards(
   where: Prisma.GatewayRequestLogWhereInput,
-): Promise<{ cards: DashboardCards }> {
+): Promise<DashboardCards> {
   const [statusGroups, slowWarnMs] = await Promise.all([
     prisma.gatewayRequestLog.groupBy({
       by: ["status"],
@@ -258,14 +261,32 @@ export async function fetchDashboardStatsSummary(
     }),
   ]);
   return {
-    cards: {
-      ...mergeStatusGroupCounts(
-        statusGroups.map((g) => ({ status: g.status, count: g._count._all })),
-      ),
-      slowWarn,
-      backgroundWait,
-    },
+    ...mergeStatusGroupCounts(
+      statusGroups.map((g) => ({ status: g.status, count: g._count._all })),
+    ),
+    slowWarn,
+    backgroundWait,
   };
+}
+
+/**
+ * 状态页卡片。
+ * 传入 `scopeKey` 时走 Gen-HotCold-R2 Phase 2 投影计数（短 TTL 自愈缓存），
+ * 缺失/过期/出错自动回退到全量重算并回填；不传则直接全量计算（历史/过滤查询）。
+ */
+export async function fetchDashboardStatsSummary(
+  where: Prisma.GatewayRequestLogWhereInput,
+  opts?: { scopeKey?: string; ttlMs?: number },
+): Promise<{ cards: DashboardCards }> {
+  if (opts?.scopeKey) {
+    const cards = await getProjectedDashboardCards({
+      scopeKey: opts.scopeKey,
+      ttlMs: opts.ttlMs,
+      recompute: () => computeDashboardSummaryCards(where),
+    });
+    return { cards };
+  }
+  return { cards: await computeDashboardSummaryCards(where) };
 }
 
 export type DashboardFailCodeCount = {

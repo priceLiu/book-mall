@@ -10,6 +10,7 @@ import {
 } from "@/lib/gateway/log-dashboard-projection";
 import {
   buildDashboardLogWhere,
+  dashboardLiveScopeKey,
   DashboardScopeError,
   parseDashboardQueryFromSearchParams,
 } from "@/lib/gateway/log-dashboard-query";
@@ -44,9 +45,12 @@ export async function GET(request: NextRequest) {
     const needFailCodes = parts.has("failCodes");
     const needCharts = needCategories || needModels;
 
+    // Gen-HotCold-R2 Phase 2：实时无过滤的卡片走投影缓存（自愈回退全量）。
+    const summaryScopeKey = dashboardLiveScopeKey(user.id, query) ?? undefined;
+
     if (needSummary && needCharts) {
       const [summary, charts] = await Promise.all([
-        fetchDashboardStatsSummary(where),
+        fetchDashboardStatsSummary(where, { scopeKey: summaryScopeKey }),
         fetchDashboardChartStats(where),
       ]);
       payload.cards = summary.cards;
@@ -54,7 +58,9 @@ export async function GET(request: NextRequest) {
       if (needModels) payload.byModel = charts.byModel;
     } else {
       if (needSummary) {
-        const summary = await fetchDashboardStatsSummary(where);
+        const summary = await fetchDashboardStatsSummary(where, {
+          scopeKey: summaryScopeKey,
+        });
         payload.cards = summary.cards;
       }
       if (needCategories && needModels) {

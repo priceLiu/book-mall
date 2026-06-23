@@ -6,6 +6,7 @@ import {
 } from "@/lib/gateway/poll-service";
 import type { SlowWarnAutoHandlerResult } from "@/lib/generation/slow-warn-auto-handler";
 import { runCanvasPollWorker } from "@/lib/canvas/canvas-task-service";
+import { isOpportunisticPollFallbackEnabled } from "@/lib/generation/opportunistic-poll";
 
 // 自动 tick（含 poll=1）的合并间隔：日志/状态/轮询池三页 + 多标签同时打开时，
 // 同一用户每个周期最多触发一次重量级 poll worker，避免读页面把连接池打满、
@@ -28,6 +29,13 @@ export async function maybeRunOpportunisticGatewayPoll(
   opts?: OpportunisticPollOpts,
 ): Promise<{ ran: boolean; autoHandler?: SlowWarnAutoHandlerResult }> {
   if (opts?.skip) return { ran: false };
+
+  // Gen-HotCold-R2 Phase 1：读路径默认不再触发重 poll。
+  // 仅「手动刷新(force/poll=1)」或「无后台 poll-loop 的兜底开关」时运行；
+  // 进度推进交由独立 poll-loop / cron 负责。
+  if (!opts?.force && !isOpportunisticPollFallbackEnabled()) {
+    return { ran: false };
+  }
 
   const now = Date.now();
   const last = lastPollAtByUser.get(userId) ?? 0;

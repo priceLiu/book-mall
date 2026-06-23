@@ -112,8 +112,11 @@ import {
   ingestCanvasProjectTasks,
   markCanvasProjectTasksPoolForbidden,
 } from "./use-node-task-history";
+import {
+  CANVAS_POLL_IDLE_RECHECK_MS,
+  nextPollIntervalMs,
+} from "./poll-interval";
 
-const POLL_INTERVAL_MS = 2000;
 /** 打开画布后延迟全量任务扫描，避免首屏与大量媒体加载抢主线程 */
 const INITIAL_FULL_SCAN_DELAY_MS = 5000;
 /** 首 tick 也延后，避免与 hydrate / fitView 同帧抢主线程 */
@@ -1466,8 +1469,10 @@ export function useCanvasRunner(
     if (!base || !projectId) return;
     let cancelled = false;
     let pollStopped = false;
-    let intervalId = 0;
+    let loopTimer = 0;
     let tickCount = 0;
+    /** 上一次轮询是否读道降级（tasks==null）；用于自适应退避到 15s */
+    let lastPollStale = false;
     const serverInflightRef = { current: false };
     const applyStoryColumnRowTasks = (
       tasks: CanvasTaskRecord[],
@@ -1759,8 +1764,13 @@ export function useCanvasRunner(
       try {
         const tasks = await listCanvasProjectTasks(base, projectId, nodeIds);
         if (cancelled) return;
-        // 读道降级（DB 塞车 / 不可用）：保留上一帧，不覆盖快照、不误清进行中状态
-        if (tasks == null) return;
+        // 读道降级（DB 塞车 / 不可用）：保留上一帧，不覆盖快照、不误清进行中状态；
+        // 同时标记 stale，让自适应轮询退避到 15s，给 DB 喘息。
+        if (tasks == null) {
+          lastPollStale = true;
+          return;
+        }
+        lastPollStale = false;
         ingestCanvasProjectTasks(projectId, tasks);
         const nodesNow = useCanvasStore.getState().nodes;
         applyStoryColumnRowTasks(tasks, nodesNow);
@@ -1810,14 +1820,41 @@ export function useCanvasRunner(
           serverInflightRef.current = false;
           markCanvasProjectTasksForbidden(projectId);
           markCanvasProjectTasksPoolForbidden(projectId);
-          if (intervalId) window.clearInterval(intervalId);
+          if (loopTimer) window.clearTimeout(loopTimer);
         }
       }
     };
 
-    intervalId = window.setInterval(() => void tick(), POLL_INTERVAL_MS);
+    /** 当前在飞工作量：本地在飞 + 服务端在飞 + 队列 + 正在跑的 runOne */
+    const currentInflightCount = (): number => {
+      const localInflight = collectCanvasTaskPollNodeIds(
+        useCanvasStore.getState().nodes,
+      ).length;
+      return (
+        localInflight +
+        (serverInflightRef.current ? 1 : 0) +
+        inflightRef.current.size +
+        queueRef.current.length
+      );
+    };
+
+    // Gen-HotCold-R2 Phase 4：自适应轮询。固定 2s 空轮询替换为按在飞数退避；
+    // 无在飞时暂停 DB 轮询，只保留廉价的「空转再探」节拍唤醒。
+    const scheduleNext = () => {
+      if (cancelled || pollStopped) return;
+      const ms = nextPollIntervalMs(currentInflightCount(), lastPollStale);
+      const delay = ms > 0 ? ms : CANVAS_POLL_IDLE_RECHECK_MS;
+      loopTimer = window.setTimeout(() => void loop(), delay);
+    };
+
+    const loop = async (forceFullScan = false) => {
+      if (cancelled || pollStopped) return;
+      await tick(forceFullScan);
+      scheduleNext();
+    };
+
     const initialTickTimer = window.setTimeout(
-      () => void tick(false),
+      () => void loop(false),
       INITIAL_TICK_DELAY_MS,
     );
     const fullScanTimer = window.setTimeout(
@@ -1826,7 +1863,7 @@ export function useCanvasRunner(
     );
     return () => {
       cancelled = true;
-      if (intervalId) window.clearInterval(intervalId);
+      if (loopTimer) window.clearTimeout(loopTimer);
       window.clearTimeout(initialTickTimer);
       window.clearTimeout(fullScanTimer);
     };

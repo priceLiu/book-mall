@@ -1571,6 +1571,8 @@ model StoryGenerationTask {
   @@index([projectId, kind])
   @@index([characterId])
   @@index([frameId])
+  // Gen-HotCold-R2 Phase 0：partial index 由裸 SQL 管理（见 canvas 任务表说明）：
+  //   StoryGenerationTask_inflight_queuedAt_idx / StoryGenerationTask_submitted_lastPolledAt_idx
 }
 
 /// OSS 异步清理队列：删除 / 重新生成时旧的稳定 URL 入队，由 cron worker 调 deleteManagedOssObjectByUrl 清理
@@ -2029,6 +2031,10 @@ model CanvasGenerationTask {
   @@index([projectId, inputHash])
   @@index([providerId])
   @@index([projectId, nodeId, deletedAt, createdAt])
+  // Gen-HotCold-R2 Phase 0：以下 partial index 由裸 SQL 管理（Prisma 无法表达 WHERE）：
+  //   CanvasGenerationTask_inflight_queuedAt_idx  (status, queuedAt) WHERE status IN (QUEUED,DISPATCHING,PENDING,SUBMITTED)
+  //   CanvasGenerationTask_submitted_lastPolledAt_idx (lastPolledAt) WHERE status = 'SUBMITTED'
+  // 见 migrations/20260716130000_genhotcold_partial_indexes
 }
 
 /// 生成交通控流状态（租户 / 个人 scope，Single Writer：book-mall）
@@ -2365,6 +2371,134 @@ model GatewayRequestLog {
   @@index([settlementKind, submittedAt])
   @@index([actorBookUserId, settlementKind])
   @@index([billingCategory, submittedAt])
+  // Gen-HotCold-R2 Phase 0：partial index 由裸 SQL 管理（Prisma 无法表达 WHERE）：
+  //   GatewayRequestLog_running_submittedAt_idx (submittedAt) WHERE status='RUNNING' AND externalTaskId IS NOT NULL
+  // 见 migrations/20260716130000_genhotcold_partial_indexes
+}
+
+/// Gen-HotCold-R2 Phase 5A：GatewayRequestLog 历史归档（只读冷数据）。
+/// 终态且过保留期的日志从主表搬迁至此，主表只留「在飞 + 近期」热数据。
+/// 与主表同结构但**无外键/无 updatedAt 触发**、索引精简；报表按时间在主表/归档表间路由。
+model GatewayRequestLogArchive {
+  id           String @id
+  userId       String
+  apiKeyId     String
+  credentialId String?
+
+  providerKind   GatewayProviderKind?
+  model          String
+  endpoint       String
+  requestKind    GatewayRequestKind   @default(OTHER)
+  status         GatewayRequestStatus @default(PENDING)
+  externalTaskId String?
+  vendorRequestId String?
+  clientSource   GatewayClientSource  @default(EXTERNAL)
+  clientPage     String?
+  storyProjectId String?
+  storyTaskId    String?
+
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  hasTokenUsage    Boolean              @default(false)
+  metricsSource    GatewayMetricsSource @default(UNAVAILABLE)
+  durationMs       Int?
+  vendorDurationMs Int?
+
+  pricingModelKey         String?
+  pricingTierRaw          String?
+  billingKind             String?
+  vendorListUnitCostYuan  Decimal? @db.Decimal(16, 8)
+  estimatedVendorCostYuan Decimal? @db.Decimal(16, 6)
+
+  billingMode       CreditBillingMode?
+  canonicalModelKey String?
+  creditsCharged    Int?
+  costSnapshotYuan  Decimal?           @db.Decimal(16, 6)
+  marginSnapshot    Decimal?           @db.Decimal(6, 4)
+  seatId            String?
+
+  tenantId                String?
+  actorBookUserId         String?
+  credentialAliasSnapshot String?
+  channelSnapshot         String?
+  staffFlag               Boolean          @default(false)
+  billingPersonaSnap      BillingPersona?
+
+  settlementKind         BillingSettlementKind?
+  byokTaskKind           ByokTaskKind?
+  billingCategory        BillingCategory?
+  quotaDelta             Int?
+  includedUsedAfter      Int?
+  includedRemainingAfter Int?
+
+  inputSummary  Json?
+  resultSummary Json?
+  failCode      String?
+  failMessage   String? @db.Text
+
+  submittedAt  DateTime  @default(now())
+  completedAt  DateTime?
+  lastPolledAt DateTime?
+  pollCount    Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  /// 搬迁入归档表的时间
+  archivedAt DateTime @default(now())
+
+  @@index([submittedAt])
+  @@index([actorBookUserId, submittedAt])
+  @@index([tenantId, submittedAt])
+  @@index([canonicalModelKey])
+}
+
+/// Gen-HotCold-R2 Phase 5A：CreditLedger 历史归档（只读冷账本）。
+/// 保留 idempotencyKey（防重），无外键；报表按时间在主表/归档表间路由。
+model CreditLedgerArchive {
+  id               String           @id
+  accountId        String
+  type             CreditLedgerType
+  credits          Int
+  balanceAfter     Int
+  actorUserId      String?
+  refType          String?
+  refId            String?
+  costSnapshotYuan Decimal?         @db.Decimal(16, 6)
+  pool             CreditPool       @default(GENERAL)
+  idempotencyKey   String?          @unique
+  description      String?
+  staffFlag        Boolean          @default(false)
+  billingPersonaSnap BillingPersona?
+  createdAt        DateTime         @default(now())
+  archivedAt       DateTime         @default(now())
+
+  @@index([accountId, createdAt])
+}
+
+/// Gen-HotCold-R2 Phase 2：Gateway 状态投影计数（动静分离）。
+/// 状态页卡片不再每次对 GatewayRequestLog 全表 groupBy：
+///  - global 行由 createRequestLog/finalize 增量 bump 维持「在飞」实时；
+///  - 各 scope 行作为短 TTL 自愈缓存（computedAt 过期即重算回填），并发轮询共享同一快照。
+/// 计数可能短暂漂移，由 computedAt TTL 重算 + reconcile 脚本纠偏（真相仍是 GatewayRequestLog）。
+model GatewayStatsCounter {
+  /// global | user:<bookUserId> | tenant:<tenantId> | 查询签名
+  scopeKey       String
+  /// 目前固定 "live"（无日期过滤的实时快照）
+  bucket         String   @default("live")
+  inProgress     Int      @default(0)
+  succeeded      Int      @default(0)
+  failed         Int      @default(0)
+  cancelled      Int      @default(0)
+  queued         Int      @default(0)
+  slowWarn       Int      @default(0)
+  backgroundWait Int      @default(0)
+  /// 最近一次「全量重算回填」的时间，用于 TTL 自愈
+  computedAt     DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@id([scopeKey, bucket])
+  @@index([computedAt])
 }
 
 /// Book 侧统一结算流水：每笔 Gateway 成功调用的扣积分 / 扣套餐次快照（财务对帐真源）

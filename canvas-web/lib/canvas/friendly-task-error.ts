@@ -58,6 +58,26 @@ function extractVendorErrorMessage(raw: string): string {
   return trimmed;
 }
 
+function isMislabeledInsufficientCredits(input: {
+  failCode?: string | null;
+  failMessage?: string | null;
+}): boolean {
+  if (input.failCode?.trim() !== "INSUFFICIENT_CREDITS") return false;
+  const blob = (input.failMessage ?? "").toLowerCase();
+  return (
+    blob.includes("prisma.") ||
+    blob.includes("creditledger") ||
+    blob.includes("transaction already closed") ||
+    blob.includes("interactive transaction timeout") ||
+    blob.includes("transaction api error") ||
+    blob.includes("pool timeout") ||
+    blob.includes("server has closed the connection")
+  );
+}
+
+const STALE_INSUFFICIENT_HINT =
+  "若为历史失败且账户已充值，请关闭节点上的错误提示后点「重新生成」。";
+
 /** 将服务端 failMessage 转为用户可读文案；可选 modelKey 用于区分 DeepSeek / KIE 等同文案错误 */
 export function formatCanvasTaskError(
   failCode?: string | null,
@@ -93,10 +113,18 @@ export function formatCanvasTaskError(
     return msg || "火山方舟视频生成失败";
   }
 
+  if (
+    isMislabeledInsufficientCredits({ failCode: code, failMessage: msg }) ||
+    (code === "SYSTEM_BUSY" && blob.includes("系统繁忙"))
+  ) {
+    return "系统繁忙，积分冻结超时，请稍后重试；若余额充足仍失败，请联系管理员。";
+  }
+
   if (blob.includes("积分不足")) {
-    return msg.includes("积分不足")
-      ? `${msg}。请前往主站充值积分后重试。`
+    const base = msg.includes("积分不足")
+      ? `${msg}。请前往主站充值视频积分后重试。`
       : "平台积分不足，请充值后重试。";
+    return `${base} ${STALE_INSUFFICIENT_HINT}`;
   }
 
   if (

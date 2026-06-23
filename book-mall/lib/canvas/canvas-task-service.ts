@@ -35,6 +35,7 @@ import {
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import { dispatchQueuedCanvasTasks } from "@/lib/generation/traffic-control/dispatch-canvas";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
+import { isOpportunisticPollFallbackEnabled } from "@/lib/generation/opportunistic-poll";
 import {
   pollShardOverFetchSize,
   selectPollShardTasks,
@@ -945,7 +946,8 @@ let opportunisticPollInFlight = false;
 const lastOpportunisticPollByProject = new Map<string, number>();
 const OPPORTUNISTIC_POLL_MIN_GAP_MS = 8000;
 
-export function scheduleOpportunisticCanvasPoll(projectId: string): void {
+/** 单飞 + 每项目节流的 fire-and-forget 轮询（内部用，不做开关判断） */
+function kickCanvasPollSingleFlight(projectId: string): void {
   if (process.env.CANVAS_DISABLE_OPPORTUNISTIC_POLL === "1") return;
   const now = Date.now();
   const last = lastOpportunisticPollByProject.get(projectId) ?? 0;
@@ -966,9 +968,21 @@ export function scheduleOpportunisticCanvasPoll(projectId: string): void {
     });
 }
 
-/** 提交 KIE 任务后异步 poll 一次，避免仅依赖 cron/回调（走统一单飞管制） */
+/**
+ * 读路径（项目读 / 任务读）兜底轮询：Gen-HotCold-R2 Phase 1 默认 **关**。
+ * 进度推进交独立 poll-loop；仅 `CANVAS_OPPORTUNISTIC_POLL=1`（无后台 loop 的 dev）时兜底。
+ */
+export function scheduleOpportunisticCanvasPoll(projectId: string): void {
+  if (!isOpportunisticPollFallbackEnabled()) return;
+  kickCanvasPollSingleFlight(projectId);
+}
+
+/**
+ * 提交 KIE 任务后异步 poll 一次（写路径），避免仅依赖 cron/回调。
+ * 非读路径，不受 Phase 1 读兜底开关约束，但仍走单飞管制。
+ */
 export function scheduleCanvasPollWorkerForProject(projectId: string): void {
-  scheduleOpportunisticCanvasPoll(projectId);
+  kickCanvasPollSingleFlight(projectId);
 }
 
 const POLL_INNER_TIMEOUT_MS = getGenerationPollInnerTimeoutMs();

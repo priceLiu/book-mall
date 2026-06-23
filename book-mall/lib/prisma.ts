@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
 import {
   resolvePrismaDatasourceUrl,
+  resolvePrismaReplicaUrl,
   getPrismaConnectionLimit,
 } from "@/lib/prisma-pool-config";
 
@@ -24,6 +25,8 @@ export { getPrismaConnectionLimit };
  */
 type PrismaGlobal = {
   prisma?: PrismaClient;
+  /** Gen-HotCold-R2 Phase 6：只读副本 Client（未配置副本时 = 主库实例） */
+  prismaRead?: PrismaClient;
   /** node_modules/.prisma/client 生成时间戳 · 用于 prisma generate 后失效旧 Client */
   prismaClientStamp?: string;
 };
@@ -53,12 +56,11 @@ const DB_RETRY_MAX = 3;
 const DB_RETRY_BASE_DELAY_MS = 60;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-function buildPrismaClient(): PrismaClient {
+function buildPrismaClient(urlOverride?: string): PrismaClient {
+  const url = urlOverride ?? datasourceUrl;
   const base = new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-    ...(datasourceUrl
-      ? { datasources: { db: { url: datasourceUrl } } }
-      : {}),
+    ...(url ? { datasources: { db: { url } } } : {}),
   });
 
   const extended = base.$extends({
@@ -100,3 +102,15 @@ export const prisma = globalForPrisma.prisma ?? buildPrismaClient();
 
 globalForPrisma.prisma = prisma;
 globalForPrisma.prismaClientStamp = clientStamp;
+
+/**
+ * 只读副本 Client（Gen-HotCold-R2 Phase 6）。
+ * 配置 `DATABASE_REPLICA_URL` 时指向只读副本，用于报表/仪表盘等重读，卸载主库；
+ * 未配置则复用主库实例（行为不变）。**严禁**用 prismaRead 写库。
+ */
+const replicaUrl = resolvePrismaReplicaUrl();
+export const prismaRead: PrismaClient =
+  globalForPrisma.prismaRead ??
+  (replicaUrl ? buildPrismaClient(replicaUrl) : prisma);
+
+globalForPrisma.prismaRead = prismaRead;

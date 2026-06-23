@@ -35,6 +35,8 @@ describe("mergeStatusGroupCounts", () => {
       succeeded: 10,
       failed: 1,
       cancelled: 1,
+      slowWarn: 0,
+      backgroundWait: 0,
     });
   });
 });
@@ -42,7 +44,7 @@ describe("mergeStatusGroupCounts", () => {
 describe("buildEmptyCategoryCounts", () => {
   it("returns chart billing categories without OTHER", () => {
     const rows = buildEmptyCategoryCounts();
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(7);
     expect(rows.every((r) => r.count === 0)).toBe(true);
     expect(rows.some((r) => r.category === "OTHER")).toBe(false);
     expect(rows[0]?.category).toBe("TEXT_TO_IMAGE");
