@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { ArrowUp, Languages, Loader2, Zap } from "lucide-react";
 import { useNodes } from "@xyflow/react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -22,10 +22,7 @@ import {
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { formatCanvasTaskError } from "@/lib/canvas/friendly-task-error";
 import {
-  buildLibtvRuntimeErrorAlertKey,
-  libtvRuntimeErrorAlertScope,
-  markLibtvRuntimeErrorAlertShown,
-  shouldShowLibtvRuntimeErrorAlert,
+  useLibtvRuntimeErrorAlert,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { Pro2TextNodeEnginePickers } from "./pro2-text-node-engine-pickers";
@@ -92,45 +89,23 @@ export function Pro2StarterInputDock() {
           d.modelKey,
         )
       : null;
-  const lastAlertedErrorRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!isStoryOutlineMode || !outlineErrorMessage || !storeNode) return;
-    const taskId = d.themeOutlineRuntime?.taskId?.trim();
-    const storageKey = buildLibtvRuntimeErrorAlertKey({
-      scope: libtvRuntimeErrorAlertScope(),
-      nodeId: storeNode.id,
-      taskId,
-      failCode: d.themeOutlineRuntime?.failCode,
-      failMessage: outlineErrorMessage,
-    });
-    if (
-      !shouldShowLibtvRuntimeErrorAlert({
-        taskId,
-        dismissedFailTaskId: d.themeOutlineRuntime?.dismissedFailTaskId,
-        storageKey,
-      })
-    ) {
-      return;
-    }
-    const key = storageKey;
-    if (lastAlertedErrorRef.current === key) return;
-    lastAlertedErrorRef.current = key;
-    markLibtvRuntimeErrorAlertShown(storageKey);
-    void alert({
-      title: "大纲生成失败",
-      message: outlineErrorMessage,
-      variant: "error",
-    });
-  }, [
-    isStoryOutlineMode,
-    outlineErrorMessage,
-    storeNode,
-    d.themeOutlineRuntime?.taskId,
-    d.themeOutlineRuntime?.failCode,
-    d.themeOutlineRuntime?.dismissedFailTaskId,
-    alert,
-  ]);
+  useLibtvRuntimeErrorAlert({
+    enabled: isStoryOutlineMode && Boolean(outlineErrorMessage) && Boolean(storeNode),
+    nodeId: storeNode?.id ?? "",
+    status: d.themeOutlineRuntime?.status,
+    taskId: d.themeOutlineRuntime?.taskId,
+    failCode: d.themeOutlineRuntime?.failCode,
+    failMessage: outlineErrorMessage ?? undefined,
+    dismissedFailTaskId: d.themeOutlineRuntime?.dismissedFailTaskId,
+    onAlert: (msg) => {
+      void alert({
+        title: "大纲生成失败",
+        message: msg,
+        variant: "error",
+      });
+    },
+  });
 
   const onSaveGeneralText = useCallback(() => {
     if (!storeNode) return;

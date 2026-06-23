@@ -50,10 +50,7 @@ import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-medi
 import { LibtvNodeErrorBanner } from "../libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
 import {
-  buildLibtvRuntimeErrorAlertKey,
-  libtvRuntimeErrorAlertScope,
-  markLibtvRuntimeErrorAlertShown,
-  shouldShowLibtvRuntimeErrorAlert,
+  useLibtvRuntimeErrorAlert,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
@@ -85,46 +82,21 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
   });
 
-  const lastAlertedErrorRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (d.runtime?.status !== "error") return;
-    const msg = d.runtime.failMessage?.trim();
-    if (!msg) return;
-    const taskId = d.runtime.taskId?.trim();
-    const storageKey = buildLibtvRuntimeErrorAlertKey({
-      scope: libtvRuntimeErrorAlertScope(),
-      nodeId: id,
-      taskId,
-      failCode: d.runtime.failCode,
-      failMessage: msg,
-    });
-    if (
-      !shouldShowLibtvRuntimeErrorAlert({
-        taskId,
-        dismissedFailTaskId: d.runtime.dismissedFailTaskId,
-        storageKey,
-      })
-    ) {
-      return;
-    }
-    const sig = `${storageKey}`;
-    if (lastAlertedErrorRef.current === sig) return;
-    lastAlertedErrorRef.current = sig;
-    markLibtvRuntimeErrorAlertShown(storageKey);
-    void alert({
-      title: "视频生成失败",
-      message: msg,
-      variant: "error",
-    });
-  }, [
-    alert,
-    id,
-    d.runtime?.status,
-    d.runtime?.taskId,
-    d.runtime?.failCode,
-    d.runtime?.failMessage,
-    d.runtime?.dismissedFailTaskId,
-  ]);
+  useLibtvRuntimeErrorAlert({
+    nodeId: id,
+    status: d.runtime?.status,
+    taskId: d.runtime?.taskId,
+    failCode: d.runtime?.failCode,
+    failMessage: d.runtime?.failMessage,
+    dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
+    onAlert: (msg) => {
+      void alert({
+        title: "视频生成失败",
+        message: msg,
+        variant: "error",
+      });
+    },
+  });
 
   const videoUrl =
     d.runtime?.ossUrl ??

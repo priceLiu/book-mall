@@ -1,5 +1,7 @@
 /** LibTV / sbv1 / Pro2 · 运行时失败弹窗：同浏览器标签页内只弹一次（刷新不重复） */
 
+import { useEffect, useRef } from "react";
+
 const STORAGE_PREFIX = "canvas-libtv-error-alert:";
 
 export function buildLibtvRuntimeErrorAlertKey(input: {
@@ -44,4 +46,74 @@ export function shouldShowLibtvRuntimeErrorAlert(input: {
 export function libtvRuntimeErrorAlertScope(): string {
   if (typeof window === "undefined") return "";
   return window.location.pathname;
+}
+
+/**
+ * 仅在本次会话内「生成中 → 失败」时弹窗；进页已存在的历史 error 不弹（避免充值后仍被旧状态打扰）。
+ */
+export function useLibtvRuntimeErrorAlert(opts: {
+  nodeId: string;
+  status?: string;
+  taskId?: string;
+  failCode?: string;
+  failMessage?: string;
+  dismissedFailTaskId?: string;
+  enabled?: boolean;
+  onAlert: (message: string) => void;
+}): void {
+  const isFirstPaintRef = useRef(true);
+  const prevStatusRef = useRef<string | undefined>(undefined);
+  const lastAlertedRef = useRef<string | null>(null);
+  const onAlertRef = useRef(opts.onAlert);
+  onAlertRef.current = opts.onAlert;
+
+  useEffect(() => {
+    if (opts.enabled === false) return;
+
+    const status = opts.status;
+    if (isFirstPaintRef.current) {
+      isFirstPaintRef.current = false;
+      prevStatusRef.current = status;
+      return;
+    }
+
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = status;
+
+    if (status !== "error") return;
+    if (prev !== "pending" && prev !== "running") return;
+
+    const msg = opts.failMessage?.trim();
+    if (!msg) return;
+
+    const taskId = opts.taskId?.trim();
+    const storageKey = buildLibtvRuntimeErrorAlertKey({
+      scope: libtvRuntimeErrorAlertScope(),
+      nodeId: opts.nodeId,
+      taskId,
+      failCode: opts.failCode,
+      failMessage: msg,
+    });
+    if (
+      !shouldShowLibtvRuntimeErrorAlert({
+        taskId,
+        dismissedFailTaskId: opts.dismissedFailTaskId,
+        storageKey,
+      })
+    ) {
+      return;
+    }
+    if (lastAlertedRef.current === storageKey) return;
+    lastAlertedRef.current = storageKey;
+    markLibtvRuntimeErrorAlertShown(storageKey);
+    onAlertRef.current(msg);
+  }, [
+    opts.enabled,
+    opts.nodeId,
+    opts.status,
+    opts.taskId,
+    opts.failCode,
+    opts.failMessage,
+    opts.dismissedFailTaskId,
+  ]);
 }

@@ -384,7 +384,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [toDate, setToDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(initialData.logs.length === 0);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -603,6 +603,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     if (skipInitialFetchRef.current) {
       skipInitialFetchRef.current = false;
       if (
+        initialData.logs.length > 0 &&
         filtersAreDefault &&
         page === (initialData.page || 1) &&
         pageSize === (initialData.pageSize || PAGE_SIZE_PRESETS[0])

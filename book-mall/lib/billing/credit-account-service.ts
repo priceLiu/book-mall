@@ -6,6 +6,8 @@
  *
  * 所有写操作在事务内更新余额 + 落流水（含 balanceAfter 与幂等键）。
  */
+import { createHash } from "node:crypto";
+
 import { Prisma, type BillingPersona, type CreditLedgerType, type CreditOwnerType, type CreditPool, type ResourceMeterType } from "@prisma/client";
 
 import { isStaffRole } from "@/lib/billing/billing-persona";
@@ -136,6 +138,20 @@ async function resolveLedgerPersonaFields(input: LedgerWriteInput): Promise<{
   };
 }
 
+/**
+ * Gen-HotCold-R2 Phase 3：按账户的 advisory 锁键。
+ *
+ * 同账户的 reserve/settle/release/refund/grant 在事务内先抢同一把 advisory 锁，
+ * 把「同一 CreditAccount 行的并发争用 + P2034 重试」变成「有序排队」；
+ * 不同账户键不同 → 互不阻塞。命名空间前缀避免与 canvas 任务锁等其它域冲突。
+ */
+function accountAdvisoryLockKeys(ref: AccountRef): [number, number] {
+  const buf = createHash("sha256")
+    .update(`credit-account:${ref.ownerType}:${ref.ownerId}`)
+    .digest();
+  return [buf.readInt32BE(0), buf.readInt32BE(4)];
+}
+
 async function writeLedger(input: LedgerWriteInput) {
   const pool: PoolKind = input.pool ?? "GENERAL";
   const fields = poolFields(pool);
@@ -149,9 +165,14 @@ async function writeLedger(input: LedgerWriteInput) {
 
   const personaFields = await resolveLedgerPersonaFields(input);
 
+  const [lockK1, lockK2] = accountAdvisoryLockKeys(input.ref);
+
   return runTxWithRetry(
     () =>
       prisma.$transaction(async (tx) => {
+        // 同账户串行：先抢 advisory 锁，余额行的并发写不再相互重试雪崩。
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockK1}::int, ${lockK2}::int)`;
+
         const account = await tx.creditAccount.upsert({
           where: { ownerType_ownerId: { ownerType: input.ref.ownerType, ownerId: input.ref.ownerId } },
           create: { ownerType: input.ref.ownerType, ownerId: input.ref.ownerId },
