@@ -57,7 +57,7 @@ export function AccountShell({
         <aside
           className="site-app-sidebar hidden md:sticky md:top-16 md:block md:max-h-[calc(100dvh-4rem)] md:self-start md:overflow-y-auto md:overscroll-y-contain"
         >
-          <div className="px-3 py-4">
+          <div className="account-sidebar-panel px-3 py-4">
             <AccountNavMenu {...menuProps} placement="sidebar" />
           </div>
         </aside>

@@ -30,10 +30,9 @@ import {
   type AccountNavMenuItem,
 } from "@/lib/account-nav-menu-config";
 
-const itemClass =
-  "flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-[#1f2328] transition-colors hover:bg-[#f6f8fa] focus-visible:bg-[#f6f8fa] focus-visible:outline-hidden";
-const itemActiveClass = "bg-[#f6f8fa] font-semibold";
-const separatorClass = "mx-1 my-1 h-px bg-[#d1d9e0]";
+const itemClass = "account-nav-item";
+const itemActiveClass = "account-nav-item-active";
+const separatorClass = "account-nav-separator";
 const signOutButtonClass = cn(
   buttonVariants({ variant: "default", size: "sm" }),
   "mt-1 h-9 w-full min-w-0 justify-start gap-2 px-3 font-medium focus-visible:ring-offset-background",
@@ -149,7 +148,7 @@ function AccountSidebarNav({
     <nav className="mt-2 min-w-0 w-full" aria-label="个人中心导航">
       {groups.map((group, index) => (
         <div key={group.id} className="min-w-0">
-          <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[#656d76]">
+          <p className="account-nav-group-label">
             {group.label}
           </p>
           <div className="min-w-0 space-y-0.5">{group.items.map((item) => renderItem(item))}</div>
@@ -320,7 +319,7 @@ export function AccountNavMenu({
         <SheetTrigger asChild>
           <button
             type="button"
-            className="inline-flex shrink-0 items-center justify-center rounded-md p-2 text-[#656d76] transition-colors hover:bg-[#f6f8fa] hover:text-[#1f2328] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#0969da]/45 focus-visible:ring-offset-2"
+            className="inline-flex shrink-0 items-center justify-center rounded-md p-2 text-[#656d76] transition-colors hover:text-[#1f2328] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#0969da]/45 focus-visible:ring-offset-2"
             aria-label="打开个人中心菜单"
           >
             <MenuIcon className="h-5 w-5" aria-hidden />

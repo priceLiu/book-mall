@@ -36,19 +36,15 @@ export function accountOverviewCardFooterClass() {
 /** 个人中心侧栏 / 页内导航链接（非 Button） */
 export function accountNavLinkClass(active: boolean) {
   return cn(
-    "block rounded-md px-3 py-2 text-sm transition-colors",
-    active
-      ? "bg-[#f6f8fa] font-semibold text-[#1f2328]"
-      : "text-[#656d76] hover:bg-[#f6f8fa] hover:text-[#1f2328]",
+    "account-nav-item",
+    active && "account-nav-item-active",
   );
 }
 
 /** 侧栏内「打开子应用」等操作行 */
 export function accountNavActionClass(disabled?: boolean) {
   return cn(
-    "w-full rounded-md px-3 py-2 text-left text-sm transition-colors",
-    disabled
-      ? "cursor-not-allowed text-[#656d76]/60"
-      : "text-[#1f2328] hover:bg-[#f6f8fa]",
+    "account-nav-item text-left",
+    disabled && "cursor-not-allowed opacity-60",
   );
 }
