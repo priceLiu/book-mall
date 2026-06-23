@@ -11,6 +11,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 export const SITE_HOME_PRODUCT_OPTIONS = [
   {
@@ -42,8 +43,8 @@ function resolveProductValue(pathname: string) {
 const splitBtnClass =
   "rounded-none shadow-none first:rounded-s-lg last:rounded-e-lg focus-visible:z-10 h-9 px-4 pointer-events-none";
 
-/** 顶栏「产品」：分割按钮点击均打开下拉；仅菜单项跳转 */
-export function SiteHomeProductNav() {
+/** 顶栏「产品」：分割按钮或文字链样式（YouMind 居中导航） */
+export function SiteHomeProductNav({ variant = "button" }: { variant?: "button" | "link" }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -56,6 +57,53 @@ export function SiteHomeProductNav() {
     pathname.startsWith("/courses/");
 
   const mainLabel = onProductSection ? active.label : "产品";
+
+  if (variant === "link") {
+    return (
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className={cn("site-home-nav-link", onProductSection && "site-home-nav-link-active")}
+            aria-haspopup="menu"
+            aria-expanded={open}
+          >
+            <span>{mainLabel}</span>
+            <ChevronDown className="size-3.5 opacity-60" aria-hidden />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          className="max-w-64 md:max-w-xs"
+          side="bottom"
+          sideOffset={8}
+          align="center"
+        >
+          <DropdownMenuRadioGroup
+            value={selected}
+            onValueChange={(value) => {
+              const option = SITE_HOME_PRODUCT_OPTIONS.find((o) => o.value === value);
+              if (!option) return;
+              setOpen(false);
+              router.push(option.href);
+            }}
+          >
+            {SITE_HOME_PRODUCT_OPTIONS.map((option) => (
+              <DropdownMenuRadioItem
+                key={option.value}
+                value={option.value}
+                className="items-start [&>span]:pt-1.5"
+              >
+                <div className="flex flex-col gap-1">
+                  <span className="site-home-nav-sheet-item">{option.label}</span>
+                  <span className="text-xs font-normal text-muted-foreground">{option.description}</span>
+                </div>
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -97,10 +145,10 @@ export function SiteHomeProductNav() {
               value={option.value}
               className="items-start [&>span]:pt-1.5"
             >
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium">{option.label}</span>
-                <span className="text-xs text-muted-foreground">{option.description}</span>
-              </div>
+                <div className="flex flex-col gap-1">
+                  <span className="site-home-nav-sheet-item">{option.label}</span>
+                  <span className="text-xs font-normal text-muted-foreground">{option.description}</span>
+                </div>
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

@@ -73,77 +73,77 @@ html {
   }
 } */
 
-/* *=========== Blue theme（主站 Semi 蓝，替代原橙色） =========== */
+/* *=========== YouMind Neutral（默认深色 + 白/黑 CTA） =========== */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --background: 0 0% 98%;
+    --foreground: 240 6% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 6% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 240 6% 10%;
 
-    --primary: 214 100% 52%;
-    --primary-foreground: 0 0% 100%;
+    /* 浅色：深底白字 CTA */
+    --primary: 240 6% 10%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 215 16% 46%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
 
-    --accent: 214 100% 96%;
-    --accent-foreground: 214 100% 40%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 214 100% 52%;
-    --radius: 0.5rem;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 240 4% 46%;
+    --radius: 0.75rem;
 
-    --color-1: 214 100% 55%;
-    --color-2: 199 89% 48%;
-    --color-3: 262 83% 58%;
-    --color-4: 170 80% 50%;
+    --cta-bg: 240 6% 10%;
+    --cta-fg: 0 0% 98%;
+    --cta-hover: 240 5% 20%;
   }
 
   .dark {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
+    --background: 240 6% 6%;
+    --foreground: 0 0% 98%;
 
-    --card: 222 40% 9%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 4% 10%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 222 40% 9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 4% 10%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 214 100% 52%;
-    --primary-foreground: 0 0% 100%;
+    /* 深色：白底黑字 CTA */
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 6% 10%;
 
-    --secondary: 222 30% 14%;
-    --secondary-foreground: 210 25% 90%;
+    --secondary: 240 4% 14%;
+    --secondary-foreground: 0 0% 90%;
 
-    --muted: 222 28% 12%;
-    --muted-foreground: 215 16% 65%;
+    --muted: 240 4% 12%;
+    --muted-foreground: 240 5% 64%;
 
-    --accent: 222 30% 16%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 72.2% 50.6%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 222 24% 18%;
-    --input: 222 24% 18%;
-    --ring: 214 100% 52%;
+    --border: 240 4% 18%;
+    --input: 240 4% 18%;
+    --ring: 240 5% 50%;
 
-    --color-1: 214 100% 58%;
-    --color-2: 199 89% 52%;
-    --color-3: 262 83% 62%;
-    --color-4: 170 80% 52%;
+    --cta-bg: 0 0% 98%;
+    --cta-fg: 240 6% 10%;
+    --cta-hover: 240 5% 90%;
   }
 }
 
@@ -176,28 +176,18 @@ html {
 /* 首页 Footer 玻璃卡片（浅/深主题） */
 @layer components {
   .footer-glass {
-    backdrop-filter: blur(12px) saturate(180%);
-    background: radial-gradient(
-      circle at 40% 50%,
-      rgba(255, 255, 255, 0.65) 0%,
-      rgba(219, 234, 254, 0.35) 50%,
-      rgba(248, 250, 252, 0.92) 100%
-    );
-    border: 1px solid hsl(var(--primary) / 0.14);
+    backdrop-filter: blur(12px) saturate(150%);
+    background: hsl(var(--card) / 0.85);
+    border: 1px solid hsl(var(--border));
     border-radius: 1rem;
-    box-shadow: 0 8px 32px hsl(var(--primary) / 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
   }
 
   .dark .footer-glass {
-    backdrop-filter: blur(14px) saturate(150%);
-    background: radial-gradient(
-      circle at 35% 45%,
-      rgba(255, 255, 255, 0.06) 0%,
-      rgba(40, 25, 10, 0.28) 45%,
-      rgba(12, 8, 6, 0.9) 100%
-    );
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(14px) saturate(140%);
+    background: hsl(var(--card) / 0.6);
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   }
 
   /* 首页 Footer：品牌+导航作为整体在卡片内水平居中，左右留白对称 */
@@ -246,12 +236,6 @@ html {
     .footer-glass-nav {
       gap: 2.25rem;
     }
-  }
-
-  /* 个人中心：蓝色可点击文字统一为橙色按钮样式 */
-  .account-center a.text-primary,
-  .account-center .text-primary.underline {
-    @apply inline-flex h-8 min-w-[calc(5.5em+1.5rem)] shrink-0 items-center justify-center rounded-md border-0 bg-orange-500 px-3 text-sm font-medium text-white no-underline shadow-none hover:bg-orange-600 hover:text-white hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 dark:bg-orange-600 dark:hover:bg-orange-500;
   }
 
   .account-shell-root {

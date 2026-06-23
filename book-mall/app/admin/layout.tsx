@@ -34,7 +34,7 @@ export default async function AdminLayout({
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-border bg-card text-card-foreground shadow-sm">
         <div className="container mx-auto flex min-h-14 max-w-screen-xl items-center gap-2 px-4 py-2">
-          <Link href="/admin" className="shrink-0 font-semibold text-card-foreground hover:text-primary">
+          <Link href="/admin" className="shrink-0 font-semibold text-card-foreground hover:text-foreground">
             管理后台
           </Link>
           <div className="min-w-0 flex-1">

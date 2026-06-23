@@ -48,7 +48,7 @@ export const AuthAnimatedInput = memo(
           background: useMotionTemplate`
             radial-gradient(
               ${visible ? `${radius}px` : "0px"} circle at ${mouseX}px ${mouseY}px,
-              #3b82f6,
+              #a1a1aa,
               transparent 80%
             )
           `,
@@ -190,7 +190,7 @@ export const OrbitPathRings = memo(function OrbitPathRings({
           cy="50%"
           r={r}
           fill="none"
-          className="stroke-sky-500/28 dark:stroke-sky-300/15"
+          className="stroke-muted-foreground/25 dark:stroke-muted-foreground/15"
           strokeWidth={1}
           strokeDasharray={i === radiiPx.length - 1 ? "6 4" : undefined}
         />
@@ -211,7 +211,7 @@ export const Ripple = memo(function Ripple({
     <section
       className={cn(
         "pointer-events-none absolute inset-0 flex items-center justify-center",
-        "bg-sky-100/40 dark:bg-sky-400/[0.02]",
+        "bg-muted/30 dark:bg-muted/10",
         maskBottom &&
           "[mask-image:linear-gradient(to_bottom,black_88%,transparent_100%)]",
         className
@@ -226,7 +226,7 @@ export const Ripple = memo(function Ripple({
             key={i}
             className={cn(
               "absolute animate-ripple rounded-full border bg-transparent",
-              "border-sky-500/30 opacity-55 dark:border-sky-300/18 dark:opacity-40"
+              "border-muted-foreground/25 opacity-55 dark:border-muted-foreground/15 dark:opacity-40"
             )}
             style={{
               width: `${size}px`,

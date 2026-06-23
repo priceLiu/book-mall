@@ -98,7 +98,7 @@ export default async function AdminDashboardPage() {
             href="/pricing-disclosure"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-primary underline-offset-4 hover:underline"
+            className="font-medium text-foreground underline-offset-4 hover:underline"
           >
             前台价格公示
           </Link>
@@ -108,14 +108,14 @@ export default async function AdminDashboardPage() {
               href={usageHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-primary underline-offset-4 hover:underline"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               费用多维度概览（财务控制台）
             </a>
           ) : (
             <Link
               href={usageHref}
-              className="font-medium text-primary underline-offset-4 hover:underline"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               费用多维度概览
             </Link>
@@ -136,7 +136,7 @@ export default async function AdminDashboardPage() {
             <CardTitle className="text-3xl tabular-nums">{activeSubscriptions}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 text-xs text-muted-foreground">
-            <Link href="/admin/billing" className="font-medium text-primary underline-offset-4 hover:underline">
+            <Link href="/admin/billing" className="font-medium text-foreground underline-offset-4 hover:underline">
               课程订阅管理 →
             </Link>
           </CardContent>
@@ -156,7 +156,7 @@ export default async function AdminDashboardPage() {
             </p>
             <Link
               href="/admin/payments"
-              className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
+              className="mt-auto block pt-3 font-medium text-foreground underline-offset-4 hover:underline"
             >
               支付核对 →
             </Link>
@@ -171,7 +171,7 @@ export default async function AdminDashboardPage() {
             <p className="min-h-[3rem] leading-snug">钱包 RECHARGE 分录条数</p>
             <Link
               href="/admin/payments"
-              className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
+              className="mt-auto block pt-3 font-medium text-foreground underline-offset-4 hover:underline"
             >
               支付核对 →
             </Link>
@@ -195,14 +195,14 @@ export default async function AdminDashboardPage() {
                 href={usageHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
+                className="mt-auto block pt-3 font-medium text-foreground underline-offset-4 hover:underline"
               >
                 费用概览（财务控制台）→
               </a>
             ) : (
               <Link
                 href={usageHref}
-                className="mt-auto block pt-3 font-medium text-primary underline-offset-4 hover:underline"
+                className="mt-auto block pt-3 font-medium text-foreground underline-offset-4 hover:underline"
               >
                 费用概览 →
               </Link>

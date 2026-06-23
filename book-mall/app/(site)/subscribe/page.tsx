@@ -93,7 +93,7 @@ export default async function SubscribePage() {
         <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
           适合希望<span className="text-foreground font-medium">系统提升</span>
           、需要固定学习节奏与大纲背书的个人与小型团队。{" "}
-          <Link href="/products/ai-courses" className="text-primary underline-offset-4 hover:underline">
+          <Link href="/products/ai-courses" className="text-foreground underline-offset-4 hover:underline">
             查看已上架课程
           </Link>
         </p>
@@ -107,7 +107,7 @@ export default async function SubscribePage() {
         <AiAppsRechargeNotice />
         <p className="text-sm text-muted-foreground">
           工具按次单价、订阅标价与最低余额线等以{" "}
-          <Link href="/pricing-disclosure" className="font-medium text-primary underline-offset-4 hover:underline">
+          <Link href="/pricing-disclosure" className="font-medium text-foreground underline-offset-4 hover:underline">
             价格公示与使用说明
           </Link>{" "}
           为准。
@@ -116,7 +116,7 @@ export default async function SubscribePage() {
           工具型产品提供在线推理、结构化内容生成与工作流编排等能力。除订阅会员身份外，按量与工具调用依赖钱包余额；不满足条件时应用将无法正常使用，请以下方「选择订阅」开通会员，并在个人中心充值。
         </p>
         <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
-          <Link href="/products/ai-apps" className="text-primary underline-offset-4 hover:underline">
+          <Link href="/products/ai-apps" className="text-foreground underline-offset-4 hover:underline">
             浏览 AI 应用列表与计费说明
           </Link>
         </p>

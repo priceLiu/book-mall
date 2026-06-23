@@ -102,7 +102,7 @@ export function AccountOverviewCards({
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-sm font-medium text-amber-800 dark:text-amber-200">
+            <span className="rounded-full border border-border bg-muted px-3 py-1 text-sm font-medium text-foreground">
               {personaLabel(billingPersona)}
             </span>
             {membershipPlanName ? (
@@ -120,7 +120,7 @@ export function AccountOverviewCards({
               </span>
             ) : null}
             {isTeamSharedPool ? (
-              <span className="rounded-full border border-sky-500/35 bg-sky-500/10 px-3 py-1 text-xs text-sky-800 dark:text-sky-200">
+              <span className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
                 团队共享池 · 全员合计
               </span>
             ) : null}

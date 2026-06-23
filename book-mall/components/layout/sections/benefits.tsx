@@ -37,10 +37,10 @@ const benefitList: BenefitsProps[] = [
 
 export const BenefitsSection = () => {
   return (
-    <section id="benefits" className="container py-24 sm:py-32">
+    <section id="benefits" className="site-marketing-section py-24 sm:py-32">
       <div className="grid lg:grid-cols-2 place-items-center lg:gap-24">
         <div>
-          <h2 className="text-lg text-primary mb-2 tracking-wider">优势</h2>
+          <h2 className="text-lg text-muted-foreground mb-2 tracking-wider">优势</h2>
 
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             AI 成为您的智手
@@ -61,8 +61,8 @@ export const BenefitsSection = () => {
                   <Icon
                     name={icon as keyof typeof icons}
                     size={32}
-                    color="hsl(var(--primary))"
-                    className="mb-6 text-primary"
+                    color="hsl(var(--muted-foreground))"
+                    className="mb-6 text-muted-foreground"
                   />
                   <span className="text-5xl text-muted-foreground/15 font-medium transition-all delay-75 group-hover/number:text-muted-foreground/30">
                     0{index + 1}

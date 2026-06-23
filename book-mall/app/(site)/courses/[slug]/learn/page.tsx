@@ -42,10 +42,10 @@ export default async function CourseLearnPage({ params }: Props) {
     <main className="pb-16 pt-8 md:pt-12">
       <div className="mx-auto max-w-3xl px-4 space-y-6">
         <p className="text-sm text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
-          <Link href="/courses" className="text-primary underline">
+          <Link href="/courses" className="text-foreground underline">
             学堂首页
           </Link>
-          <Link href={`/courses/${course.slug}`} className="text-primary underline">
+          <Link href={`/courses/${course.slug}`} className="text-foreground underline">
             课程介绍
           </Link>
         </p>

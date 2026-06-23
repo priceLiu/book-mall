@@ -16,7 +16,7 @@ import {
   scheduleOpportunisticGatewayPoll,
   parseGatewayLogPollParams,
 } from "@/lib/gateway/log-read-poll-guard";
-import { isGatewayLogHistoryMode } from "@/lib/gateway/gateway-hot-window";
+import { isGatewayLogHistoryMode, gatewayLogHotCutoffDate } from "@/lib/gateway/gateway-hot-window";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -137,6 +137,7 @@ export async function GET(request: NextRequest) {
       created,
       updated,
       serverNowMs: Date.now(),
+      hotCutoffMs: gatewayLogHotCutoffDate().getTime(),
       // since 未传时为 null，前端应回退到全量加载。
       sinceApplied: sinceDate ? sinceDate.toISOString() : null,
     });

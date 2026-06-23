@@ -6,26 +6,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 
 export const CommunitySection = () => {
   return (
-    <section id="community" className="scroll-mt-28 py-12">
-      <hr className="border-secondary" />
-      <div className="container py-20 sm:py-20">
+    <section id="community" className="site-marketing-section scroll-mt-28 py-12">
+      <hr className="border-border" />
+      <div className="py-20 sm:py-20">
         <div className="lg:w-[60%] mx-auto">
           <Card className="bg-background border-none shadow-none text-center flex flex-col items-center justify-center">
             <CardHeader>
               <CardTitle className="text-3xl md:text-5xl font-bold leading-snug">
                 准备好，写上你的需求，
-                <span
-                  className={cn(
-                    "inline-block pl-2",
-                    "bg-gradient-to-r from-[#D247BF] to-primary bg-clip-text text-transparent",
-                    // iOS / WebKit：与首页 Hero 一致，避免渐变色块不按字形裁剪
-                    "[-webkit-background-clip:text] [-webkit-text-fill-color:transparent]",
-                  )}
-                >
+                <span className="inline-block pl-2 text-foreground">
                   加入
                 </span>
                 。
@@ -52,7 +44,7 @@ export const CommunitySection = () => {
           </Card>
         </div>
       </div>
-      <hr className="border-secondary" />
+      <hr className="border-border" />
     </section>
   );
 };

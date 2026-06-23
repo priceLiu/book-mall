@@ -19,7 +19,7 @@ export function ByokMembershipCta({ isLoggedIn, isTeamScope = false }: Props) {
       <Button
         type="button"
         size="sm"
-        className="w-full bg-amber-600 text-white hover:bg-amber-700"
+        className="w-full"
         onClick={() => {
           if (!isLoggedIn) {
             router.push(`/login?callbackUrl=${encodeURIComponent(href)}`);

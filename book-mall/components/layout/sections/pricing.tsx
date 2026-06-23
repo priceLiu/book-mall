@@ -145,7 +145,7 @@ export async function PricingSection() {
                 <div className="space-y-4">
                   {benefitList.map((benefit) => (
                     <span key={benefit} className="flex">
-                      <Check className="text-primary mr-2 shrink-0 mt-0.5" />
+                      <Check className="text-muted-foreground mr-2 shrink-0 mt-0.5" />
                       <span className="text-sm leading-snug">{benefit}</span>
                     </span>
                   ))}

@@ -55,7 +55,7 @@ function SiteHomeVideo() {
         )}
         aria-hidden={!showLoadingOverlay}
       >
-        <Loader2 className="size-10 animate-spin text-primary" aria-label="视频加载中" />
+        <Loader2 className="size-10 animate-spin text-muted-foreground" aria-label="视频加载中" />
       </div>
 
       {videoError ? (
@@ -115,7 +115,7 @@ function SiteHomeVideo() {
   );
 }
 
-/** Semi frame4565：左 45% 文案 + 右 55% 视频贴右缘 */
+/** 首屏左右结构：左文案 + 右视频，全屏高度 */
 export function SiteHomeHeroSection() {
   return (
     <section id="hero-video" className="site-home-hero">

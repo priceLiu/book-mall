@@ -76,7 +76,7 @@ export const HeroSection = () => {
               )}
               aria-hidden={!showLoadingOverlay}
             >
-              <Loader2 className="size-10 animate-spin text-primary" aria-label="视频加载中" />
+              <Loader2 className="size-10 animate-spin text-muted-foreground" aria-label="视频加载中" />
             </div>
 
             {videoError ? (

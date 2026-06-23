@@ -101,7 +101,7 @@ export default async function ProductsPage({
                   {tierLabel[p.tier] ?? p.tier}
                 </span>
               </div>
-              <h2 className="text-base font-semibold group-hover:text-primary mb-2 leading-snug">
+              <h2 className="text-base font-semibold group-hover:text-foreground mb-2 leading-snug">
                 {p.title}
               </h2>
               <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-1">{p.summary}</p>

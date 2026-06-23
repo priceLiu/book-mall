@@ -140,7 +140,7 @@ export async function PricingDisclosureContent({
         <SubscriptionPlansTable rows={subscriptionPlanRows} />
         <p className="text-xs text-muted-foreground">
           购买入口参见{" "}
-          <Link href="/subscribe" className="text-primary underline">
+          <Link href="/subscribe" className="text-foreground underline">
             订阅与支付
           </Link>
           。
@@ -192,7 +192,7 @@ export async function PricingDisclosureContent({
           <li>
             <strong className="text-foreground">AI 智能试衣 · 生成一次试衣成片</strong>
             （基础版 <code className="text-xs">aitryon</code>，详见{" "}
-            <Link href="#ai-tryon" className="text-primary underline">
+            <Link href="#ai-tryon" className="text-foreground underline">
               第二节 · AI 试衣完整价目
             </Link>
             ）
@@ -249,7 +249,7 @@ export async function PricingDisclosureContent({
         <p className="font-medium text-foreground">说明与权利保留</p>
         <p className="mt-2 leading-relaxed">
           单价与订阅价可能随运营策略变更；新价格仅在生效时间之后适用。完整计费与提现规则摘要见本页{" "}
-          <Link href="#billing-policy" className="text-primary underline">
+          <Link href="#billing-policy" className="text-foreground underline">
             计费、余额与提现说明
           </Link>
           。
