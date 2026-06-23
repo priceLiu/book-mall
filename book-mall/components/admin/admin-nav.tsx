@@ -21,7 +21,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { AdminToolsStationEntry } from "@/components/admin/admin-tools-station-entry";
-import { ToggleTheme } from "@/components/layout/toogle-theme";
 import {
   ADMIN_TOP_LEVEL_LINKS,
   adminNavGroupsForDesktop,
@@ -33,10 +32,10 @@ import { cn } from "@/lib/utils";
 import { navigateBookMallFullSignOut } from "@/lib/session-kicked-marker";
 
 const ADMIN_NAV_GHOST =
-  "h-9 px-2 text-sm font-normal text-card-foreground hover:bg-accent hover:text-accent-foreground";
+  "site-app-nav-link h-9 border-0 bg-transparent px-3 shadow-none hover:shadow-none";
 
 const SHEET_ITEM =
-  "flex w-full min-w-0 items-center rounded-md px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted";
+  "site-app-nav-link flex w-full min-w-0 items-center rounded-md px-3 py-2";
 
 export type AdminNavUserProps = {
   id: string;
@@ -78,15 +77,15 @@ function AdminHeaderUser({ user }: { user: AdminNavUserProps }) {
     >
       <Avatar className="h-8 w-8 shrink-0">
         {img ? <AvatarImage src={img} alt="" referrerPolicy="no-referrer" /> : null}
-        <AvatarFallback className="text-xs font-semibold text-card-foreground">{initial}</AvatarFallback>
+        <AvatarFallback className="text-xs font-semibold text-[#1f2328]">{initial}</AvatarFallback>
       </Avatar>
       <div className="hidden min-w-0 flex-col leading-tight sm:flex">
-        <span className="truncate text-sm font-medium text-card-foreground">{primary}</span>
+        <span className="truncate text-sm font-semibold text-[#1f2328]">{primary}</span>
         {secondary ? (
-          <span className="truncate text-xs text-muted-foreground">{secondary}</span>
+          <span className="truncate text-xs text-[#656d76]">{secondary}</span>
         ) : null}
       </div>
-      <span className="hidden shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground sm:inline-flex">
+      <span className="hidden shrink-0 rounded-full border border-[#d1d9e0] bg-[#f6f8fa] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-[#656d76] sm:inline-flex">
         管理员
       </span>
     </div>
@@ -104,7 +103,7 @@ function NavLinkItem({
   onNavigate?: () => void;
   className?: string;
 }) {
-  const cls = cn(className, active && "bg-muted font-medium");
+  const cls = cn(className, active && "site-app-nav-link-active");
 
   if (item.external) {
     return (
@@ -191,7 +190,7 @@ function AdminNavSheet({
       <SheetTrigger asChild>
         <button
           type="button"
-          className="inline-flex shrink-0 items-center justify-center rounded-lg p-2 text-card-foreground transition-colors hover:bg-accent md:hidden"
+          className="inline-flex shrink-0 items-center justify-center rounded-md p-2 text-[#1f2328] transition-colors hover:bg-[#f6f8fa] md:hidden"
           aria-label="打开管理菜单"
         >
           <MenuIcon className="h-5 w-5" />
@@ -199,10 +198,10 @@ function AdminNavSheet({
       </SheetTrigger>
       <SheetContent side="left" className="w-[17rem] max-w-[85vw] gap-0 overflow-y-auto p-0">
         <SheetTitle className="sr-only">管理后台菜单</SheetTitle>
-        <div className="border-b border-border px-4 py-3">
-          <p className="text-sm font-semibold">管理后台</p>
+        <div className="border-b border-[#d1d9e0] px-4 py-3">
+          <p className="text-sm font-semibold text-[#1f2328]">管理后台</p>
           {!financeWebOrigin ? (
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-[11px] leading-relaxed text-[#656d76]">
               未配置财务控制台域名时，部分链接走 Book 内重定向页。
             </p>
           ) : null}
@@ -222,7 +221,7 @@ function AdminNavSheet({
           })}
           {groups.map((group) => (
             <div key={group.id}>
-              <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-[#656d76]">
                 {group.label}
               </p>
               <div className="space-y-0.5">
@@ -259,7 +258,7 @@ export function AdminNav({
   const allGroups = buildAdminNavGroups(financeWebOrigin);
 
   return (
-    <nav className="flex min-w-0 flex-1 items-center gap-x-1 gap-y-2 text-card-foreground">
+    <nav className="flex min-w-0 flex-1 items-center gap-x-1 gap-y-2 text-[#1f2328]">
       <AdminNavSheet groups={allGroups} pathname={pathname} financeWebOrigin={financeWebOrigin} />
 
       <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-1 md:flex">
@@ -276,15 +275,11 @@ export function AdminNav({
       <div className="ml-auto flex flex-wrap items-center gap-2">
         <AdminHeaderUser user={user} />
 
-        <span className="mx-0.5 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
+        <span className="mx-0.5 hidden h-4 w-px shrink-0 bg-[#d1d9e0] sm:inline-block" aria-hidden />
 
         <AdminToolsStationEntry toolsSsoReady={toolsSsoReady} toolsSsoIssues={toolsSsoIssues} />
 
-        <span className="mx-1 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
-
-        <ToggleTheme iconOnly />
-
-        <span className="mx-1 hidden h-4 w-px shrink-0 bg-border sm:inline-block" aria-hidden />
+        <span className="mx-1 hidden h-4 w-px shrink-0 bg-[#d1d9e0] sm:inline-block" aria-hidden />
 
         <Button variant="ghost" size="sm" className={`${ADMIN_NAV_GHOST} hidden sm:inline-flex`} asChild>
           <Link href="/account">个人中心</Link>

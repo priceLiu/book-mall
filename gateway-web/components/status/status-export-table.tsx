@@ -143,11 +143,11 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
   };
 
   return (
-    <div className="rounded-lg border border-white/10 bg-[var(--gw-surface)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+    <div className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--gw-border)] px-4 py-3">
         <div>
-          <h2 className="text-sm font-medium text-white">明细表格</h2>
-          <p className="mt-0.5 text-xs text-zinc-500">
+          <h2 className="text-sm font-medium text-[var(--gw-ink)]">明细表格</h2>
+          <p className="mt-0.5 text-xs text-[var(--gw-muted)]">
             与当前筛选一致 · 分页规则同 Gateway 日志页
           </p>
         </div>
@@ -156,7 +156,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
             type="button"
             onClick={() => void loadRows()}
             disabled={loading}
-            className="rounded-md border border-white/15 px-3 py-1.5 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            className="rounded-md border border-[var(--gw-border)] px-3 py-1.5 text-sm text-[var(--gw-ink)] hover:bg-[var(--gw-hover)] disabled:opacity-50"
           >
             刷新
           </button>
@@ -164,7 +164,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
             type="button"
             onClick={downloadCsv}
             disabled={loading || total === 0}
-            className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+            className="gw-btn-sm"
           >
             下载 CSV
           </button>
@@ -180,7 +180,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
       <div className="relative overflow-x-auto">
         {loading && rows.length > 0 ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40">
-            <SpinnerIcon className="h-6 w-6 text-sky-400" />
+            <SpinnerIcon className="h-6 w-6 text-[var(--gw-accent)]" />
           </div>
         ) : null}
         <table
@@ -189,7 +189,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
           }`}
         >
           <thead>
-            <tr className="border-b border-white/10 text-xs uppercase text-zinc-500">
+            <tr className="border-b border-[var(--gw-border)] text-xs uppercase text-[var(--gw-muted)]">
               <th className="w-12 px-3 py-2 text-right font-medium">#</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">失败码</th>
@@ -207,16 +207,16 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
           <tbody>
             {loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-4 py-12 text-center text-zinc-400">
+                <td colSpan={12} className="px-4 py-12 text-center text-[var(--gw-muted)]">
                   <div className="inline-flex items-center gap-2">
-                    <SpinnerIcon className="h-5 w-5 text-sky-400" />
+                    <SpinnerIcon className="h-5 w-5 text-[var(--gw-accent)]" />
                     正在加载表格…
                   </div>
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={12} className="px-4 py-8 text-center text-[var(--gw-muted)]">
                   当前筛选下暂无记录
                 </td>
               </tr>
@@ -234,45 +234,45 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
                 return (
                   <tr
                     key={row.id}
-                    className="border-b border-white/5 hover:bg-white/[0.02]"
+                    className="border-b border-[var(--gw-border)] hover:bg-[var(--gw-hover)]"
                   >
-                    <td className="px-3 py-2 text-right font-mono tabular-nums text-zinc-500">
+                    <td className="px-3 py-2 text-right font-mono tabular-nums text-[var(--gw-muted)]">
                       {rowNo}
                     </td>
-                    <td className="px-3 py-2 lowercase text-zinc-300">
+                    <td className="px-3 py-2 lowercase text-[var(--gw-ink)]">
                       {row.status.toLowerCase()}
                     </td>
                     <td className="px-3 py-2 font-mono text-xs text-red-300">
                       {row.status === "FAILED" ? failCode : "—"}
                     </td>
-                    <td className="max-w-[240px] px-3 py-2 text-xs leading-relaxed text-zinc-400">
+                    <td className="max-w-[240px] px-3 py-2 text-xs leading-relaxed text-[var(--gw-muted)]">
                       {failMessage}
                     </td>
-                    <td className="max-w-[140px] truncate px-3 py-2 font-mono text-xs text-zinc-300">
+                    <td className="max-w-[140px] truncate px-3 py-2 font-mono text-xs text-[var(--gw-ink)]">
                       {row.canonicalModelKey ?? row.model}
                     </td>
-                    <td className="px-3 py-2 text-zinc-400">
+                    <td className="px-3 py-2 text-[var(--gw-muted)]">
                       {billingCategoryLabel(row.billingCategory)}
                     </td>
-                    <td className="px-3 py-2 tabular-nums text-zinc-300">
+                    <td className="px-3 py-2 tabular-nums text-[var(--gw-ink)]">
                       {row.actorPhone ?? "—"}
                     </td>
-                    <td className="px-3 py-2 text-zinc-300">
+                    <td className="px-3 py-2 text-[var(--gw-ink)]">
                       {row.actorName ?? "—"}
                     </td>
-                    <td className="px-3 py-2 text-zinc-300">
+                    <td className="px-3 py-2 text-[var(--gw-ink)]">
                       {row.actorDisplayLabel ?? "—"}
                     </td>
-                    <td className="px-3 py-2 tabular-nums text-zinc-300">
+                    <td className="px-3 py-2 tabular-nums text-[var(--gw-ink)]">
                       {row.durationMs != null
                         ? formatDurationSeconds(row.durationMs)
                         : "—"}
                     </td>
-                    <td className="px-3 py-2 text-zinc-400">
+                    <td className="px-3 py-2 text-[var(--gw-muted)]">
                       {formatLogTimestamp(row.submittedAt)}
                     </td>
                     <td
-                      className="px-3 py-2 font-mono text-xs text-zinc-500"
+                      className="px-3 py-2 font-mono text-xs text-[var(--gw-muted)]"
                       title={row.id}
                     >
                       {row.id.slice(0, 8)}…

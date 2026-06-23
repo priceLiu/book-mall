@@ -122,26 +122,26 @@ export default function DashboardKeysPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">API 密钥</h1>
+        <h1 className="text-2xl font-semibold text-[var(--gw-ink)]">API 密钥</h1>
         <p className="mt-1 text-sm text-[var(--gw-muted)]">
-          调用 <code className="text-white/80">/api/v1</code> 时使用{" "}
-          <code className="text-white/80">Authorization: Bearer sk-gw-…</code>
+          调用 <code className="text-[var(--gw-ink)]/80">/api/v1</code> 时使用{" "}
+          <code className="text-[var(--gw-ink)]/80">Authorization: Bearer sk-gw-…</code>
         </p>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300">
+      <div className="rounded-xl border border-[var(--gw-border)] bg-white/5 px-4 py-3 text-sm text-[var(--gw-ink)]">
         <p>
-          <strong className="font-medium text-white">Personal</strong>
+          <strong className="font-medium text-[var(--gw-ink)]">Personal</strong>
           ：个人密钥，在 Book 个人中心关联后供 Canvas / Story / 工具站使用。
         </p>
         {bookRole === "ADMIN" ? (
           <p className="mt-2">
-            <strong className="font-medium text-white">Platform Admin</strong>
+            <strong className="font-medium text-[var(--gw-ink)]">Platform Admin</strong>
             ：全站管理员密钥（原「Canvas Pilot」已统一为此名称），用于平台级调试与外部直连；Book
             子站代理仍应关联 Personal Key。
           </p>
         ) : (
-          <p className="mt-2 text-zinc-500">
+          <p className="mt-2 text-[var(--gw-muted)]">
             Platform Admin 密钥仅 Book 管理员可创建。
           </p>
         )}
@@ -153,7 +153,7 @@ export default function DashboardKeysPage() {
             请立即复制保存，此密钥仅显示一次：
           </p>
           <div className="mt-2 flex items-start gap-2">
-            <code className="min-w-0 flex-1 break-all rounded bg-black/40 p-3 text-sm text-white">
+            <code className="min-w-0 flex-1 break-all rounded bg-black/40 p-3 text-sm text-[var(--gw-ink)]">
               {rawKey}
             </code>
             <button
@@ -242,7 +242,7 @@ export default function DashboardKeysPage() {
                   <span
                     className={`rounded-full border px-2 py-0.5 text-xs ${
                       k.scope === "PLATFORM"
-                        ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
+                        ? "border-[var(--gw-accent)]/40 bg-[var(--gw-accent-muted)] text-[var(--gw-accent)]"
                         : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
                     }`}
                   >

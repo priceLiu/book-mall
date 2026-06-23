@@ -18,15 +18,15 @@ const TAB_LABELS: Record<ModelTab, string> = {
 function tagClass(kind: "provider" | "model" | "cap" | "warn") {
   switch (kind) {
     case "provider":
-      return "border-white/15 bg-white/10 text-zinc-300";
+      return "border-[var(--gw-border)] bg-white/10 text-[var(--gw-ink)]";
     case "model":
       return "border-blue-500/30 bg-blue-500/15 text-blue-200";
     case "cap":
       return "border-emerald-500/30 bg-emerald-500/15 text-emerald-200";
     case "warn":
-      return "border-amber-500/30 bg-amber-500/15 text-amber-200";
+      return "border-amber-500/30 bg-[var(--gw-accent-muted)] text-[var(--gw-accent)]";
     default:
-      return "border-white/10 bg-white/5 text-zinc-400";
+      return "border-[var(--gw-border)] bg-white/5 text-[var(--gw-muted)]";
   }
 }
 
@@ -188,12 +188,12 @@ export function ModelManager({
   return (
     <div className="space-y-4">
       {toast ? (
-        <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-zinc-200">
+        <div className="rounded-lg border border-[var(--gw-border)] bg-white/5 px-4 py-2 text-sm text-[var(--gw-ink)]">
           {toast}
         </div>
       ) : null}
 
-      <div className="flex gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+      <div className="flex gap-1 rounded-lg border border-[var(--gw-border)] bg-black/20 p-1">
         {(Object.keys(TAB_LABELS) as ModelTab[]).map((key) => (
           <button
             key={key}
@@ -201,8 +201,8 @@ export function ModelManager({
             onClick={() => setTab(key)}
             className={`rounded-md px-4 py-2 text-sm transition ${
               tab === key
-                ? "bg-white/10 text-white"
-                : "text-zinc-500 hover:text-zinc-300"
+                ? "bg-white/10 text-[var(--gw-ink)]"
+                : "text-[var(--gw-muted)] hover:text-[var(--gw-ink)]"
             }`}
           >
             {TAB_LABELS[key]}
@@ -224,7 +224,7 @@ export function ModelManager({
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 flex-1 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-lg font-semibold text-white">{g.label}</h2>
+                    <h2 className="text-lg font-semibold text-[var(--gw-ink)]">{g.label}</h2>
                     <ProviderApplyLink
                       providerKind={g.providerKind}
                       className="text-xs text-[var(--gw-accent)] hover:underline"
@@ -252,7 +252,7 @@ export function ModelManager({
                       </span>
                     ))}
                     {g.models.length > 6 ? (
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-xs text-[var(--gw-muted)]">
                         +{g.models.length - 6} 更多
                       </span>
                     ) : null}
@@ -270,7 +270,7 @@ export function ModelManager({
                     )}
                   </div>
                   {primary ? (
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-[var(--gw-muted)]">
                       默认凭证：{primary.alias}
                       {primary.channel ? `（${primary.channel}）` : ""} ·{" "}
                       {primary.apiKeyMasked}
@@ -279,7 +279,7 @@ export function ModelManager({
                         : ""}
                     </p>
                   ) : (
-                    <p className="text-xs text-zinc-500">尚未绑定厂商 API Key</p>
+                    <p className="text-xs text-[var(--gw-muted)]">尚未绑定厂商 API Key</p>
                   )}
                 </div>
 
@@ -289,14 +289,14 @@ export function ModelManager({
                       <button
                         type="button"
                         disabled={busyId === primary.id}
-                        className="text-zinc-400 hover:text-white disabled:opacity-50"
+                        className="text-[var(--gw-muted)] hover:text-[var(--gw-ink)] disabled:opacity-50"
                         onClick={() => void onTest(primary)}
                       >
                         Test Connection
                       </button>
                       <button
                         type="button"
-                        className="text-zinc-400 hover:text-white"
+                        className="text-[var(--gw-muted)] hover:text-[var(--gw-ink)]"
                         onClick={() => openEdit(primary)}
                       >
                         Edit
@@ -304,7 +304,7 @@ export function ModelManager({
                       <button
                         type="button"
                         disabled={busyId === primary.id}
-                        className="text-zinc-400 hover:text-white disabled:opacity-50"
+                        className="text-[var(--gw-muted)] hover:text-[var(--gw-ink)] disabled:opacity-50"
                         onClick={() => void onClone(primary)}
                       >
                         Clone
@@ -341,9 +341,9 @@ export function ModelManager({
               </div>
 
               {creds.length > 0 ? (
-                <div className="mt-4 space-y-2 border-t border-white/5 pt-3">
+                <div className="mt-4 space-y-2 border-t border-[var(--gw-border)] pt-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-zinc-400">
+                    <span className="text-xs font-medium text-[var(--gw-muted)]">
                       同厂商凭证（{creds.length}）· 按渠道区分，生成默认走「默认凭证」
                     </span>
                     <button
@@ -357,10 +357,10 @@ export function ModelManager({
                   {creds.map((c) => (
                     <div
                       key={c.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/5 px-3 py-2 text-xs"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--gw-border)] px-3 py-2 text-xs"
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-zinc-200">{c.alias}</span>
+                        <span className="text-[var(--gw-ink)]">{c.alias}</span>
                         {c.channel ? (
                           <span className={`rounded-full border px-2 py-0.5 ${tagClass("provider")}`}>
                             {c.channel}
@@ -372,11 +372,11 @@ export function ModelManager({
                           </span>
                         ) : null}
                         {!c.active ? (
-                          <span className="rounded-full border border-white/10 px-2 py-0.5 text-zinc-500">
+                          <span className="rounded-full border border-[var(--gw-border)] px-2 py-0.5 text-[var(--gw-muted)]">
                             停用
                           </span>
                         ) : null}
-                        <span className="text-zinc-500">{c.apiKeyMasked}</span>
+                        <span className="text-[var(--gw-muted)]">{c.apiKeyMasked}</span>
                       </div>
                       <div className="flex items-center gap-3">
                         {!c.isDefaultForProvider && c.active ? (
@@ -391,7 +391,7 @@ export function ModelManager({
                         ) : null}
                         <button
                           type="button"
-                          className="text-zinc-400 hover:text-white"
+                          className="text-[var(--gw-muted)] hover:text-[var(--gw-ink)]"
                           onClick={() => openEdit(c)}
                         >
                           编辑
@@ -406,7 +406,7 @@ export function ModelManager({
         })}
 
         {groups.length === 0 ? (
-          <div className="gw-card text-sm text-zinc-500">此分类暂无模型</div>
+          <div className="gw-card text-sm text-[var(--gw-muted)]">此分类暂无模型</div>
         ) : null}
       </div>
 

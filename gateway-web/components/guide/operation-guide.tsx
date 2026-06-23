@@ -56,20 +56,20 @@ export function OperationGuideContent() {
         <p className="text-xs uppercase tracking-widest text-[var(--gw-muted)]">
           Gateway · 操作指引
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-white">
+        <h1 className="mt-2 text-2xl font-semibold text-[var(--gw-ink)]">
           从厂商 Key 到 Canvas / 工具站可用
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[var(--gw-muted)]">
-          Gateway 是<strong className="font-normal text-white/90">断直连</strong>
+          Gateway 是<strong className="font-normal text-[var(--gw-ink)]/90">断直连</strong>
           代理层：你在各 AI 厂商注册的 API Key 只保存在 Gateway；Book / Canvas /
-          工具站通过一把 <code className="text-white/90">sk-gw-...</code>{" "}
+          工具站通过一把 <code className="text-[var(--gw-ink)]/90">sk-gw-...</code>{" "}
           调用已接入的模型，产品侧不再填写厂商 Key。
         </p>
       </header>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-white">一、整体关系（先看懂这个）</h2>
-        <pre className="overflow-x-auto rounded-lg border border-white/10 bg-black/30 p-4 text-xs leading-relaxed text-zinc-300">
+        <h2 className="text-lg font-medium text-[var(--gw-ink)]">一、整体关系（先看懂这个）</h2>
+        <pre className="overflow-x-auto rounded-lg border border-[var(--gw-border)] bg-black/30 p-4 text-xs leading-relaxed text-[var(--gw-ink)]">
 {`┌─ 你 ─────────────────────────────────────────────┐
 │  1. 去 KIE / DeepSeek / 百炼 / DashScope / 混元 注册 │
 │  2. Gateway「厂商凭证」填入各厂商 API Key          │
@@ -88,7 +88,7 @@ export function OperationGuideContent() {
           sk-gw。
         </div>
         <p className="text-sm text-[var(--gw-muted)]">
-          能用的模型取决于 sk-gw <strong className="text-white/90">绑定了哪些厂商凭证</strong>
+          能用的模型取决于 sk-gw <strong className="text-[var(--gw-ink)]/90">绑定了哪些厂商凭证</strong>
           ，不是 sk-gw 的数量。完整 modelKey 列表见{" "}
           <Link href="/dashboard/models" className="text-[var(--gw-accent)] hover:underline">
             接入模型
@@ -98,7 +98,7 @@ export function OperationGuideContent() {
       </section>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-white">二、五步操作（按顺序做）</h2>
+        <h2 className="text-lg font-medium text-[var(--gw-ink)]">二、五步操作（按顺序做）</h2>
         <ol className="space-y-5">
           {[
             {
@@ -114,7 +114,7 @@ export function OperationGuideContent() {
                   >
                     Book 个人中心 → Gateway API Key
                   </a>
-                  ，点<strong className="text-white/90">「用 Book 账号打开 Gateway」</strong>
+                  ，点<strong className="text-[var(--gw-ink)]/90">「用 Book 账号打开 Gateway」</strong>
                   ；或 Gateway 登录页点「使用 Book 账号登录」。
                 </>
               ),
@@ -143,8 +143,8 @@ export function OperationGuideContent() {
                   <Link href="/dashboard/keys" className="text-[var(--gw-accent)] hover:underline">
                     API 密钥
                   </Link>
-                  ，新建 <code className="text-white/90">sk-gw-...</code>
-                  ，创建时<strong className="text-white/90">勾选</strong>
+                  ，新建 <code className="text-[var(--gw-ink)]/90">sk-gw-...</code>
+                  ，创建时<strong className="text-[var(--gw-ink)]/90">勾选</strong>
                   要启用的厂商凭证。明文只显示一次，请妥善保存。
                 </>
               ),
@@ -181,7 +181,7 @@ export function OperationGuideContent() {
                 {i + 1}
               </span>
               <div>
-                <h3 className="font-medium text-white">{step.title}</h3>
+                <h3 className="font-medium text-[var(--gw-ink)]">{step.title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-[var(--gw-muted)]">
                   {step.body}
                 </p>
@@ -192,11 +192,11 @@ export function OperationGuideContent() {
       </section>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-white">三、厂商凭证与可用能力</h2>
+        <h2 className="text-lg font-medium text-[var(--gw-ink)]">三、厂商凭证与可用能力</h2>
         <p className="text-sm text-[var(--gw-muted)]">
           下表为常见对应关系；具体 modelKey 以「接入模型」页为准。
         </p>
-        <div className="overflow-x-auto rounded-lg border border-white/10">
+        <div className="overflow-x-auto rounded-lg border border-[var(--gw-border)]">
           <table className="gw-table min-w-[640px]">
             <thead>
               <tr>
@@ -209,9 +209,9 @@ export function OperationGuideContent() {
             <tbody className="text-[var(--gw-muted)]">
               {PROVIDER_ROWS.map((row) => (
                 <tr key={row.kind}>
-                  <td className="whitespace-nowrap font-medium text-white/90">
+                  <td className="whitespace-nowrap font-medium text-[var(--gw-ink)]/90">
                     {row.label}
-                    <div className="mt-0.5 font-mono text-[10px] text-zinc-500">
+                    <div className="mt-0.5 font-mono text-[10px] text-[var(--gw-muted)]">
                       {row.kind}
                     </div>
                   </td>
@@ -241,8 +241,8 @@ export function OperationGuideContent() {
       </section>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-white">四、入口速查</h2>
-        <div className="overflow-x-auto rounded-lg border border-white/10">
+        <h2 className="text-lg font-medium text-[var(--gw-ink)]">四、入口速查</h2>
+        <div className="overflow-x-auto rounded-lg border border-[var(--gw-border)]">
           <table className="gw-table min-w-[560px]">
             <thead>
               <tr>
@@ -252,7 +252,7 @@ export function OperationGuideContent() {
             </thead>
             <tbody className="text-sm text-[var(--gw-muted)]">
               <tr>
-                <td className="text-white/90">Book 一键进 Gateway / 关联 sk-gw</td>
+                <td className="text-[var(--gw-ink)]/90">Book 一键进 Gateway / 关联 sk-gw</td>
                 <td>
                   <a href={bookAccount} className="text-[var(--gw-accent)] hover:underline">
                     Book 个人中心 · Gateway API Key
@@ -260,7 +260,7 @@ export function OperationGuideContent() {
                 </td>
               </tr>
               <tr>
-                <td className="text-white/90">Book SSO 登录 Gateway</td>
+                <td className="text-[var(--gw-ink)]/90">Book SSO 登录 Gateway</td>
                 <td>
                   <a href={bookSso} className="text-[var(--gw-accent)] hover:underline">
                     使用 Book 账号登录
@@ -268,7 +268,7 @@ export function OperationGuideContent() {
                 </td>
               </tr>
               <tr>
-                <td className="text-white/90">填厂商 API Key</td>
+                <td className="text-[var(--gw-ink)]/90">填厂商 API Key</td>
                 <td>
                   <Link href="/dashboard/credentials" className="text-[var(--gw-accent)] hover:underline">
                     厂商凭证
@@ -276,7 +276,7 @@ export function OperationGuideContent() {
                 </td>
               </tr>
               <tr>
-                <td className="text-white/90">创建 sk-gw</td>
+                <td className="text-[var(--gw-ink)]/90">创建 sk-gw</td>
                 <td>
                   <Link href="/dashboard/keys" className="text-[var(--gw-accent)] hover:underline">
                     API 密钥
@@ -284,7 +284,7 @@ export function OperationGuideContent() {
                 </td>
               </tr>
               <tr>
-                <td className="text-white/90">查看 modelKey 清单</td>
+                <td className="text-[var(--gw-ink)]/90">查看 modelKey 清单</td>
                 <td>
                   <Link href="/dashboard/models" className="text-[var(--gw-accent)] hover:underline">
                     接入模型
@@ -292,7 +292,7 @@ export function OperationGuideContent() {
                 </td>
               </tr>
               <tr>
-                <td className="text-white/90">用量与请求日志</td>
+                <td className="text-[var(--gw-ink)]/90">用量与请求日志</td>
                 <td>
                   <Link href="/dashboard" className="text-[var(--gw-accent)] hover:underline">
                     用量
@@ -309,10 +309,10 @@ export function OperationGuideContent() {
       </section>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-white">五、常见问题</h2>
+        <h2 className="text-lg font-medium text-[var(--gw-ink)]">五、常见问题</h2>
         <dl className="space-y-4 text-sm text-[var(--gw-muted)]">
           <div>
-            <dt className="font-medium text-white/90">
+            <dt className="font-medium text-[var(--gw-ink)]/90">
               只绑了 KIE，能用 DashScope 文生图吗？
             </dt>
             <dd className="mt-1">
@@ -321,27 +321,27 @@ export function OperationGuideContent() {
             </dd>
           </div>
           <div>
-            <dt className="font-medium text-white/90">百炼和 DashScope 要填两次 Key 吗？</dt>
+            <dt className="font-medium text-[var(--gw-ink)]/90">百炼和 DashScope 要填两次 Key 吗？</dt>
             <dd className="mt-1">
               若 Canvas 百炼 R2V 与工具站 DashScope 都要用，建议各建一条凭证（种类分别为 BAILIAN /
               DASHSCOPE）；很多情况下可以是同一个 DashScope Key。
             </dd>
           </div>
           <div>
-            <dt className="font-medium text-white/90">Canvas 还让用户自建 Provider 吗？</dt>
+            <dt className="font-medium text-[var(--gw-ink)]/90">Canvas 还让用户自建 Provider 吗？</dt>
             <dd className="mt-1">
               已下线。统一走 Gateway；画布配置页仅展示 Gateway 虚拟 Provider。
             </dd>
           </div>
           <div>
-            <dt className="font-medium text-white/90">关联 sk-gw 失败？</dt>
+            <dt className="font-medium text-[var(--gw-ink)]/90">关联 sk-gw 失败？</dt>
             <dd className="mt-1">
               确认 sk-gw 属于当前 Book 邮箱对应的 Gateway 账号，且已绑定至少一条厂商凭证；Key
               未被撤销。
             </dd>
           </div>
           <div>
-            <dt className="font-medium text-white/90">在哪里看 Token / 费用？</dt>
+            <dt className="font-medium text-[var(--gw-ink)]/90">在哪里看 Token / 费用？</dt>
             <dd className="mt-1">
               Gateway「用量」与「日志」。Book 个人中心只显示是否已关联、Key 前缀与已绑定厂商种类。
             </dd>
@@ -349,7 +349,7 @@ export function OperationGuideContent() {
         </dl>
       </section>
 
-      <footer className="flex flex-wrap items-center justify-center gap-4 border-t border-white/10 pt-6 text-sm">
+      <footer className="flex flex-wrap items-center justify-center gap-4 border-t border-[var(--gw-border)] pt-6 text-sm">
         <Link href="/login" className="gw-btn">
           登录 Gateway
         </Link>

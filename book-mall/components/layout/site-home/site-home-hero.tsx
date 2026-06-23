@@ -124,9 +124,7 @@ export function SiteHomeHeroSection() {
       <div className="site-home-hero-inner">
         <div className="site-home-hero-content">
           <h1 className="site-home-hero-title">
-            一人公司
-            <br />
-            AI 变身打工仔
+            一人公司 AI 变身打工仔
           </h1>
 
           <p className="site-home-hero-subtitle">

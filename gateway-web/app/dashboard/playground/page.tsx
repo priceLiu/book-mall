@@ -68,9 +68,9 @@ export default function PlaygroundPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">API 调试</h1>
+        <h1 className="text-2xl font-semibold text-[var(--gw-ink)]">API 调试</h1>
         <p className="mt-1 text-sm text-[var(--gw-muted)]">
-          在界面里粘贴 <code className="text-white/80">sk-gw-...</code>{" "}
+          在界面里粘贴 <code className="text-[var(--gw-ink)]/80">sk-gw-...</code>{" "}
           即可试调用，无需命令行。发送后可在{" "}
           <Link href="/dashboard/logs" className="text-[var(--gw-accent)] hover:underline">
             日志
@@ -130,8 +130,8 @@ export default function PlaygroundPage() {
 
       {response ? (
         <section className="gw-card">
-          <h2 className="mb-2 text-sm font-medium text-white">响应</h2>
-          <pre className="max-h-[420px] overflow-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-white/90">
+          <h2 className="mb-2 text-sm font-medium text-[var(--gw-ink)]">响应</h2>
+          <pre className="max-h-[420px] overflow-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-[var(--gw-ink)]/90">
             {response}
           </pre>
         </section>

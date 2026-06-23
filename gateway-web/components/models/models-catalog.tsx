@@ -74,7 +74,7 @@ export function ModelsCatalog({
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-[200px] flex-1">
-          <span className="mb-1 block text-xs text-zinc-500">搜索 modelKey / 名称</span>
+          <span className="mb-1 block text-xs text-[var(--gw-muted)]">搜索 modelKey / 名称</span>
           <input
             type="search"
             value={query}
@@ -84,7 +84,7 @@ export function ModelsCatalog({
           />
         </label>
         <label>
-          <span className="mb-1 block text-xs text-zinc-500">能力类型</span>
+          <span className="mb-1 block text-xs text-[var(--gw-muted)]">能力类型</span>
           <select
             value={kindFilter}
             onChange={(e) => setKindFilter(e.target.value)}
@@ -98,7 +98,7 @@ export function ModelsCatalog({
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-2 pb-2 text-sm text-zinc-400">
+        <label className="flex items-center gap-2 pb-2 text-sm text-[var(--gw-muted)]">
           <input
             type="checkbox"
             checked={onlyBound}
@@ -109,13 +109,13 @@ export function ModelsCatalog({
         </label>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs text-zinc-500">
+      <div className="flex flex-wrap gap-2 text-xs text-[var(--gw-muted)]">
         <span>
-          共 <strong className="text-zinc-300">{totalCount}</strong> 个模型
+          共 <strong className="text-[var(--gw-ink)]">{totalCount}</strong> 个模型
         </span>
         <span>·</span>
         <span>
-          当前筛选 <strong className="text-zinc-300">{visibleCount}</strong> 个
+          当前筛选 <strong className="text-[var(--gw-ink)]">{visibleCount}</strong> 个
         </span>
         {boundKinds.length > 0 ? (
           <>
@@ -136,9 +136,9 @@ export function ModelsCatalog({
       <div className="space-y-6">
         {filteredGroups.map((group) => (
           <section key={group.providerKind} className="gw-card overflow-hidden">
-            <header className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3">
-              <h2 className="text-sm font-semibold text-white">{group.label}</h2>
-              <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-zinc-400">
+            <header className="flex flex-wrap items-center gap-2 border-b border-[var(--gw-border)] px-4 py-3">
+              <h2 className="text-sm font-semibold text-[var(--gw-ink)]">{group.label}</h2>
+              <span className="rounded-full border border-[var(--gw-border)] px-2 py-0.5 text-[11px] text-[var(--gw-muted)]">
                 {group.providerKind}
               </span>
               {group.credentialBound ? (
@@ -146,18 +146,18 @@ export function ModelsCatalog({
                   凭证已绑定
                 </span>
               ) : (
-                <span className="rounded-full bg-zinc-500/20 px-2 py-0.5 text-[11px] text-zinc-400">
+                <span className="rounded-full bg-zinc-500/20 px-2 py-0.5 text-[11px] text-[var(--gw-muted)]">
                   未绑定凭证
                 </span>
               )}
-              <span className="ml-auto text-xs text-zinc-500">
+              <span className="ml-auto text-xs text-[var(--gw-muted)]">
                 {group.models.length} 个模型
               </span>
             </header>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-white/5 text-[11px] uppercase tracking-wide text-zinc-500">
+                  <tr className="border-b border-[var(--gw-border)] text-[11px] uppercase tracking-wide text-[var(--gw-muted)]">
                     <th className="px-4 py-2 font-medium">modelKey</th>
                     <th className="px-4 py-2 font-medium">名称</th>
                     <th className="px-4 py-2 font-medium">类型</th>
@@ -169,21 +169,21 @@ export function ModelsCatalog({
                   {group.models.map((m) => (
                     <tr
                       key={`${group.providerKind}:${m.modelKey}`}
-                      className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]"
+                      className="border-b border-[var(--gw-border)] last:border-0 hover:bg-[var(--gw-hover)]"
                     >
-                      <td className="px-4 py-2.5 font-mono text-xs text-zinc-200">
+                      <td className="px-4 py-2.5 font-mono text-xs text-[var(--gw-ink)]">
                         {m.modelKey}
                       </td>
-                      <td className="px-4 py-2.5 text-zinc-100">{m.displayName}</td>
+                      <td className="px-4 py-2.5 text-[var(--gw-ink)]">{m.displayName}</td>
                       <td className="px-4 py-2.5">
-                        <span className="rounded-md bg-white/5 px-2 py-0.5 text-[11px] text-zinc-300">
+                        <span className="rounded-md bg-white/5 px-2 py-0.5 text-[11px] text-[var(--gw-ink)]">
                           {formatRequestKindLabel(m.requestKind)}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-zinc-400">
+                      <td className="px-4 py-2.5 text-xs text-[var(--gw-muted)]">
                         {m.products.join(" · ")}
                       </td>
-                      <td className="max-w-xs px-4 py-2.5 text-xs leading-relaxed text-zinc-500">
+                      <td className="max-w-xs px-4 py-2.5 text-xs leading-relaxed text-[var(--gw-muted)]">
                         {m.description ?? "—"}
                       </td>
                     </tr>
@@ -195,7 +195,7 @@ export function ModelsCatalog({
         ))}
 
         {filteredGroups.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-white/10 px-6 py-10 text-center text-sm text-zinc-500">
+          <div className="rounded-xl border border-dashed border-[var(--gw-border)] px-6 py-10 text-center text-sm text-[var(--gw-muted)]">
             没有匹配的模型。试试清空搜索或关闭「仅已绑定凭证的厂商」。
           </div>
         ) : null}

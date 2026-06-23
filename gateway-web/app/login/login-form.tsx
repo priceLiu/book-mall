@@ -39,7 +39,7 @@ export default function LoginForm() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="gw-card w-full max-w-md">
-        <h1 className="text-xl font-semibold text-white">登录 Gateway</h1>
+        <h1 className="text-xl font-semibold text-[var(--gw-ink)]">登录 Gateway</h1>
         <p className="mt-1 text-sm text-[var(--gw-muted)]">
           使用 Gateway 账号或 Book SSO 登录后管理 API 密钥与厂商凭证。
         </p>

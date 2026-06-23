@@ -32,9 +32,9 @@ export default function DashboardDocsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">接入文档</h1>
+        <h1 className="text-2xl font-semibold text-[var(--gw-ink)]">接入文档</h1>
         <p className="mt-1 text-sm text-[var(--gw-muted)]">
-          对外 Base URL：<code className="text-white/90">{apiBase}</code>
+          对外 Base URL：<code className="text-[var(--gw-ink)]/90">{apiBase}</code>
           {" · "}
           <Link href="/dashboard/playground" className="text-[var(--gw-accent)] hover:underline">
             在界面里调试（无需 curl）
@@ -43,28 +43,28 @@ export default function DashboardDocsPage() {
       </div>
 
       <section className="gw-card space-y-3">
-        <h2 className="text-sm font-medium text-white">Chat Completions</h2>
+        <h2 className="text-sm font-medium text-[var(--gw-ink)]">Chat Completions</h2>
         <p className="text-sm text-[var(--gw-muted)]">
           OpenAI 兼容对话接口，需在控制台创建 API 密钥并配置对应厂商凭证。
         </p>
-        <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-white/90">
+        <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-[var(--gw-ink)]/90">
           {chatCurl}
         </pre>
       </section>
 
       <section className="gw-card space-y-3">
-        <h2 className="text-sm font-medium text-white">Jobs · createTask</h2>
+        <h2 className="text-sm font-medium text-[var(--gw-ink)]">Jobs · createTask</h2>
         <p className="text-sm text-[var(--gw-muted)]">
           异步任务创建（视频/图片等），返回 taskId 后轮询 recordInfo。
         </p>
-        <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-white/90">
+        <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-[var(--gw-ink)]/90">
           {createTaskCurl}
         </pre>
       </section>
 
       <section className="gw-card space-y-3">
-        <h2 className="text-sm font-medium text-white">Jobs · recordInfo</h2>
-        <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-white/90">
+        <h2 className="text-sm font-medium text-[var(--gw-ink)]">Jobs · recordInfo</h2>
+        <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-[var(--gw-ink)]/90">
           {recordInfoCurl}
         </pre>
       </section>

@@ -61,9 +61,9 @@ function SidebarHeader({
 
   if (collapsed) {
     return (
-      <div className="flex flex-col items-center border-b border-white/10 px-2 py-4">
+      <div className="flex flex-col items-center border-b border-[var(--gw-border)] px-2 py-4">
         <div
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/20 text-sm font-semibold text-sky-200"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--gw-accent-muted)] text-sm font-semibold text-[var(--gw-accent)]"
           title={displayName}
         >
           {initial}
@@ -73,24 +73,24 @@ function SidebarHeader({
   }
 
   return (
-    <div className="border-b border-white/10 px-4 py-5">
-      <div className="text-sm font-semibold text-white">Gateway 控制台</div>
+    <div className="border-b border-[var(--gw-border)] px-4 py-5">
+      <div className="text-sm font-semibold text-[var(--gw-ink)]">Gateway 控制台</div>
       <div className="mt-1 truncate text-xs text-[var(--gw-muted)]">{displayName}</div>
       <div className="mt-2 flex flex-wrap gap-1">
         <span
           className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
             isAdmin
-              ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
-              : "border-white/15 bg-white/5 text-zinc-400"
+              ? "border-[var(--gw-accent)]/30 bg-[var(--gw-accent-muted)] text-[var(--gw-accent)]"
+              : "border-[var(--gw-border)] bg-[var(--gw-surface)] text-[var(--gw-muted)]"
           }`}
         >
           {isAdmin ? "Admin" : "User"}
         </span>
-        <span className="inline-block rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] text-zinc-400">
+        <span className="inline-block rounded-full border border-[var(--gw-border)] bg-[var(--gw-surface)] px-2 py-0.5 text-[10px] text-[var(--gw-muted)]">
           {isByok ? "BYOK" : "平台代付"}
         </span>
         {isPlatformPoolDelegate ? (
-          <span className="inline-block rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-200">
+          <span className="inline-block rounded-full border border-[var(--gw-accent)]/30 bg-[var(--gw-accent-muted)] px-2 py-0.5 text-[10px] text-[var(--gw-accent)]">
             平台池
           </span>
         ) : null}
@@ -128,7 +128,7 @@ function SidebarBody({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className={`flex w-full items-center rounded-lg text-zinc-400 transition hover:bg-white/5 hover:text-white ${
+            className={`flex w-full items-center rounded-md text-[var(--gw-muted)] transition hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)] ${
               collapsed ? "justify-center p-2" : "gap-2 px-3 py-2 text-xs"
             }`}
             title={collapsed ? "展开侧栏" : "收起侧栏"}
@@ -227,7 +227,7 @@ export function DashboardShell({
     <div className="flex h-dvh min-h-screen overflow-hidden bg-[var(--gw-bg)]">
       {/* 桌面端：可收缩静态侧栏 */}
       <aside
-        className={`hidden shrink-0 flex-col border-r border-white/10 bg-[var(--gw-surface)] transition-[width] duration-200 md:flex md:min-h-screen ${desktopAsideWidth}`}
+        className={`hidden shrink-0 flex-col border-r border-[var(--gw-border)] bg-[var(--gw-surface)] transition-[width] duration-200 md:flex md:min-h-screen ${desktopAsideWidth}`}
       >
         <SidebarBody
           user={user}
@@ -249,16 +249,16 @@ export function DashboardShell({
       ) : null}
       <aside
         aria-hidden={!sidebarOpen}
-        className={`fixed inset-y-0 left-0 z-50 flex w-56 flex-col border-r border-white/10 bg-[var(--gw-surface)] transition-transform duration-200 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-56 flex-col border-r border-[var(--gw-border)] bg-[var(--gw-surface)] transition-transform duration-200 md:hidden ${
           sidebarOpen
             ? "translate-x-0"
             : "pointer-events-none -translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-end border-b border-white/10 px-3 py-2">
+        <div className="flex items-center justify-end border-b border-[var(--gw-border)] px-3 py-2">
           <button
             type="button"
-            className="rounded-lg p-2 text-zinc-400 hover:bg-white/5 hover:text-white"
+            className="rounded-md p-2 text-[var(--gw-muted)] hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)]"
             aria-label="关闭菜单"
             onClick={() => setSidebarOpen(false)}
           >
@@ -274,16 +274,16 @@ export function DashboardShell({
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-white/10 bg-[var(--gw-surface)] px-4 md:hidden">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[var(--gw-border)] bg-[var(--gw-bg)] px-4 md:hidden">
           <button
             type="button"
-            className="rounded-lg p-2 text-zinc-300 hover:bg-white/5 hover:text-white"
+            className="rounded-md p-2 text-[var(--gw-muted)] hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)]"
             aria-label="打开菜单"
             onClick={() => setSidebarOpen(true)}
           >
             <IconMenu className="h-5 w-5" />
           </button>
-          <span className="truncate text-sm font-medium text-white">Gateway 控制台</span>
+          <span className="truncate text-sm font-medium text-[var(--gw-ink)]">Gateway 控制台</span>
         </header>
         <main
           className={

@@ -59,11 +59,11 @@ export function RecoverStallLogButton({
             }
           })();
         }}
-        className="rounded-md bg-orange-600/90 px-2 py-1 text-xs text-white hover:bg-orange-500 disabled:opacity-60"
+        className="gw-btn-xs disabled:opacity-60"
       >
         {busy ? "复核中…" : "厂商复核恢复"}
       </button>
-      {msg ? <span className="text-[10px] text-zinc-500">{msg}</span> : null}
+      {msg ? <span className="text-[10px] text-[var(--gw-muted)]">{msg}</span> : null}
     </div>
   );
 }

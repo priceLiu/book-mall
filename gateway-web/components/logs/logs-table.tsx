@@ -204,8 +204,8 @@ function LogsListLoadingRow({ message }: { message: string }) {
   return (
     <tr>
       <td colSpan={24} className="py-20 text-center">
-        <SpinnerIcon className="mx-auto size-6 animate-spin text-sky-400/90" />
-        <p className="mt-3 text-sm text-zinc-400" role="status" aria-live="polite">
+        <SpinnerIcon className="mx-auto size-6 animate-spin text-[var(--gw-accent)]/90" />
+        <p className="mt-3 text-sm text-[var(--gw-muted)]" role="status" aria-live="polite">
           {message}
         </p>
       </td>
@@ -411,9 +411,7 @@ function mergeLogsDelta(
 }
 
 function logFilterChipClass(active: boolean): string {
-  return active
-    ? "rounded-lg border border-sky-500/45 bg-sky-500/15 px-3 py-1.5 text-xs font-medium text-sky-100"
-    : "rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200";
+  return active ? "gw-chip-active" : "gw-chip";
 }
 
 function clearSelectionOnFilter(setSelected: (s: Set<string>) => void) {
@@ -643,7 +641,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     if (!autoRefresh || viewMode !== "live") return;
 
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: number | undefined;
 
     const schedule = (delayMs: number) => {
       if (cancelled || delayMs <= 0) return;
@@ -851,10 +849,10 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="shrink-0 space-y-2.5 rounded-xl border border-white/[0.06] bg-[#0f0f14] px-3 py-2.5">
+      <div className="shrink-0 space-y-2.5 rounded-xl border border-[var(--gw-border)] bg-[#0f0f14] px-3 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className="mr-1 shrink-0 text-xs text-zinc-500">视图</span>
+            <span className="mr-1 shrink-0 text-xs text-[var(--gw-muted)]">视图</span>
             <button
               type="button"
               className={logFilterChipClass(viewMode === "live")}
@@ -872,7 +870,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               历史
             </button>
             <span className="mx-1 text-zinc-700">|</span>
-            <span className="mr-1 shrink-0 text-xs text-zinc-500">应用</span>
+            <span className="mr-1 shrink-0 text-xs text-[var(--gw-muted)]">应用</span>
             {LOG_APP_FILTER_OPTIONS.map((opt) => {
               const active = sourceFilter === opt.value;
               return (
@@ -890,7 +888,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 </button>
               );
             })}
-            <span className="ml-2 shrink-0 text-[11px] text-zinc-600">
+            <span className="ml-2 shrink-0 text-[11px] text-[var(--gw-muted)]">
               {loading
                 ? "加载中…"
                 : `共 ${total} 条 · 第 ${page}/${totalPages} 页 · 本页 ${logs.length} 条`}
@@ -922,7 +920,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             </span>
             <Link
               href="/dashboard/poll-pool"
-              className="shrink-0 text-[11px] text-sky-400/90 underline-offset-2 hover:text-sky-300 hover:underline"
+              className="shrink-0 text-[11px] text-[var(--gw-accent)]/90 underline-offset-2 hover:text-[var(--gw-accent)] hover:underline"
             >
               轮询池
             </Link>
@@ -931,19 +929,19 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             {fetchError ? (
               <span className="text-xs text-red-400/90">{fetchError}</span>
             ) : null}
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:text-zinc-200">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--gw-border)] px-2.5 py-2 text-[11px] text-[var(--gw-muted)] transition hover:border-white/20 hover:text-[var(--gw-ink)]">
               <input
                 type="checkbox"
                 checked={autoRefresh}
                 onChange={(e) => setAutoRefresh(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-white/20 bg-transparent accent-sky-500"
+                className="gw-accent-control h-3.5 w-3.5 rounded border-white/20 bg-transparent"
               />
               自动刷新
             </label>
             <button
               type="button"
               disabled={refreshing || loading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--gw-border)] px-2.5 py-2 text-[11px] text-[var(--gw-muted)] transition hover:border-white/20 hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)] disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => void refreshLogs()}
               title="立即刷新日志（进行中任务会触发服务端轮询）"
             >
@@ -956,7 +954,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             </button>
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-2 text-[11px] text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200"
+              className="inline-flex items-center gap-1 rounded-lg border border-[var(--gw-border)] px-2.5 py-2 text-[11px] text-[var(--gw-muted)] transition hover:border-white/20 hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)]"
               onClick={toggleFiltersCollapsed}
               aria-expanded={!filtersCollapsed}
               title={filtersCollapsed ? "展开筛选条件" : "收起筛选条件以显示更多列表"}
@@ -968,12 +966,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         </div>
 
         {filtersCollapsed && !filtersAreDefault ? (
-          <div className="flex flex-wrap items-center gap-1.5 border-t border-white/[0.06] pt-2">
-            <span className="shrink-0 text-[11px] text-zinc-600">已筛选</span>
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-[var(--gw-border)] pt-2">
+            <span className="shrink-0 text-[11px] text-[var(--gw-muted)]">已筛选</span>
             {activeFilterLabels.map((label) => (
               <span
                 key={label}
-                className="rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-200/90"
+                className="rounded-md border border-sky-500/20 bg-[var(--gw-accent-muted)] px-2 py-0.5 text-[11px] text-[var(--gw-accent)]/90"
               >
                 {label}
               </span>
@@ -983,9 +981,9 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
         {!filtersCollapsed ? (
           <>
-            <div className="flex flex-wrap items-end justify-end gap-2 border-t border-white/[0.06] pt-2.5">
+            <div className="flex flex-wrap items-end justify-end gap-2 border-t border-[var(--gw-border)] pt-2.5">
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-zinc-500">开始日期</span>
+                <span className="text-xs text-[var(--gw-muted)]">开始日期</span>
                 <input
                   type="date"
                   value={fromDate}
@@ -995,12 +993,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                     resetPage();
                     clearSelectionOnFilter(setSelected);
                   }}
-                  className="w-[148px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20 [color-scheme:dark]"
+                  className="w-[148px] rounded-lg border border-[var(--gw-border)] bg-[#141419] px-3 py-2 text-sm text-[var(--gw-ink)] outline-none focus:border-white/20 [color-scheme:dark]"
                   aria-label="开始日期"
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-zinc-500">结束日期</span>
+                <span className="text-xs text-[var(--gw-muted)]">结束日期</span>
                 <input
                   type="date"
                   value={toDate}
@@ -1010,14 +1008,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                     resetPage();
                     clearSelectionOnFilter(setSelected);
                   }}
-                  className="w-[148px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20 [color-scheme:dark]"
+                  className="w-[148px] rounded-lg border border-[var(--gw-border)] bg-[#141419] px-3 py-2 text-sm text-[var(--gw-ink)] outline-none focus:border-white/20 [color-scheme:dark]"
                   aria-label="结束日期"
                 />
               </label>
               {fromDate || toDate ? (
                 <button
                   type="button"
-                  className="rounded-lg border border-white/10 px-2.5 py-2 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200"
+                  className="rounded-lg border border-[var(--gw-border)] px-2.5 py-2 text-xs text-[var(--gw-muted)] transition hover:border-white/20 hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)]"
                   onClick={() => {
                     setFromDate("");
                     setToDate("");
@@ -1035,7 +1033,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   resetPage();
                   clearSelectionOnFilter(setSelected);
                 }}
-                className="min-w-[160px] rounded-lg border border-white/10 bg-[#141419] px-3 py-2 text-sm text-zinc-300 outline-none focus:border-white/20"
+                className="min-w-[160px] rounded-lg border border-[var(--gw-border)] bg-[#141419] px-3 py-2 text-sm text-[var(--gw-ink)] outline-none focus:border-white/20"
                 aria-label="按状态筛选"
               >
                 {STATUS_OPTIONS.map((o) => (
@@ -1051,8 +1049,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-white/[0.06] pt-2.5">
-              <span className="mr-1 shrink-0 text-xs text-zinc-500">厂商</span>
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-[var(--gw-border)] pt-2.5">
+              <span className="mr-1 shrink-0 text-xs text-[var(--gw-muted)]">厂商</span>
               <button
                 type="button"
                 className={logFilterChipClass(!providerFilter)}
@@ -1084,8 +1082,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
-              <span className="shrink-0 text-xs text-zinc-500">模型</span>
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--gw-border)] pt-2.5">
+              <span className="shrink-0 text-xs text-[var(--gw-muted)]">模型</span>
               <select
                 value={modelFilter}
                 onChange={(e) => {
@@ -1094,7 +1092,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   clearSelectionOnFilter(setSelected);
                 }}
                 disabled={!modelOptions.length}
-                className="min-w-[min(100%,320px)] max-w-xl flex-1 rounded-lg border border-white/10 bg-[#141419] px-3 py-2 font-mono text-xs text-zinc-300 outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-w-[min(100%,320px)] max-w-xl flex-1 rounded-lg border border-[var(--gw-border)] bg-[#141419] px-3 py-2 font-mono text-xs text-[var(--gw-ink)] outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="按模型筛选"
               >
                 <option value="">全部模型</option>
@@ -1105,14 +1103,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 ))}
               </select>
               {providerFilter ? (
-                <span className="shrink-0 text-[11px] text-zinc-600">
+                <span className="shrink-0 text-[11px] text-[var(--gw-muted)]">
                   已按 {formatProviderKindLabel(providerFilter)} 收窄
                 </span>
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
-              <span className="shrink-0 text-xs text-zinc-500">渠道 Key</span>
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--gw-border)] pt-2.5">
+              <span className="shrink-0 text-xs text-[var(--gw-muted)]">渠道 Key</span>
               <select
                 value={credentialIdFilter}
                 onChange={(e) => {
@@ -1121,7 +1119,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   clearSelectionOnFilter(setSelected);
                 }}
                 disabled={!credentialKeyOptions.length}
-                className="min-w-[min(100%,280px)] max-w-md flex-1 rounded-lg border border-white/10 bg-[#141419] px-3 py-2 font-mono text-xs text-zinc-300 outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-w-[min(100%,280px)] max-w-md flex-1 rounded-lg border border-[var(--gw-border)] bg-[#141419] px-3 py-2 font-mono text-xs text-[var(--gw-ink)] outline-none focus:border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="按渠道 Key 筛选"
               >
                 <option value="">全部 Key</option>
@@ -1132,7 +1130,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 ))}
               </select>
               {!credentialKeyOptions.length ? (
-                <span className="shrink-0 text-[11px] text-zinc-600">
+                <span className="shrink-0 text-[11px] text-[var(--gw-muted)]">
                   当前批次无渠道 Key 记录
                 </span>
               ) : null}
@@ -1142,7 +1140,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       </div>
 
       <div
-        className="gw-logs-table-scroll gw-scrollbar-thin relative min-h-0 flex-1 overflow-auto rounded-xl border border-white/[0.06] bg-[#0f0f14]"
+        className="gw-logs-table-scroll gw-scrollbar-thin relative min-h-0 flex-1 overflow-auto rounded-xl border border-[var(--gw-border)] bg-[#0f0f14]"
         aria-busy={loading}
       >
         <table className="gw-logs-table min-w-[3356px]">
@@ -1153,7 +1151,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   type="checkbox"
                   checked={allSelected}
                   onChange={toggleAll}
-                  className="h-3.5 w-3.5 rounded border-white/20 bg-transparent accent-sky-500"
+                  className="gw-accent-control h-3.5 w-3.5 rounded border-white/20 bg-transparent"
                   aria-label="全选"
                 />
               </th>
@@ -1195,7 +1193,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 Duration
               </th>
               <th
-                className="w-[72px] text-zinc-500"
+                className="w-[72px] text-[var(--gw-muted)]"
                 title="厂商原生总耗时（只读）：KIE costTime 或火山 created_at→updated_at；不写回库，可与左侧 Duration 对比。"
               >
                 厂商 Dur
@@ -1213,7 +1211,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 Generate
               </th>
               <th
-                className="w-[72px] text-zinc-500"
+                className="w-[72px] text-[var(--gw-muted)]"
                 title="厂商原生生成耗时（只读）：火山 trace updated_at−created_at 或 KIE costTime；不写回库，可与左侧 Generate 对比。"
               >
                 厂商 Gen
@@ -1385,19 +1383,19 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                       type="checkbox"
                       checked={selected.has(l.id)}
                       onChange={() => toggleOne(l.id)}
-                      className="h-3.5 w-3.5 rounded border-white/20 bg-transparent accent-sky-500"
+                      className="gw-accent-control h-3.5 w-3.5 rounded border-white/20 bg-transparent"
                       aria-label={`选择 ${l.id}`}
                     />
                   </td>
-                  <td className="align-middle tabular-nums text-sm text-zinc-300">
+                  <td className="align-middle tabular-nums text-sm text-[var(--gw-ink)]">
                     {l.actorPhone?.trim() || "—"}
                   </td>
-                  <td className="align-middle text-sm text-zinc-300">
+                  <td className="align-middle text-sm text-[var(--gw-ink)]">
                     {l.actorName?.trim() || "—"}
                   </td>
                   <td className="align-middle">
                     <span
-                      className="text-sm text-zinc-300"
+                      className="text-sm text-[var(--gw-ink)]"
                       title={sourceTitle}
                     >
                       {sourceLabel}
@@ -1405,7 +1403,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-top">
                     <span
-                      className="inline-flex rounded-md bg-sky-600 px-2 py-0.5 font-mono text-[11px] font-medium text-white"
+                      className="gw-btn-xs font-mono"
                       title={
                         displayLogModelKey(l) !== l.model ? l.model : undefined
                       }
@@ -1415,7 +1413,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="font-mono text-[11px] text-zinc-400"
+                      className="font-mono text-[11px] text-[var(--gw-muted)]"
                       title={l.credentialKeyMasked ?? undefined}
                     >
                       {formatLogCredentialKeyMasked(l.credentialKeyMasked)}
@@ -1436,13 +1434,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                     />
                   </td>
                   <td
-                    className="align-middle text-center text-xs text-zinc-600"
+                    className="align-middle text-center text-xs text-[var(--gw-muted)]"
                     title="汇总见表头；单行日志与画布排队无直接对应"
                   >
                     —
                   </td>
                   <td
-                    className="align-middle font-mono text-sm text-zinc-300"
+                    className="align-middle font-mono text-sm text-[var(--gw-ink)]"
                     title={
                       durationMs != null && durationMs > 0
                         ? `${durationMs} ms`
@@ -1458,7 +1456,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                     {duration}
                   </td>
                   <td
-                    className="align-middle font-mono text-sm text-zinc-500"
+                    className="align-middle font-mono text-sm text-[var(--gw-muted)]"
                     title={
                       vendorNative.vendorNativeDurationMs != null
                         ? `厂商原生 ${vendorNative.vendorNativeDurationMs} ms（只读，不回写）`
@@ -1469,7 +1467,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="font-mono text-sm text-zinc-300"
+                      className="font-mono text-sm text-[var(--gw-ink)]"
                       title={queueCell.title}
                     >
                       {queueCell.value}
@@ -1477,7 +1475,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="font-mono text-sm text-zinc-300"
+                      className="font-mono text-sm text-[var(--gw-ink)]"
                       title={generateCell.title}
                     >
                       {generateCell.value}
@@ -1485,7 +1483,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="font-mono text-sm text-zinc-500"
+                      className="font-mono text-sm text-[var(--gw-muted)]"
                       title={
                         vendorNative.vendorNativeGenerateMs != null
                           ? `厂商原生 ${vendorNative.vendorNativeGenerateMs} ms（只读，不回写）`
@@ -1497,7 +1495,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="font-mono text-sm text-zinc-300"
+                      className="font-mono text-sm text-[var(--gw-ink)]"
                       title={postProcCell.title}
                     >
                       {postProcCell.value}
@@ -1506,7 +1504,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   <td className="align-middle">
                     <span
                       className={`font-mono text-sm ${
-                        pollCell.warn ? "text-amber-400" : "text-zinc-300"
+                        pollCell.warn ? "text-amber-400" : "text-[var(--gw-ink)]"
                       }`}
                       title={pollCell.title}
                     >
@@ -1515,7 +1513,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="block whitespace-nowrap font-mono text-[11px] leading-snug text-zinc-400"
+                      className="block whitespace-nowrap font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
                       title={l.submittedAt}
                     >
                       {formatLogTimestamp(l.submittedAt)}
@@ -1524,14 +1522,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   <td className="align-middle">
                     {l.completedAt ? (
                       <span
-                        className="block whitespace-nowrap font-mono text-[11px] leading-snug text-zinc-400"
+                        className="block whitespace-nowrap font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
                         title={l.completedAt}
                       >
                         {formatLogTimestamp(l.completedAt)}
                       </span>
                     ) : (
                       <span
-                        className="text-sm text-zinc-600"
+                        className="text-sm text-[var(--gw-muted)]"
                         title={isInProgress ? "任务进行中" : undefined}
                       >
                         —
@@ -1540,14 +1538,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="block break-all font-mono text-[11px] leading-snug text-zinc-400"
+                      className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
                       title={appTask.title}
                     >
                       {appTask.value}
                     </span>
                   </td>
                   <td
-                    className="align-middle font-mono text-sm text-zinc-300"
+                    className="align-middle font-mono text-sm text-[var(--gw-ink)]"
                     title={
                       isInProgress ? "任务进行中，完成后写入费用估算" : usage.title
                     }
@@ -1565,7 +1563,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                     {isInProgress ? "—" : platformCredits.value}
                   </td>
                   <td
-                    className="align-middle font-mono text-sm text-zinc-300"
+                    className="align-middle font-mono text-sm text-[var(--gw-ink)]"
                     title={
                       isInProgress ? "任务进行中，完成后写入 Token" : tokens.title
                     }
@@ -1574,7 +1572,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="block break-all font-mono text-[11px] leading-snug text-zinc-400"
+                      className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
                       title={logId.title}
                     >
                       {logId.value}
@@ -1582,7 +1580,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="block break-all font-mono text-[11px] leading-snug text-zinc-400"
+                      className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
                       title={requestId.title}
                     >
                       {requestId.value}
@@ -1590,7 +1588,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   </td>
                   <td className="align-middle">
                     <span
-                      className="block break-all font-mono text-[11px] leading-snug text-zinc-400"
+                      className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
                       title={vendorTaskId.title}
                     >
                       {vendorTaskId.value}
@@ -1602,7 +1600,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                       resultSummary={l.resultSummary}
                     />
                   </td>
-                  <td className="align-middle text-center text-zinc-600">
+                  <td className="align-middle text-center text-[var(--gw-muted)]">
                     —
                   </td>
                 </tr>
@@ -1612,7 +1610,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               <tr>
                 <td
                   colSpan={24}
-                  className="py-16 text-center text-sm text-zinc-500"
+                  className="py-16 text-center text-sm text-[var(--gw-muted)]"
                 >
                   {total > 0 ? "本页暂无数据" : "暂无日志"}
                 </td>
@@ -1624,9 +1622,9 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         </table>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-[#0f0f14] px-3 py-2.5">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--gw-border)] bg-[#0f0f14] px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-zinc-500">每页</span>
+          <span className="text-xs text-[var(--gw-muted)]">每页</span>
           <select
             value={pageSizePreset}
             onChange={(e) => {
@@ -1635,7 +1633,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               if (next === "custom") return;
               applyPageSize(Number(next));
             }}
-            className="rounded-lg border border-white/10 bg-[#141419] px-2.5 py-1.5 text-xs text-zinc-300 outline-none focus:border-white/20"
+            className="rounded-lg border border-[var(--gw-border)] bg-[#141419] px-2.5 py-1.5 text-xs text-[var(--gw-ink)] outline-none focus:border-white/20"
             aria-label="每页条数"
           >
             {PAGE_SIZE_PRESETS.map((n) => (
@@ -1646,7 +1644,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             <option value="custom">自定义</option>
           </select>
           {pageSizePreset === "custom" ? (
-            <label className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
+            <label className="inline-flex items-center gap-1.5 text-xs text-[var(--gw-muted)]">
               <input
                 type="number"
                 min={1}
@@ -1662,13 +1660,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   const n = clampPageSize(Number(customPageSizeInput));
                   applyPageSize(n);
                 }}
-                className="w-20 rounded-lg border border-white/10 bg-[#141419] px-2 py-1.5 font-mono text-xs text-zinc-300 outline-none focus:border-white/20"
+                className="w-20 rounded-lg border border-[var(--gw-border)] bg-[#141419] px-2 py-1.5 font-mono text-xs text-[var(--gw-ink)] outline-none focus:border-white/20"
                 aria-label="自定义每页条数"
               />
               条
             </label>
           ) : null}
-          <span className="text-[11px] text-zinc-600">
+          <span className="text-[11px] text-[var(--gw-muted)]">
             最多 {PAGE_SIZE_MAX} 条/页
           </span>
         </div>
@@ -1682,11 +1680,11 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 setPage((p) => Math.max(1, p - 1));
                 clearSelectionOnFilter(setSelected);
               }}
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-[var(--gw-border)] px-3 py-1.5 text-xs text-[var(--gw-muted)] transition hover:border-white/20 hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               上一页
             </button>
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-[var(--gw-muted)]">
               第 {page} / {totalPages} 页
             </span>
             <button
@@ -1696,13 +1694,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 setPage((p) => Math.min(totalPages, p + 1));
                 clearSelectionOnFilter(setSelected);
               }}
-              className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-white/20 hover:bg-white/5 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-[var(--gw-border)] px-3 py-1.5 text-xs text-[var(--gw-muted)] transition hover:border-white/20 hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               下一页
             </button>
           </div>
         ) : (
-          <span className="text-xs text-zinc-600">共 {total} 条</span>
+          <span className="text-xs text-[var(--gw-muted)]">共 {total} 条</span>
         )}
       </div>
     </div>

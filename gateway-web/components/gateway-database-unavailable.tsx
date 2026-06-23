@@ -11,17 +11,17 @@ export function GatewayDatabaseUnavailable({
           {message ??
             "Gateway 与 Canvas 均依赖 book-mall 的 PostgreSQL。当前连接超时或连接数已满，请稍后刷新。"}
         </p>
-        <ul className="mt-4 space-y-2 text-left text-xs text-zinc-400">
-          <li>1. 在终端重启：<code className="text-zinc-300">pnpm dev:all</code></li>
+        <ul className="mt-4 space-y-2 text-left text-xs text-[var(--gw-muted)]">
+          <li>1. 在终端重启：<code className="text-[var(--gw-ink)]">pnpm dev:all</code></li>
           <li>
             2. 若仍失败，先用{" "}
-            <code className="text-zinc-300">pnpm dev:all:nopoll</code> 降低 poll 占用的连接数
+            <code className="text-[var(--gw-ink)]">pnpm dev:all:nopoll</code> 降低 poll 占用的连接数
           </li>
           <li>3. 检查腾讯云 CDB 实例状态、安全组与本机 IP 白名单</li>
         </ul>
         <a
           href="/dashboard"
-          className="mt-6 inline-block rounded-md border border-white/15 px-4 py-2 text-sm text-zinc-200 hover:bg-white/5"
+          className="mt-6 inline-block rounded-md border border-[var(--gw-border)] px-4 py-2 text-sm text-[var(--gw-ink)] hover:bg-[var(--gw-hover)]"
         >
           重试
         </a>

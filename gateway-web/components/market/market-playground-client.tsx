@@ -101,7 +101,7 @@ function FieldInput({
 
   if (field.type === "boolean") {
     return (
-      <label className="flex items-center gap-2 text-sm text-zinc-300">
+      <label className="flex items-center gap-2 text-sm text-[var(--gw-ink)]">
         <input
           type="checkbox"
           checked={Boolean(value)}
@@ -200,7 +200,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
 function HistoryGrid({ items }: { items: MarketHistoryItem[] }) {
   if (!items.length) {
     return (
-      <p className="text-sm text-zinc-500">暂无成功运行的记录。Run 一次后这里会显示最近 8 条。</p>
+      <p className="text-sm text-[var(--gw-muted)]">暂无成功运行的记录。Run 一次后这里会显示最近 8 条。</p>
     );
   }
 
@@ -209,7 +209,7 @@ function HistoryGrid({ items }: { items: MarketHistoryItem[] }) {
       {items.map((item) => (
         <div
           key={item.logId}
-          className="overflow-hidden rounded-lg border border-white/10 bg-black/30"
+          className="overflow-hidden rounded-lg border border-[var(--gw-border)] bg-black/30"
         >
           <div className="relative aspect-square bg-black/50">
             {item.mediaKind === "video" && item.previewUrl ? (
@@ -228,12 +228,12 @@ function HistoryGrid({ items }: { items: MarketHistoryItem[] }) {
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full items-center justify-center p-2 text-center text-[10px] text-zinc-500">
+              <div className="flex h-full items-center justify-center p-2 text-center text-[10px] text-[var(--gw-muted)]">
                 {item.mediaKind === "text" ? "Chat" : "—"}
               </div>
             )}
           </div>
-          <div className="px-2 py-1.5 text-[10px] text-zinc-500">
+          <div className="px-2 py-1.5 text-[10px] text-[var(--gw-muted)]">
             {new Date(item.submittedAt).toLocaleString()}
           </div>
         </div>
@@ -410,19 +410,19 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
         <div>
           <Link
             href="/dashboard/market"
-            className="text-xs text-zinc-500 hover:text-orange-300"
+            className="text-xs text-[var(--gw-muted)] hover:text-[var(--gw-accent)]"
           >
             ← 模型市场
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold text-white">{model.displayName}</h1>
-          <p className="mt-1 text-sm text-zinc-500">{model.description}</p>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-400">
+          <h1 className="mt-2 text-2xl font-semibold text-[var(--gw-ink)]">{model.displayName}</h1>
+          <p className="mt-1 text-sm text-[var(--gw-muted)]">{model.description}</p>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--gw-muted)]">
             <span className="rounded bg-white/5 px-2 py-0.5">{model.providerLabel}</span>
             <span className="rounded bg-white/5 px-2 py-0.5 font-mono">
               {model.activeModelKey}
             </span>
             {model.creditsPerUnit != null ? (
-              <span className="rounded bg-orange-500/10 px-2 py-0.5 text-orange-300">
+              <span className="rounded bg-[var(--gw-accent-muted)] px-2 py-0.5 text-[var(--gw-accent)]">
                 {model.creditsPerUnit} 积分/次
               </span>
             ) : null}
@@ -430,7 +430,7 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-white/10 pb-2">
+      <div className="flex gap-2 border-b border-[var(--gw-border)] pb-2">
         {(
           [
             ["playground", "Playground"],
@@ -444,8 +444,8 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
             onClick={() => setTab(id)}
             className={`rounded-lg px-3 py-1.5 text-sm ${
               tab === id
-                ? "bg-white/10 text-white"
-                : "text-zinc-500 hover:text-white"
+                ? "bg-white/10 text-[var(--gw-ink)]"
+                : "text-[var(--gw-muted)] hover:text-[var(--gw-ink)]"
             }`}
           >
             {label}
@@ -455,14 +455,14 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
 
       {tab === "readme" ? (
         <section className="gw-card prose prose-invert max-w-none text-sm leading-relaxed">
-          <pre className="whitespace-pre-wrap font-sans text-zinc-300">{model.readme}</pre>
+          <pre className="whitespace-pre-wrap font-sans text-[var(--gw-ink)]">{model.readme}</pre>
         </section>
       ) : null}
 
       {tab === "examples" ? (
         <section className="space-y-3">
           {(schema.examples ?? []).length === 0 ? (
-            <p className="text-sm text-zinc-500">暂无预设示例。</p>
+            <p className="text-sm text-[var(--gw-muted)]">暂无预设示例。</p>
           ) : (
             schema.examples!.map((ex) => (
               <button
@@ -471,8 +471,8 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
                 onClick={() => applyExample(ex.input)}
                 className="gw-card block w-full text-left transition hover:border-orange-400/30"
               >
-                <div className="text-sm font-medium text-white">{ex.label}</div>
-                <pre className="mt-2 max-h-32 overflow-auto text-xs text-zinc-500">
+                <div className="text-sm font-medium text-[var(--gw-ink)]">{ex.label}</div>
+                <pre className="mt-2 max-h-32 overflow-auto text-xs text-[var(--gw-muted)]">
                   {JSON.stringify(ex.input, null, 2)}
                 </pre>
               </button>
@@ -487,7 +487,7 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
             <button
               type="button"
               className={`rounded-lg px-3 py-1 text-xs ${
-                mode === "form" ? "bg-white/10 text-white" : "text-zinc-500"
+                mode === "form" ? "bg-white/10 text-[var(--gw-ink)]" : "text-[var(--gw-muted)]"
               }`}
               onClick={() => setMode("form")}
             >
@@ -496,7 +496,7 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
             <button
               type="button"
               className={`rounded-lg px-3 py-1 text-xs ${
-                mode === "json" ? "bg-white/10 text-white" : "text-zinc-500"
+                mode === "json" ? "bg-white/10 text-[var(--gw-ink)]" : "text-[var(--gw-muted)]"
               }`}
               onClick={() => {
                 setJsonText(JSON.stringify(input, null, 2));
@@ -509,12 +509,12 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <section className="gw-card space-y-4">
-              <h2 className="text-sm font-medium text-white">Input</h2>
+              <h2 className="text-sm font-medium text-[var(--gw-ink)]">Input</h2>
               {mode === "form" ? (
                 schema.fields.map((field) => (
                   <label key={field.key} className="block">
                     {field.type !== "boolean" ? (
-                      <span className="mb-1 block text-xs text-zinc-500">
+                      <span className="mb-1 block text-xs text-[var(--gw-muted)]">
                         {field.label}
                         {field.required ? " *" : ""}
                       </span>
@@ -539,7 +539,7 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
 
               {error ? <p className="text-sm text-red-400">{error}</p> : null}
               {pollStatus ? (
-                <p className="text-xs text-zinc-500">Status: {pollStatus}</p>
+                <p className="text-xs text-[var(--gw-muted)]">Status: {pollStatus}</p>
               ) : null}
 
               <button
@@ -558,13 +558,13 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
             </section>
 
             <section className="gw-card space-y-4">
-              <h2 className="text-sm font-medium text-white">Output</h2>
+              <h2 className="text-sm font-medium text-[var(--gw-ink)]">Output</h2>
               {!output ? (
-                <p className="text-sm text-zinc-500">运行成功后在此预览结果。</p>
+                <p className="text-sm text-[var(--gw-muted)]">运行成功后在此预览结果。</p>
               ) : (
                 <div className="space-y-3">
                   {output.text ? (
-                    <pre className="max-h-60 overflow-auto rounded-lg bg-black/40 p-3 text-xs text-zinc-200">
+                    <pre className="max-h-60 overflow-auto rounded-lg bg-black/40 p-3 text-xs text-[var(--gw-ink)]">
                       {output.text}
                     </pre>
                   ) : null}
@@ -590,7 +590,7 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
           </div>
 
           <section className="space-y-3">
-            <h2 className="text-sm font-medium text-white">Your runs</h2>
+            <h2 className="text-sm font-medium text-[var(--gw-ink)]">Your runs</h2>
             <HistoryGrid items={history} />
           </section>
         </>

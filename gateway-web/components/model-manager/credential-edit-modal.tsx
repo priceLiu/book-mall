@@ -140,17 +140,17 @@ export function CredentialEditModal({
         aria-label={isEdit ? "编辑凭证" : "添加凭证"}
       >
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-lg font-semibold text-white">
+          <h3 className="text-lg font-semibold text-[var(--gw-ink)]">
             {isEdit ? "Edit" : "添加凭证"}
           </h3>
-          <button type="button" className="text-zinc-500 hover:text-white" onClick={onClose}>
+          <button type="button" className="text-[var(--gw-muted)] hover:text-[var(--gw-ink)]" onClick={onClose}>
             ×
           </button>
         </div>
 
         <div className="mt-4 space-y-4">
           <label className="block">
-            <span className="mb-1 block text-sm text-zinc-400">Display Name</span>
+            <span className="mb-1 block text-sm text-[var(--gw-muted)]">Display Name</span>
             <input
               className="gw-input"
               required
@@ -161,7 +161,7 @@ export function CredentialEditModal({
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-sm text-zinc-400">
+            <span className="mb-1 block text-sm text-[var(--gw-muted)]">
               渠道（可选）— 区分同厂商不同来源的 Key，如「官方自有」「某代理」
             </span>
             <input
@@ -173,7 +173,7 @@ export function CredentialEditModal({
             />
           </label>
 
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label className="flex items-center gap-2 text-sm text-[var(--gw-ink)]">
             <input
               type="checkbox"
               checked={active}
@@ -182,7 +182,7 @@ export function CredentialEditModal({
             Enable Status
           </label>
 
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label className="flex items-center gap-2 text-sm text-[var(--gw-ink)]">
             <input
               type="checkbox"
               checked={isDefault}
@@ -193,7 +193,7 @@ export function CredentialEditModal({
 
           {!isEdit ? (
             <div>
-              <span className="mb-2 block text-sm text-zinc-400">Provider</span>
+              <span className="mb-2 block text-sm text-[var(--gw-muted)]">Provider</span>
               <div className="flex flex-wrap gap-2">
                 {PROVIDERS.map((p) => (
                   <button
@@ -202,27 +202,27 @@ export function CredentialEditModal({
                     onClick={() => setProviderKind(p)}
                     className={`rounded-full border px-3 py-1 text-xs transition ${
                       providerKind === p
-                        ? "border-white bg-white/15 text-white"
-                        : "border-white/15 text-zinc-400 hover:border-white/30"
+                        ? "border-white bg-white/15 text-[var(--gw-ink)]"
+                        : "border-[var(--gw-border)] text-[var(--gw-muted)] hover:border-white/30"
                     }`}
                   >
                     {formatProviderKindLabel(p)}
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-zinc-500">
+              <p className="mt-2 text-xs text-[var(--gw-muted)]">
                 尚无厂商 Key？{" "}
                 <ProviderApplyLink providerKind={providerKind} />
               </p>
             </div>
           ) : (
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-[var(--gw-muted)]">
               Provider：{formatProviderKindLabel(credential!.providerKind)}
             </p>
           )}
 
           <label className="block">
-            <span className="mb-1 block text-sm text-zinc-400">
+            <span className="mb-1 block text-sm text-[var(--gw-muted)]">
               {isVolcengine ? "ARK API Key（Seedance 2.0 / 推理 · ark-…）" : "API Key"}
             </span>
             <input
@@ -238,11 +238,11 @@ export function CredentialEditModal({
 
           {isVolcengine ? (
             <>
-              <p className="text-xs leading-relaxed text-zinc-500">
+              <p className="text-xs leading-relaxed text-[var(--gw-muted)]">
                 仅生视频可只填 ARK API Key。私域人像入库 / 活体认证还须 IAM Access Key（与 ark Key 不同，在火山控制台「访问控制」创建）。
               </p>
               <label className="block">
-                <span className="mb-1 block text-sm text-zinc-400">
+                <span className="mb-1 block text-sm text-[var(--gw-muted)]">
                   Access Key ID（可选 · 私域人像 / 活体）
                 </span>
                 <input
@@ -254,7 +254,7 @@ export function CredentialEditModal({
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-sm text-zinc-400">
+                <span className="mb-1 block text-sm text-[var(--gw-muted)]">
                   Secret Access Key（可选 · 与 Access Key 成对填写）
                 </span>
                 <input
@@ -269,7 +269,7 @@ export function CredentialEditModal({
           ) : null}
 
           <label className="block">
-            <span className="mb-1 block text-sm text-zinc-400">API URL（可选）</span>
+            <span className="mb-1 block text-sm text-[var(--gw-muted)]">API URL（可选）</span>
             <input
               className="gw-input font-mono text-xs"
               value={baseUrl}

@@ -93,7 +93,7 @@ function formatAgeSec(sec: number): string {
 function BackgroundBadge({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <span className="ml-2 rounded-full border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-100">
+    <span className="ml-2 rounded-full border border-[var(--gw-accent)]/40 bg-[var(--gw-accent-muted)] px-2 py-0.5 text-[10px] font-medium text-[var(--gw-accent)]">
       后台
     </span>
   );
@@ -102,7 +102,7 @@ function BackgroundBadge({ show }: { show: boolean }) {
 function SlowBadge({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <span className="ml-2 rounded-full border border-orange-500/40 bg-orange-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-200">
+    <span className="ml-2 rounded-full border border-[var(--gw-accent)]/40 bg-[var(--gw-accent-muted)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--gw-accent)]">
       预警
     </span>
   );
@@ -112,7 +112,7 @@ function StatCard({
   label,
   value,
   sub,
-  accent = "text-zinc-100",
+  accent = "text-[var(--gw-ink)]",
 }: {
   label: string;
   value: number;
@@ -120,12 +120,12 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[var(--gw-surface)] p-4">
-      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+    <div className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)] p-4">
+      <div className="text-xs uppercase tracking-wide text-[var(--gw-muted)]">{label}</div>
       <div className={`mt-2 text-3xl font-semibold tabular-nums ${accent}`}>
         {value}
       </div>
-      {sub ? <div className="mt-1 text-xs text-zinc-500">{sub}</div> : null}
+      {sub ? <div className="mt-1 text-xs text-[var(--gw-muted)]">{sub}</div> : null}
     </div>
   );
 }
@@ -144,14 +144,14 @@ function GatewayQueueTable({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="px-4 py-6 text-sm text-zinc-500">当前无 Gateway 轮询任务</p>
+      <p className="px-4 py-6 text-sm text-[var(--gw-muted)]">当前无 Gateway 轮询任务</p>
     );
   }
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-white/10 text-xs uppercase text-zinc-500">
+          <tr className="border-b border-[var(--gw-border)] text-xs uppercase text-[var(--gw-muted)]">
             <th className="px-4 py-3">来源</th>
             <th className="px-4 py-3">模型</th>
             <th className="px-4 py-3">类型</th>
@@ -166,7 +166,7 @@ function GatewayQueueTable({
           {rows.map((row) => (
             <tr
               key={row.id}
-              className={`border-b border-white/5 hover:bg-white/[0.02] ${
+              className={`border-b border-[var(--gw-border)] hover:bg-[var(--gw-hover)] ${
                 row.backgroundWait
                   ? "bg-amber-500/[0.05]"
                   : row.slowWarn
@@ -174,43 +174,43 @@ function GatewayQueueTable({
                     : ""
               }`}
             >
-              <td className="px-4 py-3 text-zinc-300">
+              <td className="px-4 py-3 text-[var(--gw-ink)]">
                 {row.clientSource}
                 <BackgroundBadge show={row.backgroundWait} />
                 <SlowBadge show={row.slowWarn && !row.backgroundWait} />
               </td>
-              <td className="max-w-[160px] truncate px-4 py-3 font-mono text-xs text-zinc-300">
+              <td className="max-w-[160px] truncate px-4 py-3 font-mono text-xs text-[var(--gw-ink)]">
                 {row.canonicalModelKey ?? row.model ?? "—"}
               </td>
-              <td className="px-4 py-3 text-zinc-400">
+              <td className="px-4 py-3 text-[var(--gw-muted)]">
                 {row.providerKind ?? "—"} · {row.requestKind}
               </td>
               <td
                 className={`px-4 py-3 tabular-nums ${
                   row.backgroundWait
-                    ? "font-medium text-amber-200"
+                    ? "font-medium text-[var(--gw-accent)]"
                     : row.slowWarn
-                      ? "font-medium text-orange-300"
-                      : "text-zinc-300"
+                      ? "font-medium text-[var(--gw-accent)]"
+                      : "text-[var(--gw-ink)]"
                 }`}
               >
                 {formatAgeSec(row.ageSec)}
               </td>
-              <td className="px-4 py-3 tabular-nums text-zinc-400">
+              <td className="px-4 py-3 tabular-nums text-[var(--gw-muted)]">
                 {row.pollCount}
                 {row.lastPolledAt ? (
-                  <div className="text-[10px] text-zinc-600">
+                  <div className="text-[10px] text-[var(--gw-muted)]">
                     {new Date(row.lastPolledAt).toLocaleTimeString()}
                   </div>
                 ) : null}
               </td>
-              <td className="max-w-[140px] truncate px-4 py-3 font-mono text-xs text-zinc-500">
+              <td className="max-w-[140px] truncate px-4 py-3 font-mono text-xs text-[var(--gw-muted)]">
                 {row.externalTaskId ?? "—"}
               </td>
               <td className="px-4 py-3">
                 <Link
                   href={`/dashboard/logs?highlight=${row.gatewayLogId}`}
-                  className="font-mono text-xs text-sky-400 hover:underline"
+                  className="font-mono text-xs text-[var(--gw-accent)] hover:underline"
                 >
                   {row.gatewayLogId.slice(0, 10)}…
                 </Link>
@@ -222,7 +222,7 @@ function GatewayQueueTable({
                       type="button"
                       disabled={busyId === row.id}
                       onClick={() => void onRelease(row.id, "recover")}
-                      className="rounded border border-sky-500/40 px-2 py-0.5 text-xs text-sky-200 hover:bg-sky-500/10 disabled:opacity-50"
+                      className="gw-btn-xs disabled:opacity-50"
                     >
                       恢复
                     </button>
@@ -236,7 +236,7 @@ function GatewayQueueTable({
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs text-zinc-600">—</span>
+                  <span className="text-xs text-[var(--gw-muted)]">—</span>
                 )}
               </td>
             </tr>
@@ -263,14 +263,14 @@ function AppQueueTable({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="px-4 py-6 text-sm text-zinc-500">当前无 {title} 待 poll 任务</p>
+      <p className="px-4 py-6 text-sm text-[var(--gw-muted)]">当前无 {title} 待 poll 任务</p>
     );
   }
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-white/10 text-xs uppercase text-zinc-500">
+          <tr className="border-b border-[var(--gw-border)] text-xs uppercase text-[var(--gw-muted)]">
             <th className="px-4 py-3">状态</th>
             <th className="px-4 py-3">项目</th>
             <th className="px-4 py-3">类型</th>
@@ -285,7 +285,7 @@ function AppQueueTable({
           {rows.map((row) => (
             <tr
               key={row.id}
-              className={`border-b border-white/5 hover:bg-white/[0.02] ${
+              className={`border-b border-[var(--gw-border)] hover:bg-[var(--gw-hover)] ${
                 row.backgroundWait
                   ? "bg-amber-500/[0.05]"
                   : row.slowWarn
@@ -293,37 +293,37 @@ function AppQueueTable({
                     : ""
               }`}
             >
-              <td className="px-4 py-3 text-zinc-300">
+              <td className="px-4 py-3 text-[var(--gw-ink)]">
                 {row.status}
                 <BackgroundBadge show={row.backgroundWait} />
                 <SlowBadge show={row.slowWarn && !row.backgroundWait} />
               </td>
-              <td className="max-w-[180px] truncate px-4 py-3 text-zinc-300">
+              <td className="max-w-[180px] truncate px-4 py-3 text-[var(--gw-ink)]">
                 {row.projectName}
               </td>
-              <td className="px-4 py-3 text-zinc-400">
+              <td className="px-4 py-3 text-[var(--gw-muted)]">
                 {row.kind}
                 {row.nodeId ? ` · ${row.nodeId}` : ""}
               </td>
               <td
                 className={`px-4 py-3 tabular-nums ${
                   row.backgroundWait
-                    ? "font-medium text-amber-200"
+                    ? "font-medium text-[var(--gw-accent)]"
                     : row.slowWarn
-                      ? "font-medium text-orange-300"
-                      : "text-zinc-300"
+                      ? "font-medium text-[var(--gw-accent)]"
+                      : "text-[var(--gw-ink)]"
                 }`}
               >
                 {formatAgeSec(row.ageSec)}
               </td>
-              <td className="px-4 py-3 tabular-nums text-zinc-400">
+              <td className="px-4 py-3 tabular-nums text-[var(--gw-muted)]">
                 {row.pollCount}
               </td>
-              <td className="px-4 py-3 font-mono text-xs text-zinc-500">
+              <td className="px-4 py-3 font-mono text-xs text-[var(--gw-muted)]">
                 {row.gatewayLogId ? (
                   <Link
                     href={`/dashboard/logs?highlight=${row.gatewayLogId}`}
-                    className="text-sky-400 hover:underline"
+                    className="text-[var(--gw-accent)] hover:underline"
                   >
                     {row.gatewayLogId.slice(0, 10)}…
                   </Link>
@@ -331,7 +331,7 @@ function AppQueueTable({
                   "—"
                 )}
               </td>
-              <td className="max-w-[120px] truncate px-4 py-3 font-mono text-xs text-zinc-500">
+              <td className="max-w-[120px] truncate px-4 py-3 font-mono text-xs text-[var(--gw-muted)]">
                 {row.id}
               </td>
               <td className="px-4 py-3">
@@ -341,7 +341,7 @@ function AppQueueTable({
                       type="button"
                       disabled={busyId === row.id}
                       onClick={() => void onRelease(row.id, "recover")}
-                      className="rounded border border-sky-500/40 px-2 py-0.5 text-xs text-sky-200 hover:bg-sky-500/10 disabled:opacity-50"
+                      className="gw-btn-xs disabled:opacity-50"
                     >
                       恢复
                     </button>
@@ -355,7 +355,7 @@ function AppQueueTable({
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs text-zinc-600">—</span>
+                  <span className="text-xs text-[var(--gw-muted)]">—</span>
                 )}
               </td>
             </tr>
@@ -496,10 +496,10 @@ export function PollPoolView() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-white">轮询池</h1>
-          <p className="mt-1 max-w-2xl text-sm text-zinc-400">
+          <h1 className="text-xl font-semibold text-[var(--gw-ink)]">轮询池</h1>
+          <p className="mt-1 max-w-2xl text-sm text-[var(--gw-muted)]">
             Gateway worker 正在 poll 的 RUNNING 任务，以及 Canvas / Story 待 poll
-            队列。超过预警线的任务会<strong className="text-orange-300">自动升格 poll</strong>
+            队列。超过预警线的任务会<strong className="text-[var(--gw-accent)]">自动升格 poll</strong>
             并尝试写回画布；存在预警任务时每 10s 自动 poll + 恢复，仍卡住可手动「恢复」或「释放」。
           </p>
         </div>
@@ -508,7 +508,7 @@ export function PollPoolView() {
             type="button"
             onClick={() => void load()}
             disabled={refreshing}
-            className="rounded-md border border-white/15 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            className="rounded-md border border-[var(--gw-border)] px-4 py-2 text-sm text-[var(--gw-ink)] hover:bg-[var(--gw-hover)] disabled:opacity-50"
           >
             {refreshing ? "刷新中…" : "刷新快照"}
           </button>
@@ -516,7 +516,7 @@ export function PollPoolView() {
             type="button"
             onClick={() => void load({ poll: true })}
             disabled={refreshing}
-            className="rounded-md border border-sky-500/40 bg-sky-500/15 px-4 py-2 text-sm text-sky-100 hover:bg-sky-500/25 disabled:opacity-50"
+            className="gw-btn"
           >
             立即 poll
           </button>
@@ -530,7 +530,7 @@ export function PollPoolView() {
       ) : null}
 
       {actionMsg ? (
-        <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-200">
+        <div className="rounded-lg border border-[var(--gw-border)] bg-white/5 px-4 py-3 text-sm text-[var(--gw-ink)]">
           {actionMsg}
         </div>
       ) : null}
@@ -547,7 +547,7 @@ export function PollPoolView() {
             return (
               <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <label className="inline-flex items-center gap-2 text-sm text-zinc-300">
+            <label className="inline-flex items-center gap-2 text-sm text-[var(--gw-ink)]">
               <input
                 type="checkbox"
                 checked={backgroundOnly}
@@ -557,7 +557,7 @@ export function PollPoolView() {
               仅显示后台等待（≥{data.config.backgroundWaitSec}s）
             </label>
             {totalBackgroundCount > 0 ? (
-              <span className="text-xs text-amber-200/90">
+              <span className="text-xs text-[var(--gw-accent)]/90">
                 当前 {totalBackgroundCount} 条 · Canvas 侧应显示「持续后台生成中」
               </span>
             ) : null}
@@ -565,10 +565,10 @@ export function PollPoolView() {
           <section className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
             <div className="flex flex-wrap items-end gap-4">
               <div>
-                <div className="text-xs uppercase tracking-wide text-orange-200/80">
+                <div className="text-xs uppercase tracking-wide text-[var(--gw-accent)]/80">
                   预警阈值（秒）
                 </div>
-                <p className="mt-1 text-xs text-zinc-500">
+                <p className="mt-1 text-xs text-[var(--gw-muted)]">
                   写入 PlatformConfig · 全站 poll 升格与状态页「预警」Tab 共用
                   {data.config.slowWarnSource === "env" ? "（当前 fallback 环境变量）" : ""}
                 </p>
@@ -580,20 +580,20 @@ export function PollPoolView() {
                   max={7200}
                   value={slowWarnDraft}
                   onChange={(e) => setSlowWarnDraft(e.target.value)}
-                  className="w-28 rounded-md border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+                  className="w-28 rounded-md border border-[var(--gw-border)] bg-black/30 px-3 py-2 text-sm text-[var(--gw-ink)]"
                 />
-                <span className="text-sm text-zinc-400">s</span>
+                <span className="text-sm text-[var(--gw-muted)]">s</span>
               </label>
               <button
                 type="button"
                 onClick={() => void saveThreshold()}
                 disabled={savingThreshold}
-                className="rounded-md border border-orange-500/40 bg-orange-500/15 px-4 py-2 text-sm text-orange-100 hover:bg-orange-500/25 disabled:opacity-50"
+                className="gw-btn-sm disabled:opacity-50"
               >
                 {savingThreshold ? "保存中…" : "保存阈值"}
               </button>
-              <div className="text-sm text-zinc-400">
-                当前生效：<span className="tabular-nums text-orange-200">{data.config.slowWarnSec}s</span>
+              <div className="text-sm text-[var(--gw-muted)]">
+                当前生效：<span className="tabular-nums text-[var(--gw-accent)]">{data.config.slowWarnSec}s</span>
               </div>
             </div>
           </section>
@@ -609,7 +609,7 @@ export function PollPoolView() {
               label="Canvas 待 poll"
               value={data.canvas.totalSubmitted + data.canvas.totalPending}
               sub={`后台 ${data.canvas.backgroundCount} · 预警 ${data.canvas.slowCount}`}
-              accent="text-sky-300"
+              accent="text-[var(--gw-accent)]"
             />
             <StatCard
               label="Story 待 poll"
@@ -625,12 +625,12 @@ export function PollPoolView() {
             />
           </div>
 
-          <section className="rounded-lg border border-white/10 bg-[var(--gw-surface)]">
-            <div className="border-b border-white/10 px-4 py-3">
-              <h2 className="text-sm font-medium text-white">
+          <section className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)]">
+            <div className="border-b border-[var(--gw-border)] px-4 py-3">
+              <h2 className="text-sm font-medium text-[var(--gw-ink)]">
                 Gateway 轮询队列
               </h2>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-[var(--gw-muted)]">
                 与 runGatewayPollWorker 相同口径 · 慢任务优先 · 本页展示前{" "}
                 {filterRows(data.gateway.queue).length} 条
               </p>
@@ -642,9 +642,9 @@ export function PollPoolView() {
             />
           </section>
 
-          <section className="rounded-lg border border-white/10 bg-[var(--gw-surface)]">
-            <div className="border-b border-white/10 px-4 py-3">
-              <h2 className="text-sm font-medium text-white">Canvas poll 池</h2>
+          <section className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)]">
+            <div className="border-b border-[var(--gw-border)] px-4 py-3">
+              <h2 className="text-sm font-medium text-[var(--gw-ink)]">Canvas poll 池</h2>
             </div>
             <AppQueueTable
               rows={filterRows(data.canvas.queue)}
@@ -654,15 +654,15 @@ export function PollPoolView() {
             />
           </section>
 
-          <section className="rounded-lg border border-white/10 bg-[var(--gw-surface)]">
-            <div className="border-b border-white/10 px-4 py-3">
-              <h2 className="text-sm font-medium text-white">Story poll 池</h2>
+          <section className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)]">
+            <div className="border-b border-[var(--gw-border)] px-4 py-3">
+              <h2 className="text-sm font-medium text-[var(--gw-ink)]">Story poll 池</h2>
             </div>
             <AppQueueTable rows={filterRows(data.story.queue)} title="Story" />
           </section>
 
           {data.serverTime ? (
-            <p className="text-xs text-zinc-600">
+            <p className="text-xs text-[var(--gw-muted)]">
               快照时间 {new Date(data.serverTime).toLocaleString()} · 每 {POLL_MS / 1000}s 自动刷新
             </p>
           ) : null}
@@ -671,10 +671,10 @@ export function PollPoolView() {
           })()}
         </>
       ) : initialLoading ? (
-        <p className="text-sm text-zinc-400">正在加载轮询池…</p>
+        <p className="text-sm text-[var(--gw-muted)]">正在加载轮询池…</p>
       ) : null}
       {refreshing && data ? (
-        <p className="text-xs text-zinc-500">后台刷新中…</p>
+        <p className="text-xs text-[var(--gw-muted)]">后台刷新中…</p>
       ) : null}
     </div>
   );
