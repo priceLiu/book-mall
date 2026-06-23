@@ -13,6 +13,7 @@ import {
   VIDEO_BACKGROUND_WAIT_HINT,
 } from "@/lib/gateway/video-background-generation";
 import { VIDEO_BACKGROUND_UI_MS } from "@/lib/gateway/video-task-wait-policy";
+import { canvasTaskTerminalCutoffDate } from "@/lib/canvas/canvas-task-hot-window";
 import { prisma } from "@/lib/prisma";
 
 export type CanvasBackgroundVideoTaskRow = {
@@ -54,7 +55,6 @@ function nodeLabelFromCanvas(canvas: unknown, nodeId: string): string {
  * 超窗的成功任务媒体早已落节点、失败任务也早超出「可恢复」时效,无需再拉。
  * 火山后台视频最长 ~45min,6h 足以覆盖「刚结束/可恢复」的全部场景。
  */
-const BACKGROUND_VIDEO_TERMINAL_LOOKBACK_MS = 6 * 60 * 60 * 1000;
 const BACKGROUND_VIDEO_TASK_TAKE = 100;
 
 export async function listCanvasProjectBackgroundVideoTasks(input: {
@@ -68,7 +68,7 @@ export async function listCanvasProjectBackgroundVideoTasks(input: {
   });
   if (!project) return [];
 
-  const terminalCutoff = new Date(Date.now() - BACKGROUND_VIDEO_TERMINAL_LOOKBACK_MS);
+  const terminalCutoff = canvasTaskTerminalCutoffDate();
   const tasks = await prisma.canvasGenerationTask.findMany({
     where: {
       projectId: input.projectId,

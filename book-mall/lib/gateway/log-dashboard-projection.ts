@@ -16,6 +16,34 @@ import { getProjectedDashboardCards } from "@/lib/gateway/stats-counter";
 // Gen-HotCold-R2 Phase 6：仪表盘聚合是只读重活，路由到只读副本（未配置副本时即主库）。
 import { prismaRead as prisma } from "@/lib/prisma";
 
+function archiveWhere(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Prisma.GatewayRequestLogArchiveWhereInput {
+  return where as Prisma.GatewayRequestLogArchiveWhereInput;
+}
+
+async function mergedStatusGroups(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<{ status: GatewayRequestStatus; count: number }[]> {
+  const [mainGroups, archGroups] = await Promise.all([
+    prisma.gatewayRequestLog.groupBy({
+      by: ["status"],
+      where,
+      _count: { _all: true },
+    }),
+    prisma.gatewayRequestLogArchive.groupBy({
+      by: ["status"],
+      where: archiveWhere(where),
+      _count: { _all: true },
+    }),
+  ]);
+  const map = new Map<GatewayRequestStatus, number>();
+  for (const g of [...mainGroups, ...archGroups]) {
+    map.set(g.status, (map.get(g.status) ?? 0) + g._count._all);
+  }
+  return [...map.entries()].map(([status, count]) => ({ status, count }));
+}
+
 export const DASHBOARD_IN_PROGRESS_STATUSES: GatewayRequestStatus[] = [
   "PENDING",
   "RUNNING",
@@ -267,6 +295,176 @@ export async function computeDashboardSummaryCards(
     slowWarn,
     backgroundWait,
   };
+}
+
+/** history 模式：主表 + 归档表合并统计。slowWarn/backgroundWait 仅主表（在飞不进归档）。 */
+export async function computeDashboardSummaryCardsMerged(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<DashboardCards> {
+  const [statusGroups, slowWarnMs] = await Promise.all([
+    mergedStatusGroups(where),
+    resolveGenerationSlowWarnMs(),
+  ]);
+  const [slowWarn, backgroundWait] = await Promise.all([
+    prisma.gatewayRequestLog.count({
+      where: {
+        AND: [where, buildSlowGenerationWhere(slowWarnMs)],
+      },
+    }),
+    prisma.gatewayRequestLog.count({
+      where: {
+        AND: [where, buildVideoBackgroundWaitWhere()],
+      },
+    }),
+  ]);
+  return {
+    ...mergeStatusGroupCounts(statusGroups),
+    slowWarn,
+    backgroundWait,
+  };
+}
+
+async function fetchChartModelStatsMerged(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<DashboardStatsPayload["byModel"]> {
+  const chartWhere: Prisma.GatewayRequestLogWhereInput = {
+    AND: [where, { status: { in: CHART_STATUSES } }],
+  };
+  const [mainGroups, archGroups] = await Promise.all([
+    prisma.gatewayRequestLog.groupBy({
+      by: ["status", "canonicalModelKey", "model"],
+      where: chartWhere,
+      _count: { _all: true },
+    }),
+    prisma.gatewayRequestLogArchive.groupBy({
+      by: ["status", "canonicalModelKey", "model"],
+      where: archiveWhere(chartWhere),
+      _count: { _all: true },
+    }),
+  ]);
+  const inProgress = new Map<string, DashboardModelCount>();
+  const succeeded = new Map<string, DashboardModelCount>();
+  for (const g of [...mainGroups, ...archGroups]) {
+    const bucket = dashboardStatusBucket(g.status);
+    if (bucket !== "inProgress" && bucket !== "succeeded") continue;
+    const target = bucket === "inProgress" ? inProgress : succeeded;
+    const modelKey = resolveModelKeyFromParts(g.canonicalModelKey, g.model);
+    const count = g._count._all;
+    const existing = target.get(modelKey);
+    if (existing) {
+      existing.count += count;
+      continue;
+    }
+    target.set(modelKey, {
+      model: g.model?.trim() || modelKey,
+      canonicalModelKey: g.canonicalModelKey?.trim() || null,
+      count,
+    });
+  }
+  return {
+    inProgress: sortModelCounts(inProgress),
+    succeeded: sortModelCounts(succeeded),
+  };
+}
+
+async function fetchChartCategoryStatsMerged(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<DashboardStatsPayload["byCategory"]> {
+  const inProgress = buildEmptyCategoryCounts();
+  const succeeded = buildEmptyCategoryCounts();
+  const chartWhere: Prisma.GatewayRequestLogWhereInput = {
+    AND: [where, { status: { in: CHART_STATUSES } }],
+  };
+  const otherWhere = {
+    AND: [
+      chartWhere,
+      { OR: [{ billingCategory: null }, { billingCategory: "OTHER" }] },
+    ],
+  } satisfies Prisma.GatewayRequestLogWhereInput;
+
+  const [mainGroups, archGroups, mainOther, archOther] = await Promise.all([
+    prisma.gatewayRequestLog.groupBy({
+      by: ["status", "billingCategory"],
+      where: chartWhere,
+      _count: { _all: true },
+    }),
+    prisma.gatewayRequestLogArchive.groupBy({
+      by: ["status", "billingCategory"],
+      where: archiveWhere(chartWhere),
+      _count: { _all: true },
+    }),
+    prisma.gatewayRequestLog.findMany({
+      where: otherWhere,
+      select: CHART_LOG_SELECT,
+    }),
+    prisma.gatewayRequestLogArchive.findMany({
+      where: archiveWhere(otherWhere),
+      select: CHART_LOG_SELECT,
+    }),
+  ]);
+
+  for (const g of [...mainGroups, ...archGroups]) {
+    if (!g.billingCategory || g.billingCategory === "OTHER") continue;
+    const bucket = dashboardStatusBucket(g.status);
+    const target =
+      bucket === "inProgress" ? inProgress : bucket === "succeeded" ? succeeded : null;
+    if (!target) continue;
+    bumpCategoryCount(
+      target,
+      g.billingCategory as DashboardChartCategoryKey,
+      g._count._all,
+    );
+  }
+
+  for (const row of [...mainOther, ...archOther]) {
+    const bucket = dashboardStatusBucket(row.status);
+    if (bucket !== "inProgress" && bucket !== "succeeded") continue;
+    const cat = resolveDashboardChartCategory(row, row.billingCategory);
+    bumpCategoryCount(bucket === "inProgress" ? inProgress : succeeded, cat, 1);
+  }
+
+  return { inProgress, succeeded };
+}
+
+export async function fetchDashboardChartStatsMerged(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<Pick<DashboardStatsPayload, "byCategory" | "byModel">> {
+  const [byCategory, byModel] = await Promise.all([
+    fetchChartCategoryStatsMerged(where),
+    fetchChartModelStatsMerged(where),
+  ]);
+  return { byCategory, byModel };
+}
+
+export async function fetchDashboardFailCodeCountsMerged(
+  where: Prisma.GatewayRequestLogWhereInput,
+): Promise<{ failCodes: DashboardFailCodeCount[]; failedTotal: number }> {
+  const failedWhere: Prisma.GatewayRequestLogWhereInput = {
+    AND: [where, { status: "FAILED" }],
+  };
+  const [mainGroups, archGroups, mainTotal, archTotal] = await Promise.all([
+    prisma.gatewayRequestLog.groupBy({
+      by: ["failCode"],
+      where: failedWhere,
+      _count: { _all: true },
+    }),
+    prisma.gatewayRequestLogArchive.groupBy({
+      by: ["failCode"],
+      where: archiveWhere(failedWhere),
+      _count: { _all: true },
+    }),
+    prisma.gatewayRequestLog.count({ where: failedWhere }),
+    prisma.gatewayRequestLogArchive.count({ where: archiveWhere(failedWhere) }),
+  ]);
+  const map = new Map<string, number>();
+  for (const g of [...mainGroups, ...archGroups]) {
+    const code = g.failCode?.trim() || "UNKNOWN";
+    map.set(code, (map.get(code) ?? 0) + g._count._all);
+  }
+  const failCodes = [...map.entries()]
+    .map(([failCode, count]) => ({ failCode, count }))
+    .sort((a, b) => b.count - a.count);
+  return { failCodes, failedTotal: mainTotal + archTotal };
 }
 
 /**

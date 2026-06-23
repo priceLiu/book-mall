@@ -37,11 +37,14 @@ import {
   resolveGatewayLogPageSizePreset,
   type GatewayLogPageSizePreset,
 } from "@/lib/gateway-log-pagination-config";
+import {
+  gatewaySummaryPollIntervalMs,
+} from "@/lib/gateway-live-poll-policy";
 
-const SUMMARY_POLL_IDLE_MS = 60_000;
-const SUMMARY_POLL_ACTIVE_MS = 10_000;
 const IN_FLIGHT_POLL_MS = 10_000;
 const LIVE_CLOCK_MS = 1_000;
+
+type StatusQueryMode = "live" | "history";
 
 const SLOW_WARN_THRESHOLD_MS = 800_000;
 const SLOW_WARN_THRESHOLD_SEC = SLOW_WARN_THRESHOLD_MS / 1000;
@@ -212,8 +215,10 @@ function filtersEqual(a: FilterState, b: FilterState): boolean {
 function buildQueryString(
   filters: FilterState,
   extra: Record<string, string | number | undefined>,
+  queryMode: StatusQueryMode = "live",
 ): string {
   const qs = new URLSearchParams();
+  qs.set("mode", queryMode);
   if (filters.scope === "team") {
     if (filters.tenantId) {
       qs.set("scope", "team");
@@ -361,7 +366,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
         tenantId: initialMeta.teams[0]?.id ?? "",
         actorPhone: "",
         storyProjectId: "",
-        hours: "12",
+        hours: "1",
         fromDate: "",
         toDate: "",
       },
@@ -369,6 +374,9 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     );
 
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
+  const [queryMode, setQueryMode] = useState<StatusQueryMode>("live");
+  const queryModeRef = useRef<StatusQueryMode>("live");
+  queryModeRef.current = queryMode;
   const [filters, setFilters] = useState<FilterState>(() => defaultFilters());
   const [applied, setApplied] = useState<FilterState>(() => defaultFilters());
   const [phoneDraft, setPhoneDraft] = useState("");
@@ -397,7 +405,6 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
-  const summaryPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inFlightPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const loadSeqRef = useRef(0);
   const detailLoadSeqRef = useRef(0);
@@ -463,7 +470,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
 
   const loadSummary = useCallback(async () => {
     if (applied.scope === "team" && !applied.tenantId) return null;
-    const statsQs = buildQueryString(applied, { parts: "summary" });
+    const statsQs = buildQueryString(applied, { parts: "summary" }, queryMode);
     const statsRes = await fetchJson<StatsSummaryResponse>(
       `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
     );
@@ -480,11 +487,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       },
     }));
     return statsRes;
-  }, [applied]);
+  }, [applied, queryMode]);
 
   const loadCategories = useCallback(async () => {
     if (applied.scope === "team" && !applied.tenantId) return null;
-    const statsQs = buildQueryString(applied, { parts: "categories" });
+    const statsQs = buildQueryString(applied, { parts: "categories" }, queryMode);
     const statsRes = await fetchJson<StatsCategoriesResponse>(
       `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
     );
@@ -505,12 +512,12 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       },
     }));
     return statsRes;
-  }, [applied]);
+  }, [applied, queryMode]);
 
   /** 轮询用：卡片与柱状图同一请求，避免 summary / categories 不同步。 */
   const loadStatsAll = useCallback(async () => {
     if (applied.scope === "team" && !applied.tenantId) return null;
-    const statsQs = buildQueryString(applied, { parts: "all" });
+    const statsQs = buildQueryString(applied, { parts: "all" }, queryMode);
     const statsRes = await fetchJson<StatsAllResponse>(
       `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
     );
@@ -521,7 +528,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       byModel: statsRes.data.byModel,
     });
     return statsRes;
-  }, [applied]);
+  }, [applied, queryMode]);
 
   const loadDetailLogs = useCallback(
     async (opts?: {
@@ -543,13 +550,17 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
 
       const targetPage = append ? loadedPagesRef.current + 1 : 1;
       const seq = ++detailLoadSeqRef.current;
-      const logsQs = buildQueryString(applied, {
-        ...tabQuery,
-        page: targetPage,
-        limit: pageSize,
-        skipPoll: opts?.skipPoll === false ? undefined : "1",
-        ...(opts?.poll ? { poll: "1" } : {}),
-      });
+      const logsQs = buildQueryString(
+        applied,
+        {
+          ...tabQuery,
+          page: targetPage,
+          limit: pageSize,
+          skipPoll: opts?.skipPoll === false ? undefined : "1",
+          ...(opts?.poll && queryMode === "live" ? { poll: "1" } : {}),
+        },
+        queryMode,
+      );
       const res = await fetchJson<DetailLogsResponse>(
         `/api/book-mall/api/gateway/logs?${logsQs}`,
       );
@@ -585,12 +596,12 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       }
       return res;
     },
-    [activeTab, applied, failedFailCodeTab, pageSize, tabQuery],
+    [activeTab, applied, failedFailCodeTab, pageSize, tabQuery, queryMode],
   );
 
   const loadFailCodeCounts = useCallback(async () => {
     if (applied.scope === "team" && !applied.tenantId) return;
-    const statsQs = buildQueryString(applied, { parts: "failCodes" });
+    const statsQs = buildQueryString(applied, { parts: "failCodes" }, queryMode);
     const res = await fetchJson<StatsFailCodesResponse>(
       `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
     );
@@ -598,7 +609,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       setFailCodeCounts(res.data.failCodes ?? []);
       setFailedTotal(res.data.failedTotal ?? 0);
     }
-  }, [applied]);
+  }, [applied, queryMode]);
 
   /**
    * 「生成中」Tab（第 1 页）增量轮询：只拉新行 + 在途行最新状态，客户端合并并剔除已完成行，
@@ -622,12 +633,16 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     }
     if (!cursor) return loadDetailLogs({ poll: true, skipPoll: false, reset: true });
     const ids = current.map((l) => l.id);
-    const qs = buildQueryString(applied, {
-      statuses: "PENDING,RUNNING",
-      since: cursor,
-      ids: ids.join(","),
-      poll: "1",
-    });
+    const qs = buildQueryString(
+      applied,
+      {
+        statuses: "PENDING,RUNNING",
+        since: cursor,
+        ids: ids.join(","),
+        poll: "1",
+      },
+      "live",
+    );
     const res = await fetchJson<DetailLogsDelta>(
       `/api/book-mall/api/gateway/logs/delta?${qs}`,
     );
@@ -747,35 +762,48 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   ]);
 
   useEffect(() => {
-    if (viewMode !== "dashboard") return;
-    const ms =
-      activeTab === "failed" ||
-      activeTab === "succeeded"
-        ? SUMMARY_POLL_IDLE_MS
-        : inProgressCount > 0 || slowWarnCount > 0 || backgroundWaitCount > 0
-          ? SUMMARY_POLL_ACTIVE_MS
-          : SUMMARY_POLL_IDLE_MS;
-    const refresh = () => {
-      if (document.visibilityState === "visible") void loadStatsAll();
+    if (viewMode !== "dashboard" || queryMode !== "live") return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const counts = {
+      inProgress: inProgressCount,
+      slowWarn: slowWarnCount,
+      backgroundWait: backgroundWaitCount,
     };
-    // 不在此处立即 refresh()：首屏统计已由 loadAll() 拉取；该 effect 还会随
-    // inProgress/slowWarn 计数变化重跑，立即 refresh 会造成挂载与计数变化时的重复全量查询。
-    summaryPollRef.current = setInterval(refresh, ms);
+    const schedule = (delayMs: number) => {
+      if (cancelled || delayMs <= 0) return;
+      timer = window.setTimeout(() => void tick(), delayMs);
+    };
+    const tick = async () => {
+      if (document.visibilityState === "visible") await loadStatsAll();
+      if (cancelled) return;
+      schedule(gatewaySummaryPollIntervalMs(counts));
+    };
+    schedule(gatewaySummaryPollIntervalMs(counts));
     return () => {
-      if (summaryPollRef.current) clearInterval(summaryPollRef.current);
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
     };
-  }, [activeTab, inProgressCount, slowWarnCount, backgroundWaitCount, loadStatsAll, viewMode]);
+  }, [
+    viewMode,
+    queryMode,
+    inProgressCount,
+    slowWarnCount,
+    backgroundWaitCount,
+    loadStatsAll,
+  ]);
 
   useEffect(() => {
-    if (viewMode !== "dashboard") return;
+    if (viewMode !== "dashboard" || queryMode !== "live") return;
     const shouldPollInProgress =
       activeTab === "inProgress" && inProgressCount > 0;
     const shouldPollBackgroundWait =
       activeTab === "backgroundWait" && backgroundWaitCount > 0;
     const shouldPollSlowWarn =
       activeTab === "slowWarn" && slowWarnCount > 0;
-    if (!shouldPollInProgress && !shouldPollBackgroundWait && !shouldPollSlowWarn) return;
-    // 首次（含切 Tab）走全量，建立干净基线；之后每 10s「生成中」走增量、「预警」仍全量。
+    if (!shouldPollInProgress && !shouldPollBackgroundWait && !shouldPollSlowWarn) {
+      return;
+    }
     const refreshFull = () => {
       if (document.visibilityState !== "visible") return;
       void loadDetailLogs({ poll: true, skipPoll: false });
@@ -798,7 +826,13 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     loadDetailLogs,
     loadInProgressDelta,
     viewMode,
+    queryMode,
   ]);
+
+  useEffect(() => {
+    if (viewMode !== "dashboard") return;
+    void loadAll();
+  }, [queryMode, loadAll, viewMode]);
 
   const applyFilters = () => {
     commitFilters({ ...filters, actorPhone: phoneDraft });
@@ -832,7 +866,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     phoneDraft,
   ]);
 
-  const exportQueryString = buildQueryString(applied, {});
+  const exportQueryString = buildQueryString(applied, {}, queryMode);
   const activeTabLabel =
     TAB_CONFIG.find((t) => t.id === activeTab)?.label ?? "明细";
   const showActorColumns =
@@ -978,6 +1012,24 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             />
           </label>
         ) : null}
+
+        <label className="flex flex-col gap-1 text-xs text-zinc-400">
+          数据视图
+          <select
+            className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white"
+            value={queryMode}
+            onChange={(e) => {
+              const mode = e.target.value === "history" ? "history" : "live";
+              setQueryMode(mode);
+              if (mode === "live" && !filters.hours) {
+                commitFilters({ ...filters, hours: "1", actorPhone: phoneDraft });
+              }
+            }}
+          >
+            <option value="live">实时（热区近 1h）</option>
+            <option value="history">历史（归档）</option>
+          </select>
+        </label>
 
         <label className="flex flex-col gap-1 text-xs text-zinc-400">
           时间

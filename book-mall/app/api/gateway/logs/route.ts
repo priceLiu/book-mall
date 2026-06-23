@@ -23,7 +23,11 @@ import {
 import { canViewFinanceCost } from "@/lib/auth/permissions";
 import { resolveGatewaySessionBookUserId } from "@/lib/gateway/log-query-scope";
 import { fetchCanvasQueueWithoutLogStats } from "@/lib/canvas/canvas-queue-without-log";
-import { prisma } from "@/lib/prisma";
+import {
+  countGatewayLogsMerged,
+  findGatewayLogsMerged,
+} from "@/lib/maintenance/hotcold-archive-read";
+import { isGatewayLogHistoryMode } from "@/lib/gateway/gateway-hot-window";
 
 export const dynamic = "force-dynamic";
 
@@ -41,14 +45,18 @@ export async function GET(request: NextRequest) {
       status === "PENDING" ||
       status === "RUNNING";
 
-    scheduleOpportunisticGatewayPoll(user.id, {
-      force: pollOpts.force,
-      skip: pollOpts.skip || (!pollOpts.force && !isInFlightQuery),
-    });
-
     const page = parseLogPageParam(request.nextUrl.searchParams.get("page"));
     const pageSize = parseLogLimitParam(request.nextUrl.searchParams.get("limit"));
     const query = parseDashboardQueryFromSearchParams(request.nextUrl.searchParams);
+    const historyMode = isGatewayLogHistoryMode(query.mode);
+
+    scheduleOpportunisticGatewayPoll(user.id, {
+      force: pollOpts.force,
+      skip:
+        pollOpts.skip ||
+        historyMode ||
+        (!pollOpts.force && !isInFlightQuery),
+    });
 
     const scopeInput = {
       gatewaySessionUser: {
@@ -87,7 +95,10 @@ export async function GET(request: NextRequest) {
     // 自动刷新 tick 传 facets=0：facets（按 provider/model/credential 分面，3~4 条额外查询）
     // 只在首屏 / 改筛选时才需要重算，8s 轮询不必每次都算，显著降低读页面对 DB 的压力。
     const facetsParam = request.nextUrl.searchParams.get("facets")?.trim();
-    const includeFacets = facetsParam !== "0" && facetsParam !== "false";
+    const includeFacets =
+      !historyMode &&
+      facetsParam !== "0" &&
+      facetsParam !== "false";
 
     const bookUserId = await resolveGatewaySessionBookUserId(user);
     const isPlatformAdmin = bookUserId
@@ -101,25 +112,28 @@ export async function GET(request: NextRequest) {
     );
 
     const [total, facets, canvasQueueStats] = await Promise.all([
-      prisma.gatewayRequestLog.count({ where }),
+      countGatewayLogsMerged(where, query.mode),
       includeFacets
         ? resolveGatewayLogListFacets(facetWhere, providerKind || undefined)
         : Promise.resolve(null),
-      fetchCanvasQueueWithoutLogStats({
-        ownerUserIds: canvasOwnerUserIds,
-        staleMinutes: canvasQueueStaleMin,
-      }).catch(() => null),
+      historyMode
+        ? Promise.resolve(null)
+        : fetchCanvasQueueWithoutLogStats({
+            ownerUserIds: canvasOwnerUserIds,
+            staleMinutes: canvasQueueStaleMin,
+          }).catch(() => null),
     ]);
 
     const totalPages = computeLogTotalPages(total, pageSize);
     const safePage =
       total === 0 ? 1 : Math.min(Math.max(1, page), totalPages);
 
-    const logs = await prisma.gatewayRequestLog.findMany({
+    const logs = await findGatewayLogsMerged({
       where,
-      orderBy: { submittedAt: "desc" },
+      mode: query.mode,
       skip: (safePage - 1) * pageSize,
       take: pageSize,
+      orderBy: { submittedAt: "desc" },
     });
 
     const rows = await mapGatewayRequestLogsToResponseRows(logs);
@@ -130,6 +144,7 @@ export async function GET(request: NextRequest) {
       page: safePage,
       pageSize,
       totalPages,
+      mode: query.mode,
       // facets=null 表示本次未重算，前端沿用上一次的分面值。
       facets,
       canvasQueueStats,

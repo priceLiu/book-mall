@@ -1,28 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { needsArchive } from "@/lib/maintenance/hotcold-archive-read";
+import { needsArchiveByHotHours } from "@/lib/maintenance/hotcold-archive-read";
 
-const NOW = new Date("2026-06-23T00:00:00.000Z");
-const DAY = 86_400_000;
+const NOW = new Date("2026-06-23T12:00:00.000Z");
+const HOUR_MS = 3_600_000;
 
-describe("needsArchive 报表读路由判定", () => {
+describe("needsArchiveByHotHours", () => {
   it("无下界 → 需要并读归档", () => {
-    expect(needsArchive(null, 90, NOW)).toBe(true);
-    expect(needsArchive(undefined, 90, NOW)).toBe(true);
+    expect(needsArchiveByHotHours(null, 1, NOW)).toBe(true);
   });
 
-  it("范围完全在保留期内 → 只读主表", () => {
-    const from = new Date(NOW.getTime() - 30 * DAY);
-    expect(needsArchive(from, 90, NOW)).toBe(false);
+  it("范围完全在 1h 热区内 → 只读主表", () => {
+    const from = new Date(NOW.getTime() - 30 * 60_000);
+    expect(needsArchiveByHotHours(from, 1, NOW)).toBe(false);
   });
 
-  it("范围跨越保留边界 → 并读归档", () => {
-    const from = new Date(NOW.getTime() - 120 * DAY);
-    expect(needsArchive(from, 90, NOW)).toBe(true);
-  });
-
-  it("恰好等于保留边界 → 不需归档（边界含在主表）", () => {
-    const from = new Date(NOW.getTime() - 90 * DAY);
-    expect(needsArchive(from, 90, NOW)).toBe(false);
+  it("范围跨越 1h 边界 → 并读归档", () => {
+    const from = new Date(NOW.getTime() - 2 * HOUR_MS);
+    expect(needsArchiveByHotHours(from, 1, NOW)).toBe(true);
   });
 });

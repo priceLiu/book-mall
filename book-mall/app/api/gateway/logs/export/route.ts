@@ -21,7 +21,8 @@ import { billingCategoryLabel, resolveBillingCategory } from "@/lib/billing/bill
 import { resolveGatewayFailCodeDisplay } from "@/lib/gateway/log-fail-code";
 import { scheduleOpportunisticGatewayPoll } from "@/lib/gateway/log-read-poll-guard";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
-import { prisma } from "@/lib/prisma";
+import { findGatewayLogsMerged } from "@/lib/maintenance/hotcold-archive-read";
+import { isGatewayLogHistoryMode } from "@/lib/gateway/gateway-hot-window";
 
 export const dynamic = "force-dynamic";
 
@@ -71,10 +72,11 @@ export async function GET(request: NextRequest) {
       ),
     );
 
-    const logs = await prisma.gatewayRequestLog.findMany({
+    const logs = await findGatewayLogsMerged({
       where,
-      orderBy: { submittedAt: "desc" },
+      mode: query.mode,
       take: limit,
+      orderBy: { submittedAt: "desc" },
     });
 
     const actorIds = logs

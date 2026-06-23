@@ -8,7 +8,7 @@ import {
 } from "@/lib/canvas/api-helpers";
 import { assertAccessibleCanvasProject } from "@/lib/canvas/canvas-project-access";
 import {
-  listProjectTasks,
+  listProjectGenerationRecords,
   listUserGenerationRecords,
 } from "@/lib/canvas/canvas-task-service";
 import {
@@ -40,7 +40,10 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     await assertAccessibleCanvasProject(guard.user.id, projectId);
     const since = startOfTodayBeijing();
     const [projectTasks, todayTasks] = await Promise.all([
-      listProjectTasks({ userId: guard.user.id, projectId }),
+      listProjectGenerationRecords({
+        userId: guard.user.id,
+        projectId,
+      }),
       listUserGenerationRecords({
         userId: guard.user.id,
         since,

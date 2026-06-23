@@ -3,17 +3,22 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   fetchDashboardCategoryStats,
   fetchDashboardChartStats,
+  fetchDashboardChartStatsMerged,
   fetchDashboardFailCodeCounts,
+  fetchDashboardFailCodeCountsMerged,
   fetchDashboardModelStats,
   fetchDashboardStatsSummary,
+  computeDashboardSummaryCardsMerged,
   parseDashboardStatsParts,
 } from "@/lib/gateway/log-dashboard-projection";
 import {
   buildDashboardLogWhere,
   dashboardLiveScopeKey,
   DashboardScopeError,
+  isLiveDashboardQuery,
   parseDashboardQueryFromSearchParams,
 } from "@/lib/gateway/log-dashboard-query";
+import { isGatewayLogHistoryMode } from "@/lib/gateway/gateway-hot-window";
 import { requireGatewaySessionUser } from "@/lib/gateway/session";
 
 export const dynamic = "force-dynamic";
@@ -45,39 +50,65 @@ export async function GET(request: NextRequest) {
     const needFailCodes = parts.has("failCodes");
     const needCharts = needCategories || needModels;
 
-    // Gen-HotCold-R2 Phase 2：实时无过滤的卡片走投影缓存（自愈回退全量）。
-    const summaryScopeKey = dashboardLiveScopeKey(user.id, query) ?? undefined;
+    const historyMode = isGatewayLogHistoryMode(query.mode);
+    // Gen-HotCold-R3：live 无过滤走投影；history 并读归档表。
+    const summaryScopeKey =
+      !historyMode && isLiveDashboardQuery(query)
+        ? dashboardLiveScopeKey(user.id, query) ?? undefined
+        : undefined;
 
     if (needSummary && needCharts) {
-      const [summary, charts] = await Promise.all([
-        fetchDashboardStatsSummary(where, { scopeKey: summaryScopeKey }),
-        fetchDashboardChartStats(where),
-      ]);
-      payload.cards = summary.cards;
-      if (needCategories) payload.byCategory = charts.byCategory;
-      if (needModels) payload.byModel = charts.byModel;
+      if (historyMode) {
+        const [cards, charts] = await Promise.all([
+          computeDashboardSummaryCardsMerged(where),
+          fetchDashboardChartStatsMerged(where),
+        ]);
+        payload.cards = cards;
+        if (needCategories) payload.byCategory = charts.byCategory;
+        if (needModels) payload.byModel = charts.byModel;
+      } else {
+        const [summary, charts] = await Promise.all([
+          fetchDashboardStatsSummary(where, { scopeKey: summaryScopeKey }),
+          fetchDashboardChartStats(where),
+        ]);
+        payload.cards = summary.cards;
+        if (needCategories) payload.byCategory = charts.byCategory;
+        if (needModels) payload.byModel = charts.byModel;
+      }
     } else {
       if (needSummary) {
-        const summary = await fetchDashboardStatsSummary(where, {
-          scopeKey: summaryScopeKey,
-        });
-        payload.cards = summary.cards;
+        if (historyMode) {
+          payload.cards = await computeDashboardSummaryCardsMerged(where);
+        } else {
+          const summary = await fetchDashboardStatsSummary(where, {
+            scopeKey: summaryScopeKey,
+          });
+          payload.cards = summary.cards;
+        }
       }
       if (needCategories && needModels) {
-        const charts = await fetchDashboardChartStats(where);
+        const charts = historyMode
+          ? await fetchDashboardChartStatsMerged(where)
+          : await fetchDashboardChartStats(where);
         payload.byCategory = charts.byCategory;
         payload.byModel = charts.byModel;
       } else if (needCategories) {
-        const categories = await fetchDashboardCategoryStats(where);
-        payload.byCategory = categories.byCategory;
+        const categories = historyMode
+          ? (await fetchDashboardChartStatsMerged(where)).byCategory
+          : (await fetchDashboardCategoryStats(where)).byCategory;
+        payload.byCategory = categories;
       } else if (needModels) {
-        const models = await fetchDashboardModelStats(where);
-        payload.byModel = models.byModel;
+        const models = historyMode
+          ? (await fetchDashboardChartStatsMerged(where)).byModel
+          : (await fetchDashboardModelStats(where)).byModel;
+        payload.byModel = models;
       }
     }
 
     if (needFailCodes) {
-      const failStats = await fetchDashboardFailCodeCounts(where);
+      const failStats = historyMode
+        ? await fetchDashboardFailCodeCountsMerged(where)
+        : await fetchDashboardFailCodeCounts(where);
       payload.failCodes = failStats.failCodes;
       payload.failedTotal = failStats.failedTotal;
     }

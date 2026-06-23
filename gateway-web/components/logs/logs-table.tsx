@@ -33,6 +33,10 @@ import {
 } from "@/lib/gateway-log-display";
 import { resolveLiveLogPhaseTiming } from "@/lib/volcengine-log-timing-live";
 import { useLiveWallClockMs } from "@/lib/use-live-wall-clock";
+import {
+  gatewayLivePollIntervalMs,
+  type GatewayDynamicActivityCounts,
+} from "@/lib/gateway-live-poll-policy";
 
 export type GatewayLogRow = {
   id: string;
@@ -171,7 +175,7 @@ function clampPageSize(value: number): number {
   return Math.min(PAGE_SIZE_MAX, Math.floor(value));
 }
 
-const AUTO_REFRESH_MS = 8_000;
+type LogsViewMode = "live" | "history";
 /** 进行中 Duration / 各阶段墙钟刷新间隔 */
 const LIVE_CLOCK_MS = 1_000;
 
@@ -238,6 +242,7 @@ async function fetchGatewayLogs(params: {
   providerFilter: string;
   modelFilter: string;
   credentialIdFilter: string;
+  mode: LogsViewMode;
   skipPoll?: boolean;
   poll?: boolean;
   /** 自动刷新 tick 传 false：不重算分面，沿用上一次 facets，降低 DB 压力 */
@@ -246,6 +251,7 @@ async function fetchGatewayLogs(params: {
   const qs = new URLSearchParams({
     page: String(params.page),
     limit: String(params.pageSize),
+    mode: params.mode,
   });
   if (params.fromDate) qs.set("from", params.fromDate);
   if (params.toDate) qs.set("to", params.toDate);
@@ -254,7 +260,8 @@ async function fetchGatewayLogs(params: {
   if (params.providerFilter) qs.set("providerKind", params.providerFilter);
   if (params.modelFilter) qs.set("model", params.modelFilter);
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
-  if (params.skipPoll !== false) qs.set("skipPoll", "1");
+  if (params.mode === "history") qs.set("skipPoll", "1");
+  else if (params.skipPoll !== false) qs.set("skipPoll", "1");
   if (params.poll) qs.set("poll", "1");
   if (params.includeFacets === false) qs.set("facets", "0");
   try {
@@ -316,7 +323,7 @@ async function fetchGatewayLogsDelta(params: {
   credentialIdFilter: string;
   poll?: boolean;
 }): Promise<GatewayLogsDelta> {
-  const qs = new URLSearchParams();
+  const qs = new URLSearchParams({ mode: "live" });
   qs.set("since", params.since);
   if (params.ids.length) qs.set("ids", params.ids.join(","));
   if (params.fromDate) qs.set("from", params.fromDate);
@@ -419,6 +426,9 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [canvasQueueStats, setCanvasQueueStats] = useState(
     initialData.canvasQueueStats ?? null,
   );
+  const [viewMode, setViewMode] = useState<LogsViewMode>("live");
+  const viewModeRef = useRef<LogsViewMode>("live");
+  viewModeRef.current = viewMode;
   /** 每秒 tick，驱动进行中 Duration / Queue / Generate / Poll 墙钟重算 */
   const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
 
@@ -441,6 +451,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       providerFilter,
       modelFilter,
       credentialIdFilter,
+      mode: viewMode,
     }),
     [
       page,
@@ -452,6 +463,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       providerFilter,
       modelFilter,
       credentialIdFilter,
+      viewMode,
     ],
   );
 
@@ -594,33 +606,40 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅挂载时恢复每页条数
   }, []);
 
-  /** 开启自动刷新时定期拉列表；有进行中任务时附带 poll=1 触发服务端 opportunistic 轮询 */
+  /** 开启自动刷新时定期拉列表；仅 live 且有动数据时 poll 厂商 */
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || viewMode !== "live") return;
 
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const schedule = (delayMs: number) => {
+      if (cancelled || delayMs <= 0) return;
+      timer = window.setTimeout(() => void run(), delayMs);
+    };
+
     const run = async () => {
-      if (cancelled) return;
+      if (cancelled || viewModeRef.current !== "live") return;
       const poll = hasInFlightLogsRef.current;
-      // 第 1 页（按 submittedAt desc）走增量「只加新数据」；其他页回退全量。
-      // 全量也不重算分面（facets），沿用上一次值，减少每 8s 的额外查询。
       if (pageRef.current === 1) {
         await loadLogsDelta({ poll });
       } else {
         await loadLogs({ poll, includeFacets: false });
       }
+      if (cancelled) return;
+      const intervalMs = gatewayLivePollIntervalMs(
+        { inProgress: 0, slowWarn: 0, backgroundWait: 0 },
+        hasInFlightLogsRef.current,
+      );
+      schedule(intervalMs);
     };
 
     void run();
-    const timer = window.setInterval(() => {
-      void run();
-    }, AUTO_REFRESH_MS);
-
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      if (timer) window.clearTimeout(timer);
     };
-  }, [autoRefresh, loadLogs, loadLogsDelta]);
+  }, [autoRefresh, viewMode, loadLogs, loadLogsDelta]);
 
   /** 筛选 / 分页 / 每页条数变更时拉取 */
   useEffect(() => {
@@ -785,6 +804,30 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       <div className="shrink-0 space-y-2.5 rounded-xl border border-white/[0.06] bg-[#0f0f14] px-3 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="mr-1 shrink-0 text-xs text-zinc-500">视图</span>
+            <button
+              type="button"
+              className={logFilterChipClass(viewMode === "live")}
+              onClick={() => {
+                setViewMode("live");
+                resetPage();
+                clearSelectionOnFilter(setSelected);
+              }}
+            >
+              实时（近 1h）
+            </button>
+            <button
+              type="button"
+              className={logFilterChipClass(viewMode === "history")}
+              onClick={() => {
+                setViewMode("history");
+                resetPage();
+                clearSelectionOnFilter(setSelected);
+              }}
+            >
+              历史
+            </button>
+            <span className="mx-1 text-zinc-700">|</span>
             <span className="mr-1 shrink-0 text-xs text-zinc-500">应用</span>
             {LOG_APP_FILTER_OPTIONS.map((opt) => {
               const active = sourceFilter === opt.value;
@@ -808,13 +851,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 ? "加载中…"
                 : `共 ${total} 条 · 第 ${page}/${totalPages} 页 · 本页 ${logs.length} 条`}
               {(fromDate || toDate) && !loading ? " · 按日期" : ""}
-              {autoRefresh
-                ? hasInFlightLogs
-                  ? " · 自动刷新 8s · 轮询厂商"
-                  : " · 自动刷新 8s"
-                : hasInFlightLogs
-                  ? " · 有进行中任务"
-                  : ""}
+              {viewMode === "live"
+                ? autoRefresh && hasInFlightLogs
+                  ? " · 自动刷新 · 轮询厂商"
+                  : autoRefresh
+                    ? " · 自动刷新（无在飞已暂停）"
+                    : ""
+                : " · 历史（不自动刷新）"}
               {lastRefreshedAt && !loading
                 ? ` · 更新 ${lastRefreshedAt.toLocaleTimeString()}`
                 : ""}

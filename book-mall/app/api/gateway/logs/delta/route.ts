@@ -16,6 +16,7 @@ import {
   scheduleOpportunisticGatewayPoll,
   parseGatewayLogPollParams,
 } from "@/lib/gateway/log-read-poll-guard";
+import { isGatewayLogHistoryMode } from "@/lib/gateway/gateway-hot-window";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,18 @@ export async function GET(request: NextRequest) {
     const refreshIds = parseRefreshIds(params.get("ids"));
     const hasInFlight = refreshIds.length > 0;
 
+    const query = parseDashboardQueryFromSearchParams(params);
+    const historyMode = isGatewayLogHistoryMode(query.mode);
+
+    if (historyMode) {
+      return NextResponse.json({
+        created: [],
+        updated: [],
+        serverNowMs: Date.now(),
+        sinceApplied: null,
+      });
+    }
+
     scheduleOpportunisticGatewayPoll(user.id, {
       force: pollOpts.force,
       skip: pollOpts.skip || (!pollOpts.force && !hasInFlight),
@@ -65,7 +78,6 @@ export async function GET(request: NextRequest) {
     const sinceMs = sinceRaw ? Date.parse(sinceRaw) : NaN;
     const sinceDate = Number.isFinite(sinceMs) ? new Date(sinceMs) : null;
 
-    const query = parseDashboardQueryFromSearchParams(params);
     const sessionUser = {
       id: user.id,
       bookUserId: user.bookUserId,
