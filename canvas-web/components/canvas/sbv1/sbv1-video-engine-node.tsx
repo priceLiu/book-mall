@@ -8,6 +8,7 @@ import { Maximize2, Play, RefreshCw, Video } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
+  pickPreferredCanvasTask,
   runtimePatchFromCanvasTask,
   shouldApplyCanvasTaskRuntimePatch,
   isServerInflightTaskStatus,
@@ -162,7 +163,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     const terminal = history.find(
       (t) =>
         t.id === boundId &&
-        (t.status === "SUCCEEDED" || t.status === "FAILED"),
+        (t.status === "SUCCEEDED" ||
+          t.status === "FAILED" ||
+          t.status === "CANCELLED"),
     );
     if (!terminal) return;
 
@@ -171,6 +174,24 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
     if (!rtPatch) return;
     if (!shouldApplyCanvasTaskRuntimePatch(d.runtime, terminal, rtPatch)) return;
+    updateNodeData(id, nodePatch);
+  }, [history, d.runtime, id, updateNodeData, inflightTask]);
+
+  /** 本地 pending/running 无 taskId（乐观 UI 落盘）· 用最新任务终态对齐 */
+  useEffect(() => {
+    if (inflightTask) return;
+    const localSt = d.runtime?.status;
+    if (localSt !== "pending" && localSt !== "running") return;
+    if (d.runtime?.taskId?.trim()) return;
+
+    const pick = pickPreferredCanvasTask(history);
+    if (!pick || isServerInflightTaskStatus(pick.status)) return;
+
+    const nodePatch = sbv1VideoPatchFromTask(pick);
+    if (!nodePatch) return;
+    const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
+    if (!rtPatch) return;
+    if (!shouldApplyCanvasTaskRuntimePatch(d.runtime, pick, rtPatch)) return;
     updateNodeData(id, nodePatch);
   }, [history, d.runtime, id, updateNodeData, inflightTask]);
 

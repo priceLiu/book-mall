@@ -32,14 +32,14 @@ export function sbv1ImagePatchFromTask(
     };
   }
 
-  if (task.status === "FAILED") {
+  if (task.status === "FAILED" || task.status === "CANCELLED") {
     return {
       uploading: false,
       uploadError: undefined,
       runtime: {
         status: "error",
         taskId: task.id,
-        failCode: task.failCode ?? "FAILED",
+        failCode: task.failCode ?? (task.status === "CANCELLED" ? "CANCELLED" : "FAILED"),
         failMessage: formatCanvasTaskError(
           task.failCode,
           task.failMessage,
@@ -98,14 +98,14 @@ export function sbv1VideoPatchFromTask(
     };
   }
 
-  if (task.status === "FAILED") {
+  if (task.status === "FAILED" || task.status === "CANCELLED") {
     return {
       uploading: false,
       uploadError: undefined,
       runtime: {
         status: "error",
         taskId: task.id,
-        failCode: task.failCode ?? "FAILED",
+        failCode: task.failCode ?? (task.status === "CANCELLED" ? "CANCELLED" : "FAILED"),
         failMessage: formatCanvasTaskError(
           task.failCode,
           task.failMessage,
