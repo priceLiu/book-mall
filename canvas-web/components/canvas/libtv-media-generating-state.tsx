@@ -37,7 +37,8 @@ export function LibtvMediaGeneratingState({
   className,
   children,
 }: {
-  label: string;
+  /** 留空则仅显示扫光 + 旋转图标，不渲染文字（避免「排队中…」等影响心情的提示） */
+  label?: string;
   /** sbv1 / 分镜1.0 → cyan；Pro2 → violet */
   variant?: "cyan" | "violet";
   /** 超过 10min 后台轮询 */
@@ -61,7 +62,7 @@ export function LibtvMediaGeneratingState({
       {children}
       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/45 px-6 py-10 text-center">
         <RefreshCw className={spinClass} />
-        <span className={labelClass}>{label}</span>
+        {label?.trim() ? <span className={labelClass}>{label}</span> : null}
       </div>
     </div>
   );

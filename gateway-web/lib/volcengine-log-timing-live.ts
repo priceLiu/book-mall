@@ -1,5 +1,8 @@
 /** 与 book-mall log-volcengine-timing 对齐 · 日志页 live 墙钟拆分 */
 
+/** 厂商停更 / 轮询失联超过此间隔 → 视为「失联」，冻结生成墙钟，避免数字无界上涨（与 book-mall VOLCENGINE_GATEWAY_POLL_GAP_MS 对齐） */
+export const VOLCENGINE_LIVE_POLL_GAP_MS = 2 * 60 * 1000;
+
 type VolcengineTimingTrace = {
   vendorCreatedAtMs?: number;
   vendorUpdatedAtMs?: number;
@@ -17,6 +20,10 @@ function isVendorTerminalStatus(status: string): boolean {
     status === "failed" ||
     status === "cancelled"
   );
+}
+
+export function hasVolcengineTimingTrace(resultSummary: unknown): boolean {
+  return readVolcengineTimingTrace(resultSummary) != null;
 }
 
 function readVolcengineTimingTrace(
@@ -72,6 +79,8 @@ export function liveVolcengineVideoTiming(input: {
   vendorPostProcessMs: number | null;
   pollDelayMs: number;
   totalMs: number;
+  /** 厂商停更 / 轮询失联超阈值：生成/后处理墙钟已冻结，待主动核对（UI 标黄） */
+  stalled: boolean;
 } | null {
   const trace = readVolcengineTimingTrace(input.resultSummary);
   if (!trace) return null;
@@ -83,25 +92,34 @@ export function liveVolcengineVideoTiming(input: {
 
   const st = normalizeStatus(trace.lastStatus);
   const vendorUpdated = trace.vendorUpdatedAtMs;
-  const hasStartedRunning =
-    st === "running" || st === "processing" || trace.firstRunningAtMs != null;
 
+  // 失联检测：厂商 updated_at 停更 或 我方 lastPolledAt 距今超过阈值 → 视为轮询失联。
+  // 此时不应继续把「生成」按墙钟无界递增（多半厂商早已返回，只是没 poll 到），
+  // 冻结在「最后一次与厂商/轮询有接触的时刻」，并交由上层标黄、触发主动核对。
+  const lastPolled = trace.lastPolledAtMs;
+  const staleAnchor =
+    trace.vendorUpdatedStaleSinceMs ?? vendorUpdated ?? lastPolled ?? genStart;
+  const stalled = input.nowMs - staleAnchor > VOLCENGINE_LIVE_POLL_GAP_MS;
+  // 冻结参考时刻：失联时仅累计到「最后接触时刻」，否则用当前墙钟。
+  const liveRef = stalled
+    ? Math.max(genStart, lastPolled ?? vendorUpdated ?? staleAnchor)
+    : input.nowMs;
+
+  // 阶段秒表（与服务端一致）：
+  //  · updated_at 已跳变 → 生成冻结为 GPU 真值，仍 running 则后处理走墙钟；
+  //  · Seedance updated 恒等于 created → 生成按墙钟实时累计（GPU 真值终态回填）。
   let generateMs: number | null = null;
   let vendorPostProcessMs: number | null = null;
   const gpuMs = volcengineVendorGpuMs(trace);
   if (gpuMs != null) {
     generateMs = gpuMs;
-    if (
-      vendorUpdated != null &&
-      (st === "running" || st === "processing")
-    ) {
-      vendorPostProcessMs = Math.max(0, input.nowMs - vendorUpdated);
+    if (vendorUpdated != null && (st === "running" || st === "processing")) {
+      vendorPostProcessMs = Math.max(0, liveRef - vendorUpdated);
     }
-  } else if (hasStartedRunning) {
-    generateMs = null;
+  } else {
+    generateMs = Math.max(0, liveRef - genStart);
   }
 
-  const lastPolled = trace.lastPolledAtMs;
   const pollDelayMs =
     lastPolled != null ? Math.max(0, input.nowMs - lastPolled) : 0;
 
@@ -111,6 +129,7 @@ export function liveVolcengineVideoTiming(input: {
     vendorPostProcessMs,
     pollDelayMs,
     totalMs: Math.max(0, input.nowMs - submittedMs),
+    stalled,
   };
 }
 
@@ -138,6 +157,7 @@ export function resolveLiveLogPhaseTiming(input: {
   vendorPostProcessMs: number | null;
   pollDelayMs: number | null;
   totalMs: number | null;
+  stalled: boolean;
 } {
   const server = input.server;
   const inProgress = isInProgressStatus(input.status);
@@ -148,6 +168,7 @@ export function resolveLiveLogPhaseTiming(input: {
       vendorPostProcessMs: server.vendorPostProcessMs ?? null,
       pollDelayMs: server.pollDelayMs ?? null,
       totalMs: null,
+      stalled: false,
     };
   }
 
@@ -168,6 +189,7 @@ export function resolveLiveLogPhaseTiming(input: {
     vendorPostProcessMs: server.vendorPostProcessMs ?? null,
     pollDelayMs: server.pollDelayMs ?? null,
     totalMs: Math.max(0, input.nowMs - submittedMs),
+    stalled: false,
   };
 }
 

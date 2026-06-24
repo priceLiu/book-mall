@@ -123,7 +123,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const waitSince =
     inflightTask?.submittedAt ?? inflightTask?.createdAt ?? null;
   const isPending = d.runtime?.status === "pending";
-  const { generatingLabel, waitHint, isBackground } = useVideoGeneratingWait(
+  const { waitHint, isBackground } = useVideoGeneratingWait(
     isGenerating,
     waitSince,
     isPending,
@@ -378,7 +378,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           <div className={SBV1_MEDIA_STAGE_CLASS}>
             {isGenerating ? (
               <LibtvMediaGeneratingState
-                label={generatingLabel}
                 variant="cyan"
                 tone={isBackground ? "background" : "active"}
               >

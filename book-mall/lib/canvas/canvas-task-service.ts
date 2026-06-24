@@ -39,7 +39,6 @@ import {
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import { dispatchQueuedCanvasTasks } from "@/lib/generation/traffic-control/dispatch-canvas";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
-import { isOpportunisticPollFallbackEnabled } from "@/lib/generation/opportunistic-poll";
 import {
   pollShardOverFetchSize,
   selectPollShardTasks,
@@ -1038,11 +1037,21 @@ function kickCanvasPollSingleFlight(projectId: string): void {
 }
 
 /**
- * 读路径（项目读 / 任务读）兜底轮询：Gen-HotCold-R2 Phase 1 默认 **关**。
- * 进度推进交独立 poll-loop；仅 `CANVAS_OPPORTUNISTIC_POLL=1`（无后台 loop 的 dev）时兜底。
+ * 读路径（项目读 / 任务读）兜底轮询：**仅推进用户正在看的单个项目**。
+ *
+ * 注意与 `log-read-poll-guard` 里的「全量」poll worker 区分：
+ * 那里跑 `runCanvasPollWorker()`（无 projectId、batch 100、扫全表），web 进程跑会占满
+ * 连接池，故仍只在独立 poll-loop / `CANVAS_OPPORTUNISTIC_POLL=1` 时跑。
+ *
+ * 而此处是 **项目作用域** 单飞轮询（`{ projectId }`）：开销极小，且已有
+ *  - 全局单飞（`opportunisticPollInFlight`，整进程同一时刻仅一条）
+ *  - 每项目 8s 节流（`OPPORTUNISTIC_POLL_MIN_GAP_MS`）
+ *  - 并发封顶（web 进程 = 2 路，见 getEffectiveGenerationPollConcurrency）
+ *  - kill-switch `CANVAS_DISABLE_OPPORTUNISTIC_POLL=1`
+ * 因此默认 **开启**：用户盯着画布、视频在厂商侧已完成时，无需干等下一轮 SCF（最长 60s+）
+ * 即可被检测并回写完成，消除「厂商早就好了、画布还在转」的滞后。
  */
 export function scheduleOpportunisticCanvasPoll(projectId: string): void {
-  if (!isOpportunisticPollFallbackEnabled()) return;
   kickCanvasPollSingleFlight(projectId);
 }
 

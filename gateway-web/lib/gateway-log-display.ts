@@ -173,6 +173,30 @@ export function formatLogAppTaskCell(input: {
 const POLL_DELAY_LIMIT_MS = 10_000;
 const POLL_INFLIGHT_WARN_MS = 120_000;
 
+/** 厂商分列全为 — 时的悬停说明（非 bug：非火山视频 / 未 poll 到 trace） */
+export function resolveLogVendorPhaseEmptyHint(input: {
+  providerKind: string | null;
+  requestKind: string;
+  externalTaskId?: string | null;
+  isInProgress: boolean;
+  hasVolcengineTrace: boolean;
+}): string | undefined {
+  if (input.providerKind !== "VOLCENGINE" || input.requestKind !== "VIDEO") {
+    return "厂商分阶段（排队 / 生成 / 后处理）仅统计火山异步视频；生图 / 同步接口无此拆分";
+  }
+  if (!input.hasVolcengineTrace) {
+    if (!input.externalTaskId?.trim()) {
+      return input.isInProgress
+        ? "尚无厂商 taskId：可能卡在 Gateway 提交，或 poll worker 未运行（3 分钟后会 STALE_ORPHAN 收口）"
+        : "无厂商 taskId，未产生 volcengineTiming";
+    }
+    return input.isInProgress
+      ? "已有 taskId 但尚未 poll 到 volcengineTiming，请检查 canvas poll SCF / book-mall poll worker"
+      : "终态无 volcengineTiming trace";
+  }
+  return undefined;
+}
+
 /** 日志表 · 火山视频耗时阶段（排队 / 生成 / 后处理 / 轮询延迟） */
 export function formatLogTimingPhaseCell(
   ms: number | null | undefined,
@@ -259,6 +283,8 @@ export function logProviderFilterOptions(
 }
 
 const STATUS_LABEL: Record<string, string> = {
+  QUEUED: "排队中",
+  DISPATCHING: "派发中",
   PENDING: "排队",
   RUNNING: "进行中",
   SUCCEEDED: "成功",
@@ -338,6 +364,10 @@ export function formatRequestStatusShortLabel(status: LogRequestStatus): string 
       return "running";
     case "PENDING":
       return "pending";
+    case "QUEUED":
+      return "queued";
+    case "DISPATCHING":
+      return "dispatching";
     case "CANCELLED":
       return "cancelled";
     default:
@@ -355,6 +385,9 @@ export function statusDotClass(status: LogRequestStatus): string {
       return "bg-[#f97316] shadow-[0_0_6px_rgba(249,115,22,0.65)]";
     case "PENDING":
       return "bg-[#eab308] shadow-[0_0_6px_rgba(234,179,8,0.55)]";
+    case "QUEUED":
+    case "DISPATCHING":
+      return "bg-zinc-400/80 shadow-[0_0_6px_rgba(161,161,170,0.5)]";
     case "CANCELLED":
       return "bg-zinc-500";
     default:
@@ -376,6 +409,9 @@ export function statusBadgeClass(status: LogRequestStatus): string {
       return "bg-sky-500/15 text-sky-300";
     case "PENDING":
       return "bg-amber-500/15 text-amber-300";
+    case "QUEUED":
+    case "DISPATCHING":
+      return "bg-zinc-500/15 text-zinc-300";
     case "CANCELLED":
       return "bg-zinc-500/15 text-zinc-400";
     default:

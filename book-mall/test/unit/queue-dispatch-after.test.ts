@@ -2,19 +2,18 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   QUEUE_SLOT_BASE_MS,
-  QUEUE_SLOT_JITTER_MS,
   queueDispatchAfterFromIndex,
 } from "@/lib/generation/traffic-control/queue-dispatch-after";
 
 describe("queueDispatchAfterFromIndex", () => {
-  it("index 0 is within jitter only", () => {
+  it("index 0 (queue head) is immediately dispatchable, no jitter", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     const d = queueDispatchAfterFromIndex(0, 1_000_000);
     expect(d.getTime()).toBe(1_000_000);
+    // 即便 random 接近 1，队首也不应被抖动推后
     vi.spyOn(Math, "random").mockReturnValue(0.999);
     const d2 = queueDispatchAfterFromIndex(0, 1_000_000);
-    expect(d2.getTime()).toBeGreaterThanOrEqual(1_000_000 + QUEUE_SLOT_JITTER_MS - 3);
-    expect(d2.getTime()).toBeLessThanOrEqual(1_000_000 + QUEUE_SLOT_JITTER_MS);
+    expect(d2.getTime()).toBe(1_000_000);
     vi.restoreAllMocks();
   });
 

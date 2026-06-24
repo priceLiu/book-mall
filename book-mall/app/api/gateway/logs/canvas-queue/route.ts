@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { fetchCanvasQueueWithoutLogStats } from "@/lib/canvas/canvas-queue-without-log";
+import {
+  fetchCanvasQueueWithoutLogStats,
+  listCanvasQueuedWithoutLogTasks,
+} from "@/lib/canvas/canvas-queue-without-log";
+import { buildCanvasPendingLogRows } from "@/lib/canvas/canvas-pending-log-row";
 import { canViewFinanceCost } from "@/lib/auth/permissions";
 import {
   gatewayDatabaseUnavailableResponse,
@@ -34,7 +38,26 @@ export async function GET(request: NextRequest) {
       staleMinutes,
     });
 
-    return NextResponse.json(stats);
+    // 方向 2：?rows=1 时附带合成「排队中（待提交）」日志行，供 Logs 页第一时间展示完整过程
+    const wantRows = request.nextUrl.searchParams.get("rows") === "1";
+    if (!wantRows) {
+      return NextResponse.json(stats);
+    }
+
+    const limit = Math.min(
+      Math.max(Number(request.nextUrl.searchParams.get("limit") ?? "50") || 50, 1),
+      200,
+    );
+    const tasks = await listCanvasQueuedWithoutLogTasks({
+      ownerUserIds,
+      staleMinutes: 0,
+      limit,
+    });
+
+    return NextResponse.json({
+      ...stats,
+      pendingRows: buildCanvasPendingLogRows(tasks),
+    });
   } catch (e) {
     if (isGatewayDatabaseError(e)) {
       return gatewayDatabaseUnavailableResponse();

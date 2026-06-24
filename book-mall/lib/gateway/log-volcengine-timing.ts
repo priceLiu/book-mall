@@ -355,25 +355,23 @@ export function computeVolcengineTimingBreakdown(input: {
   let pollDelayMs: number | null = null;
 
   if (!isTerminal) {
-    // 厂商分阶段计时：GPU 完成（updated 跳变）→ 生成冻结；后处理进行中才递增 postproc。
-    // Poll Δ = 我方轮询间隔（可递增，卡死信号）。总墙钟仅体现在 E2E/终态 duration，不在此伪造生成秒数。
+    // 进行中 = 阶段秒表（排队段已在上方按 genStart 冻结）：
+    //  · 厂商 updated_at 已跳变（GPU 真值可得）→ 生成冻结为 GPU 真值；仍 running 则后处理走墙钟。
+    //  · Seedance 等 updated_at 恒等于 created（GPU 真值要等终态）→ 生成按墙钟实时累计，
+    //    避免进行中长时间显示「—」；厂商 GPU 真值在终态回填（另见「厂商生成」只读列）。
+    // Poll Δ = 我方轮询间隔（可递增，卡死信号）。
     const st = normalizeStatus(trace.lastStatus);
-    const hasStartedRunning =
-      st === "running" || st === "processing" || firstRunning != null;
     const lastPolled = trace.lastPolledAtMs;
     pollDelayMs = lastPolled != null ? Math.max(0, now - lastPolled) : 0;
 
     const gpuMs = volcengineVendorGpuMs(trace);
     if (gpuMs != null) {
       generateMs = gpuMs;
-      if (
-        vendorUpdated != null &&
-        (st === "running" || st === "processing")
-      ) {
+      if (vendorUpdated != null && (st === "running" || st === "processing")) {
         vendorPostProcessMs = Math.max(0, now - vendorUpdated);
       }
-    } else if (hasStartedRunning) {
-      generateMs = null;
+    } else if (genStart != null) {
+      generateMs = Math.max(0, now - genStart);
     }
   } else if (vendorCreated != null && vendorUpdated != null) {
     generateMs = Math.max(0, vendorUpdated - vendorCreated);
