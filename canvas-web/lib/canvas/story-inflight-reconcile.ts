@@ -146,7 +146,7 @@ export function reconcileStaleInflightRuntimes(
         if (!hasServerInflightForScope(tasks, node.id, scope)) {
           const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
           if (pick) {
-            if (!shouldSkipStoryRowTaskApply(rt, pick)) {
+            if (!shouldSkipStoryRowTaskApply(rt, pick, node.id)) {
               storyApplyTaskResult(
                 node,
                 pick,
@@ -185,7 +185,7 @@ export function reconcileStaleInflightRuntimes(
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
         const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
         if (pick) {
-          if (!shouldSkipStoryRowTaskApply(row.runtime, pick)) {
+          if (!shouldSkipStoryRowTaskApply(row.runtime, pick, node.id)) {
             storyApplyTaskResult(
               node,
               pick,
@@ -218,7 +218,7 @@ export function reconcileStaleInflightRuntimes(
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
         const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
         if (pick) {
-          if (!shouldSkipStoryRowTaskApply(row.runtime, pick)) {
+          if (!shouldSkipStoryRowTaskApply(row.runtime, pick, node.id)) {
             storyApplyTaskResult(
               node,
               pick,
@@ -263,7 +263,7 @@ export function reconcileStaleInflightRuntimes(
         if (hasServerInflightForScope(tasks, node.id, scope)) return row;
         const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
         if (pick) {
-          if (!shouldSkipStoryRowTaskApply(row.runtime, pick)) {
+          if (!shouldSkipStoryRowTaskApply(row.runtime, pick, node.id)) {
             storyApplyTaskResult(
               node,
               pick,
@@ -320,7 +320,7 @@ export function reconcileStaleInflightRuntimes(
           if (hasServerInflightForScope(tasks, node.id, scope)) continue;
           const pick = pickPreferredCanvasTaskForScope(nodeTasks, scope);
           if (pick) {
-            if (!shouldSkipStoryRowTaskApply(rt, pick)) {
+            if (!shouldSkipStoryRowTaskApply(rt, pick, node.id)) {
               storyApplyTaskResult(
                 node,
                 pick,
@@ -381,7 +381,7 @@ export function reconcileStaleInflightRuntimes(
       } else {
         const patch = runtimePatchFromCanvasTask(pick);
         const localRt = (node.data as { runtime?: CanvasNodeRuntime }).runtime;
-        if (patch && shouldApplyCanvasTaskRuntimePatch(localRt, pick, patch)) {
+        if (patch && shouldApplyCanvasTaskRuntimePatch(localRt, pick, patch, node.id)) {
           setNodeRuntime(node.id, patch);
         }
       }

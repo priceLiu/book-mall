@@ -79,9 +79,8 @@ await acquireTrafficSlotInTx(tx, scope, maxConcurrency);
 2. `findMany` QUEUED — 失败则 return，不 dispatch  
 3. **for 循环内**每任务 try/catch — 一单失败不阻断后续  
 
-> `fastPath`（run API 即时派发，`fireCanvasDispatchForProject` 默认开启）：**跳过** 步骤 1
-> 的两项兜底清扫，只走 `findMany` + dispatch，缩短「出队前」。清扫仍由轮询 worker
-> （`runCanvasPollWorker` / `reconcile` 调用时不传 `fastPath`）周期执行，**不得**在 worker 路径开启 `fastPath`。
+> `fastPath`（run API 即时派发，`fireCanvasDispatchForProject` 默认开启）：**跳过** `cancelQueueTimeouts`，
+> 但 **仍执行** `recoverStalePreSubmitVideoTasks`（30s 自动释放+重排）。轮询 worker 调用时不传 `fastPath`。
 
 ### 3.5 瞬时繁忙 ≠ 业务失败
 
@@ -89,7 +88,7 @@ await acquireTrafficSlotInTx(tx, scope, maxConcurrency);
 
 ### 3.6 canvas 与 story 同口径
 
-`dispatch-canvas.ts` 与 `dispatch-story.ts` 须同步遵守 §3.1–3.5。Review 时 **成对检查**。
+`dispatch-canvas.ts` 与 `dispatch-story.ts` 须同步遵守 §3.1–3.5、§3.8。Review 时 **成对检查**。
 
 ### 3.7 入队交通灯（序号 stagger）
 
@@ -106,6 +105,28 @@ dispatchAfter = now + queueIndex × 5000ms + random(0, 3000ms)
 - `recoverStaleDispatching` / revert 回 QUEUED 时用 `queueDispatchAfterFromIndex(i)` 错开，**禁止** `dispatchAfter = now` 或裸 `+ 2000`  
 - `getDispatchBatch()` 默认 **5**（减轻单轮 poll 事务峰值）  
 - 第二层 **车间距**（`sampleActorDispatchSpacingMs`）仍在 slot 失败 / actor spacing 时生效
+
+### 3.8 Pre-submit 自动释放 + 重排（2026-06 起 · canvas 视频 + 漫剧 FRAME_VIDEO）
+
+提交厂商前卡住时 **禁止** 对视频任务直接 `QUEUE_TIMEOUT` / 弹「排队超过 10 分钟」；统一走自愈：
+
+| 步骤 | 行为 |
+|------|------|
+| 检测 | `QUEUED` / `DISPATCHING` 且距上次入队/重排 ≥ `DISPATCHING_STALE_SEC`（默认 **30s**） |
+| 释放 | `DISPATCHING`：`releaseTrafficSlot`；canvas 另清 `gatewayKieSubmitClaimed` |
+| 重排 | → `QUEUED` + `dispatchAfter` 立即可派 + `fireVideoTrafficDispatchBacklog` |
+| 计数 | `inputPayload.dispatchStaleRetryCount++`；每轮重排 **重置 `queuedAt`**（保证 30s 节奏） |
+| 耗尽 | ≥ `DISPATCH_STALE_RETRY_MAX`（默认 **6**）→ `FAILED` / `SUBMIT_DISPATCH_TIMEOUT` / 「提交生成超时, 请重试」 |
+| 成功 | `SUBMITTED` 后 **清零** retry 计数；**立即释放**交通槽（不等 Gateway 终态） |
+
+实现：
+
+- [`recover-stale-dispatching.ts`](../lib/generation/traffic-control/recover-stale-dispatching.ts) — canvas `video-engine` / `ai-video-engine`
+- [`recover-stale-dispatching-story.ts`](../lib/generation/traffic-control/recover-stale-dispatching-story.ts) — story `FRAME_VIDEO`
+- [`pre-submit-retry.ts`](../lib/generation/traffic-control/pre-submit-retry.ts) — 计数 / 终态文案
+- 触发：`scheduleRecoverStaleDispatching`（画布 tasks 读、Gateway Logs canvas-queue）、`dispatchQueued*` 每轮开头、`reconcileCanvasInflightZombies`
+
+环境变量：`DISPATCHING_STALE_SEC`、`DISPATCH_STALE_RETRY_MAX`。
 
 ---
 
@@ -138,7 +159,7 @@ pnpm --dir book-mall canvas:diagnose-missing-gateway-log   # 若已登记
 - [ ] 占槽路径使用 `runTxWithRetry`  
 - [ ] DISPATCHING 异常有 revert（release + QUEUED）  
 - [ ] 批次 loop 每任务独立 catch  
-- [ ] story 与 canvas 已对齐  
+- [ ] story 与 canvas 已对齐（含 §3.8 pre-submit 自愈）  
 - [ ] 未引入「整批一个 catch 跳过全部 QUEUED」  
 
 ---
@@ -150,3 +171,4 @@ pnpm --dir book-mall canvas:diagnose-missing-gateway-log   # 若已登记
 | 2026-06-22 | DB-Resilience-R1：503 重排队、poll 退避、queued-reconcile |
 | 2026-06-24 | **recurrence**：dispatch 占槽 5s 超时 + tx 内 tenant 查询 + 批次 catch；规范固化 + canvas/story dispatch 修复 |
 | 2026-06-24 | **queue stagger**：序号 ×5s + jitter 入队；recover/revert 错开；DISPATCH_BATCH 默认 5 |
+| 2026-06-25 | **pre-submit 自愈**：30s×6 自动释放+重排；SUBMITTED 清 retry + 释槽；canvas/story 视频对齐；§3.8 |

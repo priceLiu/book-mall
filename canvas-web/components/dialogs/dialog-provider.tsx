@@ -38,6 +38,8 @@ export type AlertOptions = {
   title?: ReactNode;
   message: ReactNode;
   okLabel?: string;
+  /** 仅右上角关闭，不展示底部「我知道了」 */
+  dismissOnly?: boolean;
   /** 信息层级：默认 info；error 时图标变红，success 变绿 */
   variant?: "info" | "success" | "error" | "warning";
 };
@@ -310,37 +312,60 @@ function AlertBody({
   onFinish: (action: "confirm" | "cancel") => void;
 }) {
   const opts = task.opts;
+  const dismissOnly = opts.dismissOnly === true;
   return (
     <>
-      <div className="flex items-start gap-3 px-5 py-4">
-        <VariantIcon variant={opts.variant} />
-        <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-medium text-white">
-            {opts.title ??
-              (opts.variant === "error"
-                ? "出错了"
-                : opts.variant === "success"
-                  ? "完成"
-                  : "提示")}
-          </p>
-          <div className="mt-1 break-words text-[12px] leading-relaxed text-white/75">
-            {opts.message}
+      <div
+        className={
+          dismissOnly
+            ? "relative px-5 pb-5 pt-4"
+            : "flex items-start gap-3 px-5 py-4"
+        }
+      >
+        {dismissOnly ? (
+          <button
+            type="button"
+            onClick={() => onFinish("confirm")}
+            className="absolute right-3 top-3 grid size-7 place-items-center rounded-md text-white/50 transition hover:bg-white/10 hover:text-white"
+            aria-label="关闭"
+          >
+            <span className="text-[18px] leading-none" aria-hidden>
+              ×
+            </span>
+          </button>
+        ) : null}
+        <div className={dismissOnly ? "flex items-start gap-3 pr-8" : "contents"}>
+          <VariantIcon variant={opts.variant} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-medium text-white">
+              {opts.title ??
+                (opts.variant === "error"
+                  ? "出错了"
+                  : opts.variant === "success"
+                    ? "完成"
+                    : "提示")}
+            </p>
+            <div className="mt-1 break-words text-[12px] leading-relaxed text-white/75">
+              {opts.message}
+            </div>
           </div>
         </div>
       </div>
-      <div className="flex justify-end gap-2 border-t border-white/5 bg-black/20 px-4 py-3">
-        <button
-          type="button"
-          autoFocus
-          onClick={() => onFinish("confirm")}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onFinish("confirm");
-          }}
-          className="rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)]"
-        >
-          {opts.okLabel ?? "我知道了"}
-        </button>
-      </div>
+      {!dismissOnly ? (
+        <div className="flex justify-end gap-2 border-t border-white/5 bg-black/20 px-4 py-3">
+          <button
+            type="button"
+            autoFocus
+            onClick={() => onFinish("confirm")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onFinish("confirm");
+            }}
+            className="rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)]"
+          >
+            {opts.okLabel ?? "我知道了"}
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }

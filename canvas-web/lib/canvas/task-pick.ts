@@ -3,6 +3,7 @@ import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import type { CanvasStoryRunJob } from "./canvas-run-bus";
 import type { StoryRunContext } from "./story-workspace-types";
 import { formatCanvasTaskError } from "./friendly-task-error";
+import { shouldSkipStaleTerminalWhileLocalInflight } from "./canvas-run-session";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 
 export type CanvasTaskStoryScope = {
@@ -96,13 +97,24 @@ function newestTaskByUpdatedAt(
 export function shouldSkipStoryRowTaskApply(
   localRuntime: CanvasNodeRuntime | undefined,
   pick: CanvasTaskRecord,
+  nodeId?: string,
 ): boolean {
   const localSt = localRuntime?.status;
   if (localSt !== "pending" && localSt !== "running") return false;
   if (isServerInflightTaskStatus(pick.status)) return false;
-  // 本地尚未绑定 taskId（刚点发送）时，必须接受服务端终态，否则会卡在「生成中」
-  if (!localRuntime?.taskId) return false;
-  if (pick.id === localRuntime.taskId) return false;
+  if (nodeId) {
+    return shouldSkipStaleTerminalWhileLocalInflight(nodeId, localRuntime, pick);
+  }
+  if (localRuntime?.taskId) {
+    if (pick.id === localRuntime.taskId) return false;
+  } else {
+    // 无 taskId：历史终态一律跳过，避免刚点生成时闪回旧结果
+    return (
+      pick.status === "SUCCEEDED" ||
+      pick.status === "FAILED" ||
+      pick.status === "CANCELLED"
+    );
+  }
   return (
     pick.status === "SUCCEEDED" ||
     pick.status === "FAILED" ||
@@ -113,10 +125,17 @@ export function shouldSkipStoryRowTaskApply(
 /** 任务终态写回 node.runtime 前 · 用户已关闭的错误勿重复弹出 */
 export function shouldApplyCanvasTaskRuntimePatch(
   localRuntime: CanvasNodeRuntime | undefined,
-  task: Pick<CanvasTaskRecord, "id" | "status">,
+  task: Pick<CanvasTaskRecord, "id" | "status" | "updatedAt" | "createdAt">,
   patch: Partial<CanvasNodeRuntime> | null,
+  nodeId?: string,
 ): boolean {
   if (!patch) return false;
+  if (
+    nodeId &&
+    shouldSkipStaleTerminalWhileLocalInflight(nodeId, localRuntime, task as CanvasTaskRecord)
+  ) {
+    return false;
+  }
   if (patch.status !== "error") return true;
   const dismissed = localRuntime?.dismissedFailTaskId?.trim();
   if (!dismissed) return true;

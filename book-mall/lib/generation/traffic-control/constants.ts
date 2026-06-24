@@ -44,7 +44,13 @@ export function getDispatchBatch(): number {
 }
 
 export function getDispatchingStaleSec(): number {
-  return readPositiveInt("DISPATCHING_STALE_SEC", 60);
+  /** DISPATCHING 超过此秒数未 submit 厂商 → 释放槽、退回 QUEUED 自动重派 */
+  return readPositiveInt("DISPATCHING_STALE_SEC", 30);
+}
+
+/** 30s 自愈累计重派次数上限；耗尽后 fail「提交生成超时, 请重试」 */
+export function getDispatchStaleRetryMax(): number {
+  return readPositiveInt("DISPATCH_STALE_RETRY_MAX", 6);
 }
 
 /** RUNNING 视频 log 超过此分钟数对账释放（火山 45 + 余量） */

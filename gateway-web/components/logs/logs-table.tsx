@@ -511,6 +511,15 @@ async function fetchCanvasQueueStats(): Promise<CanvasQueueFetchResult> {
   }
 }
 
+function applyCanvasQueueFetchResult(
+  result: CanvasQueueFetchResult,
+  setStats: (s: CanvasQueueWithoutLogStats | null) => void,
+  setPending: (rows: CanvasPendingLogRow[]) => void,
+) {
+  if (result.stats) setStats(result.stats);
+  setPending(result.pendingRows);
+}
+
 type GatewayLogsDelta = {
   created: GatewayLogRow[];
   updated: GatewayLogRow[];
@@ -1207,15 +1216,19 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   canvasQueueStatsRef.current = canvasQueueStats;
 
   const hasCanvasQueueActivity = useMemo(
-    () => (canvasQueueStats?.total ?? 0) > 0,
-    [canvasQueueStats],
+    () => (canvasQueueStats?.total ?? 0) > 0 || pendingRows.length > 0,
+    [canvasQueueStats, pendingRows.length],
   );
   const hasCanvasQueueActivityRef = useRef(hasCanvasQueueActivity);
   hasCanvasQueueActivityRef.current = hasCanvasQueueActivity;
+  const pendingRowsRef = useRef(pendingRows);
+  pendingRowsRef.current = pendingRows;
 
   const shouldLiveFastRefresh = useCallback(() => {
     return (
-      hasInFlightLogsRef.current || hasCanvasQueueActivityRef.current
+      hasInFlightLogsRef.current ||
+      hasCanvasQueueActivityRef.current ||
+      pendingRowsRef.current.length > 0
     );
   }, []);
 
@@ -1293,6 +1306,15 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
           );
           if (data.facets) setFacets(data.facets);
           if (data.canvasQueueStats) setCanvasQueueStats(data.canvasQueueStats);
+          if (listFilterParams.mode === "live" && !append) {
+            void fetchCanvasQueueStats().then((s) => {
+              applyCanvasQueueFetchResult(
+                s,
+                setCanvasQueueStats,
+                setPendingRows,
+              );
+            });
+          }
         }
 
         setLoadedPages(targetPage);
@@ -1362,8 +1384,11 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         const merged = mergeLogsDelta(logsRef.current, delta);
         setLogs(merged.rows);
         void fetchCanvasQueueStats().then((s) => {
-          if (s.stats) setCanvasQueueStats(s.stats);
-          setPendingRows(s.pendingRows);
+          applyCanvasQueueFetchResult(
+            s,
+            setCanvasQueueStats,
+            setPendingRows,
+          );
         });
         setLastRefreshedAt(new Date());
         return null;
@@ -1430,6 +1455,16 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       }
       autoRefreshBusyRef.current = true;
       try {
+        if (filtersAreDefault) {
+          void fetchCanvasQueueStats().then((s) => {
+            if (cancelled) return;
+            applyCanvasQueueFetchResult(
+              s,
+              setCanvasQueueStats,
+              setPendingRows,
+            );
+          });
+        }
         const fast = shouldLiveFastRefresh();
         if (fast) {
           await loadLogsDelta({ poll: true, silent: true });
@@ -1440,11 +1475,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         autoRefreshBusyRef.current = false;
       }
       if (cancelled) return;
-      const intervalMs = shouldLiveFastRefresh()
-        ? gatewayLivePollIntervalMs(
-            { inProgress: 0, slowWarn: 0, backgroundWait: 0 },
-            true,
-          )
+      const fast = shouldLiveFastRefresh();
+      const intervalMs = fast
+        ? hasCanvasQueueActivityRef.current || pendingRowsRef.current.length > 0
+          ? 3_000
+          : gatewayLivePollIntervalMs(
+              { inProgress: 0, slowWarn: 0, backgroundWait: 0 },
+              true,
+            )
         : GATEWAY_LIVE_HOT_SYNC_MS;
       schedule(intervalMs);
     };
@@ -1454,7 +1492,46 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [autoRefresh, viewMode, listReady, loadLogsPaged, loadLogsDelta, shouldLiveFastRefresh]);
+  }, [autoRefresh, viewMode, listReady, loadLogsPaged, loadLogsDelta, shouldLiveFastRefresh, filtersAreDefault]);
+
+  /** 实时 Tab：排队合成行 2s 轮询（点击后尚未建 Gateway log 的任务只出现在此接口） */
+  useEffect(() => {
+    if (!listReady || viewMode !== "live" || dateRangeInvalid || !filtersAreDefault) {
+      return;
+    }
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const schedule = (delayMs: number) => {
+      if (cancelled) return;
+      timer = window.setTimeout(() => void tick(), delayMs);
+    };
+
+    const tick = async () => {
+      if (cancelled || viewModeRef.current !== "live") return;
+      if (!pageVisibleRef.current) {
+        schedule(5_000);
+        return;
+      }
+      try {
+        const s = await fetchCanvasQueueStats();
+        if (cancelled) return;
+        applyCanvasQueueFetchResult(s, setCanvasQueueStats, setPendingRows);
+      } catch {
+        /* ignore */
+      }
+      const busy =
+        (canvasQueueStatsRef.current?.total ?? 0) > 0 ||
+        pendingRowsRef.current.length > 0;
+      schedule(busy ? 2_000 : 8_000);
+    };
+
+    void tick();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [listReady, viewMode, dateRangeInvalid, filtersAreDefault]);
 
   /** 筛选 / 每页条数 / 动静切换：重置并拉首屏（skipCount） */
   useEffect(() => {

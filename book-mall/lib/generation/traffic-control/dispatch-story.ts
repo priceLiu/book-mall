@@ -18,6 +18,8 @@ import { computeStoryQueueDispatchAfter, queueDispatchAfterFromIndex } from "./q
 import { acquireTrafficSlotInTx, releaseTrafficSlot } from "./slot";
 import { resolveStoryProjectTrafficScope, resolveMaxConcurrencyForScope } from "./scope-key";
 import { nextDispatchAfterFromSpacing } from "./token-bucket";
+import { releaseGatewayVideoTrafficSlotIfOccupying } from "./release-gateway-video-traffic-slot";
+import { clearDispatchStaleRetryInPayload } from "./pre-submit-retry";
 
 async function revertStuckStoryDispatchingTask(
   taskId: string,
@@ -113,10 +115,26 @@ async function dispatchOneStoryQueuedTask(
             gatewayLogId: job.logId,
             submittedAt: new Date(),
             lastPolledAt: new Date(),
+            inputPayload: clearDispatchStaleRetryInPayload(
+              input,
+            ) as Prisma.InputJsonValue,
           },
         }),
       { label: "story-dispatch-submitted-write", maxRetries: 5 },
     );
+
+    await releaseGatewayVideoTrafficSlotIfOccupying({
+      logId: job.logId,
+      scopeKey: scope.scopeKey,
+      fireDispatch: true,
+    }).catch((e) => {
+      console.warn(
+        "[story-dispatch] release slot after submit failed",
+        job.logId.slice(0, 12),
+        e instanceof Error ? e.message : String(e),
+      );
+    });
+
     return "dispatched";
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -160,16 +178,33 @@ async function dispatchOneStoryQueuedTask(
 
 export async function dispatchQueuedStoryTasks(opts?: {
   projectId?: string;
-}): Promise<{ dispatched: number; skipped: number; failed: number; cancelled: number }> {
-  const result = { dispatched: 0, skipped: 0, failed: 0, cancelled: 0 };
+}): Promise<{ dispatched: number; skipped: number; failed: number; cancelled: number; recovered: number }> {
+  const result = { dispatched: 0, skipped: 0, failed: 0, cancelled: 0, recovered: 0 };
   if (!isTrafficControlEnabled()) return result;
 
   try {
+    const { recoverStaleDispatchingStoryTasks } = await import(
+      "./recover-stale-dispatching-story"
+    );
+    result.recovered = await recoverStaleDispatchingStoryTasks({
+      projectId: opts?.projectId,
+      limit: 20,
+    });
+  } catch (e) {
+    console.warn(
+      "[story-dispatch] recoverStaleDispatchingStory failed",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  try {
     const cutoff = new Date(Date.now() - getQueueTimeoutMin() * 60_000);
+    // FRAME_VIDEO 走 30s×6 pre-submit 自愈，不用 10min QUEUE_TIMEOUT
     const cancelled = await prisma.storyGenerationTask.updateMany({
       where: {
         status: "QUEUED",
         queuedAt: { lt: cutoff },
+        kind: { not: "FRAME_VIDEO" },
         ...(opts?.projectId ? { projectId: opts.projectId } : {}),
       },
       data: {

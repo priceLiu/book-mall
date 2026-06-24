@@ -4,17 +4,9 @@
 import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { getDispatchingStaleSec } from "@/lib/generation/traffic-control/constants";
-import {
-  releaseTrafficSlot,
-} from "@/lib/generation/traffic-control/slot";
-import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
-import { queueDispatchAfterFromIndex } from "@/lib/generation/traffic-control/queue-dispatch-after";
-import { isCanvasVideoTrafficKind } from "@/lib/generation/traffic-control/admit-canvas";
 import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
 
 const SUBMITTED_INCOMPLETE_MS = 3 * 60 * 1000;
-const DISPATCHING_ZOMBIE_MS = () => getDispatchingStaleSec() * 1000;
 
 function taskPayload(
   task: Pick<CanvasGenerationTask, "inputPayload">,
@@ -87,66 +79,13 @@ export async function reconcileCanvasInflightZombies(opts?: {
     summary.failedIncomplete += 1;
   }
 
-  const dispatchCutoff = new Date(now - DISPATCHING_ZOMBIE_MS());
-  const dispatchingZombies = await prisma.canvasGenerationTask.findMany({
-    where: {
-      status: "DISPATCHING",
-      kieTaskId: null,
-      updatedAt: { lt: dispatchCutoff },
-      ...projectFilter,
-    },
-    orderBy: { updatedAt: "asc" },
-    take: limit,
-    select: {
-      id: true,
-      projectId: true,
-      actorUserId: true,
-      inputPayload: true,
-      project: { select: { userId: true } },
-    },
+  const { recoverStalePreSubmitVideoTasks } = await import(
+    "@/lib/generation/traffic-control/recover-stale-dispatching"
+  );
+  summary.requeuedDispatching = await recoverStalePreSubmitVideoTasks({
+    projectId: opts?.projectId,
+    limit,
   });
-
-  let requeueIndex = 0;
-  for (const t of dispatchingZombies) {
-    const payload = taskPayload(t);
-    if (payload.gatewayLogId || payload.gatewayKieSubmitClaimed === true) {
-      continue;
-    }
-    const scope = await resolveCanvasProjectTrafficScope(
-      t.projectId,
-      t.actorUserId ?? t.project.userId,
-    );
-    await releaseTrafficSlot(scope.scopeKey);
-    const videoKind = isCanvasVideoTrafficKind(payload);
-    if (!videoKind) {
-      await prisma.canvasGenerationTask.update({
-        where: { id: t.id },
-        data: {
-          status: "FAILED",
-          failCode: "DISPATCH_STUCK",
-          failMessage: "出队超时未完成提交，请重试",
-          completedAt: new Date(),
-        },
-      });
-      summary.failedIncomplete += 1;
-      continue;
-    }
-    await prisma.canvasGenerationTask.update({
-      where: { id: t.id },
-      data: {
-        status: "QUEUED",
-        dispatchAfter: queueDispatchAfterFromIndex(requeueIndex++),
-        failCode: null,
-        failMessage: null,
-        inputPayload: {
-          ...payload,
-          gatewayKieSubmitClaimed: false,
-          syncGatewaySubmit: true,
-        } as Prisma.InputJsonValue,
-      },
-    });
-    summary.requeuedDispatching += 1;
-  }
 
   const submittedStuck = await prisma.canvasGenerationTask.findMany({
     where: {

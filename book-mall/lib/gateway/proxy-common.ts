@@ -49,7 +49,6 @@ import {
   isStaffRole,
 } from "@/lib/billing/billing-persona";
 import { VideoRiskError } from "@/lib/billing/video-risk-control";
-import { releaseTrafficSlotFromGatewayLog } from "@/lib/generation/traffic-control/slot";
 import { mapBillingFailureForGatewayLog } from "@/lib/billing/billing-failure-map";
 import {
   bumpGatewayStatusOnCreate,
@@ -426,14 +425,17 @@ export async function finalizeRequestLog(
       const terminalLog = await prisma.gatewayRequestLog.findUnique({
         where: { id: logId },
         select: {
-          tenantId: true,
-          actorBookUserId: true,
-          userId: true,
           requestKind: true,
         },
       });
-      if (terminalLog) {
-        await releaseTrafficSlotFromGatewayLog(terminalLog);
+      if (terminalLog?.requestKind === "VIDEO") {
+        const { releaseGatewayVideoTrafficSlotIfOccupying } = await import(
+          "@/lib/generation/traffic-control/release-gateway-video-traffic-slot"
+        );
+        await releaseGatewayVideoTrafficSlotIfOccupying({
+          logId,
+          fireDispatch: true,
+        });
       }
     } catch (e) {
       console.warn("[gateway] releaseTrafficSlot 失败（忽略）", logId, e);

@@ -1,8 +1,9 @@
-import type { CanvasGenerationTask } from "@prisma/client";
+import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import {
   buildCanvasAiKieCallbackUrl,
 } from "@/lib/canvas/canvas-constants";
+import { canvasVideoPayloadWhere } from "@/lib/canvas/canvas-queue-without-log";
 import { claimCanvasTaskKieSubmit } from "@/lib/canvas/canvas-kie-gateway-claim";
 import {
   canvasGwCreateBailianR2vJob,
@@ -17,7 +18,6 @@ import { isTransientSystemBusyError, runTxWithRetry, CANVAS_DB_TX_OPTIONS } from
 
 import {
   getDispatchBatch,
-  getDispatchingStaleSec,
   getQueueTimeoutMin,
   isTrafficControlEnabled,
 } from "./constants";
@@ -29,6 +29,8 @@ import {
 import { resolveCanvasProjectTrafficScope, resolveMaxConcurrencyForScope } from "./scope-key";
 import { queueDispatchAfterFromIndex } from "./queue-dispatch-after";
 import { nextDispatchAfterFromSpacing } from "./token-bucket";
+import { releaseGatewayVideoTrafficSlotIfOccupying } from "./release-gateway-video-traffic-slot";
+import { clearDispatchStaleRetryInPayload } from "./pre-submit-retry";
 
 function taskInputPayload(
   task: Pick<CanvasGenerationTask, "inputPayload">,
@@ -113,11 +115,13 @@ async function submitCanvasVideoToGateway(
 
 async function cancelQueueTimeouts(projectId?: string): Promise<number> {
   const cutoff = new Date(Date.now() - getQueueTimeoutMin() * 60_000);
+  // 画布视频走 30s×6 次 pre-submit 自愈，不再用 10min QUEUE_TIMEOUT 弹「排队超过…」
   const res = await prisma.canvasGenerationTask.updateMany({
     where: {
       status: "QUEUED",
       queuedAt: { lt: cutoff },
       ...(projectId ? { projectId } : {}),
+      NOT: canvasVideoPayloadWhere(),
     },
     data: {
       status: "CANCELLED",
@@ -130,59 +134,10 @@ async function cancelQueueTimeouts(projectId?: string): Promise<number> {
 }
 
 async function recoverStaleDispatching(projectId?: string): Promise<number> {
-  const cutoff = new Date(Date.now() - getDispatchingStaleSec() * 1000);
-  const stale = await prisma.canvasGenerationTask.findMany({
-    where: {
-      status: "DISPATCHING",
-      ...(projectId ? { projectId } : {}),
-      OR: [
-        { updatedAt: { lt: cutoff } },
-        { kieTaskId: null, queuedAt: { lt: cutoff } },
-        { kieTaskId: null, queuedAt: null, createdAt: { lt: cutoff } },
-      ],
-    },
-    select: {
-      id: true,
-      projectId: true,
-      tenantId: true,
-      actorUserId: true,
-      inputPayload: true,
-      kieTaskId: true,
-      project: { select: { userId: true } },
-    },
-    take: 20,
-  });
-  let n = 0;
-  for (const t of stale) {
-    const scope = await resolveCanvasProjectTrafficScope(
-      t.projectId,
-      t.actorUserId ?? t.project.userId,
-    );
-    await releaseTrafficSlot(scope.scopeKey);
-    const payload = taskInputPayload(t);
-    const stuckClaim =
-      payload.gatewayKieSubmitClaimed === true && !payload.gatewayLogId && !t.kieTaskId;
-    await prisma.canvasGenerationTask.update({
-      where: { id: t.id },
-      data: {
-        status: "QUEUED",
-        dispatchAfter: queueDispatchAfterFromIndex(n),
-        failCode: null,
-        failMessage: null,
-        ...(stuckClaim
-          ? {
-              inputPayload: {
-                ...payload,
-                gatewayKieSubmitClaimed: false,
-                syncGatewaySubmit: true,
-              },
-            }
-          : {}),
-      },
-    });
-    n++;
-  }
-  return n;
+  const { recoverStalePreSubmitVideoTasks } = await import(
+    "./recover-stale-dispatching"
+  );
+  return recoverStalePreSubmitVideoTasks({ projectId });
 }
 
 /** DISPATCHING 但未 createTask：释放槽并退回 QUEUED（生产线卡死恢复） */
@@ -308,17 +263,31 @@ async function dispatchOneCanvasQueuedTask(
             kieTaskId: job.taskId,
             submittedAt: new Date(),
             lastPolledAt: new Date(),
-            inputPayload: {
+            inputPayload: clearDispatchStaleRetryInPayload({
               ...taskInputPayload(claimedTask),
               gatewayLogId: job.logId,
               gatewayKieSubmitClaimed: true,
               syncGatewaySubmit: true,
               trafficScopeKey: scope.scopeKey,
-            },
+            }) as Prisma.InputJsonValue,
           },
         }),
       { label: "canvas-dispatch-submitted-write", maxRetries: 5 },
     );
+
+    // 厂商已受理：立即释放交通槽，让后续 QUEUED 任务出队（不等 RUNNING 终态 / 10min promote）。
+    await releaseGatewayVideoTrafficSlotIfOccupying({
+      logId: job.logId,
+      scopeKey: scope.scopeKey,
+      fireDispatch: true,
+    }).catch((e) => {
+      console.warn(
+        "[canvas-dispatch] release slot after submit failed",
+        job.logId.slice(0, 12),
+        e instanceof Error ? e.message : String(e),
+      );
+    });
+
     return "dispatched";
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -369,9 +338,8 @@ async function dispatchOneCanvasQueuedTask(
 
 /** poll worker 入口：出队 QUEUED 画布视频任务。
  *
- * `fastPath`：用户点击生成后的「即时派发」热路径。仅做「查本项目 QUEUED → 取槽 →
- * 提交厂商」，**跳过**排队超时取消 / 僵死 DISPATCHING 回收两项兜底清扫
- * （它们仍由轮询 worker 周期性执行），把点击到厂商提交之间的 DB 往返与排队等待降到最低。 */
+ * `fastPath`：用户点击生成后的「即时派发」热路径。跳过排队超时取消，但仍回收僵死 DISPATCHING
+ * （避免槽位泄漏导致出队前长时间卡在 dispatching）。 */
 export async function dispatchQueuedCanvasTasks(opts?: {
   projectId?: string;
   fastPath?: boolean;
@@ -388,14 +356,15 @@ export async function dispatchQueuedCanvasTasks(opts?: {
         e instanceof Error ? e.message : String(e),
       );
     }
-    try {
-      result.recovered = await recoverStaleDispatching(opts?.projectId);
-    } catch (e) {
-      console.warn(
-        "[canvas-dispatch] recoverStaleDispatching failed",
-        e instanceof Error ? e.message : String(e),
-      );
-    }
+  }
+
+  try {
+    result.recovered = await recoverStaleDispatching(opts?.projectId);
+  } catch (e) {
+    console.warn(
+      "[canvas-dispatch] recoverStaleDispatching failed",
+      e instanceof Error ? e.message : String(e),
+    );
   }
 
   let queued: (CanvasGenerationTask & { project: { userId: string } })[] = [];

@@ -38,6 +38,19 @@ export async function GET(request: NextRequest) {
       staleMinutes,
     });
 
+    if (stats.total > 0) {
+      const { fireVideoTrafficDispatchBacklog } = await import(
+        "@/lib/generation/traffic-control/fire-canvas-dispatch"
+      );
+      const { scheduleRecoverStaleDispatching } = await import(
+        "@/lib/generation/traffic-control/recover-stale-dispatching"
+      );
+      fireVideoTrafficDispatchBacklog("canvas-queue-read");
+      if (stats.dispatching > 0 || stats.staleCount > 0 || stats.queued > 0) {
+        scheduleRecoverStaleDispatching(undefined, "canvas-queue-read");
+      }
+    }
+
     // 方向 2：?rows=1 时附带合成「排队中（待提交）」日志行，供 Logs 页第一时间展示完整过程
     const wantRows = request.nextUrl.searchParams.get("rows") === "1";
     if (!wantRows) {
