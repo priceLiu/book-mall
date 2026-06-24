@@ -264,7 +264,7 @@ export function storyApplyTaskResult(
     const prevRt = (
       node.data as { themeOutlineRuntime?: CanvasNodeRuntime }
     ).themeOutlineRuntime;
-    if (shouldSkipStoryRowTaskApply(prevRt, task)) return;
+    if (shouldSkipStoryRowTaskApply(prevRt, task, node.id)) return;
     const patch: Record<string, unknown> = { themeOutlineRuntime: runtime };
     if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
       patch.generatedOutlineMd = task.textOutput.trim();

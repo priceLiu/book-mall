@@ -1,5 +1,4 @@
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
-import { releaseTrafficSlotFromGatewayLog } from "@/lib/generation/traffic-control/slot";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -30,17 +29,4 @@ export async function failGatewayLogIfStillRunning(input: {
   }).catch((e) => {
     console.warn("[failGatewayLogIfStillRunning]", log.id, e);
   });
-
-  const fullLog = await prisma.gatewayRequestLog.findUnique({
-    where: { id: log.id },
-    select: {
-      tenantId: true,
-      actorBookUserId: true,
-      userId: true,
-      requestKind: true,
-    },
-  });
-  if (fullLog) {
-    await releaseTrafficSlotFromGatewayLog(fullLog);
-  }
 }

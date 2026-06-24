@@ -4,7 +4,6 @@
  */
 import type { Prisma } from "@prisma/client";
 
-import { releaseTrafficSlotFromGatewayLog } from "@/lib/generation/traffic-control/slot";
 import {
   attachVideoBackgroundGeneration,
   readVideoBackgroundGeneration,
@@ -82,6 +81,15 @@ export async function promoteVolcengineTasksToBackgroundGeneration(
       promotedAtMs: nowMs,
     });
 
+    const { releaseGatewayVideoTrafficSlotIfOccupying } = await import(
+      "@/lib/generation/traffic-control/release-gateway-video-traffic-slot"
+    );
+    await releaseGatewayVideoTrafficSlotIfOccupying({
+      logId: row.id,
+      fireDispatch: true,
+      nowMs,
+    });
+
     await prisma.gatewayRequestLog.updateMany({
       where: {
         id: row.id,
@@ -92,7 +100,6 @@ export async function promoteVolcengineTasksToBackgroundGeneration(
       },
     });
 
-    await releaseTrafficSlotFromGatewayLog(row);
     promoted++;
   }
 

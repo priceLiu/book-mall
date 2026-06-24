@@ -74,8 +74,17 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       }),
     ]);
 
-    // 仅当本次读到「有进行中任务」时，后台疏导推进（全局单飞 + 每项目节流），不阻塞响应
+    // 有进行中任务：后台 DISPATCHING 超时自愈（30s）+ 轮询推进，不阻塞读响应
     const hasInflight = tasks.some((t) => CANVAS_INFLIGHT_STATUS.has(t.status));
+    const needsPreSubmitRecover = tasks.some(
+      (t) => t.status === "DISPATCHING" || t.status === "QUEUED",
+    );
+    if (needsPreSubmitRecover) {
+      const { scheduleRecoverStaleDispatching } = await import(
+        "@/lib/generation/traffic-control/recover-stale-dispatching"
+      );
+      scheduleRecoverStaleDispatching(projectId, "canvas-tasks-read");
+    }
     if (hasInflight) scheduleOpportunisticCanvasPoll(projectId);
 
     return NextResponse.json({ tasks }, { headers: jsonHeaders(request) });

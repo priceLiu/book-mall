@@ -5,16 +5,13 @@ import { getCanvasVolcengineVideoTimeoutMin } from "@/lib/canvas/canvas-constant
 import { CANVAS_AI_TASK_TIMEOUT_MIN } from "@/lib/canvas/canvas-constants";
 
 import {
-  getDispatchingStaleSec,
   getReconcileRunningVideoMaxMin,
 } from "./constants";
 import { isGatewayVideoLogOccupyingTrafficSlot } from "@/lib/gateway/video-background-generation";
 import {
-  releaseTrafficSlot,
   releaseTrafficSlotFromGatewayLog,
 } from "./slot";
 import { resolveTrafficScopeFromIds } from "./scope-key";
-import { queueDispatchAfterFromIndex } from "./queue-dispatch-after";
 import { dispatchQueuedCanvasTasks } from "./dispatch-canvas";
 
 export type ReconcileTrafficReport = {
@@ -131,64 +128,10 @@ export async function reconcileRunningSlotCounts(): Promise<number> {
 }
 
 async function recoverStaleDispatchingTasks(): Promise<number> {
-  const cutoff = new Date(Date.now() - getDispatchingStaleSec() * 1000);
-  // 活锁防护：仅看 updatedAt 会被「反复轻触却不推进状态」的写刷新，使任务永不达到陈旧阈值
-  // 而永久卡在 DISPATCHING。补一条「无 vendor 任务 id（kieTaskId 为空）且 queuedAt 已过阈值」的判据，
-  // 该口径只依赖入队时间，不受 updatedAt 抖动影响，确保未真正派发出去的任务一定能被捞回重派。
-  const stale = await prisma.canvasGenerationTask.findMany({
-    where: {
-      status: "DISPATCHING",
-      OR: [
-        { updatedAt: { lt: cutoff } },
-        { kieTaskId: null, queuedAt: { lt: cutoff } },
-        { kieTaskId: null, queuedAt: null, createdAt: { lt: cutoff } },
-      ],
-    },
-    select: {
-      id: true,
-      projectId: true,
-      actorUserId: true,
-      inputPayload: true,
-      kieTaskId: true,
-      project: { select: { userId: true } },
-    },
-    take: 50,
-  });
-  let n = 0;
-  for (const t of stale) {
-    const { resolveCanvasProjectTrafficScope } = await import("./scope-key");
-    const scope = await resolveCanvasProjectTrafficScope(
-      t.projectId,
-      t.actorUserId ?? t.project.userId,
-    );
-    await releaseTrafficSlot(scope.scopeKey);
-    const payload =
-      t.inputPayload && typeof t.inputPayload === "object" && !Array.isArray(t.inputPayload)
-        ? (t.inputPayload as Record<string, unknown>)
-        : {};
-    const stuckClaim =
-      payload.gatewayKieSubmitClaimed === true &&
-      !payload.gatewayLogId &&
-      !t.kieTaskId;
-    await prisma.canvasGenerationTask.update({
-      where: { id: t.id },
-      data: {
-        status: "QUEUED",
-        dispatchAfter: queueDispatchAfterFromIndex(n),
-        ...(stuckClaim
-          ? {
-              inputPayload: {
-                ...payload,
-                gatewayKieSubmitClaimed: false,
-                syncGatewaySubmit: true,
-              },
-            }
-          : {}),
-      },
-    });
-    n++;
-  }
-  return n;
+  const { recoverStalePreSubmitVideoTasks } = await import(
+    "./recover-stale-dispatching"
+  );
+  return recoverStalePreSubmitVideoTasks({ limit: 50 });
 }
 
 /** P0 对账 + 顺带推进 QUEUED dispatch（cron / 脚本） */

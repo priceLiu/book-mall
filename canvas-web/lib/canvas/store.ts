@@ -95,6 +95,7 @@ import {
   isCanvasPositionCommitOnly,
   syncNodeDimensionsFromChanges,
 } from "./canvas-node-changes";
+import { preserveLocalInflightOnHydrateLayout } from "./hydrate-inflight-preserve";
 
 /** 大图 hydrate：列高/媒体同步延后一帧，先出画布 */
 const DEFER_HYDRATE_LAYOUT_NODE_COUNT = 24;
@@ -414,9 +415,13 @@ export const useCanvasStore = create<CanvasState>()(
         const applyDeferredLayout = () => {
           const current = get();
           const laid = finalizeHydratedGraph(current.nodes, current.edges);
+          const nodesWithInflight = preserveLocalInflightOnHydrateLayout(
+            current.nodes,
+            laid.nodes,
+          );
           set((state) =>
             withGraphRevision(state, {
-              nodes: isolateSharedCanvasNodeData(laid.nodes),
+              nodes: isolateSharedCanvasNodeData(nodesWithInflight),
               edges: laid.edges,
             }),
           );

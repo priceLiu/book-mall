@@ -89,6 +89,15 @@ export function formatCanvasTaskError(
   const blob = `${code} ${msg} ${failMessage ?? ""}`.toLowerCase();
 
   if (
+    code === "SUBMIT_DISPATCH_TIMEOUT" ||
+    code === "QUEUE_TIMEOUT" ||
+    msg.includes("排队超过") ||
+    msg.includes("提交生成超时")
+  ) {
+    return "提交生成超时, 请重试";
+  }
+
+  if (
     blob.includes("429") ||
     blob.includes("frequency") ||
     blob.includes("rate limit") ||

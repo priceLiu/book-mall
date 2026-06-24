@@ -23,6 +23,11 @@ export type VideoBackgroundGenerationMeta = {
   promotedAtMs?: number;
 };
 
+/** 交通控流槽释放（与 UI「后台生成」解耦：可在 SUBMITTED 后立即释放） */
+export type GatewayTrafficSlotMeta = {
+  releasedAtMs: number;
+};
+
 export function readVideoBackgroundGeneration(
   resultSummary: unknown,
 ): VideoBackgroundGenerationMeta | null {
@@ -38,6 +43,38 @@ export function readVideoBackgroundGeneration(
     slotReleased: (bg as Record<string, unknown>).slotReleased === true,
     promotedAtMs: Number((bg as Record<string, unknown>).promotedAtMs) || undefined,
   };
+}
+
+export function readGatewayTrafficSlotReleased(
+  resultSummary: unknown,
+): GatewayTrafficSlotMeta | null {
+  if (!resultSummary || typeof resultSummary !== "object") return null;
+  const gw = (resultSummary as Record<string, unknown>)._gateway;
+  if (!gw || typeof gw !== "object") return null;
+  const releasedAtMs = Number((gw as Record<string, unknown>).trafficSlotReleasedAtMs);
+  if (!Number.isFinite(releasedAtMs)) return null;
+  return { releasedAtMs };
+}
+
+export function attachGatewayTrafficSlotReleased(
+  resultSummary: unknown,
+  releasedAtMs: number = Date.now(),
+): Record<string, unknown> {
+  const base =
+    resultSummary && typeof resultSummary === "object" && !Array.isArray(resultSummary)
+      ? ({ ...(resultSummary as Record<string, unknown>) } as Record<string, unknown>)
+      : resultSummary != null
+        ? { value: resultSummary }
+        : {};
+  const prevGw =
+    base._gateway && typeof base._gateway === "object"
+      ? { ...(base._gateway as Record<string, unknown>) }
+      : {};
+  base._gateway = {
+    ...prevGw,
+    trafficSlotReleasedAtMs: releasedAtMs,
+  };
+  return base;
 }
 
 export function attachVideoBackgroundGeneration(
@@ -65,13 +102,14 @@ export function attachVideoBackgroundGeneration(
   return base;
 }
 
-/** Gateway RUNNING 视频是否仍占用交通并发槽（后台已释放槽的不计入） */
+/** Gateway RUNNING 视频是否仍占用交通并发槽（已标记 trafficSlotReleased 或 legacy 后台释放的不计入） */
 export function isGatewayVideoLogOccupyingTrafficSlot(input: {
   status: string;
   requestKind?: string | null;
   resultSummary?: unknown;
 }): boolean {
   if (input.status !== "RUNNING" || input.requestKind !== "VIDEO") return false;
+  if (readGatewayTrafficSlotReleased(input.resultSummary)) return false;
   const bg = readVideoBackgroundGeneration(input.resultSummary);
   return !(bg?.slotReleased === true);
 }

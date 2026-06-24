@@ -1,12 +1,15 @@
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import { showCanvasCreditsToast } from "@/components/canvas/canvas-credits-toast-host";
+import {
+  clearCanvasNodeRunSession,
+  isCanvasNodeRunSessionActive,
+  markCanvasNodeRunSession,
+} from "./canvas-run-session";
 
 const shownTaskIds = new Set<string>();
 const lastStatus = new Map<string, string>();
 /** 本页会话内见过「进行中」态的任务 */
 const sessionInflightTaskIds = new Set<string>();
-/** 本页会话内用户触发的生成（runOne 开始时登记 nodeId） */
-const sessionStartedNodeIds = new Set<string>();
 
 const INFLIGHT_STATUSES = new Set([
   "QUEUED",
@@ -17,8 +20,7 @@ const INFLIGHT_STATUSES = new Set([
 
 /** 用户点击生成后登记，用于同步返回 SUCCEEDED 时仍能弹积分提示 */
 export function markCanvasNodeGenerationStarted(nodeId: string): void {
-  if (!nodeId) return;
-  sessionStartedNodeIds.add(nodeId);
+  markCanvasNodeRunSession(nodeId);
 }
 
 function markTaskInflight(taskId: string): void {
@@ -28,7 +30,7 @@ function markTaskInflight(taskId: string): void {
 
 function isLiveCreditsSettle(task: CanvasTaskRecord, prev: string | undefined): boolean {
   if (sessionInflightTaskIds.has(task.id)) return true;
-  if (sessionStartedNodeIds.has(task.nodeId)) return true;
+  if (isCanvasNodeRunSessionActive(task.nodeId)) return true;
   if (prev !== undefined && prev !== "SUCCEEDED") return true;
   return false;
 }
@@ -53,7 +55,7 @@ export function maybeNotifyCanvasCreditsSettled(task: CanvasTaskRecord): void {
 
   shownTaskIds.add(task.id);
   sessionInflightTaskIds.delete(task.id);
-  sessionStartedNodeIds.delete(task.nodeId);
+  clearCanvasNodeRunSession(task.nodeId);
 
   if (shownTaskIds.size > 400) {
     shownTaskIds.clear();

@@ -637,6 +637,8 @@ export function useCanvasRunner(
 
   const drainRef = useRef<() => void>(() => {});
   const pumpSequentialRef = useRef<() => void>(() => {});
+  /** 入队后立即触发任务轮询，避免等 INITIAL_TICK_DELAY 才同步服务端态 */
+  const pollKickRef = useRef<(() => void) | null>(null);
 
   const releaseInflightKey = useCallback((key: string) => {
     if (!inflightRef.current.delete(key)) return;
@@ -759,6 +761,7 @@ export function useCanvasRunner(
 
     seq.activeKey = key;
     detachNodeTaskRefs(job);
+    markCanvasNodeGenerationStarted(job.nodeId);
     const nodesNow = useCanvasStore.getState().nodes;
     if (
       !commitStoryRunPendingPatch(node, job, nodesNow, updateNodeData) &&
@@ -773,6 +776,7 @@ export function useCanvasRunner(
     }
     queueRef.current.push({ ...job, forceFresh: seq.forceFresh });
     drainRef.current();
+    pollKickRef.current?.();
   }, [abortSequential, setNodeRuntime, updateNodeData, detachNodeTaskRefs]);
 
   useEffect(() => {
@@ -997,7 +1001,7 @@ export function useCanvasRunner(
                 r.task.model,
               ),
             };
-            if (shouldApplyCanvasTaskRuntimePatch(localRt, r.task, errorPatch)) {
+            if (shouldApplyCanvasTaskRuntimePatch(localRt, r.task, errorPatch, nodeId)) {
               setNodeRuntime(nodeId, errorPatch);
             }
           }
@@ -1106,7 +1110,7 @@ export function useCanvasRunner(
                     pick.model,
                   ),
                 };
-                if (shouldApplyCanvasTaskRuntimePatch(localRt, pick, errorPatch)) {
+                if (shouldApplyCanvasTaskRuntimePatch(localRt, pick, errorPatch, nodeId)) {
                   setNodeRuntime(nodeId, errorPatch);
                 }
               } else {
@@ -1291,6 +1295,7 @@ export function useCanvasRunner(
         return;
       }
       detachNodeTaskRefs(job);
+      markCanvasNodeGenerationStarted(job.nodeId);
       if (node) {
         const nodesNow = useCanvasStore.getState().nodes;
         if (
@@ -1307,6 +1312,7 @@ export function useCanvasRunner(
       }
       queueRef.current.push(job);
       drain();
+      pollKickRef.current?.();
     },
     [drain, setNodeRuntime, updateNodeData, gatewayLinkAccountUrl, gatewayLinkBlocked, detachNodeTaskRefs],
   );
@@ -1500,7 +1506,7 @@ export function useCanvasRunner(
         job: CanvasStoryRunJob,
         localRuntime: CanvasNodeRuntime | undefined,
       ) => {
-        if (shouldSkipStoryRowTaskApply(localRuntime, pick)) return;
+        if (shouldSkipStoryRowTaskApply(localRuntime, pick, node.id)) return;
         storyApplyTaskResult(node, pick, job, updateNodeData, nodes);
         if (pick.status === "SUCCEEDED" || pick.status === "FAILED") {
           releaseInflightKey(runKey(job));
@@ -1731,7 +1737,7 @@ export function useCanvasRunner(
         return;
       }
       if (patch) {
-        if (!shouldApplyCanvasTaskRuntimePatch(localRt, t, patch)) return;
+        if (!shouldApplyCanvasTaskRuntimePatch(localRt, t, patch, nodeId)) return;
         setNodeRuntime(nodeId, patch);
         if (t.textOutput) {
           if (node?.type === "ai-engine" || isStoryLlmNodeType(node?.type ?? "")) {
@@ -1872,16 +1878,33 @@ export function useCanvasRunner(
       scheduleNext();
     };
 
+    pollKickRef.current = () => {
+      if (cancelled || pollStopped) return;
+      if (loopTimer) window.clearTimeout(loopTimer);
+      void loop(false);
+    };
+
+    const initialDelay =
+      inflightRef.current.size > 0 ||
+      queueRef.current.length > 0 ||
+      collectCanvasTaskPollNodeIds(useCanvasStore.getState().nodes).length > 0
+        ? 0
+        : INITIAL_TICK_DELAY_MS;
     const initialTickTimer = window.setTimeout(
       () => void loop(false),
-      INITIAL_TICK_DELAY_MS,
+      initialDelay,
     );
+    const fullScanDelay =
+      inflightRef.current.size > 0 || queueRef.current.length > 0
+        ? Math.min(INITIAL_FULL_SCAN_DELAY_MS, 1500)
+        : INITIAL_FULL_SCAN_DELAY_MS;
     const fullScanTimer = window.setTimeout(
       () => void tick(true),
-      INITIAL_FULL_SCAN_DELAY_MS,
+      fullScanDelay,
     );
     return () => {
       cancelled = true;
+      pollKickRef.current = null;
       if (loopTimer) window.clearTimeout(loopTimer);
       window.clearTimeout(initialTickTimer);
       window.clearTimeout(fullScanTimer);
