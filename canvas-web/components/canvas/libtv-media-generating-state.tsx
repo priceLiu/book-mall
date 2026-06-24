@@ -13,11 +13,18 @@ import { cn } from "@/lib/utils";
 /** LibTV 媒体节点是否处于生图/生视频/上传进行中 */
 export function isLibtvMediaGenerating(data: {
   uploading?: unknown;
-  runtime?: { status?: string } | null;
+  runtime?: {
+    status?: string;
+    ossUrl?: string;
+    ephemeralUrl?: string;
+  } | null;
 }): boolean {
   const s = data.runtime?.status;
+  const rt = data.runtime;
   // 终态优先：乐观 UI 可能遗留 uploading=true，勿把已完成节点仍显示为生成中
   if (s === "done" || s === "error" || s === "idle") return false;
+  // runtime 已写回成片但 status 仍 pending/running（任务表滞后或 SUBMITTED 未刷新）
+  if (rt?.ossUrl?.trim() || rt?.ephemeralUrl?.trim()) return false;
   if (data.uploading) return true;
   return s === "running" || s === "pending";
 }

@@ -18,6 +18,10 @@ function interpretToolsSession(
       return "无 tools_token 或为空：浏览器未带会话 Cookie（或未 SSO）。↑ active=false 预期如此";
     case "jwt_local":
       return "JWT 本地验签成功，未请求主站；Neon/跨域不参与本条路径";
+    case "jwt_fallback_after_abort":
+      return "主站 introspect 超时后回落 JWT 本地验签；Neon/DB 冷启动时常见";
+    case "jwt_fallback_network":
+      return "主站 introspect 网络失败后回落 JWT 本地验签；检查 MAIN_SITE_ORIGIN 与主站可达性";
     case "missing_main_origin":
       return "MAIN_SITE_ORIGIN 未配置，无法回落 introspect；请补工具站环境变量";
     case "introspect_aborted":
