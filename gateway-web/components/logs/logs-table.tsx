@@ -661,7 +661,9 @@ const LogsTableRow = memo(function LogsTableRow({
   const vendorTaskId = formatLogMonospaceId(l.externalTaskId);
   const appTask = formatLogAppTaskCell(l);
   const queueCell = formatLogTimingPhaseCell(queueMs, "queue");
-  const generateCell = formatLogTimingPhaseCell(generateMs, "generate");
+  const generateCell = formatLogTimingPhaseCell(generateMs, "generate", {
+    pending: isInProgress && generateMs == null && queueMs != null,
+  });
   const postProcCell = formatLogTimingPhaseCell(
     vendorPostProcessMs,
     "postproc",
@@ -1921,7 +1923,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="w-[88px] bg-sky-950/20"
-                title="我们 · Gateway 段：Submitted → Completed。不含出队前等待；进行中为墙钟递增。"
+                title="我们 · Gateway 段：各阶段之和（排队+生成+后处理+轮询）；非墙钟。总耗时见左列。"
               >
                 网关段
               </th>
@@ -1939,7 +1941,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="w-[88px] bg-zinc-800/25"
-                title="厂商 GPU 生成：进行中为墙钟；成功为 updated_at−created_at；失败为观测到厂商终态前的等待"
+                title="厂商 GPU：updated_at 跳变后冻结（created→updated）；生成中 updated 未动显示 …"
               >
                 生成
               </th>
@@ -1951,13 +1953,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="w-[72px] bg-zinc-800/25 text-[var(--gw-muted)]"
-                title="厂商原生总耗时（只读）：KIE costTime 或火山 created_at→updated_at；不写回库。"
+                title="厂商原生总耗时：终态或 updated 已跳变后冻结；GPU 进行中为 —"
               >
                 厂商总耗时
               </th>
               <th
                 className="w-[72px] border-r border-white/10 bg-zinc-800/25 text-[var(--gw-muted)]"
-                title="厂商原生生成耗时（只读）：火山 trace 或 KIE costTime；不写回库。"
+                title="厂商原生 GPU：updated−created；未跳变前不计秒"
               >
                 厂商生成
               </th>

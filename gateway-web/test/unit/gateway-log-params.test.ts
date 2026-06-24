@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { resolveLogDisplayDurationMs } from "@/lib/gateway-log-params";
 
 describe("resolveLogDisplayDurationMs", () => {
-  it("in-progress prefers submitted wall clock over phase sum", () => {
+  it("in-progress uses phase sum (not gateway wall clock)", () => {
     const submittedAt = new Date(1_000_000).toISOString();
     const nowMs = 1_000_000 + 80_000;
     const ms = resolveLogDisplayDurationMs({
@@ -13,11 +13,26 @@ describe("resolveLogDisplayDurationMs", () => {
       isInProgress: true,
       nowMs,
       queueMs: 1_000,
-      generateMs: 79_000,
+      generateMs: 233_000,
       pollDelayMs: 73_000,
-      liveTotalMs: 152_000,
+      liveTotalMs: 80_000,
     });
-    expect(ms).toBe(80_000);
+    expect(ms).toBe(307_000);
+  });
+
+  it("in-progress with generate pending uses queue + poll only", () => {
+    const submittedAt = new Date(1_000_000).toISOString();
+    const ms = resolveLogDisplayDurationMs({
+      durationMs: null,
+      submittedAt,
+      completedAt: null,
+      isInProgress: true,
+      nowMs: 1_000_000 + 900_000,
+      queueMs: 5_000,
+      generateMs: null,
+      pollDelayMs: 800_000,
+    });
+    expect(ms).toBe(805_000);
   });
 
   it("terminal uses stored durationMs", () => {

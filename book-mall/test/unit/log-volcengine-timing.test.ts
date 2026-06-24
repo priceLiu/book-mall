@@ -151,9 +151,7 @@ describe("log-volcengine-timing", () => {
     ).toBeNull();
   });
 
-  it("in-flight running: Generate tracks wall-clock, Poll Δ = our poll lag (fresh poll → 0)", () => {
-    // 火山生成中 updated_at 恒等于 created_at：Generate 必须走墙钟（仍在生成，持续增长），
-    // Poll Δ 只反映我方轮询延迟。刚 poll 过 → Poll Δ ≈ 0，绝不能把生成时间写进 Poll Δ。
+  it("in-flight running: Generate null until vendor updated jumps; Poll Δ = poll lag", () => {
     const submittedAtMs = 1_000_000;
     const genStartMs = 1_000_000 + 3_000;
     const firstPollMs = genStartMs + 5_000;
@@ -173,7 +171,7 @@ describe("log-volcengine-timing", () => {
         created_at: genStartMs / 1000,
         updated_at: genStartMs / 1000,
       },
-      polledAtMs: nowMs, // 刚刚成功 poll
+      polledAtMs: nowMs,
     });
 
     const breakdown = computeVolcengineTimingBreakdown({
@@ -184,8 +182,8 @@ describe("log-volcengine-timing", () => {
     });
 
     expect(breakdown.queueMs).toBe(3_000);
-    expect(breakdown.generateMs).toBe(65_000); // 墙钟生成时长
-    expect(breakdown.pollDelayMs).toBe(0); // 刚 poll 过，无延迟
+    expect(breakdown.generateMs).toBeNull();
+    expect(breakdown.pollDelayMs).toBe(0);
     expect(breakdown.pollDelayOverLimit).toBe(false);
   });
 
@@ -213,8 +211,32 @@ describe("log-volcengine-timing", () => {
     });
 
     expect(breakdown.queueMs).toBe(3_000);
-    expect(breakdown.generateMs).toBe(65_000); // 墙钟生成时长
-    expect(breakdown.pollDelayMs).toBe(60_000); // now − lastPolled
+    expect(breakdown.generateMs).toBeNull();
+    expect(breakdown.pollDelayMs).toBe(60_000);
+  });
+
+  it("in-flight running: generate freezes after vendor updated jump; postproc ticks", () => {
+    const submittedAtMs = 1_000_000;
+    const createdMs = submittedAtMs + 5_000;
+    const updatedMs = createdMs + 233_000;
+    const nowMs = updatedMs + 120_000;
+    const trace = mergeVolcengineTimingTrace(null, {
+      status: "running",
+      raw: {
+        created_at: createdMs / 1000,
+        updated_at: updatedMs / 1000,
+      },
+      polledAtMs: nowMs - 5_000,
+    });
+    const breakdown = computeVolcengineTimingBreakdown({
+      trace,
+      submittedAtMs,
+      completedAtMs: null,
+      nowMs,
+    });
+    expect(breakdown.generateMs).toBe(233_000);
+    expect(breakdown.vendorPostProcessMs).toBe(120_000);
+    expect(breakdown.pollDelayMs).toBe(5_000);
   });
 
   it("terminal failed without succeeded does not bucket into postproc", () => {
@@ -335,7 +357,7 @@ describe("log-volcengine-timing", () => {
     expect(isVolcengineVendorStuck(trace, nowMs)).toBe(true);
   });
 
-  it("resolveVendorNativeTimingForLogRow: Seedance running frozen updated uses now−created", () => {
+  it("resolveVendorNativeTimingForLogRow: Seedance GPU 进行中 updated 未跳变 → null（不计秒）", () => {
     const createdMs = 1_000_000;
     const nowMs = createdMs + 1_084_000;
     const trace = mergeVolcengineTimingTrace(null, {
@@ -353,7 +375,8 @@ describe("log-volcengine-timing", () => {
       resultSummary: { _gateway: { volcengineTiming: trace } },
       nowMs,
     });
-    expect(row.vendorNativeGenerateMs).toBe(1_084_000);
+    expect(row.vendorNativeGenerateMs).toBeNull();
+    expect(row.vendorNativeDurationMs).toBeNull();
   });
 
   it("resolveVendorNativeTimingForLogRow uses volcengine trace span", () => {

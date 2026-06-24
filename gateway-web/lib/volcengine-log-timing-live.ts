@@ -44,7 +44,23 @@ function normalizeStatus(raw: unknown): string {
     .toLowerCase();
 }
 
-/** 进行中火山视频 · Generate / 后处理 / Poll Δ 与 book-mall 一致 */
+function isSeedanceFrozenUpdatedAt(
+  vendorCreated: number | undefined,
+  vendorUpdated: number | undefined,
+): boolean {
+  if (vendorCreated == null || vendorUpdated == null) return false;
+  return vendorUpdated - vendorCreated <= 5_000;
+}
+
+function volcengineVendorGpuMs(trace: VolcengineTimingTrace): number | null {
+  const created = trace.vendorCreatedAtMs;
+  const updated = trace.vendorUpdatedAtMs;
+  if (created == null || updated == null) return null;
+  if (isSeedanceFrozenUpdatedAt(created, updated)) return null;
+  return Math.max(0, updated - created);
+}
+
+/** 进行中火山视频 · 分阶段计时（与 book-mall computeVolcengineTimingBreakdown 一致） */
 export function liveVolcengineVideoTiming(input: {
   submittedAt: string;
   completedAt: string | null;
@@ -52,7 +68,7 @@ export function liveVolcengineVideoTiming(input: {
   nowMs: number;
 }): {
   queueMs: number;
-  generateMs: number;
+  generateMs: number | null;
   vendorPostProcessMs: number | null;
   pollDelayMs: number;
   totalMs: number;
@@ -67,25 +83,22 @@ export function liveVolcengineVideoTiming(input: {
 
   const st = normalizeStatus(trace.lastStatus);
   const vendorUpdated = trace.vendorUpdatedAtMs;
-  const vendorCreated = trace.vendorCreatedAtMs;
   const hasStartedRunning =
     st === "running" || st === "processing" || trace.firstRunningAtMs != null;
 
-  let generateMs: number;
+  let generateMs: number | null = null;
   let vendorPostProcessMs: number | null = null;
-  if (
-    hasStartedRunning &&
-    vendorUpdated != null &&
-    vendorCreated != null &&
-    vendorUpdated > vendorCreated &&
-    (st === "running" || st === "processing")
-  ) {
-    generateMs = Math.max(0, vendorUpdated - genStart);
-    vendorPostProcessMs = Math.max(0, input.nowMs - vendorUpdated);
+  const gpuMs = volcengineVendorGpuMs(trace);
+  if (gpuMs != null) {
+    generateMs = gpuMs;
+    if (
+      vendorUpdated != null &&
+      (st === "running" || st === "processing")
+    ) {
+      vendorPostProcessMs = Math.max(0, input.nowMs - vendorUpdated);
+    }
   } else if (hasStartedRunning) {
-    generateMs = Math.max(0, input.nowMs - genStart);
-  } else {
-    generateMs = 0;
+    generateMs = null;
   }
 
   const lastPolled = trace.lastPolledAtMs;
@@ -106,7 +119,7 @@ function isInProgressStatus(status: string): boolean {
   return s === "RUNNING" || s === "PENDING";
 }
 
-/** 进行中任务 · 各阶段墙钟（火山 trace 优先，否则按总墙钟外推 Generate） */
+/** 进行中任务 · 各阶段（火山 trace 优先；无 trace 时不外推厂商生成墙钟） */
 export function resolveLiveLogPhaseTiming(input: {
   submittedAt: string;
   completedAt: string | null;
@@ -149,52 +162,35 @@ export function resolveLiveLogPhaseTiming(input: {
   }
 
   const submittedMs = new Date(input.submittedAt).getTime();
-  const wallMs = Math.max(0, input.nowMs - submittedMs);
-  const queueMs = server.queueMs ?? 0;
-  const postProc = server.vendorPostProcessMs ?? 0;
-  const generateMs = Math.max(
-    server.generateMs ?? 0,
-    Math.max(0, wallMs - queueMs - (server.pollDelayMs ?? 0) - postProc),
-  );
-  const pollDelayMs = Math.max(
-    server.pollDelayMs ?? 0,
-    Math.max(0, wallMs - queueMs - generateMs - postProc),
-  );
-
   return {
-    queueMs,
-    generateMs,
-    vendorPostProcessMs: postProc > 0 ? postProc : null,
-    pollDelayMs,
-    totalMs: wallMs,
+    queueMs: server.queueMs ?? null,
+    generateMs: server.generateMs ?? null,
+    vendorPostProcessMs: server.vendorPostProcessMs ?? null,
+    pollDelayMs: server.pollDelayMs ?? null,
+    totalMs: Math.max(0, input.nowMs - submittedMs),
   };
 }
 
-/** 火山 trace 原生跨度终点（与 book-mall resolveVolcengineVendorTraceEndMs 对齐） */
+/** 火山 trace 原生跨度终点（GPU 进行中 → null） */
 function resolveVolcengineVendorTraceEndMs(
   trace: VolcengineTimingTrace,
-  nowMs: number,
 ): number | null {
   if (trace.vendorCreatedAtMs == null) return null;
   const st = normalizeStatus(trace.lastStatus);
   const terminal = isVendorTerminalStatus(st);
   const created = trace.vendorCreatedAtMs;
   const updated = trace.vendorUpdatedAtMs;
-  const updatedFrozen =
-    created != null &&
-    updated != null &&
-    updated - created <= 5_000;
 
   if (terminal) {
     return updated ?? created;
   }
-  if (updated != null && !updatedFrozen) {
+  if (updated != null && !isSeedanceFrozenUpdatedAt(created, updated)) {
     return updated;
   }
-  return nowMs;
+  return null;
 }
 
-/** 厂商原生耗时（只读对比列；进行中火山 trace 用墙钟补 updated） */
+/** 厂商原生耗时（只读；阶段完成才出数） */
 export function resolveVendorNativeTimingLive(input: {
   providerKind: string | null;
   requestKind: string;
@@ -218,7 +214,7 @@ export function resolveVendorNativeTimingLive(input: {
   if (input.providerKind === "VOLCENGINE" && input.requestKind === "VIDEO") {
     const trace = readVolcengineTimingTrace(input.resultSummary);
     if (trace?.vendorCreatedAtMs != null) {
-      const end = resolveVolcengineVendorTraceEndMs(trace, input.nowMs);
+      const end = resolveVolcengineVendorTraceEndMs(trace);
       if (end != null) {
         vendorTraceSpanMs = Math.max(0, end - trace.vendorCreatedAtMs);
       }
