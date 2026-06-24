@@ -31,6 +31,7 @@ export class CanvasProjectError extends Error {
       | "MODEL_NOT_AVAILABLE"
       | "PROVIDER_KEYS_REQUIRED"
       | "GATEWAY_KEY_REQUIRED"
+      | "INSUFFICIENT_CREDITS"
       | "UPSTREAM_ERROR",
     message: string,
     public httpStatus = 400,
