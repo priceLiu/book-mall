@@ -7,6 +7,7 @@ import storyManifest from "@/lib/story-theater-videos.manifest.json";
 export type ToolWorkShowcaseItem = {
   id: string;
   imageUrl: string;
+  videoUrl: string | null;
   title: string;
   categoryLabel: string;
   productHref: string | null;
@@ -23,6 +24,7 @@ type GalleryEntry = {
   id: string;
   title: string;
   thumbnailUrl: string;
+  output?: { mediaType?: string; url?: string };
 };
 
 const STORY_THEATER_TITLES = [
@@ -72,6 +74,7 @@ function listToolStationShowcaseItems(
     items.push({
       id: `story-${video.id}`,
       imageUrl: `${storyOrigin}/imgs/covers/cover-${(i % 15) + 1}.png`,
+      videoUrl: video.url,
       title: STORY_THEATER_TITLES[i % STORY_THEATER_TITLES.length] ?? video.id,
       categoryLabel: "漫剧剧场",
       productHref: productHrefForNavKey("story-theater", productSlugByNavKey),
@@ -119,6 +122,10 @@ function listQuickReplicaShowcaseItems(
       items.push({
         id: entry.id,
         imageUrl: entry.thumbnailUrl,
+        videoUrl:
+          entry.output?.mediaType === "video" && entry.output.url
+            ? entry.output.url
+            : null,
         title: entry.title,
         categoryLabel: pool.categoryLabel,
         productHref: pool.navKey

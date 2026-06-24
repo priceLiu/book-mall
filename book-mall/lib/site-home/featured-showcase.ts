@@ -5,6 +5,7 @@ import { listToolWorkShowcaseItems } from "@/lib/site-home/tool-works-showcase";
 export type FeaturedShowcaseCard = {
   id: string;
   imageUrl: string;
+  videoUrl: string | null;
   title: string;
   summary?: string;
   categoryLabel: string;
@@ -55,6 +56,7 @@ export function buildFeaturedShowcaseCards(
     return {
       id: `product-${p.id}`,
       imageUrl: p.coverImageUrl,
+      videoUrl: null,
       title: p.title,
       summary: p.summary,
       categoryLabel: categoryLine(p.kind, p.category?.name),
@@ -74,6 +76,7 @@ export function buildFeaturedShowcaseCards(
     cards.push({
       id: work.id,
       imageUrl: work.imageUrl,
+      videoUrl: work.videoUrl,
       title: work.title,
       categoryLabel: work.categoryLabel,
       coverAspect: "aspect-square",
