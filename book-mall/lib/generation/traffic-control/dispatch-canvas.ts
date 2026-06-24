@@ -137,6 +137,7 @@ async function recoverStaleDispatching(projectId?: string): Promise<number> {
       OR: [
         { updatedAt: { lt: cutoff } },
         { kieTaskId: null, queuedAt: { lt: cutoff } },
+        { kieTaskId: null, queuedAt: null, createdAt: { lt: cutoff } },
       ],
     },
     select: {

@@ -62,6 +62,7 @@
     "canvas:diagnose-user": "dotenv -e .env.local -- tsx scripts/diagnose-canvas-user.ts",
     "canvas:recover-volcengine-timeout": "dotenv -e .env.local -- tsx scripts/recover-canvas-volcengine-timeout.ts",
     "canvas:queued-reconcile": "dotenv -e .env.local -- tsx scripts/canvas-queued-reconcile.ts",
+    "canvas:diagnose-missing-gateway-log": "dotenv -e .env.local -- tsx scripts/diagnose-missing-gateway-log.ts",
     "generation:reconcile-traffic": "dotenv -e .env.local -- tsx scripts/reconcile-generation-traffic.ts",
     "canvas:generate-style-library-placeholders": "tsx scripts/generate-style-library-placeholders.ts",
     "canvas:fetch-style-library-from-html": "tsx scripts/fetch-style-library-from-html.ts",
