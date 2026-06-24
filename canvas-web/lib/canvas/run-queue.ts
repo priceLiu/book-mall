@@ -1692,6 +1692,7 @@ export function useCanvasRunner(
         boundTaskId === t.id;
       // 本地 pending/running 时，列表「最新」可能仍是上一轮终态任务
       if (isLocalInflightStatus(localSt) && isTerminal) {
+        if (shouldSkipStoryRowTaskApply(localRt, t, nodeId)) return;
         if (!isCurrentTaskTerminal) return;
       }
       // 仍绑定其它 taskId 时，忽略「非当前任务」的终态，避免旧成功覆盖新提交
@@ -1711,6 +1712,14 @@ export function useCanvasRunner(
           t,
         );
         if (sbv1Patch) {
+          const rtPatch = sbv1Patch.runtime as Partial<CanvasNodeRuntime> | undefined;
+          if (shouldSkipStoryRowTaskApply(localRt, t, nodeId)) return;
+          if (
+            rtPatch &&
+            !shouldApplyCanvasTaskRuntimePatch(localRt, t, rtPatch, nodeId)
+          ) {
+            return;
+          }
           updateNodeData(nodeId, sbv1Patch);
           const st = (sbv1Patch.runtime as CanvasNodeRuntime | undefined)?.status;
           if (st === "done" || st === "error") {
@@ -1725,6 +1734,14 @@ export function useCanvasRunner(
       if (node?.type === "sbv1-video-engine") {
         const videoPatch = sbv1VideoPatchFromTask(t);
         if (videoPatch) {
+          const rtPatch = videoPatch.runtime as Partial<CanvasNodeRuntime> | undefined;
+          if (shouldSkipStoryRowTaskApply(localRt, t, nodeId)) return;
+          if (
+            rtPatch &&
+            !shouldApplyCanvasTaskRuntimePatch(localRt, t, rtPatch, nodeId)
+          ) {
+            return;
+          }
           updateNodeData(nodeId, videoPatch);
           const st = (videoPatch.runtime as CanvasNodeRuntime | undefined)?.status;
           if (st === "done" || st === "error") {
