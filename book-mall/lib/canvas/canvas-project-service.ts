@@ -16,6 +16,7 @@ import {
   pickProjectThumbnailUrl,
 } from "@/lib/canvas/pick-project-thumbnail";
 import { cloneCanvasGraphForDuplicate } from "@/lib/canvas/clone-canvas-graph";
+import { mergePersistedMediaIntoCanvasGraph } from "@/lib/canvas/canvas-persist-merge";
 import { extractManagedOssObjectKey } from "@/lib/oss-delete-object";
 import { readOssEnv } from "@/lib/oss-client";
 
@@ -236,7 +237,11 @@ export async function updateCanvasProjectForUser(
         409,
       );
     }
-    data.canvas = patch.canvas as Prisma.InputJsonValue;
+    const mergedCanvas = mergePersistedMediaIntoCanvasGraph(
+      patch.canvas,
+      p.canvas,
+    );
+    data.canvas = mergedCanvas as Prisma.InputJsonValue;
   }
 
   const updated = await prisma.canvasProject.update({

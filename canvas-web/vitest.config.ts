@@ -18,8 +18,8 @@ export default defineConfig({
   },
   test: {
     include: [
-      // Gen-HotCold-R2 纯函数单测（按需扩展）。
       "test/unit/poll-interval.test.ts",
+      "test/unit/canvas-panel-data-recovery.test.ts",
     ],
     environment: "node",
     globals: false,
