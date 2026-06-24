@@ -12,6 +12,7 @@ import {
 } from "@/lib/gateway/model-registry";
 import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
 import { PLATFORM_MEDIA_KIND_LABEL, canonicalByKey } from "@/lib/platform-model/canonical-registry";
+import { showcaseCoverUrlFor } from "@/lib/gateway/market-showcase-covers";
 import { prisma } from "@/lib/prisma";
 
 export type MarketTaskTag =
@@ -67,6 +68,16 @@ const VENDOR_LABEL: Record<string, string> = {
   deepseek: "DeepSeek",
   tencent: "Tencent",
 };
+
+/** 不对用户展示的第三方路由/聚合平台（可展示厂商名） */
+const HIDDEN_PLATFORM_VENDORS = new Set(["kie"]);
+
+const HIDDEN_PLATFORM_LABELS = new Set([
+  "kie",
+  "bailian",
+  "dashscope",
+  "volcengine gateway",
+]);
 
 export function marketTaskTagsForModel(input: {
   canonicalKey: string;
@@ -160,6 +171,41 @@ export function providerLabelFor(canonicalKey: string, vendor: string): string {
     VENDOR_LABEL[vendor.toLowerCase()] ??
     vendor
   );
+}
+
+/** 首页走马灯：仅展示厂商名，隐藏 KIE 等第三方路由平台。 */
+export function showcaseVendorLabelFor(
+  canonicalKey: string,
+  routeVendor: string,
+): string | null {
+  const fromPresentation = presentationFor(canonicalKey).providerLabel?.trim();
+  if (fromPresentation && !HIDDEN_PLATFORM_LABELS.has(fromPresentation.toLowerCase())) {
+    return fromPresentation;
+  }
+
+  const vendor = routeVendor.trim().toLowerCase();
+  if (!HIDDEN_PLATFORM_VENDORS.has(vendor)) {
+    const label = VENDOR_LABEL[vendor];
+    if (label) return label;
+  }
+
+  const def = canonicalByKey(canonicalKey);
+  const primary = def?.primaryVendor?.trim().toLowerCase();
+  if (primary && !HIDDEN_PLATFORM_VENDORS.has(primary)) {
+    const label = VENDOR_LABEL[primary];
+    if (label) return label;
+  }
+
+  return null;
+}
+
+/** 首页走马灯：去掉名称末尾的 (KIE) 等第三方路由平台标注，保留模型名本身。 */
+export function showcaseDisplayNameFor(displayName: string): string {
+  const trimmed = displayName.trim();
+  const stripped = trimmed
+    .replace(/\s*[\(（]\s*KIE\s*[\)）]\s*$/i, "")
+    .trim();
+  return stripped || trimmed;
 }
 
 export async function listMarketModelsForGatewayUser(input: {
@@ -372,4 +418,59 @@ export function featuredHeroSlides(): Array<{ canonicalKey: string; heroUrl: str
     canonicalKey: k,
     heroUrl: heroUrlFor(k),
   }));
+}
+
+export type MarketShowcaseItem = {
+  canonicalKey: string;
+  displayName: string;
+  description: string;
+  vendorLabel: string | null;
+  role: string;
+  creditsPerUnit: number | null;
+  coverUrl: string;
+};
+
+/** 首页模型走马灯：公开读取 ACTIVE 平台代付上架模型，无需 Gateway 登录态。 */
+export async function listPublicMarketShowcaseModels(
+  limit = 16,
+): Promise<MarketShowcaseItem[]> {
+  const offerings = await prisma.appModelOffering.findMany({
+    where: { status: "ACTIVE", activeModelKey: { not: null } },
+    orderBy: [{ sortOrder: "asc" }, { displayName: "asc" }],
+  });
+  const prices = await prisma.modelCreditPrice.findMany({
+    where: { active: true },
+    select: { canonicalModelKey: true, creditsPerUnit: true },
+  });
+  const priceMap = new Map(prices.map((p) => [p.canonicalModelKey, p.creditsPerUnit]));
+
+  const items: MarketShowcaseItem[] = [];
+  for (const o of offerings) {
+    const price = resolveOfferingCredits(
+      o.canonicalModelKey,
+      priceMap,
+      o.publishedCreditsPerUnit,
+    );
+    if (!price || !o.activeModelKey) continue;
+    const def = canonicalByKey(o.canonicalModelKey);
+    items.push({
+      canonicalKey: o.canonicalModelKey,
+      displayName: showcaseDisplayNameFor(o.displayName),
+      description: def?.description ?? "",
+      vendorLabel: showcaseVendorLabelFor(
+        o.canonicalModelKey,
+        o.activeVendor ?? "kie",
+      ),
+      role: o.role,
+      creditsPerUnit: o.publishedCreditsPerUnit ?? price,
+      coverUrl: showcaseCoverUrlFor(o.canonicalModelKey),
+    });
+  }
+
+  const featuredKeys = PRESENTATION.featuredCanonicalKeys ?? [];
+  const featured = featuredKeys
+    .map((k) => items.find((m) => m.canonicalKey === k))
+    .filter((m): m is MarketShowcaseItem => Boolean(m));
+  const rest = items.filter((m) => !featuredKeys.includes(m.canonicalKey));
+  return [...featured, ...rest].slice(0, limit);
 }
