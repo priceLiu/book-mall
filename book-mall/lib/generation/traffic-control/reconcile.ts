@@ -140,9 +140,17 @@ async function recoverStaleDispatchingTasks(): Promise<number> {
       OR: [
         { updatedAt: { lt: cutoff } },
         { kieTaskId: null, queuedAt: { lt: cutoff } },
+        { kieTaskId: null, queuedAt: null, createdAt: { lt: cutoff } },
       ],
     },
-    select: { id: true, projectId: true, actorUserId: true, project: { select: { userId: true } } },
+    select: {
+      id: true,
+      projectId: true,
+      actorUserId: true,
+      inputPayload: true,
+      kieTaskId: true,
+      project: { select: { userId: true } },
+    },
     take: 50,
   });
   let n = 0;
@@ -153,9 +161,29 @@ async function recoverStaleDispatchingTasks(): Promise<number> {
       t.actorUserId ?? t.project.userId,
     );
     await releaseTrafficSlot(scope.scopeKey);
+    const payload =
+      t.inputPayload && typeof t.inputPayload === "object" && !Array.isArray(t.inputPayload)
+        ? (t.inputPayload as Record<string, unknown>)
+        : {};
+    const stuckClaim =
+      payload.gatewayKieSubmitClaimed === true &&
+      !payload.gatewayLogId &&
+      !t.kieTaskId;
     await prisma.canvasGenerationTask.update({
       where: { id: t.id },
-      data: { status: "QUEUED", dispatchAfter: new Date() },
+      data: {
+        status: "QUEUED",
+        dispatchAfter: new Date(),
+        ...(stuckClaim
+          ? {
+              inputPayload: {
+                ...payload,
+                gatewayKieSubmitClaimed: false,
+                syncGatewaySubmit: true,
+              },
+            }
+          : {}),
+      },
     });
     n++;
   }
