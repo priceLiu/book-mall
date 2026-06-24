@@ -9,6 +9,7 @@ import { QrKindBrowsePanel } from "@/components/quick-replica/qr-kind-browse-pan
 import { QrSidebar, type QrNavMode } from "@/components/quick-replica/qr-sidebar";
 import { QrTemplateGallery } from "@/components/quick-replica/qr-template-gallery";
 import { QrTemplatePreviewModal } from "@/components/quick-replica/qr-template-preview-modal";
+import { QrToast } from "@/components/quick-replica/qr-toast";
 import {
   QrWorkspacePanel,
   type QrGenerateJobResult,
@@ -63,6 +64,7 @@ export function QrAppClient({
   const [templates, setTemplates] = useState<QrTemplate[]>([]);
   const [kindItems, setKindItems] = useState<QrKindBrowseItem[]>([]);
   const [previewTemplate, setPreviewTemplate] = useState<QrTemplate | null>(null);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
   const [generateResult, setGenerateResult] = useState<QrGenerateJobResult | null>(null);
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -335,6 +337,8 @@ export function QrAppClient({
     setTemplatesLoading(true);
   };
 
+  const dismissCopyToast = useCallback(() => setCopyToast(null), []);
+
   const onCopyTemplate = (t: QrTemplate) => {
     const nextDraft = templateToWorkspaceDraft(t);
     setDraft(nextDraft);
@@ -344,6 +348,7 @@ export function QrAppClient({
     if (navMode === "home" || navMode === "admin") {
       setNavMode("category");
     }
+    setCopyToast("复制成功");
 
     void (async () => {
       const result = await saveCopiedTemplate(t);
@@ -576,6 +581,8 @@ export function QrAppClient({
         }}
         onSaved={onGenerateSaved}
       />
+
+      <QrToast message={copyToast} onDismiss={dismissCopyToast} />
     </div>
   );
 }

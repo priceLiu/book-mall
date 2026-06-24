@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Copy, X } from "lucide-react";
 
 import { QrModal } from "@/components/quick-replica/qr-modal";
+import { QrToast } from "@/components/quick-replica/qr-toast";
 import { getKindDef, type QrTemplate } from "@/lib/qr-template-types";
 
 type Props = {
@@ -51,6 +52,8 @@ export function QrTemplatePreviewModal({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
+  const dismissCopyToast = useCallback(() => setCopyToast(null), []);
 
   if (!template) return null;
 
@@ -64,10 +67,37 @@ export function QrTemplatePreviewModal({
       : `${promptText.slice(0, 280)}…`;
 
   const copyPrompt = async () => {
+    const showResult = (text: string) => setCopyToast(text);
+
+    const fallbackCopy = (): boolean => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = promptText;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch {
+        return false;
+      }
+    };
+
     try {
       await navigator.clipboard.writeText(promptText);
+      showResult("复制成功");
+      return;
     } catch {
-      /* ignore */
+      /* clipboard API blocked */
+    }
+
+    if (fallbackCopy()) {
+      showResult("复制成功");
+    } else {
+      showResult("复制失败，请手动复制");
     }
   };
 
@@ -122,7 +152,8 @@ export function QrTemplatePreviewModal({
   };
 
   return (
-    <QrModal open={open} onClose={onClose} variant="preview" hideHeader>
+    <>
+      <QrModal open={open} onClose={onClose} variant="preview" hideHeader>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
         {/* 左 ~2/3 · 参考作品（大图 contain） */}
         <div
@@ -253,6 +284,9 @@ export function QrTemplatePreviewModal({
           </div>
         </div>
       </div>
-    </QrModal>
+      </QrModal>
+
+      <QrToast message={copyToast} onDismiss={dismissCopyToast} />
+    </>
   );
 }
