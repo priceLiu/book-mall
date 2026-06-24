@@ -15,6 +15,7 @@ import {
 } from "@/lib/canvas/canvas-project-service";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/pick-project-thumbnail";
 import { scheduleOpportunisticCanvasPoll } from "@/lib/canvas/canvas-task-service";
+import { reconcileStaleCanvasVideoRuntimeOnProjectRead } from "@/lib/canvas/canvas-video-display-recover";
 import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     if (inflight > 0) {
       scheduleOpportunisticCanvasPoll(id);
     }
+    await reconcileStaleCanvasVideoRuntimeOnProjectRead(id);
     const project = await getCanvasProjectForUser(guard.user.id, id);
     return NextResponse.json({ project }, { headers: jsonHeaders(request) });
   } catch (err) {

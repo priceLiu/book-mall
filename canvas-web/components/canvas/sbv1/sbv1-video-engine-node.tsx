@@ -391,7 +391,26 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 label={generatingLabel}
                 variant="cyan"
                 tone={isBackground ? "background" : "active"}
-              />
+              >
+                {hasVideo ? (
+                  posterUrl?.trim() ? (
+                    <LazyViewportImage
+                      src={posterUrl}
+                      alt=""
+                      className="absolute inset-0"
+                      imgClassName="pointer-events-none object-contain opacity-60"
+                      rootMargin="280px"
+                    />
+                  ) : (
+                    <LazyViewportVideo
+                      src={videoUrl ?? undefined}
+                      className="absolute inset-0"
+                      videoClassName="pointer-events-none object-contain opacity-60"
+                      rootMargin="280px"
+                    />
+                  )
+                ) : null}
+              </LibtvMediaGeneratingState>
             ) : hasVideo ? (
               <div className="group/video absolute inset-0">
                 {posterUrl?.trim() ? (
