@@ -27,6 +27,13 @@ import { pollHunyuanTaskForLog, submitHunyuanJobForLog } from "./hunyuan-jobs";
 import { getDecryptedCredentialApiKey } from "./credential-service";
 
 import { SUBMIT_ORPHAN_FAIL } from "@/lib/gateway/gateway-submit-error-policy";
+import {
+  auditGatewayPollStallAfterBatch,
+  countSlowRunningGatewayLogs,
+  markGatewayPollWorkerTick,
+  recordGatewayPollLastAttempt,
+  type GatewayPollBatchSnapshot,
+} from "@/lib/gateway/gateway-poll-stall-diagnostics";
 
 const STALE_RUNNING_NO_TASK_MS = 3 * 60 * 1000;
 /** 火山视频提交失败但未写入 externalTaskId 时，尽快收口 RUNNING（高负载下 submit 可能 >90s） */
@@ -194,6 +201,7 @@ async function pollGatewayLogWithTimeout(
 ): Promise<"updated" | "pending" | "skipped"> {
   if (!row.externalTaskId || !row.apiKeyId) return "skipped";
   const beforeStatus = row.status;
+  let resultSummary: unknown = null;
   try {
     await Promise.race([
       gatewayV1RecordInfo({
@@ -207,18 +215,58 @@ async function pollGatewayLogWithTimeout(
         ),
       ),
     ]);
-  } catch {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const logRow = await prisma.gatewayRequestLog.findUnique({
+      where: { id: row.id },
+      select: { resultSummary: true },
+    });
+    resultSummary = logRow?.resultSummary ?? null;
+    await recordGatewayPollLastAttempt({
+      logId: row.id,
+      resultSummary,
+      ok: false,
+      kind: /connection pool|timed out fetching/i.test(msg) ? "db" : "vendor",
+      error: msg,
+    }).catch(() => undefined);
+    try {
+      await prisma.gatewayRequestLog.update({
+        where: { id: row.id },
+        data: { lastPolledAt: new Date(), pollCount: { increment: 1 } },
+      });
+    } catch (dbErr) {
+      const dbMsg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+      await recordGatewayPollLastAttempt({
+        logId: row.id,
+        resultSummary,
+        ok: false,
+        kind: "db",
+        error: dbMsg,
+      }).catch(() => undefined);
+    }
+    return "pending";
+  }
+
+  try {
     await prisma.gatewayRequestLog.update({
       where: { id: row.id },
       data: { lastPolledAt: new Date(), pollCount: { increment: 1 } },
     });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const logRow = await prisma.gatewayRequestLog.findUnique({
+      where: { id: row.id },
+      select: { resultSummary: true },
+    });
+    await recordGatewayPollLastAttempt({
+      logId: row.id,
+      resultSummary: logRow?.resultSummary ?? null,
+      ok: false,
+      kind: "db",
+      error: msg,
+    }).catch(() => undefined);
     return "pending";
   }
-
-  await prisma.gatewayRequestLog.update({
-    where: { id: row.id },
-    data: { lastPolledAt: new Date(), pollCount: { increment: 1 } },
-  });
   const after = await prisma.gatewayRequestLog.findUnique({
     where: { id: row.id },
     select: { status: true },
@@ -272,9 +320,15 @@ async function maybeReconcileRunningSlotCounts(): Promise<void> {
 }
 
 export async function runGatewayPollWorker(opts?: { limit?: number }) {
+  const tickAt = Date.now();
+  const tickDbErrors: string[] = [];
+  let workerOk = true;
+
   try {
     await expireStaleGatewayLogs();
   } catch (e) {
+    workerOk = false;
+    tickDbErrors.push(e instanceof Error ? e.message : String(e));
     console.warn(
       "[gateway-poll] expireStaleGatewayLogs skipped",
       e instanceof Error ? e.message : String(e),
@@ -297,6 +351,8 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
       console.info("[gateway-poll] slow-warn auto", autoHandler);
     }
   } catch (e) {
+    workerOk = false;
+    tickDbErrors.push(e instanceof Error ? e.message : String(e));
     console.warn(
       "[gateway-poll] slow-warn auto skipped",
       e instanceof Error ? e.message : String(e),
@@ -308,43 +364,69 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
   const slowMs = await resolveGenerationSlowWarnMs();
   const slowCutoff = new Date(Date.now() - slowMs);
 
-  const slowRows = await prisma.gatewayRequestLog.findMany({
-    where: {
-      status: "RUNNING",
-      externalTaskId: { not: null },
-      submittedAt: { lte: slowCutoff },
-      providerKind: { in: [...GATEWAY_POLL_PROVIDER_KINDS] },
-    },
-    orderBy: { submittedAt: "asc" },
-    take: limit,
-    select: {
-      id: true,
-      status: true,
-      apiKeyId: true,
-      externalTaskId: true,
-    },
-  });
-  const slowIds = new Set(slowRows.map((r) => r.id));
-  const normalLimit = Math.max(0, limit - slowRows.length);
-  const normalRows =
-    normalLimit > 0
-      ? await prisma.gatewayRequestLog.findMany({
-          where: {
-            status: "RUNNING",
-            externalTaskId: { not: null },
-            providerKind: { in: [...GATEWAY_POLL_PROVIDER_KINDS] },
-            ...(slowIds.size > 0 ? { id: { notIn: Array.from(slowIds) } } : {}),
-          },
-          orderBy: [{ submittedAt: "desc" }, { pollCount: "asc" }],
-          take: normalLimit,
-          select: {
-            id: true,
-            status: true,
-            apiKeyId: true,
-            externalTaskId: true,
-          },
-        })
-      : [];
+  let slowRows: PollableGatewayRow[] = [];
+  let normalRows: PollableGatewayRow[] = [];
+  let slowRunningTotal = 0;
+
+  try {
+    slowRows = await prisma.gatewayRequestLog.findMany({
+      where: {
+        status: "RUNNING",
+        externalTaskId: { not: null },
+        submittedAt: { lte: slowCutoff },
+        providerKind: { in: [...GATEWAY_POLL_PROVIDER_KINDS] },
+      },
+      orderBy: { submittedAt: "asc" },
+      take: limit,
+      select: {
+        id: true,
+        status: true,
+        apiKeyId: true,
+        externalTaskId: true,
+      },
+    });
+    if (slowRows.length >= limit) {
+      slowRunningTotal = await countSlowRunningGatewayLogs(slowCutoff);
+    } else {
+      slowRunningTotal = slowRows.length;
+    }
+    const slowIds = new Set(slowRows.map((r) => r.id));
+    const normalLimit = Math.max(0, limit - slowRows.length);
+    normalRows =
+      normalLimit > 0
+        ? await prisma.gatewayRequestLog.findMany({
+            where: {
+              status: "RUNNING",
+              externalTaskId: { not: null },
+              providerKind: { in: [...GATEWAY_POLL_PROVIDER_KINDS] },
+              ...(slowIds.size > 0 ? { id: { notIn: Array.from(slowIds) } } : {}),
+            },
+            orderBy: [{ submittedAt: "desc" }, { pollCount: "asc" }],
+            take: normalLimit,
+            select: {
+              id: true,
+              status: true,
+              apiKeyId: true,
+              externalTaskId: true,
+            },
+          })
+        : [];
+  } catch (e) {
+    workerOk = false;
+    tickDbErrors.push(e instanceof Error ? e.message : String(e));
+    markGatewayPollWorkerTick(false, tickDbErrors[0]);
+    throw e;
+  }
+
+  const batchSnapshot: GatewayPollBatchSnapshot = {
+    tickAt,
+    limit,
+    slowRunningTotal,
+    selectedSlowIds: slowRows.map((r) => r.id),
+    selectedNormalIds: normalRows.map((r) => r.id),
+    tickDbErrors,
+    workerOk,
+  };
 
   const [escUpdated, mainUpdated] = await Promise.all([
     runGatewayEscalationPollLane(slowRows),
@@ -370,8 +452,24 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
       console.info("[gateway-poll] recovered misclassified stall logs", stall);
     }
   } catch (e) {
+    workerOk = false;
+    tickDbErrors.push(e instanceof Error ? e.message : String(e));
     console.warn(
       "[gateway-poll] recoverMisclassifiedVolcengineStallLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  markGatewayPollWorkerTick(workerOk, tickDbErrors[0]);
+
+  try {
+    const audit = await auditGatewayPollStallAfterBatch(batchSnapshot);
+    if (audit.audited > 0) {
+      console.warn("[gateway-poll] stall audit", audit);
+    }
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] stall audit skipped",
       e instanceof Error ? e.message : String(e),
     );
   }

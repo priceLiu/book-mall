@@ -171,12 +171,18 @@ export function formatLogAppTaskCell(input: {
 }
 
 const POLL_DELAY_LIMIT_MS = 10_000;
+const POLL_INFLIGHT_WARN_MS = 120_000;
 
 /** 日志表 · 火山视频耗时阶段（排队 / 生成 / 后处理 / 轮询延迟） */
 export function formatLogTimingPhaseCell(
   ms: number | null | undefined,
   phase: "queue" | "generate" | "postproc" | "poll",
-  opts?: { overLimit?: boolean },
+  opts?: {
+    overLimit?: boolean;
+    stallHint?: string | null;
+    stallCause?: string | null;
+    inProgress?: boolean;
+  },
 ): { value: string; title?: string; warn?: boolean } {
   if (ms == null || ms < 0) return { value: "—" };
   const sec = Math.round(ms / 1000);
@@ -186,16 +192,25 @@ export function formatLogTimingPhaseCell(
     postproc: "厂商后处理（仅成功任务；updated_at → succeeded）",
     poll: "我方轮询 / 收口延迟",
   } as const;
-  const title = `${labels[phase]} · ${sec}s`;
+  let title = `${labels[phase]} · ${sec}s`;
   if (phase === "poll") {
-    const warn = opts?.overLimit === true || ms > POLL_DELAY_LIMIT_MS;
-    return {
-      value: `${sec}s`,
-      title: warn
-        ? `${title}（超过 10s 上限，请检查 poll worker / 画布页是否打开）`
-        : title,
-      warn,
-    };
+    const inProgress = opts?.inProgress === true;
+    const warn =
+      opts?.overLimit === true ||
+      (!inProgress && ms > POLL_DELAY_LIMIT_MS) ||
+      (inProgress && ms > POLL_INFLIGHT_WARN_MS);
+    if (warn) {
+      title += inProgress
+        ? "（进行中 >2min 未 poll，轮询可能停摆）"
+        : "（超过 10s 上限，请检查 poll worker）";
+    }
+    if (opts?.stallCause) {
+      title += `\n原因：${opts.stallCause}`;
+    }
+    if (opts?.stallHint?.trim()) {
+      title += `\n${opts.stallHint.trim()}`;
+    }
+    return { value: `${sec}s`, title, warn };
   }
   return { value: `${sec}s`, title };
 }

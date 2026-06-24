@@ -12,6 +12,7 @@ import {
 } from "@/lib/gateway/log-volcengine-timing";
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { resolveGatewayLogVendorRequestId } from "@/lib/gateway/vendor-request-id";
+import { readPollStallDiagnostic } from "@/lib/gateway/gateway-poll-stall-diagnostics";
 import { prisma } from "@/lib/prisma";
 
 export async function mapGatewayRequestLogsToResponseRows(
@@ -146,6 +147,7 @@ export async function mapGatewayRequestLogsToResponseRows(
         vendorPostProcessMs: timing?.vendorPostProcessMs ?? null,
         pollDelayMs: timing?.pollDelayMs ?? null,
         pollDelayOverLimit: timing?.pollDelayOverLimit ?? false,
+        pollStallDiagnostic: readPollStallDiagnostic(l.resultSummary),
         vendorNativeDurationMs: vendorNative.vendorNativeDurationMs,
         vendorNativeGenerateMs: vendorNative.vendorNativeGenerateMs,
         estimatedVendorCostYuan,

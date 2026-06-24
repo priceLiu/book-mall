@@ -82,6 +82,14 @@ export type GatewayLogRow = {
   vendorPostProcessMs?: number | null;
   pollDelayMs?: number | null;
   pollDelayOverLimit?: boolean;
+  pollStallDiagnostic?: {
+    cause?: string;
+    hint?: string;
+    pollLagSec?: number;
+    selectedThisTick?: boolean;
+    slowRunningTotal?: number;
+    batchLimit?: number;
+  } | null;
   vendorNativeDurationMs?: number | null;
   vendorNativeGenerateMs?: number | null;
   estimatedVendorCostYuan: string | null;
@@ -630,10 +638,10 @@ const LogsTableRow = memo(function LogsTableRow({
     "postproc",
   );
   const pollCell = formatLogTimingPhaseCell(pollDelayMs, "poll", {
-    overLimit:
-      !isInProgress &&
-      pollDelayMs != null &&
-      pollDelayMs > 10_000,
+    inProgress: isInProgress,
+    overLimit: l.pollDelayOverLimit === true,
+    stallCause: l.pollStallDiagnostic?.cause ?? null,
+    stallHint: l.pollStallDiagnostic?.hint ?? null,
   });
   const rawProgressLabel = isInProgress
     ? pickLogProgressLabel(l.status, l.resultSummary)

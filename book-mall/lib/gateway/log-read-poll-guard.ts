@@ -7,6 +7,7 @@ import {
 import type { SlowWarnAutoHandlerResult } from "@/lib/generation/slow-warn-auto-handler";
 import { runCanvasPollWorker } from "@/lib/canvas/canvas-task-service";
 import { isOpportunisticPollFallbackEnabled } from "@/lib/generation/opportunistic-poll";
+import { isGenerationPollWorkerProcess } from "@/lib/generation/poll-config";
 
 // 自动 tick（含 poll=1）的合并间隔：日志/状态/轮询池三页 + 多标签同时打开时，
 // 同一用户每个周期最多触发一次重量级 poll worker，避免读页面把连接池打满、
@@ -38,10 +39,17 @@ async function runOpportunisticGatewayPollBody(): Promise<SlowWarnAutoHandlerRes
   } catch {
     /* ignore */
   }
-  try {
-    await runCanvasPollWorker();
-  } catch {
-    /* ignore */
+  // Canvas 推进由独立 poll-loop / cron 负责。dev:all 下 web 进程跑全量 worker 会占满
+  // connection_limit=30，与 SSE / 日志页 / 生成接口抢连接 → pool timeout。
+  if (
+    isOpportunisticPollFallbackEnabled() ||
+    isGenerationPollWorkerProcess()
+  ) {
+    try {
+      await runCanvasPollWorker();
+    } catch {
+      /* ignore */
+    }
   }
   return autoHandler;
 }

@@ -19,9 +19,11 @@ describe("generation poll scale defaults", () => {
     expect(getGenerationPollShardCount()).toBe(1);
   });
 
-  it("effective 并发不超过 connection_limit - 预留", () => {
+  it("effective 并发：poll-loop 进程按 connection_limit 封顶", () => {
     const prevLimit = process.env.PRISMA_CONNECTION_LIMIT;
+    const prevWorker = process.env.GENERATION_POLL_WORKER;
     process.env.PRISMA_CONNECTION_LIMIT = "1";
+    process.env.GENERATION_POLL_WORKER = "1";
     expect(getEffectiveGenerationPollConcurrency()).toBe(1);
     process.env.PRISMA_CONNECTION_LIMIT = "20";
     expect(getEffectiveGenerationPollConcurrency()).toBe(
@@ -29,6 +31,20 @@ describe("generation poll scale defaults", () => {
     );
     if (prevLimit === undefined) delete process.env.PRISMA_CONNECTION_LIMIT;
     else process.env.PRISMA_CONNECTION_LIMIT = prevLimit;
+    if (prevWorker === undefined) delete process.env.GENERATION_POLL_WORKER;
+    else process.env.GENERATION_POLL_WORKER = prevWorker;
+  });
+
+  it("web 进程 opportunistic poll 最多 2 路并行", () => {
+    const prevLimit = process.env.PRISMA_CONNECTION_LIMIT;
+    const prevWorker = process.env.GENERATION_POLL_WORKER;
+    delete process.env.GENERATION_POLL_WORKER;
+    process.env.PRISMA_CONNECTION_LIMIT = "30";
+    expect(getEffectiveGenerationPollConcurrency()).toBe(2);
+    if (prevLimit === undefined) delete process.env.PRISMA_CONNECTION_LIMIT;
+    else process.env.PRISMA_CONNECTION_LIMIT = prevLimit;
+    if (prevWorker === undefined) delete process.env.GENERATION_POLL_WORKER;
+    else process.env.GENERATION_POLL_WORKER = prevWorker;
   });
 });
 
