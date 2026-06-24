@@ -14,6 +14,7 @@ import {
   getQueueTimeoutMin,
   isTrafficControlEnabled,
 } from "./constants";
+import { computeStoryQueueDispatchAfter, queueDispatchAfterFromIndex } from "./queue-dispatch-after";
 import { acquireTrafficSlotInTx, releaseTrafficSlot } from "./slot";
 import { resolveStoryProjectTrafficScope, resolveMaxConcurrencyForScope } from "./scope-key";
 import { nextDispatchAfterFromSpacing } from "./token-bucket";
@@ -28,7 +29,7 @@ async function revertStuckStoryDispatchingTask(
       where: { id: taskId, status: "DISPATCHING" },
       data: {
         status: "QUEUED",
-        dispatchAfter: new Date(Date.now() + 2_000),
+        dispatchAfter: queueDispatchAfterFromIndex(0),
         failCode: null,
         failMessage: null,
       },
@@ -241,6 +242,9 @@ export async function admitStoryFrameVideoTask(input: {
   );
   const now = new Date();
   const status = isTrafficControlEnabled() ? "QUEUED" : "PENDING";
+  const dispatchAfter = isTrafficControlEnabled()
+    ? await computeStoryQueueDispatchAfter(scope, now.getTime())
+    : undefined;
 
   return prisma.storyGenerationTask.create({
     data: {
@@ -252,6 +256,7 @@ export async function admitStoryFrameVideoTask(input: {
       frameId: input.frameId ?? null,
       status,
       queuedAt: isTrafficControlEnabled() ? now : undefined,
+      dispatchAfter,
       tenantId: scope.tenantId ?? null,
       actorUserId: input.actorUserId,
     },

@@ -87,6 +87,22 @@ await acquireTrafficSlotInTx(tx, scope, maxConcurrency);
 
 `dispatch-canvas.ts` 与 `dispatch-story.ts` 须同步遵守 §3.1–3.5。Review 时 **成对检查**。
 
+### 3.7 入队交通灯（序号 stagger）
+
+QUEUED 创建时 **禁止** 对每条任务独立 `random(0, N)`（连点仍可能同秒 eligible）。
+
+统一使用 [`queue-dispatch-after.ts`](../lib/generation/traffic-control/queue-dispatch-after.ts)：
+
+```
+dispatchAfter = now + queueIndex × 5000ms + random(0, 3000ms)
+```
+
+- `queueIndex` = 同 traffic scope 下、**insert 前**已有 `QUEUED` 条数（0-based）  
+- 所有入队路径（admit / story-scope / engine-runner / story-task）须 `await compute*QueueDispatchAfter`  
+- `recoverStaleDispatching` / revert 回 QUEUED 时用 `queueDispatchAfterFromIndex(i)` 错开，**禁止** `dispatchAfter = now` 或裸 `+ 2000`  
+- `getDispatchBatch()` 默认 **5**（减轻单轮 poll 事务峰值）  
+- 第二层 **车间距**（`sampleActorDispatchSpacingMs`）仍在 slot 失败 / actor spacing 时生效
+
 ---
 
 ## 4. 无 Gateway log 的正常阶段
@@ -129,3 +145,4 @@ pnpm --dir book-mall canvas:diagnose-missing-gateway-log   # 若已登记
 |------|------|
 | 2026-06-22 | DB-Resilience-R1：503 重排队、poll 退避、queued-reconcile |
 | 2026-06-24 | **recurrence**：dispatch 占槽 5s 超时 + tx 内 tenant 查询 + 批次 catch；规范固化 + canvas/story dispatch 修复 |
+| 2026-06-24 | **queue stagger**：序号 ×5s + jitter 入队；recover/revert 错开；DISPATCH_BATCH 默认 5 |

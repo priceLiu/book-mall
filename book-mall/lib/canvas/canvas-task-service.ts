@@ -86,6 +86,7 @@ import {
   canvasGwRecordInfo,
 } from "./canvas-gateway-client";
 import { failGatewayLogIfStillRunning } from "@/lib/gateway/fail-gateway-log-on-timeout";
+import { persistCanvasE2eForTask } from "@/lib/gateway/log-canvas-e2e-timing";
 import {
   extractVolcengineVideoUrlFromGatewaySummary,
   patchCanvasProjectNodeRuntimeFromTask,
@@ -696,6 +697,7 @@ export async function applyCanvasVolcengineVideoResult(
       },
     });
     if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
+    await persistCanvasE2eForTask(taskId).catch(() => undefined);
     return;
   }
 
@@ -725,6 +727,7 @@ export async function applyCanvasVolcengineVideoResult(
     },
   });
   if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
+  await persistCanvasE2eForTask(taskId).catch(() => undefined);
 }
 
 export async function applyCanvasKieTaskResult(

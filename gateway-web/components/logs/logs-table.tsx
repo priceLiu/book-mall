@@ -16,6 +16,8 @@ import {
   isLogInProgress,
   pickLogProgressLabel,
   resolveLogDisplayDurationMs,
+  resolveCanvasE2eDisplayMs,
+  resolvePreGatewayDisplayMs,
 } from "@/lib/gateway-log-params";
 import {
   collectLogModels,
@@ -81,6 +83,7 @@ export type GatewayLogRow = {
   generateMs?: number | null;
   vendorPostProcessMs?: number | null;
   pollDelayMs?: number | null;
+  peakPollDelayMs?: number | null;
   pollDelayOverLimit?: boolean;
   pollStallDiagnostic?: {
     cause?: string;
@@ -92,6 +95,13 @@ export type GatewayLogRow = {
   } | null;
   vendorNativeDurationMs?: number | null;
   vendorNativeGenerateMs?: number | null;
+  canvasStartedAt?: string | null;
+  canvasCompletedAt?: string | null;
+  e2eMs?: number | null;
+  preGatewayMs?: number | null;
+  postGatewayMs?: number | null;
+  gatewaySegmentMs?: number | null;
+  e2eFrozen?: boolean;
   estimatedVendorCostYuan: string | null;
   failCode: string | null;
   failMessage: string | null;
@@ -219,7 +229,7 @@ function SpinnerIcon({ className }: { className?: string }) {
 function LogsListLoadingRow({ message }: { message: string }) {
   return (
     <tr>
-      <td colSpan={24} className="py-20 text-center">
+      <td colSpan={30} className="py-20 text-center">
         <SpinnerIcon className="mx-auto size-6 animate-spin text-[var(--gw-accent)]/90" />
         <p className="mt-3 text-sm text-[var(--gw-muted)]" role="status" aria-live="polite">
           {message}
@@ -601,6 +611,23 @@ const LogsTableRow = memo(function LogsTableRow({
     pollDelayMs,
     liveTotalMs: live.totalMs,
   });
+  const e2eMs = resolveCanvasE2eDisplayMs({
+    e2eMs: l.e2eMs,
+    canvasStartedAt: l.canvasStartedAt,
+    canvasCompletedAt: l.canvasCompletedAt,
+    preGatewayMs: l.preGatewayMs,
+    submittedAt: l.submittedAt,
+    e2eFrozen: l.e2eFrozen,
+    isInProgress,
+    nowMs: liveTick ?? null,
+  });
+  const preGatewayMs = resolvePreGatewayDisplayMs({
+    preGatewayMs: l.preGatewayMs,
+    canvasStartedAt: l.canvasStartedAt,
+    submittedAt: l.submittedAt,
+    isInProgress,
+    nowMs: liveTick ?? null,
+  });
   const vendorNative = resolveVendorNativeTimingLive({
     providerKind: l.providerKind,
     requestKind: l.requestKind,
@@ -613,6 +640,8 @@ const LogsTableRow = memo(function LogsTableRow({
     },
   });
   const duration = formatDurationSeconds(durationMs);
+  const e2eDuration = formatDurationSeconds(e2eMs ?? null);
+  const preGatewayDuration = formatDurationSeconds(preGatewayMs ?? null);
   const vendorNativeDuration = formatDurationSeconds(
     vendorNative.vendorNativeDurationMs,
   );
@@ -642,6 +671,7 @@ const LogsTableRow = memo(function LogsTableRow({
     overLimit: l.pollDelayOverLimit === true,
     stallCause: l.pollStallDiagnostic?.cause ?? null,
     stallHint: l.pollStallDiagnostic?.hint ?? null,
+    peakPollDelayMs: l.peakPollDelayMs,
   });
   const rawProgressLabel = isInProgress
     ? pickLogProgressLabel(l.status, l.resultSummary)
@@ -712,10 +742,39 @@ const LogsTableRow = memo(function LogsTableRow({
         />
       </td>
       <td
-        className="align-middle text-center text-xs text-[var(--gw-muted)]"
+        className="align-middle border-l border-white/5 text-center text-xs text-[var(--gw-muted)]"
         title="汇总见表头；单行日志与画布排队无直接对应"
       >
         —
+      </td>
+      <td
+        className="align-middle font-mono text-sm font-semibold text-violet-200"
+        title={
+          e2eMs != null
+            ? [
+                `真实墙钟：画布点击 → 任务完成（终态冻结，进行中递增）`,
+                preGatewayMs != null
+                  ? `出队前 ${Math.round(preGatewayMs / 1000)}s`
+                  : null,
+                l.gatewaySegmentMs != null
+                  ? `Gateway ${Math.round(l.gatewaySegmentMs / 1000)}s`
+                  : null,
+                l.postGatewayMs != null
+                  ? `OSS/回写 ${Math.round(l.postGatewayMs / 1000)}s`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : "无关联画布任务"
+        }
+      >
+        {e2eDuration}
+      </td>
+      <td
+        className="align-middle font-mono text-sm text-amber-200/90"
+        title="我们：点击 → Gateway 有 log（交通控流 QUEUED/DISPATCHING/dispatch/createTask）。超 120s 多为出队卡死。"
+      >
+        {preGatewayDuration}
       </td>
       <td
         className="align-middle font-mono text-sm text-[var(--gw-ink)]"
@@ -733,17 +792,17 @@ const LogsTableRow = memo(function LogsTableRow({
       >
         {duration}
       </td>
-      <td
-        className="align-middle font-mono text-sm text-[var(--gw-muted)]"
-        title={
-          vendorNative.vendorNativeDurationMs != null
-            ? `厂商原生 ${vendorNative.vendorNativeDurationMs} ms（只读，不回写）`
-            : "厂商未回传可对比总耗时"
-        }
-      >
-        {vendorNativeDuration}
+      <td className="align-middle border-r border-white/5">
+        <span
+          className={`font-mono text-sm ${
+            pollCell.warn ? "text-amber-400" : "text-[var(--gw-ink)]"
+          }`}
+          title={pollCell.title}
+        >
+          {pollCell.value}
+        </span>
       </td>
-      <td className="align-middle">
+      <td className="align-middle border-l border-white/5">
         <span
           className="font-mono text-sm text-[var(--gw-ink)]"
           title={queueCell.title}
@@ -761,6 +820,24 @@ const LogsTableRow = memo(function LogsTableRow({
       </td>
       <td className="align-middle">
         <span
+          className="font-mono text-sm text-[var(--gw-ink)]"
+          title={postProcCell.title}
+        >
+          {postProcCell.value}
+        </span>
+      </td>
+      <td
+        className="align-middle font-mono text-sm text-[var(--gw-muted)]"
+        title={
+          vendorNative.vendorNativeDurationMs != null
+            ? `厂商原生 ${vendorNative.vendorNativeDurationMs} ms（只读，不回写）`
+            : "厂商未回传可对比总耗时"
+        }
+      >
+        {vendorNativeDuration}
+      </td>
+      <td className="align-middle border-r border-white/5">
+        <span
           className="font-mono text-sm text-[var(--gw-muted)]"
           title={
             vendorNative.vendorNativeGenerateMs != null
@@ -769,24 +846,6 @@ const LogsTableRow = memo(function LogsTableRow({
           }
         >
           {vendorNativeGenerate}
-        </span>
-      </td>
-      <td className="align-middle">
-        <span
-          className="font-mono text-sm text-[var(--gw-ink)]"
-          title={postProcCell.title}
-        >
-          {postProcCell.value}
-        </span>
-      </td>
-      <td className="align-middle">
-        <span
-          className={`font-mono text-sm ${
-            pollCell.warn ? "text-amber-400" : "text-[var(--gw-ink)]"
-          }`}
-          title={pollCell.title}
-        >
-          {pollCell.value}
         </span>
       </td>
       <td className="align-middle">
@@ -1722,8 +1781,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       >
         <table className="gw-logs-table min-w-[3356px]">
           <thead>
-            <tr>
-              <th className="w-11">
+            <tr className="border-b border-white/10">
+              <th rowSpan={2} className="w-11 align-bottom">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -1732,125 +1791,176 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                   aria-label="全选"
                 />
               </th>
-              <th className="min-w-[120px]" title="发起请求的用户手机号">
+              <th rowSpan={2} className="min-w-[120px] align-bottom" title="发起请求的用户手机号">
                 Phone
               </th>
-              <th className="min-w-[100px]" title="用户昵称">
+              <th rowSpan={2} className="min-w-[100px] align-bottom" title="用户昵称">
                 Nick
               </th>
-              <th className="w-[88px]">Source</th>
-              <th className="min-w-[168px]">Model</th>
+              <th rowSpan={2} className="w-[88px] align-bottom">
+                Source
+              </th>
+              <th rowSpan={2} className="min-w-[168px] align-bottom">
+                Model
+              </th>
               <th
-                className="min-w-[140px]"
+                rowSpan={2}
+                className="min-w-[140px] align-bottom"
                 title="实际路由的厂商凭证 Key（脱敏）"
               >
                 Key
               </th>
-              <th className="min-w-[480px]">Params</th>
-              <th className="min-w-[280px]">Images</th>
+              <th rowSpan={2} className="min-w-[480px] align-bottom">
+                Params
+              </th>
+              <th rowSpan={2} className="min-w-[280px] align-bottom">
+                Images
+              </th>
               <th
-                className="min-w-[220px]"
+                rowSpan={2}
+                className="min-w-[220px] align-bottom"
                 title="任务状态；失败行展示 failCode 与 failMessage"
               >
                 Status
               </th>
               <th
-                className="w-[96px]"
-                title="全站汇总：CanvasGenerationTask 处于 QUEUED/DISPATCHING、尚未 createTask 产生 Gateway 日志的数量（非本行字段）"
+                colSpan={5}
+                className="border-x border-white/10 bg-sky-950/35 px-2 py-1.5 text-center text-[11px] font-semibold tracking-wide text-sky-200/95"
               >
-                <div>Canvas 排队</div>
-                <div className="mt-0.5 text-[10px] font-normal normal-case tracking-normal text-violet-300/90">
-                  {canvasQueueStats ? canvasQueueStats.total : "—"}
-                </div>
+                系统
               </th>
               <th
-                className="w-[88px]"
-                title="Gateway 观测耗时：Submitted → Completed（或进行中为实时计时）。含火山排队与轮询间隔，非厂商控制台内的纯渲染秒数。"
+                colSpan={5}
+                className="border-x border-white/10 bg-zinc-800/45 px-2 py-1.5 text-center text-[11px] font-semibold tracking-wide text-zinc-300/95"
               >
-                Duration
+                厂商
+              </th>
+              <th rowSpan={2} className="min-w-[168px] align-bottom">
+                Submitted
+              </th>
+              <th rowSpan={2} className="min-w-[168px] align-bottom">
+                Completed
               </th>
               <th
-                className="w-[72px] text-[var(--gw-muted)]"
-                title="厂商原生总耗时（只读）：KIE costTime 或火山 created_at→updated_at；不写回库，可与左侧 Duration 对比。"
-              >
-                厂商 Dur
-              </th>
-              <th
-                className="w-[88px]"
-                title="Gateway 提交 → 首次观测到火山 running（或仍在 queued 时的累计排队）"
-              >
-                Queue
-              </th>
-              <th
-                className="w-[88px]"
-                title="厂商 GPU 生成：进行中为墙钟；成功为 updated_at−created_at；失败为观测到厂商终态前的等待"
-              >
-                Generate
-              </th>
-              <th
-                className="w-[72px] text-[var(--gw-muted)]"
-                title="厂商原生生成耗时（只读）：火山 trace updated_at−created_at 或 KIE costTime；不写回库，可与左侧 Generate 对比。"
-              >
-                厂商 Gen
-              </th>
-              <th
-                className="w-[96px]"
-                title="仅成功任务：updated_at 跳变 → 首次 succeeded 的后处理/打包；失败任务为 —"
-              >
-                PostProc
-              </th>
-              <th
-                className="w-[88px]"
-                title="成功：首次 succeeded → Gateway completed；失败：观测到厂商终态/末次 poll → completed（我方收口延迟）"
-              >
-                Poll Δ
-              </th>
-              <th className="min-w-[168px]">Submitted</th>
-              <th className="min-w-[168px]">Completed</th>
-              <th
-                className="min-w-[200px]"
+                rowSpan={2}
+                className="min-w-[200px] align-bottom"
                 title="Canvas 画布节点 task（CanvasGenerationTask.id）或 Story 任务 id；悬停可看 nodeId"
               >
                 Node Task
               </th>
               <th
-                className="w-[100px]"
+                rowSpan={2}
+                className="w-[100px] align-bottom"
                 title="挂牌参考费用（元），供后续费用统计；非钱包扣点。"
               >
                 Usage ¥
               </th>
               <th
-                className="w-[96px]"
+                rowSpan={2}
+                className="w-[96px] align-bottom"
                 title="平台代付扣减积分（Finance 2.0 · 与 finance-web 扣减明细一致）"
               >
                 Credits
               </th>
               <th
-                className="w-[110px]"
+                rowSpan={2}
+                className="w-[110px] align-bottom"
                 title="Token 计量：厂商回传优先；异步任务按 prompt 文本平台估算。"
               >
                 Token
               </th>
               <th
-                className="min-w-[200px]"
+                rowSpan={2}
+                className="min-w-[200px] align-bottom"
                 title="Gateway 请求日志 id（平台侧 cuid）"
               >
                 Log ID
               </th>
               <th
-                className="min-w-[200px]"
+                rowSpan={2}
+                className="min-w-[200px] align-bottom"
                 title="厂商 HTTP 追踪 Request ID（如 Volcengine 响应头 / 错误体）"
               >
                 Request ID
               </th>
               <th
-                className="min-w-[200px]"
+                rowSpan={2}
+                className="min-w-[200px] align-bottom"
                 title="厂商异步任务 ID（externalTaskId）；提交失败或未创建时为 —"
               >
                 Vendor Task ID
               </th>
-              <th className="w-[150px]">Results</th>
-              <th className="w-[120px]">Retry Callback</th>
+              <th rowSpan={2} className="w-[150px] align-bottom">
+                Results
+              </th>
+              <th rowSpan={2} className="w-[120px] align-bottom">
+                Retry Callback
+              </th>
+            </tr>
+            <tr className="border-b border-white/10 text-[11px]">
+              <th
+                className="w-[88px] border-l border-white/10 bg-sky-950/20"
+                title="全站汇总：CanvasGenerationTask 处于 QUEUED/DISPATCHING、尚未 createTask 产生 Gateway 日志的数量（非本行字段）"
+              >
+                <div>画布排队</div>
+                <div className="mt-0.5 text-[10px] font-normal normal-case tracking-normal text-violet-300/90">
+                  {canvasQueueStats ? canvasQueueStats.total : "—"}
+                </div>
+              </th>
+              <th
+                className="w-[88px] bg-sky-950/20 text-violet-200"
+                title="真实墙钟：画布点击 → 任务完成。唯一与用户体感一致的总计时；终态冻结，进行中 live 递增。"
+              >
+                总耗时
+              </th>
+              <th
+                className="w-[72px] bg-sky-950/20 text-amber-200/90"
+                title="我们 · 出队前：点击 → Gateway submitted（控流/dispatch/DB，此阶段无 Gateway log）。"
+              >
+                出队前
+              </th>
+              <th
+                className="w-[88px] bg-sky-950/20"
+                title="我们 · Gateway 段：Submitted → Completed。不含出队前等待；进行中为墙钟递增。"
+              >
+                网关段
+              </th>
+              <th
+                className="w-[88px] border-r border-white/10 bg-sky-950/20"
+                title="我方轮询滞后：距上次成功 poll 的间隔；黄字表示超过阈值。"
+              >
+                轮询延迟
+              </th>
+              <th
+                className="w-[88px] border-l border-white/10 bg-zinc-800/25"
+                title="Gateway 提交 → 首次观测到火山 running（或仍在 queued 时的累计排队）"
+              >
+                排队
+              </th>
+              <th
+                className="w-[88px] bg-zinc-800/25"
+                title="厂商 GPU 生成：进行中为墙钟；成功为 updated_at−created_at；失败为观测到厂商终态前的等待"
+              >
+                生成
+              </th>
+              <th
+                className="w-[96px] bg-zinc-800/25"
+                title="仅成功任务：updated_at 跳变 → 首次 succeeded 的后处理/打包；失败任务为 —"
+              >
+                后处理
+              </th>
+              <th
+                className="w-[72px] bg-zinc-800/25 text-[var(--gw-muted)]"
+                title="厂商原生总耗时（只读）：KIE costTime 或火山 created_at→updated_at；不写回库。"
+              >
+                厂商总耗时
+              </th>
+              <th
+                className="w-[72px] border-r border-white/10 bg-zinc-800/25 text-[var(--gw-muted)]"
+                title="厂商原生生成耗时（只读）：火山 trace 或 KIE costTime；不写回库。"
+              >
+                厂商生成
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1878,7 +1988,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             {!logs.length ? (
               <tr>
                 <td
-                  colSpan={24}
+                  colSpan={30}
                   className="py-16 text-center text-sm text-[var(--gw-muted)]"
                 >
                   {loading ? "加载中…" : "暂无日志"}
@@ -1888,7 +1998,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             {loadingMore ? (
               <tr>
                 <td
-                  colSpan={24}
+                  colSpan={30}
                   className="py-4 text-center text-xs text-[var(--gw-accent)]/90"
                 >
                   正在加载更多…

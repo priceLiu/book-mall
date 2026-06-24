@@ -13,6 +13,10 @@ import {
 import { estimateVendorCost } from "@/lib/gateway/pricing-estimate";
 import { resolveGatewayLogVendorRequestId } from "@/lib/gateway/vendor-request-id";
 import { readPollStallDiagnostic } from "@/lib/gateway/gateway-poll-stall-diagnostics";
+import {
+  resolveCanvasE2eForLogRow,
+  type CanvasTaskTimingInput,
+} from "@/lib/gateway/log-canvas-e2e-timing";
 import { prisma } from "@/lib/prisma";
 
 export async function mapGatewayRequestLogsToResponseRows(
@@ -36,6 +40,27 @@ export async function mapGatewayRequestLogsToResponseRows(
 
   const appTaskLinks = await resolveGatewayLogAppTaskLinks(logs);
 
+  const canvasTaskIds = [
+    ...new Set(
+      [...appTaskLinks.values()]
+        .filter((l) => l.appTaskKind === "canvas")
+        .map((l) => l.appTaskId),
+    ),
+  ];
+  const canvasTaskTimingById = new Map<string, CanvasTaskTimingInput>();
+  if (canvasTaskIds.length > 0) {
+    const rows = await prisma.canvasGenerationTask.findMany({
+      where: { id: { in: canvasTaskIds } },
+      select: {
+        id: true,
+        createdAt: true,
+        queuedAt: true,
+        completedAt: true,
+      },
+    });
+    for (const row of rows) canvasTaskTimingById.set(row.id, row);
+  }
+
   const actorIds = logs
     .map((l) => l.actorBookUserId)
     .filter((id): id is string => !!id);
@@ -44,6 +69,14 @@ export async function mapGatewayRequestLogsToResponseRows(
   return Promise.all(
     logs.map(async (l) => {
       const appTask = appTaskLinks.get(l.id);
+      const canvasTaskTiming =
+        appTask?.appTaskKind === "canvas"
+          ? (canvasTaskTimingById.get(appTask.appTaskId) ?? null)
+          : null;
+      const e2e = resolveCanvasE2eForLogRow({
+        log: l,
+        canvasTask: canvasTaskTiming,
+      });
       const actor =
         l.actorBookUserId != null
           ? (actorMap.get(l.actorBookUserId) ?? null)
@@ -146,10 +179,18 @@ export async function mapGatewayRequestLogsToResponseRows(
         generateMs: timing?.generateMs ?? null,
         vendorPostProcessMs: timing?.vendorPostProcessMs ?? null,
         pollDelayMs: timing?.pollDelayMs ?? null,
+        peakPollDelayMs: timing?.peakPollDelayMs ?? null,
         pollDelayOverLimit: timing?.pollDelayOverLimit ?? false,
         pollStallDiagnostic: readPollStallDiagnostic(l.resultSummary),
         vendorNativeDurationMs: vendorNative.vendorNativeDurationMs,
         vendorNativeGenerateMs: vendorNative.vendorNativeGenerateMs,
+        canvasStartedAt: e2e.canvasStartedAt,
+        canvasCompletedAt: e2e.canvasCompletedAt,
+        e2eMs: e2e.e2eMs,
+        preGatewayMs: e2e.preGatewayMs,
+        postGatewayMs: e2e.postGatewayMs,
+        gatewaySegmentMs: e2e.gatewayMs,
+        e2eFrozen: e2e.e2eFrozen,
         estimatedVendorCostYuan,
         failCode: l.failCode,
         failMessage: l.failMessage,

@@ -514,12 +514,12 @@ export function resolveLogDisplayDurationMs(input: {
   liveTotalMs?: number | null;
 }): number | null {
   if (input.isInProgress) {
-    if (input.liveTotalMs != null && input.liveTotalMs > 0) {
-      return input.liveTotalMs;
-    }
     if (input.nowMs != null) {
       const wall = input.nowMs - new Date(input.submittedAt).getTime();
       if (wall >= 0) return wall;
+    }
+    if (input.liveTotalMs != null && input.liveTotalMs > 0) {
+      return input.liveTotalMs;
     }
     const phaseSum =
       Math.max(0, input.queueMs ?? 0) +
@@ -535,6 +535,80 @@ export function resolveLogDisplayDurationMs(input: {
     input.submittedAt,
     input.completedAt,
   );
+}
+
+/** 真实耗时：画布点击 → 完成；进行中必须 live 墙钟，禁止回落到 stale API 快照。 */
+export function resolveCanvasE2eDisplayMs(input: {
+  e2eMs: number | null | undefined;
+  canvasStartedAt: string | null | undefined;
+  canvasCompletedAt?: string | null | undefined;
+  preGatewayMs?: number | null;
+  submittedAt?: string;
+  e2eFrozen?: boolean;
+  isInProgress: boolean;
+  nowMs: number | null;
+}): number | null {
+  if (
+    !input.isInProgress &&
+    input.canvasStartedAt &&
+    input.canvasCompletedAt
+  ) {
+    const ms =
+      new Date(input.canvasCompletedAt).getTime() -
+      new Date(input.canvasStartedAt).getTime();
+    if (ms >= 0) return ms;
+  }
+
+  if (input.e2eFrozen && input.e2eMs != null && input.e2eMs > 0) {
+    return input.e2eMs;
+  }
+
+  if (input.isInProgress && input.nowMs != null) {
+    if (input.canvasStartedAt) {
+      const ms = input.nowMs - new Date(input.canvasStartedAt).getTime();
+      if (ms >= 0) return ms;
+    }
+    if (input.submittedAt) {
+      const gwWall = input.nowMs - new Date(input.submittedAt).getTime();
+      const pre = Math.max(0, input.preGatewayMs ?? 0);
+      if (gwWall >= 0) return pre + gwWall;
+    }
+  }
+
+  if (input.e2eMs != null && input.e2eMs > 0) return input.e2eMs;
+  return null;
+}
+
+/** Pre-Gateway：点击 → Gateway submitted（出队/createTask 前）；提交后数值固定。 */
+export function resolvePreGatewayDisplayMs(input: {
+  preGatewayMs: number | null | undefined;
+  canvasStartedAt: string | null | undefined;
+  submittedAt: string;
+  isInProgress: boolean;
+  nowMs: number | null;
+}): number | null {
+  if (input.preGatewayMs != null && input.preGatewayMs >= 0) {
+    return input.preGatewayMs;
+  }
+  if (
+    input.isInProgress &&
+    input.canvasStartedAt &&
+    input.nowMs != null
+  ) {
+    const ms =
+      new Date(input.submittedAt).getTime() -
+      new Date(input.canvasStartedAt).getTime();
+    if (ms >= 0) return ms;
+    const growing = input.nowMs - new Date(input.canvasStartedAt).getTime();
+    return growing >= 0 ? growing : null;
+  }
+  if (input.canvasStartedAt) {
+    const ms =
+      new Date(input.submittedAt).getTime() -
+      new Date(input.canvasStartedAt).getTime();
+    return ms >= 0 ? ms : null;
+  }
+  return null;
 }
 
 /** 进行中任务 · 从 resultSummary 解析厂商进度文案 */

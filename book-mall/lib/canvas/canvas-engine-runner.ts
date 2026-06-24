@@ -72,6 +72,7 @@ import {
   isTrafficControlEnabled,
   GENERATION_INFLIGHT_STATUSES,
 } from "@/lib/generation/traffic-control/constants";
+import { computeCanvasQueueDispatchAfter } from "@/lib/generation/traffic-control/queue-dispatch-after";
 import { fireCanvasDispatchForProject } from "@/lib/generation/traffic-control/fire-canvas-dispatch";
 import { assertVideoCreditsBeforeTrafficQueue } from "@/lib/generation/traffic-control/video-queue-precheck";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
@@ -1428,6 +1429,12 @@ export async function runRefVideoEngineNode(
       params: { ...params, duration, resolution },
     });
 
+    const queuedAt = queued ? new Date() : undefined;
+    const dispatchAfter =
+      queued && scope
+        ? await computeCanvasQueueDispatchAfter(scope, queuedAt!.getTime())
+        : undefined;
+
     const created = await prisma.canvasGenerationTask.create({
       data: {
         projectId,
@@ -1437,7 +1444,8 @@ export async function runRefVideoEngineNode(
         providerId: null,
         inputHash,
         status: queued ? "QUEUED" : "PENDING",
-        queuedAt: queued ? new Date() : undefined,
+        queuedAt,
+        dispatchAfter,
         tenantId: scope?.tenantId ?? undefined,
         actorUserId: userId,
         inputPayload: {
@@ -1558,6 +1566,12 @@ export async function runRefVideoEngineNode(
     params,
   });
 
+  const queuedAt = queued ? new Date() : undefined;
+  const dispatchAfter =
+    queued && scope
+      ? await computeCanvasQueueDispatchAfter(scope, queuedAt!.getTime())
+      : undefined;
+
   const created = await prisma.canvasGenerationTask.create({
     data: {
       projectId,
@@ -1567,7 +1581,8 @@ export async function runRefVideoEngineNode(
       providerId: null,
       inputHash,
       status: queued ? "QUEUED" : "PENDING",
-      queuedAt: queued ? new Date() : undefined,
+      queuedAt,
+      dispatchAfter,
       tenantId: scope?.tenantId ?? undefined,
       actorUserId: userId,
       inputPayload: {

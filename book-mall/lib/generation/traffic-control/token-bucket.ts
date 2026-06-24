@@ -4,6 +4,7 @@ import {
   computeTokenBurst,
   getActorDispatchMinMs,
   getTrafficTokensPerSec,
+  sampleActorDispatchSpacingMs,
 } from "./constants";
 
 export function refillTokenBucket(
@@ -33,7 +34,6 @@ export function spacingBlocked(
 export function nextDispatchAfterFromSpacing(
   lastDispatchAt: Date | null | undefined,
 ): Date {
-  const minMs = getActorDispatchMinMs();
   if (!lastDispatchAt) return new Date();
-  return new Date(lastDispatchAt.getTime() + minMs);
+  return new Date(lastDispatchAt.getTime() + sampleActorDispatchSpacingMs());
 }

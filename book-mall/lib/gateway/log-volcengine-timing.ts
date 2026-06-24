@@ -49,6 +49,8 @@ export type VolcengineTimingTrace = {
   firstFailedPolledAtMs?: number;
   lastStatus?: string;
   lastPolledAtMs?: number;
+  /** 进行中观测到的最大 poll 间隔（终态保留，便于对照终态 Poll 列） */
+  peakPollDelayMs?: number;
 };
 
 export type VolcengineTimingBreakdown = {
@@ -57,6 +59,7 @@ export type VolcengineTimingBreakdown = {
   /** 终态：厂商 updated_at 跳变后至首次 succeeded 的后处理/状态滞后（进行中为 null） */
   vendorPostProcessMs: number | null;
   pollDelayMs: number | null;
+  peakPollDelayMs?: number | null;
   pollDelayOverLimit: boolean;
 };
 
@@ -438,8 +441,20 @@ export function computeVolcengineTimingBreakdown(input: {
     generateMs,
     vendorPostProcessMs,
     pollDelayMs,
+    peakPollDelayMs: trace.peakPollDelayMs ?? null,
     pollDelayOverLimit: pollDelayMs != null && pollDelayMs > pollLimit,
   };
+}
+
+/** 进行中 poll：记录观测到的最大轮询间隔，终态仍可读。 */
+export function bumpVolcenginePeakPollDelay(
+  trace: VolcengineTimingTrace,
+  pollDelayMs: number | null | undefined,
+): VolcengineTimingTrace {
+  if (pollDelayMs == null || pollDelayMs <= 0) return trace;
+  const prev = trace.peakPollDelayMs ?? 0;
+  if (pollDelayMs <= prev) return trace;
+  return { ...trace, peakPollDelayMs: pollDelayMs };
 }
 
 export function attachGatewayTimingToSummary(
