@@ -183,13 +183,23 @@ export function formatLogTimingPhaseCell(
     stallCause?: string | null;
     inProgress?: boolean;
     peakPollDelayMs?: number | null;
+    /** 厂商 GPU 进行中、updated 未跳变：显示 … 而非递增秒数 */
+    pending?: boolean;
   },
 ): { value: string; title?: string; warn?: boolean } {
-  if (ms == null || ms < 0) return { value: "—" };
+  if (ms == null || ms < 0) {
+    if (opts?.pending) {
+      return {
+        value: "…",
+        title: "厂商 GPU 进行中，等待 updated_at 跳变后冻结秒数",
+      };
+    }
+    return { value: "—" };
+  }
   const sec = Math.round(ms / 1000);
   const labels = {
     queue: "火山排队",
-    generate: "厂商生成（进行中为墙钟；失败为等厂商终态）",
+    generate: "厂商 GPU（updated−created；进行中未跳变显示 …）",
     postproc: "厂商后处理（仅成功任务；updated_at → succeeded）",
     poll: "我方轮询 / 收口延迟",
   } as const;

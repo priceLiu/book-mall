@@ -2,7 +2,7 @@
  * Gateway 日志 · 火山视频任务耗时拆分（排队 / 生成 / 轮询延迟）
  *
  * - 排队：Gateway submittedAt → 厂商 created_at（无则回退首次 poll 观测 running）
- * - 生成（进行中）：墙钟 now − genStart
+ * - 生成：厂商 updated_at 跳离 created 后冻结（GPU 秒数）；生成中 updated 未动 → 无秒数
  * - 后处理（终态）：首次观测 succeeded − vendor updated_at（Seedance 常见 status 仍 running）
  * - 轮询延迟 Poll Δ（终态）：Gateway completedAt − 首次观测 succeeded
  */
@@ -355,30 +355,25 @@ export function computeVolcengineTimingBreakdown(input: {
   let pollDelayMs: number | null = null;
 
   if (!isTerminal) {
-    // 火山 Seedance 生成中 updated_at 不前进（恒等于 created_at，直到出结果才跳到完成
-    // 时刻），故生成中无法用 vendor updated_at 拆分。Generate 直接走墙钟
-    // （now − genStart，持续增长 = 仍在生成）；Poll Δ 表示「我方轮询延迟」
-    // （now − 最近一次成功 poll），正常 ≈ 轮询间隔，仅当我方轮询停摆才增大，
-    // 同时作为卡死信号。（终态拆分仍以 vendor updated_at 为准，见下。）
-    // 仅在已进入 running 后计 Generate；纯 queued（厂商尚未开始生成）不计生成。
+    // 厂商分阶段计时：GPU 完成（updated 跳变）→ 生成冻结；后处理进行中才递增 postproc。
+    // Poll Δ = 我方轮询间隔（可递增，卡死信号）。总墙钟仅体现在 E2E/终态 duration，不在此伪造生成秒数。
     const st = normalizeStatus(trace.lastStatus);
     const hasStartedRunning =
       st === "running" || st === "processing" || firstRunning != null;
-    if (hasStartedRunning) {
-      const base = genStart ?? firstRunning;
-      if (base != null) generateMs = Math.max(0, now - base);
-    }
     const lastPolled = trace.lastPolledAtMs;
     pollDelayMs = lastPolled != null ? Math.max(0, now - lastPolled) : 0;
-    // 进行中：updated_at 已跳离 created_at 但 status 仍 running → 实时后处理墙钟
-    if (
-      vendorUpdated != null &&
-      vendorCreated != null &&
-      vendorUpdated > vendorCreated &&
-      (st === "running" || st === "processing")
-    ) {
-      generateMs = Math.max(0, vendorUpdated - (genStart ?? vendorCreated));
-      vendorPostProcessMs = Math.max(0, now - vendorUpdated);
+
+    const gpuMs = volcengineVendorGpuMs(trace);
+    if (gpuMs != null) {
+      generateMs = gpuMs;
+      if (
+        vendorUpdated != null &&
+        (st === "running" || st === "processing")
+      ) {
+        vendorPostProcessMs = Math.max(0, now - vendorUpdated);
+      }
+    } else if (hasStartedRunning) {
+      generateMs = null;
     }
   } else if (vendorCreated != null && vendorUpdated != null) {
     generateMs = Math.max(0, vendorUpdated - vendorCreated);
@@ -606,10 +601,21 @@ export type VendorNativeTiming = {
   vendorTraceSpanMs: number | null;
 };
 
-/** 火山 trace 原生跨度终点（厂商列专用，与「我方 Generate 墙钟」分离） */
+/** 厂商 GPU 段：仅当火山 updated_at 已跳离 created 才有确定秒数（Seedance 生成中无中间值） */
+export function volcengineVendorGpuMs(
+  trace: VolcengineTimingTrace,
+): number | null {
+  const created = trace.vendorCreatedAtMs;
+  const updated = trace.vendorUpdatedAtMs;
+  if (created == null || updated == null) return null;
+  if (isSeedanceFrozenUpdatedAt(created, updated)) return null;
+  return Math.max(0, updated - created);
+}
+
+/** 火山 trace 原生跨度终点（厂商列：阶段完成即冻结，GPU 进行中无终点 → null） */
 export function resolveVolcengineVendorTraceEndMs(
   trace: VolcengineTimingTrace,
-  nowMs: number,
+  _nowMs: number,
 ): number | null {
   if (trace.vendorCreatedAtMs == null) return null;
   const st = normalizeStatus(trace.lastStatus);
@@ -623,8 +629,7 @@ export function resolveVolcengineVendorTraceEndMs(
   if (updated != null && !isSeedanceFrozenUpdatedAt(created, updated)) {
     return updated;
   }
-  // Seedance running：updated_at 恒等于 created_at → 厂商跨度用 now−created（非 0）
-  return nowMs;
+  return null;
 }
 
 export function resolveVendorNativeTiming(input: {

@@ -496,8 +496,8 @@ export function resolveLogDurationMs(
 }
 
 /**
- * 日志表 Duration 列。
- * 进行中：优先 live 拆分总耗时 / 墙钟递增，忽略 DB 里仅 poll 时写入的 durationMs；
+ * 日志表 Duration（网关段）列。
+ * 进行中：各阶段之和（厂商 GPU 未出数时不伪造墙钟）；仅 E2E 总耗时列 live 递增。
  * 终态：用已落库的 durationMs 或 completedAt − submittedAt。
  */
 export function resolveLogDisplayDurationMs(input: {
@@ -514,6 +514,17 @@ export function resolveLogDisplayDurationMs(input: {
   liveTotalMs?: number | null;
 }): number | null {
   if (input.isInProgress) {
+    const phaseSum =
+      Math.max(0, input.queueMs ?? 0) +
+      Math.max(0, input.generateMs ?? 0) +
+      Math.max(0, input.vendorPostProcessMs ?? 0) +
+      Math.max(0, input.pollDelayMs ?? 0);
+    const hasPhaseAnchors =
+      (input.queueMs ?? 0) > 0 ||
+      input.generateMs != null ||
+      (input.vendorPostProcessMs ?? 0) > 0 ||
+      (input.pollDelayMs ?? 0) > 0;
+    if (hasPhaseAnchors) return phaseSum;
     if (input.nowMs != null) {
       const wall = input.nowMs - new Date(input.submittedAt).getTime();
       if (wall >= 0) return wall;
@@ -521,12 +532,6 @@ export function resolveLogDisplayDurationMs(input: {
     if (input.liveTotalMs != null && input.liveTotalMs > 0) {
       return input.liveTotalMs;
     }
-    const phaseSum =
-      Math.max(0, input.queueMs ?? 0) +
-      Math.max(0, input.generateMs ?? 0) +
-      Math.max(0, input.vendorPostProcessMs ?? 0) +
-      Math.max(0, input.pollDelayMs ?? 0);
-    if (phaseSum > 0) return phaseSum;
     return null;
   }
 
