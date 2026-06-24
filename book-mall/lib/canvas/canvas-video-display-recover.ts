@@ -223,6 +223,103 @@ export type CanvasVideoRecoverCandidate = {
   hasMedia: boolean;
 };
 
+const RECOVER_TASK_SELECT = {
+  id: true,
+  projectId: true,
+  nodeId: true,
+  status: true,
+  failCode: true,
+  ossUrl: true,
+  ephemeralUrl: true,
+  inputPayload: true,
+  project: { select: { name: true, canvas: true } },
+} as const;
+
+function gatewayLogMeta(
+  gl:
+    | {
+        status: string;
+        durationMs: number | null;
+        resultSummary: unknown;
+      }
+    | undefined,
+): {
+  gatewayStatus: string | null;
+  gatewayDurationSec: number | null;
+  pollDelayMs: number | null;
+} {
+  if (!gl) {
+    return {
+      gatewayStatus: null,
+      gatewayDurationSec: null,
+      pollDelayMs: null,
+    };
+  }
+  const tb = (gl.resultSummary as Record<string, unknown> | null)?._gateway as
+    | { timingBreakdown?: { pollDelayMs?: number } }
+    | undefined;
+  return {
+    gatewayStatus: gl.status,
+    gatewayDurationSec: gl.durationMs
+      ? Math.round(gl.durationMs / 1000)
+      : null,
+    pollDelayMs: tb?.timingBreakdown?.pollDelayMs ?? null,
+  };
+}
+
+function buildRecoverCandidate(
+  t: {
+    id: string;
+    projectId: string;
+    nodeId: string;
+    status: string;
+    failCode: string | null;
+    ossUrl: string | null;
+    ephemeralUrl: string | null;
+    inputPayload: unknown;
+    project: { name: string; canvas: unknown };
+  },
+  gatewayStatus: string | null,
+  gatewayDurationSec: number | null,
+  pollDelayMs: number | null,
+): CanvasVideoRecoverCandidate | null {
+  const canvas = t.project.canvas;
+  const node = (
+    canvas as {
+      nodes?: Array<{ id: string; data?: { runtime?: CanvasNodeRuntimeLike } }>;
+    } | null
+  )?.nodes?.find((n) => n.id === t.nodeId);
+  const rt = node?.data?.runtime;
+  const media = Boolean(t.ossUrl?.trim() || t.ephemeralUrl?.trim());
+  const runtimeOk = canvasNodeShowsPersistedMedia(canvas, t.nodeId, t.id);
+
+  const needsRecovery =
+    (t.status === "SUBMITTED" && gatewayStatus === "SUCCEEDED") ||
+    (t.status === "FAILED" &&
+      t.failCode != null &&
+      (t.failCode.startsWith("timeout") ||
+        t.failCode === "VOLCENGINE_GATEWAY_POLL_STALL" ||
+        t.failCode === "GATEWAY_TASK_FAILED")) ||
+    (t.status === "SUCCEEDED" && media && !runtimeOk) ||
+    (gatewayStatus === "SUCCEEDED" && !runtimeOk && !media);
+
+  if (!needsRecovery) return null;
+
+  return {
+    taskId: t.id,
+    projectId: t.projectId,
+    projectName: t.project.name,
+    nodeId: t.nodeId,
+    taskStatus: t.status,
+    failCode: t.failCode,
+    gatewayStatus,
+    gatewayDurationSec,
+    pollDelayMs,
+    runtimeStatus: rt?.status ?? null,
+    hasMedia: media,
+  };
+}
+
 /** 扫描需恢复的画布视频任务（SUCCEEDED 未写 runtime / SUBMITTED+Gateway 已成功 / timeout FAILED） */
 export async function findCanvasVideoTasksNeedingRecovery(opts?: {
   projectId?: string;
@@ -232,26 +329,77 @@ export async function findCanvasVideoTasksNeedingRecovery(opts?: {
   const since =
     opts?.since ?? new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
   const limit = opts?.limit ?? 500;
+  const projectFilter = opts?.projectId ? { projectId: opts.projectId } : {};
+  const perQuery = Math.min(limit, 120);
 
-  const tasks = await prisma.canvasGenerationTask.findMany({
-    where: {
-      createdAt: { gte: since },
-      ...(opts?.projectId ? { projectId: opts.projectId } : {}),
-    },
-    orderBy: { updatedAt: "desc" },
-    take: limit,
-    select: {
-      id: true,
-      projectId: true,
-      nodeId: true,
-      status: true,
-      failCode: true,
-      ossUrl: true,
-      ephemeralUrl: true,
-      inputPayload: true,
-      project: { select: { name: true, canvas: true } },
-    },
-  });
+  const [submittedTasks, failedTasks, succeededTasks] = await Promise.all([
+    prisma.canvasGenerationTask.findMany({
+      where: {
+        status: "SUBMITTED",
+        createdAt: { gte: since },
+        ...projectFilter,
+      },
+      orderBy: [{ submittedAt: "asc" }, { updatedAt: "asc" }],
+      take: perQuery,
+      select: RECOVER_TASK_SELECT,
+    }),
+    prisma.canvasGenerationTask.findMany({
+      where: {
+        status: "FAILED",
+        createdAt: { gte: since },
+        ...projectFilter,
+        OR: [
+          { failCode: { startsWith: "timeout" } },
+          { failCode: "VOLCENGINE_GATEWAY_POLL_STALL" },
+          { failCode: "GATEWAY_TASK_FAILED" },
+        ],
+      },
+      orderBy: { updatedAt: "desc" },
+      take: Math.min(perQuery, 60),
+      select: RECOVER_TASK_SELECT,
+    }),
+    prisma.canvasGenerationTask.findMany({
+      where: {
+        status: "SUCCEEDED",
+        createdAt: { gte: since },
+        ...projectFilter,
+        OR: [{ ossUrl: { not: null } }, { ephemeralUrl: { not: null } }],
+      },
+      orderBy: { completedAt: "desc" },
+      take: Math.min(perQuery, 60),
+      select: RECOVER_TASK_SELECT,
+    }),
+  ]);
+
+  const byId = new Map<
+    string,
+    (typeof submittedTasks)[number]
+  >();
+  for (const t of [...submittedTasks, ...failedTasks, ...succeededTasks]) {
+    byId.set(t.id, t);
+  }
+  const tasks = [...byId.values()].slice(0, limit);
+
+  const gwIds = [
+    ...new Set(
+      tasks
+        .map((t) => {
+          const payload = taskInputPayload(t);
+          return typeof payload?.gatewayLogId === "string"
+            ? payload.gatewayLogId.trim()
+            : "";
+        })
+        .filter(Boolean),
+    ),
+  ];
+  const gatewayLogs =
+    gwIds.length > 0
+      ? await prisma.gatewayRequestLog.findMany({
+          where: { id: { in: gwIds } },
+          select: { id: true, status: true, durationMs: true, resultSummary: true },
+        })
+      : [];
+  const gatewayById = new Map(gatewayLogs.map((gl) => [gl.id, gl]));
 
   const out: CanvasVideoRecoverCandidate[] = [];
 
@@ -263,58 +411,16 @@ export async function findCanvasVideoTasksNeedingRecovery(opts?: {
       typeof payload?.gatewayLogId === "string"
         ? payload.gatewayLogId.trim()
         : "";
-    let gatewayStatus: string | null = null;
-    let gatewayDurationSec: number | null = null;
-    let pollDelayMs: number | null = null;
-    if (gwId) {
-      const gl = await prisma.gatewayRequestLog.findUnique({
-        where: { id: gwId },
-        select: { status: true, durationMs: true, resultSummary: true },
-      });
-      gatewayStatus = gl?.status ?? null;
-      gatewayDurationSec = gl?.durationMs
-        ? Math.round(gl.durationMs / 1000)
-        : null;
-      const tb = (gl?.resultSummary as Record<string, unknown> | null)
-        ?._gateway as { timingBreakdown?: { pollDelayMs?: number } } | undefined;
-      pollDelayMs = tb?.timingBreakdown?.pollDelayMs ?? null;
-    }
-
-    const canvas = t.project.canvas;
-    const node = (
-      canvas as {
-        nodes?: Array<{ id: string; data?: { runtime?: CanvasNodeRuntimeLike } }>;
-      } | null
-    )?.nodes?.find((n) => n.id === t.nodeId);
-    const rt = node?.data?.runtime;
-    const media = Boolean(t.ossUrl?.trim() || t.ephemeralUrl?.trim());
-    const runtimeOk = canvasNodeShowsPersistedMedia(canvas, t.nodeId, t.id);
-
-    const needsRecovery =
-      (t.status === "SUBMITTED" && gatewayStatus === "SUCCEEDED") ||
-      (t.status === "FAILED" &&
-        t.failCode != null &&
-        (t.failCode.startsWith("timeout") ||
-          t.failCode === "VOLCENGINE_GATEWAY_POLL_STALL" ||
-          t.failCode === "GATEWAY_TASK_FAILED")) ||
-      (t.status === "SUCCEEDED" && media && !runtimeOk) ||
-      (gatewayStatus === "SUCCEEDED" && !runtimeOk && !media);
-
-    if (!needsRecovery) continue;
-
-    out.push({
-      taskId: t.id,
-      projectId: t.projectId,
-      projectName: t.project.name,
-      nodeId: t.nodeId,
-      taskStatus: t.status,
-      failCode: t.failCode,
+    const { gatewayStatus, gatewayDurationSec, pollDelayMs } = gatewayLogMeta(
+      gwId ? gatewayById.get(gwId) : undefined,
+    );
+    const candidate = buildRecoverCandidate(
+      t,
       gatewayStatus,
       gatewayDurationSec,
       pollDelayMs,
-      runtimeStatus: rt?.status ?? null,
-      hasMedia: media,
-    });
+    );
+    if (candidate) out.push(candidate);
   }
 
   return out;

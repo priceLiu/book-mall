@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { getCanvasAiPollToken } from "@/lib/canvas/canvas-constants";
+import { reconcileCanvasInflightZombies } from "@/lib/canvas/canvas-inflight-zombie-reconcile";
 import { runCanvasDisplayReconcileWorker } from "@/lib/canvas/canvas-video-display-recover";
 
 export const runtime = "nodejs";
@@ -27,6 +28,7 @@ export async function POST(request: NextRequest) {
       ? Math.min(Math.max(Number(limitRaw), 1), 200)
       : 40;
 
-  const summary = await runCanvasDisplayReconcileWorker({ limit });
-  return NextResponse.json(summary, { status: 200 });
+  const zombies = await reconcileCanvasInflightZombies({ limit });
+  const display = await runCanvasDisplayReconcileWorker({ limit });
+  return NextResponse.json({ zombies, ...display }, { status: 200 });
 }

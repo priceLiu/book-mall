@@ -4,6 +4,7 @@
  *   pnpm canvas:display-reconcile
  *   pnpm canvas:display-reconcile -- --limit=80
  */
+import { reconcileCanvasInflightZombies } from "../lib/canvas/canvas-inflight-zombie-reconcile";
 import { runCanvasDisplayReconcileWorker } from "../lib/canvas/canvas-video-display-recover";
 
 function parseLimit(argv: string[]): number | undefined {
@@ -18,8 +19,9 @@ function parseLimit(argv: string[]): number | undefined {
 
 async function main() {
   const limit = parseLimit(process.argv.slice(2));
-  const summary = await runCanvasDisplayReconcileWorker({ limit });
-  console.log(JSON.stringify(summary, null, 2));
+  const zombies = await reconcileCanvasInflightZombies({ limit });
+  const display = await runCanvasDisplayReconcileWorker({ limit });
+  console.log(JSON.stringify({ zombies, ...display }, null, 2));
 }
 
 main()
