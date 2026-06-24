@@ -6,6 +6,7 @@ import { isGatewayLogTerminalStatus } from "@/lib/gateway/log-progress";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import {
   attachGatewayTimingToSummary,
+  buildVolcengineTerminalFinalizeMetrics,
   computeVolcengineTimingBreakdown,
   isVolcenginePollLagCritical,
   isVolcengineQueuedStale,
@@ -62,16 +63,16 @@ export async function persistVolcengineTimingOnPoll(input: {
     isVolcengineQueuedStale(trace, polledAtMs);
 
   if (queuedStalled) {
-    const durationMs = input.log.submittedAt
-      ? polledAtMs - input.log.submittedAt.getTime()
-      : 0;
-    await finalizeRequestLog(input.log.id, {
+    const polledAtMs = Date.now();
+    await finalizeVolcengineVideoRequestLog(input.log.id, {
+      submittedAt: input.log.submittedAt,
       status: "FAILED",
-      durationMs,
+      trace,
+      resultSummaryBase: nextSummary,
+      fallbackNowMs: polledAtMs,
       failCode: "VOLCENGINE_QUEUED_STALE",
       failMessage:
         "Volcengine 任务在 queued 阶段 updated_at 已停更超过 10 分钟，判定厂商排队卡死；请在控制台核对或重试",
-      resultSummary: nextSummary,
     });
     return { breakdown, resultSummary: nextSummary, vendorStalled: true };
   }
@@ -81,16 +82,15 @@ export async function persistVolcengineTimingOnPoll(input: {
     isVolcenginePollLagCritical(trace, polledAtMs);
 
   if (pollLagCritical) {
-    const durationMs = input.log.submittedAt
-      ? polledAtMs - input.log.submittedAt.getTime()
-      : 0;
-    await finalizeRequestLog(input.log.id, {
+    await finalizeVolcengineVideoRequestLog(input.log.id, {
+      submittedAt: input.log.submittedAt,
       status: "FAILED",
-      durationMs,
+      trace,
+      resultSummaryBase: nextSummary,
+      fallbackNowMs: polledAtMs,
       failCode: "VOLCENGINE_POLL_LAG",
       failMessage:
         "Volcengine 已返回终态但 Gateway 日志仍未 completed；请检查 poll worker 或刷新日志",
-      resultSummary: nextSummary,
     });
     return { breakdown, resultSummary: nextSummary, vendorStalled: true };
   }
@@ -110,6 +110,40 @@ export async function persistVolcengineTimingOnPoll(input: {
   }
 
   return { breakdown, resultSummary: nextSummary };
+}
+
+type VolcengineVideoFinalizePatch = Omit<
+  Parameters<typeof finalizeRequestLog>[1],
+  "status" | "durationMs" | "resultSummary" | "completedAt"
+>;
+
+/** 火山视频终态：按 trace 冻结 completedAt / durationMs / 阶段拆分后再 finalize。 */
+export async function finalizeVolcengineVideoRequestLog(
+  logId: string,
+  input: {
+    submittedAt: Date;
+    status: "SUCCEEDED" | "FAILED";
+    trace: import("@/lib/gateway/log-volcengine-timing").VolcengineTimingTrace;
+    resultSummaryBase: unknown;
+    fallbackNowMs?: number;
+  } & VolcengineVideoFinalizePatch,
+): Promise<void> {
+  const { submittedAt, status, trace, resultSummaryBase, fallbackNowMs, ...patch } =
+    input;
+  const metrics = buildVolcengineTerminalFinalizeMetrics({
+    trace,
+    status,
+    submittedAt,
+    resultSummaryBase,
+    fallbackNowMs,
+  });
+  await finalizeRequestLog(logId, {
+    ...patch,
+    status,
+    durationMs: metrics.durationMs,
+    completedAt: new Date(metrics.completedAtMs),
+    resultSummary: metrics.resultSummary,
+  });
 }
 
 export {

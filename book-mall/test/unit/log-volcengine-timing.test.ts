@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildVolcengineTerminalFinalizeMetrics,
   computeVolcengineTimingBreakdown,
   isVolcengineVendorStuck,
   isVolcenginePollLagCritical,
@@ -364,5 +365,71 @@ describe("log-volcengine-timing", () => {
     });
     expect(row.vendorNativeDurationMs).toBe(88_000);
     expect(row.vendorNativeGenerateMs).toBe(88_000);
+  });
+
+  it("terminal finalize: durationMs equals phase sum, not late recover wall clock", () => {
+    const submittedAtMs = 1_000_000;
+    const genStartMs = submittedAtMs + 3_000;
+    const vendorUpdatedAtMs = genStartMs + 335_000;
+    const lateRecoverAtMs = submittedAtMs + 759_000;
+
+    let trace = mergeVolcengineTimingTrace(null, {
+      status: "running",
+      raw: {
+        created_at: genStartMs / 1000,
+        updated_at: genStartMs / 1000,
+      },
+      polledAtMs: genStartMs + 5_000,
+    });
+    trace = mergeVolcengineTimingTrace(trace, {
+      status: "succeeded",
+      raw: {
+        created_at: genStartMs / 1000,
+        updated_at: vendorUpdatedAtMs / 1000,
+      },
+      polledAtMs: lateRecoverAtMs,
+    });
+
+    const metrics = buildVolcengineTerminalFinalizeMetrics({
+      trace,
+      status: "SUCCEEDED",
+      submittedAt: new Date(submittedAtMs),
+      resultSummaryBase: {},
+      fallbackNowMs: lateRecoverAtMs,
+    });
+
+    expect(metrics.breakdown.generateMs).toBe(335_000);
+    expect(metrics.breakdown.vendorPostProcessMs).toBe(421_000);
+    expect(metrics.breakdown.pollDelayMs).toBe(0);
+    expect(metrics.durationMs).toBe(759_000);
+    expect(metrics.completedAtMs).toBe(lateRecoverAtMs);
+  });
+
+  it("resolveVolcengineLogTiming freezes stored breakdown for terminal logs", () => {
+    const submittedAt = new Date(1_000_000);
+    const completedAt = new Date(1_403_000);
+    const stored = {
+      queueMs: 0,
+      generateMs: 400_000,
+      vendorPostProcessMs: 3_000,
+      pollDelayMs: 0,
+      pollDelayOverLimit: false,
+    };
+    const resultSummary = {
+      _gateway: {
+        volcengineTiming: { kind: "volcengine_timing", lastStatus: "succeeded" },
+        timingBreakdown: stored,
+      },
+    };
+    expect(
+      resolveVolcengineLogTiming({
+        providerKind: "VOLCENGINE",
+        requestKind: "VIDEO",
+        submittedAt,
+        completedAt,
+        resultSummary,
+        nowMs: 9_999_999_999,
+      }),
+    ).toEqual(stored);
   });
 });

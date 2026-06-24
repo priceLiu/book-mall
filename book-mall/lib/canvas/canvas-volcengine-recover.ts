@@ -5,7 +5,11 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
 import { persistCanvasKieResultToOss, persistCanvasVideoResultToOss } from "@/lib/canvas/canvas-oss";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
-import { persistVolcengineTimingOnPoll } from "@/lib/gateway/log-volcengine-timing-persist";
+import {
+  finalizeVolcengineVideoRequestLog,
+  persistVolcengineTimingOnPoll,
+} from "@/lib/gateway/log-volcengine-timing-persist";
+import { readVolcengineTimingTrace } from "@/lib/gateway/log-volcengine-timing";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import {
@@ -175,19 +179,32 @@ async function finalizeGatewaySuccess(input: {
     resultSummaryOverride: baseSummary,
   });
 
-  const durationMs = log.submittedAt
-    ? Math.max(0, Date.now() - log.submittedAt.getTime())
-    : 0;
-
-  await finalizeRequestLog(log.id, {
-    status: "SUCCEEDED",
-    durationMs,
-    failCode: undefined,
-    failMessage: undefined,
-    resultSummary,
-    externalTaskId: input.taskId,
-    model: log.model,
-  });
+  const trace = readVolcengineTimingTrace(resultSummary);
+  const polledAtMs = Date.now();
+  if (trace) {
+    await finalizeVolcengineVideoRequestLog(log.id, {
+      submittedAt: log.submittedAt,
+      status: "SUCCEEDED",
+      trace,
+      resultSummaryBase: resultSummary,
+      fallbackNowMs: polledAtMs,
+      externalTaskId: input.taskId,
+      model: log.model,
+    });
+  } else {
+    const durationMs = log.submittedAt
+      ? Math.max(0, polledAtMs - log.submittedAt.getTime())
+      : 0;
+    await finalizeRequestLog(log.id, {
+      status: "SUCCEEDED",
+      durationMs,
+      failCode: undefined,
+      failMessage: undefined,
+      resultSummary,
+      externalTaskId: input.taskId,
+      model: log.model,
+    });
+  }
 }
 
 export async function patchCanvasProjectNodeRuntimeFromTask(

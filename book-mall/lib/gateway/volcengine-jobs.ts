@@ -13,7 +13,11 @@ import {
   volcengineVideoTaskFailMessage,
 } from "@/lib/gateway/volcengine-client";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
-import { persistVolcengineTimingOnPoll } from "@/lib/gateway/log-volcengine-timing-persist";
+import {
+  finalizeVolcengineVideoRequestLog,
+  persistVolcengineTimingOnPoll,
+} from "@/lib/gateway/log-volcengine-timing-persist";
+import { readVolcengineTimingTrace } from "@/lib/gateway/log-volcengine-timing";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 
 export async function submitVolcengineVideoJobForLog(opts: {
@@ -117,12 +121,23 @@ export async function pollVolcengineVideoTaskForLog(opts: {
       vendorRaw: polled.raw,
       resultSummaryOverride: baseSummary,
     });
-    await finalizeRequestLog(opts.logId, {
-      status: "SUCCEEDED",
-      durationMs: Date.now() - opts.startedAt,
-      resultSummary,
-      externalTaskId: opts.taskId,
-    });
+    const trace = readVolcengineTimingTrace(resultSummary);
+    if (trace) {
+      await finalizeVolcengineVideoRequestLog(opts.logId, {
+        submittedAt: log.submittedAt,
+        status: "SUCCEEDED",
+        trace,
+        resultSummaryBase: resultSummary,
+        externalTaskId: opts.taskId,
+      });
+    } else {
+      await finalizeRequestLog(opts.logId, {
+        status: "SUCCEEDED",
+        durationMs: Date.now() - opts.startedAt,
+        resultSummary,
+        externalTaskId: opts.taskId,
+      });
+    }
     return "done";
   }
 
@@ -136,14 +151,27 @@ export async function pollVolcengineVideoTaskForLog(opts: {
         error: row.error,
       }),
     });
-    await finalizeRequestLog(opts.logId, {
-      status: "FAILED",
-      durationMs: Date.now() - opts.startedAt,
-      failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
-      failCode: "VOLCENGINE_TASK_FAILED",
-      externalTaskId: opts.taskId,
-      resultSummary,
-    });
+    const trace = readVolcengineTimingTrace(resultSummary);
+    if (trace) {
+      await finalizeVolcengineVideoRequestLog(opts.logId, {
+        submittedAt: log.submittedAt,
+        status: "FAILED",
+        trace,
+        resultSummaryBase: resultSummary,
+        failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
+        failCode: "VOLCENGINE_TASK_FAILED",
+        externalTaskId: opts.taskId,
+      });
+    } else {
+      await finalizeRequestLog(opts.logId, {
+        status: "FAILED",
+        durationMs: Date.now() - opts.startedAt,
+        failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
+        failCode: "VOLCENGINE_TASK_FAILED",
+        externalTaskId: opts.taskId,
+        resultSummary,
+      });
+    }
     return "done";
   }
 

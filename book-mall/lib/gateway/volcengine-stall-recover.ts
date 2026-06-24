@@ -5,7 +5,11 @@ import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display
 import { applyCanvasVolcengineVideoResult } from "@/lib/canvas/canvas-task-service";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
-import { persistVolcengineTimingOnPoll } from "@/lib/gateway/log-volcengine-timing-persist";
+import {
+  finalizeVolcengineVideoRequestLog,
+  persistVolcengineTimingOnPoll,
+} from "@/lib/gateway/log-volcengine-timing-persist";
+import { readVolcengineTimingTrace } from "@/lib/gateway/log-volcengine-timing";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { resolveVolcengineArkApiKey } from "@/lib/gateway/volcengine-gateway-credential";
 import {
@@ -147,7 +151,7 @@ export async function recoverVolcengineGatewayLogFromVendor(
 
   const row = polled.output;
   const vendorStatus = String(row.status ?? "running");
-  const startedAt = log.submittedAt.getTime();
+  const polledAtMs = Date.now();
 
   if (isVolcengineVideoTaskSuccess(row)) {
     const videoUrl = row.content?.video_url;
@@ -168,12 +172,24 @@ export async function recoverVolcengineGatewayLogFromVendor(
       vendorRaw: polled.raw,
       resultSummaryOverride: baseSummary,
     });
-    await finalizeRequestLog(log.id, {
-      status: "SUCCEEDED",
-      durationMs: Date.now() - startedAt,
-      resultSummary,
-      externalTaskId: taskId,
-    });
+    const trace = readVolcengineTimingTrace(resultSummary);
+    if (trace) {
+      await finalizeVolcengineVideoRequestLog(log.id, {
+        submittedAt: log.submittedAt,
+        status: "SUCCEEDED",
+        trace,
+        resultSummaryBase: resultSummary,
+        fallbackNowMs: polledAtMs,
+        externalTaskId: taskId,
+      });
+    } else {
+      await finalizeRequestLog(log.id, {
+        status: "SUCCEEDED",
+        durationMs: polledAtMs - log.submittedAt.getTime(),
+        resultSummary,
+        externalTaskId: taskId,
+      });
+    }
     await syncCanvasAfterGatewayRecover(log.id, videoUrl);
     return {
       ok: true,
@@ -201,14 +217,28 @@ export async function recoverVolcengineGatewayLogFromVendor(
         error: row.error,
       }),
     });
-    await finalizeRequestLog(log.id, {
-      status: "FAILED",
-      durationMs: Date.now() - startedAt,
-      failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
-      failCode: "VOLCENGINE_TASK_FAILED",
-      externalTaskId: taskId,
-      resultSummary,
-    });
+    const trace = readVolcengineTimingTrace(resultSummary);
+    if (trace) {
+      await finalizeVolcengineVideoRequestLog(log.id, {
+        submittedAt: log.submittedAt,
+        status: "FAILED",
+        trace,
+        resultSummaryBase: resultSummary,
+        fallbackNowMs: polledAtMs,
+        failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
+        failCode: "VOLCENGINE_TASK_FAILED",
+        externalTaskId: taskId,
+      });
+    } else {
+      await finalizeRequestLog(log.id, {
+        status: "FAILED",
+        durationMs: polledAtMs - log.submittedAt.getTime(),
+        failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
+        failCode: "VOLCENGINE_TASK_FAILED",
+        externalTaskId: taskId,
+        resultSummary,
+      });
+    }
     return {
       ok: true,
       action: "vendor_failed",
