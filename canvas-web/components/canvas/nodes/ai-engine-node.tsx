@@ -201,7 +201,7 @@ export function AiEngineNode({ id, data, selected }: NodeProps) {
                   ? "跳过缓存，强制创建新任务"
                   : undefined
             }
-            className="nodrag inline-flex w-full items-center justify-center gap-1 rounded-md bg-[var(--canvas-accent)] px-2 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="nodrag inline-flex w-full items-center justify-center gap-1 rounded-md bg-[var(--canvas-accent)] px-2 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isGenerating ? (
               <>

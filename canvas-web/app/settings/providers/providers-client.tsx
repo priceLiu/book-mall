@@ -1141,7 +1141,7 @@ function AddProviderModal({
             type="button"
             onClick={() => void onSubmit()}
             disabled={submitting}
-            className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft)] hover:text-white disabled:opacity-60"
+            className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)] disabled:opacity-60"
           >
             {submitting ? <Loader2 className="size-3 animate-spin" /> : null}
             创建并自动拉取模型清单

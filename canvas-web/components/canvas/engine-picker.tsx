@@ -381,7 +381,7 @@ function EngineModelModal({
       >
         <header className="flex items-start justify-between gap-3 border-b border-white/5 px-5 py-4">
           <p className="flex items-center gap-2 text-[15px] font-medium text-white">
-            <Sparkles className="size-4 text-[var(--canvas-accent,#a78bfa)]" />
+            <Sparkles className="size-4 text-[var(--canvas-accent)]" />
             {title}
           </p>
           <button
@@ -458,7 +458,7 @@ function EngineModelModal({
                 provider: draft.provider,
               });
             }}
-            className="rounded-md bg-[var(--canvas-accent,#a78bfa)] px-4 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft,#c4b5fd)] disabled:opacity-50"
+            className="rounded-md bg-[var(--canvas-accent)] px-4 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)] disabled:opacity-50"
           >
             确认
           </button>
@@ -576,7 +576,7 @@ function EmptyState({ role }: { role: "LLM" | "IMAGE" | "VIDEO" }) {
       </p>
       <a
         href="/settings/providers"
-        className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-[12px] text-[var(--canvas-accent,#a78bfa)] hover:bg-white/10"
+        className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-[12px] text-[var(--canvas-accent)] hover:bg-white/10"
         target="_blank"
         rel="noopener noreferrer"
       >

@@ -866,7 +866,7 @@ export const NODE_DEFAULT_DATA: Record<CanvasNodeType, Record<string, unknown>> 
   } satisfies OutputNodeData as Record<string, unknown>,
   group: {
     label: "未命名分组",
-    color: "#a78bfa",
+    color: "#238636",
   } satisfies GroupNodeData as Record<string, unknown>,
 };
 
@@ -988,9 +988,9 @@ export const STORY_FRAME_IMAGE_ENGINE_SIZE = {
   height: 480,
 } as const;
 
-/** 6 个预设分组色（与暗紫主题搭） */
+/** 6 个预设分组色 */
 export const GROUP_COLOR_PRESETS = [
-  "#a78bfa", // 主紫
+  "#238636", // Gateway 主色
   "#60a5fa", // 蓝
   "#34d399", // 绿
   "#fbbf24", // 琥珀

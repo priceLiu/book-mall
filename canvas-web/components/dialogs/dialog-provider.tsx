@@ -292,7 +292,7 @@ function ConfirmBody({
           className={
             opts.danger
               ? "rounded-md border border-red-500/40 bg-red-500/15 px-3 py-1.5 text-[12px] font-medium text-red-100 hover:bg-red-500/25"
-              : "rounded-md bg-[var(--canvas-accent,#a78bfa)] px-3 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft,#c4b5fd)] hover:text-white"
+              : "rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)]"
           }
         >
           {opts.confirmLabel ?? (opts.danger ? "确认删除" : "确认")}
@@ -336,7 +336,7 @@ function AlertBody({
           onKeyDown={(e) => {
             if (e.key === "Enter") onFinish("confirm");
           }}
-          className="rounded-md bg-[var(--canvas-accent,#a78bfa)] px-3 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft,#c4b5fd)] hover:text-white"
+          className="rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)]"
         >
           {opts.okLabel ?? "我知道了"}
         </button>
@@ -406,7 +406,7 @@ function PromptBody({
             }
           }}
           placeholder={opts.placeholder}
-          className="mt-2 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[12px] text-white placeholder:text-white/40 focus:border-[var(--canvas-accent,#a78bfa)] focus:outline-none"
+          className="mt-2 w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[12px] text-white placeholder:text-white/40 focus:border-[var(--canvas-accent)] focus:outline-none"
         />
         {error ? (
           <p className="mt-1.5 text-[11px] text-red-300">{error}</p>
@@ -423,7 +423,7 @@ function PromptBody({
         <button
           type="button"
           onClick={onSubmit}
-          className="rounded-md bg-[var(--canvas-accent,#a78bfa)] px-3 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft,#c4b5fd)] hover:text-white"
+          className="rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)]"
         >
           {opts.confirmLabel ?? "确认"}
         </button>
