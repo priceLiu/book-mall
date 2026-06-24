@@ -172,7 +172,8 @@ export function isSameSbv1MediaDataPatch(
   if (!nextRt) {
     return !("runtime" in patch);
   }
-  const prev = (cur.runtime as CanvasNodeRuntime | undefined) ?? {};
+  const prev: Partial<CanvasNodeRuntime> =
+    (cur.runtime as CanvasNodeRuntime | undefined) ?? {};
   return (
     (prev.status ?? "idle") === (nextRt.status ?? "idle") &&
     (prev.taskId ?? "") === (nextRt.taskId ?? "") &&
