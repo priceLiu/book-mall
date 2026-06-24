@@ -10,6 +10,7 @@ import {
   PRO_NODE_SHELL_FOOTER_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
 import { PRO2_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
+import { CANVAS_SEMANTIC_TITLE_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { NodeStatusBadge } from "./node-shell";
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { StoryProStageRail } from "./story-pro-stage-rail";
@@ -131,13 +132,16 @@ export function ProNodeShell({
                   aria-hidden
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-emerald-300">
+                  <p
+                    className={cn(
+                      "truncate text-[11px] font-semibold uppercase tracking-wider",
+                      CANVAS_SEMANTIC_TITLE_CLASS,
+                    )}
+                  >
                     {title}
                   </p>
                   {subtitle ? (
-                    <p className="truncate text-[11px] text-emerald-200/80">
-                      {subtitle}
-                    </p>
+                    <p className="truncate text-[11px] text-white/60">{subtitle}</p>
                   ) : null}
                 </div>
               </div>

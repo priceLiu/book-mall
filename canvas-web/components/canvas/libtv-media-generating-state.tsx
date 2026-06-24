@@ -6,6 +6,7 @@ import {
   LIBTV_MEDIA_GENERATING_CYAN_CLASS,
   LIBTV_MEDIA_GENERATING_VIOLET_CLASS,
 } from "@/lib/canvas/libtv-node-chrome";
+import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { storyEditionSpinClass } from "@/lib/canvas/story-edition-chrome";
 import { cn } from "@/lib/utils";
 
@@ -46,12 +47,7 @@ export function LibtvMediaGeneratingState({
     variant === "violet" ? "pro2" : "pro",
     "lg",
   );
-  const labelClass =
-    tone === "background"
-      ? "text-[11px] font-medium text-orange-200/90"
-      : variant === "violet"
-        ? "text-[11px] font-medium text-violet-200/80"
-        : "text-[11px] font-medium text-cyan-200/80";
+  const labelClass = `text-[11px] font-medium ${CANVAS_SEMANTIC_STATUS_CLASS}`;
 
   return (
     <div className={cn("absolute inset-0 overflow-hidden", shimmerClass, className)}>

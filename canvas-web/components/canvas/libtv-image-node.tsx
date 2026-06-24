@@ -11,6 +11,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { uploadCanvasImage } from "@/lib/canvas-api";
 import { normalizeCanvasImageFile } from "@/lib/canvas/normalize-canvas-image-file";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import {
   LIBTV_CARD_DRAG_CLASS,
   LIBTV_MEDIA_CARD_SHELL_CLASS,
@@ -81,14 +82,14 @@ const EDITION_CHROME: Record<
 > = {
   pro2: {
     ring: "ring-1 ring-violet-400/45",
-    icon: "text-violet-300",
-    spinner: "text-violet-300",
+    icon: "text-white/70",
+    spinner: CANVAS_SEMANTIC_STATUS_CLASS,
     generating: "violet",
   },
   sbv1: {
     ring: "ring-1 ring-cyan-400/50",
-    icon: "text-cyan-300",
-    spinner: "text-cyan-300",
+    icon: "text-white/70",
+    spinner: CANVAS_SEMANTIC_STATUS_CLASS,
     generating: "cyan",
   },
 };

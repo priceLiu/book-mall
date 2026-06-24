@@ -34,7 +34,22 @@ import {
   CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
   canvasToolbarSidePanelAsideClass,
 } from "@/lib/canvas/canvas-toolbar-side-panel";
+import {
+  CANVAS_PANEL_HEADER_BORDER_CLASS,
+  CANVAS_PANEL_HEADER_ICON_CLASS,
+  CANVAS_PANEL_SECONDARY_BTN_CLASS,
+  CANVAS_PANEL_TAB_ACTIVE_CLASS,
+  CANVAS_PANEL_TAB_IDLE_CLASS,
+  CANVAS_PANEL_TITLE_CLASS,
+  CANVAS_SEMANTIC_ERROR_CLASS,
+  CANVAS_SEMANTIC_STATUS_CLASS,
+  CANVAS_STATUS_CHIP_ERROR_CLASS,
+  CANVAS_STATUS_CHIP_NEUTRAL_CLASS,
+  CANVAS_STATUS_CHIP_RUNNING_CLASS,
+  CANVAS_STATUS_CHIP_SUCCESS_CLASS,
+} from "@/lib/canvas/canvas-chrome-semantics";
 import { usePanelInfiniteScroll } from "@/lib/canvas/use-panel-infinite-scroll";
+import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { resolveGenerationRecordPreview } from "@/lib/canvas/generation-record-preview";
 import {
@@ -64,14 +79,14 @@ function statusLabel(status: CanvasGenerationRecord["status"]): string {
 function statusTone(status: CanvasGenerationRecord["status"]): string {
   switch (status) {
     case "SUCCEEDED":
-      return "text-emerald-300 border-emerald-400/30 bg-emerald-500/10";
+      return CANVAS_STATUS_CHIP_SUCCESS_CLASS;
     case "FAILED":
-      return "text-red-300 border-red-400/30 bg-red-500/10";
+      return CANVAS_STATUS_CHIP_ERROR_CLASS;
     case "PENDING":
     case "SUBMITTED":
-      return "text-violet-300 border-violet-400/30 bg-violet-500/10";
+      return CANVAS_STATUS_CHIP_RUNNING_CLASS;
     default:
-      return "text-white/60 border-white/15 bg-white/5";
+      return CANVAS_STATUS_CHIP_NEUTRAL_CLASS;
   }
 }
 
@@ -124,9 +139,9 @@ function RecordRow({
             {item.status === "FAILED" ? (
               <AlertCircle className="size-5 text-red-400/80" />
             ) : item.status === "SUCCEEDED" ? (
-              <CheckCircle2 className="size-5 text-emerald-400/80" />
+              <CheckCircle2 className={cn("size-5", CANVAS_SEMANTIC_STATUS_CLASS)} />
             ) : (
-              <Loader2 className="size-5 animate-spin text-violet-300/80" />
+              <Loader2 className={cn("size-5 animate-spin", CANVAS_SEMANTIC_STATUS_CLASS)} />
             )}
           </div>
         )}
@@ -152,9 +167,9 @@ function RecordRow({
             <p
               className={`mt-1 text-[11px] ${
                 nodePresent
-                  ? "text-emerald-200/75"
+                  ? CANVAS_SEMANTIC_STATUS_CLASS
                   : canRestoreCanvas
-                    ? "text-amber-200/80"
+                    ? CANVAS_SEMANTIC_STATUS_CLASS
                     : "text-white/45"
               }`}
             >
@@ -190,7 +205,7 @@ function RecordRow({
                 type="button"
                 disabled={restoring}
                 onClick={() => onRestoreCanvas(item)}
-                className="inline-flex items-center gap-1 rounded-md border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-100 hover:bg-emerald-500/15 disabled:opacity-50"
+                className={CANVAS_PANEL_SECONDARY_BTN_CLASS}
               >
                 {restoring ? (
                   <Loader2 className="size-3 animate-spin" />
@@ -210,7 +225,7 @@ function RecordRow({
               位于其他画布 ·{" "}
               <Link
                 href={`/canvas/${targetProjectId}`}
-                className="text-emerald-200/80 hover:underline"
+                className="text-white/75 hover:underline"
               >
                 打开画布
               </Link>
@@ -476,16 +491,21 @@ export function MyCanvasGenerationRecordsPanel({
     >
       <aside
         className={canvasToolbarSidePanelAsideClass(
-          "border-l border-emerald-400/15",
+          `border-l ${CANVAS_PANEL_HEADER_BORDER_CLASS}`,
         )}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="生成记录"
       >
-        <header className="flex items-center justify-between border-b border-emerald-400/15 px-4 py-3">
+        <header
+          className={cn(
+            "flex items-center justify-between border-b px-4 py-3",
+            CANVAS_PANEL_HEADER_BORDER_CLASS,
+          )}
+        >
           <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-emerald-300" />
-            <p className="text-sm font-medium">生成记录</p>
+            <Sparkles className={CANVAS_PANEL_HEADER_ICON_CLASS} />
+            <p className={CANVAS_PANEL_TITLE_CLASS}>生成记录</p>
           </div>
           <button
             type="button"
@@ -501,22 +521,24 @@ export function MyCanvasGenerationRecordsPanel({
           <button
             type="button"
             onClick={() => setTab("today")}
-            className={`rounded-md px-3 py-1.5 text-[11px] ${
+            className={cn(
+              "rounded-md px-3 py-1.5 text-[11px]",
               tab === "today"
-                ? "bg-emerald-500/20 text-emerald-100"
-                : "text-white/55 hover:bg-white/8"
-            }`}
+                ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                : CANVAS_PANEL_TAB_IDLE_CLASS,
+            )}
           >
             今日全部 ({todayTasks.length}{todayHasMore ? "+" : ""})
           </button>
           <button
             type="button"
             onClick={() => setTab("project")}
-            className={`rounded-md px-3 py-1.5 text-[11px] ${
+            className={cn(
+              "rounded-md px-3 py-1.5 text-[11px]",
               tab === "project"
-                ? "bg-emerald-500/20 text-emerald-100"
-                : "text-white/55 hover:bg-white/8"
-            }`}
+                ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                : CANVAS_PANEL_TAB_IDLE_CLASS,
+            )}
           >
             本项目 ({projectTasks.length}{projectHasMore ? "+" : ""})
           </button>

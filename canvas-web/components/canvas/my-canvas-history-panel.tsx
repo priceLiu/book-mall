@@ -30,6 +30,18 @@ import {
   CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
   canvasToolbarSidePanelAsideClass,
 } from "@/lib/canvas/canvas-toolbar-side-panel";
+import {
+  CANVAS_PANEL_HEADER_BORDER_CLASS,
+  CANVAS_PANEL_HEADER_ICON_CLASS,
+  CANVAS_PANEL_ITEM_META_CLASS,
+  CANVAS_PANEL_ITEM_TITLE_CLASS,
+  CANVAS_PANEL_SECONDARY_BTN_CLASS,
+  CANVAS_PANEL_TAB_ACTIVE_CLASS,
+  CANVAS_PANEL_TAB_IDLE_CLASS,
+  CANVAS_PANEL_TITLE_CLASS,
+  CANVAS_SEMANTIC_STATUS_CLASS,
+} from "@/lib/canvas/canvas-chrome-semantics";
+import { cn } from "@/lib/utils";
 
 type HistoryTab = "autosave" | "manual";
 
@@ -189,16 +201,21 @@ export function MyCanvasHistoryPanel({
     >
       <aside
         className={canvasToolbarSidePanelAsideClass(
-          "border-l border-violet-400/15",
+          `border-l ${CANVAS_PANEL_HEADER_BORDER_CLASS}`,
         )}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="我的历史"
       >
-        <header className="flex items-center justify-between border-b border-violet-400/15 px-4 py-3">
+        <header
+          className={cn(
+            "flex items-center justify-between border-b px-4 py-3",
+            CANVAS_PANEL_HEADER_BORDER_CLASS,
+          )}
+        >
           <div className="flex items-center gap-2">
-            <History className="size-4 text-violet-300" />
-            <p className="text-sm font-medium">我的历史</p>
+            <History className={CANVAS_PANEL_HEADER_ICON_CLASS} />
+            <p className={CANVAS_PANEL_TITLE_CLASS}>我的历史</p>
           </div>
           <button
             type="button"
@@ -214,22 +231,24 @@ export function MyCanvasHistoryPanel({
           <button
             type="button"
             onClick={() => setTab("autosave")}
-            className={`rounded-md px-3 py-1.5 text-[11px] ${
+            className={cn(
+              "rounded-md px-3 py-1.5 text-[11px]",
               tab === "autosave"
-                ? "bg-violet-500/20 text-violet-100"
-                : "text-white/55 hover:bg-white/8"
-            }`}
+                ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                : CANVAS_PANEL_TAB_IDLE_CLASS,
+            )}
           >
             自动保存 ({meta?.autosaveCount ?? 0}/{CANVAS_PROJECT_HISTORY_MAX})
           </button>
           <button
             type="button"
             onClick={() => setTab("manual")}
-            className={`rounded-md px-3 py-1.5 text-[11px] ${
+            className={cn(
+              "rounded-md px-3 py-1.5 text-[11px]",
               tab === "manual"
-                ? "bg-violet-500/20 text-violet-100"
-                : "text-white/55 hover:bg-white/8"
-            }`}
+                ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                : CANVAS_PANEL_TAB_IDLE_CLASS,
+            )}
           >
             手动保存 ({meta?.manualCount ?? 0}/{CANVAS_PROJECT_HISTORY_MAX})
           </button>
@@ -243,7 +262,7 @@ export function MyCanvasHistoryPanel({
           <select
             value={String(intervalMs)}
             onChange={(e) => onIntervalChange(Number.parseInt(e.target.value, 10))}
-            className="nodrag mt-2 w-full rounded-lg border border-white/12 bg-black/40 px-3 py-2 text-[12px] text-white focus:border-violet-400/50 focus:outline-none"
+            className="nodrag mt-2 w-full rounded-lg border border-white/12 bg-black/40 px-3 py-2 text-[12px] text-white focus:border-white/25 focus:outline-none"
           >
             {CANVAS_AUTOSAVE_INTERVAL_OPTIONS.map((opt) => (
               <option key={opt.id} value={opt.ms}>
@@ -314,10 +333,8 @@ export function MyCanvasHistoryPanel({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium text-violet-50">
-                        {item.label}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-violet-200/55">
+                      <p className={CANVAS_PANEL_ITEM_TITLE_CLASS}>{item.label}</p>
+                      <p className={CANVAS_PANEL_ITEM_META_CLASS}>
                         {new Date(item.createdAt).toLocaleString("zh-CN")}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -325,7 +342,7 @@ export function MyCanvasHistoryPanel({
                           type="button"
                           disabled={restoringId === item.id}
                           onClick={() => void onRestoreItem(item)}
-                          className="inline-flex items-center gap-1 rounded-md border border-violet-400/30 bg-violet-500/15 px-2 py-1 text-[11px] text-violet-100 hover:bg-violet-500/25 disabled:opacity-50"
+                          className={CANVAS_PANEL_SECONDARY_BTN_CLASS}
                         >
                           {restoringId === item.id ? (
                             <Loader2 className="size-3 animate-spin" />

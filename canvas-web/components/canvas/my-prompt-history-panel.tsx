@@ -26,6 +26,16 @@ import {
   CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
   canvasToolbarSidePanelAsideClass,
 } from "@/lib/canvas/canvas-toolbar-side-panel";
+import {
+  CANVAS_PANEL_HEADER_BORDER_CLASS,
+  CANVAS_PANEL_HEADER_ICON_CLASS,
+  CANVAS_PANEL_ITEM_META_CLASS,
+  CANVAS_PANEL_TAB_ACTIVE_CLASS,
+  CANVAS_PANEL_TAB_IDLE_CLASS,
+  CANVAS_PANEL_TITLE_CLASS,
+  CANVAS_SEMANTIC_ERROR_CLASS,
+  CANVAS_SEMANTIC_STATUS_CLASS,
+} from "@/lib/canvas/canvas-chrome-semantics";
 import { usePanelInfiniteScroll } from "@/lib/canvas/use-panel-infinite-scroll";
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/lib/canvas/store";
@@ -70,19 +80,19 @@ function PromptRow({
         "rounded-lg border px-3 py-2.5",
         failed
           ? "border-red-400/25 bg-red-500/5"
-          : "border-emerald-400/20 bg-emerald-500/5",
+          : "border-white/10 bg-white/[0.03]",
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
             {failed ? (
-              <span className="inline-flex items-center gap-1 text-red-300">
+              <span className={cn("inline-flex items-center gap-1", CANVAS_SEMANTIC_ERROR_CLASS)}>
                 <XCircle className="size-3" />
                 失败
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-emerald-300">
+              <span className={cn("inline-flex items-center gap-1", CANVAS_SEMANTIC_STATUS_CLASS)}>
                 <CheckCircle2 className="size-3" />
                 成功
               </span>
@@ -93,7 +103,9 @@ function PromptRow({
             <span className="text-white/35">{formatWhen(item.createdAt)}</span>
           </div>
           {showProject && item.projectName ? (
-            <p className="mt-1 text-[10px] text-violet-200/80">{item.projectName}</p>
+            <p className={cn("mt-1 text-[10px]", CANVAS_PANEL_ITEM_META_CLASS)}>
+              {item.projectName}
+            </p>
           ) : null}
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-white/90">
             {item.promptText}
@@ -249,17 +261,22 @@ export function MyPromptHistoryPanel({
     >
       <aside
         className={canvasToolbarSidePanelAsideClass(
-          "border-l border-violet-400/20",
+          `border-l ${CANVAS_PANEL_HEADER_BORDER_CLASS}`,
         )}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="我的提示词"
       >
-        <header className="border-b border-violet-400/15 px-4 py-3">
+        <header
+          className={cn(
+            "border-b px-4 py-3",
+            CANVAS_PANEL_HEADER_BORDER_CLASS,
+          )}
+        >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Sparkles className="size-4 text-violet-300" />
-              <p className="text-sm font-medium">我的提示词</p>
+              <Sparkles className={CANVAS_PANEL_HEADER_ICON_CLASS} />
+              <p className={CANVAS_PANEL_TITLE_CLASS}>我的提示词</p>
             </div>
             <button
               type="button"
@@ -280,8 +297,8 @@ export function MyPromptHistoryPanel({
               className={cn(
                 "rounded-md px-2.5 py-1 text-[11px]",
                 scope === "project"
-                  ? "bg-violet-500/25 text-violet-100"
-                  : "text-white/55 hover:bg-white/5",
+                  ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                  : CANVAS_PANEL_TAB_IDLE_CLASS,
               )}
             >
               本项目
@@ -292,8 +309,8 @@ export function MyPromptHistoryPanel({
               className={cn(
                 "rounded-md px-2.5 py-1 text-[11px]",
                 scope === "mine"
-                  ? "bg-violet-500/25 text-violet-100"
-                  : "text-white/55 hover:bg-white/5",
+                  ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                  : CANVAS_PANEL_TAB_IDLE_CLASS,
               )}
             >
               我的全部
@@ -313,8 +330,8 @@ export function MyPromptHistoryPanel({
                   className={cn(
                     "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px]",
                     mediaKind === tab.id
-                      ? "bg-cyan-500/20 text-cyan-100"
-                      : "text-white/55 hover:bg-white/5",
+                      ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                      : CANVAS_PANEL_TAB_IDLE_CLASS,
                   )}
                 >
                   <Icon className="size-3" />
@@ -330,8 +347,8 @@ export function MyPromptHistoryPanel({
               className={cn(
                 "rounded-md px-2.5 py-1 text-[11px]",
                 outcome === "success"
-                  ? "bg-emerald-500/20 text-emerald-100"
-                  : "text-white/55 hover:bg-white/5",
+                  ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                  : CANVAS_PANEL_TAB_IDLE_CLASS,
               )}
             >
               成功
@@ -356,7 +373,7 @@ export function MyPromptHistoryPanel({
             <p className="text-sm text-red-300">{error}</p>
           ) : loading ? (
             <div className="flex items-center justify-center gap-2 py-16 text-sm text-white/50">
-              <Loader2 className="size-4 animate-spin text-violet-300" />
+              <Loader2 className={cn("size-4 animate-spin", CANVAS_SEMANTIC_STATUS_CLASS)} />
               加载中…
             </div>
           ) : items.length === 0 ? (
@@ -389,7 +406,7 @@ export function MyPromptHistoryPanel({
           {scope === "project" && effectiveProjectId ? (
             <Link
               href={`/canvas/${effectiveProjectId}`}
-              className="ml-1 text-violet-300/90 hover:underline"
+              className="ml-1 text-white/75 hover:underline"
               onClick={onClose}
             >
               回到画布

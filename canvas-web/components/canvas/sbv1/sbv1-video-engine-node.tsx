@@ -7,6 +7,7 @@ import { Handle, Position, useNodes, useReactFlow } from "@xyflow/react";
 import { Maximize2, Play, RefreshCw, Video } from "lucide-react";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import {
   pickPreferredCanvasTask,
   runtimePatchFromCanvasTask,
@@ -361,7 +362,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
             <div className="flex items-center gap-2">
-              <Video className="size-3.5 text-cyan-300" />
+              <Video className="size-3.5 text-white/70" />
               <p className="text-xs font-medium text-white">{SBV1_VIDEO_COMPOSE_LABEL}</p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -379,7 +380,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                 </button>
               ) : null}
               {isGenerating ? (
-                <RefreshCw className="size-3.5 animate-spin text-cyan-300" />
+                <RefreshCw className={cn("size-3.5 animate-spin", CANVAS_SEMANTIC_STATUS_CLASS)} />
               ) : null}
             </div>
           </div>

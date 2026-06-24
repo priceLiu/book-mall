@@ -3,6 +3,8 @@
  * 设计规范：`canvas-web/docs/design.md` §14
  */
 
+import { CANVAS_SEMANTIC_TITLE_CLASS } from "./canvas-chrome-semantics";
+
 export const PRO_NODE_ACCENT = "#22d3ee";
 export const PRO_NODE_ACCENT_SOFT = "rgba(34, 211, 238, 0.12)";
 export const PRO_NODE_BORDER = "rgba(34, 211, 238, 0.35)";
@@ -84,7 +86,8 @@ export const PRO_REF_THUMB_CLASS =
 export const PRO_MODAL_HEADER_CLASS =
   "nodrag flex shrink-0 items-center gap-3 border-b border-cyan-400/20 bg-gradient-to-r from-cyan-950/50 via-[#0b1220] to-cyan-950/30 px-4 py-3";
 
-export const PRO_MODAL_TITLE_CLASS = "truncate text-sm font-medium text-cyan-50";
+export const PRO_MODAL_TITLE_CLASS =
+  `truncate text-sm font-medium ${CANVAS_SEMANTIC_TITLE_CLASS}`;
 
 export const PRO_MODAL_SUBTITLE_CLASS = "truncate text-[11px] text-cyan-200/55";
 

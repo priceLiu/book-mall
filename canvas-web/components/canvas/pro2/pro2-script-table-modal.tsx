@@ -173,7 +173,7 @@ export function Pro2ScriptHubEditorModal({
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-violet-400/15 bg-[#14101c]/95 px-5 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="min-w-0">
-            <p className="truncate text-[14px] font-semibold text-violet-50">
+            <p className="truncate text-[14px] font-semibold text-white">
               {title}
             </p>
             {savedHint ? (

@@ -6,6 +6,14 @@ import { cn } from "@/lib/utils";
 import { useCanvasNodeEmbedded } from "@/lib/canvas/canvas-node-embedded-context";
 import { RF_NODE_DRAG_HANDLE, RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
 import { STORY_NODE_SHELL_FOOTER_CLASS } from "@/lib/canvas/story-node-chrome";
+import {
+  CANVAS_SEMANTIC_TITLE_CLASS,
+  CANVAS_STATUS_BADGE_DONE_CLASS,
+  CANVAS_STATUS_BADGE_ERROR_CLASS,
+  CANVAS_STATUS_BADGE_IDLE_CLASS,
+  CANVAS_STATUS_BADGE_PENDING_CLASS,
+  CANVAS_STATUS_BADGE_RUNNING_CLASS,
+} from "@/lib/canvas/canvas-chrome-semantics";
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 
 export type NodeShellProps = {
@@ -155,14 +163,13 @@ export function NodeShell({
             <p
               className={cn(
                 "truncate text-[11px] font-medium uppercase tracking-wider",
-                engine ? "" : "text-[var(--canvas-muted)]",
+                CANVAS_SEMANTIC_TITLE_CLASS,
               )}
-              style={engine ? { color: engineTint } : undefined}
             >
               {title}
             </p>
             {subtitle ? (
-              <p className="truncate text-[11px] text-emerald-300/85">{subtitle}</p>
+              <p className="truncate text-[11px] text-white/60">{subtitle}</p>
             ) : null}
           </div>
         </div>
@@ -242,22 +249,19 @@ export function NodeStatusBadge({
   switch (status) {
     case "running":
       return (
-        <span
-          className="inline-flex items-center gap-1 rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-200"
-          title="生成中"
-        >
+        <span className={CANVAS_STATUS_BADGE_RUNNING_CLASS} title="生成中">
           <Loader2 className="size-3 animate-spin" /> 生成中
         </span>
       );
     case "pending":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-200">
+        <span className={CANVAS_STATUS_BADGE_PENDING_CLASS}>
           <Loader2 className="size-3 animate-spin" /> 排队
         </span>
       );
     case "done":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-200">
+        <span className={CANVAS_STATUS_BADGE_DONE_CLASS}>
           <Check className="size-3" /> 完成
         </span>
       );
@@ -265,16 +269,14 @@ export function NodeStatusBadge({
       return (
         <span
           title={message ?? undefined}
-          className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] text-red-200"
+          className={CANVAS_STATUS_BADGE_ERROR_CLASS}
         >
           <AlertTriangle className="size-3" /> 失败
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] text-emerald-300/90">
-          就绪
-        </span>
+        <span className={CANVAS_STATUS_BADGE_IDLE_CLASS}>就绪</span>
       );
   }
 }
