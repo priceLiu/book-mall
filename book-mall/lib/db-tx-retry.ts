@@ -50,7 +50,7 @@ export function isPrismaTransactionTimeoutError(error: unknown): boolean {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-/** 画布建任务 / claim 等热路径：默认 5s 事务超时在连接池排队时易误报「数据库繁忙」。 */
+/** 画布建任务 / claim / **dispatch 占槽** 等热路径：默认 5s 事务超时在连接池排队时易误报「数据库繁忙」。规范见 `book-mall/doc/tech/generation-traffic-dispatch-invariants.md`。 */
 export const CANVAS_DB_TX_OPTIONS = {
   maxWait: 10_000,
   timeout: 30_000,

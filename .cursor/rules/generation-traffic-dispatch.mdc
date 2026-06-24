@@ -1,0 +1,37 @@
+---
+description: 生成交通控流出队 dispatch 不变量（防生产线卡死 / 无 Gateway log）
+globs: book-mall/lib/generation/traffic-control/**,book-mall/lib/db-tx-retry.ts,book-mall/lib/canvas/canvas-queue-without-log.ts
+alwaysApply: false
+---
+
+# 生成 dispatch · 不变量（防生产线卡死）
+
+权威文档：`book-mall/doc/tech/generation-traffic-dispatch-invariants.md`
+
+## 禁止
+
+- `$transaction` **裸调用**（默认 **5s** 超时）用于占槽 / claim / dispatch — 必须用 `CANVAS_DB_TX_OPTIONS`（30s）
+- 在 **interactive tx 内**用全局 `prisma` 查 tenant / `resolveMaxConcurrencyForScope` — 须在 tx **外**预解析后传入 `acquireTrafficSlotInTx(tx, scope, maxConcurrency)`
+- 整批 dispatch 一个外层 `try/catch` 吞掉后续任务 — **每任务**独立 catch
+- DISPATCHING 后 submit 失败却不 **releaseTrafficSlot + 退回 QUEUED**（无 `gatewayLogId` / 无 vendor job 时）
+
+## 必须
+
+| 步骤 | 做法 |
+|------|------|
+| 占槽 | `runTxWithRetry(() => prisma.$transaction(..., CANVAS_DB_TX_OPTIONS))` |
+| 503 / P1017 / tx timeout | `isTransientSystemBusyError` → **QUEUED** + `dispatchAfter`，非 FAILED |
+| 厂商已 createTask | `runTxWithRetry` 写 SUBMITTED；失败勿标 FAILED |
+| 批次入口 | recover / cancel / findMany / per-task dispatch **分段** try/catch |
+| canvas + story | `dispatch-canvas.ts` 与 `dispatch-story.ts` **同口径** |
+
+## Code Review
+
+PR 改 `traffic-control/**` 或新增出队路径时核对上表；缺任一项 **驳回**。
+
+## 运维（卡死时）
+
+```bash
+pnpm --dir book-mall canvas:queued-reconcile
+pnpm --dir book-mall generation:reconcile-traffic
+```

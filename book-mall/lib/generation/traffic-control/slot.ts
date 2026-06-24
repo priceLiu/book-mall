@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { CANVAS_DB_TX_OPTIONS } from "@/lib/db-tx-retry";
 import { getTrafficTokensPerSec, computeTokenBurst } from "./constants";
 import {
   refillTokenBucket,
@@ -20,8 +21,11 @@ export type AcquireSlotResult =
 export async function acquireTrafficSlotInTx(
   tx: Prisma.TransactionClient,
   scope: TrafficScope,
+  /** 事务外预解析，避免 tx 内再开 prisma 查询拖过 5s 默认超时 */
+  maxConcurrencyOverride?: number,
 ): Promise<AcquireSlotResult> {
-  const maxConcurrency = await resolveMaxConcurrencyForScope(scope);
+  const maxConcurrency =
+    maxConcurrencyOverride ?? (await resolveMaxConcurrencyForScope(scope));
   const tokensPerSec = getTrafficTokensPerSec();
   const now = new Date();
 
@@ -117,5 +121,9 @@ export async function releaseTrafficSlotFromGatewayLog(log: {
 }
 
 export async function acquireTrafficSlot(scope: TrafficScope): Promise<AcquireSlotResult> {
-  return prisma.$transaction((tx) => acquireTrafficSlotInTx(tx, scope));
+  const maxConcurrency = await resolveMaxConcurrencyForScope(scope);
+  return prisma.$transaction(
+    (tx) => acquireTrafficSlotInTx(tx, scope, maxConcurrency),
+    CANVAS_DB_TX_OPTIONS,
+  );
 }
