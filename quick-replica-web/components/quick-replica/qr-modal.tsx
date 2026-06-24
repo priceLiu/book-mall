@@ -9,7 +9,7 @@ type Props = {
   onClose: () => void;
   title?: string;
   children: ReactNode;
-  /** default: 窄条；square: 80% 正方形；preview: 居中盒 min(90vw,1080)×min(90dvh,810) */
+  /** default: 窄条；square: 80% 正方形；preview: 居中盒 min(90vw,1400)×min(calc(100vh-80px),90dvh) */
   variant?: "default" | "square" | "preview";
   hideHeader?: boolean;
 };
@@ -40,7 +40,7 @@ export function QrModal({
 
   const shellClass =
     variant === "preview"
-      ? "qr-modal-shell relative z-10 flex h-[min(90dvh,810px)] w-[min(90vw,1080px)] max-h-[90dvh] max-w-[90vw]"
+      ? "qr-modal-shell relative z-10 flex h-[min(calc(100vh-80px),90dvh)] w-[min(90vw,1400px)] max-h-[calc(100vh-80px)] max-w-[min(90vw,1400px)] min-h-[33vh]"
       : variant === "square"
         ? "qr-modal-shell relative z-10 flex h-[80vmin] w-[80vmin] max-h-[80dvh] max-w-[80vw]"
         : "qr-modal-shell relative z-10 flex max-h-[90dvh] w-full max-w-lg";
@@ -48,7 +48,7 @@ export function QrModal({
   const showHeader = Boolean(title) && !hideHeader;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-10">
       <button
         type="button"
         className="absolute inset-0 bg-black/65 backdrop-blur-sm"

@@ -123,10 +123,10 @@ export function QrTemplatePreviewModal({
 
   return (
     <QrModal open={open} onClose={onClose} variant="preview" hideHeader>
-      <div className="grid min-h-0 flex-1 grid-cols-3">
-        {/* 左 2/3 · 参考作品（填满可用区域，按比例 contain） */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+        {/* 左 ~2/3 · 参考作品（大图 contain） */}
         <div
-          className="relative col-span-2 min-h-0 overflow-hidden"
+          className="flex h-[46%] min-h-0 w-full shrink-0 items-center justify-center overflow-hidden p-3 md:h-auto md:flex-1 md:p-8"
           style={{ background: "var(--qr-bg-page)" }}
         >
           {previewUrl ? (
@@ -134,7 +134,7 @@ export function QrTemplatePreviewModal({
               <video
                 src={previewUrl}
                 controls
-                className="absolute inset-0 h-full w-full object-contain"
+                className="h-full w-full max-h-full rounded-xl object-contain"
                 playsInline
               />
             ) : (
@@ -142,20 +142,19 @@ export function QrTemplatePreviewModal({
               <img
                 src={previewUrl}
                 alt={template.title}
-                className="absolute inset-0 h-full w-full object-contain"
+                className="h-full w-full max-h-full rounded-xl object-contain"
               />
             )
           ) : (
-            <div className="flex h-full items-center justify-center">
+            <div className="flex h-full min-h-[12rem] items-center justify-center">
               <p className="text-xs text-[var(--qr-text-muted)]">暂无预览</p>
             </div>
           )}
         </div>
 
-        {/* 右 1/3 · 模板细节 / 提示词 */}
+        {/* 右 ~1/3 · 模板细节 / 提示词 */}
         <div
-          className="col-span-1 flex min-h-0 flex-col"
-          style={{ borderLeft: "1px solid var(--qr-border)" }}
+          className="flex min-h-0 min-w-0 flex-1 flex-col border-t border-[var(--qr-border)] md:w-[420px] md:flex-none md:border-l md:border-t-0"
         >
           <div
             className="flex shrink-0 items-start justify-between px-5 py-4"
