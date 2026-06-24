@@ -922,6 +922,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [pageVisible, setPageVisible] = useState(true);
   const pageVisibleRef = useRef(true);
   pageVisibleRef.current = pageVisible;
+  const autoRefreshBusyRef = useRef(false);
 
   useEffect(() => {
     const onVis = () => {
@@ -1195,14 +1196,23 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         schedule(GATEWAY_LIVE_HOT_SYNC_MS);
         return;
       }
-      const fast = shouldLiveFastRefresh();
-      if (fast) {
-        await loadLogsDelta({ poll: true });
-      } else if (loadedPagesRef.current === 1) {
-        await loadLogsPaged({ poll: true, includeFacets: false });
+      if (autoRefreshBusyRef.current) {
+        schedule(3000);
+        return;
+      }
+      autoRefreshBusyRef.current = true;
+      try {
+        const fast = shouldLiveFastRefresh();
+        if (fast) {
+          await loadLogsDelta({ poll: true });
+        } else if (loadedPagesRef.current === 1) {
+          await loadLogsPaged({ poll: true, includeFacets: false });
+        }
+      } finally {
+        autoRefreshBusyRef.current = false;
       }
       if (cancelled) return;
-      const intervalMs = fast
+      const intervalMs = shouldLiveFastRefresh()
         ? gatewayLivePollIntervalMs(
             { inProgress: 0, slowWarn: 0, backgroundWait: 0 },
             true,

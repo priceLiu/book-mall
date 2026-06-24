@@ -407,6 +407,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const [error, setError] = useState<string | null>(null);
   const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
   const inFlightPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const inFlightPollBusyRef = useRef(false);
   const loadSeqRef = useRef(0);
   const detailLoadSeqRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
@@ -809,13 +810,21 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       if (document.visibilityState !== "visible") return;
       void loadDetailLogs({ poll: true, skipPoll: false });
     };
-    const refreshTick = () => {
+    const refreshTick = async () => {
       if (document.visibilityState !== "visible") return;
-      if (shouldPollInProgress) void loadInProgressDelta();
-      else void loadDetailLogs({ poll: true, skipPoll: false });
+      if (inFlightPollBusyRef.current) return;
+      inFlightPollBusyRef.current = true;
+      try {
+        if (shouldPollInProgress) await loadInProgressDelta();
+        else await loadDetailLogs({ poll: true, skipPoll: false });
+      } finally {
+        inFlightPollBusyRef.current = false;
+      }
     };
     refreshFull();
-    inFlightPollRef.current = setInterval(refreshTick, IN_FLIGHT_POLL_MS);
+    inFlightPollRef.current = setInterval(() => {
+      void refreshTick();
+    }, IN_FLIGHT_POLL_MS);
     return () => {
       if (inFlightPollRef.current) clearInterval(inFlightPollRef.current);
     };
