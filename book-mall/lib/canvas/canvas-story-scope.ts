@@ -5,6 +5,7 @@ import type { Prisma, CanvasGenerationTask } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { CANVAS_DB_TX_OPTIONS, runTxWithRetry } from "@/lib/db-tx-retry";
+import { promptArchiveFieldsForTask } from "@/lib/canvas/canvas-task-prompt-archive";
 import { CanvasProjectError } from "./canvas-project-service";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
@@ -162,9 +163,16 @@ export async function createStoryScopedCanvasTask(
             ? { storyScope: args.storyScope }
             : payload;
 
+      const archive = promptArchiveFieldsForTask({
+        kind: args.data.kind,
+        inputPayload: scopePatch,
+        textOutput: args.data.textOutput ?? null,
+      });
+
       return tx.canvasGenerationTask.create({
         data: {
           ...args.data,
+          ...archive,
           projectId: args.projectId,
           nodeId: args.nodeId,
           status,

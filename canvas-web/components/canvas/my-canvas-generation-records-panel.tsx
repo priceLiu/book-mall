@@ -35,10 +35,14 @@ import {
   CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
 } from "@/lib/canvas/canvas-toolbar-side-panel";
 import {
-  peekToolbarPanelCache,
+  fetchToolbarPanelWithSwr,
+  invalidateToolbarPanelCache,
   toolbarPanelCacheKey,
-  writeToolbarPanelCache,
 } from "@/lib/canvas/toolbar-panel-cache";
+import {
+  GENERATION_RECORDS_CACHE_PREFIX,
+  subscribeCanvasGenerationRecordsChanged,
+} from "@/lib/canvas/canvas-panel-sync-events";
 import {
   CANVAS_PANEL_SHELL_BODY_CLASS,
   CANVAS_PANEL_SHELL_EMPTY_CLASS,
@@ -289,57 +293,44 @@ export function MyCanvasGenerationRecordsPanel({
   const reload = useCallback(async (opts?: { force?: boolean }) => {
     if (!base || !projectId) return;
     const cacheKey = toolbarPanelCacheKey("generation-records", { projectId });
-    const cached = peekToolbarPanelCache<{
-      projectTasks: CanvasGenerationRecord[];
-      todayTasks: CanvasGenerationRecord[];
-      projectHasMore: boolean;
-      todayHasMore: boolean;
-      projectNextCursor: string | null;
-      todayNextCursor: string | null;
-    }>(cacheKey, opts);
-    if (cached) {
-      setProjectTasks(cached.projectTasks);
-      setTodayTasks(cached.todayTasks);
-      setProjectHasMore(cached.projectHasMore);
-      setTodayHasMore(cached.todayHasMore);
-      projectCursorRef.current = cached.projectNextCursor;
-      todayCursorRef.current = cached.todayNextCursor;
-      setLoading(false);
-      setListError(null);
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await listCanvasGenerationRecords(base, projectId, {
-        projectLimit: CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
-        todayLimit: CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
-      });
-      setProjectTasks(data.projectTasks);
-      setTodayTasks(data.todayTasks);
-      setProjectHasMore(data.projectHasMore);
-      setTodayHasMore(data.todayHasMore);
-      projectCursorRef.current = data.projectNextCursor;
-      todayCursorRef.current = data.todayNextCursor;
-      writeToolbarPanelCache(cacheKey, {
-        projectTasks: data.projectTasks,
-        todayTasks: data.todayTasks,
-        projectHasMore: data.projectHasMore,
-        todayHasMore: data.todayHasMore,
-        projectNextCursor: data.projectNextCursor,
-        todayNextCursor: data.todayNextCursor,
-      });
-      setListError(null);
-    } catch (e) {
-      setProjectTasks([]);
-      setTodayTasks([]);
-      setProjectHasMore(false);
-      setTodayHasMore(false);
-      projectCursorRef.current = null;
-      todayCursorRef.current = null;
-      setListError(formatCanvasApiError(e instanceof Error ? e.message : String(e)));
-    } finally {
-      setLoading(false);
-    }
+    await fetchToolbarPanelWithSwr({
+      cacheKey,
+      force: opts?.force,
+      fetch: async () => {
+        const data = await listCanvasGenerationRecords(base, projectId, {
+          projectLimit: CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
+          todayLimit: CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
+        });
+        return {
+          projectTasks: data.projectTasks,
+          todayTasks: data.todayTasks,
+          projectHasMore: data.projectHasMore,
+          todayHasMore: data.todayHasMore,
+          projectNextCursor: data.projectNextCursor,
+          todayNextCursor: data.todayNextCursor,
+        };
+      },
+      onLoading: setLoading,
+      onData: (cached) => {
+        setProjectTasks(cached.projectTasks);
+        setTodayTasks(cached.todayTasks);
+        setProjectHasMore(cached.projectHasMore);
+        setTodayHasMore(cached.todayHasMore);
+        projectCursorRef.current = cached.projectNextCursor;
+        todayCursorRef.current = cached.todayNextCursor;
+        setListError(null);
+      },
+      onError: (e) => {
+        if (e == null) return;
+        setProjectTasks([]);
+        setTodayTasks([]);
+        setProjectHasMore(false);
+        setTodayHasMore(false);
+        projectCursorRef.current = null;
+        todayCursorRef.current = null;
+        setListError(formatCanvasApiError(e instanceof Error ? e.message : String(e)));
+      },
+    });
   }, [base, projectId]);
 
   const loadMore = useCallback(async () => {
@@ -414,6 +405,14 @@ export function MyCanvasGenerationRecordsPanel({
     if (!open) return;
     void reload();
   }, [open, reload]);
+
+  useEffect(() => {
+    return subscribeCanvasGenerationRecordsChanged((detail) => {
+      if (detail.projectId !== projectId) return;
+      invalidateToolbarPanelCache(GENERATION_RECORDS_CACHE_PREFIX);
+      if (openRef.current) void reload({ force: true });
+    });
+  }, [projectId, reload]);
 
   const onLocate = useCallback(
     async (item: CanvasGenerationRecord) => {
@@ -514,14 +513,6 @@ export function MyCanvasGenerationRecordsPanel({
       router,
     ],
   );
-
-  useEffect(() => {
-    if (!open) return;
-    const id = window.setInterval(() => {
-      if (openRef.current) void reload({ force: true });
-    }, 8000);
-    return () => window.clearInterval(id);
-  }, [open, reload]);
 
   const items = tab === "project" ? projectTasks : todayTasks;
 

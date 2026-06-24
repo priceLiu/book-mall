@@ -45,10 +45,9 @@ import {
   CANVAS_PANEL_TAB_IDLE_CLASS,
 } from "@/lib/canvas/canvas-chrome-semantics";
 import {
+  fetchToolbarPanelWithSwr,
   invalidateToolbarPanelCache,
-  peekToolbarPanelCache,
   toolbarPanelCacheKey,
-  writeToolbarPanelCache,
 } from "@/lib/canvas/toolbar-panel-cache";
 import { cn } from "@/lib/utils";
 
@@ -86,34 +85,26 @@ export function MyCanvasHistoryPanel({
       projectId,
       tab,
     });
-    const cached = peekToolbarPanelCache<{
-      items: CanvasProjectHistorySummary[];
-      meta: CanvasProjectHistoryMeta | null;
-    }>(cacheKey, opts);
-    if (cached) {
-      setItems(cached.items);
-      setMeta(cached.meta);
-      setLoading(false);
-      setListError(null);
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await listCanvasProjectHistory(base, projectId, { source: tab });
-      setItems(data.items);
-      setMeta(data.meta);
-      writeToolbarPanelCache(cacheKey, {
-        items: data.items,
-        meta: data.meta,
-      });
-      setListError(null);
-    } catch (e) {
-      setItems([]);
-      setMeta(null);
-      setListError(formatCanvasApiError(e instanceof Error ? e.message : String(e)));
-    } finally {
-      setLoading(false);
-    }
+    await fetchToolbarPanelWithSwr({
+      cacheKey,
+      force: opts?.force,
+      fetch: async () => {
+        const data = await listCanvasProjectHistory(base, projectId, { source: tab });
+        return { items: data.items, meta: data.meta };
+      },
+      onLoading: setLoading,
+      onData: (cached) => {
+        setItems(cached.items);
+        setMeta(cached.meta);
+        setListError(null);
+      },
+      onError: (e) => {
+        if (e == null) return;
+        setItems([]);
+        setMeta(null);
+        setListError(formatCanvasApiError(e instanceof Error ? e.message : String(e)));
+      },
+    });
   }, [base, projectId, tab]);
 
   useEffect(() => {

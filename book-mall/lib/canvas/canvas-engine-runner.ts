@@ -19,6 +19,7 @@ import type {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { promptArchiveFieldsForTask } from "@/lib/canvas/canvas-task-prompt-archive";
 import { formatVideoEngineFailMessage } from "@/lib/story/kie-client";
 
 import {
@@ -1449,6 +1450,14 @@ export async function runRefVideoEngineNode(
           referenceImageUrls: refs,
           clientPage: gwClientPage,
         } as Prisma.InputJsonValue,
+        ...promptArchiveFieldsForTask({
+          kind: "IMAGE",
+          inputPayload: {
+            kind: "ai-video-engine",
+            prompt: clipPrompt(expandedPrompt),
+            modelKey,
+          },
+        }),
       },
     });
 
@@ -1573,6 +1582,14 @@ export async function runRefVideoEngineNode(
         kieInput: input,
         clientPage: gwClientPage,
       } as Prisma.InputJsonValue,
+      ...promptArchiveFieldsForTask({
+        kind: "IMAGE",
+        inputPayload: {
+          kind: "ai-video-engine",
+          prompt: clipPrompt(expandedPrompt),
+          modelKey,
+        },
+      }),
     },
   });
 

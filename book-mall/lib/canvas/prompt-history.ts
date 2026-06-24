@@ -108,16 +108,20 @@ function mapRowToPromptHistoryItem(
 ): CanvasPromptHistoryItem | null {
   if (row.status !== "SUCCEEDED" && row.status !== "FAILED") return null;
 
+  const archivedText = row.archivePromptText?.trim();
+  const archivedKind = parseMediaKind(row.archiveMediaKind ?? undefined);
   const preview = resolveGenerationRecordPreview({
     ossUrl: row.ossUrl,
     ephemeralUrl: row.ephemeralUrl,
     inputPayload: row.inputPayload,
   });
-  const promptText = extractPromptTextFromPayload({
-    inputPayload: row.inputPayload,
-    kind: row.kind,
-    textOutput: row.textOutput,
-  });
+  const promptText =
+    archivedText ||
+    extractPromptTextFromPayload({
+      inputPayload: row.inputPayload,
+      kind: row.kind,
+      textOutput: row.textOutput,
+    });
   if (!promptText) return null;
 
   const labels = resolveGenerationRecordLabels({
@@ -132,11 +136,13 @@ function mapRowToPromptHistoryItem(
     projectName,
     nodeId: row.nodeId,
     promptText,
-    mediaKind: inferPromptMediaKind({
-      kind: row.kind,
-      inputPayload: row.inputPayload,
-      previewKind: preview.previewKind,
-    }),
+    mediaKind:
+      archivedKind ??
+      inferPromptMediaKind({
+        kind: row.kind,
+        inputPayload: row.inputPayload,
+        previewKind: preview.previewKind,
+      }),
     status: row.status,
     modelLabel: labels.modelLabel,
     providerLabel: labels.providerLabel,
@@ -209,7 +215,7 @@ function buildPromptHistoryCursorWhere(
   };
 }
 
-async function fetchPromptHistoryPage(args: {
+async function fetchPromptHistoryPageLegacy(args: {
   baseWhere: Prisma.CanvasGenerationTaskWhereInput;
   orderBy: Prisma.CanvasGenerationTaskOrderByWithRelationInput;
   includeProjectName?: boolean;
@@ -287,6 +293,75 @@ async function fetchPromptHistoryPage(args: {
   return { items, hasMore, nextCursor };
 }
 
+async function fetchPromptHistoryPage(args: {
+  baseWhere: Prisma.CanvasGenerationTaskWhereInput;
+  orderBy: Prisma.CanvasGenerationTaskOrderByWithRelationInput;
+  includeProjectName?: boolean;
+  projectIdForRows?: string;
+  mediaKind?: PromptHistoryMediaKind;
+  limit: number;
+  cursor?: string | null;
+  mapProjectName?: (row: Awaited<ReturnType<typeof findGenerationTaskRows>>[number]) => string | undefined;
+}): Promise<PromptHistoryPage> {
+  const limit = args.limit;
+  const cursor = parsePromptHistoryCursor(args.cursor);
+  const cursorWhere = buildPromptHistoryCursorWhere(cursor);
+  const indexedWhere: Prisma.CanvasGenerationTaskWhereInput = {
+    AND: [
+      args.baseWhere,
+      { archivePromptText: { not: null } },
+      ...(args.mediaKind ? [{ archiveMediaKind: args.mediaKind }] : []),
+      ...(cursorWhere ? [cursorWhere] : []),
+    ],
+  };
+
+  const rows = await findGenerationTaskRows({
+    where: indexedWhere,
+    orderBy: args.orderBy,
+    take: limit + 1,
+    includeProjectName: args.includeProjectName,
+    projectIdForRows: args.projectIdForRows,
+  });
+
+  const pageRows = rows.slice(0, limit);
+  const items: CanvasPromptHistoryItem[] = [];
+  for (const row of pageRows) {
+    const projectName = args.mapProjectName?.(row) ?? row.project?.name;
+    const item = mapRowToPromptHistoryItem(row, projectName);
+    if (item) items.push(item);
+  }
+
+  const hasMore = rows.length > limit;
+  const lastRow = pageRows[pageRows.length - 1] ?? null;
+  const nextCursor =
+    hasMore && lastRow
+      ? encodePromptHistoryCursor({
+          createdAt: lastRow.createdAt,
+          id: lastRow.id,
+        })
+      : null;
+
+  return { items, hasMore, nextCursor };
+}
+
+async function fetchPromptHistoryPageSafe(
+  args: Parameters<typeof fetchPromptHistoryPage>[0],
+): Promise<PromptHistoryPage> {
+  try {
+    return await fetchPromptHistoryPage(args);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("archivePromptText") ||
+      msg.includes("archiveMediaKind") ||
+      msg.includes("does not exist")
+    ) {
+      return fetchPromptHistoryPageLegacy(args);
+    }
+    throw err;
+  }
+}
+
 export async function listProjectPromptHistory(args: {
   userId: string;
   projectId: string;
@@ -304,7 +379,7 @@ export async function listProjectPromptHistory(args: {
         ? ["FAILED" as const]
         : TERMINAL_STATUSES;
 
-  return fetchPromptHistoryPage({
+  return fetchPromptHistoryPageSafe({
     baseWhere: {
       projectId: args.projectId,
       deletedAt: null,
@@ -333,7 +408,7 @@ export async function listUserPromptHistory(args: {
         ? ["FAILED" as const]
         : TERMINAL_STATUSES;
 
-  return fetchPromptHistoryPage({
+  return fetchPromptHistoryPageSafe({
     baseWhere: {
       deletedAt: null,
       status: { in: statusFilter },

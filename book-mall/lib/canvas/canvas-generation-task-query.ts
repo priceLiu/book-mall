@@ -44,6 +44,8 @@ export type GenerationTaskRecordRow = {
   inputPayload: unknown;
   resultPayload: unknown;
   canvasHistoryId: string | null;
+  archivePromptText?: string | null;
+  archiveMediaKind?: string | null;
   project?: { name: string };
 };
 
@@ -67,6 +69,22 @@ const generationTaskSelectBase = {
   resultPayload: true,
 } as const;
 
+const generationTaskSelectArchive = {
+  archivePromptText: true,
+  archiveMediaKind: true,
+} as const;
+
+let canvasArchiveColumnsReady: boolean | null = null;
+
+function isPrismaMissingArchiveColumns(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("archivePromptText") ||
+    msg.includes("archiveMediaKind") ||
+    (msg.includes("does not exist") && msg.includes("CanvasGenerationTask"))
+  );
+}
+
 export async function findGenerationTaskRows(args: {
   where: Prisma.CanvasGenerationTaskWhereInput;
   orderBy: Prisma.CanvasGenerationTaskOrderByWithRelationInput;
@@ -74,53 +92,85 @@ export async function findGenerationTaskRows(args: {
   includeProjectName?: boolean;
   projectIdForRows?: string;
 }): Promise<GenerationTaskRecordRow[]> {
-  const selectWithHistory = {
-    ...generationTaskSelectBase,
-    ...(args.includeProjectName
-      ? { projectId: true, project: { select: { name: true } } }
-      : {}),
-    canvasHistoryId: true,
-  } as const;
-
-  const selectWithoutHistory = {
-    ...generationTaskSelectBase,
-    ...(args.includeProjectName
-      ? { projectId: true, project: { select: { name: true } } }
-      : {}),
-  } as const;
-
   type RawRow = Omit<GenerationTaskRecordRow, "canvasHistoryId"> & {
     canvasHistoryId?: string | null;
+    archivePromptText?: string | null;
+    archiveMediaKind?: string | null;
   };
 
   let rows: RawRow[];
 
-  if (canvasHistoryIdColumnReady !== false) {
-    try {
-      rows = (await prisma.canvasGenerationTask.findMany({
-        where: args.where,
-        orderBy: args.orderBy,
-        take: args.take,
-        select: selectWithHistory,
-      })) as RawRow[];
-      canvasHistoryIdColumnReady = true;
-    } catch (err) {
-      if (!isPrismaMissingCanvasHistoryIdColumn(err)) throw err;
-      canvasHistoryIdColumnReady = false;
-      rows = (await prisma.canvasGenerationTask.findMany({
-        where: args.where,
-        orderBy: args.orderBy,
-        take: args.take,
-        select: selectWithoutHistory,
-      })) as RawRow[];
-    }
-  } else {
-    rows = (await prisma.canvasGenerationTask.findMany({
+  const runFind = async (
+    select: Record<string, unknown>,
+  ): Promise<RawRow[]> =>
+    (await prisma.canvasGenerationTask.findMany({
       where: args.where,
       orderBy: args.orderBy,
       take: args.take,
-      select: selectWithoutHistory,
+      select: select as never,
     })) as RawRow[];
+
+  const selectCore = {
+    ...generationTaskSelectBase,
+    ...(args.includeProjectName
+      ? { projectId: true, project: { select: { name: true } } }
+      : {}),
+  };
+
+  const selectWithArchive = {
+    ...selectCore,
+    ...(canvasArchiveColumnsReady !== false ? generationTaskSelectArchive : {}),
+  };
+
+  const selectWithHistory = {
+    ...selectWithArchive,
+    canvasHistoryId: true,
+  };
+
+  if (canvasHistoryIdColumnReady !== false) {
+    try {
+      rows = await runFind(selectWithHistory);
+      canvasHistoryIdColumnReady = true;
+      canvasArchiveColumnsReady = canvasArchiveColumnsReady ?? true;
+    } catch (err) {
+      if (canvasArchiveColumnsReady !== false && isPrismaMissingArchiveColumns(err)) {
+        canvasArchiveColumnsReady = false;
+        try {
+          rows = await runFind({ ...selectCore, canvasHistoryId: true });
+          canvasHistoryIdColumnReady = true;
+        } catch (err2) {
+          if (!isPrismaMissingCanvasHistoryIdColumn(err2)) throw err2;
+          canvasHistoryIdColumnReady = false;
+          rows = await runFind(selectCore);
+        }
+      } else if (!isPrismaMissingCanvasHistoryIdColumn(err)) {
+        throw err;
+      } else {
+        canvasHistoryIdColumnReady = false;
+        try {
+          rows = await runFind(selectWithArchive);
+        } catch (err2) {
+          if (isPrismaMissingArchiveColumns(err2)) {
+            canvasArchiveColumnsReady = false;
+            rows = await runFind(selectCore);
+          } else {
+            throw err2;
+          }
+        }
+      }
+    }
+  } else {
+    try {
+      rows = await runFind(selectWithArchive);
+      canvasArchiveColumnsReady = canvasArchiveColumnsReady ?? true;
+    } catch (err) {
+      if (isPrismaMissingArchiveColumns(err)) {
+        canvasArchiveColumnsReady = false;
+        rows = await runFind(selectCore);
+      } else {
+        throw err;
+      }
+    }
   }
 
   return rows.map((row) => ({

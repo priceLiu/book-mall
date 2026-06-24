@@ -1,6 +1,7 @@
 /**
  * 画布顶栏侧栏 · 首屏列表内存缓存（减轻每次打开面板都打库）。
  * 仅缓存第一页（默认 20 条）；变更事件可 invalidate。
+ * P1：peek 命中时仍可 background revalidate（见 fetchToolbarPanelWithSwr）。
  */
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
@@ -57,4 +58,49 @@ export function invalidateToolbarPanelCache(prefix: string): void {
 
 export function invalidateAllToolbarPanelCache(): void {
   store.clear();
+}
+
+/** Stale-While-Revalidate：有缓存则先展示，后台再拉新数据写回 cache。 */
+export async function fetchToolbarPanelWithSwr<T>(args: {
+  cacheKey: string;
+  force?: boolean;
+  fetch: () => Promise<T>;
+  onData: (data: T, meta: { fromCache: boolean }) => void;
+  onError?: (error: unknown) => void;
+  onLoading?: (loading: boolean) => void;
+  isStale?: (seq: number) => boolean;
+  seq?: number;
+}): Promise<void> {
+  const cached = peekToolbarPanelCache<T>(args.cacheKey, {
+    force: args.force,
+  });
+
+  if (cached) {
+    args.onData(cached, { fromCache: true });
+    args.onLoading?.(false);
+    void (async () => {
+      try {
+        const fresh = await args.fetch();
+        if (args.isStale?.(args.seq ?? 0)) return;
+        writeToolbarPanelCache(args.cacheKey, fresh);
+        args.onData(fresh, { fromCache: false });
+      } catch (e) {
+        if (!args.isStale?.(args.seq ?? 0)) args.onError?.(e);
+      }
+    })();
+    return;
+  }
+
+  args.onLoading?.(true);
+  try {
+    const fresh = await args.fetch();
+    if (args.isStale?.(args.seq ?? 0)) return;
+    writeToolbarPanelCache(args.cacheKey, fresh);
+    args.onData(fresh, { fromCache: false });
+    args.onError?.(null);
+  } catch (e) {
+    if (!args.isStale?.(args.seq ?? 0)) args.onError?.(e);
+  } finally {
+    if (!args.isStale?.(args.seq ?? 0)) args.onLoading?.(false);
+  }
 }

@@ -14,10 +14,9 @@ import {
 } from "@/lib/canvas-video-library";
 import type { VideoLibraryItem } from "@/lib/canvas-video-library-types";
 import {
+  fetchToolbarPanelWithSwr,
   invalidateToolbarPanelCache,
-  peekToolbarPanelCache,
   toolbarPanelCacheKey,
-  writeToolbarPanelCache,
 } from "@/lib/canvas/toolbar-panel-cache";
 import {
   CANVAS_PANEL_SHELL_BODY_CLASS,
@@ -77,31 +76,26 @@ export function MyVideoLibraryPanel({
   const load = useCallback(async (opts?: { force?: boolean }) => {
     if (!base) return;
     const cacheKey = toolbarPanelCacheKey("video-library");
-    const cached = peekToolbarPanelCache<VideoLibraryCache>(cacheKey, opts);
-    if (cached) {
-      setItems(cached.items);
-      setQuota(cached.quota);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await listVideoLibrary(base);
-      setItems(data.items);
-      setQuota(data.quota);
-      writeToolbarPanelCache(cacheKey, {
-        items: data.items,
-        quota: data.quota,
-      });
-      setError(null);
-    } catch (e) {
-      setItems([]);
-      setQuota(null);
-      setError(formatCanvasApiError(e instanceof Error ? e.message : "加载失败"));
-    } finally {
-      setLoading(false);
-    }
+    await fetchToolbarPanelWithSwr({
+      cacheKey,
+      force: opts?.force,
+      fetch: async () => {
+        const data = await listVideoLibrary(base);
+        return { items: data.items, quota: data.quota };
+      },
+      onLoading: setLoading,
+      onData: (cached) => {
+        setItems(cached.items);
+        setQuota(cached.quota);
+        setError(null);
+      },
+      onError: (e) => {
+        if (e == null) return;
+        setItems([]);
+        setQuota(null);
+        setError(formatCanvasApiError(e instanceof Error ? e.message : String(e)));
+      },
+    });
   }, [base]);
 
   useEffect(() => {

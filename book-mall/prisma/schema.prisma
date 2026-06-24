@@ -2015,6 +2015,10 @@ model CanvasGenerationTask {
   canvasHistoryId String?
   canvasHistory   CanvasProjectHistory? @relation(fields: [canvasHistoryId], references: [id], onDelete: SetNull)
 
+  /// 「我的提示词」归档：提交时从 inputPayload 提取，避免列表扫描全表 task
+  archivePromptText String? @db.Text
+  archiveMediaKind  String?
+
   submittedAt  DateTime?
   completedAt  DateTime?
   lastPolledAt DateTime?
@@ -2035,6 +2039,8 @@ model CanvasGenerationTask {
   @@index([projectId, inputHash])
   @@index([providerId])
   @@index([projectId, nodeId, deletedAt, createdAt])
+  @@index([projectId, deletedAt, status, archiveMediaKind, createdAt])
+  @@index([actorUserId, deletedAt, status, archiveMediaKind, createdAt])
   // Gen-HotCold-R2 Phase 0：以下 partial index 由裸 SQL 管理（Prisma 无法表达 WHERE）：
   //   CanvasGenerationTask_inflight_queuedAt_idx  (status, queuedAt) WHERE status IN (QUEUED,DISPATCHING,PENDING,SUBMITTED)
   //   CanvasGenerationTask_submitted_lastPolledAt_idx (lastPolledAt) WHERE status = 'SUBMITTED'
