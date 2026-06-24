@@ -2,6 +2,7 @@ import { BenefitsSection } from "@/components/layout/sections/benefits";
 import { CommunitySection } from "@/components/layout/sections/community";
 import { FeaturesSection } from "@/components/layout/sections/features";
 import { FeaturedProductsSection } from "@/components/layout/sections/featured-products";
+import { SiteHomeGatewayModelsSection } from "@/components/layout/site-home/site-home-gateway-models-section";
 import { FooterSection } from "@/components/layout/sections/footer";
 import { SiteHomeHeroSection } from "@/components/layout/site-home/site-home-hero";
 import { SiteHomeLogoMarquee } from "@/components/layout/site-home/site-home-logo-marquee";
@@ -51,6 +52,7 @@ export default function Home() {
       <SiteHomeLogoMarquee />
       <div className="site-home-below-hero">
         <FeaturedProductsSection />
+        <SiteHomeGatewayModelsSection />
         <BenefitsSection />
         <FeaturesSection />
         <TestimonialSection />
