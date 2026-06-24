@@ -27,6 +27,7 @@ import {
   releaseTrafficSlot,
 } from "./slot";
 import { resolveCanvasProjectTrafficScope, resolveMaxConcurrencyForScope } from "./scope-key";
+import { queueDispatchAfterFromIndex } from "./queue-dispatch-after";
 import { nextDispatchAfterFromSpacing } from "./token-bucket";
 
 function taskInputPayload(
@@ -165,7 +166,7 @@ async function recoverStaleDispatching(projectId?: string): Promise<number> {
       where: { id: t.id },
       data: {
         status: "QUEUED",
-        dispatchAfter: new Date(),
+        dispatchAfter: queueDispatchAfterFromIndex(n),
         failCode: null,
         failMessage: null,
         ...(stuckClaim
@@ -199,7 +200,7 @@ async function revertStuckDispatchingTask(
       where: { id: taskId, status: "DISPATCHING" },
       data: {
         status: "QUEUED",
-        dispatchAfter: new Date(Date.now() + 2_000),
+        dispatchAfter: queueDispatchAfterFromIndex(0),
         failCode: null,
         failMessage: null,
         ...(stuckClaim
@@ -275,7 +276,7 @@ async function dispatchOneCanvasQueuedTask(
             where: { id: task.id },
             data: {
               status: "QUEUED",
-              dispatchAfter: new Date(Date.now() + 2_000),
+              dispatchAfter: queueDispatchAfterFromIndex(0),
               failCode: null,
               failMessage: null,
               inputPayload: {

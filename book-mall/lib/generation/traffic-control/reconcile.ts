@@ -14,6 +14,7 @@ import {
   releaseTrafficSlotFromGatewayLog,
 } from "./slot";
 import { resolveTrafficScopeFromIds } from "./scope-key";
+import { queueDispatchAfterFromIndex } from "./queue-dispatch-after";
 import { dispatchQueuedCanvasTasks } from "./dispatch-canvas";
 
 export type ReconcileTrafficReport = {
@@ -173,7 +174,7 @@ async function recoverStaleDispatchingTasks(): Promise<number> {
       where: { id: t.id },
       data: {
         status: "QUEUED",
-        dispatchAfter: new Date(),
+        dispatchAfter: queueDispatchAfterFromIndex(n),
         ...(stuckClaim
           ? {
               inputPayload: {

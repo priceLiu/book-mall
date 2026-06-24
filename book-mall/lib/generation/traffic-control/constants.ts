@@ -19,6 +19,18 @@ export function getActorDispatchMinMs(): number {
   return readPositiveInt("ACTOR_DISPATCH_MIN_MS", 1200);
 }
 
+/** 车间距随机上界：下次 dispatch 间隔 ∈ [MIN, MIN+JITTER] ms，打散同批点击的 DB 洪峰。 */
+export function getActorDispatchJitterMs(): number {
+  return readPositiveInt("ACTOR_DISPATCH_JITTER_MS", 2000);
+}
+
+export function sampleActorDispatchSpacingMs(): number {
+  const min = getActorDispatchMinMs();
+  const jitter = getActorDispatchJitterMs();
+  if (jitter <= 0) return min;
+  return min + Math.floor(Math.random() * (jitter + 1));
+}
+
 export function getTrafficTokensPerSec(): number {
   return readPositiveFloat("TRAFFIC_TOKENS_PER_SEC", 1);
 }
@@ -28,7 +40,7 @@ export function getQueueTimeoutMin(): number {
 }
 
 export function getDispatchBatch(): number {
-  return readPositiveInt("DISPATCH_BATCH", 10);
+  return readPositiveInt("DISPATCH_BATCH", 5);
 }
 
 export function getDispatchingStaleSec(): number {

@@ -97,11 +97,7 @@ export function liveVolcengineVideoTiming(input: {
     generateMs,
     vendorPostProcessMs,
     pollDelayMs,
-    totalMs:
-      queueMs +
-      generateMs +
-      (vendorPostProcessMs ?? 0) +
-      pollDelayMs,
+    totalMs: Math.max(0, input.nowMs - submittedMs),
   };
 }
 

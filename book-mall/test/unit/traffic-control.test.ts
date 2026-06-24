@@ -14,6 +14,7 @@ import {
 import {
   refillTokenBucket,
   spacingBlocked,
+  nextDispatchAfterFromSpacing,
 } from "@/lib/generation/traffic-control/token-bucket";
 
 describe("traffic-control constants", () => {
@@ -71,6 +72,16 @@ describe("token-bucket", () => {
     expect(spacingBlocked(new Date(now - 1000), now)).toBe(true);
     expect(spacingBlocked(new Date(now - 5000), now)).toBe(false);
     expect(getActorDispatchMinMs()).toBeGreaterThanOrEqual(1000);
+  });
+
+  it("nextDispatchAfterFromSpacing adds min + jitter", () => {
+    const last = new Date(Date.now() - 5000);
+    const next = nextDispatchAfterFromSpacing(last);
+    const delta = next.getTime() - last.getTime();
+    expect(delta).toBeGreaterThanOrEqual(getActorDispatchMinMs());
+    expect(delta).toBeLessThanOrEqual(
+      getActorDispatchMinMs() + 2000 + 1,
+    );
   });
 
   it("queue wait estimate scales with position", () => {

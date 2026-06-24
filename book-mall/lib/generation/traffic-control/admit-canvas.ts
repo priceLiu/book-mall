@@ -3,6 +3,7 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 import { promptArchiveFieldsForTask } from "@/lib/canvas/canvas-task-prompt-archive";
 import { prisma } from "@/lib/prisma";
 import { isTrafficControlEnabled } from "./constants";
+import { computeCanvasQueueDispatchAfter } from "./queue-dispatch-after";
 import { resolveCanvasProjectTrafficScope, type TrafficScope } from "./scope-key";
 
 export function isCanvasVideoTrafficKind(payload: Record<string, unknown> | null): boolean {
@@ -26,6 +27,9 @@ export async function admitCanvasVideoTask(input: {
     input.scope ??
     (await resolveCanvasProjectTrafficScope(input.projectId, input.actorUserId));
   const now = new Date();
+  const dispatchAfter = isTrafficControlEnabled()
+    ? await computeCanvasQueueDispatchAfter(scope, now.getTime())
+    : undefined;
 
   return prisma.canvasGenerationTask.create({
     data: {
@@ -39,6 +43,7 @@ export async function admitCanvasVideoTask(input: {
       nodeId: input.nodeId,
       status: isTrafficControlEnabled() ? "QUEUED" : "PENDING",
       queuedAt: isTrafficControlEnabled() ? now : undefined,
+      dispatchAfter,
       tenantId: scope.tenantId ?? null,
       actorUserId: input.actorUserId,
     },

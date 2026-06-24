@@ -7,6 +7,7 @@ import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import {
   attachGatewayTimingToSummary,
   buildVolcengineTerminalFinalizeMetrics,
+  bumpVolcenginePeakPollDelay,
   computeVolcengineTimingBreakdown,
   isVolcenginePollLagCritical,
   isVolcengineQueuedStale,
@@ -50,11 +51,18 @@ export async function persistVolcengineTimingOnPoll(input: {
     completedAtMs: input.log.completedAt?.getTime() ?? null,
     nowMs: polledAtMs,
   });
+  const traceWithPeak = bumpVolcenginePeakPollDelay(trace, breakdown.pollDelayMs);
+  const breakdownFinal = computeVolcengineTimingBreakdown({
+    trace: traceWithPeak,
+    submittedAtMs: input.log.submittedAt.getTime(),
+    completedAtMs: input.log.completedAt?.getTime() ?? null,
+    nowMs: polledAtMs,
+  });
 
   const nextSummary = attachGatewayTimingToSummary(
     input.resultSummaryOverride ?? input.log.resultSummary,
-    trace,
-    breakdown,
+    traceWithPeak,
+    breakdownFinal,
     input.resultSummaryOverride,
   );
 
@@ -67,14 +75,14 @@ export async function persistVolcengineTimingOnPoll(input: {
     await finalizeVolcengineVideoRequestLog(input.log.id, {
       submittedAt: input.log.submittedAt,
       status: "FAILED",
-      trace,
+      trace: traceWithPeak,
       resultSummaryBase: nextSummary,
       fallbackNowMs: polledAtMs,
       failCode: "VOLCENGINE_QUEUED_STALE",
       failMessage:
         "Volcengine 任务在 queued 阶段 updated_at 已停更超过 10 分钟，判定厂商排队卡死；请在控制台核对或重试",
     });
-    return { breakdown, resultSummary: nextSummary, vendorStalled: true };
+    return { breakdown: breakdownFinal, resultSummary: nextSummary, vendorStalled: true };
   }
 
   const pollLagCritical =
@@ -85,14 +93,14 @@ export async function persistVolcengineTimingOnPoll(input: {
     await finalizeVolcengineVideoRequestLog(input.log.id, {
       submittedAt: input.log.submittedAt,
       status: "FAILED",
-      trace,
+      trace: traceWithPeak,
       resultSummaryBase: nextSummary,
       fallbackNowMs: polledAtMs,
       failCode: "VOLCENGINE_POLL_LAG",
       failMessage:
         "Volcengine 已返回终态但 Gateway 日志仍未 completed；请检查 poll worker 或刷新日志",
     });
-    return { breakdown, resultSummary: nextSummary, vendorStalled: true };
+    return { breakdown: breakdownFinal, resultSummary: nextSummary, vendorStalled: true };
   }
 
   if (!isGatewayLogTerminalStatus(input.log.status)) {
@@ -109,7 +117,7 @@ export async function persistVolcengineTimingOnPoll(input: {
     });
   }
 
-  return { breakdown, resultSummary: nextSummary };
+  return { breakdown: breakdownFinal, resultSummary: nextSummary };
 }
 
 type VolcengineVideoFinalizePatch = Omit<

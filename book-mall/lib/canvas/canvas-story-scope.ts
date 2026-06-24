@@ -8,6 +8,7 @@ import { CANVAS_DB_TX_OPTIONS, runTxWithRetry } from "@/lib/db-tx-retry";
 import { promptArchiveFieldsForTask } from "@/lib/canvas/canvas-task-prompt-archive";
 import { CanvasProjectError } from "./canvas-project-service";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
+import { computeCanvasQueueDispatchAfter } from "@/lib/generation/traffic-control/queue-dispatch-after";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 
 export type CanvasTaskStoryScope = {
@@ -120,14 +121,22 @@ export async function createStoryScopedCanvasTask(
 ): Promise<CanvasGenerationTask> {
   const status = args.initialStatus ?? "PENDING";
   const actorUserId = args.actorUserId;
-  // 事务外解析 scope，缩短持连接时间（resolve 含额外读库，不应占 advisory lock）。
+  const queuedNow = status === "QUEUED" ? new Date() : null;
+  // 事务外解析 scope + 入队 dispatchAfter，缩短持 advisory lock 时间。
   let tenantId: string | null = null;
+  let queueDispatchAfter: Date | undefined;
   if (actorUserId && status === "QUEUED") {
     const scope = await resolveCanvasProjectTrafficScope(
       args.projectId,
       actorUserId,
     );
     tenantId = scope.tenantId ?? null;
+    if (!args.data.dispatchAfter) {
+      queueDispatchAfter = await computeCanvasQueueDispatchAfter(
+        scope,
+        queuedNow!.getTime(),
+      );
+    }
   }
 
   // 同 (project,node,scope) 由 pg_advisory_xact_lock 串行化，已足够互斥去重，
@@ -176,7 +185,11 @@ export async function createStoryScopedCanvasTask(
           projectId: args.projectId,
           nodeId: args.nodeId,
           status,
-          queuedAt: status === "QUEUED" ? new Date() : undefined,
+          queuedAt: queuedNow ?? undefined,
+          dispatchAfter:
+            queuedNow && !args.data.dispatchAfter
+              ? queueDispatchAfter
+              : args.data.dispatchAfter,
           tenantId: tenantId ?? undefined,
           actorUserId: actorUserId ?? undefined,
           inputPayload: scopePatch as Prisma.InputJsonValue,

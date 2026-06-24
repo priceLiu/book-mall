@@ -44,6 +44,7 @@ import {
   selectPollShardTasks,
 } from "@/lib/generation/poll-shard";
 import { isTrafficControlEnabled } from "@/lib/generation/traffic-control/constants";
+import { computeStoryQueueDispatchAfter } from "@/lib/generation/traffic-control/queue-dispatch-after";
 import { dispatchQueuedStoryTasks } from "@/lib/generation/traffic-control/dispatch-story";
 import { resolveStoryProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
 import {
@@ -347,6 +348,11 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
   const scope = useVideoQueue
     ? await resolveStoryProjectTrafficScope(args.projectId, project.userId)
     : null;
+  const queuedAt = useVideoQueue ? new Date() : undefined;
+  const dispatchAfter =
+    useVideoQueue && scope
+      ? await computeStoryQueueDispatchAfter(scope, queuedAt!.getTime())
+      : undefined;
 
   const task = await prisma.storyGenerationTask.create({
     data: {
@@ -357,7 +363,8 @@ async function submitGenerationTask(args: SubmitArgs): Promise<string> {
       characterId: args.characterId ?? null,
       frameId: args.frameId ?? null,
       status: useVideoQueue ? "QUEUED" : "PENDING",
-      queuedAt: useVideoQueue ? new Date() : undefined,
+      queuedAt,
+      dispatchAfter,
       tenantId: scope?.tenantId ?? null,
       actorUserId: project.userId,
     },

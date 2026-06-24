@@ -182,6 +182,7 @@ export function formatLogTimingPhaseCell(
     stallHint?: string | null;
     stallCause?: string | null;
     inProgress?: boolean;
+    peakPollDelayMs?: number | null;
   },
 ): { value: string; title?: string; warn?: boolean } {
   if (ms == null || ms < 0) return { value: "—" };
@@ -209,6 +210,13 @@ export function formatLogTimingPhaseCell(
     }
     if (opts?.stallHint?.trim()) {
       title += `\n${opts.stallHint.trim()}`;
+    }
+    if (
+      opts?.peakPollDelayMs != null &&
+      opts.peakPollDelayMs > 0 &&
+      (!inProgress || opts.peakPollDelayMs > ms)
+    ) {
+      title += `\n进行中峰值：${Math.round(opts.peakPollDelayMs / 1000)}s`;
     }
     return { value: `${sec}s`, title, warn };
   }

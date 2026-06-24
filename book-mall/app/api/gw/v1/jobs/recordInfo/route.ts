@@ -9,7 +9,8 @@ import {
   buildGatewayLogProgressSummary,
   touchGatewayLogProgress,
 } from "@/lib/gateway/log-progress";
-import { persistVolcengineTimingOnPoll } from "@/lib/gateway/log-volcengine-timing-persist";
+import { persistVolcengineTimingOnPoll, finalizeVolcengineVideoRequestLog } from "@/lib/gateway/log-volcengine-timing-persist";
+import { readVolcengineTimingTrace } from "@/lib/gateway/log-volcengine-timing";
 import { inferGatewayFailCode } from "@/lib/gateway/log-fail-code";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { prisma } from "@/lib/prisma";
@@ -218,15 +219,30 @@ export async function GET(request: NextRequest) {
             vendorRaw: polled.raw,
             resultSummaryOverride: baseSummary,
           });
-          await finalizeRequestLog(log.id, {
-            status: "SUCCEEDED",
-            durationMs: log.submittedAt
-              ? Date.now() - log.submittedAt.getTime()
-              : 0,
-            resultSummary,
-            externalTaskId: taskId,
-            model: log.model,
-          });
+          const trace = readVolcengineTimingTrace(resultSummary);
+          const polledAtMs = Date.now();
+          if (trace) {
+            await finalizeVolcengineVideoRequestLog(log.id, {
+              submittedAt: log.submittedAt,
+              status: "SUCCEEDED",
+              trace,
+              resultSummaryBase: resultSummary,
+              fallbackNowMs: polledAtMs,
+              externalTaskId: taskId,
+              model: log.model,
+            });
+          } else {
+            await finalizeRequestLog(log.id, {
+              status: "SUCCEEDED",
+              durationMs: log.submittedAt
+                ? polledAtMs - log.submittedAt.getTime()
+                : 0,
+              completedAt: new Date(polledAtMs),
+              resultSummary,
+              externalTaskId: taskId,
+              model: log.model,
+            });
+          }
         } else if (isVolcengineVideoTaskFailed(row)) {
           const { resultSummary } = await persistVolcengineTimingOnPoll({
             log,
@@ -237,17 +253,34 @@ export async function GET(request: NextRequest) {
               error: row.error,
             }),
           });
-          await finalizeRequestLog(log.id, {
-            status: "FAILED",
-            durationMs: log.submittedAt
-              ? Date.now() - log.submittedAt.getTime()
-              : 0,
-            failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
-            failCode: "VOLCENGINE_TASK_FAILED",
-            externalTaskId: taskId,
-            model: log.model,
-            resultSummary,
-          });
+          const trace = readVolcengineTimingTrace(resultSummary);
+          const polledAtMs = Date.now();
+          if (trace) {
+            await finalizeVolcengineVideoRequestLog(log.id, {
+              submittedAt: log.submittedAt,
+              status: "FAILED",
+              trace,
+              resultSummaryBase: resultSummary,
+              fallbackNowMs: polledAtMs,
+              failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
+              failCode: "VOLCENGINE_TASK_FAILED",
+              externalTaskId: taskId,
+              model: log.model,
+            });
+          } else {
+            await finalizeRequestLog(log.id, {
+              status: "FAILED",
+              durationMs: log.submittedAt
+                ? polledAtMs - log.submittedAt.getTime()
+                : 0,
+              completedAt: new Date(polledAtMs),
+              failMessage: volcengineVideoTaskFailMessage(row).slice(0, 500),
+              failCode: "VOLCENGINE_TASK_FAILED",
+              externalTaskId: taskId,
+              model: log.model,
+              resultSummary,
+            });
+          }
         } else if (isVolcengineVideoTaskInProgress(row)) {
           const { vendorStalled } = await persistVolcengineTimingOnPoll({
             log,
