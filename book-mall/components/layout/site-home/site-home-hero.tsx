@@ -109,11 +109,11 @@ export function SiteHomeHeroSection({ clips }: { clips: string[] }) {
             <div className="site-home-hero-copy-panel">
               <div className="site-home-hero-copy">
                 <h1 className="site-home-hero-title">
-                  一人公司 AI 变身打工仔
+                  全球顶级视频、图像、音乐与 LLM 模型
                 </h1>
 
                 <p className="site-home-hero-subtitle">
-                  一人公司、创业老板、自由职业的专属 AI 加油站；一站式找工具、用应用、学课程，打通「找、用、学」闭环。
+                  多种接入方式：开箱即用、自带厂商 Key 接入，或通过 API 统一调用。
                 </p>
 
                 <div className="site-home-hero-actions">
