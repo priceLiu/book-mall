@@ -29,6 +29,51 @@ export function isServerInflightTaskStatus(status: string): boolean {
   );
 }
 
+/** SUBMITTED 滞后但同节点已有更新的成功成片 → 勿再当作进行中阻塞 UI */
+export function isStaleServerInflightTask(
+  task: CanvasTaskRecord,
+  nodeTasks: CanvasTaskRecord[],
+): boolean {
+  if (!isServerInflightTaskStatus(task.status)) return false;
+  const taskTime = new Date(task.updatedAt).getTime();
+  return nodeTasks.some(
+    (t) =>
+      t.id !== task.id &&
+      t.status === "SUCCEEDED" &&
+      taskHasSuccessPayload(t) &&
+      new Date(t.updatedAt).getTime() >= taskTime,
+  );
+}
+
+/** 节点任务历史中当前应阻塞终态同步的进行中任务（排除 stale SUBMITTED）。 */
+export function pickActiveServerInflightTask(
+  nodeTasks: CanvasTaskRecord[],
+  boundTaskId?: string | null,
+  runtime?: CanvasNodeRuntime | null,
+): CanvasTaskRecord | undefined {
+  const boundId = boundTaskId?.trim();
+  const hasRtMedia = Boolean(
+    runtime?.ossUrl?.trim() || runtime?.ephemeralUrl?.trim(),
+  );
+
+  if (boundId) {
+    const bound = nodeTasks.find((t) => t.id === boundId);
+    if (bound && isServerInflightTaskStatus(bound.status)) {
+      if (isStaleServerInflightTask(bound, nodeTasks) || hasRtMedia) {
+        // fall through
+      } else {
+        return bound;
+      }
+    }
+  }
+
+  return nodeTasks.find(
+    (t) =>
+      isServerInflightTaskStatus(t.status) &&
+      !isStaleServerInflightTask(t, nodeTasks),
+  );
+}
+
 export function canvasTaskInflightLabel(status: string): string | null {
   if (status === "QUEUED") return "排队中…";
   if (status === "DISPATCHING") return "准备生成…";

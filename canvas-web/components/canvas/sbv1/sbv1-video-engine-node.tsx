@@ -12,6 +12,7 @@ import {
   pickPreferredCanvasTask,
   runtimePatchFromCanvasTask,
   shouldApplyCanvasTaskRuntimePatch,
+  pickActiveServerInflightTask,
   isServerInflightTaskStatus,
 } from "@/lib/canvas/task-pick";
 import {
@@ -114,21 +115,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const isGenerating = isLibtvMediaGenerating(d);
   const hasVideo = Boolean(videoUrl);
 
-  const inflightTask = useMemo(() => {
-    const boundId = d.runtime?.taskId;
-    if (boundId) {
-      const bound = history.find((t) => t.id === boundId);
-      if (
-        bound &&
-        isServerInflightTaskStatus(bound.status)
-      ) {
-        return bound;
-      }
-    }
-    return history.find(
-      (t) => isServerInflightTaskStatus(t.status),
-    );
-  }, [history, d.runtime?.taskId]);
+  const inflightTask = useMemo(
+    () => pickActiveServerInflightTask(history, d.runtime?.taskId, d.runtime),
+    [history, d.runtime],
+  );
 
   const waitSince =
     inflightTask?.submittedAt ?? inflightTask?.createdAt ?? null;

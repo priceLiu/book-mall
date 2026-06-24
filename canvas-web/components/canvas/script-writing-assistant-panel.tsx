@@ -555,7 +555,6 @@ export function ScriptWritingAssistantPanel({
 
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
-  const graphRevision = useCanvasStore((s) => s.graphRevision);
   const importPlan = useMemo(
     () => resolveStoryProAssistantImport(nodes, edges),
     [nodes, edges],
@@ -575,7 +574,7 @@ export function ScriptWritingAssistantPanel({
 
   const workflowThreads = useMemo(
     () => listStoryProAssistantWorkflowThreads(nodes, edges),
-    [nodes, edges, graphRevision],
+    [nodes, edges],
   );
 
   const selectedNodeId = useMemo(() => {
@@ -588,7 +587,7 @@ export function ScriptWritingAssistantPanel({
         n.type === "story-pro2-script-hub",
     );
     return hit?.id ?? selected[0]?.id ?? null;
-  }, [nodes, graphRevision]);
+  }, [nodes]);
 
   const activeThread = useMemo(
     () => threadRows.find((t) => t.workflowKey === activeWorkflowKey) ?? null,
@@ -641,7 +640,6 @@ export function ScriptWritingAssistantPanel({
     nodes,
     edges,
     selectedNodeId,
-    graphRevision,
   ]);
 
   useEffect(() => {
