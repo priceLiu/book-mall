@@ -21,7 +21,7 @@ export async function assertVideoCreditsBeforeTrafficQueue(input: {
   if (input.skip || !isTrafficControlEnabled()) return;
 
   const auth = await resolveGatewayAuthForBookUser(input.userId);
-  if (!auth?.apiKeyId) return;
+  if (!auth) return;
 
   const scope = await resolveCanvasProjectTrafficScope(input.projectId, input.userId);
   const inputSummary = buildGatewayInputSummary(input.model, {
@@ -35,14 +35,14 @@ export async function assertVideoCreditsBeforeTrafficQueue(input: {
     await assertCreditsBeforeGenerate({
       tenantId: scope.tenantId,
       actorBookUserId: input.userId,
-      apiKeyId: auth.apiKeyId,
+      apiKeyId: auth.id,
       model: input.model,
       requestKind: "VIDEO",
       inputSummary,
     });
   } catch (e) {
     if (e instanceof InsufficientCreditsError) {
-      throw new CanvasProjectError("INSUFFICIENT_CREDITS", e.message);
+      throw new CanvasProjectError("INSUFFICIENT_CREDITS", e.message, 402);
     }
     throw e;
   }
