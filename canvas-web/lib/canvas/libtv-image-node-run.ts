@@ -1,3 +1,4 @@
+import { markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 
 /** 组内分镜格：走列 batch，不用 Dock 模型选择 */
@@ -60,6 +61,7 @@ export function optimisticLibtvMediaRunStart(
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
   setNodeRuntime?: (id: string, runtime: Partial<CanvasNodeRuntime>) => void,
 ): void {
+  markCanvasNodeGenerationStarted(nodeId);
   const patch = libtvImageRunPendingPatch();
   updateNodeData(nodeId, patch);
   setNodeRuntime?.(nodeId, patch.runtime as Partial<CanvasNodeRuntime>);

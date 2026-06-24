@@ -12,6 +12,7 @@ import {
   pickActiveServerInflightTask,
   runtimePatchFromCanvasTask,
   shouldApplyCanvasTaskRuntimePatch,
+  shouldSkipStoryRowTaskApply,
 } from "@/lib/canvas/task-pick";
 import {
   SBV1_VIDEO_ENGINE_LEFT_ADD_MENU,
@@ -158,6 +159,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           t.status === "CANCELLED"),
     );
     if (!terminal) return;
+    if (shouldSkipStoryRowTaskApply(d.runtime, terminal, id)) return;
 
     const nodePatch = sbv1VideoPatchFromTask(terminal);
     if (!nodePatch) return;
