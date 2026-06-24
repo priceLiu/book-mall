@@ -46,15 +46,48 @@ export const CANVAS_PANEL_HEADER_ICON_CLASS = "size-4 text-white/70";
 export const CANVAS_PANEL_TITLE_CLASS = "text-sm font-medium text-white";
 
 /** 侧栏 Tab */
-export const CANVAS_PANEL_TAB_ACTIVE_CLASS = "bg-white/12 text-white";
-export const CANVAS_PANEL_TAB_IDLE_CLASS = "text-white/55 hover:bg-white/8";
+export const CANVAS_PANEL_TAB_ACTIVE_CLASS = "bg-black/40 text-white";
+export const CANVAS_PANEL_TAB_IDLE_CLASS = "text-white/55 hover:bg-black/25";
+
+/** 顶栏右侧侧栏 · 与「我的视频库」对齐（弱描边 + black/25 内容块） */
+export const CANVAS_PANEL_SHELL_HEADER_CLASS =
+  "flex items-center justify-between border-b border-white/10 px-4 py-3";
+export const CANVAS_PANEL_SHELL_TABS_ROW_CLASS = "flex gap-1 px-3 py-2";
+export const CANVAS_PANEL_SHELL_BODY_CLASS = "min-h-0 flex-1 overflow-y-auto p-3";
+export const CANVAS_PANEL_SHELL_FOOTER_CLASS =
+  "border-t border-white/10 px-4 py-3";
+export const CANVAS_PANEL_SHELL_SETTINGS_BLOCK_CLASS = "px-4 py-3";
+export const CANVAS_PANEL_SHELL_SELECT_CLASS =
+  "nodrag w-full rounded-md border border-white/10 bg-black/25 px-3 py-2 text-[12px] text-white focus:border-white/15 focus:outline-none";
+export const CANVAS_PANEL_SHELL_LIST_ITEM_CLASS =
+  "flex gap-3 rounded-lg border border-white/10 bg-black/25 p-2";
+export const CANVAS_PANEL_SHELL_THUMB_CLASS =
+  "relative shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/50";
+export const CANVAS_PANEL_SHELL_THUMB_LG_CLASS =
+  "relative size-20 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/50";
+export const CANVAS_PANEL_SHELL_THUMB_SM_CLASS =
+  "flex size-14 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/50";
+export const CANVAS_PANEL_SHELL_EMPTY_CLASS =
+  "py-12 text-center text-[12px] text-white/45";
+/** 侧栏首屏加载（居中 · 文案白/45 · spinner 走 CANVAS_SEMANTIC_STATUS_CLASS） */
+export const CANVAS_PANEL_SHELL_LOADING_CLASS =
+  "flex items-center justify-center gap-2 py-16 text-[12px] text-white/45";
+export const CANVAS_PANEL_SHELL_LOADING_MORE_CLASS =
+  "flex items-center justify-center gap-2 py-3 text-[11px] text-white/45";
+export const CANVAS_PANEL_SHELL_LOADING_SPINNER_CLASS = `${CANVAS_SEMANTIC_STATUS_CLASS} animate-spin`;
+export const CANVAS_PANEL_SHELL_ERROR_CLASS =
+  "rounded-md border border-red-400/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-200";
+export const CANVAS_PANEL_SHELL_LINK_BTN_CLASS =
+  "text-[10px] text-white/85 hover:underline";
+export const CANVAS_PANEL_SHELL_LINK_BTN_DANGER_CLASS =
+  "inline-flex items-center gap-0.5 text-[10px] text-red-300/80 hover:underline disabled:opacity-40";
 
 /** 侧栏列表项 */
 export const CANVAS_PANEL_ITEM_TITLE_CLASS =
   "truncate text-[13px] font-medium text-white";
 export const CANVAS_PANEL_ITEM_META_CLASS = "mt-0.5 text-[11px] text-white/55";
 export const CANVAS_PANEL_ITEM_CARD_CLASS =
-  "rounded-lg border border-white/10 bg-black/25 p-3";
+  "rounded-lg border border-white/10 bg-black/25 p-2";
 
 /** 状态 Chip（成功/进行中 → 橙 · 失败 → 红） */
 export const CANVAS_STATUS_CHIP_SUCCESS_CLASS =

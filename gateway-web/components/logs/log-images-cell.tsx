@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, memo, useMemo } from "react";
 import { createPortal } from "react-dom";
 import type { LogInputImageItem } from "@/lib/gateway-log-params";
 import { extractLogInputImages, readLogInputImageHint } from "@/lib/gateway-log-params";
@@ -159,9 +159,13 @@ function LogImageThumb({ item }: { item: LogInputImageItem }) {
   );
 }
 
-export function LogImagesCell({ inputSummary }: { inputSummary: unknown }) {
-  const images = extractLogInputImages(inputSummary);
-  const hintCount = readLogInputImageHint(inputSummary);
+export const LogImagesCell = memo(function LogImagesCell({
+  inputSummary,
+}: {
+  inputSummary: unknown;
+}) {
+  const images = useMemo(() => extractLogInputImages(inputSummary), [inputSummary]);
+  const hintCount = useMemo(() => readLogInputImageHint(inputSummary), [inputSummary]);
 
   if (!images.length) {
     if (hintCount != null) {
@@ -201,4 +205,4 @@ export function LogImagesCell({ inputSummary }: { inputSummary: unknown }) {
       </div>
     </div>
   );
-}
+});

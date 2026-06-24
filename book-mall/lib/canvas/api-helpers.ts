@@ -5,6 +5,7 @@ import { CanvasProjectError } from "./canvas-project-service";
 import { CanvasProviderError } from "./canvas-provider-service";
 import { CanvasSecretError } from "./secret";
 import { CanvasCharacterError } from "./canvas-character-service";
+import { CanvasVideoLibraryError } from "./canvas-video-library-service";
 import { StoryFrameGateError } from "./story-frame-gate";
 import { StoryModelCapabilityError } from "./story-model-capabilities";
 import { isPrismaConnectionUnavailable, prismaConnectionUnavailableMessage } from "@/lib/db-unavailable";
@@ -92,6 +93,16 @@ export function canvasErrorToResponse(
   if (err instanceof CanvasCharacterError) {
     return NextResponse.json(
       { error: err.code, message: err.message },
+      { status: err.httpStatus, headers: jsonHeaders(request) },
+    );
+  }
+  if (err instanceof CanvasVideoLibraryError) {
+    return NextResponse.json(
+      {
+        error: err.code,
+        message: err.message,
+        ...(err.details ?? {}),
+      },
       { status: err.httpStatus, headers: jsonHeaders(request) },
     );
   }

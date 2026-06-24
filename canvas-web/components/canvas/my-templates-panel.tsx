@@ -1,18 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bookmark, Eye, Loader2, X } from "lucide-react";
+import { Bookmark, Eye, X } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   listCanvasTemplates,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
+import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
+import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import {
-  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
-  canvasToolbarSidePanelAsideClass,
-} from "@/lib/canvas/canvas-toolbar-side-panel";
+  invalidateToolbarPanelCache,
+  peekToolbarPanelCache,
+  toolbarPanelCacheKey,
+  writeToolbarPanelCache,
+} from "@/lib/canvas/toolbar-panel-cache";
+import {
+  CANVAS_PANEL_ITEM_CARD_CLASS,
+  CANVAS_PANEL_SHELL_BODY_CLASS,
+  CANVAS_PANEL_SHELL_ERROR_CLASS,
+  CANVAS_PANEL_SHELL_HEADER_CLASS,
+  CANVAS_PANEL_SHELL_THUMB_SM_CLASS,
+} from "@/lib/canvas/canvas-chrome-semantics";
 import type { CanvasGraph } from "@/lib/canvas/types";
+import { cn } from "@/lib/utils";
 import { TemplateReadonlyCanvas } from "./template-readonly-canvas";
 
 export function MyTemplatesPanel({
@@ -31,14 +43,25 @@ export function MyTemplatesPanel({
   const [error, setError] = useState<string | null>(null);
   const [viewing, setViewing] = useState<CanvasTemplateRecord | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { force?: boolean }) => {
     if (!base) return;
+    const cacheKey = toolbarPanelCacheKey("canvas-templates");
+    const cached = peekToolbarPanelCache<CanvasTemplateRecord[]>(cacheKey, opts);
+    if (cached) {
+      setTemplates(cached);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     setLoading(true);
     try {
       const all = await listCanvasTemplates(base);
-      setTemplates(all.filter((t) => !t.builtin));
+      const userTemplates = all.filter((t) => !t.builtin);
+      setTemplates(userTemplates);
+      writeToolbarPanelCache(cacheKey, userTemplates);
       setError(null);
     } catch (e) {
+      setTemplates([]);
       setError(e instanceof Error ? e.message : "加载失败");
     } finally {
       setLoading(false);
@@ -47,7 +70,7 @@ export function MyTemplatesPanel({
 
   useEffect(() => {
     if (!open) return;
-    void load();
+    void load({ force: refreshKey > 0 });
   }, [open, load, refreshKey]);
 
   if (!open && !viewing) return null;
@@ -55,20 +78,12 @@ export function MyTemplatesPanel({
   return (
     <>
       {open ? (
-        <div
-          className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[60]`}
-          onClick={onClose}
-          role="presentation"
+        <CanvasToolbarSidePanelShell
+          open={open}
+          onClose={onClose}
+          ariaLabel="我的模板"
         >
-          <aside
-            className={canvasToolbarSidePanelAsideClass(
-              "border-l border-white/10",
-            )}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="我的模板"
-          >
-            <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <header className={CANVAS_PANEL_SHELL_HEADER_CLASS}>
               <div className="flex items-center gap-2">
                 <Bookmark className="size-4 text-[var(--canvas-accent)]" />
                 <p className="text-sm font-medium">我的模板</p>
@@ -83,18 +98,13 @@ export function MyTemplatesPanel({
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <div className={CANVAS_PANEL_SHELL_BODY_CLASS}>
               {error ? (
-                <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-200">
-                  {error}
-                </p>
+                <p className={CANVAS_PANEL_SHELL_ERROR_CLASS}>{error}</p>
               ) : null}
 
               {loading ? (
-                <div className="flex items-center gap-2 py-8 text-sm text-[var(--canvas-muted)]">
-                  <Loader2 className="size-4 animate-spin" />
-                  加载中…
-                </div>
+                <CanvasPanelShellLoading />
               ) : templates.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-[12px] text-[var(--canvas-muted)]">
                   还没有保存的模板。
@@ -108,9 +118,12 @@ export function MyTemplatesPanel({
                       <button
                         type="button"
                         onClick={() => setViewing(t)}
-                        className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-[var(--canvas-accent)]/40 hover:bg-[var(--canvas-accent)]/5"
+                        className={cn(
+                          "flex w-full items-center gap-3 text-left transition hover:bg-black/35",
+                          CANVAS_PANEL_ITEM_CARD_CLASS,
+                        )}
                       >
-                        <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-[var(--canvas-accent)]/20 to-black/40">
+                        <div className={cn(CANVAS_PANEL_SHELL_THUMB_SM_CLASS, "size-14 overflow-hidden")}>
                           {t.thumbnail ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -143,8 +156,7 @@ export function MyTemplatesPanel({
             <footer className="border-t border-white/10 px-4 py-2 text-[10px] text-[var(--canvas-muted)]">
               点击模板可只读预览，不会修改当前画布。
             </footer>
-          </aside>
-        </div>
+        </CanvasToolbarSidePanelShell>
       ) : null}
 
       {viewing ? (

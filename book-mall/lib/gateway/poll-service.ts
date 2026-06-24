@@ -34,6 +34,8 @@ const STALE_VOLCENGINE_NO_TASK_MS = 5 * 60 * 1000;
 const STALE_RUNNING_WITH_TASK_MS = 6 * 60 * 60 * 1000;
 /** 火山视频任务：过长仍 RUNNING 则自动收口（避免日志页一直 running） */
 const STALE_VOLCENGINE_VIDEO_MS = 90 * 60 * 1000;
+/** 百炼 / KIE / 通义异步视频：超过此时长仍 RUNNING 则自动失败收口 */
+const STALE_ASYNC_VIDEO_MS = 45 * 60 * 1000;
 
 /** 清理无 taskId 或超时仍 RUNNING 的日志，避免界面一直 running */
 export async function expireStaleGatewayLogs(): Promise<number> {
@@ -124,6 +126,24 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     },
   });
 
+  const asyncVideoCutoff = new Date(now - STALE_ASYNC_VIDEO_MS);
+  const r3b = await prisma.gatewayRequestLog.updateMany({
+    where: {
+      status: "RUNNING",
+      requestKind: "VIDEO",
+      externalTaskId: { not: null },
+      submittedAt: { lt: asyncVideoCutoff },
+      providerKind: { in: ["BAILIAN", "KIE", "DASHSCOPE"] },
+    },
+    data: {
+      status: "FAILED",
+      failCode: "STALE_TIMEOUT",
+      failMessage:
+        "异步视频任务轮询超时（超过 45 分钟），请在厂商控制台核对任务状态后重试",
+      completedAt: new Date(),
+    },
+  });
+
   let r4 = 0;
   try {
     r4 = await promoteVolcengineTasksToBackgroundGeneration(now);
@@ -134,7 +154,7 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     );
   }
 
-  return r0.count + r1.count + r2.count + r3a.count + r3.count + r4;
+  return r0.count + r1.count + r2.count + r3a.count + r3.count + r3b.count + r4;
 }
 
 export function parseGatewayClientSource(

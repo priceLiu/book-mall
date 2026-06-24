@@ -6,8 +6,15 @@ import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 import { isCanvasVolcengineVideoTaskPayload } from "@/lib/canvas/canvas-constants";
 import { applyCanvasVolcengineVideoResult } from "@/lib/canvas/canvas-task-service";
 import {
+  CANVAS_MEDIA_NODE_TYPES,
+  CANVAS_VIDEO_MEDIA_NODE_TYPES,
+  canvasNodeShowsPersistedMedia,
+  patchCanvasJsonNodeMedia,
+  patchCanvasProjectNodeMediaFromTask,
+  buildMediaRuntimePatchFromTask,
+} from "@/lib/canvas/canvas-media-patch";
+import {
   extractVolcengineVideoUrlFromGatewaySummary,
-  patchCanvasProjectNodeRuntimeFromTask,
   recoverCanvasVolcengineTimedOutTask,
 } from "@/lib/canvas/canvas-volcengine-recover";
 import { recoverVolcengineGatewayLogFromVendor } from "@/lib/gateway/volcengine-stall-recover";
@@ -44,20 +51,13 @@ function isVolcengineVideoCanvasTask(
   return isCanvasVolcengineVideoTaskPayload(taskInputPayload(task));
 }
 
+/** @deprecated 使用 canvasNodeShowsPersistedMedia */
 export function canvasNodeRuntimeShowsVideo(
   canvas: unknown,
   nodeId: string,
   taskId?: string,
 ): boolean {
-  if (!canvas || typeof canvas !== "object") return false;
-  const nodes = (canvas as { nodes?: Array<{ id: string; data?: unknown }> })
-    .nodes;
-  const node = nodes?.find((n) => n.id === nodeId);
-  const rt = (node?.data as { runtime?: CanvasNodeRuntimeLike })?.runtime;
-  if (!rt || rt.status !== "done") return false;
-  if (!(rt.ossUrl?.trim() || rt.ephemeralUrl?.trim())) return false;
-  if (taskId && rt.taskId && rt.taskId !== taskId) return false;
-  return true;
+  return canvasNodeShowsPersistedMedia(canvas, nodeId, taskId);
 }
 
 type CanvasNodeRuntimeLike = {
@@ -114,11 +114,11 @@ export async function recoverCanvasVideoTaskDisplay(
     (task.ossUrl?.trim() || task.ephemeralUrl?.trim())
   ) {
     if (
-      canvasNodeRuntimeShowsVideo(task.project.canvas, task.nodeId, task.id)
+      canvasNodeShowsPersistedMedia(task.project.canvas, task.nodeId, task.id)
     ) {
       return { ok: true, action: "noop", ...base, ossUrl: task.ossUrl ?? task.ephemeralUrl ?? undefined };
     }
-    await patchCanvasProjectNodeRuntimeFromTask(task);
+    await patchCanvasProjectNodeMediaFromTask(task);
     return {
       ok: true,
       action: "patched_runtime",
@@ -288,7 +288,7 @@ export async function findCanvasVideoTasksNeedingRecovery(opts?: {
     )?.nodes?.find((n) => n.id === t.nodeId);
     const rt = node?.data?.runtime;
     const media = Boolean(t.ossUrl?.trim() || t.ephemeralUrl?.trim());
-    const runtimeOk = canvasNodeRuntimeShowsVideo(canvas, t.nodeId, t.id);
+    const runtimeOk = canvasNodeShowsPersistedMedia(canvas, t.nodeId, t.id);
 
     const needsRecovery =
       (t.status === "SUBMITTED" && gatewayStatus === "SUCCEEDED") ||
@@ -357,80 +357,191 @@ export async function recoverCanvasVideoProjectDisplay(
   return results;
 }
 
-const VIDEO_ENGINE_NODE_TYPES = new Set([
-  "sbv1-video-engine",
-  "video-engine",
-  "ai-video-engine",
-]);
-
-function nodeRuntimeNeedsVideoReconcile(
-  runtime: CanvasNodeRuntimeLike | undefined,
+function nodeDataNeedsMediaReconcile(
+  nodeType: string | undefined,
+  data:
+    | {
+        ossUrl?: string;
+        runtime?: CanvasNodeRuntimeLike;
+      }
+    | undefined,
 ): boolean {
-  if (!runtime) return false;
-  const st = runtime.status;
+  if (!CANVAS_MEDIA_NODE_TYPES.has(nodeType ?? "")) return false;
+  const url =
+    data?.runtime?.ossUrl?.trim() ||
+    data?.runtime?.ephemeralUrl?.trim() ||
+    data?.ossUrl?.trim();
+  if (url && data?.runtime?.status === "done") return false;
+  const st = data?.runtime?.status;
   if (st !== "running" && st !== "pending") return false;
-  return !(runtime.ossUrl?.trim() || runtime.ephemeralUrl?.trim());
+  return !url;
 }
 
+export type CanvasMediaRuntimeReconcileResult = {
+  patched: number;
+  /** 内存中已修补的 canvas；无变更时为 null */
+  canvas: unknown | null;
+};
+
 /**
- * 打开画布时 opportunistic 修复：节点 runtime 卡在 running/pending 且无成片 URL，
- * 但同节点已有 SUCCEEDED 火山视频任务 → 写回最新成片（避免「视频丢失」）。
+ * 打开画布时批量修复：节点卡在 running/pending 且无成片，但库内已有 SUCCEEDED 任务。
+ * 传入 `canvasIn` 可避免重复读库；单次 findMany + 单次写库。
  */
-export async function reconcileStaleCanvasVideoRuntimeOnProjectRead(
+export async function reconcileStaleCanvasMediaRuntimeOnProjectRead(
   projectId: string,
-): Promise<number> {
-  const project = await prisma.canvasProject.findUnique({
-    where: { id: projectId, deletedAt: null },
-    select: { canvas: true },
-  });
-  if (!project?.canvas) return 0;
+  canvasIn?: unknown,
+): Promise<CanvasMediaRuntimeReconcileResult> {
+  let canvas = canvasIn;
+  if (!canvas) {
+    const project = await prisma.canvasProject.findUnique({
+      where: { id: projectId, deletedAt: null },
+      select: { canvas: true },
+    });
+    canvas = project?.canvas;
+  }
+  if (!canvas) return { patched: 0, canvas: null };
 
   const nodes =
     (
-      project.canvas as {
+      canvas as {
         nodes?: Array<{
           id: string;
           type?: string;
-          data?: { runtime?: CanvasNodeRuntimeLike };
+          data?: { ossUrl?: string; runtime?: CanvasNodeRuntimeLike };
         }>;
       } | null
     )?.nodes ?? [];
 
-  const staleNodeIds = nodes
-    .filter(
-      (n) =>
-        VIDEO_ENGINE_NODE_TYPES.has(n.type ?? "") &&
-        nodeRuntimeNeedsVideoReconcile(n.data?.runtime),
-    )
-    .map((n) => n.id);
+  const staleNodes = nodes.filter((n) =>
+    nodeDataNeedsMediaReconcile(n.type, n.data),
+  );
+  if (staleNodes.length === 0) return { patched: 0, canvas: null };
 
-  if (staleNodeIds.length === 0) return 0;
+  const staleNodeIds = staleNodes.map((n) => n.id);
+  const tasks = await prisma.canvasGenerationTask.findMany({
+    where: {
+      projectId,
+      nodeId: { in: staleNodeIds },
+      deletedAt: null,
+      status: "SUCCEEDED",
+      OR: [{ ossUrl: { not: null } }, { ephemeralUrl: { not: null } }],
+    },
+    orderBy: { completedAt: "desc" },
+    select: {
+      id: true,
+      projectId: true,
+      nodeId: true,
+      ossUrl: true,
+      ephemeralUrl: true,
+      completedAt: true,
+      resultPayload: true,
+      inputPayload: true,
+    },
+  });
 
-  let patched = 0;
-  for (const nodeId of staleNodeIds) {
-    const latest = await prisma.canvasGenerationTask.findFirst({
-      where: {
-        projectId,
-        nodeId,
-        deletedAt: null,
-        status: "SUCCEEDED",
-        OR: [{ ossUrl: { not: null } }, { ephemeralUrl: { not: null } }],
-      },
-      orderBy: { completedAt: "desc" },
-      select: {
-        id: true,
-        projectId: true,
-        nodeId: true,
-        ossUrl: true,
-        ephemeralUrl: true,
-        completedAt: true,
-        resultPayload: true,
-        inputPayload: true,
-      },
-    });
-    if (!latest || !isVolcengineVideoCanvasTask(latest)) continue;
-    await patchCanvasProjectNodeRuntimeFromTask(latest);
-    patched += 1;
+  const latestByNode = new Map<string, (typeof tasks)[number]>();
+  for (const t of tasks) {
+    if (!latestByNode.has(t.nodeId)) latestByNode.set(t.nodeId, t);
   }
-  return patched;
+
+  let nextCanvas: unknown = canvas;
+  let patched = 0;
+  let thumbCandidate: string | undefined;
+  for (const node of staleNodes) {
+    const task = latestByNode.get(node.id);
+    if (!task) continue;
+    if (
+      CANVAS_VIDEO_MEDIA_NODE_TYPES.has(node.type ?? "") &&
+      !isVolcengineVideoCanvasTask(task)
+    ) {
+      continue;
+    }
+    const mediaUrl = task.ossUrl?.trim() || task.ephemeralUrl?.trim();
+    if (!mediaUrl) continue;
+    const runtime = buildMediaRuntimePatchFromTask(task, mediaUrl);
+    nextCanvas = patchCanvasJsonNodeMedia(
+      nextCanvas,
+      node.id,
+      node.type,
+      mediaUrl,
+      runtime,
+    );
+    patched += 1;
+    const poster =
+      runtime.posterUrl || task.ossUrl?.trim() || undefined;
+    if (poster && !thumbCandidate) thumbCandidate = poster;
+  }
+
+  if (patched === 0) return { patched: 0, canvas: null };
+
+  const projectRow = await prisma.canvasProject.findUnique({
+    where: { id: projectId },
+    select: { thumbnailUrl: true },
+  });
+  const data: Prisma.CanvasProjectUpdateInput = {
+    canvas: nextCanvas as Prisma.InputJsonValue,
+  };
+  if (!projectRow?.thumbnailUrl && thumbCandidate) {
+    data.thumbnailUrl = thumbCandidate;
+  }
+  await prisma.canvasProject.update({
+    where: { id: projectId },
+    data,
+  });
+
+  return { patched, canvas: nextCanvas };
+}
+
+/** @deprecated 使用 reconcileStaleCanvasMediaRuntimeOnProjectRead */
+export async function reconcileStaleCanvasVideoRuntimeOnProjectRead(
+  projectId: string,
+): Promise<number> {
+  const r = await reconcileStaleCanvasMediaRuntimeOnProjectRead(projectId);
+  return r.patched;
+}
+
+export type CanvasDisplayReconcileSummary = {
+  candidates: number;
+  recovered: number;
+  noop: number;
+  failed: number;
+  actions: Record<CanvasVideoRecoverAction, number>;
+};
+
+/**
+ * 定时 / poll 收尾：扫描需恢复的画布视频任务并自动写回（Gateway 已成功、SUCCEEDED 未 patch 等）。
+ */
+export async function runCanvasDisplayReconcileWorker(opts?: {
+  limit?: number;
+  since?: Date;
+}): Promise<CanvasDisplayReconcileSummary> {
+  const limit = opts?.limit ?? 30;
+  const candidates = await findCanvasVideoTasksNeedingRecovery({
+    limit,
+    since: opts?.since,
+  });
+  const actions: Record<CanvasVideoRecoverAction, number> = {
+    patched_runtime: 0,
+    applied_from_gateway: 0,
+    recovered_vendor: 0,
+    noop: 0,
+    failed: 0,
+  };
+  let recovered = 0;
+  let failed = 0;
+
+  for (const c of candidates) {
+    const r = await recoverCanvasVideoTaskDisplay(c.taskId);
+    actions[r.action] += 1;
+    if (r.ok && r.action !== "noop" && r.action !== "failed") recovered += 1;
+    if (!r.ok || r.action === "failed") failed += 1;
+  }
+
+  return {
+    candidates: candidates.length,
+    recovered,
+    noop: actions.noop,
+    failed,
+    actions,
+  };
 }

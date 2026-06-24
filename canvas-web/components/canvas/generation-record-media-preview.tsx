@@ -272,7 +272,7 @@ export function GenerationRecordMediaPreview({
     <>
       <div
         ref={anchorRef}
-        className="relative size-14 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/30"
+        className="relative size-14 shrink-0 overflow-hidden rounded-md border border-white/10 bg-black/50"
         onMouseEnter={() => showAt(index)}
         onMouseLeave={scheduleHide}
       >

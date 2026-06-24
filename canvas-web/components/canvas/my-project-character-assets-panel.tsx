@@ -3,17 +3,16 @@
 import { X } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
-import {
-  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
-  canvasToolbarSidePanelAsideClass,
-} from "@/lib/canvas/canvas-toolbar-side-panel";
-import {
-  ProjectAssetsPanelIcon,
-} from "./unified-project-assets-view";
+import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
+import { ProjectAssetsPanelIcon } from "./unified-project-assets-view";
 import {
   UnifiedProjectAssetsView,
   type UnifiedProjectAssetTab,
 } from "./unified-project-assets-view";
+import {
+  CANVAS_PANEL_SHELL_BODY_CLASS,
+  CANVAS_PANEL_SHELL_HEADER_CLASS,
+} from "@/lib/canvas/canvas-chrome-semantics";
 
 export function MyProjectCharacterAssetsPanel({
   open,
@@ -28,48 +27,40 @@ export function MyProjectCharacterAssetsPanel({
 }) {
   const projectId = useCanvasStore((s) => s.projectId);
 
-  if (!open) return null;
-
   return (
-    <div
-      className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[60]`}
-      onClick={onClose}
-      role="presentation"
+    <CanvasToolbarSidePanelShell
+      open={open}
+      onClose={onClose}
+      ariaLabel="项目资产"
     >
-      <aside
-        className={canvasToolbarSidePanelAsideClass(
-          "border-l border-cyan-400/15",
-        )}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="项目资产"
-      >
-        <header className="border-b border-cyan-400/15 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ProjectAssetsPanelIcon />
-              <p className="text-sm font-medium">项目资产</p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md p-1 text-[var(--canvas-muted)] hover:bg-white/5 hover:text-white"
-              aria-label="关闭"
-            >
-              <X className="size-4" />
-            </button>
+      <header className={CANVAS_PANEL_SHELL_HEADER_CLASS}>
+        <div className="flex items-center gap-2">
+          <ProjectAssetsPanelIcon />
+          <div>
+            <p className="text-sm font-medium">项目资产</p>
+            <p className="text-[10px] text-white/45">
+              角色、场景、分镜等媒体资产
+            </p>
           </div>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <UnifiedProjectAssetsView
-            projectId={projectId}
-            initialTab={initialTab}
-            compact
-            onInsertToCanvas={onInsertToCanvas}
-          />
         </div>
-      </aside>
-    </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md p-1 text-[var(--canvas-muted)] hover:bg-white/5 hover:text-white"
+          aria-label="关闭"
+        >
+          <X className="size-4" />
+        </button>
+      </header>
+
+      <div className={CANVAS_PANEL_SHELL_BODY_CLASS}>
+        <UnifiedProjectAssetsView
+          projectId={projectId}
+          initialTab={initialTab}
+          compact
+          onInsertToCanvas={onInsertToCanvas}
+        />
+      </div>
+    </CanvasToolbarSidePanelShell>
   );
 }

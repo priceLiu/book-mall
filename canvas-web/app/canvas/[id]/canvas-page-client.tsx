@@ -5,6 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { RequireAuth } from "@/components/auth/require-auth";
+import {
+  CanvasToolsSessionBanner,
+  CanvasToolsSessionProvider,
+} from "@/components/auth/canvas-tools-session-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { handleCanvasWheel } from "@/lib/canvas/canvas-form-wheel";
 import { registerCanvasNotifier } from "@/lib/canvas/canvas-notify";
@@ -220,6 +224,7 @@ function Inner({ projectId }: { projectId: string }) {
     hasStoryProPipeline(nodes) && !isStoryPro2Canvas && !isSbv1Canvas;
   const showImmersiveChrome = isSbv1Canvas || isStoryPro2Canvas;
   const canvasEditorRef = useRef<HTMLDivElement>(null);
+  const toolbarShellRef = useRef<HTMLDivElement>(null);
   const { immersive, topChromeVisible, toggleImmersive, exitImmersive } =
     useCanvasImmersiveMode(canvasEditorRef);
   const [nameDraft, setNameDraft] = useState("");
@@ -254,6 +259,24 @@ function Inner({ projectId }: { projectId: string }) {
     setMyHistoryOpen(false);
     setMyGenerationRecordsOpen(false);
   }, []);
+
+  useEffect(() => {
+    const editor = canvasEditorRef.current;
+    const toolbar = toolbarShellRef.current;
+    if (!editor || !toolbar) return;
+
+    const syncToolbarHeight = () => {
+      const chromeHidden =
+        showImmersiveChrome && immersive && !topChromeVisible;
+      const height = chromeHidden ? 0 : toolbar.offsetHeight;
+      editor.style.setProperty("--canvas-toolbar-height", `${height}px`);
+    };
+
+    syncToolbarHeight();
+    const ro = new ResizeObserver(syncToolbarHeight);
+    ro.observe(toolbar);
+    return () => ro.disconnect();
+  }, [showImmersiveChrome, immersive, topChromeVisible]);
 
   useEffect(() => {
     const onWheel = (e: WheelEvent) => handleCanvasWheel(e);
@@ -903,8 +926,10 @@ function Inner({ projectId }: { projectId: string }) {
         ref={canvasEditorRef}
         className="fixed inset-0 z-[200] flex h-[100dvh] w-screen flex-col overflow-hidden bg-[var(--canvas-bg)]"
         data-canvas-editor
+        style={{ ["--canvas-toolbar-height" as string]: "3rem" }}
       >
         <div
+          ref={toolbarShellRef}
           className={cn(
             "z-[300] shrink-0 bg-[var(--canvas-bg)] shadow-[0_1px_0_rgba(255,255,255,0.06)] transition-transform duration-300 ease-out",
             showImmersiveChrome && immersive
@@ -983,6 +1008,7 @@ function Inner({ projectId }: { projectId: string }) {
             }
           />
           <GatewayLinkBanner />
+          <CanvasToolsSessionBanner />
         </div>
       <MyCanvasHistoryPanel
         open={myHistoryOpen}
@@ -1151,9 +1177,11 @@ function Inner({ projectId }: { projectId: string }) {
 export function CanvasPageClient({ projectId }: { projectId: string }) {
   return (
     <RequireAuth>
-      <SaveProjectAssetDialogHost />
-      <PortraitImportProgressHost />
-      <Inner projectId={projectId} />
+      <CanvasToolsSessionProvider>
+        <SaveProjectAssetDialogHost />
+        <PortraitImportProgressHost />
+        <Inner projectId={projectId} />
+      </CanvasToolsSessionProvider>
     </RequireAuth>
   );
 }

@@ -29,18 +29,28 @@ import {
   fetchGenerationRecordCanvas,
   generationRecordDisplayTitle,
 } from "@/lib/canvas/restore-generation-record";
+import { CanvasPanelShellLoading, CanvasPanelShellLoadingMore } from "@/components/canvas/canvas-panel-shell-loading";
+import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import {
-  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
   CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
-  canvasToolbarSidePanelAsideClass,
 } from "@/lib/canvas/canvas-toolbar-side-panel";
 import {
-  CANVAS_PANEL_HEADER_BORDER_CLASS,
-  CANVAS_PANEL_HEADER_ICON_CLASS,
-  CANVAS_PANEL_SECONDARY_BTN_CLASS,
+  peekToolbarPanelCache,
+  toolbarPanelCacheKey,
+  writeToolbarPanelCache,
+} from "@/lib/canvas/toolbar-panel-cache";
+import {
+  CANVAS_PANEL_SHELL_BODY_CLASS,
+  CANVAS_PANEL_SHELL_EMPTY_CLASS,
+  CANVAS_PANEL_SHELL_ERROR_CLASS,
+  CANVAS_PANEL_SHELL_FOOTER_CLASS,
+  CANVAS_PANEL_SHELL_HEADER_CLASS,
+  CANVAS_PANEL_SHELL_LINK_BTN_CLASS,
+  CANVAS_PANEL_SHELL_TABS_ROW_CLASS,
+  CANVAS_PANEL_SHELL_THUMB_SM_CLASS,
+  CANVAS_PANEL_ITEM_CARD_CLASS,
   CANVAS_PANEL_TAB_ACTIVE_CLASS,
   CANVAS_PANEL_TAB_IDLE_CLASS,
-  CANVAS_PANEL_TITLE_CLASS,
   CANVAS_SEMANTIC_ERROR_CLASS,
   CANVAS_SEMANTIC_STATUS_CLASS,
   CANVAS_STATUS_CHIP_ERROR_CLASS,
@@ -130,12 +140,12 @@ function RecordRow({
   );
 
   return (
-    <li className="rounded-lg border border-white/10 bg-black/25 p-3">
+    <li className={CANVAS_PANEL_ITEM_CARD_CLASS}>
       <div className="flex items-start gap-3">
         {hasMedia ? (
           <GenerationRecordMediaPreview item={item} title={title} />
         ) : (
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/30">
+          <div className={CANVAS_PANEL_SHELL_THUMB_SM_CLASS}>
             {item.status === "FAILED" ? (
               <AlertCircle className="size-5 text-red-400/80" />
             ) : item.status === "SUCCEEDED" ? (
@@ -190,7 +200,10 @@ function RecordRow({
               <button
                 type="button"
                 onClick={() => onLocate(item)}
-                className="inline-flex items-center gap-1 rounded-md border border-white/12 px-2 py-1 text-[10px] text-white/70 hover:bg-white/8"
+                className={cn(
+                  "inline-flex items-center gap-1",
+                  CANVAS_PANEL_SHELL_LINK_BTN_CLASS,
+                )}
               >
                 {isOtherProject ? (
                   <ExternalLink className="size-3" />
@@ -205,7 +218,10 @@ function RecordRow({
                 type="button"
                 disabled={restoring}
                 onClick={() => onRestoreCanvas(item)}
-                className={CANVAS_PANEL_SECONDARY_BTN_CLASS}
+                className={cn(
+                  "inline-flex items-center gap-1 disabled:opacity-50",
+                  CANVAS_PANEL_SHELL_LINK_BTN_CLASS,
+                )}
               >
                 {restoring ? (
                   <Loader2 className="size-3 animate-spin" />
@@ -270,8 +286,28 @@ export function MyCanvasGenerationRecordsPanel({
   const openRef = useRef(open);
   openRef.current = open;
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (opts?: { force?: boolean }) => {
     if (!base || !projectId) return;
+    const cacheKey = toolbarPanelCacheKey("generation-records", { projectId });
+    const cached = peekToolbarPanelCache<{
+      projectTasks: CanvasGenerationRecord[];
+      todayTasks: CanvasGenerationRecord[];
+      projectHasMore: boolean;
+      todayHasMore: boolean;
+      projectNextCursor: string | null;
+      todayNextCursor: string | null;
+    }>(cacheKey, opts);
+    if (cached) {
+      setProjectTasks(cached.projectTasks);
+      setTodayTasks(cached.todayTasks);
+      setProjectHasMore(cached.projectHasMore);
+      setTodayHasMore(cached.todayHasMore);
+      projectCursorRef.current = cached.projectNextCursor;
+      todayCursorRef.current = cached.todayNextCursor;
+      setLoading(false);
+      setListError(null);
+      return;
+    }
     setLoading(true);
     try {
       const data = await listCanvasGenerationRecords(base, projectId, {
@@ -284,6 +320,14 @@ export function MyCanvasGenerationRecordsPanel({
       setTodayHasMore(data.todayHasMore);
       projectCursorRef.current = data.projectNextCursor;
       todayCursorRef.current = data.todayNextCursor;
+      writeToolbarPanelCache(cacheKey, {
+        projectTasks: data.projectTasks,
+        todayTasks: data.todayTasks,
+        projectHasMore: data.projectHasMore,
+        todayHasMore: data.todayHasMore,
+        projectNextCursor: data.projectNextCursor,
+        todayNextCursor: data.todayNextCursor,
+      });
       setListError(null);
     } catch (e) {
       setProjectTasks([]);
@@ -474,38 +518,28 @@ export function MyCanvasGenerationRecordsPanel({
   useEffect(() => {
     if (!open) return;
     const id = window.setInterval(() => {
-      if (openRef.current) void reload();
+      if (openRef.current) void reload({ force: true });
     }, 8000);
     return () => window.clearInterval(id);
   }, [open, reload]);
 
-  if (!open) return null;
-
   const items = tab === "project" ? projectTasks : todayTasks;
 
   return (
-    <div
-      className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[1450]`}
-      onClick={onClose}
-      role="presentation"
+    <CanvasToolbarSidePanelShell
+      open={open}
+      onClose={onClose}
+      ariaLabel="生成记录"
     >
-      <aside
-        className={canvasToolbarSidePanelAsideClass(
-          `border-l ${CANVAS_PANEL_HEADER_BORDER_CLASS}`,
-        )}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="生成记录"
-      >
-        <header
-          className={cn(
-            "flex items-center justify-between border-b px-4 py-3",
-            CANVAS_PANEL_HEADER_BORDER_CLASS,
-          )}
-        >
+        <header className={CANVAS_PANEL_SHELL_HEADER_CLASS}>
           <div className="flex items-center gap-2">
-            <Sparkles className={CANVAS_PANEL_HEADER_ICON_CLASS} />
-            <p className={CANVAS_PANEL_TITLE_CLASS}>生成记录</p>
+            <Sparkles className="size-4 text-[var(--canvas-accent)]" />
+            <div>
+              <p className="text-sm font-medium">生成记录</p>
+              <p className="text-[10px] text-white/45">
+                含成功与失败 · 可恢复整图快照
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -517,7 +551,7 @@ export function MyCanvasGenerationRecordsPanel({
           </button>
         </header>
 
-        <div className="flex gap-1 border-b border-white/8 px-3 py-2">
+        <div className={CANVAS_PANEL_SHELL_TABS_ROW_CLASS}>
           <button
             type="button"
             onClick={() => setTab("today")}
@@ -544,19 +578,14 @@ export function MyCanvasGenerationRecordsPanel({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className={CANVAS_PANEL_SHELL_BODY_CLASS}>
           {listError ? (
-            <p className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-200">
-              {listError}
-            </p>
+            <p className={cn("mb-3", CANVAS_PANEL_SHELL_ERROR_CLASS)}>{listError}</p>
           ) : null}
           {loading && items.length === 0 ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-[12px] text-white/45">
-              <Loader2 className="size-4 animate-spin" />
-              加载生成记录…
-            </div>
+            <CanvasPanelShellLoading label="加载生成记录…" />
           ) : items.length === 0 ? (
-            <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
+            <p className={CANVAS_PANEL_SHELL_EMPTY_CLASS}>
               {tab === "project"
                 ? "本项目还没有生成记录。在节点上点击生成后，成功与失败都会出现在这里。"
                 : "今天还没有生成记录。"}
@@ -580,9 +609,8 @@ export function MyCanvasGenerationRecordsPanel({
                 />
               ))}
               {loadingMore ? (
-                <li className="flex items-center justify-center gap-2 py-3 text-[11px] text-white/45">
-                  <Loader2 className="size-3.5 animate-spin" />
-                  加载更多…
+                <li>
+                  <CanvasPanelShellLoadingMore />
                 </li>
               ) : null}
               <li>
@@ -592,20 +620,19 @@ export function MyCanvasGenerationRecordsPanel({
           )}
         </div>
 
-        <footer className="flex items-center justify-between border-t border-white/8 px-4 py-3">
+        <footer className={cn(CANVAS_PANEL_SHELL_FOOTER_CLASS, "flex items-center justify-between")}>
           <span className="inline-flex items-center gap-1 text-[10px] text-white/40">
             <Clapperboard className="size-3" />
-            含成功与失败 · 可恢复整图快照 · 每 8 秒自动刷新
+            每 8 秒自动刷新
           </span>
           <button
             type="button"
-            onClick={() => void reload()}
-            className="rounded-md border border-white/12 px-3 py-1.5 text-[11px] text-white/70 hover:bg-white/8"
+            onClick={() => void reload({ force: true })}
+            className={CANVAS_PANEL_SHELL_LINK_BTN_CLASS}
           >
             刷新
           </button>
         </footer>
-      </aside>
-    </div>
+    </CanvasToolbarSidePanelShell>
   );
 }

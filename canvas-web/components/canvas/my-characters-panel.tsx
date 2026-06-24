@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ImagePlus, Loader2, Trash2, UserRound, X } from "lucide-react";
+import { ImagePlus, Trash2, UserRound, X } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -10,10 +10,22 @@ import {
   listCanvasCharacters,
   type CanvasCharacterRecord,
 } from "@/lib/canvas-api";
+import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
+import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import {
-  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
-  canvasToolbarSidePanelAsideClass,
-} from "@/lib/canvas/canvas-toolbar-side-panel";
+  invalidateToolbarPanelCache,
+  peekToolbarPanelCache,
+  toolbarPanelCacheKey,
+  writeToolbarPanelCache,
+} from "@/lib/canvas/toolbar-panel-cache";
+import {
+  CANVAS_PANEL_ITEM_CARD_CLASS,
+  CANVAS_PANEL_SHELL_BODY_CLASS,
+  CANVAS_PANEL_SHELL_ERROR_CLASS,
+  CANVAS_PANEL_SHELL_HEADER_CLASS,
+  CANVAS_PANEL_SHELL_THUMB_SM_CLASS,
+} from "@/lib/canvas/canvas-chrome-semantics";
+import { cn } from "@/lib/utils";
 
 export function MyCharactersPanel({
   open,
@@ -33,14 +45,24 @@ export function MyCharactersPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { force?: boolean }) => {
     if (!base) return;
+    const cacheKey = toolbarPanelCacheKey("canvas-characters");
+    const cached = peekToolbarPanelCache<CanvasCharacterRecord[]>(cacheKey, opts);
+    if (cached) {
+      setCharacters(cached);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     setLoading(true);
     try {
       const list = await listCanvasCharacters(base);
       setCharacters(list);
+      writeToolbarPanelCache(cacheKey, list);
       setError(null);
     } catch (e) {
+      setCharacters([]);
       setError(e instanceof Error ? e.message : "加载失败");
     } finally {
       setLoading(false);
@@ -49,11 +71,12 @@ export function MyCharactersPanel({
 
   useEffect(() => {
     if (!open) return;
-    void load();
+    void load({ force: refreshKey > 0 });
   }, [open, load, refreshKey]);
 
   useEffect(() => {
     const onChanged = () => {
+      invalidateToolbarPanelCache("canvas-characters|");
       if (open) void load();
     };
     window.addEventListener("canvas:characters-changed", onChanged);
@@ -80,7 +103,8 @@ export function MyCharactersPanel({
     if (!ok) return;
     try {
       await deleteCanvasCharacter(base, c.id);
-      await load();
+      invalidateToolbarPanelCache("canvas-characters|");
+      await load({ force: true });
     } catch (e) {
       await alert({
         title: "删除失败",
@@ -90,23 +114,13 @@ export function MyCharactersPanel({
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[60]`}
-      onClick={onClose}
-      role="presentation"
+    <CanvasToolbarSidePanelShell
+      open={open}
+      onClose={onClose}
+      ariaLabel="我的角色"
     >
-      <aside
-        className={canvasToolbarSidePanelAsideClass(
-          "border-l border-white/10",
-        )}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="我的角色"
-      >
-        <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+        <header className={CANVAS_PANEL_SHELL_HEADER_CLASS}>
           <div className="flex items-center gap-2">
             <UserRound className="size-4 text-[var(--canvas-accent)]" />
             <p className="text-sm font-medium">我的角色</p>
@@ -121,18 +135,13 @@ export function MyCharactersPanel({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className={CANVAS_PANEL_SHELL_BODY_CLASS}>
           {error ? (
-            <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-200">
-              {error}
-            </p>
+            <p className={CANVAS_PANEL_SHELL_ERROR_CLASS}>{error}</p>
           ) : null}
 
           {loading ? (
-            <div className="flex items-center gap-2 py-8 text-sm text-[var(--canvas-muted)]">
-              <Loader2 className="size-4 animate-spin" />
-              加载中…
-            </div>
+            <CanvasPanelShellLoading />
           ) : characters.length === 0 ? (
             <div className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-[12px] text-[var(--canvas-muted)]">
               还没有保存的角色。
@@ -143,14 +152,19 @@ export function MyCharactersPanel({
             <ul className="space-y-2">
               {characters.map((c) => (
                 <li key={c.id}>
-                  <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-2 transition hover:border-[var(--canvas-accent)]/40 hover:bg-[var(--canvas-accent)]/5">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 transition hover:bg-black/35",
+                      CANVAS_PANEL_ITEM_CARD_CLASS,
+                    )}
+                  >
                     <button
                       type="button"
                       onClick={() => onInsertCharacter(c)}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       title="点击在画布创建图片节点"
                     >
-                      <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-black/40">
+                      <div className={cn(CANVAS_PANEL_SHELL_THUMB_SM_CLASS, "size-14 overflow-hidden")}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={c.imageUrl}
@@ -188,7 +202,6 @@ export function MyCharactersPanel({
         <footer className="border-t border-white/10 px-4 py-2 text-[10px] text-[var(--canvas-muted)]">
           点击角色会在画布上创建一个图片节点，可继续连入工作流。
         </footer>
-      </aside>
-    </div>
+    </CanvasToolbarSidePanelShell>
   );
 }
