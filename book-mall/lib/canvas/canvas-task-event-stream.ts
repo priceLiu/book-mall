@@ -3,13 +3,6 @@
  */
 import { prisma } from "@/lib/prisma";
 
-const INFLIGHT_STATUSES = [
-  "QUEUED",
-  "DISPATCHING",
-  "PENDING",
-  "SUBMITTED",
-] as const;
-
 export type CanvasTaskSyncSnapshot = {
   fingerprint: string;
   inflightCount: number;
@@ -17,39 +10,91 @@ export type CanvasTaskSyncSnapshot = {
   latestUpdatedAt: string | null;
 };
 
+type SnapshotRow = {
+  latest: Date | null;
+  total: bigint;
+  inflight: bigint;
+};
+
+const snapshotCache = new Map<
+  string,
+  { snap: CanvasTaskSyncSnapshot; fetchedAt: number }
+>();
+
+/** 同项目并发 SSE / poll 共享快照，避免连接池被 duplicate query 打满 */
+const SNAPSHOT_CACHE_MS = (() => {
+  const raw = Number(process.env.CANVAS_TASK_SNAPSHOT_CACHE_MS ?? "");
+  return Number.isFinite(raw) && raw >= 500 ? raw : 3000;
+})();
+
+export const CANVAS_TASK_SSE_POLL_MS = (() => {
+  const raw = Number(process.env.CANVAS_TASK_SSE_POLL_MS ?? "");
+  return Number.isFinite(raw) && raw >= 3000 ? raw : 8000;
+})();
+
+/** 无进行中任务时的 SSE 轮询间隔（默认 20s，减轻 dev:all 连接池压力） */
+export const CANVAS_TASK_SSE_IDLE_POLL_MS = (() => {
+  const raw = Number(process.env.CANVAS_TASK_SSE_IDLE_POLL_MS ?? "");
+  return Number.isFinite(raw) && raw >= 5000 ? raw : 20_000;
+})();
+
+export const CANVAS_TASK_SSE_HEARTBEAT_MS = 15000;
+
+export function resolveCanvasTaskSsePollDelayMs(
+  snap: Pick<CanvasTaskSyncSnapshot, "inflightCount">,
+): number {
+  return snap.inflightCount > 0
+    ? CANVAS_TASK_SSE_POLL_MS
+    : CANVAS_TASK_SSE_IDLE_POLL_MS;
+}
+
 export async function getCanvasProjectTaskSyncSnapshot(
   projectId: string,
+  opts?: { bypassCache?: boolean },
 ): Promise<CanvasTaskSyncSnapshot> {
-  const [agg, inflightCount] = await Promise.all([
-    prisma.canvasGenerationTask.aggregate({
-      where: { projectId, deletedAt: null },
-      _max: { updatedAt: true },
-      _count: { _all: true },
-    }),
-    prisma.canvasGenerationTask.count({
-      where: {
-        projectId,
-        deletedAt: null,
-        status: { in: [...INFLIGHT_STATUSES] },
-      },
-    }),
-  ]);
+  const now = Date.now();
+  if (!opts?.bypassCache) {
+    const hit = snapshotCache.get(projectId);
+    if (hit && now - hit.fetchedAt < SNAPSHOT_CACHE_MS) {
+      return hit.snap;
+    }
+  }
 
-  const latest = agg._max.updatedAt;
-  const taskCount = agg._count._all;
+  const rows = await prisma.$queryRaw<SnapshotRow[]>`
+    SELECT
+      MAX("updatedAt") AS latest,
+      COUNT(*)::bigint AS total,
+      COUNT(*) FILTER (
+        WHERE status IN (
+          'QUEUED',
+          'DISPATCHING',
+          'PENDING',
+          'SUBMITTED'
+        )
+      )::bigint AS inflight
+    FROM "CanvasGenerationTask"
+    WHERE "projectId" = ${projectId}
+      AND "deletedAt" IS NULL
+  `;
+
+  const row = rows[0];
+  const latest = row?.latest ?? null;
+  const taskCount = Number(row?.total ?? 0);
+  const inflightCount = Number(row?.inflight ?? 0);
   const fingerprint = `${latest?.getTime() ?? 0}:${taskCount}:${inflightCount}`;
 
-  return {
+  const snap: CanvasTaskSyncSnapshot = {
     fingerprint,
     inflightCount,
     taskCount,
     latestUpdatedAt: latest?.toISOString() ?? null,
   };
+
+  snapshotCache.set(projectId, { snap, fetchedAt: now });
+  return snap;
 }
 
-export const CANVAS_TASK_SSE_POLL_MS = (() => {
-  const raw = Number(process.env.CANVAS_TASK_SSE_POLL_MS ?? "");
-  return Number.isFinite(raw) && raw >= 1500 ? raw : 2500;
-})();
-
-export const CANVAS_TASK_SSE_HEARTBEAT_MS = 15000;
+export function invalidateCanvasTaskSyncSnapshotCache(projectId?: string): void {
+  if (projectId) snapshotCache.delete(projectId);
+  else snapshotCache.clear();
+}
