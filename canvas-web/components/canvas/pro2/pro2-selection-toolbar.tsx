@@ -9,6 +9,7 @@ import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { CANVAS_PRIMARY_BTN_SM_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { createProjectAsset } from "@/lib/canvas-api";
 import { exportNodeToProjectAssetDraft } from "@/lib/canvas/project-asset-export";
+import { useCanvasStore } from "@/lib/canvas/store";
 import { notifyProjectAssetsChanged } from "@/lib/canvas/use-project-assets";
 import {
   computePro2MultiSelectionBbox,
