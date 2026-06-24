@@ -342,6 +342,7 @@ export async function fetchPollPoolSnapshot(input: {
         createdAt: true,
         lastPolledAt: true,
         pollCount: true,
+        inputPayload: true,
         project: { select: { name: true } },
       },
     }),
