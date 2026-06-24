@@ -1,5 +1,6 @@
 import type { CanvasGenerationTask, Prisma } from "@prisma/client";
 
+import { promptArchiveFieldsForTask } from "@/lib/canvas/canvas-task-prompt-archive";
 import { prisma } from "@/lib/prisma";
 import { isTrafficControlEnabled } from "./constants";
 import { resolveCanvasProjectTrafficScope, type TrafficScope } from "./scope-key";
@@ -29,6 +30,11 @@ export async function admitCanvasVideoTask(input: {
   return prisma.canvasGenerationTask.create({
     data: {
       ...input.data,
+      ...promptArchiveFieldsForTask({
+        kind: input.data.kind,
+        inputPayload: input.data.inputPayload,
+        textOutput: input.data.textOutput ?? null,
+      }),
       projectId: input.projectId,
       nodeId: input.nodeId,
       status: isTrafficControlEnabled() ? "QUEUED" : "PENDING",

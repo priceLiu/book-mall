@@ -11,10 +11,9 @@ import {
 import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
 import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import {
+  fetchToolbarPanelWithSwr,
   invalidateToolbarPanelCache,
-  peekToolbarPanelCache,
   toolbarPanelCacheKey,
-  writeToolbarPanelCache,
 } from "@/lib/canvas/toolbar-panel-cache";
 import {
   CANVAS_PANEL_ITEM_CARD_CLASS,
@@ -46,26 +45,24 @@ export function MyTemplatesPanel({
   const load = useCallback(async (opts?: { force?: boolean }) => {
     if (!base) return;
     const cacheKey = toolbarPanelCacheKey("canvas-templates");
-    const cached = peekToolbarPanelCache<CanvasTemplateRecord[]>(cacheKey, opts);
-    if (cached) {
-      setTemplates(cached);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    setLoading(true);
-    try {
-      const all = await listCanvasTemplates(base);
-      const userTemplates = all.filter((t) => !t.builtin);
-      setTemplates(userTemplates);
-      writeToolbarPanelCache(cacheKey, userTemplates);
-      setError(null);
-    } catch (e) {
-      setTemplates([]);
-      setError(e instanceof Error ? e.message : "加载失败");
-    } finally {
-      setLoading(false);
-    }
+    await fetchToolbarPanelWithSwr({
+      cacheKey,
+      force: opts?.force,
+      fetch: async () => {
+        const all = await listCanvasTemplates(base);
+        return all.filter((t) => !t.builtin);
+      },
+      onLoading: setLoading,
+      onData: (userTemplates) => {
+        setTemplates(userTemplates);
+        setError(null);
+      },
+      onError: (e) => {
+        if (e == null) return;
+        setTemplates([]);
+        setError(e instanceof Error ? e.message : "加载失败");
+      },
+    });
   }, [base]);
 
   useEffect(() => {

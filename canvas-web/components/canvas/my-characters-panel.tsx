@@ -13,10 +13,9 @@ import {
 import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
 import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import {
+  fetchToolbarPanelWithSwr,
   invalidateToolbarPanelCache,
-  peekToolbarPanelCache,
   toolbarPanelCacheKey,
-  writeToolbarPanelCache,
 } from "@/lib/canvas/toolbar-panel-cache";
 import {
   CANVAS_PANEL_ITEM_CARD_CLASS,
@@ -48,25 +47,21 @@ export function MyCharactersPanel({
   const load = useCallback(async (opts?: { force?: boolean }) => {
     if (!base) return;
     const cacheKey = toolbarPanelCacheKey("canvas-characters");
-    const cached = peekToolbarPanelCache<CanvasCharacterRecord[]>(cacheKey, opts);
-    if (cached) {
-      setCharacters(cached);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    setLoading(true);
-    try {
-      const list = await listCanvasCharacters(base);
-      setCharacters(list);
-      writeToolbarPanelCache(cacheKey, list);
-      setError(null);
-    } catch (e) {
-      setCharacters([]);
-      setError(e instanceof Error ? e.message : "加载失败");
-    } finally {
-      setLoading(false);
-    }
+    await fetchToolbarPanelWithSwr({
+      cacheKey,
+      force: opts?.force,
+      fetch: () => listCanvasCharacters(base),
+      onLoading: setLoading,
+      onData: (list) => {
+        setCharacters(list);
+        setError(null);
+      },
+      onError: (e) => {
+        if (e == null) return;
+        setCharacters([]);
+        setError(e instanceof Error ? e.message : "加载失败");
+      },
+    });
   }, [base]);
 
   useEffect(() => {

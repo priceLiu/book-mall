@@ -26,10 +26,15 @@ import {
   CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
 } from "@/lib/canvas/canvas-toolbar-side-panel";
 import {
+  fetchToolbarPanelWithSwr,
+  invalidateToolbarPanelCache,
   peekToolbarPanelCache,
   toolbarPanelCacheKey,
-  writeToolbarPanelCache,
 } from "@/lib/canvas/toolbar-panel-cache";
+import {
+  PROMPT_HISTORY_CACHE_PREFIX,
+  subscribeCanvasPromptHistoryChanged,
+} from "@/lib/canvas/canvas-panel-sync-events";
 import {
   CANVAS_PANEL_SHELL_BODY_CLASS,
   CANVAS_PANEL_SHELL_ERROR_CLASS,
@@ -163,6 +168,8 @@ export function MyPromptHistoryPanel({
   const cursorRef = useRef<string | null>(null);
   const hasMoreRef = useRef(false);
   const loadSeqRef = useRef(0);
+  const openRef = useRef(open);
+  openRef.current = open;
 
   const fetchPage = useCallback(
     async (cursor?: string | null) => {
@@ -187,47 +194,45 @@ export function MyPromptHistoryPanel({
       mediaKind,
       outcome,
     });
-    const cached = peekToolbarPanelCache<{
-      items: CanvasPromptHistoryItem[];
-      hasMore: boolean;
-      nextCursor: string | null;
-    }>(cacheKey, opts);
-    if (cached) {
-      setItems(cached.items);
-      setHasMore(cached.hasMore);
-      hasMoreRef.current = cached.hasMore;
-      cursorRef.current = cached.nextCursor;
-      setLoading(false);
-      setError(null);
-      return;
-    }
     const seq = ++loadSeqRef.current;
-    setLoading(true);
-    setError(null);
-    setItems([]);
-    cursorRef.current = null;
-    hasMoreRef.current = false;
-    try {
-      const page = await fetchPage(null);
-      if (seq !== loadSeqRef.current) return;
-      setItems(page.items);
-      setHasMore(page.hasMore);
-      hasMoreRef.current = page.hasMore;
-      cursorRef.current = page.nextCursor;
-      writeToolbarPanelCache(cacheKey, {
-        items: page.items,
-        hasMore: page.hasMore,
-        nextCursor: page.nextCursor,
-      });
-    } catch (e) {
-      if (seq !== loadSeqRef.current) return;
-      setError(
-        e instanceof Error ? formatCanvasApiError(e.message) : "加载提示词失败",
-      );
-      setItems([]);
-    } finally {
-      if (seq === loadSeqRef.current) setLoading(false);
+    if (!opts?.force) {
+      setLoading(true);
+      setError(null);
     }
+    await fetchToolbarPanelWithSwr({
+      cacheKey,
+      force: opts?.force,
+      seq,
+      isStale: (s) => s !== loadSeqRef.current,
+      fetch: async () => {
+        const page = await fetchPage(null);
+        return {
+          items: page.items,
+          hasMore: page.hasMore,
+          nextCursor: page.nextCursor,
+        };
+      },
+      onLoading: (loading) => {
+        if (seq !== loadSeqRef.current) return;
+        setLoading(loading);
+      },
+      onData: (cached, meta) => {
+        if (seq !== loadSeqRef.current) return;
+        setItems(cached.items);
+        setHasMore(cached.hasMore);
+        hasMoreRef.current = cached.hasMore;
+        cursorRef.current = cached.nextCursor;
+        if (!meta.fromCache) setError(null);
+      },
+      onError: (e) => {
+        if (seq !== loadSeqRef.current) return;
+        if (e == null) return;
+        setError(
+          e instanceof Error ? formatCanvasApiError(e.message) : "加载提示词失败",
+        );
+        if (!peekToolbarPanelCache(cacheKey)) setItems([]);
+      },
+    });
   }, [base, effectiveProjectId, fetchPage, mediaKind, outcome, scope]);
 
   const loadMore = useCallback(async () => {
@@ -275,6 +280,14 @@ export function MyPromptHistoryPanel({
     if (!open) return;
     void loadFirst();
   }, [open, loadFirst]);
+
+  useEffect(() => {
+    return subscribeCanvasPromptHistoryChanged((detail) => {
+      if (scope === "project" && detail.projectId !== effectiveProjectId) return;
+      invalidateToolbarPanelCache(PROMPT_HISTORY_CACHE_PREFIX);
+      if (openRef.current) void loadFirst({ force: true });
+    });
+  }, [effectiveProjectId, loadFirst, scope]);
 
   const copyPrompt = async (text: string) => {
     try {

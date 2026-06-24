@@ -18,6 +18,10 @@ import type {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
+  promptArchiveFieldsForTask,
+  syncTaskPromptArchiveById,
+} from "@/lib/canvas/canvas-task-prompt-archive";
+import {
   CANVAS_AI_TASK_TIMEOUT_MIN,
   buildCanvasAiKieCallbackUrl,
   getCanvasProjectInflightMax,
@@ -428,6 +432,14 @@ export async function submitCanvasNodeTask(
       } as Prisma.InputJsonValue,
       inputHash,
       status: "PENDING",
+      ...promptArchiveFieldsForTask({
+        kind: "IMAGE",
+        inputPayload: {
+          ...built.input,
+          providerId: "gateway:kie",
+          providerKind: "KIE",
+        },
+      }),
     },
   });
 

@@ -49,6 +49,10 @@ import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
 import { formatCanvasTaskError } from "./friendly-task-error";
 import { maybeNotifyCanvasCreditsSettled, markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import {
+  isCanvasTaskTerminalStatus,
+  notifyCanvasTaskPanelSync,
+} from "./canvas-panel-sync-events";
+import {
   registerCanvasRunBus,
   type CanvasStoryRunJob,
   unregisterCanvasRunBus,
@@ -575,6 +579,7 @@ export function useCanvasRunner(
   const deferredForceFreshRef = useRef<Map<string, QueueItem>>(new Map());
   const taskByNodeRef = useRef<Map<string, string>>(new Map());
   const jobByTaskRef = useRef<Map<string, QueueItem>>(new Map());
+  const terminalNotifiedRef = useRef<Set<string>>(new Set());
   const sequentialRef = useRef<{
     jobs: QueueItem[];
     cursor: number;
@@ -589,6 +594,34 @@ export function useCanvasRunner(
     if (job.mediaKind) parts.push(job.mediaKind);
     return parts.join(":");
   };
+
+  const emitTaskPanelSync = useCallback(
+    (
+      task: Pick<CanvasTaskRecord, "id" | "status">,
+      opts?: { created?: boolean; flushAutosave?: boolean },
+    ) => {
+      if (!projectId) return;
+      const terminal = isCanvasTaskTerminalStatus(task.status);
+      if (terminal) {
+        const dedupeKey = `${task.id}:${task.status}`;
+        if (terminalNotifiedRef.current.has(dedupeKey) && !opts?.flushAutosave) {
+          return;
+        }
+        terminalNotifiedRef.current.add(dedupeKey);
+      }
+      notifyCanvasTaskPanelSync({
+        projectId,
+        taskId: task.id,
+        status: task.status,
+        terminal,
+        created: opts?.created,
+      });
+      if (opts?.flushAutosave && task.status === "SUCCEEDED") {
+        window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
+      }
+    },
+    [projectId],
+  );
 
   /** 新 run 开始前解绑旧 taskId，避免轮询把上一轮成功任务写回 runtime */
   const detachNodeTaskRefs = useCallback((job: QueueItem) => {
@@ -892,6 +925,10 @@ export function useCanvasRunner(
         });
         taskByNodeRef.current.set(key, r.task.id);
         jobByTaskRef.current.set(r.task.id, job);
+        emitTaskPanelSync(r.task, {
+          created: true,
+          flushAutosave: r.task.status === "SUCCEEDED",
+        });
         const nodesNow = useCanvasStore.getState().nodes;
         const nodeNow = nodesNow.find((n) => n.id === nodeId) ?? node;
         if (
@@ -1670,6 +1707,7 @@ export function useCanvasRunner(
             const job = jobByTaskRef.current.get(t.id);
             if (job) releaseInflightKey(runKey(job));
             if (st === "done") maybeNotifyCanvasCreditsSettled(t);
+            emitTaskPanelSync(t, { flushAutosave: st === "done" });
           }
         }
         return;
@@ -1683,6 +1721,7 @@ export function useCanvasRunner(
             const job = jobByTaskRef.current.get(t.id);
             if (job) releaseInflightKey(runKey(job));
             if (st === "done") maybeNotifyCanvasCreditsSettled(t);
+            emitTaskPanelSync(t, { flushAutosave: st === "done" });
           }
         }
         return;
@@ -1710,6 +1749,7 @@ export function useCanvasRunner(
             }
           }
           if (patch.status === "done") maybeNotifyCanvasCreditsSettled(t);
+          emitTaskPanelSync(t, { flushAutosave: patch.status === "done" });
         }
       }
     };

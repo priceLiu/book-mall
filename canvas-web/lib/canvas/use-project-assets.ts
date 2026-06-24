@@ -8,10 +8,9 @@ import {
 } from "@/lib/canvas-api";
 import { CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE } from "@/lib/canvas/canvas-toolbar-side-panel";
 import {
+  fetchToolbarPanelWithSwr,
   invalidateToolbarPanelCache,
-  peekToolbarPanelCache,
   toolbarPanelCacheKey,
-  writeToolbarPanelCache,
 } from "@/lib/canvas/toolbar-panel-cache";
 
 const CHANGE_EVENT = "canvas:project-assets-changed";
@@ -69,42 +68,34 @@ export function useProjectAssets(
       kind: opts?.kind ?? "",
       scope: opts?.scope ?? "all",
     });
-    const cached = peekToolbarPanelCache<{
-      assets: ProjectAssetRecord[];
-      hasMore: boolean;
-      nextCursor: string | null;
-    }>(cacheKey, loadOpts);
-    if (cached) {
-      setAssets(cached.assets);
-      setHasMore(cached.hasMore);
-      hasMoreRef.current = cached.hasMore;
-      cursorRef.current = cached.nextCursor;
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const page = await fetchPage(null);
-      setAssets(page.assets);
-      setHasMore(page.hasMore);
-      hasMoreRef.current = page.hasMore;
-      cursorRef.current = page.nextCursor;
-      writeToolbarPanelCache(cacheKey, {
-        assets: page.assets,
-        hasMore: page.hasMore,
-        nextCursor: page.nextCursor,
-      });
-    } catch (e) {
-      setAssets([]);
-      setHasMore(false);
-      hasMoreRef.current = false;
-      cursorRef.current = null;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    await fetchToolbarPanelWithSwr({
+      cacheKey,
+      force: loadOpts?.force,
+      fetch: async () => {
+        const page = await fetchPage(null);
+        return {
+          assets: page.assets,
+          hasMore: page.hasMore,
+          nextCursor: page.nextCursor,
+        };
+      },
+      onLoading: setLoading,
+      onData: (cached) => {
+        setAssets(cached.assets);
+        setHasMore(cached.hasMore);
+        hasMoreRef.current = cached.hasMore;
+        cursorRef.current = cached.nextCursor;
+        setError(null);
+      },
+      onError: (e) => {
+        if (e == null) return;
+        setAssets([]);
+        setHasMore(false);
+        hasMoreRef.current = false;
+        cursorRef.current = null;
+        setError(e instanceof Error ? e.message : String(e));
+      },
+    });
   }, [base, fetchPage, opts?.projectId, opts?.kind, opts?.scope]);
 
   const loadMore = useCallback(async () => {
