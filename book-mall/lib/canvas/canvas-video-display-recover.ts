@@ -356,3 +356,81 @@ export async function recoverCanvasVideoProjectDisplay(
   }
   return results;
 }
+
+const VIDEO_ENGINE_NODE_TYPES = new Set([
+  "sbv1-video-engine",
+  "video-engine",
+  "ai-video-engine",
+]);
+
+function nodeRuntimeNeedsVideoReconcile(
+  runtime: CanvasNodeRuntimeLike | undefined,
+): boolean {
+  if (!runtime) return false;
+  const st = runtime.status;
+  if (st !== "running" && st !== "pending") return false;
+  return !(runtime.ossUrl?.trim() || runtime.ephemeralUrl?.trim());
+}
+
+/**
+ * 打开画布时 opportunistic 修复：节点 runtime 卡在 running/pending 且无成片 URL，
+ * 但同节点已有 SUCCEEDED 火山视频任务 → 写回最新成片（避免「视频丢失」）。
+ */
+export async function reconcileStaleCanvasVideoRuntimeOnProjectRead(
+  projectId: string,
+): Promise<number> {
+  const project = await prisma.canvasProject.findUnique({
+    where: { id: projectId, deletedAt: null },
+    select: { canvas: true },
+  });
+  if (!project?.canvas) return 0;
+
+  const nodes =
+    (
+      project.canvas as {
+        nodes?: Array<{
+          id: string;
+          type?: string;
+          data?: { runtime?: CanvasNodeRuntimeLike };
+        }>;
+      } | null
+    )?.nodes ?? [];
+
+  const staleNodeIds = nodes
+    .filter(
+      (n) =>
+        VIDEO_ENGINE_NODE_TYPES.has(n.type ?? "") &&
+        nodeRuntimeNeedsVideoReconcile(n.data?.runtime),
+    )
+    .map((n) => n.id);
+
+  if (staleNodeIds.length === 0) return 0;
+
+  let patched = 0;
+  for (const nodeId of staleNodeIds) {
+    const latest = await prisma.canvasGenerationTask.findFirst({
+      where: {
+        projectId,
+        nodeId,
+        deletedAt: null,
+        status: "SUCCEEDED",
+        OR: [{ ossUrl: { not: null } }, { ephemeralUrl: { not: null } }],
+      },
+      orderBy: { completedAt: "desc" },
+      select: {
+        id: true,
+        projectId: true,
+        nodeId: true,
+        ossUrl: true,
+        ephemeralUrl: true,
+        completedAt: true,
+        resultPayload: true,
+        inputPayload: true,
+      },
+    });
+    if (!latest || !isVolcengineVideoCanvasTask(latest)) continue;
+    await patchCanvasProjectNodeRuntimeFromTask(latest);
+    patched += 1;
+  }
+  return patched;
+}

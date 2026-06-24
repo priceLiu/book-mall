@@ -1982,6 +1982,11 @@ type CanvasGenerationRecordExtras = {
   thumbnailUrl: string | null;
   previewUrl: string | null;
   previewKind: "image" | "video" | null;
+  previewMedia?: Array<{
+    url: string;
+    kind: "image" | "video";
+    label: string;
+  }>;
   canvasHistoryId: string | null;
   canRestoreCanvas: boolean;
 };
@@ -2050,6 +2055,7 @@ function buildGenerationRecordListItem(
     thumbnailUrl: posterUrl ?? preview.thumbnailUrl,
     previewUrl: preview.previewUrl,
     previewKind: preview.previewKind,
+    previewMedia: preview.previewMedia,
     creditsCharged: billing.creditsCharged,
     billingMode: billing.billingMode,
     canvasHistoryId,
