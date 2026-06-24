@@ -88,11 +88,13 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
   });
 
-  const headers = jsonHeaders(request);
-  headers.set("Content-Type", "text/event-stream; charset=utf-8");
-  headers.set("Cache-Control", "no-cache, no-transform");
-  headers.set("Connection", "keep-alive");
-  headers.set("X-Accel-Buffering", "no");
-
-  return new Response(stream, { headers });
+  return new Response(stream, {
+    headers: {
+      ...jsonHeaders(request),
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
