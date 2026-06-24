@@ -170,6 +170,30 @@ export function resolveLiveLogPhaseTiming(input: {
   };
 }
 
+/** 火山 trace 原生跨度终点（与 book-mall resolveVolcengineVendorTraceEndMs 对齐） */
+function resolveVolcengineVendorTraceEndMs(
+  trace: VolcengineTimingTrace,
+  nowMs: number,
+): number | null {
+  if (trace.vendorCreatedAtMs == null) return null;
+  const st = normalizeStatus(trace.lastStatus);
+  const terminal = isVendorTerminalStatus(st);
+  const created = trace.vendorCreatedAtMs;
+  const updated = trace.vendorUpdatedAtMs;
+  const updatedFrozen =
+    created != null &&
+    updated != null &&
+    updated - created <= 5_000;
+
+  if (terminal) {
+    return updated ?? created;
+  }
+  if (updated != null && !updatedFrozen) {
+    return updated;
+  }
+  return nowMs;
+}
+
 /** 厂商原生耗时（只读对比列；进行中火山 trace 用墙钟补 updated） */
 export function resolveVendorNativeTimingLive(input: {
   providerKind: string | null;
@@ -194,15 +218,10 @@ export function resolveVendorNativeTimingLive(input: {
   if (input.providerKind === "VOLCENGINE" && input.requestKind === "VIDEO") {
     const trace = readVolcengineTimingTrace(input.resultSummary);
     if (trace?.vendorCreatedAtMs != null) {
-      const st = normalizeStatus(trace.lastStatus);
-      const terminal = isVendorTerminalStatus(st);
-      const end =
-        trace.vendorUpdatedAtMs != null
-          ? trace.vendorUpdatedAtMs
-          : terminal
-            ? trace.vendorCreatedAtMs
-            : input.nowMs;
-      vendorTraceSpanMs = Math.max(0, end - trace.vendorCreatedAtMs);
+      const end = resolveVolcengineVendorTraceEndMs(trace, input.nowMs);
+      if (end != null) {
+        vendorTraceSpanMs = Math.max(0, end - trace.vendorCreatedAtMs);
+      }
     }
   }
 

@@ -606,6 +606,27 @@ export type VendorNativeTiming = {
   vendorTraceSpanMs: number | null;
 };
 
+/** 火山 trace 原生跨度终点（厂商列专用，与「我方 Generate 墙钟」分离） */
+export function resolveVolcengineVendorTraceEndMs(
+  trace: VolcengineTimingTrace,
+  nowMs: number,
+): number | null {
+  if (trace.vendorCreatedAtMs == null) return null;
+  const st = normalizeStatus(trace.lastStatus);
+  const terminal = isVendorTerminalStatus(st);
+  const created = trace.vendorCreatedAtMs;
+  const updated = trace.vendorUpdatedAtMs;
+
+  if (terminal) {
+    return updated ?? created;
+  }
+  if (updated != null && !isSeedanceFrozenUpdatedAt(created, updated)) {
+    return updated;
+  }
+  // Seedance running：updated_at 恒等于 created_at → 厂商跨度用 now−created（非 0）
+  return nowMs;
+}
+
 export function resolveVendorNativeTiming(input: {
   providerKind: string | null;
   requestKind: string;
@@ -626,15 +647,10 @@ export function resolveVendorNativeTiming(input: {
   ) {
     const trace = readVolcengineTimingTrace(input.resultSummary);
     if (trace?.vendorCreatedAtMs != null) {
-      const st = normalizeStatus(trace.lastStatus);
-      const terminal = isVendorTerminalStatus(st);
-      const end =
-        trace.vendorUpdatedAtMs != null
-          ? trace.vendorUpdatedAtMs
-          : terminal
-            ? trace.vendorCreatedAtMs
-            : now;
-      vendorTraceSpanMs = Math.max(0, end - trace.vendorCreatedAtMs);
+      const end = resolveVolcengineVendorTraceEndMs(trace, now);
+      if (end != null) {
+        vendorTraceSpanMs = Math.max(0, end - trace.vendorCreatedAtMs);
+      }
     }
   }
 
