@@ -1,21 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { AppOpenTransitionShell } from "@/components/app-open/app-open-transition-shell";
 import { StoryOpenLoader } from "@/components/app-open/story-open-loader";
 
 export function StoryOpenClient({ reEnterPath }: { reEnterPath: string }) {
-  useEffect(() => {
-    window.location.replace(reEnterPath);
-  }, [reEnterPath]);
-
   return (
-    <div
-      className="relative flex min-h-[100dvh] flex-col items-center justify-center gap-6 overflow-hidden bg-background px-4"
-      role="status"
-      aria-live="polite"
-    >
-      <StoryOpenLoader />
-      <p className="text-sm text-muted-foreground">正在通过 Book SSO 打开漫剧剧场…</p>
-    </div>
+    <AppOpenTransitionShell
+      targetUrl={reEnterPath}
+      loader={<StoryOpenLoader />}
+      title="正在打开漫剧剧场"
+      subtitle="正在通过 Book SSO 完成登录，请稍候…"
+      gradientClassName="bg-[radial-gradient(ellipse_80%_60%_at_50%_40%,rgba(245,158,11,0.14),transparent_70%)]"
+    />
   );
 }

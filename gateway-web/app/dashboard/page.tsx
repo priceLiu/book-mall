@@ -34,7 +34,7 @@ export default async function DashboardUsagePage() {
       </div>
 
       <section className="gw-card">
-        <h2 className="mb-3 text-sm font-medium text-[var(--gw-ink)]">按模型 Top</h2>
+        <h2>按模型 Top</h2>
         <table className="gw-table">
           <thead>
             <tr>
@@ -65,7 +65,7 @@ export default async function DashboardUsagePage() {
       </section>
 
       <section className="gw-card">
-        <h2 className="mb-3 text-sm font-medium text-[var(--gw-ink)]">按日趋势</h2>
+        <h2>按日趋势</h2>
         <table className="gw-table">
           <thead>
             <tr>

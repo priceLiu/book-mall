@@ -491,6 +491,7 @@ export async function runImageEngineNode(
   if (!args.forceFresh) {
     await assertNoProjectInflightByInputHash(projectId, inputHash);
   }
+  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
@@ -1008,6 +1009,7 @@ export async function runVideoEngineNode(
   if (!args.forceFresh) {
     await assertNoProjectInflightByInputHash(projectId, inputHash);
   }
+  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 

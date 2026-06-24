@@ -7,7 +7,7 @@ export const GATEWAY_LIVE_POLL_ACTIVE_MS = 8_000;
 export const GATEWAY_LIVE_POLL_STALE_MS = 15_000;
 export const GATEWAY_SUMMARY_POLL_ACTIVE_MS = 20_000;
 /** 无在飞时仍定期全量同步 live 热区，剔除已过期终态行 */
-export const GATEWAY_LIVE_HOT_SYNC_MS = 60_000;
+export const GATEWAY_LIVE_HOT_SYNC_MS = 15_000;
 
 export type GatewayDynamicActivityCounts = {
   inProgress: number;

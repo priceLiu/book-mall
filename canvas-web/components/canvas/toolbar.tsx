@@ -42,6 +42,7 @@ export function CanvasToolbar({
   onOpenMySavedScripts,
   onOpenMyVideoLibrary,
   onOpenProjectCharacterAssets,
+  onOpenPromptHistory,
   onOpenStyleLibrary,
   onReflowStoryLayout,
   running,
@@ -68,6 +69,7 @@ export function CanvasToolbar({
   onOpenMySavedScripts?: () => void;
   onOpenMyVideoLibrary?: () => void;
   onOpenProjectCharacterAssets?: () => void;
+  onOpenPromptHistory?: () => void;
   onOpenStyleLibrary?: () => void;
   onReflowStoryLayout?: () => void;
   running: boolean;
@@ -206,6 +208,17 @@ export function CanvasToolbar({
           >
             <Film className="size-3" />
             我的视频库
+          </button>
+        ) : null}
+        {onOpenPromptHistory ? (
+          <button
+            type="button"
+            onClick={onOpenPromptHistory}
+            className="inline-flex items-center gap-1 rounded-md border border-violet-400/25 bg-violet-500/8 px-2 py-1 text-[11px] text-violet-100/90 hover:border-violet-400/40 hover:bg-violet-500/15 hover:text-violet-50"
+            title="已提交提示词自动归档，按文字/图片/视频与成败分类"
+          >
+            <Sparkles className="size-3" />
+            我的提示词
           </button>
         ) : null}
         {onOpenProjectCharacterAssets ? (

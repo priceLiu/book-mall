@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   BookOpen,
   Clapperboard,
@@ -31,6 +31,7 @@ import {
 } from "@/lib/canvas/project-asset-kind-map";
 import type { ProjectAssetKind, ProjectAssetRecord } from "@/lib/canvas/project-asset-types";
 import { useProjectAssets } from "@/lib/canvas/use-project-assets";
+import { usePanelInfiniteScroll } from "@/lib/canvas/use-panel-infinite-scroll";
 import {
   PRO_ASSETS_LINK_CLASS,
   PRO_ASSETS_TAB_ACTIVE_CLASS,
@@ -84,6 +85,10 @@ export function UnifiedProjectAssetsView({
   const base = useBookMallBaseUrl();
   const { confirm, doubleConfirm, alert } = useDialogs();
   const [tab, setTab] = useState<UnifiedProjectAssetTab>(initialTab);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
   const [preview, setPreview] = useState<{ url: string; title: string } | null>(null);
   const [hoverPreview, setHoverPreview] = useState<{
     url: string;
@@ -97,9 +102,16 @@ export function UnifiedProjectAssetsView({
   const kindFilter = tab === "all" ? null : tab;
   const canvasInsertEnabled =
     Boolean(onInsertToCanvas) && isProjectAssetCanvasInsertAvailable();
-  const { assets, loading, error, refresh } = useProjectAssets(base, {
+  const { assets, loading, loadingMore, hasMore, loadMore, error, refresh } = useProjectAssets(base, {
     projectId,
     kind: kindFilter,
+  });
+  const loadMoreSentinelRef = usePanelInfiniteScroll({
+    enabled: !loading && !search.trim(),
+    hasMore,
+    loading,
+    loadingMore,
+    onLoadMore: loadMore,
   });
 
   const filtered = useMemo(() => {
@@ -264,6 +276,10 @@ export function UnifiedProjectAssetsView({
                 />
               ))}
             </div>
+            {loadingMore ? (
+              <p className="py-2 text-center text-[11px] text-white/45">加载更多…</p>
+            ) : null}
+            <div ref={loadMoreSentinelRef} className="h-1" aria-hidden />
           </>
         )}
       </div>

@@ -28,7 +28,6 @@ export const PROJECT_ASSET_TAB_KINDS: ProjectAssetKind[] = [
   "PRIVATE_PORTRAIT",
   "DIGITAL_HUMAN",
   "STYLE",
-  "PROMPT",
   "GROUP_BUNDLE",
 ];
 

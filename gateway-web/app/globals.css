@@ -4,7 +4,7 @@
 
 /* GitHub 深色设计 token（对齐 https://github.com/ Dashboard Dark） */
 :root {
-  --gw-font-sans:
+  --gw-font-stack-sans:
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
@@ -14,6 +14,11 @@
     sans-serif,
     "Apple Color Emoji",
     "Segoe UI Emoji";
+  --gw-font-sans: var(--gw-font-stack-sans);
+  --gw-body-font-size: 14px;
+  --gw-text-weight-normal: 400;
+  --gw-text-weight-semibold: 600;
+  --gw-text-white: #ffffff;
   --gw-bg: #0d1117;
   --gw-surface: #161b22;
   --gw-surface-elevated: #161b22;
@@ -36,13 +41,25 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: var(--gw-font-sans);
-  font-size: 0.875rem;
+  font-family: var(--gw-font-stack-sans);
+  font-size: var(--gw-body-font-size);
+  font-weight: var(--gw-text-weight-normal);
   line-height: 1.5;
   color: var(--gw-ink);
   background: var(--gw-bg);
   color-scheme: dark;
   -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  /* 图 1：区块标题 h2 — 白字、半粗、14px */
+  h2 {
+    font-family: var(--gw-font-stack-sans);
+    font-size: var(--gw-body-font-size);
+    font-weight: var(--gw-text-weight-semibold);
+    color: var(--gw-text-white);
+    line-height: 1.5;
+  }
 }
 
 @layer components {
@@ -80,19 +97,45 @@ body {
   }
 
   .gw-chip {
-    @apply rounded-md border border-[var(--gw-border)] px-3 py-1.5 text-xs text-[var(--gw-muted)] transition hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)];
+    font-family: var(--gw-font-stack-sans);
+    font-size: var(--gw-body-font-size);
+    font-weight: var(--gw-text-weight-normal);
+    @apply rounded-md border border-[var(--gw-border)] px-3 py-1.5 text-[var(--gw-text-white)] transition hover:bg-[var(--gw-hover)];
   }
 
   .gw-chip-active {
-    @apply rounded-md border border-[var(--gw-btn-primary-bg)] bg-[var(--gw-btn-primary-bg)] px-3 py-1.5 text-xs font-medium text-white;
+    font-weight: var(--gw-text-weight-semibold);
+    @apply rounded-md border border-[var(--gw-btn-primary-bg)] bg-[var(--gw-btn-primary-bg)] px-3 py-1.5 text-[var(--gw-text-white)];
   }
 
   .gw-chip-round {
-    @apply rounded-full border border-[var(--gw-border)] px-3 py-1 text-xs text-[var(--gw-muted)] transition hover:border-white/20 hover:text-[var(--gw-ink)];
+    font-family: var(--gw-font-stack-sans);
+    font-size: var(--gw-body-font-size);
+    font-weight: var(--gw-text-weight-normal);
+    @apply rounded-full border border-[var(--gw-border)] px-3 py-1 text-[var(--gw-text-white)] transition hover:border-white/20 hover:bg-[var(--gw-hover)];
   }
 
   .gw-chip-round-active {
-    @apply rounded-full border border-[var(--gw-btn-primary-bg)] bg-[var(--gw-btn-primary-bg)] px-3 py-1 text-xs font-medium text-white;
+    font-weight: var(--gw-text-weight-semibold);
+    @apply rounded-full border border-[var(--gw-btn-primary-bg)] bg-[var(--gw-btn-primary-bg)] px-3 py-1 text-[var(--gw-text-white)];
+  }
+
+  /* 图 2：侧栏 / 顶栏菜单项 */
+  .gw-nav-link {
+    font-family: var(--gw-font-stack-sans);
+    font-size: var(--gw-body-font-size);
+    font-weight: var(--gw-text-weight-normal);
+    color: var(--gw-text-white);
+    line-height: 1.5;
+  }
+
+  .gw-nav-link:hover {
+    color: var(--gw-text-white);
+  }
+
+  .gw-nav-link-active {
+    font-weight: var(--gw-text-weight-semibold);
+    color: var(--gw-text-white);
   }
 
   .gw-accent-control {
@@ -100,19 +143,37 @@ body {
   }
 
   .gw-table {
-    @apply w-full text-left text-sm;
+    @apply w-full text-left;
+    font-family: var(--gw-font-stack-sans);
+    font-size: var(--gw-body-font-size);
   }
 
   .gw-table th {
-    @apply border-b border-[var(--gw-border)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--gw-muted)];
+    font-family: var(--gw-font-stack-sans);
+    font-size: var(--gw-body-font-size);
+    font-weight: var(--gw-text-weight-normal);
+    color: var(--gw-text-white);
+    @apply border-b border-[var(--gw-border)] px-3 py-2;
   }
 
   .gw-table td {
     @apply border-b border-[var(--gw-border)] px-3 py-2 align-top;
   }
 
+  /* 图 2：非 gw-table 组件内的表头行 */
+  .gw-th-row th {
+    font-family: var(--gw-font-stack-sans);
+    font-size: var(--gw-body-font-size);
+    font-weight: var(--gw-text-weight-normal);
+    color: var(--gw-text-white);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
   .gw-logs-table {
-    @apply w-full text-left text-sm;
+    @apply w-full text-left;
+    font-family: var(--gw-font-stack-sans);
+    font-size: var(--gw-body-font-size);
   }
 
   .gw-logs-table-scroll {
@@ -120,7 +181,11 @@ body {
   }
 
   .gw-logs-table th {
-    @apply border-b border-[var(--gw-border)] bg-[var(--gw-surface)] px-4 py-3 text-xs font-semibold text-[var(--gw-muted)];
+    font-family: var(--gw-font-stack-sans);
+    font-size: var(--gw-body-font-size);
+    font-weight: var(--gw-text-weight-normal);
+    color: var(--gw-text-white);
+    @apply border-b border-[var(--gw-border)] bg-[var(--gw-surface)] px-4 py-3;
     position: sticky;
     top: 0;
     z-index: 20;

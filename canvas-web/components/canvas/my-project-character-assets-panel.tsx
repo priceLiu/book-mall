@@ -4,9 +4,16 @@ import { X } from "lucide-react";
 
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
+  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
+  canvasToolbarSidePanelAsideClass,
+} from "@/lib/canvas/canvas-toolbar-side-panel";
+import {
   ProjectAssetsPanelIcon,
 } from "./unified-project-assets-view";
-import { UnifiedProjectAssetsView } from "./unified-project-assets-view";
+import {
+  UnifiedProjectAssetsView,
+  type UnifiedProjectAssetTab,
+} from "./unified-project-assets-view";
 
 export function MyProjectCharacterAssetsPanel({
   open,
@@ -16,7 +23,7 @@ export function MyProjectCharacterAssetsPanel({
 }: {
   open: boolean;
   onClose: () => void;
-  initialTab?: "all" | "CHARACTER" | "STYLE";
+  initialTab?: UnifiedProjectAssetTab;
   onInsertToCanvas?: (assetId: string) => void;
 }) {
   const projectId = useCanvasStore((s) => s.projectId);
@@ -25,12 +32,14 @@ export function MyProjectCharacterAssetsPanel({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex justify-end bg-black/45"
+      className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[60]`}
       onClick={onClose}
       role="presentation"
     >
       <aside
-        className="flex h-full w-full max-w-md flex-col border-l border-cyan-400/15 bg-[var(--canvas-surface)] text-white shadow-2xl"
+        className={canvasToolbarSidePanelAsideClass(
+          "border-l border-cyan-400/15",
+        )}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="项目资产"

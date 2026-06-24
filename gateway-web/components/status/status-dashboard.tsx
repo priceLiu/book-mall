@@ -1225,10 +1225,10 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
                 setHasMoreLogs(true);
                 if (tab.id !== "failed") setFailedFailCodeTab("all");
               }}
-              className={`px-4 py-3 text-sm disabled:cursor-wait disabled:opacity-60 ${
+              className={`gw-nav-link px-4 py-3 disabled:cursor-wait disabled:opacity-60 ${
                 activeTab === tab.id
-                  ? "border-b-2 border-[var(--gw-btn-primary-bg)] font-medium text-white"
-                  : "text-[var(--gw-muted)] hover:text-[var(--gw-ink)]"
+                  ? "gw-nav-link-active border-b-2 border-[var(--gw-btn-primary-bg)]"
+                  : "hover:bg-[var(--gw-hover)]"
               }`}
             >
               {tab.label}
@@ -1303,7 +1303,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             }`}
           >
             <thead>
-              <tr className="border-b border-[var(--gw-border)] text-xs uppercase text-[var(--gw-muted)]">
+              <tr className="gw-th-row border-b border-[var(--gw-border)]">
                 <th className="w-12 px-4 py-3 text-right font-medium">#</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 {showFailColumns ? (

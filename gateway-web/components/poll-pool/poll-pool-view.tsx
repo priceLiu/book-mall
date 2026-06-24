@@ -151,7 +151,7 @@ function GatewayQueueTable({
     <div className="overflow-x-auto">
       <table className="min-w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-[var(--gw-border)] text-xs uppercase text-[var(--gw-muted)]">
+          <tr className="gw-th-row border-b border-[var(--gw-border)]">
             <th className="px-4 py-3">来源</th>
             <th className="px-4 py-3">模型</th>
             <th className="px-4 py-3">类型</th>
@@ -270,7 +270,7 @@ function AppQueueTable({
     <div className="overflow-x-auto">
       <table className="min-w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-[var(--gw-border)] text-xs uppercase text-[var(--gw-muted)]">
+          <tr className="gw-th-row border-b border-[var(--gw-border)]">
             <th className="px-4 py-3">状态</th>
             <th className="px-4 py-3">项目</th>
             <th className="px-4 py-3">类型</th>
@@ -627,9 +627,7 @@ export function PollPoolView() {
 
           <section className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)]">
             <div className="border-b border-[var(--gw-border)] px-4 py-3">
-              <h2 className="text-sm font-medium text-[var(--gw-ink)]">
-                Gateway 轮询队列
-              </h2>
+              <h2>Gateway 轮询队列</h2>
               <p className="mt-1 text-xs text-[var(--gw-muted)]">
                 与 runGatewayPollWorker 相同口径 · 慢任务优先 · 本页展示前{" "}
                 {filterRows(data.gateway.queue).length} 条
@@ -644,7 +642,7 @@ export function PollPoolView() {
 
           <section className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)]">
             <div className="border-b border-[var(--gw-border)] px-4 py-3">
-              <h2 className="text-sm font-medium text-[var(--gw-ink)]">Canvas poll 池</h2>
+              <h2>Canvas poll 池</h2>
             </div>
             <AppQueueTable
               rows={filterRows(data.canvas.queue)}
@@ -656,7 +654,7 @@ export function PollPoolView() {
 
           <section className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)]">
             <div className="border-b border-[var(--gw-border)] px-4 py-3">
-              <h2 className="text-sm font-medium text-[var(--gw-ink)]">Story poll 池</h2>
+              <h2>Story poll 池</h2>
             </div>
             <AppQueueTable rows={filterRows(data.story.queue)} title="Story" />
           </section>

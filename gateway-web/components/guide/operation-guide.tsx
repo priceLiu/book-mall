@@ -68,7 +68,7 @@ export function OperationGuideContent() {
       </header>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-[var(--gw-ink)]">一、整体关系（先看懂这个）</h2>
+        <h2>一、整体关系（先看懂这个）</h2>
         <pre className="overflow-x-auto rounded-lg border border-[var(--gw-border)] bg-black/30 p-4 text-xs leading-relaxed text-[var(--gw-ink)]">
 {`┌─ 你 ─────────────────────────────────────────────┐
 │  1. 去 KIE / DeepSeek / 百炼 / DashScope / 混元 注册 │
@@ -98,7 +98,7 @@ export function OperationGuideContent() {
       </section>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-[var(--gw-ink)]">二、五步操作（按顺序做）</h2>
+        <h2>二、五步操作（按顺序做）</h2>
         <ol className="space-y-5">
           {[
             {
@@ -192,7 +192,7 @@ export function OperationGuideContent() {
       </section>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-[var(--gw-ink)]">三、厂商凭证与可用能力</h2>
+        <h2>三、厂商凭证与可用能力</h2>
         <p className="text-sm text-[var(--gw-muted)]">
           下表为常见对应关系；具体 modelKey 以「接入模型」页为准。
         </p>
@@ -241,7 +241,7 @@ export function OperationGuideContent() {
       </section>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-[var(--gw-ink)]">四、入口速查</h2>
+        <h2>四、入口速查</h2>
         <div className="overflow-x-auto rounded-lg border border-[var(--gw-border)]">
           <table className="gw-table min-w-[560px]">
             <thead>
@@ -309,7 +309,7 @@ export function OperationGuideContent() {
       </section>
 
       <section className="gw-card space-y-4">
-        <h2 className="text-lg font-medium text-[var(--gw-ink)]">五、常见问题</h2>
+        <h2>五、常见问题</h2>
         <dl className="space-y-4 text-sm text-[var(--gw-muted)]">
           <div>
             <dt className="font-medium text-[var(--gw-ink)]/90">

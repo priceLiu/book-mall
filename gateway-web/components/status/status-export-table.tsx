@@ -217,7 +217,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
     <div className="rounded-lg border border-[var(--gw-border)] bg-[var(--gw-surface)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--gw-border)] px-4 py-3">
         <div>
-          <h2 className="text-sm font-medium text-[var(--gw-ink)]">明细表格</h2>
+          <h2>明细表格</h2>
           <p className="mt-0.5 text-xs text-[var(--gw-muted)]">
             与当前筛选一致 · 首屏加载后滚动追加（skipCount）
           </p>
@@ -266,7 +266,7 @@ export function StatusExportTable({ queryString }: { queryString: string }) {
           }`}
         >
           <thead>
-            <tr className="border-b border-[var(--gw-border)] text-xs uppercase text-[var(--gw-muted)]">
+            <tr className="gw-th-row border-b border-[var(--gw-border)]">
               <th className="w-12 px-3 py-2 text-right font-medium">#</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">失败码</th>

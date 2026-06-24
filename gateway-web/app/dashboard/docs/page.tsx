@@ -43,7 +43,7 @@ export default function DashboardDocsPage() {
       </div>
 
       <section className="gw-card space-y-3">
-        <h2 className="text-sm font-medium text-[var(--gw-ink)]">Chat Completions</h2>
+        <h2>Chat Completions</h2>
         <p className="text-sm text-[var(--gw-muted)]">
           OpenAI 兼容对话接口，需在控制台创建 API 密钥并配置对应厂商凭证。
         </p>
@@ -53,7 +53,7 @@ export default function DashboardDocsPage() {
       </section>
 
       <section className="gw-card space-y-3">
-        <h2 className="text-sm font-medium text-[var(--gw-ink)]">Jobs · createTask</h2>
+        <h2>Jobs · createTask</h2>
         <p className="text-sm text-[var(--gw-muted)]">
           异步任务创建（视频/图片等），返回 taskId 后轮询 recordInfo。
         </p>
@@ -63,7 +63,7 @@ export default function DashboardDocsPage() {
       </section>
 
       <section className="gw-card space-y-3">
-        <h2 className="text-sm font-medium text-[var(--gw-ink)]">Jobs · recordInfo</h2>
+        <h2>Jobs · recordInfo</h2>
         <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-[var(--gw-ink)]/90">
           {recordInfoCurl}
         </pre>

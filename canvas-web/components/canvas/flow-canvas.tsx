@@ -337,7 +337,10 @@ function FlowCanvasInner({
     initialFitDoneRef.current = false;
     setCanvasViewportMoving(false);
     const s = useCanvasStore.getState();
-    setRfNodes(ensureNodeDragHandles(s.nodes));
+    setRfNodes(
+      ensureNodeDragHandles(s.nodes).map((n) => ({ ...n, selected: false })),
+    );
+    s.setLibtvFloatingDockSelection(null, null);
     setRfEdges(s.edges);
   }, [projectId, setRfNodes, setRfEdges, setCanvasViewportMoving]);
 
@@ -485,14 +488,15 @@ function FlowCanvasInner({
         return;
       }
       if (libtvCanvas) {
-        deferStoreGraphSyncRef.current = false;
         setCanvasGeometryDragging(false);
         setCanvasDraggingNodeId(null);
-        // 坐标松手由 onNodeDragStop → commitFlowPositionsFromRf 落库；勿把 select 写入 store
+        // 坐标松手写入 store（不 normalize）；与 onNodeDragStop 双保险
         if (isCanvasPositionCommitOnly(changes)) {
+          storeOnNodesChange(changes);
           syncLibtvFloatingDockPinFromRf();
           return;
         }
+        deferStoreGraphSyncRef.current = false;
         const geometryChanges = rfChanges.filter((c) => c.type !== "select");
         if (geometryChanges.length > 0) {
           storeOnNodesChange(geometryChanges);
@@ -741,12 +745,12 @@ function FlowCanvasInner({
       setCanvasGeometryDragging(false);
       setCanvasDraggingNodeId(null);
       setSnapGuides([]);
-      deferStoreGraphSyncRef.current = false;
       if (dragUndoPausedRef.current) {
         useCanvasStore.temporal.getState().resume();
         dragUndoPausedRef.current = false;
       }
       if (node.type === "group") {
+        deferStoreGraphSyncRef.current = false;
         setDragHoverGroup(null);
         return;
       }
@@ -787,6 +791,7 @@ function FlowCanvasInner({
           node.type,
         );
       }
+      deferStoreGraphSyncRef.current = false;
       if (didCommitPositions || willReparent) {
         flushAutosaveAfterDrag();
       }

@@ -1,0 +1,262 @@
+{
+  "generatedAt": "2026-05-22T08:23:57.446Z",
+  "baseUrl": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com",
+  "prefix": "story-web/landing/video",
+  "videos": [
+    {
+      "id": "demo-1",
+      "file": "demo-1.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-1.mp4"
+    },
+    {
+      "id": "demo-2",
+      "file": "demo-2.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-2.mp4"
+    },
+    {
+      "id": "demo-3",
+      "file": "demo-3.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-3.mp4"
+    },
+    {
+      "id": "demo-4",
+      "file": "demo-4.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-4.mp4"
+    },
+    {
+      "id": "demo-5",
+      "file": "demo-5.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-5.mp4"
+    },
+    {
+      "id": "demo-6",
+      "file": "demo-6.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-6.mp4"
+    },
+    {
+      "id": "demo-7",
+      "file": "demo-7.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-7.mp4"
+    },
+    {
+      "id": "demo-8",
+      "file": "demo-8.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-8.mp4"
+    },
+    {
+      "id": "demo-9",
+      "file": "demo-9.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-9.mp4"
+    },
+    {
+      "id": "demo-10",
+      "file": "demo-10.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-10.mp4"
+    },
+    {
+      "id": "demo-11",
+      "file": "demo-11.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-11.mp4"
+    },
+    {
+      "id": "demo-12",
+      "file": "demo-12.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-12.mp4"
+    },
+    {
+      "id": "demo-13",
+      "file": "demo-13.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-13.mp4"
+    },
+    {
+      "id": "demo-14",
+      "file": "demo-14.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-14.mp4"
+    },
+    {
+      "id": "demo-15",
+      "file": "demo-15.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-15.mp4"
+    },
+    {
+      "id": "demo-16",
+      "file": "demo-16.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-16.mp4"
+    },
+    {
+      "id": "demo-17",
+      "file": "demo-17.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-17.mp4"
+    },
+    {
+      "id": "demo-18",
+      "file": "demo-18.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-18.mp4"
+    },
+    {
+      "id": "demo-19",
+      "file": "demo-19.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-19.mp4"
+    },
+    {
+      "id": "demo-20",
+      "file": "demo-20.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-20.mp4"
+    },
+    {
+      "id": "demo-21",
+      "file": "demo-21.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-21.mp4"
+    },
+    {
+      "id": "demo-22",
+      "file": "demo-22.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-22.mp4"
+    },
+    {
+      "id": "demo-23",
+      "file": "demo-23.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-23.mp4"
+    },
+    {
+      "id": "demo-24",
+      "file": "demo-24.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-24.mp4"
+    },
+    {
+      "id": "demo-25",
+      "file": "demo-25.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-25.mp4"
+    },
+    {
+      "id": "demo-26",
+      "file": "demo-26.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-26.mp4"
+    },
+    {
+      "id": "demo-27",
+      "file": "demo-27.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-27.mp4"
+    },
+    {
+      "id": "demo-28",
+      "file": "demo-28.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-28.mp4"
+    },
+    {
+      "id": "demo-29",
+      "file": "demo-29.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-29.mp4"
+    },
+    {
+      "id": "demo-30",
+      "file": "demo-30.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-30.mp4"
+    },
+    {
+      "id": "demo-31",
+      "file": "demo-31.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-31.mp4"
+    },
+    {
+      "id": "demo-32",
+      "file": "demo-32.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-32.mp4"
+    },
+    {
+      "id": "demo-33",
+      "file": "demo-33.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-33.mp4"
+    },
+    {
+      "id": "demo-34",
+      "file": "demo-34.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-34.mp4"
+    },
+    {
+      "id": "demo-35",
+      "file": "demo-35.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-35.mp4"
+    },
+    {
+      "id": "demo-36",
+      "file": "demo-36.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-36.mp4"
+    },
+    {
+      "id": "demo-37",
+      "file": "demo-37.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-37.mp4"
+    },
+    {
+      "id": "demo-38",
+      "file": "demo-38.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-38.mp4"
+    },
+    {
+      "id": "demo-39",
+      "file": "demo-39.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-39.mp4"
+    },
+    {
+      "id": "demo-40",
+      "file": "demo-40.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-40.mp4"
+    },
+    {
+      "id": "demo-41",
+      "file": "demo-41.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-41.mp4"
+    },
+    {
+      "id": "demo-42",
+      "file": "demo-42.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-42.mp4"
+    },
+    {
+      "id": "demo-43",
+      "file": "demo-43.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-43.mp4"
+    },
+    {
+      "id": "demo-44",
+      "file": "demo-44.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-44.mp4"
+    },
+    {
+      "id": "demo-45",
+      "file": "demo-45.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-45.mp4"
+    },
+    {
+      "id": "demo-46",
+      "file": "demo-46.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-46.mp4"
+    },
+    {
+      "id": "demo-47",
+      "file": "demo-47.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-47.mp4"
+    },
+    {
+      "id": "demo-48",
+      "file": "demo-48.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-48.mp4"
+    },
+    {
+      "id": "demo-49",
+      "file": "demo-49.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-49.mp4"
+    },
+    {
+      "id": "demo-50",
+      "file": "demo-50.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-50.mp4"
+    },
+    {
+      "id": "demo-51",
+      "file": "demo-51.mp4",
+      "url": "https://tool-mall.oss-cn-guangzhou.aliyuncs.com/story-web/landing/video/demo-51.mp4"
+    }
+  ]
+}

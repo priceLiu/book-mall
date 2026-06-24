@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-
+import { AppOpenTransitionShell } from "@/components/app-open/app-open-transition-shell";
 import { QuickReplicaOpenLoader } from "@/components/app-open/quick-replica-open-loader";
 
 export function QuickReplicaOpenClient({
@@ -9,18 +8,13 @@ export function QuickReplicaOpenClient({
 }: {
   reEnterPath: string;
 }) {
-  useEffect(() => {
-    window.location.replace(reEnterPath);
-  }, [reEnterPath]);
-
   return (
-    <div
-      className="relative flex min-h-[100dvh] flex-col items-center justify-center gap-6 overflow-hidden bg-background px-4"
-      role="status"
-      aria-live="polite"
-    >
-      <QuickReplicaOpenLoader />
-      <p className="text-sm text-muted-foreground">正在通过 Book SSO 打开快速复制…</p>
-    </div>
+    <AppOpenTransitionShell
+      targetUrl={reEnterPath}
+      loader={<QuickReplicaOpenLoader />}
+      title="正在打开快速复制"
+      subtitle="正在通过 Book SSO 完成登录，请稍候…"
+      gradientClassName="bg-[radial-gradient(ellipse_80%_60%_at_50%_40%,rgba(236,72,153,0.12),transparent_70%)]"
+    />
   );
 }

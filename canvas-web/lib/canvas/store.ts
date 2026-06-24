@@ -42,6 +42,7 @@ import {
   normalizeCanvasNodes,
   reflowStoryTemplateGroups as reflowStoryTemplateGroupsOnNodes,
   sortNodesForReactFlow,
+  stripPersistedNodeSelection,
 } from "./normalize-graph-nodes";
 import { reflowStoryComicFlat } from "./story-comic-layout";
 import { reflowStoryComicColumns } from "./story-comic-columns-layout";
@@ -403,11 +404,11 @@ export const useCanvasStore = create<CanvasState>()(
         );
         edges = migrated.edges;
         let normalized = normalizeCanvasNodes(migrated.nodes, edges);
-        let nodes = normalized.some((n) =>
-          String(n.type ?? "").startsWith("story-pro2-"),
-        )
-          ? reconcileStoryPro2Workspace(normalized)
-          : reconcileStoryProWorkspace(normalized);
+        let nodes = stripPersistedNodeSelection(
+          normalized.some((n) => String(n.type ?? "").startsWith("story-pro2-"))
+            ? reconcileStoryPro2Workspace(normalized)
+            : reconcileStoryProWorkspace(normalized),
+        );
         const viewport = g.viewport ?? { x: 0, y: 0, zoom: 1 };
 
         const applyDeferredLayout = () => {
@@ -461,7 +462,7 @@ export const useCanvasStore = create<CanvasState>()(
         const s = get();
         return {
           schemaVersion: CANVAS_SCHEMA_VERSION,
-          nodes: s.nodes,
+          nodes: stripPersistedNodeSelection(s.nodes),
           edges: s.edges,
           viewport: s.viewport,
         };

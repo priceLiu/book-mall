@@ -230,6 +230,7 @@ export function LibtvImageInputDock() {
 
   const onRunFreestanding = useCallback(async () => {
     if (!storeNode || !isLibtvFreestandingImageNode(storeNode)) return;
+    if (isRunning) return;
     optimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
     const revertPending = () =>
       revertOptimisticLibtvMediaRunStart(storeNode.id, updateNodeData, setNodeRuntime);
@@ -290,6 +291,7 @@ export function LibtvImageInputDock() {
     settingsData.dockStyleRef,
     base,
     alert,
+    isRunning,
   ]);
 
   const onRun = isPipelineCell ? onRunPipeline : () => void onRunFreestanding();

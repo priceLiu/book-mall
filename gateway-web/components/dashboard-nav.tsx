@@ -50,14 +50,14 @@ export function DashboardNav({
             onClick={() => onNavigate?.()}
             aria-current={active ? "page" : undefined}
             title={collapsed ? item.label : undefined}
-            className={`rounded-md text-sm transition ${
+            className={`gw-nav-link rounded-md transition ${
               collapsed
-                ? "relative flex items-center justify-center px-2 py-2.5 text-xs font-medium"
+                ? "relative flex items-center justify-center px-2 py-2.5"
                 : "flex items-center justify-between px-3 py-2"
             } ${
               active
-                ? "bg-[var(--gw-hover)] font-semibold text-[var(--gw-ink)]"
-                : "text-[var(--gw-muted)] hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)]"
+                ? "gw-nav-link-active bg-[var(--gw-hover)]"
+                : "hover:bg-[var(--gw-hover)]"
             }`}
           >
             <span>{collapsed ? navShortLabel(item.label) : item.label}</span>

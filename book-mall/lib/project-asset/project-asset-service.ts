@@ -188,17 +188,53 @@ function buildProjectAssetWhere(
 export async function listProjectAssets(
   userId: string,
   filter: ListProjectAssetsFilter = {},
-): Promise<ProjectAssetRecord[]> {
+  paging?: { limit?: number; cursor?: string | null },
+): Promise<{
+  assets: ProjectAssetRecord[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}> {
+  const limit = Math.min(Math.max(paging?.limit ?? 24, 1), 100);
+  const cursorRaw = paging?.cursor?.trim() || null;
   const ctx = await resolveProjectAssetTenantContext(userId);
-  const rows = await prisma.projectAsset.findMany({
-    where: buildProjectAssetWhere(ctx, filter),
-    include: { refs: { orderBy: { sortOrder: "asc" } } },
-    orderBy: { updatedAt: "desc" },
-    take: 300,
-  });
-  const unified = rows.map(toRecord);
+  const baseWhere = buildProjectAssetWhere(ctx, filter);
 
-  if (filter.includeLegacy !== false) {
+  let cursorWhere: Prisma.ProjectAssetWhereInput | undefined;
+  if (cursorRaw) {
+    try {
+      const j = JSON.parse(
+        Buffer.from(cursorRaw, "base64url").toString("utf8"),
+      ) as { updatedAt?: string; id?: string };
+      const updatedAt = j.updatedAt ? new Date(j.updatedAt) : null;
+      const id = typeof j.id === "string" ? j.id.trim() : "";
+      if (updatedAt && !Number.isNaN(updatedAt.getTime()) && id) {
+        cursorWhere = {
+          OR: [
+            { updatedAt: { lt: updatedAt } },
+            { updatedAt, id: { lt: id } },
+          ],
+        };
+      }
+    } catch {
+      /* ignore bad cursor */
+    }
+  }
+
+  const where: Prisma.ProjectAssetWhereInput = cursorWhere
+    ? { AND: [baseWhere, cursorWhere] }
+    : baseWhere;
+
+  const rows = await prisma.projectAsset.findMany({
+    where,
+    include: { refs: { orderBy: { sortOrder: "asc" } } },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+  });
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const unified = pageRows.map(toRecord);
+
+  if (filter.includeLegacy !== false && !cursorRaw) {
     const legacyOpts: LegacyListOpts = {
       userId,
       projectId: filter.projectId ?? null,
@@ -222,7 +258,19 @@ export async function listProjectAssets(
     );
   }
 
-  return unified.slice(0, 300);
+  const assets = unified.slice(0, limit);
+  const last = pageRows[pageRows.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? Buffer.from(
+          JSON.stringify({
+            updatedAt: last.updatedAt.toISOString(),
+            id: last.id,
+          }),
+        ).toString("base64url")
+      : null;
+
+  return { assets, hasMore, nextCursor };
 }
 
 export async function getProjectAsset(
