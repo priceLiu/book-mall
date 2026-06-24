@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { Marquee } from "@devnomic/marquee";
 import "@devnomic/marquee/dist/index.css";
@@ -22,6 +22,11 @@ function ShowcaseCoverMedia({
   coverAspect: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const onHoverStart = useCallback(() => {
     const video = videoRef.current;
@@ -53,16 +58,18 @@ function ShowcaseCoverMedia({
       />
       {videoUrl ? (
         <>
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            poster={imageUrl}
-            muted
-            playsInline
-            loop
-            preload="metadata"
-            className="absolute inset-0 size-full object-cover opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-          />
+          {mounted ? (
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              poster={imageUrl}
+              muted
+              playsInline
+              loop
+              preload="metadata"
+              className="absolute inset-0 size-full object-cover opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+            />
+          ) : null}
           <span
             className="pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-200 group-hover:opacity-0"
             aria-hidden
