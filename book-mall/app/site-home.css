@@ -144,7 +144,7 @@
 
 [data-site-home] .site-home-hero-copy-panel {
   width: 100%;
-  max-width: min(52rem, 100%);
+  max-width: 100%;
   padding: 0;
   border: none;
   background: transparent;
@@ -163,17 +163,19 @@
 [data-site-home] .site-home-hero-title {
   margin: 0 0 1rem;
   font-family: var(--font-cereal);
-  font-size: clamp(1.625rem, 2.2vw + 0.75rem, 2.75rem);
+  font-size: clamp(1.5rem, 1.65vw + 0.65rem, 2.75rem);
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.025em;
   color: #1f2328;
   text-shadow: 0 1px 16px rgba(255, 255, 255, 0.85);
+  max-width: 100%;
+  text-wrap: pretty;
 }
 
 @media (min-width: 1024px) {
   [data-site-home] .site-home-hero-title {
-    white-space: nowrap;
+    max-width: 100%;
   }
 }
 
@@ -186,13 +188,14 @@
 
 [data-site-home] .site-home-hero-subtitle {
   margin: 0;
-  max-width: 36rem;
+  max-width: 100%;
   font-family: var(--font-cereal);
   font-size: 1.25rem;
   font-weight: 400;
   line-height: 1.5;
   color: #424a53;
   text-shadow: 0 1px 12px rgba(255, 255, 255, 0.75);
+  text-wrap: pretty;
 }
 
 @media (min-width: 1280px) {
