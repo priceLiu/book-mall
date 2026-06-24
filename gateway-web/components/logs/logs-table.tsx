@@ -1161,11 +1161,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     }
     const visiblePending = pendingRows
       .filter((p) => !realTaskIds.has(p.canvasTaskId))
-      .sort(
-        (a, b) =>
-          new Date(a.canvasStartedAt).getTime() -
-          new Date(b.canvasStartedAt).getTime(),
-      );
+      .sort((a, b) => {
+        const aMs = Date.parse(a.canvasStartedAt ?? "");
+        const bMs = Date.parse(b.canvasStartedAt ?? "");
+        return (
+          (Number.isFinite(aMs) ? aMs : 0) - (Number.isFinite(bMs) ? bMs : 0)
+        );
+      });
     if (visiblePending.length === 0) return logs;
     return [...visiblePending, ...logs];
   }, [logs, pendingRows, showPendingRows]);
@@ -1530,6 +1532,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     listFilterParams,
     dateRangeInvalid,
     filtersAreDefault,
+    initialData.logs.length,
     viewMode,
     loadLogsPaged,
     resetListScroll,
