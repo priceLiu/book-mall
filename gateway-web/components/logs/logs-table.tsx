@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { LogImagesCell } from "./log-images-cell";
 import { LogParamsCell } from "./log-params-cell";
 import { LogResultCell } from "./log-result-cell";
@@ -551,6 +551,325 @@ function clearSelectionOnFilter(setSelected: (s: Set<string>) => void) {
   setSelected(new Set());
 }
 
+const LogsTableRow = memo(function LogsTableRow({
+  log: l,
+  isSelected,
+  liveTick,
+  onToggleSelect,
+}: {
+  log: GatewayLogRow;
+  isSelected: boolean;
+  /** 仅进行中行传入墙钟 tick；已完成行不传，避免每秒整表重渲染 */
+  liveTick?: number | null;
+  onToggleSelect: (id: string) => void;
+}) {
+  const isInProgress = isLogInProgress(l.status);
+  const live = resolveLiveLogPhaseTiming({
+    submittedAt: l.submittedAt,
+    completedAt: l.completedAt,
+    status: l.status,
+    resultSummary: l.resultSummary,
+    nowMs: liveTick ?? null,
+    server: {
+      queueMs: l.queueMs,
+      generateMs: l.generateMs,
+      vendorPostProcessMs: l.vendorPostProcessMs,
+      pollDelayMs: l.pollDelayMs,
+    },
+  });
+  const queueMs = live.queueMs;
+  const generateMs = live.generateMs;
+  const vendorPostProcessMs = live.vendorPostProcessMs;
+  const pollDelayMs = live.pollDelayMs;
+  const durationMs = resolveLogDisplayDurationMs({
+    durationMs: l.durationMs,
+    submittedAt: l.submittedAt,
+    completedAt: l.completedAt,
+    isInProgress,
+    nowMs: liveTick ?? null,
+    queueMs,
+    generateMs,
+    vendorPostProcessMs,
+    pollDelayMs,
+    liveTotalMs: live.totalMs,
+  });
+  const vendorNative = resolveVendorNativeTimingLive({
+    providerKind: l.providerKind,
+    requestKind: l.requestKind,
+    vendorDurationMs: l.vendorDurationMs,
+    resultSummary: l.resultSummary,
+    nowMs: liveTick ?? Date.now(),
+    server: {
+      vendorNativeDurationMs: l.vendorNativeDurationMs,
+      vendorNativeGenerateMs: l.vendorNativeGenerateMs,
+    },
+  });
+  const duration = formatDurationSeconds(durationMs);
+  const vendorNativeDuration = formatDurationSeconds(
+    vendorNative.vendorNativeDurationMs,
+  );
+  const vendorNativeGenerate = formatDurationSeconds(
+    vendorNative.vendorNativeGenerateMs,
+  );
+  const usage = formatUsageYuanDisplay(l.estimatedVendorCostYuan);
+  const platformCredits = formatPlatformCreditsDisplay(l.creditsCharged);
+  const tokens = formatTokenDisplay(
+    l.totalTokens,
+    l.promptTokens,
+    l.completionTokens,
+    l.metricsSource,
+  );
+  const logId = formatLogMonospaceId(l.id);
+  const requestId = formatLogMonospaceId(l.vendorRequestId);
+  const vendorTaskId = formatLogMonospaceId(l.externalTaskId);
+  const appTask = formatLogAppTaskCell(l);
+  const queueCell = formatLogTimingPhaseCell(queueMs, "queue");
+  const generateCell = formatLogTimingPhaseCell(generateMs, "generate");
+  const postProcCell = formatLogTimingPhaseCell(
+    vendorPostProcessMs,
+    "postproc",
+  );
+  const pollCell = formatLogTimingPhaseCell(pollDelayMs, "poll", {
+    overLimit:
+      !isInProgress &&
+      pollDelayMs != null &&
+      pollDelayMs > 10_000,
+  });
+  const rawProgressLabel = isInProgress
+    ? pickLogProgressLabel(l.status, l.resultSummary)
+    : null;
+  const statusShort = l.status.trim().toLowerCase();
+  const progressLabel =
+    rawProgressLabel &&
+    rawProgressLabel.trim().toLowerCase() !== statusShort
+      ? rawProgressLabel
+      : null;
+  const sourceLabel = formatLogPageLabel(l.clientSource, l.clientPage);
+  const sourceTitle = formatLogSourceTooltip(
+    l.clientSource,
+    l.providerKind,
+    l.clientPage,
+  );
+
+  return (
+    <tr className="gw-logs-row">
+      <td className="align-middle">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(l.id)}
+          className="gw-accent-control h-3.5 w-3.5 rounded border-white/20 bg-transparent"
+          aria-label={`选择 ${l.id}`}
+        />
+      </td>
+      <td className="align-middle tabular-nums text-sm text-[var(--gw-ink)]">
+        {l.actorPhone?.trim() || "—"}
+      </td>
+      <td className="align-middle text-sm text-[var(--gw-ink)]">
+        {l.actorName?.trim() || "—"}
+      </td>
+      <td className="align-middle">
+        <span className="text-sm text-[var(--gw-ink)]" title={sourceTitle}>
+          {sourceLabel}
+        </span>
+      </td>
+      <td className="align-top">
+        <span
+          className="gw-btn-xs font-mono"
+          title={displayLogModelKey(l) !== l.model ? l.model : undefined}
+        >
+          {displayLogModelKey(l)}
+        </span>
+      </td>
+      <td className="align-middle">
+        <span
+          className="font-mono text-[11px] text-[var(--gw-muted)]"
+          title={l.credentialKeyMasked ?? undefined}
+        >
+          {formatLogCredentialKeyMasked(l.credentialKeyMasked)}
+        </span>
+      </td>
+      <td className="align-top">
+        <LogParamsCell inputSummary={l.inputSummary} />
+      </td>
+      <td className="align-top">
+        <LogImagesCell inputSummary={l.inputSummary} />
+      </td>
+      <td className="align-middle">
+        <LogStatusBadge
+          status={l.status}
+          failCode={l.failCode}
+          failMessage={l.failMessage}
+          progressLabel={progressLabel}
+        />
+      </td>
+      <td
+        className="align-middle text-center text-xs text-[var(--gw-muted)]"
+        title="汇总见表头；单行日志与画布排队无直接对应"
+      >
+        —
+      </td>
+      <td
+        className="align-middle font-mono text-sm text-[var(--gw-ink)]"
+        title={
+          durationMs != null && durationMs > 0
+            ? `${durationMs} ms`
+            : isInProgress
+              ? progressLabel
+                ? `任务进行中 · ${progressLabel}`
+                : "任务进行中"
+              : durationMs != null
+                ? `${durationMs} ms（由完成时间推算）`
+                : undefined
+        }
+      >
+        {duration}
+      </td>
+      <td
+        className="align-middle font-mono text-sm text-[var(--gw-muted)]"
+        title={
+          vendorNative.vendorNativeDurationMs != null
+            ? `厂商原生 ${vendorNative.vendorNativeDurationMs} ms（只读，不回写）`
+            : "厂商未回传可对比总耗时"
+        }
+      >
+        {vendorNativeDuration}
+      </td>
+      <td className="align-middle">
+        <span
+          className="font-mono text-sm text-[var(--gw-ink)]"
+          title={queueCell.title}
+        >
+          {queueCell.value}
+        </span>
+      </td>
+      <td className="align-middle">
+        <span
+          className="font-mono text-sm text-[var(--gw-ink)]"
+          title={generateCell.title}
+        >
+          {generateCell.value}
+        </span>
+      </td>
+      <td className="align-middle">
+        <span
+          className="font-mono text-sm text-[var(--gw-muted)]"
+          title={
+            vendorNative.vendorNativeGenerateMs != null
+              ? `厂商原生 ${vendorNative.vendorNativeGenerateMs} ms（只读，不回写）`
+              : "厂商未回传可对比生成耗时"
+          }
+        >
+          {vendorNativeGenerate}
+        </span>
+      </td>
+      <td className="align-middle">
+        <span
+          className="font-mono text-sm text-[var(--gw-ink)]"
+          title={postProcCell.title}
+        >
+          {postProcCell.value}
+        </span>
+      </td>
+      <td className="align-middle">
+        <span
+          className={`font-mono text-sm ${
+            pollCell.warn ? "text-amber-400" : "text-[var(--gw-ink)]"
+          }`}
+          title={pollCell.title}
+        >
+          {pollCell.value}
+        </span>
+      </td>
+      <td className="align-middle">
+        <span
+          className="block whitespace-nowrap font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
+          title={l.submittedAt}
+        >
+          {formatLogTimestamp(l.submittedAt)}
+        </span>
+      </td>
+      <td className="align-middle">
+        {l.completedAt ? (
+          <span
+            className="block whitespace-nowrap font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
+            title={l.completedAt}
+          >
+            {formatLogTimestamp(l.completedAt)}
+          </span>
+        ) : (
+          <span
+            className="text-sm text-[var(--gw-muted)]"
+            title={isInProgress ? "任务进行中" : undefined}
+          >
+            —
+          </span>
+        )}
+      </td>
+      <td className="align-middle">
+        <span
+          className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
+          title={appTask.title}
+        >
+          {appTask.value}
+        </span>
+      </td>
+      <td
+        className="align-middle font-mono text-sm text-[var(--gw-ink)]"
+        title={isInProgress ? "任务进行中，完成后写入费用估算" : usage.title}
+      >
+        {isInProgress ? "—" : usage.value}
+      </td>
+      <td
+        className="align-middle font-mono text-sm text-emerald-300/90"
+        title={
+          isInProgress
+            ? "任务进行中，完成后写入扣减积分"
+            : platformCredits.title
+        }
+      >
+        {isInProgress ? "—" : platformCredits.value}
+      </td>
+      <td
+        className="align-middle font-mono text-sm text-[var(--gw-ink)]"
+        title={
+          isInProgress ? "任务进行中，完成后写入 Token" : tokens.title
+        }
+      >
+        {isInProgress ? "—" : tokens.value}
+      </td>
+      <td className="align-middle">
+        <span
+          className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
+          title={logId.title}
+        >
+          {logId.value}
+        </span>
+      </td>
+      <td className="align-middle">
+        <span
+          className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
+          title={requestId.title}
+        >
+          {requestId.value}
+        </span>
+      </td>
+      <td className="align-middle">
+        <span
+          className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
+          title={vendorTaskId.title}
+        >
+          {vendorTaskId.value}
+        </span>
+      </td>
+      <td className="align-middle">
+        <LogResultCell status={l.status} resultSummary={l.resultSummary} />
+      </td>
+      <td className="align-middle text-center text-[var(--gw-muted)]">—</td>
+    </tr>
+  );
+});
+
 export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData }) {
   const [logs, setLogs] = useState(initialData.logs);
   const [pageSize, setPageSize] = useState(initialData.pageSize || PAGE_SIZE_PRESETS[0]);
@@ -592,8 +911,20 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   loadedPagesRef.current = loadedPages;
   hasMoreLogsRef.current = hasMoreLogs;
-  /** 每秒 tick，驱动进行中 Duration / Queue / Generate / Poll 墙钟重算 */
-  const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
+  const [pageVisible, setPageVisible] = useState(true);
+  const pageVisibleRef = useRef(true);
+  pageVisibleRef.current = pageVisible;
+
+  useEffect(() => {
+    const onVis = () => {
+      const visible = document.visibilityState === "visible";
+      setPageVisible(visible);
+      pageVisibleRef.current = visible;
+    };
+    onVis();
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
 
   useEffect(() => {
     setFiltersCollapsed(readFiltersCollapsed());
@@ -641,6 +972,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     () => logs.some((l) => isLogInProgress(l.status)),
     [logs],
   );
+  /** 每秒 tick，仅在有在飞任务时启用，避免已完成行每秒整表重渲染 */
+  const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS, hasInFlightLogs);
   const hasInFlightLogsRef = useRef(hasInFlightLogs);
   hasInFlightLogsRef.current = hasInFlightLogs;
   const canvasQueueStatsRef = useRef(canvasQueueStats);
@@ -850,6 +1183,10 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
     const run = async () => {
       if (cancelled || viewModeRef.current !== "live") return;
+      if (!pageVisibleRef.current) {
+        schedule(GATEWAY_LIVE_HOT_SYNC_MS);
+        return;
+      }
       const fast = shouldLiveFastRefresh();
       if (fast) {
         await loadLogsDelta({ poll: true });
@@ -1060,14 +1397,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     }
   };
 
-  const toggleOne = (id: string) => {
+  const toggleOne = useCallback((id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -1509,325 +1846,17 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               />
             ) : (
               <>
-            {logs.map((l) => {
-              const isInProgress = isLogInProgress(l.status);
-              const live = resolveLiveLogPhaseTiming({
-                submittedAt: l.submittedAt,
-                completedAt: l.completedAt,
-                status: l.status,
-                resultSummary: l.resultSummary,
-                nowMs: liveNowMs,
-                server: {
-                  queueMs: l.queueMs,
-                  generateMs: l.generateMs,
-                  vendorPostProcessMs: l.vendorPostProcessMs,
-                  pollDelayMs: l.pollDelayMs,
-                },
-              });
-              const queueMs = live.queueMs;
-              const generateMs = live.generateMs;
-              const vendorPostProcessMs = live.vendorPostProcessMs;
-              const pollDelayMs = live.pollDelayMs;
-              const durationMs = resolveLogDisplayDurationMs({
-                durationMs: l.durationMs,
-                submittedAt: l.submittedAt,
-                completedAt: l.completedAt,
-                isInProgress,
-                nowMs: liveNowMs,
-                queueMs,
-                generateMs,
-                vendorPostProcessMs,
-                pollDelayMs,
-                liveTotalMs: live.totalMs,
-              });
-              const vendorNative = resolveVendorNativeTimingLive({
-                providerKind: l.providerKind,
-                requestKind: l.requestKind,
-                vendorDurationMs: l.vendorDurationMs,
-                resultSummary: l.resultSummary,
-                nowMs: liveNowMs ?? Date.now(),
-                server: {
-                  vendorNativeDurationMs: l.vendorNativeDurationMs,
-                  vendorNativeGenerateMs: l.vendorNativeGenerateMs,
-                },
-              });
-              const duration = formatDurationSeconds(durationMs);
-              const vendorNativeDuration = formatDurationSeconds(
-                vendorNative.vendorNativeDurationMs,
-              );
-              const vendorNativeGenerate = formatDurationSeconds(
-                vendorNative.vendorNativeGenerateMs,
-              );
-              const usage = formatUsageYuanDisplay(l.estimatedVendorCostYuan);
-              const platformCredits = formatPlatformCreditsDisplay(l.creditsCharged);
-              const tokens = formatTokenDisplay(
-                l.totalTokens,
-                l.promptTokens,
-                l.completionTokens,
-                l.metricsSource,
-              );
-              const logId = formatLogMonospaceId(l.id);
-              const requestId = formatLogMonospaceId(l.vendorRequestId);
-              const vendorTaskId = formatLogMonospaceId(l.externalTaskId);
-              const appTask = formatLogAppTaskCell(l);
-              const queueCell = formatLogTimingPhaseCell(queueMs, "queue");
-              const generateCell = formatLogTimingPhaseCell(generateMs, "generate");
-              const postProcCell = formatLogTimingPhaseCell(
-                vendorPostProcessMs,
-                "postproc",
-              );
-              const pollCell = formatLogTimingPhaseCell(pollDelayMs, "poll", {
-                overLimit:
-                  !isInProgress &&
-                  pollDelayMs != null &&
-                  pollDelayMs > 10_000,
-              });
-              const rawProgressLabel = isInProgress
-                ? pickLogProgressLabel(l.status, l.resultSummary)
-                : null;
-              const statusShort = l.status.trim().toLowerCase();
-              const progressLabel =
-                rawProgressLabel &&
-                rawProgressLabel.trim().toLowerCase() !== statusShort
-                  ? rawProgressLabel
-                  : null;
-              const sourceLabel = formatLogPageLabel(l.clientSource, l.clientPage);
-              const sourceTitle = formatLogSourceTooltip(
-                l.clientSource,
-                l.providerKind,
-                l.clientPage,
-              );
-
-              return (
-                <tr key={l.id} className="gw-logs-row">
-                  <td className="align-middle">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(l.id)}
-                      onChange={() => toggleOne(l.id)}
-                      className="gw-accent-control h-3.5 w-3.5 rounded border-white/20 bg-transparent"
-                      aria-label={`选择 ${l.id}`}
-                    />
-                  </td>
-                  <td className="align-middle tabular-nums text-sm text-[var(--gw-ink)]">
-                    {l.actorPhone?.trim() || "—"}
-                  </td>
-                  <td className="align-middle text-sm text-[var(--gw-ink)]">
-                    {l.actorName?.trim() || "—"}
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="text-sm text-[var(--gw-ink)]"
-                      title={sourceTitle}
-                    >
-                      {sourceLabel}
-                    </span>
-                  </td>
-                  <td className="align-top">
-                    <span
-                      className="gw-btn-xs font-mono"
-                      title={
-                        displayLogModelKey(l) !== l.model ? l.model : undefined
-                      }
-                    >
-                      {displayLogModelKey(l)}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="font-mono text-[11px] text-[var(--gw-muted)]"
-                      title={l.credentialKeyMasked ?? undefined}
-                    >
-                      {formatLogCredentialKeyMasked(l.credentialKeyMasked)}
-                    </span>
-                  </td>
-                  <td className="align-top">
-                    <LogParamsCell inputSummary={l.inputSummary} />
-                  </td>
-                  <td className="align-top">
-                    <LogImagesCell inputSummary={l.inputSummary} />
-                  </td>
-                  <td className="align-middle">
-                    <LogStatusBadge
-                      status={l.status}
-                      failCode={l.failCode}
-                      failMessage={l.failMessage}
-                      progressLabel={progressLabel}
-                    />
-                  </td>
-                  <td
-                    className="align-middle text-center text-xs text-[var(--gw-muted)]"
-                    title="汇总见表头；单行日志与画布排队无直接对应"
-                  >
-                    —
-                  </td>
-                  <td
-                    className="align-middle font-mono text-sm text-[var(--gw-ink)]"
-                    title={
-                      durationMs != null && durationMs > 0
-                        ? `${durationMs} ms`
-                        : isInProgress
-                          ? progressLabel
-                            ? `任务进行中 · ${progressLabel}`
-                            : "任务进行中"
-                          : durationMs != null
-                            ? `${durationMs} ms（由完成时间推算）`
-                            : undefined
-                    }
-                  >
-                    {duration}
-                  </td>
-                  <td
-                    className="align-middle font-mono text-sm text-[var(--gw-muted)]"
-                    title={
-                      vendorNative.vendorNativeDurationMs != null
-                        ? `厂商原生 ${vendorNative.vendorNativeDurationMs} ms（只读，不回写）`
-                        : "厂商未回传可对比总耗时"
-                    }
-                  >
-                    {vendorNativeDuration}
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="font-mono text-sm text-[var(--gw-ink)]"
-                      title={queueCell.title}
-                    >
-                      {queueCell.value}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="font-mono text-sm text-[var(--gw-ink)]"
-                      title={generateCell.title}
-                    >
-                      {generateCell.value}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="font-mono text-sm text-[var(--gw-muted)]"
-                      title={
-                        vendorNative.vendorNativeGenerateMs != null
-                          ? `厂商原生 ${vendorNative.vendorNativeGenerateMs} ms（只读，不回写）`
-                          : "厂商未回传可对比生成耗时"
-                      }
-                    >
-                      {vendorNativeGenerate}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="font-mono text-sm text-[var(--gw-ink)]"
-                      title={postProcCell.title}
-                    >
-                      {postProcCell.value}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className={`font-mono text-sm ${
-                        pollCell.warn ? "text-amber-400" : "text-[var(--gw-ink)]"
-                      }`}
-                      title={pollCell.title}
-                    >
-                      {pollCell.value}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="block whitespace-nowrap font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
-                      title={l.submittedAt}
-                    >
-                      {formatLogTimestamp(l.submittedAt)}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    {l.completedAt ? (
-                      <span
-                        className="block whitespace-nowrap font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
-                        title={l.completedAt}
-                      >
-                        {formatLogTimestamp(l.completedAt)}
-                      </span>
-                    ) : (
-                      <span
-                        className="text-sm text-[var(--gw-muted)]"
-                        title={isInProgress ? "任务进行中" : undefined}
-                      >
-                        —
-                      </span>
-                    )}
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
-                      title={appTask.title}
-                    >
-                      {appTask.value}
-                    </span>
-                  </td>
-                  <td
-                    className="align-middle font-mono text-sm text-[var(--gw-ink)]"
-                    title={
-                      isInProgress ? "任务进行中，完成后写入费用估算" : usage.title
-                    }
-                  >
-                    {isInProgress ? "—" : usage.value}
-                  </td>
-                  <td
-                    className="align-middle font-mono text-sm text-emerald-300/90"
-                    title={
-                      isInProgress
-                        ? "任务进行中，完成后写入扣减积分"
-                        : platformCredits.title
-                    }
-                  >
-                    {isInProgress ? "—" : platformCredits.value}
-                  </td>
-                  <td
-                    className="align-middle font-mono text-sm text-[var(--gw-ink)]"
-                    title={
-                      isInProgress ? "任务进行中，完成后写入 Token" : tokens.title
-                    }
-                  >
-                    {isInProgress ? "—" : tokens.value}
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
-                      title={logId.title}
-                    >
-                      {logId.value}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
-                      title={requestId.title}
-                    >
-                      {requestId.value}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    <span
-                      className="block break-all font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
-                      title={vendorTaskId.title}
-                    >
-                      {vendorTaskId.value}
-                    </span>
-                  </td>
-                  <td className="align-middle">
-                    <LogResultCell
-                      status={l.status}
-                      resultSummary={l.resultSummary}
-                    />
-                  </td>
-                  <td className="align-middle text-center text-[var(--gw-muted)]">
-                    —
-                  </td>
-                </tr>
-              );
-            })}
+            {logs.map((l) => (
+              <LogsTableRow
+                key={l.id}
+                log={l}
+                isSelected={selected.has(l.id)}
+                liveTick={
+                  isLogInProgress(l.status) ? liveNowMs : undefined
+                }
+                onToggleSelect={toggleOne}
+              />
+            ))}
             {!logs.length ? (
               <tr>
                 <td

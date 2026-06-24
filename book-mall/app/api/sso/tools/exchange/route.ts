@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getToolsSsoEligibility } from "@/lib/tools-sso-access";
-import {
-  getToolsJwtTtlSec,
-  requireToolsJwtSecret,
-  toolsExchangeAuthorized,
-} from "@/lib/sso-tools-env";
-import { signToolsAccessToken } from "@/lib/tools-sso-token";
-import { resolveTenantContextForUser } from "@/lib/tenant/context";
-import {
-  getSessionVersion,
-} from "@/lib/auth-session-version";
-import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
+import { toolsExchangeAuthorized } from "@/lib/sso-tools-env";
+import { issueToolsAccessTokenForUser } from "@/lib/issue-tools-access-token-for-user";
 import {
   mergeEcomToolkitNavKeys,
   userCanAccessEcommerceToolkit,
 } from "@/lib/ecom/ecom-access";
-import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
+import { TOOL_SUITE_NAV_KEYS } from "@/lib/tool-suite-nav-keys";
 import {
   intersectNavKeysWithSsoClient,
   loadActiveSsoClient,
@@ -119,45 +110,18 @@ export async function POST(req: Request) {
     data: { consumedAt: now },
   });
 
-  let jwtSecret: string;
-  try {
-    jwtSecret = requireToolsJwtSecret();
-  } catch {
-    return NextResponse.json({ error: "JWT 密钥未配置" }, { status: 503 });
+  const issued = await issueToolsAccessTokenForUser(row.userId);
+  if (!issued.ok) {
+    return NextResponse.json(
+      { error: issued.error, ...(issued.code ? { code: issued.code } : {}) },
+      { status: issued.status },
+    );
   }
 
-  const expiresIn = getToolsJwtTtlSec();
-  const ecomBillingMode = await getUserEcomBillingMode(row.userId);
-  const tenantCtx = await resolveTenantContextForUser(row.userId);
-  const sessionVersion = await getSessionVersion(row.userId);
-  const accessToken = signToolsAccessToken({
-    userId: row.userId,
-    secret: jwtSecret,
-    expiresInSec: expiresIn,
-    tier: elig.isAdmin ? "admin" : "gold",
-    toolsNavKeys,
-    ecomBillingMode,
-    sessionVersion,
-    tenant: tenantCtx
-      ? {
-          tenantId: tenantCtx.tenantId,
-          tenantType: tenantCtx.tenantType,
-          roleType: tenantCtx.role,
-          seatId: tenantCtx.seatId,
-        }
-      : undefined,
-    profile: {
-      email: elig.email,
-      phone: elig.phone,
-      name: elig.name,
-      image: elig.image,
-    },
-  });
-
   return NextResponse.json({
-    access_token: accessToken,
-    expires_in: expiresIn,
+    access_token: issued.accessToken,
+    expires_in: issued.expiresIn,
     token_type: "Bearer",
-    token_subtype: elig.isAdmin ? "tools_sso_admin" : "tools_sso_gold",
+    token_subtype: issued.tokenSubtype,
   });
 }

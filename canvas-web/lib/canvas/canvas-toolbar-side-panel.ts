@@ -1,11 +1,14 @@
 import { cn } from "@/lib/utils";
 
-/** 画布顶栏右侧菜单弹层：与「我的提示词」对齐（约 1/4 屏宽） */
+/** 画布顶栏右侧菜单弹层：略宽，便于缩略图与列表 */
 export const CANVAS_TOOLBAR_SIDE_PANEL_WIDTH_CLASS =
-  "w-[25vw] min-w-[320px] max-w-[50vw]";
+  "w-[min(42vw,720px)] min-w-[380px] max-w-[92vw]";
+
+/** 低于顶栏 z-[300]，遮罩与面板从顶栏下缘开始，不盖住菜单 */
+export const CANVAS_TOOLBAR_SIDE_PANEL_Z_CLASS = "z-[280]";
 
 export const CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS =
-  "fixed inset-0 flex justify-end bg-black/45";
+  "fixed bottom-0 left-0 right-0 top-[var(--canvas-toolbar-height,3rem)] flex justify-end bg-black/45";
 
 export const CANVAS_TOOLBAR_SIDE_PANEL_ASIDE_BASE_CLASS =
   "flex h-full flex-col bg-[var(--canvas-surface)] text-white shadow-2xl";

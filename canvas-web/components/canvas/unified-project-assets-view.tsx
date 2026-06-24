@@ -19,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   deleteProjectAsset,
@@ -33,10 +34,14 @@ import type { ProjectAssetKind, ProjectAssetRecord } from "@/lib/canvas/project-
 import { useProjectAssets } from "@/lib/canvas/use-project-assets";
 import { usePanelInfiniteScroll } from "@/lib/canvas/use-panel-infinite-scroll";
 import {
+  CANVAS_PANEL_SHELL_SELECT_CLASS,
+} from "@/lib/canvas/canvas-chrome-semantics";
+import {
   PRO_ASSETS_LINK_CLASS,
   PRO_ASSETS_TAB_ACTIVE_CLASS,
   PRO_ASSETS_TAB_IDLE_CLASS,
 } from "@/lib/canvas/story-pro-node-chrome";
+import { cn } from "@/lib/utils";
 import {
   buildProjectAssetDragPayload,
   CANVAS_PROJECT_ASSET_DRAG_MIME,
@@ -212,7 +217,7 @@ export function UnifiedProjectAssetsView({
             placeholder="搜索资产…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="min-w-[140px] flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-white placeholder:text-white/35"
+            className={cn("min-w-[140px] flex-1", CANVAS_PANEL_SHELL_SELECT_CLASS, "py-1.5 text-xs")}
           />
           {!compact ? (
             <Link href="/guides/project-assets" className={PRO_ASSETS_LINK_CLASS}>
@@ -234,7 +239,7 @@ export function UnifiedProjectAssetsView({
         </div>
 
         {loading ? (
-          <p className="text-xs text-white/45">加载中…</p>
+          <CanvasPanelShellLoading />
         ) : error ? (
           <p className="text-xs text-rose-300/85">
             加载失败：{error}

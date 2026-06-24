@@ -2,6 +2,10 @@
  * 浏览器侧 canvas API 客户端：统一处理跨域代理与 cookie。
  */
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
+import {
+  isCanvasToolsSessionUnauthorized,
+  refreshCanvasToolsSessionClient,
+} from "@/lib/canvas-tools-session-client";
 import { ensureCanvasUploadFileMeta } from "@/lib/canvas/normalize-canvas-image-file";
 import {
   isTransientDbApiError,
@@ -130,6 +134,9 @@ export function formatCanvasApiError(raw: string): string {
   if (t.includes("401") || t.includes("UNAUTHORIZED")) {
     return "登录已失效，请重新连接主站账号。";
   }
+  if (t.includes("缺少 Bearer Token") || t.includes("无效或过期的工具令牌")) {
+    return "工具站登录令牌缺失或已过期，请刷新页面或重新从主站进入画布。";
+  }
   if (t.includes("INTERNAL_ERROR")) {
     return "服务器处理失败，请稍后重试；若持续出现请查看 book-mall 终端日志。";
   }
@@ -177,12 +184,22 @@ async function call<T>(
   }
   const { url, init: i } = resolveBookMallBrowserRequest(base, apiPath, init);
   const maxAttempts = 4;
+  let sessionRefreshAttempted = false;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const r = await fetch(url, i);
     const raw = await r.text();
     if (!r.ok) {
       const msg = sanitizeCanvasApiErrorBody(r.status, raw);
+      if (
+        typeof window !== "undefined" &&
+        !sessionRefreshAttempted &&
+        isCanvasToolsSessionUnauthorized(msg, r.status)
+      ) {
+        sessionRefreshAttempted = true;
+        const refreshed = await refreshCanvasToolsSessionClient();
+        if (refreshed) continue;
+      }
       if (
         attempt < maxAttempts - 1 &&
         isTransientDbApiError(r.status, msg)

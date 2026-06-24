@@ -8,12 +8,13 @@
 | `book-mall-story-kie-cleanup.zip` | `book-mall-story-kie-cleanup` | `POST /api/story/kie/cleanup` | 每 1 分钟 |
 | `book-mall-canvas-kie-poll.zip` | `book-mall-canvas-kie-poll` | `POST /api/canvas/kie/poll` | 每 1 分钟（~15 人同时长视频建议 **30 秒**） |
 | `book-mall-canvas-kie-cleanup.zip` | `book-mall-canvas-kie-cleanup` | `POST /api/canvas/kie/cleanup` | 每 1 分钟 |
+| `book-mall-canvas-display-reconcile.zip` | `book-mall-canvas-display-reconcile` | `POST /api/canvas/display-reconcile` | 每 5 分钟（与 poll 错开） |
 
 重新打包（仓库根目录执行）：
 
 ```bash
 cd deploy/tencent/scf
-for d in book-mall-story-kie-poll book-mall-story-kie-cleanup book-mall-canvas-kie-poll book-mall-canvas-kie-cleanup; do
+for d in book-mall-story-kie-poll book-mall-story-kie-cleanup book-mall-canvas-kie-poll book-mall-canvas-kie-cleanup book-mall-canvas-display-reconcile; do
   (cd "$d" && zip -r "../${d}.zip" index.js)
 done
 ```
@@ -31,6 +32,7 @@ done
 7. **触发器**：定时触发器，Cron 示例（7 段，每秒位）：
    - poll：`0 */1 * * * *`（每分钟第 0 秒）
    - cleanup：`30 */1 * * * *`（每分钟第 30 秒，与 poll 错开）
+   - display-reconcile：`0 */5 * * * *`（每 5 分钟；修复「任务已成功但节点未写回」）
 
 ## 验收
 

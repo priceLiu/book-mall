@@ -7,7 +7,6 @@ import {
   requireSessionUser,
 } from "@/lib/canvas/api-helpers";
 import { createCanvasProjectHistoryForUser } from "@/lib/canvas/canvas-project-history-service";
-import { assertAccessibleCanvasProject } from "@/lib/canvas/canvas-project-access";
 import {
   getCanvasProjectForUser,
   softDeleteCanvasProjectForUser,
@@ -15,7 +14,7 @@ import {
 } from "@/lib/canvas/canvas-project-service";
 import { pickProjectThumbnailUrl } from "@/lib/canvas/pick-project-thumbnail";
 import { scheduleOpportunisticCanvasPoll } from "@/lib/canvas/canvas-task-service";
-import { reconcileStaleCanvasVideoRuntimeOnProjectRead } from "@/lib/canvas/canvas-video-display-recover";
+import { reconcileStaleCanvasMediaRuntimeOnProjectRead } from "@/lib/canvas/canvas-video-display-recover";
 import { prisma } from "@/lib/prisma";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -29,20 +28,24 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   if (!guard.ok) return guard.response;
   const { id } = await ctx.params;
   try {
-    await assertAccessibleCanvasProject(guard.user.id, id);
-    // Gen-HotCold-R2 Phase 1：读路径不再阻塞等待 poll。
-    // 仅在兜底开关开启时 fire-and-forget 触发单飞轮询；进度真相交独立 poll-loop。
-    const inflight = await prisma.canvasGenerationTask.count({
+    let project = await getCanvasProjectForUser(guard.user.id, id);
+    const inflight = await prisma.canvasGenerationTask.findFirst({
       where: {
         projectId: id,
         status: { in: ["PENDING", "SUBMITTED"] },
       },
+      select: { id: true },
     });
-    if (inflight > 0) {
+    if (inflight) {
       scheduleOpportunisticCanvasPoll(id);
     }
-    await reconcileStaleCanvasVideoRuntimeOnProjectRead(id);
-    const project = await getCanvasProjectForUser(guard.user.id, id);
+    const reconciled = await reconcileStaleCanvasMediaRuntimeOnProjectRead(
+      id,
+      project.canvas,
+    );
+    if (reconciled.canvas) {
+      project = { ...project, canvas: reconciled.canvas };
+    }
     return NextResponse.json({ project }, { headers: jsonHeaders(request) });
   } catch (err) {
     return canvasErrorToResponse(request, err);

@@ -1,4 +1,8 @@
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
+import {
+  isCanvasToolsSessionUnauthorized,
+  refreshCanvasToolsSessionClient,
+} from "@/lib/canvas-tools-session-client";
 import type {
   SaveVideoToLibraryInput,
   VideoLibraryItem,
@@ -11,28 +15,58 @@ export type {
   VideoLibraryQuota,
 } from "@/lib/canvas-video-library-types";
 
-const LIBRARY_PATH = "/api/sso/tools/image-to-video/library";
-const PERSIST_PATH = "/api/sso/tools/image-to-video/library/persist-from-url";
+const LIBRARY_PATH = "/api/canvas/video-library";
+const PERSIST_PATH = "/api/canvas/video-library/persist-from-url";
 
-async function parseJson<T>(r: Response): Promise<T> {
-  return (await r.json()) as T;
+async function libraryFetch<T>(
+  base: string,
+  apiPath: string,
+  init?: RequestInit,
+): Promise<T> {
+  const { url, init: merged } = resolveBookMallBrowserRequest(base, apiPath, init);
+  let sessionRefreshAttempted = false;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await fetch(url, merged);
+    const raw = await r.text();
+    let data: Record<string, unknown> = {};
+    try {
+      data = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    } catch {
+      /* ignore */
+    }
+
+    if (!r.ok) {
+      const msg =
+        (typeof data.message === "string" ? data.message : null) ??
+        (typeof data.error === "string" ? data.error : null) ??
+        raw.slice(0, 200);
+      if (
+        typeof window !== "undefined" &&
+        !sessionRefreshAttempted &&
+        isCanvasToolsSessionUnauthorized(msg, r.status)
+      ) {
+        sessionRefreshAttempted = true;
+        const refreshed = await refreshCanvasToolsSessionClient();
+        if (refreshed) continue;
+      }
+      throw new Error(msg || `请求失败（HTTP ${r.status}）`);
+    }
+
+    return (raw ? JSON.parse(raw) : {}) as T;
+  }
+
+  throw new Error("401 未授权");
 }
 
 export async function listVideoLibrary(
   base: string,
 ): Promise<{ items: VideoLibraryItem[]; quota: VideoLibraryQuota | null }> {
-  const { url, init } = resolveBookMallBrowserRequest(base, LIBRARY_PATH, {
-    method: "GET",
-  });
-  const r = await fetch(url, init);
-  const data = await parseJson<{
+  const data = await libraryFetch<{
     items?: VideoLibraryItem[];
     quota?: VideoLibraryQuota;
-    error?: string;
-  }>(r);
-  if (!r.ok) {
-    throw new Error(data.error ?? "加载视频库失败");
-  }
+  }>(base, LIBRARY_PATH, { method: "GET" });
+
   return {
     items: Array.isArray(data.items) ? data.items : [],
     quota:
@@ -48,7 +82,12 @@ export async function saveVideoToLibrary(
   base: string,
   input: SaveVideoToLibraryInput,
 ): Promise<{ item: VideoLibraryItem; quota: VideoLibraryQuota | null }> {
-  const { url, init } = resolveBookMallBrowserRequest(base, PERSIST_PATH, {
+  const data = await libraryFetch<{
+    item?: VideoLibraryItem;
+    quota?: VideoLibraryQuota;
+    error?: string;
+    message?: string;
+  }>(base, PERSIST_PATH, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -60,21 +99,12 @@ export async function saveVideoToLibrary(
       durationSec: input.durationSec ?? 5,
     }),
   });
-  const r = await fetch(url, init);
-  const data = await parseJson<{
-    item?: VideoLibraryItem;
-    quota?: VideoLibraryQuota;
-    error?: string;
-    message?: string;
-  }>(r);
-  if (!r.ok) {
-    if (data.error === "video_library_full") {
-      throw new Error(
-        data.message ??
-          "我的视频库已满，请删除旧条目后再保存。",
-      );
-    }
-    throw new Error(data.error ?? data.message ?? "保存到视频库失败");
+
+  if (data.error === "LIBRARY_FULL" || data.error === "video_library_full") {
+    throw new Error(
+      (typeof data.message === "string" ? data.message : null) ??
+        "我的视频库已满，请删除旧条目后再保存。",
+    );
   }
   if (!data.item?.id) {
     throw new Error("保存成功但响应缺少条目信息");
@@ -96,14 +126,7 @@ export async function deleteVideoLibraryItem(
   id: string,
 ): Promise<void> {
   const path = `${LIBRARY_PATH}?id=${encodeURIComponent(id)}`;
-  const { url, init } = resolveBookMallBrowserRequest(base, path, {
-    method: "DELETE",
-  });
-  const r = await fetch(url, init);
-  const data = await parseJson<{ error?: string }>(r);
-  if (!r.ok) {
-    throw new Error(data.error ?? "删除失败");
-  }
+  await libraryFetch<{ ok?: boolean }>(base, path, { method: "DELETE" });
   window.dispatchEvent(new CustomEvent("canvas:video-library-changed"));
 }
 

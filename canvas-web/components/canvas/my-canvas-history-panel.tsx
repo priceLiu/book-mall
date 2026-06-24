@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock, History, Loader2, RotateCcw, Trash2, X } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
+import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import {
   ProjectAssetHoverPreviewLayer,
   useProjectAssetHoverPreview,
@@ -27,20 +29,27 @@ import {
   setCanvasAutosaveIntervalMs,
 } from "@/lib/canvas/canvas-autosave-settings";
 import {
-  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
-  canvasToolbarSidePanelAsideClass,
-} from "@/lib/canvas/canvas-toolbar-side-panel";
-import {
-  CANVAS_PANEL_HEADER_BORDER_CLASS,
-  CANVAS_PANEL_HEADER_ICON_CLASS,
-  CANVAS_PANEL_ITEM_META_CLASS,
-  CANVAS_PANEL_ITEM_TITLE_CLASS,
-  CANVAS_PANEL_SECONDARY_BTN_CLASS,
+  CANVAS_PANEL_SHELL_BODY_CLASS,
+  CANVAS_PANEL_SHELL_EMPTY_CLASS,
+  CANVAS_PANEL_SHELL_ERROR_CLASS,
+  CANVAS_PANEL_SHELL_FOOTER_CLASS,
+  CANVAS_PANEL_SHELL_HEADER_CLASS,
+  CANVAS_PANEL_SHELL_LINK_BTN_CLASS,
+  CANVAS_PANEL_SHELL_LINK_BTN_DANGER_CLASS,
+  CANVAS_PANEL_SHELL_LIST_ITEM_CLASS,
+  CANVAS_PANEL_SHELL_SELECT_CLASS,
+  CANVAS_PANEL_SHELL_SETTINGS_BLOCK_CLASS,
+  CANVAS_PANEL_SHELL_TABS_ROW_CLASS,
+  CANVAS_PANEL_SHELL_THUMB_LG_CLASS,
   CANVAS_PANEL_TAB_ACTIVE_CLASS,
   CANVAS_PANEL_TAB_IDLE_CLASS,
-  CANVAS_PANEL_TITLE_CLASS,
-  CANVAS_SEMANTIC_STATUS_CLASS,
 } from "@/lib/canvas/canvas-chrome-semantics";
+import {
+  invalidateToolbarPanelCache,
+  peekToolbarPanelCache,
+  toolbarPanelCacheKey,
+  writeToolbarPanelCache,
+} from "@/lib/canvas/toolbar-panel-cache";
 import { cn } from "@/lib/utils";
 
 type HistoryTab = "autosave" | "manual";
@@ -71,13 +80,32 @@ export function MyCanvasHistoryPanel({
   const openRef = useRef(open);
   openRef.current = open;
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (opts?: { force?: boolean }) => {
     if (!base || !projectId) return;
+    const cacheKey = toolbarPanelCacheKey("canvas-history", {
+      projectId,
+      tab,
+    });
+    const cached = peekToolbarPanelCache<{
+      items: CanvasProjectHistorySummary[];
+      meta: CanvasProjectHistoryMeta | null;
+    }>(cacheKey, opts);
+    if (cached) {
+      setItems(cached.items);
+      setMeta(cached.meta);
+      setLoading(false);
+      setListError(null);
+      return;
+    }
     setLoading(true);
     try {
       const data = await listCanvasProjectHistory(base, projectId, { source: tab });
       setItems(data.items);
       setMeta(data.meta);
+      writeToolbarPanelCache(cacheKey, {
+        items: data.items,
+        meta: data.meta,
+      });
       setListError(null);
     } catch (e) {
       setItems([]);
@@ -102,6 +130,7 @@ export function MyCanvasHistoryPanel({
 
   useEffect(() => {
     const onHistoryUpdated = () => {
+      invalidateToolbarPanelCache("canvas-history|");
       if (openRef.current) void reload();
     };
     window.addEventListener("canvas:history-updated", onHistoryUpdated);
@@ -142,9 +171,7 @@ export function MyCanvasHistoryPanel({
       const raw = e instanceof Error ? e.message : String(e);
       const message = raw.includes("history not found")
         ? "该历史版本已不存在（可能已被新版本顶出）。请刷新列表后重试。"
-        : raw.includes("404")
-          ? formatCanvasApiError(raw)
-          : raw;
+        : formatCanvasApiError(raw);
       await alert({
         title: "恢复失败",
         message,
@@ -176,6 +203,7 @@ export function MyCanvasHistoryPanel({
     setDeletingId(item.id);
     try {
       await deleteCanvasProjectHistoryEntry(base, projectId, item.id);
+      invalidateToolbarPanelCache("canvas-history|");
       await reload();
     } catch (e) {
       await alert({
@@ -188,204 +216,192 @@ export function MyCanvasHistoryPanel({
     }
   };
 
-  if (!open) return null;
-
   const tabCount =
     tab === "manual" ? meta?.manualCount ?? items.length : meta?.autosaveCount ?? items.length;
 
   return (
-    <div
-      className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[1450]`}
-      onClick={onClose}
-      role="presentation"
+    <CanvasToolbarSidePanelShell
+      open={open}
+      onClose={onClose}
+      ariaLabel="我的历史"
     >
-      <aside
-        className={canvasToolbarSidePanelAsideClass(
-          `border-l ${CANVAS_PANEL_HEADER_BORDER_CLASS}`,
-        )}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="我的历史"
-      >
-        <header
+      <header className={CANVAS_PANEL_SHELL_HEADER_CLASS}>
+        <div className="flex items-center gap-2">
+          <History className="size-4 text-[var(--canvas-accent)]" />
+          <div>
+            <p className="text-sm font-medium">我的历史</p>
+            <p className="text-[10px] text-white/45">
+              自动与手动各保留 {CANVAS_PROJECT_HISTORY_MAX} 条
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md p-1 text-[var(--canvas-muted)] hover:bg-white/5 hover:text-white"
+          aria-label="关闭"
+        >
+          <X className="size-4" />
+        </button>
+      </header>
+
+      <div className={CANVAS_PANEL_SHELL_TABS_ROW_CLASS}>
+        <button
+          type="button"
+          onClick={() => setTab("autosave")}
           className={cn(
-            "flex items-center justify-between border-b px-4 py-3",
-            CANVAS_PANEL_HEADER_BORDER_CLASS,
+            "rounded-md px-3 py-1.5 text-[11px]",
+            tab === "autosave"
+              ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+              : CANVAS_PANEL_TAB_IDLE_CLASS,
           )}
         >
-          <div className="flex items-center gap-2">
-            <History className={CANVAS_PANEL_HEADER_ICON_CLASS} />
-            <p className={CANVAS_PANEL_TITLE_CLASS}>我的历史</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1 text-[var(--canvas-muted)] hover:bg-white/5 hover:text-white"
-            aria-label="关闭"
-          >
-            <X className="size-4" />
-          </button>
-        </header>
+          自动保存 ({meta?.autosaveCount ?? 0}/{CANVAS_PROJECT_HISTORY_MAX})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("manual")}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-[11px]",
+            tab === "manual"
+              ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+              : CANVAS_PANEL_TAB_IDLE_CLASS,
+          )}
+        >
+          手动保存 ({meta?.manualCount ?? 0}/{CANVAS_PROJECT_HISTORY_MAX})
+        </button>
+      </div>
 
-        <div className="flex gap-1 border-b border-white/8 px-3 py-2">
-          <button
-            type="button"
-            onClick={() => setTab("autosave")}
-            className={cn(
-              "rounded-md px-3 py-1.5 text-[11px]",
-              tab === "autosave"
-                ? CANVAS_PANEL_TAB_ACTIVE_CLASS
-                : CANVAS_PANEL_TAB_IDLE_CLASS,
-            )}
-          >
-            自动保存 ({meta?.autosaveCount ?? 0}/{CANVAS_PROJECT_HISTORY_MAX})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("manual")}
-            className={cn(
-              "rounded-md px-3 py-1.5 text-[11px]",
-              tab === "manual"
-                ? CANVAS_PANEL_TAB_ACTIVE_CLASS
-                : CANVAS_PANEL_TAB_IDLE_CLASS,
-            )}
-          >
-            手动保存 ({meta?.manualCount ?? 0}/{CANVAS_PROJECT_HISTORY_MAX})
-          </button>
+      <div className={CANVAS_PANEL_SHELL_SETTINGS_BLOCK_CLASS}>
+        <div className="flex items-center gap-2 text-[11px] text-white/55">
+          <Clock className="size-3.5" />
+          <span>自动保存间隔</span>
         </div>
+        <select
+          value={String(intervalMs)}
+          onChange={(e) => onIntervalChange(Number.parseInt(e.target.value, 10))}
+          className={cn("nodrag mt-2", CANVAS_PANEL_SHELL_SELECT_CLASS)}
+        >
+          {CANVAS_AUTOSAVE_INTERVAL_OPTIONS.map((opt) => (
+            <option key={opt.id} value={opt.ms}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-[10px] leading-relaxed text-white/40">
+          {intervalMs === 0
+            ? "当前：仅手动保存会写入「手动保存」历史。"
+            : `当前：编辑停顿约 ${CANVAS_AUTOSAVE_DEBOUNCE_MS / 1000} 秒后写入「自动保存」；另约每 ${formatCanvasAutosaveIntervalLabel(intervalMs)} 补一条备份。`}
+        </p>
+      </div>
 
-        <div className="border-b border-white/8 px-4 py-3">
-          <div className="flex items-center gap-2 text-[11px] text-white/55">
-            <Clock className="size-3.5" />
-            <span>自动保存间隔</span>
-          </div>
-          <select
-            value={String(intervalMs)}
-            onChange={(e) => onIntervalChange(Number.parseInt(e.target.value, 10))}
-            className="nodrag mt-2 w-full rounded-lg border border-white/12 bg-black/40 px-3 py-2 text-[12px] text-white focus:border-white/25 focus:outline-none"
-          >
-            {CANVAS_AUTOSAVE_INTERVAL_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.ms}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <p className="mt-2 text-[10px] leading-relaxed text-white/40">
-            自动与手动各保留 {CANVAS_PROJECT_HISTORY_MAX} 条，互不影响。手动保存满
-            {CANVAS_PROJECT_HISTORY_MAX} 条时，继续保存会提示覆盖最旧一条，也可在此删除旧版本。
-            {intervalMs === 0
-              ? " 当前：仅手动保存会写入「手动保存」历史。"
-              : ` 当前：编辑停顿约 ${CANVAS_AUTOSAVE_DEBOUNCE_MS / 1000} 秒后写入「自动保存」；另约每 ${formatCanvasAutosaveIntervalLabel(intervalMs)} 补一条备份。`}
+      <div className={CANVAS_PANEL_SHELL_BODY_CLASS}>
+        {listError ? (
+          <p className={cn("mb-3", CANVAS_PANEL_SHELL_ERROR_CLASS)}>{listError}</p>
+        ) : null}
+        {loading ? (
+          <CanvasPanelShellLoading label="加载历史…" />
+        ) : items.length === 0 ? (
+          <p className={CANVAS_PANEL_SHELL_EMPTY_CLASS}>
+            {tab === "manual"
+              ? "还没有手动保存。点击工具栏「手动保存」后，版本会出现在这里。"
+              : intervalMs <= 0
+                ? "已关闭自动保存历史。可在上方改间隔。"
+                : "还没有自动保存记录。编辑停顿约 1.5 秒后会写入一条快照。"}
           </p>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {listError ? (
-            <p className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-200">
-              {listError}
-            </p>
-          ) : null}
-          {loading ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-[12px] text-white/45">
-              <Loader2 className="size-4 animate-spin" />
-              加载历史…
-            </div>
-          ) : items.length === 0 ? (
-            <p className="text-[12px] leading-relaxed text-[var(--canvas-muted)]">
-              {tab === "manual"
-                ? "还没有手动保存。点击工具栏「手动保存」后，版本会出现在这里（最多 20 条）。"
-                : intervalMs <= 0
-                  ? "已关闭自动保存历史。可在上方改间隔；画布仍会在编辑后自动落盘到项目。"
-                  : "还没有自动保存记录。编辑停顿约 1.5 秒后会写入一条快照（最多 20 条）。"}
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className="rounded-lg border border-violet-400/15 bg-violet-950/20 p-3"
-                >
-                  <div className="flex items-start gap-3">
-                    {item.thumbnailUrl ? (
+        ) : (
+          <ul className="space-y-2">
+            {items.map((item) => (
+              <li
+                key={item.id}
+                className={CANVAS_PANEL_SHELL_LIST_ITEM_CLASS}
+              >
+                {item.thumbnailUrl ? (
+                  <button
+                    type="button"
+                    className={cn(
+                      CANVAS_PANEL_SHELL_THUMB_LG_CLASS,
+                      "focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
+                    )}
+                    aria-label={`预览 ${item.label}`}
+                    onMouseEnter={(e) =>
+                      showHoverPreview({
+                        url: item.thumbnailUrl,
+                        title: item.label,
+                        anchor: e.currentTarget,
+                      })
+                    }
+                    onMouseLeave={hideHoverPreview}
+                  >
+                    <ProjectCoverMedia
+                      url={item.thumbnailUrl}
+                      alt={item.label}
+                      className="size-full object-cover"
+                      placeholderLetter={item.label}
+                    />
+                  </button>
+                ) : (
+                  <div className={cn(CANVAS_PANEL_SHELL_THUMB_LG_CLASS, "flex items-center justify-center text-[10px] text-white/30")}>
+                    无预览
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-medium text-white/90">
+                    {item.label}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-white/40">
+                    {new Date(item.createdAt).toLocaleString("zh-CN")}
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={restoringId === item.id}
+                      onClick={() => void onRestoreItem(item)}
+                      className={cn(
+                        "inline-flex items-center gap-0.5 disabled:opacity-40",
+                        CANVAS_PANEL_SHELL_LINK_BTN_CLASS,
+                      )}
+                    >
+                      {restoringId === item.id ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="size-3" />
+                      )}
+                      恢复
+                    </button>
+                    {tab === "manual" ? (
                       <button
                         type="button"
-                        className="relative size-14 shrink-0 overflow-hidden rounded-md border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
-                        aria-label={`预览 ${item.label}`}
-                        onMouseEnter={(e) =>
-                          showHoverPreview({
-                            url: item.thumbnailUrl,
-                            title: item.label,
-                            anchor: e.currentTarget,
-                          })
-                        }
-                        onMouseLeave={hideHoverPreview}
+                        disabled={deletingId === item.id}
+                        onClick={() => void onDeleteItem(item)}
+                        className={CANVAS_PANEL_SHELL_LINK_BTN_DANGER_CLASS}
                       >
-                        <ProjectCoverMedia
-                          url={item.thumbnailUrl}
-                          alt={item.label}
-                          className="size-full object-cover"
-                          placeholderLetter={item.label}
-                        />
+                        {deletingId === item.id ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-3" />
+                        )}
+                        删除
                       </button>
-                    ) : (
-                      <div className="flex size-14 shrink-0 items-center justify-center rounded-md border border-white/10 bg-black/30 text-[10px] text-white/30">
-                        无预览
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className={CANVAS_PANEL_ITEM_TITLE_CLASS}>{item.label}</p>
-                      <p className={CANVAS_PANEL_ITEM_META_CLASS}>
-                        {new Date(item.createdAt).toLocaleString("zh-CN")}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={restoringId === item.id}
-                          onClick={() => void onRestoreItem(item)}
-                          className={CANVAS_PANEL_SECONDARY_BTN_CLASS}
-                        >
-                          {restoringId === item.id ? (
-                            <Loader2 className="size-3 animate-spin" />
-                          ) : (
-                            <RotateCcw className="size-3" />
-                          )}
-                          恢复
-                        </button>
-                        {tab === "manual" ? (
-                          <button
-                            type="button"
-                            disabled={deletingId === item.id}
-                            onClick={() => void onDeleteItem(item)}
-                            className="inline-flex items-center gap-1 rounded-md border border-red-400/25 bg-red-500/10 px-2 py-1 text-[11px] text-red-200 hover:bg-red-500/20 disabled:opacity-50"
-                          >
-                            {deletingId === item.id ? (
-                              <Loader2 className="size-3 animate-spin" />
-                            ) : (
-                              <Trash2 className="size-3" />
-                            )}
-                            删除
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
+                    ) : null}
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
-        <footer className="border-t border-white/8 px-4 py-3">
-          <button
-            type="button"
-            onClick={() => void reload()}
-            className="rounded-md border border-white/12 px-3 py-1.5 text-[11px] text-white/70 hover:bg-white/8"
-          >
-            刷新列表 ({tabCount})
-          </button>
-        </footer>
-      </aside>
+      <footer className={CANVAS_PANEL_SHELL_FOOTER_CLASS}>
+        <button
+          type="button"
+          onClick={() => void reload({ force: true })}
+          className="text-[10px] text-white/70 hover:underline"
+        >
+          刷新列表 ({tabCount})
+        </button>
+      </footer>
       <ProjectAssetHoverPreviewLayer state={hoverPreview} />
-    </div>
+    </CanvasToolbarSidePanelShell>
   );
 }

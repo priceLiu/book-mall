@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   copyTextToClipboard,
@@ -108,13 +108,16 @@ function ParamsPreviewTip({
   );
 }
 
-export function LogParamsCell({
+export const LogParamsCell = memo(function LogParamsCell({
   inputSummary,
 }: {
   inputSummary: unknown;
 }) {
-  const { inputPreviewLine, inputFullJson, model, copyText } =
-    formatLogParamsView(inputSummary);
+  const formatted = useMemo(
+    () => formatLogParamsView(inputSummary),
+    [inputSummary],
+  );
+  const { inputPreviewLine, inputFullJson, model, copyText } = formatted;
   const [copied, setCopied] = useState(false);
   const [tipCopied, setTipCopied] = useState(false);
   const [open, setOpen] = useState(false);
@@ -224,4 +227,4 @@ export function LogParamsCell({
         : null}
     </>
   );
-}
+});

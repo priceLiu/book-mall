@@ -58,6 +58,7 @@
     "canvas:poll-once": "dotenv -e .env.local -- tsx scripts/canvas-ai-poll.ts",
     "canvas:poll-loop": "PRISMA_CONNECTION_LIMIT=1 dotenv -e .env.local -- tsx scripts/canvas-ai-poll-loop.ts",
     "canvas:recover-stuck-video": "dotenv -e .env.local -- tsx scripts/recover-canvas-stuck-video.ts",
+    "canvas:display-reconcile": "dotenv -e .env.local -- tsx scripts/canvas-display-reconcile-once.ts",
     "canvas:diagnose-user": "dotenv -e .env.local -- tsx scripts/diagnose-canvas-user.ts",
     "canvas:recover-volcengine-timeout": "dotenv -e .env.local -- tsx scripts/recover-canvas-volcengine-timeout.ts",
     "canvas:queued-reconcile": "dotenv -e .env.local -- tsx scripts/canvas-queued-reconcile.ts",

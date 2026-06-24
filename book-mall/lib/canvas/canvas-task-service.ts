@@ -86,7 +86,14 @@ import {
   extractVolcengineVideoUrlFromGatewaySummary,
   patchCanvasProjectNodeRuntimeFromTask,
 } from "@/lib/canvas/canvas-volcengine-recover";
-import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
+import {
+  canvasNodeShowsPersistedMedia,
+  patchCanvasProjectNodeMediaFromTask,
+} from "@/lib/canvas/canvas-media-patch";
+import {
+  recoverCanvasVideoTaskDisplay,
+  runCanvasDisplayReconcileWorker,
+} from "@/lib/canvas/canvas-video-display-recover";
 import { isCanvasVolcengineVideoTaskPayload } from "@/lib/canvas/canvas-constants";
 import { getGenerationPollInnerTimeoutMs } from "@/lib/generation/poll-config";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
@@ -605,7 +612,23 @@ export async function applyCanvasVolcengineVideoResult(
     include: { project: true },
   });
   if (!task) return;
-  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") {
+    if (
+      task.status === "SUCCEEDED" &&
+      (task.ossUrl?.trim() || task.ephemeralUrl?.trim())
+    ) {
+      if (
+        !canvasNodeShowsPersistedMedia(
+          task.project.canvas,
+          task.nodeId,
+          task.id,
+        )
+      ) {
+        await patchCanvasProjectNodeMediaFromTask(task);
+      }
+    }
+    return;
+  }
   if (!(await claimCanvasTaskForResultApply(taskId))) return;
 
   const ephemeralUrl = videoUrl?.trim();
@@ -704,7 +727,23 @@ export async function applyCanvasKieTaskResult(
     logKieEvent("warn", "[canvas] applyKieTaskResult: task not found", { taskId });
     return;
   }
-  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") return;
+  if (task.status === "SUCCEEDED" || task.status === "CANCELLED") {
+    if (
+      task.status === "SUCCEEDED" &&
+      (task.ossUrl?.trim() || task.ephemeralUrl?.trim())
+    ) {
+      if (
+        !canvasNodeShowsPersistedMedia(
+          task.project.canvas,
+          task.nodeId,
+          task.id,
+        )
+      ) {
+        await patchCanvasProjectNodeMediaFromTask(task);
+      }
+    }
+    return;
+  }
   if (!(await claimCanvasTaskForResultApply(taskId))) return;
 
   if (record.state === "success") {
@@ -787,20 +826,24 @@ export async function applyCanvasKieTaskResult(
       },
     });
     if (applied.count === 0) return;
-    if (isVideoOss) {
-      const updated = await prisma.canvasGenerationTask.findUnique({
-        where: { id: taskId },
-        select: {
-          id: true,
-          projectId: true,
-          nodeId: true,
-          ossUrl: true,
-          ephemeralUrl: true,
-          completedAt: true,
-          resultPayload: true,
-        },
-      });
-      if (updated) await patchCanvasProjectNodeRuntimeFromTask(updated);
+    const updated = await prisma.canvasGenerationTask.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        projectId: true,
+        nodeId: true,
+        ossUrl: true,
+        ephemeralUrl: true,
+        completedAt: true,
+        resultPayload: true,
+      },
+    });
+    if (updated) {
+      if (isVideoOss) {
+        await patchCanvasProjectNodeRuntimeFromTask(updated);
+      } else {
+        await patchCanvasProjectNodeMediaFromTask(updated);
+      }
     }
     logKieEvent("info", "[canvas] task succeeded", {
       taskId,
@@ -1857,6 +1900,17 @@ export async function runCanvasPollWorker(opts?: {
     if (recordPauseMs > 0 && pass + 1 < maxPasses) {
       await new Promise((r) => setTimeout(r, recordPauseMs));
     }
+  }
+
+  try {
+    const display = await runCanvasDisplayReconcileWorker({ limit: 25 });
+    if (display.recovered > 0 || display.failed > 0) {
+      logKieEvent("info", "[canvas] display-reconcile", display);
+    }
+  } catch (e) {
+    logKieEvent("warn", "[canvas] display-reconcile error", {
+      msg: e instanceof Error ? e.message : String(e),
+    });
   }
 
   return result;

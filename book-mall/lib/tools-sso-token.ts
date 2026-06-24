@@ -175,6 +175,27 @@ export function verifyToolsAccessToken(
   token: string,
   secret: string,
 ): VerifiedToolsToken | null {
+  return parseVerifiedToolsToken(token, secret, { requireUnexpired: true });
+}
+
+/** 签名有效但允许过期（refresh-token 用；过期超过 graceSec 则拒绝） */
+export function verifyToolsAccessTokenAllowExpired(
+  token: string,
+  secret: string,
+  graceSec = 7 * 24 * 3600,
+): VerifiedToolsToken | null {
+  const parsed = parseVerifiedToolsToken(token, secret, { requireUnexpired: false });
+  if (!parsed) return null;
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (parsed.exp + graceSec < nowSec) return null;
+  return parsed;
+}
+
+function parseVerifiedToolsToken(
+  token: string,
+  secret: string,
+  opts: { requireUnexpired: boolean },
+): VerifiedToolsToken | null {
   const parts = token.trim().split(".");
   if (parts.length !== 3) return null;
   const [h, p, s] = parts;
@@ -200,7 +221,8 @@ export function verifyToolsAccessToken(
   }
 
   if (payloadRaw.aud !== TOOLS_JWT_AUDIENCE) return null;
-  if (typeof payloadRaw.exp !== "number" || payloadRaw.exp * 1000 < Date.now()) {
+  if (typeof payloadRaw.exp !== "number") return null;
+  if (opts.requireUnexpired && payloadRaw.exp * 1000 < Date.now()) {
     return null;
   }
   if (typeof payloadRaw.sub !== "string" || !payloadRaw.sub) return null;

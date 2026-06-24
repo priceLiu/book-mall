@@ -8,7 +8,6 @@ import {
   Copy,
   FileText,
   Image as ImageIcon,
-  Loader2,
   Sparkles,
   X,
   XCircle,
@@ -21,18 +20,27 @@ import {
   listUserPromptHistory,
   type CanvasPromptHistoryItem,
 } from "@/lib/canvas-api";
+import { CanvasPanelShellLoading, CanvasPanelShellLoadingMore } from "@/components/canvas/canvas-panel-shell-loading";
+import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import {
-  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
   CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
-  canvasToolbarSidePanelAsideClass,
 } from "@/lib/canvas/canvas-toolbar-side-panel";
 import {
-  CANVAS_PANEL_HEADER_BORDER_CLASS,
-  CANVAS_PANEL_HEADER_ICON_CLASS,
+  peekToolbarPanelCache,
+  toolbarPanelCacheKey,
+  writeToolbarPanelCache,
+} from "@/lib/canvas/toolbar-panel-cache";
+import {
+  CANVAS_PANEL_SHELL_BODY_CLASS,
+  CANVAS_PANEL_SHELL_ERROR_CLASS,
+  CANVAS_PANEL_SHELL_FOOTER_CLASS,
+  CANVAS_PANEL_SHELL_HEADER_CLASS,
+  CANVAS_PANEL_SHELL_LINK_BTN_CLASS,
+  CANVAS_PANEL_SHELL_TABS_ROW_CLASS,
+  CANVAS_PANEL_ITEM_CARD_CLASS,
   CANVAS_PANEL_ITEM_META_CLASS,
   CANVAS_PANEL_TAB_ACTIVE_CLASS,
   CANVAS_PANEL_TAB_IDLE_CLASS,
-  CANVAS_PANEL_TITLE_CLASS,
   CANVAS_SEMANTIC_ERROR_CLASS,
   CANVAS_SEMANTIC_STATUS_CLASS,
 } from "@/lib/canvas/canvas-chrome-semantics";
@@ -80,7 +88,7 @@ function PromptRow({
         "rounded-lg border px-3 py-2.5",
         failed
           ? "border-red-400/25 bg-red-500/5"
-          : "border-white/10 bg-white/[0.03]",
+          : "border-white/10 bg-black/25",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -119,7 +127,7 @@ function PromptRow({
         <button
           type="button"
           onClick={() => onCopy(item.promptText)}
-          className="shrink-0 rounded-md border border-white/10 p-1.5 text-white/60 hover:border-white/25 hover:text-white"
+          className="shrink-0 rounded-md p-1.5 text-white/60 hover:bg-black/25 hover:text-white"
           title="复制提示词"
         >
           <Copy className="size-3.5" />
@@ -171,8 +179,28 @@ export function MyPromptHistoryPanel({
     [base, effectiveProjectId, mediaKind, outcome, scope],
   );
 
-  const loadFirst = useCallback(async () => {
+  const loadFirst = useCallback(async (opts?: { force?: boolean }) => {
     if (!base) return;
+    const cacheKey = toolbarPanelCacheKey("prompt-history", {
+      scope,
+      projectId: effectiveProjectId ?? "",
+      mediaKind,
+      outcome,
+    });
+    const cached = peekToolbarPanelCache<{
+      items: CanvasPromptHistoryItem[];
+      hasMore: boolean;
+      nextCursor: string | null;
+    }>(cacheKey, opts);
+    if (cached) {
+      setItems(cached.items);
+      setHasMore(cached.hasMore);
+      hasMoreRef.current = cached.hasMore;
+      cursorRef.current = cached.nextCursor;
+      setLoading(false);
+      setError(null);
+      return;
+    }
     const seq = ++loadSeqRef.current;
     setLoading(true);
     setError(null);
@@ -186,6 +214,11 @@ export function MyPromptHistoryPanel({
       setHasMore(page.hasMore);
       hasMoreRef.current = page.hasMore;
       cursorRef.current = page.nextCursor;
+      writeToolbarPanelCache(cacheKey, {
+        items: page.items,
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor,
+      });
     } catch (e) {
       if (seq !== loadSeqRef.current) return;
       setError(
@@ -195,7 +228,7 @@ export function MyPromptHistoryPanel({
     } finally {
       if (seq === loadSeqRef.current) setLoading(false);
     }
-  }, [base, fetchPage]);
+  }, [base, effectiveProjectId, fetchPage, mediaKind, outcome, scope]);
 
   const loadMore = useCallback(async () => {
     if (!base || !hasMoreRef.current || !cursorRef.current || loadingMore) return;
@@ -251,74 +284,60 @@ export function MyPromptHistoryPanel({
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[60]`}
-      onClick={onClose}
-      role="presentation"
+    <CanvasToolbarSidePanelShell
+      open={open}
+      onClose={onClose}
+      ariaLabel="我的提示词"
     >
-      <aside
-        className={canvasToolbarSidePanelAsideClass(
-          `border-l ${CANVAS_PANEL_HEADER_BORDER_CLASS}`,
-        )}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="我的提示词"
-      >
-        <header
-          className={cn(
-            "border-b px-4 py-3",
-            CANVAS_PANEL_HEADER_BORDER_CLASS,
-          )}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Sparkles className={CANVAS_PANEL_HEADER_ICON_CLASS} />
-              <p className={CANVAS_PANEL_TITLE_CLASS}>我的提示词</p>
+        <header className={CANVAS_PANEL_SHELL_HEADER_CLASS}>
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-[var(--canvas-accent)]" />
+            <div>
+              <p className="text-sm font-medium">我的提示词</p>
+              <p className="text-[10px] text-white/45">
+                已提交的提示词自动归档 · 按类型与成败分类
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md p-1 text-[var(--canvas-muted)] hover:bg-white/5 hover:text-white"
-              aria-label="关闭"
-            >
-              <X className="size-4" />
-            </button>
           </div>
-          <p className="mt-1 text-[11px] text-white/50">
-            已提交的提示词自动归档 · 按类型与成败分类
-          </p>
-          <div className="mt-3 flex gap-1">
-            <button
-              type="button"
-              onClick={() => setScope("project")}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-[11px]",
-                scope === "project"
-                  ? CANVAS_PANEL_TAB_ACTIVE_CLASS
-                  : CANVAS_PANEL_TAB_IDLE_CLASS,
-              )}
-            >
-              本项目
-            </button>
-            <button
-              type="button"
-              onClick={() => setScope("mine")}
-              className={cn(
-                "rounded-md px-2.5 py-1 text-[11px]",
-                scope === "mine"
-                  ? CANVAS_PANEL_TAB_ACTIVE_CLASS
-                  : CANVAS_PANEL_TAB_IDLE_CLASS,
-              )}
-            >
-              我的全部
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1 text-[var(--canvas-muted)] hover:bg-white/5 hover:text-white"
+            aria-label="关闭"
+          >
+            <X className="size-4" />
+          </button>
         </header>
 
-        <div className="border-b border-white/10 px-3 py-2">
+        <div className={CANVAS_PANEL_SHELL_TABS_ROW_CLASS}>
+          <button
+            type="button"
+            onClick={() => setScope("project")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-[11px]",
+              scope === "project"
+                ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                : CANVAS_PANEL_TAB_IDLE_CLASS,
+            )}
+          >
+            本项目
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope("mine")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-[11px]",
+              scope === "mine"
+                ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                : CANVAS_PANEL_TAB_IDLE_CLASS,
+            )}
+          >
+            我的全部
+          </button>
+        </div>
+
+        <div className={cn(CANVAS_PANEL_SHELL_TABS_ROW_CLASS, "flex-col gap-2 border-t-0 pt-0")}>
           <div className="flex flex-wrap gap-1">
             {MEDIA_TABS.map((tab) => {
               const Icon = tab.icon;
@@ -328,7 +347,7 @@ export function MyPromptHistoryPanel({
                   type="button"
                   onClick={() => setMediaKind(tab.id)}
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px]",
+                    "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-[11px]",
                     mediaKind === tab.id
                       ? CANVAS_PANEL_TAB_ACTIVE_CLASS
                       : CANVAS_PANEL_TAB_IDLE_CLASS,
@@ -340,12 +359,12 @@ export function MyPromptHistoryPanel({
               );
             })}
           </div>
-          <div className="mt-2 flex gap-1">
+          <div className="flex flex-wrap gap-1">
             <button
               type="button"
               onClick={() => setOutcome("success")}
               className={cn(
-                "rounded-md px-2.5 py-1 text-[11px]",
+                "inline-flex items-center rounded-md px-3 py-1.5 text-[11px]",
                 outcome === "success"
                   ? CANVAS_PANEL_TAB_ACTIVE_CLASS
                   : CANVAS_PANEL_TAB_IDLE_CLASS,
@@ -357,10 +376,10 @@ export function MyPromptHistoryPanel({
               type="button"
               onClick={() => setOutcome("failed")}
               className={cn(
-                "rounded-md px-2.5 py-1 text-[11px]",
+                "inline-flex items-center rounded-md px-3 py-1.5 text-[11px]",
                 outcome === "failed"
-                  ? "bg-red-500/20 text-red-100"
-                  : "text-white/55 hover:bg-white/5",
+                  ? CANVAS_PANEL_TAB_ACTIVE_CLASS
+                  : CANVAS_PANEL_TAB_IDLE_CLASS,
               )}
             >
               失败
@@ -368,14 +387,11 @@ export function MyPromptHistoryPanel({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className={CANVAS_PANEL_SHELL_BODY_CLASS}>
           {error ? (
-            <p className="text-sm text-red-300">{error}</p>
+            <p className={CANVAS_PANEL_SHELL_ERROR_CLASS}>{error}</p>
           ) : loading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-sm text-white/50">
-              <Loader2 className={cn("size-4 animate-spin", CANVAS_SEMANTIC_STATUS_CLASS)} />
-              加载中…
-            </div>
+            <CanvasPanelShellLoading />
           ) : items.length === 0 ? (
             <p className="py-16 text-center text-sm text-white/45">
               当前分类下暂无提示词记录
@@ -390,18 +406,13 @@ export function MyPromptHistoryPanel({
                   onCopy={copyPrompt}
                 />
               ))}
-              {loadingMore ? (
-                <div className="flex items-center justify-center gap-2 py-3 text-xs text-white/45">
-                  <Loader2 className="size-3.5 animate-spin" />
-                  加载更多…
-                </div>
-              ) : null}
+              {loadingMore ? <CanvasPanelShellLoadingMore /> : null}
               <div ref={loadMoreSentinelRef} className="h-1" aria-hidden />
             </div>
           )}
         </div>
 
-        <footer className="border-t border-white/10 px-4 py-2 text-[10px] text-white/40">
+        <footer className={cn(CANVAS_PANEL_SHELL_FOOTER_CLASS, "text-[10px] text-white/40")}>
           提示词在每次点击生成时自动保存；成功与失败分别归档。
           {scope === "project" && effectiveProjectId ? (
             <Link
@@ -413,7 +424,6 @@ export function MyPromptHistoryPanel({
             </Link>
           ) : null}
         </footer>
-      </aside>
-    </div>
+    </CanvasToolbarSidePanelShell>
   );
 }
