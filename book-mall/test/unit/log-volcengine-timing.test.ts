@@ -335,6 +335,27 @@ describe("log-volcengine-timing", () => {
     expect(isVolcengineVendorStuck(trace, nowMs)).toBe(true);
   });
 
+  it("resolveVendorNativeTimingForLogRow: Seedance running frozen updated uses now−created", () => {
+    const createdMs = 1_000_000;
+    const nowMs = createdMs + 1_084_000;
+    const trace = mergeVolcengineTimingTrace(null, {
+      status: "running",
+      raw: {
+        created_at: createdMs / 1000,
+        updated_at: createdMs / 1000,
+      },
+      polledAtMs: nowMs - 950_000,
+    });
+    const row = resolveVendorNativeTimingForLogRow({
+      providerKind: "VOLCENGINE",
+      requestKind: "VIDEO",
+      vendorDurationMs: null,
+      resultSummary: { _gateway: { volcengineTiming: trace } },
+      nowMs,
+    });
+    expect(row.vendorNativeGenerateMs).toBe(1_084_000);
+  });
+
   it("resolveVendorNativeTimingForLogRow uses volcengine trace span", () => {
     const createdMs = 1_000_000;
     const updatedMs = 1_000_000 + 120_000;
