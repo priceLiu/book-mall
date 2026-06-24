@@ -224,7 +224,7 @@ export function ModelManager({
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 flex-1 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-lg font-semibold text-[var(--gw-ink)]">{g.label}</h2>
+                    <h2>{g.label}</h2>
                     <ProviderApplyLink
                       providerKind={g.providerKind}
                       className="text-xs text-[var(--gw-accent)] hover:underline"

@@ -607,11 +607,8 @@ export function useCanvasRunner(
 
   const releaseInflightKey = useCallback((key: string) => {
     if (!inflightRef.current.delete(key)) return;
-    const deferred = deferredForceFreshRef.current.get(key);
-    if (!deferred) return;
+    // 生成中重复点击产生的 deferred 不再自动排队，避免同一节点连跑两轮（重复 Gateway 日志 / 扣费）
     deferredForceFreshRef.current.delete(key);
-    queueRef.current.push(deferred);
-    drainRef.current();
   }, []);
 
   /** 顺序链单步完成：防止 subscribe 与 finally 重复推进 cursor */
@@ -1230,31 +1227,9 @@ export function useCanvasRunner(
         return;
       }
       const key = runKey(job);
-      if (job.forceFresh) {
-        queueRef.current = queueRef.current.filter((q) => runKey(q) !== key);
-        if (inflightRef.current.has(key)) {
-          deferredForceFreshRef.current.set(key, job);
-          const node = useCanvasStore.getState().nodes.find((n) => n.id === job.nodeId);
-          if (node) {
-            if (
-              !commitStoryRunPendingPatch(
-                node,
-                job,
-                useCanvasStore.getState().nodes,
-                updateNodeData,
-              ) &&
-              !commitLibtvMediaRunPendingPatch(node, updateNodeData)
-            ) {
-              setNodeRuntime(job.nodeId, {
-                status: "pending",
-                taskId: undefined,
-                failCode: undefined,
-                failMessage: undefined,
-              });
-            }
-          }
-          return;
-        }
+      if (job.forceFresh && inflightRef.current.has(key)) {
+        // 生成中重复点击忽略（勿 deferred 排队，否则首轮结束后会自动再提交）
+        return;
       }
       if (inflightRef.current.has(key)) return;
       if (queueRef.current.some((q) => runKey(q) === key)) return;

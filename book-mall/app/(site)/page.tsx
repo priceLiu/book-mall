@@ -5,6 +5,7 @@ import { FeaturedProductsSection } from "@/components/layout/sections/featured-p
 import { FooterSection } from "@/components/layout/sections/footer";
 import { SiteHomeHeroSection } from "@/components/layout/site-home/site-home-hero";
 import { SiteHomeLogoMarquee } from "@/components/layout/site-home/site-home-logo-marquee";
+import { pickRandomStoryVideos } from "@/lib/story-theater-videos";
 import { TestimonialSection } from "@/components/layout/sections/testimonial";
 
 export const dynamic = "force-dynamic";
@@ -42,9 +43,11 @@ export const metadata = {
 };
 
 export default function Home() {
+  const heroClips = pickRandomStoryVideos(3);
+
   return (
     <>
-      <SiteHomeHeroSection />
+      <SiteHomeHeroSection clips={heroClips} />
       <SiteHomeLogoMarquee />
       <div className="site-home-below-hero">
         <FeaturedProductsSection />

@@ -29,6 +29,12 @@ import {
   fetchGenerationRecordCanvas,
   generationRecordDisplayTitle,
 } from "@/lib/canvas/restore-generation-record";
+import {
+  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
+  CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
+  canvasToolbarSidePanelAsideClass,
+} from "@/lib/canvas/canvas-toolbar-side-panel";
+import { usePanelInfiniteScroll } from "@/lib/canvas/use-panel-infinite-scroll";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { resolveGenerationRecordPreview } from "@/lib/canvas/generation-record-preview";
 import {
@@ -238,7 +244,12 @@ export function MyCanvasGenerationRecordsPanel({
     [],
   );
   const [todayTasks, setTodayTasks] = useState<CanvasGenerationRecord[]>([]);
+  const [projectHasMore, setProjectHasMore] = useState(false);
+  const [todayHasMore, setTodayHasMore] = useState(false);
+  const projectCursorRef = useRef<string | null>(null);
+  const todayCursorRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const openRef = useRef(open);
@@ -248,18 +259,97 @@ export function MyCanvasGenerationRecordsPanel({
     if (!base || !projectId) return;
     setLoading(true);
     try {
-      const data = await listCanvasGenerationRecords(base, projectId);
+      const data = await listCanvasGenerationRecords(base, projectId, {
+        projectLimit: CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
+        todayLimit: CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
+      });
       setProjectTasks(data.projectTasks);
       setTodayTasks(data.todayTasks);
+      setProjectHasMore(data.projectHasMore);
+      setTodayHasMore(data.todayHasMore);
+      projectCursorRef.current = data.projectNextCursor;
+      todayCursorRef.current = data.todayNextCursor;
       setListError(null);
     } catch (e) {
       setProjectTasks([]);
       setTodayTasks([]);
+      setProjectHasMore(false);
+      setTodayHasMore(false);
+      projectCursorRef.current = null;
+      todayCursorRef.current = null;
       setListError(formatCanvasApiError(e instanceof Error ? e.message : String(e)));
     } finally {
       setLoading(false);
     }
   }, [base, projectId]);
+
+  const loadMore = useCallback(async () => {
+    if (!base || !projectId || loadingMore) return;
+    const isProject = tab === "project";
+    const cursor = isProject
+      ? projectCursorRef.current
+      : todayCursorRef.current;
+    const hasMore = isProject ? projectHasMore : todayHasMore;
+    if (!hasMore || !cursor) return;
+    setLoadingMore(true);
+    try {
+      const data = await listCanvasGenerationRecords(base, projectId, {
+        ...(isProject
+          ? {
+              projectLimit: CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
+              projectCursor: cursor,
+            }
+          : {
+              todayLimit: CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
+              todayCursor: cursor,
+            }),
+      });
+      if (isProject) {
+        setProjectTasks((prev) => {
+          const seen = new Set(prev.map((t) => t.id));
+          const merged = [...prev];
+          for (const row of data.projectTasks) {
+            if (!seen.has(row.id)) merged.push(row);
+          }
+          return merged;
+        });
+        setProjectHasMore(data.projectHasMore);
+        projectCursorRef.current = data.projectNextCursor;
+      } else {
+        setTodayTasks((prev) => {
+          const seen = new Set(prev.map((t) => t.id));
+          const merged = [...prev];
+          for (const row of data.todayTasks) {
+            if (!seen.has(row.id)) merged.push(row);
+          }
+          return merged;
+        });
+        setTodayHasMore(data.todayHasMore);
+        todayCursorRef.current = data.todayNextCursor;
+      }
+      setListError(null);
+    } catch (e) {
+      setListError(formatCanvasApiError(e instanceof Error ? e.message : String(e)));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [
+    base,
+    projectId,
+    tab,
+    projectHasMore,
+    todayHasMore,
+    loadingMore,
+  ]);
+
+  const activeHasMore = tab === "project" ? projectHasMore : todayHasMore;
+  const loadMoreSentinelRef = usePanelInfiniteScroll({
+    enabled: open,
+    hasMore: activeHasMore,
+    loading,
+    loadingMore,
+    onLoadMore: loadMore,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -380,12 +470,14 @@ export function MyCanvasGenerationRecordsPanel({
 
   return (
     <div
-      className="fixed inset-0 z-[1450] flex justify-end bg-black/45"
+      className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[1450]`}
       onClick={onClose}
       role="presentation"
     >
       <aside
-        className="flex h-full w-full max-w-md flex-col border-l border-emerald-400/15 bg-[var(--canvas-surface)] text-white shadow-2xl"
+        className={canvasToolbarSidePanelAsideClass(
+          "border-l border-emerald-400/15",
+        )}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="生成记录"
@@ -415,7 +507,7 @@ export function MyCanvasGenerationRecordsPanel({
                 : "text-white/55 hover:bg-white/8"
             }`}
           >
-            今日全部 ({todayTasks.length})
+            今日全部 ({todayTasks.length}{todayHasMore ? "+" : ""})
           </button>
           <button
             type="button"
@@ -426,7 +518,7 @@ export function MyCanvasGenerationRecordsPanel({
                 : "text-white/55 hover:bg-white/8"
             }`}
           >
-            本项目 ({projectTasks.length})
+            本项目 ({projectTasks.length}{projectHasMore ? "+" : ""})
           </button>
         </div>
 
@@ -465,6 +557,15 @@ export function MyCanvasGenerationRecordsPanel({
                   restoring={restoringId === item.id}
                 />
               ))}
+              {loadingMore ? (
+                <li className="flex items-center justify-center gap-2 py-3 text-[11px] text-white/45">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  加载更多…
+                </li>
+              ) : null}
+              <li>
+                <div ref={loadMoreSentinelRef} className="h-1" aria-hidden />
+              </li>
             </ul>
           )}
         </div>

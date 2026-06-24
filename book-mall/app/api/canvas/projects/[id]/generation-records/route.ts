@@ -11,6 +11,7 @@ import {
   listProjectGenerationRecords,
   listUserGenerationRecords,
 } from "@/lib/canvas/canvas-task-service";
+import { parseGenerationRecordLimit } from "@/lib/canvas/generation-task-page-cursor";
 import {
   attachNodePresentToGenerationRecords,
   loadCanvasNodeIdsByProjectForUser,
@@ -39,20 +40,47 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   try {
     await assertAccessibleCanvasProject(guard.user.id, projectId);
     const since = startOfTodayBeijing();
-    const [projectTasks, todayTasks] = await Promise.all([
-      listProjectGenerationRecords({
-        userId: guard.user.id,
-        projectId,
-      }),
-      listUserGenerationRecords({
-        userId: guard.user.id,
-        since,
-        limit: 200,
-      }),
+    const sp = request.nextUrl.searchParams;
+    const projectLimitRaw = sp.get("projectLimit");
+    const todayLimitRaw = sp.get("todayLimit");
+    const projectLimit = projectLimitRaw
+      ? parseGenerationRecordLimit(projectLimitRaw)
+      : null;
+    const todayLimit = todayLimitRaw
+      ? parseGenerationRecordLimit(todayLimitRaw)
+      : null;
+    const projectCursor = sp.get("projectCursor")?.trim() || undefined;
+    const todayCursor = sp.get("todayCursor")?.trim() || undefined;
+
+    const [projectPage, todayPage] = await Promise.all([
+      projectLimit != null
+        ? listProjectGenerationRecords({
+            userId: guard.user.id,
+            projectId,
+            limit: projectLimit,
+            cursor: projectCursor,
+          })
+        : Promise.resolve({
+            items: [],
+            hasMore: false,
+            nextCursor: null as string | null,
+          }),
+      todayLimit != null
+        ? listUserGenerationRecords({
+            userId: guard.user.id,
+            since,
+            limit: todayLimit,
+            cursor: todayCursor,
+          })
+        : Promise.resolve({
+            items: [],
+            hasMore: false,
+            nextCursor: null as string | null,
+          }),
     ]);
     const projectIds = [
       projectId,
-      ...todayTasks.map((t) => t.projectId).filter(Boolean),
+      ...todayPage.items.map((t) => t.projectId).filter(Boolean),
     ] as string[];
     const nodeIdsByProject = await loadCanvasNodeIdsByProjectForUser(
       guard.user.id,
@@ -61,14 +89,18 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     return NextResponse.json(
       {
         projectTasks: attachNodePresentToGenerationRecords(
-          projectTasks,
+          projectPage.items,
           nodeIdsByProject,
           projectId,
         ),
         todayTasks: attachNodePresentToGenerationRecords(
-          todayTasks,
+          todayPage.items,
           nodeIdsByProject,
         ),
+        projectHasMore: projectPage.hasMore,
+        projectNextCursor: projectPage.nextCursor,
+        todayHasMore: todayPage.hasMore,
+        todayNextCursor: todayPage.nextCursor,
         since: since.toISOString(),
       },
       { headers: jsonHeaders(request) },

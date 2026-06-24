@@ -32,8 +32,14 @@ export async function GET(request: NextRequest) {
       search: sp.get("q"),
       includeLegacy: sp.get("includeLegacy") !== "0",
     };
-    const assets = await listProjectAssets(guard.user.id, filter);
-    return NextResponse.json({ assets }, { headers: jsonHeaders(request) });
+    const limitRaw = sp.get("limit");
+    const limit = limitRaw ? Number(limitRaw) : undefined;
+    const cursor = sp.get("cursor")?.trim() || undefined;
+    const page = await listProjectAssets(guard.user.id, filter, {
+      limit,
+      cursor,
+    });
+    return NextResponse.json(page, { headers: jsonHeaders(request) });
   } catch (err) {
     if (err instanceof ProjectAssetError) {
       return NextResponse.json(

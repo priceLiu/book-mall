@@ -64,6 +64,13 @@ import { extractPosterUrlFromResultPayload } from "./video-poster-ffmpeg";
 import { resolveCanvasHistoryIdsForTasks } from "./generation-canvas-history";
 import { findGenerationTaskRows, type GenerationTaskRecordRow } from "./canvas-generation-task-query";
 import {
+  buildGenerationTaskCursorWhere,
+  encodeGenerationTaskCursor,
+  GENERATION_RECORD_PAGE_DEFAULT,
+  parseGenerationRecordLimit,
+  parseGenerationTaskCursor,
+} from "./generation-task-page-cursor";
+import {
   buildCanvasTaskHotReadWhere,
   canvasGenerationRecordsDefaultSince,
 } from "./canvas-task-hot-window";
@@ -2131,27 +2138,43 @@ export async function listProjectTasks(args: {
   });
 }
 
-/** 生成记录面板：本项目近 N 天任务（低频全字段，非高频 /tasks 轮询）。 */
+/** 生成记录面板：本项目近 N 天任务（分页，非高频 /tasks 轮询）。 */
 export async function listProjectGenerationRecords(args: {
   userId: string;
   projectId: string;
   since?: Date;
-}): Promise<CanvasGenerationRecordListItem[]> {
+  limit?: number;
+  cursor?: string | null;
+}): Promise<{
+  items: CanvasGenerationRecordListItem[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}> {
   await assertAccessibleCanvasProject(args.userId, args.projectId);
   const since = args.since ?? canvasGenerationRecordsDefaultSince();
+  const limit = parseGenerationRecordLimit(String(args.limit ?? GENERATION_RECORD_PAGE_DEFAULT));
+  const cursor = parseGenerationTaskCursor(args.cursor);
+  const cursorWhere = buildGenerationTaskCursorWhere(cursor);
+  const baseWhere: Prisma.CanvasGenerationTaskWhereInput = {
+    projectId: args.projectId,
+    deletedAt: null,
+    createdAt: { gte: since },
+  };
+  const where: Prisma.CanvasGenerationTaskWhereInput = cursorWhere
+    ? { AND: [baseWhere, cursorWhere] }
+    : baseWhere;
+
   const rows = await findGenerationTaskRows({
-    where: {
-      projectId: args.projectId,
-      deletedAt: null,
-      createdAt: { gte: since },
-    },
+    where,
     orderBy: { createdAt: "desc" },
-    take: 500,
+    take: limit + 1,
     projectIdForRows: args.projectId,
   });
-  const enriched = await enrichCanvasTaskRows(rows);
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const enriched = await enrichCanvasTaskRows(pageRows);
   const historyByTask = await resolveCanvasHistoryIdsForTasks(
-    rows.map((r) => ({
+    pageRows.map((r) => ({
       id: r.id,
       projectId: args.projectId,
       createdAt: r.createdAt,
@@ -2159,8 +2182,8 @@ export async function listProjectGenerationRecords(args: {
       inputPayload: r.inputPayload,
     })),
   );
-  return enriched.map((row, idx) => {
-    const source = rows[idx];
+  const items = enriched.map((row, idx) => {
+    const source = pageRows[idx];
     if (!source) {
       throw new Error("generation record row missing");
     }
@@ -2173,33 +2196,56 @@ export async function listProjectGenerationRecords(args: {
       historyByTask.get(row.id) ?? null,
     );
   });
+  const last = pageRows[pageRows.length - 1];
+  return {
+    items,
+    hasMore,
+    nextCursor:
+      hasMore && last
+        ? encodeGenerationTaskCursor({ createdAt: last.createdAt, id: last.id })
+        : null,
+  };
 }
 
-/** 用户级生成记录（含成功/失败；可按时间筛选，用于「生成记录」面板）。 */
+/** 用户级生成记录（分页；可按时间筛选，用于「生成记录」面板）。 */
 export async function listUserGenerationRecords(args: {
   userId: string;
   projectId?: string;
   since?: Date;
   limit?: number;
-}): Promise<CanvasUserGenerationRecordListItem[]> {
-  const limit = Math.min(Math.max(args.limit ?? 100, 1), 500);
-  const rows = await findGenerationTaskRows({
-    where: {
+  cursor?: string | null;
+}): Promise<{
+  items: CanvasUserGenerationRecordListItem[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}> {
+  const limit = parseGenerationRecordLimit(String(args.limit ?? GENERATION_RECORD_PAGE_DEFAULT));
+  const cursor = parseGenerationTaskCursor(args.cursor);
+  const cursorWhere = buildGenerationTaskCursorWhere(cursor);
+  const baseWhere: Prisma.CanvasGenerationTaskWhereInput = {
+    deletedAt: null,
+    project: {
+      userId: args.userId,
       deletedAt: null,
-      project: {
-        userId: args.userId,
-        deletedAt: null,
-        ...(args.projectId ? { id: args.projectId } : {}),
-      },
-      ...(args.since ? { createdAt: { gte: args.since } } : {}),
+      ...(args.projectId ? { id: args.projectId } : {}),
     },
+    ...(args.since ? { createdAt: { gte: args.since } } : {}),
+  };
+  const where: Prisma.CanvasGenerationTaskWhereInput = cursorWhere
+    ? { AND: [baseWhere, cursorWhere] }
+    : baseWhere;
+
+  const rows = await findGenerationTaskRows({
+    where,
     orderBy: { createdAt: "desc" },
-    take: limit,
+    take: limit + 1,
     includeProjectName: true,
   });
-  const enriched = await enrichCanvasTaskRows(rows);
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const enriched = await enrichCanvasTaskRows(pageRows);
   const historyByTask = await resolveCanvasHistoryIdsForTasks(
-    rows.map((r) => ({
+    pageRows.map((r) => ({
       id: r.id,
       projectId: r.projectId,
       createdAt: r.createdAt,
@@ -2207,8 +2253,8 @@ export async function listUserGenerationRecords(args: {
       inputPayload: r.inputPayload,
     })),
   );
-  return enriched.map((row, idx) => {
-    const source = rows[idx];
+  const items = enriched.map((row, idx) => {
+    const source = pageRows[idx];
     if (!source) {
       throw new Error("generation record row missing");
     }
@@ -2225,6 +2271,15 @@ export async function listUserGenerationRecords(args: {
       projectName: source.project?.name ?? "",
     };
   });
+  const last = pageRows[pageRows.length - 1];
+  return {
+    items,
+    hasMore,
+    nextCursor:
+      hasMore && last
+        ? encodeGenerationTaskCursor({ createdAt: last.createdAt, id: last.id })
+        : null,
+  };
 }
 
 export type CanvasGenerationKindAlias = CanvasGenerationKind;

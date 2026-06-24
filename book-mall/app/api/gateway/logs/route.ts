@@ -95,10 +95,12 @@ export async function GET(request: NextRequest) {
     // 自动刷新 tick 传 facets=0：facets（按 provider/model/credential 分面，3~4 条额外查询）
     // 只在首屏 / 改筛选时才需要重算，8s 轮询不必每次都算，显著降低读页面对 DB 的压力。
     const facetsParam = request.nextUrl.searchParams.get("facets")?.trim();
+    const facetsOnly = facetsParam === "only";
     const includeFacets =
       !historyMode &&
       facetsParam !== "0" &&
-      facetsParam !== "false";
+      facetsParam !== "false" &&
+      !facetsOnly;
 
     const bookUserId = await resolveGatewaySessionBookUserId(user);
     const isPlatformAdmin = bookUserId
@@ -114,6 +116,14 @@ export async function GET(request: NextRequest) {
     const skipCountParam = request.nextUrl.searchParams.get("skipCount")?.trim();
     /** skipCount=1：跳过 count（主表+归档双 count 很慢）；首屏/滚动追加均可用 */
     const skipCount = skipCountParam === "1" || skipCountParam === "true";
+
+    if (facetsOnly) {
+      const facets = await resolveGatewayLogListFacets(
+        facetWhere,
+        providerKind || undefined,
+      );
+      return NextResponse.json({ facets });
+    }
 
     const [total, facets, canvasQueueStats] = await Promise.all([
       skipCount

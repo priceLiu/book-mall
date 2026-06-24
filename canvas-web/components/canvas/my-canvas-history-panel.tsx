@@ -26,6 +26,10 @@ import {
   getCanvasAutosaveIntervalMs,
   setCanvasAutosaveIntervalMs,
 } from "@/lib/canvas/canvas-autosave-settings";
+import {
+  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
+  canvasToolbarSidePanelAsideClass,
+} from "@/lib/canvas/canvas-toolbar-side-panel";
 
 type HistoryTab = "autosave" | "manual";
 
@@ -179,12 +183,14 @@ export function MyCanvasHistoryPanel({
 
   return (
     <div
-      className="fixed inset-0 z-[1450] flex justify-end bg-black/45"
+      className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[1450]`}
       onClick={onClose}
       role="presentation"
     >
       <aside
-        className="flex h-full w-full max-w-md flex-col border-l border-violet-400/15 bg-[var(--canvas-surface)] text-white shadow-2xl"
+        className={canvasToolbarSidePanelAsideClass(
+          "border-l border-violet-400/15",
+        )}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="我的历史"

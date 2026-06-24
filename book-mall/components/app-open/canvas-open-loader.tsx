@@ -12,10 +12,10 @@ export function CanvasOpenLoader() {
       />
 
       <div
-        className="relative h-[8.5rem] w-[10.5rem] rounded-2xl border border-violet-400/20 bg-black/25 shadow-inner backdrop-blur-[1px]"
+        className="relative h-[8.5rem] w-[10.5rem] rounded-2xl border border-violet-200 bg-[#f6f8fa] shadow-sm"
         aria-hidden
       >
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(167,139,250,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(167,139,250,0.08)_1px,transparent_1px)] bg-[size:18px_18px] motion-safe:animate-canvas-grid-pulse motion-reduce:opacity-80" />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.06)_1px,transparent_1px)] bg-[size:18px_18px] motion-safe:animate-canvas-grid-pulse motion-reduce:opacity-80" />
 
         <svg
           viewBox="0 0 168 136"

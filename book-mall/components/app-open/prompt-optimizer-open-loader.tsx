@@ -11,12 +11,12 @@ export function PromptOptimizerOpenLoader() {
         aria-hidden
       />
       <div
-        className="relative flex h-28 w-44 items-center justify-center rounded-2xl border border-indigo-400/25 bg-black/25 shadow-inner backdrop-blur-[1px]"
+        className="relative flex h-28 w-44 items-center justify-center rounded-2xl border border-indigo-200 bg-[#f6f8fa] shadow-sm"
         aria-hidden
       >
         <Sparkles
           strokeWidth={1.5}
-          className="size-10 text-indigo-300/90 motion-safe:animate-pulse motion-reduce:opacity-90"
+          className="size-10 text-indigo-500/80 motion-safe:animate-pulse motion-reduce:opacity-90"
         />
       </div>
     </div>

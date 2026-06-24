@@ -50,7 +50,7 @@ export async function savePortraitToProjectAssets(
       kind: "PRIVATE_PORTRAIT",
       scope: "all",
     });
-    dup = existing.find(
+    dup = existing.assets.find(
       (a) => String(a.payload?.portraitAssetId ?? "") === input.assetId,
     );
   } catch {

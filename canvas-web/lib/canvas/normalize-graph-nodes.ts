@@ -19,6 +19,19 @@ import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
 const GROUP_PADDING = 28;
 const GROUP_HEADER = 40;
 
+/** 选中态仅会话内有效，持久化/加载时一律清除，避免重开画布自动弹出 Dock */
+export function stripPersistedNodeSelection(
+  nodes: CanvasFlowNode[],
+): CanvasFlowNode[] {
+  let changed = false;
+  const next = nodes.map((n) => {
+    if (!n.selected) return n;
+    changed = true;
+    return { ...n, selected: false };
+  });
+  return changed ? next : nodes;
+}
+
 /** 漫剧模板分组默认画布位置（孤儿节点还原用） */
 const STORY_GROUP_FALLBACK: Record<string, { x: number; y: number }> = {
   "sc-group-characters": { x: 40, y: 720 },

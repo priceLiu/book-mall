@@ -39,6 +39,11 @@ import {
   type GatewayDynamicActivityCounts,
 } from "@/lib/gateway-live-poll-policy";
 import {
+  gatewayTransientRetryDelayMs,
+  isGatewayTransientFetchError,
+  sleepMs,
+} from "@/lib/gateway-db-retry";
+import {
   filterLiveHotWindowRows,
   gatewayLogHotCutoffMs,
 } from "@/lib/gateway-log-hot-window";
@@ -271,6 +276,8 @@ async function fetchGatewayLogs(params: {
   poll?: boolean;
   /** 自动刷新 tick 传 false：不重算分面，沿用上一次 facets，降低 DB 压力 */
   includeFacets?: boolean;
+  /** 仅拉筛选项分面（不查日志行） */
+  facetsOnly?: boolean;
   /** 历史追加页：跳过 count，响应带 hasMore */
   skipCount?: boolean;
 }): Promise<GatewayLogsResponse> {
@@ -291,35 +298,123 @@ async function fetchGatewayLogs(params: {
   else if (params.skipPoll !== false) qs.set("skipPoll", "1");
   if (params.poll) qs.set("poll", "1");
   if (params.includeFacets === false) qs.set("facets", "0");
-  try {
-    const res = await fetch(`/api/book-mall/api/gateway/logs?${qs.toString()}`);
-    const data = (await res.json().catch(() => null)) as
-      | (GatewayLogsResponse & { error?: string })
-      | null;
-    if (!res.ok) {
-      throw new Error(data?.error ?? "加载日志失败");
+  if (params.facetsOnly) qs.set("facets", "only");
+  const path = `/api/book-mall/api/gateway/logs?${qs.toString()}`;
+  const maxAttempts = 4;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await fetch(path);
+      const raw = await res.text();
+      let data: (GatewayLogsResponse & { error?: string }) | null = null;
+      try {
+        data = raw ? (JSON.parse(raw) as GatewayLogsResponse & { error?: string }) : null;
+      } catch {
+        data = null;
+      }
+      if (
+        !res.ok &&
+        attempt < maxAttempts - 1 &&
+        isGatewayTransientFetchError(res.status, raw)
+      ) {
+        await sleepMs(gatewayTransientRetryDelayMs(attempt));
+        continue;
+      }
+      if (!res.ok) {
+        throw new Error(
+          data?.error === "DATABASE_UNAVAILABLE"
+            ? "服务繁忙，请稍后再试"
+            : (data?.error ?? "加载日志失败"),
+        );
+      }
+      return {
+        logs: data?.logs ?? [],
+        total: data?.total ?? null,
+        page: data?.page ?? params.page,
+        pageSize: data?.pageSize ?? params.pageSize,
+        totalPages: data?.totalPages ?? null,
+        hasMore: data?.hasMore,
+        facets: data?.facets,
+        canvasQueueStats: data?.canvasQueueStats ?? null,
+        hotCutoffMs: data?.hotCutoffMs,
+      };
+    } catch (e) {
+      if (
+        attempt < maxAttempts - 1 &&
+        e instanceof Error &&
+        (e.name === "AbortError" || /failed to fetch/i.test(e.message))
+      ) {
+        await sleepMs(gatewayTransientRetryDelayMs(attempt));
+        continue;
+      }
+      if (e instanceof Error && e.message !== "加载日志失败") {
+        throw new Error(
+          e.name === "AbortError" || /failed to fetch/i.test(e.message)
+            ? "暂时无法连接主站，请稍后再试"
+            : e.message,
+        );
+      }
+      throw e;
     }
-    return {
-      logs: data?.logs ?? [],
-      total: data?.total ?? null,
-      page: data?.page ?? params.page,
-      pageSize: data?.pageSize ?? params.pageSize,
-      totalPages: data?.totalPages ?? null,
-      hasMore: data?.hasMore,
-      facets: data?.facets,
-      canvasQueueStats: data?.canvasQueueStats ?? null,
-      hotCutoffMs: data?.hotCutoffMs,
-    };
-  } catch (e) {
-    if (e instanceof Error && e.message !== "加载日志失败") {
-      throw new Error(
-        e.name === "AbortError" || /failed to fetch/i.test(e.message)
-          ? "连接主站失败，请确认 book-mall 已启动"
-          : e.message,
-      );
-    }
-    throw e;
   }
+
+  throw new Error("服务繁忙，请稍后再试");
+}
+
+/** 仅拉筛选项分面（动静分离：与日志行查询解耦，加快首屏/Tab 切换） */
+async function fetchGatewayLogFacets(params: {
+  pageSize: number;
+  fromDate: string;
+  toDate: string;
+  statusFilter: string;
+  sourceFilter: string;
+  providerFilter: string;
+  modelFilter: string;
+  credentialIdFilter: string;
+  mode: LogsViewMode;
+}): Promise<GatewayLogFacets | null> {
+  const qs = new URLSearchParams({
+    page: "1",
+    limit: String(params.pageSize),
+    mode: params.mode,
+    facets: "only",
+    skipCount: "1",
+    skipPoll: "1",
+  });
+  if (params.fromDate) qs.set("from", params.fromDate);
+  if (params.toDate) qs.set("to", params.toDate);
+  if (params.statusFilter) qs.set("status", params.statusFilter);
+  if (params.sourceFilter) qs.set("clientSource", params.sourceFilter);
+  if (params.providerFilter) qs.set("providerKind", params.providerFilter);
+  if (params.modelFilter) qs.set("model", params.modelFilter);
+  if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
+  const path = `/api/book-mall/api/gateway/logs?${qs.toString()}`;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(path);
+      const raw = await res.text();
+      if (
+        !res.ok &&
+        attempt < 2 &&
+        isGatewayTransientFetchError(res.status, raw)
+      ) {
+        await sleepMs(gatewayTransientRetryDelayMs(attempt));
+        continue;
+      }
+      if (!res.ok) return null;
+      const data = raw
+        ? (JSON.parse(raw) as { facets?: GatewayLogFacets })
+        : null;
+      return data?.facets ?? null;
+    } catch {
+      if (attempt < 2) {
+        await sleepMs(gatewayTransientRetryDelayMs(attempt));
+        continue;
+      }
+      return null;
+    }
+  }
+  return null;
 }
 
 async function fetchCanvasQueueStats(): Promise<CanvasQueueWithoutLogStats | null> {
@@ -365,31 +460,62 @@ async function fetchGatewayLogsDelta(params: {
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
   if (params.poll) qs.set("poll", "1");
   else qs.set("skipPoll", "1");
-  try {
-    const res = await fetch(`/api/book-mall/api/gateway/logs/delta?${qs.toString()}`);
-    const data = (await res.json().catch(() => null)) as
-      | (GatewayLogsDelta & { error?: string })
-      | null;
-    if (!res.ok) {
-      throw new Error(data?.error ?? "加载日志失败");
+  const path = `/api/book-mall/api/gateway/logs/delta?${qs.toString()}`;
+  const maxAttempts = 3;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await fetch(path);
+      const raw = await res.text();
+      let data: (GatewayLogsDelta & { error?: string }) | null = null;
+      try {
+        data = raw ? (JSON.parse(raw) as GatewayLogsDelta & { error?: string }) : null;
+      } catch {
+        data = null;
+      }
+      if (
+        !res.ok &&
+        attempt < maxAttempts - 1 &&
+        isGatewayTransientFetchError(res.status, raw)
+      ) {
+        await sleepMs(gatewayTransientRetryDelayMs(attempt));
+        continue;
+      }
+      if (!res.ok) {
+        throw new Error(
+          data?.error === "DATABASE_UNAVAILABLE"
+            ? "服务繁忙，请稍后再试"
+            : (data?.error ?? "加载日志失败"),
+        );
+      }
+      return {
+        created: data?.created ?? [],
+        updated: data?.updated ?? [],
+        serverNowMs: data?.serverNowMs ?? Date.now(),
+        sinceApplied: data?.sinceApplied ?? null,
+        hotCutoffMs: data?.hotCutoffMs,
+      };
+    } catch (e) {
+      if (
+        attempt < maxAttempts - 1 &&
+        e instanceof Error &&
+        (e.name === "AbortError" || /failed to fetch/i.test(e.message))
+      ) {
+        await sleepMs(gatewayTransientRetryDelayMs(attempt));
+        continue;
+      }
+      if (e instanceof Error && e.message !== "加载日志失败") {
+        throw new Error(
+          e.name === "AbortError" || /failed to fetch/i.test(e.message)
+            ? "暂时无法连接主站，请稍后再试"
+            : e.message,
+        );
+      }
+      throw e;
     }
-    return {
-      created: data?.created ?? [],
-      updated: data?.updated ?? [],
-      serverNowMs: data?.serverNowMs ?? Date.now(),
-      sinceApplied: data?.sinceApplied ?? null,
-      hotCutoffMs: data?.hotCutoffMs,
-    };
-  } catch (e) {
-    if (e instanceof Error && e.message !== "加载日志失败") {
-      throw new Error(
-        e.name === "AbortError" || /failed to fetch/i.test(e.message)
-          ? "连接主站失败，请确认 book-mall 已启动"
-          : e.message,
-      );
-    }
-    throw e;
   }
+
+  throw new Error("服务繁忙，请稍后再试");
 }
 
 /** 升序游标合并：updated 原地替换、created 去重前插，按 submittedAt desc 排序并截断 */
@@ -517,6 +643,21 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   );
   const hasInFlightLogsRef = useRef(hasInFlightLogs);
   hasInFlightLogsRef.current = hasInFlightLogs;
+  const canvasQueueStatsRef = useRef(canvasQueueStats);
+  canvasQueueStatsRef.current = canvasQueueStats;
+
+  const hasCanvasQueueActivity = useMemo(
+    () => (canvasQueueStats?.total ?? 0) > 0,
+    [canvasQueueStats],
+  );
+  const hasCanvasQueueActivityRef = useRef(hasCanvasQueueActivity);
+  hasCanvasQueueActivityRef.current = hasCanvasQueueActivity;
+
+  const shouldLiveFastRefresh = useCallback(() => {
+    return (
+      hasInFlightLogsRef.current || hasCanvasQueueActivityRef.current
+    );
+  }, []);
 
   const logsRef = useRef(logs);
   logsRef.current = logs;
@@ -605,6 +746,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     },
     [listFilterParams],
   );
+
+  const loadFacets = useCallback(async () => {
+    if (viewModeRef.current !== "live") return;
+    const facets = await fetchGatewayLogFacets(listFilterParams);
+    if (facets) setFacets(facets);
+  }, [listFilterParams]);
 
   const refreshLogs = useCallback(async () => {
     setRefreshing(true);
@@ -703,14 +850,14 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
     const run = async () => {
       if (cancelled || viewModeRef.current !== "live") return;
-      const poll = hasInFlightLogsRef.current;
-      if (poll) {
-        await loadLogsDelta({ poll });
+      const fast = shouldLiveFastRefresh();
+      if (fast) {
+        await loadLogsDelta({ poll: true });
       } else if (loadedPagesRef.current === 1) {
-        await loadLogsPaged({ includeFacets: false });
+        await loadLogsPaged({ poll: true, includeFacets: false });
       }
       if (cancelled) return;
-      const intervalMs = poll
+      const intervalMs = fast
         ? gatewayLivePollIntervalMs(
             { inProgress: 0, slowWarn: 0, backgroundWait: 0 },
             true,
@@ -724,7 +871,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [autoRefresh, viewMode, loadLogsPaged, loadLogsDelta]);
+  }, [autoRefresh, viewMode, loadLogsPaged, loadLogsDelta, shouldLiveFastRefresh]);
 
   /** 筛选 / 每页条数 / 动静切换：重置并拉首屏（skipCount） */
   useEffect(() => {
@@ -752,13 +899,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       void (async () => {
         try {
           await loadLogsPaged({
-            includeFacets: viewMode === "live",
+            includeFacets: false,
           });
         } finally {
           if (!cancelled) setLoading(false);
         }
       })();
-    }, 280);
+    }, 100);
 
     return () => {
       cancelled = true;
@@ -774,6 +921,13 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     loadLogsPaged,
     resetListScroll,
   ]);
+
+  /** 实时 Tab：分面单独拉取，不阻塞日志列表首屏 */
+  useEffect(() => {
+    if (dateRangeInvalid || viewMode !== "live") return;
+    const timer = window.setTimeout(() => void loadFacets(), 300);
+    return () => window.clearTimeout(timer);
+  }, [dateRangeInvalid, viewMode, loadFacets]);
 
   useEffect(() => {
     const el = loadMoreSentinelRef.current;

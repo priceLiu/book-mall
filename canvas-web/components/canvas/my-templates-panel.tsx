@@ -8,6 +8,10 @@ import {
   listCanvasTemplates,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
+import {
+  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
+  canvasToolbarSidePanelAsideClass,
+} from "@/lib/canvas/canvas-toolbar-side-panel";
 import type { CanvasGraph } from "@/lib/canvas/types";
 import { TemplateReadonlyCanvas } from "./template-readonly-canvas";
 
@@ -52,12 +56,14 @@ export function MyTemplatesPanel({
     <>
       {open ? (
         <div
-          className="fixed inset-0 z-[60] flex justify-end bg-black/45"
+          className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[60]`}
           onClick={onClose}
           role="presentation"
         >
           <aside
-            className="flex h-full w-full max-w-sm flex-col border-l border-white/10 bg-[var(--canvas-surface)] text-white shadow-2xl"
+            className={canvasToolbarSidePanelAsideClass(
+              "border-l border-white/10",
+            )}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-label="我的模板"

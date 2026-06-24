@@ -212,7 +212,7 @@ function HeroCarousel({
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
           <p className="text-xs uppercase tracking-widest text-[var(--gw-accent)]/90">Featured</p>
-          <h2 className="mt-1 text-2xl font-semibold text-[var(--gw-ink)]">{title}</h2>
+          <h2 className="mt-1">{title}</h2>
           <Link
             href={marketModelHref(current.canonicalKey)}
             className="gw-btn mt-4 inline-flex text-sm"

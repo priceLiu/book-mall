@@ -10,6 +10,10 @@ import {
   listCanvasCharacters,
   type CanvasCharacterRecord,
 } from "@/lib/canvas-api";
+import {
+  CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS,
+  canvasToolbarSidePanelAsideClass,
+} from "@/lib/canvas/canvas-toolbar-side-panel";
 
 export function MyCharactersPanel({
   open,
@@ -90,12 +94,14 @@ export function MyCharactersPanel({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex justify-end bg-black/45"
+      className={`${CANVAS_TOOLBAR_SIDE_PANEL_OVERLAY_CLASS} z-[60]`}
       onClick={onClose}
       role="presentation"
     >
       <aside
-        className="flex h-full w-full max-w-sm flex-col border-l border-white/10 bg-[var(--canvas-surface)] text-white shadow-2xl"
+        className={canvasToolbarSidePanelAsideClass(
+          "border-l border-white/10",
+        )}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="我的角色"

@@ -3,6 +3,11 @@
  */
 import { resolveBookMallBrowserRequest } from "@/lib/book-mall-client-request";
 import { ensureCanvasUploadFileMeta } from "@/lib/canvas/normalize-canvas-image-file";
+import {
+  isTransientDbApiError,
+  sleepMs,
+  transientDbRetryDelayMs,
+} from "@/lib/fetch-with-db-retry";
 
 /** 无权限或项目不存在时停止 tasks 轮询，避免控制台 404 刷屏 */
 const forbiddenCanvasProjectIds = new Set<string>();
@@ -120,7 +125,7 @@ export function formatCanvasApiError(raw: string): string {
   const t = raw.trim();
   if (!t) return "加载失败，请稍后重试";
   if (t.includes("DATABASE_UNAVAILABLE") || t.includes("503")) {
-    return "数据库暂不可用。请确认本机能访问 book-mall 配置的 PostgreSQL，或稍后重试。";
+    return "服务繁忙，请稍后再试";
   }
   if (t.includes("401") || t.includes("UNAUTHORIZED")) {
     return "登录已失效，请重新连接主站账号。";
@@ -171,21 +176,32 @@ async function call<T>(
     );
   }
   const { url, init: i } = resolveBookMallBrowserRequest(base, apiPath, init);
-  const r = await fetch(url, i);
-  // 一次性读出 body：Response.body 是 ReadableStream，只能消费一次。
-  // 读完之后再决定 JSON / 文本，避免出现 "body stream already read"。
-  const raw = await r.text();
-  if (!r.ok) {
-    const msg = sanitizeCanvasApiErrorBody(r.status, raw);
-    markForbiddenCanvasProjectFromPath(r.status, apiPath);
-    throw new Error(msg ? `${r.status} ${msg}` : `${r.status} ${r.statusText}`);
+  const maxAttempts = 4;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const r = await fetch(url, i);
+    const raw = await r.text();
+    if (!r.ok) {
+      const msg = sanitizeCanvasApiErrorBody(r.status, raw);
+      if (
+        attempt < maxAttempts - 1 &&
+        isTransientDbApiError(r.status, msg)
+      ) {
+        await sleepMs(transientDbRetryDelayMs(attempt));
+        continue;
+      }
+      markForbiddenCanvasProjectFromPath(r.status, apiPath);
+      throw new Error(msg ? `${r.status} ${msg}` : `${r.status} ${r.statusText}`);
+    }
+    if (!raw) return undefined as unknown as T;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      throw new Error(`Bad JSON from ${apiPath}: ${raw.slice(0, 200)}`);
+    }
   }
-  if (!raw) return undefined as unknown as T;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    throw new Error(`Bad JSON from ${apiPath}: ${raw.slice(0, 200)}`);
-  }
+
+  throw new Error("503 服务繁忙，请稍后再试");
 }
 
 // ── projects ──
@@ -305,6 +321,81 @@ export async function deleteCanvasProjectHistoryEntry(
   );
 }
 
+export type CanvasPromptHistoryItem = {
+  id: string;
+  projectId: string;
+  projectName?: string;
+  nodeId: string;
+  promptText: string;
+  mediaKind: "TEXT" | "IMAGE" | "VIDEO";
+  status: "SUCCEEDED" | "FAILED";
+  modelLabel: string;
+  providerLabel: string;
+  failMessage: string | null;
+  submittedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+};
+
+export type CanvasPromptHistoryPage = {
+  items: CanvasPromptHistoryItem[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
+export async function listProjectPromptHistory(
+  base: string,
+  projectId: string,
+  filters?: {
+    mediaKind?: CanvasPromptHistoryItem["mediaKind"];
+    outcome?: "success" | "failed";
+    limit?: number;
+    cursor?: string | null;
+  },
+): Promise<CanvasPromptHistoryPage> {
+  const qs = new URLSearchParams();
+  if (filters?.mediaKind) qs.set("mediaKind", filters.mediaKind);
+  if (filters?.outcome) qs.set("outcome", filters.outcome);
+  if (filters?.limit != null) qs.set("limit", String(filters.limit));
+  if (filters?.cursor) qs.set("cursor", filters.cursor);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const j = await call<CanvasPromptHistoryPage>(
+    base,
+    `/api/canvas/projects/${projectId}/prompt-history${suffix}`,
+  );
+  return {
+    items: j.items ?? [],
+    hasMore: j.hasMore ?? false,
+    nextCursor: j.nextCursor ?? null,
+  };
+}
+
+export async function listUserPromptHistory(
+  base: string,
+  filters?: {
+    mediaKind?: CanvasPromptHistoryItem["mediaKind"];
+    outcome?: "success" | "failed";
+    limit?: number;
+    cursor?: string | null;
+  },
+): Promise<CanvasPromptHistoryPage> {
+  const qs = new URLSearchParams();
+  if (filters?.mediaKind) qs.set("mediaKind", filters.mediaKind);
+  if (filters?.outcome) qs.set("outcome", filters.outcome);
+  if (filters?.limit != null) qs.set("limit", String(filters.limit));
+  if (filters?.cursor) qs.set("cursor", filters.cursor);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const j = await call<CanvasPromptHistoryPage>(
+    base,
+    `/api/canvas/prompt-history${suffix}`,
+  );
+  return {
+    items: j.items ?? [],
+    hasMore: j.hasMore ?? false,
+    nextCursor: j.nextCursor ?? null,
+  };
+}
+
 export type CanvasGenerationRecord = CanvasTaskRecord & {
   projectId?: string;
   projectName?: string;
@@ -330,17 +421,45 @@ export type CanvasGenerationRecord = CanvasTaskRecord & {
 export async function listCanvasGenerationRecords(
   base: string,
   projectId: string,
+  opts?: {
+    projectLimit?: number;
+    projectCursor?: string | null;
+    todayLimit?: number;
+    todayCursor?: string | null;
+  },
 ): Promise<{
   projectTasks: CanvasGenerationRecord[];
   todayTasks: CanvasGenerationRecord[];
+  projectHasMore: boolean;
+  projectNextCursor: string | null;
+  todayHasMore: boolean;
+  todayNextCursor: string | null;
   since: string;
 }> {
+  const qs = new URLSearchParams();
+  if (opts?.projectLimit != null) qs.set("projectLimit", String(opts.projectLimit));
+  if (opts?.projectCursor) qs.set("projectCursor", opts.projectCursor);
+  if (opts?.todayLimit != null) qs.set("todayLimit", String(opts.todayLimit));
+  if (opts?.todayCursor) qs.set("todayCursor", opts.todayCursor);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
   const j = await call<{
     projectTasks: CanvasGenerationRecord[];
     todayTasks: CanvasGenerationRecord[];
+    projectHasMore?: boolean;
+    projectNextCursor?: string | null;
+    todayHasMore?: boolean;
+    todayNextCursor?: string | null;
     since: string;
-  }>(base, `/api/canvas/projects/${projectId}/generation-records`);
-  return j;
+  }>(base, `/api/canvas/projects/${projectId}/generation-records${suffix}`);
+  return {
+    projectTasks: j.projectTasks ?? [],
+    todayTasks: j.todayTasks ?? [],
+    projectHasMore: j.projectHasMore ?? false,
+    projectNextCursor: j.projectNextCursor ?? null,
+    todayHasMore: j.todayHasMore ?? false,
+    todayNextCursor: j.todayNextCursor ?? null,
+    since: j.since,
+  };
 }
 
 
@@ -1321,20 +1440,33 @@ export async function listProjectAssets(
     scope?: "all" | "project" | "library";
     visibility?: import("@/lib/canvas/project-asset-types").AssetVisibility | "all";
     q?: string;
+    limit?: number;
+    cursor?: string | null;
   },
-): Promise<import("@/lib/canvas/project-asset-types").ProjectAssetRecord[]> {
+): Promise<{
+  assets: import("@/lib/canvas/project-asset-types").ProjectAssetRecord[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}> {
   const sp = new URLSearchParams();
   if (opts?.projectId) sp.set("projectId", opts.projectId);
   if (opts?.kind) sp.set("kind", opts.kind);
   if (opts?.scope) sp.set("scope", opts.scope);
   if (opts?.visibility) sp.set("visibility", opts.visibility);
   if (opts?.q) sp.set("q", opts.q);
+  if (opts?.limit != null) sp.set("limit", String(opts.limit));
+  if (opts?.cursor) sp.set("cursor", opts.cursor);
   const q = sp.toString();
-  const j = await call<{ assets: import("@/lib/canvas/project-asset-types").ProjectAssetRecord[] }>(
-    base,
-    `/api/canvas/project-assets${q ? `?${q}` : ""}`,
-  );
-  return j.assets ?? [];
+  const j = await call<{
+    assets: import("@/lib/canvas/project-asset-types").ProjectAssetRecord[];
+    hasMore?: boolean;
+    nextCursor?: string | null;
+  }>(base, `/api/canvas/project-assets${q ? `?${q}` : ""}`);
+  return {
+    assets: j.assets ?? [],
+    hasMore: j.hasMore ?? false,
+    nextCursor: j.nextCursor ?? null,
+  };
 }
 
 export async function createProjectAsset(

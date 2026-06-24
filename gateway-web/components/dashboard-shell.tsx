@@ -74,7 +74,7 @@ function SidebarHeader({
 
   return (
     <div className="border-b border-[var(--gw-border)] px-4 py-5">
-      <div className="text-sm font-semibold text-[var(--gw-ink)]">Gateway 控制台</div>
+      <div className="gw-nav-link gw-nav-link-active">Gateway 控制台</div>
       <div className="mt-1 truncate text-xs text-[var(--gw-muted)]">{displayName}</div>
       <div className="mt-2 flex flex-wrap gap-1">
         <span
@@ -128,8 +128,8 @@ function SidebarBody({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className={`flex w-full items-center rounded-md text-[var(--gw-muted)] transition hover:bg-[var(--gw-hover)] hover:text-[var(--gw-ink)] ${
-              collapsed ? "justify-center p-2" : "gap-2 px-3 py-2 text-xs"
+            className={`flex w-full items-center rounded-md gw-nav-link transition hover:bg-[var(--gw-hover)] ${
+              collapsed ? "justify-center p-2" : "gap-2 px-3 py-2"
             }`}
             title={collapsed ? "展开侧栏" : "收起侧栏"}
             aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
@@ -212,6 +212,17 @@ export function DashboardShell({
     setSidebarOpen(false);
   }, [pathname]);
 
+  /** 屏蔽触控板/浏览器边缘滑动触发的 history 回退（与 canvas 页一致） */
+  useEffect(() => {
+    const guard = () => {
+      window.history.pushState({ gatewaySwipeGuard: true }, "", window.location.href);
+    };
+    guard();
+    const onPopState = () => guard();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [pathname]);
+
   function toggleSidebarCollapsed() {
     setSidebarCollapsed((prev) => {
       const next = !prev;
@@ -283,7 +294,7 @@ export function DashboardShell({
           >
             <IconMenu className="h-5 w-5" />
           </button>
-          <span className="truncate text-sm font-medium text-[var(--gw-ink)]">Gateway 控制台</span>
+          <span className="gw-nav-link gw-nav-link-active truncate">Gateway 控制台</span>
         </header>
         <main
           className={

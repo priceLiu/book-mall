@@ -18,6 +18,7 @@ import { MyCharactersPanel } from "@/components/canvas/my-characters-panel";
 import { MySavedScriptsPanel } from "@/components/canvas/my-saved-scripts-panel";
 import { MyVideoLibraryPanel } from "@/components/canvas/my-video-library-panel";
 import { MyProjectCharacterAssetsPanel } from "@/components/canvas/my-project-character-assets-panel";
+import { MyPromptHistoryPanel } from "@/components/canvas/my-prompt-history-panel";
 import { StyleLibraryModal } from "@/components/canvas/style-library-modal";
 import { NodePalette } from "@/components/canvas/node-palette";
 import { CanvasToolbar } from "@/components/canvas/toolbar";
@@ -234,12 +235,25 @@ function Inner({ projectId }: { projectId: string }) {
   const [videoLibraryRefreshKey, setVideoLibraryRefreshKey] = useState(0);
   const [myProjectCharacterAssetsOpen, setMyProjectCharacterAssetsOpen] =
     useState(false);
+  const [myPromptHistoryOpen, setMyPromptHistoryOpen] = useState(false);
   const { insertAtViewportCenter: insertProjectAssetAtViewportCenter } =
     useRegisterProjectAssetCanvasInsert();
   const [styleLibraryOpen, setStyleLibraryOpen] = useState(false);
   const [myHistoryOpen, setMyHistoryOpen] = useState(false);
   const [myGenerationRecordsOpen, setMyGenerationRecordsOpen] = useState(false);
   const [templatesRefreshKey, setTemplatesRefreshKey] = useState(0);
+
+  const closeAllToolbarPanels = useCallback(() => {
+    setMyTemplatesOpen(false);
+    setMyCharactersOpen(false);
+    setMySavedScriptsOpen(false);
+    setMyVideoLibraryOpen(false);
+    setMyProjectCharacterAssetsOpen(false);
+    setMyPromptHistoryOpen(false);
+    setStyleLibraryOpen(false);
+    setMyHistoryOpen(false);
+    setMyGenerationRecordsOpen(false);
+  }, []);
 
   useEffect(() => {
     const onWheel = (e: WheelEvent) => handleCanvasWheel(e);
@@ -259,16 +273,22 @@ function Inner({ projectId }: { projectId: string }) {
   }, [projectId]);
 
   useEffect(() => {
-    const open = () => setStyleLibraryOpen(true);
+    const open = () => {
+      closeAllToolbarPanels();
+      setStyleLibraryOpen(true);
+    };
     window.addEventListener("canvas:open-style-library", open);
     return () => window.removeEventListener("canvas:open-style-library", open);
-  }, []);
+  }, [closeAllToolbarPanels]);
 
   useEffect(() => {
-    const open = () => setMyHistoryOpen(true);
+    const open = () => {
+      closeAllToolbarPanels();
+      setMyHistoryOpen(true);
+    };
     window.addEventListener("canvas:open-my-history", open);
     return () => window.removeEventListener("canvas:open-my-history", open);
-  }, []);
+  }, [closeAllToolbarPanels]);
 
   /** 加载完成时的节点数；用于阻止误把「有内容的画布」自动保存成空。 */
   const loadedNodeCountRef = useRef(0);
@@ -906,17 +926,49 @@ function Inner({ projectId }: { projectId: string }) {
             onUndo={undo}
             onRedo={redo}
             onRunAll={runAll}
-            onOpenMyTemplates={() => setMyTemplatesOpen(true)}
-            onOpenMyHistory={() => setMyHistoryOpen(true)}
-            onOpenGenerationRecords={() => setMyGenerationRecordsOpen(true)}
-            onOpenMyCharacters={() => setMyCharactersOpen(true)}
-            onOpenMyVideoLibrary={() => setMyVideoLibraryOpen(true)}
+            onOpenMyTemplates={() => {
+              closeAllToolbarPanels();
+              setMyTemplatesOpen(true);
+            }}
+            onOpenMyHistory={() => {
+              closeAllToolbarPanels();
+              setMyHistoryOpen(true);
+            }}
+            onOpenGenerationRecords={() => {
+              closeAllToolbarPanels();
+              setMyGenerationRecordsOpen(true);
+            }}
+            onOpenMyCharacters={() => {
+              closeAllToolbarPanels();
+              setMyCharactersOpen(true);
+            }}
+            onOpenMyVideoLibrary={() => {
+              closeAllToolbarPanels();
+              setMyVideoLibraryOpen(true);
+            }}
             onOpenMySavedScripts={
-              isStoryProCanvas ? () => setMySavedScriptsOpen(true) : undefined
+              isStoryProCanvas
+                ? () => {
+                    closeAllToolbarPanels();
+                    setMySavedScriptsOpen(true);
+                  }
+                : undefined
             }
-            onOpenProjectCharacterAssets={() => setMyProjectCharacterAssetsOpen(true)}
+            onOpenProjectCharacterAssets={() => {
+              closeAllToolbarPanels();
+              setMyProjectCharacterAssetsOpen(true);
+            }}
+            onOpenPromptHistory={() => {
+              closeAllToolbarPanels();
+              setMyPromptHistoryOpen(true);
+            }}
             onOpenStyleLibrary={
-              isStoryProCanvas ? () => setStyleLibraryOpen(true) : undefined
+              isStoryProCanvas
+                ? () => {
+                    closeAllToolbarPanels();
+                    setStyleLibraryOpen(true);
+                  }
+                : undefined
             }
             onReflowStoryLayout={
               isStoryComicCanvas ? () => reflowStoryComicLayout() : undefined
@@ -969,6 +1021,12 @@ function Inner({ projectId }: { projectId: string }) {
         onInsertToCanvas={(assetId) => {
           void insertProjectAssetAtViewportCenter(assetId);
         }}
+      />
+      <MyPromptHistoryPanel
+        open={myPromptHistoryOpen}
+        onClose={() => setMyPromptHistoryOpen(false)}
+        projectId={projectId}
+        initialScope="mine"
       />
       {isStoryProCanvas || isStoryPro2Canvas ? (
         <StyleLibraryModal

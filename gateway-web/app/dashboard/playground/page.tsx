@@ -130,7 +130,7 @@ export default function PlaygroundPage() {
 
       {response ? (
         <section className="gw-card">
-          <h2 className="mb-2 text-sm font-medium text-[var(--gw-ink)]">响应</h2>
+          <h2>响应</h2>
           <pre className="max-h-[420px] overflow-auto rounded-lg bg-black/40 p-4 text-xs leading-relaxed text-[var(--gw-ink)]/90">
             {response}
           </pre>

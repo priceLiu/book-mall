@@ -20,7 +20,7 @@ export function StoryOpenLoader() {
           strokeWidth={1.25}
           className="absolute right-0 top-3 h-12 w-12 text-amber-600/70 motion-safe:animate-story-reel motion-reduce:opacity-90"
         />
-        <div className="absolute inset-x-2 bottom-0 h-9 overflow-hidden rounded-lg border border-amber-500/25 bg-black/40 shadow-inner">
+        <div className="absolute inset-x-2 bottom-0 h-9 overflow-hidden rounded-lg border border-amber-200/80 bg-[#f6f8fa] shadow-sm">
           <div className="flex h-full motion-safe:animate-story-film-track motion-reduce:opacity-80">
             {Array.from({ length: 8 }).map((_, i) => (
               <span

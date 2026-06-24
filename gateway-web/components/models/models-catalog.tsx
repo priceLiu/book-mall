@@ -137,7 +137,7 @@ export function ModelsCatalog({
         {filteredGroups.map((group) => (
           <section key={group.providerKind} className="gw-card overflow-hidden">
             <header className="flex flex-wrap items-center gap-2 border-b border-[var(--gw-border)] px-4 py-3">
-              <h2 className="text-sm font-semibold text-[var(--gw-ink)]">{group.label}</h2>
+              <h2>{group.label}</h2>
               <span className="rounded-full border border-[var(--gw-border)] px-2 py-0.5 text-[11px] text-[var(--gw-muted)]">
                 {group.providerKind}
               </span>
@@ -157,7 +157,7 @@ export function ModelsCatalog({
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-[var(--gw-border)] text-[11px] uppercase tracking-wide text-[var(--gw-muted)]">
+                  <tr className="gw-th-row border-b border-[var(--gw-border)]">
                     <th className="px-4 py-2 font-medium">modelKey</th>
                     <th className="px-4 py-2 font-medium">名称</th>
                     <th className="px-4 py-2 font-medium">类型</th>

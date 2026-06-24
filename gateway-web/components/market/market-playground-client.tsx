@@ -509,7 +509,7 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <section className="gw-card space-y-4">
-              <h2 className="text-sm font-medium text-[var(--gw-ink)]">Input</h2>
+              <h2>Input</h2>
               {mode === "form" ? (
                 schema.fields.map((field) => (
                   <label key={field.key} className="block">
@@ -558,7 +558,7 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
             </section>
 
             <section className="gw-card space-y-4">
-              <h2 className="text-sm font-medium text-[var(--gw-ink)]">Output</h2>
+              <h2>Output</h2>
               {!output ? (
                 <p className="text-sm text-[var(--gw-muted)]">运行成功后在此预览结果。</p>
               ) : (
@@ -590,7 +590,7 @@ export function MarketPlaygroundClient({ canonicalKey, initial }: Props) {
           </div>
 
           <section className="space-y-3">
-            <h2 className="text-sm font-medium text-[var(--gw-ink)]">Your runs</h2>
+            <h2>Your runs</h2>
             <HistoryGrid items={history} />
           </section>
         </>
