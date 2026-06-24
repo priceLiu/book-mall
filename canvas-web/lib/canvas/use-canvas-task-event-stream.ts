@@ -32,10 +32,15 @@ export function useCanvasTaskEventStream(
     let es: EventSource | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let disposed = false;
+    let retryMs = 5000;
 
     const connect = () => {
       if (disposed) return;
       es = new EventSource(url, { withCredentials: true });
+
+      es.addEventListener("open", () => {
+        retryMs = 5000;
+      });
 
       es.addEventListener("tasks-changed", (ev) => {
         try {
@@ -66,7 +71,8 @@ export function useCanvasTaskEventStream(
         es?.close();
         es = null;
         if (!disposed) {
-          retryTimer = setTimeout(connect, 5000);
+          retryTimer = setTimeout(connect, retryMs);
+          retryMs = Math.min(Math.round(retryMs * 1.5), 60_000);
         }
       };
     };

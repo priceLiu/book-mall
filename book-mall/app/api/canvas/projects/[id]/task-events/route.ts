@@ -9,8 +9,10 @@ import {
 import { assertAccessibleCanvasProject } from "@/lib/canvas/canvas-project-access";
 import {
   CANVAS_TASK_SSE_HEARTBEAT_MS,
+  CANVAS_TASK_SSE_IDLE_POLL_MS,
   CANVAS_TASK_SSE_POLL_MS,
   getCanvasProjectTaskSyncSnapshot,
+  resolveCanvasTaskSsePollDelayMs,
 } from "@/lib/canvas/canvas-task-event-stream";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -37,39 +39,69 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   const encoder = new TextEncoder();
   let closed = false;
   let lastFingerprint = "";
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let pollDelayMs = CANVAS_TASK_SSE_POLL_MS;
+  let pollFailures = 0;
 
   const stream = new ReadableStream({
     start(controller) {
       const send = (event: string, data: Record<string, unknown>) => {
         if (closed) return;
-        controller.enqueue(
-          encoder.encode(
-            `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
-          ),
-        );
+        try {
+          controller.enqueue(
+            encoder.encode(
+              `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+            ),
+          );
+        } catch {
+          closed = true;
+        }
+      };
+
+      const clearPollTimer = () => {
+        if (pollTimer) {
+          clearTimeout(pollTimer);
+          pollTimer = null;
+        }
+      };
+
+      const schedulePoll = (delayMs: number) => {
+        clearPollTimer();
+        pollTimer = setTimeout(() => {
+          void poll();
+        }, delayMs);
       };
 
       const poll = async () => {
         if (closed || request.signal.aborted) return;
         try {
-          const snap = await getCanvasProjectTaskSyncSnapshot(projectId);
+          const snap = await getCanvasProjectTaskSyncSnapshot(projectId, {
+            bypassCache: pollFailures > 0,
+          });
+          pollFailures = 0;
+          pollDelayMs = resolveCanvasTaskSsePollDelayMs(snap);
           if (snap.fingerprint !== lastFingerprint) {
             lastFingerprint = snap.fingerprint;
             send("tasks-changed", { projectId, ...snap });
           }
         } catch {
+          pollFailures += 1;
+          pollDelayMs = Math.min(
+            CANVAS_TASK_SSE_IDLE_POLL_MS * Math.max(pollFailures, 1),
+            60_000,
+          );
           send("error", { projectId, message: "snapshot_failed" });
         }
+        schedulePoll(pollDelayMs);
       };
 
-      send("connected", { projectId });
+      send("connected", {
+        projectId,
+        pollMs: CANVAS_TASK_SSE_POLL_MS,
+        idlePollMs: CANVAS_TASK_SSE_IDLE_POLL_MS,
+      });
       void poll();
-
-      pollTimer = setInterval(() => {
-        void poll();
-      }, CANVAS_TASK_SSE_POLL_MS);
 
       heartbeatTimer = setInterval(() => {
         send("ping", { t: Date.now() });
@@ -77,14 +109,14 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     },
     cancel() {
       closed = true;
-      if (pollTimer) clearInterval(pollTimer);
+      if (pollTimer) clearTimeout(pollTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
     },
   });
 
   request.signal.addEventListener("abort", () => {
     closed = true;
-    if (pollTimer) clearInterval(pollTimer);
+    if (pollTimer) clearTimeout(pollTimer);
     if (heartbeatTimer) clearInterval(heartbeatTimer);
   });
 
