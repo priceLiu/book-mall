@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Save, X, Play, RefreshCw } from "lucide-react";
 
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { STORY_HUB_SECTION_ORDER } from "@/lib/canvas/spawn-story-workspace";
 import {
   hubDialoguePreviewMd,
@@ -340,9 +341,9 @@ export function StoryScriptHubModal({
         ) : null}
         <span className="shrink-0 text-[11px] text-white/50">
           {savedHint ? (
-            <span className="text-emerald-300">已保存</span>
+            <span className={CANVAS_SEMANTIC_STATUS_CLASS}>已保存</span>
           ) : dirty ? (
-            <span className="text-amber-300">未保存</span>
+            <span className={CANVAS_SEMANTIC_STATUS_CLASS}>未保存</span>
           ) : null}
         </span>
         {section !== "dialogue" && !readOnly ? (

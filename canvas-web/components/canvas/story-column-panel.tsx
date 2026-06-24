@@ -11,10 +11,8 @@ import type {
 
 function StatusPill({ status }: { status: string }) {
   const cls =
-    status === "running" ?
-      "bg-amber-500/20 text-amber-200"
-    : status === "done" ?
-      "bg-emerald-500/15 text-emerald-200"
+    status === "running" || status === "done"
+      ? "bg-orange-500/20 text-orange-200"
     : status === "error" ?
       "bg-red-500/20 text-red-200"
     : "bg-white/5 text-[var(--canvas-muted)]";

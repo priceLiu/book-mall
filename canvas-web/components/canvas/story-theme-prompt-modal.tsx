@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Save, X } from "lucide-react";
 
 import { RF_NODE_SCROLL } from "@/lib/canvas/react-flow-classes";
+import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { storyThemePromptDisplayMd } from "@/lib/canvas/story-theme-prompt-display";
 import {
   STORY_THEME_SYSTEM_PROMPT_TEMPLATES,
@@ -259,9 +260,9 @@ export function StoryThemePromptModal({
         </div>
         <span className="shrink-0 text-[11px] text-white/50">
           {savedHint ? (
-            <span className="text-emerald-300">已保存</span>
+            <span className={CANVAS_SEMANTIC_STATUS_CLASS}>已保存</span>
           ) : dirty ? (
-            <span className="text-amber-300">未保存</span>
+            <span className={CANVAS_SEMANTIC_STATUS_CLASS}>未保存</span>
           ) : null}
         </span>
         {!readOnly ? (

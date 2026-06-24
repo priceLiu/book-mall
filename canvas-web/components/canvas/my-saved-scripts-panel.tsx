@@ -9,6 +9,16 @@ import {
   canvasToolbarSidePanelAsideClass,
 } from "@/lib/canvas/canvas-toolbar-side-panel";
 import {
+  CANVAS_PANEL_HEADER_BORDER_CLASS,
+  CANVAS_PANEL_HEADER_ICON_CLASS,
+  CANVAS_PANEL_ITEM_CARD_CLASS,
+  CANVAS_PANEL_ITEM_META_CLASS,
+  CANVAS_PANEL_ITEM_TITLE_CLASS,
+  CANVAS_PANEL_SECONDARY_BTN_CLASS,
+  CANVAS_PANEL_TITLE_CLASS,
+} from "@/lib/canvas/canvas-chrome-semantics";
+import { cn } from "@/lib/utils";
+import {
   collectStoryProSavedScriptsFromCanvas,
   formatFinalizedScriptMetaLine,
   formatFinalizedScriptTitle,
@@ -54,16 +64,21 @@ export function MySavedScriptsPanel({
         >
           <aside
             className={canvasToolbarSidePanelAsideClass(
-              "border-l border-cyan-400/15",
+              `border-l ${CANVAS_PANEL_HEADER_BORDER_CLASS}`,
             )}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-label="我保存的剧本"
           >
-            <header className="flex items-center justify-between border-b border-cyan-400/15 px-4 py-3">
+            <header
+              className={cn(
+                "flex items-center justify-between border-b px-4 py-3",
+                CANVAS_PANEL_HEADER_BORDER_CLASS,
+              )}
+            >
               <div className="flex items-center gap-2">
-                <BookOpen className="size-4 text-cyan-300" />
-                <p className="text-sm font-medium">我保存的剧本</p>
+                <BookOpen className={CANVAS_PANEL_HEADER_ICON_CLASS} />
+                <p className={CANVAS_PANEL_TITLE_CLASS}>我保存的剧本</p>
               </div>
               <button
                 type="button"
@@ -87,12 +102,12 @@ export function MySavedScriptsPanel({
                   {items.map((item) => (
                     <li
                       key={item.id}
-                      className="rounded-lg border border-cyan-400/15 bg-cyan-950/20 p-3"
+                      className={CANVAS_PANEL_ITEM_CARD_CLASS}
                     >
-                      <p className="truncate text-[13px] font-medium text-cyan-50">
+                      <p className={CANVAS_PANEL_ITEM_TITLE_CLASS}>
                         {formatFinalizedScriptTitle(item.snapshot.theme)}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-cyan-200/55">
+                      <p className={CANVAS_PANEL_ITEM_META_CLASS}>
                         {item.hubLabel} ·{" "}
                         {formatFinalizedScriptVersionLabel(item.snapshot.version)}{" "}
                         · {formatRevisionTime(item.snapshot.finalizedAt)}
@@ -106,7 +121,10 @@ export function MySavedScriptsPanel({
                       </p>
                       <button
                         type="button"
-                        className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-md border border-cyan-400/30 bg-cyan-500/10 px-2 py-1.5 text-[11px] text-cyan-100 hover:bg-cyan-500/20"
+                        className={cn(
+                          "mt-2 inline-flex w-full items-center justify-center gap-1",
+                          CANVAS_PANEL_SECONDARY_BTN_CLASS,
+                        )}
                         onClick={() => setViewing(item)}
                       >
                         <Eye className="size-3" />

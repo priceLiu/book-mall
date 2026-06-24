@@ -37,6 +37,10 @@
   --canvas-accent: #a78bfa;
   --canvas-accent-soft: #7c5cff;
   --canvas-accent-glow: rgba(167, 139, 250, 0.35);
+  /** 语义色：标题 / 状态 / 错误（LibTV 顶栏与节点共用） */
+  --canvas-title: #ffffff;
+  --canvas-status: rgba(253, 186, 116, 0.9);
+  --canvas-error: rgba(248, 113, 113, 0.9);
   --canvas-header-h: 3.5rem;
   --canvas-story-video-tip-width: 520px;
   --canvas-story-video-tip-max-h: 560px;

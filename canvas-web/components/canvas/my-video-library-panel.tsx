@@ -211,7 +211,7 @@ export function MyVideoLibraryPanel({
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
-                            className="text-[10px] text-emerald-300/90 hover:underline"
+                            className="text-[10px] text-white/85 hover:underline"
                             onClick={() => setPreview(item)}
                           >
                             播放

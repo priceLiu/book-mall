@@ -1,6 +1,8 @@
 "use client";
 
 import { Check, Eye, Loader2 } from "lucide-react";
+import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
+import { cn } from "@/lib/utils";
 
 /** LibTV 图片节点 · 标题栏右上角预览（替代 Stage 居中 Eye） */
 export function LibtvNodeHeaderPreviewButton({
@@ -46,7 +48,7 @@ export function LibtvNodeHeaderActions({
           className="flex size-7 items-center justify-center"
           title="私域人像入库中…"
         >
-          <Loader2 className="size-3.5 animate-spin text-cyan-300/90" />
+          <Loader2 className={cn("size-3.5 animate-spin", CANVAS_SEMANTIC_STATUS_CLASS)} />
         </span>
       ) : portraitActive ? (
         <span
@@ -54,7 +56,7 @@ export function LibtvNodeHeaderActions({
           title="已入库 · 生视频将引用 asset://"
           aria-label="已入库"
         >
-          <Check className="size-3.5 text-emerald-400" strokeWidth={2.5} />
+          <Check className={cn("size-3.5", CANVAS_SEMANTIC_STATUS_CLASS)} strokeWidth={2.5} />
         </span>
       ) : null}
       <LibtvNodeHeaderPreviewButton visible={showPreview} onClick={onPreview} />

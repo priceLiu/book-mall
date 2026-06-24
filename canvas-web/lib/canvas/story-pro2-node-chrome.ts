@@ -11,6 +11,7 @@ import {
   LIBTV_SQUARE_IMAGE_NODE_MIN_WIDTH,
   LIBTV_SQUARE_IMAGE_NODE_WIDTH,
 } from "./libtv-node-chrome";
+import { CANVAS_SEMANTIC_TITLE_CLASS } from "./canvas-chrome-semantics";
 
 export const PRO2_NODE_ACCENT = "#9f8fef";
 export const PRO2_NODE_ACCENT_SOFT = "rgba(159, 143, 239, 0.1)";
@@ -92,11 +93,11 @@ export const PRO2_MEDIA_CARD_SHELL_CLASS =
 
 /** 2.0 媒体节点标题栏 · 唯一拖动手柄 */
 export const PRO2_MEDIA_NODE_TITLE_CLASS =
-  "mb-1.5 flex min-h-[22px] shrink-0 cursor-grab items-center gap-1.5 px-0.5 text-[11px] text-white/55 active:cursor-grabbing";
+  "mb-1.5 flex min-h-[22px] shrink-0 cursor-grab items-center gap-1.5 px-0.5 text-[11px] text-white active:cursor-grabbing";
 
 /** 2.0 文本 / 脚本节点标题栏 · 整行宽 · 唯一拖动手柄 */
 export const PRO2_TEXT_NODE_TITLE_CLASS =
-  "flex w-full min-h-[26px] shrink-0 cursor-grab items-center gap-1.5 px-1 text-[11px] text-white/55 active:cursor-grabbing";
+  "flex w-full min-h-[26px] shrink-0 cursor-grab items-center gap-1.5 px-1 text-[11px] text-white active:cursor-grabbing";
 
 /** 列摘要薄卡 */
 export const PRO2_COLUMN_CARD_WIDTH = 320;
@@ -114,7 +115,7 @@ export const PRO2_STYLE_ASSET_CARD_SHELL_CLASS =
 export const PRO2_CARD_SELECTED_CLASS = "";
 
 export const PRO2_CARD_TITLE_CLASS =
-  "text-[12px] font-semibold tracking-wide text-violet-100";
+  `text-[12px] font-semibold tracking-wide ${CANVAS_SEMANTIC_TITLE_CLASS}`;
 
 /** @deprecated 薄卡不再使用副标题；仅浮动检视/助手内必要时保留 */
 export const PRO2_CARD_SUBTITLE_CLASS = "text-[10px] text-white/55";
@@ -219,7 +220,7 @@ export type StoryAssistantChrome = {
 };
 
 export const PRO2_ASSISTANT_CHROME: StoryAssistantChrome = {
-  titleText: "text-violet-200",
+  titleText: CANVAS_SEMANTIC_TITLE_CLASS,
   tabActive: "border-violet-400/45 bg-violet-500/15 text-violet-50",
   tabIdle: "border-white/10 text-white/55 hover:border-white/20 hover:text-white/80",
   threadActive: "border-violet-400/45 bg-violet-500/15 text-violet-50",
@@ -241,7 +242,7 @@ export const PRO2_ASSISTANT_CHROME: StoryAssistantChrome = {
 };
 
 export const PRO_ASSISTANT_CHROME: StoryAssistantChrome = {
-  titleText: "text-emerald-300",
+  titleText: CANVAS_SEMANTIC_TITLE_CLASS,
   tabActive: "border-emerald-400/45 bg-emerald-500/15 text-emerald-100",
   tabIdle: "border-white/10 text-white/55 hover:border-white/20 hover:text-white/80",
   threadActive: "border-emerald-400/45 bg-emerald-500/15 text-emerald-50",
