@@ -1569,6 +1569,27 @@ export async function runCanvasPollWorker(opts?: {
 
   await dispatchQueuedCanvasTasks({ projectId: opts?.projectId }).catch(() => undefined);
 
+  try {
+    const { reconcileCanvasInflightZombies } = await import(
+      "@/lib/canvas/canvas-inflight-zombie-reconcile"
+    );
+    const zombies = await reconcileCanvasInflightZombies({
+      projectId: opts?.projectId,
+      limit: 25,
+    });
+    if (
+      zombies.failedIncomplete > 0 ||
+      zombies.requeuedDispatching > 0 ||
+      zombies.displayRecovered > 0
+    ) {
+      logKieEvent("info", "[canvas] inflight-zombie-reconcile", zombies);
+    }
+  } catch (e) {
+    logKieEvent("warn", "[canvas] inflight-zombie-reconcile error", {
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
   if (opts?.projectId) {
     try {
       const auto = await maybeRunSlowWarnAutoHandler({ limit: 8, force: true });

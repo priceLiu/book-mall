@@ -79,8 +79,12 @@ function statusLabel(status: CanvasGenerationRecord["status"]): string {
       return "成功";
     case "FAILED":
       return "失败";
-    case "PENDING":
+    case "QUEUED":
       return "排队中";
+    case "DISPATCHING":
+      return "出队中";
+    case "PENDING":
+      return "准备中";
     case "SUBMITTED":
       return "生成中";
     case "CANCELLED":
@@ -96,6 +100,8 @@ function statusTone(status: CanvasGenerationRecord["status"]): string {
       return CANVAS_STATUS_CHIP_SUCCESS_CLASS;
     case "FAILED":
       return CANVAS_STATUS_CHIP_ERROR_CLASS;
+    case "QUEUED":
+    case "DISPATCHING":
     case "PENDING":
     case "SUBMITTED":
       return CANVAS_STATUS_CHIP_RUNNING_CLASS;
