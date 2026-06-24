@@ -149,3 +149,37 @@ export function sbv1ImageFailurePatch(
     } satisfies CanvasNodeRuntime,
   };
 }
+
+/** updateNodeData 前比对 · 避免 effect 重复写相同 patch 触发 RF 无限同步 */
+export function isSameSbv1MediaDataPatch(
+  current: Record<string, unknown> | undefined,
+  patch: Record<string, unknown>,
+): boolean {
+  const cur = current ?? {};
+  if (
+    patch.uploading !== undefined &&
+    Boolean(patch.uploading) !== Boolean(cur.uploading)
+  ) {
+    return false;
+  }
+  if (
+    "uploadError" in patch &&
+    (patch.uploadError ?? undefined) !== (cur.uploadError ?? undefined)
+  ) {
+    return false;
+  }
+  const nextRt = patch.runtime as CanvasNodeRuntime | undefined;
+  if (!nextRt) {
+    return !("runtime" in patch);
+  }
+  const prev = (cur.runtime as CanvasNodeRuntime | undefined) ?? {};
+  return (
+    (prev.status ?? "idle") === (nextRt.status ?? "idle") &&
+    (prev.taskId ?? "") === (nextRt.taskId ?? "") &&
+    (prev.failCode ?? "") === (nextRt.failCode ?? "") &&
+    (prev.failMessage ?? "") === (nextRt.failMessage ?? "") &&
+    (prev.ossUrl ?? "") === (nextRt.ossUrl ?? "") &&
+    (prev.ephemeralUrl ?? "") === (nextRt.ephemeralUrl ?? "") &&
+    (prev.posterUrl ?? "") === (nextRt.posterUrl ?? "")
+  );
+}

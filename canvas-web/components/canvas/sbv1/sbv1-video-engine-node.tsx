@@ -37,7 +37,7 @@ import type { Sbv1VideoEngineNodeData } from "@/lib/canvas/sbv1-workspace-types"
 import type { CanvasNodeRuntime } from "@/lib/canvas/types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { pickTaskResultMediaUrl } from "@/lib/canvas/task-media-url";
-import { sbv1VideoPatchFromTask } from "@/lib/canvas/sbv1-image-task-apply";
+import { sbv1VideoPatchFromTask, isSameSbv1MediaDataPatch } from "@/lib/canvas/sbv1-image-task-apply";
 import { useNodeTaskHistory } from "@/lib/canvas/use-node-task-history";
 import { useVideoGeneratingWait } from "@/lib/canvas/use-video-generating-wait";
 import { cn } from "@/lib/utils";
@@ -118,7 +118,13 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   const inflightTask = useMemo(
     () => pickActiveServerInflightTask(history, d.runtime?.taskId, d.runtime),
-    [history, d.runtime],
+    [
+      history,
+      d.runtime?.taskId,
+      d.runtime?.status,
+      d.runtime?.ossUrl,
+      d.runtime?.ephemeralUrl,
+    ],
   );
 
   const waitSince =
@@ -132,7 +138,8 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   useEffect(() => {
     if (!inflightTask) return;
-    const localRt = d.runtime;
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    const localRt = (node?.data as Sbv1VideoEngineNodeData | undefined)?.runtime;
     if (shouldSkipStoryRowTaskApply(localRt, inflightTask, id)) return;
 
     const nodePatch = sbv1VideoPatchFromTask(inflightTask);
@@ -142,6 +149,9 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
         rtPatch &&
         !shouldApplyCanvasTaskRuntimePatch(localRt, inflightTask, rtPatch, id)
       ) {
+        return;
+      }
+      if (isSameSbv1MediaDataPatch(node?.data as Record<string, unknown>, nodePatch)) {
         return;
       }
       updateNodeData(id, nodePatch);
@@ -154,15 +164,17 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
       }
       setNodeRuntime(id, patch);
     }
-  }, [inflightTask, id, setNodeRuntime, updateNodeData, d.runtime]);
+  }, [inflightTask, id, setNodeRuntime, updateNodeData]);
 
   /** 任务已在服务端终态但 runtime 仍停在 pending/running（须已绑定 taskId，勿误伤刚点的乐观 pending） */
   useEffect(() => {
     if (inflightTask) return;
-    const boundId = d.runtime?.taskId?.trim();
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    const localRt = (node?.data as Sbv1VideoEngineNodeData | undefined)?.runtime;
+    const boundId = localRt?.taskId?.trim();
     if (!boundId) return;
 
-    const localSt = d.runtime?.status;
+    const localSt = localRt?.status;
     if (localSt !== "pending" && localSt !== "running") return;
 
     const terminal = history.find(
@@ -173,24 +185,32 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
           t.status === "CANCELLED"),
     );
     if (!terminal) return;
-    if (shouldSkipStoryRowTaskApply(d.runtime, terminal, id)) return;
+    if (shouldSkipStoryRowTaskApply(localRt, terminal, id)) return;
 
     const nodePatch = sbv1VideoPatchFromTask(terminal);
     if (!nodePatch) return;
     const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
     if (!rtPatch) return;
-    if (!shouldApplyCanvasTaskRuntimePatch(d.runtime, terminal, rtPatch, id)) {
+    if (!shouldApplyCanvasTaskRuntimePatch(localRt, terminal, rtPatch, id)) {
+      return;
+    }
+    if (isSameSbv1MediaDataPatch(node?.data as Record<string, unknown>, nodePatch)) {
       return;
     }
     updateNodeData(id, nodePatch);
-  }, [history, d.runtime, id, updateNodeData, inflightTask]);
+  }, [history, id, updateNodeData, inflightTask]);
 
   /** 乐观 UI 遗留 uploading=true · 任务已终态时清掉并落盘 */
   useEffect(() => {
     if (!d.uploading) return;
     const st = d.runtime?.status;
     if (st !== "done" && st !== "error" && st !== "idle") return;
-    updateNodeData(id, { uploading: false, uploadError: undefined });
+    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
+    const patch = { uploading: false, uploadError: undefined };
+    if (isSameSbv1MediaDataPatch(node?.data as Record<string, unknown>, patch)) {
+      return;
+    }
+    updateNodeData(id, patch);
   }, [d.uploading, d.runtime?.status, id, updateNodeData]);
 
   const hasToolbarContent = Boolean(
