@@ -3,7 +3,10 @@ import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import type { CanvasStoryRunJob } from "./canvas-run-bus";
 import type { StoryRunContext } from "./story-workspace-types";
 import { formatCanvasTaskError } from "./friendly-task-error";
-import { shouldSkipStaleTerminalWhileLocalInflight } from "./canvas-run-session";
+import {
+  isCanvasNodeRunSessionActive,
+  shouldSkipStaleTerminalWhileLocalInflight,
+} from "./canvas-run-session";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 
 export type CanvasTaskStoryScope = {
@@ -99,9 +102,23 @@ export function shouldSkipStoryRowTaskApply(
   pick: CanvasTaskRecord,
   nodeId?: string,
 ): boolean {
+  if (
+    nodeId &&
+    isCanvasNodeRunSessionActive(nodeId) &&
+    !localRuntime?.taskId?.trim() &&
+    localRuntime?.status === "error"
+  ) {
+    return true;
+  }
+
   const localSt = localRuntime?.status;
   if (localSt !== "pending" && localSt !== "running") return false;
-  if (isServerInflightTaskStatus(pick.status)) return false;
+  if (isServerInflightTaskStatus(pick.status)) {
+    if (nodeId) {
+      return shouldSkipStaleTerminalWhileLocalInflight(nodeId, localRuntime, pick);
+    }
+    return false;
+  }
   if (nodeId) {
     return shouldSkipStaleTerminalWhileLocalInflight(nodeId, localRuntime, pick);
   }

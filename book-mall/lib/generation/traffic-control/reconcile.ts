@@ -7,7 +7,7 @@ import { CANVAS_AI_TASK_TIMEOUT_MIN } from "@/lib/canvas/canvas-constants";
 import {
   getReconcileRunningVideoMaxMin,
 } from "./constants";
-import { isGatewayVideoLogOccupyingTrafficSlot } from "@/lib/gateway/video-background-generation";
+import { canvasVideoPayloadWhere } from "@/lib/canvas/canvas-queue-without-log";
 import {
   releaseTrafficSlotFromGatewayLog,
 } from "./slot";
@@ -95,27 +95,30 @@ export async function reconcileRunningSlotCounts(): Promise<number> {
   const states = await prisma.generationTrafficState.findMany({ take: 200 });
   let fixed = 0;
   for (const state of states) {
-    const where =
+    const taskScopeWhere =
       state.ownerType === "TENANT"
-        ? { tenantId: state.ownerId, requestKind: "VIDEO" as const, status: "RUNNING" as const }
-        : {
-            tenantId: null,
-            requestKind: "VIDEO" as const,
-            status: "RUNNING" as const,
-            OR: [{ actorBookUserId: state.ownerId }, { userId: state.ownerId }],
-          };
-    const rows = await prisma.gatewayRequestLog.findMany({
-      where,
-      select: { resultSummary: true },
-      take: 500,
-    });
-    const actual = rows.filter((row) =>
-      isGatewayVideoLogOccupyingTrafficSlot({
-        status: "RUNNING",
-        requestKind: "VIDEO",
-        resultSummary: row.resultSummary,
+        ? { tenantId: state.ownerId }
+        : { tenantId: null, actorUserId: state.ownerId };
+
+    const [canvasDispatching, storyDispatching] = await Promise.all([
+      prisma.canvasGenerationTask.count({
+        where: {
+          status: "DISPATCHING",
+          ...taskScopeWhere,
+          ...canvasVideoPayloadWhere(),
+        },
       }),
-    ).length;
+      prisma.storyGenerationTask.count({
+        where: {
+          status: "DISPATCHING",
+          kind: "FRAME_VIDEO",
+          ...taskScopeWhere,
+        },
+      }),
+    ]);
+    /** 槽位只反映「提交厂商前」管线；厂商 RUNNING 已在 SUBMITTED 后释放 */
+    const actual = canvasDispatching + storyDispatching;
+
     if (actual !== state.runningVideoCount) {
       await prisma.generationTrafficState.update({
         where: { scopeKey: state.scopeKey },

@@ -48,6 +48,13 @@ export function getDispatchingStaleSec(): number {
   return readPositiveInt("DISPATCHING_STALE_SEC", 30);
 }
 
+/** dispatch 内 createTask HTTP 超时（须 < DISPATCHING_STALE_SEC，默认 25s） */
+export function getDispatchSubmitTimeoutMs(): number {
+  const staleMs = getDispatchingStaleSec() * 1000;
+  const raw = readPositiveInt("DISPATCH_SUBMIT_TIMEOUT_MS", 25_000);
+  return Math.min(raw, Math.max(5_000, staleMs - 2_000));
+}
+
 /** 30s 自愈累计重派次数上限；耗尽后 fail「提交生成超时, 请重试」 */
 export function getDispatchStaleRetryMax(): number {
   return readPositiveInt("DISPATCH_STALE_RETRY_MAX", 6);
@@ -71,6 +78,13 @@ export const GENERATION_INFLIGHT_STATUSES = [
   "DISPATCHING",
   "PENDING",
   "SUBMITTED",
+] as const;
+
+/** 仅「提交厂商前」占新建额度；SUBMITTED 已在厂商跑不应挡再次点击生成 */
+export const GENERATION_PIPELINE_INFLIGHT_STATUSES = [
+  "QUEUED",
+  "DISPATCHING",
+  "PENDING",
 ] as const;
 
 export type GenerationInflightStatus = (typeof GENERATION_INFLIGHT_STATUSES)[number];

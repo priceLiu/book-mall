@@ -17,6 +17,7 @@ function task(overrides: Partial<CanvasQueuedTaskRow> = {}): CanvasQueuedTaskRow
     model: "doubao-seedance",
     queuedAt: "2026-06-25T01:00:00.000Z",
     createdAt: "2026-06-25T00:59:58.000Z",
+    trafficStartedAt: "2026-06-25T00:59:58.000Z",
     dispatchAfter: null,
     waitMinutes: 0,
     payloadKind: "video-engine",
@@ -33,13 +34,15 @@ describe("buildCanvasPendingLogRow", () => {
     expect(row.pending).toBe(true);
   });
 
-  it("锚点用 queuedAt（无则回退 createdAt），submittedAt 占位为同一锚点", () => {
-    const withQueued = buildCanvasPendingLogRow(task());
-    expect(withQueued.canvasStartedAt).toBe("2026-06-25T01:00:00.000Z");
-    expect(withQueued.submittedAt).toBe("2026-06-25T01:00:00.000Z");
-
-    const noQueued = buildCanvasPendingLogRow(task({ queuedAt: null }));
-    expect(noQueued.canvasStartedAt).toBe("2026-06-25T00:59:58.000Z");
+  it("锚点用 trafficStartedAt（自愈重排不随 queuedAt 重置），submittedAt 占位为同一锚点", () => {
+    const row = buildCanvasPendingLogRow(
+      task({
+        trafficStartedAt: "2026-06-25T00:59:58.000Z",
+        queuedAt: "2026-06-25T01:30:00.000Z",
+      }),
+    );
+    expect(row.canvasStartedAt).toBe("2026-06-25T00:59:58.000Z");
+    expect(row.submittedAt).toBe("2026-06-25T00:59:58.000Z");
   });
 
   it("未到厂商：无 externalTaskId / 厂商分阶段 / 费用，clientPage 指向画布项目", () => {

@@ -34,8 +34,8 @@ function isTerminalTaskStatus(status: string): boolean {
 }
 
 /**
- * 本地 pending/running 时，勿用「上一轮」终态任务覆盖乐观 UI。
- * 刚点击、尚未绑定 taskId 时尤其如此（否则会闪回空态/旧成片，数秒后才恢复生成中）。
+ * 本地 pending/running 时，勿用「上一轮」服务端任务（终态或 stale 在途）覆盖乐观 UI。
+ * 刚点击、尚未绑定 taskId 时尤其如此（否则会闪回空态/旧成片或旧 queued，数秒后才恢复）。
  */
 export function shouldSkipStaleTerminalWhileLocalInflight(
   nodeId: string,
@@ -44,8 +44,12 @@ export function shouldSkipStaleTerminalWhileLocalInflight(
 ): boolean {
   const localSt = localRuntime?.status;
   if (localSt !== "pending" && localSt !== "running") return false;
-  if (isServerInflightTaskStatus(pick.status)) return false;
-  if (!isTerminalTaskStatus(pick.status)) return false;
+  if (
+    !isServerInflightTaskStatus(pick.status) &&
+    !isTerminalTaskStatus(pick.status)
+  ) {
+    return false;
+  }
 
   const localTaskId = localRuntime?.taskId?.trim();
   if (localTaskId) {

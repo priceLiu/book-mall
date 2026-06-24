@@ -38,6 +38,27 @@ function stalePreSubmitCutoff(): Date {
   return new Date(Date.now() - getDispatchingStaleSec() * 1000);
 }
 
+function readDispatchingAtMs(payload: Record<string, unknown>): number | null {
+  const raw = payload.dispatchingAt;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function isStalePreSubmitTask(
+  task: Pick<CanvasGenerationTask, "updatedAt" | "queuedAt" | "createdAt" | "kieTaskId" | "inputPayload">,
+  cutoff: Date,
+): boolean {
+  const cutoffMs = cutoff.getTime();
+  if (task.updatedAt.getTime() <= cutoffMs) return true;
+  if (task.kieTaskId) return false;
+  const payload = taskInputPayload(task);
+  const dispatchingMs = readDispatchingAtMs(payload);
+  if (dispatchingMs != null && dispatchingMs <= cutoffMs) return true;
+  const queuedMs = (task.queuedAt ?? task.createdAt).getTime();
+  return queuedMs <= cutoffMs;
+}
+
 function staleDispatchingWhere(
   projectId: string | undefined,
   cutoff: Date,
@@ -47,9 +68,9 @@ function staleDispatchingWhere(
     ...(projectId ? { projectId } : {}),
     ...canvasVideoPayloadWhere(),
     OR: [
-      { updatedAt: { lt: cutoff } },
-      { kieTaskId: null, queuedAt: { lt: cutoff } },
-      { kieTaskId: null, queuedAt: null, createdAt: { lt: cutoff } },
+      { updatedAt: { lte: cutoff } },
+      { kieTaskId: null, queuedAt: { lte: cutoff } },
+      { kieTaskId: null, queuedAt: null, createdAt: { lte: cutoff } },
     ],
   };
 }
@@ -66,8 +87,8 @@ function staleQueuedWhere(
     AND: [
       {
         OR: [
-          { queuedAt: { lt: cutoff } },
-          { queuedAt: null, createdAt: { lt: cutoff } },
+          { queuedAt: { lte: cutoff } },
+          { queuedAt: null, createdAt: { lte: cutoff } },
         ],
       },
       {
@@ -145,11 +166,9 @@ async function recoverStaleQueuedCanvasTasks(opts?: {
       continue;
     }
     const { payload: nextPayload } = nextDispatchStaleRetryPayload(payload);
-    const requeueNow = new Date();
     await prisma.canvasGenerationTask.update({
       where: { id: t.id },
       data: {
-        queuedAt: requeueNow,
         dispatchAfter: queueDispatchAfterFromIndex(0),
         failCode: null,
         failMessage: null,
@@ -174,6 +193,9 @@ async function recoverStaleDispatchingOnly(opts?: {
       actorUserId: true,
       inputPayload: true,
       kieTaskId: true,
+      updatedAt: true,
+      queuedAt: true,
+      createdAt: true,
       project: { select: { userId: true } },
     },
     orderBy: [{ queuedAt: "asc" }, { createdAt: "asc" }],
@@ -182,6 +204,7 @@ async function recoverStaleDispatchingOnly(opts?: {
 
   let n = 0;
   for (const t of stale) {
+    if (!isStalePreSubmitTask(t, cutoff)) continue;
     const payload = taskInputPayload(t);
     const gwId =
       typeof payload.gatewayLogId === "string" ? payload.gatewayLogId.trim() : "";
@@ -215,12 +238,10 @@ async function recoverStaleDispatchingOnly(opts?: {
     const stuckClaim =
       payload.gatewayKieSubmitClaimed === true && !payload.gatewayLogId && !t.kieTaskId;
     const { payload: nextPayload } = nextDispatchStaleRetryPayload(payload);
-    const requeueNow = new Date();
     await prisma.canvasGenerationTask.update({
-      where: { id: t.id },
+      where: { id: t.id, status: "DISPATCHING" },
       data: {
         status: "QUEUED",
-        queuedAt: requeueNow,
         dispatchAfter: queueDispatchAfterFromIndex(n),
         failCode: null,
         failMessage: null,
@@ -286,9 +307,13 @@ export function scheduleRecoverStaleDispatching(
       const { fireCanvasDispatchForProject, fireVideoTrafficDispatchBacklog } =
         await import("./fire-canvas-dispatch");
       if (projectId) {
-        fireCanvasDispatchForProject(projectId, `${source}-after-recover`);
+        fireCanvasDispatchForProject(projectId, `${source}-after-recover`, {
+          bypassDebounce: true,
+        });
       } else {
-        fireVideoTrafficDispatchBacklog(`${source}-after-recover`);
+        fireVideoTrafficDispatchBacklog(`${source}-after-recover`, {
+          bypassDebounce: true,
+        });
       }
       if (
         process.env.NODE_ENV === "development" ||

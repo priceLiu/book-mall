@@ -48,6 +48,22 @@ export function libtvRuntimeErrorAlertScope(): string {
   return window.location.pathname;
 }
 
+export function libtvRuntimeErrorAlertTitle(
+  failCode?: string,
+  message?: string,
+): string {
+  const code = failCode?.trim();
+  const msg = message ?? "";
+  if (
+    code === "INSUFFICIENT_CREDITS" ||
+    msg.includes("积分不足") ||
+    msg.includes("积分不够")
+  ) {
+    return "积分不足";
+  }
+  return "视频生成失败";
+}
+
 /**
  * 仅在本次会话内「生成中 → 失败」时弹窗；进页已存在的历史 error 不弹（避免充值后仍被旧状态打扰）。
  */
@@ -59,7 +75,7 @@ export function useLibtvRuntimeErrorAlert(opts: {
   failMessage?: string;
   dismissedFailTaskId?: string;
   enabled?: boolean;
-  onAlert: (message: string) => void;
+  onAlert: (payload: { message: string; failCode?: string }) => void;
 }): void {
   const isFirstPaintRef = useRef(true);
   const prevStatusRef = useRef<string | undefined>(undefined);
@@ -106,7 +122,7 @@ export function useLibtvRuntimeErrorAlert(opts: {
     if (lastAlertedRef.current === storageKey) return;
     lastAlertedRef.current = storageKey;
     markLibtvRuntimeErrorAlertShown(storageKey);
-    onAlertRef.current(msg);
+    onAlertRef.current({ message: msg, failCode: opts.failCode });
   }, [
     opts.enabled,
     opts.nodeId,

@@ -27,11 +27,13 @@ export function isRetryableTxError(error: unknown): boolean {
   return false;
 }
 
+export const DISPATCH_SUBMIT_TIMEOUT_MESSAGE = "dispatch submit timeout";
+
 /** Gateway createTask / 扣费预检返回的瞬时繁忙（尚无 logId，可安全退回队列）。 */
 export function isTransientSystemBusyError(error: unknown): boolean {
   if (isRetryableTxError(error)) return true;
   if (error instanceof Error) {
-    return /503|系统繁忙|Gateway createTask HTTP 503|pool timeout|Timed out fetching a new connection/i.test(
+    return /503|系统繁忙|Gateway createTask HTTP 503|pool timeout|Timed out fetching a new connection|createTask retry timeout|dispatch submit timeout/i.test(
       error.message,
     );
   }

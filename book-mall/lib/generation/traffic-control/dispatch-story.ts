@@ -1,7 +1,12 @@
 import type { StoryGenerationTask, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { isTransientSystemBusyError, runTxWithRetry, CANVAS_DB_TX_OPTIONS } from "@/lib/db-tx-retry";
+import {
+  DISPATCH_SUBMIT_TIMEOUT_MESSAGE,
+  isTransientSystemBusyError,
+  runTxWithRetry,
+  CANVAS_DB_TX_OPTIONS,
+} from "@/lib/db-tx-retry";
 import { buildStoryAiKieCallbackUrl } from "@/lib/story/story-ai-constants";
 import {
   storyGwCreateKieJob,
@@ -11,6 +16,7 @@ import { isVolcengineStoryVideoModelKey } from "@/lib/canvas/canvas-video-volcen
 
 import {
   getDispatchBatch,
+  getDispatchSubmitTimeoutMs,
   getQueueTimeoutMin,
   isTrafficControlEnabled,
 } from "./constants";
@@ -76,7 +82,14 @@ async function dispatchOneStoryQueuedTask(
 
         await tx.storyGenerationTask.update({
           where: { id: task.id },
-          data: { status: "DISPATCHING", dispatchAfter: null },
+          data: {
+            status: "DISPATCHING",
+            dispatchAfter: null,
+            inputPayload: {
+              ...input,
+              dispatchingAt: new Date().toISOString(),
+            } as Prisma.InputJsonValue,
+          },
         });
         return { action: "claimed" as const };
       }, CANVAS_DB_TX_OPTIONS),
@@ -89,26 +102,36 @@ async function dispatchOneStoryQueuedTask(
   try {
     const isVolcengine = isVolcengineStoryVideoModelKey(task.model);
     const callBackUrl = buildStoryAiKieCallbackUrl("video", task.id);
-    const job = isVolcengine
-      ? await storyGwCreateVolcengineVideoJob(task.project.userId, {
+    const timeoutMs = getDispatchSubmitTimeoutMs();
+    const submitPromise = isVolcengine
+      ? storyGwCreateVolcengineVideoJob(task.project.userId, {
           model: task.model,
           body: input,
           storyProjectId: task.projectId,
           storyTaskId: task.id,
         })
-      : await storyGwCreateKieJob(task.project.userId, {
+      : storyGwCreateKieJob(task.project.userId, {
           model: task.model,
           input,
           callBackUrl,
           storyProjectId: task.projectId,
           storyTaskId: task.id,
         });
+    const job = await Promise.race([
+      submitPromise,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(DISPATCH_SUBMIT_TIMEOUT_MESSAGE)),
+          timeoutMs,
+        ),
+      ),
+    ]);
     vendorJob = job;
 
-    await runTxWithRetry(
+    const submitted = await runTxWithRetry(
       () =>
-        prisma.storyGenerationTask.update({
-          where: { id: task.id },
+        prisma.storyGenerationTask.updateMany({
+          where: { id: task.id, status: "DISPATCHING" },
           data: {
             status: "SUBMITTED",
             kieTaskId: job.taskId,
@@ -122,6 +145,10 @@ async function dispatchOneStoryQueuedTask(
         }),
       { label: "story-dispatch-submitted-write", maxRetries: 5 },
     );
+    if (submitted.count === 0) {
+      await releaseTrafficSlot(scope.scopeKey);
+      return "skipped";
+    }
 
     await releaseGatewayVideoTrafficSlotIfOccupying({
       logId: job.logId,
