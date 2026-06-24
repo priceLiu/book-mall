@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
       includeFacets
         ? resolveGatewayLogListFacets(facetWhere, providerKind || undefined)
         : Promise.resolve(null),
-      historyMode
+      historyMode || skipCount
         ? Promise.resolve(null)
         : fetchCanvasQueueWithoutLogStats({
             ownerUserIds: canvasOwnerUserIds,

@@ -8,10 +8,12 @@ import {
 } from "@/lib/canvas/api-helpers";
 import { assertAccessibleCanvasProject } from "@/lib/canvas/canvas-project-access";
 import {
+  CANVAS_TASK_SSE_DB_BACKOFF_MS,
   CANVAS_TASK_SSE_HEARTBEAT_MS,
   CANVAS_TASK_SSE_IDLE_POLL_MS,
   CANVAS_TASK_SSE_POLL_MS,
   getCanvasProjectTaskSyncSnapshot,
+  isCanvasTaskSseEnabled,
   resolveCanvasTaskSsePollDelayMs,
 } from "@/lib/canvas/canvas-task-event-stream";
 
@@ -36,13 +38,18 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     return canvasErrorToResponse(request, err);
   }
 
+  if (!isCanvasTaskSseEnabled()) {
+    return new Response("SSE disabled", { status: 503 });
+  }
+
   const encoder = new TextEncoder();
   let closed = false;
   let lastFingerprint = "";
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-  let pollDelayMs = CANVAS_TASK_SSE_POLL_MS;
+  let pollDelayMs = CANVAS_TASK_SSE_IDLE_POLL_MS;
   let pollFailures = 0;
+  let dbBackoffUntil = 0;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -75,10 +82,13 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 
       const poll = async () => {
         if (closed || request.signal.aborted) return;
+        const now = Date.now();
+        if (now < dbBackoffUntil) {
+          schedulePoll(dbBackoffUntil - now);
+          return;
+        }
         try {
-          const snap = await getCanvasProjectTaskSyncSnapshot(projectId, {
-            bypassCache: pollFailures > 0,
-          });
+          const snap = await getCanvasProjectTaskSyncSnapshot(projectId);
           pollFailures = 0;
           pollDelayMs = resolveCanvasTaskSsePollDelayMs(snap);
           if (snap.fingerprint !== lastFingerprint) {
@@ -87,9 +97,10 @@ export async function GET(request: NextRequest, ctx: Ctx) {
           }
         } catch {
           pollFailures += 1;
+          dbBackoffUntil = Date.now() + CANVAS_TASK_SSE_DB_BACKOFF_MS;
           pollDelayMs = Math.min(
             CANVAS_TASK_SSE_IDLE_POLL_MS * Math.max(pollFailures, 1),
-            60_000,
+            120_000,
           );
           send("error", { projectId, message: "snapshot_failed" });
         }

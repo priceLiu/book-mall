@@ -56,11 +56,33 @@ export type CanvasQueueWithoutLogStats = {
   fetchedAt: string;
 };
 
+const queueStatsCache = new Map<
+  string,
+  { stats: CanvasQueueWithoutLogStats; fetchedAt: number }
+>();
+const QUEUE_STATS_CACHE_MS = 5000;
+
+function queueStatsCacheKey(
+  ownerUserIds: string[] | null,
+  staleMinutes: number,
+): string {
+  const owners =
+    ownerUserIds === null ? "*" : ownerUserIds.length ? ownerUserIds.join(",") : "__none__";
+  return `${owners}:${staleMinutes}`;
+}
+
 export async function fetchCanvasQueueWithoutLogStats(input: {
   ownerUserIds: string[] | null;
   staleMinutes?: number;
 }): Promise<CanvasQueueWithoutLogStats> {
   const staleMinutes = input.staleMinutes ?? 2;
+  const cacheKey = queueStatsCacheKey(input.ownerUserIds, staleMinutes);
+  const now = Date.now();
+  const hit = queueStatsCache.get(cacheKey);
+  if (hit && now - hit.fetchedAt < QUEUE_STATS_CACHE_MS) {
+    return hit.stats;
+  }
+
   const where = buildCanvasQueueWithoutLogWhere(input.ownerUserIds);
   const staleWhere = staleQueuedWhere(staleMinutes);
 
@@ -82,7 +104,7 @@ export async function fetchCanvasQueueWithoutLogStats(input: {
   const queued = byStatus.QUEUED ?? 0;
   const dispatching = byStatus.DISPATCHING ?? 0;
 
-  return {
+  const stats: CanvasQueueWithoutLogStats = {
     total: queued + dispatching,
     queued,
     dispatching,
@@ -90,6 +112,8 @@ export async function fetchCanvasQueueWithoutLogStats(input: {
     staleMinutes,
     fetchedAt: new Date().toISOString(),
   };
+  queueStatsCache.set(cacheKey, { stats, fetchedAt: now });
+  return stats;
 }
 
 export type CanvasQueuedTaskRow = {

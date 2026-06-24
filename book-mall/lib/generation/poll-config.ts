@@ -25,14 +25,30 @@ export function getGenerationPollConcurrency(): number {
 }
 
 /**
+ * 独立 poll-loop / cron 进程（可跑满并行度）。
+ * poll-loop 脚本应设 GENERATION_POLL_WORKER=1 或 PRISMA_CONNECTION_LIMIT=1。
+ */
+export function isGenerationPollWorkerProcess(): boolean {
+  const flag = process.env.GENERATION_POLL_WORKER?.trim().toLowerCase();
+  if (flag === "1" || flag === "true") return true;
+  return process.env.PRISMA_CONNECTION_LIMIT?.trim() === "1";
+}
+
+/** Web/API 进程内 opportunistic poll 最多并行路数（避免占满 connection_limit=30） */
+const WEB_OPPORTUNISTIC_POLL_CONCURRENCY = 2;
+
+/**
  * 按本进程 Prisma 连接池上限封顶 poll 并行度。
  * poll-loop 子进程 PRISMA_CONNECTION_LIMIT=1 时自动降为 1，避免 25 路抢 1 连接 → pool timeout。
- * web 进程保留 WEB_DB_RESERVE 条连接给 run / tasks 读等 API。
+ * web 进程保留 WEB_DB_RESERVE 条连接给 run / tasks 读 / SSE 等 API。
  */
 const WEB_DB_RESERVE = 3;
 
 export function getEffectiveGenerationPollConcurrency(): number {
   const configured = getGenerationPollConcurrency();
+  if (!isGenerationPollWorkerProcess()) {
+    return Math.min(configured, WEB_OPPORTUNISTIC_POLL_CONCURRENCY);
+  }
   const poolLimit = getPrismaConnectionLimit();
   const cap = Math.max(1, poolLimit - WEB_DB_RESERVE);
   return Math.min(configured, cap);

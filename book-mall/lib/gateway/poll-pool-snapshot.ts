@@ -306,7 +306,7 @@ export async function fetchPollPoolSnapshot(input: {
       .map((r) => mapGatewayRow(r, nowMs, slowWarnMs)),
   ].slice(0, limit);
 
-  const [canvasTasks, storyTasks, canvasSubmittedCount, canvasPendingCount, storySubmittedCount, storyPendingCount] =
+  const [canvasTasks, storyTasks, canvasStatusCounts, storyStatusCounts] =
     await Promise.all([
     prisma.canvasGenerationTask.findMany({
       where: canvasWhere,
@@ -346,19 +346,27 @@ export async function fetchPollPoolSnapshot(input: {
         project: { select: { name: true } },
       },
     }),
-    prisma.canvasGenerationTask.count({
-      where: { AND: [canvasWhere, { status: "SUBMITTED" }] },
+    prisma.canvasGenerationTask.groupBy({
+      by: ["status"],
+      where: canvasWhere,
+      _count: { _all: true },
     }),
-    prisma.canvasGenerationTask.count({
-      where: { AND: [canvasWhere, { status: "PENDING" }] },
-    }),
-    prisma.storyGenerationTask.count({
-      where: { AND: [storyWhere, { status: "SUBMITTED" }] },
-    }),
-    prisma.storyGenerationTask.count({
-      where: { AND: [storyWhere, { status: "PENDING" }] },
+    prisma.storyGenerationTask.groupBy({
+      by: ["status"],
+      where: storyWhere,
+      _count: { _all: true },
     }),
   ]);
+
+  const countByStatus = (
+    rows: { status: string; _count: { _all: number } }[],
+    status: string,
+  ) => rows.find((r) => r.status === status)?._count._all ?? 0;
+
+  const canvasSubmittedCount = countByStatus(canvasStatusCounts, "SUBMITTED");
+  const canvasPendingCount = countByStatus(canvasStatusCounts, "PENDING");
+  const storySubmittedCount = countByStatus(storyStatusCounts, "SUBMITTED");
+  const storyPendingCount = countByStatus(storyStatusCounts, "PENDING");
 
   const mapAppTask = (
     app: "canvas" | "story",
