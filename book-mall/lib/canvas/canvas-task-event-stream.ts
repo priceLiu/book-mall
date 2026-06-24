@@ -59,7 +59,7 @@ export function resolveCanvasTaskSsePollDelayMs(
 
 export function isCanvasTaskSseEnabled(): boolean {
   const v = process.env.CANVAS_TASK_SSE?.trim().toLowerCase();
-  return v !== "0" && v !== "false";
+  return v === "1" || v === "true";
 }
 
 async function loadCanvasProjectTaskSyncSnapshot(

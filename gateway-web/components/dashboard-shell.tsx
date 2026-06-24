@@ -11,6 +11,10 @@ import {
 
 import { DashboardNav } from "@/components/dashboard-nav";
 import { LogoutButton } from "@/components/logout-button";
+import {
+  createSingleFlight,
+  fetchJsonWithTimeout,
+} from "@/lib/gateway-fetch-client";
 
 export type DashboardNavItem = {
   href: string;
@@ -160,22 +164,18 @@ function useGatewayNavBadges() {
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      try {
-        const res = await fetch(
-          "/api/book-mall/api/gateway/logs/stats?parts=summary&hours=1&mode=live&scope=all",
-        );
-        const body = (await res.json().catch(() => null)) as {
-          cards?: { backgroundWait?: number };
-        } | null;
-        if (cancelled || !res.ok || !body?.cards) return;
-        setBadges({
-          backgroundWait: body.cards.backgroundWait ?? 0,
-        });
-      } catch {
-        /* ignore */
-      }
-    }
+    const load = createSingleFlight(async () => {
+      const { ok, data } = await fetchJsonWithTimeout<{
+        cards?: { backgroundWait?: number };
+      }>(
+        "/api/book-mall/api/gateway/logs/stats?parts=summary&hours=1&mode=live&scope=all",
+        { timeoutMs: 12_000 },
+      );
+      if (cancelled || !ok || !data?.cards) return;
+      setBadges({
+        backgroundWait: data.cards.backgroundWait ?? 0,
+      });
+    });
 
     void load();
     const id = window.setInterval(() => {
