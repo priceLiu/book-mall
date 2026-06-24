@@ -54,6 +54,22 @@ if [ -z "$DIRECT_DATABASE_URL" ]; then
   esac
 fi
 
-echo "[book-mall] Running prisma migrate deploy..."
-prisma migrate deploy
+# 生产默认不在容器启动时跑迁移（大表 DDL 会阻塞 3000 探针）。发版前由运维/Agent 执行 pnpm db:deploy。
+# 本地 compose / 非 production 仍自动 migrate；生产需显式 PRISMA_MIGRATE_ON_START=1 才在启动时 migrate。
+should_migrate=0
+if [ "$NODE_ENV" != "production" ]; then
+  should_migrate=1
+fi
+if [ "${PRISMA_MIGRATE_ON_START:-}" = "1" ]; then
+  should_migrate=1
+fi
+if [ "${SKIP_PRISMA_MIGRATE_ON_START:-}" = "1" ]; then
+  should_migrate=0
+fi
+if [ "$should_migrate" = "1" ]; then
+  echo "[book-mall] Running prisma migrate deploy..."
+  prisma migrate deploy
+else
+  echo "[book-mall] Skipping prisma migrate deploy on start (run pnpm db:deploy before release)"
+fi
 exec node server.js
