@@ -54,6 +54,7 @@
 1. **迁移**：`pnpm --dir book-mall db:deploy`（或 Docker build 内 migrate）
 2. **对账 cron**：每 5～10min 调 `pnpm generation:reconcile-traffic`（可与 poll SCF 同机）
 3. **回退**：生产 env 设 `TRAFFIC_CONTROL_OFF=1` 恢复同步 submit
+4. **dispatch 不变量**（防生产线卡死）：[`../tech/generation-traffic-dispatch-invariants.md`](../tech/generation-traffic-dispatch-invariants.md)
 
 ---
 
@@ -62,3 +63,4 @@
 | 日期 | 内容 |
 |------|------|
 | 2026-06-19 | P0–P3 全量实现 |
+| 2026-06-24 | dispatch 占槽 tx 规范固化（R1.1）；见 invariants 文档 |

@@ -72,9 +72,10 @@
 
 | 文件 | 变更 |
 |------|------|
-| `lib/db-tx-retry.ts` | `isTransientSystemBusyError` |
-| `lib/generation/traffic-control/dispatch-canvas.ts` | 503 重排队 |
-| `lib/generation/traffic-control/dispatch-story.ts` | 同上 + submitted 写重试 |
+| `lib/db-tx-retry.ts` | `isTransientSystemBusyError` · **`CANVAS_DB_TX_OPTIONS`** |
+| `lib/generation/traffic-control/dispatch-canvas.ts` | 503 重排队 · **占槽 tx 30s + runTxWithRetry + DISPATCHING revert** |
+| `lib/generation/traffic-control/dispatch-story.ts` | 同上口径（须与 canvas 对齐） |
+| `lib/generation/traffic-control/slot.ts` | **tx 外** `maxConcurrency` · `CANVAS_DB_TX_OPTIONS` |
 | `lib/generation/traffic-control/fire-canvas-dispatch.ts` | **新增** |
 | `lib/db-poll-backoff.ts` | **新增** |
 | `scripts/{story,canvas,gateway}-poll-loop.ts` | DB 退避 |
@@ -126,3 +127,19 @@
 - [ ] Gateway Logs「Canvas 排队」与 `canvas:queued-reconcile` 一致
 - [ ] 积分不足在 QUEUED 前即 FAILED（Phase E）
 - [ ] 生产 PgBouncer 上线后 connection 错误接近零
+
+---
+
+## R1.1 · 生产线卡死 recurrence（2026-06-24）
+
+**现象**：与 P2 相同 — QUEUED/DISPATCHING 堆积、Gateway 无新 log；日志 `Transaction already closed ... timeout was 5000 ms`。
+
+**与 R1 初版的差距**：R1 已处理 503 重排队，但 **占槽 `$transaction` 仍用默认 5s**，且 `acquireTrafficSlotInTx` 在 tx 内查 tenant；整批 dispatch 一次 catch 跳过剩余任务。
+
+**强制规范**：[`book-mall/doc/tech/generation-traffic-dispatch-invariants.md`](../../book-mall/doc/tech/generation-traffic-dispatch-invariants.md) · Cursor `.cursor/rules/generation-traffic-dispatch.mdc`
+
+**验收补充**：
+
+- [ ] dispatch 占槽路径无裸 `$transaction`（均有 `CANVAS_DB_TX_OPTIONS`）
+- [ ] `generation:reconcile-traffic` 可推进卡住的 QUEUED（`dispatched` > 0 或 `queueTimeouts` 清理）
+- [ ] `canvas:queued-reconcile` staleCount 在 reconcile 后归零

@@ -13,7 +13,7 @@ import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { refundFailedGatewayLog } from "@/lib/billing/gateway-credit-settlement";
 import { prisma } from "@/lib/prisma";
-import { isTransientSystemBusyError, runTxWithRetry } from "@/lib/db-tx-retry";
+import { isTransientSystemBusyError, runTxWithRetry, CANVAS_DB_TX_OPTIONS } from "@/lib/db-tx-retry";
 
 import {
   getDispatchBatch,
@@ -26,7 +26,7 @@ import {
   acquireTrafficSlotInTx,
   releaseTrafficSlot,
 } from "./slot";
-import { resolveCanvasProjectTrafficScope } from "./scope-key";
+import { resolveCanvasProjectTrafficScope, resolveMaxConcurrencyForScope } from "./scope-key";
 import { nextDispatchAfterFromSpacing } from "./token-bucket";
 
 function taskInputPayload(
@@ -184,9 +184,43 @@ async function recoverStaleDispatching(projectId?: string): Promise<number> {
   return n;
 }
 
+/** DISPATCHING 但未 createTask：释放槽并退回 QUEUED（生产线卡死恢复） */
+async function revertStuckDispatchingTask(
+  taskId: string,
+  scopeKey: string,
+  payload?: Record<string, unknown>,
+): Promise<void> {
+  await releaseTrafficSlot(scopeKey);
+  const p = payload ?? {};
+  const stuckClaim =
+    p.gatewayKieSubmitClaimed === true && !p.gatewayLogId;
+  await prisma.canvasGenerationTask
+    .update({
+      where: { id: taskId, status: "DISPATCHING" },
+      data: {
+        status: "QUEUED",
+        dispatchAfter: new Date(Date.now() + 2_000),
+        failCode: null,
+        failMessage: null,
+        ...(stuckClaim
+          ? {
+              inputPayload: {
+                ...p,
+                gatewayKieSubmitClaimed: false,
+                syncGatewaySubmit: true,
+              },
+            }
+          : {}),
+      },
+    })
+    .catch(() => undefined);
+}
+
 async function dispatchOneCanvasQueuedTask(
   task: CanvasGenerationTask & { project: { userId: string } },
 ): Promise<"dispatched" | "skipped" | "failed"> {
+  let scopeKey: string | null = null;
+  try {
   const payload = taskInputPayload(task);
   if (!isCanvasVideoTrafficKind(payload)) return "skipped";
 
@@ -197,28 +231,34 @@ async function dispatchOneCanvasQueuedTask(
 
   const actorUserId = task.actorUserId ?? task.project.userId;
   const scope = await resolveCanvasProjectTrafficScope(task.projectId, actorUserId);
+  scopeKey = scope.scopeKey;
+  const maxConcurrency = await resolveMaxConcurrencyForScope(scope);
 
-  const slotResult = await prisma.$transaction(async (tx) => {
-    const fresh = await tx.canvasGenerationTask.findUnique({ where: { id: task.id } });
-    if (!fresh || fresh.status !== "QUEUED") return { action: "skipped" as const };
+  const slotResult = await runTxWithRetry(
+    () =>
+      prisma.$transaction(async (tx) => {
+        const fresh = await tx.canvasGenerationTask.findUnique({ where: { id: task.id } });
+        if (!fresh || fresh.status !== "QUEUED") return { action: "skipped" as const };
 
-    const acquired = await acquireTrafficSlotInTx(tx, scope);
-    if (!acquired.ok) {
-      const retryAfter =
-        acquired.retryAfter ?? nextDispatchAfterFromSpacing(new Date());
-      await tx.canvasGenerationTask.update({
-        where: { id: task.id },
-        data: { dispatchAfter: retryAfter },
-      });
-      return { action: "skipped" as const };
-    }
+        const acquired = await acquireTrafficSlotInTx(tx, scope, maxConcurrency);
+        if (!acquired.ok) {
+          const retryAfter =
+            acquired.retryAfter ?? nextDispatchAfterFromSpacing(new Date());
+          await tx.canvasGenerationTask.update({
+            where: { id: task.id },
+            data: { dispatchAfter: retryAfter },
+          });
+          return { action: "skipped" as const };
+        }
 
-    await tx.canvasGenerationTask.update({
-      where: { id: task.id },
-      data: { status: "DISPATCHING", dispatchAfter: null },
-    });
-    return { action: "claimed" as const };
-  });
+        await tx.canvasGenerationTask.update({
+          where: { id: task.id },
+          data: { status: "DISPATCHING", dispatchAfter: null },
+        });
+        return { action: "claimed" as const };
+      }, CANVAS_DB_TX_OPTIONS),
+    { label: "canvas-dispatch-slot", maxRetries: 3 },
+  );
 
   if (slotResult.action !== "claimed") return "skipped";
 
@@ -285,17 +325,7 @@ async function dispatchOneCanvasQueuedTask(
 
     // 厂商提交前 / createTask 503 预检失败：退回队列稍后重试，不判失败、不产生孤儿日志。
     if (!vendorJob && isTransientSystemBusyError(e)) {
-      await prisma.canvasGenerationTask
-        .update({
-          where: { id: task.id },
-          data: {
-            status: "QUEUED",
-            dispatchAfter: new Date(Date.now() + 5_000),
-            failCode: null,
-            failMessage: null,
-          },
-        })
-        .catch(() => undefined);
+      await revertStuckDispatchingTask(task.id, scope.scopeKey, taskInputPayload(task));
       return "skipped";
     }
 
@@ -312,6 +342,28 @@ async function dispatchOneCanvasQueuedTask(
     });
     return "failed";
   }
+  } catch (e) {
+    if (scopeKey) {
+      const fresh = await prisma.canvasGenerationTask.findUnique({
+        where: { id: task.id },
+        select: { status: true, inputPayload: true },
+      });
+      if (fresh?.status === "DISPATCHING") {
+        await revertStuckDispatchingTask(
+          task.id,
+          scopeKey,
+          taskInputPayload(fresh),
+        );
+      }
+    }
+    if (isTransientSystemBusyError(e)) return "skipped";
+    console.warn(
+      "[canvas-dispatch] task error",
+      task.id.slice(0, 12),
+      e instanceof Error ? e.message : String(e),
+    );
+    return "skipped";
+  }
 }
 
 /** poll worker 入口：出队 QUEUED 画布视频任务 */
@@ -322,29 +374,35 @@ export async function dispatchQueuedCanvasTasks(opts?: {
   if (!isTrafficControlEnabled()) return result;
 
   try {
-  result.cancelled = await cancelQueueTimeouts(opts?.projectId);
-  result.recovered = await recoverStaleDispatching(opts?.projectId);
-
-  const batch = getDispatchBatch();
-  const queued = await prisma.canvasGenerationTask.findMany({
-    where: {
-      status: "QUEUED",
-      ...(opts?.projectId ? { projectId: opts.projectId } : {}),
-      OR: [{ dispatchAfter: null }, { dispatchAfter: { lte: new Date() } }],
-    },
-    orderBy: [{ queuedAt: "asc" }, { createdAt: "asc" }],
-    take: batch,
-    include: { project: { select: { userId: true } } },
-  });
-
-  for (const task of queued) {
-    const r = await dispatchOneCanvasQueuedTask(task);
-    if (r === "dispatched") result.dispatched++;
-    else if (r === "failed") result.failed++;
-    else result.skipped++;
+    result.cancelled = await cancelQueueTimeouts(opts?.projectId);
+  } catch (e) {
+    console.warn(
+      "[canvas-dispatch] cancelQueueTimeouts failed",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+  try {
+    result.recovered = await recoverStaleDispatching(opts?.projectId);
+  } catch (e) {
+    console.warn(
+      "[canvas-dispatch] recoverStaleDispatching failed",
+      e instanceof Error ? e.message : String(e),
+    );
   }
 
-  return result;
+  let queued: (CanvasGenerationTask & { project: { userId: string } })[] = [];
+  try {
+    const batch = getDispatchBatch();
+    queued = await prisma.canvasGenerationTask.findMany({
+      where: {
+        status: "QUEUED",
+        ...(opts?.projectId ? { projectId: opts.projectId } : {}),
+        OR: [{ dispatchAfter: null }, { dispatchAfter: { lte: new Date() } }],
+      },
+      orderBy: [{ queuedAt: "asc" }, { createdAt: "asc" }],
+      take: batch,
+      include: { project: { select: { userId: true } } },
+    });
   } catch (e) {
     console.warn(
       "[canvas-dispatch] skipped (db unavailable?)",
@@ -352,6 +410,24 @@ export async function dispatchQueuedCanvasTasks(opts?: {
     );
     return result;
   }
+
+  for (const task of queued) {
+    try {
+      const r = await dispatchOneCanvasQueuedTask(task);
+      if (r === "dispatched") result.dispatched++;
+      else if (r === "failed") result.failed++;
+      else result.skipped++;
+    } catch (e) {
+      result.skipped++;
+      console.warn(
+        "[canvas-dispatch] task loop error",
+        task.id.slice(0, 12),
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+  }
+
+  return result;
 }
 
 /** DISPATCHING 失败且已 create log 时的清理（供扩展） */
