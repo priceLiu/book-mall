@@ -10,7 +10,6 @@ import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import {
   pickActiveServerInflightTask,
-  runtimePatchFromCanvasTask,
   shouldApplyCanvasTaskRuntimePatch,
   shouldSkipStoryRowTaskApply,
 } from "@/lib/canvas/task-pick";
@@ -69,7 +68,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
   const duplicateNode = useCanvasStore((s) => s.duplicateNode);
   const d = data as unknown as Sbv1VideoEngineNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
-  const setNodeRuntime = useCanvasStore((s) => s.setNodeRuntime);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const { succeeded, history } = useNodeTaskHistory(id);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -136,37 +134,6 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     isPending,
   );
 
-  useEffect(() => {
-    if (!inflightTask) return;
-    const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
-    const localRt = (node?.data as Sbv1VideoEngineNodeData | undefined)?.runtime;
-    if (shouldSkipStoryRowTaskApply(localRt, inflightTask, id)) return;
-
-    const nodePatch = sbv1VideoPatchFromTask(inflightTask);
-    if (nodePatch) {
-      const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
-      if (
-        rtPatch &&
-        !shouldApplyCanvasTaskRuntimePatch(localRt, inflightTask, rtPatch, id)
-      ) {
-        return;
-      }
-      if (isSameSbv1MediaDataPatch(node?.data as Record<string, unknown>, nodePatch)) {
-        return;
-      }
-      updateNodeData(id, nodePatch);
-      return;
-    }
-    const patch = runtimePatchFromCanvasTask(inflightTask);
-    if (patch?.status === "pending" || patch?.status === "running") {
-      if (!shouldApplyCanvasTaskRuntimePatch(localRt, inflightTask, patch, id)) {
-        return;
-      }
-      setNodeRuntime(id, patch);
-    }
-  }, [inflightTask, id, setNodeRuntime, updateNodeData]);
-
-  /** 任务已在服务端终态但 runtime 仍停在 pending/running（须已绑定 taskId，勿误伤刚点的乐观 pending） */
   useEffect(() => {
     if (inflightTask) return;
     const node = useCanvasStore.getState().nodes.find((n) => n.id === id);

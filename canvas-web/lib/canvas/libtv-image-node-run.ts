@@ -59,22 +59,18 @@ export function libtvMediaRunIdlePatch(): Record<string, unknown> {
 export function optimisticLibtvMediaRunStart(
   nodeId: string,
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
-  setNodeRuntime?: (id: string, runtime: Partial<CanvasNodeRuntime>) => void,
+  _setNodeRuntime?: (id: string, runtime: Partial<CanvasNodeRuntime>) => void,
 ): void {
   markCanvasNodeGenerationStarted(nodeId);
-  const patch = libtvImageRunPendingPatch();
-  updateNodeData(nodeId, patch);
-  setNodeRuntime?.(nodeId, patch.runtime as Partial<CanvasNodeRuntime>);
+  updateNodeData(nodeId, libtvImageRunPendingPatch());
 }
 
 export function revertOptimisticLibtvMediaRunStart(
   nodeId: string,
   updateNodeData: (id: string, patch: Record<string, unknown>) => void,
-  setNodeRuntime?: (id: string, runtime: Partial<CanvasNodeRuntime>) => void,
+  _setNodeRuntime?: (id: string, runtime: Partial<CanvasNodeRuntime>) => void,
 ): void {
-  const patch = libtvMediaRunIdlePatch();
-  updateNodeData(nodeId, patch);
-  setNodeRuntime?.(nodeId, patch.runtime as Partial<CanvasNodeRuntime>);
+  updateNodeData(nodeId, libtvMediaRunIdlePatch());
 }
 
 export function commitLibtvImageRunPendingPatch(

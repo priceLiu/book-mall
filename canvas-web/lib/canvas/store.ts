@@ -96,6 +96,7 @@ import {
   syncNodeDimensionsFromChanges,
 } from "./canvas-node-changes";
 import { preserveLocalInflightOnHydrateLayout } from "./hydrate-inflight-preserve";
+import { isSameSbv1MediaDataPatch } from "./sbv1-image-task-apply";
 
 /** 大图 hydrate：列高/媒体同步延后一帧，先出画布 */
 const DEFER_HYDRATE_LAYOUT_NODE_COUNT = 24;
@@ -838,6 +839,13 @@ export const useCanvasStore = create<CanvasState>()(
 
       updateNodeData: (id, patch, options) => {
         const all = get().nodes;
+        const target = all.find((n) => n.id === id);
+        if (
+          target &&
+          isSameSbv1MediaDataPatch(target.data as Record<string, unknown>, patch)
+        ) {
+          return;
+        }
         let nodes = all.map((n) => {
           if (n.id !== id) return n;
           const base = (n.data ?? {}) as Record<string, unknown>;
@@ -897,24 +905,34 @@ export const useCanvasStore = create<CanvasState>()(
         const nowInflight =
           next.status === "pending" || next.status === "running";
         const focusNode = nowInflight && !wasInflight;
+        const needsFocusSelection =
+          focusNode &&
+          all.some((n) => (n.id === id ? !n.selected : n.selected));
+
+        if (!needsFocusSelection) {
+          set({
+            nodes: all.map((n) =>
+              n.id === id
+                ? { ...n, data: { ...n.data, runtime: next } }
+                : n,
+            ),
+          });
+          return;
+        }
 
         set({
           nodes: all.map((n) => {
             if (n.id !== id) {
-              return focusNode ? { ...n, selected: false } : n;
+              return { ...n, selected: false };
             }
             return {
               ...n,
-              selected: focusNode ? true : n.selected,
+              selected: true,
               data: { ...n.data, runtime: next },
             };
           }),
-          ...(focusNode
-            ? {
-                runningFocusNodeId: id,
-                runningFocusNonce: get().runningFocusNonce + 1,
-              }
-            : {}),
+          runningFocusNodeId: id,
+          runningFocusNonce: get().runningFocusNonce + 1,
         });
       },
 
