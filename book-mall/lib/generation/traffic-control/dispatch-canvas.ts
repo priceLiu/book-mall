@@ -367,28 +367,35 @@ async function dispatchOneCanvasQueuedTask(
   }
 }
 
-/** poll worker 入口：出队 QUEUED 画布视频任务 */
+/** poll worker 入口：出队 QUEUED 画布视频任务。
+ *
+ * `fastPath`：用户点击生成后的「即时派发」热路径。仅做「查本项目 QUEUED → 取槽 →
+ * 提交厂商」，**跳过**排队超时取消 / 僵死 DISPATCHING 回收两项兜底清扫
+ * （它们仍由轮询 worker 周期性执行），把点击到厂商提交之间的 DB 往返与排队等待降到最低。 */
 export async function dispatchQueuedCanvasTasks(opts?: {
   projectId?: string;
+  fastPath?: boolean;
 }): Promise<{ cancelled: number; recovered: number; dispatched: number; skipped: number; failed: number }> {
   const result = { cancelled: 0, recovered: 0, dispatched: 0, skipped: 0, failed: 0 };
   if (!isTrafficControlEnabled()) return result;
 
-  try {
-    result.cancelled = await cancelQueueTimeouts(opts?.projectId);
-  } catch (e) {
-    console.warn(
-      "[canvas-dispatch] cancelQueueTimeouts failed",
-      e instanceof Error ? e.message : String(e),
-    );
-  }
-  try {
-    result.recovered = await recoverStaleDispatching(opts?.projectId);
-  } catch (e) {
-    console.warn(
-      "[canvas-dispatch] recoverStaleDispatching failed",
-      e instanceof Error ? e.message : String(e),
-    );
+  if (!opts?.fastPath) {
+    try {
+      result.cancelled = await cancelQueueTimeouts(opts?.projectId);
+    } catch (e) {
+      console.warn(
+        "[canvas-dispatch] cancelQueueTimeouts failed",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+    try {
+      result.recovered = await recoverStaleDispatching(opts?.projectId);
+    } catch (e) {
+      console.warn(
+        "[canvas-dispatch] recoverStaleDispatching failed",
+        e instanceof Error ? e.message : String(e),
+      );
+    }
   }
 
   let queued: (CanvasGenerationTask & { project: { userId: string } })[] = [];

@@ -9,8 +9,10 @@ import {
   mergeVolcengineTimingTrace,
   resolveVendorNativeTimingForLogRow,
   resolveVolcengineLogTiming,
+  resolveVolcengineTerminalCompletedAtMs,
   VOLCENGINE_VENDOR_STALE_RELEASE_MS,
 } from "@/lib/gateway/log-volcengine-timing";
+import type { VolcengineTimingTrace } from "@/lib/gateway/log-volcengine-timing";
 
 describe("log-volcengine-timing", () => {
   it("splits queue / generate / poll delay on success", () => {
@@ -151,7 +153,7 @@ describe("log-volcengine-timing", () => {
     ).toBeNull();
   });
 
-  it("in-flight running: Generate null until vendor updated jumps; Poll Δ = poll lag", () => {
+  it("in-flight running: Seedance frozen updated → Generate ticks wall-clock from genStart; Poll Δ = poll lag", () => {
     const submittedAtMs = 1_000_000;
     const genStartMs = 1_000_000 + 3_000;
     const firstPollMs = genStartMs + 5_000;
@@ -182,7 +184,8 @@ describe("log-volcengine-timing", () => {
     });
 
     expect(breakdown.queueMs).toBe(3_000);
-    expect(breakdown.generateMs).toBeNull();
+    // genStart=submitted+3s, now=submitted+68s → 生成墙钟 65s（GPU 真值终态回填）
+    expect(breakdown.generateMs).toBe(65_000);
     expect(breakdown.pollDelayMs).toBe(0);
     expect(breakdown.pollDelayOverLimit).toBe(false);
   });
@@ -211,7 +214,8 @@ describe("log-volcengine-timing", () => {
     });
 
     expect(breakdown.queueMs).toBe(3_000);
-    expect(breakdown.generateMs).toBeNull();
+    // Seedance updated 冻结：生成仍按墙钟累计（now−genStart=65s），不因 poll 滞后而显示 —
+    expect(breakdown.generateMs).toBe(65_000);
     expect(breakdown.pollDelayMs).toBe(60_000);
   });
 
@@ -475,5 +479,64 @@ describe("log-volcengine-timing", () => {
         nowMs: 9_999_999_999,
       }),
     ).toEqual(stored);
+  });
+});
+
+describe("resolveVolcengineTerminalCompletedAtMs（D·完成时刻锚点回归）", () => {
+  const submittedAtMs = 1_000_000;
+  const base: VolcengineTimingTrace = { kind: "volcengine_timing" };
+
+  it("SUCCEEDED：优先用 firstSucceededPolledAtMs（厂商完成观测时刻），而非检测时的 now", () => {
+    const firstSucc = submittedAtMs + 264_000;
+    const lateNow = submittedAtMs + 888_000; // 检测滞后到 888s
+    const got = resolveVolcengineTerminalCompletedAtMs({
+      trace: { ...base, firstSucceededPolledAtMs: firstSucc, lastStatus: "succeeded" },
+      status: "SUCCEEDED",
+      submittedAtMs,
+      fallbackNowMs: lateNow,
+    });
+    expect(got).toBe(firstSucc);
+  });
+
+  it("SUCCEEDED：无 succeeded 观测锚点时回退 vendorUpdatedAtMs，仍不灌入检测滞后", () => {
+    const vendorUpdated = submittedAtMs + 300_000;
+    const lateNow = submittedAtMs + 900_000;
+    // lastStatus 非 succeeded（未 poll 到终态）→ firstSucc 解析为 null → 回退 vendorUpdatedAtMs
+    const got = resolveVolcengineTerminalCompletedAtMs({
+      trace: { ...base, vendorUpdatedAtMs: vendorUpdated, lastStatus: "running" },
+      status: "SUCCEEDED",
+      submittedAtMs,
+      fallbackNowMs: lateNow,
+    });
+    expect(got).toBe(vendorUpdated);
+  });
+
+  it("完成时刻不会早于提交时刻（下限夹取 submittedAtMs）", () => {
+    const got = resolveVolcengineTerminalCompletedAtMs({
+      trace: { ...base, firstSucceededPolledAtMs: submittedAtMs - 50_000, lastStatus: "succeeded" },
+      status: "SUCCEEDED",
+      submittedAtMs,
+      fallbackNowMs: submittedAtMs + 10_000,
+    });
+    expect(got).toBe(submittedAtMs);
+  });
+
+  it("FAILED：优先 firstFailedPolledAtMs / vendorUpdatedAtMs，否则回退 now", () => {
+    const vendorUpdated = submittedAtMs + 120_000;
+    const got = resolveVolcengineTerminalCompletedAtMs({
+      trace: { ...base, vendorUpdatedAtMs: vendorUpdated, lastStatus: "failed" },
+      status: "FAILED",
+      submittedAtMs,
+      fallbackNowMs: submittedAtMs + 600_000,
+    });
+    expect(got).toBe(vendorUpdated);
+
+    const noAnchor = resolveVolcengineTerminalCompletedAtMs({
+      trace: { ...base, lastStatus: "failed" },
+      status: "FAILED",
+      submittedAtMs,
+      fallbackNowMs: submittedAtMs + 5_000,
+    });
+    expect(noAnchor).toBe(submittedAtMs + 5_000);
   });
 });

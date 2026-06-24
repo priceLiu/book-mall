@@ -31,9 +31,15 @@ import {
   formatLogAppTaskCell,
   formatLogTimingPhaseCell,
   logProviderFilterOptions,
+  resolveLogVendorPhaseEmptyHint,
   LOG_APP_FILTER_OPTIONS,
 } from "@/lib/gateway-log-display";
-import { resolveLiveLogPhaseTiming, resolveVendorNativeTimingLive } from "@/lib/volcengine-log-timing-live";
+import {
+  hasVolcengineTimingTrace,
+  liveVolcengineVideoTiming,
+  resolveLiveLogPhaseTiming,
+  resolveVendorNativeTimingLive,
+} from "@/lib/volcengine-log-timing-live";
 import { useLiveWallClockMs } from "@/lib/use-live-wall-clock";
 import {
   gatewayLivePollIntervalMs,
@@ -112,7 +118,21 @@ export type GatewayLogRow = {
   submittedAt: string;
   completedAt: string | null;
   credentialId?: string | null;
+  /** 方向 2：画布排队中（待提交）合成行标记 */
+  pending?: boolean;
+  /** 方向 2：合成行对应的真实画布任务 id（用于与真实日志去重） */
+  canvasTaskId?: string | null;
 };
+
+/** 后端 canvas-queue?rows=1 返回的合成「排队中」行（已对齐 GatewayLogRow 必填字段） */
+type CanvasPendingLogRow = GatewayLogRow & {
+  pending: true;
+  canvasTaskId: string;
+};
+
+function isPendingLogRow(l: GatewayLogRow): boolean {
+  return l.pending === true || l.id.startsWith("pending:");
+}
 
 const STATUS_OPTIONS = [
   { value: "", label: "Select Status" },
@@ -124,6 +144,10 @@ const STATUS_OPTIONS = [
 ];
 
 const PAGE_SIZE_PRESETS = [20, 50, 100] as const;
+/** 首屏 / 每批懒加载默认条数：先出 50 条，向下滚动再按批加载，避免一次拿太多卡顿。 */
+const DEFAULT_PAGE_SIZE = 50;
+/** A·自动复核：同一在途行两次自动向厂商复核的最小间隔，避免每秒重复打 recover */
+const AUTO_RECOVER_MIN_GAP_MS = 60_000;
 const PAGE_SIZE_STORAGE_KEY = "gw-logs-page-size";
 const FILTERS_COLLAPSED_STORAGE_KEY = "gw-logs-filters-collapsed";
 const PAGE_SIZE_MAX = 500;
@@ -170,7 +194,7 @@ export type GatewayLogsInitialData = {
 };
 
 function readStoredPageSize(): number {
-  if (typeof window === "undefined") return PAGE_SIZE_PRESETS[0];
+  if (typeof window === "undefined") return DEFAULT_PAGE_SIZE;
   try {
     const raw = window.localStorage.getItem(PAGE_SIZE_STORAGE_KEY);
     const n = Number(raw);
@@ -178,7 +202,7 @@ function readStoredPageSize(): number {
   } catch {
     /* ignore */
   }
-  return PAGE_SIZE_PRESETS[0];
+  return DEFAULT_PAGE_SIZE;
 }
 
 function readFiltersCollapsed(): boolean {
@@ -205,13 +229,64 @@ function resolvePageSizePreset(size: number): PageSizePreset {
 }
 
 function clampPageSize(value: number): number {
-  if (!Number.isFinite(value) || value < 1) return PAGE_SIZE_PRESETS[0];
+  if (!Number.isFinite(value) || value < 1) return DEFAULT_PAGE_SIZE;
   return Math.min(PAGE_SIZE_MAX, Math.floor(value));
 }
 
 type LogsViewMode = "live" | "history";
 /** 进行中 Duration / 各阶段墙钟刷新间隔 */
 const LIVE_CLOCK_MS = 1_000;
+/** 自动刷新连续失败达到此次数后才显示红字（瞬时网络闪断静默重试） */
+const AUTO_REFRESH_FAIL_BEFORE_ERROR = 3;
+/** 避免连接池排队时浏览器挂 60s+；超时后快速失败并允许重试 */
+const GATEWAY_LOGS_FETCH_TIMEOUT_MS = 20_000;
+const GATEWAY_LOGS_FETCH_MAX_ATTEMPTS = 2;
+
+async function gatewayLogsFetchText(
+  path: string,
+  opts?: { maxAttempts?: number },
+): Promise<{ ok: boolean; status: number; raw: string }> {
+  const maxAttempts = opts?.maxAttempts ?? GATEWAY_LOGS_FETCH_MAX_ATTEMPTS;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      GATEWAY_LOGS_FETCH_TIMEOUT_MS,
+    );
+    try {
+      const res = await fetch(path, { signal: controller.signal });
+      const raw = await res.text();
+      window.clearTimeout(timeoutId);
+      if (
+        !res.ok &&
+        attempt < maxAttempts - 1 &&
+        isGatewayTransientFetchError(res.status, raw)
+      ) {
+        await sleepMs(gatewayTransientRetryDelayMs(attempt));
+        continue;
+      }
+      return { ok: res.ok, status: res.status, raw };
+    } catch (e) {
+      window.clearTimeout(timeoutId);
+      lastError = e;
+      if (
+        attempt < maxAttempts - 1 &&
+        e instanceof Error &&
+        (e.name === "AbortError" || /failed to fetch/i.test(e.message))
+      ) {
+        await sleepMs(gatewayTransientRetryDelayMs(attempt));
+        continue;
+      }
+      if (e instanceof Error && e.name === "AbortError") {
+        throw new Error("加载超时，请稍后重试");
+      }
+      throw e;
+    }
+  }
+  if (lastError instanceof Error) throw lastError;
+  throw new Error("加载失败，请稍后重试");
+}
 
 function SpinnerIcon({ className }: { className?: string }) {
   return (
@@ -226,16 +301,42 @@ function SpinnerIcon({ className }: { className?: string }) {
   );
 }
 
-function LogsListLoadingRow({ message }: { message: string }) {
+/**
+ * 非阻塞骨架：加载时保留表格结构 + 脉冲占位行，避免整表清空后只剩大转圈的「卡住」观感。
+ * 顶部一条细进度提示，下面铺若干占位行；查询在后台进行，页面始终可交互。
+ */
+function LogsListSkeletonRows({
+  message,
+  rows = 8,
+}: {
+  message: string;
+  rows?: number;
+}) {
   return (
-    <tr>
-      <td colSpan={30} className="py-20 text-center">
-        <SpinnerIcon className="mx-auto size-6 animate-spin text-[var(--gw-accent)]/90" />
-        <p className="mt-3 text-sm text-[var(--gw-muted)]" role="status" aria-live="polite">
-          {message}
-        </p>
-      </td>
-    </tr>
+    <>
+      <tr>
+        <td colSpan={30} className="px-3 py-2">
+          <span
+            className="inline-flex items-center gap-2 text-xs text-[var(--gw-accent)]/90"
+            role="status"
+            aria-live="polite"
+          >
+            <SpinnerIcon className="size-3.5 animate-spin" />
+            {message}
+          </span>
+        </td>
+      </tr>
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={`sk-${i}`} className="gw-logs-row" aria-hidden>
+          <td colSpan={30} className="py-3">
+            <span
+              className="block h-3 animate-pulse rounded bg-white/5"
+              style={{ width: `${88 - (i % 4) * 12}%` }}
+            />
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }
 
@@ -318,65 +419,33 @@ async function fetchGatewayLogs(params: {
   if (params.includeFacets === false) qs.set("facets", "0");
   if (params.facetsOnly) qs.set("facets", "only");
   const path = `/api/book-mall/api/gateway/logs?${qs.toString()}`;
-  const maxAttempts = 4;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      const res = await fetch(path);
-      const raw = await res.text();
-      let data: (GatewayLogsResponse & { error?: string }) | null = null;
-      try {
-        data = raw ? (JSON.parse(raw) as GatewayLogsResponse & { error?: string }) : null;
-      } catch {
-        data = null;
-      }
-      if (
-        !res.ok &&
-        attempt < maxAttempts - 1 &&
-        isGatewayTransientFetchError(res.status, raw)
-      ) {
-        await sleepMs(gatewayTransientRetryDelayMs(attempt));
-        continue;
-      }
-      if (!res.ok) {
-        throw new Error(
-          data?.error === "DATABASE_UNAVAILABLE"
-            ? "服务繁忙，请稍后再试"
-            : (data?.error ?? "加载日志失败"),
-        );
-      }
-      return {
-        logs: data?.logs ?? [],
-        total: data?.total ?? null,
-        page: data?.page ?? params.page,
-        pageSize: data?.pageSize ?? params.pageSize,
-        totalPages: data?.totalPages ?? null,
-        hasMore: data?.hasMore,
-        facets: data?.facets,
-        canvasQueueStats: data?.canvasQueueStats ?? null,
-        hotCutoffMs: data?.hotCutoffMs,
-      };
-    } catch (e) {
-      if (
-        attempt < maxAttempts - 1 &&
-        e instanceof Error &&
-        (e.name === "AbortError" || /failed to fetch/i.test(e.message))
-      ) {
-        await sleepMs(gatewayTransientRetryDelayMs(attempt));
-        continue;
-      }
-      if (e instanceof Error && e.message !== "加载日志失败") {
-        throw new Error(
-          e.name === "AbortError" || /failed to fetch/i.test(e.message)
-            ? "暂时无法连接主站，请稍后再试"
-            : e.message,
-        );
-      }
-      throw e;
-    }
+  const { ok, status, raw } = await gatewayLogsFetchText(path);
+  let data: (GatewayLogsResponse & { error?: string }) | null = null;
+  try {
+    data = raw ? (JSON.parse(raw) as GatewayLogsResponse & { error?: string }) : null;
+  } catch {
+    data = null;
   }
-
-  throw new Error("服务繁忙，请稍后再试");
+  if (!ok) {
+    throw new Error(
+      status === 401
+        ? "登录已过期，请重新登录"
+        : data?.error === "DATABASE_UNAVAILABLE"
+          ? "加载失败，请稍后重试"
+          : (data?.error ?? "加载日志失败"),
+    );
+  }
+  return {
+    logs: data?.logs ?? [],
+    total: data?.total ?? null,
+    page: data?.page ?? params.page,
+    pageSize: data?.pageSize ?? params.pageSize,
+    totalPages: data?.totalPages ?? null,
+    hasMore: data?.hasMore,
+    facets: data?.facets,
+    canvasQueueStats: data?.canvasQueueStats ?? null,
+    hotCutoffMs: data?.hotCutoffMs,
+  };
 }
 
 /** 仅拉筛选项分面（动静分离：与日志行查询解耦，加快首屏/Tab 切换） */
@@ -407,41 +476,38 @@ async function fetchGatewayLogFacets(params: {
   if (params.modelFilter) qs.set("model", params.modelFilter);
   if (params.credentialIdFilter) qs.set("credentialId", params.credentialIdFilter);
   const path = `/api/book-mall/api/gateway/logs?${qs.toString()}`;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(path);
-      const raw = await res.text();
-      if (
-        !res.ok &&
-        attempt < 2 &&
-        isGatewayTransientFetchError(res.status, raw)
-      ) {
-        await sleepMs(gatewayTransientRetryDelayMs(attempt));
-        continue;
-      }
-      if (!res.ok) return null;
-      const data = raw
-        ? (JSON.parse(raw) as { facets?: GatewayLogFacets })
-        : null;
-      return data?.facets ?? null;
-    } catch {
-      if (attempt < 2) {
-        await sleepMs(gatewayTransientRetryDelayMs(attempt));
-        continue;
-      }
-      return null;
-    }
-  }
-  return null;
-}
-
-async function fetchCanvasQueueStats(): Promise<CanvasQueueWithoutLogStats | null> {
   try {
-    const res = await fetch("/api/book-mall/api/gateway/logs/canvas-queue?staleMin=2");
-    if (!res.ok) return null;
-    return (await res.json().catch(() => null)) as CanvasQueueWithoutLogStats | null;
+    const { ok, raw } = await gatewayLogsFetchText(path, { maxAttempts: 1 });
+    if (!ok) return null;
+    const data = raw ? (JSON.parse(raw) as { facets?: GatewayLogFacets }) : null;
+    return data?.facets ?? null;
   } catch {
     return null;
+  }
+}
+
+type CanvasQueueFetchResult = {
+  stats: CanvasQueueWithoutLogStats | null;
+  pendingRows: CanvasPendingLogRow[];
+};
+
+async function fetchCanvasQueueStats(): Promise<CanvasQueueFetchResult> {
+  try {
+    const res = await fetch(
+      "/api/book-mall/api/gateway/logs/canvas-queue?staleMin=2&rows=1&limit=50",
+    );
+    if (!res.ok) return { stats: null, pendingRows: [] };
+    const data = (await res.json().catch(() => null)) as
+      | (CanvasQueueWithoutLogStats & { pendingRows?: CanvasPendingLogRow[] })
+      | null;
+    if (!data) return { stats: null, pendingRows: [] };
+    const { pendingRows, ...stats } = data;
+    return {
+      stats: stats as CanvasQueueWithoutLogStats,
+      pendingRows: Array.isArray(pendingRows) ? pendingRows : [],
+    };
+  } catch {
+    return { stats: null, pendingRows: [] };
   }
 }
 
@@ -479,61 +545,29 @@ async function fetchGatewayLogsDelta(params: {
   if (params.poll) qs.set("poll", "1");
   else qs.set("skipPoll", "1");
   const path = `/api/book-mall/api/gateway/logs/delta?${qs.toString()}`;
-  const maxAttempts = 3;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      const res = await fetch(path);
-      const raw = await res.text();
-      let data: (GatewayLogsDelta & { error?: string }) | null = null;
-      try {
-        data = raw ? (JSON.parse(raw) as GatewayLogsDelta & { error?: string }) : null;
-      } catch {
-        data = null;
-      }
-      if (
-        !res.ok &&
-        attempt < maxAttempts - 1 &&
-        isGatewayTransientFetchError(res.status, raw)
-      ) {
-        await sleepMs(gatewayTransientRetryDelayMs(attempt));
-        continue;
-      }
-      if (!res.ok) {
-        throw new Error(
-          data?.error === "DATABASE_UNAVAILABLE"
-            ? "服务繁忙，请稍后再试"
-            : (data?.error ?? "加载日志失败"),
-        );
-      }
-      return {
-        created: data?.created ?? [],
-        updated: data?.updated ?? [],
-        serverNowMs: data?.serverNowMs ?? Date.now(),
-        sinceApplied: data?.sinceApplied ?? null,
-        hotCutoffMs: data?.hotCutoffMs,
-      };
-    } catch (e) {
-      if (
-        attempt < maxAttempts - 1 &&
-        e instanceof Error &&
-        (e.name === "AbortError" || /failed to fetch/i.test(e.message))
-      ) {
-        await sleepMs(gatewayTransientRetryDelayMs(attempt));
-        continue;
-      }
-      if (e instanceof Error && e.message !== "加载日志失败") {
-        throw new Error(
-          e.name === "AbortError" || /failed to fetch/i.test(e.message)
-            ? "暂时无法连接主站，请稍后再试"
-            : e.message,
-        );
-      }
-      throw e;
-    }
+  const { ok, status, raw } = await gatewayLogsFetchText(path);
+  let data: (GatewayLogsDelta & { error?: string }) | null = null;
+  try {
+    data = raw ? (JSON.parse(raw) as GatewayLogsDelta & { error?: string }) : null;
+  } catch {
+    data = null;
   }
-
-  throw new Error("服务繁忙，请稍后再试");
+  if (!ok) {
+    throw new Error(
+      status === 401
+        ? "登录已过期，请重新登录"
+        : data?.error === "DATABASE_UNAVAILABLE"
+          ? "加载失败，请稍后重试"
+          : (data?.error ?? "加载日志失败"),
+    );
+  }
+  return {
+    created: data?.created ?? [],
+    updated: data?.updated ?? [],
+    serverNowMs: data?.serverNowMs ?? Date.now(),
+    sinceApplied: data?.sinceApplied ?? null,
+    hotCutoffMs: data?.hotCutoffMs,
+  };
 }
 
 /** 升序游标合并：updated 原地替换、created 去重前插，按 submittedAt desc 排序并截断 */
@@ -574,14 +608,22 @@ const LogsTableRow = memo(function LogsTableRow({
   isSelected,
   liveTick,
   onToggleSelect,
+  onRecover,
+  recovering,
 }: {
   log: GatewayLogRow;
   isSelected: boolean;
   /** 仅进行中行传入墙钟 tick；已完成行不传，避免每秒整表重渲染 */
   liveTick?: number | null;
   onToggleSelect: (id: string) => void;
+  /** A·主动复核：向厂商核对并收口（进行中且有 taskId 的火山视频行可用） */
+  onRecover?: (id: string) => void;
+  recovering?: boolean;
 }) {
   const isInProgress = isLogInProgress(l.status);
+  // 方向 2：排队中（待提交）合成行 —— 尚未到厂商，网关段/厂商分阶段一律 —，
+  // 出队前 = 总耗时（点击至今的墙钟），Submitted 显示 —。
+  const pendingRow = isPendingLogRow(l);
   const live = resolveLiveLogPhaseTiming({
     submittedAt: l.submittedAt,
     completedAt: l.completedAt,
@@ -599,18 +641,25 @@ const LogsTableRow = memo(function LogsTableRow({
   const generateMs = live.generateMs;
   const vendorPostProcessMs = live.vendorPostProcessMs;
   const pollDelayMs = live.pollDelayMs;
-  const durationMs = resolveLogDisplayDurationMs({
-    durationMs: l.durationMs,
-    submittedAt: l.submittedAt,
-    completedAt: l.completedAt,
-    isInProgress,
-    nowMs: liveTick ?? null,
-    queueMs,
-    generateMs,
-    vendorPostProcessMs,
-    pollDelayMs,
-    liveTotalMs: live.totalMs,
-  });
+  // B：厂商停更 / 轮询失联 → 生成/网关段已冻结，标黄提示「待核对」（配合主动复核）
+  const pollStalled = live.stalled === true && isInProgress;
+  const stalledTitleSuffix = pollStalled
+    ? "\n⚠ 厂商停更 / 轮询失联超 2min，已冻结生成秒表（多为厂商已返回但未 poll 到）；点击行尾「核对厂商」可立即向厂商复核收口。"
+    : "";
+  const durationMs = pendingRow
+    ? null
+    : resolveLogDisplayDurationMs({
+        durationMs: l.durationMs,
+        submittedAt: l.submittedAt,
+        completedAt: l.completedAt,
+        isInProgress,
+        nowMs: liveTick ?? null,
+        queueMs,
+        generateMs,
+        vendorPostProcessMs,
+        pollDelayMs,
+        liveTotalMs: live.totalMs,
+      });
   const e2eMs = resolveCanvasE2eDisplayMs({
     e2eMs: l.e2eMs,
     canvasStartedAt: l.canvasStartedAt,
@@ -621,13 +670,15 @@ const LogsTableRow = memo(function LogsTableRow({
     isInProgress,
     nowMs: liveTick ?? null,
   });
-  const preGatewayMs = resolvePreGatewayDisplayMs({
-    preGatewayMs: l.preGatewayMs,
-    canvasStartedAt: l.canvasStartedAt,
-    submittedAt: l.submittedAt,
-    isInProgress,
-    nowMs: liveTick ?? null,
-  });
+  const preGatewayMs = pendingRow
+    ? (e2eMs ?? null)
+    : resolvePreGatewayDisplayMs({
+        preGatewayMs: l.preGatewayMs,
+        canvasStartedAt: l.canvasStartedAt,
+        submittedAt: l.submittedAt,
+        isInProgress,
+        nowMs: liveTick ?? null,
+      });
   const vendorNative = resolveVendorNativeTimingLive({
     providerKind: l.providerKind,
     requestKind: l.requestKind,
@@ -675,6 +726,20 @@ const LogsTableRow = memo(function LogsTableRow({
     stallHint: l.pollStallDiagnostic?.hint ?? null,
     peakPollDelayMs: l.peakPollDelayMs,
   });
+  const vendorPhaseEmptyHint = resolveLogVendorPhaseEmptyHint({
+    providerKind: l.providerKind,
+    requestKind: l.requestKind,
+    externalTaskId: l.externalTaskId,
+    isInProgress,
+    hasVolcengineTrace: hasVolcengineTimingTrace(l.resultSummary),
+  });
+  const phaseCellTitle = (
+    cell: { value: string; title?: string },
+    fallback?: string,
+  ) =>
+    cell.value === "—" && fallback
+      ? fallback
+      : cell.title ?? (cell.value === "—" ? fallback : undefined);
   const rawProgressLabel = isInProgress
     ? pickLogProgressLabel(l.status, l.resultSummary)
     : null;
@@ -694,13 +759,22 @@ const LogsTableRow = memo(function LogsTableRow({
   return (
     <tr className="gw-logs-row">
       <td className="align-middle">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => onToggleSelect(l.id)}
-          className="gw-accent-control h-3.5 w-3.5 rounded border-white/20 bg-transparent"
-          aria-label={`选择 ${l.id}`}
-        />
+        {pendingRow ? (
+          <span
+            className="block text-center text-xs text-[var(--gw-muted)]"
+            title="排队中（待提交）· 尚无可操作日志"
+          >
+            —
+          </span>
+        ) : (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(l.id)}
+            className="gw-accent-control h-3.5 w-3.5 rounded border-white/20 bg-transparent"
+            aria-label={`选择 ${l.id}`}
+          />
+        )}
       </td>
       <td className="align-middle tabular-nums text-sm text-[var(--gw-ink)]">
         {l.actorPhone?.trim() || "—"}
@@ -742,15 +816,29 @@ const LogsTableRow = memo(function LogsTableRow({
           failMessage={l.failMessage}
           progressLabel={progressLabel}
         />
+        {!pendingRow &&
+        isInProgress &&
+        l.externalTaskId?.trim() &&
+        l.providerKind === "VOLCENGINE" &&
+        l.requestKind === "VIDEO" &&
+        onRecover ? (
+          <button
+            type="button"
+            onClick={() => onRecover(l.id)}
+            disabled={recovering}
+            className={`mt-1 block rounded px-1.5 py-0.5 text-[10px] leading-none transition-colors disabled:opacity-50 ${
+              pollStalled
+                ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
+                : "bg-white/5 text-[var(--gw-muted)] hover:bg-white/10"
+            }`}
+            title="向厂商复核该任务：若已生成完成则立即收口并停止计数（也会同步画布显示）"
+          >
+            {recovering ? "核对中…" : "核对厂商"}
+          </button>
+        ) : null}
       </td>
       <td
-        className="align-middle border-l border-white/5 text-center text-xs text-[var(--gw-muted)]"
-        title="汇总见表头；单行日志与画布排队无直接对应"
-      >
-        —
-      </td>
-      <td
-        className="align-middle font-mono text-sm font-semibold text-violet-200"
+        className="align-middle border-l border-white/5 font-mono text-sm font-semibold text-violet-200"
         title={
           e2eMs != null
             ? [
@@ -779,17 +867,25 @@ const LogsTableRow = memo(function LogsTableRow({
         {preGatewayDuration}
       </td>
       <td
-        className="align-middle font-mono text-sm text-[var(--gw-ink)]"
+        className={`align-middle font-mono text-sm ${
+          pollStalled ? "text-amber-400" : "text-[var(--gw-ink)]"
+        }`}
         title={
-          durationMs != null && durationMs > 0
-            ? `${durationMs} ms`
+          (durationMs != null && durationMs > 0
+            ? queueMs == null &&
+                generateMs == null &&
+                vendorPostProcessMs == null &&
+                (pollDelayMs ?? 0) === 0 &&
+                isInProgress
+              ? `${durationMs} ms · 尚无厂商分阶段，网关段暂用墙钟（见总耗时）`
+              : `${durationMs} ms`
             : isInProgress
               ? progressLabel
                 ? `任务进行中 · ${progressLabel}`
-                : "任务进行中"
+                : vendorPhaseEmptyHint ?? "任务进行中"
               : durationMs != null
                 ? `${durationMs} ms（由完成时间推算）`
-                : undefined
+                : "") + stalledTitleSuffix || undefined
         }
       >
         {duration}
@@ -799,7 +895,7 @@ const LogsTableRow = memo(function LogsTableRow({
           className={`font-mono text-sm ${
             pollCell.warn ? "text-amber-400" : "text-[var(--gw-ink)]"
           }`}
-          title={pollCell.title}
+          title={phaseCellTitle(pollCell, vendorPhaseEmptyHint)}
         >
           {pollCell.value}
         </span>
@@ -807,15 +903,20 @@ const LogsTableRow = memo(function LogsTableRow({
       <td className="align-middle border-l border-white/5">
         <span
           className="font-mono text-sm text-[var(--gw-ink)]"
-          title={queueCell.title}
+          title={phaseCellTitle(queueCell, vendorPhaseEmptyHint)}
         >
           {queueCell.value}
         </span>
       </td>
       <td className="align-middle">
         <span
-          className="font-mono text-sm text-[var(--gw-ink)]"
-          title={generateCell.title}
+          className={`font-mono text-sm ${
+            pollStalled ? "text-amber-400" : "text-[var(--gw-ink)]"
+          }`}
+          title={
+            (phaseCellTitle(generateCell, vendorPhaseEmptyHint) ?? "") +
+              stalledTitleSuffix || undefined
+          }
         >
           {generateCell.value}
         </span>
@@ -823,7 +924,7 @@ const LogsTableRow = memo(function LogsTableRow({
       <td className="align-middle">
         <span
           className="font-mono text-sm text-[var(--gw-ink)]"
-          title={postProcCell.title}
+          title={phaseCellTitle(postProcCell, vendorPhaseEmptyHint)}
         >
           {postProcCell.value}
         </span>
@@ -833,7 +934,7 @@ const LogsTableRow = memo(function LogsTableRow({
         title={
           vendorNative.vendorNativeDurationMs != null
             ? `厂商原生 ${vendorNative.vendorNativeDurationMs} ms（只读，不回写）`
-            : "厂商未回传可对比总耗时"
+            : vendorPhaseEmptyHint ?? "厂商未回传可对比总耗时"
         }
       >
         {vendorNativeDuration}
@@ -844,19 +945,28 @@ const LogsTableRow = memo(function LogsTableRow({
           title={
             vendorNative.vendorNativeGenerateMs != null
               ? `厂商原生 ${vendorNative.vendorNativeGenerateMs} ms（只读，不回写）`
-              : "厂商未回传可对比生成耗时"
+              : vendorPhaseEmptyHint ?? "厂商未回传可对比生成耗时"
           }
         >
           {vendorNativeGenerate}
         </span>
       </td>
       <td className="align-middle">
-        <span
-          className="block whitespace-nowrap font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
-          title={l.submittedAt}
-        >
-          {formatLogTimestamp(l.submittedAt)}
-        </span>
+        {pendingRow ? (
+          <span
+            className="text-sm text-[var(--gw-muted)]"
+            title="尚未提交厂商（排队 / 派发中）"
+          >
+            —
+          </span>
+        ) : (
+          <span
+            className="block whitespace-nowrap font-mono text-[11px] leading-snug text-[var(--gw-muted)]"
+            title={l.submittedAt}
+          >
+            {formatLogTimestamp(l.submittedAt)}
+          </span>
+        )}
       </td>
       <td className="align-middle">
         {l.completedAt ? (
@@ -941,12 +1051,12 @@ const LogsTableRow = memo(function LogsTableRow({
 
 export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData }) {
   const [logs, setLogs] = useState(initialData.logs);
-  const [pageSize, setPageSize] = useState(initialData.pageSize || PAGE_SIZE_PRESETS[0]);
+  const [pageSize, setPageSize] = useState(initialData.pageSize || DEFAULT_PAGE_SIZE);
   const [pageSizePreset, setPageSizePreset] = useState<PageSizePreset>(
-    resolvePageSizePreset(initialData.pageSize || PAGE_SIZE_PRESETS[0]),
+    resolvePageSizePreset(initialData.pageSize || DEFAULT_PAGE_SIZE),
   );
   const [customPageSizeInput, setCustomPageSizeInput] = useState(
-    String(initialData.pageSize || PAGE_SIZE_PRESETS[0]),
+    String(initialData.pageSize || DEFAULT_PAGE_SIZE),
   );
   const [facets, setFacets] = useState<GatewayLogFacets>(
     initialData.facets ?? { models: [], providerKinds: [], credentialKeys: [] },
@@ -960,6 +1070,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(initialData.logs.length === 0);
+  const [listReady, setListReady] = useState(initialData.logs.length > 0);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -968,6 +1079,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const [canvasQueueStats, setCanvasQueueStats] = useState(
     initialData.canvasQueueStats ?? null,
   );
+  /** 方向 2：画布排队中（待提交）合成行，点击生成后第一时间在 Logs 出现 */
+  const [pendingRows, setPendingRows] = useState<CanvasPendingLogRow[]>([]);
   const [viewMode, setViewMode] = useState<LogsViewMode>("live");
   const viewModeRef = useRef<LogsViewMode>("live");
   viewModeRef.current = viewMode;
@@ -984,6 +1097,27 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
   const pageVisibleRef = useRef(true);
   pageVisibleRef.current = pageVisible;
   const autoRefreshBusyRef = useRef(false);
+  const autoRefreshFailStreakRef = useRef(0);
+
+  const reportFetchError = useCallback(
+    (message: string, opts?: { silent?: boolean }) => {
+      if (opts?.silent) {
+        autoRefreshFailStreakRef.current += 1;
+        if (autoRefreshFailStreakRef.current >= AUTO_REFRESH_FAIL_BEFORE_ERROR) {
+          setFetchError(message);
+        }
+        return;
+      }
+      autoRefreshFailStreakRef.current = 0;
+      setFetchError(message);
+    },
+    [],
+  );
+
+  const clearFetchErrorOnSuccess = useCallback(() => {
+    autoRefreshFailStreakRef.current = 0;
+    setFetchError(null);
+  }, []);
 
   useEffect(() => {
     const onVis = () => {
@@ -1038,9 +1172,32 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     !fromDate &&
     !toDate;
 
+  /**
+   * 方向 2：仅在 live 模式 + 无筛选时，把画布「排队中（待提交）」合成行并入列表顶部。
+   * 任务一旦提交厂商即转 RUNNING（不再被排队查询命中），且这里再按真实日志的
+   * storyTaskId / appTaskId 去重一次，避免与刚出现的真实日志短暂双出。
+   */
+  const showPendingRows = viewMode === "live" && filtersAreDefault;
+  const displayLogs = useMemo(() => {
+    if (!showPendingRows || pendingRows.length === 0) return logs;
+    const realTaskIds = new Set<string>();
+    for (const l of logs) {
+      const sid = l.storyTaskId?.trim();
+      if (sid) realTaskIds.add(sid);
+      const aid = l.appTaskId?.trim();
+      if (aid) realTaskIds.add(aid);
+    }
+    const visiblePending = pendingRows.filter(
+      (p) => !realTaskIds.has(p.canvasTaskId),
+    );
+    if (visiblePending.length === 0) return logs;
+    return [...visiblePending, ...logs];
+  }, [logs, pendingRows, showPendingRows]);
+
   const hasInFlightLogs = useMemo(
-    () => logs.some((l) => isLogInProgress(l.status)),
-    [logs],
+    () =>
+      displayLogs.some((l) => isLogInProgress(l.status) || isPendingLogRow(l)),
+    [displayLogs],
   );
   /** 每秒 tick，仅在有在飞任务时启用，避免已完成行每秒整表重渲染 */
   const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS, hasInFlightLogs);
@@ -1080,6 +1237,8 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       append?: boolean;
       poll?: boolean;
       includeFacets?: boolean;
+      /** 自动刷新 tick：连续失败达阈值前不弹红字 */
+      silent?: boolean;
     }) => {
       const append = opts?.append === true;
       if (
@@ -1094,7 +1253,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       const seq = ++historyLoadSeqRef.current;
 
       try {
-        setFetchError(null);
+        clearFetchErrorOnSuccess();
         const data = await fetchGatewayLogs({
           ...listFilterParams,
           page: targetPage,
@@ -1142,12 +1301,15 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         return data;
       } catch (e) {
         if (seq === historyLoadSeqRef.current) {
-          setFetchError(e instanceof Error ? e.message : "加载日志失败");
+          reportFetchError(
+            e instanceof Error ? e.message : "加载日志失败",
+            { silent: opts?.silent },
+          );
         }
         return null;
       }
     },
-    [listFilterParams],
+    [listFilterParams, clearFetchErrorOnSuccess, reportFetchError],
   );
 
   const loadFacets = useCallback(async () => {
@@ -1168,7 +1330,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
 
   /** 动数据增量刷新：只拉新行 + 在途行最新状态，客户端合并 */
   const loadLogsDelta = useCallback(
-    async (opts?: { poll?: boolean }) => {
+    async (opts?: { poll?: boolean; silent?: boolean }) => {
       const current = logsRef.current;
       if (current.length === 0) {
         return loadLogsPaged({ poll: opts?.poll, includeFacets: false });
@@ -1183,7 +1345,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       const inFlightIds = current
         .filter((l) => isLogInProgress(l.status))
         .map((l) => l.id);
-      setFetchError(null);
+      clearFetchErrorOnSuccess();
       try {
         const delta = await fetchGatewayLogsDelta({
           since: cursor,
@@ -1200,12 +1362,16 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
         const merged = mergeLogsDelta(logsRef.current, delta);
         setLogs(merged.rows);
         void fetchCanvasQueueStats().then((s) => {
-          if (s) setCanvasQueueStats(s);
+          if (s.stats) setCanvasQueueStats(s.stats);
+          setPendingRows(s.pendingRows);
         });
         setLastRefreshedAt(new Date());
         return null;
       } catch (e) {
-        setFetchError(e instanceof Error ? e.message : "加载日志失败");
+        reportFetchError(
+          e instanceof Error ? e.message : "加载日志失败",
+          { silent: opts?.silent },
+        );
         return null;
       }
     },
@@ -1218,30 +1384,31 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       providerFilter,
       modelFilter,
       credentialIdFilter,
+      clearFetchErrorOnSuccess,
+      reportFetchError,
     ],
   );
 
   useEffect(() => {
     setLogs(initialData.logs);
-    setPageSize(initialData.pageSize || PAGE_SIZE_PRESETS[0]);
+    if (initialData.pageSize) {
+      setPageSize(initialData.pageSize);
+    }
     if (initialData.facets) setFacets(initialData.facets);
   }, [initialData]);
 
   useEffect(() => {
     const stored = readStoredPageSize();
-    if (stored !== initialData.pageSize) {
-      setPageSize(stored);
-      setPageSizePreset(resolvePageSizePreset(stored));
-      setCustomPageSizeInput(String(stored));
-      resetListScroll();
-      skipInitialFetchRef.current = false;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅挂载时恢复每页条数
+    if (stored === pageSize) return;
+    setPageSize(stored);
+    setPageSizePreset(resolvePageSizePreset(stored));
+    setCustomPageSizeInput(String(stored));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 挂载时恢复 localStorage 每页条数
   }, []);
 
-  /** 动数据自动刷新：有在飞走 delta；仅首屏时同步热区，已滚动加载则跳过全量 */
+  /** 动数据自动刷新：首屏加载完成后再启动，避免与首屏请求叠加打满 DB */
   useEffect(() => {
-    if (!autoRefresh || viewMode !== "live") return;
+    if (!autoRefresh || viewMode !== "live" || !listReady) return;
 
     let cancelled = false;
     let timer: number | undefined;
@@ -1265,9 +1432,9 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       try {
         const fast = shouldLiveFastRefresh();
         if (fast) {
-          await loadLogsDelta({ poll: true });
+          await loadLogsDelta({ poll: true, silent: true });
         } else if (loadedPagesRef.current === 1) {
-          await loadLogsPaged({ poll: true, includeFacets: false });
+          await loadLogsPaged({ poll: true, includeFacets: false, silent: true });
         }
       } finally {
         autoRefreshBusyRef.current = false;
@@ -1287,7 +1454,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [autoRefresh, viewMode, loadLogsPaged, loadLogsDelta, shouldLiveFastRefresh]);
+  }, [autoRefresh, viewMode, listReady, loadLogsPaged, loadLogsDelta, shouldLiveFastRefresh]);
 
   /** 筛选 / 每页条数 / 动静切换：重置并拉首屏（skipCount） */
   useEffect(() => {
@@ -1298,16 +1465,19 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       if (
         initialData.logs.length > 0 &&
         filtersAreDefault &&
-        pageSize === (initialData.pageSize || PAGE_SIZE_PRESETS[0])
+        pageSize === (initialData.pageSize || DEFAULT_PAGE_SIZE)
       ) {
         setLoading(false);
+        setListReady(true);
         return;
       }
     }
 
     resetListScroll();
     setLoading(true);
+    setListReady(false);
     setFetchError(null);
+    autoRefreshFailStreakRef.current = 0;
     clearSelectionOnFilter(setSelected);
 
     let cancelled = false;
@@ -1318,7 +1488,10 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             includeFacets: false,
           });
         } finally {
-          if (!cancelled) setLoading(false);
+          if (!cancelled) {
+            setLoading(false);
+            setListReady(true);
+          }
         }
       })();
     }, 100);
@@ -1338,12 +1511,12 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
     resetListScroll,
   ]);
 
-  /** 实时 Tab：分面单独拉取，不阻塞日志列表首屏 */
+  /** 实时 Tab：分面单独拉取；首屏列表就绪后再请求，避免并发占满连接池 */
   useEffect(() => {
-    if (dateRangeInvalid || viewMode !== "live") return;
-    const timer = window.setTimeout(() => void loadFacets(), 300);
+    if (dateRangeInvalid || viewMode !== "live" || !listReady) return;
+    const timer = window.setTimeout(() => void loadFacets(), 800);
     return () => window.clearTimeout(timer);
-  }, [dateRangeInvalid, viewMode, loadFacets]);
+  }, [dateRangeInvalid, viewMode, listReady, loadFacets]);
 
   useEffect(() => {
     const el = loadMoreSentinelRef.current;
@@ -1484,6 +1657,54 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
       return next;
     });
   }, []);
+
+  // A·主动复核：向厂商核对该任务，命中终态即收口（停止计数）；完成后轻量增量刷新
+  const [recoveringIds, setRecoveringIds] = useState<Set<string>>(new Set());
+  const recoverAttemptRef = useRef<Map<string, number>>(new Map());
+  const recoverLog = useCallback(
+    async (logId: string) => {
+      setRecoveringIds((prev) => new Set(prev).add(logId));
+      try {
+        await fetch(`/api/book-mall/api/gateway/logs/${logId}/recover`, {
+          method: "POST",
+        });
+      } catch {
+        /* 静默：失败留待下次轮询 / 手动重试 */
+      } finally {
+        setRecoveringIds((prev) => {
+          const next = new Set(prev);
+          next.delete(logId);
+          return next;
+        });
+        void loadLogsDelta({ silent: true });
+      }
+    },
+    [loadLogsDelta],
+  );
+
+  // A·自动兜底：live 模式下，对「厂商停更 / 轮询失联」且已有 taskId 的在途火山视频行，
+  // 每行节流 60s 自动向厂商复核一次（命中即收口、停止计数），把检测滞后从分钟级压到秒级。
+  useEffect(() => {
+    if (viewMode !== "live" || liveNowMs == null) return;
+    const now = liveNowMs;
+    for (const l of displayLogs) {
+      if (isPendingLogRow(l)) continue;
+      if (!isLogInProgress(l.status)) continue;
+      if (!l.externalTaskId?.trim()) continue;
+      if (l.providerKind !== "VOLCENGINE" || l.requestKind !== "VIDEO") continue;
+      const volc = liveVolcengineVideoTiming({
+        submittedAt: l.submittedAt,
+        completedAt: l.completedAt,
+        resultSummary: l.resultSummary,
+        nowMs: now,
+      });
+      if (!volc?.stalled) continue;
+      const last = recoverAttemptRef.current.get(l.id) ?? 0;
+      if (now - last < AUTO_RECOVER_MIN_GAP_MS) continue;
+      recoverAttemptRef.current.set(l.id, now);
+      void recoverLog(l.id);
+    }
+  }, [displayLogs, liveNowMs, viewMode, recoverLog]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -1826,7 +2047,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
                 Status
               </th>
               <th
-                colSpan={5}
+                colSpan={4}
                 className="border-x border-white/10 bg-sky-950/35 px-2 py-1.5 text-center text-[11px] font-semibold tracking-wide text-sky-200/95"
               >
                 系统
@@ -1852,7 +2073,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 rowSpan={2}
-                className="w-[100px] align-bottom"
+                className="min-w-[160px] align-bottom"
                 title="挂牌参考费用（元），供后续费用统计；非钱包扣点。"
               >
                 Usage ¥
@@ -1901,65 +2122,56 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             </tr>
             <tr className="border-b border-white/10 text-[11px]">
               <th
-                className="w-[88px] border-l border-white/10 bg-sky-950/20"
-                title="全站汇总：CanvasGenerationTask 处于 QUEUED/DISPATCHING、尚未 createTask 产生 Gateway 日志的数量（非本行字段）"
-              >
-                <div>画布排队</div>
-                <div className="mt-0.5 text-[10px] font-normal normal-case tracking-normal text-violet-300/90">
-                  {canvasQueueStats ? canvasQueueStats.total : "—"}
-                </div>
-              </th>
-              <th
-                className="w-[88px] bg-sky-950/20 text-violet-200"
+                className="whitespace-nowrap border-l border-white/10 bg-sky-950/20 px-2 text-violet-200"
                 title="真实墙钟：画布点击 → 任务完成。唯一与用户体感一致的总计时；终态冻结，进行中 live 递增。"
               >
                 总耗时
               </th>
               <th
-                className="w-[72px] bg-sky-950/20 text-amber-200/90"
+                className="whitespace-nowrap bg-sky-950/20 px-2 text-amber-200/90"
                 title="我们 · 出队前：点击 → Gateway submitted（控流/dispatch/DB，此阶段无 Gateway log）。"
               >
                 出队前
               </th>
               <th
-                className="w-[88px] bg-sky-950/20"
-                title="我们 · Gateway 段：各阶段之和（排队+生成+后处理+轮询）；非墙钟。总耗时见左列。"
+                className="whitespace-nowrap bg-sky-950/20 px-2"
+                title="Gateway 段：各阶段之和（排队+生成+后处理+轮询）；进行中按阶段墙钟实时累计。点击→完成的总墙钟见左列「总耗时」。"
               >
                 网关段
               </th>
               <th
-                className="w-[88px] border-r border-white/10 bg-sky-950/20"
+                className="whitespace-nowrap border-r border-white/10 bg-sky-950/20 px-2"
                 title="我方轮询滞后：距上次成功 poll 的间隔；黄字表示超过阈值。"
               >
-                轮询延迟
+                轮询
               </th>
               <th
-                className="w-[88px] border-l border-white/10 bg-zinc-800/25"
-                title="Gateway 提交 → 首次观测到火山 running（或仍在 queued 时的累计排队）"
+                className="whitespace-nowrap border-l border-white/10 bg-zinc-800/25 px-2"
+                title="仅火山异步视频 · Gateway 提交 → 首次观测到火山 running（或仍在 queued 时的累计排队）"
               >
                 排队
               </th>
               <th
-                className="w-[88px] bg-zinc-800/25"
-                title="厂商 GPU：updated_at 跳变后冻结（created→updated）；生成中 updated 未动显示 …"
+                className="whitespace-nowrap bg-zinc-800/25 px-2"
+                title="仅火山异步视频 · 生成阶段秒表：到厂商起按墙钟实时累计，厂商完成时冻结；厂商 GPU 真值见右侧「厂商生成」列。"
               >
                 生成
               </th>
               <th
-                className="w-[96px] bg-zinc-800/25"
-                title="仅成功任务：updated_at 跳变 → 首次 succeeded 的后处理/打包；失败任务为 —"
+                className="whitespace-nowrap bg-zinc-800/25 px-2"
+                title="仅火山异步视频 · 成功任务：updated_at 跳变 → 首次 succeeded；失败为 —"
               >
                 后处理
               </th>
               <th
-                className="w-[72px] bg-zinc-800/25 text-[var(--gw-muted)]"
-                title="厂商原生总耗时：终态或 updated 已跳变后冻结；GPU 进行中为 —"
+                className="whitespace-nowrap bg-zinc-800/25 px-2 text-[var(--gw-muted)]"
+                title="仅火山异步视频 · 厂商原生总耗时；生图/无 trace 为 —"
               >
-                厂商总耗时
+                总耗时
               </th>
               <th
-                className="w-[72px] border-r border-white/10 bg-zinc-800/25 text-[var(--gw-muted)]"
-                title="厂商原生 GPU：updated−created；未跳变前不计秒"
+                className="whitespace-nowrap border-r border-white/10 bg-zinc-800/25 px-2 text-[var(--gw-muted)]"
+                title="仅火山异步视频 · 厂商 GPU 真值（updated−created，只读）；与左侧「生成」墙钟对照。未跳变前不计秒。"
               >
                 厂商生成
               </th>
@@ -1967,33 +2179,53 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
           </thead>
           <tbody>
             {loading ? (
-              <LogsListLoadingRow
+              <LogsListSkeletonRows
                 message={
                   viewMode === "history"
-                    ? "正在查询历史归档，可能需数十秒…"
+                    ? "正在后台查询历史归档，页面可继续操作…"
                     : "正在加载日志…"
                 }
               />
             ) : (
               <>
-            {logs.map((l) => (
+            {displayLogs.map((l) => (
               <LogsTableRow
                 key={l.id}
                 log={l}
                 isSelected={selected.has(l.id)}
                 liveTick={
-                  isLogInProgress(l.status) ? liveNowMs : undefined
+                  isLogInProgress(l.status) || isPendingLogRow(l)
+                    ? liveNowMs
+                    : undefined
                 }
                 onToggleSelect={toggleOne}
+                onRecover={recoverLog}
+                recovering={recoveringIds.has(l.id)}
               />
             ))}
-            {!logs.length ? (
+            {!displayLogs.length ? (
               <tr>
                 <td
                   colSpan={30}
                   className="py-16 text-center text-sm text-[var(--gw-muted)]"
                 >
-                  {loading ? "加载中…" : "暂无日志"}
+                  {loading ? (
+                    "加载中…"
+                  ) : fetchError ? (
+                    <span className="inline-flex flex-col items-center gap-3">
+                      <span>{fetchError}</span>
+                      <button
+                        type="button"
+                        className="gw-btn-secondary text-xs"
+                        onClick={() => void refreshLogs()}
+                        disabled={refreshing}
+                      >
+                        {refreshing ? "重试中…" : "重试"}
+                      </button>
+                    </span>
+                  ) : (
+                    "暂无日志"
+                  )}
                 </td>
               </tr>
             ) : null}

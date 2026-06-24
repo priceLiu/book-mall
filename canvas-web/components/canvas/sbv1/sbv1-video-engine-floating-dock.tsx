@@ -93,14 +93,19 @@ const Sbv1VideoEngineFloatingDockBody = memo(function Sbv1VideoEngineFloatingDoc
   );
 
   const onRun = useCallback(async () => {
-    const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
-    const storeNode = latestNodes.find((n) => n.id === nodeId);
-    const latestData = (storeNode?.data ?? {}) as Sbv1VideoEngineNodeData;
-
+    // 点击即响应：先同步写入乐观「生成中」，再让浏览器绘制一帧，
+    // 然后才跑上游解析 / 校验 / 入队（这些在大画布上可能是几十~上百 ms 的同步开销，
+    // 放到首帧绘制之后，保证转圈第一时间出现）。
     optimisticLibtvMediaRunStart(nodeId, updateNodeData, setNodeRuntime);
 
     const revertPending = () =>
       revertOptimisticLibtvMediaRunStart(nodeId, updateNodeData, setNodeRuntime);
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
+    const storeNode = latestNodes.find((n) => n.id === nodeId);
+    const latestData = (storeNode?.data ?? {}) as Sbv1VideoEngineNodeData;
 
     const prompt = (latestData.prompt ?? "").trim();
     const resolved = resolveSbv1VideoEngineInputs(latestNodes, latestEdges, nodeId, {

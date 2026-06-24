@@ -8,7 +8,9 @@ export function isGatewayTransientFetchError(
   return (
     t.includes("DATABASE_UNAVAILABLE") ||
     t.includes("系统繁忙") ||
-    t.includes("book_mall_fetch_failed")
+    t.includes("book_mall_fetch_failed") ||
+    t.includes("book_mall_proxy_failed") ||
+    t.includes("book_mall_unreachable")
   );
 }
 

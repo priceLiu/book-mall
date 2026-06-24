@@ -108,7 +108,7 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
   const waitSince =
     inflightTask?.submittedAt ?? inflightTask?.createdAt ?? null;
   const isPending = d.runtime?.status === "pending";
-  const { generatingLabel, waitHint, isBackground } = useVideoGeneratingWait(
+  const { waitHint, isBackground } = useVideoGeneratingWait(
     showGenerating,
     waitSince,
     isPending,
@@ -269,7 +269,6 @@ export function AiVideoEngineNode({ id, data, selected }: NodeProps) {
                 emptyMessage={
                   showGenerating ? undefined : "生成结果将显示在此"
                 }
-                generatingLabel={generatingLabel}
                 saveToLibrary={
                   videoUrl && !showGenerating
                     ? {

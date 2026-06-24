@@ -79,6 +79,10 @@ await acquireTrafficSlotInTx(tx, scope, maxConcurrency);
 2. `findMany` QUEUED — 失败则 return，不 dispatch  
 3. **for 循环内**每任务 try/catch — 一单失败不阻断后续  
 
+> `fastPath`（run API 即时派发，`fireCanvasDispatchForProject` 默认开启）：**跳过** 步骤 1
+> 的两项兜底清扫，只走 `findMany` + dispatch，缩短「出队前」。清扫仍由轮询 worker
+> （`runCanvasPollWorker` / `reconcile` 调用时不传 `fastPath`）周期执行，**不得**在 worker 路径开启 `fastPath`。
+
 ### 3.5 瞬时繁忙 ≠ 业务失败
 
 `isTransientSystemBusyError`（503、连接池、tx timeout、P2034）→ 退回 **QUEUED**，**不得** `FAILED` + 误导 failCode。

@@ -1226,7 +1226,11 @@ export function useCanvasRunner(
       }
       queueRef.current.splice(i, 1);
       inflightRef.current.add(key);
-      void runOne(item);
+      // 点击即响应：乐观 pending 已在 enqueue 时同步写入；把 runOne（含上游解析 +
+      // 厂商提交等同步前段）推到下一个宏任务，先让浏览器把「生成中」转圈画出来，
+      // 再跑提交链路。inflightRef 已同步占位，去重不受影响。
+      const job = item;
+      setTimeout(() => void runOne(job), 0);
     }
   }, [runOne]);
 

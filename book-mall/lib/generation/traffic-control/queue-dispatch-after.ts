@@ -15,12 +15,20 @@ function scopeQueuedWhere(scope: TrafficScope) {
   return { tenantId: null, actorUserId: scope.ownerId };
 }
 
-/** 纯函数：queueIndex × base + jitter，便于单测。 */
+/** 纯函数：queueIndex × base + jitter，便于单测。
+ *
+ * 队首（scope 内无其它 QUEUED，index=0）**立即可派发**：不加抖动，
+ * 让 admit 之后那拍 `fireCanvasDispatchForProject` 当场就能取到本任务
+ * （findMany 用 `dispatchAfter <= now`），避免「点了生成、几十秒没反应」。
+ * 抖动 / 错峰只用于 index≥1 的积压，防止批量入队时同拍打爆厂商。 */
 export function queueDispatchAfterFromIndex(
   index: number,
   nowMs = Date.now(),
 ): Date {
   const slot = Math.max(0, Math.floor(index));
+  if (slot === 0) {
+    return new Date(nowMs);
+  }
   const jitter =
     QUEUE_SLOT_JITTER_MS > 0
       ? Math.floor(Math.random() * (QUEUE_SLOT_JITTER_MS + 1))

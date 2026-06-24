@@ -104,9 +104,6 @@ export function VideoGenerateNode({ id, data, selected }: NodeProps) {
             downloadHref={url}
             downloadFileName="video-generate.mp4"
             generating={generating}
-            generatingLabel={
-              upstreamRuntime?.status === "pending" ? "排队中…" : "视频生成中…"
-            }
             onPreview={url && !generating ? openPreview : undefined}
             emptyIcon={<Video className="size-24" strokeWidth={1.25} />}
             emptyMessage={

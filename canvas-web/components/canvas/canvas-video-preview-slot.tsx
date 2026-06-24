@@ -19,7 +19,7 @@ export function CanvasVideoPreviewSlot({
   onPreview,
   downloadHref,
   downloadFileName,
-  generatingLabel = "视频生成中…",
+  generatingLabel,
   className,
   emptyIcon,
   emptyMessage,
@@ -81,9 +81,11 @@ export function CanvasVideoPreviewSlot({
       {generating ? (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/50">
           <RefreshCw className="size-8 animate-spin text-[#fdba74]" />
-          <span className="text-[11px] font-medium text-[#fdba74]">
-            {generatingLabel}
-          </span>
+          {generatingLabel?.trim() ? (
+            <span className="text-[11px] font-medium text-[#fdba74]">
+              {generatingLabel}
+            </span>
+          ) : null}
         </div>
       ) : null}
 
