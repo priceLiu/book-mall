@@ -629,6 +629,41 @@
   text-decoration: none;
 }
 
+/* —— 推荐产品 · 大卡片走马灯（全屏宽，尺寸与原先 grid 单列一致） —— */
+[data-site-home] .site-home-featured-products {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding-inline: 0;
+  background: #ffffff;
+}
+
+[data-site-home] .site-home-featured-products-header {
+  max-width: min(1400px, 96vw);
+  margin-inline: auto;
+}
+
+[data-site-home] .site-home-featured-marquee-track {
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  overflow: hidden;
+}
+
+[data-site-home] .site-home-featured-marquee {
+  --duration: 65s;
+}
+
+[data-site-home] .site-home-featured-card {
+  width: min(calc(100vw - 2rem), 420px);
+}
+
+@media (min-width: 1024px) {
+  [data-site-home] .site-home-featured-card {
+    width: min(calc((min(1400px, 96vw) - 4rem - 3rem) / 3), 420px);
+  }
+}
+
 /* —— 顶栏：#121317 半透明磨砂 + 白字 —— */
 :is([data-site-home], [data-site-home-header]) .site-home-nav {
   position: fixed;
