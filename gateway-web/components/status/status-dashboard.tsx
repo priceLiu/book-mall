@@ -40,6 +40,7 @@ import {
 import {
   gatewaySummaryPollIntervalMs,
 } from "@/lib/gateway-live-poll-policy";
+import { fetchJsonWithTimeout } from "@/lib/gateway-fetch-client";
 
 const IN_FLIGHT_POLL_MS = 20_000;
 const LIVE_CLOCK_MS = 1_000;
@@ -249,17 +250,32 @@ function buildQueryString(
   return qs.toString();
 }
 
+const FETCH_TIMEOUT_MS = 15_000;
+
 async function fetchJson<T>(
   path: string,
+  timeoutMs = FETCH_TIMEOUT_MS,
 ): Promise<
   { ok: true; data: T } | { ok: false; status: number; error?: string }
 > {
-  const res = await fetch(path);
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { error?: string } | null;
-    return { ok: false, status: res.status, error: body?.error };
+  try {
+    const { ok, status, data } = await fetchJsonWithTimeout<T>(path, {
+      timeoutMs,
+    });
+    if (!ok) {
+      const body = data as { error?: string } | null;
+      return { ok: false, status, error: body?.error };
+    }
+    return { ok: true, data: data as T };
+  } catch (e) {
+    const aborted =
+      e instanceof DOMException && e.name === "AbortError";
+    return {
+      ok: false,
+      status: aborted ? 408 : 0,
+      error: aborted ? "请求超时，请稍后重试" : "网络异常，请稍后重试",
+    };
   }
-  return { ok: true, data: (await res.json()) as T };
 }
 
 type DetailLogsDelta = {
@@ -405,11 +421,19 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const [detailLoading, setDetailLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS);
   const inFlightPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inFlightPollBusyRef = useRef(false);
   const loadSeqRef = useRef(0);
   const detailLoadSeqRef = useRef(0);
+  const statsFlightKeyRef = useRef<string | null>(null);
+  const statsFlightPromiseRef = useRef<
+    Promise<
+      | { ok: true; data: StatsAllResponse }
+      | { ok: false; status: number; error?: string }
+      | null
+    > | null
+  >(null);
+  const statsPollBusyRef = useRef(false);
   const hasLoadedOnceRef = useRef(false);
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
@@ -435,6 +459,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     activeTab === "inProgress" ||
     activeTab === "backgroundWait" ||
     activeTab === "slowWarn";
+  const liveNowMs = useLiveWallClockMs(LIVE_CLOCK_MS, hasInFlight);
 
   const tabQuery = useMemo(() => {
     const base = TAB_CONFIG.find((t) => t.id === activeTab)?.query ?? {};
@@ -520,16 +545,32 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const loadStatsAll = useCallback(async () => {
     if (applied.scope === "team" && !applied.tenantId) return null;
     const statsQs = buildQueryString(applied, { parts: "all" }, queryMode);
-    const statsRes = await fetchJson<StatsAllResponse>(
-      `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
-    );
-    if (!statsRes.ok) return statsRes;
-    setStats({
-      cards: statsRes.data.cards,
-      byCategory: statsRes.data.byCategory,
-      byModel: statsRes.data.byModel,
+    const path = `/api/book-mall/api/gateway/logs/stats?${statsQs}`;
+    if (
+      statsFlightPromiseRef.current &&
+      statsFlightKeyRef.current === statsQs
+    ) {
+      return statsFlightPromiseRef.current;
+    }
+    statsFlightKeyRef.current = statsQs;
+    const flight = (async () => {
+      const statsRes = await fetchJson<StatsAllResponse>(path);
+      if (statsRes.ok) {
+        setStats({
+          cards: statsRes.data.cards,
+          byCategory: statsRes.data.byCategory,
+          byModel: statsRes.data.byModel,
+        });
+      }
+      return statsRes;
+    })().finally(() => {
+      if (statsFlightKeyRef.current === statsQs) {
+        statsFlightPromiseRef.current = null;
+        statsFlightKeyRef.current = null;
+      }
     });
-    return statsRes;
+    statsFlightPromiseRef.current = flight;
+    return flight;
   }, [applied, queryMode]);
 
   const loadDetailLogs = useCallback(
@@ -669,13 +710,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             : "请选择团队后再查看",
         );
         setLoading(false);
-        setDetailLoading(false);
         return;
       }
 
       const seq = ++loadSeqRef.current;
       setLoading(true);
-      setDetailLoading(true);
       setError(null);
 
       try {
@@ -700,7 +739,6 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       } finally {
         if (seq === loadSeqRef.current) {
           setLoading(false);
-          setDetailLoading(false);
         }
       }
   }, [
@@ -712,7 +750,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   useEffect(() => {
     if (viewMode !== "dashboard") return;
     void loadAll();
-  }, [loadAll, viewMode]);
+  }, [loadAll, viewMode, queryMode]);
 
   useEffect(() => {
     if (viewMode !== "dashboard") return;
@@ -777,7 +815,14 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       timer = window.setTimeout(() => void tick(), delayMs);
     };
     const tick = async () => {
-      if (document.visibilityState === "visible") await loadStatsAll();
+      if (document.visibilityState !== "visible") return;
+      if (statsPollBusyRef.current) return;
+      statsPollBusyRef.current = true;
+      try {
+        await loadStatsAll();
+      } finally {
+        statsPollBusyRef.current = false;
+      }
       if (cancelled) return;
       schedule(gatewaySummaryPollIntervalMs(counts));
     };
@@ -839,11 +884,6 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     queryMode,
   ]);
 
-  useEffect(() => {
-    if (viewMode !== "dashboard") return;
-    void loadAll();
-  }, [queryMode, loadAll, viewMode]);
-
   const applyFilters = () => {
     commitFilters({ ...filters, actorPhone: phoneDraft });
   };
@@ -888,8 +928,8 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   const showBackgroundWaitHint = activeTab === "backgroundWait";
 
   const loadingMessage = hasLoadedOnce
-    ? "正在更新数据…"
-    : "正在加载驾驶舱数据…";
+    ? "正在更新统计…"
+    : "正在加载统计卡片…";
 
   return (
     <div className="space-y-6">
@@ -1135,7 +1175,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       </div>
 
       {loading && !hasLoadedOnce ? (
-        <LoadingBanner message="正在从 Gateway 拉取统计与明细，请稍候…" />
+        <LoadingBanner message="正在异步拉取统计卡片，明细表格可独立加载…" />
       ) : null}
 
       {error ? (
@@ -1227,7 +1267,6 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
             <button
               key={tab.id}
               type="button"
-              disabled={loading && !hasLoadedOnce}
               onClick={() => {
                 setActiveTab(tab.id);
                 setLoadedPages(1);
