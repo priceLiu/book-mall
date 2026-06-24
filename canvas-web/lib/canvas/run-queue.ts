@@ -73,6 +73,7 @@ import {
   sbv1ImageFailurePatch,
   sbv1ImagePatchFromTask,
   sbv1VideoPatchFromTask,
+  isSameSbv1MediaDataPatch,
 } from "./sbv1-image-task-apply";
 import {
   commitLibtvMediaRunPendingPatch,
@@ -455,6 +456,9 @@ function applySbv1ImageTaskResult(
     task,
   );
   if (!patch) return false;
+  if (isSameSbv1MediaDataPatch(node.data as Record<string, unknown>, patch)) {
+    return true;
+  }
   updateNodeData(node.id, patch);
   return true;
 }
@@ -467,6 +471,9 @@ function applySbv1VideoTaskResult(
   if (node.type !== "sbv1-video-engine") return false;
   const patch = sbv1VideoPatchFromTask(task);
   if (!patch) return false;
+  if (isSameSbv1MediaDataPatch(node.data as Record<string, unknown>, patch)) {
+    return true;
+  }
   updateNodeData(node.id, patch);
   return true;
 }
@@ -1718,7 +1725,14 @@ export function useCanvasRunner(
           ) {
             return;
           }
-          updateNodeData(nodeId, sbv1Patch);
+          if (
+            !isSameSbv1MediaDataPatch(
+              node.data as Record<string, unknown>,
+              sbv1Patch,
+            )
+          ) {
+            updateNodeData(nodeId, sbv1Patch);
+          }
           const st = (sbv1Patch.runtime as CanvasNodeRuntime | undefined)?.status;
           if (st === "done" || st === "error") {
             const job = jobByTaskRef.current.get(t.id);
@@ -1740,7 +1754,14 @@ export function useCanvasRunner(
           ) {
             return;
           }
-          updateNodeData(nodeId, videoPatch);
+          if (
+            !isSameSbv1MediaDataPatch(
+              node.data as Record<string, unknown>,
+              videoPatch,
+            )
+          ) {
+            updateNodeData(nodeId, videoPatch);
+          }
           const st = (videoPatch.runtime as CanvasNodeRuntime | undefined)?.status;
           if (st === "done" || st === "error") {
             const job = jobByTaskRef.current.get(t.id);
