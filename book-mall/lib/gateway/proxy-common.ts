@@ -276,14 +276,22 @@ export async function finalizeRequestLog(
     vendorRequestId?: string;
     model?: string;
     pricingTierRaw?: string;
+    /** 显式完成时刻（火山视频终态收口应来自 trace，而非 recover 当下） */
+    completedAt?: Date;
   },
 ) {
   const log = await prisma.gatewayRequestLog.findUnique({ where: { id: logId } });
   if (!log) return;
 
+  const completedAt =
+    patch.completedAt ??
+    (log.submittedAt && patch.durationMs > 0
+      ? new Date(log.submittedAt.getTime() + patch.durationMs)
+      : new Date());
+
   let durationMs = patch.durationMs;
   if (durationMs <= 0 && log.submittedAt) {
-    durationMs = Math.max(0, Date.now() - log.submittedAt.getTime());
+    durationMs = Math.max(0, completedAt.getTime() - log.submittedAt.getTime());
   }
 
   const tokenMetrics = resolveGatewayTokenMetrics({
@@ -374,7 +382,7 @@ export async function finalizeRequestLog(
       failCode: resolvedFailCode,
       externalTaskId: patch.externalTaskId,
       vendorRequestId: patch.vendorRequestId,
-      completedAt: new Date(),
+      completedAt,
       pricingModelKey: estimate.pricingModelKey,
       pricingTierRaw: estimate.pricingTierRaw,
       billingKind: estimate.billingKind,

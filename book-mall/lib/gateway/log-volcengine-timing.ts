@@ -468,6 +468,92 @@ export function attachGatewayTimingToSummary(
   return obj;
 }
 
+/** 终态 completedAt：优先首次观测厂商终态的墙钟，避免延迟 recover 用 Date.now() 扭曲拆分。 */
+export function resolveVolcengineTerminalCompletedAtMs(input: {
+  trace: VolcengineTimingTrace;
+  status: "SUCCEEDED" | "FAILED";
+  submittedAtMs: number;
+  fallbackNowMs?: number;
+}): number {
+  const fallbackNowMs = input.fallbackNowMs ?? Date.now();
+  const { trace, status, submittedAtMs } = input;
+
+  if (status === "SUCCEEDED") {
+    const firstSucc = resolveFirstSucceededPolledAtMs(trace, fallbackNowMs);
+    if (firstSucc != null) return Math.max(firstSucc, submittedAtMs);
+    if (trace.vendorUpdatedAtMs != null) {
+      return Math.max(trace.vendorUpdatedAtMs, submittedAtMs);
+    }
+    return fallbackNowMs;
+  }
+
+  const firstFail = resolveFirstFailedPolledAtMs(trace);
+  if (firstFail != null) return Math.max(firstFail, submittedAtMs);
+  if (trace.vendorUpdatedAtMs != null) {
+    return Math.max(trace.vendorUpdatedAtMs, submittedAtMs);
+  }
+  return fallbackNowMs;
+}
+
+/** 终态 Duration：各阶段之和；无法拆分时回退 completedAt − submittedAt。 */
+export function sumVolcengineTimingBreakdownMs(input: {
+  breakdown: VolcengineTimingBreakdown;
+  submittedAtMs: number;
+  completedAtMs: number;
+}): number {
+  const parts = [
+    input.breakdown.queueMs,
+    input.breakdown.generateMs,
+    input.breakdown.vendorPostProcessMs,
+    input.breakdown.pollDelayMs,
+  ];
+  let sum = 0;
+  for (const part of parts) {
+    if (part != null && part > 0) sum += part;
+  }
+  if (sum > 0) return sum;
+  return Math.max(0, input.completedAtMs - input.submittedAtMs);
+}
+
+/** 火山视频终态收口：冻结 trace + 阶段拆分 + completedAt / durationMs。 */
+export function buildVolcengineTerminalFinalizeMetrics(input: {
+  trace: VolcengineTimingTrace;
+  status: "SUCCEEDED" | "FAILED";
+  submittedAt: Date;
+  resultSummaryBase: unknown;
+  fallbackNowMs?: number;
+}): {
+  completedAtMs: number;
+  durationMs: number;
+  breakdown: VolcengineTimingBreakdown;
+  resultSummary: Record<string, unknown>;
+} {
+  const submittedAtMs = input.submittedAt.getTime();
+  const fallbackNowMs = input.fallbackNowMs ?? Date.now();
+  const completedAtMs = resolveVolcengineTerminalCompletedAtMs({
+    trace: input.trace,
+    status: input.status,
+    submittedAtMs,
+    fallbackNowMs,
+  });
+  const breakdown = computeVolcengineTimingBreakdown({
+    trace: input.trace,
+    submittedAtMs,
+    completedAtMs,
+  });
+  const durationMs = sumVolcengineTimingBreakdownMs({
+    breakdown,
+    submittedAtMs,
+    completedAtMs,
+  });
+  const resultSummary = attachGatewayTimingToSummary(
+    input.resultSummaryBase,
+    input.trace,
+    breakdown,
+  );
+  return { completedAtMs, durationMs, breakdown, resultSummary };
+}
+
 export function resolveVolcengineLogTiming(input: {
   providerKind: string | null;
   requestKind: string;
@@ -484,15 +570,17 @@ export function resolveVolcengineLogTiming(input: {
   const trace = readVolcengineTimingTrace(input.resultSummary);
   if (!trace) return stored;
 
-  const live = computeVolcengineTimingBreakdown({
+  // 终态：优先落库时的 timingBreakdown，避免延迟 recover 后 UI 重算覆盖真实阶段耗时
+  if (input.completedAt != null && stored) {
+    return stored;
+  }
+
+  return computeVolcengineTimingBreakdown({
     trace,
     submittedAtMs: input.submittedAt.getTime(),
     completedAtMs: input.completedAt?.getTime() ?? null,
     nowMs: input.nowMs,
   });
-
-  // 有 trace 时始终 live 重算（旧 stored 无 vendorPostProcessMs，可借 lastPolledAt 回退拆分）
-  return live;
 }
 
 /** 厂商 API / trace 原生耗时（只读展示，不写回 DB） */

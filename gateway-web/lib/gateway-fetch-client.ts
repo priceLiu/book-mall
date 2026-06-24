@@ -6,7 +6,13 @@ export async function fetchJsonWithTimeout<T = unknown>(
 ): Promise<{ ok: boolean; status: number; data: T | null }> {
   const timeoutMs = init?.timeoutMs ?? 12_000;
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  const timer = window.setTimeout(() => {
+    controller.abort(
+      typeof DOMException !== "undefined"
+        ? new DOMException("请求超时", "TimeoutError")
+        : undefined,
+    );
+  }, timeoutMs);
   try {
     const res = await fetch(input, {
       ...init,
@@ -14,6 +20,15 @@ export async function fetchJsonWithTimeout<T = unknown>(
     });
     const data = (await res.json().catch(() => null)) as T | null;
     return { ok: res.ok, status: res.status, data };
+  } catch (e) {
+    const timedOut =
+      (e instanceof DOMException &&
+        (e.name === "AbortError" || e.name === "TimeoutError")) ||
+      (e instanceof Error && e.name === "AbortError");
+    if (timedOut) {
+      return { ok: false, status: 408, data: null };
+    }
+    return { ok: false, status: 0, data: null };
   } finally {
     window.clearTimeout(timer);
   }
