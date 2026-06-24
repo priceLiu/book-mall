@@ -43,6 +43,17 @@ if [ -z "$DATABASE_URL" ]; then
   echo "[book-mall] ERROR: DATABASE_URL 未设置，无法执行 prisma migrate deploy"
   exit 1
 fi
+
+if [ -z "$DIRECT_DATABASE_URL" ]; then
+  export DIRECT_DATABASE_URL="$DATABASE_URL"
+  echo "[book-mall] DIRECT_DATABASE_URL 未设置，迁移将使用 DATABASE_URL（直连库时与显式配置等效）"
+  case "$DATABASE_URL" in
+    *pgbouncer=true*)
+      echo "[book-mall] WARNING: DATABASE_URL 含 pgbouncer=true，请在环境变量中单独配置 DIRECT_DATABASE_URL 直连 CDB"
+      ;;
+  esac
+fi
+
 echo "[book-mall] Running prisma migrate deploy..."
 prisma migrate deploy
 exec node server.js
