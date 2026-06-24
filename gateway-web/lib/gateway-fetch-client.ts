@@ -19,15 +19,16 @@ export async function fetchJsonWithTimeout<T = unknown>(
   }
 }
 
-export function createSingleFlight<T extends (...args: never[]) => Promise<unknown>>(
-  fn: T,
-): T {
-  let inFlight: Promise<unknown> | null = null;
-  return ((...args: Parameters<T>) => {
-    if (inFlight) return inFlight as ReturnType<T>;
+/** 同参数并发调用合并为一次 in-flight Promise */
+export function createSingleFlight<A extends unknown[], R>(
+  fn: (...args: A) => Promise<R>,
+): (...args: A) => Promise<R> {
+  let inFlight: Promise<R> | null = null;
+  return (...args: A) => {
+    if (inFlight) return inFlight;
     inFlight = fn(...args).finally(() => {
       inFlight = null;
     });
-    return inFlight as ReturnType<T>;
-  }) as T;
+    return inFlight;
+  };
 }
