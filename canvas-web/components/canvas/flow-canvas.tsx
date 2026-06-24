@@ -920,7 +920,7 @@ function FlowCanvasInner({
         if (
           e.zIndex === 1000 &&
           className === e.className &&
-          e.style?.stroke === "#a78bfa"
+          e.style?.stroke === "#238636"
         ) {
           return e;
         }
@@ -929,7 +929,7 @@ function FlowCanvasInner({
           ...e,
           zIndex: 1000,
           className,
-          style: { ...(e.style ?? {}), stroke: "#a78bfa", strokeWidth: 1.5 },
+          style: { ...(e.style ?? {}), stroke: "#238636", strokeWidth: 1.5 },
         };
       }
       const opacity = (e.style as { opacity?: number } | undefined)?.opacity;

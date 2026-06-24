@@ -27,7 +27,7 @@ const GROUP_SPECS: Array<{
   {
     id: STORY_GROUP_VIDEOS,
     label: "视频列 · 分镜视频与对白",
-    color: "#a78bfa",
+    color: "#238636",
     relX: 1720,
   },
 ];

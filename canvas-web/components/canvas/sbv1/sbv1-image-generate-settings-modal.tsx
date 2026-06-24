@@ -137,7 +137,7 @@ export function Sbv1ImageGenerateSettingsModal({
       >
         <header className="flex items-start justify-between gap-3 border-b border-white/5 px-4 py-3">
           <p className="flex items-center gap-2 text-[14px] font-medium text-white">
-            <Sparkles className="size-4 text-[var(--canvas-accent,#a78bfa)]" />
+            <Sparkles className="size-4 text-[var(--canvas-accent)]" />
             图片生成设置
           </p>
           <button
@@ -229,7 +229,7 @@ export function Sbv1ImageGenerateSettingsModal({
             type="button"
             disabled={!providerId.trim() || !modelKey.trim()}
             onClick={handleConfirm}
-            className="rounded-md bg-[var(--canvas-accent,#a78bfa)] px-4 py-1.5 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft,#c4b5fd)] disabled:opacity-50"
+            className="rounded-md bg-[var(--canvas-accent)] px-4 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)] disabled:opacity-50"
           >
             确认
           </button>

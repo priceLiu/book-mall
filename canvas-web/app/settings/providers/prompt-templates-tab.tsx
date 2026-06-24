@@ -266,7 +266,7 @@ function EngineSection({
               type="button"
               disabled={busy}
               onClick={() => void onSave()}
-              className="rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-black disabled:opacity-50"
+              className="rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
             >
               {busy ? "保存中…" : "保存"}
             </button>

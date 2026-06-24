@@ -50,7 +50,7 @@ export const STORY_PRO_BATCH_BTN_CLASS =
   "rounded-md border border-cyan-400/45 bg-cyan-500/25 font-medium text-cyan-50 hover:bg-cyan-500/35 disabled:cursor-not-allowed disabled:border-cyan-400/25 disabled:bg-cyan-500/10 disabled:text-cyan-200/40";
 
 export const STORY_PRO2_BATCH_BTN_CLASS =
-  "rounded-md border border-violet-400/45 bg-violet-500/25 font-medium text-violet-50 hover:bg-violet-500/35 disabled:cursor-not-allowed disabled:border-violet-400/25 disabled:bg-violet-500/10 disabled:text-violet-200/40";
+  "rounded-md bg-[var(--canvas-accent)] font-medium text-white hover:bg-[var(--canvas-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50";
 
 export function storyEditionBatchBtnClass(edition: StoryEdition): string {
   if (edition === "pro2") return STORY_PRO2_BATCH_BTN_CLASS;
@@ -59,7 +59,7 @@ export function storyEditionBatchBtnClass(edition: StoryEdition): string {
 
 export function storyEditionActiveRefBorderClass(edition: StoryEdition): string {
   if (edition === "pro2") {
-    return "border-violet-400 shadow-[0_0_0_1px_#a78bfa,0_0_10px_rgba(167,139,250,0.4)]";
+    return "border-violet-400 shadow-[0_0_0_1px_#238636,0_0_10px_rgba(35,134,54,0.4)]";
   }
   return edition === "pro"
     ? "border-cyan-400 shadow-[0_0_0_1px_#22d3ee,0_0_10px_rgba(34,211,238,0.4)]"
@@ -143,7 +143,7 @@ const PRO2_MODAL_TAB_IDLE =
   "text-white/60 hover:bg-violet-500/10 hover:text-violet-100";
 
 const PRO2_MODAL_SAVE_BTN_CLASS =
-  "inline-flex shrink-0 items-center gap-1 rounded-md bg-violet-500/30 px-3 py-1.5 text-[12px] font-medium text-violet-50 hover:bg-violet-500/40 disabled:opacity-40";
+  "inline-flex shrink-0 items-center gap-1 rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[var(--canvas-accent-soft)] disabled:opacity-40";
 
 const PRO2_MODAL_OUTLINE_BTN_CLASS =
   "inline-flex shrink-0 items-center gap-1 rounded-md border border-violet-400/45 bg-violet-500/15 px-3 py-1.5 text-[12px] font-medium text-violet-100 disabled:opacity-40";

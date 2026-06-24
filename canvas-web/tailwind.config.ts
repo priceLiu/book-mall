@@ -17,7 +17,7 @@ const config: Config = {
           border: "rgba(255,255,255,0.08)",
           ink: "#f5f5f7",
           muted: "#a3a3b3",
-          accent: "#a78bfa",
+          accent: "#238636",
         },
         libtv: {
           media: "#262626",

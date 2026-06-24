@@ -39,7 +39,7 @@ const BTN_BASE =
 export const NODE_BTN_ENGINE_PRIMARY = `${BTN_BASE} w-full bg-[#fb923c] px-3 py-2 text-[12px] text-black hover:bg-[#fdba74]`;
 
 /** 画布主按钮（非引擎 orange 场景，如 ai-engine） */
-export const NODE_BTN_PRIMARY = `${BTN_BASE} w-full bg-[var(--canvas-accent)] px-3 py-2 text-[12px] text-black hover:bg-[var(--canvas-accent-soft)] hover:text-white`;
+export const NODE_BTN_PRIMARY = `${BTN_BASE} w-full bg-[var(--canvas-accent)] px-3 py-2 text-[12px] text-white hover:bg-[var(--canvas-accent-soft)]`;
 
 export const NODE_BTN_SECONDARY = `${BTN_BASE} border border-white/15 px-2.5 py-1.5 text-[11px] text-white/85 hover:bg-white/10`;
 

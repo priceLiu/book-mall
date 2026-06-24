@@ -61,7 +61,7 @@ export function ProNodeShell({
   const embedded = useCanvasNodeEmbedded();
   const status = runtime?.status ?? "idle";
   const isGenerating = status === "running" || status === "pending";
-  const tint = embedded ? "#a78bfa" : PRO_NODE_ACCENT;
+  const tint = embedded ? "var(--canvas-accent)" : PRO_NODE_ACCENT;
   const borderColor = isGenerating
     ? tint
     : selected

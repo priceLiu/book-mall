@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useCanvasStore } from "@/lib/canvas/store";
+import { CANVAS_PRIMARY_BTN_SM_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { useSaveGroupAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import {
@@ -445,7 +446,7 @@ export function Pro2MediaGroupToolbarPanel({
             </button>
             <button
               type="button"
-              className="rounded-md bg-violet-500/85 px-3 py-1 text-[12px] font-medium text-white hover:bg-violet-500"
+              className={CANVAS_PRIMARY_BTN_SM_CLASS}
               onClick={onSaveEdit}
             >
               保存

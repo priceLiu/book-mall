@@ -28,6 +28,7 @@ import {
   CANVAS_SEMANTIC_STATUS_CLASS,
   CANVAS_SEMANTIC_TITLE_CLASS,
   CANVAS_TOOLBAR_BTN_CLASS,
+  CANVAS_PRIMARY_BTN_SM_CLASS,
 } from "@/lib/canvas/canvas-chrome-semantics";
 
 export function CanvasToolbar({
@@ -305,7 +306,7 @@ export function CanvasToolbar({
               ? "请先在 Book 个人中心绑定 AI 模型密钥"
               : undefined
           }
-          className="inline-flex items-center gap-1 rounded-md bg-[var(--canvas-accent)] px-3 py-1 text-[12px] font-medium text-black hover:bg-[var(--canvas-accent-soft)] hover:text-white disabled:opacity-60"
+          className={CANVAS_PRIMARY_BTN_SM_CLASS}
         >
           {running ? <Loader2 className="size-3 animate-spin" /> : <Play className="size-3" />}
           运行全部

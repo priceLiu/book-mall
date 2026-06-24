@@ -24,9 +24,21 @@ export const CANVAS_STATUS_BADGE_IDLE_CLASS = `${STATUS_BADGE_BASE} bg-orange-50
 
 export const CANVAS_STATUS_BADGE_ERROR_CLASS = `${STATUS_BADGE_BASE} bg-red-500/20 text-red-200`;
 
+/** Gateway 控制台主按钮色（gateway-web --gw-btn-primary-*） */
+export const CANVAS_GATEWAY_BTN_BG = "#238636";
+export const CANVAS_GATEWAY_BTN_HOVER = "#2ea043";
+
+/** 实心主 CTA（运行全部、弹层确认、组工具栏确定等） */
+export const CANVAS_PRIMARY_BTN_CLASS =
+  "inline-flex shrink-0 items-center justify-center gap-1 rounded-md bg-[var(--canvas-accent)] px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-[var(--canvas-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50";
+
+/** 顶栏 / 浮动工具条小号主按钮（与 CANVAS_TOOLBAR_BTN_CLASS 同高同字号） */
+export const CANVAS_PRIMARY_BTN_SM_CLASS =
+  "inline-flex shrink-0 items-center gap-1 rounded-md border border-transparent bg-[var(--canvas-accent)] px-2 py-1 text-[11px] font-medium text-white transition hover:bg-[var(--canvas-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50";
+
 /** 顶栏工具按钮（白字 · 中性描边，禁止彩色字） */
 export const CANVAS_TOOLBAR_BTN_CLASS =
-  "inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/85 hover:border-white/30 hover:text-white";
+  "inline-flex shrink-0 items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/85 hover:border-white/30 hover:text-white";
 
 /** 侧栏标题行 */
 export const CANVAS_PANEL_HEADER_BORDER_CLASS = "border-white/10";

@@ -6,7 +6,7 @@ import { useViewportTransformActive } from "@/lib/canvas/use-viewport-transform-
 import { ChevronDown, Copy, FolderPlus, LayoutGrid, Loader2, BookmarkPlus } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { useCanvasStore } from "@/lib/canvas/store";
+import { CANVAS_PRIMARY_BTN_SM_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
 import { createProjectAsset } from "@/lib/canvas-api";
 import { exportNodeToProjectAssetDraft } from "@/lib/canvas/project-asset-export";
 import { notifyProjectAssetsChanged } from "@/lib/canvas/use-project-assets";
@@ -334,7 +334,7 @@ export function Pro2SelectionToolbar({
                 </button>
                 <button
                   type="button"
-                  className="rounded-md bg-violet-500/85 px-3 py-1 text-[12px] font-medium text-white hover:bg-violet-500"
+                  className={CANVAS_PRIMARY_BTN_SM_CLASS}
                   onClick={onGroup}
                 >
                   打组

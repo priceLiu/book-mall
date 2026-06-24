@@ -287,7 +287,7 @@ function CompactField({
                   className={[
                     "min-h-[28px] flex-1 rounded px-2 py-1 text-[11px] font-semibold transition",
                     active
-                      ? "bg-[var(--canvas-accent,#a78bfa)] text-white"
+                      ? "bg-[var(--canvas-accent)] text-white"
                       : "text-white/75 hover:bg-white/10",
                   ].join(" ")}
                 >
