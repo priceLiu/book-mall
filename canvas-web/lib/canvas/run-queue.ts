@@ -46,7 +46,7 @@ import {
   isAnyStoryVideoColumnType,
 } from "./story-workspace-resolver";
 import { sceneRowKeysEquivalent } from "./story-pro-scene-asset-catalog";
-import { formatCanvasTaskError } from "./friendly-task-error";
+import { formatCanvasTaskError, resolveLibtvRunFailureCode } from "./friendly-task-error";
 import { maybeNotifyCanvasCreditsSettled, markCanvasNodeGenerationStarted } from "./canvas-credits-notify";
 import {
   isCanvasTaskTerminalStatus,
@@ -1152,19 +1152,17 @@ export function useCanvasRunner(
             updateNodeData,
             errState.nodes,
           );
-        } else if (
-          !applySbv1ImageRunFailure(
-            errNode,
-            updateNodeData,
-            "REQUEST_FAILED",
-            msg,
-          )
-        ) {
-          setNodeRuntime(nodeId, {
-            status: "error",
-            failCode: "REQUEST_FAILED",
-            failMessage: formatCanvasTaskError("REQUEST_FAILED", msg),
-          });
+        } else {
+          const failCode = resolveLibtvRunFailureCode(msg);
+          if (
+            !applySbv1ImageRunFailure(errNode, updateNodeData, failCode, msg)
+          ) {
+            setNodeRuntime(nodeId, {
+              status: "error",
+              failCode,
+              failMessage: formatCanvasTaskError(failCode, msg),
+            });
+          }
         }
       } finally {
         const nodeAfter = useCanvasStore.getState().nodes.find((n) => n.id === nodeId);

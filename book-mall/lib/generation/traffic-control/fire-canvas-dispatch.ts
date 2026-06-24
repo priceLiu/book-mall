@@ -6,14 +6,26 @@ let lastGlobalDispatchAt = 0;
 /** 读路径 / 槽位释放触发的全局出队：防抖，避免 canvas-queue 轮询打满 DB */
 const GLOBAL_DISPATCH_MIN_GAP_MS = 2_000;
 
-function runDispatch(
-  source: string,
-  opts?: { projectId?: string; fastPath?: boolean },
-): void {
+const projectDispatchInFlight = new Set<string>();
+
+type DispatchRunOpts = {
+  projectId?: string;
+  fastPath?: boolean;
+  /** 自愈重派等路径：跳过 debounce / 全局 in-flight 门闩 */
+  bypassDebounce?: boolean;
+};
+
+function runDispatch(source: string, opts?: DispatchRunOpts): void {
   const fastPath = opts?.fastPath ?? true;
+  const projectId = opts?.projectId;
+  if (projectId) {
+    if (projectDispatchInFlight.has(projectId)) return;
+    projectDispatchInFlight.add(projectId);
+  }
+
   void Promise.all([
-    dispatchQueuedCanvasTasks({ projectId: opts?.projectId, fastPath }),
-    dispatchQueuedStoryTasks(opts?.projectId ? { projectId: opts.projectId } : undefined),
+    dispatchQueuedCanvasTasks({ projectId, fastPath }),
+    dispatchQueuedStoryTasks(projectId ? { projectId } : undefined),
   ])
     .then(([canvas, story]) => {
       const noisy =
@@ -33,6 +45,9 @@ function runDispatch(
         `[canvas-dispatch] ${source} skipped:`,
         e instanceof Error ? e.message : String(e),
       );
+    })
+    .finally(() => {
+      if (projectId) projectDispatchInFlight.delete(projectId);
     });
 }
 
@@ -43,7 +58,7 @@ function runDispatch(
 export function fireCanvasDispatchForProject(
   projectId: string,
   source: string,
-  opts?: { fastPath?: boolean },
+  opts?: { fastPath?: boolean; bypassDebounce?: boolean },
 ): void {
   runDispatch(source, { projectId, fastPath: opts?.fastPath });
 }
@@ -55,10 +70,13 @@ export function fireCanvasDispatchForProject(
  */
 export function fireVideoTrafficDispatchBacklog(
   source: string,
-  opts?: { fastPath?: boolean },
+  opts?: { fastPath?: boolean; bypassDebounce?: boolean },
 ): void {
   const now = Date.now();
-  if (globalDispatchInFlight || now - lastGlobalDispatchAt < GLOBAL_DISPATCH_MIN_GAP_MS) {
+  if (
+    !opts?.bypassDebounce &&
+    (globalDispatchInFlight || now - lastGlobalDispatchAt < GLOBAL_DISPATCH_MIN_GAP_MS)
+  ) {
     return;
   }
   globalDispatchInFlight = true;
@@ -98,7 +116,7 @@ export function fireVideoTrafficDispatchBacklog(
 /** @deprecated 使用 fireVideoTrafficDispatchBacklog */
 export function fireCanvasDispatchQueuedBacklog(
   source: string,
-  opts?: { fastPath?: boolean },
+  opts?: { fastPath?: boolean; bypassDebounce?: boolean },
 ): void {
   fireVideoTrafficDispatchBacklog(source, opts);
 }

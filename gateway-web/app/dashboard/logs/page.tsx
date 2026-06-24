@@ -8,7 +8,7 @@ const EMPTY_INITIAL: GatewayLogsInitialData = {
   logs: [],
   total: 0,
   page: 1,
-  pageSize: 20,
+  pageSize: 30,
   totalPages: 1,
 };
 

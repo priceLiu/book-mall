@@ -132,11 +132,9 @@ async function recoverStaleStoryQueuedTasks(opts?: {
       continue;
     }
     const { payload: nextPayload } = nextDispatchStaleRetryPayload(payload);
-    const requeueNow = new Date();
     await prisma.storyGenerationTask.update({
       where: { id: t.id },
       data: {
-        queuedAt: requeueNow,
         dispatchAfter: queueDispatchAfterFromIndex(0),
         failCode: null,
         failMessage: null,
@@ -200,12 +198,10 @@ async function recoverStaleStoryDispatchingOnly(opts?: {
 
     await releaseTrafficSlot(scope.scopeKey);
     const { payload: nextPayload } = nextDispatchStaleRetryPayload(payload);
-    const requeueNow = new Date();
     await prisma.storyGenerationTask.update({
-      where: { id: t.id },
+      where: { id: t.id, status: "DISPATCHING" },
       data: {
         status: "QUEUED",
-        queuedAt: requeueNow,
         dispatchAfter: queueDispatchAfterFromIndex(n),
         failCode: null,
         failMessage: null,

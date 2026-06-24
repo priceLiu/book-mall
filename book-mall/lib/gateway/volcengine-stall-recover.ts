@@ -296,3 +296,45 @@ export async function recoverMisclassifiedVolcengineStallLogs(opts?: {
   }
   return { scanned: rows.length, recovered };
 }
+
+/** 2min 轮询失联 · 自动向厂商核对 RUNNING 火山视频（Logs 页 / canvas-queue 触发） */
+export async function autoRecoverPollStalledVolcengineGatewayLogs(opts?: {
+  limit?: number;
+  staleMs?: number;
+}): Promise<{ scanned: number; recovered: number }> {
+  const staleMs = opts?.staleMs ?? 2 * 60 * 1000;
+  const limit = opts?.limit ?? 8;
+  const lagCutoff = new Date(Date.now() - staleMs);
+
+  const rows = await prisma.gatewayRequestLog.findMany({
+    where: {
+      status: "RUNNING",
+      providerKind: "VOLCENGINE",
+      requestKind: "VIDEO",
+      externalTaskId: { not: null },
+      OR: [
+        { lastPolledAt: { lte: lagCutoff } },
+        { lastPolledAt: null, submittedAt: { lte: lagCutoff } },
+      ],
+    },
+    orderBy: [{ lastPolledAt: "asc" }, { submittedAt: "asc" }],
+    take: limit,
+    select: { id: true },
+  });
+
+  let recovered = 0;
+  for (const row of rows) {
+    const r = await recoverVolcengineGatewayLogFromVendor(row.id);
+    if (
+      r.ok &&
+      (r.action === "succeeded" ||
+        r.action === "vendor_failed" ||
+        r.action === "still_running")
+    ) {
+      if (r.action === "succeeded" || r.action === "vendor_failed") {
+        recovered++;
+      }
+    }
+  }
+  return { scanned: rows.length, recovered };
+}

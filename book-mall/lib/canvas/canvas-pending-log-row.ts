@@ -51,7 +51,7 @@ export function buildCanvasPendingLogRow(
 ): CanvasPendingLogRow {
   const status: CanvasPendingLogStatus =
     task.status === "DISPATCHING" ? "DISPATCHING" : "QUEUED";
-  const startedAt = task.queuedAt ?? task.createdAt;
+  const startedAt = task.trafficStartedAt;
   return {
     id: `pending:${task.id}`,
     canvasTaskId: task.id,

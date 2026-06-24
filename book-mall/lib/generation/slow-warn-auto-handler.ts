@@ -125,6 +125,13 @@ export async function runSlowWarnAutoHandler(opts?: {
   const gatewaySucceededSync =
     await autoSyncCanvasFromSucceededGateway(limit);
 
+  const { autoRecoverPollStalledVolcengineGatewayLogs } = await import(
+    "@/lib/gateway/volcengine-stall-recover"
+  );
+  const pollStall = await autoRecoverPollStalledVolcengineGatewayLogs({
+    limit: Math.min(limit, 8),
+  });
+
   const slowEsc = await escalateSlowCanvasSubmittedTasks({
     limit,
     thresholdMs,
@@ -149,9 +156,9 @@ export async function runSlowWarnAutoHandler(opts?: {
 
   return {
     gatewaySucceededSync,
-    slowCanvasRecovered: slowEsc.recovered,
+    slowCanvasRecovered: slowEsc.recovered + pollStall.recovered,
     slowGatewayRecovered,
     scanned:
-      slowEsc.scanned + slowGateway.length + gatewaySucceededSync,
+      slowEsc.scanned + slowGateway.length + gatewaySucceededSync + pollStall.scanned,
   };
 }

@@ -4,6 +4,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { readTrafficStartedAtIso } from "@/lib/generation/traffic-control/traffic-timing";
 
 export const CANVAS_QUEUE_WITHOUT_LOG_STATUSES = ["QUEUED", "DISPATCHING"] as const;
 
@@ -125,6 +126,8 @@ export type CanvasQueuedTaskRow = {
   model: string | null;
   queuedAt: string | null;
   createdAt: string;
+  /** 用户点击生成锚点（自愈重排不重置） */
+  trafficStartedAt: string;
   dispatchAfter: string | null;
   waitMinutes: number;
   payloadKind: string | null;
@@ -181,6 +184,10 @@ export async function listCanvasQueuedWithoutLogTasks(input: {
       createdAt: t.createdAt.toISOString(),
       dispatchAfter: t.dispatchAfter?.toISOString() ?? null,
       waitMinutes: Math.floor(Math.max(0, now - anchor.getTime()) / 60_000),
+      trafficStartedAt: readTrafficStartedAtIso(
+        payload,
+        t.queuedAt ?? t.createdAt,
+      ),
       payloadKind:
         typeof payload?.kind === "string" ? payload.kind : null,
       actorUserId: t.actorUserId,

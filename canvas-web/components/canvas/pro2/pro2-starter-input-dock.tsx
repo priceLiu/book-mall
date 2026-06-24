@@ -98,10 +98,10 @@ export function Pro2StarterInputDock() {
     failCode: d.themeOutlineRuntime?.failCode,
     failMessage: outlineErrorMessage ?? undefined,
     dismissedFailTaskId: d.themeOutlineRuntime?.dismissedFailTaskId,
-    onAlert: (msg) => {
+    onAlert: ({ message }) => {
       void alert({
         title: "大纲生成失败",
-        message: msg,
+        message,
         variant: "error",
       });
     },

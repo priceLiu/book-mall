@@ -53,6 +53,7 @@ import { LibtvNodeErrorBanner } from "../libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
 import {
   useLibtvRuntimeErrorAlert,
+  libtvRuntimeErrorAlertTitle,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
@@ -91,10 +92,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     failCode: d.runtime?.failCode,
     failMessage: d.runtime?.failMessage,
     dismissedFailTaskId: d.runtime?.dismissedFailTaskId,
-    onAlert: (msg) => {
+    onAlert: ({ message, failCode }) => {
       void alert({
-        title: "视频生成失败",
-        message: msg,
+        title: libtvRuntimeErrorAlertTitle(failCode, message),
+        message,
         variant: "error",
         dismissOnly: true,
       });
@@ -131,16 +132,29 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
 
   useEffect(() => {
     if (!inflightTask) return;
+    const localRt = d.runtime;
+    if (shouldSkipStoryRowTaskApply(localRt, inflightTask, id)) return;
+
     const nodePatch = sbv1VideoPatchFromTask(inflightTask);
     if (nodePatch) {
+      const rtPatch = nodePatch.runtime as Partial<CanvasNodeRuntime> | undefined;
+      if (
+        rtPatch &&
+        !shouldApplyCanvasTaskRuntimePatch(localRt, inflightTask, rtPatch, id)
+      ) {
+        return;
+      }
       updateNodeData(id, nodePatch);
       return;
     }
     const patch = runtimePatchFromCanvasTask(inflightTask);
     if (patch?.status === "pending" || patch?.status === "running") {
+      if (!shouldApplyCanvasTaskRuntimePatch(localRt, inflightTask, patch, id)) {
+        return;
+      }
       setNodeRuntime(id, patch);
     }
-  }, [inflightTask, id, setNodeRuntime, updateNodeData]);
+  }, [inflightTask, id, setNodeRuntime, updateNodeData, d.runtime]);
 
   /** 任务已在服务端终态但 runtime 仍停在 pending/running（须已绑定 taskId，勿误伤刚点的乐观 pending） */
   useEffect(() => {

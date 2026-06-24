@@ -78,6 +78,21 @@ function isMislabeledInsufficientCredits(input: {
 const STALE_INSUFFICIENT_HINT =
   "若为历史失败且账户已充值，请关闭节点上的错误提示后点「重新生成」。";
 
+/** run API 抛错 / catch 块：从 HTTP 文案推断 failCode */
+export function resolveLibtvRunFailureCode(rawMessage: string): string {
+  const msg = rawMessage.trim();
+  const blob = msg.toLowerCase();
+  if (
+    msg.includes("402") ||
+    blob.includes("insufficient_credits") ||
+    msg.includes("积分不足") ||
+    msg.includes("积分不够")
+  ) {
+    return "INSUFFICIENT_CREDITS";
+  }
+  return "REQUEST_FAILED";
+}
+
 /** 将服务端 failMessage 转为用户可读文案；可选 modelKey 用于区分 DeepSeek / KIE 等同文案错误 */
 export function formatCanvasTaskError(
   failCode?: string | null,

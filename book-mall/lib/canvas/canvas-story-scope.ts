@@ -10,6 +10,7 @@ import { CanvasProjectError } from "./canvas-project-service";
 import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
 import { computeCanvasQueueDispatchAfter } from "@/lib/generation/traffic-control/queue-dispatch-after";
 import { resolveCanvasProjectTrafficScope } from "@/lib/generation/traffic-control/scope-key";
+import { withTrafficStartedAtPayload } from "@/lib/generation/traffic-control/traffic-timing";
 
 export type CanvasTaskStoryScope = {
   rowKey?: string;
@@ -113,6 +114,8 @@ export async function createStoryScopedCanvasTask(
     storyScope?: CanvasTaskStoryScope;
     initialStatus?: "PENDING" | "SUBMITTED" | "QUEUED";
     actorUserId?: string;
+    /** forceFresh 重生成：允许同节点已有 SUBMITTED 时再建一条 */
+    skipInflightScopeConflict?: boolean;
     data: Omit<
       Prisma.CanvasGenerationTaskUncheckedCreateInput,
       "projectId" | "nodeId" | "status" | "queuedAt" | "tenantId" | "actorUserId"
@@ -152,12 +155,14 @@ export async function createStoryScopedCanvasTask(
       );
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${k1}::int, ${k2}::int)`;
 
-      await findInflightScopeConflict(
-        tx,
-        args.projectId,
-        args.nodeId,
-        args.storyScope,
-      );
+      if (!args.skipInflightScopeConflict) {
+        await findInflightScopeConflict(
+          tx,
+          args.projectId,
+          args.nodeId,
+          args.storyScope,
+        );
+      }
       const payload = args.data.inputPayload;
       const scopePatch =
         args.storyScope &&
@@ -171,10 +176,17 @@ export async function createStoryScopedCanvasTask(
           : args.storyScope
             ? { storyScope: args.storyScope }
             : payload;
+      const inputPayload =
+        queuedNow && scopePatch && typeof scopePatch === "object" && !Array.isArray(scopePatch)
+          ? (withTrafficStartedAtPayload(
+              scopePatch as Record<string, unknown>,
+              queuedNow.getTime(),
+            ) as Prisma.InputJsonValue)
+          : (scopePatch as Prisma.InputJsonValue);
 
       const archive = promptArchiveFieldsForTask({
         kind: args.data.kind,
-        inputPayload: scopePatch,
+        inputPayload: inputPayload,
         textOutput: args.data.textOutput ?? null,
       });
 
@@ -192,7 +204,7 @@ export async function createStoryScopedCanvasTask(
               : args.data.dispatchAfter,
           tenantId: tenantId ?? undefined,
           actorUserId: actorUserId ?? undefined,
-          inputPayload: scopePatch as Prisma.InputJsonValue,
+          inputPayload,
         },
       });
       }, CANVAS_DB_TX_OPTIONS),

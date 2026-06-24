@@ -14,10 +14,16 @@ import { CanvasProjectError } from "@/lib/canvas/canvas-project-service";
 import { finalizeRequestLog } from "@/lib/gateway/proxy-common";
 import { refundFailedGatewayLog } from "@/lib/billing/gateway-credit-settlement";
 import { prisma } from "@/lib/prisma";
-import { isTransientSystemBusyError, runTxWithRetry, CANVAS_DB_TX_OPTIONS } from "@/lib/db-tx-retry";
+import {
+  DISPATCH_SUBMIT_TIMEOUT_MESSAGE,
+  isTransientSystemBusyError,
+  runTxWithRetry,
+  CANVAS_DB_TX_OPTIONS,
+} from "@/lib/db-tx-retry";
 
 import {
   getDispatchBatch,
+  getDispatchSubmitTimeoutMs,
   getQueueTimeoutMin,
   isTrafficControlEnabled,
 } from "./constants";
@@ -111,6 +117,22 @@ async function submitCanvasVideoToGateway(
     projectId: task.projectId,
   });
   return { taskId: job.taskId, logId: job.logId };
+}
+
+async function submitCanvasVideoToGatewayWithTimeout(
+  task: CanvasGenerationTask & { project: { userId: string } },
+  payload: Record<string, unknown>,
+): Promise<{ taskId: string; logId: string }> {
+  const timeoutMs = getDispatchSubmitTimeoutMs();
+  return Promise.race([
+    submitCanvasVideoToGateway(task, payload),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(DISPATCH_SUBMIT_TIMEOUT_MESSAGE)),
+        timeoutMs,
+      ),
+    ),
+  ]);
 }
 
 async function cancelQueueTimeouts(projectId?: string): Promise<number> {
@@ -207,9 +229,18 @@ async function dispatchOneCanvasQueuedTask(
           return { action: "skipped" as const };
         }
 
+        const dispatchingAt = new Date().toISOString();
+        const nextPayload = {
+          ...taskInputPayload(fresh),
+          dispatchingAt,
+        } as Prisma.InputJsonValue;
         await tx.canvasGenerationTask.update({
           where: { id: task.id },
-          data: { status: "DISPATCHING", dispatchAfter: null },
+          data: {
+            status: "DISPATCHING",
+            dispatchAfter: null,
+            inputPayload: nextPayload,
+          },
         });
         return { action: "claimed" as const };
       }, CANVAS_DB_TX_OPTIONS),
@@ -220,9 +251,11 @@ async function dispatchOneCanvasQueuedTask(
 
   // 仅当 createTask 成功返回 logId 后为 true；503 预检失败时仍为 false，可安全退回队列。
   let vendorJob: { taskId: string; logId: string } | null = null;
+  let claimedTask: CanvasGenerationTask | null = null;
   try {
-    const { claimed, task: claimedTask } = await claimCanvasTaskKieSubmit(task.id);
-    if (!claimed) {
+    const claim = await claimCanvasTaskKieSubmit(task.id);
+    claimedTask = claim.task;
+    if (!claim.claimed) {
       await releaseTrafficSlot(scope.scopeKey);
       const p = taskInputPayload(claimedTask);
       if (!claimedTask.kieTaskId && !p.gatewayLogId) {
@@ -246,25 +279,25 @@ async function dispatchOneCanvasQueuedTask(
       return "skipped";
     }
 
-    const job = await submitCanvasVideoToGateway(
-      { ...claimedTask, project: task.project },
-      taskInputPayload(claimedTask),
+    const job = await submitCanvasVideoToGatewayWithTimeout(
+      { ...claimedTask!, project: task.project },
+      taskInputPayload(claimedTask!),
     );
     vendorJob = job;
 
     // 厂商已受理（gateway 日志已建、vendor 任务已在跑）：此处的状态落库务必重试，
     // 否则瞬时 DB 错误会把任务误判 FAILED，留下「日志在跑 / 任务失败」的孤儿（白烧成本）。
-    await runTxWithRetry(
+    const submitted = await runTxWithRetry(
       () =>
-        prisma.canvasGenerationTask.update({
-          where: { id: task.id },
+        prisma.canvasGenerationTask.updateMany({
+          where: { id: task.id, status: "DISPATCHING" },
           data: {
             status: "SUBMITTED",
             kieTaskId: job.taskId,
             submittedAt: new Date(),
             lastPolledAt: new Date(),
             inputPayload: clearDispatchStaleRetryInPayload({
-              ...taskInputPayload(claimedTask),
+              ...taskInputPayload(claimedTask!),
               gatewayLogId: job.logId,
               gatewayKieSubmitClaimed: true,
               syncGatewaySubmit: true,
@@ -274,6 +307,10 @@ async function dispatchOneCanvasQueuedTask(
         }),
       { label: "canvas-dispatch-submitted-write", maxRetries: 5 },
     );
+    if (submitted.count === 0) {
+      await releaseTrafficSlot(scope.scopeKey);
+      return "skipped";
+    }
 
     // 厂商已受理：立即释放交通槽，让后续 QUEUED 任务出队（不等 RUNNING 终态 / 10min promote）。
     await releaseGatewayVideoTrafficSlotIfOccupying({
@@ -293,9 +330,13 @@ async function dispatchOneCanvasQueuedTask(
     const msg = e instanceof Error ? e.message : String(e);
     await releaseTrafficSlot(scope.scopeKey);
 
-    // 厂商提交前 / createTask 503 预检失败：退回队列稍后重试，不判失败、不产生孤儿日志。
+    // 厂商提交前 / createTask 503 预检失败 / HTTP 超时：退回队列稍后重试，不判失败、不产生孤儿日志。
     if (!vendorJob && isTransientSystemBusyError(e)) {
-      await revertStuckDispatchingTask(task.id, scope.scopeKey, taskInputPayload(task));
+      await revertStuckDispatchingTask(
+        task.id,
+        scope.scopeKey,
+        taskInputPayload(claimedTask ?? task),
+      );
       return "skipped";
     }
 
@@ -356,6 +397,13 @@ export async function dispatchQueuedCanvasTasks(opts?: {
         e instanceof Error ? e.message : String(e),
       );
     }
+  }
+
+  try {
+    const { reconcileRunningSlotCounts } = await import("./reconcile");
+    await reconcileRunningSlotCounts().catch(() => undefined);
+  } catch {
+    /* noop */
   }
 
   try {

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isTrafficControlEnabled } from "./constants";
 import { computeCanvasQueueDispatchAfter } from "./queue-dispatch-after";
 import { resolveCanvasProjectTrafficScope, type TrafficScope } from "./scope-key";
+import { withTrafficStartedAtPayload } from "./traffic-timing";
 
 export function isCanvasVideoTrafficKind(payload: Record<string, unknown> | null): boolean {
   if (!payload) return false;
@@ -30,10 +31,21 @@ export async function admitCanvasVideoTask(input: {
   const dispatchAfter = isTrafficControlEnabled()
     ? await computeCanvasQueueDispatchAfter(scope, now.getTime())
     : undefined;
+  const inputPayload = input.data.inputPayload;
+  const payloadObj =
+    inputPayload &&
+    typeof inputPayload === "object" &&
+    !Array.isArray(inputPayload)
+      ? (inputPayload as Record<string, unknown>)
+      : {};
+  const trafficPayload = isTrafficControlEnabled()
+    ? (withTrafficStartedAtPayload(payloadObj, now.getTime()) as Prisma.InputJsonValue)
+    : input.data.inputPayload;
 
   return prisma.canvasGenerationTask.create({
     data: {
       ...input.data,
+      inputPayload: trafficPayload,
       ...promptArchiveFieldsForTask({
         kind: input.data.kind,
         inputPayload: input.data.inputPayload,

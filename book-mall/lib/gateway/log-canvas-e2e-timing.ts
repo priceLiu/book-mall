@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { isGatewayLogTerminalStatus } from "@/lib/gateway/log-progress";
+import { readTrafficStartedAtIso, readTrafficStartedAtMs } from "@/lib/generation/traffic-control/traffic-timing";
 
 /** 用户 E2E：画布点击生成 → 任务完成（含交通控流 / OSS / DB，不含纯 UI 渲染） */
 export type CanvasE2eTimingRecord = {
@@ -27,6 +28,7 @@ export type CanvasTaskTimingInput = {
   createdAt: Date;
   queuedAt: Date | null;
   completedAt: Date | null;
+  inputPayload?: unknown;
 };
 
 export function readCanvasE2eTiming(
@@ -68,7 +70,16 @@ export function buildCanvasE2eTiming(input: {
   anchorMs: number;
   freeze?: boolean;
 }): CanvasE2eTimingRecord {
-  const startedAtMs = input.canvasTask.createdAt.getTime();
+  const payload =
+    input.canvasTask.inputPayload &&
+    typeof input.canvasTask.inputPayload === "object" &&
+    !Array.isArray(input.canvasTask.inputPayload)
+      ? (input.canvasTask.inputPayload as Record<string, unknown>)
+      : null;
+  const startedAtMs = readTrafficStartedAtMs(
+    payload,
+    input.canvasTask.queuedAt ?? input.canvasTask.createdAt,
+  );
   const gatewaySubmittedMs = input.log.submittedAt.getTime();
   const preGatewayMs = Math.max(0, gatewaySubmittedMs - startedAtMs);
 
@@ -196,6 +207,13 @@ export function resolveCanvasE2eForLogRow(input: {
     isGatewayLogTerminalStatus(input.log.status) &&
     input.canvasTask.completedAt != null;
 
+  const payload =
+    input.canvasTask.inputPayload &&
+    typeof input.canvasTask.inputPayload === "object" &&
+    !Array.isArray(input.canvasTask.inputPayload)
+      ? (input.canvasTask.inputPayload as Record<string, unknown>)
+      : null;
+
   const built = buildCanvasE2eTiming({
     log: input.log,
     canvasTask: input.canvasTask,
@@ -204,7 +222,10 @@ export function resolveCanvasE2eForLogRow(input: {
   });
 
   return {
-    canvasStartedAt: input.canvasTask.createdAt.toISOString(),
+    canvasStartedAt: readTrafficStartedAtIso(
+      payload,
+      input.canvasTask.queuedAt ?? input.canvasTask.createdAt,
+    ),
     canvasCompletedAt: input.canvasTask.completedAt?.toISOString() ?? null,
     e2eMs: built.e2eMs ?? null,
     preGatewayMs: built.preGatewayMs ?? null,

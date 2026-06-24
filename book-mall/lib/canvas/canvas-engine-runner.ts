@@ -71,6 +71,7 @@ import { storyEngineSystemFallback } from "./story-engine-prompts";
 import {
   isTrafficControlEnabled,
   GENERATION_INFLIGHT_STATUSES,
+  GENERATION_PIPELINE_INFLIGHT_STATUSES,
 } from "@/lib/generation/traffic-control/constants";
 import { computeCanvasQueueDispatchAfter } from "@/lib/generation/traffic-control/queue-dispatch-after";
 import { fireCanvasDispatchForProject } from "@/lib/generation/traffic-control/fire-canvas-dispatch";
@@ -176,7 +177,7 @@ async function ensureProjectInflightCapacity(projectId: string): Promise<void> {
   const current = await prisma.canvasGenerationTask.count({
     where: {
       projectId,
-      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
+      status: { in: [...GENERATION_PIPELINE_INFLIGHT_STATUSES] },
     },
   });
   if (current >= max) {
@@ -1011,7 +1012,9 @@ export async function runVideoEngineNode(
   if (!args.forceFresh) {
     await assertNoProjectInflightByInputHash(projectId, inputHash);
   }
-  await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
+  if (!args.forceFresh) {
+    await ensureNoActiveTaskForScope(projectId, nodeId, args.storyScope);
+  }
   await ensureProjectInflightCapacity(projectId);
   await ensureUserInflightCapacity(userId);
 
@@ -1074,6 +1077,7 @@ export async function runVideoEngineNode(
     nodeId,
     storyScope: args.storyScope,
     actorUserId: userId,
+    skipInflightScopeConflict: args.forceFresh === true,
     initialStatus: isTrafficControlEnabled() ? "QUEUED" : "PENDING",
     data: {
       kind: "IMAGE",

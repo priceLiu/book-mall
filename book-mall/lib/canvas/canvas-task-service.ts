@@ -38,7 +38,10 @@ import {
 } from "@/lib/generation/poll-config";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import { dispatchQueuedCanvasTasks } from "@/lib/generation/traffic-control/dispatch-canvas";
-import { GENERATION_INFLIGHT_STATUSES } from "@/lib/generation/traffic-control/constants";
+import {
+  GENERATION_INFLIGHT_STATUSES,
+  GENERATION_PIPELINE_INFLIGHT_STATUSES,
+} from "@/lib/generation/traffic-control/constants";
 import {
   pollShardOverFetchSize,
   selectPollShardTasks,
@@ -226,7 +229,7 @@ async function ensureProjectInflightCapacity(
   const current = await prisma.canvasGenerationTask.count({
     where: {
       projectId,
-      status: { in: [...GENERATION_INFLIGHT_STATUSES] },
+      status: { in: [...GENERATION_PIPELINE_INFLIGHT_STATUSES] },
     },
   });
   if (current >= max) {
