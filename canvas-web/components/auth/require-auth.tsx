@@ -18,6 +18,12 @@ import {
   buildSilentReEnterHref,
   shouldAttemptSilentSso,
 } from "@/lib/tools-silent-sso";
+import {
+  bumpSsoReenterAttempts,
+  clearSsoReenterAttempts,
+  MAX_SSO_REENTER_ATTEMPTS,
+  readSsoReenterAttempts,
+} from "@/lib/sso-reenter-attempts";
 
 const SESSION_FETCH_TIMEOUT_MS = 20_000;
 const SESSION_FETCH_RETRY_DELAY_MS = 800;
@@ -88,15 +94,21 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [hasTokenCookie, setHasTokenCookie] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
+  const [exhausted, setExhausted] = useState(false);
   const silentAttemptedRef = useRef(false);
   const loadGenRef = useRef(0);
 
-  const redirectToSso = useCallback(() => {
+  const reEnterHref = useCallback(() => {
     const path =
       typeof window !== "undefined" ? window.location.pathname : "/projects";
-    const reEnter =
+    return (
       buildSilentReEnterHref(mainOrigin, path, "canvas") ||
-      bookMallReEnterHref(path, "canvas");
+      bookMallReEnterHref(path, "canvas")
+    );
+  }, [mainOrigin]);
+
+  const redirectToSso = useCallback(() => {
+    const reEnter = reEnterHref();
     if (reEnter) {
       window.location.href = reEnter;
       return true;
@@ -109,7 +121,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       return true;
     }
     return false;
-  }, [mainOrigin]);
+  }, [reEnterHref]);
 
   const loadSession = useCallback(async (opts?: { retry?: boolean }) => {
     const gen = ++loadGenRef.current;
@@ -176,7 +188,16 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     void loadSession();
   }, [loadSession]);
 
-  /** 会话无效时自动跳转 re-enter（一次），与 tool-web 壳层一致 */
+  /** 会话建立成功后清零静默换票计数，便于下一轮失效重新自动换票 */
+  useEffect(() => {
+    if (ready) clearSsoReenterAttempts();
+  }, [ready]);
+
+  /**
+   * 会话无效时静默自动换票（re-enter），对用户无感。
+   * 整页跳转会重新挂载组件，故用 sessionStorage 跨刷新累计次数：
+   * 连续 MAX_SSO_REENTER_ATTEMPTS 次仍未建立会话，才停下并提示重新登录。
+   */
   useEffect(() => {
     if (silentAttemptedRef.current) return;
     if (
@@ -189,15 +210,28 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       return;
     }
     if (error) return;
-    const path =
-      typeof window !== "undefined" ? window.location.pathname : "/projects";
-    const href =
-      buildSilentReEnterHref(mainOrigin, path, "canvas") ||
-      bookMallReEnterHref(path, "canvas");
+    const href = reEnterHref();
     if (!href) return;
+    if (readSsoReenterAttempts() >= MAX_SSO_REENTER_ATTEMPTS) {
+      setExhausted(true);
+      return;
+    }
+    bumpSsoReenterAttempts();
     silentAttemptedRef.current = true;
     window.location.href = href;
-  }, [loading, hasTokenCookie, sessionActive, mainOrigin, error]);
+  }, [loading, hasTokenCookie, sessionActive, reEnterHref, error]);
+
+  /**
+   * 是否正处于「静默自动换票」过程中：此时不展示手动屏，只显示连接 loader，避免闪烁。
+   * 与上面的 effect 条件保持一致（已达上限 / 有错误 / 被登出抑制 / 无 href 时为 false）。
+   */
+  const autoConnecting =
+    !ready &&
+    !loading &&
+    !error &&
+    !exhausted &&
+    shouldAttemptSilentSso({ hasTokenCookie, sessionActive, loading: false }) &&
+    Boolean(reEnterHref());
 
   if (ready) {
     return (
@@ -208,7 +242,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (loading) {
+  if (loading || autoConnecting) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-[var(--canvas-bg)] text-[var(--canvas-muted)]">
         <div className="flex items-center">
@@ -226,9 +260,11 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--canvas-bg)] px-6 text-center text-[var(--canvas-muted)]">
       <p className="max-w-md text-sm text-zinc-300">
         {error ??
-          (hasTokenCookie
-            ? "工具站令牌已失效，请重新连接主站账号。"
-            : "尚未建立画布会话，请连接 Book 账号后继续使用。")}
+          (exhausted
+            ? "多次自动连接 Book 账号均未成功，请重新登录后继续使用。"
+            : hasTokenCookie
+              ? "工具站令牌已失效，请重新连接主站账号。"
+              : "尚未建立画布会话，请连接 Book 账号后继续使用。")}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <button
@@ -236,6 +272,8 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/15"
           onClick={() => {
             silentAttemptedRef.current = false;
+            setExhausted(false);
+            clearSsoReenterAttempts();
             void loadSession({ retry: true });
           }}
         >
@@ -245,6 +283,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
           type="button"
           className="rounded-lg border border-[var(--canvas-accent)]/40 bg-[var(--canvas-accent)]/15 px-4 py-2 text-sm text-[var(--canvas-accent)] transition hover:bg-[var(--canvas-accent)]/25"
           onClick={() => {
+            clearSsoReenterAttempts();
             if (!redirectToSso()) {
               setError(
                 "未配置 MAIN_SITE_ORIGIN / NEXT_PUBLIC_BOOK_MALL_URL，无法跳转登录。",

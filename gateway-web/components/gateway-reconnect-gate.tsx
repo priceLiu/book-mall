@@ -14,6 +14,9 @@ import {
 
 type SessionResponse = { user: GatewayDashboardUser | null };
 
+/** 连续静默自动重连上限；超过则停下并提示用户手动重连/登录。 */
+const MAX_RECONNECT_ATTEMPTS = 6;
+
 function ConnectingShell({ longWait }: { longWait: boolean }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--gw-bg)] p-6">
@@ -33,6 +36,36 @@ function ConnectingShell({ longWait }: { longWait: boolean }) {
   );
 }
 
+function ReconnectFailedShell({ onRetry }: { onRetry: () => void }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[var(--gw-bg)] p-6">
+      <div className="max-w-sm text-center">
+        <p className="text-sm font-medium text-[var(--gw-ink)]">
+          多次自动连接服务均未成功
+        </p>
+        <p className="mt-2 text-xs text-[var(--gw-muted)]">
+          请重试连接；若仍失败，请重新登录后继续使用。
+        </p>
+        <div className="mt-5 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-md border border-[var(--gw-border)] bg-[var(--gw-surface)] px-4 py-2 text-sm text-[var(--gw-ink)] transition hover:bg-[var(--gw-hover)]"
+          >
+            重试连接
+          </button>
+          <a
+            href="/login"
+            className="rounded-md border border-[var(--gw-accent)]/40 bg-[var(--gw-accent)]/15 px-4 py-2 text-sm text-[var(--gw-accent)] transition hover:bg-[var(--gw-accent)]/25"
+          >
+            重新登录
+          </a>
+        </div>
+      </div>
+    </main>
+  );
+}
+
 /**
  * 主站 DB 瞬时不可用时自动重连 session，不向用户展示运维指令。
  */
@@ -43,13 +76,20 @@ export function GatewayReconnectGate({
 }) {
   const [user, setUser] = useState<GatewayDashboardUser | null>(null);
   const [longWait, setLongWait] = useState(false);
+  const [failed, setFailed] = useState(false);
   const attemptRef = useRef(0);
+  const [reconnectNonce, setReconnectNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
       while (!cancelled) {
+        // 瞬时错误连续自动重连达到上限后停下，提示用户手动重连/登录
+        if (attemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          setFailed(true);
+          return;
+        }
         try {
           const res = await fetch("/api/book-mall/api/gateway/auth/session", {
             credentials: "include",
@@ -89,13 +129,26 @@ export function GatewayReconnectGate({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reconnectNonce]);
 
   if (user) {
     return (
       <DashboardShell user={user} nav={resolveGatewayDashboardNav(user)}>
         {children}
       </DashboardShell>
+    );
+  }
+
+  if (failed) {
+    return (
+      <ReconnectFailedShell
+        onRetry={() => {
+          attemptRef.current = 0;
+          setLongWait(false);
+          setFailed(false);
+          setReconnectNonce((n) => n + 1);
+        }}
+      />
     );
   }
 
