@@ -142,8 +142,41 @@ model User {
   sbv1PortraitGroupId     String?
   sbv1PortraitLivenessAt  DateTime?
 
+  /// 分享返佣：通过分享链接注册时，记录邀请我的上线用户
+  referredByUserId String?
+  referredBy       User?            @relation("UserReferrals", fields: [referredByUserId], references: [id], onDelete: SetNull)
+  referrals        User[]           @relation("UserReferrals")
+  /// 分享返佣：作为分享人的档案（分享码 + 财务后台设置的返佣比例）
+  referralProfile  ReferralProfile? @relation("ReferralProfileOwner")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([referredByUserId])
+}
+
+/// 分享返佣 · 分享人档案。
+/// - 仅「个人套餐 月付≥599 / 年付≥1490 及以上」用户可生成（门禁在应用层判定）。
+/// - commissionRate（返佣比例）由财务管理员在后台逐个分享人录入，0 表示未设置。
+model ReferralProfile {
+  id             String    @id @default(cuid())
+  referrerUserId String    @unique
+  referrer       User      @relation("ReferralProfileOwner", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  /// 分享码（出现在 /r/{code} 链接中），全站唯一
+  code           String    @unique
+  /// 返佣比例：0~1 的小数（如 0.10 = 10%）。默认 0 = 未设置，由财务后台录入
+  commissionRate Decimal   @default(0) @db.Decimal(5, 4)
+  /// 是否启用该分享码（财务可停用）
+  enabled        Boolean   @default(true)
+  /// 财务备注（如约定、结算口径）
+  note           String?
+  /// 返佣比例最近一次修改时间与操作人（财务管理员 userId）
+  rateUpdatedAt  DateTime?
+  rateUpdatedBy  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([code])
 }
 
 /// 按用户 + 模型 + 账期累计用量（用于云厂商阶梯价，如 aitryon-refiner 按生成张数分档）。

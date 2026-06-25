@@ -12,16 +12,21 @@ import {
 import { deriveEcomBillingMode } from "@/lib/billing/billing-persona";
 import { prisma } from "@/lib/prisma";
 import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
+import { resolveReferrerByCode } from "@/lib/referral/referral-service";
+import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
 
 export const dynamic = "force-dynamic";
 
 const registerSchema = z.object({
   phone: z.string().min(1),
   code: z.string().refine(isValidSmsCodeInput, "验证码格式无效"),
-  password: z.string().min(8, "密码至少 8 位"),
+  // 分享链接免密注册时可省略密码（后续可用短信 OTP 登录或在设置中补设密码）。
+  password: z.string().min(8, "密码至少 8 位").optional(),
   name: z.string().max(64).optional(),
-  billingPersona: z.enum(["PLATFORM_CREDIT", "BYOK"]),
+  billingPersona: z.enum(["PLATFORM_CREDIT", "BYOK"]).optional(),
   inviteToken: z.string().min(1).optional(),
+  /// 分享码（来自 /r/{code} 链接），用于注册归因
+  referralCode: z.string().min(1).max(32).optional(),
 });
 
 function isDev() {
@@ -55,6 +60,12 @@ export async function POST(request: Request) {
       }
     }
 
+    const referralCode = parsed.data.referralCode?.trim() || undefined;
+    // 分享链接注册：允许免密码（password 可省）。其余注册仍要求密码。
+    if (!referralCode && !parsed.data.password) {
+      return NextResponse.json({ error: "密码至少 8 位" }, { status: 400 });
+    }
+
     await verifySmsCode({
       phoneRaw: phone,
       purpose: inviteToken ? "TEAM_INVITE" : "REGISTER",
@@ -62,54 +73,83 @@ export async function POST(request: Request) {
       inviteToken,
     });
 
-    const billingPersona = parsed.data.billingPersona as BillingPersona;
+    // 分享链接注册默认平台代付；普通注册保留用户所选 persona。
+    const billingPersona = (parsed.data.billingPersona ??
+      "PLATFORM_CREDIT") as BillingPersona;
     const existing = await prisma.user.findUnique({ where: { phone } });
     if (existing?.phoneVerifiedAt) {
       return NextResponse.json({ error: "该手机号已注册" }, { status: 409 });
     }
 
-    const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+    // 解析分享归因：仅在分享码有效且非自荐时记录 referredByUserId（仅新建用户写入）。
+    let referredByUserId: string | null = null;
+    if (referralCode) {
+      const referrer = await resolveReferrerByCode(referralCode);
+      if (referrer && referrer.referrerUserId !== existing?.id) {
+        referredByUserId = referrer.referrerUserId;
+      }
+    }
+
+    const passwordHash = parsed.data.password
+      ? await bcrypt.hash(parsed.data.password, 12)
+      : null;
     const lockedAt = new Date();
     const verifiedAt = new Date();
 
-    await prisma.$transaction(async (tx) => {
+    const createdUserId = await prisma.$transaction(async (tx) => {
       if (existing) {
         const user = await tx.user.update({
           where: { id: existing.id },
           data: {
             phone,
             phoneVerifiedAt: verifiedAt,
-            passwordHash,
+            // 仅在用户设置了密码时更新密码，避免清空历史密码
+            ...(passwordHash ? { passwordHash } : {}),
             name: parsed.data.name?.trim() || existing.name,
             billingPersona,
             billingPersonaLockedAt: lockedAt,
             ecomBillingMode: deriveEcomBillingMode(billingPersona),
+            // 仅在尚未归因时写入分享上线
+            ...(referredByUserId && !existing.referredByUserId
+              ? { referredByUserId }
+              : {}),
           },
         });
         const wallet = await tx.wallet.findUnique({ where: { userId: user.id } });
         if (!wallet) {
           await tx.wallet.create({ data: { userId: user.id } });
         }
-      } else {
-        const user = await tx.user.create({
-          data: {
-            phone,
-            phoneVerifiedAt: verifiedAt,
-            passwordHash,
-            name: parsed.data.name?.trim() || null,
-            billingPersona,
-            billingPersonaLockedAt: lockedAt,
-            ecomBillingMode: deriveEcomBillingMode(billingPersona),
-          },
-        });
-        await tx.wallet.create({ data: { userId: user.id } });
+        return user.id;
       }
+      const user = await tx.user.create({
+        data: {
+          phone,
+          phoneVerifiedAt: verifiedAt,
+          passwordHash,
+          name: parsed.data.name?.trim() || null,
+          billingPersona,
+          billingPersonaLockedAt: lockedAt,
+          ecomBillingMode: deriveEcomBillingMode(billingPersona),
+          ...(referredByUserId ? { referredByUserId } : {}),
+        },
+      });
+      await tx.wallet.create({ data: { userId: user.id } });
+      return user.id;
     });
 
     // Gateway 身份 / sk-gw 在首次 SSO 或生成时懒加载（见 sync-user / platform-managed-key），
     // 不在注册热路径阻塞，避免注册 + 登录连续等待 2～3 秒。
 
-    return NextResponse.json({ ok: true, billingPersona, phone });
+    // 免密注册场景：返回一次性自动登录票据，客户端据此建立会话（无需二次短信）。
+    const autoLoginToken = issueAutoLoginToken(createdUserId);
+
+    return NextResponse.json({
+      ok: true,
+      billingPersona,
+      phone,
+      passwordless: !passwordHash,
+      autoLoginToken,
+    });
   } catch (e) {
     if (e instanceof SmsVerificationError) {
       return NextResponse.json({ error: e.message }, { status: 400 });

@@ -18,6 +18,7 @@ import {
   Receipt,
   ScrollText,
   Activity,
+  Gift,
 } from "lucide-react";
 
 export type AccountNavLinkItem = {
@@ -81,6 +82,8 @@ export function buildAccountNavMenuGroups(input: {
   showCanvasLaunch: boolean;
   showEcomLaunch: boolean;
   showQuickReplicaLaunch: boolean;
+  /** 个人套餐 月付≥599 / 年付≥1490 及以上：显示分享返佣入口 */
+  showReferral?: boolean;
 }): AccountNavMenuGroup[] {
   const isByok = input.billingPersona === "BYOK";
   const isPlatform = input.billingPersona === "PLATFORM_CREDIT" || !input.billingPersona;
@@ -106,6 +109,14 @@ export function buildAccountNavMenuGroups(input: {
     label: "学堂订阅",
     icon: Wallet,
   });
+  if (input.showReferral) {
+    billingItems.push({
+      kind: "link",
+      href: "/account/referral",
+      label: "分享返佣",
+      icon: Gift,
+    });
+  }
 
   const groups: AccountNavMenuGroup[] = [
     {

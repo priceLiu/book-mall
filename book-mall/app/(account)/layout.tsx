@@ -8,6 +8,7 @@ import { prepareAccountCanvasLaunch } from "@/lib/account-canvas-launch";
 import { buildAccountAppsMenuHint } from "@/lib/account-apps-menu-hint";
 import { getEcommerceWebOrigin, getQuickReplicaOrigin } from "@/lib/app-web-origins";
 import { userCanAccessEcommerceToolkit } from "@/lib/ecom/ecom-access";
+import { getReferralEligibility } from "@/lib/referral/referral-service";
 import { AccountShell } from "@/components/account/account-shell";
 import { NavbarAuth } from "@/components/layout/navbar-auth";
 import { SiteAppShell } from "@/components/layout/site-home/site-app-shell";
@@ -44,12 +45,14 @@ export default async function AccountGroupLayout({
     redirect("/onboarding/billing-persona");
   }
 
-  const [profile, hasMembership, canvasLaunch, ecomAccess] = await Promise.all([
-    Promise.resolve(userRecord),
-    userHasMembershipToolAccess(session.user.id),
-    prepareAccountCanvasLaunch(session.user.id),
-    userCanAccessEcommerceToolkit(session.user.id),
-  ]);
+  const [profile, hasMembership, canvasLaunch, ecomAccess, referralEligibility] =
+    await Promise.all([
+      Promise.resolve(userRecord),
+      userHasMembershipToolAccess(session.user.id),
+      prepareAccountCanvasLaunch(session.user.id),
+      userCanAccessEcommerceToolkit(session.user.id),
+      getReferralEligibility(session.user.id),
+    ]);
 
   const toolsSsoReady = isToolsSsoConfigured();
   const canLaunchTools = toolsSsoReady && hasMembership;
@@ -98,6 +101,7 @@ export default async function AccountGroupLayout({
         quickReplicaOriginConfigured={quickReplicaOriginConfigured}
         appsMenuHint={appsMenuHint}
         billingPersona={userRecord.billingPersona}
+        showReferral={referralEligibility.eligible}
       >
         {children}
       </AccountShell>

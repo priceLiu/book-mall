@@ -13,6 +13,7 @@ import {
   SmsVerificationError,
   verifySmsCode,
 } from "@/lib/auth/sms-verification-service";
+import { verifyAutoLoginToken } from "@/lib/auth/auto-login-token";
 import { allowDevMockAuth, DEV_AUTH_PASSWORD, isDevAuthPhone } from "@/lib/dev-mock-auth";
 import {
   bumpSessionVersion,
@@ -84,6 +85,7 @@ export const authOptions: NextAuthOptions = {
         code: { label: "验证码", type: "text" },
         loginMode: { label: "模式", type: "text" },
         inviteToken: { label: "邀请 token", type: "text" },
+        autoLoginToken: { label: "自动登录票据", type: "text" },
       },
       async authorize(credentials) {
         const phone = normalizePhone(credentials?.phone);
@@ -97,7 +99,11 @@ export const authOptions: NextAuthOptions = {
         });
         if (!user) return null;
 
-        if (loginMode === "otp") {
+        if (loginMode === "autologin") {
+          // 注册成功后免密自动登录：校验服务端签发的一次性票据，且票据 userId 与手机号匹配。
+          const tokenUserId = verifyAutoLoginToken(credentials?.autoLoginToken);
+          if (!tokenUserId || tokenUserId !== user.id) return null;
+        } else if (loginMode === "otp") {
           const code = credentials?.code?.trim();
           if (!code) return null;
           try {
