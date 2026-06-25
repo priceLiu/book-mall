@@ -71,8 +71,49 @@ async function syncCanvasAfterGatewayRecover(
   }
 }
 
+/**
+ * 复核并发上限。Logs 页自动复核会对每条在途行并行打 recover，叠加 canvas-queue 服务端
+ * 自动复核 + 手动「核对厂商」，多路同时进入会在长厂商轮询周围串联多次 DB 操作，
+ * 耗尽 Prisma 连接池（P2024）。这里做两层保护：
+ *  1. 同一 logId 复用在途 Promise（去重，避免重复打厂商 / 重复写库）；
+ *  2. 全局并发封顶，超出即快速返回 busy，下一轮再核对（绝不排队堆积拖垮请求）。
+ */
+const RECOVER_MAX_CONCURRENCY = (() => {
+  const v = Number(process.env.VOLCENGINE_RECOVER_MAX_CONCURRENCY);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 4;
+})();
+
+const inflightRecovers = new Map<
+  string,
+  Promise<VolcengineGatewayRecoverResult>
+>();
+let activeRecoverCount = 0;
+
 /** 对单条 Gateway 日志 poll 厂商：succeeded → 收口；vendor failed → FAILED；running → 继续等 */
-export async function recoverVolcengineGatewayLogFromVendor(
+export function recoverVolcengineGatewayLogFromVendor(
+  gatewayLogId: string,
+): Promise<VolcengineGatewayRecoverResult> {
+  const existing = inflightRecovers.get(gatewayLogId);
+  if (existing) return existing;
+
+  if (activeRecoverCount >= RECOVER_MAX_CONCURRENCY) {
+    return Promise.resolve({
+      ok: false,
+      action: "skipped",
+      message: "recover_busy",
+    });
+  }
+
+  activeRecoverCount += 1;
+  const p = runRecoverVolcengineGatewayLog(gatewayLogId).finally(() => {
+    activeRecoverCount -= 1;
+    inflightRecovers.delete(gatewayLogId);
+  });
+  inflightRecovers.set(gatewayLogId, p);
+  return p;
+}
+
+async function runRecoverVolcengineGatewayLog(
   gatewayLogId: string,
 ): Promise<VolcengineGatewayRecoverResult> {
   const log = await prisma.gatewayRequestLog.findUnique({
