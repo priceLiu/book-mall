@@ -33,6 +33,12 @@ import {
   shouldAttemptSilentSso,
 } from "@/lib/tools-silent-sso";
 import {
+  bumpSsoReenterAttempts,
+  clearSsoReenterAttempts,
+  MAX_SSO_REENTER_ATTEMPTS,
+  readSsoReenterAttempts,
+} from "@/lib/sso-reenter-attempts";
+import {
   introspectSessionRevoked,
   SESSION_KICKED_MESSAGE,
 } from "@/lib/session-revoked";
@@ -384,7 +390,16 @@ export function ToolShellClient({
     return () => window.clearInterval(id);
   }, [session.active, loading]);
 
-  /** Phase B：无 token 时自动跳转主站 re-enter（一次）。 */
+  /** 会话有效后清零静默换票计数，便于下一轮失效重新自动换票 */
+  useEffect(() => {
+    if (session.active) clearSsoReenterAttempts();
+  }, [session.active]);
+
+  /**
+   * 无 token 时静默自动换票（re-enter），对用户无感。整页跳转会重新挂载，
+   * 故用 sessionStorage 跨刷新累计次数：连续 MAX_SSO_REENTER_ATTEMPTS 次仍
+   * 未建立会话则停止自动换票（顶栏改显「重新连接」，由用户手动触发）。
+   */
   const silentAttemptedRef = useRef(false);
   useEffect(() => {
     if (silentAttemptedRef.current) return;
@@ -400,6 +415,8 @@ export function ToolShellClient({
     }
     const href = buildSilentReEnterHref(mainOrigin, pathname, "tool");
     if (!href) return;
+    if (readSsoReenterAttempts() >= MAX_SSO_REENTER_ATTEMPTS) return;
+    bumpSsoReenterAttempts();
     silentAttemptedRef.current = true;
     window.location.href = href;
   }, [loading, hasTokenCookie, session.active, pathname, mainOrigin]);
