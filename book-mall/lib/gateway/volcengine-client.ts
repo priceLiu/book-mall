@@ -82,6 +82,16 @@ function arkBase(baseUrl?: string | null): string {
   return (baseUrl?.trim() || defaultBaseUrl("VOLCENGINE")).replace(/\/$/, "");
 }
 
+/**
+ * 厂商任务查询（GET poll）的硬超时。火山偶发慢响应会让 `fetch` 挂住 60s+，
+ * 当复核 / 收口在 HTTP 请求里串联多次 DB 操作时，会拖垮请求时长并耗尽 Prisma 连接池
+ * （P2024 / P1017）。给 poll 设硬超时，超时即按「仍在运行」快速返回、下轮再核对。
+ */
+const VOLCENGINE_TASK_POLL_TIMEOUT_MS = (() => {
+  const v = Number(process.env.VOLCENGINE_TASK_POLL_TIMEOUT_MS);
+  return Number.isFinite(v) && v > 0 ? v : 15_000;
+})();
+
 export async function volcengineCreateVideoTask(opts: {
   apiKey: string;
   baseUrl?: string | null;
@@ -135,13 +145,24 @@ export async function volcengineGetVideoTask(opts: {
   taskId: string;
 }): Promise<{ output: VolcengineVideoTaskResult; raw: unknown }> {
   const base = arkBase(opts.baseUrl);
-  const r = await fetch(
-    `${base}/contents/generations/tasks/${encodeURIComponent(opts.taskId)}`,
-    {
-      method: "GET",
-      headers: { Authorization: `Bearer ${opts.apiKey}` },
-    },
-  );
+  let r: Response;
+  try {
+    r = await fetch(
+      `${base}/contents/generations/tasks/${encodeURIComponent(opts.taskId)}`,
+      {
+        method: "GET",
+        headers: { Authorization: `Bearer ${opts.apiKey}` },
+        signal: AbortSignal.timeout(VOLCENGINE_TASK_POLL_TIMEOUT_MS),
+      },
+    );
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "TimeoutError") {
+      throw new Error(
+        `火山方舟任务查询超时（${VOLCENGINE_TASK_POLL_TIMEOUT_MS}ms）`,
+      );
+    }
+    throw e;
+  }
   const text = await r.text();
   let json: VolcengineVideoTaskResult & Record<string, unknown>;
   try {
