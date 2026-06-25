@@ -4,7 +4,7 @@ import Link from "next/link";
 import { SiteHomeFrameworks } from "@/components/layout/site-home/site-home-frameworks";
 import { SiteHomeHeroClips } from "@/components/layout/site-home/site-home-hero-clips";
 import Image from "next/image";
-import { type RefObject, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { makeVideoAudible, muteVideo } from "@/lib/site-home/hover-audio";
 
@@ -15,92 +15,108 @@ const HERO_VIDEO_WEBM = "/home-hero-opt.webm";
 const HERO_VIDEO_MP4 = "/home-hero-opt.mp4";
 const POSTER_DIM = { w: 1920, h: 1080 } as const;
 
+function HeroPosterImage() {
+  return (
+    <Image
+      width={POSTER_DIM.w}
+      height={POSTER_DIM.h}
+      sizes="100vw"
+      priority
+      className="site-home-hero-bg-video"
+      src={HERO_POSTER}
+      alt=""
+    />
+  );
+}
+
 function SiteHomeHeroBackgroundVideo({
   videoRef,
+  audible,
   onError,
   onMutedChange,
 }: {
   videoRef: RefObject<HTMLVideoElement>;
+  audible: boolean;
   onError: () => void;
   onMutedChange: (muted: boolean) => void;
 }) {
   return (
-    <div className="site-home-hero-bg-media" suppressHydrationWarning>
-      <video
-        ref={videoRef}
-        className="site-home-hero-bg-video"
-        // 某些浏览器扩展（视频控制/下载助手等）会在 <video> 内注入 <div>，
-        // 早于 React 注水 → "Did not expect server HTML to contain a <div> in <video>"。
-        // 该子树由外部改写，注水时容忍差异即可。
-        suppressHydrationWarning
-        poster={HERO_POSTER}
-        playsInline
-        preload="auto"
-        muted
-        autoPlay
-        loop
-        aria-hidden
-        onVolumeChange={(e) => onMutedChange(e.currentTarget.muted)}
-        onLoadedData={(e) => {
-          if (
-            typeof window !== "undefined" &&
-            window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ) {
-            e.currentTarget.pause();
-            e.currentTarget.removeAttribute("autoplay");
-          }
-        }}
-        onError={onError}
-      >
-        <source src={HERO_VIDEO_WEBM} type="video/webm" />
-        <source src={HERO_VIDEO_MP4} type="video/mp4" />
-      </video>
-    </div>
+    <video
+      ref={videoRef}
+      className="site-home-hero-bg-video"
+      poster={HERO_POSTER}
+      playsInline
+      preload="auto"
+      // muted 由 audible 状态驱动：硬编码 muted 会在每次 re-render 被 React 重新置真，
+      // 导致点击取消静音后立刻又被静音（点了没声音）。
+      muted={!audible}
+      autoPlay
+      loop
+      aria-hidden
+      onVolumeChange={(e) => onMutedChange(e.currentTarget.muted)}
+      onLoadedData={(e) => {
+        if (
+          typeof window !== "undefined" &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
+          e.currentTarget.pause();
+          e.currentTarget.removeAttribute("autoplay");
+        }
+      }}
+      onError={onError}
+    >
+      <source src={HERO_VIDEO_WEBM} type="video/webm" />
+      <source src={HERO_VIDEO_MP4} type="video/mp4" />
+    </video>
   );
 }
 
 /** 首屏：全屏视频背景 + 底部文案浮层 */
 export function SiteHomeHeroSection({ clips }: { clips: string[] }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [mounted, setMounted] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [audible, setAudible] = useState(false);
+
+  // 视频仅在挂载后（客户端）渲染：服务端与首个客户端渲染都用首帧海报 <img>，
+  // 二者一致 → 无注水比对；浏览器扩展往 <video> 注入 <div> 也不再触发 hydration 报错。
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const showVideo = mounted && !videoError;
 
   const toggleSound = () => {
     const v = videoRef.current;
     if (!v) return;
     if (v.muted) {
       makeVideoAudible(v);
+      setAudible(true);
     } else {
       muteVideo(v);
+      setAudible(false);
     }
   };
 
   return (
     <section id="hero-video" className="site-home-hero">
       <div className="site-home-hero-bg" aria-hidden>
-        {videoError ? (
-          <div className="site-home-hero-bg-media">
-            <Image
-              width={POSTER_DIM.w}
-              height={POSTER_DIM.h}
-              sizes="100vw"
-              priority
-              className="site-home-hero-bg-video"
-              src={HERO_POSTER}
-              alt=""
+        <div className="site-home-hero-bg-media" suppressHydrationWarning>
+          {showVideo ? (
+            <SiteHomeHeroBackgroundVideo
+              videoRef={videoRef}
+              audible={audible}
+              onError={() => setVideoError(true)}
+              onMutedChange={(muted) => setAudible(!muted)}
             />
-          </div>
-        ) : (
-          <SiteHomeHeroBackgroundVideo
-            videoRef={videoRef}
-            onError={() => setVideoError(true)}
-            onMutedChange={(muted) => setAudible(!muted)}
-          />
-        )}
+          ) : (
+            <HeroPosterImage />
+          )}
+        </div>
         <div className="site-home-hero-bg-scrim" />
       </div>
 
-      {!videoError ? (
+      {showVideo ? (
         <button
           type="button"
           onClick={toggleSound}
