@@ -11,10 +11,14 @@ import {
   isGatewayTransientFetchError,
   sleepMs,
 } from "@/lib/gateway-db-retry";
+import { silentGatewaySessionRefresh } from "@/lib/gateway-silent-sso";
 
 type SessionResponse = { user: GatewayDashboardUser | null };
 
-/** 连续静默自动重连上限；超过则停下并提示用户手动重连/登录。 */
+/**
+ * 连续静默自动重连/换票上限；超过则停下并提示用户手动重连/登录。
+ * 涵盖两类：①主站 DB 瞬时不可用（重试 session）；②令牌过期/失效（隐藏 iframe 自动换票）。
+ */
 const MAX_RECONNECT_ATTEMPTS = 6;
 
 function ConnectingShell({ longWait }: { longWait: boolean }) {
@@ -101,22 +105,29 @@ export function GatewayReconnectGate({
             await sleepMs(gatewayTransientRetryDelayMs(attemptRef.current));
             continue;
           }
-          if (!res.ok) {
-            window.location.href = "/login";
-            return;
-          }
           let data: SessionResponse | null = null;
-          try {
-            data = raw ? (JSON.parse(raw) as SessionResponse) : null;
-          } catch {
-            data = null;
+          if (res.ok) {
+            try {
+              data = raw ? (JSON.parse(raw) as SessionResponse) : null;
+            } catch {
+              data = null;
+            }
           }
-          if (!data?.user) {
-            window.location.href = "/login";
+          if (data?.user) {
+            setUser(data.user);
             return;
           }
-          setUser(data.user);
-          return;
+          // 令牌过期/失效：隐藏 iframe 自动换票（用户无感），计入重连次数；
+          // 主站会话也失效则换票失败，达上限后提示重新登录。
+          attemptRef.current += 1;
+          if (attemptRef.current >= 4) setLongWait(true);
+          const refreshed = await silentGatewaySessionRefresh();
+          if (refreshed) {
+            // 新 cookie 已写入：立刻重取 session（下一轮循环）
+            continue;
+          }
+          await sleepMs(gatewayTransientRetryDelayMs(attemptRef.current));
+          continue;
         } catch {
           attemptRef.current += 1;
           if (attemptRef.current >= 4) setLongWait(true);

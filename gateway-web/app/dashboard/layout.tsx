@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { GatewayReconnectGate } from "@/components/gateway-reconnect-gate";
 import { DashboardShell } from "@/components/dashboard-shell";
 import {
@@ -18,12 +17,16 @@ export default async function DashboardLayout({
     user: GatewayDashboardUser | null;
   }>("/api/gateway/auth/session");
 
-  if (session.status === 503 || session.status === 502) {
+  // 主站 DB 瞬时不可用，或令牌过期/失效（无 user）：
+  // 都交给客户端守卫做「自动换票 / 自动重连」（最多 6 次，无感）；
+  // 6 次仍不行才在守卫内提示「重新登录」。直接服务端 redirect 会丢失静默换票机会。
+  if (
+    session.status === 503 ||
+    session.status === 502 ||
+    !session.ok ||
+    !session.data?.user
+  ) {
     return <GatewayReconnectGate>{children}</GatewayReconnectGate>;
-  }
-
-  if (!session.ok || !session.data?.user) {
-    redirect("/login");
   }
 
   const user = session.data.user;
