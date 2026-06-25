@@ -47,22 +47,41 @@ export async function POST(req: Request) {
   let gwUser;
   try {
     gwUser = await ensureBookUserGatewayIdentitySynced(bookUser.id);
-  } catch {
+  } catch (e) {
+    console.error("[gateway/exchange] identity sync failed", e);
     return NextResponse.json({ error: "Gateway 用户同步失败" }, { status: 500 });
   }
 
-  const secret = requireGatewayJwtSecret();
+  // GATEWAY_JWT_SECRET 未配置会抛错：单独捕获并返回 503（可诊断），
+  // 否则裸 500 在登录页只显示 exchange_500，无法定位是缺密钥还是其他故障。
+  let secret: string;
+  try {
+    secret = requireGatewayJwtSecret();
+  } catch (e) {
+    console.error("[gateway/exchange] GATEWAY_JWT_SECRET missing/invalid", e);
+    return NextResponse.json(
+      { error: "Gateway 签名密钥未配置（GATEWAY_JWT_SECRET）" },
+      { status: 503 },
+    );
+  }
+
   const expiresIn = getGatewayJwtTtlSec();
-  const accessToken = signGatewayAccessToken({
-    gatewayUserId: gwUser.id,
-    secret,
-    expiresInSec: expiresIn,
-    profile: {
-      email: gwUser.email,
-      name: gwUser.name,
-      image: gwUser.image,
-    },
-  });
+  let accessToken: string;
+  try {
+    accessToken = signGatewayAccessToken({
+      gatewayUserId: gwUser.id,
+      secret,
+      expiresInSec: expiresIn,
+      profile: {
+        email: gwUser.email,
+        name: gwUser.name,
+        image: gwUser.image,
+      },
+    });
+  } catch (e) {
+    console.error("[gateway/exchange] sign token failed", e);
+    return NextResponse.json({ error: "签发令牌失败" }, { status: 500 });
+  }
 
   return NextResponse.json({
     access_token: accessToken,

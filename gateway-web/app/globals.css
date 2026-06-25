@@ -186,15 +186,20 @@ body {
     font-weight: var(--gw-text-weight-normal);
     color: var(--gw-text-white);
     @apply border-b border-[var(--gw-border)] bg-[var(--gw-surface)] px-4 py-3;
+  }
+
+  /*
+   * 双行表头（第一行含 rowSpan=2 列 + 系统/厂商分组，第二行为各阶段子列）。
+   * 整个 thead 作为一个块吸顶：避免之前「每个 th 各自 top:0」导致第二行
+   * 与第一行都钉在 top:0 而相互重叠（表头看起来错位 / 没固定）。
+   * thead 给不透明底色，使分组 / 阶段格的半透明色叠在底色上，滚动时内容不透出。
+   */
+  .gw-logs-table thead {
     position: sticky;
     top: 0;
     z-index: 20;
+    background: var(--gw-surface);
     box-shadow: 0 1px 0 var(--gw-border);
-  }
-
-  .gw-logs-table thead {
-    position: relative;
-    z-index: 20;
   }
 
   .gw-logs-table td {
