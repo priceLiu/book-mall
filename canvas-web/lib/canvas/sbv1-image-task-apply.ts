@@ -150,11 +150,22 @@ export function sbv1ImageFailurePatch(
   };
 }
 
-/** updateNodeData 前比对 · 避免 effect 重复写相同 patch 触发 RF 无限同步 */
+/**
+ * updateNodeData 前比对 · 避免 effect 重复写相同 patch 触发 RF 无限同步。
+ *
+ * 仅适用于「纯媒体/runtime patch」（仅含 runtime / uploading / uploadError）。
+ * 若 patch 还带 prompt / durationSec / engine 等业务字段，一律放行（返回 false），
+ * 否则会误吞普通字段更新（改时长、存提示词失效、刷新回退）。
+ */
+const SBV1_MEDIA_PATCH_KEYS = new Set(["runtime", "uploading", "uploadError"]);
+
 export function isSameSbv1MediaDataPatch(
   current: Record<string, unknown> | undefined,
   patch: Record<string, unknown>,
 ): boolean {
+  for (const key of Object.keys(patch)) {
+    if (!SBV1_MEDIA_PATCH_KEYS.has(key)) return false;
+  }
   const cur = current ?? {};
   if (
     patch.uploading !== undefined &&
