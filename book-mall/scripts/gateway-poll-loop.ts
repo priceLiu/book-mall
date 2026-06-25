@@ -16,7 +16,8 @@ let stopping = false;
 
 async function tick(): Promise<boolean> {
   try {
-    const r = await runGatewayPollWorker({ limit: 30 });
+    // 不传 limit：worker 按 GATEWAY_POLL_* env 分厂商预算（火山默认 60，覆盖 ~50 并发）
+    const r = await runGatewayPollWorker();
     if (r.updated > 0) {
       console.log(`[gateway-poll] updated=${r.updated} scanned=${r.scanned}`);
     }

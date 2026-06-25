@@ -1,12 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import type { GatewayClientSource } from "@prisma/client";
+import type { GatewayClientSource, Prisma } from "@prisma/client";
 import { resolveGenerationSlowWarnMs } from "@/lib/generation/slow-warn-config";
 import { maybeRunSlowWarnAutoHandler } from "@/lib/generation/slow-warn-auto-handler";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import {
   promoteVolcengineTasksToBackgroundGeneration,
 } from "@/lib/gateway/volcengine-background-promote";
-import { recoverMisclassifiedVolcengineStallLogs } from "@/lib/gateway/volcengine-stall-recover";
+import {
+  autoRecoverPollStalledVolcengineGatewayLogs,
+  recoverMisclassifiedVolcengineStallLogs,
+} from "@/lib/gateway/volcengine-stall-recover";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
 import {
@@ -185,8 +188,66 @@ const GATEWAY_POLL_PROVIDER_KINDS = [
   "VOLCENGINE",
 ] as const;
 
-const MAIN_POLL_TIMEOUT_MS = 45_000;
+/**
+ * 厂商按「完成感知方式」分流（差异化处理）：
+ * - VOLCENGINE：纯轮询、支持 ~50 并发 → 最大 poll 预算 + 按「最久未 poll」公平调度。
+ * - 回调型（KIE）：完成由 callBackUrl 推送收口，poll 仅低频兜底（漏回调时补捞）。
+ * - 其它异步轮询（BAILIAN / DASHSCOPE / HUNYUAN）：中等预算，同样按公平调度。
+ */
+const CALLBACK_POLL_PROVIDER_KINDS = ["KIE"] as const;
+const OTHER_POLL_PROVIDER_KINDS = ["BAILIAN", "DASHSCOPE", "HUNYUAN"] as const;
+
 const ESCALATION_POLL_TIMEOUT_MS = 20_000;
+
+function pollEnvInt(name: string, fallback: number): number {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback;
+}
+
+/** 单次 tick 各厂商 poll 预算。火山预算须 ≥ 厂商并发上限（~50），否则尾部任务被饿死。 */
+function resolvePollBudgets(limitHint?: number): {
+  volcengine: number;
+  other: number;
+  callbackBackstop: number;
+  concurrency: number;
+  callbackBackstopStaleMs: number;
+  stallRecoverMs: number;
+  stallRecoverLimit: number;
+} {
+  const isLight = limitHint != null;
+  const volcengine = isLight
+    ? limitHint
+    : pollEnvInt("GATEWAY_POLL_VOLCENGINE_BUDGET", 60);
+  return {
+    volcengine,
+    other: isLight
+      ? Math.max(2, Math.ceil(volcengine * 0.4))
+      : pollEnvInt("GATEWAY_POLL_OTHER_BUDGET", 24),
+    callbackBackstop: isLight
+      ? Math.max(1, Math.ceil(volcengine * 0.2))
+      : pollEnvInt("GATEWAY_POLL_CALLBACK_BACKSTOP", 8),
+    concurrency: pollEnvInt("GATEWAY_POLL_CONCURRENCY", 8),
+    callbackBackstopStaleMs: pollEnvInt(
+      "GATEWAY_POLL_CALLBACK_BACKSTOP_STALE_MS",
+      90_000,
+    ),
+    stallRecoverMs: pollEnvInt("GATEWAY_VOLCENGINE_STALL_RECOVER_MS", 120_000),
+    stallRecoverLimit: pollEnvInt("GATEWAY_VOLCENGINE_STALL_RECOVER_LIMIT", 12),
+  };
+}
+
+const POLL_ROW_SELECT = {
+  id: true,
+  status: true,
+  apiKeyId: true,
+  externalTaskId: true,
+} as const;
+
+/** 公平调度：最久未 poll 的先 poll（null 即从未 poll，最优先），杜绝按 submittedAt 的尾部饿死。 */
+const POLL_FAIRNESS_ORDER: Prisma.GatewayRequestLogOrderByWithRelationInput[] = [
+  { lastPolledAt: { sort: "asc", nulls: "first" } },
+  { submittedAt: "asc" },
+];
 
 type PollableGatewayRow = {
   id: string;
@@ -277,23 +338,6 @@ async function pollGatewayLogWithTimeout(
   return "pending";
 }
 
-/** 慢任务升格通道：20s 超时 + 并行，不阻塞主通道 */
-async function runGatewayEscalationPollLane(
-  rows: PollableGatewayRow[],
-): Promise<number> {
-  if (rows.length === 0) return 0;
-  let updated = 0;
-  await mapWithConcurrency(
-    rows,
-    async (row) => {
-      const r = await pollGatewayLogWithTimeout(row, ESCALATION_POLL_TIMEOUT_MS);
-      if (r === "updated") updated++;
-    },
-    5,
-  );
-  return updated;
-}
-
 /** 视频槽位自愈：按实际 RUNNING 视频日志重算 runningVideoCount，修复泄漏/卡死残留的占槽。
  * 全量扫描 traffic state 较重，限频每 5min 一次。 */
 const SLOT_RECONCILE_INTERVAL_MS = 5 * 60 * 1000;
@@ -360,57 +404,62 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
     autoHandler = undefined;
   }
 
-  const limit = opts?.limit ?? 20;
+  const budgets = resolvePollBudgets(opts?.limit);
   const slowMs = await resolveGenerationSlowWarnMs();
   const slowCutoff = new Date(Date.now() - slowMs);
+  const callbackStaleCutoff = new Date(
+    Date.now() - budgets.callbackBackstopStaleMs,
+  );
 
-  let slowRows: PollableGatewayRow[] = [];
-  let normalRows: PollableGatewayRow[] = [];
+  let volcRows: PollableGatewayRow[] = [];
+  let otherRows: PollableGatewayRow[] = [];
+  let callbackRows: PollableGatewayRow[] = [];
   let slowRunningTotal = 0;
 
   try {
-    slowRows = await prisma.gatewayRequestLog.findMany({
-      where: {
-        status: "RUNNING",
-        externalTaskId: { not: null },
-        submittedAt: { lte: slowCutoff },
-        providerKind: { in: [...GATEWAY_POLL_PROVIDER_KINDS] },
-      },
-      orderBy: { submittedAt: "asc" },
-      take: limit,
-      select: {
-        id: true,
-        status: true,
-        apiKeyId: true,
-        externalTaskId: true,
-      },
-    });
-    if (slowRows.length >= limit) {
-      slowRunningTotal = await countSlowRunningGatewayLogs(slowCutoff);
-    } else {
-      slowRunningTotal = slowRows.length;
-    }
-    const slowIds = new Set(slowRows.map((r) => r.id));
-    const normalLimit = Math.max(0, limit - slowRows.length);
-    normalRows =
-      normalLimit > 0
-        ? await prisma.gatewayRequestLog.findMany({
-            where: {
-              status: "RUNNING",
-              externalTaskId: { not: null },
-              providerKind: { in: [...GATEWAY_POLL_PROVIDER_KINDS] },
-              ...(slowIds.size > 0 ? { id: { notIn: Array.from(slowIds) } } : {}),
-            },
-            orderBy: [{ submittedAt: "desc" }, { pollCount: "asc" }],
-            take: normalLimit,
-            select: {
-              id: true,
-              status: true,
-              apiKeyId: true,
-              externalTaskId: true,
-            },
-          })
-        : [];
+    [volcRows, otherRows, callbackRows] = await Promise.all([
+      // 火山：纯轮询、~50 并发 → 大预算 + 公平调度
+      prisma.gatewayRequestLog.findMany({
+        where: {
+          status: "RUNNING",
+          externalTaskId: { not: null },
+          providerKind: "VOLCENGINE",
+        },
+        orderBy: POLL_FAIRNESS_ORDER,
+        take: budgets.volcengine,
+        select: POLL_ROW_SELECT,
+      }),
+      // 其它异步轮询厂商
+      prisma.gatewayRequestLog.findMany({
+        where: {
+          status: "RUNNING",
+          externalTaskId: { not: null },
+          providerKind: { in: [...OTHER_POLL_PROVIDER_KINDS] },
+        },
+        orderBy: POLL_FAIRNESS_ORDER,
+        take: budgets.other,
+        select: POLL_ROW_SELECT,
+      }),
+      // 回调型（KIE）：完成由 callback 收口，poll 仅补捞「久未 poll」的，省预算给火山
+      prisma.gatewayRequestLog.findMany({
+        where: {
+          status: "RUNNING",
+          externalTaskId: { not: null },
+          providerKind: { in: [...CALLBACK_POLL_PROVIDER_KINDS] },
+          OR: [
+            { lastPolledAt: null },
+            { lastPolledAt: { lte: callbackStaleCutoff } },
+          ],
+        },
+        orderBy: POLL_FAIRNESS_ORDER,
+        take: budgets.callbackBackstop,
+        select: POLL_ROW_SELECT,
+      }),
+    ]);
+    slowRunningTotal =
+      volcRows.length >= budgets.volcengine
+        ? await countSlowRunningGatewayLogs(slowCutoff)
+        : volcRows.length;
   } catch (e) {
     workerOk = false;
     tickDbErrors.push(e instanceof Error ? e.message : String(e));
@@ -420,34 +469,50 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
 
   const batchSnapshot: GatewayPollBatchSnapshot = {
     tickAt,
-    limit,
+    limit: budgets.volcengine,
     slowRunningTotal,
-    selectedSlowIds: slowRows.map((r) => r.id),
-    selectedNormalIds: normalRows.map((r) => r.id),
+    selectedSlowIds: volcRows.map((r) => r.id),
+    selectedNormalIds: [...otherRows, ...callbackRows].map((r) => r.id),
     tickDbErrors,
     workerOk,
   };
 
-  const [escUpdated, mainUpdated] = await Promise.all([
-    runGatewayEscalationPollLane(slowRows),
-    (async () => {
-      let updated = 0;
-      await mapWithConcurrency(
-        normalRows,
-        async (row) => {
-          const r = await pollGatewayLogWithTimeout(row, MAIN_POLL_TIMEOUT_MS);
-          if (r === "updated") updated++;
-        },
-        5,
-      );
-      return updated;
-    })(),
-  ]);
+  // 火山优先入队，统一在有限并发下 poll（单条 hung 调用不拖垮整 tick）
+  const orderedRows = [...volcRows, ...otherRows, ...callbackRows];
+  let updated = 0;
+  await mapWithConcurrency(
+    orderedRows,
+    async (row) => {
+      const r = await pollGatewayLogWithTimeout(row, ESCALATION_POLL_TIMEOUT_MS);
+      if (r === "updated") updated++;
+    },
+    budgets.concurrency,
+  );
 
+  // L2 兜底安全网：任何 2min 未 poll 到的火山 RUNNING 主动向厂商核对并收口（不依赖 Logs 页触发）。
+  // 公平调度下正常已 poll 过的 lastPolledAt 是新的，不会被此处重复 poll。
   let stallRecovered = 0;
   try {
+    const auto = await autoRecoverPollStalledVolcengineGatewayLogs({
+      staleMs: budgets.stallRecoverMs,
+      limit: budgets.stallRecoverLimit,
+    });
+    stallRecovered += auto.recovered;
+    if (auto.recovered > 0) {
+      console.info("[gateway-poll] auto-recovered stalled volcengine logs", auto);
+    }
+  } catch (e) {
+    workerOk = false;
+    tickDbErrors.push(e instanceof Error ? e.message : String(e));
+    console.warn(
+      "[gateway-poll] autoRecoverPollStalledVolcengineGatewayLogs skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  try {
     const stall = await recoverMisclassifiedVolcengineStallLogs({ limit: 20 });
-    stallRecovered = stall.recovered;
+    stallRecovered += stall.recovered;
     if (stall.recovered > 0) {
       console.info("[gateway-poll] recovered misclassified stall logs", stall);
     }
@@ -475,9 +540,9 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
   }
 
   return {
-    scanned: slowRows.length + normalRows.length,
-    updated: escUpdated + mainUpdated,
-    escalation: escUpdated,
+    scanned: orderedRows.length,
+    updated,
+    escalation: volcRows.length,
     stallRecovered,
     autoHandler,
   };
