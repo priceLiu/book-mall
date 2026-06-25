@@ -8,6 +8,7 @@ import "@devnomic/marquee/dist/index.css";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { makeVideoAudible, muteVideo } from "@/lib/site-home/hover-audio";
 import type { FeaturedShowcaseCard } from "@/lib/site-home/featured-showcase";
 
 function ShowcaseCoverMedia({
@@ -31,12 +32,14 @@ function ShowcaseCoverMedia({
   const onHoverStart = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    void video.play().catch(() => undefined);
+    // 悬停播放并发声（取消静音）。
+    makeVideoAudible(video);
   }, []);
 
   const onHoverEnd = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
+    muteVideo(video);
     video.pause();
     video.currentTime = 0;
   }, []);

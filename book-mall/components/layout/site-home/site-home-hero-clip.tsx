@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { makeVideoAudible, muteVideo } from "@/lib/site-home/hover-audio";
 
 /** 首屏小窗：首帧/元数据懒加载，悬停播放、移开停止 */
 export function SiteHomeHeroClip({ src }: { src: string }) {
@@ -43,12 +44,14 @@ export function SiteHomeHeroClip({ src }: { src: string }) {
     const v = videoRef.current;
     if (!v) return;
     v.preload = "auto";
-    void v.play().catch(() => undefined);
+    // 悬停播放并发声（取消静音）。
+    makeVideoAudible(v);
   }, [attachSrc]);
 
   const onLeave = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
+    muteVideo(v);
     v.pause();
     try {
       v.currentTime = 0;

@@ -18,10 +18,12 @@ export function AccountShell({
   quickReplicaOriginConfigured,
   appsMenuHint,
   billingPersona,
+  showReferral,
   children,
 }: {
   profile: { image: string | null; name: string | null; phone: string | null };
   isAdmin: boolean;
+  showReferral?: boolean;
   showToolsCta: boolean;
   canLaunchTools: boolean;
   canLaunchCanvas: boolean;
@@ -49,6 +51,7 @@ export function AccountShell({
     quickReplicaOriginConfigured,
     appsMenuHint,
     billingPersona,
+    showReferral,
   };
 
   return (

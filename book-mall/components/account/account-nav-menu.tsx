@@ -178,11 +178,13 @@ export function AccountNavMenu({
   quickReplicaOriginConfigured,
   appsMenuHint,
   billingPersona,
+  showReferral = false,
   placement = "sidebar",
 }: {
   profile: Profile;
   isAdmin: boolean;
   billingPersona: import("@prisma/client").BillingPersona | null;
+  showReferral?: boolean;
   showToolsCta: boolean;
   canLaunchTools: boolean;
   canLaunchCanvas: boolean;
@@ -235,6 +237,7 @@ export function AccountNavMenu({
         showCanvasLaunch: canLaunchCanvas && canvasOriginConfigured,
         showEcomLaunch: ecomReady,
         showQuickReplicaLaunch: canLaunchQuickReplica && quickReplicaOriginConfigured,
+        showReferral,
       }),
     [
       isAdmin,
@@ -246,6 +249,7 @@ export function AccountNavMenu({
       ecomReady,
       canLaunchQuickReplica,
       quickReplicaOriginConfigured,
+      showReferral,
     ],
   );
 
