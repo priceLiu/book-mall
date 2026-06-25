@@ -5,7 +5,12 @@
  *   cd book-mall && pnpm exec dotenv -e .env.local -- tsx scripts/ops-topup-jane-video-credits.ts --confirm  # 真正写入
  *
  * - 走统一计费正规函数 topupCredits（pool=VIDEO，type=TOPUP），自动落流水 + 更新余额。
- * - 幂等键保证重复执行不重复充值。
+ * - 幂等键保证重复执行不重复充值（重跑安全：同键不会二次到账）。
+ * - 注意：连接 .env.local 的 DATABASE_URL，即写入【生产】积分账户。
+ *
+ * 执行记录：
+ *   2026-06-25 已 --confirm 执行。jane 团队（cmqjtfu3d006lr0je53p8mwzj，显示名「团队 2026-06-18」）
+ *   视频余额 764 → 99764（+99000），冻结 1039 不变。幂等键 ops_topup:jane-team:2026-06-25:video-99000。
  */
 import { prisma } from "../lib/prisma";
 import { ensureCreditAccount, topupCredits } from "../lib/billing/credit-account-service";
