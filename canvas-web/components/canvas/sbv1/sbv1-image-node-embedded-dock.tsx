@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { ArrowUp, Loader2, MapPin, Upload } from "lucide-react";
-import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
+import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { buildPro2DockMentionables } from "@/lib/canvas/pro2-dock-mentionables";
@@ -187,7 +187,7 @@ export function Sbv1ImageNodeEmbeddedDock({
         disabled={isRunning}
         maxImages={12}
       >
-        <MentionsTextarea
+        <MentionsEditable
           className={cn(
             PRO2_DOCK_TEXTAREA_CLASS,
             RF_FORM_CONTROL,

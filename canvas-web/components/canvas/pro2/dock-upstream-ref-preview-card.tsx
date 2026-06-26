@@ -9,6 +9,7 @@ import {
   SBV1_DOCK_REF_IDLE_BORDER_CLASS,
 } from "@/lib/canvas/dock-active-ref-chrome";
 import { SBV1_REF_THUMB_CLASS } from "@/lib/canvas/sbv1-node-chrome";
+import { setMentionDragData } from "@/lib/canvas/mention-drag";
 import type { PortraitImportUiState } from "@/lib/canvas/portrait-node-data";
 import { cn } from "@/lib/utils";
 
@@ -50,10 +51,16 @@ export function DockUpstreamRefPreviewCard({
       <div
         className={cn(
           SBV1_REF_THUMB_CLASS,
-          "group border transition-shadow",
+          "group cursor-grab border transition-shadow active:cursor-grabbing",
           active ? SBV1_DOCK_ACTIVE_REF_BORDER_CLASS : SBV1_DOCK_REF_IDLE_BORDER_CLASS,
           className,
         )}
+        title={`${label} · 可拖入正文 @ 引用`}
+        draggable
+        onDragStart={(e) => {
+          setMentionDragData(e.dataTransfer, id);
+          setHover(null);
+        }}
         onMouseEnter={(e) => {
           if (!previewUrl) return;
           setHover({
@@ -77,6 +84,7 @@ export function DockUpstreamRefPreviewCard({
           <img
             src={previewUrl}
             alt={label}
+            draggable={false}
             className="size-full object-cover"
           />
         ) : (

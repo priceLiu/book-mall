@@ -11,10 +11,10 @@ import {
   Zap,
 } from "lucide-react";
 import {
-  MentionsTextarea,
   type MentionableItem,
   type MentionsTextareaCommitHandle,
 } from "@/components/canvas/mentions/MentionsTextarea";
+import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { DockUpstreamRefPreviewCard } from "@/components/canvas/pro2/dock-upstream-ref-preview-card";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
@@ -315,7 +315,7 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
               </p>
             </div>
           ) : null}
-          <MentionsTextarea
+          <MentionsEditable
             key={nodeId}
             className={cn(
               SBV1_CHAT_INPUT_TEXTAREA_CLASS,

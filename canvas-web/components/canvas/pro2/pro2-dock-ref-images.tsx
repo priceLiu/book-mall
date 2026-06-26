@@ -12,6 +12,7 @@ import { spawnSbv1ImageDockPastedImages } from "@/lib/canvas/spawn-sbv1-paste-im
 import { useCanvasStore } from "@/lib/canvas/store";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import { removeDockRefFromState } from "@/lib/canvas/strip-dock-mentions";
+import { setMentionDragData } from "@/lib/canvas/mention-drag";
 import {
   PRO2_DOCK_ACTIVE_REF_BORDER_CLASS,
   PRO2_DOCK_REF_IDLE_BORDER_CLASS,
@@ -60,12 +61,21 @@ function DockRefImageChip({
     <>
       <div
         className={cn(
-          "group relative size-10 overflow-hidden rounded-lg border bg-white/[0.04] transition-shadow",
+          "group relative size-10 cursor-grab overflow-hidden rounded-lg border bg-white/[0.04] transition-shadow active:cursor-grabbing",
           active
             ? PRO2_DOCK_ACTIVE_REF_BORDER_CLASS
             : PRO2_DOCK_REF_IDLE_BORDER_CLASS,
         )}
-        title={refItem.label}
+        title={`${refItem.label} · 可拖入正文 @ 引用`}
+        draggable={!disabled}
+        onDragStart={(e) => {
+          if (disabled) {
+            e.preventDefault();
+            return;
+          }
+          setMentionDragData(e.dataTransfer, refItem.id);
+          setHover(null);
+        }}
         onMouseEnter={(e) => {
           if (!refItem.url) return;
           setHover({
@@ -89,6 +99,7 @@ function DockRefImageChip({
           <img
             src={refItem.url}
             alt={refItem.label}
+            draggable={false}
             className="size-full object-cover"
           />
         ) : (

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo } from "react";
 import { ArrowUp, Loader2, MapPin } from "lucide-react";
-import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
+import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
 import { PRO2_DOCK_TEXTAREA_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
@@ -234,7 +234,7 @@ export function Pro2ThreeViewNodeEmbeddedDock({ nodeId }: { nodeId: string }) {
         </Pro2DockToolbar>
       }
     >
-      <MentionsTextarea
+      <MentionsEditable
         className={cn(
           PRO2_DOCK_TEXTAREA_CLASS,
           RF_FORM_CONTROL,
