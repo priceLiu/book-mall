@@ -47,6 +47,13 @@ export async function GET(request: NextRequest) {
       void autoRecoverPollStalledVolcengineGatewayLogs({ limit: 6 }).catch(
         () => undefined,
       );
+      // 生视频看门狗（常驻 web 进程兜底）：跑太久+疑似阻塞主动复核 + poll worker 失活告警。
+      const { runGatewayVideoWatchdog } = await import(
+        "@/lib/gateway/gateway-video-watchdog"
+      );
+      void runGatewayVideoWatchdog({ source: "canvas-queue-read" }).catch(
+        () => undefined,
+      );
     }
 
     if (stats.total > 0) {

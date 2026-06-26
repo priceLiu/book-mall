@@ -605,6 +605,18 @@ export async function runGatewayPollWorker(opts?: { limit?: number }) {
   markGatewayPollWorkerTick(workerOk, tickDbErrors[0]);
 
   try {
+    const { runGatewayVideoWatchdog } = await import(
+      "@/lib/gateway/gateway-video-watchdog"
+    );
+    await runGatewayVideoWatchdog({ source: "gateway-poll-worker" });
+  } catch (e) {
+    console.warn(
+      "[gateway-poll] gateway video watchdog skipped",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  try {
     const audit = await auditGatewayPollStallAfterBatch(batchSnapshot);
     if (audit.audited > 0) {
       console.warn("[gateway-poll] stall audit", audit);
