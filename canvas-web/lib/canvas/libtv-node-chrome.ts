@@ -30,6 +30,13 @@ export const LIBTV_MEDIA_STAGE_CLASS =
 export const LIBTV_IMAGE_NODE_HEADER_HEIGHT = 44;
 export const LIBTV_VIDEO_NODE_HEADER_HEIGHT = 38;
 
+/**
+ * 媒体自适配「版本」——标题栏高度/适配算法变更时 +1。
+ * 旧节点（含已手动拉伸/旧版本适配过的）下次进画布会按新算法**重算一次**外框，
+ * 确保 `object-contain` 四边贴合、消除历史留边；重算后写回版本号，不再重复探测。
+ */
+export const LIBTV_MEDIA_FIT_VERSION = 2;
+
 /** @deprecated 旧常量（偏小，会导致留边）。新代码请用按节点类型区分的上面两个。 */
 export const LIBTV_MEDIA_NODE_HEADER_HEIGHT = LIBTV_IMAGE_NODE_HEADER_HEIGHT;
 
