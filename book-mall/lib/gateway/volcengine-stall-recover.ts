@@ -3,6 +3,7 @@
  */
 import { recoverCanvasVideoTaskDisplay } from "@/lib/canvas/canvas-video-display-recover";
 import { applyCanvasVolcengineVideoResult } from "@/lib/canvas/canvas-task-service";
+import { extractVolcengineVideoUrlFromGatewaySummary } from "@/lib/canvas/canvas-volcengine-recover";
 import { getDecryptedCredentialApiKey } from "@/lib/gateway/credential-service";
 import { buildGatewayTaskResultSummary } from "@/lib/gateway/log-result-summary";
 import {
@@ -140,11 +141,26 @@ async function runRecoverVolcengineGatewayLog(
     return { ok: false, action: "skipped", message: "not_volcengine_video" };
   }
   if (log.status === "SUCCEEDED") {
+    // 已成功但画布可能未同步（被其它路径先收口 / 早期早退跳过了同步）：补一次画布同步，
+    // 并清理遗留的 failCode（成功日志不应带 STALE_TIMEOUT 等失败码），实现「彻底收口」自愈。
+    const videoUrl = extractVolcengineVideoUrlFromGatewaySummary(
+      log.resultSummary,
+    );
+    if (log.failCode) {
+      await prisma.gatewayRequestLog
+        .update({
+          where: { id: log.id },
+          data: { failCode: null, failMessage: null },
+        })
+        .catch(() => undefined);
+    }
+    await syncCanvasAfterGatewayRecover(log.id, videoUrl).catch(() => undefined);
     return {
       ok: true,
       action: "succeeded",
       message: "already_succeeded",
       gatewayStatus: log.status,
+      videoUrl: videoUrl ?? undefined,
     };
   }
   if (
