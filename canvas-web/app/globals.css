@@ -212,6 +212,12 @@ body {
   overscroll-behavior-x: none;
 }
 
+/* 弹层打开时暂停画布指针交互，避免背后 hover / pan 触发重绘导致 backdrop 闪烁 */
+html[data-canvas-modal-open] .canvas-flow-wrap,
+html[data-canvas-modal-open] .pro2-input-dock {
+  pointer-events: none;
+}
+
 .react-flow__node-group {
   background-color: transparent !important;
   background: transparent !important;

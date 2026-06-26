@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sparkles, X } from "lucide-react";
+import {
+  useClientPortalMounted,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { EnginePicker } from "@/components/canvas/engine-picker";
 import { GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID } from "@/lib/canvas/system-providers";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
@@ -43,7 +48,9 @@ export function Sbv1VideoGenerateSettingsModal({
   onClose,
   onConfirm,
 }: Sbv1VideoGenerateSettingsModalProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useClientPortalMounted();
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
 
   const [referenceMode, setReferenceMode] = useState<Sbv1ReferenceMode>(
     data.referenceMode,
@@ -66,6 +73,8 @@ export function Sbv1VideoGenerateSettingsModal({
   const [watermark, setWatermark] = useState(
     Boolean(data.engine?.params?.watermark),
   );
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   const smartMulti = referenceMode === "smart_multi";
 
@@ -80,34 +89,18 @@ export function Sbv1VideoGenerateSettingsModal({
   }, [smartMulti, engineParams.duration, durationSec]);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     if (!open) return;
-    setReferenceMode(data.referenceMode);
-    setAspectRatio(data.aspectRatio);
-    setDurationSec(data.durationSec);
-    setResolution(data.resolution);
-    setProviderId(normalizeSbv1EngineProviderId(data.engine?.providerId));
-    setModelKey(data.engine?.modelKey ?? "");
-    setEngineParams(data.engine?.params ?? {});
-    setGenerateAudio(data.engine?.params?.generate_audio !== false);
-    setWatermark(Boolean(data.engine?.params?.watermark));
-  }, [open, data]);
-
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+    const d = dataRef.current;
+    setReferenceMode(d.referenceMode);
+    setAspectRatio(d.aspectRatio);
+    setDurationSec(d.durationSec);
+    setResolution(d.resolution);
+    setProviderId(normalizeSbv1EngineProviderId(d.engine?.providerId));
+    setModelKey(d.engine?.modelKey ?? "");
+    setEngineParams(d.engine?.params ?? {});
+    setGenerateAudio(d.engine?.params?.generate_audio !== false);
+    setWatermark(Boolean(d.engine?.params?.watermark));
+  }, [open]);
 
   if (!mounted || !open) return null;
 

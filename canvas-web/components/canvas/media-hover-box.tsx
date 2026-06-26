@@ -1,8 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Eye, Upload, X } from "lucide-react";
+import {
+  useClientPortalMounted,
+  useModalBodyScrollLock,
+  useModalCompareArrowKeys,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import {
   bindImageDragDropHandlers,
   firstImageFileFromDataTransfer,
@@ -267,7 +273,7 @@ export function MediaPreviewLightbox({
   initialView?: "single" | "compare";
   onClose: () => void;
 }) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useClientPortalMounted();
   const showCompare = compareContext ? canShowCompare(compareContext) : false;
   const splitPrompt = Boolean(prompt?.trim()) && kind === "image";
   const [view, setView] = useState<"single" | "compare">(
@@ -300,27 +306,9 @@ export function MediaPreviewLightbox({
   const { leftId, rightId, setLeftId, setRightId, stepRight } =
     useCompareSides(options, defaults);
 
-  useEffect(() => {
-    setMounted(true);
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      } else if (view === "compare" && e.key === "ArrowLeft") {
-        e.preventDefault();
-        stepRight(-1);
-      } else if (view === "compare" && e.key === "ArrowRight") {
-        e.preventDefault();
-        stepRight(1);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose, view, stepRight]);
+  useModalBodyScrollLock();
+  useModalEscapeClose(onClose);
+  useModalCompareArrowKeys(view === "compare", stepRight);
 
   if (!mounted) return null;
 

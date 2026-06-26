@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Maximize2, Minimize2 } from "lucide-react";
+import { LibtvInputDockUiContext } from "@/lib/canvas/libtv-input-dock-ui-context";
 import {
   LIBTV_INPUT_DOCK_BG,
   LIBTV_INPUT_DOCK_BORDER,
@@ -63,69 +64,73 @@ export function Pro2InputDockShell({
   useLibtvDockWheelScroll(dockScrollEl);
   const dockW = width ?? flowAnchor.flowW;
   const dockHeight = expanded ? PRO2_DOCK_HEIGHT_EXPANDED : PRO2_DOCK_HEIGHT;
+  const dockUi = useMemo(() => ({ expanded }), [expanded]);
 
   if (!viewportEl) return null;
 
   return createPortal(
-    <div
-      className={cn(
-        "pro2-input-dock pointer-events-auto absolute z-[1000]",
-        RF_NO_WHEEL,
-        dockClassName,
-      )}
-      style={{
-        left: flowAnchor.flowX,
-        top: flowAnchor.flowY,
-        width: dockW,
-        transform: "translate(-50%, 0) translateZ(0)",
-        visibility: hidden ? "hidden" : "visible",
-        pointerEvents: hidden ? "none" : "auto",
-        backfaceVisibility: "hidden",
-      }}
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
-    >
+    <LibtvInputDockUiContext.Provider value={dockUi}>
       <div
         className={cn(
-          LIBTV_INPUT_DOCK_SHELL_CLASS,
+          "pro2-input-dock pointer-events-auto absolute z-[1000]",
           RF_NO_WHEEL,
-          "relative",
-          className,
+          dockClassName,
         )}
-        data-libtv-input-dock=""
         style={{
-          borderColor: LIBTV_INPUT_DOCK_BORDER,
-          background: LIBTV_INPUT_DOCK_BG,
-          height: dockHeight,
-          maxHeight: dockHeight,
-          transition: "height 180ms ease",
+          left: flowAnchor.flowX,
+          top: flowAnchor.flowY,
+          width: dockW,
+          transform: "translate(-50%, 0) translateZ(0)",
+          visibility: hidden ? "hidden" : "visible",
+          pointerEvents: hidden ? "none" : "auto",
+          backfaceVisibility: "hidden",
         }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          title={expanded ? "收起输入坞" : "放大输入坞"}
-          className="nodrag absolute right-2 top-2 z-20 grid size-7 place-items-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
-          onClick={() => setExpanded((v) => !v)}
-        >
-          {expanded ? (
-            <Minimize2 className="size-3.5" />
-          ) : (
-            <Maximize2 className="size-3.5" />
-          )}
-        </button>
-        {header}
         <div
-          ref={setDockScrollEl}
-          className="pro2-dock-scroll flex h-0 min-h-0 flex-1 flex-col overflow-hidden overscroll-contain [overflow-anchor:none]"
-          data-canvas-wheel-scroll
+          className={cn(
+            LIBTV_INPUT_DOCK_SHELL_CLASS,
+            RF_NO_WHEEL,
+            "relative",
+            className,
+          )}
+          data-libtv-input-dock=""
+          data-libtv-dock-expanded={expanded ? "true" : "false"}
+          style={{
+            borderColor: LIBTV_INPUT_DOCK_BORDER,
+            background: LIBTV_INPUT_DOCK_BG,
+            height: dockHeight,
+            maxHeight: dockHeight,
+            transition: "height 180ms ease",
+          }}
         >
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {children}
+          <button
+            type="button"
+            title={expanded ? "收起输入坞" : "放大输入坞"}
+            className="nodrag absolute right-2 top-2 z-20 grid size-7 place-items-center rounded-md text-white/45 transition hover:bg-white/10 hover:text-white/80"
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded ? (
+              <Minimize2 className="size-3.5" />
+            ) : (
+              <Maximize2 className="size-3.5" />
+            )}
+          </button>
+          {header}
+          <div
+            ref={setDockScrollEl}
+            className="pro2-dock-scroll flex h-0 min-h-0 flex-1 flex-col overflow-hidden overscroll-contain [overflow-anchor:none]"
+            data-canvas-wheel-scroll
+          >
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              {children}
+            </div>
           </div>
+          {footer ? <div className="shrink-0">{footer}</div> : null}
         </div>
-        {footer ? <div className="shrink-0">{footer}</div> : null}
       </div>
-    </div>,
+    </LibtvInputDockUiContext.Provider>,
     viewportEl,
   );
 }

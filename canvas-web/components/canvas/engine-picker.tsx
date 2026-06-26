@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  useClientPortalMounted,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { ChevronDown, Cog, ExternalLink, Sparkles, X } from "lucide-react";
 
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
@@ -239,10 +244,21 @@ function EnginePickerInlinePanel({
   const [draft, setDraft] = useState<DraftSelection | null>(() =>
     resolveInitialDraft(groups, providerId, modelKey, params),
   );
+  const paramsKey = useMemo(() => JSON.stringify(params), [params]);
+  const groupsKey = useMemo(
+    () =>
+      groups
+        .map(
+          (g) =>
+            `${g.provider.id}:${g.models.map((m) => m.modelKey).join(",")}`,
+        )
+        .join("|"),
+    [groups],
+  );
 
   useEffect(() => {
     setDraft(resolveInitialDraft(groups, providerId, modelKey, params));
-  }, [groups, providerId, modelKey, params]);
+  }, [groupsKey, groups, providerId, modelKey, paramsKey]);
 
   const hasParams =
     !!draft?.model.paramsSchema && draft.model.paramsSchema.length > 0;
@@ -348,34 +364,31 @@ function EngineModelModal({
     provider: CanvasProviderDto;
   }) => void;
 }) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useClientPortalMounted();
   const [draft, setDraft] = useState<DraftSelection | null>(() =>
     resolveInitialDraft(groups, providerId, modelKey, params),
   );
   const userPickedRef = useRef(false);
+  const paramsKey = useMemo(() => JSON.stringify(params), [params]);
+  const groupsKey = useMemo(
+    () =>
+      groups
+        .map(
+          (g) =>
+            `${g.provider.id}:${g.models.map((m) => m.modelKey).join(",")}`,
+        )
+        .join("|"),
+    [groups],
+  );
 
-  useEffect(() => {
-    setMounted(true);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey, true);
-      document.body.style.overflow = "";
-    };
-  }, [onClose]);
+  useModalBodyScrollLock();
+  useModalEscapeClose(onClose, { capture: true });
 
   /** Provider 异步加载完成时补全初始 draft；用户已在弹层内点选后不再覆盖 */
   useEffect(() => {
     if (userPickedRef.current) return;
     setDraft(resolveInitialDraft(groups, providerId, modelKey, params));
-  }, [groups, providerId, modelKey, params]);
+  }, [groupsKey, groups, providerId, modelKey, paramsKey]);
 
   if (!mounted) return null;
 

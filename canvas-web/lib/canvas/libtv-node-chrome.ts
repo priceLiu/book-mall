@@ -91,7 +91,7 @@ export const LIBTV_CANVAS_DOCK_BAR_CLASS =
 export const LIBTV_INPUT_DOCK_BORDER = "rgba(255, 255, 255, 0.08)";
 export const LIBTV_INPUT_DOCK_BG = "#262626";
 export const LIBTV_INPUT_DOCK_SHELL_CLASS =
-  "flex flex-col overflow-hidden rounded-2xl border shadow-[0_16px_48px_rgba(0,0,0,0.45)] backdrop-blur-xl";
+  "flex flex-col overflow-hidden rounded-2xl border shadow-[0_16px_48px_rgba(0,0,0,0.45)]";
 export const LIBTV_INPUT_DOCK_DIVIDER = "border-white/[0.06]";
 export const LIBTV_INPUT_DOCK_TOOLBAR_ICON_CLASS =
   "nodrag rounded-md p-1.5 text-white/40 transition hover:bg-white/[0.06] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40";

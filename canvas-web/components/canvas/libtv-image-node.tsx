@@ -81,10 +81,10 @@ const EDITION_CHROME: Record<
   { ring: string; icon: string; spinner: string; generating: "violet" | "cyan" }
 > = {
   pro2: {
-    ring: "ring-1 ring-violet-400/45",
+    ring: "ring-1 ring-cyan-400/50",
     icon: "text-white/70",
     spinner: CANVAS_SEMANTIC_STATUS_CLASS,
-    generating: "violet",
+    generating: "cyan",
   },
   sbv1: {
     ring: "ring-1 ring-cyan-400/50",

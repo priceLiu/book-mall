@@ -14,17 +14,20 @@ import { findAllMentionRangesInDisplay } from "@/lib/canvas/mention-at-display-i
 import {
   INLINE_MENTION_BADGE_GAP_PX,
   INLINE_MENTION_THUMB_PX,
+  inlineMentionThumbReserveSpaces,
 } from "@/lib/canvas/mention-inline-thumb-metrics";
 import {
   mapDisplayIndexToRawIndex,
   stripMentionThumbSlots,
 } from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { LIBTV_INPUT_DOCK_BG } from "@/lib/canvas/libtv-node-chrome";
+import { useLibtvInputDockUi } from "@/lib/canvas/libtv-input-dock-ui-context";
 import { getTextareaCaretClientRect } from "@/lib/canvas/textarea-caret-rect";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { cn } from "@/lib/utils";
 
 const REMEASURE_DEBOUNCE_MS = 80;
+const MEASURE_RETRY_MAX = 6;
 
 export type MentionInlineThumbMirrorHandle = {
   resolveThumbAtPoint: (
@@ -81,6 +84,20 @@ function measureBadgePlacements(
     const end = getTextareaCaretClientRect(textarea, rawEnd, measureScroll);
     if (!start || !end) continue;
 
+    const fontSizePx = parseFloat(window.getComputedStyle(textarea).fontSize) || 13;
+    const tailSpaces = clean.slice(range.end).match(/^ */)?.[0]?.length ?? 0;
+    const reserveSpaces = inlineMentionThumbReserveSpaces(fontSizePx);
+    const hideTail = Math.min(tailSpaces, reserveSpaces);
+    const maskEndCaret =
+      hideTail > 0
+        ? getTextareaCaretClientRect(
+            textarea,
+            toRawIndex(raw, clean, range.end + hideTail),
+            measureScroll,
+          )
+        : end;
+    const maskRight = maskEndCaret?.left ?? end.left;
+
     const lineH = start.height || BADGE_HEIGHT_PX;
     out.push({
       item: range.item,
@@ -88,7 +105,7 @@ function measureBadgePlacements(
       rangeStart: range.start,
       left: start.left - wrapperRect.left,
       top: start.top - wrapperRect.top + (lineH - BADGE_HEIGHT_PX) / 2,
-      maskWidth: Math.max(end.left - start.left, start.height * 0.5),
+      maskWidth: Math.max(maskRight - start.left, start.height * 0.5),
     });
   }
 
@@ -96,14 +113,7 @@ function measureBadgePlacements(
 }
 
 function placementKey(p: BadgePlacement): string {
-  return [
-    p.item.id,
-    p.rangeStart,
-    p.label,
-    Math.round(p.left),
-    Math.round(p.top),
-    Math.round(p.maskWidth),
-  ].join("|");
+  return [p.item.id, p.rangeStart, p.label].join("|");
 }
 
 function syncBadgeDom(
@@ -210,7 +220,9 @@ export const MentionInlineThumbOverlay = forwardRef<
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const debounceRef = useRef<number | null>(null);
+  const measureRetryRef = useRef(0);
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
+  const { expanded: dockExpanded } = useLibtvInputDockUi();
 
   const syncScrollOffset = useCallback(() => {
     const ta = textareaRef.current;
@@ -236,14 +248,23 @@ export const MentionInlineThumbOverlay = forwardRef<
     if (expected === 0) {
       root.replaceChildren();
       syncScrollOffset();
+      measureRetryRef.current = 0;
       return;
     }
 
     if (next.length === 0 && expected > 0) {
+      root.replaceChildren();
       syncScrollOffset();
+      if (measureRetryRef.current < MEASURE_RETRY_MAX) {
+        measureRetryRef.current += 1;
+        window.setTimeout(() => {
+          remeasure();
+        }, 32 * measureRetryRef.current);
+      }
       return;
     }
 
+    measureRetryRef.current = 0;
     syncBadgeDom(root, next, edition);
     syncScrollOffset();
   }, [textareaRef, mentionables, enabled, edition, syncScrollOffset]);
@@ -276,7 +297,7 @@ export const MentionInlineThumbOverlay = forwardRef<
       cancelAnimationFrame(raf1);
       if (raf2 != null) cancelAnimationFrame(raf2);
     };
-  }, [displayValue, mentionables, remeasure, syncScrollOffset]);
+  }, [displayValue, mentionables, remeasure, syncScrollOffset, dockExpanded]);
 
   useLayoutEffect(() => {
     const ta = textareaRef.current;
@@ -292,6 +313,8 @@ export const MentionInlineThumbOverlay = forwardRef<
     ta.addEventListener("scroll", onScroll, { passive: true });
     const ro = new ResizeObserver(scheduleRemeasure);
     ro.observe(ta);
+    const dockShell = ta.closest("[data-libtv-input-dock]");
+    if (dockShell) ro.observe(dockShell);
 
     const dockScroll = ta.closest(".pro2-dock-scroll");
     dockScroll?.addEventListener("scroll", scheduleRemeasure, { passive: true });
