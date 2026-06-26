@@ -312,11 +312,24 @@ async function runRecoverVolcengineGatewayLog(
   };
 }
 
-/** 批量复核历史误杀（FAILED · VOLCENGINE_GATEWAY_POLL_STALL） */
+/**
+ * 自动复核近期误杀（FAILED · 火山视频 · 可恢复 failCode）。
+ *
+ * **recencyMs**：仅回捞「最近收口」的失败（默认 2h）。STALE_TIMEOUT 加入可恢复集合后，
+ * 历史上大量过期任务也会命中；若每 tick 无窗口地 `orderBy completedAt desc take N`，会反复
+ * 重打那批永远恢复不了的过期 Vendor Task（厂商结果已过期）→ 空转。加近期窗口后：worker 短暂
+ * 滞后/重启导致的「刚被误杀」能被自动捞回，老化失败则交由用户手动「核对厂商」一次性处理。
+ */
 export async function recoverMisclassifiedVolcengineStallLogs(opts?: {
   limit?: number;
+  recencyMs?: number;
 }): Promise<{ scanned: number; recovered: number }> {
   const limit = opts?.limit ?? 30;
+  const recencyMs = (() => {
+    if (opts?.recencyMs != null) return opts.recencyMs;
+    const v = Number(process.env.VOLCENGINE_STALL_RECLAIM_RECENCY_MS);
+    return Number.isFinite(v) && v > 0 ? v : 2 * 60 * 60 * 1000;
+  })();
   const rows = await prisma.gatewayRequestLog.findMany({
     where: {
       status: "FAILED",
@@ -324,6 +337,7 @@ export async function recoverMisclassifiedVolcengineStallLogs(opts?: {
       externalTaskId: { not: null },
       providerKind: "VOLCENGINE",
       requestKind: "VIDEO",
+      completedAt: { gte: new Date(Date.now() - recencyMs) },
     },
     orderBy: { completedAt: "desc" },
     take: limit,

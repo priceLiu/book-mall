@@ -60,7 +60,7 @@ connection_limit=10&pool_timeout=30&connect_timeout=15
 | 对账排队任务 | `pnpm --dir book-mall canvas:queued-reconcile` |
 | 洗误标 Gateway log | `pnpm --dir book-mall gateway:repair-insufficient-mislabel -- --apply` |
 
-poll-loop 子进程已在 `package.json` 设 `PRISMA_CONNECTION_LIMIT=1`。生产 PgBouncer 见 `deploy/tencent/pgbouncer/README.md`。
+poll-loop 子进程已在 `package.json` 设 `PRISMA_CONNECTION_LIMIT=3`（dev 经 PgBouncer，给单 worker 留 1~2 条连接余量，避免单连接慢/被回收时整 worker 饿死 → P2024 → 任务漏 poll 到 90min 误超时；worker 身份由 `GENERATION_POLL_WORKER=1` 标记，与连接数无关）。生产 PgBouncer / 连接预算见 `deploy/tencent/pgbouncer/README.md`。
 
 Release 全文：`docs/releases/2026-06-db-resilience-r1.md`。
 
