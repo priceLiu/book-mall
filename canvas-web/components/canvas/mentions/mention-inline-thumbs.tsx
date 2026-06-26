@@ -171,8 +171,8 @@ function syncBadgeDom(
       const label = document.createElement("span");
       label.className = "mention-inline-label min-w-0 truncate";
 
-      badge.appendChild(img);
       badge.appendChild(label);
+      badge.appendChild(img);
       host.appendChild(badge);
       root.appendChild(host);
     }
@@ -283,6 +283,7 @@ export const MentionInlineThumbOverlay = forwardRef<
   }, [remeasure, viewportMoving]);
 
   useLayoutEffect(() => {
+    measureRetryRef.current = 0;
     remeasure();
     let raf2: number | null = null;
     const raf1 = requestAnimationFrame(() => {
@@ -313,8 +314,18 @@ export const MentionInlineThumbOverlay = forwardRef<
     ta.addEventListener("scroll", onScroll, { passive: true });
     const ro = new ResizeObserver(scheduleRemeasure);
     ro.observe(ta);
-    const dockShell = ta.closest("[data-libtv-input-dock]");
-    if (dockShell) ro.observe(dockShell);
+
+    // 收起/展开高度过渡期间不观察外壳尺寸（否则每帧触发测量、量到不稳定布局会清空徽标、
+    // 并拖累主线程）；改为过渡结束后做一次干净重测（重置重试预算）。
+    const dockShell = ta.closest(
+      "[data-libtv-input-dock]",
+    ) as HTMLElement | null;
+    const onDockTransitionEnd = (e: Event) => {
+      if ((e as TransitionEvent).propertyName !== "height") return;
+      measureRetryRef.current = 0;
+      scheduleRemeasure();
+    };
+    dockShell?.addEventListener("transitionend", onDockTransitionEnd);
 
     const dockScroll = ta.closest(".pro2-dock-scroll");
     dockScroll?.addEventListener("scroll", scheduleRemeasure, { passive: true });
@@ -324,6 +335,7 @@ export const MentionInlineThumbOverlay = forwardRef<
       ta.removeEventListener("input", scheduleRemeasure);
       ta.removeEventListener("compositionend", scheduleRemeasure);
       ta.removeEventListener("scroll", onScroll);
+      dockShell?.removeEventListener("transitionend", onDockTransitionEnd);
       dockScroll?.removeEventListener("scroll", scheduleRemeasure);
       window.removeEventListener("resize", scheduleRemeasure);
       ro.disconnect();
