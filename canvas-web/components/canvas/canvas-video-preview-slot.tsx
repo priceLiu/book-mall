@@ -9,7 +9,7 @@ import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library-types";
 import { cn } from "@/lib/utils";
 
 const SLOT_DOWNLOAD_BTN =
-  "nodrag absolute z-20 inline-flex size-11 items-center justify-center rounded-full border border-white/30 bg-black/70 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/90 hover:scale-105";
+  "nodrag absolute z-20 inline-flex size-11 items-center justify-center rounded-full border border-white/30 bg-black/80 text-white shadow-lg transition hover:bg-black/90 hover:scale-105";
 
 /** 与分镜视频列 StoryVideoRowSlot 一致：默认封面图，点击播放再加载 mp4 */
 export function CanvasVideoPreviewSlot({
@@ -118,7 +118,7 @@ export function CanvasVideoPreviewSlot({
           className="nodrag absolute inset-0 z-10 flex items-center justify-center"
           onClick={onPreview}
         >
-          <span className="flex size-12 items-center justify-center rounded-full bg-white/25 shadow-lg backdrop-blur-sm transition-transform group-hover:scale-105">
+          <span className="flex size-12 items-center justify-center rounded-full bg-white/30 shadow-lg transition-transform group-hover:scale-105">
             <Play className="ml-0.5 size-5 fill-white text-white" />
           </span>
         </button>

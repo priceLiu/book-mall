@@ -25,6 +25,10 @@ import {
 import { releaseTrafficSlot } from "./slot";
 import { resolveCanvasProjectTrafficScope } from "./scope-key";
 import { releaseGatewayVideoTrafficSlotIfOccupying } from "./release-gateway-video-traffic-slot";
+import {
+  findPromotableCanvasGatewayLog,
+  promoteCanvasTaskFromGatewayLog,
+} from "./canvas-orphan-gateway-log";
 
 function taskInputPayload(
   task: Pick<CanvasGenerationTask, "inputPayload">,
@@ -224,6 +228,23 @@ async function recoverStaleDispatchingOnly(opts?: {
       if (promoted) {
         n++;
         continue;
+      }
+    } else {
+      // 无 gatewayLogId：可能是「提交超时但其实成功」的孤儿日志。凭 storyTaskId=task.id 找回并 promote，
+      // 避免自愈重派再次 createTask（重复扣费 + 假性失败）。
+      const orphan = await findPromotableCanvasGatewayLog(t.id);
+      if (orphan) {
+        const promoted = await promoteCanvasTaskFromGatewayLog({
+          taskId: t.id,
+          payload,
+          logId: orphan.logId,
+          externalTaskId: orphan.externalTaskId,
+          scopeKey: scope.scopeKey,
+        });
+        if (promoted) {
+          n++;
+          continue;
+        }
       }
     }
 

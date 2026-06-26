@@ -10,7 +10,7 @@ import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library-types";
 import { cn } from "@/lib/utils";
 
 const SLOT_BTN =
-  "nodrag absolute z-20 inline-flex size-11 items-center justify-center rounded-full border border-white/30 bg-black/70 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/90 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-45";
+  "nodrag absolute z-20 inline-flex size-11 items-center justify-center rounded-full border border-white/30 bg-black/80 text-white shadow-lg transition hover:bg-black/90 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-45";
 
 const INLINE_BTN =
   "nodrag inline-flex items-center gap-1 rounded-md border border-white/15 bg-black/40 px-2 py-1 text-[10px] text-white/85 hover:border-emerald-400/40 hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-45";
