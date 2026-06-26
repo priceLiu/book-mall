@@ -1,5 +1,6 @@
 import { uploadCanvasImage } from "@/lib/canvas-api";
 import { absoluteNodePosition } from "./normalize-graph-nodes";
+import { normalizeCanvasImageFile } from "./normalize-canvas-image-file";
 import { selectSbv1NodeAfterSpawn } from "./sbv1-spawn-nodes";
 import {
   SBV1_IMAGE_NODE_HEIGHT,
@@ -74,18 +75,30 @@ export async function spawnSbv1PastedImages(
   const createdIds: string[] = [];
 
   for (let i = 0; i < batch.length; i++) {
-    const file = batch[i]!;
+    const raw = batch[i]!;
+    // 与节点「点击/悬停粘贴上传」(LibtvImageNode.onFile) 对齐：
+    // 预览用客户端规范化后的 blob（贴合内容、去透明留白）；
+    // 上传仍用「原始字节」交服务端 sharp 处理，避免 canvas 重编码丢色彩/降质。
+    let preview = raw;
+    try {
+      preview = await normalizeCanvasImageFile(raw);
+    } catch {
+      preview = raw;
+    }
     const yOff = (existing + i) * (imgH + ROW_GAP);
     const pos = {
       x: anchorAbs.x - imgW - gap,
       y: anchorAbs.y + yOff,
     };
-    const blobUrl = URL.createObjectURL(file);
+    const blobUrl = URL.createObjectURL(preview);
     const id = args.addNode("sbv1-image", pos, {
       blobUrl,
       uploading: true,
       dockInput: "",
-      label: file.name.replace(/\.[^.]+$/, "") || `图片 ${existing + i + 1}`,
+      imageMode: "upload",
+      label:
+        (preview.name || raw.name).replace(/\.[^.]+$/, "") ||
+        `图片 ${existing + i + 1}`,
     });
     createdIds.push(id);
     args.setEdges((es) => [
@@ -99,7 +112,7 @@ export async function spawnSbv1PastedImages(
         animated: false,
       },
     ]);
-    void uploadCanvasImage(args.base, file)
+    void uploadCanvasImage(args.base, raw)
       .then((ossUrl) => {
         args.updateNodeData(id, { ossUrl, uploading: false });
       })
@@ -144,19 +157,26 @@ export async function spawnSbv1CanvasPastedImages(args: {
   );
   const createdIds: string[] = [];
   for (let i = 0; i < images.length; i++) {
-    const file = images[i]!;
-    const blobUrl = URL.createObjectURL(file);
+    const raw = images[i]!;
+    let preview = raw;
+    try {
+      preview = await normalizeCanvasImageFile(raw);
+    } catch {
+      preview = raw;
+    }
+    const blobUrl = URL.createObjectURL(preview);
     const id = args.addNode(
       "sbv1-image",
       { x: args.origin.x + i * 28, y: args.origin.y + i * 28 },
       {
         blobUrl,
         uploading: true,
-        label: file.name.replace(/\.[^.]+$/, "") || `图片 ${i + 1}`,
+        imageMode: "upload",
+        label: (preview.name || raw.name).replace(/\.[^.]+$/, "") || `图片 ${i + 1}`,
       },
     );
     createdIds.push(id);
-    void uploadCanvasImage(args.base, file)
+    void uploadCanvasImage(args.base, raw)
       .then((ossUrl) => {
         args.updateNodeData(id, { ossUrl, uploading: false });
       })

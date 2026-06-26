@@ -59,36 +59,65 @@ function buildSharpPipeline(buf: Buffer) {
 }
 
 /**
- * 画布上传 · 统一转 JPEG（PNG 透明铺白底），并限制最大边长。
- * 避免 PC 端 PNG 直传 / sharp 直通失败；与 JPG 走同一成功路径。
+ * 画布上传 · 限制最大边长后规范化：
+ * - JPEG 直接重编码 JPEG；
+ * - 带透明像素的图（PNG/WebP 等）裁掉四周透明留白后保留透明输出 PNG（不铺白底、无暗边）；
+ * - 不透明图铺白底转 JPEG（兼容 PC 端 PNG 直传 / sharp 直通失败）。
  */
 export async function normalizeCanvasUploadImageBuffer(
   buf: Buffer,
 ): Promise<{ buf: Buffer; contentType: string; ext: string }> {
-  let pipeline = buildSharpPipeline(buf);
-  const meta = await pipeline.metadata();
+  const meta = await buildSharpPipeline(buf).metadata();
   if (!meta.width || !meta.height || !meta.format) {
     throw new Error("无法识别图片格式");
   }
 
-  if (
-    (meta.width ?? 0) > MAX_EDGE_PX ||
-    (meta.height ?? 0) > MAX_EDGE_PX
-  ) {
-    pipeline = pipeline.resize({
-      width: MAX_EDGE_PX,
-      height: MAX_EDGE_PX,
-      fit: "inside",
-      withoutEnlargement: true,
-    });
-  }
+  const needResize =
+    (meta.width ?? 0) > MAX_EDGE_PX || (meta.height ?? 0) > MAX_EDGE_PX;
+  /** 每次重建管道，避免 sharp 实例被 toBuffer 消费后复用失败 */
+  const buildResized = () => {
+    let p = buildSharpPipeline(buf);
+    if (needResize) {
+      p = p.resize({
+        width: MAX_EDGE_PX,
+        height: MAX_EDGE_PX,
+        fit: "inside",
+        withoutEnlargement: true,
+      });
+    }
+    return p;
+  };
 
   if (meta.format === "jpeg") {
-    const out = await pipeline.jpeg({ quality: 92, mozjpeg: true }).toBuffer();
+    const out = await buildResized().jpeg({ quality: 92, mozjpeg: true }).toBuffer();
     return { buf: Buffer.from(out), contentType: "image/jpeg", ext: "jpg" };
   }
 
-  const out = await pipeline
+  // 透明图（带 alpha 且实际使用了透明）：裁掉四周透明留白后保留透明输出 PNG，
+  // 避免铺白底产生白边、也避免透明留白在画布上显示为暗边。
+  if (meta.hasAlpha) {
+    let isOpaque = false;
+    try {
+      isOpaque = (await sharp(buf, { failOn: "none" }).stats()).isOpaque;
+    } catch {
+      isOpaque = false;
+    }
+    if (!isOpaque) {
+      try {
+        const out = await buildResized()
+          .trim({ threshold: 10 })
+          .png({ compressionLevel: 9 })
+          .toBuffer();
+        return { buf: Buffer.from(out), contentType: "image/png", ext: "png" };
+      } catch {
+        // 全透明 / 裁剪失败 → 不裁剪，仍保留透明
+        const out = await buildResized().png({ compressionLevel: 9 }).toBuffer();
+        return { buf: Buffer.from(out), contentType: "image/png", ext: "png" };
+      }
+    }
+  }
+
+  const out = await buildResized()
     .flatten({ background: { r: 255, g: 255, b: 255 } })
     .jpeg({ quality: 92, mozjpeg: true })
     .toBuffer();

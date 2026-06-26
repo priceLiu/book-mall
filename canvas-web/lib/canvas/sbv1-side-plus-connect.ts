@@ -1,5 +1,7 @@
 import type { Connection } from "@xyflow/react";
-import { isSbv1MediaGroup, sbv1ImageChildren } from "./sbv1-media-group-meta";
+import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
+import { isPro2StyledGroup } from "./pro2-media-group-meta";
+import { isSbv1VideoEngineRefImageNode } from "./sbv1-upstream-ref-links";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
 
 /** sbv1 左侧 + 拖线：统一为 sbv1-image → sbv1-video-engine (in_ref) */
@@ -38,8 +40,9 @@ export function normalizeSbv1PlusLeftConnection(
 }
 
 /**
- * 分组右侧 + 拖到视频引擎：展开为组内每张 sbv1-image → engine (in_ref)
- * （与 spawnSbv1VideoEngineFromGroup 菜单行为一致）
+ * 分组右侧 + 拖到视频引擎：展开为组内每张图片 → engine (in_ref)。
+ * 与 spawnSbv1VideoEngineFromGroup 菜单一致；同时覆盖影视专业 2.0 媒体组
+ * （分镜图组等，子节点为 story-pro2-image），与 分镜视频 1.0 行为对齐。
  */
 export function expandSbv1GroupOutMediaConnection(
   connection: Connection,
@@ -54,9 +57,16 @@ export function expandSbv1GroupOutMediaConnection(
   if (sourceNode?.type !== "group" || targetNode?.type !== "sbv1-video-engine") {
     return null;
   }
-  if (!isSbv1MediaGroup(sourceNode, nodes)) return null;
+  if (
+    !isSbv1MediaGroup(sourceNode, nodes) &&
+    !isPro2StyledGroup(sourceNode, nodes)
+  ) {
+    return null;
+  }
 
-  const children = sbv1ImageChildren(connection.source, nodes);
+  const children = nodes.filter(
+    (n) => n.parentId === connection.source && isSbv1VideoEngineRefImageNode(n),
+  );
   if (!children.length) return [];
 
   const engineId = connection.target;

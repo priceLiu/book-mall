@@ -98,7 +98,8 @@ function generatingLabelFor(
   edition: LibtvImageNodeEdition,
   d: LibtvImageNodeData,
 ): string {
-  if (d.uploading && !d.runtime?.status) return "上传中…";
+  // 上传中只显示扫光 + 旋转图标，不显示「上传中…」文字
+  if (d.uploading && !d.runtime?.status) return "";
   const role = d.pro2MediaRole;
   if (role === "character-three-view") return "生成三视图中…";
   if (role === "scene") return "生成场景图中…";
@@ -185,7 +186,13 @@ export function LibtvImageNode({
     mediaUrl: previewUrl,
     kind: "image",
     profile: "square-image",
-    disabled: !hasImage || isGenerating || isCharacterThreeView,
+    // 本地上传/粘贴时按 blob 立即自适配（blob 探测必成功），避免只等 ossUrl
+    // ——OSS 探测偶发慢/失败会让外框停在默认比例，露出深色舞台「边框/投影」。
+    // 仅 AI 生成中（非上传）才暂停自适配，避免贴合占位旧图。
+    disabled:
+      !hasImage ||
+      isCharacterThreeView ||
+      (isGenerating && !d.uploading),
   });
 
   const nodeLabel = useMemo(() => {

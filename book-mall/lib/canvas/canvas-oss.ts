@@ -76,6 +76,10 @@ async function downloadToBuffer(
 const MULTIPART_UPLOAD_THRESHOLD_BYTES = 5 * 1024 * 1024;
 const LARGE_UPLOAD_TIMEOUT_MS = 600_000;
 
+/** OSS PUT 可重试的瞬时网络错误（TLS 握手断开 / 连接重置 / 超时等） */
+const TRANSIENT_OSS_ERROR =
+  /socket disconnected|secure TLS connection|ECONNRESET|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|socket hang up|network|timeout|ConnectionTimeout|RequestTimeout|RequestError/i;
+
 async function uploadBufferToOss(args: {
   cfg: OssEnvConfig;
   key: string;
@@ -86,27 +90,46 @@ async function uploadBufferToOss(args: {
 }): Promise<string> {
   const useMultipart = args.buf.byteLength >= MULTIPART_UPLOAD_THRESHOLD_BYTES;
   const timeoutMs = useMultipart ? LARGE_UPLOAD_TIMEOUT_MS : 60_000;
-  const client = await createOssClientFrom(args.cfg, { timeoutMs });
   const ct = args.contentType.split(";")[0].trim() || "application/octet-stream";
-  let result: { url?: string };
-  try {
-    result = await ossUploadBuffer(client, {
-      key: args.key,
-      buf: args.buf,
-      contentType: ct,
-      useMultipart,
-      timeoutMs,
-    });
-  } catch (e) {
-    const raw = e instanceof Error ? e.message : String(e);
-    if (
-      /specified endpoint|must be addressed using the specified endpoint/i.test(raw)
-    ) {
-      throw new Error(
-        `${raw} — 请将 OSS_REGION 改为 OSS 控制台 Bucket 的「访问域名 / 地域」一致。`,
-      );
+
+  // 瞬时网络抖动（如 TLS 握手前 socket 断开）重试；每次重建客户端用全新连接
+  const sleeps = [0, 600, 1800];
+  let result: { url?: string } | null = null;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < sleeps.length; attempt++) {
+    if (sleeps[attempt] > 0) {
+      await new Promise((r) => setTimeout(r, sleeps[attempt]));
     }
-    throw e;
+    const client = await createOssClientFrom(args.cfg, { timeoutMs });
+    try {
+      result = await ossUploadBuffer(client, {
+        key: args.key,
+        buf: args.buf,
+        contentType: ct,
+        useMultipart,
+        timeoutMs,
+      });
+      break;
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      if (
+        /specified endpoint|must be addressed using the specified endpoint/i.test(raw)
+      ) {
+        throw new Error(
+          `${raw} — 请将 OSS_REGION 改为 OSS 控制台 Bucket 的「访问域名 / 地域」一致。`,
+        );
+      }
+      lastError = e;
+      if (attempt < sleeps.length - 1 && TRANSIENT_OSS_ERROR.test(raw)) {
+        continue;
+      }
+      throw e;
+    }
+  }
+  if (!result) {
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(String(lastError ?? "oss upload failed"));
   }
   const u = typeof result.url === "string" ? result.url.trim() : "";
   if (args.preferBucketUrl) {

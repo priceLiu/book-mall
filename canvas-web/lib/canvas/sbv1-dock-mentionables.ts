@@ -1,6 +1,9 @@
 import type { MentionableItem } from "@/components/canvas/mentions/MentionsTextarea";
 import { parseReferencedIds } from "@/components/canvas/mentions/MentionsTextarea";
-import type { Sbv1UpstreamRefLink } from "./sbv1-upstream-ref-links";
+import {
+  isSbv1VideoEngineRefImageNode,
+  type Sbv1UpstreamRefLink,
+} from "./sbv1-upstream-ref-links";
 import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 import type { CanvasFlowNode } from "./types";
 
@@ -42,7 +45,9 @@ export function buildSbv1DockMentionables(
       continue;
     }
     const nodeId = id.startsWith("sbv1-ref-") ? id.slice("sbv1-ref-".length) : "";
-    const node = nodes?.find((n) => n.id === nodeId && n.type === "sbv1-image");
+    const node = nodes?.find(
+      (n) => n.id === nodeId && isSbv1VideoEngineRefImageNode(n),
+    );
     if (!node) continue;
     const linkIndex =
       upstreamLinks.findIndex((l) => l.id === id) + 1 ||

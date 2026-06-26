@@ -56,6 +56,9 @@ export type EnginePickerProps = {
 /* 须高于 story-engine-actions-modal (1090) 等嵌套宿主 */
 const ENGINE_PICKER_MODAL_Z = 1200;
 
+/** 稳定的空参数引用：避免默认 `params = {}` 每次 render 产生新对象，触发弹层 effect 反复 setDraft */
+const EMPTY_PARAMS: Record<string, unknown> = Object.freeze({});
+
 /**
  * - 触发按钮显示当前选中
  * - 弹层：模型卡片 → 下方动态参数（分段按钮 / 滑条 / 复选框）
@@ -68,7 +71,7 @@ export function EnginePicker({
   capabilityHint,
   providerId,
   modelKey,
-  params = {},
+  params = EMPTY_PARAMS,
   onChange,
   embedded = false,
   modelsOnly = false,
@@ -77,14 +80,30 @@ export function EnginePicker({
   const { providers, loading } = useUserProviders();
   const [open, setOpen] = useState(false);
 
+  // 调用方常以「内联数组字面量」传入这些 props（每次 render 新引用），
+  // 若直接进 useMemo 依赖会导致 filtered/groups 每帧变更，进而让弹层 effect 反复 setDraft → 闪烁。
+  // 改用「序列化 key」做依赖，按内容稳定。
+  const SEP = "\u0001";
+  const allowedKey = (allowedModelKeys ?? []).join(SEP);
+  const providerIdsKey = (providerIds ?? []).join(SEP);
+  const reqCapsKey = (requiredCapabilities ?? []).join(SEP);
+
   const allowedSet = useMemo(
-    () => (allowedModelKeys?.length ? new Set(allowedModelKeys) : null),
-    [allowedModelKeys],
+    () => (allowedKey ? new Set(allowedKey.split(SEP)) : null),
+    [allowedKey],
   );
 
   const providerIdSet = useMemo(
-    () => (providerIds?.length ? new Set(providerIds) : null),
-    [providerIds],
+    () => (providerIdsKey ? new Set(providerIdsKey.split(SEP)) : null),
+    [providerIdsKey],
+  );
+
+  const stableReqCaps = useMemo(
+    () =>
+      reqCapsKey
+        ? (reqCapsKey.split(SEP) as StoryModelCapability[])
+        : undefined,
+    [reqCapsKey],
   );
 
   const filtered = useMemo(
@@ -101,22 +120,22 @@ export function EnginePicker({
               m.role === role &&
               m.enabled &&
               (!allowedSet || allowedSet.has(m.modelKey)) &&
-              (!requiredCapabilities?.length ||
-                modelHasStoryCapabilities(m.modelKey, requiredCapabilities)),
+              (!stableReqCaps?.length ||
+                modelHasStoryCapabilities(m.modelKey, stableReqCaps)),
           ),
         }))
         .filter((g) => g.models.length > 0),
-    [providers, role, allowedSet, providerIdSet, requiredCapabilities],
+    [providers, role, allowedSet, providerIdSet, stableReqCaps],
   );
 
   const capabilityMismatch = useMemo(() => {
-    if (!requiredCapabilities?.length || !modelKey.trim()) return null;
-    if (modelHasStoryCapabilities(modelKey, requiredCapabilities)) return null;
+    if (!stableReqCaps?.length || !modelKey.trim()) return null;
+    if (modelHasStoryCapabilities(modelKey, stableReqCaps)) return null;
     return (
       capabilityHint ??
-      `当前模型可能不支持 ${storyCapabilityHint(requiredCapabilities)}，建议重新选择`
+      `当前模型可能不支持 ${storyCapabilityHint(stableReqCaps)}，建议重新选择`
     );
-  }, [requiredCapabilities, modelKey, capabilityHint]);
+  }, [stableReqCaps, modelKey, capabilityHint]);
 
   const current = useMemo(() => {
     for (const g of filtered) {
