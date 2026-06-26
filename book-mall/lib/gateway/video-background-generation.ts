@@ -12,9 +12,15 @@ export const VIDEO_BACKGROUND_WAIT_HINT =
 export const VIDEO_BACKGROUND_RECOVER_HINT =
   "厂商侧可能已出片，请点击「加载到节点」恢复。";
 
-/** 历史误杀 failCode（可尝试向厂商复核并恢复） */
+/**
+ * 历史误杀 failCode（可尝试向厂商复核并恢复）。
+ * 含 `STALE_TIMEOUT`：90min/硬上限超时收口的火山视频，厂商常已出片；
+ * 复核函数已按 `providerKind=VOLCENGINE && requestKind=VIDEO && externalTaskId` 收窄，
+ * 非火山视频的 STALE_TIMEOUT 进入复核会被 skip，不会误恢复。
+ */
 export const VOLCENGINE_RECOVERABLE_STALL_FAIL_CODES = [
   "VOLCENGINE_GATEWAY_POLL_STALL",
+  "STALE_TIMEOUT",
 ] as const;
 
 export type VideoBackgroundGenerationMeta = {

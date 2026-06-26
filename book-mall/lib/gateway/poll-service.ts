@@ -9,6 +9,7 @@ import {
 import {
   autoRecoverPollStalledVolcengineGatewayLogs,
   recoverMisclassifiedVolcengineStallLogs,
+  recoverVolcengineGatewayLogFromVendor,
 } from "@/lib/gateway/volcengine-stall-recover";
 import { gatewayV1RecordInfo } from "@/lib/gateway/gateway-v1-http-client";
 import { createKieTaskWithKey, getKieTaskWithKey } from "@/lib/story/kie-client";
@@ -42,8 +43,21 @@ const STALE_RUNNING_NO_TASK_MS = 3 * 60 * 1000;
 /** 火山视频提交失败但未写入 externalTaskId 时，尽快收口 RUNNING（高负载下 submit 可能 >90s） */
 const STALE_VOLCENGINE_NO_TASK_MS = 5 * 60 * 1000;
 const STALE_RUNNING_WITH_TASK_MS = 6 * 60 * 60 * 1000;
-/** 火山视频任务：过长仍 RUNNING 则自动收口（避免日志页一直 running） */
+/** 火山视频任务：过长仍 RUNNING 则先向厂商核对（彻底收口），核对不通过才失败 */
 const STALE_VOLCENGINE_VIDEO_MS = 90 * 60 * 1000;
+/**
+ * 火山视频绝对硬上限：超过此时长且向厂商核对仍无法确认终态（仍 running / 厂商不可达）才强制
+ * 收口为 STALE_TIMEOUT，杜绝「厂商早已出片却被 90min 盲超时误杀」。
+ */
+const STALE_VOLCENGINE_VIDEO_HARD_MS = (() => {
+  const v = Number(process.env.STALE_VOLCENGINE_VIDEO_HARD_MS);
+  return Number.isFinite(v) && v > 0 ? v : 4 * 60 * 60 * 1000;
+})();
+/** 每次 sweep 最多核对的火山在途视频条数（其余留待下一 tick，避免拖垮 tick 时长预算） */
+const STALE_VOLCENGINE_RECONCILE_LIMIT = (() => {
+  const v = Number(process.env.STALE_VOLCENGINE_RECONCILE_LIMIT);
+  return Number.isFinite(v) && v > 0 ? Math.floor(v) : 8;
+})();
 /** 百炼 / KIE / 通义异步视频：超过此时长仍 RUNNING 则自动失败收口 */
 const STALE_ASYNC_VIDEO_MS = 45 * 60 * 1000;
 
@@ -119,22 +133,7 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     },
   });
 
-  const volcengineVideoCutoff = new Date(now - STALE_VOLCENGINE_VIDEO_MS);
-  const r3 = await prisma.gatewayRequestLog.updateMany({
-    where: {
-      status: "RUNNING",
-      providerKind: "VOLCENGINE",
-      requestKind: "VIDEO",
-      externalTaskId: { not: null },
-      submittedAt: { lt: volcengineVideoCutoff },
-    },
-    data: {
-      status: "FAILED",
-      failCode: "STALE_TIMEOUT",
-      failMessage: "火山视频任务轮询超时（超过 90 分钟），请在厂商控制台核对任务状态",
-      completedAt: new Date(),
-    },
-  });
+  const r3 = await reconcileStaleVolcengineVideoLogs(now);
 
   const asyncVideoCutoff = new Date(now - STALE_ASYNC_VIDEO_MS);
   const r3b = await prisma.gatewayRequestLog.updateMany({
@@ -164,7 +163,85 @@ export async function expireStaleGatewayLogs(): Promise<number> {
     );
   }
 
-  return r0.count + r1.count + r2.count + r3a.count + r3.count + r3b.count + r4;
+  return r0.count + r1.count + r2.count + r3a.count + r3 + r3b.count + r4;
+}
+
+/**
+ * 火山在途视频「彻底收口」：到 90min 不再盲目失败，而是逐条向厂商核对：
+ *  - 厂商已出片 → SUCCEEDED 收口（带视频，并同步画布）；
+ *  - 厂商明确失败 → FAILED（VOLCENGINE_TASK_FAILED）；
+ *  - 厂商仍 running / 不可达 → 保持 RUNNING，下一 tick 继续核对；
+ *    仅当超过绝对硬上限（STALE_VOLCENGINE_VIDEO_HARD_MS）仍无法确认才强制 STALE_TIMEOUT。
+ * 复核走 recoverVolcengineGatewayLogFromVendor（含 15s 厂商超时 + 去重 + 并发封顶），
+ * 这里以有限并发执行：厂商 HTTP 并行、DB 写串行，墙钟受单次 15s 超时约束、不拖垮 tick。
+ */
+async function reconcileStaleVolcengineVideoLogs(nowMs: number): Promise<number> {
+  const cutoff = new Date(nowMs - STALE_VOLCENGINE_VIDEO_MS);
+  const rows = await prisma.gatewayRequestLog.findMany({
+    where: {
+      status: "RUNNING",
+      providerKind: "VOLCENGINE",
+      requestKind: "VIDEO",
+      externalTaskId: { not: null },
+      submittedAt: { lt: cutoff },
+    },
+    orderBy: { submittedAt: "asc" },
+    take: STALE_VOLCENGINE_RECONCILE_LIMIT,
+    select: { id: true, submittedAt: true },
+  });
+  if (rows.length === 0) return 0;
+
+  const hardCutoffMs = nowMs - STALE_VOLCENGINE_VIDEO_HARD_MS;
+  let closed = 0;
+
+  await mapWithConcurrency(
+    rows,
+    async (row) => {
+      let confirmedTerminal = false;
+      try {
+        const result = await recoverVolcengineGatewayLogFromVendor(row.id);
+        // succeeded / vendor_failed = 厂商终态已写库收口；其余（still_running / skipped / busy）= 未确认
+        confirmedTerminal =
+          result.ok &&
+          (result.action === "succeeded" || result.action === "vendor_failed");
+      } catch (e) {
+        console.warn(
+          "[gateway-poll] reconcileStaleVolcengineVideoLogs recover failed",
+          row.id,
+          e instanceof Error ? e.message : String(e),
+        );
+      }
+      if (confirmedTerminal) {
+        closed += 1;
+        return;
+      }
+      // 厂商未确认终态：仅在超过绝对硬上限时才强制收口，否则保留 RUNNING 等下一轮
+      if (row.submittedAt.getTime() < hardCutoffMs) {
+        try {
+          const r = await prisma.gatewayRequestLog.updateMany({
+            where: { id: row.id, status: "RUNNING" },
+            data: {
+              status: "FAILED",
+              failCode: "STALE_TIMEOUT",
+              failMessage:
+                "火山视频任务轮询超时（超过硬上限），向厂商核对仍未确认终态，请在厂商控制台核对 Vendor Task ID",
+              completedAt: new Date(),
+            },
+          });
+          closed += r.count;
+        } catch (e) {
+          console.warn(
+            "[gateway-poll] reconcileStaleVolcengineVideoLogs hard-fail skipped",
+            row.id,
+            e instanceof Error ? e.message : String(e),
+          );
+        }
+      }
+    },
+    Math.min(4, rows.length),
+  );
+
+  return closed;
 }
 
 export function parseGatewayClientSource(
