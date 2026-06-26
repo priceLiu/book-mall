@@ -54,9 +54,9 @@ type MirrorSync = {
 function syncMirrorStyles(
   textarea: HTMLTextAreaElement,
   mirror: HTMLDivElement,
-  scrollOverride?: { top: number; left: number },
+  scrollOverride: { top: number; left: number } | undefined,
+  computed: CSSStyleDeclaration,
 ): MirrorSync {
-  const computed = window.getComputedStyle(textarea);
   const style = mirror.style;
   style.position = "fixed";
   style.visibility = "hidden";
@@ -115,8 +115,8 @@ export function getTextareaCaretClientRect(
           left: options.measureScrollLeft ?? textarea.scrollLeft,
         }
       : undefined;
-  const { scaleY } = syncMirrorStyles(textarea, mirror, scrollOverride);
   const computed = window.getComputedStyle(textarea);
+  const { scaleY } = syncMirrorStyles(textarea, mirror, scrollOverride, computed);
 
   const clamped = Math.min(position, textarea.value.length);
   mirror.textContent = textarea.value.substring(0, clamped);
@@ -142,6 +142,54 @@ export function getTextareaCaretClientRect(
     bottom: markerRect.bottom,
     height,
   };
+}
+
+/**
+ * 一次镜像同步、批量测量多个光标位置（用于内联缩略图一次重测多个 @ 区段）。
+ * 相比逐个调用 `getTextareaCaretClientRect`，避免重复 `getComputedStyle` 与样式拷贝。
+ */
+export function getTextareaCaretClientRects(
+  textarea: HTMLTextAreaElement,
+  positions: number[],
+  options?: { measureScrollTop?: number; measureScrollLeft?: number },
+): (TextareaCaretClientRect | null)[] {
+  if (positions.length === 0) return [];
+  const mirror = getMirror(textarea);
+  const scrollOverride =
+    options?.measureScrollTop !== undefined ||
+    options?.measureScrollLeft !== undefined
+      ? {
+          top: options.measureScrollTop ?? textarea.scrollTop,
+          left: options.measureScrollLeft ?? textarea.scrollLeft,
+        }
+      : undefined;
+  const computed = window.getComputedStyle(textarea);
+  const { scaleY } = syncMirrorStyles(textarea, mirror, scrollOverride, computed);
+  const value = textarea.value;
+  const fallbackHeight =
+    parseFloat(computed.lineHeight) * scaleY ||
+    parseFloat(computed.fontSize) * scaleY ||
+    16;
+
+  return positions.map((position) => {
+    if (position < 0) return null;
+    const clamped = Math.min(position, value.length);
+    mirror.textContent = value.substring(0, clamped);
+    const marker = document.createElement("span");
+    marker.textContent = "\u200b";
+    marker.style.display = "inline-block";
+    marker.style.width = "0";
+    marker.style.overflow = "visible";
+    mirror.appendChild(marker);
+    const markerRect = marker.getBoundingClientRect();
+    mirror.textContent = "";
+    return {
+      left: markerRect.left,
+      top: markerRect.top,
+      bottom: markerRect.bottom,
+      height: markerRect.height || fallbackHeight,
+    };
+  });
 }
 
 /** 视口坐标 → textarea 字符索引（用于 @ 悬停命中） */

@@ -14,7 +14,7 @@ export function CanvasPillToolbar({
 }) {
   return (
     <div
-      className={`flex items-center gap-1 rounded-full border border-white/15 bg-black/85 px-1.5 py-1.5 shadow-xl backdrop-blur-md ${className}`}
+      className={`flex items-center gap-1 rounded-full border border-white/15 bg-[#161618]/95 px-1.5 py-1.5 shadow-xl ${className}`}
     >
       {children}
       {badge}

@@ -124,7 +124,7 @@ export function CanvasViewportToolbar({
       ) : null}
       <Panel position="bottom-right" className="!m-0 !mb-4 !mr-4">
         <div
-          className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/96 px-1 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+          className="pointer-events-auto flex items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/98 px-1 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >

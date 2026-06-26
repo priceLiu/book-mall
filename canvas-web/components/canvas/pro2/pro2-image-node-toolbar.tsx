@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 /** LibTV 节点顶栏工具条 · 壳层（规范见 libtv-node-interaction-spec.md §5） */
 export const PRO2_IMAGE_NODE_TOOLBAR_SHELL_CLASS =
-  "inline-flex w-max max-w-none flex-nowrap items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/96 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-xl";
+  "inline-flex w-max max-w-none flex-nowrap items-center gap-0.5 rounded-xl border border-white/10 bg-[#1c1c1e]/98 px-1.5 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.45)]";
 
 /** 带文案的操作钮 */
 export const PRO2_IMAGE_NODE_TOOLBAR_TOOL_BTN_CLASS =

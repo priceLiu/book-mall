@@ -22,7 +22,7 @@ import {
 } from "@/lib/canvas/mention-inline-thumb-placeholder";
 import { LIBTV_INPUT_DOCK_BG } from "@/lib/canvas/libtv-node-chrome";
 import { useLibtvInputDockUi } from "@/lib/canvas/libtv-input-dock-ui-context";
-import { getTextareaCaretClientRect } from "@/lib/canvas/textarea-caret-rect";
+import { getTextareaCaretClientRects } from "@/lib/canvas/textarea-caret-rect";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { cn } from "@/lib/utils";
 
@@ -71,32 +71,41 @@ function measureBadgePlacements(
   const wrapperRect = wrapper.getBoundingClientRect();
   const raw = textarea.value;
   const clean = stripMentionThumbSlots(raw);
-  const ranges = findAllMentionRangesInDisplay(clean, mentionables);
-  const out: BadgePlacement[] = [];
-  const measureScroll = { measureScrollTop: 0, measureScrollLeft: 0 };
+  const ranges = findAllMentionRangesInDisplay(clean, mentionables).filter(
+    (r) => r.item.previewUrl,
+  );
+  if (ranges.length === 0) return [];
 
-  for (const range of ranges) {
-    if (!range.item.previewUrl) continue;
+  const fontSizePx = parseFloat(window.getComputedStyle(textarea).fontSize) || 13;
+  const reserveSpaces = inlineMentionThumbReserveSpaces(fontSizePx);
 
-    const rawStart = toRawIndex(raw, clean, range.start);
-    const rawEnd = toRawIndex(raw, clean, range.end);
-    const start = getTextareaCaretClientRect(textarea, rawStart, measureScroll);
-    const end = getTextareaCaretClientRect(textarea, rawEnd, measureScroll);
-    if (!start || !end) continue;
-
-    const fontSizePx = parseFloat(window.getComputedStyle(textarea).fontSize) || 13;
+  // 收集所有待测位置，一次镜像同步批量测量（start / end / maskEnd）
+  const positions: number[] = [];
+  const meta = ranges.map((range) => {
     const tailSpaces = clean.slice(range.end).match(/^ */)?.[0]?.length ?? 0;
-    const reserveSpaces = inlineMentionThumbReserveSpaces(fontSizePx);
     const hideTail = Math.min(tailSpaces, reserveSpaces);
-    const maskEndCaret =
+    const startIdx = positions.length;
+    positions.push(toRawIndex(raw, clean, range.start));
+    positions.push(toRawIndex(raw, clean, range.end));
+    const maskIdx =
       hideTail > 0
-        ? getTextareaCaretClientRect(
-            textarea,
-            toRawIndex(raw, clean, range.end + hideTail),
-            measureScroll,
-          )
-        : end;
-    const maskRight = maskEndCaret?.left ?? end.left;
+        ? (positions.push(toRawIndex(raw, clean, range.end + hideTail)),
+          positions.length - 1)
+        : startIdx + 1;
+    return { range, startIdx, endIdx: startIdx + 1, maskIdx };
+  });
+
+  const rects = getTextareaCaretClientRects(textarea, positions, {
+    measureScrollTop: 0,
+    measureScrollLeft: 0,
+  });
+
+  const out: BadgePlacement[] = [];
+  for (const { range, startIdx, endIdx, maskIdx } of meta) {
+    const start = rects[startIdx];
+    const end = rects[endIdx];
+    if (!start || !end) continue;
+    const maskRight = rects[maskIdx]?.left ?? end.left;
 
     const lineH = start.height || BADGE_HEIGHT_PX;
     out.push({
@@ -294,9 +303,16 @@ export const MentionInlineThumbOverlay = forwardRef<
         remeasure();
       });
     });
+    // 收起态 / portal 初次布局可能在 rAF 后才稳定（字体、高度过渡），补一次延时重测
+    const settleTimer = window.setTimeout(() => {
+      measureRetryRef.current = 0;
+      syncScrollOffset();
+      remeasure();
+    }, 160);
     return () => {
       cancelAnimationFrame(raf1);
       if (raf2 != null) cancelAnimationFrame(raf2);
+      window.clearTimeout(settleTimer);
     };
   }, [displayValue, mentionables, remeasure, syncScrollOffset, dockExpanded]);
 
@@ -304,13 +320,24 @@ export const MentionInlineThumbOverlay = forwardRef<
     const ta = textareaRef.current;
     if (!enabled || !ta) return;
 
+    // 徽标已生成时滚动只同步 transform（廉价）；若徽标缺失但仍有待显示的
+    // mention（首测在布局未稳时失败），滚动/聚焦时补一次重测，自愈空白态。
+    const selfHealIfEmpty = () => {
+      const root = overlayRef.current;
+      if (root && root.childElementCount === 0) {
+        measureRetryRef.current = 0;
+        scheduleRemeasure();
+      }
+    };
     const onScroll = () => {
       syncScrollOffset();
+      selfHealIfEmpty();
     };
     syncScrollOffset();
 
     ta.addEventListener("input", scheduleRemeasure);
     ta.addEventListener("compositionend", scheduleRemeasure);
+    ta.addEventListener("focus", selfHealIfEmpty);
     ta.addEventListener("scroll", onScroll, { passive: true });
     const ro = new ResizeObserver(scheduleRemeasure);
     ro.observe(ta);
@@ -334,6 +361,7 @@ export const MentionInlineThumbOverlay = forwardRef<
     return () => {
       ta.removeEventListener("input", scheduleRemeasure);
       ta.removeEventListener("compositionend", scheduleRemeasure);
+      ta.removeEventListener("focus", selfHealIfEmpty);
       ta.removeEventListener("scroll", onScroll);
       dockShell?.removeEventListener("transitionend", onDockTransitionEnd);
       dockScroll?.removeEventListener("scroll", scheduleRemeasure);

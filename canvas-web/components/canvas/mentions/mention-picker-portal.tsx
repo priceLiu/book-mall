@@ -213,7 +213,7 @@ export function MentionPickerPortal({
 
   return createPortal(
     <div
-      className={`${RF_NO_DRAG} nopan fixed flex flex-col overflow-hidden rounded-xl border border-white/15 bg-[#141414]/98 shadow-2xl backdrop-blur-md`}
+      className={`${RF_NO_DRAG} nopan fixed flex flex-col overflow-hidden rounded-xl border border-white/15 bg-[#141414]/98 shadow-2xl`}
       style={{
         left,
         top,

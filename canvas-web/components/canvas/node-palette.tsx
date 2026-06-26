@@ -510,8 +510,8 @@ function PalettePill({
   proTheme?: boolean;
 }) {
   const pillClass = proTheme
-    ? "inline-flex w-fit max-w-full items-center gap-0.5 rounded-full border border-cyan-400/25 bg-[var(--canvas-surface)]/80 px-1 py-0.5 shadow-md backdrop-blur-sm"
-    : "inline-flex w-fit max-w-full items-center gap-0.5 rounded-full border border-white/12 bg-[var(--canvas-surface)]/75 px-1 py-0.5 shadow-md backdrop-blur-sm";
+    ? "inline-flex w-fit max-w-full items-center gap-0.5 rounded-full border border-cyan-400/25 bg-[var(--canvas-surface)]/95 px-1 py-0.5 shadow-md"
+    : "inline-flex w-fit max-w-full items-center gap-0.5 rounded-full border border-white/12 bg-[var(--canvas-surface)]/92 px-1 py-0.5 shadow-md";
 
   if (collapsed) {
     return (
@@ -585,7 +585,7 @@ const SHORTCUTS: Array<{ keys: string[]; desc: string }> = [
 
 function HelpShortcutsPanel({ onClose }: { onClose: () => void }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/12 bg-black/90 shadow-2xl backdrop-blur-lg">
+    <div className="overflow-hidden rounded-2xl border border-white/12 bg-[#101012]/96 shadow-2xl">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
         <div className="flex items-center gap-2 text-[13px] text-white">
           <HelpCircle className="size-4 text-[var(--canvas-accent)]" />
@@ -778,10 +778,10 @@ export function NodePalette({
           }
         >
           {/* 移到顶部：工具条左侧、与整列垂直居中 */}
-          <div className="pointer-events-auto shrink-0 self-center rounded-full bg-[var(--canvas-surface)]/95 p-0.5 shadow-md backdrop-blur-sm">
+          <div className="pointer-events-auto shrink-0 self-center rounded-full bg-[var(--canvas-surface)]/95 p-0.5 shadow-md">
             {collapseButton}
           </div>
-          <div className="pointer-events-auto flex flex-col rounded-xl border border-white/12 bg-[var(--canvas-surface)]/90 shadow-md backdrop-blur-md">
+          <div className="pointer-events-auto flex flex-col rounded-xl border border-white/12 bg-[var(--canvas-surface)]/95 shadow-md">
             <div className="nodrag flex flex-col items-center gap-1 py-1.5 pl-1 pr-1">
                 {pro2Only ? (
                   <PalettePill

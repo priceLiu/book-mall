@@ -85,7 +85,7 @@ export const LIBTV_NODE_HANDLE_CLASS =
 
 /** 画布底部磁吸 Dock 外壳（分镜 1.0 · 2.0 共用） */
 export const LIBTV_CANVAS_DOCK_BAR_CLASS =
-  "pointer-events-auto mx-auto flex h-14 items-end gap-2 rounded-2xl border border-white/[0.08] bg-[rgba(38,38,40,0.72)] px-3 pb-2 shadow-[0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl backdrop-saturate-150";
+  "pointer-events-auto mx-auto flex h-14 items-end gap-2 rounded-2xl border border-white/[0.08] bg-[rgba(34,34,36,0.94)] px-3 pb-2 shadow-[0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.06)]";
 
 /** 节点下方浮动输入坞 · 外壳描边 / 背景（Pro2InputDockShell） */
 export const LIBTV_INPUT_DOCK_BORDER = "rgba(255, 255, 255, 0.08)";

@@ -111,7 +111,7 @@ function Sbv1DockIcon({
           stiffness: 500,
           damping: 30,
         }}
-        className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-800/90 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm"
+        className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-800/95 px-1.5 py-0.5 text-[10px] text-white"
       >
         {item.name}
       </motion.div>

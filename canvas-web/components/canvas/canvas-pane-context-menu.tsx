@@ -94,7 +94,7 @@ function CanvasPaneContextMenuRow({
           role="menu"
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="overflow-hidden rounded-[6px] border border-white/10 bg-[#323232]/96 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+          <div className="overflow-hidden rounded-[6px] border border-white/10 bg-[#323232]/98 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.55)]">
             {item.children!.map((child) => (
               <CanvasPaneContextMenuRow
                 key={child.id}
@@ -161,7 +161,7 @@ export function CanvasPaneContextMenu({
       onContextMenu={(e) => e.preventDefault()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="overflow-visible rounded-[6px] border border-white/10 bg-[#323232]/96 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+      <div className="overflow-visible rounded-[6px] border border-white/10 bg-[#323232]/98 py-1 shadow-[0_8px_32px_rgba(0,0,0,0.55)]">
         {items.map((item) => (
           <CanvasPaneContextMenuRow
             key={item.id}
