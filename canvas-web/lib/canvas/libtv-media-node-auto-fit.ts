@@ -2,7 +2,10 @@
 
 import { useEffect, useRef } from "react";
 
-import { LIBTV_MEDIA_NODE_HEADER_HEIGHT } from "./libtv-node-chrome";
+import {
+  LIBTV_IMAGE_NODE_HEADER_HEIGHT,
+  LIBTV_VIDEO_NODE_HEADER_HEIGHT,
+} from "./libtv-node-chrome";
 import { isPro2StyledGroup } from "./pro2-media-group-meta";
 import { relayoutPro2MediaGroup } from "./pro2-media-group-layout";
 import { isSbv1MediaGroup } from "./sbv1-media-group-meta";
@@ -70,7 +73,10 @@ export function computeLibtvMediaNodeSize(
 ): LibtvMediaNodeSize {
   const nw = Math.max(1, naturalWidth);
   const nh = Math.max(1, naturalHeight);
-  const headerHeight = LIBTV_MEDIA_NODE_HEADER_HEIGHT;
+  const headerHeight =
+    profile === "sbv1-video"
+      ? LIBTV_VIDEO_NODE_HEADER_HEIGHT
+      : LIBTV_IMAGE_NODE_HEADER_HEIGHT;
 
   const defaultWidth =
     profile === "sbv1-video" ? 635 : PRO2_IMAGE_NODE_WIDTH;

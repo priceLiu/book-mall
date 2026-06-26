@@ -9,7 +9,10 @@ import {
   portraitImportUiState,
   type CanvasPortraitNodeFields,
 } from "./portrait-node-data";
-import { resolveSbv1UpstreamRefLinks } from "./sbv1-upstream-ref-links";
+import {
+  isSbv1VideoEngineRefImageNode,
+  resolveSbv1UpstreamRefLinks,
+} from "./sbv1-upstream-ref-links";
 import type { Sbv1ReferenceMode } from "./sbv1-workspace-types";
 import { directPredecessors } from "./topo";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
@@ -26,7 +29,7 @@ function uniqueDirectPredecessors(edges: CanvasFlowEdge[], nodeId: string): stri
   return [...new Set(directPredecessors(edges, nodeId))];
 }
 
-/** 非 sbv1-image 上游（如风格资产）仍可走 HTTPS */
+/** 非图片参考上游（如风格资产）仍可走 HTTPS；图片节点已由 upstreamLinks 处理，跳过避免重复 */
 function resolveNonSbv1ImageHttpsInputs(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
@@ -35,7 +38,7 @@ function resolveNonSbv1ImageHttpsInputs(
   const out: string[] = [];
   for (const pid of uniqueDirectPredecessors(edges, engineNodeId)) {
     const p = nodes.find((n) => n.id === pid);
-    if (!p || p.type === "sbv1-image") continue;
+    if (!p || isSbv1VideoEngineRefImageNode(p)) continue;
     if (p.type === "story-pro2-style-asset") {
       const url = String(
         (p.data as { imageUrl?: string }).imageUrl ?? "",
@@ -116,7 +119,7 @@ export function resolveSbv1VideoEngineInputs(
 
   for (const link of activeLinks) {
     const imgNode = nodes.find((n) => n.id === link.sourceNodeId);
-    if (!imgNode || imgNode.type !== "sbv1-image") continue;
+    if (!imgNode || !isSbv1VideoEngineRefImageNode(imgNode)) continue;
     if (
       !link.previewUrl &&
       !isPortraitNodeActive(imgNode.data as CanvasPortraitNodeFields) &&

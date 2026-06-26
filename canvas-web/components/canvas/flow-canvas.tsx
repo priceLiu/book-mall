@@ -1129,13 +1129,12 @@ function FlowCanvasInner({
       if (event.defaultPrevented) return;
       const t = event.target as HTMLElement | null;
       const dt = event.clipboardData;
+      // 不在此处规范化：保留剪贴板「原始字节」交给下游上传（与点击上传一致，
+      // 服务端 sharp 统一处理）。提前 canvas 重编码会丢色彩配置导致变暗、并多一次有损往返。
+      // 预览用的规范化由 ingestImageFile / onFile 各自完成。
       let imageFiles = allImageFilesFromDataTransfer(dt);
       if (!imageFiles.length) {
         imageFiles = await resolveClipboardImageFiles(dt);
-      } else {
-        imageFiles = await Promise.all(
-          imageFiles.map((f) => normalizeCanvasImageFile(f)),
-        );
       }
 
       if (

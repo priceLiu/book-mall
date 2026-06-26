@@ -19,6 +19,7 @@ import { storyApplyTaskResult } from "@/lib/canvas/story-run-apply";
 import { resolveStoryProRunStylePayload } from "@/lib/canvas/story-pro-run-style-context";
 import { resolveStoryVideoRowPortraitAssetRefs } from "@/lib/canvas/story-video-portrait-refs";
 import { storyVideoGenerateBlockReason } from "@/lib/canvas/story-frame-gate";
+import { isAnyStoryVideoColumnType } from "@/lib/canvas/story-workspace-resolver";
 import { tasksMatchStoryScope } from "@/lib/canvas/task-pick";
 import type { CanvasEnginePick } from "@/lib/canvas/types";
 import type {
@@ -176,11 +177,7 @@ async function commitStoryVideoRowRunOnce(
   const updateNodeData = useCanvasStore.getState().updateNodeData;
   const state = useCanvasStore.getState();
   const videoNode = state.nodes.find((n) => n.id === videoColumnId);
-  if (
-    !videoNode ||
-    (videoNode.type !== "story-video-column" &&
-      videoNode.type !== "story-pro-video")
-  ) {
+  if (!videoNode || !isAnyStoryVideoColumnType(videoNode.type ?? "")) {
     return { ok: false, error: "找不到分镜视频列，请检查工作区是否完整。" };
   }
 

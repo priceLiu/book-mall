@@ -20,8 +20,18 @@ export const LIBTV_MEDIA_CARD_SHELL_CLASS =
 export const LIBTV_MEDIA_STAGE_CLASS =
   "libtv-media-node-bg relative min-h-0 flex-1 overflow-hidden";
 
-/** LibTV 媒体卡内标题栏（icon + 标题 + border-b）占用高度（px） */
-export const LIBTV_MEDIA_NODE_HEADER_HEIGHT = 36;
+/**
+ * LibTV 媒体卡内标题栏占用高度（px）——须与实际渲染高度一致，否则自动适配后
+ * stage 比例与图片真实比例不符，`object-contain` 会在四周留深色「边框/投影」。
+ *
+ * - 图片/三视图卡：右上 `size-7`(28) 预览按钮 + `py-2`(16) + `border-b`(1) ≈ 44
+ * - 视频合成卡：右上 `p-1`(22) 图标按钮 + `py-2`(16) + `border-b`(1) ≈ 38
+ */
+export const LIBTV_IMAGE_NODE_HEADER_HEIGHT = 44;
+export const LIBTV_VIDEO_NODE_HEADER_HEIGHT = 38;
+
+/** @deprecated 旧常量（偏小，会导致留边）。新代码请用按节点类型区分的上面两个。 */
+export const LIBTV_MEDIA_NODE_HEADER_HEIGHT = LIBTV_IMAGE_NODE_HEADER_HEIGHT;
 
 /**
  * LibTV 方形图片媒体卡默认尺寸（Pro2 图片/风格 · sbv1 图片 · 须一致）
