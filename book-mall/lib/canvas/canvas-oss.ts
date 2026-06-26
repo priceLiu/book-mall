@@ -14,7 +14,10 @@ import {
   buildStyleLibraryOssKey,
   type CanvasOssKind,
 } from "./canvas-constants";
-import { extractVideoFirstFrameJpeg } from "./video-poster-ffmpeg";
+import {
+  extractVideoFirstFrameJpeg,
+  remuxMp4Faststart,
+} from "./video-poster-ffmpeg";
 
 const MAX_IMAGE_BYTES = 30 * 1024 * 1024; // 30MB
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200MB
@@ -187,10 +190,15 @@ export async function persistCanvasKieResultToOss(args: {
           : args.kind === "node-audio"
             ? "audio/mpeg"
             : "image/png";
+      // 视频统一做 faststart（moov 移到头部 → 边下边播）；失败/非 mp4 回退原始 buffer。
+      const uploadBuf =
+        args.kind === "node-video"
+          ? ((await remuxMp4Faststart(dl.buf, ext)) ?? dl.buf)
+          : dl.buf;
       const ossUrl = await uploadBufferToOss({
         cfg,
         key,
-        buf: dl.buf,
+        buf: uploadBuf,
         contentType: dl.contentType || defaultCt,
       });
       return ossUrl;
@@ -217,6 +225,8 @@ export async function persistCanvasVideoResultToOss(args: {
 
   const dl = await downloadToBuffer(args.ephemeralUrl, MAX_VIDEO_BYTES);
   const ext = dl.ext || "mp4";
+  // faststart：把 moov atom 移到头部，浏览器可边下边播；失败/非 mp4 回退原始 buffer。
+  const uploadBuf = (await remuxMp4Faststart(dl.buf, ext)) ?? dl.buf;
   const videoKey = buildCanvasOssKey("node-video", {
     projectId: args.projectId,
     userId: args.userId,
@@ -225,7 +235,7 @@ export async function persistCanvasVideoResultToOss(args: {
   const videoUrl = await uploadBufferToOss({
     cfg,
     key: videoKey,
-    buf: dl.buf,
+    buf: uploadBuf,
     contentType: dl.contentType || "video/mp4",
   });
 

@@ -28,10 +28,10 @@ import { SaveVideoToLibraryButton } from "@/components/canvas/save-video-to-libr
 import type { SaveVideoToLibraryInput } from "@/lib/canvas-video-library-types";
 
 const SLOT_CORNER_BTN =
-  "nodrag absolute z-20 inline-flex size-8 items-center justify-center rounded-full border shadow-md backdrop-blur-sm opacity-0 transition-opacity group-hover/card:opacity-100";
+  "nodrag absolute z-20 inline-flex size-8 items-center justify-center rounded-full border shadow-md opacity-0 transition-opacity group-hover/card:opacity-100";
 
 const SLOT_DOWNLOAD_BTN =
-  "nodrag absolute z-20 inline-flex size-11 items-center justify-center rounded-full border border-white/30 bg-black/70 text-white shadow-lg backdrop-blur-sm transition hover:bg-black/90 hover:scale-105";
+  "nodrag absolute z-20 inline-flex size-11 items-center justify-center rounded-full border border-white/30 bg-black/80 text-white shadow-lg transition hover:bg-black/90 hover:scale-105";
 
 /** 分镜视频列 · 单行卡片（悬停右侧 Tip 看全文，卡片内仅缩略 + 中央生成钮） */
 export function StoryVideoRowSlot({
@@ -141,7 +141,7 @@ export function StoryVideoRowSlot({
               className="nodrag absolute inset-0 z-10 flex items-center justify-center"
               onClick={onPreview}
             >
-              <span className="flex size-12 items-center justify-center rounded-full bg-white/25 shadow-lg backdrop-blur-sm transition-transform group-hover/card:scale-105">
+              <span className="flex size-12 items-center justify-center rounded-full bg-white/30 shadow-lg transition-transform group-hover/card:scale-105">
                 <Play className="ml-0.5 size-5 fill-white text-white" />
               </span>
             </button>

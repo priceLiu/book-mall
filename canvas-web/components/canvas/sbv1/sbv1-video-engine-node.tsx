@@ -409,7 +409,7 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
                     type="button"
                     aria-label="播放"
                     title="播放视频"
-                    className="nodrag pointer-events-auto flex size-20 items-center justify-center rounded-full border border-white/25 bg-black/50 shadow-lg backdrop-blur-sm transition-transform group-hover/video:scale-105"
+                    className="nodrag pointer-events-auto flex size-20 items-center justify-center rounded-full border border-white/25 bg-black/60 shadow-lg transition-transform group-hover/video:scale-105"
                     onClick={(e) => {
                       e.stopPropagation();
                       setPreviewOpen(true);

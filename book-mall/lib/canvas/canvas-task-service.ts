@@ -1566,6 +1566,13 @@ async function advanceOneSubmittedCanvasTask(
   return delta;
 }
 
+/** 全局交通对账（RUNNING 超时释放 + 槽位计数纠偏）最小间隔，避免每 10s 都扫全表 */
+const TRAFFIC_RECONCILE_MIN_GAP_MS = (() => {
+  const raw = Number(process.env.TRAFFIC_RECONCILE_MIN_GAP_MS ?? "");
+  return Number.isFinite(raw) && raw >= 10_000 ? raw : 60_000;
+})();
+let lastTrafficReconcileAt = 0;
+
 export async function runCanvasPollWorker(opts?: {
   /** 仅推进指定项目的任务（项目页 GET / 提交后按需 poll 用） */
   projectId?: string;
@@ -1600,6 +1607,33 @@ export async function runCanvasPollWorker(opts?: {
     logKieEvent("warn", "[canvas] inflight-zombie-reconcile error", {
       error: e instanceof Error ? e.message : String(e),
     });
+  }
+
+  // 全局看门狗：异常检测 + 修复（释放超时 RUNNING、纠偏槽位、回收 stale DISPATCHING）。
+  // 仅全局轮询触发、按 TRAFFIC_RECONCILE_MIN_GAP_MS 限频；dispatch 已在上方完成故传 false。
+  if (
+    !opts?.projectId &&
+    Date.now() - lastTrafficReconcileAt >= TRAFFIC_RECONCILE_MIN_GAP_MS
+  ) {
+    lastTrafficReconcileAt = Date.now();
+    try {
+      const { reconcileGenerationTraffic } = await import(
+        "@/lib/generation/traffic-control/reconcile"
+      );
+      const r = await reconcileGenerationTraffic({ dispatch: false });
+      if (
+        r.releasedReserve > 0 ||
+        r.failedRunningLogs > 0 ||
+        r.reconciledSlots > 0 ||
+        r.staleDispatching > 0
+      ) {
+        logKieEvent("info", "[canvas] traffic-watchdog reconcile", r);
+      }
+    } catch (e) {
+      logKieEvent("warn", "[canvas] traffic-watchdog reconcile error", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   }
 
   if (opts?.projectId) {

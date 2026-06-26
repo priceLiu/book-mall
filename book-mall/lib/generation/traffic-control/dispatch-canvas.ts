@@ -37,6 +37,10 @@ import { queueDispatchAfterFromIndex } from "./queue-dispatch-after";
 import { nextDispatchAfterFromSpacing } from "./token-bucket";
 import { releaseGatewayVideoTrafficSlotIfOccupying } from "./release-gateway-video-traffic-slot";
 import { clearDispatchStaleRetryInPayload } from "./pre-submit-retry";
+import {
+  findPromotableCanvasGatewayLog,
+  promoteCanvasTaskFromGatewayLog,
+} from "./canvas-orphan-gateway-log";
 
 function taskInputPayload(
   task: Pick<CanvasGenerationTask, "inputPayload">,
@@ -84,6 +88,7 @@ async function submitCanvasVideoToGateway(
           : undefined,
       clientPage,
       projectId: task.projectId,
+      canvasTaskId: task.id,
     });
     return { taskId: job.taskId, logId: job.logId };
   }
@@ -95,6 +100,7 @@ async function submitCanvasVideoToGateway(
       body: (payload.volcengineBody as Record<string, unknown>) ?? {},
       clientPage,
       projectId: task.projectId,
+      canvasTaskId: task.id,
       providerId: typeof payload.providerId === "string" ? payload.providerId : undefined,
       gatewayCredentialId:
         typeof data.gatewayCredentialId === "string" && data.gatewayCredentialId.trim()
@@ -115,6 +121,7 @@ async function submitCanvasVideoToGateway(
     callBackUrl,
     clientPage,
     projectId: task.projectId,
+    canvasTaskId: task.id,
   });
   return { taskId: job.taskId, logId: job.logId };
 }
@@ -167,6 +174,7 @@ async function revertStuckDispatchingTask(
   taskId: string,
   scopeKey: string,
   payload?: Record<string, unknown>,
+  dispatchAfter?: Date,
 ): Promise<void> {
   await releaseTrafficSlot(scopeKey);
   const p = payload ?? {};
@@ -177,7 +185,7 @@ async function revertStuckDispatchingTask(
       where: { id: taskId, status: "DISPATCHING" },
       data: {
         status: "QUEUED",
-        dispatchAfter: queueDispatchAfterFromIndex(0),
+        dispatchAfter: dispatchAfter ?? queueDispatchAfterFromIndex(0),
         failCode: null,
         failMessage: null,
         ...(stuckClaim
@@ -279,6 +287,22 @@ async function dispatchOneCanvasQueuedTask(
       return "skipped";
     }
 
+    // 幂等守卫：若上一次提交「超时但其实成功」，已存在带本 task.id 的厂商日志 →
+    // 直接 promote 成 SUBMITTED，绝不重复 createTask（避免重复扣费 + 假性失败）。
+    const orphan = await findPromotableCanvasGatewayLog(task.id);
+    if (orphan) {
+      const promoted = await promoteCanvasTaskFromGatewayLog({
+        taskId: task.id,
+        payload: taskInputPayload(claimedTask!),
+        logId: orphan.logId,
+        externalTaskId: orphan.externalTaskId,
+        scopeKey: scope.scopeKey,
+      });
+      if (promoted) return "dispatched";
+      await releaseTrafficSlot(scope.scopeKey);
+      return "skipped";
+    }
+
     const job = await submitCanvasVideoToGatewayWithTimeout(
       { ...claimedTask!, project: task.project },
       taskInputPayload(claimedTask!),
@@ -330,12 +354,16 @@ async function dispatchOneCanvasQueuedTask(
     const msg = e instanceof Error ? e.message : String(e);
     await releaseTrafficSlot(scope.scopeKey);
 
-    // 厂商提交前 / createTask 503 预检失败 / HTTP 超时：退回队列稍后重试，不判失败、不产生孤儿日志。
+    // 厂商提交前 / createTask 503 预检失败 / HTTP 超时：退回队列稍后重试，不判失败。
     if (!vendorJob && isTransientSystemBusyError(e)) {
+      // 提交超时这一类：被放弃的 createTask 可能仍在厂商侧成功并稍后落日志，
+      // 故延后再派（给孤儿日志一点出现时间），下一轮 findPromotableCanvasGatewayLog 直接 promote，避免重复 createTask。
+      const isSubmitTimeout = /dispatch submit timeout/i.test(msg);
       await revertStuckDispatchingTask(
         task.id,
         scope.scopeKey,
         taskInputPayload(claimedTask ?? task),
+        isSubmitTimeout ? new Date(Date.now() + 15_000) : undefined,
       );
       return "skipped";
     }

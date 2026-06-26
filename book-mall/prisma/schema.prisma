@@ -2401,6 +2401,8 @@ model GatewayRequestLog {
   @@index([apiKeyId, submittedAt])
   @@index([externalTaskId])
   @@index([vendorRequestId])
+  // canvas/story 任务 ↔ 日志对账：提交超时但其实成功时凭 storyTaskId 找回孤儿日志
+  @@index([storyTaskId])
   @@index([status])
   // 状态仪表盘/轮询池/在飞查询：按状态 + 时间/轮询时间复合，避免大表扫 status 后再过滤
   @@index([status, submittedAt])

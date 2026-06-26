@@ -44,14 +44,18 @@ export function getDispatchBatch(): number {
 }
 
 export function getDispatchingStaleSec(): number {
-  /** DISPATCHING 超过此秒数未 submit 厂商 → 释放槽、退回 QUEUED 自动重派 */
-  return readPositiveInt("DISPATCHING_STALE_SEC", 30);
+  /**
+   * DISPATCHING 超过此秒数未 submit 厂商 → 释放槽、退回 QUEUED 自动重派。
+   * 提高到 60s：给 book-mall 冷启动 / Gateway 高峰下的「慢提交」留出完成窗口，
+   * 避免提交其实成功却被判超时 → 重派 → 重复 createTask（孤儿日志 + 假性失败）。
+   */
+  return readPositiveInt("DISPATCHING_STALE_SEC", 60);
 }
 
-/** dispatch 内 createTask HTTP 超时（须 < DISPATCHING_STALE_SEC，默认 25s） */
+/** dispatch 内 createTask HTTP 超时（须 < DISPATCHING_STALE_SEC，默认 45s） */
 export function getDispatchSubmitTimeoutMs(): number {
   const staleMs = getDispatchingStaleSec() * 1000;
-  const raw = readPositiveInt("DISPATCH_SUBMIT_TIMEOUT_MS", 25_000);
+  const raw = readPositiveInt("DISPATCH_SUBMIT_TIMEOUT_MS", 45_000);
   return Math.min(raw, Math.max(5_000, staleMs - 2_000));
 }
 
@@ -60,9 +64,9 @@ export function getDispatchStaleRetryMax(): number {
   return readPositiveInt("DISPATCH_STALE_RETRY_MAX", 6);
 }
 
-/** RUNNING 视频 log 超过此分钟数对账释放（火山 45 + 余量） */
+/** RUNNING 视频 log 超过此分钟数对账释放（默认 30min；可用 env 调整） */
 export function getReconcileRunningVideoMaxMin(): number {
-  return readPositiveInt("RECONCILE_RUNNING_VIDEO_MAX_MIN", 46);
+  return readPositiveInt("RECONCILE_RUNNING_VIDEO_MAX_MIN", 30);
 }
 
 export function computeTokenBurst(maxConcurrency: number): number {
