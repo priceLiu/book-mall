@@ -9,7 +9,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useNodes } from "@xyflow/react";
-import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
+import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { busEnqueueStoryRun } from "@/lib/canvas/canvas-run-bus";
@@ -446,7 +446,7 @@ export function LibtvImageInputDock() {
           disabled={isRunning}
           maxImages={12}
         >
-          <MentionsTextarea
+          <MentionsEditable
             className={cn(
               PRO2_DOCK_TEXTAREA_CLASS,
               RF_FORM_CONTROL,

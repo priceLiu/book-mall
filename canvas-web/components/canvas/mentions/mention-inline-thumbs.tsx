@@ -60,7 +60,7 @@ function toRawIndex(raw: string, clean: string, displayIndex: number): number {
   return mapDisplayIndexToRawIndex(raw, displayIndex);
 }
 
-/** 在 scrollTop/Left=0 下测量内容坐标；滚动由 overlay transform 同步 */
+/** 按 textarea 当前 scrollTop/Left 测量可见区坐标（与 overlay 视口对齐，无需 transform 补偿） */
 function measureBadgePlacements(
   textarea: HTMLTextAreaElement,
   mentionables: MentionableItem[],
@@ -180,8 +180,8 @@ function syncBadgeDom(
       const label = document.createElement("span");
       label.className = "mention-inline-label min-w-0 truncate";
 
-      badge.appendChild(label);
       badge.appendChild(img);
+      badge.appendChild(label);
       host.appendChild(badge);
       root.appendChild(host);
     }
@@ -233,6 +233,7 @@ export const MentionInlineThumbOverlay = forwardRef<
   const viewportMoving = useCanvasStore((s) => s.canvasViewportMoving);
   const { expanded: dockExpanded } = useLibtvInputDockUi();
 
+  /** badge 在 scrollTop=0 下测量，滚动时仅平移 overlay（廉价、丝滑跟随，无需重测） */
   const syncScrollOffset = useCallback(() => {
     const ta = textareaRef.current;
     const overlay = overlayRef.current;

@@ -314,7 +314,7 @@ export function MediaPreviewLightbox({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-black/94 backdrop-blur-md"
+      className="fixed inset-0 z-[1100] flex h-[100dvh] w-screen flex-col bg-black/94"
       role="dialog"
       aria-modal="true"
       aria-label={view === "compare" ? "图片对比" : "媒体预览"}
@@ -408,6 +408,7 @@ export function MediaPreviewLightbox({
               {kind === "video" ? (
                 <CanvasVideoPlayer
                   src={src}
+                  poster={posterUrl?.trim() || undefined}
                   autoPlay
                   className="max-h-[calc(100dvh-72px)] w-[min(98vw,960px)]"
                 />

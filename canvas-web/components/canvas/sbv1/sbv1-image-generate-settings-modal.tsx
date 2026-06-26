@@ -117,7 +117,12 @@ export function Sbv1ImageGenerateSettingsModal({
   return createPortal(
     <div
       className="fixed inset-0 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
-      style={{ zIndex: MODAL_Z }}
+      style={{
+        zIndex: MODAL_Z,
+        isolation: "isolate",
+        transform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+      }}
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {

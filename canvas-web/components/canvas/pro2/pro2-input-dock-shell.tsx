@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useStore } from "@xyflow/react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { LibtvInputDockUiContext } from "@/lib/canvas/libtv-input-dock-ui-context";
 import {
@@ -35,6 +36,17 @@ export type Pro2InputDockShellProps = {
   hidden?: boolean;
 };
 
+/**
+ * 反向缩放钳制：在常用缩放区间内坞保持恒定屏幕尺寸；超出区间（极端放大/缩小）
+ * 时不再完全补偿，避免坞缩成过小或撑成铺满屏幕。
+ */
+const DOCK_INVERSE_SCALE_MIN = 0.45;
+const DOCK_INVERSE_SCALE_MAX = 2.2;
+/** 画布缩小（zoom<1）时坞在恒定尺寸基础上最多额外放大 30% */
+const DOCK_ZOOM_OUT_MAX_BOOST = 1.3;
+/** 缩放到该值时达到满额 +30%（区间内线性渐入） */
+const DOCK_ZOOM_OUT_BOOST_FULL = 0.5;
+
 function useReactFlowViewportEl(): HTMLElement | null {
   const [el, setEl] = useState<HTMLElement | null>(null);
   useEffect(() => {
@@ -62,6 +74,21 @@ export function Pro2InputDockShell({
   const [expanded, setExpanded] = useState(false);
   const [dockScrollEl, setDockScrollEl] = useState<HTMLElement | null>(null);
   useLibtvDockWheelScroll(dockScrollEl);
+  // 画布缩放：坞挂在 viewport 内会随之 scale(zoom)，这里反向 1/zoom 抵消，
+  // 让坞在屏幕上保持恒定尺寸（仅影响坞自身视觉，不碰画布缩放上下限）。
+  const zoom = useStore((s) => s.transform[2]);
+  const baseInv = 1 / (zoom || 1);
+  // 画布缩小时按缩放程度线性放大，最多 +30%；放大画布时不加成（仍保持恒定）
+  const zoomOutBoost =
+    zoom >= 1
+      ? 1
+      : 1 +
+        (DOCK_ZOOM_OUT_MAX_BOOST - 1) *
+          Math.min(1, (1 - zoom) / (1 - DOCK_ZOOM_OUT_BOOST_FULL));
+  const invScale = Math.min(
+    DOCK_INVERSE_SCALE_MAX * DOCK_ZOOM_OUT_MAX_BOOST,
+    Math.max(DOCK_INVERSE_SCALE_MIN, baseInv * zoomOutBoost),
+  );
   const dockW = width ?? flowAnchor.flowW;
   const dockHeight = expanded ? PRO2_DOCK_HEIGHT_EXPANDED : PRO2_DOCK_HEIGHT;
   const dockUi = useMemo(() => ({ expanded }), [expanded]);
@@ -80,7 +107,9 @@ export function Pro2InputDockShell({
           left: flowAnchor.flowX,
           top: flowAnchor.flowY,
           width: dockW,
-          transform: "translate(-50%, 0) translateZ(0)",
+          // origin=顶部中点；先 scale 再 translateX(-50%)，使坞顶部中点恒定锚在 (flowX,flowY)
+          transformOrigin: "50% 0",
+          transform: `translateX(-50%) scale(${invScale}) translateZ(0)`,
           visibility: hidden ? "hidden" : "visible",
           pointerEvents: hidden ? "none" : "auto",
           backfaceVisibility: "hidden",

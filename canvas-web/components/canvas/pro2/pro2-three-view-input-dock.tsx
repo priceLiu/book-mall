@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { ArrowUp, Loader2, MapPin } from "lucide-react";
 import { useNodes } from "@xyflow/react";
-import { MentionsTextarea } from "@/components/canvas/mentions/MentionsTextarea";
+import { MentionsEditable } from "@/components/canvas/mentions/MentionsEditable";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { useLibtvFloatingDock } from "@/lib/canvas/use-libtv-floating-dock";
 import { batchRunStoryRowsSequential } from "@/lib/canvas/batch-run-nodes";
@@ -256,7 +256,7 @@ export function Pro2ThreeViewInputDock() {
         </>
       }
     >
-      <MentionsTextarea
+      <MentionsEditable
         className={cn(
           PRO2_DOCK_TEXTAREA_CLASS,
           RF_FORM_CONTROL,

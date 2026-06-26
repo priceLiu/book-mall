@@ -400,7 +400,13 @@ function EngineModelModal({
   const node = (
     <div
       className="fixed inset-0 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4"
-      style={{ zIndex: ENGINE_PICKER_MODAL_Z }}
+      style={{
+        zIndex: ENGINE_PICKER_MODAL_Z,
+        // 把毛玻璃背板隔离到独立合成层：弹层内 hover 重绘不再触发 backdrop 重栅格化 → 消除闪烁
+        isolation: "isolate",
+        transform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+      }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
