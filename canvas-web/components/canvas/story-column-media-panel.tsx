@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Clapperboard, Check, Download, Eye, RefreshCw, X } from "lucide-react";
+import {
+  useClientPortalMounted,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { useLazyMediaActive } from "@/lib/canvas/use-lazy-media-active";
 import { cn } from "@/lib/utils";
 import { STORY_MEDIA_COL_WIDTH } from "@/lib/canvas/story-ref-image";
@@ -369,20 +374,9 @@ export function StoryMediaPreviewModal({
   title?: string;
   onClose: () => void;
 }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose]);
+  const mounted = useClientPortalMounted();
+  useModalBodyScrollLock();
+  useModalEscapeClose(onClose);
 
   if (!mounted) return null;
 

@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import {
+  useClientPortalMounted,
+  useModalBodyScrollLock,
+  useModalCompareArrowKeys,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import type { CanvasTaskRecord } from "@/lib/canvas-api";
 import {
   buildSideOptions,
@@ -32,11 +38,7 @@ export function CompareModal({
   defaultRightId,
   onClose,
 }: CompareModalProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useClientPortalMounted();
 
   const options = useMemo(
     () => buildSideOptions(tasks, referenceImages),
@@ -52,26 +54,9 @@ export function CompareModal({
   const { leftId, rightId, setLeftId, setRightId, stepRight } =
     useCompareSides(options, defaults);
 
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onClose();
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        stepRight(-1);
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        stepRight(1);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose, stepRight]);
+  useModalBodyScrollLock();
+  useModalEscapeClose(onClose);
+  useModalCompareArrowKeys(true, stepRight);
 
   if (!mounted || options.length < 2) return null;
 

@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sparkles, X } from "lucide-react";
+import {
+  useClientPortalMounted,
+  useModalBodyScrollLock,
+  useModalEscapeClose,
+} from "@/lib/canvas/use-modal-portal-effects";
 import { EnginePicker } from "@/components/canvas/engine-picker";
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
 import {
@@ -44,7 +49,9 @@ export function Sbv1ImageGenerateSettingsModal({
   onClose,
   onConfirm,
 }: Sbv1ImageGenerateSettingsModalProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useClientPortalMounted();
+  useModalBodyScrollLock(open);
+  useModalEscapeClose(onClose, { active: open });
 
   const [imageQuality, setImageQuality] = useState<Sbv1ImageQuality>(
     data.imageQuality ?? "standard",
@@ -62,39 +69,25 @@ export function Sbv1ImageGenerateSettingsModal({
   const [engineParams, setEngineParams] = useState<Record<string, unknown>>(
     data.engine?.params ?? {},
   );
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   useEffect(() => {
     if (!open) return;
-    setImageQuality(data.imageQuality ?? "standard");
-    setResolution(data.resolution ?? "2K");
-    setAspectRatio(data.aspectRatio ?? "auto");
-    setOutputCount(data.outputCount ?? 1);
-    setProviderId(data.engine?.providerId ?? "");
-    setModelKey(data.engine?.modelKey ?? "");
-    const params = data.engine?.params ?? {};
+    const d = dataRef.current;
+    setImageQuality(d.imageQuality ?? "standard");
+    setResolution(d.resolution ?? "2K");
+    setAspectRatio(d.aspectRatio ?? "auto");
+    setOutputCount(d.outputCount ?? 1);
+    setProviderId(d.engine?.providerId ?? "");
+    setModelKey(d.engine?.modelKey ?? "");
+    const params = d.engine?.params ?? {};
     setEngineParams(params);
     const fmt = String(params.output_format ?? "png").toLowerCase();
     setOutputFormat(
       FORMAT_OPTIONS.includes(fmt as OutputFormat) ? (fmt as OutputFormat) : "png",
     );
-  }, [open, data]);
-
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!mounted || !open) return null;
 
