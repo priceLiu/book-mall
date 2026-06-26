@@ -244,6 +244,7 @@ export function MediaHoverBox({
           src={src}
           kind={kind}
           alt={alt}
+          posterUrl={posterUrl}
           compareContext={compareContext}
           prompt={prompt}
           initialView={initialView}
@@ -259,6 +260,7 @@ export function MediaPreviewLightbox({
   src,
   kind,
   alt,
+  posterUrl,
   compareContext,
   prompt,
   initialView = "single",
@@ -267,6 +269,7 @@ export function MediaPreviewLightbox({
   src: string;
   kind: "image" | "video";
   alt: string;
+  posterUrl?: string;
   compareContext?: MediaCompareContext;
   /** 分镜图等：单图预览时左侧展示 Prompt（约 30% 宽） */
   prompt?: string;
