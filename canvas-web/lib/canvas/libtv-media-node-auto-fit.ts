@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 import {
   LIBTV_IMAGE_NODE_HEADER_HEIGHT,
+  LIBTV_MEDIA_FIT_VERSION,
   LIBTV_VIDEO_NODE_HEADER_HEIGHT,
 } from "./libtv-node-chrome";
 import { isPro2StyledGroup } from "./pro2-media-group-meta";
@@ -176,6 +177,14 @@ export function useLibtvMediaNodeAutoFit({
           ?.mediaFit,
       ),
   );
+  const mediaFitVersion = useCanvasStore(
+    (s) =>
+      (
+        s.nodes.find((n) => n.id === nodeId)?.data as {
+          mediaFitVersion?: number;
+        }
+      )?.mediaFitVersion,
+  );
   const skipForSbv1GroupImage = useCanvasStore((s) => {
     if (kind !== "image" || !parentId) return false;
     const parentGroup = s.nodes.find((n) => n.id === parentId);
@@ -194,11 +203,16 @@ export function useLibtvMediaNodeAutoFit({
       kind === "video" && poster ? "image" : kind;
     const fitKey = `${probeKind}|${probeUrl}|${profile}`;
 
-    if (mediaFit && mediaFitKey === url) {
+    // 旧节点（无版本号或版本落后）即使已 mediaFit，也强制重算一次以贴合新标题栏高度；
+    // 组内节点走组 relayout，不在此处强制重算，避免触发整组重排。
+    const fitVersionStale =
+      !parentId && mediaFitVersion !== LIBTV_MEDIA_FIT_VERSION;
+
+    if (mediaFit && mediaFitKey === url && !fitVersionStale) {
       lastFitKey.current = fitKey;
       return;
     }
-    if (lastFitKey.current === fitKey) return;
+    if (lastFitKey.current === fitKey && !fitVersionStale) return;
 
     let cancelled = false;
 
@@ -212,6 +226,7 @@ export function useLibtvMediaNodeAutoFit({
           updateNodeData(nodeId, {
             mediaFit: true,
             mediaFitKey: url,
+            mediaFitVersion: LIBTV_MEDIA_FIT_VERSION,
           });
           lastFitKey.current = fitKey;
 
@@ -254,6 +269,7 @@ export function useLibtvMediaNodeAutoFit({
     parentId,
     mediaFit,
     mediaFitKey,
+    mediaFitVersion,
     edges,
     resizeNode,
     updateNodeData,
