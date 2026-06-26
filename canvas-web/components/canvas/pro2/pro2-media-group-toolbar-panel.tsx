@@ -401,7 +401,7 @@ export function Pro2MediaGroupToolbarPanel({
 
       {editOpen ? (
         <div
-          className="absolute left-1/2 top-[calc(100%+8px)] z-[1] w-[240px] -translate-x-1/2 rounded-xl border border-white/12 bg-[#1c1c1e]/97 p-3 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+          className="absolute left-1/2 top-[calc(100%+8px)] z-[1] w-[240px] -translate-x-1/2 rounded-xl border border-white/12 bg-[#1c1c1e]/98 p-3 shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <p className="mb-1.5 text-[11px] font-medium text-white/55">组名</p>

@@ -167,7 +167,7 @@ export function CanvasBackgroundVideoPanel({ projectId }: { projectId: string })
   return createPortal(
     <div
       className={cn(
-        "pointer-events-auto fixed bottom-[5.75rem] right-4 z-[200] w-[min(100vw-2rem,22rem)] rounded-xl border shadow-xl backdrop-blur",
+        "pointer-events-auto fixed bottom-[5.75rem] right-4 z-[200] w-[min(100vw-2rem,22rem)] rounded-xl border shadow-xl",
         hasTasks
           ? "border-orange-400/35 bg-[#141418]/98"
           : "border-orange-400/20 bg-[#141418]/95",

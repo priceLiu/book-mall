@@ -520,7 +520,7 @@ export function GroupNode({ id, data, selected }: NodeProps) {
               {editOpen ? (
                 <div
                   ref={editPanelRef}
-                  className="nodrag pointer-events-auto fixed z-40 w-[240px] rounded-2xl border border-white/15 bg-black/90 p-3 shadow-2xl backdrop-blur-md"
+                  className="nodrag pointer-events-auto fixed z-40 w-[240px] rounded-2xl border border-white/15 bg-[#101012]/96 p-3 shadow-2xl"
                   style={{
                     left: screenPos.x,
                     top: screenPos.y + 6,

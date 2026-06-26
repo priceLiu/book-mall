@@ -203,7 +203,7 @@ export function Pro2FloatingInspector() {
       onWheel={(e) => e.stopPropagation()}
     >
       <div
-        className="flex max-h-[inherit] flex-col overflow-hidden rounded-2xl border shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+        className="flex max-h-[inherit] flex-col overflow-hidden rounded-2xl border shadow-[0_24px_64px_rgba(0,0,0,0.55)]"
         style={{
           borderColor: PRO2_NODE_BORDER,
           background:

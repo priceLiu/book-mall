@@ -151,7 +151,7 @@ export function SelectionToolbar() {
           </CanvasToolIcon>
         </CanvasPillToolbar>
       ) : (
-        <div className="w-[260px] rounded-2xl border border-white/15 bg-black/90 p-3 shadow-2xl backdrop-blur-md">
+        <div className="w-[260px] rounded-2xl border border-white/15 bg-[#101012]/96 p-3 shadow-2xl">
           <div className="mb-2 flex items-center justify-between text-[11px] font-medium">
             <span className="text-white/70">为分组选个边框颜色与名字</span>
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-white/85">

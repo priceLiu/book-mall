@@ -43,7 +43,7 @@ export function CanvasCreditsToastHost() {
         <div
           key={t.id}
           className={cn(
-            "flex items-center gap-2 rounded-xl border border-amber-400/30 bg-[#1a1a1a]/95 px-3 py-2 text-sm text-amber-100 shadow-lg backdrop-blur",
+            "flex items-center gap-2 rounded-xl border border-amber-400/30 bg-[#1a1a1a]/97 px-3 py-2 text-sm text-amber-100 shadow-lg",
           )}
         >
           <Zap className="size-4 shrink-0 fill-amber-300/90 text-amber-300/90" />
