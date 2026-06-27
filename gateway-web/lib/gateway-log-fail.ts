@@ -18,6 +18,8 @@ const FAIL_CODE_HINTS: Record<string, string> = {
   INVALID_INPUT: "请求参数不符合厂商要求（比例、参考图、content 结构等）。",
   MODEL_NOT_FOUND: "模型或接入点不存在，请检查 Gateway 登记与凭证。",
   UPSTREAM_AUTH_FAILED: "火山凭证无效或无权限。",
+  UPSTREAM_INSUFFICIENT_BALANCE:
+    "厂商账户欠费或余额不足（非凭证无效）。请到对应厂商控制台充值/结清欠费，或改用其它凭证/模型。",
   UPSTREAM_TRANSIENT: "厂商或网络瞬态错误；Gateway 已有限重试。",
   SUBMIT_ORPHAN:
     "已建 Gateway 日志但未拿到厂商 taskId（submit 挂起/进程中断），非内容安全 400。",
@@ -55,6 +57,17 @@ function isMislabeledInsufficientCredits(input: {
   );
 }
 
+const UPSTREAM_BALANCE_MARKERS = [
+  "overdue balance",
+  "accountoverdue",
+  "account overdue",
+  "insufficient balance",
+  "insufficient_balance",
+  "arrears",
+  "欠费",
+  "余额不足",
+] as const;
+
 function inferFailCode(input: {
   failCode?: string | null;
   failMessage?: string | null;
@@ -62,10 +75,14 @@ function inferFailCode(input: {
   if (isMislabeledInsufficientCredits(input)) {
     return "SYSTEM_BUSY";
   }
+  const blob = (input.failMessage ?? "").toLowerCase();
+  // 欠费纠偏：历史误记为 UPSTREAM_AUTH_FAILED（凭证无效）的 403 欠费，按真因展示
+  if (blob && UPSTREAM_BALANCE_MARKERS.some((m) => blob.includes(m))) {
+    return "UPSTREAM_INSUFFICIENT_BALANCE";
+  }
   const existing = input.failCode?.trim();
   if (existing) return existing;
 
-  const blob = (input.failMessage ?? "").toLowerCase();
   if (!blob) return undefined;
 
   if (CONTENT_POLICY_MARKERS.some((m) => blob.includes(m))) {

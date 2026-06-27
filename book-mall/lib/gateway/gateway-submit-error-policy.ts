@@ -35,6 +35,18 @@ export const MODEL_NOT_FOUND_MARKERS = [
   "endpoint not found",
 ] as const;
 
+/** 厂商账户欠费 / 余额不足（非凭证无效）。火山 AccountOverdueError 走 403，须与凭证/权限问题区分 */
+export const UPSTREAM_BALANCE_MARKERS = [
+  "overdue balance",
+  "accountoverdue",
+  "account overdue",
+  "insufficient balance",
+  "insufficient_balance",
+  "arrears",
+  "欠费",
+  "余额不足",
+] as const;
+
 export const TRANSIENT_SUBMIT_MARKERS = [
   "econnreset",
   "econnrefused",
@@ -74,6 +86,13 @@ export function isContentPolicySubmitMessage(message?: string | null): boolean {
   const blob = normalizeBlob(message ?? "");
   if (!blob) return false;
   return CONTENT_POLICY_MARKERS.some((m) => blob.includes(m));
+}
+
+/** 厂商账户欠费/余额不足（非凭证无效）。火山 AccountOverdueError 为 403，须独立分类 */
+export function isUpstreamBalanceMessage(message?: string | null): boolean {
+  const blob = normalizeBlob(message ?? "");
+  if (!blob) return false;
+  return UPSTREAM_BALANCE_MARKERS.some((m) => blob.includes(m));
 }
 
 function isInvalidInputMessage(message: string, httpStatus?: number): boolean {
@@ -182,6 +201,19 @@ export function classifyGatewaySubmitError(error: unknown): ClassifiedGatewaySub
         userHintZh: "请求参数不符合厂商要求，请检查比例、参考图数量与 content 结构。",
       };
     }
+    if (isUpstreamBalanceMessage(message)) {
+      return {
+        class: "NON_RETRYABLE",
+        failCode: "UPSTREAM_INSUFFICIENT_BALANCE",
+        message,
+        httpStatus,
+        vendorRequestId,
+        vendorTaskId,
+        retryable: false,
+        userHintZh:
+          "厂商账户欠费或余额不足（非凭证无效）。请在火山引擎控制台为 Gateway 绑定的凭证充值/结清欠费后重试，或改用其它已绑定凭证/模型。",
+      };
+    }
     if (httpStatus === 401 || httpStatus === 403) {
       return {
         class: "NON_RETRYABLE",
@@ -221,6 +253,17 @@ export function classifyGatewaySubmitError(error: unknown): ClassifiedGatewaySub
   const message = error instanceof Error ? error.message : String(error);
   const vendorRequestId = extractVendorRequestId(message);
 
+  if (isUpstreamBalanceMessage(message)) {
+    return {
+      class: "NON_RETRYABLE",
+      failCode: "UPSTREAM_INSUFFICIENT_BALANCE",
+      message,
+      vendorRequestId,
+      retryable: false,
+      userHintZh:
+        "厂商账户欠费或余额不足（非凭证无效）。请为 Gateway 绑定的对应厂商凭证充值/结清欠费后重试，或改用其它凭证/模型。",
+    };
+  }
   if (message.includes("凭证不可用") || message.includes("credential")) {
     return {
       class: "NON_RETRYABLE",
