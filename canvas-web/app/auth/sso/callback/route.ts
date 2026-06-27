@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getMainSiteOrigin, getAppPublicOrigin } from "@/lib/site-origin";
+import { buildSetSsoExchangeFreshCookieHeader } from "@/lib/sso-exchange-fresh";
 
 function exchangeSecret(): string | null {
   const s = process.env.TOOLS_SSO_SERVER_SECRET?.trim();
@@ -60,5 +61,9 @@ export async function GET(request: NextRequest) {
     path: "/",
     maxAge: expiresIn,
   });
+  response.headers.append(
+    "Set-Cookie",
+    buildSetSsoExchangeFreshCookieHeader(),
+  );
   return response;
 }

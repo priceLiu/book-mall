@@ -20,13 +20,16 @@
  *   pnpm canvas:backfill-video -- --apply --project <projectId>
  *   pnpm canvas:backfill-video -- --apply --faststart-only
  *   pnpm canvas:backfill-video -- --apply --poster-only --limit 100
+ *   pnpm canvas:backfill-video -- --apply --limit 50 --offset 150   # 分页扫存量
  */
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import {
   createOssClientFrom,
+  ossGetBuffer,
   ossUploadBuffer,
   readOssEnv,
+  withOssRetry,
 } from "../lib/oss-client";
 import {
   extractVideoFirstFrameJpeg,
@@ -37,11 +40,19 @@ import { buildCanvasOssKey } from "../lib/canvas/canvas-constants";
 
 const MULTIPART_THRESHOLD = 5 * 1024 * 1024;
 const UPLOAD_TIMEOUT_MS = 600_000;
+/** 大文件分片并发；1 最稳，2 折中 */
+const MULTIPART_PARALLEL = (() => {
+  const n = Number(process.env.BACKFILL_OSS_PARALLEL ?? "2");
+  return Number.isFinite(n) && n >= 1 ? Math.min(4, Math.floor(n)) : 2;
+})();
+
+type OssClient = Awaited<ReturnType<typeof createOssClientFrom>>;
 
 type Args = {
   dryRun: boolean;
   projectId?: string;
   limit: number;
+  offset: number;
   faststartOnly: boolean;
   posterOnly: boolean;
 };
@@ -50,6 +61,7 @@ function parseArgs(argv: string[]): Args {
   let dryRun = true;
   let projectId: string | undefined;
   let limit = 500;
+  let offset = 0;
   let faststartOnly = false;
   let posterOnly = false;
   for (let i = 0; i < argv.length; i++) {
@@ -67,9 +79,14 @@ function parseArgs(argv: string[]): Args {
     } else if (arg === "--limit") {
       limit = Number(argv[i + 1]) || limit;
       i += 1;
+    } else if (arg.startsWith("--offset=")) {
+      offset = Number(arg.slice("--offset=".length)) || offset;
+    } else if (arg === "--offset") {
+      offset = Number(argv[i + 1]) || offset;
+      i += 1;
     }
   }
-  return { dryRun, projectId, limit, faststartOnly, posterOnly };
+  return { dryRun, projectId, limit, offset, faststartOnly, posterOnly };
 }
 
 function ossUrlToKey(url: string): string | null {
@@ -90,59 +107,75 @@ function readPosterUrl(resultPayload: unknown): string | null {
  * 用首段字节判断 mp4 是否已 faststart（moov 在 mdat 之前）。
  * 返回 true=需要重排；false=已在头部；null=无法判断（按需要处理）。
  */
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-): Promise<Response> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } finally {
-    clearTimeout(t);
-  }
-}
-
-async function probeNeedsFaststart(url: string): Promise<boolean | null> {
-  try {
-    const r = await fetchWithTimeout(
-      url,
-      { headers: { Range: "bytes=0-65535" } },
-      15_000,
-    );
-    if (!r.ok && r.status !== 206) return null;
-    const buf = Buffer.from(await r.arrayBuffer());
-    let off = 0;
-    while (off + 8 <= buf.byteLength) {
-      let size = buf.readUInt32BE(off);
-      const type = buf.toString("ascii", off + 4, off + 8);
-      let headerLen = 8;
-      if (size === 1) {
-        if (off + 16 > buf.byteLength) break;
-        // 64-bit size：低 32 位足够判断推进
-        size = Number(buf.readBigUInt64BE(off + 8));
-        headerLen = 16;
-      }
-      if (type === "moov") return false; // moov 在前 → 已 faststart
-      if (type === "mdat") return true; // 先遇到 mdat → moov 在后，需要重排
-      if (size <= 0) break; // size=0 表示到 EOF（mdat 常见），无法继续
-      off += size < headerLen ? headerLen : size;
+function probeMp4NeedsFaststart(buf: Buffer): boolean | null {
+  let off = 0;
+  while (off + 8 <= buf.byteLength) {
+    let size = buf.readUInt32BE(off);
+    const type = buf.toString("ascii", off + 4, off + 8);
+    let headerLen = 8;
+    if (size === 1) {
+      if (off + 16 > buf.byteLength) break;
+      size = Number(buf.readBigUInt64BE(off + 8));
+      headerLen = 16;
     }
-    return null;
+    if (type === "moov") return false;
+    if (type === "mdat") return true;
+    if (size <= 0) break;
+    off += size < headerLen ? headerLen : size;
+  }
+  return null;
+}
+
+async function probeNeedsFaststart(
+  client: OssClient,
+  key: string,
+): Promise<boolean | null> {
+  try {
+    const buf = await withOssRetry(
+      `[probe ${key.slice(-24)}]`,
+      () => ossGetBuffer(client, { key, range: "bytes=0-65535", timeoutMs: 30_000 }),
+      { attempts: 3 },
+    );
+    if (!buf) return null;
+    return probeMp4NeedsFaststart(buf);
   } catch {
     return null;
   }
 }
 
-async function downloadBuffer(url: string): Promise<Buffer | null> {
+async function downloadFromOss(client: OssClient, key: string): Promise<Buffer | null> {
   try {
-    const r = await fetchWithTimeout(url, {}, 120_000);
-    if (!r.ok) return null;
-    return Buffer.from(await r.arrayBuffer());
+    return await withOssRetry(
+      `[get ${key.slice(-24)}]`,
+      () => ossGetBuffer(client, { key, timeoutMs: UPLOAD_TIMEOUT_MS }),
+      { attempts: 4 },
+    );
   } catch {
     return null;
   }
+}
+
+async function uploadToOss(
+  client: OssClient,
+  args: {
+    key: string;
+    buf: Buffer;
+    contentType: string;
+  },
+): Promise<void> {
+  await withOssRetry(
+    `[put ${args.key.slice(-24)}]`,
+    () =>
+      ossUploadBuffer(client, {
+        key: args.key,
+        buf: args.buf,
+        contentType: args.contentType,
+        useMultipart: args.buf.byteLength >= MULTIPART_THRESHOLD,
+        timeoutMs: UPLOAD_TIMEOUT_MS,
+        multipartParallel: MULTIPART_PARALLEL,
+      }),
+    { attempts: 4 },
+  );
 }
 
 async function main() {
@@ -156,6 +189,14 @@ async function main() {
   const doFaststart = !args.posterOnly;
   const doPoster = !args.faststartOnly;
 
+  const ossClient = await createOssClientFrom(cfg, { timeoutMs: UPLOAD_TIMEOUT_MS });
+  const transport =
+    cfg.endpoint?.trim() ||
+    `https://${cfg.bucket}.${cfg.region}.aliyuncs.com (SDK 默认)`;
+  console.log(
+    `[backfill-video] OSS transport=${transport} multipartParallel=${MULTIPART_PARALLEL}`,
+  );
+
   const tasks = await prisma.canvasGenerationTask.findMany({
     where: {
       status: "SUCCEEDED",
@@ -165,11 +206,12 @@ async function main() {
     },
     select: { id: true, projectId: true, ossUrl: true, resultPayload: true },
     orderBy: { completedAt: "desc" },
+    skip: args.offset,
     take: args.limit,
   });
 
   console.log(
-    `[backfill-video] scan tasks=${tasks.length} dryRun=${args.dryRun} faststart=${doFaststart} poster=${doPoster}`,
+    `[backfill-video] scan tasks=${tasks.length} offset=${args.offset} dryRun=${args.dryRun} faststart=${doFaststart} poster=${doPoster}`,
   );
 
   let fastDone = 0;
@@ -177,24 +219,31 @@ async function main() {
   let posterDone = 0;
   let posterSkip = 0;
   let failed = 0;
+  const total = tasks.length;
 
-  for (const task of tasks) {
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i]!;
+    const progress = `[${i + 1}/${total}]`;
     const url = task.ossUrl?.trim();
     if (!url) continue;
     const key = ossUrlToKey(url);
     if (!key) {
-      console.warn(`[skip] task=${task.id} 无法解析 OSS key from ${url}`);
+      console.warn(`${progress} skip task=${task.id} 无法解析 OSS key`);
       continue;
     }
 
     const hasPoster = Boolean(readPosterUrl(task.resultPayload));
     const needPoster = doPoster && !hasPoster;
+    if (doFaststart || needPoster) {
+      console.log(`${progress} task=${task.id.slice(0, 12)}… probing`);
+    }
     const needFaststartProbe = doFaststart
-      ? await probeNeedsFaststart(url)
+      ? await probeNeedsFaststart(ossClient, key)
       : false;
     const needFaststart = doFaststart && needFaststartProbe !== false; // null/true 都处理
 
     if (!needPoster && !needFaststart) {
+      console.log(`${progress} task=${task.id.slice(0, 12)}… skip (已满足)`);
       if (doFaststart) fastSkip += 1;
       if (doPoster) posterSkip += 1;
       continue;
@@ -202,44 +251,50 @@ async function main() {
 
     if (args.dryRun) {
       console.log(
-        `[dry-run] task=${task.id} project=${task.projectId} faststart=${needFaststart} poster=${needPoster} key=${key}`,
+        `${progress} [dry-run] task=${task.id} faststart=${needFaststart} poster=${needPoster}`,
       );
       if (needFaststart) fastDone += 1;
       if (needPoster) posterDone += 1;
       continue;
     }
 
-    // 实际处理：下载一次原始视频，兼顾 faststart 与封面
-    const buf = await downloadBuffer(url);
+    console.log(
+      `${progress} task=${task.id.slice(0, 12)}… oss get (${[
+        needFaststart && "faststart",
+        needPoster && "poster",
+      ]
+        .filter(Boolean)
+        .join("+")})`,
+    );
+    const buf = await downloadFromOss(ossClient, key);
     if (!buf || !buf.byteLength) {
-      console.warn(`[fail] task=${task.id} 下载失败 ${url}`);
+      console.warn(`${progress} fail task=${task.id} OSS 下载失败`);
       failed += 1;
       continue;
     }
+    console.log(`${progress} oss get ok ${(buf.byteLength / 1024 / 1024).toFixed(1)}MB`);
 
     // 1) faststart：覆盖写回同一 key（URL 不变）
     if (needFaststart) {
+      console.log(`${progress} remux faststart…`);
       const fast = await remuxMp4Faststart(buf, "mp4");
       if (fast && fast.byteLength) {
         try {
-          const client = await createOssClientFrom(cfg, {
-            timeoutMs: UPLOAD_TIMEOUT_MS,
-          });
-          await ossUploadBuffer(client, {
+          console.log(`${progress} oss put faststart…`);
+          await uploadToOss(ossClient, {
             key,
             buf: fast,
             contentType: "video/mp4",
-            useMultipart: fast.byteLength >= MULTIPART_THRESHOLD,
-            timeoutMs: UPLOAD_TIMEOUT_MS,
           });
           fastDone += 1;
-          console.log(`[faststart] task=${task.id} key=${key} (${fast.byteLength}B)`);
+          console.log(`${progress} faststart ok (${(fast.byteLength / 1024 / 1024).toFixed(1)}MB)`);
         } catch (e) {
           failed += 1;
-          console.warn(`[fail] faststart task=${task.id}`, e);
+          console.warn(`${progress} fail faststart task=${task.id}`, e);
         }
       } else {
-        fastSkip += 1; // ffmpeg 不可用 / 非 mp4 → 保持原样
+        fastSkip += 1;
+        console.log(`${progress} faststart skip (ffmpeg 不可用或非 mp4)`);
       }
     } else if (doFaststart) {
       fastSkip += 1;
@@ -247,6 +302,7 @@ async function main() {
 
     // 2) poster：缺封面才生成
     if (needPoster) {
+      console.log(`${progress} extracting poster…`);
       const jpeg = await extractVideoFirstFrameJpeg(buf);
       if (jpeg && jpeg.byteLength) {
         try {
@@ -254,18 +310,13 @@ async function main() {
             projectId: task.projectId,
             ext: "jpg",
           });
-          const client = await createOssClientFrom(cfg, { timeoutMs: 60_000 });
-          const put = await ossUploadBuffer(client, {
+          await uploadToOss(ossClient, {
             key: posterKey,
             buf: jpeg,
             contentType: "image/jpeg",
-            useMultipart: false,
-            timeoutMs: 60_000,
           });
           const posterUrl =
-            typeof put.url === "string" && /^https:\/\//i.test(put.url)
-              ? put.url
-              : `${(process.env.OSS_PUBLIC_URL_BASE || "").replace(/\/$/, "")}/${posterKey}`;
+            `${(process.env.OSS_PUBLIC_URL_BASE || `https://${cfg.bucket}.${cfg.region}.aliyuncs.com`).replace(/\/$/, "")}/${posterKey}`;
           await prisma.canvasGenerationTask.update({
             where: { id: task.id },
             data: {
@@ -276,13 +327,14 @@ async function main() {
             },
           });
           posterDone += 1;
-          console.log(`[poster] task=${task.id} -> ${posterUrl}`);
+          console.log(`${progress} poster ok`);
         } catch (e) {
           failed += 1;
-          console.warn(`[fail] poster task=${task.id}`, e);
+          console.warn(`${progress} fail poster task=${task.id}`, e);
         }
       } else {
-        posterSkip += 1; // ffmpeg 不可用 → 跳过
+        posterSkip += 1;
+        console.log(`${progress} poster skip (ffmpeg 不可用)`);
       }
     } else if (doPoster) {
       posterSkip += 1;

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutTemplate, Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { RequireAuth } from "@/components/auth/require-auth";
 import {
   CanvasToolsSessionBanner,
   CanvasToolsSessionProvider,
@@ -1178,12 +1177,10 @@ function Inner({ projectId }: { projectId: string }) {
 
 export function CanvasPageClient({ projectId }: { projectId: string }) {
   return (
-    <RequireAuth>
-      <CanvasToolsSessionProvider>
-        <SaveProjectAssetDialogHost />
-        <PortraitImportProgressHost />
-        <Inner projectId={projectId} />
-      </CanvasToolsSessionProvider>
-    </RequireAuth>
+    <CanvasToolsSessionProvider>
+      <SaveProjectAssetDialogHost />
+      <PortraitImportProgressHost />
+      <Inner projectId={projectId} />
+    </CanvasToolsSessionProvider>
   );
 }

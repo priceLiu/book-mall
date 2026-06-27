@@ -823,16 +823,17 @@ const LogsTableRow = memo(function LogsTableRow({
         title={
           e2eMs != null
             ? [
-                `真实墙钟：画布点击 → 任务完成（终态冻结，进行中递增）`,
+                `系统总耗时：画布点击 → 任务完成`,
                 preGatewayMs != null
                   ? `出队前 ${Math.round(preGatewayMs / 1000)}s`
                   : null,
                 l.gatewaySegmentMs != null
-                  ? `Gateway ${Math.round(l.gatewaySegmentMs / 1000)}s`
+                  ? `网关段 ${Math.round(l.gatewaySegmentMs / 1000)}s`
                   : null,
                 l.postGatewayMs != null
                   ? `OSS/回写 ${Math.round(l.postGatewayMs / 1000)}s`
                   : null,
+                `≈ 出队前 + 网关段 + OSS/回写（秒级四舍五入）`,
               ]
                 .filter(Boolean)
                 .join(" · ")
@@ -858,8 +859,8 @@ const LogsTableRow = memo(function LogsTableRow({
                 vendorPostProcessMs == null &&
                 (pollDelayMs ?? 0) === 0 &&
                 isInProgress
-              ? `${durationMs} ms · 尚无厂商分阶段，网关段暂用墙钟（见总耗时）`
-              : `${durationMs} ms`
+              ? `${durationMs} ms · 尚无厂商分阶段，网关段暂用墙钟`
+              : `${durationMs} ms · 排队+生成+后处理+轮询`
             : isInProgress
               ? progressLabel
                 ? `任务进行中 · ${progressLabel}`
@@ -914,8 +915,8 @@ const LogsTableRow = memo(function LogsTableRow({
         className="align-middle font-mono text-sm text-[var(--gw-muted)]"
         title={
           vendorNative.vendorNativeDurationMs != null
-            ? `厂商原生 ${vendorNative.vendorNativeDurationMs} ms（只读，不回写）`
-            : vendorPhaseEmptyHint ?? "厂商未回传可对比总耗时"
+            ? `厂商 GPU 跨度 ${vendorNative.vendorNativeDurationMs} ms（created→updated，不含排队/后处理）`
+            : vendorPhaseEmptyHint ?? "厂商 GPU 未出数（进行中 updated 未跳变或无 trace）"
         }
       >
         {vendorNativeDuration}
@@ -2136,7 +2137,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
             <tr className="border-b border-white/10 text-[11px]">
               <th
                 className="whitespace-nowrap border-l border-white/10 bg-sky-950/20 px-2 text-violet-200"
-                title="真实墙钟：画布点击 → 任务完成。唯一与用户体感一致的总计时；终态冻结，进行中 live 递增。"
+                title="系统 · 真实墙钟：画布点击 → 任务完成（= 出队前 + 网关段 + OSS/回写）。进行中 live 递增，终态冻结。"
               >
                 总耗时
               </th>
@@ -2148,7 +2149,7 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="whitespace-nowrap bg-sky-950/20 px-2"
-                title="Gateway 段：各阶段之和（排队+生成+后处理+轮询）；进行中按阶段墙钟实时累计。点击→完成的总墙钟见左列「总耗时」。"
+                title="系统 · Gateway 段：排队 + 生成 + 后处理 + 轮询（我方观测拆分之和）。不等于左列总耗时（左列还含出队前与 OSS 回写）。"
               >
                 网关段
               </th>
@@ -2178,9 +2179,9 @@ export function LogsTable({ initialData }: { initialData: GatewayLogsInitialData
               </th>
               <th
                 className="whitespace-nowrap bg-zinc-800/25 px-2 text-[var(--gw-muted)]"
-                title="仅火山异步视频 · 厂商原生总耗时；生图/无 trace 为 —"
+                title="厂商 · 火山 trace created→updated（仅 GPU 生成跨度，不含排队/后处理/我方轮询）。与「生成」列 GPU 真值一致；进行中 updated 未跳变时为 —。"
               >
-                总耗时
+                厂商 GPU
               </th>
               <th
                 className="whitespace-nowrap border-r border-white/10 bg-zinc-800/25 px-2 text-[var(--gw-muted)]"

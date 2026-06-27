@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BookMallBaseUrlProvider } from "@/components/book-mall-base-url-provider";
+import { CanvasAuthGate } from "@/components/auth/canvas-auth-gate";
 import { CanvasShell } from "@/components/layout/canvas-shell";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
@@ -28,7 +29,9 @@ export default function RootLayout({
       <body className="canvas-sans">
         <BookMallBaseUrlProvider baseUrl={bookMallBaseUrl}>
           <DialogProvider>
-            <CanvasShell>{children}</CanvasShell>
+            <CanvasAuthGate>
+              <CanvasShell>{children}</CanvasShell>
+            </CanvasAuthGate>
           </DialogProvider>
         </BookMallBaseUrlProvider>
       </body>

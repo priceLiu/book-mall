@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   createCanvasProvider,
@@ -1190,9 +1189,5 @@ function Field({
 }
 
 export function ProvidersClient() {
-  return (
-    <RequireAuth>
-      <Inner />
-    </RequireAuth>
-  );
+  return <Inner />;
 }

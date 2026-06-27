@@ -24,6 +24,10 @@ import {
   MENTION_BADGE_ATTR,
   serializeEditable,
 } from "@/lib/canvas/mention-editable-dom";
+import {
+  resolveCaretTextAnchor,
+  scanMentionTriggerBeforeCursor,
+} from "@/lib/canvas/mention-editable-trigger";
 import { getMentionDragId, hasMentionDrag } from "@/lib/canvas/mention-drag";
 import { PRO2_DOCK_TEXTAREA_SCROLL_CLASS } from "@/lib/canvas/story-pro2-node-chrome";
 import { useDeferredTextCommit } from "@/lib/canvas/use-deferred-text-commit";
@@ -79,11 +83,6 @@ type TriggerAnchor = {
   at: number;
 };
 
-function isWhitespace(ch: string | undefined): boolean {
-  return ch === undefined || ch === "" || /\s/.test(ch);
-}
-
-/** 跨浏览器：从屏幕坐标取得折叠的插入点 Range */
 function caretRangeFromPoint(x: number, y: number): Range | null {
   const doc = document as Document & {
     caretRangeFromPoint?: (x: number, y: number) => Range | null;
@@ -251,27 +250,19 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
       if (!sel || sel.rangeCount === 0) return closePopover();
       const range = sel.getRangeAt(0);
       if (!range.collapsed) return closePopover();
-      const node = range.startContainer;
-      if (node.nodeType !== Node.TEXT_NODE || !root.contains(node)) {
-        return closePopover();
-      }
-      const textNode = node as Text;
-      const text = (textNode.textContent ?? "").slice(0, range.startOffset);
-      const at = text.lastIndexOf("@");
-      if (at < 0) return closePopover();
-      // @ 须位于文本开头或前接空白
-      if (at > 0 && !isWhitespace(text[at - 1])) return closePopover();
-      const tail = text.slice(at + 1);
-      if (/\s/.test(tail)) return closePopover();
-      // 已是完整 label 命中则不再触发
-      if (
-        tail &&
-        mentionablesRef.current.some((m) => m.label === tail)
-      ) {
-        return closePopover();
-      }
-      triggerAnchorRef.current = { node: textNode, at };
-      setPopoverFilter(tail);
+
+      const anchor = resolveCaretTextAnchor(root, range);
+      if (!anchor) return closePopover();
+
+      const textBefore = (anchor.node.textContent ?? "").slice(0, anchor.offset);
+      const hit = scanMentionTriggerBeforeCursor(
+        textBefore,
+        mentionablesRef.current,
+      );
+      if (!hit) return closePopover();
+
+      triggerAnchorRef.current = { node: anchor.node, at: hit.at };
+      setPopoverFilter(hit.filter);
       setPopoverOpen(true);
       setPopoverIndex(0);
       setAnchorTick((t) => t + 1);
@@ -465,11 +456,22 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
       [clearDropCaret, closePopover, disabled, insertBadgeAtRange],
     );
 
+    const detectTriggerRafRef = useRef<number | null>(null);
+    const scheduleDetectTrigger = useCallback(() => {
+      if (detectTriggerRafRef.current != null) {
+        cancelAnimationFrame(detectTriggerRafRef.current);
+      }
+      detectTriggerRafRef.current = requestAnimationFrame(() => {
+        detectTriggerRafRef.current = null;
+        detectTrigger();
+      });
+    }, [detectTrigger]);
+
     // ---- 事件 ----
     const onInput = useCallback(() => {
       syncFromDom("schedule");
-      detectTrigger();
-    }, [detectTrigger, syncFromDom]);
+      scheduleDetectTrigger();
+    }, [scheduleDetectTrigger, syncFromDom]);
 
     const onKeyDown = useCallback(
       (e: KeyboardEvent<HTMLDivElement>) => {
@@ -628,6 +630,8 @@ export const MentionsEditable = forwardRef<HTMLDivElement, MentionsEditableProps
           cancelAnimationFrame(hoverRafRef.current);
         if (dragRafRef.current != null)
           cancelAnimationFrame(dragRafRef.current);
+        if (detectTriggerRafRef.current != null)
+          cancelAnimationFrame(detectTriggerRafRef.current);
       },
       [],
     );

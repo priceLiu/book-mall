@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Layers } from "lucide-react";
 
-import { RequireAuth } from "@/components/auth/require-auth";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { UnifiedProjectAssetsView } from "@/components/canvas/unified-project-assets-view";
 import {
@@ -103,9 +102,5 @@ function Inner() {
 }
 
 export function AssetsClient() {
-  return (
-    <RequireAuth>
-      <Inner />
-    </RequireAuth>
-  );
+  return <Inner />;
 }

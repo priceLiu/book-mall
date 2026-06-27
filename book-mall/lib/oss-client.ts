@@ -64,6 +64,8 @@ export async function ossUploadBuffer(
     contentType: string;
     useMultipart: boolean;
     timeoutMs: number;
+    /** 分片并发；回填大文件建议 1~2 降低 TLS 断连 */
+    multipartParallel?: number;
   },
 ): Promise<{ url?: string }> {
   const ct = args.contentType.split(";")[0].trim() || "application/octet-stream";
@@ -72,7 +74,7 @@ export async function ossUploadBuffer(
       args.key,
       args.buf,
       {
-        parallel: 4,
+        parallel: args.multipartParallel ?? 4,
         partSize: 1024 * 1024,
         timeout: args.timeoutMs,
         mime: ct,
@@ -87,4 +89,43 @@ export async function ossUploadBuffer(
     headers: { "Content-Type": ct },
     ACL: "public-read",
   });
+}
+
+/** 经 OSS SDK 读对象（比 fetch 公网 URL 更稳；支持 Range） */
+export async function ossGetBuffer(
+  client: Awaited<ReturnType<typeof createOssClientFrom>>,
+  args: { key: string; range?: string; timeoutMs?: number },
+): Promise<Buffer | null> {
+  const res = await client.get(args.key, {
+    timeout: args.timeoutMs ?? 120_000,
+    ...(args.range ? { headers: { Range: args.range } } : {}),
+  });
+  const content = (res as { content?: Buffer }).content;
+  return content && content.byteLength ? content : null;
+}
+
+const RETRYABLE = /ResponseError|timeout|ECONNRESET|ETIMEDOUT|socket disconnected/i;
+
+/** OSS 读写重试（指数退避） */
+export async function withOssRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  opts?: { attempts?: number; baseDelayMs?: number },
+): Promise<T> {
+  const attempts = opts?.attempts ?? 4;
+  const baseDelayMs = opts?.baseDelayMs ?? 2000;
+  let lastErr: unknown;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      if (i >= attempts || !RETRYABLE.test(msg)) throw e;
+      const wait = baseDelayMs * i;
+      console.warn(`${label} retry ${i}/${attempts - 1} in ${wait}ms (${msg.slice(0, 80)})`);
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  }
+  throw lastErr;
 }
