@@ -122,6 +122,38 @@ vendor failed    → VOLCENGINE_TASK_FAILED
 | 轮询池 | Gateway FAILED stall → 「恢复」 |
 | 后台自动 | `recoverMisclassifiedVolcengineStallLogs`（poll worker 每轮） |
 
+### 3.6 生视频看门狗（双机制收口护栏）
+
+`runGatewayVideoWatchdog`（`gateway-video-watchdog.ts`）对 RUNNING 火山视频按以下条件主动向厂商核对并收口（`recoverVolcengineGatewayLogFromVendor`，含 15s 超时 + 去重 + 并发封顶）：
+
+| 触发 | 条件 |
+|------|------|
+| `poll_stale` | submitted 已久 且 `lastPolledAt` 滞后（worker 卡死 / 单条 poll 阻塞） |
+| `checkpoint` | 墙钟越过检查点（默认 **300 / 500 / 600 / 900s**），即使 poll 仍在 tick 也强制核对 |
+| `interval` | 越过末档后每 `GATEWAY_VIDEO_WATCHDOG_INTERVAL_MS`（默认 120s）持续核对 |
+
+去重：每次实际打厂商后把 `watchdogLastRecoverAtMs` 写入 `resultSummary._gateway`，避免同档重复复核（跨副本也生效）。
+
+**两种巡检机制（互补）：**
+
+1. **定时巡检（常驻）**：`instrumentation.ts` → `startResidentGatewayVideoWatchdog` 在 web 进程内 `setInterval` 每 `GATEWAY_VIDEO_WATCHDOG_RESIDENT_INTERVAL_MS`（默认 30s）跑一次。**不依赖**外部 `gateway-poll-loop` 是否存活，也不依赖是否有人打开 Logs 页。
+2. **被触发巡检**：`gateway-poll-loop` 每轮末尾 + Logs 页 `canvas-queue` 读路径。
+
+策略实现见 `gateway-video-watchdog-policy.ts`；审计脚本 `scripts/audit-gateway-postproc-anomalies.ts`（按时间窗列出后处理虚高的成功任务）。
+
+可配置 env：
+
+| env | 默认 | 说明 |
+|-----|------|------|
+| `GATEWAY_VIDEO_WATCHDOG_RESIDENT` | `1` | 常驻定时巡检开关（设 `0` 关闭） |
+| `GATEWAY_VIDEO_WATCHDOG_RESIDENT_INTERVAL_MS` | `30000` | 常驻巡检间隔 |
+| `GATEWAY_VIDEO_WATCHDOG_CHECKPOINTS_SEC` | `300,500,600,900` | 墙钟检查点 |
+| `GATEWAY_VIDEO_WATCHDOG_INTERVAL_MS` | `120000` | 末档后定期复核间隔 |
+| `GATEWAY_VIDEO_WATCHDOG_RECOVER_GAP_MS` | `60000` | 同 log 最小复核间隔 |
+| `GATEWAY_VIDEO_WATCHDOG_MIN_INTERVAL_MS` | `30000` | 看门狗每进程节流 |
+| `GATEWAY_VIDEO_WATCHDOG_LIMIT` | `8` | 单次最多复核条数 |
+| `GATEWAY_VIDEO_WATCHDOG_LOG` | `0` | 设 `1` 打 vendor check 明细日志 |
+
 **查厂商任务请用 Vendor Task（`cgt-…` / `externalTaskId`），不是 Request ID（`0217…`）。**
 
 ---
@@ -139,6 +171,7 @@ vendor failed    → VOLCENGINE_TASK_FAILED
 
 | 日期 | 说明 |
 |------|------|
+| 2026-06-27 | 看门狗双机制：**常驻定时巡检（30s，web 进程内）** + 多检查点（300/500/600/900s）向厂商主动核对，解决「poll-loop 停跑 + 无人看页面」时后处理虚高、迟收口 |
 | 2026-06-22 | **停更不再判失败**：≥10min 转持续后台生成；仅 vendor fail 才 FAILED；误杀恢复入口 |
 | 2026-06-22 | Canvas 10min 后台 UI、Gateway 后台等待 Tab/ badge、轮询池后台筛选 |
 | 2026-06-22 | 初版：错误分类、SUBMIT_ORPHAN、重试策略 |

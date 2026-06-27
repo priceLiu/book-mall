@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Copy, Plus, Trash2, X } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { RequireAuth } from "@/components/auth/require-auth";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { ProjectCoverMedia } from "@/components/canvas/project-cover-media";
 import {
@@ -767,9 +766,5 @@ function PickCard({
 }
 
 export function ProjectsClient() {
-  return (
-    <RequireAuth>
-      <Inner />
-    </RequireAuth>
-  );
+  return <Inner />;
 }

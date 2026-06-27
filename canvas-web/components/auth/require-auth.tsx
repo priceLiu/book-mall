@@ -19,6 +19,10 @@ import {
   shouldAttemptSilentSso,
 } from "@/lib/tools-silent-sso";
 import {
+  clearSsoExchangeFreshClient,
+  isSsoExchangeFreshClient,
+} from "@/lib/sso-exchange-fresh";
+import {
   bumpSsoReenterAttempts,
   clearSsoReenterAttempts,
   MAX_SSO_REENTER_ATTEMPTS,
@@ -27,6 +31,8 @@ import {
 
 const SESSION_FETCH_TIMEOUT_MS = 20_000;
 const SESSION_FETCH_RETRY_DELAY_MS = 800;
+const SESSION_FETCH_FRESH_EXCHANGE_RETRIES = 4;
+const SESSION_FETCH_FRESH_EXCHANGE_DELAY_MS = 1_200;
 const SESSION_POLL_MS = 60_000;
 
 async function fetchToolsSessionClient(): Promise<
@@ -129,10 +135,19 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       setLoading(true);
     }
     setError(null);
+    const freshExchange = isSsoExchangeFreshClient();
+    const maxAttempts = freshExchange
+      ? SESSION_FETCH_FRESH_EXCHANGE_RETRIES
+      : opts?.retry === false
+        ? 1
+        : 2;
+    const retryDelayMs = freshExchange
+      ? SESSION_FETCH_FRESH_EXCHANGE_DELAY_MS
+      : SESSION_FETCH_RETRY_DELAY_MS;
     try {
       let data = await fetchToolsSessionClient();
-      if (!data.active && opts?.retry !== false) {
-        await new Promise((r) => setTimeout(r, SESSION_FETCH_RETRY_DELAY_MS));
+      for (let attempt = 1; attempt < maxAttempts && !data.active; attempt++) {
+        await new Promise((r) => setTimeout(r, retryDelayMs));
         if (gen !== loadGenRef.current) return;
         data = await fetchToolsSessionClient();
       }
@@ -140,6 +155,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       setHasTokenCookie(Boolean(data.hasCookie));
       setSessionActive(Boolean(data.active));
       if (data.active) {
+        clearSsoExchangeFreshClient();
         setReady(true);
         return;
       }
@@ -190,7 +206,10 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   /** 会话建立成功后清零静默换票计数，便于下一轮失效重新自动换票 */
   useEffect(() => {
-    if (ready) clearSsoReenterAttempts();
+    if (ready) {
+      clearSsoReenterAttempts();
+      clearSsoExchangeFreshClient();
+    }
   }, [ready]);
 
   /**
@@ -262,9 +281,11 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
         {error ??
           (exhausted
             ? "多次自动连接 Book 账号均未成功，请重新登录后继续使用。"
-            : hasTokenCookie
-              ? "工具站令牌已失效，请重新连接主站账号。"
-              : "尚未建立画布会话，请连接 Book 账号后继续使用。")}
+            : isSsoExchangeFreshClient() && hasTokenCookie
+              ? "刚完成 SSO 换票，主站校验较慢。请点「重新连接」或稍候再试。"
+              : hasTokenCookie
+                ? "工具站令牌已失效，请重新连接主站账号。"
+                : "尚未建立画布会话，请连接 Book 账号后继续使用。")}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <button

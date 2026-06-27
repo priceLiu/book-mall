@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { RequireAuth } from "@/components/auth/require-auth";
 import { GalleryMediaCard } from "@/components/gallery/gallery-media-card";
 import {
   listCanvasCharacters,
@@ -135,9 +134,5 @@ function Inner() {
 }
 
 export function GalleryClient() {
-  return (
-    <RequireAuth>
-      <Inner />
-    </RequireAuth>
-  );
+  return <Inner />;
 }
