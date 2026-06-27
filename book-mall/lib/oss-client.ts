@@ -55,6 +55,13 @@ type OssMultipartClient = {
   ) => Promise<{ url?: string }>;
 };
 
+type OssGetClient = {
+  get: (
+    name: string,
+    options?: Record<string, unknown>,
+  ) => Promise<{ content?: Buffer }>;
+};
+
 /** ali-oss 运行时支持 multipartUpload，但 @types 未声明 */
 export async function ossUploadBuffer(
   client: Awaited<ReturnType<typeof createOssClientFrom>>,
@@ -96,11 +103,11 @@ export async function ossGetBuffer(
   client: Awaited<ReturnType<typeof createOssClientFrom>>,
   args: { key: string; range?: string; timeoutMs?: number },
 ): Promise<Buffer | null> {
-  const res = await client.get(args.key, {
+  const res = await (client as unknown as OssGetClient).get(args.key, {
     timeout: args.timeoutMs ?? 120_000,
     ...(args.range ? { headers: { Range: args.range } } : {}),
   });
-  const content = (res as { content?: Buffer }).content;
+  const content = res.content;
   return content && content.byteLength ? content : null;
 }
 
