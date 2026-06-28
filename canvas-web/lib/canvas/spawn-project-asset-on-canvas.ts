@@ -2,6 +2,8 @@
  * 项目资产 → 画布节点：insert-map 归一化 + spawn（拖放 / 插入按钮）
  */
 import { mapProjectAssetInsert } from "@/lib/canvas-api";
+import { patchStarterFromScriptPackage } from "./crew-bulletin-script-package";
+import type { InsertMapResult } from "./project-asset-types";
 import type { CanvasProjectEdition } from "@/lib/canvas/project-edition-detect";
 import {
   isSbv1PipelineNodeType,
@@ -9,7 +11,6 @@ import {
   isStoryProPipelineNodeType,
 } from "@/lib/canvas/project-edition-detect";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
-import type { InsertMapResult } from "@/lib/canvas/project-asset-types";
 import type {
   CanvasFlowEdge,
   CanvasFlowNode,
@@ -174,6 +175,51 @@ export function normalizeProjectAssetInsertData(
   return next;
 }
 
+/** SCRIPT_PACKAGE 拖入生产画布 · 合并到现有 starter，避免重复节点 */
+function tryMergeScriptPackageIntoProductionStarter(
+  insert: InsertMapResult,
+  assetId: string,
+  actions: SpawnProjectAssetActions,
+): string | null {
+  if (insert.nodeType !== "story-pro2-starter") return null;
+  const meta = actions.getGraphMeta?.();
+  if (!meta?.productionCanvas && !meta?.requireScriptLink) return null;
+
+  const existing = actions.getNodes().find((n) => n.type === "story-pro2-starter");
+  if (!existing || !actions.updateNodeData) return null;
+
+  const incoming = insert.data ?? {};
+  const markdown = String(
+    incoming.scriptStudioCompletedBatchesMd ??
+      incoming.generatedOutlineMd ??
+      "",
+  );
+  actions.updateNodeData(
+    existing.id,
+    patchStarterFromScriptPackage({
+      id: assetId,
+      displayName: String(incoming.label ?? incoming.linkedScriptPackageTitle ?? "剧本包"),
+      payload: {
+        markdown,
+        totalEpisodes: incoming.scriptStudioTotalEpisodes,
+        frozenBiblesMd: incoming.scriptStudioFrozenBiblesMd,
+        frozenBiblesOssUrl: incoming.scriptStudioFrozenBiblesOssUrl,
+        completedBatchesOssUrl: incoming.scriptStudioCompletedBatchesOssUrl,
+        batchIndex: incoming.scriptStudioBatchIndex,
+        system: incoming.scriptStudioSystem,
+        crewBulletin: incoming.crewBulletin,
+        scriptStudioCharacterRows: incoming.scriptStudioCharacterRows,
+        sceneRows: incoming.sceneRows,
+        scriptStudioPropRows: incoming.scriptStudioPropRows,
+        scriptStudioFrameRows: incoming.scriptStudioFrameRows,
+        scriptStudioMoodRows: incoming.scriptStudioMoodRows,
+        scriptStudioAudioRows: incoming.scriptStudioAudioRows,
+      },
+    }),
+  );
+  return existing.id;
+}
+
 type BundleLayout = {
   nodes?: Array<{
     id: string;
@@ -186,6 +232,8 @@ type BundleLayout = {
 
 export type SpawnProjectAssetActions = {
   getNodes: () => CanvasFlowNode[];
+  getGraphMeta?: () => { productionCanvas?: boolean; requireScriptLink?: boolean } | null;
+  updateNodeData?: (id: string, patch: Record<string, unknown>) => void;
   addNode: (
     type: CanvasNodeType,
     position: { x: number; y: number },
@@ -307,6 +355,22 @@ export async function spawnProjectAssetOnCanvas(args: {
   }
 
   const insert = await mapProjectAssetInsert(args.base, args.assetId, args.edition);
+
+  const mergedStarterId = tryMergeScriptPackageIntoProductionStarter(
+    insert,
+    args.assetId,
+    args.actions,
+  );
+  if (mergedStarterId) {
+    if (args.selectAfterSpawn !== false) {
+      selectPro2NodeAfterSpawn(args.actions.setNodes, mergedStarterId);
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("canvas:flush-autosave"));
+    }
+    return mergedStarterId;
+  }
+
   const isBundle =
     insert.nodeType === "group" &&
     Boolean(

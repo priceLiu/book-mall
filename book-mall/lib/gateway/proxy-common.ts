@@ -22,6 +22,7 @@ import {
   type UsageFromResponse,
 } from "./gateway-token-metrics";
 import { assertModelRegistered, UnregisteredGatewayModelError } from "./model-registry";
+import { gatewayFetch } from "./format-fetch-error";
 import { resolveBillableImageCountFromLog } from "./log-billing-metrics";
 import { inferGatewayFailCode } from "./log-fail-code";
 import { parseVideoPricingHints } from "./log-pricing-hints";
@@ -489,14 +490,18 @@ export async function forwardChatCompletions(opts: {
       : cred.apiKey;
 
   const started = Date.now();
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${bearerKey}`,
+  const r = await gatewayFetch(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${bearerKey}`,
+      },
+      body: JSON.stringify(requestBody),
     },
-    body: JSON.stringify(requestBody),
-  });
+    { hop: "upstream", providerKind: cred.providerKind },
+  );
   const text = await r.text();
   return { status: r.status, text, durationMs: Date.now() - started };
 }
@@ -529,14 +534,18 @@ export async function forwardChatCompletionsStream(opts: {
       : cred.apiKey;
 
   const started = Date.now();
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${bearerKey}`,
+  const r = await gatewayFetch(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${bearerKey}`,
+      },
+      body: JSON.stringify({ ...requestBody, stream: true }),
     },
-    body: JSON.stringify({ ...requestBody, stream: true }),
-  });
+    { hop: "upstream", providerKind: cred.providerKind },
+  );
   return {
     status: r.status,
     body: r.body,

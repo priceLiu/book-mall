@@ -24,7 +24,7 @@ export function buildPro2StarterNodeData(
     starterMode: "generate",
     themeInput: "",
     generatedOutlineMd: "",
-    pro2TextPurpose: "story-outline",
+    pro2TextPurpose: "general",
     providerId: "",
     modelKey: "",
     params: { ...STORY_PRO_LLM_PARAMS_DEFAULT },
@@ -80,7 +80,9 @@ export function buildPro2ThreeViewNodeData(
   overrides?: Record<string, unknown>,
 ): Record<string, unknown> {
   return {
+    ...SBV1_DEFAULT_IMAGE_NODE_DATA,
     label: "角色",
+    aspectRatio: "16:9",
     dockInput: "",
     ...overrides,
   };

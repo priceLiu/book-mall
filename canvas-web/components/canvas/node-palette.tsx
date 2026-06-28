@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Box,
   Brain,
   ChevronLeft,
   ChevronRight,
@@ -16,12 +17,14 @@ import {
   LayoutGrid,
   MapPin,
   Mic,
+  Music,
   Palette,
   Save,
   Sparkles,
   Type,
   Users,
   Video,
+  Wind,
   X,
 } from "lucide-react";
 import type { CanvasContentNodeType } from "@/lib/canvas/types";
@@ -238,6 +241,25 @@ const STORY_PRO2_PALETTE: PaletteItem[] = [
     label: "分镜视频",
     icon: <Video className="size-[18px]" />,
     hint: "视频 + 配音",
+  },
+  {
+    type: "story-pro2-prop",
+    label: "道具设计",
+    icon: <Box className="size-[18px]" />,
+    hint: "占位 · 功能待开发",
+    dividerBefore: true,
+  },
+  {
+    type: "story-pro2-mood",
+    label: "氛围设计",
+    icon: <Wind className="size-[18px]" />,
+    hint: "占位 · 功能待开发",
+  },
+  {
+    type: "story-pro2-audio",
+    label: "音效设计",
+    icon: <Music className="size-[18px]" />,
+    hint: "占位 · 功能待开发",
   },
   {
     type: "jianying-export-pro2",

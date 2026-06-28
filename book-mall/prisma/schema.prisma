@@ -1820,6 +1820,7 @@ enum ProjectAssetKind {
   STYLE
   PROMPT
   GROUP_BUNDLE
+  SCRIPT_PACKAGE
 }
 
 /// 统一项目资产（Pro2 · sbv1 · Story-Pro 共用）

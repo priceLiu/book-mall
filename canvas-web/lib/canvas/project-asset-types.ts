@@ -11,7 +11,8 @@ export type ProjectAssetKind =
   | "PRIVATE_PORTRAIT"
   | "STYLE"
   | "PROMPT"
-  | "GROUP_BUNDLE";
+  | "GROUP_BUNDLE"
+  | "SCRIPT_PACKAGE";
 
 export type AssetVisibility = "PRIVATE" | "TEAM_PUBLIC";
 

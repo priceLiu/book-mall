@@ -1,25 +1,24 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import type { NodeProps } from "@xyflow/react";
 import {
   AlignLeft,
-  AlertTriangle,
   FileText,
-  FileUp,
   GripVertical,
+  ImageIcon,
   Loader2,
+  Music,
+  PenLine,
+  Play,
 } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
-import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { uploadCanvasFile } from "@/lib/canvas-api";
 import { useCanvasStore } from "@/lib/canvas/store";
 import {
   PRO2_CARD_SHELL_CLASS,
   pro2NodeBorderColor,
-  PRO2_NODE_ACCENT,
   PRO2_NODE_HANDLE_CLASS,
   PRO2_TEXT_NODE_MIN_HEIGHT,
   PRO2_TEXT_NODE_MIN_WIDTH,
@@ -55,10 +54,9 @@ import {
   spawnPro2ScriptHubFromSource,
 } from "@/lib/canvas/pro2-spawn-nodes";
 import {
-  parseStoryProUploadScriptFile,
-  STORY_PRO_UPLOAD_SCRIPT_ACCEPT,
-  formatCanvasFetchError,
-} from "@/lib/canvas/story-pro-upload-script";
+  attachPro2StarterShortcutPreset,
+  type Pro2ShortcutPresetId,
+} from "@/lib/canvas/pro2-spawn-shortcut-presets";
 import { promoteEmbeddedPackFromOutline } from "@/lib/canvas/story-hub-runtime";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
@@ -66,11 +64,35 @@ import { cn } from "@/lib/utils";
 import { Pro2ThinNodeToolbar } from "./pro2-thin-node-toolbar";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
+import { Pro2NodeErrorBanner } from "./pro2-node-error-banner";
+import {
+  LIBTV_NODE_STAGE_DRAG_CLASS,
+  LibtvTryActionRow,
+} from "../libtv-thin-node-try-row";
 
-const TRY_UPLOAD = { id: "upload", label: "上传剧本", icon: FileUp } as const;
+type StarterTryAction =
+  | { id: "write"; label: string; icon: typeof PenLine; kind: "write" }
+  | {
+      id: Pro2ShortcutPresetId;
+      label: string;
+      icon: typeof Play;
+      kind: "preset";
+    }
+  | { id: "text-to-music"; label: string; icon: typeof Music; kind: "soon" };
+
+const STARTER_TRY_ACTIONS: StarterTryAction[] = [
+  { id: "write", label: "自己编写内容", icon: PenLine, kind: "write" },
+  { id: "text-to-video", label: "文生视频", icon: Play, kind: "preset" },
+  {
+    id: "image-to-prompt",
+    label: "图片反推提示词",
+    icon: ImageIcon,
+    kind: "preset",
+  },
+  { id: "text-to-music", label: "文字生音乐", icon: Music, kind: "soon" },
+];
 
 export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
-  const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -78,7 +100,6 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
   const setNodes = useCanvasStore((s) => s.setNodes);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const openOutlineEditor = useCanvasStore((s) => s.openPro2TextOutlineEditor);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const d = data as unknown as StoryPro2StarterNodeData;
   const saveAsAsset = useSaveNodeAsAsset();
@@ -94,6 +115,10 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     isStoryOutlineMode &&
     (d.themeOutlineRuntime?.status === "pending" ||
       d.themeOutlineRuntime?.status === "running");
+  const outlineGeneratingLabel =
+    d.themeOutlineRuntime?.status === "running" || d.themeOutlineRuntime?.taskId
+      ? "生成中…"
+      : "提交中…";
   const outlineErrorMessage =
     isStoryOutlineMode && d.themeOutlineRuntime?.status === "error"
       ? formatCanvasTaskError(
@@ -121,69 +146,73 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
     return `文本节点 ${idx >= 0 ? idx + 1 : ""}`.trim();
   }, [nodes, id]);
 
-  const leftAddMenuSections = useMemo(
-    () =>
-      PRO2_STARTER_LEFT_ADD_MENU.map((section) => ({
-        ...section,
-        items: section.items.map((item) =>
-          item.id === "upload-script"
-            ? { ...item, enabled: !hasCardContent }
-            : item,
-        ),
-      })),
-    [hasCardContent],
-  );
+  const leftAddMenuSections = PRO2_STARTER_LEFT_ADD_MENU;
 
   const openEditor = useCallback(() => {
     if (!hasCardContent || isGenerating) return;
     openOutlineEditor(id);
   }, [hasCardContent, isGenerating, id, openOutlineEditor]);
 
-  const ingestScriptFile = useCallback(
-    async (file: File) => {
-      if (!base) return;
-      try {
-        const parsed = await parseStoryProUploadScriptFile(file);
-        if (!parsed.ok) {
-          await alert({
-            title: "无法解析剧本",
-            message: parsed.error,
-            variant: "error",
-          });
-          return;
-        }
-        const blob = new Blob([parsed.md], {
-          type:
-            parsed.meta.format === "txt"
-              ? "text/plain;charset=utf-8"
-              : "text/markdown;charset=utf-8",
-        });
-        const uploadFile = new File([blob], parsed.meta.fileName, {
-          type: blob.type,
-        });
-        const ossUrl = await uploadCanvasFile(base, uploadFile);
-        updateNodeData(id, {
-          starterMode: "upload",
-          uploadedScriptMd: parsed.md,
-          uploadedScriptOssUrl: ossUrl,
-          uploadedScriptMeta: parsed.meta,
-          generatedOutlineMd: "",
-          themeInput: "",
-        });
-      } catch (e) {
-        await alert({
-          title: "上传失败",
-          message: formatCanvasFetchError(e, "剧本上传云端失败"),
-          variant: "error",
-        });
-      }
+  const dismissOutlineError = useCallback(() => {
+    const rt = d.themeOutlineRuntime;
+    if (!rt?.taskId) {
+      updateNodeData(id, {
+        themeOutlineRuntime: {
+          ...rt,
+          status: "idle",
+          failCode: undefined,
+          failMessage: undefined,
+        },
+      });
+      return;
+    }
+    updateNodeData(id, {
+      themeOutlineRuntime: {
+        ...rt,
+        status: "idle",
+        failCode: undefined,
+        failMessage: undefined,
+        dismissedFailTaskId: rt.taskId,
+      },
+    });
+  }, [d.themeOutlineRuntime, id, updateNodeData]);
+
+  const onTryWrite = useCallback(() => {
+    updateNodeData(id, { pro2TextPurpose: "general" });
+    openOutlineEditor(id);
+  }, [id, updateNodeData, openOutlineEditor]);
+
+  const onTryPreset = useCallback(
+    (preset: Pro2ShortcutPresetId) => {
+      attachPro2StarterShortcutPreset(id, preset, nodes, {
+        addNode: (type, position, nodeData) =>
+          addNode(type as never, position, nodeData),
+        setEdges,
+        setNodes,
+        updateNodeData,
+      });
     },
-    [base, id, updateNodeData, alert],
+    [id, nodes, addNode, setEdges, setNodes, updateNodeData],
   );
 
-  const onTryAction = useCallback(async () => {
-    fileInputRef.current?.click();
-  }, []);
+  const onTryAction = useCallback(
+    (action: StarterTryAction) => {
+      if (action.kind === "write") {
+        onTryWrite();
+        return;
+      }
+      if (action.kind === "soon") {
+        void alert({
+          title: "即将推出",
+          message: "文字生音乐预设正在开发中，请稍后再试。",
+          variant: "info",
+        });
+        return;
+      }
+      onTryPreset(action.id);
+    },
+    [onTryWrite, onTryPreset, alert],
+  );
 
   const spawnNeighbor = useCallback(
     (side: "left" | "right", nodeType?: string) => {
@@ -310,11 +339,6 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
 
   const onSidePick = useCallback(
     (side: "left" | "right") => (itemId: string, nodeType?: string) => {
-      if (itemId === "upload-script") {
-        if (hasCardContent) return;
-        fileInputRef.current?.click();
-        return;
-      }
       void handlePro2SideAddNodePick(
         itemId,
         nodeType,
@@ -347,7 +371,7 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
         },
       );
     },
-    [spawnNeighbor, alert, hasCardContent],
+    [spawnNeighbor, alert],
   );
 
   return (
@@ -422,25 +446,25 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
       <div
         className={cn(
           PRO2_CARD_SHELL_CLASS,
+          LIBTV_CARD_DRAG_CLASS,
           "flex min-h-0 flex-1 flex-col overflow-hidden",
         )}
         style={{ borderColor: pro2NodeBorderColor(!!selected) }}
       >
-        {displayState === "generated" && isGenerating ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-[12px] text-violet-200/70">
+        {outlineErrorMessage && !isGenerating ? (
+          <Pro2NodeErrorBanner
+            message={outlineErrorMessage}
+            onDismiss={dismissOutlineError}
+          />
+        ) : null}
+        {isGenerating ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 text-[12px] text-violet-200/70">
             <Loader2 className="size-5 animate-spin" />
-            生成中…
-          </div>
-        ) : outlineErrorMessage ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-            <AlertTriangle className="size-8 text-red-400/70" />
-            <p className="text-[11px] leading-relaxed text-red-200/85">
-              {outlineErrorMessage}
-            </p>
+            {outlineGeneratingLabel}
           </div>
         ) : displayState === "generated" ? (
           <div
-            className="h-full min-h-0 cursor-pointer p-2"
+            className="h-full min-h-0 p-2"
             title={hasUploadedScript ? "已上传剧本 · 双击放大查看" : "双击放大编辑"}
             onDoubleClick={(e) => {
               e.preventDefault();
@@ -463,39 +487,44 @@ export function StoryPro2StarterNode({ id, data, selected }: NodeProps) {
             </div>
           </div>
         ) : displayState === "connected" ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
+          <div
+            className={cn(
+              LIBTV_NODE_STAGE_DRAG_CLASS,
+              "flex flex-col items-center justify-center gap-2 px-4 text-center",
+            )}
+          >
             <AlignLeft className="size-8 text-white/20" />
             <p className="text-[11px] text-white/45">{linkedMessage}</p>
           </div>
         ) : (
-          <div className="flex h-full min-h-0 flex-col px-3 pb-3 pt-2">
+          <div
+            className={cn(
+              LIBTV_NODE_STAGE_DRAG_CLASS,
+              "flex flex-col px-3 pb-3 pt-2",
+            )}
+          >
             <div className="mb-3 flex justify-center pt-1">
               <AlignLeft className="size-8 text-white/20" />
             </div>
             <p className="mb-2 text-[11px] text-white/45">尝试：</p>
-            <button
-              type="button"
-              className="nodrag flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-left text-[12px] text-white/85 transition hover:bg-violet-500/12"
-              onClick={() => void onTryAction()}
-            >
-              <TRY_UPLOAD.icon className="size-4 shrink-0 text-white/55" />
-              {TRY_UPLOAD.label}
-            </button>
+            <ul className="space-y-0.5">
+              {STARTER_TRY_ACTIONS.map((action) => (
+                <li key={action.id}>
+                  <LibtvTryActionRow
+                    icon={action.icon}
+                    label={action.label}
+                    disabled={action.kind === "soon"}
+                    onClick={() => onTryAction(action)}
+                  />
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[10px] leading-relaxed text-white/35">
+              在脚本生成器中创作并发布剧本后，可在公告条领取制作任务；本节点也可用于提示词与下游生图/生视频。
+            </p>
           </div>
         )}
       </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={STORY_PRO_UPLOAD_SCRIPT_ACCEPT}
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (file) void ingestScriptFile(file);
-        }}
-      />
     </div>
   );
 }

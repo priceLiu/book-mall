@@ -21,6 +21,9 @@ const STORY_PRO2_NODE_TYPES = new Set([
   "story-pro2-scene",
   "story-pro2-frame",
   "story-pro2-video",
+  "story-pro2-prop",
+  "story-pro2-mood",
+  "story-pro2-audio",
   "jianying-export-pro2",
 ]);
 
@@ -47,19 +50,82 @@ export function storyPro2ToProRunnerType(type: string): string {
   return type;
 }
 
-export function canvasProjectEditionFromGraph(
-  canvas: unknown,
+type CanvasGraphMetaHint = {
+  edition?: string;
+  crewBulletinAnchor?: unknown;
+  linkedScriptPackageAssetId?: string;
+};
+
+function readCanvasGraphMetaHint(meta: unknown): CanvasGraphMetaHint | null {
+  if (!meta || typeof meta !== "object") return null;
+  return meta as CanvasGraphMetaHint;
+}
+
+/** 列表轻量查询：仅 meta，不扫全量 nodes */
+export function canvasProjectEditionFromMeta(meta: unknown): CanvasProjectEdition {
+  const m = readCanvasGraphMetaHint(meta);
+  if (!m) return "standard";
+  if (m.edition === "sbv1") return "sbv1";
+  if (m.edition === "pro2") return "pro2";
+  if (m.crewBulletinAnchor || m.linkedScriptPackageAssetId) return "pro2";
+  return "standard";
+}
+
+export function canvasProjectEditionFromNodeTypes(
+  nodeTypes: Iterable<string> | null | undefined,
 ): CanvasProjectEdition {
-  if (!canvas || typeof canvas !== "object") return "standard";
-  const nodes = (canvas as { nodes?: unknown }).nodes;
-  if (!Array.isArray(nodes)) return "standard";
-  for (const raw of nodes) {
-    if (!raw || typeof raw !== "object") continue;
-    const type = (raw as { type?: unknown }).type;
+  if (!nodeTypes) return "standard";
+  for (const type of nodeTypes) {
     if (typeof type !== "string") continue;
     if (isSbv1PipelineNodeType(type)) return "sbv1";
     if (isStoryPro2PipelineNodeType(type)) return "pro2";
     if (isStoryProPipelineNodeType(type)) return "pro";
   }
   return "standard";
+}
+
+/** 列表轻量查询：meta + 节点 type 数组（SQL jsonb_agg），避免加载整张 canvas */
+export function canvasProjectEditionFromListHints(
+  meta: unknown,
+  nodeTypes: Iterable<string> | null | undefined,
+): CanvasProjectEdition {
+  const fromMeta = canvasProjectEditionFromMeta(meta);
+  if (fromMeta !== "standard") return fromMeta;
+  return canvasProjectEditionFromNodeTypes(nodeTypes);
+}
+
+/** 已绑定脚本包 / 公告栏的协同画布，禁止删除 */
+export function canvasProjectHasCollaboration(meta: unknown): boolean {
+  const m = readCanvasGraphMetaHint(meta);
+  if (!m) return false;
+  if (m.crewBulletinAnchor) return true;
+  return Boolean(m.linkedScriptPackageAssetId?.trim());
+}
+
+export function canvasProjectHasCollaborationFromGraph(
+  canvas: unknown,
+): boolean {
+  if (!canvas || typeof canvas !== "object") return false;
+  const meta = (canvas as { meta?: unknown }).meta;
+  return canvasProjectHasCollaboration(meta);
+}
+
+export function canvasProjectEditionFromGraph(
+  canvas: unknown,
+): CanvasProjectEdition {
+  if (!canvas || typeof canvas !== "object") return "standard";
+
+  const meta = (canvas as { meta?: CanvasGraphMetaHint }).meta;
+  const fromMeta = canvasProjectEditionFromMeta(meta);
+  if (fromMeta !== "standard") return fromMeta;
+
+  const nodes = (canvas as { nodes?: unknown }).nodes;
+  if (!Array.isArray(nodes)) return "standard";
+  const types: string[] = [];
+  for (const raw of nodes) {
+    if (!raw || typeof raw !== "object") continue;
+    const type = (raw as { type?: unknown }).type;
+    if (typeof type === "string") types.push(type);
+  }
+  return canvasProjectEditionFromNodeTypes(types);
 }

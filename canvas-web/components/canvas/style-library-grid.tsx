@@ -27,6 +27,8 @@ type StyleLibraryGridProps = {
   onPreview?: (preset: StyleLibraryPreset) => void;
   selectLabel?: string;
   className?: string;
+  /** 弹层内禁用卡片 hover 位移，减轻 backdrop-blur 闪屏 */
+  calmCards?: boolean;
   /** 弹层等容器：筛选头固定，仅下方网格滚动 */
   fixedFilter?: boolean;
   filterClassName?: string;
@@ -38,6 +40,7 @@ export function StyleLibraryGrid({
   onPreview,
   selectLabel = "套用",
   className,
+  calmCards = false,
   fixedFilter = false,
   filterClassName,
   contentClassName,
@@ -101,6 +104,7 @@ export function StyleLibraryGrid({
             key={preset.id}
             preset={preset}
             selectLabel={selectLabel}
+            calm={calmCards}
             onSelect={onSelect}
             onPreview={onPreview}
           />
@@ -163,18 +167,25 @@ function StyleLibraryCard({
   onSelect,
   onPreview,
   selectLabel,
+  calm = false,
 }: {
   preset: StyleLibraryPreset;
   onSelect?: (preset: StyleLibraryPreset) => void;
   onPreview?: (preset: StyleLibraryPreset) => void;
   selectLabel: string;
+  calm?: boolean;
 }) {
   const hasImage = Boolean(preset.imageUrl?.trim());
   const stop = (e: React.MouseEvent) => e.stopPropagation();
 
   return (
     <article
-      className={cn("nodrag w-full min-w-0 cursor-pointer", STYLE_LIBRARY_CARD_SHELL)}
+      className={cn(
+        "nodrag w-full min-w-0 cursor-pointer",
+        calm
+          ? "group/card relative overflow-hidden rounded-[10px] bg-[#1a1a1a] transition hover:bg-[#222]"
+          : STYLE_LIBRARY_CARD_SHELL,
+      )}
       onClick={() => onSelect?.(preset)}
       onKeyDown={(e) => {
         if (e.key === "Enter") onSelect?.(preset);
@@ -208,7 +219,14 @@ function StyleLibraryCard({
           </div>
         )}
 
-        <div className={STYLE_LIBRARY_HOVER_PROMPT_OVERLAY} aria-hidden>
+        <div
+          className={cn(
+            calm
+              ? "pointer-events-none absolute inset-x-0 bottom-0 z-10 max-h-[70%] overflow-y-auto bg-black/85 p-2.5 text-[12px] leading-relaxed text-white opacity-0 transition-opacity duration-150 group-hover/card:opacity-100"
+              : STYLE_LIBRARY_HOVER_PROMPT_OVERLAY,
+          )}
+          aria-hidden
+        >
           {preset.prompt}
         </div>
 

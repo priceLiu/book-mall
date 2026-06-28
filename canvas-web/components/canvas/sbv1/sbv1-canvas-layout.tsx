@@ -89,6 +89,7 @@ export function Sbv1CanvasLayout({
       <StyleLibraryModal
         open={styleLibOpen}
         mode="spawn"
+        dockSpawn={Boolean(styleLibImageNodeId)}
         onClose={closeStyleLib}
         onSpawn={onStylePresetPicked}
       />

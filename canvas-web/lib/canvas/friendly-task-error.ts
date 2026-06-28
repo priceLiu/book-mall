@@ -198,11 +198,30 @@ export function formatCanvasTaskError(
   }
 
   if (
+    blob.includes("gateway 内部链路") ||
+    blob.includes("api 连接超时") ||
+    blob.includes("api 请求失败")
+  ) {
+    return msg;
+  }
+
+  if (
     blob.includes("fetch failed") ||
     blob.includes("failed to fetch") ||
-    blob.includes("network")
+    blob.includes("network") ||
+    blob.includes("aborterror") ||
+    blob.includes("aborted") ||
+    blob.includes("timeout") ||
+    blob.includes("timed out")
   ) {
-    return "网络请求失败。若 Gateway 日志仍为 running，任务可能仍在生成，请稍候勿重复点击。";
+    const vendor = inferLlmVendorFromModelKey(modelKey);
+    if (vendor === "kie") {
+      return "KIE/Gemini 连接超时或网络中断。请稍后重试，或换用 DeepSeek 模型；若持续失败请检查 Gateway 中 KIE 凭证与 baseUrl。";
+    }
+    if (vendor === "deepseek") {
+      return "DeepSeek 连接超时或网络中断。请稍后重试，并检查 Gateway 中 DeepSeek 凭证是否可用。";
+    }
+    return "模型 API 连接失败（fetch failed）。请稍后重试；若 Gateway 日志仍在 running 则勿重复点击。";
   }
   if (msg) return msg;
   if (code) return code;

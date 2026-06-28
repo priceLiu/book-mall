@@ -28,24 +28,22 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   if (!guard.ok) return guard.response;
   const { id } = await ctx.params;
   try {
-    let project = await getCanvasProjectForUser(guard.user.id, id);
-    const inflight = await prisma.canvasGenerationTask.findFirst({
-      where: {
-        projectId: id,
-        status: { in: ["PENDING", "SUBMITTED"] },
-      },
-      select: { id: true },
-    });
-    if (inflight) {
-      scheduleOpportunisticCanvasPoll(id);
-    }
-    const reconciled = await reconcileStaleCanvasMediaRuntimeOnProjectRead(
-      id,
-      project.canvas,
-    );
-    if (reconciled.canvas) {
-      project = { ...project, canvas: reconciled.canvas };
-    }
+    const project = await getCanvasProjectForUser(guard.user.id, id);
+    void (async () => {
+      try {
+        const inflight = await prisma.canvasGenerationTask.findFirst({
+          where: {
+            projectId: id,
+            status: { in: ["PENDING", "SUBMITTED"] },
+          },
+          select: { id: true },
+        });
+        if (inflight) scheduleOpportunisticCanvasPoll(id);
+        await reconcileStaleCanvasMediaRuntimeOnProjectRead(id, project.canvas);
+      } catch {
+        /* 不阻塞打开画布 */
+      }
+    })();
     return NextResponse.json({ project }, { headers: jsonHeaders(request) });
   } catch (err) {
     return canvasErrorToResponse(request, err);

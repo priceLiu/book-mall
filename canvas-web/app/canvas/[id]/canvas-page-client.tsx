@@ -122,6 +122,7 @@ function Inner({ projectId }: { projectId: string }) {
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
   const { nodes, edges } = useCanvasGraphSnapshot();
+  const graphMeta = useCanvasStore((s) => s.graphMeta);
   const reflowStoryComicLayout = useCanvasStore(
     (s) => s.reflowStoryComicLayout,
   );
@@ -217,6 +218,7 @@ function Inner({ projectId }: { projectId: string }) {
   const layoutShell = resolveCanvasLayoutShell({
     projectEdition: project?.edition,
     nodes,
+    graphMeta,
   });
   const isStoryPro2Canvas = layoutShell === "pro2";
   const isSbv1Canvas = layoutShell === "sbv1";
@@ -1115,7 +1117,7 @@ function Inner({ projectId }: { projectId: string }) {
         !loading &&
         loadedNodeCountRef.current > 0 &&
         !isSbv1Project &&
-        !isStoryPro2Project ? (
+        !isStoryPro2Canvas ? (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
             <div className="pointer-events-auto max-w-md rounded-xl border border-white/10 bg-[var(--canvas-surface)]/95 px-6 py-5 text-center shadow-xl">
               <p className="text-sm font-medium text-white">节点数据丢失</p>
@@ -1139,7 +1141,8 @@ function Inner({ projectId }: { projectId: string }) {
         {nodes.length === 0 &&
         !loading &&
         loadedNodeCountRef.current === 0 &&
-        !isSbv1Project ? (
+        !isSbv1Project &&
+        !isStoryPro2Canvas ? (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
             <div className="pointer-events-auto max-w-sm rounded-xl border border-white/10 bg-black/50 px-5 py-4 text-center">
               <p className="text-xs text-[var(--canvas-muted)]">

@@ -69,6 +69,8 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     unitLabel: "元/百万 tokens",
     routes: dedupeRoutes([
       { vendor: "deepseek", modelKey: "deepseek-v4-flash", providerKind: "DEEPSEEK" },
+      { vendor: "deepseek", modelKey: "deepseek-v4-pro", providerKind: "DEEPSEEK" },
+      { vendor: "deepseek", modelKey: "deepseek-chat", providerKind: "DEEPSEEK" },
     ]),
   },
   {
@@ -98,6 +100,8 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     billingKind: "PER_1K_TOKENS",
     unitLabel: "元/百万 tokens",
     routes: dedupeRoutes([
+      { vendor: "kie", modelKey: "google/gemini-3-flash-preview", providerKind: "KIE" },
+      { vendor: "kie", modelKey: "gemini-3-flash", providerKind: "KIE" },
       { vendor: "kie", modelKey: "gemini-2.5-flash", providerKind: "KIE" },
     ]),
   },

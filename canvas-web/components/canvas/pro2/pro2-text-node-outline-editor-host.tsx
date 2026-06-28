@@ -6,6 +6,7 @@ import {
   findStoryPro2ScriptHubForStarter,
 } from "@/lib/canvas/spawn-story-pro2-workspace";
 import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
+import { resolvePro2TextPurpose } from "@/lib/canvas/pro2-text-purpose";
 import {
   pushStoryRevision,
   type StoryTextRevision,
@@ -38,6 +39,15 @@ export function Pro2TextNodeOutlineEditorHost() {
     return `文本节点 ${idx >= 0 ? idx + 1 : ""}`.trim();
   }, [node, nodes]);
 
+  const textPurpose = useMemo(
+    () =>
+      node
+        ? resolvePro2TextPurpose(d, { nodeId: node.id, nodes, edges })
+        : "general",
+    [node, d, nodes, edges],
+  );
+  const isGeneral = textPurpose === "general";
+
   const persistOutline = useCallback(
     (md: string) => {
       if (!node) return;
@@ -49,6 +59,7 @@ export function Pro2TextNodeOutlineEditorHost() {
       updateNodeData(node.id, {
         generatedOutlineMd: md,
         generatedOutlineHistory: history,
+        ...(isGeneral ? { themeInput: md.slice(0, 8000) } : {}),
       });
       const hub = findStoryPro2ScriptHubForStarter(
         nodes,
@@ -60,15 +71,16 @@ export function Pro2TextNodeOutlineEditorHost() {
         updateNodeData(hub.scriptHubId, { outlineMd: md });
       }
     },
-    [node, d.workspaceIds, d.generatedOutlineHistory, nodes, edges, updateNodeData],
+    [node, d.workspaceIds, d.generatedOutlineHistory, nodes, edges, updateNodeData, isGeneral],
   );
 
-  if (!node || !outlineMd.trim()) return null;
+  if (!node) return null;
+  if (!outlineMd.trim() && !isGeneral) return null;
 
   return (
     <Pro2TextNodeOutlineModal
       open
-      title={`${nodeLabel} · 故事大纲`}
+      title={`${nodeLabel} · ${isGeneral ? "内容" : "故事大纲"}`}
       value={outlineMd}
       onClose={closeEditor}
       onAutoSave={persistOutline}

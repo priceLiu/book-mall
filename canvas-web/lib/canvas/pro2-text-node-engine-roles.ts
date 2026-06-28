@@ -118,7 +118,7 @@ export function resolvePro2TextNodeEngineRoles(
   }
 
   if (roles.size === 0) {
-    return [...GATEWAY_MODEL_ROLE_ORDER];
+    return ["LLM"];
   }
 
   return GATEWAY_MODEL_ROLE_ORDER.filter((r) => roles.has(r));

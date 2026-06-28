@@ -273,3 +273,100 @@ export function spawnPro2ShortcutPreset(
   });
   return { groupId, focusNodeId: textId };
 }
+
+type AttachStarterStore = Pick<
+  SpawnStore,
+  "addNode" | "setEdges" | "setNodes"
+> & {
+  updateNodeData: (id: string, patch: Record<string, unknown>) => void;
+};
+
+/** 在已有空文本节点上挂载快捷预设（不重复新建文本节点） */
+export function attachPro2StarterShortcutPreset(
+  starterId: string,
+  preset: Pro2ShortcutPresetId,
+  nodes: CanvasFlowNode[],
+  store: AttachStarterStore,
+): void {
+  const starter = nodes.find((n) => n.id === starterId);
+  if (!starter || starter.type !== "story-pro2-starter") return;
+
+  const gap = 56;
+  const textW = starter.width ?? PRO2_TEXT_NODE_WIDTH;
+  const sx = starter.position.x;
+  const sy = starter.position.y;
+
+  store.updateNodeData(starterId, {
+    pro2TextPurpose: "general",
+    pro2PresetKind: preset,
+  });
+
+  if (preset === "image-to-prompt") {
+    const imageId = store.addNode(
+      "story-pro2-image",
+      { x: sx - LIBTV_SQUARE_IMAGE_NODE_WIDTH - gap, y: sy },
+      buildPro2ImageNodeData({
+        label: "图片",
+        pro2PresetKind: preset,
+      }),
+    );
+    if (!imageId) return;
+    store.setEdges((prev) => [
+      ...prev,
+      {
+        id: `e-${imageId}-${starterId}`,
+        source: imageId,
+        target: starterId,
+        sourceHandle: "image",
+        targetHandle: "in_text",
+      },
+    ]);
+    selectPro2NodeAfterSpawn(store.setNodes, starterId);
+    return;
+  }
+
+  if (preset === "video-to-prompt") {
+    const videoId = store.addNode(
+      "sbv1-video-engine",
+      { x: sx - SBV1_VIDEO_ENGINE_WIDTH - gap, y: sy },
+      buildSbv1VideoEngineNodeData({
+        label: "视频",
+        pro2PresetKind: preset,
+      }),
+    );
+    if (!videoId) return;
+    store.setEdges((prev) => [
+      ...prev,
+      {
+        id: `e-${videoId}-${starterId}`,
+        source: videoId,
+        target: starterId,
+        sourceHandle: "out_video",
+        targetHandle: "in_text",
+      },
+    ]);
+    selectPro2NodeAfterSpawn(store.setNodes, starterId);
+    return;
+  }
+
+  const videoId = store.addNode(
+    "sbv1-video-engine",
+    { x: sx + textW + gap, y: sy },
+    buildSbv1VideoEngineNodeData({
+      label: "视频",
+      pro2PresetKind: preset,
+    }),
+  );
+  if (!videoId) return;
+  store.setEdges((prev) => [
+    ...prev,
+    {
+      id: `e-${starterId}-${videoId}`,
+      source: starterId,
+      target: videoId,
+      sourceHandle: "text",
+      targetHandle: "in_ref",
+    },
+  ]);
+  selectPro2NodeAfterSpawn(store.setNodes, starterId);
+}

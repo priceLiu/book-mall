@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Download, LayoutGrid, MapPin, RotateCw, Users, BookmarkPlus } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { Download, LayoutGrid, MapPin, Megaphone, Package, RotateCw, Users, BookmarkPlus } from "lucide-react";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { parseStoryboardRows } from "@/lib/canvas/parse-md-tables";
 import { resolveHubStoryboardMd } from "@/lib/canvas/story-hub-runtime";
+import { confirmAndPublishPro2ScriptHub } from "@/lib/canvas/pro2-publish-script-hub";
+import { syncScriptPackageAssetOnPublish } from "@/lib/canvas/sync-script-package-on-publish";
 import {
   downloadPro2ScriptMarkdown,
   generatePro2CharacterThreeViewFromHub,
@@ -32,6 +35,9 @@ import {
 } from "@/lib/canvas/pro2-scene-batch-image";
 import type { StoryProScriptHubNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
+import { exportScriptPackageDraft } from "@/lib/canvas/export-script-package";
+import { openSaveProjectAssetDialog } from "@/components/canvas/save-project-asset-dialog";
+import type { StoryProStarterNodeData } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryRefImage } from "@/lib/canvas/story-ref-image";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 import { cn } from "@/lib/utils";
@@ -103,7 +109,8 @@ export function Pro2ScriptHubToolbar({
   tableTitle,
   className,
 }: Pro2ScriptHubToolbarProps) {
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
+  const base = useBookMallBaseUrl();
   const { providers } = useUserProviders();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
@@ -111,8 +118,9 @@ export function Pro2ScriptHubToolbar({
   const [framePickerOpen, setFramePickerOpen] = useState(false);
   const [tvPickerOpen, setTvPickerOpen] = useState(false);
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
-  const saveAsAsset = useSaveNodeAsAsset();
+  const projectId = useCanvasStore((s) => s.projectId) ?? "";
 
+  const saveAsAsset = useSaveNodeAsAsset();
   const dockInput = hubData.dockInput ?? "";
   const dockRefImages = (hubData.dockRefImages ?? []) as StoryRefImage[];
   const hasTable = pro2HubHasScriptTable(hubData);
@@ -251,11 +259,80 @@ export function Pro2ScriptHubToolbar({
     setScenePickerOpen(true);
   };
 
+  const onExportScriptPackage = async () => {
+    if (!projectId) {
+      await alert({
+        title: "无法导出",
+        message: "请先保存画布项目后再导出剧本包。",
+        variant: "warning",
+      });
+      return;
+    }
+    const starter = nodes.find(
+      (n) =>
+        n.type === "story-pro2-starter" &&
+        (n.data as StoryProStarterNodeData).workspaceIds?.scriptHubId === hubId,
+    );
+    const starterData = (starter?.data ?? {}) as StoryProStarterNodeData;
+    const draft = exportScriptPackageDraft({
+      projectId,
+      edition: "pro2",
+      starterId: starter?.id ?? hubId,
+      starterData,
+      hubId,
+      hubData,
+    });
+    if (!String(draft.payload.markdown ?? "").trim()) {
+      await alert({
+        title: "暂无剧本内容",
+        message: "请先生成至少一批工业化剧本后再导出。",
+        variant: "warning",
+      });
+      return;
+    }
+    updateNodeData(hubId, { scriptFinalized: true });
+    openSaveProjectAssetDialog(draft, { showTeamShare: true });
+  };
+
   const onDownload = () => {
     const md = pro2ScriptHubExportMarkdown(hubData);
     if (!md.trim()) return;
     downloadPro2ScriptMarkdown(md, tableTitle);
   };
+
+  const onPublishScript = useCallback(async () => {
+    if (isGenerating) return;
+    const live = useCanvasStore.getState().nodes.find((n) => n.id === hubId);
+    const liveData = (live?.data ?? hubData) as StoryProScriptHubNodeData;
+    const pub = await confirmAndPublishPro2ScriptHub(hubId, liveData, {
+      alert,
+      confirm,
+    }, {
+      requireBatch: liveData.scriptStudioMode === true,
+      batchIndex: liveData.scriptStudioBatchIndex,
+    });
+    if (pub) {
+      updateNodeData(hubId, pub);
+      if (base?.trim() && projectId) {
+        const starter = useCanvasStore
+          .getState()
+          .nodes.find(
+            (n) =>
+              n.type === "story-pro2-starter" &&
+              (n.data as StoryProStarterNodeData).workspaceIds?.scriptHubId ===
+                hubId,
+          );
+        void syncScriptPackageAssetOnPublish({
+          base,
+          projectId,
+          hubId,
+          hubData: { ...liveData, ...pub } as StoryProScriptHubNodeData,
+          starterId: starter?.id,
+          starterData: (starter?.data ?? {}) as StoryProStarterNodeData,
+        });
+      }
+    }
+  }, [hubId, hubData, isGenerating, alert, confirm, updateNodeData, base, projectId]);
 
   return (
     <>
@@ -316,6 +393,25 @@ export function Pro2ScriptHubToolbar({
           <span>生成分镜</span>
         </button>
         <div className="mx-0.5 h-5 w-px bg-white/10" />
+        <button
+          type="button"
+          className={TOOL_BTN}
+          disabled={isGenerating}
+          title="发布剧本 · 剧组可在公告条领取任务（发布者也可领取）"
+          onClick={() => void onPublishScript()}
+        >
+          <Megaphone className="size-3.5" />
+          <span>发布剧本</span>
+        </button>
+        <button
+          type="button"
+          className={TOOL_BTN}
+          title="导出定稿剧本包（SCRIPT_PACKAGE）"
+          onClick={() => void onExportScriptPackage()}
+        >
+          <Package className="size-3.5" />
+          <span>导出剧本包</span>
+        </button>
         <button
           type="button"
           className={TOOL_BTN}

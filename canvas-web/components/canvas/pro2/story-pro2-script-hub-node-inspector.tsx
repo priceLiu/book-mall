@@ -111,12 +111,12 @@ export function StoryPro2ScriptHubInspector({ id, data, selected }: NodeProps) {
     openStoryHubReview(id, section);
   };
 
+  const strayRuntime = (data as { runtime?: unknown }).runtime;
+
   useEffect(() => {
-    const stray = (data as { runtime?: unknown }).runtime;
-    if (stray) {
-      updateNodeData(id, { runtime: undefined });
-    }
-  }, [id, data, updateNodeData]);
+    if (!strayRuntime) return;
+    updateNodeData(id, { runtime: undefined });
+  }, [id, strayRuntime, updateNodeData]);
 
   useEffect(() => {
     if (d.providerId?.trim() && d.modelKey?.trim()) return;

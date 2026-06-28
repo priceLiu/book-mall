@@ -145,10 +145,46 @@ function linkFromSource(
 }
 
 function targetInputHandle(nodeType: string): string {
-  if (nodeType === "story-pro2-image" || nodeType === "sbv1-image") {
+  if (
+    nodeType === "story-pro2-image" ||
+    nodeType === "story-pro2-three-view" ||
+    nodeType === "sbv1-image"
+  ) {
     return "in_image";
   }
   return "in_text";
+}
+
+const IMAGE_UPSTREAM_SOURCE_TYPES = new Set([
+  "image",
+  "image-preview",
+  "story-pro2-image",
+  "story-pro2-three-view",
+  "story-pro2-style-asset",
+  "sbv1-image",
+  "image-engine",
+  "three-view-engine",
+]);
+
+function edgeMatchesDockInput(
+  edge: CanvasFlowEdge,
+  nodeId: string,
+  nodeType: string,
+  nodes: CanvasFlowNode[],
+): boolean {
+  if (edge.target !== nodeId) return false;
+  const inHandle = targetInputHandle(nodeType);
+  if (!edge.targetHandle || edge.targetHandle === inHandle) return true;
+  // 历史连线可能误用 in_text / default，仍应展示图片上游缩略图
+  if (inHandle === "in_image") {
+    const source = nodes.find((n) => n.id === edge.source);
+    if (source?.type && IMAGE_UPSTREAM_SOURCE_TYPES.has(source.type)) {
+      return (
+        edge.targetHandle === "in_text" || edge.targetHandle === "default"
+      );
+    }
+  }
+  return false;
 }
 
 /** 解析节点左侧入边 · 供输入坞展示链接态 chip */
@@ -158,11 +194,8 @@ export function resolvePro2DockUpstreamLinks(
   nodes: CanvasFlowNode[],
   edges: CanvasFlowEdge[],
 ): Pro2DockUpstreamLink[] {
-  const inHandle = targetInputHandle(nodeType);
-  const incoming = edges.filter(
-    (e) =>
-      e.target === nodeId &&
-      (!e.targetHandle || e.targetHandle === inHandle),
+  const incoming = edges.filter((e) =>
+    edgeMatchesDockInput(e, nodeId, nodeType, nodes),
   );
   const out: Pro2DockUpstreamLink[] = [];
   const seen = new Set<string>();

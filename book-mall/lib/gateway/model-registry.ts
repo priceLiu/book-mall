@@ -12,6 +12,7 @@ import { routeGatewayModel } from "@/lib/gateway/model-router";
 import {
   PLATFORM_MEDIA_KIND_LABEL,
   canonicalByKey,
+  GATEWAY_CANONICAL_REGISTRY,
 } from "@/lib/platform-model/canonical-registry";
 import { prisma } from "@/lib/prisma";
 
@@ -74,17 +75,115 @@ export async function assertModelRegistered(modelKey: string): Promise<{
     return { canonicalModelKey: key, providerKind: routed.providerKind, vendor: "" };
   }
 
-  const route = await prisma.gatewayModelRoute.findFirst({
-    where: { modelKey: key, active: true, catalog: { gatewayPublished: true, active: true } },
+  const routeWhere = {
+    active: true as const,
+    catalog: { gatewayPublished: true, active: true },
+  };
+
+  const direct = await prisma.gatewayModelRoute.findFirst({
+    where: { modelKey: key, ...routeWhere },
     include: { catalog: { select: { canonicalKey: true } } },
   });
-  if (!route) throw new UnregisteredGatewayModelError(key);
+  if (direct) {
+    return {
+      canonicalModelKey: direct.canonicalModelKey,
+      providerKind: direct.providerKind,
+      vendor: direct.vendor,
+    };
+  }
 
-  return {
-    canonicalModelKey: route.canonicalModelKey,
-    providerKind: route.providerKind,
-    vendor: route.vendor,
-  };
+  const alias = await prisma.modelAlias.findUnique({
+    where: {
+      source_aliasValue: {
+        source: "INTERNAL_SCHEME_A_MODEL",
+        aliasValue: key,
+      },
+    },
+    select: { catalog: { select: { canonicalKey: true } } },
+  });
+  const aliasCanonical = alias?.catalog?.canonicalKey;
+  if (aliasCanonical) {
+    const viaAlias = await prisma.gatewayModelRoute.findFirst({
+      where: { canonicalModelKey: aliasCanonical, ...routeWhere },
+      include: { catalog: { select: { canonicalKey: true } } },
+      orderBy: { sortOrder: "asc" },
+    });
+    if (viaAlias) {
+      return {
+        canonicalModelKey: viaAlias.canonicalModelKey,
+        providerKind: viaAlias.providerKind,
+        vendor: viaAlias.vendor,
+      };
+    }
+  }
+
+  const codeDef = GATEWAY_CANONICAL_REGISTRY.find((d) =>
+    d.routes.some((r) => r.modelKey === key),
+  );
+  if (codeDef) {
+    const codeRoute = codeDef.routes.find((r) => r.modelKey === key)!;
+    const viaCanonical = await prisma.gatewayModelRoute.findFirst({
+      where: { canonicalModelKey: codeDef.canonicalModelKey, ...routeWhere },
+      orderBy: { sortOrder: "asc" },
+    });
+    if (viaCanonical) {
+      return {
+        canonicalModelKey: viaCanonical.canonicalModelKey,
+        providerKind: codeRoute.providerKind,
+        vendor: codeRoute.vendor,
+      };
+    }
+    return {
+      canonicalModelKey: codeDef.canonicalModelKey,
+      providerKind: codeRoute.providerKind,
+      vendor: codeRoute.vendor,
+    };
+  }
+
+  // 与 registryCount === 0 一致：model-router 可路由的 Story LLM 等仍允许 invoke（UI 硬编码列表与 DB 未同步时）
+  try {
+    const routed = routeGatewayModel(key);
+    return {
+      canonicalModelKey: key,
+      providerKind: routed.providerKind,
+      vendor: "",
+    };
+  } catch {
+    throw new UnregisteredGatewayModelError(key);
+  }
+}
+
+/** 纯函数：canonical / model-router 侧已知 modelKey（单测与 audit 脚本用）。 */
+export function resolveKnownGatewayModelRegistration(modelKey: string): {
+  canonicalModelKey: string;
+  providerKind: GatewayProviderKind;
+  vendor: string;
+} | null {
+  const key = modelKey.trim();
+  if (!key) return null;
+
+  const codeDef = GATEWAY_CANONICAL_REGISTRY.find((d) =>
+    d.routes.some((r) => r.modelKey === key),
+  );
+  if (codeDef) {
+    const codeRoute = codeDef.routes.find((r) => r.modelKey === key)!;
+    return {
+      canonicalModelKey: codeDef.canonicalModelKey,
+      providerKind: codeRoute.providerKind,
+      vendor: codeRoute.vendor,
+    };
+  }
+
+  try {
+    const routed = routeGatewayModel(key);
+    return {
+      canonicalModelKey: key,
+      providerKind: routed.providerKind,
+      vendor: "",
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function listActiveRoutes(): Promise<

@@ -36,6 +36,8 @@ import {
   optimisticLibtvMediaRunStart,
   revertOptimisticLibtvMediaRunStart,
 } from "@/lib/canvas/libtv-image-node-run";
+import { resolveLibtvFloatingDockSelection } from "@/lib/canvas/libtv-floating-dock-selection";
+import { isLibtvPro2ImageDockNodeType } from "@/lib/canvas/libtv-pro2-image-dock-types";
 import type { StoryProFrameRow } from "@/lib/canvas/story-pro-workspace-types";
 import type { StoryPro2ImageNodeData } from "@/lib/canvas/story-pro2-workspace-types";
 import { isLibtvMediaGenerating } from "@/components/canvas/libtv-media-generating-state";
@@ -59,7 +61,19 @@ import {
   sbv1ImageSettingsTriggerLabel,
 } from "./sbv1/sbv1-image-generate-settings-modal";
 
-type DockImageNodeType = "sbv1-image" | "story-pro2-image";
+type DockImageNodeType =
+  | "sbv1-image"
+  | "story-pro2-image"
+  | "story-pro2-prop"
+  | "story-pro2-mood"
+  | "story-pro2-audio";
+
+function placeholderDockLabel(type: string | undefined): string | undefined {
+  if (type === "story-pro2-prop") return "描述道具外观与材质；输入 @ 引用风格或场景…";
+  if (type === "story-pro2-mood") return "描述氛围、光线与情绪；输入 @ 引用风格…";
+  if (type === "story-pro2-audio") return "描述环境音效或 BGM 意向…";
+  return undefined;
+}
 
 function framePromptPlaceholder(role?: string): string {
   if (role === "frame") {
@@ -88,18 +102,19 @@ export function LibtvImageInputDock() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const sbv1DockNodeId = useLibtvSoleSelectedNodeId("sbv1-image");
-  const pro2DockNodeIdRaw = useLibtvSoleSelectedNodeId("story-pro2-image");
   const pro2DockNodeId = useMemo(() => {
-    if (!pro2DockNodeIdRaw) return null;
-    const rf = rfNodes.find((n) => n.id === pro2DockNodeIdRaw);
+    const sel = resolveLibtvFloatingDockSelection(rfNodes);
+    if (!sel || !isLibtvPro2ImageDockNodeType(sel.nodeType)) return null;
+    const rf = rfNodes.find((n) => n.id === sel.nodeId);
     if (
+      sel.nodeType === "story-pro2-image" &&
       (rf?.data as { pro2MediaRole?: string })?.pro2MediaRole ===
-      "character-three-view"
+        "character-three-view"
     ) {
       return null;
     }
-    return pro2DockNodeIdRaw;
-  }, [pro2DockNodeIdRaw, rfNodes]);
+    return sel.nodeId;
+  }, [rfNodes]);
 
   const dockNodeId = sbv1DockNodeId ?? pro2DockNodeId;
 
@@ -111,7 +126,7 @@ export function LibtvImageInputDock() {
     useLibtvFloatingDock(dockNodeId);
 
   const nodeType = (storeNode?.type ?? "sbv1-image") as DockImageNodeType;
-  const isPro2 = nodeType === "story-pro2-image";
+  const isPro2 = isLibtvPro2ImageDockNodeType(nodeType);
   const pro2Data = (storeNode?.data ?? {}) as StoryPro2ImageNodeData;
   const isPipelineCell = isLibtvPipelineImageCell(storeNode ?? undefined);
   const showModelPicker = !isPipelineCell;
@@ -335,7 +350,8 @@ export function LibtvImageInputDock() {
 
   const placeholder = hasImage
     ? "输入文字指令对图片进行编辑，如：将背景改为雪夜"
-    : framePromptPlaceholder(pro2Data.pro2MediaRole);
+    : placeholderDockLabel(nodeType) ??
+      framePromptPlaceholder(pro2Data.pro2MediaRole);
 
   const mentionEdition = nodeType === "sbv1-image" ? "sbv1" : "pro2";
 

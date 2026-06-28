@@ -87,7 +87,7 @@ export function resolvePro2TextPurpose(
     if (edgeLinksMediaOnly(nodeId, nodes, edges)) return "general";
   }
 
-  return "story-outline";
+  return "general";
 }
 
 export function isPro2StoryOutlineTextNode(
@@ -108,18 +108,40 @@ export function migratePro2TextPurposeAll(
 ): CanvasFlowNode[] {
   return nodes.map((n) => {
     if (n.type !== "story-pro2-starter") return n;
-    const data = (n.data ?? {}) as Pro2TextPurposeNodeData;
+    const data = (n.data ?? {}) as Pro2TextPurposeNodeData & {
+      themeOutlineRuntime?: { status?: string };
+      generatedOutlineMd?: string;
+    };
+    const ctx = { nodeId: n.id, nodes, edges };
+
+    if (data.pro2TextPurpose === "story-outline") {
+      const linkedHub =
+        ctx.nodeId &&
+        edges.some((e) => {
+          if (e.source !== ctx.nodeId && e.target !== ctx.nodeId) return false;
+          const otherId = e.source === ctx.nodeId ? e.target : e.source;
+          const other = nodes.find((node) => node.id === otherId);
+          return other?.type === "story-pro2-script-hub";
+        });
+      const hasOutlineWork =
+        Boolean(data.generatedOutlineMd?.trim()) ||
+        data.themeOutlineRuntime?.status === "pending" ||
+        data.themeOutlineRuntime?.status === "running";
+      if (!linkedHub && !hasOutlineWork) {
+        return {
+          ...n,
+          data: { ...n.data, pro2TextPurpose: "general" as const },
+        };
+      }
+      return n;
+    }
+
     if (
-      data.pro2TextPurpose === "story-outline" ||
       data.pro2TextPurpose === "general"
     ) {
       return n;
     }
-    const inferred = resolvePro2TextPurpose(data, {
-      nodeId: n.id,
-      nodes,
-      edges,
-    });
+    const inferred = resolvePro2TextPurpose(data, ctx);
     if (inferred === "story-outline") return n;
     return {
       ...n,

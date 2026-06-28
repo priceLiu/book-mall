@@ -21,6 +21,7 @@ import type {
 } from "./story-workspace-types";
 import type { CanvasFlowNode, CanvasNodeRuntime } from "./types";
 import { formatCanvasTaskError } from "./friendly-task-error";
+import { applyScriptStudioThemeOutlineResult } from "./script-studio-run-apply";
 import { pickTaskResultMediaUrl } from "./task-media-url";
 import { shouldSkipStoryRowTaskApply } from "./task-pick";
 import { buildStoryProStyleDraftApplyPatch } from "./story-pro-style-draft";
@@ -252,13 +253,21 @@ export function storyApplyTaskResult(
             };
 
   if (
-    (node.type === "story-pro2-starter" || node.type === "story-pro-starter") &&
+    (node.type === "story-pro2-starter" ||
+      node.type === "story-pro-starter" ||
+      node.type === "story-pro2-script-hub") &&
     ctx?.mediaKind === "themeOutline"
   ) {
+    const hubStudio =
+      node.type === "story-pro2-script-hub" &&
+      (node.data as { scriptStudioMode?: boolean }).scriptStudioMode === true;
     if (
       node.type === "story-pro2-starter" &&
       !isPro2StoryOutlineTextNode((node.data ?? {}) as Record<string, unknown>)
     ) {
+      return;
+    }
+    if (node.type === "story-pro2-script-hub" && !hubStudio) {
       return;
     }
     const prevRt = (
@@ -267,11 +276,21 @@ export function storyApplyTaskResult(
     if (shouldSkipStoryRowTaskApply(prevRt, task, node.id)) return;
     const patch: Record<string, unknown> = { themeOutlineRuntime: runtime };
     if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
-      patch.generatedOutlineMd = task.textOutput.trim();
-      patch.pipelineStage = "llm_done";
-      patch.starterMode = "generate";
+      if (node.type === "story-pro2-starter") {
+        patch.generatedOutlineMd = task.textOutput.trim();
+        patch.pipelineStage = "llm_done";
+        patch.starterMode = "generate";
+      }
     }
     updateNodeData(node.id, patch);
+    if (task.status === "SUCCEEDED" && task.textOutput?.trim()) {
+      applyScriptStudioThemeOutlineResult(
+        node,
+        task.textOutput.trim(),
+        allNodes,
+        updateNodeData,
+      );
+    }
     return;
   }
 

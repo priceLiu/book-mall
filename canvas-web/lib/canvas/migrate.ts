@@ -23,6 +23,9 @@ import {
 } from "./types";
 import { migratePro2SceneColumnOffCanvas } from "./pro2-spawn-scene-image-group";
 import { migratePro2TextPurposeAll } from "./pro2-text-purpose";
+import { migrateLegacyPro2ScriptStudioGraph } from "./pro2-script-studio-migrate";
+import { migrateLinkedScriptPackageStarterToMeta } from "./crew-bulletin-graph-anchor";
+import { enrichCrewBulletinGraphAnchorRows } from "./crew-bulletin-graph-anchor";
 import { normalizeCanvasNodes } from "./normalize-graph-nodes";
 import { migrateStoryComicStarterNode } from "./story-starter-migrate";
 import { migrateStoryOutlineLlmParams } from "./story-llm-params-migrate";
@@ -187,10 +190,31 @@ export function migrateGraphV1ToV2(graph: CanvasGraph): CanvasGraph {
     ),
     rawMigrated.edges,
   );
-  return {
-    ...graph,
-    schemaVersion: CANVAS_SCHEMA_VERSION,
+  const scriptStudioMigrated = migrateLegacyPro2ScriptStudioGraph(
     nodes,
-    edges: rawMigrated.edges,
+    rawMigrated.edges,
+    graph.meta,
+  );
+  const linkedMetaMigrated = migrateLinkedScriptPackageStarterToMeta({
+    ...graph,
+    nodes: scriptStudioMigrated.nodes,
+    edges: scriptStudioMigrated.edges,
+  });
+  const meta = linkedMetaMigrated.meta;
+  const enrichedMeta =
+    meta?.crewBulletinAnchor
+      ? {
+          ...meta,
+          crewBulletinAnchor: enrichCrewBulletinGraphAnchorRows(
+            meta.crewBulletinAnchor,
+          ),
+        }
+      : meta;
+  return {
+    ...linkedMetaMigrated,
+    schemaVersion: CANVAS_SCHEMA_VERSION,
+    nodes: linkedMetaMigrated.nodes,
+    edges: linkedMetaMigrated.edges,
+    meta: enrichedMeta,
   };
 }

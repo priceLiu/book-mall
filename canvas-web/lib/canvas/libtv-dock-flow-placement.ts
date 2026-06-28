@@ -9,10 +9,18 @@ import type { CanvasFlowNode } from "./types";
 /** 节点底边与输入坞之间的画布间距（px · flow 坐标） */
 export const LIBTV_DOCK_GAP = 24;
 
+/** 100% 缩放下 · 输入坞相对节点外框：宽 +30%、高 −10%（基准 1.2×） */
+export const LIBTV_DOCK_WIDTH_RATIO = 1.2 * 1.3;
+export const LIBTV_DOCK_HEIGHT_RATIO = 1.2 * 0.9;
+
+/** @deprecated 使用 LIBTV_DOCK_WIDTH_RATIO / LIBTV_DOCK_HEIGHT_RATIO */
+export const LIBTV_DOCK_SIZE_RATIO = LIBTV_DOCK_WIDTH_RATIO;
+
 export type LibtvDockFlowPlacement = {
   flowX: number;
   flowY: number;
   flowW: number;
+  flowH: number;
 };
 
 type NodeFlowGeometry = {
@@ -62,10 +70,16 @@ function placementFromGeometry(
   geometry: NodeFlowGeometry,
   minFlowWidth: number,
 ): LibtvDockFlowPlacement {
+  const flowW = Math.max(
+    geometry.w * LIBTV_DOCK_WIDTH_RATIO,
+    minFlowWidth > 0 ? minFlowWidth : 0,
+  );
+  const flowH = geometry.h * LIBTV_DOCK_HEIGHT_RATIO;
   return {
     flowX: geometry.x + geometry.w / 2,
     flowY: geometry.y + geometry.h + LIBTV_DOCK_GAP,
-    flowW: Math.max(geometry.w, minFlowWidth),
+    flowW,
+    flowH,
   };
 }
 

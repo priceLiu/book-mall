@@ -15,6 +15,8 @@ import type { LibtvDockFlowPlacement } from "@/lib/canvas/libtv-dock-flow-placem
 import {
   PRO2_DOCK_HEIGHT,
   PRO2_DOCK_HEIGHT_EXPANDED,
+  PRO2_DOCK_WIDTH,
+  PRO2_DOCK_WIDTH_EXPANDED,
 } from "@/lib/canvas/story-pro2-node-chrome";
 import { useLibtvDockWheelScroll } from "@/lib/canvas/use-libtv-dock-wheel-scroll";
 import { RF_NO_WHEEL } from "@/lib/canvas/react-flow-classes";
@@ -89,8 +91,15 @@ export function Pro2InputDockShell({
     DOCK_INVERSE_SCALE_MAX * DOCK_ZOOM_OUT_MAX_BOOST,
     Math.max(DOCK_INVERSE_SCALE_MIN, baseInv * zoomOutBoost),
   );
-  const dockW = width ?? flowAnchor.flowW;
-  const dockHeight = expanded ? PRO2_DOCK_HEIGHT_EXPANDED : PRO2_DOCK_HEIGHT;
+  const baseDockW = width ?? flowAnchor.flowW;
+  // 放大态：长（宽）与高同时展开，宽边按更大比例放大，视觉更明显
+  const dockW = expanded
+    ? Math.round(baseDockW * (PRO2_DOCK_WIDTH_EXPANDED / PRO2_DOCK_WIDTH))
+    : Math.round(baseDockW);
+  const baseDockH = flowAnchor.flowH ?? PRO2_DOCK_HEIGHT;
+  const dockHeight = expanded
+    ? Math.round(baseDockH * (PRO2_DOCK_HEIGHT_EXPANDED / PRO2_DOCK_HEIGHT))
+    : Math.round(baseDockH);
   const dockUi = useMemo(() => ({ expanded }), [expanded]);
 
   if (!viewportEl) return null;
@@ -107,6 +116,7 @@ export function Pro2InputDockShell({
           left: flowAnchor.flowX,
           top: flowAnchor.flowY,
           width: dockW,
+          transition: "width 180ms ease",
           // origin=顶部中点；先 scale 再 translateX(-50%)，使坞顶部中点恒定锚在 (flowX,flowY)
           transformOrigin: "50% 0",
           transform: `translateX(-50%) scale(${invScale}) translateZ(0)`,

@@ -28,6 +28,7 @@ import {
   getCanvasUserInflightMax,
 } from "./canvas-constants";
 import { CanvasProjectError } from "./canvas-project-service";
+import { scriptStudioMirrorPayload } from "./script-studio-parse-mirror";
 import type { CanvasTaskStoryScope } from "./canvas-story-scope";
 import {
   assertNoProjectInflightByInputHash,
@@ -256,6 +257,10 @@ export type RunEngineNodeArgs = {
   storyScope?: CanvasTaskStoryScope;
   /** Gateway 日志页面来源，如 canvas/{projectId} */
   clientPage?: string;
+  /**
+   * Story LLM：先返回 SUBMITTED 任务，Gateway 调用在后台继续（避免 run HTTP 阻塞 3min+）。
+   */
+  executeAsync?: boolean;
 };
 
 export type RunEngineNodeResult =
@@ -713,6 +718,125 @@ type StoryLlmKind =
   | "character-engine"
   | "storyboard-engine";
 
+type StoryLlmExecutionContext = {
+  userId: string;
+  projectId: string;
+  nodeId: string;
+  node: CanvasRunNodeInput;
+  engineKind: StoryLlmKind;
+  gwClientPage: string;
+  storyScope?: CanvasTaskStoryScope;
+  data: Record<string, unknown>;
+  modelKey: string;
+  providerId: string;
+  params: Record<string, unknown>;
+  userText: string;
+  imageUrls: string[];
+};
+
+async function executeStoryLlmEngineTask(
+  taskId: string,
+  ctx: StoryLlmExecutionContext,
+): Promise<RunEngineNodeResult> {
+  const {
+    userId,
+    projectId,
+    nodeId,
+    node,
+    engineKind,
+    gwClientPage,
+    storyScope,
+    data,
+    modelKey,
+    providerId,
+    params,
+    userText,
+    imageUrls,
+  } = ctx;
+
+  try {
+    const customSystem =
+      engineKind === "story-outline-engine"
+        ? String(data.outlineSystemPrompt ?? data.systemPrompt ?? "").trim()
+        : "";
+    const systemPrompt =
+      customSystem || storyEngineSystemFallback(engineKind);
+    const userContent: (
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    )[] = [];
+    for (const u of imageUrls) {
+      userContent.push({ type: "image_url", image_url: { url: u } });
+    }
+    userContent.push({
+      type: "text",
+      text: clipPrompt(userText, STORY_LLM_MAX_PROMPT_LEN),
+    });
+
+    const messages: import("./providers/types").CanvasChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content:
+          userContent.length === 1 && userContent[0].type === "text"
+            ? userContent[0].text
+            : userContent,
+      },
+    ];
+    const resp = await canvasGwChat(userId, {
+      modelKey,
+      messages,
+      params,
+      clientPage: gwClientPage,
+      projectId,
+      canvasTaskId: taskId,
+    });
+    const scriptStudioMirror =
+      data.scriptStudioMode === true
+        ? scriptStudioMirrorPayload(resp.text)
+        : null;
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "SUCCEEDED",
+        textOutput: resp.text,
+        resultPayload: {
+          ...(typeof resp.rawPayload === "object" && resp.rawPayload
+            ? (resp.rawPayload as Record<string, unknown>)
+            : {}),
+          ...(scriptStudioMirror ?? {}),
+        } as Prisma.InputJsonValue,
+        inputPayload: {
+          kind: engineKind,
+          prompt: clipPrompt(userText, STORY_LLM_MAX_PROMPT_LEN),
+          params,
+          providerId,
+          modelKey,
+          textInputs: node.textInputs ?? [],
+          ...(storyScope ? { storyScope } : {}),
+          gatewayLogId: resp.logId,
+        } as Prisma.InputJsonValue,
+        submittedAt: new Date(),
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const code = "STORY_LLM_FAILED";
+    const updated = await prisma.canvasGenerationTask.update({
+      where: { id: taskId },
+      data: {
+        status: "FAILED",
+        failCode: code,
+        failMessage: msg.slice(0, 500),
+        completedAt: new Date(),
+      },
+    });
+    return { reused: false, task: updated };
+  }
+}
+
 /** Story LLM 引擎 —— 同步 Markdown 文本，不注入海报 system prompt。 */
 export async function runStoryLlmEngineNode(
   args: RunEngineNodeArgs & { engineKind: StoryLlmKind },
@@ -800,78 +924,35 @@ export async function runStoryLlmEngineNode(
     },
   });
 
-  try {
-    const customSystem =
-      engineKind === "story-outline-engine"
-        ? String(
-            data.outlineSystemPrompt ?? data.systemPrompt ?? "",
-          ).trim()
-        : "";
-    const systemPrompt =
-      customSystem || storyEngineSystemFallback(engineKind);
-    const userContent: (
-      | { type: "text"; text: string }
-      | { type: "image_url"; image_url: { url: string } }
-    )[] = [];
-    for (const u of imageUrls) {
-      userContent.push({ type: "image_url", image_url: { url: u } });
-    }
-    userContent.push({ type: "text", text: clipPrompt(userText, STORY_LLM_MAX_PROMPT_LEN) });
+  const execCtx: StoryLlmExecutionContext = {
+    userId,
+    projectId,
+    nodeId,
+    node,
+    engineKind,
+    gwClientPage,
+    storyScope: args.storyScope,
+    data,
+    modelKey,
+    providerId,
+    params,
+    userText,
+    imageUrls,
+  };
 
-    const messages: import("./providers/types").CanvasChatMessage[] = [
-      { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content:
-          userContent.length === 1 && userContent[0].type === "text"
-            ? userContent[0].text
-            : userContent,
-      },
-    ];
-    const resp = await canvasGwChat(userId, {
-      modelKey,
-      messages,
-      params,
-      clientPage: gwClientPage,
-      projectId,
+  if (args.executeAsync) {
+    setImmediate(() => {
+      void executeStoryLlmEngineTask(created.id, execCtx).catch((e) => {
+        console.error("[canvas/story-llm] async execute failed", {
+          taskId: created.id,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      });
     });
-    const updated = await prisma.canvasGenerationTask.update({
-      where: { id: created.id },
-      data: {
-        status: "SUCCEEDED",
-        textOutput: resp.text,
-        resultPayload: (resp.rawPayload ?? null) as
-          | Prisma.InputJsonValue
-          | undefined,
-        inputPayload: {
-          kind: engineKind,
-          prompt: clipPrompt(userText, STORY_LLM_MAX_PROMPT_LEN),
-          params,
-          providerId,
-          modelKey,
-          textInputs: node.textInputs ?? [],
-          ...(args.storyScope ? { storyScope: args.storyScope } : {}),
-          gatewayLogId: resp.logId,
-        } as Prisma.InputJsonValue,
-        submittedAt: new Date(),
-        completedAt: new Date(),
-      },
-    });
-    return { reused: false, task: updated };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const code = "STORY_LLM_FAILED";
-    const updated = await prisma.canvasGenerationTask.update({
-      where: { id: created.id },
-      data: {
-        status: "FAILED",
-        failCode: code,
-        failMessage: msg.slice(0, 500),
-        completedAt: new Date(),
-      },
-    });
-    return { reused: false, task: updated };
+    return { reused: false, task: created };
   }
+
+  return executeStoryLlmEngineTask(created.id, execCtx);
 }
 
 /** 视频引擎 —— KIE 图生视频，异步 poll。 */

@@ -14,6 +14,7 @@ import {
 } from "@/lib/canvas/libtv-side-spawn";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { selectPro2NodeAfterSpawn } from "@/lib/canvas/pro2-spawn-select";
+import { openPro2StyleLibraryForMediaNode } from "@/lib/canvas/pro2-open-style-library";
 import { LibtvImageNode } from "../libtv-image-node";
 
 export function StoryPro2ImageNode(props: NodeProps) {
@@ -35,6 +36,10 @@ export function StoryPro2ImageNode(props: NodeProps) {
         nodeType,
         { alert },
         () => {
+          if (itemId === "style-asset") {
+            openPro2StyleLibraryForMediaNode(props.id);
+            return;
+          }
           const spawnType = resolveLibtvSideSpawnNodeType(itemId, nodeType);
           if (!spawnType) return;
           spawnLibtvNeighborFromAnchor(props.id, side, spawnType, spawnStore);

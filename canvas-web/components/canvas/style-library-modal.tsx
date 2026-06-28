@@ -17,6 +17,7 @@ export function StyleLibraryModal({
   onApplied,
   mode = "apply",
   onSpawn,
+  dockSpawn = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -25,6 +26,8 @@ export function StyleLibraryModal({
   /** apply：写入风格定义节点；spawn：在画布生成风格素材卡 */
   mode?: "apply" | "spawn";
   onSpawn?: (preset: StyleLibraryPreset) => void;
+  /** spawn 模式 · 从图片/三视图 Dock 打开：选中后在节点左侧生成并连线 */
+  dockSpawn?: boolean;
 }) {
   const applyPreset = useApplyStyleLibraryPreset();
   const isSpawn = mode === "spawn";
@@ -52,7 +55,6 @@ export function StyleLibraryModal({
     async (preset: StyleLibraryPreset) => {
       if (isSpawn) {
         onSpawn?.(preset);
-        onClose();
         return;
       }
       const ok = await applyPreset(preset);
@@ -89,7 +91,9 @@ export function StyleLibraryModal({
             </p>
             <p className="mt-0.5 text-[12px] text-white/55">
               {isSpawn
-                ? "悬停卡片查看风格提示词；点击条目将在画布生成「素材-风格」节点，并自动吸附附近脚本节点。"
+                ? dockSpawn
+                  ? "悬停卡片查看风格提示词；点击条目将在当前节点左侧生成「素材-风格」并自动连线。"
+                  : "悬停卡片查看风格提示词；点击条目将在画布生成「素材-风格」节点，并自动吸附附近脚本节点。"
                 : "悬停卡片查看风格提示词；点击条目将写入可编辑的「风格定义」节点（多工作流时优先当前选中或故事已定稿且风格未定稿的一套）。"}
             </p>
             {hint ? (
@@ -108,6 +112,7 @@ export function StyleLibraryModal({
 
         <StyleLibraryGrid
           fixedFilter
+          calmCards
           className="min-h-0 w-full min-w-0 flex-1"
           filterClassName="px-5 pt-2"
           contentClassName="px-5 py-4"

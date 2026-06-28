@@ -98,6 +98,35 @@ export function mapProjectAssetToCanvasInsert(
         outlineMd: String(payload.markdown ?? ""),
       });
 
+    case "SCRIPT_PACKAGE":
+      if (edition === "pro2") {
+        return mergeAssetNodeSnapshot(asset, "story-pro2-starter", {
+          label: asset.displayName,
+          linkedScriptPackageTitle: asset.displayName,
+          generatedOutlineMd: String(payload.markdown ?? asset.description),
+          scriptStudioCompletedBatchesMd: String(payload.markdown ?? ""),
+          scriptStudioFrozenBiblesMd: String(payload.frozenBiblesMd ?? ""),
+          scriptStudioFrozenBiblesOssUrl: String(payload.frozenBiblesOssUrl ?? ""),
+          scriptStudioCompletedBatchesOssUrl: String(
+            payload.completedBatchesOssUrl ?? "",
+          ),
+          scriptStudioTotalEpisodes: payload.totalEpisodes ?? 30,
+          scriptStudioBatchIndex: payload.batchIndex ?? 0,
+          scriptStudioSystem: payload.system ?? "original",
+          crewBulletin: payload.crewBulletin,
+          scriptStudioCharacterRows: payload.scriptStudioCharacterRows,
+          sceneRows: payload.sceneRows,
+          scriptStudioPropRows: payload.scriptStudioPropRows,
+          scriptStudioFrameRows: payload.scriptStudioFrameRows,
+          scriptStudioMoodRows: payload.scriptStudioMoodRows,
+          scriptStudioAudioRows: payload.scriptStudioAudioRows,
+          workspaceIds: { linkedScriptPackageAssetId: asset.id },
+        });
+      }
+      return mergeAssetNodeSnapshot(asset, "story-pro-starter", {
+        uploadedScriptMd: String(payload.markdown ?? ""),
+      });
+
     case "STYLE":
       if (edition === "pro2") {
         return mergeAssetNodeSnapshot(asset, "story-pro2-style-asset", {

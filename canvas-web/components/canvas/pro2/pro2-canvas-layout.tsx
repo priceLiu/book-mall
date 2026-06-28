@@ -11,6 +11,14 @@ import {
 } from "@/lib/canvas/pro2-spawn-style-asset";
 import type { StyleLibraryPreset } from "@/lib/canvas/style-library/catalog";
 import { Pro2CanvasToolbar } from "./pro2-canvas-toolbar";
+import { Pro2CrewBulletin } from "./pro2-crew-bulletin";
+import { Pro2ProductionGateBanner } from "./pro2-production-gate-banner";
+import { shouldShowCrewBulletinRail } from "@/lib/canvas/crew-bulletin-context";
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import {
+  useCrewBulletinSubscription,
+  broadcastCrewBulletinLocalChange,
+} from "@/lib/canvas/use-crew-bulletin-subscription";
 
 export type Pro2CanvasLayoutProps = {
   projectId: string;
@@ -23,6 +31,7 @@ export function Pro2CanvasLayout({
   onUndo,
   onRedo,
 }: Pro2CanvasLayoutProps) {
+  const base = useBookMallBaseUrl();
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
@@ -35,6 +44,22 @@ export function Pro2CanvasLayout({
   const getEdges = useCallback(() => useCanvasStore.getState().edges, []);
 
   const [styleLibOpen, setStyleLibOpen] = useState(false);
+
+  const nodes = useCanvasStore((s) => s.nodes);
+  const graphMeta = useCanvasStore((s) => s.graphMeta);
+  const showCrewBulletin = shouldShowCrewBulletinRail(
+    nodes,
+    graphMeta ?? undefined,
+  );
+
+  useCrewBulletinSubscription(base, projectId, showCrewBulletin);
+
+  useEffect(() => {
+    const onChanged = () => broadcastCrewBulletinLocalChange(projectId);
+    window.addEventListener("canvas:crew-bulletin-changed", onChanged);
+    return () =>
+      window.removeEventListener("canvas:crew-bulletin-changed", onChanged);
+  }, [projectId]);
 
   useEffect(() => {
     const onOpen = () => setStyleLibOpen(true);
@@ -104,9 +129,12 @@ export function Pro2CanvasLayout({
           window.dispatchEvent(new CustomEvent("canvas:open-my-history"));
         }}
       />
+      <Pro2ProductionGateBanner />
+      {showCrewBulletin ? <Pro2CrewBulletin /> : null}
       <StyleLibraryModal
         open={styleLibOpen}
         mode="spawn"
+        dockSpawn={Boolean(styleLibImageNodeId)}
         onClose={closeStyleLib}
         onSpawn={onStylePresetPicked}
       />

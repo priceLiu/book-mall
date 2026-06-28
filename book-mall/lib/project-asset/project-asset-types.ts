@@ -9,6 +9,7 @@ export const PROJECT_ASSET_KIND_LABELS: Record<ProjectAssetKind, string> = {
   AUDIO: "音频",
   STORYBOARD_IMAGE: "分镜图",
   STORYBOARD_VIDEO: "分镜视频",
+  SCRIPT_PACKAGE: "剧本包",
   DIGITAL_HUMAN: "数字人",
   PRIVATE_PORTRAIT: "私域人像库",
   STYLE: "风格",

@@ -8,6 +8,8 @@ import {
 } from "@/lib/canvas/canvas-project-access";
 import {
   canvasProjectEditionFromGraph,
+  canvasProjectEditionFromListHints,
+  canvasProjectHasCollaboration,
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
 import { getActiveTenantContext } from "@/lib/tenant/context";
@@ -56,6 +58,8 @@ export type CanvasProjectSummary = {
   description: string;
   thumbnailUrl: string;
   edition: CanvasProjectEdition;
+  /** 已绑定脚本包 / 公告栏的协同画布，禁止删除 */
+  collaborationLocked: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -105,35 +109,81 @@ function toSummary(p: {
   createdAt: Date;
   updatedAt: Date;
 }): CanvasProjectSummary {
+  const canvas =
+    p.canvas && typeof p.canvas === "object"
+      ? (p.canvas as { meta?: unknown })
+      : null;
   return {
     id: p.id,
     name: p.name,
     description: p.description,
     thumbnailUrl: resolveThumbnailUrl(p),
     edition: canvasProjectEditionFromGraph(p.canvas),
+    collaborationLocked: canvasProjectHasCollaboration(canvas?.meta),
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
+  };
+}
+
+type CanvasProjectListRow = {
+  id: string;
+  name: string;
+  description: string;
+  thumbnailUrl: string;
+  meta: unknown;
+  nodeTypes: string[] | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function parseListNodeTypes(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter((t): t is string => typeof t === "string");
+}
+
+function listRowToSummary(row: CanvasProjectListRow): CanvasProjectSummary {
+  const nodeTypes = parseListNodeTypes(row.nodeTypes);
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    thumbnailUrl: row.thumbnailUrl?.trim() ?? "",
+    edition: canvasProjectEditionFromListHints(row.meta, nodeTypes),
+    collaborationLocked: canvasProjectHasCollaboration(row.meta),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
 export async function listCanvasProjectsForUser(
   userId: string,
 ): Promise<CanvasProjectSummary[]> {
-  const rows = await prisma.canvasProject.findMany({
-    where: { userId, deletedAt: null },
-    orderBy: { updatedAt: "desc" },
-    take: 200,
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      thumbnailUrl: true,
-      canvas: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
-  return rows.map(toSummary);
+  const rows = await prisma.$queryRaw<CanvasProjectListRow[]>`
+    SELECT
+      cp.id,
+      cp.name,
+      cp.description,
+      cp."thumbnailUrl",
+      cp.canvas->'meta' AS meta,
+      (
+        SELECT COALESCE(jsonb_agg(elem->>'type'), '[]'::jsonb)
+        FROM jsonb_array_elements(
+          CASE
+            WHEN jsonb_typeof(cp.canvas->'nodes') = 'array'
+            THEN cp.canvas->'nodes'
+            ELSE '[]'::jsonb
+          END
+        ) AS elem
+      ) AS "nodeTypes",
+      cp."createdAt",
+      cp."updatedAt"
+    FROM "CanvasProject" cp
+    WHERE cp."userId" = ${userId}
+      AND cp."deletedAt" IS NULL
+    ORDER BY cp."updatedAt" DESC
+    LIMIT 200
+  `;
+  return rows.map(listRowToSummary);
 }
 
 function defaultCanvasProjectName(now = new Date()): string {
@@ -258,11 +308,28 @@ export async function softDeleteCanvasProjectForUser(
   userId: string,
   projectId: string,
 ): Promise<void> {
-  const p = await prisma.canvasProject.findFirst({
-    where: { id: projectId, userId, deletedAt: null },
-    select: { id: true, thumbnailUrl: true },
-  });
+  const rows = await prisma.$queryRaw<
+    Array<{ id: string; thumbnailUrl: string; meta: unknown }>
+  >`
+    SELECT
+      cp.id,
+      cp."thumbnailUrl",
+      cp.canvas->'meta' AS meta
+    FROM "CanvasProject" cp
+    WHERE cp.id = ${projectId}
+      AND cp."userId" = ${userId}
+      AND cp."deletedAt" IS NULL
+    LIMIT 1
+  `;
+  const p = rows[0];
   if (!p) throw new CanvasProjectError("NOT_FOUND", "project not found", 404);
+  if (canvasProjectHasCollaboration(p.meta)) {
+    throw new CanvasProjectError(
+      "FORBIDDEN",
+      "协同画布已绑定脚本包，无法删除",
+      403,
+    );
+  }
 
   const cleanupNotBefore = new Date(Date.now() + 5 * 60 * 1000);
   await prisma.$transaction(async (tx) => {

@@ -1,9 +1,9 @@
 "use client";
 
 import type { CanvasProviderDto } from "@/lib/canvas-providers-api";
-import { THREE_VIEW_ENGINE_MODEL_KEYS } from "./builtin-prompt-templates";
+import { SBV1_IMAGE_MODEL_KEYS, buildSbv1ImageEngineParams } from "./sbv1-image-models";
 import { findStoryPro2WorkspaceForStarter } from "./spawn-story-pro2-workspace";
-import { pickDefaultStoryImageEngine } from "./system-providers";
+import { pickDefaultPro2CharacterImageEngine } from "./pro2-three-view-engine";
 import { resolveStarterForHub } from "./story-workspace-resolver";
 import type { StoryPro2WorkspaceIds } from "./story-pro2-workspace-types";
 import type { CanvasFlowEdge, CanvasFlowNode } from "./types";
@@ -14,36 +14,13 @@ export type Pro2ThreeViewBatchImagePick = {
   params: Record<string, unknown>;
 };
 
-export const PRO2_THREE_VIEW_MODEL_KEYS: string[] = [
-  ...THREE_VIEW_ENGINE_MODEL_KEYS,
-];
-
-const DEFAULT_IMAGE_PARAMS: Record<string, unknown> = {
-  aspect_ratio: "16:9",
-  resolution: "2K",
-  output_format: "png",
-};
+/** @deprecated Pro2 三视图 UI 与 2.0 图片节点一致，见 PRO2_CHARACTER_IMAGE_MODEL_KEYS */
+export const PRO2_THREE_VIEW_MODEL_KEYS: string[] = [...SBV1_IMAGE_MODEL_KEYS];
 
 export function pickDefaultPro2ThreeViewImageEngine(
   providers: CanvasProviderDto[],
 ): Pro2ThreeViewBatchImagePick | null {
-  for (const provider of providers.filter((p) => p.active)) {
-    for (const key of PRO2_THREE_VIEW_MODEL_KEYS) {
-      const model = provider.models.find(
-        (m) => m.role === "IMAGE" && m.enabled && m.modelKey === key,
-      );
-      if (model) {
-        return {
-          providerId: provider.id,
-          modelKey: model.modelKey,
-          params: { ...DEFAULT_IMAGE_PARAMS },
-        };
-      }
-    }
-  }
-  const fallback = pickDefaultStoryImageEngine(providers);
-  if (!fallback) return null;
-  return { ...fallback, params: { ...DEFAULT_IMAGE_PARAMS } };
+  return pickDefaultPro2CharacterImageEngine(providers);
 }
 
 /** 从已存在的人物设计列读取 batchImage */
@@ -78,6 +55,6 @@ export function resolvePro2ThreeViewBatchImageForHub(
   return {
     providerId: batch.providerId,
     modelKey: batch.modelKey,
-    params: batch.params ?? { ...DEFAULT_IMAGE_PARAMS },
+    params: batch.params ?? buildSbv1ImageEngineParams({ aspectRatio: "16:9", resolution: "2K" }),
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDelayedPointerHover } from "@/lib/canvas/use-delayed-pointer-hover";
 import { handlePro2SideAddNodePick } from "@/lib/canvas/pro2-add-node-pick";
 import {
@@ -13,14 +13,19 @@ import {
   AlignLeft,
   FileText,
   GripVertical,
-  Loader2,
   Play,
+  Upload,
   User,
 } from "lucide-react";
 import { Handle, Position } from "@xyflow/react";
 
+import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { LibtvMediaGeneratingState } from "../libtv-media-generating-state";
+import {
+  LIBTV_NODE_STAGE_DRAG_CLASS,
+  LibtvTryActionRow,
+} from "../libtv-thin-node-try-row";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { PRO2_SCRIPT_HUB_NODE_LABEL } from "@/lib/canvas/story-pro2-node-chrome";
 import {
@@ -55,6 +60,8 @@ import {
   LIBTV_CARD_DRAG_CLASS,
   LIBTV_NODE_OUTER_CLASS,
 } from "@/lib/canvas/libtv-node-chrome";
+import { ingestPro2HubScriptFile } from "@/lib/canvas/pro2-hub-script-upload";
+import { STORY_PRO_UPLOAD_SCRIPT_ACCEPT } from "@/lib/canvas/story-pro-upload-script";
 import { cn } from "@/lib/utils";
 import { Pro2NodeResizer } from "./pro2-node-resizer";
 import { Pro2NodeSidePlus } from "./pro2-node-side-plus";
@@ -68,11 +75,17 @@ import { generatePro2CharacterThreeViewFromHub } from "@/lib/canvas/pro2-script-
 import { resolvePro2ThreeViewBatchImageForHub } from "@/lib/canvas/pro2-three-view-batch-image";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
 
-const TRY_ACTIONS = [
-  { id: "script", label: "剧本生成分镜脚本", icon: FileText },
+type HubTryActionId = "upload-script" | "video-ref" | "character";
+
+const TRY_ACTIONS: Array<{
+  id: HubTryActionId;
+  label: string;
+  icon: typeof Upload;
+}> = [
+  { id: "upload-script", label: "上传剧本生成分镜脚本", icon: Upload },
   { id: "video-ref", label: "视频参考生成分镜脚本", icon: Play },
   { id: "character", label: "角色生成分镜脚本", icon: User },
-] as const;
+];
 
 function pro2HubThreeViewStore() {
   const state = useCanvasStore.getState();
@@ -106,6 +119,7 @@ function pro2HubThreeViewStore() {
 }
 
 export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
+  const base = useBookMallBaseUrl();
   const { alert } = useDialogs();
   const { providers } = useUserProviders();
   const nodes = useCanvasStore((s) => s.nodes);
@@ -113,8 +127,11 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   const addNode = useCanvasStore((s) => s.addNode);
   const setNodes = useCanvasStore((s) => s.setNodes);
   const setEdges = useCanvasStore((s) => s.setEdges);
+  const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const openTableEditor = useCanvasStore((s) => s.openPro2ScriptTableEditor);
   const [tvPickerOpen, setTvPickerOpen] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const scriptUploadRef = useRef<HTMLInputElement>(null);
 
   const d = data as unknown as StoryProScriptHubNodeData;
   const storyboardMd = resolveHubStoryboardMd(d);
@@ -183,7 +200,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
   }, [nodes, edges, id, d.outlineMd]);
   const connectingFromNodeId = useCanvasStore((s) => s.connectingFromNodeId);
   const { hovered: sideHover, onPointerEnter, onPointerLeave } = useDelayedPointerHover();
-  const showToolbar = Boolean(selected && hasTable && !isGenerating);
+  const showToolbar = Boolean(selected && hasPreviewContent && !isGenerating);
   const showThinTitle = displayState !== "generated" || isGenerating;
   const previewTitle =
     displayState === "generated" && !isGenerating ? tableTitle : undefined;
@@ -251,6 +268,50 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
     if (!hasPreviewContent) return;
     openTableEditor(id, previewTab);
   }, [hasPreviewContent, id, openTableEditor, previewTab]);
+
+  const onTryUploadScript = useCallback(() => {
+    if (isGenerating || uploadBusy) return;
+    scriptUploadRef.current?.click();
+  }, [isGenerating, uploadBusy]);
+
+  const onScriptFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file || isGenerating) return;
+      setUploadBusy(true);
+      try {
+        await ingestPro2HubScriptFile(
+          id,
+          file,
+          base,
+          { nodes, edges, updateNodeData },
+          { alert },
+        );
+      } finally {
+        setUploadBusy(false);
+      }
+    },
+    [id, base, nodes, edges, updateNodeData, alert, isGenerating],
+  );
+
+  const onTryAction = useCallback(
+    (actionId: HubTryActionId) => {
+      if (actionId === "upload-script") {
+        onTryUploadScript();
+        return;
+      }
+      void alert({
+        title: "即将推出",
+        message:
+          actionId === "video-ref"
+            ? "视频参考生成分镜脚本正在开发中，请稍后再试。"
+            : "角色生成分镜脚本正在开发中，请稍后再试。",
+        variant: "info",
+      });
+    },
+    [onTryUploadScript, alert],
+  );
 
   return (
     <div
@@ -328,6 +389,7 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
       <div
         className={cn(
           PRO2_CARD_SHELL_CLASS,
+          LIBTV_CARD_DRAG_CLASS,
           "relative flex h-full min-h-0 flex-col overflow-hidden",
         )}
         style={{ borderColor: pro2NodeBorderColor(!!selected) }}
@@ -357,33 +419,49 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
             />
           </div>
         ) : displayState === "connected" ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-[11px] text-white/45">
+          <div
+            className={cn(
+              LIBTV_NODE_STAGE_DRAG_CLASS,
+              "flex flex-col items-center justify-center gap-2 px-4 text-center text-[11px] text-white/45",
+            )}
+          >
             <AlignLeft className="size-8 text-white/20" />
             <p>{linkedMessage.title}</p>
             <p className="text-[10px] text-white/35">{linkedMessage.hint}</p>
           </div>
         ) : (
-          <div className="flex h-full min-h-0 flex-col overflow-y-auto px-3 pb-3 pt-2">
+          <div
+            className={cn(
+              LIBTV_NODE_STAGE_DRAG_CLASS,
+              "flex flex-col overflow-y-auto px-3 pb-3 pt-2",
+            )}
+          >
             <div className="mb-3 flex justify-center pt-1">
               <AlignLeft className="size-8 text-white/20" />
             </div>
             <p className="mb-2 text-[11px] text-white/45">尝试：</p>
             <ul className="space-y-0.5">
-              {TRY_ACTIONS.map((action) => {
-                const Icon = action.icon;
-                return (
-                  <li key={action.id}>
-                    <span className="flex items-center gap-2 rounded-md px-1 py-1.5 text-[12px] text-white/55">
-                      <Icon className="size-4 shrink-0" />
-                      {action.label}
-                    </span>
-                  </li>
-                );
-              })}
+              {TRY_ACTIONS.map((action) => (
+                <li key={action.id}>
+                  <LibtvTryActionRow
+                    icon={action.icon}
+                    label={action.label}
+                    disabled={
+                      isGenerating ||
+                      (action.id === "upload-script" && uploadBusy)
+                    }
+                    onClick={() => onTryAction(action.id)}
+                  />
+                </li>
+              ))}
             </ul>
-            <p className="mt-3 text-center text-[10px] text-white/30">
-              从文本节点右侧 + 连接脚本以自动链接大纲
-            </p>
+            <div className="mt-3 space-y-1 text-center text-[10px] leading-relaxed text-white/30">
+              <p>一句话生成剧本：在下方 Dock 输入剧情后发送</p>
+              <p>上传剧本生成分镜脚本：点击上方按钮选择 .md / .txt 文件</p>
+              <p className="pt-1 text-white/25">
+                完成剧本后在节点顶栏发布，即可在公告条领取制作任务
+              </p>
+            </div>
           </div>
         )}
       </div>
@@ -395,6 +473,14 @@ export function StoryPro2ScriptHubNode({ id, data, selected }: NodeProps) {
         initialBatchImage={resolvePro2ThreeViewBatchImageForHub(id, nodes, edges)}
         onClose={() => setTvPickerOpen(false)}
         onConfirm={runThreeViewGenerate}
+      />
+
+      <input
+        ref={scriptUploadRef}
+        type="file"
+        accept={STORY_PRO_UPLOAD_SCRIPT_ACCEPT}
+        className="hidden"
+        onChange={(e) => void onScriptFileChange(e)}
       />
     </div>
   );

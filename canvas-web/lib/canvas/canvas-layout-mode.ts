@@ -12,12 +12,23 @@ export type CanvasLayoutShell = "pro2" | "sbv1" | "legacy";
 export function resolveCanvasLayoutShell(args: {
   projectEdition?: string | null;
   nodes: CanvasFlowNode[];
+  graphMeta?: { edition?: string; crewBulletinAnchor?: unknown; linkedScriptPackageAssetId?: string } | null;
 }): CanvasLayoutShell {
-  const { projectEdition, nodes } = args;
-  if (projectEdition === "pro2" || hasStoryPro2Pipeline(nodes)) {
+  const { projectEdition, nodes, graphMeta } = args;
+  const metaEdition = graphMeta?.edition;
+  const metaPro2Collaboration =
+    Boolean(graphMeta?.crewBulletinAnchor) ||
+    Boolean(graphMeta?.linkedScriptPackageAssetId);
+
+  if (
+    projectEdition === "pro2" ||
+    metaEdition === "pro2" ||
+    metaPro2Collaboration ||
+    hasStoryPro2Pipeline(nodes)
+  ) {
     return "pro2";
   }
-  if (projectEdition === "sbv1" || hasSbv1Pipeline(nodes)) {
+  if (projectEdition === "sbv1" || metaEdition === "sbv1" || hasSbv1Pipeline(nodes)) {
     return "sbv1";
   }
   return "legacy";

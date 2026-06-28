@@ -53,6 +53,8 @@ export type CanvasProjectSummary = {
   description: string;
   thumbnailUrl: string;
   edition: "pro" | "pro2" | "sbv1" | "standard";
+  /** 已绑定脚本包 / 公告栏的协同画布，禁止删除 */
+  collaborationLocked?: boolean;
   createdAt: string;
   updatedAt: string;
 };

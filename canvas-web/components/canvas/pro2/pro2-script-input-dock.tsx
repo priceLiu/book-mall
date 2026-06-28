@@ -37,7 +37,7 @@ import { Pro2DockPasteZone } from "./pro2-dock-paste-zone";
 import { Pro2DockRefImages } from "./pro2-dock-ref-images";
 
 const SCRIPT_PLACEHOLDER =
-  "描述剧情或添加角色参考、场景参考等，为你生成分镜脚本";
+  "一句话生成剧本：描述剧情或添加角色/场景参考，为你生成分镜脚本；上传剧本生成分镜脚本：在节点内点击上传按钮";
 
 /** 2.0 脚本节点 · 底部输入坞（与文本节点统一外壳） */
 export function Pro2ScriptInputDock() {

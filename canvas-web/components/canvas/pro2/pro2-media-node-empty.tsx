@@ -9,7 +9,7 @@ export function Pro2MediaNodeEmptyState({
   label,
   className,
   /** LibTV 节点空态：整卡可拖，勿加 nodrag */
-  passNodeDrag = false,
+  passNodeDrag = true,
 }: {
   icon: LucideIcon;
   label: string;

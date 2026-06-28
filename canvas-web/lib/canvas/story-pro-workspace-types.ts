@@ -128,6 +128,34 @@ export type StoryProScriptHubNodeData = {
   /** 每次「故事定稿」追加一条，供「查看定稿剧本」只读历史 */
   finalizedScriptHistory?: StoryProFinalizedScriptSnapshot[];
   feasibility?: StoryProFeasibilityAssessment;
+  /** 剧本创作 · 工业化分批（与 starter 同步） */
+  scriptStudioMode?: boolean;
+  /** 小白生剧 / 上传剧本 */
+  scriptStudioInputMode?: StoryProStarterMode;
+  /** 剧本创作 · 主题或描述（hub 入口） */
+  scriptStudioThemeInput?: string;
+  scriptStudioSystem?: "original" | "adaptation";
+  scriptStudioTotalEpisodes?: number;
+  scriptStudioBatchIndex?: number;
+  scriptStudioFrozenBiblesMd?: string;
+  scriptStudioFrozenBiblesOssUrl?: string;
+  scriptStudioCompletedBatchesMd?: string;
+  scriptStudioCompletedBatchesOssUrl?: string;
+  /** 工业化批次 LLM runtime（hub 入口） */
+  themeOutlineRuntime?: CanvasNodeRuntime;
+  /** 上传剧本（hub 入口 · autosave 剥离大正文） */
+  uploadedScriptMd?: string;
+  uploadedScriptOssUrl?: string;
+  uploadedScriptMeta?: StoryProUploadedScriptMeta;
+  /** 解析行暂存（发布前 · 不自动 spawn 列节点） */
+  scriptStudioCharacterRows?: StoryProCharacterRow[];
+  scriptStudioPropRows?: StoryProPropRow[];
+  scriptStudioFrameRows?: StoryProFrameRow[];
+  scriptStudioMoodRows?: StoryProMoodRow[];
+  scriptStudioAudioRows?: StoryProAudioRow[];
+  /** 发布剧本后 · 剧组公告条 */
+  crewBulletin?: import("./crew-bulletin-types").CrewBulletinState;
+  scriptPublished?: boolean;
 };
 
 export type StoryProCharacterRow = {
@@ -150,6 +178,55 @@ export type StoryProSceneRow = {
   prompt: string;
   promptHistory?: StoryTextRevision[];
   refImages?: StoryRefImage[];
+  runtime?: CanvasNodeRuntime;
+};
+
+/** 2.0 · 全局道具行（角色/场景同构：设定 + 提示词 + 细节图） */
+export type StoryProPropRow = {
+  key: string;
+  name: string;
+  /** 道具设定：剧情作用、新旧质感、年代合规、材质色彩 */
+  description: string;
+  prompt: string;
+  promptHistory?: StoryTextRevision[];
+  refImages?: StoryRefImage[];
+  /** 绑定道具资产库（ProjectAssetKind.PROP） */
+  assetId?: string;
+  /** 剧本创作 · 对应 LibTV 媒体卡节点 id */
+  mediaNodeId?: string;
+  lockedRefIds?: string[];
+  runtime?: CanvasNodeRuntime;
+};
+
+/** 2.0 · 全局氛围行（氛围板：色调/光影/环境关键词） */
+export type StoryProMoodRow = {
+  key: string;
+  name: string;
+  /** 氛围描述：烟火气/冷清压抑/紧张肃杀/暧昧柔和 等 */
+  description: string;
+  prompt: string;
+  promptHistory?: StoryTextRevision[];
+  refImages?: StoryRefImage[];
+  /** 剧本创作 · 对应 LibTV 媒体卡节点 id */
+  mediaNodeId?: string;
+  runtime?: CanvasNodeRuntime;
+};
+
+/** 2.0 · 音效行（环境音/动作音 SFX） */
+export type StoryProAudioRow = {
+  key: string;
+  /** 关联镜号（可空，全局环境音不绑镜） */
+  frameKey?: string;
+  name: string;
+  /** 音效描述：细雨/城市车流/安静空寂/人群嘈杂/风声 等 */
+  description: string;
+  /** 音效生成提示词 */
+  prompt: string;
+  promptHistory?: StoryTextRevision[];
+  /** 剧本创作 · 对应 LibTV 媒体卡节点 id */
+  mediaNodeId?: string;
+  /** 生成产物 OSS URL */
+  audioUrl?: string;
   runtime?: CanvasNodeRuntime;
 };
 
@@ -178,6 +255,12 @@ export type StoryProFrameRow = {
   characterRefSnapshotAt?: string;
   characterAssetVersions?: Record<string, number>;
   characterRefIds?: string[];
+  /** 2.0 · 本镜引用的全局道具行 key（道具资产并入分镜图参考） */
+  propRefIds?: string[];
+  /** v2.5 · 所属集数（大画布看板） */
+  episodeNo?: number;
+  /** v2.5 · 制作中 / 已提交（看板交付） */
+  stageStatus?: "draft" | "submitted";
 };
 
 export type StoryProVideoRow = {
@@ -205,6 +288,29 @@ export type StoryProSceneColumnNodeData = {
   rows: StoryProSceneRow[];
   batchImage?: CanvasEnginePick;
   hubNodeId?: string;
+};
+
+/** 2.0 · 道具列节点 data */
+export type StoryProPropColumnNodeData = {
+  rows: StoryProPropRow[];
+  batchImage?: CanvasEnginePick;
+  hubNodeId?: string;
+};
+
+/** 2.0 · 氛围列节点 data（独立节点，引用现有风格库） */
+export type StoryProMoodColumnNodeData = {
+  rows: StoryProMoodRow[];
+  batchImage?: CanvasEnginePick;
+  hubNodeId?: string;
+};
+
+/** 2.0 · 音效列节点 data */
+export type StoryProAudioColumnNodeData = {
+  rows: StoryProAudioRow[];
+  batchAudio?: CanvasEnginePick;
+  hubNodeId?: string;
+  /** 上游分镜视频列 id（音效跟随镜头） */
+  frameColumnId?: string;
 };
 
 export type StoryProFrameColumnNodeData = {
@@ -249,6 +355,19 @@ export type StoryProStarterNodeData = {
   pro2PresetKind?: string;
   themeOutlineRuntime?: CanvasNodeRuntime;
   themeOutlineSystemPrompt?: string;
+  /** 剧本创作画布 · 工业化标准化分批生成 */
+  scriptStudioMode?: boolean;
+  scriptStudioSystem?: "original" | "adaptation";
+  scriptStudioTotalEpisodes?: number;
+  /** 当前批次 index（0 = 第 1–10 集） */
+  scriptStudioBatchIndex?: number;
+  /** 4 份冻结档案 + 已完成批次 Markdown（JSON 内嵌，大文本后续可迁 OSS） */
+  scriptStudioFrozenBiblesMd?: string;
+  /** 冻结档案 OSS（超 32KB 时异步上传） */
+  scriptStudioFrozenBiblesOssUrl?: string;
+  scriptStudioCompletedBatchesMd?: string;
+  /** 已完成批次 OSS（可选） */
+  scriptStudioCompletedBatchesOssUrl?: string;
   /** 运行时内存/会话用；autosave 时剥离，以 OSS 为准 */
   uploadedScriptMd?: string;
   /** 剧本正文 OSS URL（持久化） */
@@ -263,6 +382,17 @@ export type StoryProStarterNodeData = {
   imageEngine?: import("./types").CanvasEnginePick;
   /** 文本节点 · Gateway VIDEO 槽（文生视频 / 下游视频合成） */
   videoEngine?: import("./types").CanvasEnginePick;
+  /** 协作画布 · 关联已发布剧本包后的本地公告条 */
+  crewBulletin?: import("./crew-bulletin-types").CrewBulletinState;
+  linkedScriptPackageTitle?: string;
+  /** 协作画布 · 关联剧本包正文（仅公告条/任务上下文，不在 starter 卡片展示） */
+  linkedScriptPackageMarkdown?: string;
+  scriptStudioCharacterRows?: StoryProCharacterRow[];
+  scriptStudioPropRows?: StoryProPropRow[];
+  scriptStudioFrameRows?: StoryProFrameRow[];
+  scriptStudioMoodRows?: StoryProMoodRow[];
+  scriptStudioAudioRows?: StoryProAudioRow[];
+  sceneRows?: StoryProSceneRow[];
   pipelineStage?: "idle" | "llm_done" | "script_finalized" | "style_finalized" | "finalized";
   workspaceIds?: StoryProWorkspaceIds;
 };
@@ -274,7 +404,13 @@ export type StoryProWorkspaceIds = {
   sceneColumnId?: string;
   frameColumnId?: string;
   videoColumnId?: string;
+  /** 剧本创作 · 道具/氛围/音效数据列（解析 rows，UI 走 2.0 媒体卡） */
+  propColumnId?: string;
+  moodColumnId?: string;
+  audioColumnId?: string;
   jianyingExportId?: string;
+  /** 生产画布关联的已定稿剧本资产 id */
+  linkedScriptPackageAssetId?: string;
 };
 
 export const STORY_PRO_NODE_TYPES = [

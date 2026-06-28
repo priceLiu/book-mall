@@ -8,8 +8,14 @@ export type {
   StoryProStyleNodeData,
   StoryProCharacterRow,
   StoryProSceneRow,
+  StoryProPropRow,
+  StoryProMoodRow,
+  StoryProAudioRow,
   StoryProFrameRow,
   StoryProVideoRow,
+  StoryProPropColumnNodeData,
+  StoryProMoodColumnNodeData,
+  StoryProAudioColumnNodeData,
   StoryProFeasibilityAssessment,
   StoryProFinalizedScriptSnapshot,
 } from "./story-pro-workspace-types";
@@ -21,19 +27,23 @@ import type { Sbv1ImageNodeData } from "./sbv1-workspace-types";
 export type Pro2ImageMediaRole = "generic" | "frame" | "character-three-view" | "scene";
 
 /** 2.0 角色三视图节点 data（独立 type · 横向矩形） */
-export type StoryPro2ThreeViewNodeData = ImageNodeData & {
-  dockInput?: string;
-  pro2RowKey?: string;
-  pro2HubNodeId?: string;
-  pro2ControllerNodeId?: string;
-  pro2GroupId?: string;
-  dockStyleRef?: {
-    presetId: string;
-    name: string;
-    prompt: string;
-    imageUrl: string;
+export type StoryPro2ThreeViewNodeData = ImageNodeData &
+  Pick<
+    Sbv1ImageNodeData,
+    "engine" | "aspectRatio" | "imageQuality" | "resolution" | "outputCount"
+  > & {
+    dockInput?: string;
+    pro2RowKey?: string;
+    pro2HubNodeId?: string;
+    pro2ControllerNodeId?: string;
+    pro2GroupId?: string;
+    dockStyleRef?: {
+      presetId: string;
+      name: string;
+      prompt: string;
+      imageUrl: string;
+    };
   };
-};
 
 /** 2.0 图片节点 data */
 export type StoryPro2ImageNodeData = ImageNodeData &

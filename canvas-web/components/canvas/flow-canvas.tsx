@@ -220,7 +220,7 @@ function FlowCanvasInner({
 
   const enablePaneContextMenu = pro2FloatingInspector || sbv1Canvas;
   const enableDragSnapGuides = pro2FloatingInspector || sbv1Canvas;
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -323,14 +323,14 @@ function FlowCanvasInner({
           addNode: addNode as Pro2AddNodePickStore["addNode"],
           setNodes,
         },
-        { alert },
+        { alert, confirm },
         {
           edition: sbv1Canvas ? "sbv1" : "pro2",
           spawnAtScreen,
         },
       );
     },
-    [addNode, setNodes, alert, sbv1Canvas, closePaneAddMenu],
+    [addNode, setNodes, alert, confirm, sbv1Canvas, closePaneAddMenu],
   );
 
   useEffect(() => {
@@ -1279,6 +1279,10 @@ function FlowCanvasInner({
                   return;
                 }
                 closePaneAddMenu();
+                const active = document.activeElement;
+                if (active instanceof HTMLElement) {
+                  active.blur();
+                }
                 useCanvasStore
                   .getState()
                   .setLibtvFloatingDockSelection(null, null);
@@ -1288,6 +1292,7 @@ function FlowCanvasInner({
                 setRfNodes((prev) =>
                   prev.map((n) => (n.selected ? { ...n, selected: false } : n)),
                 );
+                window.dispatchEvent(new CustomEvent("canvas:pro2-pane-click"));
               }
             : undefined
         }
